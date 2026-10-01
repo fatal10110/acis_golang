@@ -327,6 +327,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 		l.autosave.Add(live)
 	}
 
+	l.registerGM(live)
 	for _, frame := range macroListFrames(live.macros) {
 		client.Session.SendFrame(frame)
 	}

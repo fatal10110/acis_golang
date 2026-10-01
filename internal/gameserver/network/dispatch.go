@@ -196,6 +196,10 @@ type PlayerConfig struct {
 	// DiscardItemDisabled is server.properties AllowDiscardItem inverted, so
 	// the zero value lets players drop items as the shipped config does.
 	DiscardItemDisabled bool
+	// GMStartupUnlisted is players.properties GMStartupAutoList inverted, so
+	// the zero value lists a game master that logs in, as the shipped config
+	// does.
+	GMStartupUnlisted bool
 	// CraftingDisabled is players.properties CraftingEnabled inverted, so
 	// the zero value keeps crafting on as the shipped config does.
 	CraftingDisabled bool
@@ -340,6 +344,12 @@ type GameClientLink struct {
 	// recommendGate orders recommendations against the daily refresh; see
 	// RefreshDailyRecommendations.
 	recommendGate sync.RWMutex
+	// gms is the online game-master roster /gmlist reads and petitions
+	// notify.
+	gms admin.GMList[*livePlayer]
+	// gmAudit records every admin command run; the zero logger records
+	// nothing.
+	gmAudit zerolog.Logger
 }
 
 // AIRegistry owns recurring actor-AI registrations.
@@ -490,6 +500,9 @@ type GameClientLinkConfig struct {
 	// Recommendations persists who recommended whom and the counters; nil
 	// keeps them in memory only.
 	Recommendations recommendationStore
+	// GMAudit records every admin command run (server.properties GMAudit);
+	// the zero logger records nothing.
+	GMAudit zerolog.Logger
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -554,6 +567,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		restarts:         cfg.Restarts,
 		levels:           cfg.Levels,
 		admin:            cfg.Admin,
+		gmAudit:          cfg.GMAudit,
 		playerConfig:     cfg.PlayerConfig,
 		petConfig:        cfg.PetConfig,
 		disableRaidCurse: cfg.DisableRaidCurse,

@@ -97,7 +97,7 @@ type bypassRoute struct {
 
 // bypassRoutes are the bypass command families, tried in order.
 var bypassRoutes = []bypassRoute{
-	{[]string{"admin_"}, unportedBypass("admin command handlers (#161)")},
+	{[]string{"admin_"}, (*GameClientLink).bypassAdmin},
 	{[]string{"player_help "}, (*GameClientLink).bypassPlayerHelp},
 	{[]string{"npc_"}, (*GameClientLink).bypassNpc},
 	{[]string{"manor_menu_select?"}, unportedBypass("manor (#240)")},

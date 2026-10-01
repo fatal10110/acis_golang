@@ -99,6 +99,7 @@ func provideGameClientLink(
 	relations *relation.Manager,
 	characters *gamesql.CharacterStore,
 	log zerolog.Logger,
+	gmAudit gmAuditLogger,
 ) (*network.GameClientLink, error) {
 	enchantCfg := gameplay.Enchant
 	freightCfg := gameplay.Freight
@@ -136,6 +137,7 @@ func provideGameClientLink(
 		SubclassWithoutQuests:      bool(gameplay.SubclassWithoutQuests),
 		KeepMaintainedIngredients:  !bool(gameplay.BlacksmithUseRecipes),
 		DiscardItemDisabled:        !bool(gameplay.AllowDiscardItem),
+		GMStartupUnlisted:          !gameplay.Admin.GMStartupAutoList,
 	}
 	link, err := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,
@@ -190,6 +192,7 @@ func provideGameClientLink(
 		Restarts:         data.Restarts,
 		Levels:           data.Levels,
 		Admin:            data.Admin,
+		GMAudit:          gmAudit.enabled(gameplay.Admin.GMAudit),
 		PlayerConfig:     playerConfig,
 		PetConfig:        petCfg,
 		DisableRaidCurse: bool(gameplay.DisableRaidCurse),

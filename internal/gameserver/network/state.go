@@ -111,6 +111,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x4b: true, // finish rotating
 		0x58: true, // enchant item
 		0x59: true, // destroy item
+		0x5b: true, // admin command typed in chat
 		0x5c: true, // move in vehicle
 		0x5d: true, // cannot move in vehicle
 		0x5e: true, // friend invite
@@ -129,6 +130,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x76: true, // private store sell: quit
 		0x77: true, // private store sell: set title
 		0x79: true, // buy from a private store
+		0x81: true, // online game-master list
 		0x88: true, // request ally crest
 		0x89: true, // change pet name
 		0x8a: true, // pet use item

@@ -86,6 +86,8 @@ type livePlayer struct {
 	// access is the character's access level, resolved once at login and
 	// never changed afterwards, so any goroutine may read it.
 	access admin.AccessLevel
+	// teleportMode is how p's move clicks travel; owned by p's queue.
+	teleportMode teleportMode
 	// handlerPanicked records that a task this player's connection waited on
 	// panicked. Written by onLive and read by the dispatch loop, both on the
 	// owning connection goroutine and nowhere else.

@@ -56,6 +56,13 @@ import (
 // tests/npcs/warehouse_test.go pins those silences and every refusal that
 // does answer.
 //
+// SendBypassBuildCmd and RequestBypassToServer's admin_ commands answer an
+// unknown command from a player that is not a game master with nothing, as
+// the reference does (SendBypassBuildCmd.java:34-41,
+// RequestBypassToServer.java:53-60): a command typed in chat or a link click
+// leaves no client action pending. tests/admin pins that silence and every
+// refusal that does answer.
+//
 // Logout at character select is absent for the same reason: with no character
 // in the world the reference sends nothing and keeps the connection open
 // (#2514), and the opcode registers no pending client action there.
@@ -143,6 +150,7 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"RequestActionUse pet command with no active summon", encodeRequestActionUse(16, false, false), []byte{serverpackets.OpcodeActionFailed}},
 		{"Action on the selected player itself (a follow of oneself)", encodeActionOn(self, false), []byte{serverpackets.OpcodeActionFailed}},
 		{"RequestBypassToServer for a command family not modeled yet", encodeRequestBypassToServer("bbs_default"), []byte{serverpackets.OpcodeActionFailed}},
+		{"RequestGmList with no game master online", wire.NewPacketWriter(clientpackets.OpcodeRequestGmList).Bytes(), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodePlaySound}},
 		{"RequestRecipeBookOpen on an empty book", encodeRequestRecipeBookOpen(1), []byte{serverpackets.OpcodeRecipeBookItemList}},
 		{"RequestPreviewItem trying nothing on", encodeRequestPreviewItem(1), []byte{serverpackets.OpcodeActionFailed}},
 		{"RequestEvaluate naming no online player", encodeRequestEvaluate(missingObjectID), []byte{serverpackets.OpcodeSystemMessage}},
