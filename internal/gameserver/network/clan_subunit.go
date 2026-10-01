@@ -54,7 +54,7 @@ func (l *GameClientLink) createSubunit(live *livePlayer, kind int, name, captain
 	}
 	cl, unit := change.Clan, change.Unit
 	if change.Paid {
-		l.sendReputationChange(cl, change.Reputation)
+		l.sendReputationChange(cl, change.Reputation, live)
 	}
 	leaderName := cl.SubunitLeaderName(unit.ID)
 	l.broadcastToClan(cl, 0,
