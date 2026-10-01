@@ -24,13 +24,14 @@ func provideRelations(ctx bootContext, pool *sql.DB, _ *idfactory.Allocator, log
 	return relation.NewManager(rows), store, nil
 }
 
-// startRelationPersistence writes the friend and block lists back at
-// shutdown, after the game listener has stopped and every player has left.
+// startRelationPersistence writes the friend and block list changes made
+// during the run back at shutdown, after the game listener has stopped and
+// every player has left.
 func startRelationPersistence(lc fx.Lifecycle, relations *relation.Manager, store *gamesql.RelationStore, log zerolog.Logger) {
 	lc.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
 			saveOnStop(ctx, shutdownSaveTimeout, log, "save character relations", func(ctx context.Context) error {
-				return store.Save(ctx, relations.Rows())
+				return store.Save(ctx, relations.Changes())
 			})
 			return nil
 		},

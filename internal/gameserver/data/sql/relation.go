@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
 )
@@ -41,50 +43,49 @@ func (s *RelationStore) Load(ctx context.Context) ([]relation.Row, error) {
 	return out, nil
 }
 
-// Save writes rows back in one transaction: a row with relation flags is
-// inserted or has its flags replaced, a row with none (Relation 0) is
-// deleted.
+// relationSaveChunk bounds how many rows one multi-row statement of Save
+// covers: 3000 placeholders for an upsert, far under the 65535 a prepared
+// statement may hold.
+const relationSaveChunk = 1000
+
+// Save writes rows back: a row with relation flags is inserted or has its
+// flags replaced, a row with none (Relation 0) is deleted. The upserts go
+// first, then the deletes, each as multi-row statements of up to
+// relationSaveChunk rows. Every statement commits on its own, so the
+// statements finished before an error or ctx's deadline stay written.
 func (s *RelationStore) Save(ctx context.Context, rows []relation.Row) error {
-	if len(rows) == 0 {
-		return nil
-	}
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("save character relations: %w", err)
-	}
-	committed := false
-	defer func() {
-		if !committed {
-			_ = tx.Rollback()
-		}
-	}()
-
-	upsert, err := tx.PrepareContext(ctx,
-		`INSERT INTO character_relations (char_id, friend_id, relation) VALUES (?, ?, ?)
-		 ON DUPLICATE KEY UPDATE relation = VALUES(relation)`)
-	if err != nil {
-		return fmt.Errorf("save character relations: %w", err)
-	}
-	defer upsert.Close()
-	del, err := tx.PrepareContext(ctx, `DELETE FROM character_relations WHERE char_id = ? AND friend_id = ?`)
-	if err != nil {
-		return fmt.Errorf("save character relations: %w", err)
-	}
-	defer del.Close()
-
+	var upserts, deletes []relation.Row
 	for _, r := range rows {
 		if r.Relation == 0 {
-			_, err = del.ExecContext(ctx, r.CharID, r.FriendID)
+			deletes = append(deletes, r)
 		} else {
-			_, err = upsert.ExecContext(ctx, r.CharID, r.FriendID, r.Relation)
-		}
-		if err != nil {
-			return fmt.Errorf("save character relation %d-%d: %w", r.CharID, r.FriendID, err)
+			upserts = append(upserts, r)
 		}
 	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit character relations: %w", err)
+	for chunk := range slices.Chunk(upserts, relationSaveChunk) {
+		args := make([]any, 0, len(chunk)*3)
+		for _, r := range chunk {
+			args = append(args, r.CharID, r.FriendID, r.Relation)
+		}
+		query := `INSERT INTO character_relations (char_id, friend_id, relation) VALUES ` +
+			strings.TrimSuffix(strings.Repeat("(?,?,?),", len(chunk)), ",") +
+			` ON DUPLICATE KEY UPDATE relation = VALUES(relation)`
+		if _, err := s.db.ExecContext(ctx, query, args...); err != nil {
+			return fmt.Errorf("save %d character relations (%d-%d..%d-%d): %w",
+				len(chunk), chunk[0].CharID, chunk[0].FriendID, chunk[len(chunk)-1].CharID, chunk[len(chunk)-1].FriendID, err)
+		}
 	}
-	committed = true
+	for chunk := range slices.Chunk(deletes, relationSaveChunk) {
+		args := make([]any, 0, len(chunk)*2)
+		for _, r := range chunk {
+			args = append(args, r.CharID, r.FriendID)
+		}
+		query := `DELETE FROM character_relations WHERE (char_id, friend_id) IN (` +
+			strings.TrimSuffix(strings.Repeat("(?,?),", len(chunk)), ",") + `)`
+		if _, err := s.db.ExecContext(ctx, query, args...); err != nil {
+			return fmt.Errorf("delete %d character relations (%d-%d..%d-%d): %w",
+				len(chunk), chunk[0].CharID, chunk[0].FriendID, chunk[len(chunk)-1].CharID, chunk[len(chunk)-1].FriendID, err)
+		}
+	}
 	return nil
 }

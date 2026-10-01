@@ -1932,7 +1932,7 @@ func startLoginServerAcceptor(t *testing.T) (addr string, servers *manager.Serve
 // as the shutdown save does.
 func (s *Server) SaveRelations(tb testing.TB) {
 	tb.Helper()
-	if err := s.relationRows.Save(context.Background(), s.Relations.Rows()); err != nil {
+	if err := s.relationRows.Save(context.Background(), s.Relations.Changes()); err != nil {
 		tb.Fatalf("save character relations: %v", err)
 	}
 }

@@ -3,9 +3,9 @@
 // waiting for an answer.
 //
 // Relations live in memory for the whole run. They are loaded once at boot
-// from character_relations and written back as a whole at shutdown (see
-// Manager.Rows), so a change made during the run reaches the table only
-// then.
+// from character_relations, and the pairs changed during the run are
+// written back at shutdown (see Manager.Changes), so a change made during
+// the run reaches the table only then.
 //
 // Other systems ask this package two questions about a message or request
 // one player sends another: Manager.IsBlocked (is the sender on the
@@ -14,6 +14,7 @@
 package relation
 
 import (
+	"cmp"
 	"slices"
 	"sync"
 )
@@ -45,19 +46,22 @@ func makePair(a, b int32) pair {
 	return pair{a, b}
 }
 
-// Manager holds every character's relations. mu guards relations; any
-// goroutine may call any method.
+// Manager holds every character's relations. mu guards relations and
+// changed; any goroutine may call any method.
 type Manager struct {
 	mu sync.RWMutex
 	// relations keeps a pair whose flags were all cleared, with 0, until
 	// the run ends: the save deletes its row.
 	relations map[pair]int32
+	// changed is every pair whose flags changed since load: the only rows
+	// the save writes.
+	changed map[pair]struct{}
 }
 
 // NewManager returns a manager holding rows. A pair listed twice, in either
 // order, keeps the first row's flags.
 func NewManager(rows []Row) *Manager {
-	m := &Manager{relations: make(map[pair]int32, len(rows))}
+	m := &Manager{relations: make(map[pair]int32, len(rows)), changed: make(map[pair]struct{})}
 	for _, r := range rows {
 		k := makePair(r.CharID, r.FriendID)
 		if _, ok := m.relations[k]; !ok {
@@ -161,31 +165,36 @@ func (m *Manager) update(a, b, flag int32, set bool) bool {
 	defer m.mu.Unlock()
 	rel, ok := m.relations[k]
 	if set {
-		m.relations[k] = rel | flag
+		if !ok || rel&flag == 0 {
+			m.relations[k] = rel | flag
+			m.changed[k] = struct{}{}
+		}
 		return true
 	}
 	if !ok || rel&flag == 0 {
 		return false
 	}
 	m.relations[k] = rel &^ flag
+	m.changed[k] = struct{}{}
 	return true
 }
 
-// Rows returns every pair the manager holds, lower id first, sorted by that
-// pair: the ones with flags to upsert and the cleared ones (Relation 0)
-// whose rows to delete.
-func (m *Manager) Rows() []Row {
+// Changes returns every pair whose flags changed since load, lower id
+// first, sorted by that pair: the ones with flags to upsert and the cleared
+// ones (Relation 0) whose rows to delete. A pair stays listed after it is
+// saved, so a later save writes it again.
+func (m *Manager) Changes() []Row {
 	m.mu.RLock()
-	rows := make([]Row, 0, len(m.relations))
-	for k, rel := range m.relations {
-		rows = append(rows, Row{CharID: k.low, FriendID: k.high, Relation: rel})
+	rows := make([]Row, 0, len(m.changed))
+	for k := range m.changed {
+		rows = append(rows, Row{CharID: k.low, FriendID: k.high, Relation: m.relations[k]})
 	}
 	m.mu.RUnlock()
 	slices.SortFunc(rows, func(a, b Row) int {
 		if a.CharID != b.CharID {
-			return int(a.CharID) - int(b.CharID)
+			return cmp.Compare(a.CharID, b.CharID)
 		}
-		return int(a.FriendID) - int(b.FriendID)
+		return cmp.Compare(a.FriendID, b.FriendID)
 	})
 	return rows
 }

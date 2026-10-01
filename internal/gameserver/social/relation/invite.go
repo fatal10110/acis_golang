@@ -52,14 +52,8 @@ type Invite struct {
 	RequesterLeft bool
 }
 
-// Busy reports whether id holds an unanswered invitation or has sent one
-// that is still answerable.
-func (iv *Invites) Busy(id int32) bool {
-	iv.mu.Lock()
-	defer iv.mu.Unlock()
-	return iv.busyLocked(id, iv.now())
-}
-
+// busyLocked reports whether id holds an unanswered invitation or has sent
+// one that is still answerable.
 func (iv *Invites) busyLocked(id int32, now time.Time) bool {
 	if from := iv.pending[id]; from != nil && now.Before(from.expiresAt) {
 		return true
