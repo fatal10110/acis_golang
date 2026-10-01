@@ -183,7 +183,7 @@ func (c *Character) EffectRangeInPeaceZone(x, y, z, effectRange int) bool {
 // AttachRuntime records the static template and restored inventory used by
 // live combat and visibility code. Call it before exposing c to the world.
 func (c *Character) AttachRuntime(tmpl *Template, inv *itemcontainer.Inventory) {
-	c.runtimeTemplate = tmpl
+	c.runtimeTemplate.Store(tmpl)
 	c.inventory = inv
 	if inv != nil {
 		inv.SetLimiter(c)

@@ -258,7 +258,7 @@ func (e *TaskEffects) Drown(actor task.WaterActor) {
 		return
 	}
 	coefficient := 0.001724
-	if player.ClassMage(live.ClassID) {
+	if player.ClassMage(live.ClassID()) {
 		coefficient = 0.002698
 	}
 	damage := live.MaxHPValue() * live.Race.BreathMultiplier() * coefficient

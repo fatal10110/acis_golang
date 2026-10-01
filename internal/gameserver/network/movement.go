@@ -167,7 +167,7 @@ func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported l
 }
 
 func liveMoveSpeed(live *livePlayer) float64 {
-	if live == nil || live.template == nil {
+	if live == nil || live.Template() == nil {
 		return 0
 	}
 	return live.MoveSpeed()

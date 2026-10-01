@@ -12,6 +12,7 @@ type exitBlock int
 const (
 	exitAllowed exitBlock = iota
 	exitBlockEnchant
+	exitBlockClassChange
 	exitBlockNoRestartZone
 	exitBlockAttackStance
 )
@@ -26,6 +27,9 @@ const (
 func (l *GameClientLink) exitBlockReason(live *livePlayer) exitBlock {
 	if l.enchantService().Selected(live.ObjectID(), live.Inventory()) {
 		return exitBlockEnchant
+	}
+	if live.ClassChangeLocked() {
+		return exitBlockClassChange
 	}
 	if live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagNoRestart) {
 		return exitBlockNoRestartZone

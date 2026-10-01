@@ -155,7 +155,7 @@ func (a PlayerActor) SkillMastery(def modelskill.Definition) bool {
 		return false
 	}
 	statMul := statbonus.STRBonus[statbonus.ClampIndex(a.Character.STR())]
-	if player.ClassMage(a.Character.ClassID) {
+	if player.ClassMage(a.Character.ClassID()) {
 		statMul = statbonus.INTBonus[statbonus.ClampIndex(a.Character.INT())]
 	}
 	return a.Character.RollFloat(100) < a.Character.CalcStat(stat.SkillMastery, 0)*statMul

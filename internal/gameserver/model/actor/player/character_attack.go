@@ -208,8 +208,24 @@ func (c *Character) ConsumeBowMP() {
 // persisted last-known location.
 
 func (c *Character) template() *Template {
-	return c.runtimeTemplate
+	return c.runtimeTemplate.Load()
 }
+
+// Template returns the active class's template.
+func (c *Character) Template() *Template { return c.template() }
+
+// BaseTemplate returns the base class's template: the body (collision
+// size, safe fall height) a character keeps whichever class it plays.
+func (c *Character) BaseTemplate() *Template {
+	if t := c.baseTemplate.Load(); t != nil {
+		return t
+	}
+	return c.template()
+}
+
+// SetBaseTemplate records the base class's template. Call it with
+// AttachRuntime before c is exposed to the world.
+func (c *Character) SetBaseTemplate(t *Template) { c.baseTemplate.Store(t) }
 
 func (c *Character) activeWeapon() activeWeapon {
 	if c.inventory == nil {
@@ -814,7 +830,7 @@ func (c *Character) CollisionRadius() float64 {
 	if radius, _, ok := c.mountBody(); ok {
 		return radius
 	}
-	tmpl := c.template()
+	tmpl := c.BaseTemplate()
 	if tmpl == nil {
 		return 0
 	}
@@ -831,7 +847,7 @@ func (c *Character) CollisionHeight() float64 {
 	if _, height, ok := c.mountBody(); ok {
 		return height
 	}
-	tmpl := c.template()
+	tmpl := c.BaseTemplate()
 	if tmpl == nil {
 		return 0
 	}

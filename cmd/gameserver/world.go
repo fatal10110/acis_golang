@@ -19,8 +19,10 @@ import (
 	"go.uber.org/fx"
 )
 
-func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, ids *idfactory.Allocator) *manager.Roster {
-	return manager.NewRoster(characters, items, shortcuts, data.Players, data.Items, data.NPCs, ids, manager.DefaultDeleteAfter, time.Now)
+func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, subclasses *gamesql.SubclassStore, ids *idfactory.Allocator) *manager.Roster {
+	roster := manager.NewRoster(characters, items, shortcuts, data.Players, data.Items, data.NPCs, ids, manager.DefaultDeleteAfter, time.Now)
+	roster.SetSubclasses(subclasses)
+	return roster
 }
 
 // provideWorldObjects spawns every door and static object template into

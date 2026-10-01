@@ -216,8 +216,12 @@ func missingMaterials(c *player.Character, r recipe.Recipe) []any {
 type Registration struct {
 	// Notices are the messages to send, in order.
 	Notices []any
-	// Registered is the recipe the item put in the book, when it did.
+	// Registered is the recipe the item was used up for, when it was.
 	Registered *recipe.Recipe
+	// Stored reports that the recipe went into the book. A character
+	// playing a subclass uses the item up and is told the recipe was
+	// added, but the book, the base class's alone, stays as it was.
+	Stored bool
 }
 
 // RecipesHandler is the use-item handler name recipe items carry.
@@ -259,20 +263,28 @@ func (s *Service) Register(c *player.Character, inst *item.Instance, tmpl *item.
 	if c.Inventory().DestroyByObjectID(inst.ObjectID, 1) == nil {
 		return Registration{}, true
 	}
-	book.Put(r)
-	return Registration{Notices: []any{RecipeAdded{ItemID: tmpl.ID}}, Registered: &r}, true
+	stored := !c.SubclassActive()
+	if stored {
+		book.Put(r)
+	}
+	return Registration{Notices: []any{RecipeAdded{ItemID: tmpl.ID}}, Registered: &r, Stored: stored}, true
 }
 
 // Forget deletes recipeID from c's book. ok is false for an unknown recipe,
 // which changes nothing; a known recipe the book does not hold is still
-// reported deleted.
-func (s *Service) Forget(c *player.Character, recipeID int) (recipe.Recipe, bool) {
-	r, ok := s.Recipe(recipeID)
+// reported deleted. removed is false for a character playing a subclass:
+// the book is the base class's, and nothing leaves it then, though the
+// deletion is still reported.
+func (s *Service) Forget(c *player.Character, recipeID int) (r recipe.Recipe, removed, ok bool) {
+	r, ok = s.Recipe(recipeID)
 	if !ok {
-		return recipe.Recipe{}, false
+		return recipe.Recipe{}, false, false
+	}
+	if c.SubclassActive() {
+		return r, false, true
 	}
 	c.RecipeBook().Remove(r.ID)
-	return r, true
+	return r, true, true
 }
 
 // ShopAttempt is the outcome of one workshop order.

@@ -40,10 +40,21 @@ type Character struct {
 	AccountName string
 	Name        string
 
-	ClassID     int
+	// BaseClassID is the class the character was created into (or its
+	// later occupations); it never changes while the character is live.
+	// The class the character currently plays is ClassID, a subclass while
+	// one is active.
 	BaseClassID int
 	Race        Race
 	Sex         Sex
+
+	// activeClassID is the class currently played: the base class, or the
+	// active subclass's class. Other actors' queues read it (CharInfo,
+	// target conditions), so it is atomic.
+	activeClassID atomic.Int32
+	// subclasses holds the character's subclass slots and, while one of
+	// them is active, the base class's progression; see subclass.go.
+	subclasses subclassState
 
 	// CharLevel is the persisted level. The field is named CharLevel, not
 	// Level, so it doesn't collide with the Level() method the cast/target
@@ -128,7 +139,11 @@ type Character struct {
 	onlineTimeBase int64
 	onlineBegin    time.Time
 
-	runtimeTemplate          *Template
+	// runtimeTemplate is the active class's template and baseTemplate the
+	// base class's; a class switch replaces runtimeTemplate on the owner's
+	// queue while other actors read it.
+	runtimeTemplate          atomic.Pointer[Template]
+	baseTemplate             atomic.Pointer[Template]
 	levelTable               *LevelTable
 	allowDelevel             bool
 	raidCursesDisabled       bool
@@ -289,7 +304,6 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 		AccountName: accountName,
 		Name:        name,
 
-		ClassID:     tmpl.ID,
 		BaseClassID: tmpl.ID,
 		Race:        race,
 		Sex:         sex,
@@ -316,6 +330,7 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 		maxBuffsAmount: defaultMaxBuffsAmount,
 	}
 
+	c.SetClassID(tmpl.ID)
 	if len(tmpl.Spawns) > 0 {
 		c.Location = tmpl.Spawns[rand.IntN(len(tmpl.Spawns))]
 	}

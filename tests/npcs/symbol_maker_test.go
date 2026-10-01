@@ -72,7 +72,7 @@ func bootSymbolWorld(t *testing.T, adena int32, dyeCounts map[int32]int32) *folk
 		gameservertest.WithItemTemplates(dyeTemplates()),
 		noBypassReuse,
 		gameservertest.WithHennaSeed(func(db *sql.DB, _ *gamesql.HennaStore) {
-			if _, err := db.ExecContext(context.Background(), `UPDATE characters SET classid = ?`, warriorClass); err != nil {
+			if _, err := db.ExecContext(context.Background(), `UPDATE characters SET classid = ?, base_class = ?`, warriorClass, warriorClass); err != nil {
 				t.Fatalf("set classid: %v", err)
 			}
 		}),
@@ -188,7 +188,7 @@ func (w *folkWorld) held(t *testing.T, templateID int32) int {
 func (w *folkWorld) savedHennas(t *testing.T) []henna.Row {
 	t.Helper()
 	w.srv.FlushPersistence(t)
-	rows, err := w.srv.Hennas.ListByOwner(context.Background(), w.player)
+	rows, err := w.srv.Hennas.ListByOwner(context.Background(), w.player, 0)
 	if err != nil {
 		t.Fatalf("list hennas: %v", err)
 	}

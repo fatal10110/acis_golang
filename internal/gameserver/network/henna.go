@@ -102,9 +102,9 @@ func (l *GameClientLink) deleteHenna(live *livePlayer, req clientpackets.Request
 		return
 	}
 	if l.hennas != nil {
-		slot := d.DBSlot
+		slot, classIndex := d.DBSlot, live.ClassIndex()
 		l.queueRowWrite(live.ObjectID(), "delete henna", func(ctx context.Context, ownerID int32) error {
-			return l.hennas.Delete(ctx, ownerID, slot)
+			return l.hennas.Delete(ctx, ownerID, classIndex, slot)
 		})
 	}
 	l.sendHennaChange(live)
@@ -119,9 +119,9 @@ func (l *GameClientLink) saveHennaSlot(live *livePlayer, h henna.Henna, dbSlot i
 	if l.hennas == nil {
 		return
 	}
-	symbolID := h.SymbolID
+	symbolID, classIndex := h.SymbolID, live.ClassIndex()
 	l.queueRowWrite(live.ObjectID(), "insert henna", func(ctx context.Context, ownerID int32) error {
-		return l.hennas.Insert(ctx, ownerID, symbolID, dbSlot)
+		return l.hennas.Insert(ctx, ownerID, classIndex, symbolID, dbSlot)
 	})
 }
 

@@ -55,7 +55,7 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 			 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		c.AccountName, c.ID, c.Name, c.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
 		c.Face, c.HairStyle, c.HairColor, byte(c.Sex), c.LastHeading, c.Location.X, c.Location.Y, c.Location.Z,
-		c.Exp, c.SP, int(c.Race), c.ClassID, c.BaseClassID, c.Title, c.AccessLevel, 0, time.Now().UnixMilli(),
+		c.Exp, c.SP, int(c.Race), c.ClassID(), c.BaseClassID, c.Title, c.AccessLevel, 0, time.Now().UnixMilli(),
 	)
 	if err != nil {
 		return fmt.Errorf("create character %q: %w", c.Name, err)
@@ -63,24 +63,27 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 	return nil
 }
 
-// Save persists a character's progress — level, exp, expBeforeDeath, sp,
-// cur/max HP/CP/MP, karma/pvpkills/pkkills, death_penalty_level, and the
-// accumulated session playtime — so a later reload reflects everything gained
+// Save persists a character's progress — the active class, the base
+// class's level, exp and sp, expBeforeDeath, cur/max HP/CP/MP,
+// karma/pvpkills/pkkills, death_penalty_level, the accumulated session
+// playtime and each subclass's progression — so a later reload reflects everything gained
 // since the last save instead of the row's creation-time values. Location and
 // appearance columns are not written here. The row is also marked online:
 // Save only runs for characters currently in game.
 func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
 	resources, progression := st.Resources, st.Progression
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, death_penalty_level = ?, onlinetime = ?, online = 1
+		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, death_penalty_level = ?, onlinetime = ?, online = 1
 			 WHERE obj_Id = ?`,
 		progression.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
-		progression.Exp, progression.ExpBeforeDeath, progression.SP, st.Karma, st.PvPKills, st.PKKills, st.DeathPenaltyLevel, st.OnlineTime, st.ID,
+		progression.Exp, progression.ExpBeforeDeath, progression.SP, st.Karma, st.PvPKills, st.PKKills, st.ClassID, st.DeathPenaltyLevel, st.OnlineTime, st.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("save character %d: %w", st.ID, err)
 	}
-	return nil
+	// The characters row carries the base class's progression; each
+	// subclass keeps its own in its row.
+	return updateSubclasses(ctx, s.db, st.ID, st.Subclasses)
 }
 
 // Get returns the character with the given object id, or
@@ -150,7 +153,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	}
 	c.Sex = player.Sex(sex)
 	c.Race = player.Race(race)
-	c.ClassID = classID
+	c.SetClassID(classID)
 	c.SetHero(hero != 0)
 	c.SetDeathPenaltyLevel(deathPenaltyLevel)
 	// The playtime clock starts at restore: every later save persists the
@@ -233,8 +236,8 @@ func (s *CharacterStore) SetOffline(ctx context.Context, objectID int32, lastAcc
 }
 
 // Purge removes the character row for objectID together with every row it
-// owns - its items, shortcuts, hennas, recipe book, skills, skill-save
-// state, pets, and item augmentations - as one transaction, so a failure or
+// owns - its items, shortcuts, hennas, recipe book, subclasses, skills,
+// skill-save state, pets, and item augmentations - as one transaction, so a failure or
 // cancellation partway through leaves all of them in place instead of
 // orphaning owned rows behind a deleted character. Pets and augmentations are deleted
 // before items, since both key off the character's still-live item ids. It
@@ -282,6 +285,9 @@ func (s *CharacterStore) Purge(ctx context.Context, objectID int32) (bool, error
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM character_recipebook WHERE charId = ?", objectID); err != nil {
 		return false, fmt.Errorf("purge character %d recipe book: %w", objectID, err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM character_subclasses WHERE char_obj_id = ?", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d subclasses: %w", objectID, err)
 	}
 
 	if err := tx.Commit(); err != nil {

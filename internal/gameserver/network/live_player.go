@@ -41,15 +41,14 @@ type livePlayer struct {
 	// persistence.
 	ctx context.Context
 	// session sends one frame to this player's client; see SendFrame.
-	session  func(wire.Frame) bool
-	template *player.Template
-	npcs     *npc.Table
-	items    []*item.Instance
-	throne   staticobject.Chair
-	attack   *attack.Controller
-	move     *move.Controller
-	combat   *ai.PlayerAttack
-	cast     *actorcast.Controller
+	session func(wire.Frame) bool
+	npcs    *npc.Table
+	items   []*item.Instance
+	throne  staticobject.Chair
+	attack  *attack.Controller
+	move    *move.Controller
+	combat  *ai.PlayerAttack
+	cast    *actorcast.Controller
 	// petRestoreInFlight is set while a summon cast that has already hit is
 	// still waiting for its pets-row read, and cleared when that read lands
 	// however it ends.
@@ -138,6 +137,14 @@ type livePlayer struct {
 
 	// bypasses are the links of the last validated HTML page p was sent.
 	bypasses bypassWhitelist
+
+	// pendingClassChange is the class change the last bypass started, set
+	// on p's queue while the connection goroutine waits in onLive and taken
+	// by that goroutine once the wait returns; see finishPendingClassChange.
+	pendingClassChange *classChange
+	// subclassReuseUntil ends the reuse delay of the subclass actions. Set
+	// and read on p's queue.
+	subclassReuseUntil time.Time
 
 	// shownMultisell is the multisell list p was last shown, the one its
 	// exchanges choose from, or nil. Set and read on p's queue.

@@ -27,10 +27,9 @@ type skillReuse struct {
 }
 
 // SkillSaveClassIndex returns the persisted class slot for this character's
-// active skill state. Subclasses are not modeled yet, so every character
-// currently uses the base class slot.
+// active skill state: the active class index.
 func (c *Character) SkillSaveClassIndex() int32 {
-	return 0
+	return int32(c.ClassIndex())
 }
 
 // SetSkillLevel records the known level for skillID. A non-positive level
@@ -236,4 +235,18 @@ func (c *Character) disableSkillUntil(key int32, expiresAt time.Time) {
 		c.skills.disabled = make(map[int32]time.Time)
 	}
 	c.skills.disabled[key] = expiresAt
+}
+
+// ClearSkillReuses forgets every recorded reuse timer.
+func (c *Character) ClearSkillReuses() {
+	c.skills.mu.Lock()
+	defer c.skills.mu.Unlock()
+	c.skills.reuses = nil
+}
+
+// ClearDisabledSkills re-enables every skill waiting out a reuse delay.
+func (c *Character) ClearDisabledSkills() {
+	c.skills.mu.Lock()
+	defer c.skills.mu.Unlock()
+	c.skills.disabled = nil
 }

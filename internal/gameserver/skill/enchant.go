@@ -57,7 +57,7 @@ func EnchantOfferFor(c *player.Character, trees *modelskill.Trees, skills *Persi
 	if c == nil || trees == nil || skills == nil || skills.skills == nil {
 		return EnchantOffer{}, false
 	}
-	if !EnchantEligible(c.ClassID, c.Level()) {
+	if !EnchantEligible(c.ClassID(), c.Level()) {
 		return EnchantOffer{}, false
 	}
 	if c.SkillLevel(skillID) >= level {

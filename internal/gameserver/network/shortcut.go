@@ -77,9 +77,9 @@ func (l *GameClientLink) deleteTargetShortcuts(live *livePlayer, typ shortcut.Ty
 // then re-announces each shot still on automatic use.
 func (l *GameClientLink) shortcutDeleted(live *livePlayer, sc shortcut.Shortcut) {
 	if l.shortcuts != nil {
-		slot, page := sc.Slot, sc.Page
+		slot, page, classIndex := sc.Slot, sc.Page, live.ClassIndex()
 		l.queueRowWrite(live.ObjectID(), "delete shortcut", func(ctx context.Context, ownerID int32) error {
-			return l.shortcuts.Delete(ctx, ownerID, slot, page)
+			return l.shortcuts.Delete(ctx, ownerID, classIndex, slot, page)
 		})
 	}
 	if sc.Type == shortcut.Item {
@@ -126,11 +126,11 @@ func (l *GameClientLink) saveShortcut(live *livePlayer, sc shortcut.Shortcut, op
 	if l.shortcuts == nil {
 		return
 	}
-	ownerID := live.ObjectID()
+	ownerID, classIndex := live.ObjectID(), live.ClassIndex()
 	l.persist.Enqueue(ownerID, func() {
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
-		if err := l.shortcuts.Save(ctx, ownerID, sc); err != nil {
+		if err := l.shortcuts.Save(ctx, ownerID, classIndex, sc); err != nil {
 			l.log.Error().Err(err).Int32("object_id", ownerID).Msg(op)
 		}
 	})

@@ -18,7 +18,7 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 	case *livePlayer:
 		p.sendVisibilityFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
 			Character: o.Character,
-			Template:  o.template,
+			Template:  o.Template(),
 			Items:     o.inventoryItems(),
 		}))
 		if o.throne != nil {
