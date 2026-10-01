@@ -223,6 +223,12 @@ func TestAllowedAcceptsWireSafeInGameOpcodes(t *testing.T) {
 		clientpackets.OpcodeRequestRecipeBookDestroy,
 		clientpackets.OpcodeRequestRecipeItemMakeInfo,
 		clientpackets.OpcodeRequestRecipeItemMakeSelf,
+		clientpackets.OpcodeRequestHennaItemList,
+		clientpackets.OpcodeRequestHennaItemInfo,
+		clientpackets.OpcodeRequestHennaEquip,
+		clientpackets.OpcodeRequestHennaUnequipList,
+		clientpackets.OpcodeRequestHennaUnequipInfo,
+		clientpackets.OpcodeRequestHennaUnequip,
 		clientpackets.OpcodeDlgAnswer,
 		clientpackets.OpcodeGameGuardReply,
 		clientpackets.OpcodeRequestShowMiniMap,
@@ -231,6 +237,30 @@ func TestAllowedAcceptsWireSafeInGameOpcodes(t *testing.T) {
 	for _, opcode := range opcodes {
 		if !Allowed(StateInGame, opcode) {
 			t.Fatalf("Allowed(in-game, 0x%02x) = false, want true", opcode)
+		}
+	}
+}
+
+// TestAllowedGatesSymbolMakerOpcodesToInGame pins the six symbol maker
+// requests to the in-game state: before enter world none of them may reach a
+// handler.
+func TestAllowedGatesSymbolMakerOpcodesToInGame(t *testing.T) {
+	opcodes := []byte{
+		clientpackets.OpcodeRequestHennaItemList,
+		clientpackets.OpcodeRequestHennaItemInfo,
+		clientpackets.OpcodeRequestHennaEquip,
+		clientpackets.OpcodeRequestHennaUnequipList,
+		clientpackets.OpcodeRequestHennaUnequipInfo,
+		clientpackets.OpcodeRequestHennaUnequip,
+	}
+	for _, opcode := range opcodes {
+		for _, state := range []State{StateConnected, StateAuthed, StateEntering} {
+			if Allowed(state, opcode) {
+				t.Errorf("Allowed(%s, 0x%02x) = true, want false", state, opcode)
+			}
+		}
+		if !Allowed(StateInGame, opcode) {
+			t.Errorf("Allowed(%s, 0x%02x) = false, want true", StateInGame, opcode)
 		}
 	}
 }
