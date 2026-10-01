@@ -155,16 +155,15 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	}
 
 	// Per-slot augmentation option pairs: always empty except the two
-	// weapon-hand slots, since only a weapon can be augmented and
-	// augmentation is not modeled here.
+	// weapon-hand slots, since only a weapon can be augmented.
 	for i := 0; i < 14; i++ {
 		w.WriteUint16(0)
 	}
-	w.WriteInt32(0) // right-hand augmentation id
+	w.WriteInt32(paperdoll[rhandPaperdollIndex].AugmentationID)
 	for i := 0; i < 12; i++ {
 		w.WriteUint16(0)
 	}
-	w.WriteInt32(0) // left-hand augmentation id
+	w.WriteInt32(paperdoll[lhandPaperdollIndex].AugmentationID)
 	for i := 0; i < 4; i++ {
 		w.WriteUint16(0)
 	}

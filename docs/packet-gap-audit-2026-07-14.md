@@ -112,18 +112,15 @@ Missing M3 data/UI client packets:
 - `RequestExEnchantSkillInfo`
 - `RequestExEnchantSkill`
 - `RequestExFishRanking`
-- `RequestConfirmTargetItem`
-- `RequestConfirmRefinerItem`
-- `RequestConfirmGemStone`
-- `RequestConfirmCancelItem`
 
 `RequestExEnchantSkillInfo` and `RequestExEnchantSkill` currently have Go decoders and byte-layout
 tests only. They are still counted as gaps because the skill-enchant tree, trainer validation, cost
 payment, success/failure roll, and skill persistence flow are not implemented.
 
-`RequestConfirmTargetItem`, `RequestConfirmRefinerItem`, `RequestConfirmGemStone`, and
-`RequestConfirmCancelItem` currently have Go decoders and byte-layout tests only. They are still
-counted as gaps because the live augmentation validation/apply/remove flow is not implemented.
+The augmentation window's `RequestConfirmTargetItem`, `RequestConfirmRefinerItem`,
+`RequestConfirmGemStone`, `RequestRefine`, `RequestConfirmCancelItem` and `RequestRefineCancel`
+are implemented and wired ([#593](https://github.com/fatal10110/acis_golang/issues/593)-[#596](https://github.com/fatal10110/acis_golang/issues/596),
+[#142](https://github.com/fatal10110/acis_golang/issues/142)).
 
 Implemented and wired M3 data/UI client packets in Go:
 
@@ -231,10 +228,10 @@ Remaining EnterWorld burst packet gaps:
 `PledgeSkillList`, `ExMailArrived`, and `PlaySound`
 currently have Go frame builders only. `NpcHtmlMessage` is wired for civilian NPC chat windows
 (`talkToFolk`, #720), link and help pages, and the arena signboard. `SellList` is sent by a merchant's or fisherman's `Sell` dialog command. The augmentation variation packets
-`ExShowVariationMakeWindow`, `ExShowVariationCancelWindow`, `ExConfirmVariationItem`,
-`ExConfirmVariationRefiner`, `ExConfirmVariationGemstone`, `ExConfirmCancelItem`,
-`ExVariationResult`, and `ExVariationCancelResult` also have Go frame builders only. They are not
-wired until production owner flows can emit them truthfully.
+`ExShowVariationMakeWindow`, `ExShowVariationCancelWindow` (the blacksmith's `Augment 1` and
+`Augment 2` dialog commands), `ExConfirmVariationItem`, `ExConfirmVariationRefiner`,
+`ExConfirmVariationGemstone`, `ExConfirmCancelItem`, `ExVariationResult`, and
+`ExVariationCancelResult` are wired ([#662](https://github.com/fatal10110/acis_golang/issues/662)-[#668](https://github.com/fatal10110/acis_golang/issues/668)).
 
 Missing M3 data/UI server packets:
 
@@ -251,13 +248,6 @@ Missing M3 data/UI server packets:
 - `ExShowCropSetting`
 - `ExShowSellCropList`
 - `ExShowProcureCropDetail`
-- `ExShowVariationMakeWindow`
-- `ExShowVariationCancelWindow`
-- `ExConfirmVariationItem`
-- `ExConfirmVariationRefiner`
-- `ExConfirmVariationGemstone`
-- `ExVariationResult`
-- `ExVariationCancelResult`
 
 Implemented and wired M3 data/UI server packets in Go:
 

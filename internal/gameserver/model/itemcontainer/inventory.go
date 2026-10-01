@@ -453,6 +453,34 @@ func (inv *Inventory) SetEnchantLevel(inst *item.Instance, level int) bool {
 	return true
 }
 
+// SetAugmentation gives inst, held in this inventory, aug and queues a
+// modified inventory notification. It returns false when inst is absent from
+// this inventory or already augmented.
+func (inv *Inventory) SetAugmentation(inst *item.Instance, aug item.Augmentation) bool {
+	if inst == nil {
+		return false
+	}
+	if inv.ItemByObjectID(inst.ObjectID) != inst || !inst.SetAugmentation(&aug) {
+		return false
+	}
+	inv.queueUpdate(inst, UpdateModified)
+	return true
+}
+
+// RemoveAugmentation takes the augmentation off inst, held in this
+// inventory, and queues a modified inventory notification. It returns false
+// when inst is absent from this inventory or carries none.
+func (inv *Inventory) RemoveAugmentation(inst *item.Instance) bool {
+	if inst == nil || inv.ItemByObjectID(inst.ObjectID) != inst {
+		return false
+	}
+	if _, ok := inst.RemoveAugmentation(); !ok {
+		return false
+	}
+	inv.queueUpdate(inst, UpdateModified)
+	return true
+}
+
 // DropItem removes count units of the instance identified by objectID from
 // the inventory for dropping to the ground. When the held stack is bigger
 // than count, the existing stack is decremented in place and a brand new

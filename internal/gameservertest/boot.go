@@ -33,6 +33,7 @@ import (
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
@@ -131,6 +132,9 @@ type options struct {
 	multisells             *multisell.Table
 	multisellDelay         time.Duration
 	keepMaintained         bool
+	augmentations          *augmentation.Table
+	augmentationChances    *augmentation.Chances
+	augmentRoll            augmentation.Rand
 	enchantConfig          *enchant.Config
 	skillEnchantRoll       func() int
 	levels                 *player.LevelTable
@@ -496,6 +500,16 @@ func WithMultisellDelay(d time.Duration) Option {
 // BlacksmithUseRecipes off: a maintainIngredient ingredient is kept.
 func WithKeepMaintainedIngredients() Option {
 	return func(o *options) { o.keepMaintained = true }
+}
+
+// WithAugmentations loads table as the augmentation data refines roll
+// from and worn augmented weapons draw their bonuses from (default: none,
+// every refine refused), with chances (nil: the shipped defaults) and roll
+// drawing the refine's random ints (nil: the random source).
+func WithAugmentations(table *augmentation.Table, chances *augmentation.Chances, roll augmentation.Rand) Option {
+	return func(o *options) {
+		o.augmentations, o.augmentationChances, o.augmentRoll = table, chances, roll
+	}
 }
 
 // WithEnchantRoll supplies the enchant dice roll source wired into the link
@@ -1275,6 +1289,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		}
 	}
 	o.skills.SetStoreSkillCooltime(o.storeSkillCooltime)
+	if err := o.skills.SetAugmentations(o.augmentations); err != nil {
+		t.Fatalf("augmentation bonuses: %v", err)
+	}
 	if o.seed != nil {
 		o.seed(chars, items)
 	}
@@ -1480,6 +1497,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Levels:           levels,
 		Admin:            o.admin,
 		Log:              o.log,
+	}
+	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
+	gclConfig.AugmentationChances = augmentation.DefaultChances()
+	if o.augmentationChances != nil {
+		gclConfig.AugmentationChances = *o.augmentationChances
 	}
 	var water *task.Water
 	if o.water {

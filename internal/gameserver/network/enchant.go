@@ -263,6 +263,7 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 				reserved.Add(s.ObjectID)
 				batch.Saves = append(batch.Saves, s)
 				row.ownerID = s.OwnerID
+				l.addAugmentationRow(&batch, s)
 			})
 		}
 		if !slices.Contains(owners, row.ownerID) {
@@ -280,6 +281,25 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 	}, owners[0], owners[1:]...)
 }
 
+// addAugmentationRow adds the augmentations row a weapon's saved state
+// carries to batch: written when it is augmented, deleted when it is not,
+// as the persistence tick does. The row lands in the same transaction as
+// the item's own, so an augmentation and the life stone it consumed cannot
+// land apart.
+func (l *GameClientLink) addAugmentationRow(batch *item.FlushBatch, s item.InstanceState) {
+	if l.itemTemplates == nil {
+		return
+	}
+	if tmpl, ok := l.itemTemplates.Get(s.TemplateID); !ok || tmpl.Kind != item.KindWeapon {
+		return
+	}
+	if s.Augmentation == nil {
+		batch.AugmentationDeletes = append(batch.AugmentationDeletes, s.ObjectID)
+		return
+	}
+	batch.AugmentationSaves = append(batch.AugmentationSaves, item.FlushAugmentationSave{ObjectID: s.ObjectID, Augmentation: *s.Augmentation})
+}
+
 // keptRows narrows batch to the rows in keep, which is sorted ascending: the
 // rows no later write has landed on yet (persist.Write.Run).
 func keptRows(batch item.FlushBatch, keep []int32) item.FlushBatch {
@@ -290,6 +310,10 @@ func keptRows(batch item.FlushBatch, keep []int32) item.FlushBatch {
 	return item.FlushBatch{
 		Saves:   slices.DeleteFunc(slices.Clone(batch.Saves), func(s item.InstanceState) bool { return !kept(s.ObjectID) }),
 		Deletes: slices.DeleteFunc(slices.Clone(batch.Deletes), func(id int32) bool { return !kept(id) }),
+		AugmentationSaves: slices.DeleteFunc(slices.Clone(batch.AugmentationSaves), func(a item.FlushAugmentationSave) bool {
+			return !kept(a.ObjectID)
+		}),
+		AugmentationDeletes: slices.DeleteFunc(slices.Clone(batch.AugmentationDeletes), func(id int32) bool { return !kept(id) }),
 	}
 }
 

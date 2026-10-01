@@ -134,6 +134,25 @@ func (c *Character) HasSkillReuse(key int32) bool {
 	return ok
 }
 
+// RedisableSkillReuse disables key again until its recorded reuse timer
+// runs out, when that timer is still running. It reports whether it was:
+// a skill granted back while its earlier reuse is pending keeps waiting it
+// out.
+func (c *Character) RedisableSkillReuse(key int32) bool {
+	now := c.Now()
+	c.skills.mu.Lock()
+	defer c.skills.mu.Unlock()
+	reuse, ok := c.skills.reuses[key]
+	if !ok || !reuse.expiresAt.After(now) {
+		return false
+	}
+	if c.skills.disabled == nil {
+		c.skills.disabled = make(map[int32]time.Time)
+	}
+	c.skills.disabled[key] = reuse.expiresAt
+	return true
+}
+
 // SetSkillReuse records a reuse timer with an explicit expiration time.
 func (c *Character) SetSkillReuse(ref modelskill.Ref, key int32, delay time.Duration, expiresAt time.Time) {
 	if delay <= 0 {

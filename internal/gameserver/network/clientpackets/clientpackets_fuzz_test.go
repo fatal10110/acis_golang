@@ -142,7 +142,9 @@ var gameDecoders = []gameDecoder{
 	{"RequestConfirmTargetItem", decodes(DecodeRequestConfirmTargetItem), seedExtended(OpcodeRequestConfirmTargetItem, seedObjectID)},
 	{"RequestConfirmRefinerItem", decodes(DecodeRequestConfirmRefinerItem), seedExtended(OpcodeRequestConfirmRefinerItem, seedObjectID, seedObjectID+1)},
 	{"RequestConfirmGemStone", decodes(DecodeRequestConfirmGemStone), seedExtended(OpcodeRequestConfirmGemStone, seedObjectID, seedObjectID+1, seedObjectID+2, int32(20))},
+	{"RequestRefine", decodes(DecodeRequestRefine), seedExtended(OpcodeRequestRefine, seedObjectID, seedObjectID+1, seedObjectID+2, int32(20))},
 	{"RequestConfirmCancelItem", decodes(DecodeRequestConfirmCancelItem), seedExtended(OpcodeRequestConfirmCancelItem, seedObjectID)},
+	{"RequestRefineCancel", decodes(DecodeRequestRefineCancel), seedExtended(OpcodeRequestRefineCancel, seedObjectID)},
 	{"RequestExMagicSkillUseGround", decodes(DecodeRequestExMagicSkillUseGround), seedExtended(OpcodeRequestExMagicSkillUseGround, seedX, seedY, seedZ, int32(1177), int32(0), byte(0))},
 }
 

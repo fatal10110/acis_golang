@@ -464,6 +464,35 @@ func (inst *Instance) Equipped() bool {
 	return InstanceState{Location: inst.Location}.Equipped()
 }
 
+// RemoveAugmentation takes inst's augmentation away and returns it. ok is
+// false when inst carried none.
+func (inst *Instance) RemoveAugmentation() (aug Augmentation, ok bool) {
+	mu := inst.lock()
+	mu.Lock()
+	if inst.Augmentation == nil {
+		mu.Unlock()
+		return Augmentation{}, false
+	}
+	aug = *inst.Augmentation
+	inst.Augmentation = nil
+	mu.Unlock()
+
+	inst.persisted()
+	return aug, true
+}
+
+// AugmentationValue returns a copy of inst's augmentation. ok is false when
+// inst carries none.
+func (inst *Instance) AugmentationValue() (aug Augmentation, ok bool) {
+	mu := inst.lock()
+	mu.RLock()
+	defer mu.RUnlock()
+	if inst.Augmentation == nil {
+		return Augmentation{}, false
+	}
+	return *inst.Augmentation, true
+}
+
 // Augmented reports whether inst carries an augmentation.
 func (inst *Instance) Augmented() bool {
 	mu := inst.lock()
