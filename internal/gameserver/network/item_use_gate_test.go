@@ -14,6 +14,14 @@ func TestParseConditionIntLiteralBases(t *testing.T) {
 		{"", 0, false},
 		{"abc", 0, false},
 		{"0x100000000", 0, false},
+		// Reference Integer.decode outcomes (Java probe): "#" hex is read,
+		// while the base-0 extras and a sign after the prefix are rejected.
+		{"#1F", 31, true},
+		{"-0x10", -16, true},
+		{"0b1", 0, false},
+		{"0o10", 0, false},
+		{"1_0", 0, false},
+		{"0x-1", 0, false},
 	}
 	for _, c := range cases {
 		got, ok := parseConditionInt(c.raw)

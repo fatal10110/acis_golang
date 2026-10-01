@@ -246,3 +246,56 @@ func TestLoadMultiSellListsDatapackSmoke(t *testing.T) {
 		t.Fatalf("list 1000 first ingredient item id = %d, want %d", got, want)
 	}
 }
+
+// TestMultiSellNPCTextIsStrictDecimal pins the accepted input set of the
+// <npc> element text to the reference's Integer.parseInt (Java probe,
+// OpenJDK 21.0.11): a signed base-10 int32 with nothing around it. Empty,
+// self-closing, padded, non-numeric, prefixed and out-of-range text fails
+// the load naming the file; the decoder's own int conversion would read
+// the empty forms as 0 and trim the padding.
+func TestMultiSellNPCTextIsStrictDecimal(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name    string
+		npc     string
+		want    int32
+		wantErr bool
+	}{
+		{name: "plain", npc: `<npc>12</npc>`, want: 12},
+		{name: "signed", npc: `<npc>+12</npc>`, want: 12},
+		{name: "negative", npc: `<npc>-12</npc>`, want: -12},
+		{name: "leading zero is decimal", npc: `<npc>010</npc>`, want: 10},
+		{name: "empty", npc: `<npc></npc>`, wantErr: true},
+		{name: "self-closing", npc: `<npc/>`, wantErr: true},
+		{name: "padded", npc: `<npc> 12 </npc>`, wantErr: true},
+		{name: "non-numeric", npc: `<npc>abc</npc>`, wantErr: true},
+		{name: "hex", npc: `<npc>0x10</npc>`, wantErr: true},
+		{name: "int32 overflow", npc: `<npc>2147483648</npc>`, wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			path := filepath.Join(dir, "1.xml")
+			writeXMLFixture(t, path, `<list><npcs>`+tc.npc+`</npcs></list>`)
+
+			table, err := LoadMultiSellLists(dir, nil)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("LoadMultiSellLists(%s) error = nil, want a rejection", tc.npc)
+				}
+				if !strings.Contains(err.Error(), path) {
+					t.Fatalf("LoadMultiSellLists(%s) error %q does not name %q", tc.npc, err, path)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("LoadMultiSellLists(%s): %v", tc.npc, err)
+			}
+			list, _ := table.Get(commons.LegacyStringHash("1"))
+			if len(list.NPCIDs) != 1 || list.NPCIDs[0] != tc.want {
+				t.Fatalf("LoadMultiSellLists(%s) npcs = %v, want [%d]", tc.npc, list.NPCIDs, tc.want)
+			}
+		})
+	}
+}

@@ -25,6 +25,37 @@ func TestNewAccessLevel(t *testing.T) {
 	}
 }
 
+// TestNewAccessLevelRejectsUnreadableColor pins the color attributes to the
+// reference's Integer.decode("0x" + value) (Java probe, OpenJDK 21.0.11): six
+// hex digits read, while a sign, a second prefix, a value past int32 or a
+// non-hex digit fails the access level.
+func TestNewAccessLevelRejectsUnreadableColor(t *testing.T) {
+	for _, tc := range []struct {
+		color string
+		ok    bool
+	}{
+		{"CC3333", true},
+		{"7FFFFFFF", true},
+		{"80000000", false},
+		{"-1", false},
+		{"+1", false},
+		{"0x10", false},
+		{"GG0000", false},
+		{"", false},
+	} {
+		for _, key := range []string{"nameColor", "titleColor"} {
+			set := commons.NewStatSet()
+			set.Set("level", "0")
+			set.Set("name", "User")
+			set.Set(key, tc.color)
+			_, err := NewAccessLevel(set)
+			if (err == nil) != tc.ok {
+				t.Errorf("NewAccessLevel(%s=%q) error = %v, want ok=%v", key, tc.color, err, tc.ok)
+			}
+		}
+	}
+}
+
 func TestNewAdminCommand(t *testing.T) {
 	set := commons.NewStatSet()
 	set.Set("name", "admin_ann")
@@ -56,6 +87,13 @@ func TestNewAnnouncement(t *testing.T) {
 	}
 	if got.Message != "Server restart soon." || !got.Critical || !got.Auto || got.InitialDelay != 60 || got.Delay != 300 || got.Limit != 5 {
 		t.Fatalf("NewAnnouncement() = %+v", got)
+	}
+
+	// An automatic announcement must state its limit: the reference unboxes
+	// the absent value and fails rather than reading 0.
+	set.Unset("limit")
+	if got, err := NewAnnouncement(set); err == nil {
+		t.Fatalf("NewAnnouncement(auto, no limit) = %+v, want an error", got)
 	}
 
 	set = commons.NewStatSet()

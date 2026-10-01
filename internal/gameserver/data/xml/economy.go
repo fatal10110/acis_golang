@@ -195,7 +195,7 @@ func (e augmentationSkillElement) skill() (augmentation.Skill, error) {
 }
 
 type augmentationSetElement struct {
-	Order *coord                    `xml:"order,attr"`
+	Order *literal32                `xml:"order,attr"`
 	Stats []augmentationStatElement `xml:"stat"`
 }
 
@@ -233,6 +233,9 @@ func LoadBuyLists(path string, items *item.Table) (*buylist.Table, error) {
 	lists := make([]buylist.List, 0, len(file.BuyLists))
 	for _, el := range file.BuyLists {
 		set := commons.StatSetFromXMLAttrs(el.Attrs)
+		if err := decodeLiteralAttrs(set, "id", "npcId"); err != nil {
+			return nil, fmt.Errorf("xml: %s: buylist: %w", path, err)
+		}
 		id, err := set.GetInt("id")
 		if err != nil {
 			return nil, fmt.Errorf("xml: %s: %w", path, err)

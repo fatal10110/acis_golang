@@ -107,6 +107,9 @@ func buildTerritory(el territoryElement) (*spawn.Territory, error) {
 	nodes := make([]spawn.Node, 0, len(el.Nodes))
 	for _, nodeEl := range el.Nodes {
 		set := commons.StatSetFromXMLAttrs(nodeEl.Attrs)
+		if err := decodeLiteralAttrs(set, "x", "y"); err != nil {
+			return nil, err
+		}
 		x, err := set.GetInt("x")
 		if err != nil {
 			return nil, err
@@ -117,7 +120,11 @@ func buildTerritory(el territoryElement) (*spawn.Territory, error) {
 		}
 		nodes = append(nodes, spawn.Node{X: x, Y: y})
 	}
-	return spawn.NewTerritory(commons.StatSetFromXMLAttrs(el.Attrs), nodes)
+	set := commons.StatSetFromXMLAttrs(el.Attrs)
+	if err := decodeLiteralAttrs(set, "minZ", "maxZ"); err != nil {
+		return nil, fmt.Errorf("territory %q: %w", set.GetStringDefault("name", "?"), err)
+	}
+	return spawn.NewTerritory(set, nodes)
 }
 
 func buildMaker(el makerElement, territories map[string]*spawn.Territory, log zerolog.Logger, spawnMultiplier float64) (*spawn.Maker, error) {
@@ -149,6 +156,9 @@ func buildEntry(el spawnNPCElement, spawnMultiplier float64) (spawn.Entry, error
 	set := commons.StatSetFromXMLAttrs(el.Attrs)
 	f := commons.NewFields(set, "spawn entry loader")
 	npcID := f.StringDefault("id", "?")
+	if err := decodeLiteralAttrs(set, "id", "total"); err != nil {
+		return spawn.Entry{}, fmt.Errorf("npc %q: %w", npcID, err)
+	}
 
 	privates := make([]spawn.Private, 0)
 	for _, group := range el.Privates {

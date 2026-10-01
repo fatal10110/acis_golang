@@ -5,6 +5,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // attrValues is a sticky-error reader over one element's attribute values
@@ -143,9 +145,23 @@ func (a *attrValues) int32Default(key string, def int32) int32 {
 	return int32(n)
 }
 
+// int32Literal returns the value at key as an int32 integer literal (see
+// commons.DecodeInt32), recording an error if key is absent or its value
+// fails to parse.
+func (a *attrValues) int32Literal(key string) int32 {
+	if a.err != nil {
+		return 0
+	}
+	if _, ok := a.vals[key]; !ok {
+		a.fail(fmt.Errorf("attribute %q is required", key))
+		return 0
+	}
+	return a.int32LiteralDefault(key, 0)
+}
+
 // int32LiteralDefault returns the value at key as an int32, or def if key is
-// absent. The value is parsed as an integer literal, so a base prefix such
-// as 0x or # is accepted.
+// absent. The value is parsed as an integer literal by commons.DecodeInt32,
+// so "0x"/"#" hex and leading-zero octal are accepted.
 func (a *attrValues) int32LiteralDefault(key string, def int32) int32 {
 	if a.err != nil {
 		return def
@@ -154,15 +170,12 @@ func (a *attrValues) int32LiteralDefault(key string, def int32) int32 {
 	if !ok {
 		return def
 	}
-	if strings.HasPrefix(raw, "#") {
-		raw = "0x" + raw[1:]
-	}
-	n, err := strconv.ParseInt(raw, 0, 32)
+	n, err := commons.DecodeInt32(raw)
 	if err != nil {
 		a.fail(fmt.Errorf("attribute %q: %w", key, err))
 		return def
 	}
-	return int32(n)
+	return n
 }
 
 // float32Default returns the value at key as a float32, or def if key is

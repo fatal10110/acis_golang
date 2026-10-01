@@ -2,10 +2,11 @@ package conditions
 
 import (
 	"fmt"
+	"math"
 	"sort"
-	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/geometry"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -98,9 +99,9 @@ func compilePlayer(node modelskill.Condition) (Condition, error) {
 		case "seed_fire", "seed_water", "seed_wind", "seed_various", "seed_any":
 			seeds[seedIndex[lower]], err = decodeInt(value)
 		case "battle_force":
-			forces[0], err = decodeInt(value)
+			forces[0], err = decodeByte(value)
 		case "spell_force":
-			forces[1], err = decodeInt(value)
+			forces[1], err = decodeByte(value)
 		case "insidepoly":
 			var c Condition
 			c, err = compileInsidePoly(node, value)
@@ -300,10 +301,23 @@ func compileGameAttr(name, value string) (Condition, error) {
 // including "1", is false.
 func parseBool(v string) bool { return strings.EqualFold(v, "true") }
 
-// decodeInt accepts decimal, 0x hex and leading-zero octal integers.
+// decodeInt reads an int32 integer literal: decimal, "0x"/"#" hex or
+// leading-zero octal (see commons.DecodeInt32).
 func decodeInt(v string) (int, error) {
-	n, err := strconv.ParseInt(v, 0, 32)
+	n, err := commons.DecodeInt32(v)
 	return int(n), err
+}
+
+// decodeByte is decodeInt restricted to the signed 8-bit range.
+func decodeByte(v string) (int, error) {
+	n, err := decodeInt(v)
+	if err != nil {
+		return 0, err
+	}
+	if n < math.MinInt8 || n > math.MaxInt8 {
+		return 0, fmt.Errorf("%q: value out of byte range", v)
+	}
+	return n, nil
 }
 
 // decodePair reads an "a,b" integer pair; anything after a second comma is
@@ -321,14 +335,17 @@ func decodePair(v string) (int, int, error) {
 	return a, b, err
 }
 
-// decodeList reads a comma-separated integer list, trimming each entry.
+// decodeList reads a comma-separated integer list. Empty entries between
+// adjacent commas are skipped; every other entry is trimmed of control
+// characters and spaces and must then be an integer literal, so a
+// blank-but-not-empty entry is an error.
 func decodeList(v string) ([]int, error) {
 	var out []int
 	for _, tok := range strings.Split(v, ",") {
-		tok = strings.TrimSpace(tok)
 		if tok == "" {
 			continue
 		}
+		tok = strings.TrimFunc(tok, func(r rune) bool { return r <= ' ' })
 		n, err := decodeInt(tok)
 		if err != nil {
 			return nil, err
