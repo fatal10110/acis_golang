@@ -65,7 +65,7 @@ type Character struct {
 	SP        int
 
 	// ExpBeforeDeath is the persisted exp snapshot taken at the last death,
-	// before the death's exp loss was applied (Player.java:2919). A
+	// before the death's exp loss was applied. A
 	// resurrection effect restores a percentage of the exp lost since then
 	// via RestoreExp, which also clears this back to 0.
 	ExpBeforeDeath int64
@@ -198,9 +198,7 @@ type Character struct {
 
 	// summonFriendMu guards the pending SUMMON_FRIEND/SUMMON_PARTY
 	// teleport-confirm request state, which the caster's queue records
-	// (TeleportRequest),
-	// matching Player._summonTargetRequest/_summonSkillRequest
-	// (Player.java:452-453).
+	// (TeleportRequest): the summoning target and skill.
 	summonFriendMu    sync.Mutex
 	summonRequester   SummonFriendRequester
 	summonRequesterID int32
@@ -265,7 +263,7 @@ type Character struct {
 
 	// perfectShieldBlockRate is the players.properties-configured
 	// PerfectShieldBlockRate roll threshold for a shield block to upgrade
-	// to a perfect block (Formulas.java:859).
+	// to a perfect block.
 	perfectShieldBlockRate int
 
 	skills skillState

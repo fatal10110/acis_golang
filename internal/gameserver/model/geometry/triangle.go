@@ -1,16 +1,16 @@
 package geometry
 
 // Triangle is a 2D triangle. It keeps the vertex ring for area, rectangle
-// overlap, and shape-vs-shape intersection, but answers Contains with the
-// reference's exact-integer half-plane test rather than the even-odd ray
+// overlap, and shape-vs-shape intersection, but answers Contains with an
+// exact-integer half-plane test rather than the even-odd ray
 // cast the other ring shapes use: a point is inside when it sits on the
 // same side of all three edges, edges inclusive.
 type Triangle struct {
 	vertexList
 
 	// Vertex A plus the BA and CA edge vectors, the form the half-plane
-	// test consumes. int32 throughout so the products wrap where the
-	// reference's 32-bit integer arithmetic wraps.
+	// test consumes. int32 throughout so the products wrap exactly as
+	// 32-bit integer arithmetic wraps.
 	ax, ay   int32
 	bax, bay int32
 	cax, cay int32
@@ -40,9 +40,8 @@ func newTriangleFromCoords(ax, ay, bx, by, cx, cy int32) Triangle {
 }
 
 // Contains reports whether (x, y) lies inside the triangle, edges
-// inclusive. The three cross products run in int64 — the reference widens
-// them to long for exactly this reason, since world coordinates squared
-// overflow 32 bits.
+// inclusive. The three cross products run in int64, widened for exactly
+// this reason: world coordinates squared overflow 32 bits.
 func (t Triangle) Contains(x, y int) bool {
 	dx := int64(int32(x) - t.ax)
 	dy := int64(int32(y) - t.ay)

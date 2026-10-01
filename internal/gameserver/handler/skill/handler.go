@@ -274,13 +274,12 @@ type Resisted struct {
 	TargetName string
 	SkillID    modelskill.ID
 	SkillLevel int
-	// Unconditional marks a skill's own effect-landing resist — Mdam/Blow/Manadam/
-	// L2SkillChargeDmg's creature.sendPacket, sent with no caster-type gate in the
-	// reference — as
-	// opposed to the generic per-effect-template resist inside L2Skill.getEffects,
-	// which the reference gates to a Player caster. Only Summon.sendPacket
-	// forwards the former to a summon's owner unconditionally; the latter never
-	// fires for a non-Player caster at all.
+	// Unconditional marks a skill's own effect-landing resist — the
+	// Mdam/Blow/Manadam/charge-damage report, sent to the caster with no
+	// caster-type gate — as opposed to the generic per-effect-template
+	// resist, which is gated to a Player caster. Only a summon forwards the
+	// former to its owner unconditionally; the latter never fires for a
+	// non-Player caster at all.
 	Unconditional bool
 }
 
@@ -556,8 +555,8 @@ func (dummyHandler) Types() []string { return []string{"DUMMY", "BEAST_FEED"} }
 
 func (dummyHandler) Use(Cast) {}
 
-// alikeDead reports whether a is dead or in a death-like state, matching the
-// reference's isAlikeDead() default of falling back to isDead().
+// alikeDead reports whether a is dead or in a death-like state, falling back
+// to plain death by default.
 func alikeDead(a Actor) bool {
 	if a == nil {
 		return false

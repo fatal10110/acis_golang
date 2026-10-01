@@ -274,11 +274,9 @@ func (h *Hostile) ConsumeHP(amount float64) {
 }
 
 // ReduceHPByDOT applies periodic damage and records it in the threat table
-// at zero hate weight, matching Npc.reduceCurrentHp's unconditional
-// addDamageHate(attacker, damage, 0) — every HP reduction feeds the
-// AggroList, DOT included (Npc.java:390-395; no isDOT gate in the chain
-// Creature.reduceCurrentHpByDOT -> Npc.reduceCurrentHp -> reduceHp). A
-// zero-damage tick registers the hit the same way and writes no HP.
+// at zero hate weight — every HP reduction feeds the hate list, DOT
+// included (there is no isDOT gate on that path). A zero-damage tick
+// registers the hit the same way and writes no HP.
 func (h *Hostile) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT bool) {
 	if h.AlikeDead() {
 		return
@@ -302,21 +300,19 @@ func (h *Hostile) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT boo
 	h.Die(killer, h.rewards)
 }
 
-// applyNonConsumptionDamageEffects mirrors NpcStatus.reduceHp's inherited
-// CreatureStatus block (CreatureStatus.java:228-248): non-DOT HP reduction
-// stops SLEEP and IMMOBILE_UNTIL_ATTACKED, and has a 1-in-10 chance to break
-// STUN. NpcStatus.reduceHp (NpcStatus.java:21-35) adds only a duel-interrupt
-// check on the attacker and otherwise delegates unchanged, including the
-// isDOT gate on the whole block — unlike PlayerStatus, which overrides the
-// gate to !isHPConsumption alone and stun-breaks separately on !isDOT
-// (PlayerStatus.java:118-134). HP consumption never reaches this block: it
-// goes through ConsumeHP instead. There is no sit/stand-up clause
-// (Player-only, PlayerStatus.java:124). Callers
-// must run this after AddDamageHate, matching Npc.reduceCurrentHp
-// (Npc.java:395, 468): the hate lands before super.reduceCurrentHp reaches
-// this block, so a sleep-stop's synchronous wake-think (EffectSleep.java:37-44
-// -> hooks_cc.go's thinkAndRefreshExit) always sees the hit's hate already
-// in the threat table.
+// applyNonConsumptionDamageEffects applies the creature-wide HP-reduction
+// side effects an NPC keeps: non-DOT HP reduction stops SLEEP and
+// IMMOBILE_UNTIL_ATTACKED, and has a 1-in-10 chance to break STUN. An NPC
+// adds only a duel-interrupt check on the attacker and otherwise keeps the
+// creature rule unchanged, including the isDOT gate on the whole block —
+// unlike a player, whose gate is !isHPConsumption alone and who
+// stun-breaks separately on !isDOT. HP consumption never reaches this
+// block: it goes through ConsumeHP instead. There is no sit/stand-up clause
+// (Player-only). Callers must run this after AddDamageHate: the hate lands
+// before the HP reduction reaches this block, so a sleep-stop's synchronous
+// wake-think (the sleep effect's exit -> hooks_cc.go's
+// thinkAndRefreshExit) always sees the hit's hate already in the threat
+// table.
 func (h *Hostile) applyNonConsumptionDamageEffects(isDOT bool) {
 	if isDOT {
 		return
@@ -380,9 +376,9 @@ func (h *Hostile) CounterSkillPhysical() float64 {
 }
 
 // CancelVulnerability returns h's CANCEL_VULN multiplier for the cancel and
-// cancel-debuff success-rate formulas (Formulas.java:949-951). classification
-// is unused: the reference applies CANCEL_VULN uniformly, without the
-// per-classification switch it uses for the other _VULN stats.
+// cancel-debuff success-rate formulas. classification is unused:
+// CANCEL_VULN applies uniformly, without the per-classification switch the
+// other _VULN stats use.
 func (h *Hostile) CancelVulnerability(_ string) float64 {
 	return h.CalcStat(stat.CancelVuln, 1)
 }

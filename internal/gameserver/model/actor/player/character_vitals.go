@@ -114,13 +114,12 @@ func (c *Character) CurrentCP() int {
 // ReduceCurrentHP subtracts non-negative HP and reports whether this call
 // newly killed the character.
 //
-// Death is a half-point threshold, not a zero crossing: the reference sets
-// HP and then dies on `_hp < 0.5` (PlayerStatus.java:222-239,
-// CreatureStatus.java:255-256), so any remainder under half a point is
+// Death is a half-point threshold, not a zero crossing: HP is set and the
+// character then dies on HP < 0.5, so any remainder under half a point is
 // already a death. A zero crossing would miss it, and the gap is reachable
 // rather than theoretical because the callers that gate on affordability
 // compare against truncated HP: a character on 10.4 HP reports 10, pays a
-// cost of 10 in full, and lands on 0.4 — dead in the reference, displayed
+// cost of 10 in full, and lands on 0.4 — dead, displayed
 // at 0 HP either way. The remainder is then cleared so a repeat call sees
 // an already-dead character.
 //

@@ -9,10 +9,10 @@ import (
 // OpcodeConfirmDlg is the wire opcode for ConfirmDlg.
 const OpcodeConfirmDlg = 0xed
 
-// ConfirmDlgSummonFriendRequest is SystemMessageId's
+// ConfirmDlgSummonFriendRequest is system message
 // S1_WISHES_TO_SUMMON_YOU_FROM_S2_DO_YOU_ACCEPT, the messageId skill
-// 1403's summon-confirm dialog carries (SummonFriend.java:78,
-// SystemMessageId.java:13579) and the id DlgAnswer's response echoes back.
+// 1403's summon-confirm dialog carries and the id DlgAnswer's response
+// echoes back.
 const ConfirmDlgSummonFriendRequest int32 = 1842
 
 // ConfirmDlgResurrectionRequest is SystemMessageId's
@@ -31,9 +31,8 @@ const (
 // FrameConfirmDlgSummonFriendRequest builds skill 1403's summon-confirm
 // dialog: messageId, the caster's name (TYPE_TEXT), the caster's position
 // (TYPE_ZONE_NAME), the client-UI countdown, and the caster's object id for
-// DlgAnswer's requesterId echo — matching ConfirmDlg.writeImpl's two-entry
-// branch (ConfirmDlg.java:113-159) as built by
-// SummonFriend.java:76-84 (addCharName/addZoneName/addTime/addRequesterId).
+// DlgAnswer's requesterId echo — ConfirmDlg's two-parameter layout followed
+// by the countdown and requester id.
 func FrameConfirmDlgSummonFriendRequest(casterName string, casterID int32, x, y, z int32, timeout time.Duration) wire.Frame {
 	w := newFrameWriter(OpcodeConfirmDlg)
 	w.WriteInt32(ConfirmDlgSummonFriendRequest)

@@ -64,8 +64,8 @@ func (e *Engine) CanMove(ox, oy, oz, tx, ty, tz int) bool {
 }
 
 // CanMoveAround reports whether the 3x3 geodata cell block centered on the
-// world position is fully open in every direction, matching Java's
-// GeoEngine.canMoveAround: a single point can sit on open ground yet still
+// world position is fully open in every direction: a single point can sit on
+// open ground yet still
 // be enclosed by blocked edges on every side, so a walkability check must
 // look at the surrounding cells rather than the cell alone.
 func (e *Engine) CanMoveAround(worldX, worldY, worldZ int) bool {
@@ -165,12 +165,12 @@ func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight
 	dy := ty - oy
 	m := float64(dy) / float64(dx)
 	dz := float64(tz) + theight - (float64(oz) + oheight)
-	// Java computes dx*dx+dy*dy in 32-bit int before widening to double, so a
+	// dx*dx+dy*dy is computed in 32-bit int before widening to float64, so a
 	// segment longer than ~46340 units in one axis overflows and can hand
-	// Math.sqrt a negative value (NaN) or a wrapped-around one. That silently
+	// math.Sqrt a negative value (NaN) or a wrapped-around one. That silently
 	// disables (or corrupts) the vertical obstacle check for the rest of the
-	// cast, which real oracle captures show as observable behavior — mirror
-	// the 32-bit overflow here instead of computing the true distance.
+	// cast, which is observable behavior — keep the 32-bit overflow here
+	// instead of computing the true distance.
 	mz := dz / math.Sqrt(float64(int32(dx)*int32(dx)+int32(dy)*int32(dy)))
 	dir := moveDirectionFor(gtx-gox, gty-goy)
 	gridX := alignCell(ox)
@@ -194,8 +194,8 @@ func (e *Engine) canSee(ox, oy, oz int, oheight float64, tx, ty, tz int, theight
 
 		current = e.blockAtGeo(gox, goy)
 		losZ := float64(oz) + oheight + float64(e.maxObstacleHeight)
-		// Same 32-bit overflow as the dz/mz slope above: Java squares these
-		// deltas as int before Math.sqrt.
+		// Same 32-bit overflow as the dz/mz slope above: these deltas are
+		// squared as int32 before math.Sqrt.
 		stepDX := int32(checkX - ox)
 		stepDY := int32(checkY - oy)
 		losZ += mz * math.Sqrt(float64(stepDX*stepDX+stepDY*stepDY))

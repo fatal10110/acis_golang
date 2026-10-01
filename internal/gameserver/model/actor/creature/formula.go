@@ -305,8 +305,8 @@ func ResolveBlowInput(attacker, target FormulaActor, def modelskill.Definition, 
 
 // ResolveManaDamageInput builds a mana-damage input from the caster/target
 // pair. Unlike the other three damage resolvers, target invulnerability is
-// checked here: Manadam.java's handler gates targetCreature.isInvul() before
-// computing calcManaDam or draining MP at all (Manadam.java:43-44), and no
+// checked here: the mana-damage handler checks the target's invulnerability
+// before computing mana damage or draining MP at all, and no
 // ReduceMP implementation applies its own invul guard afterward.
 //
 // It does not check the attacker's damage permission at all, unlike the
@@ -375,14 +375,13 @@ func PhysicalSkillCrit(attacker FormulaActor, def modelskill.Definition) bool {
 }
 
 // RandomDamageMultiplier returns the attacker's random damage multiplier for
-// physical skills. Mirrors Creature.getRandomDamageMultiplier
-// (Creature.java:1699-1710): weapon-random spread when a weapon supplies
-// one (Weapon.getRandomDamage() may legitimately be 0), else the weaponless
+// physical skills: weapon-random spread when a weapon supplies one (a
+// weapon's random damage may legitimately be 0), else the weaponless
 // fallback `5 + sqrt(level)`. RandomDamageSpread() returns -1 (not 0) to
 // signal "no weapon" — a weapon with an explicit or defaulted 0 spread
 // (e.g. the "Elrokian Trap", item 8763, which has no random_damage
-// attribute) must NOT fall back to the level formula, since Java's gate is
-// `activeWeapon != null`, not "spread > 0".
+// attribute) must NOT fall back to the level formula, since the gate is
+// "a weapon is active", not "spread > 0".
 func RandomDamageMultiplier(attacker FormulaActor, def modelskill.Definition) float64 {
 	if attacker == nil || SkillTypeKey(def.EffectType) == "CHARGEDAM" {
 		return 1

@@ -117,7 +117,7 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool) {
 // a bow takes its arrows into the left hand by itself, and a lure only goes
 // on over a fishing rod, replacing the lure worn, with no message and no
 // toggle off. Anything else answers ActionFailed, as UseItem does for any
-// item nothing uses (the reference drops it silently).
+// item nothing uses (the specified behavior drops it silently).
 func (l *GameClientLink) useOffHandItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) {
 	if tmpl.EtcItem == nil || tmpl.EtcItem.Type != item.EtcItemLure || !wieldsFishingRod(inv) {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -204,8 +204,8 @@ func sendUnequippedMessage(live *livePlayer, templateID int32, enchantLevel int)
 // instance in res.Changed contributes while equipped — item-attached
 // passive skills and equip modifiers — based on its current equip state.
 // Unequip and equip changes for the same paperdoll slot arrive in that
-// order (the old occupant first, the new one second), mirroring the
-// reference's unequip-before-equip listener sequencing for one slot swap.
+// order (the old occupant first, the new one second): a slot swap runs its
+// unequip listeners before its equip listeners.
 // Putting on or taking off formal wear always resends SkillList, since
 // every entry's greyed-out flag follows it.
 func (l *GameClientLink) applyEquipStatChanges(live *livePlayer, inv *itemcontainer.Inventory, res invops.Result) {
@@ -347,16 +347,15 @@ func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageAutoUseOfItemCancelled, req.ItemID))
 }
 
-// hasActiveSummon reports whether live has a summon in the world. It is the
-// counterpart of the reference's `player.getSummon() != null`, and answers
-// no for a summon cast still resolving its pets row: the reference's own
-// setSummon runs after Pet.restore returns (SummonCreature.java:58,64), so
-// its slot is empty across that read too.
+// hasActiveSummon reports whether live has a summon in the world, and
+// answers no for a summon cast still resolving its pets row: the summon
+// slot is filled only after the pet row is restored, so it is empty across
+// that read.
 // restoringSummon reports whether live has a summon cast that already hit
-// and is still resolving its pets row. It is the Go-side stand-in for the
-// casting state the reference holds across that read, for the gates the
-// reference closes with isCastingNow() — never for hasActiveSummon, which
-// has to keep answering as getSummon() does.
+// and is still resolving its pets row. It stands in for the casting state
+// held across that read, for the gates that refuse a player who is casting
+// — never for hasActiveSummon, which has to keep answering whether the
+// summon slot is filled.
 func (l *GameClientLink) restoringSummon(live *livePlayer) bool {
 	return live != nil && live.petRestoreInFlight.Load()
 }
@@ -371,9 +370,7 @@ func (l *GameClientLink) hasActiveSummon(live *livePlayer) bool {
 
 // activeServitorTarget returns live's active servitor as a
 // skilltarget.Actor, or nil if it has none, has a pet instead, or doesn't
-// expose that surface. Matches the reference's `player.hasServitor()` gate
-// (`Player.java:2986-2990`, checking `_summon instanceof Servitor`): a pet
-// alone does not qualify.
+// expose that surface. Only a servitor qualifies: a pet alone does not.
 func (l *GameClientLink) activeServitorTarget(live *livePlayer) skilltarget.Actor {
 	if l.world == nil || live == nil {
 		return nil
@@ -440,8 +437,8 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 // an access level without transactions, a trade or a store, fishing. The
 // distance is last, so none of these ever reads as too far.
 //
-// The reference also refuses an augmented item and, for a non-GM, a quest
-// item here; neither gets this far, since an augmented item is not
+// An augmented item and, for a non-GM, a quest item are refused here too;
+// neither gets this far, since an augmented item is not
 // droppable and a quest item is ignored above.
 func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.RequestDropItem) {
 	if !liveItemOpsAllowed(live) || l.groundItems == nil {
@@ -459,7 +456,7 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDiscardThisItem))
 		return
 	default:
-		// The reference ignores these requests without an answer;
+		// The specified behavior ignores these requests without an answer;
 		// ActionFailed releases the drag without a message.
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
@@ -604,8 +601,8 @@ func (l *GameClientLink) unequipDestroyedItem(live *livePlayer, inv *itemcontain
 }
 
 // crystallizeLiveItem answers RequestCrystallizeItem. A player running a
-// private store is refused first. The reference also refuses a player
-// already crystallizing, a flag that only guards this same handler against
+// private store is refused first. A player already crystallizing is
+// refused too, by a flag that only guards this same handler against
 // itself: requests run one at a time on the player's queue, so no second
 // crystallize can start while one is under way here.
 func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets.RequestCrystallizeItem) {
@@ -677,8 +674,7 @@ func (l *GameClientLink) broadcastEquipmentChange(live *livePlayer) {
 }
 
 // broadcastCharacterInfo resends UserInfo to live (refreshing its own
-// visible state) and CharInfo to every client that already knows about it,
-// matching the reference's broadcastUserInfo().
+// visible state) and CharInfo to every client that already knows about it.
 func (l *GameClientLink) broadcastCharacterInfo(live *livePlayer) {
 	items := live.inventoryItems()
 	live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
@@ -711,9 +707,9 @@ func (l *GameClientLink) processingTransaction(live *livePlayer) bool {
 
 // liveItemOpsAllowed reports whether live may currently manipulate items at
 // all: not gone and not dead. Drop/destroy/crystallize/enchant/pet-use gate
-// on this alone — RequestDropItem.java:36 checks isDead() only,
-// RequestDestroyItem.java/RequestEnchantItem.java check nothing, and
-// RequestPetUseItem.java:34 checks isAlikeDead()||pet.isDead(). Pickup does
+// on this alone — a drop checks only death, destroy and enchant check
+// nothing, and pet item use checks the owner's death-like state or the
+// pet's death. Pickup does
 // not gate on this alone; see liveItemInteractionAllowed and
 // livePickupBlockedDeferrable's comment (pickup.go).
 func liveItemOpsAllowed(live *livePlayer) bool {
@@ -723,10 +719,9 @@ func liveItemOpsAllowed(live *livePlayer) bool {
 // liveItemInteractionAllowed reports whether live may currently use or
 // equip/unequip an item, or pick one up off the ground: not gone, not dead,
 // and free of the crowd-control quartet that locks item interaction
-// (stunned, sleeping, paralyzed, or afraid). This is the union the reference
-// applies to UseItem.java:66 and RequestUnEquipItem.java:37 directly, and to
-// pickup indirectly via PlayableAI.tryToPickUp's denyAiAction() gate
-// (PlayableAI.java:411-417, Creature.java:636-639) — denyAiAction also folds
+// (stunned, sleeping, paralyzed, or afraid). This is the union applied to
+// UseItem and RequestUnEquipItem directly, and to pickup indirectly via the
+// AI's deny-action gate — which also folds
 // in teleporting/immobile-until-attacked/dead, which this port doesn't model
 // for pickup any more than it does for use/unequip (documented deferred
 // gaps).

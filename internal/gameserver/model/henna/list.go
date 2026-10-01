@@ -11,8 +11,8 @@ const (
 	MaxStatValue = 5
 )
 
-// Stat indexes match Java HennaType ordinal order used by HennaInfo and
-// the cached _stats array: INT, STR, CON, MEN, DEX, WIT.
+// Stat indexes follow the henna stat order HennaInfo writes and the
+// per-stat totals use: INT, STR, CON, MEN, DEX, WIT.
 type Stat int
 
 const (

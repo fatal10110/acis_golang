@@ -217,7 +217,7 @@ func (s *Store) manufactureCostLocked(recipeID int) (int, bool) {
 // Craft runs fn with the workshop held: no other order and no list change
 // can land while it runs. cost is what the workshop lists the recipe at.
 // A recipe the workshop does not list is not crafted: fn does not run and
-// Craft reports false. The reference crafts it for nothing; only a crafted
+// Craft reports false, rather than crafting it for nothing; only a crafted
 // order can name one, since the workshop window shows listed recipes only.
 func (s *Store) Craft(recipeID int, fn func(cost int)) bool {
 	s.mu.Lock()

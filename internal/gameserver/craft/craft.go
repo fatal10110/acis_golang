@@ -164,8 +164,8 @@ func (s *Service) MakeSelf(c *player.Character, recipeID int, busy bool) Attempt
 	if c.ReduceMP(float64(r.MPCost)) > 0 {
 		c.BroadcastStatus()
 	}
-	// The materials are checked again once the MP is paid, as the
-	// reference does before taking them.
+	// The materials are checked again once the MP is paid, before they
+	// are taken.
 	if missing := missingMaterials(c, r); len(missing) > 0 {
 		a.Notices = append(a.Notices, missing...)
 		return a

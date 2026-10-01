@@ -10,16 +10,15 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-// petNamePattern matches StringUtil.isValidString(name, "^[A-Za-z0-9]{1,16}$")
-// in RequestChangePetName.java.
+// petNamePattern is the valid pet name: 1 to 16 ASCII letters or digits.
 var petNamePattern = regexp.MustCompile(`^[A-Za-z0-9]{1,16}$`)
 
 type petNameStore interface {
 	NameTaken(context.Context, string) (bool, error)
 }
 
-// ownedPet resolves live's currently spawned pet actor, matching Java's
-// player.hasPet() check: it does not require a pet inventory, unlike
+// ownedPet resolves live's currently spawned pet actor: it does not
+// require a pet inventory, unlike
 // activePet (pet.go), which pet item transfers do.
 func (l *GameClientLink) ownedPet(live *livePlayer) (*summon.Actor, bool) {
 	if l == nil || live == nil || l.world == nil {
@@ -43,7 +42,7 @@ func (l *GameClientLink) ownedPet(live *livePlayer) (*summon.Actor, bool) {
 const renameTimeout = 5 * time.Second
 
 // handleRequestChangePetName runs RequestChangePetName's decoded gates in
-// reference order: no active pet is silent, then length, then the
+// the specified order: no active pet is silent, then length, then the
 // "already named" gate, then the character pattern, then the npc-name
 // collision, the pets-table uniqueness read, and the rename itself.
 //
@@ -84,8 +83,8 @@ func (l *GameClientLink) beginChangePetName(live *livePlayer, req clientpackets.
 	if l.npcs == nil || l.petStore == nil {
 		return nil
 	}
-	// Java checks the npc-name collision (silent reject) before checking
-	// the pets table (RequestChangePetName.java:63-71).
+	// The npc-name collision (silent reject) is checked before the pets
+	// table.
 	if _, ok := l.npcs.GetByName(req.Name); ok {
 		return nil
 	}
@@ -134,8 +133,8 @@ func (l *GameClientLink) finishChangePetName(live *livePlayer, name string, take
 	}
 	// Written on the control item's lane, behind any pet save already queued,
 	// so an older copy cannot land after it. The rename does not wait for the write:
-	// the reference only renames in memory and stores the name with the pet's
-	// next save, so a failed write is logged, not rolled back.
+	// the rename itself is in memory and the name is otherwise stored with
+	// the pet's next save, so a failed write is logged, not rolled back.
 	pets, log := l.petStore, l.log
 	l.persist.Enqueue(itemObjectID, func() {
 		saveCtx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)

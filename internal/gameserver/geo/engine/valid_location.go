@@ -13,8 +13,7 @@ import (
 // cell sits on a different floor, the origin is returned unchanged. A target
 // outside the geodata grid does not short-circuit: the walk runs toward it
 // and stops at the grid border it exits through, same as any other stop
-// condition (GeoEngine.java getValidLocation, GEO_CELLS_X/GEO_CELLS_Y bounds
-// check inside the loop).
+// condition (the grid-bounds check runs inside the walk loop).
 //
 // Used as the no-path fallback for movement requests: rather than refusing to
 // move at all when no pathfinder route exists, the actor advances as far as

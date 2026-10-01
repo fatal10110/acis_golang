@@ -12,12 +12,10 @@ import (
 )
 
 // dropScatterOffset is the +/- range applied to each stack's drop point
-// around the corpse, matching Npc.dropItem's item.dropMe(this, 70) call
-// (aCis Npc.java:2258).
+// around the corpse.
 const dropScatterOffset = 70
 
-// Loot-protection windows mirror ItemInstance's REGULAR_LOOT_PROTECTION_TIME
-// / RAID_LOOT_PROTECTION_TIME constants (aCis ItemInstance.java:53-54).
+// Loot-protection windows for a regular kill's drop and a raid kill's drop.
 const (
 	regularLootProtection = 15 * time.Second
 	raidLootProtection    = 300 * time.Second
@@ -76,9 +74,8 @@ type KillReward struct {
 // killer/monster level gap (see item.LevelPenaltyMultiplier); pool may be
 // nil for an unspoiled monster. dropperID is the dying NPC's object id, so
 // nearby observers see the loot fall from its corpse. geo scatters each
-// stack around (x, y, z) and validates the result against geodata,
-// matching ItemInstance.dropMe(Creature, int) (aCis ItemInstance.java:768-
-// 789); a nil geo drops every stack at the exact corpse position instead.
+// stack around (x, y, z) and validates the result against geodata; a nil
+// geo drops every stack at the exact corpse position instead.
 func NewKillReward(categories []item.DropCategory, pool *item.SpoilPool, levelMultiplier float64, raid bool, rates item.Rates, autoLootItems, autoLootHerbs bool, ids idAllocator, items *item.Table, ground groundPlacer, geo move.Geo, x, y, z, heading int, dropperID int32) *KillReward {
 	return &KillReward{
 		categories:      categories,
@@ -107,9 +104,8 @@ func NewKillReward(categories []item.DropCategory, pool *item.SpoilPool, levelMu
 func (k *KillReward) CalculateRewards(killer attackable.Combatant) {
 	receiver, isPlayer := killer.(rewardItemReceiver)
 	if isPlayer {
-		// Only a Playable kill gets its drop reserved, matching Npc.dropItem's
-		// `creature.getActingPlayer() != null` guard before setDropProtection
-		// (aCis Npc.java:2255-2256).
+		// Only a Playable kill gets its drop reserved: the killer must
+		// resolve to an acting player before drop protection is set.
 		k.protectOwnerID = killer.ObjectID()
 	}
 	rolled, herbs := item.RollKillReward(k.categories, k.pool, k.levelMultiplier, k.raid, k.rates, k.autoLootHerbs)

@@ -8,9 +8,8 @@ import (
 // hostileStatActor implements conditions.Actor, backed by *Hostile's real
 // position/movement/heading/active-effect state, mirroring
 // characterStatActor (model/actor/player/character_conditions.go). NPCs are
-// never conditions.PlayerActor, matching the Java reference
-// (ConditionUsingItemType/player-state conditions require
-// effector instanceof Player): a using/player/resting-tagged condition on
+// never conditions.PlayerActor (using-item and player-state conditions
+// require a Player effector): a using/player/resting-tagged condition on
 // an NPC owner correctly fails closed via conditionGate's type assertion,
 // not error. See #1509.
 var _ conditions.Actor = hostileStatActor{}
@@ -54,10 +53,9 @@ func (a hostileStatActor) Z() int { return a.h.Z() }
 func (a hostileStatActor) IsMoving() bool { return a.h.Move().Moving() }
 
 // IsRunning satisfies conditions.Actor. True unless this NPC was spawned in
-// walk stance (aCis Walkers.java onCreated's setWalkOrRun(false) for its
-// WALKING_NPCS id subset) — every other NPC's Npc.onSpawn calls
-// setWalkOrRun(true) and the Java reference never toggles an NPC back
-// (Creature's walk/run toggle is otherwise player-command driven only).
+// walk stance (the walker ids that spawn walking) — every other NPC spawns
+// running and nothing toggles an NPC back (the walk/run toggle is
+// otherwise player-command driven only).
 func (a hostileStatActor) IsRunning() bool { return a.h.Running() }
 
 // IsRiding satisfies conditions.Actor. Always false: NPCs are never

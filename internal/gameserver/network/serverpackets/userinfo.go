@@ -67,8 +67,8 @@ type UserInfoSnapshot struct {
 	Character *player.Character
 	Template  *player.Template
 	Items     []*item.Instance
-	// IsGM is the accessLevels.xml isGM flag for Character's access level
-	// (Player.isGM() in the reference), not merely AccessLevel > 0.
+	// IsGM is the accessLevels.xml isGM flag for Character's access level,
+	// not merely AccessLevel > 0.
 	IsGM bool
 	// SpawnProtectedTeam reports the team byte the client sees while spawn
 	// protection is active: TeamType.BLUE when spawn protection is enabled

@@ -24,7 +24,7 @@ func (b *Null) HeightNearest(cellX, cellY int, worldZ int32) int16 {
 }
 
 // NullHeight returns worldZ narrowed to the int16 range used by stored
-// geodata heights, matching Java's `(short) worldZ` conversion.
+// geodata heights by a truncating 16-bit conversion.
 func NullHeight(worldZ int32) int16 { return int16(worldZ) }
 
 // NSWENearest always returns AllDirections.

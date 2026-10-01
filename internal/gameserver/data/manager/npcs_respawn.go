@@ -205,8 +205,8 @@ func (n *Npcs) FolkCount() int {
 // pickPosition selects one spawn position from positions. A single entry
 // (the "fixed" declaration) is used exactly as declared, heading included.
 // Multiple entries (the "chance-weighted" declaration) are chosen by
-// rolling a percentage against each Chance in turn — and, matching the
-// reference server's own behavior for this shape, the winning entry's
-// declared heading is discarded in favor of a fresh random one. A weight
+// rolling a percentage against each Chance in turn — and, for this shape,
+// the winning entry's declared heading is discarded in favor of a fresh
+// random one. A weight
 // table that doesn't sum to 100 falls back to the last entry rather than
 // leaving the slot unspawned.

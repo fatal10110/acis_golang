@@ -21,7 +21,7 @@ type shotMessageSet struct {
 
 // shotMessages maps each shot handler name itemhandler.UseShot covers to
 // its client messages. Spirit and blessed-spirit share the same message
-// ids in the reference.
+// ids.
 var shotMessages = map[string]shotMessageSet{
 	itemhandler.SoulShotsHandler: {
 		noCapacity:    serverpackets.SystemMessageCannotUseSoulshots,
@@ -83,7 +83,7 @@ func (l *GameClientLink) chargeShot(live *livePlayer, inv *itemcontainer.Invento
 
 	switch res.Outcome {
 	case itemhandler.ShotAlreadyCharged:
-		// The reference treats this as a pure no-op, not a rejection of
+		// This is a pure no-op, not a rejection of
 		// something that changed: fully silent, no message, no
 		// ActionFailed.
 	case itemhandler.ShotNoCapacity:
@@ -143,13 +143,11 @@ func (l *GameClientLink) rechargeShots(live *livePlayer, inv *itemcontainer.Inve
 }
 
 // disableAutoShot turns off itemID's auto-shot flag and notifies the
-// client, matching Player.disableAutoShot's active-list branch
-// (Player.java:5106-5117: removeAutoSoulShot, ExAutoSoulShot(itemId, 0),
-// then AUTO_USE_OF_S1_CANCELLED). Called when a direct-use shot charge
+// client: the item leaves the active auto-shot list, then
+// ExAutoSoulShot(itemId, 0), then AUTO_USE_OF_S1_CANCELLED. Called when a direct-use shot charge
 // hits ShotNotEnoughItems while its item is auto-enabled, so a depleted
 // stack turns auto-shot off instead of leaving the client's auto icon lit
-// against a caster that can no longer charge (SoulShots.java:52-54,
-// SpiritShots.java:46-48, BlessedSpiritShots.java:48-50).
+// against a caster that can no longer charge.
 func (l *GameClientLink) disableAutoShot(live *livePlayer, itemID int32) {
 	live.SetAutoSoulShot(itemID, false)
 	live.SendFrame(serverpackets.FrameExAutoSoulShot(itemID, false))
@@ -157,8 +155,8 @@ func (l *GameClientLink) disableAutoShot(live *livePlayer, itemID int32) {
 }
 
 // replyShotRejection answers a shot-charge rejection: msg unless
-// autoEnabled suppresses it (matching the reference's own suppression for
-// an AutoSoulShot-enabled item), and ActionFailed when clicked so the
+// autoEnabled suppresses it (an AutoSoulShot-enabled item gets no
+// message), and ActionFailed when clicked so the
 // client's pending click resolves to something, per this codebase's
 // no-silent-rejection rule.
 func (l *GameClientLink) replyShotRejection(live *livePlayer, autoEnabled, clicked bool, msg int) {
@@ -213,8 +211,7 @@ func (l *GameClientLink) chargeBeastShot(live *livePlayer, inv *itemcontainer.In
 
 	switch res.Outcome {
 	case itemhandler.BeastShotAlreadyCharged:
-		// The reference treats this as a pure no-op: fully silent, no
-		// message, no ActionFailed.
+		// This is a pure no-op: fully silent, no message, no ActionFailed.
 	case itemhandler.BeastShotCallerIsSummon:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetCannotUseItem))
 	case itemhandler.BeastShotNoSummon:

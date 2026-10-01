@@ -18,8 +18,7 @@ func NewClientRegistry() *ClientRegistry {
 // Take claims accountName for client, replacing whatever connection held it
 // before. It reports the previously registered connection, if any, so the
 // caller can evict it: a second AuthLogin for an account in use takes the
-// account over rather than being rejected, matching LoginServerThread.addClient
-// (LoginServerThread.java:292-304).
+// account over rather than being rejected.
 func (r *ClientRegistry) Take(accountName string, client *Client) (evicted *Client, replaced bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

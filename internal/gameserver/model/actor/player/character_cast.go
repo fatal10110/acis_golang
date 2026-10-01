@@ -14,12 +14,12 @@ type CastController interface {
 	StopCast()
 	// CanAbortCast reports whether the active cast is still inside its
 	// interrupt window — the Esc cast-cancel path only fires at all when
-	// this is true (RequestTargetCancel.java:26 canAbortCast() gate).
+	// this is true.
 	CanAbortCast() bool
 	// InterruptCastOnDamage applies the damage-based cast-break rule to the
 	// live cast, using men/attackCancel/roll/immune resolved from the
-	// character taking the damage — the reference always resolves these
-	// from the interrupted creature, never the attacker.
+	// character taking the damage — these always come from the interrupted
+	// creature, never the attacker.
 	InterruptCastOnDamage(damage float64, men int, attackCancel func(float64) float64, roll int, immune bool) bool
 }
 
@@ -51,7 +51,7 @@ func (c *Character) CurrentSkillIsMagic() bool {
 
 // InterruptCast aborts c's in-progress cast if it is still inside its
 // interrupt window, sending CASTING_INTERRUPTED — the abort-cast effect's
-// path (EffectAbortCast.java uses interrupt(), not stop()).
+// path (an interrupt, not a plain stop).
 func (c *Character) InterruptCast() {
 	if cast := c.castController(); cast != nil {
 		cast.InterruptCast()
@@ -74,12 +74,11 @@ func (c *Character) CanAbortCast() bool {
 	return cast != nil && cast.CanAbortCast()
 }
 
-// breakCastOnDamage applies the reference's damage-based cast-interrupt
-// check (Formulas.calcCastBreak) to c's own in-progress cast. MEN and
-// ATTACK_CANCEL are always resolved from c, the creature taking the
-// damage, never the attacker — matching Formulas.calcCastBreak(target, dmg)
-// reading everything off target. calcCastBreak has no damage guard: even a
-// 0-damage hit rolls at rate clamped to [1,99], so this never short-circuits
+// breakCastOnDamage applies the damage-based cast-interrupt check to c's
+// own in-progress cast. MEN and ATTACK_CANCEL are always resolved from c,
+// the creature taking the damage, never the attacker. The check has no
+// damage guard: even a 0-damage hit rolls at rate clamped to [1,99], so
+// this never short-circuits
 // on damage <= 0.
 func (c *Character) breakCastOnDamage(damage float64) {
 	cast := c.castController()

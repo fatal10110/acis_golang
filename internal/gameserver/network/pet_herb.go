@@ -40,8 +40,8 @@ func (l *GameClientLink) consumePetHerb(live *livePlayer, pet *summon.Actor, inv
 			return
 		case itemhandler.Applied:
 		default:
-			// A herb with no usable skill only logs in the reference
-			// (ItemSkills.useItem); the client reads nothing for it.
+			// A herb with no usable skill is only logged; the client reads
+			// nothing for it.
 			return
 		}
 

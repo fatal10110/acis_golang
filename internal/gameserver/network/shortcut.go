@@ -11,14 +11,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-// registerShortcut mirrors the reference behavior for shortcut registration:
-// it accepts only well-formed items, actions, macros, recipes, and learned
+// registerShortcut handles shortcut registration: it accepts only
+// well-formed items, actions, macros, recipes, and learned
 // skills, and silently rejects everything else (bad page range, unknown type,
 // or a skill-shortcut for a skill the player doesn't have). Shortcuts are a
 // client-side UI convenience with no server-authoritative action lock — a
 // rejected registration can't freeze client input the way the silent-drop bug
-// class behind #829 freezes it, and the reference handler itself stays silent
-// on every rejection path — so this is left intentionally silent instead of
+// class behind #829 freezes it, and the specified handler stays silent on
+// every rejection path — so this is left intentionally silent instead of
 // patched with ActionFailed the way the action-locked handlers in #873 were.
 func (l *GameClientLink) registerShortcut(live *livePlayer, req clientpackets.RequestShortCutReg) {
 	if live == nil {
@@ -32,8 +32,8 @@ func (l *GameClientLink) registerShortcut(live *livePlayer, req clientpackets.Re
 	}
 	live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(live.Inventory(), sc)))
 	// An item no longer held or a recipe the book lacks still shows on the
-	// bar for this session, but is neither kept nor saved: the reference
-	// answers ShortCutRegister before its integrity check drops the entry.
+	// bar for this session, but is neither kept nor saved: ShortCutRegister
+	// is answered before the integrity check drops the entry.
 	switch {
 	case sc.Type == shortcut.Item && live.Inventory().ItemByObjectID(sc.ID) == nil:
 		return
@@ -44,10 +44,10 @@ func (l *GameClientLink) registerShortcut(live *livePlayer, req clientpackets.Re
 	l.saveShortcut(live, sc, "register shortcut")
 }
 
-// deleteShortcut mirrors the reference behavior: a delete on a page outside
-// the valid range, or for a slot the player has nothing in, returns nothing.
-// Same reasoning as registerShortcut above — silent rejection is intentional
-// Java parity for a UI packet that doesn't lock client input.
+// deleteShortcut ignores a delete on a page outside the valid range, or for
+// a slot the player has nothing in: it returns nothing. Same reasoning as
+// registerShortcut above — silent rejection is intentional parity for a UI
+// packet that doesn't lock client input.
 func (l *GameClientLink) deleteShortcut(live *livePlayer, req clientpackets.RequestShortCutDel) {
 	if live == nil || !shortcut.ValidDeletePage(req.Page) {
 		return
@@ -103,12 +103,10 @@ func isShotItem(templates *item.Table, templateID int32) bool {
 }
 
 // refreshSkillShortcuts re-points every shortcut slot bound to skillID at its
-// new level and resends each one, mirroring Player.addSkill's
-// updateShortcuts=true branch (Player.java:4581-4582 ->
-// ShortcutList.refreshShortcuts): the reward-skill grant and the manual
-// learn-a-skill acquisition both pass that flag (Player.java:3283,
-// RequestAcquireSkill.java:95,125), so a skill upgrade there must not leave
-// the shortcut bar showing the previous level.
+// new level and resends each one, as a skill grant that refreshes shortcuts
+// does: the reward-skill grant and the manual learn-a-skill acquisition both
+// refresh them, so a skill upgrade there must not leave the shortcut bar
+// showing the previous level.
 func (l *GameClientLink) refreshSkillShortcuts(live *livePlayer, skillID, level int32) {
 	if live == nil || live.shortcuts == nil {
 		return
@@ -121,10 +119,9 @@ func (l *GameClientLink) refreshSkillShortcuts(live *livePlayer, skillID, level 
 }
 
 // saveShortcut queues one shortcut row's write on the owner's persistence
-// lane. Nothing waits for it: the reference registers the shortcut in memory
-// and sends ShortCutRegister first, and only logs a failed insert
-// (ShortcutList.addShortcut, ShortcutList.refreshShortcuts), so the client's
-// reply never depends on the row landing.
+// lane. Nothing waits for it: the shortcut is registered in memory and
+// ShortCutRegister sent first, and a failed insert is only logged, so the
+// client's reply never depends on the row landing.
 func (l *GameClientLink) saveShortcut(live *livePlayer, sc shortcut.Shortcut, op string) {
 	if l.shortcuts == nil {
 		return

@@ -21,8 +21,8 @@ type DecayActor interface {
 
 // SummonDecayActor is a corpse-decay entry whose owner linkage is rechecked
 // each tick. When OwnerStillLinked reports false, the entry is removed without
-// invoking decay effects — matching the reference decay task's orphaned-summon
-// cancellation before its deadline check.
+// invoking decay effects; this orphaned-summon cancellation runs before the
+// deadline check.
 type SummonDecayActor interface {
 	DecayActor
 	OwnerStillLinked() bool

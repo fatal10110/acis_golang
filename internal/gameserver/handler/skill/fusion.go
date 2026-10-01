@@ -6,8 +6,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
-// fusionHandler ports FusionSkill's constructor (java FusionSkill.java:27-43):
-// a FUSION-skillType cast grows an existing live Fusion effect from its
+// fusionHandler starts a fusion skill at cast start: a FUSION-skillType cast
+// grows an existing live Fusion effect from its
 // triggered skill in place, or applies that triggered skill fresh.
 type fusionHandler struct {
 	defs Definitions

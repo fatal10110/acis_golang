@@ -30,8 +30,7 @@ func (groundHandler) FinalTarget(caster, _ Actor, _ *modelskill.Definition) Acto
 // point: real line of sight from the caster to that point, then whether the
 // skill's effect range around that point overlaps a peace zone attached to
 // the caster's own region. Only players track a ground-click point, so any
-// other caster is permissive, matching the reference restricting this target
-// type to players.
+// other caster is permissive: this target type is restricted to players.
 func GroundCastFailureFor(caster Actor, skill *modelskill.Definition) GroundCastFailure {
 	if caster.Kind() != actor.KindPlayer {
 		return GroundCastAllowed

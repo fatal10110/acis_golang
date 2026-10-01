@@ -9,14 +9,12 @@ type seedHandler struct{}
 
 func (seedHandler) Types() []string { return []string{"SEED"} }
 
-// Use ports L2SkillSeed.useSkill(): a target that already carries a live
-// seed effect from this exact skill grows its power in place instead of
-// getting a second instance. L2SkillSeed.useSkill() also loops every live
-// EffectSeed on the target through AbstractEffect.rescheduleEffect(), but
-// that call is a same-deadline no-op: startEffectTask()'s initialDelay is
-// derived from the effect's fixed construction-time _periodStartTime, which
-// rescheduleEffect() never mutates (AbstractEffect.java:264-270, 186-206,
-// 138-141), so it reproduces the original expiry instead of granting a
+// Use casts a seed skill: a target that already carries a live seed effect
+// from this exact skill grows its power in place instead of getting a
+// second instance. Every live seed effect on the target is also
+// rescheduled, but that is a same-deadline no-op: the new delay derives
+// from the effect's fixed construction-time period start, which rescheduling
+// never mutates, so it reproduces the original expiry instead of granting a
 // fresh period — recasting must not extend a live seed's duration. A target
 // with no existing seed effect from this skill gets a fresh one applied
 // normally.

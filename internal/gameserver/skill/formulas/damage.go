@@ -339,7 +339,7 @@ type MagicAffectedInput struct {
 	Defended            bool
 }
 
-// MagicAffected applies the reference magic landing threshold using gaussian.
+// MagicAffected applies the magic landing threshold using gaussian.
 func MagicAffected(in MagicAffectedInput, gaussian float64) bool {
 	defence := 0.
 	if in.Defended {

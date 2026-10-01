@@ -129,8 +129,7 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 		// hit-time stop answers with its reason alone: no ActionFailed, no
 		// heading toward the target and no MoveToPawn (those belong to the
 		// pet and NPC cast paths). A locked door is refused with no packet
-		// at all, matching the reference's silent return from its target
-		// check.
+		// at all: the target check returns silently.
 		if started.CanCastFailure && magicCastFailureReasonOnly(err) {
 			sendMagicCastFailureReason(live, started.Definition, err)
 			return
@@ -446,8 +445,8 @@ func (l *GameClientLink) walkToCastTarget(live *livePlayer, target skilltarget.A
 		refuseCastTooFar(live)
 		return true
 	}
-	// The reference leaves an immobile caster's CAST intention current with
-	// no packet; the request still owes its client an answer.
+	// The specified behavior leaves an immobile caster's CAST intention
+	// current with no packet; the request still owes its client an answer.
 	if live.move == nil || live.MovementDisabled() {
 		sendMagicActionFailed(live)
 		return true
@@ -633,7 +632,7 @@ func (l *GameClientLink) abortFusionTargeting(target *livePlayer) {
 }
 
 // handleMagicSkillUseGround records the client-supplied ground-click point
-// on the caster, height-snapped to geodata like the reference, then runs the
+// on the caster, height-snapped to geodata, then runs the
 // same cast pipeline an ordinary RequestMagicSkillUse drives — the ground
 // point itself is carried out-of-band via live.Character, not as this
 // cast's resolved target.
@@ -668,11 +667,10 @@ func (l *GameClientLink) handleMagicSkillUseGround(live *livePlayer, req clientp
 // drives for an ordinary active skill. The on/off decision happens inside
 // actorcast.ApplyToggle, but effect application/removal is this handler's
 // job, done only after the MagicSkillUse ack goes out — on both branches,
-// matching PlayerCast.doToggleCast broadcasting before either callSkill or
-// effect.exit() (PlayerCast.java:127 vs 135-137). The ack is handed to
-// ApplyToggle rather than sent on return, because the reference also
-// broadcasts it ahead of the MP/HP consume (:127 vs :139-165) and a cost
-// that kills the caster sends its own packets from inside that consume.
+// the broadcast precedes both the skill call and the effect exit. The ack
+// is handed to ApplyToggle rather than sent on return, because it is also
+// broadcast ahead of the MP/HP consume, and a cost that kills the caster
+// sends its own packets from inside that consume.
 func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpackets.RequestMagicSkillUse, selected world.Tracked) {
 	handlers := l.castEffects()
 	def, target, activated, err := actorcast.ApplyToggle(
@@ -719,10 +717,10 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 // broadcastCastAborted tells the caster and everyone watching it that an
 // in-flight cast was cancelled: the cancel animation goes to the whole
 // known list. interrupted additionally sends CASTING_INTERRUPTED to the
-// caster alone, matching CreatureCast.interrupt() vs the unconditional
-// stop(). The action-failed acknowledgement is not sent here: it belongs to
-// every Stop call, idle or in-flight (PlayerCast.stop()'s unconditional
-// clientActionFailed(), PlayerCast.java:381-387), so it is wired through
+// caster alone, which an interrupt does and a plain stop does not. The
+// action-failed acknowledgement is not sent here: it belongs to every Stop
+// call, idle or in-flight (a player's cast stop always sends it), so it is
+// wired through
 // the CastStopAck event instead of gated behind this in-flight-only path.
 func (l *GameClientLink) broadcastCastAborted(live *livePlayer, interrupted bool) {
 	if live == nil {
@@ -753,8 +751,8 @@ func sendMagicCastFailure(live *livePlayer, def modelskill.Definition, err error
 
 // sendItemConsumeFailure rejects an item-triggered cast whose required item
 // could not be destroyed (a stack-destroy race, not the skill's own
-// itemConsumeId precheck): NOT_ENOUGH_ITEMS (351), matching Java's
-// PlayableCast destroyItem failure, then the action-failed acknowledgement.
+// itemConsumeId precheck): NOT_ENOUGH_ITEMS (351), as for any failed item
+// destroy on a playable's cast, then the action-failed acknowledgement.
 func sendItemConsumeFailure(live *livePlayer) {
 	if live == nil {
 		return
@@ -829,12 +827,11 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 	case errors.Is(err, actorcast.ErrSkillDisabled):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1PreparedForReuse, int32(def.ID), int32(def.Level)))
 	case errors.Is(err, actorcast.ErrAllSkillsDisabled):
-		// No reason message: PlayableAI.tryToCast's denyAiAction() check (Java
-		// PlayableAI.java:299-303) runs before canAttemptCast/isSkillDisabled
-		// ever sees the actor, so the S1_PREPARED_FOR_REUSE branch
-		// (CreatureCast.java:324-327) is unreachable for a CC'd caster.
-		// PlayerAI.clientActionFailed() (PlayerAI.java:556-560) sends only
-		// ActionFailed, which sendMagicCastFailure (above) still sends via
+		// No reason message: the AI's deny-action check runs before the
+		// cast-attempt and skill-disabled checks ever see the actor, so the
+		// S1_PREPARED_FOR_REUSE branch is unreachable for a CC'd caster.
+		// The player AI's failure reply sends only ActionFailed, which
+		// sendMagicCastFailure (above) still sends via
 		// sendMagicActionFailed after this reason switch returns.
 	case errors.Is(err, actorcast.ErrInvalidTarget):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
@@ -878,9 +875,8 @@ func sendSkillConditionFailureVia(send frameSender, live *livePlayer, clause mod
 	}
 }
 
-// sendLaunchAbort sends the reference's distinct system message for a
-// launch-phase mid-cast revalidation failure. A lost target sends nothing,
-// matching CreatureCast.onMagicLaunch.
+// sendLaunchAbort sends the distinct system message for a launch-phase
+// mid-cast revalidation failure. A lost target sends nothing.
 func sendLaunchAbort(live *livePlayer, reason actorcast.LaunchAbortReason) {
 	if live == nil {
 		return

@@ -75,9 +75,8 @@ func recipeBookFrame(live *livePlayer, dwarven bool) wire.Frame {
 
 // destroyRecipe answers RequestRecipeBookDestroy: the recipe leaves the
 // book together with every shortcut pointing at it, then live sees the
-// deletion and its page again. On a subclass the book, the base class's,
-// keeps the recipe and its shortcuts; the deletion is still reported. An unknown recipe id is dropped without a
-// word, as the reference does; the book window stays as it was and no
+// deletion and its page again. An unknown recipe id is dropped without a
+// word, as specified; the book window stays as it was and no
 // client action waits on the answer.
 func (l *GameClientLink) destroyRecipe(live *livePlayer, req clientpackets.RequestRecipeBookDestroy) {
 	// The book of a running workshop is locked, the recipe kept.
@@ -104,8 +103,8 @@ func (l *GameClientLink) destroyRecipe(live *livePlayer, req clientpackets.Reque
 
 // sendRecipeItemMakeInfo answers RequestRecipeItemMakeInfo with the craft
 // window of any loaded recipe, whether or not live holds it. An unknown
-// recipe id gets nothing: the reference answers it with a packet carrying
-// no bytes at all, which the client has nothing to read from, and the
+// recipe id gets nothing: the specified answer is a packet carrying no
+// bytes at all, which the client has nothing to read from, and the
 // request leaves no client action waiting.
 func (l *GameClientLink) sendRecipeItemMakeInfo(live *livePlayer, req clientpackets.RequestRecipeItemMakeInfo) {
 	r, ok := l.craft.Recipe(int(req.RecipeID))
@@ -120,8 +119,8 @@ func sendRecipeMakeInfo(live *livePlayer, r recipe.Recipe, status int32) {
 	live.SendFrame(serverpackets.FrameRecipeItemMakeInfo(r, int32(res.CurrentMP), int32(res.MaxMP), status))
 }
 
-// makeRecipeSelf answers RequestRecipeItemMakeSelf. A request the reference
-// drops without a word stays silent here too: an unknown recipe, or one not
+// makeRecipeSelf answers RequestRecipeItemMakeSelf. A request specified to
+// drop without a word stays silent here too: an unknown recipe, or one not
 // on the matching page of live's book. The craft window only asks again on
 // the player's next click, so nothing waits on those.
 func (l *GameClientLink) makeRecipeSelf(live *livePlayer, req clientpackets.RequestRecipeItemMakeSelf) {
@@ -161,8 +160,8 @@ func (l *GameClientLink) useRecipeItem(live *livePlayer, inst *item.Instance, tm
 
 // queueRowWrite queues one row write on ownerID's persistence lane, where
 // character selection waits for it before reading the rows back. Nothing
-// waits for it here: the reference writes the row after changing the book
-// and only logs a failed write, so the client's answer never depends on it.
+// waits for it here: the row is written after the book changes and a failed
+// write is only logged, so the client's answer never depends on it.
 func (l *GameClientLink) queueRowWrite(ownerID int32, op string, write func(ctx context.Context, ownerID int32) error) {
 	l.persist.Enqueue(ownerID, func() {
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)

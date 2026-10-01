@@ -65,8 +65,8 @@ func (c *Character) WeightPenalty() int {
 	return c.weightPenalty
 }
 
-// weightPenaltySpeedMultiplier mirrors WeightPenalty's per-band speed
-// multiplier (WeightPenalty.java:5-9): NONE/LEVEL_1 1, LEVEL_2/LEVEL_3 0.5,
+// weightPenaltySpeedMultiplier is the weight penalty's per-band speed
+// multiplier: NONE/LEVEL_1 1, LEVEL_2/LEVEL_3 0.5,
 // LEVEL_4 0 — a fully overloaded player cannot move.
 func (c *Character) weightPenaltySpeedMultiplier() float64 {
 	switch c.WeightPenalty() {

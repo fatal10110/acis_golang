@@ -34,8 +34,8 @@ type inventoryUpdateEntry struct {
 // queue and weight state under their own lock. order tracks registration
 // order (oldest first) so a tick with several newly-registered inventories
 // — a give-to-pet touching both the player's and the pet's — sends them in
-// a deterministic sequence, matching the reference manager's list-based
-// visitation instead of Go map iteration order.
+// a deterministic sequence, in registration order instead of Go map
+// iteration order.
 //
 // epoch closes a check-then-remove race Tick would otherwise have: Add
 // bumps an inventory's epoch, and Tick only drops an entry found empty or

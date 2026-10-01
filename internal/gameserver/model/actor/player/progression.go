@@ -300,9 +300,8 @@ func (c *Character) addLevel(table *LevelTable, tmpl *Template, delta int, hooks
 	}
 
 	hooks.add(c.refreshForLevel)
-	// PlayerStatus.addLevel calls _actor.refreshWeightPenalty() directly
-	// on every level change (PlayerStatus.java:644), before the UserInfo
-	// send below (:648) — the weight limit is CON-derived and therefore
+	// Every level change refreshes the weight penalty directly, before the
+	// UserInfo send below — the weight limit is CON-derived and therefore
 	// level-dependent.
 	hooks.add(c.RefreshWeightPenalty)
 	// A rider's speeds halve once its mount outlevels it by more than 9.

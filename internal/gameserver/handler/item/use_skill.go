@@ -47,13 +47,12 @@ const (
 // caller can name it in a rejection reply. The ShortBuff* fields are only
 // meaningful on Applied when HasShortBuff is true: the caller drives the
 // caster's short-buff HUD state with them (after sending its own cast
-// packets, so the HUD update lands last on the wire, matching the
-// reference's own ordering).
+// packets, so the HUD update lands last on the wire).
 // SharedReuseGroup and ReuseMillis are only meaningful on Applied.
 // SharedReuseGroup is -1 when the item defines no shared-reuse group (the
-// caller sends no ExUseSharedGroupItem packet in that case), matching the
-// reference's addItemSkillTimeStamp, which reports the same shared-reuse
-// group and reuse timing for an instant-cast item as for an AI-cast one.
+// caller sends no ExUseSharedGroupItem packet in that case). An instant-cast
+// item reports the same shared-reuse group and reuse timing as an AI-cast
+// one.
 type UseResult struct {
 	Outcome Outcome
 	Skill   modelskill.Definition
@@ -64,15 +63,14 @@ type UseResult struct {
 	// summon, for a herb), returning the merged caster-visible result so
 	// the caller can feed it to its ATTACK_FAILED/counterattack/etc.
 	// reporting seam. It is set only on Applied and is the caller's job to
-	// invoke after sending its own cast-acknowledgment packets, matching
-	// the reference's send-then-apply cast sequencing.
+	// invoke after sending its own cast-acknowledgment packets: the cast is
+	// sent first, then applied.
 	Apply func() actorcast.EffectResult
 
 	// MirroredSummon is the servitor the herb's effect was mirrored onto,
 	// set only when that mirror happened. The caller broadcasts its own
-	// MagicSkillUse for it (caster and target both the servitor), matching
-	// the reference's mirrored `doInstantCast` broadcasting independently
-	// of the caster's own cast packet (`PlayerCast.java:104`).
+	// MagicSkillUse for it (caster and target both the servitor),
+	// independently of the caster's own cast packet.
 	MirroredSummon actorcast.Target
 
 	HasShortBuff             bool
@@ -125,10 +123,9 @@ type UseRequest struct {
 	// caster; ItemSkillsHandler items do not distinguish on this field.
 	IsPet bool
 
-	// Summon is the caster's active servitor, if any — never a pet, matching
-	// the reference's `player.hasServitor()` gate. A herb's effect is
-	// mirrored onto it in addition to Caster, matching the reference's
-	// `player.getSummon().getCast().doInstantCast(...)`. Nil when the caster
+	// Summon is the caster's active servitor, if any — never a pet. A herb's
+	// effect is mirrored onto it, as its own instant cast, in addition to
+	// Caster. Nil when the caster
 	// has no active servitor, or is itself one (IsPet), leaves the mirror
 	// unapplied.
 	Summon skilltarget.Actor
@@ -221,8 +218,8 @@ func UseAll(req UseRequest) []UseResult {
 
 // shortBuffDecision decides whether def should drive the item-window
 // short-buff HUD slot: it's one of the healing-potion-family skills, and
-// its id doesn't lose to whatever short buff is already showing — the
-// reference's own gate (`skillInfo.getId() >= player.getShortBuffTaskSkillId()`).
+// its id doesn't lose to whatever short buff is already showing (its skill
+// id is at least the showing short buff's skill id).
 // It only reads caster's current HUD state; actually updating that state
 // (and sending the packet) is the caller's job once its own cast packets
 // are already on the wire.
@@ -282,9 +279,8 @@ func ResolveAICastSkills(tmpl *modelitem.Template, defs actorcast.Definitions) [
 // cooldown key, taking the longer of the skill's own reuse delay and the
 // item's, the way an item-carried skill's timestamp is recorded. It
 // reports that reuse delay in milliseconds regardless of whether it
-// installed a cooldown, matching the reference's addItemSkillTimeStamp,
-// which reports the same reuse value on the shared-reuse-group packet
-// even when the delay is too short to disable the skill.
+// installed a cooldown: the shared-reuse-group packet carries the same reuse
+// value even when the delay is too short to disable the skill.
 func installItemReuse(caster SkillCaster, def modelskill.Definition, reuseKey int32, itemReuseDelay int32) int {
 	reuse := time.Duration(def.ReuseDelay) * time.Millisecond
 	if item := time.Duration(itemReuseDelay) * time.Millisecond; item > reuse {

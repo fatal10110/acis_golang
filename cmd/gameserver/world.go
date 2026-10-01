@@ -87,9 +87,8 @@ func startNpcs(npcs *manager.Npcs, log zerolog.Logger) {
 }
 
 // startNpcPersistence syncs every live database-tracked spawn's current
-// HP/position into its spawn.State row and saves spawn_data at shutdown,
-// mirroring the reference server's own save-on-shutdown behavior. The save
-// runs under its own budget: it stops ahead of the final item flush, and on a
+// HP/position into its spawn.State row and saves spawn_data at shutdown. The
+// save runs under its own budget: it stops ahead of the final item flush, and on a
 // slow database it would otherwise spend the rest of the stop budget.
 func startNpcPersistence(lc fx.Lifecycle, npcs *manager.Npcs, spawns *manager.Spawns, store *gamesql.SpawnStore, log zerolog.Logger) {
 	lc.Append(fx.Hook{

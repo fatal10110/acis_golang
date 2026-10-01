@@ -23,8 +23,8 @@ type ExtractableProduct struct {
 // string into its product rows: semicolon-separated groups, each a comma-
 // separated list of item id/quantity pairs followed by a trailing percent
 // chance (e.g. "57,10,20.5;1234,1,5678,2,79.5"). A malformed group is
-// skipped rather than failing the whole skill, matching the reference
-// parser's per-group error tolerance.
+// skipped rather than failing the whole skill: parse errors are tolerated
+// per group.
 func ParseExtractableItems(raw string) []ExtractableProduct {
 	if raw == "" {
 		return nil
@@ -56,8 +56,7 @@ func parseExtractableGroup(group string) (ExtractableProduct, bool) {
 		if err != nil {
 			return ExtractableProduct{}, false
 		}
-		// A quantity past the 32-bit range fails its group, as the
-		// reference's Integer.parseInt does.
+		// A quantity past the 32-bit range fails its group.
 		quantity, err := strconv.ParseInt(fields[i+1], 10, 32)
 		if err != nil {
 			return ExtractableProduct{}, false

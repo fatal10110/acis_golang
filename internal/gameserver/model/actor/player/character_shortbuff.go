@@ -9,8 +9,8 @@ import (
 // ShortBuffTaskSkillID returns the skill id of the short buff currently
 // showing on the item-window HUD slot, or 0 if none. Callers deciding
 // whether a newly used skill should override the current HUD slot compare
-// against this the way the reference does: only a numerically >= skill id
-// takes over a running countdown.
+// against this: only a numerically >= skill id takes over a running
+// countdown.
 func (c *Character) ShortBuffTaskSkillID() int32 {
 	c.stateMu.RLock()
 	defer c.stateMu.RUnlock()
@@ -21,9 +21,9 @@ func (c *Character) ShortBuffTaskSkillID() int32 {
 // countdown for skillID/level, cancelling any timer already running for a
 // previous short buff, and schedules an automatic clear broadcast once
 // durationSeconds elapses. It unconditionally broadcasts and reschedules
-// when called; gating which skills reach this call (the reference only
-// calls its equivalent for the HP-potion skill family, and only when
-// skillID is numerically >= ShortBuffTaskSkillID) is the caller's job.
+// when called; gating which skills reach this call (only the HP-potion
+// skill family, and only when skillID is numerically >=
+// ShortBuffTaskSkillID) is the caller's job.
 func (c *Character) UpdateShortBuff(skillID, level, durationSeconds int32) {
 	c.stateMu.Lock()
 	if c.shortBuffTimer != nil {

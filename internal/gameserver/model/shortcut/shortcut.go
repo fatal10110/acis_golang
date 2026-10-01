@@ -51,10 +51,9 @@ type Shortcut struct {
 	ID            int32
 	Level         int32
 	CharacterType int32
-	// SharedReuseGroup mirrors Java's Shortcut._sharedReuseGroup, which
-	// defaults to -1 and is only ever populated for an ITEM shortcut on
-	// restore (ShortcutList.java:173-209) — never persisted, always
-	// recomputed from the live inventory. See RestoreItemShortcuts.
+	// SharedReuseGroup defaults to -1 and is only ever populated for an
+	// ITEM shortcut on restore — never persisted, always recomputed from
+	// the live inventory. See RestoreItemShortcuts.
 	SharedReuseGroup int32
 }
 
@@ -118,20 +117,20 @@ func Starter() []Shortcut {
 	}
 }
 
-// TutorialBookItemID is the reference-hardcoded template id of the tutorial
-// guide granted to every base profession (RequestCharacterCreate.java:150).
+// TutorialBookItemID is the fixed template id of the tutorial guide granted
+// to every base profession.
 const TutorialBookItemID = 5588
 
 // TutorialBookShortcut returns the slot-11 ITEM shortcut for the tutorial
 // book granted at character creation, keyed on the granted instance's own
 // objectID rather than the template id — the client cannot resolve an ITEM
-// shortcut any other way (RequestCharacterCreate.java:149-151).
+// shortcut any other way.
 func TutorialBookShortcut(objectID int32) Shortcut {
 	return Shortcut{Slot: 11, Page: 0, Type: Item, ID: objectID, Level: -1, CharacterType: 1, SharedReuseGroup: -1}
 }
 
-// Auto-get skill ids RequestCharacterCreate.java:157-164 hardcodes to a
-// starter shortcut slot: 1001 (orc mystics) and 1177 (other mystics) share
+// Auto-get skill ids that get a fixed starter shortcut slot: 1001 (orc
+// mystics) and 1177 (other mystics) share
 // slot 1, 1216 shares slot 9. Any other auto-get skill id gets no shortcut.
 const (
 	autoGetSkillOrcMystic   int32 = 1001
@@ -140,9 +139,8 @@ const (
 )
 
 // AutoGetSkillShortcuts returns the default shortcut-bar entries for a new
-// character's free (auto-get) skills, given their id/level pairs. It mirrors
-// RequestCharacterCreate.java:157-164, which hardcodes the shortcut level to
-// 1 rather than the granted skill's own level.
+// character's free (auto-get) skills, given their id/level pairs. The
+// shortcut level is always 1 rather than the granted skill's own level.
 func AutoGetSkillShortcuts(autoGet map[int32]int32) []Shortcut {
 	var out []Shortcut
 	for id := range autoGet {
@@ -228,10 +226,9 @@ func (l *List) All() []Shortcut {
 }
 
 // RefreshSkillLevel sets level on every SKILL shortcut referencing skillID
-// and returns the updated entries, ordered by page then slot. It mirrors
-// Java's ShortcutList.refreshShortcuts(predicate, level) for the skill-id
-// predicate: callers use it to re-point shortcut slots at a skill's new
-// level after a grant or upgrade.
+// and returns the updated entries, ordered by page then slot. Callers use it
+// to re-point shortcut slots at a skill's new level after a grant or
+// upgrade.
 func (l *List) RefreshSkillLevel(skillID, level int32) []Shortcut {
 	if l == nil || l.bySlot == nil {
 		return nil
@@ -255,8 +252,8 @@ func (l *List) RefreshSkillLevel(skillID, level int32) []Shortcut {
 // when ok is true.
 type ItemLookup func(objectID int32) (group int32, ok bool)
 
-// RestoreItemShortcuts mirrors ShortcutList.restore()'s per-row ITEM handling
-// (ShortcutList.java:173-209): an ITEM shortcut whose item no longer exists
+// RestoreItemShortcuts is the per-row ITEM handling of a shortcut restore:
+// an ITEM shortcut whose item no longer exists
 // in the owner's inventory is dropped, and every surviving ITEM shortcut has
 // its SharedReuseGroup populated via lookup. Other shortcut types pass
 // through unchanged.
