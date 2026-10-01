@@ -450,8 +450,9 @@ func (l *GameClientLink) completeClassChange(live *livePlayer, ch *classChange, 
 // state: the worn items' bonuses and the skills of the class left go, the
 // effects that do not outlast death end, a servitor and the cubics leave,
 // and the new class's skills, hennas, shortcuts, effects and reuse timers
-// come in its place, the recipe book with the base class alone. The client
-// is shown the result in the order the reference sends it.
+// come in its place, the recipe book with the base class alone; the party's
+// level follows the new class's level and the clan's skills come back. The
+// client is shown the result in the order the reference sends it.
 func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChangeRows) {
 	c := live.Character
 	classID := c.BaseClassID
@@ -473,9 +474,10 @@ func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChan
 	c.ClearCharges()
 	c.SwitchClass(index, tmpl)
 	c.RestoreVitals(tmpl)
-	// The party's level follows here, and the noble, hero, clan and siege
-	// skills come back after the class's own, once those systems exist
-	// (#3071).
+	// The party's level follows the level of the class switched to.
+	if l.parties != nil {
+		l.parties.RecalculateLevel(live.ObjectID())
+	}
 	l.unsummonServitor(live)
 	if l.skills != nil {
 		l.skills.RemoveAllSkills(c)
@@ -497,6 +499,13 @@ func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChan
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("class change: give skills")
 		}
 		live.SendFrame(serverpackets.FrameSkillList(skillListEntries(c, l.skills)))
+		// The skills held outside the class come back after that list,
+		// which does not show them: the clan's skills here; the noble and
+		// hero skills before them (#3203) and a clan leader's siege skills
+		// after them (#3150) once those systems exist.
+		if cl, ok := l.clanService().ClanOf(c); ok {
+			l.giveClanSkills(live, cl, c.PledgeClass())
+		}
 		// The death penalty's passive stats are not a learned skill's:
 		// they stay through the change, as the reference gives them back.
 		l.equipItemStats(live, inv)
