@@ -9,8 +9,8 @@ import (
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 )
 
-// ClanStore reads and writes clan_data, clan_privs and the clan columns of
-// characters.
+// ClanStore reads and writes clan_data, clan_privs, clan_skills and the
+// clan columns of characters.
 type ClanStore struct {
 	db *sql.DB
 }
@@ -78,6 +78,22 @@ func (s *ClanStore) Load(ctx context.Context) (clan.Snapshot, error) {
 	}
 	if err := closeRows(rows); err != nil {
 		return snap, fmt.Errorf("load clan privileges: %w", err)
+	}
+
+	rows, err = s.db.QueryContext(ctx, `SELECT clan_id, skill_id, skill_level FROM clan_skills`)
+	if err != nil {
+		return snap, fmt.Errorf("load clan skills: %w", err)
+	}
+	for rows.Next() {
+		var r clan.SkillRow
+		if err := rows.Scan(&r.ClanID, &r.ID, &r.Level); err != nil {
+			rows.Close()
+			return snap, fmt.Errorf("load clan skills: %w", err)
+		}
+		snap.Skills = append(snap.Skills, r)
+	}
+	if err := closeRows(rows); err != nil {
+		return snap, fmt.Errorf("load clan skills: %w", err)
 	}
 	return snap, nil
 }
@@ -203,6 +219,17 @@ func (s *ClanStore) UpdateCrest(ctx context.Context, clanID int32, typ datacache
 	}
 	if _, err := s.db.ExecContext(ctx, query, crestID, clanID); err != nil {
 		return fmt.Errorf("update clan %d crest: %w", clanID, err)
+	}
+	return nil
+}
+
+// SaveSkill stores a clan skill at its level, replacing the level stored
+// before.
+func (s *ClanStore) SaveSkill(ctx context.Context, clanID int32, sk clan.Skill) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO clan_skills (clan_id,skill_id,skill_level) VALUES (?,?,?) ON DUPLICATE KEY UPDATE skill_level=VALUES(skill_level)`,
+		clanID, sk.ID, sk.Level)
+	if err != nil {
+		return fmt.Errorf("store clan %d skill %d: %w", clanID, sk.ID, err)
 	}
 	return nil
 }
