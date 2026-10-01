@@ -94,7 +94,6 @@ M2 required client packets are complete:
 
 Missing M3 data/UI client packets:
 
-- `RequestBBSwrite`
 - `RequestSetAllyCrest`
 - `RequestBuyProcure`
 - `RequestBuySeed`
@@ -116,7 +115,7 @@ are implemented and wired ([#593](https://github.com/fatal10110/acis_golang/issu
 
 Implemented and wired M3 data/UI client packets in Go:
 
-- `RequestBypassToServer` (`player_help` help pages; `npc_<objectId>_<command>` validated against the last sent page and routed to the civilian NPC in interaction distance for its `Chat`, `Link`, merchant `Sell` and karma-gate answers and a merchant's `Buy` and `Wear` windows; the other NPC dialog commands and the admin, quest, community-board, hero, olympiad, and manor families are logged and answered `ActionFailed` until their systems exist)
+- `RequestBypassToServer` (`player_help` help pages; `npc_<objectId>_<command>` validated against the last sent page and routed to the civilian NPC in interaction distance for its `Chat`, `Link`, merchant `Sell` and karma-gate answers and a merchant's `Buy` and `Wear` windows; community board links go to the board; the other NPC dialog commands and the admin, quest, hero, olympiad, and manor families are logged and answered `ActionFailed` until their systems exist)
 - `RequestSellItem` (sells to the targeted merchant or mercenary manager in interaction distance: sellable rows go for half their reference price in adena, then the merchant's sold page)
 - `RequestLinkHtml`
 - `RequestBuyItem`
@@ -125,6 +124,7 @@ Implemented and wired M3 data/UI client packets in Go:
 - `RequestExPledgeCrestLarge`
 - `RequestPledgeCrest`
 - `RequestSetPledgeCrest` and `RequestExSetPledgeCrestLarge` (clan crest upload and deletion: dissolution, privilege and clan level 3 checks, the image saved to the crest cache under a fresh id, the clan_data column stored, and every online member's UserInfo and CharInfo refreshed)
+- `RequestShowBoard` and `RequestBBSwrite` (the community board, behind `EnableCommunityBoard`: the home, mail, friends/block and clan boards answer with `ShowBoard`; the memo, favorites and region boards show the board's unknown-command page until #3201 and #3202; with the board off every board command answers `CB_OFFLINE`)
 - `RequestCursedWeaponList`
 - `RequestCursedWeaponLocation` (accepted; no response is emitted while no cursed weapon is active)
 
@@ -207,19 +207,17 @@ Implemented and wired EnterWorld burst packets in Go:
 - `FriendList`
 - `ShortCutInit`
 - `Die`
+- unread-mail notice: `SystemMessage` NEW_MAIL, `PlaySound`, `ExMailArrived` (board on)
+- `NpcHtmlMessage` clan notice (board on) or server news (`ShowServerNews`)
 - `SkillCoolTime`
 - `PledgeSkillList` for a clan member, first in the clan block; also `PledgeSkillListAdd` to every online member as the clan learns a skill ([#717](https://github.com/fatal10110/acis_golang/issues/717))
 
-Remaining EnterWorld burst packet gaps:
+No EnterWorld burst packet gap remains.
 
-- `ExMailArrived` ([#718](https://github.com/fatal10110/acis_golang/issues/718))
-- `PlaySound` ([#719](https://github.com/fatal10110/acis_golang/issues/719))
-- `NpcHtmlMessage` clan notice / server news ([#2951](https://github.com/fatal10110/acis_golang/issues/2951))
-
-`PledgeShowMemberListUpdate` ([#631](https://github.com/fatal10110/acis_golang/issues/631)),
-`PledgeShowMemberListAll` ([#632](https://github.com/fatal10110/acis_golang/issues/632)),
-`ExMailArrived`, and `PlaySound`
-currently have Go frame builders only. `NpcHtmlMessage` is wired for civilian NPC chat windows
+`PledgeShowMemberListUpdate` ([#631](https://github.com/fatal10110/acis_golang/issues/631)) and
+`PledgeShowMemberListAll` ([#632](https://github.com/fatal10110/acis_golang/issues/632))
+currently have Go frame builders only. `ExMailArrived` and `PlaySound` are also sent to an online
+recipient when community board mail reaches it. `NpcHtmlMessage` is wired for civilian NPC chat windows
 (`talkToFolk`, #720), link and help pages, and the arena signboard. `SellList` is sent by a merchant's or fisherman's `Sell` dialog command. The augmentation variation packets
 `ExShowVariationMakeWindow`, `ExShowVariationCancelWindow` (the blacksmith's `Augment 1` and
 `Augment 2` dialog commands), `ExConfirmVariationItem`, `ExConfirmVariationRefiner`,

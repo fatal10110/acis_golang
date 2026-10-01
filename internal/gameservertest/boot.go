@@ -21,6 +21,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -140,6 +141,9 @@ type options struct {
 	seedSevenSigns         func(*gamesql.SevenSignsStore)
 	clanConfig             *clan.Config
 	seedClans              func(db *sql.DB)
+	board                  bbs.Config
+	seedBoard              func(db *sql.DB)
+	serverNews             bool
 	clanClock              func() time.Time
 	npcs                   *npc.Table
 	summonItems            *item.SummonItemTable
@@ -514,6 +518,24 @@ func WithClanConfig(cfg clan.Config) Option {
 // before the clans are restored from them.
 func WithClanSeed(seed func(db *sql.DB)) Option {
 	return func(o *options) { o.seedClans = seed }
+}
+
+// WithCommunityBoard sets the community board's server.properties
+// settings (default off, opening on _bbshome). With the board on, the mail
+// stored in bbs_mail is restored once the characters and clans are seeded.
+func WithCommunityBoard(cfg bbs.Config) Option {
+	return func(o *options) { o.board = cfg }
+}
+
+// WithBoardSeed runs seed against the database after the characters and
+// clans are seeded and before the board's mail is restored.
+func WithBoardSeed(seed func(db *sql.DB)) Option {
+	return func(o *options) { o.seedBoard = seed }
+}
+
+// WithServerNews sets server.properties ShowServerNews (default false).
+func WithServerNews(shown bool) Option {
+	return func(o *options) { o.serverNews = shown }
 }
 
 // WithClanClock times clan invitations out on now instead of the wall
@@ -1268,8 +1290,14 @@ const shutdownDrainTimeout = 10 * time.Second
 // ItemInstances save, tracked ground items back into items_on_ground — and
 // then tears the stack down. Restart tests call it on the first Boot cycle
 // so the second Boot restores what the first died holding.
+//
+// It first settles, as the production stop order closes the listener and
+// stops the actor pool before those saves: a request still being handled —
+// a drop whose DropItem frame is already out but whose ground item is not
+// yet tracked — finishes before anything is snapshotted.
 func (s *Server) Shutdown(tb testing.TB) {
 	tb.Helper()
+	s.Settle(tb)
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
 	defer cancel()
 	if err := s.ItemInstances.Save(ctx); err != nil {
@@ -1721,6 +1749,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		clanConfig = *o.clanConfig
 	}
 	gclConfig.Clans = clan.NewService(clan.NewTable(), clanStore, persistWorker, ids, clanConfig, o.clanClock, o.log)
+	// The mail is restored once the characters are seeded, below.
+	mailStore := gamesql.NewMailStore(db)
+	gclConfig.Board, gclConfig.ShowServerNews = o.board, o.serverNews
+	if o.board.Enabled {
+		gclConfig.Mailbox = bbs.NewMailbox(mailStore, persistWorker, o.log)
+	}
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
 	gclConfig.ArmorSets = o.armorSets
 	gclConfig.Relations, gclConfig.Characters, gclConfig.FriendInviteClock = relations, chars, o.friendInviteClock
@@ -1890,6 +1924,16 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	gclConfig.Clans.Table().Restore(clanRows, clanNow, clanConfig.JoinDays)
 	gclConfig.Clans.DropMissingCrests(crests)
+	if o.seedBoard != nil {
+		o.seedBoard(db)
+	}
+	if gclConfig.Mailbox != nil {
+		mails, _, err := mailStore.Load(context.Background())
+		if err != nil {
+			t.Fatalf("load mail: %v", err)
+		}
+		gclConfig.Mailbox.Restore(mails)
+	}
 
 	c := testsupport.Dial(t, ln.Addr().String())
 	c.SendProtocolVersion(746)

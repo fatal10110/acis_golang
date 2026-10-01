@@ -83,6 +83,8 @@ type livePlayer struct {
 	replayingEffects atomic.Bool
 	shortcuts        *shortcut.List
 	macros           *macro.List
+	// board is the player's community board session; owned by its queue.
+	board boardSession
 	// access is the character's access level, resolved at login and
 	// replaced by setAccessLevel on p's queue; any goroutine reads it
 	// through accessLevel.
@@ -689,6 +691,16 @@ func (p *livePlayer) tryToIdle(denied bool) {
 		return
 	}
 	busy := p.CastingNow() || (p.attack != nil && p.attack.AttackingNow()) || inPostureTransition(p)
+	p.goIdle()
+	if busy {
+		p.SendFrame(serverpackets.FrameActionFailed())
+	}
+}
+
+// goIdle drops every intention p holds, active and queued, and stops its
+// movement, answering nothing: the idle a refused stand takes, whose
+// refusal sends its own ActionFailed.
+func (p *livePlayer) goIdle() {
 	p.dropHeldIntention()
 	p.takePickup()
 	p.takeDeferredPickup()
@@ -701,9 +713,6 @@ func (p *livePlayer) tryToIdle(denied bool) {
 	p.takeInteract()
 	if p.combat != nil {
 		p.combat.Stop()
-	}
-	if busy {
-		p.SendFrame(serverpackets.FrameActionFailed())
 	}
 }
 

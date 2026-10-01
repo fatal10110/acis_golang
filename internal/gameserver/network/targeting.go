@@ -671,8 +671,7 @@ func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target 
 	// get-up, then the player gets up again. During a get-up the player is
 	// not seated, and the request is refused below as a stand while not
 	// seated.
-	if stand && live.Seated() && live.FakeDead() {
-		live.GetUpFromFakeDeath()
+	if stand && live.StandFromFakeDeath() {
 		return
 	}
 	if !stand {

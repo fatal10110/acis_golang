@@ -83,6 +83,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x1f: true, // buy item
 		0x20: true, // request linked html
 		0x21: true, // request bypass command
+		0x22: true, // community board write
 		0x23: true, // dummy packet
 		0x24: true, // invite into a clan
 		0x25: true, // answer a clan invitation
@@ -121,6 +122,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x51: true, // surrender a clan war
 		0x52: true, // answer a surrender proposal
 		0x53: true, // upload pledge crest
+		0x57: true, // open the community board
 		0x58: true, // enchant item
 		0x59: true, // destroy item
 		0x5b: true, // admin command typed in chat
@@ -163,6 +165,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x9f: true, // package send
 		0xa0: true, // block list commands
 		0xa7: true, // multisell exchange
+		0xaa: true, // user command
 		0xac: true, // open recipe book
 		0xad: true, // delete a recipe
 		0xae: true, // recipe craft window

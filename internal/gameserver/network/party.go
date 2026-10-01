@@ -301,4 +301,6 @@ var partyMessages = map[party.MessageID]int{
 	party.MsgChannelDisbanded:          serverpackets.SystemMessageCommandChannelDisbanded,
 	party.MsgDismissedFromChannel:      serverpackets.SystemMessageDismissedFromCommandChannel,
 	party.MsgPartyDismissedFromChannel: serverpackets.SystemMessageS1PartyDismissedFromCommandChannel,
+	party.MsgLeftChannel:               serverpackets.SystemMessageLeftCommandChannel,
+	party.MsgPartyLeftChannel:          serverpackets.SystemMessageS1PartyLeftCommandChannel,
 }

@@ -72,6 +72,7 @@ type Clan struct {
 	allyPenaltyType   int
 	charPenaltyExpiry int64
 	dissolvingExpiry  int64
+	board             board
 
 	members    map[int32]*Member
 	privileges map[int]int32

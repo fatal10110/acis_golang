@@ -336,6 +336,20 @@ const clanPrivsSchema = "CREATE TABLE IF NOT EXISTS `clan_privs` (\n" +
 	"  PRIMARY KEY (`clan_id`,`ranking`)\n" +
 	")"
 
+// bbsMailSchema mirrors the shipped bbs_mail table definition verbatim.
+const bbsMailSchema = "CREATE TABLE IF NOT EXISTS `bbs_mail` (\n" +
+	"  `id` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `receiver_id` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `sender_id` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `location` VARCHAR(15) NOT NULL,\n" +
+	"  `recipients` VARCHAR(200) DEFAULT NULL,\n" +
+	"  `subject` VARCHAR(128) DEFAULT NULL,\n" +
+	"  `message` VARCHAR(3000) DEFAULT NULL,\n" +
+	"  `sent_date` TIMESTAMP NULL DEFAULT NULL,\n" +
+	"  `is_unread` SMALLINT(1) DEFAULT 1,\n" +
+	"  PRIMARY KEY  (`id`)\n" +
+	")"
+
 // accountsSchema mirrors the shipped accounts table definition verbatim.
 // The login server owns it; the game server's behavior harness runs a login
 // server on the same database.
@@ -408,6 +422,7 @@ var schemaStmts = []string{
 	characterMacrosesSchema, characterRecommendsSchema,
 	clanDataSchema, clanPrivsSchema, clanSkillsSchema, clanSubpledgesSchema, clanWarsSchema,
 	accountsSchema,
+	bbsMailSchema,
 }
 
 var seedStmts = []string{sevenSignsStatusSeed}
