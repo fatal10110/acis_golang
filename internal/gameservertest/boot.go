@@ -304,8 +304,9 @@ func WithPvPFlags(flags *task.PvPFlags) Option {
 	return func(o *options) { o.pvpFlags = flags }
 }
 
-// WithDecay supplies the corpse-decay task wired into the link (default:
-// nil, so a dead summon's corpse never decays).
+// WithDecay supplies the corpse-decay task wired into the link and the
+// civilian NPC spawner (default: nil, so a dead summon's or civilian NPC's
+// corpse never decays).
 func WithDecay(decay *task.Decay) Option {
 	return func(o *options) { o.decay = decay }
 }
@@ -723,6 +724,8 @@ type Server struct {
 	stance network.AttackStanceTracker
 	// maxGeoPathFail is each fixture hostile's MaxGeopathFailCount.
 	maxGeoPathFail int
+	// decay is the corpse-decay task WithDecay supplied; nil when none was.
+	decay *task.Decay
 	// zones is the zone index WithZones supplied; nil when none was.
 	zones        *zone.Index
 	queues       *queues
@@ -1822,6 +1825,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		stance:           gclConfig.AttackStance,
 		maxGeoPathFail:   o.maxGeoPathFailCount,
 		zones:            o.zones,
+		decay:            o.decay,
 		AI:               ai,
 		Water:            water,
 		BuyListStock:     stock,

@@ -91,6 +91,9 @@ func (s *folkSink) Emit(ev event.Event) {
 		s.broadcast(func() wire.Frame { return frames.Status(f.ObjectID(), attrs) })
 	case event.Attacked, event.AttackStanceRequested:
 		s.startAttackStance()
+	case event.Died:
+		s.broadcast(func() wire.Frame { return frames.Die(f.ObjectID(), false) })
+		s.stopAttackStance()
 	case event.MagicSkillUse:
 		s.broadcast(func() wire.Frame {
 			return frames.SkillUse(e.CasterID, e.CasterAt, e.TargetID, e.TargetAt, e.SkillID, e.Level, e.HitTime, e.ReuseDelay, false)
@@ -127,6 +130,19 @@ func (s *folkSink) startAttackStance() {
 		return
 	}
 	s.broadcast(func() wire.Frame { return serverpackets.FrameAutoAttackStart(s.f.ObjectID()) })
+}
+
+// stopAttackStance ends the attack stance of an NPC that died: observers
+// that saw it fall see its stance end.
+func (s *folkSink) stopAttackStance() {
+	if s.stance == nil {
+		return
+	}
+	s.f.SetInCombat(false)
+	if !s.stance.Remove(s.f) {
+		return
+	}
+	s.broadcast(func() wire.Frame { return serverpackets.FrameAutoAttackStop(s.f.ObjectID()) })
 }
 
 // broadcast fans one lazily built frame out to the NPC's observers.

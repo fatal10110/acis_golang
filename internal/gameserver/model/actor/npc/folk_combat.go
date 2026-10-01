@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
@@ -15,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -27,12 +29,13 @@ var (
 // damage, heal and debuff it from their own queues; its regeneration and
 // effect ticks run on its own.
 type folkCombat struct {
-	// world, queue, sink, los and heldMask are set by Attach before the NPC
-	// is published.
+	// world, queue, sink, los, decay and heldMask are set by Attach before
+	// the NPC is published.
 	world *world.State
 	queue *sim.Queue
 	sink  event.Sink
 	los   LineOfSight
+	decay *task.Decay
 	// heldMask is the item-type bits of the template's weapon and shield.
 	heldMask int32
 
@@ -52,9 +55,12 @@ type folkCombat struct {
 	invul          atomic.Bool
 	immobilized    atomic.Bool
 
-	// vitalsMu guards hp and mp.
-	vitalsMu sync.Mutex
-	hp, mp   float64
+	// vitalsMu guards hp, mp and the death state: dead, decayed and the
+	// corpse's decay deadline (zero while none is registered).
+	vitalsMu       sync.Mutex
+	hp, mp         float64
+	dead, decayed  bool
+	corpseDeadline time.Time
 	// hpBar is the health-bar segment state HPStatusUpdate advances.
 	hpBar creature.HPBar
 }
@@ -82,6 +88,9 @@ type FolkRuntime struct {
 	// Items resolves the template's held weapon and shield; nil leaves the
 	// NPC holding nothing.
 	Items *item.Table
+	// Decay removes the NPC's corpse once its template corpse time has
+	// passed; nil leaves a dead NPC's corpse in place.
+	Decay *task.Decay
 }
 
 // folkAdmits reports whether a civilian NPC holds e: only plain buffs and
@@ -108,7 +117,7 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 	if rt.Queue == nil {
 		return errors.New("npc: folk runtime needs a queue")
 	}
-	f.world, f.queue, f.sink, f.los = rt.World, rt.Queue, rt.Sink, rt.LOS
+	f.world, f.queue, f.sink, f.los, f.decay = rt.World, rt.Queue, rt.Sink, rt.LOS, rt.Decay
 	f.cast.ai = rt.AI
 	f.heldMask = templateHeldMask(f.Instance.Template, rt.Items)
 	if rt.MaxBuffsAmount > 0 {
@@ -151,8 +160,8 @@ func (f *Folk) CharacterName() string { return f.Instance.Template.Name }
 // Karma reports 0: NPCs carry no PK karma.
 func (f *Folk) Karma() int { return 0 }
 
-// AlikeDead reports false: a civilian NPC never dies.
-func (f *Folk) AlikeDead() bool { return false }
+// AlikeDead reports whether the NPC is dead: it never feigns death.
+func (f *Folk) AlikeDead() bool { return f.Dead() }
 
 // FakeDeath reports false: NPCs never feign death.
 func (f *Folk) FakeDeath() bool { return false }
@@ -160,10 +169,10 @@ func (f *Folk) FakeDeath() bool { return false }
 // RecentFakeDeath reports false: NPCs never feign death.
 func (f *Folk) RecentFakeDeath() bool { return false }
 
-// MovementDisabled reports a template that cannot move, an immobilized NPC
-// or a teleport under way.
+// MovementDisabled reports a template that cannot move, an immobilized or
+// dead NPC, or a teleport under way.
 func (f *Folk) MovementDisabled() bool {
-	return !f.Instance.Template.CanMove || f.immobilized.Load() || (f.motion != nil && f.motion.teleporting.Load())
+	return !f.Instance.Template.CanMove || f.immobilized.Load() || f.Dead() || (f.motion != nil && f.motion.teleporting.Load())
 }
 
 // SilentMoving reports whether an effect lets the NPC move unseen.

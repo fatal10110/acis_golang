@@ -163,7 +163,7 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	n.mu.Unlock()
 
 	if npc.FolkKind(inst) {
-		n.spawnFolk(inst, loc, heading)
+		n.spawnFolk(key, inst, loc, heading)
 		return nil
 	}
 	if !npc.Attackable(inst) {
@@ -218,6 +218,25 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	// NPC in world.State, not before.
 	startWalkerRoute(n.walker, walkerRef, inst, n.log)
 
+	n.trackLive(key, id)
+	return hostile
+}
+
+// spawnFolk places a civilian NPC built from inst in the world at (loc,
+// heading) and tracks it under its spawn slot key, like a hostile: a mortal
+// one that dies decays and respawns through the slot. A route walker walks
+// its route while it lives.
+func (n *Npcs) spawnFolk(key string, inst *npc.Instance, loc location.Location, heading int) {
+	if _, err := n.folk.Spawn(inst, loc, heading); err != nil {
+		n.log.Warn().Err(err).Int("npc_id", inst.Template.ID).Msg("spawn: cannot build folk npc")
+		return
+	}
+	n.folkCount.Add(1)
+	n.trackLive(key, inst.ObjectID)
+}
+
+// trackLive records id as the live NPC of the slot key.
+func (n *Npcs) trackLive(key string, id int32) {
 	n.mu.Lock()
 	n.live[id] = key
 	n.liveCount++
@@ -225,18 +244,6 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	slot.liveID = id
 	n.slot[key] = slot
 	n.mu.Unlock()
-	return hostile
-}
-
-// spawnFolk places a civilian NPC built from inst in the world at (loc,
-// heading). Nothing kills it, so it takes no AI tick, decay or respawn; a
-// route walker walks its route for the server's lifetime.
-func (n *Npcs) spawnFolk(inst *npc.Instance, loc location.Location, heading int) {
-	if _, err := n.folk.Spawn(inst, loc, heading); err != nil {
-		n.log.Warn().Err(err).Int("npc_id", inst.Template.ID).Msg("spawn: cannot build folk npc")
-		return
-	}
-	n.folkCount.Add(1)
 }
 
 func (n *Npcs) spawnPrivates(key string, entry spawn.Entry, master *npc.Hostile) {

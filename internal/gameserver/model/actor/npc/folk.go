@@ -83,8 +83,9 @@ const socialInterval = 12 * time.Second
 // can be selected, and answers a player's interact with its chat window.
 // It never attacks, but casts the skills a dialog command or script asks of
 // it once given a cast runtime (SetCaster). Any other creature may attack
-// it by force: it takes damage, never below 1 HP, regenerates, and holds
-// the buffs and debuffs cast on it (no other effect lands on it).
+// it by force: it takes damage, regenerates, and holds the buffs and
+// debuffs cast on it (no other effect lands on it). An undying template
+// keeps at least 1 HP; any other dies, and its corpse decays.
 type Folk struct {
 	world.Presence
 	Instance *Instance
@@ -189,7 +190,7 @@ func (f *Folk) NPCInfoSnapshot() npcinfo.Snapshot {
 		CurrentHP: f.CurrentHP(), MaxHP: f.MaxHP(),
 		CollisionRadius: t.CollisionRadius, CollisionHeight: t.CollisionHeight,
 		RightHand: t.RightHand, LeftHand: t.LeftHand,
-		Running: f.Running(), InCombat: f.InCombat(), SummonAnimation: 2,
+		Running: f.Running(), InCombat: f.InCombat(), AlikeDead: f.AlikeDead(), SummonAnimation: 2,
 		AbnormalEffect: f.AbnormalEffect(), Name: name, Title: title,
 	}
 }

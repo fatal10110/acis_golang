@@ -43,6 +43,8 @@ type FolkSpawner struct {
 	AI *task.AI
 	// Items resolves the template's held weapon and shield.
 	Items *item.Table
+	// Decay removes a dead NPC's corpse; nil leaves corpses in place.
+	Decay *task.Decay
 	// Effects is the server's effect-list context.
 	Effects effect.Env
 	// MaxBuffsAmount is the configured base buff-slot count.
@@ -65,6 +67,7 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 		Effects:        s.Effects,
 		MaxBuffsAmount: s.MaxBuffsAmount,
 		Items:          s.Items,
+		Decay:          s.Decay,
 	}
 	if s.NewSink != nil {
 		rt.Sink = s.NewSink(f)
@@ -136,13 +139,16 @@ type folkControl struct {
 	log    zerolog.Logger
 }
 
-// Emit advances the NPC's route on each arrival.
+// Emit advances the NPC's route on each arrival, and ends it when the NPC
+// dies.
 func (c *folkControl) Emit(ev event.Event) {
-	if _, ok := ev.(event.Arrived); !ok {
-		return
-	}
-	if err := c.walker.Arrived(c.ref); err != nil {
-		c.log.Warn().Err(err).Msg("task: walker arrived")
+	switch ev.(type) {
+	case event.Arrived:
+		if err := c.walker.Arrived(c.ref); err != nil {
+			c.log.Warn().Err(err).Msg("task: walker arrived")
+		}
+	case event.Died:
+		c.walker.StopRoute(c.ref)
 	}
 }
 

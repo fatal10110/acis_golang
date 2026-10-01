@@ -60,7 +60,8 @@ type KillRewardConfig struct {
 // respawn. A civilian service NPC (a shop, trainer, gatekeeper, village
 // master and the like) becomes a npc.Folk for players to talk to: it
 // stands at its spawn point, or walks its route when its template alias
-// names one in the walker route data. Any other non-combat instance type
+// names one in the walker route data. A mortal one that dies decays and
+// respawns through its slot like a hostile. Any other non-combat instance type
 // (castle artifacts, siege flags, towers) is counted and skipped.
 //
 // All exported methods are safe for concurrent use; mu guards slots/live.
@@ -242,6 +243,7 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		CastEffects:         castEffects,
 		AI:                  ai,
 		Items:               items,
+		Decay:               decay,
 		Effects:             effects,
 		MaxBuffsAmount:      maxBuffsAmount,
 		MaxGeoPathFailCount: maxGeoPathFailCount,
