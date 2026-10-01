@@ -132,6 +132,12 @@ func (l *GameClientLink) orderWorkshopCraft(live *livePlayer, req clientpackets.
 	}
 	busy := l.trades != nil && (l.trades.ProcessingTransaction(crafter.ObjectID()) || l.trades.ProcessingTransaction(live.ObjectID()))
 	var attempt craft.ShopAttempt
+	// The craft's item operation (payAdena's adena legs) is opened before
+	// the workshop is held: a private store deal opens its operation first
+	// and holds the store inside it, and the other order would let each wait
+	// for the other.
+	end := l.itemInstances.BeginOperation(live.ObjectID(), crafter.ObjectID())
+	defer end()
 	// An order for a recipe the workshop does not list is dropped: the
 	// window never offers one, so only a crafted packet names it.
 	listed := crafter.PrivateStore().Craft(r.ID, func(cost int) {
@@ -139,6 +145,7 @@ func (l *GameClientLink) orderWorkshopCraft(live *livePlayer, req clientpackets.
 			return l.payAdena(live, crafter, price)
 		})
 	})
+	end()
 	if !listed {
 		return
 	}
@@ -159,6 +166,8 @@ func workshopInReach(live, crafter *livePlayer) bool {
 
 // payAdena moves amount adena from payer to payee as one step: payer must
 // still hold it all when the move runs. It reports whether the adena moved.
+// It runs inside its caller's item operation, which holds both inventories'
+// owners (task.ItemInstances.BeginOperation).
 func (l *GameClientLink) payAdena(payer, payee *livePlayer, amount int) bool {
 	from, to := payer.Inventory(), payee.Inventory()
 	if from == nil || to == nil || amount <= 0 {
@@ -169,14 +178,11 @@ func (l *GameClientLink) payAdena(payer, payee *livePlayer, amount int) bool {
 		return false
 	}
 	move := []invops.Move{{ObjectID: adena.ObjectID, Count: amount}}
-	end := l.itemInstances.BeginOperation()
-	defer end()
 	res, moved, err := l.inventory.Exchange(from, to, move, nil, func(held, _ itemcontainer.Held) bool {
 		inst := held.ItemByObjectID(adena.ObjectID)
 		return inst != nil && inst.CountValue() >= amount
 	})
 	l.applyPersistActions(res.Persist)
-	end()
 	if err != nil {
 		l.log.Error().Err(err).Msg("pay workshop adena")
 		return false

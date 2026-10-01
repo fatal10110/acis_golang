@@ -21,6 +21,9 @@ import (
 // places: the link has no persistence worker, so the write runs inline.
 type gateProbe struct {
 	instances *task.ItemInstances
+	// covered, when set, replaces OperationOpen as what a probed point has
+	// to see.
+	covered   func() bool
 	mu        sync.Mutex
 	recording bool
 	mutations []bool
@@ -35,6 +38,9 @@ func (p *gateProbe) start() {
 
 func (p *gateProbe) record(into *[]bool) {
 	open := p.instances.OperationOpen()
+	if p.covered != nil {
+		open = p.covered()
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.recording {
@@ -53,12 +59,12 @@ func (p *gateProbe) assertCovered(t *testing.T) {
 	}
 	for n, open := range p.mutations {
 		if !open {
-			t.Fatalf("mutation %d ran with no operation open: a tick could land that leg before it is bound", n)
+			t.Fatalf("mutation %d ran outside the operation the probe wants: another write could land that leg before it is bound", n)
 		}
 	}
 	for n, open := range p.writes {
 		if !open {
-			t.Fatalf("write %d was reserved after the operation ended: a tick could land a leg between them", n)
+			t.Fatalf("write %d was reserved outside the operation the probe wants: another write could land a leg between them", n)
 		}
 	}
 }

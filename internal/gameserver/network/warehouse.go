@@ -316,7 +316,7 @@ func (l *GameClientLink) requestWarehouseDeposit(live *livePlayer, req clientpac
 	}
 	// A player with a trade open was refused above, so no open trade can
 	// stop the deposit between the fee and the moves.
-	end := l.itemInstances.BeginOperation()
+	end := l.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
 	defer end()
 	res, outcome, err := l.inventory.Deposit(live.Inventory(), active.store, storeMoves(req.Items), l.itemHolder(live),
 		active.private, len(req.Items)*depositFeePerItem, active.fits)
@@ -338,7 +338,7 @@ func (l *GameClientLink) requestWarehouseWithdraw(live *livePlayer, req clientpa
 	if !ok {
 		return
 	}
-	end := l.itemInstances.BeginOperation()
+	end := l.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
 	defer end()
 	res, outcome, err := l.inventory.Withdraw(active.store, live.Inventory(), storeMoves(req.Items))
 	if err != nil {
@@ -376,7 +376,7 @@ func (l *GameClientLink) requestPackageSend(live *livePlayer, req clientpackets.
 		return
 	}
 	inv := live.Inventory()
-	end := l.itemInstances.BeginOperation()
+	end := l.itemInstances.BeginOperation(live.ObjectID(), active.store.OwnerID())
 	defer end()
 	res, outcome, err := l.inventory.SendPackage(inv, active.store, storeMoves(req.Items), l.itemHolder(live),
 		len(req.Items)*freight.Price, active.fits)
