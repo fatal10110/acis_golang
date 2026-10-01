@@ -437,6 +437,15 @@ func (testHostileGeo) Height(_, _, _ int) int16          { return 0 }
 
 func (testHostileGeo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
 func (testHostileGeo) Walkable(int, int, int) bool                                 { return true }
+
+func (g testHostileGeo) CanFly(ox, oy, oz int, _ float64, tx, ty, tz int) bool {
+	return g.CanMove(ox, oy, oz, tx, ty, tz)
+}
+
+func (g testHostileGeo) ValidFlyLocation(ox, oy, oz int, _ float64, tx, ty, tz int) location.Location {
+	return g.ValidLocation(ox, oy, oz, tx, ty, tz)
+}
+
 func (testHostileGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }

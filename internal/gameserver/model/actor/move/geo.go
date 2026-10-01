@@ -13,12 +13,17 @@ import (
 // Each method returns a single tier of the 3-tier route resolution a move
 // request applies: a straight-line reachability gate (CanMove), a routed
 // search to step around obstacles (FindPath), and a partial-progress last
-// reachable point when neither succeeds (ValidLocation).
+// reachable point when neither succeeds (ValidLocation). A swimming or
+// flying player resolves through the fly queries instead: a straight 3D
+// corridor oheight tall (CanFly) and the last point of it a flier reaches
+// (ValidFlyLocation), with no routed search.
 type Geo interface {
 	CanMove(ox, oy, oz, tx, ty, tz int) bool
 	Height(x, y, z int) int16
 	FindPath(origin, target location.Location) (waypoints []location.Location, ok bool)
 	ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location
+	CanFly(ox, oy, oz int, oheight float64, tx, ty, tz int) bool
+	ValidFlyLocation(ox, oy, oz int, oheight float64, tx, ty, tz int) location.Location
 	// Walkable reports whether the exact point is open geodata in every
 	// direction (a 3x3 cell block, not just the point itself), the check
 	// Territory-random spawn placement retries against.
@@ -57,6 +62,14 @@ func (g EngineGeo) FindPath(origin, target location.Location) ([]location.Locati
 
 func (g EngineGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 	return g.Engine.ValidLocation(ox, oy, oz, tx, ty, tz)
+}
+
+func (g EngineGeo) CanFly(ox, oy, oz int, oheight float64, tx, ty, tz int) bool {
+	return g.Engine.CanFly(ox, oy, oz, oheight, tx, ty, tz)
+}
+
+func (g EngineGeo) ValidFlyLocation(ox, oy, oz int, oheight float64, tx, ty, tz int) location.Location {
+	return g.Engine.ValidFlyLocation(ox, oy, oz, oheight, tx, ty, tz)
 }
 
 func (g EngineGeo) Walkable(x, y, z int) bool {

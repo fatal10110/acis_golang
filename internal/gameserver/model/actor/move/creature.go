@@ -67,6 +67,10 @@ const waterDepthMin = 20
 
 const worldZMax = 16410
 
+// flyCorridorHeight is the corridor height a swimming or flying player's
+// straight-line and partial-progress fly queries test.
+const flyCorridorHeight = 32
+
 // TargetSnapshot is the target state a follow tick needs. Build Known from
 // the current known-list relationship before calling FollowTick.
 type TargetSnapshot struct {
@@ -651,9 +655,28 @@ func (m *CreatureMove) setPawnLocked(pawn Pawn, offset int, tracks bool) {
 // first segment to walk; waypoints holds the remaining segments, if any.
 //
 // origin and target carry geodata-snapped Z.
+//
+// A player that swims or flies from the origin takes no routed search: a
+// flier's line is open by the fly corridor (a swimmer's by the ground line),
+// and a line that is not ends at the last point a flier reaches along it.
+// Any other mover resolves on the ground whatever its move type.
 func (m *CreatureMove) resolvePathLocked(target location.Location) (location.Location, []location.Location, pathFindResult) {
-	if m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, target.X, target.Y, target.Z) {
+	moveType := MoveGround
+	if m.playerStepsLocked() {
+		moveType = m.moveTypeLocked()
+	}
+	var open bool
+	if moveType == MoveFly {
+		open = m.geo.CanFly(m.origin.X, m.origin.Y, m.origin.Z, flyCorridorHeight, target.X, target.Y, target.Z)
+	} else {
+		open = m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, target.X, target.Y, target.Z)
+	}
+	if open {
 		return target, nil, pathDirect
+	}
+	if moveType != MoveGround {
+		fallback := m.geo.ValidFlyLocation(m.origin.X, m.origin.Y, m.origin.Z, flyCorridorHeight, target.X, target.Y, target.Z)
+		return fallback, nil, pathFailed
 	}
 
 	if path, ok := m.geo.FindPath(m.origin, target); ok && len(path) >= 2 {
@@ -1036,10 +1059,14 @@ func (m *CreatureMove) maxZLocked() int {
 // highest a step from there may land: the surface of the water zone the
 // mover stands in when the floor lies deeper than waterDepthMin below it,
 // else the world max. It queries the water zone once. Callers hold mu.
+//
+// A player is held at the surface only while it flies, never while it
+// swims; but a mover in a water zone swims even when it flies, so a player
+// is never held there.
 func (m *CreatureMove) waterLocked() (MoveType, int) {
 	if m.water != nil {
 		if surface, ok := m.water(m.origin); ok {
-			if int(m.geo.Height(m.origin.X, m.origin.Y, m.origin.Z))-surface < -waterDepthMin {
+			if !m.playerStepsLocked() && int(m.geo.Height(m.origin.X, m.origin.Y, m.origin.Z))-surface < -waterDepthMin {
 				return MoveSwim, surface
 			}
 			return MoveSwim, worldZMax

@@ -133,6 +133,14 @@ func (permissiveGeo) FindPath(origin, target location.Location) ([]location.Loca
 
 func (permissiveGeo) Walkable(int, int, int) bool { return true }
 
+func (g permissiveGeo) CanFly(ox, oy, oz int, _ float64, tx, ty, tz int) bool {
+	return g.CanMove(ox, oy, oz, tx, ty, tz)
+}
+
+func (g permissiveGeo) ValidFlyLocation(ox, oy, oz int, _ float64, tx, ty, tz int) location.Location {
+	return g.ValidLocation(ox, oy, oz, tx, ty, tz)
+}
+
 func (permissiveGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 	return location.Location{X: tx, Y: ty, Z: tz}
 }

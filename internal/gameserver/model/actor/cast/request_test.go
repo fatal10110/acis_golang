@@ -511,6 +511,14 @@ func (requestGeo) FindPath(_, _ location.Location) ([]location.Location, bool) {
 
 func (requestGeo) Walkable(int, int, int) bool { return true }
 
+func (g requestGeo) CanFly(ox, oy, oz int, _ float64, tx, ty, tz int) bool {
+	return g.CanMove(ox, oy, oz, tx, ty, tz)
+}
+
+func (g requestGeo) ValidFlyLocation(ox, oy, oz int, _ float64, tx, ty, tz int) location.Location {
+	return g.ValidLocation(ox, oy, oz, tx, ty, tz)
+}
+
 func (requestGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }

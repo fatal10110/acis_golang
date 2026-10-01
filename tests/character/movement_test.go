@@ -35,7 +35,11 @@ func TestMovementUpdatesWorldState(t *testing.T) {
 	waitForWorldPosition(t, srv, objID, target)
 }
 
-func TestSwimmingMovementCapsPositionAtWaterSurface(t *testing.T) {
+// TestSwimmingPlayerRisesPastWaterSurface pins PlayerMove.updatePosition
+// (PlayerMove.java:224-257): the water surface caps a player's height only
+// while it flies (or rides a boat), so a swimmer over deep water climbs past
+// the surface to the height it asked for.
+func TestSwimmingPlayerRisesPastWaterSurface(t *testing.T) {
 	form, err := zone.NewCuboid(-1_000, 1_000, -1_000, 1_000, -1_000, 150)
 	if err != nil {
 		t.Fatal(err)
@@ -65,7 +69,7 @@ func TestSwimmingMovementCapsPositionAtWaterSurface(t *testing.T) {
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
 	}
-	waitForWorldPosition(t, srv, objID, location.Location{X: target.X, Y: target.Y, Z: 150})
+	waitForWorldPosition(t, srv, objID, target)
 }
 
 // TestMoveBackwardToLocationRejectsBeyond9900Units pins

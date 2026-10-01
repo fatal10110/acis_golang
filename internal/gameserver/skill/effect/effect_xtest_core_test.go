@@ -105,6 +105,14 @@ func (openGeo) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
 }
 func (openGeo) Walkable(int, int, int) bool { return true }
 
+func (g openGeo) CanFly(ox, oy, oz int, _ float64, tx, ty, tz int) bool {
+	return g.CanMove(ox, oy, oz, tx, ty, tz)
+}
+
+func (g openGeo) ValidFlyLocation(ox, oy, oz int, _ float64, tx, ty, tz int) location.Location {
+	return g.ValidLocation(ox, oy, oz, tx, ty, tz)
+}
+
 // newTestList returns a list whose owner runs on its own inline queue, with
 // the clock reading the wall time at creation.
 func newTestList(owner effect.StatOwner) *effect.List {
