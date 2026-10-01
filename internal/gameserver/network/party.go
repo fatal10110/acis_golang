@@ -125,11 +125,15 @@ func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.Re
 		return
 	}
 
+	// Either side may have become busy on another queue since the checks
+	// above; the invitation then asks no one, so the party stops waiting.
 	switch book.Invite(tradebook.KindParty, live.ObjectID(), target.ObjectID(), true).Status {
 	case tradebook.RequestRequesterBusy:
+		l.parties.CancelInvite(live.ObjectID())
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWaitingForAnotherReply))
 		return
 	case tradebook.RequestTargetBusy:
+		l.parties.CancelInvite(live.ObjectID())
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.Name))
 		return
 	}

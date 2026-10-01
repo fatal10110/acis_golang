@@ -10,14 +10,16 @@ import (
 // directly rather than through packets.
 
 type member struct {
-	id    int32
-	name  string
-	level int
+	id       int32
+	name     string
+	level    int
+	departed bool
 }
 
 func (m *member) ObjectID() int32       { return m.id }
 func (m *member) Level() int            { return m.level }
 func (m *member) CharacterName() string { return m.name }
+func (m *member) Departed() bool        { return m.departed }
 
 func newMembers(n int) []*member {
 	out := make([]*member, n)

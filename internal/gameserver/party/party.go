@@ -22,6 +22,11 @@ type Member interface {
 	ObjectID() int32
 	Level() int
 	CharacterName() string
+	// Departed reports whether the player has begun leaving the world.
+	// It must turn true before the player's own Leave(Disconnected), so
+	// that Answer, under the registry lock, either runs before that Leave
+	// (which then takes the player out again) or sees the player gone.
+	Departed() bool
 }
 
 // LootRule is a party's item distribution rule, as the client numbers it.
@@ -208,18 +213,31 @@ func (r *Registry[M]) BeginInvite(requesterID int32, loot int32) (InviteStatus, 
 	return InviteReady, g.loot
 }
 
+// CancelInvite withdraws the invitation BeginInvite readied for
+// requesterID when it could not be delivered after all: the requester's
+// party stops waiting, so its leader may invite again at once.
+func (r *Registry[M]) CancelInvite(requesterID int32) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if g := r.byMember[requesterID]; g != nil && g.leader.ObjectID() == requesterID {
+		g.setInviting(false, r.now())
+	}
+}
+
 // Answer applies target's answer to requester's invitation: an acceptance
 // forms a party with the requester as leader, or adds target to the
 // requester's party. Either way the requester's party stops waiting.
 //
 // A target already in a party, or a party that filled up meanwhile, takes
 // no one: membership stays one party per player and at most MaxMembers.
+// Neither does a requester or target that has begun leaving the world, so
+// no party forms around a player whose own departure already ran.
 func (r *Registry[M]) Answer(requester, target M, accept bool) []Notice {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	var out notices
 	g := r.byMember[requester.ObjectID()]
-	if accept && r.byMember[target.ObjectID()] == nil {
+	if accept && r.byMember[target.ObjectID()] == nil && !requester.Departed() && !target.Departed() {
 		switch {
 		case g == nil:
 			g = r.form(&out, requester, target)

@@ -150,6 +150,14 @@ func (l *GameClientLink) startPartyPositions(id party.ID) {
 		l.sendPartyPositions(id)
 		q.Every(partyPositionPeriod, func() { l.sendPartyPositions(id) })
 	})
+	// Formed and Dispersed are applied outside the registry lock, possibly
+	// on different queues, so the party may already have dispersed and its
+	// Dispersed found no queue to stop. The registry drops a party before
+	// it reports Dispersed, so a party still listed here will have its
+	// queue, now registered, stopped by that report.
+	if _, ok := l.parties.Members(id); !ok {
+		l.stopPartyPositions(id)
+	}
 }
 
 func (l *GameClientLink) stopPartyPositions(id party.ID) {

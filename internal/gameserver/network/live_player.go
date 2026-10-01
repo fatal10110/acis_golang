@@ -357,6 +357,12 @@ func (p *livePlayer) detached() bool {
 	return p.deliveryStopped.Load()
 }
 
+// Departed reports whether p has begun leaving the world, for the party
+// registry: detach marks it before taking p out of its party.
+func (p *livePlayer) Departed() bool {
+	return p.detached()
+}
+
 // markDetaching runs on p's queue, where autosave and shadow-item expiry
 // check detached, so neither enqueues after detach's own writes (#1948).
 func (p *livePlayer) markDetaching() {
