@@ -756,7 +756,7 @@ func (c *Character) applyNonConsumptionDamageEffects(isDOT bool) {
 	list.StopByType(effect.TypeSleep)
 	list.StopByType(effect.TypeImmobileUntilAttacked)
 
-	if c.Seated() && !c.Operating() {
+	if c.Seated() && !c.InStoreMode() {
 		c.StandUp()
 	}
 

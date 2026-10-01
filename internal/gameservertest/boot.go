@@ -48,6 +48,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
+	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -747,12 +748,29 @@ func (s *Server) PlayerCastingNow(tb testing.TB, objID int32) bool {
 	return reader.CastingNow()
 }
 
-// SetPlayerOperating toggles the live player's store/workshop operation
-// state, the precondition of the use-item storing gate.
+// SetPlayerOperating opens (a sell store, with nothing listed) or closes
+// the live player's private store, the precondition of the store-mode
+// gates.
 func (s *Server) SetPlayerOperating(tb testing.TB, objID int32, operating bool) {
 	tb.Helper()
+	operate := privatestore.OperateNone
+	if operating {
+		operate = privatestore.OperateSell
+	}
+	s.SetPlayerOperateType(tb, objID, operate)
+}
+
+// PlayerOperateType returns what the live player's private store is doing.
+func (s *Server) PlayerOperateType(tb testing.TB, objID int32) privatestore.OperateType {
+	tb.Helper()
+	return s.onlineCharacter(tb, objID).OperateType()
+}
+
+// SetPlayerOperateType sets what the live player's private store is doing.
+func (s *Server) SetPlayerOperateType(tb testing.TB, objID int32, operate privatestore.OperateType) {
+	tb.Helper()
 	setter := s.onlineCharacter(tb, objID)
-	setter.SetOperating(operating)
+	setter.SetOperateType(operate)
 }
 
 // SetPlayerInCombat toggles the live player's combat flag, the precondition

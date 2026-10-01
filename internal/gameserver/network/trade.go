@@ -46,6 +46,15 @@ func (l *GameClientLink) handleTradeRequest(live *livePlayer, req clientpackets.
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, tradeChaoticRefusal))
 		return
 	}
+	// Neither side may be setting up a store, nor running one.
+	if live.InManageStoreMode() || target.InManageStoreMode() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePrivateStoreUnderWay))
+		return
+	}
+	if live.InStoreMode() || target.InStoreMode() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotTradeDiscardDropInShopMode))
+		return
+	}
 
 	switch l.tradeBook().Request(live.ObjectID(), target.ObjectID()).Status {
 	case tradebook.RequestRequesterBusy:

@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
 )
 
 // craftingDisabledText and registerDisabledText are the plain chat lines a
@@ -71,6 +72,11 @@ func recipeBookFrame(live *livePlayer, dwarven bool) wire.Frame {
 // word, as the reference does; the book window stays as it was and no
 // client action waits on the answer.
 func (l *GameClientLink) destroyRecipe(live *livePlayer, req clientpackets.RequestRecipeBookDestroy) {
+	// The book of a running workshop is locked, the recipe kept.
+	if live.OperateType() == privatestore.OperateManufacture {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantAlterRecipeBookWhileCrafting))
+		return
+	}
 	r, ok := l.craft.Forget(live.Character, int(req.RecipeID))
 	if !ok {
 		return
@@ -218,6 +224,32 @@ func sendCraftNotices(live *livePlayer, notices []any) {
 			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageUpToS1RecipesCanRegister, int32(n.Limit)))
 		case craft.RecipeAdded:
 			live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1Added, n.ItemID))
+		case craft.BookLocked:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantAlterRecipeBookWhileCrafting))
+		case craft.NotEnoughAdena:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena))
+		case craft.CraftedFor:
+			live.SendFrame(workshopCraftFrame(serverpackets.SystemMessageS2CreatedForS1ForS3Adena,
+				serverpackets.SystemMessageS2S3SCreatedForS1ForS4Adena, n.Customer, n.ItemID, n.Count, n.Price))
+		case craft.CraftedBy:
+			live.SendFrame(workshopCraftFrame(serverpackets.SystemMessageS1CreatedS2ForS3Adena,
+				serverpackets.SystemMessageS1CreatedS2S3SForS4Adena, n.Crafter, n.ItemID, n.Count, n.Price))
+		case craft.CraftForFailed:
+			live.SendFrame(workshopCraftFrame(serverpackets.SystemMessageCreationOfS2ForS1AtS3AdenaFail, 0, n.Customer, n.ItemID, 1, n.Price))
+		case craft.CraftByFailed:
+			live.SendFrame(workshopCraftFrame(serverpackets.SystemMessageS1FailedToCreateS2ForS3Adena, 0, n.Crafter, n.ItemID, 1, n.Price))
 		}
 	}
+}
+
+// workshopCraftFrame is a workshop craft's message naming the other side,
+// the product and the price: single for one unit, multiple (with the
+// count) for more.
+func workshopCraftFrame(single, multiple int, name string, itemID int32, count, price int) wire.Frame {
+	if count > 1 && multiple != 0 {
+		return serverpackets.FrameSystemMessageParams(multiple, serverpackets.TextParam(name), serverpackets.NumberParam(int32(count)),
+			serverpackets.ItemNameParam(itemID), serverpackets.ItemNumberParam(int32(price)))
+	}
+	return serverpackets.FrameSystemMessageParams(single, serverpackets.TextParam(name), serverpackets.ItemNameParam(itemID),
+		serverpackets.ItemNumberParam(int32(price)))
 }

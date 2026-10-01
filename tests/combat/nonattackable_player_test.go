@@ -222,21 +222,35 @@ func TestShiftClickOnUnflaggedPlayerStaysPut(t *testing.T) {
 	}
 }
 
-// TestPlainClickOnStorePlayerIsReleased clicks an unflagged player operating
-// a store: the store window is not modeled, so the click is only released.
-func TestPlainClickOnStorePlayerIsReleased(t *testing.T) {
+// TestPlainClickOnStorePlayerOpensItsStore clicks an unflagged player
+// running a sell store within reach: the click is released, the clicker
+// faces the store (MoveToPawn at the interaction distance) and is shown its
+// (empty) sell list instead of attacking or following it.
+func TestPlainClickOnStorePlayerOpensItsStore(t *testing.T) {
 	t.Parallel()
 	p := bootClickPair(t, 0)
-	p.walkVictimAway(t, 300)
+	p.walkVictimAway(t, 50)
 	p.srv.SetPlayerOperating(t, p.victimID, true)
 	selectPlayerTarget(t, p.c, p.victimID)
 	drainUntilQuiet(t, p.c)
 
 	p.c.Send(encodeAction(p.victimID, int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
 	assertFrameOpcode(t, mustRead(t, p.c, "store ActionFailed"), serverpackets.OpcodeActionFailed, "store ActionFailed")
+	face := mustRead(t, p.c, "store MoveToPawn")
+	assertFrameOpcode(t, face, serverpackets.OpcodeMoveToPawn, "store MoveToPawn")
+	r := wireReader(face[1:])
+	if mover, target, distance := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); mover != p.attackerID || target != p.victimID || distance != 150 {
+		t.Fatalf("MoveToPawn %d -> %d at %d, want %d -> %d at 150", mover, target, distance, p.attackerID, p.victimID)
+	}
+	list := mustRead(t, p.c, "PrivateStoreListSell")
+	assertFrameOpcode(t, list, serverpackets.OpcodePrivateStoreListSell, "PrivateStoreListSell")
+	r = wireReader(list[1:])
+	if owner, packaged, _, rows := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); owner != p.victimID || packaged != 0 || rows != 0 {
+		t.Fatalf("PrivateStoreListSell owner %d packaged %d rows %d, want %d, 0, 0", owner, packaged, rows, p.victimID)
+	}
 	p.srv.Advance(t, 2*time.Second)
-	if frames := readQuiet(p.c); frameIndex(frames, serverpackets.OpcodeMoveToPawn, 0) >= 0 || attacksBy(frames, p.attackerID) != 0 {
-		t.Fatalf("store click frames = %v, want no walk and no swing", opcodes(frames))
+	if frames := readQuiet(p.c); attacksBy(frames, p.attackerID) != 0 || followMoveIndex(frames, p.attackerID, p.victimID) >= 0 {
+		t.Fatalf("store click frames = %v, want no swing and no follow", opcodes(frames))
 	}
 }
 

@@ -301,7 +301,7 @@ func (l *GameClientLink) ExpireShadowItem(live *livePlayer, inst *item.Instance)
 }
 
 func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.RequestAutoSoulShot) {
-	if live == nil || live.AlikeDead() {
+	if live == nil || live.AlikeDead() || live.Operating() {
 		return
 	}
 	inv := live.Inventory()

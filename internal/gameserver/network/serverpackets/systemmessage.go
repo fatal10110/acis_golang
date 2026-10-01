@@ -256,7 +256,73 @@ const (
 
 	// Stack-change feedback.
 	SystemMessageYouFeelS1Effect = 110 // skill-name parameter
+
+	// Private store and workshop feedback.
+	SystemMessagePrivateStoreNotWhileCasting    = 1128
+	SystemMessageNoPrivateStoreHere             = 1296
+	SystemMessageIncorrectItemCount             = 347
+	SystemMessageExceededTheMaximum             = 1369
+	SystemMessagePurchasePriceHigherThanMoney   = 720
+	SystemMessagePrivateStoreUnderWay           = 340
+	SystemMessageNoRecipesRegistered            = 895
+	SystemMessageS1PurchasedS2                  = 378  // text, item-name parameters
+	SystemMessageS1PurchasedS2S3                = 379  // text, number, item-name parameters
+	SystemMessageS1PurchasedS3S2S               = 380  // text, item-name, number parameters
+	SystemMessagePurchasedS2FromS1              = 559  // text, item-name parameters
+	SystemMessagePurchasedS2S3FromS1            = 560  // text, number, item-name parameters
+	SystemMessagePurchasedS3S2SFromS1           = 561  // text, item-name, number parameters
+	SystemMessageS2CreatedForS1ForS3Adena       = 1145 // text, item-name, item-number parameters
+	SystemMessageS1CreatedS2ForS3Adena          = 1146 // text, item-name, item-number parameters
+	SystemMessageS2S3SCreatedForS1ForS4Adena    = 1147 // text, number, item-name, item-number parameters
+	SystemMessageS1CreatedS2S3SForS4Adena       = 1148 // text, number, item-name, item-number parameters
+	SystemMessageCreationOfS2ForS1AtS3AdenaFail = 1149 // text, item-name, item-number parameters
+	SystemMessageS1FailedToCreateS2ForS3Adena   = 1150 // text, item-name, item-number parameters
 )
+
+// SystemMessageParam is one typed SystemMessage parameter: Text for a text
+// parameter, Value for the others.
+type SystemMessageParam struct {
+	Type  int32
+	Text  string
+	Value int32
+}
+
+// TextParam is a text parameter.
+func TextParam(text string) SystemMessageParam {
+	return SystemMessageParam{Type: SystemMessageParamText, Text: text}
+}
+
+// NumberParam is a number parameter.
+func NumberParam(n int32) SystemMessageParam {
+	return SystemMessageParam{Type: SystemMessageParamNumber, Value: n}
+}
+
+// ItemNameParam is an item-name parameter.
+func ItemNameParam(itemID int32) SystemMessageParam {
+	return SystemMessageParam{Type: SystemMessageParamItemName, Value: itemID}
+}
+
+// ItemNumberParam is an item-number parameter.
+func ItemNumberParam(n int32) SystemMessageParam {
+	return SystemMessageParam{Type: SystemMessageParamItemNumber, Value: n}
+}
+
+// FrameSystemMessageParams builds a SystemMessage packet with params in
+// order.
+func FrameSystemMessageParams(id int, params ...SystemMessageParam) wire.Frame {
+	w := newFrameWriter(OpcodeSystemMessage)
+	w.WriteInt32(int32(id))
+	w.WriteInt32(int32(len(params)))
+	for _, p := range params {
+		w.WriteInt32(p.Type)
+		if p.Type == SystemMessageParamText {
+			w.WriteString(p.Text)
+		} else {
+			w.WriteInt32(p.Value)
+		}
+	}
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
 
 // SystemMessage parameter types used by focused packet helpers.
 const (

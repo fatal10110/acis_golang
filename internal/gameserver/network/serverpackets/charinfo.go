@@ -109,7 +109,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteUint8(boolUint8(c.AlikeDead()))
 	w.WriteUint8(0) // invisible
 	w.WriteUint8(uint8(c.MountType()))
-	w.WriteUint8(0) // private store/craft mode
+	w.WriteUint8(uint8(c.OperateType()))
 	cubicIDs := c.CubicIDs()
 	count, err := wire.Uint16Count(len(cubicIDs))
 	if err != nil {
