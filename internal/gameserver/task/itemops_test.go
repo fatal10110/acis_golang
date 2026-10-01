@@ -58,13 +58,15 @@ func (l *tradeLegs) bindAndReserve() (*persist.Write, BoundGroups, item.FlushBat
 
 // land runs the operation's own write, as its queued job would.
 func (l *tradeLegs) land(flusher ItemFlusher, write *persist.Write, carried BoundGroups, batch item.FlushBatch) {
-	write.Run(func(keep []int32) {
+	write.Run(func(keep []int32) error {
 		kept := item.FlushBatch{Saves: slices.DeleteFunc(slices.Clone(batch.Saves), func(st item.InstanceState) bool {
 			return !slices.Contains(keep, st.ObjectID)
 		})}
-		if flusher.Flush(context.Background(), kept) == nil {
-			l.instances.Landed(carried, keep)
+		if err := flusher.Flush(context.Background(), kept); err != nil {
+			return err
 		}
+		l.instances.Landed(carried, keep)
+		return nil
 	})
 }
 

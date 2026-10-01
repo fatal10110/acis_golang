@@ -149,6 +149,14 @@ func (w *Write) sort() {
 // called at all when none are left. It must write those rows and nothing
 // else; ids is in ascending object-id order.
 //
+// write reports whether its rows landed. Only a write that landed supersedes
+// the earlier ones: a failed write left the rows as they were, so an earlier
+// write still owes them its content. Counting it anyway would also split
+// rows that have to land together — two writes carrying the same rows can
+// hold their places in different orders, each later on some of the rows than
+// the other, and a failure of the one that runs first would leave the other
+// keeping only its later rows and landing them alone (#3125).
+//
 // Run waits for those rows and keeps them for as long as write takes, so the
 // goroutine calling it is held for the length of the database write, not just
 // the bookkeeping. A caller that is a shared drainer — a persist.Worker lane,
@@ -157,7 +165,7 @@ func (w *Write) sort() {
 //
 // Rows are taken in ascending id order, so two batches that overlap cannot
 // deadlock against each other.
-func (w *Write) Run(write func(ids []int32)) {
+func (w *Write) Run(write func(ids []int32) error) {
 	w.run(write, nil)
 }
 
@@ -165,7 +173,7 @@ func (w *Write) Run(write func(ids []int32)) {
 // take every row it reserved within wait, leaving the reservation intact for
 // a later Run or TryRun, and reports whether the write was decided. A false
 // result means nothing was written and nothing was consumed.
-func (w *Write) TryRun(wait time.Duration, write func(ids []int32)) bool {
+func (w *Write) TryRun(wait time.Duration, write func(ids []int32) error) bool {
 	return w.run(write, &wait)
 }
 
@@ -180,13 +188,13 @@ func (w *Write) Cancel() {
 	w.order.forget(w.ids)
 }
 
-func (w *Write) run(write func(ids []int32), wait *time.Duration) bool {
+func (w *Write) run(write func(ids []int32) error, wait *time.Duration) bool {
 	if w == nil {
 		return true
 	}
 	w.sort()
 	if w.order == nil {
-		write(w.ids)
+		_ = write(w.ids)
 		return true
 	}
 	rows, ok := w.order.take(w.ids, wait)
@@ -198,8 +206,7 @@ func (w *Write) run(write func(ids []int32), wait *time.Duration) bool {
 	// and every later write of it stuck.
 	defer w.order.release(w.ids, rows)
 	keep := w.order.keep(w, rows)
-	if len(keep) > 0 {
-		write(keep)
+	if len(keep) > 0 && write(keep) == nil {
 		w.order.applied(w, rows)
 	}
 	return true
