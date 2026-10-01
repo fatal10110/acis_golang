@@ -83,6 +83,9 @@ func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def mod
 		}, func() {
 			l.expireCubic(live, id, runtime)
 		}, live.Queue())
+		// A cubic's M.Atk is its granting skill's power, kept for its
+		// whole life like its level.
+		runtime.MAtk = int(def.Power)
 		live.cubics[id] = runtime
 	}
 	runtime.RefreshDisappear(lifetime)
@@ -259,7 +262,7 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 		if live.Character.Dead() || live.detached() || !live.cubicStillActive(id, runtime) {
 			return
 		}
-		actorcast.ApplyCubicEffect(l.skillHandlers, live.Character, def, target, l.playerMessageSink(live, func() { beforeVitals = live.Vitals() }))
+		actorcast.ApplyCubicEffect(l.skillHandlers, live.Character, def, float64(runtime.MAtk), target, l.playerMessageSink(live, func() { beforeVitals = live.Vitals() }))
 		sendMagicStatusUpdate(live, beforeVitals)
 	})
 }
