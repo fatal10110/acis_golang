@@ -64,9 +64,20 @@ type AttackableActor interface {
 	RestoreSpawnHeadingIfAtHome()
 	RealMoveSpeed() float64
 	MoveFromSpawnUsingRandomOffset(offset int)
-	// Now reads the clock the actor's queue runs on; hate, desire and
-	// wander stamps use it.
+	// Now reads the clock the actor's queue runs on; hate and desire
+	// stamps use it.
 	Now() time.Time
+	// After runs fn as a task on the actor's queue once d has elapsed on
+	// that clock, unless the returned timer is stopped first. The wander
+	// chain's firings use it.
+	After(d time.Duration, fn func()) Timer
+}
+
+// Timer is a pending one-shot task armed by AttackableActor.After.
+type Timer interface {
+	// Stop cancels the task and reports whether this call kept it from
+	// running.
+	Stop() bool
 }
 
 // MoveController controls movement requests emitted by the AI loop.
@@ -215,8 +226,8 @@ type Attackable struct {
 	now func() time.Time
 
 	// lastDesire is the intention kind of the last executed desire, used so
-	// the first wander step walks immediately and later steps wait the
-	// wander timer then roll RandomWalkRate.
+	// the first wander step walks immediately and a later promotion starts
+	// the wander chain instead.
 	lastDesire Intention
 	// latched is the one-pass attack latch. An attack promoted while the
 	// last executed desire was idle or wander is latched, and the next
@@ -225,9 +236,14 @@ type Attackable struct {
 	// is set the empty-queue idle waits. kind is IntentionIdle when unset.
 	// A respawn builds a new loop, so it starts unset.
 	latched intention
-	// wanderReady is the earliest time a subsequent wander step may walk
-	// or re-roll. Zero means the timer is not running.
-	wanderReady time.Time
+	// wanderTask is the wander chain's pending firing, nil when no chain
+	// runs. The chain is a self-rescheduling task on the actor's queue,
+	// independent of desire selection: each firing rolls randomWalkRate,
+	// walks and ends on a hit, and schedules the next firing on a miss.
+	// wanderSeq identifies the pending firing, so one that already left the
+	// timer when the chain was stopped or replaced does nothing.
+	wanderTask Timer
+	wanderSeq  uint64
 	// randomWalkRate is npcs.properties RandomWalkRate (percent, 0-100).
 	randomWalkRate int
 	// roll draws a uniform integer in [0, n) for the wander-rate check.
@@ -257,7 +273,8 @@ func NewAttackable(actor AttackableActor, move MoveController, attack AttackCont
 }
 
 // SetRandomWalkRate records npcs.properties RandomWalkRate for subsequent
-// wander steps. The first wander step after idle or combat always walks.
+// wander chain rolls. The first wander step after idle or combat always
+// walks.
 func (a *Attackable) SetRandomWalkRate(rate int) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -595,7 +612,7 @@ func (a *Attackable) setBackToPeaceLocked() {
 	a.desires.Clear()
 	a.next = intention{}
 	a.setCurrent(intention{kind: IntentionIdle})
-	a.wanderReady = time.Time{}
+	a.stopWanderChain()
 	a.move.Stop()
 }
 
@@ -870,7 +887,7 @@ func (a *Attackable) continueCurrent() error {
 // latched attack, which is the whole pass.
 func (a *Attackable) promoteAndStep() error {
 	for attempts := 0; attempts <= maxDesires; attempts++ {
-		latched := a.promoteNext()
+		latched, promoted := a.promoteNext()
 		switch a.current.kind {
 		case IntentionAttack:
 			again, err := a.thinkAttack()
@@ -890,7 +907,9 @@ func (a *Attackable) promoteAndStep() error {
 			a.lastDesire = IntentionFollow
 			return a.thinkFollow()
 		case IntentionWander:
-			if !a.currentQueued() {
+			// A wander steps only on the pass that promotes it; while it
+			// stays current, its chain fires on its own.
+			if !promoted || !a.currentQueued() {
 				return nil
 			}
 			a.thinkWander()
@@ -943,35 +962,30 @@ func (a *Attackable) hasLatch() bool {
 
 // promoteNext picks the latched attack, else the heaviest queued desire,
 // and updates the latch from it. It reports whether the pick was the
-// latched attack.
+// latched attack, and whether anything was promoted: nothing is during the
+// hit animation, with no promotable desire, or when a wander is current
+// and the pick is a wander too.
 //
 // Desire selection always makes the pick current, whatever the current
 // intention is, so a heavier attack on another target, a cast or a walk
 // takes over a running attack. Replacing the intention with a different
 // one drops any follow task and the queued next intention the old one left
 // behind.
-func (a *Attackable) promoteNext() bool {
+func (a *Attackable) promoteNext() (fromLatch, promoted bool) {
 	if a.inHitAnimation() {
-		return false
+		return false, false
 	}
 	next, fromLatch, ok := a.nextToDo()
 	if !ok {
-		return false
+		return false, false
 	}
 	if a.current.kind == IntentionWander && next.kind == IntentionWander {
-		return false
+		return false, false
 	}
 	if next.kind == IntentionAttack && (a.lastDesire == IntentionIdle || a.lastDesire == IntentionWander) {
 		a.latched = next
 	} else {
 		a.latched = intention{}
-	}
-	if a.current.kind == IntentionWander {
-		a.wanderReady = time.Time{}
-	} else if next.kind == IntentionWander && !a.wanderReady.IsZero() && !a.now().Before(a.wanderReady) {
-		// A wander timer that ran out while the actor was not wandering
-		// found nothing to roll for and ended.
-		a.wanderReady = time.Time{}
 	}
 	if !a.current.same(next) {
 		a.move.CancelFollow()
@@ -979,7 +993,7 @@ func (a *Attackable) promoteNext() bool {
 	}
 	a.lastKind = a.current.kind
 	a.setCurrent(next)
-	return fromLatch
+	return fromLatch, true
 }
 
 // same reports whether o is the same intention as i: same kind, aimed at
@@ -1275,29 +1289,73 @@ func (a *Attackable) clearCurrentDesire() {
 	a.desires.RemoveIf(func(d *Desire) bool { return d.Equal(probe) })
 }
 
+// thinkWander is the wander step: the promotion of a WANDER desire and
+// each chain firing that rolled a miss. The first step after a desire of
+// another kind ends any running chain and walks at once; a later one
+// starts the chain, which waits the wander timer before its first roll.
 func (a *Attackable) thinkWander() {
+	if a.current.kind != IntentionWander {
+		return
+	}
 	a.actor.ForceWalkStance()
 	if a.actor.IsMoving() {
 		return
 	}
 	if a.lastDesire != IntentionWander {
-		a.wanderReady = time.Time{}
+		a.stopWanderChain()
 		a.doWanderMove()
 		return
 	}
-	if a.wanderReady.IsZero() {
-		a.wanderReady = a.now().Add(a.wanderDelay())
+	a.scheduleWander()
+}
+
+// scheduleWander arms the wander chain's next firing one wander timer from
+// now. A chain already pending is kept, so an actor runs one chain at most:
+// its firing comes first and would cancel the newer one anyway.
+func (a *Attackable) scheduleWander() {
+	if a.wanderTask != nil {
 		return
 	}
-	if a.now().Before(a.wanderReady) {
+	a.wanderSeq++
+	seq := a.wanderSeq
+	a.wanderTask = a.actor.After(a.wanderDelay(), func() { a.fireWander(seq) })
+}
+
+// stopWanderChain cancels the wander chain's pending firing, if any.
+func (a *Attackable) stopWanderChain() {
+	if a.wanderTask == nil {
 		return
 	}
-	a.wanderReady = time.Time{}
+	a.wanderTask.Stop()
+	a.wanderTask = nil
+	a.wanderSeq++
+}
+
+// fireWander is one firing of the wander chain, run on the actor's queue
+// whatever the actor's control state. A hit walks when the actor still
+// wanders and stands, and ends the chain either way: a hit whose walk is
+// refused, as for a stunned actor, leaves the wander current with its
+// desire queued, and desire selection does not restart a current wander,
+// so the actor stands until another desire replaces it or it idles. A miss
+// takes the wander step again, which schedules the next firing while the
+// wander is still current and standing. A dead actor's chain ends.
+func (a *Attackable) fireWander(seq uint64) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if seq != a.wanderSeq {
+		return
+	}
+	a.wanderTask = nil
+	if a.actor.AlikeDead() {
+		return
+	}
 	if a.randomWalkRate > 0 && a.roll != nil && a.roll(100) < a.randomWalkRate {
-		a.doWanderMove()
+		if !a.actor.IsMoving() && a.current.kind == IntentionWander {
+			a.doWanderMove()
+		}
 		return
 	}
-	a.wanderReady = a.now().Add(a.wanderDelay())
+	a.thinkWander()
 }
 
 func (a *Attackable) wanderDelay() time.Duration {

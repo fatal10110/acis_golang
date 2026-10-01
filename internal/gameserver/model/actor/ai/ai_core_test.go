@@ -537,6 +537,7 @@ type fakeActor struct {
 	moveToPawnCalls int
 	moveToPawnTo    attackable.Combatant
 	refusals        int
+	timers          []*fakeTimer
 }
 
 func actor(id int32) *fakeActor {
@@ -585,6 +586,51 @@ func (a *fakeActor) MoveFromSpawnUsingRandomOffset(offset int) {
 }
 
 func (*fakeActor) Now() time.Time { return time.Now() }
+
+// fakeTimer is a task armed by fakeActor.After; tests run it by hand.
+type fakeTimer struct {
+	delay   time.Duration
+	fn      func()
+	stopped bool
+}
+
+func (t *fakeTimer) Stop() bool {
+	was := t.stopped
+	t.stopped = true
+	return !was
+}
+
+func (a *fakeActor) After(d time.Duration, fn func()) Timer {
+	t := &fakeTimer{delay: d, fn: fn}
+	a.timers = append(a.timers, t)
+	return t
+}
+
+// pendingTimers returns the armed timers not yet stopped or run.
+func (a *fakeActor) pendingTimers() []*fakeTimer {
+	var pending []*fakeTimer
+	for _, t := range a.timers {
+		if !t.stopped {
+			pending = append(pending, t)
+		}
+	}
+	return pending
+}
+
+// fireTimer runs the sole pending timer, failing unless exactly one is
+// armed with delay want.
+func (a *fakeActor) fireTimer(t *testing.T, want time.Duration) {
+	t.Helper()
+	pending := a.pendingTimers()
+	if len(pending) != 1 {
+		t.Fatalf("pending timers = %d, want 1", len(pending))
+	}
+	if pending[0].delay != want {
+		t.Fatalf("timer delay = %v, want %v", pending[0].delay, want)
+	}
+	pending[0].stopped = true
+	pending[0].fn()
+}
 
 // recordingMove/recordingAttack/recordingCast (below) stand in for
 // MoveController/AttackController/CastController. move.Controller,
@@ -2161,76 +2207,88 @@ func TestAttackableAIIdleSkipsAbortWhileCasting(t *testing.T) {
 	}
 }
 
-func TestAttackableAIWanderTimerThenRateWalks(t *testing.T) {
-	owner := actor(1)
-	owner.moveSpeed = 50
-	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	now := start
-	ai.now = func() time.Time { return now }
-	ai.SetRandomWalkRate(100)
-	ai.roll = func(int) int { return 0 }
+// TestAttackableAIWanderChainHitWalksAndEnds pins AttackableAI.thinkWander's
+// task chain: a WANDER promoted after a wander arms one firing a wander
+// timer out and takes no step, periodic cycles leave the current wander
+// alone, and a hit walks and schedules nothing more.
+func TestAttackableAIWanderChainHitWalksAndEnds(t *testing.T) {
+	brain, owner, _, _ := wanderArrivedThenPromoted(t, time.Unix(1_000, 0))
 
-	if err := thinkWanderOnce(ai); err != nil {
-		t.Fatalf("first RunAI() error: %v", err)
+	for range 3 {
+		if err := brain.TickThink(); err != nil {
+			t.Fatalf("TickThink() error: %v", err)
+		}
 	}
-	owner.wanderCalls = 0
-
-	if err := ai.RunAI(); err != nil {
-		t.Fatalf("arm-timer RunAI() error: %v", err)
-	}
-	if owner.wanderCalls != 0 {
-		t.Fatalf("wander calls while timer arms = %d, want 0", owner.wanderCalls)
+	if owner.wanderCalls != 1 || len(owner.timers) != 1 {
+		t.Fatalf("wander walks/timers after cycles on the current wander = %d/%d, want 1/1", owner.wanderCalls, len(owner.timers))
 	}
 
-	now = start.Add(4 * time.Second)
-	if err := ai.RunAI(); err != nil {
-		t.Fatalf("early RunAI() error: %v", err)
+	owner.fireTimer(t, defaultWanderTimer*time.Second)
+	if owner.wanderCalls != 2 {
+		t.Fatalf("wander walks after a hit = %d, want 2", owner.wanderCalls)
 	}
-	if owner.wanderCalls != 0 {
-		t.Fatalf("wander calls before timer = %d, want 0", owner.wanderCalls)
-	}
-
-	now = start.Add(5 * time.Second)
-	if err := ai.RunAI(); err != nil {
-		t.Fatalf("due RunAI() error: %v", err)
-	}
-	if owner.wanderCalls != 1 {
-		t.Fatalf("wander calls after timer + rate = %d, want 1", owner.wanderCalls)
+	if got := len(owner.pendingTimers()); got != 0 {
+		t.Fatalf("pending timers after a hit = %d, want 0 (chain ended)", got)
 	}
 }
 
-func TestAttackableAIWanderRateZeroReschedulesWithoutWalking(t *testing.T) {
-	owner := actor(1)
-	owner.moveSpeed = 50
-	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
-	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	now := start
-	ai.now = func() time.Time { return now }
-	ai.SetRandomWalkRate(0)
+// TestAttackableAIWanderChainMissReschedules pins the chain's miss: no walk,
+// and the next firing one wander timer later.
+func TestAttackableAIWanderChainMissReschedules(t *testing.T) {
+	brain, owner, _, _ := wanderArrivedThenPromoted(t, time.Unix(1_000, 0))
+	brain.SetRandomWalkRate(0)
 
-	if err := thinkWanderOnce(ai); err != nil {
-		t.Fatalf("first RunAI() error: %v", err)
+	for range 3 {
+		owner.fireTimer(t, defaultWanderTimer*time.Second)
+		if owner.wanderCalls != 1 {
+			t.Fatalf("wander walks with rate 0 = %d, want 1 (the first step only)", owner.wanderCalls)
+		}
 	}
-	owner.wanderCalls = 0
-	if err := ai.RunAI(); err != nil {
-		t.Fatalf("arm-timer RunAI() error: %v", err)
+	if got := len(owner.timers); got != 4 {
+		t.Fatalf("timers armed = %d, want 4 (one per miss after the first)", got)
+	}
+}
+
+// TestAttackableAIWanderChainHitWhileOutOfControlEndsIt pins the chain
+// firing while the actor cannot act: the hit's walk is the actor's to
+// refuse, the chain ends, and once control returns desire selection does
+// not restart the wander that is still current with its desire queued.
+func TestAttackableAIWanderChainHitWhileOutOfControlEndsIt(t *testing.T) {
+	brain, owner, _, _ := wanderArrivedThenPromoted(t, time.Unix(1_000, 0))
+	owner.denyAction = true
+
+	owner.fireTimer(t, defaultWanderTimer*time.Second)
+	if owner.wanderCalls != 2 {
+		t.Fatalf("wander walk attempts after the out-of-control hit = %d, want 2", owner.wanderCalls)
 	}
 
-	now = start.Add(5 * time.Second)
-	if err := ai.RunAI(); err != nil {
-		t.Fatalf("due RunAI() error: %v", err)
+	owner.denyAction = false
+	for range 4 {
+		if err := brain.TickThink(); err != nil {
+			t.Fatalf("TickThink() error: %v", err)
+		}
+		if err := brain.RunAI(); err != nil {
+			t.Fatalf("RunAI() error: %v", err)
+		}
 	}
-	if owner.wanderCalls != 0 {
-		t.Fatalf("wander calls with rate 0 = %d, want 0", owner.wanderCalls)
+	if got := brain.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() after control returned = %v, want %v kept", got, IntentionWander)
 	}
+	if owner.wanderCalls != 2 || len(owner.pendingTimers()) != 0 {
+		t.Fatalf("wander walks/pending timers after control returned = %d/%d, want 2/0", owner.wanderCalls, len(owner.pendingTimers()))
+	}
+}
 
-	now = start.Add(9 * time.Second)
-	if err := ai.RunAI(); err != nil {
-		t.Fatalf("before second timer RunAI() error: %v", err)
-	}
-	if owner.wanderCalls != 0 {
-		t.Fatalf("wander calls before rescheduled timer = %d, want 0", owner.wanderCalls)
+// TestAttackableAIWanderChainEndsOnDeath pins a dead actor's chain: the
+// firing neither walks nor reschedules.
+func TestAttackableAIWanderChainEndsOnDeath(t *testing.T) {
+	brain, owner, _, _ := wanderArrivedThenPromoted(t, time.Unix(1_000, 0))
+	brain.SetRandomWalkRate(0)
+	owner.alikeDead = true
+
+	owner.fireTimer(t, defaultWanderTimer*time.Second)
+	if owner.wanderCalls != 1 || len(owner.pendingTimers()) != 0 {
+		t.Fatalf("wander walks/pending timers after a dead firing = %d/%d, want 1/0", owner.wanderCalls, len(owner.pendingTimers()))
 	}
 }
 
@@ -4029,7 +4087,7 @@ func TestAttackableThinkFromIdleLeavesQueuedAttackForRunAI(t *testing.T) {
 // wanderArrivedThenPromoted walks one wander step at clock start, arrives,
 // and has a THINK (a control effect ending), which takes no wander step.
 // The next cycles run at start+1s (lifetime), start+2s (empty-queue idle)
-// and start+3s (WANDER re-promoted, arming the wander timer). It returns
+// and start+3s (WANDER re-promoted, arming the wander chain). It returns
 // the brain, its actor, the promotion time and a setter for the AI clock.
 func wanderArrivedThenPromoted(t *testing.T, start time.Time) (*Attackable, *fakeActor, time.Time, func(time.Time)) {
 	t.Helper()
@@ -4046,6 +4104,9 @@ func wanderArrivedThenPromoted(t *testing.T, start time.Time) (*Attackable, *fak
 	if owner.wanderCalls != 1 {
 		t.Fatalf("wander walks after the first wander step = %d, want 1", owner.wanderCalls)
 	}
+	if len(owner.timers) != 0 {
+		t.Fatalf("timers after the first wander step = %d, want 0 (it walks at once)", len(owner.timers))
+	}
 	brain.Arrived()
 	if got := brain.CurrentIntention(); got != IntentionWander {
 		t.Fatalf("CurrentIntention() after Arrived = %v, want %v kept", got, IntentionWander)
@@ -4057,8 +4118,8 @@ func wanderArrivedThenPromoted(t *testing.T, start time.Time) (*Attackable, *fak
 	if got := brain.CurrentIntention(); got != IntentionWander {
 		t.Fatalf("CurrentIntention() after arrival Think = %v, want %v kept", got, IntentionWander)
 	}
-	if owner.walkStanceCalls != stances || !brain.wanderReady.IsZero() {
-		t.Fatalf("walk stances/wanderReady after arrival Think = %d/%v, want %d/unset (no wander step)", owner.walkStanceCalls, brain.wanderReady, stances)
+	if owner.walkStanceCalls != stances || len(owner.timers) != 0 {
+		t.Fatalf("walk stances/timers after arrival Think = %d/%d, want %d/0 (no wander step)", owner.walkStanceCalls, len(owner.timers), stances)
 	}
 
 	for i, at := range []int{1, 2, 3} {
@@ -4076,8 +4137,8 @@ func wanderArrivedThenPromoted(t *testing.T, start time.Time) (*Attackable, *fak
 	if got := brain.CurrentIntention(); got != IntentionWander {
 		t.Fatalf("CurrentIntention() after the promotion = %v, want %v", got, IntentionWander)
 	}
-	if want := promoted.Add(defaultWanderTimer * time.Second); !brain.wanderReady.Equal(want) {
-		t.Fatalf("wanderReady after the promotion = %v, want %v", brain.wanderReady, want)
+	if pending := owner.pendingTimers(); len(pending) != 1 || pending[0].delay != defaultWanderTimer*time.Second {
+		t.Fatalf("pending timers after the promotion = %d, want one wander timer", len(pending))
 	}
 	if owner.wanderCalls != 1 {
 		t.Fatalf("wander walks after the promotion = %d, want 1", owner.wanderCalls)
@@ -4085,40 +4146,15 @@ func wanderArrivedThenPromoted(t *testing.T, start time.Time) (*Attackable, *fak
 	return brain, owner, promoted, func(at time.Time) { now = at }
 }
 
-// TestAttackableArrivalThinkWanderTimerStartsAtPromotion pins that a THINK
-// after a wander arrival leaves the wander timer alone (AbstractAI.onEvtThink
-// has no WANDER case): the timer starts at the next WANDER promotion, so no
-// walk comes one timer after the THINK and the next one comes one timer
-// after the promotion.
-func TestAttackableArrivalThinkWanderTimerStartsAtPromotion(t *testing.T) {
-	start := time.Unix(1_000, 0)
-	brain, owner, promoted, setNow := wanderArrivedThenPromoted(t, start)
-
-	setNow(start.Add(defaultWanderTimer * time.Second))
-	if err := brain.TickThink(); err != nil {
-		t.Fatalf("TickThink() one timer after the THINK error: %v", err)
-	}
-	if owner.wanderCalls != 1 {
-		t.Fatalf("wander walks one timer after the THINK = %d, want 1", owner.wanderCalls)
-	}
-
-	setNow(promoted.Add(defaultWanderTimer * time.Second))
-	if err := brain.TickThink(); err != nil {
-		t.Fatalf("TickThink() one timer after the promotion error: %v", err)
-	}
-	if owner.wanderCalls != 2 {
-		t.Fatalf("wander walks one timer after the promotion = %d, want 2", owner.wanderCalls)
-	}
-}
-
 // TestAttackableWanderTimerOutlivesIdle pins AttackableAI's pending
 // _wanderTask across an idle: when a walk not taken by the wander (the
-// hostile's wander recheck step) arrives while the timer runs, the idle and
-// the next WANDER promotion keep that timer, since the running task fires
+// hostile's wander recheck step) arrives while the chain runs, the idle and
+// the next WANDER promotion keep that firing, since the running task fires
 // first and cancels the one the promotion schedules.
 func TestAttackableWanderTimerOutlivesIdle(t *testing.T) {
 	start := time.Unix(1_000, 0)
 	brain, owner, promoted, setNow := wanderArrivedThenPromoted(t, start)
+	running := owner.pendingTimers()[0]
 
 	setNow(promoted.Add(time.Second))
 	brain.Arrived()
@@ -4136,36 +4172,38 @@ func TestAttackableWanderTimerOutlivesIdle(t *testing.T) {
 	if got := brain.CurrentIntention(); got != IntentionWander {
 		t.Fatalf("CurrentIntention() after the re-promotion = %v, want %v", got, IntentionWander)
 	}
-	if want := promoted.Add(defaultWanderTimer * time.Second); !brain.wanderReady.Equal(want) {
-		t.Fatalf("wanderReady after the re-promotion = %v, want the running timer %v", brain.wanderReady, want)
+	if pending := owner.pendingTimers(); len(pending) != 1 || pending[0] != running {
+		t.Fatalf("pending timers after the re-promotion = %d, want only the running one", len(pending))
 	}
 
-	setNow(promoted.Add(defaultWanderTimer * time.Second))
-	if err := brain.TickThink(); err != nil {
-		t.Fatalf("TickThink() at the running timer error: %v", err)
-	}
+	owner.fireTimer(t, defaultWanderTimer*time.Second)
 	if owner.wanderCalls != 2 {
 		t.Fatalf("wander walks when the running timer ran out = %d, want 2", owner.wanderCalls)
 	}
 }
 
-// TestAttackableWanderTimerEndsWhileNotWandering pins that a wander task
-// running out while the actor is idle finds no WANDER and ends: the next
-// wander promotion arms a fresh timer instead of walking at once.
+// TestAttackableWanderTimerEndsWhileNotWandering pins that a wander firing
+// while the actor is idle finds no WANDER and ends: the next wander
+// promotion arms a fresh timer instead of walking at once.
 func TestAttackableWanderTimerEndsWhileNotWandering(t *testing.T) {
 	start := time.Unix(1_000, 0)
 	brain, owner, promoted, setNow := wanderArrivedThenPromoted(t, start)
+	stale := owner.pendingTimers()[0]
 
 	setNow(promoted.Add(time.Second))
 	brain.Arrived()
-	late := promoted.Add(10 * time.Second)
-	setNow(late)
+	setNow(promoted.Add(2 * time.Second))
 	if err := brain.TickThink(); err != nil {
 		t.Fatalf("idle TickThink() error: %v", err)
 	}
 	if got := brain.CurrentIntention(); got != IntentionIdle {
 		t.Fatalf("CurrentIntention() after the empty-queue cycle = %v, want %v", got, IntentionIdle)
 	}
+	owner.fireTimer(t, defaultWanderTimer*time.Second)
+	if owner.wanderCalls != 1 || len(owner.pendingTimers()) != 0 {
+		t.Fatalf("wander walks/pending timers after an idle firing = %d/%d, want 1/0", owner.wanderCalls, len(owner.pendingTimers()))
+	}
+
 	if err := brain.TickThink(); err != nil {
 		t.Fatalf("promote TickThink() error: %v", err)
 	}
@@ -4175,8 +4213,8 @@ func TestAttackableWanderTimerEndsWhileNotWandering(t *testing.T) {
 	if owner.wanderCalls != 1 {
 		t.Fatalf("wander walks after the re-promotion = %d, want 1 (stale timer must not roll)", owner.wanderCalls)
 	}
-	if want := late.Add(defaultWanderTimer * time.Second); !brain.wanderReady.Equal(want) {
-		t.Fatalf("wanderReady after the re-promotion = %v, want a fresh timer %v", brain.wanderReady, want)
+	if pending := owner.pendingTimers(); len(pending) != 1 || pending[0] == stale {
+		t.Fatalf("pending timers after the re-promotion = %d, want one fresh timer", len(pending))
 	}
 }
 
