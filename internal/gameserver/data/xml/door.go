@@ -57,6 +57,9 @@ doors:
 func buildDoorTemplate(el doorElement) (*door.Template, error) {
 	set := commons.StatSetFromXMLAttrs(el.Attrs)
 	set.MergeXMLAttrs(el.Position.Attrs)
+	if err := decodeLiteralAttrs(set, "x", "y", "z"); err != nil {
+		return nil, fmt.Errorf("door position: %w", err)
+	}
 	set.MergeXMLAttrs(el.Stats.Attrs)
 	set.MergeXMLAttrs(el.Function.Attrs)
 

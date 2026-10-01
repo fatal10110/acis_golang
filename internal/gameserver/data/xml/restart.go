@@ -15,8 +15,8 @@ type restartFile struct {
 }
 
 type restartAreaElement struct {
-	MinZ     *coord32                    `xml:"minZ,attr"`
-	MaxZ     *coord32                    `xml:"maxZ,attr"`
+	MinZ     *literal32                  `xml:"minZ,attr"`
+	MaxZ     *literal32                  `xml:"maxZ,attr"`
 	Nodes    []pointElement              `xml:"node"`
 	Restarts []restartRestrictionElement `xml:"restart"`
 }

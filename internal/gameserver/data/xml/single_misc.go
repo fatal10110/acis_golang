@@ -120,8 +120,8 @@ func LoadSoulCrystalData(path string) (*item.SoulCrystalTable, error) {
 // spellbookElement is one <book> element. skillId and itemId are both
 // required.
 type spellbookElement struct {
-	SkillID *coord32 `xml:"skillId,attr"`
-	ItemID  *coord32 `xml:"itemId,attr"`
+	SkillID *literal32 `xml:"skillId,attr"`
+	ItemID  *literal32 `xml:"itemId,attr"`
 }
 
 func (e spellbookElement) build() (skill.Spellbook, error) {
@@ -158,9 +158,9 @@ func LoadSpellbooks(path string) (*skill.SpellbookTable, error) {
 // summonItemElement is one <item> element. id, npcId and summonType are all
 // required.
 type summonItemElement struct {
-	ID         *coord32 `xml:"id,attr"`
-	NPCID      *coord32 `xml:"npcId,attr"`
-	SummonType *coord   `xml:"summonType,attr"`
+	ID         *literal32 `xml:"id,attr"`
+	NPCID      *literal32 `xml:"npcId,attr"`
+	SummonType *literal32 `xml:"summonType,attr"`
 }
 
 func (e summonItemElement) build() (item.SummonItem, error) {
@@ -360,6 +360,13 @@ func LoadAnnouncements(path string) ([]admin.Announcement, error) {
 		if err != nil || message == "" {
 			continue
 		}
+		// Only an automatic announcement reads its schedule, so only its
+		// values are parsed.
+		if set.GetBoolDefault("auto", false) {
+			if err := decodeLiteralAttrs(set, "initial_delay", "delay", "limit"); err != nil {
+				return nil, fmt.Errorf("xml: %s: announcement %q: %w", path, message, err)
+			}
+		}
 		announcement, err := admin.NewAnnouncement(set)
 		if err != nil {
 			return nil, fmt.Errorf("xml: %s: %w", path, err)
@@ -404,7 +411,11 @@ func LoadObserverGroups(path string) (*observer.Table, error) {
 
 	spawns := make([]observer.Spawn, 0, len(doc.Spawns))
 	for _, el := range doc.Spawns {
-		entry, err := observer.NewSpawn(commons.StatSetFromXMLAttrs(el.Attrs))
+		set := commons.StatSetFromXMLAttrs(el.Attrs)
+		if err := decodeLiteralAttrs(set, "id", "x", "y", "z"); err != nil {
+			return nil, fmt.Errorf("xml: %s: observer spawn: %w", path, err)
+		}
+		entry, err := observer.NewSpawn(set)
 		if err != nil {
 			return nil, fmt.Errorf("xml: %s: %w", path, err)
 		}
@@ -495,10 +506,10 @@ func LoadCursedWeapons(path string, skills *skill.Table) (*entity.CursedWeaponTa
 // present, overrides the skill's max level from the skill table; price
 // defaults to 0 and desc to "".
 type bufferSkillElement struct {
-	ID          *coord32 `xml:"id,attr"`
-	Level       *coord   `xml:"level,attr"`
-	Price       *coord   `xml:"price,attr"`
-	Description string   `xml:"desc,attr"`
+	ID          *literal32 `xml:"id,attr"`
+	Level       *literal32 `xml:"level,attr"`
+	Price       *literal32 `xml:"price,attr"`
+	Description string     `xml:"desc,attr"`
 }
 
 func (e bufferSkillElement) build(category string, skills *skill.Table) (skill.BufferSkill, error) {

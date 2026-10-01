@@ -86,6 +86,43 @@ func (c *coord32) UnmarshalXMLAttr(attr xml.Attr) error {
 	return nil
 }
 
+// literal32 is an int32 attribute written as an integer literal: decimal,
+// "0x"/"#" hex, or leading-zero octal, parsed by commons.DecodeInt32 ("010"
+// is 8, not 10). Like coord32 it rejects empty, padded, malformed and
+// out-of-range values; declare a required attribute as *literal32.
+type literal32 int32
+
+func (l *literal32) UnmarshalXMLAttr(attr xml.Attr) error {
+	n, err := commons.DecodeInt32(attr.Value)
+	if err != nil {
+		return fmt.Errorf("%s: %w", attr.Name.Local, err)
+	}
+	*l = literal32(n)
+	return nil
+}
+
+// decodeLiteralAttrs replaces the raw value of each present key in set with
+// its integer-literal value (see literal32), for attributes a model
+// constructor reads from a StatSet. An absent key stays absent so the
+// constructor's own required/default handling still applies.
+func decodeLiteralAttrs(set *commons.StatSet, keys ...string) error {
+	for _, key := range keys {
+		if !set.Has(key) {
+			continue
+		}
+		raw, err := set.GetString(key)
+		if err != nil {
+			return err
+		}
+		n, err := commons.DecodeInt32(raw)
+		if err != nil {
+			return fmt.Errorf("%s: %w", key, err)
+		}
+		set.Set(key, int(n))
+	}
+	return nil
+}
+
 // coord64 is like coord but for a required int64 attribute (e.g. a clan hall
 // siege length in milliseconds).
 type coord64 int64
@@ -186,15 +223,19 @@ func (l *intListAttr) UnmarshalXMLAttr(attr xml.Attr) error {
 // locationElement one whose x/y/z attributes are a world location. Both are
 // embedded into the element types that carry coordinates alongside their own
 // attributes, so the decoder converts them like any other tagged field.
+// Every point is an integer literal (a zone, manor or restart area node, a
+// door outline corner). A location is plain decimal (a teleport destination,
+// a player spawn); literalLocation is its integer-literal counterpart.
 //
 // The coordinates are pointers because they are required and zero is a legal
 // coordinate: a non-pointer cannot tell an absent attribute from x="0", and a
 // missing coordinate silently reading as the world origin is exactly the
 // data-file corruption the loaders are meant to reject. A malformed value is
-// rejected by coord itself, so nil here means only "attribute absent".
+// rejected by the attribute type itself, so nil here means only "attribute
+// absent".
 type pointElement struct {
-	X *coord `xml:"x,attr"`
-	Y *coord `xml:"y,attr"`
+	X *literal32 `xml:"x,attr"`
+	Y *literal32 `xml:"y,attr"`
 }
 
 func (e pointElement) point() (location.Point, error) {
@@ -211,6 +252,21 @@ type locationElement struct {
 }
 
 func (e locationElement) loc() (location.Location, error) {
+	if e.X == nil || e.Y == nil || e.Z == nil {
+		return location.Location{}, fmt.Errorf("x, y and z are required")
+	}
+	return location.Location{X: int(*e.X), Y: int(*e.Y), Z: int(*e.Z)}, nil
+}
+
+// literalLocation is a locationElement whose coordinates are integer
+// literals (a zone or residence spawn point, a control tower position).
+type literalLocation struct {
+	X *literal32 `xml:"x,attr"`
+	Y *literal32 `xml:"y,attr"`
+	Z *literal32 `xml:"z,attr"`
+}
+
+func (e literalLocation) loc() (location.Location, error) {
 	if e.X == nil || e.Y == nil || e.Z == nil {
 		return location.Location{}, fmt.Errorf("x, y and z are required")
 	}

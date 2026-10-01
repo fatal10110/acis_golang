@@ -10,6 +10,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -206,6 +207,38 @@ func TestRefusedCollarCastStillSendsSummonAPet(t *testing.T) {
 		assertStaticSystemMessage(t, frames[1], serverpackets.SystemMessageSummonAPet)
 		if h.srv.PlayerCastingNow(t, h.ownerID) {
 			t.Fatal("collar short of MP started a cast")
+		}
+	})
+	// The collar's skill is magic, so a Mute on the owner refuses it at
+	// canCast (meetsHpMpDisabledConditions), which answers nothing of its
+	// own: SUMMON_A_PET is the only packet.
+	t.Run("muted", func(t *testing.T) {
+		t.Parallel()
+		h := bootCollarSkill(t, summonCreature())
+		obj, ok := h.srv.State.Player(h.ownerID)
+		if !ok {
+			t.Fatal("owner not in world")
+		}
+		owner := obj.(interface {
+			effect.Actor
+			EffectList() *effect.List
+		})
+		mute, err := effect.New(effect.Skill{ID: 1064, Level: 1, Debuff: true}, modelskill.EffectTemplate{Name: "Mute", Time: 30})
+		if err != nil {
+			t.Fatalf("effect.New(Mute): %v", err)
+		}
+		mute.Effector, mute.Effected = owner, owner
+		runOn(t, h.srv.PlayerQueue(t, h.ownerID), func() { owner.EffectList().Add(mute) })
+		drainUntilQuiet(t, h.client)
+
+		h.client.Send(encodeUseItem(h.collarID, false))
+		frames := drainFrames(t, h.client)
+		if got, want := frameOpcodes(frames), []byte{serverpackets.OpcodeSystemMessage}; string(got) != string(want) {
+			t.Fatalf("muted collar = opcodes %x, want SUMMON_A_PET alone", got)
+		}
+		assertStaticSystemMessage(t, frames[0], serverpackets.SystemMessageSummonAPet)
+		if _, ok := h.srv.State.Summon(h.ownerID); ok || h.srv.PlayerCastingNow(t, h.ownerID) {
+			t.Fatal("muted collar summoned or started a cast")
 		}
 	})
 }

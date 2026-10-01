@@ -13,7 +13,7 @@ type manorFile struct {
 }
 
 type manorElement struct {
-	ID    *coord32       `xml:"id,attr"`
+	ID    *literal32     `xml:"id,attr"`
 	Name  string         `xml:"name,attr"`
 	Crops []attrsElement `xml:"crop"`
 }
@@ -52,9 +52,9 @@ type manorAreaFile struct {
 
 type manorAreaElement struct {
 	Name     string         `xml:"name,attr"`
-	CastleID *coord32       `xml:"castleId,attr"`
-	MinZ     *coord32       `xml:"minZ,attr"`
-	MaxZ     *coord32       `xml:"maxZ,attr"`
+	CastleID *literal32     `xml:"castleId,attr"`
+	MinZ     *literal32     `xml:"minZ,attr"`
+	MaxZ     *literal32     `xml:"maxZ,attr"`
 	Nodes    []pointElement `xml:"node"`
 }
 

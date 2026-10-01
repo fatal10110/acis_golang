@@ -43,6 +43,12 @@ func NewAccessLevel(set *commons.StatSet) (AccessLevel, error) {
 	if err := f.Err(); err != nil {
 		return AccessLevel{}, err
 	}
+	// A color is the hex digits of an int32 literal with its "0x" left off.
+	for _, c := range [...]struct{ key, value string }{{"nameColor", accessLevel.NameColor}, {"titleColor", accessLevel.TitleColor}} {
+		if _, err := commons.DecodeInt32("0x" + c.value); err != nil {
+			return AccessLevel{}, fmt.Errorf("admin: access level %d: %s: %w", level, c.key, err)
+		}
+	}
 	return accessLevel, nil
 }
 
@@ -101,7 +107,7 @@ func NewAnnouncement(set *commons.StatSet) (Announcement, error) {
 	af := commons.NewFields(set, fmt.Sprintf("admin: announcement %q", message))
 	a.InitialDelay = af.Int("initial_delay")
 	a.Delay = af.Int("delay")
-	a.Limit = af.IntDefault("limit", 0)
+	a.Limit = af.Int("limit")
 	if err := af.Err(); err != nil {
 		return Announcement{}, err
 	}

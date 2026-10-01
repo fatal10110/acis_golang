@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -123,6 +124,6 @@ func parseConditionBool(raw string) (bool, bool) {
 }
 
 func parseConditionInt(raw string) (int, bool) {
-	v, err := strconv.ParseInt(raw, 0, 32)
+	v, err := commons.DecodeInt32(raw)
 	return int(v), err == nil
 }

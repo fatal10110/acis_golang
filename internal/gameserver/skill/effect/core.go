@@ -41,8 +41,10 @@ const (
 	FlagConfused
 	// FlagBetrayed marks a summon as temporarily hostile to its owner.
 	FlagBetrayed
-	flagMuted
-	flagPhysicalMuted
+	// FlagMuted marks a target as blocked from magic skills.
+	FlagMuted
+	// FlagPhysicalMuted marks a target as blocked from physical skills.
+	FlagPhysicalMuted
 	// FlagRooted marks a target as rooted.
 	FlagRooted
 	// FlagSleep marks a target as asleep.
@@ -242,13 +244,13 @@ var coreKinds = map[string]kind{
 	"ImobileBuff":           {typ: TypeImmobilizeEffector},
 	"Invincible":            {typ: TypeInvincible},
 	"ManaHealOverTime":      {typ: TypeManaHealOverTime},
-	"Mute":                  {typ: TypeMute, flag: flagMuted},
+	"Mute":                  {typ: TypeMute, flag: FlagMuted},
 	"NoblesseBless":         {typ: TypeNoblesseBless, flag: flagNoblesseBlessing},
 	"Paralyze":              {typ: TypeParalyze, flag: FlagParalyzed},
 	"Petrification":         {typ: TypePetrification, flag: FlagParalyzed},
-	"PhysicalMute":          {typ: TypePhysicalMute, flag: flagPhysicalMuted},
+	"PhysicalMute":          {typ: TypePhysicalMute, flag: FlagPhysicalMuted},
 	"RemoveTarget":          {typ: TypeRemoveTarget},
-	"SilenceMagicPhysical":  {typ: TypeSilenceAll, flag: flagMuted | flagPhysicalMuted},
+	"SilenceMagicPhysical":  {typ: TypeSilenceAll, flag: FlagMuted | FlagPhysicalMuted},
 	"SilentMove":            {typ: TypeSilentMove, flag: FlagSilentMove},
 	"StunSelf":              {typ: TypeStunSelf, flag: FlagStunned, selfTarget: true},
 	"Heal":                  {typ: TypeHeal},

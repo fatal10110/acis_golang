@@ -14,8 +14,9 @@ import (
 // TestIntAttrsRejectMalformedValues pins the accepted input set of every
 // non-coordinate integer attribute decoded into a tagged field, the same way
 // TestCoordinateAttrRejectsMalformedValues pins the coordinates: a bare
-// base-10 integer is read, while an empty, whitespace-padded, non-numeric,
-// or out-of-int32 value fails the load naming the attribute and the file. A
+// integer is read, while an empty, whitespace-padded, non-numeric, or
+// out-of-int32 value fails the load naming the attribute and the file.
+// TestIntAttrGrammarMatchesReferencePerField covers the base prefixes. A
 // required attribute that is absent fails the same way; an optional one (a
 // boat ticket item) defaults to 0. The decoder's own int conversion would
 // read the empty and absent cases as 0 and trim the padding.

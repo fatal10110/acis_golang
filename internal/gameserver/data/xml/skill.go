@@ -331,10 +331,10 @@ func (sl *skillLoader) effect(op funcElement, attachCond *skill.ConditionClause,
 		EffectPower:      a.float64Default("effectPower", -1),
 		EffectPowerSet:   a.has("effectPower"),
 		EffectType:       a.strDefault("effectType", ""),
-		TriggeredID:      int(a.int32LiteralDefault("triggeredId", 0)),
-		TriggeredLevel:   int(a.int32LiteralDefault("triggeredLevel", 1)),
+		TriggeredID:      int(a.int32Default("triggeredId", 0)),
+		TriggeredLevel:   int(a.int32Default("triggeredLevel", 1)),
 		ChanceType:       a.strDefault("chanceType", ""),
-		ActivationChance: int(a.int32LiteralDefault("activationChance", -1)),
+		ActivationChance: int(a.int32Default("activationChance", -1)),
 		AttachCondition:  attachCond,
 	}
 	if a.has("abnormal") {
