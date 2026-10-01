@@ -54,7 +54,10 @@ type mountFeedState struct {
 	// starts, its hunger is judged by the gauge the last mount left.
 	fed     bool
 	current int
-	ticker  *sim.Ticker
+	// petCollar is the collar of the pet whose meal the gauge started
+	// from, kept until a dismount hands the gauge back to that pet's row.
+	petCollar int32
+	ticker    *sim.Ticker
 	// gen tells a tick of a stopped task from one of the running task.
 	gen uint64
 }
@@ -95,14 +98,14 @@ func (f *mountFeedState) stopLocked() {
 	}
 }
 
-// loadMountFeed resolves the pet data of the mount npcID for the
-// character's current level. A mount with no usable feeding data is never
-// fed. The gauge is left as it was until the feed starts.
-func (c *Character) loadMountFeed(npcID int32) {
+// loadMountFeed resolves the pet data of the mount npcID at level. A mount
+// with no usable feeding data is never fed. The gauge is left as it was
+// until the feed starts.
+func (c *Character) loadMountFeed(npcID int32, level int) {
 	var data MountData
 	found := false
 	if c.mountData != nil {
-		data, found = c.mountData.MountData(npcID, c.Level())
+		data, found = c.mountData.MountData(npcID, level)
 	}
 	ok := found && data.MaxMeal > 0 && data.MealInNormal > 0 && data.MealInBattle > 0
 	f := &c.mountFeed
@@ -117,6 +120,19 @@ func (c *Character) loadMountFeed(npcID int32) {
 // mountFeedPeriod. It runs once the mount transition was shown, and again
 // when a dead rider is revived: the revived rider's mount is full again.
 func (c *Character) StartMountFeed() {
+	c.startMountFeed(-1, 0)
+}
+
+// StartPetMountFeed is StartMountFeed for a pet just mounted: the gauge
+// starts from the pet's own meal fed, capped at the mount's max meal, and
+// goes back to the row of the pet's collar controlItemID at the dismount.
+func (c *Character) StartPetMountFeed(fed int, controlItemID int32) {
+	c.startMountFeed(fed, controlItemID)
+}
+
+// startMountFeed starts the feed with the gauge at fed, or full when fed
+// is negative.
+func (c *Character) startMountFeed(fed int, petCollar int32) {
 	if !c.Mounted() {
 		return
 	}
@@ -129,7 +145,12 @@ func (c *Character) StartMountFeed() {
 	}
 	f.stopLocked()
 	f.fed = true
-	gauge := f.setCurrentLocked(f.data.MaxMeal, inCombat)
+	if fed < 0 {
+		fed = f.data.MaxMeal
+	} else {
+		f.petCollar = petCollar
+	}
+	gauge := f.setCurrentLocked(fed, inCombat)
 	if q := c.Queue(); q != nil && !c.Dead() {
 		gen := f.gen
 		f.ticker = q.Every(mountFeedPeriod, func() { c.tickMountFeed(gen) })
@@ -222,7 +243,8 @@ func (c *Character) autoFeedMount(food1, food2 int32, hungry bool) {
 
 // Dismount takes the character off its mount and stops the mount's feed
 // task, and reports whether it was mounted. Leaving a flying mount takes
-// Wyvern Breath away.
+// Wyvern Breath away. A gauge that started from a pet's meal goes back to
+// that pet's row (event.Dismounted).
 func (c *Character) Dismount() bool {
 	c.stateMu.Lock()
 	if c.mountNPCID == 0 {
@@ -241,8 +263,10 @@ func (c *Character) Dismount() bool {
 	f.mu.Lock()
 	f.stopLocked()
 	f.data, f.found, f.canFeed = MountData{}, false, false
+	dismounted := event.Dismounted{PetControlItemID: f.petCollar, Fed: f.current}
+	f.petCollar = 0
 	f.mu.Unlock()
 	c.refreshMoveSpeed()
-	c.emit(event.Dismounted{})
+	c.emit(dismounted)
 	return true
 }

@@ -5,8 +5,6 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -156,45 +154,5 @@ func TestMountCommandElevationRefusal(t *testing.T) {
 		h, _ := bootWyvernRiderOpts(t, []gameservertest.Option{gameservertest.WithGeo(dropGeo{drop: 250})})
 		drainFrames(t, h.client)
 		h.requireDismounted(t, "/mount 250 above the ground", h.mountCommand(t, cmdMount))
-	})
-}
-
-// striderNPCID is a strider's npc id: one of the pets a player can ride.
-const striderNPCID = 12526
-
-// TestMountCommandStriderNotPortedYet pins /mount beside a summoned strider
-// pet, before strider riding is ported (#3210): the client is released with
-// ActionFailed and the rider stays on foot. A pet that cannot be ridden
-// gets no answer.
-func TestMountCommandStriderNotPortedYet(t *testing.T) {
-	t.Parallel()
-	t.Run("strider", func(t *testing.T) {
-		t.Parallel()
-		strider := wolfTemplate()
-		strider.ID = striderNPCID
-		items, err := item.NewSummonItemTable([]item.SummonItem{{ItemID: wolfCollarID, NPCID: striderNPCID, SummonType: 1}})
-		if err != nil {
-			t.Fatalf("summon items: %v", err)
-		}
-		h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
-			gameservertest.WithNPCs(npc.NewTable([]*npc.Template{strider, treeTemplate()})),
-			gameservertest.WithSummonItems(items),
-		})
-		h.spawnWolf(t)
-		frames := h.mountCommand(t, cmdMount)
-		if len(frames) != 1 || frames[0][0] != serverpackets.OpcodeActionFailed {
-			t.Fatalf("/mount beside a strider = %x, want ActionFailed", frameOpcodes(frames))
-		}
-		if h.rider(t).Mounted() {
-			t.Fatal("rider mounted a strider")
-		}
-	})
-	t.Run("wolf", func(t *testing.T) {
-		t.Parallel()
-		h := bootOwnerWithCollar(t)
-		h.spawnWolf(t)
-		if frames := h.mountCommand(t, cmdMount); len(frames) != 0 {
-			t.Fatalf("/mount beside a wolf = %x, want silence", frameOpcodes(frames))
-		}
 	})
 }

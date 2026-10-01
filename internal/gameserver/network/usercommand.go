@@ -3,14 +3,11 @@ package network
 import (
 	"fmt"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 // User command ids, as the client numbers the slash commands it resolves.
@@ -120,45 +117,11 @@ func (l *GameClientLink) userCommandEscape(live *livePlayer, _ int32) {
 	l.castItemSkills(live, live.Inventory(), nil, []modelskill.Definition{def}, false, false)
 }
 
-// userCommandMount (/mount) mounts live on its strider pet, or takes it off
-// its mount. Neither on a mount nor with a strider to ride, nothing
+// userCommandMount (/mount) mounts live on its rideable pet, or takes it
+// off its mount. Neither on a mount nor with a pet to ride, nothing
 // happens.
-func (l *GameClientLink) userCommandMount(live *livePlayer, id int32) {
-	if l.hasMountablePet(live) && !live.Mounted() && !live.EffectList().IsAffected(effect.FlagBetrayed) {
-		l.userCommandGap(live, id, "strider mount (#3210)")
-		return
-	}
-	if !live.Mounted() {
-		return
-	}
-	if live.MountType() == player.MountTypeWyvern {
-		if live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagNoLanding) {
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoDismountHere))
-			return
-		}
-		if l.unsafeDismountHeight(live) {
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDismountFromElevation))
-			return
-		}
-	}
-	if live.MountHungry() {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageHungryStriderNotMount))
-		return
-	}
-	live.Character.Dismount()
-}
-
-// hasMountablePet reports whether live's summon is a pet it can ride.
-func (l *GameClientLink) hasMountablePet(live *livePlayer) bool {
-	if l.world == nil {
-		return false
-	}
-	obj, ok := l.world.Summon(live.ObjectID())
-	if !ok {
-		return false
-	}
-	s, ok := obj.(*summon.Actor)
-	return ok && s.IsPet() && pet.IsMountable(s.NPCID())
+func (l *GameClientLink) userCommandMount(live *livePlayer, _ int32) {
+	l.mountPlayer(live)
 }
 
 // unsafeDismountHeight reports whether live hangs higher above the ground

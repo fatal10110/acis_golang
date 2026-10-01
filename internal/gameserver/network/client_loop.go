@@ -1273,6 +1273,8 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 						return
 					}
 					l.changeLiveMoveType(live, !live.Running())
+				case actionMountDismount:
+					l.actionMountDismount(live)
 				default:
 					if l.storeActionUse(live, req.ActionID) {
 						return

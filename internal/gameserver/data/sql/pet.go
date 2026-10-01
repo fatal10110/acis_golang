@@ -68,6 +68,15 @@ func (s *PetStore) Save(ctx context.Context, itemObjectID int32, st pet.State) e
 	return nil
 }
 
+// SaveFed writes fed into the existing row of the pet whose collar is
+// itemObjectID, leaving the rest of the row as it is.
+func (s *PetStore) SaveFed(ctx context.Context, itemObjectID int32, fed int) error {
+	if _, err := s.db.ExecContext(ctx, `UPDATE pets SET fed=? WHERE item_obj_id=?`, fed, itemObjectID); err != nil {
+		return fmt.Errorf("save pet %d fed: %w", itemObjectID, err)
+	}
+	return nil
+}
+
 // DeleteByItemObjectID removes the pet row tied to itemObjectID, if any.
 func (s *PetStore) DeleteByItemObjectID(ctx context.Context, itemObjectID int32) error {
 	_, err := s.db.ExecContext(ctx, "DELETE FROM pets WHERE item_obj_id = ?", itemObjectID)
