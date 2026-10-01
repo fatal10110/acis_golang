@@ -163,6 +163,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x9f: true, // package send
 		0xa0: true, // block list commands
 		0xa7: true, // multisell exchange
+		0xaa: true, // user command
 		0xac: true, // open recipe book
 		0xad: true, // delete a recipe
 		0xae: true, // recipe craft window

@@ -1920,6 +1920,18 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.handleSay2(client, live, req) })
 			}
 
+		case clientpackets.OpcodeRequestUserCommand:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestUserCommand)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestUserCommand(live, req.CommandID) })
+			}
+
 		case clientpackets.OpcodeDummy1A,
 			clientpackets.OpcodeDummy23,
 			clientpackets.OpcodeDummy2E,
