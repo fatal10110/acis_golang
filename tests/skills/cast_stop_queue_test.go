@@ -202,3 +202,68 @@ func TestQueuedSkillStillRunsAfterNaturalFinish(t *testing.T) {
 		t.Fatalf("queued skill never started after the cast finished: opcodes %x", opcodesOf(frames))
 	}
 }
+
+// teleportMidCastActionFailed teleports the caster in place mid-cast, with
+// the physical skill queued behind the cast when queue is set, and returns
+// how many ActionFailed follow the stop's MagicSkillCanceled.
+func teleportMidCastActionFailed(t *testing.T, queue bool) int {
+	t.Helper()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithSkills(skillPersistence(t, stopQueueSkills())),
+	)
+	if !srv.DrivesClock() {
+		t.Skip("holding a cast open needs the driven clock")
+	}
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	for _, def := range stopQueueSkills() {
+		seedKnownSkill(t, srv, objID, int(def.ID), 1)
+	}
+	startInWorld(t, c)
+	drainUntilQuiet(t, c)
+	c.Send(encodeRequestMagicSkillUse(stopQueueMagicSkillID, false, false))
+	drainUntilQuiet(t, c)
+	if queue {
+		assertQueuedWithActionFailed(t, c, stopQueuePhysicalSkillID)
+	}
+	mpBefore := srv.PlayerCurrentMP(t, objID)
+
+	x, y, z := srv.PlayerPosition(t, objID)
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.TeleportTo(x, y, z, 0) })
+	frames := queueFrames(t, c)
+	canceled := -1
+	failed := 0
+	for i, frame := range frames {
+		switch {
+		case frame[0] == serverpackets.OpcodeMagicSkillCanceled:
+			canceled = i
+		case frame[0] == serverpackets.OpcodeActionFailed && canceled >= 0:
+			failed++
+		}
+	}
+	if canceled < 0 {
+		t.Fatalf("teleport mid-cast sent no MagicSkillCanceled: opcodes %x", opcodesOf(frames))
+	}
+	if queue {
+		assertQueuedSkillDropped(t, srv, c, objID, frames, mpBefore)
+	}
+	return failed
+}
+
+// TestTeleportStopDropsQueuedSkill pins a teleport mid-cast with a skill
+// queued: Creature.teleportTo's abortAll stops the cast
+// (Creature.java:1298-1306), and the queued CAST's PlayerAI.thinkCast
+// answers one more ActionFailed than the same teleport with nothing queued.
+func TestTeleportStopDropsQueuedSkill(t *testing.T) {
+	t.Parallel()
+	var bare, queued int
+	t.Run("nothing queued", func(t *testing.T) { bare = teleportMidCastActionFailed(t, false) })
+	t.Run("skill queued", func(t *testing.T) { queued = teleportMidCastActionFailed(t, true) })
+	if t.Failed() {
+		return
+	}
+	if queued != bare+1 {
+		t.Fatalf("teleport stop sent %d ActionFailed with a queued skill and %d without, want one more", queued, bare)
+	}
+}

@@ -318,8 +318,13 @@ func (p *livePlayer) Stop() {
 	p.dropHeldIntention()
 	p.takePickup()
 	p.takeDeferredPickup()
-	p.takeDeferredMagicSkill()
-	p.takeDeferredItemAICast()
+	// A skill or item cast queued behind the cast in flight is left for the
+	// stop's own CastFinished, which drops it with ActionFailed; one queued
+	// behind anything else goes silently.
+	if p.cast == nil || !p.cast.CastingNow() {
+		p.takeDeferredMagicSkill()
+		p.takeDeferredItemAICast()
+	}
 	p.takeDeferredFollow()
 	p.takeDeferredUseItem()
 	p.takeDeferredAction()

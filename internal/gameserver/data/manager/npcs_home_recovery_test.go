@@ -132,7 +132,7 @@ func TestHostileControlClosesAbortedCastWithCancelAnimation(t *testing.T) {
 	rec := &event.Recorder{}
 	hostile.Attach(npc.Runtime{World: state, Sink: rec})
 
-	(&hostileControl{hostile: hostile}).Emit(event.CastAborted{Interrupted: true})
+	(&hostileControl{hostile: hostile}).Emit(event.CastAborted{})
 
 	if got := event.Of[event.SkillCanceled](rec); len(got) != 1 || got[0].ObjectID != 7 {
 		t.Fatalf("SkillCanceled events = %+v, want one for the NPC itself (7)", got)
