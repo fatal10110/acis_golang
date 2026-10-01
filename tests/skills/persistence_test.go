@@ -120,6 +120,76 @@ func TestLiveBuffAndReusePersistAtLogoutAndRestoreAtLogin(t *testing.T) {
 	}
 }
 
+// TestSkillStateSurvivesDropBeforeEnterWorld restores a saved buff and reuse
+// timer at a selection whose connection drops before EnterWorld. The
+// selection consumed the saved rows, so the departure saves them back: the
+// next login restores the buff in its entry burst and the reuse timer in its
+// SkillCoolTime.
+func TestSkillStateSurvivesDropBeforeEnterWorld(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+		gameservertest.WithCapturedLog(),
+		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{
+			{
+				ID: 1204, Level: 2, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+				HitTime: 500, ReuseDelay: 45_000, StaticHitTime: true, StaticReuse: true,
+				MPInitialConsume: 2, MPConsume: 3, SkillType: "BUFF",
+				Effects: []modelskill.EffectTemplate{{Name: "Buff", Count: 2, Time: 30}},
+			},
+		})),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	seedKnownSkill(t, srv, objID, 1204, 2)
+	startInWorld(t, c)
+	c.Send(encodeRequestMagicSkillUse(1204, false, false))
+	assertCasterMPStatus(t, srv, c.Read(), objID, 28)
+	readCastStartFrames(t, c, objID, 1204, 2, 500, 45_000, objID)
+	readHitStatusThenIcons(t, srv, c, objID, 25)
+	drainUntilQuiet(t, c)
+	logout(t, srv, c)
+
+	dropped := srv.DialClient(t, "player1", 1)
+	dropped.Send(encodeRequestGameStart(0))
+	if reply := dropped.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
+		t.Fatalf("opcode = %#x, want SSQInfo", reply[0])
+	}
+	if reply := dropped.Read(); reply[0] != serverpackets.OpcodeCharSelected {
+		t.Fatalf("opcode = %#x, want CharSelected", reply[0])
+	}
+	if err := dropped.Close(); err != nil {
+		t.Fatalf("close the selecting client: %v", err)
+	}
+	srv.AdvanceUntil(t, "selected character out of the world", func() bool {
+		_, ok := srv.State.Player(objID)
+		return !ok
+	})
+	srv.FlushPersistence(t)
+	if count, _ := skillSaveRow(t, srv, objID, 1204, 2); count != 1 {
+		t.Fatalf("character_skills_save rows after a drop before EnterWorld = %d, want 1", count)
+	}
+
+	relogin := srv.DialClient(t, "player1", 1)
+	relogin.Send(encodeRequestGameStart(0))
+	if reply := relogin.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
+		t.Fatalf("opcode = %#x, want SSQInfo", reply[0])
+	}
+	if reply := relogin.Read(); reply[0] != serverpackets.OpcodeCharSelected {
+		t.Fatalf("opcode = %#x, want CharSelected", reply[0])
+	}
+	relogin.Send(encodeEnterWorld())
+	frames := readEnterWorldBurstWithRestoredBuff(t, relogin)
+	if frame := frames[3]; frame[0] != serverpackets.OpcodeAbnormalStatusUpdate {
+		t.Fatalf("restored-buff frame opcode = %#x, want AbnormalStatusUpdate", frame[0])
+	}
+	coolTimes := readSkillCoolTimeEntriesFromFrame(t, frames[len(frames)-2])
+	if len(coolTimes) != 1 || coolTimes[0].SkillID != 1204 || coolTimes[0].Level != 2 ||
+		coolTimes[0].RemainingSeconds <= 0 || coolTimes[0].RemainingSeconds > 45 {
+		t.Fatalf("restored SkillCoolTime = %+v, want one skill 1204 level 2 row with a positive remainder", coolTimes)
+	}
+}
+
 func TestStoreSkillCooltimeDisabledSkipsSaveAndRestore(t *testing.T) {
 	t.Parallel()
 	const skillID, level = 1204, 2

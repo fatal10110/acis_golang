@@ -1,6 +1,7 @@
 package network
 
 import (
+	"cmp"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -65,17 +66,19 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	session := NewSession(conn, gameCipher)
 	client := NewClient(session)
 
-	// chars and entering are read entirely by this goroutine: they resolve
-	// the character-list slot indices RequestCharacterDelete,
-	// CharacterRestore and RequestGameStart address, and the character
-	// RequestGameStart selected for EnterWorld to finish spawning.
+	// chars, entering and live are read entirely by this goroutine: chars
+	// resolves the character-list slot indices RequestCharacterDelete,
+	// CharacterRestore and RequestGameStart address; entering is the player
+	// RequestGameStart restored and registered, for EnterWorld to spawn; live
+	// is that player once EnterWorld took it.
 	var chars []*player.Character
-	var entering *player.Character
-	var live *livePlayer
+	var entering, live *livePlayer
 	defer func() {
-		if live != nil {
+		// A connection lost between selection and EnterWorld takes the
+		// selected player out of the world as a logout would.
+		if leaving := cmp.Or(live, entering); leaving != nil {
 			var owners []int32
-			onLive(live, func() { owners = l.detachLivePlayer(live) })
+			onLive(leaving, func() { owners = l.detachLivePlayer(leaving) })
 			_ = l.awaitPersistence(conn, owners...)
 		}
 		if l.clients != nil {
@@ -433,13 +436,28 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.log.Error().Int("class_id", c.ClassID()).Msg("select character: no template loaded")
 				return
 			}
+			// The selection restores the character in full. A restore that
+			// fails attaches nothing, and closes the connection.
+			selected, ok := l.restoreSelected(ctx, client, c)
+			if !ok {
+				client.closeNow()
+				return
+			}
+			entering = selected
 			session.SendFrame(serverpackets.FrameSSQInfo())
 			client.SetState(StateEntering)
 			session.SendFrame(serverpackets.FrameCharSelected(serverpackets.CharSelectedSnapshot{
 				Character: c, Template: tmpl, SessionID: client.SessionKey().PlayKey1,
 				GameTime: l.gameTime(),
 			}))
-			entering = c
+			// From here on lookups by name and id find the character, as
+			// the world checks above do for a later selection; it is spawned
+			// only once EnterWorld arrives. Registered after CharSelected,
+			// so nothing sent to it can reach its client ahead of the
+			// selection's answer.
+			if l.world != nil {
+				l.world.AddPlayer(selected)
+			}
 
 		case clientpackets.OpcodeEnterWorld:
 			// Unreachable while the state gate admits EnterWorld only in
@@ -449,12 +467,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				client.closeNow()
 				return
 			}
-			// Assigned before the check: a failure after the player was
-			// attached hands the partial attachment back, and the deferred
-			// detachLivePlayer above is what releases it.
-			entered, ok := l.enterWorld(ctx, client, entering)
-			live = entered
-			if !ok {
+			// A failed entry leaves live attached and registered; the
+			// deferred detachLivePlayer above is what releases it.
+			live, entering = entering, nil
+			if !l.enterWorld(client, live) {
 				client.closeNow()
 				return
 			}

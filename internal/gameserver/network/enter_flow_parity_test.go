@@ -329,18 +329,14 @@ func TestUnknownExtendedOpcodeInGameClosesWithServerClose(t *testing.T) {
 	c.ExpectClosed()
 }
 
-// TestFailedEnterWorldClosesWithServerClose pins that an EnterWorld whose
-// setup fails (here: the item list cannot be read) closes the connection
-// with ServerClose, not a bare EOF.
-func TestFailedEnterWorldClosesWithServerClose(t *testing.T) {
+// TestFailedSelectionRestoreClosesWithServerClose pins that a selection
+// whose character restore fails (here: the item list cannot be read) closes
+// the connection with ServerClose, not a bare EOF, before CharSelected.
+func TestFailedSelectionRestoreClosesWithServerClose(t *testing.T) {
 	c, _, items, _ := newLinkedGameClientSeedOneChar(t)
 
-	c.Send(encodeRequestGameStart(0))
-	c.Read() // SSQInfo
-	c.Read() // CharSelected
-
 	items.failListByOwner(errors.New("items unavailable"))
-	c.Send(encodeEnterWorld())
+	c.Send(encodeRequestGameStart(0))
 	if frame := c.Read(); frame[0] != serverpackets.OpcodeServerClose {
 		t.Fatalf("close opcode = %#x, want ServerClose (%#x)", frame[0], serverpackets.OpcodeServerClose)
 	}

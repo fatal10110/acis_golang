@@ -778,6 +778,7 @@ type Server struct {
 	groundStore      *gamesql.GroundItemStore
 	cursedWeapons    *entity.CursedWeaponTable
 	autosave         *task.Autosave
+	gameClock        *task.GameClock
 	autosaveClock    *autosaveClock
 	persist          *persist.Worker
 	logs             *lockedBuffer
@@ -1311,6 +1312,24 @@ func (s *Server) Shutdown(tb testing.TB) {
 	// within one function — reset explicitly here too, so the second
 	// Boot's Effects.Tick doesn't also carry this server's leftovers.
 	s.Effects.Reset()
+}
+
+// CrossDayNight ticks the in-game clock the player clock runs on, one
+// in-game minute at a time, until it crosses the day/night boundary, so the
+// day/night listeners run once; the per-minute listeners run on every tick.
+// Boot does not start the game-minute ticker.
+// It reports whether night has just fallen.
+func (s *Server) CrossDayNight(tb testing.TB) bool {
+	tb.Helper()
+	night := s.gameClock.IsNight()
+	for range 24 * 60 {
+		s.gameClock.Tick()
+		if s.gameClock.IsNight() != night {
+			return !night
+		}
+	}
+	tb.Fatal("game clock never crossed the day/night boundary")
+	return false
 }
 
 // TickAutosave advances the harness clock past the next autosave deadline
@@ -1987,6 +2006,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		groundStore:      gamesql.NewGroundItemStore(db),
 		cursedWeapons:    cursed,
 		autosave:         autosave,
+		gameClock:        clock,
 		autosaveClock:    autosaveClock,
 		persist:          persistWorker,
 		queues:           queues,
