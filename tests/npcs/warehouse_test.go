@@ -88,7 +88,8 @@ func bootKeeper(t *testing.T, adena int32, stacks [][2]int32, extra ...gameserve
 // opens the page admitting every dialog command.
 func (w *whWorld) enter(t *testing.T) {
 	t.Helper()
-	startInWorld(t, w.c)
+	w.c.Send(encodeRequestGameStart(0))
+	enterFrom(t, w.srv, w.c)
 	x, y, z := w.srv.PlayerPosition(t, w.player)
 	w.at.X, w.at.Y, w.at.Z = x, y, z
 	w.keeper = w.spawnFolk(t, folkTemplate("WarehouseKeeper", keeperID), 50)
@@ -647,7 +648,7 @@ func (w *freightWorld) loginReceiver(t *testing.T) *whWorld {
 	slot := slices.IndexFunc(chars, func(ch *player.Character) bool { return ch.ID == w.receiver.ID })
 	rw := &whWorld{folkWorld: &folkWorld{srv: w.srv, c: c, player: w.receiver.ID}, items: map[int32]int32{}}
 	c.Send(encodeRequestGameStart(int32(slot)))
-	enterFrom(t, c)
+	enterFrom(t, w.srv, c)
 	x, y, z := w.srv.PlayerPosition(t, rw.player)
 	rw.at.X, rw.at.Y, rw.at.Z = x, y, z
 	rw.keeper = rw.spawnFolk(t, folkTemplate("WarehouseKeeper", keeperID), 60)
@@ -657,8 +658,11 @@ func (w *freightWorld) loginReceiver(t *testing.T) *whWorld {
 }
 
 // enterFrom finishes a character selection on c and drains the enter
-// burst.
-func enterFrom(t *testing.T, c *testsupport.ScriptedClient) {
+// burst. It waits for the server to finish handling EnterWorld first: on
+// the wall clock (the real pool) the login reads the character's rows
+// before it sends the burst's first frame, and a quiet spell then can end
+// the drain before the player is in the world.
+func enterFrom(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient) {
 	t.Helper()
 	for _, want := range []byte{serverpackets.OpcodeSSQInfo, serverpackets.OpcodeCharSelected} {
 		if reply := c.Read(); reply[0] != want {
@@ -666,6 +670,7 @@ func enterFrom(t *testing.T, c *testsupport.ScriptedClient) {
 		}
 	}
 	c.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
+	srv.Settle(t)
 	drainUntilQuiet(t, c)
 }
 
@@ -744,6 +749,10 @@ func TestSelectionWaitsForAccountSessionToLeave(t *testing.T) {
 	}
 	slot := int32(slices.IndexFunc(chars, func(ch *player.Character) bool { return ch.ID == w.receiver.ID }))
 	c.Send(encodeRequestGameStart(slot))
+	// The sender's queue is held, so Settle would wait on it; the selection
+	// itself runs on the connection, and once it is handled its answer, if
+	// any, is already on the way.
+	w.srv.AwaitHandled(t)
 	if frames := drainFrames(t, c); len(frames) != 0 {
 		t.Fatalf("selection with the sender still in the world answered %x, want nothing", opcodes(frames))
 	}
@@ -754,7 +763,7 @@ func TestSelectionWaitsForAccountSessionToLeave(t *testing.T) {
 		return !ok
 	})
 	c.Send(encodeRequestGameStart(slot))
-	enterFrom(t, c)
+	enterFrom(t, w.srv, c)
 	if _, ok := w.srv.State.Player(w.receiver.ID); !ok {
 		t.Fatal("receiver not in the world after its selection")
 	}
