@@ -111,9 +111,15 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	if picked.TemplateID == item.AdenaID && inv.ItemByTemplateID(item.AdenaID) != nil {
 		obtained.Notice = event.ObtainAdena
 	}
+	// The operation spans only the pickup and its write: every persistence
+	// write waits while any operation is open, so the broadcasts, the despawn
+	// and ItemAdded below stay out of it. A failed pickup changed nothing and
+	// has no rows to write.
 	end := l.itemInstances.BeginOperation()
 	defer end()
 	res, failure := l.inventory.PickupGround(inv, &ground.Instance, ground.Template, live.ObjectID())
+	l.applyPersistActions(res.Persist)
+	end()
 	switch failure {
 	case invops.PickupOK:
 	case invops.PickupSlotsFull:
@@ -147,9 +153,6 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	l.broadcastPickupAttention(live, ground)
 	live.ItemAdded(obtained)
 	l.lockPickupParalysis(live)
-
-	l.applyPersistActions(res.Persist)
-	end()
 	return true
 }
 

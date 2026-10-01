@@ -83,6 +83,13 @@ func (g *operationGate) endRead() {
 	}
 }
 
+// isOpen reports whether any operation is open.
+func (g *operationGate) isOpen() bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.open > 0
+}
+
 // parked reports how many operations and writes are waiting on the gate.
 func (g *operationGate) parked() (ops, reads int) {
 	g.mu.Lock()
@@ -108,4 +115,15 @@ func (i *ItemInstances) BeginOperation() (end func()) {
 	i.ops.beginOperation()
 	var once sync.Once
 	return func() { once.Do(i.ops.endOperation) }
+}
+
+// OperationOpen reports whether any multi-row operation is open
+// (BeginOperation), which is when no persistence write reads a row. It is a
+// probe for a handler's tests: they assert from inside its mutation, and from
+// its write's reservation, that the handler holds an operation across both.
+func (i *ItemInstances) OperationOpen() bool {
+	if i == nil {
+		return false
+	}
+	return i.ops.isOpen()
 }
