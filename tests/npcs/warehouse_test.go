@@ -749,6 +749,10 @@ func TestSelectionWaitsForAccountSessionToLeave(t *testing.T) {
 	}
 	slot := int32(slices.IndexFunc(chars, func(ch *player.Character) bool { return ch.ID == w.receiver.ID }))
 	c.Send(encodeRequestGameStart(slot))
+	// The sender's queue is held, so Settle would wait on it; the selection
+	// itself runs on the connection, and once it is handled its answer, if
+	// any, is already on the way.
+	w.srv.AwaitHandled(t)
 	if frames := drainFrames(t, c); len(frames) != 0 {
 		t.Fatalf("selection with the sender still in the world answered %x, want nothing", opcodes(frames))
 	}

@@ -1248,6 +1248,17 @@ func (s *Server) Settle(tb testing.TB) {
 	}
 }
 
+// AwaitHandled is Settle's first wait alone: it returns once the server has
+// handled every frame a client already wrote, without waiting on the actor
+// queues. A test holding an actor's queue uses it to know a request was
+// answered, or refused, before it checks what the client received.
+func (s *Server) AwaitHandled(tb testing.TB) {
+	tb.Helper()
+	if err := s.awaitHandled(); err != nil {
+		tb.Fatal(err)
+	}
+}
+
 // NewObjectID allocates the next object id from the server's id sequence.
 func (s *Server) NewObjectID() int32 {
 	id, err := s.ids.NextID()
