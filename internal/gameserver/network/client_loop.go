@@ -407,9 +407,15 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.log.Error().Err(err).Int32("object_id", c.ObjectID()).Msg("select character: reload row")
 				continue
 			}
+			// The list may predate a ban stored since; the row is what
+			// counts.
+			if fresh.AccessLevel < 0 {
+				continue
+			}
 			c = fresh
 			chars[req.Slot] = fresh
 			l.clanService().RestoreMembership(c, time.Now())
+			l.applyLoadedAccessLevel(c)
 			tmpl, ok := l.templates.Get(c.ClassID())
 			if !ok {
 				l.log.Error().Int("class_id", c.ClassID()).Msg("select character: no template loaded")

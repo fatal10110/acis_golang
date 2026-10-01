@@ -40,7 +40,7 @@ func (l *GameClientLink) handleTradeRequest(live *livePlayer, req clientpackets.
 	if live == nil || l.world == nil {
 		return
 	}
-	if !live.access.AllowTransaction {
+	if !live.accessLevel().AllowTransaction {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return
 	}
@@ -104,7 +104,7 @@ func (l *GameClientLink) handleAnswerTradeRequest(live *livePlayer, req clientpa
 	}
 	// A refused answer leaves the request pending: the requester stays busy
 	// until the request expires, exactly as when the answer never came.
-	if !live.access.AllowTransaction {
+	if !live.accessLevel().AllowTransaction {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return
 	}
@@ -197,7 +197,7 @@ func (l *GameClientLink) handleAddTradeItem(live *livePlayer, req clientpackets.
 		l.cancelTradeByID(live.ObjectID())
 		return
 	}
-	if !live.access.AllowTransaction {
+	if !live.accessLevel().AllowTransaction {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		l.cancelTradeByID(live.ObjectID())
 		return
@@ -290,7 +290,7 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 	}
 	// The access check follows the presence check on both paths, the
 	// departed-partner one included, and keeps the trade open.
-	if !live.access.AllowTransaction {
+	if !live.accessLevel().AllowTransaction {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return
 	}

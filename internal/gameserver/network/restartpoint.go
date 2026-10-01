@@ -68,13 +68,13 @@ func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location
 
 // teleportLivePlayer relocates live to a scattered point near target, snapped
 // to ground height unless live is flying or the point is inside water,
-// cancelling any attack/combat in progress. It broadcasts
-// the discontinuous-position packet to live's own session and every
-// observer, then takes live off the grid: it exits every zone around the old
-// position, everything around the old position forgets live and live forgets
-// it, even what the destination still sees. live rejoins the grid and enters
-// the destination's zones once its client reports it appeared
-// (completeLivePlayerTeleport).
+// cancelling any attack, cast or move in progress while keeping the attack
+// stance. It broadcasts the discontinuous-position packet to live's own
+// session and every observer, then takes live off the grid: it exits every
+// zone around the old position, everything around the old position forgets
+// live and live forgets it, even what the destination still sees. live
+// rejoins the grid and enters the destination's zones once its client
+// reports it appeared (completeLivePlayerTeleport).
 func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Location, randomOffset int) {
 	live.teleportMu.Lock()
 	defer live.teleportMu.Unlock()
@@ -85,15 +85,17 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 	// teleport hook, only death/class-change/logout/party abort triggers.
 	// An out-of-range/LOS teleport is instead caught within ≤1s by the
 	// existing fixed-rate FusionChannelValid recheck.
-	// live.Stop() already reaches the cast controller (live_player.go's
-	// Stop() calls p.cast.Stop()), so a second StopCast() here would hit
-	// the same Controller instance twice — castController wires
-	// live.Character's cast controller to the identical *actorcast.Controller
-	// stored in live.cast (live_player.go:270) — and double the
-	// unconditional action-failed ack (controller.go's stopInternal fires
-	// onStopAck on every call
+	// live.abortAll() already reaches the cast controller (it calls
+	// p.cast.Stop()), so a second StopCast() here would hit the same
+	// Controller instance twice — castController wires live.Character's
+	// cast controller to the identical *actorcast.Controller stored in
+	// live.cast — and double the unconditional action-failed ack
+	// (controller.go's stopInternal fires onStopAck on every call
 	// regardless of whether a cast was in flight).
-	live.Stop()
+	//
+	// The attack stance survives the teleport: no AutoAttackStop here, the
+	// stance ends on its own expiry.
+	live.abortAll()
 	// Every hostile around the old position forgets live, dropping its
 	// threat even when the destination is still in that hostile's sight.
 	npc.DropThreatAround(l.world, live)
