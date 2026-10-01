@@ -70,6 +70,7 @@ type gameplayConfig struct {
 	RandomWalkRate           randomWalkRate
 	MaxGeoPathFailCount      maxGeoPathFailCount
 	DisableRaidCurse         raidCursesDisabled
+	FreeTeleport             freeTeleport
 	RaidMultipliers          npc.RaidMultipliers
 	Enchant                  enchant.Config
 	Merchant                 merchant.Config
@@ -171,6 +172,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.DisableRaidCurse, err = loadDisableRaidCurse(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.FreeTeleport, err = loadFreeTeleport(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.RaidMultipliers, err = loadRaidMultipliers(paths); err != nil {
@@ -672,6 +676,18 @@ func loadDisableRaidCurse(paths gameServerPaths) (raidCursesDisabled, error) {
 		return false, err
 	}
 	return raidCursesDisabled(config.NewFields(props, "disable raid curse").Bool("DisableRaidCurse", false)), nil
+}
+
+// freeTeleport is npcs.properties FreeTeleport: when true, no NPC
+// destination is charged for.
+type freeTeleport bool
+
+func loadFreeTeleport(paths gameServerPaths) (freeTeleport, error) {
+	props, err := config.LoadFile(paths.NpcsConfigPath)
+	if err != nil {
+		return false, err
+	}
+	return freeTeleport(config.NewFields(props, "free teleport").Bool("FreeTeleport", false)), nil
 }
 
 // loadRaidMultipliers reads the npcs.properties RaidDefenceMultiplier,
