@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
@@ -139,6 +140,10 @@ type livePlayer struct {
 
 	// bypasses are the links of the last validated HTML page p was sent.
 	bypasses bypassWhitelist
+
+	// shownMultisell is the multisell list p was last shown, the one its
+	// exchanges choose from, or nil. Set and read on p's queue.
+	shownMultisell atomic.Pointer[multisell.List]
 
 	// fusionTargetID is the object id of the target this player's active
 	// fusion channel holds, or 0; cleared only by the channel that set it.

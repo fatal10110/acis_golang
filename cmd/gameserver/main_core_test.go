@@ -721,6 +721,34 @@ func TestLoadCraftConfig(t *testing.T) {
 	}
 }
 
+// TestLoadMultisellConfig pins the two multisell knobs to their property
+// keys and shipped defaults: MultisellTime in server.properties (100 ms)
+// and BlacksmithUseRecipes in players.properties (true).
+func TestLoadMultisellConfig(t *testing.T) {
+	dir := t.TempDir()
+	empty := filepath.Join(dir, "empty.properties")
+	set := filepath.Join(dir, "set.properties")
+	if err := os.WriteFile(empty, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(set, []byte("MultisellTime = 750\nBlacksmithUseRecipes = False\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, err := loadMultisellDelay(gameServerPaths{ConfigPath: empty}); err != nil || got != multisellDelay(100*time.Millisecond) {
+		t.Fatalf("loadMultisellDelay(default) = %v, %v; want 100ms", got, err)
+	}
+	if got, err := loadMultisellDelay(gameServerPaths{ConfigPath: set}); err != nil || got != multisellDelay(750*time.Millisecond) {
+		t.Fatalf("loadMultisellDelay(set) = %v, %v; want 750ms", got, err)
+	}
+	if got, err := loadBlacksmithUseRecipes(gameServerPaths{PlayersConfigPath: empty}); err != nil || !bool(got) {
+		t.Fatalf("loadBlacksmithUseRecipes(default) = %v, %v; want true", got, err)
+	}
+	if got, err := loadBlacksmithUseRecipes(gameServerPaths{PlayersConfigPath: set}); err != nil || bool(got) {
+		t.Fatalf("loadBlacksmithUseRecipes(set) = %v, %v; want false", got, err)
+	}
+}
+
 func TestLoadServerBypassDelayDefaultsToHundredMilliseconds(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "server.properties")
 	if err := os.WriteFile(configPath, nil, 0o600); err != nil {

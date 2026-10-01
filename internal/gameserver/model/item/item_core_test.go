@@ -377,6 +377,14 @@ func TestInstancePersistNotifier(t *testing.T) {
 		{name: "set same location", mutate: func(inst *Instance) { inst.SetLocation(LocationInventory, 0) }, want: 0},
 		{name: "set enchant level", mutate: func(inst *Instance) { inst.SetEnchantLevel(4) }, want: 1},
 		{name: "set same enchant level", mutate: func(inst *Instance) { inst.SetEnchantLevel(3) }, want: 0},
+		{name: "set augmentation", mutate: func(inst *Instance) { inst.SetAugmentation(&Augmentation{Attributes: 1}) }, want: 1},
+		{name: "set no augmentation", mutate: func(inst *Instance) { inst.SetAugmentation(nil) }, want: 0},
+		{
+			name:   "set augmentation over one held",
+			setup:  func(inst *Instance) { inst.Augmentation = &Augmentation{Attributes: 1} },
+			mutate: func(inst *Instance) { inst.SetAugmentation(&Augmentation{Attributes: 2}) },
+			want:   0,
+		},
 		{name: "decrease mana", mutate: func(inst *Instance) { inst.DecreaseMana(60) }, want: 1},
 		{name: "decrease no mana", mutate: func(inst *Instance) { inst.DecreaseMana(0) }, want: 0},
 		{
@@ -413,6 +421,24 @@ func TestInstancePersistNotifier(t *testing.T) {
 				t.Errorf("notifications = %d, want %d", notified, tt.want)
 			}
 		})
+	}
+}
+
+// TestInstanceSetAugmentationKeepsHeldOne pins the setter's refusal: an
+// item already augmented keeps its augmentation, and the one put on is a
+// copy the caller's value cannot change later.
+func TestInstanceSetAugmentationKeepsHeldOne(t *testing.T) {
+	inst := newPersistTestInstance()
+	aug := Augmentation{Attributes: 1, SkillID: 3203, SkillLevel: 2}
+	if !inst.SetAugmentation(&aug) {
+		t.Fatal("SetAugmentation on a plain item = false, want true")
+	}
+	aug.Attributes = 9
+	if inst.SetAugmentation(&Augmentation{Attributes: 2}) {
+		t.Fatal("SetAugmentation over a held augmentation = true, want false")
+	}
+	if got := inst.Snapshot().Augmentation; got == nil || *got != (Augmentation{Attributes: 1, SkillID: 3203, SkillLevel: 2}) {
+		t.Fatalf("augmentation = %v, want the first one put on", got)
 	}
 }
 

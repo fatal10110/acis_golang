@@ -219,6 +219,7 @@ func TestAllowedAcceptsWireSafeInGameOpcodes(t *testing.T) {
 		clientpackets.OpcodeRequestSkillCoolTime,
 		clientpackets.OpcodeRequestPackageItemList,
 		clientpackets.OpcodeRequestPackageSend,
+		clientpackets.OpcodeMultiSellChoose,
 		clientpackets.OpcodeRequestRecipeBookOpen,
 		clientpackets.OpcodeRequestRecipeBookDestroy,
 		clientpackets.OpcodeRequestRecipeItemMakeInfo,

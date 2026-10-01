@@ -188,7 +188,8 @@ func (l *GameClientLink) bypassNpc(live *livePlayer, command string) {
 func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command string) bool {
 	rules := l.playerConfig.chatRules()
 	rules.AllowWear = l.merchant.Config().AllowWear
-	reply := f.Bypass(l.html, rules, live.Karma(), command)
+	talker := npc.Talker{Karma: live.Karma(), Level: live.Level(), LowLevelNewbie: live.LowLevelNewbie()}
+	reply := f.Bypass(l.html, rules, talker, command)
 	if reply.LeadingActionFailed {
 		live.SendFrame(serverpackets.FrameActionFailed())
 	}
@@ -211,6 +212,8 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		l.sendHennaEquipList(live)
 	case npc.BypassHennaRemoveList:
 		l.openHennaRemoveList(live)
+	case npc.BypassMultisell:
+		l.openMultisell(live, f, reply.Multisell, reply.InventoryOnly)
 	case npc.BypassAborted:
 		return false
 	case npc.BypassUnported:

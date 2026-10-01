@@ -20,7 +20,8 @@ const (
 	// BypassPage opens HTML alone.
 	BypassPage
 	// BypassRefused answers nothing: a Link naming a path that climbs out of
-	// the page tree, or a shop command naming no buylist.
+	// the page tree, a shop command naming no buylist, or a merchant's
+	// multisell command naming no list.
 	BypassRefused
 	// BypassAborted is a command so malformed its handling stops outright:
 	// nothing is sent, not even the dispatcher's closing ActionFailed.
@@ -37,7 +38,19 @@ const (
 	// BypassHennaRemoveList opens the symbol maker's deletion window, or
 	// says the talker wears no symbol.
 	BypassHennaRemoveList
+	// BypassMultisell opens the multisell list Multisell names, in its
+	// inventory-only form when InventoryOnly is set.
+	BypassMultisell
 )
+
+// Talker is what a dialog command reads of the player sending it.
+type Talker struct {
+	Karma int
+	Level int
+	// LowLevelNewbie is a level 6 to 25 player who has made at most the
+	// first occupation change.
+	LowLevelNewbie bool
+}
 
 // BypassReply is a civilian NPC's answer to one dialog command.
 type BypassReply struct {
@@ -56,6 +69,11 @@ type BypassReply struct {
 	CancelEnchant bool
 	// ListID is the buylist BypassBuyList and BypassWearList name.
 	ListID int
+	// Multisell is the list name BypassMultisell opens.
+	Multisell string
+	// InventoryOnly opens the list on the talker's unworn armor and
+	// weapons: only the entries taking one of them, one set per item.
+	InventoryOnly bool
 }
 
 // fishermanCommands are the fisherman's own commands, run before the
@@ -63,14 +81,17 @@ type BypassReply struct {
 var fishermanCommands = []string{"FishSkillList", "FishingChampionship", "FishingReward"}
 
 // Bypass answers command, the part of an npc_<objectId>_<command> dialog
-// link after the object id, sent by a talker carrying karma. A shop,
-// fisherman, gatekeeper or warehouse keeper first applies its karma gate
-// to every command, answering with its refusal page when that page exists.
-// A symbol maker's Draw and RemoveList open its windows. The generic
-// commands follow: Chat <n> opens chat page n (page 0 when n
-// does not parse), Link <path> opens data/html/<path>. Every other command
-// belongs to a system not in place yet.
-func (f *Folk) Bypass(pages Pages, rules ChatRules, karma int, command string) BypassReply {
+// link after the object id, sent by talker. A shop, fisherman, gatekeeper
+// or warehouse keeper first applies its karma gate to every command,
+// answering with its refusal page when that page exists. A symbol maker's
+// Draw and RemoveList open its windows. A merchant or fisherman then
+// answers its sell, multisell and shop commands. The generic commands
+// follow: Chat <n> opens chat page n (page 0 when n does not parse), Link
+// <path> opens data/html/<path>, multisell <list> and exc_multisell <list>
+// open a multisell list. Every other command belongs to a system not in
+// place yet.
+func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command string) BypassReply {
+	karma := talker.Karma
 	kind := hostileKind(f.Instance)
 	reply := BypassReply{LeadingActionFailed: kind == "DungeonGatekeeper"}
 	if _, ok := unportedFolkChats[kind]; ok {
@@ -112,6 +133,9 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, karma int, command string) B
 	}
 	reply.CancelEnchant = kind == "WarehouseKeeper"
 	if kind == "Merchant" || kind == "Fisherman" {
+		if out, ok := f.merchantMultisell(pages, talker, command, reply); ok {
+			return out
+		}
 		if shop, ok := merchantCommand(reply, rules, command); ok {
 			return shop
 		}
@@ -143,6 +167,12 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, karma int, command string) B
 			return reply
 		}
 		reply.Outcome, reply.HTML = BypassPage, f.page(pages, "data/html/"+path)
+		return reply
+	case strings.HasPrefix(command, "multisell"):
+		reply.Outcome, reply.Multisell = BypassMultisell, strings.TrimFunc(command[len("multisell"):], javaSpace)
+		return reply
+	case strings.HasPrefix(command, "exc_multisell"):
+		reply.Outcome, reply.Multisell, reply.InventoryOnly = BypassMultisell, strings.TrimFunc(command[len("exc_multisell"):], javaSpace), true
 		return reply
 	}
 	return reply
@@ -178,3 +208,47 @@ func merchantCommand(reply BypassReply, rules ChatRules, command string) (Bypass
 	reply.ListID = int(id)
 	return reply, true
 }
+
+// merchantMultisell answers a merchant's own multisell commands, whose
+// first word matches in any case: Multisell <list>, Exc_Multisell <list>,
+// Newbie_Exc_Multisell <list>, which only a low-level newbie may open and
+// others are told off for, and Multisell_Shadow, the shadow weapon page for
+// the talker's level. A list command naming no list answers nothing. ok is
+// false for every other command.
+func (f *Folk) merchantMultisell(pages Pages, talker Talker, command string, reply BypassReply) (BypassReply, bool) {
+	words := strings.FieldsFunc(command, func(r rune) bool { return r == ' ' })
+	if len(words) == 0 {
+		return reply, false
+	}
+	switch {
+	case strings.EqualFold(words[0], "Multisell"), strings.EqualFold(words[0], "Exc_Multisell"), strings.EqualFold(words[0], "Newbie_Exc_Multisell"):
+		if len(words) < 2 {
+			reply.Outcome = BypassRefused
+			return reply, true
+		}
+		if strings.EqualFold(words[0], "Newbie_Exc_Multisell") && !talker.LowLevelNewbie {
+			reply.Outcome, reply.HTML = BypassChatWindow, f.page(pages, "data/html/exchangelvlimit.htm")
+			return reply, true
+		}
+		reply.Outcome, reply.Multisell = BypassMultisell, words[1]
+		reply.InventoryOnly = !strings.EqualFold(words[0], "Multisell")
+		return reply, true
+	case strings.EqualFold(words[0], "Multisell_Shadow"):
+		page := "data/html/common/shadow_item_b.htm"
+		switch {
+		case talker.Level < 40:
+			page = "data/html/common/shadow_item-lowlevel.htm"
+		case talker.Level < 46:
+			page = "data/html/common/shadow_item_mi_c.htm"
+		case talker.Level < 52:
+			page = "data/html/common/shadow_item_hi_c.htm"
+		}
+		reply.Outcome, reply.HTML = BypassPage, f.page(pages, page)
+		return reply, true
+	}
+	return reply, false
+}
+
+// javaSpace is the set trimmed around a command argument: every character
+// up to and including the space.
+func javaSpace(r rune) bool { return r <= ' ' }

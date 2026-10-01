@@ -124,6 +124,7 @@ var gameDecoders = []gameDecoder{
 	{"RequestHennaUnequipList", decodes(DecodeRequestHennaUnequipList), seedPacket(OpcodeRequestHennaUnequipList, int32(0))},
 	{"RequestHennaUnequipInfo", decodes(DecodeRequestHennaUnequipInfo), seedPacket(OpcodeRequestHennaUnequipInfo, int32(1))},
 	{"RequestHennaUnequip", decodes(DecodeRequestHennaUnequip), seedPacket(OpcodeRequestHennaUnequip, int32(1))},
+	{"MultiSellChoose", decodes(DecodeMultiSellChoose), seedPacket(OpcodeMultiSellChoose, int32(1002), int32(1), int32(1))},
 	{"RequestAllyCrest", decodes(DecodeRequestAllyCrest), seedPacket(OpcodeRequestAllyCrest, int32(1))},
 	{"RequestChangePetName", decodes(DecodeRequestChangePetName), seedPacket(OpcodeRequestChangePetName, "Kookaburra")},
 	{"RequestPetUseItem", decodes(DecodeRequestPetUseItem), seedPacket(OpcodeRequestPetUseItem, seedObjectID)},
