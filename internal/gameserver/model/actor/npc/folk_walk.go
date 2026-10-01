@@ -144,10 +144,10 @@ func (m *folkMotion) BroadcastStop() { m.emit(event.Stopped{}) }
 // OwnsOffensiveFollowTicker reports false: the NPC never follows a target.
 func (m *folkMotion) OwnsOffensiveFollowTicker() bool { return false }
 
-// MovementDisabled reports a template that cannot move or a teleport under
-// way; nothing else immobilizes a civilian NPC.
+// MovementDisabled reports a template that cannot move, a dead NPC or a
+// teleport under way; nothing else immobilizes a civilian NPC.
 func (m *folkMotion) MovementDisabled() bool {
-	return !m.Instance.Template.CanMove || m.teleporting.Load()
+	return !m.Instance.Template.CanMove || m.Dead() || m.teleporting.Load()
 }
 
 // GeoPathFailCount reports the NPC's failed-pathfinding streak.

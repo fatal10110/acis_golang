@@ -553,7 +553,8 @@ func (s *Server) installPeaceZone(hostile *npc.Hostile) {
 }
 
 // FolkTemplate is a fixture civilian NPC template of the given instance
-// kind and template id.
+// kind and template id. Like the shipped service NPCs it is undying, so no
+// damage takes it below 1 HP.
 func FolkTemplate(kind string, npcID int) *npc.Template {
 	return &npc.Template{
 		ID:              npcID,
@@ -568,6 +569,8 @@ func FolkTemplate(kind string, npcID int) *npc.Template {
 		CON:             43,
 		CollisionRadius: 8,
 		CollisionHeight: 24,
+		CorpseTime:      7,
+		Undying:         true,
 	}
 }
 
@@ -621,6 +624,7 @@ func (s *Server) folkSpawner(walker *task.Walker, geo move.Geo) gamemanager.Folk
 		CastEffects:         s.castEffects,
 		AI:                  s.AI,
 		Items:               s.itemTable,
+		Decay:               s.decay,
 		Effects:             s.effectEnv,
 		MaxGeoPathFailCount: s.maxGeoPathFail,
 		Log:                 s.log,

@@ -31,8 +31,11 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 		}
 	}
 	if obj, ok := n.state.Object(actorID); ok {
-		if h, ok := obj.(*npc.Hostile); ok {
-			n.ai.Remove(h)
+		switch a := obj.(type) {
+		case *npc.Hostile:
+			n.ai.Remove(a)
+		case *npc.Folk:
+			n.ai.Remove(a)
 		}
 	}
 	n.walker.StopRouteByID(actorID)
@@ -171,7 +174,8 @@ func (n *Npcs) SyncPersistedState() {
 	}
 }
 
-// LiveCount returns the number of currently spawned (not decayed) NPCs.
+// LiveCount returns the number of currently spawned (not decayed) NPCs,
+// civilian ones included.
 func (n *Npcs) LiveCount() int {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -197,7 +201,8 @@ func (n *Npcs) SkippedNonCombatCount() int {
 	return int(n.skippedNonCombatCount.Load())
 }
 
-// FolkCount returns the number of civilian NPCs spawned.
+// FolkCount returns the number of civilian NPCs spawned, respawns
+// included.
 func (n *Npcs) FolkCount() int {
 	return int(n.folkCount.Load())
 }

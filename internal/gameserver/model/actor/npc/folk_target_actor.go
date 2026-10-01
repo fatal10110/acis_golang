@@ -1,8 +1,6 @@
 package npc
 
 import (
-	"time"
-
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -14,9 +12,6 @@ var _ skilltarget.Actor = (*Folk)(nil)
 // accepts only a CTRL-pressed damage skill.
 func (f *Folk) Folk() bool        { return true }
 func (f *Folk) FolkOrGuard() bool { return true }
-
-// Dead reports false: no damage takes a civilian NPC below 1 HP.
-func (f *Folk) Dead() bool { return false }
 
 // AttackableBy reports whether caster may affect this NPC offensively: any
 // other creature may, with a forced attack. AttackableWithoutForceBy is
@@ -40,8 +35,8 @@ func (f *Folk) ClanGroups() []string { return f.Instance.Template.Clans }
 func (f *Folk) CanSeeTarget(target skilltarget.Actor) bool { return f.canSee(target) }
 
 // A civilian NPC casts only at creatures: it holds no ground point, summon,
-// party, clan, duel, Olympiad, corpse, spoil or seed state, and is not a
-// monster, artifact, chest or pet.
+// party, clan, duel, Olympiad, spoil or seed state, and is not a monster,
+// artifact, chest or pet.
 func (f *Folk) CanSeePoint(int, int, int) bool             { return true }
 func (f *Folk) EffectRangeInPeaceZone(_, _, _, _ int) bool { return false }
 func (f *Folk) GroundTarget() (x, y, z int)                { return 0, 0, 0 }
@@ -49,9 +44,6 @@ func (f *Folk) MonsterKind() bool                          { return false }
 func (f *Folk) Holy() bool                                 { return false }
 func (f *Folk) Unlockable() bool                           { return false }
 func (f *Folk) IsPet() bool                                { return false }
-func (f *Folk) HasCorpse() bool                            { return false }
-func (f *Folk) CorpseDeadline() (time.Time, bool)          { return time.Time{}, false }
-func (f *Folk) CorpseTime() time.Duration                  { return 0 }
 func (f *Folk) Spoiled() bool                              { return false }
 func (f *Folk) Seeded() bool                               { return false }
 func (f *Folk) Summon() (skilltarget.Actor, bool)          { return nil, false }
