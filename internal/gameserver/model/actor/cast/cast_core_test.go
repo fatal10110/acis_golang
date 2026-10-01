@@ -3164,12 +3164,9 @@ type testActor struct {
 	disabled     []testCooldown
 	reuses       []testReuse
 
-	cubicFull   bool
 	allDisabled bool
 	held        int32
 }
-
-func (a *testActor) CubicListFull() bool { return a.cubicFull }
 
 func (a *testActor) HeldItemTypeMask() int32 { return a.held }
 

@@ -102,7 +102,6 @@ func (HostileActor) ItemCount(int) int                       { return 0 }
 func (HostileActor) ConsumeItem(int, int) bool               { return false }
 
 // HostileActor casters hold no cubics, ground signet, skill lock or charges.
-func (HostileActor) CubicListFull() bool           { return false }
 func (HostileActor) ExitSignetGround()             {}
 func (HostileActor) AllSkillsDisabled() bool       { return false }
 func (HostileActor) EnableAllSkills()              {}

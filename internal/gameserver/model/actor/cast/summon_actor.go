@@ -88,7 +88,6 @@ func (a SummonActor) AllSkillsDisabled() bool { return a.Summon != nil && a.Summ
 
 // SummonActor casters hold no cubics, ground signet, raw skill lock or
 // charges.
-func (SummonActor) CubicListFull() bool           { return false }
 func (SummonActor) ExitSignetGround()             {}
 func (SummonActor) EnableAllSkills()              {}
 func (SummonActor) GroundTargetUnset() bool       { return false }

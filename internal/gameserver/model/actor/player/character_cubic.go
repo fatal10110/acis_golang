@@ -12,12 +12,6 @@ func (c *Character) cubicMaxSlots() int {
 	return c.SkillLevel(cubicMasterySkillID)
 }
 
-// CubicListFull reports whether c already holds as many active cubics as
-// Cubic Mastery allows, matching the reference's CubicList.isFull().
-func (c *Character) CubicListFull() bool {
-	return c.cubics.Len() > c.cubicMaxSlots()
-}
-
 // AddOrRefreshCubic admits id to c's active cubics, recording whether a
 // party member (rather than c itself) granted it, or marks an already-active
 // cubic for a disappear-timer reset instead. touched reports whether id is

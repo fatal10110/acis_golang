@@ -204,13 +204,6 @@ func (a PlayerActor) ExitSignetGround() {
 	}
 }
 
-// CubicListFull reports whether a's character already holds as many active
-// cubics as Cubic Mastery allows, backing Actor.CubicListFull
-// CanCast's cubic-specific gate checks.
-func (a PlayerActor) CubicListFull() bool {
-	return a.Character != nil && a.Character.CubicListFull()
-}
-
 // AllSkillsDisabled backs Actor.AllSkillsDisabled, which Controller.Stop
 // and AIController.Disabled probe for, matching Java's
 // Creature.isAllSkillsDisabled().

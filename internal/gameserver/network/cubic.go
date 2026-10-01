@@ -1,6 +1,7 @@
 package network
 
 import (
+	"slices"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -52,6 +53,16 @@ func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def mod
 	live.cubicsMu.Lock()
 	if live.cubics == nil {
 		live.cubics = make(map[cubic.ID]*cubic.Runtime)
+	}
+	// Admitting past the cubic cap evicted the oldest cubic from the list;
+	// stop its runtime too, so its action tick, disappear timer and any
+	// pending cast delay die with it, as stopping an evicted cubic does.
+	active := live.Character.CubicIDs()
+	for evictedID, evicted := range live.cubics {
+		if !slices.Contains(active, int(evictedID)) {
+			delete(live.cubics, evictedID)
+			evicted.Stop()
+		}
 	}
 	runtime, exists := live.cubics[id]
 	if !exists {

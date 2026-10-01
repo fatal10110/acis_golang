@@ -353,7 +353,6 @@ func magicCastFailureReasonOnly(err error) bool {
 		errors.Is(err, actorcast.ErrNotEnoughHP) ||
 		errors.Is(err, actorcast.ErrMagicMuted) ||
 		errors.Is(err, actorcast.ErrPhysicalMuted) ||
-		errors.Is(err, actorcast.ErrCubicListFull) ||
 		errors.Is(err, actorcast.ErrNotEnoughItems) ||
 		errors.Is(err, actorcast.ErrWeaponNotAllowed) ||
 		errors.Is(err, actorcast.ErrCantSeeTarget) ||
@@ -839,8 +838,6 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 		// sendMagicActionFailed after this reason switch returns.
 	case errors.Is(err, actorcast.ErrInvalidTarget):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
-	case errors.Is(err, actorcast.ErrCubicListFull):
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCubicSummoningFailed))
 	case errors.Is(err, actorcast.ErrSummonOnlyOne):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 	case errors.Is(err, actorcast.ErrSummonInCombat):

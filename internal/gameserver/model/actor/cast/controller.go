@@ -35,10 +35,6 @@ var (
 	// ErrSkillUnavailable means a player cast request did not name a known
 	// active skill.
 	ErrSkillUnavailable = errors.New("cast: skill unavailable")
-	// ErrCubicListFull means a self-targeted cubic-granting skill was cast
-	// while the caster already holds as many cubics as Cubic Mastery
-	// allows.
-	ErrCubicListFull = errors.New("cast: cubic list full")
 	// ErrAllSkillsDisabled means the actor is under a blanket skill lock
 	// (crowd control, or Java's Duel-defeat lock once that lands).
 	ErrAllSkillsDisabled = errors.New("cast: all skills disabled")
@@ -92,9 +88,6 @@ type Actor interface {
 	ItemCount(itemID int) int
 	ConsumeItem(itemID, count int) bool
 
-	// CubicListFull reports whether a self-targeted cubic-granting skill must
-	// be refused because the caster already holds its maximum cubics.
-	CubicListFull() bool
 	// ExitSignetGround drops the caster's live ground-signet effect on abort.
 	ExitSignetGround()
 	// AllSkillsDisabled reports the blanket skill lock CanCast gates on;
@@ -401,11 +394,6 @@ func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 	}
 	if gate, ok := c.actor.(olympiadGate); ok && olympiadRestricted(def) && gate.ActingPlayerInOlympiad() {
 		return ErrOlympiadSkill
-	}
-	if def.SkillType == "SUMMON" && def.IsCubic && def.Target == modelskill.TargetSelf {
-		if c.actor.CubicListFull() {
-			return ErrCubicListFull
-		}
 	}
 	if def.ItemConsumeID > 0 && def.ItemConsumeCount > 0 && c.actor.ItemCount(def.ItemConsumeID) < def.ItemConsumeCount {
 		return ErrNotEnoughItems
