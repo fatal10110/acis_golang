@@ -295,7 +295,7 @@ func TestServitorCastMidSwingRunsAfterTheSwing(t *testing.T) {
 	startOwnerSwing(t, h)
 
 	h.client.Send(encodeRequestMagicSkillUse(summonCatSkillID))
-	frames := readImmediate(h.client)
+	frames := h.srv.ReadQueued(t, h.client)
 	if len(frames) != 1 || frames[0][0] != serverpackets.OpcodeActionFailed {
 		t.Fatalf("servitor cast mid-swing = opcodes %x, want ActionFailed alone", frameOpcodes(frames))
 	}

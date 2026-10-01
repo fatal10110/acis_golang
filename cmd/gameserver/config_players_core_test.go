@@ -399,7 +399,7 @@ func TestLoadStorageSlotsUsesPlayersProperties(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "players.properties")
 	props := "MaximumWarehouseSlotsForNoDwarf = 11\nMaximumWarehouseSlotsForDwarf = 12\n" +
 		"MaximumFreightSlots = 13\nMaxPvtStoreSlotsOther = 14\nMaxPvtStoreSlotsDwarf = 15\n" +
-		"DwarfRecipeLimit = 16\nCommonRecipeLimit = 0\n"
+		"DwarfRecipeLimit = 16\nCommonRecipeLimit = 0\nMaximumWarehouseSlotsForClan = 17\n"
 	if err := os.WriteFile(configPath, []byte(props), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -411,7 +411,7 @@ func TestLoadStorageSlotsUsesPlayersProperties(t *testing.T) {
 	want := player.StorageSlots{
 		WarehouseNoDwarf: 11, WarehouseDwarf: 12, Freight: 13,
 		PrivateStoreNoDwarf: 14, PrivateStoreDwarf: 15,
-		DwarfRecipe: 16, CommonRecipe: 0, Configured: true,
+		DwarfRecipe: 16, CommonRecipe: 0, ClanWarehouse: 17, Configured: true,
 	}
 	if got != want {
 		t.Fatalf("loadStorageSlots() = %+v, want %+v", got, want)
@@ -428,8 +428,12 @@ func TestLoadStorageSlotsDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadStorageSlots() error = %v", err)
 	}
-	if got != player.DefaultStorageSlots {
-		t.Fatalf("loadStorageSlots() = %+v, want %+v", got, player.DefaultStorageSlots)
+	// A missing clan warehouse size is the reference's 150, not the
+	// shipped file's 200.
+	want := player.DefaultStorageSlots
+	want.ClanWarehouse = 150
+	if got != want {
+		t.Fatalf("loadStorageSlots() = %+v, want %+v", got, want)
 	}
 }
 

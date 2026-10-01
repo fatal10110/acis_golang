@@ -66,7 +66,7 @@ func (a *augmentedCaster) startCast(t *testing.T) {
 	t.Helper()
 	a.c.Send(encodeRequestMagicSkillUse(longCastSkillID))
 	readUntilOpcode(t, a.c, serverpackets.OpcodeMagicSkillUse, "long cast MagicSkillUse")
-	readImmediate(a.c)
+	a.srv.ReadQueued(t, a.c)
 	a.requireCasting(t, "after the cast started")
 }
 
@@ -85,7 +85,7 @@ func (a *augmentedCaster) sendMidCast(t *testing.T, frame []byte) [][]byte {
 	t.Helper()
 	a.c.Send(frame)
 	a.srv.Settle(t)
-	frames := readImmediate(a.c)
+	frames := a.srv.ReadQueued(t, a.c)
 	a.requireCasting(t, "after the request")
 	return frames
 }

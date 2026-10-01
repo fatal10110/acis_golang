@@ -15,9 +15,9 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// loadClanConfig reads the clans.properties penalties the clan core uses
-// and the players.properties clan skill item switch, defaulting as the
-// reference does when a key is missing.
+// loadClanConfig reads the clans.properties penalties and clan warehouse
+// withdrawal right the clan core uses and the players.properties clan skill
+// item switch, defaulting as the reference does when a key is missing.
 func loadClanConfig(paths gameServerPaths, _ zerolog.Logger) (clan.Config, error) {
 	props, err := config.LoadFile(paths.ClansConfigPath)
 	if err != nil {
@@ -29,11 +29,12 @@ func loadClanConfig(paths gameServerPaths, _ zerolog.Logger) (clan.Config, error
 	}
 	f := config.NewFields(props, "clans")
 	cfg := clan.Config{
-		JoinDays:          f.Int("DaysBeforeJoinAClan", 5),
-		CreateDays:        f.Int("DaysBeforeCreateAClan", 10),
-		MembersForWar:     f.Int("ClanMembersForWar", 15),
-		WarPenaltyDays:    f.Int("ClanWarPenaltyWhenEnded", 5),
-		LifeCrystalNeeded: players.Bool("LifeCrystalNeeded", true),
+		JoinDays:                        f.Int("DaysBeforeJoinAClan", 5),
+		CreateDays:                      f.Int("DaysBeforeCreateAClan", 10),
+		MembersForWar:                   f.Int("ClanMembersForWar", 15),
+		WarPenaltyDays:                  f.Int("ClanWarPenaltyWhenEnded", 5),
+		LifeCrystalNeeded:               players.Bool("LifeCrystalNeeded", true),
+		MembersCanWithdrawFromWarehouse: f.Bool("MembersCanWithdrawFromClanWH", false),
 	}
 	return cfg, f.Err()
 }

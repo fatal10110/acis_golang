@@ -128,11 +128,19 @@ func TestCompletedNPCCastDropsItsCastDesire(t *testing.T) {
 
 	srv.AdvanceUntil(t, "the monster's cast finishing", func() bool { return !hostile.AI().CastController().CastingNow() })
 
-	if hasCastDesire(hostile) {
+	// The cast ends on the monster's queue: its cast state clears first, then
+	// the same task drops the desire and re-runs the AI. Read them on that
+	// queue, after the task, not part-way through it on the wall clock.
+	var desired bool
+	var intention ai.Intention
+	onNPCQueue(t, hostile, func() {
+		desired, intention = hasCastDesire(hostile), hostile.AI().CurrentIntention()
+	})
+	if desired {
 		t.Fatal("CAST desire still queued after its cast completed")
 	}
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
-		t.Fatalf("CurrentIntention() after the cast completed = %v, want %v", got, ai.IntentionIdle)
+	if intention != ai.IntentionIdle {
+		t.Fatalf("CurrentIntention() after the cast completed = %v, want %v", intention, ai.IntentionIdle)
 	}
 	drainUntilQuiet(t, c)
 	assertNoRecast(t, srv, hostile)

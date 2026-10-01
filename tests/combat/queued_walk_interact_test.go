@@ -21,17 +21,6 @@ func isOwnFrame(frame []byte, opcode byte, objID int32) bool {
 	return len(frame) >= 5 && frame[0] == opcode && wireReader(frame[1:]).ReadInt32() == objID
 }
 
-// readImmediateFrames collects the frames already on their way to c, letting
-// at most a millisecond pass on the driven clock at a time: nothing a swing or
-// cast in flight schedules comes due meanwhile.
-func readImmediateFrames(c *scriptedClient) [][]byte {
-	var frames [][]byte
-	for frame := c.ReadWithTimeout(time.Millisecond); frame != nil; frame = c.ReadWithTimeout(time.Millisecond) {
-		frames = append(frames, frame)
-	}
-	return frames
-}
-
 // readUntilOwnMove reads frames for up to d until objID's own MoveToLocation,
 // returning the frames read before it and the move itself.
 func readUntilOwnMove(t *testing.T, c *scriptedClient, objID int32, d time.Duration, what string) (before [][]byte, move []byte) {
@@ -82,7 +71,7 @@ func TestWalkReSteeredMidWalkSendsNoStopMove(t *testing.T) {
 			t.Fatalf("re-steered walk sent opcode %#x before its MoveToLocation", frame[0])
 		}
 	}
-	for _, frame := range readImmediateFrames(c) {
+	for _, frame := range srv.ReadQueued(t, c) {
 		if isOwnFrame(frame, serverpackets.OpcodeStopMove, objID) {
 			t.Fatal("re-steered walk sent StopMove after its MoveToLocation")
 		}
@@ -167,13 +156,14 @@ func spawnThrone(t *testing.T, srv *gameservertest.Server) *staticobject.Object 
 
 // clickThroneQueued selects throne, then clicks it again while a swing or
 // cast holds the player: the click is answered ActionFailed alone.
-func clickThroneQueued(t *testing.T, c *scriptedClient, throne *staticobject.Object, what string) {
+func clickThroneQueued(t *testing.T, srv *gameservertest.Server, throne *staticobject.Object, what string) {
 	t.Helper()
+	c := srv.Client
 	x, y, z := int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z)
 	c.Send(encodeAction(throne.ObjectID(), x, y, z, false))
 	readUntil(t, c, serverpackets.OpcodeMyTargetSelected, "throne selected "+what)
 	c.Send(encodeAction(throne.ObjectID(), x, y, z, false))
-	frames := readImmediateFrames(c)
+	frames := srv.ReadQueued(t, c)
 	failed := 0
 	for _, frame := range frames {
 		switch frame[0] {
@@ -230,7 +220,7 @@ func TestThroneClickMidSwingInteractsAtSwingEnd(t *testing.T) {
 	s := bootMidSwingPickup(t, 0)
 	throne := spawnThrone(t, s.srv)
 
-	clickThroneQueued(t, s.c, throne, "mid-swing")
+	clickThroneQueued(t, s.srv, throne, "mid-swing")
 	var swungAgain bool
 	for end := s.c.Now().Add(3 * time.Second); s.c.Now().Before(end); {
 		frame := s.c.ReadWithTimeout(300 * time.Millisecond)
@@ -264,7 +254,7 @@ func TestThroneClickMidCastInteractsAtCastEnd(t *testing.T) {
 	srv, pc, _ := bootMidCastBesideHostile(t)
 	throne := spawnThrone(t, srv)
 
-	clickThroneQueued(t, srv.Client, throne, "mid-cast")
+	clickThroneQueued(t, srv, throne, "mid-cast")
 	if !pc.CastingNow() {
 		t.Fatal("the throne click ended the cast")
 	}
@@ -312,7 +302,7 @@ func TestFearedThroneClickKeepsFleeing(t *testing.T) {
 
 	c.Send(encodeAction(throne.ObjectID(), x, y, z, false))
 	var opcodes []byte
-	for _, frame := range readImmediateFrames(c) {
+	for _, frame := range srv.ReadQueued(t, c) {
 		if isOwnFrame(frame, serverpackets.OpcodeStopMove, objID) || frame[0] == serverpackets.OpcodeActionFailed {
 			opcodes = append(opcodes, frame[0])
 		}
