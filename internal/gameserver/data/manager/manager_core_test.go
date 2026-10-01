@@ -60,6 +60,14 @@ func (f fakeGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 }
 func (f fakeGeo) Walkable(x, y, z int) bool { return true }
 
+func (f fakeGeo) CanFly(ox, oy, oz int, _ float64, tx, ty, tz int) bool {
+	return f.CanMove(ox, oy, oz, tx, ty, tz)
+}
+
+func (f fakeGeo) ValidFlyLocation(ox, oy, oz int, _ float64, tx, ty, tz int) location.Location {
+	return f.ValidLocation(ox, oy, oz, tx, ty, tz)
+}
+
 type nopKiller struct {
 	attackabletest.Combatant
 	id int32
@@ -452,6 +460,15 @@ type constGeoZ struct{ z int16 }
 
 func (g constGeoZ) CanMove(int, int, int, int, int, int) bool { return true }
 func (g constGeoZ) Height(int, int, int) int16                { return g.z }
+
+func (g constGeoZ) CanFly(ox, oy, oz int, _ float64, tx, ty, tz int) bool {
+	return g.CanMove(ox, oy, oz, tx, ty, tz)
+}
+
+func (g constGeoZ) ValidFlyLocation(ox, oy, oz int, _ float64, tx, ty, tz int) location.Location {
+	return g.ValidLocation(ox, oy, oz, tx, ty, tz)
+}
+
 func (constGeoZ) FindPath(_, _ location.Location) ([]location.Location, bool) {
 	return nil, false
 }
@@ -512,6 +529,14 @@ func TestRandomTerritoryPositionUsesMergedZRangeNotSubTerritoryOwnRange(t *testi
 type halfWalkableGeo struct {
 	unwalkableMaxX int
 	walkableCalls  int
+}
+
+func (g *halfWalkableGeo) CanFly(ox, oy, oz int, _ float64, tx, ty, tz int) bool {
+	return g.CanMove(ox, oy, oz, tx, ty, tz)
+}
+
+func (g *halfWalkableGeo) ValidFlyLocation(ox, oy, oz int, _ float64, tx, ty, tz int) location.Location {
+	return g.ValidLocation(ox, oy, oz, tx, ty, tz)
 }
 
 func (halfWalkableGeo) CanMove(int, int, int, int, int, int) bool { return true }

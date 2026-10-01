@@ -62,6 +62,15 @@ func (hostileGeo) Height(_, _, _ int) int16          { return 0 }
 // queries never need a useful answer: return no path and reflect the origin.
 func (hostileGeo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
 func (hostileGeo) Walkable(int, int, int) bool                                 { return true }
+
+func (g hostileGeo) CanFly(ox, oy, oz int, _ float64, tx, ty, tz int) bool {
+	return g.CanMove(ox, oy, oz, tx, ty, tz)
+}
+
+func (g hostileGeo) ValidFlyLocation(ox, oy, oz int, _ float64, tx, ty, tz int) location.Location {
+	return g.ValidLocation(ox, oy, oz, tx, ty, tz)
+}
+
 func (hostileGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }

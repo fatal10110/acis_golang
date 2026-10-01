@@ -35,11 +35,21 @@ func (g *GateGeo) Block() { g.blocked = true }
 
 func (g *GateGeo) CanMove(int, int, int, int, int, int) bool { return !g.blocked }
 
+func (g *GateGeo) CanFly(int, int, int, float64, int, int, int) bool { return !g.blocked }
+
 func (Geo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
 func (Geo) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
 	return location.Location{X: tx, Y: ty, Z: tz}
 }
 func (Geo) Walkable(int, int, int) bool { return true }
+
+func (g Geo) CanFly(ox, oy, oz int, _ float64, tx, ty, tz int) bool {
+	return g.CanMove(ox, oy, oz, tx, ty, tz)
+}
+
+func (g Geo) ValidFlyLocation(ox, oy, oz int, _ float64, tx, ty, tz int) location.Location {
+	return g.ValidLocation(ox, oy, oz, tx, ty, tz)
+}
 
 // Templates builds the single class template (id 0) every suite's characters
 // use: level-1 human fighter stats with the shared acquire-skill grants.

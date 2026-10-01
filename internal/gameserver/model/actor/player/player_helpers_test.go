@@ -72,6 +72,15 @@ func (ccGeo) Height(_, _, _ int) int16          { return 0 }
 // never need a useful answer: return no path and reflect the origin.
 func (ccGeo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
 func (ccGeo) Walkable(int, int, int) bool                                 { return true }
+
+func (g ccGeo) CanFly(ox, oy, oz int, _ float64, tx, ty, tz int) bool {
+	return g.CanMove(ox, oy, oz, tx, ty, tz)
+}
+
+func (g ccGeo) ValidFlyLocation(ox, oy, oz int, _ float64, tx, ty, tz int) location.Location {
+	return g.ValidLocation(ox, oy, oz, tx, ty, tz)
+}
+
 func (ccGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 	return location.Location{X: ox, Y: oy, Z: oz}
 }
@@ -124,6 +133,14 @@ func (permissiveGeo) CanMove(ox, oy, oz, tx, ty, tz int) bool { return true }
 func (permissiveGeo) Height(x, y, z int) int16                { return int16(z) }
 func (permissiveGeo) FindPath(origin, target location.Location) ([]location.Location, bool) {
 	return nil, false
+}
+
+func (g permissiveGeo) CanFly(ox, oy, oz int, _ float64, tx, ty, tz int) bool {
+	return g.CanMove(ox, oy, oz, tx, ty, tz)
+}
+
+func (g permissiveGeo) ValidFlyLocation(ox, oy, oz int, _ float64, tx, ty, tz int) location.Location {
+	return g.ValidLocation(ox, oy, oz, tx, ty, tz)
 }
 func (permissiveGeo) Walkable(int, int, int) bool { return true }
 func (permissiveGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {

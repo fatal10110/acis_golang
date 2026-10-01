@@ -74,10 +74,20 @@ type recordingGeo struct {
 	findPath           []location.Location
 	findPathOK         bool
 	validLocation      location.Location
+	canFly             bool
+	validFlyLocation   location.Location
 	heightCalls        []location.Location
 	moveCalls          []geoCall
 	findPathCalls      []findPathCall
 	validLocationCalls []validLocationCall
+	flyCalls           []flyCall
+	validFlyCalls      []flyCall
+}
+
+// flyCall is one fly query: the line and the corridor height asked for.
+type flyCall struct {
+	origin, target location.Location
+	height         float64
 }
 
 func (g *recordingGeo) CanMove(ox, oy, oz, tx, ty, tz int) bool {
@@ -115,6 +125,27 @@ func (g *recordingGeo) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Locati
 
 func (g *recordingGeo) Walkable(int, int, int) bool { return true }
 
+func (g *recordingGeo) CanFly(ox, oy, oz int, oheight float64, tx, ty, tz int) bool {
+	g.flyCalls = append(g.flyCalls, flyCall{
+		origin: location.Location{X: ox, Y: oy, Z: oz},
+		target: location.Location{X: tx, Y: ty, Z: tz},
+		height: oheight,
+	})
+	return g.canFly
+}
+
+func (g *recordingGeo) ValidFlyLocation(ox, oy, oz int, oheight float64, tx, ty, tz int) location.Location {
+	g.validFlyCalls = append(g.validFlyCalls, flyCall{
+		origin: location.Location{X: ox, Y: oy, Z: oz},
+		target: location.Location{X: tx, Y: ty, Z: tz},
+		height: oheight,
+	})
+	if g.validFlyLocation == (location.Location{}) {
+		return location.Location{X: ox, Y: oy, Z: oz}
+	}
+	return g.validFlyLocation
+}
+
 // staticGeo is a zero-allocation Geo stub for allocation-ceiling tests:
 // recordingGeo's call-log slices grow and occasionally reallocate, which
 // would add noise to a per-call allocation measurement.
@@ -137,6 +168,12 @@ func (g staticGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
 }
 
 func (g staticGeo) Walkable(int, int, int) bool { return true }
+
+func (g staticGeo) CanFly(int, int, int, float64, int, int, int) bool { return g.canMove }
+
+func (g staticGeo) ValidFlyLocation(ox, oy, oz int, _ float64, _, _, _ int) location.Location {
+	return location.Location{X: ox, Y: oy, Z: oz}
+}
 
 // moveClock runs a mover's queue on a virtual clock that moves only on
 // Advance, so an arrival timer fires only when a test lets it.
