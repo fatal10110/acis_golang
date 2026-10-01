@@ -102,7 +102,7 @@ func bootSmith(t *testing.T, level int, draws []augmentDraw, adena int32) *smith
 	if adena > 0 {
 		s.ade = srv.GiveItem(t, s.objID, item.AdenaID, adena)
 	}
-	if err := srv.Shortcuts.Save(context.Background(), s.objID, shortcut.Shortcut{Slot: 1, Type: shortcut.Item, ID: s.sword, Level: -1, CharacterType: 1}); err != nil {
+	if err := srv.Shortcuts.Save(context.Background(), s.objID, 0, shortcut.Shortcut{Slot: 1, Type: shortcut.Item, ID: s.sword, Level: -1, CharacterType: 1}); err != nil {
 		t.Fatalf("seed sword shortcut: %v", err)
 	}
 	startInWorld(t, s.c)

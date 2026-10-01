@@ -48,7 +48,7 @@ func generalLearnOpts(t *testing.T, sp int) []gameservertest.Option {
 // its bar across levels.
 func bindSkillShortcut(t *testing.T, srv *gameservertest.Server, objID, slot, skillID, level int32) {
 	t.Helper()
-	if err := srv.Shortcuts.Save(context.Background(), objID, shortcut.Shortcut{
+	if err := srv.Shortcuts.Save(context.Background(), objID, 0, shortcut.Shortcut{
 		Slot: slot, Page: 0, Type: shortcut.Skill, ID: skillID, Level: level, CharacterType: 1,
 	}); err != nil {
 		t.Fatalf("seed shortcut: %v", err)

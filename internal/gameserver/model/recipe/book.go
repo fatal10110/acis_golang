@@ -83,6 +83,15 @@ func (b *Book) Put(r Recipe) {
 	p.add(r)
 }
 
+// Clear empties both pages. Each page keeps the table size it had grown
+// to, so recipes put back list in that table's order.
+func (b *Book) Clear() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.dwarven.entries = nil
+	b.common.entries = nil
+}
+
 // Remove takes recipe id off the dwarven page, or off the common page when
 // the dwarven page does not hold it. It reports whether a page held it.
 func (b *Book) Remove(id int) bool {

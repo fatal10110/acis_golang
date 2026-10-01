@@ -3,8 +3,7 @@ package network
 import "time"
 
 // Reuse-gate identifiers, one per client action that carries a per-client
-// reuse delay. The reference numbers these through a global enum; this port
-// only needs the gates the current milestone wires (character selection
+// reuse delay. Only the gates the current milestone wires exist (character selection
 // family, server bypass, crafting and multisell), so the set grows as later systems
 // port their own gated actions.
 const (

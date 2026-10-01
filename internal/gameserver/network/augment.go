@@ -13,7 +13,7 @@ import (
 
 // The augmentation window's requests answer only with their own packets
 // and system messages. A request naming an item the player does not hold
-// gets nothing at all, as in the reference: the window registers no
+// gets nothing at all, as specified: the window registers no
 // pending client action, and only asks again on the player's next drop.
 
 // newAugmentService builds the refine service from cfg's augmentation
@@ -194,7 +194,7 @@ func (l *GameClientLink) cancelAugment(live *livePlayer, req clientpackets.Reque
 	}
 	check := augment.ConfirmCancel(live.ObjectID(), inv, req.ObjectID)
 	if !check.OK {
-		// An item someone else owns answers nothing, as in the reference.
+		// An item someone else owns answers nothing, as specified.
 		if inst.Snapshot().OwnerID != live.ObjectID() {
 			return
 		}

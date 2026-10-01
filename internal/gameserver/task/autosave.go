@@ -38,9 +38,8 @@ type autosaveEntry struct {
 	deadline time.Time
 }
 
-// Autosave periodically re-saves every tracked online player, matching the
-// reference's per-connection autosave timer without a goroutine per
-// connection.
+// Autosave periodically re-saves every tracked online player, each on its
+// own autosave deadline, without a goroutine per connection.
 //
 // mu guards entries.
 type Autosave struct {

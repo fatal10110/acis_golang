@@ -48,15 +48,20 @@ func Templates(t testing.TB) *player.TemplateTable {
 	return templatesWith(t, ClassTemplate())
 }
 
-// templatesWith is Templates with class 0 replaced by class0.
-func templatesWith(t testing.TB, class0 *player.Template) *player.TemplateTable {
+// templatesWith is Templates with class 0 replaced by class0 and extra
+// added, each replacing a default of its id.
+func templatesWith(t testing.TB, class0 *player.Template, extra ...*player.Template) *player.TemplateTable {
 	t.Helper()
-	table, err := player.NewTemplateTable(map[int]*player.Template{
+	tmpls := map[int]*player.Template{
 		0:  class0,
 		1:  fighterLineTemplate(1),
 		2:  fighterLineTemplate(2),
 		88: duelistTemplate(),
-	})
+	}
+	for _, tmpl := range extra {
+		tmpls[tmpl.ID] = tmpl
+	}
+	table, err := player.NewTemplateTable(tmpls)
 	if err != nil {
 		t.Fatalf("build template table: %v", err)
 	}

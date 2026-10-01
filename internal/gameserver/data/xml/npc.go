@@ -13,9 +13,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-// maxClassID is the highest valid profession id: the reference's ClassId
-// enum has 119 ordinals (0-118), including 30 reserved "dummy" slots at
-// 58-87 that resolve but name no real profession.
+// maxClassID is the highest valid profession id: there are 119 class ids
+// (0-118), including 30 reserved "dummy" slots at 58-87 that resolve but
+// name no real profession.
 const maxClassID = 118
 
 // npcFile is the root <list> element of one NPC template XML file.

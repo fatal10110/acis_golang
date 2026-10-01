@@ -36,8 +36,8 @@ const (
 	ShotNotHandled ShotOutcome = iota
 	// ShotApplied means the weapon was charged and the shot count consumed.
 	ShotApplied
-	// ShotAlreadyCharged means the weapon already carries this charge; the
-	// reference treats this as a pure no-op, not a rejection.
+	// ShotAlreadyCharged means the weapon already carries this charge; it is
+	// a pure no-op, not a rejection.
 	ShotAlreadyCharged
 	// ShotNoCapacity means no real weapon is equipped, or it can't carry
 	// this shot kind at all.
@@ -61,8 +61,8 @@ type ShotUseRequest struct {
 
 // ShotUseResult is the outcome of one UseShot call. AutoEnabled reports
 // whether Item's template is enabled for AutoSoulShot, so the caller can
-// suppress a rejection message the reference itself suppresses in that
-// case. SkillID is the visual charge skill to broadcast on ShotApplied (0
+// suppress the rejection message in that case. SkillID is the visual
+// charge skill to broadcast on ShotApplied (0
 // if the template attaches none).
 type ShotUseResult struct {
 	Outcome     ShotOutcome

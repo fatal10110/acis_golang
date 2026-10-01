@@ -22,10 +22,12 @@ const (
 )
 
 // restoreRecipeBook fills c's recipe book from its saved rows before c
-// enters the world. A row naming a recipe that is no longer loaded is
-// skipped, and a failed read leaves the book empty; both are logged.
+// enters the world. The book is the base class's: a character entering on a
+// subclass enters with it empty. A row naming a recipe that is no longer
+// loaded is skipped, and a failed read leaves the book empty; both are
+// logged.
 func (l *GameClientLink) restoreRecipeBook(ctx context.Context, c *player.Character) {
-	if l.recipeBooks == nil {
+	if l.recipeBooks == nil || c.SubclassActive() {
 		return
 	}
 	ids, err := l.recipeBooks.ListByOwner(ctx, c.ID)
@@ -33,11 +35,16 @@ func (l *GameClientLink) restoreRecipeBook(ctx context.Context, c *player.Charac
 		l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: list recipe book")
 		return
 	}
+	l.putRecipes(c, ids)
+}
+
+// putRecipes writes each loaded recipe of ids into c's book.
+func (l *GameClientLink) putRecipes(c *player.Character, ids []int) {
 	book := c.RecipeBook()
 	for _, id := range ids {
 		r, ok := l.craft.Recipe(id)
 		if !ok {
-			l.log.Error().Int32("object_id", c.ID).Int("recipe_id", id).Msg("enter world: recipe book row names no loaded recipe")
+			l.log.Error().Int32("object_id", c.ID).Int("recipe_id", id).Msg("recipe book row names no loaded recipe")
 			continue
 		}
 		book.Put(r)
@@ -69,7 +76,7 @@ func recipeBookFrame(live *livePlayer, dwarven bool) wire.Frame {
 // destroyRecipe answers RequestRecipeBookDestroy: the recipe leaves the
 // book together with every shortcut pointing at it, then live sees the
 // deletion and its page again. An unknown recipe id is dropped without a
-// word, as the reference does; the book window stays as it was and no
+// word, as specified; the book window stays as it was and no
 // client action waits on the answer.
 func (l *GameClientLink) destroyRecipe(live *livePlayer, req clientpackets.RequestRecipeBookDestroy) {
 	// The book of a running workshop is locked, the recipe kept.
@@ -77,12 +84,14 @@ func (l *GameClientLink) destroyRecipe(live *livePlayer, req clientpackets.Reque
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantAlterRecipeBookWhileCrafting))
 		return
 	}
-	r, ok := l.craft.Forget(live.Character, int(req.RecipeID))
+	r, removed, ok := l.craft.Forget(live.Character, int(req.RecipeID))
 	if !ok {
 		return
 	}
-	l.deleteTargetShortcuts(live, shortcut.Recipe, int32(r.ID))
-	if l.recipeBooks != nil {
+	if removed {
+		l.deleteTargetShortcuts(live, shortcut.Recipe, int32(r.ID))
+	}
+	if removed && l.recipeBooks != nil {
 		recipeID := r.ID
 		l.queueRowWrite(live.ObjectID(), "delete recipe", func(ctx context.Context, ownerID int32) error {
 			return l.recipeBooks.Delete(ctx, ownerID, recipeID)
@@ -94,8 +103,8 @@ func (l *GameClientLink) destroyRecipe(live *livePlayer, req clientpackets.Reque
 
 // sendRecipeItemMakeInfo answers RequestRecipeItemMakeInfo with the craft
 // window of any loaded recipe, whether or not live holds it. An unknown
-// recipe id gets nothing: the reference answers it with a packet carrying
-// no bytes at all, which the client has nothing to read from, and the
+// recipe id gets nothing: the specified answer is a packet carrying no
+// bytes at all, which the client has nothing to read from, and the
 // request leaves no client action waiting.
 func (l *GameClientLink) sendRecipeItemMakeInfo(live *livePlayer, req clientpackets.RequestRecipeItemMakeInfo) {
 	r, ok := l.craft.Recipe(int(req.RecipeID))
@@ -110,8 +119,8 @@ func sendRecipeMakeInfo(live *livePlayer, r recipe.Recipe, status int32) {
 	live.SendFrame(serverpackets.FrameRecipeItemMakeInfo(r, int32(res.CurrentMP), int32(res.MaxMP), status))
 }
 
-// makeRecipeSelf answers RequestRecipeItemMakeSelf. A request the reference
-// drops without a word stays silent here too: an unknown recipe, or one not
+// makeRecipeSelf answers RequestRecipeItemMakeSelf. A request specified to
+// drop without a word stays silent here too: an unknown recipe, or one not
 // on the matching page of live's book. The craft window only asks again on
 // the player's next click, so nothing waits on those.
 func (l *GameClientLink) makeRecipeSelf(live *livePlayer, req clientpackets.RequestRecipeItemMakeSelf) {
@@ -139,7 +148,7 @@ func (l *GameClientLink) useRecipeItem(live *livePlayer, inst *item.Instance, tm
 	if reg.Registered == nil {
 		return true
 	}
-	if l.recipeBooks != nil {
+	if reg.Stored && l.recipeBooks != nil {
 		recipeID := reg.Registered.ID
 		l.queueRowWrite(live.ObjectID(), "store recipe", func(ctx context.Context, ownerID int32) error {
 			return l.recipeBooks.Insert(ctx, ownerID, recipeID)
@@ -151,8 +160,8 @@ func (l *GameClientLink) useRecipeItem(live *livePlayer, inst *item.Instance, tm
 
 // queueRowWrite queues one row write on ownerID's persistence lane, where
 // character selection waits for it before reading the rows back. Nothing
-// waits for it here: the reference writes the row after changing the book
-// and only logs a failed write, so the client's answer never depends on it.
+// waits for it here: the row is written after the book changes and a failed
+// write is only logged, so the client's answer never depends on it.
 func (l *GameClientLink) queueRowWrite(ownerID int32, op string, write func(ctx context.Context, ownerID int32) error) {
 	l.persist.Enqueue(ownerID, func() {
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)

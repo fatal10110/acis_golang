@@ -128,9 +128,8 @@ func startGroundItems(lc fx.Lifecycle, items *task.GroundItems, store *gamesql.G
 }
 
 // startGroundItemPersistence saves every currently tracked ground item back
-// to items_on_ground at shutdown, mirroring the reference server's own
-// save-on-shutdown behavior. Cursed weapons are excluded, matching Java's
-// ItemsOnGroundTaskManager.save() skip to avoid a duplicate save.
+// to items_on_ground at shutdown. Cursed weapons are skipped to avoid a
+// duplicate save.
 func startGroundItemPersistence(lc fx.Lifecycle, items *task.GroundItems, store *gamesql.GroundItemStore, data *gameData, log zerolog.Logger) {
 	skip := func(itemID int32) bool {
 		if data.CursedWeapons == nil {
@@ -379,9 +378,8 @@ func provideItemInstances(pool *sql.DB, data *gameData, worker *persist.Worker, 
 	return task.NewItemInstances(gamesql.NewItemFlushStore(pool), data.Items, worker, writes, log)
 }
 
-// startItemInstances launches the persistence tick and flushes whatever is
-// still pending at shutdown, matching the reference's shutdown sequence
-// forcing one final ItemInstanceTaskManager save.
+// startItemInstances launches the persistence tick and, at shutdown, forces
+// one final save of whatever is still pending.
 func startItemInstances(lc fx.Lifecycle, items *task.ItemInstances, worker *persist.Worker, log zerolog.Logger) {
 	// Appended first so fx's reverse stop order runs it after the ticker
 	// has stopped: the final save then sees a pending set nothing else is

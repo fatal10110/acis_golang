@@ -32,8 +32,8 @@ type Session struct {
 	mu     sync.Mutex
 
 	// cryptEnabled gates the rolling cipher: frames cross in cleartext
-	// until the VersionCheck reply goes out, matching the reference where
-	// encryption starts only once the key has been delivered. mu guards it
+	// until the VersionCheck reply goes out: encryption starts only once the
+	// key has been delivered. mu guards it
 	// together with the encrypt path.
 	cryptEnabled bool
 

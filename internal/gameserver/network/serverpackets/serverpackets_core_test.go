@@ -251,7 +251,7 @@ func TestFrameCharDeleteOk(t *testing.T) {
 // ---- from charinfo_test.go ----
 func TestFrameCharInfoCoreFields(t *testing.T) {
 	c := &player.Character{
-		ID: 0x10000001, Name: "Observer", ClassID: 0,
+		ID: 0x10000001, Name: "Observer",
 		Race: player.RaceHuman, Sex: player.SexMale,
 		Location:    location.Location{X: 10, Y: 20, Z: 30},
 		LastHeading: 123,
@@ -298,7 +298,7 @@ func TestFrameCharInfoMirrorsPvPFlag(t *testing.T) {
 
 func TestFrameCharInfoUsesDoublePrecisionFloatFields(t *testing.T) {
 	c := &player.Character{
-		ID: 0x10000001, Name: "Observer", ClassID: 0,
+		ID: 0x10000001, Name: "Observer",
 		Race: player.RaceHuman, Sex: player.SexMale,
 		Location: location.Location{X: 10, Y: 20, Z: 30},
 	}
@@ -419,7 +419,6 @@ func TestFrameCharSelected(t *testing.T) {
 		ClanID:   5,
 		Sex:      player.SexMale,
 		Race:     player.RaceHuman,
-		ClassID:  0,
 		Location: location.Location{X: 10, Y: 20, Z: 30},
 		SP:       7, Exp: 12345, CharLevel: 3,
 		KarmaPoints: 1, PKKills: 2,
@@ -441,7 +440,7 @@ func TestFrameCharSelected(t *testing.T) {
 
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Sex))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Race))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID()))
 
 	want = binary.LittleEndian.AppendUint32(want, 1)
 
@@ -467,7 +466,7 @@ func TestFrameCharSelected(t *testing.T) {
 	}
 	want = binary.LittleEndian.AppendUint32(want, 1234) // game time
 	want = binary.LittleEndian.AppendUint32(want, 0)    // reserved
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID()))
 	for i := 0; i < 4; i++ {
 		want = binary.LittleEndian.AppendUint32(want, 0)
 	}
@@ -3154,7 +3153,6 @@ func TestFrameUserInfo(t *testing.T) {
 	c := &player.Character{
 		ID:        0x10000001,
 		Name:      "Newbie",
-		ClassID:   0,
 		Race:      player.RaceHuman,
 		Sex:       player.SexMale,
 		CharLevel: 1,
@@ -3198,7 +3196,7 @@ func TestFrameUserInfo(t *testing.T) {
 	want = append(want, encodeUTF16Z(c.Name)...)
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Race))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Sex))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID()))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.CharLevel))
 	want = binary.LittleEndian.AppendUint64(want, uint64(c.Exp))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.STR()))
@@ -3294,7 +3292,7 @@ func TestFrameUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, 0) // mount npc id
 
 	want = binary.LittleEndian.AppendUint16(want, 80) // MaximumSlotsForNoDwarf default
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID()))
 	want = binary.LittleEndian.AppendUint32(want, 0)
 	want = binary.LittleEndian.AppendUint32(want, uint32(resources.MaxCP))
 	want = binary.LittleEndian.AppendUint32(want, uint32(resources.CurrentCP))

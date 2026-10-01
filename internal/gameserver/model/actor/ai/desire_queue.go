@@ -164,9 +164,9 @@ func (q *DesireQueue) Has(probe *Desire) bool {
 }
 
 // NonMovingAttack returns the queued ATTACK Desire aimed at target whose
-// MoveToTarget is false, if one is queued. Equivalent to the reference's
-// Npc.canAutoAttack finding the first ATTACK desire for target and then
-// checking !getMoveToTarget(): a matching desire with MoveToTarget true is
+// MoveToTarget is false, if one is queued. Equivalent to finding the first
+// ATTACK desire for target and then checking that it does not move to its
+// target: a matching desire with MoveToTarget true is
 // treated the same as no match, since callers only act on the non-moving
 // case.
 func (q *DesireQueue) NonMovingAttack(target attackable.Combatant) (*Desire, bool) {

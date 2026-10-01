@@ -164,6 +164,18 @@ const characterRecipeBookSchema = "CREATE TABLE IF NOT EXISTS `character_recipeb
 	"  PRIMARY KEY (`charId`,`recipeId`)\n" +
 	")"
 
+// characterSubclassesSchema mirrors the shipped character_subclasses table
+// definition verbatim.
+const characterSubclassesSchema = "CREATE TABLE IF NOT EXISTS `character_subclasses` (\n" +
+	"`char_obj_id` decimal(11,0) NOT NULL default '0',\n" +
+	"`class_id` int(2) NOT NULL default '0',\n" +
+	"`exp` decimal(20,0) NOT NULL default '0',\n" +
+	"`sp` decimal(11,0) NOT NULL default '0',\n" +
+	"`level` int(2) NOT NULL default '40',\n" +
+	"`class_index` int(1) NOT NULL default '0',\n" +
+	"PRIMARY KEY  (`char_obj_id`,`class_id`)\n" +
+	")"
+
 // buylistsSchema mirrors the shipped buylists table definition verbatim.
 const buylistsSchema = "CREATE TABLE IF NOT EXISTS `buylists` (\n" +
 	"  `buylist_id` INT UNSIGNED,\n" +
@@ -261,7 +273,7 @@ var schemaStmts = []string{
 	charactersSchema, itemsSchema, augmentationsSchema, spawnDataSchema,
 	itemsOnGroundSchema, characterSkillsSchema, characterShortcutsSchema,
 	characterHennasSchema, characterRecipeBookSchema, petsSchema, characterSkillsSaveSchema,
-	sevenSignsStatusSchema, buylistsSchema,
+	sevenSignsStatusSchema, buylistsSchema, characterSubclassesSchema,
 }
 
 var seedStmts = []string{sevenSignsStatusSeed}

@@ -276,15 +276,13 @@ func validateShopRows(name string, count int32, maxItems, rowSize, remaining int
 	if count <= 0 {
 		return fmt.Errorf("clientpackets: %s: invalid item count %d", name, count)
 	}
-	// Mirrors RequestBuyItem.java:32 / RequestSellItem.java:26's
-	// "count > Config.MAX_ITEM_IN_PACKET" guard.
+	// A buy or sell list longer than the per-packet item cap is refused.
 	if int(count) > maxItems {
 		return fmt.Errorf("clientpackets: %s: item count %d exceeds max %d", name, count, maxItems)
 	}
-	// A row-count/remaining-length mismatch mirrors the reference's silent
-	// readImpl() return (RequestBuyItem/RequestSellItem: "count * BATCH_LENGTH
-	// != _buf.remaining()"), not a BufferUnderflowException: it never counts
-	// toward the underflow threshold, so this stays unwrapped.
+	// A row-count/remaining-length mismatch (count * row size differs from
+	// the bytes left) is a silent decode refusal, not a buffer underflow: it
+	// never counts toward the underflow threshold, so this stays unwrapped.
 	if int64(count)*int64(rowSize) != int64(remaining) {
 		return fmt.Errorf("clientpackets: %s: %d item rows need %d bytes, got %d", name, count, int64(count)*int64(rowSize), remaining)
 	}

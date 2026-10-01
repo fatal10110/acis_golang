@@ -84,9 +84,9 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		l.shadowItems.Remove(live.ObjectID())
 	}
 	if l.attackStance != nil {
-		// Unconditional, alongside the other registry removals: the
-		// reference drops the stance entry here too (Player.java:6292,
-		// between the water and pvp-flag removals), and live.Stop's
+		// Unconditional, alongside the other registry removals: the stance
+		// entry is dropped here, between the water and pvp-flag removals,
+		// and live.Stop's
 		// stopLiveAutoAttack cannot stand in for it. That helper clears the
 		// in-combat flag before it reaches the tracker, so a detach that
 		// resumes after an aborted first pass finds the flag already down,
@@ -100,7 +100,7 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		l.attackStance.Remove(live)
 	}
 	if l.pvpFlags != nil {
-		// reset=false, matching Player.java:6293's deleteMe cleanup: a
+		// reset=false, as the disconnect cleanup requires: a
 		// disconnecting character's flag isn't persisted, so there's
 		// nothing to reset it to — just stop tracking it.
 		l.pvpFlags.Remove(live.Character, false)
@@ -309,8 +309,7 @@ func (l *GameClientLink) dropPetItem(actor *summon.Actor, inv *itemcontainer.Inv
 
 // flushItemPersistence releases inv's persistence dependency, so its items stop
 // scheduling with the lazy persistence task, and writes their state on the
-// owner's persistence lane, matching the
-// reference's ItemContainer.deleteMe: a container that goes away drops out
+// owner's persistence lane: a container that goes away drops out
 // of the pending set and is saved at once, rather than leaving rows for a
 // tick that will never see the container again. The items are read when the
 // job runs, so a change made before it — such as a pet save's control item

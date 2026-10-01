@@ -27,8 +27,8 @@ type Instance struct {
 	// DriftRange overrides the default home radius when positive.
 	DriftRange int
 	// WalkMode forces walk stance (WalkSpeed, not RunSpeed) instead of the
-	// default run stance every other NPC spawns in (aCis Walkers.java
-	// onCreated's setWalkOrRun(false) for its WALKING_NPCS id subset).
+	// default run stance every other NPC spawns in (the walker ids that
+	// spawn walking).
 	WalkMode bool
 	// Maker is the spawning npc-maker group. InTerritory and idle wander
 	// use its polygon when this is set. A nil Maker keeps the home-offset

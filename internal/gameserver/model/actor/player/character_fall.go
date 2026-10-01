@@ -18,9 +18,11 @@ func (c *Character) CheckFall(reportedZ int, ground, enabled bool, now time.Time
 		return 0, true
 	}
 
-	safeHeight := c.template().SafeFallHeightFemale
+	// The body is the base class's whichever class is active.
+	base := c.BaseTemplate()
+	safeHeight := base.SafeFallHeightFemale
 	if c.Sex == SexMale {
-		safeHeight = c.template().SafeFallHeightMale
+		safeHeight = base.SafeFallHeightMale
 	}
 	deltaZ := int(int32(c.CurrentLocation().Z) - int32(reportedZ))
 	if deltaZ <= safeHeight {

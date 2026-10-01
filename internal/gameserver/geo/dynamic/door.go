@@ -17,8 +17,8 @@ const (
 )
 
 // ErrDegenerateFootprint reports a door polygon that fails ear-clip
-// triangulation, matching the condition DoorData.java:113-123 logs and
-// skips rather than treating as fatal.
+// triangulation. The door loader logs and skips such a door rather than
+// treating it as fatal.
 var ErrDegenerateFootprint = errors.New("geo/dynamic: degenerate door footprint")
 
 // Sampler provides the static geodata lookups door shaping needs.

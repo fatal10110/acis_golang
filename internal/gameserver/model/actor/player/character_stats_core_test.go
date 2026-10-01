@@ -2658,6 +2658,9 @@ type pvpFlagNPC struct {
 func (pvpFlagNPC) ObjectID() int32 { return 4 }
 func (n pvpFlagNPC) Guard() bool   { return n.guard }
 
+// Attackable reports the attackable NPC a helpful skill flags its caster on.
+func (pvpFlagNPC) Attackable() bool { return true }
+
 func TestNotePvPHitFromAttackerUsesFlaggedDurationForOngoingPvPFight(t *testing.T) {
 	attacker := &Character{ID: 1}
 	victim := &Character{ID: 2}
@@ -4523,7 +4526,7 @@ func TestCharacterHealInputUsesMagicAttackAndHealProficiency(t *testing.T) {
 
 	// Human Mystic (10) and its cleric line are mage classes.
 	for _, classID := range []int{10, 15, 16} {
-		c.ClassID = classID
+		c.SetClassID(classID)
 		mage, _ := c.HealInput(modelskill.Definition{SkillType: "HEAL", Power: 25})
 		if mage.Scaling != formulas.HealShotScalingMage {
 			t.Fatalf("class %d HealInput scaling = %v, want mage", classID, mage.Scaling)
@@ -5156,8 +5159,8 @@ func TestNewCharacter(t *testing.T) {
 	if c.ID != 0x10000001 || c.AccountName != "acct1" || c.Name != "Newbie" {
 		t.Fatalf("NewCharacter() identity = %+v", c)
 	}
-	if c.ClassID != 0 || c.BaseClassID != 0 {
-		t.Errorf("ClassID/BaseClassID = %d/%d, want 0/0", c.ClassID, c.BaseClassID)
+	if c.ClassID() != 0 || c.BaseClassID != 0 {
+		t.Errorf("ClassID/BaseClassID = %d/%d, want 0/0", c.ClassID(), c.BaseClassID)
 	}
 	if c.Race != RaceHuman {
 		t.Errorf("Race = %v, want %v", c.Race, RaceHuman)
@@ -5570,10 +5573,11 @@ func combatItems() *item.Table {
 
 func liveCharacter(id int32, tmpl *Template, items *item.Table, equipped ...*item.Instance) *Character {
 	c := &Character{
-		ID: id, Name: "char", ClassID: tmpl.ID, BaseClassID: tmpl.ID,
+		ID: id, Name: "char", BaseClassID: tmpl.ID,
 		Race: RaceHuman, Sex: SexMale, CharLevel: 1,
 		Location: location.Location{X: int(id) * 100, Y: 0, Z: 0},
 	}
+	c.SetClassID(tmpl.ID)
 	c.SetResourceValues(Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 30, CurrentMP: 30})
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, items, equipped))
 	c.SetRollSource(zeroRoll)

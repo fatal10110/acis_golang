@@ -151,7 +151,7 @@ func (a characterStatActor) LevelMod() float64 {
 
 func (a characterStatActor) IsSummon() bool { return false }
 
-func (a characterStatActor) IsMageClass() bool { return ClassMage(a.c.ClassID) }
+func (a characterStatActor) IsMageClass() bool { return ClassMage(a.c.ClassID()) }
 
 func (a characterStatActor) HennaBonus(s stat.Stat) float64 { return hennaBonusFor(a.c, s) }
 
@@ -258,7 +258,7 @@ func (c *Character) ShieldDefense(caster creature.FormulaActor, def modelskill.D
 }
 
 // notifyShieldBlock sends this defending player's client feedback for a
-// shield-block roll: no message on a failed block (Formulas.java:866-879).
+// shield-block roll: no message on a failed block.
 func (c *Character) notifyShieldBlock(result formulas.ShieldDefense) {
 	switch result {
 	case formulas.ShieldSuccess:
@@ -469,19 +469,16 @@ type hitOutcome struct {
 	dead   bool
 }
 
-// absorbCPThenReduceHP applies PlayerStatus.reduceHp's CP-first absorption
-// (PlayerStatus.java:166-184): a Playable attacker other than the actor
-// itself (PvP, pet/summon damage) drains CP before HP, unless ignoreCP is
-// set (Player.java:6152's ignoreCP argument, sourced from the skill's
+// absorbCPThenReduceHP applies a player's CP-first absorption: a Playable
+// attacker other than the actor itself (PvP, pet/summon damage) drains CP
+// before HP, unless ignoreCP is set (sourced from the skill's
 // dmgDirectlyToHp for skill-cast and DOT damage, and always false for
-// melee auto-attack, which passes no skill). Every damage route in the
-// reference converges on this block — melee (CreatureAttack.java:263), DOT
-// (EffectDamOverTime.java:48), and skill-cast (Player.java:6152/6154) — so
-// ReduceHP, ReduceHPByDOT, and TakeDamage all reach it through landHit,
-// after the servitor's damage share and under vitalsMu, and after
-// applyNonConsumptionDamageEffects's sleep/immobile-stop, stand-up, and
-// stun-break side effects (PlayerStatus.java:118-134), which run first in
-// the reference. Already-dead is a no-op, matching PlayerStatus.reduceHp.
+// melee auto-attack, which passes no skill). Every damage route converges
+// on this block — melee, DOT, and skill-cast — so ReduceHP, ReduceHPByDOT,
+// and TakeDamage all reach it through landHit, after the servitor's damage
+// share and under vitalsMu, and after applyNonConsumptionDamageEffects's
+// sleep/immobile-stop, stand-up, and stun-break side effects, which run
+// first. Already-dead is a no-op.
 func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Combatant, ignoreCP bool) hitOutcome {
 	if amount < 0 {
 		amount = 0
@@ -689,14 +686,13 @@ func (c *Character) reduceSkillHP(amount float64, attacker attackable.Combatant,
 
 // ReduceHPByDOT applies periodic damage without the normal-hit cast
 // interruption. isDOT distinguishes a real damage-over-time skill tick
-// (true, e.g. Poison/Bleed — Creature.reduceCurrentHpByDOT hardcodes this)
-// from other periodic, non-attack damage sources the reference still routes
-// through reduceCurrentHp with isDOT=false, such as drowning
-// (WaterTaskManager.java calls reduceCurrentHp(hp, player, false, false,
-// null)): both skip cast interruption, but only isDOT=false allows the
-// 1-in-10 STUN-break roll. No datapack DOT effect sets dmgDirectlyToHp (the
-// only skill that does, Backstab, is a BLOW burst hit, never delivered
-// through EffectDamOverTime), so ignoreCP is always false here.
+// (true, e.g. Poison/Bleed — always a DOT hit) from other periodic,
+// non-attack damage sources that are plain HP reductions with isDOT=false,
+// such as drowning: both skip cast interruption, but only isDOT=false
+// allows the 1-in-10 STUN-break roll. No datapack DOT effect sets
+// dmgDirectlyToHp (the only skill that does, Backstab, is a BLOW burst
+// hit, never delivered through the damage-over-time effect), so ignoreCP
+// is always false here.
 //
 // Invulnerability drops the damage unless it is c's own damage-over-time
 // tick; drowning, which is c's own damage but not such a tick, is dropped
@@ -831,7 +827,7 @@ func (c *Character) RechargeMP(amount float64) float64 {
 // charged spiritshot scales its M.Atk term; a fighter's does not.
 func (c *Character) HealInput(def modelskill.Definition) (formulas.HealInput, bool) {
 	scaling := formulas.HealShotScalingNone
-	if ClassMage(c.ClassID) {
+	if ClassMage(c.ClassID()) {
 		scaling = formulas.HealShotScalingMage
 	}
 	return creature.ResolveHealInput(def, c.HealProficiency(), c.MAtk(), scaling), true
@@ -860,9 +856,9 @@ func (c *Character) CounterSkillPhysical() float64 {
 }
 
 // CancelVulnerability returns c's CANCEL_VULN multiplier for the cancel and
-// cancel-debuff success-rate formulas (Formulas.java:949-951). classification
-// is unused: the reference applies CANCEL_VULN uniformly, without the
-// per-classification switch it uses for the other _VULN stats.
+// cancel-debuff success-rate formulas. classification is unused:
+// CANCEL_VULN applies uniformly, without the per-classification switch the
+// other _VULN stats use.
 func (c *Character) CancelVulnerability(_ string) float64 {
 	return c.CalcStat(stat.CancelVuln, 1)
 }

@@ -106,7 +106,7 @@ func parsePoint(s string) (location.Location, error) {
 
 // Evaluate runs q against e (and f, for Path) and returns the result as a
 // datadiff.Record: q.ID() as the ID, and the answer as its fields, so two
-// evaluations of the same query — Go's and an oracle's — diff as plain text
+// evaluations of the same query — this engine's and a captured one — diff as plain text
 // via datadiff.Compare.
 func Evaluate(e *engine.Engine, f *pathfind.Finder, q Query) datadiff.Record {
 	fields := make(map[string]string)

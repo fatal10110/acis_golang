@@ -364,9 +364,8 @@ func (c *Character) DisableItem(objectID int32, delay time.Duration) {
 }
 
 // ItemDisabled reports whether an inventory object id is still disabled.
-// Matches Java's Playable.isItemDisabled: the AllSkillsDisabled lock only
-// short-circuits every id when at least one item is already tracked as
-// disabled (Playable.java:355-359) — with no disabled item at all, the lock
+// The AllSkillsDisabled lock only short-circuits every id when at least
+// one item is already tracked as disabled — with no disabled item at all, the lock
 // has no effect here.
 func (c *Character) ItemDisabled(objectID int32) bool {
 	if objectID <= 0 {
@@ -398,10 +397,9 @@ func (c *Character) ItemDisabled(objectID int32) bool {
 	return false
 }
 
-// AllSkillsDisabled mirrors Java's Creature.isAllSkillsDisabled(): the
-// crowd-control states that block skill and item use. Java also unions a raw
-// Duel-defeat lock (Creature._allSkillsDisabled, set/cleared only by
-// PlayerStatus/Player's Duel handling), which this port does not model since
+// AllSkillsDisabled reports the crowd-control states that block skill and
+// item use. The full rule also unions a raw Duel-defeat lock (set and
+// cleared only by duel handling), which this port does not model since
 // Duel isn't ported yet.
 func (c *Character) AllSkillsDisabled() bool {
 	live := c.liveLocked()

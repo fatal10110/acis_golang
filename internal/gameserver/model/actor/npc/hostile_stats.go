@@ -163,7 +163,7 @@ func (h *Hostile) CalcStat(s stat.Stat, base float64) float64 {
 // defaultBuiltin returns the static, attribute-driven finalize step every
 // NPC's calculation chain for s runs at order 10, or nil for a Stat with no
 // builtin. Unlike a player, an NPC gets no henna or CP funcs — the
-// reference AI only ever adds the shared creature set to a monster.
+// a monster only ever gets the shared creature set.
 func defaultBuiltin(s stat.Stat) funcs.Func {
 	switch s {
 	case stat.MaxHP:

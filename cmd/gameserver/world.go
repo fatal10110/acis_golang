@@ -19,8 +19,10 @@ import (
 	"go.uber.org/fx"
 )
 
-func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, ids *idfactory.Allocator) *manager.Roster {
-	return manager.NewRoster(characters, items, shortcuts, data.Players, data.Items, data.NPCs, ids, manager.DefaultDeleteAfter, time.Now)
+func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, subclasses *gamesql.SubclassStore, ids *idfactory.Allocator) *manager.Roster {
+	roster := manager.NewRoster(characters, items, shortcuts, data.Players, data.Items, data.NPCs, ids, manager.DefaultDeleteAfter, time.Now)
+	roster.SetSubclasses(subclasses)
+	return roster
 }
 
 // provideWorldObjects spawns every door and static object template into
@@ -65,7 +67,7 @@ func provideSpawns(ctx bootContext, paths gameServerPaths, pool *sql.DB, log zer
 // tasks' own effects can only point back at Npcs after it exists.
 func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids *idfactory.Allocator, decay *task.Decay, decayHooks *worldDecayEffects, respawnTask *task.Respawn, respawnHooks *npcRespawnEffects, ai *task.AI, positions *task.PositionUpdates, ground *task.GroundItems, rewards manager.KillRewardConfig, gameplay gameplayConfig, log zerolog.Logger, walker *task.Walker, link *network.GameClientLink, attackStance *task.AttackStance, effects effect.Env, pool *sim.Pool) (*manager.Npcs, error) {
 	npcs, err := manager.NewNpcsWithMaxBuffsAmount(spawns, data.NPCs, move.NewGeo(data.Geo, data.Finder), state, ids, decay, respawnTask, ai, positions, data.Items, ground, rewards, time.Now, log,
-		data.Skills, link.HostileCastEffects(), walker, network.HostileSinks(state, attackStance), network.FolkSinks(state), int(gameplay.MaxBuffsAmount), int(gameplay.RandomWalkRate), int(gameplay.MaxGeoPathFailCount), gameplay.RaidMultipliers, effects, pool, data.Zones)
+		data.Skills, link.HostileCastEffects(), walker, network.HostileSinks(state, attackStance), network.FolkSinks(state, attackStance), int(gameplay.MaxBuffsAmount), int(gameplay.RandomWalkRate), int(gameplay.MaxGeoPathFailCount), gameplay.RaidMultipliers, effects, pool, data.Zones)
 	if err != nil {
 		return nil, err
 	}
@@ -85,9 +87,8 @@ func startNpcs(npcs *manager.Npcs, log zerolog.Logger) {
 }
 
 // startNpcPersistence syncs every live database-tracked spawn's current
-// HP/position into its spawn.State row and saves spawn_data at shutdown,
-// mirroring the reference server's own save-on-shutdown behavior. The save
-// runs under its own budget: it stops ahead of the final item flush, and on a
+// HP/position into its spawn.State row and saves spawn_data at shutdown. The
+// save runs under its own budget: it stops ahead of the final item flush, and on a
 // slow database it would otherwise spend the rest of the stop budget.
 func startNpcPersistence(lc fx.Lifecycle, npcs *manager.Npcs, spawns *manager.Spawns, store *gamesql.SpawnStore, log zerolog.Logger) {
 	lc.Append(fx.Hook{

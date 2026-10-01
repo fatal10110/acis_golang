@@ -23,15 +23,15 @@ func (c *Character) NotifyCPRestored(healerName string, amount int, byOther bool
 }
 
 // NotifyEffectRemovedDueLackHP sends this player's SKILL_REMOVED_DUE_LACK_HP
-// system message. e is unused: the reference message carries no skill-name
-// parameter (EffectDamOverTime.java:32-36).
+// system message. e is unused: the message carries no skill-name
+// parameter.
 func (c *Character) NotifyEffectRemovedDueLackHP(*effect.Effect) {
 	c.emit(event.EffectRemovedLackHP{})
 }
 
 // NotifyEffectRemovedDueLackMP sends this player's SKILL_REMOVED_DUE_LACK_MP
-// system message. e is unused: the reference message carries no skill-name
-// parameter (EffectManaDamOverTime.java:29-33).
+// system message. e is unused: the message carries no skill-name
+// parameter.
 func (c *Character) NotifyEffectRemovedDueLackMP(*effect.Effect) {
 	c.emit(event.EffectRemovedLackMP{})
 }

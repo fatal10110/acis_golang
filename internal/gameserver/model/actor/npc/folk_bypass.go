@@ -67,6 +67,9 @@ const (
 	BypassInstantTeleport
 	// BypassQuestInfo opens the client's quest information window.
 	BypassQuestInfo
+	// BypassSubclass runs a village master's subclass command; see
+	// ParseSubclassCommand.
+	BypassSubclass
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -129,13 +132,18 @@ var fishermanCommands = []string{"FishingChampionship", "FishingReward"}
 // multisell <list> and exc_multisell <list> open a multisell list, Augment
 // 1 and Augment 2 open the augmentation and removal windows,
 // teleport_request opens the destination list, and teleport <index> and
-// instant_teleport <index> take the talker to a destination. Every other
-// command belongs to a system not in place yet.
+// instant_teleport <index> take the talker to a destination. A village
+// master's Subclass commands go to the subclass dialog. Every other command
+// belongs to a system not in place yet.
 func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command string) BypassReply {
 	karma := talker.Karma
 	kind := hostileKind(f.Instance)
 	reply := BypassReply{LeadingActionFailed: kind == "DungeonGatekeeper"}
 	if _, ok := unportedFolkChats[kind]; ok {
+		return reply
+	}
+	if f.VillageMaster() && strings.HasPrefix(command, "Subclass") {
+		reply.Outcome = BypassSubclass
 		return reply
 	}
 	chat := folkChats[kind]

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -39,6 +40,12 @@ type homeRecovery interface {
 }
 
 var _ homeRecovery = (*locatedRef)(nil)
+
+// locatedRef forwards the NPC's known list, so the controller ends a chase
+// walk whose target the NPC no longer knows.
+var _ interface {
+	Knows(attackable.Combatant) bool
+} = (*locatedRef)(nil)
 
 // TestLiveHostileMoveHomeTeleportsThroughLocatedRef pins the production
 // wiring from newLiveHostile: move.Controller.self is *locatedRef, which

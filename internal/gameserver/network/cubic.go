@@ -216,8 +216,8 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 	beforeVitals := live.Vitals()
 	if id == cubic.Life {
 		live.after(cubicCastDelay, func() {
-			// The reference's stop() cancels the in-flight cast task on a
-			// dead/stopped cubic; re-check here since fireCubic only gated
+			// Stopping a cubic cancels its in-flight cast; a dead/stopped
+			// cubic must not fire. Re-check here since fireCubic only gated
 			// on Dead() at the start of the tick, before this delay.
 			// detached() also covers a logout inside the delay window:
 			// stopCubics() stops each runtime's timers but never removes

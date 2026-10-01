@@ -72,8 +72,8 @@ func (w activeWeapon) grade() int {
 // PeaceZoneQuery reports whether any point within effectRange of (x, y, z) —
 // sampled at the point and its four axis-aligned range offsets — falls
 // inside a peace-suspending zone attached to the region containing
-// (regionX, regionY). Callers pass their own position as the region anchor,
-// matching the reference's caster-region-only zone lookup.
+// (regionX, regionY). Callers pass their own position as the region anchor:
+// the zone lookup uses the caster's region only.
 
 // SetGroundTarget records the last ground-click point a ground-targeted
 // skill cast (RequestExMagicSkillUseGround) resolved, reused across casts
@@ -83,8 +83,8 @@ func (w activeWeapon) grade() int {
 
 // CanSeePoint reports whether an arbitrary world point is visible to this
 // player: a geodata line-of-sight query from this player's position and eye
-// height to the raw point (no height offset on the point end, matching the
-// reference's ground-target LOS query), or permissive when no
+// height to the raw point (no height offset on the point end, as for a
+// ground-target LOS query), or permissive when no
 // line-of-sight query is attached (e.g. in tests).
 
 // EffectRangeInPeaceZone reports whether the given point's effect range
@@ -208,8 +208,24 @@ func (c *Character) ConsumeBowMP() {
 // persisted last-known location.
 
 func (c *Character) template() *Template {
-	return c.runtimeTemplate
+	return c.runtimeTemplate.Load()
 }
+
+// Template returns the active class's template.
+func (c *Character) Template() *Template { return c.template() }
+
+// BaseTemplate returns the base class's template: the body (collision
+// size, safe fall height) a character keeps whichever class it plays.
+func (c *Character) BaseTemplate() *Template {
+	if t := c.baseTemplate.Load(); t != nil {
+		return t
+	}
+	return c.template()
+}
+
+// SetBaseTemplate records the base class's template. Call it with
+// AttachRuntime before c is exposed to the world.
+func (c *Character) SetBaseTemplate(t *Template) { c.baseTemplate.Store(t) }
 
 func (c *Character) activeWeapon() activeWeapon {
 	if c.inventory == nil {
@@ -367,8 +383,7 @@ func (c *Character) Accuracy() int {
 }
 
 // CriticalRate returns this player's physical critical rate, truncated to
-// an int and capped at 500 per CreatureStatus.getCriticalHit
-// (CreatureStatus.java:551-553): `Math.min((int) calcStat(...), 500)`.
+// an int and capped at 500: min(int(stat), 500).
 func (c *Character) CriticalRate() float64 {
 	return float64(min(int(c.calcStat(stat.CriticalRate, c.activeWeapon().stat("rCrit", 4))), 500))
 }
@@ -620,8 +635,7 @@ func (c *Character) WeaponGrade() int {
 
 // ChargeShotResult distinguishes why a direct-use shot charge attempt did
 // or didn't take, so the network layer can pick the matching client
-// message (or suppress it for an auto-shot-enabled item, the way the
-// reference does).
+// message (or suppress it for an auto-shot-enabled item).
 
 // ChargeShotOK means the weapon accepted the charge.
 
@@ -632,13 +646,13 @@ func (c *Character) WeaponGrade() int {
 // the weapon's.
 
 // ChargeShotAlreadyCharged means the weapon already carries this
-// charge; the reference answers this case with total silence, not a
+// charge; the specified answer is total silence, not a
 // system message.
 
 // ChargeSoulshot attempts to charge the active weapon with a soulshot of
 // shotCrystal grade, using reducedRoll (a 0-99 percentile roll) to decide
 // whether the weapon's reduced-consumption count applies. Checks run
-// capacity, then grade, then already-charged — the reference's own order
+// capacity, then grade, then already-charged — the specified order
 // for this shot kind, which differs from ChargeSpiritshot's order. On
 // ChargeShotOK the weapon is marked charged and consume is the count to
 // destroy from the item stack.
@@ -646,7 +660,7 @@ func (c *Character) WeaponGrade() int {
 // ChargeSpiritshot attempts to charge the active weapon with a spiritshot
 // of shotCrystal grade (kind is ShotSpirit or ShotBlessedSpirit; both draw
 // from the weapon's same spiritshot capacity). Checks run capacity, then
-// already-charged, then grade — the reference's own order for this shot
+// already-charged, then grade — the specified order for this shot
 // kind, which differs from ChargeSoulshot's order. On ChargeShotOK the
 // weapon is marked charged with kind and consume is the count to destroy
 // from the item stack.
@@ -756,10 +770,7 @@ func (c *Character) MP() int {
 }
 
 // ClearRecentFakeDeath cancels the post-fake-death grace period. An attack
-// or completed cast zeroes it unconditionally, matching
-// Player.clearRecentFakeDeath() (`_recentFakeDeathEndTime = 0;`,
-// Player.java:2130-2133), called unconditionally from PlayerAttack.doAttack
-// (PlayerAttack.java:23) and PlayerCast.doCast (PlayerCast.java:184).
+// or completed cast zeroes it unconditionally.
 func (c *Character) ClearRecentFakeDeath() {
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
@@ -819,7 +830,7 @@ func (c *Character) CollisionRadius() float64 {
 	if radius, _, ok := c.mountBody(); ok {
 		return radius
 	}
-	tmpl := c.template()
+	tmpl := c.BaseTemplate()
 	if tmpl == nil {
 		return 0
 	}
@@ -836,7 +847,7 @@ func (c *Character) CollisionHeight() float64 {
 	if _, height, ok := c.mountBody(); ok {
 		return height
 	}
-	tmpl := c.template()
+	tmpl := c.BaseTemplate()
 	if tmpl == nil {
 		return 0
 	}
