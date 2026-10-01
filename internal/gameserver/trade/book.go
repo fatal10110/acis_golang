@@ -127,6 +127,14 @@ func NewBook(now func() time.Time) *Book {
 
 // Request records a pending direct-trade request.
 func (b *Book) Request(requesterID, targetID int32) RequestResult {
+	return b.RequestUnless(requesterID, targetID, false)
+}
+
+// RequestUnless is Request for a request a check outside the book may
+// refuse, such as the target's block list. refused is that check's verdict;
+// it counts only once neither side is busy, so a busy side is reported
+// first, and a refused request records nothing.
+func (b *Book) RequestUnless(requesterID, targetID int32, refused bool) RequestResult {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -136,6 +144,8 @@ func (b *Book) Request(requesterID, targetID int32) RequestResult {
 		return RequestResult{Status: RequestRequesterBusy}
 	case b.processingTransactionLocked(targetID):
 		return RequestResult{Status: RequestTargetBusy}
+	case refused:
+		return RequestResult{Status: RequestRefused}
 	}
 
 	b.recordLocked(KindTrade, requesterID, targetID)

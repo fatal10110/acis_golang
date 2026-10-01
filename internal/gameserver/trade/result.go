@@ -10,6 +10,9 @@ const (
 	RequestRequesterBusy
 	// RequestTargetBusy means the target already has a pending or active trade.
 	RequestTargetBusy
+	// RequestRefused means neither side was busy but a check outside the
+	// book refused the request (RequestUnless); nothing was recorded.
+	RequestRefused
 )
 
 // RequestResult is returned after a direct-trade request attempt.

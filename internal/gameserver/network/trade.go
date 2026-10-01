@@ -66,17 +66,36 @@ func (l *GameClientLink) handleTradeRequest(live *livePlayer, req clientpackets.
 		return
 	}
 
-	switch l.tradeBook().Request(live.ObjectID(), target.ObjectID()).Status {
+	// The target's block settings refuse only once neither side is busy.
+	blocked := l.tradeBlockRefusal(live, target)
+	switch l.tradeBook().RequestUnless(live.ObjectID(), target.ObjectID(), blocked != 0).Status {
 	case tradebook.RequestRequesterBusy:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAlreadyTrading))
 		return
 	case tradebook.RequestTargetBusy:
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.Name))
 		return
+	case tradebook.RequestRefused:
+		live.SendFrame(serverpackets.FrameSystemMessageString(blocked, target.Name))
+		return
 	}
 
 	target.SendFrame(serverpackets.FrameSendTradeRequest(live.ObjectID()))
 	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageRequestS1ForTrade, target.Name))
+}
+
+// tradeBlockRefusal is the system message refusing live's trade request
+// because target blocks everything or has live on its block list, or 0 when
+// target's block settings let the request through.
+func (l *GameClientLink) tradeBlockRefusal(live, target *livePlayer) int {
+	switch {
+	case target.BlockingAll():
+		return serverpackets.SystemMessageS1BlockedEverything
+	case l.relations != nil && l.relations.IsBlocked(target.ObjectID(), live.ObjectID()):
+		return serverpackets.SystemMessageS1HasAddedYouToIgnoreList
+	default:
+		return 0
+	}
 }
 
 func (l *GameClientLink) handleAnswerTradeRequest(live *livePlayer, req clientpackets.AnswerTradeRequest) {
