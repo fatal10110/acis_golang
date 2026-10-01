@@ -80,16 +80,16 @@ func (l *GameClientLink) livePlayerByName(name string) (*livePlayer, bool) {
 // requestJoinParty invites the named player into live's party, or into a
 // new one live will lead.
 //
-// The block-list, hidden-target, offline-mode and jail refusals wait for
-// the systems that own them (#3159), the Olympiad one for the Olympiad
-// (#3160).
+// An invisible target is refused as the wrong target. The block-list,
+// offline-mode and jail refusals wait for the systems that own them
+// (#3159), the Olympiad one for the Olympiad (#3160).
 func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.RequestJoinParty) {
 	target, ok := l.livePlayerByName(req.Target)
 	if !ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageFirstSelectUserToInviteToParty))
 		return
 	}
-	if target.ObjectID() == live.ObjectID() || target.CursedWeaponEquipped() || live.CursedWeaponEquipped() {
+	if target.ObjectID() == live.ObjectID() || target.CursedWeaponEquipped() || live.CursedWeaponEquipped() || target.Invisible() {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouHaveInvitedTheWrongTarget))
 		return
 	}

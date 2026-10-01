@@ -19,6 +19,9 @@ type CharInfoSnapshot struct {
 	// Clan is Character's clan as others see it; Leader and Privileges are
 	// not shown.
 	Clan ClanFields
+	// Hidden tells the viewer to draw Character invisible: it is invisible
+	// and the viewer is no game master.
+	Hidden bool
 }
 
 // FrameCharInfo builds a CharInfo packet for a visible player.
@@ -110,7 +113,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteUint8(boolUint8(c.Running()))
 	w.WriteUint8(boolUint8(c.InCombat()))
 	w.WriteUint8(boolUint8(c.AlikeDead()))
-	w.WriteUint8(0) // invisible
+	w.WriteUint8(boolUint8(s.Hidden))
 	w.WriteUint8(uint8(c.MountType()))
 	w.WriteUint8(uint8(c.OperateType()))
 	cubicIDs := c.CubicIDs()

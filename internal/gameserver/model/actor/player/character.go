@@ -125,6 +125,10 @@ type Character struct {
 	// partyRoom is the party-matching room the character is in; see
 	// character_partyroom.go.
 	partyRoom atomic.Int32
+	// invisible and seesInvisible are the hide state and the game-master
+	// sight past it; see character_invisible.go.
+	invisible     atomic.Bool
+	seesInvisible atomic.Bool
 
 	// KarmaPoints is the persisted karma value. The field is named
 	// KarmaPoints, not Karma, so it doesn't collide with the Karma() method

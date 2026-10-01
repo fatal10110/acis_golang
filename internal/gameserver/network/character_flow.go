@@ -725,6 +725,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
 
 	c.SetCanGiveDamage(access.GiveDamage)
+	c.SetSeesInvisible(access.IsGM)
 	live.attack, live.move, live.combat = attackCtl, moveCtl, combat
 	live.kick = client.Session.Close
 	live.zoneActor = &liveZoneActor{live: live}

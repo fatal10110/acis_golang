@@ -548,10 +548,21 @@ func (a *Actor) SetTeleporting(v bool) bool {
 
 // Knows reports whether target is currently visible to this summon.
 // attackable stays a leaf, so a Combatant is not statically a world object;
-// one that is not on the grid is never known.
+// one that is not on the grid is never known. An invisible player or its
+// summon is known only when the owner is a game master.
 func (a *Actor) Knows(target attackable.Combatant) bool {
 	tracked, ok := target.(world.Tracked)
-	return ok && world.Knows(a, tracked)
+	if !ok || !world.Knows(a, tracked) {
+		return false
+	}
+	return a.ownerSeesInvisible() || !attackable.HiddenActingPlayer(target)
+}
+
+// ownerSeesInvisible reports whether the summon's owner is a game master,
+// whose sight past invisibility the summon shares.
+func (a *Actor) ownerSeesInvisible() bool {
+	owner, ok := a.currentOwner().(interface{ SeesInvisible() bool })
+	return ok && owner.SeesInvisible()
 }
 
 // OwnsOffensiveFollowTicker reports that summon AI already rechecks its

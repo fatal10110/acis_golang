@@ -533,10 +533,14 @@ func (c *Character) Position() (int, int, int) {
 
 // Knows reports whether target is visible to this player.
 // attackable stays a leaf, so a Combatant is not statically a world object;
-// one that is not on the grid is never known.
+// one that is not on the grid is never known. Only a game master knows an
+// invisible player or its summon.
 func (c *Character) Knows(target attackable.Combatant) bool {
 	tracked, ok := target.(world.Tracked)
-	return ok && world.Knows(c, tracked)
+	if !ok || !world.Knows(c, tracked) {
+		return false
+	}
+	return c.SeesInvisible() || !attackable.HiddenActingPlayer(target)
 }
 
 // CanSee reports whether target is visible to this player: a geodata

@@ -1059,10 +1059,11 @@ func (h *Hostile) OutOfControl() bool {
 
 // Knows reports whether target is currently visible to this NPC.
 // attackable stays a leaf, so a Combatant is not statically a world object;
-// one that is not on the grid is never known.
+// one that is not on the grid is never known, nor is an invisible player
+// or its summon.
 func (h *Hostile) Knows(target attackable.Combatant) bool {
 	tracked, ok := target.(world.Tracked)
-	return ok && world.Knows(h, tracked)
+	return ok && world.Knows(h, tracked) && !attackable.HiddenActingPlayer(target)
 }
 
 // PhysicalAttackRange returns this NPC's melee attack range.
