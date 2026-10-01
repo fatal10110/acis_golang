@@ -76,6 +76,7 @@ func cpRecoveryWorldAt(t *testing.T, manager arenaManager, adena int32) (*folkWo
 	w.at = location.Location{X: x, Y: y, Z: z}
 	arena := w.srv.SpawnCastingFolkNPCAt(t, folkTemplate(manager.kind, manager.id),
 		location.Location{X: w.at.X + 60, Y: w.at.Y, Z: w.at.Z}, defs)
+	w.settleAI(t)
 	w.onPlayer(t, func(pc *player.Character) { pc.SetCP(0) })
 	drainUntilQuiet(t, w.c)
 	return w, arena
@@ -127,6 +128,18 @@ func (w *folkWorld) tickAI(t *testing.T) [][]byte {
 		t.Fatalf("AI.Tick() = %v", err)
 	}
 	return drainFrames(t, w.c)
+}
+
+// settleAI runs one full three-tick AI cycle, dropping what it shows: a
+// civilian NPC spawned just before has lived past the first tick its AI
+// acts on nothing on, gone idle to its walk stance unless it walks a route
+// (NpcAI.runAI), and meets the decay of a desire queued next on its third
+// tick, as on a server that has run for a while.
+func (w *folkWorld) settleAI(t *testing.T) {
+	t.Helper()
+	for range 3 {
+		w.tickAI(t)
+	}
 }
 
 func textParam(s string) []byte {

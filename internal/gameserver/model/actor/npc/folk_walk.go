@@ -16,7 +16,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// FolkMovement is what a route-walking civilian NPC moves with. A civilian
+// FolkMovement is what a civilian NPC that can move moves with: along its
+// route, if it has one, and toward the target of a cast desire. A civilian
 // NPC given none stands where it spawned.
 type FolkMovement struct {
 	Geo   move.Geo
@@ -37,7 +38,8 @@ type FolkMovement struct {
 	// streak restarts from zero; zero keeps DefaultMaxGeoPathFailCount.
 	MaxGeoPathFailCount int
 	// Control receives event.Arrived, on Queue, each time a walk reaches
-	// its destination, after the NPC's position settles there.
+	// its destination, after the NPC's position settles there, and
+	// event.Died when the NPC dies; nil for none.
 	Control event.Sink
 	// Route is the route walk the NPC steps off while it acts on a cast
 	// desire, and back onto once none outweighs the walk; nil for none.
@@ -53,7 +55,7 @@ type FolkRoute interface {
 	ResumeRoute(task.WalkerActor) error
 }
 
-// folkMotion is a walking civilian NPC's movement: the moving actor its
+// folkMotion is a movable civilian NPC's movement: the moving actor its
 // controller drives and the sink of that controller's events.
 type folkMotion struct {
 	*Folk

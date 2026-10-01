@@ -42,12 +42,14 @@ type blindGeo struct{ gameservertest.Geo }
 func (blindGeo) CanSeeActor(int, int, int, float64, int, int, int, float64) bool { return false }
 
 // spawnCastingWalker spawns the fixture route walker at at, in walk
-// stance, with the cast runtime over skills, walking a route over nodes.
+// stance, with the cast runtime over skills, walking a route over nodes,
+// and settles its AI.
 func (w *folkWorld) spawnCastingWalker(t *testing.T, at location.Location, skills *modelskill.Table, nodes ...route.WalkerLocation) *npc.Folk {
 	t.Helper()
 	f, _ := w.srv.SpawnRouteFolkNPC(t, gameservertest.RouteFolkSpawn{
 		Template: walkerTemplate(), At: at, Routes: walkerRoute(nodes...), WalkMode: true, Skills: skills,
 	})
+	w.settleAI(t)
 	return f
 }
 
@@ -173,6 +175,7 @@ func TestRouteWalkerFolkFollowsCastTargetOutOfSight(t *testing.T) {
 		Routes: walkerRoute(route.WalkerLocation{Location: a, DelayMillis: int(nodeDelay / time.Millisecond)}, route.WalkerLocation{Location: b}),
 		Geo:    blindGeo{},
 	})
+	w.settleAI(t)
 	w.srv.AdvanceUntil(t, "walker standing on its delayed node", standingOn(f, a))
 	drainUntilQuiet(t, w.c)
 

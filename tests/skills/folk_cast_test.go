@@ -18,7 +18,8 @@ const (
 )
 
 // bootFolkCaster brings a player in next to a civilian NPC with the
-// production cast runtime over defs, the AI task driven by hand.
+// production cast runtime over defs, the AI task driven by hand and
+// settled.
 func bootFolkCaster(t *testing.T, defs []modelskill.Definition) (*gameservertest.Server, int32, *npc.Folk) {
 	t.Helper()
 	srv := gameservertest.Boot(t,
@@ -31,6 +32,7 @@ func bootFolkCaster(t *testing.T, defs []modelskill.Definition) (*gameservertest
 	x, y, z := srv.PlayerPosition(t, objID)
 	folk := srv.SpawnCastingFolkNPCAt(t, gameservertest.FolkTemplate("Folk", 30100),
 		location.Location{X: x + 40, Y: y, Z: z}, modelskill.NewTable(defs))
+	settleAI(t, srv)
 	drainUntilQuiet(t, c)
 	return srv, objID, folk
 }
@@ -54,6 +56,17 @@ func tickAI(t *testing.T, srv *gameservertest.Server) [][]byte {
 		t.Fatalf("AI.Tick() = %v", err)
 	}
 	return readUntilQuiet(t, srv.Client)
+}
+
+// settleAI runs one full three-tick AI cycle, dropping what it shows: a
+// civilian NPC spawned just before has lived past the first tick its AI
+// acts on nothing on and gone idle to its walk stance (NpcAI.runAI), as on
+// a server that has run for a while.
+func settleAI(t *testing.T, srv *gameservertest.Server) {
+	t.Helper()
+	for range 3 {
+		tickAI(t, srv)
+	}
 }
 
 // TestFolkAuraCastLandsOnPlayersOnly pins TargetAura.java for a live Folk

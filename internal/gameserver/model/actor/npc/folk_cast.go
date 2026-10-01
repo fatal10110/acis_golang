@@ -28,10 +28,10 @@ type FolkCastAI interface {
 	CanDesire(target attackable.Combatant, ref modelskill.Ref) bool
 }
 
-// FolkAI is the AI task a civilian NPC ticks on while it holds cast
-// desires: once a second, on its own queue, while its region is active.
+// FolkAI is the AI task a civilian NPC ticks on from its spawn: once a
+// second, on its own queue, while its region is active. The NPC leaves it
+// when it dies.
 type FolkAI interface {
-	Add(task.AIActor)
 	Remove(task.AIActor)
 }
 
@@ -44,10 +44,10 @@ const castDesireDecay = 66000
 // takes it off the route.
 const routeDesireWeight = 1_000_000
 
-// folkCast is a civilian NPC's cast runtime: the controller its casts run
-// on and the desires its AI picks them from. The controller is set once
-// before the NPC is published; desires is safe for concurrent use; step
-// belongs to the NPC's queue.
+// folkCast is a civilian NPC's AI and cast runtime: the controller its
+// casts run on and the desires its AI picks them from. The controller is
+// set once before the NPC is published; desires is safe for concurrent
+// use; step, lifeTime, acting and offRoute belong to the NPC's queue.
 type folkCast struct {
 	control CastControl
 	castAI  FolkCastAI
@@ -55,8 +55,14 @@ type folkCast struct {
 
 	desires *ai.DesireQueue
 	step    int
+	// lifeTime counts the AI ticks the NPC has lived through. Its AI acts
+	// on nothing, and does not idle, before the first one is over.
+	lifeTime int
+	// acting marks an NPC whose AI last acted on a cast desire rather than
+	// going idle; the AI idles it at once when its desires run out.
+	acting bool
 	// offRoute marks a route walker its AI took off its route to act on a
-	// cast desire; it stays on the AI task until it is back on it.
+	// cast desire, until it is back on it.
 	offRoute bool
 
 	// currentMu guards current, the cast desire the AI last acted on (nil
@@ -84,7 +90,7 @@ func (f *Folk) CastControl() CastControl { return f.cast.control }
 // command or script asks an NPC: a skill still in reuse, or one whose hit
 // f cannot pay, is refused, and an equal desire already queued gains the
 // weight instead. f's AI starts the cast on its next tick, closing in
-// first when target is out of the skill's range.
+// first when target is out of the skill's range or out of its sight.
 func (f *Folk) AddCastDesire(target attackable.Combatant, ref modelskill.Ref, weight float64) {
 	if target == nil || f.cast.castAI == nil || f.queue == nil {
 		return
@@ -102,15 +108,12 @@ func (f *Folk) AddCastDesire(target attackable.Combatant, ref modelskill.Ref, we
 			Kind: ai.IntentionCast, FinalTarget: final, Skill: ref,
 			MoveToTarget: true, Weight: weight, QueuedAt: f.now(),
 		})
-		if f.cast.ai != nil {
-			f.cast.ai.Add(f)
-		}
 	})
 }
 
-// AbortCast stops f's cast in flight, observers seeing it canceled, and
-// drops every desire it holds, leaving its AI idle: what a death or a
-// despawn does to the NPC's casting.
+// AbortCast stops f's cast in flight, observers seeing it canceled, drops
+// every desire it holds and takes it off the AI task, its lifetime over:
+// what a death or a despawn does to the NPC's AI.
 func (f *Folk) AbortCast() {
 	f.StopCast()
 	if f.queue == nil {
@@ -119,7 +122,7 @@ func (f *Folk) AbortCast() {
 	f.queue.Post(func() {
 		f.cast.desires.Clear()
 		f.setCurrentDesire(nil)
-		f.cast.offRoute = false
+		f.cast.offRoute, f.cast.acting, f.cast.lifeTime = false, false, 0
 		if f.cast.ai != nil {
 			f.cast.ai.Remove(f)
 		}
@@ -130,13 +133,21 @@ func (f *Folk) AbortCast() {
 func (f *Folk) Tick() {}
 
 // TickThink runs one AI tick on f's queue: invalid cast desires are
-// dropped, the heaviest one left is acted on unless a cast is in flight,
-// and every third tick the cast desires lose weight, an NPC still acting on
-// one switching to its run stance. An NPC with no desire left leaves the AI
-// task once back on its route.
+// dropped and the heaviest one left is acted on unless a cast is in
+// flight; an NPC with no desire left and no cast in flight idles, unless it
+// walks a route; and every third tick the cast desires lose weight, an NPC
+// still acting on one switching to its run stance. A dead NPC's tick does
+// nothing.
 func (f *Folk) TickThink() error {
+	if f.Dead() {
+		return nil
+	}
 	f.runAI()
+	if f.cast.desires.Len() == 0 && f.cast.lifeTime > 0 && !f.CastingNow() && !f.walksRoute() {
+		f.thinkIdle()
+	}
 	f.cast.step++
+	f.cast.lifeTime++
 	if f.cast.step%3 == 0 {
 		f.cast.desires.DecreaseWeightByType(ai.IntentionCast, castDesireDecay)
 		if f.currentDesire() != nil {
@@ -144,40 +155,53 @@ func (f *Folk) TickThink() error {
 		}
 		f.cast.step = 0
 	}
-	if f.cast.desires.Len() == 0 && !f.CastingNow() && !f.cast.offRoute && f.cast.ai != nil {
-		f.setCurrentDesire(nil)
-		f.cast.ai.Remove(f)
-	}
 	return nil
 }
 
-// runAI prunes f's cast desires and, when f is not casting, acts on the
-// heaviest one; a route walker acts on it only when it outweighs the walk,
-// and otherwise goes back to its route.
+// runAI prunes f's cast desires and, once f has lived through an AI tick
+// and is not casting, acts on the heaviest one. A route walker acts on it
+// only when it outweighs the walk, and otherwise goes back to its route;
+// any other NPC that just ran out of desires idles.
 func (f *Folk) runAI() {
-	castAI := f.cast.castAI
-	if castAI == nil {
-		return
+	if castAI := f.cast.castAI; castAI != nil {
+		f.cast.desires.RemoveIf(func(d *ai.Desire) bool {
+			if d.Kind == ai.IntentionCast && (d.Weight <= 0 || !castAI.MeetsHPMPDisabled(d.FinalTarget, d.Skill)) {
+				return true
+			}
+			return d.FinalTarget != nil && (!f.Knows(d.FinalTarget) || d.FinalTarget.AlikeDead())
+		})
 	}
-	f.cast.desires.RemoveIf(func(d *ai.Desire) bool {
-		if d.Kind == ai.IntentionCast && (d.Weight <= 0 || !castAI.MeetsHPMPDisabled(d.FinalTarget, d.Skill)) {
-			return true
-		}
-		return d.FinalTarget != nil && (!f.Knows(d.FinalTarget) || d.FinalTarget.AlikeDead())
-	})
-	if f.denyAIAction() || f.CastingNow() {
+	if f.denyAIAction() || f.CastingNow() || f.cast.lifeTime == 0 {
 		return
 	}
 	f.cancelFollow()
 	desire, ok := f.cast.desires.Peek()
+	if !ok && !f.walksRoute() {
+		f.setCurrentDesire(nil)
+		if f.cast.acting {
+			f.cast.acting = false
+			f.thinkIdle()
+		}
+		return
+	}
 	if !ok || (f.walksRoute() && desire.Weight <= routeDesireWeight) {
 		f.setCurrentDesire(nil)
+		f.cast.acting = false
 		f.backOnRoute()
 		return
 	}
 	f.leaveRoute()
 	f.setCurrentDesire(desire)
+	f.cast.acting = true
 	f.thinkCast(desire)
+}
+
+// thinkIdle is what an NPC with nothing left to do does: it stops any walk
+// and cast, and switches to its walk stance.
+func (f *Folk) thinkIdle() {
+	f.stopMoving()
+	f.StopCast()
+	f.forceWalkStance()
 }
 
 // walksRoute reports whether f walks a route.
