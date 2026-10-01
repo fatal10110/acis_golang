@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
@@ -113,4 +114,31 @@ func TestHeldCollarResumedWhileTeleportingGoesIdle(t *testing.T) {
 		t.Fatalf("after the teleport cleared = opcodes %x, want none", frameOpcodes(frames))
 	}
 	assertCollarRefusedUnspent(t, h, mpBefore, "the held collar resumed while teleporting")
+}
+
+// TestHeldCollarDroppedByTeleport: a real teleport idles the AI, which drops
+// the collar cast held behind a stand-up (CreatureAI.onEvtTeleported ->
+// doIdleIntention, whose prepareIntention clears the next intention,
+// CreatureAI.java:90-93, PlayableAI.java:31-40). After Appearing and the
+// stand-up's end, no cast starts, no pet comes, and nothing is spent.
+func TestHeldCollarDroppedByTeleport(t *testing.T) {
+	t.Parallel()
+	h := bootPostureCollar(t)
+	mpBefore := h.srv.PlayerCurrentMP(t, h.ownerID)
+	startOwnerStandUp(t, h)
+
+	h.client.Send(encodeUseItem(h.collarID, false))
+	assertHeldCollar(t, h, readImmediate(h.client), "collar mid stand-up")
+
+	x, y, z := h.srv.PlayerPosition(t, h.ownerID)
+	h.character(t).TeleportTo(x+300, y, z, 0)
+	readUntilOpcode(t, h.client, serverpackets.OpcodeTeleportToLocation, "owner TeleportToLocation")
+	h.client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	h.srv.SettlePosture(t, h.ownerID)
+	for _, frame := range drainFrames(t, h.client) {
+		if frame[0] == serverpackets.OpcodeMagicSkillUse {
+			t.Fatal("held collar cast started after the teleport")
+		}
+	}
+	assertCollarRefusedUnspent(t, h, mpBefore, "the held collar across a teleport")
 }

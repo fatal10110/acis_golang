@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -142,5 +143,36 @@ func TestHeldItemSkillCastResumedWhileTeleportingGoesIdle(t *testing.T) {
 	// The held cast went idle: clearing the teleport does not revive it.
 	live.SetTeleporting(false)
 	assertNoFrameFor(t, c, 300*time.Millisecond, "after the teleport cleared")
+	assertItemCount(t, srv, objID, scroll, 3)
+}
+
+// TestHeldItemSkillCastDroppedByTeleport: a real teleport idles the AI, which
+// drops the cast held behind a stand-up (CreatureAI.onEvtTeleported ->
+// doIdleIntention, whose prepareIntention clears the next intention,
+// CreatureAI.java:90-93, PlayableAI.java:31-40). After Appearing and the
+// stand-up's end, the scroll never casts and is kept.
+func TestHeldItemSkillCastDroppedByTeleport(t *testing.T) {
+	t.Parallel()
+	srv, objID, scroll := bootDenyAICaster(t)
+	if !srv.DrivesClock() {
+		t.Skip("holding a stand-up open needs the driven clock")
+	}
+	c := srv.Client
+	sitAndSettle(t, srv)
+	standUp(t, c)
+	c.Send(encodeUseItem(scroll, false))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "held item cast")
+
+	x, y, z := srv.PlayerPosition(t, objID)
+	onlineLivePlayer(t, srv, objID).TeleportTo(x+300, y, z, 0)
+	readUntilOpcode(t, c, serverpackets.OpcodeTeleportToLocation)
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	srv.Advance(t, sitStandDelay)
+	if seen := opcodesUntilQuiet(t, c); seen[serverpackets.OpcodeMagicSkillUse] != 0 {
+		t.Fatal("held item cast started after the teleport")
+	}
+	if srv.PlayerCastingNow(t, objID) {
+		t.Fatal("held item cast in flight after the teleport")
+	}
 	assertItemCount(t, srv, objID, scroll, 3)
 }
