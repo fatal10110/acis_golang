@@ -1,6 +1,7 @@
 package npc
 
 import (
+	"errors"
 	"math"
 	"math/rand"
 	"sync"
@@ -54,11 +55,13 @@ type folkCombat struct {
 }
 
 // FolkRuntime is what a civilian NPC needs to take part in combat beyond
-// its template. A nil dependency leaves the matching behavior off: no queue
-// means nothing regenerates the NPC or ticks its effects, no sink shows its
-// changes to nobody, and no world leaves it knowing nobody.
+// its template. Queue is required: the regeneration and attack-stance tasks
+// post to the queue of every NPC they track. A nil Sink shows the NPC's
+// changes to nobody, and a nil World leaves it knowing nobody.
 type FolkRuntime struct {
 	World *world.State
+	// Queue is the NPC's own queue its regeneration, effects and stance
+	// expiry run on.
 	Queue *sim.Queue
 	Sink  event.Sink
 	// Effects is the server's effect-list context.
@@ -86,14 +89,19 @@ func (f *Folk) initCombat(mods []effect.Mod) {
 	f.hpBar.Calibrate(float64(f.MaxHP()))
 }
 
-// Attach installs rt. Call it once, before the NPC is published.
-func (f *Folk) Attach(rt FolkRuntime) {
+// Attach installs rt. Call it once, before the NPC is published. It
+// refuses a runtime without a queue.
+func (f *Folk) Attach(rt FolkRuntime) error {
+	if rt.Queue == nil {
+		return errors.New("npc: folk runtime needs a queue")
+	}
 	f.world, f.queue, f.sink = rt.World, rt.Queue, rt.Sink
 	if rt.MaxBuffsAmount > 0 {
 		f.maxBuffs.Store(int32(rt.MaxBuffsAmount))
 	}
 	f.effects = effect.NewList(f, effect.WithEnv(rt.Effects), effect.WithAdmission(folkAdmits))
 	f.effects.SetQueue(rt.Queue)
+	return nil
 }
 
 // Queue returns the queue the NPC's regeneration and effects run on.

@@ -59,7 +59,9 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 	if s.NewSink != nil {
 		rt.Sink = s.NewSink(f)
 	}
-	f.Attach(rt)
+	if err := f.Attach(rt); err != nil {
+		return nil, err
+	}
 	alias := inst.Template.Alias
 	if s.Walker == nil || alias == "" || !s.Walker.HasRoute(alias, alias) {
 		s.State.Spawn(f, loc.X, loc.Y, loc.Z, heading)

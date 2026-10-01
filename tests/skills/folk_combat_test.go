@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -33,15 +34,15 @@ func folkNuke(power int) modelskill.Definition {
 
 // folkCaster boots a caster knowing def, in world, with a merchant spawned
 // dx units east of it and selected. It returns the merchant's max HP as
-// its selection reported it.
-func folkCaster(t *testing.T, def modelskill.Definition, dx int) (srv *gameservertest.Server, c *testsupport.ScriptedClient, objID int32, origin location.Location, folk *npc.Folk, maxHP int) {
+// its selection reported it. opts apply after the defaults.
+func folkCaster(t *testing.T, def modelskill.Definition, dx int, opts ...gameservertest.Option) (srv *gameservertest.Server, c *testsupport.ScriptedClient, objID int32, origin location.Location, folk *npc.Folk, maxHP int) {
 	t.Helper()
-	srv = gameservertest.Boot(t,
+	srv = gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{def})),
 		gameservertest.WithAttackStanceClock(time.Now),
-	)
+	}, opts...)...)
 	c, objID = srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, int(def.ID), def.Level)
 	startInWorld(t, c)
@@ -169,5 +170,172 @@ func TestHelpfulSkillOnFolkLandsWithoutPvPFlag(t *testing.T) {
 	}
 	if flag := obj.(interface{ PvPFlagState() task.PvPFlagState }).PvPFlagState(); flag != task.PvPFlagNone {
 		t.Fatalf("caster PvP flag after buffing a civilian NPC = %v, want none", flag)
+	}
+}
+
+// TestFolkAttackStanceExpiryShowsAutoAttackStop pins the end of a hit
+// civilian NPC's attack stance (AttackStanceTaskManager expiry ->
+// Creature.broadcastPacket(AutoAttackStop)): once the stance period passes
+// with no new hit, the player watching it reads AutoAttackStop for the NPC
+// and the NPC leaves combat.
+func TestFolkAttackStanceExpiryShowsAutoAttackStop(t *testing.T) {
+	t.Parallel()
+	var nowMS atomic.Int64
+	nowMS.Store(time.Now().UnixMilli())
+	clock := func() time.Time { return time.UnixMilli(nowMS.Load()) }
+	srv, c, objID, _, folk, maxHP := folkCaster(t, folkNuke(1), 40, gameservertest.WithAttackStanceClock(clock))
+
+	c.Send(encodeRequestMagicSkillUse(folkNukeID, true, false))
+	readCastStartFrames(t, c, objID, folkNukeID, 1, 500, 60_000, folk.ObjectID())
+	srv.AdvanceUntil(t, "the nuke landing", func() bool { return folk.CurrentHP() < maxHP })
+	if log := readFrameLog(c); log.index(objectFrame(serverpackets.OpcodeAutoAttackStart, folk.ObjectID())) < 0 {
+		t.Fatal("the hit merchant showed no AutoAttackStart")
+	}
+	if !folk.InCombat() {
+		t.Fatal("the hit merchant is not in combat")
+	}
+
+	nowMS.Add((task.AttackStancePeriod + time.Second).Milliseconds())
+	if err := srv.AttackStance.Tick(); err != nil {
+		t.Fatalf("AttackStance.Tick() = %v", err)
+	}
+	srv.Settle(t)
+	if log := readFrameLog(c); log.index(objectFrame(serverpackets.OpcodeAutoAttackStop, folk.ObjectID())) < 0 {
+		t.Fatal("the merchant's attack stance expired without an AutoAttackStop")
+	}
+	if folk.InCombat() {
+		t.Fatal("the merchant is still in combat after its stance expired")
+	}
+}
+
+// landOnFolk lands an effect of skill id built from tmpl on folk, on the
+// NPC's own queue.
+func landOnFolk(t *testing.T, folk *npc.Folk, id int, tmpl modelskill.EffectTemplate) {
+	t.Helper()
+	e, err := effect.New(effect.Skill{ID: modelskill.ID(id), Level: 1}, tmpl)
+	if err != nil {
+		t.Fatalf("effect.New(%s): %v", tmpl.Name, err)
+	}
+	e.Effector, e.Effected = folk, folk
+	done := make(chan struct{})
+	if !folk.Queue().Post(func() { folk.EffectList().Add(e); close(done) }) {
+		t.Fatal("post to merchant queue: queue closed")
+	}
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("effect add on the merchant's queue did not complete")
+	}
+	held := false
+	for _, h := range folk.EffectList().All() {
+		held = held || h == e
+	}
+	if !held {
+		t.Fatalf("merchant does not hold the %s effect of skill %d", tmpl.Name, id)
+	}
+}
+
+// folkFrames returns the frames among log that name objID with opcode.
+func folkFrames(log frameLog, opcode byte, objID int32) frameLog {
+	var out frameLog
+	match := objectFrame(opcode, objID)
+	for _, frame := range log {
+		if match(frame) {
+			out = append(out, frame)
+		}
+	}
+	return out
+}
+
+// TestFolkStatBuffBroadcast pins how a civilian NPC shows a buff's stat
+// change (Creature.broadcastModifiedStats): attack and casting speed go out
+// in one StatusUpdate with no MAX_HP, which only an Attackable sends; a
+// max-HP change alone sends nothing; a run-speed change sends the NPC's
+// whole info instead of a StatusUpdate, NpcInfo when it can move and
+// ServerObjectInfo when its move speed is 0.
+func TestFolkStatBuffBroadcast(t *testing.T) {
+	t.Parallel()
+	srv, c, objID, _, folk, _ := folkCaster(t, folkNuke(1), 40)
+	x, y, z := srv.PlayerPosition(t, objID)
+	still := gameservertest.FolkTemplate("Merchant", 30002)
+	still.RunSpeed, still.WalkSpeed = 0, 0
+	statue := srv.SpawnFolkNPCAt(t, still, location.Location{X: x - 40, Y: y, Z: z})
+	drainUntilQuiet(t, c)
+	baseAtk, baseCast := folk.AttackSpeed(), folk.MagicAttackSpeed()
+
+	// Attack and casting speed: one StatusUpdate with both, and no MAX_HP.
+	landOnFolk(t, folk, 1086, modelskill.EffectTemplate{
+		Name: "Buff", Time: 60, Count: 1, Icon: true, StackType: "speed_both", StackOrder: 1,
+		Funcs: []modelskill.FuncTemplate{
+			{Op: modelskill.FuncMul, Stat: "pAtkSpd", Value: 1.2},
+			{Op: modelskill.FuncMul, Stat: "mAtkSpd", Value: 1.2},
+		},
+	})
+	log := readFrameLog(c)
+	if folk.AttackSpeed() == baseAtk || folk.MagicAttackSpeed() == baseCast {
+		t.Fatalf("speeds after the buff = %d/%d, want both raised from %d/%d", folk.AttackSpeed(), folk.MagicAttackSpeed(), baseAtk, baseCast)
+	}
+	su := speedStatusUpdatesOf(log, folk.ObjectID())
+	if len(su) != 1 || su[0].attrs[statusAtkSpd] != int32(folk.AttackSpeed()) || su[0].attrs[statusCastSpd] != int32(folk.MagicAttackSpeed()) {
+		t.Fatalf("speed StatusUpdates of the merchant = %+v, want one with ATK_SPD %d and CAST_SPD %d", su, folk.AttackSpeed(), folk.MagicAttackSpeed())
+	}
+	assertNoFolkMaxHP(t, log, folk.ObjectID())
+	if got := folkFrames(log, serverpackets.OpcodeNPCInfo, folk.ObjectID()); len(got) != 0 {
+		t.Fatalf("an attack-speed buff sent %d NpcInfo frames of the merchant, want none", len(got))
+	}
+
+	// Max HP alone: nothing.
+	landOnFolk(t, folk, 1045, modelskill.EffectTemplate{
+		Name: "Buff", Time: 60, Count: 1, Icon: true, StackType: "max_hp_up", StackOrder: 1,
+		Funcs: []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "maxHp", Value: 500}},
+	})
+	log = readFrameLog(c)
+	if got := folkFrames(log, serverpackets.OpcodeStatusUpdate, folk.ObjectID()); len(got) != 0 {
+		t.Fatalf("a max-HP buff sent %d StatusUpdates of the merchant, want none", len(got))
+	}
+	if got := folkFrames(log, serverpackets.OpcodeNPCInfo, folk.ObjectID()); len(got) != 0 {
+		t.Fatalf("a max-HP buff sent %d NpcInfo frames of the merchant, want none", len(got))
+	}
+
+	// Run speed on a moving NPC: NpcInfo, no StatusUpdate.
+	runSpeed := modelskill.EffectTemplate{
+		Name: "Buff", Time: 60, Count: 1, Icon: true, StackType: "speed_up", StackOrder: 1,
+		Funcs: []modelskill.FuncTemplate{{Op: modelskill.FuncMul, Stat: "runSpd", Value: 1.5}},
+	}
+	landOnFolk(t, folk, 1204, runSpeed)
+	log = readFrameLog(c)
+	if got := folkFrames(log, serverpackets.OpcodeNPCInfo, folk.ObjectID()); len(got) != 1 {
+		t.Fatalf("a run-speed buff sent %d NpcInfo frames of the merchant, want 1", len(got))
+	}
+	if got := folkFrames(log, serverpackets.OpcodeServerObjectInfo, folk.ObjectID()); len(got) != 0 {
+		t.Fatalf("a run-speed buff on a moving merchant sent %d ServerObjectInfo frames, want none", len(got))
+	}
+	if got := folkFrames(log, serverpackets.OpcodeStatusUpdate, folk.ObjectID()); len(got) != 0 {
+		t.Fatalf("a run-speed buff sent %d StatusUpdates of the merchant, want none", len(got))
+	}
+
+	// Run speed on an NPC whose move speed is 0: ServerObjectInfo.
+	if statue.MoveSpeed() != 0 {
+		t.Fatalf("still merchant move speed = %v, want 0", statue.MoveSpeed())
+	}
+	landOnFolk(t, statue, 1204, runSpeed)
+	log = readFrameLog(c)
+	if got := folkFrames(log, serverpackets.OpcodeServerObjectInfo, statue.ObjectID()); len(got) != 1 {
+		t.Fatalf("a run-speed buff on a still merchant sent %d ServerObjectInfo frames, want 1", len(got))
+	}
+	if got := folkFrames(log, serverpackets.OpcodeNPCInfo, statue.ObjectID()); len(got) != 0 {
+		t.Fatalf("a run-speed buff on a still merchant sent %d NpcInfo frames, want none", len(got))
+	}
+}
+
+// assertNoFolkMaxHP fails when log carries a StatusUpdate of objID with
+// MAX_HP.
+func assertNoFolkMaxHP(t *testing.T, log frameLog, objID int32) {
+	t.Helper()
+	if i := log.index(func(frame []byte) bool {
+		_, ok := statusValue(frame, objID, serverpackets.StatusMaxHP)
+		return ok
+	}); i >= 0 {
+		t.Fatalf("frame %d is a StatusUpdate of the civilian NPC with MAX_HP, which only an Attackable sends", i)
 	}
 }
