@@ -1544,3 +1544,39 @@ func TestDecodeRequestPreviewItem(t *testing.T) {
 		t.Fatalf("missing row: err = %v, want a short packet", err)
 	}
 }
+
+// TestDecodeSymbolMakerRequests pins the six symbol maker requests: one
+// little-endian int32 each after the opcode, a symbol id for the four that
+// name one; a payload short of it is an error.
+func TestDecodeSymbolMakerRequests(t *testing.T) {
+	id := []byte{0x07, 0x00, 0x00, 0x00}
+	for _, tc := range []struct {
+		name   string
+		decode func([]byte) (RequestHennaSymbol, error)
+		opcode byte
+	}{
+		{"RequestHennaItemInfo", DecodeRequestHennaItemInfo, OpcodeRequestHennaItemInfo},
+		{"RequestHennaEquip", DecodeRequestHennaEquip, OpcodeRequestHennaEquip},
+		{"RequestHennaUnequipInfo", DecodeRequestHennaUnequipInfo, OpcodeRequestHennaUnequipInfo},
+		{"RequestHennaUnequip", DecodeRequestHennaUnequip, OpcodeRequestHennaUnequip},
+	} {
+		if got, err := tc.decode(append([]byte{tc.opcode}, id...)); err != nil || got.SymbolID != 7 {
+			t.Fatalf("%s = %+v, %v; want symbol 7", tc.name, got, err)
+		}
+		if _, err := tc.decode([]byte{tc.opcode, 7, 0}); err == nil {
+			t.Fatalf("%s: want error on short payload", tc.name)
+		}
+	}
+	if _, err := DecodeRequestHennaItemList(append([]byte{OpcodeRequestHennaItemList}, id...)); err != nil {
+		t.Fatalf("DecodeRequestHennaItemList: %v", err)
+	}
+	if _, err := DecodeRequestHennaUnequipList(append([]byte{OpcodeRequestHennaUnequipList}, id...)); err != nil {
+		t.Fatalf("DecodeRequestHennaUnequipList: %v", err)
+	}
+	if _, err := DecodeRequestHennaItemList([]byte{OpcodeRequestHennaItemList}); err == nil {
+		t.Fatal("DecodeRequestHennaItemList: want error on short payload")
+	}
+	if _, err := DecodeRequestHennaUnequipList([]byte{OpcodeRequestHennaUnequipList}); err == nil {
+		t.Fatal("DecodeRequestHennaUnequipList: want error on short payload")
+	}
+}

@@ -130,6 +130,12 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0xad: true, // delete a recipe
 		0xae: true, // recipe craft window
 		0xaf: true, // craft a recipe
+		0xba: true, // symbol draw window
+		0xbb: true, // symbol draw details
+		0xbc: true, // draw a symbol
+		0xbd: true, // symbol deletion window
+		0xbe: true, // symbol deletion details
+		0xbf: true, // delete a symbol
 		0xc5: true, // dialog answer
 		0xc6: true, // try on merchant items
 		0xca: true, // game guard reply

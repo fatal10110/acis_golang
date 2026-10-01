@@ -59,6 +59,12 @@ import (
 // answer (an unknown recipe's craft window is a packet with no bytes), and
 // none of them registers a pending client action — the recipe windows only
 // ask again on the next click. tests/items asserts that silence.
+//
+// RequestHennaItemInfo, RequestHennaEquip and RequestHennaUnequipInfo naming
+// an unknown symbol, and RequestHennaUnequip naming a symbol not worn, are
+// absent for the same reason: the reference returns without an answer, and
+// the symbol windows hold no pending action, asking again on the next click.
+// tests/npcs asserts that silence.
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 

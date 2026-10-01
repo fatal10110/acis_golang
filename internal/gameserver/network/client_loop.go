@@ -819,6 +819,78 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.makeRecipeSelf(live, req) })
 			}
 
+		case clientpackets.OpcodeRequestHennaItemList:
+			_, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestHennaItemList)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.sendHennaEquipList(live) })
+			}
+
+		case clientpackets.OpcodeRequestHennaItemInfo:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestHennaItemInfo)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.sendHennaItemInfo(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestHennaEquip:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestHennaEquip)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.drawHenna(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestHennaUnequipList:
+			_, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestHennaUnequipList)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { sendHennaUnequipList(live) })
+			}
+
+		case clientpackets.OpcodeRequestHennaUnequipInfo:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestHennaUnequipInfo)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.sendHennaUnequipInfo(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestHennaUnequip:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestHennaUnequip)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.deleteHenna(live, req) })
+			}
+
 		case clientpackets.OpcodeRequestEnchantItem:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestEnchantItem)
 			if err != nil {

@@ -39,6 +39,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/symbolmaker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -64,6 +65,8 @@ type shortcutStore interface {
 
 type hennaStore interface {
 	ListByOwner(ctx context.Context, ownerID int32) ([]henna.Row, error)
+	Insert(ctx context.Context, ownerID int32, symbolID, slot int) error
+	Delete(ctx context.Context, ownerID int32, slot int) error
 }
 
 // recipeBookStore reads and writes the character_recipebook rows of one
@@ -196,6 +199,7 @@ type GameClientLink struct {
 	recipeBooks   recipeBookStore
 	craft         *craft.Service
 	merchant      *merchant.Service
+	symbols       *symbolmaker.Service
 	templates     *player.TemplateTable
 	itemTemplates *item.Table
 	html          *datacache.HTML
@@ -471,6 +475,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		enchantCfg = *cfg.PlayerConfig.Enchant
 	}
 	link.enchant = enchantflow.NewService(link.enchantState, link.ids, link.rollEnchant, enchantCfg)
+	link.symbols = symbolmaker.NewService(cfg.HennaTable, link.nextObjectID)
 	link.craft = craft.NewService(cfg.Recipes, !cfg.PlayerConfig.CraftingDisabled, link.nextObjectID, cfg.CraftRoll)
 	link.chance = &actorcast.ChanceProcs{Definitions: link.skills, Targets: link.targets, Skills: link.skillHandlers, Deliver: link.deliverChanceCast}
 	if link.zones != nil {

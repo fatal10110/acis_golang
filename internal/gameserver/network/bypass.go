@@ -207,6 +207,10 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		l.showBuyWindow(live, f, reply.ListID)
 	case npc.BypassWearList:
 		l.showWearWindow(live, f, reply.ListID)
+	case npc.BypassHennaDraw:
+		l.sendHennaEquipList(live)
+	case npc.BypassHennaRemoveList:
+		l.openHennaRemoveList(live)
 	case npc.BypassAborted:
 		return false
 	case npc.BypassUnported:

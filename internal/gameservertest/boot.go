@@ -36,6 +36,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -122,6 +123,7 @@ type options struct {
 	wantChars              int
 	enchantRoll            func() float64
 	recipes                *recipe.Table
+	hennas                 *henna.Table
 	craftingDisabled       bool
 	manufactureDelay       time.Duration
 	craftRoll              func(n int) int
@@ -411,6 +413,12 @@ func WithCharacterSex(name string, level, sp int, sex player.Sex) Option {
 // WithShortcutSeed inserts shortcut rows before the client dials.
 func WithShortcutSeed(seed func(*gamesql.ShortcutStore)) Option {
 	return func(o *options) { o.seedShortcuts = seed }
+}
+
+// WithHennaTable boots with hennas as the loaded dye symbol table instead
+// of HennaTemplates.
+func WithHennaTable(hennas *henna.Table) Option {
+	return func(o *options) { o.hennas = hennas }
 }
 
 // WithHennaSeed inserts character_hennas rows (and optional class updates)
@@ -1408,7 +1416,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Items:            items,
 		Shortcuts:        shortcuts,
 		Hennas:           hennas,
-		HennaTable:       HennaTemplates(t),
+		HennaTable:       cmp.Or(o.hennas, HennaTemplates(t)),
 		RecipeBooks:      recipeBooks,
 		Recipes:          cmp.Or(o.recipes, RecipeTemplates()),
 		CraftRoll:        o.craftRoll,

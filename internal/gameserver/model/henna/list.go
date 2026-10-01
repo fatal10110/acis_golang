@@ -177,21 +177,31 @@ func (l *List) BySymbolID(symbolID int) (Henna, bool) {
 	return Henna{}, false
 }
 
-// IsFull reports whether classLevel leaves no empty slot.
-func (l *List) IsFull(classLevel int) bool {
+// Hennas returns the equipped dyes in slot order.
+func (l *List) Hennas() []Henna {
 	if l == nil {
-		return MaxSlots(classLevel) <= 0
+		return nil
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	used := 0
+	var out []Henna
 	for _, h := range l.slots {
 		if h != nil {
-			used++
+			out = append(out, *h)
 		}
 	}
-	empty := MaxSlots(classLevel) - used
-	return empty <= 0
+	return out
+}
+
+// EmptySlots returns how many more dyes classLevel lets the list take,
+// never below zero.
+func (l *List) EmptySlots(classLevel int) int {
+	return max(MaxSlots(classLevel)-len(l.Hennas()), 0)
+}
+
+// IsFull reports whether classLevel leaves no empty slot.
+func (l *List) IsFull(classLevel int) bool {
+	return l.EmptySlots(classLevel) <= 0
 }
 
 // Snapshot builds the HennaInfo payload for classID.
