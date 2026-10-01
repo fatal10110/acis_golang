@@ -3618,6 +3618,14 @@ func TestFrameExShowVariationWindows(t *testing.T) {
 	}
 }
 
+// TestFrameExShowQuestInfo pins the quest information window: writeC(0xfe)
+// then writeH(0x19), nothing more (ExShowQuestInfo.java).
+func TestFrameExShowQuestInfo(t *testing.T) {
+	if got, want := framePayload(t, FrameExShowQuestInfo()), []byte{0xfe, 0x19, 0x00}; !bytes.Equal(got, want) {
+		t.Fatalf("FrameExShowQuestInfo() = %x, want %x", got, want)
+	}
+}
+
 func TestFrameExConfirmVariationItem(t *testing.T) {
 	got := framePayload(t, FrameExConfirmVariationItem(1000))
 	want := []byte{OpcodeExtended}

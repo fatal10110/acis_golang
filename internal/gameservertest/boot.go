@@ -46,6 +46,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -91,6 +92,10 @@ type options struct {
 	karmaPlayerCanTrade    bool
 	admin                  *admin.Data
 	restarts               *restart.Table
+	teleports              travel.TeleportTable
+	instantTeleports       travel.InstantTable
+	freeTeleport           bool
+	teleportClock          func() time.Time
 	zones                  *zone.Index
 	water                  bool
 	waterNow               func() time.Time
@@ -236,6 +241,15 @@ func WithAdmin(data *admin.Data) Option { return func(o *options) { o.admin = da
 // (default: none, so restart requests answer ActionFailed).
 func WithRestartPoints(table *restart.Table) Option {
 	return func(o *options) { o.restarts = table }
+}
+
+// WithTeleports supplies the destinations civilian NPCs offer (default:
+// none), charged for unless free, with the weekend half-price hours read
+// from now (nil means time.Now).
+func WithTeleports(teleports travel.TeleportTable, instants travel.InstantTable, free bool, now func() time.Time) Option {
+	return func(o *options) {
+		o.teleports, o.instantTeleports, o.freeTeleport, o.teleportClock = teleports, instants, free, now
+	}
 }
 
 // WithZones supplies the zone index wired into the link (default: none, so
@@ -1538,6 +1552,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Autosave:         autosave,
 		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight},
 		Restarts:         o.restarts,
+		Teleports:        o.teleports,
+		InstantTeleports: o.instantTeleports,
+		FreeTeleport:     o.freeTeleport,
+		TeleportClock:    o.teleportClock,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),
 		EnchantRoll:      o.enchantRoll,

@@ -13,6 +13,7 @@ const (
 	OpcodeExAutoSoulShot              uint16 = 0x0012
 	OpcodeExEnchantSkillList          uint16 = 0x0017
 	OpcodeExEnchantSkillInfo          uint16 = 0x0018
+	OpcodeExShowQuestInfo             uint16 = 0x0019
 	OpcodeExMailArrived               uint16 = 0x002d
 	OpcodeExStorageMaxCount           uint16 = 0x002e
 	OpcodeExSetCompassZoneCode        uint16 = 0x0032

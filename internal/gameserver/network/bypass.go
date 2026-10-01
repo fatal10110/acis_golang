@@ -5,7 +5,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/gatekeeper"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -230,9 +232,62 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 	case npc.BypassAugmentCancel:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSelectItemToRemoveAugmentation))
 		live.SendFrame(serverpackets.FrameExShowVariationCancelWindow())
+	case npc.BypassReleased:
+		live.SendFrame(serverpackets.FrameActionFailed())
+	case npc.BypassTeleportList:
+		l.showTeleportList(live, f)
+	case npc.BypassTeleport:
+		l.departFromNpc(live, f, command, l.gatekeeper.Teleport(live.Character, f.NpcID(), reply.Index))
+	case npc.BypassInstantTeleport:
+		l.departFromNpc(live, f, command, l.gatekeeper.Instant(f.NpcID(), reply.Index))
+	case npc.BypassQuestInfo:
+		live.SendFrame(serverpackets.FrameExShowQuestInfo())
 	case npc.BypassUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Str("command", command).Msg("bypass: npc dialog command not modeled")
 	case npc.BypassRefused:
 	}
 	return true
+}
+
+// showTeleportList opens f's list of standard destinations. An NPC
+// offering none answers nothing of its own.
+func (l *GameClientLink) showTeleportList(live *livePlayer, f *npc.Folk) {
+	page, ok, unported := l.gatekeeper.Window(f.ObjectID(), f.NpcID(), travel.KindStandard)
+	switch {
+	case unported:
+		l.log.Debug().Int("npc_id", f.NpcID()).Msg("bypass: teleport list priced in ancient adena not modeled")
+	case ok:
+		sendValidatedHTML(live, f.ObjectID(), page, 0)
+	}
+}
+
+// departFromNpc carries out trip, a teleport live asked f for: the payment
+// messages, then the move, then the trip's own ActionFailed.
+func (l *GameClientLink) departFromNpc(live *livePlayer, f *npc.Folk, command string, trip gatekeeper.Trip) {
+	if trip.Unported {
+		l.log.Debug().Int("npc_id", f.NpcID()).Str("command", command).Msg("bypass: teleport priced in ancient adena not modeled")
+		return
+	}
+	for _, n := range trip.Notices {
+		switch n := n.(type) {
+		case gatekeeper.NotEnoughAdena:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena))
+		case gatekeeper.AdenaSpent:
+			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DisappearedAdena, int32(n.Count)))
+		case gatekeeper.NotEnoughItems:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughItems))
+		case gatekeeper.ItemsSpent:
+			if n.Count > 1 {
+				live.SendFrame(serverpackets.FrameSystemMessageItemNameItemNumber(serverpackets.SystemMessageS2S1Disappeared, n.ItemID, int32(n.Count)))
+			} else {
+				live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1Disappeared, n.ItemID))
+			}
+		}
+	}
+	if trip.Depart {
+		l.teleportLivePlayer(live, trip.Destination, gatekeeper.ScatterRadius)
+	}
+	if trip.Release {
+		live.SendFrame(serverpackets.FrameActionFailed())
+	}
 }

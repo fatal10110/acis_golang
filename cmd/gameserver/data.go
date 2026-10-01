@@ -28,6 +28,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/rs/zerolog"
@@ -77,16 +78,20 @@ type gameData struct {
 	Doors         *door.Table
 	Statics       *staticobject.Table
 	Restarts      *restart.Table
-	Admin         *admin.Data
-	Geo           *engine.Engine
-	Finder        *pathfind.Finder
-	Hennas        *henna.Table
-	HealSps       *skill.HealSpsTable
-	Recipes       *recipe.Table
-	BuyLists      *buylist.Table
-	Multisells    *multisell.Table
-	Augmentations *augmentation.Table
-	ArmorSets     *armorset.Table
+	// Teleports and InstantTeleports are the destinations civilian NPCs
+	// offer.
+	Teleports        travel.TeleportTable
+	InstantTeleports travel.InstantTable
+	Admin            *admin.Data
+	Geo              *engine.Engine
+	Finder           *pathfind.Finder
+	Hennas           *henna.Table
+	HealSps          *skill.HealSpsTable
+	Recipes          *recipe.Table
+	BuyLists         *buylist.Table
+	Multisells       *multisell.Table
+	Augmentations    *augmentation.Table
+	ArmorSets        *armorset.Table
 }
 
 type geodata struct {
@@ -161,6 +166,14 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
+	teleports, err := gamexml.LoadTeleports(filepath.Join(xmlRoot, "teleports.xml"))
+	if err != nil {
+		return nil, err
+	}
+	instantTeleports, err := gamexml.LoadInstantTeleports(filepath.Join(xmlRoot, "instantTeleports.xml"))
+	if err != nil {
+		return nil, err
+	}
 	adminData, err := gamexml.LoadAdminData(xmlRoot)
 	if err != nil {
 		return nil, err
@@ -197,32 +210,34 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", npcs.Len()).Int("skills", skills.Len()).Int("hennas", hennas.Len()).Int("heal_sps", healSps.Count()).Int("recipes", recipes.Len()).Int("buylists", buyLists.Len()).Int("multisells", multisells.Count()).Int("augmentation_skills", augmentations.SkillCount()).Int("augmentation_stats", augmentations.StatCount()).Int("armor_sets", armorSets.Len()).Msg("game data loaded")
+	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", npcs.Len()).Int("skills", skills.Len()).Int("hennas", hennas.Len()).Int("heal_sps", healSps.Count()).Int("recipes", recipes.Len()).Int("buylists", buyLists.Len()).Int("multisells", multisells.Count()).Int("augmentation_skills", augmentations.SkillCount()).Int("augmentation_stats", augmentations.StatCount()).Int("armor_sets", armorSets.Len()).Int("teleports", teleports.Count()).Int("instant_teleports", instantTeleports.Count()).Msg("game data loaded")
 	return &gameData{
-		Players:       players,
-		Levels:        levels,
-		Items:         items,
-		Skills:        skills,
-		Trees:         trees,
-		Spellbooks:    spellbooks,
-		CursedWeapons: cursedWeapons,
-		Zones:         zones,
-		Routes:        routes,
-		NPCs:          npcs,
-		SummonItems:   summonItems,
-		Doors:         doors,
-		Statics:       statics,
-		Restarts:      restarts,
-		Admin:         adminData,
-		Geo:           geo.Engine,
-		Finder:        geo.Finder,
-		Hennas:        hennas,
-		HealSps:       healSps,
-		Recipes:       recipes,
-		BuyLists:      buyLists,
-		Multisells:    multisells,
-		Augmentations: augmentations,
-		ArmorSets:     armorSets,
+		Players:          players,
+		Levels:           levels,
+		Items:            items,
+		Skills:           skills,
+		Trees:            trees,
+		Spellbooks:       spellbooks,
+		CursedWeapons:    cursedWeapons,
+		Zones:            zones,
+		Routes:           routes,
+		NPCs:             npcs,
+		SummonItems:      summonItems,
+		Doors:            doors,
+		Statics:          statics,
+		Restarts:         restarts,
+		Teleports:        teleports,
+		InstantTeleports: instantTeleports,
+		Admin:            adminData,
+		Geo:              geo.Engine,
+		Finder:           geo.Finder,
+		Hennas:           hennas,
+		HealSps:          healSps,
+		Recipes:          recipes,
+		BuyLists:         buyLists,
+		Multisells:       multisells,
+		Augmentations:    augmentations,
+		ArmorSets:        armorSets,
 	}, nil
 }
 

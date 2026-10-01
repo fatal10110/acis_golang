@@ -490,6 +490,32 @@ func TestLoadDisableRaidCurseDefaultsToFalse(t *testing.T) {
 	}
 }
 
+// TestLoadFreeTeleport pins npcs.properties FreeTeleport: false when
+// absent or not "true", as read when set.
+func TestLoadFreeTeleport(t *testing.T) {
+	for _, tc := range []struct {
+		name, body string
+		want       freeTeleport
+		wantErr    bool
+	}{
+		{"absent", "", false, false},
+		{"true", "FreeTeleport = True\n", true, false},
+		{"false", "FreeTeleport = False\n", false, false},
+		{"not a boolean", "FreeTeleport = maybe\n", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			configPath := filepath.Join(t.TempDir(), "npcs.properties")
+			if err := os.WriteFile(configPath, []byte(tc.body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			got, err := loadFreeTeleport(gameServerPaths{NpcsConfigPath: configPath})
+			if (err != nil) != tc.wantErr || got != tc.want {
+				t.Fatalf("loadFreeTeleport() = %v, %v; want %v, error %v", got, err, tc.want, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestLoadMaxGeoPathFailCountUsesGeoengineProperties(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "geoengine.properties")
 	if err := os.WriteFile(configPath, []byte("MaxGeopathFailCount = 80\n"), 0o600); err != nil {
