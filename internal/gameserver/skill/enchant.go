@@ -137,3 +137,13 @@ func Enchant(c *player.Character, table *player.LevelTable, tmpl *player.Templat
 	}
 	return result, EnchantFailed, nil
 }
+
+// EnchantSkillsFor returns the enchant trainer list for c, in tree order:
+// each enchant level one above a known skill's level, and each route start
+// over a skill known at its max normal level.
+func EnchantSkillsFor(c *player.Character, trees *modelskill.Trees, skills *Persistence) []modelskill.EnchantSkill {
+	if c == nil || trees == nil || skills == nil || skills.skills == nil {
+		return nil
+	}
+	return trees.EnchantSkillsFor(skills.skills, TreeSkillLevels(c.SkillLevels()))
+}

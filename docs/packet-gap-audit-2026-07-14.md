@@ -230,8 +230,7 @@ Remaining EnterWorld burst packet gaps:
 `PledgeShowMemberListAll` ([#632](https://github.com/fatal10110/acis_golang/issues/632)),
 `PledgeSkillList`, `ExMailArrived`, and `PlaySound`
 currently have Go frame builders only. `NpcHtmlMessage` is wired for civilian NPC chat windows
-(`talkToFolk`, #720), link and help pages, and the arena signboard. `SellList` is sent by a merchant's or fisherman's `Sell` dialog command. `ExEnchantSkillList` and `ExEnchantSkillInfo` also have Go
-frame builders only. The augmentation variation packets
+(`talkToFolk`, #720), link and help pages, and the arena signboard. `SellList` is sent by a merchant's or fisherman's `Sell` dialog command. The augmentation variation packets
 `ExShowVariationMakeWindow`, `ExShowVariationCancelWindow`, `ExConfirmVariationItem`,
 `ExConfirmVariationRefiner`, `ExConfirmVariationGemstone`, `ExConfirmCancelItem`,
 `ExVariationResult`, and `ExVariationCancelResult` also have Go frame builders only. They are not
@@ -252,8 +251,6 @@ Missing M3 data/UI server packets:
 - `ExShowCropSetting`
 - `ExShowSellCropList`
 - `ExShowProcureCropDetail`
-- `ExEnchantSkillList`
-- `ExEnchantSkillInfo`
 - `ExShowVariationMakeWindow`
 - `ExShowVariationCancelWindow`
 - `ExConfirmVariationItem`
@@ -338,6 +335,8 @@ Implemented and wired M5 skill progression/cast server packets in Go:
 - `AcquireSkillList`
 - `AcquireSkillInfo`
 - `AcquireSkillDone`
+- `ExEnchantSkillInfo`
+- `ExEnchantSkillList`
 - `MagicSkillUse`
 - `MagicSkillLaunched`
 - `MagicSkillCanceled`
