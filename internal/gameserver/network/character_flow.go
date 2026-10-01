@@ -174,16 +174,18 @@ func (l *GameClientLink) restoreRows(ownerID int32, items []*item.Instance, rest
 	return kept
 }
 
-// restoredItemLocation reports whether a row at loc is one the player
-// inventory rebuilds itself from — its base and equip locations, the only two
-// Inventory.Restore keeps. The row query is not location-filtered, so a
-// warehouse or freight row reaches here too; claiming one would hand its write
-// to an instance the inventory then discards, leaving the row with no writer
-// at all. The reference draws the same line one step earlier, by binding
-// getBaseLocation() and getEquipLocation() into the restore query itself
-// (Inventory.java:110-114), so its guard never sees those rows either.
+// restoredItemLocation reports whether a row at loc is one a login rebuilds
+// a container from: the inventory's base and equip locations, the private
+// warehouse and the player's own freight. The row query is not
+// location-filtered, so a row at any other location reaches here too;
+// claiming one would hand its write to an instance nothing restores,
+// leaving the row with no writer at all.
 func restoredItemLocation(loc item.Location) bool {
-	return loc == item.LocationInventory || loc == item.LocationPaperdoll
+	switch loc {
+	case item.LocationInventory, item.LocationPaperdoll, item.LocationWarehouse, item.LocationFreight:
+		return true
+	}
+	return false
 }
 
 // enterWorld sends the EnterWorld packet burst for c and registers it in the
@@ -253,11 +255,15 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	}
 	l.restoreRecipeBook(ctx, c)
 
+	// Split off before the inventory restore below takes its rows: the
+	// warehouse and freight rows are the rest of the same set.
+	storage := l.restoreStorage(ctx, client.AccountName(), c, items)
 	live, err := l.attachLivePlayer(ctx, client, c, tmpl, items, shortcuts)
 	if err != nil {
 		l.log.Error().Err(err).Msg("enter world: attach live player")
 		return nil, false
 	}
+	live.storage = storage
 	if l.roster != nil {
 		// Mark the row online at login (the reference updates the online
 		// status when a client enters the world), so external DB consumers

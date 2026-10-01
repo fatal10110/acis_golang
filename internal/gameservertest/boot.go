@@ -112,6 +112,7 @@ type options struct {
 	weightLimitMultiplier  float64
 	inventorySlots         player.InventorySlots
 	storageSlots           player.StorageSlots
+	freight                *network.FreightConfig
 	storeSkillCooltime     bool
 	cancelLesserEffect     bool
 	magicFailures          bool
@@ -366,6 +367,12 @@ func WithStorageSlots(slots player.StorageSlots) Option {
 		slots.Configured = true
 		o.storageSlots = slots
 	}
+}
+
+// WithFreight sets the freight service settings (default
+// network.DefaultFreightConfig).
+func WithFreight(cfg network.FreightConfig) Option {
+	return func(o *options) { o.freight = &cfg }
 }
 
 // WithMaxBuffsAmount sets the players.properties MaxBuffsAmount base
@@ -1506,7 +1513,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots},
+		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight},
 		Restarts:         o.restarts,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),

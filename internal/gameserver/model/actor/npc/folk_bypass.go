@@ -10,7 +10,7 @@ type BypassOutcome int
 
 const (
 	// BypassUnported names a command of a system not in place yet (quests,
-	// shops, warehouses, teleports, lottery, observation, castles and the
+	// teleports, lottery, observation, castles and the
 	// like), or one no dialog handles. It answers nothing of its own.
 	BypassUnported BypassOutcome = iota
 	// BypassChatWindow opens HTML, then releases the client with
@@ -40,6 +40,9 @@ const (
 	// BypassMultisell opens the multisell list Multisell names, in its
 	// inventory-only form when InventoryOnly is set.
 	BypassMultisell
+	// BypassWarehouse runs the warehouse keeper's storage command
+	// Warehouse.
+	BypassWarehouse
 	// BypassSkillList opens this trainer's list of skills to learn.
 	BypassSkillList
 	// BypassEnchantSkillList opens this trainer's list of skills to enchant.
@@ -83,6 +86,11 @@ type BypassReply struct {
 	// InventoryOnly opens the list on the talker's unworn armor and
 	// weapons: only the entries taking one of them, one set per item.
 	InventoryOnly bool
+	// Warehouse is the storage command BypassWarehouse runs, and
+	// FreightTarget the text after the command's last '_', which names the
+	// character a FreightCharacter command opens.
+	Warehouse     WarehouseCommand
+	FreightTarget string
 }
 
 // fishermanCommands are the fisherman's championship commands, run before
@@ -96,13 +104,14 @@ var fishermanCommands = []string{"FishingChampionship", "FishingReward"}
 // answering with its refusal page when that page exists. A fisherman's
 // FishSkillList opens the fishing skills list. A symbol maker's Draw and
 // RemoveList open its windows. A merchant or fisherman then answers its
-// sell, multisell and shop commands. The trainer commands follow: SkillList
-// and EnchantSkillList open the skills to learn and to enchant. Then the
-// generic ones: Chat <n> opens chat page n (page 0 when n does not parse),
-// Link <path> opens data/html/<path>, multisell <list> and exc_multisell
-// <list> open a multisell list, and Augment 1 and Augment 2 open the
-// augmentation and removal windows. Every other command belongs to a system
-// not in place yet.
+// sell, multisell and shop commands, and a warehouse keeper its storage
+// commands. The trainer commands follow: SkillList and EnchantSkillList
+// open the skills to learn and to enchant. Then the generic ones: Chat <n>
+// opens chat page n (page 0 when n does not parse), Link <path> opens
+// data/html/<path>, multisell <list> and exc_multisell <list> open a
+// multisell list, and Augment 1 and Augment 2 open the augmentation and
+// removal windows. Every other command belongs to a system not in place
+// yet.
 func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command string) BypassReply {
 	karma := talker.Karma
 	kind := hostileKind(f.Instance)
@@ -149,6 +158,13 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		}
 	}
 	reply.CancelEnchant = kind == "WarehouseKeeper"
+	if reply.CancelEnchant {
+		if cmd := warehouseCommand(command); cmd != WarehouseNoCommand {
+			reply.Outcome, reply.Warehouse = BypassWarehouse, cmd
+			reply.FreightTarget = command[strings.LastIndexByte(command, '_')+1:]
+			return reply
+		}
+	}
 	if kind == "Merchant" || kind == "Fisherman" {
 		if out, ok := f.merchantMultisell(pages, talker, command, reply); ok {
 			return out

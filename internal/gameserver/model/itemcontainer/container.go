@@ -479,7 +479,11 @@ func (c *Container) DestroyAllItems() {
 	}
 }
 
-type transferTarget interface {
+// Receiver is a container a transfer moves items into: a stackable item
+// merges into the stack ItemByTemplateID names, anything else arrives
+// through Add or AddNew. A freight container answers both by its active
+// town.
+type Receiver interface {
 	Add(inst *item.Instance) (result *item.Instance, absorbed bool)
 	AddNew(templateID int32, count int, objectID int32) *item.Instance
 	ItemByTemplateID(templateID int32) *item.Instance
@@ -500,7 +504,7 @@ type transferTarget interface {
 // The caller remains responsible for undoing any life-stone augmentation
 // bonus a transferred instance was granting its previous owner — that's
 // stat-engine behavior this package doesn't own.
-func (c *Container) Transfer(objectID int32, count int, target transferTarget, newObjectID int32) (result *item.Instance, freedObjectID int32, freed bool) {
+func (c *Container) Transfer(objectID int32, count int, target Receiver, newObjectID int32) (result *item.Instance, freedObjectID int32, freed bool) {
 	if target == nil || count <= 0 {
 		return nil, 0, false
 	}
@@ -565,6 +569,44 @@ func (c *Container) Transfer(objectID int32, count int, target transferTarget, n
 	}
 
 	return target.AddNew(templateID, count, newObjectID), freedObjectID, freed
+}
+
+// Restore replaces c's contents with persisted item rows at c's location,
+// without changing their state beyond the owner and entry time. A
+// stackable row of a template c already holds merges into that stack, as
+// a restore merges them: the grown stack and the absorbed row's delete are
+// both scheduled. Every other row is restored as read and schedules no
+// write.
+func (c *Container) Restore(items []*item.Instance) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	clear(c.items)
+	restoredAt := nowMillis()
+	for _, inst := range items {
+		if inst == nil {
+			continue
+		}
+		st := inst.Snapshot()
+		if st.Location != c.location {
+			continue
+		}
+		inst.EnterContainer(c.ownerID, st.Location, st.LocationData, restoredAt)
+		if tmpl, _ := c.templates.Get(inst.TemplateID); tmpl != nil && tmpl.Stackable {
+			// A freight restore merges across town tags too: its rows are
+			// read with no town selected.
+			if held := c.itemByTemplateIDLocked(inst.TemplateID); held != nil {
+				held.BindPersister(c.persist)
+				inst.BindPersister(c.persist)
+				held.AddCount(st.Count)
+				inst.DestroyState()
+				continue
+			}
+		}
+		c.items[inst.ObjectID] = inst
+	}
+	for _, inst := range c.items {
+		inst.BindPersister(c.persist)
+	}
 }
 
 // ValidateCapacity reports whether adding slotCount more stacks/instances

@@ -37,6 +37,12 @@ func (s StorageSlots) withDefaults() StorageSlots {
 	return s
 }
 
+// BaseFreight returns the configured freight size before any limit stat:
+// the limit of a freight whose owner is not the one depositing into it.
+func (s StorageSlots) BaseFreight() int {
+	return s.withDefaults().Freight
+}
+
 func (c *Character) configuredStorageSlots() StorageSlots {
 	c.stateMu.RLock()
 	defer c.stateMu.RUnlock()

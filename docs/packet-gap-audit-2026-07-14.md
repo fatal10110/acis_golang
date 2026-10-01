@@ -160,6 +160,9 @@ Implemented and wired M5 target/combat/item/stance/social client packets in Go:
 - `RequestChangeWaitType`
 - `RequestSocialAction`
 - `RequestPackageSendableItemList`
+- `SendWarehouseDepositList`
+- `SendWarehouseWithdrawList`
+- `RequestPackageSend`
 - `RequestEnchantItem`
 - `RequestPetUseItem`
 - `RequestGiveItemToPet`
@@ -170,15 +173,12 @@ Implemented and wired M5 target/combat/item/stance/social client packets in Go:
 Missing M5 stats/combat/items/progression client packets:
 
 - `RequestChangePetName`
-- `SendWarehouseDepositList`
-- `SendWarehouseWithdrawList`
-- `RequestPackageSend`
 
-Warehouse/freight transaction packets remain deferred:
+Warehouse/freight transaction packets are wired behind the warehouse keeper dialog (#139):
 
-- `SendWarehouseDepositList` and `SendWarehouseWithdrawList` need dialog/bypass routing to establish the current warehouse NPC and active warehouse before the client request arrives.
-- `RequestPackageSend` needs same-account freight ownership, freight restore/persistence, fee charging, and active warehouse/session validation.
-- `RequestPackageSendableItemList` is wired for the preview step and returns `PackageSendableList` for carried, tradable, non-quest inventory items.
+- `SendWarehouseDepositList` and `SendWarehouseWithdrawList` move items into and out of the warehouse the keeper's `DepositP`/`WithdrawP`/`WithdrawF`/`FreightChar_` command opened. Clan warehouse commands answer a clanless player's refusal; a clan member's needs the clan system.
+- `RequestPackageSend` ships to another character of the account, whose freight is read at login, for `FreightPrice` a row.
+- `RequestPackageSendableItemList` returns `PackageSendableList` of the available, tradable inventory items.
 
 ## Game Server Packet Gaps
 
@@ -275,13 +275,9 @@ Missing M4 world/movement server packets:
 Implemented M5 item/status server packet encoders in Go, with owning runtime wiring still tracked by the relevant systems:
 
 - `ExUseSharedGroupItem`
-- `PackageToList`
-- `PackageSendableList`
 - `PlaySound`
 - `Revive`
 - `ShortBuffStatusUpdate`
-- `WarehouseDepositList`
-- `WarehouseWithdrawList`
 
 Implemented and wired M5 item server packets in Go:
 
@@ -291,8 +287,11 @@ Implemented and wired M5 item server packets in Go:
 - `ExAutoSoulShot`
 - `InventoryUpdate`
 - `PackageSendableList`
+- `PackageToList`
 - `PetInventoryUpdate`
 - `PetStatusShow`
+- `WarehouseDepositList`
+- `WarehouseWithdrawList`
 - `PetDelete`
 - `PetStatusUpdate`
 - `PetInfo`

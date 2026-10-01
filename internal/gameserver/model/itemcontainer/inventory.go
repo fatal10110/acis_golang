@@ -519,9 +519,9 @@ func (inv *Inventory) DropItem(objectID int32, count int, newObjectID int32) *it
 }
 
 // TransferItem moves count units from inv to target and queues inventory
-// updates on inv for the source-side change. The target inventory's Add path
+// updates on inv for the source-side change. A target inventory's Add path
 // queues its own update.
-func (inv *Inventory) TransferItem(objectID int32, count int, target *Inventory, newObjectID int32) (result *item.Instance, freedObjectID int32, freed bool) {
+func (inv *Inventory) TransferItem(objectID int32, count int, target Receiver, newObjectID int32) (result *item.Instance, freedObjectID int32, freed bool) {
 	if target == nil || count <= 0 {
 		return nil, 0, false
 	}

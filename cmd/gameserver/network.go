@@ -94,6 +94,7 @@ func provideGameClientLink(
 	log zerolog.Logger,
 ) (*network.GameClientLink, error) {
 	enchantCfg := gameplay.Enchant
+	freightCfg := gameplay.Freight
 	playerConfig := network.PlayerConfig{
 		Enchant:                    &enchantCfg,
 		RespawnRestoreHP:           float64(gameplay.RespawnRestoreHP),
@@ -107,6 +108,7 @@ func provideGameClientLink(
 		WeightLimitMultiplier:      float64(gameplay.WeightLimitMultiplier),
 		InventorySlots:             gameplay.InventorySlots,
 		StorageSlots:               gameplay.StorageSlots,
+		Freight:                    &freightCfg,
 		KarmaPlayerCanTeleport:     bool(gameplay.KarmaPlayerCanTeleport),
 		KarmaPlayerCanShop:         gameplay.KarmaServiceGates.CanShop,
 		KarmaPlayerCanUseGK:        gameplay.KarmaServiceGates.CanUseGK,
