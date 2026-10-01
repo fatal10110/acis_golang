@@ -229,7 +229,11 @@ func (h *Hostile) reduceHP(amount float64, attacker attackable.Combatant) {
 	if h.AlikeDead() {
 		return
 	}
-	amount = max(amount, 0)
+	// A NaN amount (a zero-defence hit scaled by a zero multiplier) takes
+	// nothing, like a negative one.
+	if !(amount > 0) {
+		amount = 0
+	}
 	h.testOverhit(attacker, amount)
 	h.registerHit(attacker, amount, false)
 	if h.Invul() || !creature.CanDealDamage(attacker) {

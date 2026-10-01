@@ -4,6 +4,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -150,7 +151,7 @@ func (a *Actor) SyncControlItemEnchant() bool {
 }
 
 func (a *Actor) notifyDamage(attacker attackable.Combatant, amount float64) {
-	a.emit(event.Damaged{AttackerName: attacker.CharacterName(), Damage: int32(amount)})
+	a.emit(event.Damaged{AttackerName: attacker.CharacterName(), Damage: commons.JavaInt(amount)})
 }
 
 // IsPet reports whether this live summon is a pet rather than a servitor.

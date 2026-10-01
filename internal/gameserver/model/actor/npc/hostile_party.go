@@ -3,6 +3,7 @@ package npc
 import (
 	"math"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 )
@@ -83,7 +84,7 @@ func (h *Hostile) registerHit(combatant attackable.Combatant, amount float64, is
 		h.AddCombatDamageHate(combatant, amount)
 	}
 	h.RollAttackedShotRecharge()
-	h.propagatePartyAttacked(h, combatant, int(amount), false)
+	h.propagatePartyAttacked(h, combatant, int(commons.JavaInt(amount)), false)
 }
 
 func (h *Hostile) inParty() bool {

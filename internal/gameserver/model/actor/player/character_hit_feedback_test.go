@@ -1,6 +1,7 @@
 package player
 
 import (
+	"math"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -84,5 +85,37 @@ func TestSelfDamageSendsNoDamageReportAndDrainsNoCP(t *testing.T) {
 				t.Fatalf("cp/hp = %v/%v, want 200/450 (self damage skips CP)", c.CP(), c.HP())
 			}
 		})
+	}
+}
+
+// TestUnboundedSkillHitSaturatesTheDamageReport pins the HP-reduce path for
+// a zero-defence hit (issue #3002). PlayerStatus.reduceHp reports
+// (int) value, so a +Infinity hit names Integer.MAX_VALUE and then drains
+// CP and HP to 0; a NaN hit fails every "value > 0" test and leaves both
+// pools untouched, with nothing NaN stored.
+func TestUnboundedSkillHitSaturatesTheDamageReport(t *testing.T) {
+	attacker := hitFeedbackAttacker()
+
+	inf := hitFeedbackVictim()
+	inf.SetRollSource(zeroRoll)
+	rec := recordEvents(inf)
+	inf.ReduceHP(math.Inf(1), attacker, modelskill.Definition{})
+	got := event.Of[event.DamageReceived](rec)
+	if len(got) != 1 || got[0].Amount != math.MaxInt32 {
+		t.Fatalf("+Inf hit DamageReceived = %+v, want one at %d", got, math.MaxInt32)
+	}
+	if inf.CP() != 0 || inf.HP() != 0 || !inf.Dead() {
+		t.Fatalf("+Inf hit cp/hp/dead = %v/%v/%v, want 0/0/true", inf.CP(), inf.HP(), inf.Dead())
+	}
+
+	nan := hitFeedbackVictim()
+	nan.SetRollSource(zeroRoll)
+	rec = recordEvents(nan)
+	nan.ReduceHP(math.NaN(), attacker, modelskill.Definition{})
+	if got := event.Of[event.DamageReceived](rec); len(got) != 0 {
+		t.Fatalf("NaN hit DamageReceived = %+v, want none", got)
+	}
+	if nan.CP() != 200 || nan.HP() != 500 || nan.Dead() {
+		t.Fatalf("NaN hit cp/hp/dead = %v/%v/%v, want 200/500/false", nan.CP(), nan.HP(), nan.Dead())
 	}
 }

@@ -401,9 +401,11 @@ func mdamLandsRoll(n int) int {
 }
 
 // landMDAM targets hostile and returns once the player's MDAM has landed on
-// it and the server has settled.
+// it and the server has settled. The fixture monster's M.Def truncates to 0,
+// which an MDAM turns into a killing blow, so it gets a real M.Def first.
 func landMDAM(t *testing.T, srv *gameservertest.Server, objID int32, hostile *npc.Hostile) {
 	t.Helper()
+	hostile.AddStatFuncs([]effect.Mod{{Stat: stat.MagicDefence, Op: effect.OpSet, Value: 100}})
 	c := srv.Client
 	full := hostile.CurrentHP()
 	px, py, pz := srv.PlayerPosition(t, objID)

@@ -2417,7 +2417,7 @@ func TestMakeAttackHitAppliesRacePosAndIgnoresPvP(t *testing.T) {
 		t.Fatalf("hit miss=%v crit=%v, want connected non-crit", hit.Miss, hit.Crit)
 	}
 	want := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
-		AttackPower: attacker.PAtk(), Defence: creature.Positive(target.PDef()),
+		AttackPower: attacker.PAtk(), Defence: target.PDef(),
 		PosMul: 1.2, ElementalMul: 1, RandomMul: 1, RaceMul: target.RaceMultiplier(attacker),
 		WeaponVulnMul: 1, PvPMul: 1,
 	}))
