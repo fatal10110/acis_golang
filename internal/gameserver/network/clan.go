@@ -200,6 +200,8 @@ func (l *GameClientLink) sendJoinedClan(live *livePlayer, cl *clan.Clan) {
 // clan's skills taken, its skill list, its status, and its clan window
 // closed.
 func (l *GameClientLink) sendLeftClan(live *livePlayer, cl *clan.Clan) {
+	// Leaving closes whatever warehouse live had open, its own included.
+	live.storage.active = activeStore{}
 	l.takeClanSkills(live, cl)
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 	l.broadcastCharacterInfo(live)

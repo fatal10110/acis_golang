@@ -15,7 +15,9 @@ type StorageSlots struct {
 	PrivateStoreDwarf   int
 	DwarfRecipe         int
 	CommonRecipe        int
-	Configured          bool
+	// ClanWarehouse is the clan warehouse size, which no stat changes.
+	ClanWarehouse int
+	Configured    bool
 }
 
 // DefaultStorageSlots is the shipped players.properties storage sizes.
@@ -27,6 +29,7 @@ var DefaultStorageSlots = StorageSlots{
 	PrivateStoreDwarf:   5,
 	DwarfRecipe:         50,
 	CommonRecipe:        50,
+	ClanWarehouse:       200,
 	Configured:          true,
 }
 
@@ -35,6 +38,11 @@ func (s StorageSlots) withDefaults() StorageSlots {
 		return DefaultStorageSlots
 	}
 	return s
+}
+
+// ClanWarehouseSlots returns the configured clan warehouse size.
+func (s StorageSlots) ClanWarehouseSlots() int {
+	return s.withDefaults().ClanWarehouse
 }
 
 // BaseFreight returns the configured freight size before any limit stat:
