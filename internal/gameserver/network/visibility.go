@@ -2,12 +2,15 @@ package network
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -27,12 +30,15 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 		if title, ok := storeTitleFrame(o); ok {
 			p.sendVisibilityFrame(title)
 		}
+		p.describeState(o, o.CastControl())
 	case *npc.Hostile:
 		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
+		p.describeState(o, o.CastControl())
 	case *npc.Decoration:
 		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
 	case *npc.Folk:
 		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
+		p.describeState(o, nil)
 	case *summon.Actor:
 		if o.ShownAsOwnedBy(p.ObjectID()) {
 			o.MarkDiscoveredByOwner()
@@ -43,15 +49,23 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 					// discovery can run on another actor's: a summon-friend cast
 					// teleports p from the caster's queue. Building the snapshot
 					// there would let an update drained after it overtake it, so
-					// the snapshot is always taken and sent on p's queue.
+					// the snapshot is always taken and sent on p's queue. The
+					// pet's state follows its item list there.
 					seen := p.petSightings.Add(1)
-					p.Queue().Post(func() { p.sendPetItemList(inv, seen) })
+					p.Queue().Post(func() {
+						if p.sendPetItemList(inv, seen) {
+							p.describeState(o, o.CastControl())
+						}
+					})
+					return
 				}
+				p.describeState(o, o.CastControl())
 			}
 			return
 		}
 		if snap, ok := summonInfoSnapshot(o, p, p.npcs, p.link.summonInCombat(o)); ok {
 			p.sendVisibilityFrame(serverpackets.FrameNPCInfo(snap))
+			p.describeState(o, o.CastControl())
 		}
 	case groundItemObject:
 		if dropperID := o.DropperID(); dropperID != 0 {
@@ -67,14 +81,54 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 	}
 }
 
+// discoveredCreature is a creature a player can come to know while it walks.
+type discoveredCreature interface {
+	ObjectID() int32
+	Position() (x, y, z int)
+	MovingTo() (location.Location, bool)
+}
+
+// castInFlight is the cast controller surface describeState reads.
+type castInFlight interface {
+	InFlight() (modelskill.Definition, actorcast.Target, bool)
+}
+
+// describeState shows p, right after c's info packet, what c is doing: the
+// leg it walks, from where it stands, or else the cast it has in flight,
+// with the skill's own hit time and reuse delay. cast is c's cast
+// controller, nil when it has none. A creature doing neither shows nothing
+// more.
+func (p *livePlayer) describeState(c discoveredCreature, cast any) {
+	x, y, z := c.Position()
+	at := location.Location{X: x, Y: y, Z: z}
+	if dest, ok := c.MovingTo(); ok {
+		p.sendVisibilityFrame(serverpackets.FrameMoveToLocation(c.ObjectID(), dest, at))
+		return
+	}
+	ctl, ok := cast.(castInFlight)
+	if !ok {
+		return
+	}
+	def, target, ok := ctl.InFlight()
+	if !ok || target == nil {
+		return
+	}
+	p.sendVisibilityFrame(serverpackets.FrameMagicSkillUse(
+		serverpackets.SkillCastObject{ObjectID: c.ObjectID(), Location: at},
+		skillCastObject(target),
+		int32(def.ID), int32(def.Level), def.HitTime, def.ReuseDelay, false,
+	))
+}
+
 // sendPetItemList sends the owner's full pet inventory, draining the pending
 // PetInventoryUpdate queue it supersedes. It runs on p's queue, and sends
 // nothing once p has forgotten the pet (unsummoned or out of view) or seen it
-// again since the Discover numbered seen.
-func (p *livePlayer) sendPetItemList(inv *itemcontainer.Inventory, seen uint32) {
+// again since the Discover numbered seen; it reports whether p still sees the
+// pet as that Discover did.
+func (p *livePlayer) sendPetItemList(inv *itemcontainer.Inventory, seen uint32) bool {
 	sim.AssertOwner(p.Queue())
 	if p.petSightings.Load() != seen {
-		return
+		return false
 	}
 	var frame wire.Frame
 	err := inv.BuildAndDrainUpdates(func(items []*item.Instance) error {
@@ -84,9 +138,10 @@ func (p *livePlayer) sendPetItemList(inv *itemcontainer.Inventory, seen uint32) 
 	})
 	if err != nil {
 		p.log.Error().Err(err).Msg("build PetItemList")
-		return
+		return true
 	}
 	p.sendVisibilityFrame(frame)
+	return true
 }
 
 // liveSummonOwner returns the connected player controlling a.

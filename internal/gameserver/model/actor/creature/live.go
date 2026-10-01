@@ -66,6 +66,15 @@ func (l *Live) Move() *move.CreatureMove {
 	return &l.movement
 }
 
+// MovingTo returns the target of this creature's leg in flight and whether
+// it is walking at all; a nil Live never walks.
+func (l *Live) MovingTo() (location.Location, bool) {
+	if l == nil {
+		return location.Location{}, false
+	}
+	return l.movement.MovingTo()
+}
+
 // ValidLocation resolves a destination against this creature's movement
 // geodata without starting an ordinary move.
 func (l *Live) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
