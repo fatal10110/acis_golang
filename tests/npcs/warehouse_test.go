@@ -533,6 +533,13 @@ type freightWorld struct {
 
 func bootFreight(t *testing.T, adena int32, stacks [][2]int32, extra ...gameservertest.Option) *freightWorld {
 	t.Helper()
+	return bootFreightPrepared(t, nil, adena, stacks, extra...)
+}
+
+// bootFreightPrepared is bootFreight running prepare, when set, once both
+// characters exist and before the sender enters the world.
+func bootFreightPrepared(t *testing.T, prepare func(srv *gameservertest.Server, sender int32, receiver *player.Character), adena int32, stacks [][2]int32, extra ...gameservertest.Option) *freightWorld {
+	t.Helper()
 	opts := append([]gameservertest.Option{
 		gameservertest.WithCharacter("Sender", playerLevel, 0),
 		gameservertest.WithWantChars(1),
@@ -545,6 +552,9 @@ func bootFreight(t *testing.T, adena int32, stacks [][2]int32, extra ...gameserv
 	w.items[item.AdenaID] = srv.GiveItem(t, w.player, item.AdenaID, adena)
 	for _, s := range stacks {
 		w.items[s[0]] = srv.GiveItem(t, w.player, s[0], s[1])
+	}
+	if prepare != nil {
+		prepare(srv, w.player, receiver)
 	}
 	w.enter(t)
 	return &freightWorld{whWorld: w, receiver: receiver}
@@ -601,6 +611,30 @@ func TestPackageSendShipsToAccountCharacter(t *testing.T) {
 
 	// The receiver logs in on the account, once the sender's session has
 	// left, and collects its freight.
+	rw := w.loginReceiver(t)
+	c := rw.c
+	frames = rw.command(t, "WithdrawF")
+	requireOpcodes(t, "receiver's WithdrawF", frames, serverpackets.OpcodeActionFailed, serverpackets.OpcodeWarehouseWithdrawList, serverpackets.OpcodeActionFailed)
+	_, _, _, rows := decodeWarehouseList(t, frames[1], serverpackets.OpcodeWarehouseWithdrawList)
+	if len(rows) != 2 || rows[sword] != (listRow{swordID, 1}) {
+		t.Fatalf("receiver's freight = %v, want the sword and 3 potions", rows)
+	}
+	moves := make([]whRow, 0, 2)
+	for objectID, row := range rows {
+		moves = append(moves, whRow{objectID, row.count})
+	}
+	c.Send(encodeWithdraw(moves...))
+	drainUntilQuiet(t, c)
+	if got := rowsAt(saved(t, w.srv, w.receiver.ID), item.LocationInventory); got[swordID] != 1 || got[potionID] != 3 {
+		t.Fatalf("receiver's saved inventory = %v, want the sword and 3 potions", got)
+	}
+}
+
+// loginReceiver takes the account over on a second client, waits for the
+// sender's session to leave, enters the receiver and talks to a keeper
+// beside it.
+func (w *freightWorld) loginReceiver(t *testing.T) *whWorld {
+	t.Helper()
 	c := w.srv.DialClient(t, w.srv.Account(), 2)
 	w.srv.AdvanceUntil(t, "sender out of the world", func() bool {
 		_, ok := w.srv.State.Player(w.player)
@@ -619,21 +653,7 @@ func TestPackageSendShipsToAccountCharacter(t *testing.T) {
 	rw.keeper = rw.spawnFolk(t, folkTemplate("WarehouseKeeper", keeperID), 60)
 	rw.talkTo(t, rw.keeper)
 	rw.openAnyNpcPage(t)
-	frames = rw.command(t, "WithdrawF")
-	requireOpcodes(t, "receiver's WithdrawF", frames, serverpackets.OpcodeActionFailed, serverpackets.OpcodeWarehouseWithdrawList, serverpackets.OpcodeActionFailed)
-	_, _, _, rows := decodeWarehouseList(t, frames[1], serverpackets.OpcodeWarehouseWithdrawList)
-	if len(rows) != 2 || rows[sword] != (listRow{swordID, 1}) {
-		t.Fatalf("receiver's freight = %v, want the sword and 3 potions", rows)
-	}
-	moves := make([]whRow, 0, 2)
-	for objectID, row := range rows {
-		moves = append(moves, whRow{objectID, row.count})
-	}
-	c.Send(encodeWithdraw(moves...))
-	drainUntilQuiet(t, c)
-	if got := rowsAt(saved(t, w.srv, w.receiver.ID), item.LocationInventory); got[swordID] != 1 || got[potionID] != 3 {
-		t.Fatalf("receiver's saved inventory = %v, want the sword and 3 potions", got)
-	}
+	return rw
 }
 
 // enterFrom finishes a character selection on c and drains the enter
