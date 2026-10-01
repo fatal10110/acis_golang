@@ -332,7 +332,6 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		SP:              state.SP,
 		ExpType:         levelStats.ExpType,
 		Growth:          npcTmpl.Pet,
-		CON:             npcTmpl.CON,
 		Config:          nil, // set by newPet from link.petConfig
 		Inventory:       link.newPetInventory(live, controlItem.ObjectID, items),
 		Fed:             fed,
