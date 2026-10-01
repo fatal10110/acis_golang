@@ -173,7 +173,7 @@ func TestBypassNpcRejections(t *testing.T) {
 		{npcCommand(far, "Chat 1"), releaseOnly},
 		{"npc_" + strconv.Itoa(int(near.ObjectID())), releaseOnly},
 		{npcCommand(near, "Buy 1"), releaseOnly},
-		{npcCommand(near, "SkillList"), releaseOnly},
+		{npcCommand(near, "TerritoryStatus"), releaseOnly},
 		{npcCommand(near, "Quest"), releaseOnly},
 		{npcCommand(near, "Link ../../config/server.properties"), releaseOnly},
 		{npcCommand(near, "Link"), nil},
@@ -223,7 +223,9 @@ func TestBypassDungeonGatekeeperReleasesFirst(t *testing.T) {
 // TestBypassKarmaGateCoversEveryCommand pins the shop karma gate on
 // dialog commands: with KarmaPlayerCanShop off, a player carrying karma
 // gets the refusal page, as is, for every command. A fisherman checks its
-// own refusal page, then, past its own commands, the merchant one.
+// own refusal page, then, past its own commands, the merchant one: with no
+// fisherman refusal page, its FishSkillList still opens the fishing list
+// (here empty: nothing left to learn, then AcquireSkillDone).
 func TestBypassKarmaGateCoversEveryCommand(t *testing.T) {
 	t.Parallel()
 	const pkPage = "<html><body>No trade with killers %objectId%</body></html>"
@@ -243,11 +245,11 @@ func TestBypassKarmaGateCoversEveryCommand(t *testing.T) {
 		{merchant, "Chat 1", chatWindowAnswer},
 		{merchant, "Buy 1", chatWindowAnswer},
 		{fisherman, "Chat 1", chatWindowAnswer},
-		{fisherman, "FishSkillList", releaseOnly},
+		{fisherman, "FishSkillList", []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeAcquireSkillDone, serverpackets.OpcodeActionFailed, serverpackets.OpcodeActionFailed}},
 	} {
 		w.openAnyNpcPage(t)
 		html := ""
-		if len(tc.want) > 1 {
+		if tc.want[0] == serverpackets.OpcodeNpcHtmlMessage {
 			html = pkPage + "\n"
 		}
 		assertAnswer(t, w.bypass(t, npcCommand(tc.f, tc.command)), tc.want, tc.f, html)

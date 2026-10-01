@@ -92,20 +92,6 @@ func assertSkillList(t *testing.T, frame []byte, want ...skillListEntry) {
 	}
 }
 
-// assertAcquireSkillListEmpty asserts frame is an AcquireSkillList of the
-// given trainer type with no remaining offers.
-func assertAcquireSkillListEmpty(t *testing.T, frame []byte, wantType serverpackets.AcquireSkillType) {
-	t.Helper()
-	assertFrameOpcode(t, frame, serverpackets.OpcodeAcquireSkillList, "AcquireSkillList")
-	r := wireReader(frame[1:])
-	if skillType, count := r.ReadInt32(), r.ReadInt32(); skillType != int32(wantType) || count != 0 {
-		t.Fatalf("AcquireSkillList = type %d count %d, want type %d empty", skillType, count, wantType)
-	}
-	if err := r.Err(); err != nil {
-		t.Fatalf("read AcquireSkillList: %v", err)
-	}
-}
-
 // assertKnownSkills reads the character's persisted known-skill rows and
 // compares them with want.
 func assertKnownSkills(t *testing.T, srv *gameservertest.Server, objID int32, want map[int]int) {

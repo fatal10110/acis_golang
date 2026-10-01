@@ -20,15 +20,21 @@ func TestLearnedSkillSurvivesRelogin(t *testing.T) {
 	t.Parallel()
 	srv, c, objID := bootLearner(t, append(generalLearnOpts(t, 50), gameservertest.WithCapturedLog())...)
 	startInWorld(t, c)
+	trainer := selectTrainer(t, srv, c, objID, 0)
 
 	c.Send(encodeRequestAcquireSkill(3, 1, 0))
 	assertSPStatus(t, c.Read(), objID, 0)
 	c.Read() // SP-decreased SystemMessage
 	c.Read() // LearnedSkill SystemMessage
 	c.Read() // SkillList
-	c.Read() // empty AcquireSkillList
+	c.Read() // NoMoreSkillsToLearn SystemMessage
+	c.Read() // AcquireSkillDone
+	c.Read() // ActionFailed
 	drainUntilQuiet(t, c)
 	assertKnownSkills(t, srv, objID, map[int]int{3: 1})
+	// The trainer leaves, so the relogin burst holds no NpcInfo.
+	srv.State.Despawn(trainer)
+	drainUntilQuiet(t, c)
 
 	logout(t, srv, c)
 

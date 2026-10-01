@@ -37,6 +37,7 @@ func TestSlowKnownSkillStoreKeepsQueuesFree(t *testing.T) {
 	)
 	bindSkillShortcut(t, srv, objID, 3, 3, -1)
 	startInWorld(t, c)
+	selectTrainer(t, srv, c, objID, 0)
 
 	c.Send(encodeRequestAcquireSkill(3, 1, 0))
 	assertSPStatus(t, c.Read(), objID, 0)
@@ -44,7 +45,7 @@ func TestSlowKnownSkillStoreKeepsQueuesFree(t *testing.T) {
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageLearnedSkill, 3, 1)
 	assertSkillList(t, c.Read(), skillListEntry{passive: 0, level: 1, id: 3})
 	assertShortCutRegister(t, c, 3, 3, 1)
-	assertAcquireSkillListEmpty(t, c.Read(), serverpackets.AcquireSkillTypeUsual)
+	assertEmptyListClose(t, c, serverpackets.SystemMessageNoMoreSkillsToLearn)
 	drainUntilQuiet(t, c)
 
 	srv.Settle(t)

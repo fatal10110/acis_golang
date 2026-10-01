@@ -214,6 +214,12 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		l.openHennaRemoveList(live)
 	case npc.BypassMultisell:
 		l.openMultisell(live, f, reply.Multisell, reply.InventoryOnly)
+	case npc.BypassSkillList:
+		l.showSkillList(live, f)
+	case npc.BypassEnchantSkillList:
+		l.showEnchantSkillList(live, f)
+	case npc.BypassFishSkillList:
+		l.showFishSkillList(live)
 	case npc.BypassAborted:
 		return false
 	case npc.BypassUnported:

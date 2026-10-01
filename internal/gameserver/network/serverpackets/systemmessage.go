@@ -138,6 +138,7 @@ const (
 	SystemMessageSummonOnlyOne                     = 580
 	SystemMessageYouCannotSummonInCombat           = 578
 	SystemMessageNotCallPetFromThisLocation        = 604
+	SystemMessageDoNotHaveFurtherSkillsToLearnS1   = 607
 	SystemMessageNoMoreSkillsToLearn               = 750
 	SystemMessageObserversCannotParticipate        = 781
 	SystemMessagePetCannotUseItem                  = 972
