@@ -6,6 +6,8 @@ import (
 
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/skill/skilltest"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target/targettest"
 	modelactor "github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -237,9 +239,12 @@ type fakeCubicFireOwner struct {
 	rollIdx  int
 	hp       int
 	maxHP    float64
+	attacker skilltarget.Actor
 }
 
 func (f *fakeCubicFireOwner) ObjectID() int32 { return f.objectID }
+
+func (f *fakeCubicFireOwner) Attacker() skilltarget.Actor { return f.attacker }
 
 func (f *fakeCubicFireOwner) Position() (int, int, int) { return f.x, f.y, f.z }
 
@@ -268,6 +273,15 @@ type fakeCubicTarget struct {
 	x, y, z    int
 	alikeDead  bool
 	siegeGuard bool
+	// refused makes the target one its attacker must force an attack on;
+	// checkedBy is the attacker last checked.
+	refused   bool
+	checkedBy skilltarget.Actor
+}
+
+func (f *fakeCubicTarget) AttackableWithoutForceBy(caster skilltarget.Actor) bool {
+	f.checkedBy = caster
+	return !f.refused
 }
 
 func (f *fakeCubicTarget) ObjectID() int32 { return f.objectID }
@@ -312,18 +326,30 @@ func TestDecideCubicFire_RejectsOutOfRangeTarget(t *testing.T) {
 	}
 }
 
-func TestDecideCubicFire_RejectsDeadTarget(t *testing.T) {
-	target := &fakeCubicTarget{objectID: 2, alikeDead: true}
-	owner := &fakeCubicFireOwner{objectID: 1, rolls: []int{0, 0}, target: target}
-	_, _, ok := DecideCubicFire(owner, []int{4049}, 100)
-	if ok {
-		t.Fatal("DecideCubicFire() = true for an already-dead target")
+// fakeCubicAttacker stands for a cubic's owner as an attacker.
+type fakeCubicAttacker struct {
+	targettest.Actor
+	world.Presence
+}
+
+// TestDecideCubicFire_RejectsTargetNeedingForce pins the enemy gate: the
+// owner's selection is fired at only when the owner may attack it without
+// forcing, as checked against the owner itself.
+func TestDecideCubicFire_RejectsTargetNeedingForce(t *testing.T) {
+	attacker := &fakeCubicAttacker{}
+	target := &fakeCubicTarget{objectID: 2, refused: true}
+	owner := &fakeCubicFireOwner{objectID: 1, rolls: []int{0, 0}, target: target, attacker: attacker}
+	if _, _, ok := DecideCubicFire(owner, []int{4049}, 100); ok {
+		t.Fatal("DecideCubicFire() = true for a target the owner must force an attack on")
+	}
+	if target.checkedBy != attacker {
+		t.Fatalf("checked against %v, want the owner's attacker", target.checkedBy)
 	}
 }
 
 func TestDecideLifeCubicTarget_SkipsWhenAtFullHP(t *testing.T) {
 	owner := &fakeCubicFireOwner{objectID: 1, hp: 100, maxHP: 100}
-	_, ok := DecideLifeCubicTarget(owner)
+	_, ok := DecideLifeCubicTarget(owner, nil)
 	if ok {
 		t.Fatal("DecideLifeCubicTarget() = true at full HP, want false")
 	}
@@ -331,7 +357,7 @@ func TestDecideLifeCubicTarget_SkipsWhenAtFullHP(t *testing.T) {
 
 func TestDecideLifeCubicTarget_HealsSelfWhenRollPasses(t *testing.T) {
 	owner := &fakeCubicFireOwner{objectID: 1, hp: 1, maxHP: 1000, rolls: []int{0}}
-	target, ok := DecideLifeCubicTarget(owner)
+	target, ok := DecideLifeCubicTarget(owner, nil)
 	if !ok {
 		t.Fatal("DecideLifeCubicTarget() = false despite low HP and a passing roll")
 	}

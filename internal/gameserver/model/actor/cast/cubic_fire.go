@@ -1,28 +1,36 @@
 package cast
 
 import (
-	"math"
-
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-// cubicMaxMagicRange is Cubic.MAX_MAGIC_RANGE: the 3D range (collision radii
-// included) both pickCubicEnemyTarget and DecideLifeCubicTarget scan within.
+// cubicMaxMagicRange is the 3D distance from its owner, collision radii
+// left out, within which a cubic picks an enemy or a party member to heal.
 const cubicMaxMagicRange = 900
 
 // CubicFireOwner is the narrow owner surface a cubic fire attempt reads
-// from: its currently selected target, its own RNG roll, and its own vitals
-// for the Life Cubic's self-heal gate.
+// from: its currently selected target, its own RNG roll, its own vitals
+// for the Life Cubic's self-heal gate, and itself as the attacker an enemy
+// must be attackable by without a forced attack.
 type CubicFireOwner interface {
 	Target() world.Tracked
 	Roll(n int) int
 	CurrentHP() int
 	MaxHPValue() float64
+	Attacker() skilltarget.Actor
+}
+
+// cubicEnemy is a selected object a cubic may fire at when its owner could
+// attack it without forcing.
+type cubicEnemy interface {
+	Target
+	AttackableWithoutForceBy(caster skilltarget.Actor) bool
 }
 
 // CubicGrantedLevel resolves the level a granted cubic actually fires its
@@ -64,21 +72,51 @@ func DecideCubicFire(owner CubicFireOwner, skillIDs []int, activationChance int)
 	return skillID, target, true
 }
 
-// DecideLifeCubicTarget is the life cubic's no-party friendly-target
-// fallback: heal the owner if under full HP, gated by an HP-ratio-banded
-// probability roll. The party-scan branch needs the
-// milestone-M8 party system and isn't reachable yet.
-func DecideLifeCubicTarget(owner CubicFireOwner) (Target, bool) {
-	self, ok := owner.(Target)
-	if !ok {
-		return nil, false
+// LifeCubicMember is one member of the Life Cubic owner's party as the
+// heal-target scan reads it.
+type LifeCubicMember struct {
+	Target  Target
+	Dead    bool
+	HPRatio float64
+}
+
+// DecideLifeCubicTarget picks the Life Cubic's heal target. In a party
+// (members non-nil, in party order, the owner among them) it is the living
+// member under full HP with the lowest HP ratio within range of the owner,
+// the first of equals; outside one it is the owner, when under full HP. A
+// target is then healed only on a roll banded by its HP ratio.
+func DecideLifeCubicTarget(owner CubicFireOwner, members []LifeCubicMember) (Target, bool) {
+	var (
+		target Target
+		ratio  = 1.0
+	)
+	if members != nil {
+		self, ok := owner.(Target)
+		if !ok {
+			return nil, false
+		}
+		ox, oy, oz := self.Position()
+		for _, m := range members {
+			if m.Dead || m.HPRatio >= 1.0 || ratio <= m.HPRatio {
+				continue
+			}
+			mx, my, mz := m.Target.Position()
+			if !location.In3DRadius(ox, oy, oz, mx, my, mz, cubicMaxMagicRange) {
+				continue
+			}
+			target, ratio = m.Target, m.HPRatio
+		}
+	} else {
+		self, ok := owner.(Target)
+		maxHP := owner.MaxHPValue()
+		if !ok || maxHP <= 0 {
+			return nil, false
+		}
+		if hpRatio := float64(owner.CurrentHP()) / maxHP; hpRatio < 1.0 {
+			target, ratio = self, hpRatio
+		}
 	}
-	maxHP := owner.MaxHPValue()
-	if maxHP <= 0 {
-		return nil, false
-	}
-	ratio := float64(owner.CurrentHP()) / maxHP
-	if ratio >= 1.0 {
+	if target == nil {
 		return nil, false
 	}
 
@@ -95,47 +133,30 @@ func DecideLifeCubicTarget(owner CubicFireOwner) (Target, bool) {
 	if roll > chance {
 		return nil, false
 	}
-	return self, true
-}
-
-// pickCubicEnemyTarget mirrors Cubic.pickEnemyTarget: the owner's currently
-// selected target, if within range and not already dead. A civilian NPC,
-// never attackable without force, is never one. The reference's full
-// isAttackableWithoutForceBy alignment/karma matrix is not replicated
-// here — deferred, see fatal10110/acis_golang#1129.
-func pickCubicEnemyTarget(owner CubicFireOwner) (Target, bool) {
-	selected := owner.Target()
-	if selected == nil {
-		return nil, false
-	}
-	combatant, ok := selected.(attackable.Combatant)
-	if !ok || combatant.AlikeDead() {
-		return nil, false
-	}
-	if civilian, ok := selected.(interface{ Folk() bool }); ok && civilian.Folk() {
-		return nil, false
-	}
-	target, ok := selected.(Target)
-	if !ok {
-		return nil, false
-	}
-	ownerTarget, ok := owner.(Target)
-	if !ok || !cubicWithinRange(ownerTarget, target) {
-		return nil, false
-	}
 	return target, true
 }
 
-func cubicWithinRange(a, b Target) bool {
-	ax, ay, az := a.Position()
-	bx, by, bz := b.Position()
-	dx := float64(ax - bx)
-	dy := float64(ay - by)
-	dz := float64(az - bz)
-	dist := math.Sqrt(dx*dx + dy*dy + dz*dz)
-
-	total := float64(cubicMaxMagicRange) + collisionRadius(a) + collisionRadius(b)
-	return dist <= total
+// pickCubicEnemyTarget picks a cubic's enemy: the owner's selected object,
+// within range of the owner, that the owner may attack without forcing.
+// Whether a dead one is affected is left to the fired skill.
+func pickCubicEnemyTarget(owner CubicFireOwner) (Target, bool) {
+	selected, ok := owner.Target().(cubicEnemy)
+	if !ok {
+		return nil, false
+	}
+	self, ok := owner.(Target)
+	if !ok {
+		return nil, false
+	}
+	ox, oy, oz := self.Position()
+	tx, ty, tz := selected.Position()
+	if !location.In3DRadius(ox, oy, oz, tx, ty, tz, cubicMaxMagicRange) {
+		return nil, false
+	}
+	if !selected.AttackableWithoutForceBy(owner.Attacker()) {
+		return nil, false
+	}
+	return selected, true
 }
 
 // ApplyCubicHeal restores HP directly, matching Cubic.useHealSkill: a flat

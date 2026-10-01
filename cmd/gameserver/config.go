@@ -945,6 +945,10 @@ func provideKillRewardConfig(paths gameServerPaths, serverProps *config.Properti
 	if err != nil {
 		return manager.KillRewardConfig{}, err
 	}
+	partyXP, err := partyXPRules(playersProps, serverProps)
+	if err != nil {
+		return manager.KillRewardConfig{}, err
+	}
 
 	return manager.KillRewardConfig{
 		Rates: item.Rates{
@@ -960,6 +964,35 @@ func provideKillRewardConfig(paths gameServerPaths, serverProps *config.Properti
 		DeepBlueDropRules: playersProps.Bool("UseDeepBlueDropRules", true),
 		PlayerLevels:      data.Levels,
 		PartyRange:        partyRange,
+		PartyXP:           partyXP,
+	}, nil
+}
+
+// partyXPRules reads how a party shares a kill: the cutoff from the players
+// file, the party rates from the server file.
+func partyXPRules(playersProps, serverProps *config.Properties) (player.PartyXPRules, error) {
+	cutoffLevel, err := playersProps.Int("PartyXpCutoffLevel", 20)
+	if err != nil {
+		return player.PartyXPRules{}, err
+	}
+	cutoffPercent, err := playersProps.Float64("PartyXpCutoffPercent", 3)
+	if err != nil {
+		return player.PartyXPRules{}, err
+	}
+	rateXP, err := serverProps.Float64("RatePartyXp", 1)
+	if err != nil {
+		return player.PartyXPRules{}, err
+	}
+	rateSP, err := serverProps.Float64("RatePartySp", 1)
+	if err != nil {
+		return player.PartyXPRules{}, err
+	}
+	return player.PartyXPRules{
+		Cutoff:        player.ParsePartyXPCutoff(playersProps.String("PartyXpCutoffMethod", "level")),
+		CutoffLevel:   cutoffLevel,
+		CutoffPercent: cutoffPercent,
+		RateXP:        rateXP,
+		RateSP:        rateSP,
 	}, nil
 }
 

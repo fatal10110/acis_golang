@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -124,10 +125,11 @@ func TestMonsterNeverAutoAttacksFolk(t *testing.T) {
 }
 
 // cubicOwner is a cubic's owner standing at its position with target
-// selected, whose every roll is 0.
+// selected, whose every roll is 0, attacking as attacker.
 type cubicOwner struct {
 	location.Location
-	target world.Tracked
+	target   world.Tracked
+	attacker skilltarget.Actor
 }
 
 func (o cubicOwner) ObjectID() int32         { return 1 }
@@ -136,6 +138,9 @@ func (o cubicOwner) Target() world.Tracked   { return o.target }
 func (o cubicOwner) Roll(int) int            { return 0 }
 func (o cubicOwner) CurrentHP() int          { return 1 }
 func (o cubicOwner) MaxHPValue() float64     { return 1 }
+func (o cubicOwner) Attacker() skilltarget.Actor {
+	return o.attacker
+}
 
 // TestCubicNeverFiresAtFolk pins Cubic.pickEnemyTarget's
 // isAttackableWithoutForceBy gate: a cubic whose owner has a civilian NPC
@@ -146,10 +151,11 @@ func TestCubicNeverFiresAtFolk(t *testing.T) {
 	f := w.spawnFolk(t, folkTemplate("Merchant", merchantID), 40)
 	monster := w.srv.SpawnHostileNPCAt(t, location.Location{X: w.at.X - 40, Y: w.at.Y, Z: w.at.Z})
 
-	if _, _, ok := actorcast.DecideCubicFire(cubicOwner{Location: w.at, target: f}, []int{4049}, 100); ok {
+	attacker := w.onlineCharacter(t)
+	if _, _, ok := actorcast.DecideCubicFire(cubicOwner{Location: w.at, target: f, attacker: attacker}, []int{4049}, 100); ok {
 		t.Fatal("a cubic fires at a selected civilian NPC")
 	}
-	if _, target, ok := actorcast.DecideCubicFire(cubicOwner{Location: w.at, target: monster}, []int{4049}, 100); !ok || target.ObjectID() != monster.ObjectID() {
+	if _, target, ok := actorcast.DecideCubicFire(cubicOwner{Location: w.at, target: monster, attacker: attacker}, []int{4049}, 100); !ok || target.ObjectID() != monster.ObjectID() {
 		t.Fatalf("control: cubic target = %v, %v, want the selected monster", target, ok)
 	}
 }
