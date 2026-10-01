@@ -78,8 +78,8 @@ func (sweepHandler) Types() []string { return []string{"SWEEP"} }
 // reset together with it — and applies the
 // skill's own self-targeted effects, if any. A caster that is not a player,
 // or a handler without ids to create items with, leaves every pool alone.
-// Sweeping has no slot check. Items go to the sweeper alone: splitting them
-// across a party waits for parties (#146).
+// Sweeping has no slot check. Items go to the sweeper alone: a partied
+// sweeper's items following the party's loot rule is #3157.
 func (h sweepHandler) Use(cast Cast) {
 	if h.ids == nil || cast.Caster == nil || cast.Caster.Kind() != actor.KindPlayer {
 		return

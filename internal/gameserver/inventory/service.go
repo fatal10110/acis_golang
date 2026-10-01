@@ -243,9 +243,9 @@ const (
 // owned one only goes to its owner. Callers pass an owner id they already
 // read, so one snapshot decides both the lock and the pickup.
 //
-// The full loot rule also admits members of the owner's looting party; this
-// narrower owner comparison is the repo's existing simplification, now stated
-// in one place instead of two.
+// The full loot rule also admits members of the owner's party or command
+// channel (#3157); this narrower owner comparison is stated in one place
+// instead of two.
 func LootLocked(ownerID, pickerID int32) bool {
 	return ownerID != 0 && ownerID != pickerID
 }

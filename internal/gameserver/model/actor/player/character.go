@@ -102,6 +102,9 @@ type Character struct {
 	// respawnRestoreHP is the fraction of max HP a revive restores when no
 	// Phoenix Blessing does it in full.
 	respawnRestoreHP float64
+	// partyBars gates the party-window refreshes vitals changes send; see
+	// PartyWindowStale.
+	partyBars partyBars
 
 	Face, HairStyle, HairColor int
 

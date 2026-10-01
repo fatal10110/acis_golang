@@ -84,6 +84,10 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x20: true, // request linked html
 		0x21: true, // request bypass command
 		0x23: true, // dummy packet
+		0x29: true, // invite to party
+		0x2a: true, // answer party invitation
+		0x2b: true, // leave party
+		0x2c: true, // expel party member
 		0x2e: true, // dummy packet
 		0x2f: true, // request magic skill use
 		0x30: true, // appearing
