@@ -46,6 +46,10 @@ const (
 	BypassEnchantSkillList
 	// BypassFishSkillList opens the fishing skills list.
 	BypassFishSkillList
+	// BypassAugmentMake opens the augmentation window.
+	BypassAugmentMake
+	// BypassAugmentCancel opens the augmentation removal window.
+	BypassAugmentCancel
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -96,8 +100,9 @@ var fishermanCommands = []string{"FishingChampionship", "FishingReward"}
 // and EnchantSkillList open the skills to learn and to enchant. Then the
 // generic ones: Chat <n> opens chat page n (page 0 when n does not parse),
 // Link <path> opens data/html/<path>, multisell <list> and exc_multisell
-// <list> open a multisell list. Every other command belongs to a system not
-// in place yet.
+// <list> open a multisell list, and Augment 1 and Augment 2 open the
+// augmentation and removal windows. Every other command belongs to a system
+// not in place yet.
 func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command string) BypassReply {
 	karma := talker.Karma
 	kind := hostileKind(f.Instance)
@@ -190,6 +195,27 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		return reply
 	case strings.HasPrefix(command, "exc_multisell"):
 		reply.Outcome, reply.Multisell, reply.InventoryOnly = BypassMultisell, strings.TrimFunc(command[len("exc_multisell"):], javaSpace), true
+		return reply
+	case strings.HasPrefix(command, "Augment"):
+		// The choice is the one character after "Augment ": a command too
+		// short to hold it, or one that is no digit, stops the handling.
+		if len(command) < 9 {
+			reply.Outcome = BypassAborted
+			return reply
+		}
+		choice, err := strconv.Atoi(strings.TrimFunc(command[8:9], func(r rune) bool { return r <= ' ' }))
+		if err != nil {
+			reply.Outcome = BypassAborted
+			return reply
+		}
+		switch choice {
+		case 1:
+			reply.Outcome = BypassAugmentMake
+		case 2:
+			reply.Outcome = BypassAugmentCancel
+		default:
+			reply.Outcome = BypassRefused
+		}
 		return reply
 	}
 	return reply

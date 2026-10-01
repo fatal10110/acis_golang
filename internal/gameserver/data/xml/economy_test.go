@@ -341,6 +341,22 @@ func TestLoadEconomyDataErrors(t *testing.T) {
 			t.Fatal("expected an error for an out-of-int32-range skillId, got nil")
 		}
 	})
+
+	// A stat option names one of its color block's 13 stat tables by
+	// position, so a block short of them would leave ids that resolve to
+	// nothing: the load refuses it.
+	t.Run("augmentation stat block short of stats", func(t *testing.T) {
+		augDir := filepath.Join(dir, "augmentation-short")
+		if err := os.MkdirAll(augDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		writeXMLFixture(t, filepath.Join(augDir, "skills.xml"), `<list><augmentation id="14561" skillId="3203" skillLevel="1" type="blue"/></list>`)
+		writeXMLFixture(t, filepath.Join(augDir, "stats.xml"), `<list><set order="0"><stat name="pDef"><table name="#soloValues">1</table><table name="#combinedValues">1</table></stat></set></list>`)
+		_, err := LoadAugmentations(augDir)
+		if err == nil || !strings.Contains(err.Error(), "order 0: 1 stats, want 13") {
+			t.Fatalf("LoadAugmentations error = %v, want the short stat block named", err)
+		}
+	})
 }
 
 func bucketCount(buckets [10][]int) int {

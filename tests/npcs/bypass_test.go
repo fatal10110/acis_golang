@@ -337,3 +337,42 @@ func encodeTradeRequest(objectID int32) []byte {
 	w.WriteInt32(objectID)
 	return w.Bytes()
 }
+
+// TestBypassAugmentOpensVariationWindows pins a blacksmith's Augment
+// command: "Augment 1" prompts for the item to augment and opens the
+// augmentation window, "Augment 2" prompts for the item to restore and opens
+// the removal window, each then released by the dispatcher; any other
+// choice is only released, and a choice too short or not a digit aborts
+// with nothing sent.
+func TestBypassAugmentOpensVariationWindows(t *testing.T) {
+	t.Parallel()
+	w := bootFolkWorld(t, dialogPages(), noBypassReuse)
+	smith := w.spawnFolk(t, folkTemplate("Trainer", 30300), 50)
+
+	for _, tc := range []struct {
+		command string
+		want    []byte
+		message int32
+		window  uint16
+	}{
+		{"Augment 1", []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeExtended, serverpackets.OpcodeActionFailed}, serverpackets.SystemMessageSelectItemToAugment, serverpackets.OpcodeExShowVariationMakeWindow},
+		{"Augment 2", []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeExtended, serverpackets.OpcodeActionFailed}, serverpackets.SystemMessageSelectItemToRemoveAugmentation, serverpackets.OpcodeExShowVariationCancelWindow},
+		{"Augment 3", releaseOnly, 0, 0},
+		{"Augment", nil, 0, 0},
+		{"Augment x", nil, 0, 0},
+	} {
+		w.openAnyNpcPage(t)
+		frames := w.bypass(t, npcCommand(smith, tc.command))
+		assertAnswer(t, frames, tc.want, smith, "")
+		if tc.message == 0 {
+			continue
+		}
+		if got := wire.NewReader(frames[0][1:]).ReadInt32(); got != tc.message {
+			t.Fatalf("%s: system message = %d, want %d", tc.command, got, tc.message)
+		}
+		r := wire.NewReader(frames[1][1:])
+		if sub := r.ReadUint16(); sub != tc.window || r.Remaining() != 0 {
+			t.Fatalf("%s: window = %#x with %d more bytes, want %#x alone", tc.command, sub, r.Remaining(), tc.window)
+		}
+	}
+}

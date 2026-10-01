@@ -74,8 +74,7 @@ func (s *ItemStore) WriteBatch(ctx context.Context, batch item.FlushBatch) error
 // particular order.
 func (s *ItemStore) ListByOwner(ctx context.Context, ownerID int32) ([]*item.Instance, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT object_id, item_id, count, enchant_level, loc, loc_data, custom_type1, custom_type2, mana_left, time
-		 FROM items WHERE owner_id = ? ORDER BY loc_data`, ownerID)
+		itemSelect+` WHERE i.owner_id = ? ORDER BY i.loc_data`, ownerID)
 	if err != nil {
 		return nil, fmt.Errorf("list items for owner %d: %w", ownerID, err)
 	}
@@ -108,8 +107,7 @@ func (s *ItemStore) ListByOwnerAndLocations(ctx context.Context, ownerID int32, 
 	}
 
 	rows, err := s.db.QueryContext(ctx,
-		fmt.Sprintf(`SELECT object_id, item_id, count, enchant_level, loc, loc_data, custom_type1, custom_type2, mana_left, time
-		 FROM items WHERE owner_id = ? AND loc IN (%s) ORDER BY loc_data`, placeholders),
+		fmt.Sprintf(itemSelect+` WHERE i.owner_id = ? AND i.loc IN (%s) ORDER BY i.loc_data`, placeholders),
 		args...)
 	if err != nil {
 		return nil, fmt.Errorf("list items for owner %d: %w", ownerID, err)
@@ -123,16 +121,27 @@ func (s *ItemStore) ListByOwnerAndLocations(ctx context.Context, ownerID int32, 
 	return out, nil
 }
 
+// itemSelect reads an items row together with the augmentation its item
+// carries, if any.
+const itemSelect = `SELECT i.object_id, i.item_id, i.count, i.enchant_level, i.loc, i.loc_data,
+		i.custom_type1, i.custom_type2, i.mana_left, i.time, a.attributes, a.skill_id, a.skill_level
+	 FROM items i LEFT JOIN augmentations a ON a.item_oid = i.object_id`
+
 func scanItems(rows *sql.Rows, ownerID int32) ([]*item.Instance, error) {
 	out := []*item.Instance{}
 	for rows.Next() {
 		var inst item.Instance
 		var loc string
+		var attributes, skillID, skillLevel sql.NullInt32
 		inst.OwnerID = ownerID
 
 		if err := rows.Scan(&inst.ObjectID, &inst.TemplateID, &inst.Count, &inst.EnchantLevel,
-			&loc, &inst.LocationData, &inst.CustomType1, &inst.CustomType2, &inst.ManaLeft, &inst.Time); err != nil {
+			&loc, &inst.LocationData, &inst.CustomType1, &inst.CustomType2, &inst.ManaLeft, &inst.Time,
+			&attributes, &skillID, &skillLevel); err != nil {
 			return nil, err
+		}
+		if attributes.Valid {
+			inst.Augmentation = &item.Augmentation{Attributes: attributes.Int32, SkillID: skillID.Int32, SkillLevel: skillLevel.Int32}
 		}
 		parsed, err := item.ParseLocation(loc)
 		if err != nil {

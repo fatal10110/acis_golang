@@ -5,11 +5,12 @@ package item
 const PaperdollSlots = 17
 
 // PaperdollEntry is the contents of one equip-array position: which item
-// occupies it, and at what enchant level. The zero value means nothing is
-// equipped there.
+// occupies it, at what enchant level, and the augmentation id it carries
+// (0 for none). The zero value means nothing is equipped there.
 type PaperdollEntry struct {
 	ObjectID, TemplateID int32
 	EnchantLevel         int
+	AugmentationID       int32
 }
 
 // Paperdoll builds the fixed-size equip array the client expects from a
@@ -29,6 +30,9 @@ func Paperdoll(items []*Instance) [PaperdollSlots]PaperdollEntry {
 			ObjectID:     st.ObjectID,
 			TemplateID:   st.TemplateID,
 			EnchantLevel: st.EnchantLevel,
+		}
+		if st.Augmentation != nil {
+			out[st.LocationData].AugmentationID = st.Augmentation.Attributes
 		}
 	}
 	return out

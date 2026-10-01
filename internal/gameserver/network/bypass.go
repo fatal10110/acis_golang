@@ -222,6 +222,12 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		l.showFishSkillList(live)
 	case npc.BypassAborted:
 		return false
+	case npc.BypassAugmentMake:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSelectItemToAugment))
+		live.SendFrame(serverpackets.FrameExShowVariationMakeWindow())
+	case npc.BypassAugmentCancel:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSelectItemToRemoveAugmentation))
+		live.SendFrame(serverpackets.FrameExShowVariationCancelWindow())
 	case npc.BypassUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Str("command", command).Msg("bypass: npc dialog command not modeled")
 	case npc.BypassRefused:

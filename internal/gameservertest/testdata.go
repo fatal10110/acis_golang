@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -205,6 +206,17 @@ const PetResurrectionScrollID int32 = 6387
 // ItemSkills scroll whose skill, 2239, also names the scroll as its own
 // consume item, so one use destroys the carrier and then the skill's item.
 const SelfConsumingScrollID int32 = 8379
+
+// StormbringerID is a C-grade sword (datapack item 72, 916 crystals): the
+// lowest grade a life stone augments.
+const StormbringerID int32 = 72
+
+// LifeStone46ID is the no-grade level 46 life stone (datapack item 8723).
+const LifeStone46ID int32 = 8723
+
+// GemstoneDID is Gemstone D (datapack item 2130), the gemstone augmenting a
+// C- or B-grade weapon consumes.
+const GemstoneDID int32 = 2130
 
 // FormalWearID is the full-body formal dress (bodypart alldress) that forbids
 // item and skill use while worn.
@@ -608,6 +620,43 @@ func ItemTemplates() *item.Table {
 			AttachedSkills: []item.SkillRef{{ID: 2048, Level: 1}},
 			Weight:         40,
 		},
+		{
+			ID:           StormbringerID,
+			Name:         "Stormbringer",
+			Kind:         item.KindWeapon,
+			Slot:         item.SlotRHand,
+			Duration:     -1,
+			Crystal:      item.CrystalC,
+			CrystalCount: 916,
+			Dropable:     true,
+			Tradable:     true,
+			Sellable:     true,
+			Destroyable:  true,
+			Depositable:  true,
+			Weapon:       &item.WeaponDetail{Type: item.WeaponSword, SoulshotCount: 1, SpiritshotCount: 1},
+		},
+		{
+			ID:          LifeStone46ID,
+			Name:        "Life Stone: level 46",
+			Kind:        item.KindEtcItem,
+			Duration:    -1,
+			Stackable:   true,
+			Dropable:    true,
+			Tradable:    true,
+			Destroyable: true,
+			EtcItem:     &item.EtcItemDetail{Type: item.EtcItemMaterial},
+		},
+		{
+			ID:          GemstoneDID,
+			Name:        "Gemstone D",
+			Kind:        item.KindEtcItem,
+			Duration:    -1,
+			Stackable:   true,
+			Dropable:    true,
+			Tradable:    true,
+			Destroyable: true,
+			EtcItem:     &item.EtcItemDetail{Type: item.EtcItemMaterial},
+		},
 	})
 }
 
@@ -669,4 +718,66 @@ func (s *Server) giveItem(tb testing.TB, ownerID, templateID, count int32) int32
 		tb.Fatalf("give item: %v", err)
 	}
 	return objectID
+}
+
+// Augmentation skill ids of AugmentationTable, by color: every life stone
+// level's one blue, purple and red option names one of them at level 1.
+const (
+	AugmentBlueSkillID   int32 = 3203
+	AugmentPurpleSkillID int32 = 3243
+	AugmentRedSkillID    int32 = 3256
+)
+
+// augmentationStatNames are a color block's 13 stat tables in the shipped
+// order.
+var augmentationStatNames = [...]string{"pDef", "mDef", "maxHp", "maxMp", "maxCp", "pAtk", "mAtk", "regHp", "regMp", "regCp", "rEvas", "accCombat", "rCrit"}
+
+// AugmentationStatValue is AugmentationTable's solo value of stat table
+// index stat (0 pDef .. 12 rCrit) in color block color; its combined value
+// is half of it. Every level reads the same value.
+func AugmentationStatValue(color, stat int) float32 {
+	return float32(10*(stat+1) + color)
+}
+
+// AugmentationTable builds a small augmentation table shaped like the
+// shipped one: four color blocks of the 13 stat tables, each holding one
+// value (AugmentationStatValue) every level reads, and per life stone level
+// one blue, purple and red skill option, ids 14561 + level*178 + 0, 1, 2.
+func AugmentationTable(t testing.TB) *augmentation.Table {
+	t.Helper()
+	var groups []augmentation.StatGroup
+	for color := range 4 {
+		var stats []augmentation.Stat
+		for i, name := range augmentationStatNames {
+			v := AugmentationStatValue(color, i)
+			stat, err := augmentation.NewStat(name, []float32{v}, []float32{v / 2})
+			if err != nil {
+				t.Fatalf("augmentation stat: %v", err)
+			}
+			stats = append(stats, stat)
+		}
+		group, err := augmentation.NewStatGroup(color, stats)
+		if err != nil {
+			t.Fatalf("augmentation stat group: %v", err)
+		}
+		groups = append(groups, group)
+	}
+	var skills []augmentation.Skill
+	for level := range 10 {
+		for i, c := range []struct {
+			color   string
+			skillID int32
+		}{{"blue", AugmentBlueSkillID}, {"purple", AugmentPurpleSkillID}, {"red", AugmentRedSkillID}} {
+			s, err := augmentation.NewSkill(14561+level*178+i, c.skillID, 1, c.color)
+			if err != nil {
+				t.Fatalf("augmentation skill: %v", err)
+			}
+			skills = append(skills, s)
+		}
+	}
+	table, err := augmentation.NewTable(groups, skills)
+	if err != nil {
+		t.Fatalf("augmentation table: %v", err)
+	}
+	return table
 }

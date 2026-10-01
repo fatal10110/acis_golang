@@ -8,11 +8,13 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/rs/zerolog"
 )
 
@@ -45,6 +47,9 @@ type Persistence struct {
 	worker             *persist.Worker
 	log                zerolog.Logger
 	storeSkillCooltime atomic.Bool
+	// augments resolves an augmented weapon's stat bonuses; nil grants
+	// none. Set once at boot, before any character is in the world.
+	augments *augmentation.Table
 }
 
 // NewPersistence returns a lifecycle persistence component backed by store and
@@ -79,6 +84,21 @@ func (p *Persistence) SetPersistWorker(w *persist.Worker, log zerolog.Logger) {
 	if p != nil {
 		p.worker, p.log = w, log
 	}
+}
+
+// SetAugmentations makes the bonuses of t's augmentations apply while an
+// augmented weapon is worn. Call it once at boot, before any character
+// enters the world. It fails when a bonus names a stat that does not exist.
+func (p *Persistence) SetAugmentations(t *augmentation.Table) error {
+	if t != nil {
+		for _, name := range t.BonusStats() {
+			if _, err := stat.ByName(name); err != nil {
+				return fmt.Errorf("augmentation bonus: %w", err)
+			}
+		}
+	}
+	p.augments = t
+	return nil
 }
 
 // SetStoreSkillCooltime controls persistence of effects and reuse timers.
@@ -356,7 +376,8 @@ func (p *Persistence) persistKnownSkill(c *player.Character, skillID, level int)
 
 // EquipItemStats attaches the stat functions inst's template contributes
 // while equipped and grants its item skills, mirroring the equip listeners in
-// their order: the item's equip modifiers owned by the instance first, then —
+// their order: the item's equip modifiers owned by the instance first, then
+// an augmented weapon's augmentation (see EquipItemStatsReporting), then —
 // unless inst is a weapon above the character's Expertise — a weapon's +4
 // enchant skill while inst is at +4 or higher, then every
 // item.Template.AttachedSkills entry (any activation), each added to c's
@@ -366,8 +387,38 @@ func (p *Persistence) persistKnownSkill(c *player.Character, skillID, level int)
 // timersChanged report whether the caller must resend SkillList and
 // SkillCoolTime respectively.
 func (p *Persistence) EquipItemStats(c *player.Character, inst *item.Instance, tmpl *item.Template) (skillsChanged, timersChanged bool, err error) {
+	return p.EquipItemStatsReporting(c, inst, tmpl, nil)
+}
+
+// AugmentChange reports what applying or removing an augmentation changed
+// beyond its stat bonuses: whether its skill was granted or removed, so
+// SkillList must be resent, and whether that skill came back still waiting
+// out its reuse, so SkillCoolTime must be sent too.
+type AugmentChange struct {
+	SkillsChanged bool
+	TimersChanged bool
+}
+
+// EquipItemStatsReporting is EquipItemStats with the augmentation of an
+// augmented weapon applied between the item's own functions and its
+// skills, as the reference's skill listener does ahead of its grade
+// penalty check: its stat bonuses attach without a stat report and its
+// skill, if any, is granted. augmented, when not nil, is told what that
+// changed at that moment, for a caller that answers it with its own
+// packets; a nil augmented folds it into the result instead.
+func (p *Persistence) EquipItemStatsReporting(c *player.Character, inst *item.Instance, tmpl *item.Template, augmented func(AugmentChange)) (skillsChanged, timersChanged bool, err error) {
 	if p == nil || c == nil || inst == nil || tmpl == nil {
 		return false, false, nil
+	}
+	aug, augmentedWeapon := inst.AugmentationValue()
+	augmentedWeapon = augmentedWeapon && tmpl.Weapon != nil
+	var augMods []effect.Mod
+	var augGrant *itemSkillGrant
+	if augmentedWeapon {
+		augMods, augGrant, err = p.augmentationGrant(inst, aug)
+		if err != nil {
+			return false, false, fmt.Errorf("apply augmentation for character %d item %d: %w", c.ID, inst.ObjectID, err)
+		}
 	}
 	owner := effect.ItemOwner{Inst: inst, Tmpl: tmpl}
 	modFns, err := effect.ItemModifierFuncs(owner)
@@ -396,8 +447,76 @@ func (p *Persistence) EquipItemStats(c *player.Character, inst *item.Instance, t
 		grants = append(grants, attached...)
 	}
 	c.AddStatFuncs(modFns)
-	skillsChanged, timersChanged = p.grantItemSkills(c, grants)
-	return skillsChanged, timersChanged, nil
+	if augmentedWeapon {
+		change := p.applyAugmentation(c, augMods, augGrant)
+		if augmented != nil {
+			augmented(change)
+		} else {
+			skillsChanged, timersChanged = change.SkillsChanged, change.TimersChanged
+		}
+	}
+	itemSkills, itemTimers := p.grantItemSkills(c, grants)
+	return skillsChanged || itemSkills, timersChanged || itemTimers, nil
+}
+
+// augmentationGrant resolves what aug, carried by inst, applies: its stat
+// bonuses owned by the augmentation, and its skill when it names a loaded
+// one.
+func (p *Persistence) augmentationGrant(inst *item.Instance, aug item.Augmentation) ([]effect.Mod, *itemSkillGrant, error) {
+	var mods []effect.Mod
+	if p.augments != nil {
+		for _, b := range p.augments.Bonuses(aug.Attributes) {
+			s, err := stat.ByName(b.Stat)
+			if err != nil {
+				return nil, nil, err
+			}
+			mods = append(mods, effect.Mod{Stat: s, Op: effect.OpAdd, Value: float64(b.Value), Owner: effect.ModOwnerAugmentation(inst)})
+		}
+	}
+	if aug.SkillID == 0 {
+		return mods, nil, nil
+	}
+	def, ok := p.definition(modelskill.Ref{ID: modelskill.ID(aug.SkillID), Level: int(aug.SkillLevel)})
+	if !ok {
+		return mods, nil, nil
+	}
+	g := itemSkillGrant{def: def, noEquipDelay: true}
+	if def.Activation == modelskill.ActivationPassive {
+		fns, err := effect.PassiveFuncs(def)
+		if err != nil {
+			return nil, nil, fmt.Errorf("skill %d level %d: %w", aug.SkillID, aug.SkillLevel, err)
+		}
+		g.fns = fns
+	}
+	return mods, &g, nil
+}
+
+// applyAugmentation attaches an augmentation's stat bonuses, which report
+// no stat change of their own, then grants its skill. An active skill whose
+// reuse is still running when it comes back is disabled until it ends.
+func (p *Persistence) applyAugmentation(c *player.Character, mods []effect.Mod, grant *itemSkillGrant) AugmentChange {
+	c.AttachStatFuncs(mods)
+	if grant == nil {
+		return AugmentChange{}
+	}
+	p.grantItemSkills(c, []itemSkillGrant{*grant})
+	change := AugmentChange{SkillsChanged: true}
+	if grant.def.Activation == modelskill.ActivationActive {
+		change.TimersChanged = c.RedisableSkillReuse(cast.ReuseKey(grant.def))
+	}
+	return change
+}
+
+// removeAugmentation detaches the stat bonuses of the augmentation inst
+// carries, then takes its skill away when it names a loaded one.
+func (p *Persistence) removeAugmentation(c *player.Character, inst *item.Instance) AugmentChange {
+	c.RemoveStatsByOwner(effect.ModOwnerAugmentation(inst))
+	aug, ok := inst.AugmentationValue()
+	if !ok || aug.SkillID == 0 || !p.HasDefinition(modelskill.Ref{ID: modelskill.ID(aug.SkillID), Level: int(aug.SkillLevel)}) {
+		return AugmentChange{}
+	}
+	removeItemSkill(c, int(aug.SkillID))
+	return AugmentChange{SkillsChanged: true}
 }
 
 // enchant4SkillGrant resolves tmpl's +4 enchant skill. ok is false for a
@@ -533,7 +652,8 @@ func (p *Persistence) grantItemSkills(c *player.Character, grants []itemSkillGra
 
 // UnequipItemStats removes every stat function inst contributed via
 // EquipItemStats, mirroring the unequip listeners in their order: the
-// instance's own functions first, then — for a weapon at +4 or higher — its
+// instance's own functions first, then an augmented weapon's augmentation
+// (see UnequipItemStatsReporting), then — for a weapon at +4 or higher — its
 // +4 enchant skill, then — unless inv still has another equipped item
 // sharing tmpl's id — every tmpl.AttachedSkills entry leaves c's known-skill
 // set with the stat functions of the level c knows it at. Each removal
@@ -546,12 +666,30 @@ func (p *Persistence) grantItemSkills(c *player.Character, grants []itemSkillGra
 // the reference's unequip listener does. No reuse timer armed by the
 // equip-delay grant is cleared, matching the reference.
 func (p *Persistence) UnequipItemStats(c *player.Character, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) (skillsChanged bool) {
+	return p.UnequipItemStatsReporting(c, inv, inst, tmpl, nil)
+}
+
+// UnequipItemStatsReporting is UnequipItemStats with the augmentation of an
+// augmented weapon removed between the item's own functions and its +4
+// skill, as the reference's skill listener does: its stat bonuses detach
+// with their own stat report, then its skill, if any, leaves. augmented,
+// when not nil, is told what that changed at that moment; a nil augmented
+// folds it into the result instead.
+func (p *Persistence) UnequipItemStatsReporting(c *player.Character, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template, augmented func(AugmentChange)) (skillsChanged bool) {
 	if c == nil || inst == nil {
 		return false
 	}
 	c.RemoveStatsByOwner(effect.ModOwnerItem(effect.ItemOwner{Inst: inst, Tmpl: tmpl}))
 	if tmpl == nil {
 		return false
+	}
+	if tmpl.Weapon != nil && inst.Augmented() {
+		change := p.removeAugmentation(c, inst)
+		if augmented != nil {
+			augmented(change)
+		} else {
+			skillsChanged = change.SkillsChanged
+		}
 	}
 	if inst.Snapshot().EnchantLevel >= item.Enchant4SkillLevel && p.RevokeEnchant4Skill(c, tmpl) {
 		skillsChanged = true

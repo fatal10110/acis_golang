@@ -507,6 +507,72 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if live != nil {
 					onLive(live, func() { l.handleMagicSkillUseGround(live, req) })
 				}
+			case clientpackets.OpcodeRequestConfirmTargetItem:
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestConfirmTargetItem)
+				if err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					continue
+				}
+				if live != nil {
+					onLive(live, func() { l.confirmAugmentTarget(live, req) })
+				}
+			case clientpackets.OpcodeRequestConfirmRefinerItem:
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestConfirmRefinerItem)
+				if err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					continue
+				}
+				if live != nil {
+					onLive(live, func() { l.confirmAugmentRefiner(live, req) })
+				}
+			case clientpackets.OpcodeRequestConfirmGemStone:
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestConfirmGemStone)
+				if err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					continue
+				}
+				if live != nil {
+					onLive(live, func() { l.confirmAugmentGemstone(live, req) })
+				}
+			case clientpackets.OpcodeRequestRefine:
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestRefine)
+				if err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					continue
+				}
+				if live != nil {
+					onLive(live, func() { l.refineAugment(live, req) })
+				}
+			case clientpackets.OpcodeRequestConfirmCancelItem:
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestConfirmCancelItem)
+				if err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					continue
+				}
+				if live != nil {
+					onLive(live, func() { l.confirmAugmentCancel(live, req) })
+				}
+			case clientpackets.OpcodeRequestRefineCancel:
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestRefineCancel)
+				if err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					continue
+				}
+				if live != nil {
+					onLive(live, func() { l.cancelAugment(live, req) })
+				}
 			case clientpackets.OpcodeRequestCursedWeaponLocation:
 				if live == nil {
 					continue
