@@ -120,6 +120,8 @@ type Character struct {
 	// fallingUntil is owned by the player's packet queue; ValidatePosition
 	// is its only reader and writer.
 	fallingUntil time.Time
+	// blockingAll is the block-everything mode; see character_blockall.go.
+	blockingAll atomic.Bool
 
 	// KarmaPoints is the persisted karma value. The field is named
 	// KarmaPoints, not Karma, so it doesn't collide with the Karma() method

@@ -244,6 +244,15 @@ const sevenSignsStatusSchema = "CREATE TABLE IF NOT EXISTS `seven_signs_status` 
 	"  PRIMARY KEY  (`id`)\n" +
 	")"
 
+// characterRelationsSchema mirrors the shipped character_relations table
+// definition verbatim.
+const characterRelationsSchema = "CREATE TABLE IF NOT EXISTS `character_relations` (\n" +
+	"  `char_id` INT UNSIGNED NOT NULL default 0,\n" +
+	"  `friend_id` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `relation` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  PRIMARY KEY (`char_id`,`friend_id`)\n" +
+	")"
+
 // sevenSignsStatusSeed seeds the single status row the gameserver reads and
 // writes, matching the shipped schema seed.
 const sevenSignsStatusSeed = "INSERT IGNORE INTO `seven_signs_status` VALUES " +
@@ -274,6 +283,7 @@ var schemaStmts = []string{
 	itemsOnGroundSchema, characterSkillsSchema, characterShortcutsSchema,
 	characterHennasSchema, characterRecipeBookSchema, petsSchema, characterSkillsSaveSchema,
 	sevenSignsStatusSchema, buylistsSchema, characterSubclassesSchema,
+	characterRelationsSchema,
 }
 
 var seedStmts = []string{sevenSignsStatusSeed}

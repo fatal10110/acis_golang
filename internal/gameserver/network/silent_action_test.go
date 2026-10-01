@@ -96,6 +96,13 @@ import (
 // RequestConfirmCancelItem naming an item the player does not hold get
 // nothing, as in the reference: the window registers no pending client
 // action and only asks again on the next item dropped into it.
+//
+// Four friend and block branches are absent too, each silent in the
+// reference: RequestAnswerFriendInvite with no answerable invitation (the
+// dialog closed when the client answered), RequestBlock unblocking a name
+// not on the block list or naming a type no command sends, and
+// RequestSendL2FriendSay with an empty or over-long message. None registers
+// a pending client action; tests/social asserts those silences.
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 
@@ -139,6 +146,10 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		// that follows is refused without a message of its own.
 		{"RequestActionUse private store sell", encodeRequestActionUse(10, false, false), []byte{serverpackets.OpcodePrivateStoreManageListSell}},
 		{"RequestActionUse private store buy while setting up a sell store", encodeRequestActionUse(28, false, false), []byte{serverpackets.OpcodeActionFailed}},
+		{"RequestFriendInvite naming nobody online", encodeNamedRequest(clientpackets.OpcodeRequestFriendInvite, "Nobody"), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeFriendAddRequestResult}},
+		{"RequestFriendDel naming no friend", encodeNamedRequest(clientpackets.OpcodeRequestFriendDel, "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestBlock naming no character", encodeRequestBlock(clientpackets.BlockAdd, "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestSendL2FriendSay to no friend", encodeRequestSendL2FriendSay("hi", "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
 	}
 
 	for _, tc := range cases {
@@ -191,5 +202,27 @@ func encodeRequestPreviewItem(listID int32, itemIDs ...int32) []byte {
 	for _, id := range itemIDs {
 		w.WriteInt32(id)
 	}
+	return w.Bytes()
+}
+
+func encodeNamedRequest(opcode byte, name string) []byte {
+	w := wire.NewPacketWriter(opcode)
+	w.WriteString(name)
+	return w.Bytes()
+}
+
+func encodeRequestBlock(typ int32, name string) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestBlock)
+	w.WriteInt32(typ)
+	if typ == clientpackets.BlockAdd || typ == clientpackets.BlockRemove {
+		w.WriteString(name)
+	}
+	return w.Bytes()
+}
+
+func encodeRequestSendL2FriendSay(message, recipient string) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestSendL2FriendSay)
+	w.WriteString(message)
+	w.WriteString(recipient)
 	return w.Bytes()
 }

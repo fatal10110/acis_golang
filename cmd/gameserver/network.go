@@ -25,6 +25,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -93,6 +94,8 @@ func provideGameClientLink(
 	worker *persist.Worker,
 	itemWrites *persist.Order,
 	pool *sim.Pool,
+	relations *relation.Manager,
+	characters *gamesql.CharacterStore,
 	log zerolog.Logger,
 ) (*network.GameClientLink, error) {
 	enchantCfg := gameplay.Enchant
@@ -196,6 +199,9 @@ func provideGameClientLink(
 		Augmentations:       data.Augmentations,
 		AugmentationChances: gameplay.AugmentationChances,
 		ArmorSets:           data.ArmorSets,
+
+		Relations:  relations,
+		Characters: characters,
 	})
 	if err != nil {
 		return nil, err

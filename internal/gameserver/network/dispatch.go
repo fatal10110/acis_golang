@@ -1,6 +1,7 @@
 package network
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"errors"
@@ -48,6 +49,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/symbolmaker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
@@ -323,6 +325,12 @@ type GameClientLink struct {
 	// skillEnchantRoll supplies skill-enchant dice rolls in [0,99];
 	// overridden in tests for a deterministic outcome.
 	skillEnchantRoll func() int
+
+	// relations, friendInvites and characters back the friend and block
+	// lists; see friends.go.
+	relations     *relation.Manager
+	friendInvites *relation.Invites
+	characters    characterDirectory
 }
 
 // AIRegistry owns recurring actor-AI registrations.
@@ -436,6 +444,14 @@ type GameClientLinkConfig struct {
 	// TradeClock times direct-trade, party and command channel requests
 	// out; nil means time.Now.
 	TradeClock func() time.Time
+	// Relations holds the friend and block lists; nil starts with none and
+	// keeps what changes in memory only.
+	Relations *relation.Manager
+	// Characters finds characters, online or not, by name and id for the
+	// friend and block commands; nil finds none.
+	Characters characterDirectory
+	// FriendInviteClock times friend invitations out; nil means time.Now.
+	FriendInviteClock func() time.Time
 	// EnchantRoll supplies enchant dice rolls in [0,1); nil falls back to
 	// the random source. Behavior harnesses inject a deterministic roll.
 	EnchantRoll func() float64
@@ -532,6 +548,9 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		petItems:         petitem.NewService(cfg.IDs),
 		trades:           tradebook.NewBook(cfg.TradeClock),
 		parties:          party.NewRegistry[*livePlayer](cfg.TradeClock),
+		relations:        cmp.Or(cfg.Relations, relation.NewManager(nil)),
+		friendInvites:    relation.NewInvites(cfg.FriendInviteClock),
+		characters:       cfg.Characters,
 		enchantState:     enchantflow.NewState(),
 		targets:          skilltarget.NewRegistry(skilltarget.WorldKnown{State: cfg.World}),
 		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(cfg.Skills, cfg.PlayerConfig.MagicFailures, cfg.HealSps, handlerskill.SignetDeps{

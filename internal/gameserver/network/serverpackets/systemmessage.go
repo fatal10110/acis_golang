@@ -537,3 +537,29 @@ const (
 	SystemMessageOnlyLevel1ClanOrHigherCanUseWarehouse = 710
 	SystemMessageCharacterDoesNotExist                 = 873
 )
+
+// Friend list, block list and block-everything messages.
+const (
+	SystemMessageS1AddedToFriends                   = 132
+	SystemMessageS1JoinedAsFriend                   = 479
+	SystemMessageS1DeletedFromFriendsList           = 481
+	SystemMessageCannotAddYourselfToFriendsList     = 482
+	SystemMessageS1AlreadyInFriendsList             = 484
+	SystemMessageUserNotInFriendsList               = 486
+	SystemMessageFriendListHeader                   = 487
+	SystemMessageS1Online                           = 488
+	SystemMessageS1Offline                          = 489
+	SystemMessageFriendListFooter                   = 490
+	SystemMessageFriendS1HasLoggedIn                = 503
+	SystemMessageBlockListHeader                    = 613
+	SystemMessageFailedToRegisterToIgnoreList       = 615
+	SystemMessageS1AddedToYourIgnoreList            = 617
+	SystemMessageS1RemovedFromYourIgnoreList        = 618
+	SystemMessageS1HasAddedYouToIgnoreList          = 619
+	SystemMessageS1HasAddedYouToIgnoreList2         = 620
+	SystemMessagePlayerIsRejectingFriendInvitations = 662
+	SystemMessageYouMayNotImposeBlockOnGM           = 827
+	SystemMessageS1BlockedEverything                = 940
+	SystemMessageBlockingAll                        = 961
+	SystemMessageNotBlockingAll                     = 962
+)

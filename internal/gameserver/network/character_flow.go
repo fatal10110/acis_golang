@@ -364,7 +364,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	}
 	client.Session.SendFrame(serverpackets.FrameQuestList(nil))
 	client.Session.SendFrame(serverpackets.FrameSkillList(skillList))
-	client.Session.SendFrame(serverpackets.FrameFriendList(nil))
+	client.Session.SendFrame(serverpackets.FrameFriendList(l.friendListEntries(c.ID)))
 	client.Session.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 	l.sendLoginWeight(live)
 	client.Session.SendFrame(itemListFrame)
@@ -372,6 +372,8 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	if c.Dead() {
 		client.Session.SendFrame(serverpackets.FrameDie(c.ObjectID(), l.dieOptions(c)))
 	}
+	// Friends hear of the entry last, just ahead of the reuse timers.
+	l.notifyFriends(live, true)
 	client.Session.SendFrame(serverpackets.FrameSkillCoolTime(coolTimes))
 	client.Session.SendFrame(serverpackets.FrameActionFailed())
 	return true
