@@ -88,7 +88,6 @@ func TestPlainClickOnAnotherPlayersPetFollowsIt(t *testing.T) {
 		// The follow task rechecks on the movement-correction ticks; the
 		// pet follows its owner on the AI think.
 		for range time.Second / move.PositionUpdateInterval {
-			h.srv.Advance(t, move.PositionUpdateInterval)
 			h.srv.TickPositions()
 		}
 		if err := h.srv.AI.Tick(); err != nil {

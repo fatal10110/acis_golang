@@ -64,15 +64,15 @@ func TestPlayerStepRoundsFromCurrentCell(t *testing.T) {
 // since its last update, toward the old destination, and counts that as a
 // position update (PlayerMove.moveToLocation, PlayerMove.java:113-116:
 // updatePosition(true) then _instant = now; :218-228 the elapsed
-// milliseconds and _moveTimeStamp++). The next update covers only the rest
-// of its interval (Duration.between(_instant, now)).
+// milliseconds and _moveTimeStamp++). The next update covers only the time
+// since the retarget (Duration.between(_instant, now)).
 func TestPlayerRetargetAdvancesByElapsedTime(t *testing.T) {
 	controller, mover, self, _, clock := newPlayerStepController(t, 100, staticGeo{canMove: true})
 	mover.SetSpeeds(200, 100)
 	if ok, err := controller.MoveToLocation(location.Location{X: 1000}); err != nil || !ok {
 		t.Fatalf("MoveToLocation() = %v, %v; want accepted", ok, err)
 	}
-	controller.PositionUpdate()
+	clock.tick(controller)
 	if got := mover.Position(); got != (location.Location{X: 10}) {
 		t.Fatalf("position after the first update = %+v, want X 10", got)
 	}
@@ -93,8 +93,12 @@ func TestPlayerRetargetAdvancesByElapsedTime(t *testing.T) {
 	// The rest of the interval, 60 ms: 6 units. The retarget update was the
 	// second one, so updates 3 to 5 run at the start speed and the sixth at
 	// the full speed.
+	clock.in.Advance(60 * time.Millisecond)
+	controller.PositionUpdate()
 	for i, want := range []location.Location{{X: 14, Y: 6}, {X: 14, Y: 16}, {X: 14, Y: 26}, {X: 14, Y: 46}} {
-		controller.PositionUpdate()
+		if i > 0 {
+			clock.tick(controller)
+		}
 		if got := mover.Position(); got != want {
 			t.Fatalf("position after update %d = %+v, want %+v", i+3, got, want)
 		}
@@ -118,24 +122,25 @@ func (a *arrivalHeadings) Emit(e event.Event) {
 // java:291-293 setHeadingTo(nextX, nextY) ahead of setXYZ and the
 // in-radius return at :323).
 func TestPlayerPawnWalkStoppingStepTurns(t *testing.T) {
-	controller, mover, self, _, _ := newPlayerStepController(t, 100, staticGeo{canMove: true})
+	controller, mover, self, _, clock := newPlayerStepController(t, 100, staticGeo{canMove: true})
 	arrivals := &arrivalHeadings{self: self}
 	controller.sink = arrivals
 	pawn := &followTarget{x: 300}
 	if !controller.MoveToPawn(pawn, 100) {
 		t.Fatal("MoveToPawn() = false, want the walk accepted")
 	}
-	for range 20 {
-		controller.PositionUpdate()
+	for range 10 {
+		clock.tick(controller)
 	}
 	before := mover.Position()
-	if before != (location.Location{X: 200}) || !mover.Moving() {
-		t.Fatalf("walk at %+v (moving %v), want under way at X 200", before, mover.Moving())
+	if before != (location.Location{X: 100}) || !mover.Moving() {
+		t.Fatalf("walk at %+v (moving %v), want under way at X 100", before, mover.Moving())
 	}
-	// The pawn steps aside: the last step re-aims at it and ends within 100.
-	pawn.x, pawn.y = 210, 95
+	// The pawn steps aside, 107 away: the next step re-aims at it and ends
+	// within 100, well before the arrival timer armed for the old stop.
+	pawn.x, pawn.y = 150, 95
 	self.headings = nil
-	controller.PositionUpdate()
+	clock.tick(controller)
 	if mover.Moving() {
 		t.Fatalf("walk still under way at %+v", mover.Position())
 	}
@@ -159,7 +164,7 @@ func TestPlayerPawnWalkStoppingStepTurns(t *testing.T) {
 // player into the wall again.
 func TestPlayerPawnWalkStopsAtWall(t *testing.T) {
 	geo := wallGeo()
-	controller, mover, self, sink, _ := newPlayerStepController(t, 100, geo)
+	controller, mover, self, sink, clock := newPlayerStepController(t, 100, geo)
 	target := &followTarget{x: 300}
 	if following, err := controller.MaybeStartOffensiveFollow(target, 40); err != nil || !following {
 		t.Fatalf("MaybeStartOffensiveFollow() = %v, %v; want the approach", following, err)
@@ -172,7 +177,7 @@ func TestPlayerPawnWalkStopsAtWall(t *testing.T) {
 	}
 
 	for range 30 {
-		controller.PositionUpdate()
+		clock.tick(controller)
 	}
 	if mover.Moving() {
 		t.Fatalf("walk still under way at %+v", mover.Position())
@@ -194,7 +199,7 @@ func TestPlayerPawnWalkStopsAtWall(t *testing.T) {
 	}
 	sent := len(self.moves)
 	for range 20 {
-		controller.PositionUpdate()
+		clock.tick(controller)
 	}
 	if got := len(self.moves); got != sent || mover.Position() != (location.Location{X: 90}) {
 		t.Fatalf("after the block: %d more moves, at %+v; want the player left at X 90", got-sent, mover.Position())
@@ -230,7 +235,7 @@ func TestPawnWalkArrivalTimerDoesNotCrossWall(t *testing.T) {
 		t.Fatal("MoveToPawn() not accepted")
 	}
 	for range 15 {
-		controller.PositionUpdate()
+		clock.tick(controller)
 	}
 	if p := mover.Position(); p.X != 150 {
 		t.Fatalf("after 15 updates at %+v, want X 150", p)
@@ -265,7 +270,7 @@ func TestPawnWalkArrivalTimerStopsShortOnOpenGround(t *testing.T) {
 		t.Fatal("MoveToPawn() not accepted")
 	}
 	for range 15 {
-		controller.PositionUpdate()
+		clock.tick(controller)
 	}
 	clock.in.Advance(100 * time.Millisecond)
 	if p := mover.Position(); p.X != 160 || mover.Moving() {

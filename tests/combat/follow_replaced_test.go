@@ -77,7 +77,6 @@ func (p clickPair) assertFollowOver(t *testing.T, after string) {
 func (p clickPair) tickFor(t *testing.T, d time.Duration) {
 	t.Helper()
 	for passed := time.Duration(0); passed < d; passed += move.PositionUpdateInterval {
-		p.srv.Advance(t, move.PositionUpdateInterval)
 		p.srv.TickPositions()
 	}
 }

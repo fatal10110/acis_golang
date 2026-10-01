@@ -103,12 +103,16 @@ type TargetSnapshot struct {
 //
 // A mover given SetSpeeds (a player) steps by the player rules: each update
 // measures its delta from the current cell and rounds the next one, advances
-// by the time it stands for, and retargeting a walk in flight first advances
-// it by the time passed since the last update.
+// by the queue-clock time passed since the move started or the last update
+// (a retarget catch-up included), and retargeting a walk in flight first
+// advances it by the time passed since the last update. Every update
+// measures from the one before it, never from the shared ticker's schedule,
+// so a late update walks the extra time once and the next one only what is
+// left: the walk always covers the time that passed.
 //
 // The arrival timer preserves progress when no position-update task is
-// wired. When it is wired, UpdatePosition advances origin at the fixed
-// movement correction cadence and may complete the move first. A blocked
+// wired. When it is wired, the position updates advance origin on the
+// movement correction ticks and may complete the move first. A blocked
 // interpolation tick that still has queued waypoints reseeds the next
 // remaining leg instead of stopping; the blocked hook fires only once the
 // route is exhausted, including when an earlier tick on that same request
@@ -146,12 +150,9 @@ type CreatureMove struct {
 	startSpeed    float64
 	hasStartSpeed bool
 	updates       int
-	// lastUpdate is when the last position update, or the move start, ran
-	// on the queue clock; sinceTick is how much of the next position
-	// update's interval the retarget updates since the last one already
-	// walked. Player movers only.
+	// lastUpdate is when the last position update, retarget catch-up or
+	// the move start ran on the queue clock. Player movers only.
 	lastUpdate time.Time
-	sinceTick  time.Duration
 	owner      moveOwner
 	timer      *sim.Timer
 	moveSeq    uint64
@@ -578,7 +579,6 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn,
 	if !m.moving {
 		m.routeBlocked = false
 		m.updates = 0
-		m.sinceTick = 0
 	} else if m.playerStepsLocked() {
 		m.catchUpLocked()
 	}
@@ -817,10 +817,11 @@ func (m *CreatureMove) finishLocked() func() {
 // onto its point. A tracking pawn walk first re-aims the leg at that
 // position.
 //
-// A player's update stands for step of walking, less what retarget updates
-// since the last one already walked.
+// The update stands for step of walking, for a player too: the production
+// tick (Controller.PositionUpdate) measures a player's step on the queue
+// clock instead.
 func (m *CreatureMove) UpdatePosition(step time.Duration) (event.Move, bool) {
-	u := m.updatePosition(step)
+	u := m.updatePosition(step, false)
 	if u.hook != nil {
 		u.hook()
 	}
@@ -839,7 +840,11 @@ type positionUpdate struct {
 	from, to location.Location
 }
 
-func (m *CreatureMove) updatePosition(step time.Duration) positionUpdate {
+// updatePosition runs one position update standing for step. With measured,
+// a player's update instead stands for the queue-clock time since its last
+// update, the move start or a retarget catch-up, less than a millisecond
+// counting as one; any other mover's still stands for step.
+func (m *CreatureMove) updatePosition(step time.Duration, measured bool) positionUpdate {
 	// Read the pawn's position before taking mu: it may take the pawn's
 	// own locks.
 	m.mu.Lock()
@@ -856,7 +861,15 @@ func (m *CreatureMove) updatePosition(step time.Duration) positionUpdate {
 	if !m.moving {
 		return positionUpdate{}
 	}
-	if step <= 0 {
+	player := m.playerStepsLocked()
+	var now time.Time
+	if player {
+		now = m.nowLocked()
+		if measured {
+			step = now.Sub(m.lastUpdate)
+		}
+	}
+	if step <= 0 && !(player && measured) {
 		return positionUpdate{ev: m.currentEventLocked(), moving: true}
 	}
 	m.updates++
@@ -867,10 +880,9 @@ func (m *CreatureMove) updatePosition(step time.Duration) positionUpdate {
 		m.destination = pawnAt
 	}
 	var passed float64
-	if m.playerStepsLocked() {
-		passed = playerPassed(m.updateSpeedLocked(), step-m.sinceTick)
-		m.sinceTick = 0
-		m.lastUpdate = m.nowLocked()
+	if player {
+		passed = playerPassed(m.updateSpeedLocked(), step)
+		m.lastUpdate = now
 	} else {
 		passed = m.updateSpeedLocked() * step.Seconds()
 	}
@@ -974,7 +986,6 @@ func (m *CreatureMove) stepLocked(passed float64, moveType MoveType, maxZ int) (
 // hold mu.
 func (m *CreatureMove) catchUpLocked() {
 	elapsed := m.nowLocked().Sub(m.lastUpdate)
-	m.sinceTick += elapsed
 	m.updates++
 	moveType, maxZ := m.waterLocked()
 	next, accurate, _ := m.stepLocked(playerPassed(m.updateSpeedLocked(), elapsed), moveType, maxZ)

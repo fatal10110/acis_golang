@@ -92,11 +92,21 @@ func (in *Inline) Run() {
 // Advance runs pending tasks, then moves the clock forward by d. Each timer
 // due by the new time fires at its own deadline, in deadline order (ties in
 // arming order), and the tasks it posts run before the next timer fires.
-func (in *Inline) Advance(d time.Duration) {
+func (in *Inline) Advance(d time.Duration) { in.advance(d, true) }
+
+// AdvanceBefore is Advance, except that the timers due exactly at the new
+// time stay armed: they fire on the next Advance, after the tasks posted
+// before it. A caller that posts work for the new instant in between runs
+// that work ahead of the timers due at the same instant.
+func (in *Inline) AdvanceBefore(d time.Duration) { in.advance(d, false) }
+
+// advance moves the clock forward by d, firing the timers due before the
+// new time, and also those due exactly at it when inclusive.
+func (in *Inline) advance(d time.Duration, inclusive bool) {
 	in.Run()
 	in.mu.Lock()
 	end := in.at.Add(d)
-	for len(in.timers) > 0 && !in.timers[0].at.After(end) {
+	for len(in.timers) > 0 && (in.timers[0].at.Before(end) || inclusive && in.timers[0].at.Equal(end)) {
 		v := heap.Pop(&in.timers).(*vtimer)
 		if v.at.After(in.at) { // a negative delay fires now, not in the past
 			in.at = v.at
