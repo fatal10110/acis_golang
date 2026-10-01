@@ -63,6 +63,11 @@ import (
 // leaves no client action pending. tests/admin pins that silence and every
 // refusal that does answer.
 //
+// PetitionVote without a closed petition awaiting feedback, or with a rate
+// the client cannot name, is absent too: the reference drops it without an
+// answer (PetitionVote.java:31-33), and the client closes its feedback
+// window when it sends the vote. tests/petition asserts that silence.
+//
 // Logout at character select is absent for the same reason: with no character
 // in the world the reference sends nothing and keeps the connection open
 // (#2514), and the opcode registers no pending client action there.
@@ -190,6 +195,9 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"Say2 whisper to nobody online", encodeSay2Tell("hi", "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestWithdrawPledge without a clan", wire.NewPacketWriter(clientpackets.OpcodeRequestWithdrawPledge).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestOustPledgeMember without a clan", encodeRequestOustPledgeMember("Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestPetition with no game master online", encodeRequestPetition("help", 3), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodePlaySound}},
+		{"RequestPetitionCancel with no petition", wire.NewPacketWriter(clientpackets.OpcodeRequestPetitionCancel).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
+		{"Say2 petition line outside a petition", encodeSay2Petition("hello"), []byte{serverpackets.OpcodeSystemMessage}},
 	}
 
 	for _, tc := range cases {
@@ -295,5 +303,19 @@ func encodeRequestMakeMacro(name string) []byte {
 func encodeRequestOustPledgeMember(name string) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestOustPledgeMember)
 	w.WriteString(name)
+	return w.Bytes()
+}
+
+func encodeRequestPetition(content string, typ int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestPetition)
+	w.WriteString(content)
+	w.WriteInt32(typ)
+	return w.Bytes()
+}
+
+func encodeSay2Petition(text string) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeSay2)
+	w.WriteString(text)
+	w.WriteInt32(6)
 	return w.Bytes()
 }

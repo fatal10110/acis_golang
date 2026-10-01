@@ -34,6 +34,11 @@ var adminCommands = map[string]adminCommand{
 	"admin_gmoff":        (*GameClientLink).adminGMOff,
 	"admin_ban":          (*GameClientLink).adminBan,
 	"admin_unban":        (*GameClientLink).adminUnban,
+
+	// Petitions; see admin_petition.go.
+	"admin_petition":      (*GameClientLink).adminPetition,
+	"admin_force_peti":    (*GameClientLink).adminForcePetition,
+	"admin_add_peti_chat": (*GameClientLink).adminPetitionChat,
 }
 
 // adminEntry is one of the two ways a command reaches the server; they

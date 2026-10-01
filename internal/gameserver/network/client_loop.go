@@ -1303,6 +1303,36 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.requestGmList(live) })
 			}
 
+		case clientpackets.OpcodeRequestPetition:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPetition)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestPetition(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestPetitionCancel:
+			// The request carries no body.
+			if live != nil {
+				onLive(live, func() { l.requestPetitionCancel(live) })
+			}
+
+		case clientpackets.OpcodePetitionVote:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodePetitionVote)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.petitionVote(live, req) })
+			}
+
 		case clientpackets.OpcodeRequestTargetCancel:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestTargetCancel)
 			if err != nil {

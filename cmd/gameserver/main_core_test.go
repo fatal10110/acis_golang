@@ -57,6 +57,7 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 		"startDebugHTTP":           {debugHTTPStopTimeout, "debugHTTPStopTimeout", "graceful stop of the debug listener"},
 		"startNpcPersistence":      {shutdownSaveTimeout, "shutdownSaveTimeout", "spawn_data save"},
 		"startRelationPersistence": {shutdownSaveTimeout, "shutdownSaveTimeout", "character_relations save"},
+		"startPetitionPersistence": {shutdownSaveTimeout, "shutdownSaveTimeout", "petition and petition_message save"},
 		"startSimPool":             {simPoolStopTimeout, "simPoolStopTimeout", "actor pool finishing queued tasks"},
 		"startTicker": {
 			task.ItemInstanceSaveTimeout, "",

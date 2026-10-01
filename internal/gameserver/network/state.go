@@ -143,6 +143,8 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x76: true, // private store sell: quit
 		0x77: true, // private store sell: set title
 		0x79: true, // buy from a private store
+		0x7f: true, // send a petition
+		0x80: true, // cancel or leave a petition
 		0x81: true, // online game-master list
 		0x88: true, // request ally crest
 		0x89: true, // change pet name
@@ -183,6 +185,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0xc2: true, // delete a macro
 		0xc5: true, // dialog answer
 		0xc6: true, // try on merchant items
+		0xc8: true, // rate a closed petition
 		0xca: true, // game guard reply
 		0xcc: true, // friend message
 		0xcd: true, // show mini map
