@@ -1,8 +1,15 @@
 package loginserver
 
 import (
+	"errors"
 	"net"
+	"os"
+	"slices"
 	"testing"
+	"time"
+
+	commoncrypt "github.com/fatal10110/acis_golang/internal/commons/crypt"
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/data/manager"
@@ -113,4 +120,79 @@ func TestClientLinkEvictionAfterHandlerFinalPacketSendsNothing(t *testing.T) {
 
 	release()
 	first.expectClosed()
+}
+
+// stallPeer floods c's connection with request and never reads a reply,
+// until the server stops reading it: its handler is then blocked writing a
+// reply into a socket whose buffers are full. A write that cannot complete
+// within half a second marks that point.
+func stallPeer(t *testing.T, c *fakeLoginClient, request []byte) {
+	t.Helper()
+	buf := make([]byte, commoncrypt.PaddedSize(len(request)+4))
+	copy(buf, request)
+	commoncrypt.AppendChecksum(buf)
+	commoncrypt.EncryptBlocks(c.cipher, buf)
+	frame, err := wire.FrameBytes(buf)
+	if err != nil {
+		t.Fatalf("FrameBytes: %v", err)
+	}
+	batch := slices.Repeat(frame, 64)
+
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		c.conn.SetWriteDeadline(time.Now().Add(500 * time.Millisecond))
+		if _, err := c.conn.Write(batch); err != nil {
+			if errors.Is(err, os.ErrDeadlineExceeded) {
+				return
+			}
+			t.Fatalf("flood write: %v", err)
+		}
+	}
+	t.Fatal("server kept reading a peer that never drains its replies")
+}
+
+// TestClientLinkSweepDoesNotWaitOnStalledPeer stalls one authed peer, whose
+// handler is blocked writing to it, and runs a purge-loop tick once both it
+// and an idle authed peer are past the login timeout. The tick returns at
+// once, the idle peer is still purged with LoginFail AccessFailed and then
+// EOF, and the same tick's failed-attempt sweep still runs.
+func TestClientLinkSweepDoesNotWaitOnStalledPeer(t *testing.T) {
+	accounts := newFakeAccountStore(
+		model.NewAccount("stalled", mustHashPassword(t, "s3cret"), 0, 1),
+		model.NewAccount("idle", mustHashPassword(t, "s3cret"), 0, 1),
+	)
+	// The purge loop's own ticker never fires during the test; the test runs
+	// its tick directly, at a time past the login timeout.
+	addr, l, servers, sessions, _ := newTestClientLink(t, accounts, false, func(l *ClientLink) {
+		l.loginTimeout = time.Hour
+		l.failedAttempts = map[string]failedAttempt{"192.0.2.9": {count: 1, last: time.Now()}}
+	})
+	// Large ServerList replies fill the stalled peer's socket quickly.
+	for id := 1; id <= 100; id++ {
+		markOnlineAuto(t, servers, id)
+	}
+
+	stalled := dialLoginClient(t, addr)
+	key1, key2 := stalled.login(l, "stalled", "s3cret")
+	stallPeer(t, stalled, encodeRequestServerList(key1, key2))
+
+	idle := dialLoginClient(t, addr)
+	idle.login(l, "idle", "s3cret")
+
+	swept := make(chan struct{})
+	go func() {
+		l.sweep(time.Now().Add(2 * time.Hour))
+		close(swept)
+	}()
+	select {
+	case <-swept:
+	case <-time.After(2 * time.Second):
+		t.Fatal("purge tick blocked on a stalled peer")
+	}
+
+	idle.expectLoginFail(serverpackets.LoginFailAccessFailed)
+	waitSessionMissing(t, sessions, "idle")
+	if n := failedAttemptCount(l); n != 0 {
+		t.Fatalf("failed attempts tracked = %d after the tick, want 0", n)
+	}
 }
