@@ -185,20 +185,38 @@ func TestAdminForcePetitionAndAddChat(t *testing.T) {
 }
 
 // TestPetitionTextCannotCarryLinks pins the guard on player-written text a
-// game master's petition window shows: a link in the petition text loses
-// its action, so it cannot run a command as the game master who clicks it.
+// game master's petition window shows: a link in the petition text or the
+// feedback loses its action, so it cannot run a command as the game master
+// who clicks it. The window reads a backslash as quoting the next
+// character (NpcHtmlMessage.replace), so the guard runs on the text as
+// shown: neither a quoted "act\ion" nor a nested "actactionion" or
+// "bypbypassass" brings a link word back. A backslash ending the text is
+// kept, where the reference sends no page.
 func TestPetitionTextCannotCarryLinks(t *testing.T) {
 	t.Parallel()
 	r := boot(t)
 	r.enterAll(t)
-	exchange(t, r.player, encodePetition(`<a action="bypass -h admin_set access 8">Join</a>`, 3))
+	exchange(t, r.player, encodePetition(`<a action="bypass -h admin_set access 8">Join</a> a\b \\ <a act\ion="by\pass -h admin_x">J</a> <a actactionion="bypbypassass -h admin_y">K</a> end\`, 3))
 	collect(t, r.gm)
 	id := r.srv.Petitions.List()[0].ID
 	page := htmlBody(t, exchange(t, r.gm, encodeBypass("admin_petition view "+itoa(id)))[0])
-	if strings.Contains(page, "bypass -h admin_set") {
-		t.Fatalf("petition page carries the player's link: %q", page)
+	for _, link := range []string{"admin_set", "admin_x", "admin_y"} {
+		if strings.Contains(page, "bypass -h "+link) {
+			t.Fatalf("petition page carries the player's link to %s: %q", link, page)
+		}
 	}
-	if !strings.Contains(page, `<a =" -h admin_set access 8">Join</a>`) {
-		t.Fatalf("petition page = %q, want the text without its link words", page)
+	if want := `<a =" -h admin_set access 8">Join</a> ab \ <a =" -h admin_x">J</a> <a =" -h admin_y">K</a> end\`; !strings.Contains(page, want) {
+		t.Fatalf("petition page = %q, want %q", page, want)
+	}
+
+	// The feedback a closed petition shows goes through the same guard.
+	exchange(t, r.gm, encodeBypass("admin_petition join "+itoa(id)))
+	collect(t, r.player)
+	exchange(t, r.gm, encodePetitionCancel())
+	collect(t, r.player)
+	exchange(t, r.player, encodeVote(0, `<a act\ion="bypbypassass -h admin_z">\$1</a>\`))
+	page = htmlBody(t, exchange(t, r.gm, encodeBypass("admin_petition view "+itoa(id)))[0])
+	if want := `Feedback: <a =" -h admin_z">$1</a>\`; !strings.Contains(page, want) {
+		t.Fatalf("petition page = %q, want %q", page, want)
 	}
 }

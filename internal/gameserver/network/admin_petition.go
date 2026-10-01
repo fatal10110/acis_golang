@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/petition"
@@ -207,7 +208,7 @@ func (l *GameClientLink) showPetition(gm *livePlayer, id int32) {
 		{"%type%", d.Type.String()},
 		{"%state%", d.State.String()},
 		{"%responders%", d.Responders},
-		{"%content%", defusePlayerHTML(d.Content)},
+		{"%content%", defusePlayerHTML(commons.HTMLValue(d.Content))},
 	} {
 		html = strings.ReplaceAll(html, r.key, r.value)
 	}
@@ -217,7 +218,7 @@ func (l *GameClientLink) showPetition(gm *livePlayer, id int32) {
 	case petition.Closed:
 		html = strings.ReplaceAll(html, "%buttonsOrFeedback%", petitionFeedback)
 		html = strings.ReplaceAll(html, "%rate%", d.Rate.Desc())
-		html = strings.ReplaceAll(html, "%feedback%", defusePlayerHTML(d.Feedback))
+		html = strings.ReplaceAll(html, "%feedback%", defusePlayerHTML(commons.HTMLValue(d.Feedback)))
 	default:
 		html = strings.ReplaceAll(html, "%buttonsOrFeedback%", "")
 	}
@@ -227,9 +228,15 @@ func (l *GameClientLink) showPetition(gm *livePlayer, id int32) {
 
 // defusePlayerHTML strips the link words from text a player wrote before a
 // game master's window shows it, so a petition cannot carry a link that
-// runs a command as the game master who clicks it.
+// runs a command as the game master who clicks it. It runs on the text as
+// the window shows it, after commons.HTMLValue has dropped the quoting
+// backslashes, so "act\ion" cannot turn back into a link word, and it
+// repeats until no link word is left, so "actactionion" cannot either.
 func defusePlayerHTML(text string) string {
-	return strings.ReplaceAll(strings.ReplaceAll(text, "action", ""), "bypass", "")
+	for strings.Contains(text, "action") || strings.Contains(text, "bypass") {
+		text = strings.ReplaceAll(strings.ReplaceAll(text, "action", ""), "bypass", "")
+	}
+	return text
 }
 
 // adminHTML returns admin panel page name, the missing-page notice when
