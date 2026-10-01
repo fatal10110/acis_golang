@@ -20,9 +20,22 @@ import (
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
-// arenaDirectorID is the arena manager whose shipped page offers the paid
-// CP restore (data/html/default/31226.htm).
-const arenaDirectorID = 31226
+// arenaManager is one of the two NPCs Npc.onBypassFeedback's CPRecovery
+// answers, with the shipped page that offers the paid restore.
+type arenaManager struct {
+	name string
+	kind string
+	id   int
+	page string // under data/html
+}
+
+var (
+	// arenaDirector is a plain Folk (data/html/default/31226.htm).
+	arenaDirector = arenaManager{"31226 Folk", "Folk", 31226, "default/31226.htm"}
+	// arenaWarehouse is a WarehouseKeeper, whose own bypass handler runs
+	// first (data/html/warehouse/31225.htm).
+	arenaWarehouse = arenaManager{"31225 WarehouseKeeper", "WarehouseKeeper", 31225, "warehouse/31225.htm"}
+)
 
 // arenaCPRecoverySkill is the skill the arena manager casts (4380, Arena CP
 // Recovery: COMBATPOINTHEAL, power 5000, target ONE, castRange 600).
@@ -33,12 +46,18 @@ const arenaCPRecoverySkill = 4380
 // player's CP is emptied so a restore shows.
 func cpRecoveryWorld(t *testing.T, adena int32) (*folkWorld, *npc.Folk) {
 	t.Helper()
-	page, err := os.ReadFile(datapack.Path(t, "data", "html", "default", "31226.htm"))
+	return cpRecoveryWorldAt(t, arenaDirector, adena)
+}
+
+// cpRecoveryWorldAt is cpRecoveryWorld next to manager.
+func cpRecoveryWorldAt(t *testing.T, manager arenaManager, adena int32) (*folkWorld, *npc.Folk) {
+	t.Helper()
+	page, err := os.ReadFile(datapack.Path(t, "data", "html", manager.page))
 	if err != nil {
-		t.Fatalf("read arena director page: %v", err)
+		t.Fatalf("read arena manager page: %v", err)
 	}
 	pages := dialogPages()
-	pages["default/31226.htm"] = string(page)
+	pages[manager.page] = string(page)
 	defs, err := xmldata.LoadSkillDefinitions(datapack.Path(t, "data", "xml", "skills"), zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadSkillDefinitions: %v", err)
@@ -55,7 +74,7 @@ func cpRecoveryWorld(t *testing.T, adena int32) (*folkWorld, *npc.Folk) {
 	startInWorld(t, w.c)
 	x, y, z := srv.PlayerPosition(t, w.player)
 	w.at = location.Location{X: x, Y: y, Z: z}
-	arena := w.srv.SpawnCastingFolkNPCAt(t, folkTemplate("Folk", arenaDirectorID),
+	arena := w.srv.SpawnCastingFolkNPCAt(t, folkTemplate(manager.kind, manager.id),
 		location.Location{X: w.at.X + 60, Y: w.at.Y, Z: w.at.Z}, defs)
 	w.onPlayer(t, func(pc *player.Character) { pc.SetCP(0) })
 	drainUntilQuiet(t, w.c)
@@ -125,10 +144,21 @@ func textParam(s string) []byte {
 // tick it casts 4380 on the talker for everyone watching (MagicSkillUse,
 // MagicSkillLaunched onto the talker), the talker's CP is restored
 // (CombatPointHeal: S1_CP_WILL_BE_RESTORED with the amount), and it does
-// not cast again.
+// not cast again. Both arena managers do so: 31226, a plain Folk, and
+// 31225, a WarehouseKeeper whose own handler lets CPRecovery through to
+// Npc's.
 func TestBypassCPRecoveryArenaManagerCastsRestore(t *testing.T) {
 	t.Parallel()
-	w, arena := cpRecoveryWorld(t, 500)
+	for _, manager := range []arenaManager{arenaDirector, arenaWarehouse} {
+		t.Run(manager.name, func(t *testing.T) {
+			t.Parallel()
+			testCPRecoveryCastsRestore(t, manager)
+		})
+	}
+}
+
+func testCPRecoveryCastsRestore(t *testing.T, manager arenaManager) {
+	w, arena := cpRecoveryWorldAt(t, manager, 500)
 	w.talkTo(t, arena)
 
 	assertFrames(t, "CPRecovery", w.dialogFrames(t, npcCommand(arena, "CPRecovery")),

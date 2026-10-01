@@ -16,21 +16,16 @@ import (
 )
 
 // FolkCastAI is the cast seam a civilian NPC's AI drives for one cast
-// desire, from queueing it to starting the cast.
+// desire, from queueing it to starting the cast: the hostile AI's cast
+// seam, plus what queueing a desire needs.
 type FolkCastAI interface {
+	ai.CastController
 	// FinalTarget resolves the creature ref's target type aims at from the
 	// requested target; nil drops the request.
 	FinalTarget(target attackable.Combatant, ref modelskill.Ref) attackable.Combatant
 	// CanDesire runs the gates a cast request passes before it is queued:
 	// the skill's reuse, and the MP and HP its hit takes.
 	CanDesire(target attackable.Combatant, ref modelskill.Ref) bool
-	MeetsHPMPDisabled(target attackable.Combatant, ref modelskill.Ref) bool
-	CanAttempt(target attackable.Combatant, ref modelskill.Ref) bool
-	Range(ref modelskill.Ref) int
-	StopsMovement(ref modelskill.Ref) bool
-	SkillType(ref modelskill.Ref) string
-	CanCast(target attackable.Combatant, ref modelskill.Ref) bool
-	Cast(target attackable.Combatant, ref modelskill.Ref)
 }
 
 // FolkAI is the AI task a civilian NPC ticks on while it holds cast
