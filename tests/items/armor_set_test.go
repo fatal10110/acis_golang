@@ -58,6 +58,13 @@ type armorSetRig struct {
 // the paperdoll at login.
 func bootArmorSet(t *testing.T, roll float64, enchant map[int32]int, worn []int32, scroll int32) armorSetRig {
 	t.Helper()
+	return bootArmorSetWith(t, roll, enchant, worn, scroll, nil)
+}
+
+// bootArmorSetWith is bootArmorSet with the shipped templates of extra
+// loaded and one of each given to the character too.
+func bootArmorSetWith(t *testing.T, roll float64, enchant map[int32]int, worn []int32, scroll int32, extra []int32) armorSetRig {
+	t.Helper()
 	datapack.Require(t)
 	_, shipped := shippedData()
 	dir, _ := datapack.Find()
@@ -67,7 +74,7 @@ func bootArmorSet(t *testing.T, roll float64, enchant map[int32]int, worn []int3
 	}
 	ids := []int32{mithrilChestID, mithrilLegsID, mithrilHeadID, mithrilShieldID}
 	templates := gameservertest.ItemTemplates().All()
-	for _, id := range append(ids, armorScrollD, blessedArmorD) {
+	for _, id := range append(append(ids, armorScrollD, blessedArmorD), extra...) {
 		tmpl, ok := shipped.Get(id)
 		if !ok {
 			t.Fatalf("shipped item %d missing", id)
@@ -114,6 +121,9 @@ func bootArmorSet(t *testing.T, roll float64, enchant map[int32]int, worn []int3
 	}
 	if scroll != 0 {
 		rig.objects[scroll] = srv.GiveItem(t, objID, scroll, 1)
+	}
+	for _, id := range extra {
+		rig.objects[id] = srv.GiveItem(t, objID, id, 1)
 	}
 	return rig
 }
