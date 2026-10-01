@@ -215,3 +215,65 @@ func TestPlayerPlainWalkStillRoutes(t *testing.T) {
 		t.Fatalf("first leg = %+v, want the detour's first corner", got)
 	}
 }
+
+// The arrival timer that ends a pawn walk when no position update got there
+// first never carries the walker through a closed line: a pawn walk heads
+// straight through walls, and only the position update stepping into one
+// moves the player in the reference (PlayerMove.updatePosition, PlayerMove.
+// java:285-289 blocks at canMoveToTarget). Here the walker stands at X 150,
+// one step short of its stop at X 160 behind a wall at X 155, and the timer
+// fires before the next update: the walk ends blocked at X 150.
+func TestPawnWalkArrivalTimerDoesNotCrossWall(t *testing.T) {
+	geo := &recordingGeo{canMoveAt: func(ox, _, _, tx, _, _ int) bool { return (ox < 155) == (tx < 155) }}
+	controller, mover, _, sink, clock := newPlayerStepController(t, 100, geo)
+	if !controller.MoveToPawn(&followTarget{x: 200}, 40) {
+		t.Fatal("MoveToPawn() not accepted")
+	}
+	for range 15 {
+		controller.PositionUpdate()
+	}
+	if p := mover.Position(); p.X != 150 {
+		t.Fatalf("after 15 updates at %+v, want X 150", p)
+	}
+	clock.in.Advance(100 * time.Millisecond) // the timer beats the next tick
+	if p := mover.Position(); p.X != 150 {
+		t.Fatalf("arrival timer moved the walker to %+v through the wall at X 155, want it left at X 150", p)
+	}
+	if mover.Moving() {
+		t.Fatal("walk still under way after the timer met the wall")
+	}
+	blocked, arrived := 0, 0
+	for _, e := range sink.events {
+		switch e.(type) {
+		case event.MoveBlocked:
+			blocked++
+		case event.Arrived:
+			arrived++
+		}
+	}
+	if blocked != 1 || arrived != 0 {
+		t.Fatalf("MoveBlocked = %d, Arrived = %d; want the walk to end blocked once (events %v)", blocked, arrived, sink.events)
+	}
+}
+
+// With an open line the arrival timer still ends the pawn walk at the
+// offset short of the pawn, as an arrival.
+func TestPawnWalkArrivalTimerStopsShortOnOpenGround(t *testing.T) {
+	geo := &recordingGeo{canMove: true}
+	controller, mover, _, sink, clock := newPlayerStepController(t, 100, geo)
+	if !controller.MoveToPawn(&followTarget{x: 200}, 40) {
+		t.Fatal("MoveToPawn() not accepted")
+	}
+	for range 15 {
+		controller.PositionUpdate()
+	}
+	clock.in.Advance(100 * time.Millisecond)
+	if p := mover.Position(); p.X != 160 || mover.Moving() {
+		t.Fatalf("after the timer at %+v (moving %v), want stopped at X 160", p, mover.Moving())
+	}
+	for _, e := range sink.events {
+		if _, ok := e.(event.MoveBlocked); ok {
+			t.Fatalf("open-ground walk ended blocked (events %v)", sink.events)
+		}
+	}
+}

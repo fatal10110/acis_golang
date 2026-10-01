@@ -580,16 +580,23 @@ func (m *CreatureMove) onArrive(seq uint64) {
 // stopShortOfPawnLocked ends the last leg of a pawn walk whose arrival
 // timer elapsed before a position update ended it: the actor stops offset
 // short of the destination on the line toward it, or where it stands when
-// already that close. Callers hold mu.
+// already that close. A pawn walk heads straight through closed lines, so a
+// closed line to that stop ends the walk blocked where the actor stands,
+// as the position update meeting it would. Callers hold mu.
 func (m *CreatureMove) stopShortOfPawnLocked() func() {
 	dx := float64(m.destination.X) - m.accurateX
 	dy := float64(m.destination.Y) - m.accurateY
 	if left := math.Hypot(dx, dy); left > float64(m.pawnOffset) {
 		fraction := (left - float64(m.pawnOffset)) / left
-		m.accurateX += dx * fraction
-		m.accurateY += dy * fraction
-		x, y := int(m.accurateX), int(m.accurateY)
+		accurateX := m.accurateX + dx*fraction
+		accurateY := m.accurateY + dy*fraction
+		x, y := int(accurateX), int(accurateY)
 		z := min(int(m.geo.Height(x, y, m.origin.Z+2*block.CellHeight)), m.maxZLocked())
+		if !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, x, y, z) {
+			m.routeBlocked = true
+			return m.stopBlockedLocked()
+		}
+		m.accurateX, m.accurateY = accurateX, accurateY
 		m.origin = location.Location{X: x, Y: y, Z: z}
 	}
 	return m.endLocked()

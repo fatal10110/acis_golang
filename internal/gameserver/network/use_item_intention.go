@@ -245,13 +245,14 @@ func (l *GameClientLink) thinkMoveTo(live *livePlayer, dest location.Location) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	origin := live.move.Position()
 	accepted, err := live.move.MoveToLocation(dest)
 	if err != nil {
 		l.log.Warn().Err(err).Msg("move: broadcast")
 	}
 	if accepted {
-		live.Character.SetHeading(origin.HeadingTo(dest))
+		// Face dest from where the request left the player: a walk in
+		// flight first advances by the time since its last update.
+		live.Character.SetHeading(live.move.Position().HeadingTo(dest))
 	}
 }
 

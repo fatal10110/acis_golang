@@ -424,3 +424,41 @@ func TestWeaponUseItemAfterDeathMidPickupWalkWalksNowhere(t *testing.T) {
 		t.Fatalf("tracked ground items after the toggle = %d, want the item still on the ground", n)
 	}
 }
+
+// TestWeaponUseItemMidWalkFacesFromCaughtUpCell: the fresh walk a mid-walk
+// equip re-runs turns the player toward the destination from where the
+// request left them. A walk in flight first advances by the time since its
+// last update (PlayerMove.moveToLocation, PlayerMove.java:113-114 runs
+// updatePosition first and :197 sets the heading after), so the heading is
+// taken from that cell, not from the one the player stood on before.
+func TestWeaponUseItemMidWalkFacesFromCaughtUpCell(t *testing.T) {
+	t.Parallel()
+	srv, objID, sword := bootIntentionCaster(t, modelskill.TargetSelf)
+	if !srv.DrivesClock() {
+		t.Skip("needs the driven clock to land the equip between position updates")
+	}
+	c := srv.Client
+	x, y, z := srv.PlayerPosition(t, objID)
+
+	c.Send(encodeMoveBackwardToLocation(int32(x+400), int32(y+137), int32(z)))
+	walk := c.Read()
+	assertFrameOpcode(t, walk, serverpackets.OpcodeMoveToLocation, "walk")
+	_, dest, _ := gameservertest.ReadMoveToLocationCoords(t, walk)
+	srv.Advance(t, 500*time.Millisecond)
+	srv.Advance(t, 50*time.Millisecond)
+	drainUntilQuiet(t, c)
+	bx, by, bz := srv.PlayerPosition(t, objID)
+	before := location.Location{X: bx, Y: by, Z: bz}
+
+	c.Send(encodeSignetUseItem(sword))
+	srv.Settle(t)
+	ax, ay, az := srv.PlayerPosition(t, objID)
+	after := location.Location{X: ax, Y: ay, Z: az}
+	if after == before {
+		t.Fatalf("the re-run walk did not catch up from %+v", before)
+	}
+	if got, want := playerHeading(t, srv, objID), after.HeadingTo(dest); got != want {
+		t.Fatalf("heading = %d, want %d toward %+v from the caught-up cell %+v (from %+v it would be %d)",
+			got, want, dest, after, before, before.HeadingTo(dest))
+	}
+}
