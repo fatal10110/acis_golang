@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/armorset"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -50,6 +51,9 @@ type Persistence struct {
 	// augments resolves an augmented weapon's stat bonuses; nil grants
 	// none. Set once at boot, before any character is in the world.
 	augments *augmentation.Table
+	// armorSets grants a worn armor set's skills; nil grants none. Set
+	// once at boot, before any character is in the world.
+	armorSets *armorset.Table
 }
 
 // NewPersistence returns a lifecycle persistence component backed by store and
@@ -99,6 +103,14 @@ func (p *Persistence) SetAugmentations(t *augmentation.Table) error {
 	}
 	p.augments = t
 	return nil
+}
+
+// SetArmorSets makes a worn armor set grant its skills. Call it once at
+// boot, before any character enters the world.
+func (p *Persistence) SetArmorSets(t *armorset.Table) {
+	if p != nil {
+		p.armorSets = t
+	}
 }
 
 // SetStoreSkillCooltime controls persistence of effects and reuse timers.
@@ -377,7 +389,8 @@ func (p *Persistence) persistKnownSkill(c *player.Character, skillID, level int)
 // EquipItemStats attaches the stat functions inst's template contributes
 // while equipped and grants its item skills, mirroring the equip listeners in
 // their order: the item's equip modifiers owned by the instance first, then
-// an augmented weapon's augmentation (see EquipItemStatsReporting), then —
+// the skills of the armor set inst completes (see armorSetGrants), then an
+// augmented weapon's augmentation (see EquipItemStatsReporting), then —
 // unless inst is a weapon above the character's Expertise — a weapon's +4
 // enchant skill while inst is at +4 or higher, then every
 // item.Template.AttachedSkills entry (any activation), each added to c's
@@ -390,23 +403,27 @@ func (p *Persistence) EquipItemStats(c *player.Character, inst *item.Instance, t
 	return p.EquipItemStatsReporting(c, inst, tmpl, nil)
 }
 
-// AugmentChange reports what applying or removing an augmentation changed
-// beyond its stat bonuses: whether its skill was granted or removed, so
-// SkillList must be resent, and whether that skill came back still waiting
-// out its reuse, so SkillCoolTime must be sent too.
-type AugmentChange struct {
+// SkillChange reports what one equip or unequip stage — an armor set's
+// skill grant or removal, or an augmentation's — changed beyond its stat
+// bonuses: whether a skill was granted or removed, so SkillList must be
+// resent, and whether a skill came back still waiting out its reuse, so
+// SkillCoolTime must be sent too.
+type SkillChange struct {
 	SkillsChanged bool
 	TimersChanged bool
 }
 
-// EquipItemStatsReporting is EquipItemStats with the augmentation of an
-// augmented weapon applied between the item's own functions and its
-// skills, as the reference's skill listener does ahead of its grade
-// penalty check: its stat bonuses attach without a stat report and its
-// skill, if any, is granted. augmented, when not nil, is told what that
-// changed at that moment, for a caller that answers it with its own
-// packets; a nil augmented folds it into the result instead.
-func (p *Persistence) EquipItemStatsReporting(c *player.Character, inst *item.Instance, tmpl *item.Template, augmented func(AugmentChange)) (skillsChanged, timersChanged bool, err error) {
+// EquipItemStatsReporting is EquipItemStats with each armor set grant and
+// the augmentation of an augmented weapon reported as its own stage. The
+// armor set grants follow the item's own functions, each one answered by
+// its own skill list as the reference's armor set listener sends one per
+// grant. The augmentation follows them ahead of the item's skills, as the
+// reference's skill listener applies it ahead of its grade penalty check:
+// its stat bonuses attach without a stat report and its skill, if any, is
+// granted. stage, when not nil, is told what each of those changed at that
+// moment, for a caller that answers it with its own packets; a nil stage
+// folds them into the result instead.
+func (p *Persistence) EquipItemStatsReporting(c *player.Character, inst *item.Instance, tmpl *item.Template, stage func(SkillChange)) (skillsChanged, timersChanged bool, err error) {
 	if p == nil || c == nil || inst == nil || tmpl == nil {
 		return false, false, nil
 	}
@@ -446,14 +463,25 @@ func (p *Persistence) EquipItemStatsReporting(c *player.Character, inst *item.In
 		}
 		grants = append(grants, attached...)
 	}
-	c.AddStatFuncs(modFns)
-	if augmentedWeapon {
-		change := p.applyAugmentation(c, augMods, augGrant)
-		if augmented != nil {
-			augmented(change)
-		} else {
-			skillsChanged, timersChanged = change.SkillsChanged, change.TimersChanged
+	setStages, err := p.armorSetGrants(c, inst, tmpl)
+	if err != nil {
+		return false, false, fmt.Errorf("apply armor set for character %d item %d: %w", c.ID, inst.ObjectID, err)
+	}
+	report := func(change SkillChange) {
+		if stage != nil {
+			stage(change)
+			return
 		}
+		skillsChanged = skillsChanged || change.SkillsChanged
+		timersChanged = timersChanged || change.TimersChanged
+	}
+	c.AddStatFuncs(modFns)
+	for _, group := range setStages {
+		p.grantItemSkills(c, group)
+		report(SkillChange{SkillsChanged: true})
+	}
+	if augmentedWeapon {
+		report(p.applyAugmentation(c, augMods, augGrant))
 	}
 	itemSkills, itemTimers := p.grantItemSkills(c, grants)
 	return skillsChanged || itemSkills, timersChanged || itemTimers, nil
@@ -494,13 +522,13 @@ func (p *Persistence) augmentationGrant(inst *item.Instance, aug item.Augmentati
 // applyAugmentation attaches an augmentation's stat bonuses, which report
 // no stat change of their own, then grants its skill. An active skill whose
 // reuse is still running when it comes back is disabled until it ends.
-func (p *Persistence) applyAugmentation(c *player.Character, mods []effect.Mod, grant *itemSkillGrant) AugmentChange {
+func (p *Persistence) applyAugmentation(c *player.Character, mods []effect.Mod, grant *itemSkillGrant) SkillChange {
 	c.AttachStatFuncs(mods)
 	if grant == nil {
-		return AugmentChange{}
+		return SkillChange{}
 	}
 	p.grantItemSkills(c, []itemSkillGrant{*grant})
-	change := AugmentChange{SkillsChanged: true}
+	change := SkillChange{SkillsChanged: true}
 	if grant.def.Activation == modelskill.ActivationActive {
 		change.TimersChanged = c.RedisableSkillReuse(cast.ReuseKey(grant.def))
 	}
@@ -509,14 +537,191 @@ func (p *Persistence) applyAugmentation(c *player.Character, mods []effect.Mod, 
 
 // removeAugmentation detaches the stat bonuses of the augmentation inst
 // carries, then takes its skill away when it names a loaded one.
-func (p *Persistence) removeAugmentation(c *player.Character, inst *item.Instance) AugmentChange {
+func (p *Persistence) removeAugmentation(c *player.Character, inst *item.Instance) SkillChange {
 	c.RemoveStatsByOwner(effect.ModOwnerAugmentation(inst))
 	aug, ok := inst.AugmentationValue()
 	if !ok || aug.SkillID == 0 || !p.HasDefinition(modelskill.Ref{ID: modelskill.ID(aug.SkillID), Level: int(aug.SkillLevel)}) {
-		return AugmentChange{}
+		return SkillChange{}
 	}
 	removeItemSkill(c, int(aug.SkillID))
-	return AugmentChange{SkillsChanged: true}
+	return SkillChange{SkillsChanged: true}
+}
+
+// armorSetCommonSkillID is the skill every complete armor set grants
+// alongside its own set skill.
+const armorSetCommonSkillID = 3006
+
+// armorSetGrants resolves the skills the worn armor set gains from inst,
+// newly equipped, one group per skill list the reference sends: the common
+// set skill and the set skill when inst is one of the worn chest's set
+// pieces and completes the set, then the shield skill when the set's shield
+// is held, then the +6 skill when every piece is at +6 or higher — or, when
+// inst is the set's shield and the set is complete, the shield skill alone.
+// A group whose skill is not loaded is left out. Formal wear grants nothing
+// here. Everything is resolved before any is granted, so a malformed passive
+// leaves the character untouched.
+func (p *Persistence) armorSetGrants(c *player.Character, inst *item.Instance, tmpl *item.Template) ([][]itemSkillGrant, error) {
+	if p.armorSets == nil || tmpl.Slot == item.SlotAllDress {
+		return nil, nil
+	}
+	inv := c.Inventory()
+	if inv == nil {
+		return nil, nil
+	}
+	set, ok := p.armorSets.Worn(inv)
+	if !ok {
+		return nil, nil
+	}
+	var stages [][]itemSkillGrant
+	// add appends one group led by lead, which must be loaded for the group
+	// to apply; extra skills ride along only when loaded themselves.
+	add := func(lead int32, extra ...int32) error {
+		g, ok, err := p.armorSetSkillGrant(lead)
+		if err != nil || !ok {
+			return err
+		}
+		group := make([]itemSkillGrant, 0, 1+len(extra))
+		for _, id := range extra {
+			e, ok, err := p.armorSetSkillGrant(id)
+			if err != nil {
+				return err
+			}
+			if ok {
+				group = append(group, e)
+			}
+		}
+		stages = append(stages, append(group, g))
+		return nil
+	}
+	slot := armorSetSlot(tmpl)
+	switch {
+	case set.ContainsItem(slot, inst.TemplateID):
+		if !set.ContainsAll(inv) {
+			return nil, nil
+		}
+		if err := add(set.SkillID, armorSetCommonSkillID); err != nil {
+			return nil, err
+		}
+		if set.WearsShield(inv) {
+			if err := add(set.ShieldSkillID); err != nil {
+				return nil, err
+			}
+		}
+		if set.Enchanted6(inv) {
+			if err := add(set.Enchant6Skill); err != nil {
+				return nil, err
+			}
+		}
+	case set.IsShield(inst.TemplateID) && set.ContainsAll(inv):
+		if err := add(set.ShieldSkillID); err != nil {
+			return nil, err
+		}
+	}
+	return stages, nil
+}
+
+// unequipArmorSet removes the skills inst, just unequipped, took from its
+// armor set: a set chest takes its set's common, set, shield and +6 skills;
+// another piece of the worn chest's set takes the same; the set's shield
+// takes the shield skill. It reports whether inst belonged to a set that
+// way, which is when the caller resends SkillList — even when none of
+// those skills was known.
+func (p *Persistence) unequipArmorSet(c *player.Character, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) bool {
+	if p == nil || p.armorSets == nil || tmpl.Slot == item.SlotAllDress {
+		return false
+	}
+	slot := armorSetSlot(tmpl)
+	var set armorset.Set
+	var ok bool
+	if slot == itemcontainer.Chest {
+		set, ok = p.armorSets.FindByChest(inst.TemplateID)
+	} else if inv != nil {
+		set, ok = p.armorSets.Worn(inv)
+	}
+	if !ok {
+		return false
+	}
+	var setSkill, shieldSkill, enchant6Skill int32
+	switch {
+	case slot == itemcontainer.Chest || set.ContainsItem(slot, inst.TemplateID):
+		setSkill, shieldSkill, enchant6Skill = set.SkillID, set.ShieldSkillID, set.Enchant6Skill
+	case set.IsShield(inst.TemplateID):
+		shieldSkill = set.ShieldSkillID
+	default:
+		return false
+	}
+	if setSkill != 0 {
+		removeItemSkill(c, armorSetCommonSkillID)
+		removeItemSkill(c, int(setSkill))
+	}
+	if shieldSkill != 0 {
+		removeItemSkill(c, int(shieldSkill))
+	}
+	if enchant6Skill != 0 {
+		removeItemSkill(c, int(enchant6Skill))
+	}
+	return true
+}
+
+// armorSetSlot is the paperdoll position tmpl occupies when worn, or -1 for
+// a slot that resolves to none, which holds no set piece.
+func armorSetSlot(tmpl *item.Template) int {
+	if slot, ok := tmpl.Slot.PaperdollIndex(); ok {
+		return slot
+	}
+	return -1
+}
+
+// armorSetSkillGrant resolves level 1 of an armor set skill. ok is false
+// when it is not loaded.
+func (p *Persistence) armorSetSkillGrant(id int32) (itemSkillGrant, bool, error) {
+	g, ok, err := p.listenerSkillGrant(modelskill.Ref{ID: modelskill.ID(id), Level: 1})
+	if err != nil {
+		return itemSkillGrant{}, false, fmt.Errorf("armor set skill %d: %w", id, err)
+	}
+	return g, ok, nil
+}
+
+// listenerSkillGrant resolves ref as a grant that arms no equip delay,
+// with its stat functions when passive. ok is false when ref is not
+// loaded.
+func (p *Persistence) listenerSkillGrant(ref modelskill.Ref) (g itemSkillGrant, ok bool, err error) {
+	def, ok := p.definition(ref)
+	if !ok {
+		return itemSkillGrant{}, false, nil
+	}
+	g = itemSkillGrant{def: def, noEquipDelay: true}
+	if def.Activation == modelskill.ActivationPassive {
+		if g.fns, err = effect.PassiveFuncs(def); err != nil {
+			return itemSkillGrant{}, false, err
+		}
+	}
+	return g, true, nil
+}
+
+// GrantArmorSetSkill adds level 1 of skillID, an armor set's +6 skill, to
+// c's known-skill set, as a scroll of enchant taking a worn piece of a
+// fully +6 set to +6 does. It reports whether the skill is loaded, which
+// is when the caller resends SkillList.
+func (p *Persistence) GrantArmorSetSkill(c *player.Character, skillID int32) (bool, error) {
+	if p == nil || c == nil {
+		return false, nil
+	}
+	g, ok, err := p.armorSetSkillGrant(skillID)
+	if err != nil || !ok {
+		return false, err
+	}
+	p.grantItemSkills(c, []itemSkillGrant{g})
+	return true, nil
+}
+
+// RevokeArmorSetSkill drops skillID, an armor set's +6 skill, from c's
+// known-skill set with the stat functions of the level c knows it at.
+func (p *Persistence) RevokeArmorSetSkill(c *player.Character, skillID int32) {
+	if p == nil || c == nil {
+		return
+	}
+	removeItemSkill(c, int(skillID))
 }
 
 // enchant4SkillGrant resolves tmpl's +4 enchant skill. ok is false for a
@@ -526,19 +731,11 @@ func (p *Persistence) enchant4SkillGrant(tmpl *item.Template) (g itemSkillGrant,
 		return itemSkillGrant{}, false, nil
 	}
 	ref := *tmpl.Weapon.Enchant4Skill
-	def, ok := p.definition(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: int(ref.Level)})
-	if !ok {
-		return itemSkillGrant{}, false, nil
+	g, ok, err = p.listenerSkillGrant(modelskill.Ref{ID: modelskill.ID(ref.ID), Level: int(ref.Level)})
+	if err != nil {
+		return itemSkillGrant{}, false, fmt.Errorf("item %d enchant skill %d level %d: %w", tmpl.ID, ref.ID, ref.Level, err)
 	}
-	g = itemSkillGrant{def: def, noEquipDelay: true}
-	if def.Activation == modelskill.ActivationPassive {
-		fns, err := effect.PassiveFuncs(def)
-		if err != nil {
-			return itemSkillGrant{}, false, fmt.Errorf("item %d enchant skill %d level %d: %w", tmpl.ID, ref.ID, ref.Level, err)
-		}
-		g.fns = fns
-	}
-	return g, true, nil
+	return g, ok, nil
 }
 
 // GrantEnchant4Skill adds tmpl's +4 enchant skill to c's known-skill set, as
@@ -652,7 +849,8 @@ func (p *Persistence) grantItemSkills(c *player.Character, grants []itemSkillGra
 
 // UnequipItemStats removes every stat function inst contributed via
 // EquipItemStats, mirroring the unequip listeners in their order: the
-// instance's own functions first, then an augmented weapon's augmentation
+// instance's own functions first, then the skills of the worn armor set inst
+// belongs to (see unequipArmorSet), then an augmented weapon's augmentation
 // (see UnequipItemStatsReporting), then — for a weapon at +4 or higher — its
 // +4 enchant skill, then — unless inv still has another equipped item
 // sharing tmpl's id — every tmpl.AttachedSkills entry leaves c's known-skill
@@ -669,13 +867,15 @@ func (p *Persistence) UnequipItemStats(c *player.Character, inv *itemcontainer.I
 	return p.UnequipItemStatsReporting(c, inv, inst, tmpl, nil)
 }
 
-// UnequipItemStatsReporting is UnequipItemStats with the augmentation of an
-// augmented weapon removed between the item's own functions and its +4
-// skill, as the reference's skill listener does: its stat bonuses detach
-// with their own stat report, then its skill, if any, leaves. augmented,
-// when not nil, is told what that changed at that moment; a nil augmented
-// folds it into the result instead.
-func (p *Persistence) UnequipItemStatsReporting(c *player.Character, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template, augmented func(AugmentChange)) (skillsChanged bool) {
+// UnequipItemStatsReporting is UnequipItemStats with the armor set skill
+// removal and the augmentation of an augmented weapon reported as their own
+// stages, between the item's own functions and its +4 skill, in that order
+// as the reference's armor set and skill listeners run: the armor set's
+// skills leave with one skill list, then the augmentation's stat bonuses
+// detach with their own stat report and its skill, if any, leaves. stage,
+// when not nil, is told what each of those changed at that moment; a nil
+// stage folds them into the result instead.
+func (p *Persistence) UnequipItemStatsReporting(c *player.Character, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template, stage func(SkillChange)) (skillsChanged bool) {
 	if c == nil || inst == nil {
 		return false
 	}
@@ -683,13 +883,18 @@ func (p *Persistence) UnequipItemStatsReporting(c *player.Character, inv *itemco
 	if tmpl == nil {
 		return false
 	}
-	if tmpl.Weapon != nil && inst.Augmented() {
-		change := p.removeAugmentation(c, inst)
-		if augmented != nil {
-			augmented(change)
-		} else {
-			skillsChanged = change.SkillsChanged
+	report := func(change SkillChange) {
+		if stage != nil {
+			stage(change)
+			return
 		}
+		skillsChanged = skillsChanged || change.SkillsChanged
+	}
+	if p.unequipArmorSet(c, inv, inst, tmpl) {
+		report(SkillChange{SkillsChanged: true})
+	}
+	if tmpl.Weapon != nil && inst.Augmented() {
+		report(p.removeAugmentation(c, inst))
 	}
 	if inst.Snapshot().EnchantLevel >= item.Enchant4SkillLevel && p.RevokeEnchant4Skill(c, tmpl) {
 		skillsChanged = true

@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/armorset"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 )
@@ -100,6 +101,14 @@ const (
 	// StepRevokeEnchantSkill means the equipped weapon Template at +4 or
 	// higher failed: its +4 enchant skill is removed and SkillList resent.
 	StepRevokeEnchantSkill
+	// StepGrantArmorSetSkill means a worn armor piece reached +6 with the
+	// worn set at +6 or higher throughout: the set's +6 skill SkillID is
+	// added and SkillList resent.
+	StepGrantArmorSetSkill
+	// StepRevokeArmorSetSkill means a worn armor piece at +6 or higher
+	// failed while the worn set was at +6 or higher throughout: the set's
+	// +6 skill SkillID is removed and SkillList resent.
+	StepRevokeArmorSetSkill
 	// StepUnequipped means a broken item left the paperdoll: Unequipped
 	// lists every instance the removal took off, whose equip side effects
 	// have to be undone.
@@ -157,6 +166,9 @@ type Step struct {
 	// Template is the weapon of a StepGrantEnchantSkill or
 	// StepRevokeEnchantSkill.
 	Template *item.Template
+	// SkillID is the armor set +6 skill of a StepGrantArmorSetSkill or
+	// StepRevokeArmorSetSkill.
+	SkillID int32
 	// Unequipped lists what a StepUnequipped took off the paperdoll.
 	Unequipped []*item.Instance
 }
@@ -179,6 +191,9 @@ type Service struct {
 	ids   inventory.IDAllocator
 	roll  func() float64
 	cfg   Config
+	// armorSets resolves the worn armor set whose +6 skill an armor
+	// enchant grants or revokes; nil grants none.
+	armorSets *armorset.Table
 }
 
 // NewService returns an enchant workflow service using cfg's rates and
@@ -191,6 +206,12 @@ func NewService(state *State, ids inventory.IDAllocator, roll func() float64, cf
 		roll = func() float64 { return rnd.GetFloat(1) }
 	}
 	return &Service{state: state, ids: ids, roll: roll, cfg: cfg}
+}
+
+// SetArmorSets makes an armor enchant grant and revoke the worn armor
+// set's +6 skill. Call it before the service handles any request.
+func (s *Service) SetArmorSets(t *armorset.Table) {
+	s.armorSets = t
 }
 
 // UseScroll selects the enchant scroll inst, held in inv, for playerID.
@@ -319,10 +340,15 @@ func (s *Service) EnchantItem(req Request) (Result, error) {
 	if s.roll() < chance {
 		out = s.success(inv, target, targetTemplate, out)
 	} else {
-		// An equipped weapon at +4 or higher loses its +4 enchant skill
-		// before the failure takes its level or the item itself.
+		// An equipped weapon at +4 or higher loses its +4 enchant skill,
+		// and an equipped armor piece at +6 or higher its worn set's +6
+		// skill, before the failure takes its level or the item itself.
 		if st := target.Snapshot(); st.Equipped() && hasEnchant4Skill(targetTemplate) && st.EnchantLevel >= item.Enchant4SkillLevel {
 			out.Steps = append(out.Steps, Step{Kind: StepRevokeEnchantSkill, Template: targetTemplate})
+		} else if st.Equipped() && targetTemplate.Kind == item.KindArmor && st.EnchantLevel >= armorset.Enchant6Level {
+			if skillID := s.wornSetEnchant6Skill(inv); skillID > 0 {
+				out.Steps = append(out.Steps, Step{Kind: StepRevokeArmorSetSkill, SkillID: skillID})
+			}
 		}
 		if scrollDef.blessed {
 			out = s.blessedFailure(inv, target, out)
@@ -383,14 +409,29 @@ func (s *Service) success(inv *itemcontainer.Inventory, target *item.Instance, t
 	if inv.SetEnchantLevel(target, oldLevel+1) {
 		out.Persist = append(out.Persist, inventory.Update(target))
 	}
-	// Reaching exactly +4 on an equipped weapon grants its +4 enchant skill.
-	// ponytail: the worn armor set's +6 skill is not granted or revoked
-	// here yet; armor sets have no runtime owner (#2952).
+	// Reaching exactly +4 on an equipped weapon grants its +4 enchant skill;
+	// reaching exactly +6 on an equipped armor piece grants the worn set's
+	// +6 skill once every set piece is at +6 or higher. The piece need not
+	// belong to the set.
 	if st := target.Snapshot(); st.Equipped() && st.EnchantLevel == item.Enchant4SkillLevel && hasEnchant4Skill(tmpl) {
 		out.Steps = append(out.Steps, Step{Kind: StepGrantEnchantSkill, Template: tmpl})
+	} else if st.Equipped() && tmpl.Kind == item.KindArmor && st.EnchantLevel == armorset.Enchant6Level {
+		if skillID := s.wornSetEnchant6Skill(inv); skillID > 0 {
+			out.Steps = append(out.Steps, Step{Kind: StepGrantArmorSetSkill, SkillID: skillID})
+		}
 	}
 	out.Steps = append(out.Steps, resultStep(ResultSuccess))
 	return out
+}
+
+// wornSetEnchant6Skill returns the +6 skill of the armor set inv's worn
+// chest belongs to while every piece of it is at +6 or higher, or 0.
+func (s *Service) wornSetEnchant6Skill(inv *itemcontainer.Inventory) int32 {
+	set, ok := s.armorSets.Worn(inv)
+	if !ok || !set.Enchanted6(inv) {
+		return 0
+	}
+	return set.Enchant6Skill
 }
 
 // hasEnchant4Skill reports whether tmpl is a weapon with a +4 enchant skill.
