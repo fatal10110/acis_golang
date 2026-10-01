@@ -326,6 +326,18 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			session.SendFrame(l.framePledgeCrest(req))
 
+		case clientpackets.OpcodeRequestSetPledgeCrest:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestSetPledgeCrest)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestSetPledgeCrest(live, req) })
+			}
+
 		case clientpackets.OpcodeRequestAllyCrest:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestAllyCrest)
 			if err != nil {
@@ -518,6 +530,17 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				if frame, ok := l.frameExPledgeCrestLarge(req); ok {
 					session.SendFrame(frame)
+				}
+			case clientpackets.OpcodeRequestExSetPledgeCrestLarge:
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestExSetPledgeCrestLarge)
+				if err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					continue
+				}
+				if live != nil {
+					onLive(live, func() { l.requestSetLargePledgeCrest(live, req) })
 				}
 			case clientpackets.OpcodeRequestPledgePowerGrades:
 				if live != nil {

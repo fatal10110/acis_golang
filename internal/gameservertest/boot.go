@@ -1848,6 +1848,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("load clans: %v", err)
 	}
 	gclConfig.Clans.Table().Restore(clanRows, time.Now(), clanConfig.JoinDays)
+	gclConfig.Clans.DropMissingCrests(crests)
 
 	c := testsupport.Dial(t, ln.Addr().String())
 	c.SendProtocolVersion(746)

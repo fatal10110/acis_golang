@@ -252,10 +252,11 @@ func loadHTMLCache(paths gameServerPaths) (*datacache.HTML, error) {
 }
 
 func loadCrestCache(paths gameServerPaths) (*datacache.Crests, error) {
-	crests, err := datacache.LoadCrests(filepath.Join(paths.DataRoot, "data", "crests"))
+	dir := filepath.Join(paths.DataRoot, "data", "crests")
+	crests, err := datacache.LoadCrests(dir)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return datacache.NewCrests(), nil
+			return datacache.NewCrestsIn(dir), nil
 		}
 		return nil, err
 	}

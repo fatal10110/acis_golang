@@ -1,6 +1,10 @@
 package clan
 
-import "context"
+import (
+	"context"
+
+	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
+)
 
 // MembershipRow is the characters-row side of joining or founding a clan.
 type MembershipRow struct {
@@ -36,6 +40,9 @@ type Store interface {
 	SaveMembership(ctx context.Context, r MembershipRow) error
 	RemoveMembership(ctx context.Context, r RemovalRow) error
 	SetPowerGrade(ctx context.Context, objectID int32, grade int) error
+	// UpdateCrest stores one of the clan's own crest id columns: the
+	// pledge, large pledge or alliance crest, as typ names it.
+	UpdateCrest(ctx context.Context, clanID int32, typ datacache.CrestType, crestID int32) error
 }
 
 // Writer runs a store write later, on ownerID's lane, so writes for one

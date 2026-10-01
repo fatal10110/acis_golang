@@ -188,6 +188,17 @@ func (t *Table) Len() int {
 	return len(t.clans)
 }
 
+// allClans returns every clan, in no particular order.
+func (t *Table) allClans() []*Clan {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	out := make([]*Clan, 0, len(t.clans))
+	for _, cl := range t.clans {
+		out = append(out, cl)
+	}
+	return out
+}
+
 // insert adds cl unless a clan already carries its name, ignoring case.
 func (t *Table) insert(cl *Clan) bool {
 	t.mu.Lock()
