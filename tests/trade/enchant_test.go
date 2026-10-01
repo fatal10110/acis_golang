@@ -133,3 +133,36 @@ func TestTradeConfirmKeepsReloggedPartnerEnchant(t *testing.T) {
 		t.Fatalf("scroll after the enchant = %+v, want consumed", held.Snapshot())
 	}
 }
+
+// TestSelectedEnchantScrollCannotBeOffered pins the enchant clause of the
+// item guard on AddTradeItem (Player.validateItemManipulation,
+// Player.java:6213-6215): the scroll a trader selected before the window
+// opened is refused with NOTHING_HAPPENED and the partner hears nothing.
+// The same scroll, unselected, is offered as usual.
+func TestSelectedEnchantScrollCannotBeOffered(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		selected bool
+	}{{"selected", true}, {"not selected", false}} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := bootTraders(t)
+			scroll := h.srv.GiveItem(t, h.firstID, enchantScrollD, 1)
+			h.enterAll(t)
+			if tc.selected {
+				selectEnchantScroll(t, h.first, scroll)
+			}
+			h.startTrade(t)
+
+			h.first.Send(encodeAddTradeItem(0, scroll, 1))
+			if !tc.selected {
+				assertFrameOpcode(t, h.first.Read(), serverpackets.OpcodeTradeOwnAdd, "TradeOwnAdd")
+				return
+			}
+			assertStaticSystemMessage(t, h.first.Read(), serverpackets.SystemMessageNothingHappened)
+			assertSilent(t, h.second, "partner of a refused scroll offer")
+			if held := h.srv.PlayerInventory(t, h.firstID).ItemByObjectID(scroll); held == nil || held.Snapshot().Count != 1 {
+				t.Fatalf("scroll after the refused offer = %+v, want one still held", held)
+			}
+		})
+	}
+}

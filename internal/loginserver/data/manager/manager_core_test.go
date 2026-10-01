@@ -207,6 +207,121 @@ func TestIPBanList_IsBanned_NilAddress(t *testing.T) {
 	}
 }
 
+// clockedIPBanList returns an empty list whose Ban and IsBanned read *now.
+func clockedIPBanList(now *time.Time) *IPBanList {
+	l := NewIPBanList(zerolog.Nop())
+	l.now = func() time.Time { return *now }
+	return l
+}
+
+func retainNone(string) bool { return false }
+
+// Expected values follow the reference ban list: a zero expiry never lifts,
+// and a timed ban lifts only once the current time is strictly past its
+// expiry (IpBanManager.isBannedAddress, "time > 0 && time < now").
+func TestIPBanList_SweepExpiredDropsOnlyExpiredTemporaryBans(t *testing.T) {
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	now := start
+	l := clockedIPBanList(&now)
+
+	permanent := net.ParseIP("192.0.2.1")
+	l.Ban(permanent, 0)
+	const temporary = 2000
+	for i := range temporary {
+		l.Ban(net.IPv4(10, 2, byte(i>>8), byte(i)), 10*time.Minute)
+	}
+	now = start.Add(time.Minute)
+	later := net.ParseIP("192.0.2.2")
+	l.Ban(later, 10*time.Minute)
+
+	expiry := start.Add(10 * time.Minute)
+	l.SweepExpired(expiry, retainNone)
+	if got, want := len(l.bans), temporary+2; got != want {
+		t.Fatalf("after sweeping at the expiry instant: %d bans, want %d (a ban is still active at its expiry)", got, want)
+	}
+
+	l.SweepExpired(expiry.Add(time.Nanosecond), retainNone)
+	if got := len(l.bans); got != 2 {
+		t.Fatalf("after sweeping past expiry: %d bans, want 2 (permanent + unexpired)", got)
+	}
+	now = expiry.Add(time.Nanosecond)
+	if !l.IsBanned(permanent) || !l.IsBanned(later) {
+		t.Fatal("sweep removed a ban that has not expired")
+	}
+
+	l.SweepExpired(start.Add(100*365*24*time.Hour), retainNone)
+	if got := len(l.bans); got != 1 {
+		t.Fatalf("after sweeping far in the future: %d bans, want 1", got)
+	}
+	if !l.IsBanned(permanent) {
+		t.Fatal("sweep removed a permanent ban")
+	}
+}
+
+// A swept list answers every ban check exactly as an unswept one.
+func TestIPBanList_SweepExpiredDoesNotChangeBanChecks(t *testing.T) {
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	nowSwept, nowPlain := start, start
+	swept, plain := clockedIPBanList(&nowSwept), clockedIPBanList(&nowPlain)
+
+	addrs := []net.IP{net.ParseIP("192.0.2.10"), net.ParseIP("192.0.2.11"), net.ParseIP("192.0.2.12"), net.ParseIP("2001:db8::1")}
+	durations := []time.Duration{0, time.Second, 10 * time.Minute, time.Hour}
+	for i, addr := range addrs {
+		swept.Ban(addr, durations[i])
+		plain.Ban(addr, durations[i])
+	}
+
+	for _, at := range []time.Duration{0, time.Second, time.Second + time.Nanosecond, 10 * time.Minute, 10*time.Minute + time.Millisecond, 2 * time.Hour} {
+		nowSwept, nowPlain = start.Add(at), start.Add(at)
+		swept.SweepExpired(nowSwept, retainNone)
+		for _, addr := range addrs {
+			if got, want := swept.IsBanned(addr), plain.IsBanned(addr); got != want {
+				t.Fatalf("at +%v IsBanned(%v) = %v after sweeping, %v without", at, addr, got, want)
+			}
+		}
+	}
+}
+
+// While its address may still have an open connection, an expired ban keeps
+// deciding Ban's outcome: Ban leaves an existing entry alone, so a new ban
+// on top of the expired one has no effect (IpBanManager.addBanForAddress
+// putIfAbsent) and the next check lifts it. Unretained, the entry is swept
+// and a later connect-then-ban bans as it would have anyway.
+func TestIPBanList_SweepExpiredLeavesRetainedAddresses(t *testing.T) {
+	start := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	now := start
+	l := clockedIPBanList(&now)
+
+	held, idle := net.ParseIP("192.0.2.20"), net.ParseIP("192.0.2.21")
+	l.Ban(held, time.Minute)
+	l.Ban(idle, time.Minute)
+
+	now = start.Add(time.Hour)
+	l.SweepExpired(now, func(addr string) bool { return addr == held.String() })
+	if _, ok := l.bans[held.String()]; !ok {
+		t.Fatal("sweep removed an expired ban whose address is retained")
+	}
+	if _, ok := l.bans[idle.String()]; ok {
+		t.Fatal("sweep kept an expired ban whose address is not retained")
+	}
+
+	l.Ban(held, 10*time.Minute)
+	if l.IsBanned(held) {
+		t.Fatal("ban over a retained expired entry took effect; it must keep the expired entry")
+	}
+	if _, ok := l.bans[held.String()]; ok {
+		t.Fatal("IsBanned did not lift the expired entry")
+	}
+
+	if l.IsBanned(idle) {
+		t.Fatal("swept address reported banned on connect")
+	}
+	l.Ban(idle, 10*time.Minute)
+	if !l.IsBanned(idle) {
+		t.Fatal("ban after the connect check did not take effect")
+	}
+}
+
 // ---- from rsapool_test.go ----
 func TestNewRSAKeyPool(t *testing.T) {
 	pool, err := NewRSAKeyPool()

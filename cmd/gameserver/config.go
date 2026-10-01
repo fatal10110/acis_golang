@@ -65,6 +65,7 @@ type gameplayConfig struct {
 	CraftingEnabled          craftingEnabled
 	MultisellDelay           multisellDelay
 	BlacksmithUseRecipes     blacksmithUseRecipes
+	AllowDiscardItem         allowDiscardItem
 	SpawnMultiplier          spawnMultiplier
 	RandomWalkRate           randomWalkRate
 	MaxGeoPathFailCount      maxGeoPathFailCount
@@ -155,6 +156,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.BlacksmithUseRecipes, err = loadBlacksmithUseRecipes(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.AllowDiscardItem, err = loadAllowDiscardItem(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.SpawnMultiplier, err = loadSpawnMultiplier(paths); err != nil {
@@ -587,6 +591,18 @@ func loadBlacksmithUseRecipes(paths gameServerPaths) (blacksmithUseRecipes, erro
 		return false, err
 	}
 	return blacksmithUseRecipes(config.NewFields(props, "blacksmith use recipes").Bool("BlacksmithUseRecipes", true)), nil
+}
+
+// allowDiscardItem lets players other than GMs drop items on the ground,
+// read from server.properties.
+type allowDiscardItem bool
+
+func loadAllowDiscardItem(paths gameServerPaths) (allowDiscardItem, error) {
+	props, err := config.LoadFile(paths.ConfigPath)
+	if err != nil {
+		return false, err
+	}
+	return allowDiscardItem(config.NewFields(props, "allow discard item").Bool("AllowDiscardItem", true)), nil
 }
 
 // loadPetConfig takes the process logger for the same reason as

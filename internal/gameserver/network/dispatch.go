@@ -179,6 +179,9 @@ type PlayerConfig struct {
 	MaxBuffsAmount int
 	// MagicFailures makes magic-damage casts roll for a half or full resist.
 	MagicFailures bool
+	// DiscardItemDisabled is server.properties AllowDiscardItem inverted, so
+	// the zero value lets players drop items as the shipped config does.
+	DiscardItemDisabled bool
 	// CraftingDisabled is players.properties CraftingEnabled inverted, so
 	// the zero value keeps crafting on as the shipped config does.
 	CraftingDisabled bool

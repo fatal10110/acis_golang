@@ -26,7 +26,7 @@ func TestListRegisterReplacesSlotAndOrdersByPageSlot(t *testing.T) {
 func TestListDeleteRemovesSlot(t *testing.T) {
 	list := NewList([]Shortcut{{Slot: 3, Page: 1, Type: Action, ID: 2, Level: -1, CharacterType: 1}})
 
-	if !list.Delete(3, 1) {
+	if _, ok := list.Delete(3, 1); !ok {
 		t.Fatal("Delete() = false, want true")
 	}
 	if got := list.All(); len(got) != 0 {
@@ -41,9 +41,7 @@ func TestNewRegistrationValidatesTypePageAndSkillLevel(t *testing.T) {
 		}
 		return 0
 	}
-	hasItem := func(id int32) bool { return id == 57 }
-
-	sc, ok := NewRegistration(3, 1, Skill, 248, 1, skillLevels, hasItem)
+	sc, ok := NewRegistration(3, 1, Skill, 248, 1, skillLevels)
 	if !ok {
 		t.Fatal("NewRegistration returned false for known skill")
 	}
@@ -51,7 +49,9 @@ func TestNewRegistrationValidatesTypePageAndSkillLevel(t *testing.T) {
 		t.Fatalf("NewRegistration skill = %+v, want skill level 3", sc)
 	}
 
-	sc, ok = NewRegistration(4, 1, Item, 57, 1, nil, hasItem)
+	// An item the player does not hold still registers: the caller answers
+	// it on the bar and only then decides whether to keep it.
+	sc, ok = NewRegistration(4, 1, Item, 58, 1, nil)
 	if !ok {
 		t.Fatal("NewRegistration returned false for item shortcut")
 	}
@@ -69,17 +69,12 @@ func TestNewRegistrationValidatesTypePageAndSkillLevel(t *testing.T) {
 		{"high page", 11, Item, 57},
 		{"bad type", 0, None, 57},
 		{"unknown skill", 0, Skill, 999},
-		{"item not in inventory", 0, Item, 58},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			if _, ok := NewRegistration(1, tt.page, tt.typ, tt.id, 1, skillLevels, hasItem); ok {
+			if _, ok := NewRegistration(1, tt.page, tt.typ, tt.id, 1, skillLevels); ok {
 				t.Fatal("NewRegistration returned true, want false")
 			}
 		})
-	}
-
-	if _, ok := NewRegistration(1, 0, Item, 57, 1, skillLevels, nil); ok {
-		t.Fatal("NewRegistration returned true for item registration with nil hasItem, want false")
 	}
 }
 
