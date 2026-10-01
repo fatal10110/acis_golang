@@ -72,7 +72,7 @@ type Update struct {
 // left. Every paperdoll mutation applies that rule, so each caller reports
 // the extra left-hand change among the instances it altered.
 //
-// mu guards paperdoll, wornMask, totalWeight, updates and limiter.
+// mu guards paperdoll, wornMask, totalWeight, updates, removed and limiter.
 // Mutable item fields are guarded by item.Instance.
 type Inventory struct {
 	*Container
@@ -91,6 +91,9 @@ type Inventory struct {
 	updates     []Update
 	delivery    Delivery
 	limiter     Limiter
+	// removed holds the object ids of instances that left the inventory
+	// since the last fireDelivery, which hands them to a RemovalDelivery.
+	removed []int32
 }
 
 // Limiter reports how many item slots and how much carried weight an
@@ -169,6 +172,14 @@ func (inv *Inventory) ValidateCapacityByItemID(templateID int32, count int) bool
 type Delivery interface {
 	QueueInventoryUpdate(*Inventory)
 	UpdateInventoryWeight(*Inventory)
+}
+
+// RemovalDelivery is a Delivery that also hears which instances left the
+// inventory entirely: destroyed, dropped, or moved to another container.
+// A partial count change of a stack that stays is not a removal. It is
+// called after the mutation, with no inventory lock held.
+type RemovalDelivery interface {
+	InventoryItemsRemoved(inv *Inventory, objectIDs []int32)
 }
 
 // NewInventory returns an empty inventory owned by ownerID: baseLocation
@@ -365,7 +376,11 @@ func (inv *Inventory) Remove(inst *item.Instance, isDrop bool) bool {
 		inst.SetOwnerLocation(0, item.LocationVoid, st.LocationData)
 	}
 
-	inv.queueUpdate(inst, UpdateRemoved)
+	st := inst.Snapshot()
+	inv.mu.Lock()
+	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
+	defer inv.mu.Unlock()
+	inv.queueRemovedLocked(st.ObjectID, st.TemplateID, st.Count)
 	return true
 }
 
@@ -435,8 +450,11 @@ func (inv *Inventory) DestroyAllItems() {
 	for _, inst := range instances {
 		st := inst.Snapshot()
 		inst.DestroyState()
-		inv.queueUpdateRecord(st.ObjectID, st.TemplateID, st.Count, UpdateRemoved)
+		inv.mu.Lock()
+		inv.queueRemovedLocked(st.ObjectID, st.TemplateID, st.Count)
+		inv.mu.Unlock()
 	}
+	inv.fireDelivery()
 }
 
 // SetEnchantLevel changes inst's enchant level and queues a modified
@@ -544,7 +562,10 @@ func (inv *Inventory) TransferItem(objectID int32, count int, target Receiver, n
 	if remaining := inv.ItemByObjectID(objectID); remaining != nil {
 		inv.queueUpdate(remaining, UpdateModified)
 	} else {
-		inv.queueUpdateRecord(objectID, templateID, movedCount, UpdateRemoved)
+		inv.mu.Lock()
+		inv.queueRemovedLocked(objectID, templateID, movedCount)
+		inv.mu.Unlock()
+		inv.fireDelivery()
 	}
 	return result, freedObjectID, freed
 }
@@ -1123,13 +1144,6 @@ func (inv *Inventory) queueUpdateLocked(inst *item.Instance, state UpdateState) 
 	inv.queueUpdateRecordLocked(st.ObjectID, st.TemplateID, st.Count, state)
 }
 
-func (inv *Inventory) queueUpdateRecord(objectID, templateID int32, count int, state UpdateState) {
-	inv.mu.Lock()
-	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
-	defer inv.mu.Unlock()
-	inv.queueUpdateRecordLocked(objectID, templateID, count, state)
-}
-
 func (inv *Inventory) queueUpdateRecordLocked(objectID, templateID int32, count int, state UpdateState) {
 	// Coalesce a repeated update for the same stackable instance and state
 	// (e.g. several count changes in a row) into the latest count instead of
@@ -1147,14 +1161,30 @@ func (inv *Inventory) queueUpdateRecordLocked(objectID, templateID int32, count 
 	inv.updates = append(inv.updates, Update{ObjectID: objectID, TemplateID: templateID, Count: count, State: state})
 }
 
-// fireDelivery reports a queued update after a mutation. It reads delivery
-// under the lock and calls it outside so the delivery can inspect inv safely.
+// queueRemovedLocked queues the removed update of an instance that left the
+// inventory and records its object id for the next fireDelivery.
+func (inv *Inventory) queueRemovedLocked(objectID, templateID int32, count int) {
+	inv.queueUpdateRecordLocked(objectID, templateID, count, UpdateRemoved)
+	inv.removed = append(inv.removed, objectID)
+}
+
+// fireDelivery reports a queued update after a mutation, then the instances
+// that left since the last call. It reads delivery under the lock and calls
+// it outside so the delivery can inspect inv safely.
 func (inv *Inventory) fireDelivery() {
 	inv.mu.Lock()
 	delivery := inv.delivery
 	pending := len(inv.updates) > 0
+	removed := inv.removed
+	inv.removed = nil
 	inv.mu.Unlock()
-	if delivery != nil && pending {
+	if delivery == nil {
+		return
+	}
+	if pending {
 		delivery.QueueInventoryUpdate(inv)
+	}
+	if rd, ok := delivery.(RemovalDelivery); ok && len(removed) > 0 {
+		rd.InventoryItemsRemoved(inv, removed)
 	}
 }

@@ -19,6 +19,16 @@ const tradeInteractionDistance = 150
 // carries karma while KarmaPlayerCanTrade is off.
 const tradeChaoticRefusal = "You cannot trade in a chaotic state."
 
+// boundItems reports which of live's items may not leave its inventory by
+// drop, trade or hand-over to its pet: the collar of its pet that is out or
+// of its mount, and the enchant scroll it has selected. Each call reads them
+// as they stand then.
+func (l *GameClientLink) boundItems(live *livePlayer) tradebook.BoundItems {
+	return func(objectID int32) bool {
+		return live.ControlItemInUse(objectID) || objectID == l.enchantStateStore().Active(live.ObjectID())
+	}
+}
+
 func (l *GameClientLink) tradeBook() *tradebook.Book {
 	if l.trades == nil {
 		l.trades = tradebook.NewBook(time.Now)
@@ -159,7 +169,7 @@ func (l *GameClientLink) handleAddTradeItem(live *livePlayer, req clientpackets.
 		return
 	}
 
-	result := l.tradeBook().AddItem(live.ObjectID(), live.Inventory(), live.Character, req.ObjectID, int(req.Count))
+	result := l.tradeBook().AddItem(live.ObjectID(), live.Inventory(), l.boundItems(live), req.ObjectID, int(req.Count))
 	switch result.Status {
 	case tradebook.AddNoSession:
 		return
@@ -310,7 +320,7 @@ func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirm
 		res, moved, err := l.inventory.Exchange(first.Inventory(), second.Inventory(),
 			tradeMoves(session.FirstOffer), tradeMoves(session.SecondOffer),
 			func(firstHeld, secondHeld itemcontainer.Held) bool {
-				status = session.Check(firstHeld, secondHeld, first.Character, second.Character)
+				status = session.Check(firstHeld, secondHeld, l.boundItems(first), l.boundItems(second))
 				return status == tradebook.SettlementOK
 			})
 		switch {

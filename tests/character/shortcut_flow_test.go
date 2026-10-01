@@ -123,8 +123,8 @@ func findShortCut(entries []shortCutInitEntry, typ serverpackets.ShortcutType, i
 
 // TestShortcutFlowRegistersPersistsDeletesDropsStale drives the shortcut
 // bar over the real wire protocol: restore-time stale-row drop and
-// shared-reuse-group population, action/item registration (with the silent
-// rejection of an item objectId outside the inventory), deletion, and the
+// shared-reuse-group population, action/item registration (an item objectId
+// outside the inventory is answered on the bar but never kept), deletion, and the
 // surviving rows coming back on the next enter-world burst.
 func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 	const staleObjectID int32 = 999
@@ -181,11 +181,21 @@ func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 		t.Fatalf("item register opcode = %#x, want ShortCutRegister (%#x)", reply[0], serverpackets.OpcodeShortCutRegister)
 	}
 
-	// A registration for an objectId outside the inventory is silently
-	// dropped: no reply, no persisted row (ShortcutList.java ITEM branch).
+	// A registration for an objectId outside the inventory is answered
+	// ShortCutRegister for the requested slot, then dropped without a row:
+	// RequestShortCutReg.java:44-49 sends the packet before
+	// ShortcutList.addShortcut's ITEM integrity check returns.
 	c.Send(encodeRequestShortCutReg(int32(serverpackets.ShortcutItem), wireShortcutSlot(1, 5), missingObjectID, 1))
+	reply := c.Read()
+	if reply[0] != serverpackets.OpcodeShortCutRegister {
+		t.Fatalf("missing-object register opcode = %#x, want ShortCutRegister (%#x)", reply[0], serverpackets.OpcodeShortCutRegister)
+	}
+	r := wire.NewReader(reply[1:])
+	if typ, slot, id := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); typ != int32(serverpackets.ShortcutItem) || slot != wireShortcutSlot(1, 5) || id != missingObjectID {
+		t.Fatalf("missing-object ShortCutRegister = type %d slot %d id %d, want item at slot %d for %d", typ, slot, id, wireShortcutSlot(1, 5), missingObjectID)
+	}
 	if frame := c.ReadWithTimeout(rejectSilenceWindow); frame != nil {
-		t.Fatalf("registration for missing object answered %#x, want silence", frame[0])
+		t.Fatalf("missing-object register sent a second frame %#x", frame[0])
 	}
 
 	// Shortcut rows are written on the persistence worker.

@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -23,6 +24,23 @@ func (d *playerInventoryDelivery) QueueInventoryUpdate(inv *itemcontainer.Invent
 		return
 	}
 	d.updates.Add(inv, d.live)
+}
+
+// InventoryItemsRemoved takes the item shortcuts of every instance that
+// left the inventory off the bar. The removal can run on any goroutine, so
+// the deletion goes to the player's queue, which owns the bar; an item that
+// leaves before a detached player's next login is dropped from the bar when
+// the shortcuts are restored.
+func (d *playerInventoryDelivery) InventoryItemsRemoved(_ *itemcontainer.Inventory, objectIDs []int32) {
+	if d == nil || d.live == nil || d.live.detached() {
+		return
+	}
+	live := d.live
+	postLive(live, func() {
+		for _, objectID := range objectIDs {
+			live.link.deleteTargetShortcuts(live, shortcut.Item, objectID)
+		}
+	})
 }
 
 func (d *playerInventoryDelivery) UpdateInventoryWeight(inv *itemcontainer.Inventory) {
