@@ -69,6 +69,7 @@ func shippedAccessLevels(t *testing.T) *admin.Data {
 // rows it stands in for, so a datapack change cannot leave the gate tests
 // passing against stale data.
 func TestFallbackAccessLevelsMatchDatapack(t *testing.T) {
+	t.Parallel()
 	shipped, err := datapackAccessLevels()
 	if err != nil {
 		t.Fatalf("load datapack access levels: %v", err)
@@ -108,6 +109,7 @@ func setCharacterColumn(t *testing.T, h *traders, objID int32, column string, va
 // The gate reads only the requester, so the user-level trader can still
 // request the restricted one.
 func TestTradeRequestRefusedWithoutTransactionRight(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t, gameservertest.WithAdmin(shippedAccessLevels(t)))
 	setCharacterColumn(t, h, h.firstID, "accesslevel", testGMLevel)
 	h.enterAll(t)
@@ -126,6 +128,7 @@ func TestTradeRequestRefusedWithoutTransactionRight(t *testing.T) {
 // YOU_ARE_NOT_AUTHORIZED_TO_DO_THAT, no trade window opens on either side,
 // and the request stays pending, so the requester is still busy.
 func TestAnswerTradeRequestRefusedWithoutTransactionRight(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t, gameservertest.WithAdmin(shippedAccessLevels(t)))
 	setCharacterColumn(t, h, h.secondID, "accesslevel", testGMLevel)
 	h.enterAll(t)
@@ -146,6 +149,7 @@ func TestAnswerTradeRequestRefusedWithoutTransactionRight(t *testing.T) {
 // TestUserAccessLevelTrades pins that the access table does not get in the
 // way of ordinary characters: two user-level traders open a trade as usual.
 func TestUserAccessLevelTrades(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t, gameservertest.WithAdmin(shippedAccessLevels(t)))
 	h.enterAll(t)
 	h.startTrade(t)
@@ -155,6 +159,7 @@ func TestUserAccessLevelTrades(t *testing.T) {
 // KarmaPlayerCanTrade off: karma on either side refuses the request with the
 // chaotic-state text to the requester, and the target hears nothing.
 func TestTradeRequestRefusedWithKarma(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name    string
 		chaotic func(h *traders) int32
@@ -177,6 +182,7 @@ func TestTradeRequestRefusedWithKarma(t *testing.T) {
 // TestTradeWithKarmaAllowedByDefault pins the shipped KarmaPlayerCanTrade =
 // True: a chaotic target can still be traded with.
 func TestTradeWithKarmaAllowedByDefault(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	setCharacterColumn(t, h, h.secondID, "karma", 240)
 	h.enterAll(t)
@@ -188,6 +194,7 @@ func TestTradeWithKarmaAllowedByDefault(t *testing.T) {
 // windows still open, and only the confirm at that distance cancels the
 // trade for both players.
 func TestAcceptOutOfRangeOpensTrade(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	h.enterAll(t)
 

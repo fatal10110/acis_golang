@@ -15,6 +15,7 @@ import (
 // nothing for a throne. The click never sits on or claims it; the
 // sit request still does.
 func TestSelectedThroneClickInteractsWithoutSitting(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	enterWorld(t, c)

@@ -17,6 +17,7 @@ import (
 // timePassed)): a position update that runs 150 ms after the walk started
 // walks 150 ms worth, and the next one, 100 ms later, only those 100 ms.
 func TestLatePositionUpdateWalksElapsedTime(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	if !srv.DrivesClock() {
 		t.Skip("pinning the time between position updates needs the driven clock")

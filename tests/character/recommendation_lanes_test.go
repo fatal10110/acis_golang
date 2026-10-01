@@ -81,6 +81,7 @@ func recommendationRows(t *testing.T, srv *gameservertest.Server, giverID, targe
 // giver's lane is stalled: whichever order the lanes then run in, the stored
 // count matches what the taker holds, so its next login loses nothing.
 func TestRecommendationsFromStalledLanesKeepStoredCount(t *testing.T) {
+	t.Parallel()
 	r := bootRecommendationTrio(t)
 	release := r.srv.HoldPersistenceLane(t, r.firstID)
 
@@ -103,6 +104,7 @@ func TestRecommendationsFromStalledLanesKeepStoredCount(t *testing.T) {
 // The taker relogs while the giver's lane is stalled behind its
 // recommendation: the login still reads the recommendation it was given.
 func TestRecommendedTakerRelogWhileGiverLaneStalled(t *testing.T) {
+	t.Parallel()
 	r := bootRecommendationTrio(t)
 	release := r.srv.HoldPersistenceLane(t, r.firstID)
 
@@ -128,6 +130,7 @@ func TestRecommendedTakerRelogWhileGiverLaneStalled(t *testing.T) {
 // what the players hold, so a relog neither restores a spent recommendation
 // nor forgets one given after the refresh.
 func TestRecommendationQueuedAcrossDailyRefresh(t *testing.T) {
+	t.Parallel()
 	r := bootRecommendationTrio(t)
 	release := r.srv.HoldPersistenceLane(t, r.firstID)
 

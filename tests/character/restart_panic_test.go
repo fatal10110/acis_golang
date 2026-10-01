@@ -57,6 +57,7 @@ func (p *panicOnStanceRemove) Remove(task.AttackStanceActor) bool {
 // only come from the deferred detach, which runs precisely because live was
 // left in place.
 func TestPanicInQueuedRestartHandlerDropsSession(t *testing.T) {
+	t.Parallel()
 	stance := &panicOnStanceCheck{}
 	srv := gameservertest.Boot(t,
 		gameservertest.WithAttackStanceTracker(stance),
@@ -92,6 +93,7 @@ func TestPanicInQueuedRestartHandlerDropsSession(t *testing.T) {
 // reached it; finding the reduced HP persisted proves the re-entrant detach
 // ran that far and not merely that the session closed.
 func TestPanicInsideDetachCompletesTeardown(t *testing.T) {
+	t.Parallel()
 	stance := &panicOnStanceRemove{}
 	srv := gameservertest.Boot(t,
 		gameservertest.WithAttackStanceTracker(stance),

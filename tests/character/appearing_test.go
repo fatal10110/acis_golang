@@ -13,6 +13,7 @@ import (
 // window (Teleporting() already false), and the server must keep answering
 // UserInfo for that case (Appearing.java:17-24).
 func TestAppearingAnswersUserInfoOutsideTeleportWindow(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 

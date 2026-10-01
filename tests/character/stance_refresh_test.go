@@ -60,6 +60,7 @@ func assertStanceRefresh(t *testing.T, self, observer *testsupport.ScriptedClien
 }
 
 func TestPlayerStanceChangeRefreshesSelfAndObserver(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	self := srv.Client
 	enterWorld(t, self)
@@ -84,6 +85,7 @@ func TestPlayerStanceChangeRefreshesSelfAndObserver(t *testing.T) {
 }
 
 func TestZeroSpeedStanceSkipsMoveTypeButRefreshesInfo(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1), gameservertest.WithWeightLimitMultiplier(1))
 	self := srv.Client
 	objectID := srv.SoleObjectID(t)

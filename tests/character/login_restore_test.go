@@ -139,6 +139,7 @@ func etcStatusWeightPenalty(t *testing.T, frame []byte) int32 {
 // PcInventory.java:101-113), nothing about the weight reaches the client
 // ahead of SendMacroList, and every burst frame carries the real load.
 func TestEnterWorldSendsRestoredWeightBetweenUserInfoAndItemList(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSeed(func(chars *gamesql.CharacterStore, items *gamesql.ItemStore) {
@@ -182,6 +183,7 @@ func TestEnterWorldSendsRestoredWeightBetweenUserInfoAndItemList(t *testing.T) {
 // zero move multiplier, and the player is left in band 4 with zero movement
 // speed.
 func TestEnterWorldOverloadedRestoreRefreshesPenaltyBeforeItemList(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
@@ -233,6 +235,7 @@ func TestEnterWorldOverloadedRestoreRefreshesPenaltyBeforeItemList(t *testing.T)
 // (Player.java:1139, 2254-2266). The RelationChanged that broadcastCharInfo
 // also sends is not ported yet (#1165).
 func TestEnterWorldOverloadedLoginRefreshesObservers(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Observer", 1, 0),
 		gameservertest.WithWantChars(1),
@@ -314,6 +317,7 @@ func charInfoMoveMult(t *testing.T, frame []byte) (objectID int32, moveMult floa
 // level 50; no other flow's character reaches that level, so this is the
 // only enter-world path affected by the added grant.
 func TestEnterWorldReGrantsFreeSkills(t *testing.T) {
+	t.Parallel()
 	skills := skillstate.NewPersistence(nil, modelskill.NewTable([]modelskill.Definition{{ID: 900001, Level: 1}}))
 	srv := gameservertest.Boot(t,
 		gameservertest.WithSkills(skills),
