@@ -52,6 +52,9 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	// leave its room; marked as departing first, so no room or waiting
 	// list takes it back in.
 	l.leavePartyMatch(live)
+	// A rider gets off before it leaves, so the meal a pet's mount had left
+	// goes back to the pet's row.
+	live.Character.Dismount()
 
 	if l.roster != nil || l.skills != nil {
 		roster, skills, log := l.roster, l.skills, l.log

@@ -215,6 +215,9 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.feedMountFood(live, e.ObjectID)
 	case event.Dismounted:
 		l.broadcastDismount(live)
+		if e.PetControlItemID != 0 {
+			l.storePetFood(e.PetControlItemID, e.Fed)
+		}
 	case event.MountOutOfFeed:
 		l.throwStarvedRider(live, e.WasFlying)
 	case event.UserInfoChanged:

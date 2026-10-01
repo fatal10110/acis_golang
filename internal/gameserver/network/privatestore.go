@@ -40,12 +40,7 @@ func (l *GameClientLink) storeActionUse(live *livePlayer, actionID int32) bool {
 	default:
 		return false
 	}
-	if live.Dead() || live.FakeDead() || liveOutOfControl(live) {
-		live.SendFrame(serverpackets.FrameActionFailed())
-		return true
-	}
-	if live.ObserverMode() {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageObserversCannotParticipate))
+	if actionUseRefused(live) {
 		return true
 	}
 	if !open() {

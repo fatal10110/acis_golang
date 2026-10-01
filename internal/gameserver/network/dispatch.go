@@ -105,6 +105,7 @@ type recipeBookStore interface {
 type petStore interface {
 	Get(ctx context.Context, itemObjectID int32) (petmodel.State, bool, error)
 	Save(ctx context.Context, itemObjectID int32, state petmodel.State) error
+	SaveFed(ctx context.Context, itemObjectID int32, fed int) error
 }
 
 // AttackStanceTracker owns combat-stance membership. It is exported so the
