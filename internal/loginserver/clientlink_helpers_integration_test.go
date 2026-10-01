@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/rsa"
 	"encoding/binary"
+	"errors"
 	"net"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -189,11 +191,13 @@ func (f *fakeLoginClient) read() []byte {
 	return payload
 }
 
+// expectClosed requires the server to have closed the connection with no
+// further bytes: a read that times out on a still-open, silent socket fails.
 func (f *fakeLoginClient) expectClosed() {
 	f.t.Helper()
 	f.conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 	buf := make([]byte, 1)
-	if n, err := f.conn.Read(buf); n != 0 || err == nil {
+	if n, err := f.conn.Read(buf); n != 0 || err == nil || errors.Is(err, os.ErrDeadlineExceeded) {
 		f.t.Fatalf("expected connection to close, got n=%d err=%v", n, err)
 	}
 }
