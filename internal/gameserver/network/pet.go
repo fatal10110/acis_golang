@@ -80,8 +80,16 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 	if !ok {
 		return
 	}
+	if !l.playerConfig.KarmaPlayerCanTrade && live.Karma() > 0 {
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, tradeChaoticRefusal))
+		return
+	}
 	if live.Operating() {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotPickupOrUseItemTrading))
+		return
+	}
+	if l.processingTransaction(live) {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAlreadyTrading))
 		return
 	}
 	playerInv := live.Inventory()
@@ -139,6 +147,10 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 	}
 	_, petInv, ok := l.activePet(live)
 	if !ok {
+		return
+	}
+	if l.processingTransaction(live) {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAlreadyTrading))
 		return
 	}
 	playerInv := live.Inventory()

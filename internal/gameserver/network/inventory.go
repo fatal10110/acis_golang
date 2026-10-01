@@ -434,8 +434,15 @@ func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
 }
 
 // dropLiveItem answers RequestDropItem. Whether the item can be discarded
-// at all is settled before the distance: a pet's collar while the pet is out,
-// a missing item or a bad count never reads as too far.
+// at all is settled first: a pet's collar while the pet is out, the selected
+// enchant scroll, a missing item or a bad count, and any drop by a non-GM
+// when the server allows no discards. The player's own state comes next:
+// an access level without transactions, a trade or a store, fishing. The
+// distance is last, so none of these ever reads as too far.
+//
+// The reference also refuses an augmented item and, for a non-GM, a quest
+// item here; neither gets this far, since an augmented item is not
+// droppable and a quest item is ignored above.
 func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.RequestDropItem) {
 	if !liveItemOpsAllowed(live) || l.groundItems == nil {
 		return
@@ -445,7 +452,8 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 		return
 	}
 	count := int(req.Count)
-	switch l.inventory.DropItemFailure(inv, req.ObjectID, count, live.ControlItemInUse(req.ObjectID)) {
+	refused := l.boundItems(live)(req.ObjectID) || (l.playerConfig.DiscardItemDisabled && !live.access.IsGM)
+	switch l.inventory.DropItemFailure(inv, req.ObjectID, count, refused) {
 	case invops.DropOK:
 	case invops.DropCannotDiscard:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDiscardThisItem))
@@ -454,6 +462,18 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 		// The reference ignores these requests without an answer;
 		// ActionFailed releases the drag without a message.
 		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if !live.access.AllowTransaction {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
+		return
+	}
+	if l.busyTrading(live) {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotTradeDiscardDropInShopMode))
+		return
+	}
+	if live.Fishing() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDoWhileFishing2))
 		return
 	}
 	if !dropInRange(live, int(req.X), int(req.Y), int(req.Z)) {
@@ -505,7 +525,7 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 	if live == nil {
 		return
 	}
-	if live.Operating() || (l.trades != nil && l.trades.ProcessingTransaction(live.ObjectID())) {
+	if l.busyTrading(live) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotTradeDiscardDropInShopMode))
 		return
 	}
@@ -684,6 +704,18 @@ func (l *GameClientLink) broadcastCharacterInfo(live *livePlayer) {
 // RequestPetUseItem.java:34 checks isAlikeDead()||pet.isDead(). Pickup does
 // not gate on this alone; see liveItemInteractionAllowed and
 // livePickupBlockedDeferrable's comment (pickup.go).
+// busyTrading reports whether live runs or is setting up a private store or
+// workshop, or is tied up in a direct trade or a pending trade request.
+func (l *GameClientLink) busyTrading(live *livePlayer) bool {
+	return live.Operating() || l.processingTransaction(live)
+}
+
+// processingTransaction reports whether live is tied up in a direct trade
+// or a pending trade request.
+func (l *GameClientLink) processingTransaction(live *livePlayer) bool {
+	return l.trades != nil && l.trades.ProcessingTransaction(live.ObjectID())
+}
+
 func liveItemOpsAllowed(live *livePlayer) bool {
 	return live != nil && !live.AlikeDead()
 }

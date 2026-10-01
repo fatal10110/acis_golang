@@ -125,6 +125,7 @@ func provideGameClientLink(
 		ManufactureDelay:           time.Duration(gameplay.ManufactureDelay),
 		MultisellDelay:             time.Duration(gameplay.MultisellDelay),
 		KeepMaintainedIngredients:  !bool(gameplay.BlacksmithUseRecipes),
+		DiscardItemDisabled:        !bool(gameplay.AllowDiscardItem),
 	}
 	link, err := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,

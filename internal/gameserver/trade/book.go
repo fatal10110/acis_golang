@@ -184,10 +184,9 @@ func (b *Book) ProcessingRequest(playerID int32) bool {
 
 // BoundItems tells which of a participant's items are bound where they are
 // and may not change hands whatever their own state: the control item of a
-// pet that is out. A nil BoundItems binds nothing.
-type BoundItems interface {
-	ControlItemInUse(objectID int32) bool
-}
+// pet that is out, or the enchant scroll the participant has selected. It is
+// asked again at settlement. A nil BoundItems binds nothing.
+type BoundItems func(objectID int32) bool
 
 // AddItem adds an item to a player's active direct-trade offer. bound is
 // that player's.
@@ -555,7 +554,7 @@ func itemForOffer(inv Holdings, bound BoundItems, ownerID, objectID int32, count
 	if st.OwnerID != ownerID || st.Equipped() || st.Count < count {
 		return nil, false
 	}
-	if bound != nil && bound.ControlItemInUse(objectID) {
+	if bound != nil && bound(objectID) {
 		return nil, false
 	}
 	tmpl, ok := inv.Templates().Get(inst.TemplateID)
