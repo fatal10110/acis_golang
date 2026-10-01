@@ -148,12 +148,17 @@ func (c *Character) beginPostureTransitionLocked(standing bool, delay time.Durat
 }
 
 // settlePosture ends the transition gen started, unless a later transition
-// replaced it.
+// replaced it. A sit-down's end leaves the character seated, even when a
+// get-up out of fake death on its corpse took the standing posture
+// meanwhile without replacing the lie-down.
 func (c *Character) settlePosture(gen uint64, endsFakeDeath bool) {
 	c.stateMu.Lock()
 	if gen != c.postureGen {
 		c.stateMu.Unlock()
 		return
+	}
+	if c.sittingNow {
+		c.standing = false
 	}
 	c.sittingNow, c.standingNow = false, false
 	if endsFakeDeath {
@@ -190,7 +195,8 @@ func (c *Character) StartFakeDeath() bool {
 // StopFakeDeath gets up out of fake death and sends the get-up and revive
 // visuals, dead or alive. A living character plays dead until the stand-up
 // ends. A dead one takes the standing posture with no stand-up and leaves
-// fake death at once, so a later revive finds it standing and not faking.
+// fake death at once, so a later revive finds it not faking; a lie-down
+// still running goes on and seats it when it ends.
 func (c *Character) StopFakeDeath() bool {
 	dead := c.Dead()
 	delay := fakeDeathDelay(fakeDeathStandMillis, c.MovementSpeedMultiplier())

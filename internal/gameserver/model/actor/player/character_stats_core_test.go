@@ -3028,6 +3028,37 @@ func TestCharacterStopFakeDeathBroadcastsAfterDeath(t *testing.T) {
 	}
 }
 
+// TestDieDuringFakeDeathGetUpGetsUpAgain pins the death of a player still
+// getting up out of fake death (Player.doDie, Player.java:2609-2613): the
+// flag still holds, so the death sends one more get-up and revive and
+// restarts the recent-fake-death grace (Player.stopFakeDeath,
+// Player.java:7035-7056).
+func TestDieDuringFakeDeathGetUpGetsUpAgain(t *testing.T) {
+	c := attachIdleLive(t, liveCharacter(1, combatTemplate(), combatItems()))
+	c.StartFakeDeath()
+	c.StopFakeDeath()
+	c.stateMu.Lock()
+	c.recentFakeDeathUntil = time.Time{}
+	c.stateMu.Unlock()
+	rec := recordEvents(c)
+
+	if !c.Die(nil) {
+		t.Fatal("Die() = false on a living character")
+	}
+	if !c.RecentFakeDeath() {
+		t.Fatal("RecentFakeDeath() = false after dying during the get-up, want the grace restarted")
+	}
+	stops := 0
+	for _, e := range event.Of[event.StanceChanged](rec) {
+		if e.Stance == event.StanceFakeDeathStop {
+			stops++
+		}
+	}
+	if revives := event.Count[event.FakeDeathRevived](rec); stops != 1 || revives != 1 {
+		t.Fatalf("death during the get-up sent stops:%d revives:%d, want one each", stops, revives)
+	}
+}
+
 // TestStopFakeDeathWithoutGetUpEndsFakeDeath pins the two StopFakeDeath
 // branches that schedule no get-up and so must end fake death themselves: a
 // character killed while playing dead, which must not stay fake-dead after

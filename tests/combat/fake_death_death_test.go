@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -77,6 +78,14 @@ func postureLifeFrames(frames [][]byte, id int32) []fakeDeathFrame {
 // Noblesse Blessing when blessed, and waits for the lie-down to end.
 func lieInFakeDeath(t *testing.T, srv *gameservertest.Server, victim *player.Character, blessed bool) {
 	t.Helper()
+	startFakeDeath(t, srv, victim, blessed)
+	srv.AdvanceUntil(t, "fake-death lie-down ended", victim.Seated)
+}
+
+// startFakeDeath puts victim in a Fake Death effect, preceded by a Noblesse
+// Blessing when blessed, and leaves it lying down.
+func startFakeDeath(t *testing.T, srv *gameservertest.Server, victim *player.Character, blessed bool) {
+	t.Helper()
 	names := []string{"FakeDeath"}
 	if blessed {
 		names = []string{"NoblesseBless", "FakeDeath"}
@@ -91,7 +100,6 @@ func lieInFakeDeath(t *testing.T, srv *gameservertest.Server, victim *player.Cha
 			victim.EffectList().Add(e)
 		}
 	})
-	srv.AdvanceUntil(t, "fake-death lie-down ended", victim.Seated)
 	if !victim.FakeDead() {
 		t.Fatal("victim is not playing dead")
 	}
@@ -114,7 +122,17 @@ func onlineVictim(t *testing.T, srv *gameservertest.Server, id int32) *player.Ch
 // want, and that the victim ends standing and no longer playing dead.
 func assertDeathFrames(t *testing.T, self, observer *scriptedClient, victim *player.Character, want []fakeDeathFrame) {
 	t.Helper()
-	id := victim.ObjectID()
+	assertFramesOnly(t, self, observer, victim.ObjectID(), want)
+	if !victim.Dead() || !victim.Standing() || victim.FakeDead() {
+		t.Fatalf("victim Dead=%v Standing=%v FakeDead=%v, want dead, standing, not playing dead",
+			victim.Dead(), victim.Standing(), victim.FakeDead())
+	}
+}
+
+// assertFramesOnly checks the victim's own client and the observer saw
+// want of id's posture and life frames.
+func assertFramesOnly(t *testing.T, self, observer *scriptedClient, id int32, want []fakeDeathFrame) {
+	t.Helper()
 	for _, rc := range []struct {
 		who string
 		c   *scriptedClient
@@ -122,10 +140,6 @@ func assertDeathFrames(t *testing.T, self, observer *scriptedClient, victim *pla
 		if got := postureLifeFrames(readQuiet(rc.c), id); !slices.Equal(got, want) {
 			t.Errorf("%s frames = %v, want %v", rc.who, got, want)
 		}
-	}
-	if !victim.Dead() || !victim.Standing() || victim.FakeDead() {
-		t.Fatalf("victim Dead=%v Standing=%v FakeDead=%v, want dead, standing, not playing dead",
-			victim.Dead(), victim.Standing(), victim.FakeDead())
 	}
 }
 
@@ -189,4 +203,57 @@ func TestLethalHitWhilePlayingDeadSendsGetUps(t *testing.T) {
 	attackPlayer(t, c, victim.ObjectID())
 	srv.AdvanceUntil(t, "victim killed", victim.Dead)
 	assertDeathFrames(t, vc, c, victim, []fakeDeathFrame{frameStand, frameStopFake, frameRevive, frameDie, frameStopFake, frameRevive})
+}
+
+// TestKillDuringLieDownLeavesSeatedCorpse kills a player still lying down
+// into fake death: the get-ups go out and the corpse takes the standing
+// posture, but the lie-down runs on and seats it when it ends.
+func TestKillDuringLieDownLeavesSeatedCorpse(t *testing.T) {
+	t.Parallel()
+	srv, c, vc, attacker, iv := bootPvPPair(t)
+	victim := onlineVictim(t, srv, iv.ObjectID())
+	startFakeDeath(t, srv, victim, false)
+	drainUntilQuiet(t, vc)
+	drainUntilQuiet(t, c)
+	if !victim.SittingNow() {
+		t.Fatal("the lie-down had already ended; the scenario proves nothing")
+	}
+
+	onQueue(t, srv.PlayerQueue(t, victim.ObjectID()), func() {
+		if !victim.Kill(attacker) {
+			t.Error("Kill() = false on a living player")
+		}
+	})
+	assertDeathFrames(t, vc, c, victim, []fakeDeathFrame{frameStopFake, frameRevive, frameDie, frameStopFake, frameRevive})
+	srv.AdvanceUntil(t, "lie-down ended", func() bool { return !victim.SittingNow() })
+	if victim.Standing() || !victim.Seated() || victim.FakeDead() {
+		t.Fatalf("corpse after the lie-down Standing=%v Seated=%v FakeDead=%v, want seated, not playing dead",
+			victim.Standing(), victim.Seated(), victim.FakeDead())
+	}
+}
+
+// TestKillDuringFakeDeathGetUpSendsOneGetUp kills a player already getting
+// up out of fake death: its Fake Death is gone, so Die comes first, then
+// the death's one get-up.
+func TestKillDuringFakeDeathGetUpSendsOneGetUp(t *testing.T) {
+	t.Parallel()
+	srv, c, vc, attacker, iv := bootPvPPair(t)
+	victim := onlineVictim(t, srv, iv.ObjectID())
+	lieInFakeDeath(t, srv, victim, false)
+	onQueue(t, srv.PlayerQueue(t, victim.ObjectID()), func() {
+		victim.EffectList().StopByType(effect.TypeFakeDeath)
+	})
+	drainUntilQuiet(t, vc)
+	drainUntilQuiet(t, c)
+	srv.Advance(t, time.Second)
+	if !victim.FakeDead() || !victim.StandingNow() {
+		t.Fatalf("victim FakeDead=%v StandingNow=%v, want still getting up", victim.FakeDead(), victim.StandingNow())
+	}
+
+	onQueue(t, srv.PlayerQueue(t, victim.ObjectID()), func() {
+		if !victim.Kill(attacker) {
+			t.Error("Kill() = false on a living player")
+		}
+	})
+	assertFramesOnly(t, vc, c, victim.ObjectID(), []fakeDeathFrame{frameDie, frameStopFake, frameRevive})
 }
