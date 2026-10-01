@@ -60,6 +60,7 @@ const (
 	SystemMessageAlreadyTrading                    = 142
 	SystemMessageTargetIncorrect                   = 144
 	SystemMessageTargetNotFound                    = 145
+	SystemMessageInMessageRefusalMode              = 176
 	SystemMessageCannotUseQuestItems               = 148
 	SystemMessageCannotPickupOrUseItemTrading      = 149
 	SystemMessageS1IsBusyTryLater                  = 153
@@ -532,10 +533,11 @@ const (
 
 // Warehouse and freight refusals; no parameter.
 const (
-	SystemMessageNoItemDepositedInWH                   = 282
-	SystemMessageNoRightToUseClanWarehouse             = 709
-	SystemMessageOnlyLevel1ClanOrHigherCanUseWarehouse = 710
-	SystemMessageCharacterDoesNotExist                 = 873
+	SystemMessageNoItemDepositedInWH                             = 282
+	SystemMessageNoRightToUseClanWarehouse                       = 709
+	SystemMessageOnlyLevel1ClanOrHigherCanUseWarehouse           = 710
+	SystemMessageCharacterDoesNotExist                           = 873
+	SystemMessageOnlyClanLeaderCanRetrieveItemsFromClanWarehouse = 1039
 )
 
 // Friend list, block list and block-everything messages.

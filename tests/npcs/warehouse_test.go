@@ -669,9 +669,7 @@ func enterFrom(t *testing.T, srv *gameservertest.Server, c *testsupport.Scripted
 			t.Fatalf("opcode = %#x, want %#x", reply[0], want)
 		}
 	}
-	c.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
-	srv.Settle(t)
-	drainUntilQuiet(t, c)
+	enterWorld(t, srv, c)
 }
 
 // TestPackageSendGates pins the package's item gates: a row naming the

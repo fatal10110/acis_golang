@@ -97,6 +97,7 @@ type options struct {
 	admin                  *admin.Data
 	gmStartupUnlisted      bool
 	gmAudit                zerolog.Logger
+	chat                   network.ChatConfig
 	restarts               *restart.Table
 	teleports              travel.TeleportTable
 	instantTeleports       travel.InstantTable
@@ -259,6 +260,11 @@ func WithGMStartupUnlisted() Option { return func(o *options) { o.gmStartupUnlis
 // WithGMAudit records every admin command run to log (server.properties
 // GMAudit = True); by default nothing is recorded.
 func WithGMAudit(log zerolog.Logger) Option { return func(o *options) { o.gmAudit = log } }
+
+// WithChat sets the server.properties chat settings: the chat log, the bot
+// whisper filter and the chat reuse delays (default: nothing logged,
+// nothing filtered, no delay).
+func WithChat(cfg network.ChatConfig) Option { return func(o *options) { o.chat = cfg } }
 
 // WithRestartPoints supplies the restart-point table wired into the link
 // (default: none, so restart requests answer ActionFailed).
@@ -847,7 +853,6 @@ func (s *Server) SeedCharacterFor(tb testing.TB, account, name string, level, sp
 func (s *Server) DialClient(t *testing.T, account string, wantChars int) *testsupport.ScriptedClient {
 	t.Helper()
 	c := testsupport.Dial(t, s.addr.String())
-	s.addClient(c)
 	c.SendProtocolVersion(746)
 
 	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
@@ -860,14 +865,34 @@ func (s *Server) DialClient(t *testing.T, account string, wantChars int) *testsu
 	w.WriteInt32(key.LoginKey2)
 	c.Send(w.Bytes())
 
-	reply := c.Read()
+	readCharSelectInfo(t, c, account, wantChars)
+	// Registered once logged in: the handshake reads wait on the wall
+	// clock, as Boot's do, never by moving a driven clock.
+	s.addClient(c)
+	return c
+}
+
+// handshakeReadTimeout bounds the wait for the CharSelectInfo that answers a
+// harness client's AuthLogin. That reply follows the session check over the
+// login link and the account's character rows from the shared database, which
+// a machine running every suite at once can hold past a test body's 5s read; a
+// server that never answers still fails the test.
+const handshakeReadTimeout = 30 * time.Second
+
+// readCharSelectInfo reads the CharSelectInfo that answers c's AuthLogin and
+// checks it lists wantChars characters for account.
+func readCharSelectInfo(tb testing.TB, c *testsupport.ScriptedClient, account string, wantChars int) {
+	tb.Helper()
+	reply := c.ReadWithTimeout(handshakeReadTimeout)
+	if reply == nil {
+		tb.Fatalf("CharSelectInfo for %s not received within %v", account, handshakeReadTimeout)
+	}
 	if reply[0] != serverpackets.OpcodeCharSelectInfo {
-		t.Fatalf("opcode = %#x, want CharSelectInfo (%#x)", reply[0], serverpackets.OpcodeCharSelectInfo)
+		tb.Fatalf("opcode = %#x, want CharSelectInfo (%#x)", reply[0], serverpackets.OpcodeCharSelectInfo)
 	}
 	if count := wire.NewReader(reply[1:]).ReadInt32(); count != int32(wantChars) {
-		t.Fatalf("char count for %s = %d, want %d", account, count, wantChars)
+		tb.Fatalf("char count for %s = %d, want %d", account, count, wantChars)
 	}
-	return c
 }
 
 // onlineCharacter resolves the online player objID to its character,
@@ -1682,6 +1707,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Levels:           levels,
 		Admin:            o.admin,
 		GMAudit:          o.gmAudit,
+		Chat:             o.chat,
 		Log:              o.log,
 	}
 	// The clans are restored once the characters are seeded, below.
@@ -1871,14 +1897,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	w.WriteInt32(key.LoginKey1)
 	w.WriteInt32(key.LoginKey2)
 	c.Send(w.Bytes())
-
-	reply := c.Read()
-	if reply[0] != serverpackets.OpcodeCharSelectInfo {
-		t.Fatalf("opcode = %#x, want CharSelectInfo (%#x)", reply[0], serverpackets.OpcodeCharSelectInfo)
-	}
-	if count := wire.NewReader(reply[1:]).ReadInt32(); count != int32(o.wantChars) {
-		t.Fatalf("initial char count = %d, want %d", count, o.wantChars)
-	}
+	readCharSelectInfo(t, c, o.account, o.wantChars)
 
 	srv := &Server{
 		Client:           c,

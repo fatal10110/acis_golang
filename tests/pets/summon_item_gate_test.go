@@ -33,7 +33,7 @@ func startOwnerSwing(t *testing.T, h *petWorld) {
 			break
 		}
 	}
-	readImmediate(h.client)
+	h.srv.ReadQueued(t, h.client)
 }
 
 // TestSummonItemsMidSwingAnswerCannotSummonInCombat pins
@@ -64,7 +64,7 @@ func TestSummonItemsMidSwingAnswerCannotSummonInCombat(t *testing.T) {
 			startOwnerSwing(t, h)
 
 			h.client.Send(encodeUseItem(used, false))
-			frames := readImmediate(h.client)
+			frames := h.srv.ReadQueued(t, h.client)
 			if len(frames) == 0 {
 				t.Fatalf("%s mid-swing: no answer", tt.name)
 			}
