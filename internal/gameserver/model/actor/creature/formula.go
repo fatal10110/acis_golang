@@ -4,6 +4,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -124,7 +125,7 @@ func ResolvePhysicalSkillInput(attacker, target FormulaActor, def modelskill.Def
 	return formulas.PhysicalSkillInput{
 		AttackPower:   attacker.PAtk(),
 		SkillPower:    skillPower,
-		Defence:       Positive(defence),
+		Defence:       defence,
 		Shield:        shield,
 		Crit:          crit,
 		SoulShot:      soulshot,
@@ -145,7 +146,7 @@ func ResolvePhysicalAttackInput(attacker, target FormulaActor, crit bool) (formu
 		return formulas.PhysicalAttackInput{}, formulas.ShieldFailed
 	}
 	shield := target.ShieldDefense(attacker, modelskill.Definition{}, crit)
-	defence := Positive(target.PDef())
+	defence := target.PDef()
 	if shield == formulas.ShieldSuccess {
 		defence += target.CalcStat(stat.ShieldDefence, 0)
 	}
@@ -176,16 +177,19 @@ func ResolvePhysicalAttackInput(attacker, target FormulaActor, crit bool) (formu
 
 // ApplyPhysicalAttackDamage converts a resolved auto-attack input into the
 // integer damage one hit deals. A perfect shield block is a flat 1 before
-// dual-wield splitting.
+// dual-wield splitting. The formula result narrows to int32 first (a zero
+// defence yields +Inf, which saturates, or NaN, which becomes 0), and only
+// then does a dual-wield hit halve it.
 func ApplyPhysicalAttackDamage(in formulas.PhysicalAttackInput, shield formulas.ShieldDefense, split bool) int {
 	damage := 1.0
 	if shield != formulas.ShieldPerfect {
 		damage = formulas.PhysicalAttackDamage(in)
 	}
+	hit := int(commons.JavaInt(damage))
 	if split {
-		damage /= 2
+		hit /= 2
 	}
-	return int(damage)
+	return hit
 }
 
 // ResolveMagicDamageInput builds a magic-damage input from the caster/target
@@ -205,7 +209,7 @@ func ResolveMagicDamageInput(attacker, target FormulaActor, def modelskill.Defin
 	}
 	in := formulas.MagicDamageInput{
 		MAtk:            attacker.MAtk(),
-		MDef:            Positive(mDef),
+		MDef:            mDef,
 		SkillPower:      casterSkillPower(attacker, def),
 		PvPMul:          MagicPvPMul(attacker, def, pvp),
 		ElementalMul:    ElementalSkillModifier(target, def),
@@ -282,7 +286,7 @@ func ResolveBlowInput(attacker, target FormulaActor, def modelskill.Definition, 
 	return formulas.BlowInput{
 		AttackPower:       attacker.PAtk(),
 		SkillPower:        skillPower,
-		Defence:           Positive(defence),
+		Defence:           defence,
 		Shield:            shield,
 		SoulShot:          soulshot,
 		IsPvP:             pvp,
@@ -318,13 +322,13 @@ func ResolveManaDamageInput(attacker, target FormulaActor, maxMP float64, def mo
 	sps, bsps := SpiritshotFlags(attacker)
 	affected := formulas.MagicAffected(formulas.MagicAffectedInput{
 		MAtk:     attacker.MAtk(),
-		MDef:     Positive(target.MDef()),
+		MDef:     target.MDef(),
 		VulnMul:  SkillVulnerability(target, def.SkillType, def),
 		Defended: def.Activation == modelskill.ActivationActive && def.Offensive,
 	}, rnd.NextGaussian())
 	return formulas.ManaDamageInput{
 		MAtk:            attacker.MAtk(),
-		MDef:            Positive(target.MDef()),
+		MDef:            target.MDef(),
 		SkillPower:      casterSkillPower(attacker, def),
 		TargetMaxMp:     maxMP,
 		SoulShot:        sps,
@@ -509,7 +513,7 @@ func SkillMAtkModifier(target, attacker FormulaActor, def modelskill.Definition,
 	if !def.Magic || target == nil || attacker == nil {
 		return 1
 	}
-	mDef := Positive(target.MDef())
+	mDef := target.MDef()
 	mAtk := attacker.MAtk()
 	if bss {
 		mAtk *= 4
@@ -626,14 +630,6 @@ func WeaponVulnerability(target FormulaActor, weapon item.WeaponType) float64 {
 	default:
 		return 1
 	}
-}
-
-// Positive returns v unless it is zero or negative, in which case it returns 1.
-func Positive(v float64) float64 {
-	if v <= 0 {
-		return 1
-	}
-	return v
 }
 
 // SkillTypeKey normalizes skill and effect type names for formula dispatch.

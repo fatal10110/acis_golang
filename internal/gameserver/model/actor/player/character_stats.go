@@ -3,6 +3,7 @@ package player
 import (
 	"math"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
@@ -566,7 +567,7 @@ func (c *Character) shareDamageWithServitor(amount float64, attacker attackable.
 	if !location.In3DRadius(x, y, z, sx, sy, sz, servitorDamageShareRadius) {
 		return 0
 	}
-	share := int(amount * c.calcStat(stat.TransferDamagePercent, 0) / 100)
+	share := int(commons.JavaInt(amount * c.calcStat(stat.TransferDamagePercent, 0) / 100))
 	share = min(int(servitor.HP())-1, share)
 	if share <= 0 {
 		return 0
@@ -618,7 +619,7 @@ func (c *Character) sendHitFeedback(amount float64, attacker attackable.Combatan
 	if hit.cpOnly {
 		c.BroadcastStatus()
 	}
-	if full := int(amount); full > 0 && !isDOT && c.hitByOther(attacker) {
+	if full := int(commons.JavaInt(amount)); full > 0 && !isDOT && c.hitByOther(attacker) {
 		c.emit(event.DamageReceived{AttackerName: attacker.CharacterName(), Amount: full})
 		if shared > 0 {
 			if recipient, ok := actingPlayer(attacker).(servitorShareRecipient); ok {
@@ -663,7 +664,9 @@ func (c *Character) ReduceHPWithoutCastBreak(amount float64, attacker attackable
 // effects; it then writes nothing unless it is another playable's hit
 // through CP, which rewrites CP unchanged and reports the status.
 func (c *Character) reduceSkillHP(amount float64, attacker attackable.Combatant, skill modelskill.Definition, breakCast bool) {
-	if amount < 0 {
+	// A NaN amount (a zero-defence hit scaled by a zero multiplier) takes
+	// nothing, like a negative one.
+	if !(amount > 0) {
 		amount = 0
 	}
 	if c.Invul() || c.Dead() {

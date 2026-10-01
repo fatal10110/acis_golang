@@ -1,6 +1,7 @@
 package skill
 
 import (
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -152,7 +153,7 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		if damage > 0 {
 			if !applyPhysicalSkillCounter(cast, target, damage, target.CounterSkillPhysical(), false, &result) {
 				target.ReduceHP(damage, cast.Caster, cast.Skill)
-				recordDamage(&result, cast.Caster, target, int(damage), false, false)
+				recordDamage(&result, cast.Caster, target, javaInt(damage), false, false)
 			}
 			applyLethalHit(cast, cast.Skill, target, &result)
 		} else {
@@ -205,7 +206,7 @@ func (chargeDamHandler) UseResult(cast Cast) Result {
 		damage := formulas.PhysicalSkillDamage(in) * modifier
 		if !applyPhysicalSkillCounter(cast, target, damage, target.CounterSkillPhysical(), false, &result) {
 			target.ReduceHP(damage, cast.Caster, cast.Skill)
-			recordDamage(&result, cast.Caster, target, int(damage), false, false)
+			recordDamage(&result, cast.Caster, target, javaInt(damage), false, false)
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
@@ -263,7 +264,7 @@ func (h mdamHandler) UseResult(cast Cast) Result {
 		if in.Shield != formulas.ShieldPerfect {
 			reportMagicFailure(cast, target, in.Failure, &result)
 		}
-		damage := int(formulas.MagicDamage(in))
+		damage := javaInt(formulas.MagicDamage(in))
 		if damage > 0 {
 			// MDAM rolls the target's cast break, then reports the damage
 			// before applying it, unlike the physical handlers.
@@ -353,7 +354,7 @@ func (h drainHandler) UseResult(cast Cast) Result {
 		if in.Shield != formulas.ShieldPerfect {
 			reportMagicFailure(cast, target, in.Failure, &result)
 		}
-		damage := int(formulas.MagicDamage(in))
+		damage := javaInt(formulas.MagicDamage(in))
 		if damage <= 0 {
 			continue
 		}
@@ -473,19 +474,23 @@ func (blowHandler) UseResult(cast Cast) Result {
 		if in.Landed {
 			counter := target.CounterSkillPhysical()
 			applyBlowEffects(cast, obj, in.Shield, counterSkillReflects(cast.Skill, counter), &result)
-			damage := 1
+			// The blow formula narrows to int32 before the critical
+			// doubling, which then runs on the widened value: a saturated
+			// hit doubles past the int32 range and narrows again only for
+			// the damage report.
+			damage := 1.0
 			if in.Shield != formulas.ShieldPerfect {
-				damage = int(formulas.BlowDamage(in))
+				damage = float64(commons.JavaInt(formulas.BlowDamage(in)))
 			}
 			if in.Crit {
 				damage *= 2
 			}
 			if damage > 0 {
 				// A blow always reports itself as a physical critical.
-				countered := applyPhysicalSkillCounter(cast, target, float64(damage), counter, true, &result)
+				countered := applyPhysicalSkillCounter(cast, target, damage, counter, true, &result)
 				if !countered {
-					target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
-					recordDamage(&result, cast.Caster, target, damage, false, true)
+					target.ReduceHP(damage, cast.Caster, cast.Skill)
+					recordDamage(&result, cast.Caster, target, javaInt(damage), false, true)
 				}
 			}
 			dischargeSoulshot(cast)
@@ -517,7 +522,7 @@ func applyPhysicalSkillCounter(cast Cast, target Creature, damage, counter float
 	if cast.Caster != nil {
 		damage *= counter / 100
 		cast.Caster.ReduceHP(damage, target, cast.Skill)
-		recordDamage(result, target, cast.Caster, int(damage), false, pcrit)
+		recordDamage(result, target, cast.Caster, javaInt(damage), false, pcrit)
 	}
 	return true
 }
@@ -525,6 +530,12 @@ func applyPhysicalSkillCounter(cast Cast, target Creature, damage, counter float
 type damageSummon interface {
 	OwnerID() int32
 	IsPet() bool
+}
+
+// javaInt narrows a damage amount to the int32 a damage report carries: a
+// zero-defence hit's +Inf saturates and a NaN reports 0.
+func javaInt(damage float64) int {
+	return int(commons.JavaInt(damage))
 }
 
 // recordDamage records attacker's damage feedback against target at its
@@ -808,13 +819,13 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 			result.ManaDrains = append(result.ManaDrains, ManaDrain{
 				TargetID:   obj.ObjectID(),
 				CasterName: actorName(cast.Caster),
-				MP:         int32(mp),
+				MP:         commons.JavaInt(mp),
 			})
 			result.record(result.ManaDrains[len(result.ManaDrains)-1])
 		}
 		if cast.Caster != nil && cast.Caster.Kind() == actor.KindPlayer {
-			result.OpponentMPReduced = append(result.OpponentMPReduced, int32(mp))
-			result.record(OpponentMPReducedMessage{MP: int32(mp)})
+			result.OpponentMPReduced = append(result.OpponentMPReduced, commons.JavaInt(mp))
+			result.record(OpponentMPReducedMessage{MP: commons.JavaInt(mp)})
 		}
 	}
 	applySelfEffects(cast, cast.Skill)

@@ -405,6 +405,9 @@ func spawnShieldedHostile(t *testing.T, srv *gameservertest.Server, defs actorca
 		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 8, CollisionHeight: 20,
 	}, defs)
 	hostile.SetRollSource(func(int) int { return 0 })
+	// A template M.Def of 0 truncates to 0, which an MDAM turns into a
+	// killing blow; give the monster a real one.
+	hostile.AddStatFuncs([]effect.Mod{{Stat: stat.MagicDefence, Op: effect.OpSet, Value: 100}})
 	if !hostile.Queue().Post(func() { aiCtl.Cast(hostile, modelskill.Ref{ID: npcShieldSkill, Level: 1}) }) {
 		t.Fatal("post npc cast: queue closed")
 	}

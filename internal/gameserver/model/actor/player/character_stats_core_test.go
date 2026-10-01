@@ -6746,7 +6746,7 @@ func TestCharacterMakeAttackHitUsesPosPvpWeaponCritShieldAndSoulshot(t *testing.
 		t.Fatalf("front hit miss=%v crit=%v, want hit non-crit", front.Miss, front.Crit)
 	}
 	wantFront := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
-		AttackPower: frontAtk.PAtk(), Defence: creature.Positive(frontTgt.PDef()),
+		AttackPower: frontAtk.PAtk(), Defence: frontTgt.PDef(),
 		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1,
 	}))
 	if front.Damage != wantFront {
@@ -6756,7 +6756,7 @@ func TestCharacterMakeAttackHitUsesPosPvpWeaponCritShieldAndSoulshot(t *testing.
 	behindAtk, behindTgt := place(-100, 0)
 	behind := behindAtk.MakeAttackHit(behindTgt, false)
 	wantBehind := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
-		AttackPower: behindAtk.PAtk(), Defence: creature.Positive(behindTgt.PDef()),
+		AttackPower: behindAtk.PAtk(), Defence: behindTgt.PDef(),
 		PosMul: 1.2, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1,
 	}))
 	if behind.Damage != wantBehind {
@@ -6767,7 +6767,7 @@ func TestCharacterMakeAttackHitUsesPosPvpWeaponCritShieldAndSoulshot(t *testing.
 	pvpAtk.AddStatFuncs([]effect.Mod{{Stat: stat.PvPPhysicalDmg, Op: effect.OpMul, Value: 2, Owner: testModOwner()}})
 	pvp := pvpAtk.MakeAttackHit(pvpTgt, false)
 	wantPvP := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
-		AttackPower: pvpAtk.PAtk(), Defence: creature.Positive(pvpTgt.PDef()),
+		AttackPower: pvpAtk.PAtk(), Defence: pvpTgt.PDef(),
 		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 2,
 	}))
 	if pvp.Damage != wantPvP {
@@ -6779,7 +6779,7 @@ func TestCharacterMakeAttackHitUsesPosPvpWeaponCritShieldAndSoulshot(t *testing.
 	wpnTgt.AddStatFuncs([]effect.Mod{{Stat: stat.SwordWpnVuln, Op: effect.OpMul, Value: 1.5, Owner: testModOwner()}})
 	wpn := wpnAtk.MakeAttackHit(wpnTgt, false)
 	wantWpn := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
-		AttackPower: wpnAtk.PAtk(), Defence: creature.Positive(wpnTgt.PDef()),
+		AttackPower: wpnAtk.PAtk(), Defence: wpnTgt.PDef(),
 		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1.5, PvPMul: 1,
 	}))
 	if wpn.Damage != wantWpn {
@@ -6795,7 +6795,7 @@ func TestCharacterMakeAttackHitUsesPosPvpWeaponCritShieldAndSoulshot(t *testing.
 		t.Fatal("crit hit Crit = false")
 	}
 	wantCrit := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
-		AttackPower: critAtk.PAtk(), Defence: creature.Positive(critTgt.PDef()), Crit: true,
+		AttackPower: critAtk.PAtk(), Defence: critTgt.PDef(), Crit: true,
 		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1,
 		CritDamageMul: 2, CritDamagePosMul: 1, CritVulnMul: 1.5,
 	}))
@@ -6808,7 +6808,7 @@ func TestCharacterMakeAttackHitUsesPosPvpWeaponCritShieldAndSoulshot(t *testing.
 	ssAtk.SetChargedShot(item.ShotSoul, true)
 	ss := ssAtk.MakeAttackHit(ssTgt, false)
 	wantSS := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
-		AttackPower: ssAtk.PAtk(), Defence: creature.Positive(ssTgt.PDef()), SoulShot: true,
+		AttackPower: ssAtk.PAtk(), Defence: ssTgt.PDef(), SoulShot: true,
 		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1,
 	}))
 	if ss.Damage != wantSS {
@@ -6847,7 +6847,7 @@ func TestCharacterMakeAttackHitUsesPosPvpWeaponCritShieldAndSoulshot(t *testing.
 		t.Fatalf("shield = %v, want ShieldSuccess", blocked.Shield)
 	}
 	wantBlocked := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
-		AttackPower: shieldAtk.PAtk(), Defence: creature.Positive(shieldTgt.PDef()) + shieldTgt.CalcStat(stat.ShieldDefence, 0),
+		AttackPower: shieldAtk.PAtk(), Defence: shieldTgt.PDef() + shieldTgt.CalcStat(stat.ShieldDefence, 0),
 		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1,
 	}))
 	if blocked.Damage != wantBlocked {

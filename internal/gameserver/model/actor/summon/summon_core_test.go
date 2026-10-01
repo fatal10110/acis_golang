@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -1464,7 +1463,7 @@ func TestSummonMakeAttackHitUsesPosAndPvP(t *testing.T) {
 		t.Fatalf("front miss=%v crit=%v, want hit non-crit", front.Miss, front.Crit)
 	}
 	wantFront := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
-		AttackPower: frontAtk.PAtk(), Defence: creature.Positive(frontTgt.PDef()),
+		AttackPower: frontAtk.PAtk(), Defence: frontTgt.PDef(),
 		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1,
 	}))
 	if front.Damage != wantFront {
@@ -1474,7 +1473,7 @@ func TestSummonMakeAttackHitUsesPosAndPvP(t *testing.T) {
 	behindAtk, behindTgt := place(-100, 0)
 	behind := behindAtk.MakeAttackHit(behindTgt, false)
 	wantBehind := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
-		AttackPower: behindAtk.PAtk(), Defence: creature.Positive(behindTgt.PDef()),
+		AttackPower: behindAtk.PAtk(), Defence: behindTgt.PDef(),
 		PosMul: 1.2, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 1,
 	}))
 	if behind.Damage != wantBehind {
@@ -1485,7 +1484,7 @@ func TestSummonMakeAttackHitUsesPosAndPvP(t *testing.T) {
 	pvpAtk.AddStatFuncs([]effect.Mod{{Stat: stat.PvPPhysicalDmg, Op: effect.OpMul, Value: 2, Owner: effect.ModOwnerEffect(&effect.Effect{})}})
 	pvp := pvpAtk.MakeAttackHit(pvpTgt, false)
 	wantPvP := int(formulas.PhysicalAttackDamage(formulas.PhysicalAttackInput{
-		AttackPower: pvpAtk.PAtk(), Defence: creature.Positive(pvpTgt.PDef()),
+		AttackPower: pvpAtk.PAtk(), Defence: pvpTgt.PDef(),
 		PosMul: 1, ElementalMul: 1, RandomMul: 1, RaceMul: 1, WeaponVulnMul: 1, PvPMul: 2,
 	}))
 	if pvp.Damage != wantPvP {
