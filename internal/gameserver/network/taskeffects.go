@@ -51,7 +51,9 @@ const autosaveSaveTimeout = 5 * time.Second
 // steps counts the movement steps since the zones were last revalidated: a
 // step revalidates them only every zoneStepsPerRevalidation steps, while
 // spawning, a teleport landing, a move's end or stop and a region change
-// revalidate them at once and restart the count.
+// revalidate them at once and restart the count. While the player is
+// teleporting the count still runs but no zone is revalidated, as a
+// teleport stops the player's move before it leaves the grid.
 type liveZoneActor struct {
 	// deliveryMu keeps compass sends in the same order as zone transitions.
 	// mu protects the zone state and is released before sending a frame.
@@ -123,10 +125,13 @@ func (a *liveZoneActor) revalidateMove(ix *zone.Index, previous location.Locatio
 		a.mu.Unlock()
 		return
 	}
+	// A teleport in progress keeps the count but revalidates no zone: the
+	// move it stops must not enter the zones of a position it is leaving.
+	teleporting := a.live.Teleporting()
 	pos := a.Position()
 	if reason == revalidateForce || world.RegionKey(previous.X, previous.Y) != world.RegionKey(pos.X, pos.Y) {
 		a.steps = 0
-		if ix != nil {
+		if ix != nil && !teleporting {
 			ix.RevalidateMove(a, previous)
 		}
 	}
@@ -134,7 +139,7 @@ func (a *liveZoneActor) revalidateMove(ix *zone.Index, previous location.Locatio
 		a.steps++
 		if a.steps >= zoneStepsPerRevalidation {
 			a.steps = 0
-			if ix != nil {
+			if ix != nil && !teleporting {
 				ix.Revalidate(a)
 			}
 		}

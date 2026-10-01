@@ -197,3 +197,42 @@ func TestZoneEnterOnRegionCrossingBeforeFifthUpdate(t *testing.T) {
 		return
 	}
 }
+
+// TestTeleportMidWalkEntersNoZoneBeforeLeaving pins the teleport guard of
+// WorldRegion.revalidateZones (WorldRegion.java:146-152): Creature.teleportTo
+// marks the player teleporting (Creature.java:388-393) before abortAll
+// stops its move, so the forced revalidation of that stop enters no zone.
+// A walk inside a water zone it has not entered yet (updates 1-4) that is
+// cut by a teleport sends no water entry/exit UserInfo pair around the
+// TeleportToLocation, and the player never swims there.
+func TestTeleportMidWalkEntersNoZoneBeforeLeaving(t *testing.T) {
+	srv, character, objID := bootBesideWater(t)
+	spawn := besideWaterSpawn
+	mover := srv.PlayerMove(t, objID)
+	c := srv.Client
+	c.Send(encodeMoveBackwardToLocation(location.Location{X: spawn.X + 3_000, Y: spawn.Y, Z: spawn.Z}, spawn, 1))
+	if reply := c.Read(); reply[0] != serverpackets.OpcodeMoveToLocation {
+		t.Fatalf("walk opcode = %#x, want MoveToLocation", reply[0])
+	}
+	tickFrames(t, srv)
+	if at := mover.Position(); at.X < spawn.X+5 || character.InWater() {
+		t.Fatalf("after one update: at %+v, in water %v; want inside the zone, not entered yet", at, character.InWater())
+	}
+
+	character.TeleportTo(spawn.X-5_000, spawn.Y, spawn.Z, 0)
+	frames := readUntilQuiet(c)
+	teleport := firstOpcode(frames, serverpackets.OpcodeTeleportToLocation)
+	if teleport < 0 {
+		t.Fatalf("teleport frames = %x, want TeleportToLocation", frames)
+	}
+	if i := firstOpcode(frames, serverpackets.OpcodeUserInfo); i >= 0 {
+		t.Fatalf("teleport frames = %x: UserInfo at %d, want no water entry or exit (TeleportToLocation at %d)", frames, i, teleport)
+	}
+	if character.InWater() || mover.MoveType() != move.MoveGround {
+		t.Fatalf("teleporting: in water %v, move type %d; want the zone never entered", character.InWater(), mover.MoveType())
+	}
+	appear(t, c)
+	if character.InWater() || mover.MoveType() != move.MoveGround {
+		t.Fatalf("after appearing: in water %v, move type %d; want on the ground", character.InWater(), mover.MoveType())
+	}
+}
