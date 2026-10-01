@@ -306,6 +306,20 @@ func (c *Controller) CurrentSkill() (modelskill.Definition, bool) {
 	return c.current, true
 }
 
+// InFlight returns the skill and target of the cast in flight, and whether
+// one is in flight at all.
+func (c *Controller) InFlight() (modelskill.Definition, Target, bool) {
+	if c == nil {
+		return modelskill.Definition{}, nil, false
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if !c.casting {
+		return modelskill.Definition{}, nil, false
+	}
+	return c.current, c.target, true
+}
+
 // CanAttemptCast is the pre-movement gate: already casting, every skill
 // disabled, and per-skill reuse. Callers that stop a walk for a long hit
 // time must run this first so those rejections leave movement alone.

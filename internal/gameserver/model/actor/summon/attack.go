@@ -40,6 +40,10 @@ func (a *Actor) MovementDisabled() bool {
 
 func (a *Actor) IsMoving() bool { return a.Move().Moving() }
 
+// MovingTo returns the target of a's leg in flight and whether it is walking
+// at all.
+func (a *Actor) MovingTo() (location.Location, bool) { return a.Move().MovingTo() }
+
 func (a *Actor) InAttackRange(target attackable.Combatant) bool {
 	x, y, z := a.Position()
 	return attack.InPhysicalRange(location.Location{X: x, Y: y, Z: z}, a.PhysicalAttackRange(), a.CollisionRadius(), target)

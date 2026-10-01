@@ -94,6 +94,15 @@ func (f *Folk) IsMoving() bool {
 	return f.motion != nil && f.motion.move.Moving()
 }
 
+// MovingTo returns the target of the NPC's leg in flight and whether it is
+// walking at all.
+func (f *Folk) MovingTo() (location.Location, bool) {
+	if f.motion == nil {
+		return location.Location{}, false
+	}
+	return f.motion.move.MovingTo()
+}
+
 // Emit settles the NPC's controller events: an arrival syncs its world
 // position, faces its spawn heading when back on its spawn point, and is
 // passed on to Control; a blocked walk shows observers where it stopped.
