@@ -156,12 +156,15 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0xb5: true, // workshop: craft window
 		0xb6: true, // workshop: order a craft
 		0xb7: true, // workshop: back to its list
+		0xb9: true, // recommend a player
 		0xba: true, // symbol draw window
 		0xbb: true, // symbol draw details
 		0xbc: true, // draw a symbol
 		0xbd: true, // symbol deletion window
 		0xbe: true, // symbol deletion details
 		0xbf: true, // delete a symbol
+		0xc1: true, // create or edit a macro
+		0xc2: true, // delete a macro
 		0xc5: true, // dialog answer
 		0xc6: true, // try on merchant items
 		0xca: true, // game guard reply

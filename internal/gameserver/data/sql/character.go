@@ -30,7 +30,7 @@ const characterColumns = `obj_Id, account_name, char_name,
 	COALESCE(race,0), COALESCE(classid,0), base_class,
 	COALESCE(deletetime,0), COALESCE(title,''), COALESCE(accesslevel,0), COALESCE(hero,0), COALESCE(lastAccess,0),
 	COALESCE(onlinetime,0),
-	COALESCE(death_penalty_level,0)`
+	COALESCE(death_penalty_level,0), rec_have, rec_left`
 
 // CharacterStore reads and writes the characters table.
 type CharacterStore struct {
@@ -136,6 +136,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var hero int
 	var maxHP, curHP, maxCP, curCP, maxMP, curMP float64
 	var deathPenaltyLevel, onlineTime int
+	var recHave, recLeft int
 
 	err := row.Scan(
 		&c.ID, &c.AccountName, &c.Name,
@@ -146,7 +147,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 		&race, &classID, &c.BaseClassID,
 		&c.DeleteAt, &c.Title, &c.AccessLevel, &hero, &c.LastAccess,
 		&onlineTime,
-		&deathPenaltyLevel,
+		&deathPenaltyLevel, &recHave, &recLeft,
 	)
 	if err != nil {
 		return nil, err
@@ -156,6 +157,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	c.SetClassID(classID)
 	c.SetHero(hero != 0)
 	c.SetDeathPenaltyLevel(deathPenaltyLevel)
+	c.SetRecommendationCounts(recHave, recLeft)
 	// The playtime clock starts at restore: every later save persists the
 	// restored base plus the elapsed session time.
 	c.SetOnlineTime(int64(onlineTime), time.Now())
@@ -280,6 +282,9 @@ func (s *CharacterStore) Purge(ctx context.Context, objectID int32) (bool, error
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM character_shortcuts WHERE char_obj_id = ?", objectID); err != nil {
 		return false, fmt.Errorf("purge character %d shortcuts: %w", objectID, err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM character_macroses WHERE char_obj_id = ?", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d macros: %w", objectID, err)
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM character_hennas WHERE char_obj_id = ?", objectID); err != nil {
 		return false, fmt.Errorf("purge character %d hennas: %w", objectID, err)

@@ -103,6 +103,12 @@ import (
 // not on the block list or naming a type no command sends, and
 // RequestSendL2FriendSay with an empty or over-long message. None registers
 // a pending client action; tests/social asserts those silences.
+//
+// RequestDeleteMacro naming a macro the list lacks, and RequestEvaluate
+// naming an online player other than the current selection, are absent as
+// well: the reference returns without an answer, and neither the macro
+// window nor the recommend command registers a pending client action.
+// tests/character asserts both silences.
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 
@@ -139,6 +145,8 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"RequestBypassToServer for a command family not modeled yet", encodeRequestBypassToServer("bbs_default"), []byte{serverpackets.OpcodeActionFailed}},
 		{"RequestRecipeBookOpen on an empty book", encodeRequestRecipeBookOpen(1), []byte{serverpackets.OpcodeRecipeBookItemList}},
 		{"RequestPreviewItem trying nothing on", encodeRequestPreviewItem(1), []byte{serverpackets.OpcodeActionFailed}},
+		{"RequestEvaluate naming no online player", encodeRequestEvaluate(missingObjectID), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestMakeMacro without a name", encodeRequestMakeMacro(""), []byte{serverpackets.OpcodeSystemMessage}},
 		// The view resync answers with UserInfo, then each known object;
 		// the player here knows nothing.
 		{"RequestRecordInfo with nothing in view", wire.NewPacketWriter(clientpackets.OpcodeRequestRecordInfo).Bytes(), []byte{serverpackets.OpcodeUserInfo}},
@@ -224,5 +232,22 @@ func encodeRequestSendL2FriendSay(message, recipient string) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestSendL2FriendSay)
 	w.WriteString(message)
 	w.WriteString(recipient)
+	return w.Bytes()
+}
+
+func encodeRequestEvaluate(targetID int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestEvaluate)
+	w.WriteInt32(targetID)
+	return w.Bytes()
+}
+
+func encodeRequestMakeMacro(name string) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestMakeMacro)
+	w.WriteInt32(0)
+	w.WriteString(name)
+	w.WriteString("")
+	w.WriteString("")
+	w.WriteUint8(0)
+	w.WriteUint8(0)
 	return w.Bytes()
 }

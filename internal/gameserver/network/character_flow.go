@@ -251,7 +251,9 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	} else {
 		c.RestoreHennas(nil, func(int) (henna.Henna, bool) { return henna.Henna{}, false })
 	}
+	macros := l.restoreMacros(ctx, c.ID)
 	l.restoreRecipeBook(ctx, c)
+	l.restoreRecommended(ctx, c)
 
 	// Split off before the inventory restore below takes its rows: the
 	// warehouse and freight rows are the rest of the same set.
@@ -262,6 +264,7 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		return nil, false
 	}
 	live.storage = storage
+	live.macros = macros
 	if l.roster != nil {
 		// Mark the row online at login (the online status is updated when a
 		// client enters the world), so external DB consumers
@@ -324,7 +327,9 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 		l.autosave.Add(live)
 	}
 
-	client.Session.SendFrame(serverpackets.FrameSendMacroListEmpty())
+	for _, frame := range macroListFrames(live.macros) {
+		client.Session.SendFrame(frame)
+	}
 	client.Session.SendFrame(serverpackets.FrameExStorageMaxCount(c))
 	client.Session.SendFrame(serverpackets.FrameHennaInfo(c.HennaSnapshot()))
 	// Replay restored buffs into the live effect list here, at the effect

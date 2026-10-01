@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/macro"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -81,6 +82,7 @@ type livePlayer struct {
 	// owner's queue; atomic for the Emit readers.
 	replayingEffects atomic.Bool
 	shortcuts        *shortcut.List
+	macros           *macro.List
 	// access is the character's access level, resolved once at login and
 	// never changed afterwards, so any goroutine may read it.
 	access admin.AccessLevel

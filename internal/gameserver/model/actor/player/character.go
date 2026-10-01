@@ -278,6 +278,8 @@ type Character struct {
 	recipes recipe.Book
 	// store is the private store; it carries its own lock.
 	store privatestore.Store
+	// recommendations carries its own lock; see character_recommendation.go.
+	recommendations recommendationState
 }
 
 var _ effect.StatOwner = (*Character)(nil)

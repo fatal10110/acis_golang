@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
@@ -331,6 +332,14 @@ type GameClientLink struct {
 	relations     *relation.Manager
 	friendInvites *relation.Invites
 	characters    characterDirectory
+	// macros persists each player's macro list; see macro.go.
+	macros macroStore
+	// recommendations persists who recommended whom and the counters; see
+	// recommendation.go.
+	recommendations recommendationStore
+	// recommendGate orders recommendations against the daily refresh; see
+	// RefreshDailyRecommendations.
+	recommendGate sync.RWMutex
 }
 
 // AIRegistry owns recurring actor-AI registrations.
@@ -475,6 +484,12 @@ type GameClientLinkConfig struct {
 	// enchant grants and revokes; nil grants none. The equip-time set
 	// skills come from the skill persistence's own table.
 	ArmorSets *armorset.Table
+	// Macros persists each player's macro list; nil keeps macros in memory
+	// only.
+	Macros macroStore
+	// Recommendations persists who recommended whom and the counters; nil
+	// keeps them in memory only.
+	Recommendations recommendationStore
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -567,6 +582,8 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		newCipherKey: randomCipherKey,
 		noCipher:     cfg.NoCipher,
 	}
+	link.macros = cfg.Macros
+	link.recommendations = cfg.Recommendations
 	// Built here, not lazily: every client goroutine shares this link.
 	enchantCfg := enchantflow.DefaultConfig()
 	if cfg.PlayerConfig.Enchant != nil {

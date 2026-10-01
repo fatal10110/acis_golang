@@ -164,6 +164,27 @@ const characterRecipeBookSchema = "CREATE TABLE IF NOT EXISTS `character_recipeb
 	"  PRIMARY KEY (`charId`,`recipeId`)\n" +
 	")"
 
+// characterMacrosesSchema mirrors the shipped character_macroses table
+// definition verbatim.
+const characterMacrosesSchema = "CREATE TABLE IF NOT EXISTS `character_macroses` (\n" +
+	"  `char_obj_id` INT NOT NULL DEFAULT 0,\n" +
+	"  `id` INT NOT NULL DEFAULT 0,\n" +
+	"  `icon` INT,\n" +
+	"  `name` VARCHAR(40) ,\n" +
+	"  `descr` VARCHAR(80) ,\n" +
+	"  `acronym` VARCHAR(4) ,\n" +
+	"  `commands` VARCHAR(255) ,\n" +
+	"  PRIMARY KEY (`char_obj_id`,`id`)\n" +
+	")"
+
+// characterRecommendsSchema mirrors the shipped character_recommends table
+// definition verbatim.
+const characterRecommendsSchema = "CREATE TABLE IF NOT EXISTS character_recommends ( \n" +
+	" char_id INT NOT NULL default 0, \n" +
+	" target_id INT(11) NOT NULL DEFAULT 0, \n" +
+	" PRIMARY KEY (char_id,target_id) \n" +
+	")"
+
 // characterSubclassesSchema mirrors the shipped character_subclasses table
 // definition verbatim.
 const characterSubclassesSchema = "CREATE TABLE IF NOT EXISTS `character_subclasses` (\n" +
@@ -284,6 +305,7 @@ var schemaStmts = []string{
 	characterHennasSchema, characterRecipeBookSchema, petsSchema, characterSkillsSaveSchema,
 	sevenSignsStatusSchema, buylistsSchema, characterSubclassesSchema,
 	characterRelationsSchema,
+	characterMacrosesSchema, characterRecommendsSchema,
 }
 
 var seedStmts = []string{sevenSignsStatusSeed}

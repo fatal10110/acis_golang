@@ -121,8 +121,8 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	}
 	w.WriteUint8(0) // party match room
 	w.WriteInt32(int32(c.AbnormalEffect()))
-	w.WriteUint8(0)  // recommendations left
-	w.WriteUint16(0) // recommendations received
+	w.WriteUint8(uint8(c.RecommendationsLeft()))
+	w.WriteUint16(uint16(c.RecommendationsHave()))
 	w.WriteInt32(int32(c.ClassID()))
 	w.WriteInt32(int32(resources.MaxCP))
 	w.WriteInt32(int32(resources.CurrentCP))

@@ -31,13 +31,16 @@ func (l *GameClientLink) registerShortcut(live *livePlayer, req clientpackets.Re
 		return
 	}
 	live.SendFrame(serverpackets.FrameShortCutRegister(serverShortcut(live.Inventory(), sc)))
-	// An item no longer held or a recipe the book lacks still shows on the
-	// bar for this session, but is neither kept nor saved: ShortCutRegister
-	// is answered before the integrity check drops the entry.
+	// An item no longer held, a recipe the book lacks or a macro the list
+	// lacks still shows on the bar for this session, but is neither kept nor
+	// saved: ShortCutRegister is answered before the integrity check drops
+	// the entry.
 	switch {
 	case sc.Type == shortcut.Item && live.Inventory().ItemByObjectID(sc.ID) == nil:
 		return
 	case sc.Type == shortcut.Recipe && !live.RecipeBook().Has(int(sc.ID)):
+		return
+	case sc.Type == shortcut.Macro && !live.macros.Has(sc.ID):
 		return
 	}
 	live.shortcuts.Register(sc)
