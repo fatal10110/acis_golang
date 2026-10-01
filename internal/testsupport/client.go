@@ -40,6 +40,9 @@ type ScriptedClient struct {
 	// reads the clock it advances; see SetAwait.
 	await func(d time.Duration) bool
 	now   func() time.Time
+	// afterSend, when set, runs after Send has written a frame; see
+	// SetAfterSend.
+	afterSend func(payload []byte)
 }
 
 // frameInFlight is how long a read waits for a frame await reported as
@@ -52,6 +55,13 @@ const frameInFlight = 5 * time.Second
 // wall-clock read that timed out would. Set it before the client is used.
 func (f *ScriptedClient) SetAwait(await func(d time.Duration) bool, now func() time.Time) {
 	f.await, f.now = await, now
+}
+
+// SetAfterSend has fn run after each Send has written its frame, with the
+// frame's cleartext payload, before Send returns. Set it before the client
+// is used.
+func (f *ScriptedClient) SetAfterSend(fn func(payload []byte)) {
+	f.afterSend = fn
 }
 
 // Now reads the clock reads wait on: SetAwait's clock, else the wall clock.
@@ -234,6 +244,9 @@ func (f *ScriptedClient) Send(payload []byte) {
 	}
 	if err := f.TrySend(payload); err != nil {
 		f.t.Fatalf("WriteFrame: %v", err)
+	}
+	if f.afterSend != nil {
+		f.afterSend(payload)
 	}
 }
 

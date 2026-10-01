@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -113,14 +114,48 @@ func (t *traffic) conn(addr net.Addr) *connTraffic {
 	return t.conns[addr.String()]
 }
 
-// addClient registers a harness client; on a driven clock its reads wait by
-// moving the clock.
+// addClient registers a harness client. On a driven clock its reads wait by
+// moving the clock. On the wall clock (the real pool) its EnterWorld returns
+// only once the server has handled it; see awaitEnterWorld.
 func (s *Server) addClient(c *testsupport.ScriptedClient) {
 	s.traffic.mu.Lock()
 	s.traffic.clients = append(s.traffic.clients, c)
 	s.traffic.mu.Unlock()
 	if s.queues.advance != nil {
 		c.SetAwait(func(d time.Duration) bool { return s.awaitFrame(c, d) }, s.queues.inline.Now)
+		return
+	}
+	c.SetAfterSend(func(payload []byte) {
+		if len(payload) > 0 && payload[0] == clientpackets.OpcodeEnterWorld {
+			s.awaitEnterWorld(c)
+		}
+	})
+}
+
+// enterWorldTimeout bounds the wall time awaitEnterWorld waits. EnterWorld
+// reads the character's rows from the shared database before its burst,
+// which a machine running every suite at once can hold for seconds.
+const enterWorldTimeout = 30 * time.Second
+
+// awaitEnterWorld waits until the server has handled the EnterWorld c just
+// sent: its burst is queued and the player is in the world. EnterWorld reads
+// the character's rows before the first frame of its burst and adds the
+// player to the world only after them, so on the wall clock a suite reading
+// "until quiet" right after it can stop before either, and then find no
+// player or read the burst late. On a driven clock every read already waits
+// for the server to catch up, and the login runs on an actor queue only the
+// clock moves, so this wait is for the wall clock alone. It also returns once
+// the connection closed or the login waits on a persistence lane the test
+// holds, and gives up quietly after enterWorldTimeout, leaving the reads to
+// report.
+func (s *Server) awaitEnterWorld(c *testsupport.ScriptedClient) {
+	deadline := time.Now().Add(enterWorldTimeout)
+	for time.Now().Before(deadline) {
+		ct := s.traffic.conn(c.LocalAddr())
+		if ct != nil && (ct.done.Load() || ct.waits.Load()-1 >= c.Sent() || s.parkedOnHeldLane(ct)) {
+			return
+		}
+		time.Sleep(50 * time.Microsecond)
 	}
 }
 
