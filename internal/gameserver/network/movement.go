@@ -75,7 +75,6 @@ func (l *GameClientLink) startLiveMove(live *livePlayer, target location.Locatio
 	// is what the walk simulates from (matching the reference's
 	// tryToMoveTo) — the client origin is nothing but a lag hint the
 	// server must not adopt.
-	origin := live.move.Position()
 	accepted, err := live.move.MoveToLocation(target)
 	if err != nil {
 		l.log.Warn().Err(err).Msg("move: broadcast")
@@ -90,8 +89,9 @@ func (l *GameClientLink) startLiveMove(live *livePlayer, target location.Locatio
 	live.clearParkedApproaches()
 	live.holdMoveTo(target)
 	// Face the destination from the same server-authoritative origin the
-	// walk itself started from.
-	live.Character.SetHeading(origin.HeadingTo(target))
+	// walk itself started from: where a walk in flight stood once the
+	// request advanced it.
+	live.Character.SetHeading(live.move.Position().HeadingTo(target))
 }
 
 // fleeLivePlayer runs live away from e.From as a server-driven move: run
@@ -127,7 +127,7 @@ func (l *GameClientLink) fleeLivePlayer(live *livePlayer, e event.FleeRequested)
 		return
 	}
 	live.clearParkedApproaches()
-	live.Character.SetHeading(origin.HeadingTo(target))
+	live.Character.SetHeading(live.move.Position().HeadingTo(target))
 }
 
 func (l *GameClientLink) stopLivePlayer(live *livePlayer) {

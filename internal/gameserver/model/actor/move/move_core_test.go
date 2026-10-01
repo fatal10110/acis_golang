@@ -161,8 +161,14 @@ func TestControllerNPCOffensiveFollowAddsLeadOnlyForMovingTargets(t *testing.T) 
 	}
 }
 
+// npcChaseSelf is a hostile NPC: it approaches its target with a plain walk
+// the controller's follow recheck re-sends.
+type npcChaseSelf struct{ playerFollowSelf }
+
+func (*npcChaseSelf) OffensiveFollowIsPawnMove() bool { return false }
+
 func TestControllerOffensiveFollowRechecksMovingTargetEveryFivePositionUpdates(t *testing.T) {
-	self := &playerFollowSelf{}
+	self := &npcChaseSelf{}
 	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
 	if err != nil {
 		t.Fatal(err)
@@ -190,8 +196,41 @@ func TestControllerOffensiveFollowRechecksMovingTargetEveryFivePositionUpdates(t
 	}
 }
 
-func TestControllerStopCancelsOffensiveFollowRechecks(t *testing.T) {
+// A player's attack approach runs no follow recheck (PlayerAI.thinkAttack
+// walks by PlayerMove.maybeMoveToPawn, PlayerAI.java:188; only
+// CreatureMove.maybeStartOffensiveFollow, which PlayerAI never calls, starts
+// a follow task): its pawn walk re-aims at the moving target itself and no
+// MoveToPawn is re-sent until the attack thinks again.
+func TestControllerPlayerAttackApproachRunsNoRecheck(t *testing.T) {
 	self := &playerFollowSelf{}
+	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mover.SetQueue(newMoveClock().q)
+	controller, err := NewController(mover, self, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := &followTarget{x: 300}
+	if following, err := controller.MaybeStartOffensiveFollow(target, 40); err != nil || !following {
+		t.Fatalf("MaybeStartOffensiveFollow() = %v, %v; want the approach", following, err)
+	}
+
+	target.x = 400
+	for range 10 {
+		controller.PositionUpdate()
+	}
+	if got := len(self.moves); got != 1 {
+		t.Fatalf("move broadcasts = %d, want only the approach", got)
+	}
+	if got := mover.Destination(); got != (location.Location{X: 400}) {
+		t.Fatalf("walk destination = %+v, want re-aimed at the target's latest position", got)
+	}
+}
+
+func TestControllerStopCancelsOffensiveFollowRechecks(t *testing.T) {
+	self := &npcChaseSelf{}
 	mover, err := NewCreatureMove(location.Location{}, 100, staticGeo{canMove: true})
 	if err != nil {
 		t.Fatal(err)
@@ -444,8 +483,14 @@ func TestControllerMoveToLocationEventIncrementsFailCountOnBlockedPath(t *testin
 	}
 }
 
+// npcHomeRecoverySelf is a hostile NPC: it recovers stalled home paths and
+// approaches its target with a plain walk.
+type npcHomeRecoverySelf struct{ homeRecoverySelf }
+
+func (*npcHomeRecoverySelf) OffensiveFollowIsPawnMove() bool { return false }
+
 func TestControllerOffensiveFollowIncrementsFailCountOnBlockedPath(t *testing.T) {
-	self := &homeRecoverySelf{}
+	self := &npcHomeRecoverySelf{}
 	geo := &recordingGeo{canMove: false, height: 0, findPathOK: false}
 	mover, err := NewCreatureMove(location.Location{}, 100, geo)
 	if err != nil {

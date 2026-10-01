@@ -1,6 +1,7 @@
 package character
 
 import (
+	"math"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -175,7 +176,9 @@ func TestRunStartsAtWalkSpeed(t *testing.T) {
 			speed = character.WalkSpeed()
 		}
 		accurate += speed / 10
-		if got, want := mover.Position().X, int(accurate); got != want {
+		// The player's cell is the accurate position rounded half up
+		// (PlayerMove.updatePosition's Math.round, PlayerMove.java:272).
+		if got, want := mover.Position().X, int(math.Floor(accurate+0.5)); got != want {
 			t.Fatalf("X after update %d = %d, want %d (walk %v, run %v)", update, got, want, character.WalkSpeed(), character.RunSpeed())
 		}
 	}
