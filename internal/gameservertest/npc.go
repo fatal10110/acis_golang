@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
@@ -73,12 +74,15 @@ func (s *Server) SpawnHostileNPCTemplateAt(t *testing.T, tmpl *npc.Template, at 
 }
 
 // killRewards is the fixture kill-reward config: the suite's level table,
-// stock x1 drop rates, the stock party range, and the suite's drop gates.
+// stock x1 drop rates, the stock party range and party exp rules, the
+// suite's drop gates, and the server's parties.
 func (s *Server) killRewards() gamemanager.KillRewardConfig {
 	return gamemanager.KillRewardConfig{
 		PlayerLevels:      s.levelTable,
 		Rates:             item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1},
 		PartyRange:        1500,
+		PartyXP:           player.PartyXPRules{Cutoff: player.PartyXPCutoffLevel, CutoffLevel: 20, CutoffPercent: 3, RateXP: 1, RateSP: 1},
+		Parties:           s.rewardParties,
 		DeepBlueDropRules: s.deepBlueDrops,
 		AutoLoot:          s.autoLoot,
 	}

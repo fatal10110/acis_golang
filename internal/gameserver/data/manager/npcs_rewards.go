@@ -186,39 +186,69 @@ func (d *deathRewards) grantExpAndSp(entries []playerRewardEntry, summonDamage m
 	if d.config.PlayerLevels == nil || totalDamage <= 0 {
 		return
 	}
+	// A party shares the kill through the first of its members the loop
+	// reaches, which spends every living member's own entry.
+	spent := map[int32]bool{}
 	for _, entry := range entries {
-		// Only real death forfeits the exp; Fake Death keeps it.
-		if entry.actor.Dead() || !entry.actor.Knows(d.hostile) {
+		if spent[entry.actor.ObjectID()] {
 			continue
 		}
-		var own *summon.Actor
-		if d.state != nil {
-			if obj, ok := d.state.Summon(entry.actor.ObjectID()); ok {
-				own, _ = obj.(*summon.Actor)
-			}
+		if group, ok := d.rewardGroup(entry.actor); ok {
+			d.grantParty(entry.actor, group, entries, spent, summonDamage, totalDamage)
+			continue
 		}
-		exp, sp := player.KillRewardExpAndSp(d.tmpl.RewardExp, d.tmpl.RewardSp, entry.damage, totalDamage, entry.actor.Level()-d.tmpl.Level)
-		var penalty float32
-		if own != nil && !own.IsPet() {
-			penalty = own.ExpPenalty()
-		}
-		// Scaled in single precision even without a servitor, so a large
-		// reward loses its low bits the same way.
-		exp = int64(float32(float32(exp) * (1 - penalty)))
-		if d.hostile.OverhitValid(entry.actor) {
-			entry.actor.NotifyOverHit()
-			exp += d.hostile.OverhitBonus(exp)
-		}
-		// Karma drops by the whole kill exp, before any pet takes its share.
-		entry.actor.UpdateKarmaLoss(d.config.PlayerLevels, exp)
-		if own != nil && own.CanReceiveKillReward(d.config.PartyRange) {
-			petExp, petSp := petReward(own.ExpType(), summonDamage[own.ObjectID()], entry.damage, exp, sp)
-			exp -= petExp
-			sp -= petSp
-			own.AddExpAndSp(petExp, petSp)
-		}
-		entry.actor.RewardExpAndSp(d.config.PlayerLevels, exp, sp)
+		d.grantSolo(entry, summonDamage, totalDamage)
 	}
+}
+
+// grantSolo pays a partyless attacker its own damage share.
+func (d *deathRewards) grantSolo(entry playerRewardEntry, summonDamage map[int32]float64, totalDamage float64) {
+	// Only real death forfeits the exp; Fake Death keeps it.
+	if entry.actor.Dead() || !entry.actor.Knows(d.hostile) {
+		return
+	}
+	own := d.summonOf(entry.actor)
+	exp, sp := player.KillRewardExpAndSp(d.tmpl.RewardExp, d.tmpl.RewardSp, entry.damage, totalDamage, entry.actor.Level()-d.tmpl.Level)
+	var penalty float32
+	if own != nil && !own.IsPet() {
+		penalty = own.ExpPenalty()
+	}
+	// Scaled in single precision even without a servitor, so a large
+	// reward loses its low bits the same way.
+	exp = int64(float32(float32(exp) * (1 - penalty)))
+	if d.hostile.OverhitValid(entry.actor) {
+		entry.actor.NotifyOverHit()
+		exp += d.hostile.OverhitBonus(exp)
+	}
+	// Karma drops by the whole kill exp, before any pet takes its share.
+	entry.actor.UpdateKarmaLoss(d.config.PlayerLevels, exp)
+	d.pay(entry.actor, own, exp, sp, entry.damage, summonDamage)
+}
+
+// summonOf returns p's live summon, or nil.
+func (d *deathRewards) summonOf(p *player.Character) *summon.Actor {
+	if d.state == nil {
+		return nil
+	}
+	obj, ok := d.state.Summon(p.ObjectID())
+	if !ok {
+		return nil
+	}
+	own, _ := obj.(*summon.Actor)
+	return own
+}
+
+// pay gives p its exp and sp, less the part its pet takes when the pet may
+// share the kill: a fixed part by the pet's exp type, or the pet's damage
+// over ownerDamage, p's own combined damage.
+func (d *deathRewards) pay(p *player.Character, own *summon.Actor, exp int64, sp int, ownerDamage float64, summonDamage map[int32]float64) {
+	if own != nil && own.CanReceiveKillReward(d.config.PartyRange) {
+		petExp, petSp := petReward(own.ExpType(), summonDamage[own.ObjectID()], ownerDamage, exp, sp)
+		exp -= petExp
+		sp -= petSp
+		own.AddExpAndSp(petExp, petSp)
+	}
+	p.RewardExpAndSp(d.config.PlayerLevels, exp, sp)
 }
 
 func petReward(expType int, petDamage, totalDamage float64, exp int64, sp int) (int64, int) {

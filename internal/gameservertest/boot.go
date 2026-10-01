@@ -179,6 +179,9 @@ type options struct {
 	merchant               merchantOptions
 	doors                  []*door.Template
 	petitionConfig         *petition.Config
+	// rewardPartiesWrap wraps the link's kill-party resolver
+	// (WithRewardParties).
+	rewardPartiesWrap func(gamemanager.RewardParties) gamemanager.RewardParties
 }
 
 type characterSpec struct {
@@ -796,6 +799,8 @@ type Server struct {
 	effectEnv effect.Env
 	// castEffects is the link's hostile-NPC cast seam, as boot wires it.
 	castEffects actorcast.EffectHandlers
+	// rewardParties resolves a kill's party for the hostiles the suite spawns.
+	rewardParties gamemanager.RewardParties
 	// stance is the stance tracker the link was wired with, nil when none
 	// was; fixture NPCs report their attack stances to it.
 	stance network.AttackStanceTracker
@@ -1998,6 +2003,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Effects:          taskEffects,
 		effectEnv:        effectEnv,
 		castEffects:      gcl.HostileCastEffects(),
+		rewardParties:    o.rewardParties(gcl),
 		stance:           gclConfig.AttackStance,
 		maxGeoPathFail:   o.maxGeoPathFailCount,
 		zones:            o.zones,
