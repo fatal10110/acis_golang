@@ -96,20 +96,21 @@ func (c *Character) skillTargetFlagsPvP(target attackable.Combatant, skillType s
 	if skillType == "SUMMON" || skillType == "BEAST_FEED" || skillType == "UNLOCK" || skillType == "UNLOCK_SPECIAL" || skillType == "DELUXE_KEY_UNLOCK" {
 		return false
 	}
-	return target.Kind() == actor.KindNPC && !target.Guard()
+	// A civilian NPC is no attackable NPC.
+	npc, ok := target.(interface{ Attackable() bool })
+	return target.Kind() == actor.KindNPC && ok && npc.Attackable() && !target.Guard()
 }
 
 // notePvPHitFromAttacker flags attacker with the PvP flag tracker after a
-// resolved physical or offensive-skill attack, mirroring
-// Player.updatePvPStatus(Creature target)/Playable.checkIfPvP: a karma'd
-// victim (c) never flags its attacker — hitting a PKer is PK territory, not
+// resolved physical or offensive-skill attack: a karma'd victim (c) never
+// flags its attacker — hitting a PKer is PK territory, not
 // PvP — and attacking oneself is a no-op. When it does flag, the shorter
 // PvP-vs-PvP duration applies only when both sides are karma-free and c is
 // already flagged (an ongoing PvP fight); otherwise the longer "engaging an
 // innocent" duration applies. attacker resolves through *Character, so only
 // a live player attacker can ever be flagged — an NPC/monster attacker
-// (which never satisfies this assertion) is always a no-op, matching the
-// reference's target.getActingPlayer() == null bail. byServitor marks the
+// (which never satisfies this assertion) is always a no-op: an attacker
+// with no acting player bails. byServitor marks the
 // attack as the attacker's summon's.
 func (c *Character) notePvPHitFromAttacker(attacker any, byServitor bool) {
 	pk, ok := attacker.(*Character)

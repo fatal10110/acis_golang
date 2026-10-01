@@ -53,7 +53,8 @@ func enchantTestTable(t *testing.T) *player.LevelTable {
 // knows enchantTestSkillID at level 20 (the current max normal level) and
 // has plenty of SP/exp to enchant it to level 101.
 func enchantTestChar() *player.Character {
-	ch := &player.Character{ID: 1, ClassID: 88, CharLevel: 76, SP: 1000, Exp: 500000}
+	ch := &player.Character{ID: 1, CharLevel: 76, SP: 1000, Exp: 500000}
+	ch.SetClassID(88)
 	ch.SetSkillLevel(enchantTestSkillID, 20)
 	return ch
 }

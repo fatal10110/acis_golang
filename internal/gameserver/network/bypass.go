@@ -108,7 +108,7 @@ var bypassRoutes = []bypassRoute{
 }
 
 // requestBypassToServer routes a clicked HTML link to its command family.
-// A command no family claims is dropped, as the reference drops it.
+// A command no family claims is dropped, as specified.
 func (l *GameClientLink) requestBypassToServer(live *livePlayer, req clientpackets.RequestBypassToServer) {
 	if live == nil || req.Command == "" {
 		return
@@ -137,7 +137,7 @@ func (l *GameClientLink) bypassPlayerHelp(live *livePlayer, command string) {
 }
 
 // bypassQuest handles a validated "Quest <quest> [event]" link. A command
-// not on the last page is dropped silently, as the reference drops it.
+// not on the last page is dropped silently, as specified.
 // ponytail: quest events need the quest engine; the command is logged and
 // the client released until #130 routes it to the quest's event handler.
 func (l *GameClientLink) bypassQuest(live *livePlayer, command string) {
@@ -150,8 +150,8 @@ func (l *GameClientLink) bypassQuest(live *livePlayer, command string) {
 // bypassNpc handles npc_<objectId>_<command>: a command on the last page
 // sent reaches the named NPC when the player can interact with it, and
 // the client is then released with ActionFailed. A command not on that
-// page, or an object id that does not parse, is dropped silently, as the
-// reference drops it; the link click leaves no client action pending.
+// page, or an object id that does not parse, is dropped silently, as
+// specified; the link click leaves no client action pending.
 func (l *GameClientLink) bypassNpc(live *livePlayer, command string) {
 	if !live.bypasses.allows(command) {
 		return
@@ -242,6 +242,8 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		l.departFromNpc(live, f, command, l.gatekeeper.Instant(f.NpcID(), reply.Index))
 	case npc.BypassQuestInfo:
 		live.SendFrame(serverpackets.FrameExShowQuestInfo())
+	case npc.BypassSubclass:
+		return l.subclassBypass(live, f, command)
 	case npc.BypassUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Str("command", command).Msg("bypass: npc dialog command not modeled")
 	case npc.BypassRefused:

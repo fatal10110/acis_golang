@@ -72,9 +72,8 @@ func (a *Actor) BroadcastMoveToPawn(target attackable.Combatant) {
 }
 
 // BroadcastSelfSkillUse reports the cast-start animation of skillID at level
-// with this summon as both caster and target, matching the reference's
-// summon.broadcastPacket(new MagicSkillUse(summon, summon, ...)) self-cast
-// shape.
+// with this summon as both caster and target (a self-cast MagicSkillUse
+// broadcast).
 func (a *Actor) BroadcastSelfSkillUse(skillID, level int32) {
 	x, y, z := a.Position()
 	at := location.Location{X: x, Y: y, Z: z}

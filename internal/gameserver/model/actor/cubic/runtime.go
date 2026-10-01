@@ -29,8 +29,8 @@ type Runtime struct {
 	queue            *sim.Queue
 
 	// mu is taken from other actors' queues: a party member's cubic cast
-	// refreshes the timers on the caster's queue (syncCubicRuntime), and a
-	// summon-friend teleport stops them on the summoner's.
+	// refreshes the timers, or stops an evicted cubic's, on the caster's
+	// queue (syncCubicRuntime).
 	mu      sync.Mutex
 	running bool
 	// generation increments on every Action()/StopAction() call, so a tick

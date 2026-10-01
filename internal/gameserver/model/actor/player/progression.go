@@ -42,6 +42,10 @@ func (h progressionHooks) run() {
 func (c *Character) ProgressionValues() Progression {
 	c.progressionMu.RLock()
 	defer c.progressionMu.RUnlock()
+	return c.progressionLocked()
+}
+
+func (c *Character) progressionLocked() Progression {
 	return Progression{
 		CharLevel:      c.CharLevel,
 		Exp:            c.Exp,
@@ -118,7 +122,7 @@ func (c *Character) RewardExpAndSp(table *LevelTable, exp int64, sp int) bool {
 	if table == nil {
 		exp = 0
 	}
-	return c.addExpAndSp(table, c.runtimeTemplate, exp, sp)
+	return c.addExpAndSp(table, c.template(), exp, sp)
 }
 
 // AddExp adds delta experience to c. An addition that would overflow
@@ -276,6 +280,10 @@ func (c *Character) addLevel(table *LevelTable, tmpl *Template, delta int, hooks
 
 	increased := delta > 0
 	c.CharLevel += delta
+	// A subclass never drops below the level it starts at.
+	if c.SubclassActive() && c.CharLevel < SubclassStartLevel {
+		c.CharLevel = SubclassStartLevel
+	}
 
 	lower := table.RequiredExpForLevel(c.CharLevel)
 	upper := table.RequiredExpForLevel(c.CharLevel + 1)
@@ -292,9 +300,8 @@ func (c *Character) addLevel(table *LevelTable, tmpl *Template, delta int, hooks
 	}
 
 	hooks.add(c.refreshForLevel)
-	// PlayerStatus.addLevel calls _actor.refreshWeightPenalty() directly
-	// on every level change (PlayerStatus.java:644), before the UserInfo
-	// send below (:648) — the weight limit is CON-derived and therefore
+	// Every level change refreshes the weight penalty directly, before the
+	// UserInfo send below — the weight limit is CON-derived and therefore
 	// level-dependent.
 	hooks.add(c.RefreshWeightPenalty)
 	// A rider's speeds halve once its mount outlevels it by more than 9.

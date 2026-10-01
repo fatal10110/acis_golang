@@ -12,7 +12,7 @@ func (c *Character) RestoreHennas(rows []henna.Row, lookup func(symbolID int) (h
 		c.hennas = &henna.List{}
 	}
 	c.hennas.Restore(rows, lookup)
-	c.hennas.Recalculate(c.ClassID)
+	c.hennas.Recalculate(c.ClassID())
 }
 
 // HennaList returns the character's equipped-dye container, allocating an
@@ -26,37 +26,37 @@ func (c *Character) HennaList() *henna.List {
 
 // HennaSnapshot returns the HennaInfo payload for the current class.
 func (c *Character) HennaSnapshot() henna.Snapshot {
-	level, _ := ClassLevel(c.ClassID)
-	return c.HennaList().Snapshot(c.ClassID, level)
+	level, _ := ClassLevel(c.ClassID())
+	return c.HennaList().Snapshot(c.ClassID(), level)
 }
 
 // HennaMaxSlots returns how many dyes the current class may wear.
 func (c *Character) HennaMaxSlots() int {
-	level, _ := ClassLevel(c.ClassID)
+	level, _ := ClassLevel(c.ClassID())
 	return henna.MaxSlots(level)
 }
 
 // HennaEmptySlots returns how many more dyes the current class may draw.
 func (c *Character) HennaEmptySlots() int {
-	level, _ := ClassLevel(c.ClassID)
+	level, _ := ClassLevel(c.ClassID())
 	return c.HennaList().EmptySlots(level)
 }
 
 // AddHenna equips h into the first empty slot allowed by class level.
 func (c *Character) AddHenna(h henna.Henna) (dbSlot int, ok bool) {
-	level, _ := ClassLevel(c.ClassID)
-	return c.HennaList().Add(h, c.ClassID, level)
+	level, _ := ClassLevel(c.ClassID())
+	return c.HennaList().Add(h, c.ClassID(), level)
 }
 
 // RemoveHenna unequips the dye with symbolID.
 func (c *Character) RemoveHenna(symbolID int) (dbSlot int, ok bool) {
-	return c.HennaList().Remove(symbolID, c.ClassID)
+	return c.HennaList().Remove(symbolID, c.ClassID())
 }
 
 // RefreshHennaStats recalculates dye bonuses after a class change without
 // reloading rows from the database.
 func (c *Character) RefreshHennaStats() {
-	c.HennaList().Recalculate(c.ClassID)
+	c.HennaList().Recalculate(c.ClassID())
 }
 
 func hennaBonusFor(c *Character, s stat.Stat) float64 {

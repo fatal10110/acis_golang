@@ -1530,3 +1530,27 @@ EnchantSafeMaxFull = 5
 		t.Fatalf("loadEnchantConfig(empty) = %+v, want the shipped defaults %+v", got, enchant.DefaultConfig())
 	}
 }
+
+func TestLoadSubclassConfig(t *testing.T) {
+	dir := t.TempDir()
+	empty := filepath.Join(dir, "empty.properties")
+	set := filepath.Join(dir, "set.properties")
+	if err := os.WriteFile(empty, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(set, []byte("SubclassTime = 500\nSubClassWithoutQuests = True\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := loadSubclassDelay(gameServerPaths{ConfigPath: empty}); err != nil || got != subclassDelay(2000*time.Millisecond) {
+		t.Fatalf("loadSubclassDelay(default) = %v, %v; want 2s", got, err)
+	}
+	if got, err := loadSubclassDelay(gameServerPaths{ConfigPath: set}); err != nil || got != subclassDelay(500*time.Millisecond) {
+		t.Fatalf("loadSubclassDelay(set) = %v, %v; want 500ms", got, err)
+	}
+	if got, err := loadSubclassWithoutQuests(gameServerPaths{PlayersConfigPath: empty}); err != nil || bool(got) {
+		t.Fatalf("loadSubclassWithoutQuests(default) = %v, %v; want false", got, err)
+	}
+	if got, err := loadSubclassWithoutQuests(gameServerPaths{PlayersConfigPath: set}); err != nil || !bool(got) {
+		t.Fatalf("loadSubclassWithoutQuests(set) = %v, %v; want true", got, err)
+	}
+}

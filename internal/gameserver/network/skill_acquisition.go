@@ -16,8 +16,8 @@ const (
 	// spellbookRequirementType is the requirement kind tag marking a
 	// spellbook item in an AcquireSkillInfo requirement entry.
 	spellbookRequirementType = 99
-	// spellbookRequirementUnk is the trailing field Java sends with
-	// spellbook requirements; its value is part of the wire contract.
+	// spellbookRequirementUnk is the trailing field sent with spellbook
+	// requirements; its value is part of the wire contract.
 	spellbookRequirementUnk = 50
 
 	// fishingRequirementType marks the item consumed to learn a fishing
@@ -42,7 +42,7 @@ func (l *GameClientLink) sendAcquireSkillInfo(live *livePlayer, req clientpacket
 	}
 	switch req.SkillType {
 	case acquireSkillTypeUsual:
-		if !trainer.CanTeach(live.ClassID) {
+		if !trainer.CanTeach(live.ClassID()) {
 			return
 		}
 		l.sendGeneralAcquireSkillInfo(live, req)
@@ -76,7 +76,7 @@ func (l *GameClientLink) learnAcquireSkill(live *livePlayer, req clientpackets.R
 }
 
 func (l *GameClientLink) sendGeneralAcquireSkillInfo(live *livePlayer, req clientpackets.RequestAcquireSkillInfo) {
-	offer, ok := skillstate.GeneralOfferFor(live.Character, live.template, l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
+	offer, ok := skillstate.GeneralOfferFor(live.Character, live.Template(), l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
 	if !ok {
 		return
 	}
@@ -91,7 +91,7 @@ func (l *GameClientLink) sendGeneralAcquireSkillInfo(live *livePlayer, req clien
 // not ask whether trainer trains live's profession; the list it reopens
 // does. A skill that is not the next learnable level answers nothing.
 func (l *GameClientLink) learnGeneralAcquireSkill(live *livePlayer, trainer *npc.Folk, req clientpackets.RequestAcquireSkill) {
-	_, status, err := skillstate.LearnGeneral(live.Character, live.template, l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
+	_, status, err := skillstate.LearnGeneral(live.Character, live.Template(), l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn skill")
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
@@ -174,10 +174,10 @@ func (l *GameClientLink) acquireSkillList(live *livePlayer) (list wire.Frame, ok
 }
 
 func acquireSkillListEntries(live *livePlayer) []serverpackets.AcquireSkillListEntry {
-	if live == nil || live.template == nil {
+	if live == nil || live.Template() == nil {
 		return nil
 	}
-	grants := live.template.AvailableSkillGrants(live.Level(), live.SkillLevels())
+	grants := live.Template().AvailableSkillGrants(live.Level(), live.SkillLevels())
 	entries := make([]serverpackets.AcquireSkillListEntry, 0, len(grants))
 	for _, grant := range grants {
 		entries = append(entries, serverpackets.AcquireSkillListEntry{
@@ -191,7 +191,7 @@ func acquireSkillListEntries(live *livePlayer) []serverpackets.AcquireSkillListE
 
 // fishingAcquireSkillList builds the fishing-type trainer list of skills the
 // character can learn now; each entry's displayed cost is 0 and its row tag
-// is 1 (the fishing marker), matching the oracle's FishingSkillNode layout.
+// is 1 (the fishing marker), the fishing skill-node row layout.
 // ok is false when there is none.
 func (l *GameClientLink) fishingAcquireSkillList(live *livePlayer) (list wire.Frame, ok bool) {
 	nodes := l.skillTrees.FishingSkillsFor(live.Level(), live.HasDwarvenCraft(), skillstate.TreeSkillLevels(live.SkillLevels()))

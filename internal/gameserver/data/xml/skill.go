@@ -47,9 +47,8 @@ type skillElement struct {
 // enchant-level count, or <table> block can't even be parsed is logged and
 // skipped as a whole element. Within an otherwise-valid element, a single
 // level (regular or enchant) that fails to build is logged and skipped on
-// its own, matching DocumentSkill.java's per-level try/catch ("Failed
-// parsing skill.", makeSkills, DocumentSkill.java:310-370): other levels of
-// the same skill, other skills, and other files continue loading.
+// its own: other levels of the same skill, other skills, and other files
+// continue loading.
 //
 // log receives skipped-skill diagnostics; the zero logger discards them.
 func LoadSkillDefinitions(dir string, log zerolog.Logger) (*skill.Table, error) {
@@ -85,10 +84,9 @@ type skillLoader struct {
 	tables map[string][]string
 }
 
-// resolveTableValue resolves one attribute value against sl.tables,
-// matching DocumentSkill.java's getTableValue/getTableValue(name,int)
-// (DocumentSkill.java:55-81): an undefined table name or an out-of-range
-// row index is logged and read as "" rather than aborting the skill.
+// resolveTableValue resolves one attribute value against sl.tables: an
+// undefined table name or an out-of-range row index is logged and read as
+// "" rather than aborting the skill.
 func (sl *skillLoader) resolveTableValue(name, val string, tableIndex int) string {
 	resolved, err := resolveTableValue(sl.tables, name, val, tableIndex)
 	if err != nil {
@@ -295,9 +293,8 @@ func (sl *skillLoader) applyTemplateNodes(def *skill.Definition, ops []funcEleme
 			continue
 		}
 
-		// DocumentBase.java's parseTemplate has no fall-through branch for an
-		// unrecognized tag inside a <for> block: it silently skips it rather
-		// than failing the file (DocumentBase.java:145-174).
+		// An unrecognized tag inside a <for> block has no fall-through
+		// branch: it is silently skipped rather than failing the file.
 		if _, err := skill.ParseFuncOp(op.XMLName.Local); err != nil {
 			continue
 		}
@@ -399,18 +396,18 @@ func (sl *skillLoader) funcTemplate(tag string, attrs []xml.Attr, children []con
 }
 
 // condMsgMode selects how buildSkillConditionClause resolves a cond's
-// msg/msgId/addName attributes, mirroring the differences between the three
-// places DocumentSkill.java attaches a message to a condition:
-//   - condMsgModeRegular: a regular-level <cond> (DocumentSkill.java:216-224)
-//     uses msg when present, else msgId (with addName only when msgId > 0);
-//     msgId and addName are never read alongside msg.
-//   - condMsgModeEnchant: an enchant1cond/enchant2cond block
-//     (DocumentSkill.java:245-247, 289-291) reads only msg — msgId and
-//     addName are never consulted, even when present in the XML.
-//   - condMsgModeBoth: op-level <cond> attachment (DocumentBase.java's
-//     generic parseTemplate, not DocumentSkill's per-level loop) has no
-//     message semantics in the reference at all; this preserves the prior
-//     Go behavior of resolving msg and msgId independently rather than
+// msg/msgId/addName attributes, following the differences between the three
+// places a skill file attaches a message to a condition:
+//   - condMsgModeRegular: a regular-level <cond> uses msg when present, else
+//     msgId (with addName only when msgId > 0); msgId and addName are never
+//     read alongside msg.
+//   - condMsgModeEnchant: an enchant1cond/enchant2cond block reads only
+//     msg — msgId and addName are never consulted, even when present in the
+//     XML.
+//   - condMsgModeBoth: op-level <cond> attachment (the generic template
+//     parse, not the per-level skill loop) has no specified message
+//     semantics at all; this preserves the prior Go behavior of resolving
+//     msg and msgId independently rather than
 //     changing untested behavior outside this finding's scope.
 type condMsgMode int
 
@@ -421,9 +418,9 @@ const (
 )
 
 // conditionClause resolves a <cond> element into a clause. A cond with no
-// predicate child returns (nil, nil): DocumentBase.java's parseCondition
-// returns null for a missing element node, and attach(null) is a tolerated
-// no-op (DocumentBase.java:309-315,341) rather than a load failure.
+// predicate child returns (nil, nil): a missing condition element parses to
+// no condition, and attaching no condition is a tolerated no-op rather than
+// a load failure.
 func (sl *skillLoader) conditionClause(attrs []xml.Attr, children []condNode, tableIndex int, msgMode condMsgMode) (*skill.ConditionClause, error) {
 	if len(children) == 0 {
 		return nil, nil

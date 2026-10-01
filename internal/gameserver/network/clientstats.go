@@ -2,12 +2,10 @@ package network
 
 import "time"
 
-// Packet-protection thresholds, mirroring the reference's packet-queue
-// protection defaults (Config.CLIENT_PACKET_QUEUE_*): a 160 packets/second
-// short-flood ceiling, an 80/s average over the 5-second measure window for
-// long floods, and at most 2 detected floods per sliding minute before the
-// client is disconnected. The reference hardcodes these too; none are
-// file-configurable.
+// Packet-protection thresholds: a 160 packets/second short-flood ceiling,
+// an 80/s average over the 5-second measure window for long floods, and at
+// most 2 detected floods per sliding minute before the client is
+// disconnected. These are hardcoded defaults; none are file-configurable.
 const (
 	maxPacketsPerSecond        = 160
 	floodMeasureInterval       = 5
@@ -19,11 +17,10 @@ const (
 // clientStats is one client's per-packet flood accounting. All fields are
 // owned by the connection's read loop goroutine; nothing else touches them.
 //
-// The reference measures packets through a threaded per-client queue; this
-// port counts frames at the same point in the read path instead. The
-// queue-size accounting and burst cap of the reference have no counterpart
-// here because there is no inbound queue to overflow or drain in batches —
-// each frame is processed inline with its read.
+// Frames are counted where the read path receives them, not through a
+// threaded per-client queue. Queue-size accounting and a burst cap have no
+// counterpart here because there is no inbound queue to overflow or drain
+// in batches — each frame is processed inline with its read.
 type clientStats struct {
 	packetsInSecond [floodMeasureInterval]int
 	head            int
@@ -55,8 +52,8 @@ func (s *clientStats) countIncomingPacket(now time.Time) (sendActionFailed, drop
 }
 
 // floodsExceeded reports whether more than maxFloodsPerMin floods were
-// detected within the sliding minute, the disconnect trigger the reference
-// checks before running each received packet.
+// detected within the sliding minute, the disconnect trigger checked before
+// running each received packet.
 func (s *clientStats) floodsExceeded() bool {
 	return s.floodsInMin > maxFloodsPerMin
 }

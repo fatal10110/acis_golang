@@ -141,7 +141,7 @@ func (s *Service) Buy(inv *itemcontainer.Inventory, list buylist.List, rows []Bu
 			return Purchase{}, nil
 		}
 		// The tax applies to the unit price, before the count; the 32-bit
-		// products wrap as the reference's int arithmetic does.
+		// products wrap as int32 arithmetic does.
 		price = commons.JavaInt(float64(price) * (1 + taxRate))
 		subtotal += int64(row.Count * price)
 		if subtotal > math.MaxInt32 {

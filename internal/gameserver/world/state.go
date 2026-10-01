@@ -118,7 +118,7 @@ func (s *State) RemovePlayer(id int32) {
 func (s *State) Player(id int32) (Player, bool) { return s.players.get(id) }
 
 // PlayerByName returns the online player with the given name, matched
-// case-insensitively, mirroring Java's World.getPlayer(String).
+// case-insensitively.
 func (s *State) PlayerByName(name string) (Player, bool) {
 	s.playersMu.RLock()
 	id, ok := s.playerNames[strings.ToLower(name)]

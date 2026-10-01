@@ -46,7 +46,7 @@ func writeCharSelected(w *wire.Writer, s CharSelectedSnapshot) {
 
 	w.WriteInt32(int32(c.Sex))
 	w.WriteInt32(int32(c.Race))
-	w.WriteInt32(int32(c.ClassID))
+	w.WriteInt32(int32(c.ClassID()))
 
 	w.WriteInt32(1)
 
@@ -77,7 +77,7 @@ func writeCharSelected(w *wire.Writer, s CharSelectedSnapshot) {
 
 	w.WriteInt32(0) // reserved
 
-	w.WriteInt32(int32(c.ClassID))
+	w.WriteInt32(int32(c.ClassID()))
 
 	w.WriteInt32(0) // reserved
 	w.WriteInt32(0) // reserved

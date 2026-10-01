@@ -129,8 +129,8 @@ func (n *Npcs) spawnPersisted(key string, maker *spawn.Maker, entry spawn.Entry,
 const fullHP = -1
 
 // spawnFresh places one non-persisted instance of entry at a freshly rolled
-// position, always alive at full HP/MP — the reference server never restores
-// HP/MP/position across restarts for a spawn without a database name.
+// position, always alive at full HP/MP — HP/MP/position are never restored
+// across restarts for a spawn without a database name.
 func (n *Npcs) spawnFresh(key string, entry spawn.Entry, tmpl *npc.Template, pos spawn.Position) {
 	master := n.instantiate(key, entry, tmpl, pos.Location, pos.Heading, fullHP, fullMP, nil)
 	if master != nil {
@@ -240,7 +240,7 @@ func (n *Npcs) spawnFolk(inst *npc.Instance, loc location.Location, heading int)
 }
 
 func (n *Npcs) spawnPrivates(key string, entry spawn.Entry, master *npc.Hostile) {
-	// Java's generic MonsterBehavior creates spawn-list privates only for Party_Type 2.
+	// The generic monster behavior creates spawn-list privates only for Party_Type 2.
 	partyType, err := master.Instance.Template.AIParams.GetIntDefault("Party_Type", 0)
 	if err != nil || partyType != 2 {
 		return

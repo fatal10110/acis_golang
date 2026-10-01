@@ -52,10 +52,9 @@ type PlayerSkillRequest struct {
 }
 
 // fakeDeathSkillID is the Fake Death toggle skill. Recasting it while
-// faking must be let through even though the caster is FakeDead(): Java's
-// PlayerCast.canAttemptCast rejects every cast during fake death except this
-// one skill id — `if (_actor.isFakeDeath() && skill.getId() != 60)`
-// (PlayerCast.java:218-222) — so the player can un-toggle it.
+// faking must be let through even though the caster is FakeDead(): every
+// cast during fake death is rejected except this one skill id, so the
+// player can un-toggle it.
 const fakeDeathSkillID = 60
 
 // StartedSkill is a player skill request accepted by the cast controller.
@@ -167,15 +166,13 @@ func startResolvedSkill(now time.Time, controller *Controller, caster *player.Ch
 	}
 	started.Plan = plan
 
-	// PlayerCast.doCast clears the post-fake-death grace unconditionally
-	// right after committing to a successfully started cast
-	// (_actor.clearRecentFakeDeath(), PlayerCast.java:181-185). It never
-	// runs for doInstantCast (potions) or doToggleCast, which
-	// startResolvedSkill's ActivationActive-only callers already exclude.
-	// FUSION and SIGNET_CASTTIME never reach doCast at all — PlayerAI
-	// dispatches them to doFusionCast instead (PlayerAI.java:299-301),
-	// which never calls clearRecentFakeDeath — so they're excluded here
-	// too.
+	// A successfully started cast clears the post-fake-death grace
+	// unconditionally, right after committing. That never happens for an
+	// instant cast (potions) or a toggle cast, which startResolvedSkill's
+	// ActivationActive-only callers already exclude. FUSION and
+	// SIGNET_CASTTIME never take that path at all — they go through the
+	// fusion cast path instead, which never clears the grace — so they're
+	// excluded here too.
 	if !FusionTimeline(def) {
 		caster.ClearRecentFakeDeath()
 	}

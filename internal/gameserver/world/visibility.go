@@ -673,8 +673,8 @@ type bodied interface {
 // metric. rangeBody3D widens by each side's collision radius when it has
 // one; rangePoint2D drops the Z axis and never widens. A rng of -1 means
 // unlimited; any other negative value behaves like its absolute value. The comparison stays in float64 space end to end,
-// matching MathUtil.checkIfInRange's double totalRadius (MathUtil.java:193-198,
-// 214-217): summing collision radii as an int before comparing, as an
+// with the collision radii summed as float64: summing them as an int before
+// comparing, as an
 // earlier version of this function did, silently truncates fractional
 // radii (e.g. 7.5 on female player templates, or Grow-scaled NPC bodies).
 func inRange(rng int, a, b Tracked, metric rangeMetric) bool {

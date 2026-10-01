@@ -81,6 +81,13 @@ func WithEnv(env Env) Option {
 	}
 }
 
+// WithAdmission makes the list hold only the effects admit accepts. Any
+// other effect added to it is dropped before it starts: no start hook, no
+// stat change, no icon or message.
+func WithAdmission(admit func(*Effect) bool) Option {
+	return func(l *List) { l.admit = admit }
+}
+
 // IsNight reports whether it is night on the server that owns l.
 func (l *List) IsNight() bool {
 	return l != nil && l.night != nil && l.night.IsNight()
@@ -138,6 +145,9 @@ type List struct {
 	activity     ActivityRegistry
 	cancelLesser bool
 	night        conditions.NightSource
+	// admit, when set, decides which effects the list holds at all; see
+	// WithAdmission.
+	admit func(*Effect) bool
 
 	buffs   []*Effect
 	debuffs []*Effect
@@ -207,9 +217,9 @@ func NewList(owner StatOwner, opts ...Option) *List {
 
 // Flags returns the union of every visible held effect's flag bits — the
 // active member of each stack group. Stacked-but-inactive members live only
-// in the stacks map and contribute nothing, unlike the reference, whose
-// computeEffectFlags() ORs every entry in _buffs/_debuffs including
-// stacked-but-not-in-use ones (EffectList.java:896-921). The difference is
+// in the stacks map and contribute nothing here, although the specified
+// flag union ORs every held buff and debuff, stacked-but-not-in-use ones
+// included. The difference is
 // unreachable for the crowd-control flags that consume this surface: the
 // kinds carrying them either reject same-flag re-application
 // (rejectsIfAffected) or activate the next stack member the instant the
@@ -378,8 +388,8 @@ func (l *List) ActiveBySkillID(id int) (level int, ok bool) {
 	return 0, false
 }
 
-// DanceCount returns the number of active dance/song effects, mirroring
-// Java's EffectList.getDanceCount(). It drives the per-cast MP surcharge a
+// DanceCount returns the number of active dance/song effects. It drives the
+// per-cast MP surcharge a
 // dance/song skill pays for each already-running dance/song: casting
 // another one gets more expensive as more stay active simultaneously.
 func (l *List) DanceCount() int {

@@ -12,9 +12,9 @@ func (l *List) Tick() {
 }
 
 // tickAt claims a due action from every held effect, active or displaced —
-// AbstractEffect.scheduleEffect()'s ACTING case runs (and decrements _count)
-// for every scheduled effect regardless of getInUse() (AbstractEffect.java:
-// 291-306) — but only runs the periodic hook for the currently active member
+// a scheduled tick runs (and decrements the count) for every scheduled
+// effect whether or not it is in use — but only runs the periodic hook for
+// the currently active member
 // of each stack group; a displaced member silently drains its count and
 // self-removes on exhaustion without ever firing its action.
 func (l *List) tickAt(now time.Time) {
@@ -42,15 +42,15 @@ func (l *List) Add(e *Effect) {
 
 // AddRestored is Add for an effect reinstated at login: it activates e and
 // refreshes the icons the same way, but sends the owner none of the
-// felt/disappeared/expiry system messages. The reference restores effects
-// before the player has a client, so those messages go nowhere; only the
+// felt/disappeared/expiry system messages. Effects are restored before the
+// player has a client, so those messages go nowhere; only the
 // later icon update reaches the client.
 func (l *List) AddRestored(e *Effect) {
 	l.addAnnounced(e, false)
 }
 
 func (l *List) addAnnounced(e *Effect, announce bool) {
-	if l == nil || e == nil {
+	if l == nil || e == nil || (l.admit != nil && !l.admit(e)) {
 		return
 	}
 	var pending []func()
@@ -284,13 +284,13 @@ func (l *List) notifyAbnormalUpdate() {
 	}
 }
 
-// notifyExpiry queues e's worn-off/disappeared/aborted system message,
-// mirroring EffectList.removeEffectFromQueue: only for an effect that
+// notifyExpiry queues e's worn-off/disappeared/aborted system message: only
+// for an effect that
 // actually left the buffs/debuffs list (not one rejected before insertion)
 // and whose template shows an icon. wornOff must be read before
 // e.stopSchedule() runs, since that call zeroes e's remaining-tick counter.
 // e.Skill.Toggle wins over the count check even though a toggle's schedule
-// never reaches count 0, matching the reference checking isToggle() first.
+// never reaches count 0: the toggle check comes first.
 func (l *List) notifyExpiry(e *Effect, wornOff bool, pending *[]func()) {
 	if !e.Template.Icon || l.silent {
 		return
@@ -341,8 +341,7 @@ func appendThunk(pending *[]func(), thunk func()) {
 // under l.mu), the removal path's does not.
 //
 // It does not (re)start e's tick schedule: that starts once, in add, when e
-// is first created — matching L2Skill.getEffects() calling scheduleEffect()
-// unconditionally for every created effect (L2Skill.java:1188-1191) — so a
+// is first created, unconditionally for every created effect — so a
 // promoted stack loser resumes with whatever count it drained down to while
 // displaced instead of restarting from the template.
 func (l *List) beginActivate(e *Effect, onReject func(*Effect), announce bool) func() {
@@ -377,9 +376,9 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect), announce bool) f
 	}
 }
 
-// add inserts e, starting its tick schedule unconditionally first — matching
-// how the reference schedules every created effect's periodic task up front,
-// before any stacking/activation outcome is known. A RejectsIfAffected
+// add inserts e, starting its tick schedule unconditionally first — every
+// created effect's periodic task is scheduled up front, before any
+// stacking/activation outcome is known. A RejectsIfAffected
 // effect that finds its own Flag bit
 // already set by any currently held effect is dropped outright before any
 // buff/debuff handling: its stop-task hook fires and it never reaches the

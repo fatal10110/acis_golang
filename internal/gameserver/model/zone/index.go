@@ -137,9 +137,9 @@ func FindAtXY[T Kind](ix *Index, x, y int) (T, bool) {
 // EffectRangeInPeaceZone reports whether a skill's effect range around
 // (x, y, z) overlaps a peace-suspending zone attached to the region
 // containing (regionX, regionY) — the caster's own region, not necessarily
-// the region containing (x, y, z), matching the reference's region-only
-// zone lookup. It samples the center point and the four axis-aligned range
-// offsets, mirroring the reference's diamond sample. A nil index, a server
+// the region containing (x, y, z): the zone lookup is region-only. It
+// samples the center point and the four axis-aligned range offsets (a
+// diamond sample). A nil index, a server
 // booted without zones, holds none.
 func (ix *Index) EffectRangeInPeaceZone(regionX, regionY, x, y, z, effectRange int) bool {
 	if ix == nil {

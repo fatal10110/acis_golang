@@ -86,11 +86,11 @@ func (t *Territory) Intersects(other *geometry.Territory) bool {
 
 // ErrTerritoryBuild marks a territory whose polygon could not be built (too
 // few nodes, an inverted Z range, or a shape triangulation rejects). It
-// mirrors the boundary of SpawnManager.java's per-territory try/catch around
-// `new Territory(name, Kong.doTriangulation(coords), minZ, maxZ)`: the name
-// and minZ/maxZ attribute reads happen before that try and still propagate,
-// but everything from there on is caught, warned about, and skipped by the
-// caller instead of aborting the whole spawnlist load.
+// marks the per-territory recovery boundary: the name and minZ/maxZ
+// attribute reads happen before it and their errors still propagate, but a
+// failure while building the triangulated territory is caught, warned
+// about, and skipped by the caller instead of aborting the whole spawnlist
+// load.
 var ErrTerritoryBuild = errors.New("spawn: territory build failed")
 
 // NewTerritory builds a Territory from set plus its decoded polygon nodes.

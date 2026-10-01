@@ -27,10 +27,9 @@ type skillReuse struct {
 }
 
 // SkillSaveClassIndex returns the persisted class slot for this character's
-// active skill state. Subclasses are not modeled yet, so every character
-// currently uses the base class slot.
+// active skill state: the active class index.
 func (c *Character) SkillSaveClassIndex() int32 {
-	return 0
+	return int32(c.ClassIndex())
 }
 
 // SetSkillLevel records the known level for skillID. A non-positive level
@@ -124,9 +123,8 @@ func (c *Character) AddSkillReuse(ref modelskill.Ref, key int32, delay time.Dura
 }
 
 // HasSkillReuse reports whether a reuse timer is currently recorded for key,
-// regardless of whether it has already expired. Matches Java's
-// Player.getReuseTimeStamp().containsKey(hash) guard against re-arming an
-// equip-delay timer that is already present.
+// regardless of whether it has already expired. It guards against
+// re-arming an equip-delay timer that is already present.
 func (c *Character) HasSkillReuse(key int32) bool {
 	c.skills.mu.Lock()
 	defer c.skills.mu.Unlock()
@@ -198,9 +196,8 @@ func (c *Character) SkillReuseTimers(now time.Time) []effect.ReuseTimer {
 }
 
 // SkillDisabled reports whether key is still waiting for its reuse delay.
-// Matches Java's Creature.isSkillDisabled: the AllSkillsDisabled lock only
-// short-circuits every key when at least one skill is already tracked as
-// disabled (Creature.java:1586-1590) — with no skill on cooldown at all, the
+// The AllSkillsDisabled lock only short-circuits every key when at least
+// one skill is already tracked as disabled — with no skill on cooldown at all, the
 // lock has no effect here.
 func (c *Character) SkillDisabled(key int32) bool {
 	now := c.Now()
@@ -238,4 +235,18 @@ func (c *Character) disableSkillUntil(key int32, expiresAt time.Time) {
 		c.skills.disabled = make(map[int32]time.Time)
 	}
 	c.skills.disabled[key] = expiresAt
+}
+
+// ClearSkillReuses forgets every recorded reuse timer.
+func (c *Character) ClearSkillReuses() {
+	c.skills.mu.Lock()
+	defer c.skills.mu.Unlock()
+	c.skills.reuses = nil
+}
+
+// ClearDisabledSkills re-enables every skill waiting out a reuse delay.
+func (c *Character) ClearDisabledSkills() {
+	c.skills.mu.Lock()
+	defer c.skills.mu.Unlock()
+	c.skills.disabled = nil
 }

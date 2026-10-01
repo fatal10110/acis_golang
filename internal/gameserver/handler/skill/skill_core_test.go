@@ -1586,10 +1586,11 @@ func liveShieldCharacter(t *testing.T, id int32, items *item.Table, equipped ...
 	t.Helper()
 	tmpl := liveShieldTemplate()
 	c := &player.Character{
-		ID: id, Name: "char", ClassID: tmpl.ID, BaseClassID: tmpl.ID,
+		ID: id, Name: "char", BaseClassID: tmpl.ID,
 		Race: player.RaceHuman, Sex: player.SexMale, CharLevel: 1,
 		Location: location.Location{X: int(id) * 100, Y: 0, Z: 0},
 	}
+	c.SetClassID(tmpl.ID)
 	c.SetResourceValues(player.Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 30, CurrentMP: 30})
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, items, equipped))
 	live, err := creature.NewLive(c.Location, 0, liveShieldGeo{}, c)

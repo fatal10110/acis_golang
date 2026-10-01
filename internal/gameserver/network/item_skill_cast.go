@@ -276,8 +276,17 @@ func (l *GameClientLink) finishDeferredItemAICast(live *livePlayer) bool {
 }
 
 // resumeItemAICast starts a queued item cast taken at its action's end, if
-// it still passes the gates.
+// it still passes the gates. A player that can no longer act goes idle,
+// stopping any walk under way, and is answered ActionFailed.
 func (l *GameClientLink) resumeItemAICast(live *livePlayer, itemCast *itemAICastIntention) {
+	if live.DenyAIAction() {
+		live.tryToIdle(false)
+		if live.move != nil {
+			live.move.Stop()
+		}
+		sendMagicActionFailed(live)
+		return
+	}
 	target := l.skillFinalTarget(live, itemCast.selected, itemCast.skill)
 	if target == nil {
 		return
@@ -300,11 +309,12 @@ func (l *GameClientLink) resumeItemAICast(live *livePlayer, itemCast *itemAICast
 }
 
 // attemptItemAICast runs one attached skill through the pre-attempt gate
-// before it is queued or started. A dead caster and a skill with no final
-// target get a bare ActionFailed; a gate failure gets its reason and
-// ActionFailed. It reports whether the skill may go on.
+// before it is queued or started. A caster that cannot act (dead,
+// teleporting, held by an effect, or in store or observer mode) and a skill
+// with no final target get a bare ActionFailed; a gate failure gets its
+// reason and ActionFailed. It reports whether the skill may go on.
 func (l *GameClientLink) attemptItemAICast(live *livePlayer, selected world.Tracked, def modelskill.Definition) bool {
-	if live.Character.Dead() {
+	if live.DenyAIAction() {
 		sendMagicActionFailed(live)
 		return false
 	}

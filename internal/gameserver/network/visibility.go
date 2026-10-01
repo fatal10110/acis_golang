@@ -18,7 +18,7 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 	case *livePlayer:
 		p.sendVisibilityFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
 			Character: o.Character,
-			Template:  o.template,
+			Template:  o.Template(),
 			Items:     o.inventoryItems(),
 		}))
 		if o.throne != nil {
@@ -236,8 +236,8 @@ func summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table, in
 
 // petInfoSnapshot resolves a's owner-visible PetInfo fields, given owner
 // (a's confirmed owner) and npcs to look up a's template. It returns
-// (zero, false) if the template is missing, matching Java's silent
-// no-op for an unresolvable summon.
+// (zero, false) if the template is missing: an unresolvable summon is a
+// silent no-op.
 func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serverpackets.PetInfoSnapshot, bool) {
 	if npcs == nil {
 		return serverpackets.PetInfoSnapshot{}, false
@@ -251,9 +251,9 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 	curFed, maxFed := 0, 0
 	var expForThisLevel, expForNextLevel int64
 	totalWeight, weightLimit := 0, 0
-	// Pet.getSoulShotsPerHit/getSpiritShotsPerHit (Pet.java:396-405) use the
-	// per-level pet-data row, not the npc template's base Summon.java
-	// (506-514) value that servitors use — those two can differ (e.g. Wolf
+	// A pet's soulshots/spiritshots per hit come from the per-level
+	// pet-data row, not the npc template's base value that servitors use —
+	// those two can differ (e.g. Wolf
 	// 12077: template ssCount=2, level-row ssCount=1).
 	ssCount, spsCount := tmpl.SSCount, tmpl.SPSCount
 	if a.IsPet() {

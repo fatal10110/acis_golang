@@ -21,8 +21,8 @@ type Maker struct {
 }
 
 // NewMaker builds a Maker from set plus already-resolved references and
-// decoded child entries. multiplier is Config.SPAWN_MULTIPLIER
-// (NpcMaker.java:89): maximumNpcs is scaled and Java-rounded by it.
+// decoded child entries. multiplier is the configured spawn multiplier:
+// maximumNpcs is scaled and rounded by it (see scaleBySpawnMultiplier).
 func NewMaker(set *commons.StatSet, territories []*Territory, banned []*Territory, entries []Entry, aiParams map[string]string, multiplier float64) (*Maker, error) {
 	idf := commons.NewFields(set, "spawn maker")
 	name := idf.String("name")
@@ -53,11 +53,9 @@ func NewMaker(set *commons.StatSet, territories []*Territory, banned []*Territor
 	}, nil
 }
 
-// scaleBySpawnMultiplier applies Config.SPAWN_MULTIPLIER the way
-// NpcMaker.java:89 and MultiSpawn.java:64 do: (int) Math.round(n *
-// multiplier). Math.round rounds half up; math.Round rounds half away from
-// zero, which is the same rule for the non-negative n this is always called
-// with.
+// scaleBySpawnMultiplier applies the spawn multiplier as n * multiplier
+// rounded half up to an int. math.Round rounds half away from zero, which
+// is the same rule for the non-negative n this is always called with.
 func scaleBySpawnMultiplier(n int, multiplier float64) int {
 	return int(math.Round(float64(n) * multiplier))
 }

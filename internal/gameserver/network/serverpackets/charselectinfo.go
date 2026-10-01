@@ -38,9 +38,11 @@ type CharacterSlot struct {
 	ObjectID int32
 	ClanID   int32
 
-	Sex     player.Sex
-	Race    player.Race
-	ClassID int32
+	Sex  player.Sex
+	Race player.Race
+	// BaseClassID is the class shown on the character model; ClassID the
+	// class played.
+	BaseClassID, ClassID int32
 
 	X, Y, Z int32
 
@@ -72,7 +74,7 @@ func NewCharacterSlot(c *player.Character, items []*item.Instance, now time.Time
 	resources := c.ResourceValues()
 	slot := CharacterSlot{
 		Name: c.Name, ObjectID: c.ObjectID(), ClanID: int32(c.ClanID),
-		Sex: c.Sex, Race: c.Race, ClassID: int32(c.ClassID),
+		Sex: c.Sex, Race: c.Race, BaseClassID: int32(c.BaseClassID), ClassID: int32(c.ClassID()),
 		X: int32(x), Y: int32(y), Z: int32(z),
 		CurHP: resources.CurrentHP, CurMP: resources.CurrentMP, MaxHP: resources.MaxHP, MaxMP: resources.MaxMP,
 		SP: int32(c.SP), Exp: c.Exp, Level: int32(c.CharLevel),
@@ -129,7 +131,7 @@ func writeCharSelectInfo(w *wire.Writer, loginName string, sessionID int32, slot
 
 		w.WriteInt32(int32(s.Sex))
 		w.WriteInt32(int32(s.Race))
-		w.WriteInt32(s.ClassID)
+		w.WriteInt32(s.BaseClassID)
 
 		w.WriteInt32(1)
 

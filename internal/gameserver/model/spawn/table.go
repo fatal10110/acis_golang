@@ -23,8 +23,8 @@ func NewTable(territories []*Territory, makers []*Maker) (*Table, error) {
 		return nil, errors.New("spawn: table has no makers")
 	}
 
-	// Java's SpawnManager.getTerritory/getNpcMaker resolve case-insensitively
-	// (equalsIgnoreCase), returning the first declared match. Index by the
+	// Territory and maker names resolve case-insensitively, returning the
+	// first declared match. Index by the
 	// lowercased name so lookups match that contract; keep insertion order
 	// (source declaration order) as the deterministic tie-breaker.
 	territoryMap := make(map[string]*Territory, len(territories))

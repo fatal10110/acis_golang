@@ -64,6 +64,8 @@ type gameplayConfig struct {
 	ManufactureDelay         manufactureDelay
 	CraftingEnabled          craftingEnabled
 	MultisellDelay           multisellDelay
+	SubclassDelay            subclassDelay
+	SubclassWithoutQuests    subclassWithoutQuests
 	BlacksmithUseRecipes     blacksmithUseRecipes
 	AllowDiscardItem         allowDiscardItem
 	SpawnMultiplier          spawnMultiplier
@@ -156,6 +158,12 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 	if cfg.MultisellDelay, err = loadMultisellDelay(paths); err != nil {
 		return gameplayConfig{}, err
 	}
+	if cfg.SubclassDelay, err = loadSubclassDelay(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.SubclassWithoutQuests, err = loadSubclassWithoutQuests(paths); err != nil {
+		return gameplayConfig{}, err
+	}
 	if cfg.BlacksmithUseRecipes, err = loadBlacksmithUseRecipes(paths); err != nil {
 		return gameplayConfig{}, err
 	}
@@ -246,7 +254,7 @@ func loadMaxBuffsAmount(paths gameServerPaths) (maxBuffsAmount, error) {
 
 // perfectShieldBlockRate is the roll threshold (out of 100) below which a
 // successful shield block upgrades to a perfect block, read from
-// players.properties (Config.java:338,873).
+// players.properties PerfectShieldBlockRate.
 type perfectShieldBlockRate int
 
 func loadPerfectShieldBlockRate(paths gameServerPaths) (perfectShieldBlockRate, error) {
@@ -585,6 +593,30 @@ func loadMultisellDelay(paths gameServerPaths) (multisellDelay, error) {
 	return multisellDelay(time.Duration(config.NewFields(props, "multisell reuse delay").Int("MultisellTime", 100)) * time.Millisecond), nil
 }
 
+// subclassDelay is the reuse delay between two subclass add, change or
+// replace actions, read from server.properties.
+type subclassDelay time.Duration
+
+func loadSubclassDelay(paths gameServerPaths) (subclassDelay, error) {
+	props, err := config.LoadFile(paths.ConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return subclassDelay(time.Duration(config.NewFields(props, "subclass reuse delay").Int("SubclassTime", 2000)) * time.Millisecond), nil
+}
+
+// subclassWithoutQuests lets a subclass be added without its quests, read
+// from players.properties.
+type subclassWithoutQuests bool
+
+func loadSubclassWithoutQuests(paths gameServerPaths) (subclassWithoutQuests, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return false, err
+	}
+	return subclassWithoutQuests(config.NewFields(props, "subclass without quests").Bool("SubClassWithoutQuests", false)), nil
+}
+
 // blacksmithUseRecipes makes a multisell exchange take the ingredients
 // marked maintainIngredient too, read from players.properties.
 type blacksmithUseRecipes bool
@@ -624,8 +656,8 @@ func loadPetConfig(paths gameServerPaths, _ zerolog.Logger) (pet.Config, error) 
 	return pet.ConfigFromProperties(serverProps, playersProps)
 }
 
-// spawnMultiplier is Config.SPAWN_MULTIPLIER (Config.java:715), read from
-// npcs.properties.
+// spawnMultiplier scales spawn counts, read from npcs.properties
+// SpawnMultiplier.
 type spawnMultiplier float64
 
 func loadSpawnMultiplier(paths gameServerPaths) (spawnMultiplier, error) {
@@ -636,8 +668,8 @@ func loadSpawnMultiplier(paths gameServerPaths) (spawnMultiplier, error) {
 	return spawnMultiplier(config.NewFields(props, "spawn multiplier").Float64("SpawnMultiplier", 1)), nil
 }
 
-// randomWalkRate is Config.RANDOM_WALK_RATE (Config.java:753), read from
-// npcs.properties RandomWalkRate.
+// randomWalkRate is the NPC random-walk rate, read from npcs.properties
+// RandomWalkRate.
 type randomWalkRate int
 
 func loadRandomWalkRate(paths gameServerPaths) (randomWalkRate, error) {
@@ -666,8 +698,8 @@ func loadMaxGeoPathFailCount(paths gameServerPaths) (maxGeoPathFailCount, error)
 	return maxGeoPathFailCount(n), nil
 }
 
-// raidCursesDisabled is Config.RAID_DISABLE_CURSE (Config.java:746), read from
-// npcs.properties DisableRaidCurse.
+// raidCursesDisabled switches off the raid curse, read from npcs.properties
+// DisableRaidCurse.
 type raidCursesDisabled bool
 
 func loadDisableRaidCurse(paths gameServerPaths) (raidCursesDisabled, error) {
@@ -691,8 +723,8 @@ func loadFreeTeleport(paths gameServerPaths) (freeTeleport, error) {
 }
 
 // loadRaidMultipliers reads the npcs.properties RaidDefenceMultiplier,
-// RaidHpRegenMultiplier and RaidMpRegenMultiplier keys (Config.java:742-744),
-// each defaulting to 1. A malformed value fails boot.
+// RaidHpRegenMultiplier and RaidMpRegenMultiplier keys, each defaulting to 1.
+// A malformed value fails boot.
 func loadRaidMultipliers(paths gameServerPaths) (npc.RaidMultipliers, error) {
 	props, err := config.LoadFile(paths.NpcsConfigPath)
 	if err != nil {

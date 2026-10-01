@@ -47,7 +47,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteString(c.Name)
 	w.WriteInt32(int32(c.Race))
 	w.WriteInt32(int32(c.Sex))
-	w.WriteInt32(int32(c.ClassID))
+	w.WriteInt32(int32(c.VisibleBaseClassID()))
 
 	for _, pos := range charInfoPaperdollOrder {
 		w.WriteInt32(paperdoll[pos].TemplateID)
@@ -123,7 +123,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteInt32(int32(c.AbnormalEffect()))
 	w.WriteUint8(0)  // recommendations left
 	w.WriteUint16(0) // recommendations received
-	w.WriteInt32(int32(c.ClassID))
+	w.WriteInt32(int32(c.ClassID()))
 	w.WriteInt32(int32(resources.MaxCP))
 	w.WriteInt32(int32(resources.CurrentCP))
 	w.WriteUint8(0) // enchant effect

@@ -64,10 +64,9 @@ func (h *Hostile) SetCurrentMP(mp int) {
 // newly killed the NPC. A hit against an already-dead NPC is a no-op: no
 // damage is applied and no status is broadcast. Hate, the shot-recharge
 // roll, and the party/minion attacked call always run for a live hit,
-// mirroring Npc.reduceCurrentHp (Npc.java:390-464), which runs unconditionally
-// one layer above the invul/damage-permission guard. The overhit test runs
-// first (AttackableStatus.reduceHp order), then that guard drops only the
-// HP change itself (CreatureStatus.java:209-226): an invulnerable NPC, or
+// unconditionally, one layer above the invul/damage-permission guard. The
+// overhit test runs first, then that guard drops only the HP change
+// itself: an invulnerable NPC, or
 // one hit by an attacker without damage permission, still aggroes and calls
 // its party, but takes no damage. The hit's cast-break roll is the
 // attacker's to run, through BreakCastOnDamage, once the hit's reflected

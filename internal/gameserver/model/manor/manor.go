@@ -58,8 +58,7 @@ type Table struct {
 }
 
 // NewTable builds a manor seed table. A seed id repeated across manor rows
-// keeps the last row, matching CastleManorManager.java's unconditional
-// map.put(seedId, seed) over the parsed rows.
+// keeps the last row.
 func NewTable(manors []Manor) *Table {
 	t := &Table{
 		Manors:    append([]Manor(nil), manors...),

@@ -34,7 +34,7 @@ func (r Race) String() string {
 }
 
 // BreathMultiplier returns the race-specific underwater-breath duration and
-// drowning-damage multiplier used by the reference server.
+// drowning-damage multiplier.
 func (r Race) BreathMultiplier() float64 {
 	switch r {
 	case RaceElf, RaceDarkElf:

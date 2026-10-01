@@ -81,8 +81,8 @@ func (c *Character) MountEats(templateID int32) bool {
 	return f.data.Food1 == templateID || f.data.Food2 == templateID
 }
 
-// Mounted reports whether this character currently rides a mount, matching
-// Player.isMounted() (checkSummoner's gate, SummonFriend.java:107).
+// Mounted reports whether this character currently rides a mount; the
+// summon-friend summoner check gates on it.
 func (c *Character) Mounted() bool {
 	return c.MountNPCID() != 0
 }

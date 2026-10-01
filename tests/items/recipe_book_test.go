@@ -621,7 +621,7 @@ func TestRecipeBookDestroyRemovesRecipeAndShortcuts(t *testing.T) {
 	srv, objID := bootCraft(t)
 	c := srv.Client
 	seedRecipes(t, srv, objID, commonRecipeID)
-	if err := srv.Shortcuts.Save(context.Background(), objID, shortcut.Shortcut{Slot: 4, Page: 1, Type: shortcut.Recipe, ID: commonRecipeID, Level: -1}); err != nil {
+	if err := srv.Shortcuts.Save(context.Background(), objID, 0, shortcut.Shortcut{Slot: 4, Page: 1, Type: shortcut.Recipe, ID: commonRecipeID, Level: -1}); err != nil {
 		t.Fatalf("seed shortcut: %v", err)
 	}
 	startInWorld(t, c)
@@ -643,7 +643,7 @@ func TestRecipeBookDestroyRemovesRecipeAndShortcuts(t *testing.T) {
 	if got := savedRecipes(t, srv, objID); len(got) != 0 {
 		t.Fatalf("saved recipes after delete = %v", got)
 	}
-	rows, err := srv.Shortcuts.ListByOwner(context.Background(), objID)
+	rows, err := srv.Shortcuts.ListByOwner(context.Background(), objID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -671,7 +671,7 @@ func TestRecipeShortcutNeedsRecipe(t *testing.T) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeShortCutRegister, "ShortCutRegister")
 	barrier(t, c)
 	srv.FlushPersistence(t)
-	rows, err := srv.Shortcuts.ListByOwner(context.Background(), objID)
+	rows, err := srv.Shortcuts.ListByOwner(context.Background(), objID, 0)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -126,11 +126,9 @@ func applyEffectsResult(handlers EffectHandlers, caster skilltarget.Actor, resol
 
 // ResolveAffected resolves def's affected set at an AI cast's launch, for a
 // caller that must broadcast it (MagicSkillLaunched) and then reuse that
-// exact list — not a fresh resolution — when Hit dispatches effects,
-// matching CreatureCast.java: onMagicLaunch assigns
-// `_targets = _skill.getTargetList(...)` once (:232) and the hit timer's
-// `callSkill(_skill, _targets, _item)` (:291, NpcCast.java:52) reuses that
-// same field rather than re-deriving it. The target conditions are not
+// exact list — not a fresh resolution — when Hit dispatches effects: the
+// launch assigns the target list once and the hit timer's skill call
+// reuses that same list rather than re-deriving it. The target conditions are not
 // judged again here: a playable caster's were checked when the cast
 // committed, with its CTRL state, and an NPC caster's are never checked.
 // ok is false if resolution failed for any reason (unresolvable

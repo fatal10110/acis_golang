@@ -15,10 +15,9 @@ func damageOverTimeAction(e *Effect) bool {
 		}
 	}
 	if result.Hit {
-		// A skill's own damage-over-time tick is always isDOT=true in the
-		// reference (Creature.reduceCurrentHpByDOT hardcodes it), unlike
-		// drowning's periodic damage, which reduceCurrentHp (isDOT=false)
-		// routes through the same Go method (see taskeffects.go's Drown).
+		// A skill's own damage-over-time tick is always isDOT=true, unlike
+		// drowning's periodic damage, a plain (isDOT=false) HP reduction
+		// routed through the same Go method (see taskeffects.go's Drown).
 		// A toggle's own upkeep tick on a player is HP consumption, not a
 		// hit: it leaves sleep, immobile-until-attacked and sitting alone.
 		// Every other creature already skips those for any DOT tick.
@@ -44,9 +43,8 @@ func manaDamageOverTimeAction(e *Effect) bool {
 			player.NotifyEffectRemovedDueLackMP(e)
 		}
 	}
-	// reduceMp itself no-ops and skips the broadcast when the applied
-	// reduction would be zero (CreatureStatus.java:338-349, "Bypass set to
-	// avoid to send pointless packet") — gate on ReduceMP's returned
+	// An MP reduction that would apply zero is a no-op and skips the
+	// broadcast, so no pointless packet is sent — gate on ReduceMP's returned
 	// applied amount, not the requested tick damage, so an already-empty
 	// target doesn't get a spurious broadcast.
 	if result.Damage > 0 && target.ReduceMP(result.Damage) > 0 {
@@ -60,8 +58,8 @@ func manaHealOverTimeAction(e *Effect) bool {
 	if !target.CanBeHealed() {
 		return false
 	}
-	// Same bypass as the HP tick: a full-MP target applies 0 and the
-	// reference's MP setter — and its status update — never runs.
+	// Same bypass as the HP tick: a full-MP target applies 0 and the MP
+	// setter — and its status update — never runs.
 	if target.AddMP(e.Template.Value) > 0 {
 		broadcastStatus(e.Effected)
 	}
@@ -72,14 +70,14 @@ func manaHealOverTimeAction(e *Effect) bool {
 // applies its result, shared by relax, chameleon rest, fake death and silent
 // move.
 //
-// Toggle is forced true regardless of e.Skill.Toggle: the reference Relax
-// and ChameleonRest effects check "cost exceeds current MP" unconditionally,
-// not only for toggle skills (unlike EffectManaDamOverTime, whose lack-MP
-// check really is toggle-gated). Every skill carrying either effect in the
+// Toggle is forced true regardless of e.Skill.Toggle: the relax and
+// chameleon-rest effects check "cost exceeds current MP" unconditionally,
+// not only for toggle skills (unlike the mana-damage-over-time effect, whose
+// lack-MP check really is toggle-gated). Every skill carrying either effect in the
 // current datapack happens to be TOGGLE-typed, so reading e.Skill.Toggle
 // would produce the same result today — but that's a data coincidence, not
 // a contract; force true here so a future non-toggle skill using these
-// effects still gets the unconditional check Java requires.
+// effects still gets the unconditional check.
 func manaDrainTick(e *Effect) bool {
 	target := e.Effected
 	result := ManaDamageOverTimeTick(ManaDamageOverTimeInput{

@@ -154,7 +154,7 @@ func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 		{Slot: 2, Page: 1, Type: shortcut.Action, ID: 5, Level: -1, CharacterType: 1},
 		{Slot: 4, Page: 1, Type: shortcut.Item, ID: staleObjectID, Level: -1, CharacterType: 1},
 	} {
-		if err := srv.Shortcuts.Save(context.Background(), objID, sc); err != nil {
+		if err := srv.Shortcuts.Save(context.Background(), objID, 0, sc); err != nil {
 			t.Fatalf("seed shortcut %+v: %v", sc, err)
 		}
 	}
@@ -200,7 +200,7 @@ func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 
 	// Shortcut rows are written on the persistence worker.
 	srv.FlushPersistence(t)
-	rows, err := srv.Shortcuts.ListByOwner(context.Background(), objID)
+	rows, err := srv.Shortcuts.ListByOwner(context.Background(), objID, 0)
 	if err != nil {
 		t.Fatalf("list shortcuts: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 		t.Fatalf("delete opcode = %#x, want ShortCutDelete (%#x)", reply[0], serverpackets.OpcodeShortCutDelete)
 	}
 	srv.FlushPersistence(t)
-	rows, err = srv.Shortcuts.ListByOwner(context.Background(), objID)
+	rows, err = srv.Shortcuts.ListByOwner(context.Background(), objID, 0)
 	if err != nil {
 		t.Fatalf("list shortcuts after delete: %v", err)
 	}

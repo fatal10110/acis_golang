@@ -2,12 +2,14 @@ package network
 
 import (
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -106,5 +108,43 @@ func TestStaleCubicTickDoesNotFire(t *testing.T) {
 	link.fireCubic(live, cubic.Life, evicted)
 	if got := frames.Frames(); len(got) != 0 {
 		t.Fatalf("stale Life Cubic tick sent %d frames, want none", len(got))
+	}
+}
+
+// cubicOwnerOnClock is a live player holding a granted Storm Cubic whose
+// timers run on a driven clock.
+func cubicOwnerOnClock(t *testing.T, link *GameClientLink, id int32, lifetime time.Duration) (*livePlayer, *sim.Inline) {
+	t.Helper()
+	in := sim.NewInline(time.Unix(0, 0))
+	live := newTestLivePlayer(t, id, &testsupport.FrameCapture{})
+	live.Character.Live.SetQueue(in.NewQueue("owner"))
+	def := cubicRuntimeDef(cubic.Storm)
+	def.SummonTotalLifeTime = int(lifetime / time.Millisecond)
+	live.Character.AddOrRefreshCubic(cubic.Storm, false)
+	link.syncCubicRuntime(live, cubic.Storm, def)
+	return live, in
+}
+
+// A teleport halts the player through Stop, which must leave its cubics
+// alone: the cubic still expires at its granted lifetime. Detach is the one
+// path that stops them: no timer of a logged-out player's cubic runs.
+func TestCubicsStopOnDetachButNotOnTeleportHalt(t *testing.T) {
+	const lifetime = 10 * time.Second
+	link := &GameClientLink{log: zerolog.Nop()}
+
+	halted, in := cubicOwnerOnClock(t, link, 1, lifetime)
+	sim.RunOwned(halted.Queue(), halted.Stop)
+	in.Advance(lifetime + time.Second)
+	if got := halted.Character.CubicIDs(); len(got) != 0 {
+		t.Fatalf("CubicIDs after the lifetime of a teleport-halted owner = %v, want none (the disappear timer kept running)", got)
+	}
+
+	detached, in := cubicOwnerOnClock(t, link, 2, lifetime)
+	runtime := liveCubicRuntime(detached, cubic.Storm)
+	runtime.Action()
+	sim.RunOwned(detached.Queue(), func() { link.detachLivePlayer(detached) })
+	in.Advance(lifetime + time.Second)
+	if got := detached.Character.CubicIDs(); len(got) != 1 || got[0] != int(cubic.Storm) {
+		t.Fatalf("CubicIDs after detach and the lifetime = %v, want [%d]: no cubic timer runs after detach", got, cubic.Storm)
 	}
 }

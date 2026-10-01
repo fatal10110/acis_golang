@@ -28,8 +28,8 @@ type Presence struct {
 	region  atomic.Pointer[Region]
 	// knownFrom is the region t left, held while that region change's
 	// callbacks are delivered: t's known list still resolves the neighborhood
-	// it is leaving until they finish, as the reference assigns the new region
-	// only after its forget and discover passes.
+	// it is leaving until they finish; the new region is assigned only
+	// after the forget and discover passes.
 	knownFrom atomic.Pointer[Region]
 
 	latch atomic.Bool

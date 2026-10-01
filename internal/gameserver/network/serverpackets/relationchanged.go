@@ -5,8 +5,7 @@ import "github.com/fatal10110/acis_golang/internal/commons/wire"
 // OpcodeRelationChanged is the wire opcode for RelationChanged.
 const OpcodeRelationChanged = 0xce
 
-// Relation bitmask flags carried by RelationChanged, matching
-// RelationChanged.java's RELATION_* constants.
+// Relation bitmask flags carried by RelationChanged.
 const (
 	RelationPvPFlag     = 0x00002
 	RelationHasKarma    = 0x00004
@@ -20,8 +19,8 @@ const (
 )
 
 // RelationChangedInfo carries a single playable's relation state as seen by
-// one recipient, mirroring the reference's RelationChanged(Playable,
-// relation, isAutoAttackable) constructor.
+// one recipient: its relation bits, whether the recipient may auto-attack
+// it, and its karma and PvP flag.
 type RelationChangedInfo struct {
 	ObjectID         int32
 	Relation         int32

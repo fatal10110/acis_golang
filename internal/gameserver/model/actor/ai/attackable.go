@@ -133,8 +133,7 @@ type CastController interface {
 	// attempt.
 	StopsMovement(ref skill.Ref) bool
 	// SkillType returns ref's raw skillType tag, used to grant SUMMON_FRIEND
-	// casts a target-lost bypass matching the reference's rotation-target
-	// exemption.
+	// casts a target-lost bypass (the rotation-target exemption).
 	SkillType(ref skill.Ref) string
 	// CanCast validates the final HP/MP/mute/reuse/item gates, immediately
 	// before the cast commits.
@@ -283,8 +282,8 @@ func (a *Attackable) SetRandomWalkRate(rate int) {
 
 // MaybeStartOffensiveFollow starts or maintains an offensive follow task
 // toward target at this actor's own physical attack range. Exposed for
-// AutoAttackTargetValid's queued-desire follow gate (Npc.java:2107-2110),
-// called outside the AI loop's own Think step; it must not take a.mu, since
+// AutoAttackTargetValid's queued-desire follow gate, called outside the AI
+// loop's own Think step; it must not take a.mu, since
 // a caller such as RandomizeHate already holds it while evaluating
 // candidates.
 func (a *Attackable) MaybeStartOffensiveFollow(target attackable.Combatant) (bool, error) {
@@ -355,13 +354,12 @@ func (a *Attackable) AddDamageHate(attacker attackable.Combatant, damage, hate f
 }
 
 // AddCombatDamageHate records attacker's raw combat damage in the physical
-// threat table at zero hate weight, matching Npc.reduceCurrentHp's own
-// addDamageHate(attacker, damage, 0) call — the reference never derives hate
-// from damage dealt here. weight is the ATTACKED-event attack Desire queued
-// alongside it, which feeds its own hate into the same threat table (see
-// addAttackDesireWithMove) — matching the reference's separate
-// addAttackDesire(attacker, weight) call from the NPC's assigned individual
-// AI script's onAttacked (e.g. Warrior.onAttacked, Warrior.java:387-397).
+// threat table at zero hate weight — hate is never derived from damage
+// dealt here. weight is the ATTACKED-event attack Desire queued alongside
+// it, which feeds its own hate into the same threat table (see
+// addAttackDesireWithMove) — a separate attack-desire add made by the NPC's
+// assigned individual AI script when it is attacked (e.g. the Warrior
+// script).
 // That per-script formula lives in the domain layer (see
 // Hostile.attackedHateWeight), not here: this generic AI plumbing only
 // applies whatever weight it is given. When the threat table had no
@@ -403,20 +401,19 @@ func (a *Attackable) addAttackDesire(attacker attackable.Combatant, hate float64
 	a.addAttackDesireWithMove(attacker, hate, true)
 }
 
-// addAttackDesireWithMove queues the attack Desire and, matching
-// NpcAI.addAttackDesire's updateAggro=true default (every public entry
-// point here uses that default; none pass the reference's explicit
-// updateAggro=false override), feeds the same weight into the physical
-// threat table at zero extra damage — mirroring the reference's paired
-// _aggroList.addDamageHate(target, damage, weight) call.
+// addAttackDesireWithMove queues the attack Desire and, since an attack
+// desire updates aggro by default (every public entry point here uses that
+// default; none use the no-aggro-update variant), feeds the same weight
+// into the physical threat table at zero extra damage — the paired
+// hate-list add.
 func (a *Attackable) addAttackDesireWithMove(attacker attackable.Combatant, hate float64, moveToTarget bool) {
 	a.queueAttackDesireOnly(attacker, hate, moveToTarget)
 	a.threats.AddDamage(attacker, 0, hate)
 }
 
 // addAttackDesireNoAggro queues the attack Desire without touching the
-// threat table, matching AggroList.java:227's randomizeAttack rebuild —
-// AggroList's own addAttackDesire(attacker, damage, hate, false) call — used
+// threat table — the hate-randomizing rebuild's own no-aggro-update desire
+// add — used
 // to resync the Desire queue from a threat table whose hate is already
 // authoritative (RandomizeHate) instead of adding to it a second time.
 func (a *Attackable) addAttackDesireNoAggro(attacker attackable.Combatant, hate float64) {
@@ -522,12 +519,12 @@ func (a *Attackable) thinkIfNoMostHated(hadMostHated bool, attacker attackable.C
 	_ = a.RunAI()
 }
 
-// RandomizeHate ports the AI side of AggroList.randomizeAttack(), driving
-// EffectRandomizeHate: swaps a random valid attacker into the most-hated
+// RandomizeHate is the AI side of attack randomization, driving the
+// randomize-hate effect: swaps a random valid attacker into the most-hated
 // slot ahead of the current target (see ThreatTable.RandomizeAttack), then
 // clears and rebuilds the queued attack desires from every threat entry so
-// they match the post-swap hate table, mirroring the reference's
-// updateAggro=false requeue. Reports whether a swap happened.
+// they match the post-swap hate table, requeued without updating aggro.
+// Reports whether a swap happened.
 func (a *Attackable) RandomizeHate(valid func(attackable.Combatant) bool, pick func(int) int) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -543,15 +540,15 @@ func (a *Attackable) RandomizeHate(valid func(attackable.Combatant) bool, pick f
 	return true
 }
 
-// ReconsiderTarget ports the AI side of AggroList.reconsiderTarget(range),
+// ReconsiderTarget is the AI side of in-range target reconsideration,
 // used when this actor can no longer act on its current target (e.g. an
 // immobilize state): swaps in a replacement from the threat table (see
 // ThreatTable.ReconsiderTarget) and drops the previous most-hated attacker's
 // queued attack desire if one existed. It never queues a desire for the
-// chosen target — AggroList.java:169-177 only calls stopHate/addDamageHate(0)
-// on the list, never touches the caller's desire queue; that is left to a
-// future caller, matching randomizeAttack's sibling behavior of leaving
-// target acquisition outside reconsiderTarget's scope. Reports the new
+// chosen target — the hate-list reconsideration only stops hate and adds
+// zero hate on the list, never touches the caller's desire queue; that is
+// left to a future caller, matching RandomizeHate's sibling behavior of
+// leaving target acquisition outside the reconsideration's scope. Reports the new
 // target and whether a swap happened.
 func (a *Attackable) ReconsiderTarget(inRange func(attackable.Combatant) bool, valid func(attackable.Combatant) bool) (attackable.Combatant, bool) {
 	a.mu.Lock()
@@ -1399,8 +1396,8 @@ func (a *Attackable) dropLostTarget(target attackable.Combatant) bool {
 }
 
 // dropLostCastTarget is dropLostTarget's cast-path variant: a SUMMON_FRIEND
-// cast's target is exempt from the "not known" drop, mirroring the
-// reference's isTargetLost(target, skill) rotation-target bypass.
+// cast's target is exempt from the "not known" drop (the rotation-target
+// bypass of the target-lost check).
 func (a *Attackable) dropLostCastTarget(target attackable.Combatant, skillType string) bool {
 	if target == nil {
 		a.setCurrent(intention{kind: IntentionIdle})

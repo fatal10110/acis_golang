@@ -45,15 +45,13 @@ type Effect struct {
 	landing location.Location
 
 	inUse bool
-	// startRefused marks a kind whose reference onStart always returns
-	// false while the effect stays held: EffectProtectionBlessing. The
-	// reference still marks it in use (setInUse sets _inUse before reading
-	// onStart), so its flag counts, but the failed start leaves
-	// _startConditionsCorrect false: activation adds no stat funcs and sends
-	// no felt message (EffectList.java:768-774), and ending it by expiry,
-	// dispel, death or replacement skips onExit (AbstractEffect.java:319).
-	// Only losing its stack group's head runs onExit, because setInUse(false)
-	// calls it unconditionally (AbstractEffect.java:159-166, EffectList.java:762).
+	// startRefused marks a kind whose start always fails while the effect
+	// stays held: TypeProtectionBless. It is still marked in use (the in-use
+	// flag is set before the start runs), so its flag counts, but the failed
+	// start leaves its start conditions unmet: activation adds no stat funcs
+	// and sends no felt message, and ending it by expiry, dispel, death or
+	// replacement skips onExit. Only losing its stack group's head runs
+	// onExit, because clearing the in-use flag calls it unconditionally.
 	startRefused bool
 
 	// strippedAll marks an effect a stop-all is ending. Its holder removes
@@ -249,11 +247,9 @@ func (e *Effect) claimAction(now time.Time) (runAction bool, remove bool) {
 // for the caller to run later, outside that lock: see List.runHooks.
 //
 // It does not stop e's tick schedule: a stacked-out loser keeps draining its
-// own count while displaced, mirroring AbstractEffect.scheduleEffect()'s
-// ACTING case, which decrements _count on every tick regardless of
-// getInUse() (AbstractEffect.java:291-306) and only calls stopEffectTask()
-// once the count is exhausted or the effect actually leaves the list — see
-// List.remove.
+// own count while displaced. Every tick decrements the count whether or not
+// the effect is in use, and the schedule only stops once the count is
+// exhausted or the effect actually leaves the list — see List.remove.
 func (e *Effect) beginExit() func() {
 	if !e.inUse {
 		return nil
@@ -362,10 +358,9 @@ type IconEntry struct {
 }
 
 // IconEntries returns the icon-list projection of l's currently active,
-// icon-showing effects, in buffs-then-debuffs order, mirroring
-// EffectList.updateEffectIcons()'s buff/debuff scan: an effect not currently
+// icon-showing effects, in buffs-then-debuffs order: an effect not currently
 // active, not flagged to show an icon, or classified SIGNET_GROUND is
-// skipped, matching the reference's own skip conditions.
+// skipped.
 func (l *List) IconEntries(now time.Time) []IconEntry {
 	var entries []IconEntry
 	for _, e := range l.active() {

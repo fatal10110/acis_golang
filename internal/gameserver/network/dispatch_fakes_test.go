@@ -355,7 +355,7 @@ func newFakeShortcutStore() *fakeShortcutStore {
 	return &fakeShortcutStore{byOwner: map[int32][]shortcut.Shortcut{}}
 }
 
-func (s *fakeShortcutStore) ListByOwner(_ context.Context, ownerID int32) ([]shortcut.Shortcut, error) {
+func (s *fakeShortcutStore) ListByOwner(_ context.Context, ownerID int32, _ int) ([]shortcut.Shortcut, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.listByOwnerErr != nil {
@@ -364,7 +364,7 @@ func (s *fakeShortcutStore) ListByOwner(_ context.Context, ownerID int32) ([]sho
 	return append([]shortcut.Shortcut(nil), s.byOwner[ownerID]...), nil
 }
 
-func (s *fakeShortcutStore) Save(_ context.Context, ownerID int32, sc shortcut.Shortcut) error {
+func (s *fakeShortcutStore) Save(_ context.Context, ownerID int32, _ int, sc shortcut.Shortcut) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.saveErr != nil {
@@ -376,7 +376,7 @@ func (s *fakeShortcutStore) Save(_ context.Context, ownerID int32, sc shortcut.S
 	return nil
 }
 
-func (s *fakeShortcutStore) Delete(_ context.Context, ownerID int32, slot, page int32) error {
+func (s *fakeShortcutStore) Delete(_ context.Context, ownerID int32, _ int, slot, page int32) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.deleteErr != nil {

@@ -42,8 +42,8 @@ func (l *GameClientLink) activePet(live *livePlayer) (*summon.Actor, *itemcontai
 // petInventoryOwner adapts a pet's inventory to task.InventoryUpdateOwner:
 // visibility follows the pet itself, but delivery goes over the owning
 // player's connection since pets have no connection of their own. Pets
-// never teleport independently, so the reference's isTeleporting() gate is
-// always false here.
+// never teleport independently, so the teleporting gate is always false
+// here.
 type petInventoryOwner struct {
 	live *livePlayer
 	pet  *summon.Actor
@@ -116,14 +116,13 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 		return
 	}
 
-	// Cancel before the mutation, matching the reference's
-	// Player.cancelActiveEnchant() call placed right before
-	// Player.transferItem(): a downstream transfer failure must not
-	// leave a stale enchant selection active.
+	// Cancel before the mutation, right before the item transfer: a
+	// downstream transfer failure must not leave a stale enchant selection
+	// active.
 	l.cancelActiveEnchant(live)
 
-	// The pet's own collar stays with its owner. The reference drops this
-	// hand-over without an answer, as it does a transfer that fails below,
+	// The pet's own collar stays with its owner. This hand-over is dropped
+	// without an answer, as is a transfer that fails below,
 	// and a drag into the pet's window is not an action click, so no
 	// pending action waits on it.
 	if live.ControlItemInUse(req.ObjectID) {
@@ -158,10 +157,8 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 		return
 	}
 
-	// Cancel unconditionally before attempting the transfer, matching the
-	// reference's Player.cancelActiveEnchant() call which precedes
-	// Pet.transferItem() regardless of whether objectID resolves or the
-	// transfer subsequently fails.
+	// Cancel unconditionally before attempting the transfer, regardless of
+	// whether objectID resolves or the transfer subsequently fails.
 	l.cancelActiveEnchant(live)
 
 	res, ok, err := l.petItems.GetFromPet(petInv, playerInv, req.ObjectID, int(req.Count))

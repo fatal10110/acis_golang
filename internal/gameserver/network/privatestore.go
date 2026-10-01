@@ -209,9 +209,9 @@ func (l *GameClientLink) sendRecipeShopManageList(live *livePlayer, dwarven bool
 
 // storeHidden reports the items a store manage window leaves out: a
 // summoned pet's collar (a ridden mount's is shown) and the selected
-// enchant scroll. The reference also leaves out the item a cast in flight
-// consumes; a manage window only opens after the set-up checks refused a
-// casting player, so no cast is ever in flight here.
+// enchant scroll. The item a cast in flight consumes would be left out too,
+// but a manage window only opens after the set-up checks refused a casting
+// player, so no cast is ever in flight here.
 func (l *GameClientLink) storeHidden(live *livePlayer) func(objectID int32) bool {
 	scroll := l.enchantStateStore().Active(live.ObjectID())
 	return func(objectID int32) bool {
@@ -246,8 +246,8 @@ func storeMessageFits(text string) bool {
 }
 
 // setSellStoreTitle answers SetPrivateStoreMsgSell: the title is kept and
-// shown back to live. A title too long is dropped without a word, as the
-// reference does; the client waits on nothing.
+// shown back to live. A title too long is dropped without a word, as
+// specified; the client waits on nothing.
 func (l *GameClientLink) setSellStoreTitle(live *livePlayer, req clientpackets.StoreMessage) {
 	if !storeMessageFits(req.Text) {
 		return
@@ -288,8 +288,8 @@ func (l *GameClientLink) setWorkshopName(live *livePlayer, req clientpackets.Sto
 // int32 in total, leaves the manage window open again on what did get
 // listed. Otherwise live sits down and the store opens.
 //
-// A refusal closing the store without a message stays silent, as the
-// reference does: the manage window already closed when the client sent
+// A refusal closing the store without a message stays silent, as
+// specified: the manage window already closed when the client sent
 // the list, so nothing waits on an answer.
 func (l *GameClientLink) setSellStoreList(live *livePlayer, req clientpackets.SetPrivateStoreListSell) {
 	store := live.PrivateStore()
@@ -412,7 +412,7 @@ func (l *GameClientLink) storeOwner(live *livePlayer, ownerID int32) (*livePlaye
 // sell store. A store left with nothing to sell closes, and everyone around
 // sees it.
 //
-// A refusal the reference answers with nothing stays silent: the store
+// A refusal specified with no answer stays silent: the store
 // window closed when the client sent the request, so nothing waits on an
 // answer.
 func (l *GameClientLink) buyFromStore(live *livePlayer, req clientpackets.RequestPrivateStoreBuy) {
@@ -451,8 +451,7 @@ func (l *GameClientLink) buyFromStore(live *livePlayer, req clientpackets.Reques
 
 // sellToStore answers RequestPrivateStoreSell: live sells the rows into a
 // buy store. A store left wanting nothing closes, and everyone around sees
-// it. Refusals the reference answers with nothing stay silent, as
-// buyFromStore's do.
+// it. Refusals specified with no answer stay silent, as buyFromStore's do.
 func (l *GameClientLink) sellToStore(live *livePlayer, req clientpackets.RequestPrivateStoreSell) {
 	if len(req.Items) == 0 {
 		return
