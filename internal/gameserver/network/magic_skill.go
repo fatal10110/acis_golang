@@ -455,9 +455,7 @@ func (l *GameClientLink) walkToCastTarget(live *livePlayer, target skilltarget.A
 	if !live.move.MoveToPawn(pawn, castRange) {
 		live.clearParkedApproaches()
 		sendMagicActionFailed(live)
-		return true
 	}
-	live.Character.SetHeading(live.move.Position().HeadingTo(location.Location{X: tx, Y: ty, Z: tz}))
 	return true
 }
 

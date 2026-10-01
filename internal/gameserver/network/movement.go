@@ -86,10 +86,6 @@ func (l *GameClientLink) startLiveMove(live *livePlayer, target location.Locatio
 	// Parked approach slots must not survive this new accepted walk.
 	live.clearParkedApproaches()
 	live.holdMoveTo(target)
-	// Face the destination from the same server-authoritative origin the
-	// walk itself started from: where a walk in flight stood once the
-	// request advanced it.
-	live.Character.SetHeading(live.move.Position().HeadingTo(target))
 }
 
 // fleeLivePlayer runs live away from e.From as a server-driven move: run
@@ -125,7 +121,6 @@ func (l *GameClientLink) fleeLivePlayer(live *livePlayer, e event.FleeRequested)
 		return
 	}
 	live.clearParkedApproaches()
-	live.Character.SetHeading(live.move.Position().HeadingTo(target))
 }
 
 func (l *GameClientLink) stopLivePlayer(live *livePlayer) {

@@ -502,9 +502,7 @@ func (l *GameClientLink) thinkInteract(live *livePlayer, target interactTarget, 
 		live.setInteract(target)
 		if !live.move.MoveToPawn(target, interactApproachOffset) {
 			live.takeInteract()
-			return
 		}
-		live.Character.SetHeading(live.move.Position().HeadingTo(targetLocation(target)))
 		return
 	}
 	if !l.playerCanDoInteract(live, target) {
