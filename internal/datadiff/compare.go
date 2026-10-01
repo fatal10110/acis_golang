@@ -11,7 +11,7 @@ import (
 const absent = "<absent>"
 
 // Report is the result of comparing two record sets for the same
-// category: a "want" side (e.g. an oracle-generated dump) and a "got" side
+// category: a "want" side (e.g. an externally generated dump) and a "got" side
 // (e.g. a loader's own dump).
 type Report struct {
 	CountWant, CountGot int

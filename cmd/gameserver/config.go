@@ -242,7 +242,7 @@ func loadMaxBuffsAmount(paths gameServerPaths) (maxBuffsAmount, error) {
 
 // perfectShieldBlockRate is the roll threshold (out of 100) below which a
 // successful shield block upgrades to a perfect block, read from
-// players.properties (Config.java:338,873).
+// players.properties PerfectShieldBlockRate.
 type perfectShieldBlockRate int
 
 func loadPerfectShieldBlockRate(paths gameServerPaths) (perfectShieldBlockRate, error) {
@@ -620,8 +620,8 @@ func loadPetConfig(paths gameServerPaths, _ zerolog.Logger) (pet.Config, error) 
 	return pet.ConfigFromProperties(serverProps, playersProps)
 }
 
-// spawnMultiplier is Config.SPAWN_MULTIPLIER (Config.java:715), read from
-// npcs.properties.
+// spawnMultiplier scales spawn counts, read from npcs.properties
+// SpawnMultiplier.
 type spawnMultiplier float64
 
 func loadSpawnMultiplier(paths gameServerPaths) (spawnMultiplier, error) {
@@ -632,8 +632,8 @@ func loadSpawnMultiplier(paths gameServerPaths) (spawnMultiplier, error) {
 	return spawnMultiplier(config.NewFields(props, "spawn multiplier").Float64("SpawnMultiplier", 1)), nil
 }
 
-// randomWalkRate is Config.RANDOM_WALK_RATE (Config.java:753), read from
-// npcs.properties RandomWalkRate.
+// randomWalkRate is the NPC random-walk rate, read from npcs.properties
+// RandomWalkRate.
 type randomWalkRate int
 
 func loadRandomWalkRate(paths gameServerPaths) (randomWalkRate, error) {
@@ -662,8 +662,8 @@ func loadMaxGeoPathFailCount(paths gameServerPaths) (maxGeoPathFailCount, error)
 	return maxGeoPathFailCount(n), nil
 }
 
-// raidCursesDisabled is Config.RAID_DISABLE_CURSE (Config.java:746), read from
-// npcs.properties DisableRaidCurse.
+// raidCursesDisabled switches off the raid curse, read from npcs.properties
+// DisableRaidCurse.
 type raidCursesDisabled bool
 
 func loadDisableRaidCurse(paths gameServerPaths) (raidCursesDisabled, error) {
@@ -675,8 +675,8 @@ func loadDisableRaidCurse(paths gameServerPaths) (raidCursesDisabled, error) {
 }
 
 // loadRaidMultipliers reads the npcs.properties RaidDefenceMultiplier,
-// RaidHpRegenMultiplier and RaidMpRegenMultiplier keys (Config.java:742-744),
-// each defaulting to 1. A malformed value fails boot.
+// RaidHpRegenMultiplier and RaidMpRegenMultiplier keys, each defaulting to 1.
+// A malformed value fails boot.
 func loadRaidMultipliers(paths gameServerPaths) (npc.RaidMultipliers, error) {
 	props, err := config.LoadFile(paths.NpcsConfigPath)
 	if err != nil {

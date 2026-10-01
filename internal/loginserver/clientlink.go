@@ -162,8 +162,8 @@ func (l *ClientLink) Serve(ctx context.Context, ln net.Listener) error {
 }
 
 // purgeLoop sweeps the authenticated connections every half login timeout,
-// dropping those whose connection outlived it, as the reference's purge
-// task does. The same tick drops expired failed-attempt counts and expired
+// dropping those whose connection outlived it. The same tick drops expired
+// failed-attempt counts and expired
 // temporary IP bans no open connection could still observe (see
 // IPBanList.SweepExpired); with purging disabled (zero loginTimeout) it
 // still ticks at half LoginTimeout for those sweeps alone.
@@ -715,8 +715,8 @@ func (l *ClientLink) serverEntries(accessLevel int, clientIP net.IP) []serverpac
 }
 
 // isLocalIP reports whether addr is missing or points at this machine's
-// vicinity (loopback, link-local, unspecified, or site-private), matching
-// the reference's local-address test for ServerList host substitution.
+// vicinity (loopback, link-local, unspecified, or site-private). ServerList
+// uses it to decide host substitution.
 func isLocalIP(addr net.IP) bool {
 	return addr == nil || addr.IsLoopback() || addr.IsLinkLocalUnicast() || addr.IsUnspecified() || addr.IsPrivate()
 }

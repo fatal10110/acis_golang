@@ -101,7 +101,7 @@ var supportedKeys = map[string]bool{
 	"net.sf.l2j.loginserver.level":                                   true,
 }
 
-// fileHandlerPropertyKey maps each sink to its java.util.logging.FileHandler-family property prefix.
+// fileHandlerPropertyKey maps each sink to its logging.properties file-handler key prefix.
 var fileHandlerPropertyKey = map[Sink]string{
 	SinkConsole: "java.util.logging.FileHandler",
 	SinkError:   "net.sf.l2j.commons.logging.handler.ErrorLogHandler",
@@ -133,7 +133,7 @@ func DefaultConfig() Config {
 			SinkGMAudit: "log/gmaudit/gmaudit_%g.txt",
 			SinkItem:    "log/item/item_%g.txt",
 		},
-		// java.util.logging.FileHandler class defaults: no size limit, one generation, no append.
+		// File-handler defaults when logging.properties sets none: no size limit, one generation, no append.
 		Limits: map[Sink]int64{
 			SinkConsole: 0,
 			SinkError:   0,
@@ -338,10 +338,10 @@ func (w levelWriter) WriteLevel(level zerolog.Level, p []byte) (int, error) {
 	return w.Writer.Write(p)
 }
 
-// rotatingFile reproduces java.util.logging.FileHandler's size-based rollover: writes go to
+// rotatingFile is the file handler's size-based rollover: writes go to
 // generation 0 (%g substituted with the generation index); once its size exceeds limit, existing
 // generation files shift up by one index (oldest, at count-1, is discarded) and a fresh empty
-// generation 0 file is opened. limit <= 0 disables rotation entirely, matching the JDK default.
+// generation 0 file is opened. limit <= 0 disables rotation entirely, which is the default.
 type rotatingFile struct {
 	mu      sync.Mutex
 	dir     string
