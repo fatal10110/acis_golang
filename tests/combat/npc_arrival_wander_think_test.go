@@ -61,6 +61,7 @@ func TestWanderArrivalThenSleepExitTimesWanderFromPromotion(t *testing.T) {
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("CurrentIntention() after the sleep exit = %v, want %v kept", got, ai.IntentionWander)
 	}
+	sleepEnded := hostile.Now()
 	assertNoWanderWalk(t, c, "the sleep exit, want no wander step on THINK")
 
 	wanderTimer := 5 * time.Second
@@ -78,11 +79,14 @@ func TestWanderArrivalThenSleepExitTimesWanderFromPromotion(t *testing.T) {
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("CurrentIntention() after the promotion = %v, want %v", got, ai.IntentionWander)
 	}
+	promoted := hostile.Now()
 	assertNoWanderWalk(t, c, "the wander promotion, want its timer armed")
 
 	// One wander timer after the sleep exit is still inside the timer the
-	// promotion armed.
-	srv.Advance(t, wanderTimer-3*time.Second)
+	// promotion armed. Each quiet read moves the driven clock, so the
+	// checkpoints are taken from the hostile's clock: the firing walks the
+	// hostile on its own, and a late read could find a short walk arrived.
+	advanceTo(t, srv, hostile, sleepEnded.Add(wanderTimer))
 	if err := hostile.TickThink(); err != nil {
 		t.Fatalf("sleep-exit timer TickThink() error: %v", err)
 	}
@@ -91,14 +95,13 @@ func TestWanderArrivalThenSleepExitTimesWanderFromPromotion(t *testing.T) {
 		t.Fatal("IsMoving() = true one wander timer after the sleep exit, want it standing")
 	}
 
-	srv.Advance(t, 3*time.Second)
-	if err := hostile.TickThink(); err != nil {
-		t.Fatalf("promotion timer TickThink() error: %v", err)
-	}
-	readUntil(t, c, serverpackets.OpcodeMoveToLocation, "MoveToLocation one wander timer after the promotion")
+	// The firing walks with no AI cycle; check the walk before any read
+	// can move the clock past a short walk's arrival.
+	advanceTo(t, srv, hostile, promoted.Add(wanderTimer))
 	if !hostile.IsMoving() {
 		t.Fatal("IsMoving() = false when the promotion's wander timer ran out, want the next random walk")
 	}
+	readUntil(t, c, serverpackets.OpcodeMoveToLocation, "MoveToLocation one wander timer after the promotion")
 }
 
 // assertNoWanderWalk fails on any MoveToLocation read before the client
