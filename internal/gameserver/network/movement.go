@@ -8,7 +8,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 // moveLivePlayer handles a client MoveBackwardToLocation request. target and
@@ -250,6 +249,15 @@ func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 	if live == nil || live.AlikeDead() || !live.ChangePosture(stand) {
 		return false
 	}
+	dropPostureQueuedIntentions(live)
+	l.broadcastLiveWaitType(live, stand)
+	return true
+}
+
+// dropPostureQueuedIntentions drops what a sit or stand takes the place of:
+// the queued cast, item cast, follow, item use and interaction, the held
+// intention and a friendly follow. It runs on live's own queue.
+func dropPostureQueuedIntentions(live *livePlayer) {
 	live.takeDeferredMagicSkill()
 	live.takeDeferredItemAICast()
 	live.takeDeferredFollow()
@@ -257,6 +265,11 @@ func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 	live.takeDeferredInteract()
 	live.dropHeldIntention()
 	live.endFollow()
+}
+
+// broadcastLiveWaitType sends live's sitting or standing ChangeWaitType to
+// live and every observer.
+func (l *GameClientLink) broadcastLiveWaitType(live *livePlayer, stand bool) {
 	x, y, z := live.Position()
 	waitType := serverpackets.WaitSitting
 	if stand {
@@ -265,35 +278,44 @@ func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameChangeWaitType(live.ObjectID(), waitType, location.Location{X: x, Y: y, Z: z})
 	})
-	return true
 }
 
 // standAttackedLivePlayer answers a hit or offensive skill that reached a
 // seated live player with the stand intention, even where the damage itself
-// stands nobody up (an invulnerable or storing player). A player whose AI is
-// denied (storing, stunned, observing, ...) or who is mounted drops its
-// intention and reads ActionFailed; fake death ends through its effect;
-// anyone else stands up as a stand request does. The stand runs on live's
-// own queue, right after the hit that reached it: it drops queued intentions
-// only that queue may touch. A chair is released when standing settles.
+// stands nobody up (an invulnerable or storing player). It runs where the
+// hit or skill notifies its target, before any of the hit's damage, so the
+// damage then finds the player no longer seated and stands nobody up again.
+// A player whose AI is denied (storing, stunned, observing, ...) or who is
+// mounted is answered with ActionFailed and drops its intention; one seated
+// while it plays dead gets up out of fake death, its Fake Death effect, if
+// still on, ending with its own get-up first; anyone else stands up as a
+// stand request does. What the stand takes the place of is dropped on
+// live's own queue, the only one that touches it. A chair is released when
+// standing settles.
 func (l *GameClientLink) standAttackedLivePlayer(live *livePlayer) {
-	if live == nil || !live.Seated() {
+	if live == nil || live.detached() || !live.Seated() {
 		return
 	}
+	if live.Character.DenyAIAction() || live.Operating() || live.Mounted() {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		postLive(live, func() {
+			if !live.detached() {
+				live.tryToIdle(false)
+			}
+		})
+		return
+	}
+	if live.StandFromFakeDeath() {
+		return
+	}
+	if live.AlikeDead() || !live.ChangePosture(true) {
+		return
+	}
+	l.broadcastLiveWaitType(live, true)
 	postLive(live, func() {
-		if live.detached() || !live.Seated() {
-			return
+		if !live.detached() {
+			dropPostureQueuedIntentions(live)
 		}
-		if live.Character.DenyAIAction() || live.Operating() || live.Mounted() {
-			live.tryToIdle(false)
-			live.SendFrame(serverpackets.FrameActionFailed())
-			return
-		}
-		if live.EffectList().IsAffected(effect.FlagFakeDeath) {
-			live.EffectList().StopByType(effect.TypeFakeDeath)
-			return
-		}
-		l.changeLiveWaitType(live, true)
 	})
 }
 

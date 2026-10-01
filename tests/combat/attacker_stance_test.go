@@ -380,3 +380,37 @@ func TestSeatedStoringPlayerRefusesToStandWhenHit(t *testing.T) {
 		t.Fatal("storing player stood up after the hit")
 	}
 }
+
+// TestSeatedSleepingPlayerRefusesStandBeforeHitStandsIt pins the order of a
+// hit on a seated, sleeping player: ATTACKED fires before the damage
+// (CreatureAttack.java:240 then :263), so thinkStand's rejection
+// (PlayerAI.java:490-504) answers ActionFailed first; the damage then
+// stops the sleep and stands the player up (PlayerStatus.java:118-125).
+func TestSeatedSleepingPlayerRefusesStandBeforeHitStandsIt(t *testing.T) {
+	t.Parallel()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1),
+	)
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	startInWorld(t, c)
+	victim := livePlayer(t, srv, objID)
+	attacker := srv.SpawnAttackingHostileNPCAt(t, location.Location{X: hostileX, Y: hostileY, Z: hostileZ})
+	drainUntilQuiet(t, c)
+	sitDown(t, srv, c, objID)
+	obj, _ := srv.State.Player(objID)
+	landEffect(t, obj.(effectHolder), "Sleep")
+	drainUntilQuiet(t, c)
+
+	attacker.DoAttack(t, victim.(attackable.Combatant))
+	srv.Settle(t)
+	frames := readQuiet(c)
+	if n := standingWaitTypes(frames, objID); n != 1 {
+		t.Fatalf("standing ChangeWaitType after the hit = %d, want 1", n)
+	}
+	refused := indexOf(frames, 0, serverpackets.OpcodeActionFailed, -1)
+	stood := indexOf(frames, 0, serverpackets.OpcodeChangeWaitType, objID)
+	if refused < 0 || refused > stood {
+		t.Fatalf("ActionFailed at %d, standing ChangeWaitType at %d, want the refused stand first (opcodes %v)", refused, stood, opcodes(frames))
+	}
+}
