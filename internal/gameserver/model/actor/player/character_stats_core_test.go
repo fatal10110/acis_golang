@@ -22,6 +22,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
@@ -3282,11 +3283,12 @@ func TestReduceHPStopsSleepAndImmobileUntilAttackedEffects(t *testing.T) {
 func TestReduceHPStandsUpSittingCharacterUnlessInStoreMode(t *testing.T) {
 	tests := []struct {
 		name        string
-		operating   bool
+		operate     privatestore.OperateType
 		wantStanded bool
 	}{
-		{"stands up out of store mode", false, true},
-		{"stays seated in store mode", true, false},
+		{"stands up out of store mode", privatestore.OperateNone, true},
+		{"stands up while setting a store up", privatestore.OperateSellManage, true},
+		{"stays seated in store mode", privatestore.OperateSell, false},
 	}
 
 	for _, tt := range tests {
@@ -3295,7 +3297,7 @@ func TestReduceHPStandsUpSittingCharacterUnlessInStoreMode(t *testing.T) {
 			c.SetHP(100)
 			attachTestLive(t, c)
 			sitDownSettled(c)
-			c.SetOperating(tt.operating)
+			c.SetOperateType(tt.operate)
 
 			c.ReduceHP(10, nil, modelskill.Definition{})
 

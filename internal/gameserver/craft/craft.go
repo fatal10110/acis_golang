@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
+	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
 )
 
 // Service applies the recipe book rules against the loaded recipe table.
@@ -76,6 +77,42 @@ type (
 	BookFull struct{ Limit int }
 	// RecipeAdded names the recipe item a registration used up.
 	RecipeAdded struct{ ItemID int32 }
+	// BookLocked refuses changing the recipe book while its owner runs a
+	// workshop.
+	BookLocked struct{}
+
+	// NotEnoughAdena refuses a workshop order the customer cannot pay for.
+	NotEnoughAdena struct{}
+	// CraftedFor tells the crafter it made Count of ItemID for Customer at
+	// Price.
+	CraftedFor struct {
+		Customer string
+		ItemID   int32
+		Count    int
+		Price    int
+	}
+	// CraftedBy tells the customer Crafter made Count of ItemID for it at
+	// Price.
+	CraftedBy struct {
+		Crafter string
+		ItemID  int32
+		Count   int
+		Price   int
+	}
+	// CraftForFailed tells the crafter its craft of ItemID for Customer at
+	// Price failed.
+	CraftForFailed struct {
+		Customer string
+		ItemID   int32
+		Price    int
+	}
+	// CraftByFailed tells the customer Crafter failed to craft ItemID for
+	// it at Price.
+	CraftByFailed struct {
+		Crafter string
+		ItemID  int32
+		Price   int
+	}
 )
 
 // Attempt is the outcome of one self-craft request.
@@ -94,6 +131,10 @@ type Attempt struct {
 // or a trade request. A request for an unknown recipe, or for one that is
 // not on the matching page of c's book, is dropped without a word.
 func (s *Service) MakeSelf(c *player.Character, recipeID int, busy bool) Attempt {
+	// A workshop owner crafts only for its customers.
+	if c.OperateType() == privatestore.OperateManufacture {
+		return Attempt{}
+	}
 	if c.InCombat() {
 		return Attempt{Notices: []any{InCombat{}}}
 	}
@@ -208,6 +249,8 @@ func (s *Service) Register(c *player.Character, inst *item.Instance, tmpl *item.
 	switch {
 	case !able:
 		return Registration{Notices: []any{NoCraftAbility{}}}, true
+	case c.OperateType() == privatestore.OperateManufacture:
+		return Registration{Notices: []any{BookLocked{}}}, true
 	case r.Level > c.CreateItemLevel(r.Dwarven):
 		return Registration{Notices: []any{LevelTooLow{}}}, true
 	case book.Count(r.Dwarven) >= limit:
@@ -230,4 +273,87 @@ func (s *Service) Forget(c *player.Character, recipeID int) (recipe.Recipe, bool
 	}
 	c.RecipeBook().Remove(r.ID)
 	return r, true
+}
+
+// ShopAttempt is the outcome of one workshop order.
+type ShopAttempt struct {
+	// ToCrafter and ToCustomer are the messages each side reads, in order.
+	ToCrafter  []any
+	ToCustomer []any
+	// Success reports a craft whose product reached the customer.
+	Success bool
+}
+
+// MakeFor crafts r at crafter's workshop for customer, who pays price in
+// adena through pay and supplies the materials. busy reports that either
+// side is tied up in a trade or a trade request. The customer's workshop
+// craft window is refreshed after every outcome.
+//
+// The order is refused before anything is spent when either side is dead,
+// busy, the crafter's Create Item level is below the recipe's, the customer
+// holds less adena than price or misses a material, or the crafter lacks
+// the MP. Otherwise the crafter spends the MP, the customer pays and gives
+// up the materials, and the success roll decides whether the product
+// reaches the customer.
+func (s *Service) MakeFor(crafter, customer *player.Character, r recipe.Recipe, price int, busy bool, pay func(price int) bool) ShopAttempt {
+	var a ShopAttempt
+	switch {
+	case crafter.AlikeDead() || customer.AlikeDead():
+		a.ToCrafter = append(a.ToCrafter, ActionFailed{})
+		return a
+	case busy:
+		a.ToCustomer = append(a.ToCustomer, ActionFailed{})
+		return a
+	case r.Level > crafter.CreateItemLevel(r.Dwarven):
+		a.ToCrafter = append(a.ToCrafter, ActionFailed{})
+		return a
+	}
+	if customer.Inventory().Adena() < price {
+		a.ToCustomer = append(a.ToCustomer, NotEnoughAdena{})
+		return a
+	}
+	if missing := missingMaterials(customer, r); len(missing) > 0 {
+		a.ToCustomer = append(a.ToCustomer, missing...)
+		return a
+	}
+	if crafter.ResourceValues().CurrentMP < float64(r.MPCost) {
+		a.ToCustomer = append(a.ToCustomer, NotEnoughMP{})
+		return a
+	}
+	if !s.enabled {
+		a.ToCustomer = append(a.ToCustomer, CraftingDisabled{})
+		return a
+	}
+
+	if crafter.ReduceMP(float64(r.MPCost)) > 0 {
+		crafter.BroadcastStatus()
+	}
+	if price > 0 && !pay(price) {
+		a.ToCustomer = append(a.ToCustomer, NotEnoughAdena{})
+		return a
+	}
+	if missing := missingMaterials(customer, r); len(missing) > 0 {
+		a.ToCustomer = append(a.ToCustomer, missing...)
+		return a
+	}
+	inv := customer.Inventory()
+	for _, m := range r.Materials {
+		if m.Count > 0 && inv.DestroyByTemplateID(m.ItemID, m.Count) == nil {
+			return a
+		}
+		a.ToCustomer = append(a.ToCustomer, MaterialConsumed{ItemID: m.ItemID, Count: m.Count})
+	}
+	product := r.Product
+	if s.roll(100) >= r.SuccessRate {
+		a.ToCrafter = append(a.ToCrafter, CraftForFailed{Customer: customer.Name, ItemID: product.ItemID, Price: price})
+		a.ToCustomer = append(a.ToCustomer, CraftByFailed{Crafter: crafter.Name, ItemID: product.ItemID, Price: price})
+		return a
+	}
+	customer.AddCraftedItem(product.ItemID, product.Count, s.nextID)
+	a.ToCrafter = append(a.ToCrafter, CraftedFor{Customer: customer.Name, ItemID: product.ItemID, Count: product.Count, Price: price})
+	a.ToCustomer = append(a.ToCustomer,
+		CraftedBy{Crafter: crafter.Name, ItemID: product.ItemID, Count: product.Count, Price: price},
+		ProductEarned{ItemID: product.ItemID, Count: product.Count})
+	a.Success = true
+	return a
 }

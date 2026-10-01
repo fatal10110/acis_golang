@@ -969,6 +969,18 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.deleteHenna(live, req) })
 			}
 
+		case clientpackets.OpcodeRequestPrivateStoreManageSell, clientpackets.OpcodeSetPrivateStoreListSell,
+			clientpackets.OpcodeRequestPrivateStoreQuitSell, clientpackets.OpcodeSetPrivateStoreMsgSell,
+			clientpackets.OpcodeRequestPrivateStoreBuy, clientpackets.OpcodeRequestPrivateStoreManageBuy,
+			clientpackets.OpcodeSetPrivateStoreListBuy, clientpackets.OpcodeRequestPrivateStoreQuitBuy,
+			clientpackets.OpcodeSetPrivateStoreMsgBuy, clientpackets.OpcodeRequestPrivateStoreSell,
+			clientpackets.OpcodeRequestRecipeShopMessageSet, clientpackets.OpcodeRequestRecipeShopListSet,
+			clientpackets.OpcodeRequestRecipeShopManageQuit, clientpackets.OpcodeRequestRecipeShopMakeInfo,
+			clientpackets.OpcodeRequestRecipeShopMakeItem, clientpackets.OpcodeRequestRecipeShopManagePrev:
+			if !l.dispatchPrivateStore(client, live, opcode, payload) {
+				return
+			}
+
 		case clientpackets.OpcodeMultiSellChoose:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeMultiSellChoose)
 			if err != nil {
@@ -1061,6 +1073,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					}
 					l.changeLiveMoveType(live, !live.Running())
 				default:
+					if l.storeActionUse(live, req.ActionID) {
+						return
+					}
 					if !l.handleSummonActionUse(ctx, live, req) {
 						// An action-bar command no handler claims must still
 						// answer the client — it locks its input until the

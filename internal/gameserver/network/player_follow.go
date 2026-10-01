@@ -19,7 +19,8 @@ type followIntention struct {
 // actOnPlayer answers a click on an already-selected player and reports
 // whether target was one. A player attackable without forcing, or forced
 // (ctrl) and attackable, is attacked; one operating a store is interacted
-// with; anyone else is followed.
+// with, which walks to it and opens its store window; anyone else is
+// followed.
 func (l *GameClientLink) actOnPlayer(live *livePlayer, target world.Tracked, ctrl, shift bool) bool {
 	other, ok := target.(*livePlayer)
 	if !ok || live == nil {
@@ -31,10 +32,7 @@ func (l *GameClientLink) actOnPlayer(live *livePlayer, target world.Tracked, ctr
 	case other.AttackableWithoutForceBy(live.Character) || (ctrl && other.AttackableBy(live.Character)):
 		l.attackLiveTarget(live, other, shift)
 	case other.Operating():
-		// Private stores are not ported (#137): the store window a click
-		// opens has nothing to show yet, so the click is only released.
-		l.log.Debug().Int32("target", other.ObjectID()).Msg("targeting: private store interact not modeled")
-		live.SendFrame(serverpackets.FrameActionFailed())
+		l.tryToInteract(live, other, shift)
 	default:
 		l.followLiveTarget(live, other, ctrl, shift)
 	}

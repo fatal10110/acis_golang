@@ -74,6 +74,14 @@ import (
 // the symbol windows hold no pending action, asking again on the next click.
 // tests/npcs asserts that silence.
 //
+// The private store and workshop window requests are absent as well
+// (SetPrivateStoreListSell/Buy, RequestPrivateStoreBuy/Sell, the store
+// titles, RequestPrivateStoreManage*/Quit*, RequestRecipeShop*): the
+// reference answers their refusals with nothing, and each comes from a
+// store window the client closes or keeps open itself, so no click waits on
+// an answer. tests/trade asserts those refusals. The action-bar commands that
+// open a store do answer a refusal, below.
+//
 // MultiSellChoose refused for its reuse window, its amount, list or entry,
 // the NPC or the player's reach, or a non-stackable entry asked for more
 // than once, is absent as well: the reference drops the open list without
@@ -124,6 +132,10 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"RequestBypassToServer for a command family not modeled yet", encodeRequestBypassToServer("bbs_default"), []byte{serverpackets.OpcodeActionFailed}},
 		{"RequestRecipeBookOpen on an empty book", encodeRequestRecipeBookOpen(1), []byte{serverpackets.OpcodeRecipeBookItemList}},
 		{"RequestPreviewItem trying nothing on", encodeRequestPreviewItem(1), []byte{serverpackets.OpcodeActionFailed}},
+		// The sell command puts the player in sell set-up; the buy command
+		// that follows is refused without a message of its own.
+		{"RequestActionUse private store sell", encodeRequestActionUse(10, false, false), []byte{serverpackets.OpcodePrivateStoreManageListSell}},
+		{"RequestActionUse private store buy while setting up a sell store", encodeRequestActionUse(28, false, false), []byte{serverpackets.OpcodeActionFailed}},
 	}
 
 	for _, tc := range cases {

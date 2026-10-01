@@ -80,6 +80,10 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 	if !ok {
 		return
 	}
+	if live.Operating() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotPickupOrUseItemTrading))
+		return
+	}
 	playerInv := live.Inventory()
 	if playerInv == nil {
 		return

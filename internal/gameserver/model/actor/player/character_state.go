@@ -305,25 +305,6 @@ func (c *Character) SetTransformed(transformed bool) bool {
 	return true
 }
 
-// Operating reports whether this character is operating a store/workshop.
-func (c *Character) Operating() bool {
-	c.stateMu.RLock()
-	defer c.stateMu.RUnlock()
-	return c.operating
-}
-
-// SetOperating updates store/workshop operation state and reports whether it changed.
-func (c *Character) SetOperating(operating bool) bool {
-	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
-	c.initStateLocked()
-	if c.operating == operating {
-		return false
-	}
-	c.operating = operating
-	return true
-}
-
 // Fishing reports whether this character is currently fishing.
 func (c *Character) Fishing() bool {
 	c.stateMu.RLock()

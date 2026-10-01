@@ -165,6 +165,7 @@ func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) {
 	}
 	l.rejoinZones(live)
 	l.activateSpawnProtection(live)
+	closeStoreOnTeleport(live)
 	if l.world == nil {
 		return
 	}

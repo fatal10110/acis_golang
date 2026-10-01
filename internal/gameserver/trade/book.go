@@ -168,6 +168,20 @@ func (b *Book) ProcessingTransaction(playerID int32) bool {
 	return b.processingTransactionLocked(playerID)
 }
 
+// ProcessingRequest reports whether playerID has an unexpired trade
+// request it sent or received, leaving an open session out.
+func (b *Book) ProcessingRequest(playerID int32) bool {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.purgeExpiredLocked(b.now())
+	if _, ok := b.pendingByTarget[playerID]; ok {
+		return true
+	}
+	_, ok := b.pendingByRequester[playerID]
+	return ok
+}
+
 // BoundItems tells which of a participant's items are bound where they are
 // and may not change hands whatever their own state: the control item of a
 // pet that is out. A nil BoundItems binds nothing.

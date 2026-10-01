@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -219,7 +220,6 @@ type Character struct {
 	spawnProtected       bool
 	damagePermissionSet  bool
 	canGiveDamage        bool
-	operating            bool
 	fishing              bool
 	hero                 bool
 	disabledItems        map[int32]time.Time
@@ -258,6 +258,8 @@ type Character struct {
 	hennas *henna.List
 	// recipes is the recipe book; it carries its own lock.
 	recipes recipe.Book
+	// store is the private store; it carries its own lock.
+	store privatestore.Store
 }
 
 var _ effect.StatOwner = (*Character)(nil)

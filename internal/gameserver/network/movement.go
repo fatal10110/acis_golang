@@ -312,7 +312,7 @@ func (l *GameClientLink) standAttackedLivePlayer(live *livePlayer) {
 // intentionally silent instead of patched to match the ActionFailed pattern
 // used by the action-locked handlers in #873.
 func (l *GameClientLink) broadcastLiveSocialAction(live *livePlayer, actionID int32) {
-	if actionID < 2 || actionID > 13 || live.AlikeDead() || !live.Standing() || live.InCombat() {
+	if actionID < 2 || actionID > 13 || live.Operating() || live.AlikeDead() || !live.Standing() || live.InCombat() {
 		return
 	}
 	l.broadcastLiveFrame(live, func() wire.Frame {
