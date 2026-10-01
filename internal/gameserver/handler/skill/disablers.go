@@ -28,7 +28,7 @@ func resolveShieldDefense(caster Creature, target Actor, def modelskill.Definiti
 
 type disablersHandler struct{}
 
-// Types lists all 15 skill types the reference handler covers.
+// Types lists all 15 skill types the disablers handler covers.
 func (disablersHandler) Types() []string {
 	return []string{
 		"STUN", "ROOT", "SLEEP", "PARALYZE", "MUTE", "CONFUSION",
@@ -106,8 +106,8 @@ func checkSkillSuccess(caster Creature, target Actor, def modelskill.Definition)
 
 // checkSkillSuccessBSS is checkSkillSuccess with the blessed-spiritshot
 // input forced to bss rather than read from caster's real charge state —
-// Blow.java hardcodes this input to true regardless of the caster's actual
-// charge, unlike every other landing-rate roll in the reference.
+// a blow's landing roll forces this input true regardless of the caster's
+// actual charge, unlike every other landing-rate roll.
 func checkSkillSuccessBSS(caster Creature, target Actor, def modelskill.Definition, bss bool) (succeeded, ok bool) {
 	return checkSkillSuccessBSSWithShield(caster, target, def, bss, resolveShieldDefense(caster, target, def))
 }
@@ -156,7 +156,7 @@ func (l landing) apply(cast Cast, effected Creature) {
 }
 
 // disableAggDamage applies an AGGDAMAGE skill's effects unconditionally (no
-// landing roll, no reflect, matching Disablers.java's AGGDAMAGE case) and,
+// landing roll, no reflect) and,
 // for an attackable target that can also report its level, notifies its AI
 // of the caster's aggression at power/(targetLevel+7)*150.
 func disableAggDamage(cast Cast, target Creature, land landing) {
@@ -248,8 +248,8 @@ func disableConfusion(cast Cast, target Creature, land landing) {
 
 // disableAggReduce applies the skill's effects and, for a positive skill
 // power, subtracts it from every hate entry the target's threat table
-// holds. The reference handler also covers a zero-or-negative power that
-// instead subtracts a generic AGGRESSION stat delta; that needs a stat
+// holds. A zero-or-negative power should instead subtract a generic
+// AGGRESSION stat delta; that needs a stat
 // resolution this port has no generic model for yet, so it's skipped.
 func disableAggReduce(cast Cast, target Creature, land landing) {
 	// Only an NPC holds the aggro tables this skill reduces.

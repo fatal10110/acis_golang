@@ -37,11 +37,11 @@ type shadowItemEntry struct {
 // stays equipped, firing a threshold notification at 10/5/1 minutes left
 // and an expiry event once mana reaches zero.
 //
-// The reference manager also refreshes a shadow item's persisted state
-// once a minute while equipped; that persistence trigger's own guard
-// condition (remaining mana modulo 60 equals 60) can never be true for any
-// non-negative mana value, so it never actually fires there either — this
-// port simply doesn't reproduce that dead branch.
+// There is no once-a-minute refresh of a shadow item's persisted state
+// while equipped: that persistence trigger's guard condition (remaining
+// mana modulo 60 equals 60) can never be true for any non-negative mana
+// value, so it would never fire, and this dead branch is deliberately not
+// reproduced.
 //
 // mu guards entries. Mutable item fields are guarded by item.Instance.
 type ShadowItems struct {

@@ -213,7 +213,17 @@ func (p *Persistence) RestoreSkillState(ctx context.Context, c *player.Character
 	// Restore runs at login, before c has a queue, so it filters on p.now;
 	// the timers it keeps carry their stored expiry and are checked on c's
 	// queue clock from then on.
-	plan := effect.BuildRestorePlan(rows, p.currentTime().UnixMilli(), p.lookup)
+	p.stageSkillState(c, rows, p.currentTime())
+	if _, err := p.store.DeleteByCharacter(ctx, c.ID, classIndex); err != nil {
+		return fmt.Errorf("clear restored skill state for character %d: %w", c.ID, err)
+	}
+	return nil
+}
+
+// stageSkillState restores rows' reuse timers onto c and stages their
+// effects for ReplayEffects, dropping what has run out by now.
+func (p *Persistence) stageSkillState(c *player.Character, rows []effect.SaveRow, now time.Time) {
+	plan := effect.BuildRestorePlan(rows, now.UnixMilli(), p.lookup)
 	for _, reuse := range plan.Reuse {
 		def, ok := p.definition(reuse.Skill)
 		if !ok {
@@ -228,10 +238,75 @@ func (p *Persistence) RestoreSkillState(ctx context.Context, c *player.Character
 		}
 		c.RestoreSkillEffect(eff, cast.ReuseKey(def))
 	}
-	if _, err := p.store.DeleteByCharacter(ctx, c.ID, classIndex); err != nil {
-		return fmt.Errorf("clear restored skill state for character %d: %w", c.ID, err)
+}
+
+// ClassSkills is what one class index keeps of a character's skills: the
+// skills it learned and the effects and reuse timers saved when it was
+// last left.
+type ClassSkills struct {
+	levels player.SkillLevels
+	saved  []effect.SaveRow
+}
+
+// LoadClassSkills reads charID's learned skills and saved skill state for
+// classIndex, consuming the saved state: its rows are deleted once read,
+// as a restore does. It runs off the character's queue; ApplyClassSkills
+// puts the result in place on it.
+func (p *Persistence) LoadClassSkills(ctx context.Context, charID, classIndex int32) (ClassSkills, error) {
+	var cs ClassSkills
+	if p == nil {
+		return cs, nil
 	}
-	return nil
+	if p.levels != nil {
+		levels, err := p.levels.ListKnownSkills(ctx, charID, classIndex)
+		if err != nil {
+			return cs, fmt.Errorf("load known skills for character %d class %d: %w", charID, classIndex, err)
+		}
+		cs.levels = levels
+	}
+	if !p.storeSkillCooltime.Load() || p.store == nil {
+		return cs, nil
+	}
+	rows, err := p.store.ListByCharacter(ctx, charID, classIndex)
+	if err != nil {
+		return cs, fmt.Errorf("load skill state for character %d class %d: %w", charID, classIndex, err)
+	}
+	cs.saved = rows
+	if _, err := p.store.DeleteByCharacter(ctx, charID, classIndex); err != nil {
+		return cs, fmt.Errorf("clear loaded skill state for character %d class %d: %w", charID, classIndex, err)
+	}
+	return cs, nil
+}
+
+// ApplyClassSkills gives c the learned skills cs holds, with their passive
+// stats. Call it on c's queue.
+func (p *Persistence) ApplyClassSkills(c *player.Character, cs ClassSkills) error {
+	if p == nil || c == nil {
+		return nil
+	}
+	return p.applyKnownSkills(c, cs.levels)
+}
+
+// StageClassSkillState restores the reuse timers cs saved onto c and
+// stages its effects for ReplayEffects, dropping what has run out. Call it
+// on c's queue.
+func (p *Persistence) StageClassSkillState(c *player.Character, cs ClassSkills) {
+	if p == nil || c == nil {
+		return
+	}
+	p.stageSkillState(c, cs.saved, c.Now())
+}
+
+// RemoveAllSkills takes every skill c knows away, with its passive stats,
+// without touching character_skills.
+func (p *Persistence) RemoveAllSkills(c *player.Character) {
+	if p == nil || c == nil {
+		return
+	}
+	for id := range c.SkillLevels() {
+		// A removal attaches nothing, so it cannot fail.
+		_ = p.setKnownSkill(c, id, 0, false)
+	}
 }
 
 // ReplayEffects reinstates every effect Restore recorded into c's restore
@@ -304,7 +379,7 @@ func (p *Persistence) ApplyTransientPassiveSkill(c *player.Character, skillID, o
 // reaches character_skills. A skill the server hands out purely from the
 // character's level is re-derived on every level change, so it is held in
 // memory only: persisting it would leave a row behind that a later level
-// loss has to clean up, and the reference does not write one either.
+// loss has to clean up, and no such row is expected in the table either.
 func (p *Persistence) setKnownSkill(c *player.Character, skillID, level int, persist bool) error {
 	if c == nil {
 		return nil
@@ -341,10 +416,9 @@ const knownSkillWriteTimeout = 2 * time.Second
 // is a removal, so it deletes the row rather than storing a level of 0, which
 // would restore as a known skill the character does not have.
 //
-// The write follows the in-memory change and cannot undo it: the reference
-// puts the skill in the character's map, attaches its stat functions and only
-// then calls storeSkill, which logs a failed insert and returns
-// (Player.addSkill, Player.storeSkill). A queued write must not decide
+// The write follows the in-memory change and cannot undo it: the skill
+// enters the character's map and its stat functions attach before it is
+// stored, and a failed insert is only logged. A queued write must not decide
 // whether the character learned the skill either, so a failure is logged
 // here too.
 func (p *Persistence) persistKnownSkill(c *player.Character, skillID, level int) {
@@ -416,9 +490,8 @@ type SkillChange struct {
 // EquipItemStatsReporting is EquipItemStats with each armor set grant and
 // the augmentation of an augmented weapon reported as its own stage. The
 // armor set grants follow the item's own functions, each one answered by
-// its own skill list as the reference's armor set listener sends one per
-// grant. The augmentation follows them ahead of the item's skills, as the
-// reference's skill listener applies it ahead of its grade penalty check:
+// its own skill list, one per grant. The augmentation follows them ahead of
+// the item's skills, applied ahead of the grade penalty check:
 // its stat bonuses attach without a stat report and its skill, if any, is
 // granted. stage, when not nil, is told what each of those changed at that
 // moment, for a caller that answers it with its own packets; a nil stage
@@ -443,8 +516,8 @@ func (p *Persistence) EquipItemStatsReporting(c *player.Character, inst *item.In
 		return false, false, fmt.Errorf("apply equip modifiers for character %d item %d: %w", c.ID, inst.ObjectID, err)
 	}
 	// A weapon whose crystal grade the character's Expertise doesn't yet
-	// allow skips its whole item-skill grant in the reference (the grade
-	// penalty check returns before the +4 skill and the item_skill loop
+	// allow skips its whole item-skill grant (the grade penalty check
+	// returns before the +4 skill and the item_skill loop
 	// run), so none of its granted skills apply until Expertise catches up.
 	var grants []itemSkillGrant
 	if tmpl.Weapon == nil || c.WeaponSkillsAllowed(tmpl.Crystal) {
@@ -552,7 +625,7 @@ func (p *Persistence) removeAugmentation(c *player.Character, inst *item.Instanc
 const armorSetCommonSkillID = 3006
 
 // armorSetGrants resolves the skills the worn armor set gains from inst,
-// newly equipped, one group per skill list the reference sends: the common
+// newly equipped, one group per skill list sent: the common
 // set skill and the set skill when inst is one of the worn chest's set
 // pieces and completes the set, then the shield skill when the set's shield
 // is held, then the +6 skill when every piece is at +6 or higher — or, when
@@ -860,9 +933,8 @@ func (p *Persistence) grantItemSkills(c *player.Character, grants []itemSkillGra
 // EquipItemStats was called with, so the owner identity used to attach the
 // functions matches the one used to remove them. skillsChanged reports
 // whether the caller must resend SkillList: a loaded +4 skill asks for it at
-// +4 or higher even when the Expertise gate kept it from being granted, as
-// the reference's unequip listener does. No reuse timer armed by the
-// equip-delay grant is cleared, matching the reference.
+// +4 or higher even when the Expertise gate kept it from being granted. No
+// reuse timer armed by the equip-delay grant is cleared.
 func (p *Persistence) UnequipItemStats(c *player.Character, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) (skillsChanged bool) {
 	return p.UnequipItemStatsReporting(c, inv, inst, tmpl, nil)
 }
@@ -870,7 +942,7 @@ func (p *Persistence) UnequipItemStats(c *player.Character, inv *itemcontainer.I
 // UnequipItemStatsReporting is UnequipItemStats with the armor set skill
 // removal and the augmentation of an augmented weapon reported as their own
 // stages, between the item's own functions and its +4 skill, in that order
-// as the reference's armor set and skill listeners run: the armor set's
+// as the armor set and skill listeners run: the armor set's
 // skills leave with one skill list, then the augmentation's stat bonuses
 // detach with their own stat report and its skill, if any, leaves. stage,
 // when not nil, is told what each of those changed at that moment; a nil
@@ -991,6 +1063,13 @@ func (p *Persistence) restoreKnownSkills(ctx context.Context, c *player.Characte
 	if err != nil {
 		return fmt.Errorf("restore known skills for character %d: %w", c.ID, err)
 	}
+	return p.applyKnownSkills(c, levels)
+}
+
+// applyKnownSkills gives c each learned skill of levels, attaching a
+// passive one's stat functions. A skill whose definition is no longer
+// loaded is skipped.
+func (p *Persistence) applyKnownSkills(c *player.Character, levels player.SkillLevels) error {
 	for id, level := range levels {
 		if level <= 0 {
 			continue
@@ -1035,4 +1114,22 @@ func (p *Persistence) currentTime() time.Time {
 		return p.now()
 	}
 	return time.Now()
+}
+
+// StoreClassSkills writes levels to character_skills as charID's learned
+// skills for classIndex. It runs off the character's queue.
+func (p *Persistence) StoreClassSkills(ctx context.Context, charID, classIndex int32, levels player.SkillLevels) error {
+	if p == nil {
+		return nil
+	}
+	writer, ok := p.levels.(skillLevelWriter)
+	if !ok {
+		return nil
+	}
+	for id, level := range levels {
+		if err := writer.SetKnownSkill(ctx, charID, classIndex, id, level); err != nil {
+			return fmt.Errorf("store class %d skills for character %d: %w", classIndex, charID, err)
+		}
+	}
+	return nil
 }

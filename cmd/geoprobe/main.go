@@ -1,6 +1,6 @@
 // Command geoprobe evaluates a sample of geodata queries (height, canMove,
 // line-of-sight, path) against the Go geo engine, and reports how well its
-// answers agree with a previously captured oracle dump.
+// answers agree with a previously captured dump of expected answers.
 package main
 
 import (
@@ -24,7 +24,7 @@ func main() {
 }
 
 // Exit codes: 0 means success — either a query sample was written, or a
-// comparison against an oracle dump found no differences. 1 means a
+// comparison against a captured dump found no differences. 1 means a
 // requested comparison found differences; this is the code a script gates
 // on. 2 means the command couldn't run at all (bad flags, a load or I/O
 // failure).

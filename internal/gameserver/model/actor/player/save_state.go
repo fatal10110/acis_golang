@@ -9,8 +9,14 @@ import (
 // SaveState is the character-row values one save writes, copied at one
 // instant so the write can run later without reading the live character.
 type SaveState struct {
-	ID                int32
-	Progression       Progression
+	ID int32
+	// ClassID is the class played at the copy.
+	ClassID int
+	// Progression is the base class's: the characters row always holds
+	// it, whichever class is active.
+	Progression Progression
+	// Subclasses are the subclass slots, each with its own progression.
+	Subclasses        []SubClass
 	Resources         Resources
 	Karma             int
 	PvPKills          int
@@ -24,10 +30,17 @@ type SaveState struct {
 
 // SaveState copies c's persisted character-row values.
 func (c *Character) SaveState() SaveState {
-	progression := c.ProgressionValues()
+	c.progressionMu.RLock()
+	progression := c.progressionLocked()
+	progression.CharLevel, progression.Exp, progression.SP = c.baseProgressionLocked()
+	subs := c.subclassesLocked()
+	classID := c.ClassID()
+	c.progressionMu.RUnlock()
 	return SaveState{
 		ID:                c.ID,
+		ClassID:           classID,
 		Progression:       progression,
+		Subclasses:        subs,
 		Resources:         c.ResourceValues(),
 		Karma:             progression.Karma,
 		PvPKills:          progression.PvPKills,

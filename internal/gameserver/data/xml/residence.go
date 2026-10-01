@@ -32,14 +32,14 @@ type castleElement struct {
 }
 
 type castleArtifactElement struct {
-	ID  *coord `xml:"id,attr"`
-	Pos string `xml:"pos,attr"`
+	ID  *literal32 `xml:"id,attr"`
+	Pos string     `xml:"pos,attr"`
 }
 
 type castleTowerElement struct {
 	Alias    string              `xml:"alias,attr"`
 	Type     string              `xml:"type,attr"`
-	Position []locationElement   `xml:"position"`
+	Position []literalLocation   `xml:"position"`
 	Stats    []towerStatsElement `xml:"stats"`
 	Zones    []valListElement    `xml:"zones"`
 }
@@ -116,10 +116,13 @@ type decoElement struct {
 	Price *coord `xml:"price,attr"`
 }
 
+// residenceZoneElement is a residence's <zone> outline. Its integers follow
+// the zone files' grammar (integer literals) for the bounds and the nodes
+// alike.
 type residenceZoneElement struct {
 	Type  string         `xml:"type,attr"`
-	MinZ  *coord         `xml:"minZ,attr"`
-	MaxZ  *coord         `xml:"maxZ,attr"`
+	MinZ  *literal32     `xml:"minZ,attr"`
+	MaxZ  *literal32     `xml:"maxZ,attr"`
 	Nodes []pointElement `xml:"node"`
 }
 
@@ -127,7 +130,7 @@ type residenceZoneElement struct {
 // kind plus the coordinates it applies to.
 type residenceSpawnElement struct {
 	Type string `xml:"type,attr"`
-	locationElement
+	literalLocation
 }
 
 // LoadCastles parses castles.xml into static castle data.
@@ -294,7 +297,7 @@ func buildControlTower(t castleTowerElement) (castle.ControlTower, error) {
 	}
 	// Last element wins: the StatSet this replaced was built by merging every
 	// <position>/<stats> child in document order, so a later child's attrs
-	// overwrote an earlier one's, matching the Java reference loader.
+	// overwrote an earlier one's.
 	loc, err := t.Position[len(t.Position)-1].loc()
 	if err != nil {
 		return castle.ControlTower{}, fmt.Errorf("castle: control tower %q: %w", t.Alias, err)

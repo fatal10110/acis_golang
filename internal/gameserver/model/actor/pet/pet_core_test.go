@@ -293,11 +293,10 @@ WeightLimit = 2.5
 	if got := cfg.ScaledExpGain(12564, 1000); got != 3250 {
 		t.Errorf("Configured ScaledExpGain(sin eater) = %d, want 3250", got)
 	}
-	slots, weight := cfg.InventoryLimits(43)
-	if slots != 21 {
-		t.Errorf("Inventory slots = %d, want 21", slots)
+	if cfg.InventorySlots != 21 {
+		t.Errorf("Inventory slots = %d, want 21", cfg.InventorySlots)
 	}
-	if weight != 136275 {
+	if weight := int(cfg.BaseWeightLimit(43)); weight != 136275 {
 		t.Errorf("Weight limit = %d, want %d", weight, 136275)
 	}
 }
@@ -314,11 +313,10 @@ func TestConfigFromPropertiesUsesReferenceDefaults(t *testing.T) {
 	if got := cfg.ScaledExpGain(12564, 1000); got != 1000 {
 		t.Errorf("default sin eater rate = %d, want 1000", got)
 	}
-	slots, weight := cfg.InventoryLimits(43)
-	if slots != 12 {
-		t.Errorf("default pet inventory slots = %d, want 12", slots)
+	if cfg.InventorySlots != 12 {
+		t.Errorf("default pet inventory slots = %d, want 12", cfg.InventorySlots)
 	}
-	if weight != 54510 {
+	if weight := int(cfg.BaseWeightLimit(43)); weight != 54510 {
 		t.Errorf("default weight limit = %d, want %d", weight, 54510)
 	}
 }

@@ -1,8 +1,7 @@
-// Code generated from aCis_gameserver's NpcStringId.java; DO NOT EDIT.
+// Code generated from the NpcString id text table; DO NOT EDIT.
 package npcstring
 
-// table maps a client NpcStringId to its hardcoded text, matching Java's
-// NpcStringId.getMessage() lookup (aCis network/NpcStringId.java).
+// table maps a client NpcString id to its hardcoded text.
 var table = map[int32]string{
 	1:       "Hello! I am %s. Ha-ha, you are %s? Hee hee hee hee",
 	2:       "%s--%s--%s--%s//%s Hee hee giggle",

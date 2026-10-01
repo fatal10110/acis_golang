@@ -204,7 +204,7 @@ func relaxStart(e *Effect) bool {
 // relaxAction drains MP each tick while the target stays seated and its HP
 // isn't already full, reusing the same lack-MP handling as the other
 // mana-drain ticks in this file. Unlike TypeChameleonRest, this tick has no
-// continuous-skill gate: the reference effect never checks one.
+// continuous-skill gate: the relax effect never checks one.
 func relaxAction(e *Effect) bool {
 	if player, ok := asPlayer(e.Effected); ok {
 		if player.Standing() {
@@ -277,8 +277,7 @@ func sit(effected Actor) {
 // cap isn't reached (or is unlimited, cap 0) in the first pass — including
 // re-examining candidates the first pass already removed, since removing
 // an already-removed candidate is a safe no-op but still counts against
-// the cap exactly as it does in the reference effect. A candidate whose
-// owning skill id matches the immediately preceding removal is stripped
-// without its own roll. Both quirks reproduce the reference effect's own
-// two-pass loop exactly; do not "simplify" this into cancelStart's single
+// the cap. A candidate whose owning skill id matches the immediately
+// preceding removal is stripped without its own roll. Both quirks are part
+// of the specified two-pass loop; do not "simplify" this into cancelStart's single
 // shuffled pass.

@@ -192,8 +192,7 @@ func (a *Actor) SetName(name string) {
 }
 
 // IsNamed reports whether this pet has a player-assigned custom name, as
-// opposed to falling back to its npc template's name (Pet.getName() != null
-// in the reference).
+// opposed to falling back to its npc template's name.
 func (a *Actor) IsNamed() bool {
 	a.statusMu.RLock()
 	defer a.statusMu.RUnlock()
@@ -211,8 +210,8 @@ func (a *Actor) SetNamed(named bool) {
 // persisted only once the pet has been explicitly named (IsNamed): the
 // npc-template fallback name must never round-trip through storage as a
 // saved custom name, or a later restore would misread "has a saved display
-// name" as "was explicitly named" (Pet.getName() != null in the reference
-// stays null until an actual rename).
+// name" as "was explicitly named" (a pet has no custom name until an
+// actual rename).
 func (a *Actor) PetState() (int32, petmodel.State, bool) {
 	if a == nil || !a.isPet || a.controlItemID == 0 {
 		return 0, petmodel.State{}, false
@@ -251,7 +250,7 @@ func (a *Actor) ExpType() int {
 	return a.expType
 }
 
-// CanReceiveKillReward reports whether this pet meets the reference's
+// CanReceiveKillReward reports whether this pet meets the
 // maximum-experience, life, and owner-distance reward gate.
 func (a *Actor) CanReceiveKillReward(partyRange int) bool {
 	if a == nil || !a.isPet || a.Dead() {
@@ -437,9 +436,8 @@ func (a *Actor) AlikeDead() bool { return a.Dead() }
 func (a *Actor) SiegeGuard() bool { return false }
 
 // siegeSummonNPCIDs are the Siege Golem, Hog Cannon, and Swoop Cannon
-// servitor templates SiegeSummon.java identifies (SIEGE_GOLEM_ID,
-// HOG_CANNON_ID, SWOOP_CANNON_ID), the summons the ERASE skill exempts
-// (Disablers.java: `!(targetCreature instanceof SiegeSummon)`).
+// servitor templates (the siege summons), the summons the ERASE skill
+// exempts.
 var siegeSummonNPCIDs = map[int]struct{}{
 	14737: {},
 	14768: {},
@@ -456,9 +454,9 @@ func (a *Actor) SiegeSummon() bool {
 // SummonOwner returns this summon's owning player.
 func (a *Actor) SummonOwner() Owner { return a.currentOwner() }
 
-// UnSummon despawns this summon as an owner-directed removal, matching
-// Java's Summon.unSummon(Player owner) (this actor already knows its own
-// owner, so the parameter only satisfies that contract).
+// UnSummon despawns this summon as an owner-directed removal (this actor
+// already knows its own owner, so the parameter only satisfies the
+// owner-directed contract).
 func (a *Actor) UnSummon(Owner) { a.Unsummon() }
 
 // DenyAIAction reports whether this summon cannot act now.
@@ -557,14 +555,14 @@ func (a *Actor) Knows(target attackable.Combatant) bool {
 }
 
 // OwnsOffensiveFollowTicker reports that summon AI already rechecks its
-// attack/cast intention on the reference follow cadence.
+// attack/cast intention on the follow-task cadence.
 func (*Actor) OwnsOffensiveFollowTicker() bool { return true }
 
 // PhysicalAttackRange returns this summon's melee attack range.
 func (a *Actor) PhysicalAttackRange() int { return a.combatStats().AttackRange }
 
-// GetSkill returns the skill this summon's npc template grants at skillID,
-// matching Java's Summon.getSkill. ok is false when the template doesn't
+// GetSkill returns the skill this summon's npc template grants at skillID.
+// ok is false when the template doesn't
 // grant that skill id at all.
 func (a *Actor) GetSkill(skillID int) (modelskill.Ref, bool) {
 	level, ok := a.skills[skillID]
@@ -575,8 +573,7 @@ func (a *Actor) GetSkill(skillID int) (modelskill.Ref, bool) {
 }
 
 // CanUseSkill reports whether the owner may currently command this summon
-// to use one of its special skills. Matching Java's
-// RequestActionUse.useSkill, this only gates a pet on the owner-vs-pet
+// to use one of its special skills. This only gates a pet on the owner-vs-pet
 // level gap; it does not check out-of-control state the way movement
 // commands do, and servitors have no gate at all.
 func (a *Actor) CanUseSkill() bool {
@@ -592,12 +589,10 @@ func (a *Actor) CanUseSkill() bool {
 
 // TryUseSkill dispatches an owner-commanded special-skill cast: resolves
 // skillID against this summon's own skill catalog, checks the level gate,
-// then forwards to the attached AI. Matching Java's useSkill
-// (RequestActionUse.java:453-472), the AI's tryToCast is fire-and-forget:
-// its accept/reject decision (busy, cooldown, MP/mute —
-// PlayableAI.java:297, void return) does not feed back into the result
-// here. TryUseSkill returns false only wherever Java's useSkill would
-// (unknown skill, level gap, no attached AI); a dispatched cast reports
+// then forwards to the attached AI. The AI's cast attempt is
+// fire-and-forget: its accept/reject decision (busy, cooldown, MP/mute)
+// does not feed back into the result here. TryUseSkill returns false only
+// for an unknown skill, the level gap, or no attached AI; a dispatched cast reports
 // true even if the AI goes on to reject it. ctrl is the command's
 // forced-use modifier.
 func (a *Actor) TryUseSkill(skillID int, target attackable.Combatant, ctrl bool) bool {
@@ -610,23 +605,21 @@ func (a *Actor) TryUseSkill(skillID int, target attackable.Combatant, ctrl bool)
 }
 
 // OutOfControl reports whether the owner cannot currently command this
-// summon, matching Summon.isOutOfControl (Summon.java:296-298):
-// super.isOutOfControl() || isBetrayed().
+// summon: the creature out-of-control state, or a betrayed summon.
 func (a *Actor) OutOfControl() bool {
 	return a.disabled || a.Betrayed()
 }
 
-// InCombat reports the owner's attack-stance state, matching
-// Summon.isInCombat (Summon.java:302-305): _owner != null && _owner.isInCombat().
+// InCombat reports the owner's attack-stance state: an owner exists and is
+// in combat.
 func (a *Actor) InCombat() bool {
 	owner := a.currentOwner()
 	return owner != nil && owner.InCombat()
 }
 
 // IsAttackingNow reports whether this summon's own attack cycle is
-// currently in flight, matching CreatureAttack.isAttackingNow
-// (CreatureAttack.java:56-59) as read via pet.getAttack()/servitor.getAttack()
-// — the summon's own attack component, not the owner's.
+// currently in flight — the summon's own attack component, not the
+// owner's.
 func (a *Actor) IsAttackingNow() bool {
 	return a.brain != nil && a.brain.AttackingNow()
 }
@@ -861,8 +854,8 @@ func (a *Actor) AddFed(amount int) (fed int, stillHungry bool) {
 }
 
 // Lifetime returns a servitor's current time-remaining/total-lifetime state,
-// the servitor analogue of a pet's Fed/maxMeal (Servitor.getTimeRemaining/
-// getTotalLifeTime, mirrored by PetInfo.java:26-30's non-Pet branch).
+// the servitor analogue of a pet's Fed/maxMeal (PetInfo's non-pet branch
+// writes it in their place).
 func (a *Actor) Lifetime() LifetimeState {
 	a.statusMu.RLock()
 	defer a.statusMu.RUnlock()

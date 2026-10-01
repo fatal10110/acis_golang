@@ -9,7 +9,7 @@ import (
 
 // relationBits returns the subset of RelationChanged's bitmask this port
 // can compute from a Character's own state: pvp-flag and karma. Clan
-// leadership and clan-war bits (Player.java:816-838) require the clan/pledge
+// leadership and clan-war bits require the clan/pledge
 // subsystem tracked in #149 (Clan/pledge: creation, wars, subpledges, clan
 // skills, privileges); the siege bits require #232/#234 (siege core/engine).
 // Neither subsystem exists in this port yet, so those bits are always zero
@@ -35,11 +35,10 @@ func relationAutoAttackable(karma int, pvpFlag task.PvPFlagState, subjectInPvPZo
 
 // broadcastRelations sends live's owned summon a self-view RelationChanged,
 // then broadcasts live's relation — and its owned summon's, if any — to
-// every nearby observer, mirroring Player.updatePvPFlag/setKarma's shared
-// tail (Player.java:800-803, 1083-1086) followed by
-// broadcastRelationsChanges() (Player.java:6827-6839): each nearby player
-// gets one RelationChanged for `this` and, if `_summon != null`, one more
-// for `_summon`, both carrying the same relation/auto-attackable values.
+// every nearby observer — the shared tail of a pvp-flag or karma change:
+// each nearby player gets one RelationChanged for the player and, if it has
+// a summon, one more for the summon, both carrying the same
+// relation/auto-attackable values.
 // It is the RelationChanged event's arm on livePlayer.Emit.
 func (l *GameClientLink) broadcastRelations(live *livePlayer) {
 	if l.world == nil {
@@ -84,10 +83,9 @@ func (l *GameClientLink) broadcastRelations(live *livePlayer) {
 
 // broadcastSummonSpawnRelation sends live a self-view RelationChanged for its
 // just-spawned pet, then broadcasts that same relation to every nearby
-// observer, mirroring Summon.onSpawn (Summon.java:336-349) together with
-// Summon's own broadcastRelationsChanges override (Summon.java:351-355).
-// Unlike broadcastRelations (Player.updatePvPFlag/setKarma's shared tail),
-// Summon's override only ever sends the summon's own RelationChanged to
+// observer, as a summon's spawn does. Unlike broadcastRelations (the
+// pvp-flag/karma tail), a summon's relation broadcast only ever sends the
+// summon's own RelationChanged to
 // nearby observers — the owner's relation hasn't changed, so it is not
 // resent here. Each observer's auto-attackable flag is the summon's own
 // AttackableWithoutForceBy, which reads the summon's PvP-zone membership

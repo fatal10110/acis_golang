@@ -11,7 +11,8 @@ func TestHennaBonusFromRestoredDyes(t *testing.T) {
 	table := henna.NewTable([]henna.Henna{
 		{SymbolID: 1, STR: 1, CON: -3, Classes: []int{1}},
 	})
-	c := &Character{ClassID: 1}
+	c := &Character{}
+	c.SetClassID(1)
 	c.RestoreHennas([]henna.Row{{Slot: 1, SymbolID: 1}}, table.Find)
 	actor := characterStatActor{c: c}
 	if got := actor.HennaBonus(stat.StatSTR); got != 1 {

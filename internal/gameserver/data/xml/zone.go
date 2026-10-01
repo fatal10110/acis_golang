@@ -26,7 +26,7 @@ type zoneElement struct {
 // it applies to.
 type zoneSpawnElement struct {
 	Type string `xml:"type,attr"`
-	locationElement
+	literalLocation
 }
 
 type zoneStatElement struct {
@@ -114,11 +114,11 @@ func buildZone(build func(int, zone.Form, *commons.StatSet) (zone.Kind, error), 
 
 	var id int
 	if attrs.Has("id") {
-		v, err := attrs.GetInt("id")
+		v, err := attrs.GetInt32("id")
 		if err != nil {
 			return nil, err
 		}
-		id = v
+		id = int(v)
 	} else {
 		id = *dynamicID
 		*dynamicID++
@@ -152,6 +152,9 @@ func buildZone(build func(int, zone.Form, *commons.StatSet) (zone.Kind, error), 
 }
 
 func buildZoneForm(attrs *commons.StatSet, nodeEls []pointElement) (zone.Form, error) {
+	if err := decodeLiteralAttrs(attrs, "minZ", "maxZ"); err != nil {
+		return nil, err
+	}
 	f := commons.NewFields(attrs, "zone form")
 	shape := f.String("shape")
 	minZ := f.Int("minZ")
@@ -186,6 +189,9 @@ func buildZoneForm(attrs *commons.StatSet, nodeEls []pointElement) (zone.Form, e
 	case "Cylinder":
 		if len(nodes) != 1 {
 			return nil, fmt.Errorf("cylinder zone wants 1 node, has %d", len(nodes))
+		}
+		if err := decodeLiteralAttrs(attrs, "rad"); err != nil {
+			return nil, err
 		}
 		rad := f.Int("rad")
 		if err := f.Err(); err != nil {

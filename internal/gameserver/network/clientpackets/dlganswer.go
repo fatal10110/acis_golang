@@ -8,8 +8,8 @@ import (
 
 const dlgAnswerSize = 12
 
-// DlgAnswer is the client's response to a ConfirmDlg, matching
-// DlgAnswer.java: a message id identifying which dialog is being answered,
+// DlgAnswer is the client's response to a ConfirmDlg: a message id
+// identifying which dialog is being answered,
 // the accept/decline choice (1 accepts), and the requester's object id the
 // server echoed into the dialog.
 type DlgAnswer struct {

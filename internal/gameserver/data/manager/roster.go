@@ -89,7 +89,13 @@ type itemStore interface {
 // shortcutStore is the persistence Roster needs for character_shortcuts.
 // Satisfied by *sql.ShortcutStore.
 type shortcutStore interface {
-	Save(ctx context.Context, ownerID int32, sc shortcut.Shortcut) error
+	Save(ctx context.Context, ownerID int32, classIndex int, sc shortcut.Shortcut) error
+}
+
+// subclassStore is what Roster reads of character_subclasses. Satisfied by
+// *sql.SubclassStore.
+type subclassStore interface {
+	List(ctx context.Context, charID int32) ([]player.SubClass, error)
 }
 
 // Roster creates, lists, deletes and restores the characters on an
@@ -101,6 +107,7 @@ type Roster struct {
 	characters characterStore
 	items      itemStore
 	shortcuts  shortcutStore
+	subclasses subclassStore
 	templates  *player.TemplateTable
 	itemTable  *item.Table
 	npcs       *npc.Table
@@ -222,7 +229,7 @@ func (r *Roster) Create(ctx context.Context, accountName string, req CreateReque
 
 	if r.shortcuts != nil {
 		for _, sc := range starterShortcuts {
-			if err := r.shortcuts.Save(ctx, c.ID, sc); err != nil {
+			if err := r.shortcuts.Save(ctx, c.ID, 0, sc); err != nil {
 				return nil, CreateRejected, err
 			}
 		}
@@ -258,8 +265,14 @@ func hairStyleLimit(sex player.Sex) byte {
 	return 6
 }
 
+// SetSubclasses makes Roster read each character's subclasses: List shows
+// a character playing a subclass with that subclass's progression, and
+// Load restores them.
+func (r *Roster) SetSubclasses(s subclassStore) { r.subclasses = s }
+
 // List returns the characters on accountName, purging (and excluding) any
-// whose scheduled deletion deadline has already passed.
+// whose scheduled deletion deadline has already passed. A character playing
+// a subclass is listed with that subclass's level, experience and SP.
 func (r *Roster) List(ctx context.Context, accountName string) ([]*player.Character, error) {
 	chars, err := r.characters.ListByAccount(ctx, accountName)
 	if err != nil {
@@ -275,15 +288,35 @@ func (r *Roster) List(ctx context.Context, accountName string) ([]*player.Charac
 			}
 			continue
 		}
+		if c.ClassID() != c.BaseClassID && r.subclasses != nil {
+			subs, err := r.subclasses.List(ctx, c.ID)
+			if err != nil {
+				return nil, err
+			}
+			c.RestoreSubclasses(subs)
+		}
 		live = append(live, c)
 	}
 	return live, nil
 }
 
-// Load reads objectID's characters row, for a selection that must see the
-// row as last saved rather than as the character list read it.
+// Load reads objectID's characters row and subclasses, for a selection
+// that must see them as last saved rather than as the character list read
+// them. A row naming an active class the character does not hold is played
+// on the base class.
 func (r *Roster) Load(ctx context.Context, objectID int32) (*player.Character, error) {
-	return r.characters.Get(ctx, objectID)
+	c, err := r.characters.Get(ctx, objectID)
+	if err != nil || r.subclasses == nil {
+		return c, err
+	}
+	subs, err := r.subclasses.List(ctx, objectID)
+	if err != nil {
+		return nil, err
+	}
+	if !c.RestoreSubclasses(subs) {
+		c.SetClassID(c.BaseClassID)
+	}
+	return c, nil
 }
 
 // purge deletes the character and every row it owns. The character store

@@ -85,7 +85,7 @@ func (c *Controller) playerAttemptRules(caster *player.Character, def modelskill
 }
 
 // playerStateBlocksCast rejects a cast the caster's own state forbids, in the
-// order the reference answers them.
+// specified order.
 func playerStateBlocksCast(caster *player.Character, def modelskill.Definition, sitting bool) error {
 	if caster.WearingFormalWear() {
 		return ErrFormalWear

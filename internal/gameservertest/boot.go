@@ -46,6 +46,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -75,6 +76,7 @@ type options struct {
 	// slowStores delays every handler-issued persistence write (WithSlowStores).
 	slowStores             time.Duration
 	itemFlushFault         *ItemFlushFault
+	subclassFault          SubclassFault
 	petNameLookupErr       error
 	captureLog             bool
 	account                string
@@ -91,6 +93,10 @@ type options struct {
 	karmaPlayerCanTrade    bool
 	admin                  *admin.Data
 	restarts               *restart.Table
+	teleports              travel.TeleportTable
+	instantTeleports       travel.InstantTable
+	freeTeleport           bool
+	teleportClock          func() time.Time
 	zones                  *zone.Index
 	water                  bool
 	waterNow               func() time.Time
@@ -135,6 +141,7 @@ type options struct {
 	craftRoll              func(n int) int
 	multisells             *multisell.Table
 	multisellDelay         time.Duration
+	rollDiceDelay          time.Duration
 	keepMaintained         bool
 	augmentations          *augmentation.Table
 	armorSets              *armorset.Table
@@ -144,6 +151,9 @@ type options struct {
 	skillEnchantRoll       func() int
 	levels                 *player.LevelTable
 	classTemplate          *player.Template
+	extraClassTemplates    []*player.Template
+	subclassWithoutQuests  bool
+	subclassDelay          time.Duration
 	log                    zerolog.Logger
 	geo                    move.Geo
 	itemTemplates          *item.Table
@@ -236,6 +246,15 @@ func WithAdmin(data *admin.Data) Option { return func(o *options) { o.admin = da
 // (default: none, so restart requests answer ActionFailed).
 func WithRestartPoints(table *restart.Table) Option {
 	return func(o *options) { o.restarts = table }
+}
+
+// WithTeleports supplies the destinations civilian NPCs offer (default:
+// none), charged for unless free, with the weekend half-price hours read
+// from now (nil means time.Now).
+func WithTeleports(teleports travel.TeleportTable, instants travel.InstantTable, free bool, now func() time.Time) Option {
+	return func(o *options) {
+		o.teleports, o.instantTeleports, o.freeTeleport, o.teleportClock = teleports, instants, free, now
+	}
 }
 
 // WithZones supplies the zone index wired into the link (default: none, so
@@ -507,6 +526,12 @@ func WithMultisells(table *multisell.Table) Option {
 	return func(o *options) { o.multisells = table }
 }
 
+// WithRollDiceDelay sets the reuse delay between two dice throws on one
+// client session. The default 0 leaves throws ungated.
+func WithRollDiceDelay(d time.Duration) Option {
+	return func(o *options) { o.rollDiceDelay = d }
+}
+
 // WithMultisellDelay sets the reuse delay between two multisell exchanges
 // on one client (default 0: every exchange request is taken).
 func WithMultisellDelay(d time.Duration) Option {
@@ -560,6 +585,30 @@ func WithLevels(levels *player.LevelTable) Option {
 // characters, say, a real body size.
 func WithClassTemplate(tmpl *player.Template) Option {
 	return func(o *options) { o.classTemplate = tmpl }
+}
+
+// WithClassTemplates adds class templates beside the default ones, each
+// replacing a default of the same id, so a suite can play further classes.
+func WithClassTemplates(tmpls ...*player.Template) Option {
+	return func(o *options) { o.extraClassTemplates = append(o.extraClassTemplates, tmpls...) }
+}
+
+// WithSubclassRules sets players.properties SubClassWithoutQuests and the
+// server.properties SubclassTime reuse delay (default false and none).
+func WithSubclassRules(withoutQuests bool, delay time.Duration) Option {
+	return func(o *options) { o.subclassWithoutQuests, o.subclassDelay = withoutQuests, delay }
+}
+
+// SubclassFault decides the outcome of one class change's
+// character_subclasses write: op is "insert" or "delete", index the slot.
+// A non-nil error fails that write before it reaches the database; the
+// function may also panic, as a store or driver bug would.
+type SubclassFault func(op string, index int) error
+
+// WithSubclassFault runs fault before every character_subclasses Insert and
+// Delete a class change issues.
+func WithSubclassFault(fault SubclassFault) Option {
+	return func(o *options) { o.subclassFault = fault }
 }
 
 // WithLog sets the link logger (default zero-logger).
@@ -1234,6 +1283,17 @@ func (s *Server) Settle(tb testing.TB) {
 	}
 }
 
+// AwaitHandled is Settle's first wait alone: it returns once the server has
+// handled every frame a client already wrote, without waiting on the actor
+// queues. A test holding an actor's queue uses it to know a request was
+// answered, or refused, before it checks what the client received.
+func (s *Server) AwaitHandled(tb testing.TB) {
+	tb.Helper()
+	if err := s.awaitHandled(); err != nil {
+		tb.Fatal(err)
+	}
+}
+
 // NewObjectID allocates the next object id from the server's id sequence.
 func (s *Server) NewObjectID() int32 {
 	id, err := s.ids.NextID()
@@ -1326,6 +1386,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	shortcuts := gamesql.NewShortcutStore(db)
 	hennas := gamesql.NewHennaStore(db)
 	recipeBooks := gamesql.NewRecipeBookStore(db)
+	subclasses := gamesql.NewSubclassStore(db)
 	knownSkills := gamesql.NewCharacterSkillStore(db)
 	if o.skills == nil {
 		skillTable := modelskill.NewTable([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}})
@@ -1390,10 +1451,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err != nil {
 		t.Fatalf("new shadow items: %v", err)
 	}
-	templates := Templates(t)
+	class0 := ClassTemplate()
 	if o.classTemplate != nil {
-		templates = templatesWith(t, o.classTemplate)
+		class0 = o.classTemplate
 	}
+	templates := templatesWith(t, class0, o.extraClassTemplates...)
 	itemTemplates := o.itemTemplates
 	if itemTemplates == nil {
 		itemTemplates = ItemTemplates()
@@ -1474,6 +1536,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		rosterNPCs = npc.NewTable(nil)
 	}
 	roster := gamemanager.NewRoster(chars, items, shortcuts, templates, itemTemplates, rosterNPCs, ids, gamemanager.DefaultDeleteAfter, time.Now)
+	roster.SetSubclasses(subclasses)
 	effects.SetAutosave(roster, o.skills, petStore, persistWorker, zerolog.Nop())
 	autosaveClock := &autosaveClock{now: time.Now()}
 	autosave, err := task.NewAutosave(effects, autosaveClock.Now)
@@ -1504,6 +1567,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Hennas:           hennas,
 		HennaTable:       cmp.Or(o.hennas, HennaTemplates(t)),
 		RecipeBooks:      recipeBooks,
+		Subclasses:       subclasses,
 		Recipes:          cmp.Or(o.recipes, RecipeTemplates()),
 		Multisells:       o.multisells,
 		CraftRoll:        o.craftRoll,
@@ -1536,8 +1600,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight},
+		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, RollDiceDelay: o.rollDiceDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight},
 		Restarts:         o.restarts,
+		Teleports:        o.teleports,
+		InstantTeleports: o.instantTeleports,
+		FreeTeleport:     o.freeTeleport,
+		TeleportClock:    o.teleportClock,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),
 		EnchantRoll:      o.enchantRoll,
@@ -1560,6 +1628,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			t.Fatalf("new water: %v", err)
 		}
 		gclConfig.Water = water
+	}
+	if o.subclassFault != nil {
+		gclConfig.Subclasses = faultySubclassStore{SubclassStore: subclasses, fault: o.subclassFault}
 	}
 	if o.slowStores > 0 {
 		gclConfig.Items = slowItemStore{ItemStore: items, delay: o.slowStores}
@@ -1600,6 +1671,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Decay = o.decay
 	if ai != nil {
 		gclConfig.AI = ai
+	}
+	if worldObjects != nil {
+		gclConfig.Doors = worldObjects
 	}
 	gcl, err := network.NewGameClientLink(gclConfig)
 	if err != nil {

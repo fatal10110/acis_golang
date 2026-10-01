@@ -95,7 +95,7 @@ func (t *ThreatTable) MostHated() (threat Threat, ok bool) {
 	return *best, true
 }
 
-// RandomizeAttack ports Npc.java's AggroList.randomizeAttack(): among
+// RandomizeAttack is attack randomization: among
 // attackers other than the current most-hated with positive hate, it picks
 // one passing valid and raises its hate to mostHated's hate plus 200,
 // displacing mostHated as the new top target without altering mostHated's
@@ -137,8 +137,8 @@ func (t *ThreatTable) RandomizeAttack(valid func(Combatant) bool, pick func(int)
 	if len(candidates) == 0 {
 		return false
 	}
-	// Map iteration order is randomized per Go's runtime, unlike Java's
-	// ConcurrentHashMap; sort by attacker id first so pick's index lands on
+	// Map iteration order is randomized per Go's runtime; sort by attacker
+	// id first so pick's index lands on
 	// a reproducible candidate instead of a different one each call.
 	slices.SortFunc(candidates, func(a, b *Threat) int {
 		return int(a.Attacker.ObjectID() - b.Attacker.ObjectID())
@@ -150,22 +150,22 @@ func (t *ThreatTable) RandomizeAttack(valid func(Combatant) bool, pick func(int)
 	return true
 }
 
-// ReconsiderTarget ports Npc.java's AggroList.reconsiderTarget(range): used
+// ReconsiderTarget is in-range target reconsideration: used
 // when the owner can no longer act on its current target (e.g. an
 // immobilize state) and must pick a replacement from its own hate list.
 // Among attackers with positive hate other than the current most-hated,
 // passing both inRange and valid, it picks the lowest-ObjectID candidate
-// (Go map iteration order is unlike Java's ConcurrentHashMap, so entries are
-// sorted for a reproducible pick instead of taking iteration's "first").
+// (Go map iteration order is random, so entries are sorted for a
+// reproducible pick instead of taking iteration's "first").
 //
 // If a most-hated attacker exists, its hate is zeroed and previousMostHated
 // reports it so the caller can drop its queued attack desire; the chosen
-// candidate's own hate is left unchanged — the reference reads
-// mostHated.getHate() for the addDamageHate call only after already calling
-// mostHated.stopHate() in the same statement sequence, so it always adds
-// zero there. This is not a missed transfer to fix; it is the exact
-// reference order, reproduced as coded. If no most-hated exists (empty hate
-// list or an alike-dead owner, mirroring getMostHated's own dead check),
+// candidate's own hate is left unchanged — the most-hated's hate is read
+// for the add only after it was already stopped in the same sequence, so
+// the add is always zero. This is not a missed transfer to fix; it is the
+// exact specified order, reproduced as coded. If no most-hated exists
+// (empty hate list or an alike-dead owner, the most-hated lookup's own dead
+// check),
 // the candidate instead gets a flat +2000 hate and previousMostHated is
 // nil.
 //

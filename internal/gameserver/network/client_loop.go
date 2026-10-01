@@ -115,7 +115,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		// After counting (so dropped frames never reach a handler), an
 		// excess of detected floods per minute disconnects, as does a hard
 		// cap on packets processed pre-auth. The queue-size accounting and
-		// burst cap of the reference have no counterpart here: this port's
+		// burst cap of a queued packet reader have no counterpart here: this
 		// read loop processes each frame inline with its read, so there is
 		// no inbound queue to overflow or drain in batches.
 		now := l.now
@@ -178,8 +178,8 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if !session.SendFrame(serverpackets.FrameVersionCheck(key, !l.noCipher)) {
 				return
 			}
-			// The key is out; every later frame crosses encrypted, matching
-			// the reference where crypt starts only after VersionCheck.
+			// The key is out; every later frame crosses encrypted: crypt
+			// starts only after VersionCheck.
 			if !l.noCipher {
 				session.EnableCrypt()
 			}
@@ -400,9 +400,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			c = fresh
 			chars[req.Slot] = fresh
-			tmpl, ok := l.templates.Get(c.ClassID)
+			tmpl, ok := l.templates.Get(c.ClassID())
 			if !ok {
-				l.log.Error().Int("class_id", c.ClassID).Msg("select character: no template loaded")
+				l.log.Error().Int("class_id", c.ClassID()).Msg("select character: no template loaded")
 				return
 			}
 			session.SendFrame(serverpackets.FrameSSQInfo())
@@ -609,9 +609,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeRequestSkillCoolTime:
-			// The reference registers an empty case: reuse timers reach the
-			// client unsolicited (e.g. in the EnterWorld burst), never as a
-			// request reply.
+			// This opcode is accepted and answered with nothing: reuse
+			// timers reach the client unsolicited (e.g. in the EnterWorld
+			// burst), never as a request reply.
 			continue
 
 		case clientpackets.OpcodeRequestMagicSkillUse:
@@ -748,14 +748,14 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			var failed bool
 			onLive(live, func() {
 				// A shop or warehouse window just opened keeps the request
-				// unanswered, as the reference does: no list, no
+				// unanswered, as specified: no list, no
 				// ActionFailed. The inventory button leaves no client
 				// action pending.
 				if live.inventoryDisabled.Load() {
 					return
 				}
-				// The reference's ItemList constructor recomputes carried
-				// weight on every send, not only at login.
+				// Carried weight is recomputed on every item-list send, not
+				// only at login.
 				if inv := live.Inventory(); inv != nil {
 					inv.UpdateWeight()
 				}
@@ -790,7 +790,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live == nil {
 				continue
 			}
-			onLive(live, func() { l.useItem(live, req.ObjectID, req.CtrlPressed) })
+			// The dice gate belongs to this read loop, which stays parked
+			// in onLive while useItem runs, so the throw consults it there.
+			rollDice := func() bool {
+				return client.performFloodProtected(floodProtectorRollDice, l.playerConfig.RollDiceDelay, time.Now())
+			}
+			onLive(live, func() { l.useItem(live, req.ObjectID, req.CtrlPressed, rollDice) })
 
 		case clientpackets.OpcodeRequestUnEquipItem:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeUnequipItem)
@@ -1065,7 +1070,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				case actionSitStand:
 					l.requestChangeWaitType(live, !live.Standing())
 				case actionWalkRun:
-					// A rider keeps its stance. The reference answers with
+					// A rider keeps its stance. The specified answer is
 					// nothing, and the toggle leaves no client action
 					// pending, so silence is the matching answer.
 					if live.Mounted() {
@@ -1168,6 +1173,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			onLive(live, func() { l.requestBypassToServer(live, req) })
+			l.finishPendingClassChange(live)
 
 		case clientpackets.OpcodeRequestTargetCancel:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestTargetCancel)
@@ -1511,6 +1517,13 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.requestPackageSend(live, req) })
 			}
 
+		case clientpackets.OpcodeRequestShowMiniMap:
+			// The request carries no body; with no player in the world
+			// nothing answers, as the specified handler does.
+			if live != nil {
+				onLive(live, func() { l.showMiniMap(live, serverpackets.RegularMapID) })
+			}
+
 		case clientpackets.OpcodeDummy1A,
 			clientpackets.OpcodeSay2,
 			clientpackets.OpcodeDummy23,
@@ -1523,8 +1536,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeCannotMoveInVehicle,
 			clientpackets.OpcodeRequestQuestListInGame,
 			clientpackets.OpcodeRequestQuestAbort,
-			clientpackets.OpcodeGameGuardReply,
-			clientpackets.OpcodeRequestShowMiniMap:
+			clientpackets.OpcodeGameGuardReply:
 			l.log.Warn().Str("opcode", fmt.Sprintf("%#x", opcode)).Msg("Opcode not wired")
 			continue
 

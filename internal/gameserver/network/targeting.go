@@ -206,9 +206,8 @@ func (l *GameClientLink) deferOrFailPickup(ctx context.Context, live *livePlayer
 // walkOrForwardPickup is the click-time decision shared by a fresh click
 // (startPickupLiveGroundItem) and a drained deferred click
 // (finishDeferredPickup): collect immediately if already in range, otherwise
-// walk to it unless shift was held — a shift-click never walks, matching the
-// reference's maybeMoveToLocation(..., isShiftPressed) (CreatureMove.java:
-// 438-443, the walk is skipped when isShiftPressed).
+// walk to it unless shift was held — a shift-click never walks (the walk is
+// skipped while shift is pressed).
 func (l *GameClientLink) walkOrForwardPickup(ctx context.Context, live *livePlayer, ground *grounditem.Item, shift bool) bool {
 	// The pickup is the current intention now, in range or not.
 	live.dropHeldIntention()
@@ -366,8 +365,6 @@ func (l *GameClientLink) actOnFolk(live *livePlayer, target world.Tracked, ctrl,
 		return false
 	}
 	if ctrl {
-		// A civilian NPC is not a combatant yet, so the attack answers
-		// ActionFailed (#2664).
 		l.attackLiveTarget(live, f, shift)
 		return true
 	}
@@ -643,12 +640,12 @@ func (l *GameClientLink) playerCanDoInteract(live *livePlayer, target interactTa
 }
 
 // requestChangeWaitType handles the sit/stand key (RequestChangeWaitType)
-// and the action-bar sit/stand button (RequestActionUse action 0), which the
-// reference routes through the same tryToSit(target)/tryToStand() AI calls.
+// and the action-bar sit/stand button (RequestActionUse action 0), which
+// share the same sit/stand AI path.
 // A sit request first tries the player's current target as a throne; an
 // invalid or unclaimable target (wrong type, busy, out of range) still falls
-// back to a plain sit, matching the reference's unconditional sitDown()
-// ahead of its chair check. Any rejection releases the client with
+// back to a plain sit: the sit happens unconditionally ahead of the chair
+// check. Any rejection releases the client with
 // ActionFailed instead of silence.
 func (l *GameClientLink) requestChangeWaitType(live *livePlayer, stand bool) {
 	if live == nil {
@@ -672,10 +669,10 @@ func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target 
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	// The reference's thinkStand rejects only on real death (denyAiAction),
-	// not fake death, and instead stops the fake-death toggle: stopFakeDeath
-	// removes the FAKE_DEATH effect, whose exit hook stands the player back
-	// up and broadcasts the revive visual (PlayerAI.java:490-501). Once the
+	// Standing up rejects only on real death, not fake death, and instead
+	// stops the fake-death toggle: removing the FAKE_DEATH effect runs its
+	// exit hook, which stands the player back up and broadcasts the revive
+	// visual. Once the
 	// effect is gone the player is still getting up, and the request is
 	// refused below as a stand while not seated.
 	if stand && !live.Dead() && live.EffectList().IsAffected(effect.FlagFakeDeath) {
@@ -728,9 +725,9 @@ func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked
 		return true
 	}
 	live.StoreTarget(target)
-	// Reference: Player.setTarget sends ValidateLocation for the new target
-	// before MyTargetSelected, skipped only when the target is the selecting
-	// player itself or aboard a boat (Player.java:2477-2479). Boats aren't a
+	// Setting a target sends ValidateLocation for the new target before
+	// MyTargetSelected, skipped only when the target is the selecting player
+	// itself or aboard a boat. Boats aren't a
 	// ported feature, so every target here is treated as never in one.
 	if target.ObjectID() != live.ObjectID() {
 		// Every creature target (players, NPCs including decorations,
@@ -754,15 +751,13 @@ func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked
 	return true
 }
 
-// requestTargetCancel handles a RequestTargetCancel packet, matching
-// RequestTargetCancel.java:23-29's split between the unselect flag and an
-// in-flight cast: unselect != 0 always clears the target; unselect == 0
-// clears the target only when not casting, and while casting only fires
-// the Esc cast-cancel (PlayerAI.java:160-165 onEvtCancel -> unconditional
-// getCast().stop(), MagicSkillCanceled broadcast, no CASTING_INTERRUPTED,
-// target left untouched) when still inside the interrupt window
-// (canAbortCast() at RequestTargetCancel.java:26) — outside the window Esc
-// is a no-op.
+// requestTargetCancel handles a RequestTargetCancel packet, split between
+// the unselect flag and an in-flight cast: unselect != 0 always clears the
+// target; unselect == 0 clears the target only when not casting, and while
+// casting only fires the Esc cast-cancel (an unconditional cast stop:
+// MagicSkillCanceled broadcast, no CASTING_INTERRUPTED, target left
+// untouched) when still inside the interrupt window — outside the window
+// Esc is a no-op.
 func (l *GameClientLink) requestTargetCancel(live *livePlayer, req clientpackets.RequestTargetCancel) {
 	if req.Unselect == 0 && live.Character.CastingNow() {
 		if live.Character.CanAbortCast() {
@@ -815,14 +810,14 @@ func (l *GameClientLink) attackLiveTargetWithGate(live *livePlayer, target world
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
-	// Reference: AttackRequest.java:31 rejects via isOutOfControl()
-	// (Creature.java:652-655) before dispatching to onAction.
+	// An attack request is rejected while out of control, before it is
+	// dispatched to the target's action.
 	if request && liveOutOfControl(live) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
-	// The reference's single intention slot drops PICK_UP, INTERACT, and
-	// CAST on any subsequent attack click regardless of which thinkAttack
+	// The single intention slot drops PICK_UP, INTERACT, and CAST on any
+	// subsequent attack click regardless of which attack-think
 	// branch it takes — most branches here also cancel or redirect the move
 	// itself (chase redirect, the in-range move.Stop(), a rejection's
 	// stopLocked), but even a click waited out behind a swing or cast, which
@@ -997,8 +992,7 @@ func liveStatusFrame(live *livePlayer) wire.Frame {
 
 // updateLiveAbnormalEffect sends live's own session its current active
 // abnormal-effect icon list. Like sendLiveStatus, this packet only ever goes
-// to the effected player's own client, matching the reference's
-// AbnormalStatusUpdate.
+// to the effected player's own client.
 func (l *GameClientLink) updateLiveAbnormalEffect(live *livePlayer) {
 	if live == nil {
 		return

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -39,6 +40,12 @@ type homeRecovery interface {
 }
 
 var _ homeRecovery = (*locatedRef)(nil)
+
+// locatedRef forwards the NPC's known list, so the controller ends a chase
+// walk whose target the NPC no longer knows.
+var _ interface {
+	Knows(attackable.Combatant) bool
+} = (*locatedRef)(nil)
 
 // TestLiveHostileMoveHomeTeleportsThroughLocatedRef pins the production
 // wiring from newLiveHostile: move.Controller.self is *locatedRef, which
@@ -125,7 +132,7 @@ func TestHostileControlClosesAbortedCastWithCancelAnimation(t *testing.T) {
 	rec := &event.Recorder{}
 	hostile.Attach(npc.Runtime{World: state, Sink: rec})
 
-	(&hostileControl{hostile: hostile}).Emit(event.CastAborted{Interrupted: true})
+	(&hostileControl{hostile: hostile}).Emit(event.CastAborted{})
 
 	if got := event.Of[event.SkillCanceled](rec); len(got) != 1 || got[0].ObjectID != 7 {
 		t.Fatalf("SkillCanceled events = %+v, want one for the NPC itself (7)", got)

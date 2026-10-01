@@ -8,10 +8,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/link"
 )
 
-// Disconnect thresholds for the sliding 60s abuse counters below, matching
-// Config.CLIENT_PACKET_QUEUE_MAX_UNDERFLOWS_PER_MIN /
-// _MAX_UNKNOWN_PER_MIN's hardcoded defaults (not file-configurable in the
-// reference either).
+// Disconnect thresholds for the sliding 60s abuse counters below: the
+// underflows-per-minute and unknown-packets-per-minute limits. They are
+// hardcoded defaults, not file-configurable.
 const (
 	maxUnderflowsPerMin = 1
 	maxUnknownPerMin    = 5
@@ -37,7 +36,9 @@ type Client struct {
 
 	// stats and floodProtectors are owned by the connection's read-loop
 	// goroutine: both track per-frame progress along the read path, which
-	// no other goroutine observes.
+	// no other goroutine observes. A gate the loop hands to a task it then
+	// waits on in onLive (UseItem's dice gate) is consulted by that task
+	// while the loop stays parked, so the loop still owns it.
 	stats           clientStats
 	floodProtectors [numFloodProtectors]time.Time
 }
@@ -117,7 +118,7 @@ func (c *Client) countUnknownPacket() bool {
 	return countInWindow(&c.mu, &c.unknownCount, &c.unknownWindowStart, maxUnknownPerMin)
 }
 
-// countInWindow implements the reference's sliding-60s-window counters: a
+// countInWindow implements the sliding-60s-window counters: a
 // tick more than 60s after windowStart resets the window to 1 and reports
 // no threshold breach; otherwise it increments and reports whether count
 // now exceeds max.

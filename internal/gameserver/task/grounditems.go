@@ -85,9 +85,8 @@ type DropOptions struct {
 
 	// ProtectOwnerID, when non-zero, reserves the drop to that object id
 	// for ProtectFor: inventory.LootLocked rejects pickup by anyone else
-	// until the deadline passes, matching ItemInstance.setDropProtection
-	// (aCis ItemInstance.java:827-831). ProtectFor <= 0 disables the lock
-	// even if ProtectOwnerID is set.
+	// until the deadline passes. ProtectFor <= 0 disables the lock even if
+	// ProtectOwnerID is set.
 	ProtectOwnerID int32
 	ProtectFor     time.Duration
 }
@@ -169,9 +168,8 @@ func (g *GroundItems) Load(rows []item.GroundSnapshot, templates *item.Table) er
 		row.Instance.ManaLeft = tmpl.InitialManaLeft()
 		// A loot-protection owner has no persisted deadline (only
 		// lootExpiresAt tracks it, in-memory only), so a restart can never
-		// correctly resume it; matching ItemInstance.setDropProtection's own
-		// in-memory-only ThreadPool.schedule state (aCis ItemInstance.java:
-		// 827-831), the lock does not survive past this reload.
+		// correctly resume it. Drop protection is in-memory-only state, so the
+		// lock does not survive past this reload.
 		row.Instance.OwnerID = 0
 		ground, err := grounditem.New(row.Instance, tmpl)
 		if err != nil {

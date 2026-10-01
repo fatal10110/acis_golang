@@ -36,7 +36,7 @@ func (s *Service) Drawable(c *player.Character) []henna.Henna {
 	}
 	var out []henna.Henna
 	for _, h := range s.hennas.All() {
-		if h.UsableByClass(c.ClassID) && inv.ItemByTemplateID(h.DyeID) != nil {
+		if h.UsableByClass(c.ClassID()) && inv.ItemByTemplateID(h.DyeID) != nil {
 			out = append(out, h)
 		}
 	}
@@ -84,7 +84,7 @@ func (s *Service) Draw(c *player.Character, symbolID int) Drawing {
 	if !ok {
 		return Drawing{}
 	}
-	if !h.UsableByClass(c.ClassID) {
+	if !h.UsableByClass(c.ClassID()) {
 		return Drawing{Notices: []any{CantDraw{}}}
 	}
 	if c.HennaEmptySlots() <= 0 {

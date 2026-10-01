@@ -66,7 +66,7 @@ func (f *Folk) EnableMovement(m FolkMovement) (*FolkWalker, error) {
 	if m.Queue == nil {
 		return nil, errors.New("npc: folk movement needs a queue")
 	}
-	cm, err := move.NewCreatureMove(f.Instance.Home, f.moveSpeed, m.Geo)
+	cm, err := move.NewCreatureMove(f.Instance.Home, f.MoveSpeed(), m.Geo)
 	if err != nil {
 		return nil, fmt.Errorf("npc %d folk movement: %w", f.Instance.Template.ID, err)
 	}
@@ -125,12 +125,8 @@ func (m *folkMotion) SyncPosition(position location.Location) {
 	}
 }
 
-// BroadcastMove turns the NPC toward the walk's destination and shows
-// observers the walk.
-func (m *folkMotion) BroadcastMove(ev event.Move) {
-	m.SetHeading(ev.Origin.HeadingTo(ev.Destination))
-	m.emit(ev)
-}
+// BroadcastMove shows observers the walk.
+func (m *folkMotion) BroadcastMove(ev event.Move) { m.emit(ev) }
 
 // BroadcastStop shows observers a stop in place.
 func (m *folkMotion) BroadcastStop() { m.emit(event.Stopped{}) }

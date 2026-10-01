@@ -139,9 +139,14 @@ func (c *Controller) segmentAdvanced(ev event.Move) {
 	// waypoint rather than a follow target.
 	ev.FollowTarget = 0
 	ev.FollowOffset = 0
-	// Reference rotates toward the new leg immediately before
-	// broadcasting it (CreatureMove.java moveToNextRoutePoint,
-	// setHeadingTo(destination) directly above the MoveToLocation send).
+	c.broadcastMoveStart(ev)
+}
+
+// broadcastMoveStart turns the actor toward the leg ev starts, then shows
+// observers the walk. Every walk start and route leg faces its destination
+// before the movement is broadcast, so a later stop or appearance carries the
+// walk's direction; a same-cell request faces heading 0.
+func (c *Controller) broadcastMoveStart(ev event.Move) {
 	c.self.SetHeading(ev.Origin.HeadingTo(ev.Destination))
 	c.self.BroadcastMove(ev)
 }
@@ -341,7 +346,7 @@ func (c *Controller) pawnFriendlyFollowTick() {
 	c.applyPathFindOutcome(outcome)
 	ev.FollowTarget = target.ObjectID()
 	ev.FollowOffset = c.friendlyOffset
-	c.self.BroadcastMove(ev)
+	c.broadcastMoveStart(ev)
 	c.addPositionUpdate()
 }
 
@@ -443,9 +448,12 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 			err     error
 		)
 		before := c.move.Position()
-		if pawnMove {
+		switch {
+		case pawnMove:
 			ev, outcome, err = c.move.MoveToPawnWithPathOutcome(target, offset)
-		} else {
+		case mode == FollowOffensive:
+			ev, outcome, err = c.move.ChasePawnWithPathOutcome(target, offset)
+		default:
 			ev, outcome, err = c.move.MoveToLocationWithPathOutcome(dest)
 		}
 		c.syncRetarget(before)
@@ -461,7 +469,7 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 			ev.FollowTarget = target.ObjectID()
 			ev.FollowOffset = offset
 		}
-		c.self.BroadcastMove(ev)
+		c.broadcastMoveStart(ev)
 		c.addPositionUpdate()
 		return true, nil
 	}
@@ -489,7 +497,7 @@ func (c *Controller) MoveHome(home location.Location) error {
 		return err
 	}
 	c.applyPathFindOutcome(outcome)
-	c.self.BroadcastMove(ev)
+	c.broadcastMoveStart(ev)
 	c.addPositionUpdate()
 	return nil
 }
@@ -506,7 +514,7 @@ func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
 		return false, nil
 	}
 	c.applyPathFindOutcome(outcome)
-	c.self.BroadcastMove(ev)
+	c.broadcastMoveStart(ev)
 	c.addPositionUpdate()
 	return true, nil
 }
@@ -533,7 +541,7 @@ func (c *Controller) MoveToPawn(target Pawn, offset int) bool {
 	c.applyPathFindOutcome(outcome)
 	ev.FollowTarget = target.ObjectID()
 	ev.FollowOffset = offset
-	c.self.BroadcastMove(ev)
+	c.broadcastMoveStart(ev)
 	c.addPositionUpdate()
 	return true
 }
@@ -549,7 +557,7 @@ func (c *Controller) MoveToLocationEvent(target location.Location) (event.Move, 
 		return event.Move{}, err
 	}
 	c.applyPathFindOutcome(outcome)
-	c.self.BroadcastMove(ev)
+	c.broadcastMoveStart(ev)
 	c.addPositionUpdate()
 	return ev, nil
 }
@@ -629,8 +637,8 @@ func (c *Controller) Queue() *sim.Queue {
 // animation instead of just correcting server-side state — but crossing a
 // geopath segment boundary inside UpdatePosition does rebroadcast (via
 // segmentAdvanced), deliberately, so the
-// client restarts its per-leg animation the same way the reference client
-// does on each routed waypoint. It returns false once the move has
+// client restarts its per-leg animation on each routed waypoint. It returns
+// false once the move has
 // stopped.
 //
 // Reaching the destination fires the arrived hook synchronously, before
@@ -639,16 +647,22 @@ func (c *Controller) Queue() *sim.Queue {
 // moving again by the time the hook returns, so the fresh state here — not
 // the stale result of this tick — decides whether to unregister.
 //
-// A pawn walk whose pawn the actor no longer knows ends first, where the
-// actor stands, as an arrival; while it goes on, each step it takes turns
-// the actor toward the cell it steps to, the step that ends the walk
+// A pawn walk whose pawn the actor no longer knows does not step: it heads
+// for its next geopath leg, or with none left ends where the actor stands,
+// as an arrival. While a tracking pawn walk goes on, each step it takes
+// turns the actor toward the cell it steps to, the step that ends the walk
 // included, before the walk's milestone runs.
 func (c *Controller) PositionUpdate() bool {
-	pawn, gen := c.move.walkingPawn()
-	if pawn != nil && !c.knowsPawn(pawn) {
-		c.move.abandonPawnWalk(gen)
+	var (
+		u         positionUpdate
+		abandoned bool
+	)
+	if pawn, gen := c.move.walkingPawn(); pawn != nil && !c.knowsPawn(pawn) {
+		u, abandoned = c.move.abandonPawnWalk(gen)
 	}
-	u := c.move.updatePosition(PositionUpdateInterval)
+	if !abandoned {
+		u = c.move.updatePosition(PositionUpdateInterval)
+	}
 	if u.pawnStep {
 		c.self.SetHeading(u.from.HeadingTo(u.to))
 	}
@@ -691,8 +705,9 @@ func (c *Controller) recheckOffensiveFollow() {
 	if c.offensiveTarget == nil {
 		return
 	}
+	// The follow task skips a target the actor does not know, and goes on
+	// once it is known again.
 	if actor, ok := c.self.(targetKnower); ok && !actor.Knows(c.offensiveTarget) {
-		c.clearFollow()
 		return
 	}
 	c.offensiveFollowElapsed += PositionUpdateInterval

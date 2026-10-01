@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"strconv"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -20,7 +21,25 @@ type multiSellFile struct {
 }
 
 type multiSellNPCSet struct {
-	IDs []int32 `xml:"npc"`
+	IDs []npcIDText `xml:"npc"`
+}
+
+// npcIDText is an <npc> element whose text is a plain base-10 int32 npc id.
+// Empty, padded and non-numeric text fails the load, where the decoder's own
+// int conversion would read empty text as 0 and trim the padding.
+type npcIDText int32
+
+func (n *npcIDText) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	var text string
+	if err := d.DecodeElement(&text, &start); err != nil {
+		return err
+	}
+	v, err := strconv.ParseInt(text, 10, 32)
+	if err != nil {
+		return fmt.Errorf("npc: %w", err)
+	}
+	*n = npcIDText(v)
+	return nil
 }
 
 type multiSellItem struct {
@@ -60,7 +79,9 @@ func buildMultiSellList(path string, file multiSellFile, items *item.Table) (*mu
 	}
 
 	for _, npcSet := range file.NPCs {
-		list.NPCIDs = append(list.NPCIDs, npcSet.IDs...)
+		for _, id := range npcSet.IDs {
+			list.NPCIDs = append(list.NPCIDs, int32(id))
+		}
 	}
 
 	for itemIndex, el := range file.Items {

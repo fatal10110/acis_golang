@@ -109,8 +109,8 @@ func (l *List) addStacked(e *Effect, pending *[]func()) {
 			// buff displaced by a same-stack debuff (or vice versa) stays held,
 			// inactive, counted by doesStack/buffCount, and OR'd into
 			// flagsLocked — for as long as this stack queue stays non-empty.
-			// remove() (below) early-returns once the queue is gone
-			// (EffectList.java:533-539), so if the newcomer's own duration
+			// remove() (below) early-returns once the queue is gone, so if
+			// the newcomer's own duration
 			// ends first, the queue empties and the victim's later expiry
 			// never touches the visible list: it stays held until relog.
 			if e.Skill.Debuff {
@@ -172,8 +172,8 @@ func (l *List) removeRejectedStacked(e *Effect) {
 }
 
 // remove drops e from the list for good — the only place e's tick schedule
-// stops, mirroring stopEffectTask() firing once scheduleEffect() reaches
-// FINISHING (AbstractEffect.java:308-320). Mere stacking displacement (see
+// stops, once the schedule reaches its finishing step. Mere stacking
+// displacement (see
 // addStacked) does not call remove: a displaced member stays queued and its
 // schedule keeps draining.
 //
@@ -202,14 +202,14 @@ func (l *List) remove(e *Effect, pending, exits *[]func()) {
 
 	queue, ok := l.stacks[e.stackType()]
 	if !ok || len(queue) == 0 {
-		// EffectList.java:533-539 returns before touching the visible list
-		// when this stack queue is absent or empty.
+		// Return before touching the visible list when this stack queue is
+		// absent or empty.
 		return
 	}
 	index := slices.Index(queue, e)
 	if index < 0 {
-		// EffectList.java:541-572 falls through to visible-list removal when
-		// an existing stack queue does not contain the effect.
+		// Fall through to visible-list removal when an existing stack queue
+		// does not contain the effect.
 		if l.removeFromVisible(e) {
 			l.notifyExpiry(e, wornOff, pending)
 		}

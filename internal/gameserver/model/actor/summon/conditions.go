@@ -8,9 +8,8 @@ import (
 // summonStatActor implements conditions.Actor, backed by *Actor's real
 // position/heading/active-effect state, mirroring characterStatActor
 // (model/actor/player/character_conditions.go). Summons are never
-// conditions.PlayerActor, matching the Java reference
-// (ConditionUsingItemType/player-state conditions require
-// effector instanceof Player): a using/player/resting-tagged condition on a
+// conditions.PlayerActor (using-item and player-state conditions require a
+// Player effector): a using/player/resting-tagged condition on a
 // summon owner correctly fails closed via conditionGate's type assertion,
 // not error. See #1509.
 var _ conditions.Actor = summonStatActor{}
@@ -56,8 +55,8 @@ func (s summonStatActor) Z() int { return s.a.Z() }
 func (s summonStatActor) IsMoving() bool { return s.a.IsMoving() }
 
 // IsRunning satisfies conditions.Actor. Always true, matching
-// hostileStatActor: Java's Creature walk/run toggle defaults to run stance
-// and nothing puts a non-player actor back into walk stance.
+// hostileStatActor: a creature's walk/run toggle defaults to run stance
+// and nothing puts a summon back into walk stance.
 func (s summonStatActor) IsRunning() bool { return true }
 
 // IsRiding satisfies conditions.Actor. Always false: summons are never

@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/exchange"
+	"github.com/fatal10110/acis_golang/internal/gameserver/gatekeeper"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
@@ -27,6 +28,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/armorset"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
@@ -36,6 +38,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
@@ -63,19 +66,26 @@ type itemStore interface {
 }
 
 type shortcutStore interface {
-	ListByOwner(ctx context.Context, ownerID int32) ([]shortcut.Shortcut, error)
-	Save(ctx context.Context, ownerID int32, sc shortcut.Shortcut) error
-	Delete(ctx context.Context, ownerID int32, slot, page int32) error
+	ListByOwner(ctx context.Context, ownerID int32, classIndex int) ([]shortcut.Shortcut, error)
+	Save(ctx context.Context, ownerID int32, classIndex int, sc shortcut.Shortcut) error
+	Delete(ctx context.Context, ownerID int32, classIndex int, slot, page int32) error
 }
 
 type hennaStore interface {
-	ListByOwner(ctx context.Context, ownerID int32) ([]henna.Row, error)
-	Insert(ctx context.Context, ownerID int32, symbolID, slot int) error
-	Delete(ctx context.Context, ownerID int32, slot int) error
+	ListByOwner(ctx context.Context, ownerID int32, classIndex int) ([]henna.Row, error)
+	Insert(ctx context.Context, ownerID int32, classIndex, symbolID, slot int) error
+	Delete(ctx context.Context, ownerID int32, classIndex, slot int) error
 }
 
 // recipeBookStore reads and writes the character_recipebook rows of one
 // player's recipe book.
+// subclassStore is the character_subclasses persistence a class change
+// writes. Satisfied by *sql.SubclassStore.
+type subclassStore interface {
+	Insert(ctx context.Context, charID int32, sub player.SubClass) error
+	Delete(ctx context.Context, charID int32, index int) error
+}
+
 type recipeBookStore interface {
 	ListByOwner(ctx context.Context, ownerID int32) ([]int, error)
 	Insert(ctx context.Context, ownerID int32, recipeID int) error
@@ -191,6 +201,15 @@ type PlayerConfig struct {
 	// MultisellDelay is the reuse delay between two multisell exchanges on
 	// one client session.
 	MultisellDelay time.Duration
+	// RollDiceDelay is the reuse delay between two dice throws on one
+	// client session.
+	RollDiceDelay time.Duration
+	// SubclassDelay is the reuse delay between two subclass add, change or
+	// replace actions of one player.
+	SubclassDelay time.Duration
+	// SubclassWithoutQuests lets a subclass be added without the quests it
+	// otherwise needs.
+	SubclassWithoutQuests bool
 	// KeepMaintainedIngredients is players.properties BlacksmithUseRecipes
 	// inverted, so the zero value takes every ingredient as the shipped
 	// config does.
@@ -205,8 +224,7 @@ type GameClientLink struct {
 	validator *SessionValidator
 	// clients is the process-owned account-to-connection registry: a second
 	// AuthLogin for an account already claimed evicts the prior connection
-	// instead of being rejected (LoginServerThread.addClient,
-	// LoginServerThread.java:292-304).
+	// instead of being rejected.
 	clients       *ClientRegistry
 	loginLink     func() *LoginLink
 	roster        *manager.Roster
@@ -215,9 +233,11 @@ type GameClientLink struct {
 	hennas        hennaStore
 	hennaTable    *henna.Table
 	recipeBooks   recipeBookStore
+	subclasses    subclassStore
 	craft         *craft.Service
 	merchant      *merchant.Service
 	symbols       *symbolmaker.Service
+	gatekeeper    *gatekeeper.Service
 	exchange      *exchange.Service
 	augment       *augment.Service
 	templates     *player.TemplateTable
@@ -231,6 +251,7 @@ type GameClientLink struct {
 	world         *world.State
 	npcs          *npc.Table
 	summonItems   *item.SummonItemTable
+	doors         door.StateOwner
 	petStore      petStore
 	geo           move.Geo
 	zones         *zone.Index
@@ -325,6 +346,9 @@ type GameClientLinkConfig struct {
 	Hennas      hennaStore
 	HennaTable  *henna.Table
 	RecipeBooks recipeBookStore
+	// Subclasses writes the subclass rows a village master's subclass
+	// commands add and replace.
+	Subclasses subclassStore
 	// Recipes is the loaded recipe table; nil loads none, so every recipe
 	// request is dropped.
 	Recipes  *recipe.Table
@@ -346,6 +370,7 @@ type GameClientLinkConfig struct {
 	World         *world.State
 	NPCs          *npc.Table
 	SummonItems   *item.SummonItemTable
+	Doors         door.StateOwner
 	PetStore      petStore
 	Geo           move.Geo
 	Zones         *zone.Index
@@ -392,6 +417,15 @@ type GameClientLinkConfig struct {
 	// DisableRaidCurse is npcs.properties DisableRaidCurse: when true, raid
 	// petrification and anti-strider curses never apply.
 	DisableRaidCurse bool
+	// Teleports and InstantTeleports are the destinations civilian NPCs
+	// offer; nil offers none. FreeTeleport is npcs.properties FreeTeleport:
+	// when true, no destination is charged for. TeleportClock is the local
+	// wall clock the weekend half-price hours are read from; nil means
+	// time.Now.
+	Teleports        travel.TeleportTable
+	InstantTeleports travel.InstantTable
+	FreeTeleport     bool
+	TeleportClock    func() time.Time
 	Log              zerolog.Logger
 	// Now supplies the clock packet accounting uses to bucket received
 	// frames into flood windows; nil means time.Now.
@@ -442,6 +476,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		hennas:        cfg.Hennas,
 		hennaTable:    cfg.HennaTable,
 		recipeBooks:   cfg.RecipeBooks,
+		subclasses:    cfg.Subclasses,
 		merchant:      cfg.Merchant,
 		templates:     cfg.Templates,
 		itemTemplates: cfg.ItemTemplates,
@@ -454,6 +489,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		world:         cfg.World,
 		npcs:          cfg.NPCs,
 		summonItems:   cfg.SummonItems,
+		doors:         cfg.Doors,
 		petStore:      cfg.PetStore,
 		geo:           cfg.Geo,
 		zones:         cfg.Zones,
@@ -513,6 +549,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.enchant = enchantflow.NewService(link.enchantState, link.ids, link.rollEnchant, enchantCfg)
 	link.enchant.SetArmorSets(cfg.ArmorSets)
 	link.symbols = symbolmaker.NewService(cfg.HennaTable, link.nextObjectID)
+	link.gatekeeper = gatekeeper.NewService(cfg.Teleports, cfg.InstantTeleports, cfg.FreeTeleport, cfg.TeleportClock)
 	link.craft = craft.NewService(cfg.Recipes, !cfg.PlayerConfig.CraftingDisabled, link.nextObjectID, cfg.CraftRoll)
 	link.exchange = exchange.NewService(cfg.Multisells, cfg.PlayerConfig.KeepMaintainedIngredients, link.nextObjectID)
 	link.augment = newAugmentService(cfg)

@@ -7,10 +7,9 @@ import (
 )
 
 // SummonCreature is the SUMMON_CREATURE skill handler's entry point
-// (handler/skill/summon.go's creatureSummonRuntime), matching Java's
-// SummonCreature.useSkill: only a pet-collar-item cast reaches here, so a
-// non-*item.Instance item is a silent no-op, same as Java's item==nil /
-// getSummonItem==null early returns.
+// (handler/skill/summon.go's creatureSummonRuntime): only a pet-collar-item
+// cast reaches here, so a non-*item.Instance item is a silent no-op, as is
+// a missing item or one with no summon data.
 func (c *Character) SummonCreature(_ modelskill.Definition, itemArg any) {
 	inst, ok := itemArg.(*item.Instance)
 	if !ok {

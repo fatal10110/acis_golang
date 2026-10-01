@@ -12,10 +12,9 @@ import (
 
 // increaseChargesStart adds the template's charge amount, capped at the
 // template's count (repurposed here as the max-charges cap, not a tick
-// count), matching the reference's one-shot onStart call into
-// Player.increaseCharges. It always reports success: whether the target
-// was already at the cap is the target method's own no-op/system-message
-// concern, not this effect's.
+// count), once, at start. It always reports success: whether the target
+// was already at the cap is the player charge logic's own
+// no-op/system-message concern, not this effect's.
 func increaseChargesStart(e *Effect) bool {
 	target, ok := asPlayer(e.Effected)
 	if !ok {
@@ -250,8 +249,8 @@ func fusionAction(*Effect) bool {
 // maxLevel, asks reapply to install a fresh instance at the grown level —
 // exactly what constructing a new effect at that level in this one's place
 // would produce. Doing nothing at maxLevel (rather than reapplying at the
-// same level) matches the reference: the growth attempt is a plain no-op
-// once the effect is already maxed out.
+// same level) is deliberate: the growth attempt is a plain no-op once the
+// effect is already maxed out.
 
 func chanceSkillTriggerStart(e *Effect) bool {
 	e.Effected.AddChanceTrigger(e)

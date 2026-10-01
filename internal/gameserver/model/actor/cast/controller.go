@@ -35,20 +35,15 @@ var (
 	// ErrSkillUnavailable means a player cast request did not name a known
 	// active skill.
 	ErrSkillUnavailable = errors.New("cast: skill unavailable")
-	// ErrCubicListFull means a self-targeted cubic-granting skill was cast
-	// while the caster already holds as many cubics as Cubic Mastery
-	// allows.
-	ErrCubicListFull = errors.New("cast: cubic list full")
 	// ErrAllSkillsDisabled means the actor is under a blanket skill lock
-	// (crowd control, or Java's Duel-defeat lock once that lands).
+	// (crowd control, or the Duel-defeat lock once that lands).
 	ErrAllSkillsDisabled = errors.New("cast: all skills disabled")
 	// ErrCantSeeTarget means a ranged skill's caster has no line of sight to
 	// its target when the cast commits.
 	ErrCantSeeTarget = errors.New("cast: can't see target")
 	// ErrGroundTargetUnset means a GROUND skill was requested before any
-	// RequestExMagicSkillUseGround recorded a signet point, matching
-	// PlayerCast.canAttemptCast's Location.DUMMY_LOC rejection
-	// (PlayerCast.java:224).
+	// RequestExMagicSkillUseGround recorded a signet point (the point is
+	// still the unset placeholder location).
 	ErrGroundTargetUnset = errors.New("cast: ground target unset")
 	// ErrWeaponNotAllowed means the skill is restricted to weapon or shield
 	// types the caster does not hold.
@@ -92,9 +87,6 @@ type Actor interface {
 	ItemCount(itemID int) int
 	ConsumeItem(itemID, count int) bool
 
-	// CubicListFull reports whether a self-targeted cubic-granting skill must
-	// be refused because the caster already holds its maximum cubics.
-	CubicListFull() bool
 	// ExitSignetGround drops the caster's live ground-signet effect on abort.
 	ExitSignetGround()
 	// AllSkillsDisabled reports the blanket skill lock CanCast gates on;
@@ -203,13 +195,10 @@ type Controller struct {
 // after the controller's lock is released so it may call back in:
 //   - CastAborted, once whenever a cast that was actually in flight is
 //     aborted (never for a natural finish, nor for a stop on an idle
-//     controller); Interrupted reports the window-gated Interrupt path,
-//     which additionally owes CASTING_INTERRUPTED, rather than an
-//     unconditional Stop;
+//     controller);
 //   - CastStopAck, once on every Stop/Interrupt call whether or not a cast
-//     was in flight, matching PlayerCast.stop()'s unconditional
-//     _actor.getAI().clientActionFailed() (PlayerCast.java:381-387) that
-//     runs after super.stop()'s isCastingNow()-gated cancel broadcast;
+//     was in flight: a player's cast stop always answers action-failed,
+//     after the in-flight-gated cancel broadcast;
 //   - ShotsRechargeRequested, first when a cast of a skill that spends
 //     soulshots or spiritshots finishes naturally, fusion channels aside,
 //     and for a SIGNET_CASTTIME cast also at its launch: the caster charges
@@ -220,9 +209,9 @@ type Controller struct {
 //     its attack stance;
 //   - CastFinished, once whenever an in-flight cast ends, aborted or
 //     completed, letting the owner apply the nextActionAttack resume gate
-//     (PlayableAI.onEvtFinishedCasting, PlayableAI.java:43-63); Broken
-//     repeats CastAborted's Interrupted for an aborted cast, for an owner
-//     that reports the interrupt only after its AI has moved on.
+//     when casting finishes; Broken
+//     marks an abort through the window-gated Interrupt path, which owes
+//     CASTING_INTERRUPTED once the owner's AI has moved on.
 //
 // A nil sink drops them all.
 func NewController(actor Actor, sink event.Sink) *Controller {
@@ -259,8 +248,8 @@ func (c *Controller) Now() time.Time {
 //
 // It exists for a Hit-phase effect whose own work cannot finish inside the
 // Hit task — one that has to leave the actor's queue and come back, such as
-// a summon that must read its saved state. The reference does that work
-// synchronously inside the skill handler and schedules its finalizer only
+// a summon that must read its saved state. That work is specified to run
+// synchronously inside the skill handler, with the finalizer scheduled only
 // afterwards, so the actor stays in its cast for the duration; a held Finish
 // is how that shape survives the work moving off the queue.
 //
@@ -402,11 +391,6 @@ func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 	if gate, ok := c.actor.(olympiadGate); ok && olympiadRestricted(def) && gate.ActingPlayerInOlympiad() {
 		return ErrOlympiadSkill
 	}
-	if def.SkillType == "SUMMON" && def.IsCubic && def.Target == modelskill.TargetSelf {
-		if c.actor.CubicListFull() {
-			return ErrCubicListFull
-		}
-	}
 	if def.ItemConsumeID > 0 && def.ItemConsumeCount > 0 && c.actor.ItemCount(def.ItemConsumeID) < def.ItemConsumeCount {
 		return ErrNotEnoughItems
 	}
@@ -450,7 +434,7 @@ func (c *Controller) MeetsHPMPDisabled(target Target, def modelskill.Definition)
 }
 
 // CanCastSighted is CanCast for a caster whose ranged skill needs line of
-// sight to its target, in the reference order: HP/MP and mute first, then
+// sight to its target, in the specified order: HP/MP and mute first, then
 // sight to a target other than the caster when the skill has a cast range,
 // then the rest of CanCast. A GROUND skill targets its caster, so its point
 // sight is left to its own gate.
@@ -467,9 +451,9 @@ func (c *Controller) CanCastSighted(caster LaunchCaster, target Target, def mode
 // Start accepts a cast, applies the start-of-cast costs and cooldowns, and
 // stores the active cast state. The caller owns scheduling Launch, Hit and
 // Finish according to the returned Plan. A cost that ends the cast by calling
-// back into Stop leaves the costs charged — the reference charges reuse and
-// the initial MP before it claims the cast, and charges the skill item after
-// it — and Start reports ErrNotCasting so the caller does not announce a cast
+// back into Stop leaves the costs charged — reuse and the initial MP are
+// charged before the cast is claimed, and the skill item after it — and
+// Start reports ErrNotCasting so the caller does not announce a cast
 // that is already cancelled.
 func (c *Controller) Start(now time.Time, target Target, def modelskill.Definition) (Plan, error) {
 	return c.StartCarried(now, target, def, nil)
@@ -513,26 +497,26 @@ func (c *Controller) StartCarried(now time.Time, target Target, def modelskill.D
 	// The cast is claimed above so a concurrent Start is rejected; a failed
 	// item consume releases the claim unless the cast was already ended.
 	//
-	// Deliberate divergence from the reference (issue #2336): the reference
-	// destroys the consume item after claiming the cast and ignores a failed
-	// destroy, so a race that empties the item mid-cast still casts uncharged.
+	// Deliberate divergence (issue #2336): the specified flow destroys the
+	// consume item after claiming the cast and ignores a failed destroy, so
+	// a race that empties the item mid-cast still casts uncharged.
 	// For an ordinary cast CanCast already verified the count, so ConsumeItem
 	// can only fail on that same narrow race; releasing the claim and
 	// rejecting the cast in that case is preferred over silently casting an
 	// unpaid skill.
 	//
-	// A carried cast keeps the reference outcome instead: its carrier is
+	// A carried cast keeps the specified outcome instead: its carrier is
 	// already paid, so refusing now would take the item and cast nothing.
 	// The failure is deterministic, not a race, when the carrier is also the
 	// skill's consume item (an ItemSkills scroll whose skill consumes the
 	// scroll itself) and the stack held exactly one unit: consumeCarrier took
 	// it, and the cast runs on it alone. From two units up both destroys
-	// succeed and the cast takes two, as the reference does.
+	// succeed and the cast takes two, as specified.
 	//
 	// The ItemConsumeCount > 0 half of this guard (and CanCast's matching
-	// check) is a second, separate divergence: the reference gates solely on
-	// ItemConsumeID > 0, so a skill shipping ItemConsumeCount == 0 with a real
-	// ItemConsumeID (e.g. skills 2234, 2276) still runs the reference's
+	// check) is a second, separate divergence: the specified gate is
+	// ItemConsumeID > 0 alone, so a skill shipping ItemConsumeCount == 0 with
+	// a real ItemConsumeID (e.g. skills 2234, 2276) would still run the
 	// destroy/reject path there. Go skips the gate entirely for such a skill
 	// instead of destroying zero units and reporting success/failure for an
 	// item it never touched — again preferred over reproducing that
@@ -597,7 +581,7 @@ func (c *Controller) releaseClaim(seq uint64) {
 // Hit applies the final MP and HP costs for the active cast. It leaves an
 // unaffordable cast in flight for the caller to abort through Stop, so the
 // caller can report why the cast failed before the abort funnel cancels it
-// — the packet order the reference produces. A lethal HP cost may stop the
+// — the specified packet order. A lethal HP cost may stop the
 // cast from inside ReduceHP; Hit still reports success for the cost paid.
 func (c *Controller) Hit() error {
 	def, casting := c.CurrentSkill()
@@ -619,9 +603,8 @@ func (c *Controller) Hit() error {
 		c.actor.ReduceHP(hp)
 	}
 
-	// Force/Soul charge apply, matching CreatureCast.onMagicHitTimer
-	// (CreatureCast.java:276-282): runs after the MP/HP consume above and
-	// before the caller's Hooks.Hit applies the skill's effects.
+	// Force/Soul charges apply at the hit timer: after the MP/HP consume
+	// above and before the caller's Hooks.Hit applies the skill's effects.
 	if def.NumCharges > 0 {
 		if def.MaxCharges > 0 {
 			c.actor.IncreaseCharges(def.NumCharges, def.MaxCharges)
@@ -646,9 +629,9 @@ func (c *Controller) Finish() {
 // abort reason passes through, which is what lets "abort for any reason"
 // behave uniformly without each call site enumerating its own cleanup.
 //
-// The two owner-state steps and the stop-ack observer run unconditionally,
-// as the reference does them ahead of (owner state) or regardless of
-// (clientActionFailed) its own casting check; only CastAborted is
+// The two owner-state steps and the stop-ack observer run unconditionally:
+// the owner state is reset ahead of the casting check and the action-failed
+// acknowledgement is sent regardless of it; only CastAborted is
 // reserved for a cast that was really in flight.
 func (c *Controller) Stop() {
 	c.stopInternal(false)
@@ -667,7 +650,7 @@ func (c *Controller) stopInternal(interrupted bool) bool {
 	abort, finish := c.abortLocked()
 	c.mu.Unlock()
 	if abort != nil {
-		abort(interrupted)
+		abort()
 	}
 	c.emit(event.CastStopAck{})
 	if finish != nil {
@@ -678,7 +661,7 @@ func (c *Controller) stopInternal(interrupted bool) bool {
 
 // abortLocked clears the cast and returns the observer the caller must run
 // once it has released mu, or nil when no cast was in flight.
-func (c *Controller) abortLocked() (func(bool), func(bool)) {
+func (c *Controller) abortLocked() (func(), func(bool)) {
 	aborted := c.casting
 	current := c.current
 	target, _ := c.target.(attackable.Combatant)
@@ -687,11 +670,11 @@ func (c *Controller) abortLocked() (func(bool), func(bool)) {
 	if !aborted {
 		return nil, nil
 	}
-	return func(interrupted bool) {
+	return func() {
 			if fusionEnd != nil {
 				fusionEnd()
 			}
-			c.emit(event.CastAborted{Interrupted: interrupted})
+			c.emit(event.CastAborted{})
 		}, func(interrupted bool) {
 			c.emit(event.CastFinished{Interrupted: true, Broken: interrupted, Skill: current, Target: target})
 		}
@@ -780,9 +763,9 @@ func (c *Controller) StopCast() {
 
 // CanAbortCast reports whether the active cast is still inside its
 // interrupt window, for callers that don't already hold `now` — the Esc
-// cast-cancel path (RequestTargetCancel.java:26, only fires
-// AiEventType.CANCEL when canAbortCast() is true) uses this to decide
-// whether onEvtCancel's unconditional stop() applies at all.
+// cast-cancel path (which only fires the cancel event while the cast can
+// still be aborted) uses this to decide whether the cancel's unconditional
+// stop applies at all.
 func (c *Controller) CanAbortCast() bool {
 	return c.CanAbort(c.Now())
 }
@@ -795,12 +778,11 @@ func (c *Controller) CurrentSkillIsMagic() bool {
 	return casting && def.Magic
 }
 
-// InterruptCastOnDamage applies the damage-based cast-break rule
-// (Formulas.calcCastBreak) to the active cast at c.Now(), for callers
-// outside this package that don't hold a DamageInterrupt value already.
-// Fusion reflects whether the active cast is a FUSION skill
-// (target.getFusionSkill() != null in Formulas.calcCastBreak, Formulas.java:732),
-// which unconditionally interrupts on any damage — no rate roll, no MEN. It
+// InterruptCastOnDamage applies the damage-based cast-break rule to the
+// active cast at c.Now(), for callers outside this package that don't hold
+// a DamageInterrupt value already. Fusion reflects whether the active cast
+// is a FUSION skill (the damaged caster is channelling a fusion), which
+// unconditionally interrupts on any damage — no rate roll, no MEN. It
 // is read from c.current (set atomically with c.casting at Start) rather
 // than c.fusionEnd, which ScheduleFusion only sets a few statements later —
 // using fusionEnd would leave a window between cast start and channel

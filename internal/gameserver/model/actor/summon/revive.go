@@ -96,7 +96,7 @@ func (a *Actor) restoreExp(percent float64) {
 // petRestoredExp is the experience a resurrection at percent gives back to a
 // pet that had before and now has current.
 func petRestoredExp(before, current int64, percent float64) int64 {
-	// Rounds half up, as the reference's Math.round does.
+	// Rounds half up.
 	return int64(math.Floor(float64(before-current)*percent/100 + 0.5))
 }
 

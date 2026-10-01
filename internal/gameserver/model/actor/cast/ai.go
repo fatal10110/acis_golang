@@ -35,12 +35,12 @@ type AIController struct {
 	// encoding.
 	OnCastRefusal func(error, modelskill.Definition)
 	// OnHitResult receives the EffectResult of a resolved Hit-phase cast.
-	// Summon casters wire it to forward the result to the owner, mirroring
-	// Summon.sendPacket's owner-forward. Hostile NPC casters wire it to a
+	// Summon casters wire it to forward the result to the owner, as a
+	// summon forwards its packets. Hostile NPC casters wire it to a
 	// nil-live-safe delivery hook so target-addressed messages (MagicResist,
 	// ManaDrain) still reach a real online target even though
-	// Creature.sendPacket is a no-op in the reference for caster-addressed
-	// ones (issue #2350). Each handler message reaches it as its own
+	// caster-addressed ones go nowhere for an NPC caster (issue #2350).
+	// Each handler message reaches it as its own
 	// one-message result the moment the handler produces it, so the message
 	// keeps its place among the frames the hit itself sends; the result
 	// that follows the hit carries the rest.
@@ -88,7 +88,7 @@ func (a *AIController) Range(ref modelskill.Ref) int {
 
 // StopsMovement reports whether ref's cast animation is long enough that the
 // actor should stop moving and face its target before the final cast
-// attempt, mirroring the oracle's hit-time threshold.
+// attempt, against the hit-time threshold.
 func (a *AIController) StopsMovement(ref modelskill.Ref) bool {
 	def, ok := a.definition(ref)
 	return ok && def.HitTime > 50
@@ -165,7 +165,7 @@ func (a *AIController) AttemptCast(target attackable.Combatant, ref modelskill.R
 }
 
 // CanCastPlayable runs a playable caster's gates immediately before its cast
-// commits, in the reference order: HP/MP and mute, line of sight to the
+// commits, in the specified order: HP/MP and mute, line of sight to the
 // target of a ranged skill, the skill's own conditions, the Olympiad skill
 // ban and item cost (CanCastSighted), and last the target conditions judged
 // with ctrl. The first failure is reported through OnCastRefusal, or
@@ -231,16 +231,12 @@ func (a *AIController) MeetsHPMPDisabled(target attackable.Combatant, ref models
 }
 
 // AICaster is an AI-driven caster: the launch-revalidated creature plus the
-// observer broadcasts of its cast, mirroring the reference sequence in
-// CreatureCast.java (the same doCast/onMagicLaunch/stop path PlayerCast
-// chains into via super.doCast/super.stop, so player and AI casts share
-// it): MagicSkillUse broadcasts at cast start with the computed
-// hitTime/reuseDelay (CreatureCast.java:148), MagicSkillLaunched broadcasts
-// at the launch timer — hitTime-400ms — with the full launch-resolved
-// target list (CreatureCast.java:165,232-234), and MagicSkillCanceled
-// broadcasts whenever an in-flight cast aborts (CreatureCast.java:416-419,
-// `if (isCastingNow()) _actor.broadcastPacket(new
-// MagicSkillCanceled(...))`, unmodified by NpcCast). Casters without
+// observer broadcasts of its cast, in the sequence player and AI casts
+// share: MagicSkillUse broadcasts at cast start with the computed
+// hitTime/reuseDelay, MagicSkillLaunched broadcasts at the launch timer —
+// hitTime-400ms — with the full launch-resolved target list, and
+// MagicSkillCanceled broadcasts whenever an in-flight cast aborts (only
+// while a cast is in flight, for an NPC as for any creature). Casters without
 // observers to notify report nil.
 type AICaster interface {
 	LaunchCaster
@@ -266,18 +262,16 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 		return
 	}
 
-	// MagicSkillUse broadcasts the instant the cast starts, matching
-	// CreatureCast.doCast's broadcastPacket call before the launch
-	// timer is even scheduled (CreatureCast.java:148,165).
+	// MagicSkillUse broadcasts the instant the cast starts, before the
+	// launch timer is even scheduled.
 	tx, ty, tz := castTarget.Position()
 	a.Caster.BroadcastSkillUse(castTarget.ObjectID(), tx, ty, tz, int32(def.ID), int32(def.Level),
 		int(plan.HitTime/time.Millisecond), int(plan.ReuseDelay/time.Millisecond))
 
 	// launchTargets is resolved once, in the Launch hook, and reused
-	// unchanged by Hit — mirroring CreatureCast.java's `_targets` field,
-	// assigned once in onMagicLaunch (:232) and read again by
-	// onMagicHitTimer's callSkill (:291, NpcCast.java:52) rather than
-	// re-derived. That keeps the MagicSkillLaunched broadcast and the
+	// unchanged by Hit: the launch assigns the target list once and the
+	// hit timer's skill call reads it again rather than re-deriving it.
+	// That keeps the MagicSkillLaunched broadcast and the
 	// effect-affected set as one snapshot instead of two independent
 	// resolutions 400ms apart.
 	var launchTargets []skilltarget.Actor
@@ -293,10 +287,9 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 			}
 			launchTargets, launchResolved = ResolveAffected(a.Effects, a.Caster, castTarget, def)
 			a.Controller.SetLaunchTargets(len(launchTargets))
-			// The reference recomputes _targets = getTargetList(...) at
-			// the launch timer and broadcasts that full set
-			// (CreatureCast.java:232-234); when resolution finds no
-			// affected targets, it broadcasts the empty list as-is
+			// The target list is recomputed at the launch timer and that
+			// full set is broadcast; when resolution finds no affected
+			// targets, the empty list is broadcast as-is
 			// (no skip, no synthesized fallback target) — the wire
 			// builder already writes that form (0,0) unconditionally.
 			targetIDs := make([]int32, len(launchTargets))
@@ -307,10 +300,9 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 			return true
 		},
 		Hit: func() {
-			// FUSION is dispatched to PlayerCast.doFusionCast only for
-			// player casters (PlayerAI.java:300-301); CreatureCast's
-			// override is an empty stub — "Non-Player Creatures cannot use
-			// FUSION or SIGNETS" (CreatureCast.java:81-84). AIController
+			// FUSION is dispatched to the fusion cast path only for player
+			// casters; for any other creature that path is an empty stub —
+			// non-player creatures cannot use FUSION or SIGNETS. AIController
 			// drives every non-player-initiated cast, so it must skip
 			// FUSION here rather than let it reach fusionHandler, which
 			// has no caster-type gate of its own.

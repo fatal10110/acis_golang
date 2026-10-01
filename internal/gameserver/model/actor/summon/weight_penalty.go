@@ -18,6 +18,25 @@ var (
 	weightPenaltyRegen = [...]float64{1, .5, .5, .5, .1}
 )
 
+// InventoryLimit returns how many item stacks a pet may carry; a servitor
+// carries none.
+func (a *Actor) InventoryLimit() int {
+	if a.petConfig == nil {
+		return 0
+	}
+	return a.petConfig.InventorySlots
+}
+
+// WeightLimit returns how much weight a pet may carry right now: its CON-
+// and config-derived base through its weightLimit stat, so a buff raising
+// it takes effect at once. A servitor carries nothing and has no limit.
+func (a *Actor) WeightLimit() int {
+	if !a.isPet || a.petConfig == nil {
+		return 0
+	}
+	return int(a.calcStat(stat.WeightLimit, a.petConfig.BaseWeightLimit(a.CON())))
+}
+
 // WeightPenalty returns this summon's current weight-penalty band, 0 when
 // it carries under half its weight limit. A servitor stays at 0.
 func (a *Actor) WeightPenalty() int {
@@ -46,12 +65,16 @@ func (a *Actor) settleWeightPenalty() {
 // reports whether it changed.
 func (a *Actor) storeWeightPenalty() bool {
 	inv := a.PetInventory()
-	if inv == nil || inv.WeightLimit <= 0 {
+	if inv == nil {
 		return false
 	}
 	a.weightPenaltyMu.Lock()
 	defer a.weightPenaltyMu.Unlock()
-	ratio := (float64(inv.TotalWeight()) - a.calcStat(stat.WeightPenalty, 0)) / float64(inv.WeightLimit)
+	limit := a.WeightLimit()
+	if limit <= 0 {
+		return false
+	}
+	ratio := (float64(inv.TotalWeight()) - a.calcStat(stat.WeightPenalty, 0)) / float64(limit)
 	band := int32(weightPenaltyLevel4)
 	switch {
 	case ratio < .5:

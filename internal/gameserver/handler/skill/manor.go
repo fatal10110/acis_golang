@@ -16,8 +16,8 @@ import (
 // The caster gate is what makes HARVEST's ordering safe: it marks the crop
 // consumed before it checks that the caster can be paid, so a caster that
 // clears every gate without being an earner would eat the crop and receive
-// nothing. The reference rejects a non-player caster before it touches the
-// seed state at all, which is why its own reward call needs no such check.
+// nothing. The specified flow rejects a non-player caster before it touches
+// the seed state at all, which is why its own reward call needs no such check.
 //
 // seedItem exposes the manor seed data an item carries when used to sow;
 // resolving an item id to its Seed row (a manor.Table lookup) is the item's

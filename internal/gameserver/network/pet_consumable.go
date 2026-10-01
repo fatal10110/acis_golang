@@ -11,13 +11,13 @@ import (
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 )
 
-// petFoodsHandler is the etc-item handler name RequestPetUseItem.java
-// resolves a pet-food item to (PetFoods.java), distinct from the
+// petFoodsHandler is the etc-item handler name a pet-food item resolves
+// to, distinct from the
 // potion/skill items itemhandler.ItemSkillsHandler/ElixirsHandler cover.
 const petFoodsHandler = "PetFoods"
 
-// petFoodMagicIDs maps each pet-food item id to the feed skill
-// PetFoods.java hardcodes for it (PetFoods.java:20-42): the skill's Feed
+// petFoodMagicIDs maps each pet-food item id to its fixed feed skill: the
+// skill's Feed
 // value at level 1 is the meal-gauge amount restored, scaled by the
 // configured pet food rate.
 var petFoodMagicIDs = map[int32]int32{
@@ -31,8 +31,7 @@ var petFoodMagicIDs = map[int32]int32{
 
 // usePetConsumable dispatches a non-equipment pet-inventory item that
 // petitem.UseItem accepted as an eligible consumable (petitem.UseConsumable)
-// to its etc-item handler, matching RequestPetUseItem.java's else branch:
-// ItemHandler.getInstance().getHandler(item.getEtcItem()).useItem(pet, item, false).
+// to its etc-item handler, with the pet as the user (not a forced use).
 func (l *GameClientLink) usePetConsumable(live *livePlayer, pet *summon.Actor, petInv *itemcontainer.Inventory, objectID int32) {
 	inst := petInv.ItemByObjectID(objectID)
 	if inst == nil {
@@ -94,11 +93,10 @@ func (l *GameClientLink) consumePetPotion(live *livePlayer, pet *summon.Actor, p
 	}
 }
 
-// consumePetFood runs PetFoods.java's feed path for a pet-eaten food item:
+// consumePetFood runs the pet-food feed path for a pet-eaten food item:
 // destroy one unit, broadcast the feed skill's visual effect, and raise the
 // pet's meal gauge by the skill's Feed value scaled by the configured pet
-// food rate, alerting the owner if the pet is still hungry afterward
-// (PetFoods.java:49-68).
+// food rate, alerting the owner if the pet is still hungry afterward.
 func (l *GameClientLink) consumePetFood(live *livePlayer, pet *summon.Actor, petInv *itemcontainer.Inventory, inst *item.Instance) {
 	amount, ok := petFoodFeedAmount(l.skills, l.petConfig.FoodRate, inst.TemplateID)
 	if !ok {
@@ -121,11 +119,10 @@ func (l *GameClientLink) consumePetFood(live *livePlayer, pet *summon.Actor, pet
 }
 
 // petFoodFeedAmount resolves the meal-gauge amount a pet-food item template
-// restores: PetFoods.java's hardcoded item->feed-skill map, scaled by the
-// configured pet food rate (PetFoods.java:63: skill.getFeed() *
-// Config.PET_FOOD_RATE). Used for both the manual "eat from inventory"
-// packet and the auto-feed tick, since both dispatch through the same
-// item handler in the reference.
+// restores: the fixed item->feed-skill map, with the skill's Feed value
+// scaled by the configured pet food rate. Used for both the manual "eat
+// from inventory" packet and the auto-feed tick, since both dispatch
+// through the same item handler.
 func petFoodFeedAmount(skills *skillstate.Persistence, foodRate int, templateID int32) (int, bool) {
 	magicID, ok := petFoodMagicIDs[templateID]
 	if !ok {

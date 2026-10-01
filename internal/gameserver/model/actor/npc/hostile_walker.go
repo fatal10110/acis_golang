@@ -73,14 +73,14 @@ func (h *Hostile) AddGeoPathFailCount() {
 }
 
 // SocialAction broadcasts a social-animation packet, driven by a
-// walkerRoutes.xml node's socialId (aCis NpcAI.onEvtArrived).
+// walkerRoutes.xml node's socialId on arrival.
 func (h *Hostile) SocialAction(id int) {
 	h.emit(event.SocialAction{ID: int32(id)})
 }
 
-// SayNPCString broadcasts a walkerRoutes.xml node's fstring chat line
-// (aCis Npc.broadcastNpcSay(NpcStringId), resolved via NpcStringId.getMessage()).
-// An unmapped id is a no-op: the reference has no such gap, but staying
+// SayNPCString broadcasts a walkerRoutes.xml node's fstring chat line,
+// resolved through the NpcString text table. An unmapped id is a no-op:
+// the complete id set has no such gap, but staying
 // silent beats fabricating text the client would show as this NPC's line.
 func (h *Hostile) SayNPCString(id int) {
 	text, ok := npcstring.Text(int32(id))

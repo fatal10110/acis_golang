@@ -52,8 +52,7 @@ func (a PlayerActor) MPInitialCost(def modelskill.Definition) int {
 // MPCost is def's per-cast MP cost. A dance/song skill (def.Dance) pays an
 // extra danceCount * def.NextDanceCost surcharge for each dance/song
 // already active on the caster, then the whole sum is scaled by the
-// caster's dance MP-consume rate — mirroring Java's
-// CreatureStatus.getMpConsume: "casting more dances costs more MP".
+// caster's dance MP-consume rate: casting more dances costs more MP.
 func (a PlayerActor) MPCost(def modelskill.Definition) int {
 	mp := def.MPConsume
 	if def.Dance {
@@ -136,9 +135,16 @@ func (a PlayerActor) AddSkillReuse(ref modelskill.Ref, key int32, delay time.Dur
 	}
 }
 
-func (PlayerActor) MagicMuted() bool { return false }
+// MagicMuted reports an active effect that blocks the player's magic skills.
+func (a PlayerActor) MagicMuted() bool {
+	return a.Character != nil && a.Character.EffectList().IsAffected(effect.FlagMuted)
+}
 
-func (PlayerActor) PhysicalMuted() bool { return false }
+// PhysicalMuted reports an active effect that blocks the player's physical
+// skills.
+func (a PlayerActor) PhysicalMuted() bool {
+	return a.Character != nil && a.Character.EffectList().IsAffected(effect.FlagPhysicalMuted)
+}
 
 func (PlayerActor) SpiritshotCharged() bool { return false }
 
@@ -149,7 +155,7 @@ func (a PlayerActor) SkillMastery(def modelskill.Definition) bool {
 		return false
 	}
 	statMul := statbonus.STRBonus[statbonus.ClampIndex(a.Character.STR())]
-	if player.ClassMage(a.Character.ClassID) {
+	if player.ClassMage(a.Character.ClassID()) {
 		statMul = statbonus.INTBonus[statbonus.ClampIndex(a.Character.INT())]
 	}
 	return a.Character.RollFloat(100) < a.Character.CalcStat(stat.SkillMastery, 0)*statMul
@@ -170,9 +176,8 @@ func (a PlayerActor) ConsumeItem(itemID, count int) bool {
 }
 
 // GroundTarget forwards the character's last recorded ground-click point,
-// backing GroundTargetUnset for CanAttemptCast's unset-signet gate —
-// PlayerCast.canAttemptCast rejecting a GROUND cast while _signetLocation
-// is still Location.DUMMY_LOC (PlayerCast.java:224, :42).
+// backing GroundTargetUnset for CanAttemptCast's unset-signet gate — a
+// GROUND cast is rejected while the signet point is still unset.
 // GroundTargetUnset reports whether the player's signet point is still the
 // origin.
 func (a PlayerActor) GroundTargetUnset() bool {
@@ -204,29 +209,20 @@ func (a PlayerActor) ExitSignetGround() {
 	}
 }
 
-// CubicListFull reports whether a's character already holds as many active
-// cubics as Cubic Mastery allows, backing Actor.CubicListFull
-// CanCast's cubic-specific gate checks.
-func (a PlayerActor) CubicListFull() bool {
-	return a.Character != nil && a.Character.CubicListFull()
-}
-
 // AllSkillsDisabled backs Actor.AllSkillsDisabled, which Controller.Stop
-// and AIController.Disabled probe for, matching Java's
-// Creature.isAllSkillsDisabled().
+// and AIController.Disabled probe for.
 func (a PlayerActor) AllSkillsDisabled() bool {
 	return a.Character != nil && a.Character.AllSkillsDisabled()
 }
 
-// EnableAllSkills is a no-op: it mirrors Java's Creature.enableAllSkills(),
-// which clears only the raw Duel-defeat lock. This port doesn't model that
+// EnableAllSkills is a no-op: enabling all skills clears only the raw
+// Duel-defeat lock. This port doesn't model that
 // lock since Duel isn't ported, so there is nothing to clear yet.
 func (PlayerActor) EnableAllSkills() {}
 
 // IncreaseCharges and DecreaseCharges back Actor charges
-// Controller.Hit probes for, matching CreatureCast.onMagicHitTimer's
-// `_actor instanceof Player` gate (CreatureCast.java:274-282): only a
-// PlayerActor implements this, so an NPC/summon timed cast never applies
+// Controller.Hit probes for. Only a player's hit timer applies charges:
+// only a PlayerActor implements this, so an NPC/summon timed cast never applies
 // Force/Soul charges.
 func (a PlayerActor) IncreaseCharges(count, max int) bool {
 	return a.Character != nil && a.Character.IncreaseCharges(count, max)

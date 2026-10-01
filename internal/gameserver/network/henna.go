@@ -9,8 +9,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/symbolmaker"
 )
 
-// Symbol maker requests carry no NPC: the reference answers each one
-// wherever the player stands, the draw and deletion windows only opening
+// Symbol maker requests carry no NPC: each one is answered wherever the
+// player stands, the draw and deletion windows only opening
 // from a symbol maker's dialog. Each request runs on the player's queue, so
 // one player's draws and deletions never interleave.
 
@@ -38,7 +38,7 @@ func sendHennaUnequipList(live *livePlayer) {
 
 // sendHennaItemInfo answers RequestHennaItemInfo with a loaded symbol's
 // draw details, whatever live's class. An unknown symbol is dropped without
-// a word, as the reference drops it; the draw window asks again on the next
+// a word, as specified; the draw window asks again on the next
 // click, so no client action waits on it.
 func (l *GameClientLink) sendHennaItemInfo(live *livePlayer, req clientpackets.RequestHennaSymbol) {
 	h, ok := l.symbols.Henna(int(req.SymbolID))
@@ -50,7 +50,7 @@ func (l *GameClientLink) sendHennaItemInfo(live *livePlayer, req clientpackets.R
 
 // sendHennaUnequipInfo answers RequestHennaUnequipInfo with a loaded
 // symbol's deletion details, worn or not. An unknown symbol is dropped
-// without a word, as the reference drops it.
+// without a word, as specified.
 func (l *GameClientLink) sendHennaUnequipInfo(live *livePlayer, req clientpackets.RequestHennaSymbol) {
 	h, ok := l.symbols.Henna(int(req.SymbolID))
 	if !ok {
@@ -61,7 +61,7 @@ func (l *GameClientLink) sendHennaUnequipInfo(live *livePlayer, req clientpacket
 
 // drawHenna answers RequestHennaEquip. A drawn symbol is saved to its slot
 // and live then sees its symbols, its refreshed stats and SYMBOL_ADDED. An
-// unknown symbol is dropped without a word, as the reference drops it.
+// unknown symbol is dropped without a word, as specified.
 func (l *GameClientLink) drawHenna(live *livePlayer, req clientpackets.RequestHennaSymbol) {
 	d := l.symbols.Draw(live.Character, int(req.SymbolID))
 	for _, n := range d.Notices {
@@ -91,7 +91,7 @@ func (l *GameClientLink) drawHenna(live *livePlayer, req clientpackets.RequestHe
 // deleteHenna answers RequestHennaUnequip. A deleted symbol's slot row is
 // removed and live then sees its symbols, its refreshed stats, the dyes
 // handed back and SYMBOL_DELETED. A symbol live does not wear is dropped
-// without a word, as the reference drops it.
+// without a word, as specified.
 func (l *GameClientLink) deleteHenna(live *livePlayer, req clientpackets.RequestHennaSymbol) {
 	d := l.symbols.Delete(live.Character, int(req.SymbolID))
 	if d.NotEnoughAdena {
@@ -102,9 +102,9 @@ func (l *GameClientLink) deleteHenna(live *livePlayer, req clientpackets.Request
 		return
 	}
 	if l.hennas != nil {
-		slot := d.DBSlot
+		slot, classIndex := d.DBSlot, live.ClassIndex()
 		l.queueRowWrite(live.ObjectID(), "delete henna", func(ctx context.Context, ownerID int32) error {
-			return l.hennas.Delete(ctx, ownerID, slot)
+			return l.hennas.Delete(ctx, ownerID, classIndex, slot)
 		})
 	}
 	l.sendHennaChange(live)
@@ -119,9 +119,9 @@ func (l *GameClientLink) saveHennaSlot(live *livePlayer, h henna.Henna, dbSlot i
 	if l.hennas == nil {
 		return
 	}
-	symbolID := h.SymbolID
+	symbolID, classIndex := h.SymbolID, live.ClassIndex()
 	l.queueRowWrite(live.ObjectID(), "insert henna", func(ctx context.Context, ownerID int32) error {
-		return l.hennas.Insert(ctx, ownerID, symbolID, dbSlot)
+		return l.hennas.Insert(ctx, ownerID, classIndex, symbolID, dbSlot)
 	})
 }
 

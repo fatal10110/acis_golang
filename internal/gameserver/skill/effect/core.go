@@ -41,8 +41,10 @@ const (
 	FlagConfused
 	// FlagBetrayed marks a summon as temporarily hostile to its owner.
 	FlagBetrayed
-	flagMuted
-	flagPhysicalMuted
+	// FlagMuted marks a target as blocked from magic skills.
+	FlagMuted
+	// FlagPhysicalMuted marks a target as blocked from physical skills.
+	FlagPhysicalMuted
 	// FlagRooted marks a target as rooted.
 	FlagRooted
 	// FlagSleep marks a target as asleep.
@@ -242,13 +244,13 @@ var coreKinds = map[string]kind{
 	"ImobileBuff":           {typ: TypeImmobilizeEffector},
 	"Invincible":            {typ: TypeInvincible},
 	"ManaHealOverTime":      {typ: TypeManaHealOverTime},
-	"Mute":                  {typ: TypeMute, flag: flagMuted},
+	"Mute":                  {typ: TypeMute, flag: FlagMuted},
 	"NoblesseBless":         {typ: TypeNoblesseBless, flag: flagNoblesseBlessing},
 	"Paralyze":              {typ: TypeParalyze, flag: FlagParalyzed},
 	"Petrification":         {typ: TypePetrification, flag: FlagParalyzed},
-	"PhysicalMute":          {typ: TypePhysicalMute, flag: flagPhysicalMuted},
+	"PhysicalMute":          {typ: TypePhysicalMute, flag: FlagPhysicalMuted},
 	"RemoveTarget":          {typ: TypeRemoveTarget},
-	"SilenceMagicPhysical":  {typ: TypeSilenceAll, flag: flagMuted | flagPhysicalMuted},
+	"SilenceMagicPhysical":  {typ: TypeSilenceAll, flag: FlagMuted | FlagPhysicalMuted},
 	"SilentMove":            {typ: TypeSilentMove, flag: FlagSilentMove},
 	"StunSelf":              {typ: TypeStunSelf, flag: FlagStunned, selfTarget: true},
 	"Heal":                  {typ: TypeHeal},
@@ -367,12 +369,10 @@ func Apply(effector, effected Actor, meta Skill, templates []modelskill.EffectTe
 // ApplyRestored instantiates each of templates and adds it to list, seeded to
 // resume from count and elapsedSeconds — the tick count and time-since-last-
 // tick a persisted effect had at logout — instead of starting fresh from the
-// template, mirroring Player.restoreEffects()'s
-// template.getEffect(this, this, skill) -> setCount/setTime ->
-// scheduleEffect() chain. effector and effected are both the relogging
-// character: the original caster identity is not persisted, so every
-// reinstated effect is treated as self-applied, matching the reference. The
-// replay is silent (see List.AddRestored): it activates and refreshes icons
+// template: each is built, given its saved count and time, then scheduled.
+// effector and effected are both the relogging character: the original
+// caster identity is not persisted, so every reinstated effect is treated as
+// self-applied. The replay is silent (see List.AddRestored): it activates and refreshes icons
 // but sends no stack or expiry system messages.
 func ApplyRestored(list *List, effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate, count, elapsedSeconds int32) {
 	if list == nil {
@@ -412,8 +412,8 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 	}
 
 	// A seed effect's Level is a charge counter (IncreasePower), not the
-	// applied skill level: EffectSeed.java:10 hardcodes _power = 1 at
-	// construction regardless of skill.getLevel().
+	// applied skill level: it always starts at 1, regardless of the skill
+	// level.
 	level := skill.Level
 	if k.typ == TypeSeed {
 		level = 1
@@ -434,9 +434,8 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 
 	// tmpl.AttachCondition is the <cond> sibling gating the whole <effect>
 	// block (not any one func's own predicate); AND it onto every func this
-	// effect contributes, matching the Java reference's per-func attach-
-	// condition propagation (DocumentBase's cond stays in scope for every
-	// stat element until the next cond resets it).
+	// effect contributes (a <cond> stays in scope for every stat element
+	// until the next <cond> resets it).
 	attachGate, err := funcCondition(nil, tmpl.AttachCondition)
 	if err != nil {
 		return nil, fmt.Errorf("effect %s: %w", tmpl.Name, err)
@@ -707,9 +706,8 @@ func (e *Effect) IncreasePower() {
 }
 
 // iconLevel reports the level to send on this effect's abnormal-status
-// icon. AbnormalStatusUpdate.addEffect() -> EffectHolder(skill, period)
-// (EffectHolder.java) always uses skill.getLevel(), never a seed's grown
-// _power: a seed's Level field doubles as its charge counter, so its icon
+// icon. The icon always carries the skill's level, never a seed's grown
+// power: a seed's Level field doubles as its charge counter, so its icon
 // must read the fixed skill level instead, unlike every other kind whose
 // Level is the applied skill level already.
 func (e *Effect) iconLevel() int {

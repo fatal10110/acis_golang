@@ -39,8 +39,8 @@ func (l *GameClientLink) handleSummonActionUse(ctx context.Context, live *livePl
 }
 
 // summonSkillTargetKind identifies which live object an owner-commanded
-// special-skill action targets, mirroring the WorldObject argument Java's
-// RequestActionUse passes to each useSkill(skillId, ...) call.
+// special-skill action targets: the object each commanded skill use is
+// aimed at.
 type summonSkillTargetKind uint8
 
 const (
@@ -59,11 +59,11 @@ type summonSkillEntry struct {
 	SkillID    int
 	TargetKind summonSkillTargetKind
 	// DoorOnly marks the two siege actions (Siege Golem's Siege Hammer,
-	// Wild Hog Cannon's Attack) Java restricts to a Door target. No Door
+	// Wild Hog Cannon's Attack) restricted to a Door target. No Door
 	// world-object type is modeled in Go yet, so this always evaluates to
 	// "not a Door" and these two actions correctly stay unusable until
 	// siege doors are ported, matching what a target-less/non-door click
-	// already does in the reference.
+	// already does.
 	DoorOnly bool
 }
 
@@ -76,10 +76,9 @@ var sinEaterActionStrings = [...]string{
 	", has not hit...!",
 }
 
-// summonSkillActionTable mirrors every commanded special-skill case in
-// Java's RequestActionUse.runImpl. Action 32 (Wild Hog Cannon Mode Change)
-// is intentionally absent: the reference's own case body is commented out,
-// making it a real no-op in Java too.
+// summonSkillActionTable lists every commanded special-skill action of
+// RequestActionUse. Action 32 (Wild Hog Cannon Mode Change) is
+// intentionally absent: it is specified as a no-op.
 var summonSkillActionTable = map[int32]summonSkillEntry{
 	36:   {SkillID: 4259, TargetKind: summonSkillTargetClicked},
 	39:   {SkillID: 4138, TargetKind: summonSkillTargetClicked},
@@ -117,7 +116,7 @@ var summonSkillActionTable = map[int32]summonSkillEntry{
 	1036: {SkillID: 5142, TargetKind: summonSkillTargetClicked},
 	1037: {SkillID: 5141, TargetKind: summonSkillTargetClicked},
 	1038: {SkillID: 5140, TargetKind: summonSkillTargetClicked},
-	// 1039/1040 (Swoop Cannon) reject a Door target in Java. No Door type
+	// 1039/1040 (Swoop Cannon) reject a Door target. No Door type
 	// exists in Go yet, so no target can match one and this restriction is
 	// vacuously satisfied — safe to omit without behavior divergence.
 	1039: {SkillID: 5110, TargetKind: summonSkillTargetClicked},
@@ -140,8 +139,7 @@ func doorOnlyBlocked(entry summonSkillEntry, target attackable.Combatant) bool {
 }
 
 // handleSummonSkillUse dispatches an owner-commanded pet/servitor special
-// skill (e.g. Wild Hog Cannon Attack), matching Java's
-// RequestActionUse.useSkill. Unlike handleSummonActionUse's movement/status
+// skill (e.g. Wild Hog Cannon Attack). Unlike handleSummonActionUse's movement/status
 // commands, an unresolvable summon or skill still returns true so the
 // client's input is released, matching the existing action-bar contract;
 // only an unmapped action id returns false.
@@ -199,20 +197,18 @@ func (l *GameClientLink) summonCommandContext(live *livePlayer, command summon.C
 	return ctx
 }
 
-// summonTargetIsDead reports true death only, matching
-// RequestActionUse.java:155-156 ("Fake Death is handled elsewhere (attack
-// task)") — AlikeDead() would also reject a fake-dead target, which Java's
-// attack command does not.
+// summonTargetIsDead reports true death only: fake death is handled
+// elsewhere (by the attack task) — AlikeDead() would also reject a
+// fake-dead target, which the attack command does not.
 func summonTargetIsDead(target attackable.Combatant) bool {
 	return target.Dead()
 }
 
-// summonTargetAttackable decides attack-vs-follow the way
-// RequestActionUse.java:177 does: targetCreature.isAttackableWithoutForceBy(player)
-// || (_isCtrlPressed && targetCreature.isAttackableBy(player)). A plain
-// AttackableBy check alone (the previous implementation) routes every
-// living player target to ATTACK, including party members Java would
-// instead have the summon follow.
+// summonTargetAttackable decides attack-vs-follow: attack when the target
+// is attackable by the player without force, or when ctrl is pressed and
+// the target is attackable by the player at all. A plain AttackableBy check
+// alone (the previous implementation) routes every living player target to
+// ATTACK, including party members the summon should instead follow.
 func summonTargetAttackable(live *livePlayer, target attackable.Combatant, ctrlPressed bool) bool {
 	if live == nil || target == nil {
 		return false

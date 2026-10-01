@@ -65,8 +65,7 @@ type AI interface {
 	StopMove()
 	StopAttack()
 	// AttackingNow reports whether this summon's own attack cycle is
-	// currently in flight, matching CreatureAttack.isAttackingNow
-	// (CreatureAttack.java:56-59): a plain start/stop flag on the summon's
+	// currently in flight: a plain start/stop flag on the summon's
 	// own attack component, independent of its owner.
 	AttackingNow() bool
 }
@@ -77,8 +76,8 @@ type Owner interface {
 	world.Tracked
 	attackable.Combatant
 	LevelValue() int
-	// InCombat reports the owner's own attack-stance state. Summon.isInCombat
-	// (Summon.java:302-305) delegates straight to _owner.isInCombat() — a
+	// InCombat reports the owner's own attack-stance state. A summon's
+	// in-combat state delegates straight to its owner's — a
 	// pet/servitor's "in combat" status is entirely owner-derived, never
 	// tracked on the summon itself.
 	InCombat() bool
@@ -200,7 +199,7 @@ type Actor struct {
 	sink event.Sink
 	// skills maps skill id to the level this summon's npc template grants
 	// it, used by TryUseSkill to resolve an owner-commanded action-bar
-	// skill shortcut, matching Java's Summon.getSkill.
+	// skill shortcut.
 	skills map[int]int
 	zones  ZoneQuery
 
@@ -236,8 +235,8 @@ type Actor struct {
 	food1          int32
 	food2          int32
 	// foodRestore1/foodRestore2 hold the meal gauge each food item
-	// restores on auto-feed: PetFoods.java's feed skill for that item
-	// (skill.getFeed() * PET_FOOD_RATE), since food1 and food2 can map to
+	// restores on auto-feed: the feed skill for that item (its Feed value
+	// times the pet food rate), since food1 and food2 can map to
 	// different feed skills with different amounts (e.g. Strider's food
 	// vs Clan Hall Strider's food).
 	foodRestore1  int
@@ -381,14 +380,13 @@ type PetConfig struct {
 	Name            string
 	// Named reports whether Name is a player-assigned custom name rather
 	// than a fallback to the npc template's name; it gates RequestChangePetName's
-	// "pet is already named" rejection (Pet.getName() != null in the reference).
+	// "pet is already named" rejection.
 	Named   bool
 	BabyPet bool // the pet heals its owner on its own
 	Level   int
 	Exp     int64
 	SP      int
 	ExpType int
-	CON     int
 	Passive bool
 	Config  *petmodel.Config
 	Growth  *npc.PetData
@@ -502,11 +500,6 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 // NewPet returns a live pet actor.
 func NewPet(cfg PetConfig) (*Actor, error) {
 	petCfg := copyPetConfig(cfg.Config)
-	if petCfg != nil && cfg.Inventory != nil {
-		slots, weight := petCfg.InventoryLimits(cfg.CON)
-		cfg.Inventory.SlotLimit = slots
-		cfg.Inventory.WeightLimit = weight
-	}
 	a := &Actor{
 		id:             cfg.ObjectID,
 		level:          cfg.Level,
@@ -552,6 +545,9 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 	a.respawnRestoreHP = cfg.RespawnRestoreHP
 	a.initVitals()
 	a.effects = effect.NewList(a, effect.WithEnv(cfg.Effects))
+	if petCfg != nil && cfg.Inventory != nil {
+		cfg.Inventory.SetLimiter(a)
+	}
 	a.settleWeightPenalty()
 	return a, nil
 }

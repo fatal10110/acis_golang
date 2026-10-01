@@ -20,7 +20,7 @@ func newEquipTestLivePlayer(t *testing.T, id int32, capture *testsupport.FrameCa
 		t.Fatal("missing test class template")
 	}
 	ch := &player.Character{
-		ID: id, Name: "Player", ClassID: 0, BaseClassID: 0,
+		ID: id, Name: "Player", BaseClassID: 0,
 		Race: player.RaceHuman, Sex: player.SexMale,
 		CharLevel: 1,
 		Location:  location.Location{X: int(id) * 100, Y: 0, Z: 0},
@@ -35,7 +35,7 @@ func newEquipTestLivePlayer(t *testing.T, id int32, capture *testsupport.FrameCa
 	live.SetQueue(idleQueue())
 	ch.Live = live
 
-	return &livePlayer{Character: ch, session: capture.Send, template: tmpl, items: items, visibilitySend: capture.Send}
+	return &livePlayer{Character: ch, session: capture.Send, items: items, visibilitySend: capture.Send}
 }
 
 func assertStaticSystemMessageFrame(t *testing.T, frame []byte, messageID int) {

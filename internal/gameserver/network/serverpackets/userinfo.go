@@ -67,8 +67,8 @@ type UserInfoSnapshot struct {
 	Character *player.Character
 	Template  *player.Template
 	Items     []*item.Instance
-	// IsGM is the accessLevels.xml isGM flag for Character's access level
-	// (Player.isGM() in the reference), not merely AccessLevel > 0.
+	// IsGM is the accessLevels.xml isGM flag for Character's access level,
+	// not merely AccessLevel > 0.
 	IsGM bool
 	// SpawnProtectedTeam reports the team byte the client sees while spawn
 	// protection is active: TeamType.BLUE when spawn protection is enabled
@@ -129,7 +129,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteString(c.Name)
 	w.WriteInt32(int32(c.Race))
 	w.WriteInt32(int32(c.Sex))
-	w.WriteInt32(int32(c.ClassID))
+	w.WriteInt32(int32(c.VisibleBaseClassID()))
 	w.WriteInt32(int32(progression.CharLevel))
 	w.WriteInt64(progression.Exp)
 	w.WriteInt32(int32(c.STR()))
@@ -245,7 +245,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 		w.WriteInt32(0)
 	}
 	w.WriteUint16(uint16(inventoryLimit))
-	w.WriteInt32(int32(c.ClassID))
+	w.WriteInt32(int32(c.ClassID()))
 	w.WriteInt32(0)
 	w.WriteInt32(int32(resources.MaxCP))
 	w.WriteInt32(int32(resources.CurrentCP))

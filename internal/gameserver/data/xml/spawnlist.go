@@ -54,8 +54,9 @@ type spawnPrivateEl struct {
 // dir and returns the full in-memory territory/maker table.
 //
 // log receives skipped-territory diagnostics; the zero logger discards them.
-// spawnMultiplier is Config.SPAWN_MULTIPLIER (npcs.properties SpawnMultiplier,
-// default 1): it Java-rounds maker maximums and coordinate-less entry totals.
+// spawnMultiplier is the npcs.properties SpawnMultiplier (default 1): it
+// scales and rounds maker maximums and coordinate-less entry totals (see
+// spawn.NewMaker and spawn.NewEntry).
 func LoadSpawnlist(dir string, log zerolog.Logger, spawnMultiplier float64) (*spawn.Table, error) {
 	docs, err := loadXMLDocuments[spawnlistFile](dir, "spawnlist")
 	if err != nil {
@@ -107,6 +108,9 @@ func buildTerritory(el territoryElement) (*spawn.Territory, error) {
 	nodes := make([]spawn.Node, 0, len(el.Nodes))
 	for _, nodeEl := range el.Nodes {
 		set := commons.StatSetFromXMLAttrs(nodeEl.Attrs)
+		if err := decodeLiteralAttrs(set, "x", "y"); err != nil {
+			return nil, err
+		}
 		x, err := set.GetInt("x")
 		if err != nil {
 			return nil, err
@@ -117,7 +121,11 @@ func buildTerritory(el territoryElement) (*spawn.Territory, error) {
 		}
 		nodes = append(nodes, spawn.Node{X: x, Y: y})
 	}
-	return spawn.NewTerritory(commons.StatSetFromXMLAttrs(el.Attrs), nodes)
+	set := commons.StatSetFromXMLAttrs(el.Attrs)
+	if err := decodeLiteralAttrs(set, "minZ", "maxZ"); err != nil {
+		return nil, fmt.Errorf("territory %q: %w", set.GetStringDefault("name", "?"), err)
+	}
+	return spawn.NewTerritory(set, nodes)
 }
 
 func buildMaker(el makerElement, territories map[string]*spawn.Territory, log zerolog.Logger, spawnMultiplier float64) (*spawn.Maker, error) {
@@ -149,6 +157,9 @@ func buildEntry(el spawnNPCElement, spawnMultiplier float64) (spawn.Entry, error
 	set := commons.StatSetFromXMLAttrs(el.Attrs)
 	f := commons.NewFields(set, "spawn entry loader")
 	npcID := f.StringDefault("id", "?")
+	if err := decodeLiteralAttrs(set, "id", "total"); err != nil {
+		return spawn.Entry{}, fmt.Errorf("npc %q: %w", npcID, err)
+	}
 
 	privates := make([]spawn.Private, 0)
 	for _, group := range el.Privates {
@@ -194,13 +205,12 @@ func flattenAI(ai []aiElement, stripAt bool) (string, map[string]string) {
 	return kind, params
 }
 
-// resolveTerritories looks up each ";"-delimited name in raw, matching
-// SpawnManager.findTerritory: a single name resolves to null (here: dropped,
-// with a warning) if unknown, exactly like getTerritory. A multi-name group
-// is all-or-nothing — findTerritory logs once and returns null for the whole
-// group the moment any member is missing, rather than building a partial
-// composite (SpawnManager.java:500-537) — so an unresolved name here drops
-// every name in that group, not just the missing one.
+// resolveTerritories looks up each ";"-delimited name in raw: an unknown
+// single name resolves to nothing (dropped, with a warning). A multi-name
+// group is all-or-nothing — one warning and no territory for the whole group
+// the moment any member is missing, rather than a partial composite — so an
+// unresolved name here drops every name in that group, not just the missing
+// one.
 func resolveTerritories(makerName, raw string, territories map[string]*spawn.Territory, log zerolog.Logger) []*spawn.Territory {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {

@@ -38,8 +38,8 @@ type MountBodies interface {
 // PeaceZoneQuery reports whether any point within effectRange of (x, y, z) —
 // sampled at the point and its four axis-aligned range offsets — falls
 // inside a peace-suspending zone attached to the region containing
-// (regionX, regionY). Callers pass their own position as the region anchor,
-// matching the reference's caster-region-only zone lookup.
+// (regionX, regionY). Callers pass their own position as the region anchor:
+// the zone lookup uses the caster's region only.
 type PeaceZoneQuery interface {
 	EffectRangeInPeaceZone(regionX, regionY, x, y, z, effectRange int) bool
 }
@@ -82,8 +82,7 @@ func (c *Character) SetInNoSummonFriendZone(inside bool) {
 }
 
 // NoSummonFriendZone reports whether the character currently stands inside
-// a zone that blocks SUMMON_FRIEND/SUMMON_PARTY, matching
-// isInsideZone(ZoneId.NO_SUMMON_FRIEND) (SummonFriend.java:113,138).
+// a zone that blocks SUMMON_FRIEND/SUMMON_PARTY (a no-summon-friend zone).
 func (c *Character) NoSummonFriendZone() bool {
 	return c.insideNoSummonFriendZone.Load()
 }
@@ -158,8 +157,8 @@ func (c *Character) CastModifiers() (ctrl, shift bool) {
 
 // CanSeePoint reports whether an arbitrary world point is visible to this
 // player: a geodata line-of-sight query from this player's position and eye
-// height to the raw point (no height offset on the point end, matching the
-// reference's ground-target LOS query), or permissive when no
+// height to the raw point (no height offset on the point end, as for a
+// ground-target LOS query), or permissive when no
 // line-of-sight query is attached (e.g. in tests).
 func (c *Character) CanSeePoint(x, y, z int) bool {
 	if c.los == nil {
@@ -184,7 +183,7 @@ func (c *Character) EffectRangeInPeaceZone(x, y, z, effectRange int) bool {
 // AttachRuntime records the static template and restored inventory used by
 // live combat and visibility code. Call it before exposing c to the world.
 func (c *Character) AttachRuntime(tmpl *Template, inv *itemcontainer.Inventory) {
-	c.runtimeTemplate = tmpl
+	c.runtimeTemplate.Store(tmpl)
 	c.inventory = inv
 	if inv != nil {
 		inv.SetLimiter(c)

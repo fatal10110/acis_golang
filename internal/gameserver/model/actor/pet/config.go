@@ -55,9 +55,8 @@ func (c Config) ScaledExpGain(npcID int, rawExp int64) int64 {
 	return ScaledExpGain(npcID, rawExp, c.ExpRate, c.SinEaterExpRate)
 }
 
-// InventoryLimits returns the configured pet slot limit and CON-derived
-// carried-weight limit.
-func (c Config) InventoryLimits(con int) (slots, weight int) {
-	idx := statbonus.ClampIndex(con)
-	return c.InventorySlots, int(baseWeightLimit * statbonus.CONBonus[idx] * c.WeightLimitMultiplier)
+// BaseWeightLimit returns the carried-weight limit of a pet with CON con
+// before its weightLimit stat modifiers apply.
+func (c Config) BaseWeightLimit(con int) float64 {
+	return baseWeightLimit * statbonus.CONBonus[statbonus.ClampIndex(con)] * c.WeightLimitMultiplier
 }

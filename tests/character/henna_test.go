@@ -23,10 +23,10 @@ func TestEnterWorldRestoresHennaInfoAndBonuses(t *testing.T) {
 				t.Fatalf("lookup character: %v", err)
 			}
 			if _, err := db.ExecContext(context.Background(),
-				`UPDATE characters SET classid = 1 WHERE obj_Id = ?`, objID); err != nil {
+				`UPDATE characters SET classid = 1, base_class = 1 WHERE obj_Id = ?`, objID); err != nil {
 				t.Fatalf("set classid: %v", err)
 			}
-			if err := hennas.Insert(context.Background(), objID, 1, 1); err != nil {
+			if err := hennas.Insert(context.Background(), objID, 0, 1, 1); err != nil {
 				t.Fatalf("insert henna: %v", err)
 			}
 		}),

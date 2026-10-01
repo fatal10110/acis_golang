@@ -8,8 +8,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 )
 
-const activeShortcutClassIndex = 0
-
 // ShortcutStore reads and writes character_shortcuts rows.
 type ShortcutStore struct {
 	db *sql.DB
@@ -20,13 +18,13 @@ func NewShortcutStore(db *sql.DB) *ShortcutStore {
 	return &ShortcutStore{db: db}
 }
 
-// ListByOwner returns ownerID's shortcuts for the active class slot.
-func (s *ShortcutStore) ListByOwner(ctx context.Context, ownerID int32) ([]shortcut.Shortcut, error) {
+// ListByOwner returns ownerID's shortcuts for class index classIndex.
+func (s *ShortcutStore) ListByOwner(ctx context.Context, ownerID int32, classIndex int) ([]shortcut.Shortcut, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT slot, page, type, id, level
 		 FROM character_shortcuts WHERE char_obj_id = ? AND class_index = ?
 		 ORDER BY page, slot`,
-		ownerID, activeShortcutClassIndex,
+		ownerID, classIndex,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("list shortcuts for owner %d: %w", ownerID, err)
@@ -54,14 +52,14 @@ func (s *ShortcutStore) ListByOwner(ctx context.Context, ownerID int32) ([]short
 	return out, nil
 }
 
-// Save inserts or replaces sc for ownerID's active class slot.
-func (s *ShortcutStore) Save(ctx context.Context, ownerID int32, sc shortcut.Shortcut) error {
+// Save inserts or replaces sc for ownerID's class index classIndex.
+func (s *ShortcutStore) Save(ctx context.Context, ownerID int32, classIndex int, sc shortcut.Shortcut) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO character_shortcuts
 			(char_obj_id, slot, page, type, id, level, class_index)
 		 VALUES (?, ?, ?, ?, ?, ?, ?)
 		 ON DUPLICATE KEY UPDATE type=VALUES(type), id=VALUES(id), level=VALUES(level)`,
-		ownerID, sc.Slot, sc.Page, sc.Type.String(), sc.ID, sc.Level, activeShortcutClassIndex,
+		ownerID, sc.Slot, sc.Page, sc.Type.String(), sc.ID, sc.Level, classIndex,
 	)
 	if err != nil {
 		return fmt.Errorf("save shortcut owner %d slot %d page %d: %w", ownerID, sc.Slot, sc.Page, err)
@@ -69,12 +67,12 @@ func (s *ShortcutStore) Save(ctx context.Context, ownerID int32, sc shortcut.Sho
 	return nil
 }
 
-// Delete removes one shortcut from ownerID's active class slot.
-func (s *ShortcutStore) Delete(ctx context.Context, ownerID int32, slot, page int32) error {
+// Delete removes one shortcut from ownerID's class index classIndex.
+func (s *ShortcutStore) Delete(ctx context.Context, ownerID int32, classIndex int, slot, page int32) error {
 	_, err := s.db.ExecContext(ctx,
 		`DELETE FROM character_shortcuts
 		 WHERE char_obj_id = ? AND slot = ? AND page = ? AND class_index = ?`,
-		ownerID, slot, page, activeShortcutClassIndex,
+		ownerID, slot, page, classIndex,
 	)
 	if err != nil {
 		return fmt.Errorf("delete shortcut owner %d slot %d page %d: %w", ownerID, slot, page, err)

@@ -490,6 +490,32 @@ func TestLoadDisableRaidCurseDefaultsToFalse(t *testing.T) {
 	}
 }
 
+// TestLoadFreeTeleport pins npcs.properties FreeTeleport: false when
+// absent or not "true", as read when set.
+func TestLoadFreeTeleport(t *testing.T) {
+	for _, tc := range []struct {
+		name, body string
+		want       freeTeleport
+		wantErr    bool
+	}{
+		{"absent", "", false, false},
+		{"true", "FreeTeleport = True\n", true, false},
+		{"false", "FreeTeleport = False\n", false, false},
+		{"not a boolean", "FreeTeleport = maybe\n", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			configPath := filepath.Join(t.TempDir(), "npcs.properties")
+			if err := os.WriteFile(configPath, []byte(tc.body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			got, err := loadFreeTeleport(gameServerPaths{NpcsConfigPath: configPath})
+			if (err != nil) != tc.wantErr || got != tc.want {
+				t.Fatalf("loadFreeTeleport() = %v, %v; want %v, error %v", got, err, tc.want, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestLoadMaxGeoPathFailCountUsesGeoengineProperties(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "geoengine.properties")
 	if err := os.WriteFile(configPath, []byte("MaxGeopathFailCount = 80\n"), 0o600); err != nil {
@@ -859,9 +885,8 @@ WeightLimit = 1.25
 	if got := cfg.ScaledExpGain(12564, 1000); got != 4000 {
 		t.Errorf("sin eater configured exp = %d, want 4000", got)
 	}
-	slots, _ := cfg.InventoryLimits(43)
-	if slots != 19 {
-		t.Errorf("pet inventory slots = %d, want 19", slots)
+	if cfg.InventorySlots != 19 {
+		t.Errorf("pet inventory slots = %d, want 19", cfg.InventorySlots)
 	}
 	if cfg == pet.DefaultConfig() {
 		t.Fatal("loadPetConfig returned defaults, want values from both files")
@@ -1503,5 +1528,29 @@ EnchantSafeMaxFull = 5
 	}
 	if got != enchant.DefaultConfig() {
 		t.Fatalf("loadEnchantConfig(empty) = %+v, want the shipped defaults %+v", got, enchant.DefaultConfig())
+	}
+}
+
+func TestLoadSubclassConfig(t *testing.T) {
+	dir := t.TempDir()
+	empty := filepath.Join(dir, "empty.properties")
+	set := filepath.Join(dir, "set.properties")
+	if err := os.WriteFile(empty, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(set, []byte("SubclassTime = 500\nSubClassWithoutQuests = True\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := loadSubclassDelay(gameServerPaths{ConfigPath: empty}); err != nil || got != subclassDelay(2000*time.Millisecond) {
+		t.Fatalf("loadSubclassDelay(default) = %v, %v; want 2s", got, err)
+	}
+	if got, err := loadSubclassDelay(gameServerPaths{ConfigPath: set}); err != nil || got != subclassDelay(500*time.Millisecond) {
+		t.Fatalf("loadSubclassDelay(set) = %v, %v; want 500ms", got, err)
+	}
+	if got, err := loadSubclassWithoutQuests(gameServerPaths{PlayersConfigPath: empty}); err != nil || bool(got) {
+		t.Fatalf("loadSubclassWithoutQuests(default) = %v, %v; want false", got, err)
+	}
+	if got, err := loadSubclassWithoutQuests(gameServerPaths{PlayersConfigPath: set}); err != nil || !bool(got) {
+		t.Fatalf("loadSubclassWithoutQuests(set) = %v, %v; want true", got, err)
 	}
 }

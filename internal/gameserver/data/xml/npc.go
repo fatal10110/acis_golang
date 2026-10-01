@@ -13,9 +13,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-// maxClassID is the highest valid profession id: the reference's ClassId
-// enum has 119 ordinals (0-118), including 30 reserved "dummy" slots at
-// 58-87 that resolve but name no real profession.
+// maxClassID is the highest valid profession id: there are 119 class ids
+// (0-118), including 30 reserved "dummy" slots at 58-87 that resolve but
+// name no real profession.
 const maxClassID = 118
 
 // npcFile is the root <list> element of one NPC template XML file.
@@ -95,6 +95,9 @@ func LoadNPCTemplates(dir string, items *item.Table, skills *skill.Table, log ze
 // "pet" values built from its other child blocks.
 func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table, log zerolog.Logger) (*npc.Template, error) {
 	set := commons.StatSetFromXMLAttrs(el.Attrs)
+	if err := decodeLiteralAttrs(set, "id", "idTemplate"); err != nil {
+		return nil, fmt.Errorf("npc %s: %w", set.GetStringDefault("id", "?"), err)
+	}
 	for _, s := range el.Sets {
 		set.Set(s.Name, s.Val)
 	}
@@ -158,7 +161,11 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 			}
 			levels[level] = stats
 		}
-		pet, err := npc.NewPetData(commons.StatSetFromXMLAttrs(el.PetData.Attrs), levels)
+		petSet := commons.StatSetFromXMLAttrs(el.PetData.Attrs)
+		if err := decodeLiteralAttrs(petSet, "food1", "food2"); err != nil {
+			return nil, fmt.Errorf("npc %d: petdata: %w", npcID, err)
+		}
+		pet, err := npc.NewPetData(petSet, levels)
 		if err != nil {
 			return nil, fmt.Errorf("npc %d: %w", npcID, err)
 		}
@@ -177,6 +184,9 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 		passives := make([]skill.Ref, 0)
 		for _, s := range el.Skills {
 			skillSet := commons.StatSetFromXMLAttrs(s.Attrs)
+			if err := decodeLiteralAttrs(skillSet, "id", "level"); err != nil {
+				return nil, fmt.Errorf("npc %d: skill: %w", npcID, err)
+			}
 			skillID32, err := skillSet.GetInt32("id")
 			if err != nil {
 				return nil, fmt.Errorf("npc %d: skill: %w", npcID, err)
