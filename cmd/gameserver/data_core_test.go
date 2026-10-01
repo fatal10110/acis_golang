@@ -67,7 +67,7 @@ func TestLoadCrestCacheUsesDatapackRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	crests, err := loadCrestCache(gameServerPaths{DataRoot: root})
+	crests, err := loadCrestCache(gameServerPaths{DataRoot: root}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("loadCrestCache: %v", err)
 	}
@@ -78,7 +78,7 @@ func TestLoadCrestCacheUsesDatapackRoot(t *testing.T) {
 }
 
 func TestLoadCrestCacheAllowsMissingDirectory(t *testing.T) {
-	crests, err := loadCrestCache(gameServerPaths{DataRoot: t.TempDir()})
+	crests, err := loadCrestCache(gameServerPaths{DataRoot: t.TempDir()}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("loadCrestCache: %v", err)
 	}

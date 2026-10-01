@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/rs/zerolog"
 )
@@ -26,12 +27,15 @@ type fakeStore struct {
 	clanIDs map[int32]int32
 	grades  map[int32]int
 	privs   map[[2]int32]int32
+	// crests is each clan's stored crest columns, by clan id and crest
+	// type.
+	crests map[[2]int32]int32
 }
 
 func newFakeStore() *fakeStore {
 	return &fakeStore{
 		clans: map[int32]storedClan{}, clanIDs: map[int32]int32{},
-		grades: map[int32]int{}, privs: map[[2]int32]int32{},
+		grades: map[int32]int{}, privs: map[[2]int32]int32{}, crests: map[[2]int32]int32{},
 	}
 }
 
@@ -100,6 +104,13 @@ func (f *fakeStore) SetPowerGrade(_ context.Context, objectID int32, grade int) 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.grades[objectID] = grade
+	return nil
+}
+
+func (f *fakeStore) UpdateCrest(_ context.Context, clanID int32, typ datacache.CrestType, crestID int32) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.crests[[2]int32{clanID, int32(typ)}] = crestID
 	return nil
 }
 

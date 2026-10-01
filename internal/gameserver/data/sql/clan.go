@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 )
 
 // ClanStore reads and writes clan_data, clan_privs and the clan columns of
@@ -183,6 +184,25 @@ func (s *ClanStore) RemoveMembership(ctx context.Context, r clan.RemovalRow) err
 func (s *ClanStore) SetPowerGrade(ctx context.Context, objectID int32, grade int) error {
 	if _, err := s.db.ExecContext(ctx, `UPDATE characters SET power_grade=? WHERE obj_Id=?`, grade, objectID); err != nil {
 		return fmt.Errorf("set power grade of %d: %w", objectID, err)
+	}
+	return nil
+}
+
+// UpdateCrest stores one of a clan's own crest id columns.
+func (s *ClanStore) UpdateCrest(ctx context.Context, clanID int32, typ datacache.CrestType, crestID int32) error {
+	var query string
+	switch typ {
+	case datacache.PledgeCrest:
+		query = `UPDATE clan_data SET crest_id = ? WHERE clan_id = ?`
+	case datacache.LargePledgeCrest:
+		query = `UPDATE clan_data SET crest_large_id = ? WHERE clan_id = ?`
+	case datacache.AllyCrest:
+		query = `UPDATE clan_data SET ally_crest_id = ? WHERE clan_id = ?`
+	default:
+		return fmt.Errorf("update clan %d crest: unknown crest type %d", clanID, typ)
+	}
+	if _, err := s.db.ExecContext(ctx, query, crestID, clanID); err != nil {
+		return fmt.Errorf("update clan %d crest: %w", clanID, err)
 	}
 	return nil
 }
