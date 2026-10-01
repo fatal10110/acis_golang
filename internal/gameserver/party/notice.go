@@ -37,6 +37,9 @@ const (
 	// MsgPartyDismissedFromChannel: Name's party was dismissed from the
 	// command channel.
 	MsgPartyDismissedFromChannel
+	MsgLeftChannel
+	// MsgPartyLeftChannel: Name's party left the command channel.
+	MsgPartyLeftChannel
 )
 
 // WindowAll replaces To's party window: its leader, loot rule and the other

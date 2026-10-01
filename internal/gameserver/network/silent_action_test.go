@@ -142,6 +142,13 @@ import (
 // not read (a missing token, a number that does not parse), or that names a
 // clan page the player may not see, shows nothing, as in the reference: the
 // board window holds no pending action. tests/bbs asserts those silences.
+//
+// RequestUserCommand is absent where the reference is silent: a command id
+// no handler claims, /loc where no restart point covers the player, and
+// /partyinfo, /mount, /dismount and the command channel commands from a
+// player with no party, channel or mount to act on. A user command
+// registers no pending client action; tests/character, tests/party and
+// tests/clan assert those silences.
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 
@@ -197,6 +204,9 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"Say2 whisper to nobody online", encodeSay2Tell("hi", "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestWithdrawPledge without a clan", wire.NewPacketWriter(clientpackets.OpcodeRequestWithdrawPledge).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestOustPledgeMember without a clan", encodeRequestOustPledgeMember("Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestUserCommand /attacklist without a clan", encodeRequestUserCommand(88), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestUserCommand /siegestatus without a clan", encodeRequestUserCommand(99), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestUserCommand /olympiadstat before noble status exists", encodeRequestUserCommand(109), []byte{serverpackets.OpcodeActionFailed}},
 	}
 
 	for _, tc := range cases {
@@ -302,5 +312,11 @@ func encodeRequestMakeMacro(name string) []byte {
 func encodeRequestOustPledgeMember(name string) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestOustPledgeMember)
 	w.WriteString(name)
+	return w.Bytes()
+}
+
+func encodeRequestUserCommand(id int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestUserCommand)
+	w.WriteInt32(id)
 	return w.Bytes()
 }
