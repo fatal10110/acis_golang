@@ -113,12 +113,12 @@ func (l *GameClientLink) handleRequestFriendInvite(live *livePlayer, req clientp
 	target, online := l.livePlayerByName(req.Name)
 	parties := relation.InviteParties{
 		RequesterID:  live.ObjectID(),
-		RequesterGM:  live.access.IsGM,
+		RequesterGM:  live.accessLevel().IsGM,
 		TargetOnline: online,
 	}
 	if online {
 		parties.TargetID = target.ObjectID()
-		parties.TargetGM = target.access.IsGM
+		parties.TargetGM = target.accessLevel().IsGM
 		parties.TargetBlocked = target.BlockingAll()
 	}
 	refusal := l.relations.CheckInvite(parties)

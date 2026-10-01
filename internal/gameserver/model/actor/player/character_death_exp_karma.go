@@ -35,9 +35,7 @@ func deathLossExemption(inPvP, inSiege, charmOfCourage, killedByPlayable bool) (
 // (an arena), one to a player or its summon. A player killed inside a siege
 // zone without the charm still loses exp, at a quarter of the normal rate.
 //
-// Deferred pending owning subsystems: the mutual-clan-war halving of
-// percentLost — clan-war state isn't tracked yet
-// (#149).
+// Deferred: the quarter loss of a death between clans at war (#3180).
 //
 // The siege-zone and festival-participant reductions are wired: InSiegeZone
 // and FestivalParticipant are live accessors (FestivalParticipant is a
@@ -50,25 +48,65 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 	killedByPlayable := actingCharacter(killer) != nil
 
 	c.stateMu.RLock()
-	table := c.levelTable
 	allow := c.allowDelevel
-	rate := c.rateKarmaExpLost
 	c.stateMu.RUnlock()
 	lucky := c.HasSkill(int(skill.LuckySkillID))
-	reducedLoss := c.FestivalParticipant() || c.InSiegeZone()
-	exempt, useCharm := deathLossExemption(c.InPvPZone(), c.InSiegeZone(),
-		c.EffectList().IsAffected(effect.FlagCharmOfCourage), killedByPlayable)
+	loss := c.deathLossTerms(killedByPlayable)
 
 	var hooks progressionHooks
 	defer func() { hooks.run() }()
 	c.progressionMu.Lock()
 	defer c.progressionMu.Unlock()
 	c.ExpBeforeDeath = 0
-	if table == nil || !allow || (lucky && c.CharLevel <= 9) {
+	if loss.table == nil || !allow || (lucky && c.CharLevel <= 9) {
 		return
 	}
-	if exempt {
-		if useCharm {
+	c.applyDeathPenaltyLocked(loss, &hooks)
+}
+
+// ApplyDeathPenalty takes a full death's experience and karma loss from
+// this character without a death: a clan's surrender costs its leader
+// that. The delevel gate does not apply; the PvP-zone exemptions do, as
+// for a death no playable caused.
+func (c *Character) ApplyDeathPenalty() {
+	loss := c.deathLossTerms(false)
+	if loss.table == nil {
+		return
+	}
+	var hooks progressionHooks
+	c.progressionMu.Lock()
+	c.applyDeathPenaltyLocked(loss, &hooks)
+	c.progressionMu.Unlock()
+	hooks.run()
+}
+
+// deathLoss is what a death's experience loss is computed from, read
+// before progressionMu is taken.
+type deathLoss struct {
+	table            *LevelTable
+	rate             float64
+	reducedLoss      bool
+	exempt, useCharm bool
+}
+
+// deathLossTerms reads the level table, the karma rate and the zone and
+// effect state a death's experience loss depends on.
+func (c *Character) deathLossTerms(killedByPlayable bool) deathLoss {
+	c.stateMu.RLock()
+	loss := deathLoss{table: c.levelTable, rate: c.rateKarmaExpLost}
+	c.stateMu.RUnlock()
+	loss.reducedLoss = c.FestivalParticipant() || c.InSiegeZone()
+	loss.exempt, loss.useCharm = deathLossExemption(c.InPvPZone(), c.InSiegeZone(),
+		c.EffectList().IsAffected(effect.FlagCharmOfCourage), killedByPlayable)
+	return loss
+}
+
+// applyDeathPenaltyLocked takes the experience and karma one death costs;
+// the caller holds progressionMu.
+func (c *Character) applyDeathPenaltyLocked(loss deathLoss, hooks *progressionHooks) {
+	table := loss.table
+	if loss.exempt {
+		if loss.useCharm {
 			// The charm's end broadcasts the status window with the charm
 			// cleared; it runs after progressionMu is released.
 			hooks.add(func() { c.EffectList().StopByType(effect.TypeCharmOfCourage) })
@@ -83,9 +121,9 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 
 	percentLost := level.ExpLossAtDeath
 	if c.KarmaPoints > 0 {
-		percentLost *= rate
+		percentLost *= loss.rate
 	}
-	if reducedLoss {
+	if loss.reducedLoss {
 		percentLost /= 4.0
 	}
 
@@ -95,11 +133,11 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 	// Snapshot the pre-loss exp for a later resurrection to restore from.
 	c.ExpBeforeDeath = c.Exp
 
-	c.updateKarmaLoss(table, lostExp, &hooks)
+	c.updateKarmaLoss(table, lostExp, hooks)
 	// The loss is a negative experience add, not a removal: one that would
 	// take experience below zero is dropped rather than floored, no loss
 	// message goes out, and UserInfo is sent either way.
-	c.addExp(table, c.template(), -lostExp, &hooks)
+	c.addExp(table, c.template(), -lostExp, hooks)
 	hooks.add(c.UpdateUserInfo)
 }
 

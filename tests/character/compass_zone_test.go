@@ -36,6 +36,7 @@ func assertCompassCodes(t *testing.T, frames [][]byte, want ...byte) {
 }
 
 func TestCompassZoneOnEnterWorldAndWalk(t *testing.T) {
+	t.Parallel()
 	form, err := zone.NewCuboid(-100, 100, -100, 100, -10_000, 10_000)
 	if err != nil {
 		t.Fatal(err)
@@ -76,6 +77,7 @@ func TestCompassZoneOnEnterWorldAndWalk(t *testing.T) {
 }
 
 func TestCompassZoneTownToTownTeleport(t *testing.T) {
+	t.Parallel()
 	peace := newCountedPeace(t, -10_000, 10_000, -10_000, 10_000)
 	zones := zone.NewIndex()
 	zones.Add(peace)
@@ -87,6 +89,7 @@ func TestCompassZoneTownToTownTeleport(t *testing.T) {
 }
 
 func TestCompassZoneTeleportFollowsKnownListClear(t *testing.T) {
+	t.Parallel()
 	zones := zone.NewIndex()
 	zones.Add(newCountedPeace(t, -10_000, 10_000, -10_000, 10_000))
 	srv, c, observer, objID := bootObserverPair(t, gameservertest.WithZones(zones))
@@ -118,6 +121,7 @@ func TestCompassZoneTeleportFollowsKnownListClear(t *testing.T) {
 }
 
 func TestCompassZoneWalkIntoPvPArena(t *testing.T) {
+	t.Parallel()
 	form, err := zone.NewCuboid(100, 500, -100, 100, -10_000, 10_000)
 	if err != nil {
 		t.Fatal(err)
@@ -148,6 +152,7 @@ func TestCompassZoneWalkIntoPvPArena(t *testing.T) {
 }
 
 func TestCompassZonePvPAndSiegePriority(t *testing.T) {
+	t.Parallel()
 	form, err := zone.NewCuboid(-100, 100, -100, 100, -10_000, 10_000)
 	if err != nil {
 		t.Fatal(err)

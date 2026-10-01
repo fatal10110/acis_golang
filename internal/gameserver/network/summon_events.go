@@ -590,12 +590,14 @@ func (l *GameClientLink) deleteOfflineItem(ownerID, objectID int32) {
 	if l.items == nil || l.persist == nil {
 		return
 	}
-	l.queueItemWrite(l.itemWrites.Reserve(objectID), func([]int32) {
+	l.queueItemWrite(l.itemWrites.Reserve(objectID), func([]int32) error {
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
 		if _, err := l.items.DeleteOwned(ctx, ownerID, objectID); err != nil {
 			l.log.Error().Err(err).Int32("object_id", objectID).Msg("delete offline item")
+			return err
 		}
+		return nil
 	}, ownerID)
 }
 
@@ -606,12 +608,14 @@ func (l *GameClientLink) setOfflineItemEnchant(ownerID, objectID int32, enchant 
 	if l.items == nil || l.persist == nil {
 		return
 	}
-	l.queueItemWrite(l.itemWrites.Reserve(objectID), func([]int32) {
+	l.queueItemWrite(l.itemWrites.Reserve(objectID), func([]int32) error {
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
 		if _, err := l.items.SetEnchantOwned(ctx, ownerID, objectID, enchant); err != nil {
 			l.log.Error().Err(err).Int32("object_id", objectID).Msg("set offline item enchant")
+			return err
 		}
+		return nil
 	}, ownerID)
 }
 

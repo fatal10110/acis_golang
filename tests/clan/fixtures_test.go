@@ -41,8 +41,9 @@ type clanWorld struct {
 }
 
 // clanPages stands the clan dialog in for the village master's own chat
-// page: the four datapack pages whose links name the clan commands, as the
-// clan dialog serves them, plus the pages a leader nomination answers with.
+// page: the datapack pages whose links name the clan commands, as the clan
+// dialog serves them, plus the pages a leader nomination and a clan skill
+// list refusal answer with.
 func clanPages(t *testing.T) map[string]string {
 	t.Helper()
 	read := func(name string) string {
@@ -53,9 +54,9 @@ func clanPages(t *testing.T) map[string]string {
 		return string(data)
 	}
 	pages := map[string]string{
-		"villagemaster/" + strconv.Itoa(masterID) + ".htm": read("9000-02.htm") + read("9000-03.htm") + read("9000-07.htm") + read("9000-08.htm"),
+		"villagemaster/" + strconv.Itoa(masterID) + ".htm": read("9000-01.htm") + read("9000-02.htm") + read("9000-03.htm") + read("9000-07.htm") + read("9000-08.htm"),
 	}
-	for _, name := range []string{"9000-07-success.htm", "9000-07-in-progress.htm", "9000-08-success.htm", "9000-08-no.htm"} {
+	for _, name := range []string{"9000-07-success.htm", "9000-07-in-progress.htm", "9000-08-success.htm", "9000-08-no.htm", "9000-09-no.htm"} {
 		pages[filepath.Join("script", "feature", "Clan", name)] = read(name)
 	}
 	return pages

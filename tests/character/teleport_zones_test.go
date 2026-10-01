@@ -119,6 +119,7 @@ func firstOpcode(frames [][]byte, op byte) int {
 // therefore exits it at the teleport and enters it again at Appearing, and
 // the peace flag is down in between.
 func TestTeleportInsidePeaceZoneExitsUntilAppearing(t *testing.T) {
+	t.Parallel()
 	peace := newCountedPeace(t, -10_000, 10_000, -10_000, 10_000)
 	zones := zone.NewIndex()
 	zones.Add(peace)
@@ -155,6 +156,7 @@ func TestTeleportInsidePeaceZoneExitsUntilAppearing(t *testing.T) {
 // destination's zones are entered when the client appears, not when the
 // teleport is issued.
 func TestTeleportIntoPeaceZoneEntersAtAppearing(t *testing.T) {
+	t.Parallel()
 	peace := newCountedPeace(t, 5_000, 7_000, -10_000, 10_000)
 	zones := zone.NewIndex()
 	zones.Add(peace)
@@ -224,6 +226,7 @@ func drownIndex(frames [][]byte) int {
 // already drowning takes no drowning damage while off the grid, and
 // Appearing at a dry destination sends no gauge.
 func TestTeleportOutOfWaterStopsBreathAtTeleport(t *testing.T) {
+	t.Parallel()
 	srv, character, objID, clock := bootInWater(t)
 	x, y, z := srv.PlayerPosition(t, objID)
 
@@ -264,6 +267,7 @@ func TestTeleportOutOfWaterStopsBreathAtTeleport(t *testing.T) {
 // the player untracked, so a fresh countdown starts with a full gauge
 // before Appearing's own UserInfo answer.
 func TestTeleportWithinWaterRestartsBreath(t *testing.T) {
+	t.Parallel()
 	srv, character, objID, _ := bootInWater(t)
 	x, y, z := srv.PlayerPosition(t, objID)
 

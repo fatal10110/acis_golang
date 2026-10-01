@@ -309,6 +309,44 @@ const clanPrivsSchema = "CREATE TABLE IF NOT EXISTS `clan_privs` (\n" +
 	"  PRIMARY KEY (`clan_id`,`ranking`)\n" +
 	")"
 
+// accountsSchema mirrors the shipped accounts table definition verbatim.
+// The login server owns it; the game server's behavior harness runs a login
+// server on the same database.
+const accountsSchema = "CREATE TABLE IF NOT EXISTS `accounts` (\n" +
+	"	`login` VARCHAR(45) NOT NULL DEFAULT '',\n" +
+	"	`password` VARCHAR(60) NOT NULL DEFAULT '',\n" +
+	"	`last_active` BIGINT NOT NULL DEFAULT 0,\n" +
+	"	`access_level` INT(3) NOT NULL DEFAULT 0,\n" +
+	"	`last_server` INT(4) NOT NULL DEFAULT 1,\n" +
+	"	PRIMARY KEY (`login`)\n" +
+	")"
+
+// clanSkillsSchema mirrors the shipped clan_skills table definition verbatim.
+const clanSkillsSchema = "CREATE TABLE IF NOT EXISTS clan_skills (\n" +
+	"  clan_id INT NOT NULL DEFAULT 0,\n" +
+	"  skill_id INT NOT NULL DEFAULT 0,\n" +
+	"  skill_level INT NOT NULL DEFAULT 0,\n" +
+	"  PRIMARY KEY (`clan_id`,`skill_id`)\n" +
+	")"
+
+// clanSubpledgesSchema mirrors the shipped clan_subpledges table definition
+// verbatim.
+const clanSubpledgesSchema = "CREATE TABLE IF NOT EXISTS `clan_subpledges` (\n" +
+	"  `clan_id` INT NOT NULL default '0',\n" +
+	"  `sub_pledge_id` INT NOT NULL default '0',\n" +
+	"  `name` varchar(45),\n" +
+	"  `leader_id` INT NOT NULL default '0',\n" +
+	"  PRIMARY KEY (`clan_id`,`sub_pledge_id`)\n" +
+	")"
+
+// clanWarsSchema mirrors the shipped clan_wars table definition verbatim.
+const clanWarsSchema = "CREATE TABLE IF NOT EXISTS `clan_wars` (\n" +
+	"  `clan1` varchar(35) NOT NULL DEFAULT '',\n" +
+	"  `clan2` varchar(35) NOT NULL DEFAULT '',\n" +
+	"  `expiry_time` decimal(20,0) NOT NULL DEFAULT '0',\n" +
+	"  PRIMARY KEY (`clan1`,`clan2`)\n" +
+	")"
+
 // sevenSignsStatusSeed seeds the single status row the gameserver reads and
 // writes, matching the shipped schema seed.
 const sevenSignsStatusSeed = "INSERT IGNORE INTO `seven_signs_status` VALUES " +
@@ -341,7 +379,8 @@ var schemaStmts = []string{
 	sevenSignsStatusSchema, buylistsSchema, characterSubclassesSchema,
 	characterRelationsSchema,
 	characterMacrosesSchema, characterRecommendsSchema,
-	clanDataSchema, clanPrivsSchema,
+	clanDataSchema, clanPrivsSchema, clanSkillsSchema, clanSubpledgesSchema, clanWarsSchema,
+	accountsSchema,
 }
 
 var seedStmts = []string{sevenSignsStatusSeed}

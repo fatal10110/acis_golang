@@ -2,12 +2,15 @@ package task
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 )
 
 func batchRowIDs(batch item.FlushBatch) []int32 {
@@ -160,5 +163,58 @@ func TestItemInstancesOlderWriteLandingKeepsNewerGroup(t *testing.T) {
 	calls := flusher.calls()
 	if got := batchRowIDs(calls[len(calls)-1]); !slices.Equal(got, []int32{1, 2}) {
 		t.Fatalf("write after the older write landed = %v, want the second trade's rows [1 2] still together", got)
+	}
+}
+
+// TestItemInstancesFailedWriteDoesNotSplitBoundRows pins a write that holds
+// an earlier place on one bound row and a later one on the other: the tick's
+// owner jobs widen to the same group on two lanes at once, and their places
+// can interleave that way. The write holding the later place on the
+// receiver's row runs first and the database refuses it. It landed nothing,
+// so the giver's job must still carry both rows; counting the refused write
+// as landed would leave it keeping only the giver's row and committing that
+// leg alone (#3125).
+func TestItemInstancesFailedWriteDoesNotSplitBoundRows(t *testing.T) {
+	flusher := &chunkTrackingFlusher{}
+	order := persist.NewOrder()
+	instances := NewItemInstances(flusher, item.NewTable(nil), nil, order, zerolog.Nop())
+	giver := &item.Instance{ObjectID: 1, TemplateID: 1, OwnerID: 100, Count: 60, Location: item.LocationInventory}
+	receiver := &item.Instance{ObjectID: 2, TemplateID: 1, OwnerID: 200, Count: 40, Location: item.LocationInventory}
+	instances.Add(giver)
+	instances.Add(receiver)
+	instances.Bind([]BoundRow{{ObjectID: 1, OwnerID: 100, Inst: giver}, {ObjectID: 2, OwnerID: 200, Inst: receiver}})
+
+	// An earlier write holds the giver's row, so the giver's job takes its
+	// places and then waits for that row.
+	earlier := order.Reserve(1)
+	held, release := make(chan struct{}), make(chan struct{})
+	go earlier.Run(func([]int32) error {
+		close(held)
+		<-release
+		return nil
+	})
+	<-held
+	saved := make(chan error, 1)
+	go func() { saved <- instances.UpdateItems(context.Background(), []*item.Instance{giver}) }()
+	deadline := time.Now().Add(5 * time.Second)
+	for order.Reserved(2) == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the giver's job never took its place on the receiver's row")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	// The other job, later on the receiver's row, runs first and is refused.
+	order.Reserve(2).Run(func([]int32) error { return errors.New("refused") })
+	close(release)
+	if err := <-saved; err != nil {
+		t.Fatalf("UpdateItems: %v", err)
+	}
+	calls := flusher.calls()
+	if len(calls) != 1 {
+		t.Fatalf("flushes = %d, want the giver's job's one", len(calls))
+	}
+	if got := batchRowIDs(calls[0]); !slices.Equal(got, []int32{1, 2}) {
+		t.Fatalf("giver's job wrote rows %v after the refused write, want both bound rows [1 2]", got)
 	}
 }

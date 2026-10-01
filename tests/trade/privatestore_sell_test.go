@@ -20,6 +20,7 @@ const swordID = 30
 // the second takes the last potion and the sword, which empties the list
 // and closes the store for everyone. Every row lands in the database.
 func TestPrivateSellStoreSellsUntilEmpty(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	potions := h.srv.GiveItem(t, h.firstID, potionID, 10)
 	sword := h.srv.GiveItem(t, h.firstID, swordID, 1)
@@ -76,6 +77,7 @@ func TestPrivateSellStoreSellsUntilEmpty(t *testing.T) {
 // both through, handing over units the owner never priced (see the PR's
 // abuse notes); the client never sends either. No refusal moves an item.
 func TestPrivateSellStoreRefusals(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	potions := h.srv.GiveItem(t, h.firstID, potionID, 10)
 	sword := h.srv.GiveItem(t, h.firstID, swordID, 1)
@@ -109,6 +111,7 @@ func TestPrivateSellStoreRefusals(t *testing.T) {
 // window reports the package flag, a purchase of part of the package is
 // refused, and buying every row whole empties and closes the store.
 func TestPackageSellStoreSellsOnlyWhole(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	potions := h.srv.GiveItem(t, h.firstID, potionID, 10)
 	sword := h.srv.GiveItem(t, h.firstID, swordID, 1)
@@ -152,6 +155,7 @@ func TestPackageSellStoreSellsOnlyWhole(t *testing.T) {
 // answers EXCEEDED_THE_MAXIMUM and shows the manage window again with what
 // did get listed, the owner still setting up.
 func TestSellStoreListRefusals(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	potions := h.srv.GiveItem(t, h.firstID, potionID, 10)
 	h.enterAll(t)

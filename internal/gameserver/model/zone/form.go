@@ -84,7 +84,8 @@ func NewCuboid(x1, x2, y1, y2, z1, z2 int) (Form, error) {
 }
 
 // NewCylinder builds a vertical circular column form centered on (x, y)
-// spanning z1..z2. The radius must be positive.
+// spanning z1..z2. The radius must be positive, and the centre and radius
+// must fit in 32 bits.
 func NewCylinder(x, y, z1, z2, rad int) (Form, error) {
 	circle, err := geometry.NewCircle(x, y, rad)
 	if err != nil {

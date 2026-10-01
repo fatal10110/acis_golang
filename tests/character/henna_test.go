@@ -13,6 +13,7 @@ import (
 )
 
 func TestEnterWorldRestoresHennaInfoAndBonuses(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Dyer", 40, 0),
 		gameservertest.WithWantChars(1),

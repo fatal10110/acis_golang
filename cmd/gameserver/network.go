@@ -209,9 +209,10 @@ func provideGameClientLink(
 		AugmentationChances: gameplay.AugmentationChances,
 		ArmorSets:           data.ArmorSets,
 
-		Relations:  relations,
-		Characters: characters,
-		Clans:      clans,
+		Relations:    relations,
+		Characters:   characters,
+		Clans:        clans,
+		AccessLevels: characters,
 	})
 	if err != nil {
 		return nil, err

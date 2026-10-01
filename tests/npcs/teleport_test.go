@@ -108,7 +108,7 @@ func bootTravelWorld(t *testing.T, teleports travel.TeleportTable, instants trav
 			srv.GiveItem(t, w.player, id, held[id])
 		}
 	}
-	startInWorld(t, w.c)
+	startInWorld(t, w.srv, w.c)
 	x, y, z := srv.PlayerPosition(t, w.player)
 	w.at = location.Location{X: x, Y: y, Z: z}
 	return w, w.spawnFolk(t, folkTemplate("Gatekeeper", gatekeeperID), 50)
@@ -461,7 +461,7 @@ func TestBypassTeleportListShippedGatekeeper(t *testing.T) {
 		noBypassReuse,
 	)
 	w := &folkWorld{srv: srv, c: srv.Client, player: srv.SoleObjectID(t)}
-	startInWorld(t, w.c)
+	startInWorld(t, w.srv, w.c)
 	x, y, z := srv.PlayerPosition(t, w.player)
 	w.at = location.Location{X: x, Y: y, Z: z}
 	gk := w.spawnFolk(t, folkTemplate("Gatekeeper", gatekeeperID), 50)

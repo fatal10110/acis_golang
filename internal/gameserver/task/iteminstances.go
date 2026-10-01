@@ -679,7 +679,7 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 	write, states, deletes, carried := i.placeRows(items)
 	var err error
 	var landed []int32
-	write.Run(func(keep []int32) {
+	write.Run(func(keep []int32) error {
 		var batch item.FlushBatch
 		for _, st := range states {
 			if _, found := slices.BinarySearch(keep, st.ObjectID); !found {
@@ -694,6 +694,7 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 		}
 		err = i.flusher.Flush(ctx, batch)
 		landed = keep
+		return err
 	})
 	if err == nil {
 		i.Landed(carried, landed)

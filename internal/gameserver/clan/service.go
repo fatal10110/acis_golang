@@ -2,6 +2,7 @@ package clan
 
 import (
 	"context"
+	"sync"
 	"time"
 	"unicode"
 
@@ -21,10 +22,25 @@ type Config struct {
 	// CreateDays is DaysBeforeCreateAClan: how long a leader that left its
 	// clan waits to found another.
 	CreateDays int
+	// MembersForWar is ClanMembersForWar: how many members a clan needs to
+	// declare war, or to be declared war on.
+	MembersForWar int
+	// WarPenaltyDays is ClanWarPenaltyWhenEnded: how long a clan that
+	// stopped a war waits to declare it again; 0 forgets the war at once.
+	WarPenaltyDays int
+	// LifeCrystalNeeded is players.properties LifeCrystalNeeded: learning a
+	// clan skill also takes one of the skill's item from the leader.
+	LifeCrystalNeeded bool
+	// MembersCanWithdrawFromWarehouse is MembersCanWithdrawFromClanWH: a
+	// member holding the warehouse-search privilege may withdraw from the
+	// clan warehouse, not only the leader.
+	MembersCanWithdrawFromWarehouse bool
 }
 
-// DefaultConfig is the shipped clans.properties.
-func DefaultConfig() Config { return Config{JoinDays: 1, CreateDays: 10} }
+// DefaultConfig is the shipped clans.properties and LifeCrystalNeeded.
+func DefaultConfig() Config {
+	return Config{JoinDays: 1, CreateDays: 10, MembersForWar: 15, WarPenaltyDays: 5, LifeCrystalNeeded: true}
+}
 
 // IDAllocator hands out object ids; a new clan's id comes from the same
 // space as every other persisted object's.
@@ -42,6 +58,9 @@ type Service struct {
 	cfg     Config
 	log     zerolog.Logger
 	invites *Invites
+	// subunitMu serializes sub-unit foundings, whose names are unique
+	// across every clan.
+	subunitMu sync.Mutex
 }
 
 // NewService returns a Service over table. Writes go to store through

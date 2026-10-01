@@ -71,6 +71,60 @@ func TestAwaitCloseSpendsOneBudgetOnTheAwaitClock(t *testing.T) {
 	}
 }
 
+// TestAwaitCloseReportsAStalledFrameAsOpen pins that a frame whose first
+// byte arrives and whose rest stalls past frameInFlight, on a connection the
+// server keeps open, is not a close. It waits out frameInFlight.
+func TestAwaitCloseReportsAStalledFrameAsOpen(t *testing.T) {
+	t.Parallel()
+	clientConn, serverConn := net.Pipe()
+	t.Cleanup(func() { clientConn.Close() })
+	t.Cleanup(func() { serverConn.Close() })
+	c := &ScriptedClient{t: t, conn: clientConn, handshaken: true}
+
+	var now time.Time
+	sent := false
+	c.SetAwait(func(d time.Duration) bool {
+		if sent {
+			now = now.Add(max(d, 0))
+			return false
+		}
+		sent = true
+		go serverConn.Write([]byte{5})
+		return true
+	}, func() time.Time { return now })
+
+	if c.AwaitClose(3 * time.Second) {
+		t.Fatal("AwaitClose reported a close for a frame stalled on an open connection")
+	}
+}
+
+// TestAwaitCloseReportsAFrameCutByTheCloseAsClosed pins that a frame whose
+// first byte arrives before the server closes is still a close.
+func TestAwaitCloseReportsAFrameCutByTheCloseAsClosed(t *testing.T) {
+	clientConn, serverConn := net.Pipe()
+	t.Cleanup(func() { clientConn.Close() })
+	c := &ScriptedClient{t: t, conn: clientConn, handshaken: true}
+
+	var now time.Time
+	sent := false
+	c.SetAwait(func(d time.Duration) bool {
+		if sent {
+			now = now.Add(max(d, 0))
+			return false
+		}
+		sent = true
+		go func() {
+			serverConn.Write([]byte{5})
+			serverConn.Close()
+		}()
+		return true
+	}, func() time.Time { return now })
+
+	if !c.AwaitClose(3 * time.Second) {
+		t.Fatal("AwaitClose missed a close that cut a frame off")
+	}
+}
+
 // TestExpectClosedWaitsOnTheAwaitClock pins that ExpectClosed waits through
 // await, as every read does, so on a driven clock it waits for the server's
 // progress rather than a raw socket deadline, and that a server which never

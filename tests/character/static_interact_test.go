@@ -121,6 +121,7 @@ func selectStatic(t *testing.T, c *testsupport.ScriptedClient, obj *staticobject
 }
 
 func TestTownMapClickInRangeFacesThenShowsMap(t *testing.T) {
+	t.Parallel()
 	srv := bootBodied(t)
 	c := srv.Client
 	mapObject := spawnTownMap(t, srv, c, 0)
@@ -136,6 +137,7 @@ func TestTownMapClickInRangeFacesThenShowsMap(t *testing.T) {
 }
 
 func TestTownMapClickFromAfarWalksThenShowsMap(t *testing.T) {
+	t.Parallel()
 	srv := bootBodied(t)
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -167,6 +169,7 @@ func TestTownMapClickFromAfarWalksThenShowsMap(t *testing.T) {
 }
 
 func TestTownMapShiftClickFromAfarDoesNotWalk(t *testing.T) {
+	t.Parallel()
 	srv := bootBodied(t)
 	c := srv.Client
 	mapObject := spawnTownMap(t, srv, c, 300)
@@ -185,6 +188,7 @@ func TestTownMapShiftClickFromAfarDoesNotWalk(t *testing.T) {
 // a static object has no collision radius, so a click 108 units away
 // interacts in place and one 109 units away walks.
 func TestTownMapApproachRangeCountsNoStaticRadius(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		dx   int
 		want []byte
@@ -213,6 +217,7 @@ func TestTownMapApproachRangeCountsNoStaticRadius(t *testing.T) {
 // TestArenaSignClickInRangeShowsSignboard pins the arena sign's interact:
 // facing MoveToPawn, then the signboard page tagged with the sign's id.
 func TestArenaSignClickInRangeShowsSignboard(t *testing.T) {
+	t.Parallel()
 	srv := bootBodied(t)
 	c := srv.Client
 	sign, err := staticobject.NewObject(srv.NewObjectID(), &staticobject.Template{

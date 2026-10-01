@@ -249,3 +249,22 @@ func (s *Server) awaitFrame(c *testsupport.ScriptedClient, d time.Duration) bool
 		s.queues.advance(step)
 	}
 }
+
+// ReadQueued returns every frame the server has queued to c that c has not
+// read yet, once the server has handled what c sent (see Settle). It lets no
+// time pass on a driven clock, so no timer comes due meanwhile, and on the
+// wall clock it does not stop at a quiet spell: a frame already queued is
+// read however long the machine takes to deliver it.
+func (s *Server) ReadQueued(tb testing.TB, c *testsupport.ScriptedClient) [][]byte {
+	tb.Helper()
+	s.Settle(tb)
+	ct := s.traffic.conn(c.LocalAddr())
+	if ct == nil {
+		tb.Fatal("ReadQueued: client connection not tracked")
+	}
+	var frames [][]byte
+	for c.Received() < ct.sent.Load() {
+		frames = append(frames, c.Read())
+	}
+	return frames
+}

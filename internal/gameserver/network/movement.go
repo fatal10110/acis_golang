@@ -357,7 +357,7 @@ func (l *GameClientLink) broadcastLiveStopMove(live *livePlayer, at location.Loc
 // on a later dead reconnect.
 func (l *GameClientLink) broadcastLiveDie(live *livePlayer) {
 	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameDie(live.ObjectID(), l.dieOptions(live.Character))
+		return serverpackets.FrameDie(live.ObjectID(), dieOptions(live))
 	})
 }
 

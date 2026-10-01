@@ -47,7 +47,7 @@ func bootFolkWorldAs(t *testing.T, character gameservertest.Option, pages map[st
 	opts := append([]gameservertest.Option{character, gameservertest.WithWantChars(1), gameservertest.WithHTMLPages(pages)}, extra...)
 	srv := gameservertest.Boot(t, opts...)
 	w := &folkWorld{srv: srv, c: srv.Client, player: srv.SoleObjectID(t)}
-	startInWorld(t, w.c)
+	startInWorld(t, w.srv, w.c)
 	x, y, z := srv.PlayerPosition(t, w.player)
 	w.at = location.Location{X: x, Y: y, Z: z}
 	return w
@@ -120,7 +120,7 @@ func encodeAction(objectID int32, at location.Location, shift bool) []byte {
 	return w.Bytes()
 }
 
-func startInWorld(t *testing.T, c *testsupport.ScriptedClient) {
+func startInWorld(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient) {
 	t.Helper()
 	c.Send(encodeRequestGameStart(0))
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
@@ -129,8 +129,19 @@ func startInWorld(t *testing.T, c *testsupport.ScriptedClient) {
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeCharSelected {
 		t.Fatalf("opcode = %#x, want CharSelected (%#x)", reply[0], serverpackets.OpcodeCharSelected)
 	}
+	enterWorld(t, srv, c)
+}
+
+// enterWorld sends EnterWorld and returns its burst once the server has
+// handled it. On the wall clock (the real pool) the character's rows are read
+// before the burst's first frame, and the player joins the world only after
+// them, so a quiet window alone could close before either: the drain starts
+// only once the request has been handled.
+func enterWorld(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient) [][]byte {
+	t.Helper()
 	c.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
-	drainUntilQuiet(t, c)
+	srv.Settle(t)
+	return drainFrames(t, c)
 }
 
 func drainUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) {

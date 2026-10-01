@@ -90,7 +90,7 @@ func (a *liveZoneActor) ObjectID() int32             { return a.live.ObjectID() 
 func (a *liveZoneActor) Position() location.Location { return a.live.CurrentLocation() }
 func (a *liveZoneActor) ZoneFlags() *zone.Flags      { return &a.flags }
 func (a *liveZoneActor) Class() zone.Class           { return zone.ClassPlayer }
-func (a *liveZoneActor) GM() bool                    { return a.live.access.IsGM }
+func (a *liveZoneActor) GM() bool                    { return a.live.accessLevel().IsGM }
 func (a *liveZoneActor) Online() bool                { return !a.live.detached() }
 func (a *liveZoneActor) Race() player.Race           { return a.live.Character.Race }
 func (a *liveZoneActor) ClanID() int32               { return a.live.Character.ClanID() }

@@ -315,7 +315,6 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// snapshot rather than missed.
 	now := c.Now()
 	coolTimes := skillCoolTimeEntries(c.SkillReuseTimers(now), now)
-	skillList := skillListEntries(c, l.skills)
 	// Track this player for the in-game clock's activity reminder so the
 	// PLAYING_FOR_LONG_TIME send reaches them every 720 game minutes.
 	if l.playerClock != nil {
@@ -351,6 +350,9 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	live.replayingEffects.Store(false)
 	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(c)))
 	l.enterWorldClan(client, live)
+	// Taken once the clan block has given the clan's skills, so the login
+	// SkillList carries them.
+	skillList := skillListEntries(c, l.skills)
 	if l.world != nil {
 		// A pet corpse this character left behind is its pet again, as the
 		// character is restored and before it enters the world.
@@ -377,7 +379,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	client.Session.SendFrame(itemListFrame)
 	client.Session.SendFrame(serverpackets.FrameShortCutInit(serverShortcutList(live.Inventory(), live.shortcuts.All())))
 	if c.Dead() {
-		client.Session.SendFrame(serverpackets.FrameDie(c.ObjectID(), l.dieOptions(c)))
+		client.Session.SendFrame(serverpackets.FrameDie(c.ObjectID(), dieOptions(live)))
 	}
 	// Friends hear of the entry last, just ahead of the reuse timers.
 	l.notifyFriends(live, true)
@@ -426,8 +428,8 @@ func sevenSignsPeriodMessage(p sevensigns.Period) int {
 	}
 }
 
-func (l *GameClientLink) dieOptions(c *player.Character) serverpackets.DieOptions {
-	return serverpackets.DieOptions{FixedRes: l.admin.Resolve(c.AccessLevel).AllowFixedRes}
+func dieOptions(live *livePlayer) serverpackets.DieOptions {
+	return serverpackets.DieOptions{FixedRes: live.accessLevel().AllowFixedRes}
 }
 
 // socialActionLevelUp is the social animation id played for everyone who can
@@ -530,7 +532,7 @@ func (l *GameClientLink) userInfoSnapshot(live *livePlayer) serverpackets.UserIn
 		Character:          live.Character,
 		Template:           live.Template(),
 		Items:              live.inventoryItems(),
-		IsGM:               live.access.IsGM,
+		IsGM:               live.accessLevel().IsGM,
 		SpawnProtectedTeam: l.playerConfig.SpawnProtection > 0 && live.SpawnProtected(),
 		Clan:               l.clanFields(live.Character),
 	}
@@ -590,8 +592,9 @@ func skillListEntriesGreyed(c *player.Character, skills *skillstate.Persistence,
 	}
 	sort.Ints(ids)
 
-	// Worn formal wear greys out every skill. The negative-reputation clan
-	// skill flag is not modeled yet.
+	// Worn formal wear greys out every skill. The reference also greys a
+	// clan skill while the clan's reputation is negative, but no member
+	// holds its clan's skills at 0 reputation or below, so that never shows.
 	disabled := formalWear
 	entries := make([]serverpackets.SkillListEntry, 0, len(ids))
 	for _, id := range ids {
@@ -699,7 +702,8 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	creatureLive.Move().UseZoneSwim()
 	creatureLive.SetQueue(l.queues.NewQueue(fmt.Sprintf("player-%d", c.ObjectID())))
 	access := l.admin.Resolve(c.AccessLevel)
-	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), access: access, visibilitySend: client.Session.SendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
+	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), visibilitySend: client.Session.SendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
+	live.access.Store(&access)
 	delivery.live = live
 	c.Attach(creatureLive, live)
 	moveCtl, err := move.NewController(c.Move(), c, live)

@@ -216,6 +216,7 @@ func TestFrameUserInfo(t *testing.T) {
 	}
 	c.SetTitle("Hero")
 	c.SetClanID(5)
+	c.SetColors(0x00CCFF, 0x0033CC)
 	c.SetResourceValues(player.Resources{
 		MaxHP: 80, CurrentHP: 75,
 		MaxMP: 30, CurrentMP: 30,
@@ -319,7 +320,7 @@ func TestFrameUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Face))
 	want = binary.LittleEndian.AppendUint32(want, 1) // IsGM flag
 
-	want = append(want, encodeUTF16Z("Hero")...)
+	want = append(want, encodeUTF16Z(c.Title())...)
 
 	want = binary.LittleEndian.AppendUint32(want, uint32(5))
 	want = binary.LittleEndian.AppendUint32(want, 0) // clan crest id
@@ -360,13 +361,13 @@ func TestFrameUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, 0) // fishing stance y
 	want = binary.LittleEndian.AppendUint32(want, 0) // fishing stance z
 
-	want = binary.LittleEndian.AppendUint32(want, defaultNameColor)
-	want = append(want, 1) // running
+	want = binary.LittleEndian.AppendUint32(want, 0x00CCFF) // name color
+	want = append(want, 1)                                  // running
 
-	want = binary.LittleEndian.AppendUint32(want, 0) // pledge class
-	want = binary.LittleEndian.AppendUint32(want, 0) // pledge type
-	want = binary.LittleEndian.AppendUint32(want, defaultTitleColor)
-	want = binary.LittleEndian.AppendUint32(want, 0) // cursed weapon stage
+	want = binary.LittleEndian.AppendUint32(want, 0)        // pledge class
+	want = binary.LittleEndian.AppendUint32(want, 0)        // pledge type
+	want = binary.LittleEndian.AppendUint32(want, 0x0033CC) // title color
+	want = binary.LittleEndian.AppendUint32(want, 0)        // cursed weapon stage
 
 	if !bytes.Equal(got, want) {
 		t.Errorf("FrameUserInfo mismatch:\n got  %x\n want %x", got, want)

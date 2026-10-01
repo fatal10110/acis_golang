@@ -12,6 +12,7 @@ import (
 const (
 	acquireSkillTypeUsual   int32 = 0
 	acquireSkillTypeFishing int32 = 1
+	acquireSkillTypeClan    int32 = 2
 
 	// spellbookRequirementType is the requirement kind tag marking a
 	// spellbook item in an AcquireSkillInfo requirement entry.
@@ -28,9 +29,8 @@ const (
 // RequestAcquireSkillInfo and RequestAcquireSkill carry an int32 skill type
 // whose values are the AcquireSkillType the trainer list belongs to. Both
 // are made at the civilian NPC the player last selected and can still
-// interact with; without one they answer nothing. The pledge (clan) type
-// is recognized but handled as unavailable: the clan runtime the pledge
-// flow requires is not ported yet.
+// interact with; without one they answer nothing. A skill type outside the
+// usual, fishing and clan lists answers nothing either, as specified.
 
 func (l *GameClientLink) sendAcquireSkillInfo(live *livePlayer, req clientpackets.RequestAcquireSkillInfo) {
 	if live == nil || !skillstate.ValidAcquireRequest(req.SkillID, req.Level) {
@@ -48,11 +48,10 @@ func (l *GameClientLink) sendAcquireSkillInfo(live *livePlayer, req clientpacket
 		l.sendGeneralAcquireSkillInfo(live, req)
 	case acquireSkillTypeFishing:
 		l.sendFishingAcquireSkillInfo(live, req)
-	default:
-		// Pledge (clan) and other types are not handled here: the pledge
-		// runtime that owns clan skills, reputation, and leader authority
-		// is not ported yet, so pledge-skill info is left unanswered until
-		// that lands.
+	case acquireSkillTypeClan:
+		if l.skillDefinitionLoaded(int(req.SkillID), int(req.Level)) {
+			l.sendClanAcquireSkillInfo(live, req)
+		}
 	}
 }
 
@@ -69,9 +68,10 @@ func (l *GameClientLink) learnAcquireSkill(live *livePlayer, req clientpackets.R
 		l.learnGeneralAcquireSkill(live, trainer, req)
 	case acquireSkillTypeFishing:
 		l.learnFishingAcquireSkill(live, req)
-	default:
-		// Pledge-skill learning is deferred for the same reason as the
-		// info path: it needs the unported pledge runtime.
+	case acquireSkillTypeClan:
+		if l.skillDefinitionLoaded(int(req.SkillID), int(req.Level)) {
+			l.learnClanSkill(live, req)
+		}
 	}
 }
 

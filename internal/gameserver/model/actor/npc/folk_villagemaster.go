@@ -208,9 +208,13 @@ func SubclassReplaceList(slot int, classes []int) string {
 
 // villageMasterClanCommands are the clan commands a village master runs
 // itself, matched on the command's first word ignoring case. Its other
-// clan commands (sub-units, alliances, dissolution, clan skills) belong to
-// systems not in place yet.
-var villageMasterClanCommands = []string{"create_clan", "increase_clan_level", "change_clan_leader", "cancel_clan_leader_change"}
+// clan commands (alliances, dissolution) belong to systems not in place
+// yet.
+var villageMasterClanCommands = []string{
+	"create_clan", "increase_clan_level", "change_clan_leader", "cancel_clan_leader_change",
+	"learn_clan_skills",
+	"create_academy", "create_royal", "create_knight", "rename_pledge", "assign_subpl_leader",
+}
 
 // VillageMasterClanCommand reports whether command is a clan command a
 // village master runs.

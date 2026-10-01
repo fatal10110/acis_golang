@@ -71,19 +71,52 @@ func (l *GameClientLink) memberUpdateRow(m clan.Member) serverpackets.PledgeMemb
 // framePledgeMemberList builds cl's main-clan roster with its header; see
 // memberRow for self.
 func (l *GameClientLink) framePledgeMemberList(cl *clan.Clan, self ...*livePlayer) wire.Frame {
+	return l.framePledgeUnitList(cl, clan.SubunitMain, self...)
+}
+
+// framePledgeUnitList builds the roster of cl's sub-unit pledgeType (the
+// main clan for 0) with the clan's header; see memberRow for self.
+func (l *GameClientLink) framePledgeUnitList(cl *clan.Clan, pledgeType int, self ...*livePlayer) wire.Frame {
 	info := cl.Info()
+	name := info.Name
+	if pledgeType != clan.SubunitMain {
+		unit, _ := cl.Subunit(pledgeType)
+		name = unit.Name
+	}
 	members := cl.Members()
 	rows := make([]serverpackets.PledgeMemberListMember, 0, len(members))
 	for _, m := range members {
-		rows = append(rows, l.memberRow(m, self...))
+		if m.PledgeType == pledgeType {
+			rows = append(rows, l.memberRow(m, self...))
+		}
 	}
 	return serverpackets.FramePledgeShowMemberListAll(serverpackets.PledgeMemberList{
-		ClanID: info.ID, PledgeType: clan.SubunitMain, PledgeName: info.Name, LeaderName: info.LeaderName,
+		ClanID: info.ID, PledgeType: int32(pledgeType), PledgeName: name, LeaderName: cl.SubunitLeaderName(pledgeType),
 		CrestID: info.CrestID, Level: int32(info.Level), CastleID: info.CastleID, ClanHallID: info.HallID,
 		Rank: int32(info.Rank), Reputation: int32(info.Reputation), Dissolving: info.DissolvingExpiry > 0,
 		AllyID: info.AllyID, AllyName: info.AllyName, AllyCrestID: info.AllyCrestID, AtWar: info.AtWar,
 		Members: rows,
 	})
+}
+
+// pledgeListFrames builds cl's rosters, the main clan's then each
+// sub-unit's; see memberRow for self.
+func (l *GameClientLink) pledgeListFrames(cl *clan.Clan, self ...*livePlayer) []wire.Frame {
+	units := cl.Subunits()
+	frames := make([]wire.Frame, 0, 1+len(units))
+	frames = append(frames, l.framePledgeMemberList(cl, self...))
+	for _, unit := range units {
+		frames = append(frames, l.framePledgeUnitList(cl, unit.ID, self...))
+	}
+	return frames
+}
+
+// sendPledgeLists sends live cl's rosters, the main clan's then each
+// sub-unit's.
+func (l *GameClientLink) sendPledgeLists(live *livePlayer, cl *clan.Clan) {
+	for _, frame := range l.pledgeListFrames(cl) {
+		live.SendFrame(frame)
+	}
 }
 
 // framePledgeShowInfoUpdate builds cl's header refresh.
@@ -126,11 +159,11 @@ func (l *GameClientLink) broadcastToClan(cl *clan.Clan, exceptID int32, builds .
 }
 
 // broadcastClanStatus refreshes every online member's clan window and
-// status: the roster cleared and resent, then UserInfo.
+// status: the rosters cleared and resent, then UserInfo.
 func (l *GameClientLink) broadcastClanStatus(cl *clan.Clan) {
 	for _, live := range l.onlineClanMembers(cl, 0) {
 		live.SendFrame(serverpackets.FramePledgeShowMemberListDeleteAll())
-		live.SendFrame(l.framePledgeMemberList(cl))
+		l.sendPledgeLists(live, cl)
 		live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 	}
 }

@@ -1,6 +1,10 @@
 package clan
 
-import "context"
+import (
+	"context"
+
+	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
+)
 
 // MembershipRow is the characters-row side of joining or founding a clan.
 type MembershipRow struct {
@@ -10,6 +14,9 @@ type MembershipRow struct {
 	PowerGrade int
 	PledgeType int
 	JoinExpiry int64
+	// LvlJoinedAcademy is the level an academy recruit joined at, 0
+	// otherwise.
+	LvlJoinedAcademy int
 }
 
 // RemovalRow is the characters-row side of leaving a clan. An online
@@ -36,6 +43,22 @@ type Store interface {
 	SaveMembership(ctx context.Context, r MembershipRow) error
 	RemoveMembership(ctx context.Context, r RemovalRow) error
 	SetPowerGrade(ctx context.Context, objectID int32, grade int) error
+	// UpdateCrest stores one of the clan's own crest id columns: the
+	// pledge, large pledge or alliance crest, as typ names it.
+	UpdateCrest(ctx context.Context, clanID int32, typ datacache.CrestType, crestID int32) error
+	// SaveSkill stores a clan skill at its level, replacing the level
+	// stored before.
+	SaveSkill(ctx context.Context, clanID int32, sk Skill) error
+	SetPledgeType(ctx context.Context, objectID int32, pledgeType int) error
+	SetMentor(ctx context.Context, objectID, apprentice, sponsor int32) error
+	InsertSubunit(ctx context.Context, r SubunitRow) error
+	UpdateSubunit(ctx context.Context, r SubunitRow) error
+	// InsertWar stores clanID's war on targetID, replacing any penalty row
+	// the pair kept.
+	InsertWar(ctx context.Context, clanID, targetID int32) error
+	// EndWar keeps the pair's row with its penalty expiry, or deletes it
+	// when expiry is 0.
+	EndWar(ctx context.Context, clanID, targetID int32, expiry int64) error
 }
 
 // Writer runs a store write later, on ownerID's lane, so writes for one

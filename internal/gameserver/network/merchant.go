@@ -100,7 +100,7 @@ func (l *GameClientLink) requestBuyItem(live *livePlayer, req clientpackets.Requ
 	}
 	// ponytail: no castle taxes yet; prices stay untaxed and no revenue
 	// reaches a castle until #239 gives a merchant its castle's tax rate.
-	res, err := l.merchant.Buy(inv, list, rows, 0, live.access.IsGM)
+	res, err := l.merchant.Buy(inv, list, rows, 0, live.accessLevel().IsGM)
 	if err != nil {
 		l.log.Error().Err(err).Int32("buylist", req.ListID).Msg("buy items: allocate item id")
 	}
@@ -154,7 +154,7 @@ func (l *GameClientLink) requestPreviewItem(live *livePlayer, req clientpackets.
 		return
 	}
 	f, _ := live.Target().(*npc.Folk)
-	if f == nil || !f.Merchant() || (!live.access.IsGM && !interactInRange(live, f, interactionDistance)) {
+	if f == nil || !f.Merchant() || (!live.accessLevel().IsGM && !interactInRange(live, f, interactionDistance)) {
 		return
 	}
 	list, ok := l.merchant.List(int(req.ListID))

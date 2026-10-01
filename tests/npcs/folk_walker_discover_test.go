@@ -6,7 +6,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -33,8 +32,7 @@ func TestEnteringPlayerSeesWalkingFolkMove(t *testing.T) {
 	c.Send(encodeRequestGameStart(0))
 	for frame := c.Read(); frame[0] != serverpackets.OpcodeCharSelected; frame = c.Read() {
 	}
-	c.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
-	frames := drainFrames(t, c)
+	frames := enterWorld(t, w.srv, c)
 
 	next := frameAfterNpcInfo(t, frames, f)
 	if next == nil || next[0] != serverpackets.OpcodeMoveToLocation {
@@ -66,8 +64,7 @@ func TestEnteringPlayerSeesStandingFolkInfoOnly(t *testing.T) {
 	c.Send(encodeRequestGameStart(0))
 	for frame := c.Read(); frame[0] != serverpackets.OpcodeCharSelected; frame = c.Read() {
 	}
-	c.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
-	frames := drainFrames(t, c)
+	frames := enterWorld(t, w.srv, c)
 
 	if next := frameAfterNpcInfo(t, frames, f); next != nil && next[0] == serverpackets.OpcodeMoveToLocation {
 		if dests, _ := folkMoves([][]byte{next}, f); len(dests) > 0 {

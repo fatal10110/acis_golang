@@ -114,6 +114,13 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x48: true, // validate position
 		0x4a: true, // start rotating
 		0x4b: true, // finish rotating
+		0x4d: true, // declare a clan war
+		0x4e: true, // answer a war proposal
+		0x4f: true, // stop a clan war
+		0x50: true, // answer a stop proposal
+		0x51: true, // surrender a clan war
+		0x52: true, // answer a surrender proposal
+		0x53: true, // upload pledge crest
 		0x58: true, // enchant item
 		0x59: true, // destroy item
 		0x5b: true, // admin command typed in chat

@@ -78,6 +78,9 @@ func (p *livePlayer) Emit(ev event.Event) {
 		// interact, follow, toggle or queued request outlives it to be
 		// re-run after a revive.
 		p.clearParkedApproaches()
+		// Every cubic ends with its owner's life. The removal itself
+		// sends no character-info update.
+		p.removeAllCubics()
 	}
 	if p.SessionDetached() && sessionOnly(ev) {
 		return

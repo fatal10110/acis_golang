@@ -71,7 +71,7 @@ func cpRecoveryWorldAt(t *testing.T, manager arenaManager, adena int32) (*folkWo
 	)
 	w := &folkWorld{srv: srv, c: srv.Client, player: srv.SoleObjectID(t)}
 	srv.GiveItem(t, w.player, item.AdenaID, adena)
-	startInWorld(t, w.c)
+	startInWorld(t, w.srv, w.c)
 	x, y, z := srv.PlayerPosition(t, w.player)
 	w.at = location.Location{X: x, Y: y, Z: z}
 	arena := w.srv.SpawnCastingFolkNPCAt(t, folkTemplate(manager.kind, manager.id),

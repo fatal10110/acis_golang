@@ -17,6 +17,7 @@ import (
 // TradeSuccessful messages, InventoryUpdate frames on both sides, and
 // persisted items rows whose owners and counts reflect the swap.
 func TestTradeExchangeTransfersItemsAndPersists(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	adena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
 	potions := h.srv.GiveItem(t, h.secondID, 20, 3)

@@ -127,7 +127,7 @@ func bootSubclassWorldWith(t *testing.T, before func(srv *gameservertest.Server,
 	if before != nil {
 		before(srv, w.player)
 	}
-	startInWorld(t, w.c)
+	startInWorld(t, w.srv, w.c)
 	x, y, z := srv.PlayerPosition(t, w.player)
 	w.at = location.Location{X: x, Y: y, Z: z}
 	f := w.spawnFolk(t, folkTemplate("VillageMaster", villageMasterID), 30)
@@ -590,8 +590,7 @@ func TestSubclassRestartKeepsPlayingTheSubclass(t *testing.T) {
 	if level := r.ReadInt32(); classID != spellhowler || level != player.SubclassStartLevel {
 		t.Fatalf("selected class/level = %d/%d, want %d at 40", classID, level, spellhowler)
 	}
-	w.c.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
-	burst := drainFrames(t, w.c)
+	burst := enterWorld(t, w.srv, w.c)
 	if skills := skillListIDs(t, burst[firstIndex(burst, serverpackets.OpcodeSkillList)]); !slices.Contains(skills, learnedSkill) {
 		t.Fatalf("entered skills = %v, want the subclass's %d", skills, learnedSkill)
 	}

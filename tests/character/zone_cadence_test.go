@@ -52,6 +52,7 @@ func tickFrames(t *testing.T, srv *gameservertest.Server) [][]byte {
 // (WaterZone.onEnter), until the fifth; there the zone adds SWIM and the
 // player swims.
 func TestZoneEnterWaitsForFifthPositionUpdate(t *testing.T) {
+	t.Parallel()
 	srv, character, objID := bootBesideWater(t)
 	spawn := besideWaterSpawn
 	mover := srv.PlayerMove(t, objID)
@@ -86,6 +87,7 @@ func TestZoneEnterWaitsForFifthPositionUpdate(t *testing.T) {
 // ARRIVED): a walk that ends inside the water zone on its second update
 // enters it there, without waiting for the fifth.
 func TestZoneEnterOnArrivalBeforeFifthUpdate(t *testing.T) {
+	t.Parallel()
 	srv, character, objID := bootBesideWater(t)
 	spawn := besideWaterSpawn
 	mover := srv.PlayerMove(t, objID)
@@ -114,6 +116,7 @@ func TestZoneEnterOnArrivalBeforeFifthUpdate(t *testing.T) {
 // stops a walk that entered the water zone on its first update, and the
 // zone is entered at once, its UserInfo sent ahead of the StopMove.
 func TestZoneEnterOnStopBeforeFifthUpdate(t *testing.T) {
+	t.Parallel()
 	srv, character, objID := bootBesideWater(t)
 	spawn := besideWaterSpawn
 	mover := srv.PlayerMove(t, objID)
@@ -150,6 +153,7 @@ func TestZoneEnterOnStopBeforeFifthUpdate(t *testing.T) {
 // yet enters it on the update that crosses into the next world region, not
 // on the fifth.
 func TestZoneEnterOnRegionCrossingBeforeFifthUpdate(t *testing.T) {
+	t.Parallel()
 	// boundary is a world region edge; the player lands 12 short of it,
 	// just outside a water zone starting 10 short of it, so its first
 	// walk-speed update enters the zone's volume and one of the next three
@@ -206,6 +210,7 @@ func TestZoneEnterOnRegionCrossingBeforeFifthUpdate(t *testing.T) {
 // cut by a teleport sends no water entry/exit UserInfo pair around the
 // TeleportToLocation, and the player never swims there.
 func TestTeleportMidWalkEntersNoZoneBeforeLeaving(t *testing.T) {
+	t.Parallel()
 	srv, character, objID := bootBesideWater(t)
 	spawn := besideWaterSpawn
 	mover := srv.PlayerMove(t, objID)
