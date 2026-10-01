@@ -75,7 +75,8 @@ type Deal struct {
 
 // Buy sells rows of the sell list to buyer, who pays owner in adena.
 //
-// Every row must name a listed item at its listed price, for no more units
+// The store must be selling, as a sell or a package sell store. Every row
+// must name a listed item at its listed price, for no more units
 // than are still listed, and the owner must still hold it free to trade. A
 // package sale must take every listed row whole. The buyer must afford the
 // total and carry its weight; each stack it does not hold takes a slot, a
@@ -88,7 +89,13 @@ func (s *Store) Buy(svc *invops.Service, owner, buyer Trader, rows []PurchaseRow
 	if owner.Inv == nil || buyer.Inv == nil || owner.Inv == buyer.Inv || len(rows) == 0 {
 		return Deal{}, nil
 	}
+	// The store must still be selling as the deal starts: a quit or a
+	// return to set-up racing the buyer's request ends the deal here, so
+	// the package rule and the sold-out close act on the type checked.
 	operate := s.OperateType()
+	if operate != OperateSell && operate != OperatePackageSell {
+		return Deal{}, nil
+	}
 	if operate == OperatePackageSell && len(s.sell) > len(rows) {
 		return Deal{}, nil
 	}
@@ -182,8 +189,8 @@ func (s *Store) Buy(svc *invops.Service, owner, buyer Trader, rows []PurchaseRow
 // Sell sells rows from seller's inventory into the buy list; owner pays in
 // adena.
 //
-// Every row must name a wanted item at its wanted enchant and price, for no
-// more units than are still wanted, and the seller must hold that item at
+// The store must be buying. Every row must name a wanted item at its wanted
+// enchant and price, for no more units than are still wanted, and the seller must hold that item at
 // that enchant free to trade. The owner must afford the total. Both
 // inventories are checked as the moves find them, so the deal moves
 // everything or nothing. A deal that would pay more than the largest int32
@@ -192,6 +199,10 @@ func (s *Store) Sell(svc *invops.Service, owner, seller Trader, rows []SaleRow) 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if owner.Inv == nil || seller.Inv == nil || owner.Inv == seller.Inv || len(rows) == 0 {
+		return Deal{}, nil
+	}
+	// The store must still be buying as the deal starts; see Buy.
+	if s.OperateType() != OperateBuy {
 		return Deal{}, nil
 	}
 	templates := owner.Inv.Templates()

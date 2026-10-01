@@ -66,9 +66,16 @@ type workshop struct {
 // the name is set while setting up, and the list opens the workshop.
 func openWorkshop(t *testing.T, customerAdena, materials int32, opts ...gameservertest.Option) workshop {
 	t.Helper()
+	return openWorkshopWithBook(t, customerAdena, materials, nil, opts...)
+}
+
+// openWorkshopWithBook is openWorkshop with the extra recipes in the
+// crafter's book too; the workshop still lists only the common recipe.
+func openWorkshopWithBook(t *testing.T, customerAdena, materials int32, extra []int, opts ...gameservertest.Option) workshop {
+	t.Helper()
 	srv, crafterID := bootCraft(t, opts...)
 	knowSkill(t, srv, crafterID, modelskill.CreateCommonSkillID)
-	seedRecipes(t, srv, crafterID, commonRecipeID)
+	seedRecipes(t, srv, crafterID, append([]int{commonRecipeID}, extra...)...)
 	customerID := srv.SeedCharacterFor(t, "player2", "Customer", 1, 0).ID
 	if customerAdena > 0 {
 		srv.GiveItem(t, customerID, item.AdenaID, customerAdena)
@@ -87,8 +94,14 @@ func openWorkshop(t *testing.T, customerAdena, materials int32, opts ...gameserv
 	manage := crafter.Read()
 	assertFrameOpcode(t, manage, serverpackets.OpcodeRecipeShopManageList, "RecipeShopManageList")
 	r := wire.NewReader(manage[1:])
-	if owner, _, page, recipes, id := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); owner != crafterID || page != 1 || recipes != 1 || id != commonRecipeID {
-		t.Fatalf("manage window owner %d page %d recipes %d first %d", owner, page, recipes, id)
+	owner, _, page, recipes := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
+	var book []int
+	for range recipes {
+		book = append(book, int(r.ReadInt32()))
+		r.ReadInt32()
+	}
+	if owner != crafterID || page != 1 || len(book) != 1+len(extra) || !slices.Contains(book, commonRecipeID) {
+		t.Fatalf("manage window owner %d page %d recipes %v", owner, page, book)
 	}
 	crafter.Send(encodeStoreText(clientpackets.OpcodeRequestRecipeShopMessageSet, "Potions"))
 	crafter.Send(encodeRecipeShopListSet([2]int32{commonRecipeID, workshopCost}))
@@ -278,6 +291,47 @@ func TestWorkshopOrderRefusals(t *testing.T) {
 		w.customer.Send(encodeRecipeShopOrder(clientpackets.OpcodeRequestRecipeShopMakeInfo, w.crafterID, commonRecipeID))
 		assertNoFrameFor(t, w.customer, 300*time.Millisecond, "orders to a closed workshop")
 	})
+}
+
+// TestWorkshopRefusesUnlistedRecipe pins an order for a recipe the
+// crafter's book holds but the workshop does not list: it is dropped
+// without a word and spends nothing, neither the customer's adena and
+// materials nor the crafter's MP. The reference crafts it for free
+// (RecipeItemMaker.java:75-80 sets the price only for a listed recipe);
+// the workshop window never offers one, so only a crafted packet names it.
+func TestWorkshopRefusesUnlistedRecipe(t *testing.T) {
+	t.Parallel()
+	const unlistedRecipeID = 687
+	common, _ := gameservertest.RecipeTemplates().Find(commonRecipeID)
+	recipes := recipe.NewTable([]recipe.Recipe{common, {
+		ID: unlistedRecipeID, ItemID: 6927, Level: 1, SuccessRate: 100, MPCost: 10,
+		Materials: []recipe.Ingredient{{ItemID: commonMaterialID, Count: 1}},
+		Product:   recipe.Ingredient{ItemID: commonProductID, Count: 1},
+	}})
+	w := openWorkshopWithBook(t, 500, 2, []int{unlistedRecipeID}, gameservertest.WithRecipes(recipes))
+	mpBefore := w.srv.PlayerCurrentMP(t, w.crafterID)
+
+	w.customer.Send(encodeRecipeShopOrder(clientpackets.OpcodeRequestRecipeShopMakeItem, w.crafterID, unlistedRecipeID))
+	assertNoFrameFor(t, w.customer, 300*time.Millisecond, "an order for an unlisted recipe")
+	if got := keepWorkshopFrames(collectUntilQuiet(t, w.crafter)); len(got) != 0 {
+		t.Fatalf("crafter got %d workshop frames for an unlisted order", len(got))
+	}
+	if mp := w.srv.PlayerCurrentMP(t, w.crafterID); mp != mpBefore {
+		t.Fatalf("crafter MP = %d, want %d", mp, mpBefore)
+	}
+	w.srv.InventoryUpdates.Tick()
+	w.srv.FlushItems(t)
+	if inst := mustFindItemByTemplate(t, w.srv, w.customerID, commonMaterialID); inst.Count != 2 {
+		t.Fatalf("customer materials = %d, want 2", inst.Count)
+	}
+	if inst := mustFindItemByTemplate(t, w.srv, w.customerID, item.AdenaID); inst.Count != 500 {
+		t.Fatalf("customer adena = %d, want 500", inst.Count)
+	}
+	for _, inst := range persistedItems(t, w.srv, w.customerID) {
+		if inst.TemplateID == commonProductID {
+			t.Fatalf("customer got a product: %+v", inst)
+		}
+	}
 }
 
 // TestWorkshopLocksRecipeBook pins the recipe book changes a running

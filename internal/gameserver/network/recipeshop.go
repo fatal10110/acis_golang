@@ -119,6 +119,8 @@ func (l *GameClientLink) orderWorkshopCraft(live *livePlayer, req clientpackets.
 	if !ok || live.Operating() || crafter.OperateType() != privatestore.OperateManufacture {
 		return
 	}
+	// The reference also refuses either side in a duel; duels are not
+	// modeled yet (#215).
 	if crafter.InCombat() || live.InCombat() {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantOperateStoreDuringCombat))
 		return
@@ -132,11 +134,16 @@ func (l *GameClientLink) orderWorkshopCraft(live *livePlayer, req clientpackets.
 	}
 	busy := l.trades != nil && (l.trades.ProcessingTransaction(crafter.ObjectID()) || l.trades.ProcessingTransaction(live.ObjectID()))
 	var attempt craft.ShopAttempt
-	crafter.PrivateStore().Craft(r.ID, func(cost int) {
+	// An order for a recipe the workshop does not list is dropped: the
+	// window never offers one, so only a crafted packet names it.
+	listed := crafter.PrivateStore().Craft(r.ID, func(cost int) {
 		attempt = l.craft.MakeFor(crafter.Character, live.Character, r, cost, busy, func(price int) bool {
 			return l.payAdena(live, crafter, price)
 		})
 	})
+	if !listed {
+		return
+	}
 	sendCraftNotices(crafter, attempt.ToCrafter)
 	sendCraftNotices(live, attempt.ToCustomer)
 	sendRecipeShopItemInfo(live, crafter, req.RecipeID)
