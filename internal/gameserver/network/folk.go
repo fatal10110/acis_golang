@@ -89,8 +89,18 @@ func (s *folkSink) Emit(ev event.Event) {
 	case event.Status:
 		attrs := npcStatusAttributes(e.Attrs)
 		s.broadcast(func() wire.Frame { return frames.Status(f.ObjectID(), attrs) })
-	case event.Attacked:
+	case event.Attacked, event.AttackStanceRequested:
 		s.startAttackStance()
+	case event.MagicSkillUse:
+		s.broadcast(func() wire.Frame {
+			return frames.SkillUse(e.CasterID, e.CasterAt, e.TargetID, e.TargetAt, e.SkillID, e.Level, e.HitTime, e.ReuseDelay, false)
+		})
+	case event.SkillLaunched:
+		s.broadcast(func() wire.Frame { return frames.SkillLaunched(f.ObjectID(), e.SkillID, e.Level, e.TargetIDs) })
+	case event.SkillCanceled:
+		s.broadcast(func() wire.Frame { return frames.SkillCanceled(e.ObjectID) })
+	case event.MoveToPawn:
+		s.broadcast(func() wire.Frame { return frames.MoveToPawn(f.ObjectID(), e.TargetID, e.Distance, e.Origin) })
 	case event.AutoAttackStopped:
 		s.broadcast(func() wire.Frame { return serverpackets.FrameAutoAttackStop(f.ObjectID()) })
 	case event.MoveTypeChanged:

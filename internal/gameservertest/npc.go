@@ -552,6 +552,26 @@ func (s *Server) SpawnFolkNPCAt(t *testing.T, tmpl *npc.Template, at location.Lo
 	return f
 }
 
+// SpawnCastingFolkNPCAt is SpawnFolkNPCAt with the production cast runtime
+// installed over defs: the NPC casts what a dialog command or script asks
+// of it on the AI task's next tick (WithAITask, Server.AI.Tick), its
+// effects dispatched through the link's NPC cast seam.
+func (s *Server) SpawnCastingFolkNPCAt(t *testing.T, tmpl *npc.Template, at location.Location, defs actorcast.Definitions) *npc.Folk {
+	t.Helper()
+	inst, err := npc.NewInstance(s.NewObjectID(), tmpl)
+	if err != nil {
+		t.Fatalf("new npc instance: %v", err)
+	}
+	inst.Home, inst.HasHome = at, true
+	spawner := s.folkSpawner(nil, Geo{})
+	spawner.Skills = defs
+	f, err := spawner.Spawn(inst, at, 0)
+	if err != nil {
+		t.Fatalf("spawn folk npc: %v", err)
+	}
+	return f
+}
+
 // folkSpawner is the production civilian spawner over this server's world,
 // with walker as its route walker task.
 func (s *Server) folkSpawner(walker *task.Walker, geo move.Geo) gamemanager.FolkSpawner {
@@ -563,6 +583,9 @@ func (s *Server) folkSpawner(walker *task.Walker, geo move.Geo) gamemanager.Folk
 		Queues:              s.queues,
 		NewSink:             network.FolkSinks(s.State, s.stance),
 		Zones:               s.zones,
+		CastEffects:         s.castEffects,
+		AI:                  s.AI,
+		Items:               s.itemTable,
 		Effects:             s.effectEnv,
 		MaxGeoPathFailCount: s.maxGeoPathFail,
 		Log:                 s.log,

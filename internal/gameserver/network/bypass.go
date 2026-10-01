@@ -244,11 +244,27 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		live.SendFrame(serverpackets.FrameExShowQuestInfo())
 	case npc.BypassSubclass:
 		return l.subclassBypass(live, f, command)
+	case npc.BypassCPRecovery:
+		cpRecovery(live, f)
 	case npc.BypassUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Str("command", command).Msg("bypass: npc dialog command not modeled")
 	case npc.BypassRefused:
 	}
 	return true
+}
+
+// cpRecovery has arena manager f restore live's CP for its fee: the fee
+// taken, then the notice naming live; the NPC casts the restore on its next
+// AI tick. A talker short of the fee is told so, and nothing else happens.
+func cpRecovery(live *livePlayer, f *npc.Folk) {
+	switch f.CPRecovery(live.Character) {
+	case npc.CPRecoveryNotEnoughAdena:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena))
+	case npc.CPRecoveryPaid:
+		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DisappearedAdena, npc.CPRecoveryFee))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CPWillBeRestored, live.Name))
+	case npc.CPRecoveryUnpaid:
+	}
 }
 
 // showTeleportList opens f's list of standard destinations. An NPC

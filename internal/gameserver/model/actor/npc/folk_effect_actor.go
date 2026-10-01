@@ -41,11 +41,13 @@ func (f *Folk) AddChanceTrigger(e *effect.Effect) { f.effects.AddChanceTrigger(e
 // RemoveChanceTrigger drops an exiting chance-skill trigger.
 func (f *Folk) RemoveChanceTrigger(e *effect.Effect) { f.effects.RemoveChanceTrigger(e) }
 
-// The NPC keeps no attack, cast or selected target, and the effects that
-// stop, redirect, frighten, bluff or throw a creature never land on it, so
-// the hooks below that only those reach do nothing. FearImmune and
-// BluffExempt report the civilian NPC's own immunity.
-func (f *Folk) AbortAll(bool)                              {}
+// AbortAll stops the NPC's cast in flight.
+func (f *Folk) AbortAll(bool) { f.StopCast() }
+
+// The NPC keeps no attack or selected target, and the effects that stop,
+// redirect, frighten, bluff or throw a creature never land on it, so the
+// hooks below that only those reach do nothing. FearImmune and BluffExempt
+// report the civilian NPC's own immunity.
 func (f *Folk) StopMove()                                  {}
 func (f *Folk) TryToIdle()                                 {}
 func (f *Folk) ClearTarget()                               {}
