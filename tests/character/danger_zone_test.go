@@ -55,6 +55,7 @@ func assertInDanger(t *testing.T, when string, character *player.Character, want
 // zone still holds it. EtcStatusUpdate writes that flag as its fourth field
 // (EtcStatusUpdate.java:23), so every other one sent inside carries it too.
 func TestDangerZonesDriveTheEtcStatusDangerField(t *testing.T) {
+	t.Parallel()
 	damageForm, err := zone.NewCuboid(2_000, 4_000, -1_000, 1_000, -10_000, 10_000)
 	if err != nil {
 		t.Fatal(err)

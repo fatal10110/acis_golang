@@ -18,6 +18,7 @@ const potionID = 20
 // write lands every row it changed, on both sides, before the lazy item tick
 // ever runs.
 func TestTradeWritesBothSidesWithoutTheTick(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	adena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
 	potions := h.srv.GiveItem(t, h.secondID, potionID, 3)
@@ -42,6 +43,7 @@ func TestTradeWritesBothSidesWithoutTheTick(t *testing.T) {
 // and the lazy item tick — which still holds every changed item — writes the
 // traded state once the database takes it again.
 func TestTradeRowsCommitOrRollBackTogether(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	adena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
 	potions := h.srv.GiveItem(t, h.secondID, potionID, 3)
@@ -68,6 +70,7 @@ func TestTradeRowsCommitOrRollBackTogether(t *testing.T) {
 // both players offer adena, so each adena stack gives on one leg and receives
 // on the other. The trade's write carries each row once, with its final count.
 func TestTradeWritesAStackOnBothLegsOnce(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	firstAdena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
 	secondAdena := h.srv.GiveItem(t, h.secondID, item.AdenaID, 50)
@@ -92,6 +95,7 @@ func TestTradeWritesAStackOnBothLegsOnce(t *testing.T) {
 // write lands them all, so the tick's retry fails whole and both sides keep
 // their pre-trade rows until the database takes the receiver's row again.
 func TestTickRetryOfFailedTradeLandsBothLegsOrNeither(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	adena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
 	potions := h.srv.GiveItem(t, h.secondID, potionID, 3)
@@ -126,6 +130,7 @@ func TestTickRetryOfFailedTradeLandsBothLegsOrNeither(t *testing.T) {
 // when the database takes them, and when it refuses the giver's row, nothing
 // of the pickup's write lands either.
 func TestHandlerWriteOfTradedRowCarriesTheOtherLeg(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name    string
 		refused func(h *traders) int32

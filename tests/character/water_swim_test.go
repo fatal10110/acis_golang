@@ -64,6 +64,7 @@ func waterZones(t *testing.T, minX, maxX int) *zone.Index {
 // for MoveType.GROUND: the desync is distance2D, so a report off only in
 // height is accepted silently, while the same offset along X is corrected.
 func TestValidatePositionGroundMeasuresDriftIn2D(t *testing.T) {
+	t.Parallel()
 	srv, _, objID := bootInZones(t, zone.NewIndex())
 	x, y, z := srv.PlayerPosition(t, objID)
 	server := location.Location{X: x, Y: y, Z: z}
@@ -78,6 +79,7 @@ func TestValidatePositionGroundMeasuresDriftIn2D(t *testing.T) {
 // for MoveType.SWIM (WaterZone.onEnter adds it): the desync is distance3D,
 // so a report off only in height beyond the swim speed is corrected.
 func TestValidatePositionSwimmingMeasuresDriftIn3D(t *testing.T) {
+	t.Parallel()
 	srv, character, objID := bootInZones(t, waterZones(t, -1_000, 1_000))
 	x, y, z := srv.PlayerPosition(t, objID)
 	hp := character.HP()
@@ -92,6 +94,7 @@ func TestValidatePositionSwimmingMeasuresDriftIn3D(t *testing.T) {
 // for MoveType.FLY (a flying mount adds it, Player.java:4904): the desync
 // is distance3D.
 func TestValidatePositionFlyingMeasuresDriftIn3D(t *testing.T) {
+	t.Parallel()
 	srv, character, objID := bootInZones(t, zone.NewIndex())
 	x, y, z := srv.PlayerPosition(t, objID)
 	hp := character.HP()
@@ -128,6 +131,7 @@ func countOpcode(frames [][]byte, op byte) int {
 // must not take over the first server's swim reaction. The first server's
 // player entering the water still gets its entry UserInfo and breath gauge.
 func TestWaterZoneSharedByTwoServersSwimsEachServersPlayer(t *testing.T) {
+	t.Parallel()
 	zones := waterZones(t, 2_000, 4_000)
 	clock := &waterClock{}
 	clock.nanos.Store(time.Now().UnixNano())
@@ -152,6 +156,7 @@ func TestWaterZoneSharedByTwoServersSwimsEachServersPlayer(t *testing.T) {
 // only the breath countdown in Player.revalidateZone (Player.java:847)
 // depends on AllowWater.
 func TestWaterEntryWithoutAllowWaterStillSwims(t *testing.T) {
+	t.Parallel()
 	clock := &waterClock{}
 	clock.nanos.Store(time.Now().UnixNano())
 	srv, character, objID := bootInZones(t, waterZones(t, 2_000, 4_000), gameservertest.WithWater(clock.now), gameservertest.WithAllowWater(false))

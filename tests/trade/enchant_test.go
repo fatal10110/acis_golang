@@ -52,6 +52,7 @@ func assertEnchantCancelled(t *testing.T, frame []byte) {
 // CANNOT_ENCHANT_WHILE_STORE and EnchantResult(CANCELLED), keeps the
 // scroll, and loses the selection.
 func TestPendingTradeRequestRefusesEnchant(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	weapon := h.srv.GiveItem(t, h.secondID, enchantWeaponD, 1)
 	scroll := h.srv.GiveItem(t, h.secondID, enchantScrollD, 1)
@@ -75,6 +76,7 @@ func TestPendingTradeRequestRefusesEnchant(t *testing.T) {
 // with EnchantResult(CANCELLED) and ENCHANT_SCROLL_CANCELLED ahead of the
 // confirm itself.
 func TestTradeConfirmCancelsBothEnchantSelections(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	firstScroll := h.srv.GiveItem(t, h.firstID, enchantScrollD, 1)
 	secondScroll := h.srv.GiveItem(t, h.secondID, enchantScrollD, 1)
@@ -101,6 +103,7 @@ func TestTradeConfirmCancelsBothEnchantSelections(t *testing.T) {
 // cancel reaches only the departed login, so the new login's scroll
 // selection survives the remaining trader's confirm, silently.
 func TestTradeConfirmKeepsReloggedPartnerEnchant(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t, gameservertest.WithReuseDelays(0, 0))
 	weapon := h.srv.GiveItem(t, h.secondID, enchantWeaponD, 1)
 	scroll := h.srv.GiveItem(t, h.secondID, enchantScrollD, 1)
@@ -140,6 +143,7 @@ func TestTradeConfirmKeepsReloggedPartnerEnchant(t *testing.T) {
 // opened is refused with NOTHING_HAPPENED and the partner hears nothing.
 // The same scroll, unselected, is offered as usual.
 func TestSelectedEnchantScrollCannotBeOffered(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name     string
 		selected bool

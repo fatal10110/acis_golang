@@ -21,6 +21,7 @@ import (
 // call and enters it, with the entry UserInfo. The world has a flat floor at
 // the spawn height, so a catch-up keeps the player on the same location.
 func TestZoneEnterCountsSameCellRetargets(t *testing.T) {
+	t.Parallel()
 	srv, character, objID := bootBesideWater(t, gameservertest.WithGeo(gameservertest.FlatGeo{Z: besideWaterSpawn.Z}))
 	spawn := besideWaterSpawn
 	mover := srv.PlayerMove(t, objID)

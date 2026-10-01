@@ -17,6 +17,7 @@ import (
 // in their owners' inventories, and the cleared session ignores further
 // add-item packets.
 func TestCancelMidWayReturnsItemsUntouched(t *testing.T) {
+	t.Parallel()
 	h := bootTraders(t)
 	adena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
 	h.enterAll(t)

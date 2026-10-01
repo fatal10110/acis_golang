@@ -54,6 +54,7 @@ func teleportDestination(t *testing.T, frames [][]byte, objID int32) location.Lo
 // requested height (the player swims there instead of landing on the sea
 // floor), and so does a flying player's teleport onto dry land.
 func TestTeleportHeightSnapsOnlyOnDryGroundAndNotFlying(t *testing.T) {
+	t.Parallel()
 	form, err := zone.NewCuboid(-1_000, 1_000, -1_000, 1_000, -1_000, 150)
 	if err != nil {
 		t.Fatal(err)
@@ -95,6 +96,7 @@ func TestTeleportHeightSnapsOnlyOnDryGroundAndNotFlying(t *testing.T) {
 // straight line from the requested point is blocked lands on the last point
 // GeoEngine.getValidLocation reaches, not back on the requested point.
 func TestTeleportScatterLandsOnLastReachablePoint(t *testing.T) {
+	t.Parallel()
 	clip := location.Location{X: 7, Y: -5}
 	geo := blockedGeo{seaFloorGeo{clip: &clip}}
 	srv, character, objID := bootInZones(t, zone.NewIndex(), gameservertest.WithGeo(geo))
