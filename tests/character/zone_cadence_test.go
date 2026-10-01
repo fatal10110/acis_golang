@@ -18,10 +18,10 @@ var besideWaterSpawn = location.Location{X: 10, Y: 20, Z: 30}
 
 // bootBesideWater boots a player standing just west of a water zone that
 // starts 5 units east of it, with the movement clock driven by hand.
-func bootBesideWater(t *testing.T) (*gameservertest.Server, *player.Character, int32) {
+func bootBesideWater(t *testing.T, opts ...gameservertest.Option) (*gameservertest.Server, *player.Character, int32) {
 	t.Helper()
 	spawn := besideWaterSpawn
-	srv, character, objID := bootInZones(t, waterZones(t, spawn.X+5, spawn.X+5_000))
+	srv, character, objID := bootInZones(t, waterZones(t, spawn.X+5, spawn.X+5_000), opts...)
 	if !srv.DrivesClock() {
 		t.Skip("counting position updates needs the driven clock")
 	}

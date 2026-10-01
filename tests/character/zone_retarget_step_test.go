@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
@@ -17,9 +18,10 @@ import (
 // (timePassed is at least 1 ms, :218-219). A player whose first position
 // update takes it into a water zone, then retargets three times on the same
 // cell, has not entered the zone; the fourth retarget is the fifth counted
-// call and enters it, with the entry UserInfo.
+// call and enters it, with the entry UserInfo. The world has a flat floor at
+// the spawn height, so a catch-up keeps the player on the same location.
 func TestZoneEnterCountsSameCellRetargets(t *testing.T) {
-	srv, character, objID := bootBesideWater(t)
+	srv, character, objID := bootBesideWater(t, gameservertest.WithGeo(gameservertest.FlatGeo{Z: besideWaterSpawn.Z}))
 	spawn := besideWaterSpawn
 	mover := srv.PlayerMove(t, objID)
 	c := srv.Client
@@ -33,15 +35,13 @@ func TestZoneEnterCountsSameCellRetargets(t *testing.T) {
 	}
 
 	for retarget := 1; retarget <= 4; retarget++ {
-		// The test world has no geodata floor, so only X and Y name the
-		// cell: each ground step's height search climbs.
 		before := mover.Position()
 		dest := location.Location{X: spawn.X + 3_000, Y: spawn.Y + retarget%2, Z: spawn.Z}
 		frames := testsupport.SyncBarrierFrames(t, c, func() {
 			c.Send(encodeMoveBackwardToLocation(dest, before, 1))
 			c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestItemList))
 		}, serverpackets.OpcodeItemList)
-		if at := mover.Position(); at.X != before.X || at.Y != before.Y {
+		if at := mover.Position(); at != before {
 			t.Fatalf("retarget %d moved the player from %+v to %+v, want a same-cell catch-up", retarget, before, at)
 		}
 		if firstOpcode(frames, serverpackets.OpcodeMoveToLocation) < 0 {
