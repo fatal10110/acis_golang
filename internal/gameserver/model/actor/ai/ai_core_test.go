@@ -4182,6 +4182,80 @@ func TestAttackableWanderTimerOutlivesIdle(t *testing.T) {
 	}
 }
 
+// TestAttackableWanderFirstStepAfterOtherDesireCancelsChain pins
+// AttackableAI.thinkWander keeping one chain per actor: a WANDER promoted
+// after a desire of another kind cancels the pending firing before it
+// walks at once, and that firing, if it already left its timer, neither
+// walks nor schedules.
+func TestAttackableWanderFirstStepAfterOtherDesireCancelsChain(t *testing.T) {
+	brain, owner, _, _ := wanderArrivedThenPromoted(t, time.Unix(1_000, 0))
+	running := owner.pendingTimers()[0]
+
+	brain.Desires().AddOrUpdate(&Desire{Kind: IntentionMoveTo, Location: location.Location{X: 100, Y: 100}, Weight: 1_000})
+	if err := brain.RunAI(); err != nil {
+		t.Fatalf("move-to RunAI() error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionMoveTo {
+		t.Fatalf("CurrentIntention() after the move-to promotion = %v, want %v", got, IntentionMoveTo)
+	}
+	brain.Arrived()
+
+	if err := thinkWanderOnce(brain); err != nil {
+		t.Fatalf("wander RunAI() error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() after the wander re-promotion = %v, want %v", got, IntentionWander)
+	}
+	if !running.stopped {
+		t.Fatal("pending wander firing not stopped by the first step after a move-to")
+	}
+	if owner.wanderCalls != 2 || len(owner.pendingTimers()) != 0 {
+		t.Fatalf("wander walks/pending timers after the first step = %d/%d, want 2/0 (walks at once, no chain)", owner.wanderCalls, len(owner.pendingTimers()))
+	}
+
+	timers := len(owner.timers)
+	running.fn()
+	if owner.wanderCalls != 2 || len(owner.timers) != timers {
+		t.Fatalf("wander walks/timers after the cancelled firing ran = %d/%d, want 2/%d", owner.wanderCalls, len(owner.timers), timers)
+	}
+}
+
+// TestAttackableWanderBackToPeaceStopsChainAndDropsStaleFiring pins the
+// chain ending on a return to peace, and a firing of that ended chain,
+// run after a new WANDER promotion armed the next one, neither walking
+// nor touching the new firing.
+func TestAttackableWanderBackToPeaceStopsChainAndDropsStaleFiring(t *testing.T) {
+	brain, owner, _, _ := wanderArrivedThenPromoted(t, time.Unix(1_000, 0))
+	old := owner.pendingTimers()[0]
+
+	brain.SetBackToPeace()
+	if got := len(owner.pendingTimers()); got != 0 {
+		t.Fatalf("pending timers after back to peace = %d, want 0 (chain stopped)", got)
+	}
+
+	if err := thinkWanderOnce(brain); err != nil {
+		t.Fatalf("wander RunAI() error: %v", err)
+	}
+	pending := owner.pendingTimers()
+	if len(pending) != 1 || pending[0] == old {
+		t.Fatalf("pending timers after the wander promotion = %d, want one fresh timer", len(pending))
+	}
+	fresh := pending[0]
+
+	timers := len(owner.timers)
+	old.fn()
+	if owner.wanderCalls != 1 || len(owner.timers) != timers {
+		t.Fatalf("wander walks/timers after the stale firing = %d/%d, want 1/%d", owner.wanderCalls, len(owner.timers), timers)
+	}
+	if pending := owner.pendingTimers(); len(pending) != 1 || pending[0] != fresh {
+		t.Fatal("stale firing disturbed the fresh chain")
+	}
+	owner.fireTimer(t, defaultWanderTimer*time.Second)
+	if owner.wanderCalls != 2 {
+		t.Fatalf("wander walks after the fresh firing = %d, want 2", owner.wanderCalls)
+	}
+}
+
 // TestAttackableWanderTimerEndsWhileNotWandering pins that a wander firing
 // while the actor is idle finds no WANDER and ends: the next wander
 // promotion arms a fresh timer instead of walking at once.
