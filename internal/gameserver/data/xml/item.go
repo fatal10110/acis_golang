@@ -389,11 +389,12 @@ func buildItemClauses(id int32, el itemElement, tables map[string][]string) ([]i
 // templates, so the effect is parsed and discarded for an item template
 // rather than stored. Beyond the effect's required attrs it checks only
 // table references (ponytail: no shipped item XML carries <effect> today;
-// validate the nested funcs' stat/val grammar if a datapack file starts
-// using one). Like a stat func's, the effect's val and its funcs' vals read
-// the item's own tables; every other value the effect reader would resolve
-// against a template's tables, its own or its <cond> and func conditions',
-// fails instead, because neither an item nor the effect is such a template.
+// the rest of the effect and nested func grammar is #3101, needed once a
+// datapack file uses one). Like a stat func's, the effect's val and its
+// funcs' vals read the item's own tables; every other value the effect
+// reader would resolve against a template's tables, its own or its <cond>
+// and func conditions', fails instead, because neither an item nor the
+// effect is such a template.
 func validateItemEffect(id int32, opEl funcElement, tables map[string][]string) error {
 	vals := foldAttrs(opEl.Attrs)
 	for _, name := range itemEffectTableAttrs {
@@ -414,7 +415,11 @@ func validateItemEffect(id int32, opEl funcElement, tables map[string][]string) 
 	if err := a.Err(); err != nil {
 		return fmt.Errorf("item template %d: %w", id, err)
 	}
-	for _, ch := range opEl.Children {
+	for i, ch := range opEl.Children {
+		// Only a leading <cond> is read; a later one is ignored.
+		if i != 0 && strings.EqualFold(ch.XMLName.Local, "cond") {
+			continue
+		}
 		if err := validateItemEffectChild(id, ch, tables); err != nil {
 			return err
 		}

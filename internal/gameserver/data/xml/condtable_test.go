@@ -175,14 +175,15 @@ func TestItemConditionTableRefsFollowReference(t *testing.T) {
 		<item id="24" type="EtcItem" name="a"><cond><not><player level="1"/><player hp="#t"/></not></cond></item>
 		<item id="25" type="EtcItem" name="a"><cond><not><player hp="#t"/></not></cond></item>
 		<item id="26" type="EtcItem" name="a"><for><effect name="Buff" val="0"><cond msg="x" msgId="#10"><player level="1"/></cond></effect></for></item>
+		<item id="30" type="EtcItem" name="a"><for><effect name="Buff" val="0"><add stat="pAtk" val="1"/><cond msgId="#10"><player level="#1"/></cond></effect></for></item>
 		<item id="99" type="EtcItem" name="a"></item>`)
 
 	table, err := LoadItemTemplates(dir, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("LoadItemTemplates: %v", err)
 	}
-	loaded := map[int32]bool{3: true, 4: true, 7: true, 9: true, 10: true, 13: true, 23: true, 24: true, 26: true, 99: true}
-	for _, id := range []int32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 20, 21, 22, 23, 24, 25, 26, 99} {
+	loaded := map[int32]bool{3: true, 4: true, 7: true, 9: true, 10: true, 13: true, 23: true, 24: true, 26: true, 30: true, 99: true}
+	for _, id := range []int32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 20, 21, 22, 23, 24, 25, 26, 30, 99} {
 		tpl, ok := table.Get(id)
 		if ok != loaded[id] {
 			t.Errorf("item %d loaded = %v, want %v", id, ok, loaded[id])
@@ -300,6 +301,39 @@ func TestShippedConditionTableRefsLoadAsBefore(t *testing.T) {
 	for _, tpl := range items.All() {
 		for _, uc := range tpl.UseConditions {
 			walkItem(tpl.ID, uc.Root)
+		}
+	}
+}
+
+// TestSkillTemplateReadsOnlyALeadingCond: a <cond> gates a <for> or
+// <effect> block only as its first child. A later one is never read, so it
+// attaches nothing and a table reference in it does not reject the skill.
+func TestSkillTemplateReadsOnlyALeadingCond(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		"for":    `<for><add stat="pAtk" val="1"/><cond><player hp="#t"/></cond><mul stat="pDef" val="2"/></for>`,
+		"effect": `<for><effect name="Buff" val="0" time="1"><add stat="pAtk" val="1"/><cond><player level="#t"/></cond><mul stat="pDef" val="2"/></effect></for>`,
+	}
+	for name, body := range cases {
+		def, ok := loadCondTableSkill(t, body).Get(1, 1)
+		if !ok {
+			t.Errorf("%s: skill not loaded", name)
+			continue
+		}
+		funcs := def.Funcs
+		if len(def.Effects) == 1 {
+			if def.Effects[0].AttachCondition != nil {
+				t.Errorf("%s: effect attach condition %+v, want none", name, def.Effects[0].AttachCondition)
+			}
+			funcs = def.Effects[0].Funcs
+		}
+		if len(funcs) != 2 {
+			t.Fatalf("%s: %d funcs, want 2", name, len(funcs))
+		}
+		for _, f := range funcs {
+			if f.AttachCondition != nil {
+				t.Errorf("%s: func %s gated by %+v, want ungated", name, f.Stat, f.AttachCondition)
+			}
 		}
 	}
 }

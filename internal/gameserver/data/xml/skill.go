@@ -295,8 +295,12 @@ func (sl *skillLoader) applyTemplates(def *skill.Definition, conds []condElement
 
 func (sl *skillLoader) applyTemplateNodes(def *skill.Definition, ops []funcElement, tableIndex int) error {
 	var attachCond *skill.ConditionClause
-	for _, op := range ops {
+	for i, op := range ops {
 		if strings.EqualFold(op.XMLName.Local, "cond") {
+			// Only a leading <cond> gates the block; a later one is never read.
+			if i != 0 {
+				continue
+			}
 			clause, err := conditionClause(op.Attrs, op.Children, sl.resolver(tableIndex), condMsgModeBoth)
 			if err != nil {
 				return err
@@ -379,8 +383,12 @@ func (sl *skillLoader) effect(op funcElement, attachCond *skill.ConditionClause,
 // one; the funcs' own values still read the skill's tables.
 func (sl *skillLoader) nestedEffectTemplates(eff *skill.EffectTemplate, nodes []condNode, tableIndex int) error {
 	var attachCond *skill.ConditionClause
-	for _, n := range nodes {
+	for i, n := range nodes {
 		if strings.EqualFold(n.XMLName.Local, "cond") {
+			// Only a leading <cond> gates the effect; a later one is never read.
+			if i != 0 {
+				continue
+			}
 			clause, err := conditionClause(n.Attrs, n.Children, nil, condMsgModeBoth)
 			if err != nil {
 				return err
