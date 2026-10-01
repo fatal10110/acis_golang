@@ -132,3 +132,36 @@ func TestCreateAllyRaceTakesANameOnce(t *testing.T) {
 		}
 	}
 }
+
+// TestJoinAllyRacingWarKeepsAlliesOutOfWar has the alliance leader declare
+// war on a clan while that clan accepts the alliance's invitation, the
+// declaration released a little later each round so it lands anywhere in
+// the acceptance: the join's war check and the declaration's alliance
+// check both run under allyMu, so the clan either joins or is warred on,
+// never both.
+func TestJoinAllyRacingWarKeepsAlliesOutOfWar(t *testing.T) {
+	declarer := inClan(raceLeadLeader, "LeadLeader", raceLeadClan)
+	both := 0
+	for round := range 4 * raceRounds {
+		s, leaders := allianceRaceWorld(t, 2, true)
+		s.cfg.MembersForWar = 1
+		delay := time.Duration(round%raceRounds) * 2 * time.Microsecond
+		var joined AllyJoinRefusal
+		var declared WarResult
+		raceAll(2, func(i int) {
+			if i == 0 {
+				joined = s.JoinAlly(raceLeadLeader, leaders[0], time.Now()).Refusal
+				return
+			}
+			for start := time.Now(); time.Since(start) < delay; {
+			}
+			_, declared = s.DeclareWar(declarer, "Contender0", time.Now())
+		})
+		if joined == AllyJoinAllowed && declared == WarDone {
+			both++
+		}
+	}
+	if both != 0 {
+		t.Fatalf("%d rounds left the clan both allied and warred on, want none", both)
+	}
+}

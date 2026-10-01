@@ -81,9 +81,10 @@ type Service struct {
 	// subunitMu serializes sub-unit foundings, whose names are unique
 	// across every clan.
 	subunitMu sync.Mutex
-	// allyMu serializes every alliance change: the clans of an alliance
-	// and the alliance names stay fixed while it is held. It is taken
-	// before any clan's mu.
+	// allyMu serializes every alliance change, and war declarations
+	// against alliance acceptances: the clans of an alliance and the
+	// alliance names stay fixed while it is held. It is taken before any
+	// clan's mu.
 	allyMu sync.Mutex
 }
 

@@ -162,7 +162,10 @@ type War struct {
 	Target *Clan
 }
 
-// DeclareWar has c's clan declare war on the clan named targetName.
+// DeclareWar has c's clan declare war on the clan named targetName. It
+// holds allyMu, so no clan joins the alliance of the other between the
+// alliance check and the declaration: an acceptance checks the war under
+// the same lock.
 func (s *Service) DeclareWar(c *player.Character, targetName string, now time.Time) (War, WarResult) {
 	cl, ok := s.ClanOf(c)
 	if !ok {
@@ -178,6 +181,8 @@ func (s *Service) DeclareWar(c *player.Character, targetName string, now time.Ti
 	case target == cl:
 		return War{}, WarOwnClan
 	}
+	s.allyMu.Lock()
+	defer s.allyMu.Unlock()
 	unlock := lockPair(cl, target)
 	defer unlock()
 	_, attacked := cl.attackers[target.id]
