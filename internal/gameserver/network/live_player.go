@@ -113,6 +113,11 @@ type livePlayer struct {
 	// sits ahead of detach's offline persistence write or is never enqueued.
 	// Atomic for the readers on other goroutines.
 	deliveryStopped atomic.Bool
+	// entered is set on p's queue once the login spawned p. The player is
+	// registered in the world from its selection on, so registration alone
+	// does not mean it is in the world yet. Atomic for readers on other
+	// goroutines.
+	entered atomic.Bool
 	// pickupMu guards deferred player intentions and pickup state. Another
 	// actor's queue reaches them: an effect it applies stops p's actions and
 	// drops them (stopLiveActions → tryToIdle).
