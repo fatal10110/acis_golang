@@ -195,9 +195,7 @@ type Controller struct {
 // after the controller's lock is released so it may call back in:
 //   - CastAborted, once whenever a cast that was actually in flight is
 //     aborted (never for a natural finish, nor for a stop on an idle
-//     controller); Interrupted reports the window-gated Interrupt path,
-//     which additionally owes CASTING_INTERRUPTED, rather than an
-//     unconditional Stop;
+//     controller);
 //   - CastStopAck, once on every Stop/Interrupt call whether or not a cast
 //     was in flight: a player's cast stop always answers action-failed,
 //     after the in-flight-gated cancel broadcast;
@@ -212,8 +210,8 @@ type Controller struct {
 //   - CastFinished, once whenever an in-flight cast ends, aborted or
 //     completed, letting the owner apply the nextActionAttack resume gate
 //     when casting finishes; Broken
-//     repeats CastAborted's Interrupted for an aborted cast, for an owner
-//     that reports the interrupt only after its AI has moved on.
+//     marks an abort through the window-gated Interrupt path, which owes
+//     CASTING_INTERRUPTED once the owner's AI has moved on.
 //
 // A nil sink drops them all.
 func NewController(actor Actor, sink event.Sink) *Controller {
@@ -652,7 +650,7 @@ func (c *Controller) stopInternal(interrupted bool) bool {
 	abort, finish := c.abortLocked()
 	c.mu.Unlock()
 	if abort != nil {
-		abort(interrupted)
+		abort()
 	}
 	c.emit(event.CastStopAck{})
 	if finish != nil {
@@ -663,7 +661,7 @@ func (c *Controller) stopInternal(interrupted bool) bool {
 
 // abortLocked clears the cast and returns the observer the caller must run
 // once it has released mu, or nil when no cast was in flight.
-func (c *Controller) abortLocked() (func(bool), func(bool)) {
+func (c *Controller) abortLocked() (func(), func(bool)) {
 	aborted := c.casting
 	current := c.current
 	target, _ := c.target.(attackable.Combatant)
@@ -672,11 +670,11 @@ func (c *Controller) abortLocked() (func(bool), func(bool)) {
 	if !aborted {
 		return nil, nil
 	}
-	return func(interrupted bool) {
+	return func() {
 			if fusionEnd != nil {
 				fusionEnd()
 			}
-			c.emit(event.CastAborted{Interrupted: interrupted})
+			c.emit(event.CastAborted{})
 		}, func(interrupted bool) {
 			c.emit(event.CastFinished{Interrupted: true, Broken: interrupted, Skill: current, Target: target})
 		}

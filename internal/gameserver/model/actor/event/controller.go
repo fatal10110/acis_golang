@@ -5,14 +5,14 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-// CastAborted reports an in-flight cast aborted; Interrupted means the abort
-// went through the window-gated interrupt path.
-type CastAborted struct{ Interrupted bool }
+// CastAborted reports an in-flight cast aborted. CastFinished's Broken
+// tells a window-gated interrupt from an unconditional stop.
+type CastAborted struct{}
 
 // CastFinished reports an in-flight cast ending, Interrupted by an abort or
 // completed naturally. Broken marks an abort that went through the
-// window-gated interrupt path, as CastAborted.Interrupted does. Target is the
-// cast's final target when it is a creature, nil otherwise.
+// window-gated interrupt path. Target is the cast's final target when it is
+// a creature, nil otherwise.
 type CastFinished struct {
 	Interrupted bool
 	Broken      bool

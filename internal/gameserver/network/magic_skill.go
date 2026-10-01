@@ -693,7 +693,7 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 	if err != nil {
 		if errors.Is(err, actorcast.ErrNotEnoughMP) || errors.Is(err, actorcast.ErrNotEnoughHP) {
 			sendMagicCastFailureReason(live, def, err)
-			l.broadcastCastAborted(live, false)
+			l.broadcastCastAborted(live)
 			sendMagicActionFailed(live)
 			live.endCastIntention(def, castCombatant(target))
 			return
@@ -716,22 +716,18 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 
 // broadcastCastAborted tells the caster and everyone watching it that an
 // in-flight cast was cancelled: the cancel animation goes to the whole
-// known list. interrupted additionally sends CASTING_INTERRUPTED to the
-// caster alone, which an interrupt does and a plain stop does not. The
-// action-failed acknowledgement is not sent here: it belongs to every Stop
-// call, idle or in-flight (a player's cast stop always sends it), so it is
-// wired through
-// the CastStopAck event instead of gated behind this in-flight-only path.
-func (l *GameClientLink) broadcastCastAborted(live *livePlayer, interrupted bool) {
+// known list. The action-failed acknowledgement is not sent here: it belongs
+// to every Stop call, idle or in-flight, so it is wired through the
+// CastStopAck event instead of gated behind this in-flight-only path. An
+// interrupt's CASTING_INTERRUPTED comes last, once the stopped cast's
+// CastFinished has run (see GameClientLink.finishLiveCast).
+func (l *GameClientLink) broadcastCastAborted(live *livePlayer) {
 	if live == nil {
 		return
 	}
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameMagicSkillCanceled(live.ObjectID())
 	})
-	if interrupted {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCastingInterrupted))
-	}
 }
 
 func skillCastObject(obj actorcast.Target) serverpackets.SkillCastObject {
