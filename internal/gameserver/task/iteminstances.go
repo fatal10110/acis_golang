@@ -92,6 +92,12 @@ type ItemInstances struct {
 	// groups maps each row of a write that has not landed yet to every row
 	// that must land with it (Bind).
 	groups map[int32]*rowGroup
+	// ops keeps UpdateItems from reading rows while a multi-row operation
+	// has changed them but not yet bound them (BeginOperation).
+	ops operationGate
+	// afterWiden, when set, runs inside UpdateItems' reading span, between
+	// its Widen and its state reads. Only tests set it.
+	afterWiden func()
 }
 
 // pendingItem is one changed instance waiting for the next flush, with the
@@ -138,7 +144,7 @@ func NewItemInstances(flusher ItemFlusher, templates *item.Table, worker *persis
 	if templates == nil {
 		templates = item.NewTable(nil)
 	}
-	return &ItemInstances{
+	i := &ItemInstances{
 		log:       log,
 		flusher:   flusher,
 		templates: templates,
@@ -148,6 +154,8 @@ func NewItemInstances(flusher ItemFlusher, templates *item.Table, worker *persis
 		rounds:    make(map[*saveRound]struct{}),
 		groups:    make(map[int32]*rowGroup),
 	}
+	i.ops.init()
+	return i
 }
 
 // Start launches the fixed item persistence task. The tick's outer ctx is
@@ -648,7 +656,8 @@ func (i *ItemInstances) saveChunks(ctx context.Context, entries []pendingItem) (
 //
 // The flush also carries every row bound to one of items (Bind), read
 // where it takes its place like the rest, and a flush that lands settles the
-// groups it carried whose every row it wrote (Landed).
+// groups it carried whose every row it wrote (Landed). It reads no row while a
+// multi-row operation is open (BeginOperation), so it waits for those.
 //
 // This per-call guarantee is unchanged by Save's chunking (Save simply
 // calls UpdateItems once per chunk); network.flushItemPersistence relies on
@@ -664,6 +673,46 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 	}
 
 	items = slices.DeleteFunc(items, func(inst *item.Instance) bool { return inst == nil })
+	write, states, deletes, carried := i.placeRows(items)
+	var err error
+	var landed []int32
+	write.Run(func(keep []int32) {
+		var batch item.FlushBatch
+		for _, st := range states {
+			if _, found := slices.BinarySearch(keep, st.ObjectID); !found {
+				continue
+			}
+			i.addToBatch(&batch, st)
+		}
+		for _, objectID := range deletes {
+			if _, found := slices.BinarySearch(keep, objectID); found {
+				batch.Deletes = append(batch.Deletes, objectID)
+			}
+		}
+		err = i.flusher.Flush(ctx, batch)
+		landed = keep
+	})
+	if err == nil {
+		i.Landed(carried, landed)
+	}
+	return err
+}
+
+// placeRows reads the state of items and of every row bound to one of them
+// (Widen), each with its place in its row's write order, for UpdateItems to
+// land in one flush. It returns the write holding the places, the states,
+// the bound rows with no instance left, which are deleted, and the groups the
+// rows came from.
+//
+// The whole span runs while no multi-row operation is open (BeginOperation),
+// so an operation's rows are read either before it changed any of them or
+// after it bound them all: a row is never read changed while the group it
+// belongs to is still invisible, and no operation can bind rows and take
+// their places between this Widen and these reads.
+func (i *ItemInstances) placeRows(items []*item.Instance) (*persist.Write, []item.InstanceState, []int32, BoundGroups) {
+	i.ops.beginRead()
+	defer i.ops.endRead()
+
 	// A row bound to rows outside this flush takes them along, so the rows
 	// one operation changed land in one transaction whichever write lands
 	// them (Bind).
@@ -673,6 +722,9 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 	}
 	var deletes []int32
 	widened, carried := i.Widen(ids)
+	if i.afterWiden != nil {
+		i.afterWiden()
+	}
 	for _, row := range widened {
 		if row.Inst == nil {
 			deletes = append(deletes, row.ObjectID)
@@ -701,28 +753,7 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 	for _, objectID := range deletes {
 		write.Add(objectID)
 	}
-	var err error
-	var landed []int32
-	write.Run(func(keep []int32) {
-		var batch item.FlushBatch
-		for _, st := range states {
-			if _, found := slices.BinarySearch(keep, st.ObjectID); !found {
-				continue
-			}
-			i.addToBatch(&batch, st)
-		}
-		for _, objectID := range deletes {
-			if _, found := slices.BinarySearch(keep, objectID); found {
-				batch.Deletes = append(batch.Deletes, objectID)
-			}
-		}
-		err = i.flusher.Flush(ctx, batch)
-		landed = keep
-	})
-	if err == nil {
-		i.Landed(carried, landed)
-	}
-	return err
+	return write, states, deletes, carried
 }
 
 // addToBatch resolves st's persistence effect and appends it to batch,
