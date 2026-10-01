@@ -319,7 +319,20 @@ func onLive(live *livePlayer, fn func()) bool {
 	return false
 }
 
+// Stop aborts everything p is doing, as abortAll does, then ends its attack
+// stance with AutoAttackStop to its observers. Only detach uses it: a
+// teleport aborts the same actions but keeps the stance (abortAll).
 func (p *livePlayer) Stop() {
+	p.abortAll()
+	if p.stopAttack != nil {
+		p.stopAttack(p)
+	}
+}
+
+// abortAll drops p's queued intentions and stops its attack, cast and move.
+// The attack stance and in-combat state are left alone: they end only on
+// their own expiry, on death or on logout.
+func (p *livePlayer) abortAll() {
 	p.dropHeldIntention()
 	p.takePickup()
 	p.takeDeferredPickup()
@@ -341,20 +354,16 @@ func (p *livePlayer) Stop() {
 	if p.attack != nil {
 		p.attack.Stop()
 	}
-	if p.stopAttack != nil {
-		p.stopAttack(p)
-	}
-	// Logout/deletion cleanup aborts everything, which stops the cast and
-	// cancels its pending task, so an in-flight cast never lands against an
-	// already-detached character.
+	// Stopping the cast cancels its pending task, so an in-flight cast never
+	// lands against an already-detached or relocated character.
 	if p.cast != nil {
 		p.cast.Stop()
 	}
 	// Free the chair for others but keep seated identity so observers still
 	// receive the stand-then-delete animation when this player despawns.
 	p.freeChair()
-	// Cubics are left alone: a teleport halts p too, and its cubics keep
-	// acting and ageing across it. Detach stops them (stopCubics).
+	// Cubics are left alone: across a teleport they keep acting and ageing.
+	// Detach stops them (stopCubics); death removes them (removeAllCubics).
 }
 
 // detached reports whether p's session has begun detaching (logout).
