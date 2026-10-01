@@ -179,6 +179,9 @@ type options struct {
 	merchant               merchantOptions
 	doors                  []*door.Template
 	petitionConfig         *petition.Config
+	// rewardPartiesWrap wraps the link's kill-party resolver
+	// (WithRewardParties).
+	rewardPartiesWrap func(gamemanager.RewardParties) gamemanager.RewardParties
 }
 
 type characterSpec struct {
@@ -2000,7 +2003,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Effects:          taskEffects,
 		effectEnv:        effectEnv,
 		castEffects:      gcl.HostileCastEffects(),
-		rewardParties:    gcl,
+		rewardParties:    o.rewardParties(gcl),
 		stance:           gclConfig.AttackStance,
 		maxGeoPathFail:   o.maxGeoPathFailCount,
 		zones:            o.zones,
