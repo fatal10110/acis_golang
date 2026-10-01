@@ -495,8 +495,8 @@ func (blowHandler) UseResult(cast Cast) Result {
 			}
 			dischargeSoulshot(cast)
 		}
-		// Blow.java rolls the lethal chance unconditionally per target,
-		// outside the landing gate — a missed blow can still proc it.
+		// The lethal chance is rolled unconditionally per target, outside
+		// the landing gate — a missed blow can still proc it.
 		applyLethalHit(cast, cast.Skill, target, &result)
 	}
 	applySelfEffects(cast, cast.Skill)
@@ -596,9 +596,9 @@ func reportMagicFailure(cast Cast, target Actor, failure formulas.MagicFailure, 
 		result.AttackFailed++
 		result.record(AttackFailedMessage{})
 	case formulas.MagicFailureFull:
-		// Formulas.java:614 gates this send `attacker instanceof Player` —
-		// unlike Mdam/Blow/Manadam's own unconditional skill-level resist —
-		// so it never reaches a Summon's owner in the reference.
+		// This send is gated on a Player attacker — unlike
+		// Mdam/Blow/Manadam's own unconditional skill-level resist — so it
+		// never reaches a Summon's owner.
 		appendResisted(result, target, cast.Skill, cast.Skill.Level, false)
 	}
 	if target.Kind() == actor.KindPlayer {
@@ -653,14 +653,14 @@ func deliverDamage(caster Creature, target Actor, amount int, mcrit bool) {
 
 // appendResisted records the caster-facing resisted-your-skill report for
 // target. The name is taken from whatever name the target exposes and is
-// never gated on being non-empty: every reference call site builds the
-// message from the target creature's name unconditionally, and the datapack
+// never gated on being non-empty: every resist report is built from the
+// target creature's name unconditionally, and the datapack
 // ships nameless targetable monsters (npc ids 27201-27213), so an empty name
 // still owes the caster the report.
 //
-// level is the skill level written into the message: the reference builds it
-// from the skill object (the cast level) at most producers, but Mdam adds only
-// the skill id, so its message always carries level 1.
+// level is the skill level written into the message: most producers write
+// the cast level, but Mdam writes only the skill id, so its message always
+// carries level 1.
 func appendResisted(result *Result, target Actor, def modelskill.Definition, level int, unconditional bool) {
 	if result == nil {
 		return
@@ -670,8 +670,8 @@ func appendResisted(result *Result, target Actor, def modelskill.Definition, lev
 }
 
 // appendResistedCount records count per-effect-template resists produced by
-// applyEffectsWithLanding's landing roll — the L2Skill.getEffects generic
-// resist, gated to a Player caster in the reference — never the caster's own
+// applyEffectsWithLanding's landing roll — the generic per-effect resist,
+// gated to a Player caster — never the caster's own
 // unconditional skill-level resist.
 func appendResistedCount(result *Result, target Actor, def modelskill.Definition, count int) {
 	for range count {
@@ -691,8 +691,8 @@ func counterSkillReflects(def modelskill.Definition, counter float64) bool {
 // its effector (see landReflected); a combined normal-reflect and counter
 // outcome keeps effects on the target. Unlike PDAM/MDAM, BLOW never checks
 // BLOCK_DEBUFF, and on the target a landing-rate roll gates activation with
-// the blessed-spiritshot input forced true — Blow.java hardcodes that
-// argument regardless of the caster's real charge state.
+// the blessed-spiritshot input forced true regardless of the caster's real
+// charge state.
 func applyBlowEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, countered bool, result *Result) {
 	if len(cast.Skill.Effects) == 0 {
 		return
@@ -804,7 +804,7 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		if mp > 0 {
 			target.ReduceMP(mp)
 		}
-		// Manadam.java stops SLEEP/IMMOBILE_UNTIL_ATTACKED once the raw
+		// MANADAM stops SLEEP/IMMOBILE_UNTIL_ATTACKED once the raw
 		// (pre-clamp) damage is positive, after the drain and before the
 		// drain messages, through the same effect-list removal path
 		// stopEffectsBySkillID uses.

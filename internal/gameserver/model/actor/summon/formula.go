@@ -342,9 +342,8 @@ func (a *Actor) EvasionRate() float64 {
 }
 
 // CriticalRate returns this summon's physical critical rate, given
-// baseCritRate from its npc template, truncated to an int and capped at 500
-// per CreatureStatus.getCriticalHit (CreatureStatus.java:551-553):
-// `Math.min((int) calcStat(...), 500)`.
+// baseCritRate from its npc template, truncated to an int and capped at 500:
+// min(int(stat), 500).
 func (a *Actor) CriticalRate(baseCritRate float64) float64 {
 	return float64(min(int(a.calcStat(stat.CriticalRate, baseCritRate)), 500))
 }
@@ -780,9 +779,9 @@ func (a *Actor) CounterSkillPhysical() float64 {
 }
 
 // CancelVulnerability returns a's CANCEL_VULN multiplier for the cancel and
-// cancel-debuff success-rate formulas (Formulas.java:949-951). classification
-// is unused: the reference applies CANCEL_VULN uniformly, without the
-// per-classification switch it uses for the other _VULN stats.
+// cancel-debuff success-rate formulas. classification is unused:
+// CANCEL_VULN applies uniformly, without the per-classification switch the
+// other _VULN stats use.
 func (a *Actor) CancelVulnerability(_ string) float64 {
 	return a.CalcStat(stat.CancelVuln, 1)
 }

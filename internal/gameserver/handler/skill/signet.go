@@ -310,8 +310,7 @@ func (h signetHandler) newSignetNoiseEffect(def modelskill.Definition, meta effe
 // first tick, unsummons every living, non-peace-zone summon the actor
 // finds within skill radius on each subsequent tick. Each dismissed
 // summon broadcasts its own self-cast MagicSkillUse packet from its own
-// known list, matching Java's summon.broadcastPacket(new
-// MagicSkillUse(summon, ...)).
+// known list.
 func (h signetHandler) newSignetAntiSummonEffect(def modelskill.Definition, meta effect.Skill, tmpl modelskill.EffectTemplate, actor *npc.EffectPoint) *effect.Effect {
 	e := &effect.Effect{Skill: meta, Template: tmpl, Effector: actor, Effected: actor}
 	e.OnStart = func(*effect.Effect) bool { return true }

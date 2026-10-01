@@ -37,10 +37,9 @@ type WorldObjects struct {
 
 // NewWorldObjects allocates, spawns, and indexes door and static-object
 // templates. Closed doors are applied to geodata immediately. doorTimers
-// schedules each door's next auto open/close transition, mirroring the
-// reference server's DoorAI. A door whose triangulated footprint is
-// degenerate or samples to no geodata cells is logged and skipped rather
-// than aborting boot, matching DoorData.java:113-123.
+// schedules each door's next auto open/close transition. A door whose
+// triangulated footprint is degenerate or samples to no geodata cells is
+// logged and skipped rather than aborting boot.
 func NewWorldObjects(doors *door.Table, statics *staticobject.Table, ids idAllocator, geo *engine.Engine, state *world.State, doorTimers *task.Door, newSink func(*door.Object) event.Sink, log zerolog.Logger) (*WorldObjects, error) {
 	if ids == nil {
 		return nil, fmt.Errorf("world objects: nil id allocator")
@@ -120,8 +119,7 @@ func (w *WorldObjects) StaticObjects() []*staticobject.Object {
 // SetDoorOpen changes a door's open state, applies the matching geodata,
 // broadcasts the change to known observers, reschedules the door's next auto
 // open/close timer from its template's openTime/closeTime/randomTime, and
-// propagates the same state to a linked controller door (Template.TriggeredID),
-// mirroring the reference server's Door.changeState(open, false).
+// propagates the same state to a linked controller door (Template.TriggeredID).
 func (w *WorldObjects) SetDoorOpen(id int, open bool) bool {
 	obj, ok := w.Door(id)
 	if !ok {

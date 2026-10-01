@@ -16,8 +16,8 @@ const (
 	// spellbookRequirementType is the requirement kind tag marking a
 	// spellbook item in an AcquireSkillInfo requirement entry.
 	spellbookRequirementType = 99
-	// spellbookRequirementUnk is the trailing field Java sends with
-	// spellbook requirements; its value is part of the wire contract.
+	// spellbookRequirementUnk is the trailing field sent with spellbook
+	// requirements; its value is part of the wire contract.
 	spellbookRequirementUnk = 50
 
 	// fishingRequirementType marks the item consumed to learn a fishing
@@ -191,7 +191,7 @@ func acquireSkillListEntries(live *livePlayer) []serverpackets.AcquireSkillListE
 
 // fishingAcquireSkillList builds the fishing-type trainer list of skills the
 // character can learn now; each entry's displayed cost is 0 and its row tag
-// is 1 (the fishing marker), matching the oracle's FishingSkillNode layout.
+// is 1 (the fishing marker), the fishing skill-node row layout.
 // ok is false when there is none.
 func (l *GameClientLink) fishingAcquireSkillList(live *livePlayer) (list wire.Frame, ok bool) {
 	nodes := l.skillTrees.FishingSkillsFor(live.Level(), live.HasDwarvenCraft(), skillstate.TreeSkillLevels(live.SkillLevels()))

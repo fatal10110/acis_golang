@@ -232,8 +232,7 @@ func (i *ItemInstances) Contains(inst *item.Instance) bool {
 // would call such a row settled while its delete is still queued behind
 // other work, and the row would be restored and then re-inserted by the next
 // detach flush. Checking the outstanding rounds as well keeps the answer
-// true for the whole write, the way the reference holds its set until every
-// batch has executed.
+// true for the whole write, until every batch has executed.
 //
 // An id RemoveItems dropped mid-round is excluded, matching the rule
 // finishOwner merges by: its container wrote its own final state, so the
@@ -423,11 +422,11 @@ func (i *ItemInstances) pendingInstances(objectIDs []int32) []*item.Instance {
 // fail independently. Rows one operation bound together (Bind) are the
 // exception, since UpdateItems widens every chunk to the rows bound to it:
 // both legs of a trade whose own write failed land in one transaction or not
-// at all, whichever owner's job reaches them first. Beyond that, this is not
-// past what the Java reference already does: ItemInstanceTaskManager.updateItems commits
-// five sequential executeBatch calls on an autocommit connection with no
+// at all, whichever owner's job reaches them first. Beyond that, no stronger
+// guarantee is owed: the item-persistence contract commits its writes as
+// five sequential statement batches on an autocommit connection with no
 // transaction at all, so per-statement partial visibility on error is
-// already the oracle's behavior, at a finer grain than one chunk here.
+// already part of that contract, at a finer grain than one chunk here.
 // flushItemPersistence (network/lifecycle.go) is the caller that still
 // needs, and gets, whole-container atomicity: it calls UpdateItems
 // directly for one container's items, bypassing Save's chunking entirely.
@@ -520,9 +519,9 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 			// (cmd/gameserver/tasks.go, drainItemInstances), the last chance
 			// these rows get, and an escaping panic there would leave the fx
 			// OnStop hook — no fx.RecoverFromPanics is configured — skipping
-			// every stop hook after it. The reference cannot fail that way:
-			// ItemInstanceTaskManager.updateItems catches Exception around the
-			// whole batch and never throws out of the shutdown-triggered call.
+			// every stop hook after it. The item-save contract cannot fail
+			// that way: a failure is caught around the whole batch and never
+			// escapes the shutdown-triggered save.
 			//
 			// The reason is logged here rather than left to round.err, which
 			// is best-effort and cannot be relied on: finishOwner keeps only

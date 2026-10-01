@@ -71,8 +71,8 @@ func (v vertexList) Vertices() []Point {
 // counts as inside on one side only) and treats the enclosed-an-odd-number-
 // of-times region as inside, so on a concave or self-touching ring the two
 // disagree on interior points, not merely on edges. Use this type only
-// where the reference defines the region by its raw ring; use
-// TriangulatedPolygon everywhere the reference triangulates first.
+// where a region is defined by its raw ring; use TriangulatedPolygon
+// everywhere a region is triangulated first.
 type Polygon struct {
 	vertexList
 }
@@ -91,8 +91,8 @@ func NewPolygon(points []Point) (Polygon, error) {
 
 // TriangulatedPolygon is a 2D polygon stored as the triangles ear clipping
 // produced from its vertex ring. Containment is the union of its triangles,
-// each tested edge-inclusively, which is the rule for every region the
-// reference builds by triangulating first — spawn territories and door
+// each tested edge-inclusively, which is the rule for every region built
+// by triangulating first — spawn territories and door
 // footprints. It classifies concave and self-touching rings correctly,
 // where ray casting over the same ring does not.
 //
@@ -107,7 +107,7 @@ type TriangulatedPolygon struct {
 
 // NewTriangulatedPolygon ear-clips at least three vertices into a
 // TriangulatedPolygon. It fails when the vertices do not form a monotone
-// polygon, the same input the reference rejects.
+// polygon.
 func NewTriangulatedPolygon(points []Point) (TriangulatedPolygon, error) {
 	if len(points) < 3 {
 		return TriangulatedPolygon{}, fmt.Errorf("geometry: polygon needs at least 3 vertices, got %d", len(points))
@@ -141,8 +141,8 @@ func (p TriangulatedPolygon) ContainingTriangle(x, y int) (Triangle, bool) {
 	return Triangle{}, false
 }
 
-// Size is the sum of the polygon's triangle sizes — the weight the
-// reference uses when picking a random point, and the reason a
+// Size is the sum of the polygon's triangle sizes — the weight used when
+// picking a random point, and the reason a
 // self-touching ring is not measured by a shoelace sum that would cancel
 // its lobes against each other.
 func (p TriangulatedPolygon) Size() int64 {

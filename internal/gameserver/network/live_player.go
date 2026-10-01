@@ -54,20 +54,18 @@ type livePlayer struct {
 	// still waiting for its pets-row read, and cleared when that read lands
 	// however it ends.
 	//
-	// The reference needs no equivalent: its read is a synchronous call
-	// inside useSkill, so isCastingNow() stays true across it and
-	// SummonItems.useItem returns on that alone (SummonItems.java:37-38)
-	// before it ever reaches the summon-slot check at :42-46. Go's read
+	// A synchronous read would need no such flag: the caster would stay
+	// casting across it, and a summon item's use refuses a casting player
+	// before it ever reaches the summon-slot check. Go's read
 	// leaves the queue, and the hold that stands in for that casting state
 	// has a ceiling, and crowd control or death can end the cast early, so
 	// the cast can be over while the pet is still inbound. This flag keeps
 	// the summon slot closed for the rest of the read: every summon item
 	// and a servitor cast treat it as the casting state it stands in for.
 	//
-	// It is deliberately not part of hasActiveSummon: the reference answers
-	// RequestAutoSoulShot with getSummon(), which is null across its own
-	// read (SummonCreature.java:58 vs :64), so that gate must keep seeing an
-	// empty slot.
+	// It is deliberately not part of hasActiveSummon: RequestAutoSoulShot
+	// answers from the summon slot, which stays empty across the pet-row
+	// read, so that gate must keep seeing an empty slot.
 	//
 	// Only the owner's queue and its persistence continuation write it;
 	// atomic so a gate reached from any other goroutine stays race-free.
@@ -204,8 +202,8 @@ type pickupIntention struct {
 	target world.Tracked
 	// shift is only meaningful on deferredPickup: it is the original click's
 	// shift-modifier, needed at drain time to decide walk-vs-fail exactly as
-	// a fresh click would (CreatureMove.java:438, !isShiftPressed gates the
-	// walk). pickup (the in-flight walk-then-collect intention) is only ever
+	// a fresh click would (only a non-shift click walks). pickup (the
+	// in-flight walk-then-collect intention) is only ever
 	// set for a non-shift click — a shift click fails outright instead of
 	// walking — so it never needs this field.
 	shift bool
@@ -328,9 +326,9 @@ func (p *livePlayer) Stop() {
 	if p.stopAttack != nil {
 		p.stopAttack(p)
 	}
-	// Player.cleanup -> abortAll(true) -> _cast.stop() (Creature.java:1298-1302)
-	// cancels the pending cast task on logout/deletion (CreatureCast.java:416-426),
-	// so an in-flight cast never lands against an already-detached character.
+	// Logout/deletion cleanup aborts everything, which stops the cast and
+	// cancels its pending task, so an in-flight cast never lands against an
+	// already-detached character.
 	if p.cast != nil {
 		p.cast.Stop()
 	}
@@ -354,10 +352,9 @@ func (p *livePlayer) markDetaching() {
 
 // stopCubics cancels every live cubic runtime's timers on detach, so a
 // recurring action tick never fires against a session that has already
-// logged out — the reference instead relies on fireAction's own
-// isDead()/isOnline() self-check on its next scheduled tick, but stopping
-// immediately here is equivalent and avoids a stale timer outliving the
-// session.
+// logged out. Stopping immediately here is equivalent to the action tick's
+// own dead/online self-check on its next scheduled run, and avoids a stale
+// timer outliving the session.
 func (p *livePlayer) stopCubics() {
 	p.cubicsMu.Lock()
 	defer p.cubicsMu.Unlock()
@@ -774,8 +771,8 @@ func (p *livePlayer) inventoryItems() []*item.Instance {
 // inventory-update queue in one critical section, then builds the full
 // snapshot frame unlocked.
 //
-// The reference's ItemList constructor clears the update list before it
-// reads the item set, so a full snapshot supersedes and discards the deltas
+// Building the item list clears the update list before it reads the item
+// set, so a full snapshot supersedes and discards the deltas
 // it already describes; the batching task then finds nothing to drain and
 // sends no InventoryUpdate behind the snapshot. Taking the snapshot and the
 // clear under one lock also keeps a mutation landing between them from

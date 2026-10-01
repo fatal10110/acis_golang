@@ -7,8 +7,7 @@ import (
 )
 
 // chargeAutoClearDelay is how long Force/Soul charges survive without being
-// spent or topped up before they auto-clear, matching the reference's
-// 10-minute charge task.
+// spent or topped up before they auto-clear.
 const chargeAutoClearDelay = 10 * time.Minute
 
 // Charges returns the current Force/Soul charge count.
@@ -20,8 +19,8 @@ func (c *Character) Charges() int {
 
 // IncreaseCharges adds count charges, clamped to max, and restarts the
 // auto-clear timer. It reports whether any charge was added; already being
-// at max is a no-op that reports false, matching the reference's
-// FORCE_MAXLEVEL_REACHED short-circuit.
+// at max is a no-op that reports false (the FORCE_MAXLEVEL_REACHED
+// short-circuit).
 func (c *Character) IncreaseCharges(count, max int) bool {
 	c.stateMu.Lock()
 	if c.charges >= max {
@@ -45,8 +44,7 @@ func (c *Character) IncreaseCharges(count, max int) bool {
 
 // DecreaseCharges removes count charges, reporting whether there were
 // enough to remove. Charges hitting zero stop the auto-clear timer instead
-// of restarting it, matching the reference's stopChargeTask/restartChargeTask
-// split.
+// of restarting it.
 func (c *Character) DecreaseCharges(count int) bool {
 	c.stateMu.Lock()
 	if c.charges < count {
@@ -65,8 +63,7 @@ func (c *Character) DecreaseCharges(count int) bool {
 }
 
 // ClearCharges resets the charge count to zero and cancels the auto-clear
-// timer, matching the reference's clearCharges() called on death and
-// subclass change.
+// timer; it runs on death and subclass change.
 func (c *Character) ClearCharges() {
 	c.stateMu.Lock()
 	changed := c.charges > 0

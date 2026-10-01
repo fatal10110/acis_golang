@@ -16,8 +16,8 @@ import (
 const workshopOrderRange = 150
 
 // setWorkshopList answers RequestRecipeShopListSet. A packet naming a recipe
-// that is not loaded is dropped without a word, as the reference drops a
-// packet it cannot read. No recipes, more than the workshop holds, a recipe
+// that is not loaded is dropped without a word, like any packet that cannot
+// be read. No recipes, more than the workshop holds, a recipe
 // missing from its book page, or a failed set-up check keeps live setting up
 // the workshop and shows the manage window again; otherwise live sits down
 // and the workshop opens.
@@ -83,8 +83,7 @@ func sendRecipeShopItemInfo(live, crafter *livePlayer, recipeID int32) {
 
 // showWorkshopRecipe answers RequestRecipeShopMakeInfo with a workshop's
 // craft window for the recipe asked. A crafter not running a workshop gets
-// nothing, as in the reference; the window only asks again on the next
-// click.
+// nothing, as specified; the window only asks again on the next click.
 func (l *GameClientLink) showWorkshopRecipe(live *livePlayer, req clientpackets.RequestRecipeShopMakeInfo) {
 	crafter, ok := l.livePlayerByID(req.CrafterID)
 	if !ok || crafter.OperateType() != privatestore.OperateManufacture {
@@ -95,8 +94,7 @@ func (l *GameClientLink) showWorkshopRecipe(live *livePlayer, req clientpackets.
 
 // showWorkshopOf answers RequestRecipeShopManagePrev, the craft window's
 // back button: live's target's workshop list. A dead player is released
-// with ActionFailed; a target that is no player gets nothing, as in the
-// reference.
+// with ActionFailed; a target that is no player gets nothing, as specified.
 func (l *GameClientLink) showWorkshopOf(live *livePlayer) {
 	if live.AlikeDead() {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -112,15 +110,15 @@ func (l *GameClientLink) showWorkshopOf(live *livePlayer) {
 // orderWorkshopCraft answers RequestRecipeShopMakeItem: live orders a craft
 // from a workshop within reach. The craft runs with the workshop held, so
 // orders on one workshop never overlap and its list cannot change under
-// one. Requests the reference drops without a word stay silent: the craft
+// one. Requests specified to drop without a word stay silent: the craft
 // window only asks again on the next click.
 func (l *GameClientLink) orderWorkshopCraft(live *livePlayer, req clientpackets.RequestRecipeShopMakeItem) {
 	crafter, ok := l.livePlayerByID(req.CrafterID)
 	if !ok || live.Operating() || crafter.OperateType() != privatestore.OperateManufacture {
 		return
 	}
-	// The reference also refuses either side in a duel; duels are not
-	// modeled yet (#215).
+	// Either side in a duel should be refused too; duels are not modeled
+	// yet (#215).
 	if crafter.InCombat() || live.InCombat() {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantOperateStoreDuringCombat))
 		return

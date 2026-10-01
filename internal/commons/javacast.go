@@ -2,8 +2,8 @@ package commons
 
 import "math"
 
-// JavaInt narrows f to an int32 the way a Java (int) cast does: toward
-// zero, saturating at the int32 range, NaN as 0.
+// JavaInt narrows f to an int32 by truncating toward zero, saturating at the
+// int32 range, with NaN as 0.
 func JavaInt(f float64) int32 {
 	switch {
 	case math.IsNaN(f):

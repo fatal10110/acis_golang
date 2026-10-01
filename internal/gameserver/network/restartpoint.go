@@ -50,8 +50,8 @@ func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.R
 	dest, ok := l.restartDestination(live)
 	if !ok {
 		// This is a data-loading gap (no restart-point table loaded at
-		// all), not a normal rejection the reference path handles safely:
-		// its nearest-town lookup can return nil and then dereference it.
+		// all), not a normal rejection: the nearest-town lookup has nothing
+		// to return, and nothing downstream handles that safely.
 		// With no destination and nothing sent, the dead player is stranded
 		// on the death screen; ActionFailed is the minimum that lets the
 		// client dismiss the pending death action so the player isn't
@@ -87,19 +87,17 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 	if !live.SetTeleporting(true) {
 		return
 	}
-	// Fusion channels targeting live are left alone here: the reference has
-	// no teleport hook for fusion, only death/class-change/logout/party
-	// abort triggers (Player.java:2663,5847,6302; Party.java:202,428). An
-	// out-of-range/LOS teleport is instead caught within ≤1s by the existing
-	// fixed-rate FusionChannelValid recheck (FusionSkill.java:45-49), same as
-	// Java.
+	// Fusion channels targeting live are left alone here: fusion has no
+	// teleport hook, only death/class-change/logout/party abort triggers.
+	// An out-of-range/LOS teleport is instead caught within ≤1s by the
+	// existing fixed-rate FusionChannelValid recheck.
 	// live.Stop() already reaches the cast controller (live_player.go's
 	// Stop() calls p.cast.Stop()), so a second StopCast() here would hit
 	// the same Controller instance twice — castController wires
 	// live.Character's cast controller to the identical *actorcast.Controller
 	// stored in live.cast (live_player.go:270) — and double the
-	// unconditional clientActionFailed() ack (PlayerCast.java:382-387,
-	// controller.go's stopInternal fires onStopAck on every call
+	// unconditional action-failed ack (controller.go's stopInternal fires
+	// onStopAck on every call
 	// regardless of whether a cast was in flight).
 	live.Stop()
 	// Every hostile around the old position forgets live, dropping its

@@ -149,9 +149,9 @@ func (l *GameClientLink) handleAddTradeItem(live *livePlayer, req clientpackets.
 	}
 	partnerID, ok := session.PartnerID(live.ObjectID())
 	if !ok {
-		// The session exists but has no partner recorded — equivalent
-		// to the reference's getPartner() == null, which the reference
-		// answers with TARGET_IS_NOT_FOUND and a trade cancel. The race
+		// The session exists but has no partner recorded — a missing
+		// partner, which is answered with TARGET_IS_NOT_FOUND and a trade
+		// cancel. The race
 		// is rare (partner logged off between the two packets) but a
 		// silent return would leave the trader's add-item click pending
 		// forever.
@@ -168,8 +168,8 @@ func (l *GameClientLink) handleAddTradeItem(live *livePlayer, req clientpackets.
 			return
 		}
 		// The partner left the world with the window open and is back
-		// under the same id. The reference's presence check looks the id
-		// up, finds the new login and lets the add through; the offer only
+		// under the same id. The presence check looks the id up, finds the
+		// new login and lets the add through; the offer only
 		// ever reaches the departed session, so the new login is told
 		// nothing.
 		partner = nil
@@ -247,7 +247,7 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 	partnerID, ok := session.PartnerID(live.ObjectID())
 	if !ok {
 		// Same race shape as handleAddTradeItem: the session is here but
-		// its partner is gone, which the reference answers with
+		// its partner is gone, which is answered with
 		// TARGET_IS_NOT_FOUND. Answer the same instead of dropping the
 		// confirm packet silently.
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
@@ -258,8 +258,8 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 	switch {
 	case partnerLeft:
 		// A partner who left with the window open is answered like any
-		// absent partner. Once the id is back online the reference goes on
-		// to confirm, whose re-check of the departed partner then fails:
+		// absent partner. Once the id is back online the specified flow
+		// goes on to confirm, whose re-check of the departed partner then fails:
 		// Confirm reports that below.
 		if !ok {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
@@ -277,16 +277,16 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 	}
 	if !partnerLeft && !livePlayersInRange(live, partner, tradeInteractionDistance) {
 		l.cancelActiveEnchant(partner)
-		// The reference validates the interaction radius on every confirm
-		// and answers an out-of-range confirm by cancelling the whole
+		// The interaction radius is validated on every confirm, and an
+		// out-of-range confirm is answered by cancelling the whole
 		// trade for both players, not with a per-player error message.
 		l.cancelTradeByID(live.ObjectID())
 		return
 	}
-	// The reference drops the partner's scroll-of-enchant selection before
-	// confirming. A partner who left and is back online is a new login the
-	// reference never reaches: its cancel acts on the departed player the
-	// trade still names, so the new login keeps its selection.
+	// The partner's scroll-of-enchant selection is dropped before
+	// confirming. A partner who left and is back online is a new login that
+	// cancel never reaches: it acts on the departed player the trade still
+	// names, so the new login keeps its selection.
 	if !session.PartnerLeft(live.ObjectID()) {
 		l.cancelActiveEnchant(partner)
 	}
@@ -309,8 +309,8 @@ func (l *GameClientLink) handleTradeDone(ctx context.Context, live *livePlayer, 
 }
 
 // settleConfirmedTrade exchanges the offers of a session both sides have
-// confirmed. The reference re-validates at settlement too (TradeList.confirm,
-// both-sides-confirmed branch) and answers a failed re-check by cancelling
+// confirmed. Settlement re-validates too, once both sides have confirmed,
+// and answers a failed re-check by cancelling
 // the whole trade for both players — the same cancel broadcast as everywhere
 // else — not with the exchange-ended finish of a failed transfer.
 //
@@ -375,7 +375,7 @@ func (l *GameClientLink) cancelActiveTrade(live *livePlayer) {
 }
 
 // leaveActiveTrade takes a player leaving the world out of its open trade
-// without cancelling it. The reference cancels on exit only while a request
+// without cancelling it. A trade is cancelled on exit only while a request
 // answer is still pending, and the answer clears that, so an open window
 // stays open on the partner's side with nothing sent; the partner finds out
 // on its own next trade action.
@@ -465,11 +465,10 @@ func (l *GameClientLink) validTradeParticipants(first, second *livePlayer) bool 
 }
 
 // tradePartnerLive reports whether both players are still online in the
-// world, without the 150-unit interaction-distance check. AddTradeItem.java
-// L40-46 gates on partner liveness only (partner != null, still in World,
-// getActiveTradeList() != null) — the reference enforces
-// Npc.INTERACTION_DISTANCE solely in TradeList.validate(), called from
-// TradeList.confirm() (TradeList.java L326-341), i.e. only at TradeDone.
+// world, without the 150-unit interaction-distance check. Adding a trade
+// item gates on partner liveness only (a partner, still in the world, with
+// an active trade list) — the interaction distance is enforced solely by
+// trade validation at confirm, i.e. only at TradeDone.
 func (l *GameClientLink) tradePartnerLive(first, second *livePlayer) bool {
 	if first == nil || second == nil || first.Inventory() == nil || second.Inventory() == nil {
 		return false

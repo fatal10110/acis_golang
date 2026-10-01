@@ -27,18 +27,17 @@ const (
 	systemMessageCannotSummonAgain = 1142
 )
 
-// summonCreatureSkillRef is the hardcoded SUMMON_CREATURE skill id/level
-// SummonItems.java always casts for a pet-collar item
-// (SkillTable.getInstance().getInfo(2046, 1)), independent of which collar
-// was used — the collar only selects the npc template via SummonItemData.
+// summonCreatureSkillRef is the fixed SUMMON_CREATURE skill id/level every
+// pet-collar item casts, independent of which collar was used — the collar
+// only selects the npc template via SummonItemData.
 var summonCreatureSkillRef = skillref.Ref{ID: 2046, Level: 1}
 
-// useSummonItem triggers the SUMMON_CREATURE cast for a pet-collar item
-// (SummonItems.java case 1), driving it through the same timed
+// useSummonItem triggers the SUMMON_CREATURE cast for a pet-collar item,
+// driving it through the same timed
 // Launch/Hit/Finish cast sequence useItemAICast uses for any other
 // item-carried skill. Unlike a consumable, the collar itself is never
-// destroyed — it stays the pet's persistent identity, matching
-// SummonCreature.java's own lookup by control-item object id.
+// destroyed — it stays the pet's persistent identity: the summon looks the
+// pet up by control-item object id.
 //
 // It reports whether inst was handled by this path, so the caller's
 // equip-toggle fallback still answers the client for anything else.
@@ -60,7 +59,7 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 		return false
 	}
 
-	// The gates below are shared by every summon kind, in the reference's
+	// The gates below are shared by every summon kind, in the specified
 	// order, ahead of the per-kind branches. Only a settled seat refuses: a
 	// sit-down or stand-up still in progress passes, and holds a collar's
 	// cast below.
@@ -68,17 +67,17 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
 		return true
 	}
-	// The reference answers the observer, skills-disabled and casting
-	// rejections with no packet, and a use-item request leaves no client
-	// action pending, so silence is the matching answer.
+	// The observer, skills-disabled and casting rejections are specified
+	// with no packet, and a use-item request leaves no client action
+	// pending, so silence is the matching answer.
 	if live.Character.ObserverMode() {
 		return true
 	}
 	// restoringSummon extends the casting gate over a pets-row read whose
 	// cast was already ended — by the hold ceiling, crowd control or death:
-	// the reference is still in that cast until its pet lands. It is not part
-	// of the summon-slot check below, which would answer SUMMON_ONLY_ONE
-	// where the reference is silent.
+	// the summoner counts as still in that cast until its pet lands. It is
+	// not part of the summon-slot check below, which would answer
+	// SUMMON_ONLY_ONE where the specified answer is silence.
 	if live.Character.AllSkillsDisabled() || live.Character.CastingNow() || l.restoringSummon(live) {
 		return true
 	}
@@ -262,7 +261,7 @@ func (l *GameClientLink) useDecorativeSummonItem(live *livePlayer, inv *itemcont
 
 // mountWyvern puts live on the wyvern npcID called by its collar
 // controlItemID. Both hands are emptied first; a weapon that cannot be taken
-// off refuses the mount with no packet, as the reference does, and a
+// off refuses the mount with no packet, as specified, and a
 // use-item request leaves no client action pending. The rider is then
 // forced to run and loses its toggles before the wyvern's skill list, the
 // Ride, the speed refresh and the feed gauge go out.

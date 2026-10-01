@@ -183,8 +183,7 @@ func (h *Hostile) ConsumeBowMP() {
 }
 
 // WeaponGrade returns this NPC's resolved right-hand weapon's crystal
-// grade, resolved by Attach. Zero (CrystalNone) when unarmed. Reference:
-// Npc.getActiveWeaponItem, Npc.java:371-375.
+// grade, resolved by Attach. Zero (CrystalNone) when unarmed.
 func (h *Hostile) WeaponGrade() int {
 	return int(h.weaponCrystal)
 }
@@ -243,14 +242,14 @@ func (h *Hostile) RechargeShots(physical, magic bool) {
 	}
 }
 
-// RollAttackedShotRecharge ports the generic monster AI's onAttacked shot
-// roll (MonsterBehavior/WarriorBase/WizardBase.onAttacked in the aCis Java
-// reference): on every landed hit, an NPC configured with a nonzero
+// RollAttackedShotRecharge is the generic monster AI's attacked-hook shot
+// roll (the MonsterBehavior, WarriorBase and WizardBase scripts): on every
+// landed hit, an NPC configured with a nonzero
 // SoulShot/SpiritShot AI parameter rolls its matching *Rate parameter
 // (percent, [0,100)) and recharges that shot type on success. Callers are
 // the same three HP-reduction paths that record attacker hate — TakeDamage,
-// ReduceHP, and ReduceHPByDOT — matching Npc.reduceCurrentHp's unconditional
-// (isDOT included) addDamageHate-then-onAttacked sequence.
+// ReduceHP, and ReduceHPByDOT — since every HP reduction (DOT included)
+// records hate and then runs the attacked hook.
 func (h *Hostile) RollAttackedShotRecharge() {
 	physical := h.CurrentSoulshotCount() > 0 && h.soulshotRate > 0 && h.Roll(100) < h.soulshotRate
 	magic := h.CurrentSpiritshotCount() > 0 && h.spiritshotRate > 0 && h.Roll(100) < h.spiritshotRate
@@ -366,8 +365,8 @@ func (h *Hostile) BroadcastMove(ev event.Move) {
 }
 
 // BroadcastMoveToPawn reports a rotation-only MoveToPawn notice toward
-// target, matching the reference's fallback when an AI-initiated cast is
-// rejected after movement has already turned the actor toward target.
+// target, the fallback when an AI-initiated cast is rejected after
+// movement has already turned the actor toward target.
 func (h *Hostile) BroadcastMoveToPawn(target attackable.Combatant) {
 	sx, sy, sz := h.Position()
 	origin := location.Location{X: sx, Y: sy, Z: sz}

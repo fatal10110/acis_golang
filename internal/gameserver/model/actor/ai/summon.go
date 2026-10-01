@@ -14,8 +14,8 @@ import (
 
 const summonFollowOffset = 70
 
-// summonOffensiveFollowTick is CreatureMove.java's ATTACK_FOLLOW_INTERVAL
-// (CreatureMove.java:41): a summon's offensive follow re-evaluates on its
+// summonOffensiveFollowTick is the attack-follow interval: a summon's
+// offensive follow re-evaluates on its
 // own 500 ms schedule, independent of the shared 1 s AI think tick that
 // otherwise drives Think.
 const summonOffensiveFollowTick = 500 * time.Millisecond
@@ -178,8 +178,8 @@ func (s *Summon) TryToFollow(target attackable.Combatant) bool {
 // forced-use modifier, read by the target conditions.
 //
 // A skill still cooling down is reported to the owner here, on the command,
-// and not again by the periodic think: the reference has no periodic think
-// for a summon, so re-reporting it each tick would repeat the message.
+// and not again by the periodic think: the message belongs to the command
+// alone, so re-reporting it each tick would repeat the message.
 func (s *Summon) TryToCast(target attackable.Combatant, ref skill.Ref, ctrl bool) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -344,10 +344,9 @@ func (s *Summon) StartOffensiveFollowTicker(q *sim.Queue) (stop func()) {
 }
 
 // recheckOffensiveFollow re-evaluates only the in-flight attack/cast
-// offensive follow every 500 ms (CreatureMove.java:556-561), matching the
-// reference's follow-task cadence, which runs independently of the shared
-// 1 s AI think tick. That reference task (offensiveFollowTask,
-// CreatureMove.java:563-584) manages movement only and has no attack/cast
+// offensive follow every 500 ms, the follow task's own cadence, which runs
+// independently of the shared 1 s AI think tick. That follow task manages
+// movement only and has no attack/cast
 // execution path, so this deliberately calls MaybeStartOffensiveFollow
 // directly rather than the full thinkAttackLocked/thinkCastLocked — reusing
 // those would also re-run DoAttack/Cast on this 500 ms cadence once a
@@ -449,10 +448,9 @@ func (s *Summon) FinishedCasting(follow attackable.Combatant) (idled bool) {
 // the attack cycle that precedes it already sent the summon idle while its
 // cast was in flight, and the effect's caller sends it idle again.
 //
-// A queued cast is dropped rather than started: the reference reports a
-// stopped cast to the AI before it clears its casting flag, so the queued
-// cast's think still sees a cast in flight and idles instead
-// (CreatureCast.stop, PlayableAI.thinkCast). Only a cast that completes
+// A queued cast is dropped rather than started: a stopped cast is reported
+// to the AI before its casting flag clears, so the queued cast's think
+// still sees a cast in flight and idles instead. Only a cast that completes
 // clears the flag first, so FinishedCasting still starts the queued cast.
 func (s *Summon) CastStopped(follow attackable.Combatant) (idled, handled bool) {
 	s.mu.Lock()
@@ -629,18 +627,17 @@ func (s *Summon) busyLocked() bool {
 }
 
 // AttackingNow reports whether this summon's own attack cycle is currently
-// in flight, matching CreatureAttack.isAttackingNow (CreatureAttack.java:56-59).
+// in flight.
 func (s *Summon) AttackingNow() bool {
 	return s.attack != nil && s.attack.AttackingNow()
 }
 
-// targetLostLocked matches AbstractAI.isTargetLost (AbstractAI.java:586-594,
-// unmodified by SummonAI's override at SummonAI.java:275-281): only a nil or
-// no-longer-known target counts as lost. Death (true or fake) is not a loss
-// condition here — a dead target keeps the attack/follow intention until it
-// despawns, same as the reference. On loss it also cancels any in-flight
-// movement leg (SummonMove.java:48-53's known-list-loss branch, which forces
-// the idle path's move.stop() rather than leaving a stale follow/chase
+// targetLostLocked applies the generic target-lost rule, which a summon
+// keeps: only a nil or no-longer-known target counts as lost. Death (true
+// or fake) is not a loss condition here — a dead target keeps the
+// attack/follow intention until it despawns. On loss it also cancels any
+// in-flight movement leg (losing the target from the known list forces
+// the idle path's move stop rather than leaving a stale follow/chase
 // running toward a target the actor no longer knows about).
 func (s *Summon) targetLostLocked(target attackable.Combatant) (bool, error) {
 	if target == nil || !s.actor.Knows(target) {

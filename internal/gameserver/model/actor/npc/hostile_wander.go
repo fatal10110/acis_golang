@@ -19,8 +19,8 @@ const randomWalkLoopLimit = 3
 
 // ShouldIdleWander reports whether an empty desire queue should become a
 // wander desire. Hold-position kinds stay put. MovingAttack is not a
-// wander gate (Warrior.java:331-334, Wizard.java:28-31); only
-// MonsterBehavior.onNoDesire reads it. Script-accurate eligibility: #2148.
+// wander gate for the Warrior and Wizard scripts; only the MonsterBehavior
+// script's no-desire hook reads it. Script-accurate eligibility: #2148.
 func (h *Hostile) ShouldIdleWander() bool {
 	switch hostileKind(h.Instance) {
 	case "Guard", "SiegeGuard", "Chest", "HalishaChest":

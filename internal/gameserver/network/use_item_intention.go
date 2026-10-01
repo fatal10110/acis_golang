@@ -35,7 +35,7 @@ const (
 // A player that cannot take AI actions is answered ActionFailed. One still
 // swinging, casting, sitting down or standing up keeps the toggle as its
 // next intention, replacing whatever was queued, so the swing or cast in
-// flight resolves with the weapon it started with; the reference answers
+// flight resolves with the weapon it started with; the specified answer is
 // nothing for that, and UseItem registers no pending client action.
 // Anyone else toggles the item now, then runs again the intention the
 // toggle replaced, with the packets a fresh think of it sends: a walk to a
@@ -195,7 +195,7 @@ func (l *GameClientLink) thinkCurrentIntention(live *livePlayer) {
 func (l *GameClientLink) thinkParkedCast(live *livePlayer) {
 	if itemAICastBusy(live) {
 		// A THINK on the action in flight does not keep a cast queued
-		// behind it in the reference AI: thinking an attack mid-swing
+		// behind it in the specified AI: thinking an attack mid-swing
 		// requeues the attack over the cast, thinking a cast mid-cast goes
 		// idle and clears the queue, and both answer ActionFailed. Keeping
 		// the cast queued and silent here cannot be told apart in play: a

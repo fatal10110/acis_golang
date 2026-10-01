@@ -59,17 +59,17 @@ type SkillReflectInput struct {
 	Magic          bool
 	CastRange      int
 	// SkillType is the cast skill's uppercase type key (e.g. "BUFF",
-	// "HOT"), used to exclude skill types the reference never lets bounce
-	// back regardless of the target's reflect stat.
+	// "HOT"), used to exclude skill types that never bounce back regardless
+	// of the target's reflect stat.
 	SkillType string
 	// ReflectChance is the target's already-resolved percent chance to
 	// reflect this skill (REFLECT_SKILL_MAGIC or REFLECT_SKILL_PHYSIC).
 	ReflectChance float64
 }
 
-// skillReflectExcludedTypes are skill types the reference's
-// calcSkillReflect never lets bounce back at the caster, regardless of the
-// target's reflect stat or any chance roll.
+// skillReflectExcludedTypes are skill types skill reflection never bounces
+// back at the caster, regardless of the target's reflect stat or any chance
+// roll.
 var skillReflectExcludedTypes = map[string]bool{
 	"BUFF":             true,
 	"REFLECT":          true,
@@ -124,8 +124,8 @@ func RevivePower(witBonus, skillPower float64) float64 {
 
 // CancelSuccessRate returns the percent chance, clamped to [minRate,
 // maxRate], that one cancel roll strips an active effect: effectPeriod is
-// the effect's remaining duration in seconds (divided down like the
-// reference integer arithmetic); diffLevel is the cancel skill's magic
+// the effect's remaining duration in seconds (divided down with integer
+// arithmetic); diffLevel is the cancel skill's magic
 // level minus the target's level; baseRate is the cancel skill's power;
 // vuln is the target's already-resolved cancel-vulnerability multiplier.
 func CancelSuccessRate(effectPeriod, diffLevel int, baseRate, vuln float64, minRate, maxRate int) float64 {
@@ -174,7 +174,7 @@ func EffectCancelSuccessRate(casterMagicLevel, candidateMagicLevel, candidatePer
 // seconds, and vuln is the target's already-resolved cancel-vulnerability
 // multiplier for this cancel effect's own classification.
 //
-// This differs from EffectCancelSuccessRate in two ways the reference
+// This differs from EffectCancelSuccessRate in two ways the specified
 // arithmetic requires exactly: the duration term divides by 1200 (not
 // 120), and vuln is truncated to an integer *before* it scales the whole
 // additive rate (not just a separate power term) — so a vuln under 1.0

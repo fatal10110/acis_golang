@@ -114,9 +114,9 @@ func FramePetInfo(s PetInfoSnapshot) wire.Frame {
 	w.WriteUint8(1)
 	w.WriteUint8(boolUint8(s.InCombat))
 	w.WriteUint8(boolUint8(s.AlikeDead))
-	// isShowSummonAnimation() is set true once at Summon construction and
-	// never cleared anywhere in the reference, so this byte is always 2
-	// regardless of the caller-supplied _val (PetInfo.java:73).
+	// The show-summon-animation flag is set once when a summon is created
+	// and never cleared, so this byte is always 2 regardless of the
+	// caller-supplied value.
 	w.WriteUint8(2)
 	w.WriteString(s.Name)
 	w.WriteString(s.Title)
@@ -149,7 +149,7 @@ func FramePetInfo(s PetInfoSnapshot) wire.Frame {
 
 	w.WriteInt32(int32(s.AbnormalEffect))
 	w.WriteUint16(uint16(boolInt32(s.Mountable)))
-	w.WriteUint8(0) // move type: 0 is MoveType.GROUND, the default _moveTypes state (CreatureMove.java:76-84); no swim/fly state is modeled for summons yet
+	w.WriteUint8(0) // move type: 0 is ground movement, the default move state; no swim/fly state is modeled for summons yet
 
 	w.WriteUint16(0)
 	w.WriteUint8(uint8(s.Team)) // team/CTF system is not ported yet; always 0 (TeamType.NONE)

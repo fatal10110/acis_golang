@@ -9,25 +9,22 @@ import (
 
 // fearImmunePlayableSkillIDs are the skills whose FEAR effect must not land on
 // a player-controlled target even when the success roll would otherwise pass.
-// The reference encodes this as a constant list on the fear effect class; it
-// is reproduced here so the caster-side gating the continuous handler performs
-// matches it.
+// The list is fixed by the fear effect itself; the continuous handler applies
+// it as a caster-side gate.
 var fearImmunePlayableSkillIDs = map[modelskill.ID]bool{98: true, 1272: true, 1381: true}
 
 type continuousHandler struct {
 	defs Definitions
 }
 
-// Types lists 13 of the 14 skill types the reference continuous handler's
-// SKILL_IDS covers (Continuous.java:28-44); FUSION is the 14th but is
-// omitted here. For a player caster it's a dead entry in Java too — PlayerAI
-// routes FUSION to PlayerCast.doFusionCast before callSkill ever runs
-// (PlayerAI.java:300-301), applying it via startFusionSkill at cast start
-// instead (PlayerCast.java:81-84), matched here by fusionHandler. A
-// non-player caster has no such diversion — CreatureCast.doFusionCast is an
-// uncalled stub (CreatureCast.java:81-84) — so its hit-time callSkill()
-// dispatches FUSION straight into Continuous.SKILL_IDS' entry, same as any
-// other skill type (CreatureCast.java:493-497). It applies the caster
+// Types lists 13 of the 14 skill types the continuous handler covers; FUSION
+// is the 14th but is omitted here. For a player caster it's a dead entry
+// anyway — a player's FUSION cast is diverted to the fusion cast path before
+// the hit-time skill dispatch ever runs, applying the fusion at cast start
+// instead, matched here by fusionHandler. A non-player caster has no such
+// diversion — its fusion cast path is an uncalled stub — so its hit-time
+// skill dispatch sends FUSION straight into the continuous handler's entry,
+// same as any other skill type. It applies the caster
 // skill's own effects, which every datapack FUSION skill (e.g. 3626-3628,
 // skills/3600-3699.xml) carries none of, so the observable result is a
 // no-op rather than the entry never firing at all.
@@ -71,8 +68,8 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 				continue
 			}
 			// A cursed-weapon holder can neither receive nor bestow buffs.
-			// The reference exempts clan-hall manager NPCs and resolves the
-			// caster's cursed state through its acting player; neither marker
+			// Clan-hall manager NPCs are exempt, and the caster's cursed
+			// state resolves through its acting player; neither marker
 			// exists on this layer yet, so this only gates on the caster and
 			// target directly and skips the exception.
 			if !sameObject(cast.Caster, effected) && (cursed(effected) || cursed(cast.Caster)) {

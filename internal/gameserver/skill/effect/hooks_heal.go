@@ -10,7 +10,7 @@ func healStart(e *Effect) bool {
 	amount := target.AddHP(power * target.HealEffectiveness() / 100)
 	broadcastRestore(e.Effected, amount)
 	// The applied amount is added a second time; this reproduces the
-	// reference heal effect's own behavior exactly, not a Go-side bug.
+	// specified heal-effect behavior exactly, not a Go-side bug.
 	broadcastRestore(e.Effected, target.AddHP(amount))
 	notifyHealRestored(e, amount, false)
 	return true
@@ -21,8 +21,8 @@ func healOverTimeAction(e *Effect) bool {
 	if !target.CanBeHealed() {
 		return false
 	}
-	// A tick that healed nothing broadcasts nothing: the reference's HP
-	// setter bypasses itself — and the status update with it — when the
+	// A tick that healed nothing broadcasts nothing: the HP setter
+	// bypasses itself — and the status update with it — when the
 	// applied amount is 0, which is every tick on an already-full target.
 	if target.AddHP(e.Template.Value) > 0 {
 		broadcastStatus(e.Effected)
@@ -71,7 +71,7 @@ func manaHealStart(e *Effect) bool {
 	amount := target.AddMP(target.RechargeMP(e.Template.Value))
 	broadcastRestore(e.Effected, amount)
 	// The applied amount is added a second time; this reproduces the
-	// reference heal effect's own behavior exactly, not a Go-side bug.
+	// specified heal-effect behavior exactly, not a Go-side bug.
 	broadcastRestore(e.Effected, target.AddMP(amount))
 	notifyHealRestored(e, amount, true)
 	return true

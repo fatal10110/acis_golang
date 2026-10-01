@@ -237,8 +237,8 @@ func (s *Service) Selected(playerID int32, inv *itemcontainer.Inventory) bool {
 
 // selectedScroll returns playerID's selected scroll while inv still holds
 // it. A selected scroll that has since left inv no longer counts as a
-// selection — the reference drops it the moment its item leaves the
-// inventory — so it is cleared here without a word to the client.
+// selection — a selection ends the moment its item leaves the inventory —
+// so it is cleared here without a word to the client.
 func (s *Service) selectedScroll(playerID int32, inv *itemcontainer.Inventory) *item.Instance {
 	active := s.state.Active(playerID)
 	if active == 0 {
@@ -322,8 +322,7 @@ func (s *Service) EnchantItem(req Request) (Result, error) {
 	out.Persist = append(out.Persist, inventory.DestroyedOrUpdated(scrollOwnerID, destroyedScroll))
 
 	// An open trade window stops the attempt with the scroll already spent.
-	// The selection stays, as in the reference, unless that was the last
-	// scroll.
+	// The selection stays unless that was the last scroll.
 	if req.TradeActive != nil && req.TradeActive() {
 		out.Steps = append(out.Steps, Step{Kind: StepCancelTrade}, messageStep(Message{Code: MessageTradeAttemptFailed}))
 		return out, nil

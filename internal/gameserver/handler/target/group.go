@@ -54,9 +54,9 @@ func sameDuelTeam(a, b Actor) bool {
 	return b.DuelID() == a.DuelID() && b.DuelTeam() == a.DuelTeam()
 }
 
-// clanGroupsOverlap reports whether a and b share any clan-group tag. The
-// reference uses an any-of-against-any-of check between the two tag lists,
-// so empty tag lists never match.
+// clanGroupsOverlap reports whether a and b share any clan-group tag: an
+// any-of-against-any-of check between the two tag lists, so empty tag lists
+// never match.
 func clanGroupsOverlap(a, b []string) bool {
 	for _, x := range a {
 		if x != "" && slices.Contains(b, x) {
@@ -88,7 +88,7 @@ func (partyHandler) Target() modelskill.Target { return modelskill.TargetParty }
 // playable in the same party, plus the acting player's own summon regardless
 // of party membership. The sweep centers on the acting player, so a skill
 // cast by a summon resolves its owning player as the sweep's anchor and list
-// head, matching the reference's getActingPlayer indirection.
+// head.
 func (h partyHandler) Targets(caster, _ Actor, skill *modelskill.Definition) []Actor {
 	player, ok := actingPlayerOf(caster)
 	if !ok {
@@ -164,8 +164,8 @@ type clanHandler struct{ known Known }
 func (clanHandler) Target() modelskill.Target { return modelskill.TargetClan }
 
 // Targets returns the caster and every nearby Attackable monster sharing a
-// clan-group tag. The reference handler only assembles a list for Attackable
-// casters and otherwise returns an empty target array, so this returns nil
+// clan-group tag. Only an Attackable caster gets a list; any other caster
+// gets an empty target array, so this returns nil
 // for non-attackable casters.
 func (h clanHandler) Targets(caster, _ Actor, skill *modelskill.Definition) []Actor {
 	if !isAttackable(caster) || h.known == nil {
@@ -282,8 +282,8 @@ func (corpseAllyHandler) Target() modelskill.Target { return modelskill.TargetCo
 
 // Targets returns every nearby dead player in the caster's clan or alliance
 // (and the same duel team when the caster is dueling). With no clan or no
-// matching corpses it returns the caster alone, matching the reference's
-// empty-list fallback to the caster.
+// matching corpses it returns the caster alone: an empty list falls back to
+// the caster.
 func (h corpseAllyHandler) Targets(caster, _ Actor, skill *modelskill.Definition) []Actor {
 	player, ok := actingPlayerOf(caster)
 	if !ok || !player.HasClan() || h.known == nil {
