@@ -1,6 +1,7 @@
 package combat
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -114,6 +115,49 @@ func decayAttackDesire(t *testing.T, hostile *npc.Hostile) {
 	}
 }
 
+// intentionAfter lets d pass, ending just past a swing timer, and fails
+// unless the monster's intention then satisfies ok. A driven clock runs the
+// timer inside the advance, so ok is checked at once. On the wall clock the
+// advance only sleeps until the timer is due, and its callback can land
+// after the advance returns, so it waits for ok: the wall-clock run checks
+// only that the state is reached, not when, and timing regressions are
+// caught by the driven-clock run alone.
+func intentionAfter(t *testing.T, srv *gameservertest.Server, hostile *npc.Hostile, d time.Duration, what string, ok func(ai.Intention) bool) {
+	t.Helper()
+	srv.Advance(t, d)
+	if !srv.DrivesClock() {
+		srv.AdvanceUntil(t, what, func() bool { return ok(hostile.AI().CurrentIntention()) })
+		return
+	}
+	if got := hostile.AI().CurrentIntention(); !ok(got) {
+		t.Fatalf("CurrentIntention() %s: got %v", what, got)
+	}
+}
+
+// intentionIs reports whether an intention is want.
+func intentionIs(want ai.Intention) func(ai.Intention) bool {
+	return func(got ai.Intention) bool { return got == want }
+}
+
+// intentionAcross checks the monster's intention is before 10ms ahead of
+// its swing timer due at (timed from the swing's start) and after 10ms
+// past it. Only a driven clock holds the swing's start: on the wall clock
+// the swing began before its Attack frame arrived, by however long
+// delivery took, so the 10ms window before the timer cannot hold there,
+// and only the after state is checked (see intentionAfter).
+func intentionAcross(t *testing.T, srv *gameservertest.Server, hostile *npc.Hostile, at time.Duration, before, after ai.Intention, what string) {
+	t.Helper()
+	rest := time.Duration(0)
+	if srv.DrivesClock() {
+		srv.Advance(t, at-10*time.Millisecond)
+		if got := hostile.AI().CurrentIntention(); got != before {
+			t.Fatalf("CurrentIntention() 10ms before %s = %v, want %v", what, got, before)
+		}
+		rest = 20 * time.Millisecond
+	}
+	intentionAfter(t, srv, hostile, rest, fmt.Sprintf("10ms after %s, want %v", what, after), intentionIs(after))
+}
+
 // TestHitAnimationEndIdlesHostileWithNoDesireMidSwing pins NpcAI.runAI(false)
 // run when the hit animation ends: a monster whose last desire decayed while
 // it swings aborts the swing and idles right then, broadcasting its walk
@@ -128,14 +172,7 @@ func TestHitAnimationEndIdlesHostileWithNoDesireMidSwing(t *testing.T) {
 	}
 	decayAttackDesire(t, hostile)
 
-	srv.Advance(t, hitAnimationEnd-10*time.Millisecond)
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
-		t.Fatalf("CurrentIntention() inside the hit animation = %v, want %v", got, ai.IntentionAttack)
-	}
-	srv.Advance(t, 20*time.Millisecond)
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
-		t.Fatalf("CurrentIntention() once the hit animation ended mid-swing = %v, want %v", got, ai.IntentionIdle)
-	}
+	intentionAcross(t, srv, hostile, hitAnimationEnd, ai.IntentionAttack, ai.IntentionIdle, "the hit animation ending mid-swing")
 	walk := readUntil(t, srv.Client, serverpackets.OpcodeChangeMoveType, "idle walk stance")
 	assertChangeMoveType(t, walk[len(walk)-1], hostile.ObjectID(), false)
 }
@@ -157,14 +194,7 @@ func TestSwingFinishPromotesHostileDesireBeforeHitAnimationTimer(t *testing.T) {
 		t.Fatal("AddMoveToDesire() = false, want the walk queued")
 	}
 
-	srv.Advance(t, attackTime-10*time.Millisecond)
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
-		t.Fatalf("CurrentIntention() before the swing finished = %v, want %v", got, ai.IntentionAttack)
-	}
-	srv.Advance(t, 20*time.Millisecond)
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionMoveTo {
-		t.Fatalf("CurrentIntention() once the swing finished inside the hit animation = %v, want %v", got, ai.IntentionMoveTo)
-	}
+	intentionAcross(t, srv, hostile, attackTime, ai.IntentionAttack, ai.IntentionMoveTo, "the swing finishing inside the hit animation")
 	readUntil(t, srv.Client, serverpackets.OpcodeMoveToLocation, "MoveToLocation")
 }
 
@@ -185,14 +215,7 @@ func TestBowShotIdlesHostileWithNoDesire(t *testing.T) {
 	}
 	decayAttackDesire(t, hostile)
 
-	srv.Advance(t, attackTime-10*time.Millisecond)
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
-		t.Fatalf("CurrentIntention() while drawing = %v, want %v", got, ai.IntentionAttack)
-	}
-	srv.Advance(t, 20*time.Millisecond)
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
-		t.Fatalf("CurrentIntention() once the arrow landed = %v, want %v", got, ai.IntentionIdle)
-	}
+	intentionAcross(t, srv, hostile, attackTime, ai.IntentionAttack, ai.IntentionIdle, "the arrow landing")
 	walk := readUntil(t, srv.Client, serverpackets.OpcodeChangeMoveType, "idle walk stance")
 	assertChangeMoveType(t, walk[len(walk)-1], hostile.ObjectID(), false)
 
