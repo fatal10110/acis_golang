@@ -21,12 +21,11 @@ func (l *GameClientLink) consumePetHerb(live *livePlayer, pet *summon.Actor, inv
 		IsPet:       true,
 		Target:      pet.CurrentTarget(),
 	})
-	defer l.broadcastPetFrame(live, pet, func() wire.Frame {
-		return serverpackets.FrameStatusUpdate(pet.ObjectID(), []serverpackets.StatusAttribute{
-			{Type: serverpackets.StatusCurrentHP, Value: int(pet.HP())},
-			{Type: serverpackets.StatusCurrentMP, Value: int(pet.MPValue())},
-		})
-	})
+	// However the herb's use ends, the pet's status is republished once it
+	// is spent (SummonAI.thinkPickUp → SummonStatus.broadcastStatusUpdate):
+	// HP to the players targeting the pet, PetStatusUpdate to its owner,
+	// SummonInfo to everyone else who knows it.
+	defer pet.BroadcastStatus()
 
 	for _, res := range results {
 		switch res.Outcome {
@@ -41,7 +40,8 @@ func (l *GameClientLink) consumePetHerb(live *livePlayer, pet *summon.Actor, inv
 			return
 		case itemhandler.Applied:
 		default:
-			live.SendFrame(serverpackets.FrameActionFailed())
+			// A herb with no usable skill only logs in the reference
+			// (ItemSkills.useItem); the client reads nothing for it.
 			return
 		}
 
