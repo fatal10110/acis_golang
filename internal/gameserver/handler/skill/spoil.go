@@ -75,7 +75,7 @@ func (sweepHandler) Types() []string { return []string{"SWEEP"} }
 
 // Use drains every target's spoil pool into a player caster's inventory as
 // earned items, then fully clears the pool — including its spoiler marker,
-// matching the reference container's combined reset — and applies the
+// reset together with it — and applies the
 // skill's own self-targeted effects, if any. A caster that is not a player,
 // or a handler without ids to create items with, leaves every pool alone.
 // Sweeping has no slot check. Items go to the sweeper alone: splitting them

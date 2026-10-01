@@ -12,9 +12,9 @@ const (
 	BeastSpiritShotsHandler = "BeastSpiritShots"
 )
 
-// blessedBeastSpiritshotID selects the blessed variant within
-// BeastSpiritShotsHandler; the reference distinguishes it by item id, not a
-// separate handler name.
+// blessedBeastSpiritshotID selects the blessed variant within the beast
+// spiritshot handler; it is distinguished by item id, not a separate handler
+// name.
 const blessedBeastSpiritshotID = 6647
 
 // BeastShotCharger is the active summon a beast soulshot/spiritshot charges.
@@ -35,7 +35,7 @@ const (
 	// BeastShotApplied means the summon was charged and the shot count consumed.
 	BeastShotApplied
 	// BeastShotAlreadyCharged means the summon already carries this charge;
-	// the reference treats this as a pure no-op, not a rejection.
+	// it is a pure no-op, not a rejection.
 	BeastShotAlreadyCharged
 	// BeastShotCallerIsSummon means the item was used by a summon itself,
 	// which cannot use beast shots.
@@ -49,8 +49,8 @@ const (
 )
 
 // AutoShotChecker reports whether an item is enabled for automatic shot
-// use, so a not-enough-items rejection can suppress its message the way the
-// reference's disableAutoShot does for an auto-enabled item.
+// use, so a not-enough-items rejection can suppress its message for an
+// auto-enabled item.
 type AutoShotChecker interface {
 	AutoSoulShotEnabled(itemID int32) bool
 }
@@ -59,13 +59,13 @@ type AutoShotChecker interface {
 // one beast shot item onto the caster's active summon.
 type BeastShotUseRequest struct {
 	// CallerIsSummon is true when the entity using the item is itself a
-	// summon: the reference rejects a pet trying to use a beast shot from
-	// its own inventory. Not reachable yet: the pet's own item-use path
+	// summon: a pet trying to use a beast shot from its own inventory is
+	// rejected. Not reachable yet: the pet's own item-use path
 	// (petitem.UseItem, wired to RequestPetUseItem) only handles
 	// equip/unequip and never reaches an item-handler dispatch — tracked
 	// at #553. Real callers pass false until that pipeline wires beast
 	// shots through it; the field exists so this rejection branch has
-	// independent oracle coverage in the meantime.
+	// independent test coverage in the meantime.
 	CallerIsSummon bool
 	Caster         AutoShotChecker
 	Summon         BeastShotCharger
@@ -77,8 +77,8 @@ type BeastShotUseRequest struct {
 
 // BeastShotUseResult is the outcome of one UseBeastShot call. AutoEnabled
 // reports whether Item's template is enabled for automatic shot use, so the
-// caller can suppress a BeastShotNotEnoughItems message the reference
-// itself suppresses in that case. SkillID is the visual charge skill to
+// caller can suppress the BeastShotNotEnoughItems message in that case.
+// SkillID is the visual charge skill to
 // broadcast on BeastShotApplied (0 if the template attaches none).
 type BeastShotUseResult struct {
 	Outcome     BeastShotOutcome

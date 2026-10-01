@@ -244,15 +244,15 @@ func immobilizePetBuffExit(e *Effect) {
 
 // throwUpStart computes a knockback's landing point and starts the
 // client-visible flight. The target is always aborted first, even when the
-// distance gate below rejects the effect outright — that ordering matches
-// the reference behavior, where the abort is unconditional and the range
-// check only guards whether the flight itself happens.
+// distance gate below rejects the effect outright: the abort is
+// unconditional and the range check only guards whether the flight itself
+// happens.
 //
 // The destination pivots on the effector's position, not the effected's:
 // the target is pushed further along the effector-to-effected line. Z is
 // left at the effected's current height even after the X/Y geo correction
-// below — the reference implementation never corrects Z for this effect,
-// a known approximation preserved here rather than fixed. Every creature
+// below — Z is never corrected for this effect, a known approximation
+// preserved here rather than fixed. Every creature
 // kind, summons included, takes the same flight.
 func throwUpStart(e *Effect) bool {
 	e.Effected.AbortAll(false)
