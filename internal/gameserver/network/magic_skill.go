@@ -35,6 +35,13 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 			sendMagicActionFailed(live)
 			return
 		}
+		// A mounted player can switch no toggle on or off: the request is
+		// refused before it becomes a cast intention, so nothing is paid,
+		// queued or broadcast.
+		if def.Activation == modelskill.ActivationToggle && live.Mounted() {
+			sendMagicActionFailed(live)
+			return
+		}
 		if castable && !l.attemptMagicSkill(live, def, selected) {
 			return
 		}
