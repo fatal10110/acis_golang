@@ -679,6 +679,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
 	setWaterSurface(creatureLive.Move(), l.zones)
+	// A player swims while its zones hold it in water, not wherever the
+	// water query finds it.
+	creatureLive.Move().UseZoneSwim()
 	creatureLive.SetQueue(l.queues.NewQueue(fmt.Sprintf("player-%d", c.ObjectID())))
 	access := l.admin.Resolve(c.AccessLevel)
 	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), access: access, visibilitySend: client.Session.SendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}

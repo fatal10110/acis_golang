@@ -100,7 +100,9 @@ type TargetSnapshot struct {
 // pawn.
 //
 // A mover standing in a water zone swims, and one SetFlying marks flies (a
-// swimmer counts as swimming even while flying). A swimming or flying mover
+// swimmer counts as swimming even while flying). A mover UseZoneSwim opts in
+// (a player) swims instead only while SetSwimming says its zones hold it in
+// water, which may lag behind where it stands. A swimming or flying mover
 // measures its legs, steps and pawn stops in 3D, moves its height straight
 // toward the destination's instead of along the geodata floor, and is never
 // stopped by a closed geodata line under way.
@@ -132,6 +134,9 @@ type CreatureMove struct {
 	waypoints                       []location.Location
 	accurateX, accurateY, accurateZ float64
 	flying                          bool
+	// zoneSwim marks a mover whose swimming follows swimming, set from its
+	// zone membership, instead of the water query.
+	zoneSwim, swimming bool
 	// timedType is the move type the active leg's arrival was timed with;
 	// a position update that changes the type re-times the leg.
 	timedType    MoveType
@@ -423,6 +428,31 @@ func (m *CreatureMove) SetFlying(flying bool) {
 	m.mu.Unlock()
 }
 
+// UseZoneSwim makes the mover swim only while SetSwimming says so, instead
+// of whenever the water query finds it in a water zone. The water query then
+// only caps a flying mover at the surface. Call it before the mover is
+// exposed.
+func (m *CreatureMove) UseZoneSwim() {
+	m.mu.Lock()
+	m.zoneSwim = true
+	m.mu.Unlock()
+}
+
+// SetSwimming records whether the mover's zones hold it in water, for a mover
+// UseZoneSwim opted in. A leg in flight is re-timed for the distance left
+// under the new move type.
+func (m *CreatureMove) SetSwimming(swimming bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.swimming == swimming {
+		return
+	}
+	m.swimming = swimming
+	if m.moving && m.moveTypeLocked() != m.timedType {
+		m.retimeLocked()
+	}
+}
+
 // MoveType reports how the mover travels from where it stands now.
 func (m *CreatureMove) MoveType() MoveType {
 	m.mu.Lock()
@@ -431,15 +461,31 @@ func (m *CreatureMove) MoveType() MoveType {
 }
 
 // moveTypeLocked is the mover's MoveType at its origin: swimming in a water
-// zone, else flying when SetFlying marks it, else on the ground. Callers
-// hold mu.
+// zone (for a UseZoneSwim mover, while SetSwimming says so), else flying
+// when SetFlying marks it, else on the ground. Callers hold mu.
 func (m *CreatureMove) moveTypeLocked() MoveType {
+	if m.zoneSwim {
+		return m.flagTypeLocked()
+	}
 	if m.water != nil {
 		if _, ok := m.water(m.origin); ok {
 			return MoveSwim
 		}
 	}
 	if m.flying {
+		return MoveFly
+	}
+	return MoveGround
+}
+
+// flagTypeLocked is a UseZoneSwim mover's MoveType: swimming while
+// SetSwimming says so, else flying when SetFlying marks it, else on the
+// ground. Callers hold mu.
+func (m *CreatureMove) flagTypeLocked() MoveType {
+	switch {
+	case m.swimming:
+		return MoveSwim
+	case m.flying:
 		return MoveFly
 	}
 	return MoveGround
@@ -1158,10 +1204,20 @@ func (m *CreatureMove) maxZLocked() int {
 // mover stands in when the floor lies deeper than waterDepthMin below it,
 // else the world max. It queries the water zone once. Callers hold mu.
 //
-// A player is held at the surface only while it flies, never while it
-// swims; but a mover in a water zone swims even when it flies, so a player
-// is never held there.
+// A UseZoneSwim mover (a player) is held at the surface only while it
+// flies, never while it swims: a flyer whose zones do not hold it in water
+// yet stays capped at the surface of the water zone it stands in until they
+// do.
 func (m *CreatureMove) waterLocked() (MoveType, int) {
+	if m.zoneSwim {
+		moveType := m.flagTypeLocked()
+		if moveType == MoveFly {
+			if surface, ok := m.surfaceCapLocked(); ok {
+				return moveType, surface
+			}
+		}
+		return moveType, worldZMax
+	}
 	if m.water != nil {
 		if surface, ok := m.water(m.origin); ok {
 			if !m.playerStepsLocked() && int(m.geo.Height(m.origin.X, m.origin.Y, m.origin.Z))-surface < -waterDepthMin {
@@ -1174,6 +1230,19 @@ func (m *CreatureMove) waterLocked() (MoveType, int) {
 		return MoveFly, worldZMax
 	}
 	return MoveGround, worldZMax
+}
+
+// surfaceCapLocked is the surface of the water zone at the origin when the
+// floor there lies deeper than waterDepthMin below it. Callers hold mu.
+func (m *CreatureMove) surfaceCapLocked() (int, bool) {
+	if m.water == nil {
+		return 0, false
+	}
+	surface, ok := m.water(m.origin)
+	if !ok || int(m.geo.Height(m.origin.X, m.origin.Y, m.origin.Z))-surface >= -waterDepthMin {
+		return 0, false
+	}
+	return surface, true
 }
 
 func (m *CreatureMove) arrivalHookLocked() func() {

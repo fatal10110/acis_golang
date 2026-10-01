@@ -306,8 +306,12 @@ type SummonConfirmRequested struct {
 type TeleportRequested struct{ X, Y, Z, Radius int }
 
 // Relocated reports that the server-authoritative position moved away from
-// Previous.
-type Relocated struct{ Previous location.Location }
+// Previous. Placed marks a position set outside movement (a forced flight's
+// landing) rather than a movement step.
+type Relocated struct {
+	Previous location.Location
+	Placed   bool
+}
 
 // PvPFlagged reports a hit that flags the character for PvP; UseFlaggedDuration
 // selects the PvP-versus-PvP duration. ByServitor marks a hit or skill of

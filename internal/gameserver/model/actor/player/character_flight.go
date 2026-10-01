@@ -30,7 +30,7 @@ func (c *Character) FlyTo(dest location.Location, flight modelskill.Flight) {
 // state so the next move starts from the forced landing.
 func (c *Character) SetXYZ(x, y, z int) {
 	position := location.Location{X: x, Y: y, Z: z}
-	c.SyncPosition(position)
+	c.relocate(position, true)
 	if c.Live != nil {
 		c.Move().SetPosition(position)
 	}
