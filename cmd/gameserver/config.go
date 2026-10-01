@@ -69,6 +69,7 @@ type gameplayConfig struct {
 	RandomWalkRate           randomWalkRate
 	MaxGeoPathFailCount      maxGeoPathFailCount
 	DisableRaidCurse         raidCursesDisabled
+	RaidMultipliers          npc.RaidMultipliers
 	Enchant                  enchant.Config
 	Merchant                 merchant.Config
 	Freight                  network.FreightConfig
@@ -166,6 +167,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.DisableRaidCurse, err = loadDisableRaidCurse(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.RaidMultipliers, err = loadRaidMultipliers(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.Enchant, err = loadEnchantConfig(paths); err != nil {
@@ -652,6 +656,27 @@ func loadDisableRaidCurse(paths gameServerPaths) (raidCursesDisabled, error) {
 		return false, err
 	}
 	return raidCursesDisabled(config.NewFields(props, "disable raid curse").Bool("DisableRaidCurse", false)), nil
+}
+
+// loadRaidMultipliers reads the npcs.properties RaidDefenceMultiplier,
+// RaidHpRegenMultiplier and RaidMpRegenMultiplier keys (Config.java:742-744),
+// each defaulting to 1. A malformed value fails boot.
+func loadRaidMultipliers(paths gameServerPaths) (npc.RaidMultipliers, error) {
+	props, err := config.LoadFile(paths.NpcsConfigPath)
+	if err != nil {
+		return npc.RaidMultipliers{}, err
+	}
+	def := npc.DefaultRaidMultipliers()
+	f := config.NewFields(props, "raid multipliers")
+	m := npc.RaidMultipliers{
+		HPRegen: f.Float64("RaidHpRegenMultiplier", def.HPRegen),
+		MPRegen: f.Float64("RaidMpRegenMultiplier", def.MPRegen),
+		Defence: f.Float64("RaidDefenceMultiplier", def.Defence),
+	}
+	if err := f.Err(); err != nil {
+		return npc.RaidMultipliers{}, err
+	}
+	return m, nil
 }
 
 // loadPvPFlagOptions takes the process logger so the fx graph builds it

@@ -151,9 +151,11 @@ func (h *Hostile) AttackSpeed() int {
 	return int(h.calcStat(stat.PowerAttackSpeed, h.Instance.Template.AtkSpd))
 }
 
-// MagicAttackSpeed returns this NPC's magic attack speed stat.
+// MagicAttackSpeed returns this NPC's casting speed stat, finalized from
+// every creature's base casting speed rather than the template's physical
+// attack speed.
 func (h *Hostile) MagicAttackSpeed() int {
-	return int(h.calcStat(stat.MagicAttackSpeed, h.Instance.Template.AtkSpd))
+	return int(h.calcStat(stat.MagicAttackSpeed, magicAttackSpeedBase))
 }
 
 // ActiveWeaponItem returns this NPC's resolved right-hand weapon, nil when
@@ -270,10 +272,11 @@ func (h *Hostile) SetHeadingTo(target attackable.Combatant) {
 }
 
 // PDef returns this NPC's physical defense stat, finalized through its stat
-// calculator (level scaling plus any active buff/debuff) and truncated to a
-// whole number.
+// calculator (level scaling plus any active buff/debuff) from the template
+// base, scaled by the raid defence multiplier while raid related, and
+// truncated to a whole number.
 func (h *Hostile) PDef() float64 {
-	return math.Trunc(h.calcStat(stat.PowerDefence, h.Instance.Template.PDef))
+	return math.Trunc(h.calcStat(stat.PowerDefence, h.Instance.Template.PDef*h.raidBaseMultipliers().Defence))
 }
 
 // Evasion returns this NPC's physical evasion rating (per-mille), finalized

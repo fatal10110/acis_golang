@@ -22,6 +22,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/probe"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -390,6 +391,46 @@ func TestLoadSpawnMultiplierDefaultsToOne(t *testing.T) {
 	}
 	if got != 1 {
 		t.Fatalf("loadSpawnMultiplier() = %v, want 1", got)
+	}
+}
+
+// TestLoadRaidMultipliersUsesNpcsProperties pins Config.java:742-744: the
+// three raid multipliers come from npcs.properties, each defaulting to 1.,
+// and a malformed value fails the load as Double.parseDouble does.
+func TestLoadRaidMultipliersUsesNpcsProperties(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		body    string
+		want    npc.RaidMultipliers
+		wantErr bool
+	}{
+		{name: "defaults", body: "", want: npc.RaidMultipliers{Defence: 1, HPRegen: 1, MPRegen: 1}},
+		{
+			name: "configured",
+			body: "RaidHpRegenMultiplier = 3.\nRaidMpRegenMultiplier = 0.5\nRaidDefenceMultiplier = 2\n",
+			want: npc.RaidMultipliers{Defence: 2, HPRegen: 3, MPRegen: 0.5},
+		},
+		{name: "malformed", body: "RaidDefenceMultiplier = two\n", wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			configPath := filepath.Join(t.TempDir(), "npcs.properties")
+			if err := os.WriteFile(configPath, []byte(tc.body), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			got, err := loadRaidMultipliers(gameServerPaths{NpcsConfigPath: configPath})
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("loadRaidMultipliers() = %+v, want an error", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("loadRaidMultipliers() error = %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("loadRaidMultipliers() = %+v, want %+v", got, tc.want)
+			}
+		})
 	}
 }
 
