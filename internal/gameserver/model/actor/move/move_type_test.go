@@ -303,3 +303,103 @@ func TestFollowTaskRangeMeasuresByMoveType(t *testing.T) {
 		}
 	})
 }
+
+// shelfGeo is open geodata whose floor lies at 0 short of X dropAt and at
+// -300 from there on.
+type shelfGeo struct {
+	staticGeo
+	dropAt int
+}
+
+func (g shelfGeo) Height(x, _, _ int) int16 {
+	if x < g.dropAt {
+		return 0
+	}
+	return -300
+}
+
+// A chase that wades from the shore into water mid-leg keeps stepping, now
+// in 3D, until it is within the offset of its pawn (CreatureMove has no
+// arrival timer: updatePosition runs until the 3D radius check ends it). The
+// arrival is re-timed when the move type changes, so a timer armed on the 2D
+// length of the ground request does not end the walk on the pawn's point.
+// Expected cells follow the reference formula step by step: ground steps of
+// 10 to X 100, then 3D steps toward (400,0,-300).
+func TestChaseIntoWaterRetimesArrival(t *testing.T) {
+	mover, clock := newTestMover(t, shelfGeo{staticGeo: staticGeo{canMove: true}, dropAt: 350})
+	mover.SetWaterSurface(func(at location.Location) (int, bool) { return 10_000, at.X >= 100 })
+	pawn := &kindPawn{kind: actor.KindNPC, x: 400, z: -300}
+	if _, _, err := mover.ChasePawnWithPathOutcome(pawn, 40); err != nil {
+		t.Fatal(err)
+	}
+	updates := 0
+	for mover.Moving() {
+		if updates == 200 {
+			t.Fatalf("chase still under way at %+v", mover.Position())
+		}
+		updates++
+		mover.UpdatePosition(PositionUpdateInterval)
+		clock.in.Advance(PositionUpdateInterval)
+	}
+	if want := (location.Location{X: 379, Z: -271}); mover.Position() != want || updates != 52 {
+		t.Fatalf("chase ended at %+v after %d updates, want %+v after 52", mover.Position(), updates, want)
+	}
+}
+
+// The arrival-timer fallback of a swimming or flying tracking walk
+// (stopShortOfPawnLocked) stops the offset short of a creature pawn measured
+// in 3D, moves its height along the line, and no closed ground line blocks
+// it.
+func TestPawnWalkArrivalTimerStopsShortIn3D(t *testing.T) {
+	for _, mode := range []string{"swim", "fly"} {
+		closed := false
+		mover, clock := newTestMover(t, gateGeo{staticGeo: staticGeo{canMove: true}, closed: &closed})
+		if mode == "swim" {
+			mover.SetWaterSurface(everywhereWater)
+		} else {
+			mover.SetFlying(true)
+		}
+		if _, _, err := mover.MoveToPawnWithPathOutcome(&kindPawn{kind: actor.KindNPC, x: 300, z: 300}, 40); err != nil {
+			t.Fatal(err)
+		}
+		closed = true
+		clock.in.Advance(time.Minute)
+		if mover.Moving() {
+			t.Fatalf("%s: walk still under way after its arrival timer", mode)
+		}
+		// 40 short of (300,0,300) along the line from the origin:
+		// fraction (sqrt(180000)-40)/sqrt(180000) puts X at 271.7 and Z at
+		// int(300*fraction+0.5) = 272.
+		if want := (location.Location{X: 271, Z: 272}); mover.Position() != want {
+			t.Fatalf("%s: arrival timer stopped the walk at %+v, want %+v", mode, mover.Position(), want)
+		}
+	}
+}
+
+// A player's accurate height adds dz * fraction on its ground steps too
+// (PlayerMove.updatePosition), though it lands on the floor there; a player
+// who wades in mid-leg swims on from that height. Expected cells follow the
+// reference formula step by step: ground steps of 10 to X 50, its accurate
+// height reaching -39.53, then 3D steps rounding it.
+func TestPlayerWadingInSwimsFromAccurateHeight(t *testing.T) {
+	mover, _ := newTestMover(t, shelfGeo{staticGeo: staticGeo{canMove: true}, dropAt: 350})
+	mover.SetWaterSurface(func(at location.Location) (int, bool) { return 10_000, at.X >= 50 })
+	mover.SetSpeeds(100, 100)
+	if _, err := mover.MoveToLocation(location.Location{X: 400, Z: -300}); err != nil {
+		t.Fatal(err)
+	}
+	for i, want := range []location.Location{
+		{X: 10},
+		{X: 20},
+		{X: 30},
+		{X: 40},
+		{X: 50},
+		{X: 58, Z: -46},
+		{X: 66, Z: -52},
+		{X: 74, Z: -58},
+	} {
+		if ev, _ := mover.UpdatePosition(PositionUpdateInterval); ev.Origin != want {
+			t.Fatalf("update %d landed at %+v, want %+v", i+1, ev.Origin, want)
+		}
+	}
+}
