@@ -107,3 +107,68 @@ func TestMuteStopDropsQueuedItemCast(t *testing.T) {
 	})
 	assertItemCount(t, srv, objID, potion, 5)
 }
+
+// teleportMidCastWithPotion teleports the caster in place mid-cast, with a
+// potion's item cast queued behind the cast when queue is set, and returns
+// how many ActionFailed follow the stop's MagicSkillCanceled.
+func teleportMidCastWithPotion(t *testing.T, queue bool) int {
+	t.Helper()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(stopQueueItemSkills(t)),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	if !srv.DrivesClock() {
+		t.Skip("holding a cast open needs the driven clock")
+	}
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	if err := srv.KnownSkills.SetKnownSkill(context.Background(), objID, 0, stopMagicSkillID, 1); err != nil {
+		t.Fatalf("seed known skill: %v", err)
+	}
+	potion := srv.GiveItem(t, objID, 1060, 5)
+	startInWorld(t, c)
+	drainUntilQuiet(t, c)
+	c.Send(encodeRequestMagicSkillUse(stopMagicSkillID))
+	drainUntilQuiet(t, c)
+	if queue {
+		c.Send(encodeUseItem(potion, false))
+		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued item cast")
+		drainUntilQuiet(t, c)
+	}
+
+	x, y, z := srv.PlayerPosition(t, objID)
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.TeleportTo(x, y, z, 0) })
+	canceled, failed := false, 0
+	for _, frame := range readUntilQuiet(t, c) {
+		switch {
+		case frame[0] == serverpackets.OpcodeMagicSkillCanceled:
+			canceled = true
+		case frame[0] == serverpackets.OpcodeActionFailed && canceled:
+			failed++
+		case frame[0] == serverpackets.OpcodeMagicSkillUse:
+			t.Fatal("a cast started across the teleport")
+		}
+	}
+	if !canceled {
+		t.Fatal("teleport mid-cast sent no MagicSkillCanceled")
+	}
+	assertItemCount(t, srv, objID, potion, 5)
+	return failed
+}
+
+// TestTeleportStopDropsQueuedItemCast pins a teleport mid-cast with a
+// potion's item cast queued: the teleport's abort stops the cast, and the
+// queued cast is refused as the stop reports the cast's end, answering one
+// more ActionFailed than the same teleport with nothing queued. The potion
+// is kept.
+func TestTeleportStopDropsQueuedItemCast(t *testing.T) {
+	t.Parallel()
+	var bare, queued int
+	t.Run("nothing queued", func(t *testing.T) { bare = teleportMidCastWithPotion(t, false) })
+	t.Run("potion queued", func(t *testing.T) { queued = teleportMidCastWithPotion(t, true) })
+	if t.Failed() {
+		return
+	}
+	if queued != bare+1 {
+		t.Fatalf("teleport stop sent %d ActionFailed with a queued item cast and %d without, want one more", queued, bare)
+	}
+}
