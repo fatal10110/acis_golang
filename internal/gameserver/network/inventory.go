@@ -1,6 +1,8 @@
 package network
 
 import (
+	"slices"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
@@ -229,55 +231,26 @@ func (l *GameClientLink) applyEquipStatChanges(live *livePlayer, inv *itemcontai
 // applyEquipItemStats is applyEquipStatChanges without the closing grade
 // penalty refresh, for a caller that has to send its own packets between
 // the two.
+//
+// Each instance in res.Changed is one listener step, run in that order
+// against the paperdoll as it stood at that step: its formal wear refresh,
+// armor set and augmentation stages each answer with their own SkillList
+// (and SkillCoolTime), then its item skills with one more, so a request
+// that changes several slots sends one per item that changed skills. A set
+// piece cleared ahead of the chest is still checked against the old chest,
+// and every SkillList greys out its entries only while formal wear is worn
+// at that step.
 func (l *GameClientLink) applyEquipItemStats(live *livePlayer, inv *itemcontainer.Inventory, res invops.Result) {
 	if live == nil || inv == nil {
 		return
 	}
-	var skillsChanged, timersChanged bool
-	// An armor set's or augmentation's skill refreshes the skill list the
-	// moment it is granted or removed, ahead of the item's other skills.
-	stage := func(change skillstate.SkillChange) {
-		if change.SkillsChanged {
-			live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
-		}
-		if change.TimersChanged {
-			now := live.Now()
-			live.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
-		}
-	}
-	for _, inst := range res.Changed {
+	steps := equipSteps(inv, res.Changed)
+	for i, inst := range res.Changed {
 		tmpl, ok := inv.Templates().Get(inst.TemplateID)
 		if !ok {
 			continue
 		}
-		if tmpl.Slot == item.SlotAllDress {
-			skillsChanged = true
-		}
-		if l.skills == nil {
-			continue
-		}
-		if inst.Equipped() {
-			changed, timers, err := l.skills.EquipItemStatsReporting(live.Character, inst, tmpl, stage)
-			if err != nil {
-				l.log.Error().Err(err).Int32("object_id", inst.ObjectID).Msg("equip item stats")
-			}
-			skillsChanged = skillsChanged || changed
-			timersChanged = timersChanged || timers
-			continue
-		}
-		if l.skills.UnequipItemStatsReporting(live.Character, inv, inst, tmpl, stage) {
-			skillsChanged = true
-		}
-	}
-	// Mirrors ItemPassiveSkillsListener: SkillList always precedes
-	// SkillCoolTime, and SkillCoolTime is only ever sent when an
-	// item-granted skill's reuse timer needs to reach the client.
-	if skillsChanged {
-		live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
-	}
-	if timersChanged {
-		now := live.Now()
-		live.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
+		l.applyEquipStep(live, inst, tmpl, steps[i])
 	}
 	if l.shadowItems != nil {
 		for _, inst := range res.Changed {
@@ -292,6 +265,89 @@ func (l *GameClientLink) applyEquipItemStats(live *livePlayer, inv *itemcontaine
 			}
 		}
 	}
+}
+
+// applyEquipStep attaches or detaches the stat functions and skills inst,
+// just equipped or unequipped, contributes, answering each stage with its
+// own packets. SkillList always precedes SkillCoolTime, and SkillCoolTime is
+// only ever sent when an item-granted skill's reuse timer needs to reach
+// the client.
+func (l *GameClientLink) applyEquipStep(live *livePlayer, inst *item.Instance, tmpl *item.Template, step equipStep) {
+	sendSkillList := func() {
+		live.SendFrame(serverpackets.FrameSkillList(skillListEntriesGreyed(live.Character, l.skills, step.formalWear)))
+	}
+	sendCoolTime := func() {
+		now := live.Now()
+		live.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(live.SkillReuseTimers(now), now)))
+	}
+	if l.skills == nil {
+		if tmpl.Slot == item.SlotAllDress {
+			sendSkillList()
+		}
+		return
+	}
+	stage := func(change skillstate.SkillChange) {
+		if change.SkillsChanged {
+			sendSkillList()
+		}
+		if change.TimersChanged {
+			sendCoolTime()
+		}
+	}
+	if inst.Equipped() {
+		skillsChanged, timersChanged, err := l.skills.EquipItemStatsReporting(live.Character, inst, tmpl, stage)
+		if err != nil {
+			l.log.Error().Err(err).Int32("object_id", inst.ObjectID).Msg("equip item stats")
+		}
+		stage(skillstate.SkillChange{SkillsChanged: skillsChanged, TimersChanged: timersChanged})
+		return
+	}
+	if l.skills.UnequipItemStatsReporting(live.Character, step.worn, inst, tmpl, stage) {
+		sendSkillList()
+	}
+}
+
+// equipStep is the paperdoll one listener step of an equip change sees:
+// what is worn once that step's item went on or came off, and whether the
+// chest then holds formal wear.
+type equipStep struct {
+	worn       skillstate.WornStep
+	formalWear bool
+}
+
+// equipSteps replays changed, in the order the paperdoll changed them,
+// backwards from the paperdoll inv wears now: an item worn now went on at
+// its step, so it was not worn before it; one not worn now came off at its
+// step, so it was worn before it.
+func equipSteps(inv *itemcontainer.Inventory, changed []*item.Instance) []equipStep {
+	worn := inv.PaperdollItems()
+	steps := make([]equipStep, len(changed))
+	for i := len(changed) - 1; i >= 0; i-- {
+		steps[i] = paperdollStep(inv.Templates(), slices.Clone(worn))
+		inst := changed[i]
+		if inst.Equipped() {
+			worn = slices.DeleteFunc(worn, func(w *item.Instance) bool { return w == inst })
+		} else {
+			worn = append(worn, inst)
+		}
+	}
+	return steps
+}
+
+// paperdollStep resolves the chest among worn.
+func paperdollStep(templates *item.Table, worn []*item.Instance) equipStep {
+	step := equipStep{worn: skillstate.WornStep{Items: worn}}
+	for _, inst := range worn {
+		tmpl, ok := templates.Get(inst.TemplateID)
+		if !ok {
+			continue
+		}
+		if slot, ok := tmpl.Slot.PaperdollIndex(); ok && slot == itemcontainer.Chest {
+			step.worn.ChestID = inst.TemplateID
+			step.formalWear = tmpl.Slot == item.SlotAllDress
+		}
+	}
+	return step
 }
 
 // ExpireShadowItem unequips and destroys an exhausted shadow item.

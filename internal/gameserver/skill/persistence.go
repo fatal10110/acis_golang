@@ -487,10 +487,11 @@ type SkillChange struct {
 	TimersChanged bool
 }
 
-// EquipItemStatsReporting is EquipItemStats with each armor set grant and
-// the augmentation of an augmented weapon reported as its own stage. The
-// armor set grants follow the item's own functions, each one answered by
-// its own skill list, one per grant. The augmentation follows them ahead of
+// EquipItemStatsReporting is EquipItemStats with formal wear's skill list
+// refresh, each armor set grant and the augmentation of an augmented weapon
+// reported as its own stage. Formal wear and the armor set grants follow the
+// item's own functions, each one answered by its own skill list, one per
+// grant. The augmentation follows them ahead of
 // the item's skills, applied ahead of the grade penalty check:
 // its stat bonuses attach without a stat report and its skill, if any, is
 // granted. stage, when not nil, is told what each of those changed at that
@@ -549,6 +550,13 @@ func (p *Persistence) EquipItemStatsReporting(c *player.Character, inst *item.In
 		timersChanged = timersChanged || change.TimersChanged
 	}
 	c.AddStatFuncs(modFns)
+	// Formal wear answers its own equip with a skill list, every entry
+	// greyed out by it, ahead of its item skills. Only a caller that
+	// reports each stage hears of it: one that folds them refreshes the
+	// whole paperdoll and sends no listener packets.
+	if tmpl.Slot == item.SlotAllDress && stage != nil {
+		stage(SkillChange{SkillsChanged: true})
+	}
 	for _, group := range setStages {
 		p.grantItemSkills(c, group)
 		report(SkillChange{SkillsChanged: true})
@@ -695,11 +703,11 @@ func (p *Persistence) armorSetGrants(c *player.Character, inst *item.Instance, t
 
 // unequipArmorSet removes the skills inst, just unequipped, took from its
 // armor set: a set chest takes its set's common, set, shield and +6 skills;
-// another piece of the worn chest's set takes the same; the set's shield
-// takes the shield skill. It reports whether inst belonged to a set that
-// way, which is when the caller resends SkillList — even when none of
-// those skills was known.
-func (p *Persistence) unequipArmorSet(c *player.Character, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) bool {
+// another piece of the set of the chest worn at that step (wornChestID, 0
+// for none) takes the same; that set's shield takes the shield skill. It
+// reports whether inst belonged to a set that way, which is when the caller
+// resends SkillList — even when none of those skills was known.
+func (p *Persistence) unequipArmorSet(c *player.Character, wornChestID int32, inst *item.Instance, tmpl *item.Template) bool {
 	if p == nil || p.armorSets == nil || tmpl.Slot == item.SlotAllDress {
 		return false
 	}
@@ -708,8 +716,8 @@ func (p *Persistence) unequipArmorSet(c *player.Character, inv *itemcontainer.In
 	var ok bool
 	if slot == itemcontainer.Chest {
 		set, ok = p.armorSets.FindByChest(inst.TemplateID)
-	} else if inv != nil {
-		set, ok = p.armorSets.Worn(inv)
+	} else if wornChestID != 0 {
+		set, ok = p.armorSets.FindByChest(wornChestID)
 	}
 	if !ok {
 		return false
@@ -936,18 +944,38 @@ func (p *Persistence) grantItemSkills(c *player.Character, grants []itemSkillGra
 // +4 or higher even when the Expertise gate kept it from being granted. No
 // reuse timer armed by the equip-delay grant is cleared.
 func (p *Persistence) UnequipItemStats(c *player.Character, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) (skillsChanged bool) {
-	return p.UnequipItemStatsReporting(c, inv, inst, tmpl, nil)
+	var step WornStep
+	if inv != nil {
+		step.Items = inv.PaperdollItems()
+		if chest := inv.ItemAt(itemcontainer.Chest); chest != nil {
+			step.ChestID = chest.TemplateID
+		}
+	}
+	return p.UnequipItemStatsReporting(c, step, inst, tmpl, nil)
 }
 
-// UnequipItemStatsReporting is UnequipItemStats with the armor set skill
+// WornStep is the paperdoll one unequip step of an equip change sees, once
+// the item it takes off has left it: an equip change that moves several
+// slots runs the listeners of each slot in turn, so a piece cleared ahead of
+// the chest still sees the old chest.
+type WornStep struct {
+	// Items are the instances still worn.
+	Items []*item.Instance
+	// ChestID is the template id in the chest slot, 0 when it is empty.
+	ChestID int32
+}
+
+// UnequipItemStatsReporting is UnequipItemStats against the paperdoll worn
+// at that step, with formal wear's skill list refresh, the armor set skill
 // removal and the augmentation of an augmented weapon reported as their own
 // stages, between the item's own functions and its +4 skill, in that order
-// as the armor set and skill listeners run: the armor set's
-// skills leave with one skill list, then the augmentation's stat bonuses
-// detach with their own stat report and its skill, if any, leaves. stage,
-// when not nil, is told what each of those changed at that moment; a nil
-// stage folds them into the result instead.
-func (p *Persistence) UnequipItemStatsReporting(c *player.Character, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template, stage func(SkillChange)) (skillsChanged bool) {
+// as the armor set and skill listeners run: formal wear and the armor set's
+// skills each leave with one skill list, then the augmentation's stat
+// bonuses detach with their own stat report and its skill, if any, leaves.
+// stage, when not nil, is told what each of those changed at that moment; a
+// nil stage folds the armor set and augmentation into the result instead,
+// and leaves formal wear out.
+func (p *Persistence) UnequipItemStatsReporting(c *player.Character, worn WornStep, inst *item.Instance, tmpl *item.Template, stage func(SkillChange)) (skillsChanged bool) {
 	if c == nil || inst == nil {
 		return false
 	}
@@ -962,7 +990,10 @@ func (p *Persistence) UnequipItemStatsReporting(c *player.Character, inv *itemco
 		}
 		skillsChanged = skillsChanged || change.SkillsChanged
 	}
-	if p.unequipArmorSet(c, inv, inst, tmpl) {
+	if tmpl.Slot == item.SlotAllDress && stage != nil {
+		stage(SkillChange{SkillsChanged: true})
+	}
+	if p.unequipArmorSet(c, worn.ChestID, inst, tmpl) {
 		report(SkillChange{SkillsChanged: true})
 	}
 	if tmpl.Weapon != nil && inst.Augmented() {
@@ -971,14 +1002,8 @@ func (p *Persistence) UnequipItemStatsReporting(c *player.Character, inv *itemco
 	if inst.Snapshot().EnchantLevel >= item.Enchant4SkillLevel && p.RevokeEnchant4Skill(c, tmpl) {
 		skillsChanged = true
 	}
-	if inv == nil {
-		return skillsChanged
-	}
-	for _, other := range inv.PaperdollItems() {
-		if other == inst {
-			continue
-		}
-		if other.TemplateID == tmpl.ID {
+	for _, other := range worn.Items {
+		if other != inst && other.TemplateID == tmpl.ID {
 			return skillsChanged
 		}
 	}
