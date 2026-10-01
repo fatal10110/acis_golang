@@ -430,6 +430,8 @@ type GameClientLinkConfig struct {
 	// Now supplies the clock packet accounting uses to bucket received
 	// frames into flood windows; nil means time.Now.
 	Now func() time.Time
+	// TradeClock times direct-trade requests out; nil means time.Now.
+	TradeClock func() time.Time
 	// EnchantRoll supplies enchant dice rolls in [0,1); nil falls back to
 	// the random source. Behavior harnesses inject a deterministic roll.
 	EnchantRoll func() float64
@@ -524,7 +526,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		skillEnchantRoll: cfg.SkillEnchantRoll,
 		inventory:        invops.NewService(cfg.IDs),
 		petItems:         petitem.NewService(cfg.IDs),
-		trades:           tradebook.NewBook(time.Now),
+		trades:           tradebook.NewBook(cfg.TradeClock),
 		enchantState:     enchantflow.NewState(),
 		targets:          skilltarget.NewRegistry(skilltarget.WorldKnown{State: cfg.World}),
 		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(cfg.Skills, cfg.PlayerConfig.MagicFailures, cfg.HealSps, handlerskill.SignetDeps{

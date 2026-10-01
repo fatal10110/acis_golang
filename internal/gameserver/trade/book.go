@@ -133,6 +133,10 @@ func (b *Book) Request(requesterID, targetID int32) RequestResult {
 
 // Answer accepts or rejects a pending direct-trade request.
 //
+// A request past its timeout is no request at all: accepted or refused, the
+// answer finds nothing (AnswerMissing), so the requester hears no denial and
+// the answering side is told its target is gone.
+//
 // Accepting a request whose requester has left opens the session on the
 // target's side only, with the requester already marked as left: the target
 // trades against the login that asked, which is gone, and a later login under
@@ -143,15 +147,15 @@ func (b *Book) Answer(targetID int32, accept bool) AnswerResult {
 
 	now := b.now()
 	pending, ok := b.pendingByTarget[targetID]
-	if !ok {
+	delete(b.pendingByTarget, targetID)
+	if !ok || !now.Before(pending.expiresAt) {
 		return AnswerResult{Status: AnswerMissing, TargetID: targetID}
 	}
-	delete(b.pendingByTarget, targetID)
 	if out, ok := b.pendingByRequester[pending.requesterID]; ok && !pending.requesterLeft && out.targetID == targetID {
 		delete(b.pendingByRequester, pending.requesterID)
 	}
 	result := AnswerResult{RequesterID: pending.requesterID, TargetID: targetID, RequesterLeft: pending.requesterLeft}
-	if !accept || !now.Before(pending.expiresAt) {
+	if !accept {
 		result.Status = AnswerDenied
 		return result
 	}

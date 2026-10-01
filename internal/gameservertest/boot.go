@@ -97,6 +97,7 @@ type options struct {
 	instantTeleports       travel.InstantTable
 	freeTeleport           bool
 	teleportClock          func() time.Time
+	tradeClock             func() time.Time
 	zones                  *zone.Index
 	water                  bool
 	waterNow               func() time.Time
@@ -255,6 +256,12 @@ func WithTeleports(teleports travel.TeleportTable, instants travel.InstantTable,
 	return func(o *options) {
 		o.teleports, o.instantTeleports, o.freeTeleport, o.teleportClock = teleports, instants, free, now
 	}
+}
+
+// WithTradeClock times direct-trade requests out against now (nil means
+// time.Now), so a scenario can let a request expire without waiting.
+func WithTradeClock(now func() time.Time) Option {
+	return func(o *options) { o.tradeClock = now }
 }
 
 // WithZones supplies the zone index wired into the link (default: none, so
@@ -1606,6 +1613,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		InstantTeleports: o.instantTeleports,
 		FreeTeleport:     o.freeTeleport,
 		TeleportClock:    o.teleportClock,
+		TradeClock:       o.tradeClock,
 		Zones:            o.zones,
 		PetConfig:        petmodel.DefaultConfig(),
 		EnchantRoll:      o.enchantRoll,
