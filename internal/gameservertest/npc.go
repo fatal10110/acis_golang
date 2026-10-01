@@ -320,6 +320,11 @@ func (r *movingHostileLocatedRef) CanSee(target attackable.Combatant) bool {
 	return !ok || h.CanSee(target)
 }
 
+func (r *movingHostileLocatedRef) Knows(target attackable.Combatant) bool {
+	h, ok := r.Actor.(*npc.Hostile)
+	return !ok || h.Knows(target)
+}
+
 // SpawnMovingHostileNPCAt seeds a hostile monster with the production move
 // controller wired through BroadcastMove, so leash-return and other
 // server-initiated moves emit real observer packets.

@@ -71,6 +71,13 @@ func (r *locatedRef) CanSee(target attackable.Combatant) bool {
 	return !ok || actor.CanSee(target)
 }
 
+// Knows forwards the NPC's known list, which ends a chase walk whose target
+// left it; an unwired ref knows everything.
+func (r *locatedRef) Knows(target attackable.Combatant) bool {
+	actor, ok := r.Actor.(*npc.Hostile)
+	return !ok || actor.Knows(target)
+}
+
 type (
 	creatureActorRef struct{ attack.CreatureActor }
 	statOwnerRef     struct{ effect.StatOwner }
