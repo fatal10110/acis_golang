@@ -29,6 +29,9 @@ type CastControl interface {
 	SkillOnCooldown(def modelskill.Definition) bool
 }
 
+// CastControl returns a's cast controller, nil when it has none.
+func (a *Actor) CastControl() CastControl { return a.cast }
+
 // CastingNow reports whether a has a cast in flight.
 func (a *Actor) CastingNow() bool {
 	return a.cast != nil && a.cast.CastingNow()

@@ -1131,6 +1131,14 @@ func (m *CreatureMove) Destination() location.Location {
 	return m.destination
 }
 
+// MovingTo returns the target of the leg in flight — the first geopath
+// segment of a routed walk — and whether a walk is in flight at all.
+func (m *CreatureMove) MovingTo() (location.Location, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.destination, m.moving
+}
+
 // StartFriendlyFollow starts a friendly follow task for targetID.
 func (m *CreatureMove) StartFriendlyFollow(targetID int32, offset int) {
 	m.mu.Lock()

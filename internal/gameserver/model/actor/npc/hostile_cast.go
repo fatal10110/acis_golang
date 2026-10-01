@@ -24,6 +24,9 @@ func (h *Hostile) SetCastController(c CastControl) {
 	h.cast.Store(&c)
 }
 
+// CastControl returns h's cast controller, nil when it has none.
+func (h *Hostile) CastControl() CastControl { return h.castControl() }
+
 func (h *Hostile) castControl() CastControl {
 	if p := h.cast.Load(); p != nil {
 		return *p

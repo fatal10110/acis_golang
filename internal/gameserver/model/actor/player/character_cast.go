@@ -29,6 +29,9 @@ func (c *Character) SetCastController(cast CastController) {
 	c.cast.Store(&cast)
 }
 
+// CastControl returns c's cast controller, nil before it has one.
+func (c *Character) CastControl() CastController { return c.castController() }
+
 func (c *Character) castController() CastController {
 	if p := c.cast.Load(); p != nil {
 		return *p
