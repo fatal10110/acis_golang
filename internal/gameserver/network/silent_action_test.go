@@ -123,7 +123,12 @@ import (
 // cards, RequestPledgeInfo for an unknown clan, RequestPledgePower set by a
 // non-leader, an expulsion naming nobody): the reference answers each with
 // nothing, and the clan window holds no pending action. tests/clan asserts
-// those silences and every refusal that does answer.
+// those silences and every refusal that does answer. The same holds for
+// the clan war requests from a clanless player or naming no clan (a stop or
+// surrender), the war list without a clan, a reorganization or mentor link
+// naming nobody, and every war proposal reply: no request proposes a war,
+// a stop or a surrender to another player, so a reply never has one to
+// answer.
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 

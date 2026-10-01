@@ -97,8 +97,8 @@ func (c *Character) publishPKKarma(karma int) {
 //
 // That whole update is gated behind cursed-weapon, duel, and
 // PvP/siege-zone early returns, and this branch's own condition also
-// allows an at-war clan kill. That state is not tracked on Character yet;
-// it remains owned by the clan subsystem.
+// allows a mutual clan-war kill between non-academy members; the clan
+// registry holds that state, not wired here yet (#1301).
 func (c *Character) awardKillerPvPKill(killer attackable.Combatant) {
 	pk := actingCharacter(killer)
 	if pk == nil || pk == c {

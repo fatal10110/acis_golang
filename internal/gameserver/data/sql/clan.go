@@ -20,8 +20,8 @@ func NewClanStore(db *sql.DB) *ClanStore {
 	return &ClanStore{db: db}
 }
 
-// Load reads every clan row, every clan member's characters row and every
-// rank privilege row.
+// Load reads every clan row, every clan member's characters row, every
+// rank privilege row, every sub-unit and every war.
 func (s *ClanStore) Load(ctx context.Context) (clan.Snapshot, error) {
 	var snap clan.Snapshot
 	rows, err := s.db.QueryContext(ctx, `SELECT clan_id, COALESCE(clan_name,''), clan_level, reputation_score, hasCastle,
@@ -46,7 +46,7 @@ func (s *ClanStore) Load(ctx context.Context) (clan.Snapshot, error) {
 	}
 
 	rows, err = s.db.QueryContext(ctx, `SELECT clanid, char_name, COALESCE(level,0), COALESCE(classid,0), obj_Id, COALESCE(title,''),
-		COALESCE(power_grade,0), subpledge, apprentice, sponsor, COALESCE(sex,0), COALESCE(race,0)
+		COALESCE(power_grade,0), subpledge, apprentice, sponsor, COALESCE(sex,0), COALESCE(race,0), lvl_joined_academy
 		FROM characters WHERE clanid > 0 ORDER BY obj_Id`)
 	if err != nil {
 		return snap, fmt.Errorf("load clan members: %w", err)
@@ -54,7 +54,7 @@ func (s *ClanStore) Load(ctx context.Context) (clan.Snapshot, error) {
 	for rows.Next() {
 		var m clan.MemberRow
 		if err := rows.Scan(&m.ClanID, &m.Name, &m.Level, &m.ClassID, &m.ObjectID, &m.Title,
-			&m.PowerGrade, &m.PledgeType, &m.Apprentice, &m.Sponsor, &m.Sex, &m.Race); err != nil {
+			&m.PowerGrade, &m.PledgeType, &m.Apprentice, &m.Sponsor, &m.Sex, &m.Race, &m.LvlJoinedAcademy); err != nil {
 			rows.Close()
 			return snap, fmt.Errorf("load clan members: %w", err)
 		}
@@ -94,6 +94,9 @@ func (s *ClanStore) Load(ctx context.Context) (clan.Snapshot, error) {
 	}
 	if err := closeRows(rows); err != nil {
 		return snap, fmt.Errorf("load clan skills: %w", err)
+	}
+	if err := s.loadSubunitsAndWars(ctx, &snap); err != nil {
+		return snap, err
 	}
 	return snap, nil
 }
@@ -156,11 +159,11 @@ func (s *ClanStore) SetPrivileges(ctx context.Context, clanID int32, rank int, p
 	return nil
 }
 
-// SaveMembership stores a character's clan, title, rank, sub-unit and join
-// penalty as it joins or founds a clan.
+// SaveMembership stores a character's clan, title, rank, sub-unit, join
+// penalty and academy join level as it joins or founds a clan.
 func (s *ClanStore) SaveMembership(ctx context.Context, r clan.MembershipRow) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE characters SET clanid=?, title=?, power_grade=?, subpledge=?, clan_join_expiry_time=? WHERE obj_Id=?`,
-		r.ClanID, r.Title, r.PowerGrade, r.PledgeType, r.JoinExpiry, r.ObjectID)
+	_, err := s.db.ExecContext(ctx, `UPDATE characters SET clanid=?, title=?, power_grade=?, subpledge=?, clan_join_expiry_time=?, lvl_joined_academy=? WHERE obj_Id=?`,
+		r.ClanID, r.Title, r.PowerGrade, r.PledgeType, r.JoinExpiry, r.LvlJoinedAcademy, r.ObjectID)
 	if err != nil {
 		return fmt.Errorf("save clan membership of %d: %w", r.ObjectID, err)
 	}

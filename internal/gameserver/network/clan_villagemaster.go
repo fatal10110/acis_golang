@@ -45,8 +45,12 @@ func bypassArgs(command string) (string, string) {
 // villageMasterClan runs one of a village master's clan commands for live.
 // A command missing its name argument does nothing.
 func (l *GameClientLink) villageMasterClan(live *livePlayer, f *npc.Folk, command string) {
-	arg, _ := bypassArgs(command)
-	switch strings.ToLower(strings.SplitN(command, " ", 2)[0]) {
+	arg, arg2 := bypassArgs(command)
+	verb := strings.ToLower(strings.SplitN(command, " ", 2)[0])
+	if l.villageMasterSubunit(live, verb, arg, arg2) {
+		return
+	}
+	switch verb {
 	case "create_clan":
 		if arg != "" {
 			l.createClan(live, arg)

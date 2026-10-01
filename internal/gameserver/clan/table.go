@@ -63,6 +63,8 @@ type Snapshot struct {
 	Members    []MemberRow
 	Privileges []PrivilegeRow
 	Skills     []SkillRow
+	Subunits   []SubunitRow
+	Wars       []WarRow
 }
 
 // Table is the clan registry. mu guards clans; each clan guards itself.
@@ -78,22 +80,18 @@ func NewTable() *Table { return &Table{clans: map[int32]*Clan{}} }
 // before any player connects. A clan below level 5 holds no reputation,
 // whatever its row says; a member penalty survives while it is less than
 // joinDays past its start; an alliance penalty survives until it ends. The
-// ladder then ranks the 99 clans with the most positive reputation.
+// sub-units and wars follow (see restoreWars). The ladder then ranks the 99
+// clans with the most positive reputation.
 func (t *Table) Restore(s Snapshot, now time.Time, joinDays int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	nowMs := now.UnixMilli()
 	for _, r := range s.Clans {
-		cl := &Clan{
-			id: r.ID, name: r.Name, leaderID: r.LeaderID, newLeaderID: r.NewLeaderID,
-			level: r.Level, castleID: r.CastleID,
-			crestID: r.CrestID, crestLargeID: r.CrestLargeID,
-			allyID: r.AllyID, allyName: r.AllyName, allyCrestID: r.AllyCrestID,
-			dissolvingExpiry: r.DissolvingExpiry,
-			members:          map[int32]*Member{},
-			privileges:       map[int]int32{},
-			skills:           map[int]int{},
-		}
+		cl := newClan(r.ID, r.Name, r.LeaderID)
+		cl.newLeaderID, cl.level, cl.castleID = r.NewLeaderID, r.Level, r.CastleID
+		cl.crestID, cl.crestLargeID = r.CrestID, r.CrestLargeID
+		cl.allyID, cl.allyName, cl.allyCrestID = r.AllyID, r.AllyName, r.AllyCrestID
+		cl.dissolvingExpiry = r.DissolvingExpiry
 		if r.AllyPenaltyExpiry > nowMs {
 			cl.allyPenaltyExpiry, cl.allyPenaltyType = r.AllyPenaltyExpiry, r.AllyPenaltyType
 		}
@@ -122,6 +120,8 @@ func (t *Table) Restore(s Snapshot, now time.Time, joinDays int) {
 			cl.skills[sk.ID] = sk.Level
 		}
 	}
+	t.restoreSubunits(s.Subunits)
+	t.restoreWars(s.Wars, nowMs)
 	t.rankLadder(s.Clans)
 }
 

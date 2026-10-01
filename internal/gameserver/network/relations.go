@@ -9,9 +9,9 @@ import (
 
 // relationBits returns the subset of RelationChanged's bitmask this port
 // computes from a Character's own state: pvp-flag and karma. The clan
-// leader bit is computable from clan.Service but is not wired in yet
-// (#2466); the clan-war bits wait on clan wars (#149) and the siege bits on
-// the siege core/engine (#232/#234), so those bits are always zero here.
+// leader and clan-war bits are computable from clan.Service (Clan.AtWarWith)
+// but are not wired in yet (#2466); the siege bits wait on the siege
+// core/engine (#232/#234), so those bits are always zero here.
 func relationBits(karma int, pvpFlag task.PvPFlagState) int32 {
 	var bits int32
 	if pvpFlag != task.PvPFlagNone {
