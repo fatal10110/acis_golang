@@ -25,6 +25,9 @@ const striderNPCID = 12526
 // actionMountDismount is the action-bar Mount/Dismount command.
 const actionMountDismount = int32(38)
 
+// dryadRootSkill is Dryad Root, a skill that roots its target.
+const dryadRootSkill = modelskill.ID(1201)
+
 // striderRow is one Wind Strider pet data row, as aCis_datapack ships it
 // (data/xml/npcs/12000-12999.xml, npc 12526): the meals, the ride speeds
 // (speedOnRide base and water) and pAtkOnRide (equal to mAtkOnRide).
@@ -308,6 +311,17 @@ func TestStriderMountRefusals(t *testing.T) {
 			strider.ReduceHP(strider.HP()+1, obj.(attackable.Combatant), modelskill.Definition{})
 			h.srv.AdvanceUntil(t, "strider dead", strider.Dead)
 		}, serverpackets.SystemMessageDeadStriderCantBeRidden},
+		// A root on the strider alone, its owner out of combat, refuses it
+		// as a strider in battle.
+		{"rooted strider", striderRow5.maxMeal, func(t *testing.T, h *petWorld, strider *summon.Actor) {
+			landFearPetEffect(t, strider, strider, "Root", dryadRootSkill, 1, 30)
+			if !strider.Rooted() {
+				t.Fatal("Rooted() = false after Root landed on the strider")
+			}
+			if h.character(t).InCombat() {
+				t.Fatal("rider in combat; the case needs only the strider held")
+			}
+		}, serverpackets.SystemMessageStriderInBattleCantBeRidden},
 		{"rider in combat", striderRow5.maxMeal, func(t *testing.T, h *petWorld, _ *summon.Actor) {
 			h.srv.SetPlayerInCombat(t, h.ownerID, true)
 		}, serverpackets.SystemMessageStriderInBattleCantBeRidden},
