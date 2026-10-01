@@ -86,6 +86,12 @@ type ItemInstances struct {
 	// failed items are not merged back over a container that already tore
 	// down and wrote its own final state (see RemoveItems and Save).
 	rounds map[*saveRound]struct{}
+
+	// groupsMu guards groups. It is taken after mu, never before.
+	groupsMu sync.Mutex
+	// groups maps each row of a write that has not landed yet to every row
+	// that must land with it (Bind).
+	groups map[int32]*rowGroup
 }
 
 // pendingItem is one changed instance waiting for the next flush, with the
@@ -140,6 +146,7 @@ func NewItemInstances(flusher ItemFlusher, templates *item.Table, worker *persis
 		writes:    writes,
 		pending:   make(map[int32]pendingItem),
 		rounds:    make(map[*saveRound]struct{}),
+		groups:    make(map[int32]*rowGroup),
 	}
 }
 
@@ -361,6 +368,7 @@ func (i *ItemInstances) retarget(ownerID int32, claimed map[int32]*item.Instance
 			r.removed[objectID] = struct{}{}
 		}
 	}
+	i.retargetGroups(ownerID, claimed)
 }
 
 // pendingInstances returns the instance behind each of objectIDs that has an
@@ -410,12 +418,13 @@ func (i *ItemInstances) pendingInstances(objectIDs []int32) []*item.Instance {
 // ids RemoveItems dropped during the flush are not merged back — those
 // already got their own successful write and must not be resurrected.
 //
-// Save no longer gives callers UpdateItems's whole-batch atomicity: two
-// items that must land together (e.g. both legs of a trade reaching pending
-// through the container's item persister) can now fall on either
-// side of a chunk boundary and commit, or fail, independently. This
-// narrows what a Save tick previously promised, but not past what the
-// Java reference already does: ItemInstanceTaskManager.updateItems commits
+// Save gives no whole-batch atomicity of its own: items that land in
+// different owners' jobs, or on either side of a chunk boundary, commit or
+// fail independently. Rows one operation bound together (Bind) are the
+// exception, since UpdateItems widens every chunk to the rows bound to it:
+// both legs of a trade whose own write failed land in one transaction or not
+// at all, whichever owner's job reaches them first. Beyond that, this is not
+// past what the Java reference already does: ItemInstanceTaskManager.updateItems commits
 // five sequential executeBatch calls on an autocommit connection with no
 // transaction at all, so per-statement partial visibility on error is
 // already the oracle's behavior, at a finer grain than one chunk here.
@@ -638,6 +647,10 @@ func (i *ItemInstances) saveChunks(ctx context.Context, entries []pendingItem) (
 // non-nil error means nothing was written, so callers must keep their
 // items pending for a retry rather than dropping them.
 //
+// The flush also carries every row bound to one of items (Bind), read
+// where it takes its place like the rest, and a flush that lands settles the
+// groups it carried whole.
+//
 // This per-call guarantee is unchanged by Save's chunking (Save simply
 // calls UpdateItems once per chunk); network.flushItemPersistence relies on
 // it directly, calling UpdateItems for one container's items outside of
@@ -652,6 +665,21 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 	}
 
 	items = slices.DeleteFunc(items, func(inst *item.Instance) bool { return inst == nil })
+	// A row bound to rows outside this flush takes them along, so the rows
+	// one operation changed land in one transaction whichever write lands
+	// them (Bind).
+	ids := make([]int32, 0, len(items))
+	for _, inst := range items {
+		ids = append(ids, inst.ObjectID)
+	}
+	var deletes []int32
+	for _, row := range i.Widen(ids) {
+		if row.Inst == nil {
+			deletes = append(deletes, row.ObjectID)
+			continue
+		}
+		items = append(items, row.Inst)
+	}
 	slices.SortFunc(items, func(a, b *item.Instance) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
 
 	// Each row's state and its place in that row's write order are taken
@@ -670,6 +698,9 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 			states = append(states, st)
 		})
 	}
+	for _, objectID := range deletes {
+		write.Add(objectID)
+	}
 	var err error
 	write.Run(func(keep []int32) {
 		var batch item.FlushBatch
@@ -679,8 +710,20 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 			}
 			i.addToBatch(&batch, st)
 		}
+		for _, objectID := range deletes {
+			if _, found := slices.BinarySearch(keep, objectID); found {
+				batch.Deletes = append(batch.Deletes, objectID)
+			}
+		}
 		err = i.flusher.Flush(ctx, batch)
 	})
+	if err == nil {
+		landed := deletes
+		for _, st := range states {
+			landed = append(landed, st.ObjectID)
+		}
+		i.Landed(landed)
+	}
 	return err
 }
 

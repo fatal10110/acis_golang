@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
 func (l *GameClientLink) enchantStateStore() *enchantflow.State {
@@ -235,7 +236,14 @@ func enchantResult(result enchantflow.ResultCode) serverpackets.EnchantResult {
 // the owner's lane with everything else.
 //
 // A failed write is logged and left to the persistence tick, which still has
-// every mutated instance pending and writes their current state.
+// every mutated instance pending and writes their current state. The tick
+// writes per owner lane, and the next handler write of one of these rows may
+// carry that row alone, so the rows are bound first (task.ItemInstances.Bind):
+// until one write lands them all, any write of one of them takes the rest
+// along. This write widens the same way when one of its rows is still bound to
+// an earlier operation's that never landed — the receiver spending traded
+// adena before the trade's own rows are in the database. A widened row's
+// current state decides between its save and its delete, as the tick's does.
 func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 	if l.items == nil {
 		return
@@ -247,6 +255,9 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 		inst    *item.Instance
 		ownerID int32
 		remove  bool
+		// widened marks a row bound to this write's rows by an earlier
+		// operation, which this one did not touch.
+		widened bool
 	}
 	rows := make(map[int32]rowAction, len(actions))
 	order := make([]int32, 0, len(actions))
@@ -272,6 +283,28 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 	if len(order) == 0 {
 		return
 	}
+	if l.itemInstances != nil {
+		for _, bound := range l.itemInstances.Widen(order) {
+			row := rowAction{inst: bound.Inst, ownerID: bound.OwnerID, widened: true}
+			if bound.Inst == nil {
+				row.remove = true
+			}
+			rows[bound.ObjectID] = row
+			order = append(order, bound.ObjectID)
+		}
+		if len(order) > 1 {
+			bound := make([]task.BoundRow, 0, len(order))
+			for _, objectID := range order {
+				row := rows[objectID]
+				ownerID := row.ownerID
+				if row.inst != nil && !row.widened {
+					ownerID = row.inst.Snapshot().OwnerID
+				}
+				bound = append(bound, task.BoundRow{ObjectID: objectID, OwnerID: ownerID, Inst: row.inst})
+			}
+			l.itemInstances.Bind(bound)
+		}
+	}
 
 	var batch item.FlushBatch
 	owners := make([]int32, 0, 2)
@@ -287,6 +320,10 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 			// write holding a place that does not match what it will write.
 			row.inst.WithState(func(s item.InstanceState) {
 				reserved.Add(s.ObjectID)
+				if row.widened && (s.Count <= 0 || s.Location == item.LocationVoid) {
+					batch.Deletes = append(batch.Deletes, s.ObjectID)
+					return
+				}
 				batch.Saves = append(batch.Saves, s)
 				row.ownerID = s.OwnerID
 				l.addAugmentationRow(&batch, s)
@@ -296,6 +333,7 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 			owners = append(owners, row.ownerID)
 		}
 	}
+	instances := l.itemInstances
 	l.queueItemWrite(reserved, func(keep []int32) {
 		batch := keptRows(batch, keep)
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
@@ -303,6 +341,10 @@ func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 		if err := l.items.WriteBatch(ctx, batch); err != nil {
 			l.log.Error().Err(err).Int("saves", len(batch.Saves)).Int("deletes", len(batch.Deletes)).
 				Msg("write item rows")
+			return
+		}
+		if instances != nil {
+			instances.Landed(order)
 		}
 	}, owners[0], owners[1:]...)
 }
