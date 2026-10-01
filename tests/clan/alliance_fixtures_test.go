@@ -84,20 +84,31 @@ func alliancePages(t *testing.T) map[string]string {
 	return pages
 }
 
-// seedRival stores the rival clan's leader, Rival, on account player2.
-func seedRival(t *testing.T) gameservertest.Option {
+// castMember is a level 10 character seeded beside the founder and the
+// rival, on its own account.
+type castMember struct {
+	id      int32
+	account string
+	name    string
+}
+
+// seedRival stores the rival clan's leader, Rival, on account player2,
+// and each of cast.
+func seedRival(t *testing.T, cast ...castMember) gameservertest.Option {
 	return gameservertest.WithSeed(func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
 		tmpl, ok := gameservertest.Templates(t).Get(0)
 		if !ok {
 			t.Fatal("missing test class template")
 		}
-		ch, err := player.NewCharacter(rivalLeaderID, tmpl, "player2", "Rival", 1, 0, 0, player.SexMale)
-		if err != nil {
-			t.Fatalf("seed rival: %v", err)
-		}
-		ch.CharLevel = 10
-		if err := chars.Create(context.Background(), ch); err != nil {
-			t.Fatalf("seed rival: %v", err)
+		for _, m := range append([]castMember{{rivalLeaderID, "player2", "Rival"}}, cast...) {
+			ch, err := player.NewCharacter(m.id, tmpl, m.account, m.name, 1, 0, 0, player.SexMale)
+			if err != nil {
+				t.Fatalf("seed %s: %v", m.name, err)
+			}
+			ch.CharLevel = 10
+			if err := chars.Create(context.Background(), ch); err != nil {
+				t.Fatalf("seed %s: %v", m.name, err)
+			}
 		}
 	})
 }
@@ -136,13 +147,20 @@ func bootAllianceWorld(t *testing.T, extra ...gameservertest.Option) *clanWorld 
 // seeded clans before they are restored.
 func bootAllianceWorldSeeded(t *testing.T, stmts []string, extra ...gameservertest.Option) *clanWorld {
 	t.Helper()
+	return bootAllianceCast(t, nil, stmts, extra...)
+}
+
+// bootAllianceCast is bootAllianceWorldSeeded with cast seeded too, left
+// out of the world for the test to bring in.
+func bootAllianceCast(t *testing.T, cast []castMember, stmts []string, extra ...gameservertest.Option) *clanWorld {
+	t.Helper()
 	opts := append([]gameservertest.Option{
 		gameservertest.WithCharacter("Founder", 10, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithHTMLPages(alliancePages(t)),
 		gameservertest.WithReuseDelays(0, 0),
 		gameservertest.WithLevels(warLevels(t)),
-		seedRival(t),
+		seedRival(t, cast...),
 		seedAllianceClans(t, stmts...),
 	}, extra...)
 	srv := gameservertest.Boot(t, opts...)
