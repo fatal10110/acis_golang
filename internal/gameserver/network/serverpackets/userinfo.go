@@ -29,14 +29,6 @@ func statInt32(value float64) int32 {
 // visible state.
 const OpcodeUserInfo = 0x04
 
-// defaultNameColor and defaultTitleColor are the shipped defaults for a
-// character with no name/title color override — nothing in this server sets
-// one yet.
-const (
-	defaultNameColor  = 0xFFFFFF
-	defaultTitleColor = 0xFFFF77
-)
-
 // weaponEquippedBonusSlots and noWeaponBonusSlots are the two values the
 // client's per-character bonus-slot field takes, gated on whether a weapon
 // is equipped. The client-side meaning of "bonus slots" here (commonly
@@ -287,11 +279,11 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(0) // fishing stance x: fishing is not modeled
 	w.WriteInt32(0) // fishing stance y: fishing is not modeled
 	w.WriteInt32(0) // fishing stance z: fishing is not modeled
-	w.WriteInt32(defaultNameColor)
+	w.WriteInt32(c.NameColor())
 	w.WriteUint8(boolUint8(c.Running()))
 	w.WriteInt32(int32(c.PledgeClass()))
 	w.WriteInt32(s.Clan.PledgeType)
-	w.WriteInt32(defaultTitleColor)
+	w.WriteInt32(c.TitleColor())
 	w.WriteInt32(0) // cursed weapon stage: cursed weapons are not modeled
 	return nil
 }

@@ -307,7 +307,7 @@ func (l *GameClientLink) setSellStoreList(live *livePlayer, req clientpackets.Se
 		live.SetOperateType(privatestore.OperateNone)
 		return
 	}
-	if !live.access.AllowTransaction {
+	if !live.accessLevel().AllowTransaction {
 		live.SetOperateType(privatestore.OperateNone)
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return
@@ -354,7 +354,7 @@ func (l *GameClientLink) setBuyStoreList(live *livePlayer, req clientpackets.Set
 		live.SetOperateType(privatestore.OperateNone)
 		return
 	}
-	if !live.access.AllowTransaction {
+	if !live.accessLevel().AllowTransaction {
 		live.SetOperateType(privatestore.OperateNone)
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return
@@ -425,7 +425,7 @@ func (l *GameClientLink) buyFromStore(live *livePlayer, req clientpackets.Reques
 	if op := owner.OperateType(); op != privatestore.OperateSell && op != privatestore.OperatePackageSell {
 		return
 	}
-	if !live.access.AllowTransaction {
+	if !live.accessLevel().AllowTransaction {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return
 	}
@@ -462,7 +462,7 @@ func (l *GameClientLink) sellToStore(live *livePlayer, req clientpackets.Request
 	if !ok || owner.OperateType() != privatestore.OperateBuy {
 		return
 	}
-	if !live.access.AllowTransaction {
+	if !live.accessLevel().AllowTransaction {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return
 	}

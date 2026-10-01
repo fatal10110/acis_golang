@@ -6,10 +6,10 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/network/serverpack
 // makes it a game master. It is listed when GMs log in listed and its access
 // level may use //gmlist; otherwise it is on the list hidden.
 func (l *GameClientLink) registerGM(live *livePlayer) {
-	if !live.access.IsGM {
+	if !live.accessLevel().IsGM {
 		return
 	}
-	listed := !l.playerConfig.GMStartupUnlisted && l.admin.HasAccess("admin_gmlist", live.access)
+	listed := !l.playerConfig.GMStartupUnlisted && l.admin.HasAccess("admin_gmlist", live.accessLevel())
 	l.gms.Add(live, !listed)
 }
 
@@ -19,7 +19,7 @@ func (l *GameClientLink) requestGmList(live *livePlayer) {
 	if live == nil {
 		return
 	}
-	includeHidden := live.access.IsGM
+	includeHidden := live.accessLevel().IsGM
 	if !l.gms.Online(includeHidden) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoGMProvidingServiceNow))
 		live.SendFrame(serverpackets.FramePlaySound("systemmsg_e.702"))

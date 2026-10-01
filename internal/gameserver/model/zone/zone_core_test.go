@@ -3,6 +3,7 @@ package zone
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -145,6 +146,29 @@ func TestNewCylinderRejectsNonPositiveRadius(t *testing.T) {
 	for _, rad := range []int{0, -5} {
 		if _, err := NewCylinder(0, 0, 0, 10, rad); err == nil {
 			t.Errorf("NewCylinder(rad=%d) succeeded, want error", rad)
+		}
+	}
+}
+
+func TestNewCylinderRejectsOutOfInt32Range(t *testing.T) {
+	for _, v := range [][3]int{{math.MaxInt32 + 1, 0, 10}, {0, math.MinInt32 - 1, 10}, {0, 0, math.MaxInt32 + 1}} {
+		if _, err := NewCylinder(v[0], v[1], 0, 10, v[2]); err == nil {
+			t.Errorf("NewCylinder(%d, %d, rad=%d) succeeded, want error", v[0], v[1], v[2])
+		}
+	}
+	// At the limit the cylinder is accepted but lies far off the grid, so
+	// the index attaches it to no region.
+	far, err := NewCylinder(math.MaxInt32, math.MaxInt32, 0, 10, math.MaxInt32)
+	if err != nil {
+		t.Fatalf("NewCylinder at the limit: %v", err)
+	}
+	ix := NewIndex()
+	ix.Add(NewFishing(1, far))
+	for rx := range world.RegionsX {
+		for ry := range world.RegionsY {
+			if len(ix.byRegion[rx][ry]) != 0 {
+				t.Fatalf("far cylinder attached to region %d,%d", rx, ry)
+			}
 		}
 	}
 }

@@ -294,7 +294,7 @@ func (l *GameClientLink) warehouseRequestGate(live *livePlayer) (activeStore, bo
 	if f == nil || !f.Warehouse() || !l.playerCanDoInteract(live, f) {
 		return activeStore{}, false
 	}
-	if !active.private && !live.access.AllowTransaction {
+	if !active.private && !live.accessLevel().AllowTransaction {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return activeStore{}, false
 	}
@@ -365,10 +365,10 @@ func (l *GameClientLink) requestPackageSend(live *livePlayer, req clientpackets.
 	}
 	active := live.storage.active
 	f := live.currentFolk.Load()
-	if (f == nil || !interactInRange(live, f, interactionDistance)) && !live.access.IsGM {
+	if (f == nil || !interactInRange(live, f, interactionDistance)) && !live.accessLevel().IsGM {
 		return
 	}
-	if !live.access.AllowTransaction {
+	if !live.accessLevel().AllowTransaction {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return
 	}

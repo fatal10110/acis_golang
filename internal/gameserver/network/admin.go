@@ -30,6 +30,10 @@ var adminCommands = map[string]adminCommand{
 	"admin_instant_move": (*GameClientLink).adminTeleport,
 	"admin_kick":         (*GameClientLink).adminKick,
 	"admin_enchant":      (*GameClientLink).adminEnchant,
+	"admin_set":          (*GameClientLink).adminSet,
+	"admin_gmoff":        (*GameClientLink).adminGMOff,
+	"admin_ban":          (*GameClientLink).adminBan,
+	"admin_unban":        (*GameClientLink).adminUnban,
 }
 
 // adminEntry is one of the two ways a command reaches the server; they
@@ -81,12 +85,12 @@ func (l *GameClientLink) sendBypassBuildCmd(live *livePlayer, req clientpackets.
 func (l *GameClientLink) runAdminCommand(gm *livePlayer, entry adminEntry, word, line, audited string) {
 	run, ported := adminCommands[word]
 	if !ported && !l.admin.Defines(word) {
-		if gm.access.IsGM {
+		if gm.accessLevel().IsGM {
 			sendText(gm, "The command "+strings.TrimPrefix(word, "admin_")+" doesn't exist.")
 		}
 		return
 	}
-	if !l.admin.HasAccess(word, gm.access) {
+	if !l.admin.HasAccess(word, gm.accessLevel()) {
 		if !l.admin.Defines(word) {
 			l.log.Warn().Str("command", word).Msg("admin: no rights defined for admin command")
 		}
@@ -153,12 +157,12 @@ func (l *GameClientLink) adminNamedPlayer(gm *livePlayer, name string, orSelf bo
 }
 
 // onPlayer runs fn for target on target's queue: at once when target is gm,
-// whose queue the command already runs on, else posted there. A target that
-// left the world meanwhile drops it.
-func onPlayer(gm, target *livePlayer, fn func()) {
+// whose queue the command already runs on, else posted there. It reports
+// whether fn will run: a target that left the world meanwhile drops it.
+func onPlayer(gm, target *livePlayer, fn func()) bool {
 	if target == gm {
 		fn()
-		return
+		return true
 	}
-	postLive(target, fn)
+	return postLive(target, fn)
 }
