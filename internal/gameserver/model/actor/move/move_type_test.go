@@ -214,7 +214,7 @@ func TestPawnWalkArrivalTimerStopsShortOnlyOfCreatures(t *testing.T) {
 		want location.Location
 	}{
 		{actor.KindStatic, location.Location{X: 500}},
-		{actor.KindPlayer, location.Location{X: 400}},
+		{actor.KindPlayer, location.Location{X: 410}},
 	}
 	for _, tt := range tests {
 		mover, clock := newTestMover(t, staticGeo{canMove: true})
@@ -347,9 +347,10 @@ func TestChaseIntoWaterRetimesArrival(t *testing.T) {
 }
 
 // The arrival-timer fallback of a swimming or flying tracking walk
-// (stopShortOfPawnLocked) stops the offset short of a creature pawn measured
-// in 3D, moves its height along the line, and no closed ground line blocks
-// it.
+// (runOutPawnLegLocked) ends at the first step strictly within the offset
+// of a creature pawn measured in 3D, as the position updates do
+// (TestChasePawnStopMeasuresByMoveType), moves its height along the line,
+// and no closed ground line blocks it.
 func TestPawnWalkArrivalTimerStopsShortIn3D(t *testing.T) {
 	for _, mode := range []string{"swim", "fly"} {
 		closed := false
@@ -367,10 +368,9 @@ func TestPawnWalkArrivalTimerStopsShortIn3D(t *testing.T) {
 		if mover.Moving() {
 			t.Fatalf("%s: walk still under way after its arrival timer", mode)
 		}
-		// 40 short of (300,0,300) along the line from the origin:
-		// fraction (sqrt(180000)-40)/sqrt(180000) puts X at 271.7 and Z at
-		// int(300*fraction+0.5) = 272.
-		if want := (location.Location{X: 271, Z: 272}); mover.Position() != want {
+		// 10 units a step along the 3D line to (300,0,300): the 39th step,
+		// 34.3 from the pawn, is the first within 40.
+		if want := (location.Location{X: 274, Z: 273}); mover.Position() != want {
 			t.Fatalf("%s: arrival timer stopped the walk at %+v, want %+v", mode, mover.Position(), want)
 		}
 	}

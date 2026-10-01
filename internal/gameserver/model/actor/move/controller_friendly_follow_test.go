@@ -382,7 +382,8 @@ func TestControllerPlainWalkIgnoresKnownList(t *testing.T) {
 }
 
 // With no position update ending it first, a pawn walk's arrival timer
-// stops the walk offset short of the pawn, and a re-aim moves the timer
+// ends the walk where the position updates would, at the first step
+// strictly within the offset of the pawn, and a re-aim moves the timer
 // with the pawn instead of snapping the walker onto a stale cell.
 func TestControllerPawnWalkArrivalTimer(t *testing.T) {
 	controller, mover, _, sink, clock := newPawnWalkController(t)
@@ -391,11 +392,15 @@ func TestControllerPawnWalkArrivalTimer(t *testing.T) {
 		t.Fatal("MoveToPawn() = false, want the walk accepted")
 	}
 	clock.in.Advance(2 * time.Second)
-	if mover.Moving() {
-		t.Fatal("walk still under way after the 200 units to the offset")
+	if !mover.Moving() {
+		t.Fatalf("walk ended at %+v on the 200 units to the offset, before the step within it", mover.Position())
 	}
-	if got := mover.Position(); got != (location.Location{X: 200}) {
-		t.Fatalf("timer stop = %+v, want X 200, offset 100 short of the pawn", got)
+	clock.in.Advance(PositionUpdateInterval)
+	if mover.Moving() {
+		t.Fatal("walk still under way after the step within the offset")
+	}
+	if got := mover.Position(); got != (location.Location{X: 210}) {
+		t.Fatalf("timer stop = %+v, want X 210, the first step strictly within 100 of the pawn", got)
 	}
 	if got := sink.arrivals(); got != 1 {
 		t.Fatalf("Arrived events = %d, want 1", got)
@@ -413,7 +418,7 @@ func TestControllerPawnWalkArrivalTimer(t *testing.T) {
 		t.Fatalf("walk ended at %+v on the timer armed before the pawn moved on", mover.Position())
 	}
 	clock.in.Advance(4 * time.Second)
-	if got := mover.Position(); mover.Moving() || got != (location.Location{X: 800}) {
-		t.Fatalf("walk at %+v (moving %v), want stopped at X 800", got, mover.Moving())
+	if got := mover.Position(); mover.Moving() || got != (location.Location{X: 810}) {
+		t.Fatalf("walk at %+v (moving %v), want stopped at X 810", got, mover.Moving())
 	}
 }

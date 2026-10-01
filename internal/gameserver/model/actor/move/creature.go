@@ -116,11 +116,13 @@ type TargetSnapshot struct {
 //
 // The arrival timer preserves progress when no position-update task is
 // wired. When it is wired, the position updates advance origin on the
-// movement correction ticks and may complete the move first. A blocked
-// interpolation tick that still has queued waypoints reseeds the next
-// remaining leg instead of stopping; the blocked hook fires only once the
-// route is exhausted, including when an earlier tick on that same request
-// was blocked.
+// movement correction ticks and may complete the move first. A timer that
+// elapses on the last leg of a pawn walk runs the position updates it stands
+// for, so it ends the walk where they would, whichever of the two runs
+// first. A blocked interpolation tick that still has queued waypoints
+// reseeds the next remaining leg instead of stopping; the blocked hook fires
+// only once the route is exhausted, including when an earlier tick on that
+// same request was blocked.
 type CreatureMove struct {
 	geo   Geo
 	water func(location.Location) (int, bool)
@@ -159,6 +161,9 @@ type CreatureMove struct {
 	lastUpdate time.Time
 	owner      moveOwner
 	timer      *sim.Timer
+	// timedSteps is how many position updates the pending arrival timer
+	// stands for.
+	timedSteps int
 	moveSeq    uint64
 	queue      *sim.Queue
 }
@@ -176,6 +181,12 @@ type moveOwner interface {
 	// for the first segment (MoveToLocation already returns it) or for the
 	// final segment's completion (arrived does).
 	segmentAdvanced(event.Move)
+	// pawnStepped runs when the arrival timer of a tracking pawn walk steps
+	// the walker from from to to, before the walk's milestone.
+	pawnStepped(from, to location.Location)
+	// knowsPawn reports whether the actor still knows the pawn its walk
+	// heads for; the arrival timer ends the walk of a pawn it does not.
+	knowsPawn(Pawn) bool
 }
 
 // NewCreatureMove builds movement state at origin with a non-negative ground
@@ -337,16 +348,22 @@ func (m *CreatureMove) travelTicksLocked(distance float64) float64 {
 
 // arrivalDelayLocked is how long the rest of the active leg takes from the
 // accurate position, at least one position update; on the last leg of a
-// tracking pawn walk only up to where it stops short of the destination. It
-// is 0 when the leg cannot finish at the current speeds. It records the
+// tracking pawn walk only up to where it stops short of the destination,
+// plus the update whose step brings it strictly within the offset of a
+// creature pawn, so the timer falls due past the update that ends the walk.
+// It is 0 when the leg cannot finish at the current speeds. It records the
 // move type the leg is timed with. Callers hold mu.
 func (m *CreatureMove) arrivalDelayLocked() time.Duration {
 	m.timedType = m.moveTypeLocked()
 	distance := m.leftLocked(m.timedType, m.accurateX, m.accurateY)
+	var within float64
 	if m.onTrackedPawnLegLocked() {
 		distance = max(distance-float64(m.pawnStop), 0)
+		if m.pawnStop > 0 {
+			within = 1
+		}
 	}
-	ticks := m.travelTicksLocked(distance)
+	ticks := m.travelTicksLocked(distance) + within
 	if math.IsNaN(ticks) || ticks > maxTravelTicks {
 		return 0
 	}
@@ -707,6 +724,7 @@ func (m *CreatureMove) rescheduleLocked(duration time.Duration) {
 		m.timer = nil
 	}
 	m.moveSeq++
+	m.timedSteps = int(duration / PositionUpdateInterval)
 	if duration <= 0 {
 		return
 	}
@@ -715,15 +733,42 @@ func (m *CreatureMove) rescheduleLocked(duration time.Duration) {
 }
 
 func (m *CreatureMove) onArrive(seq uint64) {
+	// Read the pawn's position, and whether the actor still knows it,
+	// before taking mu for the leg's end: either may take other actors'
+	// locks. Every change to the leg advances moveSeq.
+	m.mu.Lock()
+	if seq != m.moveSeq || !m.moving {
+		m.mu.Unlock()
+		return
+	}
+	var pawn Pawn
+	if m.onLastPawnLegLocked() && (m.pawnTracks || m.pawnStop > 0) {
+		pawn = m.pawn
+	}
+	owner := m.owner
+	m.mu.Unlock()
+	var pawnAt location.Location
+	known := true
+	if pawn != nil {
+		x, y, z := pawn.Position()
+		pawnAt = location.Location{X: x, Y: y, Z: z}
+		known = owner == nil || owner.knowsPawn(pawn)
+	}
+
 	m.mu.Lock()
 	if seq != m.moveSeq || !m.moving {
 		m.mu.Unlock()
 		return
 	}
 	var action func()
-	if m.onTrackedPawnLegLocked() {
-		action = m.stopShortOfPawnLocked()
-	} else {
+	switch {
+	case pawn != nil && !known:
+		// As the update does (abandonPawnWalk), the walk ends where the
+		// actor stands, as an arrival.
+		action = m.endLocked()
+	case pawn != nil:
+		action = m.runOutPawnLegLocked(pawnAt)
+	default:
 		action = m.finishLocked()
 	}
 	m.mu.Unlock()
@@ -733,38 +778,93 @@ func (m *CreatureMove) onArrive(seq uint64) {
 	}
 }
 
-// stopShortOfPawnLocked ends the last leg of a tracking pawn walk whose
-// arrival timer elapsed before a position update ended it: the actor stops
-// the walk's stop distance short of the destination on the line toward it
-// (on the destination itself for a pawn that is not a creature), or where
-// it stands when already that close. A tracking pawn walk heads straight
-// through closed lines, so a closed line to that stop ends a ground walk
-// blocked where the actor stands, as the position update meeting it would.
+// runOutPawnLegLocked ends the last leg of a pawn walk whose arrival timer
+// elapsed before a position update ended it, where the position updates the
+// timer stands for would: it takes their steps one by one from where the
+// actor stands, a tracking walk re-aiming each at pawnAt (where the pawn
+// stands now), and ends the walk at the first step within the offset of
+// pawnAt (2D on the ground, 3D swimming or flying), or on the leg's end.
+// When the steps run out first (a tracking walk whose pawn moved away since
+// the timer was armed), the walk goes on from there, re-timed for the rest.
+//
+// A ground walker's steps keep the plane; it lands on the floor where the
+// last one ends, and a closed line from where it stood to there ends the
+// walk blocked where it stood, as the update meeting it would. A tracking
+// walk turns the walker toward its last step, before the walk's milestone.
 // Callers hold mu.
-func (m *CreatureMove) stopShortOfPawnLocked() func() {
+func (m *CreatureMove) runOutPawnLegLocked(pawnAt location.Location) func() {
+	start := m.origin
+	startAccurate := [3]float64{m.accurateX, m.accurateY, m.accurateZ}
 	moveType, maxZ := m.waterLocked()
-	dx := float64(m.destination.X) - m.accurateX
-	dy := float64(m.destination.Y) - m.accurateY
-	dz := float64(m.destination.Z) - float64(m.origin.Z)
-	if left := span(moveType, dx, dy, dz); left > float64(m.pawnStop) {
-		fraction := (left - float64(m.pawnStop)) / left
-		accurateX := m.accurateX + dx*fraction
-		accurateY := m.accurateY + dy*fraction
-		x, y := int(accurateX), int(accurateY)
-		var z int
+	player := m.playerStepsLocked()
+	var stepFrom location.Location
+	end := false
+	for range max(m.timedSteps, 1) {
 		if moveType == MoveGround {
-			z = min(int(m.geo.Height(x, y, m.origin.Z+2*block.CellHeight)), maxZ)
-			if !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, x, y, z) {
-				m.routeBlocked = true
-				return m.stopBlockedLocked()
-			}
-		} else {
-			z = min(m.origin.Z+int(dz*fraction+0.5), maxZ)
+			// Each step reads the floor from the height the walk stood at.
+			m.origin.Z = start.Z
 		}
-		m.accurateX, m.accurateY, m.accurateZ = accurateX, accurateY, float64(z)
-		m.origin = location.Location{X: x, Y: y, Z: z}
+		m.updates++
+		if m.pawnTracks {
+			m.destination = pawnAt
+		}
+		passed := m.updateSpeedLocked() * PositionUpdateInterval.Seconds()
+		if player {
+			passed = playerPassed(m.updateSpeedLocked(), PositionUpdateInterval)
+		}
+		next, accurate, reached := m.stepLocked(passed, moveType, maxZ)
+		if reached {
+			accurate = [3]float64{float64(next.X), float64(next.Y), float64(next.Z)}
+		}
+		stepFrom = m.origin
+		m.accurateX, m.accurateY, m.accurateZ = accurate[0], accurate[1], accurate[2]
+		m.origin = next
+		if reached || (m.pawnStop > 0 && inRadius(moveType, next, pawnAt, m.pawnStop)) {
+			end = true
+			break
+		}
 	}
-	return m.endLocked()
+	if moveType == MoveGround && m.origin != start && !m.geo.CanMove(start.X, start.Y, start.Z, m.origin.X, m.origin.Y, m.origin.Z) {
+		m.origin = start
+		m.accurateX, m.accurateY, m.accurateZ = startAccurate[0], startAccurate[1], startAccurate[2]
+		m.routeBlocked = true
+		return m.stopBlockedLocked()
+	}
+	turn := m.turnLocked(stepFrom)
+	if end {
+		return chain(turn, m.endLocked())
+	}
+	if player {
+		m.lastUpdate = m.nowLocked()
+	}
+	m.retimeLocked()
+	return turn
+}
+
+// turnLocked is the turn a tracking pawn walk's step from from to the
+// origin takes, for the caller to run after unlocking; nil for any other
+// walk. Callers hold mu.
+func (m *CreatureMove) turnLocked(from location.Location) func() {
+	owner := m.owner
+	if owner == nil || !m.pawnTracks {
+		return nil
+	}
+	to := m.origin
+	return func() { owner.pawnStepped(from, to) }
+}
+
+// chain runs first and then second, either of which may be nil.
+func chain(first, second func()) func() {
+	switch {
+	case first == nil:
+		return second
+	case second == nil:
+		return first
+	}
+	return func() {
+		first()
+		second()
+	}
 }
 
 // endLocked stops the move where the actor stands and returns the arrival

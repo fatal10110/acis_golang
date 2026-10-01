@@ -186,12 +186,14 @@ func TestOwnedPetInteractRootedInReachOpensStatus(t *testing.T) {
 	}
 }
 
-// TestOwnedPetInteractArrivalReapproachesMovedPet moves the pet out of
-// reach of the approach's destination while the owner walks. Arrival thinks
-// the interact again: ActionFailed, a new MoveToPawn stopping 100 short and
-// no status window, and the owner walks again. That second walk's arrival
-// opens the window.
-func TestOwnedPetInteractArrivalReapproachesMovedPet(t *testing.T) {
+// TestOwnedPetInteractApproachFollowsMovedPet moves the pet out of reach of
+// the approach's destination while the owner walks. The approach is a
+// tracking pawn walk (PlayerMove.updatePosition re-aims every update at
+// where the pawn stands, PlayerMove.java:234): it follows the pet and ends
+// within 100 of its new cell, even with no position update running and
+// only the walk's arrival timer ending it. That arrival opens the window;
+// no second approach is sent.
+func TestOwnedPetInteractApproachFollowsMovedPet(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollar(t)
 	pet, _ := h.spawnWolf(t)
@@ -203,36 +205,24 @@ func TestOwnedPetInteractArrivalReapproachesMovedPet(t *testing.T) {
 	if !hasOpcode(frames, serverpackets.OpcodeMoveToPawn) || hasOpcode(frames, serverpackets.OpcodePetStatusShow) {
 		t.Fatalf("click at 300 = opcodes %x, want an approach and no window", frameOpcodes(frames))
 	}
-	placePet(t, pet, location.Location{X: px + 700, Y: py, Z: pz})
+	moved := location.Location{X: px + 700, Y: py, Z: pz}
+	placePet(t, pet, moved)
 	mover := h.srv.PlayerMove(t, h.ownerID)
-	// The arrival re-thinks on the same settle that ends the walk, so the
-	// owner is never seen idle between the two walks: wait for it to reach
-	// the first walk's stop, 100 short of the pet's old cell. No position
-	// update runs here to re-aim the walk at the moved pet.
-	h.srv.AdvanceUntil(t, "first approach arrival", func() bool {
-		x, _, _ := h.srv.PlayerPosition(t, h.ownerID)
-		return x >= px+200
-	})
+	h.srv.AdvanceUntil(t, "approach arrival", func() bool { return !mover.Moving() })
+	h.srv.Advance(t, 100*time.Millisecond)
 
+	x, y, z := h.srv.PlayerPosition(t, h.ownerID)
+	if at := (location.Location{X: x, Y: y, Z: z}); !at.In2DRadius(moved, 100) || at.In2DRadius(moved, 80) {
+		t.Fatalf("approach ended at %+v, %.1f from the moved pet; want the first step within 100", at, at.Distance2D(moved))
+	}
 	frames = drainFrames(t, h.client)
-	want := []byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToPawn}
+	want := []byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToPawn, serverpackets.OpcodePetStatusShow}
 	if got := interactOpcodes(frames); string(got) != string(want) {
-		t.Fatalf("arrival short of the moved pet = %x, want %x (all opcodes %x)", got, want, frameOpcodes(frames))
+		t.Fatalf("arrival at the moved pet = %x, want %x (all opcodes %x)", got, want, frameOpcodes(frames))
 	}
 	frame, _ := firstOpcode(frames, serverpackets.OpcodeMoveToPawn)
-	if objectID, targetID, distance, _ := moveToPawnFields(t, frame); objectID != h.ownerID || targetID != pet.ObjectID() || distance != 100 {
-		t.Fatalf("re-approach MoveToPawn = mover %d target %d distance %d, want %d/%d/100", objectID, targetID, distance, h.ownerID, pet.ObjectID())
-	}
-	if !mover.Moving() {
-		t.Fatal("owner not walking again after arriving short of the moved pet")
-	}
-
-	h.srv.AdvanceUntil(t, "second approach arrival", func() bool { return !mover.Moving() })
-	h.srv.Advance(t, 100*time.Millisecond)
-	frames = drainFrames(t, h.client)
-	want = []byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToPawn, serverpackets.OpcodePetStatusShow}
-	if got := interactOpcodes(frames); string(got) != string(want) {
-		t.Fatalf("second arrival = %x, want %x (all opcodes %x)", got, want, frameOpcodes(frames))
+	if _, targetID, distance, _ := moveToPawnFields(t, frame); targetID != pet.ObjectID() || distance != 150 {
+		t.Fatalf("arrival MoveToPawn target %d distance %d, want %d/150 (the facing, not a second approach)", targetID, distance, pet.ObjectID())
 	}
 }
 
