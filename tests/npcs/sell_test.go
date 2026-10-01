@@ -35,12 +35,14 @@ const (
 	scrollID    = 955
 	goldBarID   = 9800
 	fisherID    = 31562
+	mercID      = 35102
 	listOffset  = 1000000
 	startAdena  = 1000
 	sellPage    = `<html><body>Trader:<br><a action="bypass -h npc_%objectId%_Sell">Sell</a></body></html>`
 	emptyPage   = `<html><body>Nothing to sell %objectId%</body></html>`
 	soldPage    = `<html><body>Thanks %objectId%</body></html>`
 	fisherEmpty = `<html><body>No fish %objectId%</body></html>`
+	fisherSold  = `<html><body>Fish thanks %objectId%</body></html>`
 )
 
 // sellCatalog is the fixture catalog with the sword (price 1000), potion
@@ -70,6 +72,9 @@ func sellPages() map[string]string {
 		"merchant/30003-empty.htm":  emptyPage,
 		"fisherman/31562.htm":       strings.Replace(sellPage, "_Sell", "_sell", 1),
 		"fisherman/31562-empty.htm": fisherEmpty,
+		"fisherman/31562-sold.htm":  fisherSold,
+		"merchant/31562-sold.htm":   soldPage,
+		"merchant/35102-sold.htm":   soldPage,
 		"warehouse/30005.htm":       sellPage,
 	}
 }
@@ -350,11 +355,50 @@ func TestSellItemRefusals(t *testing.T) {
 		t.Fatalf("after selling the selected scroll and a potion: scroll %d potions %d, want 1 and 9", scroll, potions)
 	}
 
-	// Two gold bars pay 2,000,000,000, within the cap.
-	w.c.Send(encodeRequestSellItem(0, sellRow{w.items[goldBarID], goldBarID, 2}))
+	// Two gold bars pay 2,000,000,000, within the cap. The repeated row
+	// asks for two of the one bar the first row left, so it is skipped
+	// rather than counted against the three held, which would refuse the
+	// whole sale as 4,000,000,000.
+	bar := sellRow{w.items[goldBarID], goldBarID, 2}
+	w.c.Send(encodeRequestSellItem(0, bar, bar))
 	drainUntilQuiet(t, w.c)
 	if bars, adena := w.held(t, w.items[goldBarID]), w.adena(t); bars != 1 || adena != startAdena+20+2000000000 {
 		t.Fatalf("after selling two gold bars: bars %d adena %d, want 1 and %d", bars, adena, startAdena+20+2000000000)
+	}
+}
+
+// TestSellItemSoldPageByTargetType pins the sold page per buyer type: a
+// fisherman answers from fisherman/, not merchant/, and a mercenary
+// manager buys but sends no page, even with a merchant/ page under its id.
+func TestSellItemSoldPageByTargetType(t *testing.T) {
+	t.Parallel()
+	w := bootSeller(t, [2]int32{potionID, 10})
+	fisher := w.spawnFolk(t, folkTemplate("Fisherman", fisherID), 50)
+	merc := w.spawnFolk(t, folkTemplate("MercenaryManagerNpc", mercID), 50)
+	potion := sellRow{w.items[potionID], potionID, 1}
+
+	w.selectFolk(t, fisher)
+	w.c.Send(encodeRequestSellItem(0, potion))
+	frames := drainFrames(t, w.c)
+	page, ok := firstOpcode(frames, serverpackets.OpcodeNpcHtmlMessage)
+	if !ok {
+		t.Fatalf("sale to the fisherman answered %x, want its sold page", opcodes(frames))
+	}
+	if objectID, html, _ := htmlMessage(t, page); objectID != fisher.ObjectID() || html != wantChatPage(fisherSold, fisher) {
+		t.Fatalf("fisherman sold page = %d %q, want %d %q", objectID, html, fisher.ObjectID(), wantChatPage(fisherSold, fisher))
+	}
+	if potions, adena := w.held(t, w.items[potionID]), w.adena(t); potions != 9 || adena != startAdena+20 {
+		t.Fatalf("after selling the fisherman a potion: potions %d adena %d, want 9 and %d", potions, adena, startAdena+20)
+	}
+
+	w.selectFolk(t, merc)
+	w.c.Send(encodeRequestSellItem(0, potion))
+	frames = drainFrames(t, w.c)
+	if containsOpcode(frames, serverpackets.OpcodeNpcHtmlMessage) {
+		t.Fatalf("sale to the mercenary manager answered %x, want no page", opcodes(frames))
+	}
+	if potions, adena := w.held(t, w.items[potionID]), w.adena(t); potions != 8 || adena != startAdena+40 {
+		t.Fatalf("after selling the mercenary manager a potion: potions %d adena %d, want 8 and %d", potions, adena, startAdena+40)
 	}
 }
 
