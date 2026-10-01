@@ -37,6 +37,7 @@ func TestEnterWorldDiscoversThroneSeatedPlayerWithChairSit(t *testing.T) {
 		}
 		mustReadOpcode(t, observer, serverpackets.OpcodeCharInfo, "seated player CharInfo")
 		mustReadOpcode(t, observer, serverpackets.OpcodeChairSit, "seated player ChairSit")
+		mustReadOpcode(t, observer, serverpackets.OpcodeRelationChanged, "seated player RelationChanged")
 		gameservertest.ReadInitialCompass(t, observer, serverpackets.OpcodeStaticObjectInfo)
 	})
 
@@ -57,6 +58,7 @@ func TestEnterWorldDiscoversThroneSeatedPlayerWithChairSit(t *testing.T) {
 			mustReadOpcode(t, observer, opcode, "EnterWorld prefix")
 		}
 		mustReadOpcode(t, observer, serverpackets.OpcodeCharInfo, "ground-sitting player CharInfo")
+		mustReadOpcode(t, observer, serverpackets.OpcodeRelationChanged, "ground-sitting player RelationChanged")
 		gameservertest.ReadInitialCompass(t, observer)
 	})
 }

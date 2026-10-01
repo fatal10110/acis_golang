@@ -739,7 +739,8 @@ func (l *GameClientLink) broadcastEquipmentChange(live *livePlayer) {
 }
 
 // broadcastCharacterInfo resends UserInfo to live (refreshing its own
-// visible state) and CharInfo to every client that already knows about it.
+// visible state) and CharInfo to every client that already knows about it
+// (broadcastCharInfo).
 func (l *GameClientLink) broadcastCharacterInfo(live *livePlayer) {
 	items := live.inventoryItems()
 	live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))

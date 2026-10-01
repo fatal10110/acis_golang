@@ -297,7 +297,9 @@ func TestFusionCastersStopBetweenDeathCostsAndPenalty(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	selectPlayerTarget(t, caster, victimID)
-	caster.Send(encodeRequestMagicSkillUse(426, false, false))
+	// The victim carries karma, so a skill helping it takes CTRL
+	// (Player.canCastBeneficialSkillOnPlayable).
+	caster.Send(encodeRequestMagicSkillUse(426, true, false))
 	readUntil(t, caster, serverpackets.OpcodeMagicSkillUse, "fusion MagicSkillUse")
 	drainUntilQuiet(t, caster)
 	drainUntilQuiet(t, c)

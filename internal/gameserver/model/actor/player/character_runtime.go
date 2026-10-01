@@ -212,9 +212,13 @@ type Rules struct {
 // world besides its event sink. A nil dependency leaves the matching query
 // permissive (e.g. in tests that don't exercise geodata or zones).
 type Runtime struct {
-	World  *world.State
-	LOS    LineOfSight
-	Zones  PeaceZoneQuery
+	World *world.State
+	LOS   LineOfSight
+	Zones PeaceZoneQuery
+	// Social answers the party and clan standing the social rules read;
+	// nil leaves the character in no party and its clan in no alliance,
+	// war or leadership.
+	Social SocialGraph
 	Mounts MountBodies
 	// MountData resolves a mount's pet data; nil leaves every mount unfed
 	// and riding at its rider's own speeds.
@@ -232,6 +236,7 @@ func (c *Character) Configure(rt Runtime) {
 	c.world = rt.World
 	c.los = rt.LOS
 	c.zones = rt.Zones
+	c.social = rt.Social
 	c.mounts = rt.Mounts
 	c.mountData = rt.MountData
 	c.skillDefs = rt.Skills

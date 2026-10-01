@@ -662,6 +662,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	shortcuts = l.restoreItemShortcuts(c, shortcuts)
 	rt := player.Runtime{
 		World:  l.world,
+		Social: socialGraph{parties: l.parties, clans: l.clans},
 		Skills: l.skills,
 		Levels: l.levels,
 		Log:    l.log,

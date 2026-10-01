@@ -17,6 +17,20 @@ type PvPZoneMember interface {
 	InPvPZone() bool
 }
 
+// ArenaMember is a playable whose PvP and siege zone membership tell
+// whether it stands in an arena.
+type ArenaMember interface {
+	PvPZoneMember
+	InSiegeZone() bool
+}
+
+// InArena reports whether a stands in an arena: inside a PvP zone that is
+// not a siege zone. An actor without zone membership never does.
+func InArena(a any) bool {
+	m, ok := a.(ArenaMember)
+	return ok && m.InPvPZone() && !m.InSiegeZone()
+}
+
 // actingPlayer is the acting-player state the playable attackability rules
 // read through a playable: the player itself, or a summon's owner.
 type actingPlayer interface {

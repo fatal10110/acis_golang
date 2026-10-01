@@ -174,6 +174,7 @@ type Character struct {
 	world                    *world.State
 	los                      LineOfSight
 	zones                    PeaceZoneQuery
+	social                   SocialGraph
 	mounts                   MountBodies
 	mountData                MountDataSource
 	mountFeed                mountFeedState

@@ -53,8 +53,8 @@ func TestPartyRoomOpenBrowseEnterLeave(t *testing.T) {
 	if mode, rows := readRoomMembers(t, frames[1]); mode != 1 || !slices.Equal(rows, []roomRow{{id: leader.id, name: "Leader", level: 20, location: spawnBBS, status: 1}}) {
 		t.Fatalf("ExPartyRoomMember = mode %d %+v", mode, rows)
 	}
-	expectRoom(t, member, "CharInfo")
-	expectRoom(t, third, "CharInfo")
+	expectRoom(t, member, "CharInfo", "Relation")
+	expectRoom(t, third, "CharInfo", "Relation")
 
 	member.c.Send(encodeListPartyWaiting(anyLocation, 0))
 	want := []listedRoom{{id: 1, title: "Go", location: spawnBBS, minLevel: 10, maxLevel: 40, members: 1, maxMember: 12, leader: "Leader"}}
@@ -84,12 +84,12 @@ func TestPartyRoomOpenBrowseEnterLeave(t *testing.T) {
 	if mode, rows := readRoomMembers(t, frames[1]); mode != 0 || len(rows) != 1 || rows[0].id != leader.id {
 		t.Fatalf("entrant's ExPartyRoomMember = mode %d %+v, want the leader alone", mode, rows)
 	}
-	frames = expectRoom(t, leader, "Manage0:Member", sm(serverpackets.SystemMessageS1EnteredPartyRoom), "CharInfo")
+	frames = expectRoom(t, leader, "Manage0:Member", sm(serverpackets.SystemMessageS1EnteredPartyRoom), "CharInfo", "Relation")
 	if mode, row := readManageRow(t, frames[0]); mode != 0 || row != (roomRow{id: member.id, name: "Member", level: 30, location: spawnBBS}) {
 		t.Fatalf("ExManagePartyRoomMember = mode %d %+v", mode, row)
 	}
 	assertSystemMessageText(t, frames[1], serverpackets.SystemMessageS1EnteredPartyRoom, "Member")
-	expectRoom(t, third, "CharInfo")
+	expectRoom(t, third, "CharInfo", "Relation")
 
 	member.c.Send(encodeSay(sayPartyMatchRoom, "hi"))
 	expectRoom(t, leader, "Say")
@@ -109,10 +109,10 @@ func TestPartyRoomOpenBrowseEnterLeave(t *testing.T) {
 	}
 
 	member.c.Send(encodeExtendedInts(clientpackets.OpcodeRequestWithdrawPartyRoom, 1, 0))
-	frames = expectRoom(t, leader, sm(serverpackets.SystemMessageS1LeftPartyRoom), "Manage2:Member", "CharInfo")
+	frames = expectRoom(t, leader, sm(serverpackets.SystemMessageS1LeftPartyRoom), "Manage2:Member", "CharInfo", "Relation")
 	assertSystemMessageText(t, frames[0], serverpackets.SystemMessageS1LeftPartyRoom, "Member")
 	expectRoom(t, member, "Close", "UserInfo", sm(serverpackets.SystemMessagePartyRoomExited))
-	expectRoom(t, third, "CharInfo")
+	expectRoom(t, third, "CharInfo", "Relation")
 
 	// Leaving the waiting list answers nothing and takes Third off it.
 	third.c.Send(encodeExtendedInts(clientpackets.OpcodeRequestExitPartyMatchingWaitingRoom))
@@ -138,7 +138,7 @@ func TestPartyRoomLeaderLeavingHandsOver(t *testing.T) {
 	handover := []string{"Manage1:Member", "Manage1:Leader", sm(serverpackets.SystemMessagePartyRoomLeaderChanged)}
 	expectRoom(t, leader, append(handover, "Close", "UserInfo", sm(serverpackets.SystemMessagePartyRoomExited))...)
 	for _, p := range []player{member, third} {
-		frames := expectRoom(t, p, append(handover, sm(serverpackets.SystemMessageS1LeftPartyRoom), "Manage2:Leader", "CharInfo")...)
+		frames := expectRoom(t, p, append(handover, sm(serverpackets.SystemMessageS1LeftPartyRoom), "Manage2:Leader", "CharInfo", "Relation")...)
 		if _, row := readManageRow(t, frames[0]); row.status != 1 {
 			t.Fatalf("%s: new leader's row status %d, want 1", p.name, row.status)
 		}
@@ -168,7 +168,7 @@ func TestPartyRoomOustAndDismiss(t *testing.T) {
 	assertSilent(t, leader.c, "oust by a member")
 
 	leader.c.Send(encodeExtendedInts(clientpackets.OpcodeRequestOustFromPartyRoom, member.id))
-	expectRoom(t, leader, sm(serverpackets.SystemMessageS1LeftPartyRoom), "Manage2:Member", "CharInfo")
+	expectRoom(t, leader, sm(serverpackets.SystemMessageS1LeftPartyRoom), "Manage2:Member", "CharInfo", "Relation")
 	frames := expectRoom(t, member, "Close", "UserInfo", "List", sm(serverpackets.SystemMessageOustedFromPartyRoom))
 	if rooms := readRoomList(t, frames[2]); len(rooms) != 0 {
 		t.Fatalf("ousted player's list = %+v, want no room at location 1", rooms)
@@ -185,8 +185,8 @@ func TestPartyRoomOustAndDismiss(t *testing.T) {
 
 	leader.c.Send(encodeExtendedInts(clientpackets.OpcodeRequestDismissPartyRoom, id, 0))
 	disbanded := sm(serverpackets.SystemMessagePartyRoomDisbanded)
-	expectRoom(t, leader, "Close", disbanded, "UserInfo", "CharInfo")
-	expectRoom(t, member, "CharInfo", "Close", disbanded, "UserInfo")
+	expectRoom(t, leader, "Close", disbanded, "UserInfo", "CharInfo", "Relation")
+	expectRoom(t, member, "CharInfo", "Relation", "Close", disbanded, "UserInfo")
 
 	// The room is gone: no one is in it to withdraw, and its id lists
 	// nothing.
@@ -227,7 +227,7 @@ func TestPartyRoomInvitation(t *testing.T) {
 	expectRoom(t, member, "Ask:Leader")
 	member.c.Send(encodeExtendedInts(clientpackets.OpcodeAnswerJoinPartyRoom, 1))
 	expectRoom(t, member, "Detail", "Members0", "UserInfo")
-	expectRoom(t, leader, "Manage0:Member", sm(serverpackets.SystemMessageS1EnteredPartyRoom), "CharInfo")
+	expectRoom(t, leader, "Manage0:Member", sm(serverpackets.SystemMessageS1EnteredPartyRoom), "CharInfo", "Relation")
 
 	leader.c.Send(encodeListPartyWaiting(anyLocation, allLevels))
 	frames = expectRoom(t, leader, "Detail", "Members2", "UserInfo")
@@ -260,11 +260,11 @@ func TestPartyRoomFollowsParty(t *testing.T) {
 
 	leader.c.Send(encodeListPartyWaiting(anyLocation, allLevels))
 	leader.c.Send(encodeManagePartyRoom(0, 12, 1, 80, 0, "Go"))
-	frames := expectRoom(t, leader, "List", "CharInfo", "Detail", "Members1", sm(serverpackets.SystemMessagePartyRoomCreated), "UserInfo")
-	if _, rows := readRoomMembers(t, frames[3]); len(rows) != 2 || rows[0].id != leader.id || rows[0].status != 1 || rows[1].id != member.id || rows[1].status != 2 {
+	frames := expectRoom(t, leader, "List", "CharInfo", "Relation", "Detail", "Members1", sm(serverpackets.SystemMessagePartyRoomCreated), "UserInfo")
+	if _, rows := readRoomMembers(t, frames[4]); len(rows) != 2 || rows[0].id != leader.id || rows[0].status != 1 || rows[1].id != member.id || rows[1].status != 2 {
 		t.Fatalf("room members = %+v, want the leader (1) and its party member (2)", rows)
 	}
-	expectRoom(t, member, "UserInfo", "CharInfo")
+	expectRoom(t, member, "UserInfo", "CharInfo", "Relation")
 	g.quiet(t)
 
 	// Third enters the room, then joins the party: already in the room, it
@@ -333,7 +333,7 @@ func TestPartyRoomLeavesWithPlayer(t *testing.T) {
 		return !ok
 	})
 	got := roomTokens(t, drainFrames(t, leader.c))
-	if len(got) < 3 || !slices.Equal(got[:3], []string{sm(serverpackets.SystemMessageS1LeftPartyRoom), "Manage2:Member", "CharInfo"}) {
+	if len(got) < 4 || !slices.Equal(got[:4], []string{sm(serverpackets.SystemMessageS1LeftPartyRoom), "Manage2:Member", "CharInfo", "Relation"}) {
 		t.Fatalf("leader's frames on the member leaving = %q", got)
 	}
 	drainFrames(t, third.c)

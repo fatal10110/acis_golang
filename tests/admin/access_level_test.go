@@ -109,12 +109,16 @@ func onlyUserInfo(t *testing.T, frames [][]byte) userInfoAccess {
 	return decodeUserInfoAccess(t, frames[0])
 }
 
-// split separates CharInfo frames from the rest.
+// split separates CharInfo frames from the rest, leaving out the
+// RelationChanged that follows each.
 func split(frames [][]byte) (charInfos, rest [][]byte) {
-	for _, f := range frames {
-		if f[0] == serverpackets.OpcodeCharInfo {
+	for i, f := range frames {
+		switch {
+		case f[0] == serverpackets.OpcodeCharInfo:
 			charInfos = append(charInfos, f)
-		} else {
+		case f[0] == serverpackets.OpcodeRelationChanged && i > 0 && frames[i-1][0] == serverpackets.OpcodeCharInfo:
+			// The relation that follows every CharInfo refresh.
+		default:
 			rest = append(rest, f)
 		}
 	}
