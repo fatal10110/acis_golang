@@ -1,6 +1,7 @@
 package loginserver
 
 import (
+	"context"
 	"errors"
 	"net"
 	"os"
@@ -195,4 +196,73 @@ func TestClientLinkSweepDoesNotWaitOnStalledPeer(t *testing.T) {
 	if n := failedAttemptCount(l); n != 0 {
 		t.Fatalf("failed attempts tracked = %d after the tick, want 0", n)
 	}
+}
+
+// writeSignalConn is the server end of a net.Pipe that reports each Write
+// as it starts and presents a TCP remote address, so a handler can be run
+// on it directly and observed while blocked writing to a peer not reading.
+type writeSignalConn struct {
+	net.Conn
+	writing chan struct{}
+}
+
+func (c *writeSignalConn) Write(p []byte) (int, error) {
+	c.writing <- struct{}{}
+	return c.Conn.Write(p)
+}
+
+func (c *writeSignalConn) RemoteAddr() net.Addr {
+	return &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 40000}
+}
+
+// TestClientLinkCloseRequestedDuringBlockedWriteIsNotLost requests a close
+// while the handler is blocked writing LoginOk to a peer that has not read
+// it yet. When that write ends, the handler resets its read deadline, which
+// replaces the expired one the request set; the request must still close
+// the connection with its packet rather than leave it open until the idle
+// timeout.
+func TestClientLinkCloseRequestedDuringBlockedWriteIsNotLost(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
+	_, l, _, _, _ := newTestClientLink(t, accounts, false)
+
+	serverEnd, clientEnd := net.Pipe()
+	t.Cleanup(func() { serverEnd.Close(); clientEnd.Close() })
+	conn := &writeSignalConn{Conn: serverEnd, writing: make(chan struct{}, 8)}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	go l.handleConnection(ctx, conn)
+
+	clientEnd.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if _, err := wire.ReadFrame(clientEnd); err != nil {
+		t.Fatalf("read Init frame: %v", err)
+	}
+	cipher, err := commoncrypt.NewBlowfishCipher(testSessionKey)
+	if err != nil {
+		t.Fatalf("NewBlowfishCipher: %v", err)
+	}
+	c := &fakeLoginClient{t: t, conn: clientEnd, cipher: cipher}
+	c.gameGuard()
+	<-conn.writing // Init
+	<-conn.writing // GGAuth
+
+	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
+	select {
+	case <-conn.writing: // LoginOk: the handler is now blocked in this write
+	case <-time.After(5 * time.Second):
+		t.Fatal("handler never started writing LoginOk")
+	}
+	l.authMu.Lock()
+	holder := l.holders["player1"]
+	l.authMu.Unlock()
+	if holder == nil {
+		t.Fatal("no holder registered for player1")
+	}
+	if !holder.requestClose(serverpackets.EncodeLoginFail(serverpackets.LoginFailAccountInUse)) {
+		t.Fatal("requestClose = false on an open connection")
+	}
+
+	if reply := c.read(); reply[0] != serverpackets.OpcodeLoginOk {
+		t.Fatalf("opcode = %#x, want LoginOk (%#x)", reply[0], serverpackets.OpcodeLoginOk)
+	}
+	c.expectLoginFail(serverpackets.LoginFailAccountInUse)
 }
