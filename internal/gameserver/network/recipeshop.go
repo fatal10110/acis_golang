@@ -169,11 +169,14 @@ func (l *GameClientLink) payAdena(payer, payee *livePlayer, amount int) bool {
 		return false
 	}
 	move := []invops.Move{{ObjectID: adena.ObjectID, Count: amount}}
+	end := l.itemInstances.BeginOperation()
+	defer end()
 	res, moved, err := l.inventory.Exchange(from, to, move, nil, func(held, _ itemcontainer.Held) bool {
 		inst := held.ItemByObjectID(adena.ObjectID)
 		return inst != nil && inst.CountValue() >= amount
 	})
 	l.applyPersistActions(res.Persist)
+	end()
 	if err != nil {
 		l.log.Error().Err(err).Msg("pay workshop adena")
 		return false

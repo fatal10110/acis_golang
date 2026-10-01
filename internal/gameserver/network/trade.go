@@ -332,6 +332,8 @@ func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirm
 
 	status := tradebook.SettlementEmpty
 	if !session.Empty() {
+		end := l.itemInstances.BeginOperation()
+		defer end()
 		res, moved, err := l.inventory.Exchange(first.Inventory(), second.Inventory(),
 			tradeMoves(session.FirstOffer), tradeMoves(session.SecondOffer),
 			func(firstHeld, secondHeld itemcontainer.Held) bool {
@@ -346,6 +348,7 @@ func (l *GameClientLink) settleConfirmedTrade(session tradebook.Session, confirm
 			status = tradebook.SettlementTransferFailed
 		}
 		l.applyPersistActions(res.Persist)
+		end()
 	}
 	if status == tradebook.SettlementInvalidItems {
 		l.sendTradeCanceled(session, confirmerID)

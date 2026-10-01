@@ -129,6 +129,8 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 		return
 	}
 
+	end := l.itemInstances.BeginOperation()
+	defer end()
 	res, ok, err := l.petItems.Transfer(playerInv, petInv, req.ObjectID, int(req.Count))
 	if err != nil {
 		l.log.Error().Err(err).Msg("transfer item to pet")
@@ -138,6 +140,7 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 		return
 	}
 	l.applyPersistActions(res.Persist)
+	end()
 }
 
 func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, req clientpackets.RequestGetItemFromPet) {
@@ -161,6 +164,8 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 	// whether objectID resolves or the transfer subsequently fails.
 	l.cancelActiveEnchant(live)
 
+	end := l.itemInstances.BeginOperation()
+	defer end()
 	res, ok, err := l.petItems.GetFromPet(petInv, playerInv, req.ObjectID, int(req.Count))
 	if err != nil {
 		l.log.Error().Err(err).Msg("transfer item from pet")
@@ -170,6 +175,7 @@ func (l *GameClientLink) getItemFromPet(ctx context.Context, live *livePlayer, r
 		return
 	}
 	l.applyPersistActions(res.Persist)
+	end()
 	if res.WasWorn {
 		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetTookOffS1, res.ItemID))
 	}
@@ -209,6 +215,8 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 		return
 	}
 
+	end := l.itemInstances.BeginOperation()
+	defer end()
 	result, failure := petitem.PickupGround(pet, petInv, ground)
 	switch failure {
 	case petitem.PickupOK:
@@ -239,6 +247,7 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 		l.consumePetHerb(live, pet, petInv, result.Herb)
 	}
 	l.applyPersistActions(result.Persist)
+	end()
 }
 
 // broadcastPetPickupAttention announces a pet's loot of armor or a weapon:
@@ -279,6 +288,8 @@ func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req c
 	if !ok {
 		return
 	}
+	end := l.itemInstances.BeginOperation()
+	defer end()
 	res, failure := petitem.UseItem(pet, petInv, req.ObjectID, live == nil || live.AlikeDead())
 	switch failure {
 	case petitem.UseNoop:
@@ -295,6 +306,7 @@ func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req c
 	}
 
 	l.applyPersistActions(res.Persist)
+	end()
 	if res.Outcome == petitem.Unequipped {
 		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetTookOffS1, res.ItemID))
 		return

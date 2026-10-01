@@ -56,6 +56,8 @@ func (l *GameClientLink) enchantLiveItem(ctx context.Context, live *livePlayer, 
 	}
 
 	playerID := live.ObjectID()
+	end := l.itemInstances.BeginOperation()
+	defer end()
 	result, err := l.enchantService().EnchantItem(enchantflow.Request{
 		PlayerID: playerID,
 		Inv:      inv,
@@ -69,6 +71,7 @@ func (l *GameClientLink) enchantLiveItem(ctx context.Context, live *livePlayer, 
 		l.log.Error().Err(err).Msg("enchant item")
 	}
 	l.applyPersistActions(result.Persist)
+	end()
 	if len(result.Steps) == 0 {
 		return
 	}
@@ -244,6 +247,11 @@ func enchantResult(result enchantflow.ResultCode) serverpackets.EnchantResult {
 // an earlier operation's that never landed — the receiver spending traded
 // adena before the trade's own rows are in the database. A widened row's
 // current state decides between its save and its delete, as the tick's does.
+//
+// The binding comes after the mutation, so every caller opens the operation
+// (task.ItemInstances.BeginOperation) before it mutates and ends it once this
+// returns: until then the tick and a container's last flush read none of its
+// rows, and so never land one of them changed but not yet bound.
 func (l *GameClientLink) applyPersistActions(actions []invops.Persist) {
 	if l.items == nil {
 		return

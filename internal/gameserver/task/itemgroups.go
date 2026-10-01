@@ -43,9 +43,10 @@ type BoundGroups []*rowGroup
 // Bind has to run before the operation's write takes its places in the rows'
 // order (persist.Order), so a write that takes a later place has already seen
 // the group. Rows already bound to another group merge with it: a row cannot
-// land with only some of the rows it depends on. It still runs after the
-// operation's mutation, so a tick that reads one of the rows in between
-// writes that row alone, ahead of the operation's own write (#3034).
+// land with only some of the rows it depends on. It runs after the
+// operation's mutation, which is why the operation is opened before it
+// mutates (BeginOperation) and ended only after its places are taken: no
+// write reads one of its rows while it is changed but not yet bound.
 //
 // Bind returns the group the operation's write carries, for its Landed.
 func (i *ItemInstances) Bind(rows []BoundRow) BoundGroups {

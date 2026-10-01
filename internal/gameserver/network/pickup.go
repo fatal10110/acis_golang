@@ -111,6 +111,8 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	if picked.TemplateID == item.AdenaID && inv.ItemByTemplateID(item.AdenaID) != nil {
 		obtained.Notice = event.ObtainAdena
 	}
+	end := l.itemInstances.BeginOperation()
+	defer end()
 	res, failure := l.inventory.PickupGround(inv, &ground.Instance, ground.Template, live.ObjectID())
 	switch failure {
 	case invops.PickupOK:
@@ -147,6 +149,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	l.lockPickupParalysis(live)
 
 	l.applyPersistActions(res.Persist)
+	end()
 	return true
 }
 

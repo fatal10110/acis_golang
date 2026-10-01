@@ -135,6 +135,8 @@ func (l *GameClientLink) refineAugment(live *livePlayer, req clientpackets.Reque
 		sendRefineFailed(live)
 		return
 	}
+	end := l.itemInstances.BeginOperation()
+	defer end()
 	out := l.augment.Refine(augment.RefineRequest{
 		State:      l.augmentState(live),
 		PlayerID:   live.ObjectID(),
@@ -145,6 +147,7 @@ func (l *GameClientLink) refineAugment(live *livePlayer, req clientpackets.Reque
 		Count:      int(req.GemstoneCount),
 	})
 	l.applyPersistActions(out.Persist)
+	end()
 	sendAugmentMessages(live, out.Messages)
 	if len(out.Unequipped) > 0 {
 		l.applyEquipStatChanges(live, inv, invops.Result{EquipmentChanged: true, Changed: out.Unequipped})
@@ -209,6 +212,8 @@ func (l *GameClientLink) cancelAugment(live *livePlayer, req clientpackets.Reque
 	}
 	adenaOwner := live.ObjectID()
 	var persist []invops.Persist
+	end := l.itemInstances.BeginOperation()
+	defer end()
 	if check.Price > 0 {
 		paid := inv.DestroyByTemplateID(item.AdenaID, check.Price)
 		if paid == nil {
@@ -223,6 +228,7 @@ func (l *GameClientLink) cancelAugment(live *livePlayer, req clientpackets.Reque
 	}
 	inv.RemoveAugmentation(inst)
 	l.applyPersistActions(append(persist, invops.Update(inst)))
+	end()
 	live.SendFrame(serverpackets.FrameExVariationCancelResult(1))
 	l.refreshItemShortcuts(live, inst.ObjectID)
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageAugmentationRemovedFromS1, inst.TemplateID))
