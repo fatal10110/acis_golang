@@ -279,12 +279,14 @@ func (c *Character) Flying() bool {
 // SetFlying updates flying state and reports whether it changed.
 func (c *Character) SetFlying(flying bool) bool {
 	c.stateMu.Lock()
-	defer c.stateMu.Unlock()
 	c.initStateLocked()
 	if c.flying == flying {
+		c.stateMu.Unlock()
 		return false
 	}
 	c.flying = flying
+	c.stateMu.Unlock()
+	c.refreshMoveSpeed()
 	return true
 }
 
