@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
 // interactOpcodes keeps the interact answer's opcodes in order:
@@ -195,7 +196,7 @@ func TestOwnedPetInteractRootedInReachOpensStatus(t *testing.T) {
 // no second approach is sent.
 func TestOwnedPetInteractApproachFollowsMovedPet(t *testing.T) {
 	t.Parallel()
-	h := bootOwnerWithCollar(t)
+	h := bootOwnerWithCollarAndGeo(t, gameservertest.FlatGeo{Z: gameservertest.SpawnZ})
 	pet, _ := h.spawnWolf(t)
 	px, py, pz := h.srv.PlayerPosition(t, h.ownerID)
 	placePet(t, pet, location.Location{X: px + 300, Y: py, Z: pz})

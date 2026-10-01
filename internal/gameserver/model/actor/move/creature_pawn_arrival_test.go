@@ -193,3 +193,155 @@ func TestPawnWalkArrivalTimerEndsOnUnknownPawn(t *testing.T) {
 		t.Fatalf("Arrived events = %d, want 1", got)
 	}
 }
+
+// stairGeo is open ground with two layers: a floor at Z 0 and, over it, a
+// stair rising half a unit per unit along X. Height answers the highest
+// layer at or below the probe height, as the geodata does.
+type stairGeo struct{}
+
+func (stairGeo) CanMove(_, _, _, _, _, _ int) bool { return true }
+
+func (stairGeo) Height(x, _, z int) int16 {
+	if stair := x / 2; stair <= z {
+		return int16(stair)
+	}
+	return 0
+}
+
+func (stairGeo) FindPath(_, _ location.Location) ([]location.Location, bool) { return nil, false }
+
+func (stairGeo) ValidLocation(ox, oy, oz, _, _, _ int) location.Location {
+	return location.Location{X: ox, Y: oy, Z: oz}
+}
+
+func (stairGeo) Walkable(int, int, int) bool { return true }
+
+// The arrival timer's ground steps read each step's floor from the height
+// the step before landed on, as the position updates do (PlayerMove.
+// updatePosition and CreatureMove.updatePosition: getHeight(nextX, nextY,
+// curZ + 2 * CELL_HEIGHT)), so a pawn walk up a stair over a floor ends on
+// the stair, on the cell the updates end it on, whether the timer runs the
+// whole leg or only its last steps.
+func TestPawnArrivalTimerClimbsStairLikeUpdates(t *testing.T) {
+	pawnAt := location.Location{X: 300, Z: 150}
+	want := location.Location{X: 270, Z: 135}
+	walks := []struct {
+		name  string
+		start func(t *testing.T) (update func(), mover *CreatureMove, sink *eventLog, clock *moveClock)
+	}{
+		{name: "player tracking walk", start: func(t *testing.T) (func(), *CreatureMove, *eventLog, *moveClock) {
+			controller, mover, _, sink, clock := newPlayerStepController(t, 100, stairGeo{})
+			if !controller.MoveToPawn(&followTarget{x: pawnAt.X, z: pawnAt.Z}, 40) {
+				t.Fatal("MoveToPawn() not accepted")
+			}
+			return func() { clock.tick(controller) }, mover, sink, clock
+		}},
+		{name: "npc chase", start: func(t *testing.T) (func(), *CreatureMove, *eventLog, *moveClock) {
+			controller, mover, sink, clock := newChaseController(t, &summonChaseSelf{}, stairGeo{})
+			if following, err := controller.MaybeStartOffensiveFollow(&followTarget{x: pawnAt.X, z: pawnAt.Z}, 40); err != nil || !following {
+				t.Fatalf("MaybeStartOffensiveFollow() = %v, %v; want the chase", following, err)
+			}
+			return func() { controller.PositionUpdate() }, mover, sink, clock
+		}},
+	}
+	for _, walk := range walks {
+		for _, run := range []struct {
+			name    string
+			updates int // position updates before the ticks stall; -1 never stall
+		}{
+			{name: "updates only", updates: -1},
+			{name: "timer after 23 updates", updates: 23},
+			{name: "timer only", updates: 0},
+		} {
+			t.Run(walk.name+"/"+run.name, func(t *testing.T) {
+				update, mover, sink, clock := walk.start(t)
+				for i := 0; mover.Moving() && (run.updates < 0 || i < run.updates); i++ {
+					if i == 100 {
+						t.Fatalf("walk still under way at %+v", mover.Position())
+					}
+					update()
+				}
+				clock.in.Advance(time.Minute)
+				if mover.Moving() {
+					t.Fatalf("walk still under way at %+v after its arrival timer", mover.Position())
+				}
+				if got := mover.Position(); got != want {
+					t.Fatalf("walk ended at %+v, want %+v on the stair", got, want)
+				}
+				if got := sink.arrivals(); got != 1 {
+					t.Fatalf("Arrived events = %d, want 1", got)
+				}
+			})
+		}
+	}
+}
+
+// crossWallGeo is flat open ground with a wall along X = wall, once up: a
+// line crossing it is closed.
+type crossWallGeo struct {
+	staticGeo
+	wall int
+	up   bool
+}
+
+func (g *crossWallGeo) CanMove(ox, _, _, tx, _, _ int) bool {
+	return !g.up || (ox < g.wall) == (tx < g.wall)
+}
+
+// The arrival timer's ground steps meet a closed line where the position
+// updates would (PlayerMove.updatePosition and CreatureMove.updatePosition
+// check canMoveToTarget(curX, curY, curZ, nextX, nextY, nextZ) on every
+// step and stop blocked there): a wall going up across a pawn walk (a door
+// closing) ends it blocked on the last open step short of the wall, not
+// back where the timer's run started.
+func TestPawnArrivalTimerBlocksAtLastOpenStep(t *testing.T) {
+	want := location.Location{X: 200}
+	walks := []struct {
+		name  string
+		start func(t *testing.T, geo Geo) (update func(), mover *CreatureMove, clock *moveClock)
+	}{
+		{name: "player tracking walk", start: func(t *testing.T, geo Geo) (func(), *CreatureMove, *moveClock) {
+			controller, mover, _, _, clock := newPlayerStepController(t, 100, geo)
+			if !controller.MoveToPawn(&followTarget{x: 300}, 40) {
+				t.Fatal("MoveToPawn() not accepted")
+			}
+			return func() { clock.tick(controller) }, mover, clock
+		}},
+		{name: "npc chase", start: func(t *testing.T, geo Geo) (func(), *CreatureMove, *moveClock) {
+			controller, mover, _, clock := newChaseController(t, &summonChaseSelf{}, geo)
+			if following, err := controller.MaybeStartOffensiveFollow(&followTarget{x: 300}, 40); err != nil || !following {
+				t.Fatalf("MaybeStartOffensiveFollow() = %v, %v; want the chase", following, err)
+			}
+			return func() { controller.PositionUpdate() }, mover, clock
+		}},
+	}
+	for _, walk := range walks {
+		for _, run := range []struct {
+			name    string
+			updates int // position updates before the ticks stall; -1 never stall
+		}{
+			{name: "updates only", updates: -1},
+			{name: "timer after 5 updates", updates: 5},
+			{name: "timer only", updates: 0},
+		} {
+			t.Run(walk.name+"/"+run.name, func(t *testing.T) {
+				geo := &crossWallGeo{staticGeo: staticGeo{canMove: true}, wall: 205}
+				update, mover, clock := walk.start(t, geo)
+				geo.up = true
+				for i := 0; mover.Moving() && (run.updates < 0 || i < run.updates); i++ {
+					if i == 100 {
+						t.Fatalf("walk still under way at %+v", mover.Position())
+					}
+					update()
+				}
+				clock.in.Advance(time.Minute)
+				if mover.Moving() {
+					t.Fatalf("walk still under way at %+v after its arrival timer", mover.Position())
+				}
+				if got := mover.Position(); got != want {
+					t.Fatalf("walk ended at %+v, want %+v, the last open step short of the wall", got, want)
+				}
+			})
+		}
+	}
+}

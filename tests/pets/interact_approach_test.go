@@ -149,7 +149,7 @@ func TestOwnedPetInteractOutOfReachWalksByPawn(t *testing.T) {
 // shown facing its pet from the interaction distance, and gets the window.
 func TestOwnedPetInteractApproachArrivalOpensStatus(t *testing.T) {
 	t.Parallel()
-	h := bootOwnerWithCollar(t)
+	h := bootOwnerWithCollarAndGeo(t, gameservertest.FlatGeo{Z: gameservertest.SpawnZ})
 	pet, _ := h.spawnWolf(t)
 	px, py, pz := h.srv.PlayerPosition(t, h.ownerID)
 	placePet(t, pet, location.Location{X: px + 300, Y: py, Z: pz})

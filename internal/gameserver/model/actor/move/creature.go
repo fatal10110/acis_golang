@@ -787,23 +787,19 @@ func (m *CreatureMove) onArrive(seq uint64) {
 // When the steps run out first (a tracking walk whose pawn moved away since
 // the timer was armed), the walk goes on from there, re-timed for the rest.
 //
-// A ground walker's steps keep the plane; it lands on the floor where the
-// last one ends, and a closed line from where it stood to there ends the
-// walk blocked where it stood, as the update meeting it would. A tracking
-// walk turns the walker toward its last step, before the walk's milestone.
+// A ground walker reads each step's floor from the height the step before
+// it landed on, as the updates do, so a run up stairs over a floor stays on
+// the stairs; a step whose line is closed ends the walk blocked where the
+// last open step left it, as the update meeting it would. A tracking walk
+// turns the walker toward its last step, before the walk's milestone.
 // Callers hold mu.
 func (m *CreatureMove) runOutPawnLegLocked(pawnAt location.Location) func() {
-	start := m.origin
-	startAccurate := [3]float64{m.accurateX, m.accurateY, m.accurateZ}
 	moveType, maxZ := m.waterLocked()
 	player := m.playerStepsLocked()
 	var stepFrom location.Location
+	stepped := false
 	end := false
 	for range max(m.timedSteps, 1) {
-		if moveType == MoveGround {
-			// Each step reads the floor from the height the walk stood at.
-			m.origin.Z = start.Z
-		}
 		m.updates++
 		if m.pawnTracks {
 			m.destination = pawnAt
@@ -813,22 +809,24 @@ func (m *CreatureMove) runOutPawnLegLocked(pawnAt location.Location) func() {
 			passed = playerPassed(m.updateSpeedLocked(), PositionUpdateInterval)
 		}
 		next, accurate, reached := m.stepLocked(passed, moveType, maxZ)
+		if moveType == MoveGround && !m.geo.CanMove(m.origin.X, m.origin.Y, m.origin.Z, next.X, next.Y, next.Z) {
+			m.routeBlocked = true
+			var turn func()
+			if stepped {
+				turn = m.turnLocked(stepFrom)
+			}
+			return chain(turn, m.stopBlockedLocked())
+		}
 		if reached {
 			accurate = [3]float64{float64(next.X), float64(next.Y), float64(next.Z)}
 		}
-		stepFrom = m.origin
+		stepFrom, stepped = m.origin, true
 		m.accurateX, m.accurateY, m.accurateZ = accurate[0], accurate[1], accurate[2]
 		m.origin = next
 		if reached || (m.pawnStop > 0 && inRadius(moveType, next, pawnAt, m.pawnStop)) {
 			end = true
 			break
 		}
-	}
-	if moveType == MoveGround && m.origin != start && !m.geo.CanMove(start.X, start.Y, start.Z, m.origin.X, m.origin.Y, m.origin.Z) {
-		m.origin = start
-		m.accurateX, m.accurateY, m.accurateZ = startAccurate[0], startAccurate[1], startAccurate[2]
-		m.routeBlocked = true
-		return m.stopBlockedLocked()
 	}
 	turn := m.turnLocked(stepFrom)
 	if end {
