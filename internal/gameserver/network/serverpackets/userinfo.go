@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 func clampInt32(value int) int32 {
@@ -251,7 +252,12 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	}
 
 	w.WriteUint8(boolUint8(c.PartyRoom() > 0))
-	w.WriteInt32(int32(c.AbnormalEffect()))
+	abnormal := c.AbnormalEffect()
+	if s.IsGM && c.Invisible() {
+		// An invisible game master sees itself drawn in stealth.
+		abnormal |= skill.AbnormalStealth
+	}
+	w.WriteInt32(int32(abnormal))
 	w.WriteUint8(0)
 	w.WriteInt32(s.Clan.Privileges)
 	w.WriteUint16(uint16(c.RecommendationsLeft()))

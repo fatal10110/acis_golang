@@ -68,6 +68,7 @@ func (l *GameClientLink) setAccessLevel(live *livePlayer, level int) {
 	access := l.resolveAccessLevel(live.Character, level)
 	live.access.Store(&access)
 	live.SetCanGiveDamage(access.GiveDamage)
+	live.SetSeesInvisible(access.IsGM)
 	applyAccessAppearance(live.Character, level, access)
 	if access.IsGM {
 		// A GM already listed keeps its hidden state.
