@@ -2,7 +2,6 @@ package spawn
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -141,7 +140,7 @@ func ParsePositions(raw string) ([]Position, error) {
 func parsePosition(parts []string, weighted bool) (Position, error) {
 	nums := make([]int, 4)
 	for i, name := range []string{"x", "y", "z", "heading"} {
-		n, err := strconv.Atoi(parts[i])
+		n, err := commons.Atoi(parts[i])
 		if err != nil {
 			return Position{}, fmt.Errorf("spawn: pos %s: %w", name, err)
 		}
@@ -149,7 +148,7 @@ func parsePosition(parts []string, weighted bool) (Position, error) {
 	}
 	chance := 0
 	if weighted {
-		n, err := strconv.Atoi(strings.TrimSuffix(parts[4], "%"))
+		n, err := commons.Atoi(strings.TrimSuffix(parts[4], "%"))
 		if err != nil {
 			return Position{}, fmt.Errorf("spawn: pos chance: %w", err)
 		}

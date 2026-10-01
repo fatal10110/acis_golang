@@ -1,9 +1,9 @@
 package petitem
 
 import (
-	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
@@ -37,8 +37,8 @@ func petPlayerConditionHolds(pet *summon.Actor, attrs map[string]string) bool {
 	for name, raw := range attrs {
 		switch strings.ToLower(name) {
 		case "level":
-			level, err := strconv.Atoi(raw)
-			if err != nil || pet.Level() < level {
+			level, err := commons.DecodeInt32(raw)
+			if err != nil || pet.Level() < int(level) {
 				return false
 			}
 		default:

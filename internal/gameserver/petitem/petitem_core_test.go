@@ -555,3 +555,19 @@ func (*pickupTestOwner) ClearReviveOffer()                          {}
 func (*pickupTestOwner) NoteServitorPvPAttack(attackable.Combatant) {}
 func (*pickupTestOwner) NoteServitorPvPSkillTargets([]attackable.Combatant, bool, string) {
 }
+
+// TestPetLevelConditionReadsIntegerLiterals: the reference reads a <player
+// level> use condition with Integer.decode, so hex, "#" hex, leading-zero
+// octal and non-ASCII digits all name a level (Java probe, OpenJDK
+// 21.0.11: "0x32", "#32", "062" and fullwidth "５０" are 50, "0x33" is 51).
+func TestPetLevelConditionReadsIntegerLiterals(t *testing.T) {
+	pet := mustTestPet(t, summon.PetConfig{ObjectID: 2, NPCID: 12077, Level: 50})
+	for raw, want := range map[string]bool{
+		"50": true, "0x32": true, "#32": true, "062": true, "５０": true,
+		"0x33": false, "063": false, "08": false, "0b1": false,
+	} {
+		if got := petPlayerConditionHolds(pet, map[string]string{"level": raw}); got != want {
+			t.Errorf("level=%q on a level 50 pet holds = %v, want %v", raw, got, want)
+		}
+	}
+}

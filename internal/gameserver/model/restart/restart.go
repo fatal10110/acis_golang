@@ -3,7 +3,6 @@ package restart
 import (
 	"fmt"
 	"math/rand/v2"
-	"strconv"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
@@ -204,7 +203,7 @@ func ParseLocationValue(raw string) (location.Location, error) {
 	}
 	vals := make([]int, 3)
 	for i, p := range parts {
-		n, err := strconv.Atoi(p)
+		n, err := commons.Atoi(p)
 		if err != nil {
 			return location.Location{}, err
 		}
@@ -219,11 +218,11 @@ func ParsePointValue(raw string) (location.Point, error) {
 	if !ok {
 		return location.Point{}, fmt.Errorf("%q must be formatted x;y", raw)
 	}
-	xn, err := strconv.Atoi(x)
+	xn, err := commons.Atoi(x)
 	if err != nil {
 		return location.Point{}, err
 	}
-	yn, err := strconv.Atoi(y)
+	yn, err := commons.Atoi(y)
 	if err != nil {
 		return location.Point{}, err
 	}
