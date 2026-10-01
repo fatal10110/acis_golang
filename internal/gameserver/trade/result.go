@@ -21,9 +21,10 @@ type RequestResult struct {
 type AnswerStatus uint8
 
 const (
-	// AnswerMissing means no live request was found for the target.
+	// AnswerMissing means no live request was found for the target: none was
+	// made, or the one made has expired.
 	AnswerMissing AnswerStatus = iota
-	// AnswerDenied means the request was rejected or expired.
+	// AnswerDenied means the target refused a live request.
 	AnswerDenied
 	// AnswerAccepted means an active trade session was created.
 	AnswerAccepted
