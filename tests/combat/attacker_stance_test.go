@@ -386,6 +386,8 @@ func TestSeatedStoringPlayerRefusesToStandWhenHit(t *testing.T) {
 // (CreatureAttack.java:240 then :263), so thinkStand's rejection
 // (PlayerAI.java:490-504) answers ActionFailed first; the damage then
 // stops the sleep and stands the player up (PlayerStatus.java:118-125).
+// The refusal's doIdleIntention sends nothing, so exactly one ActionFailed
+// goes out.
 func TestSeatedSleepingPlayerRefusesStandBeforeHitStandsIt(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
@@ -412,5 +414,10 @@ func TestSeatedSleepingPlayerRefusesStandBeforeHitStandsIt(t *testing.T) {
 	stood := indexOf(frames, 0, serverpackets.OpcodeChangeWaitType, objID)
 	if refused < 0 || refused > stood {
 		t.Fatalf("ActionFailed at %d, standing ChangeWaitType at %d, want the refused stand first (opcodes %v)", refused, stood, opcodes(frames))
+	}
+	// The idle the refusal takes answers nothing, even once the damage has
+	// started the stand-up.
+	if again := indexOf(frames, refused+1, serverpackets.OpcodeActionFailed, -1); again >= 0 {
+		t.Fatalf("second ActionFailed at %d, want the refused stand's one only (opcodes %v)", again, opcodes(frames))
 	}
 }

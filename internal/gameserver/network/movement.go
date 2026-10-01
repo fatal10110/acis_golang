@@ -286,12 +286,13 @@ func (l *GameClientLink) broadcastLiveWaitType(live *livePlayer, stand bool) {
 // hit or skill notifies its target, before any of the hit's damage, so the
 // damage then finds the player no longer seated and stands nobody up again.
 // A player whose AI is denied (storing, stunned, observing, ...) or who is
-// mounted is answered with ActionFailed and drops its intention; one seated
+// mounted is answered with a single ActionFailed and goes idle; one seated
 // while it plays dead gets up out of fake death, its Fake Death effect, if
 // still on, ending with its own get-up first; anyone else stands up as a
-// stand request does. What the stand takes the place of is dropped on
-// live's own queue, the only one that touches it. A chair is released when
-// standing settles.
+// stand request does. Either way the intentions the player held or queued,
+// a click held behind a posture transition among them, are dropped, on live's own queue, the only one that touches them; the
+// idle answers nothing more even when the damage has meanwhile started a
+// stand-up. A chair is released when standing settles.
 func (l *GameClientLink) standAttackedLivePlayer(live *livePlayer) {
 	if live == nil || live.detached() || !live.Seated() {
 		return
@@ -300,20 +301,20 @@ func (l *GameClientLink) standAttackedLivePlayer(live *livePlayer) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		postLive(live, func() {
 			if !live.detached() {
-				live.tryToIdle(false)
+				live.goIdle()
 			}
 		})
 		return
 	}
-	if live.StandFromFakeDeath() {
-		return
+	if !live.StandFromFakeDeath() {
+		if live.AlikeDead() || !live.ChangePosture(true) {
+			return
+		}
+		l.broadcastLiveWaitType(live, true)
 	}
-	if live.AlikeDead() || !live.ChangePosture(true) {
-		return
-	}
-	l.broadcastLiveWaitType(live, true)
 	postLive(live, func() {
 		if !live.detached() {
+			live.takeDeferredAction()
 			dropPostureQueuedIntentions(live)
 		}
 	})

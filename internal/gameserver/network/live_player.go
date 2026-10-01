@@ -679,6 +679,16 @@ func (p *livePlayer) tryToIdle(denied bool) {
 		return
 	}
 	busy := p.CastingNow() || (p.attack != nil && p.attack.AttackingNow()) || inPostureTransition(p)
+	p.goIdle()
+	if busy {
+		p.SendFrame(serverpackets.FrameActionFailed())
+	}
+}
+
+// goIdle drops every intention p holds, active and queued, and stops its
+// movement, answering nothing: the idle a refused stand takes, whose
+// refusal sends its own ActionFailed.
+func (p *livePlayer) goIdle() {
 	p.dropHeldIntention()
 	p.takePickup()
 	p.takeDeferredPickup()
@@ -691,9 +701,6 @@ func (p *livePlayer) tryToIdle(denied bool) {
 	p.takeInteract()
 	if p.combat != nil {
 		p.combat.Stop()
-	}
-	if busy {
-		p.SendFrame(serverpackets.FrameActionFailed())
 	}
 }
 

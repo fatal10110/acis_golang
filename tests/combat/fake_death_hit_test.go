@@ -2,10 +2,11 @@ package combat
 
 import (
 	"testing"
-	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
@@ -73,39 +74,95 @@ func TestInvulnerableHitWhilePlayingDeadGetsUpTwice(t *testing.T) {
 	}
 }
 
-// TestHitWhileSeatedInFakeDeathGetUpGetsUpOnce lands a swing on a player
+// TestHitWhileSeatedInFakeDeathGetUpGetsUpOnce lands a hit on a player
 // whose Fake Death ended during the lie-down: the lie-down seated it while
 // the get-up still runs, so it plays dead with no effect left, and the
 // stand intention gets it up once.
 func TestHitWhileSeatedInFakeDeathGetUpGetsUpOnce(t *testing.T) {
 	t.Parallel()
-	srv, c, vc, _, iv := bootPvPPair(t)
+	srv, c, vc, attacker, iv := bootPvPPair(t)
 	victim := onlineVictim(t, srv, iv.ObjectID())
 	id := victim.ObjectID()
-	lieDown, _ := victimFakeDeathDelays(t, srv, victim)
-	startFakeDeath(t, srv, victim, false)
-	// Ended here, just before the lie-down ends, the get-up outlasts the
-	// lie-down by nearly its whole length, room for the swing to land.
-	srv.Advance(t, lieDown-50*time.Millisecond)
-	if !victim.SittingNow() {
-		t.Fatal("the lie-down had already ended; the scenario proves nothing")
-	}
-	onQueue(t, srv.PlayerQueue(t, id), func() { victim.EffectList().StopByType(effect.TypeFakeDeath) })
-	srv.AdvanceUntil(t, "lie-down ended", victim.Seated)
-	if !victim.FakeDead() || !victim.StandingNow() {
-		t.Fatalf("seated victim FakeDead=%v StandingNow=%v, want still getting up", victim.FakeDead(), victim.StandingNow())
-	}
+	seatWhileGettingUp(t, srv, victim)
 	drainUntilQuiet(t, vc)
 	drainUntilQuiet(t, c)
-	before := srv.PlayerCurrentHP(t, id)
 
-	attackPlayer(t, c, id)
-	srv.AdvanceUntil(t, "hit on the seated victim", func() bool { return srv.PlayerCurrentHP(t, id) < before })
+	landHit(t, srv, attacker, victim)
 	assertFramesOnly(t, vc, c, id, []fakeDeathFrame{frameStopFake, frameRevive})
 	// The earlier get-up, not the hit's, ends fake death, which may already
 	// have happened by now.
 	if victim.Dead() || !victim.Standing() {
 		t.Fatalf("victim Dead=%v Standing=%v, want alive and standing", victim.Dead(), victim.Standing())
+	}
+}
+
+// TestHitWhileSeatedInFakeDeathGetUpDropsQueuedFollow has a player seated
+// while still getting up out of fake death queue a follow behind the get-up
+// (PlayableAI.tryToFollow, PlayableAI.java:344-348), then takes a hit: the
+// stand intention's prepareIntention (AbstractAI.java:130-136) cancels the
+// follow and clears the queued intention on its fake-death branch too, so
+// once every get-up has ended the player is not following.
+func TestHitWhileSeatedInFakeDeathGetUpDropsQueuedFollow(t *testing.T) {
+	t.Parallel()
+	srv, _, vc, attacker, iv := bootPvPPair(t)
+	victim := onlineVictim(t, srv, iv.ObjectID())
+	id := victim.ObjectID()
+	selectPlayerTarget(t, vc, attacker.ObjectID())
+	seatWhileGettingUp(t, srv, victim)
+	drainUntilQuiet(t, vc)
+
+	vc.Send(encodeAction(attacker.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
+	for i := 0; ; i++ {
+		f := mustRead(t, vc, "follow click answer")
+		if f[0] == serverpackets.OpcodeActionFailed {
+			break
+		}
+		if i == 4 {
+			t.Fatal("follow click during the get-up got no ActionFailed; the follow is not queued")
+		}
+	}
+	landHit(t, srv, attacker, victim)
+	srv.AdvanceUntil(t, "every get-up ended", func() bool { return !victim.FakeDead() && !victim.StandingNow() })
+	srv.Settle(t)
+	if srv.PlayerMove(t, id).Following() {
+		t.Fatal("the follow queued behind the get-up survived the hit's stand")
+	}
+}
+
+// seatWhileGettingUp ends victim's Fake Death during its lie-down, a third
+// of a get-up before the lie-down ends: the lie-down then seats victim while
+// the get-up still runs for two thirds of its length. victim plays dead,
+// seated, with no effect left. The margins leave room for the wall clock.
+func seatWhileGettingUp(t *testing.T, srv *gameservertest.Server, victim *player.Character) {
+	t.Helper()
+	lieDown, getUp := victimFakeDeathDelays(t, srv, victim)
+	startFakeDeath(t, srv, victim, false)
+	srv.Advance(t, lieDown-getUp/3)
+	if !victim.SittingNow() {
+		t.Fatal("the lie-down had already ended; the scenario proves nothing")
+	}
+	onQueue(t, srv.PlayerQueue(t, victim.ObjectID()), func() { victim.EffectList().StopByType(effect.TypeFakeDeath) })
+	srv.AdvanceUntil(t, "lie-down ended", victim.Seated)
+	if !victim.FakeDead() || !victim.StandingNow() {
+		t.Fatalf("seated victim FakeDead=%v StandingNow=%v, want still getting up", victim.FakeDead(), victim.StandingNow())
+	}
+}
+
+// landHit lands a damaging hit from attacker on victim on the attacker's
+// queue, as a landed swing does: the victim is notified, then takes the
+// damage. Unlike a swing it takes no time, so it lands inside a short
+// posture window on the wall clock too.
+func landHit(t *testing.T, srv *gameservertest.Server, attacker attackable.Combatant, victim *player.Character) {
+	t.Helper()
+	id := victim.ObjectID()
+	before := srv.PlayerCurrentHP(t, id) + srv.PlayerCurrentCP(t, id)
+	onQueue(t, srv.PlayerQueue(t, attacker.ObjectID()), func() {
+		victim.NotifyAttacked(attacker)
+		victim.TakeDamage(10, attacker)
+	})
+	srv.Settle(t)
+	if after := srv.PlayerCurrentHP(t, id) + srv.PlayerCurrentCP(t, id); after >= before {
+		t.Fatalf("victim HP+CP %d after the hit, want below %d", after, before)
 	}
 }
 
