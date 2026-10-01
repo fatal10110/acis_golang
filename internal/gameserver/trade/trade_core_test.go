@@ -214,3 +214,68 @@ func tradeTemplates() *item.Table {
 		{ID: 30, Kind: item.KindWeapon, Slot: item.SlotRHand, Weight: 20, Tradable: true, Duration: -1, Weapon: &item.WeaponDetail{Type: item.WeaponSword}},
 	})
 }
+
+// TestBookLeaveDropsPendingRequest pins both sides of a request left behind
+// by a departing participant: the leaver's later login is free at once, the
+// one still in the world stays busy until the request would have expired, and
+// then is free too.
+func TestBookLeaveDropsPendingRequest(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		leaver, stays int32
+	}{
+		{"target leaves", 2, 1},
+		{"requester leaves", 1, 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			now := time.Unix(10, 0)
+			book := NewBook(func() time.Time { return now })
+			book.Request(1, 2)
+			book.Leave(tc.leaver)
+
+			if book.ProcessingTransaction(tc.leaver) {
+				t.Fatal("the leaver's later login inherits the request")
+			}
+			if !book.ProcessingTransaction(tc.stays) {
+				t.Fatal("the participant still in the world is freed before the request expires")
+			}
+			now = now.Add(RequestTimeout)
+			if book.ProcessingTransaction(tc.stays) {
+				t.Fatal("the participant still in the world stays busy past the request's expiry")
+			}
+		})
+	}
+}
+
+// TestBookAnswerAfterRequesterLeft pins an answer to a requester that left
+// after asking: it says so, a denial opens nothing, and an acceptance opens
+// the session on the target's side only, with the requester already gone
+// from it, leaving a later login under the requester's id outside it.
+func TestBookAnswerAfterRequesterLeft(t *testing.T) {
+	book := NewBook(time.Now)
+	book.Request(1, 2)
+	book.Leave(1)
+	if res := book.Answer(2, false); res.Status != AnswerDenied || !res.RequesterLeft {
+		t.Fatalf("denial = %+v, want denied with the requester left", res)
+	}
+
+	book.Request(3, 2)
+	book.Leave(3)
+	if res := book.Request(3, 4); res.Status != RequestStarted {
+		t.Fatalf("a later login's own request = %v, want started", res.Status)
+	}
+	res := book.Answer(2, true)
+	if res.Status != AnswerAccepted || !res.RequesterLeft || res.RequesterID != 3 {
+		t.Fatalf("acceptance = %+v, want accepted from requester 3 with the requester left", res)
+	}
+	s, ok := book.Session(2)
+	if !ok || !s.PartnerLeft(2) {
+		t.Fatalf("target session = %+v, %v; want one whose partner left", s, ok)
+	}
+	if _, ok := book.Session(3); ok {
+		t.Fatal("the requester's later login reaches the session it never asked for")
+	}
+	if !book.ProcessingRequest(3) {
+		t.Fatal("answering the departed request dropped the later login's own request")
+	}
+}

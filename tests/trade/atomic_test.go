@@ -84,6 +84,107 @@ func TestTradeWritesAStackOnBothLegsOnce(t *testing.T) {
 	assertItemRows(t, h, h.secondID, "57x80")
 }
 
+// TestTickRetryOfFailedTradeLandsBothLegsOrNeither pins the persistence
+// tick as the retry of a trade whose own write failed. The tick writes per
+// owner lane; written that way, the giver's rows would commit on the giver's
+// lane while the receiver's, still refused, fail on the receiver's, and the
+// potions would exist on both sides. The trade's rows stay bound until one
+// write lands them all, so the tick's retry fails whole and both sides keep
+// their pre-trade rows until the database takes the receiver's row again.
+func TestTickRetryOfFailedTradeLandsBothLegsOrNeither(t *testing.T) {
+	h := bootTraders(t)
+	adena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
+	potions := h.srv.GiveItem(t, h.secondID, potionID, 3)
+	h.enterAll(t)
+	h.startTrade(t)
+	offerBoth(t, h, adena, 40, potions, 2)
+
+	dropFault := refuseAdenaRowFor(t, h, h.secondID)
+	confirmBoth(t, h)
+	assertTradeSucceeded(t, h)
+	h.srv.Settle(t)
+	h.srv.FlushPersistence(t)
+
+	if err := h.srv.ItemInstances.Save(context.Background()); err == nil {
+		t.Fatal("tick saved the refused receiver row")
+	}
+	h.srv.FlushPersistence(t)
+	assertItemRows(t, h, h.firstID, "57x100")
+	assertItemRows(t, h, h.secondID, "20x3")
+
+	dropFault()
+	h.srv.FlushItems(t)
+	assertItemRows(t, h, h.firstID, "57x60 20x2")
+	assertItemRows(t, h, h.secondID, "57x40 20x1")
+}
+
+// TestHandlerWriteOfTradedRowCarriesTheOtherLeg pins a single-operation write
+// of one traded row after the trade's own write failed: the receiver picks
+// adena up into the stack the trade gave it. Written alone, that row would put
+// the traded adena in the receiver's row while the giver's still held it. The
+// pickup's write takes the trade's other rows along instead: they land with it
+// when the database takes them, and when it refuses the giver's row, nothing
+// of the pickup's write lands either.
+func TestHandlerWriteOfTradedRowCarriesTheOtherLeg(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		refused func(h *traders) int32
+		// firstRows and secondRows are what each side holds once the pickup's
+		// write has run, before any tick.
+		firstRows, secondRows string
+	}{
+		{"lands with it", func(h *traders) int32 { return h.secondID }, "57x60 20x2", "57x45 20x1"},
+		{"fails with it", func(h *traders) int32 { return h.firstID }, "57x100", "20x3"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			h := bootTraders(t)
+			adena := h.srv.GiveItem(t, h.firstID, item.AdenaID, 100)
+			potions := h.srv.GiveItem(t, h.secondID, potionID, 3)
+			h.enterAll(t)
+			h.startTrade(t)
+			offerBoth(t, h, adena, 40, potions, 2)
+
+			refused := tc.refused(h)
+			dropFault := refuseAdenaRowFor(t, h, refused)
+			confirmBoth(t, h)
+			assertTradeSucceeded(t, h)
+			h.srv.Settle(t)
+			h.srv.FlushPersistence(t)
+			assertItemRows(t, h, h.firstID, "57x100")
+			assertItemRows(t, h, h.secondID, "20x3")
+			if refused == h.secondID {
+				dropFault()
+			}
+
+			h.srv.SeedGroundItem(t, 0, item.AdenaID, 5, spawnX, spawnY, spawnZ)
+			groundID := soleGroundObjectID(t, h)
+			h.second.Send(encodeAction(groundID))
+			h.srv.AdvanceUntil(t, "adena leaves the ground", func() bool {
+				_, ok := h.srv.State.Object(groundID)
+				return !ok
+			})
+			h.srv.Settle(t)
+			h.srv.FlushPersistence(t)
+			assertItemRows(t, h, h.firstID, tc.firstRows)
+			assertItemRows(t, h, h.secondID, tc.secondRows)
+
+			dropFault()
+			h.srv.FlushItems(t)
+			assertItemRows(t, h, h.firstID, "57x60 20x2")
+			assertItemRows(t, h, h.secondID, "57x45 20x1")
+		})
+	}
+}
+
+func soleGroundObjectID(t *testing.T, h *traders) int32 {
+	t.Helper()
+	snaps := h.srv.GroundItems.Snapshots(nil)
+	if len(snaps) != 1 {
+		t.Fatalf("tracked ground items = %d, want 1", len(snaps))
+	}
+	return snaps[0].ObjectID
+}
+
 // refuseAdenaRowFor makes the database refuse any adena row written for
 // ownerID until the returned func drops the trigger. The trigger is dropped at
 // cleanup too, so a pooled database never carries it into another test.
