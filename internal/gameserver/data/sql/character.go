@@ -30,7 +30,8 @@ const characterColumns = `obj_Id, account_name, char_name,
 	COALESCE(race,0), COALESCE(classid,0), base_class,
 	COALESCE(deletetime,0), COALESCE(title,''), COALESCE(accesslevel,0), COALESCE(hero,0), COALESCE(lastAccess,0),
 	COALESCE(onlinetime,0),
-	COALESCE(death_penalty_level,0), rec_have, rec_left`
+	COALESCE(death_penalty_level,0), rec_have, rec_left,
+	clan_join_expiry_time, clan_create_expiry_time`
 
 // CharacterStore reads and writes the characters table.
 type CharacterStore struct {
@@ -55,7 +56,7 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 			 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		c.AccountName, c.ID, c.Name, c.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
 		c.Face, c.HairStyle, c.HairColor, byte(c.Sex), c.LastHeading, c.Location.X, c.Location.Y, c.Location.Z,
-		c.Exp, c.SP, int(c.Race), c.ClassID(), c.BaseClassID, c.Title, c.AccessLevel, 0, time.Now().UnixMilli(),
+		c.Exp, c.SP, int(c.Race), c.ClassID(), c.BaseClassID, c.Title(), c.AccessLevel, 0, time.Now().UnixMilli(),
 	)
 	if err != nil {
 		return fmt.Errorf("create character %q: %w", c.Name, err)
@@ -137,22 +138,30 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var maxHP, curHP, maxCP, curCP, maxMP, curMP float64
 	var deathPenaltyLevel, onlineTime int
 	var recHave, recLeft int
+	var clanID int32
+	var title string
+	var clanJoinExpiry, clanCreateExpiry int64
 
 	err := row.Scan(
 		&c.ID, &c.AccountName, &c.Name,
 		&c.CharLevel, &maxHP, &curHP, &maxCP, &curCP, &maxMP, &curMP,
 		&c.Face, &c.HairStyle, &c.HairColor, &sex,
 		&c.LastHeading, &c.Location.X, &c.Location.Y, &c.Location.Z,
-		&c.Exp, &c.ExpBeforeDeath, &c.SP, &c.KarmaPoints, &c.PvPKills, &c.PKKills, &c.ClanID,
+		&c.Exp, &c.ExpBeforeDeath, &c.SP, &c.KarmaPoints, &c.PvPKills, &c.PKKills, &clanID,
 		&race, &classID, &c.BaseClassID,
-		&c.DeleteAt, &c.Title, &c.AccessLevel, &hero, &c.LastAccess,
+		&c.DeleteAt, &title, &c.AccessLevel, &hero, &c.LastAccess,
 		&onlineTime,
 		&deathPenaltyLevel, &recHave, &recLeft,
+		&clanJoinExpiry, &clanCreateExpiry,
 	)
 	if err != nil {
 		return nil, err
 	}
 	c.Sex = player.Sex(sex)
+	c.SetClanID(clanID)
+	c.SetTitle(title)
+	c.SetClanJoinExpiryTime(clanJoinExpiry)
+	c.SetClanCreateExpiryTime(clanCreateExpiry)
 	c.Race = player.Race(race)
 	c.SetClassID(classID)
 	c.SetHero(hero != 0)

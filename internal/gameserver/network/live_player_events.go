@@ -251,6 +251,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		if l.parties != nil {
 			l.parties.RecalculateLevel(live.ObjectID())
 		}
+		l.refreshClanMemberLevel(live)
 	case event.ShortBuff:
 		live.SendFrame(serverpackets.FrameShortBuffStatusUpdate(e.SkillID, e.Level, e.DurationSeconds))
 	case event.RegenMax:
@@ -471,7 +472,7 @@ func (l *GameClientLink) sendLiveWeightPenalty(live *livePlayer) {
 	if l.world == nil {
 		return
 	}
-	info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.Template(), Items: items}
+	info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.Template(), Items: items, Clan: l.clanFields(live.Character)}
 	broadcastFrame(func() wire.Frame { return serverpackets.FrameCharInfo(info) }, func(send func(frameReceiver)) {
 		l.world.ForEachKnown(live, func(o world.Tracked) {
 			if receiver, ok := o.(frameReceiver); ok {

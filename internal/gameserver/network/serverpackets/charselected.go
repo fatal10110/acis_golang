@@ -39,9 +39,9 @@ func writeCharSelected(w *wire.Writer, s CharSelectedSnapshot) {
 	resources := c.ResourceValues()
 	w.WriteString(c.Name)
 	w.WriteInt32(c.ObjectID())
-	w.WriteString(c.Title)
+	w.WriteString(c.Title())
 	w.WriteInt32(s.SessionID)
-	w.WriteInt32(int32(c.ClanID))
+	w.WriteInt32(c.ClanID())
 	w.WriteInt32(0) // unknown
 
 	w.WriteInt32(int32(c.Sex))

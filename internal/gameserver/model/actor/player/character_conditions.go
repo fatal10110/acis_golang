@@ -149,7 +149,7 @@ func (a characterStatActor) PledgeClass() int { return 0 }
 func (a characterStatActor) IsClanLeader() bool { return false }
 
 // HasClan satisfies conditions.PlayerActor.
-func (a characterStatActor) HasClan() bool { return a.c.ClanID != 0 }
+func (a characterStatActor) HasClan() bool { return a.c.ClanID() != 0 }
 
 // ClanCastleID satisfies conditions.PlayerActor. Always 0: castle ownership
 // isn't modeled on Character yet (#1507). This gates shipped skill <cond>s:

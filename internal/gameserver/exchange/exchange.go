@@ -215,7 +215,7 @@ func (s *Service) Choose(c *player.Character, list *multisell.List, npcID int, r
 			return Outcome{Notices: []any{QuantityExceeded{}}}
 		}
 		if e.ItemID == clanReputationID {
-			if c.ClanID == 0 {
+			if c.ClanID() == 0 {
 				return Outcome{Notices: []any{NotClanMember{}}}
 			}
 			// ponytail: clan reputation (#149). Without the clan system

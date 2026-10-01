@@ -205,3 +205,21 @@ func SubclassReplaceList(slot int, classes []int) string {
 	}
 	return b.String()
 }
+
+// villageMasterClanCommands are the clan commands a village master runs
+// itself, matched on the command's first word ignoring case. Its other
+// clan commands (sub-units, alliances, dissolution, clan skills) belong to
+// systems not in place yet.
+var villageMasterClanCommands = []string{"create_clan", "increase_clan_level", "change_clan_leader", "cancel_clan_leader_change"}
+
+// VillageMasterClanCommand reports whether command is a clan command a
+// village master runs.
+func VillageMasterClanCommand(command string) bool {
+	first := firstToken(command)
+	for _, c := range villageMasterClanCommands {
+		if strings.EqualFold(first, c) {
+			return true
+		}
+	}
+	return false
+}

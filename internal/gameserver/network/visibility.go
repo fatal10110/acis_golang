@@ -52,6 +52,7 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 			Character: o.Character,
 			Template:  o.Template(),
 			Items:     o.inventoryItems(),
+			Clan:      p.link.clanFields(o.Character),
 		}))
 		if o.throne != nil {
 			p.sendVisibilityFrame(serverpackets.FrameChairSit(o.ObjectID(), o.throne.StaticObjectID()))

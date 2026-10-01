@@ -73,7 +73,7 @@ func NewCharacterSlot(c *player.Character, items []*item.Instance, now time.Time
 	x, y, z := c.Position()
 	resources := c.ResourceValues()
 	slot := CharacterSlot{
-		Name: c.Name, ObjectID: c.ObjectID(), ClanID: int32(c.ClanID),
+		Name: c.Name, ObjectID: c.ObjectID(), ClanID: c.ClanID(),
 		Sex: c.Sex, Race: c.Race, BaseClassID: int32(c.BaseClassID), ClassID: int32(c.ClassID()),
 		X: int32(x), Y: int32(y), Z: int32(z),
 		CurHP: resources.CurrentHP, CurMP: resources.CurrentMP, MaxHP: resources.MaxHP, MaxMP: resources.MaxMP,

@@ -130,9 +130,12 @@ type Character struct {
 	KarmaPoints       int
 	PvPKills, PKKills int
 
-	ClanID      int
-	Title       string
 	AccessLevel int
+
+	// clan and title are the clan membership and title the client sees;
+	// see character_clan.go.
+	clan  clanState
+	title atomic.Pointer[string]
 
 	// DeleteAt is the persisted deletion deadline, in epoch milliseconds;
 	// zero means the character is not scheduled for deletion.

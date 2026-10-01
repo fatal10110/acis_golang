@@ -146,6 +146,7 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		l.world.RemovePlayer(live.ObjectID())
 	}
 	l.leaveParty(live)
+	l.leaveClanOnLogout(live)
 	// Stop the periodic effect sweep from reaching this character's list:
 	// it left world.State above, but a still-held buff/debuff keeps the
 	// list registered with task.Effects (see effect.List.Untrack) until

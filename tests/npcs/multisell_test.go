@@ -2,6 +2,7 @@ package npcs
 
 import (
 	"context"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"slices"
@@ -779,11 +780,17 @@ func TestMultisellRefusesOverflowingQuantities(t *testing.T) {
 // kept.
 func TestMultisellClanReputationTooLow(t *testing.T) {
 	t.Parallel()
-	w := bootMultisell(t, msTalker(), [][2]int32{{msOreID, 1}}, func(srv *gameservertest.Server, _ map[int32]int32) {
-		if _, err := srv.DB.ExecContext(context.Background(), "UPDATE characters SET clanid = ? WHERE obj_Id = ?", 268435456, srv.SoleObjectID(t)); err != nil {
-			t.Fatal(err)
+	w := bootMultisell(t, msTalker(), [][2]int32{{msOreID, 1}}, nil, gameservertest.WithClanSeed(func(db *sql.DB) {
+		ctx := context.Background()
+		for _, stmt := range []string{
+			"UPDATE characters SET clanid = 268435456 WHERE char_name = 'Trader'",
+			"INSERT INTO clan_data (clan_id, clan_name, leader_id) SELECT 268435456, 'Traders', obj_Id FROM characters WHERE char_name = 'Trader'",
+		} {
+			if _, err := db.ExecContext(ctx, stmt); err != nil {
+				t.Fatal(err)
+			}
 		}
-	})
+	}))
 	w.mustOpen(t, "9004")
 
 	assertMessages(t, w.choose(t, "9004", 4, 1), msg(serverpackets.SystemMessageClanReputationScoreTooLow))
