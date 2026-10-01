@@ -2,6 +2,7 @@ package items
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -53,10 +54,15 @@ func TestItemListOrdersByEntryTimeThenObjectID(t *testing.T) {
 		t.Fatalf("DropItem ground object id = %d, want the dropped instance %d", groundID, first)
 	}
 
-	// Draining to quiet also puts a read timeout's worth of wall clock between
-	// the login restore and the pickup below, so the two entry times cannot
-	// land in the same millisecond and tie.
 	drainUntilQuiet(t, c)
+	// The pickup below must stamp a later entry time than the login restore,
+	// or the two tie and the object-id tie-break hides whether the pickup
+	// refreshed it. Entry times are wall-clock milliseconds (they persist with
+	// the item), while the harness's reads wait on its driven clock and let no
+	// wall time pass, so draining alone leaves the pickup inside the restore's
+	// millisecond about one run in ten. Wait for the wall clock to leave the
+	// millisecond the restore stamped.
+	awaitWallClockPast(t, srv.PlayerInventory(t, objID).ItemByObjectID(third).TimeValue())
 
 	c.Send(encodeAction(groundID, spawnX, spawnY, spawnZ, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "pickup pending-action release")
@@ -65,6 +71,19 @@ func TestItemListOrdersByEntryTimeThenObjectID(t *testing.T) {
 
 	c.Send(encodeRequestItemList())
 	assertItemListOrder(t, readItemList(t, c), []int32{first, third, second}, "ItemList after re-pickup")
+}
+
+// awaitWallClockPast blocks until the wall clock reads a later Unix
+// millisecond than ms, the clock containers stamp entry times on.
+func awaitWallClockPast(t *testing.T, ms int64) {
+	t.Helper()
+	deadline := time.Now().Add(time.Second)
+	for time.Now().UnixMilli() <= ms {
+		if time.Now().After(deadline) {
+			t.Fatalf("wall clock did not pass entry time %d within a second", ms)
+		}
+		time.Sleep(100 * time.Microsecond)
+	}
 }
 
 func assertItemListOrder(t *testing.T, frame []byte, want []int32, what string) {
