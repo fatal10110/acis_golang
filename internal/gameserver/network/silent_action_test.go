@@ -33,6 +33,12 @@ import (
 // opcode registers no pending client action, so its silence is documented
 // reference parity rather than a silent drop.
 //
+// RequestSellItem is absent too: the reference answers every refusal with
+// nothing (RequestSellItem.java:49-72: no merchant target or out of reach,
+// another merchant's list id, a payout past the int32 cap), and the client
+// closes its sell window when it sends the request, leaving no click
+// pending. tests/npcs asserts that silence.
+//
 // Logout at character select is absent for the same reason: with no character
 // in the world the reference sends nothing and keeps the connection open
 // (#2514), and the opcode registers no pending client action there.
