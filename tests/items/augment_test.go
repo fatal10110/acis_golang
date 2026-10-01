@@ -3,10 +3,12 @@ package items
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
@@ -464,7 +466,13 @@ func TestAugmentCancelFlow(t *testing.T) {
 	if id := systemMessageID(t, cancel[paid]); id != serverpackets.SystemMessageS1DisappearedAdena {
 		t.Fatalf("first message = %d, want S1DisappearedAdena", id)
 	}
-	disarmed := mustFindFrame(t, cancel, paid+1, serverpackets.OpcodeSystemMessage, 0, "disarm SystemMessage")
+	// Disarming stops the attack, which releases the client before the
+	// sword comes off.
+	released := mustFindFrame(t, cancel, paid+1, serverpackets.OpcodeActionFailed, 0, "disarm ActionFailed")
+	if next := findFrame(cancel, paid+1, serverpackets.OpcodeSystemMessage, 0); next < released {
+		t.Fatalf("disarm message at %d ahead of its ActionFailed at %d", next, released)
+	}
+	disarmed := mustFindFrame(t, cancel, released+1, serverpackets.OpcodeSystemMessage, 0, "disarm SystemMessage")
 	assertSystemMessageItem(t, cancel[disarmed], serverpackets.SystemMessageS1Disarmed, gameservertest.StormbringerID)
 	result := mustFindFrame(t, cancel, disarmed, serverpackets.OpcodeExtended, serverpackets.OpcodeExVariationCancelResult, "ExVariationCancelResult")
 	assertExFrames(t, "cancel result", cancel[result:result+1], exFrame{serverpackets.OpcodeExVariationCancelResult, []int32{1, 1}})
@@ -480,5 +488,111 @@ func TestAugmentCancelFlow(t *testing.T) {
 	}
 	if inst := mustFindItem(t, s.srv, s.objID, s.sword); inst.Augmentation != nil || inst.Location != item.LocationInventory {
 		t.Fatalf("sword row = %+v, want unequipped without augmentation", inst)
+	}
+}
+
+// TestAugmentActiveSkillKeepsReuseAcrossReequip pins Augmentation.applyBonus
+// for an active skill: cast, taken off and worn again before its reuse ends,
+// the skill comes back disabled until the reuse the cast armed runs out,
+// not for a fresh delay and not usable at once, and the SkillList naming it
+// is followed by a SkillCoolTime carrying the remaining time.
+func TestAugmentActiveSkillKeepsReuseAcrossReequip(t *testing.T) {
+	t.Parallel()
+	const (
+		reuse     = 60 * time.Second
+		skillID   = gameservertest.AugmentBlueSkillID
+		worn      = 20 * time.Second // between the cast and wearing it again
+		augmentID = plainAugmentationID
+	)
+	def := modelskill.Definition{
+		ID: modelskill.ID(skillID), Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		HitTime: 500, StaticHitTime: true, StaticReuse: true, ReuseDelay: int(reuse / time.Millisecond), SkillType: "HEAL", Power: 1,
+	}
+	db := sqltest.SharedDB(t)
+	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{
+		{ID: expertiseSkillID, Level: 2}, def,
+	}), gamesql.NewCharacterSkillStore(db))
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(skills),
+		gameservertest.WithAugmentations(gameservertest.AugmentationTable(t), nil, nil),
+		gameservertest.WithCharacter("Smith", 46, 0),
+		gameservertest.WithWantChars(1),
+	)
+	if !srv.DrivesClock() {
+		t.Skip("pins reuse expiry on the driven clock")
+	}
+	objID := srv.SoleObjectID(t)
+	if err := srv.KnownSkills.SetKnownSkill(context.Background(), objID, 0, expertiseSkillID, 2); err != nil {
+		t.Fatalf("grant expertise: %v", err)
+	}
+	sword := srv.GiveItem(t, objID, gameservertest.StormbringerID, 1)
+	if err := gamesql.NewAugmentationStore(db).Create(context.Background(), sword, item.Augmentation{Attributes: augmentID, SkillID: skillID, SkillLevel: 1}); err != nil {
+		t.Fatalf("seed augmentation: %v", err)
+	}
+	s := &smith{srv: srv, c: srv.Client, objID: objID, sword: sword}
+	startInWorld(t, s.c)
+
+	live, ok := srv.State.Player(objID)
+	if !ok {
+		t.Fatal("smith missing from the world")
+	}
+	caster, ok := live.(interface{ SkillDisabled(int32) bool })
+	if !ok {
+		t.Fatalf("smith %T exposes no SkillDisabled", live)
+	}
+	key := actorcast.ReuseKey(def)
+
+	equipped := s.send(t, encodeUseItem(sword, false))
+	list := mustFindFrame(t, equipped, 0, serverpackets.OpcodeSkillList, 0, "equip SkillList")
+	if !skillListHas(t, equipped[list], skillID) {
+		t.Fatalf("equip SkillList lacks augmentation skill %d", skillID)
+	}
+	if i := findFrame(equipped, 0, serverpackets.OpcodeSkillCoolTime, 0); i >= 0 {
+		t.Fatalf("equip with no reuse running sent SkillCoolTime at %d among %x", i, opcodesOf(equipped))
+	}
+
+	s.c.Send(encodeRequestMagicSkillUse(skillID))
+	srv.AdvanceUntil(t, "augmentation skill reuse armed", func() bool { return caster.SkillDisabled(key) })
+	srv.Advance(t, worn)
+	drainUntilQuiet(t, s.c)
+	s.send(t, encodeUseItem(sword, false))
+
+	again := s.send(t, encodeUseItem(sword, false))
+	list = mustFindFrame(t, again, 0, serverpackets.OpcodeSkillList, 0, "re-equip SkillList")
+	if !skillListHas(t, again[list], skillID) {
+		t.Fatalf("re-equip SkillList lacks augmentation skill %d", skillID)
+	}
+	if list+1 >= len(again) || again[list+1][0] != serverpackets.OpcodeSkillCoolTime {
+		t.Fatalf("re-equip frames %x: want SkillCoolTime right after the SkillList at %d", opcodesOf(again), list)
+	}
+	r := wire.NewReader(again[list+1][1:])
+	found := false
+	for n := r.ReadInt32(); n > 0; n-- {
+		id, level, total, remaining := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
+		if id != skillID {
+			continue
+		}
+		found = true
+		if level != 1 || total != int32(reuse/time.Second) || remaining <= 0 || remaining > int32((reuse-worn)/time.Second) {
+			t.Fatalf("SkillCoolTime entry = level %d reuse %ds remaining %ds, want level 1 reuse %ds remaining at most %ds",
+				level, total, remaining, int32(reuse/time.Second), int32((reuse-worn)/time.Second))
+		}
+	}
+	if !found {
+		t.Fatalf("SkillCoolTime lacks augmentation skill %d", skillID)
+	}
+	if !caster.SkillDisabled(key) {
+		t.Fatal("augmentation skill usable at once after re-equip, want its reuse still running")
+	}
+
+	// Disabled until the cast's own reuse ends, a little under reuse-worn
+	// from here (the cast took a few steps to arm it), not for a new delay.
+	srv.Advance(t, reuse-worn-2*time.Second)
+	if !caster.SkillDisabled(key) {
+		t.Fatal("augmentation skill usable before its reuse ended")
+	}
+	srv.Advance(t, 2*time.Second)
+	if caster.SkillDisabled(key) {
+		t.Fatal("augmentation skill still disabled after its original reuse ended")
 	}
 }
