@@ -17,16 +17,17 @@ import (
 )
 
 // FolkSpawner places civilian NPCs in the world, each on a queue of its
-// own that its regeneration, effects and walk run on. A civilian whose
-// template alias names a walker route (walkerRoutes.xml, keyed by that
-// alias for both the route and the NPC) is given movement and walks the
-// route from the moment it spawns; every other one stands at its spawn
-// point.
+// own that its regeneration, effects, AI and walks run on, and on the AI
+// task. A civilian whose template alias names a walker route
+// (walkerRoutes.xml, keyed by that alias for both the route and the NPC)
+// is given movement and walks the route from the moment it spawns. Every
+// other one stands at its spawn point; one whose template can move is given
+// movement too, to walk toward the target of a cast desire.
 type FolkSpawner struct {
 	State  *world.State
 	Walker *task.Walker
 	Geo    move.Geo
-	// Positions ticks a walker's position while it walks.
+	// Positions ticks a moving NPC's position while it walks.
 	Positions move.PositionUpdateRegistry
 	Queues    Queues
 	// NewSink builds the sink the NPC shows its movement and status
@@ -38,8 +39,8 @@ type FolkSpawner struct {
 	Skills actorcast.Definitions
 	// CastEffects dispatches the effects of the NPC's casts.
 	CastEffects actorcast.EffectHandlers
-	// AI ticks the NPC while it holds cast desires; nil leaves them unacted
-	// on.
+	// AI ticks the NPC once a second while its region is active; nil
+	// leaves it without an AI.
 	AI *task.AI
 	// Items resolves the template's held weapon and shield.
 	Items *item.Table
@@ -53,8 +54,8 @@ type FolkSpawner struct {
 	Log                 zerolog.Logger
 }
 
-// Spawn builds a civilian NPC from inst and places it at (loc, heading),
-// starting its route walk when it has one.
+// Spawn builds a civilian NPC from inst, places it at (loc, heading) and
+// on the AI task, and starts its route walk when it has one.
 func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading int) (*npc.Folk, error) {
 	inPeace := s.Zones != nil && s.Zones.NPCInPeaceZone(loc.X, loc.Y, loc.Z)
 	f, err := npc.NewFolk(inst, inPeace, s.Skills)
@@ -95,12 +96,37 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 		})
 	}
 	alias := inst.Template.Alias
-	if s.Walker == nil || alias == "" || !s.Walker.HasRoute(alias, alias) {
-		s.State.Spawn(f, loc.X, loc.Y, loc.Z, heading)
-		return f, nil
+	walksRoute := s.Walker != nil && alias != "" && s.Walker.HasRoute(alias, alias)
+	var control *folkControl
+	if walksRoute || (inst.Template.CanMove && s.Geo != nil) {
+		m := s.movement(rt)
+		if walksRoute {
+			control = &folkControl{walker: s.Walker, log: s.Log}
+			m.Control, m.Route = control, s.Walker
+		}
+		walker, err := f.EnableMovement(m)
+		if err != nil {
+			return nil, err
+		}
+		if control != nil {
+			control.ref = walker
+		}
 	}
+	s.State.Spawn(f, loc.X, loc.Y, loc.Z, heading)
+	// The AI and walker tasks only work actors already in the world grid.
+	if s.AI != nil {
+		s.AI.Add(f)
+	}
+	if control != nil {
+		if err := s.Walker.StartRoute(control.ref, alias, alias); err != nil {
+			s.Log.Warn().Err(err).Str("alias", alias).Msg("npc: folk route walk")
+		}
+	}
+	return f, nil
+}
 
-	control := &folkControl{walker: s.Walker, log: s.Log}
+// movement is what the NPC rt runs moves with.
+func (s FolkSpawner) movement(rt npc.FolkRuntime) npc.FolkMovement {
 	m := npc.FolkMovement{
 		Geo:                 s.Geo,
 		Queue:               rt.Queue,
@@ -108,8 +134,6 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 		World:               s.State,
 		Sink:                rt.Sink,
 		MaxGeoPathFailCount: s.MaxGeoPathFailCount,
-		Control:             control,
-		Route:               s.Walker,
 		Log:                 s.Log,
 	}
 	if s.Zones != nil {
@@ -119,17 +143,7 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 			return ok
 		}
 	}
-	walker, err := f.EnableMovement(m)
-	if err != nil {
-		return nil, err
-	}
-	control.ref = walker
-	s.State.Spawn(f, loc.X, loc.Y, loc.Z, heading)
-	// The walker only works actors already in the world grid.
-	if err := s.Walker.StartRoute(walker, alias, alias); err != nil {
-		s.Log.Warn().Err(err).Str("alias", alias).Msg("npc: folk route walk")
-	}
-	return f, nil
+	return m
 }
 
 // folkControl hands a walking civilian NPC's arrivals to the route walker

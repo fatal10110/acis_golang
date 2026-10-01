@@ -80,8 +80,8 @@ type FolkRuntime struct {
 	// MaxBuffsAmount is the configured base buff-slot count; zero keeps the
 	// shipped default.
 	MaxBuffsAmount int
-	// AI is the AI task the NPC ticks on while it holds cast desires; nil
-	// leaves them unacted on.
+	// AI is the AI task the NPC's spawner put it on, which it leaves when
+	// it dies; nil for none.
 	AI FolkAI
 	// LOS answers the NPC's line of sight; nil sees everything.
 	LOS LineOfSight
@@ -203,8 +203,9 @@ func (f *Folk) Guard() bool { return false }
 // aggro controls below do nothing.
 func (f *Folk) Attackable() bool { return false }
 
-// Running reports the NPC's run stance: walk for a route walker in walk
-// mode until it is first hit, run otherwise.
+// Running reports the NPC's run stance: it spawns running, or walking
+// for a route walker in walk mode; a hit or a cast desire it acts on
+// switches it to run, and its AI going idle back to walk.
 func (f *Folk) Running() bool { return f.running.Load() }
 
 // InCombat reports whether the NPC holds an attack stance.
@@ -236,6 +237,20 @@ func (f *Folk) forceRunStance() {
 	f.refreshMoveSpeed()
 	if f.MoveSpeed() != 0 {
 		f.emit(event.MoveTypeChanged{Running: true})
+	}
+	f.emit(event.NPCInfoChanged{})
+}
+
+// forceWalkStance switches a running NPC to its walk stance, as its AI
+// does when it idles: the movement slows down, and observers see the stance
+// change and the NPC's info again.
+func (f *Folk) forceWalkStance() {
+	if !f.running.CompareAndSwap(true, false) {
+		return
+	}
+	f.refreshMoveSpeed()
+	if f.MoveSpeed() != 0 {
+		f.emit(event.MoveTypeChanged{Running: false})
 	}
 	f.emit(event.NPCInfoChanged{})
 }

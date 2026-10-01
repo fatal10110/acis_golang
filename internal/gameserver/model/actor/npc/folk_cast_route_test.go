@@ -24,13 +24,12 @@ type fallingTarget struct {
 
 func (t *fallingTarget) AlikeDead() bool { return t.dead }
 
-// TestFolkOffRouteWalkerWaitsOutTeleportBeforeLeavingAITask pins the
-// off-route guard on leaving the AI task: a route walker whose last cast
-// desire goes away on a tick its AI sits out (a teleport under way) stays
-// on the AI task, resumes its route on the first tick after the teleport,
-// and only then leaves the task. Leaving earlier would strand it off its
-// route for good, since nothing else resumes it.
-func TestFolkOffRouteWalkerWaitsOutTeleportBeforeLeavingAITask(t *testing.T) {
+// TestFolkOffRouteWalkerWaitsOutTeleportBeforeResuming pins the off-route
+// mark: a route walker whose last cast desire goes away on a tick its AI
+// sits out (a teleport under way) resumes its route on the first tick
+// after the teleport, and never idles meanwhile (NpcAI.runAI: its route
+// desire never leaves the queue).
+func TestFolkOffRouteWalkerWaitsOutTeleportBeforeResuming(t *testing.T) {
 	inst, err := NewInstance(1, &Template{ID: 31226, TemplateID: 31226, Type: "Folk", Level: 70, HPMax: 2444, CanMove: true})
 	if err != nil {
 		t.Fatal(err)
@@ -58,14 +57,16 @@ func TestFolkOffRouteWalkerWaitsOutTeleportBeforeLeavingAITask(t *testing.T) {
 	w.Spawn(f, 100, 0, 0, 0)
 	w.Spawn(target.hostileTarget, 160, 0, 0, 0)
 
-	f.AddCastDesire(target, modelskill.Ref{ID: 4380, Level: 1}, 2*routeDesireWeight)
-	in.Run()
 	tick := func() {
 		t.Helper()
 		if err := f.TickThink(); err != nil {
 			t.Fatalf("TickThink() = %v", err)
 		}
 	}
+	// The AI acts on nothing on the NPC's first tick.
+	tick()
+	f.AddCastDesire(target, modelskill.Ref{ID: 4380, Level: 1}, 2*routeDesireWeight)
+	in.Run()
 
 	tick()
 	if route.leaves != 1 || !f.cast.offRoute {
@@ -83,8 +84,8 @@ func TestFolkOffRouteWalkerWaitsOutTeleportBeforeLeavingAITask(t *testing.T) {
 	if route.resumes != 0 {
 		t.Fatalf("resumes = %d during the teleport, want 0", route.resumes)
 	}
-	if aiTask.removes != 0 {
-		t.Fatal("walker left the AI task while still off its route")
+	if !f.Running() {
+		t.Fatal("walker idled to its walk stance off its route")
 	}
 
 	f.motion.teleporting.Store(false)
@@ -92,7 +93,7 @@ func TestFolkOffRouteWalkerWaitsOutTeleportBeforeLeavingAITask(t *testing.T) {
 	if route.resumes != 1 || f.cast.offRoute {
 		t.Fatalf("resumes = %d, offRoute = %v after the teleport, want 1, false", route.resumes, f.cast.offRoute)
 	}
-	if aiTask.removes != 1 {
-		t.Fatalf("AI task removes = %d once back on the route, want 1", aiTask.removes)
+	if aiTask.removes != 0 {
+		t.Fatalf("AI task removes = %d once back on the route, want the walker kept on the task", aiTask.removes)
 	}
 }

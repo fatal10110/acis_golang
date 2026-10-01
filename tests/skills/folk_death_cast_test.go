@@ -30,6 +30,7 @@ func TestMortalFolkDeathCancelsItsCast(t *testing.T) {
 		Target: modelskill.TargetSelf, SkillType: "BUFF", HitTime: 2000,
 		StaticHitTime: true, StaticReuse: true,
 	}}))
+	settleAI(t, srv)
 	drainUntilQuiet(t, c)
 
 	addCastDesire(t, folk, modelskill.Ref{ID: folkLongBuffSkill, Level: 1})

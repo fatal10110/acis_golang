@@ -79,10 +79,11 @@ const magicAttackSpeedBase = 333
 const socialInterval = 12 * time.Second
 
 // Folk is a live civilian NPC. It stands where it spawned, or walks its
-// route when given movement (EnableMovement), is shown to nearby players,
-// can be selected, and answers a player's interact with its chat window.
-// It never attacks, but casts the skills a dialog command or script asks of
-// it once given a cast runtime (SetCaster). Any other creature may attack
+// route when it has one, is shown to nearby players, can be selected, and
+// answers a player's interact with its chat window. It never attacks, but
+// casts the skills a dialog command or script asks of it once given a cast
+// runtime (SetCaster), walking toward its target first when it can move
+// (EnableMovement). Any other creature may attack
 // it by force: it takes damage, regenerates, and holds the buffs and
 // debuffs cast on it (no other effect lands on it). An undying template
 // keeps at least 1 HP; any other dies, and its corpse decays.
@@ -91,8 +92,8 @@ type Folk struct {
 	Instance *Instance
 	inPeace  bool
 
-	// motion is the movement of a route walker; nil for a standing NPC.
-	// EnableMovement sets it before the NPC is published.
+	// motion is the movement of an NPC that can move; nil for one that
+	// cannot. EnableMovement sets it before the NPC is published.
 	motion *folkMotion
 
 	// lastSocial is the Unix millisecond time of the last talk animation.

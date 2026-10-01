@@ -1,6 +1,7 @@
 package npc
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -90,10 +91,9 @@ func (a *scriptedFolkCastAI) Cast(_ attackable.Combatant, ref modelskill.Ref) {
 	a.control.casting = true
 }
 
-// recordingFolkAI records the NPC joining and leaving the AI task.
-type recordingFolkAI struct{ adds, removes int }
+// recordingFolkAI records the NPC leaving the AI task.
+type recordingFolkAI struct{ removes int }
 
-func (a *recordingFolkAI) Add(task.AIActor)    { a.adds++ }
 func (a *recordingFolkAI) Remove(task.AIActor) { a.removes++ }
 
 type recordingSink struct{ events []event.Event }
@@ -122,11 +122,12 @@ type movingTarget struct{ *hostileTarget }
 func (movingTarget) IsMoving() bool { return true }
 
 // newFolkCastRig builds the rig with its target dist units east of the
-// NPC. Every gate passes and the skill's range is 100 until a test says
-// otherwise.
+// NPC, past the NPC's first AI tick (NpcAI.runAI acts on nothing before
+// its lifetime is over zero). Every gate passes and the skill's range is
+// 100 until a test says otherwise.
 func newFolkCastRig(t *testing.T, dist int) *folkCastRig {
 	t.Helper()
-	inst, err := NewInstance(1, &Template{ID: 31226, TemplateID: 31226, Type: "Folk", Level: 70, HPMax: 2444})
+	inst, err := NewInstance(1, &Template{ID: 31226, TemplateID: 31226, Type: "Folk", Level: 70, HPMax: 2444, RunSpeed: 120, WalkSpeed: 50})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,6 +149,7 @@ func newFolkCastRig(t *testing.T, dist int) *folkCastRig {
 	f.SetCaster(r.control, r.castAI)
 	w.Spawn(f, 100, 0, 0, 0)
 	w.Spawn(r.target, 100+dist, 0, 0, 0)
+	r.tick(t)
 	return r
 }
 
@@ -245,7 +247,7 @@ func TestFolkCastRefusalTurnsToTarget(t *testing.T) {
 
 // TestFolkCastDesireRefusedByConditions follows NpcAI.addCastDesire's
 // checkConditions: a skill in reuse, or one whose MP or HP cost the NPC
-// cannot pay, is never queued, and the NPC does not join the AI task.
+// cannot pay, is never queued.
 func TestFolkCastDesireRefusedByConditions(t *testing.T) {
 	r := newFolkCastRig(t, 60)
 	r.castAI.canDesire = false
@@ -254,25 +256,20 @@ func TestFolkCastDesireRefusedByConditions(t *testing.T) {
 	if got := r.f.cast.desires.Len(); got != 0 {
 		t.Fatalf("desires = %d, want none queued", got)
 	}
-	if r.aiTask.adds != 0 {
-		t.Fatalf("AI task adds = %d, want 0", r.aiTask.adds)
-	}
 }
 
-// TestFolkCastDesireDecaysAndLeavesAITask follows NpcAI.runAI's every
-// third step decay of 66000 on cast desires (DesireQueue.decreaseWeightByType
-// drops a desire the decay would take below zero): a weight-100000 desire
-// that is never cast falls to 34000 on the third tick and is dropped on the
-// sixth, and with nothing left the NPC leaves the AI task that same tick.
-func TestFolkCastDesireDecaysAndLeavesAITask(t *testing.T) {
+// TestFolkCastDesireDecaysThenIdles follows NpcAI.runAI's every third step
+// decay of 66000 on cast desires (DesireQueue.decreaseWeightByType drops a
+// desire the decay would take below zero): a weight-100000 desire that is
+// never cast, queued after the NPC's first tick, falls to 34000 on its
+// second tick and is dropped on its fifth. With nothing left the NPC idles
+// on the next tick, back to its walk stance, and stays on the AI task.
+func TestFolkCastDesireDecaysThenIdles(t *testing.T) {
 	r := newFolkCastRig(t, 500)
 	r.desire(r.target, 4380, 100000)
-	if r.aiTask.adds != 1 {
-		t.Fatalf("AI task adds = %d, want 1", r.aiTask.adds)
-	}
 
-	weights := map[int]float64{2: 100000, 3: 34000, 5: 34000}
-	for i := 1; i <= 5; i++ {
+	weights := map[int]float64{1: 100000, 2: 34000, 4: 34000}
+	for i := 1; i <= 4; i++ {
 		r.tick(t)
 		d, ok := r.f.cast.desires.Peek()
 		if !ok {
@@ -281,16 +278,25 @@ func TestFolkCastDesireDecaysAndLeavesAITask(t *testing.T) {
 		if want, check := weights[i]; check && d.Weight != want {
 			t.Fatalf("tick %d: weight = %v, want %v", i, d.Weight, want)
 		}
-		if r.aiTask.removes != 0 {
-			t.Fatalf("tick %d: NPC left the AI task while holding a desire", i)
-		}
 	}
 	r.tick(t)
 	if got := r.f.cast.desires.Len(); got != 0 {
-		t.Fatalf("desires = %d after the sixth tick, want the spent desire dropped", got)
+		t.Fatalf("desires = %d after the fifth tick, want the spent desire dropped", got)
 	}
-	if r.aiTask.removes != 1 {
-		t.Fatalf("AI task removes = %d, want 1", r.aiTask.removes)
+	if !r.f.Running() {
+		t.Fatal("NPC walking while it still acted on the desire, want run")
+	}
+	r.events.events = nil
+	r.tick(t)
+	if r.f.Running() {
+		t.Fatal("NPC running after its desire ran out, want walk")
+	}
+	want := []event.Event{event.MoveTypeChanged{Running: false}, event.NPCInfoChanged{}}
+	if !slices.Equal(r.events.events, want) {
+		t.Fatalf("events on the idle tick = %#v, want %#v", r.events.events, want)
+	}
+	if r.aiTask.removes != 0 {
+		t.Fatalf("AI task removes = %d, want the NPC kept on the task", r.aiTask.removes)
 	}
 	if len(r.castAI.casts) != 0 {
 		t.Fatalf("casts = %v, want none", r.castAI.casts)
@@ -304,9 +310,10 @@ func TestFolkCastDesireDecaysAndLeavesAITask(t *testing.T) {
 // next one at once.
 func TestFolkCastBreakClosesDesireWithoutReselecting(t *testing.T) {
 	r := newFolkCastRig(t, 60)
-	r.desire(r.target, 1, 300)
-	r.desire(r.target, 2, 200)
-	r.desire(r.target, 3, 100)
+	// Heavy enough to outlast the decay on the rig's third tick.
+	r.desire(r.target, 1, 300000)
+	r.desire(r.target, 2, 200000)
+	r.desire(r.target, 3, 100000)
 
 	r.tick(t)
 	if got := r.castAI.casts; len(got) != 1 || got[0].ID != 1 {
