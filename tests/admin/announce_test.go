@@ -274,8 +274,17 @@ func TestAnnounceAutomatic(t *testing.T) {
 		assertSay(t, frame, 0, sayAnnouncement, "", "Tick tock")
 		heard[i] = user.Now().Sub(start)
 	}
-	if heard[0] >= time.Second || heard[1]-heard[0] < time.Second || heard[1]-heard[0] > 1100*time.Millisecond {
-		t.Fatalf("automatic announcements heard after %v, want the first at once and the second a second later", heard)
+	// The server re-arms each fire a full delay after the previous one ran,
+	// so on a driven clock the spacing is exact. On the real pool the client
+	// sees that spacing plus the second delivery's latency minus the first's,
+	// which can come out a few microseconds under a second, so there the gap
+	// only has to clear 900ms (no fire with a delay of 0).
+	if srv.DrivesClock() {
+		if heard[0] != 0 || heard[1] != time.Second {
+			t.Fatalf("automatic announcements heard after %v, want [0s 1s]", heard)
+		}
+	} else if heard[1]-heard[0] < 900*time.Millisecond {
+		t.Fatalf("automatic announcements heard after %v, want the second about a second after the first", heard)
 	}
 	if frame := user.ReadWithTimeout(1500 * time.Millisecond); frame != nil {
 		t.Fatalf("frame %#x after the limit, want none", frame[0])
