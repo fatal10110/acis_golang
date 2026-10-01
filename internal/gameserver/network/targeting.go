@@ -83,18 +83,10 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 	if !selected {
 		return
 	}
-	// A static object's interact also waits out a swing or a cast; every
-	// other selected-target click waits here only for a sit-down or
-	// stand-up. A player that cannot act is refused the interact outright,
-	// before anything is queued or run, so the click leaves a fear flee or
-	// any other walk under way untouched.
 	busy := inPostureTransition(live)
-	if _, static := target.(*staticobject.Object); static {
-		if live.DenyAIAction() {
-			live.SendFrame(serverpackets.FrameActionFailed())
-			return
-		}
-		busy = itemAICastBusy(live)
+	if obj, static := target.(*staticobject.Object); static {
+		l.actOnStaticObject(live, obj, busy, shift)
+		return
 	}
 	if busy {
 		if live.DenyAIAction() || (ctrl && liveOutOfControl(live)) || target.ObjectID() == live.ObjectID() {
@@ -132,11 +124,28 @@ func (l *GameClientLink) actOnSelectedTarget(live *livePlayer, target world.Trac
 	if l.actOnFolk(live, target, ctrl, shift) {
 		return
 	}
-	if obj, ok := target.(*staticobject.Object); ok {
-		l.thinkStaticInteract(live, obj)
+	l.attackLiveTarget(live, target, shift)
+}
+
+// actOnStaticObject answers a click on an already-selected static object
+// (a town map, an arena sign or a throne): whatever ctrl says, it is an
+// interact, walked to when out of range and faced with MoveToPawn in range.
+// A player that cannot act is refused outright, before anything is queued
+// or run, so the click leaves a fear flee or any other walk under way
+// untouched. During a sit-down or stand-up the interact is queued as the
+// next intention; tryToInteract queues it behind a swing or a cast.
+func (l *GameClientLink) actOnStaticObject(live *livePlayer, obj *staticobject.Object, posture, shift bool) {
+	if posture {
+		if live.DenyAIAction() {
+			live.SendFrame(serverpackets.FrameActionFailed())
+			return
+		}
+		live.deferInteract(obj, shift)
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	l.attackLiveTarget(live, target, shift)
+	live.takeDeferredAction()
+	l.tryToInteract(live, obj, shift)
 }
 
 // queuedSelectedTargetAction captures the click's resolved intention before a
@@ -162,38 +171,8 @@ func (l *GameClientLink) queuedSelectedTargetAction(live *livePlayer, target wor
 			return func() { l.tryToInteract(live, v, shift) }
 		}
 		return func() { l.startLiveFollow(live, v, shift) }
-	case *staticobject.Object:
-		return func() { l.thinkStaticInteract(live, v) }
 	}
 	return attack
-}
-
-// thinkStaticInteract runs a second click on a selected static object as an
-// interact: the click is released with ActionFailed first, then a town map
-// shows its map and an arena sign its signboard. A throne answers nothing
-// more: a click never sits on or claims it, only the sit request does. A
-// player that cannot act, sits, flies, runs a private store or trades
-// interacts with nothing. Every interact ends idle, stopping a walk under
-// way.
-// ponytail: an object out of interact range is not walked to, and no
-// MoveToPawn faces it (#2962).
-func (l *GameClientLink) thinkStaticInteract(live *livePlayer, obj *staticobject.Object) {
-	live.SendFrame(serverpackets.FrameActionFailed())
-	if live.DenyAIAction() || live.Seated() || live.Flying() || !l.playerCanAttemptInteract(live) {
-		live.tryToIdle(false)
-		return
-	}
-	switch obj.Type() {
-	case staticobject.MapType:
-		live.SendFrame(serverpackets.FrameShowTownMap("town_map."+obj.Template.Texture, obj.Template.MapX, obj.Template.MapY))
-	case staticobject.ArenaSignType:
-		html, ok := l.html.Get("signboard.htm")
-		if !ok {
-			html = "<html><body>My html is missing:<br>data/html/signboard.htm</body></html>"
-		}
-		sendValidatedHTML(live, obj.ObjectID(), html, 0)
-	}
-	live.tryToIdle(false)
 }
 
 func (l *GameClientLink) startPickupLiveGroundItem(ctx context.Context, live *livePlayer, target world.Tracked, shift bool) bool {
@@ -397,12 +376,20 @@ func (l *GameClientLink) actOnFolk(live *livePlayer, target world.Tracked, ctrl,
 }
 
 // interactTarget is what a player's interact intention walks to and acts
-// on: the player's own summon, whose status window opens, or a civilian
-// NPC, whose chat window opens.
+// on: the player's own summon, whose status window opens, a civilian NPC,
+// whose chat window opens, a player running a store, or a static object.
 type interactTarget interface {
 	world.Tracked
 	Position() (x, y, z int)
-	CollisionRadius() float64
+}
+
+// interactTargetRadius is target's collision radius, counted into the
+// approach range: a creature's own, none for a static object.
+func interactTargetRadius(target interactTarget) float64 {
+	if c, ok := target.(interface{ CollisionRadius() float64 }); ok {
+		return c.CollisionRadius()
+	}
+	return 0
 }
 
 // interactIntention is an interact queued behind a swing or a cast.
@@ -507,7 +494,7 @@ func (l *GameClientLink) thinkInteract(live *livePlayer, target interactTarget, 
 		endInteractIdle(live)
 		return
 	}
-	if !interactInRange(live, target, int(interactApproachOffset+live.CollisionRadius()+target.CollisionRadius())) {
+	if !interactInRange(live, target, int(interactApproachOffset+live.CollisionRadius()+interactTargetRadius(target))) {
 		if shift {
 			endInteractIdle(live)
 			return
@@ -549,6 +536,24 @@ func (l *GameClientLink) onInteract(live *livePlayer, target interactTarget) {
 		live.SendFrame(serverpackets.FramePetStatusShow(t.SummonType()))
 	case *npc.Folk:
 		l.talkToFolk(live, t)
+	case *staticobject.Object:
+		l.showStaticObject(live, t)
+	}
+}
+
+// showStaticObject is a static object's interact: a town map shows its map
+// and an arena sign its signboard. A throne answers nothing: only the sit
+// request sits on or claims it.
+func (l *GameClientLink) showStaticObject(live *livePlayer, obj *staticobject.Object) {
+	switch obj.Type() {
+	case staticobject.MapType:
+		live.SendFrame(serverpackets.FrameShowTownMap("town_map."+obj.Template.Texture, obj.Template.MapX, obj.Template.MapY))
+	case staticobject.ArenaSignType:
+		html, ok := l.html.Get("signboard.htm")
+		if !ok {
+			html = "<html><body>My html is missing:<br>data/html/signboard.htm</body></html>"
+		}
+		sendValidatedHTML(live, obj.ObjectID(), html, 0)
 	}
 }
 
