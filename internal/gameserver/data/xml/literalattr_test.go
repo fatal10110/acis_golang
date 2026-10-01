@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -600,11 +601,12 @@ type npcView struct {
 
 // TestShippedIntLiteralsReadTheSameInEitherGrammar proves the shipped
 // datapack loads unchanged: every value of every attribute whose reading
-// this change moved to the integer literal grammar reads the same number as
-// it did before (plain decimal for most loaders, strconv base-0 for the
-// skill and item effect and condition attributes, which already carry hex
-// such as count="0x7fffffff"). Skill <table> rows are checked too, since a
-// "#name" attribute reads one of them. Each attribute must have shipped
+// this change moved reads the same number now (an integer literal, or the
+// nowReading exceptions) as it did before (plain decimal for most loaders,
+// strconv base-0 for the skill and item effect and condition attributes,
+// which already carry hex such as count="0x7fffffff"). Skill <table> rows
+// are checked under both the literal and the decimal reading, since a
+// "#name" attribute of either kind reads one of them. Each attribute must have shipped
 // values unless listed in optionalInShippedData, so the scan cannot pass
 // vacuously.
 func TestShippedIntLiteralsReadTheSameInEitherGrammar(t *testing.T) {
@@ -627,7 +629,7 @@ func TestShippedIntLiteralsReadTheSameInEitherGrammar(t *testing.T) {
 		{"spellbooks.xml", map[string][]string{"book": {"skillId", "itemId"}}, beforeDecimal},
 		{"bufferSkills.xml", map[string][]string{"buff": {"id", "level", "price"}}, beforeDecimal},
 		{"augmentation/*.xml", map[string][]string{"set": {"order"}}, beforeDecimal},
-		{"castles.xml", map[string][]string{"artifact": {"id"}, "position": {"x", "y", "z"}, "spawn": {"x", "y", "z"}}, beforeDecimal},
+		{"castles.xml", map[string][]string{"artifact": {"id"}, "position": {"x", "y", "z"}, "spawn": {"x", "y", "z"}, "zone": {"minZ", "maxZ"}, "node": {"x", "y"}}, beforeDecimal},
 		{"clanHalls.xml", map[string][]string{"spawn": {"x", "y", "z"}, "zone": {"minZ", "maxZ"}, "node": {"x", "y"}}, beforeDecimal},
 		{"observerGroups.xml", map[string][]string{"spawn": {"id", "x", "y", "z"}}, beforeDecimal},
 		{"buyLists.xml", map[string][]string{"buyList": {"id", "npcId"}}, beforeDecimal},
@@ -635,7 +637,7 @@ func TestShippedIntLiteralsReadTheSameInEitherGrammar(t *testing.T) {
 		{"doors.xml", map[string][]string{"position": {"x", "y", "z"}, "loc": {"x", "y"}}, beforeDecimal},
 		{"spawnlist/*.xml", map[string][]string{"territory": {"minZ", "maxZ"}, "node": {"x", "y"}, "npc": {"id", "total"}}, beforeDecimal},
 		{"npcs/*.xml", map[string][]string{"npc": {"id", "idTemplate"}, "drop": {"itemid", "min", "max"}, "petdata": {"food1", "food2"}, "skill": {"id", "level"}}, beforeDecimal},
-		{"skills/*.xml items/*.xml", map[string][]string{"effect": {"count", "time", "self", "noicon"}, "cond": {"msgId"}, "player": conditionPlayerAttrs, "target": conditionTargetAttrs, "zone": {"minZ", "maxZ"}, "node": {"x", "y"}}, beforeBase0},
+		{"skills/*.xml items/*.xml", map[string][]string{"effect": {"count", "time", "self", "noicon", "triggeredId", "triggeredLevel", "activationChance"}, "cond": {"msgId"}, "player": conditionPlayerAttrs, "target": conditionTargetAttrs, "zone": {"minZ", "maxZ"}, "node": {"x", "y"}}, beforeBase0},
 	}
 
 	for _, spec := range specs {
@@ -663,15 +665,21 @@ func TestShippedIntLiteralsReadTheSameInEitherGrammar(t *testing.T) {
 					if strings.HasPrefix(raw, "#") {
 						continue // a skill table reference: its rows are checked below
 					}
+					now := nowReading[el.name+"@"+name]
+					if now == nil {
+						now = nowLiteral
+					}
 					for _, tok := range splitConditionList(name, raw) {
-						requireUnchanged(t, spec.before, path, el.name+"@"+name, tok)
+						requireUnchanged(t, now, spec.before, path, el.name+"@"+name, tok)
 					}
 				}
-				// Skill table rows feed the same literal reads by reference.
+				// Skill table rows feed attributes of every reading by
+				// reference, so each row must read the same under all of them.
 				if el.name == "table" {
 					for _, row := range strings.Fields(el.text) {
 						for _, tok := range strings.Split(row, ",") {
-							requireUnchanged(t, spec.before, path, "table", tok)
+							requireUnchanged(t, nowLiteral, spec.before, path, "table", tok)
+							requireUnchanged(t, nowDecimal, spec.before, path, "table", tok)
 						}
 					}
 				}
@@ -755,6 +763,32 @@ func scanAttrs(t *testing.T, data []byte) []scannedElement {
 	}
 }
 
+// nowReading lists the changed attributes whose reading is not the integer
+// literal: effect trigger fields moved from literals to plain decimals, and
+// the two forces are literals limited to a signed byte.
+var nowReading = map[string]func(string) (int64, error){
+	"effect@triggeredId":      nowDecimal,
+	"effect@triggeredLevel":   nowDecimal,
+	"effect@activationChance": nowDecimal,
+	"player@battle_force":     nowByte,
+	"player@spell_force":      nowByte,
+}
+
+func nowLiteral(raw string) (int64, error) {
+	n, err := commons.DecodeInt32(raw)
+	return int64(n), err
+}
+
+func nowDecimal(raw string) (int64, error) { return strconv.ParseInt(raw, 10, 32) }
+
+func nowByte(raw string) (int64, error) {
+	n, err := nowLiteral(raw)
+	if err == nil && (n < math.MinInt8 || n > math.MaxInt8) {
+		return 0, fmt.Errorf("%q: value out of byte range", raw)
+	}
+	return n, err
+}
+
 // beforeDecimal and beforeBase0 are the two readings the changed
 // attributes had until now.
 func beforeDecimal(raw string) (int64, error) { return strconv.ParseInt(raw, 10, 32) }
@@ -766,22 +800,21 @@ func beforeBase0(raw string) (int64, error) {
 	return strconv.ParseInt(raw, 0, 32)
 }
 
-// requireUnchanged fails when raw loads differently under the integer
-// literal grammar than under before. A value neither reading accepts (a
-// float table row, a non-numeric token) has no integer reading to compare
-// and is skipped.
-func requireUnchanged(t *testing.T, before func(string) (int64, error), path, what, raw string) {
+// requireUnchanged fails when raw loads differently under now than under
+// before. A value neither reading accepts (a float table row, a non-numeric
+// token) has no integer reading to compare and is skipped.
+func requireUnchanged(t *testing.T, now, before func(string) (int64, error), path, what, raw string) {
 	t.Helper()
-	lit, litErr := commons.DecodeInt32(raw)
+	cur, curErr := now(raw)
 	old, oldErr := before(raw)
-	if litErr != nil && oldErr != nil {
+	if curErr != nil && oldErr != nil {
 		if what != "table" {
 			t.Errorf("%s: %s=%q is not an integer in either reading", path, what, raw)
 		}
 		return
 	}
-	if litErr != nil || oldErr != nil || int64(lit) != old {
-		t.Errorf("%s: %s=%q reads differently now (%d, %v) than before (%d, %v)", path, what, raw, lit, litErr, old, oldErr)
+	if curErr != nil || oldErr != nil || cur != old {
+		t.Errorf("%s: %s=%q reads differently now (%d, %v) than before (%d, %v)", path, what, raw, cur, curErr, old, oldErr)
 	}
 }
 
