@@ -888,7 +888,13 @@ func TestManadamDrainsMpDespiteDamageDeniedCaster(t *testing.T) {
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, 46, 1)
-	startInWorld(t, c)
+	// The player must enter knowing the skill: a cast of an unknown one is
+	// refused, which would read as a drain that never lands.
+	for _, frame := range startInWorld(t, c) {
+		if frame[0] == serverpackets.OpcodeSkillList {
+			assertSkillListContains(t, frame, skillListEntry{level: 1, id: 46})
+		}
+	}
 	denyCasterDamage(t, srv, objID)
 
 	tmpl := gameservertest.AttackingHostileTemplate()
@@ -910,12 +916,42 @@ func TestManadamDrainsMpDespiteDamageDeniedCaster(t *testing.T) {
 	drained := false
 	for i := 0; i < 20 && !drained; i++ {
 		c.Send(encodeRequestMagicSkillUse(46, false, false))
-		drainUntilQuiet(t, c)
-		drained = hostile.CurrentMP() != beforeMP
+		drained = readManadamOutcome(t, c)
 	}
 	if !drained {
 		t.Fatal("MANADAM from damage-denied caster never drained MP across repeated casts")
 	}
+	if mp := hostile.CurrentMP(); mp == beforeMP {
+		t.Fatalf("MANADAM reported a drain but the monster's MP stayed %d", mp)
+	}
+}
+
+// readManadamOutcome reads a MANADAM cast's frames up to its outcome message
+// and reports whether it drained (the opponent's-MP-reduced message) rather
+// than missed (MissedTarget). It waits for that answer instead of a quiet
+// spell, which a loaded machine can outlast before the cast resolves.
+func readManadamOutcome(t *testing.T, c *testsupport.ScriptedClient) bool {
+	t.Helper()
+	var skipped []byte
+	for quiet := 0; quiet < 3 && len(skipped) < 50; {
+		frame := c.ReadWithTimeout(5 * time.Second)
+		if frame == nil {
+			quiet++
+			continue
+		}
+		skipped = append(skipped, frame[0])
+		if frame[0] != serverpackets.OpcodeSystemMessage {
+			continue
+		}
+		switch wireReader(frame[1:]).ReadInt32() {
+		case int32(serverpackets.SystemMessageYourOpponentsMPWasReducedByS1):
+			return true
+		case int32(serverpackets.SystemMessageMissedTarget):
+			return false
+		}
+	}
+	t.Fatalf("MANADAM cast answered neither an MP drain nor a miss: opcodes %x", skipped)
+	return false
 }
 
 // TestSignetPointExpiresThroughTheEffectTicker casts a plain SIGNET through

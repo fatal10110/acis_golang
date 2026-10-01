@@ -130,7 +130,7 @@ func bootShop(t *testing.T, adena int32, extra ...gameservertest.Option) *shopWo
 	if adena > 0 {
 		srv.GiveItem(t, w.player, item.AdenaID, adena)
 	}
-	startInWorld(t, w.c)
+	startInWorld(t, w.srv, w.c)
 	x, y, z := srv.PlayerPosition(t, w.player)
 	w.at = location.Location{X: x, Y: y, Z: z}
 	f := w.spawnFolk(t, folkTemplate("Merchant", merchantID), 50)

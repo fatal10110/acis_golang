@@ -8,19 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
-
-// readImmediate collects the frames already on their way to c, letting at
-// most a millisecond pass on the driven clock: nothing a swing or cast in
-// flight schedules comes due meanwhile.
-func readImmediate(c *testsupport.ScriptedClient) [][]byte {
-	var frames [][]byte
-	for frame := c.ReadWithTimeout(time.Millisecond); frame != nil; frame = c.ReadWithTimeout(time.Millisecond) {
-		frames = append(frames, frame)
-	}
-	return frames
-}
 
 // isOwnerInteractFrame reports whether frame is where the owner's interact
 // with pet shows: the owner's MoveToPawn toward it (an approach walk, or the
@@ -42,7 +30,7 @@ func clickPetQueued(t *testing.T, h *petWorld, pet *summon.Actor, what string) {
 	t.Helper()
 	px, py, pz := h.srv.PlayerPosition(t, h.ownerID)
 	h.client.Send(encodeAction(pet.ObjectID(), int32(px), int32(py), int32(pz), false))
-	frames := readImmediate(h.client)
+	frames := h.srv.ReadQueued(t, h.client)
 	if !hasOpcode(frames, serverpackets.OpcodeActionFailed) {
 		t.Fatalf("pet click %s = opcodes %x, want ActionFailed", what, frameOpcodes(frames))
 	}
@@ -81,7 +69,7 @@ func queuePetInteractMidSwing(t *testing.T) (*petWorld, *summon.Actor) {
 
 	// Selecting the pet leaves the swing and the attack running.
 	h.client.Send(encodeAction(pet.ObjectID(), int32(px), int32(py), int32(pz), false))
-	readImmediate(h.client)
+	h.srv.ReadQueued(t, h.client)
 	clickPetQueued(t, h, pet, "mid-swing")
 	return h, pet
 }
@@ -122,14 +110,14 @@ func TestSitReplacesOwnedPetInteractMidSwing(t *testing.T) {
 	t.Parallel()
 	h, pet := queuePetInteractMidSwing(t)
 	h.client.Send(encodeRequestChangeWaitType(false))
-	for _, frame := range readImmediate(h.client) {
+	for _, frame := range h.srv.ReadQueued(t, h.client) {
 		if frame[0] == serverpackets.OpcodeChangeWaitType || isOwnerInteractFrame(frame, h.ownerID, pet) {
 			t.Fatalf("sit or pet interact ran during swing: %x", frame[0])
 		}
 	}
 	frames := readUntilOpcode(t, h.client, serverpackets.OpcodeChangeWaitType, "sit after swing")
 	h.srv.Advance(t, 2500*time.Millisecond)
-	frames = append(frames, readImmediate(h.client)...)
+	frames = append(frames, h.srv.ReadQueued(t, h.client)...)
 	for _, frame := range frames {
 		if isOwnerInteractFrame(frame, h.ownerID, pet) {
 			t.Fatalf("replaced pet interact ran after sit: %x", frame[0])
@@ -156,7 +144,7 @@ func TestOwnedPetInteractMidCastRunsAtCastEnd(t *testing.T) {
 
 	h.client.Send(encodeRequestMagicSkillUse(longCastSkillID))
 	readUntilOpcode(t, h.client, serverpackets.OpcodeMagicSkillUse, "long cast MagicSkillUse")
-	readImmediate(h.client)
+	h.srv.ReadQueued(t, h.client)
 	if !h.srv.PlayerCastingNow(t, h.ownerID) {
 		t.Fatal("long cast not in flight")
 	}
@@ -200,7 +188,7 @@ func TestOwnedPetInteractQueuedForReturnedPetEndsTheAttack(t *testing.T) {
 		t.Fatal("the returned pet is still in the world")
 	}
 	// The rest of the return's own answer; the swing is still in flight.
-	for _, frame := range readImmediate(h.client) {
+	for _, frame := range h.srv.ReadQueued(t, h.client) {
 		if isOwnerInteractFrame(frame, h.ownerID, pet) {
 			t.Fatalf("the queued interact ran against the returned pet: opcode %#x", frame[0])
 		}
