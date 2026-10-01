@@ -59,6 +59,10 @@ type classChange struct {
 // classChangeRows is what the persistence lane hands back: whether an add
 // or a replace wrote its subclass, and the rows of the class switched to.
 type classChangeRows struct {
+	// aborted is set when the persistence job ended without returning,
+	// having panicked: what it wrote is unknown, so the change is undone
+	// as one that never ran.
+	aborted   bool
 	written   bool
 	skills    skillstate.ClassSkills
 	shortcuts []shortcut.Shortcut
@@ -275,7 +279,12 @@ func (l *GameClientLink) beginClassChange(live *livePlayer, ch *classChange) boo
 	}
 	ch.done = make(chan classChangeRows, 1)
 	ch.queued = l.persist.Enqueue(live.ObjectID(), func() {
-		ch.done <- l.writeClassChange(live.ObjectID(), ch, tmpl, charState, skillState)
+		// The lane recovers a panicking job, so the answer is sent from a
+		// defer: a job that never returns its rows still ends the change,
+		// as aborted, and the connection waiting on done goes on.
+		rows := classChangeRows{aborted: true}
+		defer func() { ch.done <- rows }()
+		rows = l.writeClassChange(live.ObjectID(), ch, tmpl, charState, skillState)
 	})
 	live.pendingClassChange = ch
 	return false
@@ -401,11 +410,11 @@ func (l *GameClientLink) finishPendingClassChange(live *livePlayer) {
 // added or replaced is announced and the master's confirmation shown, a
 // switch is announced alone. An add whose subclass could not be written
 // takes it back and changes nothing; a replace that could not be written
-// falls back to the base class. A change whose persistence never ran
-// releases the lock alone.
+// falls back to the base class. A change whose persistence never ran, or
+// aborted, takes back the slot it filled and releases the lock alone.
 func (l *GameClientLink) completeClassChange(live *livePlayer, ch *classChange, rows classChangeRows) {
 	defer live.SendFrame(serverpackets.FrameActionFailed())
-	if !ch.queued {
+	if !ch.queued || rows.aborted {
 		if ch.kind != classChangeSwitch {
 			live.RemoveSubclass(ch.index)
 		}
@@ -457,6 +466,9 @@ func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChan
 		return
 	}
 	inv := c.Inventory()
+	// A cast begun while the change's rows were written ends here, before
+	// the skills it casts from go.
+	c.StopCast()
 	l.unequipItemStats(live)
 	c.ClearSkillReuses()
 	c.ClearCharges()

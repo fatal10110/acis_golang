@@ -131,3 +131,24 @@ type KnownSkillStore interface {
 func SlowKnownSkills(store *gamesql.CharacterSkillStore, d time.Duration) KnownSkillStore {
 	return slowCharacterSkillStore{CharacterSkillStore: store, delay: d}
 }
+
+// faultySubclassStore runs a SubclassFault before each class change write
+// (WithSubclassFault).
+type faultySubclassStore struct {
+	*gamesql.SubclassStore
+	fault SubclassFault
+}
+
+func (s faultySubclassStore) Insert(ctx context.Context, charID int32, sub player.SubClass) error {
+	if err := s.fault("insert", sub.Index); err != nil {
+		return err
+	}
+	return s.SubclassStore.Insert(ctx, charID, sub)
+}
+
+func (s faultySubclassStore) Delete(ctx context.Context, charID int32, index int) error {
+	if err := s.fault("delete", index); err != nil {
+		return err
+	}
+	return s.SubclassStore.Delete(ctx, charID, index)
+}

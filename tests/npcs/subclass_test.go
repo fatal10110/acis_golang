@@ -2,12 +2,14 @@ package npcs
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -216,11 +218,11 @@ func TestSubclassAddSwitchesToTheNewSubclass(t *testing.T) {
 	w := bootSubclassWorld(t)
 	frames := w.addSpellhowler(t)
 
-	// The switch's burst, then the announcement, the master's page and the
-	// closing ActionFailed.
+	// The switch's burst, opened by its cast stop's ActionFailed, then the
+	// announcement, the master's page and the closing ActionFailed.
 	order := keyOpcodes(frames)
 	want := []byte{
-		serverpackets.OpcodeUserInfo, serverpackets.OpcodeSkillList, serverpackets.OpcodeEtcStatusUpdate,
+		serverpackets.OpcodeActionFailed, serverpackets.OpcodeUserInfo, serverpackets.OpcodeSkillList, serverpackets.OpcodeEtcStatusUpdate,
 		serverpackets.OpcodeHennaInfo, serverpackets.OpcodeUserInfo, serverpackets.OpcodeShortCutInit,
 		serverpackets.OpcodeSocialAction, serverpackets.OpcodeSkillCoolTime,
 		serverpackets.OpcodeSystemMessage, serverpackets.OpcodeNpcHtmlMessage, serverpackets.OpcodeActionFailed,
@@ -620,4 +622,195 @@ func encodeValidatePosition(at location.Location) []byte {
 	w.WriteInt32(0) // heading
 	w.WriteInt32(0) // boat
 	return w.Bytes()
+}
+
+func TestSubclassSwitchGivesTheClassesFreeSkills(t *testing.T) {
+	// learnedSkill as a free grant: a class at level 20 or above holds it
+	// whether or not a character_skills row says so.
+	line := darkMysticLine()
+	line[0].Skills[0].Cost = 0
+	w := bootSubclassWorld(t, gameservertest.WithClassTemplates(line...))
+	w.addSpellhowler(t)
+	w.changeTo(t, 0)
+
+	// The subclass's stored skills lose it; switching back must grant it
+	// again from the class's own grants.
+	w.srv.FlushPersistence(t)
+	exec(t, w.srv, `DELETE FROM character_skills WHERE char_obj_id = ? AND class_index = 1 AND skill_id = ?`, w.player, learnedSkill)
+	frames := w.changeTo(t, 1)
+	if skills := skillListIDs(t, frames[firstIndex(frames, serverpackets.OpcodeSkillList)]); !slices.Contains(skills, learnedSkill) || slices.Contains(skills, laterSkill) {
+		t.Fatalf("subclass skills after the switch = %v, want the free %d and not %d", skills, learnedSkill, laterSkill)
+	}
+}
+
+func TestSubclassReplaceOfTheActiveSlotStartsItAtForty(t *testing.T) {
+	const (
+		subLevel = 78
+		subExp   = 5000
+	)
+	// The character plays a level 78 Spellhowler in slot 1.
+	w := bootSubclassWorldWith(t, func(srv *gameservertest.Server, objID int32) {
+		exec(t, srv, `INSERT INTO character_subclasses (char_obj_id, class_id, exp, sp, level, class_index) VALUES (?, ?, ?, 0, ?, 1)`, objID, spellhowler, subExp, subLevel)
+		exec(t, srv, `UPDATE characters SET classid = ? WHERE obj_Id = ?`, spellhowler, objID)
+	})
+	w.command(t, "Subclass 3")
+	w.command(t, "Subclass 6 1")
+	frames := w.command(t, "Subclass 7 1 "+strconv.Itoa(phantomSummoner))
+	if n := len(frames); n < 3 || frames[n-1][0] != serverpackets.OpcodeActionFailed || systemMessageID(frames[n-3]) != smAddNewSubclass {
+		t.Fatalf("replace answer = %x, want ADD_NEW_SUBCLASS, the page and ActionFailed last", opcodes(frames))
+	}
+	info := decodeUserInfoHead(t, frames[lastIndex(frames, serverpackets.OpcodeUserInfo)])
+	if info.visibleClass != gladiatorClass || info.level != player.SubclassStartLevel {
+		t.Fatalf("UserInfo class/level = %d/%d, want %d at 40", info.visibleClass, info.level, gladiatorClass)
+	}
+
+	w.srv.FlushPersistence(t)
+	var classID, level int
+	var exp int64
+	if err := w.srv.DB.QueryRowContext(context.Background(), `SELECT class_id, level, exp FROM character_subclasses WHERE char_obj_id = ? AND class_index = 1`, w.player).Scan(&classID, &level, &exp); err != nil {
+		t.Fatal(err)
+	}
+	if classID != phantomSummoner || level != player.SubclassStartLevel || exp != 1000 {
+		t.Fatalf("slot 1 = class %d level %d exp %d, want %d at 40 with 1000", classID, level, exp, phantomSummoner)
+	}
+	// The autosave keeps the fresh progression too.
+	w.srv.TickAutosave(t)
+	w.srv.FlushPersistence(t)
+	if err := w.srv.DB.QueryRowContext(context.Background(), `SELECT level, exp FROM character_subclasses WHERE char_obj_id = ? AND class_index = 1`, w.player).Scan(&level, &exp); err != nil {
+		t.Fatal(err)
+	}
+	if level != player.SubclassStartLevel || exp != 1000 {
+		t.Fatalf("slot 1 after the autosave = level %d exp %d, want 40 with 1000", level, exp)
+	}
+}
+
+// subclassFault fails, or panics on, the class change writes whose op it
+// names, once armed.
+type subclassFault struct {
+	armed atomic.Bool
+	op    string
+	panic bool
+}
+
+func (f *subclassFault) check(op string, _ int) error {
+	if !f.armed.Load() || op != f.op {
+		return nil
+	}
+	if f.panic {
+		f.armed.Store(false)
+		panic("subclass store: injected panic")
+	}
+	return errors.New("subclass store: injected failure")
+}
+
+func TestSubclassAddWriteFailureChangesNothing(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		panic bool
+	}{
+		{"insert fails", false},
+		// The persistence lane recovers a panicking job: the change still
+		// ends, and the lock is free again.
+		{"insert panics", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fault := &subclassFault{op: "insert", panic: tc.panic}
+			w := bootSubclassWorld(t, gameservertest.WithSubclassFault(fault.check))
+			fault.armed.Store(true)
+			frames := w.addSpellhowler(t)
+			if len(frames) != 1 || frames[0][0] != serverpackets.OpcodeActionFailed {
+				t.Fatalf("failed add answer = %x, want ActionFailed alone", opcodes(frames))
+			}
+			w.openMenu(t)
+			if _, html := pageOf(t, w.command(t, "Subclass 2")); !strings.Contains(html, "_Subclass 1") || strings.Contains(html, "Subclass 5") {
+				t.Fatalf("change menu after the failed add = %q, want SubClass_ChangeNo", html)
+			}
+			w.srv.FlushPersistence(t)
+			var n int
+			if err := w.srv.DB.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM character_subclasses WHERE char_obj_id = ?`, w.player).Scan(&n); err != nil || n != 0 {
+				t.Fatalf("subclass rows = %d, %v; want none", n, err)
+			}
+			if !tc.panic {
+				return
+			}
+			// The lock was released: the next add goes through.
+			w.openMenu(t)
+			frames = w.addSpellhowler(t)
+			if _, html := pageOf(t, frames); !strings.Contains(html, "You've added a new subclass") {
+				t.Fatalf("add after the panicked one = %x, want SubClass_AddOk", opcodes(frames))
+			}
+		})
+	}
+}
+
+func TestSubclassReplaceWriteFailureRevertsToTheBaseClass(t *testing.T) {
+	fault := &subclassFault{op: "delete"}
+	w := bootSubclassWorld(t, gameservertest.WithSubclassFault(fault.check))
+	w.addSpellhowler(t)
+	w.srv.FlushPersistence(t)
+
+	fault.armed.Store(true)
+	w.openMenu(t)
+	w.command(t, "Subclass 3")
+	w.command(t, "Subclass 6 1")
+	frames := w.command(t, "Subclass 7 1 "+strconv.Itoa(phantomSummoner))
+	if n := len(frames); n < 2 || frames[n-1][0] != serverpackets.OpcodeActionFailed || frames[n-2][0] != serverpackets.OpcodeSystemMessage {
+		t.Fatalf("failed replace answer = %x, want the reverted text then ActionFailed", opcodes(frames))
+	}
+	if _, ok := firstOpcode(frames, serverpackets.OpcodeNpcHtmlMessage); ok {
+		t.Fatal("failed replace sent a page, want none")
+	}
+	if text := systemMessageText(t, frames[len(frames)-2]); text != "The sub class could not be added, you have been reverted to your base class." {
+		t.Fatalf("failed replace message = %q, want the reverted text", text)
+	}
+	info := decodeUserInfoHead(t, frames[lastIndex(frames, serverpackets.OpcodeUserInfo)])
+	if info.visibleClass != gladiatorClass || info.level != subclassLevel {
+		t.Fatalf("UserInfo class/level = %d/%d, want the base class %d at %d", info.visibleClass, info.level, gladiatorClass, subclassLevel)
+	}
+	if skills := skillListIDs(t, frames[firstIndex(frames, serverpackets.OpcodeSkillList)]); slices.Contains(skills, learnedSkill) {
+		t.Fatalf("base class skills = %v, want no subclass skill", skills)
+	}
+	// The slot is gone in memory.
+	w.openMenu(t)
+	if _, html := pageOf(t, w.command(t, "Subclass 2")); strings.Contains(html, "Subclass 5") {
+		t.Fatalf("change menu after the failed replace = %q, want SubClass_ChangeNo", html)
+	}
+
+	// The slot's row, which the failed delete left, is not written over
+	// with the replacing class.
+	w.srv.FlushPersistence(t)
+	var classID int
+	if err := w.srv.DB.QueryRowContext(context.Background(), `SELECT class_id FROM character_subclasses WHERE char_obj_id = ? AND class_index = 1`, w.player).Scan(&classID); err != nil {
+		t.Fatal(err)
+	}
+	if classID != spellhowler {
+		t.Fatalf("slot 1 row class = %d, want the stored %d kept", classID, spellhowler)
+	}
+	var rowClass int
+	if err := w.srv.DB.QueryRowContext(context.Background(), `SELECT classid FROM characters WHERE obj_Id = ?`, w.player).Scan(&rowClass); err != nil {
+		t.Fatal(err)
+	}
+	w.srv.TickAutosave(t)
+	w.srv.FlushPersistence(t)
+	if err := w.srv.DB.QueryRowContext(context.Background(), `SELECT class_id FROM character_subclasses WHERE char_obj_id = ? AND class_index = 1`, w.player).Scan(&classID); err != nil || classID != spellhowler {
+		t.Fatalf("slot 1 row class after the autosave = %d, %v; want %d", classID, err, spellhowler)
+	}
+	if err := w.srv.DB.QueryRowContext(context.Background(), `SELECT classid FROM characters WHERE obj_Id = ?`, w.player).Scan(&rowClass); err != nil || rowClass != gladiatorClass {
+		t.Fatalf("characters classid after the autosave = %d, %v; want %d", rowClass, err, gladiatorClass)
+	}
+}
+
+// systemMessageText returns the text parameter of a one-parameter S1
+// system message.
+func systemMessageText(t *testing.T, frame []byte) string {
+	t.Helper()
+	r := wire.NewReader(frame[1:])
+	r.ReadInt32() // id
+	if n := r.ReadInt32(); n != 1 {
+		t.Fatalf("system message parameters = %d, want 1", n)
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamText {
+		t.Fatalf("system message parameter type = %d, want text", typ)
+	}
+	return r.ReadString()
 }

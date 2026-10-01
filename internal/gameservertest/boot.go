@@ -76,6 +76,7 @@ type options struct {
 	// slowStores delays every handler-issued persistence write (WithSlowStores).
 	slowStores             time.Duration
 	itemFlushFault         *ItemFlushFault
+	subclassFault          SubclassFault
 	petNameLookupErr       error
 	captureLog             bool
 	account                string
@@ -589,6 +590,18 @@ func WithClassTemplates(tmpls ...*player.Template) Option {
 // server.properties SubclassTime reuse delay (default false and none).
 func WithSubclassRules(withoutQuests bool, delay time.Duration) Option {
 	return func(o *options) { o.subclassWithoutQuests, o.subclassDelay = withoutQuests, delay }
+}
+
+// SubclassFault decides the outcome of one class change's
+// character_subclasses write: op is "insert" or "delete", index the slot.
+// A non-nil error fails that write before it reaches the database; the
+// function may also panic, as a store or driver bug would.
+type SubclassFault func(op string, index int) error
+
+// WithSubclassFault runs fault before every character_subclasses Insert and
+// Delete a class change issues.
+func WithSubclassFault(fault SubclassFault) Option {
+	return func(o *options) { o.subclassFault = fault }
 }
 
 // WithLog sets the link logger (default zero-logger).
@@ -1597,6 +1610,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			t.Fatalf("new water: %v", err)
 		}
 		gclConfig.Water = water
+	}
+	if o.subclassFault != nil {
+		gclConfig.Subclasses = faultySubclassStore{SubclassStore: subclasses, fault: o.subclassFault}
 	}
 	if o.slowStores > 0 {
 		gclConfig.Items = slowItemStore{ItemStore: items, delay: o.slowStores}
