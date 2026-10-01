@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
@@ -336,6 +337,9 @@ type GameClientLink struct {
 	// recommendations persists who recommended whom and the counters; see
 	// recommendation.go.
 	recommendations recommendationStore
+	// recommendGate orders recommendations against the daily refresh; see
+	// RefreshDailyRecommendations.
+	recommendGate sync.RWMutex
 }
 
 // AIRegistry owns recurring actor-AI registrations.

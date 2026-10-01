@@ -20,9 +20,9 @@ func seedRecommendationRow(t *testing.T, store *CharacterStore, id int32, name s
 	}
 }
 
-// TestRecommendationStoreGiveAndReload covers a recommendation's three
-// writes and their reload: the record, the target's count and the giver's
-// remaining count, which the character row read restores.
+// TestRecommendationStoreGiveAndReload covers a recommendation's writes and
+// their reload: the record and the giver's remaining count, then the
+// target's count, which the character row read restores.
 func TestRecommendationStoreGiveAndReload(t *testing.T) {
 	ctx := context.Background()
 	db := sqltest.SharedDB(t)
@@ -34,8 +34,11 @@ func TestRecommendationStoreGiveAndReload(t *testing.T) {
 	if ids, err := store.ListRecommended(ctx, 0x10000001); err != nil || len(ids) != 0 {
 		t.Fatalf("ListRecommended before any = %v, %v; want none", ids, err)
 	}
-	if err := store.Give(ctx, 0x10000001, 0x10000002, 5, 5); err != nil {
+	if err := store.Give(ctx, 0x10000001, 0x10000002, 5); err != nil {
 		t.Fatalf("Give: %v", err)
+	}
+	if err := store.Receive(ctx, 0x10000002); err != nil {
+		t.Fatalf("Receive: %v", err)
 	}
 	ids, err := store.ListRecommended(ctx, 0x10000001)
 	if err != nil || !reflect.DeepEqual(ids, []int32{0x10000002}) {
@@ -53,9 +56,41 @@ func TestRecommendationStoreGiveAndReload(t *testing.T) {
 		t.Fatalf("reloaded giver left %d, target have %d; want 5 and 5", giver.RecommendationsLeft(), target.RecommendationsHave())
 	}
 	// A second record of the same pair is a duplicate key: the remaining
-	// writes are skipped and the failure reported.
-	if err := store.Give(ctx, 0x10000001, 0x10000002, 6, 4); err == nil {
+	// count is skipped and the failure reported.
+	if err := store.Give(ctx, 0x10000001, 0x10000002, 4); err == nil {
 		t.Fatal("duplicate Give returned no error")
+	}
+	if giver, err := chars.Get(ctx, 0x10000001); err != nil || giver.RecommendationsLeft() != 5 {
+		t.Fatalf("giver after a duplicate Give: %v; want 5 left kept", err)
+	}
+}
+
+// TestRecommendationStoreReceiveAddsToStoredCount pins that Receive adds to
+// the stored count instead of overwriting it, and stops at 255.
+func TestRecommendationStoreReceiveAddsToStoredCount(t *testing.T) {
+	ctx := context.Background()
+	db := sqltest.SharedDB(t)
+	chars := NewCharacterStore(db)
+	store := NewRecommendationStore(db)
+	seedRecommendationRow(t, chars, 0x10000021, "Popular", 30, 7, 0)
+	seedRecommendationRow(t, chars, 0x10000022, "Capped", 30, 254, 0)
+
+	for range 2 {
+		if err := store.Receive(ctx, 0x10000021); err != nil {
+			t.Fatalf("Receive: %v", err)
+		}
+		if err := store.Receive(ctx, 0x10000022); err != nil {
+			t.Fatalf("Receive capped: %v", err)
+		}
+	}
+	for id, want := range map[int32]int{0x10000021: 9, 0x10000022: 255} {
+		c, err := chars.Get(ctx, id)
+		if err != nil {
+			t.Fatalf("Get %d: %v", id, err)
+		}
+		if c.RecommendationsHave() != want {
+			t.Errorf("%s have %d, want %d", c.Name, c.RecommendationsHave(), want)
+		}
 	}
 }
 
@@ -81,8 +116,11 @@ func TestRecommendationStoreRefreshDaily(t *testing.T) {
 	for i, r := range rows {
 		seedRecommendationRow(t, chars, r.id, "Daily"+string(rune('A'+i)), r.level, r.have, r.left)
 	}
-	if err := store.Give(ctx, 0x10000011, 0x10000012, 11, 0); err != nil {
+	if err := store.Give(ctx, 0x10000011, 0x10000012, 0); err != nil {
 		t.Fatalf("Give: %v", err)
+	}
+	if err := store.Receive(ctx, 0x10000012); err != nil {
+		t.Fatalf("Receive: %v", err)
 	}
 	rows[1].wantHave = 9 // 11 held before the refresh
 

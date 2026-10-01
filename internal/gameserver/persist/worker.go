@@ -254,3 +254,48 @@ func wait(ctx context.Context, wg *sync.WaitGroup) error {
 		return ctx.Err()
 	}
 }
+
+// Pause holds every lane at the point it is called: each lane runs the jobs
+// enqueued before Pause, then waits; jobs enqueued after Pause wait behind
+// it. The caller must call Run on the result exactly once, which is what
+// releases the lanes.
+//
+// It lets a write that spans every owner (a table-wide reset) land between
+// two sets of per-owner jobs: those already queued land before it, and those
+// queued once Pause returns land after it.
+func (w *Worker) Pause() *Paused {
+	p := &Paused{release: make(chan struct{})}
+	if w == nil {
+		return p
+	}
+	for i := range w.lanes {
+		p.arrived.Add(1)
+		// A closed lane refuses the marker; it is draining what it already
+		// holds and takes nothing new, so there is nothing to order against.
+		if !w.lanes[i].push(func() {
+			p.arrived.Done()
+			<-p.release
+		}) {
+			p.arrived.Done()
+		}
+	}
+	return p
+}
+
+// Paused is a hold on every lane taken by Pause.
+type Paused struct {
+	arrived sync.WaitGroup
+	release chan struct{}
+	once    sync.Once
+}
+
+// Run waits until every lane has run what was queued before Pause, calls fn
+// with every lane held, and then releases the lanes. If ctx ends first it
+// releases the lanes without calling fn and returns ctx's error.
+func (p *Paused) Run(ctx context.Context, fn func() error) error {
+	defer p.once.Do(func() { close(p.release) })
+	if err := wait(ctx, &p.arrived); err != nil {
+		return err
+	}
+	return fn()
+}

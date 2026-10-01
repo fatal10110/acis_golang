@@ -15,3 +15,21 @@ func (s *Server) RefreshDailyRecommendations(tb testing.TB) {
 	}
 	s.Settle(tb)
 }
+
+// StartDailyRecommendationRefresh starts the daily recommendation refresh
+// on its own goroutine, for a suite that holds a persistence lane the
+// refresh has to wait for. The returned wait blocks until the refresh
+// returns, fails the test on its error, and then settles like
+// RefreshDailyRecommendations.
+func (s *Server) StartDailyRecommendationRefresh(tb testing.TB) (wait func()) {
+	tb.Helper()
+	done := make(chan error, 1)
+	go func() { done <- s.refreshRecommendations(context.Background()) }()
+	return func() {
+		tb.Helper()
+		if err := <-done; err != nil {
+			tb.Fatalf("refresh daily recommendations: %v", err)
+		}
+		s.Settle(tb)
+	}
+}

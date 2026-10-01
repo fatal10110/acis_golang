@@ -42,18 +42,26 @@ func (s *RecommendationStore) ListRecommended(ctx context.Context, charID int32)
 	return out, nil
 }
 
-// Give records that giverID recommended targetID, then stores the target's
-// new count and the giver's remaining one. Each write commits on its own
-// and the first failure skips the rest.
-func (s *RecommendationStore) Give(ctx context.Context, giverID, targetID int32, targetHave, giverLeft int) error {
+// Give records that giverID recommended targetID and stores the giver's
+// remaining count. Each write commits on its own and a failed record skips
+// the count. The target's count is raised separately by Receive.
+func (s *RecommendationStore) Give(ctx context.Context, giverID, targetID int32, giverLeft int) error {
 	if _, err := s.db.ExecContext(ctx, `INSERT INTO character_recommends (char_id, target_id) VALUES (?, ?)`, giverID, targetID); err != nil {
 		return fmt.Errorf("record recommendation of %d by %d: %w", targetID, giverID, err)
 	}
-	if _, err := s.db.ExecContext(ctx, `UPDATE characters SET rec_have = ? WHERE obj_Id = ?`, targetHave, targetID); err != nil {
-		return fmt.Errorf("save recommendations of %d: %w", targetID, err)
-	}
 	if _, err := s.db.ExecContext(ctx, `UPDATE characters SET rec_left = ? WHERE obj_Id = ?`, giverLeft, giverID); err != nil {
 		return fmt.Errorf("save recommendations left of %d: %w", giverID, err)
+	}
+	return nil
+}
+
+// Receive raises targetID's stored count by one, capped at 255. It adds to
+// the stored value rather than writing a count read earlier, so
+// recommendations from several givers land correctly in whatever order
+// their writes run.
+func (s *RecommendationStore) Receive(ctx context.Context, targetID int32) error {
+	if _, err := s.db.ExecContext(ctx, `UPDATE characters SET rec_have = LEAST(rec_have + 1, 255) WHERE obj_Id = ?`, targetID); err != nil {
+		return fmt.Errorf("save recommendations of %d: %w", targetID, err)
 	}
 	return nil
 }
