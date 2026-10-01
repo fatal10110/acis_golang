@@ -34,6 +34,7 @@ var adminCommands = map[string]adminCommand{
 	"admin_gmoff":        (*GameClientLink).adminGMOff,
 	"admin_ban":          (*GameClientLink).adminBan,
 	"admin_unban":        (*GameClientLink).adminUnban,
+	"admin_atmosphere":   (*GameClientLink).adminAtmosphere,
 
 	// Petitions; see admin_petition.go.
 	"admin_petition":      (*GameClientLink).adminPetition,
