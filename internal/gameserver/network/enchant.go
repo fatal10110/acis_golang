@@ -45,7 +45,7 @@ func (l *GameClientLink) useEnchantScroll(live *livePlayer, scroll *item.Instanc
 }
 
 // enchantLiveItem answers RequestEnchantItem. A dead player may enchant too:
-// the reference gates the request on the store/trade state only.
+// the request is gated on the store/trade state only.
 func (l *GameClientLink) enchantLiveItem(ctx context.Context, live *livePlayer, req clientpackets.RequestEnchantItem) {
 	if live == nil || req.ObjectID == 0 {
 		return
@@ -103,9 +103,9 @@ func (l *GameClientLink) applyEnchantSteps(live *livePlayer, steps []enchantflow
 		case enchantflow.StepRevokeArmorSetSkill:
 			l.applyArmorSetSkillChange(live, step.SkillID, false)
 		case enchantflow.StepUnequipped:
-			// The reference does not refresh the grade penalty for an item
-			// a failed enchant destroys, so only the equip side effects are
-			// undone here.
+			// The grade penalty is not refreshed for an item a failed
+			// enchant destroys, so only the equip side effects are undone
+			// here.
 			l.applyEquipItemStats(live, live.Inventory(), invops.Result{EquipmentChanged: true, Changed: step.Unequipped})
 		case enchantflow.StepCancelTrade:
 			l.cancelActiveTrade(live)

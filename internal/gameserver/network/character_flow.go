@@ -37,8 +37,7 @@ func (l *GameClientLink) authenticate(ctx context.Context, client *Client, req c
 	// A second AuthLogin for an account already claimed takes it over: the
 	// prior connection's own in-flight validation (if any) is unblocked with
 	// a rejection so it releases the account promptly, then its session is
-	// closed, matching LoginServerThread.addClient's closeNow() ahead of the
-	// new PlayerAuthRequest (LoginServerThread.java:292-304).
+	// closed ahead of the new player-auth request to the login server.
 	if l.clients != nil {
 		if evicted, replaced := l.clients.Take(req.LoginName, client); replaced {
 			l.validator.Resolve(req.LoginName, false)
@@ -145,11 +144,8 @@ func (l *GameClientLink) restoreRows(ownerID int32, items []*item.Instance, rest
 		}
 		// A row whose item template is no longer loaded — what a datapack
 		// downgrade leaves behind — is dropped from the restore and the
-		// login carries on. Inventory.restore() does the same: the
-		// ResultSet constructor dereferences the missing template,
-		// restoreFromDb swallows that and returns null, and the restore
-		// loop skips the row (Inventory.java:119-124,
-		// ItemInstance.java:108-124 and 718-735). The row itself is left
+		// login carries on: a row without its template cannot be rebuilt
+		// into an item, so the restore loop skips it. The row itself is left
 		// alone, so the item returns when its template does.
 		if l.itemTemplates != nil {
 			if _, ok := l.itemTemplates.Get(inst.TemplateID); !ok {
@@ -209,8 +205,8 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 		if err := l.skills.RestoreSkillState(ctx, c); err != nil {
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: restore skill state")
 		}
-		// Re-derive level-unlocked skills on every login (Player.java:4139
-		// calls giveSkills() right after restoreCharData()), so a free grant
+		// Re-derive level-unlocked skills on every login, right after the
+		// character data is restored, so a free grant
 		// added by an in-session level-up — which lives in memory only —
 		// comes back instead of vanishing on relog.
 		if err := l.giveOrRewardSkills(c, tmpl); err != nil {
@@ -265,8 +261,8 @@ func (l *GameClientLink) enterWorld(ctx context.Context, client *Client, c *play
 	}
 	live.storage = storage
 	if l.roster != nil {
-		// Mark the row online at login (the reference updates the online
-		// status when a client enters the world), so external DB consumers
+		// Mark the row online at login (the online status is updated when a
+		// client enters the world), so external DB consumers
 		// see online=1 without waiting for the first periodic save.
 		if err := l.roster.SaveOnlineRecency(ctx, c); err != nil {
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("enter world: save player online recency")
@@ -329,11 +325,11 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	client.Session.SendFrame(serverpackets.FrameSendMacroListEmpty())
 	client.Session.SendFrame(serverpackets.FrameExStorageMaxCount(c))
 	client.Session.SendFrame(serverpackets.FrameHennaInfo(c.HennaSnapshot()))
-	// Replay restored buffs into the live effect list here, matching
-	// EnterWorld.java:100's player.updateEffectIcons() position: List.Add's
+	// Replay restored buffs into the live effect list here, at the effect
+	// icon refresh's place in the enter-world sequence: List.Add's
 	// notifyAbnormalUpdate hook fires the resulting AbnormalStatusUpdate
-	// frame (if any effect was restored) right where the reference sends it,
-	// ahead of EtcStatusUpdate.
+	// frame (if any effect was restored) right where it belongs, ahead of
+	// EtcStatusUpdate.
 	live.replayingEffects.Store(true)
 	if l.skills != nil {
 		l.skills.ReplayEffects(c)
@@ -437,11 +433,9 @@ func expSpGainMessage(exp int64, sp int) wire.Frame {
 }
 
 // sendExpSpLossFrames tells live's own client how much experience and SP a
-// removal took. PlayerStatus.setSp sends StatusUpdate(SP) synchronously
-// during PlayableStatus.removeExpAndSp, before removeExpAndSp's own system
-// messages go out, so a combined removal orders StatusUpdate(SP) ahead of
-// EXP_DECREASED_BY_S1 (PlayerStatus.java:583-603, PlayableStatus.java:133-145,
-// PlayerStatus.java:881-891).
+// removal took. Setting SP sends StatusUpdate(SP) synchronously during the
+// removal, before the removal's own system messages go out, so a combined
+// removal orders StatusUpdate(SP) ahead of EXP_DECREASED_BY_S1.
 func sendExpSpLossFrames(live *livePlayer, e event.ExpSPLost) {
 	exp, sp := e.Exp, e.SP
 	if sp > 0 {
@@ -459,8 +453,7 @@ func sendExpSpLossFrames(live *livePlayer, e event.ExpSPLost) {
 
 // sendKarmaChangeFrames tells live's own client its new karma total:
 // SystemMessage(YOUR_KARMA_HAS_BEEN_CHANGED_TO_S1) followed by
-// StatusUpdate(KARMA), the same order Player.setKarma sends them in
-// (Player.java:1076-1080).
+// StatusUpdate(KARMA), in that order.
 func sendKarmaChangeFrames(live *livePlayer, karma int) {
 	live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageYourKarmaHasBeenChangedToS1, int32(karma)))
 	live.SendFrame(serverpackets.FrameStatusUpdate(live.ObjectID(), []serverpackets.StatusAttribute{
@@ -470,7 +463,7 @@ func sendKarmaChangeFrames(live *livePlayer, karma int) {
 
 // giveOrRewardSkills re-derives c's level-unlocked skills, calling
 // RewardSkills instead of GiveSkills whenever the server grants every
-// available skill automatically (Player.java:3256-3257).
+// available skill automatically.
 func (l *GameClientLink) giveOrRewardSkills(c *player.Character, tmpl *player.Template) error {
 	refresh := l.skills.GiveSkills
 	if l.playerConfig.AutoLearnSkills {
@@ -498,15 +491,12 @@ func (l *GameClientLink) refreshLiveLevelSkills(live *livePlayer) {
 	live.RefreshExpertisePenalty()
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 
-	// RewardSkills is the Go equivalent of Player.rewardSkills, whose grant
-	// loop calls addSkill(..., updateShortcuts=true) (Player.java:3283) only
-	// for skills the grant loop's own filter (getSkillLevel(i) < s.getValue(),
-	// Player.java:3423) restricts to level increases; GiveSkills's addSkill
-	// calls always pass false (Player.java:3262), and RewardSkills' own
-	// pull-back correction (correctInvalidSkills, mirroring
-	// removeInvalidSkills' addSkill(..., true) two-arg call at
-	// Player.java:3333,3337) also passes false. So only an actual level
-	// increase refreshes shortcuts; a pull-back's level decrease must not.
+	// RewardSkills' grant loop refreshes shortcuts only for skills its own
+	// filter (known level below the granted level) restricts to level
+	// increases; GiveSkills never refreshes them, and RewardSkills' own
+	// pull-back correction (correctInvalidSkills) does not either. So only
+	// an actual level increase refreshes shortcuts; a pull-back's level
+	// decrease must not.
 	if rewarding {
 		after := live.SkillLevels()
 		for id, level := range after {
@@ -623,8 +613,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	// save→load cycles. Current HP/MP/CP stay as restored from the row.
 	c.RestoreVitals(tmpl)
 	// Filter/populate ITEM shortcuts against the live inventory just attached
-	// above, mirroring ShortcutList.restore() (ShortcutList.java:173-209): a
-	// stale ITEM shortcut (its item consumed/traded/destroyed since last
+	// above: a stale ITEM shortcut (its item consumed/traded/destroyed since last
 	// logout) is dropped, and every surviving one gets SharedReuseGroup from
 	// its item's etc-item data.
 	shortcuts = shortcut.RestoreItemShortcuts(shortcuts, func(objectID int32) (int32, bool) {

@@ -67,8 +67,8 @@ const petRestoreTimeout = 5 * time.Second
 const petRestoreHoldCeiling = 2 * time.Second
 
 // SpawnPet resolves controlItem's saved or default pet state, spawns it
-// beside the owner, and registers it as the owner's active summon,
-// mirroring SummonCreature.java:44-76. It stops if the owner already has a
+// beside the owner, and registers it as the owner's active summon. It stops
+// if the owner already has a
 // pet or servitor tracked, or another pets-row read in flight — a re-check of
 // the gate useSummonItem already answered before the cast started.
 //
@@ -78,10 +78,9 @@ const petRestoreHoldCeiling = 2 * time.Second
 // stops. This runs
 // inside the cast's already-committed Hit phase — MagicSkillUse, the
 // SUMMON_A_PET system message and MagicSkillLaunched are already sent by the
-// caller before SpawnPet runs — and Java's own handler is silent for the
-// identical set of conditions (SummonCreature.java:36,40,44,49,54, 59 are
-// all bare `return;`, with no packet beyond what the cast itself already
-// sent).
+// caller before SpawnPet runs — and the specified handler is silent for the
+// identical set of conditions (each is a bare return, with no packet beyond
+// what the cast itself already sent).
 //
 // When the pets row has to be read, the spawn finishes on the owner's queue
 // after the read (see spawnRestoredPet), so it reports nothing to its
@@ -126,10 +125,10 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// sends keep their own order; a closed queue (the owner logged out while
 	// the read ran) drops it.
 	//
-	// Moving the read off the queue splits what the reference does in one
-	// synchronous block: it resolves the row, registers the summon and
-	// spawns inside useSkill, and only then schedules the cast's finalizer
-	// (SummonCreature.java:28-77, PlayerCast.java:150-173). Both halves of
+	// Moving the read off the queue splits what is specified as one
+	// synchronous block: resolve the row, register the summon and spawn
+	// inside the skill use, and only then schedule the cast's finalizer.
+	// Both halves of
 	// that atomicity have to be rebuilt here, because SUMMON_CREATURE
 	// carries no cool time — Plan.FinalDelay stays 0, so the Finish timer
 	// would otherwise be armed the instant the Hit phase returns and no
@@ -137,18 +136,18 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	//
 	// The Finish hold stands in for the finalizer's scheduling: the cast
 	// stays in flight until the spawn has run, so the client sees the pet
-	// before the cast's completion, in the reference's order. This is not
-	// extra waiting invented here — Pet.restore is a synchronous query
-	// inside useSkill, so the reference's caster is in its cast across the
-	// identical read. Unlike the reference, the queue itself keeps running
-	// the owner's other work throughout.
+	// before the cast's completion, in the specified order. This is not
+	// extra waiting invented here — the pet-row read is part of the skill
+	// use, so the caster is specified to be in its cast across the
+	// identical read. Unlike a synchronous read, the queue itself keeps
+	// running the owner's other work throughout.
 	//
-	// The summon slot is deliberately *not* claimed here. The reference's
-	// setSummon runs after Pet.restore returns (SummonCreature.java:58,64),
-	// as does its World.addPet, so getSummon() and getPet() are both null
-	// across the read and every gate reading them answers "no summon" —
-	// which is what hasActiveSummon does too. Claiming it early would make
-	// Go reject or accept where the reference does the opposite, and would
+	// The summon slot is deliberately *not* claimed here. The owner's
+	// summon slot and the world's pet entry are only filled after the pet
+	// row is restored, so both are empty across the read and every gate
+	// reading them answers "no summon" — which is what hasActiveSummon does
+	// too. Claiming it early would make Go reject or accept where the
+	// specified behavior does the opposite, and would
 	// leave hasActiveSummon reporting a summon that world.Summon cannot
 	// produce.
 	//
@@ -162,15 +161,15 @@ func (s *gameSummonSpawner) SpawnPet(owner *player.Character, controlItem *item.
 	// every owner (persist.LaneIndex), and nothing bounds that wait —
 	// a burst of logout saves landing on the same lane would otherwise keep
 	// the caster in a cast long after the client's own cast bar ended,
-	// which the reference never does: its read has nothing queued ahead of
-	// it. Past the ceiling the ordering guarantee yields to keeping the
+	// which the specified flow never does: its read has nothing queued ahead
+	// of it. Past the ceiling the ordering guarantee yields to keeping the
 	// player responsive, and the pet spawns after the cast completed, as it
 	// did before the hold existed. Release is idempotent, so the timer and
 	// the continuation race harmlessly.
 	// petRestoreInFlight outlives the ceiling on purpose. The ceiling ends
 	// the cast to keep the player responsive, but the pet is still on its
-	// way, so the gates the reference closes with isCastingNow() have to
-	// stay closed until it lands — otherwise the ceiling hands back exactly
+	// way, so the gates that refuse a casting player have to stay closed
+	// until it lands — otherwise the ceiling hands back exactly
 	// the window the hold was added to remove, and a wyvern collar used in
 	// it leaves the owner mounted with a pet arriving beside them.
 	live.petRestoreInFlight.Store(true)
@@ -229,9 +228,9 @@ func (s *gameSummonSpawner) endRestoreOnQueue(releaseFinish func()) {
 // control item still being held, and no other summon having reached the
 // world.
 //
-// The reference re-resolves the control item from the caster's inventory at
-// use time and drops out silently when it is gone or no longer theirs
-// (SummonCreature.java:34-41). Go needs that check on this side of the read:
+// The control item is re-resolved from the caster's inventory at use time,
+// and the summon drops out silently when it is gone or no longer theirs.
+// Go needs that check on this side of the read:
 // the read runs off the owner's queue, so the owner's own handlers — drop,
 // destroy, a trade transfer — can run between the cast's Hit phase and this
 // task, and a pet built from a collar someone else now holds would answer to
@@ -241,10 +240,10 @@ func (s *gameSummonSpawner) endRestoreOnQueue(releaseFinish func()) {
 // refuses later posts but still runs every task it has already accepted, so a
 // continuation queued just before detachLivePlayer closed the queue would run
 // after the session left the world — publishing a pet for an offline owner,
-// past the only cleanup that would have removed it. The reference cannot
-// reach that state: Player.cleanup aborts the cast and unsummons the pet
-// (Player.java:6266-6283), and its spawn had no separate continuation to
-// leave behind. The detaching flag is the same one taskeffects.go checks
+// past the only cleanup that would have removed it. A synchronous spawn
+// cannot reach that state: logout cleanup aborts the cast and unsummons the
+// pet, and such a spawn has no separate continuation to leave behind. The
+// detaching flag is the same one taskeffects.go checks
 // before applying a deferred effect to a departing session.
 //
 // items are the pet's saved item rows, which it carries again.
@@ -267,9 +266,9 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		return
 	}
 
-	// Java's unsaved branch commits the seeded row immediately
-	// (Pet.java:554's pet.store()); Go defers that first write to the
-	// first savePet instead — a deliberate difference locked in by this
+	// The specified unsaved branch commits the seeded row immediately; Go
+	// defers that first write to the first savePet instead — a deliberate
+	// difference locked in by this
 	// suite's "no pets row until a save point" assertions. Level/Name/
 	// Fed/HP/MP/Exp/SP are restored here because summon.Actor already
 	// exposes somewhere to put them. A row saved below creature.DeathHP
@@ -283,9 +282,9 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	if !ok {
 		// A corrupted/out-of-range saved level, or a template with no
 		// stat row for its own declared level: reject rather than spawn
-		// with zero-value combat/feeding stats, matching Pet.restore
-		// returning null on bad data (SummonCreature.java:59's pet==null
-		// check, itself a silent no-op — see this file's own SpawnPet doc).
+		// with zero-value combat/feeding stats: a pet that fails to restore
+		// on bad data is not spawned, a silent no-op (see this file's own
+		// SpawnPet doc).
 		return
 	}
 	fed, curHP, curMP := levelStats.MaxMeal, levelStats.MaxHP, levelStats.MaxMP
@@ -307,7 +306,7 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	}
 
 	// food1/food2 restore different amounts: each maps to its own feed
-	// skill (PetFoods.java's hardcoded item->skill map), and those skills'
+	// skill (the fixed item->skill map), and those skills'
 	// Feed values differ (e.g. Strider's food vs Clan Hall Strider's food).
 	foodRestore1, _ := petFoodFeedAmount(link.skills, link.petConfig.FoodRate, int32(npcTmpl.Pet.Food1))
 	var foodRestore2 int
@@ -367,8 +366,8 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		return
 	}
 	pet.SetHP(curHP)
-	// Java's Servitor/Pet construction sets max HP/MP before restoring
-	// saved current values (Pet.java:552-556); NewPet already seeds
+	// Summon construction sets max HP/MP before restoring saved current
+	// values; NewPet already seeds
 	// current HP/MP at max, so a restored value only needs applying when
 	// it differs from that default.
 	if hasSaved {
@@ -594,29 +593,26 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 			}
 		},
 	}
-	// Summon.sendPacket forwards every packet to the owner (base
-	// Creature.sendPacket is a no-op), but Java only calls sendPacket
-	// unconditionally for ATTACK_FAILED (Pdam.java:130, Manadam.java:44),
-	// MISSED_TARGET (Manadam.java:44), and the Lethal Strike messages
-	// (Formulas.java:242-244); the target-side LETHAL_STRIKE message is
-	// itself Player-gated, so lethal.TargetID's lookup naturally covers only
-	// real targets. S1_DODGES_ATTACK and S1_PERFORMING_COUNTERATTACK
-	// (Blow.java:46-47,88-89) and the generic per-effect resisted message
-	// (L2Skill.java:1196-1197) are all gated `instanceof Player` on the
-	// caster/effector and never fire for a Summon at all in the reference —
-	// but Mdam.java:69, Blow.java:74, Manadam.java:55, and
-	// L2SkillChargeDmg.java:77 send S1_RESISTED_YOUR_S2 unconditionally for
-	// the skill's own effect-landing resist, so that subset
-	// (Resisted.Unconditional) is forwarded below
+	// A summon forwards every packet sent to it to the owner (a plain
+	// creature drops them), but only some messages are sent to the caster
+	// unconditionally: ATTACK_FAILED (Pdam, Manadam), MISSED_TARGET
+	// (Manadam), and the Lethal Strike messages; the target-side
+	// LETHAL_STRIKE message is itself Player-gated, so lethal.TargetID's
+	// lookup naturally covers only real targets. S1_DODGES_ATTACK and
+	// S1_PERFORMING_COUNTERATTACK (Blow) and the generic per-effect
+	// resisted message are all gated on a Player caster/effector and never
+	// fire for a Summon at all — but Mdam, Blow, Manadam and charge-damage
+	// skills send S1_RESISTED_YOUR_S2 unconditionally for the skill's own
+	// effect-landing resist, so that subset (Resisted.Unconditional) is
+	// forwarded below
 	// alongside AttackFailed/Lethals/MagicResists/ManaDamageMissed/ManaDrains
-	// (ManaDrains is itself gated `target instanceof Player`,
-	// Manadam.java:68, independent of caster type), but
-	// YOUR_OPPONENTS_MP_WAS_REDUCED_BY_S1 (Manadam.java:72) is gated
-	// `creature instanceof Player` on the caster and stays unforwarded; a
+	// (ManaDrains is itself gated on a Player target, independent of caster
+	// type), but YOUR_OPPONENTS_MP_WAS_REDUCED_BY_S1 is gated on a Player
+	// caster and stays unforwarded; a
 	// hostile NPC caster routes through DeliverHitResult (nil live) instead:
 	// caster-addressed messages like this one are dropped there too, but
 	// target-addressed ones still reach an online target (issue #2350).
-	// AVOIDED_S1_ATTACK and COUNTERED_S1_ATTACK (Blow.java:49-50,85-86) are
+	// AVOIDED_S1_ATTACK and COUNTERED_S1_ATTACK (Blow) are
 	// gated on the *target* being a Player, independent of caster type, so
 	// Dodges/Counterattacks are forwarded here too; sendSkillHandlerResult
 	// resolves attacker/defender by ID regardless of the live argument, so
@@ -665,12 +661,10 @@ func (l *GameClientLink) sendSummonSkillResultVia(send frameSender, actor *summo
 	if !ok {
 		return
 	}
-	// Only the unconditional skill-level Resisted entries (Mdam.java:69,
-	// Blow.java:74, Manadam.java:55, L2SkillChargeDmg.java:77 — no
-	// `instanceof Player` gate) reach the owner via Summon.sendPacket's
-	// unconditional forwarding; the
-	// generic per-effect L2Skill.getEffects resist is gated
-	// `effector instanceof Player` and never fires for a Summon caster.
+	// Only the unconditional skill-level Resisted entries (Mdam, Blow,
+	// Manadam and charge damage — no Player gate) reach the owner through
+	// the summon's unconditional forwarding; the generic per-effect resist
+	// is gated on a Player effector and never fires for a Summon caster.
 	var messages []any
 	for _, message := range result.Messages {
 		switch m := message.(type) {

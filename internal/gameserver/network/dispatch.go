@@ -205,8 +205,7 @@ type GameClientLink struct {
 	validator *SessionValidator
 	// clients is the process-owned account-to-connection registry: a second
 	// AuthLogin for an account already claimed evicts the prior connection
-	// instead of being rejected (LoginServerThread.addClient,
-	// LoginServerThread.java:292-304).
+	// instead of being rejected.
 	clients       *ClientRegistry
 	loginLink     func() *LoginLink
 	roster        *manager.Roster

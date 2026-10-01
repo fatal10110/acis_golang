@@ -78,7 +78,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	// A herb is used the instant it is picked up and never reaches the
 	// inventory: it carries no client icon there, so storing it would leave
 	// an unusable blank slot. The capacity and loot-lock gates still run
-	// first, in the reference's order — a herb needs no slot, so the capacity
+	// first, in the specified order — a herb needs no slot, so the capacity
 	// check only rejects an inventory already past its limit.
 	if ground.Herb() {
 		groundState := ground.Instance.Snapshot()
@@ -174,17 +174,15 @@ func (l *GameClientLink) lockPickupParalysis(live *livePlayer) {
 // what let a click land in the unlock instant, read blocked, then read
 // not-deferrable, and get discarded instead of re-deferred (#1159).
 //
-// Crowd control IS in the block set here: ItemInstance.onAction routes pickup
-// through player.getAI().tryToPickUp (PlayerAI.java:327-414 is a red herring —
-// PlayableAI.tryToPickUp, PlayableAI.java:411-428, is the actual entry point)
-// which opens with denyAiAction() before it ever reaches the flying-only
-// check further down. Creature.denyAiAction() (Creature.java:636-639) unions
+// Crowd control IS in the block set here: a pickup click goes through the
+// playable AI's pickup entry, which opens with the deny-action check before
+// it ever reaches the flying-only check further down. That check unions
 // stunned/sleeping/paralyzed/afraid with teleporting, immobile-until-attacked
 // and dead; this port models the CC quartet via liveItemInteractionAllowed
 // (matching use/unequip) and leaves teleporting/immobile-until-attacked as
 // the same documented deferred gaps noted for those two handlers. The
-// transient pickup lock (pickupLocked, the PlayerAI.java:406-407 200ms
-// anti-mash gate), a swing and a cast in flight queue the pickup as the next
+// transient pickup lock (pickupLocked, the 200ms anti-mash gate), a swing
+// and a cast in flight queue the pickup as the next
 // intention, run when the lock lifts, the swing ends (finishQueuedBehindAttack)
 // or the cast ends (finishLiveCast).
 func livePickupBlockedDeferrable(live *livePlayer) (blocked, deferrable bool) {
@@ -245,7 +243,7 @@ func (l *GameClientLink) broadcastToSelfAndKnownInRadius(p *livePlayer, radius i
 	})
 }
 
-// failedPickupFrame mirrors the reference server's loot-locked messaging:
+// failedPickupFrame builds the loot-locked message:
 // adena reports only the amount, a single non-adena item names itself, and
 // a stack of more than one names itself alongside its count.
 func failedPickupFrame(templateID int32, count int) wire.Frame {

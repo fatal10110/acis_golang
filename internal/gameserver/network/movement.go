@@ -15,30 +15,29 @@ import (
 // packetOrigin are the packet's raw target/origin coordinates, before the
 // floor-to-head Z conversion below.
 func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin location.Location) {
-	// Reference: MoveBackwardToLocation.java:76 rejects while
-	// player.isOutOfControl() (Creature.java:652-655).
+	// Reject while the player is out of control.
 	if liveOutOfControl(live) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	// Reference: MoveBackwardToLocation.java:82-86 rejects a zero move speed
-	// with both ActionFailed and CANT_MOVE_TOO_ENCUMBERED, distinct from the
+	// A zero move speed is rejected with both ActionFailed and
+	// CANT_MOVE_TOO_ENCUMBERED, distinct from the
 	// arrow-key (MoveMovement == 0) rejection handled by the caller.
 	if liveMoveSpeed(live) == 0 {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantMoveTooEncumbered))
 		return
 	}
-	// Reference: MoveBackwardToLocation.java:90 cancels an in-progress
-	// enchant once the out-of-control and zero-speed gates pass, before
+	// Cancel an in-progress enchant once the out-of-control and zero-speed
+	// gates pass, before
 	// the floor-to-head Z conversion and 9900-distance cap — a later
 	// rejected walk still closes the enchant window.
 	l.cancelActiveEnchant(live)
-	// Reference: MoveBackwardToLocation.java:92-93 converts the floor-level
-	// target Z the client sent into head-level Z before pathing.
+	// Convert the floor-level target Z the client sent into head-level Z
+	// before pathing.
 	target.Z += int(live.CollisionHeight())
-	// Reference: MoveBackwardToLocation.java:109-114 rejects any target
-	// farther than 9900 units from the packet's own origin (not the
+	// Reject any target farther than 9900 units from the packet's own
+	// origin (not the
 	// server-authoritative position used below to simulate the walk).
 	if target.Distance3D(packetOrigin) > 9900 {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -72,8 +71,7 @@ func (l *GameClientLink) startLiveMove(live *livePlayer, target location.Locatio
 	live.replaceIntention()
 
 	// The server-authoritative position, never the packet's claimed origin,
-	// is what the walk simulates from (matching the reference's
-	// tryToMoveTo) — the client origin is nothing but a lag hint the
+	// is what the walk simulates from — the client origin is nothing but a lag hint the
 	// server must not adopt.
 	accepted, err := live.move.MoveToLocation(target)
 	if err != nil {
@@ -134,13 +132,13 @@ func (l *GameClientLink) stopLivePlayer(live *livePlayer) {
 	// CannotMoveAnymore is a stop report, not a position report. The walk
 	// is simulated server-side, so the stop point is wherever that
 	// simulation stands; the client-reported coordinates and heading are
-	// discarded exactly like the reference's getMove().stop() does.
+	// discarded: the stop keeps the server-side position.
 	live.move.Stop()
 }
 
 func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported location.Location) {
-	// Reference: ValidatePosition.java:39 skips validation entirely while
-	// isTeleporting() — no correction packet, unlike the other two gates
+	// Validation is skipped entirely while teleporting — no correction
+	// packet, unlike the other two gates
 	// here which answer ActionFailed.
 	if live.Teleporting() {
 		return
@@ -300,12 +298,12 @@ func (l *GameClientLink) standAttackedLivePlayer(live *livePlayer) {
 	})
 }
 
-// broadcastLiveSocialAction mirrors the reference behavior for an emote
-// request: a rejected emote (out-of-range id, dead, sitting, or in combat)
+// broadcastLiveSocialAction handles an emote request: a rejected emote
+// (out-of-range id, dead, sitting, or in combat)
 // answers with nothing, on purpose. Emotes don't register a pending client
 // action the way target/attack/item clicks do, so silence can't freeze input
 // the way the silent-drop bug class behind #829 freezes it — and the
-// reference handler itself stays silent on every rejection path except the
+// specified handler stays silent on every rejection path except the
 // fishing one (the fishing check is a separate, not-yet-wired gap and would
 // carry its own message, not ActionFailed). Adding ActionFailed here would
 // diverge from that behavior with no client-side benefit, so this is left

@@ -31,8 +31,8 @@ func (l *GameClientLink) openMultisell(live *livePlayer, f *npc.Folk, name strin
 // is false inside the multisell reuse window.
 //
 // A choice inside the reuse window, or one that does not match the open
-// list, the NPC or live's reach, drops the list without a word, as the
-// reference does. No client action waits on the answer: the multisell
+// list, the NPC or live's reach, drops the list without a word, as
+// specified. No client action waits on the answer: the multisell
 // window stays open and the client only sends again on the next click.
 func (l *GameClientLink) requestMultiSellChoose(live *livePlayer, req clientpackets.MultiSellChoose, allowed bool) {
 	if !allowed {

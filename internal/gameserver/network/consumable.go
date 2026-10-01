@@ -76,12 +76,11 @@ func (l *GameClientLink) useConsumableSkillItem(live *livePlayer, inv *itemconta
 }
 
 // applyItemCastCharges applies the item-carried skill's Force/Soul charges
-// to live, matching PlayableCast<Player>.doInstantCast's override
-// (PlayerCast.java:108-114): charges run after the cast's own packets
-// (shared-reuse, MagicSkillUse, USE_S1) and before the skill's effects
-// apply. Only the player who used the item — never the pet/summon herb
-// path (network/pet_herb.go) — reaches this, matching PlayableCast.java's
-// base doInstantCast having no charge handling at all.
+// to live: charges run after the cast's own packets (shared-reuse,
+// MagicSkillUse, USE_S1) and before the skill's effects apply. Only the
+// player who used the item — never the pet/summon herb path
+// (network/pet_herb.go) — reaches this: a non-player instant cast has no
+// charge handling at all.
 func applyItemCastCharges(live *livePlayer, res itemhandler.UseResult) {
 	if res.Skill.NumCharges <= 0 {
 		return

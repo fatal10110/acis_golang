@@ -63,7 +63,7 @@ func (l *GameClientLink) feedMountFood(live *livePlayer, objectID int32) {
 // skill's effect plays for everyone around, and the gauge rises by the
 // skill's feed value scaled by the pet food rate. Anyone else is told the
 // item cannot be used. A food item with no feed skill is ignored with no
-// packet, as the reference does; a use-item request leaves no client action
+// packet, as specified; a use-item request leaves no client action
 // pending.
 func (l *GameClientLink) eatPetFood(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance) bool {
 	tmpl, ok := inv.Templates().Get(inst.TemplateID)

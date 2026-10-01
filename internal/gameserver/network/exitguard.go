@@ -20,7 +20,7 @@ const (
 // now. A selected enchant scroll the player still holds refuses silently; every later reason
 // carries its own system message.
 //
-// The reference also refuses while the character's subclass lock is held and
+// Exit is also refused while the character's subclass lock is held and
 // while an initialized festival of darkness holds the player; neither system
 // is ported yet, so both conditions are unreachable here.
 func (l *GameClientLink) exitBlockReason(live *livePlayer) exitBlock {
