@@ -29,34 +29,9 @@ const (
 	PickupTaken
 )
 
-// PickupResult carries item-store operations for a pet ground-item pickup.
-type PickupResult struct {
-	Persist []inventory.Persist
-	Herb    *modelitem.Instance
-}
-
 // PickupAvailable reports whether pet can currently pick up ground items.
 func PickupAvailable(pet *summon.Actor) bool {
 	return pet != nil && !pet.Dead() && !pet.OutOfControl()
-}
-
-// PickupGround validates and moves a ground item into a pet inventory. It
-// claims ground first (see grounditem.Item.Claim) and keeps the claim only on
-// PickupOK, so the caller despawns an item no one else can take any more.
-func PickupGround(pet *summon.Actor, petInv *itemcontainer.Inventory, ground *grounditem.Item) (PickupResult, PickupFailure) {
-	herb, failure := ClaimGround(pet, petInv, ground)
-	if failure != PickupOK {
-		return PickupResult{}, failure
-	}
-	if herb {
-		return PickupResult{Herb: ground.Instance.Clone()}, PickupOK
-	}
-	persist, ok := StoreGround(petInv, ground)
-	if !ok {
-		ground.Release()
-		return PickupResult{}, PickupNoop
-	}
-	return PickupResult{Persist: persist}, PickupOK
 }
 
 // ClaimGround runs every check a pet's pickup of ground must pass and claims
