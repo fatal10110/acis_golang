@@ -164,7 +164,7 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 		// CharInfo ahead of its own burst, and a client entering sight of a
 		// restored ground item receives its SpawnItem; skip such leading
 		// spawn frames.
-		for i == 0 && (frame[0] == serverpackets.OpcodeCharInfo || frame[0] == serverpackets.OpcodeSpawnItem) {
+		for i == 0 && (frame[0] == serverpackets.OpcodeCharInfo || frame[0] == serverpackets.OpcodeRelationChanged || frame[0] == serverpackets.OpcodeSpawnItem) {
 			frame = c.Read()
 		}
 		if frame[0] != opcode {
@@ -172,7 +172,7 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 		}
 		frames = append(frames, frame)
 		if opcode == serverpackets.OpcodeEtcStatusUpdate {
-			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeSpawnItem)
+			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeRelationChanged, serverpackets.OpcodeSpawnItem)
 		}
 	}
 	return frames

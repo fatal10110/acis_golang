@@ -897,15 +897,19 @@ func (c *Character) AttackableBy(attacker target.Actor) bool {
 }
 
 // AttackableWithoutForceBy reports whether caster may attack c without force:
-// never when caster is c or c's own summon, otherwise when c and caster both
-// stand inside a PvP zone (each its own membership), or while c has karma or
-// a PvP flag.
+// never when caster is c or c's own summon; otherwise as the party, command
+// channel, clan and alliance rules decide (SocialWithoutForce); otherwise
+// when c and caster both stand inside a PvP zone (each its own membership),
+// or while c has karma or a PvP flag.
 //
-// The Olympiad, duel, arena, party, clan, alliance and siege-side rules are
-// not applied: that state is not tracked yet.
+// The Olympiad (#216), duel (#215) and siege-side (#234) rules are not
+// applied: that state is not tracked yet.
 func (c *Character) AttackableWithoutForceBy(caster target.Actor) bool {
 	if caster == nil || actingPlayerID(caster) == c.ID {
 		return false
+	}
+	if allowed, decided := c.SocialWithoutForce(c, caster); decided {
+		return allowed
 	}
 	if c.InPvPZone() && inPvPZone(caster) {
 		return true

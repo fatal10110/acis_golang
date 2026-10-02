@@ -21,12 +21,15 @@ func hiddenFrom(live *livePlayer, viewer any) bool {
 
 // broadcastCharInfo sends live's CharInfo, wearing items, to every client
 // that knows live. An invisible live is drawn invisible to everyone but game
-// masters, so a viewer gets one of two frames, each built on first use.
+// masters, so a viewer gets one of two frames, each built on first use. Each
+// player among them then gets live's relation to it, and its summon's
+// (sendRelations).
 func (l *GameClientLink) broadcastCharInfo(live *livePlayer, items []*item.Instance) {
 	if l.world == nil {
 		return
 	}
 	info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.Template(), Items: items, Clan: l.clanFields(live.Character)}
+	pet := l.summonOf(live)
 	var frames [2]wire.Frame
 	var built [2]bool
 	defer func() {
@@ -52,6 +55,9 @@ func (l *GameClientLink) broadcastCharInfo(live *livePlayer, items []*item.Insta
 		}
 		if frame, ok := serverpackets.CopyFrame(frames[hidden]); ok {
 			receiver.BroadcastFrame(frame)
+		}
+		if observer, ok := o.(*livePlayer); ok {
+			l.sendRelations(live, pet, observer.Character, observer.BroadcastFrame)
 		}
 	})
 }

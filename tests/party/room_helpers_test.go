@@ -86,6 +86,8 @@ func roomTokens(t *testing.T, frames [][]byte) []string {
 			out = append(out, "UserInfo")
 		case serverpackets.OpcodeCharInfo:
 			out = append(out, "CharInfo")
+		case serverpackets.OpcodeRelationChanged:
+			out = append(out, "Relation")
 		case serverpackets.OpcodeActionFailed:
 			out = append(out, "ActionFailed")
 		case serverpackets.OpcodeCreatureSay:

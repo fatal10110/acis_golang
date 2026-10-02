@@ -444,7 +444,7 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) {
 			}
 			// Skip nearby CharInfo/NPCInfo (owner, pets, NPCs) interleaved ahead
 			// of this client's own EnterWorld burst.
-			if frame[0] != serverpackets.OpcodeCharInfo && frame[0] != serverpackets.OpcodeNPCInfo {
+			if frame[0] != serverpackets.OpcodeCharInfo && frame[0] != serverpackets.OpcodeRelationChanged && frame[0] != serverpackets.OpcodeNPCInfo {
 				break
 			}
 		}
@@ -456,7 +456,7 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) {
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
 		}
 		if opcode == serverpackets.OpcodeEtcStatusUpdate {
-			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeNPCInfo)
+			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeRelationChanged, serverpackets.OpcodeNPCInfo)
 		}
 	}
 }

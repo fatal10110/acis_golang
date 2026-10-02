@@ -93,13 +93,17 @@ func (s *summonPvPScene) requireOwner(t *testing.T, wantKarma bool, wantFlag tas
 	}
 }
 
-// TestSummonSkillOnInnocentPlayerFlagsOwner forces the wolf's offensive
-// debuff on a karma-free, unflagged player. A summon's cast flags its
-// acting player once the skill has run (CreatureCast.callSkill): the owner
-// ends flagged, without karma.
-func TestSummonSkillOnInnocentPlayerFlagsOwner(t *testing.T) {
+// TestSummonSkillOnFlaggedPlayerFlagsOwner forces the wolf's offensive
+// debuff on a karma-free player once that player is PvP-flagged: no debuff
+// may be cast on a player outside a clan war who is neither flagged nor a
+// PKer, CTRL or not (Playable.canCastOffensiveSkillOnPlayable). A summon's
+// cast flags its acting player once the skill has run
+// (CreatureCast.callSkill): the owner ends flagged, without karma.
+func TestSummonSkillOnFlaggedPlayerFlagsOwner(t *testing.T) {
 	t.Parallel()
 	s := bootSummonPvPScene(t, false)
+	s.victim.(interface{ UpdatePvPFlag(task.PvPFlagState) }).UpdatePvPFlag(task.PvPFlagOn)
+	drainUntilQuiet(t, s.h.client)
 	s.strike(t, s.ownerFlagged)
 	if s.victim.Dead() {
 		t.Fatal("the harmless debuff killed the victim")

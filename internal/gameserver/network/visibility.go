@@ -58,6 +58,12 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 		if o.throne != nil {
 			p.sendVisibilityFrame(serverpackets.FrameChairSit(o.ObjectID(), o.throne.StaticObjectID()))
 		}
+		// Both players learn their relation to the other: p gets o's (and
+		// its summon's), o gets p's (and its summon's).
+		if l := p.link; l != nil {
+			l.sendRelations(o, l.summonOf(o), p.Character, p.sendVisibilityFrame)
+			l.sendRelations(p, l.summonOf(p), o.Character, o.SendFrame)
+		}
 		if title, ok := storeTitleFrame(o); ok {
 			p.sendVisibilityFrame(title)
 		}

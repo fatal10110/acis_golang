@@ -106,8 +106,13 @@ func frameAfterCharInfo(t *testing.T, frames [][]byte, objID int32) []byte {
 		if r.ReadInt32() != objID {
 			continue
 		}
-		if i+1 < len(frames) {
-			return frames[i+1]
+		// The player's relation to the viewer follows its CharInfo, ahead
+		// of what it is doing (Player.sendInfo, then describeStateToPlayer).
+		if i+1 >= len(frames) || frames[i+1][0] != serverpackets.OpcodeRelationChanged || wire.NewReader(frames[i+1][1:]).ReadInt32() != objID {
+			t.Fatalf("CharInfo of %d not followed by its RelationChanged", objID)
+		}
+		if i+2 < len(frames) {
+			return frames[i+2]
 		}
 		return nil
 	}

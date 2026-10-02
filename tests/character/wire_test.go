@@ -115,7 +115,7 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 		frame := c.Read()
 		// A client that already knows another player receives that player's
 		// CharInfo ahead of its own burst; skip those leading spawn frames.
-		for i == 0 && frame[0] == serverpackets.OpcodeCharInfo {
+		for i == 0 && (frame[0] == serverpackets.OpcodeCharInfo || frame[0] == serverpackets.OpcodeRelationChanged) {
 			frame = c.Read()
 		}
 		if frame[0] != opcode {
@@ -123,7 +123,7 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 		}
 		frames = append(frames, frame)
 		if opcode == serverpackets.OpcodeEtcStatusUpdate {
-			compass = gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo)
+			compass = gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeRelationChanged)
 		}
 	}
 	// Preserve the established burst indices used by other flow tests.

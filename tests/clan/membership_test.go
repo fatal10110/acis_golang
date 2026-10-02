@@ -50,7 +50,7 @@ func TestInviteAndJoin(t *testing.T) {
 	}
 
 	leader := drainFrames(t, w.leader)
-	want = []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodePledgeShowMemberListAdd, serverpackets.OpcodePledgeShowInfoUpdate, serverpackets.OpcodeCharInfo}
+	want = []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodePledgeShowMemberListAdd, serverpackets.OpcodePledgeShowInfoUpdate, serverpackets.OpcodeCharInfo, serverpackets.OpcodeRelationChanged}
 	if got := opcodes(leader); string(got) != string(want) {
 		t.Fatalf("leader's view of the join = %x, want %x", got, want)
 	}
