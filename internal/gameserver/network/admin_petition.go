@@ -182,7 +182,7 @@ func (l *GameClientLink) showPetitions(gm *livePlayer, page int) {
 	html := l.adminHTML("petitions.htm")
 	html = strings.ReplaceAll(html, "%unfollow%", unfollow)
 	html = strings.ReplaceAll(html, "%content%", b.String())
-	sendValidatedHTML(gm, 0, html, 0)
+	sendFilledHTML(gm, 0, html, 0)
 }
 
 // showPetition opens petition id on gm and marks it read. A closed
@@ -223,7 +223,7 @@ func (l *GameClientLink) showPetition(gm *livePlayer, id int32) {
 		html = strings.ReplaceAll(html, "%buttonsOrFeedback%", "")
 	}
 	html = strings.ReplaceAll(html, "%id%", strconv.Itoa(int(id)))
-	sendValidatedHTML(gm, 0, html, 0)
+	sendFilledHTML(gm, 0, html, 0)
 }
 
 // defusePlayerHTML strips the link words from text a player wrote before a
@@ -239,13 +239,9 @@ func defusePlayerHTML(text string) string {
 	return text
 }
 
-// adminHTML returns admin panel page name, the missing-page notice when
-// there is none.
+// adminHTML returns admin panel page name as set, before its placeholders
+// are filled: the page limited, or the missing-page notice when there is
+// none.
 func (l *GameClientLink) adminHTML(name string) string {
-	file := "data/html/admin/" + name
-	html, ok := l.html.Get(file)
-	if !ok {
-		html = fmt.Sprintf("<html><body>My html is missing:<br>%s</body></html>", file)
-	}
-	return html
+	return l.setPage("data/html/admin/" + name)
 }

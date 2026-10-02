@@ -24,12 +24,12 @@ func (l *GameClientLink) talkToFolk(live *livePlayer, f *npc.Folk) {
 	if id, ok := f.TalkAnimation(time.Now()); ok {
 		l.broadcastFolkFrame(f, func() wire.Frame { return serverpackets.FrameSocialAction(f.ObjectID(), id) })
 	}
-	html, outcome := f.ChatWindow(l.html, l.playerConfig.chatRules(), live.Karma())
+	html, outcome := f.ChatWindow(setPages{l.html}, l.playerConfig.chatRules(), live.Karma())
 	if outcome == npc.ChatUnported {
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Msg("npc: chat window not modeled")
 		return
 	}
-	sendValidatedHTML(live, f.ObjectID(), html, 0)
+	sendFilledHTML(live, f.ObjectID(), html, 0)
 	live.SendFrame(serverpackets.FrameActionFailed())
 }
 

@@ -127,11 +127,7 @@ func (l *GameClientLink) listAnnouncements(gm *livePlayer) bool {
 		return false
 	}
 	const file = "data/html/admin/announce_list.htm"
-	page, found := l.html.Get(file)
-	if !found {
-		page = "<html><body>My html is missing:<br>" + file + "</body></html>"
-	}
-	sendValidatedHTML(gm, 0, strings.ReplaceAll(page, placeholder, content), 0)
+	sendFilledHTML(gm, 0, strings.ReplaceAll(l.setPage(file), placeholder, content), 0)
 	return true
 }
 

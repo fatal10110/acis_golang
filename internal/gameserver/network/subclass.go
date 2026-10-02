@@ -87,13 +87,13 @@ func (l *GameClientLink) subclassBypass(live *livePlayer, f *npc.Folk, command s
 	var page string
 	switch cmd.Choice {
 	case 0:
-		page = f.SubclassPage(l.html, "SubClass", "")
+		page = f.SubclassPage(setPages{l.html}, "SubClass", "")
 	case 1:
 		if !l.subclassMenuAllowed(live) {
 			return true
 		}
 		if len(subs) >= player.MaxSubclasses {
-			page = f.SubclassPage(l.html, "SubClass_Fail", "")
+			page = f.SubclassPage(setPages{l.html}, "SubClass_Fail", "")
 			break
 		}
 		avail := f.AvailableSubclasses(base, subs)
@@ -101,32 +101,32 @@ func (l *GameClientLink) subclassBypass(live *livePlayer, f *npc.Folk, command s
 			live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, noSubclassesText))
 			return true
 		}
-		page = f.SubclassPage(l.html, "SubClass_Add", npc.SubclassAddList(avail))
+		page = f.SubclassPage(setPages{l.html}, "SubClass_Add", npc.SubclassAddList(avail))
 	case 2:
 		if !l.subclassMenuAllowed(live) {
 			return true
 		}
 		if len(subs) == 0 {
-			page = f.SubclassPage(l.html, "SubClass_ChangeNo", "")
+			page = f.SubclassPage(setPages{l.html}, "SubClass_ChangeNo", "")
 			break
 		}
 		if list := f.SubclassChangeList(base, subs); list != "" {
-			page = f.SubclassPage(l.html, "SubClass_Change", list)
+			page = f.SubclassPage(setPages{l.html}, "SubClass_Change", list)
 		} else {
-			page = f.SubclassPage(l.html, "SubClass_ChangeNotFound", "")
+			page = f.SubclassPage(setPages{l.html}, "SubClass_ChangeNotFound", "")
 		}
 	case 3:
 		if len(subs) == 0 {
-			page = f.SubclassPage(l.html, "SubClass_ModifyEmpty", "")
+			page = f.SubclassPage(setPages{l.html}, "SubClass_ModifyEmpty", "")
 			break
 		}
-		page = f.SubclassModifyPage(l.html, subs)
+		page = f.SubclassModifyPage(setPages{l.html}, subs)
 	case 4:
 		if !l.subclassActionAllowed(live) {
 			return true
 		}
 		if !l.mayAddSubclass(live, subs) || !f.ValidNewSubclass(base, subs, cmd.One) {
-			page = f.SubclassPage(l.html, "SubClass_Fail", "")
+			page = f.SubclassPage(setPages{l.html}, "SubClass_Fail", "")
 			break
 		}
 		return l.beginClassChange(live, &classChange{kind: classChangeAdd, index: len(subs) + 1, sub: player.NewSubClass(cmd.One, len(subs)+1, l.levels), folk: f})
@@ -135,7 +135,7 @@ func (l *GameClientLink) subclassBypass(live *livePlayer, f *npc.Folk, command s
 			return true
 		}
 		if live.ClassIndex() == cmd.One {
-			page = f.SubclassPage(l.html, "SubClass_Current", "")
+			page = f.SubclassPage(setPages{l.html}, "SubClass_Current", "")
 			break
 		}
 		classID := base
@@ -161,7 +161,7 @@ func (l *GameClientLink) subclassBypass(live *livePlayer, f *npc.Folk, command s
 			live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, noSubclassesText))
 			return true
 		}
-		page = f.SubclassPage(l.html, "SubClass_ModifyChoice"+string(rune('0'+cmd.One)), npc.SubclassReplaceList(cmd.One, avail))
+		page = f.SubclassPage(setPages{l.html}, "SubClass_ModifyChoice"+string(rune('0'+cmd.One)), npc.SubclassReplaceList(cmd.One, avail))
 	case 7:
 		if !l.subclassActionAllowed(live) {
 			return true
@@ -176,7 +176,7 @@ func (l *GameClientLink) subclassBypass(live *livePlayer, f *npc.Folk, command s
 		// of the links last sent.
 		return true
 	}
-	sendValidatedHTML(live, f.ObjectID(), page, 0)
+	sendFilledHTML(live, f.ObjectID(), page, 0)
 	return true
 }
 
@@ -442,7 +442,7 @@ func (l *GameClientLink) completeClassChange(live *livePlayer, ch *classChange, 
 			name = "SubClass_ModifyOk"
 		}
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAddNewSubclass))
-		sendValidatedHTML(live, ch.folk.ObjectID(), ch.folk.SubclassPage(l.html, name, ""), 0)
+		sendFilledHTML(live, ch.folk.ObjectID(), ch.folk.SubclassPage(setPages{l.html}, name, ""), 0)
 	}
 }
 

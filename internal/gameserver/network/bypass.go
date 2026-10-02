@@ -81,11 +81,12 @@ func (w *bypassWhitelist) allows(command string) bool {
 // to and including the space.
 func javaSpace(r rune) bool { return r <= ' ' }
 
-// sendValidatedHTML opens an HTML window on live and makes its bypass links
-// the ones live may send back.
+// sendValidatedHTML opens an HTML window on live showing html, a page sent
+// as loaded or built, with the page limit applied to it, and makes its
+// bypass links the ones live may send back. A page whose placeholders are
+// filled after it is loaded goes through sendFilledHTML instead.
 func sendValidatedHTML(live *livePlayer, objectID int32, html string, itemID int32) {
-	live.bypasses.record(serverpackets.NpcHtmlBody(html))
-	live.SendFrame(serverpackets.FrameNpcHtmlMessage(objectID, html, itemID))
+	sendFilledHTML(live, objectID, serverpackets.NpcHtmlBody(html), itemID)
 }
 
 // bypassRoute sends the bypass commands starting with one of prefixes to
@@ -191,7 +192,7 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 	rules := l.playerConfig.chatRules()
 	rules.AllowWear = l.merchant.Config().AllowWear
 	talker := npc.Talker{Karma: live.Karma(), Level: live.Level(), LowLevelNewbie: live.LowLevelNewbie()}
-	reply := f.Bypass(l.html, rules, talker, command)
+	reply := f.Bypass(setPages{l.html}, rules, talker, command)
 	if reply.LeadingActionFailed {
 		live.SendFrame(serverpackets.FrameActionFailed())
 	}
@@ -200,10 +201,10 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 	}
 	switch reply.Outcome {
 	case npc.BypassChatWindow:
-		sendValidatedHTML(live, f.ObjectID(), reply.HTML, 0)
+		sendFilledHTML(live, f.ObjectID(), reply.HTML, 0)
 		live.SendFrame(serverpackets.FrameActionFailed())
 	case npc.BypassPage:
-		sendValidatedHTML(live, f.ObjectID(), reply.HTML, 0)
+		sendFilledHTML(live, f.ObjectID(), reply.HTML, 0)
 	case npc.BypassSellList:
 		l.sendSellList(live, f, reply.HTML)
 	case npc.BypassBuyList:
