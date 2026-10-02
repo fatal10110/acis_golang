@@ -118,6 +118,7 @@ type options struct {
 	attackStanceNow        func() time.Time
 	spawnProtection        time.Duration
 	allowDelevel           bool
+	autoLearnSkills        bool
 	deepBlueDropRules      bool
 	autoLoot               bool
 	rateKarmaExpLost       float64
@@ -380,6 +381,12 @@ func WithPersistWait(d time.Duration) Option {
 // gated action within the shipped window can boot with zero delays.
 func WithReuseDelays(characterSelect, serverBypass time.Duration) Option {
 	return func(o *options) { o.characterSelectDelay, o.serverBypassDelay = characterSelect, serverBypass }
+}
+
+// WithAutoLearnSkills sets the players.properties AutoLearnSkills gate: a
+// level change grants every available class skill (default false).
+func WithAutoLearnSkills() Option {
+	return func(o *options) { o.autoLearnSkills = true }
 }
 
 // WithAllowDelevel sets the players.properties AllowDelevel gate: whether a
@@ -1784,6 +1791,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.board.Enabled {
 		gclConfig.Mailbox = bbs.NewMailbox(mailStore, persistWorker, o.log)
 	}
+	gclConfig.PlayerConfig.AutoLearnSkills = o.autoLearnSkills
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
 	gclConfig.ArmorSets = o.armorSets
 	gclConfig.Relations, gclConfig.Characters = relations, chars
