@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 	"github.com/rs/zerolog"
 )
 
@@ -38,11 +39,14 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	// The selection is dropped while live is still placed, so its
 	// neighborhood gets TargetUnselected before live's DeleteObject.
 	live.forgetTarget(live.Target())
-	// Leaving while holding a request still to answer, a trade or party
-	// invitation alike, cancels the open trade; otherwise it stays open on
-	// the partner's side.
+	// Leaving while holding a request still to answer, of any kind,
+	// cancels the open trade; otherwise it stays open on the partner's
+	// side. The session closes here, before the saves below, so the partner
+	// can no longer settle against live's inventory; both sides hear of the
+	// cancel only after the party leave below.
+	var canceledTrade tradebook.CancelResult
 	if l.trades != nil && l.trades.HoldsRequest(live.ObjectID()) {
-		l.cancelActiveTrade(live)
+		canceledTrade = l.trades.Cancel(live.ObjectID())
 	}
 	l.leaveActiveTrade(live)
 	// TaskEffects.Save runs on this queue too, so every autosave job is
@@ -151,12 +155,17 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	l.gms.Remove(live)
 	if l.world != nil {
 		l.world.Despawn(live)
-		// Out of sight, still listed online: drop its friend invitations and
-		// tell its friends it left.
-		l.leaveFriends(live)
+	}
+	// Out of sight, still listed online: out of its party, then the trade
+	// cancel decided above, then its friends told it left.
+	l.leaveParty(live)
+	if canceledTrade.Status == tradebook.CancelDone {
+		l.announceTradeCanceled(canceledTrade.Session, live)
+	}
+	if l.world != nil {
+		l.notifyFriends(live, false)
 		l.world.RemovePlayer(live.ObjectID())
 	}
-	l.leaveParty(live)
 	l.leaveClanOnLogout(live)
 	// Stop the periodic effect sweep from reaching this character's list:
 	// it left world.State above, but a still-held buff/debuff keeps the

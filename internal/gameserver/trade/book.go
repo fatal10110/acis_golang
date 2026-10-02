@@ -8,12 +8,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 )
 
-// RequestTimeout is how long a pending direct-trade request remains usable.
+// RequestTimeout is how long a pending request remains usable.
 const RequestTimeout = 15 * time.Second
 
 // RequestKind is what a pending request asks its target for. Every kind
 // shares one slot per player: a player answers one request at a time, and
-// waits on one it sent.
+// waits on the ones it sent.
 type RequestKind uint8
 
 // Request kinds.
@@ -22,35 +22,39 @@ const (
 	KindParty
 	KindCommandChannel
 	KindPartyRoom
+	KindFriend
 )
+
+// requestClock is one login's clock over the requests it sent. Every
+// request it sends restarts the clock, so all of its unanswered requests
+// share the latest deadline, and the first answer to any of them stops the
+// clock and ends them all. A relog starts a fresh clock; the requests the
+// earlier login sent keep pointing at the old one.
+type requestClock struct {
+	requesterID int32
+	expiresAt   time.Time
+	// left marks a login that left the world after asking. Its requests
+	// stay held until they expire, but a later login under the same id
+	// never asked, so an answer reaches nothing of it.
+	left bool
+}
 
 // pendingRequest is a request as its target holds it.
 type pendingRequest struct {
-	kind        RequestKind
-	requesterID int32
-	expiresAt   time.Time
-	// requesterLeft marks a requester that left the world after asking. The
-	// target stays held until the request expires, but the login that asked
-	// is gone: a later login under the same id never asked, so an answer
-	// reaches nothing of it.
-	requesterLeft bool
+	kind RequestKind
+	from *requestClock
 }
 
-// outgoingRequest is a request as its requester holds it. It expires on its
-// own, so a requester stays busy for the whole timeout even when its target
-// left the world before answering.
-type outgoingRequest struct {
-	targetID  int32
-	expiresAt time.Time
-}
-
-// Book owns pending and active direct-trade sessions. mu guards every map.
+// Book owns the pending-request slot every player has, whatever the kind
+// of request, and the active direct-trade sessions. mu guards every map and
+// every requestClock.
 type Book struct {
-	mu                 sync.Mutex
-	now                func() time.Time
-	pendingByTarget    map[int32]pendingRequest
-	pendingByRequester map[int32]outgoingRequest
-	active             map[int32]*session
+	mu              sync.Mutex
+	now             func() time.Time
+	pendingByTarget map[int32]pendingRequest
+	// clocks is each online requester's own request clock, while it runs.
+	clocks map[int32]*requestClock
+	active map[int32]*session
 }
 
 type session struct {
@@ -119,10 +123,10 @@ func NewBook(now func() time.Time) *Book {
 		now = time.Now
 	}
 	return &Book{
-		now:                now,
-		pendingByTarget:    make(map[int32]pendingRequest),
-		pendingByRequester: make(map[int32]outgoingRequest),
-		active:             make(map[int32]*session),
+		now:             now,
+		pendingByTarget: make(map[int32]pendingRequest),
+		clocks:          make(map[int32]*requestClock),
+		active:          make(map[int32]*session),
 	}
 }
 
@@ -154,9 +158,22 @@ func (b *Book) RequestUnless(requesterID, targetID int32, refused bool) RequestR
 }
 
 func (b *Book) recordLocked(kind RequestKind, requesterID, targetID int32) {
-	expiresAt := b.now().Add(RequestTimeout)
-	b.pendingByTarget[targetID] = pendingRequest{kind: kind, requesterID: requesterID, expiresAt: expiresAt}
-	b.pendingByRequester[requesterID] = outgoingRequest{targetID: targetID, expiresAt: expiresAt}
+	from := b.clocks[requesterID]
+	if from == nil {
+		from = &requestClock{requesterID: requesterID}
+		b.clocks[requesterID] = from
+	}
+	from.expiresAt = b.now().Add(RequestTimeout)
+	b.pendingByTarget[targetID] = pendingRequest{kind: kind, from: from}
+}
+
+// answeredLocked ends the request pending answered: its requester's clock
+// stops, which ends every other request that login sent too.
+func (b *Book) answeredLocked(pending pendingRequest) {
+	pending.from.expiresAt = time.Time{}
+	if b.clocks[pending.from.requesterID] == pending.from {
+		delete(b.clocks, pending.from.requesterID)
+	}
 }
 
 // Invite records a pending request of a kind other than a trade. Unlike a
@@ -182,22 +199,36 @@ func (b *Book) Invite(kind RequestKind, requesterID, targetID int32, checkReques
 // requester. A request of another kind stays pending and reports false, as
 // does one whose requester left the world after asking.
 func (b *Book) TakeInvite(kind RequestKind, targetID int32) (int32, bool) {
+	taken, ok := b.TakeRequest(kind, targetID)
+	if !ok || taken.RequesterLeft {
+		return 0, false
+	}
+	return taken.RequesterID, true
+}
+
+// Taken is a request its target answered.
+type Taken struct {
+	RequesterID int32
+	// RequesterLeft reports that the login which asked has left the world
+	// since; a later login under RequesterID is not it.
+	RequesterLeft bool
+}
+
+// TakeRequest consumes the request of kind targetID holds, whoever sent it,
+// and stops its requester's clock. A request of another kind stays pending
+// and reports false.
+func (b *Book) TakeRequest(kind RequestKind, targetID int32) (Taken, bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	b.purgeExpiredLocked(b.now())
 	pending, ok := b.pendingByTarget[targetID]
 	if !ok || pending.kind != kind {
-		return 0, false
+		return Taken{}, false
 	}
 	delete(b.pendingByTarget, targetID)
-	if out, ok := b.pendingByRequester[pending.requesterID]; ok && !pending.requesterLeft && out.targetID == targetID {
-		delete(b.pendingByRequester, pending.requesterID)
-	}
-	if pending.requesterLeft {
-		return 0, false
-	}
-	return pending.requesterID, true
+	b.answeredLocked(pending)
+	return Taken{RequesterID: pending.from.requesterID, RequesterLeft: pending.from.left}, true
 }
 
 // HoldsRequest reports whether playerID holds a request it has not
@@ -232,23 +263,22 @@ func (b *Book) Answer(targetID int32, accept bool) AnswerResult {
 		return AnswerResult{Status: AnswerMissing, TargetID: targetID}
 	}
 	delete(b.pendingByTarget, targetID)
-	if !ok || !now.Before(pending.expiresAt) {
+	if !ok || !now.Before(pending.from.expiresAt) {
 		return AnswerResult{Status: AnswerMissing, TargetID: targetID}
 	}
-	if out, ok := b.pendingByRequester[pending.requesterID]; ok && !pending.requesterLeft && out.targetID == targetID {
-		delete(b.pendingByRequester, pending.requesterID)
-	}
-	result := AnswerResult{RequesterID: pending.requesterID, TargetID: targetID, RequesterLeft: pending.requesterLeft}
+	b.answeredLocked(pending)
+	requesterID := pending.from.requesterID
+	result := AnswerResult{RequesterID: requesterID, TargetID: targetID, RequesterLeft: pending.from.left}
 	if !accept {
 		result.Status = AnswerDenied
 		return result
 	}
 
-	s := newSession(pending.requesterID, targetID)
-	if pending.requesterLeft {
-		s.leftID = pending.requesterID
+	s := newSession(requesterID, targetID)
+	if pending.from.left {
+		s.leftID = requesterID
 	} else {
-		b.active[pending.requesterID] = s
+		b.active[requesterID] = s
 	}
 	b.active[targetID] = s
 	result.Status = AnswerAccepted
@@ -283,8 +313,8 @@ func (b *Book) ProcessingTransaction(playerID int32) bool {
 	return b.processingTransactionLocked(playerID)
 }
 
-// ProcessingRequest reports whether playerID has an unexpired trade
-// request it sent or received, leaving an open session out.
+// ProcessingRequest reports whether playerID has an unexpired request of
+// any kind it sent or received, leaving an open session out.
 func (b *Book) ProcessingRequest(playerID int32) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -297,7 +327,7 @@ func (b *Book) processingRequestLocked(playerID int32) bool {
 	if _, ok := b.pendingByTarget[playerID]; ok {
 		return true
 	}
-	_, ok := b.pendingByRequester[playerID]
+	_, ok := b.clocks[playerID]
 	return ok
 }
 
@@ -396,21 +426,18 @@ func (b *Book) Cancel(playerID int32) CancelResult {
 //
 // A request still waiting for an answer goes the same way. One playerID
 // received is dropped, so a later login has nothing to answer, while its
-// requester stays busy until the request would have expired. One playerID
-// sent no longer holds playerID, so a later login is free to trade at once,
-// while its target stays held until expiry and an answer opens nothing on
-// that later login (Answer).
+// requester stays busy until the request would have expired. The ones
+// playerID sent no longer hold playerID, so a later login is free at once,
+// while their targets stay held until expiry and an answer reaches nothing
+// of that later login (Answer, TakeRequest).
 func (b *Book) Leave(playerID int32) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	delete(b.pendingByTarget, playerID)
-	if out, ok := b.pendingByRequester[playerID]; ok {
-		delete(b.pendingByRequester, playerID)
-		if pending, ok := b.pendingByTarget[out.targetID]; ok && pending.requesterID == playerID {
-			pending.requesterLeft = true
-			b.pendingByTarget[out.targetID] = pending
-		}
+	if own := b.clocks[playerID]; own != nil {
+		own.left = true
+		delete(b.clocks, playerID)
 	}
 
 	s := b.active[playerID]
@@ -668,13 +695,13 @@ func (b *Book) purgeExpiredLocked(now time.Time) {
 		if s := b.active[targetID]; s != nil && !s.locked {
 			continue
 		}
-		if !now.Before(pending.expiresAt) {
+		if !now.Before(pending.from.expiresAt) {
 			delete(b.pendingByTarget, targetID)
 		}
 	}
-	for requesterID, out := range b.pendingByRequester {
-		if !now.Before(out.expiresAt) {
-			delete(b.pendingByRequester, requesterID)
+	for requesterID, own := range b.clocks {
+		if !now.Before(own.expiresAt) {
+			delete(b.clocks, requesterID)
 		}
 	}
 }
@@ -683,11 +710,7 @@ func (b *Book) processingTransactionLocked(objectID int32) bool {
 	if b.active[objectID] != nil {
 		return true
 	}
-	if _, ok := b.pendingByTarget[objectID]; ok {
-		return true
-	}
-	_, ok := b.pendingByRequester[objectID]
-	return ok
+	return b.processingRequestLocked(objectID)
 }
 
 func itemForOffer(inv Holdings, bound BoundItems, ownerID, objectID int32, count int) (*item.Instance, bool) {

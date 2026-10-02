@@ -32,8 +32,8 @@ type InviteParties struct {
 }
 
 // CheckInvite returns the first refusal p meets, or InviteAllowed. Whether
-// the target is busy with another request is decided when the invitation is
-// recorded (Invites.Offer), after every check here passes.
+// the target is busy with another request is decided when the invitation
+// takes the target's request slot, after every check here passes.
 func (m *Manager) CheckInvite(p InviteParties) InviteRefusal {
 	switch {
 	case !p.TargetOnline:

@@ -424,10 +424,15 @@ func (l *GameClientLink) cancelTradeByID(playerID int32) {
 // partner is gone still hears its own cancel. Neither does a partner who
 // left with the window open, even when a new login holds its id.
 func (l *GameClientLink) sendTradeCanceled(session tradebook.Session, cancellerID int32) {
-	canceller, ok := l.livePlayerByID(cancellerID)
-	if !ok {
-		return
+	if canceller, ok := l.livePlayerByID(cancellerID); ok {
+		l.announceTradeCanceled(session, canceller)
 	}
+}
+
+// announceTradeCanceled is sendTradeCanceled for a canceller already in
+// hand, which need no longer be listed in the world.
+func (l *GameClientLink) announceTradeCanceled(session tradebook.Session, canceller *livePlayer) {
+	cancellerID := canceller.ObjectID()
 	if partnerID, ok := session.PartnerID(cancellerID); ok && !session.PartnerLeft(cancellerID) {
 		if partner, ok := l.livePlayerByID(partnerID); ok {
 			sendTradeCancel(partner, canceller.Name)
