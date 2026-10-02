@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -27,8 +29,12 @@ func TestCubicHandlerAddsToSelfWhenSingleTarget(t *testing.T) {
 	}
 }
 
+// TestCubicHandlerDelegatesServitorBranch casts a non-cubic SUMMON from a
+// real player: it asks for the servitor and admits no cubic.
 func TestCubicHandlerDelegatesServitorBranch(t *testing.T) {
-	caster := newFakeCubicSummoner(true)
+	caster := &player.Character{ID: 1}
+	rec := &event.Recorder{}
+	caster.Attach(nil, rec)
 
 	result := cubicHandler{}.UseResult(Cast{
 		Caster:  caster,
@@ -36,14 +42,15 @@ func TestCubicHandlerDelegatesServitorBranch(t *testing.T) {
 		Targets: []Actor{caster},
 	})
 
-	if result.CubicAdded {
-		t.Fatal("UseResult().CubicAdded = true for a non-cubic SUMMON skill, want false")
+	if result.CubicAdded || result.CubicTouched {
+		t.Fatalf("UseResult() CubicAdded/CubicTouched = %v/%v for a non-cubic SUMMON skill, want false/false", result.CubicAdded, result.CubicTouched)
 	}
-	if len(caster.added) != 0 {
-		t.Fatal("servitor-branch cast touched the cubic list, want untouched")
+	if got := caster.CubicIDs(); len(got) != 0 {
+		t.Fatalf("caster cubics = %v, want none", got)
 	}
-	if caster.servitor.NpcID != 14848 {
-		t.Fatalf("SummonServitor() NpcID = %d, want 14848", caster.servitor.NpcID)
+	requests := event.Of[event.ServitorSummonRequested](rec)
+	if len(requests) != 1 || requests[0].Skill.NpcID != 14848 {
+		t.Fatalf("servitor summon requests = %+v, want one for npc 14848", requests)
 	}
 }
 
@@ -77,9 +84,11 @@ func TestCubicHandlerMassCubicMarksOthersGivenByOther(t *testing.T) {
 	}
 }
 
+// TestCubicHandlerRegisteredForSummonType dispatches a cubic SUMMON through
+// the default registry and finds the cubic in a real player's active list.
 func TestCubicHandlerRegisteredForSummonType(t *testing.T) {
 	registry := NewDefaultRegistry()
-	caster := newFakeCubicSummoner(true)
+	caster := &player.Character{ID: 1}
 
 	if !registry.Use(Cast{
 		Caster:  caster,
@@ -88,7 +97,7 @@ func TestCubicHandlerRegisteredForSummonType(t *testing.T) {
 	}) {
 		t.Fatal("Use() returned false for SUMMON")
 	}
-	if !caster.added[cubic.Vampiric] {
-		t.Fatal("registry dispatch never reached cubicHandler")
+	if got := caster.CubicIDs(); len(got) != 1 || got[0] != int(cubic.Vampiric) {
+		t.Fatalf("caster cubics = %v, want [%d]: registry dispatch never reached cubicHandler", got, cubic.Vampiric)
 	}
 }
