@@ -70,6 +70,7 @@ type gameplayConfig struct {
 	SubclassWithoutQuests    subclassWithoutQuests
 	BlacksmithUseRecipes     blacksmithUseRecipes
 	AllowDiscardItem         allowDiscardItem
+	PartyRange               partyRange
 	SpawnMultiplier          spawnMultiplier
 	RandomWalkRate           randomWalkRate
 	MaxGeoPathFailCount      maxGeoPathFailCount
@@ -176,6 +177,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.AllowDiscardItem, err = loadAllowDiscardItem(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.PartyRange, err = loadPartyRange(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.SpawnMultiplier, err = loadSpawnMultiplier(paths); err != nil {

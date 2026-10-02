@@ -701,8 +701,8 @@ func TestCorpseMobHandlerCastConditions(t *testing.T) {
 
 // Reference: PlayerCast.canCast, case SWEEP: a player's non-area sweep of
 // a Monster refuses with SWEEPER_FAILED_TARGET_NOT_SPOILED when nobody
-// spoiled it and SWEEP_NOT_ALLOWED when the caster is not the spoiler (nor,
-// once parties exist, in the spoiler's party). AREA_CORPSE_MOB skips both.
+// spoiled it and SWEEP_NOT_ALLOWED when the caster is not the spoiler (nor
+// in the spoiler's party: sweep_party_test.go). AREA_CORPSE_MOB skips both.
 func TestSweepNeedsTheCastersOwnSpoil(t *testing.T) {
 	spoiler := &targetActor{id: 1, kind: actor.KindPlayer}
 	other := &targetActor{id: 2, kind: actor.KindPlayer}
@@ -1274,7 +1274,12 @@ func (a *targetActor) CorpseTime() time.Duration { return a.corpseTime }
 
 func (a *targetActor) Spoiled() bool { return a.spoiled }
 
-func (a *targetActor) SpoiledBy(objectID int32) bool { return a.spoiled && a.spoiler == objectID }
+func (a *targetActor) SpoilerID() int32 {
+	if !a.spoiled {
+		return 0
+	}
+	return a.spoiler
+}
 
 func (a *targetActor) Seeded() bool { return a.seeded }
 

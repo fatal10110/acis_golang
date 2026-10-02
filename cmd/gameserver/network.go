@@ -149,6 +149,7 @@ func provideGameClientLink(
 		GMStartupInvulnerable:      gameplay.Admin.GMStartupInvulnerable,
 		GMStartupInvisible:         gameplay.Admin.GMStartupInvisible,
 		GMStartupBlockAll:          gameplay.Admin.GMStartupBlockAll,
+		PartyRange:                 int(gameplay.PartyRange),
 	}
 	link, err := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,

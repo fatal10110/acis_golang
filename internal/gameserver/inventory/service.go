@@ -238,23 +238,28 @@ const (
 	PickupSlotsFull
 )
 
+// LootPicker is the player a ground item's loot lock is checked against.
+type LootPicker interface {
+	// IsLooterOrInLooterParty reports whether the player may take loot
+	// reserved to ownerID: it is the owner, or in the owner's party or
+	// command channel.
+	IsLooterOrInLooterParty(ownerID int32) bool
+}
+
 // LootLocked reports whether a ground item owned by ownerID is reserved
-// against pickerID: an unowned item (ownerID == 0) is free for anyone, an
-// owned one only goes to its owner. Callers pass an owner id they already
-// read, so one snapshot decides both the lock and the pickup.
-//
-// The full loot rule also admits members of the owner's party or command
-// channel (#3157); this narrower owner comparison is stated in one place
-// instead of two.
-func LootLocked(ownerID, pickerID int32) bool {
-	return ownerID != 0 && ownerID != pickerID
+// against picker: an unowned item (ownerID == 0) is free for anyone, an
+// owned one goes to its owner and the members of the owner's party or
+// command channel. Callers pass an owner id they already read, so one
+// snapshot decides both the lock and the pickup.
+func LootLocked(ownerID int32, picker LootPicker) bool {
+	return ownerID != 0 && !picker.IsLooterOrInLooterParty(ownerID)
 }
 
 // PickupGround moves ground (with its loaded template) into inv, the same
 // way any other incoming item would merge into an existing stack or take a
-// free slot. pickerID is compared against ground.OwnerID to enforce a loot
+// free slot. picker is checked against ground.OwnerID to enforce a loot
 // lock; an unowned ground item (OwnerID == 0) is free for anyone.
-func (s *Service) PickupGround(inv *itemcontainer.Inventory, ground *item.Instance, tmpl *item.Template, pickerID int32) (Result, PickupFailure) {
+func (s *Service) PickupGround(inv *itemcontainer.Inventory, ground *item.Instance, tmpl *item.Template, picker LootPicker) (Result, PickupFailure) {
 	groundState := ground.Snapshot()
 	if inv == nil || ground == nil || tmpl == nil || groundState.Count <= 0 {
 		return Result{}, PickupNoop
@@ -262,12 +267,21 @@ func (s *Service) PickupGround(inv *itemcontainer.Inventory, ground *item.Instan
 	if !inv.ValidateCapacity(inv.SlotsNeededFor(ground, tmpl)) {
 		return Result{}, PickupSlotsFull
 	}
-	if LootLocked(groundState.OwnerID, pickerID) {
+	if LootLocked(groundState.OwnerID, picker) {
 		return Result{}, PickupLootLocked
 	}
+	return s.TakeGround(inv, ground)
+}
 
-	picked := groundState.Instance()
-	result, absorbed := inv.Add(picked)
+// TakeGround moves ground into inv with no slot or loot-lock check: the
+// caller decided both, as a party's loot rule does for the member it hands
+// a picked-up item to.
+func (s *Service) TakeGround(inv *itemcontainer.Inventory, ground *item.Instance) (Result, PickupFailure) {
+	groundState := ground.Snapshot()
+	if inv == nil || groundState.Count <= 0 {
+		return Result{}, PickupNoop
+	}
+	result, absorbed := inv.Add(groundState.Instance())
 	if result == nil {
 		return Result{}, PickupNoop
 	}

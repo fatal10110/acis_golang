@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -215,12 +216,7 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 		return
 	}
 
-	// The ground item's row comes from outside the pet's inventory, and may
-	// still be bound to the trade that gave it to its dropper, so the
-	// operation names it too.
-	end := l.itemInstances.BeginOperationTaking([]int32{ground.Instance.ObjectID}, petInv.OwnerID())
-	defer end()
-	result, failure := petitem.PickupGround(pet, petInv, ground)
+	herb, failure := petitem.ClaimGround(pet, petInv, ground)
 	switch failure {
 	case petitem.PickupOK:
 	case petitem.PickupPetUnavailable:
@@ -240,16 +236,39 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	// A partied owner's loot follows the party's loot rule; a herb is the
+	// pet's to use either way.
+	if !herb {
+		if view, ok := l.partyLootView(live, ground); ok {
+			l.petPickupForParty(live, pet, petInv, ground, view)
+			return
+		}
+	}
+
+	// The ground item's row comes from outside the pet's inventory, and may
+	// still be bound to the trade that gave it to its dropper, so the
+	// operation names it too.
+	end := l.itemInstances.BeginOperationTaking([]int32{ground.Instance.ObjectID}, petInv.OwnerID())
+	defer end()
+	var persist []invops.Persist
+	if !herb {
+		var ok bool
+		if persist, ok = petitem.StoreGround(petInv, ground); !ok {
+			ground.Release()
+			live.SendFrame(serverpackets.FrameActionFailed())
+			return
+		}
+	}
 
 	l.broadcastGroundPickup(ground, pet.ObjectID())
 	l.groundItems.Remove(ground)
 	l.world.Despawn(ground)
 	l.broadcastPetPickupAttention(live, ground)
 
-	if result.Herb != nil {
-		l.consumePetHerb(live, pet, petInv, result.Herb)
+	if herb {
+		l.consumePetHerb(live, pet, petInv, ground.Instance.Clone())
 	}
-	l.applyPersistActions(result.Persist)
+	l.applyPersistActions(persist)
 	end()
 }
 

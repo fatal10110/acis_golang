@@ -235,6 +235,9 @@ type PlayerConfig struct {
 	// inverted, so the zero value takes every ingredient as the shipped
 	// config does.
 	KeepMaintainedIngredients bool
+	// PartyRange is how near the loot a party member must be to share it,
+	// body to body; -1 is unlimited, and 0 the shipped 1500.
+	PartyRange int
 }
 
 // GameClientLink accepts and drives connections from Interlude game

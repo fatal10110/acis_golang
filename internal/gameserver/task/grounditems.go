@@ -84,8 +84,8 @@ type DropOptions struct {
 	DropperID int32
 
 	// ProtectOwnerID, when non-zero, reserves the drop to that object id
-	// for ProtectFor: inventory.LootLocked rejects pickup by anyone else
-	// until the deadline passes. ProtectFor <= 0 disables the lock even if
+	// for ProtectFor: inventory.LootLocked rejects pickup by anyone but it
+	// and its party or command channel until the deadline passes. ProtectFor <= 0 disables the lock even if
 	// ProtectOwnerID is set.
 	ProtectOwnerID int32
 	ProtectFor     time.Duration

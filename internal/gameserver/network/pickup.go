@@ -87,7 +87,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSlotsFull))
 			return true
 		}
-		if invops.LootLocked(groundState.OwnerID, live.ObjectID()) {
+		if invops.LootLocked(groundState.OwnerID, live) {
 			live.SendFrame(serverpackets.FrameActionFailed())
 			live.SendFrame(failedPickupFrame(ground.ItemID(), ground.Count()))
 			return true
@@ -99,6 +99,13 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 		l.world.Despawn(ground)
 		l.lockPickupParalysis(live)
 		l.consumeHerb(live, ground.ItemID())
+		return true
+	}
+
+	// A partied picker's loot follows the party's loot rule; a cursed
+	// weapon never does.
+	if view, ok := l.partyLootView(live, ground); ok {
+		taken = l.pickupGroundForParty(live, ground, view)
 		return true
 	}
 
@@ -119,7 +126,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	// dropper, so the operation names it too.
 	end := l.itemInstances.BeginOperationTaking([]int32{picked.ObjectID}, inv.OwnerID())
 	defer end()
-	res, failure := l.inventory.PickupGround(inv, &ground.Instance, ground.Template, live.ObjectID())
+	res, failure := l.inventory.PickupGround(inv, &ground.Instance, ground.Template, live)
 	l.applyPersistActions(res.Persist)
 	end()
 	switch failure {
@@ -138,24 +145,28 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	}
 
 	taken = true
+	l.takeGroundFromWorld(live, ground)
+	live.ItemAdded(obtained)
+	l.lockPickupParalysis(live)
+	return true
+}
 
-	// A successful pickup still has to release the pending action the client
-	// registered when it accepted the click. GetItem, DeleteObject and
-	// InventoryUpdate all describe the world, not the action's outcome, so
-	// without this the client keeps its input locked and stops responding to
-	// every later click — the same failure shape as an unanswered rejection.
+// takeGroundFromWorld finishes live's successful pickup of ground in the
+// world. A successful pickup still has to release the pending action the
+// client registered when it accepted the click. GetItem, DeleteObject and
+// InventoryUpdate all describe the world, not the action's outcome, so
+// without this the client keeps its input locked and stops responding to
+// every later click — the same failure shape as an unanswered rejection.
+//
+// Every viewer, the picker included, then sees GetItem, then the item's
+// DeleteObject, then the attention line; what the picker or its party is
+// told it obtained comes after.
+func (l *GameClientLink) takeGroundFromWorld(live *livePlayer, ground *grounditem.Item) {
 	live.SendFrame(serverpackets.FrameActionFailed())
-
-	// Every viewer, the picker included, sees GetItem, then the item's
-	// DeleteObject, then the attention line; the picker's own pickup line
-	// comes last.
 	l.broadcastGroundPickup(ground, live.ObjectID())
 	l.groundItems.Remove(ground)
 	l.world.Despawn(ground)
 	l.broadcastPickupAttention(live, ground)
-	live.ItemAdded(obtained)
-	l.lockPickupParalysis(live)
-	return true
 }
 
 // lockPickupParalysis briefly paralyzes live after a successful pickup,

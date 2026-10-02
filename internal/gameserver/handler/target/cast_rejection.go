@@ -145,13 +145,19 @@ func targetTypeCastRejection(targetType modelskill.Target, caster, target Actor,
 
 // spoilOwned is a monster that knows which player spoiled it.
 type spoilOwned interface {
-	SpoiledBy(objectID int32) bool
+	SpoilerID() int32
 }
 
-// sweepOwnershipRejection lets a player sweep only a monster they spoiled
-// themselves. The area corpse sweep skips this gate. The spoiler's party
-// and command channel members are not let in yet (#3157). A monster that
-// cannot name its spoiler refuses the sweep.
+// lootSharer is a player that tells whether it may take loot reserved to
+// another player: its own, or its party's or command channel's.
+type lootSharer interface {
+	IsLooterOrInLooterParty(ownerID int32) bool
+}
+
+// sweepOwnershipRejection lets a player sweep only a monster spoiled by
+// itself or by a member of its party or command channel. The area corpse
+// sweep skips this gate. A monster that cannot name its spoiler refuses the
+// sweep.
 func sweepOwnershipRejection(caster, target Actor, skill *modelskill.Definition) CastRejection {
 	if skill == nil || skill.SkillType != "SWEEP" || caster.Kind() != actor.KindPlayer || !target.MonsterKind() {
 		return CastRejectNone
@@ -160,7 +166,17 @@ func sweepOwnershipRejection(caster, target Actor, skill *modelskill.Definition)
 		return CastRejectSweepNotSpoiled
 	}
 	owned, ok := target.(spoilOwned)
-	if !ok || !owned.SpoiledBy(caster.ObjectID()) {
+	if !ok {
+		return CastRejectSweepNotAllowed
+	}
+	spoiler := owned.SpoilerID()
+	if sharer, ok := caster.(lootSharer); ok {
+		if !sharer.IsLooterOrInLooterParty(spoiler) {
+			return CastRejectSweepNotAllowed
+		}
+		return CastRejectNone
+	}
+	if spoiler != caster.ObjectID() {
 		return CastRejectSweepNotAllowed
 	}
 	return CastRejectNone

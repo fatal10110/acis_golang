@@ -23,9 +23,9 @@ func (h *Hostile) Spoiled() bool {
 	return h.spoil.IsSpoiled()
 }
 
-// SpoiledBy reports whether the player objectID marked this NPC for spoil.
-func (h *Hostile) SpoiledBy(objectID int32) bool {
-	return h.spoil.IsSpoiler(objectID)
+// SpoilerID returns the player that marked this NPC for spoil, or 0.
+func (h *Hostile) SpoilerID() int32 {
+	return h.spoil.SpoilerID()
 }
 
 // SeedState returns this NPC life's manor seed state.

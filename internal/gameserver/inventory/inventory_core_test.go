@@ -138,7 +138,7 @@ func TestPickupGroundReportsCapacityBeforeLootLock(t *testing.T) {
 		t.Fatalf("ground item: %v", err)
 	}
 
-	_, failure := NewService(nil).PickupGround(inv, &ground.Instance, ground.Template, 1)
+	_, failure := NewService(nil).PickupGround(inv, &ground.Instance, ground.Template, soloPicker(1))
 
 	if failure != PickupSlotsFull {
 		t.Fatalf("PickupGround failure = %v, want PickupSlotsFull (capacity checked before loot lock)", failure)

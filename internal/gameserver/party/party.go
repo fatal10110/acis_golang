@@ -5,6 +5,7 @@
 package party
 
 import (
+	"math/rand/v2"
 	"strings"
 	"sync"
 	"time"
@@ -66,6 +67,8 @@ type Registry[M Member] struct {
 	// lootChoice is the rule a player last chose when inviting without a
 	// party of its own; the party its invitation forms takes it.
 	lootChoice map[int32]LootRule
+	// intn picks a random looter among n candidates.
+	intn func(n int) int
 }
 
 type group[M Member] struct {
@@ -75,7 +78,10 @@ type group[M Member] struct {
 	// returned notices and views may share it.
 	members []M
 	loot    LootRule
-	level   int
+	// lastLoot is the index in members of the last member whose turn it
+	// was to loot under a by-turn rule.
+	lastLoot int
+	level    int
 	// inviting is set while an invitation the leader sent waits for its
 	// answer; inviteUntil ends it.
 	inviting    bool
@@ -104,6 +110,7 @@ func NewRegistry[M Member](now func() time.Time) *Registry[M] {
 		byMember:   make(map[int32]*group[M]),
 		byID:       make(map[ID]*group[M]),
 		lootChoice: make(map[int32]LootRule),
+		intn:       rand.IntN,
 	}
 }
 

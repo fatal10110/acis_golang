@@ -179,7 +179,7 @@ func (d *deathRewards) rollDrops(receiver attackable.Combatant, attackerLevel in
 		autoLootItems = d.config.AutoLootRaid
 	}
 
-	NewKillReward(d.categories, d.hostile.SpoilPool(), levelMultiplier, d.raid, d.config.Rates, autoLootItems, d.config.AutoLootHerbs, d.ids, d.items, d.ground, d.geo, x, y, z, heading, d.hostile.ObjectID()).CalculateRewards(receiver)
+	NewKillReward(d.categories, d.hostile.SpoilPool(), levelMultiplier, d.raid, d.config.Rates, autoLootItems, d.config.AutoLootHerbs, d.ids, d.items, d.ground, d.geo, x, y, z, heading, d.hostile.ObjectID()).From(d.hostile).CalculateRewards(receiver)
 }
 
 func (d *deathRewards) grantExpAndSp(entries []playerRewardEntry, summonDamage map[int32]float64, totalDamage float64) {
