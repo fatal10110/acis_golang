@@ -76,20 +76,24 @@ type Effect struct {
 // restoreSeed carries the tick count and time-since-last-tick a persisted
 // effect had at logout, mirroring the effect_count/effect_cur_time columns
 // AbstractEffect.setCount/setTime seed before Player.restoreEffects() calls
-// scheduleEffect().
+// scheduleEffect(), and the instant at which they were read back: the
+// schedule runs from there, not from when the effect joins a list.
 type restoreSeed struct {
 	count   int32
 	elapsed int32
+	// at is the restore instant; zero means the schedule starts.
+	at time.Time
 }
 
-// seedRestore marks e to resume from count and elapsedSeconds on its next
+// seedRestore marks e to resume from count and elapsedSeconds, as of the
+// restore instant at (zero: as of the schedule start), on its next
 // startSchedule call rather than starting fresh.
-func (e *Effect) seedRestore(count, elapsedSeconds int32) {
+func (e *Effect) seedRestore(count, elapsedSeconds int32, at time.Time) {
 	if e == nil {
 		return
 	}
 	e.scheduleMu.Lock()
-	e.restore = &restoreSeed{count: count, elapsed: elapsedSeconds}
+	e.restore = &restoreSeed{count: count, elapsed: elapsedSeconds, at: at}
 	e.scheduleMu.Unlock()
 }
 
@@ -122,10 +126,19 @@ func (e *Effect) ActionTime() bool {
 }
 
 func (e *Effect) period() time.Duration {
-	if e == nil || e.Template.Time <= 0 {
+	if e == nil {
 		return 0
 	}
-	return time.Duration(e.Template.Time) * time.Second
+	return templatePeriod(e.Template)
+}
+
+// templatePeriod is the tick period of an effect built from tmpl; zero for
+// an effect without one.
+func templatePeriod(tmpl modelskill.EffectTemplate) time.Duration {
+	if tmpl.Time <= 0 {
+		return 0
+	}
+	return time.Duration(tmpl.Time) * time.Second
 }
 
 // initialCount is the tick count a fresh schedule starts from: the
@@ -159,26 +172,86 @@ func (e *Effect) startSchedule(now time.Time) {
 }
 
 // startScheduleFromRestoreLocked seeds e.remaining and e.nextAction from a
-// persisted tick count and elapsed time, mirroring
-// AbstractEffect.setCount(newCount)/setTime(newTime) ahead of a restored
-// effect's scheduleEffect() call: the tick count is clamped to the
-// template's own count, and the elapsed time (seconds since the effect's
-// last tick at logout) is clamped to the template's period before being
-// subtracted from it to find the delay until the next tick. Called with
-// e.scheduleMu already held.
+// persisted tick count and elapsed time, as resumeRestored resumes them
+// from the restore instant. An effect whose first tick came due before now
+// ends on the next tick, running no action. Called with e.scheduleMu
+// already held.
 func (e *Effect) startScheduleFromRestoreLocked(r *restoreSeed, now time.Time) {
-	e.remaining = int(min(r.count, int32(e.Template.Count)))
-
-	period := e.period()
-	if period <= 0 {
-		e.nextAction = time.Time{}
+	at := r.at
+	if at.IsZero() {
+		at = now
+	}
+	remaining, next, ok := resumeRestored(e.Template, r.count, r.elapsed, at, now)
+	if !ok {
+		e.remaining, e.nextAction = 0, now
 		return
 	}
+	e.remaining, e.nextAction = remaining, next
+}
 
-	periodSeconds := int32(e.Template.Time)
-	elapsed := min(r.elapsed, periodSeconds)
-	delay := max(time.Duration(periodSeconds-elapsed)*time.Second, 0)
-	e.nextAction = now.Add(delay)
+// resumeRestored is the schedule, at now, of an effect built from tmpl and
+// restored at the instant at from a persisted tick count and elapsed time,
+// mirroring AbstractEffect.setCount(newCount)/setTime(newTime) ahead of a
+// restored effect's scheduleEffect() call: the tick count is clamped to the
+// template's own count, and the elapsed time (seconds since the effect's
+// last tick at logout) is clamped to the template's period, so the first
+// tick comes due that much short of a period after at. Only an effect whose
+// ticks run no action resumes from an earlier at (restoreAnchor), and such
+// an effect ends on its first tick whatever count it has left, as
+// List.tickAt ends an in-use effect whose action reports false: a tick due
+// before now has ended it, and ok is false. (A restored effect stacked out
+// by another restored one would keep counting in the reference instead;
+// both are restored debuffs of one stack group, rare enough to leave
+// unmodelled.) An effect without a period only has its count clamped.
+func resumeRestored(tmpl modelskill.EffectTemplate, count, elapsedSeconds int32, at, now time.Time) (remaining int, next time.Time, ok bool) {
+	remaining = int(min(count, int32(tmpl.Count)))
+	period := templatePeriod(tmpl)
+	if period <= 0 {
+		return remaining, time.Time{}, true
+	}
+	elapsed := min(time.Duration(elapsedSeconds)*time.Second, period)
+	next = at.Add(max(period-elapsed, 0))
+	if next.Before(now) {
+		return 0, time.Time{}, false
+	}
+	return remaining, next, true
+}
+
+// RestoredSaveState is the tick count and elapsed seconds an effect that a
+// login restored at the instant at, from count and elapsedSeconds, but has
+// not replayed yet saves at now: its schedule ran from at, as the replayed
+// effect's own does (see resumeRestored). The first template ApplyRestored
+// would build whose effect is still running at now is the one whose state
+// the replayed skill saves, as Player.storeEffect writes the first effect of
+// a skill still in the list: one that has ended passes the row on to the
+// next. ok is false only when every such effect has ended by now. A zero at,
+// a skill with no such template, or a first running one whose ticks run an
+// action (see restoreAnchor), saves count and elapsedSeconds unchanged.
+func RestoredSaveState(templates []modelskill.EffectTemplate, count, elapsedSeconds int32, at, now time.Time) (savedCount, savedElapsed int32, ok bool) {
+	if at.IsZero() {
+		return count, elapsedSeconds, true
+	}
+	known := false
+	for _, tmpl := range templates {
+		if _, ok := coreKinds[tmpl.Name]; !ok {
+			continue
+		}
+		known = true
+		period := templatePeriod(tmpl)
+		if period <= 0 || restoreAnchor(tmpl, at).IsZero() {
+			return count, elapsedSeconds, true
+		}
+		remaining, next, alive := resumeRestored(tmpl, count, elapsedSeconds, at, now)
+		if !alive {
+			continue
+		}
+		left := min(max(next.Sub(now), 0), period)
+		return int32(remaining), int32((period - left) / time.Second), true
+	}
+	if known {
+		return 0, 0, false
+	}
+	return count, elapsedSeconds, true
 }
 
 // SaveState reports the tick count and elapsed-seconds-since-last-tick e

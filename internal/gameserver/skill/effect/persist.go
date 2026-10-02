@@ -1,6 +1,8 @@
 package effect
 
 import (
+	"time"
+
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -49,6 +51,10 @@ type ActiveEffect struct {
 	ReuseGroup int32
 	Count      int32
 	Time       int32
+	// RestoredAt, set on an effect a login restored but has not replayed
+	// yet, is the instant its Count and Time were read back: its schedule
+	// runs from there, so the time until the replay counts against it.
+	RestoredAt time.Time
 
 	// Toggle, Herb, Continuous, and HealOverTime each mark a category of
 	// effect that never survives a relog, mirroring an active toggle

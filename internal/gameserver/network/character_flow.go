@@ -214,9 +214,6 @@ func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, c 
 		if err := l.skills.RestoreKnownSkills(ctx, c); err != nil {
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("select character: restore known skills")
 		}
-		if err := l.skills.RestoreSkillState(ctx, c); err != nil {
-			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("select character: restore skill state")
-		}
 		// Re-derive level-unlocked skills on every login, right after the
 		// character data is restored, so a free grant
 		// added by an in-session level-up — which lives in memory only —
@@ -269,6 +266,14 @@ func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, c 
 	}
 	live.storage = storage
 	live.macros = macros
+	if l.skills != nil {
+		// Restored last, once nothing left in the selection can fail: the
+		// restore consumes the saved rows, and only an attached player
+		// saves them back when its session ends.
+		if err := l.skills.RestoreSkillState(ctx, c); err != nil {
+			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("select character: restore skill state")
+		}
+	}
 	if l.roster != nil {
 		// The row is marked online at selection, so external DB consumers
 		// see online=1 without waiting for the first periodic save.

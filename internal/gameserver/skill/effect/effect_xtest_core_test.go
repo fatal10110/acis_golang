@@ -38,7 +38,7 @@ func TestApplyRestoredDeliversOnStartToLiveEffectList(t *testing.T) {
 	meta := effect.Skill{ID: 7, Level: 3}
 	templates := []modelskill.EffectTemplate{{Name: "IncreaseCharges", Value: 2, Count: 5}}
 
-	effect.ApplyRestored(list, target, target, meta, templates, 5, 0)
+	effect.ApplyRestored(list, target, target, meta, templates, 5, 0, time.Time{})
 
 	if got := target.Charges(); got != 2 {
 		t.Fatalf("target.Charges() after ApplyRestored = %d, want 2 (OnStart delivered on restore, like a live cast)", got)
@@ -61,7 +61,7 @@ func TestApplyRestoredSkipsUnsupportedTemplatesWithoutFailingTheRest(t *testing.
 		{Name: "IncreaseCharges", Value: 1, Count: 3},
 	}
 
-	effect.ApplyRestored(list, target, target, meta, templates, 3, 0)
+	effect.ApplyRestored(list, target, target, meta, templates, 3, 0, time.Time{})
 
 	if len(list.All()) != 1 {
 		t.Fatalf("ApplyRestored added %d effects, want 1 (unsupported template skipped)", len(list.All()))
