@@ -104,8 +104,8 @@ func TestPDamKillReportsTheDamageAfterTheKill(t *testing.T) {
 // TestBlowResistReportsBeforeTheTargetStatus lands a BLOW whose stun the
 // fixture monster resists: the caster reads S1_RESISTED_YOUR_S2 before the
 // monster's StatusUpdate with the HP the blow left, since the blow lands its
-// effects before its damage (issue #2589). The stun lands at a 1% rate, so
-// a cast that lands it is retried.
+// effects before its damage (issue #2589). The stun's landing roll always
+// fails.
 func TestBlowResistReportsBeforeTheTargetStatus(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
@@ -125,8 +125,9 @@ func TestBlowResistReportsBeforeTheTargetStatus(t *testing.T) {
 	drainUntilQuiet(t, c)
 	targetHostile(t, c, hostile.ObjectID())
 	drainUntilQuiet(t, c)
-	// Every caster roll comes up zero: the blow always lands, never crits.
-	onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.SetRollSource(func(int) int { return 0 }) })
+	// Every other caster roll comes up zero: the blow always lands, never
+	// crits.
+	resistLandingRolls(t, srv, objID, func(int) int { return 0 })
 
 	for range 5 {
 		hp := hostile.CurrentHP()
@@ -292,7 +293,7 @@ func TestDrainBreaksTheMonsterCastBeforeItsEffects(t *testing.T) {
 	def := modelskill.Definition{
 		ID: orderSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 		Offensive: true, CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-		SkillType: "DRAIN", Power: 10, Magic: true, IgnoreResists: true, BaseLandRate: 0,
+		SkillType: "DRAIN", Power: 10, Magic: true, IgnoreResists: true,
 		Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}},
 	}
 	w := bootBreakingMonster(t, def)

@@ -64,7 +64,7 @@ func chanceSkills() []modelskill.Definition {
 		{
 			ID: mirageTriggered, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Offensive: true, CastRange: 900, EffectRange: 1400,
-			BaseLandRate: 100, IgnoreResists: true,
+			EffectPower: 100, IgnoreResists: true,
 			Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "mirage_debuff", StackOrder: 1}},
 		},
 		{
@@ -100,7 +100,7 @@ func chanceSkills() []modelskill.Definition {
 		{
 			ID: onCritTriggered, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Offensive: true,
-			BaseLandRate: 100, IgnoreResists: true,
+			EffectPower: 100, IgnoreResists: true,
 			Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 120, Icon: true, StackType: "pd_down", StackOrder: 3}},
 		},
 		{
@@ -111,16 +111,16 @@ func chanceSkills() []modelskill.Definition {
 		{
 			ID: onOffensiveTriggered, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Offensive: true,
-			BaseLandRate: 100, IgnoreResists: true,
+			EffectPower: 100, IgnoreResists: true,
 			Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "speed_down", StackOrder: 1}},
 		},
 		{
-			// unlandableDebuff lands at a fixed rate of 0, so its landing
-			// roll always loses.
+			// unlandableDebuff lands at its base chance of 20, so a landing
+			// roll of 20 or more loses.
 			ID: unlandableDebuff, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Offensive: true,
-			BaseLandRate: 0, IgnoreResists: true,
-			Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "weakness", StackOrder: 1}},
+			IgnoreResists: true,
+			Effects:       []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "weakness", StackOrder: 1}},
 		},
 		{
 			ID: mdamSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
@@ -142,7 +142,7 @@ func chanceSkills() []modelskill.Definition {
 		{
 			ID: npcShieldTrigger, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Offensive: true,
-			BaseLandRate: 100, IgnoreResists: true,
+			EffectPower: 100, IgnoreResists: true,
 			Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "shield_debuff", StackOrder: 1}},
 		},
 	}
@@ -596,7 +596,9 @@ func shippedSkillDefinitions(t *testing.T) []modelskill.Definition {
 // TestShippedChanceSkillsProc drives the shipped data: Mirage (445) arms
 // an 80% ON_ATTACKED trigger for 5144 level 1 (triggeredLevel defaults to
 // 1), and "Item Skill: Heal" level 10 (3207) is a passive 5% ON_HIT skill
-// triggering 5146 level 10. A won roll casts each one.
+// triggering 5146 level 10. A won roll casts each one. The won 5144 lands
+// its RemoveTarget on the attacker (power 100 against a roll of 0), which
+// stops the attacker's swing before it finishes.
 func TestShippedChanceSkillsProc(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
@@ -620,7 +622,15 @@ func TestShippedChanceSkillsProc(t *testing.T) {
 	px, py, pz := srv.PlayerPosition(t, objID)
 	attacker := srv.SpawnAttackingHostileNPCAt(t, location.Location{X: px + 20, Y: py, Z: pz})
 	drainUntilQuiet(t, c)
-	attacker.DoAttack(t, worldCombatant(t, srv, objID))
+	victim := worldCombatant(t, srv, objID)
+	hp, ok := victim.(interface{ HP() float64 })
+	if !ok {
+		t.Fatalf("world.Player(%d) = %T has no HP", objID, victim)
+	}
+	full := hp.HP()
+	attacker.StartAttack(victim)
+	srv.AdvanceUntil(t, "the attacker's hit", func() bool { return hp.HP() < full })
+	srv.Settle(t)
 	assertProc(t, queueFrames(t, c), objID, mirageTriggered, 1, attacker.ObjectID())
 
 	// The triggered heal leaves no effect behind; its reuse, started by the

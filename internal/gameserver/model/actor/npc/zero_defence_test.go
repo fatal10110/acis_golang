@@ -115,7 +115,7 @@ func TestZeroTruncatedMDefSkillFormulasDivideByZero(t *testing.T) {
 
 	// The landing-rate M.Atk term divides by the same 0; the [1, 99] clamp
 	// then caps it.
-	def := skill.Definition{SkillType: "DEBUFF", EffectType: "DEBUFF", Magic: true, BaseLandRate: 10}
+	def := skill.Definition{SkillType: "DEBUFF", EffectType: "DEBUFF", Magic: true, EffectPower: 10}
 	if got := creature.SkillMAtkModifier(target, attacker, def, false); !math.IsInf(got, 1) {
 		t.Fatalf("SkillMAtkModifier = %v, want +Inf", got)
 	}

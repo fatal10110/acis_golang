@@ -27,7 +27,7 @@ func folkNuke(power int) modelskill.Definition {
 		ID: folkNukeID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 		Offensive: true, SkillType: "PDAM", Power: float32(power), CastRange: folkNukeRange,
 		HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-		IgnoreResists: true, BaseLandRate: 100,
+		IgnoreResists: true, EffectPower: 100,
 		Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}, {Name: "Stun", Time: 10}},
 	}
 }

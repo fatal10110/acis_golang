@@ -2,7 +2,6 @@ package npc
 
 import (
 	"math"
-	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -20,17 +19,10 @@ func (h *Hostile) SkillSuccessInput(caster creature.FormulaActor, def modelskill
 }
 
 func (h *Hostile) EffectSuccessInput(caster creature.FormulaActor, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
-	if tmpl.EffectType == "" {
-		return formulas.SkillSuccessInput{BaseChance: tmpl.EffectPower, IgnoreResists: true, Shield: shield}, true
+	if h == nil {
+		return formulas.SkillSuccessInput{}, false
 	}
-	if strings.EqualFold(tmpl.EffectType, "CANCEL") {
-		return formulas.SkillSuccessInput{BaseChance: 100, IgnoreResists: true, Shield: shield}, true
-	}
-	def.EffectType = tmpl.EffectType
-	def.IgnoreResists = false
-	in, ok := h.SkillSuccessInput(caster, def, bss, shield)
-	in.BaseChance = tmpl.EffectPower
-	return in, ok
+	return creature.ResolveEffectSuccessInput(caster, h, def, tmpl, bss, shield)
 }
 
 // MAtk returns this NPC's magic attack stat, truncated to a whole number.

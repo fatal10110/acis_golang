@@ -282,7 +282,7 @@ func TestDamageOverTimeTicksDrainNPCHealth(t *testing.T) {
 				ID: 43, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 				CastRange: 900, HitTime: 0, StaticHitTime: true,
 				SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-				BaseLandRate: 100, IgnoreResists: true,
+				EffectPower: 100, IgnoreResists: true,
 				Effects: []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 100, Count: 5, Time: 1}},
 			},
 		})),
@@ -316,8 +316,8 @@ func TestDamageOverTimeTicksDrainNPCHealth(t *testing.T) {
 }
 
 // TestResistedSkillReportsResistanceToCaster drives an MDAM cast whose
-// effect-landing roll can never succeed (IgnoreResists returns BaseLandRate
-// verbatim, and a zero rate never beats the roll) at another player: the
+// effect-landing roll always fails (the caster's landing rolls come up 99,
+// above the skill's base chance of 20) at another player: the
 // damage itself lands, and the caster's own client receives the
 // resisted-your-skill system message naming the target and the skill (level 1
 // regardless of the cast level).
@@ -331,8 +331,8 @@ func TestResistedSkillReportsResistanceToCaster(t *testing.T) {
 				ID: 44, Level: 7, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 				CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
 				SkillType: "MDAM", Power: 1_000_000,
-				IgnoreResists: true, BaseLandRate: 0,
-				Effects: []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 100, Count: 5, Time: 1}},
+				IgnoreResists: true,
+				Effects:       []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 100, Count: 5, Time: 1}},
 			},
 		})),
 	)
@@ -342,6 +342,7 @@ func TestResistedSkillReportsResistanceToCaster(t *testing.T) {
 	vc := srv.DialClient(t, "victim", 1)
 	startInWorldAmongPlayers(t, vc)
 	startInWorldAmongPlayers(t, c)
+	resistLandingRolls(t, srv, objID, randomRoll)
 	drainUntilQuiet(t, vc)
 	drainUntilQuiet(t, c)
 
@@ -656,14 +657,15 @@ func TestResistedSkillReportsResistanceForNPCTarget(t *testing.T) {
 				ID: 45, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 				CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
 				SkillType: "MDAM", Power: 1_000_000,
-				IgnoreResists: true, BaseLandRate: 0,
-				Effects: []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 100, Count: 5, Time: 1}},
+				IgnoreResists: true,
+				Effects:       []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 100, Count: 5, Time: 1}},
 			},
 		})),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, 45, 1)
 	startInWorld(t, c)
+	resistLandingRolls(t, srv, objID, randomRoll)
 	hostile := srv.SpawnHostileNPC(t)
 	drainUntilQuiet(t, c)
 
@@ -708,7 +710,7 @@ func TestDamageOverTimeOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T)
 				ID: 43, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 				CastRange: 900, HitTime: 0, StaticHitTime: true,
 				SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-				BaseLandRate: 100, IgnoreResists: true,
+				EffectPower: 100, IgnoreResists: true,
 				Effects: []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 100, Count: 5, Time: 1}},
 			},
 		})),

@@ -338,29 +338,42 @@ func ResolveManaDamageInput(attacker, target FormulaActor, maxMP float64, def mo
 	}, true
 }
 
-// ResolveSkillSuccessInput builds the effect-landing input from the
-// caster/target pair.
+// ResolveSkillSuccessInput builds the skill's own landing input from the
+// caster/target pair: it starts from the skill's landing power and resists
+// as its landing effect type.
 func ResolveSkillSuccessInput(attacker, target FormulaActor, def modelskill.Definition, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+	return resolveLandingInput(attacker, target, def, def.LandingPower(), def.LandingEffectType(), def.IgnoreResists, bss, shield)
+}
+
+// ResolveEffectSuccessInput builds the landing input of one effect template
+// of def: the template's own effect power and type. A template without a
+// type rolls its bare power; a CANCEL template always lands.
+func ResolveEffectSuccessInput(attacker, target FormulaActor, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
+	if tmpl.EffectType == "" {
+		return formulas.SkillSuccessInput{BaseChance: tmpl.EffectPower, IgnoreResists: true, Shield: shield}, true
+	}
+	if strings.EqualFold(tmpl.EffectType, "CANCEL") {
+		return formulas.SkillSuccessInput{BaseChance: 100, IgnoreResists: true, Shield: shield}, true
+	}
+	return resolveLandingInput(attacker, target, def, tmpl.EffectPower, tmpl.EffectType, false, bss, shield)
+}
+
+func resolveLandingInput(attacker, target FormulaActor, def modelskill.Definition, base float64, typ string, ignoreResists, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
 	if target == nil {
 		return formulas.SkillSuccessInput{}, false
 	}
-	if def.IgnoreResists {
-		return formulas.SkillSuccessInput{
-			BaseChance:    float64(def.BaseLandRate),
-			IgnoreResists: true,
-			Shield:        shield,
-		}, true
+	if ignoreResists {
+		return formulas.SkillSuccessInput{BaseChance: base, IgnoreResists: true, Shield: shield}, true
 	}
 	if attacker == nil {
 		return formulas.SkillSuccessInput{}, false
 	}
 	return formulas.SkillSuccessInput{
-		BaseChance:    float64(def.BaseLandRate),
-		StatModifier:  SkillStatModifier(target, def.EffectType, def.Magic),
-		VulnModifier:  SkillVulnerability(target, def.EffectType, def),
+		BaseChance:    base,
+		StatModifier:  SkillStatModifier(target, typ, def.Magic),
+		VulnModifier:  SkillVulnerability(target, typ, def),
 		MAtkModifier:  SkillMAtkModifier(target, attacker, def, bss),
 		LevelModifier: SkillLevelModifier(target.Level(), attacker.Level(), def),
-		IgnoreResists: def.IgnoreResists,
 		Shield:        shield,
 	}, true
 }

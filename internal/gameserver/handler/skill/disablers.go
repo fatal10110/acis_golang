@@ -119,7 +119,16 @@ func checkSkillSuccessBSSWithShield(caster Creature, target Actor, def modelskil
 		return false, false
 	}
 	rate := formulas.SkillSuccessRate(in)
-	return formulas.SkillSucceeds(rate, rnd.Get(100)), true
+	return formulas.SkillSucceeds(rate, landingRoll(caster)), true
+}
+
+// landingRoll draws a skill landing roll in [0, 100) from the caster's
+// combat random source.
+func landingRoll(caster Creature) int {
+	if caster == nil {
+		return rnd.Get(100)
+	}
+	return caster.Roll(100)
 }
 
 // landing is one Disablers target's resolved shield outcome and the cast's

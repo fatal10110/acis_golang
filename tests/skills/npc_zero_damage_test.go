@@ -140,7 +140,7 @@ func TestZeroDamageDOTTickRegistersOnMonster(t *testing.T) {
 			ID: bleed, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 			CastRange: 900, HitTime: 0, StaticHitTime: true,
 			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-			BaseLandRate: 100, IgnoreResists: true,
+			EffectPower: 100, IgnoreResists: true,
 			Effects: []modelskill.EffectTemplate{{Name: "DamOverTime", Value: 0, Count: 5, Time: 1}},
 		}})),
 	)

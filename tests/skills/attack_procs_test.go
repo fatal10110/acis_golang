@@ -400,6 +400,23 @@ func mdamLandsRoll(n int) int {
 	return n - 1
 }
 
+// chanceWinsLandingLoses is mdamLandsRoll except that every roll out of
+// 100 after the first (the weapon's chance roll) comes up 99, losing the
+// triggered skill's landing roll.
+func chanceWinsLandingLoses() func(int) int {
+	chanceRolled := false
+	return func(n int) int {
+		if n != 100 {
+			return mdamLandsRoll(n)
+		}
+		if chanceRolled {
+			return 99
+		}
+		chanceRolled = true
+		return 0
+	}
+}
+
 // landMDAM targets hostile and returns once the player's MDAM has landed on
 // it and the server has settled. The fixture monster's M.Def truncates to 0,
 // which an MDAM turns into a killing blow, so it gets a real M.Def first.
@@ -420,22 +437,24 @@ func landMDAM(t *testing.T, srv *gameservertest.Server, objID int32, hostile *np
 // weapon skill fires on the player's offensive MDAM only once its own
 // landing roll on the monster wins. onOffensiveTriggered lands at a fixed
 // 100%: the player is told S1_HAS_BEEN_ACTIVATED and the monster holds the
-// debuff. unlandableDebuff lands at a fixed 0%: no message, no debuff.
+// debuff. unlandableDebuff lands at 20% and its landing roll comes up 99:
+// no message, no debuff.
 func TestWeaponOnMagicOffensiveSkillNeedsItsLandingRoll(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		weapon int32
+		roll   func() func(int) int
 		fires  bool
 	}{
-		{"landing roll wins", onOffensiveTriggered, true},
-		{"landing roll loses", unlandableDebuff, false},
+		{"landing roll wins", onOffensiveTriggered, func() func(int) int { return mdamLandsRoll }, true},
+		{"landing roll loses", unlandableDebuff, chanceWinsLandingLoses, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			catalog := procWeaponCatalog(t, func(w *item.WeaponDetail) {
 				w.OnCastSkill = &item.SkillTrigger{Skill: item.SkillRef{ID: tc.weapon, Level: 1}, Chance: 5}
 			})
-			srv, c, objID := bootArmed(t, catalog, mdamLandsRoll, []int32{fixtureSwordID}, mdamSkill)
+			srv, c, objID := bootArmed(t, catalog, tc.roll(), []int32{fixtureSwordID}, mdamSkill)
 			hostile := spawnReflector(t, srv, objID, 0)
 			landMDAM(t, srv, objID, hostile)
 			frames := queueFrames(t, c)

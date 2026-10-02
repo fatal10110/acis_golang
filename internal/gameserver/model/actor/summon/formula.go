@@ -3,7 +3,6 @@ package summon
 import (
 	"math"
 	"math/rand/v2"
-	"strings"
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -852,17 +851,7 @@ func (a *Actor) SkillSuccessInput(caster creature.FormulaActor, def modelskill.D
 }
 
 func (a *Actor) EffectSuccessInput(caster creature.FormulaActor, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
-	if tmpl.EffectType == "" {
-		return formulas.SkillSuccessInput{BaseChance: tmpl.EffectPower, IgnoreResists: true, Shield: shield}, true
-	}
-	if strings.EqualFold(tmpl.EffectType, "CANCEL") {
-		return formulas.SkillSuccessInput{BaseChance: 100, IgnoreResists: true, Shield: shield}, true
-	}
-	def.EffectType = tmpl.EffectType
-	def.IgnoreResists = false
-	in, ok := a.SkillSuccessInput(caster, def, bss, shield)
-	in.BaseChance = tmpl.EffectPower
-	return in, ok
+	return creature.ResolveEffectSuccessInput(caster, a, def, tmpl, bss, shield)
 }
 
 func defaultInt(value, fallback int) int {

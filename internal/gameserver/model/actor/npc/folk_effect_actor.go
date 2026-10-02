@@ -1,8 +1,6 @@
 package npc
 
 import (
-	"strings"
-
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -92,17 +90,7 @@ func (f *Folk) SkillSuccessInput(caster creature.FormulaActor, def modelskill.De
 // EffectSuccessInput resolves the landing roll of one effect template of
 // caster's skill against the NPC.
 func (f *Folk) EffectSuccessInput(caster creature.FormulaActor, def modelskill.Definition, tmpl modelskill.EffectTemplate, bss bool, shield formulas.ShieldDefense) (formulas.SkillSuccessInput, bool) {
-	if tmpl.EffectType == "" {
-		return formulas.SkillSuccessInput{BaseChance: tmpl.EffectPower, IgnoreResists: true, Shield: shield}, true
-	}
-	if strings.EqualFold(tmpl.EffectType, "CANCEL") {
-		return formulas.SkillSuccessInput{BaseChance: 100, IgnoreResists: true, Shield: shield}, true
-	}
-	def.EffectType = tmpl.EffectType
-	def.IgnoreResists = false
-	in, ok := f.SkillSuccessInput(caster, def, bss, shield)
-	in.BaseChance = tmpl.EffectPower
-	return in, ok
+	return creature.ResolveEffectSuccessInput(caster, f, def, tmpl, bss, shield)
 }
 
 // SkillReflectInput resolves the NPC's chance to reflect def.

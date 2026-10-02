@@ -286,11 +286,11 @@ func TestSummonFormulaInputsResolveStatsAndResources(t *testing.T) {
 	}
 
 	success, ok := target.SkillSuccessInput(caster, modelskill.Definition{
-		SkillType:    "STUN",
-		EffectType:   "STUN",
-		Magic:        true,
-		BaseLandRate: 50,
-		Element:      modelskill.ElementFire,
+		SkillType:   "STUN",
+		EffectType:  "STUN",
+		Magic:       true,
+		EffectPower: 50,
+		Element:     modelskill.ElementFire,
 	}, false, formulas.ShieldPerfect)
 	if !ok {
 		t.Fatal("SkillSuccessInput() ok = false")
