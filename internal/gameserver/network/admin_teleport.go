@@ -4,6 +4,7 @@ import (
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // teleportMode is how a player's move clicks travel.
@@ -17,6 +18,9 @@ const (
 	teleportModeOnce
 	// teleportModeAlways teleports to every clicked point.
 	teleportModeAlways
+	// teleportModeCamera walks to the clicked point, while the position
+	// the client reports is taken as is; see adminCamera.
+	teleportModeCamera
 )
 
 // moveByTeleport carries out a move click under live's teleport mode,
@@ -85,16 +89,45 @@ func (l *GameClientLink) adminInstantMove(gm *livePlayer, args []string) {
 	gm.teleportMode = teleportMode(mode)
 }
 
+// adminCamera answers //camera: gm's free camera turns on, gm going
+// invisible, or off, gm visible again. CameraMode tells the client which,
+// then gm is teleported where it stands. While the camera is on, the
+// position gm's client reports is taken as is (adoptCameraPosition).
+func (l *GameClientLink) adminCamera(gm *livePlayer, _ string) {
+	if gm.teleportMode != teleportModeCamera {
+		gm.teleportMode = teleportModeCamera
+		gm.SetInvisible(true)
+		gm.SendFrame(serverpackets.FrameCameraMode(serverpackets.CameraModeFirstPerson))
+	} else {
+		gm.teleportMode = teleportModeNone
+		gm.SetInvisible(false)
+		gm.SendFrame(serverpackets.FrameCameraMode(serverpackets.CameraModeThirdPerson))
+	}
+	l.teleportLivePlayer(gm, gm.CurrentLocation(), 0)
+}
+
+// adoptCameraPosition takes the position live's client reports under the
+// free camera as live's own, the world around it following; the heading
+// stays. A report outside the world changes nothing.
+func (l *GameClientLink) adoptCameraPosition(live *livePlayer, reported location.Location) {
+	if world.RegionKey(reported.X, reported.Y) == 0 {
+		return
+	}
+	l.updateLivePlayerPosition(live, reported, live.CurrentHeading())
+}
+
 // adminRecall brings the named player to gm and drops gm's selection. A
-// party or clan recall brings the named player's group; while groups are
-// not modeled, every player is alone in one.
+// party recall brings every member of the named player's party, a clan
+// recall every online member of its clan; out of a party or clan, the
+// named player comes alone.
 func (l *GameClientLink) adminRecall(gm *livePlayer, args []string) {
 	if len(args) == 0 {
 		gm.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
 		return
 	}
-	name := args[0]
-	if name == "clan" || name == "party" {
+	group := args[0]
+	name := group
+	if group == "clan" || group == "party" {
 		if len(args) < 2 {
 			gm.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
 			return
@@ -107,11 +140,32 @@ func (l *GameClientLink) adminRecall(gm *livePlayer, args []string) {
 		return
 	}
 	destination := gm.CurrentLocation()
-	onPlayer(gm, target, func() { l.teleportLivePlayer(target, destination, 0) })
+	for _, member := range l.recallGroup(group, target) {
+		onPlayer(gm, member, func() { l.teleportLivePlayer(member, destination, 0) })
+	}
 	// The recalled player leaves gm's sight, so the selection goes with it.
 	old := gm.Target()
 	gm.StoreTarget(nil)
 	l.announceTargetCleared(gm, old)
+}
+
+// recallGroup returns who a recall of target brings: target's party
+// members for "party", the online members of its clan for "clan", else
+// target alone.
+func (l *GameClientLink) recallGroup(group string, target *livePlayer) []*livePlayer {
+	switch group {
+	case "party":
+		if l.parties != nil {
+			if view, ok := l.parties.View(target.ObjectID()); ok {
+				return view.Members
+			}
+		}
+	case "clan":
+		if cl, ok := l.clanService().ClanOf(target.Character); ok {
+			return l.onlineClanMembers(cl, 0)
+		}
+	}
+	return []*livePlayer{target}
 }
 
 // adminSendHome sends the named player, else the selected one, else gm, to

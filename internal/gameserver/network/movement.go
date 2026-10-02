@@ -141,6 +141,12 @@ func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported l
 	if live.Teleporting() {
 		return
 	}
+	// Under the free camera the reported position is taken as is, with no
+	// fall check and no correction.
+	if live.teleportMode == teleportModeCamera {
+		l.adoptCameraPosition(live, reported)
+		return
+	}
 	damage, falling := live.CheckFall(reported.Z, !liveSwimming(live) && !live.Flying(), l.playerConfig.EnableFallingDamage, time.Now())
 	if damage > 0 {
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageFallDamage, int32(damage)))

@@ -122,7 +122,7 @@ func TestAdminTeleport(t *testing.T) {
 		t.Fatalf("recalled position = %d %d, want 1100 2100", x, y)
 	}
 
-	// //recall clan with no clan modeled brings the named player alone.
+	// //recall clan of a player in no clan brings that player alone.
 	exchange(t, gm, encodeBuildCmd("teleport 500 600 300"))
 	appear(t, gm)
 	drain(t, other)
