@@ -283,5 +283,5 @@ func (l *GameClientLink) sendAdminSkillPage(gm *livePlayer, file, name, content 
 	html := l.adminHTML(file)
 	html = strings.ReplaceAll(html, "%name%", name)
 	html = strings.ReplaceAll(html, "%content%", content)
-	sendValidatedHTML(gm, 0, html, 0)
+	sendFilledHTML(gm, 0, html, 0)
 }

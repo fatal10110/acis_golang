@@ -125,7 +125,7 @@ func (l *GameClientLink) requestBuyItem(live *livePlayer, req clientpackets.Requ
 		if path, ok := seller.BoughtPage(); ok {
 			if page, ok := l.html.Get(path); ok {
 				id := seller.ObjectID()
-				sendValidatedHTML(live, id, strings.ReplaceAll(page, "%objectId%", strconv.Itoa(int(id))), 0)
+				sendFilledHTML(live, id, strings.ReplaceAll(serverpackets.NpcHtmlBody(page), "%objectId%", strconv.Itoa(int(id))), 0)
 			}
 		}
 	}

@@ -22,7 +22,7 @@ func (l *GameClientLink) sendSellList(live *livePlayer, f *npc.Folk, emptyPage s
 		return objectID != live.MountObjectID() && live.ControlItemInUse(objectID)
 	})
 	if len(items) == 0 && emptyPage != "" {
-		sendValidatedHTML(live, f.ObjectID(), emptyPage, 0)
+		sendFilledHTML(live, f.ObjectID(), emptyPage, 0)
 		return
 	}
 	adena := 0
@@ -78,7 +78,7 @@ func (l *GameClientLink) requestSellItem(live *livePlayer, req clientpackets.Req
 	if len(res.Changed) > 0 {
 		l.applyEquipStatChanges(live, inv, res.Result)
 	}
-	if page, ok := f.SoldPage(l.html); ok {
-		sendValidatedHTML(live, f.ObjectID(), page, 0)
+	if page, ok := f.SoldPage(setPages{l.html}); ok {
+		sendFilledHTML(live, f.ObjectID(), page, 0)
 	}
 }

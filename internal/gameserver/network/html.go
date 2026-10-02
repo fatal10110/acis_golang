@@ -49,5 +49,5 @@ func (l *GameClientLink) sendPlayerHelp(live *livePlayer, requestedPath string) 
 	if !ok {
 		html = fmt.Sprintf("<html><body>My html is missing:<br>%s</body></html>", file)
 	}
-	live.SendFrame(serverpackets.FrameNpcHtmlMessage(0, html, itemID))
+	live.SendFrame(serverpackets.FrameNpcHtmlMessage(0, serverpackets.NpcHtmlBody(html), itemID))
 }

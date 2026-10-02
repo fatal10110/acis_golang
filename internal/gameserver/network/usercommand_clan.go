@@ -83,11 +83,7 @@ func (l *GameClientLink) userCommandClanPenalty(live *livePlayer, _ int32) {
 	if content == "" {
 		content = clanPenaltyNone
 	}
-	page, ok := l.html.Get(clanPenaltyPage)
-	if !ok {
-		page = fmt.Sprintf("<html><body>My html is missing:<br>%s</body></html>", clanPenaltyPage)
-	}
-	sendValidatedHTML(live, 0, strings.ReplaceAll(page, "%content%", content), 0)
+	sendFilledHTML(live, 0, strings.ReplaceAll(l.setPage(clanPenaltyPage), "%content%", content), 0)
 }
 
 // userCommandSiegeStatus (/siegestatus) shows a noble clan leader its

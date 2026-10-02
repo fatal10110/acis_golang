@@ -165,7 +165,7 @@ func (l *GameClientLink) sendLoginBoardPages(client *Client, live *livePlayer) {
 	}
 	if cl, ok := l.clanService().ClanOf(live.Character); l.board.cfg.Enabled && ok {
 		if notice, shown := cl.Notice(); shown {
-			page := l.loginPage("data/html/clan_notice.htm")
+			page := l.setPage("data/html/clan_notice.htm")
 			page = strings.ReplaceAll(page, "%clan_name%", cl.Name())
 			page = strings.ReplaceAll(page, "%notice_text%", bbs.NoticeText(notice))
 			l.sendLoginPage(client, live, page)
@@ -173,21 +173,14 @@ func (l *GameClientLink) sendLoginBoardPages(client *Client, live *livePlayer) {
 		}
 	}
 	if l.board.serverNews {
-		l.sendLoginPage(client, live, l.loginPage("data/html/servnews.htm"))
+		l.sendLoginPage(client, live, l.setPage("data/html/servnews.htm"))
 	}
 }
 
-// loginPage returns the page file, or the missing-page notice naming it.
-func (l *GameClientLink) loginPage(file string) string {
-	if page, ok := l.html.Get(file); ok {
-		return page
-	}
-	return "<html><body>My html is missing:<br>" + file + "</body></html>"
-}
-
-// sendLoginPage opens page in an HTML window during the login burst and
-// makes its links the ones live may send back.
+// sendLoginPage opens page, set by setPage and its placeholders filled, in
+// an HTML window during the login burst as is, and makes its links the
+// ones live may send back.
 func (l *GameClientLink) sendLoginPage(client *Client, live *livePlayer, page string) {
-	live.bypasses.record(serverpackets.NpcHtmlBody(page))
+	live.bypasses.record(page)
 	client.Session.SendFrame(serverpackets.FrameNpcHtmlMessage(0, page, 0))
 }
