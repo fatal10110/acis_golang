@@ -143,7 +143,8 @@ func (c *Character) revive() bool {
 // rider's mount stops eating. The killer's PK/PvP credit follows, then this
 // player's own costs: charges, a further get-up out of fake death for a
 // player that was playing dead (the stripped Fake Death sent its own get-up
-// before the death packet), the experience/karma loss, the stop of every
+// before the death packet), the clan-war kill report, the experience/karma
+// loss, the stop of every
 // fusion channel on this player, and the death-penalty level, whose karma
 // gate reads the karma left after that loss. A player whose Phoenix Blessing
 // survived the death is then offered its own resurrection, and the effect
@@ -180,6 +181,7 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	if fakeDead {
 		c.GetUpFromFakeDeath()
 	}
+	c.reportClanKill(killer)
 	c.applyDeathExpKarmaLoss(killer)
 	c.emit(event.FusionCastersStopRequested{})
 	c.RaiseDeathPenaltyLevel(killer, c.rollValue(100)+1)

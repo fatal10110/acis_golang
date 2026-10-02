@@ -136,6 +136,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x64: true, // abort quest
 		0x66: true, // clan name card
 		0x68: true, // request pledge crest
+		0x69: true, // surrender a clan war personally
 		0x6b: true, // acquire skill info
 		0x6c: true, // acquire skill
 		0x6d: true, // restart point

@@ -33,9 +33,9 @@ func deathLossExemption(inPvP, inSiege, charmOfCourage, killedByPlayable bool) (
 // Inside a PvP zone two deaths cost nothing: in a siege zone, one while a
 // Charm of Courage is held, which uses the charm up; in any other PvP zone
 // (an arena), one to a player or its summon. A player killed inside a siege
-// zone without the charm still loses exp, at a quarter of the normal rate.
-//
-// Deferred: the quarter loss of a death between clans at war (#3180).
+// zone without the charm still loses exp, at a quarter of the normal rate,
+// as does one killed by a player (or its summon) when either of their clans
+// has declared war on the other.
 //
 // The siege-zone and festival-participant reductions are wired: InSiegeZone
 // and FestivalParticipant are live accessors (FestivalParticipant is a
@@ -45,13 +45,13 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 	if killer == nil {
 		return
 	}
-	killedByPlayable := actingCharacter(killer) != nil
+	pk := actingCharacter(killer)
 
 	c.stateMu.RLock()
 	allow := c.allowDelevel
 	c.stateMu.RUnlock()
 	lucky := c.HasSkill(int(skill.LuckySkillID))
-	loss := c.deathLossTerms(killedByPlayable)
+	loss := c.deathLossTerms(pk != nil, c.clanWarDeath(pk))
 
 	var hooks progressionHooks
 	defer func() { hooks.run() }()
@@ -66,10 +66,10 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 
 // ApplyDeathPenalty takes a full death's experience and karma loss from
 // this character without a death: a clan's surrender costs its leader
-// that. The delevel gate does not apply; the PvP-zone exemptions do, as
+// that, and a personal surrender the member. The delevel gate does not apply; the PvP-zone exemptions do, as
 // for a death no playable caused.
 func (c *Character) ApplyDeathPenalty() {
-	loss := c.deathLossTerms(false)
+	loss := c.deathLossTerms(false, false)
 	if loss.table == nil {
 		return
 	}
@@ -90,12 +90,13 @@ type deathLoss struct {
 }
 
 // deathLossTerms reads the level table, the karma rate and the zone and
-// effect state a death's experience loss depends on.
-func (c *Character) deathLossTerms(killedByPlayable bool) deathLoss {
+// effect state a death's experience loss depends on; atWar reports a death
+// between clans at war, which costs a quarter of the normal loss.
+func (c *Character) deathLossTerms(killedByPlayable, atWar bool) deathLoss {
 	c.stateMu.RLock()
 	loss := deathLoss{table: c.levelTable, rate: c.rateKarmaExpLost}
 	c.stateMu.RUnlock()
-	loss.reducedLoss = c.FestivalParticipant() || c.InSiegeZone()
+	loss.reducedLoss = c.FestivalParticipant() || atWar || c.InSiegeZone()
 	loss.exempt, loss.useCharm = deathLossExemption(c.InPvPZone(), c.InSiegeZone(),
 		c.EffectList().IsAffected(effect.FlagCharmOfCourage), killedByPlayable)
 	return loss

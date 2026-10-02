@@ -1971,7 +1971,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 
 		case clientpackets.OpcodeRequestStartPledgeWar, clientpackets.OpcodeRequestStopPledgeWar,
-			clientpackets.OpcodeRequestSurrenderPledgeWar:
+			clientpackets.OpcodeRequestSurrenderPledgeWar, clientpackets.OpcodeRequestSurrenderPersonally:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPledgeWarName)
 			if err != nil {
 				if errors.Is(err, errMalformedPacketDisconnect) {
@@ -1985,6 +1985,8 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					onLive(live, func() { l.requestStartPledgeWar(live, req) })
 				case clientpackets.OpcodeRequestStopPledgeWar:
 					onLive(live, func() { l.requestStopPledgeWar(live, req) })
+				case clientpackets.OpcodeRequestSurrenderPersonally:
+					onLive(live, func() { l.requestSurrenderPersonally(live, req) })
 				default:
 					onLive(live, func() { l.requestSurrenderPledgeWar(live, req) })
 				}

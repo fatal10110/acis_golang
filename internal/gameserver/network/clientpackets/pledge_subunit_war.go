@@ -10,6 +10,7 @@ const (
 	OpcodeRequestReplyStopPledgeWar      = 0x50
 	OpcodeRequestSurrenderPledgeWar      = 0x51
 	OpcodeRequestReplySurrenderPledgeWar = 0x52
+	OpcodeRequestSurrenderPersonally     = 0x69
 
 	OpcodeRequestPledgeSetAcademyMaster = uint16(0x0019)
 	OpcodeRequestPledgeWarList          = uint16(0x001e)
@@ -17,14 +18,14 @@ const (
 )
 
 // RequestPledgeWarName names the clan a war request is about: a
-// declaration, a stop or a surrender.
+// declaration, a stop, a surrender or a personal surrender.
 type RequestPledgeWarName struct {
 	PledgeName string
 }
 
 // DecodeRequestPledgeWarName parses a raw RequestStartPledgeWar,
-// RequestStopPledgeWar or RequestSurrenderPledgeWar payload (opcode byte
-// included).
+// RequestStopPledgeWar, RequestSurrenderPledgeWar or
+// RequestSurrenderPersonally payload (opcode byte included).
 func DecodeRequestPledgeWarName(payload []byte) (RequestPledgeWarName, error) {
 	r := newReader(payload)
 	req := RequestPledgeWarName{PledgeName: r.ReadString()}

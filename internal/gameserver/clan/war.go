@@ -153,6 +153,9 @@ const (
 	// WarMemberInCombat refuses stopping a war while a member online is in
 	// combat.
 	WarMemberInCombat
+	// WarSurrenderFailed refuses a personal surrender of a war the clan
+	// did not declare, or from a member that already wants peace.
+	WarSurrenderFailed
 )
 
 // War is a war request's two clans: Clan the requester's, Target the
@@ -265,6 +268,11 @@ func (s *Service) CheckSurrender(c *player.Character, targetName string) (War, W
 func (s *Service) EndWar(cl, target *Clan, now time.Time) bool {
 	unlock := lockPair(cl, target)
 	defer unlock()
+	return s.endWarLocked(cl, target, now)
+}
+
+// endWarLocked is EndWar with both clans' mu held.
+func (s *Service) endWarLocked(cl, target *Clan, now time.Time) bool {
 	if _, ok := cl.wars[target.id]; !ok {
 		return false
 	}

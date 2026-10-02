@@ -26,6 +26,8 @@ type SaveState struct {
 	OnlineTime int64
 	Location   location.Location
 	Heading    int
+	// WantsPeace is the personal-surrender flag (see WantsPeace).
+	WantsPeace bool
 }
 
 // SaveState copies c's persisted character-row values.
@@ -49,5 +51,6 @@ func (c *Character) SaveState() SaveState {
 		OnlineTime:        c.TotalOnlineTime(time.Now()), // persisted wall-clock total, not a queue deadline
 		Location:          c.CurrentLocation(),
 		Heading:           c.CurrentHeading(),
+		WantsPeace:        c.WantsPeace(),
 	}
 }
