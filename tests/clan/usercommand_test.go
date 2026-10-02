@@ -97,7 +97,9 @@ func msg(id int, params ...string) []string { return append([]string{strconv.Ito
 //
 //   - Knights declared war on Twenty (allied to Allies), Three and Hundred,
 //     and keeps a re-declaration penalty row on Thousand from a war it
-//     stopped; Hundred, Nine and Fifty declared war on Knights.
+//     stopped; Hundred, Nine and Fifty declared war on Knights. Allies and
+//     Pact are led by clans 77 and 88, seeded so the boot alliance check
+//     (ClanTable.allianceCheck) keeps Twenty and Fifty in them.
 //   - /attacklist lists the rows Knights holds that no row answers: Thousand,
 //     Twenty and Three, in the rows' key order, which compares the clan ids
 //     as text ("1000" < "20" < "3"). /underattacklist lists Fifty then Nine;
@@ -117,7 +119,8 @@ func TestClanWarsListCommands(t *testing.T) {
 	_, c := bootUserCommandClan(t,
 		`INSERT INTO clan_data (clan_id, clan_name, clan_level, ally_id, ally_name) VALUES
 			(20, 'Twenty', 3, 77, 'Allies'), (3, 'Three', 3, 0, NULL), (100, 'Hundred', 3, 0, NULL),
-			(1000, 'Thousand', 3, 0, NULL), (9, 'Nine', 3, 0, NULL), (50, 'Fifty', 3, 88, 'Pact')`,
+			(1000, 'Thousand', 3, 0, NULL), (9, 'Nine', 3, 0, NULL), (50, 'Fifty', 3, 88, 'Pact'),
+			(77, 'Allies Lead', 5, 77, 'Allies'), (88, 'Pact Lead', 5, 88, 'Pact')`,
 		`INSERT INTO clan_wars (clan1, clan2, expiry_time) VALUES
 			('`+k+`', '20', 0), ('`+k+`', '3', 0), ('`+k+`', '100', 0), ('`+k+`', '1000', `+penalty+`),
 			('100', '`+k+`', 0), ('9', '`+k+`', 0), ('50', '`+k+`', 0)`,
@@ -183,7 +186,8 @@ func penaltyRows(t *testing.T, frames [][]byte) string {
 // TestClanPenaltyCommand pins /clanpenalty (ClanPenalty): every penalty in
 // force, in order and dated yyyy-MM-dd, then the dissolution refusal of a
 // clan in an alliance; a clanless player without penalties sees the
-// no-penalty row. Expired penalties are not listed.
+// no-penalty row. Expired penalties are not listed. Knights' alliance is
+// led by a seeded clan 77, which keeps it through the boot alliance check.
 func TestClanPenaltyCommand(t *testing.T) {
 	t.Parallel()
 	k := itoa(subunitClanID)
@@ -192,6 +196,7 @@ func TestClanPenaltyCommand(t *testing.T) {
 	past := strconv.FormatInt(time.Now().Add(-time.Hour).UnixMilli(), 10)
 	srv, c := bootUserCommandClan(t,
 		`UPDATE characters SET clan_join_expiry_time = `+ms+`, clan_create_expiry_time = `+past+` WHERE char_name = 'Founder'`,
+		`INSERT INTO clan_data (clan_id, clan_name, clan_level, ally_id, ally_name) VALUES (77, 'Allies Lead', 5, 77, 'Allies')`,
 		`UPDATE clan_data SET ally_id = 77, ally_name = 'Allies', char_penalty_expiry_time = `+ms+`,
 			ally_penalty_type = 3, ally_penalty_expiry_time = `+ms+`, dissolving_expiry_time = `+ms+` WHERE clan_id = `+k,
 	)
