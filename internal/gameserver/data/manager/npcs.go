@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -33,6 +34,12 @@ type slotInfo struct {
 	dbName   string
 	masterID int32
 	liveID   int32
+	// fixed marks a standalone spawn placed at a point of its own, not
+	// declared under a maker: at and heading are that point. It never
+	// respawns.
+	fixed   bool
+	at      location.Location
+	heading int
 }
 
 // KillRewardConfig carries live reward settings loaded at game-server boot.
@@ -126,6 +133,8 @@ type Npcs struct {
 	restoredDeadCount     atomic.Int64
 	skippedNonCombatCount atomic.Int64
 	folkCount             atomic.Int64
+	// fixedSeq numbers the standalone spawns SpawnFixed places.
+	fixedSeq atomic.Int64
 }
 
 // NewNpcs walks spawns' loaded table and instantiates every "on start"

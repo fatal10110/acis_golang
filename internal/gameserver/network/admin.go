@@ -40,6 +40,12 @@ var adminCommands = map[string]adminCommand{
 	"admin_atmosphere":   (*GameClientLink).adminAtmosphere,
 	"admin_hide":         (*GameClientLink).adminHide,
 	"admin_skill":        (*GameClientLink).adminSkill,
+	"admin_help":         (*GameClientLink).adminHelp,
+
+	// Spawns; see admin_spawn.go.
+	"admin_spawn":       (*GameClientLink).adminSpawn,
+	"admin_delete":      (*GameClientLink).adminDelete,
+	"admin_list_spawns": (*GameClientLink).adminListSpawns,
 
 	// Petitions; see admin_petition.go.
 	"admin_petition":      (*GameClientLink).adminPetition,

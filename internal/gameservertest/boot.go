@@ -48,6 +48,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
@@ -115,6 +116,7 @@ type options struct {
 	attackStance           *task.AttackStance
 	pvpFlags               *task.PvPFlags
 	decay                  *task.Decay
+	npcSpawns              *spawn.Table
 	attackStanceTracker    network.AttackStanceTracker
 	attackStanceNow        func() time.Time
 	spawnProtection        time.Duration
@@ -784,6 +786,7 @@ type Server struct {
 	BuyListStock     *merchant.Stock
 	BuyListRows      *gamesql.BuyListStore
 	WorldObjects     *gamemanager.WorldObjects // doors spawned by WithDoors; nil otherwise
+	NpcSpawns        *gamemanager.Npcs         // live NPC population of WithNpcSpawns; nil otherwise
 	Relations        *relation.Manager         // friend and block lists the link was wired with
 	relationRows     *gamesql.RelationStore
 	Petitions        *petition.Manager // petitions the link was wired with
@@ -1874,6 +1877,13 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("gameservertest: build game client link: %v", err)
 	}
 	effects.SetShadowItemExpiry(gcl.ExpireShadowItem)
+	var npcSpawns *gamemanager.Npcs
+	if o.npcSpawns != nil {
+		npcSpawns = bootNpcSpawns(t, gcl, npcSpawnDeps{
+			state: state, templates: o.npcs, geo: bootGeo(o.geo), ids: ids, decay: o.decay, ai: ai, positions: positions,
+			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.AttackStance, log: o.log, makers: o.npcSpawns,
+		})
+	}
 	if o.productionTickers {
 		for _, start := range []func(zerolog.Logger) *scheduler.Ticker{
 			positions.Start,
@@ -2032,6 +2042,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		zones:            o.zones,
 		decay:            o.decay,
 		AI:               ai,
+		NpcSpawns:        npcSpawns,
 		Water:            water,
 		BuyListStock:     stock,
 		BuyListRows:      buyListStore,

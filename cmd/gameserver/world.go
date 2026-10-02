@@ -74,6 +74,7 @@ func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids
 	}
 	decayHooks.SetRespawnHook(npcs.RespawnHook)
 	respawnHooks.SetHook(npcs.Respawn)
+	link.SetNpcSpawns(npcs)
 	return npcs, nil
 }
 

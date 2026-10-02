@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
@@ -381,6 +382,9 @@ type GameClientLink struct {
 	// announcements are the server announcements: read at login, repeated
 	// on their schedules and managed by //announce.
 	announcements *announcement.Registry
+	// npcSpawns is the live NPC population the admin spawn commands use;
+	// see SetNpcSpawns.
+	npcSpawns atomic.Pointer[manager.Npcs]
 }
 
 // AIRegistry owns recurring actor-AI registrations.
