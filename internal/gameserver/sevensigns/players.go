@@ -30,6 +30,11 @@ func (s *State) PlayerSeal(objectID int32) Seal {
 // else for Dusk. A player signing up for the first time is written to the
 // store at once, with no stones turned in; an existing sign-up changes in
 // memory and is written with the next save.
+//
+// An error means only that the new player's row could not be inserted: the
+// sign-up and its seal vote are already in effect in memory, as when no
+// error is returned. A caller must not read it as "not signed up" and undo
+// what the sign-up cost; it is reported so the caller can log it.
 func (s *State) SetPlayerInfo(ctx context.Context, objectID int32, cabal Cabal, seal Seal) error {
 	s.saveMu.Lock()
 	defer s.saveMu.Unlock()
@@ -158,12 +163,16 @@ func (s *State) scoreLocked(cabal Cabal) int {
 	return 0
 }
 
-func (s *State) totalMembersLocked(cabal Cabal) int {
-	n := 0
+// memberCountsLocked counts the players signed up for each cabal in one
+// pass over the sign-ups.
+func (s *State) memberCountsLocked() (dawn, dusk int) {
 	for _, p := range s.players {
-		if p.Cabal == cabal {
-			n++
+		switch p.Cabal {
+		case Dawn:
+			dawn++
+		case Dusk:
+			dusk++
 		}
 	}
-	return n
+	return dawn, dusk
 }

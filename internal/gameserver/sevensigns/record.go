@@ -73,7 +73,7 @@ func (s *State) Record(objectID int32) Record {
 		r.Dawn.Percent = share(r.Dawn.TotalScore, total, 100)
 	}
 
-	duskMembers, dawnMembers := s.totalMembersLocked(Dusk), s.totalMembersLocked(Dawn)
+	dawnMembers, duskMembers := s.memberCountsLocked()
 	for i, seal := range Seals {
 		st := SealStanding{Seal: seal, Owner: s.row.SealOwners[i]}
 		if duskMembers != 0 {
@@ -82,7 +82,7 @@ func (s *State) Record(objectID int32) Record {
 		if dawnMembers != 0 {
 			st.DawnPercent = share(s.row.DawnSealVotes[i], dawnMembers, 100)
 		}
-		dawn, dusk := s.sealPercentsLocked(i)
+		dawn, dusk := s.sealPercentsLocked(i, dawnMembers, duskMembers)
 		st.Predicted, st.Prediction = sealOutcome(st.Owner, r.Winner, dawn, dusk)
 		r.Seals[i] = st
 	}

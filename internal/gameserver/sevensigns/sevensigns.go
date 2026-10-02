@@ -365,8 +365,9 @@ func (s *State) changePeriodLocked() []Notice {
 // won by winner and returns the notices of the seals a cabal obtained.
 func (s *State) settleSealsLocked(winner Cabal) []Notice {
 	var notices []Notice
+	dawnMembers, duskMembers := s.memberCountsLocked()
 	for i, seal := range Seals {
-		dawn, dusk := s.sealPercentsLocked(i)
+		dawn, dusk := s.sealPercentsLocked(i, dawnMembers, duskMembers)
 		owner, _ := sealOutcome(s.row.SealOwners[i], winner, dawn, dusk)
 		s.row.SealOwners[i] = owner
 		if owner != NoCabal {
@@ -377,10 +378,11 @@ func (s *State) settleSealsLocked(winner Cabal) []Notice {
 }
 
 // sealPercentsLocked returns the percent of each cabal's members who chose
-// the seal at index i, counting an empty cabal as one member.
-func (s *State) sealPercentsLocked(i int) (dawn, dusk int) {
-	return share(s.row.DawnSealVotes[i], max(1, s.totalMembersLocked(Dawn)), 100),
-		share(s.row.DuskSealVotes[i], max(1, s.totalMembersLocked(Dusk)), 100)
+// the seal at index i, given each cabal's member count and counting an
+// empty cabal as one member.
+func (s *State) sealPercentsLocked(i, dawnMembers, duskMembers int) (dawn, dusk int) {
+	return share(s.row.DawnSealVotes[i], max(1, dawnMembers), 100),
+		share(s.row.DuskSealVotes[i], max(1, duskMembers), 100)
 }
 
 func (s *State) scheduleLocked() {
