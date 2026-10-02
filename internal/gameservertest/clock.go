@@ -132,22 +132,22 @@ func (s *Server) addClient(c *testsupport.ScriptedClient) {
 	})
 }
 
-// enterWorldTimeout bounds the wall time awaitEnterWorld waits. EnterWorld
-// reads the character's rows from the shared database before its burst,
-// which a machine running every suite at once can hold for seconds.
+// enterWorldTimeout bounds the wall time awaitEnterWorld waits. The login
+// runs on the player's actor queue while the connection waits for it, and a
+// machine running every suite at once can hold that queue back; giving up
+// only hands the wait to the reads, so the bound is generous.
 const enterWorldTimeout = 30 * time.Second
 
 // awaitEnterWorld waits until the server has handled the EnterWorld c just
-// sent: its burst is queued and the player is in the world. EnterWorld reads
-// the character's rows before the first frame of its burst and adds the
-// player to the world only after them, so on the wall clock a suite reading
-// "until quiet" right after it can stop before either, and then find no
-// player or read the burst late. On a driven clock every read already waits
-// for the server to catch up, and the login runs on an actor queue only the
-// clock moves, so this wait is for the wall clock alone. It also returns once
-// the connection closed or the login waits on a persistence lane the test
-// holds, and gives up quietly after enterWorldTimeout, leaving the reads to
-// report.
+// sent: the player is spawned and its whole burst is queued. EnterWorld does
+// both on the player's actor queue while the connection waits, so on the
+// wall clock a suite reading "until quiet" right after it can stop before the
+// spawn or the burst, and then find no player in sight or read the burst
+// late. On a driven clock every read already waits for the server to catch
+// up, and the login runs on an actor queue only the clock moves, so this wait
+// is for the wall clock alone. It also returns once the connection closed or
+// the login waits on a persistence lane the test holds, and gives up quietly
+// after enterWorldTimeout, leaving the reads to report.
 func (s *Server) awaitEnterWorld(c *testsupport.ScriptedClient) {
 	deadline := time.Now().Add(enterWorldTimeout)
 	for time.Now().Before(deadline) {
