@@ -120,3 +120,66 @@ func TestBookRequesterLeftIsTaken(t *testing.T) {
 		t.Fatal("answering the earlier login's invitation ended the later login's")
 	}
 }
+
+// TestBookLeftRequesterClockOutlivesTradeAndRoomAnswers pins the
+// partner-gone branch of the trade and party room answers: answering a
+// request whose requester left only clears the answering side, so the
+// requester's other pending requests stay answerable until they expire.
+func TestBookLeftRequesterClockOutlivesTradeAndRoomAnswers(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		answer func(book *Book)
+	}{
+		{"trade accept", func(book *Book) {
+			book.Request(1, 2)
+			book.Invite(KindFriend, 1, 3, false)
+			book.Leave(1)
+			if res := book.Answer(2, true); res.Status != AnswerAccepted || !res.RequesterLeft {
+				t.Fatalf("trade Answer = %+v, want accepted from a left requester", res)
+			}
+		}},
+		{"trade deny", func(book *Book) {
+			book.Request(1, 2)
+			book.Invite(KindFriend, 1, 3, false)
+			book.Leave(1)
+			if res := book.Answer(2, false); res.Status != AnswerDenied || !res.RequesterLeft {
+				t.Fatalf("trade Answer = %+v, want denied from a left requester", res)
+			}
+		}},
+		{"party room", func(book *Book) {
+			book.Invite(KindPartyRoom, 1, 2, false)
+			book.Invite(KindFriend, 1, 3, false)
+			book.Leave(1)
+			if _, ok := book.TakeInvite(KindPartyRoom, 2); ok {
+				t.Fatal("a room answer reached a requester that left")
+			}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			book := NewBook(time.Now)
+			tc.answer(book)
+			if !book.HoldsRequest(3) {
+				t.Fatal("answering the left requester's other request ended this one")
+			}
+			taken, ok := book.TakeRequest(KindFriend, 3)
+			if !ok || taken.RequesterID != 1 || !taken.RequesterLeft {
+				t.Fatalf("TakeRequest(3) = %+v %v, want requester 1, left", taken, ok)
+			}
+		})
+	}
+}
+
+// TestBookLeftRequesterOtherRequestsStillExpire pins that a left
+// requester's surviving requests still end on its clock.
+func TestBookLeftRequesterOtherRequestsStillExpire(t *testing.T) {
+	now := time.Unix(10, 0)
+	book := NewBook(func() time.Time { return now })
+	book.Request(1, 2)
+	book.Invite(KindFriend, 1, 3, false)
+	book.Leave(1)
+	book.Answer(2, false)
+	now = now.Add(RequestTimeout)
+	if _, ok := book.TakeRequest(KindFriend, 3); ok {
+		t.Fatal("a left requester's invitation outlived its clock")
+	}
+}

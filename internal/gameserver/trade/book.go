@@ -170,6 +170,9 @@ func (b *Book) recordLocked(kind RequestKind, requesterID, targetID int32) {
 // answeredLocked ends the request pending answered: its requester's clock
 // stops, which ends every other request that login sent too.
 func (b *Book) answeredLocked(pending pendingRequest) {
+	if pending.from.left && !answerReachesLeftRequester(pending.kind) {
+		return
+	}
 	pending.from.expiresAt = time.Time{}
 	if b.clocks[pending.from.requesterID] == pending.from {
 		delete(b.clocks, pending.from.requesterID)
@@ -195,6 +198,21 @@ func (b *Book) Invite(kind RequestKind, requesterID, targetID int32, checkReques
 	return RequestResult{Status: RequestStarted}
 }
 
+// answerReachesLeftRequester reports whether an answer of kind still stops
+// the clock of a requester that left the world after asking. Trade and
+// party room answers find the requester gone and only clear the answering
+// side, so the requester's other requests stay answerable until they
+// expire; friend, party and command channel answers reach the departed
+// requester and stop its clock all the same.
+//
+// The reference tells a requester that left from one that is online by
+// looking its id up in the world, so a relog under the same id still stops
+// the earlier login's clock there. Here a left login stays left whatever a
+// later login under its id does.
+func answerReachesLeftRequester(kind RequestKind) bool {
+	return kind != KindTrade && kind != KindPartyRoom
+}
+
 // TakeInvite consumes the request of kind targetID holds and returns its
 // requester. A request of another kind stays pending and reports false, as
 // does one whose requester left the world after asking.
@@ -215,8 +233,9 @@ type Taken struct {
 }
 
 // TakeRequest consumes the request of kind targetID holds, whoever sent it,
-// and stops its requester's clock. A request of another kind stays pending
-// and reports false.
+// and stops its requester's clock (unless answerReachesLeftRequester says
+// the answer cannot reach a requester that left). A request of another kind
+// stays pending and reports false.
 func (b *Book) TakeRequest(kind RequestKind, targetID int32) (Taken, bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
