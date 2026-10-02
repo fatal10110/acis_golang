@@ -58,6 +58,6 @@ func (f *Folk) HasClan() bool                              { return false }
 func (f *Folk) DuelID() int32                              { return 0 }
 func (f *Folk) DuelTeam() int                              { return 0 }
 func (f *Folk) MageClass() bool                            { return false }
-func (f *Folk) CanCastOnPlayable(skilltarget.Actor, *modelskill.Definition, bool, bool) bool {
+func (f *Folk) CanCastOnPlayable(skilltarget.Actor, *modelskill.Definition, bool, bool, bool) bool {
 	return true
 }

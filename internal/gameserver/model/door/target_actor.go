@@ -36,7 +36,7 @@ func (o *Object) GroundTarget() (x, y, z int)                    { return 0, 0, 
 func (o *Object) Summon() (skilltarget.Actor, bool)              { return nil, false }
 func (o *Object) Owner() (attackable.Combatant, bool)            { return nil, false }
 func (o *Object) OlympiadMode() bool                             { return false }
-func (o *Object) CanCastOnPlayable(skilltarget.Actor, *modelskill.Definition, bool, bool) bool {
+func (o *Object) CanCastOnPlayable(skilltarget.Actor, *modelskill.Definition, bool, bool, bool) bool {
 	return true
 }
 func (o *Object) IsInParty() bool                      { return false }

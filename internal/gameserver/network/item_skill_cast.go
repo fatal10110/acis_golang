@@ -141,7 +141,7 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 	live.clearParkedApproaches()
 	if def.Target != modelskill.TargetGround {
 		target := l.skillFinalTarget(live, selected, def)
-		if l.walkToCastTarget(live, target, def.CastRange, false, func() { live.deferItemAICast(inv, carrier, def, selected, ctrl) }) {
+		if l.walkToCastTarget(live, target, def.CastRange, false, func() { live.approachItemAICast(inv, carrier, def, selected, ctrl, target.ObjectID()) }) {
 			return nil, false, false
 		}
 	}

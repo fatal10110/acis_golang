@@ -107,6 +107,10 @@ func TestServitorPKKillTakesTheOwnersKnifeOffBeforeItsDamageMessage(t *testing.T
 	s, servitor := bootServitorPKKillScene(t, pkServitorTemplate())
 
 	selectPlayerTarget(t, s.c, s.victimID)
+	// A second click follows the innocent victim, the owner's main target
+	// its servitor's CTRL damage skill needs (Playable.java:405-412).
+	s.c.Send(encodeAction(s.victimID, int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
+	drainUntilQuiet(t, s.c)
 	s.c.Send(encodeRequestActionUse(pkServitorStrikeAction, true))
 	assertKarmaChangeFrames(t, s.c, s.objID, 240)
 	s.srv.Settle(t)

@@ -1260,7 +1260,7 @@ func (a *targetActor) MonsterKind() bool { return a.monster }
 
 func (a *targetActor) FolkOrGuard() bool { return a.folkOrGuard }
 
-func (a *targetActor) CanCastOnPlayable(Actor, *modelskill.Definition, bool, bool) bool {
+func (a *targetActor) CanCastOnPlayable(Actor, *modelskill.Definition, bool, bool, bool) bool {
 	return !a.playableCastDenied
 }
 

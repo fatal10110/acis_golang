@@ -18,16 +18,10 @@ type continuousHandler struct {
 }
 
 // Types lists 13 of the 14 skill types the continuous handler covers; FUSION
-// is the 14th but is omitted here. For a player caster it's a dead entry
-// anyway — a player's FUSION cast is diverted to the fusion cast path before
-// the hit-time skill dispatch ever runs, applying the fusion at cast start
-// instead, matched here by fusionHandler. A non-player caster has no such
-// diversion — its fusion cast path is an uncalled stub — so its hit-time
-// skill dispatch sends FUSION straight into the continuous handler's entry,
-// same as any other skill type. It applies the caster
-// skill's own effects, which every datapack FUSION skill (e.g. 3626-3628,
-// skills/3600-3699.xml) carries none of, so the observable result is a
-// no-op rather than the entry never firing at all.
+// is the 14th but is omitted here, and no FUSION cast reaches the hit-time
+// skill dispatch anyway: a player's FUSION cast is diverted to the fusion
+// cast path, which lands the force through StartFusion as the channel opens,
+// and AIController skips FUSION for every other caster.
 func (continuousHandler) Types() []string {
 	return []string{
 		"BUFF", "DEBUFF", "DOT", "MDOT", "POISON", "BLEED",

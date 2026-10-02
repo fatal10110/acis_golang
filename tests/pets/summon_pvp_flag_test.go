@@ -112,12 +112,13 @@ func TestSummonSkillOnFlaggedPlayerFlagsOwner(t *testing.T) {
 }
 
 // TestSummonSkillPKKillLeavesOwnerFlagged has the wolf's strike kill the
-// innocent player. The kill makes the owner a PKer, which resets its flag,
+// innocent player the owner follows, its main target. The kill makes the owner a PKer, which resets its flag,
 // but the strike flags the owner once its effects have run, so the owner
 // ends with both karma and the flag.
 func TestSummonSkillPKKillLeavesOwnerFlagged(t *testing.T) {
 	t.Parallel()
 	s := bootSummonPvPScene(t, true)
+	s.h.followPlayer(t, s.victimID)
 	s.strike(t, s.victim.Dead)
 	if !s.victim.Dead() {
 		t.Fatal("victim alive after the lethal strike")

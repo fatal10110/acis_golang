@@ -738,6 +738,8 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	// reads live.cast unguarded, so a lazy first write from the read-loop
 	// goroutine would race it (issue #1183).
 	l.castController(live)
+	// The intention source reads cast, combat and move, all built above.
+	c.SetIntentionSource(live)
 	if inv := c.Inventory(); inv != nil && l.shadowItems != nil {
 		for _, inst := range inv.PaperdollItems() {
 			tmpl, ok := inv.Templates().Get(inst.TemplateID)

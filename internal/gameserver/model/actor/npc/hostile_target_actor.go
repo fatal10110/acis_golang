@@ -15,7 +15,7 @@ func (h *Hostile) CanSeePoint(int, int, int) bool    { return true }
 func (h *Hostile) GroundTarget() (x, y, z int)       { return 0, 0, 0 }
 func (h *Hostile) Summon() (skilltarget.Actor, bool) { return nil, false }
 func (h *Hostile) OlympiadMode() bool                { return false }
-func (h *Hostile) CanCastOnPlayable(skilltarget.Actor, *modelskill.Definition, bool, bool) bool {
+func (h *Hostile) CanCastOnPlayable(skilltarget.Actor, *modelskill.Definition, bool, bool, bool) bool {
 	return true
 }
 func (h *Hostile) IsInParty() bool                      { return false }

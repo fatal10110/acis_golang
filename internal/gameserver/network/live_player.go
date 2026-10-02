@@ -238,6 +238,10 @@ type pickupIntention struct {
 type deferredMagicSkill struct {
 	req      clientpackets.RequestMagicSkillUse
 	selected world.Tracked
+	// approach is the object id of the final target a cast approach walks
+	// to, when the request is the current CAST intention rather than one
+	// queued behind an action in flight; 0 otherwise.
+	approach int32
 }
 
 type itemAICastIntention struct {
@@ -250,6 +254,8 @@ type itemAICastIntention struct {
 	// summon marks a pet collar's SUMMON_CREATURE: item is the collar the
 	// pet comes from, kept rather than consumed.
 	summon bool
+	// approach is as deferredMagicSkill.approach.
+	approach int32
 }
 
 func (p *livePlayer) sendVisibilityFrame(frame wire.Frame) bool {
@@ -512,6 +518,15 @@ func (p *livePlayer) deferMagicSkill(req clientpackets.RequestMagicSkillUse, sel
 	p.deferredMagic = &deferredMagicSkill{req: req, selected: selected}
 }
 
+// approachMagicSkill stores req as the current CAST intention, walking to
+// its final target finalID before it casts.
+func (p *livePlayer) approachMagicSkill(req clientpackets.RequestMagicSkillUse, selected world.Tracked, finalID int32) {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	p.clearNextIntentionLocked()
+	p.deferredMagic = &deferredMagicSkill{req: req, selected: selected, approach: finalID}
+}
+
 func (p *livePlayer) takeDeferredMagicSkill() *deferredMagicSkill {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
@@ -559,6 +574,12 @@ func (p *livePlayer) dropDeferredCast() bool {
 
 func (p *livePlayer) deferItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill modelskill.Definition, selected world.Tracked, ctrl bool) {
 	p.setDeferredItemAICast(&itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected, ctrl: ctrl})
+}
+
+// approachItemAICast is deferItemAICast for the current CAST intention,
+// walking to its final target finalID before it casts.
+func (p *livePlayer) approachItemAICast(inventory *itemcontainer.Inventory, inst *item.Instance, skill modelskill.Definition, selected world.Tracked, ctrl bool, finalID int32) {
+	p.setDeferredItemAICast(&itemAICastIntention{inventory: inventory, item: inst, skill: skill, selected: selected, ctrl: ctrl, approach: finalID})
 }
 
 // deferSummonCreatureCast stores the SUMMON_CREATURE cast of the pet collar

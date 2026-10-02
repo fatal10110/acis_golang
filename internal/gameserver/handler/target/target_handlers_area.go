@@ -45,7 +45,7 @@ func areaCastRejection(caster, target Actor, skill *modelskill.Definition, ctrl 
 	if !aimedAreaTarget(caster, target) {
 		return CastRejectSilent
 	}
-	if isPlayable(target) && (ownSide(caster, target) || !caster.CanCastOnPlayable(target, skill, ctrl, true)) {
+	if isPlayable(target) && (ownSide(caster, target) || !caster.CanCastOnPlayable(target, skill, ctrl, true, true)) {
 		return CastRejectInvalidTarget
 	}
 	return aimedAttackRejection(caster, target, ctrl)

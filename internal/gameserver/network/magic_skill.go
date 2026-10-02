@@ -89,7 +89,7 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 		live.clearParkedApproaches()
 		if def.Target != modelskill.TargetGround {
 			target := l.magicSkillFinalTarget(live, def, selected)
-			if l.walkToCastTarget(live, target, def.CastRange, req.ShiftPressed, func() { live.deferMagicSkill(req, selected) }) {
+			if l.walkToCastTarget(live, target, def.CastRange, req.ShiftPressed, func() { live.approachMagicSkill(req, selected, target.ObjectID()) }) {
 				return
 			}
 		}
@@ -161,7 +161,7 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 	handlers := l.castEffects()
 	switch def.SkillType {
 	case "FUSION":
-		l.startFusionCast(live, controller, handlers, target, def, plan)
+		l.startFusionCast(live, controller, target, def, plan)
 		return
 	case "SIGNET_CASTTIME":
 		l.startSignetCast(live, controller, handlers, target, def, plan)
@@ -222,7 +222,7 @@ func (l *GameClientLink) broadcastCastStart(live *livePlayer, target actorcast.T
 // channel opens, before the caster's MagicSkillUse, USE_S1 and gauge go out.
 // The gauge is sent whatever the hit time: a channel has no short-cast
 // cutoff.
-func (l *GameClientLink) startFusionCast(live *livePlayer, controller *actorcast.Controller, handlers actorcast.EffectHandlers, target actorcast.Target, def modelskill.Definition, plan actorcast.Plan) {
+func (l *GameClientLink) startFusionCast(live *livePlayer, controller *actorcast.Controller, target actorcast.Target, def modelskill.Definition, plan actorcast.Plan) {
 	live.setFusionTarget(target.ObjectID())
 	finishFusion := func() {
 		// Only a creature carries the triggered fusion effect to decrease.
@@ -231,9 +231,11 @@ func (l *GameClientLink) startFusionCast(live *livePlayer, controller *actorcast
 		}
 		live.clearFusionTarget(target.ObjectID())
 	}
-	handlers.Sink = l.playerMessageSink(live, nil)
-	result := actorcast.ApplyEffectsResult(handlers, live.Character, target, def)
-	l.syncCubicTargets(live, result, def)
+	// The force lands on the target the cast committed to, its conditions
+	// not judged again.
+	if effected, ok := target.(attackable.Combatant); ok {
+		skillhandler.StartFusion(l.skills, live.Character, effected, def)
+	}
 
 	l.broadcastCastStart(live, target, def, plan)
 	live.SendFrame(serverpackets.FrameSetupGauge(serverpackets.GaugeBlue, millis(plan.HitTime), millis(plan.HitTime)))
