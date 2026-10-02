@@ -243,7 +243,8 @@ func TestExpandCornerCutting(t *testing.T) {
 				{"SW", cx - 1, cy + 1, test.wantSW},
 				{"SE", cx + 1, cy + 1, test.wantSE},
 			} {
-				_, got := scratch.openSet[nodeKey{gx: candidate.gx, gy: candidate.gy, z: 0}]
+				slot := scratch.set.lookup(cellKey(candidate.gx, candidate.gy, 0))
+				got := slot != nil && slot.fwd != 0
 				if got != candidate.want {
 					t.Errorf("%s candidate queued = %v, want %v", candidate.name, got, candidate.want)
 				}
@@ -267,7 +268,7 @@ func TestAddCandidateKeepsCheaperGridParent(t *testing.T) {
 
 	finder.addCandidate(current, goal, &seq, scratch, 2, 0, 0, block.East|block.West, false)
 
-	got := &scratch.nodes[len(scratch.nodes)-1]
+	got := scratch.nodes.at(scratch.nodes.n)
 	if got.parent != current {
 		t.Fatal("addCandidate() re-parented to a more expensive smoothed link")
 	}

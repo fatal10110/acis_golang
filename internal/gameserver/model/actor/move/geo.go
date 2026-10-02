@@ -30,6 +30,15 @@ type Geo interface {
 	Walkable(x, y, z int) bool
 }
 
+// pathIntoFinder is a Geo whose routed search writes into caller-owned
+// storage instead of allocating its result. CreatureMove uses it when its
+// Geo offers it, and copies a plain FindPath result otherwise.
+type pathIntoFinder interface {
+	FindPathInto(dst []location.Location, origin, target location.Location) ([]location.Location, bool)
+}
+
+var _ pathIntoFinder = EngineGeo{}
+
 // EngineGeo wires a geodata engine and a pathfinder to the Geo interface used
 // by CreatureMove. The pathfinder may be nil, in which case FindPath always
 // reports no route, leaving the engine's straight-line CanMove and the
@@ -53,10 +62,16 @@ func (g EngineGeo) Height(x, y, z int) int16 {
 }
 
 func (g EngineGeo) FindPath(origin, target location.Location) ([]location.Location, bool) {
+	return g.FindPathInto(nil, origin, target)
+}
+
+// FindPathInto is FindPath writing the route into dst's storage, which the
+// caller owns; EngineGeo is shared by every mover and keeps no buffer.
+func (g EngineGeo) FindPathInto(dst []location.Location, origin, target location.Location) ([]location.Location, bool) {
 	if g.Finder == nil {
-		return nil, false
+		return dst[:0], false
 	}
-	path, _, ok := g.Finder.Find(origin, target)
+	path, _, ok := g.Finder.FindInto(dst, origin, target)
 	return path, ok
 }
 
