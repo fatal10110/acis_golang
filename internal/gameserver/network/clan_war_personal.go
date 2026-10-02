@@ -39,7 +39,7 @@ func (l *GameClientLink) requestSurrenderPersonally(live *livePlayer, req client
 // The killer's clan is told on its members' queues. live, dying, gets its
 // own clan's header in place, behind its death's packets, unless the score
 // crossed 0: the clan skills that then change go through each member's
-// queue, live's included.
+// queue, live's included, since the death runs on the killer's queue.
 func (l *GameClientLink) creditClanKill(live *livePlayer, e event.ClanKill) {
 	kill := l.clanService().CreditWarKill(live.ObjectID(), live.Character.ClanID(), e.KillerID, e.KillerClanID)
 	if kill.Gained {

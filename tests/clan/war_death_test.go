@@ -45,8 +45,8 @@ func onPlayerQueue(t *testing.T, srv *gameservertest.Server, id int32, fn func()
 	<-done
 }
 
-// killFounder has the player killerID kill the founder.
-func killFounder(t *testing.T, w *clanWorld, killerID int32) {
+// killPlayer has the player killerID kill the player victimID.
+func killPlayer(t *testing.T, w *clanWorld, victimID, killerID int32) {
 	t.Helper()
 	obj, ok := w.srv.State.Player(killerID)
 	if !ok {
@@ -56,10 +56,10 @@ func killFounder(t *testing.T, w *clanWorld, killerID int32) {
 	if !ok {
 		t.Fatalf("killer %T is not a combatant", obj)
 	}
-	victim := onlineCharacter(t, w.srv, w.leaderID)
-	onPlayerQueue(t, w.srv, w.leaderID, func() {
+	victim := onlineCharacter(t, w.srv, victimID)
+	onPlayerQueue(t, w.srv, victimID, func() {
 		if !victim.Kill(killer) {
-			t.Error("Kill() = false on a living founder")
+			t.Errorf("Kill() = false on living player %d", victimID)
 		}
 	})
 }
@@ -85,8 +85,10 @@ func headerReputation(t *testing.T, frame []byte) (clanID, reputation int32) {
 // reputation: Rivals gains 1 while Knights holds a positive score, then
 // Knights loses 1 while Rivals (its gain counted) holds one, and each
 // clan's members get its new header; a score rising above 0 first turns
-// the clan skills on. An academy killer, or a death in an arena, moves
-// none; the arena death also costs no experience.
+// the clan skills on, and one falling to 0 or below turns them off. An
+// academy killer, an academy member's death (Pupil in Knights' academy,
+// killed instead of the founder), or a death in an arena moves none; the
+// arena death also costs no experience.
 func TestClanWarDeath(t *testing.T) {
 	t.Parallel()
 	mutual := []string{warStmt(knightsClanID, rivalsClanID), warStmt(rivalsClanID, knightsClanID)}
@@ -95,9 +97,11 @@ func TestClanWarDeath(t *testing.T) {
 		wars                     []string
 		knightsRep, rivalsRep    int
 		byPupil, inArena         bool
+		academyVictim            bool
 		wantKnights, wantRivals  int
 		wantLoss                 int64
 		wantRivalsActivatedSkill bool
+		wantKnightsDeactivated   bool
 	}{
 		{name: "no war", knightsRep: 100, rivalsRep: 100, wantKnights: 100, wantRivals: 100, wantLoss: fullDeathLoss},
 		{name: "mutual war", wars: mutual, knightsRep: 100, rivalsRep: 100, wantKnights: 99, wantRivals: 101, wantLoss: quarterDeathLoss},
@@ -114,31 +118,55 @@ func TestClanWarDeath(t *testing.T) {
 			name: "killer's clan at 0", wars: mutual, knightsRep: 100, rivalsRep: 0, wantKnights: 99, wantRivals: 1, wantLoss: quarterDeathLoss,
 			wantRivalsActivatedSkill: true,
 		},
+		{
+			name: "victim's clan crossing to 0", wars: mutual, knightsRep: 1, rivalsRep: 100, wantKnights: 0, wantRivals: 101, wantLoss: quarterDeathLoss,
+			wantKnightsDeactivated: true,
+		},
+		{
+			name: "academy victim", wars: mutual, knightsRep: 100, rivalsRep: 100, academyVictim: true,
+			wantKnights: 100, wantRivals: 100, wantLoss: quarterDeathLoss,
+		},
 		{name: "academy killer", wars: mutual, knightsRep: 100, rivalsRep: 100, byPupil: true, wantKnights: 100, wantRivals: 100, wantLoss: quarterDeathLoss},
 		{name: "arena", wars: mutual, knightsRep: 100, rivalsRep: 100, inArena: true, wantKnights: 100, wantRivals: 100},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			pupilClanID := rivalsClanID
+			if tt.academyVictim {
+				pupilClanID = knightsClanID
+			}
 			stmts := append([]string{
 				`UPDATE clan_data SET reputation_score = ` + itoa(int32(tt.knightsRep)) + ` WHERE clan_id = ` + itoa(knightsClanID),
 				`UPDATE clan_data SET reputation_score = ` + itoa(int32(tt.rivalsRep)) + ` WHERE clan_id = ` + itoa(rivalsClanID),
-				`UPDATE characters SET clanid = ` + itoa(rivalsClanID) + `, subpledge = -1, power_grade = 9, lvl_joined_academy = 10 WHERE obj_Id = ` + itoa(pupilID),
+				`UPDATE characters SET clanid = ` + itoa(pupilClanID) + `, subpledge = -1, power_grade = 9, lvl_joined_academy = 10, exp = ` +
+					itoa(foundExp) + ` WHERE obj_Id = ` + itoa(pupilID),
 			}, tt.wars...)
 			w := bootAllianceCast(t, []castMember{{pupilID, "player3", "Pupil"}}, stmts, gameservertest.WithAllowDelevel(true))
-			killerID := w.memberID
-			if tt.byPupil {
-				startInWorld(t, w.srv.DialClient(t, "player3", 1))
-				killerID = pupilID
+			killerID, victimID, victimClient := w.memberID, w.leaderID, w.leader
+			if tt.byPupil || tt.academyVictim {
+				pupil := w.srv.DialClient(t, "player3", 1)
+				startInWorld(t, pupil)
+				if tt.byPupil {
+					killerID = pupilID
+				} else {
+					victimID, victimClient = pupilID, pupil
+				}
 				drainFrames(t, w.leader)
 				drainFrames(t, w.member)
+				drainFrames(t, pupil)
 			}
 			if tt.inArena {
 				founder := onlineCharacter(t, w.srv, w.leaderID)
 				onPlayerQueue(t, w.srv, w.leaderID, func() { founder.SetInPvPZone(true) })
 			}
 
-			killFounder(t, w, killerID)
+			killPlayer(t, w, victimID, killerID)
 			founder, rival := drainFrames(t, w.leader), drainFrames(t, w.member)
+			if tt.academyVictim {
+				if _, ok := firstOpcode(drainFrames(t, victimClient), serverpackets.OpcodePledgeShowInfoUpdate); ok {
+					t.Fatal("academy victim got a clan header, want none")
+				}
+			}
 
 			moved := tt.wantKnights != tt.knightsRep
 			header, ok := firstOpcode(founder, serverpackets.OpcodePledgeShowInfoUpdate)
@@ -178,15 +206,40 @@ func TestClanWarDeath(t *testing.T) {
 				}
 			}
 
-			w.leaveWorld(t, w.leader)
+			deactivated := slices.Contains(messages(t, founder), serverpackets.SystemMessageReputationLowClanSkillsDeactivated)
+			if deactivated != tt.wantKnightsDeactivated {
+				t.Fatalf("founder told the clan skills turned off = %v, want %v", deactivated, tt.wantKnightsDeactivated)
+			}
+			if tt.wantKnightsDeactivated {
+				notice := slices.IndexFunc(founder, func(f []byte) bool {
+					if f[0] != serverpackets.OpcodeSystemMessage {
+						return false
+					}
+					id, _ := sysMsg(t, f)
+					return id == serverpackets.SystemMessageReputationLowClanSkillsDeactivated
+				})
+				if got := only(founder[notice+1:], serverpackets.OpcodeSkillList, serverpackets.OpcodePledgeShowInfoUpdate); string(got) !=
+					string([]byte{serverpackets.OpcodeSkillList, serverpackets.OpcodePledgeShowInfoUpdate}) {
+					t.Fatalf("founder's crossing after the notice = %x, want SkillList, then the header", got)
+				}
+				// The death runs on the killer's queue; the clan skills the
+				// founder loses come off on its own, so the crossing reaches
+				// it behind the death's experience-loss UserInfo.
+				isUserInfo := func(f []byte) bool { return f[0] == serverpackets.OpcodeUserInfo }
+				if !slices.ContainsFunc(founder[:notice], isUserInfo) || slices.ContainsFunc(founder[notice:], isUserInfo) {
+					t.Fatalf("founder's frames %x: want the crossing notice after every UserInfo of the death", opcodes(founder))
+				}
+			}
+
+			w.leaveWorld(t, victimClient)
 			if got := queryInt(t, w, `SELECT reputation_score FROM clan_data WHERE clan_id = ?`, knightsClanID); got != int64(tt.wantKnights) {
 				t.Fatalf("stored Knights reputation = %d, want %d", got, tt.wantKnights)
 			}
 			if got := queryInt(t, w, `SELECT reputation_score FROM clan_data WHERE clan_id = ?`, rivalsClanID); got != int64(tt.wantRivals) {
 				t.Fatalf("stored Rivals reputation = %d, want %d", got, tt.wantRivals)
 			}
-			if got := queryInt(t, w, `SELECT exp FROM characters WHERE obj_Id = ?`, w.leaderID); got != foundExp-tt.wantLoss {
-				t.Fatalf("founder's exp after the death = %d, want %d", got, foundExp-tt.wantLoss)
+			if got := queryInt(t, w, `SELECT exp FROM characters WHERE obj_Id = ?`, victimID); got != foundExp-tt.wantLoss {
+				t.Fatalf("victim's exp after the death = %d, want %d", got, foundExp-tt.wantLoss)
 			}
 		})
 	}
