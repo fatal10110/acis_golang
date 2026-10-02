@@ -173,7 +173,7 @@ func (e *Effect) startSchedule(now time.Time) {
 
 // startScheduleFromRestoreLocked seeds e.remaining and e.nextAction from a
 // persisted tick count and elapsed time, as resumeRestored resumes them
-// from the restore instant. An effect whose last tick came due before now
+// from the restore instant. An effect whose first tick came due before now
 // ends on the next tick, running no action. Called with e.scheduleMu
 // already held.
 func (e *Effect) startScheduleFromRestoreLocked(r *restoreSeed, now time.Time) {
@@ -195,12 +195,14 @@ func (e *Effect) startScheduleFromRestoreLocked(r *restoreSeed, now time.Time) {
 // restored effect's scheduleEffect() call: the tick count is clamped to the
 // template's own count, and the elapsed time (seconds since the effect's
 // last tick at logout) is clamped to the template's period, so the first
-// tick comes due that much short of a period after at. Every tick due
-// before now has passed, each taking one from the count without running
-// the effect's action: the character was not in the world yet. Only an
-// effect whose ticks run no action resumes this way (restoreAnchor). ok is
-// false once the last of them has ended the effect. An effect without a
-// period only has its count clamped.
+// tick comes due that much short of a period after at. Only an effect whose
+// ticks run no action resumes from an earlier at (restoreAnchor), and such
+// an effect ends on its first tick whatever count it has left, as
+// List.tickAt ends an in-use effect whose action reports false: a tick due
+// before now has ended it, and ok is false. (A restored effect stacked out
+// by another restored one would keep counting in the reference instead;
+// both are restored debuffs of one stack group, rare enough to leave
+// unmodelled.) An effect without a period only has its count clamped.
 func resumeRestored(tmpl modelskill.EffectTemplate, count, elapsedSeconds int32, at, now time.Time) (remaining int, next time.Time, ok bool) {
 	remaining = int(min(count, int32(tmpl.Count)))
 	period := templatePeriod(tmpl)
@@ -209,14 +211,8 @@ func resumeRestored(tmpl modelskill.EffectTemplate, count, elapsedSeconds int32,
 	}
 	elapsed := min(time.Duration(elapsedSeconds)*time.Second, period)
 	next = at.Add(max(period-elapsed, 0))
-	for next.Before(now) {
-		// claimAction's tick: the one that takes the count to zero, or
-		// finds it there, ends the effect.
-		if remaining <= 1 {
-			return 0, time.Time{}, false
-		}
-		remaining--
-		next = next.Add(period)
+	if next.Before(now) {
+		return 0, time.Time{}, false
 	}
 	return remaining, next, true
 }

@@ -385,7 +385,8 @@ func Apply(effector, effected Actor, meta Skill, templates []modelskill.EffectTe
 //
 // restoredAt, when set, is the instant the saved state was read back: each
 // effect's schedule runs from there, not from the replay, and one whose
-// last tick came due in between is not reinstated (see resumeRestored).
+// first tick came due in between has ended and is not reinstated (see
+// resumeRestored).
 // An effect whose ticks run an action still runs from the replay (see
 // restoreAnchor).
 func ApplyRestored(list *List, effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate, count, elapsedSeconds int32, restoredAt time.Time) {
