@@ -1,6 +1,7 @@
 package cast
 
 import (
+	"testing"
 	"time"
 
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
@@ -8,11 +9,14 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	modelactor "github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -46,6 +50,15 @@ func newAbortController() (*Controller, *abortActor, *event.Recorder) {
 // desire/target surface) and skilltarget.Actor (the target-resolution
 // surface ApplyEffects needs), so the same fake can stand in for an
 // AIController's target on both sides of the bridge it builds.
+//
+// Kept per docs/agents/test-strategy.md: *player.Character and
+// *npc.Hostile implement the same surface, but these tests pin cast
+// timing and target hand-off against targets of any kind that are always
+// attackable and seen. A real player target would bring in its own
+// attackability (karma, PvP flag, party) and line-of-sight state, and a
+// real NPC is no area target of an NPC caster at all, which is not what
+// these tests are about. Where the caster's own behavior is the subject
+// (its cast broadcasts) the tests use a real *npc.Hostile (newAICaster).
 type fakeCastCreature struct {
 	world.Presence
 	skilltest.Creature
@@ -95,6 +108,12 @@ func (k effectsKnown) ForEachKnownCreatureInRadius(anchor skilltarget.Actor, _ i
 // recordingSkillHandler records every Cast it receives instead of applying
 // any actual skill logic, so tests can assert on exactly what ApplyEffects
 // resolved and handed off.
+//
+// Kept per docs/agents/test-strategy.md: the cast package's contract is
+// that hand-off (which targets reach the skill handler, and when: frozen at
+// launch, only at the hit, never for FUSION), and the handler is the seam
+// it hands off to. What the production handlers then do to their targets
+// is covered by the handler/skill tests and tests/skills.
 type recordingSkillHandler struct {
 	skillTypes []string
 	calls      []handlerskill.Cast
@@ -296,14 +315,11 @@ func (*fakeCastCreature) BroadcastSkillLaunched(int32, int32, []int32) {}
 func (*fakeCastCreature) BroadcastSkillUse(int32, int, int, int, int32, int32, int, int) {}
 
 var (
-	_ SkillCaster  = (*fakeCastCreature)(nil)
-	_ SkillCaster  = (*fakeBroadcastingCaster)(nil)
-	_ SkillCaster  = (*effectsActor)(nil)
-	_ SkillCaster  = (*pvpEffectsActor)(nil)
-	_ SkillCaster  = (*cursePvpEffectsActor)(nil)
-	_ AICaster     = (*fakeCastCreature)(nil)
-	_ AICaster     = (*fakeBroadcastingCaster)(nil)
-	_ effect.Actor = (*fakeCubicHealTarget)(nil)
+	_ SkillCaster = (*fakeCastCreature)(nil)
+	_ SkillCaster = (*effectsActor)(nil)
+	_ SkillCaster = (*pvpEffectsActor)(nil)
+	_ SkillCaster = (*cursePvpEffectsActor)(nil)
+	_ AICaster    = (*fakeCastCreature)(nil)
 )
 
 func (*fakeCastCreature) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
@@ -313,3 +329,72 @@ func (*fakeCastCreature) TestCursesOnSkillSee(modelskill.Definition, []skilltarg
 }
 
 func idleQueue() *sim.Queue { return sim.NewInline(time.Unix(0, 0)).NewQueue("test") }
+
+// Production actors the cast tests drive instead of hand-written stand-ins:
+// a hostile NPC as the AI caster whose cast broadcasts are asserted as the
+// events it really emits, and a player, a servitor and an NPC as Life Cubic
+// heal targets. See docs/agents/test-strategy.md.
+
+// newAICaster returns a monster spawned at the origin of a new world,
+// recording the events it emits, with targets spawned into that world at
+// their own positions so the caster knows them.
+func newAICaster(t *testing.T, id int32, targets ...*fakeCastCreature) (*npc.Hostile, *event.Recorder) {
+	t.Helper()
+	caster := newCastHostile(t, id, "Monster")
+	state := world.New()
+	state.Spawn(caster, 0, 0, 0, 0)
+	rec := &event.Recorder{}
+	caster.Attach(npc.Runtime{World: state, Sink: rec})
+	for _, target := range targets {
+		state.Spawn(target, target.x, target.y, target.z, 0)
+	}
+	return caster, rec
+}
+
+// definitions is the production skill table holding defs.
+func definitions(defs ...modelskill.Definition) *modelskill.Table {
+	return modelskill.NewTable(defs)
+}
+
+// newHealTargetPlayer returns a player at hp of 1000 max HP, recording the
+// events it emits.
+func newHealTargetPlayer(hp float64) (*player.Character, *event.Recorder) {
+	ch := &player.Character{ID: 1}
+	ch.SetResourceValues(player.Resources{MaxHP: 1000, CurrentHP: hp, MaxMP: 100, CurrentMP: 100})
+	rec := &event.Recorder{}
+	ch.Attach(nil, rec)
+	return ch, rec
+}
+
+// newHealTargetServitor returns a servitor at hp, recording the events it
+// emits from then on.
+func newHealTargetServitor(t *testing.T, hp float64) (*summon.Actor, *event.Recorder) {
+	t.Helper()
+	s, err := summon.NewServitor(summon.ServitorConfig{ObjectID: 1, Stats: summon.CombatStats{MaxHP: 1000, MaxMP: 100}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.SetHP(hp)
+	rec := &event.Recorder{}
+	s.Attach(summon.Runtime{Sink: rec})
+	return s, rec
+}
+
+// newHealTargetNPC returns a monster at hp, recording the
+// events it emits from then on.
+func newHealTargetNPC(t *testing.T, hp int) (*npc.Hostile, *event.Recorder) {
+	t.Helper()
+	live, err := creature.NewLive(location.Location{}, 100, permissiveGeo{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	live.SetQueue(idleQueue())
+	h, err := npc.NewHostile(&npc.Instance{ObjectID: 1, Kind: "Monster", Template: &npc.Template{ID: 1, Type: "Monster", HPMax: 1000}}, live, castHostileMove{}, castHostileAttack{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.SetCurrentHP(hp)
+	rec := &event.Recorder{}
+	h.Attach(npc.Runtime{Sink: rec})
+	return h, rec
+}

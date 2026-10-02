@@ -1,10 +1,10 @@
 package network
 
 import (
-	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/gatekeeper"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
@@ -167,7 +167,7 @@ func (l *GameClientLink) bypassNpc(live *livePlayer, command string) {
 	if end > 0 {
 		idText = command[4:end]
 	}
-	id, err := strconv.ParseInt(idText, 10, 32)
+	id, err := commons.ParseInt(idText, 32)
 	if err != nil {
 		return
 	}

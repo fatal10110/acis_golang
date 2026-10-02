@@ -10,12 +10,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target/targettest"
 	modelactor "github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -40,87 +42,93 @@ func TestCubicGrantedLevel(t *testing.T) {
 	}
 }
 
-type fakeCubicHealTarget struct {
-	world.Presence
-	effecttest.Actor
-	kind          modelactor.Kind
-	healable      bool
-	effectiveness float64
-	full          bool
-	added         float64
-	broadcasts    int
-}
-
-func (f *fakeCubicHealTarget) ObjectID() int32 { return 1 }
-
-func (f *fakeCubicHealTarget) Kind() modelactor.Kind { return f.kind }
-
-func (f *fakeCubicHealTarget) Position() (int, int, int) { return 0, 0, 0 }
-
-func (f *fakeCubicHealTarget) CanBeHealed() bool { return f.healable }
-
-func (f *fakeCubicHealTarget) AddHP(amount float64) float64 {
-	f.added = amount
-	if f.full {
-		return 0
-	}
-	return amount
-}
-
-func (f *fakeCubicHealTarget) HealEffectiveness() float64 { return f.effectiveness }
-
-func (f *fakeCubicHealTarget) BroadcastStatus() { f.broadcasts++ }
-
 // TestApplyCubicHeal_PlayerStatusOnlyWhenHPApplied pins Cubic.useHealSkill's
 // addHp (Cubic.java:364-373, CreatureStatus.java:169-187): a player whose HP
 // rose is sent its own status through setHp, whoever the healed player is;
 // a player already at full HP gets none, and a summon or NPC target is
-// left to its own AddHP. The heal still counts as landed either way, so the
-// caller sends REJUVENATING_HP.
+// left to its own AddHP, which republishes its status once. The heal still
+// counts as landed either way, so the caller sends REJUVENATING_HP.
 func TestApplyCubicHeal_PlayerStatusOnlyWhenHPApplied(t *testing.T) {
-	tests := []struct {
-		name  string
-		kind  modelactor.Kind
-		full  bool
-		wantN int
-	}{
-		{"damaged player", modelactor.KindPlayer, false, 1},
-		{"player at full HP", modelactor.KindPlayer, true, 0},
-		{"damaged summon", modelactor.KindSummon, false, 0},
-		{"damaged npc", modelactor.KindNPC, false, 0},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			target := &fakeCubicHealTarget{kind: tt.kind, healable: true, effectiveness: 100, full: tt.full}
-			if !ApplyCubicHeal(50, target) {
-				t.Fatal("ApplyCubicHeal() = false, want true (healable target)")
-			}
-			if target.broadcasts != tt.wantN {
-				t.Fatalf("BroadcastStatus calls = %d, want %d", target.broadcasts, tt.wantN)
-			}
-		})
-	}
+	t.Run("damaged player", func(t *testing.T) {
+		target, rec := newHealTargetPlayer(500)
+		if !ApplyCubicHeal(50, target) {
+			t.Fatal("ApplyCubicHeal() = false, want true (healable target)")
+		}
+		if got := target.HP(); got != 550 {
+			t.Fatalf("HP = %v, want 550", got)
+		}
+		if got := event.Count[event.VitalsChanged](rec); got != 1 {
+			t.Fatalf("status updates = %d, want 1", got)
+		}
+	})
+	t.Run("player at full HP", func(t *testing.T) {
+		target, rec := newHealTargetPlayer(1000)
+		if !ApplyCubicHeal(50, target) {
+			t.Fatal("ApplyCubicHeal() = false, want true (healable target)")
+		}
+		if got := target.HP(); got != 1000 {
+			t.Fatalf("HP = %v, want unchanged 1000", got)
+		}
+		if got := len(rec.Events()); got != 0 {
+			t.Fatalf("events = %v, want none", rec.Events())
+		}
+	})
+	t.Run("damaged summon", func(t *testing.T) {
+		target, rec := newHealTargetServitor(t, 500)
+		if !ApplyCubicHeal(50, target) {
+			t.Fatal("ApplyCubicHeal() = false, want true (healable target)")
+		}
+		if got := target.HP(); got != 550 {
+			t.Fatalf("HP = %v, want 550", got)
+		}
+		if got := event.Count[event.HPChanged](rec); got != 1 {
+			t.Fatalf("HP updates = %d, want only the 1 its own AddHP publishes", got)
+		}
+	})
+	t.Run("damaged npc", func(t *testing.T) {
+		target, rec := newHealTargetNPC(t, 100)
+		if !ApplyCubicHeal(50, target) {
+			t.Fatal("ApplyCubicHeal() = false, want true (healable target)")
+		}
+		if got := target.CurrentHP(); got != 150 {
+			t.Fatalf("HP = %d, want 150", got)
+		}
+		if got := event.Count[event.HPChanged](rec); got != 1 {
+			t.Fatalf("HP updates = %d, want only the 1 its own AddHP publishes", got)
+		}
+	})
 }
 
 func TestApplyCubicHeal_FlatFormulaNoCasterStats(t *testing.T) {
-	target := &fakeCubicHealTarget{kind: modelactor.KindPlayer, healable: true, effectiveness: 150}
+	target, _ := newHealTargetPlayer(100)
+	// A 150% heal effectiveness, as a heal-boosting buff would grant.
+	target.AttachStatFuncs([]effect.Mod{{Stat: stat.HealEffectiveness, Op: effect.OpMul, Value: 1.5}})
+	if got := target.HealEffectiveness(); got != 150 {
+		t.Fatalf("HealEffectiveness() = %v, want 150", got)
+	}
 	if !ApplyCubicHeal(200, target) {
 		t.Fatal("ApplyCubicHeal() = false, want true (healable target)")
 	}
 
-	want := 200.0 * 150 / 100
-	if target.added != want {
-		t.Fatalf("AddHP amount = %v, want %v (power * effectiveness / 100, no caster stats)", target.added, want)
+	want := 100 + 200.0*150/100
+	if got := target.HP(); got != want {
+		t.Fatalf("HP = %v, want %v (power * effectiveness / 100, no caster stats)", got, want)
 	}
 }
 
 func TestApplyCubicHeal_SkipsUnhealableTarget(t *testing.T) {
-	target := &fakeCubicHealTarget{kind: modelactor.KindPlayer, healable: false, effectiveness: 100}
+	target, rec := newHealTargetPlayer(100)
+	if !target.MarkDead() {
+		t.Fatal("MarkDead() = false, want the player dead")
+	}
 	if ApplyCubicHeal(200, target) {
 		t.Fatal("ApplyCubicHeal() = true for an unhealable target, want false")
 	}
-	if target.added != 0 {
-		t.Fatalf("AddHP called on an unhealable target, amount = %v", target.added)
+	if got := target.HP(); got != 0 {
+		t.Fatalf("HP = %v, want the dead player's 0 unchanged", got)
+	}
+	if got := event.Count[event.VitalsChanged](rec); got != 0 {
+		t.Fatalf("status updates = %d, want none", got)
 	}
 }
 
@@ -129,7 +137,10 @@ func TestApplyCubicHeal_SkipsUnhealableTarget(t *testing.T) {
 // needs. A fakeCubicEffectTarget with perfectBlock set blocks every skill
 // perfectly, so an offensive continuous skill (DEBUFF/DOT/etc.) always
 // fails the cubic landing roll — Cubic.useContinuousSkill's
-// calcCubicSkillSuccess()==false branch (Cubic.java:439-444).
+// calcCubicSkillSuccess()==false branch (Cubic.java:439-444). Kept per
+// docs/agents/test-strategy.md: a real creature blocks perfectly only on a
+// shield-block roll against an equipped shield, and the perfect block is
+// the fixed outcome this test needs, not the roll.
 type fakeCubicEffectCaster struct {
 	world.Presence
 	skilltest.Creature
@@ -193,7 +204,10 @@ func TestApplyCubicEffect_FailedOffensiveContinuousRollReportsAttackFailed(t *te
 }
 
 // fakeCubicShotOwner is a cubic owner holding a charged blessed spiritshot
-// and recording every shot-charge write.
+// and recording every shot-charge write. Kept per
+// docs/agents/test-strategy.md: it pins that no charge is written at all,
+// of any kind, which a real owner's weapon state cannot show for a write
+// that leaves it as it was.
 type fakeCubicShotOwner struct {
 	fakeCubicEffectCaster
 	blessed bool
@@ -242,7 +256,11 @@ func TestApplyCubicEffect_ContinuousAndDisablerProcsKeepOwnerSpiritshot(t *testi
 }
 
 // fakeCubicFireOwner is a minimal CubicFireOwner + Target implementer for
-// domain-level target-selection tests.
+// domain-level target-selection tests. Kept per
+// docs/agents/test-strategy.md: the production CubicFireOwner is the
+// network package's adapter over a live player, which this package cannot
+// import (network imports cast), and its scripted Roll is the RNG seam the
+// activation, skill-pick and heal-band branches are driven through.
 type fakeCubicFireOwner struct {
 	objectID int32
 	x, y, z  int
@@ -278,6 +296,11 @@ func (f *fakeCubicFireOwner) Roll(n int) int {
 	return v
 }
 
+// fakeCubicTarget is the owner's selected object. Kept per
+// docs/agents/test-strategy.md: *npc.Hostile implements the same surface,
+// but its no-force gate depends on the attacker only through
+// self-exclusion, so it cannot show that the gate is asked about the
+// owner's attacker (checkedBy) rather than some other actor.
 type fakeCubicTarget struct {
 	effecttest.Actor
 	world.Presence
@@ -338,7 +361,8 @@ func TestDecideCubicFire_RejectsOutOfRangeTarget(t *testing.T) {
 	}
 }
 
-// fakeCubicAttacker stands for a cubic's owner as an attacker.
+// fakeCubicAttacker stands for a cubic's owner as an attacker; the test
+// only compares it by identity. Kept per docs/agents/test-strategy.md.
 type fakeCubicAttacker struct {
 	targettest.Actor
 	world.Presence

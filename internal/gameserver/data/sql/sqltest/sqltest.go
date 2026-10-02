@@ -235,6 +235,20 @@ const characterSkillsSaveSchema = "CREATE TABLE IF NOT EXISTS `character_skills_
 	"  PRIMARY KEY (`char_obj_id`,`skill_id`,`skill_level`,`class_index`)\n" +
 	")"
 
+// sevenSignsSchema mirrors the shipped seven_signs table definition
+// verbatim.
+const sevenSignsSchema = "CREATE TABLE IF NOT EXISTS `seven_signs` (\n" +
+	"  `char_obj_id` INT NOT NULL DEFAULT '0',\n" +
+	"  `cabal` VARCHAR(8) NOT NULL DEFAULT 'NORMAL',\n" +
+	"  `seal` VARCHAR(8) NOT NULL DEFAULT 'NONE',\n" +
+	"  `red_stones` INT NOT NULL DEFAULT '0',\n" +
+	"  `green_stones` INT NOT NULL DEFAULT '0',\n" +
+	"  `blue_stones` INT NOT NULL DEFAULT '0',\n" +
+	"  `ancient_adena_amount` DECIMAL(20,0) NOT NULL DEFAULT '0',\n" +
+	"  `contribution_score` DECIMAL(20,0) NOT NULL DEFAULT '0',\n" +
+	"  PRIMARY KEY  (`char_obj_id`)\n" +
+	")"
+
 // sevenSignsStatusSchema mirrors the shipped seven_signs_status table
 // definition verbatim, including its seeded status row.
 const sevenSignsStatusSchema = "CREATE TABLE IF NOT EXISTS `seven_signs_status` (\n" +
@@ -457,7 +471,7 @@ var schemaStmts = []string{
 	charactersSchema, itemsSchema, augmentationsSchema, spawnDataSchema,
 	itemsOnGroundSchema, characterSkillsSchema, characterShortcutsSchema,
 	characterHennasSchema, characterRecipeBookSchema, petsSchema, characterSkillsSaveSchema,
-	sevenSignsStatusSchema, buylistsSchema, characterSubclassesSchema,
+	sevenSignsSchema, sevenSignsStatusSchema, buylistsSchema, characterSubclassesSchema,
 	characterRelationsSchema, petitionSchema, petitionMessageSchema,
 	characterMacrosesSchema, characterRecommendsSchema,
 	clanDataSchema, clanPrivsSchema, clanSkillsSchema, clanSubpledgesSchema, clanWarsSchema,

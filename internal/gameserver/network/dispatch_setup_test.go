@@ -47,6 +47,14 @@ func (staticSevenSignsStore) LoadStatus(context.Context) (sevensigns.StatusRow, 
 
 func (staticSevenSignsStore) SaveStatus(context.Context, sevensigns.StatusRow) error { return nil }
 
+func (staticSevenSignsStore) LoadPlayers(context.Context) ([]sevensigns.PlayerRow, error) {
+	return nil, nil
+}
+
+func (staticSevenSignsStore) InsertPlayer(context.Context, sevensigns.PlayerRow) error { return nil }
+
+func (staticSevenSignsStore) SavePlayers(context.Context, []sevensigns.PlayerRow) error { return nil }
+
 // --- test server setup ---
 
 // assertSystemMessageStringFrame checks a single-param text SystemMessage.
@@ -196,7 +204,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 	}
 	playerConfig := PlayerConfig{RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: karmaPlayerCanTeleport, AllowWater: true, CharacterSelectDelay: 3 * time.Second, ServerBypassDelay: 100 * time.Millisecond, MaxBuffsAmount: 20}
 	inventoryUpdates := task.NewInventoryUpdates()
-	sevenSigns := sevensigns.NewState(staticSevenSignsStore{}, log, nil, nil)
+	sevenSigns := sevensigns.NewState(staticSevenSignsStore{}, nil, log, nil, nil)
 	if err := sevenSigns.Restore(context.Background()); err != nil {
 		t.Fatalf("restore seven signs status: %v", err)
 	}

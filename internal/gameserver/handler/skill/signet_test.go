@@ -120,15 +120,11 @@ func (t *signetFakeTarget) ReduceHP(v float64, attacker attackable.Combatant, sk
 	t.hp -= v
 }
 
-type fakeSignetTemplates struct {
-	byID map[int]*npc.Template
-}
-
-func (f fakeSignetTemplates) Get(id int) (*npc.Template, bool) {
-	tpl, ok := f.byID[id]
-	return tpl, ok
-}
-
+// fakeSignetIDs hands out object ids in sequence. The production
+// idfactory.Allocator seeds its free id space from the database; these
+// handler tests need only distinct, predictable ids, so the counter stays
+// as the id-source seam (like a clock or RNG double). Kept per
+// docs/agents/test-strategy.md.
 type fakeSignetIDs struct {
 	next int32
 }
@@ -138,30 +134,9 @@ func (f *fakeSignetIDs) NextID() (int32, error) {
 	return f.next, nil
 }
 
-type fakeSignetDefinitions struct {
-	byRef map[modelskill.Ref]modelskill.Definition
-}
-
-func (f fakeSignetDefinitions) Definition(ref modelskill.Ref) (modelskill.Definition, bool) {
-	d, ok := f.byRef[ref]
-	return d, ok
-}
-
-func (f fakeSignetDefinitions) MaxLevel(id modelskill.ID) int {
-	max := 0
-	for ref := range f.byRef {
-		if ref.ID == id && ref.Level > max {
-			max = ref.Level
-		}
-	}
-	return max
-}
-
 func newTestSignetHandler(defs Definitions) (signetHandler, *world.State, *event.Recorder) {
 	state := world.New()
-	templates := fakeSignetTemplates{byID: map[int]*npc.Template{
-		13018: {ID: 13018, Type: "EffectPoint"},
-	}}
+	templates := npc.NewTable([]*npc.Template{{ID: 13018, Type: "EffectPoint"}})
 	rec := &event.Recorder{}
 	h := signetHandler{defs: defs, templates: templates, ids: &fakeSignetIDs{}, world: state, newSink: func(*npc.EffectPoint) event.Sink { return rec }, effects: effect.Env{Activity: newSignetActivity()}}
 	return h, state, rec
@@ -231,7 +206,7 @@ func TestNewDefaultRegistryWithSignetPassesActivityToSpawnedPoints(t *testing.T)
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
 	r := NewDefaultRegistryWithSignet(nil, true, nil, SignetDeps{
 		Effects:   effect.Env{Activity: activity},
-		Templates: fakeSignetTemplates{byID: map[int]*npc.Template{13018: {ID: 13018, Type: "EffectPoint"}}},
+		Templates: npc.NewTable([]*npc.Template{{ID: 13018, Type: "EffectPoint"}}),
 		IDs:       &fakeSignetIDs{},
 		World:     state,
 		NewSink:   func(*npc.EffectPoint) event.Sink { return &event.Recorder{} },
@@ -256,12 +231,12 @@ func TestNewDefaultRegistryWithSignetPassesActivityToSpawnedPoints(t *testing.T)
 }
 
 func TestSignetBuffAppliesSubSkillToNearbyTargetsAndDespawns(t *testing.T) {
-	defs := fakeSignetDefinitions{byRef: map[modelskill.Ref]modelskill.Definition{
-		{ID: 5123, Level: 1}: {
+	defs := modelskill.NewTable([]modelskill.Definition{
+		{
 			ID: 5123, Level: 1, SkillType: "BUFF",
 			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Count: 1}},
 		},
-	}}
+	})
 	h, state, _ := newTestSignetHandler(defs)
 
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
@@ -434,9 +409,9 @@ func TestSignetCasttimeMDamDropsOnLackOfMP(t *testing.T) {
 }
 
 func TestSignetNoiseCancelsDanceEffectsAfterFirstTick(t *testing.T) {
-	defs := fakeSignetDefinitions{byRef: map[modelskill.Ref]modelskill.Definition{
-		{ID: 5124, Level: 1}: {ID: 5124, Level: 1, SkillType: "DEBUFF"},
-	}}
+	defs := modelskill.NewTable([]modelskill.Definition{
+		{ID: 5124, Level: 1, SkillType: "DEBUFF"},
+	})
 	h, state, _ := newTestSignetHandler(defs)
 
 	caster := newSignetFakeCaster(1, 100, 100, 0, 100)
@@ -534,12 +509,12 @@ func (noopStatOwner) UpdateEffectIcons() {}
 // the effect task posts the list's Tick to the point's own queue, and the
 // despawn closes that queue.
 func TestSignetOutlivesItsCastersQueue(t *testing.T) {
-	defs := fakeSignetDefinitions{byRef: map[modelskill.Ref]modelskill.Definition{
-		{ID: 5123, Level: 1}: {
+	defs := modelskill.NewTable([]modelskill.Definition{
+		{
 			ID: 5123, Level: 1, SkillType: "BUFF",
 			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Count: 1}},
 		},
-	}}
+	})
 	h, state, _ := newTestSignetHandler(defs)
 	effects := task.NewEffects()
 	h.effects = effect.Env{Activity: effects}

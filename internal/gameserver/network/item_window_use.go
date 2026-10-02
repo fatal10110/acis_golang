@@ -12,7 +12,8 @@ import (
 )
 
 // Etc-item handler names of the items whose use only opens a client window
-// or plays a die throw. None of them consumes the item.
+// or plays a die throw. None of them consumes the item; the Record of Seven
+// Signs (sevenSignsRecordsHandler) is one of them too.
 const (
 	booksHandler        = "Books"
 	calculatorsHandler  = "Calculators"
@@ -24,10 +25,10 @@ const (
 // diceLandingOffset is how far in front of the roller a thrown die lands.
 const diceLandingOffset = 30
 
-// useWindowItem answers UseItem on a book, calculator, map, Christmas seal
-// or die, and reports whether tmpl is one of them. rollDice consumes the
-// client's dice reuse gate and reports whether a throw may go ahead; it is
-// asked only when a die is thrown.
+// useWindowItem answers UseItem on a book, calculator, map, Christmas seal,
+// die or Record of Seven Signs, and reports whether tmpl is one of them.
+// rollDice consumes the client's dice reuse gate and reports whether a throw
+// may go ahead; it is asked only when a die is thrown.
 func (l *GameClientLink) useWindowItem(live *livePlayer, tmpl *item.Template, rollDice func() bool) bool {
 	if tmpl.EtcItem == nil {
 		return false
@@ -43,6 +44,8 @@ func (l *GameClientLink) useWindowItem(live *livePlayer, tmpl *item.Template, ro
 		live.SendFrame(serverpackets.FrameShowXMasSeal(tmpl.ID))
 	case rollingDicesHandler:
 		l.throwDie(live, tmpl.ID, rollDice)
+	case sevenSignsRecordsHandler:
+		l.useSevenSignsRecords(live)
 	default:
 		return false
 	}

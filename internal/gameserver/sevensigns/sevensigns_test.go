@@ -94,10 +94,28 @@ type recordingStore struct {
 	// onSave, when set, runs at the start of every SaveStatus so a test can
 	// interleave other work into the transition's unlocked save window.
 	onSave func()
+
+	players     []PlayerRow
+	inserted    []PlayerRow
+	playerSaves [][]PlayerRow
 }
 
 func (s *recordingStore) LoadStatus(context.Context) (StatusRow, bool, error) {
 	return s.row, s.found, nil
+}
+
+func (s *recordingStore) LoadPlayers(context.Context) ([]PlayerRow, error) {
+	return s.players, nil
+}
+
+func (s *recordingStore) InsertPlayer(_ context.Context, row PlayerRow) error {
+	s.inserted = append(s.inserted, row)
+	return nil
+}
+
+func (s *recordingStore) SavePlayers(_ context.Context, rows []PlayerRow) error {
+	s.playerSaves = append(s.playerSaves, rows)
+	return nil
 }
 
 func (s *recordingStore) SaveStatus(ctx context.Context, row StatusRow) error {
@@ -111,10 +129,20 @@ func (s *recordingStore) SaveStatus(ctx context.Context, row StatusRow) error {
 	return nil
 }
 
+// recordingBroadcaster captures every broadcast, in order.
+type recordingBroadcaster struct {
+	notices []Notice
+}
+
+func (b *recordingBroadcaster) Broadcast(notices []Notice) {
+	b.notices = append(b.notices, notices...)
+}
+
 // stateHarness builds a state over a controllable clock; advance captures
 // each scheduled callback so tests fire transitions by hand.
 type stateHarness struct {
 	store   *recordingStore
+	out     *recordingBroadcaster
 	state   *State
 	current time.Time
 	fired   []func()
@@ -125,9 +153,10 @@ func newStateHarness(t *testing.T, start time.Time) *stateHarness {
 	t.Helper()
 	h := &stateHarness{
 		store:   &recordingStore{},
+		out:     &recordingBroadcaster{},
 		current: start,
 	}
-	h.state = NewState(h.store, zerolog.Nop(), func() time.Time { return h.current }, func(d time.Duration, fn func()) *time.Timer {
+	h.state = NewState(h.store, h.out, zerolog.Nop(), func() time.Time { return h.current }, func(d time.Duration, fn func()) *time.Timer {
 		h.delays = append(h.delays, d)
 		h.fired = append(h.fired, fn)
 		return nil

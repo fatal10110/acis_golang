@@ -4,8 +4,8 @@ import (
 	"cmp"
 	"context"
 	"slices"
-	"strconv"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -186,7 +186,7 @@ func (l *GameClientLink) warehouseBypass(live *livePlayer, f *npc.Folk, reply np
 		if !freight.Allow {
 			return true
 		}
-		id, err := strconv.ParseInt(reply.FreightTarget, 10, 32)
+		id, err := commons.ParseInt(reply.FreightTarget, 32)
 		if err != nil {
 			return false
 		}

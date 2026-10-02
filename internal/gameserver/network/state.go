@@ -199,6 +199,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0xc2: true, // delete a macro
 		0xc5: true, // dialog answer
 		0xc6: true, // try on merchant items
+		0xc7: true, // record of seven signs page
 		0xc8: true, // rate a closed petition
 		0xca: true, // game guard reply
 		0xcc: true, // friend message
