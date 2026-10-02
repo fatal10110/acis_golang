@@ -10,6 +10,7 @@ import (
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
@@ -53,6 +54,7 @@ const (
 		3*task.ItemInstanceSaveTimeout + // drainItemInstances: save, persistence-worker drain, save
 		persistCloseTimeout +
 		shutdownSaveTimeout + // items_on_ground
+		2*olympiad.TaskTimeout + // a running Olympiad calendar step, then the olympiad_nobles and server_memo save
 		gameServerStopSlack
 	// gameServerBootTimeout bounds constructor-time DB I/O (id scan, ground-item
 	// restore, spawn-state load). These run inside fx.New's constructor graph,
@@ -93,6 +95,7 @@ type gameServerPaths struct {
 	GeoConfigPath     string
 	NpcsConfigPath    string
 	ClansConfigPath   string
+	EventsConfigPath  string
 	DataRoot          string
 	LogRoot           string
 	DebugAddr         string
@@ -112,6 +115,7 @@ func parseGameServerFlags() gameServerPaths {
 	flag.StringVar(&paths.GeoConfigPath, "geo-config", "config/geoengine.properties", "geoengine properties file")
 	flag.StringVar(&paths.NpcsConfigPath, "npcs-config", "config/npcs.properties", "npc properties file")
 	flag.StringVar(&paths.ClansConfigPath, "clans-config", "config/clans.properties", "clan properties file")
+	flag.StringVar(&paths.EventsConfigPath, "events-config", "config/events.properties", "events properties file")
 	flag.StringVar(&paths.DataRoot, "data-root", ".", "datapack root containing data/xml")
 	flag.StringVar(&paths.LogRoot, "log-root", ".", "root directory for log files")
 	flag.StringVar(&paths.DebugAddr, "debug-addr", "", "optional host:port serving pprof and expvar")
@@ -169,6 +173,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideGroundItems,
 			provideGameClock,
 			provideSevenSignsState,
+			provideOlympiad,
 			provideWalker,
 			provideWater,
 			provideShadowItems,
@@ -198,6 +203,6 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideAnnouncements,
 			provideGameClientLink,
 		),
-		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startDebugHTTP, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startOlympiad, startDebugHTTP, startGameServer),
 	}
 }

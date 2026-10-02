@@ -28,6 +28,8 @@ type SaveState struct {
 	Heading    int
 	// WantsPeace is the personal-surrender flag (see WantsPeace).
 	WantsPeace bool
+	// Noble is the noblesse status (see IsNoble).
+	Noble bool
 }
 
 // SaveState copies c's persisted character-row values.
@@ -52,5 +54,6 @@ func (c *Character) SaveState() SaveState {
 		Location:          c.CurrentLocation(),
 		Heading:           c.CurrentHeading(),
 		WantsPeace:        c.WantsPeace(),
+		Noble:             c.IsNoble(),
 	}
 }

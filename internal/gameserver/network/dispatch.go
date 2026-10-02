@@ -47,6 +47,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
+	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 	"github.com/fatal10110/acis_golang/internal/gameserver/partymatch"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
@@ -292,6 +293,7 @@ type GameClientLink struct {
 	playerClock *task.PlayerClock
 	gameClock   *task.GameClock
 	sevenSigns  *sevensigns.State
+	olympiad    *olympiad.Olympiad
 	water       *task.Water
 	shadowItems *task.ShadowItems
 	autosave    *task.Autosave
@@ -474,6 +476,9 @@ type GameClientLinkConfig struct {
 	// PersistWait bounds how long a connection waits for queued saves before
 	// reading rows back; zero means LivePlayerPersistWait.
 	PersistWait time.Duration
+	// Olympiad holds the nobles' Olympiad records. Nil is tolerated
+	// (tests) and holds none.
+	Olympiad *olympiad.Olympiad
 	// Queues creates each live player's queue, which its in-world packet
 	// handlers, timers and periodic ticks run on. Required.
 	Queues       Queues
@@ -622,6 +627,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		playerClock:   cfg.PlayerClock,
 		gameClock:     cfg.GameClock,
 		sevenSigns:    cfg.SevenSigns,
+		olympiad:      cfg.Olympiad,
 		water:         cfg.Water,
 		shadowItems:   cfg.ShadowItems,
 		autosave:      cfg.Autosave,

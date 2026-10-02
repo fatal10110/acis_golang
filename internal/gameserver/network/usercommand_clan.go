@@ -87,13 +87,18 @@ func (l *GameClientLink) userCommandClanPenalty(live *livePlayer, _ int32) {
 }
 
 // userCommandSiegeStatus (/siegestatus) shows a noble clan leader its
-// members' places in the siege its clan fights. Anyone but a clan leader is
-// refused; a clan leader's noble status is not known yet.
-func (l *GameClientLink) userCommandSiegeStatus(live *livePlayer, id int32) {
+// members' places in the siege its clan fights. Anyone but a noble clan
+// leader is refused. No siege can be in progress yet (#3211), so a noble
+// clan leader is told the window only opens during one.
+func (l *GameClientLink) userCommandSiegeStatus(live *livePlayer, _ int32) {
 	cl, ok := l.clanService().ClanOf(live.Character)
 	if !ok || !cl.IsLeader(live.ObjectID()) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyClanLeaderCanIssueCommands))
 		return
 	}
-	l.userCommandGap(live, id, "noble clan leader siege status (#3212)")
+	if !live.IsNoble() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyNoblesseLeaderCanViewSiegeStatusWindow))
+		return
+	}
+	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyDuringSiege))
 }

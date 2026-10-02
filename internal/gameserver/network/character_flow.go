@@ -222,6 +222,7 @@ func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, c 
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("select character: give skills")
 			return nil, false
 		}
+		l.giveNobleSkills(c)
 		if level := c.DeathPenaltyLevel(); level > 0 {
 			if err := l.skills.ApplyTransientPassiveSkill(c, 5076, 0, level); err != nil {
 				l.log.Error().Err(err).Int32("object_id", c.ID).Msg("select character: restore death-penalty passive stats")

@@ -221,7 +221,7 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"Say2 petition line outside a petition", encodeSay2Petition("hello"), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestUserCommand /attacklist without a clan", encodeRequestUserCommand(88), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestUserCommand /siegestatus without a clan", encodeRequestUserCommand(99), []byte{serverpackets.OpcodeSystemMessage}},
-		{"RequestUserCommand /olympiadstat before noble status exists", encodeRequestUserCommand(109), []byte{serverpackets.OpcodeActionFailed}},
+		{"RequestUserCommand /olympiadstat as a non-noble", encodeRequestUserCommand(109), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestJoinAlly without a clan", encodeAllyInt(clientpackets.OpcodeRequestJoinAlly, missingObjectID), []byte{serverpackets.OpcodeSystemMessage}},
 		{"AllyLeave without a clan", wire.NewPacketWriter(clientpackets.OpcodeAllyLeave).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
 		{"AllyDismiss without a clan", encodeNamedRequest(clientpackets.OpcodeAllyDismiss, "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},

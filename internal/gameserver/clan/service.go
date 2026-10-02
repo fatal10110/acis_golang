@@ -166,8 +166,8 @@ func (s *Service) RestoreMembership(c *player.Character, now time.Time) {
 	c.SetPledgeClass(s.pledgeClass(c))
 }
 
-// pledgeClass computes c's clan rank from its current clan membership.
-// Nobility is not modeled yet (#218), so only heroism lifts it.
+// pledgeClass computes c's clan rank from its current clan membership,
+// lifted to at least 8 for a hero, else to at least 5 for a noble.
 func (s *Service) pledgeClass(c *player.Character) int {
 	cl, ok := s.ClanOf(c)
 	class := 0
@@ -177,6 +177,8 @@ func (s *Service) pledgeClass(c *player.Character) int {
 	}
 	if c.IsHero() && class < 8 {
 		class = 8
+	} else if c.IsNoble() && class < 5 {
+		class = 5
 	}
 	return class
 }
