@@ -40,10 +40,16 @@ type socialScene struct {
 // bootSocialScene boots the scene with Caster knowing def, plus opts.
 func bootSocialScene(t *testing.T, def modelskill.Definition, opts ...gameservertest.Option) *socialScene {
 	t.Helper()
+	return bootSocialSceneKnowing(t, def, nil, opts...)
+}
+
+// bootSocialSceneKnowing is bootSocialScene with Mate also knowing mateDefs.
+func bootSocialSceneKnowing(t *testing.T, def modelskill.Definition, mateDefs []modelskill.Definition, opts ...gameservertest.Option) *socialScene {
+	t.Helper()
 	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Caster", 20, 0),
 		gameservertest.WithWantChars(1),
-		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{def})),
+		gameservertest.WithSkills(skillPersistence(t, append([]modelskill.Definition{def}, mateDefs...))),
 		gameservertest.WithSeed(func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
 			tmpl, ok := gameservertest.Templates(t).Get(0)
 			if !ok {
@@ -66,6 +72,9 @@ func bootSocialScene(t *testing.T, def modelskill.Definition, opts ...gameserver
 	}, opts...)...)
 	s := &socialScene{srv: srv, caster: srv.Client, casterID: srv.SoleObjectID(t), mateID: socialMateID, strangerID: socialStrangerID}
 	seedKnownSkill(t, srv, s.casterID, int(def.ID), int(def.Level))
+	for _, d := range mateDefs {
+		seedKnownSkill(t, srv, s.mateID, int(d.ID), int(d.Level))
+	}
 	enterSocialScene(t, s.caster)
 	s.mate = srv.DialClient(t, "player2", 1)
 	enterSocialScene(t, s.mate)

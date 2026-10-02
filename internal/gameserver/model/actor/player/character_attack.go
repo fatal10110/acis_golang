@@ -902,8 +902,8 @@ func (c *Character) AttackableBy(attacker target.Actor) bool {
 // when c and caster both stand inside a PvP zone (each its own membership),
 // or while c has karma or a PvP flag.
 //
-// The Olympiad, duel and siege-side rules are not applied: that state is
-// not tracked yet.
+// The Olympiad (#216), duel (#215) and siege-side (#234) rules are not
+// applied: that state is not tracked yet.
 func (c *Character) AttackableWithoutForceBy(caster target.Actor) bool {
 	if caster == nil || actingPlayerID(caster) == c.ID {
 		return false

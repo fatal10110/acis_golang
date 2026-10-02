@@ -147,8 +147,8 @@ func (c *Character) CanCastOnPlayable(t target.Actor, skill *modelskill.Definiti
 // fight freely unless they share a party or command channel; otherwise a
 // shared party, command channel, clan or alliance needs force.
 //
-// Olympiad matches, duels and siege sides are not modeled, so their rules
-// never apply.
+// Olympiad matches (#216), duels (#215) and siege sides (#234) are not
+// modeled, so their rules never apply.
 func (c *Character) SocialWithoutForce(self attackable.ArenaMember, attacker target.Actor) (allowed, decided bool) {
 	sameParty := c.IsInSameParty(attacker)
 	sameChannel := c.IsInSameChannel(attacker)
@@ -166,8 +166,8 @@ func (c *Character) SocialWithoutForce(self attackable.ArenaMember, attacker tar
 // judged on its final target, so a CTRL damage skill counts as aimed at its
 // main target.
 //
-// Olympiad matches, duels and siege sides are not modeled, so their rules
-// never apply.
+// Olympiad matches (#216), duels (#215) and siege sides (#234) are not
+// modeled, so their rules never apply.
 func (c *Character) OffensiveCastAllowed(caster attackable.ArenaMember, t target.Actor, skill *modelskill.Definition, ctrl bool) bool {
 	targetPlayer, ok := socialPeerOf(t)
 	if !ok || targetPlayer.ObjectID() == c.ID {
@@ -215,7 +215,8 @@ func (c *Character) OffensiveCastAllowed(caster attackable.ArenaMember, t target
 // channel, clan or alliance mate always; any other flagged or karma player
 // only with CTRL.
 //
-// Olympiad matches and duels are not modeled, so their rules never apply.
+// Olympiad matches (#216) and duels (#215) are not modeled, so their rules
+// never apply.
 func (c *Character) beneficialCastAllowed(t target.Actor, ctrl bool) bool {
 	if t.Kind() == actor.KindPlayer && t.ObjectID() == c.ID {
 		return true
