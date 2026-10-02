@@ -386,6 +386,8 @@ func Apply(effector, effected Actor, meta Skill, templates []modelskill.EffectTe
 // restoredAt, when set, is the instant the saved state was read back: each
 // effect's schedule runs from there, not from the replay, and one whose
 // last tick came due in between is not reinstated (see resumeRestored).
+// An effect whose ticks run an action still runs from the replay (see
+// restoreAnchor).
 func ApplyRestored(list *List, effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate, count, elapsedSeconds int32, restoredAt time.Time) {
 	if list == nil {
 		return
@@ -399,16 +401,42 @@ func ApplyRestored(list *List, effector, effected Actor, meta Skill, templates [
 		if err != nil {
 			continue
 		}
-		if !restoredAt.IsZero() {
-			if _, _, ok := resumeRestored(tmpl, count, elapsedSeconds, restoredAt, now); !ok {
+		at := restoreAnchor(tmpl, restoredAt)
+		if !at.IsZero() {
+			if _, _, ok := resumeRestored(tmpl, count, elapsedSeconds, at, now); !ok {
 				continue
 			}
 		}
 		e.Effector = effector
 		e.Effected = effected
-		e.seedRestore(count, elapsedSeconds, restoredAt)
+		e.seedRestore(count, elapsedSeconds, at)
 		list.AddRestored(e)
 	}
+}
+
+// restoreAnchor is the instant from which an effect built from tmpl and
+// restored at restoredAt runs its schedule: restoredAt itself, or zero (the
+// replay) for an effect whose ticks run an action — damage, MP drain, a
+// fear step. Ticks due before the replay would pass without their action,
+// since a character not yet in the world is sent nothing, so a loading
+// screen held or dropped would clear such an effect at no cost; it waits
+// for the replay instead, until those ticks can run there (#3266).
+func restoreAnchor(tmpl modelskill.EffectTemplate, restoredAt time.Time) time.Time {
+	if restoredAt.IsZero() || actsOnTick(tmpl) {
+		return time.Time{}
+	}
+	return restoredAt
+}
+
+// actsOnTick reports whether an effect built from tmpl has a tick action.
+func actsOnTick(tmpl modelskill.EffectTemplate) bool {
+	k, ok := coreKinds[tmpl.Name]
+	if !ok {
+		return false
+	}
+	probe := &Effect{Type: k.typ}
+	wireHooks(probe)
+	return probe.OnAction != nil
 }
 
 // New builds a runtime effect from a parsed core effect template.

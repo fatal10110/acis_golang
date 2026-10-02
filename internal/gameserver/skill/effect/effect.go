@@ -197,9 +197,10 @@ func (e *Effect) startScheduleFromRestoreLocked(r *restoreSeed, now time.Time) {
 // last tick at logout) is clamped to the template's period, so the first
 // tick comes due that much short of a period after at. Every tick due
 // before now has passed, each taking one from the count without running
-// the effect's action: the character was not in the world yet (#3266). ok is false
-// once the last of them has ended the effect. An effect without a period
-// only has its count clamped.
+// the effect's action: the character was not in the world yet. Only an
+// effect whose ticks run no action resumes this way (restoreAnchor). ok is
+// false once the last of them has ended the effect. An effect without a
+// period only has its count clamped.
 func resumeRestored(tmpl modelskill.EffectTemplate, count, elapsedSeconds int32, at, now time.Time) (remaining int, next time.Time, ok bool) {
 	remaining = int(min(count, int32(tmpl.Count)))
 	period := templatePeriod(tmpl)
@@ -225,8 +226,9 @@ func resumeRestored(tmpl modelskill.EffectTemplate, count, elapsedSeconds int32,
 // not replayed yet saves at now: its schedule ran from at, as the replayed
 // effect's own does (see resumeRestored). The first template ApplyRestored
 // would build is the one whose state the replayed skill saves. ok is false
-// when that effect has ended by now. A zero at, or a skill with no such
-// template, saves count and elapsedSeconds unchanged.
+// when that effect has ended by now. A zero at, a skill with no such
+// template, or one whose ticks run an action (see restoreAnchor), saves
+// count and elapsedSeconds unchanged.
 func RestoredSaveState(templates []modelskill.EffectTemplate, count, elapsedSeconds int32, at, now time.Time) (savedCount, savedElapsed int32, ok bool) {
 	if at.IsZero() {
 		return count, elapsedSeconds, true
@@ -236,7 +238,7 @@ func RestoredSaveState(templates []modelskill.EffectTemplate, count, elapsedSeco
 			continue
 		}
 		period := templatePeriod(tmpl)
-		if period <= 0 {
+		if period <= 0 || restoreAnchor(tmpl, at).IsZero() {
 			return count, elapsedSeconds, true
 		}
 		remaining, next, alive := resumeRestored(tmpl, count, elapsedSeconds, at, now)
