@@ -77,9 +77,9 @@ func ParseFuncOp(tag string) (FuncOp, error) {
 }
 
 // StatModifier is one bonus a template applies to whichever stat it names
-// while equipped. Stat is the raw stat identifier as it appears in the data
-// file: resolving it against the engine's stat catalog is that engine's
-// job, not this loader's.
+// while equipped. Stat is the stat identifier exactly as the data file spells
+// it; the loader has already checked it against the stat catalog and rejects
+// a template naming an unknown stat.
 type StatModifier struct {
 	Op              FuncOp
 	Stat            string

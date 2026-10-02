@@ -102,8 +102,7 @@ func TestLoadItemTemplates(t *testing.T) {
 	</item>
 	<item id="18" type="Weapon" name="First Child Cond Item">
 		<set name="bodypart" val="rhand" />
-		<for>
-			<cond>
+		<for><cond>
 				<player level="10" />
 			</cond>
 			<add stat="pAtk" val="1" />
@@ -350,7 +349,7 @@ func TestLoadItemTemplates(t *testing.T) {
 		}
 	})
 
-	t.Run("first-child <cond> in <for> attaches to subsequent funcs", func(t *testing.T) {
+	t.Run("<cond> as the first node of <for> attaches to subsequent funcs", func(t *testing.T) {
 		tpl, ok := table.Get(18)
 		if !ok {
 			t.Fatal("item 18 not loaded")
