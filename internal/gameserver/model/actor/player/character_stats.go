@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/duel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
@@ -467,6 +468,8 @@ type hitOutcome struct {
 	// cpOnly marks a hit CP absorbed whole: HP did not change.
 	cpOnly bool
 	dead   bool
+	// duelDefeat marks a hit that would have killed a duelling character.
+	duelDefeat bool
 }
 
 // absorbCPThenReduceHP applies a player's CP-first absorption: a Playable
@@ -493,7 +496,14 @@ func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Com
 		c.curCP -= drained
 		amount -= drained
 	}
-	c.curHP -= amount
+	if amount > 0 && c.curHP-amount <= 0 && c.InDuel() {
+		// A duel never kills: the hit leaves 1 HP, and a character still
+		// fighting is defeated.
+		hit.duelDefeat = c.DuelState() == duel.Duelling
+		c.curHP = 1
+	} else {
+		c.curHP -= amount
+	}
 	hit.dead = c.curHP < creature.DeathHP
 	if hit.dead {
 		c.curHP = 0
@@ -599,6 +609,10 @@ func (c *Character) landHit(amount float64, attacker attackable.Combatant, ignor
 	if !hit.applied {
 		return false
 	}
+	if hit.duelDefeat {
+		c.DisableAllSkills()
+		c.emit(event.DuelDefeated{})
+	}
 	c.sendHitFeedback(amount, attacker, hit, isDOT, shared)
 	return hit.dead
 }
@@ -676,6 +690,9 @@ func (c *Character) reduceSkillHP(amount float64, attacker attackable.Combatant,
 	if !c.damagePermitted(attacker) {
 		return
 	}
+	if c.hitByOther(attacker) && !c.duelHitAllowed(attacker) {
+		return
+	}
 	if amount == 0 && (skill.DirectHPDamage || !c.hitByOther(attacker) || !attacker.Kind().Playable()) {
 		return
 	}
@@ -731,6 +748,9 @@ func (c *Character) reducePeriodicHP(amount float64, attacker effect.Actor, isDO
 		c.applyNonConsumptionDamageEffects(isDOT)
 	}
 	if !c.damagePermitted(killer) {
+		return
+	}
+	if c.hitByOther(killer) && !c.duelHitAllowed(killer) {
 		return
 	}
 	if amount == 0 && (!c.hitByOther(killer) || !killer.Kind().Playable()) {

@@ -29,6 +29,9 @@ func (c *Character) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 	if !c.damagePermitted(attacker) {
 		return false
 	}
+	if c.hitByOther(attacker) && !c.duelHitAllowed(attacker) {
+		return false
+	}
 	if c.landHit(float64(dmg), attacker, false, false) {
 		return c.Die(attacker)
 	}

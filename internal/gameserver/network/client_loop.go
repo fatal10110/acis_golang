@@ -774,6 +774,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if !l.dispatchPartyExtended(client, live, second, payload) {
 					return
 				}
+			case clientpackets.OpcodeRequestDuelStart, clientpackets.OpcodeRequestDuelAnswerStart,
+				clientpackets.OpcodeRequestDuelSurrender:
+				if !l.dispatchDuel(client, live, second, payload) {
+					return
+				}
 			case clientpackets.OpcodeRequestOustFromPartyRoom, clientpackets.OpcodeRequestDismissPartyRoom,
 				clientpackets.OpcodeRequestWithdrawPartyRoom, clientpackets.OpcodeRequestAskJoinPartyRoom,
 				clientpackets.OpcodeAnswerJoinPartyRoom, clientpackets.OpcodeRequestListPartyMatchingWaitingRoom,
@@ -839,6 +844,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				// the client sends this second click expecting the action
 				// to resolve, and locks its own input until Attack or
 				// ActionFailed answers it.
+				if l.refuseFrozenDuellist(live, req.ObjectID) {
+					return
+				}
 				selected := live.Target() != nil && live.Target().ObjectID() == req.ObjectID
 				l.handleTargetAction(ctx, live, req.ObjectID, selected, false, req.Shift)
 			})

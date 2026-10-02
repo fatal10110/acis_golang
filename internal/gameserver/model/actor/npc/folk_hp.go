@@ -75,6 +75,7 @@ func (f *Folk) reduceHP(amount float64, attacker attackable.Combatant) bool {
 	if f.Dead() {
 		return false
 	}
+	creature.InterruptDuelOnNPCHit(attacker)
 	if attacker != nil {
 		f.forceRunStance()
 	}

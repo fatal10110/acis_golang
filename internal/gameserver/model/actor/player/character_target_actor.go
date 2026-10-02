@@ -22,12 +22,11 @@ func (c *Character) Summon() (skilltarget.Actor, bool) {
 	return summon, ok
 }
 
-// Duel and Olympiad lookups are not modeled for players yet, and the NPC,
-// corpse and door facts never apply to them: every method below is the
-// neutral answer target resolution gives a player without that state. The
-// party, clan and alliance lookups are in character_social.go.
-func (c *Character) DuelID() int32                     { return 0 }
-func (c *Character) DuelTeam() int                     { return 0 }
+// Olympiad lookups are not modeled for players yet, and the NPC, corpse
+// and door facts never apply to them: every method below is the neutral
+// answer target resolution gives a player without that state. The duel
+// lookups are in character_duel.go; the party, clan and alliance lookups
+// in character_social.go.
 func (c *Character) OlympiadStarted() bool             { return false }
 func (c *Character) ClanGroups() []string              { return nil }
 func (c *Character) Folk() bool                        { return false }

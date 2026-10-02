@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/craft"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/duel"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/exchange"
 	"github.com/fatal10110/acis_golang/internal/gameserver/gatekeeper"
@@ -325,6 +326,7 @@ type GameClientLink struct {
 	trades           *tradebook.Book
 	parties          *partyRegistry
 	rooms            *roomRegistry
+	duels            *duelRegistry
 	partyPositions   partyPositions
 	clans            *clan.Service
 	clanWarehouses   clanWarehouseBook
@@ -653,6 +655,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		trades:           tradebook.NewBook(cfg.TradeClock),
 		parties:          party.NewRegistry[*livePlayer](cfg.TradeClock),
 		rooms:            partymatch.NewRegistry[*livePlayer](),
+		duels:            duel.NewManager[*livePlayer](),
 		relations:        cmp.Or(cfg.Relations, relation.NewManager(nil)),
 		characters:       cfg.Characters,
 		accessLevels:     cfg.AccessLevels,

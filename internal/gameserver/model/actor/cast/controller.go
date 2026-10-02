@@ -36,7 +36,7 @@ var (
 	// active skill.
 	ErrSkillUnavailable = errors.New("cast: skill unavailable")
 	// ErrAllSkillsDisabled means the actor is under a blanket skill lock
-	// (crowd control, or the Duel-defeat lock once that lands).
+	// (crowd control, or a duel defeat).
 	ErrAllSkillsDisabled = errors.New("cast: all skills disabled")
 	// ErrCantSeeTarget means a ranged skill's caster has no line of sight to
 	// its target when the cast commits.

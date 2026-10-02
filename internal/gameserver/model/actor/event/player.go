@@ -468,3 +468,9 @@ func (MountFeedGauge) event() {}
 func (MountFoodDue) event()   {}
 func (Dismounted) event()     {}
 func (MountOutOfFeed) event() {}
+
+// DuelDefeated reports that a hit left the character, duelling, at the end
+// of its HP: it lost its duel.
+type DuelDefeated struct{}
+
+func (DuelDefeated) event() {}

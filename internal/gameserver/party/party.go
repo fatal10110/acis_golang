@@ -285,6 +285,7 @@ func (r *Registry[M]) add(out *notices, g *group[M], player M) {
 	out.add(WindowAdd[M]{To: existing, Leader: g.leader.ObjectID(), Loot: g.loot, Member: player})
 	out.add(Msg[M]{To: []M{player}, ID: MsgYouJoinedParty, Name: g.leader.CharacterName()})
 	out.add(Msg[M]{To: existing, ID: MsgJoinedParty, Name: player.CharacterName()})
+	out.add(Edited[M]{Leader: g.leader})
 
 	g.members = append(existing, player)
 	r.byMember[player.ObjectID()] = g
@@ -345,6 +346,7 @@ func (r *Registry[M]) remove(out *notices, g *group[M], player M, reason Reason)
 	if isLeader {
 		r.changeLeader(out, g, g.members[0])
 	}
+	out.add(Edited[M]{Leader: g.leader})
 	g.recalculateLevel()
 	out.add(FusionStop[M]{Member: player})
 	if reason == Expelled {
@@ -364,6 +366,7 @@ func (r *Registry[M]) remove(out *notices, g *group[M], player M, reason Reason)
 // disband dissolves g, taking its channel down with it when its leader
 // leads the channel.
 func (r *Registry[M]) disband(out *notices, g *group[M]) {
+	out.add(Edited[M]{Leader: g.leader})
 	if c := g.channel; c != nil {
 		out.add(ChannelClose[M]{To: g.members})
 		if c.leader.ObjectID() == g.leader.ObjectID() {
@@ -385,7 +388,7 @@ func (r *Registry[M]) disband(out *notices, g *group[M]) {
 
 // ChangeLeader hands requester's party to the member named name. A
 // requester leading no party is told only a leader transfers its rights; a
-// name no member has changes nothing.
+// name no member has, or a member in a duel, changes nothing.
 func (r *Registry[M]) ChangeLeader(requester M, name string) []Notice {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -395,7 +398,7 @@ func (r *Registry[M]) ChangeLeader(requester M, name string) []Notice {
 		out.add(Msg[M]{To: []M{requester}, ID: MsgOnlyLeaderTransfers})
 		return out
 	}
-	if target, ok := g.byName(name); ok {
+	if target, ok := g.byName(name); ok && !inDuel(target) {
 		r.changeLeader(&out, g, target)
 	}
 	return out

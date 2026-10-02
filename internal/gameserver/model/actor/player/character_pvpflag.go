@@ -117,6 +117,10 @@ func (c *Character) notePvPHitFromAttacker(attacker any, byServitor bool) {
 	if !ok || pk == c || c.Karma() != 0 {
 		return
 	}
+	// Duellists hit each other freely.
+	if pk.InDuel() && pk.DuelID() == c.DuelID() {
+		return
+	}
 	if pk.InPvPZone() && c.InPvPZone() {
 		return
 	}

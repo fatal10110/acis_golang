@@ -320,7 +320,7 @@ func summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table, in
 		return serverpackets.NPCInfoSnapshot{}, false
 	}
 	x, y, z := a.Position()
-	title, pvpFlag, karma := "", 0, 0
+	title, pvpFlag, karma, team := "", 0, 0, 0
 	if owner, ok := liveSummonOwner(a); ok {
 		// No one but its owner is shown an invisible player's summon.
 		if owner.Invisible() && (viewer == nil || viewer.ObjectID() != owner.ObjectID()) {
@@ -329,6 +329,7 @@ func summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table, in
 		title = owner.Name
 		pvpFlag = int(owner.PvPFlagState())
 		karma = owner.Karma()
+		team = owner.DuelTeam()
 	}
 	pAtkSpd := int(a.PAtkSpd(tmpl.AtkSpd))
 	return serverpackets.NPCInfoSnapshot{
@@ -342,8 +343,8 @@ func summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table, in
 		Running: true, InCombat: inCombat, AlikeDead: a.AlikeDead(),
 		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
 		Name: a.Name(), Title: title, Summon: true, PvpFlag: pvpFlag, Karma: karma,
-		AbnormalEffect: a.AbnormalEffect(),
-		Attackable:     viewer != nil && a.AttackableWithoutForceBy(viewer.Character),
+		AbnormalEffect: a.AbnormalEffect(), Team: team,
+		Attackable: viewer != nil && a.AttackableWithoutForceBy(viewer.Character),
 	}, true
 }
 
@@ -436,6 +437,7 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 		MoveSpeed:         int(a.MoveSpeed(tmpl.RunSpeed)),
 		AbnormalEffect:    petAbnormalEffect(a, owner),
 		Mountable:         petmodel.IsMountable(a.NPCID()),
+		Team:              owner.DuelTeam(),
 		SoulShotsPerHit:   ssCount,
 		SpiritShotsPerHit: spsCount,
 	}, true

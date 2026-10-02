@@ -126,3 +126,13 @@ func (a *Actor) Post(fn func()) bool {
 		fn()
 	})
 }
+
+// ownerDuelID is the duel a's owner is in: 0 for none, -1 when a answers to
+// no owner, which no duellist's duel matches.
+func (a *Actor) ownerDuelID() int32 {
+	owner, ok := a.currentOwner().(interface{ DuelID() int32 })
+	if !ok {
+		return -1
+	}
+	return owner.DuelID()
+}

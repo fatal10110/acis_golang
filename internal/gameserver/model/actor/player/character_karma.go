@@ -37,15 +37,14 @@ func calculateKarmaGain(pkCount int, summon bool) int {
 // a PK-kill count. An actively-flagged, karma-free victim instead takes
 // the PvP-point branch; see awardKillerPvPKill.
 //
-// A kill also takes other karma-free outcomes when
-// either side is dueling, when the kill happens in a PvP/siege zone, when
-// the killer wields a cursed weapon, or when the kill is a clan-war kill.
-// None of those states are tracked on Character yet, so this only ever
-// reproduces the innocent-victim and already-flagged-victim gates; the
-// others stay dormant until their owning subsystems land.
+// A kill between two players who are both in a duel changes nothing. A
+// kill also takes other karma-free outcomes when it happens in a PvP/siege
+// zone, when the killer wields a cursed weapon, or when the kill is a
+// clan-war kill. None of those states are tracked on Character yet, so
+// those gates stay dormant until their owning subsystems land.
 func (c *Character) awardKillerPKKarma(killer attackable.Combatant) {
 	pk := actingCharacter(killer)
-	if pk == nil || pk == c || c.Karma() != 0 || c.PvPFlagState() != task.PvPFlagNone {
+	if pk == nil || pk == c || duelKillExempt(pk, c) || c.Karma() != 0 || c.PvPFlagState() != task.PvPFlagNone {
 		return
 	}
 	pk.progressionMu.Lock()
@@ -62,11 +61,12 @@ func (c *Character) awardKillerPKKarma(killer attackable.Combatant) {
 // killer's current PK count at the summon rate, and a PvP point is never
 // awarded for it. Killing one's own summon awards nothing.
 //
-// The duel and clan-war exemptions are not applied: that state is not
-// tracked yet, the same as for a player kill (#1301).
+// Nothing is awarded when both players are in a duel. The clan-war
+// exemption is not applied: that state is not tracked yet, the same as for
+// a player kill (#1301).
 func (c *Character) AwardSummonKillKarma(killer attackable.Combatant) {
 	pk := actingCharacter(killer)
-	if pk == nil || pk == c || c.Karma() != 0 || c.PvPFlagState() != task.PvPFlagNone {
+	if pk == nil || pk == c || duelKillExempt(pk, c) || c.Karma() != 0 || c.PvPFlagState() != task.PvPFlagNone {
 		return
 	}
 	if pk.InPvPZone() && c.InPvPZone() {
@@ -95,13 +95,14 @@ func (c *Character) publishPKKarma(karma int) {
 // of a kill's PvP/karma update. Only the killer's own UserInfo is resent;
 // no karma or PvP flag changes.
 //
-// That whole update is gated behind cursed-weapon, duel, and
-// PvP/siege-zone early returns, and this branch's own condition also
-// allows a mutual clan-war kill between non-academy members; the clan
-// registry holds that state, not wired here yet (#1301).
+// Nothing is awarded when both players are in a duel. The whole update is
+// also gated behind cursed-weapon and PvP/siege-zone early returns, and
+// this branch's own condition also allows a mutual clan-war kill between
+// non-academy members; the clan registry holds that state, not wired here
+// yet (#1301).
 func (c *Character) awardKillerPvPKill(killer attackable.Combatant) {
 	pk := actingCharacter(killer)
-	if pk == nil || pk == c {
+	if pk == nil || pk == c || duelKillExempt(pk, c) {
 		return
 	}
 	pk.stateMu.RLock()

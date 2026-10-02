@@ -23,6 +23,10 @@ const (
 	KindCommandChannel
 	KindPartyRoom
 	KindFriend
+	// KindDuel and KindPartyDuel challenge a player, or a party's leader,
+	// to a duel.
+	KindDuel
+	KindPartyDuel
 )
 
 // requestClock is one login's clock over the requests it sent. Every

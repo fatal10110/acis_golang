@@ -75,6 +75,7 @@ func (h *Hostile) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 	if h.AlikeDead() {
 		return false
 	}
+	creature.InterruptDuelOnNPCHit(attacker)
 	h.testOverhit(attacker, float64(dmg))
 	if dmg > 0 {
 		h.RecordAttacker(attacker)

@@ -65,7 +65,7 @@ type UserInfoSnapshot struct {
 	IsGM bool
 	// SpawnProtectedTeam reports the team byte the client sees while spawn
 	// protection is active: TeamType.BLUE when spawn protection is enabled
-	// and currently held, the unassigned team otherwise.
+	// and currently held, the character's duel team otherwise.
 	SpawnProtectedTeam bool
 	// Clan is Character's clan as the status window shows it; zero when
 	// clanless.
@@ -276,7 +276,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	if s.SpawnProtectedTeam {
 		w.WriteUint8(teamBlue)
 	} else {
-		w.WriteUint8(0) // team: teams (duel/event) are not modeled
+		w.WriteUint8(uint8(c.DuelTeam()))
 	}
 	w.WriteInt32(s.Clan.CrestLargeID)
 	w.WriteUint8(boolUint8(c.IsNoble()))

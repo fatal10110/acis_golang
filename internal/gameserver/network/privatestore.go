@@ -82,9 +82,9 @@ func (l *GameClientLink) canOpenPrivateStore(live *livePlayer, cancelTrade bool)
 	return false, true
 }
 
-// storeOpenState reads what the store set-up checks need from live. No
-// duel (#215) and no Olympiad (#216) are modeled yet, so neither ever
-// refuses.
+// storeOpenState reads what the store set-up checks need from live. The
+// duel refusal waits for #3285, and no Olympiad (#216) is modeled yet, so
+// neither ever refuses.
 func (l *GameClientLink) storeOpenState(live *livePlayer) privatestore.OpenState {
 	attacking := live.attack != nil && live.attack.AttackingNow()
 	requesting := l.trades != nil && l.trades.ProcessingRequest(live.ObjectID())
