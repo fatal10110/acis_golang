@@ -343,11 +343,10 @@ type GameClientLink struct {
 	// board is the community board; see community_board.go.
 	board communityBoard
 
-	// relations, friendInvites and characters back the friend and block
-	// lists; see friends.go.
-	relations     *relation.Manager
-	friendInvites *relation.Invites
-	characters    characterDirectory
+	// relations and characters back the friend and block lists; see
+	// friends.go.
+	relations  *relation.Manager
+	characters characterDirectory
 	// accessLevels stores the access levels admin commands change; nil
 	// keeps them in memory only.
 	accessLevels accessLevelStore
@@ -483,8 +482,9 @@ type GameClientLinkConfig struct {
 	// Now supplies the clock packet accounting uses to bucket received
 	// frames into flood windows; nil means time.Now.
 	Now func() time.Time
-	// TradeClock times direct-trade, party and command channel requests
-	// out; nil means time.Now.
+	// TradeClock times every pending request out (direct trade, party,
+	// command channel, party room and friend invitations); nil means
+	// time.Now.
 	TradeClock func() time.Time
 	// Relations holds the friend and block lists; nil starts with none and
 	// keeps what changes in memory only.
@@ -498,8 +498,6 @@ type GameClientLinkConfig struct {
 	// Petitions holds the petitions players send the game masters; nil
 	// starts with none and refuses every new one.
 	Petitions *petition.Manager
-	// FriendInviteClock times friend invitations out; nil means time.Now.
-	FriendInviteClock func() time.Time
 	// EnchantRoll supplies enchant dice rolls in [0,1); nil falls back to
 	// the random source. Behavior harnesses inject a deterministic roll.
 	EnchantRoll func() float64
@@ -627,7 +625,6 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		parties:          party.NewRegistry[*livePlayer](cfg.TradeClock),
 		rooms:            partymatch.NewRegistry[*livePlayer](),
 		relations:        cmp.Or(cfg.Relations, relation.NewManager(nil)),
-		friendInvites:    relation.NewInvites(cfg.FriendInviteClock),
 		characters:       cfg.Characters,
 		accessLevels:     cfg.AccessLevels,
 		petitions:        cmp.Or(cfg.Petitions, petition.NewManager(petition.DefaultConfig(), nil, nil, nil, nil)),

@@ -106,7 +106,6 @@ type options struct {
 	freeTeleport           bool
 	teleportClock          func() time.Time
 	tradeClock             func() time.Time
-	friendInviteClock      func() time.Time
 	zones                  *zone.Index
 	water                  bool
 	waterNow               func() time.Time
@@ -291,17 +290,12 @@ func WithTeleports(teleports travel.TeleportTable, instants travel.InstantTable,
 	}
 }
 
-// WithTradeClock times direct-trade requests out against now (nil means
-// time.Now), so a scenario can let a request expire without waiting.
+// WithTradeClock times every pending request out against now (nil means
+// time.Now): direct trade, party, command channel, party room and friend
+// invitations alike, so a scenario can let a request expire without
+// waiting.
 func WithTradeClock(now func() time.Time) Option {
 	return func(o *options) { o.tradeClock = now }
-}
-
-// WithFriendInviteClock times friend invitations out against now (nil
-// means time.Now), so a scenario can let an invitation expire without
-// waiting.
-func WithFriendInviteClock(now func() time.Time) Option {
-	return func(o *options) { o.friendInviteClock = now }
 }
 
 // WithZones supplies the zone index wired into the link (default: none, so
@@ -1792,7 +1786,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
 	gclConfig.ArmorSets = o.armorSets
-	gclConfig.Relations, gclConfig.Characters, gclConfig.FriendInviteClock = relations, chars, o.friendInviteClock
+	gclConfig.Relations, gclConfig.Characters = relations, chars
 	gclConfig.AccessLevels = chars
 	petitions, petitionRows := bootPetitions(t, db, chars, ids, o.petitionConfig)
 	gclConfig.Petitions = petitions

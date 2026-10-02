@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
+	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
 )
 
 // characterDirectory finds characters, online or not, by name and id.
@@ -99,15 +100,6 @@ func (l *GameClientLink) notifyFriends(live *livePlayer, online bool) {
 	}
 }
 
-// leaveFriends takes live leaving the world out of the friend invitations
-// and tells its online friends it left.
-func (l *GameClientLink) leaveFriends(live *livePlayer) {
-	if l.friendInvites != nil {
-		l.friendInvites.Leave(live.ObjectID())
-	}
-	l.notifyFriends(live, false)
-}
-
 // handleRequestFriendInvite sends the named player a friend invitation.
 // Every refusal answers with its message and a failed invitation result.
 func (l *GameClientLink) handleRequestFriendInvite(live *livePlayer, req clientpackets.RequestFriendInvite) {
@@ -123,14 +115,12 @@ func (l *GameClientLink) handleRequestFriendInvite(live *livePlayer, req clientp
 		parties.TargetBlocked = target.BlockingAll()
 	}
 	refusal := l.relations.CheckInvite(parties)
-	if refusal == relation.InviteAllowed {
-		// A pending trade request keeps the target as busy as a pending
-		// invitation; one slot for every kind of request is #3153.
-		busy := l.trades != nil && l.trades.ProcessingRequest(target.ObjectID())
-		if l.friendInvites.Offer(live.ObjectID(), live.Name, target.ObjectID(), busy) {
-			target.SendFrame(serverpackets.FrameFriendAddRequest(live.Name))
-			return
-		}
+	// The invitation takes the target's request slot, shared with every
+	// other kind of request; only the target being busy refuses it there.
+	if refusal == relation.InviteAllowed &&
+		l.tradeBook().Invite(tradebook.KindFriend, live.ObjectID(), target.ObjectID(), false).Status == tradebook.RequestStarted {
+		target.SendFrame(serverpackets.FrameFriendAddRequest(live.Name))
+		return
 	}
 	live.SendFrame(friendInviteRefusalMessage(refusal, req.Name))
 	live.SendFrame(serverpackets.FrameFriendAddRequestResult(false))
@@ -157,13 +147,14 @@ func friendInviteRefusalMessage(refusal relation.InviteRefusal, name string) wir
 	}
 }
 
-// handleRequestAnswerFriendInvite answers the invitation live holds.
+// handleRequestAnswerFriendInvite answers the friend invitation live holds.
 //
 // With no answerable invitation the answer goes unanswered, as in the
 // reference: the invitation dialog closed when the client answered, so no
-// click waits on a reply.
+// click waits on a reply. A request of another kind in live's slot is no
+// friend invitation: it stays pending for its own answer.
 func (l *GameClientLink) handleRequestAnswerFriendInvite(live *livePlayer, req clientpackets.RequestAnswerFriendInvite) {
-	inv, ok := l.friendInvites.Answer(live.ObjectID())
+	inv, ok := l.tradeBook().TakeRequest(tradebook.KindFriend, live.ObjectID())
 	if !ok {
 		return
 	}
@@ -186,9 +177,16 @@ func (l *GameClientLink) handleRequestAnswerFriendInvite(live *livePlayer, req c
 		requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1AddedToFriends, live.Name))
 		requester.SendFrame(serverpackets.FrameL2Friend(serverpackets.L2FriendAdd, live.Name, true, live.ObjectID()))
 	}
+	// A login that left is named as its character is stored.
+	var requesterName string
+	if requester != nil {
+		requesterName = requester.Name
+	} else {
+		requesterName = l.characterNames([]int32{inv.RequesterID})[inv.RequesterID]
+	}
 	live.SendFrame(serverpackets.FrameFriendAddRequestResult(true))
-	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1JoinedAsFriend, inv.RequesterName))
-	live.SendFrame(serverpackets.FrameL2Friend(serverpackets.L2FriendAdd, inv.RequesterName, requester != nil, inv.RequesterID))
+	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1JoinedAsFriend, requesterName))
+	live.SendFrame(serverpackets.FrameL2Friend(serverpackets.L2FriendAdd, requesterName, requester != nil, inv.RequesterID))
 }
 
 // handleRequestFriendList lists live's friends as system messages, each
