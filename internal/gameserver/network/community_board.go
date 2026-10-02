@@ -10,8 +10,10 @@ import (
 
 // communityBoard is the board's settings and mail, fixed at boot.
 type communityBoard struct {
-	cfg  bbs.Config
-	mail *bbs.Mailbox
+	cfg       bbs.Config
+	mail      *bbs.Mailbox
+	forums    *bbs.Forums
+	favorites *bbs.Favorites
 	// serverNews shows the server news page at login.
 	serverNews bool
 }
@@ -47,19 +49,19 @@ func (l *GameClientLink) boardCommand(live *livePlayer, command string) {
 	case strings.HasPrefix(command, "_bbshome"):
 		l.boardHome(live, command)
 	case strings.HasPrefix(command, "_bbsgetfav"):
-		l.boardUnported(live, command, "favorites board (#3201)")
+		l.boardFavorites(live, command)
 	case strings.HasPrefix(command, "_bbsloc"):
 		l.boardUnported(live, command, "region board (#3202)")
 	case strings.HasPrefix(command, "_bbsclan"):
 		l.boardClan(live, command)
-	case strings.HasPrefix(command, "_bbsmemo"):
-		l.boardUnported(live, command, "memo board (#3201)")
+	case strings.HasPrefix(command, "_bbsmemo"), strings.HasPrefix(command, "_bbstopics"):
+		l.boardTopics(live, command)
 	case strings.HasPrefix(command, "_bbsmail"), command == "_maillist_0_1_0_":
 		l.boardMail(live, command)
 	case strings.HasPrefix(command, "_friend"), strings.HasPrefix(command, "_block"):
 		l.boardFriends(live, command)
-	case strings.HasPrefix(command, "_bbstopics"), strings.HasPrefix(command, "_bbsposts"):
-		l.boardUnported(live, command, "memo board (#3201)")
+	case strings.HasPrefix(command, "_bbsposts"):
+		l.boardPosts(live, command)
 	default:
 		l.sendBoard(live, bbs.NotImplemented(command))
 	}
@@ -72,8 +74,10 @@ func (l *GameClientLink) requestBBSWrite(live *livePlayer, req clientpackets.Req
 		return
 	}
 	switch req.URL {
-	case "Topic", "Post":
-		l.boardUnported(live, req.URL, "memo board (#3201)")
+	case "Topic":
+		l.boardTopicWrite(live, req.Args)
+	case "Post":
+		l.boardPostWrite(live, req.Args)
 	case "_bbsclan":
 		l.boardClanWrite(live, req.Args)
 	case "Mail":
@@ -93,9 +97,8 @@ func (l *GameClientLink) requestBBSWrite(live *livePlayer, req clientpackets.Req
 
 // boardUnported answers a board command whose board is not ported yet with
 // the page an unknown command shows.
-// ponytail: the favorites, memo and region boards need the forum model
-// (#3201) and the castle registry (#3202); until then their commands show
-// the unknown-command page and log the gap.
+// ponytail: the region board needs the castle registry (#3202); until
+// then its commands show the unknown-command page and log the gap.
 func (l *GameClientLink) boardUnported(live *livePlayer, command, board string) {
 	l.log.Debug().Str("command", command).Str("board", board).Msg("community board: board not modeled")
 	l.sendBoard(live, bbs.NotImplemented(command))

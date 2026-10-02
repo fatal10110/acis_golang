@@ -72,7 +72,7 @@ func TestBoardHomeCommandConfigured(t *testing.T) {
 // TestBoardUnknownCommands pins the page an unknown command or form shows,
 // naming it: a board-prefixed command no board takes, an unknown form url,
 // a home command that names no page, the region board's form (named by its
-// first argument), and the boards not built yet (favorites, region, memo).
+// first argument), and the region board, not built yet.
 func TestBoardUnknownCommands(t *testing.T) {
 	p := bootPair(t, gameservertest.WithCommunityBoard(boardOn))
 	p.enterAll(t)
@@ -80,12 +80,12 @@ func TestBoardUnknownCommands(t *testing.T) {
 	notImplemented := func(name string) string {
 		return "<html><body><br><br><center>The command: " + name + " isn't implemented.</center></body></html>"
 	}
-	for _, cmd := range []string{"bbs_default", "_bbshomepage", "_mailbox", "_bbsgetfav", "_bbsloc", "_bbsloc;1", "_bbsmemo", "_bbstopics;read;1", "_bbsposts;read;1;1"} {
+	for _, cmd := range []string{"bbs_default", "_bbshomepage", "_mailbox", "_bbsloc", "_bbsloc;1"} {
 		assertPage(t, command(t, p.alice, cmd), notImplemented(cmd))
 	}
 	assertPage(t, write(t, p.alice, "Unknown", "a"), notImplemented("Unknown"))
 	assertPage(t, write(t, p.alice, "_bbsloc", "first", "second"), notImplemented("first"))
-	assertPage(t, write(t, p.alice, "Topic", "crea", "1"), notImplemented("Topic"))
+	assertPage(t, write(t, p.alice, "Topic", "Bogus"), notImplemented("Bogus"))
 	assertPage(t, write(t, p.alice, "Mail", "Bogus"), notImplemented("Bogus"))
 	assertPage(t, write(t, p.alice, "_bbsclan", "Bogus"), notImplemented("Bogus"))
 	assertPage(t, write(t, p.alice, "_friend", "Bogus"), notImplemented("Bogus"))

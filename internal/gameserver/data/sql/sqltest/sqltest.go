@@ -350,6 +350,46 @@ const bbsMailSchema = "CREATE TABLE IF NOT EXISTS `bbs_mail` (\n" +
 	"  PRIMARY KEY  (`id`)\n" +
 	")"
 
+// bbsForumSchema mirrors the shipped bbs_forum table definition verbatim.
+const bbsForumSchema = "CREATE TABLE IF NOT EXISTS `bbs_forum` (\n" +
+	"  `id` int(8) NOT NULL default '0',\n" +
+	"  `type` VARCHAR(10) NOT NULL default '0',\n" +
+	"  `access` VARCHAR(12) NOT NULL default '0',\n" +
+	"  `owner_id` int(8) NOT NULL default '0',\n" +
+	"  UNIQUE KEY `id` (`id`)\n" +
+	")"
+
+// bbsTopicSchema mirrors the shipped bbs_topic table definition verbatim.
+const bbsTopicSchema = "CREATE TABLE IF NOT EXISTS `bbs_topic` (\n" +
+	"  `id` int(8) NOT NULL DEFAULT '0',\n" +
+	"  `forum_id` int(8) NOT NULL DEFAULT '0',\n" +
+	"  `name` varchar(255) NOT NULL DEFAULT '',\n" +
+	"  `date` decimal(20,0) NOT NULL DEFAULT '0',\n" +
+	"  `owner_name` varchar(255) NOT NULL DEFAULT '0',\n" +
+	"  `owner_id` int(8) NOT NULL DEFAULT '0'\n" +
+	")"
+
+// bbsPostSchema mirrors the shipped bbs_post table definition verbatim.
+const bbsPostSchema = "CREATE TABLE IF NOT EXISTS `bbs_post` (\n" +
+	"  `id` int(8) NOT NULL DEFAULT '0',\n" +
+	"  `owner_name` varchar(255) NOT NULL DEFAULT '',\n" +
+	"  `owner_id` int(8) NOT NULL DEFAULT '0',\n" +
+	"  `date` decimal(20,0) NOT NULL DEFAULT '0',\n" +
+	"  `topic_id` int(8) NOT NULL DEFAULT '0',\n" +
+	"  `forum_id` int(8) NOT NULL DEFAULT '0',\n" +
+	"  `txt` text NOT NULL\n" +
+	")"
+
+// bbsFavoriteSchema mirrors the shipped bbs_favorite table definition verbatim.
+const bbsFavoriteSchema = "CREATE TABLE IF NOT EXISTS `bbs_favorite` (\n" +
+	"  `id` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `player_id` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `title` VARCHAR(35) DEFAULT NULL,\n" +
+	"  `bypass` VARCHAR(128) DEFAULT NULL,\n" +
+	"  `date` TIMESTAMP NULL DEFAULT NULL,\n" +
+	"  PRIMARY KEY  (`id`)\n" +
+	")"
+
 // accountsSchema mirrors the shipped accounts table definition verbatim.
 // The login server owns it; the game server's behavior harness runs a login
 // server on the same database.
@@ -422,7 +462,7 @@ var schemaStmts = []string{
 	characterMacrosesSchema, characterRecommendsSchema,
 	clanDataSchema, clanPrivsSchema, clanSkillsSchema, clanSubpledgesSchema, clanWarsSchema,
 	accountsSchema,
-	bbsMailSchema,
+	bbsMailSchema, bbsForumSchema, bbsTopicSchema, bbsPostSchema, bbsFavoriteSchema,
 }
 
 var seedStmts = []string{sevenSignsStatusSeed}

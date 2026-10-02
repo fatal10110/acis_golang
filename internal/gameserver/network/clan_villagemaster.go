@@ -148,6 +148,7 @@ func (l *GameClientLink) raiseClanLevel(live *livePlayer) {
 		case clan.ReputationDeducted:
 			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DeductedFromClanRep, int32(n.Points)))
 		case clan.LevelRaised:
+			l.ensureClanForums(cl.ID(), n.Level)
 			// The leader's siege skills follow the level here once sieges
 			// exist (#3150).
 			if clan.TellsLeaderAboutReputation(n.Level) {

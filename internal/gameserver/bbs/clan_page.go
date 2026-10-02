@@ -112,14 +112,14 @@ func RenderClanNotice(page string, clanID int32, enabled bool) string {
 }
 
 // RenderClanManagement fills page, the clan management form, for clanID;
-// access describes the access of the clan's announcement and bulletin
-// boards.
-func RenderClanManagement(page string, clanID int32, access string) string {
+// annAccess and cbbAccess describe the access of the clan's announcement
+// and bulletin forums.
+func RenderClanManagement(page string, clanID int32, annAccess, cbbAccess string) string {
 	page = strings.ReplaceAll(page, "%clanid%", strconv.Itoa(int(clanID)))
-	page = strings.ReplaceAll(page, "%curAnnNonPer%", access)
-	page = strings.ReplaceAll(page, "%curAnnMemPer%", access)
-	page = strings.ReplaceAll(page, "%curCbbNonPer%", access)
-	return strings.ReplaceAll(page, "%curCbbMemPer%", access)
+	page = strings.ReplaceAll(page, "%curAnnNonPer%", annAccess)
+	page = strings.ReplaceAll(page, "%curAnnMemPer%", annAccess)
+	page = strings.ReplaceAll(page, "%curCbbNonPer%", cbbAccess)
+	return strings.ReplaceAll(page, "%curCbbMemPer%", cbbAccess)
 }
 
 // RenderClanMail fills page, the clan mail form, for the clan clanID named
