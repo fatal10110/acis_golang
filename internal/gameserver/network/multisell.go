@@ -59,8 +59,14 @@ func (l *GameClientLink) requestMultiSellChoose(live *livePlayer, req clientpack
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageExceededQuantityThatCanBeInput))
 		case exchange.NotClanMember:
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouAreNotAClanMember))
+		case exchange.NotClanLeader:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyClanLeaderEnabled))
 		case exchange.ClanReputationTooLow:
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageClanReputationScoreTooLow))
+		case exchange.ClanReputationChanged:
+			l.sendReputationChange(n.Clan, n.Change, live)
+		case exchange.ReputationDeducted:
+			live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DeductedFromClanRep, int32(n.Points)))
 		case exchange.NotEnoughItems:
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughItems))
 		case exchange.Consumed:

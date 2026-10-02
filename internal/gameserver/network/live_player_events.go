@@ -290,6 +290,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSpoilSuccess))
 	case event.OverHit:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOverHit))
+	case event.ClanGateOpened:
+		l.announceClanGate(live)
 	case event.ServitorVanished:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageServitorHasVanished))
 	case event.ShieldBlocked:

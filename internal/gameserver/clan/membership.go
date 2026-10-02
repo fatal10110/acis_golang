@@ -111,6 +111,11 @@ const (
 	JoinAllowed JoinRefusal = iota
 	JoinNotAuthorized
 	JoinInviteSelf
+	// JoinTargetBlockingAll refuses a target that blocks everything.
+	JoinTargetBlockingAll
+	// JoinTargetBlocksInviter refuses a target whose block list holds the
+	// inviter.
+	JoinTargetBlocksInviter
 	JoinTargetInClan
 	JoinClanPenalty
 	JoinTargetPenalty
@@ -122,24 +127,28 @@ const (
 )
 
 // CheckJoin reports whether inviterID may invite target into cl's sub-unit
-// pledgeType now.
-func (s *Service) CheckJoin(cl *Clan, inviterID int32, target *player.Character, pledgeType int, now time.Time) JoinRefusal {
+// pledgeType now. blocksInviter reports whether target's block list holds
+// the inviter.
+func (s *Service) CheckJoin(cl *Clan, inviterID int32, target *player.Character, blocksInviter bool, pledgeType int, now time.Time) JoinRefusal {
 	cl.mu.RLock()
 	defer cl.mu.RUnlock()
-	return cl.checkJoinLocked(inviterID, target, pledgeType, now)
+	return cl.checkJoinLocked(inviterID, target, blocksInviter, pledgeType, now)
 }
 
-// checkJoinLocked runs the invitation rules. The target's block list is
-// not modeled yet (#3151), so a blocking target is never refused. An
-// invitation into a sub-unit the clan has not founded finds no room: a
-// crafted request could otherwise fill a sub-unit no roster lists.
-func (cl *Clan) checkJoinLocked(inviterID int32, target *player.Character, pledgeType int, now time.Time) JoinRefusal {
+// checkJoinLocked runs the invitation rules. An invitation into a sub-unit
+// the clan has not founded finds no room: a crafted request could
+// otherwise fill a sub-unit no roster lists.
+func (cl *Clan) checkJoinLocked(inviterID int32, target *player.Character, blocksInviter bool, pledgeType int, now time.Time) JoinRefusal {
 	nowMs := now.UnixMilli()
 	switch {
 	case cl.memberPrivilegesLocked(inviterID)&int32(PrivInvite) == 0:
 		return JoinNotAuthorized
 	case inviterID == target.ID:
 		return JoinInviteSelf
+	case target.BlockingAll():
+		return JoinTargetBlockingAll
+	case blocksInviter:
+		return JoinTargetBlocksInviter
 	case target.ClanID() != 0:
 		return JoinTargetInClan
 	case cl.charPenaltyExpiry > nowMs:
@@ -169,10 +178,11 @@ func academyAge(c *player.Character) bool {
 }
 
 // Join puts c into cl's sub-unit pledgeType on inviterID's invitation,
-// re-checking the invitation rules first. A recruit takes rank 6 in the
-// main clan, 7 in a royal guard, 8 in a knight order and 9 in the academy,
-// which also records the level it joined at.
-func (s *Service) Join(cl *Clan, inviterID int32, c *player.Character, pledgeType int, now time.Time) JoinRefusal {
+// re-checking the invitation rules first; blocksInviter reports whether c's
+// block list holds the inviter. A recruit takes rank 6 in the main clan, 7
+// in a royal guard, 8 in a knight order and 9 in the academy, which also
+// records the level it joined at.
+func (s *Service) Join(cl *Clan, inviterID int32, c *player.Character, blocksInviter bool, pledgeType int, now time.Time) JoinRefusal {
 	m := LiveMember(c)
 	m.PledgeType = pledgeType
 	m.PowerGrade = recruitPowerGrade(pledgeType)
@@ -181,7 +191,7 @@ func (s *Service) Join(cl *Clan, inviterID int32, c *player.Character, pledgeTyp
 	}
 	m.Online = true
 	cl.mu.Lock()
-	if refusal := cl.checkJoinLocked(inviterID, c, pledgeType, now); refusal != JoinAllowed {
+	if refusal := cl.checkJoinLocked(inviterID, c, blocksInviter, pledgeType, now); refusal != JoinAllowed {
 		cl.mu.Unlock()
 		return refusal
 	}

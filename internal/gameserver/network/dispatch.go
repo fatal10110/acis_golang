@@ -663,7 +663,6 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.symbols = symbolmaker.NewService(cfg.HennaTable, link.nextObjectID)
 	link.gatekeeper = gatekeeper.NewService(cfg.Teleports, cfg.InstantTeleports, cfg.FreeTeleport, cfg.TeleportClock)
 	link.craft = craft.NewService(cfg.Recipes, !cfg.PlayerConfig.CraftingDisabled, link.nextObjectID, cfg.CraftRoll)
-	link.exchange = exchange.NewService(cfg.Multisells, cfg.PlayerConfig.KeepMaintainedIngredients, link.nextObjectID)
 	link.augment = newAugmentService(cfg)
 	link.board = communityBoard{cfg: cfg.Board, mail: cfg.Mailbox, serverNews: cfg.ShowServerNews}
 	link.announcements = cfg.Announcements
@@ -674,6 +673,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	if link.clans == nil {
 		link.clans = clan.NewService(nil, nil, nil, cfg.IDs, clan.DefaultConfig(), nil, cfg.Log)
 	}
+	link.exchange = exchange.NewService(cfg.Multisells, cfg.PlayerConfig.KeepMaintainedIngredients, link.nextObjectID, link.clans)
 	if link.roster != nil {
 		clans := link.clans
 		link.roster.SetPurged(func(objectID int32) { clans.RemoveDeleted(objectID, time.Now()) })

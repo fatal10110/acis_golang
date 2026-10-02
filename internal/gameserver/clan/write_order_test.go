@@ -257,7 +257,7 @@ func TestJoinRacingOustKeepsExpelledMemberOut(t *testing.T) {
 		})
 	}
 
-	if res := s.Join(cl, orderLeaderID, recruit, SubunitMain, time.Now()); res != JoinAllowed {
+	if res := s.Join(cl, orderLeaderID, recruit, false, SubunitMain, time.Now()); res != JoinAllowed {
 		t.Fatalf("join = %v, want JoinAllowed", res)
 	}
 	<-done

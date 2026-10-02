@@ -43,4 +43,5 @@ const (
 	SystemMessageS1ClanIsFull                       = 1835 // text parameter
 	SystemMessageAcquireSkillFailedBadClanRepScore  = 1852 // no parameter
 	SystemMessageClanSkillsActivatedReputation      = 1862 // no parameter
+	SystemMessageCourtMagicianCreatedPortal         = 1923 // no parameter
 )

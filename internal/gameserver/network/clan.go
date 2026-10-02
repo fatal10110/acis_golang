@@ -87,7 +87,8 @@ func (l *GameClientLink) requestJoinPledge(live *livePlayer, req clientpackets.R
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouHaveInvitedTheWrongTarget))
 		return
 	}
-	if refusal := l.clanService().CheckJoin(cl, c.ID, target.Character, int(req.PledgeType), time.Now()); refusal != clan.JoinAllowed {
+	blocksInviter := l.relations.IsBlocked(target.ObjectID(), c.ID)
+	if refusal := l.clanService().CheckJoin(cl, c.ID, target.Character, blocksInviter, int(req.PledgeType), time.Now()); refusal != clan.JoinAllowed {
 		sendJoinRefusal(live, cl, target.Name, refusal)
 		return
 	}
@@ -117,6 +118,10 @@ func sendJoinRefusal(to *livePlayer, cl *clan.Clan, target string, refusal clan.
 		frame = serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat)
 	case clan.JoinInviteSelf:
 		frame = serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotInviteYourself)
+	case clan.JoinTargetBlockingAll:
+		frame = serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1BlockedEverything, target)
+	case clan.JoinTargetBlocksInviter:
+		frame = serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1HasAddedYouToIgnoreList, target)
 	case clan.JoinTargetInClan:
 		frame = serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1WorkingWithAnotherClan, target)
 	case clan.JoinClanPenalty:
@@ -167,7 +172,8 @@ func (l *GameClientLink) requestAnswerJoinPledge(live *livePlayer, req clientpac
 	// joined, as the reference grants them before it recomputes the rank;
 	// no SkillList follows.
 	rank := c.PledgeClass()
-	if refusal := l.clanService().Join(cl, invite.RequesterID, c, sent.PledgeType, time.Now()); refusal != clan.JoinAllowed {
+	blocksInviter := l.relations.IsBlocked(c.ID, invite.RequesterID)
+	if refusal := l.clanService().Join(cl, invite.RequesterID, c, blocksInviter, sent.PledgeType, time.Now()); refusal != clan.JoinAllowed {
 		sendJoinRefusal(requester, cl, c.Name, refusal)
 	} else {
 		l.giveClanSkills(live, cl, rank)
