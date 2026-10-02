@@ -9,8 +9,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -126,7 +128,7 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	// dropper, so the operation names it too.
 	end := l.itemInstances.BeginOperationTaking([]int32{picked.ObjectID}, inv.OwnerID())
 	defer end()
-	res, failure := l.inventory.PickupGround(inv, &ground.Instance, ground.Template, live)
+	res, failure := l.pickupGroundInto(inv, ground, live)
 	l.applyPersistActions(res.Persist)
 	end()
 	switch failure {
@@ -149,6 +151,32 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 	live.ItemAdded(obtained)
 	l.lockPickupParalysis(live)
 	return true
+}
+
+// pickupNeedsRoom reports whether live's own inventory must have room for
+// a ground item it picks up: outside a party, or under finders-keepers. The
+// party's other rules hand the item to a member with room, or leave it with
+// live when none has any.
+func (l *GameClientLink) pickupNeedsRoom(live *livePlayer) bool {
+	if l.parties == nil {
+		return true
+	}
+	view, ok := l.parties.View(live.ObjectID())
+	return !ok || view.Loot == party.LootFindersKeepers
+}
+
+// pickupGroundInto moves the claimed ground item into live's own inventory
+// inv: past the slot check when live must keep what it picks up, and the
+// loot lock in every case. A partied picker reaches this only with an item
+// that skips the party's loot rule, a cursed weapon.
+func (l *GameClientLink) pickupGroundInto(inv *itemcontainer.Inventory, ground *grounditem.Item, live *livePlayer) (invops.Result, invops.PickupFailure) {
+	if l.pickupNeedsRoom(live) {
+		return l.inventory.PickupGround(inv, &ground.Instance, ground.Template, live)
+	}
+	if invops.LootLocked(ground.Instance.Snapshot().OwnerID, live) {
+		return invops.Result{}, invops.PickupLootLocked
+	}
+	return l.inventory.TakeGround(inv, &ground.Instance)
 }
 
 // takeGroundFromWorld finishes live's successful pickup of ground in the
