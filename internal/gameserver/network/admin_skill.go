@@ -190,15 +190,15 @@ func (l *GameClientLink) removeAdminSkills(gm, target *livePlayer) {
 	l.sendSkillChanges(target, nil, nil)
 }
 
-// removeLiveSkill takes skillID away from live, on its queue, and reports
-// whether live knew it. The skill its level brought along goes with it, a
-// cast of it in flight stops, its passive stats and effects end, and with
-// store set its row is deleted and, unless it is passive, every shortcut
-// bound to it.
-func (l *GameClientLink) removeLiveSkill(live *livePlayer, skillID int, store bool) bool {
+// removeLiveSkill takes skillID away from live, on its queue; a skill live
+// does not know is left alone. The skill its level brought along goes with
+// it, a cast of it in flight stops, its passive stats and effects end, and
+// with store set its row is deleted and, unless it is passive, every
+// shortcut bound to it.
+func (l *GameClientLink) removeLiveSkill(live *livePlayer, skillID int, store bool) {
 	level := live.SkillLevel(skillID)
 	if level <= 0 {
-		return false
+		return
 	}
 	def, _ := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(skillID), Level: level})
 	l.skills.ForgetSkill(live.Character, skillID, store)
@@ -214,7 +214,6 @@ func (l *GameClientLink) removeLiveSkill(live *livePlayer, skillID int, store bo
 	if store && def.Activation != modelskill.ActivationPassive {
 		l.deleteTargetShortcuts(live, shortcut.Skill, int32(skillID))
 	}
-	return true
 }
 
 // showAdminSkills opens page of target's skill list on gm, by skill id,
