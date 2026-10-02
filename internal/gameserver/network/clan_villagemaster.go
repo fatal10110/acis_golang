@@ -120,20 +120,7 @@ func (p clanLevelPayer) PayAdena(count int) bool {
 }
 
 func (p clanLevelPayer) PayItem(itemID int32, count int) bool {
-	inv := p.live.Inventory()
-	if inv == nil || inv.ItemCount(itemID, -1, false) < count || inv.DestroyByTemplateID(itemID, count) == nil {
-		p.live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughItems))
-		return false
-	}
-	switch {
-	case shadowTemplate(p.live, itemID):
-		p.live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageRemainingManaIsNow0, itemID))
-	case count > 1:
-		p.live.SendFrame(serverpackets.FrameSystemMessageItemNameItemNumber(serverpackets.SystemMessageS2S1Disappeared, itemID, int32(count)))
-	default:
-		p.live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1Disappeared, itemID))
-	}
-	return true
+	return destroyHeldItems(p.live, itemID, count)
 }
 
 func (p clanLevelPayer) TakeSP(sp int) {

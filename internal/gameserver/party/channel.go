@@ -64,10 +64,22 @@ func (r *Registry[M]) ChannelAnswerForms(requesterID, targetID int32) (forms, ok
 // forming one when there is none. A target party already in a channel, or
 // the requester's own, joins nothing.
 func (r *Registry[M]) JoinChannel(requester, target M) []Notice {
+	return r.joinChannel(requester, target, true)
+}
+
+// JoinFormedChannel puts target's party into requester's party's channel
+// as JoinChannel does, but never forms one: an answer ChannelAnswerForms
+// found joining an existing channel was not authorized to form one should
+// that channel disband before it lands.
+func (r *Registry[M]) JoinFormedChannel(requester, target M) []Notice {
+	return r.joinChannel(requester, target, false)
+}
+
+func (r *Registry[M]) joinChannel(requester, target M, mayForm bool) []Notice {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	rp, tp := r.byMember[requester.ObjectID()], r.byMember[target.ObjectID()]
-	if rp == nil || tp == nil || rp == tp || tp.channel != nil {
+	if rp == nil || tp == nil || rp == tp || tp.channel != nil || (rp.channel == nil && !mayForm) {
 		return nil
 	}
 	var out notices

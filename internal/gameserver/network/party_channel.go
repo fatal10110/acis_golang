@@ -32,7 +32,7 @@ func (l *GameClientLink) requestAskJoinChannel(live *livePlayer, req clientpacke
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1AlreadyMemberOfCommandChannel, target.Name))
 		return
 	}
-	if !l.commandChannelAuthority(live) {
+	if !l.commandChannelAuthority(live, false) {
 		return
 	}
 	if l.tradeBook().Invite(tradebook.KindCommandChannel, live.ObjectID(), targetLeader.ObjectID(), false).Status != tradebook.RequestStarted {
@@ -63,7 +63,14 @@ func (l *GameClientLink) requestAcceptJoinChannel(live *livePlayer, req clientpa
 		requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeclinedChannelInvitation, live.Name))
 		return
 	}
-	if forms && !l.commandChannelAuthority(requester) {
+	if !forms {
+		l.applyPartyNotices(l.parties.JoinFormedChannel(requester, live))
+		return
+	}
+	// Forming a channel is authorized, and its Strategy Guide paid, on the
+	// requester; the answer runs on live's queue as the reference runs it
+	// on the answering client's thread.
+	if !l.commandChannelAuthority(requester, true) {
 		return
 	}
 	l.applyPartyNotices(l.parties.JoinChannel(requester, live))
@@ -111,14 +118,38 @@ func (l *GameClientLink) requestChannelPartyMembers(live *livePlayer, req client
 	live.SendFrame(serverpackets.FrameExMPCCShowPartyMemberInfo(rows))
 }
 
-// commandChannelAuthority reports whether live may form a command channel:
-// only the leader of a clan of level 5 or more may, refused before the
-// Clan Imperium skill or Strategy Guide it must also hold is looked at.
-// No character leads a clan until clans exist, so every request is refused
-// here (#3158).
-func (l *GameClientLink) commandChannelAuthority(live *livePlayer) bool {
-	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCommandChannelOnlyByLevel5ClanLeader))
-	return false
+// Command channel authority: the clan level its former must lead, the
+// clan skill that is authority enough, and the item that otherwise is.
+const (
+	channelClanLevel    = 5
+	clanImperiumSkillID = 391
+	strategyGuideItemID = 8871
+)
+
+// commandChannelAuthority reports whether live may form a command channel,
+// telling it why not: only the leader of a clan of level 5 or more may,
+// and then by holding Clan Imperium or a Strategy Guide. With pay set, the
+// guide is destroyed as the channel forms; otherwise holding one is
+// enough.
+func (l *GameClientLink) commandChannelAuthority(live *livePlayer, pay bool) bool {
+	cl, ok := l.clanService().ClanOf(live.Character)
+	if !ok || !cl.IsLeader(live.ObjectID()) || cl.Level() < channelClanLevel {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCommandChannelOnlyByLevel5ClanLeader))
+		return false
+	}
+	if live.HasSkill(clanImperiumSkillID) {
+		return true
+	}
+	var held bool
+	if pay {
+		held = destroyHeldItems(live, strategyGuideItemID, 1)
+	} else if inv := live.Inventory(); inv != nil {
+		held = inv.ItemByTemplateID(strategyGuideItemID) != nil
+	}
+	if !held {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotLongerSetupCommandChannel))
+	}
+	return held
 }
 
 const (

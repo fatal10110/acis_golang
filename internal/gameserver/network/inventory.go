@@ -630,6 +630,19 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 	}
 }
 
+// destroyHeldItems destroys count units of templateID out of live's
+// inventory, naming what disappeared; holding too few destroys nothing and
+// reads as not enough items.
+func destroyHeldItems(live *livePlayer, templateID int32, count int) bool {
+	inv := live.Inventory()
+	if inv == nil || inv.ItemCount(templateID, -1, false) < count || inv.DestroyByTemplateID(templateID, count) == nil {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughItems))
+		return false
+	}
+	sendDestroyedMessage(live, templateID, count)
+	return true
+}
+
 // sendDestroyedMessage names count units of templateID the player just
 // destroyed: a shadow item reads as its mana running out, several units
 // carry their count.
