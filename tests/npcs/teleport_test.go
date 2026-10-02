@@ -132,8 +132,6 @@ func (w *folkWorld) tripFrames(t *testing.T, command string) [][]byte {
 	return out
 }
 
-// assertLandedNear checks frame is the player's jump to within the 20-unit
-// scatter of spot.
 // landing returns the TeleportToLocation among frames.
 func landing(t *testing.T, frames [][]byte) []byte {
 	t.Helper()
@@ -144,6 +142,8 @@ func landing(t *testing.T, frames [][]byte) []byte {
 	return jump
 }
 
+// assertLandedNear checks frame is the player's jump to within the 20-unit
+// scatter of spot.
 func assertLandedNear(t *testing.T, frame []byte, spot location.Location) {
 	t.Helper()
 	r := wire.NewReader(frame[5:])

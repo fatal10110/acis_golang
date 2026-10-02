@@ -731,8 +731,8 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 // known list. The action-failed acknowledgement is not sent here: it belongs
 // to every Stop call, idle or in-flight, so it is wired through the
 // CastStopAck event instead of gated behind this in-flight-only path. An
-// interrupt's CASTING_INTERRUPTED comes last, once the stopped cast's
-// CastFinished has run (see GameClientLink.finishLiveCast).
+// interrupt's CASTING_INTERRUPTED comes last, after that acknowledgement,
+// once the stopped cast's CastFinished has run (see livePlayer.endCastStop).
 func (l *GameClientLink) broadcastCastAborted(live *livePlayer) {
 	if live == nil {
 		return

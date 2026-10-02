@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
@@ -110,29 +111,8 @@ func TestStoppedCastRunsQueuedPickupThenIdles(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			srv := gameservertest.Boot(t,
-				gameservertest.WithSkills(masteryItemSkills(t)),
-				gameservertest.WithCharacter("Newbie", 5, 0),
-				gameservertest.WithWantChars(1))
-			if !srv.DrivesClock() {
-				t.Skip("holding a cast open needs the driven clock")
-			}
-			c, objID := srv.Client, srv.SoleObjectID(t)
-			potion := srv.GiveItem(t, objID, 1060, 5)
-			startInWorld(t, c)
-			srv.SeedGroundItem(t, objID, item.AdenaID, 40, spawnX+tc.back, spawnY, spawnZ)
-			groundID := soleGroundObjectID(t, srv)
-			drainUntilQuiet(t, c)
-
-			c.Send(encodeUseItem(potion, false))
-			for frame := c.Read(); frame[0] != serverpackets.OpcodeMagicSkillUse; frame = c.Read() {
-			}
-			c.Send(encodeAction(groundID, spawnX, spawnY, spawnZ, false))
-			for frame := c.Read(); frame[0] != serverpackets.OpcodeActionFailed; frame = c.Read() {
-			}
-			if !srv.PlayerCastingNow(t, objID) {
-				t.Fatal("the potion cast ended before the queued pickup was checked")
-			}
+			srv, objID := bootPickupQueuedMidCast(t, tc.back)
+			c := srv.Client
 
 			onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.StopCast() })
 			frames := readUntilQuiet(t, c)
@@ -161,6 +141,86 @@ func TestStoppedCastRunsQueuedPickupThenIdles(t *testing.T) {
 			}
 			if got := srv.GroundItems.Snapshots(nil); len(got) != 0 {
 				t.Fatalf("ground items after the stopped cast's pickup = %d, want 0", len(got))
+			}
+		})
+	}
+}
+
+// bootPickupQueuedMidCast leaves a player mid-cast (a potion's item skill)
+// with a pickup of 40 adena, back units away along x, queued behind the
+// cast, every frame read so far.
+func bootPickupQueuedMidCast(t *testing.T, back int) (*gameservertest.Server, int32) {
+	t.Helper()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithSkills(masteryItemSkills(t)),
+		gameservertest.WithCharacter("Newbie", 5, 0),
+		gameservertest.WithWantChars(1))
+	if !srv.DrivesClock() {
+		t.Skip("holding a cast open needs the driven clock")
+	}
+	c, objID := srv.Client, srv.SoleObjectID(t)
+	potion := srv.GiveItem(t, objID, 1060, 5)
+	startInWorld(t, c)
+	srv.SeedGroundItem(t, objID, item.AdenaID, 40, spawnX+back, spawnY, spawnZ)
+	groundID := soleGroundObjectID(t, srv)
+	drainUntilQuiet(t, c)
+
+	c.Send(encodeUseItem(potion, false))
+	for frame := c.Read(); frame[0] != serverpackets.OpcodeMagicSkillUse; frame = c.Read() {
+	}
+	c.Send(encodeAction(groundID, spawnX, spawnY, spawnZ, false))
+	for frame := c.Read(); frame[0] != serverpackets.OpcodeActionFailed; frame = c.Read() {
+	}
+	if !srv.PlayerCastingNow(t, objID) {
+		t.Fatal("the potion cast ended before the queued pickup was checked")
+	}
+	return srv, objID
+}
+
+// TestTeleportMidCastRefusesQueuedPickup pins a teleport mid-cast with a
+// pickup queued. Creature.teleportTo (Creature.java:386-429) marks the
+// player teleporting, then abortAll (Creature.java:1298-1306) answers the
+// attack stop twice (PlayableAttack.stop's refused tryToIdle,
+// PlayerAttack.java:58-63). The cast stop broadcasts MagicSkillCanceled and
+// runs the queued PICK_UP (PlayableAI.java:43-63), whose thinkPickUp answers
+// ActionFailed and, under denyAiAction, idles without collecting or walking
+// (PlayableAI.java:198-205). The refused tryToIdle and PlayerCast.stop answer
+// one each (PlayableAI.java:354-360, PlayerCast.java:381-387) before
+// TeleportToLocation. The item stays on the ground in reach or not.
+func TestTeleportMidCastRefusesQueuedPickup(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		back int
+	}{
+		{name: "in reach", back: 0},
+		{name: "out of reach", back: 200},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			srv, objID := bootPickupQueuedMidCast(t, tc.back)
+			c := srv.Client
+			x, y, z := srv.PlayerPosition(t, objID)
+
+			onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.TeleportTo(x, y, z, 0) })
+			const af, msc, ttl byte = serverpackets.OpcodeActionFailed, serverpackets.OpcodeMagicSkillCanceled, serverpackets.OpcodeTeleportToLocation
+			jump := readUntilOpcode(t, c, ttl)
+			if got, want := opcodesOf(jump), []byte{af, af, msc, af, af, af, ttl}; string(got) != string(want) {
+				t.Fatalf("teleport mid-cast with a pickup queued sent opcodes %x up to TeleportToLocation, want %x", got, want)
+			}
+			c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+			srv.Advance(t, 3*time.Second)
+			for _, frame := range readUntilQuiet(t, c) {
+				switch frame[0] {
+				case serverpackets.OpcodeGetItem, serverpackets.OpcodeMoveToLocation:
+					t.Fatalf("the refused pickup sent opcode %#x after the teleport", frame[0])
+				}
+			}
+			if got := srv.GroundItems.Snapshots(nil); len(got) != 1 {
+				t.Fatalf("ground items after the teleport = %d, want the item still there", len(got))
+			}
+			if nx, ny, nz := srv.PlayerPosition(t, objID); nx != x || ny != y || nz != z {
+				t.Fatalf("player moved after the teleport: (%d,%d,%d) -> (%d,%d,%d)", x, y, z, nx, ny, nz)
 			}
 		})
 	}
