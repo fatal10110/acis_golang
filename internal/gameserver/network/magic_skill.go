@@ -614,14 +614,21 @@ func (l *GameClientLink) resumeServitorAfterRestore(live *livePlayer) {
 }
 
 // magicTargetLost reports whether a queued skill's target has left the world
-// or the caster's surroundings. A summon-friend skill reaches a target
+// or the caster's surroundings (an invisible player only a game master
+// knows). A summon-friend skill reaches a target
 // anywhere in the world.
 func (l *GameClientLink) magicTargetLost(live *livePlayer, target skilltarget.Actor, def modelskill.Definition) bool {
 	tracked, ok := target.(world.Tracked)
 	if !ok || l.resolveTarget(target.ObjectID()) == nil {
 		return true
 	}
-	return def.SkillType != "SUMMON_FRIEND" && !world.Knows(live, tracked)
+	if def.SkillType == "SUMMON_FRIEND" {
+		return false
+	}
+	if c, ok := target.(attackable.Combatant); ok {
+		return !live.Knows(c)
+	}
+	return !world.Knows(live, tracked)
 }
 
 func (l *GameClientLink) abortFusionTargeting(target *livePlayer) {

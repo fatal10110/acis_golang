@@ -43,10 +43,10 @@ func (h *Hostile) Aggressive() bool {
 // needs no explicit check: door.Object doesn't implement
 // attackable.Combatant, so a door can never be passed as target here. A
 // non-NPC target still within its post-fake-death grace period is excluded
-// too (the recent-fake-death check). Not modeled: the
-// remaining Player-only sub-checks (appearance invisibility, allied-Varka/
-// allied-Ketra exclusion, rift-room memo), Guard's aggressive-Monster
-// branch (gated by a config flag that ships disabled by default, and needs
+// too (the recent-fake-death check), and so is an invisible player or the
+// summon of one. Not modeled: the remaining Player-only sub-checks
+// (allied-Varka/allied-Ketra exclusion, rift-room memo), Guard's
+// aggressive-Monster branch (gated by a config flag that ships disabled by default, and needs
 // npc AI config plumbing that doesn't exist yet), and the peace-zone aggro
 // config flag (allowPeaceful is a caller-supplied parameter here rather
 // than a config-driven default). The follow gate's
@@ -84,6 +84,10 @@ func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal in
 		}
 	}
 	if !targetIsNPC && !h.inRangeAndUnconcealed(target, rangeVal) {
+		return false
+	}
+	// An invisible player, or its summon, is never an automatic target.
+	if !targetIsNPC && attackable.HiddenActingPlayer(target) {
 		return false
 	}
 
@@ -143,20 +147,18 @@ func (h *Hostile) karmaTargetVisible(target attackable.Combatant) bool {
 // keeps calling AutoAttackTargetValid unchanged for SiegeGuard, same as
 // every other kind.
 //
-// Rejects a target with no acting player (an NPC target) or an alike-dead
-// acting player, and an acting player silently moving beyond 250 units;
-// otherwise requires siege attackability (target attackable by this guard)
-// and line of sight. The target's acting player is resolved once and the
-// alike-dead/silent-moving/distance gates are checked against that acting
-// player, not against target directly — for a Summon/Pet target this is the
-// owning player, matching AutoAttackTargetValid's own Owner()
+// Rejects a target with no acting player (an NPC target), an alike-dead or
+// invisible acting player, and an acting player silently moving beyond 250
+// units; otherwise requires siege attackability (target attackable by this
+// guard) and line of sight. The target's acting player is resolved once and
+// the alike-dead/invisible/silent-moving/distance gates are checked against
+// that acting player, not against target directly — for a Summon/Pet target
+// this is the owning player, matching AutoAttackTargetValid's own Owner()
 // resolution above; only the closing attackability and line-of-sight checks
-// use the raw target. Not modeled: the acting player's invisibility check —
-// no player appearance state exists yet (#907); and the clan/siege-side
-// DEFENDER/OWNER exclusion inside a playable's siege-guard attackability
-// branch — no castle/siege state exists yet (#232/#234), so the
-// attackability check here falls through to
-// whatever general AttackableBy the target exposes.
+// use the raw target. Not modeled: the clan/siege-side DEFENDER/OWNER
+// exclusion inside a playable's siege-guard attackability branch — no
+// castle/siege state exists yet (#232/#234), so the attackability check
+// here falls through to whatever general AttackableBy the target exposes.
 func (h *Hostile) siegeGuardAutoAttackTargetValid(target attackable.Combatant) bool {
 	if target == nil {
 		return false
@@ -171,6 +173,10 @@ func (h *Hostile) siegeGuardAutoAttackTargetValid(target attackable.Combatant) b
 		actingPlayer, _ = target.Owner()
 	}
 	if actingPlayer == nil || actingPlayer.AlikeDead() {
+		return false
+	}
+
+	if attackable.HiddenActingPlayer(actingPlayer) {
 		return false
 	}
 

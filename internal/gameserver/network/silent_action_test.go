@@ -63,6 +63,11 @@ import (
 // leaves no client action pending. tests/admin pins that silence and every
 // refusal that does answer.
 //
+// PetitionVote without a closed petition awaiting feedback, or with a rate
+// the client cannot name, is absent too: the reference drops it without an
+// answer (PetitionVote.java:31-33), and the client closes its feedback
+// window when it sends the vote. tests/petition asserts that silence.
+//
 // Logout at character select is absent for the same reason: with no character
 // in the world the reference sends nothing and keeps the connection open
 // (#2514), and the opcode registers no pending client action there.
@@ -130,6 +135,13 @@ import (
 // a stop or a surrender to another player, so a reply never has one to
 // answer.
 //
+// RequestAnswerJoinAlly with nothing pending, and RequestSetAllyCrest
+// refused (from anyone but the alliance's leader, deleting no crest, an
+// over-long or unstored image), are absent too: the reference answers each
+// with nothing, the invitation dialog closed when the client answered and
+// the crest dialog holds no pending action. tests/clan asserts the crest
+// silence.
+//
 // Say2 lines the reference drops without an answer are absent as well: an
 // empty or over-long line, an unknown channel, a non-GM announcement, a bot
 // whisper, a flooded channel, a party, clan or command-channel line from a
@@ -137,6 +149,18 @@ import (
 // handler. Chat registers no pending client action (the client prints the
 // line only when the server sends it back). tests/social asserts those
 // silences.
+//
+// With the community board on, a board command or form whose arguments do
+// not read (a missing token, a number that does not parse), or that names a
+// clan page the player may not see, shows nothing, as in the reference: the
+// board window holds no pending action. tests/bbs asserts those silences.
+//
+// RequestUserCommand is absent where the reference is silent: a command id
+// no handler claims, /loc where no restart point covers the player, and
+// /partyinfo, /mount, /dismount and the command channel commands from a
+// player with no party, channel or mount to act on. A user command
+// registers no pending client action; tests/character, tests/party and
+// tests/clan assert those silences.
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 
@@ -170,7 +194,9 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"RequestActionUse with an action id no handler claims", encodeRequestActionUse(9999, false, false), []byte{serverpackets.OpcodeActionFailed}},
 		{"RequestActionUse pet command with no active summon", encodeRequestActionUse(16, false, false), []byte{serverpackets.OpcodeActionFailed}},
 		{"Action on the selected player itself (a follow of oneself)", encodeActionOn(self, false), []byte{serverpackets.OpcodeActionFailed}},
-		{"RequestBypassToServer for a command family not modeled yet", encodeRequestBypassToServer("bbs_default"), []byte{serverpackets.OpcodeActionFailed}},
+		{"RequestBypassToServer for a command family not modeled yet", encodeRequestBypassToServer("_match?class=88&page=1"), []byte{serverpackets.OpcodeActionFailed}},
+		{"RequestShowBoard while the community board is off", encodeRequestShowBoard(), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestBBSwrite while the community board is off", encodeRequestBBSWrite("Mail", "Send"), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestGmList with no game master online", wire.NewPacketWriter(clientpackets.OpcodeRequestGmList).Bytes(), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodePlaySound}},
 		{"RequestRecipeBookOpen on an empty book", encodeRequestRecipeBookOpen(1), []byte{serverpackets.OpcodeRecipeBookItemList}},
 		{"RequestPreviewItem trying nothing on", encodeRequestPreviewItem(1), []byte{serverpackets.OpcodeActionFailed}},
@@ -190,6 +216,17 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"Say2 whisper to nobody online", encodeSay2Tell("hi", "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestWithdrawPledge without a clan", wire.NewPacketWriter(clientpackets.OpcodeRequestWithdrawPledge).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestOustPledgeMember without a clan", encodeRequestOustPledgeMember("Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestPetition with no game master online", encodeRequestPetition("help", 3), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodePlaySound}},
+		{"RequestPetitionCancel with no petition", wire.NewPacketWriter(clientpackets.OpcodeRequestPetitionCancel).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
+		{"Say2 petition line outside a petition", encodeSay2Petition("hello"), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestUserCommand /attacklist without a clan", encodeRequestUserCommand(88), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestUserCommand /siegestatus without a clan", encodeRequestUserCommand(99), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestUserCommand /olympiadstat before noble status exists", encodeRequestUserCommand(109), []byte{serverpackets.OpcodeActionFailed}},
+		{"RequestJoinAlly without a clan", encodeAllyInt(clientpackets.OpcodeRequestJoinAlly, missingObjectID), []byte{serverpackets.OpcodeSystemMessage}},
+		{"AllyLeave without a clan", wire.NewPacketWriter(clientpackets.OpcodeAllyLeave).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
+		{"AllyDismiss without a clan", encodeNamedRequest(clientpackets.OpcodeAllyDismiss, "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestDismissAlly without a clan", wire.NewPacketWriter(clientpackets.OpcodeRequestDismissAlly).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestAllyInfo without an alliance", wire.NewPacketWriter(clientpackets.OpcodeRequestAllyInfo).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
 	}
 
 	for _, tc := range cases {
@@ -295,5 +332,31 @@ func encodeRequestMakeMacro(name string) []byte {
 func encodeRequestOustPledgeMember(name string) []byte {
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestOustPledgeMember)
 	w.WriteString(name)
+	return w.Bytes()
+}
+
+func encodeRequestPetition(content string, typ int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestPetition)
+	w.WriteString(content)
+	w.WriteInt32(typ)
+	return w.Bytes()
+}
+
+func encodeSay2Petition(text string) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeSay2)
+	w.WriteString(text)
+	w.WriteInt32(6)
+	return w.Bytes()
+}
+
+func encodeRequestUserCommand(id int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestUserCommand)
+	w.WriteInt32(id)
+	return w.Bytes()
+}
+
+func encodeAllyInt(opcode byte, v int32) []byte {
+	w := wire.NewPacketWriter(opcode)
+	w.WriteInt32(v)
 	return w.Bytes()
 }

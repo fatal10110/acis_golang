@@ -10,7 +10,9 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/fatal10110/acis_golang/internal/gameserver/augment"
+	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/craft"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
@@ -45,12 +47,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
+	"github.com/fatal10110/acis_golang/internal/gameserver/partymatch"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
+	"github.com/fatal10110/acis_golang/internal/gameserver/social/petition"
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/symbolmaker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -102,6 +106,7 @@ type recipeBookStore interface {
 type petStore interface {
 	Get(ctx context.Context, itemObjectID int32) (petmodel.State, bool, error)
 	Save(ctx context.Context, itemObjectID int32, state petmodel.State) error
+	SaveFed(ctx context.Context, itemObjectID int32, fed int) error
 }
 
 // AttackStanceTracker owns combat-stance membership. It is exported so the
@@ -307,6 +312,7 @@ type GameClientLink struct {
 	petItems         *petitem.Service
 	trades           *tradebook.Book
 	parties          *partyRegistry
+	rooms            *roomRegistry
 	partyPositions   partyPositions
 	clans            *clan.Service
 	clanWarehouses   clanWarehouseBook
@@ -334,6 +340,9 @@ type GameClientLink struct {
 	// overridden in tests for a deterministic outcome.
 	skillEnchantRoll func() int
 
+	// board is the community board; see community_board.go.
+	board communityBoard
+
 	// relations, friendInvites and characters back the friend and block
 	// lists; see friends.go.
 	relations     *relation.Manager
@@ -353,11 +362,17 @@ type GameClientLink struct {
 	// gms is the online game-master roster /gmlist reads and petitions
 	// notify.
 	gms admin.GMList[*livePlayer]
+	// petitions holds the petitions players send the game masters; see
+	// petition.go.
+	petitions *petition.Manager
 	// gmAudit records every admin command run; the zero logger records
 	// nothing.
 	gmAudit zerolog.Logger
 	// chat is the chat settings: log, bot filter and reuse delays.
 	chat ChatConfig
+	// announcements are the server announcements: read at login, repeated
+	// on their schedules and managed by //announce.
+	announcements *announcement.Registry
 }
 
 // AIRegistry owns recurring actor-AI registrations.
@@ -480,6 +495,9 @@ type GameClientLinkConfig struct {
 	// AccessLevels stores the access levels admin commands change; nil
 	// keeps them in memory only and finds no offline character.
 	AccessLevels accessLevelStore
+	// Petitions holds the petitions players send the game masters; nil
+	// starts with none and refuses every new one.
+	Petitions *petition.Manager
 	// FriendInviteClock times friend invitations out; nil means time.Now.
 	FriendInviteClock func() time.Time
 	// EnchantRoll supplies enchant dice rolls in [0,1); nil falls back to
@@ -520,6 +538,18 @@ type GameClientLinkConfig struct {
 	// Clans is the clan registry and its rules; nil runs with no clan at
 	// all and nothing written.
 	Clans *clan.Service
+	// Board is the community board's settings; the zero value keeps the
+	// board off.
+	Board bbs.Config
+	// Mailbox holds the board's mail; nil, as while the board is off,
+	// holds none.
+	Mailbox *bbs.Mailbox
+	// ShowServerNews shows the server news page at login when no clan
+	// notice is shown.
+	ShowServerNews bool
+	// Announcements are the server announcements; nil holds them in
+	// memory only, starting with none.
+	Announcements *announcement.Registry
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -595,10 +625,12 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		petItems:         petitem.NewService(cfg.IDs),
 		trades:           tradebook.NewBook(cfg.TradeClock),
 		parties:          party.NewRegistry[*livePlayer](cfg.TradeClock),
+		rooms:            partymatch.NewRegistry[*livePlayer](),
 		relations:        cmp.Or(cfg.Relations, relation.NewManager(nil)),
 		friendInvites:    relation.NewInvites(cfg.FriendInviteClock),
 		characters:       cfg.Characters,
 		accessLevels:     cfg.AccessLevels,
+		petitions:        cmp.Or(cfg.Petitions, petition.NewManager(petition.DefaultConfig(), nil, nil, nil, nil)),
 		enchantState:     enchantflow.NewState(),
 		targets:          skilltarget.NewRegistry(skilltarget.WorldKnown{State: cfg.World}),
 		skillHandlers: handlerskill.NewDefaultRegistryWithSignet(cfg.Skills, cfg.PlayerConfig.MagicFailures, cfg.HealSps, handlerskill.SignetDeps{
@@ -629,6 +661,11 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.craft = craft.NewService(cfg.Recipes, !cfg.PlayerConfig.CraftingDisabled, link.nextObjectID, cfg.CraftRoll)
 	link.exchange = exchange.NewService(cfg.Multisells, cfg.PlayerConfig.KeepMaintainedIngredients, link.nextObjectID)
 	link.augment = newAugmentService(cfg)
+	link.board = communityBoard{cfg: cfg.Board, mail: cfg.Mailbox, serverNews: cfg.ShowServerNews}
+	link.announcements = cfg.Announcements
+	if link.announcements == nil {
+		link.announcements = announcement.NewRegistry(nil, NewAnnouncer(cfg.World), cfg.Log, cfg.Queues.NewQueue("announcements"))
+	}
 	link.clans = cfg.Clans
 	if link.clans == nil {
 		link.clans = clan.NewService(nil, nil, nil, cfg.IDs, clan.DefaultConfig(), nil, cfg.Log)

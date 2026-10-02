@@ -18,6 +18,48 @@ import (
 // the night/day state change with the skill-name parameter tuple.
 func TestEnterWorldAnnouncesShadowSenseState(t *testing.T) {
 	t.Parallel()
+	_, c := bootShadowSensor(t)
+	selectShadowSensor(t, c)
+	c.Send(encodeEnterWorld())
+
+	found := readShadowSenseAnnouncement(t, c)
+	drainUntilQuiet(t, c)
+	if !found {
+		t.Fatal("Shadow Sense state message missing after EnterWorld")
+	}
+}
+
+// TestShadowSenseSilentOnLoadingScreen crosses the day/night boundary while
+// a dark elf holding Shadow Sense has selected its character but not yet
+// entered the world. The day/night reapply covers only players in the world,
+// so its client hears nothing on the loading screen; EnterWorld then
+// announces the current state exactly once.
+func TestShadowSenseSilentOnLoadingScreen(t *testing.T) {
+	t.Parallel()
+	srv, c := bootShadowSensor(t)
+	selectShadowSensor(t, c)
+	srv.AwaitHandled(t)
+
+	srv.CrossDayNight(t)
+	srv.Settle(t)
+	assertSilent(t, c, "day/night change on the loading screen")
+
+	c.Send(encodeEnterWorld())
+	announcements := 0
+	for _, frame := range readUntilQuiet(t, c) {
+		if isShadowSenseAnnouncement(frame) {
+			announcements++
+		}
+	}
+	if announcements != 1 {
+		t.Fatalf("Shadow Sense state messages after EnterWorld = %d, want 1", announcements)
+	}
+}
+
+// bootShadowSensor boots a server whose dialed client plays a dark elf
+// holding Shadow Sense (skill 294), seeded through the real stores.
+func bootShadowSensor(t *testing.T) (*gameservertest.Server, *testsupport.ScriptedClient) {
+	t.Helper()
 	var objID int32
 	srv := gameservertest.Boot(t,
 		gameservertest.WithWantChars(1),
@@ -39,11 +81,17 @@ func TestEnterWorldAnnouncesShadowSenseState(t *testing.T) {
 	)
 	c := srv.DialClient(t, "player1", 1)
 	// Persist Shadow Sense through the real known-skill store exactly like
-	// a learned passive; EnterWorld's restore reads it back.
+	// a learned passive; the selection's restore reads it back.
 	if err := srv.KnownSkills.SetKnownSkill(context.Background(), objID, 0, 294, 1); err != nil {
 		t.Fatalf("seed Shadow Sense: %v", err)
 	}
+	return srv, c
+}
 
+// selectShadowSensor selects the character in slot 0 and reads the
+// selection's answer.
+func selectShadowSensor(t *testing.T, c *testsupport.ScriptedClient) {
+	t.Helper()
 	c.Send(encodeRequestGameStart(0))
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
 		t.Fatalf("opcode = %#x, want SSQInfo", reply[0])
@@ -51,13 +99,16 @@ func TestEnterWorldAnnouncesShadowSenseState(t *testing.T) {
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeCharSelected {
 		t.Fatalf("opcode = %#x, want CharSelected", reply[0])
 	}
-	c.Send(encodeEnterWorld())
+}
 
-	found := readShadowSenseAnnouncement(t, c)
-	drainUntilQuiet(t, c)
-	if !found {
-		t.Fatal("Shadow Sense state message missing after EnterWorld")
+// isShadowSenseAnnouncement reports whether frame is the night/day Shadow
+// Sense state message.
+func isShadowSenseAnnouncement(frame []byte) bool {
+	if frame[0] != serverpackets.OpcodeSystemMessage {
+		return false
 	}
+	id := wireReader(frame[1:]).ReadInt32()
+	return id == serverpackets.SystemMessageNightSkillEffectApplies || id == serverpackets.SystemMessageDaySkillEffectDisappears
 }
 
 // readShadowSenseAnnouncement scans the EnterWorld frames for the night/day

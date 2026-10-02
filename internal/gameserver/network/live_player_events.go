@@ -11,7 +11,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // SendFrame sends frame to this player's client. Once the session has
@@ -215,6 +214,9 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.feedMountFood(live, e.ObjectID)
 	case event.Dismounted:
 		l.broadcastDismount(live)
+		if e.PetControlItemID != 0 {
+			l.storePetFood(e.PetControlItemID, e.Fed)
+		}
 	case event.MountOutOfFeed:
 		l.throwStarvedRider(live, e.WasFlying)
 	case event.UserInfoChanged:
@@ -468,17 +470,7 @@ func (l *GameClientLink) sendLiveWeightPenalty(live *livePlayer) {
 	items := live.inventoryItems()
 	live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 	live.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(live.Character)))
-	if l.world == nil {
-		return
-	}
-	info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.Template(), Items: items, Clan: l.clanFields(live.Character)}
-	broadcastFrame(func() wire.Frame { return serverpackets.FrameCharInfo(info) }, func(send func(frameReceiver)) {
-		l.world.ForEachKnown(live, func(o world.Tracked) {
-			if receiver, ok := o.(frameReceiver); ok {
-				send(receiver)
-			}
-		})
-	})
+	l.broadcastCharInfo(live, items)
 }
 
 // applyLiveDeathPenalty replaces the death-penalty skill's transient passive

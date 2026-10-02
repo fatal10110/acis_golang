@@ -18,7 +18,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // useItem handles UseItem. ctrl is the client's Ctrl modifier, carried into
@@ -740,23 +739,12 @@ func (l *GameClientLink) broadcastEquipmentChange(live *livePlayer) {
 }
 
 // broadcastCharacterInfo resends UserInfo to live (refreshing its own
-// visible state) and CharInfo to every client that already knows about it.
+// visible state) and CharInfo to every client that already knows about it
+// (broadcastCharInfo).
 func (l *GameClientLink) broadcastCharacterInfo(live *livePlayer) {
 	items := live.inventoryItems()
 	live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
-	if l.world == nil {
-		return
-	}
-	info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.Template(), Items: items, Clan: l.clanFields(live.Character)}
-	broadcastFrame(func() wire.Frame {
-		return serverpackets.FrameCharInfo(info)
-	}, func(send func(frameReceiver)) {
-		l.world.ForEachKnown(live, func(o world.Tracked) {
-			if receiver, ok := o.(frameReceiver); ok {
-				send(receiver)
-			}
-		})
-	})
+	l.broadcastCharInfo(live, items)
 }
 
 // busyTrading reports whether live runs or is setting up a private store or

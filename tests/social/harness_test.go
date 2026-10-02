@@ -118,7 +118,7 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	frames := make([][]byte, 0, len(want))
 	for i, opcode := range want {
 		frame := c.Read()
-		for i == 0 && frame[0] == serverpackets.OpcodeCharInfo {
+		for i == 0 && (frame[0] == serverpackets.OpcodeCharInfo || frame[0] == serverpackets.OpcodeRelationChanged) {
 			frame = c.Read()
 		}
 		if frame[0] != opcode {
@@ -126,7 +126,7 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 		}
 		frames = append(frames, frame)
 		if opcode == serverpackets.OpcodeEtcStatusUpdate {
-			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo)
+			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeRelationChanged)
 		}
 	}
 	return frames

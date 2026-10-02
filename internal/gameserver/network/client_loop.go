@@ -1,6 +1,7 @@
 package network
 
 import (
+	"cmp"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -65,17 +66,19 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	session := NewSession(conn, gameCipher)
 	client := NewClient(session)
 
-	// chars and entering are read entirely by this goroutine: they resolve
-	// the character-list slot indices RequestCharacterDelete,
-	// CharacterRestore and RequestGameStart address, and the character
-	// RequestGameStart selected for EnterWorld to finish spawning.
+	// chars, entering and live are read entirely by this goroutine: chars
+	// resolves the character-list slot indices RequestCharacterDelete,
+	// CharacterRestore and RequestGameStart address; entering is the player
+	// RequestGameStart restored and registered, for EnterWorld to spawn; live
+	// is that player once EnterWorld took it.
 	var chars []*player.Character
-	var entering *player.Character
-	var live *livePlayer
+	var entering, live *livePlayer
 	defer func() {
-		if live != nil {
+		// A connection lost between selection and EnterWorld takes the
+		// selected player out of the world as a logout would.
+		if leaving := cmp.Or(live, entering); leaving != nil {
 			var owners []int32
-			onLive(live, func() { owners = l.detachLivePlayer(live) })
+			onLive(leaving, func() { owners = l.detachLivePlayer(leaving) })
 			_ = l.awaitPersistence(conn, owners...)
 		}
 		if l.clients != nil {
@@ -338,6 +341,69 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.requestSetPledgeCrest(live, req) })
 			}
 
+		case clientpackets.OpcodeRequestJoinAlly:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestJoinAlly)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestJoinAlly(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestAnswerJoinAlly:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestAnswerJoinAlly)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestAnswerJoinAlly(live, req) })
+			}
+
+		case clientpackets.OpcodeAllyLeave:
+			if live != nil {
+				onLive(live, func() { l.allyLeave(live) })
+			}
+
+		case clientpackets.OpcodeAllyDismiss:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeAllyDismiss)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.allyDismiss(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestDismissAlly:
+			if live != nil {
+				onLive(live, func() { l.requestDismissAlly(live) })
+			}
+
+		case clientpackets.OpcodeRequestSetAllyCrest:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestSetAllyCrest)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestSetAllyCrest(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestAllyInfo:
+			if live != nil {
+				onLive(live, func() { l.requestAllyInfo(live) })
+			}
+
 		case clientpackets.OpcodeRequestAllyCrest:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestAllyCrest)
 			if err != nil {
@@ -433,13 +499,28 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				l.log.Error().Int("class_id", c.ClassID()).Msg("select character: no template loaded")
 				return
 			}
+			// The selection restores the character in full. A restore that
+			// fails attaches nothing, and closes the connection.
+			selected, ok := l.restoreSelected(ctx, client, c)
+			if !ok {
+				client.closeNow()
+				return
+			}
+			entering = selected
 			session.SendFrame(serverpackets.FrameSSQInfo())
 			client.SetState(StateEntering)
 			session.SendFrame(serverpackets.FrameCharSelected(serverpackets.CharSelectedSnapshot{
 				Character: c, Template: tmpl, SessionID: client.SessionKey().PlayKey1,
 				GameTime: l.gameTime(),
 			}))
-			entering = c
+			// From here on lookups by name and id find the character, as
+			// the world checks above do for a later selection; it is spawned
+			// only once EnterWorld arrives. Registered after CharSelected,
+			// so nothing sent to it can reach its client ahead of the
+			// selection's answer.
+			if l.world != nil {
+				l.world.AddPlayer(selected)
+			}
 
 		case clientpackets.OpcodeEnterWorld:
 			// Unreachable while the state gate admits EnterWorld only in
@@ -449,12 +530,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				client.closeNow()
 				return
 			}
-			// Assigned before the check: a failure after the player was
-			// attached hands the partial attachment back, and the deferred
-			// detachLivePlayer above is what releases it.
-			entered, ok := l.enterWorld(ctx, client, entering)
-			live = entered
-			if !ok {
+			// A failed entry leaves live attached and registered; the
+			// deferred detachLivePlayer above is what releases it.
+			live, entering = entering, nil
+			if !l.enterWorld(client, live) {
 				client.closeNow()
 				return
 			}
@@ -693,6 +772,13 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				clientpackets.OpcodeRequestExAcceptJoinMPCC, clientpackets.OpcodeRequestExOustFromMPCC,
 				clientpackets.OpcodeRequestExMPCCShowPartyMembersInfo:
 				if !l.dispatchPartyExtended(client, live, second, payload) {
+					return
+				}
+			case clientpackets.OpcodeRequestOustFromPartyRoom, clientpackets.OpcodeRequestDismissPartyRoom,
+				clientpackets.OpcodeRequestWithdrawPartyRoom, clientpackets.OpcodeRequestAskJoinPartyRoom,
+				clientpackets.OpcodeAnswerJoinPartyRoom, clientpackets.OpcodeRequestListPartyMatchingWaitingRoom,
+				clientpackets.OpcodeRequestExitPartyMatchingWaitingRoom:
+				if !l.dispatchPartyMatchExtended(client, live, second, payload) {
 					return
 				}
 			case clientpackets.OpcodeRequestCursedWeaponLocation:
@@ -1187,6 +1273,8 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 						return
 					}
 					l.changeLiveMoveType(live, !live.Running())
+				case actionMountDismount:
+					l.actionMountDismount(live)
 				default:
 					if l.storeActionUse(live, req.ActionID) {
 						return
@@ -1285,6 +1373,29 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			onLive(live, func() { l.requestBypassToServer(live, req) })
 			l.finishPendingClassChange(live)
 
+		case clientpackets.OpcodeRequestShowBoard:
+			if _, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestShowBoard); err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestShowBoard(live) })
+			}
+
+		case clientpackets.OpcodeRequestBBSWrite:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestBBSWrite)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestBBSWrite(live, req) })
+			}
+
 		case clientpackets.OpcodeSendBypassBuildCmd:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeSendBypassBuildCmd)
 			if err != nil {
@@ -1301,6 +1412,36 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			// The request carries no body.
 			if live != nil {
 				onLive(live, func() { l.requestGmList(live) })
+			}
+
+		case clientpackets.OpcodeRequestPetition:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPetition)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestPetition(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestPetitionCancel:
+			// The request carries no body.
+			if live != nil {
+				onLive(live, func() { l.requestPetitionCancel(live) })
+			}
+
+		case clientpackets.OpcodePetitionVote:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodePetitionVote)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.petitionVote(live, req) })
 			}
 
 		case clientpackets.OpcodeRequestTargetCancel:
@@ -1468,6 +1609,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		case clientpackets.OpcodeRequestJoinParty, clientpackets.OpcodeRequestAnswerJoinParty,
 			clientpackets.OpcodeRequestWithdrawParty, clientpackets.OpcodeRequestOustPartyMember:
 			if !l.dispatchParty(client, live, opcode, payload) {
+				return
+			}
+
+		case clientpackets.OpcodeRequestListPartyWaiting, clientpackets.OpcodeRequestManagePartyRoom,
+			clientpackets.OpcodeRequestJoinPartyRoom:
+			if !l.dispatchPartyMatch(client, live, opcode, payload) {
 				return
 			}
 
@@ -1879,6 +2026,18 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			if live != nil {
 				onLive(live, func() { l.handleSay2(client, live, req) })
+			}
+
+		case clientpackets.OpcodeRequestUserCommand:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestUserCommand)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestUserCommand(live, req.CommandID) })
 			}
 
 		case clientpackets.OpcodeDummy1A,

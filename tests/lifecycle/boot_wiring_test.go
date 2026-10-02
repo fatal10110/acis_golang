@@ -33,6 +33,9 @@ func TestBootWiringReachesEverySubsystem(t *testing.T) {
 
 	c.Send(encodeRequestDropItem(adena, 40, spawnX, spawnY, spawnZ))
 	groundID := readDropItemGroundID(t, c.Read(), objID, item.AdenaID, 40)
+	// The dropper's DropItem goes out while the drop is still placing the
+	// item, before it is registered and tracked; let that request finish.
+	srv.Settle(t)
 
 	if _, ok := srv.State.Object(groundID); !ok {
 		t.Fatalf("world.Object(%d) missing for dropped item", groundID)

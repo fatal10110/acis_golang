@@ -117,6 +117,14 @@ func (p *PlayerClock) Remove(actorID int32) {
 	delete(p.activity, actorID)
 }
 
+// tracked reports whether actorID was added and not removed since.
+func (p *PlayerClock) tracked(actorID int32) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	_, ok := p.activity[actorID]
+	return ok
+}
+
 // NotifyShadowSenseState sends actor the current Shadow Sense effect state.
 func (p *PlayerClock) NotifyShadowSenseState(actor PlayerClockActor) {
 	if actor == nil || !actor.HasSkill(shadowSenseSkillID) {
@@ -128,7 +136,7 @@ func (p *PlayerClock) NotifyShadowSenseState(actor PlayerClockActor) {
 // Tick fires PLAYING_FOR_LONG_TIME for every tracked player whose reminder
 // has come due and reschedules them for the next interval. Iteration is
 // over the activity map alone; the day/night reapply (onDayNight) walks
-// online world players instead.
+// the tracked players in the world instead.
 func (p *PlayerClock) Tick() {
 	current := p.clock.Minutes()
 	p.mu.Lock()
@@ -147,9 +155,11 @@ func (p *PlayerClock) Tick() {
 	}
 }
 
-// onDayNight re-applies the Shadow Sense skill to every online player who
-// holds it, and announces the effect transition. It runs on the GameClock's
-// Tick goroutine, so each effect send must be non-blocking; the per-player
+// onDayNight re-applies the Shadow Sense skill to every tracked player who
+// holds it, and announces the effect transition. A player registered in the
+// world but not yet tracked is still entering it; its entry sends the
+// current state (NotifyShadowSenseState). It runs on the GameClock's Tick
+// goroutine, so each effect send must be non-blocking; the per-player
 // session write path satisfies that.
 func (p *PlayerClock) onDayNight(night bool) {
 	if p.players == nil {
@@ -157,7 +167,7 @@ func (p *PlayerClock) onDayNight(night bool) {
 	}
 	for _, obj := range p.players.Players() {
 		actor, ok := obj.(PlayerClockActor)
-		if !ok {
+		if !ok || !p.tracked(actor.ObjectID()) {
 			continue
 		}
 		actor.Queue().Post(func() {

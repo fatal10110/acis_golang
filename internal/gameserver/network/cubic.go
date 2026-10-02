@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cubic"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -82,6 +83,9 @@ func (l *GameClientLink) syncCubicRuntime(live *livePlayer, id cubic.ID, def mod
 		}, func() {
 			l.expireCubic(live, id, runtime)
 		}, live.Queue())
+		// A cubic's M.Atk is its granting skill's power, kept for its
+		// whole life like its level.
+		runtime.MAtk = int(def.Power)
 		live.cubics[id] = runtime
 	}
 	runtime.RefreshDisappear(lifetime)
@@ -199,7 +203,7 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 	)
 	if id == cubic.Life {
 		skillID = skillIDs[0]
-		target, ok = actorcast.DecideLifeCubicTarget(owner)
+		target, ok = actorcast.DecideLifeCubicTarget(owner, l.lifeCubicParty(live))
 	} else {
 		if l.attackStance == nil || !l.attackStance.InAttackStance(live) {
 			runtime.StopAction()
@@ -258,7 +262,7 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 		if live.Character.Dead() || live.detached() || !live.cubicStillActive(id, runtime) {
 			return
 		}
-		actorcast.ApplyCubicEffect(l.skillHandlers, live.Character, def, target, l.playerMessageSink(live, func() { beforeVitals = live.Vitals() }))
+		actorcast.ApplyCubicEffect(l.skillHandlers, live.Character, def, float64(runtime.MAtk), target, l.playerMessageSink(live, func() { beforeVitals = live.Vitals() }))
 		sendMagicStatusUpdate(live, beforeVitals)
 	})
 }
@@ -279,3 +283,31 @@ type cubicHealMessageTarget interface {
 type cubicFireOwner struct{ *livePlayer }
 
 func (o cubicFireOwner) Target() world.Tracked { return o.livePlayer.Target() }
+
+// Attacker is the owner as the attacker an enemy is checked against.
+func (o cubicFireOwner) Attacker() skilltarget.Actor { return o.Character }
+
+// lifeCubicParty returns live's party, in party order, as the Life Cubic's
+// heal scan reads it; nil outside a party, and in Olympiad mode, where the
+// cubic heals only its owner.
+//
+// A duel other than a party duel limits it to its owner too; that waits for
+// duels (#3160).
+func (l *GameClientLink) lifeCubicParty(live *livePlayer) []actorcast.LifeCubicMember {
+	if l.parties == nil || live.OlympiadMode() {
+		return nil
+	}
+	view, ok := l.parties.View(live.ObjectID())
+	if !ok {
+		return nil
+	}
+	members := make([]actorcast.LifeCubicMember, len(view.Members))
+	for i, m := range view.Members {
+		ratio := 1.0
+		if res := m.ResourceValues(); res.MaxHP > 0 {
+			ratio = res.CurrentHP / res.MaxHP
+		}
+		members[i] = actorcast.LifeCubicMember{Target: m, Dead: m.Dead(), HPRatio: ratio}
+	}
+	return members
+}

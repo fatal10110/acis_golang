@@ -53,9 +53,16 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 			Template:  o.Template(),
 			Items:     o.inventoryItems(),
 			Clan:      p.link.clanFields(o.Character),
+			Hidden:    hiddenFrom(o, p),
 		}))
 		if o.throne != nil {
 			p.sendVisibilityFrame(serverpackets.FrameChairSit(o.ObjectID(), o.throne.StaticObjectID()))
+		}
+		// Both players learn their relation to the other: p gets o's (and
+		// its summon's), o gets p's (and its summon's).
+		if l := p.link; l != nil {
+			l.sendRelations(o, l.summonOf(o), p.Character, p.sendVisibilityFrame)
+			l.sendRelations(p, l.summonOf(p), o.Character, o.SendFrame)
 		}
 		if title, ok := storeTitleFrame(o); ok {
 			p.sendVisibilityFrame(title)
@@ -295,7 +302,8 @@ func (l *GameClientLink) summonInCombat(a *summon.Actor) bool {
 // summonInfoSnapshot resolves the NpcInfo fields viewer sees for a summon it
 // does not own. Attackable is per viewer: whether viewer may attack a without
 // forcing, which follows a's owner's karma and PvP flag. A nil viewer sees it
-// as not attackable. inCombat is summonInCombat's answer for a.
+// as not attackable. inCombat is summonInCombat's answer for a. The summon
+// of an invisible player is not shown: it reports false.
 func summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table, inCombat bool) (serverpackets.NPCInfoSnapshot, bool) {
 	if npcs == nil {
 		return serverpackets.NPCInfoSnapshot{}, false
@@ -307,6 +315,10 @@ func summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table, in
 	x, y, z := a.Position()
 	title, pvpFlag, karma := "", 0, 0
 	if owner, ok := liveSummonOwner(a); ok {
+		// No one but its owner is shown an invisible player's summon.
+		if owner.Invisible() && (viewer == nil || viewer.ObjectID() != owner.ObjectID()) {
+			return serverpackets.NPCInfoSnapshot{}, false
+		}
 		title = owner.Name
 		pvpFlag = int(owner.PvPFlagState())
 		karma = owner.Karma()
@@ -415,7 +427,7 @@ func petInfoSnapshot(a *summon.Actor, owner *livePlayer, npcs *npc.Table) (serve
 		EvasionRate:       int(a.EvasionRate()),
 		CriticalHit:       int(a.CriticalRate(tmpl.CritRate)),
 		MoveSpeed:         int(a.MoveSpeed(tmpl.RunSpeed)),
-		AbnormalEffect:    a.AbnormalEffect(),
+		AbnormalEffect:    petAbnormalEffect(a, owner),
 		Mountable:         petmodel.IsMountable(a.NPCID()),
 		SoulShotsPerHit:   ssCount,
 		SpiritShotsPerHit: spsCount,

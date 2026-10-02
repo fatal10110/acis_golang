@@ -58,14 +58,17 @@ func TestEnteringPlayerSeesCastInFlight(t *testing.T) {
 		r.ReadInt32() // y
 		r.ReadInt32() // z
 		r.ReadInt32() // heading
-		if r.ReadInt32() == casterID && i+1 < len(frames) {
-			next = frames[i+1]
+		// The caster's relation to the viewer follows its CharInfo, ahead of
+		// what it is doing (Player.sendInfo, then describeStateToPlayer).
+		if r.ReadInt32() == casterID && i+2 < len(frames) {
+			assertFrameOpcode(t, frames[i+1], serverpackets.OpcodeRelationChanged, "frame after caster CharInfo")
+			next = frames[i+2]
 		}
 	}
 	if next == nil {
 		t.Fatal("caster's CharInfo not followed by any frame, want MagicSkillUse")
 	}
-	assertFrameOpcode(t, next, serverpackets.OpcodeMagicSkillUse, "frame after caster CharInfo")
+	assertFrameOpcode(t, next, serverpackets.OpcodeMagicSkillUse, "frame after caster RelationChanged")
 	r := wireReader(next[1:])
 	gotCaster, gotTarget, gotSkill, gotLevel := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32()
 	gotHit, gotReuse := r.ReadInt32(), r.ReadInt32()

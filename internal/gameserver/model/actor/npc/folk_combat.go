@@ -178,10 +178,11 @@ func (f *Folk) MovementDisabled() bool {
 // SilentMoving reports whether an effect lets the NPC move unseen.
 func (f *Folk) SilentMoving() bool { return f.effects.IsAffected(effect.FlagSilentMove) }
 
-// Knows reports whether other is in the NPC's known list.
+// Knows reports whether other is in the NPC's known list. An invisible
+// player or its summon is never known.
 func (f *Folk) Knows(other attackable.Combatant) bool {
 	tracked, ok := other.(world.Tracked)
-	return ok && world.Knows(f, tracked)
+	return ok && world.Knows(f, tracked) && !attackable.HiddenActingPlayer(other)
 }
 
 // SpawnProtected reports false: spawn protection is a player state.

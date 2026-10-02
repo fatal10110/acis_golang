@@ -10,8 +10,8 @@ import (
 // the caster's party, clan, alliance, a single member of one of those, or the
 // corpses of allied players. The membership and duel/olympiad gating lives in
 // the social layer; this package only consumes it through the narrow seams
-// on Actor. The live party/clan/alliance/duel surfaces (milestone M8)
-// implement those methods when that layer lands.
+// on Actor, which players and their summons answer from their party, clan
+// and alliance.
 
 // actingPlayerOf returns the player driving caster: the owner when caster is
 // a player-owned summon, or caster itself otherwise. ok is false only when

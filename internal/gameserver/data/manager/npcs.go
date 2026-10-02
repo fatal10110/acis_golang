@@ -44,6 +44,11 @@ type KillRewardConfig struct {
 	DeepBlueDropRules bool
 	PlayerLevels      *player.LevelTable
 	PartyRange        int
+	// PartyXP are the rules a party shares a kill's exp and sp by.
+	PartyXP player.PartyXPRules
+	// Parties resolves a rewarded player's party; nil rewards every
+	// attacker alone.
+	Parties RewardParties
 }
 
 // Npcs owns every live NPC instantiated from the spawn table at boot,

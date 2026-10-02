@@ -10,7 +10,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 const tradeInteractionDistance = 150
@@ -48,7 +47,7 @@ func (l *GameClientLink) handleTradeRequest(live *livePlayer, req clientpackets.
 	if !ok {
 		return
 	}
-	if target.ObjectID() == live.ObjectID() || !world.Knows(live, target) {
+	if target.ObjectID() == live.ObjectID() || !live.Knows(target) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetIncorrect))
 		return
 	}

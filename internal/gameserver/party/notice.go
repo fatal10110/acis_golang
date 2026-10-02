@@ -37,6 +37,9 @@ const (
 	// MsgPartyDismissedFromChannel: Name's party was dismissed from the
 	// command channel.
 	MsgPartyDismissedFromChannel
+	MsgLeftChannel
+	// MsgPartyLeftChannel: Name's party left the command channel.
+	MsgPartyLeftChannel
 )
 
 // WindowAll replaces To's party window: its leader, loot rule and the other
@@ -94,6 +97,10 @@ type ChannelPartyUpdate[M Member] struct {
 	Added  bool
 }
 
+// LeaderChanged reports Leader as its party's new leader, once every
+// member has been told.
+type LeaderChanged[M Member] struct{ Leader M }
+
 // Formed reports a new party; its members' positions start being shared.
 type Formed struct{ ID ID }
 
@@ -110,5 +117,6 @@ func (FusionStop[M]) isNotice()         {}
 func (ChannelOpen[M]) isNotice()        {}
 func (ChannelClose[M]) isNotice()       {}
 func (ChannelPartyUpdate[M]) isNotice() {}
+func (LeaderChanged[M]) isNotice()      {}
 func (Formed) isNotice()                {}
 func (Dispersed) isNotice()             {}

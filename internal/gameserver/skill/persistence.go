@@ -139,7 +139,11 @@ func (p *Persistence) SaveState(c *player.Character) SaveState {
 	// Reuse expiries and effect periods run on c's queue clock, so the save
 	// reads that clock rather than p.now.
 	now := c.Now()
-	rows := effect.BuildSaveRows(p.liveActiveEffects(c, now), c.SkillReuseTimers(now), classIndex)
+	// Effects a login restored but has not replayed yet, when the session
+	// ends before entering the world, are saved back as restored: the
+	// restore consumed their rows.
+	effects := append(p.liveActiveEffects(c, now), c.ActiveSkillEffects()...)
+	rows := effect.BuildSaveRows(effects, c.SkillReuseTimers(now), classIndex)
 	return SaveState{charID: c.ID, classIndex: classIndex, rows: rows, ok: true}
 }
 

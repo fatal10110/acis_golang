@@ -313,11 +313,10 @@ func (l *GameClientLink) resolveTarget(objectID int32) world.Tracked {
 	if l.world == nil {
 		return nil
 	}
+	// Only spawned objects: a selected player still loading is registered
+	// as a player but not spawned, and cannot be clicked.
 	if obj, ok := l.world.Object(objectID); ok {
 		return obj
-	}
-	if p, ok := l.world.Player(objectID); ok {
-		return p
 	}
 	return nil
 }

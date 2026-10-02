@@ -57,6 +57,22 @@ func assertStanceRefresh(t *testing.T, self, observer *testsupport.ScriptedClien
 	if frame[0] != serverpackets.OpcodeCharInfo {
 		t.Fatalf("second observer frame opcode = %#x, want CharInfo", frame[0])
 	}
+	assertPlainRelation(t, observer.ReadWithTimeout(time.Second), objectID)
+}
+
+// assertPlainRelation checks frame is the RelationChanged that follows a
+// CharInfo refresh of objectID, a clanless, unflagged player in no party:
+// no relation bits, not attackable without force, no karma or flag
+// (Player.broadcastCharInfo).
+func assertPlainRelation(t *testing.T, frame []byte, objectID int32) {
+	t.Helper()
+	if frame == nil || frame[0] != serverpackets.OpcodeRelationChanged {
+		t.Fatalf("frame after CharInfo = %x, want RelationChanged", frame)
+	}
+	r := wire.NewReader(frame[1:])
+	if id, relation, auto, karma, flag := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); id != objectID || relation != 0 || auto != 0 || karma != 0 || flag != 0 {
+		t.Fatalf("RelationChanged = (%d,%#x,%d,%d,%d), want (%d,0,0,0,0)", id, relation, auto, karma, flag, objectID)
+	}
 }
 
 func TestPlayerStanceChangeRefreshesSelfAndObserver(t *testing.T) {
@@ -129,6 +145,7 @@ func TestZeroSpeedStanceSkipsMoveTypeButRefreshesInfo(t *testing.T) {
 	if frame == nil || frame[0] != serverpackets.OpcodeCharInfo {
 		t.Fatalf("zero-speed stance observer frame = %x, want CharInfo first", frame)
 	}
+	assertPlainRelation(t, observer.ReadWithTimeout(time.Second), objectID)
 	if frame := self.ReadWithTimeout(rejectSilenceWindow); frame != nil {
 		t.Fatalf("zero-speed stance sent extra self opcode %#x", frame[0])
 	}

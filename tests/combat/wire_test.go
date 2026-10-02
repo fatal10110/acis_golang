@@ -153,7 +153,7 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) {
 			if frame == nil {
 				t.Fatalf("EnterWorld frame %d (want %#x) never arrived", i, opcode)
 			}
-			if frame[0] != serverpackets.OpcodeCharInfo {
+			if frame[0] != serverpackets.OpcodeCharInfo && frame[0] != serverpackets.OpcodeRelationChanged {
 				break
 			}
 		}
@@ -161,7 +161,7 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) {
 			t.Fatalf("EnterWorld frame %d opcode = %#x, want %#x", i, frame[0], opcode)
 		}
 		if opcode == serverpackets.OpcodeEtcStatusUpdate {
-			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo)
+			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeRelationChanged)
 		}
 	}
 }
