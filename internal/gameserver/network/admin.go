@@ -19,6 +19,7 @@ type adminCommand func(l *GameClientLink, gm *livePlayer, line string)
 // a command still to port.
 var adminCommands = map[string]adminCommand{
 	"admin_admin":        (*GameClientLink).adminMainPage,
+	"admin_camera":       (*GameClientLink).adminCamera,
 	"admin_gmlist":       (*GameClientLink).adminToggleGMList,
 	"admin_link":         (*GameClientLink).adminLink,
 	"admin_msg":          (*GameClientLink).adminSystemMessage,
