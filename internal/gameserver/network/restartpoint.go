@@ -41,7 +41,13 @@ func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.R
 		return
 	}
 
-	dest, ok := l.restartDestination(live)
+	// Only the restart request forces the jail; every other town teleport
+	// (//sendhome, a starved flying mount, a boss-zone ejection) still
+	// resolves a jailed player to the nearest town.
+	dest, ok := jailLocation, true
+	if !live.Jailed() {
+		dest, ok = l.restartDestination(live)
+	}
 	if !ok {
 		// This is a data-loading gap (no restart-point table loaded at
 		// all), not a normal rejection: the nearest-town lookup has nothing
@@ -59,12 +65,8 @@ func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.R
 	l.teleportLivePlayer(live, dest, restartTeleportOffset)
 }
 
-// restartDestination is where live restarts: the jail for a jailed player,
-// else the nearest town.
+// restartDestination is live's nearest town restart point, jailed or not.
 func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location, bool) {
-	if live.Jailed() {
-		return jailLocation, true
-	}
 	if l.restarts == nil {
 		return location.Location{}, false
 	}

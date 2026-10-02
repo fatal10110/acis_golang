@@ -95,7 +95,7 @@ func (c *Character) RestorePunishment(level int, timer int64) {
 // not positive, and reports what changed. PunishNone lifts a chat ban or a
 // jail term; a chat ban never replaces a jail term; a new chat ban or jail
 // term replaces the one served, timer included. A lift leaves the timer to
-// SetPunishmentTimer.
+// SetPunishmentTimer. A character or account ban changes nothing here.
 func (c *Character) SetPunishment(kind Punishment, minutes int32) PunishmentChange {
 	current := Punishment(c.punishment.kind.Load())
 	switch kind {
@@ -121,7 +121,8 @@ func (c *Character) SetPunishment(kind Punishment, minutes int32) PunishmentChan
 		c.punishment.timer.Store(PunishmentMillis(minutes))
 		return JailStarted
 	}
-	c.punishment.kind.Store(int32(kind))
+	// A character or account ban is an access-level change, never a stored
+	// punishment.
 	return PunishmentKept
 }
 
