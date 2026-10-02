@@ -35,17 +35,23 @@ type setElem struct {
 
 // forElement is one <for> block: a flat list of stat-modifier elements
 // (<add>, <sub>, <set stat="..." .../>, ...), each captured generically
-// since they share one attribute shape and differ only by tag name.
+// since they share one attribute shape and differ only by tag name, plus
+// <cond> and <effect>. It decodes itself (see templatenodes.go).
 type forElement struct {
-	Ops []funcElement `xml:",any"`
+	Ops []funcElement
+	// LeadingNode reports character data before the first element.
+	LeadingNode bool
 }
 
-// funcElement is one stat-modifier element inside a <for> block; XMLName
-// carries which operation it applies (see item.ParseFuncOp).
+// funcElement is one element inside a <for> block; XMLName carries which
+// operation it applies (see item.ParseFuncOp) or names a <cond>/<effect>.
+// It decodes itself (see templatenodes.go).
 type funcElement struct {
 	XMLName  xml.Name
-	Attrs    []xml.Attr `xml:",any,attr"`
-	Children []condNode `xml:",any"`
+	Attrs    []xml.Attr
+	Children []condNode
+	// LeadingNode reports character data before the first child element.
+	LeadingNode bool
 }
 
 // condElement is one <cond> block: its own message attributes plus the
@@ -317,8 +323,11 @@ func buildItemClauses(id int32, el itemElement, tables map[string][]string) ([]i
 	for _, forEl := range el.For {
 		var attachCond *item.UseCondition
 		for i, opEl := range forEl.Ops {
-			if strings.EqualFold(opEl.XMLName.Local, "cond") {
-				if i == 0 {
+			tag := opEl.XMLName.Local
+			if strings.EqualFold(tag, "cond") {
+				// Only a <cond> that is the block's first node gates it, and
+				// only when it holds a predicate; any other one is never read.
+				if leadsWithCond(tag, i, forEl.LeadingNode) && len(opEl.Children) > 0 {
 					uc, err := buildUseCondition(id, opEl.Attrs, opEl.Children)
 					if err != nil {
 						return nil, nil, err
@@ -328,46 +337,25 @@ func buildItemClauses(id int32, el itemElement, tables map[string][]string) ([]i
 				continue
 			}
 
-			if strings.EqualFold(opEl.XMLName.Local, "effect") {
-				// An <effect> element is parsed and validated the same as
-				// any func tag, but the resulting effect template is only
-				// attached when the enclosing template is a skill; an item
-				// has no effect templates, so on an <item> the parsed
-				// template is validated then discarded: validate required
-				// attrs, no attachment.
+			if strings.EqualFold(tag, "effect") {
+				// An item has no effect templates: the effect is read with
+				// the skill grammar, then discarded.
 				if err := validateItemEffect(id, opEl, tables); err != nil {
 					return nil, nil, err
 				}
 				continue
 			}
 
-			op, err := item.ParseFuncOp(opEl.XMLName.Local)
+			op, err := item.ParseFuncOp(tag)
 			if err != nil {
 				// Unrecognized <for> children are silently ignored.
 				continue
 			}
-			vals := foldAttrs(opEl.Attrs)
-			if raw, ok := vals["val"]; ok {
-				resolved, err := resolveTableValue(tables, "val", raw, 1)
-				if err != nil {
-					return nil, nil, fmt.Errorf("item template %d: %w", id, err)
-				}
-				vals["val"] = resolved
-			}
-			mod, err := buildStatModifier(op, vals)
+			mod, err := buildItemFunc(id, op, opEl.Attrs, opEl.Children, tables)
 			if err != nil {
-				return nil, nil, fmt.Errorf("item template %d: %w", id, err)
+				return nil, nil, err
 			}
-			if attachCond != nil {
-				mod.AttachCondition = attachCond
-			}
-			if len(opEl.Children) > 0 {
-				cond, err := buildCondition(opEl.Children[0], condRolePredicate)
-				if err != nil {
-					return nil, nil, fmt.Errorf("item template %d: %s: %w", id, opEl.XMLName.Local, err)
-				}
-				mod.Condition = &cond
-			}
+			mod.AttachCondition = attachCond
 			modifiers = append(modifiers, mod)
 		}
 	}
@@ -384,17 +372,40 @@ func buildItemClauses(id int32, el itemElement, tables map[string][]string) ([]i
 	return modifiers, useConditions, nil
 }
 
-// validateItemEffect validates a <for> block's <effect> child (name and val
-// are required) without attaching anything: an item has no effect
-// templates, so the effect is parsed and discarded for an item template
-// rather than stored. Beyond the effect's required attrs it checks only
-// table references (ponytail: no shipped item XML carries <effect> today;
-// the rest of the effect and nested func grammar is #3101, needed once a
-// datapack file uses one). Like a stat func's, the effect's val and its
-// funcs' vals read the item's own tables; every other value the effect
+// buildItemFunc builds one stat func of an item, directly under <for> or
+// inside an <effect>. Its val reads the item's own tables; its stat is read
+// as written, and its condition may name no table.
+func buildItemFunc(id int32, op item.FuncOp, attrs []xml.Attr, children []condNode, tables map[string][]string) (item.StatModifier, error) {
+	vals := foldAttrs(attrs)
+	if raw, ok := vals["val"]; ok {
+		resolved, err := resolveTableValue(tables, "val", raw, 1)
+		if err != nil {
+			return item.StatModifier{}, fmt.Errorf("item template %d: %w", id, err)
+		}
+		vals["val"] = resolved
+	}
+	mod, err := buildStatModifier(op, vals)
+	if err != nil {
+		return item.StatModifier{}, fmt.Errorf("item template %d: %w", id, err)
+	}
+	if len(children) > 0 {
+		cond, err := buildCondition(children[0], condRolePredicate)
+		if err != nil {
+			return item.StatModifier{}, fmt.Errorf("item template %d: %s: %w", id, op, err)
+		}
+		mod.Condition = &cond
+	}
+	return mod, nil
+}
+
+// validateItemEffect reads a <for> block's <effect> child with the skill
+// effect grammar and discards it: an item has no effect templates, but a
+// malformed effect still rejects the item. The effect's val and abnormal and
+// its funcs' vals read the item's own tables; every other value the effect
 // reader would resolve against a template's tables, its own or its <cond>
 // and func conditions', fails instead, because neither an item nor the
-// effect is such a template.
+// effect is such a template. stackType and a func's stat are read as
+// written.
 func validateItemEffect(id int32, opEl funcElement, tables map[string][]string) error {
 	vals := foldAttrs(opEl.Attrs)
 	for _, name := range itemEffectTableAttrs {
@@ -402,53 +413,42 @@ func validateItemEffect(id int32, opEl funcElement, tables map[string][]string) 
 			return fmt.Errorf("item template %d: effect: %w", id, err)
 		}
 	}
-	if raw, ok := vals["val"]; ok {
-		resolved, err := resolveTableValue(tables, "val", raw, 1)
+	for _, name := range []string{"val", "abnormal"} {
+		raw, ok := vals[name]
+		if !ok {
+			continue
+		}
+		resolved, err := resolveTableValue(tables, name, raw, 1)
 		if err != nil {
 			return fmt.Errorf("item template %d: effect: %w", id, err)
 		}
-		vals["val"] = resolved
+		vals[name] = resolved
 	}
-	a := newAttrValues(vals, "effect")
-	_ = a.str("name")
-	_ = a.float64("val")
-	if err := a.Err(); err != nil {
+	if _, err := readEffectTemplate(vals); err != nil {
 		return fmt.Errorf("item template %d: %w", id, err)
 	}
 	for i, ch := range opEl.Children {
-		// Only a leading <cond> is read; a later one is ignored.
-		if i != 0 && strings.EqualFold(ch.XMLName.Local, "cond") {
-			continue
-		}
-		if err := validateItemEffectChild(id, ch, tables); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// validateItemEffectChild checks the table references of one child of an
-// item <effect>: a <cond> reads like an item's own, and a stat func's val
-// reads the item's tables while its condition may name none.
-func validateItemEffectChild(id int32, ch condNode, tables map[string][]string) error {
-	if strings.EqualFold(ch.XMLName.Local, "cond") {
-		if len(ch.Children) == 0 {
-			return nil
-		}
-		_, err := buildUseCondition(id, ch.Attrs, ch.Children)
-		return err
-	}
-	if _, err := item.ParseFuncOp(ch.XMLName.Local); err != nil {
-		return nil
-	}
-	if raw, ok := foldAttrs(ch.Attrs)["val"]; ok {
-		if _, err := resolveTableValue(tables, "val", raw, 1); err != nil {
-			return fmt.Errorf("item template %d: effect %s: %w", id, ch.XMLName.Local, err)
-		}
-	}
-	if len(ch.Children) > 0 {
-		if _, err := buildCondition(ch.Children[0], condRolePredicate); err != nil {
-			return fmt.Errorf("item template %d: effect %s: %w", id, ch.XMLName.Local, err)
+		tag := ch.XMLName.Local
+		switch {
+		case strings.EqualFold(tag, "cond"):
+			// Only a <cond> that is the effect's first node is read.
+			if !leadsWithCond(tag, i, opEl.LeadingNode) || len(ch.Children) == 0 {
+				continue
+			}
+			if _, err := buildUseCondition(id, ch.Attrs, ch.Children); err != nil {
+				return err
+			}
+		case strings.EqualFold(tag, "effect"):
+			return fmt.Errorf("item template %d: effect: %w", id, errNestedEffect)
+		default:
+			op, err := item.ParseFuncOp(tag)
+			if err != nil {
+				// Unrecognized effect children are silently ignored.
+				continue
+			}
+			if _, err := buildItemFunc(id, op, ch.Attrs, ch.Children, tables); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -462,12 +462,12 @@ var itemEffectTableAttrs = []string{
 }
 
 // buildStatModifier reads one stat-modifier element's "stat" and "val"
-// values (both required) from vals.
+// values (both required) from vals. The stat must name a known stat.
 func buildStatModifier(op item.FuncOp, vals map[string]string) (item.StatModifier, error) {
 	a := newAttrValues(vals, "stat modifier")
 	mod := item.StatModifier{
 		Op:    op,
-		Stat:  a.str("stat"),
+		Stat:  readFuncStat(a),
 		Value: a.float64("val"),
 	}
 	if err := a.Err(); err != nil {

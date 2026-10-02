@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
@@ -105,11 +106,16 @@ func (sl *skillLoader) resolver(tableIndex int) tableResolver {
 }
 
 // resolveAttrMap folds an element's attributes into a name-keyed map,
-// resolving any "#name" table reference against row tableIndex first. A
+// resolving any "#name" table reference against row tableIndex first,
+// except in the attributes named in asWritten, which keep their value. A
 // repeated attribute name keeps the last value.
-func (sl *skillLoader) resolveAttrMap(attrs []xml.Attr, tableIndex int) map[string]string {
+func (sl *skillLoader) resolveAttrMap(attrs []xml.Attr, tableIndex int, asWritten ...string) map[string]string {
 	vals := make(map[string]string, len(attrs))
 	for _, a := range attrs {
+		if slices.Contains(asWritten, a.Name.Local) {
+			vals[a.Name.Local] = a.Value
+			continue
+		}
 		vals[a.Name.Local] = sl.resolveTableValue(a.Name.Local, a.Value, tableIndex)
 	}
 	return vals
@@ -286,19 +292,20 @@ func (sl *skillLoader) applyTemplates(def *skill.Definition, conds []condElement
 		def.Conditions = append(def.Conditions, *clause)
 	}
 	for _, f := range fors {
-		if err := sl.applyTemplateNodes(def, f.Ops, forIndex); err != nil {
+		if err := sl.applyTemplateNodes(def, f, forIndex); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (sl *skillLoader) applyTemplateNodes(def *skill.Definition, ops []funcElement, tableIndex int) error {
+func (sl *skillLoader) applyTemplateNodes(def *skill.Definition, block forElement, tableIndex int) error {
 	var attachCond *skill.ConditionClause
-	for i, op := range ops {
+	for i, op := range block.Ops {
 		if strings.EqualFold(op.XMLName.Local, "cond") {
-			// Only a leading <cond> gates the block; a later one is never read.
-			if i != 0 {
+			// Only a <cond> that is the block's first node gates it; any
+			// other one is never read.
+			if !leadsWithCond(op.XMLName.Local, i, block.LeadingNode) {
 				continue
 			}
 			clause, err := conditionClause(op.Attrs, op.Children, sl.resolver(tableIndex), condMsgModeRegular)
@@ -335,58 +342,34 @@ func (sl *skillLoader) applyTemplateNodes(def *skill.Definition, ops []funcEleme
 	return nil
 }
 
+// effect builds an <effect> of a <for> block. Its values read row
+// tableIndex of the skill's tables, except stackType, which is read as
+// written.
 func (sl *skillLoader) effect(op funcElement, attachCond *skill.ConditionClause, tableIndex int) (skill.EffectTemplate, error) {
-	vals := sl.resolveAttrMap(op.Attrs, tableIndex)
-	a := newAttrValues(vals, "effect")
-	name := a.str("name")
-	if err := a.Err(); err != nil {
+	eff, err := readEffectTemplate(sl.resolveAttrMap(op.Attrs, tableIndex, "stackType"))
+	if err != nil {
 		return skill.EffectTemplate{}, err
 	}
-	a.prefix = "effect " + name
-
-	eff := skill.EffectTemplate{
-		Name:             name,
-		Value:            a.float64("val"),
-		Count:            int(a.int32LiteralDefault("count", 1)),
-		Time:             int(a.int32LiteralDefault("time", 1)),
-		Self:             a.int32LiteralDefault("self", 0) == 1,
-		Icon:             a.int32LiteralDefault("noicon", 0) != 1,
-		StackType:        a.strDefault("stackType", "none"),
-		StackOrder:       a.float64Default("stackOrder", 0),
-		EffectPower:      a.float64Default("effectPower", -1),
-		EffectPowerSet:   a.has("effectPower"),
-		EffectType:       a.strDefault("effectType", ""),
-		TriggeredID:      int(a.int32Default("triggeredId", 0)),
-		TriggeredLevel:   int(a.int32Default("triggeredLevel", 1)),
-		ChanceType:       a.strDefault("chanceType", ""),
-		ActivationChance: int(a.int32Default("activationChance", -1)),
-		AttachCondition:  attachCond,
-	}
-	if a.has("abnormal") {
-		mask, err := skill.ParseAbnormalEffect(a.str("abnormal"))
-		if err != nil {
-			a.fail(fmt.Errorf("attribute %q: %w", "abnormal", err))
-		}
-		eff.AbnormalEffect = mask
-	}
-	if err := a.Err(); err != nil {
-		return skill.EffectTemplate{}, err
-	}
-	if err := sl.nestedEffectTemplates(&eff, op.Children, tableIndex); err != nil {
-		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", name, err)
+	eff.AttachCondition = attachCond
+	if err := sl.nestedEffectTemplates(&eff, op, tableIndex); err != nil {
+		return skill.EffectTemplate{}, fmt.Errorf("effect %s: %w", eff.Name, err)
 	}
 	return eff, nil
 }
 
 // nestedEffectTemplates reads the children of an <effect>. Their conditions
 // belong to the effect, which has no tables, so none of their values may name
-// one; the funcs' own values still read the skill's tables.
-func (sl *skillLoader) nestedEffectTemplates(eff *skill.EffectTemplate, nodes []condNode, tableIndex int) error {
+// one; the funcs' own values still read the skill's tables. A nested
+// <effect> fails; any other unrecognized tag is skipped.
+func (sl *skillLoader) nestedEffectTemplates(eff *skill.EffectTemplate, op funcElement, tableIndex int) error {
 	var attachCond *skill.ConditionClause
-	for i, n := range nodes {
-		if strings.EqualFold(n.XMLName.Local, "cond") {
-			// Only a leading <cond> gates the effect; a later one is never read.
-			if i != 0 {
+	for i, n := range op.Children {
+		tag := n.XMLName.Local
+		switch {
+		case strings.EqualFold(tag, "cond"):
+			// Only a <cond> that is the effect's first node gates it; any
+			// other one is never read.
+			if !leadsWithCond(tag, i, op.LeadingNode) {
 				continue
 			}
 			clause, err := conditionClause(n.Attrs, n.Children, nil, condMsgModeRegular)
@@ -394,29 +377,33 @@ func (sl *skillLoader) nestedEffectTemplates(eff *skill.EffectTemplate, nodes []
 				return err
 			}
 			attachCond = clause
-			continue
+		case strings.EqualFold(tag, "effect"):
+			return errNestedEffect
+		default:
+			if _, err := skill.ParseFuncOp(tag); err != nil {
+				continue
+			}
+			fn, err := sl.funcTemplate(tag, n.Attrs, n.Children, attachCond, tableIndex, nil)
+			if err != nil {
+				return err
+			}
+			eff.Funcs = append(eff.Funcs, fn)
 		}
-		fnEl := funcElement(n)
-		fn, err := sl.funcTemplate(n.XMLName.Local, fnEl.Attrs, fnEl.Children, attachCond, tableIndex, nil)
-		if err != nil {
-			return err
-		}
-		eff.Funcs = append(eff.Funcs, fn)
 	}
 	return nil
 }
 
-// funcTemplate builds one stat func. Its values read row tableIndex of the
-// skill's tables; its condition child resolves table references with
-// condResolve.
+// funcTemplate builds one stat func. Its val reads row tableIndex of the
+// skill's tables and its stat is read as written; its condition child
+// resolves table references with condResolve.
 func (sl *skillLoader) funcTemplate(tag string, attrs []xml.Attr, children []condNode, attachCond *skill.ConditionClause, tableIndex int, condResolve tableResolver) (skill.FuncTemplate, error) {
 	op, err := skill.ParseFuncOp(tag)
 	if err != nil {
 		return skill.FuncTemplate{}, err
 	}
-	vals := sl.resolveAttrMap(attrs, tableIndex)
+	vals := sl.resolveAttrMap(attrs, tableIndex, "stat")
 	a := newAttrValues(vals, tag)
-	stat := a.str("stat")
+	stat := readFuncStat(a)
 	if err := a.Err(); err != nil {
 		return skill.FuncTemplate{}, err
 	}
