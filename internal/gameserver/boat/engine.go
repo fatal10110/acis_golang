@@ -26,8 +26,9 @@ const (
 // is heard.
 const announceRadius = 20000
 
-// busyShoutPeriod is how many busy-dock checks, five seconds apart, pass
-// between two announcements that the destination dock is held.
+// busyShoutPeriod is the modulus of the busy-announcement counter. The
+// counter advances by two on each five-second busy-dock check, so the line
+// that the destination dock is held repeats every 18 checks (90 s).
 const busyShoutPeriod = 36
 
 // Boat sounds.
