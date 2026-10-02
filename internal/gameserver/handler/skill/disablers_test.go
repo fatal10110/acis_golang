@@ -291,7 +291,7 @@ func TestControlDisablersApplyToHostileNPC(t *testing.T) {
 				Skill: modelskill.Definition{
 					SkillType:     tt.skillType,
 					EffectType:    tt.skillType,
-					BaseLandRate:  100,
+					EffectPower:   100,
 					IgnoreResists: true,
 					Effects: []modelskill.EffectTemplate{{
 						Name: tt.effectName,
@@ -499,7 +499,7 @@ func TestCheckSkillSuccessUsesLivePlayerShieldDefense(t *testing.T) {
 	skill := modelskill.Definition{
 		SkillType:     "STUN",
 		EffectType:    "STUN",
-		BaseLandRate:  100,
+		EffectPower:   100,
 		IgnoreResists: true,
 		Effects:       []modelskill.EffectTemplate{{Name: "Stun", Time: 10}},
 	}

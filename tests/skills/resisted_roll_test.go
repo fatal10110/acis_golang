@@ -52,13 +52,14 @@ func TestStunFailedRollSendsLevelOneResistedOnWire(t *testing.T) {
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
 			ID: skillID, Level: 7, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 			CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-			SkillType: "STUN", Offensive: true, IgnoreResists: true, BaseLandRate: 0,
+			SkillType: "STUN", Offensive: true, IgnoreResists: true,
 			Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 10}},
 		}})),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, skillID, 7)
 	startInWorld(t, c)
+	resistLandingRolls(t, srv, objID, randomRoll)
 	hostile := srv.SpawnHostileNPC(t)
 	drainUntilQuiet(t, c)
 	targetHostile(t, c, hostile.ObjectID())
@@ -113,13 +114,14 @@ func TestBetrayFailedRollSendsCastLevelResistedOnWire(t *testing.T) {
 		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
 			ID: skillID, Level: 7, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 			CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-			SkillType: "BETRAY", Offensive: true, IgnoreResists: true, BaseLandRate: 0,
+			SkillType: "BETRAY", Offensive: true, IgnoreResists: true,
 			Effects: []modelskill.EffectTemplate{{Name: "Betray", Time: 10}},
 		}})),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, skillID, 7)
 	startInWorld(t, c)
+	resistLandingRolls(t, srv, objID, randomRoll)
 	hostile := srv.SpawnHostileNPC(t)
 	drainUntilQuiet(t, c)
 	targetHostile(t, c, hostile.ObjectID())
@@ -152,14 +154,14 @@ func TestChanceProcForgetFailedRollSendsResistedOnWire(t *testing.T) {
 			},
 			{
 				ID: triggered, Level: 4, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-				SkillType: "AGGREDUCE_CHAR", Offensive: true, IgnoreResists: true, BaseLandRate: 0, ReuseDelay: 60_000,
+				SkillType: "AGGREDUCE_CHAR", Offensive: true, IgnoreResists: true, ReuseDelay: 60_000,
 			},
 		})),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, passive, 1)
 	startInWorld(t, c)
-	setPlayerRoll(t, srv, objID, 0)
+	resistLandingRolls(t, srv, objID, func(int) int { return 0 })
 	px, py, pz := srv.PlayerPosition(t, objID)
 	hostile := srv.SpawnHostileNPCAt(t, location.Location{X: px + 20, Y: py, Z: pz})
 	drainUntilQuiet(t, c)

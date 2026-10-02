@@ -28,7 +28,7 @@ func TestContinuousDebuffSkipsInvulnerableTargetWithoutAttackFailed(t *testing.T
 		Caster: caster,
 		Skill: modelskill.Definition{
 			SkillType: "DEBUFF", Debuff: true, Offensive: true,
-			IgnoreResists: true, BaseLandRate: 100,
+			IgnoreResists: true, EffectPower: 100,
 			Effects: buffEffect(),
 		},
 		Targets: []Actor{target},
@@ -63,7 +63,7 @@ func TestContinuousDebuffSkipsWhenCasterCannotGiveDamage(t *testing.T) {
 		Caster: caster,
 		Skill: modelskill.Definition{
 			SkillType: "DEBUFF", Debuff: true,
-			IgnoreResists: true, BaseLandRate: 100,
+			IgnoreResists: true, EffectPower: 100,
 			Effects: buffEffect(),
 		},
 		Targets: []Actor{target},

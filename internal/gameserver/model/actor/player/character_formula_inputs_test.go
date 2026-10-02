@@ -288,12 +288,12 @@ func TestCharacterSkillSuccessInputUsesStatsAndCasterMagicAttack(t *testing.T) {
 	target.CharLevel = 44
 	target.AddStatFuncs([]effect.Mod{{Stat: stat.StunVuln, Op: effect.OpMul, Value: 0.5, Owner: testModOwner()}})
 	def := modelskill.Definition{
-		SkillType:    "STUN",
-		EffectType:   "STUN",
-		Magic:        true,
-		MagicLevel:   40,
-		LevelDepend:  2,
-		BaseLandRate: 50,
+		SkillType:   "STUN",
+		EffectType:  "STUN",
+		Magic:       true,
+		MagicLevel:  40,
+		LevelDepend: 2,
+		EffectPower: 50,
 	}
 
 	in, ok := target.SkillSuccessInput(caster, def, false, formulas.ShieldFailed)
@@ -376,10 +376,10 @@ func TestCharacterSkillSuccessInputFoldsElementalResistanceIntoVulnerability(t *
 	})
 
 	in, ok := target.SkillSuccessInput(caster, modelskill.Definition{
-		SkillType:    "STUN",
-		EffectType:   "STUN",
-		Element:      modelskill.ElementFire,
-		BaseLandRate: 50,
+		SkillType:   "STUN",
+		EffectType:  "STUN",
+		Element:     modelskill.ElementFire,
+		EffectPower: 50,
 	}, false, formulas.ShieldFailed)
 	if !ok {
 		t.Fatal("SkillSuccessInput() ok = false")
@@ -417,7 +417,10 @@ func TestCharacterManaDamageInputFoldsElementalResistanceIntoVulnerability(t *te
 	}
 }
 
-func TestCharacterSkillSuccessInputDoesNotFallbackToSkillType(t *testing.T) {
+// TestCharacterSkillSuccessInputFallsBackToSkillType asserts a skill with no
+// effectType and no typed effect template resists as its own skill type
+// (here STUN: the CON stat term and the stun vulnerability).
+func TestCharacterSkillSuccessInputFallsBackToSkillType(t *testing.T) {
 	tmpl := combatTemplate()
 	tmpl.MAtk = 100
 	tmpl.MDef = 50
@@ -426,19 +429,19 @@ func TestCharacterSkillSuccessInputDoesNotFallbackToSkillType(t *testing.T) {
 	target.AddStatFuncs([]effect.Mod{{Stat: stat.StunVuln, Op: effect.OpMul, Value: 0.5, Owner: testModOwner()}})
 
 	in, ok := target.SkillSuccessInput(caster, modelskill.Definition{
-		SkillType:    "STUN",
-		Magic:        true,
-		BaseLandRate: 50,
+		SkillType:   "STUN",
+		Magic:       true,
+		EffectPower: 50,
 	}, false, formulas.ShieldFailed)
 	if !ok {
 		t.Fatal("SkillSuccessInput() ok = false")
 	}
 
-	if in.StatModifier != 1 {
-		t.Fatalf("StatModifier = %v, want 1 without EffectType", in.StatModifier)
+	if want := 0.7430194910023464; !closeFloat(in.StatModifier, want) {
+		t.Fatalf("StatModifier = %v, want %v (STUN from the skill type)", in.StatModifier, want)
 	}
-	if in.VulnModifier != 1 {
-		t.Fatalf("VulnModifier = %v, want 1 without EffectType", in.VulnModifier)
+	if !closeFloat(in.VulnModifier, 0.5) {
+		t.Fatalf("VulnModifier = %v, want 0.5 (stun vulnerability)", in.VulnModifier)
 	}
 }
 
@@ -453,7 +456,7 @@ func TestCharacterSkillSuccessInputQuadruplesMAtkOnBlessedSpiritshot(t *testing.
 	tmpl.MDef = 50
 	caster := liveCharacter(1, tmpl, combatItems())
 	target := liveCharacter(2, tmpl, combatItems())
-	def := modelskill.Definition{SkillType: "STUN", EffectType: "STUN", Magic: true, BaseLandRate: 50}
+	def := modelskill.Definition{SkillType: "STUN", EffectType: "STUN", Magic: true, EffectPower: 50}
 
 	without, ok := target.SkillSuccessInput(caster, def, false, formulas.ShieldFailed)
 	if !ok {
@@ -477,7 +480,7 @@ func TestCharacterSkillSuccessInputCarriesShieldOutcome(t *testing.T) {
 	tmpl := combatTemplate()
 	caster := liveCharacter(1, tmpl, combatItems())
 	target := liveCharacter(2, tmpl, combatItems())
-	def := modelskill.Definition{SkillType: "STUN", BaseLandRate: 100, IgnoreResists: true}
+	def := modelskill.Definition{SkillType: "STUN", EffectPower: 100, IgnoreResists: true}
 
 	in, ok := target.SkillSuccessInput(caster, def, false, formulas.ShieldPerfect)
 	if !ok {

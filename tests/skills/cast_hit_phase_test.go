@@ -41,7 +41,7 @@ func TestCastHitReusesLaunchTargetAfterItDies(t *testing.T) {
 		ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 		CastRange: 900, HitTime: 500, StaticHitTime: true,
 		SkillType: "DEBUFF", EffectType: "DEBUFF", Offensive: true, Debuff: true,
-		BaseLandRate: 100, IgnoreResists: true,
+		EffectPower: 100, IgnoreResists: true,
 		Effects:     []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}},
 		SelfEffects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, Self: true}},
 	})

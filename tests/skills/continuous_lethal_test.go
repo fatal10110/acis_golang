@@ -36,13 +36,14 @@ func TestFearLethalRollsAfterFailedLanding(t *testing.T) {
 				gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{{
 					ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 					CastRange: 900, HitTime: 500, ReuseDelay: 60_000, StaticHitTime: true, StaticReuse: true,
-					SkillType: "FEAR", Offensive: true, Magic: true, IgnoreResists: true, BaseLandRate: 0,
+					SkillType: "FEAR", Offensive: true, Magic: true, IgnoreResists: true,
 					LethalChance2: 100,
 				}})),
 			)
 			c, objID := srv.Client, srv.SoleObjectID(t)
 			seedKnownSkill(t, srv, objID, skillID, 1)
 			startInWorld(t, c)
+			resistLandingRolls(t, srv, objID, randomRoll)
 			hostile := srv.SpawnHostileNPCTemplateAt(t, &npc.Template{
 				ID: 100, TemplateID: 100, Type: tc.kind, Level: 1, HPMax: 10_000, AtkSpd: 300,
 				RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 8, CollisionHeight: 20,

@@ -58,8 +58,8 @@ func TestBuffIconPersistsUntilExpiry(t *testing.T) {
 	drainUntilQuiet(t, c)
 }
 
-// TestDebuffThatFailsToLandSendsAttackFailed verifies a debuff with no land
-// chance still plays the cast (ack, use message, launch report) but answers
+// TestDebuffThatFailsToLandSendsAttackFailed verifies a debuff whose landing
+// roll fails still plays the cast (ack, use message, launch report) but answers
 // with the attack-failed message and applies nothing.
 func TestDebuffThatFailsToLandSendsAttackFailed(t *testing.T) {
 	t.Parallel()
@@ -70,14 +70,15 @@ func TestDebuffThatFailsToLandSendsAttackFailed(t *testing.T) {
 			{
 				ID: 5, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 				SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-				BaseLandRate: 0, IgnoreResists: true,
-				Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}},
+				IgnoreResists: true,
+				Effects:       []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}},
 			},
 		})),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, objID, 5, 1)
 	startInWorld(t, c)
+	resistLandingRolls(t, srv, objID, randomRoll)
 
 	c.Send(encodeRequestMagicSkillUse(5, false, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "MagicSkillUse")
@@ -145,7 +146,7 @@ func bootOneShotDebuff(t *testing.T, skillID modelskill.ID) (*gameservertest.Ser
 				ID: skillID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
 				CastRange: 900, HitTime: 0, StaticHitTime: true,
 				SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-				BaseLandRate: 100, IgnoreResists: true,
+				EffectPower: 100, IgnoreResists: true,
 				Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60}},
 			},
 		})),
@@ -200,7 +201,7 @@ func TestStunBlocksCastingAndMovement(t *testing.T) {
 				ID: 20, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 				HitTime: 0, StaticHitTime: true,
 				SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-				BaseLandRate: 100, IgnoreResists: true,
+				EffectPower: 100, IgnoreResists: true,
 				Effects: []modelskill.EffectTemplate{{Name: "Stun", Time: 30}},
 			},
 			{
@@ -460,7 +461,7 @@ func TestMixedPolarityCancelLesserKeepsBuffVictimHeld(t *testing.T) {
 		ID: 301, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 		HitTime: 0, StaticHitTime: true, StaticReuse: true,
 		SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-		BaseLandRate: 100, IgnoreResists: true,
+		EffectPower: 100, IgnoreResists: true,
 		Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60, Icon: true, StackType: "speed_up", StackOrder: 100}},
 	}
 	srv := gameservertest.Boot(t,
@@ -509,7 +510,7 @@ func TestMixedPolarityHeldVictimSurvivesNewcomerExpiry(t *testing.T) {
 		ID: 302, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 		HitTime: 0, StaticHitTime: true, StaticReuse: true,
 		SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-		BaseLandRate: 100, IgnoreResists: true,
+		EffectPower: 100, IgnoreResists: true,
 		Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 2, Icon: true, StackType: "speed_up", StackOrder: 100}},
 	}
 	srv := gameservertest.Boot(t,
@@ -555,7 +556,7 @@ func TestMixedPolarityHeldVictimCountsForDoesStack(t *testing.T) {
 		ID: 306, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
 		HitTime: 0, StaticHitTime: true, StaticReuse: true,
 		SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true,
-		BaseLandRate: 100, IgnoreResists: true,
+		EffectPower: 100, IgnoreResists: true,
 		Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 60, Icon: true, StackType: "speed_up", StackOrder: 100}},
 	}
 	srv := gameservertest.Boot(t,

@@ -15,7 +15,7 @@ import (
 func TestHostileSkillSuccessInputUsesTemplateStatsAndCasterMagicAttack(t *testing.T) {
 	caster := newCombatHostile(t, 1, &Template{ID: 1, Type: "Monster", Level: 12, MAtk: 200})
 	target := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster", Level: 10, MEN: 40, MDef: 50})
-	def := skill.Definition{BaseLandRate: 50, EffectType: "ROOT", Magic: true, LevelDepend: 1}
+	def := skill.Definition{EffectPower: 50, EffectType: "ROOT", Magic: true, LevelDepend: 1}
 
 	without, ok := target.SkillSuccessInput(caster, def, false, formulas.ShieldFailed)
 	if !ok {
@@ -128,7 +128,7 @@ func TestHostileSkillSuccessInputAllowsIgnoreResistsWithoutCasterStats(t *testin
 	target := newCombatHostile(t, 2, &Template{ID: 2, Type: "Monster"})
 
 	in, ok := target.SkillSuccessInput(nil, skill.Definition{
-		BaseLandRate:  100,
+		EffectPower:   100,
 		IgnoreResists: true,
 	}, false, formulas.ShieldPerfect)
 	if !ok {

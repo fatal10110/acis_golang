@@ -33,7 +33,7 @@ func TestPetChanceTriggerProcsWhenPetIsHit(t *testing.T) {
 		},
 		{
 			ID: petMirageTriggered, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Offensive: true, BaseLandRate: 100, IgnoreResists: true,
+			SkillType: "DEBUFF", EffectType: "DEBUFF", Debuff: true, Offensive: true, EffectPower: 100, IgnoreResists: true,
 			Effects: []modelskill.EffectTemplate{{Name: "Debuff", Time: 30, Icon: true, StackType: "mirage_debuff", StackOrder: 1}},
 		},
 	}), gamesql.NewCharacterSkillStore(db))

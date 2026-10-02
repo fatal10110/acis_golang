@@ -213,6 +213,13 @@ func (h *AttackingHostile) DoAttack(t *testing.T, target attackable.Combatant) {
 	})
 }
 
+// StartAttack starts one swing against target without waiting for it to
+// finish, for a swing whose hit stops the attack (for example by landing a
+// target-removing effect on the NPC) so that it never finishes.
+func (h *AttackingHostile) StartAttack(target attackable.Combatant) {
+	h.ctl.DoAttack(target)
+}
+
 // CanAttack reports whether the NPC's attack controller would start a swing
 // at target now, the check its AI runs before every swing.
 func (h *AttackingHostile) CanAttack(target attackable.Combatant) bool {
