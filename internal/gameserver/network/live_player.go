@@ -91,6 +91,10 @@ type livePlayer struct {
 	access atomic.Pointer[admin.AccessLevel]
 	// teleportMode is how p's move clicks travel; owned by p's queue.
 	teleportMode teleportMode
+	// punishTimer ends the punishment p serves at punishDeadline; both
+	// owned by p's queue. See punishment.go.
+	punishTimer    *sim.Timer
+	punishDeadline time.Time
 	// handlerPanicked records that a task this player's connection waited on
 	// panicked. Written by onLive and read by the dispatch loop, both on the
 	// owning connection goroutine and nowhere else.

@@ -31,7 +31,8 @@ const characterColumns = `obj_Id, account_name, char_name,
 	COALESCE(deletetime,0), COALESCE(title,''), COALESCE(accesslevel,0), COALESCE(hero,0), COALESCE(lastAccess,0),
 	COALESCE(onlinetime,0),
 	COALESCE(death_penalty_level,0), rec_have, rec_left,
-	clan_join_expiry_time, clan_create_expiry_time`
+	clan_join_expiry_time, clan_create_expiry_time,
+	COALESCE(punish_level,0), COALESCE(punish_timer,0)`
 
 // CharacterStore reads and writes the characters table.
 type CharacterStore struct {
@@ -141,6 +142,8 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var clanID int32
 	var title string
 	var clanJoinExpiry, clanCreateExpiry int64
+	var punishLevel int
+	var punishTimer int64
 
 	err := row.Scan(
 		&c.ID, &c.AccountName, &c.Name,
@@ -153,6 +156,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 		&onlineTime,
 		&deathPenaltyLevel, &recHave, &recLeft,
 		&clanJoinExpiry, &clanCreateExpiry,
+		&punishLevel, &punishTimer,
 	)
 	if err != nil {
 		return nil, err
@@ -167,6 +171,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	c.SetHero(hero != 0)
 	c.SetDeathPenaltyLevel(deathPenaltyLevel)
 	c.SetRecommendationCounts(recHave, recLeft)
+	c.RestorePunishment(punishLevel, punishTimer)
 	// The playtime clock starts at restore: every later save persists the
 	// restored base plus the elapsed session time.
 	c.SetOnlineTime(int64(onlineTime), time.Now())

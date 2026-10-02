@@ -122,6 +122,9 @@ type Character struct {
 	fallingUntil time.Time
 	// blockingAll is the block-everything mode; see character_blockall.go.
 	blockingAll atomic.Bool
+	// punishment is the chat ban or jail the character serves; see
+	// character_punishment.go.
+	punishment punishmentState
 	// partyRoom is the party-matching room the character is in; see
 	// character_partyroom.go.
 	partyRoom atomic.Int32

@@ -390,6 +390,9 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// The chat of a petition still active is replayed after the login
 	// board pages, before the friends hear of the entry.
 	l.enterWorldPetition(client, live)
+	// A punishment served resumes its timer, and a jailed player outside
+	// the jail is taken back.
+	l.enterWorldPunishment(live)
 	// Friends hear of the entry last, just ahead of the reuse timers.
 	l.notifyFriends(live, true)
 	client.Session.SendFrame(serverpackets.FrameSkillCoolTime(coolTimes))

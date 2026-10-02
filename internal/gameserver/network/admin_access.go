@@ -144,8 +144,8 @@ func (l *GameClientLink) adminGMOff(gm *livePlayer, line string) {
 
 // adminBan answers //ban account|chat|player [name [minutes]]. Without a
 // name the selected player is banned; with one, the online player so named,
-// else the offline account or character. A chat ban is not ported yet
-// (#3164, #3155): it logs the gap and releases the client.
+// else the offline account or character. A chat ban lasts the minutes
+// given, without end by default; see adminBanChat.
 //
 // An unknown kind answers nothing, as the reference does; a chat command
 // leaves no client action pending.
@@ -158,14 +158,16 @@ func (l *GameClientLink) adminBan(gm *livePlayer, line string) {
 	}
 	kind := args[0]
 	var (
-		name   string
-		target *livePlayer
+		name    string
+		target  *livePlayer
+		minutes int32 = -1
 	)
 	if len(args) > 1 {
 		name = args[1]
 		target, _ = l.livePlayerByName(name)
 		if len(args) > 2 {
-			if _, ok := parseJavaInt(args[2]); !ok {
+			var ok bool
+			if minutes, ok = parseJavaInt(args[2]); !ok {
 				sendText(gm, usage)
 				return
 			}
@@ -194,8 +196,7 @@ func (l *GameClientLink) adminBan(gm *livePlayer, line string) {
 		onPlayer(gm, target, target.kickClient)
 		sendText(gm, target.AccountName()+" account is banned.")
 	case "chat":
-		l.log.Warn().Msg("admin: //ban chat not implemented yet (#3164, #3155)")
-		gm.SendFrame(serverpackets.FrameActionFailed())
+		l.adminBanChat(gm, target, name, minutes)
 	case "player":
 		l.changeCharAccessLevel(gm, target, name, characterBannedLevel)
 	}
@@ -203,8 +204,7 @@ func (l *GameClientLink) adminBan(gm *livePlayer, line string) {
 
 // adminUnban answers //unban account|chat|player name: an offline account
 // or character gets its access back; an online one is not banned. A chat
-// unban is not ported yet (#3164, #3155): it logs the gap and releases the
-// client.
+// unban lifts the named player's chat ban; see adminUnbanChat.
 //
 // An unknown kind answers nothing, as the reference does; a chat command
 // leaves no client action pending.
@@ -236,8 +236,7 @@ func (l *GameClientLink) adminUnban(gm *livePlayer, line string) {
 		l.sendAccountAccessLevel(name, accountUnbannedLevel)
 		sendText(gm, "Unban request sent for account "+javaString(name)+".")
 	case "chat":
-		l.log.Warn().Msg("admin: //unban chat not implemented yet (#3164, #3155)")
-		gm.SendFrame(serverpackets.FrameActionFailed())
+		l.adminUnbanChat(gm, target, name)
 	case "player":
 		if target != nil {
 			sendText(gm, target.Name+" player isn't actually banned.")

@@ -226,6 +226,7 @@ func provideGameClientLink(
 		Characters:   characters,
 		Clans:        clans,
 		AccessLevels: characters,
+		Punishments:  characters,
 		Petitions:    petitions,
 
 		Board:          board.Config,
