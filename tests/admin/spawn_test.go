@@ -350,3 +350,35 @@ func TestAdminListSpawns(t *testing.T) {
 		}
 	}
 }
+
+// TestAdminListSpawnsDecoration pins the //list_spawns row of a //spawn
+// decoration: like any standalone Spawn it reads "Spawn [id=N]" over
+// "Location: x, y, z, heading" of its spawn point (Spawn.toString,
+// Spawn.getDescription), never the bare position of an NPC no spawn placed.
+func TestAdminListSpawnsDecoration(t *testing.T) {
+	t.Parallel()
+	srv, _ := bootSpawnAdmin(t, nil)
+	gm := srv.Client
+
+	exchange(t, gm, encodeBuildCmd("spawn 13006"))
+	trees := npcsOf(srv, treeID)
+	if len(trees) != 1 {
+		t.Fatalf("trees in the world = %d, want 1", len(trees))
+	}
+	if _, ok := trees[0].(*npc.Decoration); !ok {
+		t.Fatalf("tree is %T, want a decoration", trees[0])
+	}
+	tree := trees[0].(placed)
+	x, y, z := tree.Position()
+	want := "<html><body>" +
+		listSpawnsRow(0, x, y, z, fmt.Sprintf(" - Spawn [id=13006]</a><br1>Location: %d, %d, %d, %d", x, y, z, tree.Heading())) +
+		strings.Repeat("<img height=42>", 7) + onePageBar("bypass admin_list_spawns 13006 1") + "</body></html>"
+
+	frames := exchange(t, gm, encodeBuildCmd("list_spawns 13006"))
+	if len(frames) != 1 {
+		t.Fatalf("//list_spawns 13006 frames = %x, want one page", testsupport.FrameOpcodes(frames))
+	}
+	if got := htmlBody(t, frames[0]); got != want {
+		t.Fatalf("//list_spawns 13006 page =\n%s\nwant\n%s", got, want)
+	}
+}
