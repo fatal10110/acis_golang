@@ -3,35 +3,40 @@ package skill
 import (
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
 // ---- from handler_test.go ----
-type recordingHandler struct {
-	types []string
-	uses  int
-}
-
-func (h *recordingHandler) Types() []string { return h.types }
-
-func (h *recordingHandler) Use(Cast) { h.uses++ }
-
+// TestRegistryDispatchesBySkillType registers the production
+// HEAL_PERCENT/MANAHEAL_PERCENT handler on its own and proves dispatch by
+// what it did to a real player: the registered type restores its MP, an
+// unregistered type changes nothing.
 func TestRegistryDispatchesBySkillType(t *testing.T) {
-	h := &recordingHandler{types: []string{"HEAL_PERCENT", "MANAHEAL_PERCENT"}}
+	h, ok := NewDefaultRegistry().Handler("HEAL_PERCENT")
+	if !ok {
+		t.Fatal("default registry has no HEAL_PERCENT handler")
+	}
 	registry := NewRegistry(h)
+	target := &player.Character{ID: 1}
+	target.SetResourceValues(player.Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 100, CurrentMP: 1})
+	const healed = 51.0 // 1 + 50% of 100
 
 	if _, ok := registry.Handler("heal_percent"); !ok {
 		t.Fatal("Handler() did not normalize skill type keys")
 	}
-	if !registry.Use(Cast{Skill: modelskill.Definition{SkillType: "MANAHEAL_PERCENT"}}) {
+	if !registry.Use(Cast{Caster: target, Skill: modelskill.Definition{SkillType: "MANAHEAL_PERCENT", Power: 50}, Targets: []Actor{target}}) {
 		t.Fatal("Use() returned false for a registered skill type")
 	}
-	if h.uses != 1 {
-		t.Fatalf("handler uses = %d, want 1", h.uses)
+	if got := target.MPValue(); got != healed {
+		t.Fatalf("target MP = %v, want %v", got, healed)
 	}
-	if registry.Use(Cast{Skill: modelskill.Definition{SkillType: "NOT_REGISTERED"}}) {
+	if registry.Use(Cast{Caster: target, Skill: modelskill.Definition{SkillType: "NOT_REGISTERED", Power: 50}, Targets: []Actor{target}}) {
 		t.Fatal("Use() returned true for an unregistered skill type")
+	}
+	if got := target.MPValue(); got != healed {
+		t.Fatalf("target MP after an unregistered dispatch = %v, want unchanged %v", got, healed)
 	}
 }
 

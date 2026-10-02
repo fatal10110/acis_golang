@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
@@ -18,7 +19,7 @@ import (
 func TestAIControllerDisabledReflectsCastingNow(t *testing.T) {
 	actor := &testActor{mp: 100, hp: 100}
 	ctrl := NewController(actor, nil)
-	ai := &AIController{Controller: ctrl, Definitions: fakeDefinitions{}}
+	ai := &AIController{Controller: ctrl, Definitions: definitions()}
 
 	if ai.Disabled() {
 		t.Fatal("Disabled() = true before any cast started")
@@ -35,7 +36,7 @@ func TestAIControllerDisabledReflectsCastingNow(t *testing.T) {
 
 func TestAIControllerDisabledReflectsAllSkillsDisabled(t *testing.T) {
 	actor := &testActor{mp: 100, hp: 100}
-	ai := &AIController{Controller: NewController(actor, nil), Definitions: fakeDefinitions{}}
+	ai := &AIController{Controller: NewController(actor, nil), Definitions: definitions()}
 
 	if ai.Disabled() {
 		t.Fatal("Disabled() = true before the lock is set")
@@ -55,7 +56,7 @@ func TestAIControllerDisabledReflectsAllSkillsDisabled(t *testing.T) {
 func TestAIControllerRangeAndStopsMovementReadDefinition(t *testing.T) {
 	ref := modelskill.Ref{ID: 5, Level: 1}
 	ai := &AIController{
-		Definitions: fakeDefinitions{ref: modelskill.Definition{CastRange: 600, HitTime: 1200}},
+		Definitions: definitions(modelskill.Definition{ID: 5, Level: 1, CastRange: 600, HitTime: 1200}),
 	}
 
 	if got := ai.Range(ref); got != 600 {
@@ -66,7 +67,7 @@ func TestAIControllerRangeAndStopsMovementReadDefinition(t *testing.T) {
 	}
 
 	shortRef := modelskill.Ref{ID: 6, Level: 1}
-	ai.Definitions = fakeDefinitions{shortRef: modelskill.Definition{HitTime: 40}}
+	ai.Definitions = definitions(modelskill.Definition{ID: 6, Level: 1, HitTime: 40})
 	if ai.StopsMovement(shortRef) {
 		t.Fatal("StopsMovement() = true for a 40ms hit time, want false")
 	}
@@ -81,7 +82,7 @@ func TestAIControllerCanAttemptReflectsCooldown(t *testing.T) {
 	def := modelskill.Definition{ID: 5, Level: 1}
 	actor := &testActor{mp: 100, hp: 100}
 	ctrl := NewController(actor, nil)
-	ai := &AIController{Controller: ctrl, Definitions: fakeDefinitions{ref: def}}
+	ai := &AIController{Controller: ctrl, Definitions: definitions(def)}
 	target := &fakeCastCreature{id: 2}
 
 	if !ai.CanAttempt(target, ref) {
@@ -99,7 +100,7 @@ func TestAIControllerCanCastReflectsControllerGates(t *testing.T) {
 	def := modelskill.Definition{ID: 5, Level: 1, MPConsume: 10}
 	actor := &testActor{mp: 5, hp: 100}
 	ctrl := NewController(actor, nil)
-	ai := &AIController{Controller: ctrl, Definitions: fakeDefinitions{ref: def}}
+	ai := &AIController{Controller: ctrl, Definitions: definitions(def)}
 	target := &fakeCastCreature{id: 2}
 
 	if ai.CanCast(target, ref) {
@@ -117,7 +118,7 @@ func TestAIControllerMeetsHPMPDisabledIgnoresReuse(t *testing.T) {
 	def := modelskill.Definition{ID: 5, Level: 1, MPConsume: 10}
 	actor := &testActor{mp: 10, hp: 100, disabledKeys: map[int32]bool{ReuseKey(def): true}}
 	ctrl := NewController(actor, nil)
-	ai := &AIController{Controller: ctrl, Definitions: fakeDefinitions{ref: def}}
+	ai := &AIController{Controller: ctrl, Definitions: definitions(def)}
 	target := &fakeCastCreature{id: 2}
 
 	if !ai.MeetsHPMPDisabled(target, ref) {
@@ -135,7 +136,7 @@ func TestAIControllerMeetsHPMPDisabledIgnoresReuse(t *testing.T) {
 	actor.mp = 10
 	actor.magicMuted = true
 	def.Magic = true
-	ai.Definitions = fakeDefinitions{ref: def}
+	ai.Definitions = definitions(def)
 	if ai.MeetsHPMPDisabled(target, ref) {
 		t.Fatal("MeetsHPMPDisabled() = true while magic muted")
 	}
@@ -163,7 +164,7 @@ func TestAIControllerCastStartsSchedulesAndAppliesEffectsOnHit(t *testing.T) {
 
 	ai := &AIController{
 		Controller:  ctrl,
-		Definitions: fakeDefinitions{ref: def},
+		Definitions: definitions(def),
 		Effects:     newEffectHandlers(effectsKnown{}, "DUMMYCAST", rec),
 		Caster:      caster,
 	}
@@ -213,52 +214,57 @@ func TestAIControllerCastBroadcastsSkillUseAtStartAndLaunchedOnLaunch(t *testing
 	def.SkillType = "DUMMYCAST"
 
 	rec := &recordingSkillHandler{}
-	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, kind: modelactor.KindNPC}}
 	target := &fakeCastCreature{id: 2, x: 10, y: 20, z: 30, kind: modelactor.KindNPC}
+	caster, events := newAICaster(t, 1, target)
 
 	ai := &AIController{
 		Controller:  ctrl,
-		Definitions: fakeDefinitions{ref: def},
+		Definitions: definitions(def),
 		Effects:     newEffectHandlers(effectsKnown{}, "DUMMYCAST", rec),
 		Caster:      caster,
 	}
 
 	ai.Cast(target, ref)
 
-	if len(caster.skillUseCalls) != 1 {
-		t.Fatalf("BroadcastSkillUse calls at cast start = %d, want 1", len(caster.skillUseCalls))
+	uses := event.Of[event.MagicSkillUse](events)
+	if len(uses) != 1 {
+		t.Fatalf("MagicSkillUse events at cast start = %d, want 1", len(uses))
 	}
-	use := caster.skillUseCalls[0]
-	if use.targetID != 2 || use.targetX != 10 || use.targetY != 20 || use.targetZ != 30 {
-		t.Fatalf("BroadcastSkillUse target = %+v, want id 2 at (10,20,30)", use)
+	// HitTime is the fixture's oracle-verified 525ms scaled hit time; the
+	// reuse delay is the plan's own and not under test here.
+	got := uses[0]
+	got.ReuseDelay = 0
+	want := event.MagicSkillUse{
+		CasterID: 1, TargetID: 2, TargetAt: location.Location{X: 10, Y: 20, Z: 30},
+		SkillID: int32(def.ID), Level: int32(def.Level), HitTime: 525,
 	}
-	if use.skillID != int32(def.ID) || use.level != int32(def.Level) {
-		t.Fatalf("BroadcastSkillUse skill = (%d,%d), want (%d,%d)", use.skillID, use.level, def.ID, def.Level)
+	if got != want {
+		t.Fatalf("MagicSkillUse = %+v, want %+v", got, want)
 	}
-	if len(caster.skillLaunchedCalls) != 0 {
-		t.Fatal("BroadcastSkillLaunched called before the Launch phase")
+	if got := event.Count[event.SkillLaunched](events); got != 0 {
+		t.Fatalf("SkillLaunched events before the Launch phase = %d, want 0", got)
 	}
 
 	clock.advance(125 * time.Millisecond) // Launch
 
-	if len(caster.skillUseCalls) != 1 {
-		t.Fatalf("BroadcastSkillUse calls after Launch = %d, want still 1 (no re-broadcast)", len(caster.skillUseCalls))
+	if got := event.Count[event.MagicSkillUse](events); got != 1 {
+		t.Fatalf("MagicSkillUse events after Launch = %d, want still 1 (no re-broadcast)", got)
 	}
-	if len(caster.skillLaunchedCalls) != 1 {
-		t.Fatalf("BroadcastSkillLaunched calls after Launch = %d, want 1", len(caster.skillLaunchedCalls))
+	launched := event.Of[event.SkillLaunched](events)
+	if len(launched) != 1 {
+		t.Fatalf("SkillLaunched events after Launch = %d, want 1", len(launched))
 	}
-	launched := caster.skillLaunchedCalls[0]
-	if launched.skillID != int32(def.ID) || launched.level != int32(def.Level) {
-		t.Fatalf("BroadcastSkillLaunched skill = (%d,%d), want (%d,%d)", launched.skillID, launched.level, def.ID, def.Level)
+	if launched[0].SkillID != int32(def.ID) || launched[0].Level != int32(def.Level) {
+		t.Fatalf("SkillLaunched skill = (%d,%d), want (%d,%d)", launched[0].SkillID, launched[0].Level, def.ID, def.Level)
 	}
-	if len(launched.targetIDs) != 1 || launched.targetIDs[0] != 2 {
-		t.Fatalf("BroadcastSkillLaunched targetIDs = %v, want [2]", launched.targetIDs)
+	if ids := launched[0].TargetIDs; len(ids) != 1 || ids[0] != 2 {
+		t.Fatalf("SkillLaunched TargetIDs = %v, want [2]", ids)
 	}
 
 	clock.advance(400 * time.Millisecond) // Hit
 
-	if len(caster.skillLaunchedCalls) != 1 {
-		t.Fatalf("BroadcastSkillLaunched calls after Hit = %d, want still 1 (no re-broadcast)", len(caster.skillLaunchedCalls))
+	if got := event.Count[event.SkillLaunched](events); got != 1 {
+		t.Fatalf("SkillLaunched events after Hit = %d, want still 1 (no re-broadcast)", got)
 	}
 }
 
@@ -282,13 +288,13 @@ func TestAIControllerCastBroadcastsSkillLaunchedWithFullTargetList(t *testing.T)
 	def.SkillType = "DUMMYCAST"
 
 	rec := &recordingSkillHandler{}
-	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, kind: modelactor.KindNPC}}
 	selected := &fakeCastCreature{id: 2, x: 10, kind: modelactor.KindPlayer}
 	bystander := &fakeCastCreature{id: 3, x: 20, kind: modelactor.KindPlayer}
+	caster, events := newAICaster(t, 1, selected, bystander)
 
 	ai := &AIController{
 		Controller:  ctrl,
-		Definitions: fakeDefinitions{ref: def},
+		Definitions: definitions(def),
 		Effects:     newEffectHandlers(effectsKnown{caster, selected, bystander}, "DUMMYCAST", rec),
 		Caster:      caster,
 	}
@@ -296,19 +302,20 @@ func TestAIControllerCastBroadcastsSkillLaunchedWithFullTargetList(t *testing.T)
 	ai.Cast(selected, ref)
 	clock.advance(125 * time.Millisecond) // Launch
 
-	if len(caster.skillLaunchedCalls) != 1 {
-		t.Fatalf("BroadcastSkillLaunched calls after Launch = %d, want 1", len(caster.skillLaunchedCalls))
+	launched := event.Of[event.SkillLaunched](events)
+	if len(launched) != 1 {
+		t.Fatalf("SkillLaunched events after Launch = %d, want 1", len(launched))
 	}
-	ids := caster.skillLaunchedCalls[0].targetIDs
+	ids := launched[0].TargetIDs
 	if len(ids) != 2 {
-		t.Fatalf("BroadcastSkillLaunched targetIDs = %v, want 2 ids (selected + bystander)", ids)
+		t.Fatalf("SkillLaunched TargetIDs = %v, want 2 ids (selected + bystander)", ids)
 	}
 	seen := map[int32]bool{}
 	for _, id := range ids {
 		seen[id] = true
 	}
 	if !seen[2] || !seen[3] {
-		t.Fatalf("BroadcastSkillLaunched targetIDs = %v, want to contain 2 and 3", ids)
+		t.Fatalf("SkillLaunched TargetIDs = %v, want to contain 2 and 3", ids)
 	}
 }
 
@@ -349,14 +356,14 @@ func TestAIControllerCastReusesLaunchResolvedTargetsAtHit(t *testing.T) {
 	def.SkillType = "DUMMYCAST"
 
 	rec := &recordingSkillHandler{skillTypes: []string{"DUMMYCAST"}}
-	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, kind: modelactor.KindNPC}}
 	selected := &fakeCastCreature{id: 2, x: 10, kind: modelactor.KindPlayer}
 	bystander := &fakeCastCreature{id: 3, x: 20, kind: modelactor.KindPlayer}
+	caster, events := newAICaster(t, 1, selected, bystander)
 
 	known := &mutableKnown{creatures: []skilltarget.Actor{caster, selected, bystander}}
 	ai := &AIController{
 		Controller:  ctrl,
-		Definitions: fakeDefinitions{ref: def},
+		Definitions: definitions(def),
 		Effects:     EffectHandlers{Targets: skilltarget.NewRegistry(known), Skills: handlerskill.NewRegistry(rec)},
 		Caster:      caster,
 	}
@@ -364,8 +371,8 @@ func TestAIControllerCastReusesLaunchResolvedTargetsAtHit(t *testing.T) {
 	ai.Cast(selected, ref)
 	clock.advance(125 * time.Millisecond) // Launch — resolves & broadcasts [selected, bystander]
 
-	if len(caster.skillLaunchedCalls) != 1 || len(caster.skillLaunchedCalls[0].targetIDs) != 2 {
-		t.Fatalf("BroadcastSkillLaunched calls = %+v, want 1 call with 2 targets", caster.skillLaunchedCalls)
+	if launched := event.Of[event.SkillLaunched](events); len(launched) != 1 || len(launched[0].TargetIDs) != 2 {
+		t.Fatalf("SkillLaunched events = %+v, want 1 with 2 targets", launched)
 	}
 
 	// bystander leaves the known set entirely before Hit fires — a fresh
@@ -399,12 +406,12 @@ func TestAIControllerCastBroadcastsEmptyTargetListWhenLaunchResolutionFails(t *t
 	def.Target = modelskill.TargetOne
 	def.SkillType = "DUMMYCAST"
 
-	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, kind: modelactor.KindNPC}}
 	target := &fakeCastCreature{id: 2, kind: modelactor.KindNPC}
+	caster, events := newAICaster(t, 1, target)
 
 	ai := &AIController{
 		Controller:  ctrl,
-		Definitions: fakeDefinitions{ref: def},
+		Definitions: definitions(def),
 		Effects:     EffectHandlers{}, // no Targets registry: resolution always fails
 		Caster:      caster,
 	}
@@ -412,11 +419,12 @@ func TestAIControllerCastBroadcastsEmptyTargetListWhenLaunchResolutionFails(t *t
 	ai.Cast(target, ref)
 	clock.advance(125 * time.Millisecond) // Launch
 
-	if len(caster.skillLaunchedCalls) != 1 {
-		t.Fatalf("BroadcastSkillLaunched calls = %d, want 1", len(caster.skillLaunchedCalls))
+	launched := event.Of[event.SkillLaunched](events)
+	if len(launched) != 1 {
+		t.Fatalf("SkillLaunched events = %d, want 1", len(launched))
 	}
-	if ids := caster.skillLaunchedCalls[0].targetIDs; len(ids) != 0 {
-		t.Fatalf("BroadcastSkillLaunched targetIDs = %v, want empty (no synthesized fallback target)", ids)
+	if ids := launched[0].TargetIDs; len(ids) != 0 {
+		t.Fatalf("SkillLaunched TargetIDs = %v, want empty (no synthesized fallback target)", ids)
 	}
 }
 
@@ -439,21 +447,22 @@ func TestAIControllerCastReportsAbortOnLaunchRevalidationFailure(t *testing.T) {
 	def.SkillType = "DUMMYCAST"
 	def.EffectRange = 100
 
-	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, kind: modelactor.KindNPC}}
+	target := &fakeCastCreature{id: 2, x: 200, kind: modelactor.KindNPC}
+	caster, events := newAICaster(t, 1, target)
 	ai := &AIController{
 		Controller:  ctrl,
-		Definitions: fakeDefinitions{ref: def},
+		Definitions: definitions(def),
 		Caster:      caster,
 	}
 
-	ai.Cast(&fakeCastCreature{id: 2, x: 200, kind: modelactor.KindNPC}, ref)
+	ai.Cast(target, ref)
 	clock.advance(125 * time.Millisecond) // Launch — RevalidateLaunch rejects (too far), aborts
 
 	if got := event.Count[event.CastAborted](rec); got != 1 {
 		t.Fatalf("CastAborted events = %d, want 1", got)
 	}
-	if len(caster.skillLaunchedCalls) != 0 {
-		t.Fatal("BroadcastSkillLaunched called on an aborted launch")
+	if got := event.Count[event.SkillLaunched](events); got != 0 {
+		t.Fatalf("SkillLaunched events on an aborted launch = %d, want 0", got)
 	}
 }
 
@@ -471,7 +480,7 @@ func TestAIControllerCastReportsLaunchAbort(t *testing.T) {
 	var got LaunchAbortReason
 	ai := &AIController{
 		Controller:  ctrl,
-		Definitions: fakeDefinitions{ref: def},
+		Definitions: definitions(def),
 		Caster:      &fakeCastCreature{id: 1, kind: modelactor.KindNPC},
 		OnLaunchAbort: func(reason LaunchAbortReason) {
 			got = reason
@@ -504,14 +513,14 @@ func TestAIControllerCastReportsHitResult(t *testing.T) {
 	def.SkillType = "DUMMYCAST"
 
 	rec := &recordingSkillHandler{result: handlerskill.Result{AttackFailed: 1}}
-	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, kind: modelactor.KindNPC}}
 	target := &fakeCastCreature{id: 2, kind: modelactor.KindNPC}
+	caster, _ := newAICaster(t, 1, target)
 
 	var got EffectResult
 	var calls int
 	ai := &AIController{
 		Controller:  ctrl,
-		Definitions: fakeDefinitions{ref: def},
+		Definitions: definitions(def),
 		Effects:     newEffectHandlers(effectsKnown{}, "DUMMYCAST", rec),
 		Caster:      caster,
 		OnHitResult: func(result EffectResult) {
@@ -552,13 +561,13 @@ func TestAIControllerCastStreamsHandlerMessagesToOnHitResult(t *testing.T) {
 	def.Offensive = true
 
 	var log []any
-	caster := &streamingSummonCaster{fakeBroadcastingCaster: fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, kind: modelactor.KindSummon}}, ownerID: 77}
+	caster := &streamingSummonCaster{fakeCastCreature: fakeCastCreature{id: 1, kind: modelactor.KindSummon}, ownerID: 77}
 	target := &mdamMarkerTarget{fakeCastCreature: fakeCastCreature{id: 2, kind: modelactor.KindNPC}, log: &log}
 
 	var calls []EffectResult
 	ai := &AIController{
 		Controller:  ctrl,
-		Definitions: fakeDefinitions{ref: def},
+		Definitions: definitions(def),
 		Effects: EffectHandlers{
 			Targets: skilltarget.NewRegistry(effectsKnown{}),
 			Skills:  handlerskill.NewDefaultRegistry(),
@@ -593,7 +602,7 @@ func TestAIControllerCastStreamsHandlerMessagesToOnHitResult(t *testing.T) {
 }
 
 type streamingSummonCaster struct {
-	fakeBroadcastingCaster
+	fakeCastCreature
 	ownerID int32
 }
 
@@ -636,12 +645,12 @@ func TestAIControllerCastSkipsEffectsForFusionSkill(t *testing.T) {
 	def.SkillType = "FUSION"
 
 	rec := &recordingSkillHandler{}
-	caster := &fakeBroadcastingCaster{fakeCastCreature: fakeCastCreature{id: 1, kind: modelactor.KindNPC}}
 	target := &fakeCastCreature{id: 2, kind: modelactor.KindNPC}
+	caster, events := newAICaster(t, 1, target)
 
 	ai := &AIController{
 		Controller:  ctrl,
-		Definitions: fakeDefinitions{ref: def},
+		Definitions: definitions(def),
 		Effects:     newEffectHandlers(effectsKnown{}, "FUSION", rec),
 		Caster:      caster,
 	}
@@ -656,8 +665,8 @@ func TestAIControllerCastSkipsEffectsForFusionSkill(t *testing.T) {
 	clock.advance(1100 * time.Millisecond)
 	clock.advance(400 * time.Millisecond)
 
-	if len(caster.skillLaunchedCalls) != 1 {
-		t.Fatalf("BroadcastSkillLaunched calls = %d, want 1 (Hit phase must actually run for this test to prove anything)", len(caster.skillLaunchedCalls))
+	if got := event.Count[event.SkillLaunched](events); got != 1 {
+		t.Fatalf("SkillLaunched events = %d, want 1 (Hit phase must actually run for this test to prove anything)", got)
 	}
 	if len(rec.calls) != 0 {
 		t.Fatalf("skill handler calls after FUSION Hit phase = %d, want 0 (CreatureCast.doFusionCast is a no-op)", len(rec.calls))
@@ -667,7 +676,7 @@ func TestAIControllerCastSkipsEffectsForFusionSkill(t *testing.T) {
 func TestAIControllerCastNoOpsForUnknownSkill(t *testing.T) {
 	actor := &testActor{mp: 100, hp: 100}
 	ctrl := NewController(actor, nil)
-	ai := &AIController{Controller: ctrl, Definitions: fakeDefinitions{}}
+	ai := &AIController{Controller: ctrl, Definitions: definitions()}
 	target := &fakeCastCreature{id: 2}
 
 	ai.Cast(target, modelskill.Ref{ID: 999})
@@ -675,40 +684,4 @@ func TestAIControllerCastNoOpsForUnknownSkill(t *testing.T) {
 	if ctrl.CastingNow() {
 		t.Fatal("CastingNow() = true after casting an unresolvable skill ref")
 	}
-}
-
-type fakeDefinitions map[modelskill.Ref]modelskill.Definition
-
-func (f fakeDefinitions) Definition(ref modelskill.Ref) (modelskill.Definition, bool) {
-	d, ok := f[ref]
-	return d, ok
-}
-
-type skillUseCall struct {
-	targetID                  int32
-	targetX, targetY, targetZ int
-	skillID, level            int32
-	hitTime, reuseDelay       int
-}
-
-type skillLaunchedCall struct {
-	skillID, level int32
-	targetIDs      []int32
-}
-
-// fakeBroadcastingCaster is a fakeCastCreature that also satisfies
-// magicCastBroadcaster, recording every AI-cast broadcast call so tests can
-// assert the Launch/Hit packet sequence AIController.Cast wires.
-type fakeBroadcastingCaster struct {
-	fakeCastCreature
-	skillUseCalls      []skillUseCall
-	skillLaunchedCalls []skillLaunchedCall
-}
-
-func (f *fakeBroadcastingCaster) BroadcastSkillUse(targetID int32, targetX, targetY, targetZ int, skillID, level int32, hitTime, reuseDelay int) {
-	f.skillUseCalls = append(f.skillUseCalls, skillUseCall{targetID, targetX, targetY, targetZ, skillID, level, hitTime, reuseDelay})
-}
-
-func (f *fakeBroadcastingCaster) BroadcastSkillLaunched(skillID, level int32, targetIDs []int32) {
-	f.skillLaunchedCalls = append(f.skillLaunchedCalls, skillLaunchedCall{skillID, level, targetIDs})
 }

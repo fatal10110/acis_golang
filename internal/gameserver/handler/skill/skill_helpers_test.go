@@ -26,7 +26,9 @@ import (
 // actually exercises. Prefer a real actor (see newDisablerHostile) when the
 // case is about the behavior rather than about one narrow surface; a double
 // that models death or identity itself declares its own Dead or ObjectID,
-// which shadows the one embedded here.
+// which shadows the one embedded here. Kept per
+// docs/agents/test-strategy.md: it stands in for no production type of its
+// own, only an object id the narrow doubles below share.
 type fakeActor struct {
 	effecttest.Actor
 	objectID int32
@@ -183,6 +185,12 @@ func (d continuousDefinitions) MaxLevel(id modelskill.ID) int {
 }
 
 // ---- from cubic_test.go ----
+// fakeCubicSummoner records which cubics a cast admitted and whether each
+// was granted by another player. *player.Character is the real summoner and
+// the cubic tests that only need the admitted list or the servitor request
+// use it, but the given-by-other flag it keeps is read by nothing it
+// exports, so the tests pinning that flag keep this double. Kept per
+// docs/agents/test-strategy.md.
 type fakeCubicSummoner struct {
 	neutralCreature
 	world.Presence
@@ -190,7 +198,6 @@ type fakeCubicSummoner struct {
 	added        map[cubic.ID]bool
 	givenByOther map[cubic.ID]bool
 	nextAdded    bool
-	servitor     modelskill.Definition
 }
 
 // newFakeCubicSummoner returns a summoner with its own world object id, so a
@@ -210,9 +217,7 @@ func (f *fakeCubicSummoner) AddOrRefreshCubic(id cubic.ID, givenByOther bool) (t
 	return true, f.nextAdded
 }
 
-func (f *fakeCubicSummoner) SummonServitor(def modelskill.Definition) {
-	f.servitor = def
-}
+func (*fakeCubicSummoner) SummonServitor(modelskill.Definition) {}
 
 // ---- from disablers_test.go ----
 // disablerFake is a Combatant (for the hate-table skill types) that also

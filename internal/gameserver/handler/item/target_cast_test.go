@@ -68,12 +68,7 @@ func TestResolveTargetCastRefusals(t *testing.T) {
 	crystal := modelskill.Definition{ID: soulCrystalSkillID, Level: 1}
 	other := modelskill.Definition{ID: 2097, Level: 1}
 	spice := modelskill.Definition{ID: 2188, Level: 1}
-	defs := fakeDefinitionTable{
-		{ID: unlock.ID, Level: 1}:  unlock,
-		{ID: crystal.ID, Level: 1}: crystal,
-		{ID: other.ID, Level: 1}:   other,
-		{ID: spice.ID, Level: 1}:   spice,
-	}
+	defs := definitions(unlock, crystal, other, spice)
 	ref := func(def modelskill.Definition) modelitem.SkillRef {
 		return modelitem.SkillRef{ID: int32(def.ID), Level: int32(def.Level)}
 	}
@@ -153,11 +148,11 @@ func TestResolveTargetCastIgnoresOtherItems(t *testing.T) {
 		"other handler": targetCastTemplate("ItemSkills", modelitem.SkillRef{ID: 2065, Level: 1}),
 		"weapon":        {Kind: modelitem.KindWeapon},
 	} {
-		if got := ResolveTargetCast(tmpl, user, fakeDefinitionTable{}); got.Handled {
+		if got := ResolveTargetCast(tmpl, user, definitions()); got.Handled {
 			t.Fatalf("%s: Handled = true, want false", name)
 		}
 	}
-	if got := ResolveTargetCast(targetCastTemplate(KeysHandler), nil, fakeDefinitionTable{}); got.Handled {
+	if got := ResolveTargetCast(targetCastTemplate(KeysHandler), nil, definitions()); got.Handled {
 		t.Fatal("nil user: Handled = true, want false")
 	}
 }

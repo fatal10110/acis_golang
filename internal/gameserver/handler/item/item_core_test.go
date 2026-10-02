@@ -5,45 +5,39 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/handler/skill/skilltest"
-
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 // ---- from cast_ai_test.go ----
-func newCastAICharacter(id int32) *player.Character {
-	ch := &player.Character{ID: id}
-	ch.SetResourceValues(player.Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 100, CurrentMP: 100})
-	return ch
+func aiCastItemTemplate() *modelitem.Template {
+	return &modelitem.Template{ID: 1, Kind: modelitem.KindEtcItem, Stackable: true, Destroyable: true, EtcItem: &modelitem.EtcItemDetail{SharedReuseGroup: -1, ReuseDelay: 8000}}
 }
 
 func TestConsumeAICastItemInstallsItemReuse(t *testing.T) {
 	def := modelskill.Definition{ID: 9, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf, ReuseDelay: 5000}
-	caster := newCastAICharacter(10)
-	inv := itemcontainer.NewPlayerInventory(caster.ID, modelitem.NewTable(nil))
-	inst := &modelitem.Instance{ObjectID: 20, TemplateID: 1}
-	destroyer := &fakeDestroyer{}
-	tmpl := &modelitem.Template{ID: 1, EtcItem: &modelitem.EtcItemDetail{SharedReuseGroup: -1, ReuseDelay: 8000}}
+	tmpl := aiCastItemTemplate()
+	caster := newPlayer(10, []*modelitem.Template{tmpl}, carried(20, tmpl.ID, 1))
+	inv := caster.Inventory()
 
 	consumed := ConsumeAICastItem(ConsumeAICastItemRequest{
-		Caster: caster, Definition: def, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer,
+		Caster: caster, Definition: def, Inventory: inv, Item: inv.ItemByObjectID(20), Template: tmpl, Destroyer: destroyer(),
 	})
 	if consumed.Err != nil {
 		t.Fatalf("ConsumeAICastItem() error: %v", consumed.Err)
 	}
-	if destroyer.calls != 1 {
-		t.Fatalf("DestroyItem calls = %d, want 1", destroyer.calls)
+	if got := stackCount(inv, 20); got != 0 {
+		t.Fatalf("item stack after consume = %d, want 0 (the one carried unit destroyed)", got)
 	}
 	if !caster.SkillDisabled(actorcast.ReuseKey(def)) {
 		t.Fatal("skill not disabled after the item was consumed, want the item reuse installed")
@@ -52,13 +46,13 @@ func TestConsumeAICastItemInstallsItemReuse(t *testing.T) {
 
 func TestConsumeAICastItemMissingItemChangesNothing(t *testing.T) {
 	def := modelskill.Definition{ID: 9, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf, ReuseDelay: 5000}
-	caster := newCastAICharacter(10)
-	inv := itemcontainer.NewPlayerInventory(caster.ID, modelitem.NewTable(nil))
-	inst := &modelitem.Instance{ObjectID: 20, TemplateID: 1}
-	destroyer := &fakeDestroyer{fail: true}
+	tmpl := aiCastItemTemplate()
+	caster := newPlayer(10, []*modelitem.Template{tmpl}, carried(21, tmpl.ID, 1))
+	inv := caster.Inventory()
 
+	// Object 20 is not carried, so there is nothing to destroy.
 	consumed := ConsumeAICastItem(ConsumeAICastItemRequest{
-		Caster: caster, Definition: def, Inventory: inv, Item: inst, Destroyer: destroyer,
+		Caster: caster, Definition: def, Inventory: inv, Item: carried(20, tmpl.ID, 1), Destroyer: destroyer(),
 	})
 	if !errors.Is(consumed.Err, actorcast.ErrNotEnoughItems) {
 		t.Fatalf("ConsumeAICastItem() error = %v, want ErrNotEnoughItems", consumed.Err)
@@ -66,18 +60,21 @@ func TestConsumeAICastItemMissingItemChangesNothing(t *testing.T) {
 	if caster.SkillDisabled(actorcast.ReuseKey(def)) {
 		t.Fatal("skill disabled after a failed consume, want no reuse")
 	}
+	if got := stackCount(inv, 21); got != 1 {
+		t.Fatalf("unrelated stack = %d, want untouched 1", got)
+	}
 }
 
 func TestConsumeAICastItemReportsSharedReuseGroup(t *testing.T) {
 	def := modelskill.Definition{ID: 9, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf, ReuseDelay: 5000}
-	inv := itemcontainer.NewPlayerInventory(10, modelitem.NewTable(nil))
-	inst := &modelitem.Instance{ObjectID: 20, TemplateID: 1}
-	destroyer := &fakeDestroyer{}
+	carriedTmpl := aiCastItemTemplate()
 
 	t.Run("no group defined", func(t *testing.T) {
+		caster := newPlayer(10, []*modelitem.Template{carriedTmpl}, carried(20, carriedTmpl.ID, 1))
+		inv := caster.Inventory()
 		tmpl := &modelitem.Template{ID: 1, EtcItem: &modelitem.EtcItemDetail{SharedReuseGroup: -1}}
 		res := ConsumeAICastItem(ConsumeAICastItemRequest{
-			Caster: newCastAICharacter(10), Definition: def, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer,
+			Caster: caster, Definition: def, Inventory: inv, Item: inv.ItemByObjectID(20), Template: tmpl, Destroyer: destroyer(),
 		})
 		if res.Err != nil {
 			t.Fatalf("ConsumeAICastItem() error: %v", res.Err)
@@ -88,9 +85,11 @@ func TestConsumeAICastItemReportsSharedReuseGroup(t *testing.T) {
 	})
 
 	t.Run("group defined, item reuse longer than skill's", func(t *testing.T) {
+		caster := newPlayer(11, []*modelitem.Template{carriedTmpl}, carried(20, carriedTmpl.ID, 1))
+		inv := caster.Inventory()
 		tmpl := &modelitem.Template{ID: 1, EtcItem: &modelitem.EtcItemDetail{SharedReuseGroup: 3, ReuseDelay: 8000}}
 		res := ConsumeAICastItem(ConsumeAICastItemRequest{
-			Caster: newCastAICharacter(11), Definition: def, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer,
+			Caster: caster, Definition: def, Inventory: inv, Item: inv.ItemByObjectID(20), Template: tmpl, Destroyer: destroyer(),
 		})
 		if res.Err != nil {
 			t.Fatalf("ConsumeAICastItem() error: %v", res.Err)
@@ -149,17 +148,17 @@ func TestItemBlockedByKarmaTeleport(t *testing.T) {
 	tests := []struct {
 		name                   string
 		tmpl                   *modelitem.Template
-		defs                   aiCastDefinitions
+		defs                   actorcast.Definitions
 		karma                  int
 		karmaPlayerCanTeleport bool
 		want                   bool
 	}{
-		{"nil template", nil, aiCastDefinitions{}, 1, false, false},
-		{"karma zero does not block", recallTmpl, aiCastDefinitions{{ID: 1050, Level: 1}: recall}, 0, false, false},
-		{"karma positive but config allows teleport", recallTmpl, aiCastDefinitions{{ID: 1050, Level: 1}: recall}, 1, true, false},
-		{"karma positive blocks recall item", recallTmpl, aiCastDefinitions{{ID: 1050, Level: 1}: recall}, 1, false, true},
-		{"karma positive does not block non-teleport skill", buffTmpl, aiCastDefinitions{{ID: 2005, Level: 1}: buff}, 1, false, false},
-		{"unresolved attached skill does not block", unresolvedTmpl, aiCastDefinitions{}, 1, false, false},
+		{"nil template", nil, definitions(), 1, false, false},
+		{"karma zero does not block", recallTmpl, definitions(recall), 0, false, false},
+		{"karma positive but config allows teleport", recallTmpl, definitions(recall), 1, true, false},
+		{"karma positive blocks recall item", recallTmpl, definitions(recall), 1, false, true},
+		{"karma positive does not block non-teleport skill", buffTmpl, definitions(buff), 1, false, false},
+		{"unresolved attached skill does not block", unresolvedTmpl, definitions(), 1, false, false},
 	}
 
 	for _, tt := range tests {
@@ -196,38 +195,13 @@ func TestRecallCastBlockedByKarma(t *testing.T) {
 }
 
 // ---- from use_beast_shot_test.go ----
-type fakeBeastShotCharger struct {
-	dead      bool
-	charged   map[modelitem.ShotKind]bool
-	ssCount   int
-	spsCount  int
-	setCalled map[modelitem.ShotKind]bool
-}
-
-func newFakeBeastShotCharger() *fakeBeastShotCharger {
-	return &fakeBeastShotCharger{
-		charged:   make(map[modelitem.ShotKind]bool),
-		setCalled: make(map[modelitem.ShotKind]bool),
-	}
-}
-
-func (f *fakeBeastShotCharger) Dead() bool { return f.dead }
-func (f *fakeBeastShotCharger) ChargedShot(kind modelitem.ShotKind) bool {
-	return f.charged[kind]
-}
-
-func (f *fakeBeastShotCharger) SetChargedShot(kind modelitem.ShotKind, charged bool) {
-	f.setCalled[kind] = charged
-	f.charged[kind] = charged
-}
-func (f *fakeBeastShotCharger) SSCount() int  { return f.ssCount }
-func (f *fakeBeastShotCharger) SPSCount() int { return f.spsCount }
-
 func beastShotTemplate(id int32, handler string, skillID int32) *modelitem.Template {
 	tmpl := &modelitem.Template{
-		ID:      id,
-		Kind:    modelitem.KindEtcItem,
-		EtcItem: &modelitem.EtcItemDetail{Handler: handler},
+		ID:          id,
+		Kind:        modelitem.KindEtcItem,
+		Stackable:   true,
+		Destroyable: true,
+		EtcItem:     &modelitem.EtcItemDetail{Handler: handler},
 	}
 	if skillID != 0 {
 		tmpl.AttachedSkills = []modelitem.SkillRef{{ID: skillID, Level: 1}}
@@ -235,15 +209,32 @@ func beastShotTemplate(id int32, handler string, skillID int32) *modelitem.Templ
 	return tmpl
 }
 
+// beastShotStack returns an inventory carrying count units of tmpl as
+// object 10.
+func beastShotStack(tmpl *modelitem.Template, count int) (*itemcontainer.Inventory, *modelitem.Instance) {
+	inv := itemcontainer.RestorePlayerInventory(1, modelitem.NewTable([]*modelitem.Template{tmpl}), []*modelitem.Instance{carried(10, tmpl.ID, count)})
+	return inv, inv.ItemByObjectID(10)
+}
+
+var beastShotKinds = []modelitem.ShotKind{modelitem.ShotSoul, modelitem.ShotSpirit, modelitem.ShotBlessedSpirit}
+
+// chargedKinds lists the shot kinds charged on s.
+func chargedKinds(s BeastShotCharger) []modelitem.ShotKind {
+	var kinds []modelitem.ShotKind
+	for _, kind := range beastShotKinds {
+		if s.ChargedShot(kind) {
+			kinds = append(kinds, kind)
+		}
+	}
+	return kinds
+}
+
 func TestUseBeastShotSoulshotApplied(t *testing.T) {
 	tmpl := beastShotTemplate(6645, BeastSoulShotsHandler, 2033)
-	inv := itemcontainer.NewPlayerInventory(1, modelitem.NewTable([]*modelitem.Template{tmpl}))
-	inst := &modelitem.Instance{ObjectID: 10, TemplateID: 6645}
-	summon := newFakeBeastShotCharger()
-	summon.ssCount = 5
-	destroyer := &fakeDestroyer{}
+	inv, inst := beastShotStack(tmpl, 12)
+	servitor := newServitor(t, 2, 5, 3)
 
-	res := UseBeastShot(BeastShotUseRequest{Summon: summon, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer})
+	res := UseBeastShot(BeastShotUseRequest{Summon: servitor, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer()})
 
 	if res.Outcome != BeastShotApplied {
 		t.Fatalf("Outcome = %v, want BeastShotApplied", res.Outcome)
@@ -251,193 +242,179 @@ func TestUseBeastShotSoulshotApplied(t *testing.T) {
 	if res.SkillID != 2033 {
 		t.Fatalf("SkillID = %d, want 2033", res.SkillID)
 	}
-	if destroyer.calls != 1 {
-		t.Fatalf("DestroyItem calls = %d, want 1", destroyer.calls)
+	if got := stackCount(inv, 10); got != 7 {
+		t.Fatalf("stack left = %d, want 7 (12 minus the servitor's 5 soulshots per charge)", got)
 	}
-	if !summon.setCalled[modelitem.ShotSoul] {
-		t.Fatal("SetChargedShot(ShotSoul, true) not called")
+	if got := chargedKinds(servitor); len(got) != 1 || got[0] != modelitem.ShotSoul {
+		t.Fatalf("servitor charged kinds = %v, want [soulshot]", got)
 	}
 }
 
 func TestUseBeastShotSpiritshotAndBlessedResolveDistinctKinds(t *testing.T) {
-	destroyer := &fakeDestroyer{}
+	for _, tc := range []struct {
+		name string
+		id   int32
+		want modelitem.ShotKind
+	}{
+		{"spiritshot", 6646, modelitem.ShotSpirit},
+		{"blessed spiritshot", 6647, modelitem.ShotBlessedSpirit},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpl := beastShotTemplate(tc.id, BeastSpiritShotsHandler, 0)
+			inv, inst := beastShotStack(tmpl, 12)
+			servitor := newServitor(t, 2, 5, 3)
 
-	spiritTmpl := beastShotTemplate(6646, BeastSpiritShotsHandler, 0)
-	inv := itemcontainer.NewPlayerInventory(1, modelitem.NewTable([]*modelitem.Template{spiritTmpl}))
-	inst := &modelitem.Instance{ObjectID: 10, TemplateID: 6646}
-	spiritSummon := newFakeBeastShotCharger()
-	if res := UseBeastShot(BeastShotUseRequest{Summon: spiritSummon, Inventory: inv, Item: inst, Template: spiritTmpl, Destroyer: destroyer}); res.Outcome != BeastShotApplied {
-		t.Fatalf("spirit Outcome = %v, want BeastShotApplied", res.Outcome)
-	}
-	if !spiritSummon.setCalled[modelitem.ShotSpirit] {
-		t.Fatal("expected ShotSpirit charged")
-	}
-
-	blessedTmpl := beastShotTemplate(6647, BeastSpiritShotsHandler, 0)
-	blessedSummon := newFakeBeastShotCharger()
-	if res := UseBeastShot(BeastShotUseRequest{Summon: blessedSummon, Inventory: inv, Item: inst, Template: blessedTmpl, Destroyer: destroyer}); res.Outcome != BeastShotApplied {
-		t.Fatalf("blessed Outcome = %v, want BeastShotApplied", res.Outcome)
-	}
-	if !blessedSummon.setCalled[modelitem.ShotBlessedSpirit] {
-		t.Fatal("expected ShotBlessedSpirit charged")
+			if res := UseBeastShot(BeastShotUseRequest{Summon: servitor, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer()}); res.Outcome != BeastShotApplied {
+				t.Fatalf("Outcome = %v, want BeastShotApplied", res.Outcome)
+			}
+			if got := chargedKinds(servitor); len(got) != 1 || got[0] != tc.want {
+				t.Fatalf("servitor charged kinds = %v, want [%v]", got, tc.want)
+			}
+			if got := stackCount(inv, 10); got != 9 {
+				t.Fatalf("stack left = %d, want 9 (12 minus the servitor's 3 spiritshots per charge)", got)
+			}
+		})
 	}
 }
 
 func TestUseBeastShotAlreadyChargedDoesNotConsume(t *testing.T) {
 	tmpl := beastShotTemplate(6645, BeastSoulShotsHandler, 0)
-	inv := itemcontainer.NewPlayerInventory(1, modelitem.NewTable([]*modelitem.Template{tmpl}))
-	inst := &modelitem.Instance{ObjectID: 10, TemplateID: 6645}
-	summon := newFakeBeastShotCharger()
-	summon.charged[modelitem.ShotSoul] = true
-	destroyer := &fakeDestroyer{}
+	inv, inst := beastShotStack(tmpl, 12)
+	servitor := newServitor(t, 2, 5, 3)
+	servitor.SetChargedShot(modelitem.ShotSoul, true)
 
-	res := UseBeastShot(BeastShotUseRequest{Summon: summon, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer})
+	res := UseBeastShot(BeastShotUseRequest{Summon: servitor, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer()})
 
 	if res.Outcome != BeastShotAlreadyCharged {
 		t.Fatalf("Outcome = %v, want BeastShotAlreadyCharged", res.Outcome)
 	}
-	if destroyer.calls != 0 {
-		t.Fatalf("DestroyItem calls = %d, want 0", destroyer.calls)
+	if got := stackCount(inv, 10); got != 12 {
+		t.Fatalf("stack left = %d, want untouched 12", got)
 	}
 }
 
 func TestUseBeastShotCallerIsSummonRejected(t *testing.T) {
 	tmpl := beastShotTemplate(6645, BeastSoulShotsHandler, 0)
-	inv := itemcontainer.NewPlayerInventory(1, modelitem.NewTable([]*modelitem.Template{tmpl}))
-	inst := &modelitem.Instance{ObjectID: 10, TemplateID: 6645}
-	destroyer := &fakeDestroyer{}
+	inv, inst := beastShotStack(tmpl, 12)
+	servitor := newServitor(t, 2, 5, 3)
 
-	res := UseBeastShot(BeastShotUseRequest{CallerIsSummon: true, Summon: newFakeBeastShotCharger(), Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer})
+	res := UseBeastShot(BeastShotUseRequest{CallerIsSummon: true, Summon: servitor, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer()})
 
 	if res.Outcome != BeastShotCallerIsSummon {
 		t.Fatalf("Outcome = %v, want BeastShotCallerIsSummon", res.Outcome)
 	}
-	if destroyer.calls != 0 {
-		t.Fatalf("DestroyItem calls = %d, want 0", destroyer.calls)
+	if got := stackCount(inv, 10); got != 12 {
+		t.Fatalf("stack left = %d, want untouched 12", got)
+	}
+	if got := chargedKinds(servitor); len(got) != 0 {
+		t.Fatalf("servitor charged kinds = %v, want none", got)
 	}
 }
 
 func TestUseBeastShotNoSummonRejected(t *testing.T) {
 	tmpl := beastShotTemplate(6645, BeastSoulShotsHandler, 0)
-	inv := itemcontainer.NewPlayerInventory(1, modelitem.NewTable([]*modelitem.Template{tmpl}))
-	inst := &modelitem.Instance{ObjectID: 10, TemplateID: 6645}
-	destroyer := &fakeDestroyer{}
+	inv, inst := beastShotStack(tmpl, 12)
 
-	res := UseBeastShot(BeastShotUseRequest{Summon: nil, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer})
+	res := UseBeastShot(BeastShotUseRequest{Summon: nil, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer()})
 
 	if res.Outcome != BeastShotNoSummon {
 		t.Fatalf("Outcome = %v, want BeastShotNoSummon", res.Outcome)
+	}
+	if got := stackCount(inv, 10); got != 12 {
+		t.Fatalf("stack left = %d, want untouched 12", got)
 	}
 }
 
 func TestUseBeastShotSummonDeadRejected(t *testing.T) {
 	tmpl := beastShotTemplate(6645, BeastSoulShotsHandler, 0)
-	inv := itemcontainer.NewPlayerInventory(1, modelitem.NewTable([]*modelitem.Template{tmpl}))
-	inst := &modelitem.Instance{ObjectID: 10, TemplateID: 6645}
-	summon := newFakeBeastShotCharger()
-	summon.dead = true
-	destroyer := &fakeDestroyer{}
+	inv, inst := beastShotStack(tmpl, 12)
+	servitor := newServitor(t, 2, 5, 3)
+	if !servitor.Kill(nil) {
+		t.Fatal("Kill() = false, want the servitor dead")
+	}
 
-	res := UseBeastShot(BeastShotUseRequest{Summon: summon, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer})
+	res := UseBeastShot(BeastShotUseRequest{Summon: servitor, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer()})
 
 	if res.Outcome != BeastShotSummonDead {
 		t.Fatalf("Outcome = %v, want BeastShotSummonDead", res.Outcome)
 	}
-	if destroyer.calls != 0 {
-		t.Fatalf("DestroyItem calls = %d, want 0", destroyer.calls)
+	if got := stackCount(inv, 10); got != 12 {
+		t.Fatalf("stack left = %d, want untouched 12", got)
 	}
 }
 
 func TestUseBeastShotNotEnoughItemsWhenDestroyFails(t *testing.T) {
 	tmpl := beastShotTemplate(6645, BeastSoulShotsHandler, 0)
-	inv := itemcontainer.NewPlayerInventory(1, modelitem.NewTable([]*modelitem.Template{tmpl}))
-	inst := &modelitem.Instance{ObjectID: 10, TemplateID: 6645}
-	summon := newFakeBeastShotCharger()
-	destroyer := &fakeDestroyer{fail: true}
+	inv, inst := beastShotStack(tmpl, 4) // the servitor needs 5
+	servitor := newServitor(t, 2, 5, 3)
 
-	res := UseBeastShot(BeastShotUseRequest{Summon: summon, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer})
+	res := UseBeastShot(BeastShotUseRequest{Summon: servitor, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer()})
 
 	if res.Outcome != BeastShotNotEnoughItems {
 		t.Fatalf("Outcome = %v, want BeastShotNotEnoughItems", res.Outcome)
 	}
-	if summon.setCalled[modelitem.ShotSoul] {
-		t.Fatal("SetChargedShot should not be called when destroy fails")
+	if res.AutoEnabled {
+		t.Fatal("AutoEnabled = true with no caster, want false")
+	}
+	if got := chargedKinds(servitor); len(got) != 0 {
+		t.Fatalf("servitor charged kinds = %v, want none: a failed destroy must not charge", got)
+	}
+	if got := stackCount(inv, 10); got != 4 {
+		t.Fatalf("stack left = %d, want untouched 4", got)
 	}
 }
 
-type fakeAutoShotChecker struct{ enabled bool }
-
-func (f *fakeAutoShotChecker) AutoSoulShotEnabled(itemID int32) bool { return f.enabled }
-
 func TestUseBeastShotNotEnoughItemsAutoEnabledPropagatesToResult(t *testing.T) {
 	tmpl := beastShotTemplate(6645, BeastSoulShotsHandler, 0)
-	inv := itemcontainer.NewPlayerInventory(1, modelitem.NewTable([]*modelitem.Template{tmpl}))
-	inst := &modelitem.Instance{ObjectID: 10, TemplateID: 6645}
-	summon := newFakeBeastShotCharger()
-	destroyer := &fakeDestroyer{fail: true}
+	for _, tc := range []struct {
+		name     string
+		autoID   int32
+		wantAuto bool
+	}{
+		{"this shot on auto", tmpl.ID, true},
+		{"another shot on auto", 6646, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			inv, inst := beastShotStack(tmpl, 4)
+			owner := &player.Character{ID: 1}
+			owner.SetAutoSoulShot(tc.autoID, true)
 
-	res := UseBeastShot(BeastShotUseRequest{Caster: &fakeAutoShotChecker{enabled: true}, Summon: summon, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer})
+			res := UseBeastShot(BeastShotUseRequest{Caster: owner, Summon: newServitor(t, 2, 5, 3), Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer()})
 
-	if !res.AutoEnabled {
-		t.Fatal("AutoEnabled = false, want true")
+			if res.Outcome != BeastShotNotEnoughItems {
+				t.Fatalf("Outcome = %v, want BeastShotNotEnoughItems", res.Outcome)
+			}
+			if res.AutoEnabled != tc.wantAuto {
+				t.Fatalf("AutoEnabled = %v, want %v", res.AutoEnabled, tc.wantAuto)
+			}
+		})
 	}
 }
 
 func TestUseBeastShotUnrelatedHandlerNotHandled(t *testing.T) {
 	tmpl := beastShotTemplate(500, "SomeOtherHandler", 0)
-	inv := itemcontainer.NewPlayerInventory(1, modelitem.NewTable([]*modelitem.Template{tmpl}))
-	inst := &modelitem.Instance{ObjectID: 10, TemplateID: 500}
-	destroyer := &fakeDestroyer{}
+	inv, inst := beastShotStack(tmpl, 12)
+	servitor := newServitor(t, 2, 5, 3)
 
-	res := UseBeastShot(BeastShotUseRequest{Summon: newFakeBeastShotCharger(), Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer})
+	res := UseBeastShot(BeastShotUseRequest{Summon: servitor, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer()})
 
 	if res.Outcome != BeastShotNotHandled {
 		t.Fatalf("Outcome = %v, want BeastShotNotHandled", res.Outcome)
 	}
+	if got := stackCount(inv, 10); got != 12 {
+		t.Fatalf("stack left = %d, want untouched 12", got)
+	}
 }
 
 // ---- from use_shot_test.go ----
-type fakeShotCharger struct {
-	soulshotConsume, spiritshotConsume int32
-	soulshotResult, spiritshotResult   player.ChargeShotResult
-	autoEnabled                        bool
-
-	gotShotCrystal, gotSpiritCrystal modelitem.CrystalType
-	gotSpiritKind                    modelitem.ShotKind
-	autoEnabledCalledWith            int32
-	setChargedShotCalls              int
-	setChargedShotKind               modelitem.ShotKind
-	setChargedShotValue              bool
-}
-
-func (f *fakeShotCharger) ChargeSoulshot(shotCrystal modelitem.CrystalType, reducedRoll int) (int32, player.ChargeShotResult) {
-	f.gotShotCrystal = shotCrystal
-	return f.soulshotConsume, f.soulshotResult
-}
-
-func (f *fakeShotCharger) ChargeSpiritshot(kind modelitem.ShotKind, shotCrystal modelitem.CrystalType) (int32, player.ChargeShotResult) {
-	f.gotSpiritKind = kind
-	f.gotSpiritCrystal = shotCrystal
-	return f.spiritshotConsume, f.spiritshotResult
-}
-
-func (f *fakeShotCharger) SetChargedShot(kind modelitem.ShotKind, charged bool) {
-	f.setChargedShotCalls++
-	f.setChargedShotKind = kind
-	f.setChargedShotValue = charged
-}
-
-func (f *fakeShotCharger) AutoSoulShotEnabled(itemID int32) bool {
-	f.autoEnabledCalledWith = itemID
-	return f.autoEnabled
-}
-
 func shotTemplate(handler string, crystal modelitem.CrystalType, skillID int32) *modelitem.Template {
 	tmpl := &modelitem.Template{
-		ID:      500,
-		Kind:    modelitem.KindEtcItem,
-		Crystal: crystal,
-		EtcItem: &modelitem.EtcItemDetail{Handler: handler},
+		ID:          500,
+		Kind:        modelitem.KindEtcItem,
+		Crystal:     crystal,
+		Stackable:   true,
+		Destroyable: true,
+		EtcItem:     &modelitem.EtcItemDetail{Handler: handler},
 	}
 	if skillID != 0 {
 		tmpl.AttachedSkills = []modelitem.SkillRef{{ID: skillID, Level: 1}}
@@ -445,15 +422,46 @@ func shotTemplate(handler string, crystal modelitem.CrystalType, skillID int32) 
 	return tmpl
 }
 
+// shotWeaponID is a sword taking 2 soulshots or 1 spiritshot per charge.
+const shotWeaponID = 600
+
+func shotWeapon(crystal modelitem.CrystalType) *modelitem.Template {
+	return &modelitem.Template{
+		ID: shotWeaponID, Kind: modelitem.KindWeapon, Slot: modelitem.SlotRHand, Crystal: crystal,
+		Weapon: &modelitem.WeaponDetail{Type: modelitem.WeaponSword, SoulshotCount: 2, SpiritshotCount: 1},
+	}
+}
+
+// newShooter returns a player carrying count units of shot as object 10
+// and, when weapon is set, wielding it as object 20.
+func newShooter(shot, weapon *modelitem.Template, count int) (*player.Character, *itemcontainer.Inventory, *modelitem.Instance) {
+	templates := []*modelitem.Template{shot}
+	items := []*modelitem.Instance{carried(10, shot.ID, count)}
+	if weapon != nil {
+		templates = append(templates, weapon)
+		items = append(items, equipped(20, weapon.ID))
+	}
+	ch := newPlayer(1, templates, items...)
+	inv := ch.Inventory()
+	return ch, inv, inv.ItemByObjectID(10)
+}
+
+// weaponCharges lists the shot kinds charged on ch's weapon.
+func weaponCharges(ch *player.Character) []modelitem.ShotKind {
+	var kinds []modelitem.ShotKind
+	for _, kind := range beastShotKinds {
+		if ch.ChargedShot(kind) {
+			kinds = append(kinds, kind)
+		}
+	}
+	return kinds
+}
+
 func TestUseShotSoulshotApplied(t *testing.T) {
 	tmpl := shotTemplate(SoulShotsHandler, modelitem.CrystalD, 2154)
-	table := modelitem.NewTable([]*modelitem.Template{tmpl})
-	inv := itemcontainer.NewPlayerInventory(1, table)
-	inst := &modelitem.Instance{ObjectID: 10, TemplateID: 500}
-	caster := &fakeShotCharger{soulshotConsume: 2, soulshotResult: player.ChargeShotOK}
-	destroyer := &fakeDestroyer{}
+	caster, inv, inst := newShooter(tmpl, shotWeapon(modelitem.CrystalD), 10)
 
-	res := UseShot(ShotUseRequest{Caster: caster, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer})
+	res := UseShot(ShotUseRequest{Caster: caster, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer()})
 
 	if res.Outcome != ShotApplied {
 		t.Fatalf("Outcome = %v, want ShotApplied", res.Outcome)
@@ -461,67 +469,67 @@ func TestUseShotSoulshotApplied(t *testing.T) {
 	if res.SkillID != 2154 {
 		t.Fatalf("SkillID = %d, want 2154", res.SkillID)
 	}
-	if destroyer.calls != 1 {
-		t.Fatalf("DestroyItem calls = %d, want 1", destroyer.calls)
+	if got := stackCount(inv, 10); got != 8 {
+		t.Fatalf("stack left = %d, want 8 (10 minus the weapon's 2 soulshots)", got)
 	}
-	if caster.gotShotCrystal != modelitem.CrystalD {
-		t.Fatalf("ChargeSoulshot crystal = %v, want CrystalD", caster.gotShotCrystal)
-	}
-	if caster.setChargedShotCalls != 1 || caster.setChargedShotKind != modelitem.ShotSoul || !caster.setChargedShotValue {
-		t.Fatalf("SetChargedShot calls = %d kind = %v value = %v, want 1/ShotSoul/true", caster.setChargedShotCalls, caster.setChargedShotKind, caster.setChargedShotValue)
+	if got := weaponCharges(caster); len(got) != 1 || got[0] != modelitem.ShotSoul {
+		t.Fatalf("weapon charges = %v, want [soulshot]", got)
 	}
 }
 
 func TestUseShotSpiritshotAndBlessedResolveDistinctKinds(t *testing.T) {
-	destroyer := &fakeDestroyer{}
+	for _, tc := range []struct {
+		name    string
+		handler string
+		want    modelitem.ShotKind
+	}{
+		{"spiritshot", SpiritShotsHandler, modelitem.ShotSpirit},
+		{"blessed spiritshot", BlessedSpiritShotsHandler, modelitem.ShotBlessedSpirit},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpl := shotTemplate(tc.handler, modelitem.CrystalC, 0)
+			caster, inv, inst := newShooter(tmpl, shotWeapon(modelitem.CrystalC), 10)
 
-	spiritTmpl := shotTemplate(SpiritShotsHandler, modelitem.CrystalC, 0)
-	spiritCaster := &fakeShotCharger{spiritshotConsume: 1, spiritshotResult: player.ChargeShotOK}
-	inv := itemcontainer.NewPlayerInventory(1, modelitem.NewTable([]*modelitem.Template{spiritTmpl}))
-	inst := &modelitem.Instance{ObjectID: 10, TemplateID: 500}
-	if res := UseShot(ShotUseRequest{Caster: spiritCaster, Inventory: inv, Item: inst, Template: spiritTmpl, Destroyer: destroyer}); res.Outcome != ShotApplied {
-		t.Fatalf("spirit Outcome = %v, want ShotApplied", res.Outcome)
-	}
-	if spiritCaster.gotSpiritKind != modelitem.ShotSpirit {
-		t.Fatalf("ChargeSpiritshot kind = %v, want ShotSpirit", spiritCaster.gotSpiritKind)
-	}
-
-	blessedTmpl := shotTemplate(BlessedSpiritShotsHandler, modelitem.CrystalC, 0)
-	blessedCaster := &fakeShotCharger{spiritshotConsume: 1, spiritshotResult: player.ChargeShotOK}
-	if res := UseShot(ShotUseRequest{Caster: blessedCaster, Inventory: inv, Item: inst, Template: blessedTmpl, Destroyer: destroyer}); res.Outcome != ShotApplied {
-		t.Fatalf("blessed Outcome = %v, want ShotApplied", res.Outcome)
-	}
-	if blessedCaster.gotSpiritKind != modelitem.ShotBlessedSpirit {
-		t.Fatalf("ChargeSpiritshot kind = %v, want ShotBlessedSpirit", blessedCaster.gotSpiritKind)
+			if res := UseShot(ShotUseRequest{Caster: caster, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer()}); res.Outcome != ShotApplied {
+				t.Fatalf("Outcome = %v, want ShotApplied", res.Outcome)
+			}
+			if got := weaponCharges(caster); len(got) != 1 || got[0] != tc.want {
+				t.Fatalf("weapon charges = %v, want [%v]", got, tc.want)
+			}
+			if got := stackCount(inv, 10); got != 9 {
+				t.Fatalf("stack left = %d, want 9 (10 minus the weapon's 1 spiritshot)", got)
+			}
+		})
 	}
 }
 
 func TestUseShotRejectionsDoNotConsume(t *testing.T) {
 	tests := []struct {
-		name         string
-		chargeResult player.ChargeShotResult
-		wantOutcome  ShotOutcome
+		name        string
+		weapon      *modelitem.Template
+		precharged  bool
+		wantOutcome ShotOutcome
 	}{
-		{"no capacity", player.ChargeShotNoCapacity, ShotNoCapacity},
-		{"grade mismatch", player.ChargeShotGradeMismatch, ShotGradeMismatch},
-		{"already charged", player.ChargeShotAlreadyCharged, ShotAlreadyCharged},
+		{"no capacity", nil, false, ShotNoCapacity},
+		{"grade mismatch", shotWeapon(modelitem.CrystalC), false, ShotGradeMismatch},
+		{"already charged", shotWeapon(modelitem.CrystalD), true, ShotAlreadyCharged},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tmpl := shotTemplate(SoulShotsHandler, modelitem.CrystalD, 0)
-			inv := itemcontainer.NewPlayerInventory(1, modelitem.NewTable([]*modelitem.Template{tmpl}))
-			inst := &modelitem.Instance{ObjectID: 10, TemplateID: 500}
-			caster := &fakeShotCharger{soulshotResult: tt.chargeResult}
-			destroyer := &fakeDestroyer{}
+			caster, inv, inst := newShooter(tmpl, tt.weapon, 10)
+			if tt.precharged {
+				caster.SetChargedShot(modelitem.ShotSoul, true)
+			}
 
-			res := UseShot(ShotUseRequest{Caster: caster, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer})
+			res := UseShot(ShotUseRequest{Caster: caster, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer()})
 
 			if res.Outcome != tt.wantOutcome {
 				t.Fatalf("Outcome = %v, want %v", res.Outcome, tt.wantOutcome)
 			}
-			if destroyer.calls != 0 {
-				t.Fatalf("DestroyItem calls = %d, want 0", destroyer.calls)
+			if got := stackCount(inv, 10); got != 10 {
+				t.Fatalf("stack left = %d, want untouched 10", got)
 			}
 		})
 	}
@@ -529,60 +537,65 @@ func TestUseShotRejectionsDoNotConsume(t *testing.T) {
 
 func TestUseShotNotEnoughItemsWhenDestroyFails(t *testing.T) {
 	tmpl := shotTemplate(SoulShotsHandler, modelitem.CrystalD, 0)
-	inv := itemcontainer.NewPlayerInventory(1, modelitem.NewTable([]*modelitem.Template{tmpl}))
-	inst := &modelitem.Instance{ObjectID: 10, TemplateID: 500}
-	caster := &fakeShotCharger{soulshotConsume: 1, soulshotResult: player.ChargeShotOK}
-	destroyer := &fakeDestroyer{fail: true}
+	caster, inv, inst := newShooter(tmpl, shotWeapon(modelitem.CrystalD), 1) // the weapon takes 2
 
-	res := UseShot(ShotUseRequest{Caster: caster, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer})
+	res := UseShot(ShotUseRequest{Caster: caster, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer()})
 
 	if res.Outcome != ShotNotEnoughItems {
 		t.Fatalf("Outcome = %v, want ShotNotEnoughItems", res.Outcome)
 	}
-	if caster.setChargedShotCalls != 0 {
-		t.Fatalf("SetChargedShot calls = %d, want 0: a failed destroy must not leave the weapon charged (SoulShots.java:49-62)", caster.setChargedShotCalls)
+	if got := weaponCharges(caster); len(got) != 0 {
+		t.Fatalf("weapon charges = %v, want none: a failed destroy must not leave the weapon charged (SoulShots.java:49-62)", got)
+	}
+	if got := stackCount(inv, 10); got != 1 {
+		t.Fatalf("stack left = %d, want untouched 1", got)
 	}
 }
 
 func TestUseShotAutoEnabledPropagatesToResult(t *testing.T) {
 	tmpl := shotTemplate(SoulShotsHandler, modelitem.CrystalD, 0)
-	inv := itemcontainer.NewPlayerInventory(1, modelitem.NewTable([]*modelitem.Template{tmpl}))
-	inst := &modelitem.Instance{ObjectID: 10, TemplateID: 500}
-	caster := &fakeShotCharger{soulshotResult: player.ChargeShotNoCapacity, autoEnabled: true}
-	destroyer := &fakeDestroyer{}
+	for _, tc := range []struct {
+		name     string
+		autoID   int32
+		wantAuto bool
+	}{
+		{"this shot on auto", tmpl.ID, true},
+		{"another shot on auto", tmpl.ID + 1, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			caster, inv, inst := newShooter(tmpl, nil, 10) // unarmed: no capacity
+			caster.SetAutoSoulShot(tc.autoID, true)
 
-	res := UseShot(ShotUseRequest{Caster: caster, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer})
+			res := UseShot(ShotUseRequest{Caster: caster, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer()})
 
-	if !res.AutoEnabled {
-		t.Fatal("AutoEnabled = false, want true")
-	}
-	if caster.autoEnabledCalledWith != tmpl.ID {
-		t.Fatalf("AutoSoulShotEnabled called with %d, want template id %d", caster.autoEnabledCalledWith, tmpl.ID)
+			if res.Outcome != ShotNoCapacity {
+				t.Fatalf("Outcome = %v, want ShotNoCapacity", res.Outcome)
+			}
+			if res.AutoEnabled != tc.wantAuto {
+				t.Fatalf("AutoEnabled = %v, want %v", res.AutoEnabled, tc.wantAuto)
+			}
+		})
 	}
 }
 
 func TestUseShotUnrelatedHandlerNotHandled(t *testing.T) {
 	tmpl := shotTemplate("SomeOtherHandler", modelitem.CrystalD, 0)
-	inv := itemcontainer.NewPlayerInventory(1, modelitem.NewTable([]*modelitem.Template{tmpl}))
-	inst := &modelitem.Instance{ObjectID: 10, TemplateID: 500}
-	caster := &fakeShotCharger{}
-	destroyer := &fakeDestroyer{}
+	caster, inv, inst := newShooter(tmpl, shotWeapon(modelitem.CrystalD), 10)
 
-	res := UseShot(ShotUseRequest{Caster: caster, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer})
+	res := UseShot(ShotUseRequest{Caster: caster, Inventory: inv, Item: inst, Template: tmpl, Destroyer: destroyer()})
 
 	if res.Outcome != ShotNotHandled {
 		t.Fatalf("Outcome = %v, want ShotNotHandled", res.Outcome)
 	}
+	if got := stackCount(inv, 10); got != 10 {
+		t.Fatalf("stack left = %d, want untouched 10", got)
+	}
+	if got := weaponCharges(caster); len(got) != 0 {
+		t.Fatalf("weapon charges = %v, want none", got)
+	}
 }
 
 // ---- from use_skill_ai_cast_test.go ----
-type aiCastDefinitions map[modelskill.Ref]modelskill.Definition
-
-func (d aiCastDefinitions) Definition(ref modelskill.Ref) (modelskill.Definition, bool) {
-	def, ok := d[ref]
-	return def, ok
-}
-
 func TestResolveAICastSkills(t *testing.T) {
 	scroll := modelskill.Definition{ID: 2005, Level: 1, Activation: modelskill.ActivationActive}
 	other := modelskill.Definition{ID: 2006, Level: 1, Activation: modelskill.ActivationActive}
@@ -601,7 +614,7 @@ func TestResolveAICastSkills(t *testing.T) {
 				EtcItem:        &modelitem.EtcItemDetail{Handler: ItemSkillsHandler},
 				AttachedSkills: []modelitem.SkillRef{{ID: 2005, Level: 1}},
 			},
-			defs:    aiCastDefinitions{{ID: 2005, Level: 1}: scroll},
+			defs:    definitions(scroll),
 			wantIDs: []modelskill.ID{2005},
 		},
 		{
@@ -611,7 +624,7 @@ func TestResolveAICastSkills(t *testing.T) {
 				EtcItem:        &modelitem.EtcItemDetail{Handler: ItemSkillsHandler},
 				AttachedSkills: []modelitem.SkillRef{{ID: 2005, Level: 1}, {ID: 2006, Level: 1}},
 			},
-			defs:    aiCastDefinitions{{ID: 2005, Level: 1}: scroll, {ID: 2006, Level: 1}: other},
+			defs:    definitions(scroll, other),
 			wantIDs: []modelskill.ID{2005, 2006},
 		},
 		{
@@ -621,7 +634,7 @@ func TestResolveAICastSkills(t *testing.T) {
 				EtcItem:        &modelitem.EtcItemDetail{Handler: ItemSkillsHandler},
 				AttachedSkills: []modelitem.SkillRef{{ID: 2031, Level: 1}},
 			},
-			defs: aiCastDefinitions{{ID: 2031, Level: 1}: potion},
+			defs: definitions(potion),
 		},
 		{
 			name: "non-ItemSkills handler is not handled",
@@ -630,7 +643,7 @@ func TestResolveAICastSkills(t *testing.T) {
 				EtcItem:        &modelitem.EtcItemDetail{Handler: "SomeOtherHandler"},
 				AttachedSkills: []modelitem.SkillRef{{ID: 2005, Level: 1}},
 			},
-			defs: aiCastDefinitions{{ID: 2005, Level: 1}: scroll},
+			defs: definitions(scroll),
 		},
 		{
 			name: "no attached skills is not handled",
@@ -638,12 +651,12 @@ func TestResolveAICastSkills(t *testing.T) {
 				Kind:    modelitem.KindEtcItem,
 				EtcItem: &modelitem.EtcItemDetail{Handler: ItemSkillsHandler},
 			},
-			defs: aiCastDefinitions{},
+			defs: definitions(),
 		},
 		{
 			name: "nil template is not handled",
 			tmpl: nil,
-			defs: aiCastDefinitions{},
+			defs: definitions(),
 		},
 	}
 
@@ -668,9 +681,7 @@ func TestUseDrivesShortBuffForHPPotionFamily(t *testing.T) {
 		ID: 2031, Level: 1, Potion: true,
 		Effects: []modelskill.EffectTemplate{{Count: 7, Time: 2}}, // 14s
 	}
-	caster := &fakeCaster{}
-	destroyer := &fakeDestroyer{}
-	req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, destroyer, false)
+	req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, newUseCaster(t), false)
 
 	res := Use(req)
 
@@ -690,9 +701,7 @@ func TestUseSkipsShortBuffForNonHPPotionSkill(t *testing.T) {
 		ID: 9999, Level: 1, Potion: true,
 		Effects: []modelskill.EffectTemplate{{Count: 7, Time: 2}},
 	}
-	caster := &fakeCaster{}
-	destroyer := &fakeDestroyer{}
-	req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, destroyer, false)
+	req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, newUseCaster(t), false)
 
 	res := Use(req)
 
@@ -709,9 +718,9 @@ func TestUseSkipsShortBuffWhenIDLosesToCurrent(t *testing.T) {
 		ID: 2031, Level: 1, Potion: true,
 		Effects: []modelskill.EffectTemplate{{Count: 7, Time: 2}},
 	}
-	caster := &fakeCaster{shortBuffTaskSkillID: 2037}
-	destroyer := &fakeDestroyer{}
-	req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, destroyer, false)
+	caster := newUseCaster(t)
+	caster.UpdateShortBuff(2037, 1, 14)
+	req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, false)
 
 	res := Use(req)
 
@@ -725,140 +734,75 @@ func TestUseAllowsShortBuffWhenIDMatchesOrWins(t *testing.T) {
 		ID: 2037, Level: 1, Potion: true,
 		Effects: []modelskill.EffectTemplate{{Count: 7, Time: 2}},
 	}
-	caster := &fakeCaster{shortBuffTaskSkillID: 2031}
-	destroyer := &fakeDestroyer{}
-	req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, destroyer, false)
+	for _, showing := range []int32{2031, 2037} {
+		caster := newUseCaster(t)
+		caster.UpdateShortBuff(showing, 1, 14)
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, false)
 
-	res := Use(req)
+		res := Use(req)
 
-	if !res.HasShortBuff {
-		t.Fatal("HasShortBuff = false, want true when the new skill id is numerically >= the currently-showing one")
+		if !res.HasShortBuff {
+			t.Fatalf("HasShortBuff = false with %d showing, want true when the new skill id is numerically >= the currently-showing one", showing)
+		}
 	}
 }
 
 // ---- from use_skill_summon_test.go ----
-// fakeSummon is a minimal skilltarget.Actor usable as the herb-mirror
-// destination, proving the mirror path reuses the same ApplyEffects surface
-// any caster drives rather than a servitor-specific one.
-type fakeSummon struct {
-	world.Presence
-	skilltest.Creature
-	id int32
-}
-
-func (s *fakeSummon) ObjectID() int32           { return s.id }
-func (s *fakeSummon) Position() (int, int, int) { return 0, 0, 0 }
-func (s *fakeSummon) Heading() int              { return 0 }
-func (s *fakeSummon) Dead() bool                { return false }
-
-var _ actorcast.Target = (*fakeSummon)(nil)
-
-type recordingSummonHandler struct {
-	calls []handlerskill.Cast
-}
-
-func (h *recordingSummonHandler) Types() []string { return []string{"DUMMY"} }
-func (h *recordingSummonHandler) Use(c handlerskill.Cast) {
-	h.calls = append(h.calls, c)
-}
-
+// TestUseMirrorsHerbEffectOntoSummon drives a real HEAL_PERCENT herb: the
+// caster always heals, and the mirror shows as the servitor's own HP rising
+// through the same ApplyEffects surface any caster drives.
 func TestUseMirrorsHerbEffectOntoSummon(t *testing.T) {
-	def := modelskill.Definition{ID: 100, Level: 1, Potion: true, Target: modelskill.TargetSelf, SkillType: "DUMMY"}
-	rec := &recordingSummonHandler{}
+	def := modelskill.Definition{ID: 100, Level: 1, Potion: true, Target: modelskill.TargetSelf, SkillType: "HEAL_PERCENT", Power: 50}
 	effects := actorcast.EffectHandlers{
 		Targets: skilltarget.NewRegistry(noKnownCreatures{}),
-		Skills:  handlerskill.NewRegistry(rec),
+		Skills:  handlerskill.NewDefaultRegistry(),
 	}
 
-	t.Run("herb with an active summon mirrors onto it", func(t *testing.T) {
-		rec.calls = nil
-		caster := &fakeCaster{}
-		summon := &fakeSummon{id: 2}
-		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, def, caster, &fakeDestroyer{}, false)
-		req.Effects = effects
-		req.Summon = summon
+	for _, tc := range []struct {
+		name       string
+		etcType    modelitem.EtcItemType
+		isPet      bool
+		withSummon bool
+		wantMirror bool
+	}{
+		{"herb with an active summon mirrors onto it", modelitem.EtcItemHerb, false, true, true},
+		{"herb with no active summon does not mirror", modelitem.EtcItemHerb, false, false, false},
+		{"herb used by a pet does not mirror onto its own summon field", modelitem.EtcItemHerb, true, true, false},
+		{"non-herb potion does not mirror even with an active summon", modelitem.EtcItemPotion, false, true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			caster := newUseCaster(t)
+			caster.SetResourceValues(player.Resources{MaxHP: 100, CurrentHP: 1, MaxMP: 100, CurrentMP: 100})
+			healed := 1 + caster.MaxHPValue()/2
+			servitor := newServitor(t, 2, 1, 1)
+			servitor.SetHP(1)
+			if caster.MaxHPValue() < 2 || servitor.MaxHPValue() < 2 {
+				t.Fatalf("max HP caster/servitor = %v/%v, want room for a visible heal", caster.MaxHPValue(), servitor.MaxHPValue())
+			}
+			req := newUseRequest(t, ItemSkillsHandler, tc.etcType, def, caster, tc.isPet)
+			req.Effects = effects
+			if tc.withSummon {
+				req.Summon = servitor
+			}
 
-		res := Use(req)
+			res := Use(req)
 
-		if res.Outcome != Applied {
-			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
-		}
-		res.Apply()
-		// caster and summon both satisfy skilltarget.Actor, so both
-		// their own effect application (caster) and the mirror (summon)
-		// record a call.
-		if len(rec.calls) != 2 {
-			t.Fatalf("skill handler calls = %d, want 2 (caster + summon mirror)", len(rec.calls))
-		}
-		if !mirroredTo(rec.calls, summon) {
-			t.Fatalf("recorded calls = %v, want one with the summon as caster", rec.calls)
-		}
-	})
-
-	t.Run("herb with no active summon does not mirror", func(t *testing.T) {
-		rec.calls = nil
-		caster := &fakeCaster{}
-		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, def, caster, &fakeDestroyer{}, false)
-		req.Effects = effects
-		req.Summon = nil
-
-		res := Use(req)
-
-		if res.Outcome != Applied {
-			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
-		}
-		res.Apply()
-		if len(rec.calls) != 1 {
-			t.Fatalf("skill handler calls = %d, want 1 (caster only, no summon to mirror onto)", len(rec.calls))
-		}
-	})
-
-	t.Run("herb used by a pet does not mirror onto its own summon field", func(t *testing.T) {
-		rec.calls = nil
-		caster := &fakeCaster{}
-		summon := &fakeSummon{id: 2}
-		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, def, caster, &fakeDestroyer{}, true)
-		req.Effects = effects
-		req.Summon = summon
-
-		res := Use(req)
-
-		if res.Outcome != Applied {
-			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
-		}
-		res.Apply()
-		if len(rec.calls) != 1 || mirroredTo(rec.calls, summon) {
-			t.Fatalf("recorded calls = %v, want caster only (IsPet caster must not mirror)", rec.calls)
-		}
-	})
-
-	t.Run("non-herb potion does not mirror even with an active summon", func(t *testing.T) {
-		rec.calls = nil
-		caster := &fakeCaster{}
-		summon := &fakeSummon{id: 2}
-		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, def, caster, &fakeDestroyer{}, false)
-		req.Effects = effects
-		req.Summon = summon
-
-		res := Use(req)
-
-		if res.Outcome != Applied {
-			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
-		}
-		res.Apply()
-		if len(rec.calls) != 1 || mirroredTo(rec.calls, summon) {
-			t.Fatalf("recorded calls = %v, want caster only (non-herb must not mirror)", rec.calls)
-		}
-	})
-}
-
-func mirroredTo(calls []handlerskill.Cast, summon *fakeSummon) bool {
-	for _, c := range calls {
-		if c.Caster == any(summon) {
-			return true
-		}
+			if res.Outcome != Applied {
+				t.Fatalf("Outcome = %v, want Applied", res.Outcome)
+			}
+			res.Apply()
+			if got := caster.HP(); got != healed {
+				t.Fatalf("caster HP = %v, want %v (1 + 50%% of its max HP)", got, healed)
+			}
+			want := 1.0
+			if tc.wantMirror {
+				want += servitor.MaxHPValue() / 2
+			}
+			if got := servitor.HP(); got != want {
+				t.Fatalf("servitor HP = %v, want %v (1, plus 50%% of its max HP when mirrored)", got, want)
+			}
+		})
 	}
-	return false
 }
 
 type noKnownCreatures struct{}
@@ -867,95 +811,40 @@ func (noKnownCreatures) ForEachKnownCreatureInRadius(skilltarget.Actor, int, fun
 }
 
 // ---- from use_skill_test.go ----
-type fakeCaster struct {
-	world.Presence
-	skilltest.Creature
-	disabled             map[int32]bool
-	disableCalls         int
-	reuseCalls           int
-	shortBuffTaskSkillID int32
-	flying               bool
+// newUseCaster returns a live player whose clock stands still, so a reuse
+// it installs stays in force for the whole test.
+func newUseCaster(t *testing.T) *player.Character {
+	t.Helper()
+	ch := newPlayer(1, nil)
+	goLive(t, ch)
+	return ch
 }
 
-func (f *fakeCaster) ObjectID() int32              { return 1 }
-func (f *fakeCaster) Position() (int, int, int)    { return 0, 0, 0 }
-func (f *fakeCaster) Heading() int                 { return 0 }
-func (f *fakeCaster) Dead() bool                   { return false }
-func (f *fakeCaster) SkillDisabled(key int32) bool { return f.disabled != nil && f.disabled[key] }
-func (f *fakeCaster) DisableSkill(key int32, d time.Duration) {
-	f.disableCalls++
-}
+// useStackID is the object id of the used item's 5-unit stack.
+const useStackID = 10
 
-func (f *fakeCaster) AddSkillReuse(ref modelskill.Ref, key int32, d time.Duration) {
-	f.reuseCalls++
-}
-func (f *fakeCaster) ShortBuffTaskSkillID() int32 { return f.shortBuffTaskSkillID }
-func (f *fakeCaster) ConditionActor() conditions.Actor {
-	return flyingConditionView{flying: f.flying}
-}
-
-// flyingConditionView answers only the flying state these tests gate on;
-// any other condition read panics through the nil embedded Actor.
-type flyingConditionView struct {
-	conditions.Actor
-	flying bool
-}
-
-func (v flyingConditionView) IsFlying() bool { return v.flying }
-
-type fakeDefinitions struct {
-	def modelskill.Definition
-}
-
-func (f fakeDefinitions) Definition(ref modelskill.Ref) (modelskill.Definition, bool) {
-	if ref.ID != f.def.ID || ref.Level != f.def.Level {
-		return modelskill.Definition{}, false
-	}
-	return f.def, true
-}
-
-type fakeDefinitionTable map[modelskill.Ref]modelskill.Definition
-
-func (f fakeDefinitionTable) Definition(ref modelskill.Ref) (modelskill.Definition, bool) {
-	def, ok := f[ref]
-	return def, ok
-}
-
-type fakeDestroyer struct {
-	calls int
-	fail  bool
-}
-
-func (f *fakeDestroyer) DestroyItem(inv *itemcontainer.Inventory, objectID int32, count int) (invops.Result, bool) {
-	f.calls++
-	if f.fail {
-		return invops.Result{}, false
-	}
-	return invops.Result{}, true
-}
-
-func newUseRequest(t *testing.T, handler string, etcType modelitem.EtcItemType, def modelskill.Definition, caster *fakeCaster, destroyer *fakeDestroyer, isPet bool) UseRequest {
+func newUseRequest(t *testing.T, handler string, etcType modelitem.EtcItemType, def modelskill.Definition, caster *player.Character, isPet bool) UseRequest {
 	t.Helper()
 	tmpl := &modelitem.Template{
-		ID:       1,
-		Kind:     modelitem.KindEtcItem,
-		Tradable: true,
+		ID:          1,
+		Kind:        modelitem.KindEtcItem,
+		Tradable:    true,
+		Stackable:   true,
+		Destroyable: true,
 		EtcItem: &modelitem.EtcItemDetail{
 			Type: etcType, Handler: handler, SharedReuseGroup: -1,
 		},
 		AttachedSkills: []modelitem.SkillRef{{ID: int32(def.ID), Level: int32(def.Level)}},
 	}
-	table := modelitem.NewTable([]*modelitem.Template{tmpl})
-	inv := itemcontainer.NewPlayerInventory(2, table)
-	inst := &modelitem.Instance{ObjectID: 10, TemplateID: 1}
+	inv := itemcontainer.RestorePlayerInventory(2, modelitem.NewTable([]*modelitem.Template{tmpl}), []*modelitem.Instance{carried(useStackID, tmpl.ID, 5)})
 
 	return UseRequest{
 		Caster:      caster,
 		Inventory:   inv,
-		Item:        inst,
-		Definitions: fakeDefinitions{def: def},
+		Item:        inv.ItemByObjectID(useStackID),
+		Definitions: definitions(def),
 		Effects:     actorcast.EffectHandlers{},
-		Destroyer:   destroyer,
+		Destroyer:   destroyer(),
 		IsPet:       isPet,
 	}
 }
@@ -964,53 +853,45 @@ func TestUse(t *testing.T) {
 	potion := modelskill.Definition{ID: 100, Level: 1, Potion: true, ReuseDelay: 0}
 
 	t.Run("potion consumes one unit", func(t *testing.T) {
-		caster := &fakeCaster{}
-		destroyer := &fakeDestroyer{}
-		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, destroyer, false)
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, newUseCaster(t), false)
 
 		res := Use(req)
 
 		if res.Outcome != Applied {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
 		}
-		if destroyer.calls != 1 {
-			t.Fatalf("DestroyItem calls = %d, want 1", destroyer.calls)
+		if got := stackCount(req.Inventory, useStackID); got != 4 {
+			t.Fatalf("stack left = %d, want 4", got)
 		}
 	})
 
 	t.Run("herb applies without consuming", func(t *testing.T) {
-		caster := &fakeCaster{}
-		destroyer := &fakeDestroyer{}
-		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, caster, destroyer, false)
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, newUseCaster(t), false)
 
 		res := Use(req)
 
 		if res.Outcome != Applied {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
 		}
-		if destroyer.calls != 0 {
-			t.Fatalf("DestroyItem calls = %d, want 0 (herb must not consume)", destroyer.calls)
+		if got := stackCount(req.Inventory, useStackID); got != 5 {
+			t.Fatalf("stack left = %d, want untouched 5 (herb must not consume)", got)
 		}
 	})
 
 	t.Run("herb with a summon reports it as MirroredSummon", func(t *testing.T) {
-		caster := &fakeCaster{}
-		destroyer := &fakeDestroyer{}
-		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, caster, destroyer, false)
-		summon := &fakeCaster{}
-		req.Summon = summon
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, newUseCaster(t), false)
+		servitor := newServitor(t, 2, 1, 1)
+		req.Summon = servitor
 
 		res := Use(req)
 
-		if res.MirroredSummon != summon {
-			t.Fatalf("MirroredSummon = %v, want summon", res.MirroredSummon)
+		if res.MirroredSummon != servitor {
+			t.Fatalf("MirroredSummon = %v, want the servitor", res.MirroredSummon)
 		}
 	})
 
 	t.Run("herb with no summon reports no MirroredSummon", func(t *testing.T) {
-		caster := &fakeCaster{}
-		destroyer := &fakeDestroyer{}
-		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, caster, destroyer, false)
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, newUseCaster(t), false)
 
 		res := Use(req)
 
@@ -1020,10 +901,8 @@ func TestUse(t *testing.T) {
 	})
 
 	t.Run("potion (non-herb) with a summon does not mirror", func(t *testing.T) {
-		caster := &fakeCaster{}
-		destroyer := &fakeDestroyer{}
-		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, destroyer, false)
-		req.Summon = &fakeCaster{}
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, newUseCaster(t), false)
+		req.Summon = newServitor(t, 2, 1, 1)
 
 		res := Use(req)
 
@@ -1033,10 +912,8 @@ func TestUse(t *testing.T) {
 	})
 
 	t.Run("herb used by a pet caster does not mirror", func(t *testing.T) {
-		caster := &fakeCaster{}
-		destroyer := &fakeDestroyer{}
-		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, caster, destroyer, true)
-		req.Summon = &fakeCaster{}
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, newUseCaster(t), true)
+		req.Summon = newServitor(t, 2, 1, 1)
 
 		res := Use(req)
 
@@ -1046,51 +923,59 @@ func TestUse(t *testing.T) {
 	})
 
 	t.Run("herb not enough items never rejects (no consume attempted)", func(t *testing.T) {
-		caster := &fakeCaster{}
-		destroyer := &fakeDestroyer{fail: true}
-		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, caster, destroyer, false)
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, newUseCaster(t), false)
+		// The herb is no longer carried, so a destroy would fail.
+		req.Item = carried(useStackID+1, 1, 1)
 
 		res := Use(req)
 
 		if res.Outcome != Applied {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
+		}
+	})
+
+	t.Run("potion not carried is rejected", func(t *testing.T) {
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, newUseCaster(t), false)
+		req.Item = carried(useStackID+1, 1, 1)
+
+		res := Use(req)
+
+		if res.Outcome != NotEnoughItems {
+			t.Fatalf("Outcome = %v, want NotEnoughItems", res.Outcome)
+		}
+		if got := stackCount(req.Inventory, useStackID); got != 5 {
+			t.Fatalf("carried stack left = %d, want untouched 5", got)
 		}
 	})
 
 	t.Run("elixir applied for a player caster", func(t *testing.T) {
-		caster := &fakeCaster{}
-		destroyer := &fakeDestroyer{}
-		req := newUseRequest(t, ElixirsHandler, modelitem.EtcItemElixir, potion, caster, destroyer, false)
+		req := newUseRequest(t, ElixirsHandler, modelitem.EtcItemElixir, potion, newUseCaster(t), false)
 
 		res := Use(req)
 
 		if res.Outcome != Applied {
 			t.Fatalf("Outcome = %v, want Applied", res.Outcome)
 		}
-		if destroyer.calls != 1 {
-			t.Fatalf("DestroyItem calls = %d, want 1", destroyer.calls)
+		if got := stackCount(req.Inventory, useStackID); got != 4 {
+			t.Fatalf("stack left = %d, want 4", got)
 		}
 	})
 
 	t.Run("elixir rejects a pet caster", func(t *testing.T) {
-		caster := &fakeCaster{}
-		destroyer := &fakeDestroyer{}
-		req := newUseRequest(t, ElixirsHandler, modelitem.EtcItemElixir, potion, caster, destroyer, true)
+		req := newUseRequest(t, ElixirsHandler, modelitem.EtcItemElixir, potion, newUseCaster(t), true)
 
 		res := Use(req)
 
 		if res.Outcome != PetRejected {
 			t.Fatalf("Outcome = %v, want PetRejected", res.Outcome)
 		}
-		if destroyer.calls != 0 {
-			t.Fatalf("DestroyItem calls = %d, want 0 (rejected before consume)", destroyer.calls)
+		if got := stackCount(req.Inventory, useStackID); got != 5 {
+			t.Fatalf("stack left = %d, want untouched 5 (rejected before consume)", got)
 		}
 	})
 
 	t.Run("plain ItemSkills item ignores IsPet", func(t *testing.T) {
-		caster := &fakeCaster{}
-		destroyer := &fakeDestroyer{}
-		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, destroyer, true)
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, newUseCaster(t), true)
 
 		res := Use(req)
 
@@ -1100,9 +985,7 @@ func TestUse(t *testing.T) {
 	})
 
 	t.Run("pet rejects non-tradable herb", func(t *testing.T) {
-		caster := &fakeCaster{}
-		destroyer := &fakeDestroyer{}
-		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, caster, destroyer, true)
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, potion, newUseCaster(t), true)
 		tmpl, _ := req.Inventory.Templates().Get(req.Item.TemplateID)
 		tmpl.Tradable = false
 
@@ -1111,45 +994,44 @@ func TestUse(t *testing.T) {
 		if res.Outcome != PetRejected {
 			t.Fatalf("Outcome = %v, want PetRejected", res.Outcome)
 		}
-		if destroyer.calls != 0 {
-			t.Fatalf("DestroyItem calls = %d, want 0", destroyer.calls)
+		if got := stackCount(req.Inventory, useStackID); got != 5 {
+			t.Fatalf("stack left = %d, want untouched 5", got)
 		}
 	})
 
 	t.Run("reuse rejected before consume", func(t *testing.T) {
-		key := actorcast.ReuseKey(potion)
-		caster := &fakeCaster{disabled: map[int32]bool{key: true}}
-		destroyer := &fakeDestroyer{}
-		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, destroyer, false)
+		caster := newUseCaster(t)
+		caster.DisableSkill(actorcast.ReuseKey(potion), time.Hour)
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, false)
 
 		res := Use(req)
 
 		if res.Outcome != ReuseRejected {
 			t.Fatalf("Outcome = %v, want ReuseRejected", res.Outcome)
 		}
-		if destroyer.calls != 0 {
-			t.Fatalf("DestroyItem calls = %d, want 0", destroyer.calls)
+		if got := stackCount(req.Inventory, useStackID); got != 5 {
+			t.Fatalf("stack left = %d, want untouched 5", got)
 		}
 	})
 
 	t.Run("reports shared reuse group and the longer of skill/item reuse delay", func(t *testing.T) {
 		def := modelskill.Definition{ID: 101, Level: 1, Potion: true, ReuseDelay: 1000}
-		caster := &fakeCaster{}
-		destroyer := &fakeDestroyer{}
+		caster := newUseCaster(t)
 		tmpl := &modelitem.Template{
-			ID:   1,
-			Kind: modelitem.KindEtcItem,
+			ID:          1,
+			Kind:        modelitem.KindEtcItem,
+			Stackable:   true,
+			Destroyable: true,
 			EtcItem: &modelitem.EtcItemDetail{
 				Type: modelitem.EtcItemPotion, Handler: ItemSkillsHandler,
 				ReuseDelay: 3000, SharedReuseGroup: 7,
 			},
 			AttachedSkills: []modelitem.SkillRef{{ID: int32(def.ID), Level: int32(def.Level)}},
 		}
-		table := modelitem.NewTable([]*modelitem.Template{tmpl})
-		inv := itemcontainer.NewPlayerInventory(2, table)
+		inv := itemcontainer.RestorePlayerInventory(2, modelitem.NewTable([]*modelitem.Template{tmpl}), []*modelitem.Instance{carried(useStackID, tmpl.ID, 5)})
 		req := UseRequest{
-			Caster: caster, Inventory: inv, Item: &modelitem.Instance{ObjectID: 10, TemplateID: 1},
-			Definitions: fakeDefinitions{def: def}, Effects: actorcast.EffectHandlers{}, Destroyer: destroyer,
+			Caster: caster, Inventory: inv, Item: inv.ItemByObjectID(useStackID),
+			Definitions: definitions(def), Effects: actorcast.EffectHandlers{}, Destroyer: destroyer(),
 		}
 
 		res := Use(req)
@@ -1163,12 +1045,14 @@ func TestUse(t *testing.T) {
 		if res.ReuseMillis != 3000 {
 			t.Fatalf("ReuseMillis = %d, want 3000 (item's 3000 > skill's 1000)", res.ReuseMillis)
 		}
+		key := actorcast.ReuseKey(def)
+		if !caster.SkillDisabled(key) || !caster.HasSkillReuse(key) {
+			t.Fatalf("SkillDisabled/HasSkillReuse = %v/%v, want the item reuse installed", caster.SkillDisabled(key), caster.HasSkillReuse(key))
+		}
 	})
 
 	t.Run("no shared reuse group reports -1", func(t *testing.T) {
-		caster := &fakeCaster{}
-		destroyer := &fakeDestroyer{}
-		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, caster, destroyer, false)
+		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemPotion, potion, newUseCaster(t), false)
 
 		res := Use(req)
 
@@ -1178,16 +1062,27 @@ func TestUse(t *testing.T) {
 	})
 
 	t.Run("unrelated handler not handled", func(t *testing.T) {
-		caster := &fakeCaster{}
-		destroyer := &fakeDestroyer{}
-		req := newUseRequest(t, "SomeOtherHandler", modelitem.EtcItemNone, potion, caster, destroyer, false)
+		req := newUseRequest(t, "SomeOtherHandler", modelitem.EtcItemNone, potion, newUseCaster(t), false)
 
 		res := Use(req)
 
 		if res.Outcome != NotHandled {
 			t.Fatalf("Outcome = %v, want NotHandled", res.Outcome)
 		}
+		if got := stackCount(req.Inventory, useStackID); got != 5 {
+			t.Fatalf("stack left = %d, want untouched 5", got)
+		}
 	})
+}
+
+// newHerbPairRequest is a herb carrying first then second.
+func newHerbPairRequest(t *testing.T, first, second modelskill.Definition, caster *player.Character, isPet bool) UseRequest {
+	t.Helper()
+	req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, first, caster, isPet)
+	tmpl, _ := req.Inventory.Templates().Get(req.Item.TemplateID)
+	tmpl.AttachedSkills = []modelitem.SkillRef{{ID: int32(first.ID), Level: int32(first.Level)}, {ID: int32(second.ID), Level: int32(second.Level)}}
+	req.Definitions = definitions(first, second)
+	return req
 }
 
 func TestUseAll(t *testing.T) {
@@ -1195,49 +1090,40 @@ func TestUseAll(t *testing.T) {
 	second := modelskill.Definition{ID: 101, Level: 1, Potion: true, ReuseDelay: 1}
 
 	t.Run("applies each attached instant skill in order", func(t *testing.T) {
-		caster := &fakeCaster{}
-		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, first, caster, &fakeDestroyer{}, false)
-		tmpl, _ := req.Inventory.Templates().Get(req.Item.TemplateID)
-		tmpl.AttachedSkills = []modelitem.SkillRef{{ID: int32(first.ID), Level: int32(first.Level)}, {ID: int32(second.ID), Level: int32(second.Level)}}
-		req.Definitions = fakeDefinitionTable{
-			{ID: first.ID, Level: first.Level}:   first,
-			{ID: second.ID, Level: second.Level}: second,
-		}
+		caster := newUseCaster(t)
 
-		results := UseAll(req)
+		results := UseAll(newHerbPairRequest(t, first, second, caster, false))
 
 		if len(results) != 2 || results[0].Skill.ID != first.ID || results[1].Skill.ID != second.ID {
 			t.Fatalf("results = %#v, want both skills in attached order", results)
 		}
-		if caster.reuseCalls != 2 {
-			t.Fatalf("AddSkillReuse calls = %d, want 2", caster.reuseCalls)
+		for _, def := range []modelskill.Definition{first, second} {
+			if !caster.HasSkillReuse(actorcast.ReuseKey(def)) {
+				t.Fatalf("skill %d has no reuse recorded, want each applied skill's reuse installed", def.ID)
+			}
 		}
 	})
 
 	t.Run("stops at the first reuse-disabled skill", func(t *testing.T) {
-		caster := &fakeCaster{disabled: map[int32]bool{actorcast.ReuseKey(first): true}}
-		req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, first, caster, &fakeDestroyer{}, false)
-		tmpl, _ := req.Inventory.Templates().Get(req.Item.TemplateID)
-		tmpl.AttachedSkills = []modelitem.SkillRef{{ID: int32(first.ID), Level: int32(first.Level)}, {ID: int32(second.ID), Level: int32(second.Level)}}
-		req.Definitions = fakeDefinitionTable{
-			{ID: first.ID, Level: first.Level}:   first,
-			{ID: second.ID, Level: second.Level}: second,
-		}
+		caster := newUseCaster(t)
+		caster.DisableSkill(actorcast.ReuseKey(first), time.Hour)
 
-		results := UseAll(req)
+		results := UseAll(newHerbPairRequest(t, first, second, caster, false))
 
 		if len(results) != 1 || results[0].Outcome != ReuseRejected || results[0].Skill.ID != first.ID {
 			t.Fatalf("results = %#v, want first skill reuse rejection only", results)
 		}
-		if caster.reuseCalls != 0 {
-			t.Fatalf("AddSkillReuse calls = %d, want 0", caster.reuseCalls)
+		for _, def := range []modelskill.Definition{first, second} {
+			if caster.HasSkillReuse(actorcast.ReuseKey(def)) {
+				t.Fatalf("skill %d has a reuse recorded, want none installed", def.ID)
+			}
 		}
 	})
 }
 
 func TestUseAllStopsWhenSkillConditionFails(t *testing.T) {
 	first := modelskill.Definition{
-		ID: 100, Level: 1, Potion: true,
+		ID: 100, Level: 1, Potion: true, ReuseDelay: 1000,
 		Conditions: []modelskill.ConditionClause{{
 			Root: modelskill.Condition{Kind: "player", Attrs: map[string]string{"flying": "false"}},
 		}},
@@ -1245,15 +1131,9 @@ func TestUseAllStopsWhenSkillConditionFails(t *testing.T) {
 	second := modelskill.Definition{ID: 101, Level: 1, Potion: true}
 	for _, isPet := range []bool{false, true} {
 		t.Run(map[bool]string{false: "player herb", true: "pet herb"}[isPet], func(t *testing.T) {
-			caster := &fakeCaster{flying: true}
-			destroyer := &fakeDestroyer{}
-			req := newUseRequest(t, ItemSkillsHandler, modelitem.EtcItemHerb, first, caster, destroyer, isPet)
-			tmpl, _ := req.Inventory.Templates().Get(req.Item.TemplateID)
-			tmpl.AttachedSkills = []modelitem.SkillRef{{ID: int32(first.ID), Level: int32(first.Level)}, {ID: int32(second.ID), Level: int32(second.Level)}}
-			req.Definitions = fakeDefinitionTable{
-				{ID: first.ID, Level: first.Level}:   first,
-				{ID: second.ID, Level: second.Level}: second,
-			}
+			caster := newUseCaster(t)
+			caster.SetFlying(true)
+			req := newHerbPairRequest(t, first, second, caster, isPet)
 
 			results := UseAll(req)
 
@@ -1263,30 +1143,102 @@ func TestUseAllStopsWhenSkillConditionFails(t *testing.T) {
 			if results[0].Condition.Root.Kind != "player" {
 				t.Fatalf("failed condition = %#v, want the skill's player condition", results[0].Condition)
 			}
-			if destroyer.calls != 0 || caster.reuseCalls != 0 {
-				t.Fatalf("condition failure consumed=%d reuse=%d, want neither", destroyer.calls, caster.reuseCalls)
+			if got := stackCount(req.Inventory, useStackID); got != 5 {
+				t.Fatalf("stack left = %d, want untouched 5", got)
+			}
+			if caster.HasSkillReuse(actorcast.ReuseKey(first)) {
+				t.Fatal("reuse recorded after a condition failure, want none")
 			}
 		})
 	}
 }
 
-func (*fakeSummon) Kind() actor.Kind { return actor.KindSummon }
+// The item handlers act on production types here: the inventory service
+// that destroys the consumed item, a *player.Character casting or charging
+// its weapon, and a *summon.Actor taking a beast shot. Each test asserts
+// what changed on them (the stack left, the charge on the weapon, the
+// installed reuse) rather than how often a stand-in was called. See
+// docs/agents/test-strategy.md.
 
-func (*fakeCaster) Kind() actor.Kind { return actor.KindPlayer }
+// destroyer is the inventory service that consumes an item for real.
+func destroyer() *invops.Service { return invops.NewService(nil) }
 
-var (
-	_ actorcast.SkillCaster = (*fakeCaster)(nil)
-	_ actorcast.SkillCaster = (*fakeSummon)(nil)
-)
-
-func (*fakeCaster) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
-
-func (*fakeCaster) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool {
-	return false
+// stackCount is the count of objectID left in inv, 0 once it is gone.
+func stackCount(inv *itemcontainer.Inventory, objectID int32) int {
+	inst := inv.ItemByObjectID(objectID)
+	if inst == nil {
+		return 0
+	}
+	return inst.Snapshot().Count
 }
 
-func (*fakeSummon) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
+// carried returns a carried stack of count units of templateID.
+func carried(objectID, templateID int32, count int) *modelitem.Instance {
+	return &modelitem.Instance{ObjectID: objectID, TemplateID: templateID, Count: count, Location: modelitem.LocationInventory}
+}
 
-func (*fakeSummon) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) bool {
-	return false
+// equipped returns templateID worn in the right hand.
+func equipped(objectID, templateID int32) *modelitem.Instance {
+	return &modelitem.Instance{ObjectID: objectID, TemplateID: templateID, Count: 1, Location: modelitem.LocationPaperdoll, LocationData: itemcontainer.RHand}
+}
+
+// definitions is the production skill table holding defs.
+func definitions(defs ...modelskill.Definition) *modelskill.Table {
+	return modelskill.NewTable(defs)
+}
+
+// newPlayer returns a character carrying items out of templates, with full
+// 100 HP/MP.
+func newPlayer(id int32, templates []*modelitem.Template, items ...*modelitem.Instance) *player.Character {
+	ch := &player.Character{ID: id}
+	ch.SetResourceValues(player.Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 100, CurrentMP: 100})
+	ch.AttachRuntime(&player.Template{}, itemcontainer.RestorePlayerInventory(id, modelitem.NewTable(templates), items))
+	return ch
+}
+
+// goLive gives ch a creature runtime on an idle queue, which its timed
+// state (the short-buff HUD countdown) is scheduled on.
+func goLive(t *testing.T, ch *player.Character) {
+	t.Helper()
+	live, err := creature.NewLive(location.Location{}, 100, openGeo{}, ch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	live.SetQueue(sim.NewInline(time.Unix(0, 0)).NewQueue("test"))
+	ch.Attach(live, nil)
+}
+
+// newServitor returns a live servitor charging ss beast soulshots and sps
+// beast spiritshots per charge.
+func newServitor(t *testing.T, id int32, ss, sps int) *summon.Actor {
+	t.Helper()
+	s, err := summon.NewServitor(summon.ServitorConfig{ObjectID: id, Stats: summon.CombatStats{MaxHP: 100, MaxMP: 100, SSCount: ss, SPSCount: sps}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+// openGeo is a move.Geo with no walls, needed only because creature.NewLive
+// requires one.
+type openGeo struct{}
+
+func (openGeo) CanMove(int, int, int, int, int, int) bool { return true }
+
+func (openGeo) Height(_, _, z int) int16 { return int16(z) }
+
+func (openGeo) FindPath(location.Location, location.Location) ([]location.Location, bool) {
+	return nil, false
+}
+
+func (openGeo) Walkable(int, int, int) bool { return true }
+
+func (openGeo) CanFly(int, int, int, float64, int, int, int) bool { return true }
+
+func (openGeo) ValidFlyLocation(_, _, _ int, _ float64, tx, ty, tz int) location.Location {
+	return location.Location{X: tx, Y: ty, Z: tz}
+}
+
+func (openGeo) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
+	return location.Location{X: tx, Y: ty, Z: tz}
 }
