@@ -47,6 +47,7 @@ const (
 	SystemMessageDismissedFromCommandChannel          = 1583
 	SystemMessageS1PartyDismissedFromCommandChannel   = 1584
 	SystemMessageCommandChannelLeaderNowS1            = 1589
+	SystemMessageCannotLongerSetupCommandChannel      = 1592
 	SystemMessageCannotInviteToCommandChannel         = 1593
 	SystemMessageS1AlreadyMemberOfCommandChannel      = 1594
 	SystemMessageS1DeclinedChannelInvitation          = 1680
