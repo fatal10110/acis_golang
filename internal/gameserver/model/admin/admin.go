@@ -2,6 +2,7 @@ package admin
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
@@ -120,6 +121,8 @@ func NewAnnouncement(set *commons.StatSet) (Announcement, error) {
 type Data struct {
 	accessLevels map[int]AccessLevel
 	commands     map[string]Command
+	// ordered holds the commands in the order the table lists them.
+	ordered []Command
 }
 
 func NewData(levels []AccessLevel, commands []Command) (*Data, error) {
@@ -140,7 +143,7 @@ func NewData(levels []AccessLevel, commands []Command) (*Data, error) {
 		commandMap[key] = command
 	}
 
-	return &Data{accessLevels: accessLevels, commands: commandMap}, nil
+	return &Data{accessLevels: accessLevels, commands: commandMap, ordered: slices.Clone(commands)}, nil
 }
 
 func (d *Data) AccessLevel(level int) (AccessLevel, bool) {
@@ -175,6 +178,15 @@ func (d *Data) Resolve(level int) AccessLevel {
 func (d *Data) Command(name string) (Command, bool) {
 	value, ok := d.commands[strings.ToLower(name)]
 	return value, ok
+}
+
+// Commands returns the command table in the order it lists the commands.
+// The slice is shared; callers must not modify it.
+func (d *Data) Commands() []Command {
+	if d == nil {
+		return nil
+	}
+	return d.ordered
 }
 
 func (d *Data) AccessLevelCount() int { return len(d.accessLevels) }

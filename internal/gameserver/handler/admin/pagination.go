@@ -68,3 +68,18 @@ func (p Page) Links(b *strings.Builder, action string) {
 	b.WriteString(`<td FIXWIDTH=22 align=center><img height=2><button action="` + link(p.Total) + `" back=L2UI_CH3.next1_down fore=L2UI_CH3.next1 width=16 height=16></td></tr></table>`)
 	b.WriteString(`<img src="L2UI.SquareGray" width=280 height=1>`)
 }
+
+// Search writes the search bar of a filtered list, height pixels tall: an
+// edit box whose Find button runs action with page 1 and the typed text,
+// over the count of entries found.
+func Search(b *strings.Builder, action string, height, found int) {
+	fmt.Fprintf(b, "<table width=280 height=%d><tr>", height)
+	b.WriteString("<td width=70 align=center>Search</td>")
+	b.WriteString(`<td width=140><edit var="search" width=130 height=15></td>`)
+	b.WriteString(`<td width=70><button value="Find" action="` + action + ` 1 $search" width=65 height=19 back="L2UI_ch3.smallbutton2_over" fore="L2UI_ch3.smallbutton2"></td>`)
+	b.WriteString("</tr><tr>")
+	b.WriteString("<td></td>")
+	fmt.Fprintf(b, "<td align=center>Found %d results</td>", found)
+	b.WriteString("<td></td>")
+	b.WriteString("</tr></table>")
+}

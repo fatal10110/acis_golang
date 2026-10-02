@@ -239,23 +239,33 @@ func (l *GameClientLink) useDecorativeSummonItem(live *livePlayer, inv *itemcont
 		return true
 	}
 	live.move.Stop()
+	x, y, z := live.Position()
+	if !l.placeDecoration(template, live.Character.Name, x, y, z, live.Heading()) {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
+	}
+	return true
+}
+
+// placeDecoration places a decoration NPC of template, titled title, at
+// (x, y) on the ground height below z, facing heading. It reports false,
+// placing nothing, when the NPC cannot be built.
+func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x, y, z, heading int) bool {
+	if l.geo != nil {
+		z = int(l.geo.Height(x, y, z))
+	}
 	objectID, err := l.ids.NextID()
 	if err != nil {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
-		return true
+		return false
 	}
 	instance, err := npc.NewInstance(objectID, template)
 	if err != nil {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
-		return true
+		return false
 	}
-	decoration, err := npc.NewDecoration(instance, live.Character.Name, l.skills)
+	decoration, err := npc.NewDecoration(instance, title, l.skills)
 	if err != nil {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
-		return true
+		return false
 	}
-	x, y, z := live.Position()
-	l.world.Spawn(decoration, x, y, z, live.Heading())
+	l.world.Spawn(decoration, x, y, z, heading)
 	return true
 }
 
