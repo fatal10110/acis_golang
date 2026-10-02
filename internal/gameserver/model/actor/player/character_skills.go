@@ -104,13 +104,15 @@ func (c *Character) ClearActiveSkillEffects() {
 	c.skills.effects = nil
 }
 
-// RestoreSkillEffect records one effect restored from persisted skill state.
-func (c *Character) RestoreSkillEffect(plan effect.EffectPlan, reuseGroup int32) {
+// RestoreSkillEffect records one effect restored from persisted skill state
+// at the instant at, from which its schedule runs.
+func (c *Character) RestoreSkillEffect(plan effect.EffectPlan, reuseGroup int32, at time.Time) {
 	c.AddActiveSkillEffect(effect.ActiveEffect{
 		Skill:      plan.Skill,
 		ReuseGroup: reuseGroup,
 		Count:      plan.Count,
 		Time:       plan.Time,
+		RestoredAt: at,
 	})
 }
 

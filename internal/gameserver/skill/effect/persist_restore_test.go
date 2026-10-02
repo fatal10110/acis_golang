@@ -10,7 +10,7 @@ import (
 // ---- from persist_restore_test.go ----
 func TestSeedRestoreSchedulesFromPersistedCountAndElapsedTime(t *testing.T) {
 	e := &Effect{Template: modelskill.EffectTemplate{Count: 5, Time: 10}}
-	e.seedRestore(3, 4) // 3 ticks left, 4s elapsed since the last tick at logout
+	e.seedRestore(3, 4, time.Time{}) // 3 ticks left, 4s elapsed since the last tick at logout
 	e.startSchedule(time.Unix(1000, 0))
 
 	if got := e.Remaining(); got != 3 {
@@ -35,7 +35,7 @@ func TestSeedRestoreSchedulesFromPersistedCountAndElapsedTime(t *testing.T) {
 
 func TestSeedRestoreClampsCountToTemplateCountAndElapsedToPeriod(t *testing.T) {
 	e := &Effect{Template: modelskill.EffectTemplate{Count: 2, Time: 10}}
-	e.seedRestore(99, 999) // persisted values exceeding the template's own count/period
+	e.seedRestore(99, 999, time.Time{}) // persisted values exceeding the template's own count/period
 	fixedNow := time.Unix(2000, 0)
 	e.startSchedule(fixedNow)
 
@@ -49,7 +49,7 @@ func TestSeedRestoreClampsCountToTemplateCountAndElapsedToPeriod(t *testing.T) {
 
 func TestSeedRestoreNonPeriodicEffectNeverClaims(t *testing.T) {
 	e := &Effect{Template: modelskill.EffectTemplate{Count: 1}}
-	e.seedRestore(1, 0)
+	e.seedRestore(1, 0, time.Time{})
 	e.startSchedule(time.Now())
 
 	if run, remove := e.claimAction(time.Now().Add(time.Hour)); run || remove {
@@ -64,7 +64,7 @@ func TestSeedRestoreNonPeriodicEffectNeverClaims(t *testing.T) {
 // remaining state rather than resetting or losing it.
 func TestSaveStateIsTheInverseOfSeedRestore(t *testing.T) {
 	e := &Effect{Template: modelskill.EffectTemplate{Count: 5, Time: 10}}
-	e.seedRestore(3, 4) // 3 ticks left, 4s elapsed since the last tick at logout
+	e.seedRestore(3, 4, time.Time{}) // 3 ticks left, 4s elapsed since the last tick at logout
 	start := time.Unix(1000, 0)
 	e.startSchedule(start)
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -381,18 +382,31 @@ func Apply(effector, effected Actor, meta Skill, templates []modelskill.EffectTe
 // caster identity is not persisted, so every reinstated effect is treated as
 // self-applied. The replay is silent (see List.AddRestored): it activates and refreshes icons
 // but sends no stack or expiry system messages.
-func ApplyRestored(list *List, effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate, count, elapsedSeconds int32) {
+//
+// restoredAt, when set, is the instant the saved state was read back: each
+// effect's schedule runs from there, not from the replay, and one whose
+// last tick came due in between is not reinstated (see resumeRestored).
+func ApplyRestored(list *List, effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate, count, elapsedSeconds int32, restoredAt time.Time) {
 	if list == nil {
 		return
+	}
+	var now time.Time
+	if !restoredAt.IsZero() {
+		now = list.now()
 	}
 	for _, tmpl := range templates {
 		e, err := New(meta, tmpl)
 		if err != nil {
 			continue
 		}
+		if !restoredAt.IsZero() {
+			if _, _, ok := resumeRestored(tmpl, count, elapsedSeconds, restoredAt, now); !ok {
+				continue
+			}
+		}
 		e.Effector = effector
 		e.Effected = effected
-		e.seedRestore(count, elapsedSeconds)
+		e.seedRestore(count, elapsedSeconds, restoredAt)
 		list.AddRestored(e)
 	}
 }

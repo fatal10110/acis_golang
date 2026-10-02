@@ -140,9 +140,9 @@ func (p *Persistence) SaveState(c *player.Character) SaveState {
 	// reads that clock rather than p.now.
 	now := c.Now()
 	// Effects a login restored but has not replayed yet, when the session
-	// ends before entering the world, are saved back as restored: the
-	// restore consumed their rows.
-	effects := append(p.liveActiveEffects(c, now), c.ActiveSkillEffects()...)
+	// ends before entering the world, are saved back with the time since
+	// the restore counted: the restore consumed their rows.
+	effects := append(p.liveActiveEffects(c, now), p.stagedActiveEffects(c, now)...)
 	rows := effect.BuildSaveRows(effects, c.SkillReuseTimers(now), classIndex)
 	return SaveState{charID: c.ID, classIndex: classIndex, rows: rows, ok: true}
 }
@@ -192,6 +192,26 @@ func (p *Persistence) liveActiveEffects(c *player.Character, now time.Time) []ef
 	return out
 }
 
+// stagedActiveEffects is the save view at now of the effects a restore
+// staged on c and ReplayEffects has not reinstated yet: each has run from
+// its restore instant, as it would on the live effect list, and one that
+// has ended by now is left out.
+func (p *Persistence) stagedActiveEffects(c *player.Character, now time.Time) []effect.ActiveEffect {
+	staged := c.ActiveSkillEffects()
+	out := staged[:0]
+	for _, eff := range staged {
+		if def, ok := p.definition(eff.Skill); ok {
+			count, elapsed, alive := effect.RestoredSaveState(def.Effects, eff.Count, eff.Time, eff.RestoredAt, now)
+			if !alive {
+				continue
+			}
+			eff.Count, eff.Time = count, elapsed
+		}
+		out = append(out, eff)
+	}
+	return out
+}
+
 // RestoreKnownSkills restores learned skills independently from effects and reuse timers.
 func (p *Persistence) RestoreKnownSkills(ctx context.Context, c *player.Character) error {
 	if p == nil || c == nil {
@@ -201,7 +221,11 @@ func (p *Persistence) RestoreKnownSkills(ctx context.Context, c *player.Characte
 	return p.restoreKnownSkills(ctx, c, classIndex)
 }
 
-// RestoreSkillState consumes persisted effects and reuse timers.
+// RestoreSkillState consumes persisted effects and reuse timers: it stages
+// them on c, then deletes their rows. Call it once c is attached and
+// nothing else in the login can fail, so a login that does not complete
+// leaves the rows in place; from here on the session's end saves the
+// staged state back.
 func (p *Persistence) RestoreSkillState(ctx context.Context, c *player.Character) error {
 	if p == nil || !p.storeSkillCooltime.Load() || c == nil {
 		return nil
@@ -214,9 +238,9 @@ func (p *Persistence) RestoreSkillState(ctx context.Context, c *player.Character
 	if err != nil {
 		return fmt.Errorf("restore skill state for character %d: %w", c.ID, err)
 	}
-	// Restore runs at login, before c has a queue, so it filters on p.now;
-	// the timers it keeps carry their stored expiry and are checked on c's
-	// queue clock from then on.
+	// The rows are filtered on p.now; the timers kept carry their stored
+	// expiry and are checked on c's queue clock from then on, and the
+	// staged effects run from c's queue clock instant (stageSkillState).
 	p.stageSkillState(c, rows, p.currentTime())
 	if _, err := p.store.DeleteByCharacter(ctx, c.ID, classIndex); err != nil {
 		return fmt.Errorf("clear restored skill state for character %d: %w", c.ID, err)
@@ -225,9 +249,12 @@ func (p *Persistence) RestoreSkillState(ctx context.Context, c *player.Character
 }
 
 // stageSkillState restores rows' reuse timers onto c and stages their
-// effects for ReplayEffects, dropping what has run out by now.
+// effects for ReplayEffects, dropping what has run out by now. The staged
+// effects' schedules run from this instant on c's clock, as an effect
+// restored straight onto the character's list would.
 func (p *Persistence) stageSkillState(c *player.Character, rows []effect.SaveRow, now time.Time) {
 	plan := effect.BuildRestorePlan(rows, now.UnixMilli(), p.lookup)
+	restoredAt := c.Now()
 	for _, reuse := range plan.Reuse {
 		def, ok := p.definition(reuse.Skill)
 		if !ok {
@@ -240,7 +267,7 @@ func (p *Persistence) stageSkillState(c *player.Character, rows []effect.SaveRow
 		if !ok {
 			continue
 		}
-		c.RestoreSkillEffect(eff, cast.ReuseKey(def))
+		c.RestoreSkillEffect(eff, cast.ReuseKey(def), restoredAt)
 	}
 }
 
@@ -315,13 +342,14 @@ func (p *Persistence) RemoveAllSkills(c *player.Character) {
 
 // ReplayEffects reinstates every effect Restore recorded into c's restore
 // registry (via RestoreSkillEffect) onto c's live effect list, at the tick
-// count and elapsed time it had at logout. Call once c.EffectList() is
-// attached, after Restore itself: Restore runs before the live player (and
-// its effect list) exists, so it can only record restored effects into the
-// registry — this replay is what actually fires their OnStart, schedules
-// their ticks, and surfaces their icons, mirroring
+// count and elapsed time it had at logout, run on from its restore instant.
+// Call once c.EffectList() is attached, after Restore itself: Restore
+// records restored effects into the registry only, so a character not yet
+// in the world sends nothing for them — this replay is what actually fires
+// their OnStart, schedules their ticks, and surfaces their icons, mirroring
 // Player.restoreEffects()'s template.getEffect(this, this, skill) ->
-// setCount/setTime -> scheduleEffect() chain.
+// setCount/setTime -> scheduleEffect() chain. An effect that ran out
+// between the restore and the replay is not reinstated.
 func (p *Persistence) ReplayEffects(c *player.Character) {
 	if p == nil || c == nil {
 		return
@@ -335,7 +363,7 @@ func (p *Persistence) ReplayEffects(c *player.Character) {
 		if !ok {
 			continue
 		}
-		effect.ApplyRestored(list, c, c, effect.SkillFromDefinition(def), def.Effects, eff.Count, eff.Time)
+		effect.ApplyRestored(list, c, c, effect.SkillFromDefinition(def), def.Effects, eff.Count, eff.Time, eff.RestoredAt)
 	}
 	// The registry's only purpose is staging Restore's effects until the live
 	// effect list exists to receive them; Save now reads that live list
