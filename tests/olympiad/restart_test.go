@@ -9,6 +9,7 @@ import (
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
 )
@@ -16,12 +17,16 @@ import (
 // discard drops every announcement.
 type discard struct{}
 
-func (discard) Announce(olympiad.Notice, int) {}
+func (discard) Announce(olympiad.Notice, int32) {}
 
+// newOlympiad restores an Olympiad on a virtual clock at at, its writes
+// queued on a persistence worker of its own.
 func newOlympiad(t *testing.T, store olympiad.Store, at time.Time) (*olympiad.Olympiad, *sim.Inline) {
 	t.Helper()
+	worker := persist.New(zerolog.Nop())
+	t.Cleanup(func() { _ = worker.Close(context.Background()) })
 	loop := sim.NewInline(at)
-	o := olympiad.New(olympiad.DefaultConfig(), store, discard{}, loop.NewQueue("olympiad"), zerolog.Nop())
+	o := olympiad.New(olympiad.DefaultConfig(), store, worker, discard{}, loop.NewQueue("olympiad"), zerolog.Nop())
 	if err := o.Restore(context.Background()); err != nil {
 		t.Fatalf("restore: %v", err)
 	}
@@ -112,7 +117,7 @@ func TestOlympiadStopCancelsPendingStep(t *testing.T) {
 	tr := &trace{}
 	at := time.Date(2026, 10, 7, 20, 0, 0, 0, time.UTC)
 	loop := sim.NewInline(at)
-	o := olympiad.New(olympiad.DefaultConfig(), traceStore{gamesql.NewOlympiadStore(db), tr}, traceAnnouncer{tr}, loop.NewQueue("olympiad"), zerolog.Nop())
+	o := olympiad.New(olympiad.DefaultConfig(), traceStore{gamesql.NewOlympiadStore(db), tr}, nil, traceAnnouncer{tr}, loop.NewQueue("olympiad"), zerolog.Nop())
 	if err := o.Restore(ctx); err != nil {
 		t.Fatal(err)
 	}

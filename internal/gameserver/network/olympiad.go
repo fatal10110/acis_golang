@@ -32,14 +32,14 @@ var olympiadNoticeMessages = map[olympiad.Notice]int{
 
 // Announce sends n's system message, numbering the cycle for a cycle's
 // start or end, to every player online.
-func (a olympiadAnnouncer) Announce(n olympiad.Notice, cycle int) {
+func (a olympiadAnnouncer) Announce(n olympiad.Notice, cycle int32) {
 	if a.state == nil {
 		return
 	}
 	id := olympiadNoticeMessages[n]
 	build := func() wire.Frame { return serverpackets.FrameSystemMessage(id) }
 	if n == olympiad.NoticeCycleStarted || n == olympiad.NoticeCycleEnded {
-		build = func() wire.Frame { return serverpackets.FrameSystemMessageNumber(id, int32(cycle)) }
+		build = func() wire.Frame { return serverpackets.FrameSystemMessageNumber(id, cycle) }
 	}
 	broadcastFrame(build, func(send func(frameReceiver)) {
 		for _, p := range a.state.Players() {

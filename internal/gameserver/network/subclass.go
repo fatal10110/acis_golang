@@ -223,8 +223,10 @@ func (l *GameClientLink) mayAddSubclass(live *livePlayer, subs []player.SubClass
 		}
 	}
 	// A noble, or a character who has completed Fate's Whisper and Mimir's
-	// Elixir, may add one without SubClassWithoutQuests. Neither noble
-	// status nor quest states exist yet (#3070), so none passes that way.
+	// Elixir, may add one without SubClassWithoutQuests. Neither gate is
+	// wired here yet: noble status exists (player.Character.IsNoble) but
+	// checking it is #3070's to wire, and quest states do not exist yet,
+	// so none passes that way.
 	return l.playerConfig.SubclassWithoutQuests
 }
 

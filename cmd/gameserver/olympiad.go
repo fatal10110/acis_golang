@@ -8,6 +8,7 @@ import (
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
@@ -33,14 +34,14 @@ func loadOlympiadConfig(paths gameServerPaths) (olympiad.Config, error) {
 }
 
 // provideOlympiad returns the Olympiad, persisting through the gameserver
-// database, announcing to every player in state and running its calendar
+// database on worker's lanes, announcing to every player in state and running its calendar
 // on pool.
-func provideOlympiad(paths gameServerPaths, db *sql.DB, pool *sim.Pool, state *world.State, log zerolog.Logger) (*olympiad.Olympiad, error) {
+func provideOlympiad(paths gameServerPaths, db *sql.DB, pool *sim.Pool, worker *persist.Worker, state *world.State, log zerolog.Logger) (*olympiad.Olympiad, error) {
 	cfg, err := loadOlympiadConfig(paths)
 	if err != nil {
 		return nil, err
 	}
-	return olympiad.New(cfg, gamesql.NewOlympiadStore(db), network.NewOlympiadAnnouncer(state), pool.NewQueue("olympiad"), log), nil
+	return olympiad.New(cfg, gamesql.NewOlympiadStore(db), worker, network.NewOlympiadAnnouncer(state), pool.NewQueue("olympiad"), log), nil
 }
 
 // startOlympiad restores the cycle and the nobles' records before any
@@ -56,8 +57,9 @@ func startOlympiad(lc fx.Lifecycle, o *olympiad.Olympiad) {
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
-			// Waits for a calendar step still running, then saves; each
-			// is bounded by olympiad.TaskTimeout.
+			// Waits for a calendar step still running, then for its
+			// queued writes and the final save; the persist worker,
+			// stopped after this hook, lands whatever is left.
 			ctx, cancel := context.WithTimeout(ctx, 2*olympiad.TaskTimeout)
 			defer cancel()
 			o.Stop(ctx)

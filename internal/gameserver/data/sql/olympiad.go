@@ -25,8 +25,8 @@ func NewOlympiadStore(db *sql.DB) *OlympiadStore {
 }
 
 // LoadCycle returns the stored cycle number, found=false when none is
-// stored.
-func (s *OlympiadStore) LoadCycle(ctx context.Context) (int, bool, error) {
+// stored. A value that is not a 32-bit decimal integer is an error.
+func (s *OlympiadStore) LoadCycle(ctx context.Context) (int32, bool, error) {
 	var value string
 	err := s.db.QueryRowContext(ctx, "SELECT value FROM server_memo WHERE var = ?", olympiadCycleMemo).Scan(&value)
 	if err == sql.ErrNoRows {
@@ -35,18 +35,18 @@ func (s *OlympiadStore) LoadCycle(ctx context.Context) (int, bool, error) {
 	if err != nil {
 		return 0, false, fmt.Errorf("load olympiad cycle: %w", err)
 	}
-	cycle, err := strconv.Atoi(value)
+	cycle, err := strconv.ParseInt(value, 10, 32)
 	if err != nil {
 		return 0, false, fmt.Errorf("load olympiad cycle %q: %w", value, err)
 	}
-	return cycle, true, nil
+	return int32(cycle), true, nil
 }
 
 // SaveCycle stores the cycle number.
-func (s *OlympiadStore) SaveCycle(ctx context.Context, cycle int) error {
+func (s *OlympiadStore) SaveCycle(ctx context.Context, cycle int32) error {
 	if _, err := s.db.ExecContext(ctx,
 		"INSERT INTO server_memo (var, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)",
-		olympiadCycleMemo, strconv.Itoa(cycle),
+		olympiadCycleMemo, strconv.FormatInt(int64(cycle), 10),
 	); err != nil {
 		return fmt.Errorf("save olympiad cycle: %w", err)
 	}

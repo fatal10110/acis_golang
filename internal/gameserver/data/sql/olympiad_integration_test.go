@@ -19,7 +19,7 @@ func TestOlympiadStoreCycle(t *testing.T) {
 	if _, found, err := store.LoadCycle(ctx); err != nil || found {
 		t.Fatalf("LoadCycle() on an empty table = found %v, err %v; want not found", found, err)
 	}
-	for _, cycle := range []int{3, 4} {
+	for _, cycle := range []int32{3, 4} {
 		if err := store.SaveCycle(ctx, cycle); err != nil {
 			t.Fatalf("SaveCycle(%d): %v", cycle, err)
 		}
@@ -31,6 +31,23 @@ func TestOlympiadStoreCycle(t *testing.T) {
 	var value string
 	if err := db.QueryRowContext(ctx, "SELECT value FROM server_memo WHERE var = 'olympiad_cycle'").Scan(&value); err != nil || value != "4" {
 		t.Fatalf("server_memo olympiad_cycle = %q, %v; want \"4\"", value, err)
+	}
+}
+
+// TestOlympiadStoreCycleOutOfRange pins that a stored cycle beyond 32 bits
+// fails the load rather than wrapping, as the reference's integer parse
+// rejects it.
+func TestOlympiadStoreCycleOutOfRange(t *testing.T) {
+	ctx := context.Background()
+	db := sqltest.SharedDB(t)
+	store := NewOlympiadStore(db)
+	for _, value := range []string{"4294967297", "2147483648", "-2147483649", "abc"} {
+		if _, err := db.ExecContext(ctx, "REPLACE INTO server_memo (var, value) VALUES ('olympiad_cycle', ?)", value); err != nil {
+			t.Fatal(err)
+		}
+		if got, found, err := store.LoadCycle(ctx); err == nil {
+			t.Fatalf("LoadCycle() with %q stored = %d, %v, nil; want an error", value, got, found)
+		}
 	}
 }
 

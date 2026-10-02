@@ -68,7 +68,7 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 		"providePersist":             {persistCloseTimeout, "persistCloseTimeout", "persistence worker's last close"},
 		"startGroundItemPersistence": {shutdownSaveTimeout, "shutdownSaveTimeout", "items_on_ground save"},
 		"startSevenSigns":            {0, "", "stops a timer under a lock the status save does not hold across its write"},
-		"startOlympiad":              {2 * olympiad.TaskTimeout, "TaskTimeout", "waits for a running calendar step, then saves olympiad_nobles and server_memo, each bounded by olympiad.TaskTimeout"},
+		"startOlympiad":              {2 * olympiad.TaskTimeout, "TaskTimeout", "waits for a running calendar step, which does no I/O, then for its queued olympiad_nobles and server_memo writes and the final save on the persistence lane, each bounded by olympiad.TaskTimeout"},
 		"startAnnouncements":         {0, "", "stops timers under a lock held only across in-memory work and an announcements.xml rewrite"},
 		"provideGameServerLogger":    {0, "", "closes the log file"},
 		"provideBootContext":         {0, "", "cancels a context"},

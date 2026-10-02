@@ -27,9 +27,14 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// TaskTimeout bounds the database writes of one calendar step, and of the
-// save on Stop.
+// TaskTimeout bounds one database write.
 const TaskTimeout = 10 * time.Second
+
+// writeLane is the persistence owner every Olympiad write is queued under:
+// one lane keeps the writes in the order the calendar made them, so a
+// truncate never lands after the records saved behind it. No character,
+// item or clan has object id 0.
+const writeLane int32 = 0
 
 // Period is the part of the day the Olympiad is in.
 type Period int
@@ -77,15 +82,23 @@ const (
 // Announcer tells every player online about a calendar change. cycle is the
 // cycle number for NoticeCycleStarted and NoticeCycleEnded, zero otherwise.
 type Announcer interface {
-	Announce(n Notice, cycle int)
+	Announce(n Notice, cycle int32)
+}
+
+// Writer runs a database write later, on ownerID's persistence lane, so
+// the calendar never waits on the database. Flush waits for the writes
+// queued on ownerIDs' lanes.
+type Writer interface {
+	Enqueue(ownerID int32, job func()) bool
+	Flush(ctx context.Context, ownerIDs ...int32) error
 }
 
 // Store persists the cycle number and the nobles' records.
 type Store interface {
 	// LoadCycle returns the stored cycle number, found=false when none was
 	// stored yet.
-	LoadCycle(ctx context.Context) (cycle int, found bool, err error)
-	SaveCycle(ctx context.Context, cycle int) error
+	LoadCycle(ctx context.Context) (cycle int32, found bool, err error)
+	SaveCycle(ctx context.Context, cycle int32) error
 	// LoadNobles returns the record of every noble whose character still
 	// exists, keyed by character object id.
 	LoadNobles(ctx context.Context) (map[int32]Noble, error)
@@ -112,16 +125,18 @@ const (
 )
 
 // Olympiad is the calendar and the nobles' records. Its calendar steps run
-// on its queue; the reads are safe from any goroutine.
+// on its queue and hand their database writes to its writer; the reads are
+// safe from any goroutine.
 type Olympiad struct {
-	cfg   Config
-	store Store
-	out   Announcer
-	log   zerolog.Logger
-	queue *sim.Queue
+	cfg    Config
+	store  Store
+	writes Writer
+	out    Announcer
+	log    zerolog.Logger
+	queue  *sim.Queue
 
-	// run serializes the calendar steps with Stop's save, and is held
-	// across their database writes. It guards the fields below it.
+	// run serializes the calendar steps with Stop. It guards the fields
+	// below it.
 	run     sync.Mutex
 	stopped bool
 	timer   *sim.Timer
@@ -136,18 +151,19 @@ type Olympiad struct {
 	// mu guards the fields below it; never held across I/O or an
 	// announcement.
 	mu     sync.Mutex
-	cycle  int
+	cycle  int32
 	period Period
 	// periodEnd is in Unix milliseconds.
 	periodEnd int64
 	nobles    map[int32]Noble
 }
 
-// New returns an Olympiad persisting through store and announcing through
-// out. Its calendar runs on queue, which it owns from then on. Restore then
-// Start bring it up.
-func New(cfg Config, store Store, out Announcer, queue *sim.Queue, log zerolog.Logger) *Olympiad {
-	return &Olympiad{cfg: cfg, store: store, out: out, queue: queue, log: log, registrationEnd: -1, nobles: map[int32]Noble{}}
+// New returns an Olympiad persisting through store, its writes queued on
+// writes (run inline when nil), and announcing through out. Its calendar
+// runs on queue, which it owns from then on. Restore then Start bring it
+// up.
+func New(cfg Config, store Store, writes Writer, out Announcer, queue *sim.Queue, log zerolog.Logger) *Olympiad {
+	return &Olympiad{cfg: cfg, store: store, writes: writes, out: out, queue: queue, log: log, registrationEnd: -1, nobles: map[int32]Noble{}}
 }
 
 // Restore loads the cycle number, the first when none is stored, and the
@@ -168,7 +184,7 @@ func (o *Olympiad) Restore(ctx context.Context) error {
 	o.cycle = cycle
 	o.nobles = nobles
 	o.mu.Unlock()
-	o.log.Info().Int("nobles", len(nobles)).Int("cycle", cycle).Msg("olympiad: restored")
+	o.log.Info().Int("nobles", len(nobles)).Int32("cycle", cycle).Msg("olympiad: restored")
 	return nil
 }
 
@@ -187,8 +203,10 @@ func (o *Olympiad) Start() {
 	})
 }
 
-// Stop cancels the pending calendar step, waits for a running one, and
-// saves the cycle number and the nobles' records within TaskTimeout.
+// Stop cancels the pending calendar step, waits for a running one, queues
+// the save of the cycle number and the nobles' records, and waits until
+// ctx ends for every write it queued to land. A write still queued then
+// lands when the writer drains.
 func (o *Olympiad) Stop(ctx context.Context) {
 	o.queue.Close()
 	o.run.Lock()
@@ -198,9 +216,13 @@ func (o *Olympiad) Stop(ctx context.Context) {
 		o.timer.Stop()
 		o.timer = nil
 	}
-	ctx, cancel := context.WithTimeout(ctx, TaskTimeout)
-	defer cancel()
-	o.saveStatus(ctx)
+	o.saveStatus()
+	if o.writes == nil {
+		return
+	}
+	if err := o.writes.Flush(ctx, writeLane); err != nil {
+		o.log.Error().Err(err).Msg("olympiad: wait for the final save")
+	}
 }
 
 // Noble returns objectID's record for the running cycle.
@@ -219,7 +241,7 @@ func (o *Olympiad) Period() Period {
 }
 
 // Cycle returns the running cycle's number.
-func (o *Olympiad) Cycle() int {
+func (o *Olympiad) Cycle() int32 {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	return o.cycle
@@ -233,15 +255,13 @@ func (o *Olympiad) fire() {
 		return
 	}
 	o.timer = nil
-	ctx, cancel := context.WithTimeout(context.Background(), TaskTimeout)
-	defer cancel()
 	switch o.due {
 	case stepCompetitionEnd:
 		o.out.Announce(NoticeCompetitionEnded, 0)
-		o.closeCompetition(ctx)
+		o.closeCompetition()
 	case stepValidationEnd:
 		o.startCycle()
-		o.deleteNobles(ctx)
+		o.deleteNobles()
 		o.enterPeriod()
 	case stepNoblePoints:
 		o.nextPoints = nextNoblePointsUpdate(o.queue.Now(), o.cfg)
@@ -255,7 +275,7 @@ func (o *Olympiad) fire() {
 		o.out.Announce(NoticeRegistrationEnded, 0)
 		o.registrationEnd = -1
 	case stepOlympiadEnd:
-		o.endOlympiad(ctx)
+		o.endOlympiad()
 	}
 	o.schedule()
 }
@@ -345,8 +365,8 @@ func (o *Olympiad) openCompetition() {
 // closeCompetition saves the status once the window's matches are over and
 // enters the next period. No match can still be running: matches are not
 // run yet (#217).
-func (o *Olympiad) closeCompetition(ctx context.Context) {
-	o.saveStatus(ctx)
+func (o *Olympiad) closeCompetition() {
+	o.saveStatus()
 	o.enterPeriod()
 }
 
@@ -363,47 +383,61 @@ func (o *Olympiad) startCycle() {
 // endOlympiad closes the running Olympiad: it saves the records, enters the
 // validation period, saves the status, keeps the month's standings and
 // enters the period the clock is in. No heroes are elected yet (#220).
-func (o *Olympiad) endOlympiad(ctx context.Context) {
+func (o *Olympiad) endOlympiad() {
 	o.out.Announce(NoticeCycleEnded, o.Cycle())
-	o.saveNobles(ctx)
+	o.saveNobles()
 	o.mu.Lock()
 	o.period = Validation
 	o.mu.Unlock()
-	o.saveStatus(ctx)
-	if err := o.store.SnapshotMonth(ctx); err != nil {
-		o.log.Error().Err(err).Msg("olympiad: keep the month's standings")
-	}
+	o.saveStatus()
+	o.write("keep the month's standings", func(ctx context.Context, st Store) error { return st.SnapshotMonth(ctx) })
 	o.enterPeriod()
 }
 
-// saveStatus saves the cycle number and the nobles' records.
-func (o *Olympiad) saveStatus(ctx context.Context) {
-	if err := o.store.SaveCycle(ctx, o.Cycle()); err != nil {
-		o.log.Error().Err(err).Msg("olympiad: save cycle")
-	}
-	o.saveNobles(ctx)
+// saveStatus queues the save of the cycle number and the nobles' records.
+func (o *Olympiad) saveStatus() {
+	cycle := o.Cycle()
+	o.write("save cycle", func(ctx context.Context, st Store) error { return st.SaveCycle(ctx, cycle) })
+	o.saveNobles()
 }
 
-// saveNobles saves every noble's record; none held writes nothing.
-func (o *Olympiad) saveNobles(ctx context.Context) {
+// saveNobles queues the save of every noble's record as it stands now;
+// none held writes nothing.
+func (o *Olympiad) saveNobles() {
 	o.mu.Lock()
 	nobles := maps.Clone(o.nobles)
 	o.mu.Unlock()
 	if len(nobles) == 0 {
 		return
 	}
-	if err := o.store.SaveNobles(ctx, nobles); err != nil {
-		o.log.Error().Err(err).Msg("olympiad: save nobles")
-	}
+	o.write("save nobles", func(ctx context.Context, st Store) error { return st.SaveNobles(ctx, nobles) })
 }
 
-// deleteNobles removes every noble's record, stored and held; the held ones
-// go even when the stored ones could not be removed.
-func (o *Olympiad) deleteNobles(ctx context.Context) {
-	if err := o.store.DeleteNobles(ctx); err != nil {
-		o.log.Error().Err(err).Msg("olympiad: delete nobles")
-	}
+// deleteNobles removes every noble's record held and queues the removal of
+// the stored ones; the held ones go even when the stored ones cannot.
+func (o *Olympiad) deleteNobles() {
+	o.write("delete nobles", func(ctx context.Context, st Store) error { return st.DeleteNobles(ctx) })
 	o.mu.Lock()
 	clear(o.nobles)
 	o.mu.Unlock()
+}
+
+// write queues fn on the Olympiad's persistence lane, or runs it at once
+// without a writer. Each write gets TaskTimeout.
+func (o *Olympiad) write(what string, fn func(context.Context, Store) error) {
+	store, log := o.store, o.log
+	job := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), TaskTimeout)
+		defer cancel()
+		if err := fn(ctx, store); err != nil {
+			log.Error().Err(err).Msg("olympiad: " + what)
+		}
+	}
+	if o.writes == nil {
+		job()
+		return
+	}
+	if !o.writes.Enqueue(writeLane, job) {
+		log.Error().Msg("olympiad: " + what + ": write dropped")
+	}
 }

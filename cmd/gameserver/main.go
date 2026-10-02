@@ -54,7 +54,7 @@ const (
 		3*task.ItemInstanceSaveTimeout + // drainItemInstances: save, persistence-worker drain, save
 		persistCloseTimeout +
 		shutdownSaveTimeout + // items_on_ground
-		2*olympiad.TaskTimeout + // a running Olympiad calendar step, then the olympiad_nobles and server_memo save
+		2*olympiad.TaskTimeout + // the Olympiad's queued olympiad_nobles and server_memo writes, then its final save
 		gameServerStopSlack
 	// gameServerBootTimeout bounds constructor-time DB I/O (id scan, ground-item
 	// restore, spawn-state load). These run inside fx.New's constructor graph,

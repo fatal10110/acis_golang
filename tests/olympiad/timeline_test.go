@@ -37,7 +37,7 @@ var noticeNames = map[olympiad.Notice]string{
 	olympiad.NoticeCycleEnded:         "cycle_ended",
 }
 
-func (a traceAnnouncer) Announce(n olympiad.Notice, cycle int) {
+func (a traceAnnouncer) Announce(n olympiad.Notice, cycle int32) {
 	if n == olympiad.NoticeCycleStarted || n == olympiad.NoticeCycleEnded {
 		a.tr.add("ANN %s %d", noticeNames[n], cycle)
 		return
@@ -51,7 +51,7 @@ type traceStore struct {
 	tr *trace
 }
 
-func (s traceStore) SaveCycle(ctx context.Context, cycle int) error {
+func (s traceStore) SaveCycle(ctx context.Context, cycle int32) error {
 	s.tr.add("DB save_cycle %d", cycle)
 	return s.OlympiadStore.SaveCycle(ctx, cycle)
 }
@@ -124,9 +124,8 @@ var timelineScenarios = []timelineScenario{
 // lines, and no match ever running). Its one deviation: init renews the
 // Olympiad end once reached rather than once passed, as the Go calendar
 // does; on a clock that never moves the reference's comparison repeats the
-// steps due at the end forever (#3280). Generated with
-// eclipse-temurin:21-jdk-alpine, java -Duser.timezone=UTC OlyProbe.java; the
-// probe is kept in the workspace's .agent-cache/olympiad-probe.
+// steps due at the end forever (#3280). The probe and how to regenerate the
+// golden file are in testdata/oracle (OlyProbe.java, README.md).
 //
 // The runs cover a start in the validation period, inside the window,
 // inside the previous day's window just before midnight, during the start
@@ -166,7 +165,7 @@ func runTimeline(t *testing.T, sc timelineScenario) []string {
 	}
 	tr := &trace{}
 	loop := sim.NewInline(start)
-	o := olympiad.New(olympiad.DefaultConfig(), traceStore{gamesql.NewOlympiadStore(db), tr}, traceAnnouncer{tr}, loop.NewQueue("olympiad"), zerolog.Nop())
+	o := olympiad.New(olympiad.DefaultConfig(), traceStore{gamesql.NewOlympiadStore(db), tr}, nil, traceAnnouncer{tr}, loop.NewQueue("olympiad"), zerolog.Nop())
 	if err := o.Restore(ctx); err != nil {
 		t.Fatalf("%s: restore: %v", sc.name, err)
 	}

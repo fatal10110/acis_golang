@@ -1879,7 +1879,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	// The Olympiad's records are restored once the characters are seeded,
 	// below; its calendar is not started (see WithOlympiadSeed).
-	olympiadState := olympiad.New(olympiad.DefaultConfig(), gamesql.NewOlympiadStore(db), network.NewOlympiadAnnouncer(state), queues.NewQueue("olympiad"), o.log)
+	olympiadState := olympiad.New(olympiad.DefaultConfig(), gamesql.NewOlympiadStore(db), persistWorker, network.NewOlympiadAnnouncer(state), queues.NewQueue("olympiad"), o.log)
 	gclConfig.Olympiad = olympiadState
 	gcl, err := network.NewGameClientLink(gclConfig)
 	if err != nil {
