@@ -217,6 +217,9 @@ type Character struct {
 	// can reach it without this domain package importing the cast package
 	// that already imports this one.
 	cast atomic.Pointer[CastController]
+	// intention reads the creature c's current intention acts on; see
+	// SetIntentionSource.
+	intention atomic.Pointer[IntentionSource]
 
 	// sink receives this character's events. Attach sets it once, before
 	// the character is published into the world, and it never changes

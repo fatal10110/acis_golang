@@ -26,28 +26,41 @@ func (h fusionHandler) Use(cast Cast) {
 	if h.defs == nil {
 		return
 	}
-	triggeredID := modelskill.ID(cast.Skill.TriggeredID)
-
 	for _, obj := range cast.Targets {
-		target, ok := obj.(effect.Actor)
-		if !ok {
-			continue
+		if target, ok := obj.(effect.Actor); ok {
+			h.start(cast.Caster, target, cast.Skill)
 		}
-		list := target.EffectList()
-		if list == nil {
-			continue
-		}
-
-		if e := firstEffectByID(list, triggeredID); e != nil {
-			maxLevel := h.defs.MaxLevel(triggeredID)
-			e.IncreaseEffect(list, maxLevel, func(level int) {
-				h.applyTriggered(cast.Caster, target, triggeredID, level)
-			})
-			continue
-		}
-
-		h.applyTriggered(cast.Caster, target, triggeredID, cast.Skill.TriggeredLevel)
 	}
+}
+
+// start grows target's live effect of castSkill's triggered skill, or
+// applies that triggered skill fresh.
+func (h fusionHandler) start(caster Creature, target effect.Actor, castSkill modelskill.Definition) {
+	list := target.EffectList()
+	if list == nil {
+		return
+	}
+	triggeredID := modelskill.ID(castSkill.TriggeredID)
+	if e := firstEffectByID(list, triggeredID); e != nil {
+		maxLevel := h.defs.MaxLevel(triggeredID)
+		e.IncreaseEffect(list, maxLevel, func(level int) {
+			h.applyTriggered(caster, target, triggeredID, level)
+		})
+		return
+	}
+	h.applyTriggered(caster, target, triggeredID, castSkill.TriggeredLevel)
+}
+
+// StartFusion lands castSkill's force on effected as its FUSION channel
+// opens, the way Use does, and nothing more: the channel's start is no
+// skill use, so it flags no one, rolls no chance skill and notifies no
+// attacked target.
+func StartFusion(defs Definitions, caster Creature, effected attackable.Combatant, castSkill modelskill.Definition) {
+	target, ok := effected.(effect.Actor)
+	if !ok || defs == nil {
+		return
+	}
+	fusionHandler{defs: defs}.start(caster, target, castSkill)
 }
 
 func (h fusionHandler) applyTriggered(caster Creature, effected Actor, triggeredID modelskill.ID, level int) {

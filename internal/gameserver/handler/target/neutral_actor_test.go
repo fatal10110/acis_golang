@@ -50,7 +50,9 @@ func (neutralActor) Seeded() bool { return false }
 
 func (neutralActor) Summon() (Actor, bool) { return nil, false }
 
-func (neutralActor) CanCastOnPlayable(Actor, *modelskill.Definition, bool, bool) bool { return true }
+func (neutralActor) CanCastOnPlayable(Actor, *modelskill.Definition, bool, bool, bool) bool {
+	return true
+}
 
 func (neutralActor) OlympiadMode() bool { return false }
 

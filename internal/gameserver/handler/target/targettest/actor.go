@@ -52,7 +52,9 @@ func (Actor) Seeded() bool { return false }
 
 func (Actor) Summon() (target.Actor, bool) { return nil, false }
 
-func (Actor) CanCastOnPlayable(target.Actor, *modelskill.Definition, bool, bool) bool { return true }
+func (Actor) CanCastOnPlayable(target.Actor, *modelskill.Definition, bool, bool, bool) bool {
+	return true
+}
 
 func (Actor) OlympiadMode() bool { return false }
 

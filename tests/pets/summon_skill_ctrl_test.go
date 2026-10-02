@@ -79,7 +79,8 @@ func requireSummonStrikeStarted(t *testing.T, frames [][]byte, petActor *summon.
 }
 
 // TestSummonStrikeOnUnflaggedPlayerNeedsCtrl commands the pet's offensive
-// single-target strike at an unflagged player. Without CTRL the owner reads
+// single-target strike at an unflagged player the owner follows, so the
+// player is the owner's main target. Without CTRL the owner reads
 // INVALID_TARGET and the pet turns toward the player; with CTRL, the forced
 // attack, the cast starts.
 func TestSummonStrikeOnUnflaggedPlayerNeedsCtrl(t *testing.T) {
@@ -95,6 +96,7 @@ func TestSummonStrikeOnUnflaggedPlayerNeedsCtrl(t *testing.T) {
 			t.Parallel()
 			h, petActor, bystanderID := bootWolfStrikerWithBystander(t, wolfStrike())
 			h.targetPlayer(t, bystanderID)
+			h.followPlayer(t, bystanderID)
 
 			h.client.Send(encodeRequestActionUse(wolfStrikeAction, tc.ctrl))
 			frames := readUntilOpcode(t, h.client, serverpackets.OpcodeActionFailed, "strike ActionFailed")
@@ -111,7 +113,8 @@ func TestSummonStrikeOnUnflaggedPlayerNeedsCtrl(t *testing.T) {
 // TestQueuedSummonStrikeKeepsCtrl commands the strike at an unflagged player
 // while the pet is still casting at the monster, so the command is queued as
 // the pet's next intention. The queued one runs as soon as the first cast is
-// over, judged with the CTRL flag the command carried.
+// over, judged with the CTRL flag the command carried, on the player the
+// owner follows.
 func TestQueuedSummonStrikeKeepsCtrl(t *testing.T) {
 	t.Parallel()
 	// No reuse, so the queued strike can be the same skill, and a hit time
@@ -137,6 +140,7 @@ func TestQueuedSummonStrikeKeepsCtrl(t *testing.T) {
 				t.Fatalf("first strike sent no MagicSkillUse: opcodes %x", frameOpcodes(first))
 			}
 			h.targetPlayer(t, bystanderID)
+			h.followPlayer(t, bystanderID)
 
 			h.client.Send(encodeRequestActionUse(wolfStrikeAction, tc.ctrl))
 			queued := readUntilOpcode(t, h.client, serverpackets.OpcodeActionFailed, "queued strike ActionFailed")

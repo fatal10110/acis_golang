@@ -220,9 +220,12 @@ func oneCastRejection(caster, target Actor, skill *modelskill.Definition, ctrl b
 		return CastRejectNone
 	}
 	player, _ := actingPlayerOf(caster)
+	// A summon's cast is judged as its acting player's, so the player's own
+	// intention, not the summon's, names the main target.
+	ownCast := sameCreature(caster, player)
 	if !skill.Offensive {
 		if isPlayable(target) {
-			if !player.CanCastOnPlayable(target, skill, ctrl, false) {
+			if !player.CanCastOnPlayable(target, skill, ctrl, false, ownCast) {
 				return CastRejectInvalidTarget
 			}
 			return CastRejectNone
@@ -236,7 +239,7 @@ func oneCastRejection(caster, target Actor, skill *modelskill.Definition, ctrl b
 		return CastRejectInvalidTarget
 	}
 	if isPlayable(target) {
-		if ownSide(caster, target) || !player.CanCastOnPlayable(target, skill, ctrl, true) {
+		if ownSide(caster, target) || !player.CanCastOnPlayable(target, skill, ctrl, true, ownCast) {
 			return CastRejectInvalidTarget
 		}
 		if !target.AttackableBy(caster) || (!ctrl && !target.AttackableWithoutForceBy(player)) {

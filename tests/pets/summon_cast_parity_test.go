@@ -308,13 +308,14 @@ func TestSummonStrikeOnOwnFlaggedOwnerIsInvalid(t *testing.T) {
 }
 
 // TestForcedSummonStrikeOnUnflaggedPlayerLands forces the pet's strike on an
-// unflagged player with CTRL. Nothing re-judges the target conditions once
+// unflagged player the owner follows with CTRL. Nothing re-judges the target conditions once
 // the cast has started (CreatureCast.onMagicLaunch -> getTargetList), so the
 // launch names the player and the hit lands.
 func TestForcedSummonStrikeOnUnflaggedPlayerLands(t *testing.T) {
 	t.Parallel()
 	h, petActor, bystanderID := bootWolfStrikerWithBystander(t, wolfStrike())
 	h.targetPlayer(t, bystanderID)
+	h.followPlayer(t, bystanderID)
 	obj, ok := h.srv.State.Player(bystanderID)
 	if !ok {
 		t.Fatal("bystander missing from world state")

@@ -42,8 +42,8 @@ type socialOwner interface {
 	IsInSameClan(other skilltarget.Actor) bool
 	IsInSameAlly(other skilltarget.Actor) bool
 	HasClan() bool
-	CanCastOnPlayable(target skilltarget.Actor, skill *modelskill.Definition, ctrl, offensive bool) bool
-	OffensiveCastAllowed(caster attackable.ArenaMember, target skilltarget.Actor, skill *modelskill.Definition, ctrl bool) bool
+	CanCastOnPlayable(target skilltarget.Actor, skill *modelskill.Definition, ctrl, offensive, ownCast bool) bool
+	OffensiveCastAllowed(caster attackable.ArenaMember, target skilltarget.Actor, skill *modelskill.Definition, ctrl, mainTarget bool) bool
 	SocialWithoutForce(self attackable.ArenaMember, attacker skilltarget.Actor) (allowed, decided bool)
 }
 
@@ -93,17 +93,18 @@ func (a *Actor) HasClan() bool {
 
 // CanCastOnPlayable judges a's own skill cast on target, a playable: an
 // offensive one by the owner's social standing and a's own zones, a
-// beneficial one as its owner would. A summon with no owner's standing to
-// read is refused nothing.
-func (a *Actor) CanCastOnPlayable(target skilltarget.Actor, skill *modelskill.Definition, ctrl, offensive bool) bool {
+// beneficial one as its owner would. a's own intention acts on target, so
+// target is the main target. A summon with no owner's standing to read is
+// refused nothing.
+func (a *Actor) CanCastOnPlayable(target skilltarget.Actor, skill *modelskill.Definition, ctrl, offensive, _ bool) bool {
 	owner, ok := a.social()
 	if !ok {
 		return true
 	}
 	if offensive {
-		return owner.OffensiveCastAllowed(a, target, skill, ctrl)
+		return owner.OffensiveCastAllowed(a, target, skill, ctrl, true)
 	}
-	return owner.CanCastOnPlayable(target, skill, ctrl, false)
+	return owner.CanCastOnPlayable(target, skill, ctrl, false, true)
 }
 
 // AttackableBy reports whether attacker may attack a: a living summon is

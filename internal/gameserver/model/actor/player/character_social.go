@@ -133,10 +133,13 @@ func (c *Character) AtWarWith(other target.Actor) bool {
 func (c *Character) MageClass() bool { return ClassMage(c.ClassID()) }
 
 // CanCastOnPlayable judges whether c may cast skill on target, a playable,
-// as the offensive or the beneficial social policy decides.
-func (c *Character) CanCastOnPlayable(t target.Actor, skill *modelskill.Definition, ctrl, offensive bool) bool {
+// as the offensive or the beneficial social policy decides. ownCast is true
+// when the cast is c's own, whose intention acts on t; false when c judges
+// its summon's single-target cast as the summon's acting player, where c's
+// own current intention decides whether t is the main target.
+func (c *Character) CanCastOnPlayable(t target.Actor, skill *modelskill.Definition, ctrl, offensive, ownCast bool) bool {
 	if offensive {
-		return c.OffensiveCastAllowed(c, t, skill, ctrl)
+		return c.OffensiveCastAllowed(c, t, skill, ctrl, ownCast || c.IntentionAimsAt(t))
 	}
 	return c.beneficialCastAllowed(t, ctrl)
 }
@@ -162,13 +165,14 @@ func (c *Character) SocialWithoutForce(self attackable.ArenaMember, attacker tar
 }
 
 // OffensiveCastAllowed judges an offensive skill cast on t, a playable, by
-// caster, c itself or c's summon, whose own zones count. The cast is always
-// judged on its final target, so a CTRL damage skill counts as aimed at its
-// main target.
+// caster, c itself or c's summon, whose own zones count. mainTarget reports
+// that the intention judging the cast acts on t: a CTRL damage skill passes
+// on a party, command channel, clan or alliance mate, or on an unflagged
+// player not at war, only then.
 //
 // Olympiad matches (#216), duels (#215) and siege sides (#234) are not
 // modeled, so their rules never apply.
-func (c *Character) OffensiveCastAllowed(caster attackable.ArenaMember, t target.Actor, skill *modelskill.Definition, ctrl bool) bool {
+func (c *Character) OffensiveCastAllowed(caster attackable.ArenaMember, t target.Actor, skill *modelskill.Definition, ctrl, mainTarget bool) bool {
 	targetPlayer, ok := socialPeerOf(t)
 	if !ok || targetPlayer.ObjectID() == c.ID {
 		return false
@@ -178,7 +182,7 @@ func (c *Character) OffensiveCastAllowed(caster attackable.ArenaMember, t target
 	if attackable.InArena(caster) && attackable.InArena(t) && !sameParty && !sameChannel {
 		return true
 	}
-	ctrlDamage := ctrl && skill != nil && skill.IsDamage()
+	ctrlDamage := ctrl && skill != nil && skill.IsDamage() && mainTarget
 	if sameParty || sameChannel || c.IsInSameClan(t) || c.IsInSameAlly(t) {
 		return ctrlDamage
 	}

@@ -171,7 +171,7 @@ func TestOffensiveCastPolicy(t *testing.T) {
 			if tc.cursed {
 				victim = cursedPeer{tgt}
 			}
-			got := c.CanCastOnPlayable(victim, tc.skill, tc.ctrl, true)
+			got := c.CanCastOnPlayable(victim, tc.skill, tc.ctrl, true, true)
 			if got != tc.allowed {
 				t.Fatalf("offensive cast allowed = %v, want %v", got, tc.allowed)
 			}
@@ -181,7 +181,7 @@ func TestOffensiveCastPolicy(t *testing.T) {
 
 func TestOffensiveCastRefusesSelf(t *testing.T) {
 	c, _ := policyPair(t, policyGraph{}, policySide{flag: task.PvPFlagOn}, policySide{})
-	if c.CanCastOnPlayable(c, policyDamage, true, true) {
+	if c.CanCastOnPlayable(c, policyDamage, true, true, true) {
 		t.Fatal("offensive cast on self allowed, want refused")
 	}
 }
@@ -213,7 +213,7 @@ func TestBeneficialCastPolicy(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			c, tgt := policyPair(t, tc.g, tc.cs, tc.ts)
-			if got := c.CanCastOnPlayable(tgt, policyDebuff, tc.ctrl, false); got != tc.allowed {
+			if got := c.CanCastOnPlayable(tgt, policyDebuff, tc.ctrl, false, true); got != tc.allowed {
 				t.Fatalf("beneficial cast allowed = %v, want %v", got, tc.allowed)
 			}
 		})

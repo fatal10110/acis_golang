@@ -63,8 +63,11 @@ type Actor interface {
 	Owner() (attackable.Combatant, bool)
 
 	// CanCastOnPlayable applies a playable caster's relationship policy to a
-	// playable target.
-	CanCastOnPlayable(target Actor, skill *modelskill.Definition, ctrl, offensive bool) bool
+	// playable target. ownCast is true when the actor judges its own cast;
+	// false when a player judges its summon's single-target cast, where the
+	// player's own current intention decides whether target is the main
+	// target.
+	CanCastOnPlayable(target Actor, skill *modelskill.Definition, ctrl, offensive, ownCast bool) bool
 	OlympiadMode() bool
 	OlympiadStarted() bool
 	IsInParty() bool
