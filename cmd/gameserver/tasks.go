@@ -152,22 +152,29 @@ func provideGameClock() *task.GameClock {
 	return task.NewGameClock(time.Now)
 }
 
-// provideSevenSignsState returns the event-calendar state persisting through
-// the gameserver database.
-func provideSevenSignsState(db *sql.DB, log zerolog.Logger) *sevensigns.State {
-	return sevensigns.NewState(gamesql.NewSevenSignsStore(db), log, time.Now, nil)
+// provideSevenSignsState returns the Seven Signs state persisting through
+// the gameserver database and announcing period changes to every player in
+// state.
+func provideSevenSignsState(db *sql.DB, state *world.State, log zerolog.Logger) *sevensigns.State {
+	return sevensigns.NewState(gamesql.NewSevenSignsStore(db), network.NewSevenSignsBroadcaster(state), log, time.Now, nil)
 }
 
-// startSevenSigns restores the persisted status before any character can log
-// in — firing an overdue period change immediately — and stops the
-// transition timer on shutdown.
-func startSevenSigns(lc fx.Lifecycle, state *sevensigns.State) {
+// startSevenSigns restores the persisted status and sign-ups before any
+// character can log in and arms the period-change timer — firing an overdue
+// period change immediately. On shutdown it stops the timer and saves the
+// sign-ups and the status.
+func startSevenSigns(lc fx.Lifecycle, state *sevensigns.State, log zerolog.Logger) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			return state.Restore(ctx)
+			if err := state.Restore(ctx); err != nil {
+				return err
+			}
+			state.Start()
+			return nil
 		},
-		OnStop: func(context.Context) error {
+		OnStop: func(ctx context.Context) error {
 			state.Stop()
+			saveOnStop(ctx, shutdownSaveTimeout, log, "save seven signs", state.Save)
 			return nil
 		},
 	})

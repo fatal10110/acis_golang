@@ -316,6 +316,9 @@ func (s *CharacterStore) Purge(ctx context.Context, objectID int32) (bool, error
 	if _, err := tx.ExecContext(ctx, "DELETE FROM character_relations WHERE char_id = ? OR friend_id = ?", objectID, objectID); err != nil {
 		return false, fmt.Errorf("purge character %d relations: %w", objectID, err)
 	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM seven_signs WHERE char_obj_id = ?", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d seven signs: %w", objectID, err)
+	}
 
 	if err := tx.Commit(); err != nil {
 		return false, fmt.Errorf("commit purge character %d: %w", objectID, err)

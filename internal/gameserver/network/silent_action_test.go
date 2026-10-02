@@ -161,6 +161,11 @@ import (
 // player with no party, channel or mount to act on. A user command
 // registers no pending client action; tests/character, tests/party and
 // tests/clan assert those silences.
+//
+// RequestSSQStatus for the seal prediction page is absent too: once the
+// competition is over (results, seal validation) the reference sends
+// nothing, and the record window holds no pending action. tests/lifecycle
+// asserts that silence.
 func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 	c, chars, _, _ := newLinkedGameClient(t)
 
@@ -227,6 +232,7 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"AllyDismiss without a clan", encodeNamedRequest(clientpackets.OpcodeAllyDismiss, "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestDismissAlly without a clan", wire.NewPacketWriter(clientpackets.OpcodeRequestDismissAlly).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestAllyInfo without an alliance", wire.NewPacketWriter(clientpackets.OpcodeRequestAllyInfo).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestSSQStatus festival page before the festival exists", []byte{clientpackets.OpcodeRequestSSQStatus, 2}, []byte{serverpackets.OpcodeActionFailed}},
 	}
 
 	for _, tc := range cases {
