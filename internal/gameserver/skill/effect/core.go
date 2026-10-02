@@ -65,6 +65,12 @@ const (
 // ClanGate's abnormal-effect icon.
 const magicCircleAbnormalMask = 0x800000
 
+// clanGateOpener is a ClanGate target that tells the other online members
+// of its clan, if it has one, that the portal opened.
+type clanGateOpener interface {
+	NotifyClanGateOpened()
+}
+
 // TypeManaDamOverTime is a periodic MP-drain effect: a toggle skill's
 // upkeep tick, or a plain continuous mana-drain buff. Declared here rather
 // than alongside the other Type constants so this file's additions stay
@@ -157,7 +163,8 @@ const (
 	// carries stops existing.
 	TypeSignetGround Type = "SIGNET_GROUND"
 	// TypeClanGate is a court-magician portal buff: it marks its target with
-	// the magic-circle abnormal effect for the buff's duration.
+	// the magic-circle abnormal effect for the buff's duration, and a
+	// player target's clan learns the portal opened.
 	TypeClanGate Type = "CLAN_GATE"
 	// TypeChanceSkillTrigger installs a live chance-to-trigger-another-skill
 	// condition on its target for as long as the effect is active.
@@ -597,6 +604,9 @@ func wireHooks(e *Effect) {
 	case TypeClanGate:
 		e.OnStart = func(e *Effect) bool {
 			startAbnormalEffect(e.Effected, magicCircleAbnormalMask)
+			if opener, ok := e.Effected.(clanGateOpener); ok {
+				opener.NotifyClanGateOpened()
+			}
 			return true
 		}
 		e.OnExit = func(e *Effect) { stopAbnormalEffect(e.Effected, magicCircleAbnormalMask) }

@@ -1,6 +1,10 @@
 package player
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+)
 
 // clanState is the character's side of its clan membership. A clan
 // operation another player runs (an expulsion, a leader's level-up) and the
@@ -52,3 +56,9 @@ func (c *Character) Title() string {
 
 // SetTitle replaces the character's title.
 func (c *Character) SetTitle(title string) { c.title.Store(&title) }
+
+// NotifyClanGateOpened tells the other online members of the character's
+// clan that a clan gate portal opened on it.
+func (c *Character) NotifyClanGateOpened() {
+	c.emit(event.ClanGateOpened{})
+}

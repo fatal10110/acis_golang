@@ -8,6 +8,7 @@ import (
 	"math"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -25,19 +26,28 @@ const (
 	newbieGuideID = 31760
 )
 
+// Clans is the clan side of an exchange priced in, or paying out, clan
+// reputation.
+type Clans interface {
+	ClanOf(c *player.Character) (*clan.Clan, bool)
+	TakeReputation(cl *clan.Clan, points int) (clan.ReputationChanged, bool)
+	AddReputation(cl *clan.Clan, points int) (clan.ReputationChanged, bool)
+}
+
 // Service applies the multisell rules against the loaded lists.
 type Service struct {
 	lists          *multisell.Table
 	keepMaintained bool
 	nextID         func() (int32, error)
+	clans          Clans
 }
 
 // NewService returns a Service over lists. keepMaintained is the
 // BlacksmithUseRecipes switch inverted: when set, an ingredient marked
 // maintainIngredient is only checked for, once, and never taken. nextID
-// allocates the products' object ids.
-func NewService(lists *multisell.Table, keepMaintained bool, nextID func() (int32, error)) *Service {
-	return &Service{lists: lists, keepMaintained: keepMaintained, nextID: nextID}
+// allocates the products' object ids; clans settles clan reputation.
+func NewService(lists *multisell.Table, keepMaintained bool, nextID func() (int32, error), clans Clans) *Service {
+	return &Service{lists: lists, keepMaintained: keepMaintained, nextID: nextID, clans: clans}
 }
 
 // Open prepares list name for c talking to the NPC npcID. It returns nil
@@ -125,9 +135,20 @@ type (
 	QuantityExceeded struct{}
 	// NotClanMember refuses a clan reputation price to a clanless player.
 	NotClanMember struct{}
+	// NotClanLeader refuses a clan reputation price to a member who does
+	// not lead the clan.
+	NotClanLeader struct{}
 	// ClanReputationTooLow refuses a clan reputation price the clan cannot
 	// pay.
 	ClanReputationTooLow struct{}
+	// ClanReputationChanged reports Clan's new reputation score after the
+	// exchange took or paid reputation.
+	ClanReputationChanged struct {
+		Clan   *clan.Clan
+		Change clan.ReputationChanged
+	}
+	// ReputationDeducted names the clan reputation the exchange took.
+	ReputationDeducted struct{ Points int }
 	// NotEnoughItems refuses an exchange the player lacks ingredients for,
 	// or ends one whose ingredient could not be taken.
 	NotEnoughItems struct{}
@@ -210,18 +231,23 @@ func (s *Service) Choose(c *player.Character, list *multisell.List, npcID int, r
 	if !ok {
 		return Outcome{Notices: []any{QuantityExceeded{}}}
 	}
+	var payer *clan.Clan
 	for _, e := range needs {
 		if e.Count > math.MaxInt32/amount {
 			return Outcome{Notices: []any{QuantityExceeded{}}}
 		}
 		if e.ItemID == clanReputationID {
-			if c.ClanID() == 0 {
+			cl, ok := s.clanOf(c)
+			switch {
+			case !ok:
 				return Outcome{Notices: []any{NotClanMember{}}}
+			case !cl.IsLeader(c.ID):
+				return Outcome{Notices: []any{NotClanLeader{}}}
+			case cl.Reputation() < e.Count*amount:
+				return Outcome{Notices: []any{ClanReputationTooLow{}}}
 			}
-			// ponytail: clan reputation (#3151). clan.Service knows the
-			// leader and the clan's score, but it is not wired into the
-			// exchange yet, so the price is never payable.
-			return Outcome{Notices: []any{ClanReputationTooLow{}}}
+			payer = cl
+			continue
 		}
 		enchant := -1
 		if list.MaintainEnchantment {
@@ -233,14 +259,22 @@ func (s *Service) Choose(c *player.Character, list *multisell.List, npcID int, r
 	}
 
 	var out Outcome
-	augmentations, ok := s.takeIngredients(inv, list, entry, amount, &out)
+	augmentations, ok := s.takeIngredients(inv, list, entry, amount, payer, &out)
 	if !ok {
 		out.Forget = true
 		return out
 	}
-	s.giveProducts(inv, list, entry, amount, augmentations, &out)
+	s.giveProducts(c, inv, list, entry, amount, augmentations, &out)
 	out.Notices = append(out.Notices, Traded{})
 	return out
+}
+
+// clanOf is c's clan, if it has one.
+func (s *Service) clanOf(c *player.Character) (*clan.Clan, bool) {
+	if s.clans == nil {
+		return nil, false
+	}
+	return s.clans.ClanOf(c)
 }
 
 // taken is how many units of e an exchange of amount units takes, or, for
@@ -283,12 +317,19 @@ func mergeIngredients(ingredients []multisell.Ingredient) ([]multisell.Ingredien
 // entry order: a stack in one piece; non-stackable items one by one, of
 // exactly the ingredient's enchant level on a list maintaining enchantment
 // (keeping their augmentations, in order, for the products), else each time
-// the lowest-enchanted unworn one. It reports false when an ingredient
-// could not be found or taken; what was taken before stays taken.
-func (s *Service) takeIngredients(inv *itemcontainer.Inventory, list *multisell.List, entry multisell.Entry, amount int, out *Outcome) ([]item.Augmentation, bool) {
+// the lowest-enchanted unworn one. Clan reputation is taken from payer,
+// the clan the ingredient check found able to pay it. It reports false when
+// an ingredient could not be found or taken; what was taken before stays
+// taken.
+func (s *Service) takeIngredients(inv *itemcontainer.Inventory, list *multisell.List, entry multisell.Entry, amount int, payer *clan.Clan, out *Outcome) ([]item.Augmentation, bool) {
 	var augmentations []item.Augmentation
 	for _, e := range entry.Ingredients {
 		if e.ItemID == clanReputationID {
+			points := e.Count * amount
+			if change, changed := s.clans.TakeReputation(payer, points); changed {
+				out.Notices = append(out.Notices, ClanReputationChanged{Clan: payer, Change: change})
+			}
+			out.Notices = append(out.Notices, ReputationDeducted{Points: points})
 			continue
 		}
 		first := inv.ItemByTemplateID(e.ItemID)
@@ -391,13 +432,11 @@ func consume(inv *itemcontainer.Inventory, inst *item.Instance, count int, out *
 // in one stack, anything else one item at a time, which on a list
 // maintaining enchantment takes the product's enchant level and, by its
 // place among the units, the taken ingredients' augmentations. Each product
-// is named once.
-func (s *Service) giveProducts(inv *itemcontainer.Inventory, list *multisell.List, entry multisell.Entry, amount int, augmentations []item.Augmentation, out *Outcome) {
+// is named once, but clan reputation, which goes to c's clan unnamed.
+func (s *Service) giveProducts(c *player.Character, inv *itemcontainer.Inventory, list *multisell.List, entry multisell.Entry, amount int, augmentations []item.Augmentation, out *Outcome) {
 	for _, p := range entry.Products {
 		if p.ItemID == clanReputationID {
-			// ponytail: clan reputation (#3151). The points would go to the
-			// player's clan through clan.Service, which is not wired into
-			// the exchange yet; no shipped list pays them.
+			s.payReputation(c, p.Count*amount, out)
 			continue
 		}
 		count := p.Count * amount
@@ -423,6 +462,18 @@ func (s *Service) giveProducts(inv *itemcontainer.Inventory, list *multisell.Lis
 		default:
 			out.Notices = append(out.Notices, Earned{ItemID: p.ItemID, Count: count})
 		}
+	}
+}
+
+// payReputation adds points to c's clan reputation. A clanless player's
+// points go nowhere.
+func (s *Service) payReputation(c *player.Character, points int, out *Outcome) {
+	cl, ok := s.clanOf(c)
+	if !ok {
+		return
+	}
+	if change, changed := s.clans.AddReputation(cl, points); changed {
+		out.Notices = append(out.Notices, ClanReputationChanged{Clan: cl, Change: change})
 	}
 }
 

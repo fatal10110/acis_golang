@@ -74,6 +74,12 @@ var msListFiles = map[string]string{
 		<item><ingredient id="65336" count="10"/><production id="20" count="1"/></item>
 		<item><ingredient id="9102" count="1"/><production id="20" count="1"/></item>
 	</list>`,
+	// 9005: open to every NPC, priced in clan reputation before an ore, and
+	// paying clan reputation for an ore.
+	"9005.xml": `<list>
+		<item><ingredient id="65336" count="10"/><ingredient id="9102" count="1"/><production id="20" count="1"/></item>
+		<item><ingredient id="9102" count="1"/><production id="65336" count="100"/></item>
+	</list>`,
 	// 9003: an exchange keeping enchantment.
 	"9003.xml": `<list maintainEnchantment="true">
 		<item><ingredient id="30" count="1"/><production id="9101" count="1"/></item>
