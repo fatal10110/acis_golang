@@ -33,6 +33,7 @@ type gameServerConfig struct {
 	Database            db.Config
 	AllowCursedWeapons  bool
 	AllowWater          bool
+	AllowBoat           bool
 	EnableFallingDamage bool
 	UseBlowfishCipher   bool
 	TownCombatRule      int
@@ -894,6 +895,7 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 		},
 		AllowCursedWeapons:  serverProps.Bool("AllowCursedWeapons", true),
 		AllowWater:          serverProps.Bool("AllowWater", true),
+		AllowBoat:           serverProps.Bool("AllowBoat", true),
 		EnableFallingDamage: serverProps.Bool("EnableFallingDamage", true),
 		UseBlowfishCipher:   serverProps.Bool("UseBlowfishCipher", true),
 		TownCombatRule:      townCombatRule,

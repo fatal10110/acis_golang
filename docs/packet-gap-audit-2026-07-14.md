@@ -255,17 +255,22 @@ Implemented and wired M4 movement/rotation/static-object server packets in Go:
 - `StopRotation`
 - `ChairSit`
 
+Implemented and wired boat server packets in Go (`internal/gameserver/boat`, `network/boat_events.go`):
+
+- `VehicleInfo` (discovery, stop, tie-up)
+- `VehicleDeparture` (each leg, and discovery of a sailing boat)
+- `VehicleStarted` (route start and stop)
+
+Implemented in Go but not yet sent: `OnVehicleCheckLocation` goes to a boat's passengers on each
+position update, and nobody can board yet (#602).
+
 Missing M4 world/movement server packets:
 
 - `GetOnVehicle`
 - `GetOffVehicle`
-- `VehicleDeparture`
-- `VehicleInfo`
-- `OnVehicleCheckLocation`
 - `MoveToLocationInVehicle`
 - `StopMoveInVehicle`
 - `ValidateLocationInVehicle`
-- `VehicleStarted`
 
 Implemented sky server packets in Go and wired to their only sender, the admin `//atmosphere sky|ssqinfo <state>` broadcast to every online player (#3172). Day/night crossings and EnterWorld do not send SunRise/SunSet:
 
