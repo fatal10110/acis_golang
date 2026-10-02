@@ -49,7 +49,7 @@ const (
 		shutdownSaveTimeout + // character_relations
 		shutdownSaveTimeout + // petition, petition_message
 		simPoolStopTimeout +
-		task.ItemInstanceSaveTimeout + // item ticker finishing an in-flight save
+		task.ItemInstanceSaveTimeout + // item ticker: its stop cancels an in-flight save, so this is headroom, not task.ItemInstanceTickBudget
 		3*task.ItemInstanceSaveTimeout + // drainItemInstances: save, persistence-worker drain, save
 		persistCloseTimeout +
 		shutdownSaveTimeout + // items_on_ground

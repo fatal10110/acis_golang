@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"slices"
 	"sync"
 	"time"
@@ -20,36 +19,63 @@ import (
 const (
 	// ItemInstanceTick is the fixed cadence for lazy item persistence.
 	ItemInstanceTick = time.Minute
-	// ItemInstanceSaveTimeout bounds one Save call: both the periodic
-	// tick's outer ctx (Start) and the shutdown hook's outer ctx
-	// (cmd/gameserver/tasks.go) wrap with this same constant, and Save
-	// gives each chunk its own fresh budget derived from it (see Save) so
-	// a hung DB cannot wedge the ticker, and then shutdown's StopAndWait,
-	// past this bound.
+	// ItemInstanceSaveTimeout bounds one chunk's transaction (Save gives
+	// every chunk its own fresh budget of this length, cut short by the
+	// caller's ctx) and each step of the shutdown drain
+	// (cmd/gameserver/tasks.go), so a hung DB cannot wedge a persistence
+	// lane, or the shutdown that waits for those lanes, past this bound.
 	//
-	// This is a real coupling, not just a shared default: raising it to
-	// give a chunk more room also raises how long the ticker's OnStop hook
-	// can block (scheduler.Ticker.StopAndWait has no ctx of its own — see
-	// Start) inside cmd/gameserver's gameServerStopTimeout budget for the
-	// whole shutdown sequence. That budget is summed from this constant
-	// (the ticker's wait plus the shutdown flush's three steps), and
+	// This is a real coupling, not just a shared default: raising it also
+	// raises the shutdown drain's three steps and the ticker's stop, which
+	// cmd/gameserver's gameServerStopTimeout is summed from, and
 	// cmd/gameserver/main_core_test.go pins the sum.
 	ItemInstanceSaveTimeout = 10 * time.Second
+	// ItemInstanceTickBudget bounds one periodic tick's Save: how much of
+	// the tick period a backlog may spend writing chunks, one
+	// ItemInstanceSaveTimeout at most per chunk. Half the period leaves the
+	// lanes the other half for the writes players queue on them.
+	//
+	// It is not a shutdown cost. The tick runs under a context the ticker
+	// cancels when it stops (scheduler.StartContext), and Save returns as
+	// soon as its ctx ends, so the ticker's stop waits only for that
+	// cancellation, not for this budget; the chunks it cut short go back to
+	// pending for the shutdown drain.
+	ItemInstanceTickBudget = ItemInstanceTick / 2
 	// ItemInstanceSaveChunkSize bounds how many items one Save transaction
 	// covers. Save commits chunks independently, so a batch that grew past
-	// what fits in one ItemInstanceSaveTimeout window still makes monotonic
-	// progress each tick instead of retrying the whole thing and never
-	// converging (see the constant's use in Save).
+	// what fits in one tick still makes monotonic progress each tick
+	// instead of retrying the whole thing and never converging.
 	//
-	// No measured per-item write cost backs this number (same caveat as
-	// itemFlushChunkSize in data/sql/itemflush.go, which bounds placeholder
-	// count rather than time and so doesn't need one). It is kept well
-	// below what a full chunk's worth of rows could plausibly take inside
-	// ItemInstanceSaveTimeout, so that a degraded-but-not-hung DB has room
-	// to actually commit a chunk rather than losing the whole ceiling to a
-	// transaction that was too big to ever finish in time; see Save's doc
-	// for the residual risk this doesn't remove.
+	// Measured against MariaDB (BenchmarkItemFlushStore_Flush in
+	// data/sql): a chunk of a tick's shape costs about 0.7ms fixed — the
+	// transaction and one statement per table — plus about 7.5µs per item,
+	// so 100 items take about 1.5ms, some 6,500 times inside
+	// ItemInstanceSaveTimeout. The fixed part dominates at this size, which
+	// is why a smaller chunk, or one that shrinks when chunks time out,
+	// buys a slow database almost nothing: a single item already costs half
+	// of what 100 do. A database that cannot write 100 rows in
+	// ItemInstanceSaveTimeout cannot write one in much less, and a larger
+	// chunk only lengthens how long one transaction holds its rows' write
+	// order (persist.Order) and how much one failure sends back to pending.
 	ItemInstanceSaveChunkSize = 100
+	// ItemInstancePendingCap bounds how many items can wait in the pending
+	// set once a write has already failed for them. The set is keyed by
+	// object id, so it holds at most one entry per row and the items of
+	// live containers are held in memory by those containers anyway; what
+	// a long outage keeps adding is rows nothing else holds — destroyed
+	// and dropped items. The cap sits an order of magnitude above the
+	// distinct rows a full server's players change between ticks, so it is
+	// reached only by an outage long enough that the alternative is memory
+	// growing until the process dies and every pending row is lost at
+	// once.
+	//
+	// Past the cap a failed write is dropped and logged instead of kept for
+	// a retry: failed items are merged back in the order they come back,
+	// each owner's longest-waiting first, until pending is full, and the rest
+	// are dropped (finishOwner). New changes are always accepted: they carry
+	// the freshest state and come from callers that must not block on the
+	// database.
+	ItemInstancePendingCap = 250_000
 )
 
 // errSaveJobPanic is the error a Save owner job reports when it panicked.
@@ -81,6 +107,11 @@ type ItemInstances struct {
 
 	mu      sync.RWMutex
 	pending map[int32]pendingItem
+	// seq numbers entries as they enter pending, so Save attempts the
+	// longest-waiting rows first (see Save).
+	seq uint64
+	// pendingCap is ItemInstancePendingCap, a field so tests can lower it.
+	pendingCap int
 	// rounds holds every Save whose owner jobs have not all run yet. Each
 	// records the ids RemoveItems dropped while it was outstanding, so its
 	// failed items are not merged back over a container that already tore
@@ -104,7 +135,9 @@ type ItemInstances struct {
 }
 
 // pendingItem is one changed instance waiting for the next flush, with the
-// owner its row belongs to.
+// owner its row belongs to and its place in the wait (seq): when the row
+// first went stale, kept across failed writes so a row that keeps failing
+// does not lose its turn.
 //
 // ownerID is remembered rather than read from the instance at flush time,
 // because a destroy has already taken the instance through
@@ -117,6 +150,7 @@ type ItemInstances struct {
 type pendingItem struct {
 	inst    *item.Instance
 	ownerID int32
+	seq     uint64
 }
 
 // saveRound is one Save's outstanding owner jobs. Its fields are guarded by
@@ -148,34 +182,40 @@ func NewItemInstances(flusher ItemFlusher, templates *item.Table, worker *persis
 		templates = item.NewTable(nil)
 	}
 	i := &ItemInstances{
-		log:       log,
-		flusher:   flusher,
-		templates: templates,
-		worker:    worker,
-		writes:    writes,
-		pending:   make(map[int32]pendingItem),
-		rounds:    make(map[*saveRound]struct{}),
-		groups:    make(map[int32]*rowGroup),
+		log:        log,
+		flusher:    flusher,
+		templates:  templates,
+		worker:     worker,
+		writes:     writes,
+		pending:    make(map[int32]pendingItem),
+		pendingCap: ItemInstancePendingCap,
+		rounds:     make(map[*saveRound]struct{}),
+		groups:     make(map[int32]*rowGroup),
 	}
 	i.ops.init()
 	return i
 }
 
-// Start launches the fixed item persistence task. The tick's outer ctx is
-// bounded by ItemInstanceSaveTimeout, the same constant the shutdown hook
-// uses (cmd/gameserver/tasks.go) — not a longer, tick-only ceiling: this
-// budget also bounds how long the ticker's own OnStop can block a shutdown
-// in progress (scheduler.Ticker.StopAndWait has no ctx of its own, so it
-// simply waits for whatever Save call is currently in flight), and that
-// wait has to fit inside cmd/gameserver's gameServerStopTimeout alongside
-// every other stop hook, including the final Save. A longer per-tick
-// budget would drain more of a backlog per tick, but only by taking that
-// same risk away from shutdown; see ItemInstanceSaveTimeout's doc.
+// Start launches the fixed item persistence task. Each tick's Save runs
+// for at most ItemInstanceTickBudget, under a context the ticker cancels when
+// it stops: stopping the ticker cuts a long tick short rather than waiting it
+// out, so the tick's budget can be wider than any one shutdown step. The
+// chunks a stop cuts short go back to pending, where the shutdown drain
+// (cmd/gameserver/tasks.go) writes them.
 func (i *ItemInstances) Start(log zerolog.Logger) *scheduler.Ticker {
-	return scheduler.Start(ItemInstanceTick, func() {
-		ctx, cancel := context.WithTimeout(context.Background(), ItemInstanceSaveTimeout)
+	return i.start(ItemInstanceTick, log)
+}
+
+func (i *ItemInstances) start(period time.Duration, log zerolog.Logger) *scheduler.Ticker {
+	return scheduler.StartContext(period, func(stop context.Context) {
+		ctx, cancel := context.WithTimeout(stop, ItemInstanceTickBudget)
 		defer cancel()
-		if err := i.Save(ctx); err != nil {
+		err := i.Save(ctx)
+		switch {
+		case err == nil:
+		case stop.Err() != nil:
+			log.Info().Err(err).Msg("task: item save cut short by stop; unwritten items stay pending")
+		default:
 			log.Error().Err(err).Msg("task: save item instances")
 		}
 	}, log)
@@ -203,7 +243,10 @@ func (i *ItemInstances) AddOwned(ownerID int32, inst *item.Instance) {
 		return
 	}
 	i.mu.Lock()
-	entry := i.pending[inst.ObjectID]
+	entry, ok := i.pending[inst.ObjectID]
+	if !ok {
+		entry.seq = i.nextSeq()
+	}
 	entry.inst = inst
 	if ownerID != 0 {
 		entry.ownerID = ownerID
@@ -373,7 +416,11 @@ func (i *ItemInstances) retarget(ownerID int32, claimed map[int32]*item.Instance
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	for objectID, inst := range claimed {
-		i.pending[objectID] = pendingItem{inst: inst, ownerID: ownerID}
+		entry, ok := i.pending[objectID]
+		if !ok {
+			entry.seq = i.nextSeq()
+		}
+		i.pending[objectID] = pendingItem{inst: inst, ownerID: ownerID, seq: entry.seq}
 		for r := range i.rounds {
 			r.removed[objectID] = struct{}{}
 		}
@@ -442,28 +489,18 @@ func (i *ItemInstances) pendingInstances(objectIDs []int32) []*item.Instance {
 // needs, and gets, whole-container atomicity: it calls UpdateItems
 // directly for one container's items, bypassing Save's chunking entirely.
 //
-// items is sorted by ObjectID before chunking purely to fix which items
-// land in which chunk deterministically (tests rely on this); it is not an
-// ordering guarantee for callers and must not be read as a write-priority
-// policy.
+// Rows are attempted longest-waiting first: each owner's items are chunked
+// in the order they first went stale (pendingItem.seq, which a failed write
+// keeps), and owners are dispatched in the order of their longest-waiting
+// item. When a backlog is too large for one ctx, the rows ctx runs out on are
+// therefore the newest, and they move up every tick until they are written —
+// an order keyed by object id would instead leave the newest items, which get
+// the highest ids, last on every tick for as long as the backlog lasts. The
+// order is also deterministic, which the tests rely on for chunk boundaries.
 //
-// Residual risk this does not remove: ItemInstanceSaveChunkSize and
-// ItemInstanceSaveTimeout are a fixed, unmeasured size:time ratio. A chunk
-// whose real write cost exceeds that ratio still fails every attempt at
-// that size, the same way the pre-chunking flush did at the whole-batch
-// size — chunking only lowers how much of one tick's ItemInstanceSaveTimeout
-// budget such a chunk can waste, it does not guarantee any given chunk fits
-// its budget.
-//
-// One Save call's total DB-write time is still capped near
-// ItemInstanceSaveTimeout, same as before chunking existed — chunking buys
-// smaller, independently-committing units inside that one window, not a
-// bigger window. A backlog that needs more than that per tick still only
-// drains it gradually, one tick's worth at a time. Widening the per-tick
-// budget itself needs the flush to be cancelable when shutdown starts
-// (today's Start/StopAndWait pair cannot do that — see Start's doc); until
-// that exists, a longer per-tick ceiling would trade shutdown safety for
-// throughput instead of buying both.
+// A backlog that outgrows ItemInstancePendingCap loses the failed writes past
+// the cap, logged, rather than growing memory without bound; see that
+// constant and finishOwner.
 //
 // Concurrent callers of Add and RemoveItems are safe. A Save may overlap
 // the owner jobs of an earlier one that returned on its ctx; each keeps its
@@ -488,13 +525,15 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 		return nil
 	}
 	i.rounds[round] = struct{}{}
+	backlog := len(inflight)
 	i.mu.Unlock()
+	if backlog >= i.pendingCap/2 {
+		i.log.Warn().Int("pending", backlog).Int("cap", i.pendingCap).
+			Msg("task: item persistence backlog is past half its cap; failed writes are dropped once it is reached")
+	}
 
-	for _, owner := range slices.Sorted(maps.Keys(byOwner)) {
+	for _, owner := range oldestFirst(byOwner) {
 		entries := byOwner[owner]
-		// Fixes chunk boundaries so they don't depend on map iteration
-		// order; see the chunk-boundary note above.
-		slices.SortFunc(entries, func(a, b pendingItem) int { return cmp.Compare(a.inst.ObjectID, b.inst.ObjectID) })
 		job := func() {
 			// The bookkeeping runs on the panic path too. A panic anywhere
 			// inside saveChunks is recovered by the lane (persist.Worker.runJob)
@@ -578,21 +617,66 @@ func (i *ItemInstances) Save(ctx context.Context) error {
 	return round.err
 }
 
+// oldestFirst sorts each owner's entries by when they went stale and returns
+// the owners in the order of their longest-waiting entry.
+func oldestFirst(byOwner map[int32][]pendingItem) []int32 {
+	owners := make([]int32, 0, len(byOwner))
+	for owner, entries := range byOwner {
+		slices.SortFunc(entries, func(a, b pendingItem) int { return cmp.Compare(a.seq, b.seq) })
+		owners = append(owners, owner)
+	}
+	slices.SortFunc(owners, func(a, b int32) int { return cmp.Compare(byOwner[a][0].seq, byOwner[b][0].seq) })
+	return owners
+}
+
+// nextSeq hands out the next place in the wait. The caller holds mu.
+func (i *ItemInstances) nextSeq() uint64 {
+	i.seq++
+	return i.seq
+}
+
 // finishOwner merges one owner job's failed items back to pending, skipping
 // any RemoveItems dropped while round was outstanding, and closes round once
 // its last owner job has run.
+//
+// A failed item keeps its place in the wait, and so does a newer change of
+// the same row that arrived while the write was out: the row has been stale
+// since the earlier one. Once pending holds pendingCap items a failed item is
+// dropped instead, and the drop is logged. failed holds the job's items in
+// the order they were attempted, longest-waiting first, so those keep their
+// place and the newest are the ones dropped.
 func (i *ItemInstances) finishOwner(round *saveRound, failed []pendingItem, err error) {
+	dropped, pending := i.mergeBack(round, failed, err)
+	if len(dropped) > 0 {
+		i.log.Error().Err(err).Int("dropped", len(dropped)).Ints32("object_ids", dropped[:min(len(dropped), 20)]).
+			Int("pending", pending).Int("cap", i.pendingCap).
+			Msg("task: item persistence backlog at its cap; dropped failed item writes, their rows keep their last saved state")
+	}
+}
+
+// mergeBack is finishOwner's bookkeeping under mu. It returns the failed
+// items it dropped for the cap and the pending count it left.
+func (i *ItemInstances) mergeBack(round *saveRound, failed []pendingItem, err error) ([]int32, int) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
+	var dropped []int32
 	for _, entry := range failed {
-		if _, wasRemoved := round.removed[entry.inst.ObjectID]; wasRemoved {
+		objectID := entry.inst.ObjectID
+		if _, wasRemoved := round.removed[objectID]; wasRemoved {
+			continue
+		}
+		if newer, ok := i.pending[objectID]; ok {
+			newer.seq = min(newer.seq, entry.seq)
+			i.pending[objectID] = newer
+			continue
+		}
+		if len(i.pending) >= i.pendingCap {
+			dropped = append(dropped, objectID)
 			continue
 		}
 		// Keeps the owner this round resolved: a retry of a destroyed item
 		// must not fall back to the zeroed owner on its instance.
-		if _, ok := i.pending[entry.inst.ObjectID]; !ok {
-			i.pending[entry.inst.ObjectID] = entry
-		}
+		i.pending[objectID] = entry
 	}
 	if round.err == nil {
 		round.err = err
@@ -602,6 +686,7 @@ func (i *ItemInstances) finishOwner(round *saveRound, failed []pendingItem, err 
 		delete(i.rounds, round)
 		close(round.done)
 	}
+	return dropped, len(i.pending)
 }
 
 // laneKey picks the persistence lane an item's write runs on: its owner's,

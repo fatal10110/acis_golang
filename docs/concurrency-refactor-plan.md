@@ -246,7 +246,11 @@ per actor (see its *Landed as* notes); Phase 5 is rescoped accordingly on #2273.
     against it. A select wait that gives up is logged and refuses the selection
     (`network/client_loop.go`) rather than load unwritten rows; the restart and disconnect waits
     log and carry on.
-  - `task.ItemInstanceSaveTimeout` = 10 s: budget per item-tick save and per shutdown step.
+  - `task.ItemInstanceSaveTimeout` = 10 s: budget per item-save chunk and per shutdown step.
+  - `task.ItemInstanceTickBudget` = 30 s (half the tick period): budget for one periodic item
+    save. The tick runs under a context the ticker's stop cancels (`scheduler.StartContext`), so
+    this budget is not a shutdown cost; under a degraded database the tick's chunks can hold a
+    lane this long, which an `awaitPersistence` wait behind them gives up on as above.
   - `shutdownSaveTimeout` = 10 s (`cmd/gameserver/main.go`): the spawn-data save
     (`startNpcPersistence`) and the ground-item save (`startGroundItemPersistence`) each.
   - `gameServerStopTimeout` (`cmd/gameserver/main.go`): fx's whole stop budget, shared by every
@@ -260,8 +264,8 @@ per actor (see its *Landed as* notes); Phase 5 is rescoped accordingly on #2273.
     - the debug HTTP listener's stop (`debugHTTPStopTimeout` = 2 s);
     - the spawn-data save (`shutdownSaveTimeout`);
     - the actor pool's stop (`simPoolStopTimeout` = 5 s);
-    - the item ticker's stop, which can block up to one `ItemInstanceSaveTimeout` on an in-flight
-      tick;
+    - the item ticker's stop, which cancels an in-flight tick and waits for it to notice,
+      budgeted at one `ItemInstanceSaveTimeout` as headroom;
     - `drainItemInstances`: save → `Worker.Close` → save, each on its own
       `ItemInstanceSaveTimeout` (30 s);
     - the persistence worker's last close (`persistCloseTimeout` = 5 s), which gives lanes the
