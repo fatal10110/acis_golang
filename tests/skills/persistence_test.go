@@ -297,6 +297,12 @@ func TestAutosaveRewritesSkillSaveAfterRestoreAndSurvivesCrashRelog(t *testing.T
 		t.Fatalf("character_skills_save after autosave = count %d restore_type %d, want 1 effect row", count, restoreType)
 	}
 
+	// A crash saves nothing more: hold the player's persistence lane so the
+	// save the first server's teardown still hands it never lands. Without
+	// the hold, on the real pool that save's delete-then-insert rewrite of
+	// the effect rows runs alongside the second server's login, which can
+	// read the rows between the two and restore no buff.
+	srv.HoldPersistenceLane(t, objID)
 	srv.Close()
 
 	srv2 := gameservertest.Boot(t,
