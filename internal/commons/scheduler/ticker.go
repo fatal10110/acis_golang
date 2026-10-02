@@ -4,6 +4,7 @@
 package scheduler
 
 import (
+	"context"
 	"expvar"
 	"fmt"
 	"path"
@@ -23,6 +24,9 @@ type Ticker struct {
 	stop     chan struct{}
 	done     chan struct{}
 	stopOnce sync.Once
+	// cancel ends the context StartContext hands every tick. Start's ticks
+	// take no context, so for them it ends nothing anyone watches.
+	cancel context.CancelFunc
 }
 
 // Start launches a goroutine that calls fn every period, starting after the
@@ -30,12 +34,25 @@ type Ticker struct {
 // tick never stops later ticks or crashes the process. A zero-value logger
 // disables logging. Callers must call Stop to release the goroutine.
 func Start(period time.Duration, fn func(), log zerolog.Logger) *Ticker {
-	t := &Ticker{stop: make(chan struct{}), done: make(chan struct{})}
-	go t.run(period, fn, log, statsFor(fn))
+	return start(period, func(context.Context) { fn() }, statsFor(fn), log)
+}
+
+// StartContext is Start for a tick that can be cut short: every call of fn
+// gets a context that Stop cancels, so a tick in flight when the ticker stops
+// can end early instead of making StopAndWait wait out however long fn would
+// otherwise take. fn decides what ending early means; the ticker only cancels.
+func StartContext(period time.Duration, fn func(context.Context), log zerolog.Logger) *Ticker {
+	return start(period, fn, statsFor(fn), log)
+}
+
+func start(period time.Duration, fn func(context.Context), stats *tickStat, log zerolog.Logger) *Ticker {
+	ctx, cancel := context.WithCancel(context.Background())
+	t := &Ticker{stop: make(chan struct{}), done: make(chan struct{}), cancel: cancel}
+	go t.run(ctx, period, fn, log, stats)
 	return t
 }
 
-func (t *Ticker) run(period time.Duration, fn func(), log zerolog.Logger, stats *tickStat) {
+func (t *Ticker) run(ctx context.Context, period time.Duration, fn func(context.Context), log zerolog.Logger, stats *tickStat) {
 	defer close(t.done)
 
 	ticker := time.NewTicker(period)
@@ -46,12 +63,12 @@ func (t *Ticker) run(period time.Duration, fn func(), log zerolog.Logger, stats 
 		case <-t.stop:
 			return
 		case <-ticker.C:
-			tick(fn, log, stats)
+			tick(ctx, fn, log, stats)
 		}
 	}
 }
 
-func tick(fn func(), log zerolog.Logger, stats *tickStat) {
+func tick(ctx context.Context, fn func(context.Context), log zerolog.Logger, stats *tickStat) {
 	start := time.Now()
 	defer func() {
 		stats.observe(time.Since(start))
@@ -59,10 +76,10 @@ func tick(fn func(), log zerolog.Logger, stats *tickStat) {
 			log.Error().Interface("panic", r).Msg("scheduler: recovered panic in ticked callback")
 		}
 	}()
-	fn()
+	fn(ctx)
 }
 
-func tickerName(fn func()) string {
+func tickerName(fn any) string {
 	return path.Base(runtime.FuncForPC(reflect.ValueOf(fn).Pointer()).Name())
 }
 
@@ -73,7 +90,7 @@ func tickerName(fn func()) string {
 // rebinds the key to a zeroed struct, resetting the max high-water mark.
 var statsMu sync.Mutex
 
-func statsFor(fn func()) *tickStat {
+func statsFor(fn any) *tickStat {
 	name := tickerName(fn)
 	statsMu.Lock()
 	defer statsMu.Unlock()
@@ -109,14 +126,18 @@ func (s *tickStat) String() string {
 	return fmt.Sprintf(`{"last":%d,"max":%d}`, s.last, s.max)
 }
 
-// Stop requests that future ticks halt. Safe to call more than once.
+// Stop requests that future ticks halt and cancels the context a tick started
+// by StartContext is running under. Safe to call more than once.
 func (t *Ticker) Stop() {
 	t.stopOnce.Do(func() {
 		close(t.stop)
+		t.cancel()
 	})
 }
 
 // StopAndWait requests that future ticks halt and waits for any current tick.
+// A StartContext tick sees its context canceled first, so the wait lasts only
+// as long as that tick takes to notice.
 func (t *Ticker) StopAndWait() {
 	t.Stop()
 	<-t.done
