@@ -166,7 +166,21 @@ type saveRound struct {
 	remaining int
 	err       error
 	done      chan struct{}
+	// drops totals the failed writes this round's owner jobs dropped for
+	// the cap, so the round logs one line rather than one per owner job.
+	drops capDrops
 }
+
+// capDrops is what a round dropped for ItemInstancePendingCap: the count,
+// the first capDropSample ids, and the first dropping job's error.
+type capDrops struct {
+	count  int
+	sample []int32
+	err    error
+}
+
+// capDropSample bounds the object ids a cap-drop log line names.
+const capDropSample = 20
 
 // NewItemInstances returns an empty item persistence task whose writes run
 // on worker's lanes. A nil worker writes on the calling goroutine.
@@ -642,24 +656,26 @@ func (i *ItemInstances) nextSeq() uint64 {
 // A failed item keeps its place in the wait, and so does a newer change of
 // the same row that arrived while the write was out: the row has been stale
 // since the earlier one. Once pending holds pendingCap items a failed item is
-// dropped instead, and the drop is logged. failed holds the job's items in
-// the order they were attempted, longest-waiting first, so those keep their
-// place and the newest are the ones dropped.
+// dropped instead. failed holds the job's items in the order they were
+// attempted, longest-waiting first, so those keep their place and the newest
+// are the ones dropped. The round's drops are logged once, by the job that
+// closes it: during an outage every owner job of a tick fails, and one line
+// per owner would be a line per online player each tick.
 func (i *ItemInstances) finishOwner(round *saveRound, failed []pendingItem, err error) {
-	dropped, pending := i.mergeBack(round, failed, err)
-	if len(dropped) > 0 {
-		i.log.Error().Err(err).Int("dropped", len(dropped)).Ints32("object_ids", dropped[:min(len(dropped), 20)]).
+	drops, pending, closed := i.mergeBack(round, failed, err)
+	if closed && drops.count > 0 {
+		i.log.Error().Err(drops.err).Int("dropped", drops.count).Ints32("object_ids", drops.sample).
 			Int("pending", pending).Int("cap", i.pendingCap).
 			Msg("task: item persistence backlog at its cap; dropped failed item writes, their rows keep their last saved state")
 	}
 }
 
-// mergeBack is finishOwner's bookkeeping under mu. It returns the failed
-// items it dropped for the cap and the pending count it left.
-func (i *ItemInstances) mergeBack(round *saveRound, failed []pendingItem, err error) ([]int32, int) {
+// mergeBack is finishOwner's bookkeeping under mu. It returns the round's
+// cap drops so far, the pending count it left, and whether this job closed
+// the round.
+func (i *ItemInstances) mergeBack(round *saveRound, failed []pendingItem, err error) (capDrops, int, bool) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	var dropped []int32
 	for _, entry := range failed {
 		objectID := entry.inst.ObjectID
 		if _, wasRemoved := round.removed[objectID]; wasRemoved {
@@ -671,7 +687,13 @@ func (i *ItemInstances) mergeBack(round *saveRound, failed []pendingItem, err er
 			continue
 		}
 		if len(i.pending) >= i.pendingCap {
-			dropped = append(dropped, objectID)
+			if round.drops.count == 0 {
+				round.drops.err = err
+			}
+			round.drops.count++
+			if len(round.drops.sample) < capDropSample {
+				round.drops.sample = append(round.drops.sample, objectID)
+			}
 			continue
 		}
 		// Keeps the owner this round resolved: a retry of a destroyed item
@@ -682,11 +704,12 @@ func (i *ItemInstances) mergeBack(round *saveRound, failed []pendingItem, err er
 		round.err = err
 	}
 	round.remaining--
-	if round.remaining == 0 {
+	closed := round.remaining == 0
+	if closed {
 		delete(i.rounds, round)
 		close(round.done)
 	}
-	return dropped, len(i.pending)
+	return round.drops, len(i.pending), closed
 }
 
 // laneKey picks the persistence lane an item's write runs on: its owner's,
