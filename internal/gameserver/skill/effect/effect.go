@@ -221,28 +221,35 @@ func resumeRestored(tmpl modelskill.EffectTemplate, count, elapsedSeconds int32,
 // login restored at the instant at, from count and elapsedSeconds, but has
 // not replayed yet saves at now: its schedule ran from at, as the replayed
 // effect's own does (see resumeRestored). The first template ApplyRestored
-// would build is the one whose state the replayed skill saves. ok is false
-// when that effect has ended by now. A zero at, a skill with no such
-// template, or one whose ticks run an action (see restoreAnchor), saves
-// count and elapsedSeconds unchanged.
+// would build whose effect is still running at now is the one whose state
+// the replayed skill saves, as Player.storeEffect writes the first effect of
+// a skill still in the list: one that has ended passes the row on to the
+// next. ok is false only when every such effect has ended by now. A zero at,
+// a skill with no such template, or a first running one whose ticks run an
+// action (see restoreAnchor), saves count and elapsedSeconds unchanged.
 func RestoredSaveState(templates []modelskill.EffectTemplate, count, elapsedSeconds int32, at, now time.Time) (savedCount, savedElapsed int32, ok bool) {
 	if at.IsZero() {
 		return count, elapsedSeconds, true
 	}
+	known := false
 	for _, tmpl := range templates {
-		if _, known := coreKinds[tmpl.Name]; !known {
+		if _, ok := coreKinds[tmpl.Name]; !ok {
 			continue
 		}
+		known = true
 		period := templatePeriod(tmpl)
 		if period <= 0 || restoreAnchor(tmpl, at).IsZero() {
 			return count, elapsedSeconds, true
 		}
 		remaining, next, alive := resumeRestored(tmpl, count, elapsedSeconds, at, now)
 		if !alive {
-			return 0, 0, false
+			continue
 		}
 		left := min(max(next.Sub(now), 0), period)
 		return int32(remaining), int32((period - left) / time.Second), true
+	}
+	if known {
+		return 0, 0, false
 	}
 	return count, elapsedSeconds, true
 }
