@@ -206,6 +206,12 @@ type PlayerConfig struct {
 	// the zero value lists a game master that logs in, as the shipped config
 	// does.
 	GMStartupUnlisted bool
+	// GMStartupInvulnerable, GMStartupInvisible and GMStartupBlockAll are
+	// players.properties's same-named keys: a game master logs in
+	// invulnerable, invisible, or blocking everything.
+	GMStartupInvulnerable bool
+	GMStartupInvisible    bool
+	GMStartupBlockAll     bool
 	// CraftingDisabled is players.properties CraftingEnabled inverted, so
 	// the zero value keeps crafting on as the shipped config does.
 	CraftingDisabled bool

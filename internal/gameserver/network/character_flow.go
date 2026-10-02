@@ -328,6 +328,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 		l.autosave.Add(live)
 	}
 
+	l.applyGMLoginModes(live)
 	l.registerGM(live)
 	for _, frame := range macroListFrames(live.macros) {
 		client.Session.SendFrame(frame)
@@ -393,6 +394,8 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// A punishment served resumes its timer, and a jailed player outside
 	// the jail is taken back.
 	l.enterWorldPunishment(live)
+	// A game master hears which login modes it is in.
+	sendGMLoginModes(live)
 	// Friends hear of the entry last, just ahead of the reuse timers.
 	l.notifyFriends(live, true)
 	client.Session.SendFrame(serverpackets.FrameSkillCoolTime(coolTimes))

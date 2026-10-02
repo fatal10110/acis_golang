@@ -98,6 +98,7 @@ type options struct {
 	karmaPlayerCanTrade    bool
 	admin                  *admin.Data
 	gmStartupUnlisted      bool
+	gmStartupModes         [3]bool
 	gmAudit                zerolog.Logger
 	chat                   network.ChatConfig
 	restarts               *restart.Table
@@ -266,6 +267,13 @@ func WithAdmin(data *admin.Data) Option { return func(o *options) { o.admin = da
 // WithGMStartupUnlisted sets players.properties GMStartupAutoList = False:
 // a game master logs in hidden from /gmlist.
 func WithGMStartupUnlisted() Option { return func(o *options) { o.gmStartupUnlisted = true } }
+
+// WithGMStartupModes sets players.properties GMStartupInvulnerable,
+// GMStartupInvisible and GMStartupBlockAll: the modes a game master logs in
+// with (default: none, as shipped).
+func WithGMStartupModes(invulnerable, invisible, blockAll bool) Option {
+	return func(o *options) { o.gmStartupModes = [3]bool{invulnerable, invisible, blockAll} }
+}
 
 // WithGMAudit records every admin command run to log (server.properties
 // GMAudit = True); by default nothing is recorded.
@@ -1792,6 +1800,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.Mailbox = bbs.NewMailbox(mailStore, persistWorker, o.log)
 	}
 	gclConfig.PlayerConfig.AutoLearnSkills = o.autoLearnSkills
+	gclConfig.PlayerConfig.GMStartupInvulnerable, gclConfig.PlayerConfig.GMStartupInvisible, gclConfig.PlayerConfig.GMStartupBlockAll = o.gmStartupModes[0], o.gmStartupModes[1], o.gmStartupModes[2]
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
 	gclConfig.ArmorSets = o.armorSets
 	gclConfig.Relations, gclConfig.Characters = relations, chars

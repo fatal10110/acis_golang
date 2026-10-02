@@ -3,11 +3,15 @@ package main
 import "github.com/fatal10110/acis_golang/internal/config"
 
 // adminConfig holds the game-master settings: whether admin commands are
-// audited (server.properties GMAudit) and whether a game master logs in on
-// the /gmlist list (players.properties GMStartupAutoList).
+// audited (server.properties GMAudit) and the modes a game master logs in
+// with (players.properties GMStartup*): invulnerable, invisible, blocking
+// everything, and on the /gmlist list.
 type adminConfig struct {
-	GMAudit           bool
-	GMStartupAutoList bool
+	GMAudit               bool
+	GMStartupInvulnerable bool
+	GMStartupInvisible    bool
+	GMStartupBlockAll     bool
+	GMStartupAutoList     bool
 }
 
 func loadAdminConfig(paths gameServerPaths) (adminConfig, error) {
@@ -20,10 +24,13 @@ func loadAdminConfig(paths gameServerPaths) (adminConfig, error) {
 		return adminConfig{}, err
 	}
 	sf := config.NewFields(server, "gm audit")
-	pf := config.NewFields(players, "gm startup auto list")
+	pf := config.NewFields(players, "gm startup")
 	cfg := adminConfig{
-		GMAudit:           sf.Bool("GMAudit", false),
-		GMStartupAutoList: pf.Bool("GMStartupAutoList", true),
+		GMAudit:               sf.Bool("GMAudit", false),
+		GMStartupInvulnerable: pf.Bool("GMStartupInvulnerable", false),
+		GMStartupInvisible:    pf.Bool("GMStartupInvisible", false),
+		GMStartupBlockAll:     pf.Bool("GMStartupBlockAll", false),
+		GMStartupAutoList:     pf.Bool("GMStartupAutoList", true),
 	}
 	if err := sf.Err(); err != nil {
 		return adminConfig{}, err

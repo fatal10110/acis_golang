@@ -146,6 +146,9 @@ func provideGameClientLink(
 		KeepMaintainedIngredients:  !bool(gameplay.BlacksmithUseRecipes),
 		DiscardItemDisabled:        !bool(gameplay.AllowDiscardItem),
 		GMStartupUnlisted:          !gameplay.Admin.GMStartupAutoList,
+		GMStartupInvulnerable:      gameplay.Admin.GMStartupInvulnerable,
+		GMStartupInvisible:         gameplay.Admin.GMStartupInvisible,
+		GMStartupBlockAll:          gameplay.Admin.GMStartupBlockAll,
 	}
 	link, err := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,
