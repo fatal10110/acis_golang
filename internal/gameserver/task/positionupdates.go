@@ -43,20 +43,24 @@ func (p *PositionUpdates) Add(actor move.PositionUpdater) {
 	p.add(actor.ObjectID(), actor)
 }
 
-// Remove unregisters actor from movement-correction ticks.
+// Remove unregisters actor from movement-correction ticks. It leaves a
+// different actor registered under the same object id in place, so a late
+// Remove from a holder whose id was released and reissued cannot stop the
+// new one.
 func (p *PositionUpdates) Remove(actor move.PositionUpdater) {
 	if actor == nil {
 		return
 	}
-	p.remove(actor.ObjectID())
+	p.remove(actor.ObjectID(), actor)
 }
 
-// Contains reports whether actor is currently registered.
+// Contains reports whether actor itself, not merely its object id, is
+// currently registered.
 func (p *PositionUpdates) Contains(actor move.PositionUpdater) bool {
 	if actor == nil {
 		return false
 	}
-	return p.contains(actor.ObjectID())
+	return p.contains(actor.ObjectID(), actor)
 }
 
 // Tick advances every registered in-flight movement once, on each actor's

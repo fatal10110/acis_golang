@@ -17,7 +17,13 @@ import (
 // two are separate steps on purpose, since tickGuard is shared with
 // serialDeadlineRegistry, whose tickDue clears its own scratch internally
 // and has no equivalent of releaseSnapshot.
-type activeRegistry[K comparable, V any] struct {
+//
+// remove and contains match the stored value as well as the key, so a
+// holder that lost its key to a later registration (an object id released
+// and handed out again) can never unregister or claim that newer entry.
+// Every dynamic type stored in V must therefore be comparable: a pointer,
+// or a struct of pointers, never a value holding a slice, map, or func.
+type activeRegistry[K comparable, V comparable] struct {
 	mu      sync.Mutex
 	entries map[K]V
 	scratch []V
@@ -25,7 +31,7 @@ type activeRegistry[K comparable, V any] struct {
 	tickGuard
 }
 
-func newActiveRegistry[K comparable, V any]() *activeRegistry[K, V] {
+func newActiveRegistry[K comparable, V comparable]() *activeRegistry[K, V] {
 	return &activeRegistry[K, V]{entries: make(map[K]V)}
 }
 
@@ -36,19 +42,22 @@ func (r *activeRegistry[K, V]) add(key K, value V) {
 	r.entries[key] = value
 }
 
-// remove unregisters key.
-func (r *activeRegistry[K, V]) remove(key K) {
+// remove unregisters key only while value is still the entry registered
+// under it; a different value under the same key is left in place.
+func (r *activeRegistry[K, V]) remove(key K, value V) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	delete(r.entries, key)
+	if current, ok := r.entries[key]; ok && current == value {
+		delete(r.entries, key)
+	}
 }
 
-// contains reports whether key is currently registered.
-func (r *activeRegistry[K, V]) contains(key K) bool {
+// contains reports whether value is currently registered under key.
+func (r *activeRegistry[K, V]) contains(key K, value V) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	_, ok := r.entries[key]
-	return ok
+	current, ok := r.entries[key]
+	return ok && current == value
 }
 
 // releaseSnapshot clears the scratch buffer's element references after a

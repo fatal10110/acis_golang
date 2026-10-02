@@ -66,12 +66,14 @@ func (a *AI) Add(actor AIActor) {
 	a.add(actor.ObjectID(), actor)
 }
 
-// Remove unregisters actor from recurring AI ticks.
+// Remove unregisters actor from recurring AI ticks. It leaves a different
+// actor registered under the same object id in place, so a late Remove from
+// a holder whose id was released and reissued cannot stop the new one.
 func (a *AI) Remove(actor AIActor) {
 	if actor == nil {
 		return
 	}
-	a.remove(actor.ObjectID())
+	a.remove(actor.ObjectID(), actor)
 }
 
 // Tick runs one AI cycle, on each actor's queue, for every registered actor
