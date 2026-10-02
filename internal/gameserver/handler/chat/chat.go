@@ -49,6 +49,16 @@ func (t Type) String() string {
 	return typeNames[t]
 }
 
+// TypeByName returns the channel String names.
+func TypeByName(name string) (Type, bool) {
+	for i, n := range typeNames {
+		if n == name {
+			return Type(i), true
+		}
+	}
+	return 0, false
+}
+
 // MaxTextLength is the longest line, in UTF-16 code units, a player may
 // say.
 const MaxTextLength = 100

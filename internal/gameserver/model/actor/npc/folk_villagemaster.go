@@ -206,13 +206,12 @@ func SubclassReplaceList(slot int, classes []int) string {
 	return b.String()
 }
 
-// villageMasterClanCommands are the clan commands a village master runs
-// itself, matched on the command's first word ignoring case. Its other
-// clan commands (alliances, dissolution) belong to systems not in place
-// yet.
+// villageMasterClanCommands are the clan and alliance commands a village
+// master runs itself, matched on the command's first word ignoring case.
+// Clan dissolution belongs to a system not in place yet (#3148).
 var villageMasterClanCommands = []string{
 	"create_clan", "increase_clan_level", "change_clan_leader", "cancel_clan_leader_change",
-	"learn_clan_skills",
+	"learn_clan_skills", "create_ally", "dissolve_ally",
 	"create_academy", "create_royal", "create_knight", "rename_pledge", "assign_subpl_leader",
 }
 

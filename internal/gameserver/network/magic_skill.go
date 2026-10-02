@@ -130,7 +130,7 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 		// A nextActionAttack skill refused at its cost and condition checks
 		// still hands on to the attack, after the refusal's own packets.
 		if started.CanCastFailure {
-			defer live.attackAfterCast(started.Definition, castCombatant(started.Target), req.ShiftPressed)
+			defer live.attackAfterCast(started.Definition, castCombatant(started.Target), req.ShiftPressed, false)
 		}
 		// A player's cast that fails its cost or target conditions after the
 		// hit-time stop answers with its reason alone: no ActionFailed, no
@@ -614,14 +614,21 @@ func (l *GameClientLink) resumeServitorAfterRestore(live *livePlayer) {
 }
 
 // magicTargetLost reports whether a queued skill's target has left the world
-// or the caster's surroundings. A summon-friend skill reaches a target
+// or the caster's surroundings (an invisible player only a game master
+// knows). A summon-friend skill reaches a target
 // anywhere in the world.
 func (l *GameClientLink) magicTargetLost(live *livePlayer, target skilltarget.Actor, def modelskill.Definition) bool {
 	tracked, ok := target.(world.Tracked)
 	if !ok || l.resolveTarget(target.ObjectID()) == nil {
 		return true
 	}
-	return def.SkillType != "SUMMON_FRIEND" && !world.Knows(live, tracked)
+	if def.SkillType == "SUMMON_FRIEND" {
+		return false
+	}
+	if c, ok := target.(attackable.Combatant); ok {
+		return !live.Knows(c)
+	}
+	return !world.Knows(live, tracked)
 }
 
 func (l *GameClientLink) abortFusionTargeting(target *livePlayer) {
@@ -700,14 +707,14 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 			sendMagicCastFailureReason(live, def, err)
 			l.broadcastCastAborted(live)
 			sendMagicActionFailed(live)
-			live.endCastIntention(def, castCombatant(target))
+			live.endCastIntention(def, castCombatant(target), false)
 			return
 		}
 		sendMagicCastFailure(live, def, err)
 		return
 	}
 	// A toggle's cast ends as soon as it has switched, with no CastFinished.
-	defer live.endCastIntention(def, castCombatant(target))
+	defer live.endCastIntention(def, castCombatant(target), false)
 
 	if activated {
 		// Each cost CastToggle paid already sent its own status.
@@ -724,8 +731,8 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 // known list. The action-failed acknowledgement is not sent here: it belongs
 // to every Stop call, idle or in-flight, so it is wired through the
 // CastStopAck event instead of gated behind this in-flight-only path. An
-// interrupt's CASTING_INTERRUPTED comes last, once the stopped cast's
-// CastFinished has run (see GameClientLink.finishLiveCast).
+// interrupt's CASTING_INTERRUPTED comes last, after that acknowledgement,
+// once the stopped cast's CastFinished has run (see livePlayer.endCastStop).
 func (l *GameClientLink) broadcastCastAborted(live *livePlayer) {
 	if live == nil {
 		return

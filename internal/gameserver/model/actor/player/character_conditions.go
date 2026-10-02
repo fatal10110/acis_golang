@@ -141,14 +141,11 @@ func (a characterStatActor) IsInOlympiadMode() bool { return false }
 // PkKills satisfies conditions.PlayerActor.
 func (a characterStatActor) PkKills() int { return a.c.ProgressionValues().PKKills }
 
-// PledgeClass satisfies conditions.PlayerActor. Always 0: Character.
-// PledgeClass now holds the clan rank, but the skill conditions do not read
-// it yet (#1507), and no shipped stat func's condition needs it.
-func (a characterStatActor) PledgeClass() int { return 0 }
+// PledgeClass satisfies conditions.PlayerActor with c's clan rank.
+func (a characterStatActor) PledgeClass() int { return a.c.PledgeClass() }
 
-// IsClanLeader satisfies conditions.PlayerActor. Always false: see
-// PledgeClass.
-func (a characterStatActor) IsClanLeader() bool { return false }
+// IsClanLeader satisfies conditions.PlayerActor.
+func (a characterStatActor) IsClanLeader() bool { return a.c.IsClanLeader() }
 
 // HasClan satisfies conditions.PlayerActor.
 func (a characterStatActor) HasClan() bool { return a.c.ClanID() != 0 }

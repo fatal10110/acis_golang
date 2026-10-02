@@ -6,12 +6,16 @@ import (
 
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/skill/skilltest"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target/targettest"
 	modelactor "github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -122,11 +126,10 @@ func TestApplyCubicHeal_SkipsUnhealableTarget(t *testing.T) {
 
 // fakeCubicEffectCaster and fakeCubicEffectTarget are the minimal
 // handlerskill.Actor + cast.Target surface ApplyCubicEffect's dispatch
-// needs. fakeCubicEffectTarget deliberately does not implement
-// checkSkillSuccess's skillSuccessSource probe, so an offensive continuous
-// skill (DEBUFF/DOT/etc.) always fails its landing roll — matching
-// Cubic.useContinuousSkill's calcCubicSkillSuccess()==false branch
-// (Cubic.java:439-444), the case this test exercises.
+// needs. A fakeCubicEffectTarget with perfectBlock set blocks every skill
+// perfectly, so an offensive continuous skill (DEBUFF/DOT/etc.) always
+// fails the cubic landing roll — Cubic.useContinuousSkill's
+// calcCubicSkillSuccess()==false branch (Cubic.java:439-444).
 type fakeCubicEffectCaster struct {
 	world.Presence
 	skilltest.Creature
@@ -142,8 +145,16 @@ func (f *fakeCubicEffectCaster) Dead() bool { return false }
 type fakeCubicEffectTarget struct {
 	world.Presence
 	skilltest.Creature
-	id   int32
-	list *effect.List
+	id           int32
+	list         *effect.List
+	perfectBlock bool
+}
+
+func (f *fakeCubicEffectTarget) ShieldDefense(creature.FormulaActor, modelskill.Definition, bool) formulas.ShieldDefense {
+	if f.perfectBlock {
+		return formulas.ShieldPerfect
+	}
+	return formulas.ShieldFailed
 }
 
 func (f *fakeCubicEffectTarget) ObjectID() int32 { return f.id }
@@ -162,7 +173,7 @@ func (f *fakeCubicEffectTarget) EffectList() *effect.List { return f.list }
 func TestApplyCubicEffect_FailedOffensiveContinuousRollReportsAttackFailed(t *testing.T) {
 	registry := handlerskill.NewDefaultRegistry()
 	caster := &fakeCubicEffectCaster{id: 1}
-	target := &fakeCubicEffectTarget{id: 2, list: newTestList(nil)}
+	target := &fakeCubicEffectTarget{id: 2, list: newTestList(nil), perfectBlock: true}
 
 	def := modelskill.Definition{
 		SkillType: "DEBUFF",
@@ -171,7 +182,7 @@ func TestApplyCubicEffect_FailedOffensiveContinuousRollReportsAttackFailed(t *te
 		Effects:   []modelskill.EffectTemplate{{Name: "Buff", Time: 600}},
 	}
 
-	result := ApplyCubicEffect(registry, caster, def, target, nil)
+	result := ApplyCubicEffect(registry, caster, def, 0, target, nil)
 
 	if !result.Handled {
 		t.Fatal("ApplyCubicEffect() Handled = false, want true (DEBUFF has a registered handler)")
@@ -199,9 +210,10 @@ func (f *fakeCubicShotOwner) SetChargedShot(kind item.ShotKind, charged bool) {
 }
 
 // TestApplyCubicEffect_ContinuousAndDisablerProcsKeepOwnerSpiritshot pins
-// that a cubic's POISON/DEBUFF/DOT and PARALYZE/STUN/ROOT/AGGDAMAGE procs
-// read the owner's blessed-spiritshot charge without spending it, although
-// the same skill types cast by a player discharge it.
+// that a cubic's POISON/DEBUFF/DOT, PARALYZE/STUN/ROOT/AGGDAMAGE, MDAM and
+// DRAIN procs read the owner's blessed-spiritshot charge without spending
+// it, although the same skill types cast by a player discharge it
+// (Cubic.java:378-480 never calls setChargedShot).
 func TestApplyCubicEffect_ContinuousAndDisablerProcsKeepOwnerSpiritshot(t *testing.T) {
 	registry := handlerskill.NewDefaultRegistry()
 	for _, def := range []modelskill.Definition{
@@ -212,12 +224,14 @@ func TestApplyCubicEffect_ContinuousAndDisablerProcsKeepOwnerSpiritshot(t *testi
 		{ID: 4166, SkillType: "STUN", Offensive: true},
 		{ID: 5116, SkillType: "ROOT", Offensive: true},
 		{ID: 5115, SkillType: "AGGDAMAGE", Offensive: true},
+		{ID: 4049, SkillType: "MDAM", Offensive: true, Power: 10},
+		{ID: 4050, SkillType: "DRAIN", Offensive: true, Magic: true, Power: 10},
 	} {
 		t.Run(def.SkillType, func(t *testing.T) {
 			owner := &fakeCubicShotOwner{fakeCubicEffectCaster: fakeCubicEffectCaster{id: 1}, blessed: true}
 			target := &fakeCubicEffectTarget{id: 2, list: newTestList(nil)}
 
-			if result := ApplyCubicEffect(registry, owner, def, target, nil); !result.Handled {
+			if result := ApplyCubicEffect(registry, owner, def, 0, target, nil); !result.Handled {
 				t.Fatalf("ApplyCubicEffect(%s) Handled = false, want true", def.SkillType)
 			}
 			if !owner.blessed || len(owner.writes) != 0 {
@@ -237,9 +251,12 @@ type fakeCubicFireOwner struct {
 	rollIdx  int
 	hp       int
 	maxHP    float64
+	attacker skilltarget.Actor
 }
 
 func (f *fakeCubicFireOwner) ObjectID() int32 { return f.objectID }
+
+func (f *fakeCubicFireOwner) Attacker() skilltarget.Actor { return f.attacker }
 
 func (f *fakeCubicFireOwner) Position() (int, int, int) { return f.x, f.y, f.z }
 
@@ -268,6 +285,15 @@ type fakeCubicTarget struct {
 	x, y, z    int
 	alikeDead  bool
 	siegeGuard bool
+	// refused makes the target one its attacker must force an attack on;
+	// checkedBy is the attacker last checked.
+	refused   bool
+	checkedBy skilltarget.Actor
+}
+
+func (f *fakeCubicTarget) AttackableWithoutForceBy(caster skilltarget.Actor) bool {
+	f.checkedBy = caster
+	return !f.refused
 }
 
 func (f *fakeCubicTarget) ObjectID() int32 { return f.objectID }
@@ -312,18 +338,30 @@ func TestDecideCubicFire_RejectsOutOfRangeTarget(t *testing.T) {
 	}
 }
 
-func TestDecideCubicFire_RejectsDeadTarget(t *testing.T) {
-	target := &fakeCubicTarget{objectID: 2, alikeDead: true}
-	owner := &fakeCubicFireOwner{objectID: 1, rolls: []int{0, 0}, target: target}
-	_, _, ok := DecideCubicFire(owner, []int{4049}, 100)
-	if ok {
-		t.Fatal("DecideCubicFire() = true for an already-dead target")
+// fakeCubicAttacker stands for a cubic's owner as an attacker.
+type fakeCubicAttacker struct {
+	targettest.Actor
+	world.Presence
+}
+
+// TestDecideCubicFire_RejectsTargetNeedingForce pins the enemy gate: the
+// owner's selection is fired at only when the owner may attack it without
+// forcing, as checked against the owner itself.
+func TestDecideCubicFire_RejectsTargetNeedingForce(t *testing.T) {
+	attacker := &fakeCubicAttacker{}
+	target := &fakeCubicTarget{objectID: 2, refused: true}
+	owner := &fakeCubicFireOwner{objectID: 1, rolls: []int{0, 0}, target: target, attacker: attacker}
+	if _, _, ok := DecideCubicFire(owner, []int{4049}, 100); ok {
+		t.Fatal("DecideCubicFire() = true for a target the owner must force an attack on")
+	}
+	if target.checkedBy != attacker {
+		t.Fatalf("checked against %v, want the owner's attacker", target.checkedBy)
 	}
 }
 
 func TestDecideLifeCubicTarget_SkipsWhenAtFullHP(t *testing.T) {
 	owner := &fakeCubicFireOwner{objectID: 1, hp: 100, maxHP: 100}
-	_, ok := DecideLifeCubicTarget(owner)
+	_, ok := DecideLifeCubicTarget(owner, nil)
 	if ok {
 		t.Fatal("DecideLifeCubicTarget() = true at full HP, want false")
 	}
@@ -331,7 +369,7 @@ func TestDecideLifeCubicTarget_SkipsWhenAtFullHP(t *testing.T) {
 
 func TestDecideLifeCubicTarget_HealsSelfWhenRollPasses(t *testing.T) {
 	owner := &fakeCubicFireOwner{objectID: 1, hp: 1, maxHP: 1000, rolls: []int{0}}
-	target, ok := DecideLifeCubicTarget(owner)
+	target, ok := DecideLifeCubicTarget(owner, nil)
 	if !ok {
 		t.Fatal("DecideLifeCubicTarget() = false despite low HP and a passing roll")
 	}

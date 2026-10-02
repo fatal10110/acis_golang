@@ -83,6 +83,8 @@ type livePlayer struct {
 	replayingEffects atomic.Bool
 	shortcuts        *shortcut.List
 	macros           *macro.List
+	// board is the player's community board session; owned by its queue.
+	board boardSession
 	// access is the character's access level, resolved at login and
 	// replaced by setAccessLevel on p's queue; any goroutine reads it
 	// through accessLevel.
@@ -111,6 +113,11 @@ type livePlayer struct {
 	// sits ahead of detach's offline persistence write or is never enqueued.
 	// Atomic for the readers on other goroutines.
 	deliveryStopped atomic.Bool
+	// entered is set on p's queue once the login spawned p. The player is
+	// registered in the world from its selection on, so registration alone
+	// does not mean it is in the world yet. Atomic for readers on other
+	// goroutines.
+	entered atomic.Bool
 	// pickupMu guards deferred player intentions and pickup state. Another
 	// actor's queue reaches them: an effect it applies stops p's actions and
 	// drops them (stopLiveActions → tryToIdle).
@@ -323,7 +330,7 @@ func onLive(live *livePlayer, fn func()) bool {
 // stance with AutoAttackStop to its observers. Only detach uses it: a
 // teleport aborts the same actions but keeps the stance (abortAll).
 func (p *livePlayer) Stop() {
-	p.abortAll()
+	p.abortAll(false)
 	if p.stopAttack != nil {
 		p.stopAttack(p)
 	}
@@ -332,13 +339,52 @@ func (p *livePlayer) Stop() {
 // abortAll drops p's queued intentions and stops its attack, cast and move.
 // The attack stance and in-combat state are left alone: they end only on
 // their own expiry, on death or on logout.
-func (p *livePlayer) abortAll() {
+//
+// A teleport has already left p unable to act. Its attack stop is answered
+// with two ActionFailed, the refused idle's and the stop's own, and a cast
+// in flight is stopped with the intention queued behind it still in place:
+// the stopped cast's end thinks it once, refused, before the teleport drops
+// it with everything else.
+func (p *livePlayer) abortAll(teleport bool) {
+	queuedForCast := teleport && p.cast != nil && p.cast.CastingNow()
+	if queuedForCast {
+		if p.move != nil {
+			p.move.Stop()
+		}
+	} else {
+		p.dropQueuedIntentions()
+	}
+	if p.attack != nil {
+		p.attack.Stop()
+	}
+	if teleport {
+		p.SendFrame(serverpackets.FrameActionFailed())
+		p.SendFrame(serverpackets.FrameActionFailed())
+	}
+	// Stopping the cast cancels its pending task, so an in-flight cast never
+	// lands against an already-detached or relocated character.
+	if p.cast != nil {
+		p.cast.Stop()
+	}
+	if queuedForCast {
+		p.goIdle()
+	}
+	// Free the chair for others but keep seated identity so observers still
+	// receive the stand-then-delete animation when this player despawns.
+	p.freeChair()
+	// Cubics are left alone: across a teleport they keep acting and ageing.
+	// Detach stops them (stopCubics); death removes them (removeAllCubics).
+}
+
+// dropQueuedIntentions drops every intention p holds, active and queued,
+// and stops its attack intention and any walk. A skill or item cast queued
+// behind the cast in flight is left for the stop's own CastFinished, which
+// drops it with ActionFailed; one queued behind anything else goes
+// silently.
+func (p *livePlayer) dropQueuedIntentions() {
 	p.dropHeldIntention()
 	p.takePickup()
 	p.takeDeferredPickup()
-	// A skill or item cast queued behind the cast in flight is left for the
-	// stop's own CastFinished, which drops it with ActionFailed; one queued
-	// behind anything else goes silently.
 	if p.cast == nil || !p.cast.CastingNow() {
 		p.takeDeferredMagicSkill()
 		p.takeDeferredItemAICast()
@@ -351,19 +397,16 @@ func (p *livePlayer) abortAll() {
 	if p.combat != nil {
 		p.combat.Stop()
 	}
-	if p.attack != nil {
-		p.attack.Stop()
+}
+
+// stopCastInFlight stops p's cast as Character.StopCast does and reports
+// whether a cast was in flight to stop.
+func (p *livePlayer) stopCastInFlight() bool {
+	if p.cast == nil {
+		p.StopCast()
+		return false
 	}
-	// Stopping the cast cancels its pending task, so an in-flight cast never
-	// lands against an already-detached or relocated character.
-	if p.cast != nil {
-		p.cast.Stop()
-	}
-	// Free the chair for others but keep seated identity so observers still
-	// receive the stand-then-delete animation when this player despawns.
-	p.freeChair()
-	// Cubics are left alone: across a teleport they keep acting and ageing.
-	// Detach stops them (stopCubics); death removes them (removeAllCubics).
+	return p.cast.StopInFlight()
 }
 
 // detached reports whether p's session has begun detaching (logout).
@@ -689,6 +732,16 @@ func (p *livePlayer) tryToIdle(denied bool) {
 		return
 	}
 	busy := p.CastingNow() || (p.attack != nil && p.attack.AttackingNow()) || inPostureTransition(p)
+	p.goIdle()
+	if busy {
+		p.SendFrame(serverpackets.FrameActionFailed())
+	}
+}
+
+// goIdle drops every intention p holds, active and queued, and stops its
+// movement, answering nothing: the idle a refused stand takes, whose
+// refusal sends its own ActionFailed.
+func (p *livePlayer) goIdle() {
 	p.dropHeldIntention()
 	p.takePickup()
 	p.takeDeferredPickup()
@@ -701,9 +754,6 @@ func (p *livePlayer) tryToIdle(denied bool) {
 	p.takeInteract()
 	if p.combat != nil {
 		p.combat.Stop()
-	}
-	if busy {
-		p.SendFrame(serverpackets.FrameActionFailed())
 	}
 }
 

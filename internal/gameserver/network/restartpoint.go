@@ -85,7 +85,7 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 	// teleport hook, only death/class-change/logout/party abort triggers.
 	// An out-of-range/LOS teleport is instead caught within ≤1s by the
 	// existing fixed-rate FusionChannelValid recheck.
-	// live.abortAll() already reaches the cast controller (it calls
+	// live.abortAll(true) already reaches the cast controller (it calls
 	// p.cast.Stop()), so a second StopCast() here would hit the same
 	// Controller instance twice — castController wires live.Character's
 	// cast controller to the identical *actorcast.Controller stored in
@@ -95,7 +95,7 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 	//
 	// The attack stance survives the teleport: no AutoAttackStop here, the
 	// stance ends on its own expiry.
-	live.abortAll()
+	live.abortAll(true)
 	// Every hostile around the old position forgets live, dropping its
 	// threat even when the destination is still in that hostile's sight.
 	npc.DropThreatAround(l.world, live)

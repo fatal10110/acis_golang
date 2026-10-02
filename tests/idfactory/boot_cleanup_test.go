@@ -24,7 +24,7 @@ func seedRow(t *testing.T, db *sql.DB, stmt string, args ...any) {
 // so an earlier test's leftovers can't affect assertions.
 func clearIDScanRows(t *testing.T, db *sql.DB) {
 	t.Helper()
-	for _, table := range []string{"clan_data", "clan_subpledges", "castle", "clanhall", "auctions", "mods_wedding", "petition"} {
+	for _, table := range []string{"clan_data", "clan_subpledges", "castle", "clanhall", "auctions", "mods_wedding"} {
 		if _, err := db.Exec("DELETE FROM " + table); err != nil {
 			t.Fatalf("clear %s: %v", table, err)
 		}
@@ -51,7 +51,6 @@ var idScanTables = []string{
 		"new_leader_id INT UNSIGNED NOT NULL DEFAULT 0" +
 		")",
 	"CREATE TABLE IF NOT EXISTS mods_wedding (id INT NOT NULL DEFAULT 0)",
-	"CREATE TABLE IF NOT EXISTS petition (oid INT NOT NULL DEFAULT 0)",
 	"CREATE TABLE IF NOT EXISTS clan_subpledges (" +
 		"clan_id INT UNSIGNED NOT NULL DEFAULT 0, " +
 		"leader_id INT UNSIGNED NOT NULL DEFAULT 0" +

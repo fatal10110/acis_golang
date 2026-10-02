@@ -145,7 +145,7 @@ func TestSkillMessageOrderThroughCastAdapters(t *testing.T) {
 			sink := link.playerMessageSink(live, nil)
 			var result actorcast.EffectResult
 			if cubic {
-				result = actorcast.ApplyCubicEffect(skills, caster, def, target, sink)
+				result = actorcast.ApplyCubicEffect(skills, caster, def, 0, target, sink)
 			} else {
 				result = actorcast.ApplyEffectsResult(actorcast.EffectHandlers{Targets: skilltarget.NewRegistry(nil), Skills: skills, Sink: sink}, caster, target, def)
 			}

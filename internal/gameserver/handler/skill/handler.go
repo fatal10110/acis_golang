@@ -189,11 +189,6 @@ type Cast struct {
 	// (manor.go asserts it to a seed item, summon.go forwards it untouched),
 	// left untyped deliberately rather than typed against one of them.
 	Item any
-	// Cubic marks a cubic's proc dispatched with its owner as Caster. A
-	// cubic reads the owner's blessed-spiritshot charge for its landing
-	// rolls but never spends it, so the Continuous and Disablers handlers
-	// skip their end-of-cast discharge for it.
-	Cubic bool
 	// Sink, when set, receives each handler message the moment the handler
 	// produces it, so the message keeps its place among the frames the
 	// cast's own state changes send at once (a target's status, death and
@@ -397,6 +392,9 @@ type resultHandler interface {
 // Registry maps skill type names to their handlers.
 type Registry struct {
 	entries map[string]Handler
+	// magicFailures is the server's MagicFailures switch, read by the
+	// cubic damage path (UseCubic).
+	magicFailures bool
 }
 
 // NewRegistry returns a registry populated with handlers.
@@ -422,7 +420,7 @@ func NewDefaultRegistryWithDefinitions(defs Definitions) *Registry {
 }
 
 func newDefaultRegistry(defs Definitions, magicFailures bool, healSps *modelskill.HealSpsTable) *Registry {
-	return NewRegistry(
+	r := NewRegistry(
 		pdamHandler{},
 		chargeDamHandler{},
 		mdamHandler{magicFailures: magicFailures},
@@ -457,6 +455,8 @@ func newDefaultRegistry(defs Definitions, magicFailures bool, healSps *modelskil
 		fusionHandler{defs: defs},
 		craftHandler{},
 	)
+	r.magicFailures = magicFailures
+	return r
 }
 
 // SignetDeps carries the world-spawning collaborators the signet cast

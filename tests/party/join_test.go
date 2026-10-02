@@ -39,6 +39,7 @@ func TestInviteFormsParty(t *testing.T) {
 		serverpackets.OpcodeSystemMessage,
 		serverpackets.OpcodeUserInfo,
 		serverpackets.OpcodeCharInfo,
+		serverpackets.OpcodeRelationChanged,
 	}, "leader")
 	if got := wire.NewReader(leaderFrames[0][1:]).ReadInt32(); got != 1 {
 		t.Fatalf("JoinParty response = %d, want 1", got)
@@ -52,6 +53,7 @@ func TestInviteFormsParty(t *testing.T) {
 		serverpackets.OpcodePartySmallWindowAll,
 		serverpackets.OpcodeSystemMessage,
 		serverpackets.OpcodeCharInfo,
+		serverpackets.OpcodeRelationChanged,
 		serverpackets.OpcodeUserInfo,
 	}, "member")
 	lead, loot, rows := readWindowAll(t, memberFrames[0])

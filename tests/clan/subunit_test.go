@@ -295,3 +295,29 @@ func TestLoginListsSubunits(t *testing.T) {
 		}
 	}
 }
+
+// TestCaptainOnLoadingScreenIsNotRefreshed founds a royal guard whose
+// captain has selected its character but not entered the world. The
+// captain is not an online clan member until it enters, so the founding
+// shows its client nothing on the loading screen.
+func TestCaptainOnLoadingScreenIsNotRefreshed(t *testing.T) {
+	w, _ := bootSubunitWorld(t, 1, seedSubunitClan(t))
+	squire := w.srv.DialClient(t, "squire", 1)
+	squire.Send(encodeRequestGameStart(0))
+	if reply := squire.Read(); reply[0] != serverpackets.OpcodeSSQInfo {
+		t.Fatalf("opcode = %#x, want SSQInfo", reply[0])
+	}
+	if reply := squire.Read(); reply[0] != serverpackets.OpcodeCharSelected {
+		t.Fatalf("opcode = %#x, want CharSelected", reply[0])
+	}
+	w.srv.AwaitHandled(t)
+
+	leader := w.masterCommandBy(t, w.leader, "create_royal Guards Squire")
+	if id, _, captain := subPledgeCreated(t, leader); id != 100 || captain != "Squire" {
+		t.Fatalf("royal notice = %d %q, want Squire captaining 100", id, captain)
+	}
+	w.srv.Settle(t)
+	if frames := drainFrames(t, squire); len(frames) != 0 {
+		t.Fatalf("captain on its loading screen got %x, want nothing", opcodes(frames))
+	}
+}

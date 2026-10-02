@@ -274,6 +274,33 @@ const characterRelationsSchema = "CREATE TABLE IF NOT EXISTS `character_relation
 	"  PRIMARY KEY (`char_id`,`friend_id`)\n" +
 	")"
 
+// petitionSchema mirrors the shipped petition table definition verbatim.
+const petitionSchema = "CREATE TABLE IF NOT EXISTS `petition` (\n" +
+	"  `oid` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `type` VARCHAR(20) NOT NULL,\n" +
+	"  `petitioner_oid` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `submit_date` BIGINT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `content` VARCHAR(256) NOT NULL,\n" +
+	"  `is_unread` SMALLINT(1) NOT NULL DEFAULT 1,\n" +
+	"  `state` VARCHAR(20) NOT NULL,\n" +
+	"  `rate` VARCHAR(10) NOT NULL,\n" +
+	"  `feedback` VARCHAR(512) NOT NULL,\n" +
+	"  `responders` VARCHAR(150) NOT NULL,\n" +
+	"  PRIMARY KEY  (`oid`)\n" +
+	")"
+
+// petitionMessageSchema mirrors the shipped petition_message table
+// definition verbatim.
+const petitionMessageSchema = "CREATE TABLE IF NOT EXISTS `petition_message` (\n" +
+	"  `id` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `petition_oid` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `player_oid` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `type` VARCHAR(20) NOT NULL,\n" +
+	"  `player_name` VARCHAR(20) NOT NULL,\n" +
+	"  `content` VARCHAR(120) NOT NULL,\n" +
+	"  PRIMARY KEY  (`id`, `petition_oid`)\n" +
+	")"
+
 // clanDataSchema mirrors the shipped clan_data table definition verbatim.
 const clanDataSchema = "CREATE TABLE IF NOT EXISTS `clan_data` (\n" +
 	"  `clan_id` INT NOT NULL DEFAULT 0,\n" +
@@ -307,6 +334,20 @@ const clanPrivsSchema = "CREATE TABLE IF NOT EXISTS `clan_privs` (\n" +
 	"  `ranking` INT NOT NULL DEFAULT '0',\n" +
 	"  `privs` INT NOT NULL DEFAULT '0',\n" +
 	"  PRIMARY KEY (`clan_id`,`ranking`)\n" +
+	")"
+
+// bbsMailSchema mirrors the shipped bbs_mail table definition verbatim.
+const bbsMailSchema = "CREATE TABLE IF NOT EXISTS `bbs_mail` (\n" +
+	"  `id` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `receiver_id` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `sender_id` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `location` VARCHAR(15) NOT NULL,\n" +
+	"  `recipients` VARCHAR(200) DEFAULT NULL,\n" +
+	"  `subject` VARCHAR(128) DEFAULT NULL,\n" +
+	"  `message` VARCHAR(3000) DEFAULT NULL,\n" +
+	"  `sent_date` TIMESTAMP NULL DEFAULT NULL,\n" +
+	"  `is_unread` SMALLINT(1) DEFAULT 1,\n" +
+	"  PRIMARY KEY  (`id`)\n" +
 	")"
 
 // accountsSchema mirrors the shipped accounts table definition verbatim.
@@ -377,10 +418,11 @@ var schemaStmts = []string{
 	itemsOnGroundSchema, characterSkillsSchema, characterShortcutsSchema,
 	characterHennasSchema, characterRecipeBookSchema, petsSchema, characterSkillsSaveSchema,
 	sevenSignsStatusSchema, buylistsSchema, characterSubclassesSchema,
-	characterRelationsSchema,
+	characterRelationsSchema, petitionSchema, petitionMessageSchema,
 	characterMacrosesSchema, characterRecommendsSchema,
 	clanDataSchema, clanPrivsSchema, clanSkillsSchema, clanSubpledgesSchema, clanWarsSchema,
 	accountsSchema,
+	bbsMailSchema,
 }
 
 var seedStmts = []string{sevenSignsStatusSeed}

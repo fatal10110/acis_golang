@@ -292,3 +292,93 @@ func TestClientLinkOpcodeBeforeAuthCloses(t *testing.T) {
 	c.send(encodeRequestServerList(1, 2))
 	c.expectClosed()
 }
+
+var errStoreDown = errors.New("account store unavailable")
+
+// A lookup that fails for any reason other than a missing row is treated as
+// an unknown account: with auto-creation off every attempt is refused with
+// REASON_USER_OR_PASS_WRONG and counts toward the IP ban.
+func TestClientLinkLookupFailureAutoCreateOffCountsAsUnknownAccount(t *testing.T) {
+	accounts := newFakeAccountStore(model.NewAccount("player1", mustHashPassword(t, "s3cret"), 0, 1))
+	accounts.accountErr = errStoreDown
+	addr, l, _, _, bans := newTestClientLink(t, accounts, false)
+	ip := net.ParseIP("127.0.0.1")
+
+	for i := 1; i <= DefaultLoginTryBeforeBan; i++ {
+		if bans.IsBanned(ip) {
+			t.Fatalf("IP banned before attempt %d", i)
+		}
+		c := dialLoginClient(t, addr)
+		c.gameGuard()
+		c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
+		c.expectLoginFail(serverpackets.LoginFailUserOrPassWrong)
+	}
+	if !bans.IsBanned(ip) {
+		t.Fatal("failed lookups did not count toward the IP ban")
+	}
+	if n := accounts.creations(); n != 0 {
+		t.Fatalf("CreateAccount called %d times with auto-creation off", n)
+	}
+}
+
+// With auto-creation on, a failed lookup leads to a creation attempt; when
+// the store refuses it too (as it does for a login that already exists),
+// the client is refused with REASON_ACCESS_FAILED and no attempt is counted.
+func TestClientLinkLookupFailureAutoCreateOnAttemptsCreation(t *testing.T) {
+	accounts := newFakeAccountStore()
+	accounts.accountErr = errStoreDown
+	accounts.createErr = errStoreDown
+	addr, l, _, sessions, _ := newTestClientLink(t, accounts, true)
+
+	c := dialLoginClient(t, addr)
+	c.gameGuard()
+	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "player1", "s3cret"))
+	c.expectLoginFail(serverpackets.LoginFailAccessFailed)
+
+	if n := accounts.creations(); n != 1 {
+		t.Fatalf("CreateAccount called %d times, want 1", n)
+	}
+	if n := failedAttemptCount(l); n != 0 {
+		t.Fatalf("failed attempts tracked = %d, want 0", n)
+	}
+	if _, ok := sessions.Get("player1"); ok {
+		t.Fatal("session stored for a refused login")
+	}
+}
+
+func TestClientLinkAutoCreateStoreFailureRepliesAccessFailed(t *testing.T) {
+	accounts := newFakeAccountStore()
+	accounts.createErr = errStoreDown
+	addr, l, _, sessions, _ := newTestClientLink(t, accounts, true)
+
+	c := dialLoginClient(t, addr)
+	c.gameGuard()
+	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "newplayer", "s3cret"))
+	c.expectLoginFail(serverpackets.LoginFailAccessFailed)
+
+	if n := accounts.creations(); n != 1 {
+		t.Fatalf("CreateAccount called %d times, want 1", n)
+	}
+	if _, ok := sessions.Get("newplayer"); ok {
+		t.Fatal("session stored for a refused login")
+	}
+}
+
+func TestClientLinkAutoCreateHashFailureRepliesAccessFailed(t *testing.T) {
+	accounts := newFakeAccountStore()
+	addr, l, _, sessions, _ := newTestClientLink(t, accounts, true, func(l *ClientLink) {
+		l.hashPassword = func(string) (string, error) { return "", errors.New("hash failed") }
+	})
+
+	c := dialLoginClient(t, addr)
+	c.gameGuard()
+	c.send(encodeRequestAuthLogin(&l.loginKeyPair().Private.PublicKey, "newplayer", "s3cret"))
+	c.expectLoginFail(serverpackets.LoginFailAccessFailed)
+
+	if n := accounts.creations(); n != 0 {
+		t.Fatalf("CreateAccount called %d times after the hash failed", n)
+	}
+	if _, ok := sessions.Get("newplayer"); ok {
+		t.Fatal("session stored for a refused login")
+	}
+}

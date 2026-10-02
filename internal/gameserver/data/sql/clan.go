@@ -26,7 +26,8 @@ func (s *ClanStore) Load(ctx context.Context) (clan.Snapshot, error) {
 	var snap clan.Snapshot
 	rows, err := s.db.QueryContext(ctx, `SELECT clan_id, COALESCE(clan_name,''), clan_level, reputation_score, hasCastle,
 		ally_id, COALESCE(ally_name,''), leader_id, new_leader_id, crest_id, crest_large_id, ally_crest_id,
-		ally_penalty_expiry_time, ally_penalty_type, char_penalty_expiry_time, dissolving_expiry_time
+		ally_penalty_expiry_time, ally_penalty_type, char_penalty_expiry_time, dissolving_expiry_time,
+		enabled, COALESCE(notice,''), COALESCE(introduction,'')
 		FROM clan_data`)
 	if err != nil {
 		return snap, fmt.Errorf("load clans: %w", err)
@@ -35,7 +36,8 @@ func (s *ClanStore) Load(ctx context.Context) (clan.Snapshot, error) {
 		var r clan.Row
 		if err := rows.Scan(&r.ID, &r.Name, &r.Level, &r.Reputation, &r.CastleID,
 			&r.AllyID, &r.AllyName, &r.LeaderID, &r.NewLeaderID, &r.CrestID, &r.CrestLargeID, &r.AllyCrestID,
-			&r.AllyPenaltyExpiry, &r.AllyPenaltyType, &r.CharPenaltyExpiry, &r.DissolvingExpiry); err != nil {
+			&r.AllyPenaltyExpiry, &r.AllyPenaltyType, &r.CharPenaltyExpiry, &r.DissolvingExpiry,
+			&r.NoticeEnabled, &r.Notice, &r.Introduction); err != nil {
 			rows.Close()
 			return snap, fmt.Errorf("load clans: %w", err)
 		}

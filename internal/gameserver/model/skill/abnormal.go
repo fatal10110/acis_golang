@@ -2,6 +2,10 @@ package skill
 
 import "fmt"
 
+// AbnormalStealth is the stealth abnormal visual: an invisible game master
+// sees itself, and its summon, drawn with it.
+const AbnormalStealth = 0x100000
+
 // abnormalEffectMasks maps an effect template's abnormal="..." name to the
 // client's abnormal-visual bit carried in CharInfo, UserInfo, NpcInfo and
 // the summon info packets. "null" is the explicit no-visual value.
@@ -27,7 +31,7 @@ var abnormalEffectMasks = map[string]int{
 	"floatroot":     0x020000,
 	"dancestun":     0x040000,
 	"firerootstun":  0x080000,
-	"stealth":       0x100000,
+	"stealth":       AbnormalStealth,
 	"imprison1":     0x200000,
 	"imprison2":     0x400000,
 	"magiccircle":   0x800000,

@@ -15,9 +15,10 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// loadClanConfig reads the clans.properties penalties and clan warehouse
-// withdrawal right the clan core uses and the players.properties clan skill
-// item switch, defaulting as the reference does when a key is missing.
+// loadClanConfig reads the clans.properties clan and alliance penalties,
+// alliance size and clan warehouse withdrawal right the clan core uses and
+// the players.properties clan skill item switch, defaulting as the
+// reference does when a key is missing.
 func loadClanConfig(paths gameServerPaths, _ zerolog.Logger) (clan.Config, error) {
 	props, err := config.LoadFile(paths.ClansConfigPath)
 	if err != nil {
@@ -35,6 +36,11 @@ func loadClanConfig(paths gameServerPaths, _ zerolog.Logger) (clan.Config, error
 		WarPenaltyDays:                  f.Int("ClanWarPenaltyWhenEnded", 5),
 		LifeCrystalNeeded:               players.Bool("LifeCrystalNeeded", true),
 		MembersCanWithdrawFromWarehouse: f.Bool("MembersCanWithdrawFromClanWH", false),
+		AllyJoinDaysWhenLeft:            f.Int("DaysBeforeJoinAllyWhenLeaved", 1),
+		AllyJoinDaysWhenDismissed:       f.Int("DaysBeforeJoinAllyWhenDismissed", 1),
+		AcceptClanDaysWhenDismissed:     f.Int("DaysBeforeAcceptNewClanWhenDismissed", 1),
+		CreateAllyDaysWhenDissolved:     f.Int("DaysBeforeCreateNewAllyWhenDissolved", 10),
+		MaxClansInAlly:                  f.Int("MaxNumOfClansInAlly", 3),
 	}
 	return cfg, f.Err()
 }
@@ -42,7 +48,8 @@ func loadClanConfig(paths gameServerPaths, _ zerolog.Logger) (clan.Config, error
 // provideClans restores every clan from the database, after the id factory
 // has dropped the clans whose leader no longer exists and the war
 // penalties that ran out while the server was down, clears the crest ids
-// whose image the crest cache does not hold, and returns the clan service
+// whose image the crest cache does not hold and the alliances whose
+// leading clan no longer exists, and returns the clan service
 // writing through the persistence worker. A stored clan skill whose
 // definition is not loaded is skipped.
 func provideClans(ctx bootContext, pool *sql.DB, ids *idfactory.Allocator, worker *persist.Worker, cfg clan.Config, crests *datacache.Crests, data *gameData, log zerolog.Logger) (*clan.Service, error) {
@@ -64,5 +71,6 @@ func provideClans(ctx bootContext, pool *sql.DB, ids *idfactory.Allocator, worke
 	log.Info().Int("clans", table.Len()).Msg("clans loaded")
 	service := clan.NewService(table, store, worker, ids, cfg, time.Now, log)
 	service.DropMissingCrests(crests)
+	service.DropDanglingAlliances()
 	return service, nil
 }

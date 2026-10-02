@@ -452,8 +452,13 @@ type MountFeedGauge struct{ Current, Max int }
 // item ObjectID from its rider's inventory.
 type MountFoodDue struct{ ObjectID int32 }
 
-// Dismounted reports the character getting off its mount.
-type Dismounted struct{}
+// Dismounted reports the character getting off its mount. A mount whose
+// feed gauge started from a pet's meal names that pet's collar in
+// PetControlItemID, with Fed the gauge's last value, for the pet's row.
+type Dismounted struct {
+	PetControlItemID int32
+	Fed              int
+}
 
 // MountOutOfFeed reports that the mount threw its rider for lack of feed.
 // WasFlying is whether the rider was flying on it.

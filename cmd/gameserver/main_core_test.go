@@ -57,6 +57,7 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 		"startDebugHTTP":           {debugHTTPStopTimeout, "debugHTTPStopTimeout", "graceful stop of the debug listener"},
 		"startNpcPersistence":      {shutdownSaveTimeout, "shutdownSaveTimeout", "spawn_data save"},
 		"startRelationPersistence": {shutdownSaveTimeout, "shutdownSaveTimeout", "character_relations save"},
+		"startPetitionPersistence": {shutdownSaveTimeout, "shutdownSaveTimeout", "petition and petition_message save"},
 		"startSimPool":             {simPoolStopTimeout, "simPoolStopTimeout", "actor pool finishing queued tasks"},
 		"startTicker": {
 			task.ItemInstanceSaveTimeout, "",
@@ -66,6 +67,7 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 		"providePersist":             {persistCloseTimeout, "persistCloseTimeout", "persistence worker's last close"},
 		"startGroundItemPersistence": {shutdownSaveTimeout, "shutdownSaveTimeout", "items_on_ground save"},
 		"startSevenSigns":            {0, "", "stops a timer under a lock the status save does not hold across its write"},
+		"startAnnouncements":         {0, "", "stops timers under a lock held only across in-memory work and an announcements.xml rewrite"},
 		"provideGameServerLogger":    {0, "", "closes the log file"},
 		"provideBootContext":         {0, "", "cancels a context"},
 		"provideGameServerDatabase":  {0, "", "closes the pool; the last database step, so running past the deadline loses nothing"},

@@ -231,7 +231,7 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 		frame := c.Read()
 		// A client that already knows another player receives that player's
 		// CharInfo ahead of its own burst; skip those leading spawn frames.
-		for i == 0 && frame[0] == serverpackets.OpcodeCharInfo {
+		for i == 0 && (frame[0] == serverpackets.OpcodeCharInfo || frame[0] == serverpackets.OpcodeRelationChanged) {
 			frame = c.Read()
 		}
 		// A client carrying weighted items receives the login weight refresh
@@ -244,7 +244,7 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 		}
 		frames = append(frames, frame)
 		if opcode == serverpackets.OpcodeEtcStatusUpdate {
-			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo)
+			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeRelationChanged)
 		}
 	}
 	return frames

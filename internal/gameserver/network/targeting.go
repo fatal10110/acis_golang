@@ -277,8 +277,8 @@ func (l *GameClientLink) thinkLivePickup(live *livePlayer) {
 // finishDeferredPickup runs the pickup queued as the next intention, if any,
 // and reports whether one was waiting. The pickup replaces the attack or
 // cast intention whatever its outcome: the swing, shot or cast it waited
-// behind is not followed by another. An item gone meanwhile only releases
-// the click.
+// behind is not followed by another. A player meanwhile unable to act, or an
+// item gone meanwhile, only releases the click.
 func (l *GameClientLink) finishDeferredPickup(live *livePlayer) bool {
 	pickup := live.takeDeferredPickup()
 	if pickup == nil {
@@ -286,6 +286,10 @@ func (l *GameClientLink) finishDeferredPickup(live *livePlayer) bool {
 	}
 	if live.combat != nil {
 		live.combat.Replace()
+	}
+	if live.DenyAIAction() {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return true
 	}
 	var ground *grounditem.Item
 	if pickup.target != nil {
@@ -309,11 +313,10 @@ func (l *GameClientLink) resolveTarget(objectID int32) world.Tracked {
 	if l.world == nil {
 		return nil
 	}
+	// Only spawned objects: a selected player still loading is registered
+	// as a player but not spawned, and cannot be clicked.
 	if obj, ok := l.world.Object(objectID); ok {
 		return obj
-	}
-	if p, ok := l.world.Player(objectID); ok {
-		return p
 	}
 	return nil
 }
@@ -671,8 +674,7 @@ func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target 
 	// get-up, then the player gets up again. During a get-up the player is
 	// not seated, and the request is refused below as a stand while not
 	// seated.
-	if stand && live.Seated() && live.FakeDead() {
-		live.GetUpFromFakeDeath()
+	if stand && live.StandFromFakeDeath() {
 		return
 	}
 	if !stand {

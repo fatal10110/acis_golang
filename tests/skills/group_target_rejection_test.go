@@ -101,8 +101,7 @@ func TestPartyOtherCastRejections(t *testing.T) {
 		assertNoActionFailedUntilQuiet(t, c, "party-other monster target")
 	})
 
-	// Parties are not modeled yet, so every other player is outside the
-	// caster's party.
+	// The bystander is in no party with the caster.
 	t.Run("player outside the party", func(t *testing.T) {
 		_, c, _ := bootCasterWithBystander(t, def)
 

@@ -25,7 +25,7 @@ func (l *GameClientLink) dispatchParty(client *Client, live *livePlayer, opcode 
 		// The request carries no body. A player in no party leaves nothing
 		// and hears nothing: the menu action waits on no answer.
 		if live != nil {
-			onLive(live, func() { l.applyPartyNotices(l.parties.Leave(live, party.Left)) })
+			onLive(live, func() { l.withdrawParty(live) })
 		}
 	case clientpackets.OpcodeRequestOustPartyMember:
 		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestOustPartyMember, l.requestOustPartyMember)
@@ -80,16 +80,16 @@ func (l *GameClientLink) livePlayerByName(name string) (*livePlayer, bool) {
 // requestJoinParty invites the named player into live's party, or into a
 // new one live will lead.
 //
-// The block-list, hidden-target, offline-mode and jail refusals wait for
-// the systems that own them (#3159), the Olympiad one for the Olympiad
-// (#3160).
+// An invisible target is refused as the wrong target. The block-list,
+// offline-mode and jail refusals wait for the systems that own them
+// (#3159), the Olympiad one for the Olympiad (#3160).
 func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.RequestJoinParty) {
 	target, ok := l.livePlayerByName(req.Target)
 	if !ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageFirstSelectUserToInviteToParty))
 		return
 	}
-	if target.ObjectID() == live.ObjectID() || target.CursedWeaponEquipped() || live.CursedWeaponEquipped() {
+	if target.ObjectID() == live.ObjectID() || target.CursedWeaponEquipped() || live.CursedWeaponEquipped() || target.Invisible() {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouHaveInvitedTheWrongTarget))
 		return
 	}
@@ -155,6 +155,9 @@ func (l *GameClientLink) requestAnswerJoinParty(live *livePlayer, req clientpack
 	}
 	requester.SendFrame(serverpackets.FrameJoinParty(req.Response))
 	l.applyPartyNotices(l.parties.Answer(requester, live, req.Response == 1))
+	if req.Response == 1 {
+		l.applyRoomNotices(l.rooms.PartyJoined(requester, live))
+	}
 }
 
 // requestOustPartyMember expels the named member from the party live
@@ -239,6 +242,10 @@ func (l *GameClientLink) applyPartyNotices(notices []party.Notice) {
 			l.broadcastToMembers(n.To, func() wire.Frame {
 				return serverpackets.FrameExMPCCPartyInfoUpdate(n.Leader.Name, n.Leader.ObjectID(), int32(n.Count), n.Added)
 			})
+		case party.LeaderChanged[*livePlayer]:
+			if l.rooms != nil {
+				l.applyRoomNotices(l.rooms.PartyLeaderChanged(n.Leader))
+			}
 		case party.Formed:
 			l.startPartyPositions(n.ID)
 		case party.Dispersed:
@@ -301,4 +308,6 @@ var partyMessages = map[party.MessageID]int{
 	party.MsgChannelDisbanded:          serverpackets.SystemMessageCommandChannelDisbanded,
 	party.MsgDismissedFromChannel:      serverpackets.SystemMessageDismissedFromCommandChannel,
 	party.MsgPartyDismissedFromChannel: serverpackets.SystemMessageS1PartyDismissedFromCommandChannel,
+	party.MsgLeftChannel:               serverpackets.SystemMessageLeftCommandChannel,
+	party.MsgPartyLeftChannel:          serverpackets.SystemMessageS1PartyLeftCommandChannel,
 }

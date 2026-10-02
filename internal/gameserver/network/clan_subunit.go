@@ -76,10 +76,11 @@ func (l *GameClientLink) createSubunit(live *livePlayer, kind int, name, captain
 }
 
 // refreshCaptain recomputes a new captain's clan rank and shows it its
-// status, on its own queue; nothing when it is offline.
+// status, on its own queue; nothing when it is offline, which a member still
+// entering the world is.
 func (l *GameClientLink) refreshCaptain(m clan.Member) {
-	captain, ok := l.livePlayerByID(m.ObjectID)
-	if !ok {
+	captain := l.onlineMember(m)
+	if captain == nil {
 		return
 	}
 	postLive(captain, func() {

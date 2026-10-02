@@ -136,7 +136,7 @@ func startInWorldAmongPlayers(t *testing.T, c *testsupport.ScriptedClient) [][]b
 			sawSSQ = true
 		case serverpackets.OpcodeCharSelected:
 			sawSelected = true
-		case serverpackets.OpcodeCharInfo:
+		case serverpackets.OpcodeCharInfo, serverpackets.OpcodeRelationChanged:
 		default:
 			t.Fatalf("selection frame opcode %#x, want SSQInfo/CharSelected", frame[0])
 		}
@@ -162,7 +162,7 @@ func startInWorldAmongPlayers(t *testing.T, c *testsupport.ScriptedClient) [][]b
 	frames := make([][]byte, 0, len(want))
 	for i := 0; i < len(want); {
 		frame := c.Read()
-		if frame[0] == serverpackets.OpcodeCharInfo {
+		if frame[0] == serverpackets.OpcodeCharInfo || frame[0] == serverpackets.OpcodeRelationChanged {
 			continue
 		}
 		if frame[0] != want[i] {
@@ -170,7 +170,7 @@ func startInWorldAmongPlayers(t *testing.T, c *testsupport.ScriptedClient) [][]b
 		}
 		frames = append(frames, frame)
 		if want[i] == serverpackets.OpcodeEtcStatusUpdate {
-			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo)
+			gameservertest.ReadInitialCompass(t, c, serverpackets.OpcodeCharInfo, serverpackets.OpcodeRelationChanged)
 		}
 		i++
 	}

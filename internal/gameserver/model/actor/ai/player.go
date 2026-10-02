@@ -119,7 +119,7 @@ func (p *PlayerAttack) start(target attackable.Combatant, shift, request bool) b
 		p.queued = true
 		return false
 	}
-	accepted, _, err := p.thinkLocked()
+	accepted, _, err := p.thinkLocked(false)
 	if err != nil {
 		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
 	}
@@ -150,15 +150,18 @@ func (p *PlayerAttack) gateRefusesLocked(target attackable.Combatant) bool {
 
 // ResumeAfterCast runs an attack intention that was requested while casting.
 // It reports whether such an intention was waiting, and whether running it
-// is answered with ActionFailed.
-func (p *PlayerAttack) ResumeAfterCast() (resumed, actionFailed bool) {
+// is answered with ActionFailed. A cast that was stopped still counts as in
+// flight while its end runs the attack: in reach, the attack waits as if
+// for a cast and is answered with ActionFailed, swinging nothing; out of
+// reach, the approach starts as usual.
+func (p *PlayerAttack) ResumeAfterCast(stopped bool) (resumed, actionFailed bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if !p.deferred {
 		return false, false
 	}
 	p.deferred = false
-	_, actionFailed, err := p.thinkLocked()
+	_, actionFailed, err := p.thinkLocked(stopped)
 	if err != nil {
 		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
 	}
@@ -179,13 +182,15 @@ func (p *PlayerAttack) ReplaceWithCast() {
 // with the cast's own shift modifier, and thinks it once, reporting whether
 // that is answered with ActionFailed. The caller has already checked that
 // target may be attacked without force. Like any intention the AI sets itself,
-// it skips the playable attack gate a player's own attack request runs.
-func (p *PlayerAttack) AttackAfterCast(target attackable.Combatant, shift bool) (actionFailed bool) {
+// it skips the playable attack gate a player's own attack request runs. A
+// stopped cast still counts as in flight for that think, as ResumeAfterCast
+// describes.
+func (p *PlayerAttack) AttackAfterCast(target attackable.Combatant, shift, stopped bool) (actionFailed bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.target, p.shift = target, shift
 	p.deferred, p.queued = false, false
-	_, actionFailed, err := p.thinkLocked()
+	_, actionFailed, err := p.thinkLocked(stopped)
 	if err != nil {
 		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
 	}
@@ -221,7 +226,7 @@ func (p *PlayerAttack) Think() (actionFailed bool) {
 	if p.deferred {
 		return false
 	}
-	_, actionFailed, err := p.thinkLocked()
+	_, actionFailed, err := p.thinkLocked(false)
 	if err != nil {
 		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
 	}
@@ -245,7 +250,7 @@ func (p *PlayerAttack) FinishedAttack() (actionFailed bool) {
 		p.stopLocked()
 		return false
 	}
-	_, actionFailed, err := p.thinkLocked()
+	_, actionFailed, err := p.thinkLocked(false)
 	if err != nil {
 		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
 	}
@@ -271,7 +276,7 @@ func (p *PlayerAttack) ThinkQueued() (actionFailed bool) {
 	if !p.queued || p.deferred {
 		return false
 	}
-	_, actionFailed, err := p.thinkLocked()
+	_, actionFailed, err := p.thinkLocked(false)
 	if err != nil {
 		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
 	}
@@ -290,7 +295,9 @@ func (p *PlayerAttack) ThinkQueued() (actionFailed bool) {
 // swing, bow reuse or cast in flight hold the attack: it stays current,
 // becomes the next intention too, and is answered with ActionFailed. A
 // shift-held attack out of reach goes idle with ActionFailed, not walking.
-func (p *PlayerAttack) thinkLocked() (accepted, actionFailed bool, err error) {
+// castStopping counts a cast whose stop is still being reported as in
+// flight.
+func (p *PlayerAttack) thinkLocked(castStopping bool) (accepted, actionFailed bool, err error) {
 	if p.target == nil {
 		return false, false, nil
 	}
@@ -316,7 +323,7 @@ func (p *PlayerAttack) thinkLocked() (accepted, actionFailed bool, err error) {
 
 	p.move.Stop()
 
-	if p.attack.BowCoolingDown() || p.attack.AttackingNow() || p.actor.CastingNow() {
+	if p.attack.BowCoolingDown() || p.attack.AttackingNow() || p.actor.CastingNow() || castStopping {
 		p.queued = true
 		return false, true, nil
 	}

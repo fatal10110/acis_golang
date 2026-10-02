@@ -35,11 +35,31 @@ type Config struct {
 	// member holding the warehouse-search privilege may withdraw from the
 	// clan warehouse, not only the leader.
 	MembersCanWithdrawFromWarehouse bool
+	// AllyJoinDaysWhenLeft is DaysBeforeJoinAllyWhenLeaved: how long a
+	// clan that left its alliance waits to join one again.
+	AllyJoinDaysWhenLeft int
+	// AllyJoinDaysWhenDismissed is DaysBeforeJoinAllyWhenDismissed: how
+	// long a clan dismissed from its alliance waits to join one again.
+	AllyJoinDaysWhenDismissed int
+	// AcceptClanDaysWhenDismissed is DaysBeforeAcceptNewClanWhenDismissed:
+	// how long an alliance leader that dismissed a clan waits to invite
+	// another.
+	AcceptClanDaysWhenDismissed int
+	// CreateAllyDaysWhenDissolved is DaysBeforeCreateNewAllyWhenDissolved:
+	// how long a clan that dissolved its alliance waits to found another.
+	CreateAllyDaysWhenDissolved int
+	// MaxClansInAlly is MaxNumOfClansInAlly: how many clans an alliance
+	// holds, its leading clan included.
+	MaxClansInAlly int
 }
 
 // DefaultConfig is the shipped clans.properties and LifeCrystalNeeded.
 func DefaultConfig() Config {
-	return Config{JoinDays: 1, CreateDays: 10, MembersForWar: 15, WarPenaltyDays: 5, LifeCrystalNeeded: true}
+	return Config{
+		JoinDays: 1, CreateDays: 10, MembersForWar: 15, WarPenaltyDays: 5, LifeCrystalNeeded: true,
+		AllyJoinDaysWhenLeft: 1, AllyJoinDaysWhenDismissed: 1, AcceptClanDaysWhenDismissed: 1,
+		CreateAllyDaysWhenDissolved: 10, MaxClansInAlly: 3,
+	}
 }
 
 // IDAllocator hands out object ids; a new clan's id comes from the same
@@ -61,6 +81,11 @@ type Service struct {
 	// subunitMu serializes sub-unit foundings, whose names are unique
 	// across every clan.
 	subunitMu sync.Mutex
+	// allyMu serializes every alliance change, and war declarations
+	// against alliance acceptances: the clans of an alliance and the
+	// alliance names stay fixed while it is held. It is taken before any
+	// clan's mu.
+	allyMu sync.Mutex
 }
 
 // NewService returns a Service over table. Writes go to store through

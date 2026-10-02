@@ -16,6 +16,7 @@ type InviteKind int
 // The invitation kinds.
 const (
 	InviteJoinPledge InviteKind = iota + 1
+	InviteJoinAlly
 )
 
 // Invite is one side's view of a pending invitation.

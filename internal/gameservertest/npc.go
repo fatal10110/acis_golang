@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
@@ -73,12 +74,15 @@ func (s *Server) SpawnHostileNPCTemplateAt(t *testing.T, tmpl *npc.Template, at 
 }
 
 // killRewards is the fixture kill-reward config: the suite's level table,
-// stock x1 drop rates, the stock party range, and the suite's drop gates.
+// stock x1 drop rates, the stock party range and party exp rules, the
+// suite's drop gates, and the server's parties.
 func (s *Server) killRewards() gamemanager.KillRewardConfig {
 	return gamemanager.KillRewardConfig{
 		PlayerLevels:      s.levelTable,
 		Rates:             item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1},
 		PartyRange:        1500,
+		PartyXP:           player.PartyXPRules{Cutoff: player.PartyXPCutoffLevel, CutoffLevel: 20, CutoffPercent: 3, RateXP: 1, RateSP: 1},
+		Parties:           s.rewardParties,
 		DeepBlueDropRules: s.deepBlueDrops,
 		AutoLoot:          s.autoLoot,
 	}
@@ -497,27 +501,52 @@ func (s *Server) TickEffects() {
 // intervals.
 func (s *Server) TickPositions() {
 	if s.queues.advanceThen != nil {
-		if err := s.catchUp(); err != nil {
+		if err := s.tickPositionsDriven(move.PositionUpdateInterval); err != nil {
 			panic(err)
 		}
-		s.queues.advanceThen(move.PositionUpdateInterval, s.positions.Tick)
-	} else {
-		s.positionTicks.Lock()
-		next := s.positionTicks.last.Add(move.PositionUpdateInterval)
-		if now := time.Now(); next.Before(now) {
-			next = now.Add(move.PositionUpdateInterval)
-		}
-		time.Sleep(time.Until(next))
-		if err := s.awaitHandled(); err != nil {
-			panic(err)
-		}
-		s.positionTicks.last = time.Now()
-		s.positions.Tick()
-		s.positionTicks.Unlock()
+		return
 	}
+	s.positionTicks.Lock()
+	next := s.positionTicks.last.Add(move.PositionUpdateInterval)
+	if now := time.Now(); next.Before(now) {
+		next = now.Add(move.PositionUpdateInterval)
+	}
+	time.Sleep(time.Until(next))
+	if err := s.awaitHandled(); err != nil {
+		panic(err)
+	}
+	s.positionTicks.last = time.Now()
+	s.positions.Tick()
+	s.positionTicks.Unlock()
 	if err := s.queues.settle(); err != nil {
 		panic(err)
 	}
+}
+
+// TickPositionsAfter is TickPositions on the driven clock with d, rather
+// than one interval, passing before the tick, so a test can pin how a
+// player's update walks an uneven gap such as the real pool's scheduling
+// jitter. It fails the test on the real pool, whose ticks keep the
+// production ticker's fixed rate.
+func (s *Server) TickPositionsAfter(tb testing.TB, d time.Duration) {
+	tb.Helper()
+	if s.queues.advanceThen == nil {
+		tb.Fatal("TickPositionsAfter needs the driven clock")
+	}
+	if err := s.tickPositionsDriven(d); err != nil {
+		tb.Fatal(err)
+	}
+}
+
+// tickPositionsDriven moves the driven clock by d, runs one production
+// movement-correction tick ahead of the timers due at that instant, and
+// waits for the posted ticks to run.
+func (s *Server) tickPositionsDriven(d time.Duration) error {
+	if err := s.catchUp(); err != nil {
+		return err
+	}
+	s.queues.advanceThen(d, s.positions.Tick)
+	return s.queues.settle()
 }
 
 // parkedMove is a MoveController that never moves.

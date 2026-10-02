@@ -11,7 +11,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // SendFrame sends frame to this player's client. Once the session has
@@ -215,6 +214,9 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.feedMountFood(live, e.ObjectID)
 	case event.Dismounted:
 		l.broadcastDismount(live)
+		if e.PetControlItemID != 0 {
+			l.storePetFood(e.PetControlItemID, e.Fed)
+		}
 	case event.MountOutOfFeed:
 		l.throwStarvedRider(live, e.WasFlying)
 	case event.UserInfoChanged:
@@ -405,15 +407,11 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.CastAborted:
 		l.broadcastCastAborted(live)
 	case event.CastStopAck:
-		sendMagicActionFailed(live)
+		live.endCastStop(e)
 	case event.SkillMasteryProc:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSkillReadyToUseAgain))
 	case event.CastFinished:
 		l.finishLiveCast(live, e.Skill, e.Target, e.Interrupted)
-		// An interrupt reports itself after everything its stop answered.
-		if e.Broken {
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCastingInterrupted))
-		}
 	case event.PetSummonRequested:
 		if controlItem, ok := e.ControlItem.(*item.Instance); ok {
 			(&gameSummonSpawner{link: l, live: live}).SpawnPet(live.Character, controlItem)
@@ -472,17 +470,7 @@ func (l *GameClientLink) sendLiveWeightPenalty(live *livePlayer) {
 	items := live.inventoryItems()
 	live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 	live.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(live.Character)))
-	if l.world == nil {
-		return
-	}
-	info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.Template(), Items: items, Clan: l.clanFields(live.Character)}
-	broadcastFrame(func() wire.Frame { return serverpackets.FrameCharInfo(info) }, func(send func(frameReceiver)) {
-		l.world.ForEachKnown(live, func(o world.Tracked) {
-			if receiver, ok := o.(frameReceiver); ok {
-				send(receiver)
-			}
-		})
-	})
+	l.broadcastCharInfo(live, items)
 }
 
 // applyLiveDeathPenalty replaces the death-penalty skill's transient passive
@@ -524,7 +512,11 @@ func (l *GameClientLink) finishQueuedBehindAttack(live *livePlayer) bool {
 // finishLiveCast resumes live's intentions once an in-flight cast of def on
 // target ends. A stopped cast reports its end while it still counts as in
 // flight, so a skill or item cast queued behind it is refused the way a cast
-// requested mid-cast is: it is dropped, going idle, with ActionFailed.
+// requested mid-cast is: it is dropped, going idle, with ActionFailed. An
+// attack, queued or the stopped cast's nextActionAttack follow-up, likewise
+// finds the cast in flight: it swings nothing, and a target in reach is
+// answered with ActionFailed. Any other queued intention runs as usual; the
+// stop's own idle (endCastStop) then ends whatever walk it started.
 func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definition, target attackable.Combatant, stopped bool) {
 	if stopped && live.dropDeferredCast() {
 		sendMagicActionFailed(live)
@@ -557,13 +549,28 @@ func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definit
 	if live.combat == nil {
 		return
 	}
-	if resumed, actionFailed := live.combat.ResumeAfterCast(); resumed {
+	if resumed, actionFailed := live.combat.ResumeAfterCast(stopped); resumed {
 		if actionFailed {
 			live.SendFrame(serverpackets.FrameActionFailed())
 		}
 		return
 	}
-	live.endCastIntention(def, target)
+	live.endCastIntention(def, target, stopped)
+}
+
+// endCastStop ends a cast stop, once the stopped cast's end has run: a stop
+// that ended a cast in flight, or that reached a player unable to act, idles
+// it; then the stop answers ActionFailed, and an interrupt reports itself
+// last. An idle refused for a player unable to act answers ActionFailed of
+// its own and leaves every intention in place.
+func (live *livePlayer) endCastStop(e event.CastStopAck) {
+	if denied := live.Character.DenyAIActionBeforeEffect(); e.InFlight || denied {
+		live.tryToIdle(denied)
+	}
+	sendMagicActionFailed(live)
+	if e.Broken {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCastingInterrupted))
+	}
 }
 
 func (l *GameClientLink) finishDeferredAction(live *livePlayer) bool {
@@ -586,13 +593,14 @@ func (l *GameClientLink) finishDeferredAction(live *livePlayer) bool {
 // endCastIntention ends the CAST intention a cast of def on target held,
 // with nothing queued behind it: a skill carrying nextActionAttack attacks
 // target when live may attack it without force, held with the cast's shift
-// modifier; anything else, a toggle included, goes idle.
-func (live *livePlayer) endCastIntention(def modelskill.Definition, target attackable.Combatant) {
+// modifier; anything else, a toggle included, goes idle. A stopped cast
+// still counts as in flight for that attack (attackAfterCast).
+func (live *livePlayer) endCastIntention(def modelskill.Definition, target attackable.Combatant, stopped bool) {
 	if live.combat == nil {
 		return
 	}
 	_, shift := live.Character.CastModifiers()
-	if live.attackAfterCast(def, target, shift) {
+	if live.attackAfterCast(def, target, shift, stopped) {
 		return
 	}
 	live.combat.Stop()
@@ -602,8 +610,9 @@ func (live *livePlayer) endCastIntention(def modelskill.Definition, target attac
 // final target, once its cast ends or is refused at its cost and condition
 // checks, held with the cast's shift modifier: a shift-held follow-up never
 // walks. It reports false, starting nothing, for any other skill, or a
-// target live may not attack without force.
-func (live *livePlayer) attackAfterCast(def modelskill.Definition, target attackable.Combatant, shift bool) bool {
+// target live may not attack without force. After a stopped cast the attack
+// is thought as if the cast were still in flight: it swings nothing.
+func (live *livePlayer) attackAfterCast(def modelskill.Definition, target attackable.Combatant, shift, stopped bool) bool {
 	if live.combat == nil || !def.NextActionIsAttack || target == nil {
 		return false
 	}
@@ -611,7 +620,7 @@ func (live *livePlayer) attackAfterCast(def modelskill.Definition, target attack
 	if !ok || !rules.AttackableWithoutForceBy(live.Character) {
 		return false
 	}
-	if live.combat.AttackAfterCast(target, shift) {
+	if live.combat.AttackAfterCast(target, shift, stopped) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 	}
 	return true
@@ -620,8 +629,10 @@ func (live *livePlayer) attackAfterCast(def modelskill.Definition, target attack
 // stopLiveActions stops what e names in target, movement, attack, cast
 // order. Clearing the target leaves the intentions alone. Stopping the
 // attack sends the character idle, then answers ActionFailed; stopping the
-// cast answers MagicSkillCanceled (when one was running) and ActionFailed,
-// then sends the character idle.
+// cast answers MagicSkillCanceled (when one was running), sends the
+// character idle and answers ActionFailed. The cast stop idles the
+// character itself (endCastStop) unless it ended no cast and the character
+// can still act; that idle runs here.
 func (l *GameClientLink) stopLiveActions(live *livePlayer, e event.ActionsStopRequested) {
 	if e.ClearTarget {
 		old := live.Target()
@@ -637,8 +648,9 @@ func (l *GameClientLink) stopLiveActions(live *livePlayer, e event.ActionsStopRe
 		live.SendFrame(serverpackets.FrameActionFailed())
 	}
 	if e.Cast {
-		live.StopCast()
-		live.tryToIdle(e.AIDenied)
+		if !live.stopCastInFlight() && !live.Character.DenyAIActionBeforeEffect() {
+			live.tryToIdle(false)
+		}
 	}
 }
 

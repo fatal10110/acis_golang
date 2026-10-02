@@ -45,10 +45,14 @@ var chatHandlers = map[chat.Type]chatHandler{
 	chat.Tell:               (*GameClientLink).chatTell,
 	chat.Party:              (*GameClientLink).chatParty,
 	chat.Clan:               (*GameClientLink).chatClan,
+	chat.Alliance:           (*GameClientLink).chatAlliance,
 	chat.Trade:              (*GameClientLink).chatTrade,
+	chat.PartyMatchRoom:     (*GameClientLink).chatPartyMatchRoom,
 	chat.PartyRoomCommander: (*GameClientLink).chatChannelCommander,
 	chat.PartyRoomAll:       (*GameClientLink).chatChannelAll,
 	chat.HeroVoice:          (*GameClientLink).chatHeroVoice,
+	chat.PetitionPlayer:     (*GameClientLink).chatPetition,
+	chat.PetitionGM:         (*GameClientLink).chatPetition,
 }
 
 // handleSay2 delivers a chat line live says. A line the chat rules drop,

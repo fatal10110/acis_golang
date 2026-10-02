@@ -19,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/social/petition"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver/model"
@@ -81,6 +82,7 @@ type gameplayConfig struct {
 	AugmentationChances      augmentation.Chances
 	Admin                    adminConfig
 	Chat                     chatConfig
+	Petition                 petition.Config
 }
 
 // loadGameplayConfig reads every gameplay knob through the loader that owns
@@ -210,6 +212,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.Chat, err = loadChatConfig(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.Petition, err = loadPetitionConfig(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	return cfg, nil
@@ -940,6 +945,10 @@ func provideKillRewardConfig(paths gameServerPaths, serverProps *config.Properti
 	if err != nil {
 		return manager.KillRewardConfig{}, err
 	}
+	partyXP, err := partyXPRules(playersProps, serverProps)
+	if err != nil {
+		return manager.KillRewardConfig{}, err
+	}
 
 	return manager.KillRewardConfig{
 		Rates: item.Rates{
@@ -955,6 +964,35 @@ func provideKillRewardConfig(paths gameServerPaths, serverProps *config.Properti
 		DeepBlueDropRules: playersProps.Bool("UseDeepBlueDropRules", true),
 		PlayerLevels:      data.Levels,
 		PartyRange:        partyRange,
+		PartyXP:           partyXP,
+	}, nil
+}
+
+// partyXPRules reads how a party shares a kill: the cutoff from the players
+// file, the party rates from the server file.
+func partyXPRules(playersProps, serverProps *config.Properties) (player.PartyXPRules, error) {
+	cutoffLevel, err := playersProps.Int("PartyXpCutoffLevel", 20)
+	if err != nil {
+		return player.PartyXPRules{}, err
+	}
+	cutoffPercent, err := playersProps.Float64("PartyXpCutoffPercent", 3)
+	if err != nil {
+		return player.PartyXPRules{}, err
+	}
+	rateXP, err := serverProps.Float64("RatePartyXp", 1)
+	if err != nil {
+		return player.PartyXPRules{}, err
+	}
+	rateSP, err := serverProps.Float64("RatePartySp", 1)
+	if err != nil {
+		return player.PartyXPRules{}, err
+	}
+	return player.PartyXPRules{
+		Cutoff:        player.ParsePartyXPCutoff(playersProps.String("PartyXpCutoffMethod", "level")),
+		CutoffLevel:   cutoffLevel,
+		CutoffPercent: cutoffPercent,
+		RateXP:        rateXP,
+		RateSP:        rateSP,
 	}, nil
 }
 

@@ -83,6 +83,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x1f: true, // buy item
 		0x20: true, // request linked html
 		0x21: true, // request bypass command
+		0x22: true, // community board write
 		0x23: true, // dummy packet
 		0x24: true, // invite into a clan
 		0x25: true, // answer a clan invitation
@@ -121,6 +122,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x51: true, // surrender a clan war
 		0x52: true, // answer a surrender proposal
 		0x53: true, // upload pledge crest
+		0x57: true, // open the community board
 		0x58: true, // enchant item
 		0x59: true, // destroy item
 		0x5b: true, // admin command typed in chat
@@ -137,18 +139,30 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x6b: true, // acquire skill info
 		0x6c: true, // acquire skill
 		0x6d: true, // restart point
+		0x6f: true, // party matching: open the window
+		0x70: true, // party matching: open or revise a room
+		0x71: true, // party matching: enter a room
 		0x72: true, // crystallize item
 		0x73: true, // private store sell: manage
 		0x74: true, // private store sell: set list
 		0x76: true, // private store sell: quit
 		0x77: true, // private store sell: set title
 		0x79: true, // buy from a private store
+		0x7f: true, // send a petition
+		0x80: true, // cancel or leave a petition
 		0x81: true, // online game-master list
+		0x82: true, // invite a clan into the alliance
+		0x83: true, // answer an alliance invitation
+		0x84: true, // leave the alliance
+		0x85: true, // dismiss a clan from the alliance
+		0x86: true, // dissolve the alliance
+		0x87: true, // upload alliance crest
 		0x88: true, // request ally crest
 		0x89: true, // change pet name
 		0x8a: true, // pet use item
 		0x8b: true, // give item to pet
 		0x8c: true, // get item from pet
+		0x8e: true, // alliance information
 		0x8f: true, // pet get item
 		0x90: true, // private store buy: manage
 		0x91: true, // private store buy: set list
@@ -161,6 +175,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x9f: true, // package send
 		0xa0: true, // block list commands
 		0xa7: true, // multisell exchange
+		0xaa: true, // user command
 		0xac: true, // open recipe book
 		0xad: true, // delete a recipe
 		0xae: true, // recipe craft window
@@ -183,6 +198,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0xc2: true, // delete a macro
 		0xc5: true, // dialog answer
 		0xc6: true, // try on merchant items
+		0xc8: true, // rate a closed petition
 		0xca: true, // game guard reply
 		0xcc: true, // friend message
 		0xcd: true, // show mini map

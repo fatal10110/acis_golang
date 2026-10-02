@@ -27,10 +27,21 @@ func MountTypeOf(npcID int32) int32 {
 // wyvern flies and gives its rider Wyvern Breath for as long as it is
 // ridden; the skill is not stored.
 func (c *Character) Mount(npcID, controlItemID int32) bool {
+	return c.mount(npcID, controlItemID, c.Level())
+}
+
+// MountPet records riding the pet npcID of level petLevel, called by its
+// collar controlItemID: the mount takes the pet's level, not the rider's,
+// for its pet data row and the level gap to its rider.
+// StartPetMountFeed starts feeding it.
+func (c *Character) MountPet(npcID, controlItemID int32, petLevel int) bool {
+	return c.mount(npcID, controlItemID, petLevel)
+}
+
+func (c *Character) mount(npcID, controlItemID int32, level int) bool {
 	if npcID <= 0 || controlItemID <= 0 {
 		return false
 	}
-	level := c.Level()
 	c.stateMu.Lock()
 	c.initStateLocked()
 	if c.mountNPCID == npcID && c.mountObjectID == controlItemID {
@@ -47,7 +58,7 @@ func (c *Character) Mount(npcID, controlItemID int32) bool {
 	if flying {
 		c.SetSkillLevel(int(modelskill.WyvernBreathSkillID), 1)
 	}
-	c.loadMountFeed(npcID)
+	c.loadMountFeed(npcID, level)
 	c.refreshMoveSpeed()
 	return true
 }
