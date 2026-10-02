@@ -12,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -156,14 +157,7 @@ func actingCharacter(c attackable.Combatant) (*player.Character, bool) {
 // inPartyRange reports whether c is within the party range of the victim,
 // body to body in 3D. A range of -1 is unlimited.
 func (d *deathRewards) inPartyRange(c attackable.Combatant) bool {
-	if d.config.PartyRange == -1 {
-		return true
-	}
-	hx, hy, hz := d.hostile.Position()
-	cx, cy, cz := c.Position()
-	dx, dy, dz := int64(hx-cx), int64(hy-cy), int64(hz-cz)
-	reach := float64(d.config.PartyRange) + d.hostile.CollisionRadius() + c.CollisionRadius()
-	return float64(dx*dx+dy*dy+dz*dz) <= reach*reach
+	return party.InRange(d.config.PartyRange, d.hostile, c)
 }
 
 func (d *deathRewards) rollDrops(receiver attackable.Combatant, attackerLevel int) {

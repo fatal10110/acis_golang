@@ -94,6 +94,7 @@ func provideGameClientLink(
 	effects *network.TaskEffects,
 	effectEnv effect.Env,
 	gameplay gameplayConfig,
+	rewards manager.KillRewardConfig,
 	petCfg pet.Config,
 	petStore *gamesql.PetStore,
 	worker *persist.Worker,
@@ -149,7 +150,7 @@ func provideGameClientLink(
 		GMStartupInvulnerable:      gameplay.Admin.GMStartupInvulnerable,
 		GMStartupInvisible:         gameplay.Admin.GMStartupInvisible,
 		GMStartupBlockAll:          gameplay.Admin.GMStartupBlockAll,
-		PartyRange:                 int(gameplay.PartyRange),
+		PartyRange:                 rewards.PartyRange,
 	}
 	link, err := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,

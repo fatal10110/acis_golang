@@ -10,29 +10,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 )
 
-// defaultPartyRange is the shipped players.properties PartyRange.
-const defaultPartyRange = 1500
-
-// partyLootRange is how near the loot a member must be to share it.
-func (l *GameClientLink) partyLootRange() int {
-	if l.playerConfig.PartyRange == 0 {
-		return defaultPartyRange
-	}
-	return l.playerConfig.PartyRange
-}
-
 // inPartyLootRange reports whether m is within party range of origin, body
-// to body in 3D. A range of -1 is unlimited.
+// to body in 3D.
 func (l *GameClientLink) inPartyLootRange(origin party.LootOrigin, m *livePlayer) bool {
-	r := l.partyLootRange()
-	if r == -1 {
-		return true
-	}
-	ox, oy, oz := origin.Position()
-	mx, my, mz := m.Position()
-	dx, dy, dz := int64(ox-mx), int64(oy-my), int64(oz-mz)
-	reach := float64(r) + origin.CollisionRadius() + m.CollisionRadius()
-	return float64(dx*dx+dy*dy+dz*dz) <= reach*reach
+	return party.InRange(l.playerConfig.PartyRange, origin, m)
 }
 
 // partyLootEligible accepts a member that may take one itemID from origin

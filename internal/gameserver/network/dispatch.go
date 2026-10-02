@@ -236,7 +236,7 @@ type PlayerConfig struct {
 	// config does.
 	KeepMaintainedIngredients bool
 	// PartyRange is how near the loot a party member must be to share it,
-	// body to body; -1 is unlimited, and 0 the shipped 1500.
+	// body to body; -1 is unlimited. It is the kill reward's party range.
 	PartyRange int
 }
 

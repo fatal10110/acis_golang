@@ -2,10 +2,7 @@ package party
 
 // LootOrigin is where loot came from: a member shares it only within party
 // range of it, body to body.
-type LootOrigin interface {
-	Position() (x, y, z int)
-	CollisionRadius() float64
-}
+type LootOrigin = Body
 
 // Looter picks the member who takes an item pickerID looted, by its
 // party's loot rule. Finders-keepers leaves it with the picker, as do the
