@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -76,5 +77,43 @@ func TestFavoritesBoard(t *testing.T) {
 		if frames := command(t, p.alice, cmd); len(frames) != 0 {
 			t.Fatalf("%s answer = %x, want silence", cmd, opcodes(frames))
 		}
+	}
+}
+
+// TestFavoritesBoardUnreadableRow pins a stored favorite missing its
+// title, bypass or date: its owner's favorites board shows nothing, after
+// an add too, which is still stored, while another character's board
+// still shows, its own add included.
+func TestFavoritesBoardUnreadableRow(t *testing.T) {
+	for _, row := range []string{
+		"NULL, '_bbsclan', '2026-01-05 14:07:09'",
+		"'Mine', NULL, '2026-01-05 14:07:09'",
+		"'Mine', '_bbsclan', NULL",
+	} {
+		t.Run(row, func(t *testing.T) {
+			seed := gameservertest.WithBoardSeed(func(db *sql.DB) {
+				if _, err := db.ExecContext(context.Background(), `INSERT INTO bbs_favorite (id, player_id, title, bypass, date)
+					SELECT 7, obj_Id, `+row+` FROM characters WHERE char_name = 'Alice'`); err != nil {
+					t.Fatalf("seed favorites: %v", err)
+				}
+			})
+			p := bootPair(t, gameservertest.WithCommunityBoard(boardOn), seed)
+			p.enterAll(t)
+
+			for _, cmd := range []string{"_bbsgetfav", "_bbsgetfav_add"} {
+				if frames := command(t, p.alice, cmd); len(frames) != 0 {
+					t.Fatalf("%s with an unreadable favorite answer = %x, want silence", cmd, opcodes(frames))
+				}
+			}
+			assertPage(t, command(t, p.bobby, "_bbsgetfav"), "FAVORITES \n")
+			frames := command(t, p.bobby, "_bbsgetfav_add")
+			rows := favoriteRows(t, p.srv)
+			alice := "8|" + strconv.Itoa(int(p.aliceID)) + "|Testing favorites|_bbshome|"
+			bobby := "9|" + strconv.Itoa(int(p.bobbyID)) + "|Testing favorites|_bbshome|"
+			if len(rows) != 3 || !strings.HasPrefix(rows[1], alice) || !strings.HasPrefix(rows[2], bobby) {
+				t.Fatalf("bbs_favorite = %q, want Alice's add as 8 and Bobby's as 9", rows)
+			}
+			assertPage(t, frames, "FAVORITES ROW 9|_bbshome|Testing favorites|"+rows[2][len(bobby):]+";\n\n")
+		})
 	}
 }

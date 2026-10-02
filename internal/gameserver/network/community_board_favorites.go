@@ -23,7 +23,7 @@ func (l *GameClientLink) boardFavorites(live *livePlayer, command string) {
 		if len(tokens) < 3 {
 			return
 		}
-		id, ok := boardInt(tokens[2])
+		id, ok := parseJavaInt(tokens[2])
 		if !ok {
 			return
 		}
