@@ -120,10 +120,10 @@ func (a authorityClan) option(t *testing.T) gameservertest.Option {
 }
 
 // bootAuthority boots one client per seat as bootGroup does, Leader being
-// the first, with Leader's clan stored and, when guide is set, a Strategy
-// Guide in Leader's inventory before it enters the world. It returns the
-// guide's object id (0 without one).
-func bootAuthority(t *testing.T, seats []seat, clan authorityClan, guide bool) (*group, int32) {
+// the first, with Leader's clan stored and guides Strategy Guides (each
+// its own item, the guide not stacking) in Leader's inventory before it
+// enters the world. It returns the first guide's object id (0 without one).
+func bootAuthority(t *testing.T, seats []seat, clan authorityClan, guides int) (*group, int32) {
 	t.Helper()
 	opts := append([]gameservertest.Option{
 		gameservertest.WithCharacter(seats[0].name, seats[0].level, 0),
@@ -134,8 +134,11 @@ func bootAuthority(t *testing.T, seats []seat, clan authorityClan, guide bool) (
 	srv := gameservertest.Boot(t, opts...)
 	leaderID := srv.SoleObjectID(t)
 	var guideID int32
-	if guide {
-		guideID = srv.GiveItem(t, leaderID, strategyGuideID, 1)
+	for i := range guides {
+		id := srv.GiveItem(t, leaderID, strategyGuideID, 1)
+		if i == 0 {
+			guideID = id
+		}
 	}
 	g := &group{srv: srv, players: []player{{c: srv.Client, id: leaderID, name: seats[0].name}}}
 	for i, s := range seats[1:] {
@@ -239,7 +242,7 @@ func assertPartyInfoUpdate(t *testing.T, frames [][]byte, name string, leaderID,
 // disbands the channel. Nothing is taken from the leader.
 func TestChannelFormsWithClanImperium(t *testing.T) {
 	g, _ := bootAuthority(t, []seat{{"Leader", 40}, {"Member", 30}, {"Other", 40}, {"Fourth", 50}, {"Fifth", 30}, {"Sixth", 30}},
-		authorityClan{level: 5, leads: true, skills: []int{clanImperiumID}}, false)
+		authorityClan{level: 5, leads: true, skills: []int{clanImperiumID}}, 0)
 	g.invite(t, 0, 1, 0)
 	g.invite(t, 2, 3, 0)
 	g.invite(t, 4, 5, 0)
@@ -294,7 +297,7 @@ func TestChannelFormsWithClanImperium(t *testing.T) {
 // the formation.
 func TestChannelFormsWithStrategyGuide(t *testing.T) {
 	g, guideID := bootAuthority(t, []seat{{"Leader", 40}, {"Member", 30}, {"Other", 40}, {"Fourth", 50}},
-		authorityClan{level: 5, leads: true}, true)
+		authorityClan{level: 5, leads: true}, 1)
 	g.invite(t, 0, 1, 0)
 	g.invite(t, 2, 3, 0)
 
@@ -333,12 +336,70 @@ func TestChannelFormsWithStrategyGuide(t *testing.T) {
 	}
 }
 
+// heldGuides counts the Strategy Guides in the leader's live inventory.
+func heldGuides(t *testing.T, g *group) int {
+	t.Helper()
+	return g.srv.PlayerInventory(t, g.players[0].id).ItemCount(strategyGuideID, -1, false)
+}
+
+// TestChannelGuidePaidOnlyOnFormation: a guide-only leader holding two
+// guides pays one to form the channel; inviting a further party needs a
+// guide in hand but adding that party to the standing channel takes
+// nothing. A leader whose last guide went on the formation can invite no
+// one more.
+func TestChannelGuidePaidOnlyOnFormation(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		guides int
+	}{
+		{"second guide in hand", 2},
+		{"last guide spent", 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			g, _ := bootAuthority(t, []seat{{"Leader", 40}, {"Member", 30}, {"Other", 40}, {"Fourth", 50}, {"Fifth", 30}, {"Sixth", 30}},
+				authorityClan{level: 5, leads: true}, tc.guides)
+			g.invite(t, 0, 1, 0)
+			g.invite(t, 2, 3, 0)
+			g.invite(t, 4, 5, 0)
+
+			formed := g.askAndAccept(t, 0, 2)
+			assertEvents(t, events(t, formed[0]), []int{msgS1Disappeared, msgFormed, ext(subOpenMPCC)}, "Leader formation")
+			g.srv.InventoryUpdates.Tick()
+			assertEvents(t, events(t, drainFrames(t, g.players[0].c)), []int{evInventoryUpdate}, "Leader formation inventory update")
+			if n := heldGuides(t, g); n != tc.guides-1 {
+				t.Fatalf("guides after the formation = %d, want %d", n, tc.guides-1)
+			}
+			g.quiet(t)
+
+			if tc.guides == 1 {
+				g.players[0].c.Send(encodeExtendedName(clientpackets.OpcodeRequestExAskJoinMPCC, "Fifth"))
+				assertStaticSystemMessage(t, skipPositions(g.players[0].c), msgCannotSetup)
+				for _, p := range g.players[1:] {
+					assertSilent(t, p.c, p.name+" after a refused invitation")
+				}
+				return
+			}
+
+			joined := g.askAndAccept(t, 0, 4)
+			assertEvents(t, events(t, joined[0]), []int{ext(subPartyInfoMPCCU)}, "Leader third party")
+			for i := 4; i < 6; i++ {
+				assertEvents(t, events(t, joined[i]), []int{msgJoined, ext(subOpenMPCC)}, g.players[i].name+" third party")
+			}
+			g.srv.InventoryUpdates.Tick()
+			assertSilent(t, g.players[0].c, "Leader inventory after the third party joins")
+			if n := heldGuides(t, g); n != 1 {
+				t.Fatalf("guides after the third party joins = %d, want 1", n)
+			}
+		})
+	}
+}
+
 // TestChannelGuideGoneByTheAnswer: a guide held at the invitation but
 // destroyed before the answer leaves nothing to pay with; the leader is
 // told so twice over and no channel forms.
 func TestChannelGuideGoneByTheAnswer(t *testing.T) {
 	g, guideID := bootAuthority(t, []seat{{"Leader", 40}, {"Member", 30}, {"Other", 40}, {"Fourth", 50}},
-		authorityClan{level: 5, leads: true}, true)
+		authorityClan{level: 5, leads: true}, 1)
 	g.invite(t, 0, 1, 0)
 	g.invite(t, 2, 3, 0)
 
@@ -372,17 +433,17 @@ func TestChannelGuideGoneByTheAnswer(t *testing.T) {
 // leader may. Nobody is asked.
 func TestChannelAuthorityRefusals(t *testing.T) {
 	for _, tc := range []struct {
-		name  string
-		clan  authorityClan
-		guide bool
-		want  int
+		name   string
+		clan   authorityClan
+		guides int
+		want   int
 	}{
-		{"no skill, no guide", authorityClan{level: 5, leads: true}, false, msgCannotSetup},
-		{"not the clan leader", authorityClan{level: 5, skills: []int{clanImperiumID}}, true, msgOnlyLevel5},
-		{"level 4 clan", authorityClan{level: 4, leads: true}, true, msgOnlyLevel5},
+		{"no skill, no guide", authorityClan{level: 5, leads: true}, 0, msgCannotSetup},
+		{"not the clan leader", authorityClan{level: 5, skills: []int{clanImperiumID}}, 1, msgOnlyLevel5},
+		{"level 4 clan", authorityClan{level: 4, leads: true}, 1, msgOnlyLevel5},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			g, _ := bootAuthority(t, []seat{{"Leader", 40}, {"Member", 30}, {"Other", 40}, {"Fourth", 50}}, tc.clan, tc.guide)
+			g, _ := bootAuthority(t, []seat{{"Leader", 40}, {"Member", 30}, {"Other", 40}, {"Fourth", 50}}, tc.clan, tc.guides)
 			g.invite(t, 0, 1, 0)
 			g.invite(t, 2, 3, 0)
 			g.players[0].c.Send(encodeExtendedName(clientpackets.OpcodeRequestExAskJoinMPCC, "Other"))
