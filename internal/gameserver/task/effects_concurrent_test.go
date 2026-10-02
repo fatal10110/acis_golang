@@ -68,7 +68,7 @@ func TestEffectsConcurrentAddRemoveTick(t *testing.T) {
 	// (Tick draining an expiring effect while a skill lands a new one) and
 	// leave a live list unregistered, or an empty one registered, forever.
 	for i, list := range lists {
-		registered := e.contains(list)
+		registered := e.contains(list, list)
 		active := len(list.All()) > 0
 		if registered != active {
 			t.Errorf("list %d: registered=%v, active=%v (holds %d effects) — registration out of sync with contents", i, registered, active, len(list.All()))
@@ -95,7 +95,7 @@ func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 
 	leftover := newQueuedList(benchNoopStatOwner{}, effect.WithEnv(effect.Env{Activity: e}))
 	leftover.Add(newEffect(1))
-	if !e.contains(leftover) {
+	if !e.contains(leftover, leftover) {
 		t.Fatal("leftover list not registered after Add")
 	}
 	other := NewEffects()
@@ -104,20 +104,20 @@ func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 
 	e.Reset()
 
-	if e.contains(leftover) {
+	if e.contains(leftover, leftover) {
 		t.Fatal("leftover list still registered after Reset")
 	}
 	if len(leftover.All()) != 1 {
 		t.Fatalf("Reset touched leftover's contents: %d effects, want 1", len(leftover.All()))
 	}
-	if !other.contains(otherList) {
+	if !other.contains(otherList, otherList) {
 		t.Fatal("Reset on one registry removed a list from another registry")
 	}
 
 	// Reset is teardown: a straggling Add on a reset list must not bring it
 	// back into the registry.
 	leftover.Add(newEffect(3))
-	if e.contains(leftover) {
+	if e.contains(leftover, leftover) {
 		t.Fatal("a list reset at teardown re-registered on a later Add")
 	}
 
@@ -126,7 +126,7 @@ func TestEffectsResetClearsRegistrationsAcrossOwners(t *testing.T) {
 	// registry into a state that rejects further registrations.
 	next := newQueuedList(benchNoopStatOwner{}, effect.WithEnv(effect.Env{Activity: e}))
 	next.Add(newEffect(2))
-	if !e.contains(next) {
+	if !e.contains(next, next) {
 		t.Fatal("a list added after Reset failed to register")
 	}
 
@@ -155,7 +155,7 @@ func TestEffectsUntrackedListStaysOutAfterStragglerTask(t *testing.T) {
 	first := newEffect(1)
 	list.Add(first)
 	list.Add(newEffect(2))
-	if !e.contains(list) {
+	if !e.contains(list, list) {
 		t.Fatal("list not registered after Add")
 	}
 
@@ -169,7 +169,7 @@ func TestEffectsUntrackedListStaysOutAfterStragglerTask(t *testing.T) {
 	if got := len(list.All()); got != 2 {
 		t.Fatalf("straggler tasks did not run: list holds %d effects, want 2", got)
 	}
-	if e.contains(list) {
+	if e.contains(list, list) {
 		t.Fatal("untracked list re-registered from a task accepted before its queue closed")
 	}
 }

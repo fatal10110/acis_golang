@@ -36,7 +36,7 @@ func (e *Effects) SetActive(list *effect.List, active bool) {
 	if active {
 		e.add(list, list)
 	} else {
-		e.remove(list)
+		e.remove(list, list)
 	}
 }
 
