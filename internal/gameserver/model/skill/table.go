@@ -86,3 +86,19 @@ func (t *Table) All() []Definition {
 	})
 	return defs
 }
+
+// TopLevels returns, for every skill id with a regular (non-enchant) level
+// loaded, the definition at its highest regular level, ordered by id.
+func (t *Table) TopLevels() []Definition {
+	if t == nil {
+		return nil
+	}
+	defs := make([]Definition, 0, len(t.max))
+	for id, level := range t.max {
+		if level > 0 {
+			defs = append(defs, t.byID[id][level])
+		}
+	}
+	sort.Slice(defs, func(i, j int) bool { return defs[i].ID < defs[j].ID })
+	return defs
+}

@@ -151,8 +151,7 @@ func TestAdminSkillSetAll(t *testing.T) {
 
 // TestAdminSkillPage pins //skill's other ported forms: no argument or a
 // page number opens the GM's own skill page, a page below 1 opens nothing,
-// "set" alone answers the usage then the page, and the sub-commands still
-// to port release the client.
+// "set" alone answers the usage then the page.
 func TestAdminSkillPage(t *testing.T) {
 	t.Parallel()
 	srv, _ := bootSkillAdmin(t)
@@ -171,10 +170,4 @@ func TestAdminSkillPage(t *testing.T) {
 	}
 	assertTexts(t, frames[:1], "Usage: //skill set id level [page]")
 	assertPage(t, frames[1:], skillRow(freeSkill, "Free", 1))
-	for _, command := range []string{"skill list", "skill set 1001 1", "skill remove all"} {
-		frames := exchange(t, gm, encodeBuildCmd(command))
-		if len(frames) != 1 || frames[0][0] != serverpackets.OpcodeActionFailed {
-			t.Fatalf("//%s frames = %x, want ActionFailed", command, testsupport.FrameOpcodes(frames))
-		}
-	}
 }

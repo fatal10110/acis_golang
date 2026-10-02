@@ -510,28 +510,23 @@ func (l *GameClientLink) refreshLiveLevelSkills(live *livePlayer) {
 	if l.skills == nil || live == nil {
 		return
 	}
-	rewarding := l.playerConfig.AutoLearnSkills
 	before := live.SkillLevels()
 	if err := l.giveOrRewardSkills(live.Character, live.Template()); err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("level change: refresh level skills")
 	}
 	live.RefreshExpertisePenalty()
-	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 
 	// RewardSkills' grant loop refreshes shortcuts only for skills its own
 	// filter (known level below the granted level) restricts to level
 	// increases; GiveSkills never refreshes them, and RewardSkills' own
 	// pull-back correction (correctInvalidSkills) does not either. So only
-	// an actual level increase refreshes shortcuts; a pull-back's level
-	// decrease must not.
-	if rewarding {
-		after := live.SkillLevels()
-		for id, level := range after {
-			if level > before[id] {
-				l.refreshSkillShortcuts(live, int32(id), int32(level))
-			}
-		}
+	// an actual level increase refreshes shortcuts — ahead of the skill
+	// list, as the grant does — and a pull-back's level decrease must not.
+	var refresh func(old, level int) bool
+	if l.playerConfig.AutoLearnSkills {
+		refresh = raisedSkill
 	}
+	l.sendSkillChanges(live, before, refresh)
 }
 
 // userInfoSnapshot builds the UserInfo snapshot for live, deriving the
