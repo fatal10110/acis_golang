@@ -219,7 +219,10 @@ type Runtime struct {
 	// nil leaves the character in no party and its clan in no alliance,
 	// war or leadership.
 	Social SocialGraph
-	Mounts MountBodies
+	// PartyLoot shares the items a partied character auto-loots or sweeps
+	// by its party's loot rule; nil keeps every item with the character.
+	PartyLoot PartyLoot
+	Mounts    MountBodies
 	// MountData resolves a mount's pet data; nil leaves every mount unfed
 	// and riding at its rider's own speeds.
 	MountData MountDataSource
@@ -237,6 +240,7 @@ func (c *Character) Configure(rt Runtime) {
 	c.los = rt.LOS
 	c.zones = rt.Zones
 	c.social = rt.Social
+	c.partyLoot = rt.PartyLoot
 	c.mounts = rt.Mounts
 	c.mountData = rt.MountData
 	c.skillDefs = rt.Skills

@@ -34,6 +34,13 @@ func (p *SpoilPool) IsSpoiled() bool {
 	return p.spoilerID != 0
 }
 
+// SpoilerID returns the player that marked the monster for spoil, or 0.
+func (p *SpoilPool) SpoilerID() int32 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.spoilerID
+}
+
 // IsSpoiler reports whether spoilerID is the player that marked the
 // monster for spoil.
 func (p *SpoilPool) IsSpoiler(spoilerID int32) bool {

@@ -664,9 +664,12 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	rt := player.Runtime{
 		World:  l.world,
 		Social: socialGraph{parties: l.parties, clans: l.clans},
-		Skills: l.skills,
-		Levels: l.levels,
-		Log:    l.log,
+		// PartyLoot hands a partied character's auto-loot and sweep to its
+		// party's loot rule.
+		PartyLoot: l,
+		Skills:    l.skills,
+		Levels:    l.levels,
+		Log:       l.log,
 		Rules: player.Rules{
 			RateKarmaExpLost:       l.playerConfig.RateKarmaExpLost,
 			RespawnRestoreHP:       l.playerConfig.RespawnRestoreHP,

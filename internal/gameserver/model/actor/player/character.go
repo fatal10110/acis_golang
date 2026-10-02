@@ -178,6 +178,7 @@ type Character struct {
 	los                      LineOfSight
 	zones                    PeaceZoneQuery
 	social                   SocialGraph
+	partyLoot                PartyLoot
 	mounts                   MountBodies
 	mountData                MountDataSource
 	mountFeed                mountFeedState

@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
@@ -33,6 +34,13 @@ type groundPlacer interface {
 type rewardItemReceiver interface {
 	RewardItemFits(itemID int32, count int) bool
 	AddRewardItem(itemID int32, count int, objectID int32) bool
+}
+
+// partyLooter hands an auto-looted item to its receiver's party, by the
+// party's loot rule; LootForParty reports false when the receiver is in no
+// party.
+type partyLooter interface {
+	LootForParty(itemID int32, count int, spoil bool, origin party.LootOrigin) bool
 }
 
 // herbReceiver consumes an auto-looted herb on the spot. A herb never
@@ -66,6 +74,11 @@ type KillReward struct {
 	x, y, z, heading int
 	dropperID        int32
 	protectOwnerID   int32
+
+	// origin is where the drop comes from: a partied receiver's
+	// auto-looted items go to the members in party range of it. Nil keeps
+	// them with the receiver.
+	origin party.LootOrigin
 }
 
 // NewKillReward returns a Rewarder that rolls categories against pool and
@@ -97,6 +110,14 @@ func NewKillReward(categories []item.DropCategory, pool *item.SpoilPool, levelMu
 	}
 }
 
+// From sets where the drop comes from, so a partied receiver's auto-looted
+// items follow its party's loot rule among the members in party range of
+// origin. It returns k.
+func (k *KillReward) From(origin party.LootOrigin) *KillReward {
+	k.origin = origin
+	return k
+}
+
 // CalculateRewards rolls this death's item/spoil/herb drops and either
 // places them on the ground or, when configured and supported, adds them
 // directly to the killer's inventory. An auto-looted herb is consumed
@@ -110,7 +131,7 @@ func (k *KillReward) CalculateRewards(killer attackable.Combatant) {
 	}
 	rolled, herbs := item.RollKillReward(k.categories, k.pool, k.levelMultiplier, k.raid, k.rates, k.autoLootHerbs)
 	for id, qty := range rolled {
-		if k.autoLootItems && k.addToInventory(receiver, id, int(qty)) {
+		if k.autoLootItems && k.autoLoot(receiver, id, int(qty)) {
 			continue
 		}
 		k.drop(id, int(qty))
@@ -148,6 +169,22 @@ func (k *KillReward) consumeHerb(killer attackable.Combatant, itemID int32) bool
 		return false
 	}
 	return consumer.ConsumeHerb(itemID)
+}
+
+// autoLoot takes an auto-looted item into the receiver's inventory, or
+// through its party's loot rule when it is in one. The receiver's own room
+// for it decides either way.
+func (k *KillReward) autoLoot(receiver rewardItemReceiver, itemID int32, count int) bool {
+	if receiver == nil || count <= 0 || !receiver.RewardItemFits(itemID, count) {
+		return false
+	}
+	if _, ok := k.items.Get(itemID); !ok {
+		return false
+	}
+	if sharer, ok := receiver.(partyLooter); ok && k.origin != nil && sharer.LootForParty(itemID, count, false, k.origin) {
+		return true
+	}
+	return k.addToInventory(receiver, itemID, count)
 }
 
 func (k *KillReward) addToInventory(receiver rewardItemReceiver, itemID int32, count int) bool {

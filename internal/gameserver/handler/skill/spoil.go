@@ -3,6 +3,7 @@ package skill
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
@@ -71,6 +72,12 @@ func (h spoilHandler) Use(cast Cast) {
 
 type sweepHandler struct{ ids objectIDAllocator }
 
+// partyLooter hands an item its holder swept to its party, by the party's
+// loot rule; LootForParty reports false when the holder is in no party.
+type partyLooter interface {
+	LootForParty(itemID int32, count int, spoil bool, origin party.LootOrigin) bool
+}
+
 func (sweepHandler) Types() []string { return []string{"SWEEP"} }
 
 // Use drains every target's spoil pool into a player caster's inventory as
@@ -78,8 +85,8 @@ func (sweepHandler) Types() []string { return []string{"SWEEP"} }
 // reset together with it — and applies the
 // skill's own self-targeted effects, if any. A caster that is not a player,
 // or a handler without ids to create items with, leaves every pool alone.
-// Sweeping has no slot check. Items go to the sweeper alone: a partied
-// sweeper's items following the party's loot rule is #3157.
+// Sweeping has no slot check. A partied sweeper's items follow the party's
+// loot rule, the swept monster deciding who is in range.
 func (h sweepHandler) Use(cast Cast) {
 	if h.ids == nil || cast.Caster == nil || cast.Caster.Kind() != actor.KindPlayer {
 		return
@@ -88,6 +95,7 @@ func (h sweepHandler) Use(cast Cast) {
 	if !ok {
 		return
 	}
+	sharer, _ := cast.Caster.(partyLooter)
 	for _, obj := range cast.Targets {
 		target, ok := asNPC(obj)
 		if !ok {
@@ -98,7 +106,11 @@ func (h sweepHandler) Use(cast Cast) {
 			continue
 		}
 
+		origin, _ := target.(party.LootOrigin)
 		for _, swept := range pool.Sweep() {
+			if sharer != nil && origin != nil && sharer.LootForParty(swept.ItemID, int(swept.Count), true, origin) {
+				continue
+			}
 			sweeper.AddEarnedItem(swept.ItemID, int(swept.Count), h.ids.NextID)
 		}
 	}

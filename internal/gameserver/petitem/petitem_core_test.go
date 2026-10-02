@@ -145,10 +145,10 @@ func TestPickupGroundItemAddsToPetAndReportsPersistence(t *testing.T) {
 		t.Fatalf("ground item: %v", err)
 	}
 
-	res, failure := PickupGround(pet, petInv, ground)
+	res, failure := claimAndStore(pet, petInv, ground)
 
 	if failure != PickupOK {
-		t.Fatalf("PickupGround failure = %v, want OK", failure)
+		t.Fatalf("pickup failure = %v, want OK", failure)
 	}
 	petStack := petInv.ItemByTemplateID(item.AdenaID)
 	if petStack == nil || petStack.ObjectID != ground.ObjectID() || petStack.Count != 40 || petStack.OwnerID != 2 || petStack.Location != item.LocationPet {
@@ -178,10 +178,10 @@ func TestPickupGroundItemSucceedsOverPetWeightLimit(t *testing.T) {
 		t.Fatalf("ground item: %v", err)
 	}
 
-	res, failure := PickupGround(pet, petInv, ground)
+	res, failure := claimAndStore(pet, petInv, ground)
 
 	if failure != PickupOK {
-		t.Fatalf("PickupGround failure = %v, want OK (Java has no weight gate on pet pickup)", failure)
+		t.Fatalf("pickup failure = %v, want OK (Java has no weight gate on pet pickup)", failure)
 	}
 	petStack := petInv.ItemByTemplateID(9002)
 	if petStack == nil || petStack.ObjectID != ground.ObjectID() {
@@ -209,10 +209,10 @@ func TestPickupGroundRejectsLootLockedItem(t *testing.T) {
 		t.Fatalf("ground item: %v", err)
 	}
 
-	res, failure := PickupGround(pet, petInv, ground)
+	res, failure := claimAndStore(pet, petInv, ground)
 
 	if failure != PickupLootLocked {
-		t.Fatalf("PickupGround failure = %v, want PickupLootLocked", failure)
+		t.Fatalf("pickup failure = %v, want PickupLootLocked", failure)
 	}
 	if petInv.ItemByTemplateID(item.AdenaID) != nil || len(res.Persist) != 0 {
 		t.Fatalf("result = %+v, want no pickup", res)
@@ -239,10 +239,10 @@ func TestPickupGroundReportsCapacityBeforeLootLock(t *testing.T) {
 		t.Fatalf("ground item: %v", err)
 	}
 
-	_, failure := PickupGround(pet, petInv, ground)
+	_, failure := claimAndStore(pet, petInv, ground)
 
 	if failure != PickupPetCannotCarryMore {
-		t.Fatalf("PickupGround failure = %v, want PickupPetCannotCarryMore (capacity checked before loot lock)", failure)
+		t.Fatalf("pickup failure = %v, want PickupPetCannotCarryMore (capacity checked before loot lock)", failure)
 	}
 }
 
@@ -260,10 +260,10 @@ func TestPickupGroundAllowsPetOwnerLootedItem(t *testing.T) {
 		t.Fatalf("ground item: %v", err)
 	}
 
-	res, failure := PickupGround(pet, petInv, ground)
+	res, failure := claimAndStore(pet, petInv, ground)
 
 	if failure != PickupOK {
-		t.Fatalf("PickupGround failure = %v, want OK", failure)
+		t.Fatalf("pickup failure = %v, want OK", failure)
 	}
 	if petInv.ItemByTemplateID(item.AdenaID) == nil || len(res.Persist) != 1 {
 		t.Fatalf("result = %+v, want pickup", res)
@@ -289,10 +289,10 @@ func TestPickupGroundHerbStaysOutOfPetInventory(t *testing.T) {
 		t.Fatalf("ground item: %v", err)
 	}
 
-	res, failure := PickupGround(pet, petInv, ground)
+	res, failure := claimAndStore(pet, petInv, ground)
 
 	if failure != PickupOK {
-		t.Fatalf("PickupGround failure = %v, want OK", failure)
+		t.Fatalf("pickup failure = %v, want OK", failure)
 	}
 	if petInv.ItemByTemplateID(9001) != nil {
 		t.Fatal("herb entered pet inventory")
@@ -322,10 +322,10 @@ func TestPickupGroundRejectsLootLockedHerb(t *testing.T) {
 		t.Fatalf("ground item: %v", err)
 	}
 
-	res, failure := PickupGround(pet, petInv, ground)
+	res, failure := claimAndStore(pet, petInv, ground)
 
 	if failure != PickupLootLocked {
-		t.Fatalf("PickupGround failure = %v, want PickupLootLocked", failure)
+		t.Fatalf("pickup failure = %v, want PickupLootLocked", failure)
 	}
 	if res.Herb != nil {
 		t.Fatalf("result = %+v, want no herb use", res)

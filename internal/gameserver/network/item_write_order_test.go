@@ -225,7 +225,7 @@ func TestQueuedItemWriteCannotDeleteARepickedRow(t *testing.T) {
 	if !ok {
 		t.Fatal("missing adena template")
 	}
-	picked, failure := link.inventory.PickupGround(second.Inventory(), dropped, tmpl, second.ObjectID())
+	picked, failure := link.inventory.PickupGround(second.Inventory(), dropped, tmpl, second)
 	if failure != invops.PickupOK {
 		close(release)
 		t.Fatalf("PickupGround() failure = %v", failure)
