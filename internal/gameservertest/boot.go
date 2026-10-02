@@ -792,6 +792,7 @@ type Server struct {
 	Petitions        *petition.Manager // petitions the link was wired with
 	petitionRows     *gamesql.PetitionStore
 	Clans            *clan.Service
+	SevenSigns       *sevensigns.State
 	AnnounceFile     string // the announcements.xml the server reads and rewrites
 	account          string
 	templates        *player.TemplateTable
@@ -1680,7 +1681,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.seedSevenSigns != nil {
 		o.seedSevenSigns(sevenSignsStore)
 	}
-	sevenSigns := sevensigns.NewState(sevenSignsStore, o.log, time.Now, nil)
+	sevenSigns := sevensigns.NewState(sevenSignsStore, network.NewSevenSignsBroadcaster(state), o.log, time.Now, nil)
 	if err := sevenSigns.Restore(context.Background()); err != nil {
 		t.Fatalf("restore seven signs status: %v", err)
 	}
@@ -2016,6 +2017,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		State:            state,
 		WorldObjects:     worldObjects,
 		Clans:            gclConfig.Clans,
+		SevenSigns:       sevenSigns,
 		itemTable:        itemTemplates,
 		levelTable:       levels,
 		deepBlueDrops:    o.deepBlueDropRules,

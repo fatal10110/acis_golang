@@ -507,7 +507,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				return
 			}
 			entering = selected
-			session.SendFrame(serverpackets.FrameSSQInfo())
+			session.SendFrame(ssqSkyFrame(l.sevenSigns))
 			client.SetState(StateEntering)
 			session.SendFrame(serverpackets.FrameCharSelected(serverpackets.CharSelectedSnapshot{
 				Character: c, Template: tmpl, SessionID: client.SessionKey().PlayKey1,
@@ -1764,6 +1764,18 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			if live != nil {
 				onLive(live, func() { l.requestPreviewItem(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestSSQStatus:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestSSQStatus)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestSSQStatus(live, req) })
 			}
 
 		case clientpackets.OpcodeDlgAnswer:

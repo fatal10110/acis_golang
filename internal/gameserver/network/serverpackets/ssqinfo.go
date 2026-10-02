@@ -3,12 +3,11 @@ package serverpackets
 import "github.com/fatal10110/acis_golang/internal/commons/wire"
 
 // OpcodeSSQInfo is the wire opcode for SSQInfo, the seven-signs sky state
-// sent right after a character slot is chosen.
+// sent right after a character slot is chosen and on every period change.
 const OpcodeSSQInfo = 0xf8
 
-// regularSkyState is the sky state shown when no cabal holds the seven-signs
-// seal. The seven-signs event is not modeled, so this is the only state the
-// character-selection SSQInfo reports.
+// regularSkyState is the sky state shown outside seal validation, or when
+// the competition was tied.
 const regularSkyState = SSQSkyRegular
 
 // Seven-signs sky states SSQInfo carries.
@@ -19,8 +18,8 @@ const (
 	SSQSkyRed     uint16 = 259
 )
 
-// FrameSSQInfo builds the SSQInfo packet as an owned frame. The seven-signs
-// event is not modeled, so it always reports the regular (no-cabal) sky.
+// FrameSSQInfo builds the SSQInfo packet showing the regular sky as an owned
+// frame.
 func FrameSSQInfo() wire.Frame {
 	return FrameSSQInfoSky(regularSkyState)
 }

@@ -1,6 +1,8 @@
-// Package sevensigns owns the Seven Signs event calendar: which of the four
-// recurring periods is active in the current cycle, when it ends, and the
-// persistence of that state across restarts. The period timeline is fixed:
+// Package sevensigns owns the Seven Signs competition: which of the four
+// recurring periods is active in the current cycle and when it ends, the
+// players signed up for each cabal with their chosen seal and contribution,
+// the cabals' stone and festival scores, the owners of the three seals, and
+// the persistence of all of it across restarts. The period timeline is fixed:
 //
 //	RECRUITING -> COMPETITION -> RESULTS -> SEAL_VALIDATION -> RECRUITING (next cycle)
 //
@@ -8,14 +10,16 @@
 // Monday; recruiting and results are short intervals lasting fifteen minutes
 // from the moment they begin.
 //
-// Only the calendar is implemented here. Cabals, seal ownership, stone and
-// festival scores, period-change broadcasts, and dungeon teleports belong to
-// the full Seven Signs port and are deliberately out of scope.
+// Every period change is announced to the players online through a
+// Broadcaster and saved in full.
 package sevensigns
 
 import (
+	"cmp"
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -68,30 +72,109 @@ const (
 	periodMinorLength = 15 * time.Minute
 )
 
-// StatusRow is the persisted Seven Signs status: the current cycle number,
-// the active period, and the moment the status was last written.
+// StatusRow is the persisted Seven Signs status: the current cycle and
+// period, when the status was last written, the last competition's winner,
+// the cabals' scores, and each seal's owner and votes. The per-seal arrays
+// are indexed in Seals order.
 type StatusRow struct {
 	Cycle    int
 	Period   Period
 	LastSave time.Time
+
+	PreviousWinner    Cabal
+	DawnStoneScore    float64
+	DuskStoneScore    float64
+	DawnFestivalScore int
+	DuskFestivalScore int
+	SealOwners        [3]Cabal
+	// DawnSealVotes and DuskSealVotes count each cabal's sign-ups that
+	// chose each seal.
+	DawnSealVotes [3]int
+	DuskSealVotes [3]int
 }
 
-// Store persists the single Seven Signs status row.
+// PlayerRow is one player's persisted sign-up: cabal and seal, the stones
+// turned in this cycle by color, the ancient adena they are worth to collect,
+// and the player's contribution score.
+type PlayerRow struct {
+	ObjectID          int32
+	Cabal             Cabal
+	Seal              Seal
+	RedStones         int
+	GreenStones       int
+	BlueStones        int
+	AncientAdena      int
+	ContributionScore int
+}
+
+// Store persists the Seven Signs status row and the players' sign-ups.
 type Store interface {
 	LoadStatus(ctx context.Context) (StatusRow, bool, error)
 	SaveStatus(ctx context.Context, row StatusRow) error
+	LoadPlayers(ctx context.Context) ([]PlayerRow, error)
+	InsertPlayer(ctx context.Context, row PlayerRow) error
+	SavePlayers(ctx context.Context, rows []PlayerRow) error
 }
 
-// State tracks the active period and drives its transitions. All methods are
-// safe for concurrent use.
+// Broadcaster delivers period-change notices, in order, to every player
+// online.
+type Broadcaster interface {
+	Broadcast(notices []Notice)
+}
+
+// NoticeKind names what a period-change notice tells the players.
+type NoticeKind int
+
+const (
+	// NoticeSound plays Notice.Sound.
+	NoticeSound NoticeKind = iota
+	NoticeCompetitionBegun
+	NoticeCompetitionEnded
+	// NoticeSealObtained: Notice.Cabal obtained Notice.Seal.
+	NoticeSealObtained
+	// NoticeCabalWon: Notice.Cabal won the competition.
+	NoticeCabalWon
+	NoticeValidationBegun
+	NoticeValidationEnded
+	// NoticeSky shows the sky of Notice.Cabal, the regular sky for NoCabal.
+	NoticeSky
+)
+
+// Notice is one announcement of a period change.
+type Notice struct {
+	Kind  NoticeKind
+	Sound string
+	Cabal Cabal
+	Seal  Seal
+}
+
+// Period-change sounds.
+const (
+	soundNeutral = "SSQ_Neutral_01"
+	soundDawn    = "SSQ_Dawn_01"
+	soundDusk    = "SSQ_Dusk_01"
+)
+
+// saveTimeout bounds the save that follows each period change.
+const saveTimeout = 10 * time.Second
+
+// State tracks the active period and the competition's scores and drives
+// the period transitions. All methods are safe for concurrent use.
 type State struct {
 	store     Store
+	out       Broadcaster
 	now       func() time.Time
 	afterFunc func(time.Duration, func()) *time.Timer
 	log       zerolog.Logger
 
+	// saveMu serializes every write to the store, so the write that lands
+	// last carries the latest state: each save takes its snapshot while
+	// holding it.
+	saveMu sync.Mutex
+
 	mu         sync.Mutex
 	row        StatusRow
+	players    map[int32]*PlayerRow
 	nextChange time.Time
 	timer      *time.Timer
 	// stopped latches Stop: a transition already running when Stop arrives
@@ -99,25 +182,30 @@ type State struct {
 	stopped bool
 }
 
-// NewState returns a state persisting through store. now supplies wall time;
+// NewState returns a state persisting through store and announcing period
+// changes through out (nil announces nothing). now supplies wall time;
 // afterFunc schedules the next transition timer (both overridden in tests;
 // nil falls back to time.Now and time.AfterFunc).
-func NewState(store Store, log zerolog.Logger, now func() time.Time, afterFunc func(time.Duration, func()) *time.Timer) *State {
+func NewState(store Store, out Broadcaster, log zerolog.Logger, now func() time.Time, afterFunc func(time.Duration, func()) *time.Timer) *State {
 	if now == nil {
 		now = time.Now
 	}
 	if afterFunc == nil {
 		afterFunc = time.AfterFunc
 	}
-	return &State{store: store, now: now, afterFunc: afterFunc, log: log}
+	return &State{store: store, out: out, now: now, afterFunc: afterFunc, log: log, players: map[int32]*PlayerRow{}}
 }
 
-// Restore loads the persisted status and computes when the active period
-// ends. When the persisted save predates the moment the current period
-// should have ended, the transition is marked due immediately: Start fires
-// it without waiting. The database default row (cycle 1, competition, never
-// saved) is assumed when none was written yet.
+// Restore loads the persisted status and sign-ups and computes when the
+// active period ends. When the persisted save predates the moment the
+// current period should have ended, the transition is marked due
+// immediately: Start fires it without waiting. The database default row
+// (cycle 1, competition, never saved) is assumed when none was written yet.
 func (s *State) Restore(ctx context.Context) error {
+	players, err := s.store.LoadPlayers(ctx)
+	if err != nil {
+		return fmt.Errorf("load seven signs players: %w", err)
+	}
 	row, found, err := s.store.LoadStatus(ctx)
 	if err != nil {
 		return fmt.Errorf("load seven signs status: %w", err)
@@ -130,11 +218,18 @@ func (s *State) Restore(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.row = row
+	s.players = make(map[int32]*PlayerRow, len(players))
+	for i := range players {
+		p := players[i]
+		s.players[p.ObjectID] = &p
+	}
 	if changeAlreadyDue(row, now) {
 		s.nextChange = now
 	} else {
 		s.nextChange = nextPeriodChange(row.Period, now)
 	}
+	s.log.Info().Str("period", row.Period.String()).Int("cycle", row.Cycle).Int("players", len(players)).
+		Str("leading", s.winningCabalLocked().String()).Msg("seven signs restored")
 	return nil
 }
 
@@ -159,6 +254,25 @@ func (s *State) Stop() {
 	}
 }
 
+// Save writes every sign-up and then the status row, stamping the status
+// with the time of the write.
+func (s *State) Save(ctx context.Context) error {
+	s.saveMu.Lock()
+	defer s.saveMu.Unlock()
+
+	s.mu.Lock()
+	s.row.LastSave = s.now()
+	row := s.row
+	players := make([]PlayerRow, 0, len(s.players))
+	for _, p := range s.players {
+		players = append(players, *p)
+	}
+	s.mu.Unlock()
+	slices.SortFunc(players, func(a, b PlayerRow) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
+
+	return errors.Join(s.store.SavePlayers(ctx, players), s.store.SaveStatus(ctx, row))
+}
+
 // CurrentPeriod returns the active period.
 func (s *State) CurrentPeriod() Period {
 	s.mu.Lock()
@@ -180,29 +294,93 @@ func (s *State) NextChange() time.Time {
 	return s.nextChange
 }
 
-// advance moves the state into the following period — starting the next
-// cycle after validation ends — persists it, and re-arms the timer.
+// advance moves the state into the following period — settling the
+// competition, or starting the next cycle after validation ends — announces
+// it, persists it, shows the new sky, and re-arms the timer.
 func (s *State) advance() {
 	s.mu.Lock()
-	ended := s.row.Period
-	s.row.Period = (s.row.Period + 1) % periodCount
-	if ended == SealValidation {
-		s.row.Cycle++
-	}
-	s.row.LastSave = s.now()
-	row := s.row
+	notices := s.changePeriodLocked()
 	s.nextChange = nextPeriodChange(s.row.Period, s.now())
+	cycle, period := s.row.Cycle, s.row.Period
 	s.mu.Unlock()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	s.broadcast(notices)
+
+	ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
 	defer cancel()
-	if err := s.store.SaveStatus(ctx, row); err != nil {
-		s.log.Error().Err(err).Int("cycle", row.Cycle).Str("period", row.Period.String()).Msg("save seven signs status")
+	if err := s.Save(ctx); err != nil {
+		s.log.Error().Err(err).Int("cycle", cycle).Str("period", period.String()).Msg("save seven signs")
 	}
+
+	s.broadcast([]Notice{{Kind: NoticeSky, Cabal: s.Sky()}})
+	s.log.Info().Int("cycle", cycle).Str("period", period.String()).Msg("seven signs period begun")
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.scheduleLocked()
+}
+
+func (s *State) broadcast(notices []Notice) {
+	if s.out != nil && len(notices) > 0 {
+		s.out.Broadcast(notices)
+	}
+}
+
+// changePeriodLocked enters the period following the active one, applies
+// what the ended period settles, and returns the notices announcing it.
+func (s *State) changePeriodLocked() []Notice {
+	ended := s.row.Period
+	s.row.Period = (ended + 1) % periodCount
+	switch ended {
+	case Recruiting:
+		return []Notice{{Kind: NoticeSound, Sound: soundNeutral}, {Kind: NoticeCompetitionBegun}}
+	case Competition:
+		notices := []Notice{{Kind: NoticeSound, Sound: soundNeutral}, {Kind: NoticeCompetitionEnded}}
+		winner := s.winningCabalLocked()
+		notices = append(notices, s.settleSealsLocked(winner)...)
+		if winner != NoCabal {
+			notices = append(notices, Notice{Kind: NoticeCabalWon, Cabal: winner})
+		}
+		s.row.PreviousWinner = winner
+		return notices
+	case Results:
+		sound := soundDusk
+		if s.row.PreviousWinner == Dawn {
+			sound = soundDawn
+		}
+		return []Notice{{Kind: NoticeSound, Sound: sound}, {Kind: NoticeValidationBegun}}
+	default: // SealValidation: a new cycle begins.
+		for _, p := range s.players {
+			p.Cabal, p.Seal, p.ContributionScore = NoCabal, NoSeal, 0
+		}
+		s.row.DawnSealVotes, s.row.DuskSealVotes = [3]int{}, [3]int{}
+		s.row.Cycle++
+		s.row.DawnStoneScore, s.row.DuskStoneScore = 0, 0
+		s.row.DawnFestivalScore, s.row.DuskFestivalScore = 0, 0
+		return []Notice{{Kind: NoticeSound, Sound: soundNeutral}, {Kind: NoticeValidationEnded}}
+	}
+}
+
+// settleSealsLocked hands each seal to its new owner after a competition
+// won by winner and returns the notices of the seals a cabal obtained.
+func (s *State) settleSealsLocked(winner Cabal) []Notice {
+	var notices []Notice
+	for i, seal := range Seals {
+		dawn, dusk := s.sealPercentsLocked(i)
+		owner, _ := sealOutcome(s.row.SealOwners[i], winner, dawn, dusk)
+		s.row.SealOwners[i] = owner
+		if owner != NoCabal {
+			notices = append(notices, Notice{Kind: NoticeSealObtained, Cabal: owner, Seal: seal})
+		}
+	}
+	return notices
+}
+
+// sealPercentsLocked returns the percent of each cabal's members who chose
+// the seal at index i, counting an empty cabal as one member.
+func (s *State) sealPercentsLocked(i int) (dawn, dusk int) {
+	return share(s.row.DawnSealVotes[i], max(1, s.totalMembersLocked(Dawn)), 100),
+		share(s.row.DuskSealVotes[i], max(1, s.totalMembersLocked(Dusk)), 100)
 }
 
 func (s *State) scheduleLocked() {

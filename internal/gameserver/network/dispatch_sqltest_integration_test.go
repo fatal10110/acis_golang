@@ -77,7 +77,7 @@ func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, sh
 	ids := &sequentialIDs{next: 100}
 	inventoryUpdates := task.NewInventoryUpdates()
 	sevenSignsStore := gamesql.NewSevenSignsStore(db)
-	sevenSigns := sevensigns.NewState(sevenSignsStore, zerolog.Nop(), time.Now, nil)
+	sevenSigns := sevensigns.NewState(sevenSignsStore, nil, zerolog.Nop(), time.Now, nil)
 	if err := sevenSigns.Restore(context.Background()); err != nil {
 		t.Fatalf("restore seven signs status: %v", err)
 	}
