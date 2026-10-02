@@ -223,14 +223,14 @@ func TestPlayerAttackAfterShiftCastNeverWalks(t *testing.T) {
 	move := &recordingMove{outOfReach: true, followStarted: true}
 	brain := NewPlayerAttack(pc, move, strike)
 
-	if !brain.AttackAfterCast(target, true) {
+	if !brain.AttackAfterCast(target, true, false) {
 		t.Fatal("AttackAfterCast(shift) out of reach = no ActionFailed, want ActionFailed")
 	}
 	if move.followCalls != 0 || strike.doAttackCalls != 0 || brain.Target() != nil {
 		t.Fatalf("follow calls = %d, swings = %d, intention kept = %v, want none and idle", move.followCalls, strike.doAttackCalls, brain.Target() != nil)
 	}
 
-	if brain.AttackAfterCast(target, false) {
+	if brain.AttackAfterCast(target, false, false) {
 		t.Fatal("AttackAfterCast(no shift) out of reach = ActionFailed, want the walk")
 	}
 	if move.followCalls != 1 {

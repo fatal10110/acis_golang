@@ -130,7 +130,7 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 		// A nextActionAttack skill refused at its cost and condition checks
 		// still hands on to the attack, after the refusal's own packets.
 		if started.CanCastFailure {
-			defer live.attackAfterCast(started.Definition, castCombatant(started.Target), req.ShiftPressed)
+			defer live.attackAfterCast(started.Definition, castCombatant(started.Target), req.ShiftPressed, false)
 		}
 		// A player's cast that fails its cost or target conditions after the
 		// hit-time stop answers with its reason alone: no ActionFailed, no
@@ -707,14 +707,14 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 			sendMagicCastFailureReason(live, def, err)
 			l.broadcastCastAborted(live)
 			sendMagicActionFailed(live)
-			live.endCastIntention(def, castCombatant(target))
+			live.endCastIntention(def, castCombatant(target), false)
 			return
 		}
 		sendMagicCastFailure(live, def, err)
 		return
 	}
 	// A toggle's cast ends as soon as it has switched, with no CastFinished.
-	defer live.endCastIntention(def, castCombatant(target))
+	defer live.endCastIntention(def, castCombatant(target), false)
 
 	if activated {
 		// Each cost CastToggle paid already sent its own status.
@@ -731,8 +731,8 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 // known list. The action-failed acknowledgement is not sent here: it belongs
 // to every Stop call, idle or in-flight, so it is wired through the
 // CastStopAck event instead of gated behind this in-flight-only path. An
-// interrupt's CASTING_INTERRUPTED comes last, once the stopped cast's
-// CastFinished has run (see GameClientLink.finishLiveCast).
+// interrupt's CASTING_INTERRUPTED comes last, after that acknowledgement,
+// once the stopped cast's CastFinished has run (see livePlayer.endCastStop).
 func (l *GameClientLink) broadcastCastAborted(live *livePlayer) {
 	if live == nil {
 		return

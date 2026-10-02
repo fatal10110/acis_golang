@@ -21,8 +21,13 @@ type CastFinished struct {
 }
 
 // CastStopAck reports a cast stop request, whether or not a cast was in
-// flight.
-type CastStopAck struct{}
+// flight, once the stop has reported everything else. InFlight marks a stop
+// that ended a cast in flight; Broken marks one that ended it through the
+// window-gated interrupt.
+type CastStopAck struct {
+	InFlight bool
+	Broken   bool
+}
 
 // SkillMasteryProc reports a skill-mastery roll succeeding at cast start:
 // the cast installs no reuse delay and the caster is told the skill is

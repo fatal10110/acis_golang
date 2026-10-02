@@ -277,8 +277,8 @@ func (l *GameClientLink) thinkLivePickup(live *livePlayer) {
 // finishDeferredPickup runs the pickup queued as the next intention, if any,
 // and reports whether one was waiting. The pickup replaces the attack or
 // cast intention whatever its outcome: the swing, shot or cast it waited
-// behind is not followed by another. An item gone meanwhile only releases
-// the click.
+// behind is not followed by another. A player meanwhile unable to act, or an
+// item gone meanwhile, only releases the click.
 func (l *GameClientLink) finishDeferredPickup(live *livePlayer) bool {
 	pickup := live.takeDeferredPickup()
 	if pickup == nil {
@@ -286,6 +286,10 @@ func (l *GameClientLink) finishDeferredPickup(live *livePlayer) bool {
 	}
 	if live.combat != nil {
 		live.combat.Replace()
+	}
+	if live.DenyAIAction() {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return true
 	}
 	var ground *grounditem.Item
 	if pickup.target != nil {

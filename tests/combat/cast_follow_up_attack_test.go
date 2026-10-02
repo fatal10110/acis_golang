@@ -248,11 +248,16 @@ func TestNextActionAttackItemSkillRefusedForMPStillAttacks(t *testing.T) {
 	}
 }
 
-// TestBrokenNextActionAttackCastAttacksItsTarget pins the follow-up on the
+// TestBrokenNextActionAttackCastDoesNotAttack pins the follow-up on the
 // abort path: a nextActionAttack cast broken inside its interrupt window
-// (the damage and abort-cast break, InterruptCast) still hands on to an
-// attack on the cast's target, as a cast that ended naturally does.
-func TestBrokenNextActionAttackCastAttacksItsTarget(t *testing.T) {
+// (the damage and abort-cast break, InterruptCast) hands on to no attack.
+// CreatureCast.stop (CreatureCast.java:404-434) notifies FINISHED_CASTING
+// while the cast is still in flight, so the follow-up's PlayerAI.thinkAttack
+// (PlayerAI.java:169-215) re-queues it behind the cast with ActionFailed,
+// and PlayableCast.stop's tryToIdle (PlayableCast.java:101-107) then idles
+// the player, dropping it. PlayerCast.stop answers ActionFailed, and
+// CASTING_INTERRUPTED comes last (CreatureCast.java:439-446).
+func TestBrokenNextActionAttackCastDoesNotAttack(t *testing.T) {
 	t.Parallel()
 	f := bootFollowUpCaster(t)
 	f.selectAmidFrames(t, f.a)
@@ -263,36 +268,9 @@ func TestBrokenNextActionAttackCastAttacksItsTarget(t *testing.T) {
 	if !f.pc.CastingNow() {
 		t.Fatal("follow-up skill not in flight after its MagicSkillUse")
 	}
+	drainUntilQuiet(t, f.c)
 
-	obj, ok := f.srv.State.Player(f.objID)
-	if !ok {
-		t.Fatalf("world.Player(%d) missing", f.objID)
-	}
-	holder, ok := obj.(effectHolder)
-	if !ok {
-		t.Fatalf("world.Player(%d) = %T has no queue", f.objID, obj)
-	}
-	done := make(chan struct{})
-	if !holder.Queue().Post(func() { f.pc.InterruptCast(); close(done) }) {
-		t.Fatal("post interrupt: queue closed")
-	}
-	<-done
-
-	readUntil(t, f.c, serverpackets.OpcodeMagicSkillCanceled, "MagicSkillCanceled")
-	for i := 0; i < 100; i++ {
-		frame := f.c.ReadWithTimeout(3 * time.Second)
-		if frame == nil {
-			t.Fatal("after the broken follow-up skill: no Attack by the player")
-		}
-		if frame[0] == serverpackets.OpcodeMagicSkillLaunched {
-			t.Fatal("broken follow-up skill launched")
-		}
-		if attackFrameBy(frame, f.objID) {
-			if got := attackTargetID(frame); got != f.a {
-				t.Fatalf("attack after the broken cast target = %d, want the cast's target %d", got, f.a)
-			}
-			return
-		}
-	}
-	t.Fatal("after the broken follow-up skill: no Attack by the player within 100 frames")
+	onPlayerQueue(t, f.srv, f.objID, func(pc *player.Character) { pc.InterruptCast() })
+	assertOpcodes(t, framesUntilQuiet(f.c), interruptReply, "the broken follow-up skill")
+	assertStaysIdle(t, f.srv, f.pc)
 }

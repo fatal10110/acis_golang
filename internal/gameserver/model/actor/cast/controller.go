@@ -197,8 +197,9 @@ type Controller struct {
 //     aborted (never for a natural finish, nor for a stop on an idle
 //     controller);
 //   - CastStopAck, once on every Stop/Interrupt call whether or not a cast
-//     was in flight: a player's cast stop always answers action-failed,
-//     after the in-flight-gated cancel broadcast;
+//     was in flight, last: a player's cast stop always answers
+//     action-failed, after the in-flight-gated cancel broadcast and the
+//     stopped cast's CastFinished;
 //   - ShotsRechargeRequested, first when a cast of a skill that spends
 //     soulshots or spiritshots finishes naturally, fusion channels aside,
 //     and for a SIGNET_CASTTIME cast also at its launch: the caster charges
@@ -211,7 +212,8 @@ type Controller struct {
 //     completed, letting the owner apply the nextActionAttack resume gate
 //     when casting finishes; Broken
 //     marks an abort through the window-gated Interrupt path, which owes
-//     CASTING_INTERRUPTED once the owner's AI has moved on.
+//     CASTING_INTERRUPTED once the owner's AI has moved on (a player's
+//     comes after its CastStopAck, which carries Broken too).
 //
 // A nil sink drops them all.
 func NewController(actor Actor, sink event.Sink) *Controller {
@@ -666,11 +668,12 @@ func (c *Controller) stopInternal(interrupted bool) bool {
 	if abort != nil {
 		abort()
 	}
-	c.emit(event.CastStopAck{})
 	if finish != nil {
 		finish(interrupted)
 	}
-	return abort != nil
+	inFlight := abort != nil
+	c.emit(event.CastStopAck{InFlight: inFlight, Broken: inFlight && interrupted})
+	return inFlight
 }
 
 // abortLocked clears the cast and returns the observer the caller must run
