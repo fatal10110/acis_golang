@@ -3,6 +3,9 @@ package npc
 import (
 	"strconv"
 	"strings"
+	"unicode/utf16"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // BypassOutcome is what a civilian NPC's dialog command answers with.
@@ -231,8 +234,8 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		return reply
 	case strings.HasPrefix(command, "Chat"):
 		val := 0
-		if len(command) >= 5 {
-			if n, err := strconv.ParseInt(command[5:], 10, 32); err == nil {
+		if arg, ok := commandChars(command, 5, -1); ok {
+			if n, err := commons.ParseInt(arg, 32); err == nil {
 				val = int(n)
 			}
 		}
@@ -259,11 +262,12 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	case strings.HasPrefix(command, "Augment"):
 		// The choice is the one character after "Augment ": a command too
 		// short to hold it, or one that is no digit, stops the handling.
-		if len(command) < 9 {
+		arg, ok := commandChars(command, 8, 9)
+		if !ok {
 			reply.Outcome = BypassAborted
 			return reply
 		}
-		choice, err := strconv.Atoi(strings.TrimFunc(command[8:9], func(r rune) bool { return r <= ' ' }))
+		choice, err := commons.Atoi(strings.TrimFunc(arg, javaSpace))
 		if err != nil {
 			reply.Outcome = BypassAborted
 			return reply
@@ -303,7 +307,7 @@ func teleportCommand(reply BypassReply, outcome BypassOutcome, command string) B
 		reply.Outcome = BypassReleased
 		return reply
 	}
-	index, err := strconv.ParseInt(words[1], 10, 32)
+	index, err := commons.ParseInt(words[1], 32)
 	if err != nil {
 		reply.Outcome = BypassReleased
 		return reply
@@ -321,12 +325,12 @@ func teleportCommand(reply BypassReply, outcome BypassOutcome, command string) B
 func (f *Folk) adventurerCommand(pages Pages, command string, reply BypassReply) (BypassReply, bool) {
 	switch {
 	case strings.HasPrefix(command, "raidInfo"):
-		chars := []rune(command)
-		if len(chars) < 9 {
+		arg, ok := commandChars(command, 9, -1)
+		if !ok {
 			reply.Outcome = BypassAborted
 			return reply, true
 		}
-		level, err := strconv.ParseInt(strings.TrimFunc(string(chars[9:]), javaSpace), 10, 32)
+		level, err := commons.ParseInt(strings.TrimFunc(arg, javaSpace), 32)
 		if err != nil {
 			reply.Outcome = BypassAborted
 			return reply, true
@@ -366,7 +370,7 @@ func merchantCommand(reply BypassReply, rules ChatRules, command string) (Bypass
 		reply.Outcome = BypassRefused
 		return reply, true
 	}
-	id, err := strconv.ParseInt(tokens[1], 10, 32)
+	id, err := commons.ParseInt(tokens[1], 32)
 	if err != nil {
 		reply.Outcome = BypassAborted
 		return reply, true
@@ -418,3 +422,20 @@ func (f *Folk) merchantMultisell(pages Pages, talker Talker, command string, rep
 // javaSpace is the set trimmed around a command argument: every character
 // up to and including the space.
 func javaSpace(r rune) bool { return r <= ' ' }
+
+// commandChars returns command's characters from begin up to end, or to
+// its end when end is negative, counting characters as the client encodes
+// them: one per UTF-16 unit, so a character outside the Basic Multilingual
+// Plane counts two. ok is false when command is too short for the range. A
+// bound that splits such a character keeps its half as U+FFFD, which no
+// number reads.
+func commandChars(command string, begin, end int) (string, bool) {
+	units := utf16.Encode([]rune(command))
+	if end < 0 {
+		end = len(units)
+	}
+	if begin > end || end > len(units) {
+		return "", false
+	}
+	return string(utf16.Decode(units[begin:end])), true
+}
