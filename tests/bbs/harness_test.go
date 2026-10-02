@@ -49,6 +49,7 @@ var boardPages = map[string]string{
 	"servnews.htm":                                "<html><body>SERVER NEWS</body></html>",
 	"CommunityBoard/region/castlelist.htm":        "CASTLES %castleList%",
 	"CommunityBoard/favorite/favorite-get.htm":    "FAVORITES <?FAV_LIST?>",
+	"CommunityBoard/favorite/template.htm":        "ROW <?fav_id?>|<?bypass?>|<?arg_last?>|<?sDate?>;",
 }
 
 // pair is a booted server with two dialed clients, Alice (the primary

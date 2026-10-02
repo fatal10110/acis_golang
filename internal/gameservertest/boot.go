@@ -1799,8 +1799,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Board, gclConfig.ShowServerNews = o.board, o.serverNews
 	announcementsPath := filepath.Join(t.TempDir(), "announcements.xml")
 	gclConfig.Announcements = bootAnnouncements(t, announcementsPath, o.announcements, queues.NewQueue("announcements"), state, o.log)
+	forumStore, favoriteStore := gamesql.NewForumStore(db), gamesql.NewFavoriteStore(db)
 	if o.board.Enabled {
 		gclConfig.Mailbox = bbs.NewMailbox(mailStore, persistWorker, o.log)
+		gclConfig.Forums = bbs.NewForums(forumStore, persistWorker, o.log)
+		gclConfig.Favorites = bbs.NewFavorites(favoriteStore, persistWorker, o.log)
 	}
 	gclConfig.PlayerConfig.AutoLearnSkills = o.autoLearnSkills
 	gclConfig.PlayerConfig.GMStartupInvulnerable, gclConfig.PlayerConfig.GMStartupInvisible, gclConfig.PlayerConfig.GMStartupBlockAll = o.gmStartupModes[0], o.gmStartupModes[1], o.gmStartupModes[2]
@@ -1991,6 +1994,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			t.Fatalf("load mail: %v", err)
 		}
 		gclConfig.Mailbox.Restore(mails)
+		restoreBoardForums(t, forumStore, favoriteStore, gclConfig.Forums, gclConfig.Favorites, gclConfig.Clans)
 	}
 
 	c := testsupport.Dial(t, ln.Addr().String())

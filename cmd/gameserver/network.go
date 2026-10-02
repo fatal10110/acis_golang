@@ -236,6 +236,8 @@ func provideGameClientLink(
 
 		Board:          board.Config,
 		Mailbox:        board.Mailbox,
+		Forums:         board.Forums,
+		Favorites:      board.Favorites,
 		ShowServerNews: board.ShowServerNews,
 		Announcements:  announcements,
 	})

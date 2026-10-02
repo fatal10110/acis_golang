@@ -561,6 +561,10 @@ type GameClientLinkConfig struct {
 	// Mailbox holds the board's mail; nil, as while the board is off,
 	// holds none.
 	Mailbox *bbs.Mailbox
+	// Forums holds the board's forums, Favorites its favorites; nil holds
+	// them in memory only, starting with none.
+	Forums    *bbs.Forums
+	Favorites *bbs.Favorites
 	// ShowServerNews shows the server news page at login when no clan
 	// notice is shown.
 	ShowServerNews bool
@@ -677,7 +681,13 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.gatekeeper = gatekeeper.NewService(cfg.Teleports, cfg.InstantTeleports, cfg.FreeTeleport, cfg.TeleportClock)
 	link.craft = craft.NewService(cfg.Recipes, !cfg.PlayerConfig.CraftingDisabled, link.nextObjectID, cfg.CraftRoll)
 	link.augment = newAugmentService(cfg)
-	link.board = communityBoard{cfg: cfg.Board, mail: cfg.Mailbox, serverNews: cfg.ShowServerNews}
+	link.board = communityBoard{cfg: cfg.Board, mail: cfg.Mailbox, forums: cfg.Forums, favorites: cfg.Favorites, serverNews: cfg.ShowServerNews}
+	if link.board.forums == nil {
+		link.board.forums = bbs.NewForums(nil, nil, cfg.Log)
+	}
+	if link.board.favorites == nil {
+		link.board.favorites = bbs.NewFavorites(nil, nil, cfg.Log)
+	}
 	link.announcements = cfg.Announcements
 	if link.announcements == nil {
 		link.announcements = announcement.NewRegistry(nil, NewAnnouncer(cfg.World), cfg.Log, cfg.Queues.NewQueue("announcements"))

@@ -12,13 +12,6 @@ import (
 // clanBoardLevel is the clan level a clan's board pages open at.
 const clanBoardLevel = 2
 
-// clanBoardAccess is the access the clan management page shows for the
-// clan's announcement and bulletin boards.
-// ponytail: those boards are forums (#3201); every clan forum is made with
-// read access and nothing changes it, so the page shows that access until
-// the forums exist.
-const clanBoardAccess = "Read access"
-
 // boardClan runs a clan board command: _bbsclan shows the player's clan,
 // or the clan list without one; _bbsclan;<clan|home|mail|management>;<n>
 // shows the list page n or clan n's home, mail form or management form;
@@ -198,15 +191,22 @@ func (l *GameClientLink) showClanMailForm(live *livePlayer, id int32) {
 }
 
 // showClanManagement opens the clan management form, to the leader of clan
-// id, filled with its introduction. A clan below the board level has no
-// boards to show the access of, and shows nothing.
+// id, filled with its introduction and showing the access of its
+// announcement and bulletin forums. A clan below the board level has no
+// forums to show the access of, and shows nothing.
 func (l *GameClientLink) showClanManagement(live *livePlayer, id int32) {
 	cl, ok := l.clanService().Table().Get(id)
 	if !ok || !l.clanLeaderPage(live, cl) || cl.Level() < clanBoardLevel {
 		return
 	}
+	ann, okAnn := l.board.forums.Owned(bbs.ForumClanAnnouncements, id)
+	cbb, okCbb := l.board.forums.Owned(bbs.ForumClanBulletin, id)
+	if !okAnn || !okCbb {
+		l.log.Debug().Int32("clan", id).Msg("community board: clan forums missing")
+		return
+	}
 	if page, ok := l.boardPage(bbs.ClanManagementPage); ok {
-		l.sendBoardEdit(live, bbs.RenderClanManagement(page, id, clanBoardAccess), cl.Introduction(), "", "")
+		l.sendBoardEdit(live, bbs.RenderClanManagement(page, id, ann.Access.Description(), cbb.Access.Description()), cl.Introduction(), "", "")
 	}
 }
 
@@ -223,4 +223,13 @@ func (l *GameClientLink) showClanNotice(live *livePlayer, id int32) {
 	}
 	notice, enabled := cl.Notice()
 	l.sendBoardEdit(live, bbs.RenderClanNotice(page, id, enabled), notice, "", "")
+}
+
+// ensureClanForums gives clan clanID, now at level, its announcement and
+// bulletin forums when the board is on and the level reaches 2. Every
+// change of a clan's level goes through here.
+func (l *GameClientLink) ensureClanForums(clanID int32, level int) {
+	if l.board.cfg.Enabled {
+		l.board.forums.EnsureClanForums(clanID, level)
+	}
 }
