@@ -2,8 +2,10 @@ package pets
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -84,4 +86,46 @@ func TestSummonCtrlStrikeNeedsOwnersMainTarget(t *testing.T) {
 			drainUntilQuiet(t, h.client)
 		})
 	}
+}
+
+// readUntilStrikeAnswer collects frames until the strike is answered: the
+// pet's MagicSkillUse or INVALID_TARGET. The owner's own attack keeps
+// sending frames meanwhile, so the client never goes quiet.
+func readUntilStrikeAnswer(t *testing.T, h *petWorld, petActor *summon.Actor) [][]byte {
+	t.Helper()
+	frames := make([][]byte, 0, 8)
+	for range 100 {
+		frame := h.client.ReadWithTimeout(5 * time.Second)
+		if frame == nil {
+			t.Fatalf("strike never answered: opcodes %x", frameOpcodes(frames))
+		}
+		frames = append(frames, frame)
+		switch frame[0] {
+		case serverpackets.OpcodeMagicSkillUse:
+			if wire.NewReader(frame[1:]).ReadInt32() == petActor.ObjectID() {
+				return frames
+			}
+		case serverpackets.OpcodeSystemMessage:
+			if systemMessageID(t, frame) == serverpackets.SystemMessageInvalidTarget {
+				return frames
+			}
+		}
+	}
+	t.Fatalf("strike not answered within 100 frames: opcodes %x", frameOpcodes(frames))
+	return nil
+}
+
+// TestSummonCtrlStrikeOnPlayerTheOwnerAttacks commands the wolf's damage
+// strike with CTRL at an unflagged player the owner force-attacks: the
+// owner's current intention is ATTACK, whose final target is that player
+// (Intention.updateAsAttack), so the player is the owner's main target and
+// the strike starts.
+func TestSummonCtrlStrikeOnPlayerTheOwnerAttacks(t *testing.T) {
+	t.Parallel()
+	h, petActor, playerID := bootWolfStrikerWithBystander(t, wolfStrike())
+	h.targetPlayer(t, playerID)
+	x, y, z := h.srv.PlayerPosition(t, playerID)
+	h.client.Send(encodeAttackRequest(playerID, int32(x), int32(y), int32(z), false))
+	h.client.Send(encodeRequestActionUse(wolfStrikeAction, true))
+	requireSummonStrikeStarted(t, readUntilStrikeAnswer(t, h, petActor), petActor, playerID)
 }

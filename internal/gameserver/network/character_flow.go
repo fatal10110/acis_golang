@@ -732,13 +732,14 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.SetCanGiveDamage(access.GiveDamage)
 	c.SetSeesInvisible(access.IsGM)
 	live.attack, live.move, live.combat = attackCtl, moveCtl, combat
-	c.SetIntentionSource(live)
 	live.kick = client.Session.Close
 	live.zoneActor = &liveZoneActor{live: live}
 	// Build cast eagerly, like attackCtl above: pickup-lock's timer goroutine
 	// reads live.cast unguarded, so a lazy first write from the read-loop
 	// goroutine would race it (issue #1183).
 	l.castController(live)
+	// The intention source reads cast, combat and move, all built above.
+	c.SetIntentionSource(live)
 	if inv := c.Inventory(); inv != nil && l.shadowItems != nil {
 		for _, inst := range inv.PaperdollItems() {
 			tmpl, ok := inv.Templates().Get(inst.TemplateID)

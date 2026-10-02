@@ -6,9 +6,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
-// fusionHandler starts a fusion skill at cast start: a FUSION-skillType cast
-// grows an existing live Fusion effect from its
-// triggered skill in place, or applies that triggered skill fresh.
+// fusionHandler grows an existing live Fusion effect of a FUSION cast's
+// triggered skill in place, or applies that triggered skill fresh. The live
+// entry is StartFusion, which a player's fusion cast path calls as its
+// channel opens; no cast reaches Use through the hit-time dispatch (a
+// player's FUSION cast never hits, and AIController skips FUSION for every
+// other caster), so Use is kept only so the dispatch table covers FUSION.
 type fusionHandler struct {
 	defs Definitions
 }
