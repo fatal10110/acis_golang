@@ -180,7 +180,7 @@ func (s *ClanStore) RemoveMembership(ctx context.Context, r clan.RemovalRow) err
 	}
 	defer func() { _ = tx.Rollback() }()
 	if r.Online {
-		_, err = tx.ExecContext(ctx, `UPDATE characters SET clanid=0, title='', power_grade=0, clan_join_expiry_time=?, clan_create_expiry_time=?,
+		_, err = tx.ExecContext(ctx, `UPDATE characters SET clanid=0, title='', power_grade=0, clan_join_expiry_time=?, clan_create_expiry_time=?, wantspeace=0,
 			subpledge=0, lvl_joined_academy=0, apprentice=0, sponsor=0 WHERE obj_Id=?`, r.JoinExpiry, r.CreateExpiry, r.ObjectID)
 	} else {
 		_, err = tx.ExecContext(ctx, `UPDATE characters SET clanid=0, title='', clan_join_expiry_time=?, clan_create_expiry_time=?, wantspeace=0,

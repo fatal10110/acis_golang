@@ -200,6 +200,10 @@ type Character struct {
 
 	dead atomic.Bool
 
+	// wantsPeace is whether the player has personally surrendered its
+	// clan's war; see WantsPeace.
+	wantsPeace atomic.Bool
+
 	// charmOfCourage mirrors whether the effect list holds a Charm of
 	// Courage, for status-window packets built while that list's lock may
 	// be held (stat callbacks run under it). charmMu serializes its

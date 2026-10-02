@@ -314,10 +314,12 @@ func (s *Service) remove(cl *Clan, objectID int32, joinExpiry int64, live *playe
 
 // ApplyLeft clears the clan state of m, removed at now, on its live
 // character; it runs on that character's queue. An academy member leaves
-// without a join penalty.
+// without a join penalty. A personal surrender is forgotten, so it does not
+// follow the character into its next clan.
 func (s *Service) ApplyLeft(c *player.Character, m Member, now time.Time) {
 	c.SetTitle("")
 	c.SetClanID(0)
+	c.SetWantsPeace(false)
 	if m.PledgeType != SubunitAcademy {
 		c.SetClanJoinExpiryTime(s.joinExpiry(now))
 	}

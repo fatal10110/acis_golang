@@ -45,7 +45,6 @@ func (l *GameClientLink) requestStopPledgeWar(live *livePlayer, req clientpacket
 
 // requestSurrenderPledgeWar has live's clan give up its war on the clan
 // it names: live takes a full death's experience loss, then the war ends.
-// A member's personal surrender (0x69) is not handled yet (#3196).
 func (l *GameClientLink) requestSurrenderPledgeWar(live *livePlayer, req clientpackets.RequestPledgeWarName) {
 	war, result := l.clanService().CheckSurrender(live.Character, req.PledgeName)
 	if result != clan.WarDone {
@@ -96,6 +95,8 @@ func (l *GameClientLink) sendWarRefusal(live *livePlayer, war clan.War, result c
 		frame = serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotInvolvedInWar)
 	case clan.WarMemberInCombat:
 		frame = serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotStopWarInCombat)
+	case clan.WarSurrenderFailed:
+		frame = serverpackets.FrameSystemMessage(serverpackets.SystemMessageFailedToPersonallySurrender)
 	default:
 		return
 	}

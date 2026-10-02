@@ -32,7 +32,7 @@ const characterColumns = `obj_Id, account_name, char_name,
 	COALESCE(onlinetime,0),
 	COALESCE(death_penalty_level,0), rec_have, rec_left,
 	clan_join_expiry_time, clan_create_expiry_time,
-	COALESCE(punish_level,0), COALESCE(punish_timer,0)`
+	COALESCE(punish_level,0), COALESCE(punish_timer,0), COALESCE(wantspeace,0)`
 
 // CharacterStore reads and writes the characters table.
 type CharacterStore struct {
@@ -68,17 +68,18 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 // Save persists a character's progress — the active class, the base
 // class's level, exp and sp, expBeforeDeath, cur/max HP/CP/MP,
 // karma/pvpkills/pkkills, death_penalty_level, the accumulated session
-// playtime and each subclass's progression — so a later reload reflects everything gained
+// playtime, the personal-surrender flag and each subclass's progression — so a later reload reflects everything gained
 // since the last save instead of the row's creation-time values. Location and
 // appearance columns are not written here. The row is also marked online:
 // Save only runs for characters currently in game.
 func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
 	resources, progression := st.Resources, st.Progression
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, death_penalty_level = ?, onlinetime = ?, online = 1
+		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, death_penalty_level = ?, onlinetime = ?, wantspeace = ?, online = 1
 			 WHERE obj_Id = ?`,
 		progression.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
-		progression.Exp, progression.ExpBeforeDeath, progression.SP, st.Karma, st.PvPKills, st.PKKills, st.ClassID, st.DeathPenaltyLevel, st.OnlineTime, st.ID,
+		progression.Exp, progression.ExpBeforeDeath, progression.SP, st.Karma, st.PvPKills, st.PKKills, st.ClassID, st.DeathPenaltyLevel, st.OnlineTime,
+		st.WantsPeace, st.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("save character %d: %w", st.ID, err)
@@ -144,6 +145,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var clanJoinExpiry, clanCreateExpiry int64
 	var punishLevel int
 	var punishTimer int64
+	var wantsPeace int
 
 	err := row.Scan(
 		&c.ID, &c.AccountName, &c.Name,
@@ -156,7 +158,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 		&onlineTime,
 		&deathPenaltyLevel, &recHave, &recLeft,
 		&clanJoinExpiry, &clanCreateExpiry,
-		&punishLevel, &punishTimer,
+		&punishLevel, &punishTimer, &wantsPeace,
 	)
 	if err != nil {
 		return nil, err
@@ -166,6 +168,8 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	c.SetTitle(title)
 	c.SetClanJoinExpiryTime(clanJoinExpiry)
 	c.SetClanCreateExpiryTime(clanCreateExpiry)
+	// Only a stored 1 raises the flag.
+	c.SetWantsPeace(wantsPeace == 1)
 	c.Race = player.Race(race)
 	c.SetClassID(classID)
 	c.SetHero(hero != 0)
