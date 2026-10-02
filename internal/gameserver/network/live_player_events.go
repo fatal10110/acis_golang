@@ -672,7 +672,7 @@ func etcStatus(c *player.Character) serverpackets.EtcStatus {
 	return serverpackets.EtcStatus{
 		Charges:           int32(c.Charges()),
 		WeightPenalty:     int32(c.WeightPenalty()),
-		Blocked:           c.BlockingAll(),
+		Blocked:           c.BlockingAll() || c.ChatBanned(),
 		DangerArea:        c.InDangerArea(),
 		GradePenalty:      c.WeaponGradePenalty() || c.ArmorGradePenalty() > 0,
 		CharmOfCourage:    c.CharmOfCourage(),

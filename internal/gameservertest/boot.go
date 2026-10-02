@@ -1796,6 +1796,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.ArmorSets = o.armorSets
 	gclConfig.Relations, gclConfig.Characters = relations, chars
 	gclConfig.AccessLevels = chars
+	gclConfig.Punishments = chars
 	petitions, petitionRows := bootPetitions(t, db, chars, ids, o.petitionConfig)
 	gclConfig.Petitions = petitions
 	gclConfig.Macros = gamesql.NewMacroStore(db)

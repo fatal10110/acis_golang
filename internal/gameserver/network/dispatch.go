@@ -350,6 +350,9 @@ type GameClientLink struct {
 	// accessLevels stores the access levels admin commands change; nil
 	// keeps them in memory only.
 	accessLevels accessLevelStore
+	// punishments stores the chat bans and jail terms; nil keeps them in
+	// memory only. See punishment.go.
+	punishments punishmentStore
 	// macros persists each player's macro list; see macro.go.
 	macros macroStore
 	// recommendations persists who recommended whom and the counters; see
@@ -495,6 +498,9 @@ type GameClientLinkConfig struct {
 	// AccessLevels stores the access levels admin commands change; nil
 	// keeps them in memory only and finds no offline character.
 	AccessLevels accessLevelStore
+	// Punishments stores the chat bans and jail terms; nil keeps them in
+	// memory only and finds no offline character.
+	Punishments punishmentStore
 	// Petitions holds the petitions players send the game masters; nil
 	// starts with none and refuses every new one.
 	Petitions *petition.Manager
@@ -627,6 +633,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		relations:        cmp.Or(cfg.Relations, relation.NewManager(nil)),
 		characters:       cfg.Characters,
 		accessLevels:     cfg.AccessLevels,
+		punishments:      cfg.Punishments,
 		petitions:        cmp.Or(cfg.Petitions, petition.NewManager(petition.DefaultConfig(), nil, nil, nil, nil)),
 		enchantState:     enchantflow.NewState(),
 		targets:          skilltarget.NewRegistry(skilltarget.WorldKnown{State: cfg.World}),

@@ -477,10 +477,7 @@ func TestAdminBanPlayer(t *testing.T) {
 	storedAccessLevel(t, srv, userID, bannedCharLevel)
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("ban player Nobody")), "This Player isn't found, or the AccessLevel was unaltered.")
 
-	frames = exchange(t, gm, encodeBuildCmd("ban chat Player"))
-	if len(frames) != 1 || frames[0][0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("//ban chat frames = %x, want ActionFailed", testsupport.FrameOpcodes(frames))
-	}
+	assertTexts(t, exchange(t, gm, encodeBuildCmd("ban chat Player")), "Player is chat banned.")
 }
 
 // TestAdminBanAccount pins //ban account and //unban account
@@ -518,10 +515,7 @@ func TestAdminBanAccount(t *testing.T) {
 	drain(t, gm)
 
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("unban account")), "Unban request sent for account null.")
-	frames = exchange(t, gm, encodeBuildCmd("unban chat Player"))
-	if len(frames) != 1 || frames[0][0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("//unban chat frames = %x, want ActionFailed", testsupport.FrameOpcodes(frames))
-	}
+	assertTexts(t, exchange(t, gm, encodeBuildCmd("unban chat Player")), "Player's chat ban has been lifted.")
 }
 
 // srvObjectID returns the object id of the online player called name.

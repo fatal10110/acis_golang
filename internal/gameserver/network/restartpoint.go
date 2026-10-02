@@ -21,12 +21,12 @@ const restartTeleportOffset = 20
 // resolves a destination, revives the player, and teleports them there.
 //
 // Clan hall, castle and siege-flag restarts (request types 1-3), the
-// GM/festival fixed-position restart (type 4) and the jail restart (type
-// 27) all depend on clan/siege ownership, a festival system or a
-// punishment system that aren't modeled yet. req.RequestType is accepted
-// for wire-format completeness but every request type currently resolves
-// to the same destination an unrecognized type would: the player's nearest
-// town restart point.
+// GM/festival fixed-position restart (type 4) depend on clan/siege
+// ownership or a festival system that aren't modeled yet. req.RequestType
+// is accepted for wire-format completeness: a jailed player restarts in the
+// jail whatever the type, and every other request resolves to the same
+// destination an unrecognized type would: the player's nearest town
+// restart point.
 func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.RequestRestartPoint) {
 	if live == nil {
 		return
@@ -59,7 +59,12 @@ func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.R
 	l.teleportLivePlayer(live, dest, restartTeleportOffset)
 }
 
+// restartDestination is where live restarts: the jail for a jailed player,
+// else the nearest town.
 func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location, bool) {
+	if live.Jailed() {
+		return jailLocation, true
+	}
 	if l.restarts == nil {
 		return location.Location{}, false
 	}

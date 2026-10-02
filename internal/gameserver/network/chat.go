@@ -63,8 +63,10 @@ func (l *GameClientLink) handleSay2(client *Client, live *livePlayer, req client
 	if !ok {
 		return
 	}
-	// A chat-banned player, or a jailed one that is no game master, is
-	// refused here with CHATTING_PROHIBITED once punishments exist (#3155).
+	if live.ChatBanned() || (live.Jailed() && !live.accessLevel().IsGM) {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageChattingProhibited))
+		return
+	}
 	l.chat.Log.Info().Msg(chat.LogEntry(line, live.Name))
 	handle := chatHandlers[line.Type]
 	if handle == nil {
@@ -138,17 +140,19 @@ func (l *GameClientLink) chatHeroVoice(client *Client, live *livePlayer, line ch
 }
 
 // chatTell whispers the line to the named player, and shows live the line
-// addressed "->" to that player. A player not in the world, one blocking
-// everything, or one blocking live refuses it; a game master's whisper
-// passes either block.
+// addressed "->" to that player. A player not in the world, a jailed or
+// chat-banned one, one blocking everything, or one blocking live refuses
+// it; a game master's whisper passes either block.
 func (l *GameClientLink) chatTell(_ *Client, live *livePlayer, line chat.Line) {
 	target, ok := l.livePlayerByName(line.Target)
 	if !ok || target.detached() {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
 		return
 	}
-	// A jailed or chat-banned target refuses it with TARGET_IS_CHAT_BANNED
-	// once punishments exist (#3155).
+	if target.Jailed() || target.ChatBanned() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetIsChatBanned))
+		return
+	}
 	if !live.accessLevel().IsGM {
 		if target.BlockingAll() {
 			live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1BlockedEverything, target.Name))
