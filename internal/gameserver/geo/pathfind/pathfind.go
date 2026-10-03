@@ -130,15 +130,12 @@ func (f *Finder) findForward(dst []location.Location, start, goal *node, buildRe
 	heap.Init(opened)
 	heap.Push(opened, start)
 
-	openSet := scratch.openSet
-	openSet[start.key()] = start
-	closed := scratch.closed
+	scratch.set.slot(start.key()).fwd = start.id
 	seq := int64(1)
 	iterations := 0
 
 	for opened.Len() > 0 && iterations < f.options.MaxIterations {
 		current := heap.Pop(opened).(*node)
-		delete(openSet, current.key())
 
 		if current.gx == goal.gx && current.gy == goal.gy && current.z == goal.z {
 			if !buildResult {
@@ -147,7 +144,6 @@ func (f *Finder) findForward(dst []location.Location, start, goal *node, buildRe
 			return buildPath(dst, current), current.g, true
 		}
 
-		closed[current.key()] = current
 		f.expand(current, goal, &seq, scratch)
 
 		iterations++
@@ -166,47 +162,35 @@ func (f *Finder) findBidirectional(dst []location.Location, start, goal *node, b
 
 	heap.Init(&scratch.opened)
 	heap.Push(&scratch.opened, start)
-	scratch.openSet[start.key()] = start
+	scratch.set.slot(start.key()).fwd = start.id
 	heap.Init(&scratch.backOpened)
 	heap.Push(&scratch.backOpened, goal)
-	scratch.backOpenSet[goal.key()] = goal
+	scratch.set.slot(goal.key()).back = goal.id
 
+	// A popped node meets the other frontier wherever that frontier holds
+	// the same cell, whether it is still queued there or already expanded.
 	seq := int64(3)
 	iterations := 0
 	for scratch.opened.Len() > 0 && scratch.backOpened.Len() > 0 && iterations < f.options.MaxIterations {
 		if scratch.opened[0].f <= scratch.backOpened[0].f {
 			current := heap.Pop(&scratch.opened).(*node)
-			delete(scratch.openSet, current.key())
-			if meet := scratch.backClosed[current.key()]; meet != nil {
+			if id := scratch.set.lookup(current.key()).back; id != 0 {
+				meet := scratch.nodes.at(id)
 				if !buildResult {
 					return dst, current.g + meet.g, true
 				}
 				return buildBidirectionalPath(dst, current, meet, scratch), current.g + meet.g, true
 			}
-			if meet := scratch.backOpenSet[current.key()]; meet != nil {
-				if !buildResult {
-					return dst, current.g + meet.g, true
-				}
-				return buildBidirectionalPath(dst, current, meet, scratch), current.g + meet.g, true
-			}
-			scratch.closed[current.key()] = current
-			f.expandForward(current, goal, &seq, scratch, &scratch.opened, scratch.openSet, scratch.closed)
+			f.expandForward(current, goal, &seq, scratch)
 		} else {
 			current := heap.Pop(&scratch.backOpened).(*node)
-			delete(scratch.backOpenSet, current.key())
-			if meet := scratch.closed[current.key()]; meet != nil {
+			if id := scratch.set.lookup(current.key()).fwd; id != 0 {
+				meet := scratch.nodes.at(id)
 				if !buildResult {
 					return dst, current.g + meet.g, true
 				}
 				return buildBidirectionalPath(dst, meet, current, scratch), current.g + meet.g, true
 			}
-			if meet := scratch.openSet[current.key()]; meet != nil {
-				if !buildResult {
-					return dst, current.g + meet.g, true
-				}
-				return buildBidirectionalPath(dst, meet, current, scratch), current.g + meet.g, true
-			}
-			scratch.backClosed[current.key()] = current
 			f.expandBackward(current, start, &seq, scratch)
 		}
 		iterations++
@@ -226,16 +210,12 @@ type node struct {
 	seq    int64
 	parent *node
 	index  int
+	// id is the node's nodeArena id.
+	id int32
 }
 
-func (n *node) key() nodeKey {
-	return nodeKey{gx: n.gx, gy: n.gy, z: n.z}
-}
-
-type nodeKey struct {
-	gx int
-	gy int
-	z  int
+func (n *node) key() uint64 {
+	return cellKey(n.gx, n.gy, n.z)
 }
 
 type nodeHeap []*node
@@ -271,44 +251,21 @@ func (h *nodeHeap) Pop() any {
 }
 
 type searchScratch struct {
-	opened      nodeHeap
-	openSet     map[nodeKey]*node
-	closed      map[nodeKey]*node
-	backOpened  nodeHeap
-	backOpenSet map[nodeKey]*node
-	backClosed  map[nodeKey]*node
-	nodes       []node
-	pathNodes   []*node
+	opened     nodeHeap
+	backOpened nodeHeap
+	set        nodeSet
+	nodes      nodeArena
+	pathNodes  []*node
 }
 
+// reset readies the scratch for the next search. The heaps and path list
+// only ever point into nodes, which the scratch keeps anyway, so they are
+// truncated without clearing.
 func (s *searchScratch) reset() {
-	clear(s.opened)
 	s.opened = s.opened[:0]
-	if s.openSet == nil {
-		s.openSet = make(map[nodeKey]*node)
-	} else {
-		clear(s.openSet)
-	}
-	if s.closed == nil {
-		s.closed = make(map[nodeKey]*node)
-	} else {
-		clear(s.closed)
-	}
-	clear(s.backOpened)
 	s.backOpened = s.backOpened[:0]
-	if s.backOpenSet == nil {
-		s.backOpenSet = make(map[nodeKey]*node)
-	} else {
-		clear(s.backOpenSet)
-	}
-	if s.backClosed == nil {
-		s.backClosed = make(map[nodeKey]*node)
-	} else {
-		clear(s.backClosed)
-	}
-	clear(s.nodes)
-	s.nodes = s.nodes[:0]
-	clear(s.pathNodes)
+	s.set.reset()
+	s.nodes.reset()
 	s.pathNodes = s.pathNodes[:0]
 }
 
@@ -317,13 +274,9 @@ func (s *searchScratch) newNodeFromWorld(worldX, worldY, z int) *node {
 }
 
 func (s *searchScratch) newNode(gx, gy, z int) *node {
-	s.nodes = append(s.nodes, node{
-		gx:    gx,
-		gy:    gy,
-		z:     z,
-		index: -1,
-	})
-	return &s.nodes[len(s.nodes)-1]
+	n := s.nodes.alloc()
+	n.gx, n.gy, n.z = gx, gy, z
+	return n
 }
 
 // cardinalSteps are the four straight neighbor expansions: N, S, W, E, in
@@ -365,10 +318,10 @@ var cornerSteps = [4]struct {
 // NSWE mask, then addCandidate may smooth the parent link when a bounded
 // direct movement check proves that shortcut is cheaper.
 func (f *Finder) expand(current, goal *node, seq *int64, scratch *searchScratch) {
-	f.expandForward(current, goal, seq, scratch, &scratch.opened, scratch.openSet, scratch.closed)
+	f.expandForward(current, goal, seq, scratch)
 }
 
-func (f *Finder) expandForward(current, goal *node, seq *int64, scratch *searchScratch, opened *nodeHeap, openSet, closed map[nodeKey]*node) {
+func (f *Finder) expandForward(current, goal *node, seq *int64, scratch *searchScratch) {
 	if current.nswe == block.NoDirections {
 		return
 	}
@@ -386,7 +339,7 @@ func (f *Finder) expandForward(current, goal *node, seq *int64, scratch *searchS
 			continue
 		}
 		cardinalNSWE[i] = nswe
-		f.addCandidateTo(current, goal, seq, scratch, opened, openSet, closed, gx, gy, height, nswe, false)
+		f.addCandidate(current, goal, seq, scratch, gx, gy, height, nswe, false)
 	}
 
 	for _, corner := range cornerSteps {
@@ -418,7 +371,7 @@ func (f *Finder) expandForward(current, goal *node, seq *int64, scratch *searchS
 		if !ok {
 			continue
 		}
-		f.addCandidateTo(current, goal, seq, scratch, opened, openSet, closed, gx, gy, height, nswe, true)
+		f.addCandidate(current, goal, seq, scratch, gx, gy, height, nswe, true)
 	}
 }
 
@@ -499,15 +452,10 @@ func (f *Finder) backwardCandidateNSWE(gx, gy int, current *node) (height int, n
 // only when its straight-line cost is lower and the bounded direct movement
 // check succeeds.
 func (f *Finder) addCandidate(current, goal *node, seq *int64, scratch *searchScratch, gx, gy, height int, nswe block.NSWE, diagonal bool) {
-	f.addCandidateTo(current, goal, seq, scratch, &scratch.opened, scratch.openSet, scratch.closed, gx, gy, height, nswe, diagonal)
-}
-
-func (f *Finder) addCandidateTo(current, goal *node, seq *int64, scratch *searchScratch, opened *nodeHeap, openSet, closed map[nodeKey]*node, gx, gy, height int, nswe block.NSWE, diagonal bool) {
-	key := nodeKey{gx: gx, gy: gy, z: height}
-	if _, ok := closed[key]; ok {
-		return
-	}
-	if _, ok := openSet[key]; ok {
+	// Nothing below touches the set again before slot is written, so its
+	// pointer stays valid.
+	slot := scratch.set.slot(cellKey(gx, gy, height))
+	if slot.fwd != 0 {
 		return
 	}
 
@@ -559,16 +507,14 @@ func (f *Finder) addCandidateTo(current, goal *node, seq *int64, scratch *search
 	*seq = *seq + 1
 	n.h = f.heuristic(n, goal)
 	n.f = n.g + n.h
-	heap.Push(opened, n)
-	openSet[key] = n
+	heap.Push(&scratch.opened, n)
+	slot.fwd = n.id
 }
 
 func (f *Finder) addBackwardCandidate(current, goal *node, seq *int64, scratch *searchScratch, gx, gy, height int, nswe block.NSWE, diagonal bool) {
-	key := nodeKey{gx: gx, gy: gy, z: height}
-	if _, ok := scratch.backClosed[key]; ok {
-		return
-	}
-	if _, ok := scratch.backOpenSet[key]; ok {
+	// See addCandidate: the slot pointer stays valid until it is written.
+	slot := scratch.set.slot(cellKey(gx, gy, height))
+	if slot.back != 0 {
 		return
 	}
 
@@ -584,7 +530,7 @@ func (f *Finder) addBackwardCandidate(current, goal *node, seq *int64, scratch *
 		}
 	}
 
-	// See the matching comment in addCandidateTo: corner-cut candidates need
+	// See the matching comment in addCandidate: corner-cut candidates need
 	// their own direct-connectivity check on multilayer terrain, cardinal
 	// steps don't.
 	direct := !diagonal || f.engine.CanMove(
@@ -594,7 +540,7 @@ func (f *Finder) addBackwardCandidate(current, goal *node, seq *int64, scratch *
 
 	parent := current
 	cost := current.g + weight
-	// See the matching comment in addCandidateTo: defer the CanMove line-walk
+	// See the matching comment in addCandidate: defer the CanMove line-walk
 	// behind the cheap cost/range comparison.
 	if current.parent != nil && withinSmoothRangeFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z) {
 		smoothed := current.parent.g + f.straightLineCostFrom(gx, gy, height, current.parent.gx, current.parent.gy, current.parent.z, current.parent.nswe)
@@ -620,7 +566,7 @@ func (f *Finder) addBackwardCandidate(current, goal *node, seq *int64, scratch *
 	n.h = f.heuristic(n, goal)
 	n.f = n.g + n.h
 	heap.Push(&scratch.backOpened, n)
-	scratch.backOpenSet[key] = n
+	slot.back = n.id
 }
 
 func (f *Finder) canMoveDirect(from *node, gx, gy, height int) bool {
