@@ -1,6 +1,7 @@
 package xml
 
 import (
+	"encoding/xml"
 	"fmt"
 	"strings"
 
@@ -15,18 +16,16 @@ type castleFile struct {
 	Castles []castleElement `xml:"castle"`
 }
 
+// castleElement is one <castle>. Its scalar attributes are kept raw and
+// folded with every <tax> child's (see residenceAttrs).
 type castleElement struct {
-	ID            *coord                  `xml:"id,attr"`
-	Alias         string                  `xml:"alias,attr"`
-	ParentID      *coord                  `xml:"parentId,attr"`
-	Name          string                  `xml:"name,attr"`
-	CircletID     *coord                  `xml:"circletId,attr"`
+	Attrs         []xml.Attr              `xml:",any,attr"`
 	Artifacts     []castleArtifactElement `xml:"artifacts>artifact"`
 	ControlTowers []castleTowerElement    `xml:"controlTowers>controlTower"`
 	Gates         []valListElement        `xml:"gates"`
 	NPCs          []valListElement        `xml:"npcs"`
 	Spawns        []residenceSpawnElement `xml:"spawns>spawn"`
-	Tax           []taxElement            `xml:"tax"`
+	Tax           []attrsElement          `xml:"tax"`
 	Tickets       []castleTicketElement   `xml:"tickets>ticket"`
 	Zones         []residenceZoneElement  `xml:"zones>zone"`
 }
@@ -59,15 +58,6 @@ type castleTicketElement struct {
 	SSQ        string   `xml:"ssq,attr"`
 }
 
-// taxElement is a residence's <tax> child: the rate attributes read as
-// pointers because a missing rate must stay distinguishable from a present
-// zero, matching commons.StatSet.GetInt's required-key rejection.
-type taxElement struct {
-	Rate        *coord `xml:"taxRate,attr"`
-	SysgetRate  *coord `xml:"taxSysgetRate,attr"`
-	TributeRate *coord `xml:"tributeRate,attr"`
-}
-
 // valListElement is a "<tag val=\"a;b;c\"/>" child holding a
 // semicolon-delimited list (gates, npcs, a control tower's zone aliases).
 type valListElement struct {
@@ -78,29 +68,75 @@ type clanHallFile struct {
 	Halls []clanHallElement `xml:"clanHall"`
 }
 
+// clanHallElement is one <clanHall>. Its scalar attributes are kept raw and
+// folded with every <agit> child's, then every <tax> child's (see
+// residenceAttrs).
 type clanHallElement struct {
-	ID       *coord                  `xml:"id,attr"`
-	Alias    string                  `xml:"alias,attr"`
-	ParentID *coord                  `xml:"parentId,attr"`
-	Name     string                  `xml:"name,attr"`
-	Agits    []agitElement           `xml:"agit"`
-	Gates    []valListElement        `xml:"gates"`
-	NPCs     []valListElement        `xml:"npcs"`
-	Spawns   []residenceSpawnElement `xml:"spawns>spawn"`
-	Taxes    []taxElement            `xml:"tax"`
-	Zones    []residenceZoneElement  `xml:"zones>zone"`
+	Attrs  []xml.Attr              `xml:",any,attr"`
+	Agits  []attrsElement          `xml:"agit"`
+	Gates  []valListElement        `xml:"gates"`
+	NPCs   []valListElement        `xml:"npcs"`
+	Spawns []residenceSpawnElement `xml:"spawns>spawn"`
+	Taxes  []attrsElement          `xml:"tax"`
+	Zones  []residenceZoneElement  `xml:"zones>zone"`
 }
 
-type agitElement struct {
-	Desc           string       `xml:"desc,attr"`
-	Loc            string       `xml:"loc,attr"`
-	SiegeLength    *coord64     `xml:"siegeLength,attr"`
-	ScheduleConfig string       `xml:"scheduleConfig,attr"`
-	AuctionMin     looseIntAttr `xml:"auctionMin,attr"`
-	Deposit        looseIntAttr `xml:"deposit,attr"`
-	Lease          looseIntAttr `xml:"lease,attr"`
-	Size           looseIntAttr `xml:"size,attr"`
-	Grade          looseIntAttr `xml:"grade,attr"`
+// residenceAttrs is a residence's scalar attribute set: the element's own
+// attributes, then each folded child group's in turn, every child in
+// document order. A later value replaces an earlier one of the same name and
+// a name a later child omits keeps its earlier value, so any of the folded
+// elements may supply any key. Values stay raw until read, so only the final
+// value of a key is parsed.
+type residenceAttrs map[string]string
+
+func foldResidenceAttrs(own []xml.Attr, groups ...[]attrsElement) residenceAttrs {
+	out := make(residenceAttrs, len(own))
+	for _, a := range own {
+		out[a.Name.Local] = a.Value
+	}
+	for _, group := range groups {
+		for _, child := range group {
+			for _, a := range child.Attrs {
+				out[a.Name.Local] = a.Value
+			}
+		}
+	}
+	return out
+}
+
+// requiredInt reads a required int with the coord grammar (commons.Atoi).
+func (r residenceAttrs) requiredInt(key string) (int, error) {
+	raw, ok := r[key]
+	if !ok {
+		return 0, fmt.Errorf("%s is required", key)
+	}
+	n, err := commons.Atoi(raw)
+	if err != nil {
+		return 0, fmt.Errorf("%s: %w", key, err)
+	}
+	return n, nil
+}
+
+// optionalInt64 reads an optional int64, reporting whether key is present.
+func (r residenceAttrs) optionalInt64(key string) (int64, bool, error) {
+	raw, ok := r[key]
+	if !ok {
+		return 0, false, nil
+	}
+	n, err := commons.ParseInt(raw, 64)
+	if err != nil {
+		return 0, true, fmt.Errorf("%s: %w", key, err)
+	}
+	return n, true, nil
+}
+
+// optionalInt reads an int that defaults to 0 when absent; a present
+// malformed value is an error.
+func (r residenceAttrs) optionalInt(key string) (int, error) {
+	if _, ok := r[key]; !ok {
+		return 0, nil
+	}
+	return r.requiredInt(key)
 }
 
 type clanHallDecoFile struct {
@@ -214,18 +250,21 @@ func buildDeco(el decoElement) (clanhall.Deco, error) {
 }
 
 func buildCastle(el castleElement) (*castle.Castle, error) {
-	if el.ID == nil {
-		return nil, fmt.Errorf("castle: id is required")
+	attrs := foldResidenceAttrs(el.Attrs, el.Tax)
+	id, err := attrs.requiredInt("id")
+	if err != nil {
+		return nil, fmt.Errorf("castle: %w", err)
 	}
-	id := int(*el.ID)
-	if el.ParentID == nil {
-		return nil, fmt.Errorf("castle %d: parentId is required", id)
+	parentID, err := attrs.requiredInt("parentId")
+	if err != nil {
+		return nil, fmt.Errorf("castle %d: %w", id, err)
 	}
-	if el.CircletID == nil {
-		return nil, fmt.Errorf("castle %d: circletId is required", id)
+	circletID, err := attrs.requiredInt("circletId")
+	if err != nil {
+		return nil, fmt.Errorf("castle %d: %w", id, err)
 	}
 
-	tax, err := buildResidenceTax(el.Tax)
+	tax, err := buildResidenceTax(attrs)
 	if err != nil {
 		return nil, fmt.Errorf("castle %d: %w", id, err)
 	}
@@ -281,10 +320,10 @@ func buildCastle(el castleElement) (*castle.Castle, error) {
 
 	return castle.NewCastle(castle.CastleAttrs{
 		ID:        id,
-		ParentID:  int(*el.ParentID),
-		CircletID: int(*el.CircletID),
-		Alias:     el.Alias,
-		Name:      el.Name,
+		ParentID:  parentID,
+		CircletID: circletID,
+		Alias:     attrs["alias"],
+		Name:      attrs["name"],
 		Tax:       tax,
 		Gates:     gates,
 		NPCs:      npcs,
@@ -309,7 +348,12 @@ func buildControlTower(t castleTowerElement) (castle.ControlTower, error) {
 	if stats.HP == nil || stats.PDef == nil || stats.MDef == nil {
 		return castle.ControlTower{}, fmt.Errorf("castle: control tower %q: stats hp, pDef and mDef are required", t.Alias)
 	}
-	zones := cleanStrings(splitList(firstVal(t.Zones)))
+	// Last <zones> child wins, like <position> and <stats>.
+	var zoneList string
+	if len(t.Zones) > 0 {
+		zoneList = t.Zones[len(t.Zones)-1].Val
+	}
+	zones := cleanStrings(splitList(zoneList))
 	return castle.NewControlTower(t.Alias, t.Type, loc.X, loc.Y, loc.Z, float64(*stats.HP), float64(*stats.PDef), float64(*stats.MDef), zones)
 }
 
@@ -328,29 +372,42 @@ func buildCastleTicket(t castleTicketElement) (castle.Ticket, error) {
 }
 
 func buildClanHall(el clanHallElement) (*clanhall.Hall, error) {
-	if el.ID == nil {
-		return nil, fmt.Errorf("clanhall: id is required")
-	}
-	id := int(*el.ID)
-	if el.ParentID == nil {
-		return nil, fmt.Errorf("clanhall %d: parentId is required", id)
-	}
-
-	if len(el.Agits) == 0 {
-		return nil, fmt.Errorf("clanhall %d: agit is required", id)
-	}
-	agit := el.Agits[0]
-
-	var siegeLength int64
-	if agit.SiegeLength != nil {
-		siegeLength = int64(*agit.SiegeLength)
-	}
-	scheduleConfig, err := splitInts(agit.ScheduleConfig)
+	attrs := foldResidenceAttrs(el.Attrs, el.Agits, el.Taxes)
+	id, err := attrs.requiredInt("id")
 	if err != nil {
-		return nil, fmt.Errorf("clanhall %d: scheduleConfig: %w", id, err)
+		return nil, fmt.Errorf("clanhall: %w", err)
+	}
+	parentID, err := attrs.requiredInt("parentId")
+	if err != nil {
+		return nil, fmt.Errorf("clanhall %d: %w", id, err)
 	}
 
-	tax, err := buildResidenceTax(el.Taxes)
+	// auctionMin, deposit, lease, size and grade default to 0 when absent.
+	var fees [5]int
+	for i, key := range [...]string{"auctionMin", "deposit", "lease", "size", "grade"} {
+		if fees[i], err = attrs.optionalInt(key); err != nil {
+			return nil, fmt.Errorf("clanhall %d: %w", id, err)
+		}
+	}
+
+	// A siegeLength key makes the hall siegable; only then is scheduleConfig
+	// read, and it must hold at least one int.
+	siegeLength, siegable, err := attrs.optionalInt64("siegeLength")
+	if err != nil {
+		return nil, fmt.Errorf("clanhall %d: %w", id, err)
+	}
+	var scheduleConfig []int
+	if siegable {
+		raw := attrs["scheduleConfig"]
+		if raw == "" {
+			return nil, fmt.Errorf("clanhall %d: scheduleConfig is required for a siegable hall", id)
+		}
+		if scheduleConfig, err = splitInts(raw); err != nil {
+			return nil, fmt.Errorf("clanhall %d: scheduleConfig: %w", id, err)
+		}
+	}
+
+	tax, err := buildResidenceTax(attrs)
 	if err != nil {
 		return nil, fmt.Errorf("clanhall %d: %w", id, err)
 	}
@@ -376,18 +433,18 @@ func buildClanHall(el clanHallElement) (*clanhall.Hall, error) {
 
 	return clanhall.NewHall(clanhall.HallAttrs{
 		ID:             id,
-		ParentID:       int(*el.ParentID),
-		Alias:          el.Alias,
-		Name:           el.Name,
-		Description:    agit.Desc,
-		Town:           agit.Loc,
-		AuctionMin:     int(agit.AuctionMin),
-		Deposit:        int(agit.Deposit),
-		Lease:          int(agit.Lease),
-		Size:           int(agit.Size),
-		Grade:          int(agit.Grade),
+		ParentID:       parentID,
+		Alias:          attrs["alias"],
+		Name:           attrs["name"],
+		Description:    attrs["desc"],
+		Town:           attrs["loc"],
+		AuctionMin:     fees[0],
+		Deposit:        fees[1],
+		Lease:          fees[2],
+		Size:           fees[3],
+		Grade:          fees[4],
 		SiegeLength:    siegeLength,
-		Siegable:       agit.SiegeLength != nil,
+		Siegable:       siegable,
 		ScheduleConfig: scheduleConfig,
 		Tax:            tax,
 		Gates:          gates,
@@ -395,21 +452,22 @@ func buildClanHall(el clanHallElement) (*clanhall.Hall, error) {
 	}, zones, spawns)
 }
 
-// buildResidenceTax builds a residence.Tax from a castle's or clan hall's
-// <tax> child, using only the first element if more than one is present.
-func buildResidenceTax(taxes []taxElement) (residence.Tax, error) {
-	if len(taxes) == 0 {
-		return residence.Tax{}, fmt.Errorf("tax is required")
+// buildResidenceTax reads a residence's tax rates from its folded attributes;
+// all three are required.
+func buildResidenceTax(attrs residenceAttrs) (residence.Tax, error) {
+	rate, err := attrs.requiredInt("taxRate")
+	if err != nil {
+		return residence.Tax{}, err
 	}
-	t := taxes[0]
-	if t.Rate == nil || t.SysgetRate == nil || t.TributeRate == nil {
-		return residence.Tax{}, fmt.Errorf("taxRate, taxSysgetRate and tributeRate are required")
+	sysgetRate, err := attrs.requiredInt("taxSysgetRate")
+	if err != nil {
+		return residence.Tax{}, err
 	}
-	return residence.Tax{
-		Rate:        int(*t.Rate),
-		SysgetRate:  int(*t.SysgetRate),
-		TributeRate: int(*t.TributeRate),
-	}, nil
+	tributeRate, err := attrs.requiredInt("tributeRate")
+	if err != nil {
+		return residence.Tax{}, err
+	}
+	return residence.Tax{Rate: rate, SysgetRate: sysgetRate, TributeRate: tributeRate}, nil
 }
 
 func buildResidenceZones(elems []residenceZoneElement) ([]residence.Zone, error) {
@@ -457,16 +515,6 @@ func buildResidenceSpawns(elems []residenceSpawnElement) (map[residence.SpawnTyp
 		out[kind] = append(out[kind], loc)
 	}
 	return out, nil
-}
-
-// firstVal returns the val attribute of the first element in elems, or "" if
-// elems is empty. It mirrors the original StatSet-merge behavior of using
-// only the first "<tag val=\"...\"/>" child when more than one is present.
-func firstVal(elems []valListElement) string {
-	if len(elems) == 0 {
-		return ""
-	}
-	return elems[0].Val
 }
 
 func joinVals(elems []valListElement) string {
