@@ -44,14 +44,16 @@ func (l *GameClientLink) wireZoneOccupantHooks() {
 }
 
 // recallRaidOccupant sends a, when it is a raid-related NPC, back to its
-// spawn.
+// spawn. A raid NPC that leaves the lair by teleport is not sent: the
+// reference judges it at its old position while the teleport keeps it from
+// moving, so it only heads home later, when its own AI decides to.
 func (l *GameClientLink) recallRaidOccupant(a zone.Actor) {
 	obj, ok := l.world.Object(a.ObjectID())
 	if !ok {
 		return
 	}
 	h, ok := obj.(*npc.Hostile)
-	if !ok || !h.RaidRelated() {
+	if !ok || !h.RaidRelated() || h.Teleporting() {
 		return
 	}
 	if q := h.Queue(); q != nil {

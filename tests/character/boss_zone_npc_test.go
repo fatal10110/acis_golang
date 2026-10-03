@@ -2,6 +2,7 @@ package character
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -61,22 +62,51 @@ func TestBossZoneLastPlayableOutSendsRaidHome(t *testing.T) {
 	}
 }
 
+// walkOut walks h out of the boss zone of bootInBossZone to at, one movement
+// step at a time, as its move controller does.
+func walkOut(h *npc.Hostile, at location.Location) {
+	for range zone.StepsPerRevalidation {
+		h.Move().SetPosition(at)
+		h.SyncPosition(at)
+	}
+}
+
 // TestBossZoneRaidLeavingGoesHome pins BossZone.onExit's attackable branch
-// (BossZone.java:176-177): a raid-related monster that leaves the lair
+// (BossZone.java:176-177): a raid-related monster that walks out of the lair
 // returns to its spawn point; any other monster does not.
 func TestBossZoneRaidLeavingGoesHome(t *testing.T) {
 	t.Parallel()
 	srv, _, _ := bootInBossZone(t)
 	raid, plain := spawnLairNPCs(t, srv)
 
-	plain.TeleportTo(location.Location{X: 1_500, Y: 20, Z: 30})
-	raid.TeleportTo(location.Location{X: 1_600, Y: 20, Z: 30})
+	walkOut(plain, location.Location{X: 1_500, Y: 20, Z: 30})
+	walkOut(raid, location.Location{X: 1_600, Y: 20, Z: 30})
 	if raid.InsideZone(zone.FlagBoss) || plain.InsideZone(zone.FlagBoss) {
-		t.Fatal("NPCs teleported out of the boss zone are still in it")
+		t.Fatal("NPCs that walked out of the boss zone are still in it")
 	}
 
 	srv.AdvanceUntil(t, "raid monster heads home", raid.IsMoving)
 	if plain.IsMoving() {
 		t.Fatal("a monster that is not raid-related left for home too")
+	}
+}
+
+// TestBossZoneRaidTeleportedOutStays pins the same branch for a teleport:
+// the reference runs returnHome inside teleportTo, at the old position and
+// while the teleport disables movement, so a raid-related monster teleported
+// out of the lair does not set off for home on landing.
+func TestBossZoneRaidTeleportedOutStays(t *testing.T) {
+	t.Parallel()
+	srv, _, _ := bootInBossZone(t)
+	raid, _ := spawnLairNPCs(t, srv)
+
+	raid.TeleportTo(location.Location{X: 1_600, Y: 20, Z: 30})
+	if raid.InsideZone(zone.FlagBoss) {
+		t.Fatal("raid monster teleported out of the boss zone is still in it")
+	}
+
+	srv.Advance(t, time.Second)
+	if raid.IsMoving() {
+		t.Fatal("raid monster teleported out of its lair walked home on landing")
 	}
 }

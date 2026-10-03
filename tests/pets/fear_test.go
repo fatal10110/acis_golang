@@ -179,8 +179,8 @@ const (
 
 // bootFearServitor brings the owner in with one servitor skill that calls
 // tmpl, casts it, waits for the servitor to reach world state, and spawns
-// the fixture monster.
-func bootFearServitor(t *testing.T, tmpl *npc.Template, skillID int) (*petWorld, *summon.Actor, *npc.Hostile) {
+// the fixture monster. extra adds boot options, such as the zones.
+func bootFearServitor(t *testing.T, tmpl *npc.Template, skillID int, extra ...gameservertest.Option) (*petWorld, *summon.Actor, *npc.Hostile) {
 	t.Helper()
 	db := sqltest.SharedDB(t)
 	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{
@@ -194,9 +194,10 @@ func bootFearServitor(t *testing.T, tmpl *npc.Template, skillID int) (*petWorld,
 			StaticHitTime: true, HitTime: 0, StaticReuse: true, ReuseDelay: 0,
 		},
 	}), gamesql.NewCharacterSkillStore(db))
-	srv := bootPets(t,
+	srv := bootPets(t, append([]gameservertest.Option{
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{wolfTemplate(), treeTemplate(), tmpl})),
-		gameservertest.WithSkills(skills))
+		gameservertest.WithSkills(skills),
+	}, extra...)...)
 	ownerID := srv.SoleObjectID(t)
 	if err := srv.KnownSkills.SetKnownSkill(context.Background(), ownerID, 0, skillID, 1); err != nil {
 		t.Fatalf("seed known skill %d: %v", skillID, err)

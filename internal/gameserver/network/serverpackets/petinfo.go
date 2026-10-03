@@ -16,39 +16,41 @@ const (
 // tracked separately). AtkSpdMultiplier is npcinfo.AttackSpeedMultiplier of
 // PAtkSpd.
 type PetInfoSnapshot struct {
-	SummonType        int
-	ObjectID          int32
-	TemplateID        int
-	X, Y, Z, Heading  int
-	MAtkSpd, PAtkSpd  int
-	RunSpd, WalkSpd   int
-	MoveMultiplier    float64
-	AtkSpdMultiplier  float64
-	CollisionRadius   float64
-	CollisionHeight   float64
-	InCombat          bool
-	AlikeDead         bool
-	Name, Title       string
-	PvpFlag           int
-	Karma             int
-	CurFed, MaxFed    int
-	CurHP, MaxHP      int
-	CurMP, MaxMP      int
-	SP                int
-	Level             int
-	Exp               int64
-	ExpForThisLevel   int64
-	ExpForNextLevel   int64
-	TotalWeight       int
-	WeightLimit       int
-	PAtk, PDef        int
-	MAtk, MDef        int
-	Accuracy          int
-	EvasionRate       int
-	CriticalHit       int
-	MoveSpeed         int
-	AbnormalEffect    int
-	Mountable         bool
+	SummonType       int
+	ObjectID         int32
+	TemplateID       int
+	X, Y, Z, Heading int
+	MAtkSpd, PAtkSpd int
+	RunSpd, WalkSpd  int
+	MoveMultiplier   float64
+	AtkSpdMultiplier float64
+	CollisionRadius  float64
+	CollisionHeight  float64
+	InCombat         bool
+	AlikeDead        bool
+	Name, Title      string
+	PvpFlag          int
+	Karma            int
+	CurFed, MaxFed   int
+	CurHP, MaxHP     int
+	CurMP, MaxMP     int
+	SP               int
+	Level            int
+	Exp              int64
+	ExpForThisLevel  int64
+	ExpForNextLevel  int64
+	TotalWeight      int
+	WeightLimit      int
+	PAtk, PDef       int
+	MAtk, MDef       int
+	Accuracy         int
+	EvasionRate      int
+	CriticalHit      int
+	MoveSpeed        int
+	AbnormalEffect   int
+	Mountable        bool
+	// MoveType is the summon's move type id: 1 while it swims, else 0.
+	MoveType          int
 	Team              int
 	SoulShotsPerHit   int
 	SpiritShotsPerHit int
@@ -149,7 +151,7 @@ func FramePetInfo(s PetInfoSnapshot) wire.Frame {
 
 	w.WriteInt32(int32(s.AbnormalEffect))
 	w.WriteUint16(uint16(boolInt32(s.Mountable)))
-	w.WriteUint8(0) // move type: 0 is ground movement, the default move state; no swim/fly state is modeled for summons yet
+	w.WriteUint8(uint8(s.MoveType))
 
 	w.WriteUint16(0)
 	w.WriteUint8(uint8(s.Team))
