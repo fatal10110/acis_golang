@@ -477,6 +477,7 @@ var schemaStmts = []string{
 	clanDataSchema, clanPrivsSchema, clanSkillsSchema, clanSubpledgesSchema, clanWarsSchema,
 	accountsSchema,
 	bbsMailSchema, bbsForumSchema, bbsTopicSchema, bbsPostSchema, bbsFavoriteSchema,
+	olympiadNoblesSchema, olympiadNoblesEomSchema, serverMemoSchema,
 }
 
 var seedStmts = []string{sevenSignsStatusSeed}

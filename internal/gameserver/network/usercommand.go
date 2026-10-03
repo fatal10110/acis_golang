@@ -68,14 +68,6 @@ func (l *GameClientLink) requestUserCommand(live *livePlayer, id int32) {
 	}
 }
 
-// userCommandGap answers a user command whose system is not ported yet: the
-// gap is logged and the client released.
-func (l *GameClientLink) userCommandGap(live *livePlayer, id int32, issue string) {
-	l.log.Warn().Int32("command_id", id).Int32("object_id", live.ObjectID()).Str("issue", issue).
-		Msg("game client: user command not implemented yet")
-	live.SendFrame(serverpackets.FrameActionFailed())
-}
-
 // userCommandLoc (/loc) tells live where it stands, in the message naming
 // the region its restart point covers. With no restart point resolved
 // nothing is said.
@@ -197,10 +189,4 @@ func (l *GameClientLink) userCommandChannelListUpdate(live *livePlayer, _ int32)
 		parties[i] = serverpackets.ChannelParty{LeaderName: p.Leader.Name, LeaderID: p.Leader.ObjectID(), Members: int32(p.Count)}
 	}
 	live.SendFrame(serverpackets.FrameExMultiPartyCommandChannelInfo(view.Leader.Name, int32(view.MembersCount), parties))
-}
-
-// userCommandOlympiadStat (/olympiadstat) tells a noble its Olympiad record.
-// Neither noble status nor Olympiad records exist yet.
-func (l *GameClientLink) userCommandOlympiadStat(live *livePlayer, id int32) {
-	l.userCommandGap(live, id, "olympiad record (#3212)")
 }

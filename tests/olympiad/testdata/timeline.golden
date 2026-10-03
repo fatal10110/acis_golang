@@ -1,0 +1,230 @@
+# validation start, nobles, crosses month end
+@2026-10-02T12:00:00Z cycle=4 period=VALIDATION nobles=1001:10,1002:0
+ANN cycle_started 5
+DB delete_nobles
+ANN game_started
+@2026-10-02T18:00:00Z cycle=5 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-10-02T23:50:00Z cycle=5 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 5
+@2026-10-03T00:00:00Z cycle=5 period=VALIDATION nobles=-
+ANN cycle_started 6
+DB delete_nobles
+ANN game_started
+@2026-10-03T18:00:00Z cycle=6 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-10-03T23:50:00Z cycle=6 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 6
+@2026-10-04T00:00:00Z cycle=6 period=VALIDATION nobles=-
+ANN cycle_started 7
+DB delete_nobles
+ANN game_started
+@2026-10-04T18:00:00Z cycle=7 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-10-04T23:50:00Z cycle=7 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 7
+@2026-10-05T00:00:00Z cycle=7 period=VALIDATION nobles=-
+ANN cycle_started 8
+DB delete_nobles
+ANN game_started
+@2026-10-05T18:00:00Z cycle=8 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-10-05T23:50:00Z cycle=8 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 8
+@2026-10-06T00:00:00Z cycle=8 period=VALIDATION nobles=-
+ANN cycle_started 9
+DB delete_nobles
+ANN game_started
+@2026-10-06T18:00:00Z cycle=9 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-10-06T23:50:00Z cycle=9 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 9
+@2026-10-07T00:00:00Z cycle=9 period=VALIDATION nobles=-
+ANN cycle_started 10
+DB delete_nobles
+ANN game_started
+@2026-10-07T18:00:00Z cycle=10 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-10-07T23:50:00Z cycle=10 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 10
+@2026-10-08T00:00:00Z cycle=10 period=VALIDATION nobles=-
+ANN cycle_started 11
+DB delete_nobles
+ANN game_started
+@2026-10-08T18:00:00Z cycle=11 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-10-08T23:50:00Z cycle=11 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 11
+@2026-10-09T00:00:00Z cycle=11 period=VALIDATION nobles=-
+ANN cycle_started 12
+DB delete_nobles
+ANN game_started
+@2026-10-09T18:00:00Z cycle=12 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-10-09T23:50:00Z cycle=12 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 12
+@2026-10-10T00:00:00Z cycle=12 period=VALIDATION nobles=-
+ANN cycle_started 13
+DB delete_nobles
+ANN game_started
+@2026-10-10T18:00:00Z cycle=13 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-10-10T23:50:00Z cycle=13 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 13
+@2026-10-11T00:00:00Z cycle=13 period=VALIDATION nobles=-
+ANN cycle_started 14
+DB delete_nobles
+ANN game_started
+@2026-10-11T18:00:00Z cycle=14 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-10-11T23:50:00Z cycle=14 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 14
+@2026-10-12T00:00:00Z cycle=14 period=VALIDATION nobles=-
+# inside competition
+ANN game_started
+@2026-10-31T20:00:00Z cycle=1 period=COMPETITION nobles=1001:5
+ANN registration_ended
+@2026-10-31T23:50:00Z cycle=1 period=COMPETITION nobles=1001:5
+ANN game_ended
+DB save_cycle 1
+DB save_nobles 1001:5
+@2026-11-01T00:00:00Z cycle=1 period=VALIDATION nobles=1001:5
+ANN cycle_started 2
+DB delete_nobles
+@2026-11-01T12:00:00Z cycle=2 period=VALIDATION nobles=-
+ANN cycle_started 3
+DB delete_nobles
+ANN game_started
+@2026-11-01T18:00:00Z cycle=3 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-11-01T23:50:00Z cycle=3 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 3
+@2026-11-02T00:00:00Z cycle=3 period=VALIDATION nobles=-
+ANN cycle_started 4
+DB delete_nobles
+ANN game_started
+@2026-11-02T18:00:00Z cycle=4 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-11-02T23:50:00Z cycle=4 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 4
+@2026-11-03T00:00:00Z cycle=4 period=VALIDATION nobles=-
+ANN cycle_started 5
+DB delete_nobles
+ANN game_started
+@2026-11-03T18:00:00Z cycle=5 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-11-03T23:50:00Z cycle=5 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 5
+@2026-11-04T00:00:00Z cycle=5 period=VALIDATION nobles=-
+# yesterday's window past midnight
+ANN game_started
+@2026-11-30T23:59:59.500Z cycle=7 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 7
+@2026-12-01T00:00:00Z cycle=7 period=VALIDATION nobles=-
+ANN cycle_started 8
+DB delete_nobles
+@2026-12-01T12:00:00Z cycle=8 period=VALIDATION nobles=-
+ANN cycle_started 9
+DB delete_nobles
+ANN game_started
+@2026-12-01T18:00:00Z cycle=9 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-12-01T23:50:00Z cycle=9 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 9
+@2026-12-02T00:00:00Z cycle=9 period=VALIDATION nobles=-
+ANN cycle_started 10
+DB delete_nobles
+ANN game_started
+@2026-12-02T18:00:00Z cycle=10 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-12-02T23:50:00Z cycle=10 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 10
+@2026-12-03T00:00:00Z cycle=10 period=VALIDATION nobles=-
+ANN cycle_started 11
+DB delete_nobles
+ANN game_started
+@2026-12-03T18:00:00Z cycle=11 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-12-03T23:50:00Z cycle=11 period=COMPETITION nobles=-
+# competition hour, minute passed, not grant day
+ANN game_started
+@2026-11-03T18:30:00Z cycle=2 period=COMPETITION nobles=1001:1
+ANN registration_ended
+@2026-11-03T23:50:00Z cycle=2 period=COMPETITION nobles=1001:1
+ANN game_ended
+DB save_cycle 2
+DB save_nobles 1001:1
+@2026-11-04T00:00:00Z cycle=2 period=VALIDATION nobles=1001:1
+ANN cycle_started 3
+DB delete_nobles
+ANN game_started
+@2026-11-04T18:00:00Z cycle=3 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-11-04T23:50:00Z cycle=3 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 3
+@2026-11-05T00:00:00Z cycle=3 period=VALIDATION nobles=-
+ANN cycle_started 4
+DB delete_nobles
+ANN game_started
+@2026-11-05T18:00:00Z cycle=4 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-11-05T23:50:00Z cycle=4 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 4
+@2026-11-06T00:00:00Z cycle=4 period=VALIDATION nobles=-
+ANN cycle_started 5
+DB delete_nobles
+ANN game_started
+@2026-11-06T18:00:00Z cycle=5 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-11-06T23:50:00Z cycle=5 period=COMPETITION nobles=-
+# first of month in competition
+ANN game_started
+@2026-12-01T19:00:00Z cycle=2 period=COMPETITION nobles=1001:1
+ANN registration_ended
+@2026-12-01T23:50:00Z cycle=2 period=COMPETITION nobles=1001:1
+ANN game_ended
+DB save_cycle 2
+DB save_nobles 1001:1
+@2026-12-02T00:00:00Z cycle=2 period=VALIDATION nobles=1001:1
+ANN cycle_started 3
+DB delete_nobles
+ANN game_started
+@2026-12-02T18:00:00Z cycle=3 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-12-02T23:50:00Z cycle=3 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 3
+@2026-12-03T00:00:00Z cycle=3 period=VALIDATION nobles=-
+ANN cycle_started 4
+DB delete_nobles
+ANN game_started
+@2026-12-03T18:00:00Z cycle=4 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-12-03T23:50:00Z cycle=4 period=COMPETITION nobles=-
+ANN game_ended
+DB save_cycle 4
+@2026-12-04T00:00:00Z cycle=4 period=VALIDATION nobles=-
+ANN cycle_started 5
+DB delete_nobles
+ANN game_started
+@2026-12-04T18:00:00Z cycle=5 period=COMPETITION nobles=-
+ANN registration_ended
+@2026-12-04T23:50:00Z cycle=5 period=COMPETITION nobles=-

@@ -22,6 +22,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -86,6 +87,7 @@ func provideGameClientLink(
 	playerClock *task.PlayerClock,
 	gameClock *task.GameClock,
 	sevenSigns *sevensigns.State,
+	olympiadState *olympiad.Olympiad,
 	inventoryUpdates *task.InventoryUpdates,
 	itemInstances *task.ItemInstances,
 	water *task.Water,
@@ -193,6 +195,7 @@ func provideGameClientLink(
 		PlayerClock:   playerClock,
 		GameClock:     gameClock,
 		SevenSigns:    sevenSigns,
+		Olympiad:      olympiadState,
 		Water:         water,
 		ShadowItems:   shadowItems,
 		Autosave:      autosave,

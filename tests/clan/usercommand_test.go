@@ -259,10 +259,9 @@ func alliancePenaltyRows(t *testing.T, typ, ms, line string) {
 	}
 }
 
-// TestSiegeStatusCommand pins /siegestatus up to the noble check: a player
-// leading no clan is told only a clan leader may ask. A clan leader's
-// noble status is not modeled yet, so the leader is released with
-// ActionFailed.
+// TestSiegeStatusCommand pins /siegestatus's refusals: a player leading no
+// clan is told only a clan leader may ask, and a clan leader who is not a
+// noble that only a noble leader may view the window.
 func TestSiegeStatusCommand(t *testing.T) {
 	t.Parallel()
 	srv, c := bootUserCommandClan(t)
@@ -271,7 +270,14 @@ func TestSiegeStatusCommand(t *testing.T) {
 	startInWorld(t, drifter)
 	drainFrames(t, c)
 	wantSysMsgs(t, "clanless /siegestatus", userCommand(t, drifter, cmdSiegeStatus), msg(serverpackets.SystemMessageOnlyClanLeaderCanIssueCommands))
-	if got := opcodes(userCommand(t, c, cmdSiegeStatus)); !slices.Equal(got, []byte{serverpackets.OpcodeActionFailed}) {
-		t.Fatalf("clan leader /siegestatus = %x, want ActionFailed", got)
-	}
+	wantSysMsgs(t, "non-noble clan leader /siegestatus", userCommand(t, c, cmdSiegeStatus), msg(serverpackets.SystemMessageOnlyNoblesseLeaderCanViewSiegeStatusWindow))
+}
+
+// TestSiegeStatusNobleLeader pins /siegestatus for a noble clan leader: no
+// siege can be in progress, so the leader is told the window only opens
+// during one.
+func TestSiegeStatusNobleLeader(t *testing.T) {
+	t.Parallel()
+	_, c := bootUserCommandClan(t, `UPDATE characters SET nobless = 1 WHERE char_name = 'Founder'`)
+	wantSysMsgs(t, "noble clan leader /siegestatus", userCommand(t, c, cmdSiegeStatus), msg(serverpackets.SystemMessageOnlyDuringSiege))
 }

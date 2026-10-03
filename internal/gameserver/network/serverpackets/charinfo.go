@@ -135,7 +135,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteUint8(0) // enchant effect
 	w.WriteUint8(0) // team
 	w.WriteInt32(s.Clan.CrestLargeID)
-	w.WriteUint8(0) // noble
+	w.WriteUint8(boolUint8(c.IsNoble()))
 	w.WriteUint8(0) // hero
 	w.WriteUint8(0) // fishing
 	w.WriteInt32(0)

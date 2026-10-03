@@ -56,6 +56,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
@@ -148,6 +149,7 @@ type options struct {
 	seedClans              func(db *sql.DB)
 	board                  bbs.Config
 	seedBoard              func(db *sql.DB)
+	seedOlympiad           func(db *sql.DB)
 	serverNews             bool
 	announcements          string
 	clanClock              func() time.Time
@@ -1881,6 +1883,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if worldObjects != nil {
 		gclConfig.Doors = worldObjects
 	}
+	// The Olympiad's records are restored once the characters are seeded,
+	// below; its calendar is not started (see WithOlympiadSeed).
+	olympiadState := olympiad.New(olympiad.DefaultConfig(), gamesql.NewOlympiadStore(db), persistWorker, network.NewOlympiadAnnouncer(state), queues.NewQueue("olympiad"), o.log)
+	gclConfig.Olympiad = olympiadState
 	gcl, err := network.NewGameClientLink(gclConfig)
 	if err != nil {
 		t.Fatalf("gameservertest: build game client link: %v", err)
@@ -1994,6 +2000,13 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.seedBoard != nil {
 		o.seedBoard(db)
 	}
+	if o.seedOlympiad != nil {
+		o.seedOlympiad(db)
+	}
+	if err := olympiadState.Restore(context.Background()); err != nil {
+		t.Fatalf("restore olympiad: %v", err)
+	}
+	t.Cleanup(func() { olympiadState.Stop(context.Background()) })
 	if gclConfig.Mailbox != nil {
 		mails, _, err := mailStore.Load(context.Background())
 		if err != nil {

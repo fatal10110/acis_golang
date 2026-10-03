@@ -132,6 +132,8 @@ type Character struct {
 	// sight past it; see character_invisible.go.
 	invisible     atomic.Bool
 	seesInvisible atomic.Bool
+	// noble is the noblesse status; see character_noble.go.
+	noble atomic.Bool
 
 	// KarmaPoints is the persisted karma value. The field is named
 	// KarmaPoints, not Karma, so it doesn't collide with the Karma() method
