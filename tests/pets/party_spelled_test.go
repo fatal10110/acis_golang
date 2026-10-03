@@ -68,11 +68,14 @@ func ofOpcodes(frames [][]byte, opcodes ...byte) [][]byte {
 }
 
 // TestPetStatBuffShowsIconsOnce lands a P.Atk. buff on a partyless owner's
-// pet. The stat change republishes the pet window (PetInfo, then the icons
-// it cleared, then PetStatusUpdate) and the list's icon pass sends the
-// icons again: the owner gets exactly one PetInfo, and each PartySpelled
-// carries the buff with its 30 s left. Before any effect, the pet's spawn
-// sent no PartySpelled.
+// pet, then removes it. Each stat change republishes the pet window
+// (PetInfo, then PetStatusUpdate) from inside the effect list's pass, and
+// the pass's own icon refresh follows: the owner gets PetInfo,
+// PetStatusUpdate, PartySpelled, with no second PartySpelled. The
+// reference's resend after PetInfo (Summon.updateAndBroadcastStatusAndInfos)
+// re-enters EffectList.queueRunner while queueLock is held and sends
+// nothing (EffectList.java:465-497). Before any effect, the pet's spawn sent
+// no PartySpelled.
 func TestPetStatBuffShowsIconsOnce(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollar(t)
@@ -82,22 +85,50 @@ func TestPetStatBuffShowsIconsOnce(t *testing.T) {
 	}
 	drainUntilQuiet(t, h.client)
 
-	addToPet(t, pet, mightOn(t, pet))
+	want := []byte{serverpackets.OpcodePetInfo, serverpackets.OpcodePetStatusUpdate, serverpackets.OpcodePartySpelled}
+	might := mightOn(t, pet)
+	addToPet(t, pet, might)
 	got := ofOpcodes(drainFrames(t, h.client), serverpackets.OpcodePetInfo, serverpackets.OpcodePartySpelled, serverpackets.OpcodePetStatusUpdate)
-	want := []byte{serverpackets.OpcodePetInfo, serverpackets.OpcodePartySpelled, serverpackets.OpcodePetStatusUpdate, serverpackets.OpcodePartySpelled}
 	if !slices.Equal(frameOpcodes(got), want) {
-		t.Fatalf("owner frames = %x, want PetInfo, PartySpelled, PetStatusUpdate, PartySpelled (%x)", frameOpcodes(got), want)
+		t.Fatalf("buff frames = %x, want PetInfo, PetStatusUpdate, PartySpelled (%x)", frameOpcodes(got), want)
 	}
-	wantBytes := petPartySpelledBytes(pet.ObjectID(), 1068, 1, 30)
-	for _, i := range []int{1, 3} {
-		if !samePetIcons(got[i], wantBytes) {
-			t.Fatalf("PartySpelled %d = %x, want %x", i, got[i], wantBytes)
-		}
+	if wantBytes := petPartySpelledBytes(pet.ObjectID(), 1068, 1, 30); !samePetIcons(got[2], wantBytes) {
+		t.Fatalf("PartySpelled = %x, want %x", got[2], wantBytes)
+	}
+
+	onPetQueue(t, pet, func() { pet.EffectList().Remove(might) })
+	got = ofOpcodes(drainFrames(t, h.client), serverpackets.OpcodePetInfo, serverpackets.OpcodePartySpelled, serverpackets.OpcodePetStatusUpdate)
+	if !slices.Equal(frameOpcodes(got), want) {
+		t.Fatalf("removal frames = %x, want PetInfo, PetStatusUpdate, PartySpelled (%x)", frameOpcodes(got), want)
+	}
+	if n := binary.LittleEndian.Uint32(got[2][9:]); n != 0 {
+		t.Fatalf("removal PartySpelled lists %d effects, want 0: %x", n, got[2])
+	}
+}
+
+// TestPetRenameResendsIcons renames a buffed pet. The rename's PetInfo comes
+// from outside any effect-list pass (RequestChangePetName ->
+// Summon.sendPetInfosToOwner), so the icons it clears are resent right
+// after it.
+func TestPetRenameResendsIcons(t *testing.T) {
+	t.Parallel()
+	h := bootOwnerWithCollar(t)
+	pet, _ := h.spawnWolf(t)
+	addToPet(t, pet, mightOn(t, pet))
+	drainUntilQuiet(t, h.client)
+
+	got := ofOpcodes(renameTo(t, h, "Fenrir"), serverpackets.OpcodePetInfo, serverpackets.OpcodePartySpelled)
+	if want := []byte{serverpackets.OpcodePetInfo, serverpackets.OpcodePartySpelled}; !slices.Equal(frameOpcodes(got), want) {
+		t.Fatalf("rename frames = %x, want PetInfo then PartySpelled (%x)", frameOpcodes(got), want)
+	}
+	if want := petPartySpelledBytes(pet.ObjectID(), 1068, 1, 30); !samePetIcons(got[1], want) {
+		t.Fatalf("rename PartySpelled = %x, want %x", got[1], want)
 	}
 }
 
 // TestPetIconsReachOwnersParty lands a buff on a partied owner's pet:
-// every member, the owner and Mate, gets the pet's PartySpelled.
+// every member, the owner and Mate, gets exactly one PartySpelled of the
+// pet, from the effect list's icon pass.
 func TestPetIconsReachOwnersParty(t *testing.T) {
 	t.Parallel()
 	h, wolf, mate, _ := partyPet(t, party.LootFindersKeepers)
@@ -107,11 +138,11 @@ func TestPetIconsReachOwnersParty(t *testing.T) {
 	want := petPartySpelledBytes(wolf.ObjectID(), 1068, 1, 30)
 	for who, frames := range map[string][][]byte{"owner": drainFrames(t, h.client), "mate": drainFrames(t, mate)} {
 		spelled := ofOpcodes(frames, serverpackets.OpcodePartySpelled)
-		if len(spelled) == 0 {
-			t.Fatalf("%s got no PartySpelled of the pet: opcodes %x", who, frameOpcodes(frames))
+		if len(spelled) != 1 {
+			t.Fatalf("%s got %d PartySpelled of the pet, want 1: opcodes %x", who, len(spelled), frameOpcodes(frames))
 		}
-		if last := spelled[len(spelled)-1]; !samePetIcons(last, want) {
-			t.Fatalf("%s PartySpelled = %x, want %x", who, last, want)
+		if !samePetIcons(spelled[0], want) {
+			t.Fatalf("%s PartySpelled = %x, want %x", who, spelled[0], want)
 		}
 	}
 }

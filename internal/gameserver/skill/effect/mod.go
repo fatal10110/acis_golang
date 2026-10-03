@@ -105,6 +105,11 @@ func ModOwnerAugmentation(inst *item.Instance) ModOwner { return ModOwner{augmen
 // ran the stop-all sends the one closing refresh.
 func (o ModOwner) Stripped() bool { return o.effect != nil && o.effect.strippedAll.Load() }
 
+// IsEffect reports whether o is a running buff/debuff effect. Such an
+// owner's Mods are attached and removed only inside its effect list's
+// add/remove pass, which ends with the list's own icon refresh.
+func (o ModOwner) IsEffect() bool { return o.effect != nil }
+
 // Mod is one data-driven stat modifier: a single (stat, op, value,
 // condition, owner) tuple with no behavior of its own beyond the pure
 // arithmetic Op names. It replaces the former Func interface hierarchy —

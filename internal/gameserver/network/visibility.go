@@ -209,17 +209,26 @@ func liveSummonOwner(a *summon.Actor) (*livePlayer, bool) {
 // sendSummonInfosToOwner republishes the owner-only pet window, then the
 // summon's effect icons, which PetInfo clears on the client.
 func sendSummonInfosToOwner(a *summon.Actor) {
+	if sendSummonPetInfo(a) {
+		refreshSummonPartySpelled(a)
+	}
+}
+
+// sendSummonPetInfo republishes the owner-only pet window alone and reports
+// whether it was sent.
+func sendSummonPetInfo(a *summon.Actor) bool {
 	if a == nil {
-		return
+		return false
 	}
 	owner, ok := liveSummonOwner(a)
 	if !ok {
-		return
+		return false
 	}
-	if snap, ok := petInfoSnapshot(a, owner, owner.npcs); ok {
+	snap, ok := petInfoSnapshot(a, owner, owner.npcs)
+	if ok {
 		owner.sendVisibilityFrame(serverpackets.FramePetInfo(snap))
-		refreshSummonPartySpelled(a)
 	}
+	return ok
 }
 
 func (l *GameClientLink) refreshSummonAbnormalEffect(a *summon.Actor) {

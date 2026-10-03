@@ -1,7 +1,10 @@
 package event
 
 // OwnerInfoChanged reports that a summon's owner-only info window is stale.
-type OwnerInfoChanged struct{}
+// EffectPass marks a stat change an effect's add or removal made: the
+// effect list's own icon refresh follows it, so the icons the new window
+// clears need no separate resend.
+type OwnerInfoChanged struct{ EffectPass bool }
 
 // Damaged reports direct damage a summon took from a named attacker.
 type Damaged struct {
