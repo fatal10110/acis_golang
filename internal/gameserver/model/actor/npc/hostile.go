@@ -994,7 +994,26 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 	h.BroadcastStatus()
 	h.clearAttackers()
 	h.BroadcastDie()
+	if h.RaidBoss() && killedByPlayer(killer) {
+		h.emit(event.RaidBossKilled{})
+	}
 	return true
+}
+
+// killedByPlayer reports whether killer acts for a player: a player, or a
+// summon with an owner.
+func killedByPlayer(killer attackable.Combatant) bool {
+	if killer == nil {
+		return false
+	}
+	switch killer.Kind() {
+	case actor.KindPlayer:
+		return true
+	case actor.KindSummon:
+		_, ok := killer.Owner()
+		return ok
+	}
+	return false
 }
 
 // Decayed reports whether this NPC's corpse has already been removed from

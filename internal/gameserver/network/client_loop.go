@@ -686,6 +686,16 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if live != nil {
 					onLive(live, func() { l.requestPledgeSetAcademyMaster(live, req) })
 				}
+			case clientpackets.OpcodeRequestGetBossRecord:
+				if _, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestGetBossRecord); err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					continue
+				}
+				if live != nil {
+					onLive(live, func() { l.sendBossRecord(live) })
+				}
 			case clientpackets.OpcodeRequestCursedWeaponList:
 				if live == nil {
 					continue

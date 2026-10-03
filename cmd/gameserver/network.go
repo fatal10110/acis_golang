@@ -24,6 +24,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
+	"github.com/fatal10110/acis_golang/internal/gameserver/raidpoint"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -88,6 +89,7 @@ func provideGameClientLink(
 	gameClock *task.GameClock,
 	sevenSigns *sevensigns.State,
 	olympiadState *olympiad.Olympiad,
+	raidPoints *raidpoint.Points,
 	inventoryUpdates *task.InventoryUpdates,
 	itemInstances *task.ItemInstances,
 	water *task.Water,
@@ -196,6 +198,7 @@ func provideGameClientLink(
 		GameClock:     gameClock,
 		SevenSigns:    sevenSigns,
 		Olympiad:      olympiadState,
+		RaidPoints:    raidPoints,
 		Water:         water,
 		ShadowItems:   shadowItems,
 		Autosave:      autosave,

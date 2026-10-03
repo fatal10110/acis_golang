@@ -49,6 +49,11 @@ func (s *hostileSink) Emit(ev event.Event) {
 	case event.Died:
 		s.broadcast(func() wire.Frame { return frames.Die(h.ObjectID(), h.SpoilPool().Sweepable()) })
 		s.stopAttackStance()
+	case event.RaidBossKilled:
+		s.broadcast(func() wire.Frame {
+			return serverpackets.FrameSystemMessage(serverpackets.SystemMessageRaidWasSuccessful)
+		})
+		s.broadcast(func() wire.Frame { return serverpackets.FramePlaySound(serverpackets.SoundRaidWasSuccessful) })
 	case event.AttackStanceRequested, event.Attacked:
 		s.startAttackStance()
 	case event.AutoAttackStopped:
