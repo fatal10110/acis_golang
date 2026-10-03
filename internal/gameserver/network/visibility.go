@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
@@ -120,6 +121,12 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 		p.sendVisibilityFrame(serverpackets.FrameDoorStatusUpdate(o, false))
 	case staticObject:
 		p.sendVisibilityFrame(serverpackets.FrameStaticObjectInfo(o))
+	case *boat.Boat:
+		// A boat shows only the leg it sails: it never casts.
+		p.sendVisibilityFrame(vehicleInfoFrame(o))
+		if dest, speed, rotation, ok := o.Departure(); ok {
+			p.sendVisibilityFrame(serverpackets.FrameVehicleDeparture(o.ObjectID(), speed, rotation, dest))
+		}
 	}
 }
 
@@ -281,7 +288,7 @@ type staticObject interface {
 
 func rendersObject(obj world.Tracked) bool {
 	switch obj.(type) {
-	case *livePlayer, *npc.Hostile, *npc.Decoration, *npc.Folk, *summon.Actor, groundItemObject, doorObject, staticObject:
+	case *livePlayer, *npc.Hostile, *npc.Decoration, *npc.Folk, *summon.Actor, groundItemObject, doorObject, staticObject, *boat.Boat:
 		return true
 	default:
 		return false

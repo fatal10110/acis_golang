@@ -22,6 +22,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
+	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -47,6 +48,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
@@ -182,6 +184,7 @@ type options struct {
 	realPool               bool
 	merchant               merchantOptions
 	doors                  []*door.Template
+	boats                  []route.BoatItinerary
 	petitionConfig         *petition.Config
 	// rewardPartiesWrap wraps the link's kill-party resolver
 	// (WithRewardParties).
@@ -786,6 +789,7 @@ type Server struct {
 	BuyListStock     *merchant.Stock
 	BuyListRows      *gamesql.BuyListStore
 	WorldObjects     *gamemanager.WorldObjects // doors spawned by WithDoors; nil otherwise
+	Boats            *boat.Fleet               // boats sailing WithBoats' itineraries; nil otherwise
 	NpcSpawns        *gamemanager.Npcs         // live NPC population of WithNpcSpawns; nil otherwise
 	Relations        *relation.Manager         // friend and block lists the link was wired with
 	relationRows     *gamesql.RelationStore
@@ -1636,6 +1640,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if len(o.doors) > 0 {
 		worldObjects = bootDoors(t, o.doors, ids, state)
 	}
+	boats := bootBoats(t, o.boats, ids, state)
 	levels := o.levels
 	if levels == nil {
 		synthetic := make(map[int]player.Level, 85)
@@ -2016,6 +2021,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Client:           c,
 		State:            state,
 		WorldObjects:     worldObjects,
+		Boats:            boats,
 		Clans:            gclConfig.Clans,
 		SevenSigns:       sevenSigns,
 		itemTable:        itemTemplates,

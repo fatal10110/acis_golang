@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -52,6 +53,11 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 	target := l.resolveTarget(objectID)
 	if target == nil {
 		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	if _, ok := target.(*boat.Boat); ok {
+		// A click on a boat, plain or forced, does nothing at all: a boat is
+		// never selected, and the reference answers no packet either.
 		return
 	}
 	_, ground := target.(*grounditem.Item)
