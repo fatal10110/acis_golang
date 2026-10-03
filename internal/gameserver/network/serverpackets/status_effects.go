@@ -79,3 +79,30 @@ func writeAbnormalStatusEffect(w *wire.Writer, e AbnormalStatusEffect, permanent
 	}
 	w.WriteInt32(int32(e.DurationMillis / 1000))
 }
+
+// OpcodePartySpelled is the wire opcode for PartySpelled, the effect icon
+// list a party sees of one member or of a member's summon.
+const OpcodePartySpelled byte = 0xee
+
+// PartySpelled owner kinds.
+const (
+	PartySpelledPlayer   int32 = 0
+	PartySpelledPet      int32 = 1
+	PartySpelledServitor int32 = 2
+)
+
+// FramePartySpelled builds the icon list of objectID, a kind owner, as its
+// party sees it. Every entry reports its whole seconds left; a permanent
+// one's -1 ms reads as 0, and toggles get no special encoding.
+func FramePartySpelled(kind, objectID int32, effects []AbnormalStatusEffect) wire.Frame {
+	w := newFrameWriter(OpcodePartySpelled)
+	w.WriteInt32(kind)
+	w.WriteInt32(objectID)
+	w.WriteInt32(int32(len(effects)))
+	for _, e := range effects {
+		w.WriteInt32(e.SkillID)
+		w.WriteUint16(uint16(e.Level))
+		w.WriteInt32(int32(e.DurationMillis / 1000))
+	}
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}

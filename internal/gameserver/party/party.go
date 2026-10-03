@@ -6,6 +6,7 @@ package party
 
 import (
 	"math/rand/v2"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -271,9 +272,7 @@ func (r *Registry[M]) form(out *notices, leader, target M) *group[M] {
 	out.add(WindowAdd[M]{To: []M{leader}, Leader: leader.ObjectID(), Loot: g.loot, Member: target})
 	out.add(Msg[M]{To: []M{target}, ID: MsgYouJoinedParty, Name: leader.CharacterName()})
 	out.add(Msg[M]{To: []M{leader}, ID: MsgJoinedParty, Name: target.CharacterName()})
-	for _, m := range g.members {
-		out.add(InfoRefresh[M]{Member: m})
-	}
+	g.refreshMembers(out)
 	out.add(Formed{ID: g.id})
 	return g
 }
@@ -292,9 +291,7 @@ func (r *Registry[M]) add(out *notices, g *group[M], player M) {
 	if lvl := player.Level(); lvl > g.level {
 		g.level = lvl
 	}
-	for _, m := range g.members {
-		out.add(InfoRefresh[M]{Member: m})
-	}
+	g.refreshMembers(out)
 	if g.channel != nil {
 		out.add(ChannelOpen[M]{To: []M{player}})
 	}
@@ -421,6 +418,17 @@ func (r *Registry[M]) changeLeader(out *notices, g *group[M], player M) {
 		out.add(Msg[M]{To: []M{m}, ID: MsgBecameLeader, Name: player.CharacterName()})
 	}
 	out.add(LeaderChanged[M]{Leader: player})
+}
+
+// refreshMembers shows every member, in turn, the effect icons and the
+// full view of each member, as a party that just formed or gained a member
+// does.
+func (g *group[M]) refreshMembers(out *notices) {
+	to := slices.Clone(g.members)
+	for _, m := range g.members {
+		out.add(IconRefresh[M]{To: to, Member: m})
+		out.add(InfoRefresh[M]{Member: m})
+	}
 }
 
 func (g *group[M]) view() View[M] {

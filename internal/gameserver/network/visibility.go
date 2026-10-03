@@ -82,6 +82,8 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 			o.MarkDiscoveredByOwner()
 			if snap, ok := petInfoSnapshot(o, p, p.npcs); ok {
 				p.sendVisibilityFrame(serverpackets.FramePetInfo(snap))
+				// PetInfo clears the summon's icons on the client.
+				refreshSummonPartySpelled(o)
 				if inv := o.PetInventory(); inv != nil {
 					// PetInventoryUpdate is drained and sent on p's queue, but
 					// discovery can run on another actor's: a summon-friend cast
@@ -204,9 +206,8 @@ func liveSummonOwner(a *summon.Actor) (*livePlayer, bool) {
 	return live, ok
 }
 
-// sendSummonInfosToOwner republishes the owner-only pet window. PetInfo
-// wipes PartySpelled icons; re-push is deferred with #1268 — that issue's
-// notifyAbnormalUpdate wiring does not cover this trigger.
+// sendSummonInfosToOwner republishes the owner-only pet window, then the
+// summon's effect icons, which PetInfo clears on the client.
 func sendSummonInfosToOwner(a *summon.Actor) {
 	if a == nil {
 		return
@@ -217,6 +218,7 @@ func sendSummonInfosToOwner(a *summon.Actor) {
 	}
 	if snap, ok := petInfoSnapshot(a, owner, owner.npcs); ok {
 		owner.sendVisibilityFrame(serverpackets.FramePetInfo(snap))
+		refreshSummonPartySpelled(a)
 	}
 }
 

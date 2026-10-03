@@ -34,8 +34,8 @@ func petFramesBeforeDie(t *testing.T, frames [][]byte, petID int32) (infos, stat
 // removal sends no per-effect refresh (Creature.removeStatsByOwner,
 // Creature.java:1198-1204), and Summon.stopAllEffectsExceptThoseThatLastThroughDeath
 // then sends the owner one PetInfo (sendPetInfosToOwner, Summon.java:385-389,
-// 598-604) whether or not anything was stripped. The buff's removal adds
-// only the icon update's frame.
+// 598-604) whether or not anything was stripped. The buff's removal sends
+// no PetInfo of its own: its icon update is a PartySpelled.
 func TestPetDeathStripRefreshesPetWindowOnce(t *testing.T) {
 	t.Parallel()
 	var plainStatuses int
@@ -45,7 +45,7 @@ func TestPetDeathStripRefreshesPetWindowOnce(t *testing.T) {
 		infos int
 	}{
 		{name: "no effects", infos: 1},
-		{name: "run-speed buff", buff: true, infos: 1 + iconUpdatePetInfo},
+		{name: "run-speed buff", buff: true, infos: 1},
 	} {
 		// Sequential: the buffed case compares against the plain one.
 		t.Run(tt.name, func(t *testing.T) { plainStatuses = killStrippedPet(t, tt.buff, tt.infos, plainStatuses) })

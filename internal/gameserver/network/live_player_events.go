@@ -184,7 +184,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		sendLiveStatus(live)
 		l.sendPartyVitals(live)
 	case event.EffectIconsChanged:
-		l.updateLiveAbnormalEffect(live)
+		l.updateEffectIcons(live)
 	case event.AbnormalEffectChanged:
 		if !live.replayingEffects.Load() {
 			l.broadcastCharacterInfo(live)

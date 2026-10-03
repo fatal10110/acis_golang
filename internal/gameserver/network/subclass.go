@@ -517,7 +517,9 @@ func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChan
 		l.skills.StageClassSkillState(c, rows.skills)
 		l.skills.ReplayEffects(c)
 	}
-	l.updateLiveAbnormalEffect(live)
+	if c.EffectList().HasHeld() {
+		l.updateEffectIcons(live)
+	}
 	live.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(c)))
 	// Repent Your Sins ends here once quests exist (#3070).
 	c.ClampResources()

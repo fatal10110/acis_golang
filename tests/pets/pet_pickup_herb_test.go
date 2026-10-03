@@ -188,10 +188,10 @@ func TestPetPickupConsumesHerb(t *testing.T) {
 	h, wolf := bootHerbWolf(t)
 	groundID := h.seedGroundNearOwner(t, petHerbID, 1)
 
-	// The heal-over-time landing republishes the pet's PetInfo (the effect
-	// list's own update, covered by summon_stat_republish_test); the herb
-	// flow's frames are the rest.
-	rest := withoutOpcode(requirePickupHead(t, h.petPickup(t, groundID), wolf, groundID), serverpackets.OpcodePetInfo)
+	// The heal-over-time landing sends the pet's icons to its owner (the
+	// effect list's own update, a PartySpelled); the herb flow's frames are
+	// the rest.
+	rest := withoutOpcode(requirePickupHead(t, h.petPickup(t, groundID), wolf, groundID), serverpackets.OpcodePartySpelled)
 	if got, want := frameOpcodes(rest), []byte{
 		serverpackets.OpcodeMagicSkillUse, serverpackets.OpcodeSystemMessage, serverpackets.OpcodePetStatusUpdate,
 	}; !slices.Equal(got, want) {
@@ -243,7 +243,7 @@ func TestPetPickupHerbUnderReuseReportsReuse(t *testing.T) {
 	first := h.seedGroundNearOwner(t, reuseHerbID, 1)
 	second := h.seedGroundNearOwner(t, reuseHerbID, 1)
 
-	used := withoutOpcode(requirePickupHead(t, h.petPickup(t, first), wolf, first), serverpackets.OpcodePetInfo)
+	used := withoutOpcode(requirePickupHead(t, h.petPickup(t, first), wolf, first), serverpackets.OpcodePartySpelled)
 	if len(used) != 3 || used[0][0] != serverpackets.OpcodeMagicSkillUse {
 		t.Fatalf("first herb frames = %x, want MagicSkillUse, PET_USES_S1, PetStatusUpdate", frameOpcodes(used))
 	}

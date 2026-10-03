@@ -127,6 +127,19 @@ func (l *List) Untrack() {
 	}
 }
 
+// HasHeld reports whether any effect has ever been placed in l, even one
+// since removed. An owner whose list never held one has no icon list to
+// refresh: an explicit icon refresh (a death, a class change, a party
+// join, a summon's info window) sends nothing for it.
+func (l *List) HasHeld() bool {
+	if l == nil {
+		return false
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.held
+}
+
 // emptyLocked reports whether l currently holds no buff or debuff. Caller
 // must hold l.mu.
 func (l *List) emptyLocked() bool {
@@ -134,7 +147,7 @@ func (l *List) emptyLocked() bool {
 }
 
 // List owns one creature's active buffs and debuffs. All methods are safe for
-// concurrent use; mu guards buffs, debuffs, stacks, tracked, untracked, silent, exiting,
+// concurrent use; mu guards buffs, debuffs, stacks, held, tracked, untracked, silent, exiting,
 // dropHeld, and callbacks
 // into owner. Other actors add and dispel effects synchronously from their own
 // queues while the owner's effect tick runs.
@@ -152,6 +165,9 @@ type List struct {
 	buffs   []*Effect
 	debuffs []*Effect
 	stacks  map[string][]*Effect
+	// held records that an effect has reached insertion at least once; see
+	// HasHeld.
+	held bool
 
 	// visibleFlags mirrors flagsLocked for readers that must not take mu:
 	// the info packets' abnormal-effect field is built on paths that can

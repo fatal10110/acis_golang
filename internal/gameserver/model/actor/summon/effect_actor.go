@@ -183,8 +183,9 @@ func (a *Actor) BroadcastPosition() {
 	a.emit(event.PositionCorrected{})
 }
 
-// UpdateEffectIcons refreshes the summon's effect icons.
-func (a *Actor) UpdateEffectIcons() { a.UpdateAbnormalEffect() }
+// UpdateEffectIcons reports that the summon's effect icons changed: its
+// owner's party, or its owner alone, is shown them.
+func (a *Actor) UpdateEffectIcons() { a.emit(event.EffectIconsChanged{}) }
 
 // NotifyEffectWornOff does nothing: effect expiry messages go to players.
 func (a *Actor) NotifyEffectWornOff(modelskill.ID, int) {}

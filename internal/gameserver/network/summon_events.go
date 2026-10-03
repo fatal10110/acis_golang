@@ -185,6 +185,8 @@ func (s *summonSink) Emit(ev event.Event) {
 		sendSummonInfosToOwner(actor)
 	case event.AbnormalEffectChanged:
 		l.refreshSummonAbnormalEffect(actor)
+	case event.EffectIconsChanged:
+		sendSummonPartySpelled(actor)
 	case event.AttackTargetRefused:
 		if owner, ok := l.currentSummonOwner(actor); ok {
 			owner.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetIncorrect))

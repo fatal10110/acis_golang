@@ -394,11 +394,10 @@ func (e *Effect) stackType() string {
 // when none of those apply (an unscheduled, non-repeating, non-permanent
 // effect), meaning it is omitted from the icon list entirely.
 func (e *Effect) iconDuration(now time.Time) (millis int32, ok bool) {
-	e.scheduleMu.Lock()
-	next := e.nextAction
-	e.scheduleMu.Unlock()
-
 	if e.Template.Count > 1 {
+		e.scheduleMu.Lock()
+		next := e.nextAction
+		e.scheduleMu.Unlock()
 		// Mirrors AbstractEffect.addIcon's repeat-count branch: elapsed is
 		// the whole seconds since the current tick's period started, so the
 		// value decrements every second instead of holding flat for a whole
@@ -409,12 +408,20 @@ func (e *Effect) iconDuration(now time.Time) (millis int32, ok bool) {
 		}
 		return int32((int64(e.Remaining())*int64(e.Template.Time) - elapsed) * 1000), true
 	}
+	return e.partyIconDuration(now)
+}
+
+// partyIconDuration is iconDuration without the repeat-count countdown: a
+// scheduled effect reports the time left until its next action, an
+// unscheduled permanent one -1, and any other is left out.
+func (e *Effect) partyIconDuration(now time.Time) (millis int32, ok bool) {
+	e.scheduleMu.Lock()
+	next := e.nextAction
+	e.scheduleMu.Unlock()
 
 	if !next.IsZero() {
-		remaining := max(next.Sub(now), 0)
-		return int32(remaining.Milliseconds()), true
+		return int32(max(next.Sub(now), 0).Milliseconds()), true
 	}
-
 	if e.Template.Time == -1 {
 		return -1, true
 	}
@@ -435,12 +442,24 @@ type IconEntry struct {
 // active, not flagged to show an icon, or classified SIGNET_GROUND is
 // skipped.
 func (l *List) IconEntries(now time.Time) []IconEntry {
+	return l.iconEntries(now, (*Effect).iconDuration)
+}
+
+// PartyIconEntries is IconEntries for the icon list a party sees of the
+// owner (PartySpelled): the same effects, but a scheduled effect always
+// reports the time until its next action, repeat count or not, and an
+// unscheduled one only when permanent (-1).
+func (l *List) PartyIconEntries(now time.Time) []IconEntry {
+	return l.iconEntries(now, (*Effect).partyIconDuration)
+}
+
+func (l *List) iconEntries(now time.Time, durationOf func(*Effect, time.Time) (int32, bool)) []IconEntry {
 	var entries []IconEntry
 	for _, e := range l.active() {
 		if !e.Template.Icon || e.ClassTag() == "SIGNET_GROUND" {
 			continue
 		}
-		duration, ok := e.iconDuration(now)
+		duration, ok := durationOf(e, now)
 		if !ok {
 			continue
 		}

@@ -192,8 +192,11 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	if c.EffectList().IsAffected(effect.FlagPhoenixBlessing) {
 		c.ReviveRequest(c, 0, false)
 	}
-	// The retained effects' icons are resent once the death has settled.
-	c.UpdateEffectIcons()
+	// The retained effects' icons are resent once the death has settled,
+	// unless no effect was ever held.
+	if c.EffectList().HasHeld() {
+		c.UpdateEffectIcons()
+	}
 	return true
 }
 

@@ -29,12 +29,6 @@ func blessPet(t *testing.T, h *petWorld, pet *summon.Actor, skillID modelskill.I
 	return e
 }
 
-// iconUpdatePetInfo is the PetInfo each effect-list icon update of a summon
-// sends today. The reference sends PartySpelled there instead (#1268), so
-// the counts below carry one such frame per blessing that leaves the list
-// on top of the appearance refreshes being pinned.
-const iconUpdatePetInfo = 1
-
 // petInfoCount counts the owner's PetInfo frames in frames up to the pet's
 // Die (all frames when stopAtDie is false).
 func petInfoCount(frames [][]byte, petID int32, stopAtDie bool) (count int, sawDie bool) {
@@ -56,7 +50,8 @@ func petInfoCount(frames [][]byte, petID int32, stopAtDie bool) (count int, sawD
 
 // TestBlessingEndingRefreshesPetAppearance ends a pet's Charm of Luck and
 // Phoenix Blessing the way expiry and cancellation do: each ending refreshes
-// the pet's appearance for its owner once, beside the list's icon update.
+// the pet's appearance for its owner once; the list's icon update sends a
+// PartySpelled, not a PetInfo.
 func TestBlessingEndingRefreshesPetAppearance(t *testing.T) {
 	t.Parallel()
 	for _, name := range []string{"CharmOfLuck", "PhoenixBless"} {
@@ -67,7 +62,7 @@ func TestBlessingEndingRefreshesPetAppearance(t *testing.T) {
 			e := blessPet(t, h, pet, 438, name)
 
 			runOn(t, pet.Queue(), func() { pet.EffectList().Remove(e) })
-			const want = 1 + iconUpdatePetInfo
+			const want = 1
 			if got, _ := petInfoCount(drainFrames(t, h.client), pet.ObjectID(), false); got != want {
 				t.Fatalf("owner PetInfo frames after %s ended = %d, want %d", name, got, want)
 			}
@@ -80,7 +75,7 @@ func TestBlessingEndingRefreshesPetAppearance(t *testing.T) {
 // with stopCharmOfLuck(null): the charm's onExit refreshes the pet's
 // appearance, and the outer stop refreshes it again, so the owner sees two
 // refreshes before the pet's Die. Without a charm, no blessing stop runs and
-// no refresh comes. The charm's icon update adds its own frame.
+// no refresh comes. The charm's icon update sends no PetInfo.
 func TestPhoenixBlessedPetDeathRefreshesCharmOfLuckTwice(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
@@ -89,7 +84,7 @@ func TestPhoenixBlessedPetDeathRefreshesCharmOfLuckTwice(t *testing.T) {
 		want  int
 	}{
 		{name: "phoenix only", want: 0},
-		{name: "phoenix and charm of luck", charm: true, want: 2 + iconUpdatePetInfo},
+		{name: "phoenix and charm of luck", charm: true, want: 2},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
