@@ -57,7 +57,12 @@ func TestDuelChallengeCountdownAndStart(t *testing.T) {
 		}
 	}
 	for i, frames := range [][][]byte{chFrames, rvFrames} {
-		at := requireExtended(t, frames, 0, serverpackets.OpcodeExDuelUpdateUserInfo, "ExDuelUpdateUserInfo")
+		// The opponent's row lands only once the duel window is open.
+		start := requireExtended(t, frames, 0, serverpackets.OpcodeExDuelStart, "ExDuelStart")
+		if early := indexOfExtended(frames, 0, serverpackets.OpcodeExDuelUpdateUserInfo); early >= 0 && early < start {
+			t.Fatalf("ExDuelUpdateUserInfo at %d came before ExDuelStart at %d", early, start)
+		}
+		at := requireExtended(t, frames, start, serverpackets.OpcodeExDuelUpdateUserInfo, "ExDuelUpdateUserInfo")
 		r := wire.NewReader(frames[at][3:])
 		opponent := a.players[1-i]
 		if name, id := r.ReadString(), r.ReadInt32(); name != opponent.name || id != opponent.id {
@@ -241,19 +246,26 @@ func TestDuelChallengeRefusals(t *testing.T) {
 func TestDuelFrozenLoserRefusesActions(t *testing.T) {
 	t.Parallel()
 	a := bootArena(t, "Challenger", "Rival", "Bystander")
+	if !a.srv.DrivesClock() {
+		t.Skip("holding the duel between the defeat and its end needs the driven clock")
+	}
 	a.challenge(t, 0, 1)
-	// The surrender defeats the rival now; its end waits for the next
-	// second, which a duel only counts once the bystander's click is in.
+	// The surrender defeats the rival at once; the duel's end waits for its
+	// next one-second check, and the clock stays put until the click is in.
 	a.players[1].c.Send(encodeDuelSurrender())
-	a.srv.AdvanceUntil(t, "rival defeated", func() bool { return a.standing(t, 1).DuelState() != duel.Duelling })
-	if a.standing(t, 1).DuelState() != duel.Dead {
-		t.Skip("the duel ended before the click could land")
+	a.srv.Settle(t)
+	if got := a.standing(t, 1).DuelState(); got != duel.Dead {
+		t.Fatalf("rival state after the surrender = %d, want Dead", got)
 	}
 	a.players[2].c.Send(encodeAction(a.players[1].id))
-	frames := drainFrames(t, a.players[2].c)
+	// ReadQueued, unlike a drain, lets no time pass.
+	frames := a.srv.ReadQueued(t, a.players[2].c)
 	at := requireMessage(t, frames, 0, serverpackets.SystemMessageOtherPartyIsFrozen)
 	if indexOf(frames, at, serverpackets.OpcodeActionFailed) < 0 {
 		t.Fatal("frozen-target refusal sent no ActionFailed")
+	}
+	if got := a.standing(t, 1).DuelState(); got != duel.Dead {
+		t.Fatalf("rival state after the click = %d, want Dead: the duel ended under it", got)
 	}
 }
 

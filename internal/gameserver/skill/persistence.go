@@ -1216,7 +1216,7 @@ func (p *Persistence) RestoreDuelState(c *player.Character, st SaveState) {
 	if p == nil || c == nil {
 		return
 	}
-	p.stageSkillState(c, st.rows, p.currentTime())
+	p.stageSkillState(c, st.rows, c.Now())
 	p.ReplayEffects(c)
 }
 

@@ -394,7 +394,11 @@ func (l *GameClientLink) startDuel(v duel.View[*livePlayer]) {
 			postLive(m, func() {
 				l.prepareToDuel(m, colour)
 				info := duelUserInfo(m)
-				l.broadcastToMembers(opponents, func() wire.Frame { return serverpackets.FrameExDuelUpdateUserInfo(info) })
+				// Each opponent shows m from its own queue, behind the
+				// duel window its ready task above opened.
+				for _, o := range opponents {
+					postLive(o, func() { o.SendFrame(serverpackets.FrameExDuelUpdateUserInfo(info)) })
+				}
 			})
 		}
 	}

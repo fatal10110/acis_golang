@@ -33,15 +33,25 @@ type arena struct {
 // first one the boot's own, and brings every one of them into the world.
 func bootArena(t *testing.T, names ...string) *arena {
 	t.Helper()
-	srv := gameservertest.Boot(t,
+	return bootArenaWith(t, nil, nil, names...)
+}
+
+// bootArenaWith is bootArena on a server booted with opts as well; before
+// runs once every character is seeded, before any enters the world.
+func bootArenaWith(t *testing.T, opts []gameservertest.Option, before func(*arena), names ...string) *arena {
+	t.Helper()
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter(names[0], 20, 0),
 		gameservertest.WithWantChars(1),
-	)
+	}, opts...)...)
 	a := &arena{srv: srv, players: []player{{c: srv.Client, id: srv.SoleObjectID(t), name: names[0]}}}
 	for i, name := range names[1:] {
 		account := "duellist" + string(rune('a'+i))
 		id := srv.SeedCharacterFor(t, account, name, 20, 0).ID
 		a.players = append(a.players, player{c: srv.DialClient(t, account, 1), id: id, name: name})
+	}
+	if before != nil {
+		before(a)
 	}
 	for _, p := range a.players {
 		startInWorld(t, p.c)
