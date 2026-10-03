@@ -88,7 +88,8 @@ func (a *Actor) StatFuncsAttached(fns []effect.Mod) {
 	if len(fns) == 0 {
 		return
 	}
-	a.statsModified()
+	// Every func of one attach shares its owner.
+	a.statsModified(fns[0].Owner.IsEffect())
 }
 
 // RemoveStatsByOwner drops every stat func previously added for owner. An
@@ -111,7 +112,7 @@ func (a *Actor) RemoveStatsByOwner(owner effect.ModOwner) {
 	case removed && owner.Stripped():
 		a.refreshMoveSpeed()
 	case removed:
-		a.statsModified()
+		a.statsModified(owner.IsEffect())
 	}
 }
 
@@ -120,11 +121,12 @@ func (a *Actor) RemoveStatsByOwner(owner effect.ModOwner) {
 // changed, a summon its owner has seen then republishes its full view: the
 // owner's pet window, its status and every observer's NpcInfo, which carry
 // its P.Atk./P.Def./Max HP and the attack and movement speed multipliers
-// the client animates it by.
-func (a *Actor) statsModified() {
+// the client animates it by. effectPass marks a change an effect's add or
+// removal made, inside the effect list's pass.
+func (a *Actor) statsModified(effectPass bool) {
 	a.refreshMoveSpeed()
 	if a.ownerDiscovered.Load() {
-		a.emit(event.OwnerInfoChanged{})
+		a.emit(event.OwnerInfoChanged{EffectPass: effectPass})
 		a.UpdateStatus()
 	}
 }

@@ -230,6 +230,11 @@ func (l *GameClientLink) applyPartyNotices(notices []party.Notice) {
 				}
 				return serverpackets.FrameSystemMessage(id)
 			})
+		case party.IconRefresh[*livePlayer]:
+			// A member who never held an effect has no icons to show.
+			if n.Member.EffectList().HasHeld() {
+				sendPartySpelled(n.Member, n.To)
+			}
 		case party.InfoRefresh[*livePlayer]:
 			l.broadcastCharacterInfo(n.Member)
 		case party.FusionStop[*livePlayer]:
@@ -261,6 +266,11 @@ func (l *GameClientLink) applyPartyNotices(notices []party.Notice) {
 
 // broadcastToMembers sends each of members its own copy of one frame.
 func (l *GameClientLink) broadcastToMembers(members []*livePlayer, build func() wire.Frame) {
+	sendToMembers(members, build)
+}
+
+// sendToMembers sends each of members its own copy of one frame.
+func sendToMembers(members []*livePlayer, build func() wire.Frame) {
 	broadcastFrame(build, func(send func(frameReceiver)) {
 		for _, m := range members {
 			send(m)

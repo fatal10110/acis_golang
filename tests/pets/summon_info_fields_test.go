@@ -150,9 +150,7 @@ func TestStunnedSummonInfoCarriesStunBit(t *testing.T) {
 }
 
 // assertSummonAbnormal checks every PetInfo the owner got and every NpcInfo
-// of pet the watcher got carry want. The effect list's icon update of a
-// summon refreshes both on top of the hook's own refresh today (#1268), so
-// their count is not pinned here.
+// of pet the watcher got carry want. Their count is not pinned here.
 func assertSummonAbnormal(t *testing.T, h *petWorld, watcher *testsupport.ScriptedClient, pet *summon.Actor, what string, want int) {
 	t.Helper()
 	owned := petInfoAbnormals(drainFrames(t, h.client))

@@ -62,8 +62,8 @@ func (FusionCastersStopRequested) event() {}
 // and the death-penalty level.
 type DeathSettled struct{}
 
-// EffectIconsChanged reports that the character's active-effect icon list
-// changed.
+// EffectIconsChanged reports that the actor's active-effect icon list
+// changed, a player's or a summon's.
 type EffectIconsChanged struct{}
 
 // PositionCorrected reports a forced-location correction after a flight

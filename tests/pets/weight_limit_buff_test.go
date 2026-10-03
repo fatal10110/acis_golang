@@ -123,8 +123,11 @@ func requireLimitRepublish(t *testing.T, what string, h *petWorld, observer *tes
 	if n := countOpcode(owner, serverpackets.OpcodePetStatusUpdate); n != 2 {
 		t.Fatalf("%s: owner got %d PetStatusUpdate, want 2 (opcodes %x)", what, n, frameOpcodes(owner))
 	}
-	if n := countNPCInfoFor(watched, wolf.ObjectID()); n != 3 {
-		t.Fatalf("%s: observer got %d pet NpcInfo, want 3", what, n)
+	// One NpcInfo per status republish: the effect list's icon update
+	// shows the pet's icons to its owner (PartySpelled) and nothing to the
+	// observer.
+	if n := countNPCInfoFor(watched, wolf.ObjectID()); n != 2 {
+		t.Fatalf("%s: observer got %d pet NpcInfo, want 2", what, n)
 	}
 	if got := wolf.WeightLimit(); got != int(limit) {
 		t.Fatalf("%s: WeightLimit() = %d, want %d", what, got, limit)

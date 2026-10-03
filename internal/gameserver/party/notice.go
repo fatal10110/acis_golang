@@ -78,6 +78,13 @@ type Msg[M Member] struct {
 // InfoRefresh resends Member's full view to itself and its observers.
 type InfoRefresh[M Member] struct{ Member M }
 
+// IconRefresh shows To, the members of the party Member just joined or
+// formed, Member's effect icons.
+type IconRefresh[M Member] struct {
+	To     []M
+	Member M
+}
+
 // FusionStop ends Member's own fusion channel and every fusion channel
 // held on Member.
 type FusionStop[M Member] struct{ Member M }
@@ -113,6 +120,7 @@ func (WindowDelete[M]) isNotice()       {}
 func (WindowDeleteAll[M]) isNotice()    {}
 func (Msg[M]) isNotice()                {}
 func (InfoRefresh[M]) isNotice()        {}
+func (IconRefresh[M]) isNotice()        {}
 func (FusionStop[M]) isNotice()         {}
 func (ChannelOpen[M]) isNotice()        {}
 func (ChannelClose[M]) isNotice()       {}

@@ -418,6 +418,7 @@ func (l *List) add(e *Effect, pending *[]func()) {
 // insert places e in its visible list and stack group, retiring the buffs it
 // replaces or evicts into retiring (see add).
 func (l *List) insert(e *Effect, pending *[]func(), retiring *[]*Effect) {
+	l.held = true
 	if e.Skill.Debuff {
 		for _, existing := range l.debuffs {
 			if existing.identical(e) {

@@ -182,9 +182,18 @@ func (s *summonSink) Emit(ev event.Event) {
 		// and observers.
 		s.broadcastHP()
 	case event.OwnerInfoChanged:
-		sendSummonInfosToOwner(actor)
+		if e.EffectPass {
+			// The effect list's pass ends with its own icon refresh,
+			// which follows this window: the icons it clears are not
+			// resent here.
+			sendSummonPetInfo(actor)
+		} else {
+			sendSummonInfosToOwner(actor)
+		}
 	case event.AbnormalEffectChanged:
 		l.refreshSummonAbnormalEffect(actor)
+	case event.EffectIconsChanged:
+		sendSummonPartySpelled(actor)
 	case event.AttackTargetRefused:
 		if owner, ok := l.currentSummonOwner(actor); ok {
 			owner.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetIncorrect))
