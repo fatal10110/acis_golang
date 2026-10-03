@@ -205,6 +205,10 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.applyPvPFlag(live, e)
 	case event.PKKarmaGained:
 		l.applyPKKarmaSideEffects(live)
+	case event.DuelDefeated:
+		if l.duels != nil {
+			l.duels.Defeat(live)
+		}
 	case event.LeveledUp:
 		l.broadcastLiveFrame(live, func() wire.Frame {
 			return serverpackets.FrameSocialAction(live.ObjectID(), socialActionLevelUp)

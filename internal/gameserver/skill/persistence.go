@@ -130,8 +130,18 @@ type SaveState struct {
 	ok         bool
 }
 
-// SaveState copies c's current active effects and pending reuse timers.
+// SaveState copies c's current active effects and pending reuse timers. A
+// character in a duel saves nothing: the rows its duel saved when it began
+// stay until the duel restores them (DuelState).
 func (p *Persistence) SaveState(c *player.Character) SaveState {
+	if c != nil && c.InDuel() {
+		return SaveState{}
+	}
+	return p.snapshot(c)
+}
+
+// snapshot is SaveState whatever c's duel.
+func (p *Persistence) snapshot(c *player.Character) SaveState {
 	if p == nil || !p.storeSkillCooltime.Load() || p.store == nil || c == nil {
 		return SaveState{}
 	}
@@ -1187,6 +1197,36 @@ func (p *Persistence) StoreClassSkills(ctx context.Context, charID, classIndex i
 		if err := writer.SetKnownSkill(ctx, charID, classIndex, id, level); err != nil {
 			return fmt.Errorf("store class %d skills for character %d: %w", classIndex, charID, err)
 		}
+	}
+	return nil
+}
+
+// DuelState copies c's current active effects and pending reuse timers as
+// a duel saves them when it begins, before c joins it: the duel's end puts
+// them back (RestoreDuelState).
+func (p *Persistence) DuelState(c *player.Character) SaveState {
+	return p.snapshot(c)
+}
+
+// RestoreDuelState puts back on c the reuse timers st saved that are still
+// running and the effects st saved, with the time they had left then. Call
+// it on c's queue once c's effects are stopped; the rows the duel wrote are
+// ClearSaved's to delete.
+func (p *Persistence) RestoreDuelState(c *player.Character, st SaveState) {
+	if p == nil || c == nil {
+		return
+	}
+	p.stageSkillState(c, st.rows, c.Now())
+	p.ReplayEffects(c)
+}
+
+// ClearSaved deletes the rows st's character saved for st's class.
+func (p *Persistence) ClearSaved(ctx context.Context, st SaveState) error {
+	if !st.ok {
+		return nil
+	}
+	if _, err := p.store.DeleteByCharacter(ctx, st.charID, st.classIndex); err != nil {
+		return fmt.Errorf("clear skill state for character %d: %w", st.charID, err)
 	}
 	return nil
 }

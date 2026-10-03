@@ -165,6 +165,8 @@ var gameDecoders = []gameDecoder{
 	{"RequestConfirmCancelItem", decodes(DecodeRequestConfirmCancelItem), seedExtended(OpcodeRequestConfirmCancelItem, seedObjectID)},
 	{"RequestRefineCancel", decodes(DecodeRequestRefineCancel), seedExtended(OpcodeRequestRefineCancel, seedObjectID)},
 	{"RequestExMagicSkillUseGround", decodes(DecodeRequestExMagicSkillUseGround), seedExtended(OpcodeRequestExMagicSkillUseGround, seedX, seedY, seedZ, int32(1177), int32(0), byte(0))},
+	{"RequestDuelStart", decodes(DecodeRequestDuelStart), seedExtended(OpcodeRequestDuelStart, "Rival", int32(1))},
+	{"RequestDuelAnswerStart", decodes(DecodeRequestDuelAnswerStart), seedExtended(OpcodeRequestDuelAnswerStart, int32(0), int32(0), int32(1))},
 }
 
 // TestGameDecoderFuzzSeedsDecode keeps the fuzz seeds honest: each one must

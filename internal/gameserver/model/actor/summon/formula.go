@@ -651,11 +651,13 @@ func (a *Actor) TakeDamage(damage int, attacker attackable.Combatant) bool {
 // immobilize-until-attacked, breaks a stun one time in ten, and then takes
 // the HP, running the death sequence when it drops below
 // creature.DeathHP. The owner is told of the hit whenever it has an
-// attacker, including a hit that was blocked or that killed.
+// attacker, including a hit that was blocked or that killed. Any hit
+// interrupts the duel of an attacker from outside the owner's duel.
 func (a *Actor) reduceHP(amount float64, attacker attackable.Combatant) bool {
 	if a.Dead() {
 		return false
 	}
+	creature.InterruptDuelOnSummonHit(attacker, a.ownerDuelID())
 	killed := false
 	if !a.Invul() && creature.CanDealDamage(attacker) {
 		a.applyHitSideEffects()
@@ -697,9 +699,14 @@ func (a *Actor) ConsumeHP(amount float64) {
 }
 
 // ReduceHPByDOT applies periodic HP damage without normal-hit side effects.
-// A lethal tick kills a.
+// A lethal tick kills a. Any tick, a zero one included, interrupts the duel
+// of an attacker from outside the owner's duel.
 func (a *Actor) ReduceHPByDOT(amount float64, attacker effect.Actor, _ bool) {
 	killer, _ := attacker.(attackable.Combatant)
+	if a.Dead() {
+		return
+	}
+	creature.InterruptDuelOnSummonHit(killer, a.ownerDuelID())
 	if amount <= 0 || a.Invul() || !creature.CanDealDamage(killer) {
 		return
 	}

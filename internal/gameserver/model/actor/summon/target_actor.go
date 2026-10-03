@@ -11,16 +11,14 @@ import (
 
 var _ skilltarget.Actor = (*Actor)(nil)
 
-// Summons hold no ground point, summon, duel or Olympiad state of their
-// own, and the NPC and door facts never apply to them. Their corpse facts
-// are in death.go; their party, clan and alliance standing is their
-// owner's, below.
+// Summons hold no ground point, summon or Olympiad state of their own, and
+// the NPC and door facts never apply to them. Their corpse facts are in
+// death.go; their duel, party, clan and alliance standing is their owner's,
+// below.
 func (a *Actor) CanSeePoint(int, int, int) bool    { return true }
 func (a *Actor) GroundTarget() (x, y, z int)       { return 0, 0, 0 }
 func (a *Actor) Summon() (skilltarget.Actor, bool) { return nil, false }
 func (a *Actor) OlympiadMode() bool                { return false }
-func (a *Actor) DuelID() int32                     { return 0 }
-func (a *Actor) DuelTeam() int                     { return 0 }
 func (a *Actor) MageClass() bool                   { return false }
 func (a *Actor) OlympiadStarted() bool             { return false }
 func (a *Actor) ClanGroups() []string              { return nil }
@@ -32,6 +30,17 @@ func (a *Actor) Holy() bool                        { return false }
 func (a *Actor) Unlockable() bool                  { return false }
 func (a *Actor) Spoiled() bool                     { return false }
 func (a *Actor) Seeded() bool                      { return false }
+
+// DuelID is the duel a's owner is in, 0 for none.
+func (a *Actor) DuelID() int32 { return max(a.ownerDuelID(), 0) }
+
+// DuelTeam is the team colour a's owner shows, none without an owner.
+func (a *Actor) DuelTeam() int {
+	if owner, ok := a.currentOwner().(interface{ DuelTeam() int }); ok {
+		return owner.DuelTeam()
+	}
+	return 0
+}
 
 // socialOwner is the social standing a summon reads from its owner: the
 // party, clan and alliance predicates and the social rules judged for a
@@ -126,13 +135,13 @@ func (a *Actor) ProtectionBlessing() bool {
 
 // AttackableWithoutForceBy reports whether caster may attack a without a
 // forced attack: never by its owner or the owner's own summon; otherwise as
-// the owner's party, command channel, clan and alliance rules decide with
-// a's own arena membership; otherwise when a and caster both stand inside a
-// PvP zone (each its own membership), or while the owner has karma or a PvP
-// flag.
+// the owner's duel, party, command channel, clan and alliance rules decide
+// with a's own arena membership; otherwise when a and caster both stand
+// inside a PvP zone (each its own membership), or while the owner has karma
+// or a PvP flag.
 //
-// The Olympiad (#216), duel (#215) and siege-side (#234) rules are not
-// applied: that state is not tracked yet, the same as for a player target.
+// The Olympiad (#216) and siege-side (#234) rules are not applied: that
+// state is not tracked yet, the same as for a player target.
 func (a *Actor) AttackableWithoutForceBy(caster skilltarget.Actor) bool {
 	if owner := a.currentOwner(); caster == nil || owner == nil || actingPlayerID(caster) == owner.ObjectID() {
 		return false

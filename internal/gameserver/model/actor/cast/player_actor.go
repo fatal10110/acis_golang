@@ -215,10 +215,13 @@ func (a PlayerActor) AllSkillsDisabled() bool {
 	return a.Character != nil && a.Character.AllSkillsDisabled()
 }
 
-// EnableAllSkills is a no-op: enabling all skills clears only the raw
-// Duel-defeat lock. This port doesn't model that
-// lock since Duel isn't ported, so there is nothing to clear yet.
-func (PlayerActor) EnableAllSkills() {}
+// EnableAllSkills lifts the lock a duel defeat put on every skill; the
+// crowd-control states that also disable them stay.
+func (a PlayerActor) EnableAllSkills() {
+	if a.Character != nil {
+		a.Character.EnableAllSkills()
+	}
+}
 
 // IncreaseCharges and DecreaseCharges back Actor charges
 // Controller.Hit probes for. Only a player's hit timer applies charges:

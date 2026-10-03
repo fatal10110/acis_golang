@@ -419,11 +419,13 @@ func (c *Character) ItemDisabled(objectID int32) bool {
 	return false
 }
 
-// AllSkillsDisabled reports the crowd-control states that block skill and
-// item use. The full rule also unions a raw Duel-defeat lock (set and
-// cleared only by duel handling), which this port does not model since
-// Duel isn't ported yet.
+// AllSkillsDisabled reports the lock a duel defeat puts on every skill
+// (DisableAllSkills) and the crowd-control states that block skill and item
+// use.
 func (c *Character) AllSkillsDisabled() bool {
+	if c.duel.skillsLocked.Load() {
+		return true
+	}
 	live := c.liveLocked()
 	if live == nil {
 		return false

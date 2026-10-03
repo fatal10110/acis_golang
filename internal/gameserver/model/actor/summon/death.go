@@ -89,7 +89,7 @@ func (a *Actor) die(killer attackable.Combatant) {
 // refreshes the owner's pet window and the collar's enchant; nothing else is
 // sent until the pet's next status refresh.
 //
-// Its duel exemption is not applied: duels are not ported (#215).
+// Its duel exemption is not applied yet (#3285).
 func (a *Actor) applyDeathPenalty() {
 	a.statusMu.Lock()
 	lost := petDeathPenalty(a.level, a.expForLevelLocked(a.level), a.expForLevelLocked(a.level+1))

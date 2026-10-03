@@ -85,6 +85,9 @@ type livePlayer struct {
 	macros           *macro.List
 	// board is the player's community board session; owned by its queue.
 	board boardSession
+	// duelCondition is what the player's duel saved of it when it began;
+	// owned by its queue. See duel.go.
+	duelCondition *duelCondition
 	// access is the character's access level, resolved at login and
 	// replaced by setAccessLevel on p's queue; any goroutine reads it
 	// through accessLevel.

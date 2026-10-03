@@ -229,6 +229,7 @@ func (h *Hostile) reduceHP(amount float64, attacker attackable.Combatant) {
 	if h.AlikeDead() {
 		return
 	}
+	creature.InterruptDuelOnNPCHit(attacker)
 	// A NaN amount (a zero-defence hit scaled by a zero multiplier) takes
 	// nothing, like a negative one.
 	if !(amount > 0) {
@@ -283,6 +284,7 @@ func (h *Hostile) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT boo
 	}
 	amount = max(amount, 0)
 	killer, _ := attacker.(attackable.Combatant)
+	creature.InterruptDuelOnNPCHit(killer)
 	h.testOverhit(killer, amount)
 	h.registerHit(killer, amount, true)
 	if h.Invul() || !creature.CanDealDamage(killer) {

@@ -152,7 +152,7 @@ func FramePetInfo(s PetInfoSnapshot) wire.Frame {
 	w.WriteUint8(0) // move type: 0 is ground movement, the default move state; no swim/fly state is modeled for summons yet
 
 	w.WriteUint16(0)
-	w.WriteUint8(uint8(s.Team)) // team/CTF system is not ported yet; always 0 (TeamType.NONE)
+	w.WriteUint8(uint8(s.Team))
 	w.WriteInt32(int32(s.SoulShotsPerHit))
 	w.WriteInt32(int32(s.SpiritShotsPerHit))
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)

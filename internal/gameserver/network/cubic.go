@@ -292,7 +292,7 @@ func (o cubicFireOwner) Attacker() skilltarget.Actor { return o.Character }
 // cubic heals only its owner.
 //
 // A duel other than a party duel limits it to its owner too; that waits for
-// duels (#3160).
+// #3285.
 func (l *GameClientLink) lifeCubicParty(live *livePlayer) []actorcast.LifeCubicMember {
 	if l.parties == nil || live.OlympiadMode() {
 		return nil

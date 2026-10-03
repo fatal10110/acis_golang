@@ -23,6 +23,14 @@ type partyBars struct {
 // character first plays: segments finer than a point, so nearly every whole
 // change refreshes, while a full gauge that stays full does not.
 func (c *Character) PartyWindowStale(inParty bool) bool {
+	_, partyRow := c.VitalsGaugesStale(inParty)
+	return partyRow
+}
+
+// VitalsGaugesStale is PartyWindowStale, also reporting whether the CP or
+// HP gauge left its segment, which refreshes the character in its duel
+// opponents' window.
+func (c *Character) VitalsGaugesStale(inParty bool) (cpOrHP, partyRow bool) {
 	b := &c.partyBars
 	b.calibrate.Do(func() {
 		tmpl := c.template()
@@ -36,12 +44,9 @@ func (c *Character) PartyWindowStale(inParty bool) bool {
 	res := c.ResourceValues()
 	_, cp := b.cp.Report(func() float64 { return res.CurrentCP }, res.MaxCP)
 	_, hp := b.hp.Report(func() float64 { return res.CurrentHP }, res.MaxHP)
-	if !inParty {
-		return false
-	}
-	if cp || hp {
-		return true
+	if !inParty || cp || hp {
+		return cp || hp, inParty
 	}
 	_, mp := b.mp.Report(func() float64 { return res.CurrentMP }, res.MaxMP)
-	return mp
+	return false, mp
 }
