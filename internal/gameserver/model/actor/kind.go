@@ -19,17 +19,19 @@ const (
 	KindStatic
 	// KindItem is an item lying on the ground.
 	KindItem
+	// KindBoat is a scheduled passenger boat.
+	KindBoat
 )
 
 // Playable reports whether k is a player-controlled creature: a player or
 // its summon.
 func (k Kind) Playable() bool { return k == KindPlayer || k == KindSummon }
 
-// Creature reports whether k is a creature: a player, an NPC, a summon or a
-// door. Static objects and ground items are not.
+// Creature reports whether k is a creature: a player, an NPC, a summon, a
+// door or a boat. Static objects and ground items are not.
 func (k Kind) Creature() bool {
 	switch k {
-	case KindPlayer, KindNPC, KindSummon, KindDoor:
+	case KindPlayer, KindNPC, KindSummon, KindDoor, KindBoat:
 		return true
 	}
 	return false

@@ -174,6 +174,13 @@ type CreatureMove struct {
 	timedSteps int
 	moveSeq    uint64
 	queue      *sim.Queue
+	// routeBufs back routed waypoints so a repeated geopath search reuses
+	// their storage. waypoints may alias routeBufs[routeBuf] while a new
+	// request searches into the other one, which becomes current only when
+	// that request commits its route, so a search never overwrites a route
+	// still being walked.
+	routeBufs [2][]location.Location
+	routeBuf  int
 }
 
 // moveOwner is the controller a CreatureMove reports its movement milestones
@@ -712,6 +719,9 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn,
 	m.setAccurateLocked(origin)
 	m.destination = destination
 	m.waypoints = waypoints
+	if outcome == pathRouted {
+		m.routeBuf ^= 1
+	}
 	m.setPawnLocked(pawn, offset, tracks)
 	m.moving = true
 	m.rescheduleLocked(m.arrivalDelayLocked())
@@ -768,21 +778,34 @@ func (m *CreatureMove) resolvePathLocked(target location.Location) (location.Loc
 		return fallback, nil, pathFailed
 	}
 
-	if path, ok := m.geo.FindPath(m.origin, target); ok && len(path) >= 2 {
+	if path, ok := m.findPathLocked(target); ok && len(path) >= 2 {
 		// The pathfinder returns every corner plus the final target cell,
 		// omitting the origin. Treat the first entry as the active segment
 		// and queue the rest for per-segment advancement.
-		destination := path[0]
-		var tail []location.Location
-		if len(path) > 1 {
-			tail = make([]location.Location, len(path)-1)
-			copy(tail, path[1:])
-		}
-		return destination, tail, pathRouted
+		return path[0], path[1:], pathRouted
 	}
 
 	fallback := m.geo.ValidLocation(m.origin.X, m.origin.Y, m.origin.Z, target.X, target.Y, target.Z)
 	return fallback, nil, pathFailed
+}
+
+// findPathLocked runs the routed search from origin to target into the
+// route buffer the current waypoints do not use, keeping its grown storage
+// for the next search. The caller makes that buffer current (routeBuf) only
+// when it commits the route. Callers hold mu.
+func (m *CreatureMove) findPathLocked(target location.Location) ([]location.Location, bool) {
+	next := m.routeBuf ^ 1
+	var path []location.Location
+	var ok bool
+	if g, into := m.geo.(pathIntoFinder); into {
+		path, ok = g.FindPathInto(m.routeBufs[next][:0], m.origin, target)
+	} else {
+		var found []location.Location
+		found, ok = m.geo.FindPath(m.origin, target)
+		path = append(m.routeBufs[next][:0], found...)
+	}
+	m.routeBufs[next] = path[:0]
+	return path, ok
 }
 
 // rescheduleLocked cancels any pending arrival timer and, for a positive

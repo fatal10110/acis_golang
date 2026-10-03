@@ -582,7 +582,9 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 
 // destroyLiveItem answers RequestDestroyItem. A player running a private
 // store or tied up in a direct trade is refused before anything else; a
-// destroy that goes through names what disappeared.
+// configured cursed weapon that passes the count checks is refused like a
+// non-destroyable item (a hero item keeps its own message); a destroy that
+// goes through names what disappeared.
 func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count int) {
 	if live == nil {
 		return
@@ -596,6 +598,9 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 		return
 	}
 	failure := l.inventory.DestroyItemFailure(inv, objectID, count)
+	if failure == invops.DestroyOK && l.cursedItem(inv, objectID) {
+		failure = invops.DestroyNotDestroyable
+	}
 	switch failure {
 	case invops.DestroyOK:
 	case invops.DestroyInvalidCount:
@@ -628,6 +633,20 @@ func (l *GameClientLink) destroyLiveItem(live *livePlayer, objectID int32, count
 	if res.EquipmentChanged {
 		l.broadcastEquipmentChange(live)
 	}
+}
+
+// cursedItem reports whether the item objectID in inv is a configured
+// cursed weapon, which no request may destroy whatever its template says.
+func (l *GameClientLink) cursedItem(inv *itemcontainer.Inventory, objectID int32) bool {
+	if l.cursedWeapons == nil {
+		return false
+	}
+	inst := inv.ItemByObjectID(objectID)
+	if inst == nil {
+		return false
+	}
+	_, cursed := l.cursedWeapons.Weapon(inst.TemplateID)
+	return cursed
 }
 
 // destroyHeldItems destroys count units of templateID out of live's

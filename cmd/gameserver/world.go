@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -37,6 +39,32 @@ func provideWorldObjects(data *gameData, ids *idfactory.Allocator, state *world.
 	}
 	doorHooks.SetHook(objs.ToggleDoor)
 	return objs, nil
+}
+
+// provideBoats spawns one scheduled boat per boatRoutes.xml itinerary, unless
+// AllowBoat turns boats off; it then returns a nil fleet.
+func provideBoats(cfg gameServerConfig, paths gameServerPaths, ids *idfactory.Allocator, state *world.State, log zerolog.Logger) (*boat.Fleet, error) {
+	if !cfg.AllowBoat {
+		return nil, nil
+	}
+	itineraries, err := gamexml.LoadBoatRoutes(filepath.Join(paths.DataRoot, "data", "xml", "boatRoutes.xml"))
+	if err != nil {
+		return nil, err
+	}
+	fleet, err := boat.New(itineraries, ids, state, network.BoatSinks(state))
+	if err != nil {
+		return nil, err
+	}
+	log.Info().Int("itineraries", len(itineraries)).Msg("boat itineraries loaded")
+	return fleet, nil
+}
+
+// startBoats runs the boats' schedules and movement while the server runs.
+func startBoats(lc fx.Lifecycle, fleet *boat.Fleet, log zerolog.Logger) {
+	if fleet == nil {
+		return
+	}
+	startTicker(lc, log, fleet.Start)
 }
 
 func startWorldObjects(objs *manager.WorldObjects, log zerolog.Logger) {
