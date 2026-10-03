@@ -59,6 +59,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
+	"github.com/fatal10110/acis_golang/internal/gameserver/raidpoint"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -150,6 +151,7 @@ type options struct {
 	board                  bbs.Config
 	seedBoard              func(db *sql.DB)
 	seedOlympiad           func(db *sql.DB)
+	seedBoss               func(db *sql.DB)
 	serverNews             bool
 	announcements          string
 	clanClock              func() time.Time
@@ -770,9 +772,11 @@ func bootGeo(geo move.Geo) move.Geo {
 
 // Server is a booted gameserver stack plus its first connected client.
 type Server struct {
-	Client           *testsupport.ScriptedClient
-	State            *world.State
-	DB               *sql.DB
+	Client *testsupport.ScriptedClient
+	State  *world.State
+	DB     *sql.DB
+	// RaidPoints is the players' raid points, restored at boot.
+	RaidPoints       *raidpoint.Points
 	Chars            *gamesql.CharacterStore
 	Items            *gamesql.ItemStore
 	Shortcuts        *gamesql.ShortcutStore
@@ -829,6 +833,9 @@ type Server struct {
 	castEffects actorcast.EffectHandlers
 	// rewardParties resolves a kill's party for the hostiles the suite spawns.
 	rewardParties gamemanager.RewardParties
+	// raidKills credits the raid boss kills of the hostiles the suite
+	// spawns.
+	raidKills gamemanager.RaidKillRecorder
 	// stance is the stance tracker the link was wired with, nil when none
 	// was; fixture NPCs report their attack stances to it.
 	stance network.AttackStanceTracker
@@ -1887,6 +1894,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// below; its calendar is not started (see WithOlympiadSeed).
 	olympiadState := olympiad.New(olympiad.DefaultConfig(), gamesql.NewOlympiadStore(db), persistWorker, network.NewOlympiadAnnouncer(state), queues.NewQueue("olympiad"), o.log)
 	gclConfig.Olympiad = olympiadState
+	raidPoints := raidpoint.New(gamesql.NewRaidPointStore(db), persistWorker, o.log)
+	gclConfig.RaidPoints = raidPoints
 	gcl, err := network.NewGameClientLink(gclConfig)
 	if err != nil {
 		t.Fatalf("gameservertest: build game client link: %v", err)
@@ -2007,6 +2016,17 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("restore olympiad: %v", err)
 	}
 	t.Cleanup(func() { olympiadState.Stop(context.Background()) })
+	if o.seedBoss != nil {
+		o.seedBoss(db)
+	}
+	if err := raidPoints.Restore(context.Background()); err != nil {
+		t.Fatalf("restore raid points: %v", err)
+	}
+	if o.zones != nil {
+		if err := gamesql.NewBossZoneStore(db).Restore(context.Background(), zone.OfKind[*zone.Boss](o.zones)); err != nil {
+			t.Fatalf("restore boss zones: %v", err)
+		}
+	}
 	if gclConfig.Mailbox != nil {
 		mails, _, err := mailStore.Load(context.Background())
 		if err != nil {
@@ -2042,6 +2062,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		deepBlueDrops:    o.deepBlueDropRules,
 		autoLoot:         o.autoLoot,
 		DB:               db,
+		RaidPoints:       raidPoints,
 		Chars:            chars,
 		Relations:        relations,
 		relationRows:     relationRows,
@@ -2062,6 +2083,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		effectEnv:        effectEnv,
 		castEffects:      gcl.HostileCastEffects(),
 		rewardParties:    o.rewardParties(gcl),
+		raidKills:        gcl,
 		stance:           gclConfig.AttackStance,
 		maxGeoPathFail:   o.maxGeoPathFailCount,
 		zones:            o.zones,

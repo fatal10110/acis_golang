@@ -53,6 +53,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/partymatch"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
+	"github.com/fatal10110/acis_golang/internal/gameserver/raidpoint"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -295,6 +296,7 @@ type GameClientLink struct {
 	gameClock   *task.GameClock
 	sevenSigns  *sevensigns.State
 	olympiad    *olympiad.Olympiad
+	raidPoints  *raidpoint.Points
 	water       *task.Water
 	shadowItems *task.ShadowItems
 	autosave    *task.Autosave
@@ -481,6 +483,9 @@ type GameClientLinkConfig struct {
 	// Olympiad holds the nobles' Olympiad records. Nil is tolerated
 	// (tests) and holds none.
 	Olympiad *olympiad.Olympiad
+	// RaidPoints holds the players' raid points. Nil is tolerated (tests):
+	// kills credit none and every record reads empty.
+	RaidPoints *raidpoint.Points
 	// Queues creates each live player's queue, which its in-world packet
 	// handlers, timers and periodic ticks run on. Required.
 	Queues       Queues
@@ -630,6 +635,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		gameClock:     cfg.GameClock,
 		sevenSigns:    cfg.SevenSigns,
 		olympiad:      cfg.Olympiad,
+		raidPoints:    cfg.RaidPoints,
 		water:         cfg.Water,
 		shadowItems:   cfg.ShadowItems,
 		autosave:      cfg.Autosave,

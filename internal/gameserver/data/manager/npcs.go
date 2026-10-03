@@ -56,6 +56,16 @@ type KillRewardConfig struct {
 	// Parties resolves a rewarded player's party; nil rewards every
 	// attacker alone.
 	Parties RewardParties
+	// RaidKills credits a raid or grand boss kill to the killer's side;
+	// nil credits nobody.
+	RaidKills RaidKillRecorder
+}
+
+// RaidKillRecorder credits a raid or grand boss kill.
+type RaidKillRecorder interface {
+	// RecordRaidKill credits the kill of the boss, of npc id bossID and
+	// level bossLevel, by the player killer acts for.
+	RecordRaidKill(killer *player.Character, bossID int32, bossLevel int)
 }
 
 // Npcs owns every live NPC instantiated from the spawn table at boot,

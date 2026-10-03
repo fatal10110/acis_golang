@@ -87,6 +87,7 @@ func (s *Server) killRewards() gamemanager.KillRewardConfig {
 		PartyRange:        fixturePartyRange,
 		PartyXP:           player.PartyXPRules{Cutoff: player.PartyXPCutoffLevel, CutoffLevel: 20, CutoffPercent: 3, RateXP: 1, RateSP: 1},
 		Parties:           s.rewardParties,
+		RaidKills:         s.raidKills,
 		DeepBlueDropRules: s.deepBlueDrops,
 		AutoLoot:          s.autoLoot,
 	}

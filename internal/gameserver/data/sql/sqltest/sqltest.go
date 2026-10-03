@@ -478,6 +478,7 @@ var schemaStmts = []string{
 	accountsSchema,
 	bbsMailSchema, bbsForumSchema, bbsTopicSchema, bbsPostSchema, bbsFavoriteSchema,
 	olympiadNoblesSchema, olympiadNoblesEomSchema, serverMemoSchema,
+	characterRaidPointsSchema, grandbossListSchema,
 }
 
 var seedStmts = []string{sevenSignsStatusSeed}

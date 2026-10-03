@@ -41,6 +41,7 @@ type playerRewardEntry struct {
 // CalculateRewards implements creature.Rewarder.
 func (d *deathRewards) CalculateRewards(killer attackable.Combatant) {
 	d.scheduleDecay()
+	d.creditRaidKill(killer)
 
 	// A corpse nobody fought pays nothing: no loot, no spoil, no exp.
 	if d.hostile.AI().Threats().IsEmpty() {
@@ -56,6 +57,17 @@ func (d *deathRewards) CalculateRewards(killer attackable.Combatant) {
 		d.rollDrops(receiver, d.hostile.HighestAttackerLevel(receiver.Level()))
 	}
 	d.grantExpAndSp(entries, summonDamage, totalDamage)
+}
+
+// creditRaidKill credits a raid or grand boss kill to the player its
+// killer acts for, whether or not anyone fought it.
+func (d *deathRewards) creditRaidKill(killer attackable.Combatant) {
+	if d.config.RaidKills == nil || killer == nil || !d.hostile.RaidBoss() {
+		return
+	}
+	if p, ok := actingCharacter(killer); ok {
+		d.config.RaidKills.RecordRaidKill(p, int32(d.tmpl.ID), d.tmpl.Level)
+	}
 }
 
 // dropReceiver returns the player credited with the drops: the top damage

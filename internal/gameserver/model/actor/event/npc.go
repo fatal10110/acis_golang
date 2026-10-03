@@ -52,6 +52,10 @@ type MoveTypeChanged struct{ Running bool }
 // SocialAction reports a social animation.
 type SocialAction struct{ ID int32 }
 
+// RaidBossKilled reports a raid or grand boss's death at a player's hand,
+// after its death was shown.
+type RaidBossKilled struct{}
+
 // NpcSay reports an NPC chat line.
 type NpcSay struct {
 	NpcID int
@@ -67,3 +71,4 @@ func (ShotRecharged) event()   {}
 func (MoveTypeChanged) event() {}
 func (SocialAction) event()    {}
 func (NpcSay) event()          {}
+func (RaidBossKilled) event()  {}

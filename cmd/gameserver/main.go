@@ -56,6 +56,7 @@ const (
 		persistCloseTimeout +
 		shutdownSaveTimeout + // items_on_ground
 		2*olympiad.TaskTimeout + // the Olympiad's queued olympiad_nobles and server_memo writes, then its final save
+		shutdownSaveTimeout + // grandboss_list
 		gameServerStopSlack
 	// gameServerBootTimeout bounds constructor-time DB I/O (id scan, ground-item
 	// restore, spawn-state load). These run inside fx.New's constructor graph,
@@ -175,6 +176,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideGameClock,
 			provideSevenSignsState,
 			provideOlympiad,
+			provideRaidPoints,
 			provideWalker,
 			provideWater,
 			provideShadowItems,
@@ -205,6 +207,6 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideAnnouncements,
 			provideGameClientLink,
 		),
-		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startOlympiad, startDebugHTTP, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startOlympiad, startRaidPoints, startBossZones, startDebugHTTP, startGameServer),
 	}
 }

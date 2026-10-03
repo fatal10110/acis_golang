@@ -196,7 +196,10 @@ func (z *Boss) isAllowed(id int32) bool {
 }
 
 // AllowEntry permits the player to enter (or re-enter) for the given
-// window from now. Boot-time restores use the zone's own InvadeWindow.
+// window from now. A permission restored at boot gets a zero window: the
+// reference reads the stored players before the zone's InvadeTime, so the
+// entry lapses at once and only the permission itself (summons, the next
+// save) survives the restart.
 func (z *Boss) AllowEntry(id int32, window time.Duration) {
 	z.bmu.Lock()
 	defer z.bmu.Unlock()
