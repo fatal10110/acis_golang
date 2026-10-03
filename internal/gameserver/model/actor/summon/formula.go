@@ -350,11 +350,14 @@ func (a *Actor) CriticalRate(baseCritRate float64) float64 {
 }
 
 // MoveSpeed returns this summon's current move speed from its template
-// run speed: a summon stays in run stance, a pet's weight-penalty band
-// scales the base, and the RUN_SPEED stat finalizes the speed, narrowed to
-// float32 like the client-facing speed.
+// run speed: a summon stays in run stance, the swamp it stands in and then
+// a pet's weight-penalty band scale the base, and the RUN_SPEED stat
+// finalizes the speed, narrowed to float32 like the client-facing speed.
 func (a *Actor) MoveSpeed(baseRunSpeed float64) float64 {
 	base := float64(int(baseRunSpeed))
+	if bonus := a.swampMoveBonus.Load(); bonus != 0 {
+		base = float64(float32(base * (float64(100+bonus) / 100)))
+	}
 	if band := a.weightPenalty.Load(); band != weightPenaltyNone {
 		base = float64(float32(base * weightPenaltySpeed[band]))
 	}

@@ -57,8 +57,7 @@ type FolkSpawner struct {
 // Spawn builds a civilian NPC from inst, places it at (loc, heading) and
 // on the AI task, and starts its route walk when it has one.
 func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading int) (*npc.Folk, error) {
-	inPeace := s.Zones != nil && s.Zones.NPCInPeaceZone(loc.X, loc.Y, loc.Z)
-	f, err := npc.NewFolk(inst, inPeace, s.Skills)
+	f, err := npc.NewFolk(inst, s.Skills)
 	if err != nil {
 		return nil, err
 	}
@@ -69,6 +68,7 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 		MaxBuffsAmount: s.MaxBuffsAmount,
 		Items:          s.Items,
 		Decay:          s.Decay,
+		Zones:          s.Zones,
 	}
 	if s.NewSink != nil {
 		rt.Sink = s.NewSink(f)
@@ -113,6 +113,7 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 		}
 	}
 	s.State.Spawn(f, loc.X, loc.Y, loc.Z, heading)
+	f.EnterZones()
 	// The AI and walker tasks only work actors already in the world grid.
 	if s.AI != nil {
 		s.AI.Add(f)

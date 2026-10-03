@@ -47,13 +47,32 @@ func (a *Actor) BroadcastMove(ev event.Move) {
 	a.emit(ev)
 }
 
+// SyncPosition moves the summon's world presence to position, a movement
+// step.
 func (a *Actor) SyncPosition(position location.Location) {
-	if a.world != nil {
-		_ = a.world.Move(a, position.X, position.Y, position.Z)
-	}
+	a.relocate(position, false)
 }
 
+// relocate moves the summon's world presence to position and reports the
+// move to its zones: a movement step, or with placed a position set outside
+// movement.
+func (a *Actor) relocate(position location.Location, placed bool) {
+	if a.world == nil {
+		return
+	}
+	previous := a.location()
+	_ = a.world.Move(a, position.X, position.Y, position.Z)
+	if placed {
+		a.membership.place(previous)
+		return
+	}
+	a.membership.step(previous)
+}
+
+// BroadcastStop shows observers a stop in place, once the stop has
+// revalidated the zones.
 func (a *Actor) BroadcastStop() {
+	a.membership.settle()
 	a.emit(event.Stopped{})
 }
 

@@ -18,7 +18,7 @@ func newWorldFolk(t *testing.T, w *world.State) (*Folk, *sim.Inline) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f, err := NewFolk(inst, false)
+	f, err := NewFolk(inst)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestFolkAttachRefusesNilQueue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f, err := NewFolk(inst, false)
+	f, err := NewFolk(inst)
 	if err != nil {
 		t.Fatal(err)
 	}

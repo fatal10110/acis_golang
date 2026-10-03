@@ -30,7 +30,7 @@ func newMortalFolk(t *testing.T, objectID int32, decay *task.Decay) (*Folk, *eve
 		t.Fatal(err)
 	}
 	inst.WalkMode = true
-	f, err := NewFolk(inst, false)
+	f, err := NewFolk(inst)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func newFolkAttacker(t *testing.T) *Folk {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f, err := NewFolk(inst, false)
+	f, err := NewFolk(inst)
 	if err != nil {
 		t.Fatal(err)
 	}

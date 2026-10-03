@@ -34,7 +34,7 @@ func TestFolkOffRouteWalkerWaitsOutTeleportBeforeResuming(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f, err := NewFolk(inst, false)
+	f, err := NewFolk(inst)
 	if err != nil {
 		t.Fatal(err)
 	}

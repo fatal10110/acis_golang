@@ -5,6 +5,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
@@ -17,15 +18,8 @@ func (h *Hostile) FakeDeath() bool { return false }
 // RecentFakeDeath reports false: NPCs never feign death.
 func (h *Hostile) RecentFakeDeath() bool { return false }
 
-// InPeaceZone reports whether the NPC's current position lies in a zone that
-// raises the peace flag for an NPC. The NPC is not a zone occupant yet, so
-// the zones are probed by position instead of read from a flag ledger.
-func (h *Hostile) InPeaceZone() bool {
-	if h.inPeace == nil {
-		return false
-	}
-	return h.inPeace(h.location())
-}
+// InPeaceZone reports whether the NPC's zones hold it in peace.
+func (h *Hostile) InPeaceZone() bool { return h.zones.has(zone.FlagPeace) }
 
 // SpawnProtected reports false: spawn protection is a player state.
 func (h *Hostile) SpawnProtected() bool { return false }

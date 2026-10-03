@@ -27,7 +27,7 @@ func TestFolkMerchantKinds(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: new instance: %v", tc.kind, err)
 		}
-		f, err := NewFolk(inst, false)
+		f, err := NewFolk(inst)
 		if err != nil {
 			t.Fatalf("%s: new folk: %v", tc.kind, err)
 		}

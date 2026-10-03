@@ -175,7 +175,7 @@ func (a *Actor) FlyTo(dest location.Location, flight modelskill.Flight) {
 func (a *Actor) SetXYZ(x, y, z int) {
 	position := location.Location{X: x, Y: y, Z: z}
 	a.movement.SetPosition(position)
-	a.SyncPosition(position)
+	a.relocate(position, true)
 }
 
 // BroadcastPosition sends the forced-location correction after a flight lands.

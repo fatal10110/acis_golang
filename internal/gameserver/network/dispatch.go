@@ -722,6 +722,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 			boss.Eject = func(a zone.Actor) { link.ejectBossPlayer(boss, a) }
 		}
 	}
+	link.wireZoneOccupantHooks()
 	return link, nil
 }
 

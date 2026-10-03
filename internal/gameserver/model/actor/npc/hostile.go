@@ -109,10 +109,9 @@ type Hostile struct {
 	// inWater reports whether a location lies in a water zone; nil means
 	// none does. Set before the NPC is published.
 	inWater func(location.Location) bool
-	// inPeace reports whether an NPC standing at a location holds the peace
-	// zone flag; nil means no location does. Set before the NPC is
-	// published.
-	inPeace func(location.Location) bool
+	// zones is the NPC's zone membership. SetZones gives it the zone index
+	// before the NPC is published.
+	zones *zoneMember
 
 	regionInactive atomic.Bool
 	abnormalEffect atomic.Int32
@@ -282,6 +281,7 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 		soulshotRate:       soulshotRate,
 		spiritshotRate:     spiritshotRate,
 	}
+	h.zones = newZoneMember(h)
 	h.maxBuffsAmount.Store(maxBuffCount)
 	// Raid and grand bosses are raid-related from construction; minions
 	// are marked at spawn (see SetRaidRelated).
@@ -455,6 +455,7 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 		MAtkSpd: h.MagicAttackSpeed(), PAtkSpd: pAtkSpd,
 		RunSpd: int(tmpl.RunSpeed), WalkSpd: int(tmpl.WalkSpeed),
 		MoveMultiplier: float64(h.MovementSpeedMultiplier()), AtkSpdMultiplier: npcinfo.AttackSpeedMultiplier(pAtkSpd, tmpl.AtkSpd),
+		MoveType:  h.zones.moveType(),
 		CurrentHP: h.CurrentHP(), MaxHP: int(h.MaxHPValue()),
 		CollisionRadius: h.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
 		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
@@ -476,13 +477,26 @@ func (h *Hostile) UpdateAbnormalEffect() {
 	h.emit(event.AbnormalEffectChanged{})
 }
 
-// SyncPosition moves this NPC's world-grid presence to position. A no-op
-// until Attach installs a world.
+// SyncPosition moves this NPC's world-grid presence to position, a movement
+// step. A no-op until Attach installs a world.
 func (h *Hostile) SyncPosition(position location.Location) {
+	h.relocate(position, false)
+}
+
+// relocate moves this NPC's world-grid presence to position and reports the
+// move to its zones: a movement step, or with placed a position set outside
+// movement.
+func (h *Hostile) relocate(position location.Location, placed bool) {
 	if h.world == nil {
 		return
 	}
+	previous := h.location()
 	_ = h.world.Move(h, position.X, position.Y, position.Z)
+	if placed {
+		h.zones.place(previous)
+		return
+	}
+	h.zones.step(previous)
 }
 
 // SetRollSource overrides the random source MakeAttackHit uses for its
@@ -1045,6 +1059,8 @@ func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
 	h.corpseDeadline = time.Time{}
 	h.deathMu.Unlock()
 
+	// The NPC leaves its zones while its observers still know it.
+	h.zones.leave(h.location())
 	if worldState != nil {
 		worldState.Despawn(h)
 	}

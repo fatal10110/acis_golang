@@ -22,7 +22,7 @@ func TestFolkKindLeavesOutClickInertCivilians(t *testing.T) {
 		if got := FolkKind(inst); got != tc.folk {
 			t.Fatalf("FolkKind(%s) = %v, want %v", tc.kind, got, tc.folk)
 		}
-		if _, err := NewFolk(inst, false); (err == nil) != tc.folk {
+		if _, err := NewFolk(inst); (err == nil) != tc.folk {
 			t.Fatalf("NewFolk(%s) error = %v, want folk=%v", tc.kind, err, tc.folk)
 		}
 		if Attackable(inst) {

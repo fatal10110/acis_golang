@@ -179,6 +179,9 @@ func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) {
 		return
 	}
 	destination := live.CurrentLocation()
+	// The summon leaves the zones around its old position before the jump
+	// and enters those at the destination once it has landed.
+	actor.LeaveZones()
 	actor.AbortForTeleport()
 	// The summon's jump is a teleport of its own: hostiles around its old
 	// position forget it too.
@@ -186,5 +189,6 @@ func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) {
 	l.broadcastSummonFrame(actor, serverpackets.FrameTeleportToLocation(actor.ObjectID(), destination, false))
 	actor.Move().SetPosition(destination)
 	_ = l.world.Teleport(actor, destination.X, destination.Y, destination.Z)
+	actor.EnterZones()
 	actor.OnTeleported()
 }

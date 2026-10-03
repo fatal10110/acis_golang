@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -115,10 +116,10 @@ func (a *Actor) AttackSpeed() int                { return int(a.PhysicalAttackSp
 func (a *Actor) WeaponReuseDelay() time.Duration { return 0 }
 func (a *Actor) ConsumeBowMP()                   {}
 func (a *Actor) WeaponGrade() int                { return 0 }
-func (a *Actor) InPeaceZone() bool {
-	x, y, z := a.Position()
-	return a.EffectRangeInPeaceZone(x, y, z, 0)
-}
+
+// InPeaceZone reports whether this summon's zones hold it in peace.
+func (a *Actor) InPeaceZone() bool { return a.membership.has(zone.FlagPeace) }
+
 func (a *Actor) Evasion() int { return int(a.EvasionRate()) }
 
 func (a *Actor) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit {

@@ -33,6 +33,9 @@ func (h *Hostile) TeleportTo(target location.Location) {
 	}
 	h.brain.AbortAll()
 	h.emit(event.Teleported{To: target})
+	// The NPC leaves the zones around its old position while its observers
+	// there still know it, and enters those at target once it has landed.
+	h.zones.leave(h.location())
 	// Leaving the grid forgets every creature around the old position, and
 	// its threat entry (damage and hate) goes with it even when the
 	// destination still sees it. Queued attack desires stay; the next
@@ -51,6 +54,7 @@ func (h *Hostile) TeleportTo(target location.Location) {
 		_ = h.world.Teleport(h, target.X, target.Y, target.Z)
 	}
 	h.SetTeleporting(false)
+	h.zones.enter()
 	h.ResetGeoPathFailCount()
 }
 
@@ -82,19 +86,13 @@ func (h *Hostile) SetWaterZone(inWater func(location.Location) bool) {
 	h.inWater = inWater
 }
 
-// SetPeaceZone installs the query InPeaceZone asks about the NPC's current
-// position. It must be set before the NPC is published.
-func (h *Hostile) SetPeaceZone(inPeace func(location.Location) bool) {
-	h.inPeace = inPeace
-}
-
 // SetXYZ moves the NPC immediately and reseeds its ordinary movement state.
 func (h *Hostile) SetXYZ(x, y, z int) {
 	position := location.Location{X: x, Y: y, Z: z}
 	if h.Live != nil {
 		h.Move().SetPosition(position)
 	}
-	h.SyncPosition(position)
+	h.relocate(position, true)
 }
 
 // BroadcastPosition sends the forced-location correction after a flight lands.
