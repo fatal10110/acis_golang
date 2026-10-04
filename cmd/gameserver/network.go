@@ -180,6 +180,7 @@ func provideGameClientLink(
 		GMStartupInvulnerable:      gameplay.Admin.GMStartupInvulnerable,
 		GMStartupInvisible:         gameplay.Admin.GMStartupInvisible,
 		GMStartupBlockAll:          gameplay.Admin.GMStartupBlockAll,
+		GMHeroAura:                 gameplay.Admin.GMHeroAura,
 		PartyRange:                 rewards.PartyRange,
 	}
 	link, err := network.NewGameClientLink(network.GameClientLinkConfig{

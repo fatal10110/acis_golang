@@ -85,14 +85,15 @@ const (
 	EquipOK EquipFailure = iota
 	// EquipNoop means the request is invalid and changed nothing.
 	EquipNoop
-	// EquipBadCondition means the paperdoll refused the item: legs, feet,
-	// gloves or a helmet while formal wear is worn.
+	// EquipBadCondition means the paperdoll refused the item: a hero item
+	// for a player who is no active hero, or legs, feet, gloves or a
+	// helmet while formal wear is worn.
 	EquipBadCondition
 )
 
 // ToggleEquipItem equips objectID into a player's paperdoll, or unequips it
-// when it is already worn.
-func (s *Service) ToggleEquipItem(inv *itemcontainer.Inventory, objectID int32) (Result, EquipFailure) {
+// when it is already worn. A hero item goes on only when activeHero.
+func (s *Service) ToggleEquipItem(inv *itemcontainer.Inventory, objectID int32, activeHero bool) (Result, EquipFailure) {
 	if inv == nil {
 		return Result{}, EquipNoop
 	}
@@ -112,6 +113,9 @@ func (s *Service) ToggleEquipItem(inv *itemcontainer.Inventory, objectID int32) 
 			return Result{}, EquipNoop
 		}
 		return Result{EquipmentChanged: true, Changed: changed}, EquipOK
+	}
+	if tmpl.HeroItem() && !activeHero {
+		return Result{}, EquipBadCondition
 	}
 	changed, refused := inv.EquipPlayerItem(inst, tmpl)
 	if refused {

@@ -7,8 +7,9 @@ import (
 )
 
 // TestLoadAdminConfigGMStartup pins the GM startup modes to
-// players.properties with their shipped defaults: listed on /gmlist, and
-// neither invulnerable, invisible nor blocking everything.
+// players.properties with their shipped defaults: listed on /gmlist,
+// neither invulnerable, invisible nor blocking everything, and without the
+// hero aura.
 func TestLoadAdminConfigGMStartup(t *testing.T) {
 	dir := t.TempDir()
 	server := filepath.Join(dir, "server.properties")
@@ -21,8 +22,8 @@ func TestLoadAdminConfigGMStartup(t *testing.T) {
 	}{
 		{"default", "", adminConfig{GMStartupAutoList: true}},
 		{
-			"set", "GMStartupInvulnerable = True\nGMStartupInvisible = True\nGMStartupBlockAll = True\nGMStartupAutoList = False\n",
-			adminConfig{GMStartupInvulnerable: true, GMStartupInvisible: true, GMStartupBlockAll: true},
+			"set", "GMStartupInvulnerable = True\nGMStartupInvisible = True\nGMStartupBlockAll = True\nGMStartupAutoList = False\nGMHeroAura = True\n",
+			adminConfig{GMStartupInvulnerable: true, GMStartupInvisible: true, GMStartupBlockAll: true, GMHeroAura: true},
 		},
 	} {
 		path := filepath.Join(dir, tt.name+".properties")

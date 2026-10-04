@@ -210,6 +210,7 @@ func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, c 
 		return nil, false
 	}
 	items = l.restoreItemRows(c.ID, items)
+	l.unwearHeroItems(c.ID, items)
 	if l.skills != nil {
 		if err := l.skills.RestoreKnownSkills(ctx, c); err != nil {
 			l.log.Error().Err(err).Int32("object_id", c.ID).Msg("select character: restore known skills")
@@ -551,6 +552,7 @@ func (l *GameClientLink) userInfoSnapshot(live *livePlayer) serverpackets.UserIn
 		IsGM:               live.accessLevel().IsGM,
 		SpawnProtectedTeam: l.playerConfig.SpawnProtection > 0 && live.SpawnProtected(),
 		Clan:               l.clanFields(live.Character),
+		HeroAura:           l.heroAura(live),
 	}
 }
 

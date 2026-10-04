@@ -27,6 +27,10 @@ func (s *upsertStore) SaveHeroes(_ context.Context, heroes map[int32]Hero) error
 
 func (s *upsertStore) AddDiaryEntry(context.Context, int32, int64, int, int) error { return nil }
 
+func (s *upsertStore) LoadDiary(context.Context, int32) ([]DiaryRow, error) { return nil, nil }
+
+func (s *upsertStore) LoadFights(context.Context, int32, int64) ([]FightRow, error) { return nil, nil }
+
 // heldWriter keeps every queued job until the test runs them.
 type heldWriter struct{ jobs []func() }
 
@@ -42,7 +46,7 @@ func TestActivateSavesTheHeroesAsTheyAreWhenItRuns(t *testing.T) {
 	t.Parallel()
 	store := &upsertStore{rows: map[int32]Hero{}}
 	writes := &heldWriter{}
-	m := New(store, nil, writes, 5, time.Now, zerolog.Nop())
+	m := New(store, nil, nil, writes, 5, time.Now, zerolog.Nop())
 	m.heroes = map[int32]Hero{1: {ClassID: 88, Count: 1, Played: true}, 2: {ClassID: 89, Count: 1, Played: true}}
 
 	for _, id := range []int32{1, 2} {

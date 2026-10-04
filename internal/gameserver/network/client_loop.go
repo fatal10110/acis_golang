@@ -727,6 +727,17 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if live != nil {
 					onLive(live, func() { l.sendBossRecord(live) })
 				}
+			case clientpackets.OpcodeRequestWriteHeroWords:
+				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestWriteHeroWords)
+				if err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					continue
+				}
+				if live != nil {
+					onLive(live, func() { l.writeHeroWords(live, req) })
+				}
 			case clientpackets.OpcodeRequestExFishRanking:
 				if live != nil {
 					onLive(live, func() { l.requestFishRanking(live) })

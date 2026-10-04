@@ -105,7 +105,8 @@ var bypassRoutes = []bypassRoute{
 	{[]string{"manor_menu_select?"}, unportedBypass("manor (#240)")},
 	{[]string{"bbs_", "_bbs", "_friend", "_mail", "_block"}, (*GameClientLink).boardCommand},
 	{[]string{"Quest "}, (*GameClientLink).bypassQuest},
-	{[]string{"_match", "_diary"}, unportedBypass("hero records (#3361)")},
+	{[]string{"_match"}, (*GameClientLink).bypassHeroFights},
+	{[]string{"_diary"}, (*GameClientLink).bypassHeroDiary},
 	{[]string{"arenachange"}, unportedBypass("olympiad observation (#3356)")},
 }
 

@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -39,6 +40,31 @@ func (l *GameClientLink) restoreHeroStatus(c *player.Character) {
 	}
 	if err := l.skills.GrantTransientSkills(c, modelskill.HeroSkills()); err != nil {
 		l.log.Error().Err(err).Int32("object_id", c.ID).Msg("give hero skills")
+	}
+}
+
+// heroAura reports whether live, a game master, shows the hero aura
+// GMHeroAura gives game masters.
+func (l *GameClientLink) heroAura(live *livePlayer) bool {
+	return l != nil && l.playerConfig.GMHeroAura && live.accessLevel().IsGM
+}
+
+// unwearHeroItems puts every hero item of ownerID's carried inventory back
+// in it, out of the paperdoll, unless ownerID is an active hero, before
+// the inventory is restored from items; each move is stored.
+func (l *GameClientLink) unwearHeroItems(ownerID int32, items []*item.Instance) {
+	if l.itemTemplates == nil || (l.heroes != nil && l.heroes.IsActive(ownerID)) {
+		return
+	}
+	for _, inst := range items {
+		if loc := inst.Snapshot().Location; loc != item.LocationInventory && loc != item.LocationPaperdoll {
+			continue
+		}
+		if tmpl, ok := l.itemTemplates.Get(inst.TemplateID); !ok || !tmpl.HeroItem() {
+			continue
+		}
+		inst.BindPersister(l.itemPersister(ownerID))
+		inst.SetLocation(item.LocationInventory, 0)
 	}
 }
 

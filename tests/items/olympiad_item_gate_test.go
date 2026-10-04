@@ -1,7 +1,7 @@
 package items
 
 import (
-	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -33,16 +33,20 @@ func bootOlympiadItems(t *testing.T, hero bool) *gameservertest.Server {
 		}
 		templates = append(templates, tmpl)
 	}
-	srv := gameservertest.Boot(t,
+	opts := []gameservertest.Option{
 		gameservertest.WithItemTemplates(item.NewTable(templates)),
 		gameservertest.WithCharacter("Newbie", 40, 0),
-		gameservertest.WithWantChars(1))
-	if hero {
-		if _, err := srv.DB.ExecContext(context.Background(), "UPDATE characters SET hero = 1 WHERE char_name = 'Newbie'"); err != nil {
-			t.Fatalf("seed hero: %v", err)
-		}
+		gameservertest.WithWantChars(1),
 	}
-	return srv
+	if hero {
+		// An active hero of the running era: only one wears a hero item.
+		opts = append(opts, gameservertest.WithOlympiadSeed(func(db *sql.DB) {
+			if _, err := db.Exec("INSERT INTO heroes (char_id, class_id, count, played, active) SELECT obj_Id, 88, 1, 1, 1 FROM characters WHERE char_name = 'Newbie'"); err != nil {
+				t.Fatalf("seed hero: %v", err)
+			}
+		}))
+	}
+	return gameservertest.Boot(t, opts...)
 }
 
 // TestOlympiadBarsRestrictedItems pins the Olympiad bar ahead of every item
