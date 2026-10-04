@@ -221,6 +221,10 @@ func (m *Manager) Heroes() []Hero {
 // returns its entry. It reports false, changing nothing, unless objectID
 // is an inactive hero of the running era, so two claims never both
 // succeed. The claim's diary entry and the heroes are stored behind it.
+//
+// The save reads the heroes when it runs, not when the claim queues it:
+// an election queued before the claim has replaced them by then, and a
+// later claim's save, queued first, already holds this claim too.
 func (m *Manager) Activate(objectID int32) (Hero, bool) {
 	m.mu.Lock()
 	h, ok := m.heroes[objectID]
@@ -230,10 +234,14 @@ func (m *Manager) Activate(objectID int32) (Hero, bool) {
 	}
 	h.Active = true
 	m.heroes[objectID] = h
-	heroes := maps.Clone(m.heroes)
 	m.mu.Unlock()
 	m.AddDiaryEntry(objectID, DiaryHeroGained, 0)
-	m.write("save heroes", func(ctx context.Context) error { return m.store.SaveHeroes(ctx, heroes) })
+	m.write("save heroes", func(ctx context.Context) error {
+		m.mu.Lock()
+		heroes := maps.Clone(m.heroes)
+		m.mu.Unlock()
+		return m.store.SaveHeroes(ctx, heroes)
+	})
 	return h, true
 }
 
