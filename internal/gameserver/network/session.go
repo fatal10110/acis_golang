@@ -41,11 +41,17 @@ type Session struct {
 	// the single goroutine calling ReadFrame.
 	frames      *wire.FrameReader
 	handshaking bool
+
+	// evicted is closed, once, when Close evicts the session: a kick, an
+	// account takeover or a duplicate selection. A player still lingering
+	// after its connection ended then leaves at once (awaitDetachDelay).
+	evicted   chan struct{}
+	evictOnce sync.Once
 }
 
 // NewSession pairs conn with cipher for framed, encrypted read/write.
 func NewSession(conn *Conn, cipher *gamecipher.Cipher) *Session {
-	return &Session{conn: conn, cipher: cipher, frames: wire.NewFrameReader(conn), handshaking: true}
+	return &Session{conn: conn, cipher: cipher, frames: wire.NewFrameReader(conn), handshaking: true, evicted: make(chan struct{})}
 }
 
 // SendFrame encrypts and queues frame, which must already include the
@@ -135,6 +141,7 @@ func (s *Session) EnableCrypt() {
 // client whose session another selection took over; safe to call from any
 // goroutine.
 func (s *Session) Close() {
+	s.evictOnce.Do(func() { close(s.evicted) })
 	s.sendLast(serverpackets.FrameServerClose())
 	_ = s.conn.Close()
 }
