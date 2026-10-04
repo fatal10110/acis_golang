@@ -77,7 +77,8 @@ type CountMismatch struct {
 	Want int
 }
 
-// IntPair is a pair parsed from values shaped like "57-100;6651-3".
+// IntPair is a pair parsed from values shaped like "57-100;6651-3". Both
+// numbers fit an int32: a number outside it is malformed.
 type IntPair struct {
 	First  int
 	Second int
@@ -374,8 +375,8 @@ func (p *Properties) Float64s(key string, def []float64) ([]float64, error) {
 const pairSep = ";"
 
 // IntPairs returns pairs parsed from a value shaped like "57-100;6651-3",
-// or def parsed the same way when key is missing. A malformed entry logs and
-// returns an empty list.
+// or def parsed the same way when key is missing. A malformed entry, a
+// number outside int32 included, logs and returns an empty list.
 func (p *Properties) IntPairs(key, def string) ([]IntPair, error) {
 	return p.intPairsSep(pairSep, key, def, true)
 }
@@ -410,7 +411,7 @@ func (p *Properties) intPairsSep(sep, key, def string, tolerant bool) ([]IntPair
 			}
 			return nil, err
 		}
-		first, err := strconv.Atoi(strings.TrimSpace(bounds[0]))
+		first, err := strconv.ParseInt(strings.TrimSpace(bounds[0]), 10, 32)
 		if err != nil {
 			err = fmt.Errorf("parse %s[%d] first: %w", key, i, err)
 			if tolerant {
@@ -419,7 +420,7 @@ func (p *Properties) intPairsSep(sep, key, def string, tolerant bool) ([]IntPair
 			}
 			return nil, err
 		}
-		second, err := strconv.Atoi(strings.TrimSpace(bounds[1]))
+		second, err := strconv.ParseInt(strings.TrimSpace(bounds[1]), 10, 32)
 		if err != nil {
 			err = fmt.Errorf("parse %s[%d] second: %w", key, i, err)
 			if tolerant {
@@ -428,7 +429,7 @@ func (p *Properties) intPairsSep(sep, key, def string, tolerant bool) ([]IntPair
 			}
 			return nil, err
 		}
-		out[i] = IntPair{First: first, Second: second}
+		out[i] = IntPair{First: int(first), Second: int(second)}
 	}
 	return out, nil
 }

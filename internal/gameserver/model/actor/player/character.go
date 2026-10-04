@@ -136,6 +136,9 @@ type Character struct {
 	noble atomic.Bool
 	// duel is the character's place in a duel; see character_duel.go.
 	duel duelStanding
+	// olympiad is the character's place in an Olympiad match; see
+	// character_olympiad.go.
+	olympiad olympiadStanding
 	// marriage is the marriage request the character is part of; see
 	// character_wedding.go.
 	marriage marriageRequest
@@ -186,6 +189,7 @@ type Character struct {
 	los                      LineOfSight
 	zones                    PeaceZoneQuery
 	social                   SocialGraph
+	hallFunctions            HallFunctions
 	partyLoot                PartyLoot
 	mounts                   MountBodies
 	mountData                MountDataSource
@@ -195,6 +199,7 @@ type Character struct {
 	insideSiegeZone          atomic.Bool
 	insideNoSummonFriendZone atomic.Bool
 	insideBossZone           atomic.Bool
+	insideClanHallZone       atomic.Bool
 	insideDangerArea         atomic.Bool
 	insideWater              atomic.Bool
 	swampMoveBonus           atomic.Int32
@@ -318,6 +323,9 @@ type Character struct {
 	store privatestore.Store
 	// recommendations carries its own lock; see character_recommendation.go.
 	recommendations recommendationState
+	// boat is the boat ride state; it carries its own lock. See
+	// character_boat.go.
+	boat boatRide
 }
 
 var _ effect.StatOwner = (*Character)(nil)

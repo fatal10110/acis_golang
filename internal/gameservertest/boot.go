@@ -23,13 +23,16 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
 	"github.com/fatal10110/acis_golang/internal/gameserver/enchant"
+	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
@@ -50,6 +53,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
+	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
+	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -88,6 +93,8 @@ var HexID = []byte{0x01, 0x02, 0x03, 0x04}
 type Option func(*options)
 
 type options struct {
+	// castles is the castle data (WithCastles); nil loads none.
+	castles *castledata.Table
 	// slowStores delays every handler-issued persistence write (WithSlowStores).
 	slowStores             time.Duration
 	itemFlushFault         *ItemFlushFault
@@ -113,6 +120,8 @@ type options struct {
 	gmAudit                zerolog.Logger
 	chat                   network.ChatConfig
 	restarts               *restart.Table
+	clanHallData           *hallmodel.Table
+	castleData             *castledata.Table
 	teleports              travel.TeleportTable
 	instantTeleports       travel.InstantTable
 	freeTeleport           bool
@@ -153,8 +162,12 @@ type options struct {
 	seedShortcuts          func(*gamesql.ShortcutStore)
 	seedHennas             func(db *sql.DB, hennas *gamesql.HennaStore)
 	seedSevenSigns         func(*gamesql.SevenSignsStore)
+	seedFestival           func(*gamesql.FestivalStore)
+	festivalClock          func() time.Time
 	clanConfig             *clan.Config
 	seedClans              func(db *sql.DB)
+	clanHalls              *hallmodel.Table
+	clanHallDecos          *hallmodel.DecoTable
 	board                  bbs.Config
 	seedBoard              func(db *sql.DB)
 	seedOlympiad           func(db *sql.DB)
@@ -207,6 +220,9 @@ type options struct {
 	// rewardPartiesWrap wraps the link's kill-party resolver
 	// (WithRewardParties).
 	rewardPartiesWrap func(gamemanager.RewardParties) gamemanager.RewardParties
+	// lootChannelsWrap wraps the link's raid loot-rights channel resolver
+	// (see WithLootChannels).
+	lootChannelsWrap func(gamemanager.LootChannels) gamemanager.LootChannels
 }
 
 type characterSpec struct {
@@ -311,6 +327,13 @@ func WithChat(cfg network.ChatConfig) Option { return func(o *options) { o.chat 
 // (default: none, so restart requests answer ActionFailed).
 func WithRestartPoints(table *restart.Table) Option {
 	return func(o *options) { o.restarts = table }
+}
+
+// WithResidences supplies the static clan hall and castle tables a
+// restart to the owned clan hall or castle picks its spawn from (default:
+// none, so those restarts land in town).
+func WithResidences(halls *hallmodel.Table, castles *castledata.Table) Option {
+	return func(o *options) { o.clanHallData, o.castleData = halls, castles }
 }
 
 // WithTeleports supplies the destinations civilian NPCs offer (default:
@@ -563,6 +586,15 @@ func WithClanSeed(seed func(db *sql.DB)) Option {
 	return func(o *options) { o.seedClans = seed }
 }
 
+// WithClanHalls loads halls as the clan hall data and decos as their
+// function decorations (default: none, so every seeded hall owner counts
+// and no hall restores a rented function). The clans own only the halls
+// it holds, and each owned hall restores its stored clanhall_functions
+// rows, whose fees then run on the boot clock.
+func WithClanHalls(halls *hallmodel.Table, decos *hallmodel.DecoTable) Option {
+	return func(o *options) { o.clanHalls, o.clanHallDecos = halls, decos }
+}
+
 // WithCommunityBoard sets the community board's server.properties
 // settings (default off, opening on _bbshome). With the board on, the mail
 // stored in bbs_mail is restored once the characters and clans are seeded.
@@ -592,6 +624,18 @@ func WithAnnouncements(file string) Option {
 // clock.
 func WithClanClock(now func() time.Time) Option {
 	return func(o *options) { o.clanClock = now }
+}
+
+// WithFestivalSeed adjusts the Festival of Darkness scores and status
+// columns before the festival restores them.
+func WithFestivalSeed(seed func(*gamesql.FestivalStore)) Option {
+	return func(o *options) { o.seedFestival = seed }
+}
+
+// WithFestivalClock runs the Festival of Darkness schedule and its guide
+// countdown on now instead of the wall clock.
+func WithFestivalClock(now func() time.Time) Option {
+	return func(o *options) { o.festivalClock = now }
 }
 
 // WithSevenSignsSeed adjusts the seven_signs_status row before the Seven
@@ -810,7 +854,8 @@ type Server struct {
 	DB     *sql.DB
 	// RaidPoints is the players' raid points, restored at boot.
 	RaidPoints       *raidpoint.Points
-	Lottery          *lottery.Lottery // the lottery WithLottery runs; nil without it
+	Lottery          *lottery.Lottery    // the lottery WithLottery runs; nil without it
+	HallFunctions    *clanhall.Functions // the functions the clan halls rent, restored at boot
 	Chars            *gamesql.CharacterStore
 	Items            *gamesql.ItemStore
 	Shortcuts        *gamesql.ShortcutStore
@@ -840,7 +885,9 @@ type Server struct {
 	Couples          *wedding.Manager // couples the link was wired with
 	coupleRows       *gamesql.CoupleStore
 	Clans            *clan.Service
+	Castles          *castle.Manager // the castles WithCastles loads, restored at boot
 	SevenSigns       *sevensigns.State
+	Festival         *festival.Manager
 	AnnounceFile     string // the announcements.xml the server reads and rewrites
 	account          string
 	templates        *player.TemplateTable
@@ -874,6 +921,9 @@ type Server struct {
 	// raidKills credits the raid boss kills of the hostiles the suite
 	// spawns.
 	raidKills gamemanager.RaidKillRecorder
+	// lootChannels resolves the command channel that wins a raid boss's
+	// loot rights for the hostiles the suite spawns.
+	lootChannels gamemanager.LootChannels
 	// stance is the stance tracker the link was wired with, nil when none
 	// was; fixture NPCs report their attack stances to it.
 	stance network.AttackStanceTracker
@@ -1739,6 +1789,21 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err := sevenSigns.Restore(context.Background()); err != nil {
 		t.Fatalf("restore seven signs status: %v", err)
 	}
+	festivalStore := gamesql.NewFestivalStore(db)
+	if o.seedFestival != nil {
+		o.seedFestival(festivalStore)
+	}
+	festivalClock := time.Now
+	if o.festivalClock != nil {
+		festivalClock = o.festivalClock
+	}
+	fest := festival.New(festival.DefaultConfig(), festivalStore, sevenSigns, o.log, festivalClock, nil)
+	if err := fest.Restore(context.Background(), sevenSigns.CurrentCycle()); err != nil {
+		t.Fatalf("restore festival: %v", err)
+	}
+	sevenSigns.SetFestival(fest)
+	fest.Start()
+	t.Cleanup(fest.Stop)
 	sevenSigns.Start()
 	t.Cleanup(sevenSigns.Stop)
 
@@ -1819,6 +1884,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		GameClock:        task.NewGameClock(time.Now),
 		PvPFlags:         task.NewPvPFlags(task.DefaultPvPFlagOptions(), time.Now),
 		SevenSigns:       sevenSigns,
+		Festival:         fest,
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
 		Persist:          persistWorker,
@@ -1829,6 +1895,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Autosave:         autosave,
 		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, DeathDrop: o.deathDrop, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, RollDiceDelay: o.rollDiceDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight, PartyRange: fixturePartyRange},
 		Restarts:         o.restarts,
+		ClanHallData:     o.clanHallData,
+		CastleData:       o.castleData,
 		Teleports:        o.teleports,
 		InstantTeleports: o.instantTeleports,
 		FreeTeleport:     o.freeTeleport,
@@ -1851,6 +1919,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		clanConfig = *o.clanConfig
 	}
 	gclConfig.Clans = clan.NewService(clan.NewTable(), clanStore, persistWorker, ids, clanConfig, o.clanClock, o.log)
+	gclConfig.Castles = newCastles(db, o.castles, gclConfig.Clans, persistWorker, o.log)
 	// The mail is restored once the characters are seeded, below.
 	mailStore := gamesql.NewMailStore(db)
 	gclConfig.Board, gclConfig.ShowServerNews = o.board, o.serverNews
@@ -1945,6 +2014,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	raidPoints := raidpoint.New(gamesql.NewRaidPointStore(db), persistWorker, o.log)
 	gclConfig.RaidPoints = raidPoints
 	lotteryState := o.lottery.newLottery(db, persistWorker, state, queues, o.log)
+	// The functions are restored once the clans own their halls, below.
+	hallFunctions := clanhall.New(o.clanHalls, o.clanHallDecos, gclConfig.Clans.Table(), gamesql.NewClanHallFunctionStore(db), persistWorker, o.log)
+	gclConfig.ClanHallFunctions = hallFunctions
 	gclConfig.Lottery = lotteryState
 	gcl, err := network.NewGameClientLink(gclConfig)
 	if err != nil {
@@ -2058,8 +2130,23 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err != nil {
 		t.Fatalf("load clan hall owners: %v", err)
 	}
-	// The fixture loads no clan hall data, so every seeded hall counts.
-	gclConfig.Clans.Table().RestoreHalls(hallOwners, nil)
+	// Without WithClanHalls the fixture loads no clan hall data, so every
+	// seeded hall counts.
+	var knownHall func(int32) bool
+	if o.clanHalls != nil {
+		knownHall = func(id int32) bool {
+			_, ok := o.clanHalls.Get(int(id))
+			return ok
+		}
+	}
+	gclConfig.Clans.Table().RestoreHalls(hallOwners, knownHall)
+	if err := hallFunctions.Restore(context.Background()); err != nil {
+		t.Fatalf("restore clan hall functions: %v", err)
+	}
+	hallFees := queues.NewQueue("clanhall-functions")
+	t.Cleanup(hallFees.Close)
+	hallFunctions.Start(hallFees, gcl)
+	restoreCastles(t, db, gclConfig.Castles)
 	gclConfig.Clans.DropMissingCrests(crests)
 	gclConfig.Clans.DropDanglingAlliances()
 	clanDissolutions := queues.NewQueue("clan-dissolution")
@@ -2118,7 +2205,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Boats:            boats,
 		Derby:            derbyTrack,
 		Clans:            gclConfig.Clans,
+		Castles:          gclConfig.Castles,
+		HallFunctions:    hallFunctions,
 		SevenSigns:       sevenSigns,
+		Festival:         fest,
 		itemTable:        itemTemplates,
 		levelTable:       levels,
 		deepBlueDrops:    o.deepBlueDropRules,
@@ -2149,6 +2239,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		castEffects:      gcl.HostileCastEffects(),
 		rewardParties:    o.rewardParties(gcl),
 		raidKills:        gcl,
+		lootChannels:     o.lootChannels(gcl),
 		stance:           gclConfig.AttackStance,
 		maxGeoPathFail:   o.maxGeoPathFailCount,
 		zones:            o.zones,

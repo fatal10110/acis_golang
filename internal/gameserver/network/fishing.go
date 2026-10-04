@@ -88,10 +88,12 @@ func (l *GameClientLink) castFishing(live *livePlayer) {
 	if inv != nil {
 		lure = inv.ItemAt(itemcontainer.LHand)
 	}
-	// ponytail: the on-a-boat refusal (CANNOT_FISH_ON_BOAT) waits for boat passengers, #229.
 	switch fishing.CastRefusal(live.Character, lure != nil) {
 	case fishing.RefuseNoRod:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageFishingPoleNotEquipped))
+		return
+	case fishing.RefuseOnBoat:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotFishOnBoat))
 		return
 	case fishing.RefuseOperating:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotFishWhileUsingRecipeBook))

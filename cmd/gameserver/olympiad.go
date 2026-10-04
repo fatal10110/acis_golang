@@ -15,8 +15,9 @@ import (
 	"go.uber.org/fx"
 )
 
-// loadOlympiadConfig reads the events.properties Olympiad calendar
-// settings, defaulting as the reference does when a key is missing.
+// loadOlympiadConfig reads the events.properties Olympiad calendar and
+// match settings, defaulting as the reference does when a key is missing.
+// A malformed reward list reads as no reward.
 func loadOlympiadConfig(paths gameServerPaths) (olympiad.Config, error) {
 	props, err := config.LoadFile(paths.EventsConfigPath)
 	if err != nil {
@@ -29,8 +30,22 @@ func loadOlympiadConfig(paths gameServerPaths) (olympiad.Config, error) {
 		StartMinute:       f.Int("OlyMin", def.StartMinute),
 		CompetitionMillis: f.Int64("OlyCPeriod", def.CompetitionMillis),
 		WeeklyPoints:      f.Int("OlyWeeklyPoints", def.WeeklyPoints),
+		MaxPoints:         f.Int("OlyMaxPoints", def.MaxPoints),
+		DividerClassed:    f.Int("OlyDividerClassed", def.DividerClassed),
+		DividerNonClassed: f.Int("OlyDividerNonClassed", def.DividerNonClassed),
+		ClassedReward:     olympiadRewards(f.IntPairs("OlyClassedReward", "6651-50")),
+		NonClassedReward:  olympiadRewards(f.IntPairs("OlyNonClassedReward", "6651-30")),
 	}
 	return cfg, f.Err()
+}
+
+// olympiadRewards reads item id-count pairs as match rewards.
+func olympiadRewards(pairs []config.IntPair) []olympiad.Reward {
+	rewards := make([]olympiad.Reward, 0, len(pairs))
+	for _, p := range pairs {
+		rewards = append(rewards, olympiad.Reward{ItemID: int32(p.First), Count: p.Second})
+	}
+	return rewards
 }
 
 // provideOlympiad returns the Olympiad, persisting through the gameserver

@@ -56,6 +56,13 @@ type SocialAction struct{ ID int32 }
 // after its death was shown.
 type RaidBossKilled struct{}
 
+// OnScreenMessage reports a text an NPC shows on its observers' screens
+// for DurationMs milliseconds.
+type OnScreenMessage struct {
+	Text       string
+	DurationMs int32
+}
+
 // NpcSay reports an NPC chat line.
 type NpcSay struct {
 	NpcID int
@@ -63,6 +70,7 @@ type NpcSay struct {
 }
 
 func (NPCInfoChanged) event()  {}
+func (OnScreenMessage) event() {}
 func (Status) event()          {}
 func (HPChanged) event()       {}
 func (SkillLaunched) event()   {}

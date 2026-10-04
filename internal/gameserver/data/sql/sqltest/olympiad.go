@@ -34,3 +34,18 @@ const serverMemoSchema = "CREATE TABLE IF NOT EXISTS `server_memo` (\n" +
 	"  `value` VARCHAR(255) NOT NULL DEFAULT '',\n" +
 	"  PRIMARY KEY (`var`)\n" +
 	")"
+
+// olympiadFightsSchema mirrors the shipped olympiad_fights table definition
+// verbatim.
+const olympiadFightsSchema = "CREATE TABLE IF NOT EXISTS `olympiad_fights` (\n" +
+	"  `charOneId` int(10) unsigned NOT NULL,\n" +
+	"  `charTwoId` int(10) unsigned NOT NULL,\n" +
+	"  `charOneClass` tinyint(3) unsigned NOT NULL default '0',\n" +
+	"  `charTwoClass` tinyint(3) unsigned NOT NULL default '0',\n" +
+	"  `winner` tinyint(1) unsigned NOT NULL default '0',\n" +
+	"  `start` bigint(13) unsigned NOT NULL DEFAULT '0',\n" +
+	"  `time` bigint(13) unsigned NOT NULL DEFAULT '0',\n" +
+	"  `classed` tinyint(1) unsigned NOT NULL default '0',\n" +
+	"  KEY `charOneId` (`charOneId`),\n" +
+	"  KEY `charTwoId` (`charTwoId`)\n" +
+	")"

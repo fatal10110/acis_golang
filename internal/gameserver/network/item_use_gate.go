@@ -10,9 +10,34 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 )
 
-// useConditionsHold reports whether live meets every use condition of tmpl,
-// without telling the client anything.
-func useConditionsHold(live *livePlayer, tmpl *item.Template) bool {
+// olympiadBarred reports whether tmpl may not be used or worn by live
+// because live competes in an Olympiad match: hero items and items the
+// datapack restricts for the Olympiad are barred there, ahead of any use
+// condition.
+func olympiadBarred(live *livePlayer, tmpl *item.Template) bool {
+	return (tmpl.OlyRestricted || tmpl.HeroItem()) && live.OlympiadMode()
+}
+
+// sendOlympiadBar tells live it may not use tmpl in its Olympiad match: as
+// an item that cannot be worn there when it can be worn, as one unavailable
+// there otherwise.
+func sendOlympiadBar(live *livePlayer, tmpl *item.Template) {
+	if tmpl.Equipable() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemCantBeEquippedForOlympiad))
+	} else {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemUnavailableForOlympiad))
+	}
+}
+
+// itemRestrictionHolds reports whether live may keep wearing tmpl: it is
+// not barred in live's Olympiad match and live meets every use condition.
+// The Olympiad bar still tells the client why, as it does on every path;
+// a failed use condition stays silent.
+func itemRestrictionHolds(live *livePlayer, tmpl *item.Template) bool {
+	if olympiadBarred(live, tmpl) {
+		sendOlympiadBar(live, tmpl)
+		return false
+	}
 	for _, uc := range tmpl.UseConditions {
 		if !itemUseConditionHolds(live, uc.Root) {
 			return false
@@ -21,9 +46,18 @@ func useConditionsHold(live *livePlayer, tmpl *item.Template) bool {
 	return true
 }
 
+// rejectUseItemConditions tells live why it may not use tmpl and reports
+// true, or reports false when nothing bars it: an item barred in the
+// Olympiad is refused as one that cannot be worn there when it can be
+// worn, as one unavailable there otherwise; then the first use condition
+// live fails answers with its own message.
 func rejectUseItemConditions(live *livePlayer, tmpl *item.Template) bool {
-	if live == nil || tmpl == nil || len(tmpl.UseConditions) == 0 {
+	if live == nil || tmpl == nil {
 		return false
+	}
+	if olympiadBarred(live, tmpl) {
+		sendOlympiadBar(live, tmpl)
+		return true
 	}
 	for _, uc := range tmpl.UseConditions {
 		if itemUseConditionHolds(live, uc.Root) {
@@ -100,7 +134,11 @@ func playerUseConditionHolds(live *livePlayer, attrs map[string]string) bool {
 			if live.Running() != want {
 				return false
 			}
-		case "moving", "riding", "olympiad":
+		case "olympiad":
+			if live.OlympiadMode() != parseConditionBool(raw) {
+				return false
+			}
+		case "moving", "riding":
 			if parseConditionBool(raw) {
 				return false
 			}

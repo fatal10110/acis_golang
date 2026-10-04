@@ -83,10 +83,13 @@ func (f *Fleet) Boats() []*Boat {
 	return out
 }
 
-// Tick advances every sailing boat by one position update, ending the legs
-// that arrive, and every updatesPerStep-th call takes each schedule's step
-// once its delay has run out.
+// Tick collects the fares that fall due, advances every sailing boat by one
+// position update, ending the legs that arrive, and every updatesPerStep-th
+// call takes each schedule's step once its delay has run out.
 func (f *Fleet) Tick() {
+	for _, e := range f.engines {
+		e.boat.tickFare()
+	}
 	for _, e := range f.engines {
 		b := e.boat
 		if _, _, _, sailing := b.Departure(); sailing && b.updatePosition() {

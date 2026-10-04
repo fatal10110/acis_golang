@@ -33,6 +33,13 @@ type Boat struct {
 	destination   location.Location
 	moveSpeed     int
 	rotationSpeed int
+	// dock is the dock the boat serves: the one it is tied up at, or the
+	// one it last left.
+	dock *Dock
+	// passengers are the players aboard, by object id, in boarding order.
+	passengers []int32
+	// fare is the ticket collection due after a departure.
+	fare fareDue
 
 	// Owned by the tick goroutine.
 	xAccurate, yAccurate float64
@@ -147,6 +154,7 @@ func (b *Boat) updatePosition() bool {
 		// a failed move still updates its position.
 		_ = b.world.Move(b, nx, ny, nz)
 	}
+	b.carryPassengers()
 	return passed >= left
 }
 

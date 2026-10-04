@@ -255,7 +255,8 @@ func (l *GameClientLink) startPvPFlag(live *livePlayer, useFlaggedDuration bool)
 }
 
 // unequipRestrictedItems takes off, through the UseItem equip toggle, every
-// paperdoll item whose use conditions live fails. Taking off a weapon also
+// paperdoll item whose use conditions live fails or that its Olympiad match
+// bars; a barred item is announced just before it comes off. Taking off a weapon also
 // aborts the attack in progress. An item an earlier removal in the same
 // pass already took off is not toggled back on.
 func (l *GameClientLink) unequipRestrictedItems(live *livePlayer) {
@@ -265,7 +266,7 @@ func (l *GameClientLink) unequipRestrictedItems(live *livePlayer) {
 	}
 	for _, inst := range inv.PaperdollItems() {
 		tmpl, ok := inv.Templates().Get(inst.TemplateID)
-		if !ok || !inst.Equipped() || useConditionsHold(live, tmpl) {
+		if !ok || !inst.Equipped() || itemRestrictionHolds(live, tmpl) {
 			continue
 		}
 		l.toggleEquipItem(live, inv, inst, tmpl, tmpl.Kind == item.KindWeapon)

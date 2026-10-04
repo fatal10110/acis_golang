@@ -59,6 +59,9 @@ var adminCommands = map[string]adminCommand{
 	"admin_party_info": (*GameClientLink).adminPartyInfo,
 	"admin_remove":     (*GameClientLink).adminRemove,
 
+	// Castles; see admin_castle.go.
+	"admin_castle": (*GameClientLink).adminCastle,
+
 	// Announcements; see admin_announce.go.
 	"admin_announce": (*GameClientLink).adminAnnounce,
 	"admin_ann":      (*GameClientLink).adminAnnounceText,

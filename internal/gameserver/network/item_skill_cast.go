@@ -108,13 +108,12 @@ func (l *GameClientLink) castItemSkills(live *livePlayer, inv *itemcontainer.Inv
 // lasts exactly as long as the stand-up transition, so no separate
 // intention type is tracked for it.
 func itemAICastBusy(live *livePlayer) bool {
-	if live.attack != nil && live.attack.AttackingNow() {
-		return true
-	}
-	if live.cast != nil && live.cast.CastingNow() {
-		return true
-	}
-	return inPostureTransition(live)
+	return swingOrCastBusy(live) || inPostureTransition(live)
+}
+
+// swingOrCastBusy reports whether a swing or cast is in flight.
+func swingOrCastBusy(live *livePlayer) bool {
+	return (live.attack != nil && live.attack.AttackingNow()) || (live.cast != nil && live.cast.CastingNow())
 }
 
 // inPostureTransition reports whether live is still sitting down or standing
@@ -268,6 +267,12 @@ func (l *GameClientLink) finishDeferredItemAICast(live *livePlayer) bool {
 	if inPostureTransition(live) {
 		return live.hasDeferredItemAICast()
 	}
+	return l.runDeferredItemAICast(live)
+}
+
+// runDeferredItemAICast runs the queued item cast, if any, whatever the
+// posture, and reports whether one was waiting.
+func (l *GameClientLink) runDeferredItemAICast(live *livePlayer) bool {
 	itemCast := live.takeDeferredItemAICast()
 	if itemCast == nil {
 		return false

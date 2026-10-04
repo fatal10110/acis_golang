@@ -39,3 +39,24 @@ func (t *Table) RestoreHalls(owners []HallOwner, exists func(hallID int32) bool)
 		cl.mu.Unlock()
 	}
 }
+
+// SetCastleID sets the castle the clan owns, 0 for none. The castle
+// manager is its only writer and stores the change itself.
+func (cl *Clan) SetCastleID(id int32) {
+	cl.mu.Lock()
+	cl.castleID = id
+	cl.mu.Unlock()
+}
+
+// HallOwner is the clan owning clan hall hallID, 0 when no clan owns it.
+func (t *Table) HallOwner(hallID int32) int32 {
+	if t == nil || hallID <= 0 {
+		return 0
+	}
+	for _, cl := range t.allClans() {
+		if cl.HallID() == hallID {
+			return cl.ID()
+		}
+	}
+	return 0
+}

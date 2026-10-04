@@ -11,9 +11,9 @@
 // Whether the daily new cycle and the unreachable end should stay is open
 // (#3280).
 //
-// The matches themselves and the heroes they elect are not part of this
-// package yet: the competition window starts no game manager (#217) and the
-// end of an Olympiad elects no heroes (#220).
+// The rules of a match between two nobles are in game.go. Nothing runs the
+// matches yet: the competition window starts no game manager (#3340) and
+// the end of an Olympiad elects no heroes (#220).
 package olympiad
 
 import (
@@ -55,12 +55,34 @@ type Config struct {
 	CompetitionMillis int64
 	// WeeklyPoints is added to every noble's points each week.
 	WeeklyPoints int
+	// MaxPoints caps the points one match moves.
+	MaxPoints int
+	// DividerClassed and DividerNonClassed divide the lower of the two
+	// competitors' points into what a classed or non-classed match moves.
+	DividerClassed, DividerNonClassed int
+	// ClassedReward and NonClassedReward are the items the winner of a
+	// classed or non-classed match is given.
+	ClassedReward, NonClassedReward []Reward
+}
+
+// Reward is a stack of items a match's winner is given.
+type Reward struct {
+	ItemID int32
+	Count  int
 }
 
 // DefaultConfig returns the configuration used when no setting overrides
-// it: a six-hour window opening at 18:00, three weekly points.
+// it: a six-hour window opening at 18:00, three weekly points; matches
+// moving at most 10 points, a third of the lower total in classed matches
+// and a fifth in non-classed ones, their winners given 50 and 30 Noblesse
+// Gate Passes.
 func DefaultConfig() Config {
-	return Config{StartHour: 18, CompetitionMillis: 21600000, WeeklyPoints: 3}
+	return Config{
+		StartHour: 18, CompetitionMillis: 21600000, WeeklyPoints: 3,
+		MaxPoints: 10, DividerClassed: 3, DividerNonClassed: 5,
+		ClassedReward:    []Reward{{ItemID: 6651, Count: 50}},
+		NonClassedReward: []Reward{{ItemID: 6651, Count: 30}},
+	}
 }
 
 // Notice is a calendar change announced to every player online.
@@ -109,6 +131,8 @@ type Store interface {
 	// SnapshotMonth replaces the month's standings with a copy of the
 	// stored records.
 	SnapshotMonth(ctx context.Context) error
+	// SaveFight stores the result of one match.
+	SaveFight(ctx context.Context, f Fight) error
 }
 
 // step is one scheduled calendar change. The order breaks ties between
@@ -233,6 +257,17 @@ func (o *Olympiad) Noble(objectID int32) (Noble, bool) {
 	return n, ok
 }
 
+// updateNoble changes objectID's record in place; a noble without one is
+// left without.
+func (o *Olympiad) updateNoble(objectID int32, change func(*Noble)) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if n, ok := o.nobles[objectID]; ok {
+		change(&n)
+		o.nobles[objectID] = n
+	}
+}
+
 // Period returns the period the Olympiad is in.
 func (o *Olympiad) Period() Period {
 	o.mu.Lock()
@@ -353,7 +388,7 @@ func (o *Olympiad) enterPeriod() {
 
 // openCompetition announces the competition window and starts the
 // countdown to its registration's close, ten minutes before it ends. The
-// matches are not run yet (#217).
+// matches are not run yet (#3340).
 func (o *Olympiad) openCompetition() {
 	o.out.Announce(NoticeCompetitionStarted, 0)
 	o.mu.Lock()
@@ -364,7 +399,7 @@ func (o *Olympiad) openCompetition() {
 
 // closeCompetition saves the status once the window's matches are over and
 // enters the next period. No match can still be running: matches are not
-// run yet (#217).
+// run yet (#3340).
 func (o *Olympiad) closeCompetition() {
 	o.saveStatus()
 	o.enterPeriod()

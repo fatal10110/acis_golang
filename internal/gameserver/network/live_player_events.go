@@ -150,22 +150,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.FakeDeathRevived, event.Revived:
 		l.broadcastLiveRevive(live)
 	case event.PostureSettled:
-		if live.Standing() {
-			live.releaseChair()
-		}
-		if l.finishDeferredAction(live) {
-			return
-		}
-		l.finishDeferredPickup(live)
-		// A cast queued behind the sit/stand transition runs now, unless a
-		// swing or cast still holds it for its own finish.
-		if !itemAICastBusy(live) {
-			l.finishDeferredMagicSkill(live)
-			l.finishDeferredItemAICast(live)
-			l.finishDeferredFollow(live)
-			l.finishDeferredInteract(live)
-			l.finishDeferredUseItem(live, resumePosture)
-		}
+		l.settleLivePosture(live, e.StoodUp)
 	case event.ReviveRequested:
 		live.SendFrame(serverpackets.FrameConfirmDlgResurrectionRequest(e.ReviverName))
 	case event.ReviveRefused:
@@ -394,6 +379,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 			live.SendFrame(serverpackets.FrameActionFailed())
 		}
 	case event.Arrived:
+		l.arriveAtBoatEntrance(live)
 		// CreatureMove tracks position for its own timing only; push the
 		// arrived position into the world-grid presence range checks
 		// actually read before re-thinking the attack intention, or it
@@ -407,6 +393,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.thinkAttack()
 		l.arriveHeldIntention(live)
 	case event.MoveBlocked:
+		live.SetBoatMovement(false)
 		if !l.onPlayerArrivedBlocked(live) {
 			live.move.BroadcastBlockedCorrection()
 		}
@@ -589,10 +576,16 @@ func (live *livePlayer) endCastStop(e event.CastStopAck) {
 }
 
 func (l *GameClientLink) finishDeferredAction(live *livePlayer) bool {
+	return l.runDeferredAction(live, itemAICastBusy)
+}
+
+// runDeferredAction runs the queued action, if any, unless busy still holds
+// it, and reports whether one was waiting.
+func (l *GameClientLink) runDeferredAction(live *livePlayer, busy func(*livePlayer) bool) bool {
 	if live == nil || live.detached() || !live.hasDeferredAction() {
 		return false
 	}
-	if itemAICastBusy(live) {
+	if busy(live) {
 		return true
 	}
 	if run := live.takeDeferredAction(); run != nil {

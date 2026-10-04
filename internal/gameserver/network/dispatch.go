@@ -14,7 +14,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/fatal10110/acis_golang/internal/gameserver/augment"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/craft"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -22,6 +24,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/duel"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/exchange"
+	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
 	"github.com/fatal10110/acis_golang/internal/gameserver/gatekeeper"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
@@ -45,6 +48,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
+	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
+	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -303,6 +308,7 @@ type GameClientLink struct {
 	playerClock *task.PlayerClock
 	gameClock   *task.GameClock
 	sevenSigns  *sevensigns.State
+	festival    *festival.Manager
 	olympiad    *olympiad.Olympiad
 	raidPoints  *raidpoint.Points
 	water       *task.Water
@@ -326,6 +332,8 @@ type GameClientLink struct {
 	queues           Queues
 	queuedPets       queuedPets
 	restarts         *restart.Table
+	clanHallData     *hallmodel.Table
+	castleData       *castledata.Table
 	levels           *player.LevelTable
 	admin            *admin.Data
 	playerConfig     PlayerConfig
@@ -339,6 +347,7 @@ type GameClientLink struct {
 	duels            *duelRegistry
 	partyPositions   partyPositions
 	clans            *clan.Service
+	castles          *castle.Manager
 	clanWarehouses   clanWarehouseBook
 	enchantState     *enchantflow.State
 	enchant          *enchantflow.Service
@@ -408,6 +417,8 @@ type GameClientLink struct {
 	announcements *announcement.Registry
 	schemeBuffer  *schemebuffer.Manager
 	lottery       *lottery.Lottery
+	// hallFunctions are the functions the clan halls rent; nil rents none.
+	hallFunctions *clanhall.Functions
 	// wedding holds the couples and runs the marriage requests.
 	wedding *wedding.Manager
 	// derby is the monster race track the race managers answer for; nil
@@ -487,7 +498,12 @@ type GameClientLinkConfig struct {
 	GameClock *task.GameClock
 	// SevenSigns owns the event calendar; EnterWorld reports the active
 	// period's system message. Nil is tolerated (tests) and sends nothing.
-	SevenSigns  *sevensigns.State
+	SevenSigns *sevensigns.State
+	// Festival keeps the Festival of Darkness scores and schedule the
+	// record's festival page and the festival guides read. Nil is
+	// tolerated (tests): the page is refused and the guides count from the
+	// epoch.
+	Festival    *festival.Manager
 	Water       *task.Water
 	ShadowItems *task.ShadowItems
 	Autosave    *task.Autosave
@@ -514,6 +530,8 @@ type GameClientLinkConfig struct {
 	// handlers, timers and periodic ticks run on. Required.
 	Queues       Queues
 	Restarts     *restart.Table
+	ClanHallData *hallmodel.Table  // owner restart spawns; nil restarts to town
+	CastleData   *castledata.Table // owner restart spawns; nil restarts to town
 	Levels       *player.LevelTable
 	Admin        *admin.Data
 	PlayerConfig PlayerConfig
@@ -603,6 +621,8 @@ type GameClientLinkConfig struct {
 	// Clans is the clan registry and its rules; nil runs with no clan at
 	// all and nothing written.
 	Clans *clan.Service
+	// Castles holds the castles' live state; nil runs with no castle.
+	Castles *castle.Manager
 	// Board is the community board's settings; the zero value keeps the
 	// board off.
 	Board bbs.Config
@@ -628,6 +648,9 @@ type GameClientLinkConfig struct {
 	Wedding *wedding.Manager
 	// Lottery is the Lucky Lottery; nil runs no round.
 	Lottery *lottery.Lottery
+	// ClanHallFunctions are the functions the clan halls rent; nil rents
+	// none, so every hall shows bare and gives no recovery bonus.
+	ClanHallFunctions *clanhall.Functions
 	// Derby is the monster race track; nil runs no race.
 	Derby *derby.Track
 }
@@ -681,6 +704,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		playerClock:   cfg.PlayerClock,
 		gameClock:     cfg.GameClock,
 		sevenSigns:    cfg.SevenSigns,
+		festival:      cfg.Festival,
 		olympiad:      cfg.Olympiad,
 		raidPoints:    cfg.RaidPoints,
 		water:         cfg.Water,
@@ -694,6 +718,8 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		persistWait:      cfg.PersistWait,
 		queues:           cfg.Queues,
 		restarts:         cfg.Restarts,
+		clanHallData:     cfg.ClanHallData,
+		castleData:       cfg.CastleData,
 		levels:           cfg.Levels,
 		admin:            cfg.Admin,
 		gmAudit:          cfg.GMAudit,
@@ -766,6 +792,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		link.wedding = wedding.NewManager(wedding.DefaultConfig(), ids, nil)
 	}
 	link.lottery = cfg.Lottery
+	link.hallFunctions = cfg.ClanHallFunctions
 	if link.lottery == nil {
 		link.lottery = lottery.New(lottery.DefaultConfig(), nil, nil, nil, cfg.Queues.NewQueue("lottery"), cfg.Log)
 	}
@@ -774,6 +801,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		link.announcements = announcement.NewRegistry(nil, NewAnnouncer(cfg.World), cfg.Log, cfg.Queues.NewQueue("announcements"))
 	}
 	link.clans = cfg.Clans
+	link.castles = cfg.Castles
 	if link.clans == nil {
 		link.clans = clan.NewService(nil, nil, nil, cfg.IDs, clan.DefaultConfig(), nil, cfg.Log)
 	}
@@ -789,6 +817,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		}
 	}
 	link.wireZoneOccupantHooks()
+	link.wireClanHallZones()
 	return link, nil
 }
 

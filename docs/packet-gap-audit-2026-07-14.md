@@ -136,12 +136,15 @@ Implemented and wired M4 movement/rotation/target client packets in Go:
 - `StartRotating`
 - `FinishRotating`
 
-Missing M4 world/movement client packets:
+Implemented and wired boat passenger client packets in Go (`network/boat_passenger.go`):
 
-- `RequestMoveToLocationInVehicle`
+- `RequestMoveToLocationInVehicle` (a deck click: ashore it walks to the boat's entrance or onto the deck, aboard it walks across the deck)
 - `CannotMoveAnymoreInVehicle`
 - `RequestGetOnVehicle`
 - `RequestGetOffVehicle`
+
+Missing M4 world/movement client packets:
+
 - `ObserverReturn`
 
 Implemented and wired M5 target/combat/item/stance/social client packets in Go:
@@ -261,16 +264,17 @@ Implemented and wired boat server packets in Go (`internal/gameserver/boat`, `ne
 - `VehicleDeparture` (each leg, and discovery of a sailing boat)
 - `VehicleStarted` (route start and stop)
 
-Implemented in Go but not yet sent: `OnVehicleCheckLocation` goes to a boat's passengers on each
-position update, and nobody can board yet (#602).
+- `OnVehicleCheckLocation` (each position update, to the boat's passengers)
 
-Missing M4 world/movement server packets:
+Implemented and wired boat passenger server packets in Go (`network/boat_passenger.go`):
 
-- `GetOnVehicle`
+- `GetOnVehicle` (boarding, a passenger's discovery, a drifted deck position)
 - `GetOffVehicle`
 - `MoveToLocationInVehicle`
 - `StopMoveInVehicle`
-- `ValidateLocationInVehicle`
+
+Implemented in Go but never sent, as in the reference, which never builds it: `ValidateLocationInVehicle`
+(a passenger's drifted deck position is corrected with `GetOnVehicle`).
 
 Implemented sky server packets in Go and wired to their only sender, the admin `//atmosphere sky|ssqinfo <state>` broadcast to every online player (#3172). Day/night crossings and EnterWorld do not send SunRise/SunSet:
 

@@ -132,11 +132,9 @@ func (a characterStatActor) IsNight() bool { return a.c.EffectList().IsNight() }
 // IsSitting satisfies conditions.PlayerActor.
 func (a characterStatActor) IsSitting() bool { return !a.c.Standing() }
 
-// IsInOlympiadMode satisfies conditions.PlayerActor. Always false: Olympiad
-// participation isn't modeled on Character yet (#1507). This gates shipped
-// skill <cond>s: every olympiad="false" clause passes, which is only right
-// while nobody can enter the Olympiad.
-func (a characterStatActor) IsInOlympiadMode() bool { return false }
+// IsInOlympiadMode satisfies conditions.PlayerActor with c's Olympiad
+// match standing.
+func (a characterStatActor) IsInOlympiadMode() bool { return a.c.OlympiadMode() }
 
 // PkKills satisfies conditions.PlayerActor.
 func (a characterStatActor) PkKills() int { return a.c.ProgressionValues().PKKills }
