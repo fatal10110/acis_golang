@@ -6,9 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
@@ -25,6 +28,11 @@ const (
 	generalGM     = 3 // isGM=false allowFixedRes=true
 	adminAccess   = 7 // isGM=true  allowFixedRes=true
 	restartToJail = 27
+
+	restartToClanHallType = 1
+	restartFixedType      = 4
+
+	punishJailLevel = 2 // characters.punish_level of a jail term
 )
 
 // restartClan is the clan the dead character leads: the castle in
@@ -34,12 +42,64 @@ type restartClan struct{ castle, hall int }
 // deathWindow is the Die packet's restart choices.
 type deathWindow struct{ hall, castle, siegeHQ, fixed bool }
 
-// bootDeadAtRestart boots "Newbie" stored dead (curHp 0) at the given
-// access level, leading clan (no clan when nil), with the shipped clan
-// halls, castles and access levels and the one-point restart table. It
-// enters the world and returns the server, the object id, and the choices
-// the login's Die packet offered.
+// restarter is how "Newbie" is stored before the login: the access level,
+// the clan led (none when nil), and whether a jail term without end is
+// served and the character stored dead (curHp 0).
+type restarter struct {
+	clan   *restartClan
+	access int
+	jailed bool
+	dead   bool
+}
+
+// bootDeadAtRestart boots "Newbie" stored dead at the given access level,
+// leading clan (no clan when nil), with the shipped clan halls, castles and
+// access levels and the one-point restart table. It enters the world and
+// returns the server, the object id, and the choices the login's Die
+// packet offered.
 func bootDeadAtRestart(t *testing.T, clan *restartClan, access int) (*gameservertest.Server, int32, deathWindow) {
+	t.Helper()
+	return bootRestarterDead(t, restarter{clan: clan, access: access, dead: true})
+}
+
+// bootRestarterDead boots r, which must be stored dead, enters the world
+// and returns the server, the object id, and the Die window of the login.
+func bootRestarterDead(t *testing.T, r restarter) (*gameservertest.Server, int32, deathWindow) {
+	t.Helper()
+	srv, objID := bootRestarter(t, r)
+	c := srv.Client
+	var window deathWindow
+	for i := 0; ; i++ {
+		frame := c.ReadWithTimeout(5 * time.Second)
+		if frame == nil || i == 200 {
+			t.Fatal("dead login sent no Die")
+		}
+		if frame[0] != serverpackets.OpcodeDie {
+			continue
+		}
+		w := wireReader(frame[1:])
+		if w.ReadInt32() != objID {
+			continue
+		}
+		if town := w.ReadInt32(); town != 1 {
+			t.Fatalf("Die to-village = %d, want 1", town)
+		}
+		window = deathWindow{hall: w.ReadInt32() == 1, castle: w.ReadInt32() == 1, siegeHQ: w.ReadInt32() == 1}
+		w.ReadInt32() // sweepable
+		window.fixed = w.ReadInt32() == 1
+		break
+	}
+	drainUntilQuiet(t, c)
+	if r.jailed {
+		appearInJail(t, c)
+	}
+	return srv, objID, window
+}
+
+// bootRestarter boots "Newbie" stored as r with the shipped clan halls,
+// castles and access levels and the one-point restart table, and sends
+// the game start and EnterWorld; the login burst is left unread.
+func bootRestarter(t *testing.T, r restarter) (*gameservertest.Server, int32) {
 	t.Helper()
 	datapack.Require(t)
 	halls, err := gamexml.LoadClanHalls(datapack.Path(t, "data", "xml", "clanHalls.xml"))
@@ -61,47 +121,32 @@ func bootDeadAtRestart(t *testing.T, clan *restartClan, access int) (*gameserver
 		gameservertest.WithResidences(halls, castles),
 		gameservertest.WithAdmin(adminData),
 		gameservertest.WithClanSeed(func(db *sql.DB) {
-			seedDeadRestarter(t, db, clan, access)
+			seedRestarter(t, db, r)
 		}),
 	)
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	c.Send(encodeRequestGameStart(0))
 	c.Send(encodeEnterWorld())
-	var window deathWindow
-	for i := 0; ; i++ {
-		frame := c.ReadWithTimeout(5 * time.Second)
-		if frame == nil || i == 200 {
-			t.Fatal("dead login sent no Die")
-		}
-		if frame[0] != serverpackets.OpcodeDie {
-			continue
-		}
-		r := wireReader(frame[1:])
-		if r.ReadInt32() != objID {
-			continue
-		}
-		if town := r.ReadInt32(); town != 1 {
-			t.Fatalf("Die to-village = %d, want 1", town)
-		}
-		window = deathWindow{hall: r.ReadInt32() == 1, castle: r.ReadInt32() == 1, siegeHQ: r.ReadInt32() == 1}
-		r.ReadInt32() // sweepable
-		window.fixed = r.ReadInt32() == 1
-		break
-	}
-	drainUntilQuiet(t, c)
-	return srv, objID, window
+	return srv, objID
 }
 
-// seedDeadRestarter stores Newbie dead at access, leading clan if any.
-func seedDeadRestarter(t *testing.T, db *sql.DB, clan *restartClan, access int) {
+// seedRestarter stores Newbie as r.
+func seedRestarter(t *testing.T, db *sql.DB, r restarter) {
 	t.Helper()
 	ctx := context.Background()
 	exec := func(q string, args ...any) {
 		if _, err := db.ExecContext(ctx, q, args...); err != nil {
-			t.Fatalf("seed dead restarter: %v", err)
+			t.Fatalf("seed restarter: %v", err)
 		}
 	}
-	exec("UPDATE characters SET curHp = 0, accesslevel = ? WHERE char_name = 'Newbie'", access)
+	exec("UPDATE characters SET accesslevel = ? WHERE char_name = 'Newbie'", r.access)
+	if r.dead {
+		exec("UPDATE characters SET curHp = 0 WHERE char_name = 'Newbie'")
+	}
+	if r.jailed {
+		exec("UPDATE characters SET punish_level = ?, punish_timer = 0 WHERE char_name = 'Newbie'", punishJailLevel)
+	}
+	clan := r.clan
 	if clan == nil {
 		return
 	}
@@ -258,4 +303,71 @@ func TestRestartPointSelections(t *testing.T) {
 			}
 		})
 	}
+}
+
+// jailPoint is where a jailed player is held.
+var jailPoint = location.Location{X: -114356, Y: -249645, Z: -2984}
+
+// appearInJail answers the login's jail teleport with Appearing, ending
+// the teleport the restart and movement requests wait on.
+func appearInJail(t *testing.T, c *scriptedClient) {
+	t.Helper()
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+	drainUntilQuiet(t, c)
+}
+
+// TestRestartPointJailOverride pins the jail override of
+// RequestRestartPoint.portPlayer ahead of every per-type branch: a jailed
+// player who dies restarts in the jail even when the type asked for would
+// lead out of it. A jailed clan hall owner asking for the clan hall, and a
+// jailed GM who walked away from the jail point asking for the fixed
+// restart, both land within the scatter of the jail point.
+func TestRestartPointJailOverride(t *testing.T) {
+	t.Parallel()
+	t.Run("hall owner to clan hall", func(t *testing.T) {
+		t.Parallel()
+		srv, objID, window := bootRestarterDead(t, restarter{
+			clan: &restartClan{hall: restartHallID}, access: userAccess, jailed: true, dead: true,
+		})
+		if want := (deathWindow{hall: true}); window != want {
+			t.Fatalf("Die window = %+v, want %+v", window, want)
+		}
+		c := srv.Client
+		c.Send(encodeRequestRestartPoint(restartToClanHallType))
+		if at := readRestartTeleport(t, c, objID); !nearAny(at, []location.Location{jailPoint}) {
+			t.Fatalf("restart destination = %+v, want within scatter of the jail %+v", at, jailPoint)
+		}
+		if srv.PlayerDead(t, objID) {
+			t.Fatal("player still dead after the restart")
+		}
+	})
+	t.Run("GM to fixed", func(t *testing.T) {
+		t.Parallel()
+		srv, objID := bootRestarter(t, restarter{access: adminAccess, jailed: true})
+		c := srv.Client
+		drainUntilQuiet(t, c)
+		appearInJail(t, c)
+		// The login took the GM to the jail; walk off the jail point so
+		// the fixed restart, which keeps the player where they fell,
+		// cannot land there by itself.
+		w := wire.NewPacketWriter(clientpackets.OpcodeMoveBackwardToLocation)
+		for _, v := range []int{jailPoint.X + 400, jailPoint.Y, jailPoint.Z, jailPoint.X, jailPoint.Y, jailPoint.Z, 1} {
+			w.WriteInt32(int32(v))
+		}
+		c.Send(w.Bytes())
+		drainUntilQuiet(t, c)
+		srv.Advance(t, 8*time.Second)
+		drainUntilQuiet(t, c)
+		if x, y, _ := srv.PlayerPosition(t, objID); abs(x-jailPoint.X) < 200 && abs(y-jailPoint.Y) < 200 {
+			t.Fatalf("GM at (%d,%d), want it walked at least 200 off the jail %+v", x, y, jailPoint)
+		}
+		srv.MarkPlayerDead(t, objID)
+		c.Send(encodeRequestRestartPoint(restartFixedType))
+		if at := readRestartTeleport(t, c, objID); !nearAny(at, []location.Location{jailPoint}) {
+			t.Fatalf("restart destination = %+v, want within scatter of the jail %+v", at, jailPoint)
+		}
+		if srv.PlayerDead(t, objID) {
+			t.Fatal("player still dead after the restart")
+		}
+	})
 }
