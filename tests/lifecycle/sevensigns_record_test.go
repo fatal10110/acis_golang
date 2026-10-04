@@ -47,8 +47,9 @@ func assertQuietClient(t *testing.T, c *testsupport.ScriptedClient, what string)
 
 // The record's pages answer RequestSSQStatus from the live competition: the
 // player's own sign-up and stones, both cabals' scores, the seal votes and
-// the predicted owners. The festival page waits on the festival and
-// releases the client; an unknown page carries only the page and period.
+// the predicted owners. The festival page finds no festival scores for
+// cycle 3 (the database holds cycle 1's) and releases the client; an
+// unknown page carries only the page and period.
 //
 // Seeded: cycle 3, competition, stone points dawn 30 / dusk 10, dawn
 // festival 5, Gnosis owned by Dusk and Strife by Dawn. The player then signs

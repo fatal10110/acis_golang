@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
+	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -92,6 +93,7 @@ func provideGameClientLink(
 	playerClock *task.PlayerClock,
 	gameClock *task.GameClock,
 	sevenSigns *sevensigns.State,
+	fest *festival.Manager,
 	olympiadState *olympiad.Olympiad,
 	raidPoints *raidpoint.Points,
 	inventoryUpdates *task.InventoryUpdates,
@@ -206,6 +208,7 @@ func provideGameClientLink(
 		PlayerClock:   playerClock,
 		GameClock:     gameClock,
 		SevenSigns:    sevenSigns,
+		Festival:      fest,
 		Olympiad:      olympiadState,
 		RaidPoints:    raidPoints,
 		Water:         water,

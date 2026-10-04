@@ -261,7 +261,7 @@ func TestFolkKarmaRefusalPage(t *testing.T) {
 func TestMutedAndUnportedFolkOpenNothing(t *testing.T) {
 	t.Parallel()
 	w := bootFolkWorld(t, map[string]string{"default/31000.htm": "<html><body>x</body></html>", "npcdefault.htm": "<html><body>y</body></html>"})
-	for _, kind := range []string{"MutedFolk", "Doorman", "SignsPriest"} {
+	for _, kind := range []string{"MutedFolk", "Doorman", "ManorManagerNpc"} {
 		f := w.spawnFolk(t, folkTemplate(kind, 31000), 40)
 		w.selectFolk(t, f)
 		frames := w.talk(t, f, false)

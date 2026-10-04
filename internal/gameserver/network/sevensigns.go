@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
@@ -34,14 +35,41 @@ func (l *GameClientLink) requestSSQStatus(live *livePlayer, req clientpackets.Re
 		return
 	}
 	if req.Page == ssqPageFestival {
-		// ponytail: the festival page lists each festival's best score and
-		// party, which only the Festival of Darkness keeps (#223); until it
-		// exists the page is refused.
-		l.log.Debug().Msg("seven signs: festival record page needs the Festival of Darkness")
-		live.SendFrame(serverpackets.FrameActionFailed())
+		frame, ok := l.ssqFestivalFrame(period)
+		if !ok {
+			// The festival keeps no score for this cycle: its data is
+			// missing from the database, and the page cannot be built.
+			l.log.Error().Msg("seven signs: no festival scores for the current cycle")
+			live.SendFrame(serverpackets.FrameActionFailed())
+			return
+		}
+		live.SendFrame(frame)
 		return
 	}
 	live.SendFrame(l.ssqStatusFrame(live.ObjectID(), req.Page))
+}
+
+// ssqFestivalFrame builds the record's second page: each festival's worth
+// and each cabal's best score in it this cycle, with the party that set
+// it. ok is false when the festival keeps no score for one of them.
+func (l *GameClientLink) ssqFestivalFrame(period sevensigns.Period) (wire.Frame, bool) {
+	if l.festival == nil {
+		return wire.Frame{}, false
+	}
+	festivals := make([]serverpackets.SSQFestival, festival.Count)
+	for id := range festival.Count {
+		dusk, okDusk := l.festival.HighestScore(sevensigns.Dusk, id)
+		dawn, okDawn := l.festival.HighestScore(sevensigns.Dawn, id)
+		if !okDusk || !okDawn {
+			return wire.Frame{}, false
+		}
+		festivals[id] = serverpackets.SSQFestival{
+			MaxScore: int32(festival.MaxScores[id]),
+			Dusk:     serverpackets.SSQFestivalBest{Score: int32(dusk.Score), Members: dusk.MemberNames()},
+			Dawn:     serverpackets.SSQFestivalBest{Score: int32(dawn.Score), Members: dawn.MemberNames()},
+		}
+	}
+	return serverpackets.FrameSSQStatusFestival(byte(period), festivals), true
 }
 
 // ssqStatusFrame builds page of objectID's Record of Seven Signs. A page

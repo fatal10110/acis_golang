@@ -173,6 +173,9 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	if _, ok := unportedFolkChats[kind]; ok {
 		return reply
 	}
+	if _, ok := unportedFolkCommands[kind]; ok {
+		return reply
+	}
 	if f.VillageMaster() && strings.HasPrefix(command, "Subclass") {
 		reply.Outcome = BypassSubclass
 		return reply
