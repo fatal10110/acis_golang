@@ -6,6 +6,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
 )
 
@@ -86,6 +87,8 @@ const (
 	// BypassWedding runs any command on a wedding manager, whose own
 	// dialog answers every command.
 	BypassWedding
+	// BypassDerby runs a race manager's own command; see derby.Command.
+	BypassDerby
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -152,7 +155,9 @@ var fishermanCommands = []string{"FishingChampionship", "FishingReward"}
 // CPRecovery has an arena manager restore the talker's CP for a fee and
 // answers nothing at any other NPC. A village master's Subclass commands go
 // to the subclass dialog, a scheme buffer's own commands to its dialog,
-// and every command on a wedding manager to its dialog. Every other command belongs to a system not in place yet.
+// a race manager's own commands to the race track, and every command on a
+// wedding manager to its dialog. Every other command belongs to a system not
+// in place yet.
 func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command string) BypassReply {
 	karma := talker.Karma
 	kind := hostileKind(f.Instance)
@@ -174,6 +179,10 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	}
 	if kind == "SchemeBuffer" && schemebuffer.Command(command) {
 		reply.Outcome = BypassSchemeBuffer
+		return reply
+	}
+	if f.DerbyTrackManager() && derby.Command(command) {
+		reply.Outcome = BypassDerby
 		return reply
 	}
 	chat := folkChats[kind]

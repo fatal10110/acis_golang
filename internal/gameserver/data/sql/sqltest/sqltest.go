@@ -493,6 +493,7 @@ var schemaStmts = []string{
 	olympiadNoblesSchema, olympiadNoblesEomSchema, serverMemoSchema,
 	characterRaidPointsSchema, grandbossListSchema,
 	bufferSchemesSchema, modsWeddingSchema,
+	mdtBetsSchema, mdtHistorySchema,
 }
 
-var seedStmts = []string{sevenSignsStatusSeed}
+var seedStmts = []string{sevenSignsStatusSeed, mdtBetsSeed}

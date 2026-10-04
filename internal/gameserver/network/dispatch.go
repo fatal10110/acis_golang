@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -19,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/craft"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
 	"github.com/fatal10110/acis_golang/internal/gameserver/duel"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/exchange"
@@ -42,7 +42,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
@@ -403,6 +402,9 @@ type GameClientLink struct {
 	schemeBuffer  *schemebuffer.Manager
 	// wedding holds the couples and runs the marriage requests.
 	wedding *wedding.Manager
+	// derby is the monster race track the race managers answer for; nil
+	// runs no race.
+	derby *derby.Track
 	// npcSpawns is the live NPC population the admin spawn commands use;
 	// see SetNpcSpawns.
 	npcSpawns atomic.Pointer[manager.Npcs]
@@ -613,6 +615,8 @@ type GameClientLinkConfig struct {
 	// no couple, the shipped settings, and couples numbered from IDs when
 	// it can free them too.
 	Wedding *wedding.Manager
+	// Derby is the monster race track; nil runs no race.
+	Derby *derby.Track
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -738,6 +742,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		link.board.favorites = bbs.NewFavorites(nil, nil, cfg.Log)
 	}
 	link.schemeBuffer = cfg.SchemeBuffer
+	link.derby = cfg.Derby
 	if link.schemeBuffer == nil {
 		link.schemeBuffer = schemebuffer.New(schemebuffer.DefaultConfig(), nil, nil)
 	}
@@ -766,14 +771,6 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		}
 	}
 	link.wireZoneOccupantHooks()
-	debugStop := func(reason string, at location.Location) {
-		link.log.Debug().Str("reason", reason).Interface("at", at).Str("stack", string(debug.Stack())).Msg("movedbg: player walk stopped")
-	}
-	debugResolve := func(origin, target, destination location.Location, waypoints, outcome int, distance, ticks, speed float64) {
-		link.log.Debug().Interface("origin", origin).Interface("target", target).Interface("destination", destination).Int("waypoints", waypoints).Int("outcome", outcome).Float64("distance", distance).Float64("ticks", ticks).Float64("speed", speed).Msg("movedbg: walk resolved")
-	}
-	move.DebugStop.Store(&debugStop)
-	move.DebugResolve.Store(&debugResolve)
 	return link, nil
 }
 
