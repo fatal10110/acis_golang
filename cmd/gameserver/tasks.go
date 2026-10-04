@@ -358,6 +358,16 @@ func startDoorTask(lc fx.Lifecycle, d *task.Door, log zerolog.Logger) {
 	startTicker(lc, log, d.Start)
 }
 
+func provideDoorRegen() *task.DoorRegen {
+	return task.NewDoorRegen(time.Now)
+}
+
+// startDoorRegen runs damaged doors' regeneration ticks through the world
+// objects that own them.
+func startDoorRegen(lc fx.Lifecycle, r *task.DoorRegen, objs *manager.WorldObjects, log zerolog.Logger) {
+	startTicker(lc, log, func(log zerolog.Logger) *scheduler.Ticker { return r.Start(objs, log) })
+}
+
 func startRespawnTask(lc fx.Lifecycle, r *task.Respawn, log zerolog.Logger) {
 	startTicker(lc, log, r.Start)
 }

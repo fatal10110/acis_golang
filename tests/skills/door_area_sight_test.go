@@ -204,7 +204,7 @@ func spawnDoorOn(t *testing.T, eng *engine.Engine, tmpl *door.Template) *door.Ob
 	if err != nil {
 		t.Fatalf("door timers: %v", err)
 	}
-	objs, err := gamemanager.NewWorldObjects(doors, statics, &doorIDs{next: 1 << 28}, eng, world.New(), timers, nil, zerolog.Nop())
+	objs, err := gamemanager.NewWorldObjects(doors, statics, &doorIDs{next: 1 << 28}, eng, world.New(), timers, task.NewDoorRegen(nil), nil, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("world objects: %v", err)
 	}
