@@ -1,8 +1,6 @@
 package network
 
 import (
-	"slices"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -162,37 +160,38 @@ func broadcastKnown(buf *world.KnownBuffer, state *world.State, t world.Tracked,
 func (s *hostileSink) broadcastHP() {
 	known := s.known.SnapshotCopy(s.world, s.h)
 	defer known.Release()
-	sendHPToWatchers(known.Tracked(), s.h.ObjectID(), s.h.HPStatusUpdate)
+	sendHPToWatchers(known.Tracked(), s.h.ObjectID(), s.h.PublishHP)
 }
 
 // sendHPToWatchers sends the current HP of creature id to the players in
 // known targeting it, the only observers that follow its health bar; a
 // player's selection is cleared when the creature leaves its known list.
-// The bar-segment gate status runs only once a watcher exists, so it never
-// advances for an unwatched creature.
-func sendHPToWatchers(known []world.Tracked, id int32, status func() (int, bool)) {
-	watching := func(o world.Tracked) (*livePlayer, bool) {
+// The bar-segment gate publish runs only once a watcher exists, so it never
+// advances for an unwatched creature. publish reads, gates and hands over
+// the HP under the creature's bar lock, and the frame is queued to every
+// watcher inside that hand-over, so two concurrent HP changes cannot reach
+// a watcher in the reverse order of their reads.
+func sendHPToWatchers(known []world.Tracked, id int32, publish func(send func(hp int))) {
+	var watchers []frameReceiver
+	for _, o := range known {
 		p, ok := o.(*livePlayer)
 		if !ok {
-			return nil, false
+			continue
 		}
-		target := p.Target()
-		return p, target != nil && target.ObjectID() == id
+		if target := p.Target(); target != nil && target.ObjectID() == id {
+			watchers = append(watchers, p)
+		}
 	}
-	if !slices.ContainsFunc(known, func(o world.Tracked) bool { _, ok := watching(o); return ok }) {
+	if len(watchers) == 0 {
 		return
 	}
-	hp, ok := status()
-	if !ok {
-		return
-	}
-	attrs := []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentHP, Value: hp}}
-	broadcastFrame(func() wire.Frame { return serverpackets.FrameStatusUpdate(id, attrs) }, func(send func(frameReceiver)) {
-		for _, o := range known {
-			if p, ok := watching(o); ok {
-				send(p)
+	publish(func(hp int) {
+		attrs := []serverpackets.StatusAttribute{{Type: serverpackets.StatusCurrentHP, Value: hp}}
+		broadcastFrame(func() wire.Frame { return serverpackets.FrameStatusUpdate(id, attrs) }, func(send func(frameReceiver)) {
+			for _, w := range watchers {
+				send(w)
 			}
-		}
+		})
 	})
 }
 

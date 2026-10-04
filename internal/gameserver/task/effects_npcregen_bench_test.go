@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -54,23 +55,27 @@ func BenchmarkEffectsTickManyIdleLists(b *testing.B) {
 	_ = lists // keep the idle 29,700 reachable through the whole benchmark
 }
 
-// benchRegenActor is a minimal npcRegenActor: TickRegen never finds itself
-// below max, matching the review's "all objects already at full HP/MP"
-// steady-state case that a full scan still has to visit.
+// benchRegenActor is a minimal npcRegenActor whose phase stays idle,
+// matching the review's "all objects already at full HP/MP" steady-state
+// case that a full scan still has to visit.
 type benchRegenActor struct {
 	world.Presence
-	id int32
+	id    int32
+	regen creature.Regen
 }
 
-func (a *benchRegenActor) ObjectID() int32 { return a.id }
-func (*benchRegenActor) Kind() actor.Kind  { return actor.KindNPC }
-func (a *benchRegenActor) TickRegen()      {}
+func (a *benchRegenActor) ObjectID() int32        { return a.id }
+func (*benchRegenActor) Kind() actor.Kind         { return actor.KindNPC }
+func (a *benchRegenActor) Regen() *creature.Regen { return &a.regen }
+func (*benchRegenActor) TickRegen()               {}
+func (*benchRegenActor) SettleRegen()             {}
 
 // BenchmarkNPCRegenTickManyIdleActors reproduces the review's 30k tracked
 // population for NPCRegen.Tick: a reused scratch buffer removes
 // State.Objects()'s per-tick snapshot allocation, so once its capacity
-// stabilizes the steady state costs one allocation per NPC: the TickRegen
-// task posted to its queue, which production pays too.
+// stabilizes a sweep over idle phases allocates nothing, and a backstop
+// sweep costs one allocation per NPC: the SettleRegen task posted to its
+// queue, which production pays too.
 func BenchmarkNPCRegenTickManyIdleActors(b *testing.B) {
 	const total = 30000
 

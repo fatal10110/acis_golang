@@ -65,6 +65,7 @@ func (c *Character) finalMax(s stat.Stat, base float64) float64 {
 
 // SetResourceValues replaces c's persisted HP/MP/CP resource values.
 func (c *Character) SetResourceValues(res Resources) {
+	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	c.maxHP, c.curHP = res.MaxHP, res.CurrentHP
@@ -128,6 +129,7 @@ func (c *Character) ReduceCurrentHP(amount int) bool {
 	if amount < 0 {
 		amount = 0
 	}
+	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.Dead() {
@@ -147,6 +149,7 @@ func (c *Character) ReduceCurrentMP(amount int) {
 	if amount <= 0 {
 		return
 	}
+	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.dead.Load() {

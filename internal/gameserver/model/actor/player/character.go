@@ -84,6 +84,8 @@ type Character struct {
 	// attacker's hit or skill writes them from the attacker's queue
 	// (ReduceHP, ReduceMP, TakeDamage), and its formulas read them.
 	vitalsMu sync.RWMutex
+	// regen is the HP/MP/CP regeneration task SettleRegen arms on a drop.
+	regen creature.Regen
 	// reviveMu makes a revive one step from dead to alive, so exactly one
 	// of two revives wins a death. The player's own restart-point request
 	// and a resurrecting caster's hit run on different queues. Without the

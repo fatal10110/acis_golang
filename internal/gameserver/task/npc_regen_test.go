@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -15,14 +16,18 @@ import (
 type countingRegenActor struct {
 	world.Presence
 	id    int32
-	ticks int
+	ticks int // backstop settles
+	regen creature.Regen
 }
 
 func (a *countingRegenActor) ObjectID() int32 { return a.id }
 func (*countingRegenActor) Kind() actor.Kind  { return actor.KindNPC }
-func (a *countingRegenActor) TickRegen() {
+func (a *countingRegenActor) SettleRegen() {
 	a.ticks++
 }
+
+func (a *countingRegenActor) Regen() *creature.Regen { return &a.regen }
+func (*countingRegenActor) TickRegen()               {}
 
 // TestNPCRegenTickReusesScratchAcrossShrinkingPopulation is the regression
 // case for reusing NPCRegen's scratch buffer (AppendObjects) across ticks:
@@ -39,7 +44,7 @@ func TestNPCRegenTickReusesScratchAcrossShrinkingPopulation(t *testing.T) {
 	}
 
 	regen := NewNPCRegen(state)
-	regen.Tick()
+	regen.Tick() // the first sweep is a backstop pass
 	testLoop.Run()
 	for _, a := range actors {
 		if a.ticks != 1 {
@@ -49,6 +54,7 @@ func TestNPCRegenTickReusesScratchAcrossShrinkingPopulation(t *testing.T) {
 
 	state.RemoveObject(actors[2].id)
 	state.RemoveObject(actors[4].id)
+	regen.sweeps = 0 // the next sweep is a backstop pass again
 	regen.Tick()
 	testLoop.Run()
 
@@ -80,7 +86,7 @@ func TestNPCRegenTickLogsReentrantCall(t *testing.T) {
 	testLoop.Run()
 
 	if actor.ticks != 0 {
-		t.Fatalf("actor ticks = %d, want 0 (reentrant Tick must not run TickRegen)", actor.ticks)
+		t.Fatalf("actor ticks = %d, want 0 (reentrant Tick must not run SettleRegen)", actor.ticks)
 	}
 	if !strings.Contains(buf.String(), "NPCRegen.Tick") || !strings.Contains(buf.String(), ErrReentrantTick.Error()) {
 		t.Fatalf("reentrant Tick call was not logged, got %q", buf.String())

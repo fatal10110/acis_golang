@@ -393,6 +393,7 @@ func (c *Character) AddHP(amount float64) float64 {
 		return 0
 	}
 	maxHP := c.MaxHPValue()
+	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.dead.Load() || c.curHP >= maxHP {
@@ -412,6 +413,7 @@ func (c *Character) AddMP(amount float64) float64 {
 		return 0
 	}
 	maxMP := c.MaxMPValue()
+	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.dead.Load() || c.curMP >= maxMP {
@@ -431,6 +433,7 @@ func (c *Character) AddCP(amount float64) float64 {
 		return 0
 	}
 	maxCP := c.MaxCPValue()
+	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.dead.Load() || c.curCP >= maxCP {
@@ -449,6 +452,7 @@ func (c *Character) ReduceMP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
 	}
+	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.dead.Load() || c.curMP <= 0 {
@@ -788,6 +792,7 @@ func (c *Character) applyNonConsumptionDamageEffects(isDOT bool) {
 // character; Revive is the only way back to positive HP.
 func (c *Character) SetHP(value float64) {
 	maxHP := c.MaxHPValue()
+	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.dead.Load() {
@@ -806,6 +811,7 @@ func (c *Character) SetHP(value float64) {
 // character.
 func (c *Character) SetCP(value float64) {
 	maxCP := c.MaxCPValue()
+	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.dead.Load() {
