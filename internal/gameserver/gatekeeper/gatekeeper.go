@@ -10,6 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -25,6 +27,9 @@ type Service struct {
 	tables atomic.Pointer[destinations]
 	free   bool
 	now    func() time.Time
+	// gnosis reports a talker who travels for an ancient adena price's
+	// base count; nil reports nobody.
+	gnosis func(objectID int32) bool
 }
 
 // destinations is one loaded snapshot of both destination tables.
@@ -53,6 +58,14 @@ func (s *Service) SetTables(teleports travel.TeleportTable, instants travel.Inst
 	s.tables.Store(&destinations{teleports: teleports, instants: instants})
 }
 
+// SetGnosisFollower sets the Seven Signs rule an ancient adena price
+// reads: follower reports whether a talker travels for the base count
+// (sevensigns.State.GnosisFollower); everyone else pays 1.6 times it. Call
+// it before the service is shared.
+func (s *Service) SetGnosisFollower(follower func(objectID int32) bool) {
+	s.gnosis = follower
+}
+
 // Notices a teleport reports, in the order they happen.
 type (
 	// NotEnoughAdena refuses a trip the player cannot pay in adena for.
@@ -79,21 +92,17 @@ type Trip struct {
 	// Release answers ActionFailed of the request's own, after the move
 	// when there is one.
 	Release bool
-	// Unported names a destination priced in ancient adena, whose price
-	// depends on the Seven Signs seal owners, not in place yet: nothing is
-	// taken and nobody moves.
-	Unported bool
 }
 
 // Window returns the page listing the destinations of kind npcID offers,
-// for the NPC objectID: each one a link to its "teleport <index>" command,
-// index counting every destination of npcID, with its price unless
-// teleports are free. ok is false when npcID offers no destination, and
-// unported is true when a listed price is in ancient adena.
-func (s *Service) Window(objectID int32, npcID int, kind travel.Kind) (page string, ok, unported bool) {
+// for the NPC objectID and the talker talkerID: each one a link to its
+// "teleport <index>" command, index counting every destination of npcID,
+// with its price for the talker unless teleports are free. ok is false
+// when npcID offers no destination.
+func (s *Service) Window(objectID int32, npcID int, kind travel.Kind, talkerID int32) (page string, ok bool) {
 	list, ok := s.tables.Load().teleports[npcID]
 	if !ok {
-		return "", false, false
+		return "", false
 	}
 	id := strconv.Itoa(int(objectID))
 	now := s.now()
@@ -105,18 +114,14 @@ func (s *Service) Window(objectID int32, npcID int, kind travel.Kind) (page stri
 		}
 		b.WriteString(`<a action="bypass -h npc_` + id + `_teleport ` + strconv.Itoa(index) + `" msg="811;` + t.Description + `">` + t.Description)
 		if !s.free {
-			price, priced := s.price(t, now)
-			if !priced {
-				return "", true, true
-			}
-			if price > 0 {
+			if price := s.price(t, now, talkerID); price > 0 {
 				b.WriteString(" - " + strconv.Itoa(price) + " &#" + strconv.Itoa(t.PriceID) + ";")
 			}
 		}
 		b.WriteString("</a><br1>")
 	}
 	b.WriteString("</body></html>")
-	return b.String(), true, false
+	return b.String(), true
 }
 
 // Teleport takes c to destination index of npcID's list. An NPC without a
@@ -140,11 +145,7 @@ func (s *Service) Teleport(c *player.Character, npcID, index int) Trip {
 	if s.free || t.PriceCount == 0 {
 		return trip
 	}
-	price, priced := s.price(t, s.now())
-	if !priced {
-		return Trip{Unported: true}
-	}
-	trip.Notices, trip.Depart = pay(c, int32(t.PriceID), price)
+	trip.Notices, trip.Depart = pay(c, int32(t.PriceID), s.price(t, s.now(), c.ID))
 	return trip
 }
 
@@ -163,13 +164,18 @@ func (s *Service) Instant(npcID, index int) Trip {
 	return Trip{Depart: true, Destination: list[index]}
 }
 
-// price is t's price at now. ok is false for a price in ancient adena,
-// which depends on the talker's Seven Signs standing (#2948).
-func (s *Service) price(t travel.Teleport, now time.Time) (int, bool) {
+// price is t's price at now for the talker talkerID
+// (TeleportLocation.getCalculatedPriceCount): an ancient adena price is
+// its base count for a Gnosis follower and 1.6 times it, truncated, for
+// everyone else.
+func (s *Service) price(t travel.Teleport, now time.Time, talkerID int32) int {
 	if t.PriceID == int(item.AncientAdenaID) {
-		return 0, false
+		if s.gnosis != nil && s.gnosis(talkerID) {
+			return t.PriceCount
+		}
+		return int(commons.JavaInt(float64(t.PriceCount) * 1.6))
 	}
-	return t.CalculatedPrice(now), true
+	return t.CalculatedPrice(now)
 }
 
 // pay takes count of itemID from c, reporting whether it did and what to

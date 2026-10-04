@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
@@ -330,33 +331,76 @@ func sealedDestinations() (travel.TeleportTable, travel.InstantTable) {
 	}, travel.InstantTable{}
 }
 
-// TestBypassTeleportAncientAdenaNotYetPriced pins a destination priced in
-// ancient adena as logged and left alone until Seven Signs pricing exists:
-// teleport_request opens no list, and teleport answers no message, no jump
-// and no release of its own, only the dispatcher's; nothing is taken. A
-// destination priced at more than one item says S2_S1_DISAPPEARED with the
-// item and the count taken.
-func TestBypassTeleportAncientAdenaNotYetPriced(t *testing.T) {
+// TestBypassTeleportAncientAdenaPrice pins a destination priced in ancient
+// adena (TeleportLocation.getCalculatedPriceCount): the list shows, and the
+// trip takes, 1.6 times its count, truncated, from anyone but a Gnosis
+// follower, who during seal validation pays the count itself: signed up
+// for the cabal owning the Seal of Gnosis, having chosen that seal. The
+// ancient adena taken is named with its count. A destination priced at
+// more than one item says S2_S1_DISAPPEARED with the item and the count
+// taken.
+func TestBypassTeleportAncientAdenaPrice(t *testing.T) {
 	t.Parallel()
 	teleports, instants := sealedDestinations()
 	w, gk := bootTravelWorld(t, teleports, instants, false, newTeleportClock(),
 		map[int32]int32{item.AncientAdenaID: 500, item.AdenaID: 1000, travelTokenID: 3})
-
-	w.openAnyNpcPage(t)
-	assertAnswer(t, w.tripFrames(t, npcCommand(gk, "teleport_request")), releaseOnly, gk, "")
-	w.openAnyNpcPage(t)
-	assertAnswer(t, w.tripFrames(t, npcCommand(gk, "teleport 0")), releaseOnly, gk, "")
-	for id, want := range map[int32]int{item.AncientAdenaID: 500, item.AdenaID: 1000} {
-		if got := w.held(t, id); got != want {
-			t.Fatalf("item %d held = %d, want %d", id, got, want)
-		}
-		if got := w.savedCount(t, id); got != want {
-			t.Fatalf("item %d saved = %d, want %d", id, got, want)
-		}
+	// relocate lands the player where a trip took it and places a
+	// gatekeeper beside it.
+	relocate := func() {
+		w.c.Send(encodeAppearing())
+		drainFrames(t, w.c)
+		x, y, z := w.srv.PlayerPosition(t, w.player)
+		w.at = location.Location{X: x, Y: y, Z: z}
+		gk = w.spawnFolk(t, folkTemplate("Gatekeeper", gatekeeperID), 50)
+	}
+	window := func(price int) string {
+		id := strconv.Itoa(int(gk.ObjectID()))
+		return `<html><body>&$556;<br><br>` +
+			`<a action="bypass -h npc_` + id + `_teleport 0" msg="811;Necropolis">Necropolis - ` + strconv.Itoa(price) + ` &#5575;</a><br1>` +
+			`<a action="bypass -h npc_` + id + `_teleport 1" msg="811;Dark Elf Village">Dark Elf Village - 2 &#8542;</a><br1>` +
+			`</body></html>`
 	}
 
 	w.openAnyNpcPage(t)
-	frames := w.tripFrames(t, npcCommand(gk, "teleport 1"))
+	assertAnswer(t, w.tripFrames(t, npcCommand(gk, "teleport_request")), pageAnswer, gk, window(160))
+	frames := w.tripFrames(t, npcCommand(gk, "teleport 0"))
+	assertFrames(t, "surcharged trip", frames, trip(sysMsg(serverpackets.SystemMessageS2S1Disappeared, itemNameParam(item.AncientAdenaID), itemNumberParam(160)))...)
+	assertLandedNear(t, landing(t, frames), paidSpot)
+	relocate()
+
+	// A Dawn member who chose the Seal of Gnosis, which the Dawn owns.
+	setSevenSigns(t, w, sevensigns.SealValidation, sevensigns.Dawn, sevensigns.Dawn, sevensigns.NoCabal, sevensigns.Dawn)
+	if _, err := w.srv.DB.ExecContext(context.Background(), `UPDATE seven_signs SET seal = 'GNOSIS' WHERE char_obj_id = ?`, w.player); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.srv.SevenSigns.Restore(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	w.openAnyNpcPage(t)
+	assertAnswer(t, w.tripFrames(t, npcCommand(gk, "teleport_request")), pageAnswer, gk, window(100))
+	frames = w.tripFrames(t, npcCommand(gk, "teleport 0"))
+	assertFrames(t, "follower trip", frames, trip(sysMsg(serverpackets.SystemMessageS2S1Disappeared, itemNameParam(item.AncientAdenaID), itemNumberParam(100)))...)
+	relocate()
+	if got := w.savedCount(t, item.AncientAdenaID); got != 240 {
+		t.Fatalf("ancient adena saved = %d, want 240", got)
+	}
+
+	// Outside seal validation the follower pays the surcharge too; 240
+	// ancient adena cannot pay 160 twice.
+	setSevenSigns(t, w, sevensigns.Competition, sevensigns.Dawn, sevensigns.Dawn, sevensigns.NoCabal, sevensigns.Dawn)
+	w.openAnyNpcPage(t)
+	assertAnswer(t, w.tripFrames(t, npcCommand(gk, "teleport_request")), pageAnswer, gk, window(160))
+	w.tripFrames(t, npcCommand(gk, "teleport 0"))
+	relocate()
+	w.openAnyNpcPage(t)
+	assertFrames(t, "short of ancient adena", w.tripFrames(t, npcCommand(gk, "teleport 0")),
+		sysMsg(serverpackets.SystemMessageNotEnoughItems), []byte{serverpackets.OpcodeActionFailed}, []byte{serverpackets.OpcodeActionFailed})
+	if got := w.savedCount(t, item.AncientAdenaID); got != 80 {
+		t.Fatalf("ancient adena saved = %d, want 80", got)
+	}
+
+	w.openAnyNpcPage(t)
+	frames = w.tripFrames(t, npcCommand(gk, "teleport 1"))
 	assertFrames(t, "two-token trip", frames, trip(sysMsg(serverpackets.SystemMessageS2S1Disappeared, itemNameParam(travelTokenID), itemNumberParam(2)))...)
 	assertLandedNear(t, landing(t, frames), tokenSpot)
 	if got := w.savedCount(t, travelTokenID); got != 1 {
