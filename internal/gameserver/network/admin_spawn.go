@@ -117,7 +117,7 @@ func (l *GameClientLink) adminDelete(gm *livePlayer, _ string) {
 		name, deleted = t.Name(), true
 	case *npc.Hostile, *npc.Folk:
 		if npcs := l.npcSpawns.Load(); npcs != nil && npcs.DeleteFixed(t.ObjectID()) {
-			name, deleted = npcInstanceOf(t).Template.Name, true
+			name, deleted = npcInstanceOf(t).Name(), true
 		}
 	}
 	if !deleted {
@@ -232,7 +232,7 @@ func (l *GameClientLink) describeSpawn(obj world.Tracked, npcID int32) (label, d
 		name := ""
 		if master, found := l.world.Object(rec.MasterID); found {
 			if inst := npcInstanceOf(master); inst != nil {
-				name = inst.Template.Name
+				name = inst.Name()
 			}
 		}
 		return standalone, fmt.Sprintf("Master: %s [objId=%d]", trimAndDress(name, 20), rec.MasterID), true

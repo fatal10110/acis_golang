@@ -7,7 +7,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -18,6 +17,7 @@ type characterEditStore interface {
 	SetNoble(ctx context.Context, objectID int32, noble bool) error
 	SetTitle(ctx context.Context, objectID int32, title string) error
 	SetClanPenalties(ctx context.Context, objectID int32, joinExpiry, createExpiry int64) error
+	SetSex(ctx context.Context, objectID int32, sex byte) error
 }
 
 // adminSet answers //set <field> [value] for gm's selection, gm itself
@@ -25,9 +25,8 @@ type characterEditStore interface {
 // selected player and tell gm, and a selection that is no player answers
 // nothing, as the reference does: a chat command leaves no client action
 // pending. A missing or malformed value answers the field's usage.
-//
-// //set class, //set name and //set sex, and //set title on an NPC, are
-// not ported yet (#3326): they log the gap and release the client.
+// //set name and //set title also name a selected NPC; see
+// admin_set_fields.go.
 func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 	args := handleradmin.Args(line)
 	if len(args) == 0 {
@@ -51,9 +50,16 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 		}
 	}
 	switch field {
-	case "class", "name", "sex":
-		l.log.Warn().Str("field", field).Msg("admin: //set field not implemented yet (#3326)")
-		gm.SendFrame(serverpackets.FrameActionFailed())
+	case "class":
+		if isPlayer {
+			l.adminSetClass(gm, target, value, hasValue)
+		}
+	case "sex":
+		if isPlayer {
+			l.adminSetSex(gm, target, value, hasValue)
+		}
+	case "name":
+		l.adminSetName(gm, value, hasValue)
 	case "color":
 		edit(func() {
 			color, err := commons.DecodeInt32("0x" + value)
@@ -189,7 +195,7 @@ func (l *GameClientLink) setSP(live *livePlayer, sp int32) {
 
 // adminSetTitle answers //set title <title>: a selected player, gm itself
 // without one, takes the title's first word, and it and the players around
-// it see it.
+// it see it. A selected NPC takes the word untrimmed.
 func (l *GameClientLink) adminSetTitle(gm *livePlayer, title string, hasTitle bool) {
 	if !hasTitle {
 		sendText(gm, "Usage: //set title <title>")
@@ -197,9 +203,10 @@ func (l *GameClientLink) adminSetTitle(gm *livePlayer, title string, hasTitle bo
 	}
 	target, ok := adminSelectedPlayer(gm)
 	if !ok {
-		if gm.Target().Kind() == actor.KindNPC {
-			l.log.Warn().Msg("admin: //set title on an NPC not implemented yet (#3326)")
-			gm.SendFrame(serverpackets.FrameActionFailed())
+		if inst, info, isNPC := adminNPC(gm.Target()); isNPC {
+			inst.SetTitle(title)
+			l.broadcastNPCInfo(gm.Target(), info)
+			sendText(gm, "You successfully set your target's title to "+inst.Title()+".")
 			return
 		}
 		gm.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))

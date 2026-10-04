@@ -43,7 +43,7 @@ func (s weddingSpouse) Refund(count int) {
 }
 
 // Female reports a female character.
-func (s weddingSpouse) Female() bool { return s.Sex == player.SexFemale }
+func (s weddingSpouse) Female() bool { return s.Sex() == player.SexFemale }
 
 // Adena is the adena the player holds.
 func (s weddingSpouse) Adena() int {

@@ -164,7 +164,7 @@ func (a characterStatActor) ClanHasAnyClanHall() bool { return a.c.ClanHallID() 
 func (a characterStatActor) Race() int { return int(a.c.Race) }
 
 // Sex satisfies conditions.PlayerActor, returning c.Sex's ordinal.
-func (a characterStatActor) Sex() int { return int(a.c.Sex) }
+func (a characterStatActor) Sex() int { return int(a.c.Sex()) }
 
 // InventorySize satisfies conditions.PlayerActor.
 func (a characterStatActor) InventorySize() int {

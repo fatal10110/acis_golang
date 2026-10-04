@@ -218,24 +218,18 @@ func TestAdminSetPlayerFields(t *testing.T) {
 	}
 	storedColumn(t, srv, userID, "nobless", "0")
 
-	// Unported fields release the client; unknown ones answer the usage.
-	if got := opcodes(exchange(t, gm, encodeBuildCmd("set class 1"))); !slices.Equal(got, []byte{serverpackets.OpcodeActionFailed}) {
-		t.Fatalf("//set class frames = %x, want ActionFailed", got)
-	}
+	// Unknown fields answer the usage.
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("set foo")),
 		"Usage: //set access|class|color|exp|karma",
 		"Usage: //set level|name|rec|sex|sp|tcolor|title")
 
-	// A selection that is no player answers nothing, but a title on one
-	// that is no NPC is the wrong target.
+	// A selection that is no player answers nothing; a title on an NPC
+	// is covered by TestAdminSetNPCNameTitle.
 	monster := srv.SpawnHostileNPCAt(t, location.Location{X: spawnX + 40, Y: spawnY, Z: spawnZ})
 	drain(t, gm)
 	exchange(t, gm, encodeAction(monster.ObjectID()))
 	if frames := exchange(t, gm, encodeBuildCmd("set karma 5")); len(frames) != 0 {
 		t.Fatalf("//set karma on a monster frames = %x, want none", testsupport.FrameOpcodes(frames))
-	}
-	if got := opcodes(exchange(t, gm, encodeBuildCmd("set title Boss"))); !slices.Equal(got, []byte{serverpackets.OpcodeActionFailed}) {
-		t.Fatalf("//set title on an NPC frames = %x, want ActionFailed", got)
 	}
 	// //info on an NPC opens its general page (see info_test.go), missing
 	// from this boot's page cache.

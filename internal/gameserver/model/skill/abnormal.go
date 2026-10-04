@@ -6,6 +6,10 @@ import "fmt"
 // sees itself, and its summon, drawn with it.
 const AbnormalStealth = 0x100000
 
+// AbnormalHold2 is the second hold visual: a player an admin changes the
+// class or sex of is drawn held while it is off the grid.
+const AbnormalHold2 = 0x000800
+
 // abnormalEffectMasks maps an effect template's abnormal="..." name to the
 // client's abnormal-visual bit carried in CharInfo, UserInfo, NpcInfo and
 // the summon info packets. "null" is the explicit no-visual value.
@@ -22,7 +26,7 @@ var abnormalEffectMasks = map[string]int{
 	"mute":          0x000100,
 	"root":          0x000200,
 	"hold1":         0x000400,
-	"hold2":         0x000800,
+	"hold2":         AbnormalHold2,
 	"unknown13":     0x001000,
 	"bighead":       0x002000,
 	"flame":         0x004000,

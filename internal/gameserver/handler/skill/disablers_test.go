@@ -564,7 +564,7 @@ func liveShieldCharacter(t *testing.T, id int32, items *item.Table, equipped ...
 	tmpl := liveShieldTemplate()
 	c := &player.Character{
 		ID: id, Name: "char",
-		Race: player.RaceHuman, Sex: player.SexMale, CharLevel: 1,
+		Race: player.RaceHuman, CharLevel: 1,
 		Location: location.Location{X: int(id) * 100, Y: 0, Z: 0},
 	}
 	c.SetClassID(tmpl.ID)

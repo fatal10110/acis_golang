@@ -56,7 +56,7 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 				 face, hairStyle, hairColor, sex, heading, x, y, z, exp, sp, race, classid, base_class, title, accesslevel, online, lastAccess)
 			 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		c.AccountName, c.ID, c.Name, c.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
-		c.Face, c.HairStyle, c.HairColor, byte(c.Sex), c.LastHeading, c.Location.X, c.Location.Y, c.Location.Z,
+		c.Face, c.HairStyle, c.HairColor, byte(c.Sex()), c.LastHeading, c.Location.X, c.Location.Y, c.Location.Z,
 		c.Exp, c.SP, int(c.Race), c.ClassID(), c.BaseClassID(), c.Title(), c.AccessLevel, 0, time.Now().UnixMilli(),
 	)
 	if err != nil {
@@ -165,7 +165,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.Sex = player.Sex(sex)
+	c.SetSex(player.Sex(sex))
 	c.SetClanID(clanID)
 	c.SetTitle(title)
 	c.SetClanJoinExpiryTime(clanJoinExpiry)

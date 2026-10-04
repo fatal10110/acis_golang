@@ -41,7 +41,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	paperdoll := item.Paperdoll(s.Items)
 
 	collisionRadius, collisionHeight := t.CollisionRadius, t.CollisionHeight
-	if c.Sex == player.SexFemale {
+	if c.Sex() != player.SexMale {
 		collisionRadius, collisionHeight = t.CollisionRadiusFemale, t.CollisionHeightFemale
 	}
 
@@ -52,7 +52,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteInt32(c.ObjectID())
 	w.WriteString(c.Name)
 	w.WriteInt32(int32(c.Race))
-	w.WriteInt32(int32(c.Sex))
+	w.WriteInt32(int32(c.Sex()))
 	w.WriteInt32(int32(c.VisibleBaseClassID()))
 
 	for _, pos := range charInfoPaperdollOrder {
