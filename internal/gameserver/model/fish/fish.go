@@ -56,3 +56,20 @@ func (t *Table) Find(id int32) (Fish, bool) {
 	f, ok := t.byID[id]
 	return f, ok
 }
+
+// Pick returns one fish of level, type and group, chosen with roll among
+// every matching row in file order. roll returns a uniform int in [0, n)
+// and is drawn once, only when at least one row matches; ok is false when
+// none does.
+func (t *Table) Pick(level, typ, group int, roll func(n int) int) (f Fish, ok bool) {
+	var matches []Fish
+	for _, row := range t.fish {
+		if row.Level == level && row.Type == typ && row.Group == group {
+			matches = append(matches, row)
+		}
+	}
+	if len(matches) == 0 {
+		return Fish{}, false
+	}
+	return matches[roll(len(matches))], true
+}

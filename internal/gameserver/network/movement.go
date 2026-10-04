@@ -327,18 +327,21 @@ func (l *GameClientLink) standAttackedLivePlayer(live *livePlayer) {
 	})
 }
 
-// broadcastLiveSocialAction handles an emote request: a rejected emote
-// (out-of-range id, dead, sitting, or in combat)
-// answers with nothing, on purpose. Emotes don't register a pending client
-// action the way target/attack/item clicks do, so silence can't freeze input
-// the way the silent-drop bug class behind #829 freezes it — and the
-// specified handler stays silent on every rejection path except the
-// fishing one (the fishing check is a separate, not-yet-wired gap and would
-// carry its own message, not ActionFailed). Adding ActionFailed here would
-// diverge from that behavior with no client-side benefit, so this is left
-// intentionally silent instead of patched to match the ActionFailed pattern
-// used by the action-locked handlers in #873.
+// broadcastLiveSocialAction handles an emote request. A fishing player is
+// told it cannot emote while fishing, whatever the emote. Any other rejected
+// emote (out-of-range id, dead, sitting, or in combat) answers with nothing,
+// on purpose. Emotes don't register a pending client action the way
+// target/attack/item clicks do, so silence can't freeze input the way the
+// silent-drop bug class behind #829 freezes it — and the specified handler
+// stays silent on every rejection path except the fishing one. Adding
+// ActionFailed here would diverge from that behavior with no client-side
+// benefit, so this is left intentionally silent instead of patched to match
+// the ActionFailed pattern used by the action-locked handlers in #873.
 func (l *GameClientLink) broadcastLiveSocialAction(live *livePlayer, actionID int32) {
+	if live.Fishing() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotDoWhileFishing))
+		return
+	}
 	if actionID < 2 || actionID > 13 || live.Operating() || live.AlikeDead() || !live.Standing() || live.InCombat() {
 		return
 	}

@@ -88,6 +88,9 @@ type livePlayer struct {
 	// duelCondition is what the player's duel saved of it when it began;
 	// owned by its queue. See duel.go.
 	duelCondition *duelCondition
+	// fishing is the player's fishing line and its timers; owned by its
+	// queue. See fishing.go.
+	fishing fishingRun
 	// access is the character's access level, resolved at login and
 	// replaced by setAccessLevel on p's queue; any goroutine reads it
 	// through accessLevel.
