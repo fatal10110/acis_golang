@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/fatal10110/acis_golang/internal/gameserver/augment"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/craft"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
@@ -341,6 +342,7 @@ type GameClientLink struct {
 	duels            *duelRegistry
 	partyPositions   partyPositions
 	clans            *clan.Service
+	castles          *castle.Manager
 	clanWarehouses   clanWarehouseBook
 	enchantState     *enchantflow.State
 	enchant          *enchantflow.Service
@@ -610,6 +612,8 @@ type GameClientLinkConfig struct {
 	// Clans is the clan registry and its rules; nil runs with no clan at
 	// all and nothing written.
 	Clans *clan.Service
+	// Castles holds the castles' live state; nil runs with no castle.
+	Castles *castle.Manager
 	// Board is the community board's settings; the zero value keeps the
 	// board off.
 	Board bbs.Config
@@ -782,6 +786,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		link.announcements = announcement.NewRegistry(nil, NewAnnouncer(cfg.World), cfg.Log, cfg.Queues.NewQueue("announcements"))
 	}
 	link.clans = cfg.Clans
+	link.castles = cfg.Castles
 	if link.clans == nil {
 		link.clans = clan.NewService(nil, nil, nil, cfg.IDs, clan.DefaultConfig(), nil, cfg.Log)
 	}

@@ -166,6 +166,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideIDAllocator,
 			loadClanConfig,
 			provideClans,
+			provideCastles,
 			provideRoster,
 			providePvPFlags,
 			provideInventoryUpdates,

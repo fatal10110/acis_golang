@@ -488,7 +488,7 @@ var schemaStmts = []string{
 	characterRelationsSchema, petitionSchema, petitionMessageSchema,
 	characterMacrosesSchema, characterRecommendsSchema,
 	clanDataSchema, clanPrivsSchema, clanSkillsSchema, clanSubpledgesSchema, clanWarsSchema, clanhallSchema,
-	siegeClansSchema,
+	siegeClansSchema, castleSchema,
 	accountsSchema,
 	bbsMailSchema, bbsForumSchema, bbsTopicSchema, bbsPostSchema, bbsFavoriteSchema,
 	olympiadNoblesSchema, olympiadNoblesEomSchema, olympiadFightsSchema, serverMemoSchema,
@@ -498,4 +498,4 @@ var schemaStmts = []string{
 	mdtBetsSchema, mdtHistorySchema,
 }
 
-var seedStmts = []string{sevenSignsStatusSeed, sevenSignsFestivalSeed, mdtBetsSeed}
+var seedStmts = []string{sevenSignsStatusSeed, sevenSignsFestivalSeed, mdtBetsSeed, castleSeed}
