@@ -536,8 +536,9 @@ func WithClanConfig(cfg clan.Config) Option {
 	return func(o *options) { o.clanConfig = &cfg }
 }
 
-// WithClanSeed writes clan rows once the seeded characters are stored and
-// before the clans are restored from them.
+// WithClanSeed writes clan rows, and the clanhall rows naming their owned
+// halls, once the seeded characters are stored and before the clans are
+// restored from them.
 func WithClanSeed(seed func(db *sql.DB)) Option {
 	return func(o *options) { o.seedClans = seed }
 }
@@ -2004,6 +2005,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		})
 	}
 	gclConfig.Clans.Table().Restore(clanRows, clanNow, clanConfig.JoinDays)
+	hallOwners, err := clanStore.LoadHallOwners(context.Background())
+	if err != nil {
+		t.Fatalf("load clan hall owners: %v", err)
+	}
+	// The fixture loads no clan hall data, so every seeded hall counts.
+	gclConfig.Clans.Table().RestoreHalls(hallOwners, nil)
 	gclConfig.Clans.DropMissingCrests(crests)
 	gclConfig.Clans.DropDanglingAlliances()
 	if o.seedBoard != nil {

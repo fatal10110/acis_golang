@@ -47,7 +47,8 @@ func loadClanConfig(paths gameServerPaths, _ zerolog.Logger) (clan.Config, error
 
 // provideClans restores every clan from the database, after the id factory
 // has dropped the clans whose leader no longer exists and the war
-// penalties that ran out while the server was down, clears the crest ids
+// penalties that ran out while the server was down, gives each owning clan
+// its clan hall among the loaded halls, clears the crest ids
 // whose image the crest cache does not hold and the alliances whose
 // leading clan no longer exists, and returns the clan service
 // writing through the persistence worker. A stored clan skill whose
@@ -68,6 +69,14 @@ func provideClans(ctx bootContext, pool *sql.DB, ids *idfactory.Allocator, worke
 	})
 	table := clan.NewTable()
 	table.Restore(snap, now, cfg.JoinDays)
+	halls, err := store.LoadHallOwners(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("restore clans: %w", err)
+	}
+	table.RestoreHalls(halls, func(id int32) bool {
+		_, ok := data.ClanHalls.Get(int(id))
+		return ok
+	})
 	log.Info().Int("clans", table.Len()).Msg("clans loaded")
 	service := clan.NewService(table, store, worker, ids, cfg, time.Now, log)
 	service.DropMissingCrests(crests)
