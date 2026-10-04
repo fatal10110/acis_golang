@@ -568,9 +568,6 @@ func (m *CreatureMove) Position() location.Location {
 func (m *CreatureMove) SetPosition(position location.Location) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if m.moving {
-		m.debugStopLocked("setposition-while-moving")
-	}
 	m.origin = position
 	m.setAccurateLocked(position)
 	if m.destination == position {
@@ -726,9 +723,6 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn,
 
 	distance := between(moveType, m.origin, destination)
 	ticks := m.travelTicksLocked(distance)
-	if DebugResolve != nil && m.playerStepsLocked() {
-		DebugResolve(m.origin, target, destination, len(waypoints), int(outcome), distance, ticks, m.speed)
-	}
 	if math.IsNaN(ticks) || ticks > maxTravelTicks {
 		return event.Move{}, outcome, errors.New("move: duration exceeds limit")
 	}
@@ -978,24 +972,9 @@ func chain(first, second func()) func() {
 	}
 }
 
-// DebugStop, when set, is told every time a player mover's walk stops.
-// Temporary diagnostics.
-var DebugStop func(reason string, at location.Location)
-
-// DebugResolve, when set, is told where each player walk resolves to.
-// Temporary diagnostics.
-var DebugResolve func(origin, target, destination location.Location, waypoints, outcome int, distance, ticks, speed float64)
-
-func (m *CreatureMove) debugStopLocked(reason string) {
-	if DebugStop != nil && m.playerStepsLocked() && m.moving {
-		DebugStop(reason, m.origin)
-	}
-}
-
 // endLocked stops the move where the actor stands and returns the arrival
 // hook for the caller to invoke after unlocking. Callers hold mu.
 func (m *CreatureMove) endLocked() func() {
-	m.debugStopLocked("end")
 	m.rescheduleLocked(0)
 	m.waypoints = nil
 	m.moving = false
@@ -1351,7 +1330,6 @@ func (m *CreatureMove) arrivalHookLocked() func() {
 }
 
 func (m *CreatureMove) stopBlockedLocked() func() {
-	m.debugStopLocked("blocked")
 	m.rescheduleLocked(0)
 	m.waypoints = nil
 	m.moving = false
@@ -1411,7 +1389,6 @@ func (m *CreatureMove) currentEventLocked() event.Move {
 func (m *CreatureMove) CancelMove() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.debugStopLocked("cancel")
 	m.rescheduleLocked(0)
 	m.waypoints = nil
 	m.moving = false

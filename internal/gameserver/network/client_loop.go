@@ -154,9 +154,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			continue
 		}
 
-		if live != nil && opcode != clientpackets.OpcodeMoveBackwardToLocation {
-			l.log.Debug().Str("opcode", hex.EncodeToString(payload[:1])).Int("len", len(payload)).Msg("movedbg: inbound")
-		}
 		// Once in the world, everything a frame does to the player runs as a
 		// task on its queue (onLive), serialized with its timers and ticks.
 		// The loop waits for each task before reading on, so frames are
