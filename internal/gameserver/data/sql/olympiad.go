@@ -134,6 +134,33 @@ func (s *OlympiadStore) SnapshotMonth(ctx context.Context) error {
 	return nil
 }
 
+// ClassLeaders returns the current names of the ten best nobles of classID
+// in the month's standings with at least minMatches matches, by points,
+// then matches, then wins.
+func (s *OlympiadStore) ClassLeaders(ctx context.Context, classID, minMatches int) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT characters.char_name FROM olympiad_nobles_eom, characters
+		WHERE characters.obj_Id = olympiad_nobles_eom.char_id AND olympiad_nobles_eom.class_id = ? AND olympiad_nobles_eom.competitions_done >= ?
+		ORDER BY olympiad_nobles_eom.olympiad_points DESC, olympiad_nobles_eom.competitions_done DESC, olympiad_nobles_eom.competitions_won DESC LIMIT 10`,
+		classID, minMatches)
+	if err != nil {
+		return nil, fmt.Errorf("load olympiad class %d leaders: %w", classID, err)
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("load olympiad class %d leaders: %w", classID, err)
+		}
+		names = append(names, name)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("load olympiad class %d leaders: %w", classID, err)
+	}
+	return names, nil
+}
+
 // SaveFight stores the result of one Olympiad match.
 func (s *OlympiadStore) SaveFight(ctx context.Context, f olympiad.Fight) error {
 	if _, err := s.db.ExecContext(ctx,
