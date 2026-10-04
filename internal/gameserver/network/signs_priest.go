@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -14,16 +15,15 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/signspriest"
 )
 
-// signsPriestTimeout bounds the insert of a new Seven Signs sign-up's row
-// and the save that follows a turn-in or a payout.
+// signsPriestTimeout bounds the insert of a new Seven Signs sign-up's row.
 const signsPriestTimeout = 10 * time.Second
 
 // sevenSignsBypass runs a Seven Signs priest's or Mammon NPC's
 // "SevenSigns <n> ..." command for live at f: its messages, then its page,
-// then the move it makes. A sign-up, a turn-in or a payout queues the
-// state's save on live's persistence lane, so the stones and the reward a
-// crash would otherwise restore, and the sign-up it would otherwise lose,
-// are written right behind the change. It reports false when the command
+// then the move it makes. A sign-up, a turn-in or a payout queues the save
+// of live's sign-up row on live's persistence lane, behind the items the
+// command took, so the reward a crash would otherwise restore, and the
+// sign-up it would otherwise lose, are written right behind the change. It reports false when the command
 // aborted, so that nothing more is sent.
 func (l *GameClientLink) sevenSignsBypass(live *livePlayer, f *npc.Folk, command string, dawn bool) bool {
 	if l.signsPriest == nil {
@@ -47,9 +47,17 @@ func (l *GameClientLink) sevenSignsBypass(live *livePlayer, f *npc.Folk, command
 		l.log.Error().Err(reply.SignUpErr).Int32("object_id", live.ObjectID()).Msg("seven signs: insert sign-up")
 	}
 	if reply.Save {
-		state := l.sevenSigns
-		l.queueRowWrite(live.ObjectID(), "seven signs: save after the priests' dialog", func(ctx context.Context, _ int32) error {
-			return state.Save(ctx)
+		state, itemInstances, taken := l.sevenSigns, l.itemInstances, reply.Taken
+		l.queueRowWrite(live.ObjectID(), "seven signs: save after the priests' dialog", func(ctx context.Context, objectID int32) error {
+			// The stacks the command took from are written first, and a
+			// failure leaves the row to the next full save: the row never
+			// lands ahead of the items that paid for it.
+			if itemInstances != nil {
+				if err := itemInstances.UpdateItems(ctx, taken); err != nil {
+					return fmt.Errorf("write the items taken: %w", err)
+				}
+			}
+			return state.SavePlayer(ctx, objectID)
 		})
 	}
 	for _, n := range reply.Notices {

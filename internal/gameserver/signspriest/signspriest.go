@@ -130,10 +130,15 @@ type Reply struct {
 	// Depart moves the talker to Destination, unscattered.
 	Depart      bool
 	Destination location.Location
-	// Save asks for the state to be saved: a sign-up changed, stones were
-	// turned in or their reward collected, and the change only lives in
-	// memory until then.
+	// Save asks for the talker's sign-up row to be saved: a sign-up was
+	// made, stones worth points were turned in or their reward collected,
+	// and the change only lives in memory until then. A command that changed
+	// nothing leaves it unset.
 	Save bool
+	// Taken are the stacks the command took items from. Their removal is
+	// written lazily, so a save writes them first: a crash must never keep a
+	// contribution while handing back the stones it was paid with.
+	Taken []*item.Instance
 	// SignUpErr is the failed insert of a new sign-up's row: the sign-up
 	// holds in memory regardless, and the error is only to be logged.
 	SignUpErr error
@@ -403,8 +408,9 @@ func (h *handler) contributeStones() Reply {
 		if !found {
 			return h.chat(signs(6, h.side+"_no_stones"))
 		}
-		h.notice(ContribIncreased{Score: h.addContrib(blueCount, greenCount, redCount)})
-		h.reply.Save = true
+		points := h.addContrib(blueCount, greenCount, redCount)
+		h.notice(ContribIncreased{Score: points})
+		h.reply.Save = points > 0
 		return h.chat(signs(6, h.side))
 	}
 	h.reply.Page = "signs_6_" + h.side + "_contribute.htm"
@@ -454,7 +460,9 @@ func (h *handler) contributeAmount(command string) Reply {
 		score = h.addContrib(0, 0, count)
 	}
 	h.notice(ContribIncreased{Score: score})
-	h.reply.Save = true
+	// A turn-in of no stones, or of none the cap leaves room for, changes
+	// nothing to save.
+	h.reply.Save = score > 0
 	return h.chat(signs(6, h.side))
 }
 
@@ -651,9 +659,11 @@ func (h *handler) reduceAdena(count int, say bool) bool {
 	if count <= 0 {
 		return true
 	}
-	if inv.DestroyByTemplateID(item.AdenaID, count) == nil {
+	taken := inv.DestroyByTemplateID(item.AdenaID, count)
+	if taken == nil {
 		return false
 	}
+	h.reply.Taken = append(h.reply.Taken, taken)
 	if say {
 		h.notice(AdenaSpent{Count: count})
 	}
@@ -697,6 +707,9 @@ func (h *handler) destroyItems(itemID int32, count int, say bool) bool {
 			h.notice(NotEnoughItems{})
 		}
 		return false
+	}
+	if count > 0 {
+		h.reply.Taken = append(h.reply.Taken, held)
 	}
 	if say {
 		h.notice(ItemsSpent{ItemID: itemID, Count: count})
