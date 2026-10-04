@@ -182,7 +182,11 @@ func (l *GameClientLink) sendCursedWeaponsPage(gm *livePlayer) {
 		id := strconv.Itoa(int(w.ItemID))
 		sb.WriteString("<table width=280><tr><td>Name:</td><td>" + w.Name + "</td></tr>")
 		switch {
-		case !w.Out:
+		case !w.Activated && !w.Dropped:
+			// Not out, or reserved by a //cw set whose grant has not reached
+			// the target's queue yet: the reference's set is synchronous and
+			// has no such state, so it keeps the not-out row; its Set button
+			// answers that the weapon is already active.
 			sb.WriteString("<tr><td>Position:</td><td>Doesn't exist.</td></tr><tr><td>" + cursedButton("Set CW", "set "+id) + "</td><td></td></tr>")
 		case w.Activated:
 			owner := "null"

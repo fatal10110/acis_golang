@@ -436,7 +436,10 @@ func TestAdminCursedWeaponsOnGround(t *testing.T) {
 func TestAdminReloadCursedWeapons(t *testing.T) {
 	t.Parallel()
 	fresh := cursedWeaponTable(t, zaricheID)
-	srv, gmID := bootCursedAdmin(t, 0, gameservertest.WithDataReloads(network.DataReloads{
+	// The definitions the link and the ground-item protection read, kept
+	// so the test sees them switch to the reloaded weapons.
+	defs := cursedWeaponTable(t, zaricheID, akamanahID)
+	srv, gmID := bootCursedAdmin(t, 0, gameservertest.WithCursedWeapons(defs), gameservertest.WithDataReloads(network.DataReloads{
 		CursedWeapons: func() (*entity.CursedWeaponTable, error) { return fresh, nil },
 	}))
 	gm := srv.Client
@@ -469,6 +472,35 @@ func TestAdminReloadCursedWeapons(t *testing.T) {
 		t.Fatalf("//cw page after the reload = %q\nwant %q", got, want)
 	}
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("cw set 8689")), "Unknown cursed weapon ID.")
+	if _, ok := defs.Weapon(akamanahID); ok {
+		t.Fatal("Akamanah is still a cursed weapon definition after the reload")
+	}
+	if _, ok := defs.Weapon(zaricheID); !ok || defs.Count() != 1 {
+		t.Fatalf("definitions after the reload = %v, want only Zariche", defs.IDs())
+	}
+}
+
+// TestAdminCursedWeaponsReserved pins the panel row of a weapon a //cw set
+// has reserved but whose grant has not reached the target's queue yet: it
+// keeps the not-out row, and its Set button answers that the weapon is
+// already active.
+func TestAdminCursedWeaponsReserved(t *testing.T) {
+	t.Parallel()
+	srv, _ := bootCursedAdmin(t, 0)
+	gm := srv.Client
+	enterWorld(t, gm)
+	if !srv.CursedWeapons.Reserve(akamanahID) {
+		t.Fatal("Reserve(Akamanah) = false, want true")
+	}
+	want := cwPage(t, cwNotOut("Blood Sword Akamanah", "8689")+cwNotOut("Demonic Sword Zariche", "8190"))
+	if got := lastPage(t, exchange(t, gm, encodeBuildCmd("cw"))); got != want {
+		t.Fatalf("//cw page = %q\nwant %q", got, want)
+	}
+	frames := exchange(t, gm, encodeBuildCmd("cw set 8689"))
+	if len(frames) != 2 {
+		t.Fatalf("//cw set frames = %x, want the refusal and the panel", testsupport.FrameOpcodes(frames))
+	}
+	assertTexts(t, frames[:1], "This cursed weapon is already active.")
 }
 
 // systemTextOrEmpty returns a SystemMessage frame's id and its one text
