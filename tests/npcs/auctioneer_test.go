@@ -424,7 +424,7 @@ func TestAuctionBidRebidAndCancel(t *testing.T) {
 	}
 	wantMessages(t, "more than the warehouse holds", w.bypass(t, "bid 22 31000000"), serverpackets.SystemMessageNotEnoughAdenaInClanWarehouse)
 
-	// Back to the clan's own page, then cancel.
+	// Back to the clan's own page, the rebid form, then cancel.
 	w.page(t, "bidding 22")
 	w.page(t, "list")
 	w.page(t, "start")
@@ -434,6 +434,13 @@ func TestAuctionBidRebidAndCancel(t *testing.T) {
 			t.Fatalf("bid info page lacks %q:\n%s", want, mine)
 		}
 	}
+	rebid := w.page(t, "rebid")
+	if want := fill(auctionPage(t, "AgitBid2.htm"), "%AGIT_AUCTION_BID%", "28000000", "%AGIT_AUCTION_MINBID%", "20000000",
+		"%AGIT_AUCTION_END%", endTime(end), "%AGIT_LINK_BACK%", "bypass -h npc_"+oid+"_selectedItems",
+		"npc_%objectId%_bid1", "npc_"+oid+"_bid1 22"); rebid != want {
+		t.Fatalf("rebid page =\n%s\nwant\n%s", rebid, want)
+	}
+	w.page(t, "selectedItems")
 	cancel := w.page(t, "cancelBid")
 	if want := fill(auctionPage(t, "AgitBidCancel.htm"), "%AGIT_BID%", "28000000", "%AGIT_BID_REMAIN%", "25200000",
 		"%AGIT_LINK_BACK%", "bypass -h npc_"+oid+"_selectedItems", "%objectId%", oid); cancel != want {
