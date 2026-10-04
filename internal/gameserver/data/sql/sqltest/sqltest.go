@@ -491,7 +491,7 @@ var schemaStmts = []string{
 	siegeClansSchema,
 	accountsSchema,
 	bbsMailSchema, bbsForumSchema, bbsTopicSchema, bbsPostSchema, bbsFavoriteSchema,
-	olympiadNoblesSchema, olympiadNoblesEomSchema, serverMemoSchema,
+	olympiadNoblesSchema, olympiadNoblesEomSchema, olympiadFightsSchema, serverMemoSchema,
 	characterRaidPointsSchema, grandbossListSchema,
 	bufferSchemesSchema, modsWeddingSchema,
 	gamesSchema,

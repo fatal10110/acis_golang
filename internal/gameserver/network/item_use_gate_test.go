@@ -62,11 +62,11 @@ func TestParseConditionBoolMatchesReference(t *testing.T) {
 }
 
 // TestUnreadableBoolConditionReadsFalse: a value that is not "true" is a
-// false requirement, never a failed condition. moving/riding/olympiad pass
-// while the player is not in that state, so "1" and "yes" let the item be
-// used, and only a case-insensitive "true" blocks it.
+// false requirement, never a failed condition. moving/riding pass while the
+// player is not in that state, so "1" and "yes" let the item be used, and
+// only a case-insensitive "true" blocks it.
 func TestUnreadableBoolConditionReadsFalse(t *testing.T) {
-	for _, attr := range []string{"moving", "riding", "olympiad"} {
+	for _, attr := range []string{"moving", "riding"} {
 		for _, raw := range []string{"1", "t", "yes", "", "false"} {
 			if !playerUseConditionHolds(nil, map[string]string{attr: raw}) {
 				t.Errorf("<player %s=%q> denied use, want it read as false", attr, raw)

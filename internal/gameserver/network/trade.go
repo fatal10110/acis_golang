@@ -14,6 +14,10 @@ import (
 
 const tradeInteractionDistance = 150
 
+// tradeOlympiadRefusal answers a trade request refused because either side
+// competes in an Olympiad match.
+const tradeOlympiadRefusal = "You cannot trade during Olympiad."
+
 // tradeChaoticRefusal answers a trade request refused because either side
 // carries karma while KarmaPlayerCanTrade is off.
 const tradeChaoticRefusal = "You cannot trade in a chaotic state."
@@ -49,6 +53,10 @@ func (l *GameClientLink) handleTradeRequest(live *livePlayer, req clientpackets.
 	}
 	if target.ObjectID() == live.ObjectID() || !live.Knows(target) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetIncorrect))
+		return
+	}
+	if target.OlympiadMode() || live.OlympiadMode() {
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, tradeOlympiadRefusal))
 		return
 	}
 	if !l.playerConfig.KarmaPlayerCanTrade && (live.Karma() > 0 || target.Karma() > 0) {
