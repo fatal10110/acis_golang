@@ -114,7 +114,6 @@ func TestFrameCharSelected(t *testing.T) {
 	c := &player.Character{
 		ID:       0x10000001,
 		Name:     "Newbie",
-		Sex:      player.SexMale,
 		Race:     player.RaceHuman,
 		Location: location.Location{X: 10, Y: 20, Z: 30},
 		SP:       7, Exp: 12345, CharLevel: 3,
@@ -137,7 +136,7 @@ func TestFrameCharSelected(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, uint32(5))
 	want = binary.LittleEndian.AppendUint32(want, 0) // unknown
 
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.Sex))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.Sex()))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Race))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID()))
 

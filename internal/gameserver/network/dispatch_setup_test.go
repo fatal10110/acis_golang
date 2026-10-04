@@ -364,7 +364,7 @@ func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture
 	}
 	ch := &player.Character{
 		ID: id, Name: "Player",
-		Race: player.RaceHuman, Sex: player.SexMale,
+		Race:      player.RaceHuman,
 		CharLevel: 1,
 		Location:  location.Location{X: int(id) * 100, Y: 0, Z: 0},
 	}

@@ -162,7 +162,7 @@ func (f *Folk) OnInactiveRegion() {
 }
 
 // CharacterName returns the template name.
-func (f *Folk) CharacterName() string { return f.Instance.Template.Name }
+func (f *Folk) CharacterName() string { return f.Instance.Name() }
 
 // Karma reports 0: NPCs carry no PK karma.
 func (f *Folk) Karma() int { return 0 }
@@ -289,6 +289,6 @@ func (f *Folk) UpdateAbnormalEffect() { f.emit(event.AbnormalEffectChanged{}) }
 // always shown, the view an NPC that cannot move is announced with.
 func (f *Folk) ServerObjectInfoSnapshot() npcinfo.Snapshot {
 	s := f.NPCInfoSnapshot()
-	s.Name = f.Instance.Template.Name
+	s.Name = f.Instance.Name()
 	return s
 }

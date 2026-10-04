@@ -837,7 +837,7 @@ func (c *Character) CollisionRadius() float64 {
 	if tmpl == nil {
 		return 0
 	}
-	if c.Sex == SexFemale {
+	if c.Sex() != SexMale {
 		return tmpl.CollisionRadiusFemale
 	}
 	return tmpl.CollisionRadius
@@ -854,7 +854,7 @@ func (c *Character) CollisionHeight() float64 {
 	if tmpl == nil {
 		return 0
 	}
-	if c.Sex == SexFemale {
+	if c.Sex() != SexMale {
 		return tmpl.CollisionHeightFemale
 	}
 	return tmpl.CollisionHeight

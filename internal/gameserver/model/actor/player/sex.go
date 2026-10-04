@@ -3,12 +3,14 @@ package player
 import "fmt"
 
 // Sex is a character's sex, encoded on the wire and in the characters table
-// as 0 (male) or 1 (female).
+// as 0 (male) or 1 (female). 2 (etc) is no sex a client creates, but an
+// admin can set it.
 type Sex byte
 
 const (
 	SexMale Sex = iota
 	SexFemale
+	SexEtc
 )
 
 // String returns the client-facing sex name.
@@ -18,6 +20,8 @@ func (s Sex) String() string {
 		return "male"
 	case SexFemale:
 		return "female"
+	case SexEtc:
+		return "etc"
 	default:
 		return fmt.Sprintf("sex(%d)", byte(s))
 	}
@@ -37,3 +41,9 @@ func ParseSex(v int32) (Sex, error) {
 		return 0, fmt.Errorf("player: invalid sex value %d", v)
 	}
 }
+
+// Sex returns c's sex.
+func (c *Character) Sex() Sex { return Sex(c.sex.Load()) }
+
+// SetSex changes c's sex.
+func (c *Character) SetSex(s Sex) { c.sex.Store(uint32(s)) }

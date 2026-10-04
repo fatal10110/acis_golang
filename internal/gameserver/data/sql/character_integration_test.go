@@ -18,7 +18,6 @@ func testCharacter(objectID int32, name string) *player.Character {
 		AccountName: "acct1",
 		Name:        name,
 		Race:        player.RaceHuman,
-		Sex:         player.SexMale,
 		CharLevel:   1,
 		Face:        1, HairStyle: 2, HairColor: 3,
 		Exp: 0, SP: 0,
@@ -60,7 +59,7 @@ func TestCharacterStore_CreateAndReadBack(t *testing.T) {
 	gotRes := got.ResourceValues()
 	wantRes := c.ResourceValues()
 	if got.AccountName != c.AccountName || got.Name != c.Name || got.ClassID() != c.ClassID() ||
-		got.Race != c.Race || got.Sex != c.Sex || got.CharLevel != c.CharLevel ||
+		got.Race != c.Race || got.Sex() != c.Sex() || got.CharLevel != c.CharLevel ||
 		gotRes != wantRes ||
 		got.Face != c.Face || got.HairStyle != c.HairStyle || got.HairColor != c.HairColor {
 		t.Fatalf("Get() after create = %+v, want match to %+v", got, c)

@@ -101,7 +101,7 @@ func playerUseConditionHolds(live *livePlayer, attrs map[string]string) bool {
 			}
 		case "sex":
 			sex, ok := parseConditionInt(raw)
-			if !ok || int(live.Sex) != sex {
+			if !ok || int(live.Sex()) != sex {
 				return false
 			}
 		case "ishero":
