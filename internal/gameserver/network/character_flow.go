@@ -688,6 +688,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 			AllowDelevel:           l.playerConfig.AllowDelevel,
 			RaidCursesDisabled:     l.disableRaidCurse,
 			AwardPKKillPVPPoint:    l.playerConfig.AwardPKKillPVPPoint,
+			DeathDrop:              l.playerConfig.DeathDrop,
 		},
 	}
 	if los, ok := l.geo.(player.LineOfSight); ok {

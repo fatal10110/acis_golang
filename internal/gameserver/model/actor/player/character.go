@@ -177,6 +177,7 @@ type Character struct {
 	baseTemplate             atomic.Pointer[Template]
 	levelTable               *LevelTable
 	allowDelevel             bool
+	deathDrop                DeathDropRules
 	raidCursesDisabled       bool
 	skillDefs                skillDefinitions
 	rateKarmaExpLost         float64

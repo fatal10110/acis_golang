@@ -206,6 +206,7 @@ type Rules struct {
 	AllowDelevel           bool
 	RaidCursesDisabled     bool
 	AwardPKKillPVPPoint    bool
+	DeathDrop              DeathDropRules
 }
 
 // Runtime is everything a persisted Character needs to act in the live
@@ -257,6 +258,7 @@ func (c *Character) Configure(rt Runtime) {
 	c.allowDelevel = rt.Rules.AllowDelevel
 	c.raidCursesDisabled = rt.Rules.RaidCursesDisabled
 	c.awardPKKillPVPPoint = rt.Rules.AwardPKKillPVPPoint
+	c.deathDrop = rt.Rules.DeathDrop
 }
 
 // Attach installs live as this character's crowd-control/movement runtime
