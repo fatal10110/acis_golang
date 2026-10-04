@@ -80,6 +80,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		// A connection lost between selection and EnterWorld takes the
 		// selected player out of the world as a logout would.
 		if leaving := cmp.Or(live, entering); leaving != nil {
+			leaving.sessionEnded.Store(true)
 			awaitDetachDelay(ctx, session, leaving, detachDelay(leaving, lost))
 			var owners []int32
 			onLive(leaving, func() { owners = l.detachLivePlayer(leaving) })

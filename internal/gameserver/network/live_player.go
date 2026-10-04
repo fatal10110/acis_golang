@@ -127,6 +127,9 @@ type livePlayer struct {
 	// sits ahead of detach's offline persistence write or is never enqueued.
 	// Atomic for the readers on other goroutines.
 	deliveryStopped atomic.Bool
+	// sessionEnded is set once p's session ended, before any delay keeps a
+	// player whose connection was lost in the world (see clientDetached).
+	sessionEnded atomic.Bool
 	// entered is set on p's queue once the login spawned p. The player is
 	// registered in the world from its selection on, so registration alone
 	// does not mean it is in the world yet. Atomic for readers on other
@@ -223,6 +226,14 @@ func OnlineCharacter(p world.Player) (*player.Character, bool) {
 		return nil, false
 	}
 	return live.Character, true
+}
+
+// ClientDetached reports whether p, an online player this package
+// registered, no longer has a client: its session ended while it lingers
+// in the world. It is false for any other p.
+func ClientDetached(p world.Player) bool {
+	live, ok := p.(*livePlayer)
+	return ok && live.clientDetached()
 }
 
 // RestoringSummon reports whether a summon cast that already hit is still
@@ -435,6 +446,12 @@ func (p *livePlayer) stopCastInFlight() bool {
 // detached reports whether p's session has begun detaching (logout).
 func (p *livePlayer) detached() bool {
 	return p.deliveryStopped.Load()
+}
+
+// clientDetached reports whether p no longer has a client: its session
+// ended, though p may still linger in the world before it detaches.
+func (p *livePlayer) clientDetached() bool {
+	return p.sessionEnded.Load() || p.detached()
 }
 
 // Departed reports whether p has begun leaving the world, for the party
