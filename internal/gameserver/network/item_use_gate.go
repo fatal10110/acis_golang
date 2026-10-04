@@ -18,10 +18,24 @@ func olympiadBarred(live *livePlayer, tmpl *item.Template) bool {
 	return (tmpl.OlyRestricted || tmpl.HeroItem()) && live.OlympiadMode()
 }
 
-// useConditionsHold reports whether live meets every use condition of tmpl,
-// the Olympiad bar included, without telling the client anything.
-func useConditionsHold(live *livePlayer, tmpl *item.Template) bool {
+// sendOlympiadBar tells live it may not use tmpl in its Olympiad match: as
+// an item that cannot be worn there when it can be worn, as one unavailable
+// there otherwise.
+func sendOlympiadBar(live *livePlayer, tmpl *item.Template) {
+	if tmpl.Equipable() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemCantBeEquippedForOlympiad))
+	} else {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemUnavailableForOlympiad))
+	}
+}
+
+// itemRestrictionHolds reports whether live may keep wearing tmpl: it is
+// not barred in live's Olympiad match and live meets every use condition.
+// The Olympiad bar still tells the client why, as it does on every path;
+// a failed use condition stays silent.
+func itemRestrictionHolds(live *livePlayer, tmpl *item.Template) bool {
 	if olympiadBarred(live, tmpl) {
+		sendOlympiadBar(live, tmpl)
 		return false
 	}
 	for _, uc := range tmpl.UseConditions {
@@ -42,11 +56,7 @@ func rejectUseItemConditions(live *livePlayer, tmpl *item.Template) bool {
 		return false
 	}
 	if olympiadBarred(live, tmpl) {
-		if tmpl.Equipable() {
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemCantBeEquippedForOlympiad))
-		} else {
-			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemUnavailableForOlympiad))
-		}
+		sendOlympiadBar(live, tmpl)
 		return true
 	}
 	for _, uc := range tmpl.UseConditions {

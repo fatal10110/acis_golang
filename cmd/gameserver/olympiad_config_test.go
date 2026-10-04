@@ -53,7 +53,7 @@ OlyDividerNonClassed = 5
 // the reference defaults (18, 0, 21600000, 3; 10 points at most, dividers 3
 // and 5, rewards 6651x50 and 6651x30); set keys override them; a malformed
 // number fails the load instead of defaulting, while a malformed reward
-// list reads as no reward.
+// list, an id or count outside int32 included, reads as no reward.
 func TestLoadOlympiadConfig(t *testing.T) {
 	dir := t.TempDir()
 	shipped := olympiad.Config{
@@ -90,6 +90,18 @@ func TestLoadOlympiadConfig(t *testing.T) {
 			want: func() olympiad.Config {
 				c := olympiad.DefaultConfig()
 				c.ClassedReward = []olympiad.Reward{}
+				return c
+			}(),
+		},
+		{
+			// Integer.parseInt rejects an id or count outside int32, so the
+			// reference gives no reward rather than a wrapped item id.
+			name:  "out-of-range reward",
+			props: "OlyClassedReward = 4294973947-50\nOlyNonClassedReward = 6651-2147483648\n",
+			want: func() olympiad.Config {
+				c := olympiad.DefaultConfig()
+				c.ClassedReward = []olympiad.Reward{}
+				c.NonClassedReward = []olympiad.Reward{}
 				return c
 			}(),
 		},
