@@ -324,7 +324,7 @@ func (s *summonSink) broadcastHP() {
 	}
 	known := s.known.SnapshotCopy(s.link.world, s.actor)
 	defer known.Release()
-	sendHPToWatchers(known.Tracked(), s.actor.ObjectID(), s.actor.HPStatusUpdate)
+	sendHPToWatchers(known.Tracked(), s.actor.ObjectID(), s.actor.PublishHP)
 }
 
 // leaveCorpseBehind settles a dead summon whose owner is leaving the world

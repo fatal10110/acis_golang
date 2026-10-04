@@ -117,6 +117,13 @@ func (p *Presence) Visible() bool {
 	return p.region.Load() != nil && p.visible.Load()
 }
 
+// Spawned reports whether the object is in the world: spawned and not yet
+// despawned, whether it sits on the grid or was taken off it by Leave (a
+// teleport in flight) and awaits Rejoin.
+func (p *Presence) Spawned() bool {
+	return p.visible.Load()
+}
+
 // currentRegion returns the region holding the object, or nil when the
 // object is off the grid.
 func (p *Presence) currentRegion() *Region {

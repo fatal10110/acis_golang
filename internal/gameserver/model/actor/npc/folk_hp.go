@@ -38,14 +38,18 @@ func (f *Folk) MPValue() float64 {
 // CurrentMP returns the current MP in whole points.
 func (f *Folk) CurrentMP() int { return int(f.MPValue()) }
 
-// HPStatusUpdate returns the current HP and whether the players targeting
-// the NPC must be sent it.
-func (f *Folk) HPStatusUpdate() (int, bool) {
-	return f.hpBar.Report(f.HP, f.MaxHPValue())
+// PublishHP hands send the current HP when the players targeting the NPC
+// must be sent it, under the health-bar lock (creature.HPBar.Publish).
+func (f *Folk) PublishHP(send func(hp int)) {
+	f.hpBar.Publish(f.HP, f.MaxHPValue(), send)
 }
 
-// BroadcastStatus offers the players targeting the NPC its HP.
-func (f *Folk) BroadcastStatus() { f.emit(event.HPChanged{}) }
+// BroadcastStatus offers the players targeting the NPC its HP, then
+// settles its regeneration task: every vitals change reports through here.
+func (f *Folk) BroadcastStatus() {
+	f.emit(event.HPChanged{})
+	f.SettleRegen()
+}
 
 // TakeDamage applies a landed auto-attack hit and reports whether it
 // killed the NPC.
@@ -184,7 +188,9 @@ func (f *Folk) ReduceMP(amount float64) float64 {
 
 // TickRegen applies one HP/MP regeneration step: each resource short of
 // its max gains its regen rate, at least 1, and the HP is offered to the
-// targeters when anything changed. A dead NPC regenerates nothing.
+// targeters when anything changed. A dead NPC regenerates nothing. Either
+// way the task is then settled, so a tick that fills the NPC, or finds it
+// dead, stops it.
 func (f *Folk) TickRegen() {
 	maxHP, maxMP := f.MaxHPValue(), f.MaxMPValue()
 	f.vitalsMu.Lock()
@@ -192,12 +198,14 @@ func (f *Folk) TickRegen() {
 	dead := f.dead
 	f.vitalsMu.Unlock()
 	if dead || (!needHP && !needMP) {
+		f.SettleRegen()
 		return
 	}
 	hpRegen, mpRegen := math.Max(1, f.HPRegenRate()), math.Max(1, f.MPRegenRate())
 	f.vitalsMu.Lock()
 	if f.dead {
 		f.vitalsMu.Unlock()
+		f.SettleRegen()
 		return
 	}
 	changed := false
@@ -212,7 +220,32 @@ func (f *Folk) TickRegen() {
 	f.vitalsMu.Unlock()
 	if changed {
 		f.BroadcastStatus()
+		return
 	}
+	f.SettleRegen()
+}
+
+// Regen returns the NPC's regeneration phase, which the regeneration sweep
+// polls and claims.
+func (f *Folk) Regen() *creature.Regen { return &f.regen }
+
+// SettleRegen arms the NPC's regeneration task when it is spawned, alive
+// and short of HP or MP, its first tick one period from now, and disarms
+// it otherwise (CreatureStatus.setHp/setMp's start and stop).
+func (f *Folk) SettleRegen() {
+	f.regen.Settle(f.Queue(), f.regenShort)
+}
+
+// regenShort reports whether the NPC regenerates: spawned (on the grid or
+// off it mid-relocation), not dead, and below its maximum HP or MP.
+func (f *Folk) regenShort() bool {
+	if !f.Spawned() {
+		return false
+	}
+	maxHP, maxMP := f.MaxHPValue(), f.MaxMPValue()
+	f.vitalsMu.Lock()
+	defer f.vitalsMu.Unlock()
+	return !f.dead && (f.hp < maxHP || f.mp < maxMP)
 }
 
 // Invul reports whether the NPC is invulnerable.

@@ -32,10 +32,12 @@ func (a *Actor) RandomConfusionTarget(radius int) (world.Tracked, bool) {
 
 // BroadcastStatus republishes the summon's vitals after a vitals setter:
 // the players targeting it may get its current HP, then UpdateStatus
-// refreshes its owner's pet window and observers.
+// refreshes its owner's pet window and observers. Its regeneration task is
+// then settled: every vitals change reports through here.
 func (a *Actor) BroadcastStatus() {
 	a.emit(event.HPChanged{})
 	a.UpdateStatus()
+	a.SettleRegen()
 }
 
 // AbortAll stops the summon's movement, attack and cast and sends it idle

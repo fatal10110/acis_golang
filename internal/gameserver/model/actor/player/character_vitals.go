@@ -65,6 +65,7 @@ func (c *Character) finalMax(s stat.Stat, base float64) float64 {
 
 // SetResourceValues replaces c's persisted HP/MP/CP resource values.
 func (c *Character) SetResourceValues(res Resources) {
+	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	c.maxHP, c.curHP = res.MaxHP, res.CurrentHP
@@ -128,6 +129,7 @@ func (c *Character) ReduceCurrentHP(amount int) bool {
 	if amount < 0 {
 		amount = 0
 	}
+	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.Dead() {
@@ -147,6 +149,7 @@ func (c *Character) ReduceCurrentMP(amount int) {
 	if amount <= 0 {
 		return
 	}
+	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.dead.Load() {
@@ -161,11 +164,13 @@ func (c *Character) ReduceCurrentMP(amount int) {
 // refillResources installs new base maxima and fills current HP/MP/CP to
 // the calculated maxima. A dead character takes the new maxima but keeps its
 // current values: a level gained while dead must not raise the corpse. The
-// check shares vitalsMu with MarkDead.
+// check shares vitalsMu with MarkDead. A refill to full stops the
+// regeneration task, so the next drop starts a fresh phase.
 func (c *Character) refillResources(maxHP, maxMP, maxCP float64) {
 	currentHP := c.finalMax(stat.MaxHP, maxHP)
 	currentMP := c.finalMax(stat.MaxMP, maxMP)
 	currentCP := c.finalMax(stat.MaxCP, maxCP)
+	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	c.maxHP, c.maxMP, c.maxCP = maxHP, maxMP, maxCP

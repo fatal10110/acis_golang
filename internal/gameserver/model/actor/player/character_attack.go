@@ -156,9 +156,11 @@ func (c *Character) BroadcastAbnormalEffect() {
 	c.emit(event.AbnormalEffectChanged{})
 }
 
-// BroadcastStatus reports a change to this character's current HP, MP or CP.
+// BroadcastStatus reports a change to this character's current HP, MP or
+// CP, then settles its regeneration task.
 func (c *Character) BroadcastStatus() {
 	c.emit(event.VitalsChanged{})
+	c.SettleRegen()
 }
 
 // NotifyBowDraw reports that a bow shot started drawing.

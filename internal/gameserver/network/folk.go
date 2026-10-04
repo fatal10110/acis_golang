@@ -134,7 +134,7 @@ func (s *folkSink) Emit(ev event.Event) {
 	case event.HPChanged:
 		known := s.known.SnapshotCopy(s.world, f)
 		defer known.Release()
-		sendHPToWatchers(known.Tracked(), f.ObjectID(), f.HPStatusUpdate)
+		sendHPToWatchers(known.Tracked(), f.ObjectID(), f.PublishHP)
 	case event.Status:
 		attrs := npcStatusAttributes(e.Attrs)
 		s.broadcast(func() wire.Frame { return frames.Status(f.ObjectID(), attrs) })

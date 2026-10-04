@@ -261,9 +261,11 @@ type Actor struct {
 	skillDefs          skillLookup
 	raidCursesDisabled bool
 
-	// hpBar is the health-bar segment state HPStatusUpdate advances. A
+	// hpBar is the health-bar segment state PublishHP advances. A
 	// summon's bar is never calibrated, so it reports nearly every change.
 	hpBar creature.HPBar
+	// regen is the HP/MP regeneration task SettleRegen arms on a drop.
+	regen creature.Regen
 
 	// stateMu also guards intent and target: another actor's skill landing
 	// on this summon retargets or idles it from that actor's queue.
