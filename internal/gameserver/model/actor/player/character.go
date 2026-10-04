@@ -321,6 +321,9 @@ type Character struct {
 	store privatestore.Store
 	// recommendations carries its own lock; see character_recommendation.go.
 	recommendations recommendationState
+	// boat is the boat ride state; it carries its own lock. See
+	// character_boat.go.
+	boat boatRide
 }
 
 var _ effect.StatOwner = (*Character)(nil)

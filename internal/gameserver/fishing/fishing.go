@@ -230,6 +230,7 @@ type Fisher interface {
 	// FishingRod returns the grade of the rod in hand; ok is false
 	// without one.
 	FishingRod() (grade item.CrystalType, ok bool)
+	InBoat() bool
 	Operating() bool
 	InWater() bool
 }
@@ -242,6 +243,8 @@ const (
 	RefuseNone Refusal = iota
 	// RefuseNoRod means no fishing rod is in hand.
 	RefuseNoRod
+	// RefuseOnBoat means the caster rides a boat.
+	RefuseOnBoat
 	// RefuseOperating means the caster runs a private store or workshop.
 	RefuseOperating
 	// RefuseInWater means the caster stands in water.
@@ -251,11 +254,13 @@ const (
 )
 
 // CastRefusal returns why f may not cast a line, in the order the checks
-// run; baited reports a lure worn in the off hand. Standing on a boat also
-// refuses a cast, which needs boat passengers to be modeled first.
+// run; baited reports a lure worn in the off hand.
 func CastRefusal(f Fisher, baited bool) Refusal {
 	if _, ok := f.FishingRod(); !ok {
 		return RefuseNoRod
+	}
+	if f.InBoat() {
+		return RefuseOnBoat
 	}
 	if f.Operating() {
 		return RefuseOperating

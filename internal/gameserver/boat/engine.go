@@ -79,6 +79,7 @@ func newEngine(b *Boat, legs []leg, d *docks, spawn location.Location) *engine {
 	e.audience.Radius = announceRadius
 	e.messages = e.leg(e.current).schedule
 	b.engine = e
+	b.setDock(dockSites[e.current])
 	return e
 }
 
@@ -133,8 +134,7 @@ func (e *engine) run() {
 
 	case stateExecuteRoute:
 		l := e.leg(e.current)
-		// ponytail: fare collection from passengers lands with boarding
-		// (#602); until a player can board, a departure has no one to charge.
+		e.boat.chargeFare(l.itemID, dockSites[l.dock].oust)
 		e.boat.executePath(l.path)
 		e.docks.setBusy(l.dock, false)
 		e.sound(soundArrivalDeparture)
@@ -162,6 +162,7 @@ func (e *engine) run() {
 		e.delay = e.waitDelay
 		e.sound(soundArrivalDeparture)
 		e.current, e.destination = e.destination, e.current
+		e.boat.setDock(dockSites[e.current])
 		e.messages, e.next = e.leg(e.current).schedule, 0
 		e.boat.emit(event.BoatShown{})
 		e.state = statePreparing

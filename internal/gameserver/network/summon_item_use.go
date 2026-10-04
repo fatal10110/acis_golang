@@ -91,6 +91,10 @@ func (l *GameClientLink) useSummonItem(live *livePlayer, inv *itemcontainer.Inve
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouCannotSummonInCombat))
 		return true
 	}
+	if live.InBoat() {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotCallPetFromThisLocation))
+		return true
+	}
 
 	switch summonItem.SummonType {
 	case summonItemTypeDecorative:

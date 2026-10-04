@@ -89,6 +89,9 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 			}
 		})
 	}
+	// A passenger leaves its boat silently once its save has taken the
+	// dock's shore as its position.
+	dropBoat(live)
 	if l.playerClock != nil {
 		l.playerClock.Remove(live.ObjectID())
 	}

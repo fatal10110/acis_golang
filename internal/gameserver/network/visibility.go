@@ -73,6 +73,11 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 		if title, ok := storeTitleFrame(o); ok {
 			p.sendVisibilityFrame(title)
 		}
+		// A passenger is shown where it stands on its boat's deck.
+		if boatID := o.BoatObjectID(); boatID != 0 {
+			deck, _ := o.BoatPosition()
+			p.sendVisibilityFrame(serverpackets.FrameGetOnVehicle(o.ObjectID(), boatID, deck))
+		}
 		p.describeState(o, o.CastControl())
 	case *npc.Hostile:
 		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))

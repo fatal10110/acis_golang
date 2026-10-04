@@ -57,6 +57,9 @@ var (
 	// ErrSummonInCombat means a servitor summon was cast by a player whose
 	// swing is still in flight.
 	ErrSummonInCombat = errors.New("cast: cannot summon in combat")
+	// ErrSummonOnBoat means a servitor summon was cast by a player aboard
+	// a boat.
+	ErrSummonOnBoat = errors.New("cast: cannot summon on a boat")
 )
 
 // Actor is the owner state a cast controller reads and updates while
@@ -418,8 +421,9 @@ func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 		if servitor.AttackingNow() {
 			return ErrSummonInCombat
 		}
-		// Aboard a boat the summon is refused here next, with
-		// NOT_CALL_PET_FROM_THIS_LOCATION, once boats exist (#229).
+		if aboard, ok := c.actor.(boatRider); ok && aboard.InBoat() {
+			return ErrSummonOnBoat
+		}
 	}
 	return nil
 }

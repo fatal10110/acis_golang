@@ -48,12 +48,39 @@ func (s *boatSink) Emit(ev event.Event) {
 		for _, msg := range e.MessageIDs {
 			sendToEach(listeners, func() wire.Frame { return serverpackets.FrameBoatSay(msg) })
 		}
+	case event.BoatCarried:
+		s.eachPassenger(e.Passengers, func(live *livePlayer) {
+			if l := live.link; l != nil {
+				l.carryPassenger(live, id, e.At, e.Heading)
+			}
+		})
+	case event.BoatFareDue:
+		s.eachPassenger(e.Passengers, func(live *livePlayer) {
+			if l := live.link; l != nil {
+				l.collectFare(live, id, e.ItemID, e.Oust)
+			}
+		})
 	case event.BoatSounded:
 		sendToEach(s.audience(e.Audience), func() wire.Frame {
 			return serverpackets.FramePlaySoundAt(serverpackets.Sound{
 				File: e.Sound, BindToObject: true, ObjectID: id, Location: e.At,
 			})
 		})
+	}
+}
+
+// eachPassenger runs fn on the queue of each online player of ids. fn
+// checks the player still rides the boat: it may have left between the
+// boat's update and fn.
+func (s *boatSink) eachPassenger(ids []int32, fn func(*livePlayer)) {
+	for _, id := range ids {
+		p, ok := s.world.Player(id)
+		if !ok {
+			continue
+		}
+		if live, ok := p.(*livePlayer); ok {
+			postLive(live, func() { fn(live) })
+		}
 	}
 }
 

@@ -122,13 +122,16 @@ type heldIntention struct {
 	dest location.Location
 	// itemID is a toggle's item object id.
 	itemID int32
+	// boatID is the boat whose entrance a walk heads for, or 0.
+	boatID int32
 }
 
-// holdMoveTo records a walk to dest as the current intention.
-func (p *livePlayer) holdMoveTo(dest location.Location) {
+// holdMoveTo records a walk to dest as the current intention; boatID is the
+// boat whose entrance it heads for, or 0.
+func (p *livePlayer) holdMoveTo(dest location.Location, boatID int32) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
-	p.held = heldIntention{kind: heldMoveTo, dest: dest}
+	p.held = heldIntention{kind: heldMoveTo, dest: dest, boatID: boatID}
 }
 
 // holdUseItem records toggling objectID as the current intention.
