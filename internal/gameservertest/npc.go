@@ -102,6 +102,13 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 	if err != nil {
 		t.Fatalf("new npc instance: %v", err)
 	}
+	return s.spawnHostileInstance(t, inst, at, attackCtl)
+}
+
+// spawnHostileInstance is spawnHostile for an instance the caller built.
+func (s *Server) spawnHostileInstance(t *testing.T, inst *npc.Instance, at location.Location, attackCtl ai.AttackController) *npc.Hostile {
+	t.Helper()
+	tmpl := inst.Template
 	live, err := creature.NewLive(at, tmpl.RunSpeed, Geo{}, nil, effect.WithEnv(s.effectEnv))
 	if err != nil {
 		t.Fatalf("new npc live: %v", err)

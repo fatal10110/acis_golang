@@ -61,3 +61,6 @@ func (neutralNPC) SpoilPool() *item.SpoilPool { return nil }
 // SeedState: the neutral NPC was never sown, so the manor handlers find no
 // lifecycle to act on.
 func (neutralNPC) SeedState() *npc.SeedState { return nil }
+
+// MonsterKind: the neutral NPC is no Monster.
+func (neutralNPC) MonsterKind() bool { return false }

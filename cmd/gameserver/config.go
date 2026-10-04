@@ -84,6 +84,7 @@ type gameplayConfig struct {
 	Admin                    adminConfig
 	Chat                     chatConfig
 	Petition                 petition.Config
+	Manor                    manorSettings
 }
 
 // loadGameplayConfig reads every gameplay knob through the loader that owns
@@ -177,6 +178,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.AllowDiscardItem, err = loadAllowDiscardItem(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.Manor, err = loadManorSettings(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.SpawnMultiplier, err = loadSpawnMultiplier(paths); err != nil {

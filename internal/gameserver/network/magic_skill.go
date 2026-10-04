@@ -319,9 +319,15 @@ func (l *GameClientLink) broadcastLaunchTargets(live *livePlayer, target actorca
 // the flag the skill raised after it, settle before anything else the hit
 // sends.
 func (l *GameClientLink) applyCastHit(live *livePlayer, handlers actorcast.EffectHandlers, affected []skilltarget.Actor, def modelskill.Definition) {
+	l.applyItemCastHit(live, handlers, affected, def, nil)
+}
+
+// applyItemCastHit is applyCastHit for a cast that hands item to its skill
+// handler.
+func (l *GameClientLink) applyItemCastHit(live *livePlayer, handlers actorcast.EffectHandlers, affected []skilltarget.Actor, def modelskill.Definition, item any) {
 	actorcast.RefreshSummonTargets(affected)
 	handlers.Sink = l.playerMessageSink(live, nil)
-	result := actorcast.ApplyResolvedEffectsResult(handlers, live.Character, affected, def)
+	result := actorcast.ApplyResolvedItemEffectsResult(handlers, live.Character, affected, def, item)
 	l.settlePvPChanges(live)
 	l.syncCubicTargets(live, result, def)
 }
@@ -1067,6 +1073,14 @@ func (l *GameClientLink) sendSkillHandlerResultVia(send frameSender, live *liveP
 		case skillhandler.NothingInsideMessage:
 			if live != nil {
 				send(live, serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingInsideThat))
+			}
+		case skillhandler.ManorMessage:
+			if live != nil {
+				send(live, manorMessageFrame(m))
+			}
+		case skillhandler.CropHarvested:
+			if live != nil {
+				l.sendCropHarvested(live, m)
 			}
 		case skillhandler.MagicResist:
 			target, online := l.livePlayerByID(m.TargetID)

@@ -2,23 +2,39 @@ package skill
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/manor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
-// Inert until manor lands (#240): no item implements seedItem, so SOW never
-// sows and HARVEST therefore never finds a sown target. That issue also owns
-// the parity these handlers still lack — the Player-only caster gate, the
-// Monster-only target gate, the sow/harvest system messages, the party
-// harvest broadcast and the manor production rate — plus party-shared
-// harvesting (#863).
-//
-// The caster gate is what makes HARVEST's ordering safe: it marks the crop
-// consumed before it checks that the caster can be paid, so a caster that
-// clears every gate without being an earner would eat the crop and receive
-// nothing. The specified flow rejects a non-player caster before it touches
-// the seed state at all, which is why its own reward call needs no such check.
-//
+// ManorMessage is a sow or harvest outcome its player caster is told.
+type ManorMessage uint8
+
+const (
+	// SeedAlreadySown: the target was sown before (THE_SEED_HAS_BEEN_SOWN).
+	SeedAlreadySown ManorMessage = iota + 1
+	// SeedNotSown: the sow roll failed (THE_SEED_WAS_NOT_SOWN).
+	SeedNotSown
+	// SeedSown: the seed took (THE_SEED_WAS_SUCCESSFULLY_SOWN).
+	SeedSown
+	// HarvestTargetNotSown: the target is no monster or was never sown
+	// (THE_HARVEST_FAILED_BECAUSE_THE_SEED_WAS_NOT_SOWN).
+	HarvestTargetNotSown
+	// HarvestFailed: the crop was already taken, or the harvest roll failed
+	// (THE_HARVEST_HAS_FAILED).
+	HarvestFailed
+	// HarvestNotAuthorized: the harvester is neither the sower nor in the
+	// sower's party (YOU_ARE_NOT_AUTHORIZED_TO_HARVEST).
+	HarvestNotAuthorized
+)
+
+// CropHarvested tells the rest of the harvester's party what it harvested:
+// Count units of CropID.
+type CropHarvested struct {
+	CropID int32
+	Count  int
+}
+
 // seedItem exposes the manor seed data an item carries when used to sow;
 // resolving an item id to its Seed row (a manor.Table lookup) is the item's
 // own job, not this handler's, since Cast carries no reference to global
@@ -27,22 +43,19 @@ type seedItem interface {
 	Seed() (manor.Seed, bool)
 }
 
-type sowCaster interface {
-	Actor
-	Level() int
-}
-
 type sowHandler struct{}
 
 func (sowHandler) Types() []string { return []string{"SOW"} }
 
-// Use sows the used item's seed onto the first target, when neither is
-// already seeded and the sow roll succeeds.
+// Use sows the used item's seed onto the first target. Only a player sows,
+// only from a seed item, and only onto a living monster; an already sown
+// target and a failed sow roll are answered, and a seed that takes marks
+// the monster sown by the caster.
 func (sowHandler) Use(cast Cast) {
 	if cast.Item == nil || len(cast.Targets) == 0 {
 		return
 	}
-	caster, ok := cast.Caster.(sowCaster)
+	caster, ok := asPlayer(cast.Caster)
 	if !ok {
 		return
 	}
@@ -50,13 +63,17 @@ func (sowHandler) Use(cast Cast) {
 	if !ok {
 		return
 	}
-	target, ok := asNPC(cast.Targets[0])
+	target, ok := asMonster(cast.Targets[0])
 	if !ok || target.Dead() {
 		return
 	}
 
 	state := target.SeedState()
-	if state == nil || state.Seeded() {
+	if state == nil {
+		return
+	}
+	if state.Seeded() {
+		cast.record(SeedAlreadySown)
 		return
 	}
 
@@ -67,17 +84,26 @@ func (sowHandler) Use(cast Cast) {
 
 	rate := formulas.SowSuccessRate(seed.Level, target.Level(), caster.Level(), seed.Alternative)
 	if rnd.Get(100) >= rate {
+		cast.record(SeedNotSown)
 		return
 	}
 
-	// A concurrent sower can take this life first; the loser stays silent,
-	// as the already-seeded branch above does.
-	state.Sow(caster.ObjectID(), seed)
+	// A concurrent sower can take this life first; losing that race reads
+	// as the target already sown.
+	if !state.Sow(caster.ObjectID(), seed) {
+		cast.record(SeedAlreadySown)
+		return
+	}
+	cast.record(SeedSown)
 }
 
-type harvestCaster interface {
-	Actor
-	Level() int
+// harvester is a player caster that can take a harvested crop: it earns
+// items and knows its party.
+type harvester interface {
+	Player
+	earner
+	// InPartyWith reports whether playerID is in this player's party.
+	InPartyWith(playerID int32) bool
 }
 
 // earner is a player caster that takes the items a harvest or a sweep
@@ -87,41 +113,71 @@ type earner interface {
 }
 
 // harvestHandler harvests crops. Without ids it cannot create the crop and
-// harvests nothing.
-type harvestHandler struct{ ids objectIDAllocator }
+// harvests nothing. cropRate multiplies every harvested crop count.
+type harvestHandler struct {
+	ids      objectIDAllocator
+	cropRate int
+}
 
 func (harvestHandler) Types() []string { return []string{"HARVEST"} }
 
-// Use harvests the first target's sown crop into the caster's inventory,
-// when the target is seeded, unharvested, the caster is allowed to harvest
-// it, and the harvest roll succeeds.
+// Use harvests the first target's sown crop into a player caster's
+// inventory. The crop is spent as soon as the caster is found allowed to
+// harvest it, so a failed harvest roll loses it; a successful one earns it
+// and tells the caster's party.
 func (h harvestHandler) Use(cast Cast) {
-	caster, ok := cast.Caster.(harvestCaster)
-	if !ok || h.ids == nil {
+	if h.ids == nil || len(cast.Targets) == 0 {
 		return
 	}
-	if len(cast.Targets) == 0 {
+	if _, ok := asPlayer(cast.Caster); !ok {
 		return
 	}
-	target, ok := asNPC(cast.Targets[0])
+	caster, ok := cast.Caster.(harvester)
 	if !ok {
 		return
 	}
-
-	// The claim checks sown, unharvested and allowed-to-harvest in one step,
-	// so two harvesters cannot both take one crop.
+	target, ok := asMonster(cast.Targets[0])
+	if !ok {
+		cast.record(HarvestTargetNotSown)
+		return
+	}
 	state := target.SeedState()
-	if state == nil || !state.ClaimHarvest(caster.ObjectID()) {
+	if state == nil {
+		cast.record(HarvestTargetNotSown)
+		return
+	}
+
+	// The claim checks sown, unharvested and allowed-to-harvest and spends
+	// the crop in one step, so two harvesters cannot both take one crop.
+	switch state.ClaimHarvest(caster.ObjectID(), caster.InPartyWith) {
+	case npc.HarvestNotSown:
+		cast.record(HarvestTargetNotSown)
+		return
+	case npc.HarvestAlreadyHarvested:
+		cast.record(HarvestFailed)
+		return
+	case npc.HarvestNotAuthorized:
+		cast.record(HarvestNotAuthorized)
 		return
 	}
 
 	diff := caster.Level() - target.Level()
 	if rnd.Get(100) >= formulas.HarvestSuccessRate(diff) {
+		cast.record(HarvestFailed)
 		return
 	}
 
-	itemID, count := state.HarvestedCrop()
-	if e, ok := cast.Caster.(earner); ok {
-		e.AddEarnedItem(itemID, count, h.ids.NextID)
+	cropID, count := state.HarvestedCrop(h.cropRate)
+	caster.AddEarnedItem(cropID, count, h.ids.NextID)
+	cast.record(CropHarvested{CropID: cropID, Count: count})
+}
+
+// asMonster returns a as a Monster-family NPC, or false for any other
+// participant.
+func asMonster(a Actor) (NPC, bool) {
+	n, ok := asNPC(a)
+	if !ok || !n.MonsterKind() {
+		return nil, false
 	}
+	return n, true
 }

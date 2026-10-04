@@ -138,6 +138,9 @@ type NPC interface {
 	SpoilPool() *item.SpoilPool
 	// SeedState is the NPC life's manor sow/harvest lifecycle.
 	SeedState() *npc.SeedState
+	// MonsterKind reports a Monster-family NPC, the only one sown or
+	// harvested.
+	MonsterKind() bool
 }
 
 // Summon is the summon-only cast participant surface.
@@ -474,6 +477,8 @@ type SignetDeps struct {
 	// signet spawning.
 	Queues signetQueues
 	Log    zerolog.Logger
+	// ManorCropRate multiplies every harvested crop count.
+	ManorCropRate int
 }
 
 // NewDefaultRegistryWithSignet returns the default handlers under the
@@ -485,7 +490,7 @@ func NewDefaultRegistryWithSignet(defs Definitions, magicFailures bool, healSps 
 	r := newDefaultRegistry(defs, magicFailures, healSps)
 	if signet.IDs != nil {
 		r.Register(extractableHandler{ids: signet.IDs})
-		r.Register(harvestHandler{ids: signet.IDs})
+		r.Register(harvestHandler{ids: signet.IDs, cropRate: signet.ManorCropRate})
 		r.Register(sweepHandler{ids: signet.IDs})
 	}
 	r.Register(signetHandler{defs: defs, magicFailures: magicFailures, templates: signet.Templates, ids: signet.IDs, world: signet.World, newSink: signet.NewSink, effects: signet.Effects, queues: signet.Queues, log: signet.Log})

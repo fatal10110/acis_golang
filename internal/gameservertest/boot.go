@@ -171,6 +171,7 @@ type options struct {
 	keepMaintained         bool
 	augmentations          *augmentation.Table
 	armorSets              *armorset.Table
+	manor                  network.ManorConfig
 	augmentationChances    *augmentation.Chances
 	augmentRoll            augmentation.Rand
 	enchantConfig          *enchant.Config
@@ -1824,6 +1825,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.PlayerConfig.GMStartupInvulnerable, gclConfig.PlayerConfig.GMStartupInvisible, gclConfig.PlayerConfig.GMStartupBlockAll = o.gmStartupModes[0], o.gmStartupModes[1], o.gmStartupModes[2]
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
 	gclConfig.ArmorSets = o.armorSets
+	gclConfig.Manor = o.manor
 	gclConfig.Relations, gclConfig.Characters = relations, chars
 	gclConfig.AccessLevels = chars
 	gclConfig.Punishments = chars
