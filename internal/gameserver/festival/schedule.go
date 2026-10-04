@@ -63,7 +63,14 @@ func (m *Manager) CompetitionBegun() {
 	m.log.Info().Int64("minutes", start/60000).Msg("festival: the first festival cycle begins")
 }
 
-// CompetitionEnded stops the festival schedule.
+// CompetitionEnded stops the festival schedule. The awaited festival start
+// stays where the last signup period put it until CompetitionBegun starts
+// a new schedule, so NextFestivalNotice counts down past zero through the
+// results period and, in the recruiting period that follows seal
+// validation, shows about a week's worth of minutes below zero. The
+// reference's no-party wait loop outlives the cancel and keeps moving the
+// start, so its guides show 1 to 20 minutes in both periods; that loop is
+// not reproduced.
 func (m *Manager) CompetitionEnded() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -128,7 +135,9 @@ func (m *Manager) nowMillis() int64 {
 // the next festival begins: the milliseconds left divided by a minute,
 // truncated toward zero and narrowed through single precision, plus one.
 // The count goes negative once the awaited start has passed, and counts
-// from the epoch before any schedule has started.
+// from the epoch before any schedule has started. Between CompetitionEnded
+// and the next CompetitionBegun the awaited start does not move: see
+// CompetitionEnded for what the guides show then.
 func (m *Manager) NextFestivalNotice() string {
 	if m.calendar.CurrentPeriod() == sevensigns.SealValidation {
 		return `<font color="FF0000">This is the Seal Validation period. Festivals will resume next week.</font>`
