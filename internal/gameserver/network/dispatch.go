@@ -72,6 +72,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
+	"github.com/fatal10110/acis_golang/internal/gameserver/signspriest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -429,6 +430,9 @@ type GameClientLink struct {
 	announcements *announcement.Registry
 	schemeBuffer  *schemebuffer.Manager
 	lottery       *lottery.Lottery
+	// signsPriest runs the Seven Signs priests' dialog; nil without a
+	// Seven Signs state.
+	signsPriest *signspriest.Service
 	// hallFunctions are the functions the clan halls rent; nil rents none.
 	hallFunctions *clanhall.Functions
 	// halls are the clan halls' owners, leases and auctions; nil holds no
@@ -539,7 +543,10 @@ type GameClientLinkConfig struct {
 	// record's festival page and the festival guides read. Nil is
 	// tolerated (tests): the page is refused and the guides count from the
 	// epoch.
-	Festival    *festival.Manager
+	Festival *festival.Manager
+	// SignsPriest is the events.properties Seven Signs settings the
+	// priests' dialog reads; nil reads the shipped ones.
+	SignsPriest *signspriest.Config
 	Water       *task.Water
 	ShadowItems *task.ShadowItems
 	Autosave    *task.Autosave
@@ -832,6 +839,14 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.enchant.SetArmorSets(cfg.ArmorSets)
 	link.symbols = symbolmaker.NewService(cfg.HennaTable, link.nextObjectID)
 	link.gatekeeper = gatekeeper.NewService(cfg.Teleports, cfg.InstantTeleports, cfg.FreeTeleport, cfg.TeleportClock)
+	if cfg.SevenSigns != nil {
+		link.gatekeeper.SetGnosisFollower(cfg.SevenSigns.GnosisFollower)
+		signsCfg := signspriest.DefaultConfig()
+		if cfg.SignsPriest != nil {
+			signsCfg = *cfg.SignsPriest
+		}
+		link.signsPriest = signspriest.New(cfg.SevenSigns, signsCfg)
+	}
 	link.craft = craft.NewService(cfg.Recipes, !cfg.PlayerConfig.CraftingDisabled, link.nextObjectID, cfg.CraftRoll)
 	link.augment = newAugmentService(cfg)
 	link.board = communityBoard{cfg: cfg.Board, mail: cfg.Mailbox, forums: cfg.Forums, favorites: cfg.Favorites, serverNews: cfg.ShowServerNews}

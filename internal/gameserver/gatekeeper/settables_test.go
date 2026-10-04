@@ -25,7 +25,7 @@ func TestSetTablesReplacesTheDestinations(t *testing.T) {
 				t.Error("npc 7 has no destination during the reload")
 				return
 			}
-			s.Window(1, 7, travel.Kind(0))
+			s.Window(1, 7, travel.Kind(0), 0)
 		}
 	}()
 	s.SetTables(travel.TeleportTable{}, fresh)

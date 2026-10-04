@@ -185,6 +185,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideGameClock,
 			provideSevenSignsState,
 			provideFestival,
+			loadSignsPriestConfig,
 			provideHeroes,
 			provideOlympiad,
 			provideRaidPoints,

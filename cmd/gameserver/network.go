@@ -37,6 +37,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
+	"github.com/fatal10110/acis_golang/internal/gameserver/signspriest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -101,6 +102,7 @@ func provideGameClientLink(
 	gameClock *task.GameClock,
 	sevenSigns *sevensigns.State,
 	fest *festival.Manager,
+	signsPriest signspriest.Config,
 	olympiadState *olympiad.Olympiad,
 	heroes *hero.Manager,
 	raidPoints *raidpoint.Points,
@@ -226,6 +228,7 @@ func provideGameClientLink(
 		GameClock:     gameClock,
 		SevenSigns:    sevenSigns,
 		Festival:      fest,
+		SignsPriest:   &signsPriest,
 		Olympiad:      olympiadState,
 		Heroes:        heroes,
 		RaidPoints:    raidPoints,
