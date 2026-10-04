@@ -136,7 +136,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteUint8(uint8(c.DuelTeam()))
 	w.WriteInt32(s.Clan.CrestLargeID)
 	w.WriteUint8(boolUint8(c.IsNoble()))
-	w.WriteUint8(0) // hero
+	w.WriteUint8(boolUint8(c.IsHero()))
 	bait := c.FishingBait()
 	w.WriteUint8(boolUint8(c.Fishing()))
 	w.WriteInt32(int32(bait.X))

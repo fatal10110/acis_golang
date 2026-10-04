@@ -165,7 +165,7 @@ func runTimeline(t *testing.T, sc timelineScenario) []string {
 	}
 	tr := &trace{}
 	loop := sim.NewInline(start)
-	o := olympiad.New(olympiad.DefaultConfig(), traceStore{gamesql.NewOlympiadStore(db), tr}, nil, traceAnnouncer{tr}, loop.NewQueue("olympiad"), zerolog.Nop())
+	o := olympiad.New(olympiad.DefaultConfig(), traceStore{gamesql.NewOlympiadStore(db), tr}, nil, traceAnnouncer{tr}, nil, loop.NewQueue("olympiad"), zerolog.Nop())
 	if err := o.Restore(ctx); err != nil {
 		t.Fatalf("%s: restore: %v", sc.name, err)
 	}

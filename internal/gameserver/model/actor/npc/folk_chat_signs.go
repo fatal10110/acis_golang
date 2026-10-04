@@ -1,6 +1,7 @@
 package npc
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
@@ -17,6 +18,9 @@ type ChatState interface {
 	FestivalNotice() string
 	// Noble reports whether the talker is a noble.
 	Noble() bool
+	// Hero reports whether the talker is a hero, and inactive whether it
+	// was elected hero and has not claimed the status yet.
+	Hero() (hero, inactive bool)
 }
 
 const (
@@ -37,8 +41,7 @@ var (
 	dawnFestivalGuides = idSet(31127, 31128, 31129, 31130, 31131)
 	duskFestivalGuides = idSet(31137, 31138, 31139, 31140, 31141)
 	festivalWitches    = idSet(31132, 31133, 31134, 31135, 31136, 31142, 31143, 31144, 31145, 31146)
-	// monuments read the hero state, which is not in place yet (#3338).
-	monuments = idSet(31690, 31769, 31770, 31771, 31772)
+	monuments          = idSet(31690, 31769, 31770, 31771, 31772)
 )
 
 func idSet(ids ...int) map[int]struct{} {
@@ -65,7 +68,11 @@ func (f *Folk) signsChat(pages Pages, kind InstanceKind, state ChatState) (page 
 		return strings.ReplaceAll(page, "%festivalMins%", state.FestivalNotice()), ChatShown, true
 	case "OlympiadManagerNpc":
 		if _, ok := monuments[f.NpcID()]; ok {
-			return "", ChatUnported, true
+			hero, inactive := state.Hero()
+			if hero || inactive {
+				return f.heroMainPage(pages, inactive), ChatShown, true
+			}
+			return f.page(pages, olympiadPages+"hero_main2.htm"), ChatShown, true
 		}
 		name := "noble.htm"
 		if f.NpcID() == grandOlympiadManager && state.Noble() {
@@ -74,6 +81,25 @@ func (f *Folk) signsChat(pages Pages, kind InstanceKind, state ChatState) (page 
 		return f.page(pages, olympiadPages+name), ChatShown, true
 	}
 	return "", ChatShown, false
+}
+
+// heroClaimLink is the line of a Monument of Heroes' main page that lets an
+// elected hero claim the status.
+const heroClaimLink = `<a action="bypass -h npc_%objectId%_Olympiad 5">"I want to be a Hero."</a><br>`
+
+// heroMainPage is a Monument of Heroes' main page, offering the claim of
+// the hero status when inactive is set.
+func (f *Folk) heroMainPage(pages Pages, inactive bool) string {
+	const path = olympiadPages + "hero_main.htm"
+	page, ok := pages.Get(path)
+	if !ok {
+		return f.page(pages, path)
+	}
+	link := ""
+	if inactive {
+		link = heroClaimLink
+	}
+	return strings.ReplaceAll(strings.ReplaceAll(page, "%hero%", link), "%objectId%", strconv.Itoa(int(f.ObjectID())))
 }
 
 // priestPage names the page a priest of own's cabal greets r's player

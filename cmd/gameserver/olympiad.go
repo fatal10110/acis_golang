@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/config"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
@@ -49,14 +50,14 @@ func olympiadRewards(pairs []config.IntPair) []olympiad.Reward {
 }
 
 // provideOlympiad returns the Olympiad, persisting through the gameserver
-// database on worker's lanes, announcing to every player in state and running its calendar
-// on pool.
-func provideOlympiad(paths gameServerPaths, db *sql.DB, pool *sim.Pool, worker *persist.Worker, state *world.State, log zerolog.Logger) (*olympiad.Olympiad, error) {
+// database on worker's lanes, announcing to every player in state, electing
+// heroes at its end and running its calendar on pool.
+func provideOlympiad(paths gameServerPaths, db *sql.DB, pool *sim.Pool, worker *persist.Worker, state *world.State, heroes *hero.Manager, log zerolog.Logger) (*olympiad.Olympiad, error) {
 	cfg, err := loadOlympiadConfig(paths)
 	if err != nil {
 		return nil, err
 	}
-	return olympiad.New(cfg, gamesql.NewOlympiadStore(db), worker, network.NewOlympiadAnnouncer(state), pool.NewQueue("olympiad"), log), nil
+	return olympiad.New(cfg, gamesql.NewOlympiadStore(db), worker, network.NewOlympiadAnnouncer(state), heroes, pool.NewQueue("olympiad"), log), nil
 }
 
 // startOlympiad restores the cycle and the nobles' records before any

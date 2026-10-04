@@ -78,6 +78,10 @@ func (s folkChatState) FestivalNotice() string {
 
 func (s folkChatState) Noble() bool { return s.live.IsNoble() }
 
+func (s folkChatState) Hero() (isHero, inactive bool) {
+	return s.live.IsHero(), s.l.heroes != nil && s.l.heroes.IsInactive(s.live.ObjectID())
+}
+
 // broadcastFolkFrame sends one serialized frame to every player that knows
 // f, each an independently owned copy.
 func (l *GameClientLink) broadcastFolkFrame(f *npc.Folk, build func() wire.Frame) {

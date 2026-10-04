@@ -504,6 +504,7 @@ var schemaStmts = []string{
 	accountsSchema,
 	bbsMailSchema, bbsForumSchema, bbsTopicSchema, bbsPostSchema, bbsFavoriteSchema,
 	olympiadNoblesSchema, olympiadNoblesEomSchema, olympiadFightsSchema, serverMemoSchema,
+	heroesSchema, heroesDiarySchema,
 	characterRaidPointsSchema, grandbossListSchema, cursedWeaponsSchema,
 	bufferSchemesSchema, modsWeddingSchema,
 	gamesSchema, fishingChampionshipSchema,
