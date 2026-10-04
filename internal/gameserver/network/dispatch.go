@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/craft"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -48,7 +49,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
+	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -331,7 +332,7 @@ type GameClientLink struct {
 	queues           Queues
 	queuedPets       queuedPets
 	restarts         *restart.Table
-	clanHallData     *clanhall.Table
+	clanHallData     *hallmodel.Table
 	castleData       *castledata.Table
 	levels           *player.LevelTable
 	admin            *admin.Data
@@ -416,6 +417,8 @@ type GameClientLink struct {
 	announcements *announcement.Registry
 	schemeBuffer  *schemebuffer.Manager
 	lottery       *lottery.Lottery
+	// hallFunctions are the functions the clan halls rent; nil rents none.
+	hallFunctions *clanhall.Functions
 	// wedding holds the couples and runs the marriage requests.
 	wedding *wedding.Manager
 	// derby is the monster race track the race managers answer for; nil
@@ -527,7 +530,7 @@ type GameClientLinkConfig struct {
 	// handlers, timers and periodic ticks run on. Required.
 	Queues       Queues
 	Restarts     *restart.Table
-	ClanHallData *clanhall.Table   // owner restart spawns; nil restarts to town
+	ClanHallData *hallmodel.Table  // owner restart spawns; nil restarts to town
 	CastleData   *castledata.Table // owner restart spawns; nil restarts to town
 	Levels       *player.LevelTable
 	Admin        *admin.Data
@@ -645,6 +648,9 @@ type GameClientLinkConfig struct {
 	Wedding *wedding.Manager
 	// Lottery is the Lucky Lottery; nil runs no round.
 	Lottery *lottery.Lottery
+	// ClanHallFunctions are the functions the clan halls rent; nil rents
+	// none, so every hall shows bare and gives no recovery bonus.
+	ClanHallFunctions *clanhall.Functions
 	// Derby is the monster race track; nil runs no race.
 	Derby *derby.Track
 }
@@ -786,6 +792,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		link.wedding = wedding.NewManager(wedding.DefaultConfig(), ids, nil)
 	}
 	link.lottery = cfg.Lottery
+	link.hallFunctions = cfg.ClanHallFunctions
 	if link.lottery == nil {
 		link.lottery = lottery.New(lottery.DefaultConfig(), nil, nil, nil, cfg.Queues.NewQueue("lottery"), cfg.Log)
 	}
@@ -810,6 +817,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		}
 	}
 	link.wireZoneOccupantHooks()
+	link.wireClanHallZones()
 	return link, nil
 }
 

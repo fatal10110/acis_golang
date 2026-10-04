@@ -189,6 +189,7 @@ type Character struct {
 	los                      LineOfSight
 	zones                    PeaceZoneQuery
 	social                   SocialGraph
+	hallFunctions            HallFunctions
 	partyLoot                PartyLoot
 	mounts                   MountBodies
 	mountData                MountDataSource
@@ -198,6 +199,7 @@ type Character struct {
 	insideSiegeZone          atomic.Bool
 	insideNoSummonFriendZone atomic.Bool
 	insideBossZone           atomic.Bool
+	insideClanHallZone       atomic.Bool
 	insideDangerArea         atomic.Bool
 	insideWater              atomic.Bool
 	swampMoveBonus           atomic.Int32

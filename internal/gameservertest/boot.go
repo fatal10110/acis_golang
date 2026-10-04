@@ -25,6 +25,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -53,7 +54,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
+	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -118,7 +119,7 @@ type options struct {
 	gmAudit                zerolog.Logger
 	chat                   network.ChatConfig
 	restarts               *restart.Table
-	clanHallData           *clanhall.Table
+	clanHallData           *hallmodel.Table
 	castleData             *castledata.Table
 	teleports              travel.TeleportTable
 	instantTeleports       travel.InstantTable
@@ -164,6 +165,8 @@ type options struct {
 	festivalClock          func() time.Time
 	clanConfig             *clan.Config
 	seedClans              func(db *sql.DB)
+	clanHalls              *hallmodel.Table
+	clanHallDecos          *hallmodel.DecoTable
 	board                  bbs.Config
 	seedBoard              func(db *sql.DB)
 	seedOlympiad           func(db *sql.DB)
@@ -328,7 +331,7 @@ func WithRestartPoints(table *restart.Table) Option {
 // WithResidences supplies the static clan hall and castle tables a
 // restart to the owned clan hall or castle picks its spawn from (default:
 // none, so those restarts land in town).
-func WithResidences(halls *clanhall.Table, castles *castledata.Table) Option {
+func WithResidences(halls *hallmodel.Table, castles *castledata.Table) Option {
 	return func(o *options) { o.clanHallData, o.castleData = halls, castles }
 }
 
@@ -580,6 +583,15 @@ func WithClanConfig(cfg clan.Config) Option {
 // restored from them.
 func WithClanSeed(seed func(db *sql.DB)) Option {
 	return func(o *options) { o.seedClans = seed }
+}
+
+// WithClanHalls loads halls as the clan hall data and decos as their
+// function decorations (default: none, so every seeded hall owner counts
+// and no hall restores a rented function). The clans own only the halls
+// it holds, and each owned hall restores its stored clanhall_functions
+// rows, whose fees then run on the boot clock.
+func WithClanHalls(halls *hallmodel.Table, decos *hallmodel.DecoTable) Option {
+	return func(o *options) { o.clanHalls, o.clanHallDecos = halls, decos }
 }
 
 // WithCommunityBoard sets the community board's server.properties
@@ -841,7 +853,8 @@ type Server struct {
 	DB     *sql.DB
 	// RaidPoints is the players' raid points, restored at boot.
 	RaidPoints       *raidpoint.Points
-	Lottery          *lottery.Lottery // the lottery WithLottery runs; nil without it
+	Lottery          *lottery.Lottery    // the lottery WithLottery runs; nil without it
+	HallFunctions    *clanhall.Functions // the functions the clan halls rent, restored at boot
 	Chars            *gamesql.CharacterStore
 	Items            *gamesql.ItemStore
 	Shortcuts        *gamesql.ShortcutStore
@@ -2000,6 +2013,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	raidPoints := raidpoint.New(gamesql.NewRaidPointStore(db), persistWorker, o.log)
 	gclConfig.RaidPoints = raidPoints
 	lotteryState := o.lottery.newLottery(db, persistWorker, state, queues, o.log)
+	// The functions are restored once the clans own their halls, below.
+	hallFunctions := clanhall.New(o.clanHalls, o.clanHallDecos, gclConfig.Clans.Table(), gamesql.NewClanHallFunctionStore(db), persistWorker, o.log)
+	gclConfig.ClanHallFunctions = hallFunctions
 	gclConfig.Lottery = lotteryState
 	gcl, err := network.NewGameClientLink(gclConfig)
 	if err != nil {
@@ -2113,8 +2129,22 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err != nil {
 		t.Fatalf("load clan hall owners: %v", err)
 	}
-	// The fixture loads no clan hall data, so every seeded hall counts.
-	gclConfig.Clans.Table().RestoreHalls(hallOwners, nil)
+	// Without WithClanHalls the fixture loads no clan hall data, so every
+	// seeded hall counts.
+	var knownHall func(int32) bool
+	if o.clanHalls != nil {
+		knownHall = func(id int32) bool {
+			_, ok := o.clanHalls.Get(int(id))
+			return ok
+		}
+	}
+	gclConfig.Clans.Table().RestoreHalls(hallOwners, knownHall)
+	if err := hallFunctions.Restore(context.Background()); err != nil {
+		t.Fatalf("restore clan hall functions: %v", err)
+	}
+	hallFees := queues.NewQueue("clanhall-functions")
+	t.Cleanup(hallFees.Close)
+	hallFunctions.Start(hallFees, gcl)
 	restoreCastles(t, db, gclConfig.Castles)
 	gclConfig.Clans.DropMissingCrests(crests)
 	gclConfig.Clans.DropDanglingAlliances()
@@ -2175,6 +2205,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Derby:            derbyTrack,
 		Clans:            gclConfig.Clans,
 		Castles:          gclConfig.Castles,
+		HallFunctions:    hallFunctions,
 		SevenSigns:       sevenSigns,
 		Festival:         fest,
 		itemTable:        itemTemplates,
