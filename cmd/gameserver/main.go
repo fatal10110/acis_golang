@@ -225,6 +225,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideDerbyTrack,
 			provideClanHallFunctions,
 			provideClanHalls,
+			provideDataReloads,
 			provideGameClientLink,
 		),
 		fx.Invoke(startClanDissolutions, startClanHallFunctions, startClanHalls, startSieges),

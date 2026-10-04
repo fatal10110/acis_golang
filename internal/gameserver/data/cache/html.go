@@ -8,12 +8,15 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 )
 
 // HTML stores loaded datapack HTML pages, keyed by path relative to data/html.
-// It is safe for concurrent reads after LoadHTML returns.
+// It is safe for concurrent reads after LoadHTML returns; //reload htm
+// replaces the pages in place with Replace, and each read sees the old
+// pages or the new ones.
 type HTML struct {
-	pages map[string]string
+	pages atomic.Pointer[map[string]string]
 }
 
 // LoadHTML reads every .htm and .html file under dir into memory.
@@ -54,7 +57,24 @@ func LoadHTML(dir string) (*HTML, error) {
 		return nil, fmt.Errorf("data/cache: no html files found in %s", dir)
 	}
 
-	return &HTML{pages: pages}, nil
+	h := &HTML{}
+	h.pages.Store(&pages)
+	return h, nil
+}
+
+// Replace swaps h's pages for from's, at once for every holder of h:
+// HtmCache.reload, which the reference runs by emptying its cache so every
+// page is read from disk again.
+func (h *HTML) Replace(from *HTML) {
+	h.pages.Store(from.pages.Load())
+}
+
+// loaded returns the current pages; a nil cache has none.
+func (h *HTML) loaded() map[string]string {
+	if h == nil {
+		return nil
+	}
+	return *h.pages.Load()
 }
 
 func normalizeHTML(content string) string {
@@ -68,28 +88,23 @@ func normalizeHTML(content string) string {
 // Get returns the loaded HTML content for name. name may be relative to
 // data/html, or prefixed with data/html/.
 func (h *HTML) Get(name string) (string, bool) {
-	if h == nil {
-		return "", false
-	}
-	content, ok := h.pages[htmlKey(name)]
+	content, ok := h.loaded()[htmlKey(name)]
 	return content, ok
 }
 
 // Len returns the number of loaded pages.
 func (h *HTML) Len() int {
-	if h == nil {
-		return 0
-	}
-	return len(h.pages)
+	return len(h.loaded())
 }
 
 // Paths returns loaded page paths sorted lexically.
 func (h *HTML) Paths() []string {
-	if h == nil {
+	pages := h.loaded()
+	if pages == nil {
 		return nil
 	}
-	paths := make([]string, 0, len(h.pages))
-	for name := range h.pages {
+	paths := make([]string, 0, len(pages))
+	for name := range pages {
 		paths = append(paths, name)
 	}
 	sort.Strings(paths)

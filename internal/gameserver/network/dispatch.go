@@ -450,10 +450,17 @@ type GameClientLink struct {
 	// npcSpawns is the live NPC population the admin spawn commands use;
 	// see SetNpcSpawns.
 	npcSpawns atomic.Pointer[manager.Npcs]
+	// spawnAll runs one //unspawnall or //respawnall at a time, so two
+	// game masters respawning at once cannot leave both new populations
+	// in the world.
+	spawnAll sync.Mutex
 	// manor is what the seed and harvester items read.
 	manor ManorConfig
 	// classMaster is the class manager mod's settings.
 	classMaster classmaster.Config
+	// reloads re-read the data tables //reload and //respawnall name; see
+	// admin_reload.go.
+	reloads DataReloads
 }
 
 // AIRegistry owns recurring actor-AI registrations.
@@ -698,6 +705,9 @@ type GameClientLinkConfig struct {
 	FishingChampionship *fishchamp.Championship
 	// Derby is the monster race track; nil runs no race.
 	Derby *derby.Track
+	// Reloads re-read the data tables //reload and //respawnall name; a
+	// nil hook leaves its table as booted.
+	Reloads DataReloads
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -811,6 +821,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.macros = cfg.Macros
 	link.manor = cfg.Manor
 	link.classMaster = cfg.ClassMaster
+	link.reloads = cfg.Reloads
 	link.recommendations = cfg.Recommendations
 	// Built here, not lazily: every client goroutine shares this link.
 	enchantCfg := enchantflow.DefaultConfig()

@@ -337,9 +337,9 @@ func NewTemplate(set *commons.StatSet) (*Template, error) {
 	return t, nil
 }
 
-// Table is an in-memory lookup of NPC templates keyed by id, built once at
-// boot and read for the remainder of the process lifetime. The zero value
-// is not usable; construct with NewTable.
+// Table is an in-memory lookup of NPC templates keyed by id, built at boot
+// and replaced in place by //reload npc. The zero value is not usable;
+// construct with NewTable.
 type Table struct {
 	*commons.Lookup[int, *Template]
 }
@@ -348,6 +348,13 @@ type Table struct {
 // ID. A later entry silently overwrites an earlier one with the same ID.
 func NewTable(templates []*Template) *Table {
 	return &Table{commons.NewLookup(templates, func(tpl *Template) int { return tpl.ID })}
+}
+
+// Replace swaps t's templates for from's, at once for every holder of t:
+// NpcData.reload. A live NPC keeps the template it was built from; NPCs
+// built afterwards use the new ones.
+func (t *Table) Replace(from *Table) {
+	t.Swap(from.Lookup)
 }
 
 // CollisionBody returns npcID's template collision radius and height, or
