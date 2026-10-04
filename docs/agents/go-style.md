@@ -1,7 +1,7 @@
 # Go style and design guide
 
 This guide is loaded when a task needs detailed Go design guidance. Repository-wide behavioral
-requirements remain in the outer `acis_public/AGENTS.md`.
+requirements remain in the outer `acis_public/CLAUDE.md`.
 
 ## Naming
 

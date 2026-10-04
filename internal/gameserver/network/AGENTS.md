@@ -1,7 +1,7 @@
 # Network package agent rules
 
 These rules apply to every change under `internal/gameserver/network`. Workspace-wide rules in the
-outer `acis_public/AGENTS.md` still apply.
+outer `acis_public/CLAUDE.md` still apply.
 
 ## Packet impact is part of scope
 
