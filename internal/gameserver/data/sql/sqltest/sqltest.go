@@ -342,6 +342,19 @@ const clanDataSchema = "CREATE TABLE IF NOT EXISTS `clan_data` (\n" +
 	"  KEY `ally_id` (`ally_id`)\n" +
 	")"
 
+// clanhallSchema mirrors the shipped clanhall table definition verbatim.
+const clanhallSchema = "CREATE TABLE IF NOT EXISTS `clanhall` (\n" +
+	"  `id` TINYINT NOT NULL DEFAULT '0',\n" +
+	"  `ownerId` INT UNSIGNED NOT NULL DEFAULT '0',\n" +
+	"  `paidUntil` BIGINT NOT NULL DEFAULT '0',\n" +
+	"  `paid` TINYINT NOT NULL DEFAULT '0',\n" +
+	"  `sellerBid` INT UNSIGNED NOT NULL DEFAULT '0',\n" +
+	"  `sellerName` VARCHAR(20) NOT NULL DEFAULT '',\n" +
+	"  `sellerClanName` VARCHAR(20) NOT NULL DEFAULT '',\n" +
+	"  `endDate` BIGINT NOT NULL DEFAULT '0',\n" +
+	"  PRIMARY KEY `id` (`id`)\n" +
+	")"
+
 // clanPrivsSchema mirrors the shipped clan_privs table definition verbatim.
 const clanPrivsSchema = "CREATE TABLE IF NOT EXISTS `clan_privs` (\n" +
 	"  `clan_id` INT NOT NULL DEFAULT'0',\n" +
@@ -474,7 +487,7 @@ var schemaStmts = []string{
 	sevenSignsSchema, sevenSignsStatusSchema, buylistsSchema, characterSubclassesSchema,
 	characterRelationsSchema, petitionSchema, petitionMessageSchema,
 	characterMacrosesSchema, characterRecommendsSchema,
-	clanDataSchema, clanPrivsSchema, clanSkillsSchema, clanSubpledgesSchema, clanWarsSchema,
+	clanDataSchema, clanPrivsSchema, clanSkillsSchema, clanSubpledgesSchema, clanWarsSchema, clanhallSchema,
 	accountsSchema,
 	bbsMailSchema, bbsForumSchema, bbsTopicSchema, bbsPostSchema, bbsFavoriteSchema,
 	olympiadNoblesSchema, olympiadNoblesEomSchema, serverMemoSchema,
