@@ -62,8 +62,10 @@ type folkCombat struct {
 	hp, mp         float64
 	dead, decayed  bool
 	corpseDeadline time.Time
-	// hpBar is the health-bar segment state HPStatusUpdate advances.
+	// hpBar is the health-bar segment state PublishHP advances.
 	hpBar creature.HPBar
+	// regen is the HP/MP regeneration task SettleRegen arms on a drop.
+	regen creature.Regen
 }
 
 // FolkRuntime is what a civilian NPC needs to take part in combat beyond

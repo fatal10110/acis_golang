@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -40,11 +41,33 @@ func bootSavedWolfOf(t *testing.T, wolf *npc.Template, saved pet.State) *petWorl
 	return h
 }
 
-// regenTick runs one production HP/MP regeneration sweep and waits for it.
+// regenTick lets the production regeneration sweep run, a sweep interval at
+// a time, until the owner's summon takes one regeneration tick, or until two
+// periods passed without one (a corpse never ticks). The sweep's first pass
+// arms a phase the summon's restore left idle.
 func regenTick(t *testing.T, h *petWorld) {
 	t.Helper()
-	task.NewNPCRegen(h.srv.State).Tick()
-	h.srv.Settle(t)
+	summon, ok := h.srv.State.Summon(h.ownerID)
+	if !ok {
+		t.Fatal("owner has no summon")
+	}
+	vitals, ok := summon.(interface {
+		HP() float64
+		MPValue() float64
+	})
+	if !ok {
+		t.Fatalf("summon %T exposes no vitals", summon)
+	}
+	hp, mp := vitals.HP(), vitals.MPValue()
+	regen := task.NewNPCRegen(h.srv.State)
+	for passed := time.Duration(0); passed <= 2*task.NPCRegenTick; passed += task.RegenSweep {
+		regen.Tick()
+		h.srv.Settle(t)
+		if vitals.HP() != hp || vitals.MPValue() != mp {
+			return
+		}
+		h.srv.Advance(t, task.RegenSweep)
+	}
 }
 
 // TestPetRegeneratesOnEachRegenTick calls out a wounded wolf. Each regen tick

@@ -106,9 +106,9 @@ func (s *Server) DoorRegenerating(tb testing.TB, doorID int) bool {
 	return s.doors.regen.Tracked(doorID)
 }
 
-// siegeInProgress stands in for the siege of a door's residence while
-// sieges are not ported: it lets every hit through, as a castle siege in
-// progress does for any attacker but a Swoop Cannon.
+// siegeInProgress stands in for the siege of a door's residence while the
+// castle sieges install no door gate (#3373): it lets every hit through, as
+// a castle siege in progress does for any attacker but a Swoop Cannon.
 type siegeInProgress struct{}
 
 func (siegeInProgress) AllowsDoorDamage(attackable.Combatant) bool { return true }

@@ -87,9 +87,9 @@ func ResurrectionScrollGate(userID int32, selected any) ResurrectionScrollRefusa
 	return ResurrectionScrollAllowed
 }
 
-// deadPlayerRefusal checks a dead player target. With no siege engine a
-// player has no siege side yet, so standing in an active siege zone is
-// enough to refuse; the side check belongs here once sieges exist (#234).
+// deadPlayerRefusal checks a dead player target. Standing in an active
+// siege zone is enough to refuse; the reference also requires the target's
+// siege state to be 0, not checked yet (#3375).
 func deadPlayerRefusal(p resurrectionPlayerTarget) ResurrectionScrollRefusal {
 	if p.InSiegeZone() {
 		return ResurrectionScrollSiege

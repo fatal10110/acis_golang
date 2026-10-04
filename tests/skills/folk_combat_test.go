@@ -123,8 +123,11 @@ func TestDamagedFolkRegenerates(t *testing.T) {
 	srv.AdvanceUntil(t, "the nuke landing", func() bool { return folk.CurrentHP() < maxHP })
 	readFrameLog(c)
 
-	task.NewNPCRegen(srv.State).Tick()
-	srv.AdvanceUntil(t, "the regen tick", func() bool { return folk.CurrentHP() > 1 })
+	regen := task.NewNPCRegen(srv.State)
+	srv.AdvanceUntil(t, "the regen tick", func() bool {
+		regen.Tick()
+		return folk.CurrentHP() > 1
+	})
 	hp := folk.CurrentHP()
 	if log := readFrameLog(c); log.index(func(frame []byte) bool {
 		v, ok := statusValue(frame, folk.ObjectID(), serverpackets.StatusCurrentHP)

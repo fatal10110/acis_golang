@@ -103,6 +103,7 @@ type gameServerPaths struct {
 	NpcsConfigPath    string
 	ClansConfigPath   string
 	EventsConfigPath  string
+	SiegeConfigPath   string
 	DataRoot          string
 	LogRoot           string
 	DebugAddr         string
@@ -123,6 +124,7 @@ func parseGameServerFlags() gameServerPaths {
 	flag.StringVar(&paths.NpcsConfigPath, "npcs-config", "config/npcs.properties", "npc properties file")
 	flag.StringVar(&paths.ClansConfigPath, "clans-config", "config/clans.properties", "clan properties file")
 	flag.StringVar(&paths.EventsConfigPath, "events-config", "config/events.properties", "events properties file")
+	flag.StringVar(&paths.SiegeConfigPath, "siege-config", "config/siege.properties", "siege properties file")
 	flag.StringVar(&paths.DataRoot, "data-root", ".", "datapack root containing data/xml")
 	flag.StringVar(&paths.LogRoot, "log-root", ".", "root directory for log files")
 	flag.StringVar(&paths.DebugAddr, "debug-addr", "", "optional host:port serving pprof and expvar")
@@ -170,6 +172,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			loadClanConfig,
 			provideClans,
 			provideCastles,
+			provideSieges,
 			provideRoster,
 			providePvPFlags,
 			provideInventoryUpdates,
@@ -224,7 +227,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideClanHalls,
 			provideGameClientLink,
 		),
-		fx.Invoke(startClanDissolutions, startClanHallFunctions, startClanHalls),
+		fx.Invoke(startClanDissolutions, startClanHallFunctions, startClanHalls, startSieges),
 		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startDoorRegen, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startObserverTowers, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startHeroes, startOlympiad, startRaidPoints, startCursedWeapons, startBossZones, startSchemeBuffer, startWedding, startLottery, startFishingChampionship, startDerbyTrack, startDebugHTTP, startGameServer),
 	}
 }

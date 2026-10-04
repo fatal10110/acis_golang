@@ -21,6 +21,6 @@ func (c *Character) WearingFormalWear() bool {
 }
 
 // ActiveSiegeAttacker reports whether the character's clan attacks a siege
-// running where the character stands. Castle sieges (#234) aren't ported
-// yet, so no siege is ever active and a siege-summon skill always refuses.
+// running where the character stands. It is not wired to the castle sieges
+// yet (#235), so a siege-summon skill always refuses.
 func (c *Character) ActiveSiegeAttacker() bool { return false }

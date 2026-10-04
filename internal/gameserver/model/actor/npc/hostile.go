@@ -155,9 +155,11 @@ type Hostile struct {
 
 	health creature.Health
 	hp     float64
-	// hpBar is the health-bar segment state HPStatusUpdate advances from
+	// hpBar is the health-bar segment state PublishHP advances from
 	// whichever goroutine changed HP.
 	hpBar creature.HPBar
+	// regen is the HP/MP regeneration task SettleRegen arms on a drop.
+	regen creature.Regen
 
 	// mpMu guards mp, the live MP value consumed by skill-resource handlers.
 	// A caster's mana-burn or mana-drain skill reduces it from the caster's

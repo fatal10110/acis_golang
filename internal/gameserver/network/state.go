@@ -175,6 +175,10 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x9e: true, // package sendable item list
 		0x9f: true, // package send
 		0xa0: true, // block list commands
+		0xa2: true, // siege attacker list
+		0xa3: true, // siege defender list
+		0xa4: true, // join or leave a siege
+		0xa5: true, // castle lord's answer to a defender request
 		0xa7: true, // multisell exchange
 		0xaa: true, // user command
 		0xac: true, // open recipe book

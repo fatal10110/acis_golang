@@ -156,9 +156,11 @@ func (c *Character) BroadcastAbnormalEffect() {
 	c.emit(event.AbnormalEffectChanged{})
 }
 
-// BroadcastStatus reports a change to this character's current HP, MP or CP.
+// BroadcastStatus reports a change to this character's current HP, MP or
+// CP, then settles its regeneration task.
 func (c *Character) BroadcastStatus() {
 	c.emit(event.VitalsChanged{})
+	c.SettleRegen()
 }
 
 // NotifyBowDraw reports that a bow shot started drawing.
@@ -902,8 +904,7 @@ func (c *Character) AttackableBy(attacker target.Actor) bool {
 // otherwise when c and caster both stand inside a PvP zone (each its own
 // membership), or while c has karma or a PvP flag.
 //
-// The Olympiad (#216) and siege-side (#234) rules are not applied: that
-// state is not tracked yet.
+// The Olympiad (#216) and siege-side (#3375) rules are not applied yet.
 func (c *Character) AttackableWithoutForceBy(caster target.Actor) bool {
 	if caster == nil || actingPlayerID(caster) == c.ID {
 		return false

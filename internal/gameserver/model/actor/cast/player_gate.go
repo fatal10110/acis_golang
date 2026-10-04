@@ -81,10 +81,11 @@ func (c *Controller) playerAttemptRules(caster *player.Character, target Target,
 	if def.SiegeSummonSkill && !caster.ActiveSiegeAttacker() {
 		return ErrSiegeSummonUnavailable
 	}
-	// With sieges (#234), a siege attacker's summon is next refused inside a
-	// castle zone (NOT_CALL_PET_FROM_THIS_LOCATION) and by a Dawn-held Seal
-	// of Strife for a Dusk member (SEAL_OF_STRIFE_FORBIDS_SUMMONING). Neither
-	// is reachable while no siege is ever active.
+	// With siege summons (#235), a siege attacker's summon is next refused
+	// inside a castle zone (NOT_CALL_PET_FROM_THIS_LOCATION) and by a
+	// Dawn-held Seal of Strife for a Dusk member
+	// (SEAL_OF_STRIFE_FORBIDS_SUMMONING). Neither is reachable while
+	// ActiveSiegeAttacker is always false.
 	return nil
 }
 
