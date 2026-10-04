@@ -17,7 +17,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-func (p *livePlayer) Discover(obj world.Tracked) { p.sendInfoFrom(obj, false) }
+func (p *livePlayer) Discover(obj world.Tracked) {
+	if f, ok := obj.(*npc.Folk); ok {
+		p.showDerbyRace(f)
+	}
+	p.sendInfoFrom(obj, false)
+}
 
 // requestRecordInfo answers the client's view resync: live's UserInfo, then
 // everything live knows resent as it was first seen.
@@ -248,6 +253,9 @@ func (l *GameClientLink) refreshSummonAbnormalEffect(a *summon.Actor) {
 }
 
 func (p *livePlayer) Forget(obj world.Tracked) {
+	if f, ok := obj.(*npc.Folk); ok {
+		p.hideDerbyRunners(f)
+	}
 	if o, ok := obj.(*summon.Actor); ok {
 		if o.ShownAsOwnedBy(p.ObjectID()) {
 			p.petSightings.Add(1)

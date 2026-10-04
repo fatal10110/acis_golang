@@ -62,7 +62,7 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 		"startSimPool":             {simPoolStopTimeout, "simPoolStopTimeout", "actor pool finishing queued tasks"},
 		"startTicker": {
 			task.ItemInstanceSaveTimeout, "",
-			"StopAndWait waits for one in-flight tick; the rest are in-memory, and the item tick, the only one with database I/O, runs under a context the stop cancels (TestItemInstancesStopCutsALongTickShort), so its wait is the cancellation's, kept at ItemInstanceSaveTimeout as headroom rather than its ItemInstanceTickBudget",
+			"StopAndWait waits for one in-flight tick; the rest are in-memory, and the item and race track ticks, the only ones with database I/O, run under a context the stop cancels (TestItemInstancesStopCutsALongTickShort), so their wait is the cancellation's, kept at ItemInstanceSaveTimeout as headroom rather than its ItemInstanceTickBudget",
 		},
 		"startItemInstances":         {3 * task.ItemInstanceSaveTimeout, "ItemInstanceSaveTimeout", "drainItemInstances: save, persistence-worker drain, save"},
 		"providePersist":             {persistCloseTimeout, "persistCloseTimeout", "persistence worker's last close"},
