@@ -49,6 +49,10 @@ type Store interface {
 	// SaveSkill stores a clan skill at its level, replacing the level
 	// stored before.
 	SaveSkill(ctx context.Context, clanID int32, sk Skill) error
+	// RemoveSkill deletes a clan skill's row.
+	RemoveSkill(ctx context.Context, clanID int32, skillID int) error
+	// RemoveAllSkills deletes every clan skill row of the clan.
+	RemoveAllSkills(ctx context.Context, clanID int32) error
 	SetPledgeType(ctx context.Context, objectID int32, pledgeType int) error
 	SetMentor(ctx context.Context, objectID, apprentice, sponsor int32) error
 	InsertSubunit(ctx context.Context, r SubunitRow) error
