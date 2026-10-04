@@ -3,6 +3,7 @@ package sql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
@@ -43,8 +44,11 @@ func (s *BufferSchemeStore) Load(ctx context.Context) ([]schemebuffer.Row, error
 	return out, nil
 }
 
-// Save replaces every stored scheme with rows in one transaction, so a
-// save that fails keeps the schemes stored before it.
+// Save replaces every stored scheme with rows in one transaction. A row the
+// table refuses (a name its collation reads as a duplicate, or a character
+// it cannot hold) is skipped and reported, and every other row is still
+// stored. A save that cannot delete, begin or commit keeps the schemes
+// stored before it.
 func (s *BufferSchemeStore) Save(ctx context.Context, rows []schemebuffer.Row) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -54,6 +58,7 @@ func (s *BufferSchemeStore) Save(ctx context.Context, rows []schemebuffer.Row) e
 	if _, err := tx.ExecContext(ctx, "DELETE FROM buffer_schemes"); err != nil {
 		return fmt.Errorf("save buffer schemes: %w", err)
 	}
+	var skipped []error
 	if len(rows) > 0 {
 		stmt, err := tx.PrepareContext(ctx, "INSERT INTO buffer_schemes (object_id, scheme_name, skills) VALUES (?, ?, ?)")
 		if err != nil {
@@ -62,12 +67,15 @@ func (s *BufferSchemeStore) Save(ctx context.Context, rows []schemebuffer.Row) e
 		defer stmt.Close()
 		for _, row := range rows {
 			if _, err := stmt.ExecContext(ctx, row.OwnerID, row.Name, row.Skills); err != nil {
-				return fmt.Errorf("save buffer scheme %q of %d: %w", row.Name, row.OwnerID, err)
+				if ctx.Err() != nil {
+					return fmt.Errorf("save buffer schemes: %w", err)
+				}
+				skipped = append(skipped, fmt.Errorf("skip buffer scheme %q of %d: %w", row.Name, row.OwnerID, err))
 			}
 		}
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("save buffer schemes: %w", err)
 	}
-	return nil
+	return errors.Join(skipped...)
 }

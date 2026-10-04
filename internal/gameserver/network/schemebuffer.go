@@ -4,8 +4,6 @@ import (
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
 )
 
@@ -59,29 +57,10 @@ func (l *GameClientLink) giveScheme(live *livePlayer, f *npc.Folk, pet *summon.A
 		sendText(live, schemebuffer.NoPetMessage)
 		return
 	}
-	if reply.Cost != 0 && !paySchemeFee(live, int(reply.Cost)) {
+	if reply.Cost != 0 && !reduceAdena(live, int(reply.Cost)) {
 		return
 	}
 	for _, def := range reply.Buffs {
 		skillhandler.LandEffects(f, target, def)
 	}
-}
-
-// paySchemeFee takes count adena from live with its notices: not enough adena
-// when live holds less, else the amount spent. A negative count takes
-// nothing and says nothing.
-func paySchemeFee(live *livePlayer, count int) bool {
-	inv := live.Inventory()
-	if inv == nil || count > inv.Adena() {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena))
-		return false
-	}
-	if count <= 0 {
-		return true
-	}
-	if inv.DestroyByTemplateID(item.AdenaID, count) == nil {
-		return false
-	}
-	live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DisappearedAdena, int32(count)))
-	return true
 }

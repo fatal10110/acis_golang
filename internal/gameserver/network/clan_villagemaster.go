@@ -7,7 +7,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -106,18 +105,7 @@ type clanLevelPayer struct {
 
 func (p clanLevelPayer) SP() int { return p.live.Character.ProgressionValues().SP }
 
-func (p clanLevelPayer) PayAdena(count int) bool {
-	inv := p.live.Inventory()
-	if inv == nil || count > inv.Adena() {
-		p.live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena))
-		return false
-	}
-	if inv.DestroyByTemplateID(item.AdenaID, count) == nil {
-		return false
-	}
-	p.live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DisappearedAdena, int32(count)))
-	return true
-}
+func (p clanLevelPayer) PayAdena(count int) bool { return reduceAdena(p.live, count) }
 
 func (p clanLevelPayer) PayItem(itemID int32, count int) bool {
 	return destroyHeldItems(p.live, itemID, count)

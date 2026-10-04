@@ -3,6 +3,7 @@ package sql
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
@@ -40,17 +41,42 @@ func TestBufferSchemeStoreRoundTrip(t *testing.T) {
 	}
 }
 
-// TestBufferSchemeStoreFailedSaveKeepsStoredSchemes pins the save's single
-// transaction: a row the table refuses leaves the schemes stored before.
-func TestBufferSchemeStoreFailedSaveKeepsStoredSchemes(t *testing.T) {
+// TestBufferSchemeStoreSaveSkipsRefusedRow pins the save's per-row
+// handling: a row the table refuses is reported and left out, and the rest
+// of the save still replaces what was stored before.
+func TestBufferSchemeStoreSaveSkipsRefusedRow(t *testing.T) {
+	ctx := context.Background()
+	store := NewBufferSchemeStore(sqltest.SharedDB(t))
+	if err := store.Save(ctx, []schemebuffer.Row{{OwnerID: 1, Name: "old", Skills: "1035"}}); err != nil {
+		t.Fatal(err)
+	}
+	err := store.Save(ctx, []schemebuffer.Row{
+		{OwnerID: 2, Name: "a", Skills: "1"},
+		{OwnerID: 2, Name: "a", Skills: "2"},
+		{OwnerID: 3, Name: "b", Skills: "3"},
+	})
+	if err == nil || !strings.Contains(err.Error(), `skip buffer scheme "a" of 2`) {
+		t.Fatalf("Save() with a refused row = %v; want the refused row reported", err)
+	}
+	want := []schemebuffer.Row{{OwnerID: 2, Name: "a", Skills: "1"}, {OwnerID: 3, Name: "b", Skills: "3"}}
+	if got, err := store.Load(ctx); err != nil || !slices.Equal(got, want) {
+		t.Fatalf("Load() after a save with a refused row = %+v, %v; want %+v", got, err, want)
+	}
+}
+
+// TestBufferSchemeStoreCancelledSaveKeepsStoredSchemes pins the save's single
+// transaction: a save that cannot finish leaves the schemes stored before.
+func TestBufferSchemeStoreCancelledSaveKeepsStoredSchemes(t *testing.T) {
 	ctx := context.Background()
 	store := NewBufferSchemeStore(sqltest.SharedDB(t))
 	kept := []schemebuffer.Row{{OwnerID: 1, Name: "kept", Skills: "1035"}}
 	if err := store.Save(ctx, kept); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Save(ctx, []schemebuffer.Row{{OwnerID: 2, Name: "a", Skills: "1"}, {OwnerID: 2, Name: "a", Skills: "2"}}); err == nil {
-		t.Fatal("Save() of a duplicate key succeeded")
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	if err := store.Save(cancelled, []schemebuffer.Row{{OwnerID: 2, Name: "a", Skills: "1"}}); err == nil {
+		t.Fatal("Save() with a cancelled context succeeded")
 	}
 	if got, err := store.Load(ctx); err != nil || !slices.Equal(got, kept) {
 		t.Fatalf("Load() after a failed save = %+v, %v; want %+v", got, err, kept)
