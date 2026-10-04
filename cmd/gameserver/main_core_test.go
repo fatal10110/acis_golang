@@ -74,6 +74,7 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 		"startWedding":               {shutdownSaveTimeout, "shutdownSaveTimeout", "mods_wedding save"},
 		"startLottery":               {0, "", "stops the calendar under a lock held only across in-memory work; its queued games writes land when the persistence worker drains"},
 		"startAnnouncements":         {0, "", "stops timers under a lock held only across in-memory work and an announcements.xml rewrite"},
+		"startClanDissolutions":      {0, "", "closes the dissolution queue, cancelling its timers; in-memory only"},
 		"provideGameServerLogger":    {0, "", "closes the log file"},
 		"provideBootContext":         {0, "", "cancels a context"},
 		"provideGameServerDatabase":  {0, "", "closes the pool; the last database step, so running past the deadline loses nothing"},

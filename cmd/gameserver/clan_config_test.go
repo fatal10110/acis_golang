@@ -54,5 +54,6 @@ func clanConfigDefaults(joinDays int, withdraw bool) clan.Config {
 		AcceptClanDaysWhenDismissed:     1,
 		CreateAllyDaysWhenDissolved:     10,
 		MaxClansInAlly:                  3,
+		DissolveDays:                    7,
 	}
 }

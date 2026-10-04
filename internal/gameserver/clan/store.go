@@ -64,6 +64,11 @@ type Store interface {
 	UpdateNotice(ctx context.Context, clanID int32, enabled bool, notice string) error
 	// UpdateIntroduction stores the clan's board introduction.
 	UpdateIntroduction(ctx context.Context, clanID int32, introduction string) error
+	// DeleteClan deletes a dissolved clan's rows: the clan, its
+	// privileges, skills, sub-units, wars on either side and siege
+	// registrations, and resets the tax of castleID, the castle it held
+	// (0 for none).
+	DeleteClan(ctx context.Context, clanID, castleID int32) error
 }
 
 // Writer runs a store write later, on ownerID's lane, so writes for one

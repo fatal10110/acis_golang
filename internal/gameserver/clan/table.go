@@ -221,3 +221,10 @@ func (t *Table) insert(cl *Clan) bool {
 	t.clans[cl.id] = cl
 	return true
 }
+
+// remove drops the clan with id from the registry.
+func (t *Table) remove(id int32) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	delete(t.clans, id)
+}

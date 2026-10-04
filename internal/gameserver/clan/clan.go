@@ -72,7 +72,9 @@ type Clan struct {
 	allyPenaltyType   int
 	charPenaltyExpiry int64
 	dissolvingExpiry  int64
-	board             board
+	// destroyed marks a clan dissolved for good (Service.Destroy).
+	destroyed bool
+	board     board
 
 	members    map[int32]*Member
 	privileges map[int]int32

@@ -51,6 +51,10 @@ type Config struct {
 	// MaxClansInAlly is MaxNumOfClansInAlly: how many clans an alliance
 	// holds, its leading clan included.
 	MaxClansInAlly int
+	// DissolveDays is DaysToPassToDissolveAClan: how long a requested
+	// dissolution waits before the clan is destroyed; 0 destroys it at
+	// once.
+	DissolveDays int
 }
 
 // DefaultConfig is the shipped clans.properties and LifeCrystalNeeded.
@@ -58,7 +62,7 @@ func DefaultConfig() Config {
 	return Config{
 		JoinDays: 1, CreateDays: 10, MembersForWar: 15, WarPenaltyDays: 5, LifeCrystalNeeded: true,
 		AllyJoinDaysWhenLeft: 1, AllyJoinDaysWhenDismissed: 1, AcceptClanDaysWhenDismissed: 1,
-		CreateAllyDaysWhenDissolved: 10, MaxClansInAlly: 3,
+		CreateAllyDaysWhenDissolved: 10, MaxClansInAlly: 3, DissolveDays: 7,
 	}
 }
 
@@ -86,6 +90,8 @@ type Service struct {
 	// alliance names stay fixed while it is held. It is taken before any
 	// clan's mu.
 	allyMu sync.Mutex
+	// dissolutions holds the timers of the pending dissolutions.
+	dissolutions dissolutions
 }
 
 // NewService returns a Service over table. Writes go to store through
