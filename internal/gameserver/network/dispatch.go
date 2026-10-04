@@ -26,9 +26,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/duel"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/exchange"
+	"github.com/fatal10110/acis_golang/internal/gameserver/fence"
 	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
 	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
 	"github.com/fatal10110/acis_golang/internal/gameserver/gatekeeper"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
@@ -443,6 +445,8 @@ type GameClientLink struct {
 	// derby is the monster race track the race managers answer for; nil
 	// runs no race.
 	derby *derby.Track
+	// fences are the fences the admin fence commands place and remove.
+	fences *fence.Manager
 	// npcSpawns is the live NPC population the admin spawn commands use;
 	// see SetNpcSpawns.
 	npcSpawns atomic.Pointer[manager.Npcs]
@@ -510,6 +514,9 @@ type GameClientLinkConfig struct {
 	AttackStance  AttackStanceTracker
 	AI            AIRegistry
 	PvPFlags      *task.PvPFlags
+	// Fences are the fences //spawnfence places; without them the link
+	// places fences on no geodata.
+	Fences *fence.Manager
 	// Decay removes a dead summon's corpse once its decay delay has passed.
 	Decay       *task.Decay
 	Effects     effect.Env // Activity required: without it no effect expires
@@ -846,6 +853,10 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.announcements = cfg.Announcements
 	if link.announcements == nil {
 		link.announcements = announcement.NewRegistry(nil, NewAnnouncer(cfg.World), cfg.Log, cfg.Queues.NewQueue("announcements"))
+	}
+	link.fences = cfg.Fences
+	if link.fences == nil && cfg.World != nil && cfg.IDs != nil {
+		link.fences = fence.NewManager(engine.New(), cfg.World, cfg.IDs)
 	}
 	link.clans = cfg.Clans
 	link.castles = cfg.Castles

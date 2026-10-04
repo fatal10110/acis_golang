@@ -19,6 +19,12 @@ type object struct {
 	data   [][]block.NSWE
 }
 
+// NewObject returns a dynamic geodata object whose cell edits data start at
+// geodata cell (geoX, geoY) and block from geoZ up to geoZ+height.
+func NewObject(geoX, geoY, geoZ, height int, data [][]block.NSWE) Object {
+	return &object{geoX: geoX, geoY: geoY, geoZ: geoZ, height: height, data: data}
+}
+
 func (o *object) GeoX() int               { return o.geoX }
 func (o *object) GeoY() int               { return o.geoY }
 func (o *object) GeoZ() int               { return o.geoZ }
