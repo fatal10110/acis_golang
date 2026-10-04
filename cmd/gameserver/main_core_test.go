@@ -72,6 +72,7 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 		"startBossZones":             {shutdownSaveTimeout, "shutdownSaveTimeout", "grandboss_list save"},
 		"startSchemeBuffer":          {shutdownSaveTimeout, "shutdownSaveTimeout", "buffer_schemes save"},
 		"startWedding":               {shutdownSaveTimeout, "shutdownSaveTimeout", "mods_wedding save"},
+		"startLottery":               {0, "", "stops the calendar under a lock held only across in-memory work; its queued games writes land when the persistence worker drains"},
 		"startAnnouncements":         {0, "", "stops timers under a lock held only across in-memory work and an announcements.xml rewrite"},
 		"provideGameServerLogger":    {0, "", "closes the log file"},
 		"provideBootContext":         {0, "", "cancels a context"},

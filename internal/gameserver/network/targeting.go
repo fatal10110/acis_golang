@@ -927,18 +927,6 @@ func (l *GameClientLink) startSummonAttackStance(actor *summon.Actor) {
 	})
 }
 
-func (l *GameClientLink) stopLiveAutoAttack(live *livePlayer) {
-	if live == nil || !live.SetInCombat(false) {
-		return
-	}
-	if l.attackStance == nil || !l.attackStance.Remove(live) {
-		return
-	}
-	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameAutoAttackStop(live.ObjectID())
-	})
-}
-
 func (l *GameClientLink) broadcastTargetSelected(live *livePlayer, target world.Tracked) {
 	if l.world == nil {
 		return

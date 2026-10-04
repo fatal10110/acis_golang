@@ -266,6 +266,15 @@ func (p *PlayerAttack) Replace() {
 	p.deferred, p.queued = false, false
 }
 
+// DropQueued drops the attack queued as the next intention behind a swing,
+// bow reuse or cast, keeping it current: the end of the swing re-thinks it
+// only against a target the player can keep attacking.
+func (p *PlayerAttack) DropQueued() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.queued = false
+}
+
 // ThinkQueued re-evaluates the attack only when the last think queued it
 // behind the actor's swing, bow reuse or cast, as the end of a bow shot
 // does; otherwise nothing happens. It reports whether the think is answered

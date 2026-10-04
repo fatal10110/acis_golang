@@ -57,6 +57,10 @@ func TestRelogMidFightRestoresSavedHP(t *testing.T) {
 	if err := srv.Client.Close(); err != nil {
 		t.Fatal(err)
 	}
+	// The hit left the player in attack stance, so the dropped character
+	// would stay in the world for the in-combat disconnect delay; logging
+	// the account back in evicts the old session and ends that wait.
+	c := srv.DialClient(t, "player1", 1)
 	srv.AdvanceUntil(t, "player left world", func() bool {
 		_, ok := srv.State.Player(objID)
 		return !ok
@@ -65,7 +69,6 @@ func TestRelogMidFightRestoresSavedHP(t *testing.T) {
 		t.Fatalf("characters row already holds the post-hit HP %d while the lane is held", hp)
 	}
 
-	c := srv.DialClient(t, "player1", 1)
 	c.Send(encodeRequestGameStart(0))
 	// Selection is parked on the held lane.
 	c.ExpectNoFrame()

@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
+	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -75,6 +76,9 @@ type livePlayer struct {
 	// list requests unanswered (see tempInventoryDisable). Set on the
 	// owner's queue; atomic for any reader.
 	inventoryDisabled atomic.Bool
+	// lottoPicks are the numbers chosen on a lottery seller's ticket form;
+	// only the owner's queue touches them.
+	lottoPicks lottery.Picks
 	// replayingEffects is set while EnterWorld replays the saved effects
 	// and then decides the weight penalty band, before the player is in the
 	// world. The effects' start hooks change its appearance and the band
@@ -115,8 +119,7 @@ type livePlayer struct {
 	// set once at attach time. It is the server-initiated eviction path a
 	// duplicate character selection uses to take the character away from its
 	// previous session.
-	kick       func()
-	stopAttack func(*livePlayer)
+	kick func()
 	// spawnProtectionGen is owned by p's queue.
 	spawnProtectionGen uint64
 	// deliveryStopped is set on p's queue when detach begins. Autosave and
@@ -346,14 +349,14 @@ func onLive(live *livePlayer, fn func()) bool {
 	return false
 }
 
-// Stop aborts everything p is doing, as abortAll does, then ends its attack
-// stance with AutoAttackStop to its observers. Only detach uses it: a
-// teleport aborts the same actions but keeps the stance (abortAll).
+// Stop aborts everything p is doing, as abortAll does, then drops its
+// in-combat flag silently: a player leaving the world sends its observers no
+// AutoAttackStop, only its DeleteObject. Detach drops the stance entry
+// itself. Only detach uses it: a teleport aborts the same actions but keeps
+// the stance (abortAll).
 func (p *livePlayer) Stop() {
 	p.abortAll(false)
-	if p.stopAttack != nil {
-		p.stopAttack(p)
-	}
+	p.SetInCombat(false)
 }
 
 // abortAll drops p's queued intentions and stops its attack, cast and move.
@@ -771,6 +774,23 @@ func (p *livePlayer) tryToIdle(denied bool) {
 	if busy {
 		p.SendFrame(serverpackets.FrameActionFailed())
 	}
+}
+
+// idleAfterCastStop is the idle a cast stop that ended no cast runs on a
+// player still able to act. One attacking, casting, sitting down or standing
+// up keeps its current intention, so a swing under way goes on: only the
+// intention queued behind it is dropped, and the idle answers ActionFailed.
+// Any other player drops every intention and stops walking, as goIdle does.
+func (p *livePlayer) idleAfterCastStop() {
+	if p.CastingNow() || (p.attack != nil && p.attack.AttackingNow()) || inPostureTransition(p) {
+		p.clearNextIntention()
+		if p.combat != nil {
+			p.combat.DropQueued()
+		}
+		p.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
+	p.goIdle()
 }
 
 // goIdle drops every intention p holds, active and queued, and stops its

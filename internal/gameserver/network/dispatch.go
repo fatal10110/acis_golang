@@ -26,6 +26,7 @@ import (
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -400,6 +401,7 @@ type GameClientLink struct {
 	// on their schedules and managed by //announce.
 	announcements *announcement.Registry
 	schemeBuffer  *schemebuffer.Manager
+	lottery       *lottery.Lottery
 	// wedding holds the couples and runs the marriage requests.
 	wedding *wedding.Manager
 	// derby is the monster race track the race managers answer for; nil
@@ -615,6 +617,8 @@ type GameClientLinkConfig struct {
 	// no couple, the shipped settings, and couples numbered from IDs when
 	// it can free them too.
 	Wedding *wedding.Manager
+	// Lottery is the Lucky Lottery; nil runs no round.
+	Lottery *lottery.Lottery
 	// Derby is the monster race track; nil runs no race.
 	Derby *derby.Track
 }
@@ -750,6 +754,10 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	if link.wedding == nil {
 		ids, _ := cfg.IDs.(wedding.IDs)
 		link.wedding = wedding.NewManager(wedding.DefaultConfig(), ids, nil)
+	}
+	link.lottery = cfg.Lottery
+	if link.lottery == nil {
+		link.lottery = lottery.New(lottery.DefaultConfig(), nil, nil, nil, cfg.Queues.NewQueue("lottery"), cfg.Log)
 	}
 	link.announcements = cfg.Announcements
 	if link.announcements == nil {

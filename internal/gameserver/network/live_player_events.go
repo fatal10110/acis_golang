@@ -566,14 +566,17 @@ func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definit
 	live.endCastIntention(def, target, stopped)
 }
 
-// endCastStop ends a cast stop, once the stopped cast's end has run: a stop
-// that ended a cast in flight, or that reached a player unable to act, idles
-// it; then the stop answers ActionFailed, and an interrupt reports itself
-// last. An idle refused for a player unable to act answers ActionFailed of
-// its own and leaves every intention in place.
+// endCastStop ends a cast stop, once the stopped cast's end has run: the
+// stop idles the player, then answers ActionFailed, and an interrupt reports
+// itself last. An idle refused for a player unable to act answers
+// ActionFailed of its own and leaves every intention in place. A stop that
+// ended no cast, on a player that can act, idles it as idleAfterCastStop
+// does: a swing or posture change under way goes on.
 func (live *livePlayer) endCastStop(e event.CastStopAck) {
 	if denied := live.Character.DenyAIActionBeforeEffect(); e.InFlight || denied {
 		live.tryToIdle(denied)
+	} else {
+		live.idleAfterCastStop()
 	}
 	sendMagicActionFailed(live)
 	if e.Broken {
@@ -638,9 +641,7 @@ func (live *livePlayer) attackAfterCast(def modelskill.Definition, target attack
 // order. Clearing the target leaves the intentions alone. Stopping the
 // attack sends the character idle, then answers ActionFailed; stopping the
 // cast answers MagicSkillCanceled (when one was running), sends the
-// character idle and answers ActionFailed. The cast stop idles the
-// character itself (endCastStop) unless it ended no cast and the character
-// can still act; that idle runs here.
+// character idle and answers ActionFailed (endCastStop).
 func (l *GameClientLink) stopLiveActions(live *livePlayer, e event.ActionsStopRequested) {
 	if e.ClearTarget {
 		old := live.Target()
@@ -656,9 +657,7 @@ func (l *GameClientLink) stopLiveActions(live *livePlayer, e event.ActionsStopRe
 		live.SendFrame(serverpackets.FrameActionFailed())
 	}
 	if e.Cast {
-		if !live.stopCastInFlight() && !live.Character.DenyAIActionBeforeEffect() {
-			live.tryToIdle(false)
-		}
+		live.stopCastInFlight()
 	}
 }
 
