@@ -170,7 +170,10 @@ func (l *GameClientLink) arriveHeldIntention(live *livePlayer) {
 // thought as its arrival thinks it, and an attack, pickup, summon interact,
 // follow or walk to a point is thought as an equip toggle re-runs it.
 func (l *GameClientLink) thinkCurrentIntention(live *livePlayer) {
-	if live.combat != nil && live.combat.Target() != nil {
+	// A cast queued behind the swing in flight leaves the attack the swing
+	// is for current; the THINK waits both out (thinkParkedCast).
+	queuedCast := live.hasParkedCast()
+	if live.combat != nil && live.combat.Target() != nil && !queuedCast {
 		live.thinkAttack()
 		return
 	}
@@ -178,7 +181,7 @@ func (l *GameClientLink) thinkCurrentIntention(live *livePlayer) {
 		l.toggleHeldItem(live, held.itemID)
 		return
 	}
-	if live.hasDeferredMagicSkill() || live.hasDeferredItemAICast() {
+	if queuedCast {
 		l.thinkParkedCast(live)
 		return
 	}

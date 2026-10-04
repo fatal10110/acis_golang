@@ -48,7 +48,9 @@ type PlayerAttack struct {
 	attack AttackController
 	log    zerolog.Logger
 
-	mu     sync.Mutex
+	mu sync.Mutex
+	// target is the current attack intention, nil when the current
+	// intention is not an attack.
 	target attackable.Combatant
 	// shift is the intention's shift modifier: an attack held with shift
 	// never walks, and goes idle once target is out of reach.
@@ -57,10 +59,13 @@ type PlayerAttack struct {
 	// it was requested mid-cast, is not thought until the cast ends, and
 	// ResumeAfterCast runs it then.
 	deferred bool
-	// queued marks the last think finding the actor busy with a swing, a bow
-	// reuse or a cast: the attack stays current and is also the next
-	// intention, which the end of a bow shot re-thinks.
-	queued bool
+	// next, held with nextShift, is an attack queued as the next intention
+	// behind a swing, a bow reuse or a cast: requested mid-swing, or the
+	// current attack re-queued by a think that found the actor busy. target
+	// stays the current intention until the swing or reuse ends and runs
+	// next; dropping only the next intention leaves target current.
+	next      attackable.Combatant
+	nextShift bool
 }
 
 // NewPlayerAttack builds an idle player attack intention loop.
@@ -109,16 +114,25 @@ func (p *PlayerAttack) start(target attackable.Combatant, shift, request bool) b
 		p.actor.RefuseAttackTarget()
 		return false
 	}
-	p.target, p.shift = target, shift
-	p.deferred, p.queued = false, false
 	if p.actor.CastingNow() {
+		p.target, p.shift = target, shift
 		p.deferred = true
+		p.dropNextLocked()
 		return false
 	}
 	if p.attack.AttackingNow() {
-		p.queued = true
+		// The request is the next intention; the attack the swing is for
+		// stays current until it ends. An attack waiting on a cast was a
+		// next intention too, which this one replaces.
+		if p.deferred {
+			p.target, p.shift, p.deferred = nil, false, false
+		}
+		p.queueLocked(target, shift)
 		return false
 	}
+	p.target, p.shift = target, shift
+	p.deferred = false
+	p.dropNextLocked()
 	accepted, _, err := p.thinkLocked(false)
 	if err != nil {
 		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
@@ -170,11 +184,27 @@ func (p *PlayerAttack) ResumeAfterCast(stopped bool) (resumed, actionFailed bool
 
 // ReplaceWithCast records a CAST intention taking the attack's place, current
 // or queued behind a cast: a skill request that starts now, or one queued
-// behind the swing or cast in flight. The attack is dropped: a finished
+// behind the cast in flight. The attack is dropped: a finished
 // nextActionAttack skill attacks its own final target (AttackAfterCast), not
 // the one it replaced. Movement is left alone: the cast owns it.
 func (p *PlayerAttack) ReplaceWithCast() {
 	p.Replace()
+}
+
+// QueueCastBehindSwing records a CAST intention queued as the next
+// intention behind the swing in flight. It replaces the attack queued as
+// the next intention, if any, and an attack waiting on a cast, which is a
+// next intention too. The current attack, the one the swing is for, stays
+// current until the swing ends, when the queued cast replaces it; dropping
+// the queued cast before then (DropQueued) leaves it current, re-thought at
+// the swing's end like any attack with nothing queued behind it.
+func (p *PlayerAttack) QueueCastBehindSwing() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.deferred {
+		p.target, p.shift, p.deferred = nil, false, false
+	}
+	p.dropNextLocked()
 }
 
 // AttackAfterCast makes target the attack intention once a nextActionAttack
@@ -189,7 +219,8 @@ func (p *PlayerAttack) AttackAfterCast(target attackable.Combatant, shift, stopp
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.target, p.shift = target, shift
-	p.deferred, p.queued = false, false
+	p.deferred = false
+	p.dropNextLocked()
 	_, actionFailed, err := p.thinkLocked(stopped)
 	if err != nil {
 		p.log.Warn().Err(err).Msg("ai: player attack broadcast")
@@ -204,7 +235,8 @@ func (p *PlayerAttack) Stop() {
 	p.stopLocked()
 }
 
-// Target returns the current attack target, or nil if idle.
+// Target returns the current attack target, or nil if idle. An attack
+// queued behind a swing or bow reuse is not current until it ends.
 func (p *PlayerAttack) Target() attackable.Combatant {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -235,20 +267,26 @@ func (p *PlayerAttack) Think() (actionFailed bool) {
 
 // FinishedAttack re-thinks the attack once a swing ends and reports whether
 // that is answered with ActionFailed. An attack queued behind the swing (a
-// request made mid-swing, or a think that found the swing in flight) runs
-// as the next intention. With nothing queued, the attack goes on only
-// against a target the player can keep attacking; against any other it goes
-// idle silently, without an ActionFailed. An attack waiting on a cast is not
-// current and is not thought.
+// request made mid-swing, or a think that found the swing in flight)
+// becomes current and runs, whatever its target. With nothing queued, the
+// current attack goes on only against a target the player can keep
+// attacking; against any other it goes idle silently, without an
+// ActionFailed. An attack waiting on a cast is not current and is not
+// thought.
 func (p *PlayerAttack) FinishedAttack() (actionFailed bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.deferred || p.target == nil {
+	if p.deferred {
 		return false
 	}
-	if !p.queued && !canKeepAttacking(p.actor, p.target) {
-		p.stopLocked()
-		return false
+	if !p.promoteNextLocked() {
+		if p.target == nil {
+			return false
+		}
+		if !canKeepAttacking(p.actor, p.target) {
+			p.stopLocked()
+			return false
+		}
 	}
 	_, actionFailed, err := p.thinkLocked(false)
 	if err != nil {
@@ -263,26 +301,27 @@ func (p *PlayerAttack) Replace() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.target, p.shift = nil, false
-	p.deferred, p.queued = false, false
+	p.deferred = false
+	p.dropNextLocked()
 }
 
 // DropQueued drops the attack queued as the next intention behind a swing,
-// bow reuse or cast, keeping it current: the end of the swing re-thinks it
-// only against a target the player can keep attacking.
+// bow reuse or cast, keeping the current one: the end of the swing re-thinks
+// it only against a target the player can keep attacking.
 func (p *PlayerAttack) DropQueued() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.queued = false
+	p.dropNextLocked()
 }
 
-// ThinkQueued re-evaluates the attack only when the last think queued it
-// behind the actor's swing, bow reuse or cast, as the end of a bow shot
-// does; otherwise nothing happens. It reports whether the think is answered
-// with ActionFailed.
+// ThinkQueued runs the attack queued as the next intention behind the
+// actor's swing, bow reuse or cast, as the end of a bow shot does: it
+// becomes current and is thought. With none queued nothing happens. It
+// reports whether the think is answered with ActionFailed.
 func (p *PlayerAttack) ThinkQueued() (actionFailed bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if !p.queued || p.deferred {
+	if p.deferred || !p.promoteNextLocked() {
 		return false
 	}
 	_, actionFailed, err := p.thinkLocked(false)
@@ -302,7 +341,8 @@ func (p *PlayerAttack) ThinkQueued() (actionFailed bool) {
 // fake-dead actor still closes distance first and only fails the attack
 // once in range, through CanAttack. Only once in range and stopped does a
 // swing, bow reuse or cast in flight hold the attack: it stays current,
-// becomes the next intention too, and is answered with ActionFailed. A
+// becomes the next intention too, replacing an attack queued there, and is
+// answered with ActionFailed. A
 // shift-held attack out of reach goes idle with ActionFailed, not walking.
 // castStopping counts a cast whose stop is still being reported as in
 // flight.
@@ -310,7 +350,7 @@ func (p *PlayerAttack) thinkLocked(castStopping bool) (accepted, actionFailed bo
 	if p.target == nil {
 		return false, false, nil
 	}
-	p.queued = false
+	p.dropNextLocked()
 
 	if p.actor.DenyAIAction() || !p.actor.Standing() || p.targetLost(p.target) {
 		p.stopLocked()
@@ -333,7 +373,7 @@ func (p *PlayerAttack) thinkLocked(castStopping bool) (accepted, actionFailed bo
 	p.move.Stop()
 
 	if p.attack.BowCoolingDown() || p.attack.AttackingNow() || p.actor.CastingNow() || castStopping {
-		p.queued = true
+		p.queueLocked(p.target, p.shift)
 		return false, true, nil
 	}
 
@@ -348,8 +388,31 @@ func (p *PlayerAttack) thinkLocked(castStopping bool) (accepted, actionFailed bo
 
 func (p *PlayerAttack) stopLocked() {
 	p.target, p.shift = nil, false
-	p.deferred, p.queued = false, false
+	p.deferred = false
+	p.dropNextLocked()
 	p.move.Stop()
+}
+
+// queueLocked makes an attack on target, held with shift, the next
+// intention, replacing any attack queued there.
+func (p *PlayerAttack) queueLocked(target attackable.Combatant, shift bool) {
+	p.next, p.nextShift = target, shift
+}
+
+// dropNextLocked drops the attack queued as the next intention, if any.
+func (p *PlayerAttack) dropNextLocked() {
+	p.next, p.nextShift = nil, false
+}
+
+// promoteNextLocked makes the attack queued as the next intention current,
+// reporting whether one was queued.
+func (p *PlayerAttack) promoteNextLocked() bool {
+	if p.next == nil {
+		return false
+	}
+	p.target, p.shift = p.next, p.nextShift
+	p.dropNextLocked()
+	return true
 }
 
 func (p *PlayerAttack) targetLost(target attackable.Combatant) bool {
