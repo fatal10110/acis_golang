@@ -61,6 +61,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
 	"github.com/fatal10110/acis_golang/internal/gameserver/raidpoint"
+	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -194,6 +195,7 @@ type options struct {
 	doors                  []*door.Template
 	boats                  []route.BoatItinerary
 	petitionConfig         *petition.Config
+	schemeBuffer           *schemebuffer.Manager
 	// rewardPartiesWrap wraps the link's kill-party resolver
 	// (WithRewardParties).
 	rewardPartiesWrap func(gamemanager.RewardParties) gamemanager.RewardParties
@@ -1846,6 +1848,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
 	gclConfig.ArmorSets = o.armorSets
 	gclConfig.Manor = o.manor
+	gclConfig.SchemeBuffer = o.schemeBuffer
 	gclConfig.Relations, gclConfig.Characters = relations, chars
 	gclConfig.AccessLevels = chars
 	gclConfig.Punishments = chars

@@ -38,6 +38,7 @@ func NewBufferSkill(skillID int32, category string, level *int, price int, descr
 // BufferTable is an in-memory lookup of scheme-buffer skills by id.
 type BufferTable struct {
 	byID       map[ID]BufferSkill
+	order      []ID
 	categories []string
 }
 
@@ -63,7 +64,7 @@ func NewBufferTable(entries []BufferSkill) (*BufferTable, error) {
 		categories = append(categories, entry.Category)
 	}
 
-	return &BufferTable{byID: byID, categories: categories}, nil
+	return &BufferTable{byID: byID, order: ids, categories: categories}, nil
 }
 
 // Count returns the number of scheme-buffer skills in the table.
@@ -80,4 +81,17 @@ func (t *BufferTable) Skill(skillID int32) (BufferSkill, bool) {
 // Categories returns the distinct skill categories in first-seen order.
 func (t *BufferTable) Categories() []string {
 	return append([]string(nil), t.categories...)
+}
+
+// Entries returns every scheme-buffer skill in first-seen id order: an id
+// listed again keeps its first place and takes its last entry.
+func (t *BufferTable) Entries() []BufferSkill {
+	if t == nil {
+		return nil
+	}
+	out := make([]BufferSkill, 0, len(t.order))
+	for _, id := range t.order {
+		out = append(out, t.byID[id])
+	}
+	return out
 }

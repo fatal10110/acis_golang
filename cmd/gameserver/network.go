@@ -25,6 +25,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/raidpoint"
+	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -110,6 +111,7 @@ func provideGameClientLink(
 	clans *clan.Service,
 	board communityBoard,
 	announcements *announcement.Registry,
+	schemeBuffer *schemebuffer.Manager,
 	log zerolog.Logger,
 	gmAudit gmAuditLogger,
 	chatLog chatLogger,
@@ -248,6 +250,7 @@ func provideGameClientLink(
 		Favorites:      board.Favorites,
 		ShowServerNews: board.ShowServerNews,
 		Announcements:  announcements,
+		SchemeBuffer:   schemeBuffer,
 	})
 	if err != nil {
 		return nil, err

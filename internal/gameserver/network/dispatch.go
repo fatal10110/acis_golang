@@ -55,6 +55,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/petitem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/raidpoint"
+	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -396,6 +397,7 @@ type GameClientLink struct {
 	// announcements are the server announcements: read at login, repeated
 	// on their schedules and managed by //announce.
 	announcements *announcement.Registry
+	schemeBuffer  *schemebuffer.Manager
 	// npcSpawns is the live NPC population the admin spawn commands use;
 	// see SetNpcSpawns.
 	npcSpawns atomic.Pointer[manager.Npcs]
@@ -599,6 +601,9 @@ type GameClientLinkConfig struct {
 	// Announcements are the server announcements; nil holds them in
 	// memory only, starting with none.
 	Announcements *announcement.Registry
+	// SchemeBuffer is the scheme buffer's buffs and every player's
+	// schemes; nil offers no buff and starts with no scheme.
+	SchemeBuffer *schemebuffer.Manager
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -722,6 +727,10 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	}
 	if link.board.favorites == nil {
 		link.board.favorites = bbs.NewFavorites(nil, nil, cfg.Log)
+	}
+	link.schemeBuffer = cfg.SchemeBuffer
+	if link.schemeBuffer == nil {
+		link.schemeBuffer = schemebuffer.New(schemebuffer.DefaultConfig(), nil, nil)
 	}
 	link.announcements = cfg.Announcements
 	if link.announcements == nil {
