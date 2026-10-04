@@ -20,3 +20,15 @@ func HTMLValue(value string) string {
 	}
 	return b.String()
 }
+
+// StripLinkWords takes the words "action" and "bypass" out of text a
+// player wrote, so it carries no link once an HTML window shows it. It
+// runs on the text as the window shows it, after HTMLValue has dropped the
+// quoting backslashes, so "act\ion" cannot turn back into a link word, and
+// it repeats until neither word is left, so "actactionion" cannot either.
+func StripLinkWords(text string) string {
+	for strings.Contains(text, "action") || strings.Contains(text, "bypass") {
+		text = strings.ReplaceAll(strings.ReplaceAll(text, "action", ""), "bypass", "")
+	}
+	return text
+}
