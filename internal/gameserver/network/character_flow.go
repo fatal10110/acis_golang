@@ -727,6 +727,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	live.remoteIP = client.Session.remoteIP()
 	delivery.live = live
 	c.Attach(creatureLive, live)
+	c.SetWorldHandle(live)
 	moveCtl, err := move.NewController(c.Move(), c, live)
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)

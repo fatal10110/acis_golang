@@ -486,8 +486,26 @@ func (c *Character) relocate(position location.Location, placed bool) {
 	if c.world == nil {
 		return
 	}
-	_ = c.world.Move(c, position.X, position.Y, position.Z)
+	_ = c.world.Move(c.tracked(), position.X, position.Y, position.Z)
 	c.emit(event.Relocated{Previous: previous, Placed: placed})
+}
+
+// SetWorldHandle names t, the object that embeds c, as the one the world
+// registers c under. c's own moves relocate t: the grid places and removes
+// objects by identity, and only t observes and is rendered to others. Call
+// it before c enters the world.
+func (c *Character) SetWorldHandle(t world.Tracked) {
+	c.stateMu.Lock()
+	c.worldHandle = t
+	c.stateMu.Unlock()
+}
+
+// tracked returns the object the world registers c under.
+func (c *Character) tracked() world.Tracked {
+	if c.worldHandle != nil {
+		return c.worldHandle
+	}
+	return c
 }
 
 // SetLastKnownPosition records position and heading as this player's last
