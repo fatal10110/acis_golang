@@ -4,8 +4,9 @@
 // heroes_diary.
 //
 // An elected hero stays inactive until it claims the status at a Monument
-// of Heroes; only an active hero is a hero in game. The diary and fight
-// history pages and the hero's message are not read back yet (#3361).
+// of Heroes; only an active hero is a hero in game. It also keeps what a
+// hero's pages show: the diary, the Olympiad fights and the hero's
+// message, stored in the heroes table at shutdown.
 package hero
 
 import (
@@ -87,6 +88,16 @@ type Store interface {
 	SaveHeroes(ctx context.Context, heroes map[int32]Hero) error
 	// AddDiaryEntry stores one diary entry made at at, in Unix milliseconds.
 	AddDiaryEntry(ctx context.Context, objectID int32, at int64, action, param int) error
+	// LoadDiary returns objectID's diary entries, oldest first.
+	LoadDiary(ctx context.Context, objectID int32) ([]DiaryRow, error)
+	// LoadFights returns objectID's Olympiad fights started before before,
+	// in Unix milliseconds, oldest first.
+	LoadFights(ctx context.Context, objectID int32, before int64) ([]FightRow, error)
+	// LoadMessage returns objectID's hero message; found is false when
+	// objectID is no stored hero.
+	LoadMessage(ctx context.Context, objectID int32) (message string, found bool, err error)
+	// SaveMessages stores each hero's message.
+	SaveMessages(ctx context.Context, messages map[int32]string) error
 }
 
 // Writer runs a database write later, on ownerID's persistence lane.
@@ -110,6 +121,7 @@ type Online interface {
 type Manager struct {
 	store      Store
 	clans      Clans
+	names      Names
 	writes     Writer
 	minMatches int
 	now        func() time.Time
@@ -122,21 +134,23 @@ type Manager struct {
 	// elected, both by character object id.
 	heroes  map[int32]Hero
 	allTime map[int32]Hero
+	records records
 }
 
 // New returns a Manager persisting through store, its writes queued on
-// writes (run inline when nil), and reading the clan names and crests the
-// heroes show from clans. An election picks only nobles with at least
+// writes (run inline when nil), reading the clan names and crests the
+// heroes show from clans and the raid bosses and castles their diaries
+// tell of from names. An election picks only nobles with at least
 // minMatches matches. Restore then Start bring it up.
-func New(store Store, clans Clans, writes Writer, minMatches int, now func() time.Time, log zerolog.Logger) *Manager {
+func New(store Store, clans Clans, names Names, writes Writer, minMatches int, now func() time.Time, log zerolog.Logger) *Manager {
 	return &Manager{
-		store: store, clans: clans, writes: writes, minMatches: minMatches, now: now, log: log,
-		heroes: map[int32]Hero{}, allTime: map[int32]Hero{},
+		store: store, clans: clans, names: names, writes: writes, minMatches: minMatches, now: now, log: log,
+		heroes: map[int32]Hero{}, allTime: map[int32]Hero{}, records: newRecords(),
 	}
 }
 
 // Restore loads the heroes: every stored one whose character exists, the
-// running era's among them.
+// running era's among them with their fights, diaries and messages.
 func (m *Manager) Restore(ctx context.Context) error {
 	rows, err := m.store.LoadHeroes(ctx)
 	if err != nil {
@@ -154,6 +168,12 @@ func (m *Manager) Restore(ctx context.Context) error {
 	m.mu.Lock()
 	m.heroes, m.allTime = heroes, allTime
 	m.mu.Unlock()
+	for _, r := range rows {
+		if r.Played {
+			m.loadRecords(ctx, r.ObjectID)
+			m.loadMessage(ctx, r.ObjectID)
+		}
+	}
 	m.log.Info().Int("heroes", len(heroes)).Int("all_time", len(allTime)).Msg("hero: restored")
 	return nil
 }
@@ -220,7 +240,9 @@ func (m *Manager) Heroes() []Hero {
 // Activate has objectID claim the hero status it was elected to, and
 // returns its entry. It reports false, changing nothing, unless objectID
 // is an inactive hero of the running era, so two claims never both
-// succeed. The claim's diary entry and the heroes are stored behind it.
+// succeed. The hero's message is emptied; the claim's diary entry is
+// stored, then the hero's fights and diary are read back into its pages,
+// then the heroes are stored, all behind it.
 //
 // The save reads the heroes when it runs, not when the claim queues it:
 // an election queued before the claim has replaced them by then, and a
@@ -234,8 +256,13 @@ func (m *Manager) Activate(objectID int32) (Hero, bool) {
 	}
 	h.Active = true
 	m.heroes[objectID] = h
+	m.records.messages[objectID] = ""
 	m.mu.Unlock()
 	m.AddDiaryEntry(objectID, DiaryHeroGained, 0)
+	m.write("load hero records", func(ctx context.Context) error {
+		m.loadRecords(ctx, objectID)
+		return nil
+	})
 	m.write("save heroes", func(ctx context.Context) error {
 		m.mu.Lock()
 		heroes := maps.Clone(m.heroes)
@@ -245,11 +272,15 @@ func (m *Manager) Activate(objectID int32) (Hero, bool) {
 	return h, true
 }
 
-// AddDiaryEntry queues a diary entry for objectID, dated now.
+// AddDiaryEntry queues a diary entry for objectID, dated now. A raid boss
+// kill or a castle taken also joins the diary pages once stored, when
+// objectID has a diary page.
 func (m *Manager) AddDiaryEntry(objectID int32, action, param int) {
 	at := m.now().UnixMilli()
 	m.write("add diary entry", func(ctx context.Context) error {
-		return m.store.AddDiaryEntry(ctx, objectID, at, action, param)
+		err := m.store.AddDiaryEntry(ctx, objectID, at, action, param)
+		m.noteDiaryEntry(objectID, at, action, param)
+		return err
 	})
 }
 
@@ -264,7 +295,11 @@ func (m *Manager) AddDiaryEntry(objectID int32, action, param int) {
 //
 // The outgoing heroes leave as the election starts, so none can claim its
 // status meanwhile and store the ending era's heroes behind the new ones.
+// Before anything, every hero loses its pages and its message.
 func (m *Manager) Elect(ctx context.Context) {
+	m.mu.Lock()
+	m.records.reset()
+	m.mu.Unlock()
 	if err := m.store.ResetPlayed(ctx); err != nil {
 		m.log.Error().Err(err).Msg("hero: reset the running era's heroes")
 	}

@@ -127,6 +127,7 @@ type options struct {
 	admin                  *admin.Data
 	gmStartupUnlisted      bool
 	gmStartupModes         [3]bool
+	gmHeroAura             bool
 	gmAudit                zerolog.Logger
 	chat                   network.ChatConfig
 	restarts               *restart.Table
@@ -176,6 +177,7 @@ type options struct {
 	seedShortcuts          func(*gamesql.ShortcutStore)
 	seedHennas             func(db *sql.DB, hennas *gamesql.HennaStore)
 	seedSevenSigns         func(*gamesql.SevenSignsStore)
+	sevenSignsTimer        func(time.Duration, func()) *time.Timer
 	seedFestival           func(*gamesql.FestivalStore)
 	festivalClock          func() time.Time
 	clanConfig             *clan.Config
@@ -338,6 +340,10 @@ func WithGMStartupUnlisted() Option { return func(o *options) { o.gmStartupUnlis
 func WithGMStartupModes(invulnerable, invisible, blockAll bool) Option {
 	return func(o *options) { o.gmStartupModes = [3]bool{invulnerable, invisible, blockAll} }
 }
+
+// WithGMHeroAura sets players.properties GMHeroAura = True: a game master
+// shows the hero aura.
+func WithGMHeroAura() Option { return func(o *options) { o.gmHeroAura = true } }
 
 // WithGMAudit records every admin command run to log (server.properties
 // GMAudit = True); by default nothing is recorded.
@@ -674,6 +680,12 @@ func WithFestivalClock(now func() time.Time) Option {
 // Signs calendar restores it, so boot-time period catch-up can be exercised.
 func WithSevenSignsSeed(seed func(*gamesql.SevenSignsStore)) Option {
 	return func(o *options) { o.seedSevenSigns = seed }
+}
+
+// WithSevenSignsTimer schedules the Seven Signs period changes through
+// afterFunc instead of a real timer, so a test can fire one at will.
+func WithSevenSignsTimer(afterFunc func(time.Duration, func()) *time.Timer) Option {
+	return func(o *options) { o.sevenSignsTimer = afterFunc }
 }
 
 // WithNPCs supplies the NPC template table wired into the link (and the
@@ -1846,7 +1858,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.seedSevenSigns != nil {
 		o.seedSevenSigns(sevenSignsStore)
 	}
-	sevenSigns := sevensigns.NewState(sevenSignsStore, network.NewSevenSignsBroadcaster(state), o.log, time.Now, nil)
+	sevenSigns := sevensigns.NewState(sevenSignsStore, network.NewSevenSignsBroadcaster(state), o.log, time.Now, o.sevenSignsTimer)
 	if err := sevenSigns.Restore(context.Background()); err != nil {
 		t.Fatalf("restore seven signs status: %v", err)
 	}
@@ -1997,6 +2009,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.PlayerConfig.AutoLearnSkills = o.autoLearnSkills
 	gclConfig.ClassMaster = o.classMaster
 	gclConfig.PlayerConfig.GMStartupInvulnerable, gclConfig.PlayerConfig.GMStartupInvisible, gclConfig.PlayerConfig.GMStartupBlockAll = o.gmStartupModes[0], o.gmStartupModes[1], o.gmStartupModes[2]
+	gclConfig.PlayerConfig.GMHeroAura = o.gmHeroAura
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
 	gclConfig.ArmorSets = o.armorSets
 	gclConfig.Manor = o.manor
@@ -2074,7 +2087,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// The Olympiad's records are restored once the characters are seeded,
 	// below; its calendar is started only for WithOlympiadCompetition or
 	// WithOlympiadValidation.
-	heroes := hero.New(gamesql.NewHeroStore(db), gclConfig.Clans.Table(), persistWorker, HeroMinMatches, time.Now, o.log)
+	heroes := hero.New(gamesql.NewHeroStore(db), gclConfig.Clans.Table(), hero.TableNames{NPCs: o.npcs, Castles: gclConfig.Castles}, persistWorker, HeroMinMatches, time.Now, o.log)
 	gclConfig.Heroes = heroes
 	olympiadQueue := queues.NewQueue("olympiad")
 	olympiadState := olympiad.New(o.olympiadWindow.config(olympiadQueue.Now()), gamesql.NewOlympiadStore(db), persistWorker, network.NewOlympiadAnnouncer(state), heroes, olympiadQueue, o.log)
@@ -2097,6 +2110,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("gameservertest: build game client link: %v", err)
 	}
 	effects.SetShadowItemExpiry(gcl.ExpireShadowItem)
+	// Production hands the link over before the period-change timer is
+	// armed; here the link exists only now, so a change firing earlier
+	// reaches no player, as none is online yet.
+	sevenSigns.SetOnline(gcl)
 	var npcSpawns *gamemanager.Npcs
 	var npcRespawns *task.Respawn
 	if o.npcSpawns != nil {

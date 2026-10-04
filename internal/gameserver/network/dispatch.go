@@ -238,6 +238,9 @@ type PlayerConfig struct {
 	GMStartupInvulnerable bool
 	GMStartupInvisible    bool
 	GMStartupBlockAll     bool
+	// GMHeroAura is players.properties GMHeroAura: a game master shows the
+	// hero aura.
+	GMHeroAura bool
 	// CraftingDisabled is players.properties CraftingEnabled inverted, so
 	// the zero value keeps crafting on as the shipped config does.
 	CraftingDisabled bool

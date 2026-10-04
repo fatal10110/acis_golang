@@ -199,7 +199,7 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"RequestActionUse with an action id no handler claims", encodeRequestActionUse(9999, false, false), []byte{serverpackets.OpcodeActionFailed}},
 		{"RequestActionUse pet command with no active summon", encodeRequestActionUse(16, false, false), []byte{serverpackets.OpcodeActionFailed}},
 		{"Action on the selected player itself (a follow of oneself)", encodeActionOn(self, false), []byte{serverpackets.OpcodeActionFailed}},
-		{"RequestBypassToServer for a command family not modeled yet", encodeRequestBypassToServer("_match?class=88&page=1"), []byte{serverpackets.OpcodeActionFailed}},
+		{"RequestBypassToServer for a command family not modeled yet", encodeRequestBypassToServer("arenachange 0"), []byte{serverpackets.OpcodeActionFailed}},
 		{"RequestShowBoard while the community board is off", encodeRequestShowBoard(), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestBBSwrite while the community board is off", encodeRequestBBSWrite("Mail", "Send"), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestGmList with no game master online", wire.NewPacketWriter(clientpackets.OpcodeRequestGmList).Bytes(), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodePlaySound}},

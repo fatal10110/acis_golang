@@ -18,6 +18,9 @@ type recallPlayer struct {
 
 	teleports [][4]int
 	recalls   []modelskill.RecallType
+	// in7sDungeon is the dungeon membership; leftDungeonFirst records
+	// whether it was cleared before the first move.
+	in7sDungeon, leftDungeonFirst bool
 }
 
 func (p *recallPlayer) Afraid() bool                      { return p.afraid }
@@ -31,6 +34,13 @@ func (p *recallPlayer) Flying() bool                      { return p.flying }
 func (p *recallPlayer) Recall(dest modelskill.RecallType) { p.recalls = append(p.recalls, dest) }
 func (p *recallPlayer) TeleportTo(x, y, z, radius int) {
 	p.teleports = append(p.teleports, [4]int{x, y, z, radius})
+}
+
+func (p *recallPlayer) SetIn7sDungeon(in bool) {
+	if !in && p.in7sDungeon && !p.moved() {
+		p.leftDungeonFirst = true
+	}
+	p.in7sDungeon = in
 }
 
 func (p *recallPlayer) moved() bool { return len(p.teleports)+len(p.recalls) > 0 }

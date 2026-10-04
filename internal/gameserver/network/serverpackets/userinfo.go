@@ -67,6 +67,9 @@ type UserInfoSnapshot struct {
 	// Clan is Character's clan as the status window shows it; zero when
 	// clanless.
 	Clan ClanFields
+	// HeroAura shows the hero aura on a Character that is no hero: a game
+	// master while GMHeroAura is set.
+	HeroAura bool
 }
 
 // ClanFields is the clan part of a player's UserInfo and CharInfo.
@@ -292,7 +295,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	}
 	w.WriteInt32(s.Clan.CrestLargeID)
 	w.WriteUint8(boolUint8(c.IsNoble()))
-	w.WriteUint8(boolUint8(c.IsHero()))
+	w.WriteUint8(boolUint8(c.IsHero() || s.HeroAura))
 	bait := c.FishingBait()
 	w.WriteUint8(boolUint8(c.Fishing()))
 	w.WriteInt32(int32(bait.X))

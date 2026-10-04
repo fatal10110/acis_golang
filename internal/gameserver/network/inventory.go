@@ -167,7 +167,8 @@ func wieldsFishingRod(inv *itemcontainer.Inventory) bool {
 }
 
 // toggleEquipItem puts inst on, or takes it off when it is worn, for
-// UseItem. A weapon loses its shot charges either way. Taking an item off
+// UseItem. A hero item is refused as a bad condition unless live is an
+// active hero. A weapon loses its shot charges either way. Taking an item off
 // announces it before the paperdoll changes; putting one on announces it
 // after, then recharges auto-use shots for a main-hand weapon. With
 // abortAttack the attack in progress stops and ActionFailed answers it once
@@ -182,7 +183,7 @@ func (l *GameClientLink) toggleEquipItem(live *livePlayer, inv *itemcontainer.In
 	if st.Equipped() {
 		sendUnequippedMessage(live, st.TemplateID, st.EnchantLevel)
 	}
-	res, failure := l.inventory.ToggleEquipItem(inv, st.ObjectID)
+	res, failure := l.inventory.ToggleEquipItem(inv, st.ObjectID, l.heroes != nil && l.heroes.IsActive(live.ObjectID()))
 	switch failure {
 	case invops.EquipOK:
 	case invops.EquipBadCondition:

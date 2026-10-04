@@ -85,9 +85,8 @@ func (l *GameClientLink) punish(live *livePlayer, kind player.Punishment, minute
 		if l.olympiadRegistered(live) {
 			l.dropOlympiadCompetitor(live)
 		}
-		// The Seven Signs dungeon flag is cleared here (#222) once that
-		// system exists.
 		l.sendPunishmentPage(live, jailInPage)
+		live.SetIn7sDungeon(false)
 		l.teleportLivePlayer(live, jailLocation, jailEntryOffset)
 	}
 	l.storePunishment(live)

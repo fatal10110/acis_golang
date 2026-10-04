@@ -9,10 +9,7 @@ import (
 func (s *State) PlayerCabal(objectID int32) Cabal {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if p, ok := s.players[objectID]; ok {
-		return p.Cabal
-	}
-	return NoCabal
+	return s.playerCabalLocked(objectID)
 }
 
 // PlayerSeal returns the seal objectID chose, NoSeal when none.
