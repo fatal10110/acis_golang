@@ -72,8 +72,8 @@ func (d Drop) RandomAmount() int32 {
 }
 
 // DropCategory is one weighted group of possible drops an NPC template
-// carries (e.g. one spoil result, one general drop table). See Roll for how
-// a category resolves against a kill.
+// carries (e.g. one spoil result, one general drop table). See rollOrdered
+// for how a category resolves against a kill.
 type DropCategory struct {
 	Kind   DropKind
 	Chance float64
@@ -89,40 +89,26 @@ const maxRollChance = 1_000_000
 // the maxRollChance range.
 const rollChanceScale = maxRollChance / 100.0
 
-// Roll evaluates this category once per whole unit of rate (a fractional
-// remainder still gets one extra attempt, e.g. a rate of 1.5 rolls twice)
-// and returns the resulting item quantities keyed by item ID, merging
-// duplicates when more than one attempt or drop lands on the same item.
-// levelMultiplier scales the category's base chance down for an
-// out-leveled kill (1 leaves it unaffected); rate is the drop-rate
-// multiplier already resolved for this category's kind and raid/non-raid
-// status (see Rates.Resolve). A zero chance, multiplier, or rate never
-// drops.
-//
-// A spoil category evaluates every one of its drops independently on each
-// attempt (a spoil pool can accumulate several items at once); any other
-// category picks at most one drop per attempt, weighted by each drop's
-// share of the category's cumulative chance.
-func (c DropCategory) Roll(levelMultiplier, rate float64) map[int32]int32 {
-	rolled := c.rollOrdered(levelMultiplier, rate)
-	if len(rolled) == 0 {
-		return nil
-	}
-	result := make(map[int32]int32, len(rolled))
-	for _, d := range rolled {
-		result[d.ItemID] = d.Count
-	}
-	return result
-}
-
 // rolledDrop is one item a category roll produced, with its merged count.
 type rolledDrop struct {
 	ItemID, Count int32
 }
 
-// rollOrdered is Roll returning the merged results in the order the
-// reference walks its per-category result map (see dropMerger), the order a
-// kill drops them in.
+// rollOrdered evaluates this category once per whole unit of rate (a
+// fractional remainder still gets one extra attempt, e.g. a rate of 1.5 rolls
+// twice) and returns the resulting item quantities, merging duplicates when
+// more than one attempt or drop lands on the same item. The results come in
+// the order the reference walks its per-category result map (see
+// dropMerger), the order a kill drops them in. levelMultiplier scales the
+// category's base chance down for an out-leveled kill (1 leaves it
+// unaffected); rate is the drop-rate multiplier already resolved for this
+// category's kind and raid/non-raid status (see Rates.Resolve). A zero
+// chance, multiplier, or rate never drops.
+//
+// A spoil category evaluates every one of its drops independently on each
+// attempt (a spoil pool can accumulate several items at once); any other
+// category picks at most one drop per attempt, weighted by each drop's
+// share of the category's cumulative chance.
 func (c DropCategory) rollOrdered(levelMultiplier, rate float64) []rolledDrop {
 	if c.Chance == 0 || levelMultiplier == 0 || rate == 0 {
 		return nil
@@ -159,7 +145,7 @@ func (c DropCategory) rollOrdered(levelMultiplier, rate float64) []rolledDrop {
 }
 
 // Rates holds the configured drop-rate multipliers, one per DropKind, that
-// Roll's rate argument is drawn from. A caller assembles this from server
+// rollOrdered's rate argument is drawn from. A caller assembles this from server
 // configuration.
 type Rates struct {
 	Spoil    float64

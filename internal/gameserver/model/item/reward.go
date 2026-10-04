@@ -25,7 +25,7 @@ type KillDrop struct {
 //     drops, each dropped apart.
 //
 // levelMultiplier and raid are forwarded to every category's roll exactly
-// as DropCategory.Roll expects; rates resolves the per-kind drop-rate
+// as DropCategory.rollOrdered expects; rates resolves the per-kind drop-rate
 // multiplier. pool may be nil, in which case spoil categories are skipped
 // entirely (equivalent to an unspoiled monster).
 func RollKillReward(categories []DropCategory, pool *SpoilPool, levelMultiplier float64, raid bool, rates Rates, autoLootHerbs bool) []KillDrop {

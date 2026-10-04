@@ -165,22 +165,22 @@ func TestDropRandomAmount(t *testing.T) {
 func TestDropCategoryRollBoundaries(t *testing.T) {
 	t.Run("zero category chance never drops", func(t *testing.T) {
 		c := DropCategory{Kind: DropNormal, Chance: 0, Drops: []Drop{{ItemID: 1, Min: 1, Max: 1, Chance: 100}}}
-		if got := c.Roll(1, 1); got != nil {
-			t.Fatalf("Roll() = %v, want nil", got)
+		if got := c.rollOrdered(1, 1); got != nil {
+			t.Fatalf("rollOrdered() = %v, want nil", got)
 		}
 	})
 
 	t.Run("zero level multiplier never drops", func(t *testing.T) {
 		c := DropCategory{Kind: DropNormal, Chance: 100, Drops: []Drop{{ItemID: 1, Min: 1, Max: 1, Chance: 100}}}
-		if got := c.Roll(0, 1); got != nil {
-			t.Fatalf("Roll() = %v, want nil", got)
+		if got := c.rollOrdered(0, 1); got != nil {
+			t.Fatalf("rollOrdered() = %v, want nil", got)
 		}
 	})
 
 	t.Run("zero rate never drops", func(t *testing.T) {
 		c := DropCategory{Kind: DropNormal, Chance: 100, Drops: []Drop{{ItemID: 1, Min: 1, Max: 1, Chance: 100}}}
-		if got := c.Roll(1, 0); got != nil {
-			t.Fatalf("Roll() = %v, want nil", got)
+		if got := c.rollOrdered(1, 0); got != nil {
+			t.Fatalf("rollOrdered() = %v, want nil", got)
 		}
 	})
 
@@ -193,19 +193,18 @@ func TestDropCategoryRollBoundaries(t *testing.T) {
 				{ItemID: 20, Min: 3, Max: 3, Chance: 50},
 			},
 		}
-		got := c.Roll(1, 3)
 		total := int32(0)
-		for id, qty := range got {
-			if id != 10 && id != 20 {
-				t.Fatalf("Roll() produced unexpected item %d", id)
+		for _, d := range c.rollOrdered(1, 3) {
+			if d.ItemID != 10 && d.ItemID != 20 {
+				t.Fatalf("rollOrdered() produced unexpected item %d", d.ItemID)
 			}
-			total += qty
+			total += d.Count
 		}
 		// 3 attempts, each contributing 2 or 3 units; both bounds are the
 		// same 2/3, so the sum must land in [6, 9] and be a multiple
 		// achievable by 3 picks of {2,3}.
 		if total < 6 || total > 9 {
-			t.Fatalf("Roll() total = %d, want in [6,9]", total)
+			t.Fatalf("rollOrdered() total = %d, want in [6,9]", total)
 		}
 	})
 
@@ -218,9 +217,9 @@ func TestDropCategoryRollBoundaries(t *testing.T) {
 				{ItemID: 20, Min: 1, Max: 1, Chance: 100},
 			},
 		}
-		got := c.Roll(1, 1)
+		got := rolledTotals(c.rollOrdered(1, 1))
 		if got[10] != 1 || got[20] != 1 {
-			t.Fatalf("Roll() = %v, want both items at 1 each", got)
+			t.Fatalf("rollOrdered() = %v, want both items at 1 each", got)
 		}
 	})
 
@@ -230,11 +229,21 @@ func TestDropCategoryRollBoundaries(t *testing.T) {
 			Chance: 100,
 			Drops:  []Drop{{ItemID: 10, Min: 1, Max: 1, Chance: 100}},
 		}
-		got := c.Roll(1, 1.5)
+		got := rolledTotals(c.rollOrdered(1, 1.5))
 		if got[10] != 2 {
-			t.Fatalf("Roll() = %v, want item 10 at 2 (two attempts from a 1.5 rate)", got)
+			t.Fatalf("rollOrdered() = %v, want item 10 at 2 (two attempts from a 1.5 rate)", got)
 		}
 	})
+}
+
+// rolledTotals keys a category roll's results by item id, for the
+// boundary tests that only check per-item totals.
+func rolledTotals(rolled []rolledDrop) map[int32]int32 {
+	totals := make(map[int32]int32, len(rolled))
+	for _, d := range rolled {
+		totals[d.ItemID] += d.Count
+	}
+	return totals
 }
 
 func TestRatesResolve(t *testing.T) {
@@ -929,7 +938,7 @@ func TestRollKillRewardListsNormalAndCurrencyInItems(t *testing.T) {
 }
 
 func TestRollKillRewardUsesRaidRateForNormalDrops(t *testing.T) {
-	// A rate below 1 means the category never rolls (Roll's loop condition
+	// A rate below 1 means the category never rolls (rollOrdered's loop condition
 	// is float64(i) < rate, so rate 0 never enters the loop). Using Item=0,
 	// ItemRaid=1 proves which rate a raid kill actually resolves to.
 	rates := Rates{Item: 0, ItemRaid: 1}
