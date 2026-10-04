@@ -22,6 +22,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/duel"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/exchange"
+	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
 	"github.com/fatal10110/acis_golang/internal/gameserver/gatekeeper"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
@@ -303,6 +304,7 @@ type GameClientLink struct {
 	playerClock *task.PlayerClock
 	gameClock   *task.GameClock
 	sevenSigns  *sevensigns.State
+	festival    *festival.Manager
 	olympiad    *olympiad.Olympiad
 	raidPoints  *raidpoint.Points
 	water       *task.Water
@@ -487,7 +489,12 @@ type GameClientLinkConfig struct {
 	GameClock *task.GameClock
 	// SevenSigns owns the event calendar; EnterWorld reports the active
 	// period's system message. Nil is tolerated (tests) and sends nothing.
-	SevenSigns  *sevensigns.State
+	SevenSigns *sevensigns.State
+	// Festival keeps the Festival of Darkness scores and schedule the
+	// record's festival page and the festival guides read. Nil is
+	// tolerated (tests): the page is refused and the guides count from the
+	// epoch.
+	Festival    *festival.Manager
 	Water       *task.Water
 	ShadowItems *task.ShadowItems
 	Autosave    *task.Autosave
@@ -681,6 +688,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		playerClock:   cfg.PlayerClock,
 		gameClock:     cfg.GameClock,
 		sevenSigns:    cfg.SevenSigns,
+		festival:      cfg.Festival,
 		olympiad:      cfg.Olympiad,
 		raidPoints:    cfg.RaidPoints,
 		water:         cfg.Water,

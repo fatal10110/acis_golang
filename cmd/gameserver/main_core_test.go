@@ -67,7 +67,7 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 		"startItemInstances":         {3 * task.ItemInstanceSaveTimeout, "ItemInstanceSaveTimeout", "drainItemInstances: save, persistence-worker drain, save"},
 		"providePersist":             {persistCloseTimeout, "persistCloseTimeout", "persistence worker's last close"},
 		"startGroundItemPersistence": {shutdownSaveTimeout, "shutdownSaveTimeout", "items_on_ground save"},
-		"startSevenSigns":            {shutdownSaveTimeout, "shutdownSaveTimeout", "stops the period timer, then saves seven_signs and seven_signs_status"},
+		"startSevenSigns":            {shutdownSaveTimeout, "shutdownSaveTimeout", "stops the period and festival timers, then saves seven_signs_festival (outside seal validation), seven_signs and seven_signs_status in one budget"},
 		"startOlympiad":              {2 * olympiad.TaskTimeout, "TaskTimeout", "waits for a running calendar step, which does no I/O, then for its queued olympiad_nobles and server_memo writes and the final save on the persistence lane, each bounded by olympiad.TaskTimeout"},
 		"startBossZones":             {shutdownSaveTimeout, "shutdownSaveTimeout", "grandboss_list save"},
 		"startSchemeBuffer":          {shutdownSaveTimeout, "shutdownSaveTimeout", "buffer_schemes save"},

@@ -30,6 +30,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
 	"github.com/fatal10110/acis_golang/internal/gameserver/enchant"
+	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
@@ -152,6 +153,7 @@ type options struct {
 	seedShortcuts          func(*gamesql.ShortcutStore)
 	seedHennas             func(db *sql.DB, hennas *gamesql.HennaStore)
 	seedSevenSigns         func(*gamesql.SevenSignsStore)
+	seedFestival           func(*gamesql.FestivalStore)
 	clanConfig             *clan.Config
 	seedClans              func(db *sql.DB)
 	board                  bbs.Config
@@ -596,6 +598,12 @@ func WithClanClock(now func() time.Time) Option {
 	return func(o *options) { o.clanClock = now }
 }
 
+// WithFestivalSeed adjusts the Festival of Darkness scores and status
+// columns before the festival restores them.
+func WithFestivalSeed(seed func(*gamesql.FestivalStore)) Option {
+	return func(o *options) { o.seedFestival = seed }
+}
+
 // WithSevenSignsSeed adjusts the seven_signs_status row before the Seven
 // Signs calendar restores it, so boot-time period catch-up can be exercised.
 func WithSevenSignsSeed(seed func(*gamesql.SevenSignsStore)) Option {
@@ -843,6 +851,7 @@ type Server struct {
 	coupleRows       *gamesql.CoupleStore
 	Clans            *clan.Service
 	SevenSigns       *sevensigns.State
+	Festival         *festival.Manager
 	AnnounceFile     string // the announcements.xml the server reads and rewrites
 	account          string
 	templates        *player.TemplateTable
@@ -1744,6 +1753,17 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err := sevenSigns.Restore(context.Background()); err != nil {
 		t.Fatalf("restore seven signs status: %v", err)
 	}
+	festivalStore := gamesql.NewFestivalStore(db)
+	if o.seedFestival != nil {
+		o.seedFestival(festivalStore)
+	}
+	fest := festival.New(festival.DefaultConfig(), festivalStore, sevenSigns, o.log, time.Now, nil)
+	if err := fest.Restore(context.Background(), sevenSigns.CurrentCycle()); err != nil {
+		t.Fatalf("restore festival: %v", err)
+	}
+	sevenSigns.SetFestival(fest)
+	fest.Start()
+	t.Cleanup(fest.Stop)
 	sevenSigns.Start()
 	t.Cleanup(sevenSigns.Stop)
 
@@ -1824,6 +1844,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		GameClock:        task.NewGameClock(time.Now),
 		PvPFlags:         task.NewPvPFlags(task.DefaultPvPFlagOptions(), time.Now),
 		SevenSigns:       sevenSigns,
+		Festival:         fest,
 		InventoryUpdates: inventoryUpdates,
 		ItemInstances:    itemInstances,
 		Persist:          persistWorker,
@@ -2124,6 +2145,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Derby:            derbyTrack,
 		Clans:            gclConfig.Clans,
 		SevenSigns:       sevenSigns,
+		Festival:         fest,
 		itemTable:        itemTemplates,
 		levelTable:       levels,
 		deepBlueDrops:    o.deepBlueDropRules,

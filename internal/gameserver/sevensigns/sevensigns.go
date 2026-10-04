@@ -158,11 +158,28 @@ const (
 // saveTimeout bounds the save that follows each period change.
 const saveTimeout = 10 * time.Second
 
+// Festival is the Festival of Darkness as the period changes drive it.
+// Its methods are called without the state's lock held.
+type Festival interface {
+	// CompetitionBegun starts the festival schedule as recruiting ends.
+	CompetitionBegun()
+	// CompetitionEnded stops it as the competition ends, once the end is
+	// announced and before the seals' new owners are.
+	CompetitionEnded()
+	// CycleBegun resets the festival for cycle as seal validation ends,
+	// once the end is announced.
+	CycleBegun(cycle int)
+	// SaveStatus writes the festival's columns of the status row; every
+	// status save calls it right after writing the row.
+	SaveStatus(ctx context.Context) error
+}
+
 // State tracks the active period and the competition's scores and drives
 // the period transitions. All methods are safe for concurrent use.
 type State struct {
 	store     Store
 	out       Broadcaster
+	festival  Festival
 	now       func() time.Time
 	afterFunc func(time.Duration, func()) *time.Timer
 	log       zerolog.Logger
@@ -194,6 +211,12 @@ func NewState(store Store, out Broadcaster, log zerolog.Logger, now func() time.
 		afterFunc = time.AfterFunc
 	}
 	return &State{store: store, out: out, now: now, afterFunc: afterFunc, log: log, players: map[int32]*PlayerRow{}}
+}
+
+// SetFestival hands the period changes and status saves to festival. It
+// must be called before Start.
+func (s *State) SetFestival(festival Festival) {
+	s.festival = festival
 }
 
 // Restore loads the persisted status and sign-ups and computes when the
@@ -255,7 +278,7 @@ func (s *State) Stop() {
 }
 
 // Save writes every sign-up and then the status row, stamping the status
-// with the time of the write.
+// with the time of the write, then the festival's status columns.
 func (s *State) Save(ctx context.Context) error {
 	s.saveMu.Lock()
 	defer s.saveMu.Unlock()
@@ -270,7 +293,11 @@ func (s *State) Save(ctx context.Context) error {
 	s.mu.Unlock()
 	slices.SortFunc(players, func(a, b PlayerRow) int { return cmp.Compare(a.ObjectID, b.ObjectID) })
 
-	return errors.Join(s.store.SavePlayers(ctx, players), s.store.SaveStatus(ctx, row))
+	err := errors.Join(s.store.SavePlayers(ctx, players), s.store.SaveStatus(ctx, row))
+	if s.festival != nil {
+		err = errors.Join(err, s.festival.SaveStatus(ctx))
+	}
+	return err
 }
 
 // CurrentPeriod returns the active period.
@@ -296,15 +323,18 @@ func (s *State) NextChange() time.Time {
 
 // advance moves the state into the following period — settling the
 // competition, or starting the next cycle after validation ends — announces
-// it, persists it, shows the new sky, and re-arms the timer.
+// it, drives the festival, persists it, shows the new sky, and re-arms the
+// timer.
 func (s *State) advance() {
 	s.mu.Lock()
+	ended := s.row.Period
 	notices := s.changePeriodLocked()
 	s.nextChange = nextPeriodChange(s.row.Period, s.now())
 	cycle, period := s.row.Cycle, s.row.Period
 	s.mu.Unlock()
 
-	s.broadcast(notices)
+	split := s.festivalChange(ended, cycle, notices)
+	s.broadcast(notices[split:])
 
 	ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
 	defer cancel()
@@ -318,6 +348,33 @@ func (s *State) advance() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.scheduleLocked()
+}
+
+// festivalChange announces the notices of the period that ended up to
+// where the festival's change goes, makes that change, and returns how many
+// notices it announced. Recruiting's end starts the festival before
+// anything is announced; the competition's end stops it once its sound and
+// end are announced; seal validation's end resets it for the new cycle
+// once everything is announced.
+func (s *State) festivalChange(ended Period, cycle int, notices []Notice) int {
+	if s.festival == nil {
+		return 0
+	}
+	switch ended {
+	case Recruiting:
+		s.festival.CompetitionBegun()
+		return 0
+	case Competition:
+		split := min(2, len(notices))
+		s.broadcast(notices[:split])
+		s.festival.CompetitionEnded()
+		return split
+	case SealValidation:
+		s.broadcast(notices)
+		s.festival.CycleBegun(cycle)
+		return len(notices)
+	}
+	return 0
 }
 
 func (s *State) broadcast(notices []Notice) {
