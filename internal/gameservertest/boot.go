@@ -206,6 +206,9 @@ type options struct {
 	// rewardPartiesWrap wraps the link's kill-party resolver
 	// (WithRewardParties).
 	rewardPartiesWrap func(gamemanager.RewardParties) gamemanager.RewardParties
+	// lootChannelsWrap wraps the link's raid loot-rights channel resolver
+	// (see WithLootChannels).
+	lootChannelsWrap func(gamemanager.LootChannels) gamemanager.LootChannels
 }
 
 type characterSpec struct {
@@ -873,6 +876,9 @@ type Server struct {
 	// raidKills credits the raid boss kills of the hostiles the suite
 	// spawns.
 	raidKills gamemanager.RaidKillRecorder
+	// lootChannels resolves the command channel that wins a raid boss's
+	// loot rights for the hostiles the suite spawns.
+	lootChannels gamemanager.LootChannels
 	// stance is the stance tracker the link was wired with, nil when none
 	// was; fixture NPCs report their attack stances to it.
 	stance network.AttackStanceTracker
@@ -2148,6 +2154,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		castEffects:      gcl.HostileCastEffects(),
 		rewardParties:    o.rewardParties(gcl),
 		raidKills:        gcl,
+		lootChannels:     o.lootChannels(gcl),
 		stance:           gclConfig.AttackStance,
 		maxGeoPathFail:   o.maxGeoPathFailCount,
 		zones:            o.zones,

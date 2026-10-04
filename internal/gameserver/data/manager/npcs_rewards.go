@@ -29,6 +29,9 @@ type deathRewards struct {
 	items      *item.Table
 	ground     groundPlacer
 	geo        move.Geo
+	// rights are a raid or grand boss's command channel loot rights; nil
+	// for any other NPC.
+	rights *ccLootRights
 }
 
 // playerRewardEntry is one acting player's reward share: its own damage
@@ -49,6 +52,11 @@ func (d *deathRewards) CalculateRewards(killer attackable.Combatant) {
 	}
 	threats := d.hostile.AI().Threats().Snapshot()
 	entries, summonDamage, totalDamage, maxDealer := d.rewardEntries(threats)
+	// A command channel holding the loot rights takes the drops through its
+	// leader, whatever damage anyone dealt.
+	if leader, ok := d.rights.holderLeader(); ok {
+		maxDealer = leader
+	}
 	// A top dealer who logged out forfeits the drops to the killer.
 	if maxDealer != nil && maxDealer.SessionDetached() {
 		maxDealer = nil

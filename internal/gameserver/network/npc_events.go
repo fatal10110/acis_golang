@@ -97,6 +97,8 @@ func (s *hostileSink) Emit(ev event.Event) {
 		s.broadcast(func() wire.Frame { return frames.SocialAction(h.ObjectID(), e.ID) })
 	case event.NpcSay:
 		s.broadcast(func() wire.Frame { return frames.NpcSay(h.ObjectID(), e.NpcID, e.Text) })
+	case event.OnScreenMessage:
+		s.broadcast(func() wire.Frame { return serverpackets.FrameExShowScreenMessage(e.Text, e.DurationMs) })
 	case event.ShotRecharged:
 		broadcastFrame(func() wire.Frame {
 			return frames.SkillUse(h.ObjectID(), e.At, h.ObjectID(), e.At, e.SkillID, 1, 0, 0, false)

@@ -88,6 +88,7 @@ func (s *Server) killRewards() gamemanager.KillRewardConfig {
 		PartyXP:           player.PartyXPRules{Cutoff: player.PartyXPCutoffLevel, CutoffLevel: 20, CutoffPercent: 3, RateXP: 1, RateSP: 1},
 		Parties:           s.rewardParties,
 		RaidKills:         s.raidKills,
+		Channels:          s.lootChannels,
 		DeepBlueDropRules: s.deepBlueDrops,
 		AutoLoot:          s.autoLoot,
 	}
@@ -123,12 +124,14 @@ func (s *Server) spawnHostileInstance(t *testing.T, inst *npc.Instance, at locat
 	}
 	hostile.SetMaxGeoPathFailCount(s.maxGeoPathFail)
 	s.installZones(hostile)
+	rewards, hits := gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
+		s.killRewards(), s.itemTable, s.ids, s.GroundItems)
 	hostile.Attach(npc.Runtime{
-		World: s.State,
-		Items: s.itemTable,
-		Rewards: gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
-			s.killRewards(), s.itemTable, s.ids, s.GroundItems),
-		Sink: network.HostileSinks(s.State, s.stance)(hostile),
+		World:   s.State,
+		Items:   s.itemTable,
+		Rewards: rewards,
+		Hits:    hits,
+		Sink:    network.HostileSinks(s.State, s.stance)(hostile),
 	})
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
 	hostile.EnterZones()
@@ -425,12 +428,14 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 	actorRef.CreatureActor = hostile
 	statRef.StatOwner = hostile
 	control.hostile, control.move = hostile, moveCtl
+	rewards, hits := gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
+		s.killRewards(), s.itemTable, s.ids, s.GroundItems)
 	rt := npc.Runtime{
-		World: s.State,
-		Items: s.itemTable,
-		Rewards: gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
-			s.killRewards(), s.itemTable, s.ids, s.GroundItems),
-		Sink: network.HostileSinks(s.State, s.stance)(hostile),
+		World:   s.State,
+		Items:   s.itemTable,
+		Rewards: rewards,
+		Hits:    hits,
+		Sink:    network.HostileSinks(s.State, s.stance)(hostile),
 	}
 	// Production takes line of sight from the same geodata (npcs_spawn.go).
 	if los, ok := geo.(npc.LineOfSight); ok {

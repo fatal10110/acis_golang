@@ -16,3 +16,18 @@ func (o *options) rewardParties(link gamemanager.RewardParties) gamemanager.Rewa
 	}
 	return o.rewardPartiesWrap(link)
 }
+
+// WithLootChannels wraps the resolver the suite's raid bosses find the
+// command channel winning their loot rights through (default: the link's
+// own channels), so a suite can reach a channel larger than any packet
+// forms cheaply.
+func WithLootChannels(wrap func(link gamemanager.LootChannels) gamemanager.LootChannels) Option {
+	return func(o *options) { o.lootChannelsWrap = wrap }
+}
+
+func (o *options) lootChannels(link gamemanager.LootChannels) gamemanager.LootChannels {
+	if o.lootChannelsWrap == nil {
+		return link
+	}
+	return o.lootChannelsWrap(link)
+}

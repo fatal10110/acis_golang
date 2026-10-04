@@ -67,10 +67,14 @@ func (h *Hostile) NotifyAggression(source attackable.Combatant, power int) {
 // AddCombatDamageHate's combined write for TakeDamage/ReduceHP. A no-op when
 // attacker isn't a Combatant (e.g. an environmental DOT source). Pulled out
 // after this exact block drifted out of order between copies twice (#2326,
-// #2328) — one place to keep the ordering right.
+// #2328) — one place to keep the ordering right. The hit observer sees the
+// hit first, ahead of everything it causes.
 func (h *Hostile) registerHit(combatant attackable.Combatant, amount float64, isDOT bool) {
 	if combatant == nil {
 		return
+	}
+	if h.hits != nil {
+		h.hits.Hit(combatant)
 	}
 	if isDOT {
 		h.AddDamageHate(combatant, amount, 0)
