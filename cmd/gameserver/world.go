@@ -32,8 +32,8 @@ func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.Cha
 // door-timer task's late-bound hook to it — manager.WorldObjects needs
 // *task.Door to schedule timers with, so that task's own effects can only
 // point back at WorldObjects after it exists.
-func provideWorldObjects(data *gameData, ids *idfactory.Allocator, state *world.State, doorTimers *task.Door, doorHooks *doorTimerEffects, log zerolog.Logger) (*manager.WorldObjects, error) {
-	objs, err := manager.NewWorldObjects(data.Doors, data.Statics, ids, data.Geo, state, doorTimers, network.DoorSinks(state), log)
+func provideWorldObjects(data *gameData, ids *idfactory.Allocator, state *world.State, doorTimers *task.Door, doorHooks *doorTimerEffects, doorRegen *task.DoorRegen, log zerolog.Logger) (*manager.WorldObjects, error) {
+	objs, err := manager.NewWorldObjects(data.Doors, data.Statics, ids, data.Geo, state, doorTimers, doorRegen, network.DoorSinks(state), log)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids
 	rewards.Parties = link
 	rewards.RaidKills = link
 	npcs, err := manager.NewNpcsWithMaxBuffsAmount(spawns, data.NPCs, move.NewGeo(data.Geo, data.Finder), state, ids, decay, respawnTask, ai, positions, data.Items, ground, rewards, time.Now, log,
-		data.Skills, link.HostileCastEffects(), walker, network.HostileSinks(state, attackStance), network.FolkSinks(state, attackStance), int(gameplay.MaxBuffsAmount), int(gameplay.RandomWalkRate), int(gameplay.MaxGeoPathFailCount), gameplay.RaidMultipliers, effects, pool, data.Zones)
+		data.Skills, link.HostileCastEffects(), walker, network.HostileSinks(state, attackStance), network.FolkSinks(state, attackStance), int(gameplay.MaxBuffsAmount), int(gameplay.RandomWalkRate), int(gameplay.MaxGeoPathFailCount), gameplay.RaidMultipliers, gameplay.NpcAI, effects, pool, data.Zones)
 	if err != nil {
 		return nil, err
 	}

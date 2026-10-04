@@ -52,3 +52,17 @@ func (g socialGraph) AtWar(clanID, targetClanID int32) bool {
 	cl, ok := g.clan(clanID)
 	return ok && cl.AtWarWith(targetClanID)
 }
+
+func (g socialGraph) ClanCastleID(clanID int32) int32 {
+	if cl, ok := g.clan(clanID); ok {
+		return cl.CastleID()
+	}
+	return 0
+}
+
+func (g socialGraph) ClanHallID(clanID int32) int32 {
+	if cl, ok := g.clan(clanID); ok {
+		return cl.HallID()
+	}
+	return 0
+}

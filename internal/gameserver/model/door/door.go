@@ -3,12 +3,14 @@ package door
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -116,10 +118,31 @@ type Object struct {
 
 	opened atomic.Bool
 
+	// hp holds the current HP as math.Float64bits; it and dead change only
+	// through the state owner, under the lock it applies door changes with.
+	hp    atomic.Uint64
+	dead  atomic.Bool
+	siege atomic.Pointer[siegeRef]
+
 	sink  event.Sink
 	owner StateOwner
 	sight Sight
 }
+
+// Siege is the siege state of the residence a door belongs to, deciding
+// whether a hit lowers the door's HP: a castle's siege in progress lets
+// every attacker but the anti-infantry Swoop Cannon through, and a siegable
+// clan hall's active siege zone lets any attacker through. A door with no
+// siege never loses HP, whoever hits it.
+type Siege interface {
+	AllowsDoorDamage(attacker attackable.Combatant) bool
+}
+
+type siegeRef struct{ siege Siege }
+
+// HPRegen is the HP a damaged door regains on each regeneration tick: the
+// creature base HP regeneration, which no door overrides.
+const HPRegen = 1.5
 
 // Sight is the geodata line-of-sight query a door answers skill sight with:
 // mutual sight between two points, each raised by the eye height its
@@ -131,9 +154,11 @@ type Sight interface {
 
 // StateOwner applies a door's open/close change together with everything
 // that follows it: the geodata blocker, the status broadcast, a linked
-// door, and the auto open/close timer.
+// door, and the auto open/close timer. It applies HP loss the same way,
+// with the regeneration schedule and, once HP runs out, the door's death.
 type StateOwner interface {
 	SetDoorOpen(id int, open bool) bool
+	ReduceDoorHP(id int, amount float64)
 }
 
 // NewObject creates a live door object from a static template and geodata shape.
@@ -159,14 +184,21 @@ func NewObject(objectID int32, tmpl *Template, shape GeoShape) (*Object, error) 
 		geoData:  cloneGeoData(data),
 	}
 	o.opened.Store(tmpl.Opened)
+	o.StoreHP(float64(tmpl.HP))
 	return o, nil
 }
 
 // ObjectID returns the world object id assigned to this door.
 func (o *Object) ObjectID() int32 { return o.objectID }
 
-// Dead reports that doors are never corpse targets.
-func (*Object) Dead() bool { return false }
+// Dead reports whether the door has been broken down.
+func (o *Object) Dead() bool { return o.dead.Load() }
+
+// SetDead updates only the door's dead flag and reports whether it changed.
+// It is the state owner's primitive, like SetOpened.
+func (o *Object) SetDead(dead bool) bool {
+	return o.dead.CompareAndSwap(!dead, dead)
+}
 
 // Unlockable reports whether a skill can open this door.
 func (o *Object) Unlockable() bool { return o.Template.OpenKind == OpenSkill }
@@ -189,12 +221,57 @@ func (o *Object) DoorID() int { return o.Template.ID }
 // MaxHP returns the door's maximum HP.
 func (o *Object) MaxHP() int { return o.Template.HP }
 
-// HP returns the door's current HP. Door damage is not modeled yet, so live
-// doors currently stay at full HP.
-func (o *Object) HP() int { return o.Template.HP }
+// CurrentHP returns the door's current HP.
+func (o *Object) CurrentHP() float64 { return math.Float64frombits(o.hp.Load()) }
 
-// Damage returns the visual damage stage sent in door status packets.
-func (o *Object) Damage() int { return 0 }
+// StoreHP updates only the door's current HP. It is the state owner's
+// primitive: the owner clamps the value and applies what follows it.
+func (o *Object) StoreHP(hp float64) { o.hp.Store(math.Float64bits(hp)) }
+
+// HP returns the door's current HP truncated to the whole points status
+// packets carry.
+func (o *Object) HP() int { return int(o.CurrentHP()) }
+
+// HPRatio returns current HP over maximum HP.
+func (o *Object) HPRatio() float64 { return o.CurrentHP() / float64(o.MaxHP()) }
+
+// Damage returns the visual damage stage sent in door status packets: 0 at
+// full HP up to 6 once the door is broken, one stage per sixth of HP lost.
+func (o *Object) Damage() int {
+	ratio := o.HPRatio()
+	if math.IsNaN(ratio) {
+		// 0/0: the stage a zero-HP template reports.
+		return 6
+	}
+	return max(0, min(6, 6-int(math.Ceil(ratio*6))))
+}
+
+// SetSiege installs the siege of the residence this door belongs to, the
+// only state that lets a hit lower the door's HP.
+func (o *Object) SetSiege(s Siege) {
+	if s == nil {
+		o.siege.Store(nil)
+		return
+	}
+	o.siege.Store(&siegeRef{siege: s})
+}
+
+// ReduceHP applies a hit's damage to the door. Only a hit its residence's
+// siege allows lowers HP, and an attacker whose access level deals no damage
+// lowers nothing; the state owner applies the loss, its status broadcast,
+// the regeneration schedule and, once HP runs out, the door's death.
+func (o *Object) ReduceHP(amount float64, attacker attackable.Combatant) {
+	ref := o.siege.Load()
+	if ref == nil || !ref.siege.AllowsDoorDamage(attacker) {
+		return
+	}
+	if attacker != nil && !attacker.CanGiveDamage() {
+		return
+	}
+	if o.owner != nil {
+		o.owner.ReduceDoorHP(o.DoorID(), amount)
+	}
+}
 
 // Opened reports whether this door is currently open.
 func (o *Object) Opened() bool {
@@ -229,10 +306,18 @@ func (o *Object) SetOwner(owner StateOwner) { o.owner = owner }
 // before the door is spawned.
 func (o *Object) SetSight(sight Sight) { o.sight = sight }
 
-// BroadcastStatus reports this door's current open/close state to observers.
+// BroadcastStatus reports this door's current open/close state, HP and
+// damage stage to observers.
 func (o *Object) BroadcastStatus() {
 	if o.sink != nil {
 		o.sink.Emit(event.StatusChanged{})
+	}
+}
+
+// BroadcastRevive reports this door standing again to observers.
+func (o *Object) BroadcastRevive() {
+	if o.sink != nil {
+		o.sink.Emit(event.Revived{})
 	}
 }
 

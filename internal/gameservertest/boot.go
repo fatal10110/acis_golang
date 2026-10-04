@@ -537,8 +537,9 @@ func WithClanConfig(cfg clan.Config) Option {
 	return func(o *options) { o.clanConfig = &cfg }
 }
 
-// WithClanSeed writes clan rows once the seeded characters are stored and
-// before the clans are restored from them.
+// WithClanSeed writes clan rows, and the clanhall rows naming their owned
+// halls, once the seeded characters are stored and before the clans are
+// restored from them.
 func WithClanSeed(seed func(db *sql.DB)) Option {
 	return func(o *options) { o.seedClans = seed }
 }
@@ -796,6 +797,7 @@ type Server struct {
 	BuyListStock     *merchant.Stock
 	BuyListRows      *gamesql.BuyListStore
 	WorldObjects     *gamemanager.WorldObjects // doors spawned by WithDoors; nil otherwise
+	doors            *doorHarness              // geodata and regeneration of WithDoors' doors
 	Boats            *boat.Fleet               // boats sailing WithBoats' itineraries; nil otherwise
 	NpcSpawns        *gamemanager.Npcs         // live NPC population of WithNpcSpawns; nil otherwise
 	Relations        *relation.Manager         // friend and block lists the link was wired with
@@ -1647,8 +1649,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	ids := &sequentialIDs{next: 100}
 	var worldObjects *gamemanager.WorldObjects
+	var doors *doorHarness
 	if len(o.doors) > 0 {
-		worldObjects = bootDoors(t, o.doors, ids, state)
+		worldObjects, doors = bootDoors(t, o.doors, ids, state)
 	}
 	boats := bootBoats(t, o.boats, ids, state)
 	levels := o.levels
@@ -2006,6 +2009,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		})
 	}
 	gclConfig.Clans.Table().Restore(clanRows, clanNow, clanConfig.JoinDays)
+	hallOwners, err := clanStore.LoadHallOwners(context.Background())
+	if err != nil {
+		t.Fatalf("load clan hall owners: %v", err)
+	}
+	// The fixture loads no clan hall data, so every seeded hall counts.
+	gclConfig.Clans.Table().RestoreHalls(hallOwners, nil)
 	gclConfig.Clans.DropMissingCrests(crests)
 	gclConfig.Clans.DropDanglingAlliances()
 	if o.seedBoard != nil {
@@ -2056,6 +2065,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Client:           c,
 		State:            state,
 		WorldObjects:     worldObjects,
+		doors:            doors,
 		Boats:            boats,
 		Clans:            gclConfig.Clans,
 		SevenSigns:       sevenSigns,

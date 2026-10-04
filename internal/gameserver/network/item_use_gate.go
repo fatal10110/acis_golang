@@ -5,7 +5,9 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 )
 
 // useConditionsHold reports whether live meets every use condition of tmpl,
@@ -102,13 +104,10 @@ func playerUseConditionHolds(live *livePlayer, attrs map[string]string) bool {
 			if parseConditionBool(raw) {
 				return false
 			}
-		case "castle", "clanhall":
-			id, ok := parseConditionInt(raw)
-			if !ok || id != 0 {
+		case "castle", "clanhall", "pledgeclass":
+			if !clanConditionHolds(live, name, raw) {
 				return false
 			}
-		case "pledgeclass":
-			return false
 		default:
 			return false
 		}
@@ -120,6 +119,14 @@ func playerUseConditionHolds(live *livePlayer, attrs map[string]string) bool {
 // case-insensitive "true", false for anything else, never an error.
 func parseConditionBool(raw string) bool {
 	return strings.EqualFold(raw, "true")
+}
+
+// clanConditionHolds judges a clan rank or residence attribute with the
+// skill condition of the same name, reading the clan's live ownership.
+// A value that does not parse fails.
+func clanConditionHolds(live *livePlayer, name, raw string) bool {
+	cond, err := conditions.Compile(modelskill.Condition{Kind: "player", Attrs: map[string]string{name: raw}})
+	return err == nil && cond.Test(live.ConditionActor(), nil, nil)
 }
 
 func parseConditionInt(raw string) (int, bool) {

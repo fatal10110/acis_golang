@@ -10,10 +10,16 @@ import (
 )
 
 // Aggressive reports whether this NPC attacks nearby targets on sight,
-// independent of any hate already built against it. Driven by the
-// template's aggro range: a template with no configured aggro range never
-// initiates combat on its own.
+// independent of any hate already built against it. A Monster-family NPC is
+// aggressive when its template has an aggro range; a FestivalMonster or
+// FriendlyMonster always is; a Guard or SiegeGuard never is.
 func (h *Hostile) Aggressive() bool {
+	switch hostileKind(h.Instance) {
+	case "FestivalMonster", "FriendlyMonster":
+		return true
+	case "Guard", "SiegeGuard":
+		return false
+	}
 	return h.Instance.Template.AggroRange > 0
 }
 
@@ -31,13 +37,14 @@ func (h *Hostile) Aggressive() bool {
 // within rangeVal and, unless this NPC is raid-related or its template can
 // see through concealment, not be silently moving.
 //
-// Guard and FriendlyMonster kinds then use one rule: attack only a
-// karma-positive target, purely on line of sight. Every other kind excludes
-// another NPC target unless this NPC is confused, in which case it attacks
-// purely on line of sight; otherwise, unless allowPeaceful is set, it
-// excludes a target standing in a peace zone or excludes any target at all
-// when this NPC isn't aggressive. A surviving candidate must still be
-// within line of sight.
+// Guard and FriendlyMonster kinds then attack a karma-positive target
+// purely on line of sight; a Guard also attacks an aggressive Monster-family
+// NPC in sight when AIConfig.GuardAttackAggroMob is set. Every other kind
+// excludes another NPC target unless this NPC is confused, in which case it
+// attacks purely on line of sight; otherwise it excludes a target standing
+// in a peace zone when AIConfig.MobAggroInPeaceZone is off, and any target
+// at all when this NPC is neither aggressive nor allowPeaceful. A surviving
+// candidate must still be within line of sight.
 //
 // This is the default NPC targeting rule. Door exclusion
 // needs no explicit check: door.Object doesn't implement
@@ -45,11 +52,7 @@ func (h *Hostile) Aggressive() bool {
 // non-NPC target still within its post-fake-death grace period is excluded
 // too (the recent-fake-death check), and so is an invisible player or the
 // summon of one. Not modeled: the remaining Player-only sub-checks
-// (allied-Varka/allied-Ketra exclusion, rift-room memo), Guard's
-// aggressive-Monster branch (gated by a config flag that ships disabled by default, and needs
-// npc AI config plumbing that doesn't exist yet), and the peace-zone aggro
-// config flag (allowPeaceful is a caller-supplied parameter here rather
-// than a config-driven default). The follow gate's
+// (allied-Varka/allied-Ketra exclusion, rift-room memo). The follow gate's
 // distance decision reuses move.Controller.MaybeStartOffensiveFollow, which
 // reads the current intention's move-to-target flag, not the queued hold
 // desire's.
@@ -91,25 +94,29 @@ func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal in
 		return false
 	}
 
+	cfg := h.aiSettings()
 	switch hostileKind(h.Instance) {
-	case "Guard", "FriendlyMonster":
-		return h.karmaTargetVisible(target)
+	case "Guard":
+		if target.Karma() > 0 {
+			return h.CanSee(target)
+		}
+		if monster, ok := target.(*Hostile); ok && cfg.GuardAttackAggroMob && monster.MonsterKind() {
+			return monster.Aggressive() && h.CanSee(monster)
+		}
+		return false
+	case "FriendlyMonster":
+		return target.Karma() > 0 && h.CanSee(target)
 	}
 
 	if targetIsNPC {
 		return h.Confused() && h.CanSee(target)
 	}
 
-	if !allowPeaceful {
-		if target.InPeaceZone() {
-			return false
-		}
-		if !h.Aggressive() {
-			return false
-		}
+	if !cfg.MobAggroInPeaceZone && target.InPeaceZone() {
+		return false
 	}
 
-	return h.CanSee(target)
+	return (allowPeaceful || h.Aggressive()) && h.CanSee(target)
 }
 
 // inRangeAndUnconcealed applies the range and silent-move gates the
@@ -131,13 +138,6 @@ func (h *Hostile) inRangeAndUnconcealed(target attackable.Combatant, rangeVal in
 		return true
 	}
 	return !target.SilentMoving()
-}
-
-// karmaTargetVisible reports whether target is a karma-positive actor
-// within line of sight — the sole target rule Guard and FriendlyMonster
-// kinds use in place of the general rule below.
-func (h *Hostile) karmaTargetVisible(target attackable.Combatant) bool {
-	return target.Karma() > 0 && h.CanSee(target)
 }
 
 // siegeGuardAutoAttackTargetValid is the dedicated one-argument auto-attack

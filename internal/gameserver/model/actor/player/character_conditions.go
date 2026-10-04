@@ -150,25 +150,17 @@ func (a characterStatActor) IsClanLeader() bool { return a.c.IsClanLeader() }
 // HasClan satisfies conditions.PlayerActor.
 func (a characterStatActor) HasClan() bool { return a.c.ClanID() != 0 }
 
-// ClanCastleID satisfies conditions.PlayerActor. Always 0: castle ownership
-// isn't modeled on Character yet (#1507). This gates shipped skill <cond>s:
-// Blessed Scroll of Escape: Castle (2178, castle="-1") is always refused
-// until a clan can own a castle.
-func (a characterStatActor) ClanCastleID() int { return 0 }
+// ClanCastleID satisfies conditions.PlayerActor.
+func (a characterStatActor) ClanCastleID() int { return int(a.c.ClanCastleID()) }
 
-// ClanHasAnyCastle satisfies conditions.PlayerActor. Always false, which
-// refuses 2178: see ClanCastleID.
-func (a characterStatActor) ClanHasAnyCastle() bool { return false }
+// ClanHasAnyCastle satisfies conditions.PlayerActor.
+func (a characterStatActor) ClanHasAnyCastle() bool { return a.c.ClanCastleID() > 0 }
 
-// ClanHallID satisfies conditions.PlayerActor. Always 0: clan-hall ownership
-// isn't modeled on Character yet (#1507). This gates shipped skill <cond>s:
-// Blessed Scroll of Escape: Clan Hall (2177, clanHall="-1") is always
-// refused until a clan can own a hall.
-func (a characterStatActor) ClanHallID() int { return 0 }
+// ClanHallID satisfies conditions.PlayerActor.
+func (a characterStatActor) ClanHallID() int { return int(a.c.ClanHallID()) }
 
-// ClanHasAnyClanHall satisfies conditions.PlayerActor. Always false, which
-// refuses 2177: see ClanHallID.
-func (a characterStatActor) ClanHasAnyClanHall() bool { return false }
+// ClanHasAnyClanHall satisfies conditions.PlayerActor.
+func (a characterStatActor) ClanHasAnyClanHall() bool { return a.c.ClanHallID() > 0 }
 
 // Race satisfies conditions.PlayerActor, returning c.Race's ordinal.
 func (a characterStatActor) Race() int { return int(a.c.Race) }
