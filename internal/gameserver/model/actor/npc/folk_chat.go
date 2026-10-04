@@ -101,14 +101,13 @@ var unportedFolkChats = map[InstanceKind]struct{}{
 }
 
 // unportedFolkCommands are the civilian types whose first chat page is in
-// place but whose dialog commands still need Seven Signs, festival or
-// Olympiad behavior that is not (#3337, #223, #217).
+// place but whose dialog commands still need Seven Signs or festival
+// behavior that is not (#3337, #223).
 var unportedFolkCommands = map[InstanceKind]struct{}{
-	"DawnPriest":         {},
-	"DuskPriest":         {},
-	"FestivalGuide":      {},
-	"OlympiadManagerNpc": {},
-	"SignsPriest":        {},
+	"DawnPriest":    {},
+	"DuskPriest":    {},
+	"FestivalGuide": {},
+	"SignsPriest":   {},
 }
 
 // ChatWindow resolves the first chat page this NPC shows a talker carrying

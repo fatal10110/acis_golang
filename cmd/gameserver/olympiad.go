@@ -16,9 +16,9 @@ import (
 	"go.uber.org/fx"
 )
 
-// loadOlympiadConfig reads the events.properties Olympiad calendar and
-// match settings, defaulting as the reference does when a key is missing.
-// A malformed reward list reads as no reward.
+// loadOlympiadConfig reads the events.properties Olympiad calendar, match,
+// record and noblesse pass settings, defaulting as the reference does when
+// a key is missing. A malformed reward list reads as no reward.
 func loadOlympiadConfig(paths gameServerPaths) (olympiad.Config, error) {
 	props, err := config.LoadFile(paths.EventsConfigPath)
 	if err != nil {
@@ -36,6 +36,10 @@ func loadOlympiadConfig(paths gameServerPaths) (olympiad.Config, error) {
 		DividerNonClassed: f.Int("OlyDividerNonClassed", def.DividerNonClassed),
 		ClassedReward:     olympiadRewards(f.IntPairs("OlyClassedReward", "6651-50")),
 		NonClassedReward:  olympiadRewards(f.IntPairs("OlyNonClassedReward", "6651-30")),
+		StartPoints:       f.Int("OlyStartPoints", def.StartPoints),
+		MinMatches:        f.Int("OlyMinMatchesToBeClassed", def.MinMatches),
+		GPPerPoint:        f.Int("OlyGPPerPoint", def.GPPerPoint),
+		HeroPoints:        f.Int("OlyHeroPoints", def.HeroPoints),
 	}
 	return cfg, f.Err()
 }
