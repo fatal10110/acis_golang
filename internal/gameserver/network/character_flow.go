@@ -666,6 +666,8 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	rt := player.Runtime{
 		World:  l.world,
 		Social: socialGraph{parties: l.parties, clans: l.clans},
+		// HallFunctions gives the clan hall recovery bonuses.
+		HallFunctions: l.hallFunctions,
 		// PartyLoot hands a partied character's auto-loot and sweep to its
 		// party's loot rule.
 		PartyLoot: l,

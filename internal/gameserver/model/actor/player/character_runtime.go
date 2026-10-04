@@ -220,6 +220,9 @@ type Runtime struct {
 	// nil leaves the character in no party and its clan in no alliance,
 	// war or leadership.
 	Social SocialGraph
+	// HallFunctions answers the functions a clan hall rents; nil rents
+	// none, so no clan hall bonus applies.
+	HallFunctions HallFunctions
 	// PartyLoot shares the items a partied character auto-loots or sweeps
 	// by its party's loot rule; nil keeps every item with the character.
 	PartyLoot PartyLoot
@@ -241,6 +244,7 @@ func (c *Character) Configure(rt Runtime) {
 	c.los = rt.LOS
 	c.zones = rt.Zones
 	c.social = rt.Social
+	c.hallFunctions = rt.HallFunctions
 	c.partyLoot = rt.PartyLoot
 	c.mounts = rt.Mounts
 	c.mountData = rt.MountData

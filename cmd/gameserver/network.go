@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -122,6 +123,7 @@ func provideGameClientLink(
 	couples *wedding.Manager,
 	lotteryState *lottery.Lottery,
 	derbyTrack *derby.Track,
+	hallFunctions *clanhall.Functions,
 	log zerolog.Logger,
 	gmAudit gmAuditLogger,
 	chatLog chatLogger,
@@ -270,6 +272,8 @@ func provideGameClientLink(
 		Wedding:        couples,
 		Lottery:        lotteryState,
 		Derby:          derbyTrack,
+
+		ClanHallFunctions: hallFunctions,
 	})
 	if err != nil {
 		return nil, err
