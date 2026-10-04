@@ -15,10 +15,6 @@ import (
 // floor-to-head Z conversion below.
 func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin location.Location) {
 	// Reject while the player is out of control.
-	l.log.Debug().Int32("oid", live.ObjectID()).Interface("server_pos", live.CurrentLocation()).Interface("target", target).Interface("packet_origin", packetOrigin).
-		Bool("out_of_control", liveOutOfControl(live)).Bool("teleporting", live.Teleporting()).Float64("speed", liveMoveSpeed(live)).
-		Bool("deny_ai", live.DenyAIAction()).Bool("movement_disabled", live.MovementDisabled()).Bool("cast_busy", itemAICastBusy(live)).
-		Bool("standing", live.Standing()).Int("teleport_mode", int(live.teleportMode)).Msg("movedbg: moveLivePlayer")
 	if liveOutOfControl(live) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
@@ -81,7 +77,6 @@ func (l *GameClientLink) startLiveMove(live *livePlayer, target location.Locatio
 	// is what the walk simulates from — the client origin is nothing but a lag hint the
 	// server must not adopt.
 	accepted, err := live.move.MoveToLocation(target)
-	l.log.Debug().Bool("accepted", accepted).Err(err).Interface("server_pos", live.CurrentLocation()).Bool("moving", live.IsMoving()).Msg("movedbg: startLiveMove")
 	if err != nil {
 		l.log.Warn().Err(err).Msg("move: broadcast")
 	}
@@ -170,7 +165,6 @@ func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported l
 	if liveSwimming(live) || live.Flying() {
 		drift = current.Distance3D(reported)
 	}
-	l.log.Debug().Interface("server_pos", current).Interface("reported", reported).Float64("drift", drift).Bool("moving", live.IsMoving()).Msg("movedbg: ValidatePosition")
 	if drift > liveMoveSpeed(live) {
 		live.SendFrame(serverpackets.FrameValidateLocation(live.ObjectID(), current, live.CurrentHeading()))
 	}
