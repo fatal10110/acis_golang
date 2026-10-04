@@ -239,6 +239,22 @@ func (s *ClanStore) SaveSkill(ctx context.Context, clanID int32, sk clan.Skill) 
 	return nil
 }
 
+// RemoveSkill deletes a clan skill's row.
+func (s *ClanStore) RemoveSkill(ctx context.Context, clanID int32, skillID int) error {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM clan_skills WHERE clan_id=? AND skill_id=?`, clanID, skillID); err != nil {
+		return fmt.Errorf("remove clan %d skill %d: %w", clanID, skillID, err)
+	}
+	return nil
+}
+
+// RemoveAllSkills deletes every clan skill row of the clan.
+func (s *ClanStore) RemoveAllSkills(ctx context.Context, clanID int32) error {
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM clan_skills WHERE clan_id=?`, clanID); err != nil {
+		return fmt.Errorf("remove clan %d skills: %w", clanID, err)
+	}
+	return nil
+}
+
 // nullString stores "" as NULL, as an unset alliance name is.
 func nullString(s string) any {
 	if s == "" {
