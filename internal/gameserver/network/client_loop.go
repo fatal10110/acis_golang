@@ -101,6 +101,14 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		}
 		payload, err := session.ReadFrame()
 		if err != nil {
+			// ponytail: pre-auth EOF is a port probe (admin panel dials 7777
+			// every 5s) or an aborted handshake — not worth a log line.
+			// Ceiling: a real client dropping mid-handshake leaves no trace;
+			// log it again once the admin panel stops dialing 7777 or
+			// pre-auth disconnects need diagnosing.
+			if errors.Is(err, io.EOF) && client.State() == StateConnected {
+				return
+			}
 			if normalReadFrameError(err) {
 				l.log.Debug().Err(err).Msg("Read frame")
 			} else {
