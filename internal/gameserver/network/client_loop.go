@@ -714,6 +714,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if live != nil {
 					onLive(live, func() { l.sendBossRecord(live) })
 				}
+			case clientpackets.OpcodeRequestExFishRanking:
+				if live != nil {
+					onLive(live, func() { l.requestFishRanking(live) })
+				}
 			case clientpackets.OpcodeRequestCursedWeaponList:
 				if live == nil {
 					continue

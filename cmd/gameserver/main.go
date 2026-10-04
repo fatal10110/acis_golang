@@ -9,6 +9,7 @@ import (
 	"go.uber.org/fx"
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -59,6 +60,7 @@ const (
 		shutdownSaveTimeout + // grandboss_list
 		shutdownSaveTimeout + // buffer_schemes
 		shutdownSaveTimeout + // mods_wedding
+		fishchamp.TaskTimeout + shutdownSaveTimeout + // fishing_championship and its server_memo end, behind a save already running
 		gameServerStopSlack
 	// gameServerBootTimeout bounds constructor-time DB I/O (id scan, ground-item
 	// restore, spawn-state load). These run inside fx.New's constructor graph,
@@ -213,11 +215,12 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideSchemeBuffer,
 			provideWedding,
 			provideLottery,
+			provideFishingChampionship,
 			provideDerbyTrack,
 			provideClanHallFunctions,
 			provideGameClientLink,
 		),
 		fx.Invoke(startClanDissolutions, startClanHallFunctions),
-		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startDoorRegen, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startOlympiad, startRaidPoints, startBossZones, startSchemeBuffer, startWedding, startLottery, startDerbyTrack, startDebugHTTP, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startDoorRegen, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startOlympiad, startRaidPoints, startBossZones, startSchemeBuffer, startWedding, startLottery, startFishingChampionship, startDerbyTrack, startDebugHTTP, startGameServer),
 	}
 }

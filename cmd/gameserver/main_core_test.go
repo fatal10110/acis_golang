@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/olympiad"
@@ -72,6 +73,7 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 		"startBossZones":             {shutdownSaveTimeout, "shutdownSaveTimeout", "grandboss_list save"},
 		"startSchemeBuffer":          {shutdownSaveTimeout, "shutdownSaveTimeout", "buffer_schemes save"},
 		"startWedding":               {shutdownSaveTimeout, "shutdownSaveTimeout", "mods_wedding save"},
+		"startFishingChampionship":   {fishchamp.TaskTimeout + shutdownSaveTimeout, "shutdownSaveTimeout", "fishing_championship and server_memo save, behind a save already running on the persistence lane, bounded by fishchamp.TaskTimeout"},
 		"startLottery":               {0, "", "stops the calendar under a lock held only across in-memory work; its queued games writes land when the persistence worker drains"},
 		"startAnnouncements":         {0, "", "stops timers under a lock held only across in-memory work and an announcements.xml rewrite"},
 		"startClanDissolutions":      {0, "", "closes the dissolution queue, cancelling its timers; in-memory only"},
