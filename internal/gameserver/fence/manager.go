@@ -59,8 +59,12 @@ func (m *Manager) Fences() []*Fence {
 // Add places a fence of type typ, sizeX by sizeY world units and height
 // layers high (one, two or three), centered at (x, y, z) aligned to the
 // geodata grid: it is shown to the players around, then blocks movement.
+// The far edges x+sizeX and y+sizeY are summed in 32 bits, wrapping as the
+// reference's int arithmetic does, so a sum that overflows is refused the
+// same way.
 func (m *Manager) Add(x, y, z, typ, sizeX, sizeY, height int) (*Fence, error) {
-	if x < geo.WorldXMin || x+sizeX > geo.WorldXMax || y < geo.WorldYMin || y+sizeY > geo.WorldYMax {
+	maxX, maxY := int(int32(x)+int32(sizeX)), int(int32(y)+int32(sizeY))
+	if x < geo.WorldXMin || maxX > geo.WorldXMax || y < geo.WorldYMin || maxY > geo.WorldYMax {
 		return nil, errOutOfWorld
 	}
 	fsx, okX := sizeOf(sizeX)
@@ -146,7 +150,7 @@ func align(v int, s size) int {
 }
 
 // outline marks the geodata cells a fence of type typ, cellsX by cellsY,
-// occupies: a three-cell-thick ring one cell in from the edge for type 2,
+// occupies: a two-cell-thick ring one cell in from the edge for type 2,
 // only its four corners for any other type.
 func outline(typ, cellsX, cellsY int) [][]bool {
 	inside := make([][]bool, cellsX)

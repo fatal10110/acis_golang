@@ -198,14 +198,19 @@ func TestAddBlocksMovementUntilRemoved(t *testing.T) {
 	}
 }
 
-// TestAddRejects pins the two fences FenceManager.addFence refuses before
-// taking an id: one reaching past the world edge and one longer than the
-// size table.
+// TestAddRejects pins the fences FenceManager.addFence refuses before
+// taking an id: ones reaching past the world edge (also through a width
+// whose 32-bit sum wraps) and one longer than the size table.
 func TestAddRejects(t *testing.T) {
 	ids := &counterIDs{}
 	m := NewManager(engine.New(), world.New(), ids)
 	if _, err := m.Add(engine.WorldXMax-50, 0, 0, 2, 100, 100, 1); !errors.Is(err, errOutOfWorld) {
 		t.Fatalf("past the world edge: err = %v, want errOutOfWorld", err)
+	}
+	// -100000 + -2147483600 wraps in 32 bits to 2147383696, past the
+	// world's east edge: refused, not placed with a negative width.
+	if _, err := m.Add(-100000, 0, 0, 2, -2147483600, 100, 1); !errors.Is(err, errOutOfWorld) {
+		t.Fatalf("width wrapping past the world edge: err = %v, want errOutOfWorld", err)
 	}
 	if _, err := m.Add(0, 0, 0, 2, 1100, 100, 1); !errors.Is(err, errUnknownSize) {
 		t.Fatalf("1100 wide: err = %v, want errUnknownSize", err)
