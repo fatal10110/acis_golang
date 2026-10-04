@@ -27,15 +27,7 @@ func providePvPFlags(opts task.PvPFlagOptions) *task.PvPFlags {
 	return task.NewPvPFlags(opts, time.Now)
 }
 
-func startPvPFlags(lc fx.Lifecycle, flags *task.PvPFlags, opts task.PvPFlagOptions, log zerolog.Logger) {
-	lc.Append(fx.Hook{
-		OnStart: func(context.Context) error {
-			for _, key := range opts.UnsupportedKeys {
-				log.Warn().Str("file", "players.properties").Str("key", key).Msg("unsupported Karma/PvP config option")
-			}
-			return nil
-		},
-	})
+func startPvPFlags(lc fx.Lifecycle, flags *task.PvPFlags, log zerolog.Logger) {
 	startTicker(lc, log, flags.Start)
 }
 

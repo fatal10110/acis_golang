@@ -148,6 +148,7 @@ func provideGameClientLink(
 		EnableFallingDamage:        cfg.EnableFallingDamage,
 		AllowDelevel:               bool(gameplay.AllowDelevel),
 		RateKarmaExpLost:           float64(gameplay.RateKarmaExpLost),
+		DeathDrop:                  gameplay.DeathDrop,
 		CharacterSelectDelay:       time.Duration(gameplay.CharacterSelectDelay),
 		ServerBypassDelay:          time.Duration(gameplay.ServerBypassDelay),
 		CraftingDisabled:           !bool(gameplay.CraftingEnabled),

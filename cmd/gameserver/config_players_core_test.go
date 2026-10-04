@@ -17,7 +17,6 @@ func TestLoadPvPFlagOptionsUsesPlayersProperties(t *testing.T) {
 	if err := os.WriteFile(configPath, []byte(`
 PvPVsNormalTime = 1234
 PvPVsPvPTime = 5678
-CanGMDropEquipment = True
 `), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -28,9 +27,6 @@ CanGMDropEquipment = True
 	}
 	if opts.Normal != 1234*time.Millisecond || opts.Flagged != 5678*time.Millisecond {
 		t.Fatalf("durations = normal %s flagged %s, want 1234ms/5678ms", opts.Normal, opts.Flagged)
-	}
-	if len(opts.UnsupportedKeys) != 1 || opts.UnsupportedKeys[0] != "CanGMDropEquipment" {
-		t.Fatalf("UnsupportedKeys = %v, want [CanGMDropEquipment]", opts.UnsupportedKeys)
 	}
 }
 

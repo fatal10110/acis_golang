@@ -196,6 +196,9 @@ type PlayerConfig struct {
 	// RateKarmaExpLost scales the death exp-loss percentage while the dying
 	// player carries positive karma.
 	RateKarmaExpLost float64
+	// DeathDrop is what a player's death may cost it in items; the zero
+	// value drops nothing.
+	DeathDrop player.DeathDropRules
 	// CharacterSelectDelay is the reuse delay shared by the character-list
 	// actions (delete, restore, select) on one client session.
 	CharacterSelectDelay time.Duration

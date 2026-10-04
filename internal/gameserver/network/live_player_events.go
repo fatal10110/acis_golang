@@ -174,6 +174,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.broadcastLiveDie(live)
 	case event.FusionCastersStopRequested:
 		l.abortFusionTargeting(live)
+	case event.DeathItemDrop:
+		l.dropItemsOnDeath(live, e)
 	case event.ClanKill:
 		l.creditClanKill(live, e)
 	case event.DeathSettled:
