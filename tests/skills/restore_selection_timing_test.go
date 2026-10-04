@@ -6,6 +6,7 @@ import (
 	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
@@ -142,11 +143,27 @@ func TestRestoredBuffEndingOnLoadingScreenIsGone(t *testing.T) {
 }
 
 // dropOnLoadingScreen closes c, selected but not in the world, and waits
-// until its departure's saves have run.
+// until its departure's saves have run. The drop happens at the current
+// instant: before letting any time pass on a driven clock, it waits in wall
+// time until the server has noticed the close, so the lost connection's
+// detach delay runs from the drop itself, not from however much time the
+// server took to see it, and a tick due a second after the drop never runs
+// before its saves.
 func dropOnLoadingScreen(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient, objID int32) {
 	t.Helper()
 	if err := c.Close(); err != nil {
 		t.Fatalf("close the selecting client: %v", err)
+	}
+	deadline := time.Now().Add(closeNoticeTimeout)
+	for {
+		p, ok := srv.State.Player(objID)
+		if !ok || network.ClientDetached(p) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("server did not notice the selecting client's close within %v", closeNoticeTimeout)
+		}
+		time.Sleep(100 * time.Microsecond)
 	}
 	srv.AdvanceUntil(t, "selected character out of the world", func() bool {
 		_, ok := srv.State.Player(objID)
@@ -154,3 +171,7 @@ func dropOnLoadingScreen(t *testing.T, srv *gameservertest.Server, c *testsuppor
 	})
 	srv.FlushPersistence(t)
 }
+
+// closeNoticeTimeout bounds the wall time the server may take to notice a
+// closed client.
+const closeNoticeTimeout = 10 * time.Second

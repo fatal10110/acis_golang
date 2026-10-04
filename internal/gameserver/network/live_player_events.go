@@ -168,8 +168,12 @@ func (p *livePlayer) Emit(ev event.Event) {
 			l.water.Remove(live)
 		}
 	case event.VitalsChanged:
-		sendLiveStatus(live)
-		l.sendPartyVitals(live)
+		// The restored ticks the replay runs change the vitals before the
+		// player is in the world; the EnterWorld UserInfo carries them.
+		if !live.replayingEffects.Load() {
+			sendLiveStatus(live)
+			l.sendPartyVitals(live)
+		}
 	case event.EffectIconsChanged:
 		l.updateEffectIcons(live)
 	case event.AbnormalEffectChanged:

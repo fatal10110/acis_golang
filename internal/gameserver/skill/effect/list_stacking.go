@@ -148,7 +148,7 @@ func (l *List) addStacked(e *Effect, pending *[]func()) {
 // reports a toggle abort or a worn-off effect: the displaced effect stays
 // held.
 func (l *List) notifyDisplaced(e *Effect, pending *[]func()) {
-	if !e.Template.Icon || l.owner == nil || l.silent {
+	if !e.Template.Icon || l.owner == nil || l.quietLocked() {
 		return
 	}
 	notifier, skillID, level := l.owner, e.Skill.ID, e.Skill.Level
