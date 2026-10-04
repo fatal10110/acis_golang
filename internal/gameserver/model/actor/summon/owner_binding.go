@@ -94,10 +94,10 @@ func (a *Actor) RelinkOwner(owner Owner, inv *itemcontainer.Inventory, q *sim.Qu
 // The owner's session reads its collar from its own saved row, which does
 // not hold a level the pet regained after that session left. It is not
 // SyncControlItemEnchant: that also refreshes the owner's pet window, which
-// the relink, run mid-EnterWorld before the owner is in the world, must not
-// do. In the specified flow the collar already holds the level at login,
-// so its restore refreshes nothing either, and the EnterWorld burst's own pet
-// frames show the lifted level.
+// the relink, run at character selection before the owner is spawned, must
+// not do. In the specified flow the collar already holds the level at
+// login, so its restore refreshes nothing either, and the EnterWorld burst's
+// own pet frames show the lifted level.
 func (a *Actor) liftCollar(inv *itemcontainer.Inventory) {
 	if inv == nil || a.controlItemID == 0 {
 		return
