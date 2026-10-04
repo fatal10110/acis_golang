@@ -181,16 +181,19 @@ type Character struct {
 	// runtimeTemplate is the active class's template and baseTemplate the
 	// base class's; a class switch replaces runtimeTemplate on the owner's
 	// queue while other actors read it.
-	runtimeTemplate          atomic.Pointer[Template]
-	baseTemplate             atomic.Pointer[Template]
-	levelTable               *LevelTable
-	allowDelevel             bool
-	deathDrop                DeathDropRules
-	raidCursesDisabled       bool
-	skillDefs                skillDefinitions
-	rateKarmaExpLost         float64
-	inventory                *itemcontainer.Inventory
-	world                    *world.State
+	runtimeTemplate    atomic.Pointer[Template]
+	baseTemplate       atomic.Pointer[Template]
+	levelTable         *LevelTable
+	allowDelevel       bool
+	deathDrop          DeathDropRules
+	raidCursesDisabled bool
+	skillDefs          skillDefinitions
+	rateKarmaExpLost   float64
+	inventory          *itemcontainer.Inventory
+	world              *world.State
+	// worldHandle is the object the world registers c under when c is
+	// embedded in one; nil means c itself. See SetWorldHandle.
+	worldHandle              world.Tracked
 	los                      LineOfSight
 	zones                    PeaceZoneQuery
 	social                   SocialGraph
