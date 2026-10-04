@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,18 +14,23 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/fatal10110/acis_golang/internal/gameserver/augment"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/classmaster"
 	"github.com/fatal10110/acis_golang/internal/gameserver/craft"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
 	"github.com/fatal10110/acis_golang/internal/gameserver/duel"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/exchange"
+	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
 	"github.com/fatal10110/acis_golang/internal/gameserver/gatekeeper"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -43,9 +47,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
+	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
+	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -68,6 +73,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/symbolmaker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
+	"github.com/fatal10110/acis_golang/internal/gameserver/wedding"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
@@ -196,6 +202,9 @@ type PlayerConfig struct {
 	// RateKarmaExpLost scales the death exp-loss percentage while the dying
 	// player carries positive karma.
 	RateKarmaExpLost float64
+	// DeathDrop is what a player's death may cost it in items; the zero
+	// value drops nothing.
+	DeathDrop player.DeathDropRules
 	// CharacterSelectDelay is the reuse delay shared by the character-list
 	// actions (delete, restore, select) on one client session.
 	CharacterSelectDelay time.Duration
@@ -300,6 +309,7 @@ type GameClientLink struct {
 	playerClock *task.PlayerClock
 	gameClock   *task.GameClock
 	sevenSigns  *sevensigns.State
+	festival    *festival.Manager
 	olympiad    *olympiad.Olympiad
 	raidPoints  *raidpoint.Points
 	water       *task.Water
@@ -323,6 +333,8 @@ type GameClientLink struct {
 	queues           Queues
 	queuedPets       queuedPets
 	restarts         *restart.Table
+	clanHallData     *hallmodel.Table
+	castleData       *castledata.Table
 	levels           *player.LevelTable
 	admin            *admin.Data
 	playerConfig     PlayerConfig
@@ -336,6 +348,7 @@ type GameClientLink struct {
 	duels            *duelRegistry
 	partyPositions   partyPositions
 	clans            *clan.Service
+	castles          *castle.Manager
 	clanWarehouses   clanWarehouseBook
 	enchantState     *enchantflow.State
 	enchant          *enchantflow.Service
@@ -375,6 +388,9 @@ type GameClientLink struct {
 	// accessLevels stores the access levels admin commands change; nil
 	// keeps them in memory only.
 	accessLevels accessLevelStore
+	// characterEdits stores the character fields admin commands change at
+	// once; nil keeps them in memory only. See admin_set.go.
+	characterEdits characterEditStore
 	// punishments stores the chat bans and jail terms; nil keeps them in
 	// memory only. See punishment.go.
 	punishments punishmentStore
@@ -401,6 +417,14 @@ type GameClientLink struct {
 	// on their schedules and managed by //announce.
 	announcements *announcement.Registry
 	schemeBuffer  *schemebuffer.Manager
+	lottery       *lottery.Lottery
+	// hallFunctions are the functions the clan halls rent; nil rents none.
+	hallFunctions *clanhall.Functions
+	// wedding holds the couples and runs the marriage requests.
+	wedding *wedding.Manager
+	// derby is the monster race track the race managers answer for; nil
+	// runs no race.
+	derby *derby.Track
 	// npcSpawns is the live NPC population the admin spawn commands use;
 	// see SetNpcSpawns.
 	npcSpawns atomic.Pointer[manager.Npcs]
@@ -477,7 +501,12 @@ type GameClientLinkConfig struct {
 	GameClock *task.GameClock
 	// SevenSigns owns the event calendar; EnterWorld reports the active
 	// period's system message. Nil is tolerated (tests) and sends nothing.
-	SevenSigns  *sevensigns.State
+	SevenSigns *sevensigns.State
+	// Festival keeps the Festival of Darkness scores and schedule the
+	// record's festival page and the festival guides read. Nil is
+	// tolerated (tests): the page is refused and the guides count from the
+	// epoch.
+	Festival    *festival.Manager
 	Water       *task.Water
 	ShadowItems *task.ShadowItems
 	Autosave    *task.Autosave
@@ -504,6 +533,8 @@ type GameClientLinkConfig struct {
 	// handlers, timers and periodic ticks run on. Required.
 	Queues       Queues
 	Restarts     *restart.Table
+	ClanHallData *hallmodel.Table  // owner restart spawns; nil restarts to town
+	CastleData   *castledata.Table // owner restart spawns; nil restarts to town
 	Levels       *player.LevelTable
 	Admin        *admin.Data
 	PlayerConfig PlayerConfig
@@ -537,6 +568,9 @@ type GameClientLinkConfig struct {
 	// AccessLevels stores the access levels admin commands change; nil
 	// keeps them in memory only and finds no offline character.
 	AccessLevels accessLevelStore
+	// CharacterEdits stores the character fields admin commands change at
+	// once; nil keeps them in memory only.
+	CharacterEdits characterEditStore
 	// Punishments stores the chat bans and jail terms; nil keeps them in
 	// memory only and finds no offline character.
 	Punishments punishmentStore
@@ -590,6 +624,8 @@ type GameClientLinkConfig struct {
 	// Clans is the clan registry and its rules; nil runs with no clan at
 	// all and nothing written.
 	Clans *clan.Service
+	// Castles holds the castles' live state; nil runs with no castle.
+	Castles *castle.Manager
 	// Board is the community board's settings; the zero value keeps the
 	// board off.
 	Board bbs.Config
@@ -612,6 +648,17 @@ type GameClientLinkConfig struct {
 	// SchemeBuffer is the scheme buffer's buffs and every player's
 	// schemes; nil offers no buff and starts with no scheme.
 	SchemeBuffer *schemebuffer.Manager
+	// Wedding holds the couples and the wedding settings; nil starts with
+	// no couple, the shipped settings, and couples numbered from IDs when
+	// it can free them too.
+	Wedding *wedding.Manager
+	// Lottery is the Lucky Lottery; nil runs no round.
+	Lottery *lottery.Lottery
+	// ClanHallFunctions are the functions the clan halls rent; nil rents
+	// none, so every hall shows bare and gives no recovery bonus.
+	ClanHallFunctions *clanhall.Functions
+	// Derby is the monster race track; nil runs no race.
+	Derby *derby.Track
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -663,6 +710,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		playerClock:   cfg.PlayerClock,
 		gameClock:     cfg.GameClock,
 		sevenSigns:    cfg.SevenSigns,
+		festival:      cfg.Festival,
 		olympiad:      cfg.Olympiad,
 		raidPoints:    cfg.RaidPoints,
 		water:         cfg.Water,
@@ -676,6 +724,8 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		persistWait:      cfg.PersistWait,
 		queues:           cfg.Queues,
 		restarts:         cfg.Restarts,
+		clanHallData:     cfg.ClanHallData,
+		castleData:       cfg.CastleData,
 		levels:           cfg.Levels,
 		admin:            cfg.Admin,
 		gmAudit:          cfg.GMAudit,
@@ -695,6 +745,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		relations:        cmp.Or(cfg.Relations, relation.NewManager(nil)),
 		characters:       cfg.Characters,
 		accessLevels:     cfg.AccessLevels,
+		characterEdits:   cfg.CharacterEdits,
 		punishments:      cfg.Punishments,
 		petitions:        cmp.Or(cfg.Petitions, petition.NewManager(petition.DefaultConfig(), nil, nil, nil, nil)),
 		enchantState:     enchantflow.NewState(),
@@ -738,14 +789,26 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		link.board.favorites = bbs.NewFavorites(nil, nil, cfg.Log)
 	}
 	link.schemeBuffer = cfg.SchemeBuffer
+	link.derby = cfg.Derby
 	if link.schemeBuffer == nil {
 		link.schemeBuffer = schemebuffer.New(schemebuffer.DefaultConfig(), nil, nil)
+	}
+	link.wedding = cfg.Wedding
+	if link.wedding == nil {
+		ids, _ := cfg.IDs.(wedding.IDs)
+		link.wedding = wedding.NewManager(wedding.DefaultConfig(), ids, nil)
+	}
+	link.lottery = cfg.Lottery
+	link.hallFunctions = cfg.ClanHallFunctions
+	if link.lottery == nil {
+		link.lottery = lottery.New(lottery.DefaultConfig(), nil, nil, nil, cfg.Queues.NewQueue("lottery"), cfg.Log)
 	}
 	link.announcements = cfg.Announcements
 	if link.announcements == nil {
 		link.announcements = announcement.NewRegistry(nil, NewAnnouncer(cfg.World), cfg.Log, cfg.Queues.NewQueue("announcements"))
 	}
 	link.clans = cfg.Clans
+	link.castles = cfg.Castles
 	if link.clans == nil {
 		link.clans = clan.NewService(nil, nil, nil, cfg.IDs, clan.DefaultConfig(), nil, cfg.Log)
 	}
@@ -761,14 +824,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		}
 	}
 	link.wireZoneOccupantHooks()
-	debugStop := func(reason string, at location.Location) {
-		link.log.Debug().Str("reason", reason).Interface("at", at).Str("stack", string(debug.Stack())).Msg("movedbg: player walk stopped")
-	}
-	debugResolve := func(origin, target, destination location.Location, waypoints, outcome int, distance, ticks, speed float64) {
-		link.log.Debug().Interface("origin", origin).Interface("target", target).Interface("destination", destination).Int("waypoints", waypoints).Int("outcome", outcome).Float64("distance", distance).Float64("ticks", ticks).Float64("speed", speed).Msg("movedbg: walk resolved")
-	}
-	move.DebugStop.Store(&debugStop)
-	move.DebugResolve.Store(&debugResolve)
+	link.wireClanHallZones()
 	return link, nil
 }
 

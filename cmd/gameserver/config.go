@@ -62,6 +62,7 @@ type gameplayConfig struct {
 	KarmaPlayerCanTrade      karmaPlayerCanTrade
 	AllowDelevel             allowDelevel
 	RateKarmaExpLost         rateKarmaExpLost
+	DeathDrop                player.DeathDropRules
 	CharacterSelectDelay     characterSelectDelay
 	ServerBypassDelay        serverBypassDelay
 	ManufactureDelay         manufactureDelay
@@ -151,6 +152,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.RateKarmaExpLost, err = loadRateKarmaExpLost(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.DeathDrop, err = loadDeathDropRules(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.CharacterSelectDelay, err = loadCharacterSelectDelay(paths); err != nil {

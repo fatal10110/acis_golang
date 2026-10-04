@@ -449,10 +449,6 @@ func sevenSignsPeriodMessage(p sevensigns.Period) int {
 	}
 }
 
-func dieOptions(live *livePlayer) serverpackets.DieOptions {
-	return serverpackets.DieOptions{FixedRes: live.accessLevel().AllowFixedRes}
-}
-
 // socialActionLevelUp is the social animation id played for everyone who can
 // see a character that just gained a level.
 const socialActionLevelUp = 15
@@ -670,6 +666,8 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	rt := player.Runtime{
 		World:  l.world,
 		Social: socialGraph{parties: l.parties, clans: l.clans},
+		// HallFunctions gives the clan hall recovery bonuses.
+		HallFunctions: l.hallFunctions,
 		// PartyLoot hands a partied character's auto-loot and sweep to its
 		// party's loot rule.
 		PartyLoot: l,
@@ -688,6 +686,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 			AllowDelevel:           l.playerConfig.AllowDelevel,
 			RaidCursesDisabled:     l.disableRaidCurse,
 			AwardPKKillPVPPoint:    l.playerConfig.AwardPKKillPVPPoint,
+			DeathDrop:              l.playerConfig.DeathDrop,
 		},
 	}
 	if los, ok := l.geo.(player.LineOfSight); ok {
@@ -722,8 +721,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	creatureLive.Move().UseZoneSwim()
 	creatureLive.SetQueue(l.queues.NewQueue(fmt.Sprintf("player-%d", c.ObjectID())))
 	access := l.admin.Resolve(c.AccessLevel)
-	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), visibilitySend: client.Session.SendFrame, stopAttack: l.stopLiveAutoAttack, log: l.log}
+	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), visibilitySend: client.Session.SendFrame, log: l.log}
 	live.access.Store(&access)
+	live.remoteIP = client.Session.remoteIP()
 	delivery.live = live
 	c.Attach(creatureLive, live)
 	moveCtl, err := move.NewController(c.Move(), c, live)

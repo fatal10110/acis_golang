@@ -188,6 +188,10 @@ func (s *Service) DeclareWar(c *player.Character, targetName string, now time.Ti
 	defer s.allyMu.Unlock()
 	unlock := lockPair(cl, target)
 	defer unlock()
+	if cl.destroyed || target.destroyed {
+		// Dissolved since it was looked up.
+		return War{}, WarNoSuchClan
+	}
 	_, attacked := cl.attackers[target.id]
 	_, atWar := cl.wars[target.id]
 	switch {

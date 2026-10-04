@@ -21,24 +21,6 @@ const (
 	characterUnbannedLevel = 0
 )
 
-// adminSet answers //set <field> ...: //set access changes a character's
-// access level. The other fields are not ported yet (#3165): they log the
-// gap and release the client.
-func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
-	args := handleradmin.Args(line)
-	if len(args) == 0 {
-		sendText(gm, "Usage: //set <access|class|color|exp|karma|level>")
-		sendText(gm, "Usage: //set <name|noble|rec|sex|sp|tcolor|title>")
-		return
-	}
-	if args[0] != "access" {
-		l.log.Warn().Str("field", args[0]).Msg("admin: //set field not implemented yet (#3165)")
-		gm.SendFrame(serverpackets.FrameActionFailed())
-		return
-	}
-	l.adminSetAccess(gm, args[1:])
-}
-
 // adminSetAccess answers //set access <level> for the selected object (gm
 // itself without one), and //set access <name> <level> for the named
 // character, online or not. A character set below 0 is banned and

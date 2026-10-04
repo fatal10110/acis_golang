@@ -27,10 +27,6 @@ type SummonFriendRequester interface {
 	NoSummonFriendZone() bool
 }
 
-// OlympiadMode always reports false: Olympiad (#216) isn't ported yet, so
-// no character can be a participant.
-func (c *Character) OlympiadMode() bool { return false }
-
 // ObserverMode always reports false: observer/spectate mode (#219) isn't
 // ported yet.
 func (c *Character) ObserverMode() bool { return false }

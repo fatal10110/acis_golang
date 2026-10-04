@@ -611,6 +611,14 @@ func buildSkillDefinitionAttrs(id skill.ID, level int, vals map[string]string) (
 		SimultaneousCast: a.boolDefault("simultaneousCast", false),
 
 		ExtractableItems: a.strDefault("capsuled_items_skill", ""),
+
+		RecallType: skill.ParseRecallType(a.strDefault("recallType", "")),
+	}
+
+	if a.has("teleCoords") {
+		if loc, ok := skill.ParseTeleCoords(a.str("teleCoords")); ok {
+			attrs.TeleCoords = &loc
+		}
 	}
 
 	if negate := a.strDefault("negateStats", ""); negate != "" {

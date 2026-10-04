@@ -48,8 +48,11 @@ type StanceChanged struct{ Stance Stance }
 type FakeDeathRevived struct{}
 
 // PostureSettled reports that a sit-down or stand-up transition ended and
-// the character takes control back.
-type PostureSettled struct{}
+// the character takes control back. StoodUp is set for the end of a
+// stand-up, a get-up out of fake death included, and clear for the end of a
+// sit-down or a lie-down into fake death; it names the transition that
+// ended, not the posture the character holds now.
+type PostureSettled struct{ StoodUp bool }
 
 // FusionCastersStopRequested asks that every other character channelling a
 // fusion skill on this character stop its cast.
@@ -305,6 +308,10 @@ type SummonConfirmRequested struct {
 // Radius.
 type TeleportRequested struct{ X, Y, Z, Radius int }
 
+// RecallRequested reports a recall skill sending the character to the
+// place Destination names, resolved for the character where it stands.
+type RecallRequested struct{ Destination modelskill.RecallType }
+
 // Relocated reports that the server-authoritative position moved away from
 // Previous. Placed marks a position set outside movement (a forced flight's
 // landing) rather than a movement step.
@@ -386,6 +393,7 @@ func (FleeRequested) event()          {}
 func (Retargeted) event()             {}
 func (SummonConfirmRequested) event() {}
 func (TeleportRequested) event()      {}
+func (RecallRequested) event()        {}
 func (Relocated) event()              {}
 func (PvPFlagged) event()             {}
 func (RelationChanged) event()        {}

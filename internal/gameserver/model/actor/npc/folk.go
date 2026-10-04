@@ -148,6 +148,9 @@ func (f *Folk) CollisionRadius() float64 { return f.Instance.Template.CollisionR
 // CollisionHeight returns the template body height.
 func (f *Folk) CollisionHeight() float64 { return f.Instance.Template.CollisionHeight }
 
+// weddingManager is the wedding manager's type.
+const weddingManager InstanceKind = "WeddingManagerNpc"
+
 // Muted reports a civilian NPC a player's interact does nothing on.
 func (f *Folk) Muted() bool { return hostileKind(f.Instance) == "MutedFolk" }
 
@@ -156,7 +159,7 @@ func (f *Folk) Muted() bool { return hostileKind(f.Instance) == "MutedFolk" }
 // first one always. ok is false when none plays. A wedding manager greets
 // with its own dialog and plays none.
 func (f *Folk) TalkAnimation(now time.Time) (id int32, ok bool) {
-	if f.Muted() || hostileKind(f.Instance) == "WeddingManagerNpc" {
+	if f.Muted() || hostileKind(f.Instance) == weddingManager {
 		return 0, false
 	}
 	ms := now.UnixMilli()

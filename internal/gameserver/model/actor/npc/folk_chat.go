@@ -27,9 +27,23 @@ const (
 	// ChatShown opens the returned page.
 	ChatShown ChatOutcome = iota
 	// ChatUnported names an NPC type whose dialog reads state of a system
-	// not in place yet (castles, clan halls, Seven Signs, Olympiad, manor,
-	// weddings); it opens nothing.
+	// not in place yet (castles, clan halls, Seven Signs, Olympiad, manor);
+	// it opens nothing.
 	ChatUnported
+	// ChatWedding is a wedding manager: its own dialog greets the talker.
+	ChatWedding
+	// ChatShownReleased releases the client with ActionFailed first, then
+	// opens the returned page.
+	ChatShownReleased
+	// ChatDawnOnly refuses a talker who does not belong to the Dawn: the
+	// winning cabal owning the seal the NPC serves. It says so, then
+	// releases the client.
+	ChatDawnOnly
+	// ChatDuskOnly is ChatDawnOnly for the Dusk.
+	ChatDuskOnly
+	// ChatCompetitionOnly refuses every talker while no cabal leads: it says
+	// the NPC serves only in the quest event period, and releases nothing.
+	ChatCompetitionOnly
 )
 
 // folkChat is one type's chat window: the data/html folder its pages live
@@ -69,7 +83,7 @@ var folkChats = map[InstanceKind]folkChat{
 }
 
 // unportedFolkChats are the civilian types whose chat window depends on
-// castle, clan hall, Seven Signs, Olympiad, manor or wedding state.
+// castle, clan hall, Seven Signs, Olympiad or manor state.
 var unportedFolkChats = map[InstanceKind]struct{}{
 	"Auctioneer":            {},
 	"CastleBlacksmith":      {},
@@ -80,27 +94,40 @@ var unportedFolkChats = map[InstanceKind]struct{}{
 	"CastleWarehouseKeeper": {},
 	"ClanHallDoorman":       {},
 	"ClanHallManagerNpc":    {},
-	"DawnPriest":            {},
 	"Doorman":               {},
-	"DuskPriest":            {},
-	"FestivalGuide":         {},
 	"ManorManagerNpc":       {},
 	"MercenaryManagerNpc":   {},
-	"OlympiadManagerNpc":    {},
 	"SiegeNpc":              {},
-	"SignsPriest":           {},
-	"WeddingManagerNpc":     {},
 	"WyvernManagerNpc":      {},
 }
 
+// unportedFolkCommands are the civilian types whose first chat page is in
+// place but whose dialog commands still need Seven Signs, festival or
+// Olympiad behavior that is not (#3337, #223, #217).
+var unportedFolkCommands = map[InstanceKind]struct{}{
+	"DawnPriest":         {},
+	"DuskPriest":         {},
+	"FestivalGuide":      {},
+	"OlympiadManagerNpc": {},
+	"SignsPriest":        {},
+}
+
 // ChatWindow resolves the first chat page this NPC shows a talker carrying
-// karma: its page with %objectId% filled in, or, for a karma-gated type
+// karma, or names the wedding manager, whose own dialog greets: its page with %objectId% filled in, or, for a karma-gated type
 // whose gate refuses the talker and whose refusal page exists, that page
-// as is. A missing page reads as a "My html is missing" notice naming it.
-func (f *Folk) ChatWindow(pages Pages, rules ChatRules, karma int) (string, ChatOutcome) {
+// as is. A Seven Signs priest, festival guide or Olympiad manager reads
+// its page from state; see signsChat. A missing page reads as a "My html
+// is missing" notice naming it.
+func (f *Folk) ChatWindow(pages Pages, rules ChatRules, karma int, state ChatState) (string, ChatOutcome) {
 	kind := hostileKind(f.Instance)
+	if kind == weddingManager {
+		return "", ChatWedding
+	}
 	if _, ok := unportedFolkChats[kind]; ok {
 		return "", ChatUnported
+	}
+	if page, outcome, ok := f.signsChat(pages, kind, state); ok {
+		return page, outcome
 	}
 	chat := folkChats[kind]
 	if page, refused := f.pkRefusal(pages, chat, rules, karma); refused {

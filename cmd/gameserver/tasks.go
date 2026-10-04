@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
@@ -27,15 +28,7 @@ func providePvPFlags(opts task.PvPFlagOptions) *task.PvPFlags {
 	return task.NewPvPFlags(opts, time.Now)
 }
 
-func startPvPFlags(lc fx.Lifecycle, flags *task.PvPFlags, opts task.PvPFlagOptions, log zerolog.Logger) {
-	lc.Append(fx.Hook{
-		OnStart: func(context.Context) error {
-			for _, key := range opts.UnsupportedKeys {
-				log.Warn().Str("file", "players.properties").Str("key", key).Msg("unsupported Karma/PvP config option")
-			}
-			return nil
-		},
-	})
+func startPvPFlags(lc fx.Lifecycle, flags *task.PvPFlags, log zerolog.Logger) {
 	startTicker(lc, log, flags.Start)
 }
 
@@ -159,22 +152,37 @@ func provideSevenSignsState(db *sql.DB, state *world.State, log zerolog.Logger) 
 	return sevensigns.NewState(gamesql.NewSevenSignsStore(db), network.NewSevenSignsBroadcaster(state), log, time.Now, nil)
 }
 
-// startSevenSigns restores the persisted status and sign-ups before any
-// character can log in and arms the period-change timer — firing an overdue
-// period change immediately. On shutdown it stops the timer and saves the
-// sign-ups and the status.
-func startSevenSigns(lc fx.Lifecycle, state *sevensigns.State, log zerolog.Logger) {
+// startSevenSigns restores the persisted status and sign-ups, then the
+// festival, before any character can log in; hands the period changes to
+// the festival, starts its schedule and arms the period-change timer —
+// firing an overdue period change immediately. On shutdown it stops both
+// timers, saves the festival scores unless seal validation is under way,
+// and saves the sign-ups and the status with the festival's columns.
+func startSevenSigns(lc fx.Lifecycle, state *sevensigns.State, fest *festival.Manager, log zerolog.Logger) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			if err := state.Restore(ctx); err != nil {
 				return err
 			}
+			if err := fest.Restore(ctx, state.CurrentCycle()); err != nil {
+				return err
+			}
+			state.SetFestival(fest)
+			fest.Start()
 			state.Start()
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
 			state.Stop()
-			saveOnStop(ctx, shutdownSaveTimeout, log, "save seven signs", state.Save)
+			fest.Stop()
+			saveOnStop(ctx, shutdownSaveTimeout, log, "save seven signs", func(ctx context.Context) error {
+				if state.CurrentPeriod() != sevensigns.SealValidation {
+					if err := fest.SaveScores(ctx); err != nil {
+						log.Warn().Err(err).Msg("save festival scores")
+					}
+				}
+				return state.Save(ctx)
+			})
 			return nil
 		},
 	})

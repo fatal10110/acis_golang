@@ -58,6 +58,7 @@ const (
 		2*olympiad.TaskTimeout + // the Olympiad's queued olympiad_nobles and server_memo writes, then its final save
 		shutdownSaveTimeout + // grandboss_list
 		shutdownSaveTimeout + // buffer_schemes
+		shutdownSaveTimeout + // mods_wedding
 		gameServerStopSlack
 	// gameServerBootTimeout bounds constructor-time DB I/O (id scan, ground-item
 	// restore, spawn-state load). These run inside fx.New's constructor graph,
@@ -165,6 +166,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideIDAllocator,
 			loadClanConfig,
 			provideClans,
+			provideCastles,
 			provideRoster,
 			providePvPFlags,
 			provideInventoryUpdates,
@@ -176,6 +178,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideGroundItems,
 			provideGameClock,
 			provideSevenSignsState,
+			provideFestival,
 			provideOlympiad,
 			provideRaidPoints,
 			provideWalker,
@@ -208,8 +211,13 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideCommunityBoard,
 			provideAnnouncements,
 			provideSchemeBuffer,
+			provideWedding,
+			provideLottery,
+			provideDerbyTrack,
+			provideClanHallFunctions,
 			provideGameClientLink,
 		),
-		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startDoorRegen, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startOlympiad, startRaidPoints, startBossZones, startSchemeBuffer, startDebugHTTP, startGameServer),
+		fx.Invoke(startClanDissolutions, startClanHallFunctions),
+		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startDoorRegen, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startOlympiad, startRaidPoints, startBossZones, startSchemeBuffer, startWedding, startLottery, startDerbyTrack, startDebugHTTP, startGameServer),
 	}
 }

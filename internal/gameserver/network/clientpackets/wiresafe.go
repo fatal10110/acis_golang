@@ -41,8 +41,8 @@ const (
 	OpcodeStartRotating           = 0x4a
 	OpcodeFinishRotating          = 0x4b
 	OpcodeRequestDestroyItem      = 0x59
-	OpcodeRequestMoveInVehicle    = 0x5c
-	OpcodeCannotMoveInVehicle     = 0x5d
+	OpcodeRequestMoveInVehicle    = 0x5c // RequestMoveToLocationInVehicle
+	OpcodeCannotMoveInVehicle     = 0x5d // CannotMoveAnymoreInVehicle
 	OpcodeRequestQuestListInGame  = 0x63
 	OpcodeRequestQuestAbort       = 0x64
 	OpcodeRequestAcquireSkillInfo = 0x6b

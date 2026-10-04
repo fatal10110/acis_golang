@@ -26,6 +26,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/manor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
+	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
@@ -99,6 +100,11 @@ type gameData struct {
 	Fish *fish.Table
 	// ClanHalls are the clan halls a clan can own.
 	ClanHalls *clanhall.Table
+	// ClanHallDecos are the levels, fees and decorations of the functions
+	// a clan hall can rent.
+	ClanHallDecos *clanhall.DecoTable
+	// Castles are the castles a clan can own.
+	Castles *castledata.Table
 	// Manors are the manor seed rows; ManorAreas the areas monsters are
 	// sown in.
 	Manors     *manor.Table
@@ -225,6 +231,14 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
+	clanHallDecos, err := gamexml.LoadClanHallDeco(filepath.Join(xmlRoot, "clanHallDeco.xml"))
+	if err != nil {
+		return nil, err
+	}
+	castles, err := gamexml.LoadCastles(filepath.Join(xmlRoot, "castles.xml"))
+	if err != nil {
+		return nil, err
+	}
 	manors, manorAreas, err := loadManor(xmlRoot, log)
 	if err != nil {
 		return nil, err
@@ -263,6 +277,8 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		ArmorSets:        armorSets,
 		Fish:             fishTable,
 		ClanHalls:        clanHalls,
+		ClanHallDecos:    clanHallDecos,
+		Castles:          castles,
 		Manors:           manors,
 		ManorAreas:       manorAreas,
 	}, nil

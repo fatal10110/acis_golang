@@ -44,6 +44,13 @@ func (b *clanWarehouseBook) entry(clanID int32) *clanWarehouseEntry {
 	return e
 }
 
+// forget drops the warehouse of the clan clanID, dissolved.
+func (b *clanWarehouseBook) forget(clanID int32) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	delete(b.byClan, clanID)
+}
+
 // clanWarehouse returns the warehouse of the clan clanID, restoring it
 // from its CLANWH rows on first use. A failed read is not kept: the next
 // opening reads again.

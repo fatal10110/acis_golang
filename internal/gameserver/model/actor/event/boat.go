@@ -40,7 +40,26 @@ type BoatSounded struct {
 	At       location.Location
 }
 
+// BoatCarried reports a boat's position update to the players aboard,
+// Passengers by object id: each now stands where the boat stands, At,
+// facing its own way; Heading is the boat's.
+type BoatCarried struct {
+	Passengers []int32
+	At         location.Location
+	Heading    int
+}
+
+// BoatFareDue reports a ticket collection: each of Passengers, by object
+// id, gives up one ItemID ticket, or is put ashore at Oust.
+type BoatFareDue struct {
+	Passengers []int32
+	ItemID     int
+	Oust       location.Location
+}
+
 func (BoatDeparted) event()  {}
+func (BoatCarried) event()   {}
+func (BoatFareDue) event()   {}
 func (BoatStarted) event()   {}
 func (BoatShown) event()     {}
 func (BoatAnnounced) event() {}

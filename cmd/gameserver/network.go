@@ -13,10 +13,15 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/debughttp"
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
+	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
+	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -33,6 +38,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/petition"
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/fatal10110/acis_golang/internal/gameserver/wedding"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
@@ -89,6 +95,7 @@ func provideGameClientLink(
 	playerClock *task.PlayerClock,
 	gameClock *task.GameClock,
 	sevenSigns *sevensigns.State,
+	fest *festival.Manager,
 	olympiadState *olympiad.Olympiad,
 	raidPoints *raidpoint.Points,
 	inventoryUpdates *task.InventoryUpdates,
@@ -109,9 +116,14 @@ func provideGameClientLink(
 	petitions *petition.Manager,
 	characters *gamesql.CharacterStore,
 	clans *clan.Service,
+	castles *castle.Manager,
 	board communityBoard,
 	announcements *announcement.Registry,
 	schemeBuffer *schemebuffer.Manager,
+	couples *wedding.Manager,
+	lotteryState *lottery.Lottery,
+	derbyTrack *derby.Track,
+	hallFunctions *clanhall.Functions,
 	log zerolog.Logger,
 	gmAudit gmAuditLogger,
 	chatLog chatLogger,
@@ -142,6 +154,7 @@ func provideGameClientLink(
 		EnableFallingDamage:        cfg.EnableFallingDamage,
 		AllowDelevel:               bool(gameplay.AllowDelevel),
 		RateKarmaExpLost:           float64(gameplay.RateKarmaExpLost),
+		DeathDrop:                  gameplay.DeathDrop,
 		CharacterSelectDelay:       time.Duration(gameplay.CharacterSelectDelay),
 		ServerBypassDelay:          time.Duration(gameplay.ServerBypassDelay),
 		CraftingDisabled:           !bool(gameplay.CraftingEnabled),
@@ -199,6 +212,7 @@ func provideGameClientLink(
 		PlayerClock:   playerClock,
 		GameClock:     gameClock,
 		SevenSigns:    sevenSigns,
+		Festival:      fest,
 		Olympiad:      olympiadState,
 		RaidPoints:    raidPoints,
 		Water:         water,
@@ -211,6 +225,8 @@ func provideGameClientLink(
 		ItemWrites:       itemWrites,
 		Queues:           pool,
 		Restarts:         data.Restarts,
+		ClanHallData:     data.ClanHalls,
+		CastleData:       data.Castles,
 		Levels:           data.Levels,
 		Admin:            data.Admin,
 		GMAudit:          gmAudit.enabled(gameplay.Admin.GMAudit),
@@ -238,12 +254,14 @@ func provideGameClientLink(
 		Manor:               manorConfig(gameplay.Manor, data),
 		Fish:                data.Fish,
 
-		Relations:    relations,
-		Characters:   characters,
-		Clans:        clans,
-		AccessLevels: characters,
-		Punishments:  characters,
-		Petitions:    petitions,
+		Relations:      relations,
+		Characters:     characters,
+		Clans:          clans,
+		Castles:        castles,
+		AccessLevels:   characters,
+		CharacterEdits: characters,
+		Punishments:    characters,
+		Petitions:      petitions,
 
 		Board:          board.Config,
 		Mailbox:        board.Mailbox,
@@ -252,6 +270,11 @@ func provideGameClientLink(
 		ShowServerNews: board.ShowServerNews,
 		Announcements:  announcements,
 		SchemeBuffer:   schemeBuffer,
+		Wedding:        couples,
+		Lottery:        lotteryState,
+		Derby:          derbyTrack,
+
+		ClanHallFunctions: hallFunctions,
 	})
 	if err != nil {
 		return nil, err

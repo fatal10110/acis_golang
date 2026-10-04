@@ -195,7 +195,11 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 		hp = hostile.MaxHP()
 	}
 	hostile.SetCurrentHP(hp)
-	rt := npc.Runtime{World: n.state, Log: n.log, Items: n.items, Rewards: n.rewarderFor(hostile, tmpl), Remover: n}
+	rewards := n.rewarderFor(hostile, tmpl)
+	rt := npc.Runtime{World: n.state, Log: n.log, Items: n.items, Rewards: rewards, Remover: n}
+	if rewards.rights != nil {
+		rt.Hits = rewards.rights
+	}
 	if los, ok := n.geo.(npc.LineOfSight); ok {
 		rt.LOS = los
 	}
@@ -289,7 +293,17 @@ func (n *Npcs) rewarderFor(hostile *npc.Hostile, tmpl *npc.Template) *deathRewar
 		items:      n.items,
 		ground:     n.ground,
 		geo:        n.geo,
+		rights:     raidLootRights(hostile, tmpl, n.rewards.Channels),
 	}
+}
+
+// raidLootRights returns the command channel loot rights of a raid or
+// grand boss, or nil for any other NPC or without channels.
+func raidLootRights(hostile *npc.Hostile, tmpl *npc.Template, channels LootChannels) *ccLootRights {
+	if channels == nil || !hostile.RaidBoss() {
+		return nil
+	}
+	return newCCLootRights(hostile, tmpl.ID, channels)
 }
 
 // NewHostileRewarder builds the production kill-reward hook for a hostile
@@ -298,9 +312,12 @@ func (n *Npcs) rewarderFor(hostile *npc.Hostile, tmpl *npc.Template) *deathRewar
 // from the template, placed through ids and ground, and corpse-decay
 // scheduling from its CorpseTime, so a caller whose templates declare no
 // CorpseTime never reaches the decay hook this simplified signature leaves
-// out.
-func NewHostileRewarder(hostile *npc.Hostile, tmpl *npc.Template, state *world.State, config KillRewardConfig, items *item.Table, ids idAllocator, ground groundPlacer) creature.Rewarder {
-	return &deathRewards{
+// out. The hit observer, nil for anything but a raid or grand boss with
+// channels configured, watches the hits that win a command channel the
+// boss's loot rights.
+func NewHostileRewarder(hostile *npc.Hostile, tmpl *npc.Template, state *world.State, config KillRewardConfig, items *item.Table, ids idAllocator, ground groundPlacer) (creature.Rewarder, npc.HitObserver) {
+	rights := raidLootRights(hostile, tmpl, config.Channels)
+	rewards := &deathRewards{
 		hostile:    hostile,
 		state:      state,
 		tmpl:       tmpl,
@@ -310,7 +327,12 @@ func NewHostileRewarder(hostile *npc.Hostile, tmpl *npc.Template, state *world.S
 		items:      items,
 		ids:        ids,
 		ground:     ground,
+		rights:     rights,
 	}
+	if rights == nil {
+		return rewards, nil
+	}
+	return rewards, rights
 }
 
 // RespawnHook implements the decay task's per-actor respawn resolution: it

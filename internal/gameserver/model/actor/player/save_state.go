@@ -42,6 +42,12 @@ func (c *Character) SaveState() SaveState {
 	subs := c.subclassesLocked()
 	classID := c.ClassID()
 	c.progressionMu.RUnlock()
+	// A character aboard a boat is saved on the shore of the dock the boat
+	// serves, not out at sea.
+	at := c.CurrentLocation()
+	if v := c.Boat(); v != nil {
+		at = v.OustLocation()
+	}
 	return SaveState{
 		ID:                c.ID,
 		ClassID:           classID,
@@ -54,7 +60,7 @@ func (c *Character) SaveState() SaveState {
 		PKKills:           progression.PKKills,
 		DeathPenaltyLevel: c.DeathPenaltyLevel(),
 		OnlineTime:        c.TotalOnlineTime(time.Now()), // persisted wall-clock total, not a queue deadline
-		Location:          c.CurrentLocation(),
+		Location:          at,
 		Heading:           c.CurrentHeading(),
 		WantsPeace:        c.WantsPeace(),
 		Noble:             c.IsNoble(),

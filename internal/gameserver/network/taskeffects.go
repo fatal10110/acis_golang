@@ -196,6 +196,8 @@ func (a *liveZoneActor) syncFlags() {
 	a.live.SetInPeaceZone(a.flags.Has(zone.FlagPeace))
 	a.live.SetInSiegeZone(a.flags.Has(zone.FlagSiege))
 	a.live.SetInNoSummonFriendZone(a.flags.Has(zone.FlagNoSummonFriend))
+	a.live.SetInBossZone(a.flags.Has(zone.FlagBoss))
+	a.live.SetInClanHallZone(a.flags.Has(zone.FlagClanHall))
 	a.live.SetInWater(a.flags.Has(zone.FlagWater))
 	a.live.SetInDangerArea(a.flags.Has(zone.FlagDanger))
 	if !a.flags.Has(zone.FlagSwamp) {

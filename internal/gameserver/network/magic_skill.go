@@ -373,6 +373,7 @@ func magicCastFailureReasonOnly(err error) bool {
 		errors.Is(err, actorcast.ErrOlympiadSkill) ||
 		errors.Is(err, actorcast.ErrSummonOnlyOne) ||
 		errors.Is(err, actorcast.ErrSummonInCombat) ||
+		errors.Is(err, actorcast.ErrSummonOnBoat) ||
 		errors.As(err, new(*actorcast.ConditionError))
 }
 
@@ -555,6 +556,12 @@ func (l *GameClientLink) finishDeferredMagicSkill(live *livePlayer) bool {
 	if inPostureTransition(live) {
 		return live.hasDeferredMagicSkill()
 	}
+	return l.runDeferredMagicSkill(live)
+}
+
+// runDeferredMagicSkill runs the queued skill request, if any, whatever the
+// posture, and reports whether one was waiting.
+func (l *GameClientLink) runDeferredMagicSkill(live *livePlayer) bool {
 	queued := live.takeDeferredMagicSkill()
 	if queued == nil {
 		return false
@@ -855,6 +862,8 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSummonOnlyOne))
 	case errors.Is(err, actorcast.ErrSummonInCombat):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouCannotSummonInCombat))
+	case errors.Is(err, actorcast.ErrSummonOnBoat):
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotCallPetFromThisLocation))
 	case errors.Is(err, actorcast.ErrFormalWear):
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotUseSkillsWithFormalWear))
 	case errors.Is(err, actorcast.ErrFishingSkillsOnly):

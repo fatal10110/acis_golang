@@ -239,14 +239,6 @@ func (s *CharacterStore) SetDeathPenaltyLevel(ctx context.Context, objectID int3
 	return nil
 }
 
-// SetNoble stores the character's noblesse status.
-func (s *CharacterStore) SetNoble(ctx context.Context, objectID int32, noble bool) error {
-	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET nobless = ? WHERE obj_Id = ?", noble, objectID); err != nil {
-		return fmt.Errorf("set noblesse for %d: %w", objectID, err)
-	}
-	return nil
-}
-
 // SetOnline marks the character in game and stamps lastAccess (epoch
 // milliseconds). It runs when a client enters the world, so external DB
 // consumers see the character as online from login until SetOffline.

@@ -1,7 +1,6 @@
 package task
 
 import (
-	"sort"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -37,8 +36,6 @@ type PvPFlagOptions struct {
 	Normal              time.Duration
 	Flagged             time.Duration
 	AwardPKKillPVPPoint bool
-
-	UnsupportedKeys []string
 }
 
 // DefaultPvPFlagOptions returns the shipped players.properties defaults.
@@ -48,13 +45,6 @@ func DefaultPvPFlagOptions() PvPFlagOptions {
 		Flagged:             20 * time.Second,
 		AwardPKKillPVPPoint: true,
 	}
-}
-
-var unsupportedPvPFlagKeys = []string{
-	"CanGMDropEquipment",
-	"ListOfNonDroppableItemsForPK",
-	"ListOfPetItems",
-	"MinimumPKRequiredToDrop",
 }
 
 // PvPFlagOptionsFromProperties reads the PvP flag settings from
@@ -74,13 +64,6 @@ func PvPFlagOptionsFromProperties(props *config.Properties) (PvPFlagOptions, err
 	opts.Normal = time.Duration(normal) * time.Millisecond
 	opts.Flagged = time.Duration(flagged) * time.Millisecond
 	opts.AwardPKKillPVPPoint = f.Bool("AwardPKKillPVPPoint", opts.AwardPKKillPVPPoint)
-
-	for _, key := range unsupportedPvPFlagKeys {
-		if _, ok := props.Lookup(key); ok {
-			opts.UnsupportedKeys = append(opts.UnsupportedKeys, key)
-		}
-	}
-	sort.Strings(opts.UnsupportedKeys)
 	return opts, nil
 }
 

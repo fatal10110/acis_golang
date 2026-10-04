@@ -1,0 +1,174 @@
+# empty table, Wednesday
+ANN Lottery tickets are now available for Lucky Lottery #1.
+DB insert idnr=1 enddate=2026-10-10T19:00:00.123Z prize=50000 newprize=50000
+@2026-10-07T10:00:00.123Z round=1 prize=50000 started=true selling=true end=2026-10-10T19:00:00.123Z enddate=Oct 10, 2026
+DB update_prize idnr=1 prize=52000 newprize=52000
+BUY round=1 enchant=31 type2=0
+SM 783
+@2026-10-10T18:50:00.123Z round=1 prize=52000 started=true selling=false end=2026-10-10T19:00:00.123Z enddate=Oct 10, 2026
+BUY refused started=true selling=false
+SM 1112 1 52000 2
+DB finish idnr=1 prize=52000 newprize=65480 number1=68 number2=11 prize1=15480 prize2=10320 prize3=10320
+@2026-10-10T19:00:00.123Z round=2 prize=52000 started=false selling=false end=2026-10-10T19:00:00.123Z enddate=Oct 10, 2026
+ANN Lottery tickets are now available for Lucky Lottery #2.
+DB insert idnr=2 enddate=2026-10-17T19:00:00.123Z prize=65480 newprize=65480
+@2026-10-10T19:01:00.123Z round=2 prize=65480 started=true selling=true end=2026-10-17T19:00:00.123Z enddate=Oct 17, 2026
+DB update_prize idnr=2 prize=67480 newprize=67480
+BUY round=2 enchant=4 type2=15
+SM 783
+@2026-10-17T18:50:00.123Z round=2 prize=67480 started=true selling=false end=2026-10-17T19:00:00.123Z enddate=Oct 17, 2026
+SM 1113 2 67480
+DB finish idnr=2 prize=67480 newprize=117080 number1=31 number2=0 prize1=0 prize2=0 prize3=0
+@2026-10-17T19:00:00.123Z round=3 prize=67480 started=false selling=false end=2026-10-17T19:00:00.123Z enddate=Oct 17, 2026
+ANN Lottery tickets are now available for Lucky Lottery #3.
+DB insert idnr=3 enddate=2026-10-24T19:00:00.123Z prize=117080 newprize=117080
+@2026-10-17T19:01:00.123Z round=3 prize=117080 started=true selling=true end=2026-10-24T19:00:00.123Z enddate=Oct 24, 2026
+SM 783
+@2026-10-24T18:50:00.123Z round=3 prize=117080 started=true selling=false end=2026-10-24T19:00:00.123Z enddate=Oct 24, 2026
+# last row finished, Saturday evening
+ANN Lottery tickets are now available for Lucky Lottery #5.
+DB insert idnr=5 enddate=2026-10-17T19:00:00Z prize=70000 newprize=70000
+@2026-10-10T20:30:00Z round=5 prize=70000 started=true selling=true end=2026-10-17T19:00:00Z enddate=Oct 17, 2026
+SM 783
+@2026-10-17T18:50:00Z round=5 prize=70000 started=true selling=false end=2026-10-17T19:00:00Z enddate=Oct 17, 2026
+SM 1113 5 70000
+DB finish idnr=5 prize=70000 newprize=120000 number1=68 number2=11 prize1=0 prize2=0 prize3=0
+@2026-10-17T19:00:00Z round=6 prize=70000 started=false selling=false end=2026-10-17T19:00:00Z enddate=Oct 17, 2026
+ANN Lottery tickets are now available for Lucky Lottery #6.
+DB insert idnr=6 enddate=2026-10-24T19:00:00Z prize=120000 newprize=120000
+@2026-10-17T19:01:00Z round=6 prize=120000 started=true selling=true end=2026-10-24T19:00:00Z enddate=Oct 24, 2026
+# unfinished round far from its end
+@2026-10-09T12:00:00Z round=7 prize=64000 started=true selling=true end=2026-10-10T19:00:00.250Z enddate=Oct 10, 2026
+SM 783
+@2026-10-10T18:50:00.250Z round=7 prize=64000 started=true selling=false end=2026-10-10T19:00:00.250Z enddate=Oct 10, 2026
+SM 1112 7 64000 1
+DB finish idnr=7 prize=64000 newprize=62800 number1=68 number2=11 prize1=38400 prize2=0 prize3=12800
+@2026-10-10T19:00:00.250Z round=8 prize=64000 started=false selling=false end=2026-10-10T19:00:00.250Z enddate=Oct 10, 2026
+ANN Lottery tickets are now available for Lucky Lottery #8.
+DB insert idnr=8 enddate=2026-10-17T19:00:00.250Z prize=62800 newprize=62800
+@2026-10-10T19:01:00.250Z round=8 prize=62800 started=true selling=true end=2026-10-17T19:00:00.250Z enddate=Oct 17, 2026
+# unfinished round five minutes from its end
+@2026-10-10T18:55:00Z round=7 prize=64000 started=true selling=false end=2026-10-10T19:00:00Z enddate=Oct 10, 2026
+SM 1113 7 64000
+DB finish idnr=7 prize=64000 newprize=114000 number1=68 number2=11 prize1=0 prize2=0 prize3=0
+@2026-10-10T19:00:00Z round=8 prize=64000 started=false selling=false end=2026-10-10T19:00:00Z enddate=Oct 10, 2026
+ANN Lottery tickets are now available for Lucky Lottery #8.
+DB insert idnr=8 enddate=2026-10-17T19:00:00Z prize=114000 newprize=114000
+@2026-10-10T19:01:00Z round=8 prize=114000 started=true selling=true end=2026-10-17T19:00:00Z enddate=Oct 17, 2026
+# unfinished round two minutes from its end
+SM 1113 7 64000
+DB finish idnr=7 prize=64000 newprize=114000 number1=68 number2=11 prize1=0 prize2=0 prize3=0
+@2026-10-10T18:58:00Z round=8 prize=64000 started=false selling=false end=2026-10-10T19:00:00Z enddate=Oct 10, 2026
+ANN Lottery tickets are now available for Lucky Lottery #8.
+DB insert idnr=8 enddate=2026-10-17T19:00:00Z prize=114000 newprize=114000
+@2026-10-10T18:59:00Z round=8 prize=114000 started=true selling=true end=2026-10-17T19:00:00Z enddate=Oct 17, 2026
+SM 783
+@2026-10-17T18:50:00Z round=8 prize=114000 started=true selling=false end=2026-10-17T19:00:00Z enddate=Oct 17, 2026
+# unfinished round two weeks past
+SM 1112 3 51000 1
+DB finish idnr=3 prize=51000 newprize=60200 number1=68 number2=11 prize1=30600 prize2=0 prize3=10200
+@2026-10-04T09:00:00Z round=4 prize=51000 started=false selling=false end=2026-09-19T19:00:00Z enddate=Sep 19, 2026
+ANN Lottery tickets are now available for Lucky Lottery #4.
+DB insert idnr=4 enddate=2026-09-26T19:00:00Z prize=60200 newprize=60200
+SM 783
+SM 1113 4 60200
+DB finish idnr=4 prize=60200 newprize=110200 number1=31 number2=0 prize1=0 prize2=0 prize3=0
+@2026-10-04T09:01:00Z round=5 prize=60200 started=false selling=false end=2026-09-26T19:00:00Z enddate=Sep 26, 2026
+ANN Lottery tickets are now available for Lucky Lottery #5.
+DB insert idnr=5 enddate=2026-10-03T19:00:00Z prize=110200 newprize=110200
+SM 783
+SM 1113 5 110200
+DB finish idnr=5 prize=110200 newprize=160200 number1=992 number2=0 prize1=0 prize2=0 prize3=0
+@2026-10-04T09:02:00Z round=6 prize=110200 started=false selling=false end=2026-10-03T19:00:00Z enddate=Oct 3, 2026
+ANN Lottery tickets are now available for Lucky Lottery #6.
+DB insert idnr=6 enddate=2026-10-10T19:00:00Z prize=160200 newprize=160200
+@2026-10-04T09:03:00Z round=6 prize=160200 started=true selling=true end=2026-10-10T19:00:00Z enddate=Oct 10, 2026
+SM 783
+@2026-10-10T18:50:00Z round=6 prize=160200 started=true selling=false end=2026-10-10T19:00:00Z enddate=Oct 10, 2026
+SM 1113 6 160200
+DB finish idnr=6 prize=160200 newprize=210200 number1=31744 number2=0 prize1=0 prize2=0 prize3=0
+@2026-10-10T19:00:00Z round=7 prize=160200 started=false selling=false end=2026-10-10T19:00:00Z enddate=Oct 10, 2026
+ANN Lottery tickets are now available for Lucky Lottery #7.
+DB insert idnr=7 enddate=2026-10-17T19:00:00Z prize=210200 newprize=210200
+@2026-10-10T19:01:00Z round=7 prize=210200 started=true selling=true end=2026-10-17T19:00:00Z enddate=Oct 17, 2026
+# empty table, Saturday morning
+ANN Lottery tickets are now available for Lucky Lottery #1.
+DB insert idnr=1 enddate=2026-10-17T19:00:00Z prize=50000 newprize=50000
+@2026-10-10T10:00:00Z round=1 prize=50000 started=true selling=true end=2026-10-17T19:00:00Z enddate=Oct 17, 2026
+SM 783
+@2026-10-17T18:50:00Z round=1 prize=50000 started=true selling=false end=2026-10-17T19:00:00Z enddate=Oct 17, 2026
+# empty table, Saturday after the draw
+ANN Lottery tickets are now available for Lucky Lottery #1.
+DB insert idnr=1 enddate=2026-10-17T19:00:00.999Z prize=50000 newprize=50000
+@2026-10-10T19:30:00.999Z round=1 prize=50000 started=true selling=true end=2026-10-17T19:00:00.999Z enddate=Oct 17, 2026
+SM 783
+@2026-10-17T18:50:00.999Z round=1 prize=50000 started=true selling=false end=2026-10-17T19:00:00.999Z enddate=Oct 17, 2026
+# empty table, Sunday midnight
+ANN Lottery tickets are now available for Lucky Lottery #1.
+DB insert idnr=1 enddate=2026-10-17T19:00:00Z prize=50000 newprize=50000
+@2026-10-11T00:00:00Z round=1 prize=50000 started=true selling=true end=2026-10-17T19:00:00Z enddate=Oct 17, 2026
+SM 783
+@2026-10-17T18:50:00Z round=1 prize=50000 started=true selling=false end=2026-10-17T19:00:00Z enddate=Oct 17, 2026
+# empty table, week across the year
+ANN Lottery tickets are now available for Lucky Lottery #1.
+DB insert idnr=1 enddate=2027-01-02T19:00:00.500Z prize=50000 newprize=50000
+@2026-12-30T08:00:00.500Z round=1 prize=50000 started=true selling=true end=2027-01-02T19:00:00.500Z enddate=Jan 2, 2027
+SM 783
+@2027-01-02T18:50:00.500Z round=1 prize=50000 started=true selling=false end=2027-01-02T19:00:00.500Z enddate=Jan 2, 2027
+# empty table, Friday late
+ANN Lottery tickets are now available for Lucky Lottery #1.
+DB insert idnr=1 enddate=2027-01-02T19:00:00.999Z prize=50000 newprize=50000
+@2027-01-01T23:59:59.999Z round=1 prize=50000 started=true selling=true end=2027-01-02T19:00:00.999Z enddate=Jan 2, 2027
+SM 783
+@2027-01-02T18:50:00.999Z round=1 prize=50000 started=true selling=false end=2027-01-02T19:00:00.999Z enddate=Jan 2, 2027
+# decodeNumbers
+decode 0 0 = [0, 0, 0, 0, 0]
+decode 68 11 = [3, 7, 17, 18, 20]
+decode 31 0 = [1, 2, 3, 4, 5]
+decode 0 15 = [17, 18, 19, 20, 0]
+decode 32769 7 = [1, 16, 17, 18, 19]
+# checkTicket
+check 9 68 11 = [1, 30000]
+check 9 69 3 = [2, 7000]
+check 9 7 3 = [3, 3000]
+check 9 79 0 = [4, 200]
+check 9 31 0 = [4, 200]
+check 9 59 0 = [0, 0]
+check 9 0 0 = [0, 0]
+check 10 68 11 = [0, 0]
+check 11 68 11 = [0, 0]
+check 9 -1 -1 = [1, 30000]
+check 9 65604 65547 = [1, 30000]
+# prizes
+prizes 50000 1 0 0 0 = 30000 0 0 70000
+prizes 100000 2 3 4 5 = 29700 6600 4950 107750
+prizes 64000 0 1 0 2 = 0 12720 0 100880
+prizes 1000 1 1 1 10 = -600 -200 -200 50000
+prizes 2147483000 1 1 1 0 = 1288489800 429496600 429496600 50000
+prizes -2147483000 1 1 1 1 = -1288489920 -429496640 -429496640 50000
+prizes 50000 0 0 0 0 = 0 0 0 100000
+prizes 50000 3 0 0 0 = 10000 0 0 90000
+# rates
+rate 0.6 = 60.0
+rate 0.2 = 20.0
+rate 0.15 = 15.0
+rate 0.1 = 10.0
+rate 0.3 = 30.0
+rate 0.7 = 70.0
+rate 1.0 = 100.0
+rate 0.0 = 0.0
+rate 0.333 = 33.300000000000004
+rate 1.0E-5 = 0.001
+rate 100000.0 = 1.0E7
+rate 0.07 = 7.000000000000001
+# enddate
+date 2026-10-10T19:00:00Z = Oct 10, 2026
+date 2027-01-02T19:00:00.500Z = Jan 2, 2027
+date 2026-05-02T00:00:00Z = May 2, 2026
+date 2026-12-31T23:59:59Z = Dec 31, 2026
+# buttons
+press 5->[5,0,0,0,0] 5->[0,0,0,0,0]
+press 1->[1,0,0,0,0] 2->[1,2,0,0,0] 3->[1,2,3,0,0] 4->[1,2,3,4,0] 5->[1,2,3,4,5]! 6->[1,2,3,4,5]! 3->[1,2,0,4,5] 7->[1,2,7,4,5]! 20->[1,2,7,4,5]! 21->[1,2,7,4,5]! 7->[1,2,0,4,5]
+press 21->[0,0,0,0,0]
+press 20->[20,0,0,0,0] 19->[20,19,0,0,0] 18->[20,19,18,0,0] 17->[20,19,18,17,0] 16->[20,19,18,17,16]!
+press 9->[9,0,0,0,0] 10->[9,10,0,0,0] 9->[0,10,0,0,0]

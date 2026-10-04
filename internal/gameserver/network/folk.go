@@ -9,14 +9,18 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // talkToFolk is a civilian NPC's answer to a player's interact in reach:
 // its talk animation for everyone watching it, then its chat window with
-// ActionFailed. A muted NPC does nothing. An NPC whose first dialog reads
-// state of a system not in place opens nothing; the interact's think has
-// already released the client.
+// ActionFailed — first for a Seven Signs priest, after the page for
+// everyone else. A muted NPC does nothing. A wedding manager greets with
+// its own page alone. A Mammon NPC refusing the talker says why instead,
+// releasing the client after a cabal refusal. An NPC whose first dialog
+// reads state of a system not in place opens nothing; the interact's think
+// has already released the client.
 func (l *GameClientLink) talkToFolk(live *livePlayer, f *npc.Folk) {
 	if f.Muted() {
 		return
@@ -24,14 +28,52 @@ func (l *GameClientLink) talkToFolk(live *livePlayer, f *npc.Folk) {
 	if id, ok := f.TalkAnimation(time.Now()); ok {
 		l.broadcastFolkFrame(f, func() wire.Frame { return serverpackets.FrameSocialAction(f.ObjectID(), id) })
 	}
-	html, outcome := f.ChatWindow(setPages{l.html}, l.playerConfig.chatRules(), live.Karma())
-	if outcome == npc.ChatUnported {
+	html, outcome := f.ChatWindow(setPages{l.html}, l.playerConfig.chatRules(), live.Karma(), folkChatState{l: l, live: live})
+	switch outcome {
+	case npc.ChatWedding:
+		l.weddingGreeting(live, f)
+	case npc.ChatUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Msg("npc: chat window not modeled")
-		return
+	case npc.ChatShownReleased:
+		live.SendFrame(serverpackets.FrameActionFailed())
+		sendFilledHTML(live, f.ObjectID(), html, 0)
+	case npc.ChatDawnOnly, npc.ChatDuskOnly:
+		message := serverpackets.SystemMessageCanBeUsedByDawn
+		if outcome == npc.ChatDuskOnly {
+			message = serverpackets.SystemMessageCanBeUsedByDusk
+		}
+		live.SendFrame(serverpackets.FrameSystemMessage(message))
+		live.SendFrame(serverpackets.FrameActionFailed())
+	case npc.ChatCompetitionOnly:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageQuestEventPeriod))
+	default:
+		sendFilledHTML(live, f.ObjectID(), html, 0)
+		live.SendFrame(serverpackets.FrameActionFailed())
 	}
-	sendFilledHTML(live, f.ObjectID(), html, 0)
-	live.SendFrame(serverpackets.FrameActionFailed())
 }
+
+// folkChatState is what a civilian NPC's chat window reads of live and of
+// the Seven Signs, festival and noble state.
+type folkChatState struct {
+	l    *GameClientLink
+	live *livePlayer
+}
+
+func (s folkChatState) SevenSigns() sevensigns.Record {
+	if s.l.sevenSigns == nil {
+		return sevensigns.Record{}
+	}
+	return s.l.sevenSigns.Record(s.live.ObjectID())
+}
+
+func (s folkChatState) FestivalNotice() string {
+	if s.l.festival == nil {
+		return ""
+	}
+	return s.l.festival.NextFestivalNotice()
+}
+
+func (s folkChatState) Noble() bool { return s.live.IsNoble() }
 
 // broadcastFolkFrame sends one serialized frame to every player that knows
 // f, each an independently owned copy.

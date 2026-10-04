@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -11,14 +12,17 @@ import (
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
+	"go.uber.org/fx"
 )
 
 // loadClanConfig reads the clans.properties clan and alliance penalties,
-// alliance size and clan warehouse withdrawal right the clan core uses and
-// the players.properties clan skill item switch, defaulting as the
-// reference does when a key is missing.
+// dissolution delay, alliance size and clan warehouse withdrawal right the
+// clan core uses and the players.properties clan skill item switch,
+// defaulting as the reference does when a key is missing.
 func loadClanConfig(paths gameServerPaths, _ zerolog.Logger) (clan.Config, error) {
 	props, err := config.LoadFile(paths.ClansConfigPath)
 	if err != nil {
@@ -41,6 +45,7 @@ func loadClanConfig(paths gameServerPaths, _ zerolog.Logger) (clan.Config, error
 		AcceptClanDaysWhenDismissed:     f.Int("DaysBeforeAcceptNewClanWhenDismissed", 1),
 		CreateAllyDaysWhenDissolved:     f.Int("DaysBeforeCreateNewAllyWhenDissolved", 10),
 		MaxClansInAlly:                  f.Int("MaxNumOfClansInAlly", 3),
+		DissolveDays:                    f.Int("DaysToPassToDissolveAClan", 7),
 	}
 	return cfg, f.Err()
 }
@@ -82,4 +87,21 @@ func provideClans(ctx bootContext, pool *sql.DB, ids *idfactory.Allocator, worke
 	service.DropMissingCrests(crests)
 	service.DropDanglingAlliances()
 	return service, nil
+}
+
+// startClanDissolutions arms the pending clan dissolutions before any
+// character can log in, each destroying its clan through link once it comes
+// due; on shutdown it stops them.
+func startClanDissolutions(lc fx.Lifecycle, clans *clan.Service, link *network.GameClientLink, pool *sim.Pool) {
+	queue := pool.NewQueue("clan-dissolution")
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			clans.StartDissolutions(queue, link)
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			queue.Close()
+			return nil
+		},
+	})
 }

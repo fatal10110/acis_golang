@@ -73,10 +73,15 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	// is that player once EnterWorld took it.
 	var chars []*player.Character
 	var entering, live *livePlayer
+	// lost records a read loop ended by a lost connection, which keeps the
+	// player in the world a while before it detaches.
+	lost := false
 	defer func() {
 		// A connection lost between selection and EnterWorld takes the
 		// selected player out of the world as a logout would.
 		if leaving := cmp.Or(live, entering); leaving != nil {
+			leaving.sessionEnded.Store(true)
+			awaitDetachDelay(ctx, session, leaving, detachDelay(leaving, lost))
 			var owners []int32
 			onLive(leaving, func() { owners = l.detachLivePlayer(leaving) })
 			_ = l.awaitPersistence(conn, owners...)
@@ -101,6 +106,15 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		}
 		payload, err := session.ReadFrame()
 		if err != nil {
+			lost = true
+			// ponytail: pre-auth EOF is a port probe (admin panel dials 7777
+			// every 5s) or an aborted handshake — not worth a log line.
+			// Ceiling: a real client dropping mid-handshake leaves no trace;
+			// log it again once the admin panel stops dialing 7777 or
+			// pre-auth disconnects need diagnosing.
+			if errors.Is(err, io.EOF) && client.State() == StateConnected {
+				return
+			}
 			if normalReadFrameError(err) {
 				l.log.Debug().Err(err).Msg("Read frame")
 			} else {
@@ -154,9 +168,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			continue
 		}
 
-		if live != nil && opcode != clientpackets.OpcodeMoveBackwardToLocation {
-			l.log.Debug().Str("opcode", hex.EncodeToString(payload[:1])).Int("len", len(payload)).Msg("movedbg: inbound")
-		}
 		// Once in the world, everything a frame does to the player runs as a
 		// task on its queue (onLive), serialized with its timers and ticks.
 		// The loop waits for each task before reading on, so frames are
@@ -914,12 +925,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				continue
 			}
-			l.log.Debug().Bool("live_nil", live == nil).Interface("req", req).Msg("movedbg: MoveBackwardToLocation received")
 			if live == nil {
 				continue
 			}
 			if req.MoveMovement == 0 {
-				l.log.Debug().Msg("movedbg: rejected keyboard movement (MoveMovement=0)")
 				session.SendFrame(serverpackets.FrameActionFailed())
 				continue
 			}
@@ -942,6 +951,54 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			onLive(live, func() { l.stopLivePlayer(live) })
 
+		case clientpackets.OpcodeRequestMoveInVehicle:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestMoveToLocationInVehicle)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestMoveInVehicle(live, req) })
+			}
+
+		case clientpackets.OpcodeCannotMoveInVehicle:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeCannotMoveAnymoreInVehicle)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.cannotMoveInVehicle(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestGetOnVehicle:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestGetOnVehicle)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestGetOnVehicle(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestGetOffVehicle:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestGetOffVehicle)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestGetOffVehicle(live, req) })
+			}
+
 		case clientpackets.OpcodeValidatePosition:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeValidatePosition)
 			if err != nil {
@@ -952,7 +1009,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			if live != nil {
 				onLive(live, func() {
-					l.validateLivePlayerPosition(live, location.Location{X: int(req.X), Y: int(req.Y), Z: int(req.Z)})
+					l.validateLivePlayerPosition(live, location.Location{X: int(req.X), Y: int(req.Y), Z: int(req.Z)}, req.BoatID)
 				})
 			}
 
@@ -2082,10 +2139,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeDummy2E,
 			clientpackets.OpcodeDummy34,
 			clientpackets.OpcodeDummy3E,
-			clientpackets.OpcodeRequestGetOnVehicle,
-			clientpackets.OpcodeRequestGetOffVehicle,
-			clientpackets.OpcodeRequestMoveInVehicle,
-			clientpackets.OpcodeCannotMoveInVehicle,
 			clientpackets.OpcodeRequestQuestListInGame,
 			clientpackets.OpcodeRequestQuestAbort,
 			clientpackets.OpcodeGameGuardReply:

@@ -470,6 +470,12 @@ func (l *GameClientLink) finishDeferredInteract(live *livePlayer) bool {
 	if inPostureTransition(live) {
 		return live.hasDeferredInteract()
 	}
+	return l.runDeferredInteract(live)
+}
+
+// runDeferredInteract runs the queued interact, if any, whatever the
+// posture, and reports whether one was waiting.
+func (l *GameClientLink) runDeferredInteract(live *livePlayer) bool {
 	queued := live.takeDeferredInteract()
 	if queued == nil {
 		return false
@@ -731,9 +737,8 @@ func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked
 	live.StoreTarget(target)
 	// Setting a target sends ValidateLocation for the new target before
 	// MyTargetSelected, skipped only when the target is the selecting player
-	// itself or aboard a boat. Boats aren't a
-	// ported feature, so every target here is treated as never in one.
-	if target.ObjectID() != live.ObjectID() {
+	// itself or a player aboard a boat.
+	if target.ObjectID() != live.ObjectID() && !aboardBoat(target) {
 		// Every creature target (players, NPCs including decorations,
 		// summons, doors) gets a ValidateLocation; static objects and items
 		// send none.
@@ -924,18 +929,6 @@ func (l *GameClientLink) startSummonAttackStance(actor *summon.Actor) {
 	l.broadcastSummonFrame(actor, serverpackets.FrameAutoAttackStart(actor.ObjectID()))
 	l.broadcastLiveFrame(owner, func() wire.Frame {
 		return serverpackets.FrameAutoAttackStart(owner.ObjectID())
-	})
-}
-
-func (l *GameClientLink) stopLiveAutoAttack(live *livePlayer) {
-	if live == nil || !live.SetInCombat(false) {
-		return
-	}
-	if l.attackStance == nil || !l.attackStance.Remove(live) {
-		return
-	}
-	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameAutoAttackStop(live.ObjectID())
 	})
 }
 

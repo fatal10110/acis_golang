@@ -15,10 +15,6 @@ import (
 // floor-to-head Z conversion below.
 func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin location.Location) {
 	// Reject while the player is out of control.
-	l.log.Debug().Int32("oid", live.ObjectID()).Interface("server_pos", live.CurrentLocation()).Interface("target", target).Interface("packet_origin", packetOrigin).
-		Bool("out_of_control", liveOutOfControl(live)).Bool("teleporting", live.Teleporting()).Float64("speed", liveMoveSpeed(live)).
-		Bool("deny_ai", live.DenyAIAction()).Bool("movement_disabled", live.MovementDisabled()).Bool("cast_busy", itemAICastBusy(live)).
-		Bool("standing", live.Standing()).Int("teleport_mode", int(live.teleportMode)).Msg("movedbg: moveLivePlayer")
 	if liveOutOfControl(live) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
@@ -50,6 +46,24 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin l
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	// A passenger's walk is the client's own, on the boat's deck; no walk
+	// is simulated until it steps ashore.
+	if live.InBoat() {
+		l.moveOnBoat(live, target, packetOrigin)
+		return
+	}
+	// A walk across the entrance of a known boat's dock heads for the
+	// entrance instead.
+	if l.probeBoatEntrance(live, target) {
+		return
+	}
+	live.SetCanBoard(false)
+	l.tryLiveMoveTo(live, target, 0)
+}
+
+// tryLiveMoveTo makes walking to target the current intention, as a ground
+// click does; boatID is the boat whose entrance the walk heads for, or 0.
+func (l *GameClientLink) tryLiveMoveTo(live *livePlayer, target location.Location, boatID int32) {
 	// A walk requested mid-swing, mid-cast or mid-transition waits for it as
 	// the next intention, answered ActionFailed; the end of the swing, cast
 	// or transition walks.
@@ -58,15 +72,15 @@ func (l *GameClientLink) moveLivePlayer(live *livePlayer, target, packetOrigin l
 			live.SendFrame(serverpackets.FrameActionFailed())
 			return
 		}
-		live.deferAction(func() { l.startLiveMove(live, target) })
+		live.deferAction(func() { l.startLiveMove(live, target, boatID) })
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	live.takeDeferredAction()
-	l.startLiveMove(live, target)
+	l.startLiveMove(live, target, boatID)
 }
 
-func (l *GameClientLink) startLiveMove(live *livePlayer, target location.Location) {
+func (l *GameClientLink) startLiveMove(live *livePlayer, target location.Location, boatID int32) {
 	if live.DenyAIAction() || live.MovementDisabled() {
 		live.tryToIdle(false)
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -81,7 +95,6 @@ func (l *GameClientLink) startLiveMove(live *livePlayer, target location.Locatio
 	// is what the walk simulates from — the client origin is nothing but a lag hint the
 	// server must not adopt.
 	accepted, err := live.move.MoveToLocation(target)
-	l.log.Debug().Bool("accepted", accepted).Err(err).Interface("server_pos", live.CurrentLocation()).Bool("moving", live.IsMoving()).Msg("movedbg: startLiveMove")
 	if err != nil {
 		l.log.Warn().Err(err).Msg("move: broadcast")
 	}
@@ -93,7 +106,7 @@ func (l *GameClientLink) startLiveMove(live *livePlayer, target location.Locatio
 	}
 	// Parked approach slots must not survive this new accepted walk.
 	live.clearParkedApproaches()
-	live.holdMoveTo(target)
+	live.holdMoveTo(target, boatID)
 }
 
 // fleeLivePlayer runs live away from e.From as a server-driven move: run
@@ -139,7 +152,7 @@ func (l *GameClientLink) stopLivePlayer(live *livePlayer) {
 	live.move.Stop()
 }
 
-func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported location.Location) {
+func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported location.Location, boatID int32) {
 	// Validation is skipped entirely while teleporting — no correction
 	// packet, unlike the other two gates
 	// here which answer ActionFailed.
@@ -159,6 +172,11 @@ func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported l
 	if falling {
 		return
 	}
+	// A passenger reports its deck position.
+	if live.InBoat() {
+		l.validatePassengerPosition(live, boatID, reported)
+		return
+	}
 	// ValidatePosition only corrects excessive divergence: a client that
 	// drifted beyond a second's worth of movement gets the server position
 	// back, while a report within the threshold changes nothing. The walk
@@ -170,8 +188,7 @@ func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported l
 	if liveSwimming(live) || live.Flying() {
 		drift = current.Distance3D(reported)
 	}
-	l.log.Debug().Interface("server_pos", current).Interface("reported", reported).Float64("drift", drift).Bool("moving", live.IsMoving()).Msg("movedbg: ValidatePosition")
-	if drift > liveMoveSpeed(live) {
+	if drift > liveMoveSpeed(live) && !live.BoatMovement() {
 		live.SendFrame(serverpackets.FrameValidateLocation(live.ObjectID(), current, live.CurrentHeading()))
 	}
 }
@@ -305,7 +322,7 @@ func (l *GameClientLink) broadcastLiveWaitType(live *livePlayer, stand bool) {
 // stand request does. Either way the intentions the player held or queued,
 // a click held behind a posture transition among them, are dropped, on live's own queue, the only one that touches them; the
 // idle answers nothing more even when the damage has meanwhile started a
-// stand-up. A chair is released when standing settles.
+// stand-up. A chair is released when a stand-up ends.
 func (l *GameClientLink) standAttackedLivePlayer(live *livePlayer) {
 	if live == nil || live.detached() || !live.Seated() {
 		return

@@ -150,22 +150,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.FakeDeathRevived, event.Revived:
 		l.broadcastLiveRevive(live)
 	case event.PostureSettled:
-		if live.Standing() {
-			live.releaseChair()
-		}
-		if l.finishDeferredAction(live) {
-			return
-		}
-		l.finishDeferredPickup(live)
-		// A cast queued behind the sit/stand transition runs now, unless a
-		// swing or cast still holds it for its own finish.
-		if !itemAICastBusy(live) {
-			l.finishDeferredMagicSkill(live)
-			l.finishDeferredItemAICast(live)
-			l.finishDeferredFollow(live)
-			l.finishDeferredInteract(live)
-			l.finishDeferredUseItem(live, resumePosture)
-		}
+		l.settleLivePosture(live, e.StoodUp)
 	case event.ReviveRequested:
 		live.SendFrame(serverpackets.FrameConfirmDlgResurrectionRequest(e.ReviverName))
 	case event.ReviveRefused:
@@ -174,6 +159,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.broadcastLiveDie(live)
 	case event.FusionCastersStopRequested:
 		l.abortFusionTargeting(live)
+	case event.DeathItemDrop:
+		l.dropItemsOnDeath(live, e)
 	case event.ClanKill:
 		l.creditClanKill(live, e)
 	case event.DeathSettled:
@@ -348,6 +335,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameConfirmDlgSummonFriendRequest(e.CasterName, e.CasterID, int32(e.X), int32(e.Y), int32(e.Z), e.Timeout))
 	case event.TeleportRequested:
 		l.teleportLivePlayer(live, location.Location{X: e.X, Y: e.Y, Z: e.Z}, e.Radius)
+	case event.RecallRequested:
+		l.recallLivePlayer(live, e.Destination)
 	case event.Relocated:
 		reason := revalidateStep
 		if e.Placed {
@@ -390,6 +379,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 			live.SendFrame(serverpackets.FrameActionFailed())
 		}
 	case event.Arrived:
+		l.arriveAtBoatEntrance(live)
 		// CreatureMove tracks position for its own timing only; push the
 		// arrived position into the world-grid presence range checks
 		// actually read before re-thinking the attack intention, or it
@@ -403,6 +393,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.thinkAttack()
 		l.arriveHeldIntention(live)
 	case event.MoveBlocked:
+		live.SetBoatMovement(false)
 		if !l.onPlayerArrivedBlocked(live) {
 			live.move.BroadcastBlockedCorrection()
 		}
@@ -566,14 +557,17 @@ func (l *GameClientLink) finishLiveCast(live *livePlayer, def modelskill.Definit
 	live.endCastIntention(def, target, stopped)
 }
 
-// endCastStop ends a cast stop, once the stopped cast's end has run: a stop
-// that ended a cast in flight, or that reached a player unable to act, idles
-// it; then the stop answers ActionFailed, and an interrupt reports itself
-// last. An idle refused for a player unable to act answers ActionFailed of
-// its own and leaves every intention in place.
+// endCastStop ends a cast stop, once the stopped cast's end has run: the
+// stop idles the player, then answers ActionFailed, and an interrupt reports
+// itself last. An idle refused for a player unable to act answers
+// ActionFailed of its own and leaves every intention in place. A stop that
+// ended no cast, on a player that can act, idles it as idleAfterCastStop
+// does: a swing or posture change under way goes on.
 func (live *livePlayer) endCastStop(e event.CastStopAck) {
 	if denied := live.Character.DenyAIActionBeforeEffect(); e.InFlight || denied {
 		live.tryToIdle(denied)
+	} else {
+		live.idleAfterCastStop()
 	}
 	sendMagicActionFailed(live)
 	if e.Broken {
@@ -582,10 +576,16 @@ func (live *livePlayer) endCastStop(e event.CastStopAck) {
 }
 
 func (l *GameClientLink) finishDeferredAction(live *livePlayer) bool {
+	return l.runDeferredAction(live, itemAICastBusy)
+}
+
+// runDeferredAction runs the queued action, if any, unless busy still holds
+// it, and reports whether one was waiting.
+func (l *GameClientLink) runDeferredAction(live *livePlayer, busy func(*livePlayer) bool) bool {
 	if live == nil || live.detached() || !live.hasDeferredAction() {
 		return false
 	}
-	if itemAICastBusy(live) {
+	if busy(live) {
 		return true
 	}
 	if run := live.takeDeferredAction(); run != nil {
@@ -638,9 +638,7 @@ func (live *livePlayer) attackAfterCast(def modelskill.Definition, target attack
 // order. Clearing the target leaves the intentions alone. Stopping the
 // attack sends the character idle, then answers ActionFailed; stopping the
 // cast answers MagicSkillCanceled (when one was running), sends the
-// character idle and answers ActionFailed. The cast stop idles the
-// character itself (endCastStop) unless it ended no cast and the character
-// can still act; that idle runs here.
+// character idle and answers ActionFailed (endCastStop).
 func (l *GameClientLink) stopLiveActions(live *livePlayer, e event.ActionsStopRequested) {
 	if e.ClearTarget {
 		old := live.Target()
@@ -656,9 +654,7 @@ func (l *GameClientLink) stopLiveActions(live *livePlayer, e event.ActionsStopRe
 		live.SendFrame(serverpackets.FrameActionFailed())
 	}
 	if e.Cast {
-		if !live.stopCastInFlight() && !live.Character.DenyAIActionBeforeEffect() {
-			live.tryToIdle(false)
-		}
+		live.stopCastInFlight()
 	}
 }
 
