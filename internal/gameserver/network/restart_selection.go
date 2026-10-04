@@ -29,46 +29,48 @@ const (
 	restartNoPoint
 )
 
+// effectiveRestartType is the restart type a request of requestType by
+// live resolves as (RequestRestartPoint.portPlayer): a jailed player always
+// restarts in the jail and a festival participant where they fell, whatever
+// type they asked for. Only this request forces the jail; every other town
+// teleport (//sendhome, a starved flying mount, a boss-zone ejection) still
+// sends a jailed player to the nearest town.
+func effectiveRestartType(live *livePlayer, requestType int32) int32 {
+	switch {
+	case live.Jailed():
+		return restartToJail
+	case live.FestivalParticipant():
+		return restartFixed
+	}
+	return requestType
+}
+
 // restartPointDestination resolves where a restart-point request of
-// requestType sends the dead live (RequestRestartPoint.portPlayer). A
-// jailed player always restarts in the jail and a festival participant
-// where they fell, whatever type they asked for. Only this request forces
-// the jail; every other town teleport (//sendhome, a starved flying mount,
-// a boss-zone ejection) still sends a jailed player to the nearest town.
+// requestType sends the dead live (RequestRestartPoint.portPlayer).
 //
 // The siege-side rules are not ported yet (#3346, with the clan hall
 // sieges #244): the castle restart needs the clan to own a castle, the
 // siege HQ restart finds no flag and resolves to town, and no attacker
-// waits out a respawn delay. The clan hall restart does not restore experience
-// from a rented restore-exp function yet (#3347).
+// waits out a respawn delay.
+//
+// requestType is the type effectiveRestartType already enforced.
 func (l *GameClientLink) restartPointDestination(live *livePlayer, requestType int32) (location.Location, restartOutcome) {
-	switch {
-	case live.Jailed():
-		requestType = restartToJail
-	case live.FestivalParticipant():
-		requestType = restartFixed
-	}
-
 	switch requestType {
 	case restartToClanHall:
 		hallID := live.ClanHallID()
 		if hallID == 0 {
 			return location.Location{}, restartRefused
 		}
-		if hall, ok := l.clanHallData.Get(int(hallID)); ok {
-			if at, ok := randomResidenceSpawn(hall.Spawns); ok {
-				return at, restartResolved
-			}
+		if at, ok := l.clanHallOwnerSpawn(hallID); ok {
+			return at, restartResolved
 		}
 	case restartToCastle:
 		castleID := live.ClanCastleID()
 		if castleID == 0 {
 			return location.Location{}, restartRefused
 		}
-		if c, ok := l.castleData.Get(int(castleID)); ok {
-			if at, ok := randomResidenceSpawn(c.Spawns); ok {
-				return at, restartResolved
-			}
+		if at, ok := l.castleOwnerSpawn(castleID); ok {
+			return at, restartResolved
 		}
 	case restartToSiegeHQ:
 		// A siege flag only stands during a siege; without one the
@@ -90,6 +92,26 @@ func (l *GameClientLink) restartPointDestination(live *livePlayer, requestType i
 		return location.Location{}, restartNoPoint
 	}
 	return at, restartResolved
+}
+
+// clanHallOwnerSpawn is a random OWNER spawn of clan hall hallID, false when
+// the hall data does not know the hall or lists none.
+func (l *GameClientLink) clanHallOwnerSpawn(hallID int32) (location.Location, bool) {
+	hall, ok := l.clanHallData.Get(int(hallID))
+	if !ok {
+		return location.Location{}, false
+	}
+	return randomResidenceSpawn(hall.Spawns)
+}
+
+// castleOwnerSpawn is a random OWNER spawn of castle castleID, false when
+// the castle data does not know the castle or lists none.
+func (l *GameClientLink) castleOwnerSpawn(castleID int32) (location.Location, bool) {
+	c, ok := l.castleData.Get(int(castleID))
+	if !ok {
+		return location.Location{}, false
+	}
+	return randomResidenceSpawn(c.Spawns)
 }
 
 // randomResidenceSpawn picks one of a residence's owner spawns at random
