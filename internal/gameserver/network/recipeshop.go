@@ -117,8 +117,7 @@ func (l *GameClientLink) orderWorkshopCraft(live *livePlayer, req clientpackets.
 	if !ok || live.Operating() || crafter.OperateType() != privatestore.OperateManufacture {
 		return
 	}
-	// Either side in a duel should be refused too (#3285).
-	if crafter.InCombat() || live.InCombat() {
+	if crafter.InDuel() || live.InDuel() || crafter.InCombat() || live.InCombat() {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCantOperateStoreDuringCombat))
 		return
 	}

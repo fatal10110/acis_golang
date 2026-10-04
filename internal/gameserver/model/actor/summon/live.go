@@ -104,6 +104,8 @@ type Owner interface {
 	// ClearReviveOffer closes the owner's pending resurrection offer, if
 	// any, as its revived pet does.
 	ClearReviveOffer()
+	// InDuel reports whether the owner is in a duel.
+	InDuel() bool
 }
 
 // Actor is a live pet or servitor placed in world.State next to its owner.

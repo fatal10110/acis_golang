@@ -306,6 +306,15 @@ func (m *Manager[P]) OppositeTeam(p P) []P {
 	return nil
 }
 
+// PartyDuel reports whether p's duel is a party duel. It still answers
+// while an ended duel's players leave it; p in no duel is in none.
+func (m *Manager[P]) PartyDuel(p P) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	f := m.duels[p.DuelID()]
+	return f != nil && f.party
+}
+
 // Leave takes p out of the ended duel id once p's part of its end is
 // applied; the duel is dropped once each of its players left it.
 func (m *Manager[P]) Leave(id int32) {
