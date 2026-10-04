@@ -2,6 +2,7 @@ package boat
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -99,10 +100,14 @@ func TestPassengerLeavingCallsOffFare(t *testing.T) {
 	passengerLog(t, srv, c)
 	passengerLog(t, srv, other)
 	// A ground click near the deck's middle of a boat under way is walked by
-	// the client alone and ends the boarding walk, which lets it step off.
+	// the client alone and ends the boarding walk, which lets it step off
+	// over the side.
 	c.Send(encodeMoveBackward(runeShore, runeDock))
-	c.Send(encodeGetOffVehicle(b, runeShore))
-	passengerLog(t, srv, c)
+	x, y, z := srv.Boats.Boats()[0].Position()
+	c.Send(encodeGetOffVehicle(b, location.Location{X: x, Y: y - 300, Z: z}))
+	if log := passengerLog(t, srv, c); !slices.Contains(log, getOff(me, b, location.Location{X: x, Y: y - 300, Z: z})) {
+		t.Fatalf("stepping off at sea: %q", log)
+	}
 	sail(srv, 4)
 	rest, checks := withoutChecks(passengerLog(t, srv, other))
 	var own []string

@@ -56,12 +56,22 @@ func passengerItinerary() route.BoatItinerary {
 // and the passenger itinerary's boat tied up at Rune, and enters the world.
 func bootPassenger(t *testing.T, at location.Location, tickets int32) (*gameservertest.Server, *testsupport.ScriptedClient, int32, int32) {
 	t.Helper()
-	srv := gameservertest.Boot(t,
+	return bootPassengerWith(t, at, tickets, nil)
+}
+
+// bootPassengerWith is bootPassenger with extra boot options, and setup, if
+// any, run on the character before it enters the world.
+func bootPassengerWith(t *testing.T, at location.Location, tickets int32, setup func(srv *gameservertest.Server, objID int32), opts ...gameservertest.Option) (*gameservertest.Server, *testsupport.ScriptedClient, int32, int32) {
+	t.Helper()
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Sailor", 1, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithBoats(passengerItinerary()),
-	)
+	}, opts...)...)
 	objID := srv.SoleObjectID(t)
+	if setup != nil {
+		setup(srv, objID)
+	}
 	if _, err := srv.DB.ExecContext(context.Background(), "UPDATE characters SET x = ?, y = ?, z = ? WHERE obj_Id = ?", at.X, at.Y, at.Z, objID); err != nil {
 		t.Fatalf("place character: %v", err)
 	}

@@ -181,7 +181,10 @@ func (l *GameClientLink) requestGetOnVehicle(live *livePlayer, req clientpackets
 		// Only a boat in sight can be boarded: the reference takes any boat
 		// in the world, which a forged request would turn into a jump
 		// across it.
-		if b != nil && !world.Knows(live, b) {
+		// Nor one under way: a real client is only walked to the entrance
+		// of a boat tied up, and boarding at sea after the fare is taken
+		// would ride for free.
+		if b != nil && (!world.Knows(live, b) || b.Moving()) {
 			b = nil
 		}
 	} else if b.ObjectID() != req.BoatID {
@@ -206,6 +209,9 @@ func (l *GameClientLink) requestGetOnVehicle(live *livePlayer, req clientpackets
 	l.broadcastLiveFrame(live, func() wire.Frame { return serverpackets.FrameGetOnVehicle(id, boatID, at) })
 }
 
+// maxStepOffReach is how far from its boat a passenger may step off.
+const maxStepOffReach = 600
+
 // requestGetOffVehicle answers RequestGetOffVehicle: live steps off the
 // boat it rides onto the shore line of the boat's dock, toward the point
 // it asks for, and walks there.
@@ -215,7 +221,16 @@ func (l *GameClientLink) requestGetOffVehicle(live *livePlayer, req clientpacket
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	point := b.Dock().AdjustedBoardingPoint(livePoint(live), boat.Point{X: int(req.X), Y: int(req.Y)}, true)
+	origin := livePoint(live)
+	point := b.Dock().AdjustedBoardingPoint(origin, boat.Point{X: int(req.X), Y: int(req.Y)}, true)
+	// The step-off point stays beside the boat: past the entrance it lies
+	// at most about 420 away, and a real client asks for a point over the
+	// side. The reference takes any point, which a forged request would
+	// turn into a jump across the world.
+	if origin.Distance(point) > maxStepOffReach {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
 	dest := location.Location{X: point.X, Y: point.Y, Z: boatShoreZ}
 	l.leaveBoat(live)
 	l.sendStopMoveInVehicle(live, req.BoatID)
