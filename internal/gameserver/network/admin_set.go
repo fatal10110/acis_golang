@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
@@ -55,8 +56,8 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 		gm.SendFrame(serverpackets.FrameActionFailed())
 	case "color":
 		edit(func() {
-			color, ok := decodeJavaHex(value)
-			if !hasValue || !ok {
+			color, err := commons.DecodeInt32("0x" + value)
+			if !hasValue || err != nil {
 				sendText(gm, "Usage: //set color <number>")
 				return
 			}
@@ -71,7 +72,9 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 			// number parses: the reference answers the usage every time.
 			color, ok := int32(0), false
 			if len(line) >= len("admin_set tcolor") {
-				color, ok = decodeJavaHex(line[len("admin_set tcolor"):])
+				var err error
+				color, err = commons.DecodeInt32("0x" + line[len("admin_set tcolor"):])
+				ok = err == nil
 			}
 			if !ok {
 				sendText(gm, "Usage: //set tcolor <number>")
@@ -83,7 +86,7 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 		})
 	case "exp":
 		edit(func() {
-			exp, err := strconv.ParseInt(value, 10, 64)
+			exp, err := commons.ParseInt(value, 64)
 			if !hasValue || err != nil {
 				sendText(gm, "Usage: //set exp <number>")
 				return
@@ -269,18 +272,4 @@ func (l *GameClientLink) storeCharacterEdit(objectID int32, what string, write f
 	}) {
 		log.Error().Int32("object_id", objectID).Msg(what + ": persistence closed")
 	}
-}
-
-// decodeJavaHex parses s as a hexadecimal int32 the way a "0x"-prefixed
-// number decodes in the reference: ASCII hex digits only, no sign, at most
-// 0x7FFFFFFF.
-func decodeJavaHex(s string) (int32, bool) {
-	if s == "" || s[0] == '+' || s[0] == '-' {
-		return 0, false
-	}
-	v, err := strconv.ParseInt(s, 16, 32)
-	if err != nil {
-		return 0, false
-	}
-	return int32(v), true
 }

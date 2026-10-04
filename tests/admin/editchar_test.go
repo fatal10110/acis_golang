@@ -112,6 +112,14 @@ func TestAdminSetPlayerFields(t *testing.T) {
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("set color -FF")), "Usage: //set color <number>")
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("set color 80000000")), "Usage: //set color <number>")
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("set color")), "Usage: //set color <number>")
+	// Any digit Integer.decode reads is a hexadecimal digit: fullwidth
+	// letters included.
+	sent = exchange(t, gm, encodeBuildCmd("set color \uFF26\uFF26"))
+	assertTexts(t, messages(append(sent, settle(t, gm)...)), "You successfully set color name of Player.")
+	settle(t, user)
+	if target.NameColor() != 0xFF {
+		t.Fatalf("name color = %#x after //set color with fullwidth digits, want 0xff", target.NameColor())
+	}
 
 	// tcolor reads its value from the space before it on, which never
 	// parses: the reference answers the usage and changes nothing.
@@ -154,7 +162,8 @@ func TestAdminSetPlayerFields(t *testing.T) {
 	}
 	assertTexts(t, exchange(t, gm, encodeBuildCmd("set level 82")), "Invalid used level for //set level.")
 	settle(t, gm)
-	exchange(t, gm, encodeBuildCmd("set exp 500"))
+	// Long.parseLong reads any Unicode decimal digit: fullwidth "500".
+	exchange(t, gm, encodeBuildCmd("set exp \uFF15\uFF10\uFF10"))
 	settle(t, user)
 	if target.Level() != 3 || target.ProgressionValues().Exp != 500 {
 		t.Fatalf("level %d exp %d after //set exp 500, want 3 and 500", target.Level(), target.ProgressionValues().Exp)
@@ -227,6 +236,10 @@ func TestAdminSetPlayerFields(t *testing.T) {
 	}
 	if got := opcodes(exchange(t, gm, encodeBuildCmd("set title Boss"))); !slices.Equal(got, []byte{serverpackets.OpcodeActionFailed}) {
 		t.Fatalf("//set title on an NPC frames = %x, want ActionFailed", got)
+	}
+	// //info on an NPC is not ported yet (#3325): it releases the client.
+	if got := opcodes(exchange(t, gm, encodeBuildCmd("info"))); !slices.Equal(got, []byte{serverpackets.OpcodeActionFailed}) {
+		t.Fatalf("//info on an NPC frames = %x, want ActionFailed", got)
 	}
 }
 
