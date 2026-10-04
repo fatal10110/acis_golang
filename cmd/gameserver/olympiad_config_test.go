@@ -51,9 +51,10 @@ OlyDividerNonClassed = 5
 // TestLoadOlympiadConfig pins the Olympiad settings to events.properties:
 // the shipped file, with its zero-padded OlyMin, and an empty one both give
 // the reference defaults (18, 0, 21600000, 3; 10 points at most, dividers 3
-// and 5, rewards 6651x50 and 6651x30); set keys override them; a malformed
-// number fails the load instead of defaulting, while a malformed reward
-// list, an id or count outside int32 included, reads as no reward.
+// and 5, rewards 6651x50 and 6651x30; 18 starting points, 5 matches to be
+// ranked, 1000 passes a point, 300 hero points); set keys override them; a
+// malformed number fails the load instead of defaulting, while a malformed
+// reward list, an id or count outside int32 included, reads as no reward.
 func TestLoadOlympiadConfig(t *testing.T) {
 	dir := t.TempDir()
 	shipped := olympiad.Config{
@@ -61,6 +62,7 @@ func TestLoadOlympiadConfig(t *testing.T) {
 		MaxPoints: 10, DividerClassed: 3, DividerNonClassed: 5,
 		ClassedReward:    []olympiad.Reward{{ItemID: 6651, Count: 50}},
 		NonClassedReward: []olympiad.Reward{{ItemID: 6651, Count: 30}},
+		StartPoints:      18, MinMatches: 5, GPPerPoint: 1000, HeroPoints: 300,
 	}
 	if def := olympiad.DefaultConfig(); !reflect.DeepEqual(def, shipped) {
 		t.Fatalf("DefaultConfig() = %+v, want %+v", def, shipped)
@@ -76,12 +78,14 @@ func TestLoadOlympiadConfig(t *testing.T) {
 			name: "set",
 			props: "OlyStartTime = 20\nOlyMin = 05\nOlyCPeriod = 3600000\nOlyWeeklyPoints = 7\n" +
 				"OlyMaxPoints = 4\nOlyDividerClassed = 2\nOlyDividerNonClassed = 6\n" +
-				"OlyClassedReward = 57-1000;6651-5\nOlyNonClassedReward = 6651-1\n",
+				"OlyClassedReward = 57-1000;6651-5\nOlyNonClassedReward = 6651-1\n" +
+				"OlyStartPoints = 7\nOlyMinMatchesToBeClassed = 9\nOlyGPPerPoint = 20\nOlyHeroPoints = 40\n",
 			want: olympiad.Config{
 				StartHour: 20, StartMinute: 5, CompetitionMillis: 3600000, WeeklyPoints: 7,
 				MaxPoints: 4, DividerClassed: 2, DividerNonClassed: 6,
 				ClassedReward:    []olympiad.Reward{{ItemID: 57, Count: 1000}, {ItemID: 6651, Count: 5}},
 				NonClassedReward: []olympiad.Reward{{ItemID: 6651, Count: 1}},
+				StartPoints:      7, MinMatches: 9, GPPerPoint: 20, HeroPoints: 40,
 			},
 		},
 		{

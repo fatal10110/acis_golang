@@ -82,8 +82,11 @@ func (l *GameClientLink) punish(live *livePlayer, kind player.Punishment, minute
 			l.armPunishTimer(live)
 			sendText(live, "You are jailed for "+strconv.Itoa(int(minutes))+" minutes.")
 		}
-		// An Olympiad registration is dropped here (#217) and the Seven
-		// Signs dungeon flag cleared (#222) once those systems exist.
+		if l.olympiadRegistered(live) {
+			l.dropOlympiadCompetitor(live)
+		}
+		// The Seven Signs dungeon flag is cleared here (#222) once that
+		// system exists.
 		l.sendPunishmentPage(live, jailInPage)
 		l.teleportLivePlayer(live, jailLocation, jailEntryOffset)
 	}

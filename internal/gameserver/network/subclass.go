@@ -79,8 +79,8 @@ func (l *GameClientLink) subclassBypass(live *livePlayer, f *npc.Folk, command s
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSubclassNoChangeWhileSkillInUse))
 		return true
 	}
-	// An Olympiad registration is dropped here once players can register
-	// (#3281, #3203); nothing registers for it yet.
+	// A subclass command makes a registered noble ineligible to compete.
+	l.leaveOlympiadOnSubclass(live)
 	cmd := npc.ParseSubclassCommand(command)
 	subs := live.Subclasses()
 	base := live.BaseClassID()

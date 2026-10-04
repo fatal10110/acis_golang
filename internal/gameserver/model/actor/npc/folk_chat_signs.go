@@ -67,20 +67,31 @@ func (f *Folk) signsChat(pages Pages, kind InstanceKind, state ChatState) (page 
 		page = f.page(pages, festivalGuidePath(f.NpcID()))
 		return strings.ReplaceAll(page, "%festivalMins%", state.FestivalNotice()), ChatShown, true
 	case "OlympiadManagerNpc":
-		if _, ok := monuments[f.NpcID()]; ok {
-			hero, inactive := state.Hero()
-			if hero || inactive {
-				return f.heroMainPage(pages, inactive), ChatShown, true
-			}
-			return f.page(pages, olympiadPages+"hero_main2.htm"), ChatShown, true
-		}
-		name := "noble.htm"
-		if f.NpcID() == grandOlympiadManager && state.Noble() {
-			name = "noble_main.htm"
-		}
-		return f.page(pages, olympiadPages+name), ChatShown, true
+		hero, inactive := state.Hero()
+		return f.olympiadChat(pages, 0, state.Noble(), hero, inactive), ChatShown, true
 	}
 	return "", ChatShown, false
+}
+
+// olympiadChat is an Olympiad manager's chat page val: a Monument of
+// Heroes' main page, whatever val; else noble.htm for val 0 or below, or
+// noble_<val>.htm, with the Grand Olympiad Manager's own page 0 for a
+// noble, noble_main.htm.
+func (f *Folk) olympiadChat(pages Pages, val int, noble, hero, inactive bool) string {
+	if _, ok := monuments[f.NpcID()]; ok {
+		if hero || inactive {
+			return f.heroMainPage(pages, inactive)
+		}
+		return f.page(pages, olympiadPages+"hero_main2.htm")
+	}
+	name := "noble.htm"
+	if val > 0 {
+		name = "noble_" + strconv.Itoa(val) + ".htm"
+	}
+	if f.NpcID() == grandOlympiadManager && noble && val == 0 {
+		name = "noble_main.htm"
+	}
+	return f.page(pages, olympiadPages+name)
 }
 
 // heroClaimLink is the line of a Monument of Heroes' main page that lets an
