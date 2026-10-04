@@ -127,6 +127,7 @@ type options struct {
 	admin                  *admin.Data
 	gmStartupUnlisted      bool
 	gmStartupModes         [3]bool
+	gmHeroAura             bool
 	gmAudit                zerolog.Logger
 	chat                   network.ChatConfig
 	restarts               *restart.Table
@@ -338,6 +339,10 @@ func WithGMStartupUnlisted() Option { return func(o *options) { o.gmStartupUnlis
 func WithGMStartupModes(invulnerable, invisible, blockAll bool) Option {
 	return func(o *options) { o.gmStartupModes = [3]bool{invulnerable, invisible, blockAll} }
 }
+
+// WithGMHeroAura sets players.properties GMHeroAura = True: a game master
+// shows the hero aura.
+func WithGMHeroAura() Option { return func(o *options) { o.gmHeroAura = true } }
 
 // WithGMAudit records every admin command run to log (server.properties
 // GMAudit = True); by default nothing is recorded.
@@ -1997,6 +2002,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.PlayerConfig.AutoLearnSkills = o.autoLearnSkills
 	gclConfig.ClassMaster = o.classMaster
 	gclConfig.PlayerConfig.GMStartupInvulnerable, gclConfig.PlayerConfig.GMStartupInvisible, gclConfig.PlayerConfig.GMStartupBlockAll = o.gmStartupModes[0], o.gmStartupModes[1], o.gmStartupModes[2]
+	gclConfig.PlayerConfig.GMHeroAura = o.gmHeroAura
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
 	gclConfig.ArmorSets = o.armorSets
 	gclConfig.Manor = o.manor
@@ -2074,7 +2080,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// The Olympiad's records are restored once the characters are seeded,
 	// below; its calendar is started only for WithOlympiadCompetition or
 	// WithOlympiadValidation.
-	heroes := hero.New(gamesql.NewHeroStore(db), gclConfig.Clans.Table(), persistWorker, HeroMinMatches, time.Now, o.log)
+	heroes := hero.New(gamesql.NewHeroStore(db), gclConfig.Clans.Table(), hero.TableNames{NPCs: o.npcs, Castles: gclConfig.Castles}, persistWorker, HeroMinMatches, time.Now, o.log)
 	gclConfig.Heroes = heroes
 	olympiadQueue := queues.NewQueue("olympiad")
 	olympiadState := olympiad.New(o.olympiadWindow.config(olympiadQueue.Now()), gamesql.NewOlympiadStore(db), persistWorker, network.NewOlympiadAnnouncer(state), heroes, olympiadQueue, o.log)

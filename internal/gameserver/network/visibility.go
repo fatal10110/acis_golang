@@ -61,6 +61,7 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 			Items:     o.inventoryItems(),
 			Clan:      p.link.clanFields(o.Character),
 			Hidden:    hiddenFrom(o, p),
+			HeroAura:  p.link.heroAura(o),
 		}))
 		if o.throne != nil {
 			p.sendVisibilityFrame(serverpackets.FrameChairSit(o.ObjectID(), o.throne.StaticObjectID()))

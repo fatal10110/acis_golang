@@ -145,3 +145,95 @@ func (s *HeroStore) AddDiaryEntry(ctx context.Context, objectID int32, at int64,
 	}
 	return nil
 }
+
+// LoadDiary returns objectID's diary entries, oldest first.
+func (s *HeroStore) LoadDiary(ctx context.Context, objectID int32) ([]hero.DiaryRow, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT time, action, param FROM heroes_diary WHERE char_id = ? ORDER BY time ASC", objectID)
+	if err != nil {
+		return nil, fmt.Errorf("load hero %d diary: %w", objectID, err)
+	}
+	defer rows.Close()
+	var out []hero.DiaryRow
+	for rows.Next() {
+		var r hero.DiaryRow
+		if err := rows.Scan(&r.At, &r.Action, &r.Param); err != nil {
+			return nil, fmt.Errorf("load hero %d diary: %w", objectID, err)
+		}
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("load hero %d diary: %w", objectID, err)
+	}
+	return out, nil
+}
+
+// LoadFights returns objectID's Olympiad fights started before before, in
+// Unix milliseconds, oldest first, with each side's current character
+// name.
+func (s *HeroStore) LoadFights(ctx context.Context, objectID int32, before int64) ([]hero.FightRow, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT f.charOneId, f.charTwoId, f.charOneClass, f.charTwoClass, f.winner, f.start, f.time, f.classed, one.char_name, two.char_name
+		FROM olympiad_fights f
+			LEFT JOIN characters one ON one.obj_Id = f.charOneId
+			LEFT JOIN characters two ON two.obj_Id = f.charTwoId
+		WHERE (f.charOneId = ? OR f.charTwoId = ?) AND f.start < ? ORDER BY f.start ASC`,
+		objectID, objectID, before)
+	if err != nil {
+		return nil, fmt.Errorf("load hero %d fights: %w", objectID, err)
+	}
+	defer rows.Close()
+	var out []hero.FightRow
+	for rows.Next() {
+		var (
+			r        hero.FightRow
+			one, two sql.NullString
+		)
+		if err := rows.Scan(&r.OneID, &r.TwoID, &r.OneClass, &r.TwoClass, &r.Winner, &r.Start, &r.Time, &r.Classed, &one, &two); err != nil {
+			return nil, fmt.Errorf("load hero %d fights: %w", objectID, err)
+		}
+		r.OneName, r.OneFound = one.String, one.Valid
+		r.TwoName, r.TwoFound = two.String, two.Valid
+		out = append(out, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("load hero %d fights: %w", objectID, err)
+	}
+	return out, nil
+}
+
+// LoadMessage returns objectID's hero message; found is false when
+// objectID is no stored hero.
+func (s *HeroStore) LoadMessage(ctx context.Context, objectID int32) (string, bool, error) {
+	var msg string
+	err := s.db.QueryRowContext(ctx, "SELECT message FROM heroes WHERE char_id = ?", objectID).Scan(&msg)
+	if err == sql.ErrNoRows {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("load hero %d message: %w", objectID, err)
+	}
+	return msg, true, nil
+}
+
+// SaveMessages stores each hero's message.
+func (s *HeroStore) SaveMessages(ctx context.Context, messages map[int32]string) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("save hero messages: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	stmt, err := tx.PrepareContext(ctx, "UPDATE heroes SET message = ? WHERE char_id = ?")
+	if err != nil {
+		return fmt.Errorf("save hero messages: %w", err)
+	}
+	defer stmt.Close()
+	for id, msg := range messages {
+		if _, err := stmt.ExecContext(ctx, msg, id); err != nil {
+			return fmt.Errorf("save hero %d message: %w", id, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("save hero messages: %w", err)
+	}
+	return nil
+}
