@@ -137,9 +137,11 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 	}
 	l.updateLivePlayerPosition(live, target, heading)
 	// A completed teleport drops the scroll-of-enchant selection, then ends
-	// any open trade for both sides, naming the one who moved.
+	// any open trade for both sides, naming the one who moved, then takes
+	// a passenger off its boat.
 	l.cancelActiveEnchant(live)
 	l.cancelActiveTrade(live)
+	l.leaveBoat(live)
 }
 
 // inWater reports whether at lies inside a water zone, where a creature

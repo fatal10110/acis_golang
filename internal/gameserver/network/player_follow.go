@@ -26,9 +26,10 @@ func (l *GameClientLink) actOnPlayer(live *livePlayer, target world.Tracked, ctr
 	if !ok || live == nil {
 		return false
 	}
-	// Boats are not ported (#229), so neither side is ever aboard one and the
-	// boat-mismatch refusal never applies.
 	switch {
+	case live.InBoat() != other.InBoat():
+		// One aboard a boat and the other not: nothing to do.
+		live.SendFrame(serverpackets.FrameActionFailed())
 	case other.AttackableWithoutForceBy(live.Character) || (ctrl && other.AttackableBy(live.Character)):
 		l.attackLiveTarget(live, other, shift)
 	case other.Operating():

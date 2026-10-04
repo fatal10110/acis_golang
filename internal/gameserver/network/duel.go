@@ -213,8 +213,6 @@ func (l *GameClientLink) requestDuelAnswerStart(live *livePlayer, req clientpack
 
 // duelRefusal reports whether p may join a duel, and otherwise the message,
 // naming p, that tells why.
-//
-// A player on a boat is refused like a rider once boats exist (#229).
 func (l *GameClientLink) duelRefusal(p *livePlayer) (msg int, ok bool) {
 	res := p.ResourceValues()
 	switch {
@@ -230,7 +228,7 @@ func (l *GameClientLink) duelRefusal(p *livePlayer) (msg int, ok bool) {
 		return serverpackets.SystemMessageS1CannotDuelChaotic, false
 	case p.Operating():
 		return serverpackets.SystemMessageS1CannotDuelPrivateStore, false
-	case p.Mounted():
+	case p.Mounted() || p.InBoat():
 		return serverpackets.SystemMessageS1CannotDuelRiding, false
 	case p.Fishing():
 		return serverpackets.SystemMessageS1CannotDuelFishing, false

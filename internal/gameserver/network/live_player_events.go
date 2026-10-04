@@ -394,6 +394,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 			live.SendFrame(serverpackets.FrameActionFailed())
 		}
 	case event.Arrived:
+		l.arriveAtBoatEntrance(live)
 		// CreatureMove tracks position for its own timing only; push the
 		// arrived position into the world-grid presence range checks
 		// actually read before re-thinking the attack intention, or it
@@ -407,6 +408,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.thinkAttack()
 		l.arriveHeldIntention(live)
 	case event.MoveBlocked:
+		live.SetBoatMovement(false)
 		if !l.onPlayerArrivedBlocked(live) {
 			live.move.BroadcastBlockedCorrection()
 		}

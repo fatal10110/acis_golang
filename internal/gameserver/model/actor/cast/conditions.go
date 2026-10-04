@@ -38,6 +38,12 @@ type servitorGate interface {
 	AttackingNow() bool
 }
 
+// boatRider is the optional Actor capability CanCast asks after the
+// servitorGate checks: whether the player rides a boat.
+type boatRider interface {
+	InBoat() bool
+}
+
 // ServitorSummon reports whether def summons a servitor rather than a cubic.
 func ServitorSummon(def modelskill.Definition) bool {
 	return def.SkillType == "SUMMON" && !def.IsCubic
@@ -56,6 +62,11 @@ func (a PlayerActor) HasSummon() bool {
 // Mounted reports whether the player rides a mount.
 func (a PlayerActor) Mounted() bool {
 	return a.Character != nil && a.Character.Mounted()
+}
+
+// InBoat reports whether the player rides a boat.
+func (a PlayerActor) InBoat() bool {
+	return a.Character != nil && a.Character.InBoat()
 }
 
 // AttackingNow reports whether the player's swing is still in flight. The

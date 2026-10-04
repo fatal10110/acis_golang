@@ -951,6 +951,54 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			onLive(live, func() { l.stopLivePlayer(live) })
 
+		case clientpackets.OpcodeRequestMoveInVehicle:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestMoveToLocationInVehicle)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestMoveInVehicle(live, req) })
+			}
+
+		case clientpackets.OpcodeCannotMoveInVehicle:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeCannotMoveAnymoreInVehicle)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.cannotMoveInVehicle(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestGetOnVehicle:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestGetOnVehicle)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestGetOnVehicle(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestGetOffVehicle:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestGetOffVehicle)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestGetOffVehicle(live, req) })
+			}
+
 		case clientpackets.OpcodeValidatePosition:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeValidatePosition)
 			if err != nil {
@@ -961,7 +1009,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			if live != nil {
 				onLive(live, func() {
-					l.validateLivePlayerPosition(live, location.Location{X: int(req.X), Y: int(req.Y), Z: int(req.Z)})
+					l.validateLivePlayerPosition(live, location.Location{X: int(req.X), Y: int(req.Y), Z: int(req.Z)}, req.BoatID)
 				})
 			}
 
@@ -2091,10 +2139,6 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			clientpackets.OpcodeDummy2E,
 			clientpackets.OpcodeDummy34,
 			clientpackets.OpcodeDummy3E,
-			clientpackets.OpcodeRequestGetOnVehicle,
-			clientpackets.OpcodeRequestGetOffVehicle,
-			clientpackets.OpcodeRequestMoveInVehicle,
-			clientpackets.OpcodeCannotMoveInVehicle,
 			clientpackets.OpcodeRequestQuestListInGame,
 			clientpackets.OpcodeRequestQuestAbort,
 			clientpackets.OpcodeGameGuardReply:
