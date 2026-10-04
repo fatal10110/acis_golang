@@ -538,7 +538,8 @@ func TestUseItemWeaponEquipDropsStaleAutoShot(t *testing.T) {
 		t.Fatalf("soulshots carried after re-equip = %d, want 10 (no recharge without auto-use)", got)
 	}
 
-	// Turning auto-use back on makes the next equip recharge again.
+	// Turning auto-use back on with the weapon held charges it at once
+	// (RequestAutoSoulShot.java:92-93), and the next equip recharges again.
 	c.Send(encodeRequestAutoSoulShot(1463, 1))
 	assertExAutoSoulShot(t, c.Read(), 1463, true)
 	drainUntilQuiet(t, c)
@@ -551,7 +552,7 @@ func TestUseItemWeaponEquipDropsStaleAutoShot(t *testing.T) {
 		t.Fatalf("message after S1_EQUIPPED with auto-use back on = %d, want EnabledSoulshot (%d)", id, serverpackets.SystemMessageEnabledSoulshot)
 	}
 	drainUntilQuiet(t, c)
-	if got := carriedCount(t, srv, objID, 1463); got != 9 {
-		t.Fatalf("soulshots carried after the re-enabled recharge = %d, want 9", got)
+	if got := carriedCount(t, srv, objID, 1463); got != 8 {
+		t.Fatalf("soulshots carried after the re-enabled recharge = %d, want 8", got)
 	}
 }
