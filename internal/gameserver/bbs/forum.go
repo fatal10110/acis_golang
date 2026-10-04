@@ -274,6 +274,17 @@ func (f *Forums) OwnedOrCreate(typ ForumType, access ForumAccess, ownerID int32)
 	return created
 }
 
+// MemoOf reports whether forum id is playerID's memo forum. A memo forum
+// answers its owner alone: the reference serves any player who names its
+// id, so anyone could read, rewrite or delete another's memos, and open
+// topics in a clan's forums (#3262).
+func (f *Forums) MemoOf(id, playerID int32) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	fo, ok := f.forums[id]
+	return ok && fo.Type == ForumMemo && fo.OwnerID == playerID
+}
+
 // Memo returns ownerID's memo forum, creating it, open to all, on first
 // use.
 func (f *Forums) Memo(ownerID int32) Forum {
@@ -350,14 +361,20 @@ const (
 	FoundPost
 )
 
+// topicLimit is how many topics a forum holds; a forum holding as many
+// takes no new one. The reference has no limit, so one player could grow
+// the topic and post tables without bound (#3262).
+const topicLimit = 100
+
 // AddTopic opens a topic called name in forum forumID, by the character
 // ownerName, ownerID, at now, with text as its post 0, and stores both.
-// It reports false when the forum does not exist.
+// It reports false when the forum does not exist or already holds
+// topicLimit topics.
 func (f *Forums) AddTopic(forumID int32, name, ownerName string, ownerID int32, text string, now time.Time) bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	fo, ok := f.forums[forumID]
-	if !ok {
+	if !ok || len(fo.topics) >= topicLimit {
 		return false
 	}
 	date := now.UnixMilli()

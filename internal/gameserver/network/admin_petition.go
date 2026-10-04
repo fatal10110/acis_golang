@@ -208,7 +208,7 @@ func (l *GameClientLink) showPetition(gm *livePlayer, id int32) {
 		{"%type%", d.Type.String()},
 		{"%state%", d.State.String()},
 		{"%responders%", d.Responders},
-		{"%content%", defusePlayerHTML(commons.HTMLValue(d.Content))},
+		{"%content%", commons.StripLinkWords(commons.HTMLValue(d.Content))},
 	} {
 		html = strings.ReplaceAll(html, r.key, r.value)
 	}
@@ -218,25 +218,12 @@ func (l *GameClientLink) showPetition(gm *livePlayer, id int32) {
 	case petition.Closed:
 		html = strings.ReplaceAll(html, "%buttonsOrFeedback%", petitionFeedback)
 		html = strings.ReplaceAll(html, "%rate%", d.Rate.Desc())
-		html = strings.ReplaceAll(html, "%feedback%", defusePlayerHTML(commons.HTMLValue(d.Feedback)))
+		html = strings.ReplaceAll(html, "%feedback%", commons.StripLinkWords(commons.HTMLValue(d.Feedback)))
 	default:
 		html = strings.ReplaceAll(html, "%buttonsOrFeedback%", "")
 	}
 	html = strings.ReplaceAll(html, "%id%", strconv.Itoa(int(id)))
 	sendFilledHTML(gm, 0, html, 0)
-}
-
-// defusePlayerHTML strips the link words from text a player wrote before a
-// game master's window shows it, so a petition cannot carry a link that
-// runs a command as the game master who clicks it. It runs on the text as
-// the window shows it, after commons.HTMLValue has dropped the quoting
-// backslashes, so "act\ion" cannot turn back into a link word, and it
-// repeats until no link word is left, so "actactionion" cannot either.
-func defusePlayerHTML(text string) string {
-	for strings.Contains(text, "action") || strings.Contains(text, "bypass") {
-		text = strings.ReplaceAll(strings.ReplaceAll(text, "action", ""), "bypass", "")
-	}
-	return text
 }
 
 // adminHTML returns admin panel page name as set, before its placeholders

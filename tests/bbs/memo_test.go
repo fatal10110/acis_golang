@@ -371,8 +371,8 @@ func TestMemoTopicListPages(t *testing.T) {
 		t.Fatalf("restored post page lacks its text:\n%s", got)
 	}
 
-	// Bobby reaches Alice's memo forum by its id, as the reference allows.
-	assertPage(t, command(t, p.bobby, "_bbstopics;read;3;2"), second)
+	// Alice's memo forum answers Alice alone (#3262).
+	assertPage(t, command(t, p.bobby, "_bbstopics;read;3;2"), "<html><body><br><br><center>The forum #3 doesn't exist.</center></body></html>")
 
 	write(t, p.alice, "Topic", "crea", "3", "", "new", "T14")
 	if got := topicPostRows(t, p.srv, 3); len(got) != 14 || got[13] != "14|T14|Alice|new" {
@@ -404,11 +404,15 @@ func TestClanForums(t *testing.T) {
 		t.Fatalf("management form = %q, want %q", got, want)
 	}
 
-	// A clan forum is no memo forum: its topics neither list nor show.
+	// A clan forum is no memo forum: its topics neither list nor show, and
+	// the memo board opens none in it (#3262).
 	page := func(body string) string { return "<html><body><br><br><center>" + body + "</center></body></html>" }
 	assertPage(t, command(t, p.alice, "_bbstopics;read;4"), page("The forum #4 doesn't exist."))
-	write(t, p.alice, "Topic", "crea", "4", "", "text", "Notice")
-	assertPage(t, command(t, p.alice, "_bbsposts;read;4;1"), page("The forum is off-limits."))
+	assertPage(t, write(t, p.alice, "Topic", "crea", "4", "", "text", "Notice"), page("The forum named '4' doesn't exist."))
+	if got := topicPostRows(t, p.srv, 4); len(got) != 0 {
+		t.Fatalf("clan forum topics = %q, want none", got)
+	}
+	assertPage(t, command(t, p.alice, "_bbsposts;read;4;1"), page("This topic doesn't exist."))
 }
 
 // TestMemoRestoreStopsAtOrphanPost pins the boot load of the posts: it

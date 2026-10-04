@@ -80,10 +80,21 @@ func (f *Favorites) List(playerID int32) []Favorite {
 	return slices.Clone(f.byPlayer[playerID])
 }
 
-// Add stores the home board as a new favorite of playerID, dated now.
+// favoriteLimit is how many favorites a character keeps: the most added
+// favorites the shipped favorites board can show, since with 22 rows the
+// page is too long for the board window and shows nothing. The reference
+// has no limit, so one player could grow the favorite table without bound
+// (#3262).
+const favoriteLimit = 21
+
+// Add stores the home board as a new favorite of playerID, dated now. A
+// character keeping favoriteLimit favorites gets no new one.
 func (f *Favorites) Add(playerID int32, now time.Time) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if len(f.byPlayer[playerID]) >= favoriteLimit {
+		return
+	}
 	f.lastID++
 	fav := Favorite{ID: f.lastID, PlayerID: playerID, Title: addedFavoriteTitle, Bypass: addedFavoriteBypass, Date: now}
 	f.byPlayer[playerID] = append(f.byPlayer[playerID], fav)
