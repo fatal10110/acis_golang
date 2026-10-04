@@ -28,6 +28,7 @@ import (
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
+	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
 	"github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
@@ -196,6 +197,7 @@ type options struct {
 	boats                  []route.BoatItinerary
 	petitionConfig         *petition.Config
 	schemeBuffer           *schemebuffer.Manager
+	derby                  *derbyOptions
 	// rewardPartiesWrap wraps the link's kill-party resolver
 	// (WithRewardParties).
 	rewardPartiesWrap func(gamemanager.RewardParties) gamemanager.RewardParties
@@ -816,6 +818,7 @@ type Server struct {
 	WorldObjects     *gamemanager.WorldObjects // doors spawned by WithDoors; nil otherwise
 	doors            *doorHarness              // geodata and regeneration of WithDoors' doors
 	Boats            *boat.Fleet               // boats sailing WithBoats' itineraries; nil otherwise
+	Derby            *derby.Track              // race track of WithDerbyTrack; nil otherwise
 	NpcSpawns        *gamemanager.Npcs         // live NPC population of WithNpcSpawns; nil otherwise
 	Relations        *relation.Manager         // friend and block lists the link was wired with
 	relationRows     *gamesql.RelationStore
@@ -1671,6 +1674,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		worldObjects, doors = bootDoors(t, o.doors, ids, state)
 	}
 	boats := bootBoats(t, o.boats, ids, state)
+	derbyTrack := bootDerbyTrack(t, o.derby, db, ids, state, o.zones)
 	levels := o.levels
 	if levels == nil {
 		synthetic := make(map[int]player.Level, 85)
@@ -1849,6 +1853,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.ArmorSets = o.armorSets
 	gclConfig.Manor = o.manor
 	gclConfig.SchemeBuffer = o.schemeBuffer
+	gclConfig.Derby = derbyTrack
 	gclConfig.Relations, gclConfig.Characters = relations, chars
 	gclConfig.AccessLevels = chars
 	gclConfig.Punishments = chars
@@ -2087,6 +2092,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		WorldObjects:     worldObjects,
 		doors:            doors,
 		Boats:            boats,
+		Derby:            derbyTrack,
 		Clans:            gclConfig.Clans,
 		SevenSigns:       sevenSigns,
 		itemTable:        itemTemplates,

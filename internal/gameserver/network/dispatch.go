@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/craft"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
 	"github.com/fatal10110/acis_golang/internal/gameserver/duel"
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/exchange"
@@ -398,6 +399,9 @@ type GameClientLink struct {
 	// on their schedules and managed by //announce.
 	announcements *announcement.Registry
 	schemeBuffer  *schemebuffer.Manager
+	// derby is the monster race track the race managers answer for; nil
+	// runs no race.
+	derby *derby.Track
 	// npcSpawns is the live NPC population the admin spawn commands use;
 	// see SetNpcSpawns.
 	npcSpawns atomic.Pointer[manager.Npcs]
@@ -604,6 +608,8 @@ type GameClientLinkConfig struct {
 	// SchemeBuffer is the scheme buffer's buffs and every player's
 	// schemes; nil offers no buff and starts with no scheme.
 	SchemeBuffer *schemebuffer.Manager
+	// Derby is the monster race track; nil runs no race.
+	Derby *derby.Track
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -729,6 +735,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		link.board.favorites = bbs.NewFavorites(nil, nil, cfg.Log)
 	}
 	link.schemeBuffer = cfg.SchemeBuffer
+	link.derby = cfg.Derby
 	if link.schemeBuffer == nil {
 		link.schemeBuffer = schemebuffer.New(schemebuffer.DefaultConfig(), nil, nil)
 	}

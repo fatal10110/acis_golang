@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -171,6 +172,9 @@ type livePlayer struct {
 	// shownMultisell is the multisell list p was last shown, the one its
 	// exchanges choose from, or nil. Set and read on p's queue.
 	shownMultisell atomic.Pointer[multisell.List]
+	// derbyPicks is the race ticket p is choosing at a race manager. Set
+	// and read on p's queue.
+	derbyPicks derby.Picks
 	// storage is p's warehouse and freight state, set at attach and owned
 	// by p's queue from then on.
 	storage playerStorage
