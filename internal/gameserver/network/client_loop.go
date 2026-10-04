@@ -65,6 +65,19 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	}
 	session := NewSession(conn, gameCipher)
 	client := NewClient(session)
+	// A server stop ends the connection from here. A client with a
+	// character in the world (selected or entered) reads ServerClose as its
+	// last frame and leaves the world; any other connection just closes once
+	// what is queued is flushed. The read loop then ends as on a lost
+	// connection.
+	stopOnShutdown := context.AfterFunc(ctx, func() {
+		if client.State() >= StateEntering {
+			session.Close()
+			return
+		}
+		_ = conn.Close()
+	})
+	defer stopOnShutdown()
 
 	// chars, entering and live are read entirely by this goroutine: chars
 	// resolves the character-list slot indices RequestCharacterDelete,

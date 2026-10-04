@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net"
 	"strings"
 	"sync"
@@ -335,4 +336,82 @@ func (l *lockedWriter) Write(p []byte) (int, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.w.Write(p)
+}
+
+// dialCanceledGraceLoop serves one TCP connection through
+// AcceptLoopWithCloseGrace and cancels the loop once handle has the
+// connection, returning the client side and the loop's result channel.
+func dialCanceledGraceLoop(t *testing.T, grace time.Duration, handle func(conn net.Conn)) (net.Conn, <-chan error) {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+	accepted := make(chan struct{})
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- AcceptLoopWithCloseGrace(ctx, ln, func(conn net.Conn) {
+			close(accepted)
+			handle(conn)
+		}, grace, zerolog.Nop())
+	}()
+	client, err := net.Dial("tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { client.Close() })
+	<-accepted
+	cancel()
+	return client, errCh
+}
+
+func TestAcceptLoopCloseGraceLetsHandlerFlushLastWrite(t *testing.T) {
+	release := make(chan struct{})
+	client, errCh := dialCanceledGraceLoop(t, 5*time.Second, func(conn net.Conn) {
+		<-release
+		_, _ = conn.Write([]byte("bye"))
+		conn.Close()
+	})
+	// The loop is canceled while the handler is still busy: within the grace
+	// the connection must stay open for its last write.
+	_ = client.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	buf := make([]byte, 3)
+	if _, err := client.Read(buf); err == nil || !isTimeout(err) {
+		t.Fatalf("read before the handler's write = %v, want a timeout on a still-open connection", err)
+	}
+	close(release)
+	_ = client.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if _, err := io.ReadFull(client, buf); err != nil || string(buf) != "bye" {
+		t.Fatalf("last write = %q, %v; want \"bye\"", buf, err)
+	}
+	if err := <-errCh; err != nil {
+		t.Fatalf("AcceptLoopWithCloseGrace = %v, want nil after cancellation", err)
+	}
+}
+
+func TestAcceptLoopCloseGraceForceClosesAfterGrace(t *testing.T) {
+	client, errCh := dialCanceledGraceLoop(t, 50*time.Millisecond, func(conn net.Conn) {
+		// A handler that never ends its connection itself returns only once
+		// the loop force-closes it.
+		_, _ = conn.Read(make([]byte, 1))
+	})
+	_ = client.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if _, err := client.Read(make([]byte, 1)); err == nil || isTimeout(err) {
+		t.Fatalf("read after the grace = %v, want the connection closed", err)
+	}
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("AcceptLoopWithCloseGrace = %v, want nil after cancellation", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("AcceptLoopWithCloseGrace did not return after its grace")
+	}
+}
+
+func isTimeout(err error) bool {
+	var ne net.Error
+	return errors.As(err, &ne) && ne.Timeout()
 }

@@ -45,7 +45,8 @@ const (
 	// the budget before the final item flush and the ground-item save run.
 	// TestGameServerStopTimeoutCoversEveryStopStep checks every registered
 	// stop hook against this sum.
-	gameServerStopTimeout = network.LivePlayerPersistWait + // listener: each connection's exit waits for its player's saves, in parallel
+	gameServerStopTimeout = network.ShutdownCloseGrace + // listener: connections flushing their ServerClose before the rest are force-closed
+		network.LivePlayerPersistWait + // listener: each connection's exit waits for its player's saves, in parallel
 		debugHTTPStopTimeout +
 		shutdownSaveTimeout + // spawn_data
 		shutdownSaveTimeout + // character_relations
