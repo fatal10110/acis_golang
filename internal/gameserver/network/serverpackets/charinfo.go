@@ -137,10 +137,11 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteInt32(s.Clan.CrestLargeID)
 	w.WriteUint8(boolUint8(c.IsNoble()))
 	w.WriteUint8(0) // hero
-	w.WriteUint8(0) // fishing
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
+	bait := c.FishingBait()
+	w.WriteUint8(boolUint8(c.Fishing()))
+	w.WriteInt32(int32(bait.X))
+	w.WriteInt32(int32(bait.Y))
+	w.WriteInt32(int32(bait.Z))
 	w.WriteInt32(c.NameColor())
 	w.WriteInt32(int32(c.CurrentHeading()))
 	w.WriteInt32(int32(c.PledgeClass()))

@@ -1066,6 +1066,14 @@ func (l *GameClientLink) sendSkillHandlerResultVia(send frameSender, live *liveP
 			if live != nil {
 				send(live, serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotCreateWhileTrading))
 			}
+		case skillhandler.FishingCast:
+			if live != nil {
+				l.castFishing(live)
+			}
+		case skillhandler.FishingAction:
+			if live != nil {
+				l.useFishingAction(live, m)
+			}
 		case skillhandler.SlotsFullMessage:
 			if live != nil {
 				send(live, serverpackets.FrameSystemMessage(serverpackets.SystemMessageSlotsFull))

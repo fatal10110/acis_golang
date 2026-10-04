@@ -51,8 +51,8 @@ const teamBlue = 1
 
 // UserInfoSnapshot is everything UserInfo needs about one character at the
 // moment of encoding. It is deliberately narrower than the client's full
-// field list: systems this server hasn't built yet (hero status,
-// fishing) always report their at-rest default, matching a freshly entered
+// field list: systems this server hasn't built yet (hero status)
+// always report their at-rest default, matching a freshly entered
 // character that has none of them. The
 // attributes and combat stats are Character's live values, so gear, buffs,
 // level and passives all reach the status window.
@@ -281,10 +281,11 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(s.Clan.CrestLargeID)
 	w.WriteUint8(boolUint8(c.IsNoble()))
 	w.WriteUint8(0) // hero flag: heroism is not modeled
-	w.WriteUint8(0) // fishing flag: fishing is not modeled
-	w.WriteInt32(0) // fishing stance x: fishing is not modeled
-	w.WriteInt32(0) // fishing stance y: fishing is not modeled
-	w.WriteInt32(0) // fishing stance z: fishing is not modeled
+	bait := c.FishingBait()
+	w.WriteUint8(boolUint8(c.Fishing()))
+	w.WriteInt32(int32(bait.X))
+	w.WriteInt32(int32(bait.Y))
+	w.WriteInt32(int32(bait.Z))
 	w.WriteInt32(c.NameColor())
 	w.WriteUint8(boolUint8(c.Running()))
 	w.WriteInt32(int32(c.PledgeClass()))

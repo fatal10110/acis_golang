@@ -37,6 +37,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/fish"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -357,6 +358,10 @@ type GameClientLink struct {
 	// overridden in tests for a deterministic outcome.
 	skillEnchantRoll func() int
 
+	// fishing is the fish table and dice a cast line draws from; see
+	// fishing.go.
+	fishing fishingDeps
+
 	// board is the community board; see community_board.go.
 	board communityBoard
 
@@ -543,6 +548,12 @@ type GameClientLinkConfig struct {
 	// CraftRoll supplies craft success rolls in [0,n); nil falls back to
 	// the random source.
 	CraftRoll func(n int) int
+	// Fish is the loaded fish table a cast line draws its fish from; nil
+	// draws none, so every line comes back empty.
+	Fish *fish.Table
+	// FishingRoll supplies the fishing dice in [0,n); nil falls back to the
+	// random source.
+	FishingRoll func(n int) int
 	// Augmentations is the loaded augmentation data a refine rolls from;
 	// nil refuses every refine as unsuitable.
 	Augmentations *augmentation.Table
@@ -666,6 +677,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		disableRaidCurse: cfg.DisableRaidCurse,
 		enchantRoll:      cfg.EnchantRoll,
 		skillEnchantRoll: cfg.SkillEnchantRoll,
+		fishing:          fishingDeps{table: cfg.Fish, roll: cfg.FishingRoll},
 		inventory:        invops.NewService(cfg.IDs),
 		petItems:         petitem.NewService(cfg.IDs),
 		trades:           tradebook.NewBook(cfg.TradeClock),

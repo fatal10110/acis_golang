@@ -95,6 +95,9 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool, ro
 	if l.useBeastShotItem(live, inv, inst) {
 		return
 	}
+	if l.useFishShotItem(live, inv, inst) {
+		return
+	}
 	if l.useRecipeItem(live, inst, tmpl) {
 		return
 	}
@@ -381,14 +384,18 @@ func (l *GameClientLink) ExpireShadowItem(live *livePlayer, inst *item.Instance)
 }
 
 func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.RequestAutoSoulShot) {
-	if live == nil || live.AlikeDead() || live.Operating() {
+	// Fake death does not block it: only a real death does.
+	if live == nil || live.Dead() || live.Operating() {
 		return
 	}
 	inv := live.Inventory()
 	if inv == nil {
 		return
 	}
-	hasItem := inv.ItemByTemplateID(req.ItemID) != nil
+	inst := inv.ItemByTemplateID(req.ItemID)
+	if inst == nil {
+		return
+	}
 
 	enabled := false
 	switch req.Type {
@@ -399,20 +406,67 @@ func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.
 		return
 	}
 
-	switch live.ToggleAutoSoulShot(req.ItemID, enabled, hasItem, l.hasActiveSummon(live)) {
-	case player.AutoSoulShotToggled:
+	pet := l.activeSummonActor(live)
+	toggle := player.AutoSoulShotRequest{ItemID: req.ItemID, Enabled: enabled, Held: true, ItemCount: inst.Snapshot().Count}
+	if pet != nil {
+		toggle.Summon = pet
+	}
+	status := live.ToggleAutoSoulShot(toggle)
+	switch status {
+	case player.AutoSoulShotToggled, player.AutoSoulShotGradeMismatch:
 	case player.AutoSoulShotNeedsSummon:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoServitorCannotAutomateUse))
+		return
+	case player.AutoSoulShotOlympiadBlocked:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageItemUnavailableForOlympiad))
+		return
+	case player.AutoSoulShotNotEnoughForPet:
+		msg := serverpackets.SystemMessageNotEnoughSpiritshotsForPet
+		if req.ItemID == item.BeastSoulshotID {
+			msg = serverpackets.SystemMessageNotEnoughSoulshotsForPet
+		}
+		live.SendFrame(serverpackets.FrameSystemMessage(msg))
 		return
 	default:
 		return
 	}
 	live.SendFrame(serverpackets.FrameExAutoSoulShot(req.ItemID, enabled))
-	if enabled {
-		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageUseOfItemWillBeAuto, req.ItemID))
+	if !enabled {
+		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageAutoUseOfItemCancelled, req.ItemID))
 		return
 	}
-	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageAutoUseOfItemCancelled, req.ItemID))
+	useOfItemWillBeAuto := serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageUseOfItemWillBeAuto, req.ItemID)
+	if item.IsSummonShotID(req.ItemID) {
+		// The first charge follows the notice: the owner's weapon from its
+		// auto-use shots, then the summon from its auto-use servitor shots.
+		live.SendFrame(useOfItemWillBeAuto)
+		l.rechargeShots(live, inv, true, true)
+		l.rechargeBeastShots(live, pet, true, true)
+		return
+	}
+	switch {
+	case status == player.AutoSoulShotToggled:
+		l.rechargeShots(live, inv, true, true)
+	case item.IsAutoSpiritshotID(req.ItemID):
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSpiritshotsGradeMismatch))
+	default:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSoulshotsGradeMismatch))
+	}
+	live.SendFrame(useOfItemWillBeAuto)
+}
+
+// activeSummonActor returns live's active pet or servitor, or nil when it
+// has none.
+func (l *GameClientLink) activeSummonActor(live *livePlayer) *summon.Actor {
+	if l.world == nil || live == nil {
+		return nil
+	}
+	obj, ok := l.world.Summon(live.ObjectID())
+	if !ok {
+		return nil
+	}
+	pet, _ := obj.(*summon.Actor)
+	return pet
 }
 
 // hasActiveSummon reports whether live has a summon in the world, and

@@ -457,6 +457,8 @@ func newDefaultRegistry(defs Definitions, magicFailures bool, healSps *modelskil
 		continuousHandler{defs: defs},
 		fusionHandler{defs: defs},
 		craftHandler{},
+		fishingHandler{},
+		fishingSkillHandler{},
 	)
 	r.magicFailures = magicFailures
 	return r

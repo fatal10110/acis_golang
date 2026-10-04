@@ -155,6 +155,8 @@ func readCastShots(t *testing.T, c *testsupport.ScriptedClient, objID, skillID i
 // cannot pay the servitor's per-hit count while auto-enabled turns auto use
 // off (ExAutoSoulShot off, then AUTO_USE_OF_S1_CANCELLED) instead of
 // reporting the shortage, and the click still gets its ActionFailed.
+// RequestAutoSoulShot refuses to turn auto use on for a stack smaller than
+// one charge, so the auto-use entry is set directly.
 func TestUseBeastSoulshotNotEnoughWithAutoDisablesAuto(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
@@ -175,10 +177,7 @@ func TestUseBeastSoulshotNotEnoughWithAutoDisablesAuto(t *testing.T) {
 	srv.State.AddSummon(objID, servitor)
 	drainUntilQuiet(t, c)
 
-	c.Send(encodeRequestAutoSoulShot(6645, 1))
-	assertExAutoSoulShot(t, c.Read(), 6645, true)
-	assertSystemMessageItem(t, c.Read(), serverpackets.SystemMessageUseOfItemWillBeAuto, 6645)
-	drainUntilQuiet(t, c)
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.SetAutoSoulShot(6645, true) })
 
 	c.Send(encodeUseItem(shot, false))
 	assertExAutoSoulShot(t, c.Read(), 6645, false)
