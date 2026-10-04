@@ -387,13 +387,20 @@ func Apply(effector, effected Actor, meta Skill, templates []modelskill.EffectTe
 // effect's schedule runs from there, not from the replay. One whose ticks
 // run no action and whose first tick came due in between has ended and is
 // not reinstated (see resumeRestored). One whose ticks run an action runs
-// the actions of the ticks due in between, in order, as it joins the list
-// (see List.AddRestored); only a lethal damage-over-time tick still waits
-// for the replay (see restoreAnchor).
+// the actions of the ticks due in between, in time order with those of the
+// other effects the same List.Restore reinstates (see List.Restore); only a
+// lethal damage-over-time tick still waits for the replay (see
+// restoreAnchor).
 func ApplyRestored(list *List, effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate, count, elapsedSeconds int32, restoredAt time.Time) {
 	if list == nil {
 		return
 	}
+	list.Restore(func() {
+		applyRestored(list, effector, effected, meta, templates, count, elapsedSeconds, restoredAt)
+	})
+}
+
+func applyRestored(list *List, effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate, count, elapsedSeconds int32, restoredAt time.Time) {
 	var now time.Time
 	if !restoredAt.IsZero() {
 		now = list.now()

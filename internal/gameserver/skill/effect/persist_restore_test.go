@@ -42,8 +42,13 @@ func TestSeedRestoreClampsCountToTemplateCountAndElapsedToPeriod(t *testing.T) {
 	if got := e.Remaining(); got != 2 {
 		t.Fatalf("Remaining() = %d, want clamped to template count 2", got)
 	}
-	if run, _ := e.claimAction(fixedNow); !run {
-		t.Fatal("claimAction did not fire immediately when the elapsed time exceeded the period")
+	// An elapsed time at or past the period leaves only the reference's
+	// minimum initial delay (AbstractEffect.startEffectTask's 5 ms floor).
+	if run, _ := e.claimAction(fixedNow); run {
+		t.Fatal("claimAction fired at the restore instant itself, before the minimum delay")
+	}
+	if run, _ := e.claimAction(fixedNow.Add(restoreMinDelay)); !run {
+		t.Fatal("claimAction did not fire at the minimum delay when the elapsed time exceeded the period")
 	}
 }
 

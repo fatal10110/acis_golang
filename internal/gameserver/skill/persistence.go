@@ -358,9 +358,11 @@ func (p *Persistence) RemoveAllSkills(c *player.Character) {
 // in the world sends nothing for them — this replay is what actually fires
 // their OnStart, schedules their ticks, and surfaces their icons, mirroring
 // Player.restoreEffects()'s template.getEffect(this, this, skill) ->
-// setCount/setTime -> scheduleEffect() chain. An effect whose ticks run an
+// setCount/setTime -> scheduleEffect() chain, with one icon refresh for
+// the whole replay, as EnterWorld sends one. An effect whose ticks run an
 // action runs those of the ticks due between the restore and the replay, in
-// order, on c; one that ran out in between is not reinstated. A session
+// time order across all the effects, on c; one that ran out in between is
+// not reinstated. A session
 // that ends before EnterWorld replays them too, ahead of its saves.
 func (p *Persistence) ReplayEffects(c *player.Character) {
 	if p == nil || c == nil {
@@ -370,13 +372,17 @@ func (p *Persistence) ReplayEffects(c *player.Character) {
 	if list == nil {
 		return
 	}
-	for _, eff := range c.ActiveSkillEffects() {
-		def, ok := p.definition(eff.Skill)
-		if !ok {
-			continue
+	// One restore for all of them: the ticks due since the restore run in
+	// time order across the effects, and the icons refresh once.
+	list.Restore(func() {
+		for _, eff := range c.ActiveSkillEffects() {
+			def, ok := p.definition(eff.Skill)
+			if !ok {
+				continue
+			}
+			effect.ApplyRestored(list, c, c, effect.SkillFromDefinition(def), def.Effects, eff.Count, eff.Time, eff.RestoredAt)
 		}
-		effect.ApplyRestored(list, c, c, effect.SkillFromDefinition(def), def.Effects, eff.Count, eff.Time, eff.RestoredAt)
-	}
+	})
 	// The registry's only purpose is staging Restore's effects until the live
 	// effect list exists to receive them; Save now reads that live list
 	// directly (see liveActiveEffects), so a stale, already-replayed entry

@@ -40,17 +40,67 @@ func (l *List) Add(e *Effect) {
 	l.addAnnounced(e, true)
 }
 
-// AddRestored is Add for an effect reinstated at login: it activates e and
-// refreshes the icons the same way, but sends the owner none of the
-// felt/disappeared/expiry system messages. Effects are restored before the
-// player has a client, so those messages go nowhere; only the
-// later icon update reaches the client.
+// AddRestored is Add for an effect reinstated at login: it activates e the
+// same way, but sends the owner none of the felt/disappeared/expiry system
+// messages. Effects are restored before the player has a client, so those
+// messages go nowhere; only the later icon update reaches the client.
 //
-// Once e is active, the actions of its ticks already due run in order, as
-// they would have from the restore instant (see catchUp), before the icon
-// refresh: an effect they end is not in it.
+// It runs as a Restore of its own unless one is open (see Restore): once e
+// is active, the actions of its ticks already due run in order before the
+// one icon refresh, so an effect they end is not in it.
 func (l *List) AddRestored(e *Effect) {
-	l.addAnnounced(e, false)
+	l.Restore(func() { l.addAnnounced(e, false) })
+}
+
+// restoreBatch is what one Restore collects from the restored adds it runs:
+// the effects they added, and the exit hooks their insertions queued, to
+// run after its icon refresh as an Add runs them after its own.
+type restoreBatch struct {
+	added []*Effect
+	exits []func()
+}
+
+// Restore runs apply, whose AddRestored calls join l without their icon
+// refreshes, then the actions of the ticks of those effects that came due
+// before now, in time order across all of them (see catchUp), and then
+// refreshes the icons once. The reference schedules every restored effect
+// at the restore instant on its own fixed-rate task, so the ticks due since
+// then interleave by time, not by the order the effects were saved in. A
+// Restore inside another one just runs apply: the outermost one catches up
+// and refreshes for all of them. Call it on the owner's queue.
+func (l *List) Restore(apply func()) {
+	if l == nil {
+		apply()
+		return
+	}
+	l.mu.Lock()
+	if l.restoring != nil {
+		l.mu.Unlock()
+		apply()
+		return
+	}
+	b := &restoreBatch{}
+	l.restoring = b
+	l.mu.Unlock()
+	defer func() {
+		l.mu.Lock()
+		l.restoring = nil
+		l.mu.Unlock()
+	}()
+
+	apply()
+
+	l.mu.Lock()
+	added, exits := b.added, b.exits
+	l.mu.Unlock()
+	if len(added) == 0 {
+		runHooks(exits)
+		return
+	}
+	exits = append(exits, l.catchUp(added)...)
+	l.notifyAbnormalUpdate()
+	runHooks(exits)
+	l.notifyActivityTransition()
 }
 
 func (l *List) addAnnounced(e *Effect, announce bool) {
@@ -64,50 +114,89 @@ func (l *List) addAnnounced(e *Effect, announce bool) {
 	l.silent = false
 	exiting := l.exiting
 	l.exiting = nil
+	var batch *restoreBatch
+	if !announce {
+		batch = l.restoring
+	}
 	l.mu.Unlock()
 
 	runHooks(pending)
 	exits := l.dropDeferred(exiting, announce)
-	if !announce {
-		exits = append(exits, l.catchUp(e)...)
+	if batch != nil {
+		l.mu.Lock()
+		batch.added = append(batch.added, e)
+		batch.exits = append(batch.exits, exits...)
+		l.mu.Unlock()
+		l.notifyActivityTransition()
+		return
 	}
 	l.notifyAbnormalUpdate()
 	runHooks(exits)
 	l.notifyActivityTransition()
 }
 
-// catchUp runs, in order, the ticks of restored effect e that came due
-// before now: the ticks of the loading screen, which the restore instant
-// put behind the replay. Each runs as a scheduled tick does (tickAt): it
-// counts down, and the action of an in-use e runs. When the count runs out
-// or an action reports false, e leaves the list. That removal, and any its
-// actions make, is silent and leaves the icon refresh to the caller, which
-// sends one for the whole replay; it returns the exit hooks that removal
-// queued, to run after that refresh as Remove runs them.
-func (l *List) catchUp(e *Effect) []func() {
+// catchUp runs, in time order, the ticks of the restored effects that came
+// due before now: the ticks of the loading screen, which the restore instant
+// put behind the replay. It always runs the earliest due tick next, the
+// first restored effect first on a tie. Each runs as a scheduled tick does
+// (tickAt): it counts down, and the action of an in-use effect runs. When
+// the count runs out or an action reports false, the effect leaves the
+// list. That removal, and any its action makes, is silent and leaves the
+// icon refresh to the caller, which sends one for the whole replay; it
+// returns the exit hooks that removal queued, to run after that refresh as
+// Remove runs them. With no tick due it changes nothing.
+func (l *List) catchUp(restored []*Effect) []func() {
 	now := l.now()
-	l.catchingUp.Add(1)
-	defer l.catchingUp.Add(-1)
+	var exits []func()
 	for {
-		run, remove := e.claimAction(now)
-		if !run && !remove {
-			return nil
+		e := l.nextDue(restored, now)
+		if e == nil {
+			return exits
 		}
-		if run && e.InUse() && !e.ActionTime() {
-			remove = true
-		}
-		if !remove {
+		exits = append(exits, l.catchUpTick(e, now)...)
+	}
+}
+
+// nextDue is the held effect among restored whose next tick is the earliest
+// due at now, nil when none is due.
+func (l *List) nextDue(restored []*Effect, now time.Time) *Effect {
+	var next *Effect
+	var nextAt time.Time
+	for _, e := range restored {
+		at := e.dueAt()
+		if at.IsZero() || now.Before(at) || (next != nil && !at.Before(nextAt)) {
 			continue
 		}
-		var pending, exits []func()
 		l.mu.Lock()
-		if l.holdsLocked(e) {
-			l.remove(e, &pending, &exits)
-		}
+		held := l.holdsLocked(e)
 		l.mu.Unlock()
-		runHooks(pending)
-		return exits
+		if held {
+			next, nextAt = e, at
+		}
 	}
+	return next
+}
+
+// catchUpTick runs e's tick due at now (see catchUp) and returns the exit
+// hooks of the removal it makes.
+func (l *List) catchUpTick(e *Effect, now time.Time) []func() {
+	l.catchingUp.Add(1)
+	defer l.catchingUp.Add(-1)
+	run, remove := e.claimAction(now)
+	if run && e.InUse() && !e.ActionTime() {
+		remove = true
+	}
+	if !remove {
+		return nil
+	}
+	var pending, exits []func()
+	l.mu.Lock()
+	if l.holdsLocked(e) {
+		l.remove(e, &pending, &exits)
+	}
+	l.mu.Unlock()
+	runHooks(pending)
+	return exits
 }
 
 // Drop removes e, which its own exit hook is ending, when l still holds it —

@@ -142,7 +142,7 @@ func (l *List) HasHeld() bool {
 
 // quietLocked reports whether the owner-message helpers leave their
 // messages out: during an AddRestored's insertion (silent) or a restored
-// effect's catch-up (catchingUp). Caller must hold l.mu.
+// tick's catch-up (catchingUp). Caller must hold l.mu.
 func (l *List) quietLocked() bool {
 	return l.silent || l.catchingUp.Load() > 0
 }
@@ -193,11 +193,17 @@ type List struct {
 	// The owner-message helpers read it while queueing, so the messages
 	// that insertion would queue are left out.
 	silent bool
-	// catchingUp counts the restored effects whose due ticks catchUp is
-	// running. While it is set, removals send no system messages, as
-	// under silent, and no icon refresh: the replay sends one when it is
-	// done. Set and cleared on the owner's queue; atomic for any reader.
+	// catchingUp is set while catchUp runs one tick of a restored effect
+	// that came due before the replay, and that tick's removal: those
+	// removals send no system messages, as under silent, and no icon
+	// refresh, since the replay sends one when it is done. It is never set
+	// when no restored tick is due, as on a replay for a character already
+	// in the world. Set and cleared on the owner's queue; atomic for any
+	// reader.
 	catchingUp atomic.Int32
+	// restoring is the restore batch an outermost Restore has open, nil
+	// otherwise. Read and written under mu.
+	restoring *restoreBatch
 
 	// exiting collects, during one add's l.mu hold, the held effects whose
 	// exit hook that insertion queued (a replaced, evicted or displaced

@@ -173,7 +173,7 @@ func (e *Effect) startSchedule(now time.Time) {
 
 // startScheduleFromRestoreLocked seeds e.remaining and e.nextAction from a
 // persisted tick count and elapsed time, run on from the restore instant. An
-// effect with a tick action keeps a first tick already due: List.AddRestored
+// effect with a tick action keeps a first tick already due: List.Restore
 // runs the actions of every tick due by now. One without ends on the next
 // tick, running no action, when its first tick came due before now. Called
 // with e.scheduleMu already held.
@@ -199,8 +199,9 @@ func (e *Effect) startScheduleFromRestoreLocked(r *restoreSeed, now time.Time) {
 // elapsed time: the tick count is clamped to the template's own count, and
 // the elapsed time (seconds since the effect's last tick at logout) is
 // clamped to the template's period, so the first tick comes due that much
-// short of a period after at. An effect without a period only has its
-// count clamped.
+// short of a period after at, but never sooner than restoreMinDelay after
+// it: a tick saved overdue is not due at the restore instant itself. An
+// effect without a period only has its count clamped.
 func restoredSchedule(tmpl modelskill.EffectTemplate, count, elapsedSeconds int32, at time.Time) (remaining int, next time.Time) {
 	remaining = int(min(count, int32(tmpl.Count)))
 	period := templatePeriod(tmpl)
@@ -208,8 +209,12 @@ func restoredSchedule(tmpl modelskill.EffectTemplate, count, elapsedSeconds int3
 		return remaining, time.Time{}
 	}
 	elapsed := min(time.Duration(elapsedSeconds)*time.Second, period)
-	return remaining, at.Add(max(period-elapsed, 0))
+	return remaining, at.Add(max(period-elapsed, restoreMinDelay))
 }
+
+// restoreMinDelay is the least delay before a restored effect's first tick,
+// the reference's minimum initial delay for a resumed effect task.
+const restoreMinDelay = 5 * time.Millisecond
 
 // resumeRestored is the schedule, at now, of an effect built from tmpl whose
 // ticks run no action, restored at the instant at (see restoredSchedule).
@@ -302,6 +307,14 @@ func (e *Effect) stopSchedule() {
 	e.remaining = 0
 	e.nextAction = time.Time{}
 	e.scheduleMu.Unlock()
+}
+
+// dueAt is the instant e's next tick comes due, zero when none is
+// scheduled.
+func (e *Effect) dueAt() time.Time {
+	e.scheduleMu.Lock()
+	defer e.scheduleMu.Unlock()
+	return e.nextAction
 }
 
 func (e *Effect) claimAction(now time.Time) (runAction bool, remove bool) {
