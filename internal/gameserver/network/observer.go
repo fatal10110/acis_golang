@@ -2,8 +2,6 @@ package network
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/observer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/party"
@@ -41,10 +39,7 @@ func (l *GameClientLink) observe(live *livePlayer, id int) {
 	if !ok {
 		return
 	}
-	hasSummon := false
-	if l.world != nil {
-		_, hasSummon = l.world.Summon(live.ObjectID())
-	}
+	hasSummon := l.liveSummon(live) != nil
 	if loc.CastleID > 0 {
 		if hasSummon {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoObserveWithPet))
@@ -72,7 +67,7 @@ func (l *GameClientLink) observe(live *livePlayer, id int) {
 // act or be hurt, at the viewpoint. The position it leaves is kept for its
 // return. A player short of the fee is told so and stays.
 func (l *GameClientLink) enterObserverMode(live *livePlayer, loc observer.Location) {
-	if loc.Cost > 0 && !spendAdena(live, loc.Cost) {
+	if loc.Cost > 0 && !reduceAdena(live, loc.Cost) {
 		return
 	}
 	l.dropAllSummons(live)
@@ -92,9 +87,12 @@ func (l *GameClientLink) enterObserverMode(live *livePlayer, loc observer.Locati
 }
 
 // observerReturn answers ObserverReturn: an observer goes back to where it
-// left; anyone else is ignored.
+// left; anyone else is ignored. So is an observer whose jump to the
+// viewpoint its client has not yet reported landed: the jump back would be
+// refused while that one is in flight, leaving it at the viewpoint as a
+// plain player.
 func (l *GameClientLink) observerReturn(live *livePlayer) {
-	if live.ObserverMode() {
+	if live.ObserverMode() && !live.Teleporting() {
 		l.leaveObserverMode(live)
 	}
 }
@@ -116,29 +114,10 @@ func (l *GameClientLink) leaveObserverMode(live *livePlayer) {
 // dropAllSummons sends live's summon away and ends its cubics, telling
 // its observers once.
 func (l *GameClientLink) dropAllSummons(live *livePlayer) {
-	if l.world != nil {
-		if obj, ok := l.world.Summon(live.ObjectID()); ok {
-			if s, ok := obj.(*summon.Actor); ok {
-				s.Unsummon()
-			}
-		}
+	if s := l.liveSummon(live); s != nil {
+		s.Unsummon()
 	}
 	l.stopAllCubics(live)
-}
-
-// spendAdena takes count adena from live, telling it how much went. A
-// player holding less is told it has not enough, and pays nothing.
-func spendAdena(live *livePlayer, count int) bool {
-	inv := live.Inventory()
-	if inv == nil || count > inv.Adena() {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena))
-		return false
-	}
-	if inv.DestroyByTemplateID(item.AdenaID, count) == nil {
-		return false
-	}
-	live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DisappearedAdena, int32(count)))
-	return true
 }
 
 // refuseObserverAction answers an Action request of an observer: observers
