@@ -54,6 +54,11 @@ var adminCommands = map[string]adminCommand{
 	// Data reloads; see admin_reload.go.
 	"admin_reload": (*GameClientLink).adminReload,
 
+	// Fences; see admin_fence.go.
+	"admin_spawnfence":  (*GameClientLink).adminSpawnFence,
+	"admin_deletefence": (*GameClientLink).adminDeleteFence,
+	"admin_listfence":   (*GameClientLink).adminListFence,
+
 	// Petitions; see admin_petition.go.
 	"admin_petition":      (*GameClientLink).adminPetition,
 	"admin_force_peti":    (*GameClientLink).adminForcePetition,

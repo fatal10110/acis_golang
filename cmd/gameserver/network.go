@@ -21,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
+	"github.com/fatal10110/acis_golang/internal/gameserver/fence"
 	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
 	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
 	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
@@ -214,6 +215,7 @@ func provideGameClientLink(
 		Geo:           move.NewGeo(data.Geo, data.Finder),
 		Zones:         data.Zones,
 		IDs:           ids,
+		Fences:        fence.NewManager(data.Geo, state, ids),
 		GroundItems:   ground,
 		AttackStance:  attackStance,
 		AI:            ai,
