@@ -3,6 +3,7 @@ package entity
 import (
 	"fmt"
 	"sort"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
@@ -39,8 +40,9 @@ func NewCursedWeapon(itemID int32, skillID int32, name string, dropRate, duratio
 }
 
 // CursedWeaponTable is an in-memory lookup of cursed weapon definitions by item id.
+// Replace swaps its definitions for every holder at once.
 type CursedWeaponTable struct {
-	byItemID map[int32]CursedWeapon
+	byItemID atomic.Pointer[map[int32]CursedWeapon]
 }
 
 // NewCursedWeaponTable builds a CursedWeaponTable; later duplicate item ids replace earlier ones.
@@ -49,21 +51,41 @@ func NewCursedWeaponTable(weapons []CursedWeapon) (*CursedWeaponTable, error) {
 	for _, weapon := range weapons {
 		byItemID[weapon.ItemID] = weapon
 	}
-	return &CursedWeaponTable{byItemID: byItemID}, nil
+	t := &CursedWeaponTable{}
+	t.byItemID.Store(&byItemID)
+	return t, nil
+}
+
+// Replace swaps t's definitions for from's, at once for every holder of t:
+// CursedWeaponManager.reload.
+func (t *CursedWeaponTable) Replace(from *CursedWeaponTable) {
+	t.byItemID.Store(from.byItemID.Load())
+}
+
+// weapons returns t's current definitions; none for a zero table.
+func (t *CursedWeaponTable) weapons() map[int32]CursedWeapon {
+	if p := t.byItemID.Load(); p != nil {
+		return *p
+	}
+	return nil
 }
 
 // Count returns the number of cursed weapon definitions in the table.
 func (t *CursedWeaponTable) Count() int {
-	return len(t.byItemID)
+	return len(t.weapons())
 }
 
 // IDs returns the loaded cursed weapon item ids in deterministic order.
 func (t *CursedWeaponTable) IDs() []int32 {
-	if t == nil || len(t.byItemID) == 0 {
+	if t == nil {
 		return nil
 	}
-	ids := make([]int32, 0, len(t.byItemID))
-	for id := range t.byItemID {
+	weapons := t.weapons()
+	if len(weapons) == 0 {
+		return nil
+	}
+	ids := make([]int32, 0, len(weapons))
+	for id := range weapons {
 		ids = append(ids, id)
 	}
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
@@ -72,6 +94,6 @@ func (t *CursedWeaponTable) IDs() []int32 {
 
 // Weapon returns the cursed weapon for itemID, if present.
 func (t *CursedWeaponTable) Weapon(itemID int32) (CursedWeapon, bool) {
-	weapon, ok := t.byItemID[itemID]
+	weapon, ok := t.weapons()[itemID]
 	return weapon, ok
 }

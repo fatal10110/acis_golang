@@ -89,8 +89,9 @@ const (
 // A target blocking everything or blocking live refuses first, before
 // even an invitation of oneself; an invisible target is refused as the
 // wrong target; a target whose connection is gone, or either side in jail,
-// is refused once the party check passed. The Olympiad refusal waits for
-// the Olympiad (#3160).
+// is refused once the party check passed. Either side competing in an
+// Olympiad match is then turned away without a word, as the reference does:
+// neither the inviter nor the target hears of it.
 func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.RequestJoinParty) {
 	target, ok := l.livePlayerByName(req.Target)
 	if !ok {
@@ -115,6 +116,9 @@ func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.Re
 	}
 	if target.Jailed() || live.Jailed() {
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, partyInviteJailedText))
+		return
+	}
+	if target.OlympiadMode() || live.OlympiadMode() {
 		return
 	}
 	book := l.tradeBook()

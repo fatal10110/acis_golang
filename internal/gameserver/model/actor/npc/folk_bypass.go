@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/classmaster"
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 )
 
 // BypassOutcome is what a civilian NPC's dialog command answers with.
@@ -122,6 +123,14 @@ const (
 	BypassOlympiadNoble
 	// BypassClassRanking shows the month's ranking of class Index.
 	BypassClassRanking
+	// BypassSevenSigns runs a Seven Signs priest's or Mammon NPC's
+	// "SevenSigns <n> ..." command for a talker who selected it; see
+	// signspriest.Service.Command. DawnPriest names a Priest of Dawn.
+	BypassSevenSigns
+	// BypassSignsChat answers a Seven Signs priest's or Mammon NPC's Chat
+	// command the way its chat window answers an interact: Chat says how,
+	// and HTML is the page.
+	BypassSignsChat
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -142,6 +151,11 @@ type Talker struct {
 	SubclassActive bool
 	// ThirdClass is set when the talker's class is a third occupation.
 	ThirdClass bool
+	// CurrentFolk is set when the NPC is the one the talker last selected.
+	CurrentFolk bool
+	// SevenSigns reads the talker's Record of Seven Signs; nil reads an
+	// empty record.
+	SevenSigns func() sevensigns.Record
 }
 
 // BypassReply is a civilian NPC's answer to one dialog command.
@@ -175,6 +189,10 @@ type BypassReply struct {
 	// name, the viewpoint group BypassObserveGroup names, or the viewpoint
 	// BypassObserve names.
 	Index int
+	// Chat is how BypassSignsChat answers.
+	Chat ChatOutcome
+	// DawnPriest is set when BypassSevenSigns runs at a Priest of Dawn.
+	DawnPriest bool
 }
 
 // Bypass answers command, the part of an npc_<objectId>_<command> dialog
@@ -201,8 +219,9 @@ type BypassReply struct {
 // to the subclass dialog, a class manager's own commands to its dialog,
 // a scheme buffer's own commands to its dialog, a race manager's own
 // commands to the race track, and every command on a wedding manager to
-// its dialog, as does every command on an auctioneer. Every other command
-// belongs to a system not in place yet.
+// its dialog, as does every command on an auctioneer. A Seven Signs
+// priest's and a Mammon NPC's own commands go to signsPriestBypass. Every
+// other command belongs to a system not in place yet.
 func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command string) BypassReply {
 	karma := talker.Karma
 	kind := hostileKind(f.Instance)
@@ -225,6 +244,9 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		case strings.HasPrefix(command, "Olympiad"):
 			return f.olympiadCommand(pages, talker, command, reply)
 		}
+	}
+	if out, ok := f.signsPriestBypass(pages, kind, talker, command, reply); ok {
+		return out
 	}
 	if _, ok := unportedFolkCommands[kind]; ok {
 		return reply

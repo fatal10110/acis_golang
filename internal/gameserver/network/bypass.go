@@ -199,6 +199,8 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 	talker.SubclassActive = live.ClassIndex() != 0
 	classLevel, _ := player.ClassLevel(live.ClassID())
 	talker.ThirdClass = classLevel >= 3
+	talker.CurrentFolk = live.currentFolk.Load() == f
+	talker.SevenSigns = folkChatState{l: l, live: live}.SevenSigns
 	reply := f.Bypass(setPages{l.html}, rules, talker, command)
 	if reply.LeadingActionFailed {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -245,9 +247,9 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 	case npc.BypassTeleportList:
 		l.showTeleportList(live, f)
 	case npc.BypassTeleport:
-		l.departFromNpc(live, f, command, l.gatekeeper.Teleport(live.Character, f.NpcID(), reply.Index))
+		l.departFromNpc(live, l.gatekeeper.Teleport(live.Character, f.NpcID(), reply.Index))
 	case npc.BypassInstantTeleport:
-		l.departFromNpc(live, f, command, l.gatekeeper.Instant(f.NpcID(), reply.Index))
+		l.departFromNpc(live, l.gatekeeper.Instant(f.NpcID(), reply.Index))
 	case npc.BypassQuestInfo:
 		live.SendFrame(serverpackets.FrameExShowQuestInfo())
 	case npc.BypassSubclass:
@@ -284,6 +286,10 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		l.olympiadNobleBypass(live, f, reply.Index)
 	case npc.BypassClassRanking:
 		l.showClassRanking(live, f, reply.Index)
+	case npc.BypassSevenSigns:
+		return l.sevenSignsBypass(live, f, command, reply.DawnPriest)
+	case npc.BypassSignsChat:
+		sendFolkChat(live, f, reply.HTML, reply.Chat)
 	case npc.BypassUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Str("command", command).Msg("bypass: npc dialog command not modeled")
 	case npc.BypassRefused:
@@ -305,25 +311,17 @@ func cpRecovery(live *livePlayer, f *npc.Folk) {
 	}
 }
 
-// showTeleportList opens f's list of standard destinations. An NPC
-// offering none answers nothing of its own.
+// showTeleportList opens f's list of standard destinations, priced for
+// live. An NPC offering none answers nothing of its own.
 func (l *GameClientLink) showTeleportList(live *livePlayer, f *npc.Folk) {
-	page, ok, unported := l.gatekeeper.Window(f.ObjectID(), f.NpcID(), travel.KindStandard)
-	switch {
-	case unported:
-		l.log.Debug().Int("npc_id", f.NpcID()).Msg("bypass: teleport list priced in ancient adena not modeled")
-	case ok:
+	if page, ok := l.gatekeeper.Window(f.ObjectID(), f.NpcID(), travel.KindStandard, live.ObjectID()); ok {
 		sendValidatedHTML(live, f.ObjectID(), page, 0)
 	}
 }
 
-// departFromNpc carries out trip, a teleport live asked f for: the payment
+// departFromNpc carries out trip, a teleport live asked an NPC for: the payment
 // messages, then the move, then the trip's own ActionFailed.
-func (l *GameClientLink) departFromNpc(live *livePlayer, f *npc.Folk, command string, trip gatekeeper.Trip) {
-	if trip.Unported {
-		l.log.Debug().Int("npc_id", f.NpcID()).Str("command", command).Msg("bypass: teleport priced in ancient adena not modeled")
-		return
-	}
+func (l *GameClientLink) departFromNpc(live *livePlayer, trip gatekeeper.Trip) {
 	for _, n := range trip.Notices {
 		switch n := n.(type) {
 		case gatekeeper.NotEnoughAdena:

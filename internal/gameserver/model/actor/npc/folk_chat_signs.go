@@ -61,7 +61,7 @@ func (f *Folk) signsChat(pages Pages, kind InstanceKind, state ChatState) (page 
 	case "DuskPriest":
 		return f.page(pages, sevenSignsPages+priestPage("dusk", sevensigns.Dusk, state.SevenSigns())), ChatShownReleased, true
 	case "SignsPriest":
-		page, outcome = f.mammonChat(pages, state.SevenSigns())
+		page, outcome = f.mammonChat(pages, state.SevenSigns(), 0)
 		return page, outcome, true
 	case "FestivalGuide":
 		page = f.page(pages, festivalGuidePath(f.NpcID()))
@@ -143,11 +143,12 @@ func priestPage(prefix string, own sevensigns.Cabal, r sevensigns.Record) string
 	return prefix + "_priest_" + page + ".htm"
 }
 
-// mammonChat is a Mammon NPC's first page. The merchant and the blacksmith
-// serve only members of the winning cabal that owns the Seal of Avarice,
-// respectively of Gnosis; with no winner, the merchant serves nobody and
-// the blacksmith everybody.
-func (f *Folk) mammonChat(pages Pages, r sevensigns.Record) (string, ChatOutcome) {
+// mammonChat is a Mammon NPC's chat page val: each Mammon NPC has one first
+// page, whatever val. The merchant and the blacksmith serve only members of
+// the winning cabal that owns the Seal of Avarice, respectively of Gnosis;
+// with no winner, the merchant serves nobody and the blacksmith everybody.
+// Any other NPC of the type reads its default page val.
+func (f *Folk) mammonChat(pages Pages, r sevensigns.Record, val int) (string, ChatOutcome) {
 	var name string
 	switch f.NpcID() {
 	case blackMarketeerOfMammon:
@@ -166,7 +167,7 @@ func (f *Folk) mammonChat(pages Pages, r sevensigns.Record) (string, ChatOutcome
 		}
 		name = "mammblack_1.htm"
 	default:
-		return f.chatPage(pages, folkChat{}, 0), ChatShown
+		return f.chatPage(pages, folkChat{}, val), ChatShown
 	}
 	return f.page(pages, sevenSignsPages+name), ChatShown
 }
