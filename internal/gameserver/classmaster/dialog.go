@@ -17,9 +17,6 @@ type Pages interface {
 // change left.
 const noChangeLevel = math.MaxInt32
 
-// lastClassID is the highest profession id the menus look through.
-const lastClassID = 118
-
 // Pages of a class manager, by the val of its <npcId>-<val>.htm.
 const (
 	pageNoChange = 1
@@ -97,7 +94,7 @@ func (c Config) MenuPage(pages Pages, npcID int, objectID int32, classID, level,
 		switch {
 		case level >= minLevel || c.AllowEntireTree:
 			var menu strings.Builder
-			for id := 0; id <= lastClassID; id++ {
+			for id := 0; id <= player.MaxClassID; id++ {
 				if t, ok := player.ClassLevel(id); !ok || t != tier || !c.canTransfer(classID, id) {
 					continue
 				}

@@ -100,22 +100,10 @@ func (l *GameClientLink) classMasterTransfer(live *livePlayer, classID int) (cha
 // disappeared: adena reads as adena spent, and a talker holding too little
 // is told so.
 func payClassMasterItem(live *livePlayer, it classmaster.Item) bool {
-	if it.ID != item.AdenaID {
-		return destroyHeldItems(live, it.ID, it.Count)
+	if it.ID == item.AdenaID {
+		return reduceAdena(live, it.Count)
 	}
-	inv := live.Inventory()
-	if inv == nil || it.Count > inv.Adena() {
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena))
-		return false
-	}
-	if it.Count <= 0 {
-		return true
-	}
-	if inv.DestroyByTemplateID(item.AdenaID, it.Count) == nil {
-		return false
-	}
-	live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DisappearedAdena, int32(it.Count)))
-	return true
+	return destroyHeldItems(live, it.ID, it.Count)
 }
 
 // makeNoble grants live noblesse status: the noble skills, the skill list
