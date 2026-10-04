@@ -556,6 +556,12 @@ func (l *GameClientLink) finishDeferredMagicSkill(live *livePlayer) bool {
 	if inPostureTransition(live) {
 		return live.hasDeferredMagicSkill()
 	}
+	return l.runDeferredMagicSkill(live)
+}
+
+// runDeferredMagicSkill runs the queued skill request, if any, whatever the
+// posture, and reports whether one was waiting.
+func (l *GameClientLink) runDeferredMagicSkill(live *livePlayer) bool {
 	queued := live.takeDeferredMagicSkill()
 	if queued == nil {
 		return false

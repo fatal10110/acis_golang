@@ -162,7 +162,7 @@ func (c *Character) settlePosture(gen uint64, standing bool) {
 		c.standing = false
 	}
 	c.stateMu.Unlock()
-	c.emit(event.PostureSettled{})
+	c.emit(event.PostureSettled{StoodUp: standing})
 }
 
 // FakeDead reports whether the character plays dead: from the start of
@@ -222,7 +222,7 @@ func (c *Character) endFakeDeathGetUp() {
 	c.fakeDeath = false
 	c.standingNow = false
 	c.stateMu.Unlock()
-	c.emit(event.PostureSettled{})
+	c.emit(event.PostureSettled{StoodUp: true})
 }
 
 // GetUpFromFakeDeath answers a request to leave fake death made while the

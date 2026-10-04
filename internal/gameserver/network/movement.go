@@ -322,7 +322,7 @@ func (l *GameClientLink) broadcastLiveWaitType(live *livePlayer, stand bool) {
 // stand request does. Either way the intentions the player held or queued,
 // a click held behind a posture transition among them, are dropped, on live's own queue, the only one that touches them; the
 // idle answers nothing more even when the damage has meanwhile started a
-// stand-up. A chair is released when standing settles.
+// stand-up. A chair is released when a stand-up ends.
 func (l *GameClientLink) standAttackedLivePlayer(live *livePlayer) {
 	if live == nil || live.detached() || !live.Seated() {
 		return
