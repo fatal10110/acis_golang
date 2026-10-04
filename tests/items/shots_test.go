@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
@@ -76,7 +77,9 @@ func TestUseSoulshotGradeMismatchIsRejected(t *testing.T) {
 
 // TestAutoSoulShotToggle pins RequestAutoSoulShot: enabling and disabling a
 // known inventory shot echoes ExAutoSoulShot plus its system message each
-// way.
+// way. With no weapon held the enable is a grade mismatch
+// (RequestAutoSoulShot.java:92-100): SOULSHOTS_GRADE_MISMATCH comes between
+// the two, and auto use still turns on.
 func TestAutoSoulShotToggle(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
@@ -87,6 +90,7 @@ func TestAutoSoulShotToggle(t *testing.T) {
 
 	c.Send(encodeRequestAutoSoulShot(1463, 1))
 	assertExAutoSoulShot(t, c.Read(), 1463, true)
+	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageSoulshotsGradeMismatch)
 	assertSystemMessageItem(t, c.Read(), serverpackets.SystemMessageUseOfItemWillBeAuto, 1463)
 
 	c.Send(encodeRequestAutoSoulShot(1463, 0))
@@ -97,15 +101,14 @@ func TestAutoSoulShotToggle(t *testing.T) {
 // TestUseSoulshotNotEnoughWithAutoDisablesAuto pins the failed-consume path:
 // a direct-use soulshot with an empty stack while auto-enabled suppresses
 // the not-enough message but still disables auto use (ExAutoSoulShot off,
-// cancellation message, ActionFailed for the click).
+// cancellation message, ActionFailed for the click). Turning auto use on
+// with that weapon held would charge it at once and drop auto use there, so
+// the auto-use entry is set directly.
 func TestUseSoulshotNotEnoughWithAutoDisablesAuto(t *testing.T) {
 	t.Parallel()
 	srv, shot := bootShotRig(t, 1463, 0)
 	c := srv.Client
-
-	c.Send(encodeRequestAutoSoulShot(1463, 1))
-	assertExAutoSoulShot(t, c.Read(), 1463, true)
-	assertSystemMessageItem(t, c.Read(), serverpackets.SystemMessageUseOfItemWillBeAuto, 1463)
+	onPlayerQueue(t, srv, srv.SoleObjectID(t), func(pc *player.Character) { pc.SetAutoSoulShot(1463, true) })
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeUseItem(shot, false))
