@@ -32,7 +32,7 @@ const characterColumns = `obj_Id, account_name, char_name,
 	COALESCE(onlinetime,0),
 	COALESCE(death_penalty_level,0), rec_have, rec_left,
 	clan_join_expiry_time, clan_create_expiry_time,
-	COALESCE(punish_level,0), COALESCE(punish_timer,0), COALESCE(wantspeace,0), nobless`
+	COALESCE(punish_level,0), COALESCE(punish_timer,0), COALESCE(wantspeace,0), nobless, isin7sdungeon`
 
 // CharacterStore reads and writes the characters table.
 type CharacterStore struct {
@@ -68,18 +68,18 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 // Save persists a character's progress — the active and base classes, the base
 // class's level, exp and sp, expBeforeDeath, cur/max HP/CP/MP,
 // karma/pvpkills/pkkills, death_penalty_level, the accumulated session
-// playtime, the personal-surrender flag, the noblesse status and each subclass's progression — so a later reload reflects everything gained
+// playtime, the personal-surrender flag, the noblesse status, the Seven Signs dungeon membership and each subclass's progression — so a later reload reflects everything gained
 // since the last save instead of the row's creation-time values. Location and
 // appearance columns are not written here. The row is also marked online:
 // Save only runs for characters currently in game.
 func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
 	resources, progression := st.Resources, st.Progression
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, base_class = ?, death_penalty_level = ?, onlinetime = ?, wantspeace = ?, nobless = ?, online = 1
+		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, base_class = ?, death_penalty_level = ?, onlinetime = ?, wantspeace = ?, nobless = ?, isin7sdungeon = ?, online = 1
 			 WHERE obj_Id = ?`,
 		progression.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
 		progression.Exp, progression.ExpBeforeDeath, progression.SP, st.Karma, st.PvPKills, st.PKKills, st.ClassID, st.BaseClassID, st.DeathPenaltyLevel, st.OnlineTime,
-		st.WantsPeace, st.Noble, st.ID,
+		st.WantsPeace, st.Noble, st.In7sDungeon, st.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("save character %d: %w", st.ID, err)
@@ -147,6 +147,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var punishTimer int64
 	var wantsPeace int
 	var noble int
+	var in7sDungeon int
 	var baseClassID int
 
 	err := row.Scan(
@@ -160,7 +161,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 		&onlineTime,
 		&deathPenaltyLevel, &recHave, &recLeft,
 		&clanJoinExpiry, &clanCreateExpiry,
-		&punishLevel, &punishTimer, &wantsPeace, &noble,
+		&punishLevel, &punishTimer, &wantsPeace, &noble, &in7sDungeon,
 	)
 	if err != nil {
 		return nil, err
@@ -173,6 +174,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	// Only a stored 1 raises the flag.
 	c.SetWantsPeace(wantsPeace == 1)
 	c.SetNoble(noble == 1)
+	c.SetIn7sDungeon(in7sDungeon == 1)
 	c.Race = player.Race(race)
 	c.SetClassID(classID)
 	c.SetBaseClassID(baseClassID)

@@ -176,6 +176,7 @@ type options struct {
 	seedShortcuts          func(*gamesql.ShortcutStore)
 	seedHennas             func(db *sql.DB, hennas *gamesql.HennaStore)
 	seedSevenSigns         func(*gamesql.SevenSignsStore)
+	sevenSignsTimer        func(time.Duration, func()) *time.Timer
 	seedFestival           func(*gamesql.FestivalStore)
 	festivalClock          func() time.Time
 	clanConfig             *clan.Config
@@ -674,6 +675,12 @@ func WithFestivalClock(now func() time.Time) Option {
 // Signs calendar restores it, so boot-time period catch-up can be exercised.
 func WithSevenSignsSeed(seed func(*gamesql.SevenSignsStore)) Option {
 	return func(o *options) { o.seedSevenSigns = seed }
+}
+
+// WithSevenSignsTimer schedules the Seven Signs period changes through
+// afterFunc instead of a real timer, so a test can fire one at will.
+func WithSevenSignsTimer(afterFunc func(time.Duration, func()) *time.Timer) Option {
+	return func(o *options) { o.sevenSignsTimer = afterFunc }
 }
 
 // WithNPCs supplies the NPC template table wired into the link (and the
@@ -1846,7 +1853,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.seedSevenSigns != nil {
 		o.seedSevenSigns(sevenSignsStore)
 	}
-	sevenSigns := sevensigns.NewState(sevenSignsStore, network.NewSevenSignsBroadcaster(state), o.log, time.Now, nil)
+	sevenSigns := sevensigns.NewState(sevenSignsStore, network.NewSevenSignsBroadcaster(state), o.log, time.Now, o.sevenSignsTimer)
 	if err := sevenSigns.Restore(context.Background()); err != nil {
 		t.Fatalf("restore seven signs status: %v", err)
 	}
@@ -2097,6 +2104,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("gameservertest: build game client link: %v", err)
 	}
 	effects.SetShadowItemExpiry(gcl.ExpireShadowItem)
+	// Production hands the link over before the period-change timer is
+	// armed; here the link exists only now, so a change firing earlier
+	// reaches no player, as none is online yet.
+	sevenSigns.SetOnline(gcl)
 	var npcSpawns *gamemanager.Npcs
 	var npcRespawns *task.Respawn
 	if o.npcSpawns != nil {

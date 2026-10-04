@@ -32,6 +32,8 @@ type SaveState struct {
 	WantsPeace bool
 	// Noble is the noblesse status (see IsNoble).
 	Noble bool
+	// In7sDungeon is the Seven Signs dungeon membership (see In7sDungeon).
+	In7sDungeon bool
 }
 
 // SaveState copies c's persisted character-row values.
@@ -67,5 +69,6 @@ func (c *Character) SaveState() SaveState {
 		Heading:           c.CurrentHeading(),
 		WantsPeace:        c.WantsPeace(),
 		Noble:             c.IsNoble(),
+		In7sDungeon:       c.In7sDungeon(),
 	}
 }
