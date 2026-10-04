@@ -6,12 +6,41 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/wedding"
 )
 
-// weddingSpouse is a live player as the wedding manager reads it.
-type weddingSpouse struct{ *livePlayer }
+// weddingSpouse is a live player as the wedding manager reads it; ids
+// numbers the adena a refund hands back.
+type weddingSpouse struct {
+	*livePlayer
+	ids func() (int32, error)
+}
+
+// spouse is live as the wedding manager reads it.
+func (l *GameClientLink) spouse(live *livePlayer) weddingSpouse {
+	return weddingSpouse{livePlayer: live, ids: l.nextObjectID}
+}
+
+// Pay takes count adena from the player and names the amount spent; it
+// takes and says nothing when the player holds less.
+func (s weddingSpouse) Pay(count int) bool {
+	if count <= 0 {
+		return true
+	}
+	inv := s.Inventory()
+	if inv == nil || inv.DestroyByTemplateID(item.AdenaID, count) == nil {
+		return false
+	}
+	s.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DisappearedAdena, int32(count)))
+	return true
+}
+
+// Refund gives back count adena Pay took, named as earned.
+func (s weddingSpouse) Refund(count int) {
+	s.AddEarnedItem(item.AdenaID, count, s.ids)
+}
 
 // Female reports a female character.
 func (s weddingSpouse) Female() bool { return s.Sex == player.SexFemale }
@@ -34,7 +63,7 @@ func (l *GameClientLink) sendWeddingPage(live *livePlayer, f *npc.Folk, path str
 // weddingGreeting is wedding manager f's answer to live's interact: the
 // married menu, the pending request page or the request form.
 func (l *GameClientLink) weddingGreeting(live *livePlayer, f *npc.Folk) {
-	l.sendWeddingPage(live, f, l.wedding.Greeting(weddingSpouse{live}))
+	l.sendWeddingPage(live, f, l.wedding.Greeting(l.spouse(live)))
 }
 
 // weddingBypass runs command on wedding manager f for live: AskWedding
@@ -66,7 +95,7 @@ func (l *GameClientLink) askWedding(live *livePlayer, f *npc.Folk, command strin
 		return
 	}
 	friends := l.relations.AreFriends(live.ObjectID(), partner.ObjectID())
-	if page := l.wedding.Ask(weddingSpouse{live}, weddingSpouse{partner}, friends); page != "" {
+	if page := l.wedding.Ask(l.spouse(live), l.spouse(partner), friends); page != "" {
 		l.sendWeddingPage(live, f, page)
 		return
 	}
@@ -121,9 +150,9 @@ func (l *GameClientLink) engageAnswer(live *livePlayer, answer int32) {
 		if !ok {
 			return nil, false
 		}
-		return weddingSpouse{requester}, true
+		return l.spouse(requester), true
 	}
-	out := l.wedding.Answer(weddingSpouse{live}, answer == 1, online)
+	out := l.wedding.Answer(l.spouse(live), answer == 1, online)
 	if out.Outcome == wedding.AnswerIgnored {
 		return
 	}
@@ -145,13 +174,10 @@ func (l *GameClientLink) engageAnswer(live *livePlayer, answer int32) {
 	}
 }
 
-// celebrateWedding finishes the wedding of requester and partner: each
-// pays the price, each is congratulated, each shows the wedding march then
+// celebrateWedding finishes the wedding of requester and partner, who
+// have each paid the price: each is congratulated, each shows the wedding march then
 // the fireworks to everyone watching, and every player online hears of it.
 func (l *GameClientLink) celebrateWedding(requester, partner *livePlayer) {
-	price := l.wedding.Config().Price
-	reduceAdena(requester, price)
-	reduceAdena(partner, price)
 	sendText(requester, wedding.MarriedNotice(partner.Name))
 	sendText(partner, wedding.MarriedNotice(requester.Name))
 	for _, skillID := range []int32{wedding.MarchSkillID, wedding.FireworksSkillID} {

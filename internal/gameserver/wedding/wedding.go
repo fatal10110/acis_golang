@@ -73,6 +73,12 @@ type Spouse interface {
 	// answer, 0 when none is waiting.
 	MarryRequesterID() int32
 	SetMarryRequesterID(int32)
+	// Pay takes count adena from the player and names the amount spent.
+	// It takes and says nothing, reporting false, when the player holds
+	// less.
+	Pay(count int) bool
+	// Refund gives back count adena Pay took.
+	Refund(count int)
 }
 
 // Manager holds every couple and runs the marriage requests. Its methods
@@ -204,7 +210,7 @@ const (
 	AnswerIgnored AnswerOutcome = iota
 	// AnswerDeclined ended the request unmarried.
 	AnswerDeclined
-	// AnswerMarried made the couple: each spouse now pays the price.
+	// AnswerMarried made the couple once each spouse paid the price.
 	AnswerMarried
 	// AnswerUnpaid ended the request unmarried because a spouse can no
 	// longer pay the price.
@@ -248,8 +254,11 @@ func (m *Manager) Answer(partner Spouse, accepted bool, online func(int32) (Spou
 	return out
 }
 
-// marry makes the couple of requester and partner, unless either married
-// someone else since the request or can no longer pay.
+// marry has requester and partner each pay the price, then makes their
+// couple, unless either married someone else since the request or can no
+// longer pay. The payment is taken before the couple exists, so a spouse
+// whose adena leaves between the check and the payment leaves both
+// unmarried and, once the other's payment is refunded, neither paying.
 func (m *Manager) marry(requester, partner Spouse) Answer {
 	out := Answer{Outcome: AnswerVoid, Requester: requester}
 	if m.byPlayer[requester.ObjectID()] > 0 || m.byPlayer[partner.ObjectID()] > 0 || m.ids == nil {
@@ -263,6 +272,17 @@ func (m *Manager) marry(requester, partner Spouse) Answer {
 	}
 	id, err := m.ids.NextID()
 	if err != nil {
+		return out
+	}
+	if !requester.Pay(m.cfg.Price) {
+		m.ids.ReleaseID(id)
+		out.Outcome, out.RequesterShort = AnswerUnpaid, true
+		return out
+	}
+	if !partner.Pay(m.cfg.Price) {
+		requester.Refund(m.cfg.Price)
+		m.ids.ReleaseID(id)
+		out.Outcome, out.PartnerShort = AnswerUnpaid, true
 		return out
 	}
 	c := Couple{ID: id, RequesterID: requester.ObjectID(), PartnerID: partner.ObjectID()}
