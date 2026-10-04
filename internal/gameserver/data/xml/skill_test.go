@@ -655,9 +655,10 @@ func TestLoadSkillDefinitionsMalformedXMLFails(t *testing.T) {
 }
 
 // TestLoadSkillDefinitionsSkipsMalformedSkills checks that a single <skill>
-// element with a data problem is logged and skipped rather than aborting
-// the whole load, matching DocumentSkill.java's per-level try/catch
-// ("Failed parsing skill.").
+// element with a data problem is logged and not loaded rather than aborting
+// the whole load: a level's own values fail in DocumentSkill.makeSkills'
+// per-level try/catch ("Failed parsing skill."), anything else stops the
+// file in DocumentBase.parse (see skill_file_abort_test.go).
 func TestLoadSkillDefinitionsSkipsMalformedSkills(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -679,12 +680,10 @@ func TestLoadSkillDefinitionsSkipsMalformedSkills(t *testing.T) {
 			content: `<list><skill id="1" name="x" levels="1"><set name="target" val="NOT_A_TARGET"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/></skill></list>`,
 		},
 		{
-			// power's undefined-table substitution reads as "" (see
-			// TestLoadSkillDefinitionsToleratesUndefinedTableRefInCondition
-			// for the case where an unresolved reference doesn't itself
-			// fail the level), and "" then fails power's own required
-			// float64 parse — the level is skipped for that reason, not
-			// because the unresolved reference errors directly.
+			// power's undefined-table substitution reads as "" (an
+			// unresolved reference does not itself fail the level), and ""
+			// then fails power's own float64 parse — the level is skipped
+			// for that reason.
 			name:    "value references an undefined table, and the resulting empty value fails to parse",
 			content: `<list><skill id="1" name="x" levels="1"><set name="target" val="ONE"/><set name="skillType" val="PDAM"/><set name="operateType" val="ACTIVE"/><set name="power" val="#missing"/></skill></list>`,
 		},
@@ -784,17 +783,13 @@ func TestLoadSkillDefinitionsSkipsMalformedSkills(t *testing.T) {
 	})
 }
 
-// TestLoadSkillDefinitionsToleratesUndefinedTableRefInCondition checks that
-// an unresolved "#name" table reference is itself logged and substituted
-// with "" rather than failing the level, matching DocumentSkill.java's
-// getTableValue/getTableValue(name,int) (DocumentSkill.java:55-81): both
-// overloads catch the lookup failure, log, and return "" instead of
-// propagating. Here the "" substitution flows into a condition attribute
-// that isn't itself parsed as a number during load, so the level still
-// builds successfully with the empty value — unlike the sibling case in
-// TestLoadSkillDefinitionsSkipsMalformedSkills where the "" substitution
-// feeds a required numeric attribute and fails there instead.
-func TestLoadSkillDefinitionsToleratesUndefinedTableRefInCondition(t *testing.T) {
+// TestLoadSkillDefinitionsUndefinedTableRefInCondition checks that an
+// unresolved "#name" table reference is itself logged and read as "", as
+// DocumentSkill.getTableValue (DocumentSkill.java:55-81) catches the lookup
+// failure and returns "". A condition decodes that value while it loads
+// (DocumentBase.parsePlayerCondition: Integer.decode("") throws), so the
+// skill is not loaded.
+func TestLoadSkillDefinitionsUndefinedTableRefInCondition(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "fixture.xml")
@@ -805,28 +800,23 @@ func TestLoadSkillDefinitionsToleratesUndefinedTableRefInCondition(t *testing.T)
 	if err != nil {
 		t.Fatalf("LoadSkillDefinitions: unexpected error: %v", err)
 	}
-
-	def, ok := table.Get(1, 1)
-	if !ok {
-		t.Fatal("skill 1 level 1 should have loaded despite the unresolved table reference")
-	}
-	if len(def.Conditions) != 1 || def.Conditions[0].Root.Attrs["Charges"] != "" {
-		t.Fatalf("skill 1 level 1 conditions = %+v, want Charges resolved to \"\"", def.Conditions)
+	if _, ok := table.Get(1, 1); ok {
+		t.Fatal("skill 1 level 1 loaded; its Charges condition reads \"\", which does not decode")
 	}
 
 	got := buf.String()
-	if !strings.Contains(got, "fixture.xml") || !strings.Contains(got, "\"skill\":1") {
-		t.Fatalf("log output = %q, want it to name the file and skill id", got)
+	if !strings.Contains(got, "fixture.xml") || !strings.Contains(got, "\"skill\":1") || !strings.Contains(got, "unresolved") {
+		t.Fatalf("log output = %q, want it to name the file, skill id and the unresolved table value", got)
 	}
 }
 
-// TestLoadSkillDefinitionsSkipsOnlyTheMalformedLevel checks that a bad
-// level's table-substituted value only drops that one level, keeping the
-// other, well-formed levels of the same skill — the granularity
-// DocumentSkill.java's makeSkills (DocumentSkill.java:310-370) actually
-// applies its per-level try/catch at, rather than dropping the whole
-// <skill> element the way an earlier version of this loader did.
-func TestLoadSkillDefinitionsSkipsOnlyTheMalformedLevel(t *testing.T) {
+// TestLoadSkillDefinitionsDropsTheMalformedLevelAndItsLaterLevels checks
+// that a level whose values do not build drops itself and every later level
+// of its route, keeping the earlier ones. DocumentSkill.makeSkills
+// (DocumentSkill.java:324-367) catches each level's failure, but inserts
+// each level at its route position (ArrayList.add(index, ...)); once one is
+// missing, every later insert is past the end of the list and throws too.
+func TestLoadSkillDefinitionsDropsTheMalformedLevelAndItsLaterLevels(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "fixture.xml")
@@ -848,10 +838,10 @@ func TestLoadSkillDefinitionsSkipsOnlyTheMalformedLevel(t *testing.T) {
 		t.Fatalf("skill 5 level 1 = %+v, %v, want MPConsume 10", def, ok)
 	}
 	if _, ok := table.Get(5, 2); ok {
-		t.Fatal("skill 5 level 2 should have been skipped (mpConsume = \"oops\")")
+		t.Fatal("skill 5 level 2 should have been dropped (mpConsume = \"oops\")")
 	}
-	if def, ok := table.Get(5, 3); !ok || def.MPConsume != 30 {
-		t.Fatalf("skill 5 level 3 = %+v, %v, want MPConsume 30", def, ok)
+	if _, ok := table.Get(5, 3); ok {
+		t.Fatal("skill 5 level 3 should have been dropped after level 2")
 	}
 
 	got := buf.String()

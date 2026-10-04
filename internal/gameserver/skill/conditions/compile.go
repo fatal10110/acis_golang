@@ -97,11 +97,11 @@ func compilePlayer(node modelskill.Condition) (Condition, error) {
 		var err error
 		switch lower {
 		case "seed_fire", "seed_water", "seed_wind", "seed_various", "seed_any":
-			seeds[seedIndex[lower]], err = decodeInt(value)
+			seeds[seedIndex[lower]], err = DecodeInt(value)
 		case "battle_force":
-			forces[0], err = decodeByte(value)
+			forces[0], err = DecodeByte(value)
 		case "spell_force":
-			forces[1], err = decodeByte(value)
+			forces[1], err = DecodeByte(value)
 		case "insidepoly":
 			var c Condition
 			c, err = compileInsidePoly(node, value)
@@ -155,7 +155,7 @@ func compilePlayerAttr(name, value string) (Condition, error) {
 	case "ishero":
 		return IsHero{Want: parseBool(value)}, nil
 	case "active_skill_id", "active_effect_id":
-		id, err := decodeInt(value)
+		id, err := DecodeInt(value)
 		if err != nil {
 			return nil, err
 		}
@@ -164,7 +164,7 @@ func compilePlayerAttr(name, value string) (Condition, error) {
 		}
 		return ActiveEffectID{EffectID: id, Level: -1}, nil
 	case "active_skill_id_lvl", "active_effect_id_lvl":
-		id, level, err := decodePair(value)
+		id, level, err := DecodePair(value)
 		if err != nil {
 			return nil, err
 		}
@@ -173,13 +173,13 @@ func compilePlayerAttr(name, value string) (Condition, error) {
 		}
 		return ActiveEffectID{EffectID: id, Level: level}, nil
 	case "clanhall":
-		ids, err := decodeList(value)
+		ids, err := DecodeList(value)
 		if err != nil {
 			return nil, err
 		}
 		return HasClanHall{ClanHallIDs: ids}, nil
 	}
-	n, err := decodeInt(value)
+	n, err := DecodeInt(value)
 	if err != nil {
 		return nil, err
 	}
@@ -215,21 +215,21 @@ func compileInsidePoly(node modelskill.Condition, value string) (Condition, erro
 		return nil, fmt.Errorf("missing <zone> child")
 	}
 	zone := node.Children[0]
-	minZ, err := decodeInt(zone.Attrs["minZ"])
+	minZ, err := DecodeInt(zone.Attrs["minZ"])
 	if err != nil {
 		return nil, fmt.Errorf("zone minZ: %w", err)
 	}
-	maxZ, err := decodeInt(zone.Attrs["maxZ"])
+	maxZ, err := DecodeInt(zone.Attrs["maxZ"])
 	if err != nil {
 		return nil, fmt.Errorf("zone maxZ: %w", err)
 	}
 	points := make([]geometry.Point, 0, len(zone.Children))
 	for _, n := range zone.Children {
-		x, err := decodeInt(n.Attrs["x"])
+		x, err := DecodeInt(n.Attrs["x"])
 		if err != nil {
 			return nil, fmt.Errorf("zone node x: %w", err)
 		}
-		y, err := decodeInt(n.Attrs["y"])
+		y, err := DecodeInt(n.Attrs["y"])
 		if err != nil {
 			return nil, fmt.Errorf("zone node y: %w", err)
 		}
@@ -249,25 +249,25 @@ func compileInsidePoly(node modelskill.Condition, value string) (Condition, erro
 func compileTargetAttr(name, value string) (Condition, error) {
 	switch name {
 	case "hp_min_max":
-		lo, hi, err := decodePair(value)
+		lo, hi, err := DecodePair(value)
 		if err != nil {
 			return nil, err
 		}
 		return TargetHpMinMax{Min: lo, Max: hi}, nil
 	case "active_skill_id":
-		id, err := decodeInt(value)
+		id, err := DecodeInt(value)
 		if err != nil {
 			return nil, err
 		}
 		return TargetActiveSkillID{SkillID: id}, nil
 	case "race_id":
-		ids, err := decodeList(value)
+		ids, err := DecodeList(value)
 		if err != nil {
 			return nil, err
 		}
 		return TargetRaceID{IDs: ids}, nil
 	case "npcid":
-		ids, err := decodeList(value)
+		ids, err := DecodeList(value)
 		if err != nil {
 			return nil, err
 		}
@@ -297,16 +297,16 @@ func compileGameAttr(name, value string) (Condition, error) {
 // including "1", is false.
 func parseBool(v string) bool { return strings.EqualFold(v, "true") }
 
-// decodeInt reads an int32 integer literal: decimal, "0x"/"#" hex or
+// DecodeInt reads an int32 integer literal: decimal, "0x"/"#" hex or
 // leading-zero octal (see commons.DecodeInt32).
-func decodeInt(v string) (int, error) {
+func DecodeInt(v string) (int, error) {
 	n, err := commons.DecodeInt32(v)
 	return int(n), err
 }
 
-// decodeByte is decodeInt restricted to the signed 8-bit range.
-func decodeByte(v string) (int, error) {
-	n, err := decodeInt(v)
+// DecodeByte is DecodeInt restricted to the signed 8-bit range.
+func DecodeByte(v string) (int, error) {
+	n, err := DecodeInt(v)
 	if err != nil {
 		return 0, err
 	}
@@ -316,33 +316,33 @@ func decodeByte(v string) (int, error) {
 	return n, nil
 }
 
-// decodePair reads an "a,b" integer pair; anything after a second comma is
+// DecodePair reads an "a,b" integer pair; anything after a second comma is
 // ignored.
-func decodePair(v string) (int, int, error) {
+func DecodePair(v string) (int, int, error) {
 	parts := strings.Split(v, ",")
 	if len(parts) < 2 {
 		return 0, 0, fmt.Errorf("want two comma-separated values")
 	}
-	a, err := decodeInt(parts[0])
+	a, err := DecodeInt(parts[0])
 	if err != nil {
 		return 0, 0, err
 	}
-	b, err := decodeInt(parts[1])
+	b, err := DecodeInt(parts[1])
 	return a, b, err
 }
 
-// decodeList reads a comma-separated integer list. Empty entries between
+// DecodeList reads a comma-separated integer list. Empty entries between
 // adjacent commas are skipped; every other entry is trimmed of control
 // characters and spaces and must then be an integer literal, so a
 // blank-but-not-empty entry is an error.
-func decodeList(v string) ([]int, error) {
+func DecodeList(v string) ([]int, error) {
 	var out []int
 	for _, tok := range strings.Split(v, ",") {
 		if tok == "" {
 			continue
 		}
 		tok = strings.TrimFunc(tok, func(r rune) bool { return r <= ' ' })
-		n, err := decodeInt(tok)
+		n, err := DecodeInt(tok)
 		if err != nil {
 			return nil, err
 		}

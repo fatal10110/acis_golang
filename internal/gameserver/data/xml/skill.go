@@ -22,11 +22,11 @@ type skillFile struct {
 // <enchant1> and <enchant2> children that carry the actual attribute values
 // (a level's value may reference a table by "#name" instead of a literal).
 type skillElement struct {
-	ID             string `xml:"id,attr"`
-	Name           string `xml:"name,attr"`
-	Levels         string `xml:"levels,attr"`
-	EnchantLevels1 string `xml:"enchantLevels1,attr"`
-	EnchantLevels2 string `xml:"enchantLevels2,attr"`
+	ID             string  `xml:"id,attr"`
+	Name           *string `xml:"name,attr"`
+	Levels         string  `xml:"levels,attr"`
+	EnchantLevels1 *string `xml:"enchantLevels1,attr"`
+	EnchantLevels2 *string `xml:"enchantLevels2,attr"`
 
 	Tables   []tableElement `xml:"table"`
 	Sets     []setElem      `xml:"set"`
@@ -45,13 +45,15 @@ type skillElement struct {
 // under dir and returns a lookup table of the resulting definitions, keyed
 // by id and level. A directory that can't be listed or a file whose XML is
 // not well-formed fails the whole load: the caller gets an error rather
-// than a partially populated table. A <skill> element whose id, levels,
-// enchant-level count, or <table> block can't even be parsed is logged and
-// skipped as a whole element. Within an otherwise-valid element, a single
-// level (regular or enchant) that fails to build is logged and skipped on
-// its own: other levels of the same skill, other skills, and other files
-// continue loading. A "#name" table reference in a value read without the
-// skill's tables (see conditionAttrs) skips the whole element instead.
+// than a partially populated table.
+//
+// Within a file, skills load in order, as the reference loads them. A level
+// whose values do not build is logged and dropped with every later level of
+// its route (regular, enchant1 or enchant2); see buildLevels. Any other
+// failure while a <skill> element is read (its id, level counts or tables, a
+// condition, a <for> block, or a template that has no level left to attach
+// to) stops the file there: that skill and every later skill in the file
+// are logged and not loaded, while the earlier ones are kept.
 //
 // log receives skipped-skill diagnostics; the zero logger discards them.
 func LoadSkillDefinitions(dir string, log zerolog.Logger) (*skill.Table, error) {
@@ -62,11 +64,12 @@ func LoadSkillDefinitions(dir string, log zerolog.Logger) (*skill.Table, error) 
 
 	var defs []skill.Definition
 	for _, doc := range docs {
-		for _, el := range doc.Data.Skills {
+		for i, el := range doc.Data.Skills {
 			parsed, err := buildSkillDefinitions(el, doc.Path, log)
 			if err != nil {
-				log.Error().Err(err).Str("file", doc.Path).Msg("data/xml: skipping malformed skill definition")
-				continue
+				log.Error().Err(err).Str("file", doc.Path).Int("skills_not_loaded", len(doc.Data.Skills)-i).
+					Msg("data/xml: malformed skill definition stops its file; it and every later skill in the file are not loaded")
+				break
 			}
 			defs = append(defs, parsed...)
 		}
@@ -142,19 +145,25 @@ func (sl *skillLoader) applyAttrs(vals map[string]string, attrs []setElem, table
 
 // buildSkillDefinitions expands one <skill> element into one Definition per
 // regular level (1..levels) and per enchant level (101.. and 141.. when the
-// element declares enchantLevels1/2). The element's own id, levels,
-// enchant-level counts and <table> blocks must all parse for any level to
-// build at all; a single level's own build failure only drops that level.
+// element declares enchantLevels1/2). It follows the reference's order: every
+// level is built from its values first (buildLevels), then each level's
+// conditions and <for> blocks attach to the definition at that level's
+// position among the built ones. A dropped level therefore shifts the later
+// positions, and a level whose position has no built definition fails the
+// element. Any error fails the element, and with it the rest of its file.
 func buildSkillDefinitions(el skillElement, path string, log zerolog.Logger) ([]skill.Definition, error) {
 	rawID, err := commons.ParseInt(el.ID, 32)
 	if err != nil {
 		return nil, fmt.Errorf("skill id %q: %w", el.ID, err)
 	}
 	id := skill.ID(rawID)
+	if el.Name == nil {
+		return nil, fmt.Errorf("skill %d: attribute \"name\" is missing", id)
+	}
 
-	levels, err := commons.Atoi(el.Levels)
+	levels, err := parseLevelCount(el.Levels)
 	if err != nil {
-		return nil, fmt.Errorf("skill %d: levels %q: %w", id, el.Levels, err)
+		return nil, fmt.Errorf("skill %d: levels: %w", id, err)
 	}
 	enchant1, err := parseCountAttr(el.EnchantLevels1)
 	if err != nil {
@@ -171,113 +180,119 @@ func buildSkillDefinitions(el skillElement, path string, log zerolog.Logger) ([]
 	}
 
 	sl := &skillLoader{log: log, path: path, id: id, tables: tables}
-	defs := make([]skill.Definition, 0, levels+enchant1+enchant2)
-
-	skipLevel := func(level int, err error) {
-		log.Error().Err(err).Str("file", path).Int("skill", int(id)).Int("level", level).Msg("data/xml: skipping malformed skill level")
-	}
-	// A table reference where none can be read rejects the whole skill, not
-	// just the level that reads it; any other template error drops only
-	// that level.
-	templateErr := func(level int, err error) error {
-		if errors.Is(err, errTableRefNotAllowed) {
-			return fmt.Errorf("skill %d level %d: %w", id, level, err)
-		}
-		skipLevel(level, err)
-		return nil
-	}
+	built := sl.buildLevels(el, levels, enchant1, enchant2)
 
 	for i := 1; i <= levels; i++ {
-		vals := sl.resolveLevel(el.Sets, i)
-		attrs, err := buildSkillDefinitionAttrs(id, i, vals)
-		if err != nil {
-			skipLevel(i, err)
-			continue
+		if err := sl.applyTemplatesAt(built, i-1, el.Cond, el.For, i, i, condMsgModeRegular); err != nil {
+			return nil, fmt.Errorf("skill %d level %d: %w", id, i, err)
 		}
-		def := skill.NewDefinition(id, i, el.Name, attrs)
-		if err := sl.applyTemplates(&def, el.Cond, el.For, i, i, condMsgModeRegular); err != nil {
-			if err := templateErr(i, err); err != nil {
-				return nil, err
-			}
-			continue
-		}
-		defs = append(defs, def)
 	}
 
-	// An enchant level's <set>-sourced values reuse the last regular
-	// level's table row; only its <enchantN> values vary per enchant level.
+	// An enchant route without its own enchantNcond/enchantNfor blocks
+	// reads the regular ones against the last regular level's table row.
 	for i := 0; i < enchant1; i++ {
-		level := i + 101
-		vals := sl.resolveLevel(el.Sets, levels)
-		sl.applyAttrs(vals, el.Enchant1, i+1)
-		attrs, err := buildSkillDefinitionAttrs(id, level, vals)
-		if err != nil {
-			skipLevel(level, err)
-			continue
-		}
-		def := skill.NewDefinition(id, level, el.Name, attrs)
-		condIndex := i + 1
-		conds := el.Enchant1Cond
+		condIndex, conds := i+1, el.Enchant1Cond
 		if len(conds) == 0 {
-			condIndex = levels
-			conds = el.Cond
+			condIndex, conds = levels, el.Cond
 		}
-		forIndex := i + 1
-		fors := el.Enchant1For
+		forIndex, fors := i+1, el.Enchant1For
 		if len(fors) == 0 {
-			forIndex = levels
-			fors = el.For
+			forIndex, fors = levels, el.For
 		}
-		if err := sl.applyTemplates(&def, conds, fors, condIndex, forIndex, condMsgModeEnchant); err != nil {
-			if err := templateErr(level, err); err != nil {
-				return nil, err
-			}
-			continue
+		if err := sl.applyTemplatesAt(built, levels+i, conds, fors, condIndex, forIndex, condMsgModeEnchant); err != nil {
+			return nil, fmt.Errorf("skill %d level %d: %w", id, 101+i, err)
 		}
-		defs = append(defs, def)
 	}
 
 	for i := 0; i < enchant2; i++ {
-		level := i + 141
-		vals := sl.resolveLevel(el.Sets, levels)
-		sl.applyAttrs(vals, el.Enchant2, i+1)
-		attrs, err := buildSkillDefinitionAttrs(id, level, vals)
-		if err != nil {
-			skipLevel(level, err)
-			continue
-		}
-		def := skill.NewDefinition(id, level, el.Name, attrs)
-		condIndex := i + 1
-		conds := el.Enchant2Cond
+		condIndex, conds := i+1, el.Enchant2Cond
 		if len(conds) == 0 {
-			condIndex = levels
-			conds = el.Cond
+			condIndex, conds = levels, el.Cond
 		}
-		forIndex := i + 1
-		fors := el.Enchant2For
+		forIndex, fors := i+1, el.Enchant2For
 		if len(fors) == 0 {
-			forIndex = levels
-			fors = el.For
+			forIndex, fors = levels, el.For
 		}
-		if err := sl.applyTemplates(&def, conds, fors, condIndex, forIndex, condMsgModeEnchant); err != nil {
-			if err := templateErr(level, err); err != nil {
-				return nil, err
-			}
-			continue
+		if err := sl.applyTemplatesAt(built, levels+enchant1+i, conds, fors, condIndex, forIndex, condMsgModeEnchant); err != nil {
+			return nil, fmt.Errorf("skill %d level %d: %w", id, 141+i, err)
 		}
-		defs = append(defs, def)
 	}
 
-	return defs, nil
+	return built, nil
+}
+
+// buildLevels builds the definition of every level from its values: the
+// regular levels, then the enchant1 levels, then the enchant2 levels. An
+// enchant level's <set> values read the last regular level's table row; only
+// its <enchantN> values read its own row. A level that does not build is
+// logged and dropped with every later level of its route: the reference
+// inserts each level at its position within its route, and once one is
+// missing, each later insert lands past the end of the list and fails too.
+func (sl *skillLoader) buildLevels(el skillElement, levels, enchant1, enchant2 int) []skill.Definition {
+	var built []skill.Definition
+	route := func(count, first int, vals func(i int) map[string]string) {
+		for i := 0; i < count; i++ {
+			level := first + i
+			attrs, err := buildSkillDefinitionAttrs(sl.id, level, vals(i))
+			if err != nil {
+				sl.log.Error().Err(err).Str("file", sl.path).Int("skill", int(sl.id)).Int("level", level).Int("levels_not_loaded", count-i).
+					Msg("data/xml: malformed skill level; it and every later level of its route are not loaded")
+				return
+			}
+			built = append(built, skill.NewDefinition(sl.id, level, *el.Name, attrs))
+		}
+	}
+	route(levels, 1, func(i int) map[string]string { return sl.resolveLevel(el.Sets, i+1) })
+	route(enchant1, 101, func(i int) map[string]string {
+		vals := sl.resolveLevel(el.Sets, levels)
+		sl.applyAttrs(vals, el.Enchant1, i+1)
+		return vals
+	})
+	route(enchant2, 141, func(i int) map[string]string {
+		vals := sl.resolveLevel(el.Sets, levels)
+		sl.applyAttrs(vals, el.Enchant2, i+1)
+		return vals
+	})
+	return built
+}
+
+// errNoLevelAtPosition marks templates read for a position the built levels
+// do not reach.
+var errNoLevelAtPosition = errors.New("no built level at this position")
+
+// applyTemplatesAt attaches conds and fors to built[pos]. With neither there
+// is nothing to attach and pos is not looked up.
+func (sl *skillLoader) applyTemplatesAt(built []skill.Definition, pos int, conds []condElement, fors []forElement, condIndex, forIndex int, msgMode condMsgMode) error {
+	if len(conds) == 0 && len(fors) == 0 {
+		return nil
+	}
+	if pos >= len(built) {
+		return fmt.Errorf("position %d of %d built levels: %w", pos, len(built), errNoLevelAtPosition)
+	}
+	return sl.applyTemplates(&built[pos], conds, fors, condIndex, forIndex, msgMode)
+}
+
+// parseLevelCount parses a level-count attribute: an int32 that may not be
+// negative.
+func parseLevelCount(s string) (int, error) {
+	n, err := commons.ParseInt(s, 32)
+	if err != nil {
+		return 0, err
+	}
+	if n < 0 {
+		return 0, fmt.Errorf("%q: negative level count", s)
+	}
+	return int(n), nil
 }
 
 // parseCountAttr parses an optional level-count attribute ("enchantLevels1",
-// "enchantLevels2"), defaulting to 0 when the element omits it.
-func parseCountAttr(s string) (int, error) {
-	if s == "" {
+// "enchantLevels2"), defaulting to 0 when the element omits it. A present
+// one must parse, even when empty.
+func parseCountAttr(s *string) (int, error) {
+	if s == nil {
 		return 0, nil
 	}
-	return commons.Atoi(s)
+	return parseLevelCount(*s)
 }
 
 func (sl *skillLoader) applyTemplates(def *skill.Definition, conds []condElement, fors []forElement, condIndex, forIndex int, msgMode condMsgMode) error {
@@ -548,7 +563,7 @@ func buildSkillDefinitionAttrs(id skill.ID, level int, vals map[string]string) (
 		Stat:         a.strDefault("stat", ""),
 		IgnoreShield: a.boolDefault("ignoreShld", false),
 
-		SkillType:  a.str("skillType"),
+		SkillType:  attrSkillType(a),
 		EffectType: a.strDefault("effectType", ""),
 
 		EffectID:    a.intDefault("effectId", 0),
@@ -665,6 +680,16 @@ func buildSkillDefinitionAttrs(id skill.ID, level int, vals map[string]string) (
 		return skill.DefinitionAttrs{}, err
 	}
 	return attrs, nil
+}
+
+// attrSkillType reads a level's required skillType, which must name a skill
+// type exactly as written.
+func attrSkillType(a *attrValues) string {
+	name := a.str("skillType")
+	if a.err == nil && !skill.KnownSkillType(name) {
+		a.fail(fmt.Errorf("attribute %q: unknown skill type %q", "skillType", name))
+	}
+	return name
 }
 
 // parseCommaInts parses a comma-separated list of integers.
