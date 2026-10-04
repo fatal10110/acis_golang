@@ -1,7 +1,6 @@
 package lottery
 
 import (
-	"math"
 	"strconv"
 	"strings"
 
@@ -58,9 +57,9 @@ func (l *Lottery) Fill(page string, objectID int32) string {
 // places' share of the jackpot as a percentage, and the fourth place's
 // fixed prize.
 func (l *Lottery) Instructions(page string) string {
-	page = strings.ReplaceAll(page, "%prize5%", pageDouble(l.cfg.FiveNumberRate*100))
-	page = strings.ReplaceAll(page, "%prize4%", pageDouble(l.cfg.FourNumberRate*100))
-	page = strings.ReplaceAll(page, "%prize3%", pageDouble(l.cfg.ThreeNumberRate*100))
+	page = strings.ReplaceAll(page, "%prize5%", commons.JavaDouble(l.cfg.FiveNumberRate*100))
+	page = strings.ReplaceAll(page, "%prize4%", commons.JavaDouble(l.cfg.FourNumberRate*100))
+	page = strings.ReplaceAll(page, "%prize3%", commons.JavaDouble(l.cfg.ThreeNumberRate*100))
 	return strings.ReplaceAll(page, "%prize2%", strconv.Itoa(int(l.cfg.TwoAndOneNumberPrize)))
 }
 
@@ -94,31 +93,4 @@ func (l *Lottery) ClaimList(tickets []HeldTicket) string {
 		return "There is no winning lottery ticket...<br>"
 	}
 	return sb.String()
-}
-
-// pageDouble writes v the way a page shows a floating-point value: the
-// shortest decimal that reads back as v, with at least one digit after the
-// point, in scientific form ("1.0E7") outside [0.001, 10000000).
-func pageDouble(v float64) string {
-	switch {
-	case math.IsNaN(v):
-		return "NaN"
-	case math.IsInf(v, 1):
-		return "Infinity"
-	case math.IsInf(v, -1):
-		return "-Infinity"
-	}
-	if a := math.Abs(v); a == 0 || (a >= 1e-3 && a < 1e7) {
-		s := strconv.FormatFloat(v, 'f', -1, 64)
-		if !strings.Contains(s, ".") {
-			s += ".0"
-		}
-		return s
-	}
-	mantissa, exp, _ := strings.Cut(strconv.FormatFloat(v, 'E', -1, 64), "E")
-	if !strings.Contains(mantissa, ".") {
-		mantissa += ".0"
-	}
-	e, _ := strconv.Atoi(exp)
-	return mantissa + "E" + strconv.Itoa(e)
 }

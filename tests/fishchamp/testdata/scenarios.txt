@@ -1,0 +1,112 @@
+// Fishing championship scenarios, run by both FishChampProbe.java and
+// oracle_test.go. Steps:
+//   start <instant>          the clock at boot
+//   memo <instant>           the stored week end (server_memo)
+//   row <name> <len> <rew>   a stored fishing_championship row
+//   boot                     restore and start
+//   fish <name> <lure> <rolls...>  a catch, each roll the dice's draw
+//   mid                      the fishing window's ranking button
+//   champ                    a fisherman's FishingChampionship page
+//   reward <name>            a fisherman's FishingReward
+//   advance <instant>        let the clock run to instant
+//   restart                  save, then restore and start anew
+//   rows                     save, then print the stored rows (last step
+//                            before restart or the next scenario)
+
+scenario fresh table, Wednesday
+start 2026-10-07T10:30:15.123Z
+boot
+champ
+mid
+mid
+fish Alpha 6520 10 345
+fish Bravo 6520 0 0
+fish alpha 6520 5 0
+fish Charlie 8484 20 500 1500
+fish Delta 6520 29 1000
+fish Echo 6520 15 123
+fish Foxtrot 6520 0 0
+fish Foxtrot 6520 1 999
+fish ALPHA 8485 10 345 2000
+fish Golf 8486 17 300 1100
+mid
+advance 2026-10-07T10:31:16Z
+mid
+mid
+champ
+reward Alpha
+advance 2026-10-13T19:00:00.123Z
+champ
+mid
+mid
+reward alpha
+reward Alpha
+reward Alpha
+reward Delta
+fish Hotel 6520 3 3
+rows
+restart
+champ
+reward Charlie
+advance 2026-10-20T19:00:00.123Z
+champ
+reward Golf
+rows
+
+scenario restored week still running, Sunday
+start 2026-10-11T08:00:00Z
+memo 2026-10-13T19:00:00Z
+row Kilo 75.5 0
+row Lima 88.25 1
+row Mike 61 2
+row November 70 -1
+row Oscar 88.25 1
+row Papa 66.6 0
+row Quebec 90 1
+row Romeo 60.5 1
+row Sierra 60.25 1
+row Tango 60.1 1
+boot
+champ
+reward Mike
+reward Sierra
+reward Oscar
+reward November
+mid
+mid
+fish Uniform 6520 0 100
+fish Kilo 6520 10 0
+advance 2026-10-13T18:59:59.999Z
+advance 2026-10-13T19:00:00Z
+champ
+reward Lima
+reward Kilo
+rows
+
+scenario restored week over, boot ends it
+start 2026-10-14T09:15:00.250Z
+memo 2026-10-06T19:00:00Z
+row Victor 80.125 0
+row Whiskey 79.5 1
+boot
+champ
+reward Whiskey
+reward Victor
+rows
+
+scenario fresh table, Monday night
+start 2026-10-12T23:59:59.999Z
+boot
+champ
+rows
+
+scenario fresh table, Tuesday after the end hour
+start 2026-10-13T19:30:00Z
+boot
+fish Xray 6520 29 1000
+fish Yankee 6520 29 1000
+advance 2026-10-20T19:30:00Z
+champ
+reward Yankee
+reward Xray
+rows

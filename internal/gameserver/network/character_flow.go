@@ -364,9 +364,6 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// SkillList carries them.
 	skillList := skillListEntries(c, l.skills)
 	if l.world != nil {
-		// A pet corpse this character left behind is its pet again, as the
-		// character is restored and before it enters the world.
-		l.reclaimPetCorpse(live)
 		x, y, z := c.Position()
 		l.world.Spawn(live, x, y, z, c.LastHeading)
 		// Registered since its selection; from here on it is in the world
@@ -652,7 +649,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	delivery := &playerInventoryDelivery{updates: l.inventoryUpdates, character: c}
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventoryWithDelivery(c.ID, l.itemTemplates, items, delivery, l.itemPersister(c.ID)))
 	// The body stays the base class's while a subclass is played.
-	if base, ok := l.templates.Get(c.BaseClassID); ok {
+	if base, ok := l.templates.Get(c.BaseClassID()); ok {
 		c.SetBaseTemplate(base)
 	}
 	// The characters row stores finalized max snapshots (Save writes
@@ -749,15 +746,34 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	l.castController(live)
 	// The intention source reads cast, combat and move, all built above.
 	c.SetIntentionSource(live)
-	if inv := c.Inventory(); inv != nil && l.shadowItems != nil {
-		for _, inst := range inv.PaperdollItems() {
-			tmpl, ok := inv.Templates().Get(inst.TemplateID)
-			if ok {
-				l.shadowItems.Track(live.ObjectID(), inst, tmpl)
-			}
+	return live, nil
+}
+
+// takeOverSelected finishes a selection once its player live is registered
+// in the world, on live's queue: a pet its character left behind is its pet
+// again, and its equipped shadow items start decaying. Both wait for the
+// registration, since each reaches live by its object id from then on: a
+// shadow item running dry has its expiry carried out on the registered
+// player, and a corpse decaying meanwhile hands its items to live's
+// inventory. It reports false when the work did not complete.
+func (l *GameClientLink) takeOverSelected(live *livePlayer) bool {
+	return onLive(live, func() {
+		l.reclaimPetCorpse(live)
+		l.trackShadowItems(live)
+	})
+}
+
+// trackShadowItems starts the mana decay of every shadow item live wears.
+func (l *GameClientLink) trackShadowItems(live *livePlayer) {
+	inv := live.Inventory()
+	if inv == nil || l.shadowItems == nil {
+		return
+	}
+	for _, inst := range inv.PaperdollItems() {
+		if tmpl, ok := inv.Templates().Get(inst.TemplateID); ok {
+			l.shadowItems.Track(live.ObjectID(), inst, tmpl)
 		}
 	}
-	return live, nil
 }
 
 // restoreItemShortcuts keeps the ITEM shortcuts of shortcuts whose item c

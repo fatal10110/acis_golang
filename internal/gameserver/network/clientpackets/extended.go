@@ -16,6 +16,7 @@ const (
 	OpcodeRequestExEnchantSkill        uint16 = 0x0007
 	OpcodeRequestManorList             uint16 = 0x0008
 	OpcodeRequestExPledgeCrestLarge    uint16 = 0x0010
+	OpcodeRequestExFishRanking         uint16 = 0x001f
 	OpcodeRequestCursedWeaponList      uint16 = 0x0022
 	OpcodeRequestCursedWeaponLocation  uint16 = 0x0023
 	OpcodeRequestConfirmTargetItem     uint16 = 0x0029

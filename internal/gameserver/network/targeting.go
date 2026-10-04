@@ -470,6 +470,12 @@ func (l *GameClientLink) finishDeferredInteract(live *livePlayer) bool {
 	if inPostureTransition(live) {
 		return live.hasDeferredInteract()
 	}
+	return l.runDeferredInteract(live)
+}
+
+// runDeferredInteract runs the queued interact, if any, whatever the
+// posture, and reports whether one was waiting.
+func (l *GameClientLink) runDeferredInteract(live *livePlayer) bool {
 	queued := live.takeDeferredInteract()
 	if queued == nil {
 		return false

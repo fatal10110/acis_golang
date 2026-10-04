@@ -73,6 +73,7 @@ type characterStore interface {
 	SetDeleteAt(ctx context.Context, objectID int32, at int64) error
 	SetPosition(ctx context.Context, objectID int32, loc location.Location, heading int) error
 	SetDeathPenaltyLevel(ctx context.Context, objectID int32, level int) error
+	SetNoble(ctx context.Context, objectID int32, noble bool) error
 	SetOnline(ctx context.Context, objectID int32, lastAccess int64) error
 	SetOffline(ctx context.Context, objectID int32, lastAccess int64) error
 	// Purge deletes the character together with every row it owns, as one
@@ -294,7 +295,7 @@ func (r *Roster) List(ctx context.Context, accountName string) ([]*player.Charac
 			}
 			continue
 		}
-		if c.ClassID() != c.BaseClassID && r.subclasses != nil {
+		if c.ClassID() != c.BaseClassID() && r.subclasses != nil {
 			subs, err := r.subclasses.List(ctx, c.ID)
 			if err != nil {
 				return nil, err
@@ -320,7 +321,7 @@ func (r *Roster) Load(ctx context.Context, objectID int32) (*player.Character, e
 		return nil, err
 	}
 	if !c.RestoreSubclasses(subs) {
-		c.SetClassID(c.BaseClassID)
+		c.SetClassID(c.BaseClassID())
 	}
 	return c, nil
 }
@@ -370,6 +371,12 @@ func (r *Roster) SavePosition(ctx context.Context, st player.SaveState) error {
 // debuff level for the next relog or server restart load.
 func (r *Roster) SaveDeathPenaltyLevel(ctx context.Context, st player.SaveState) error {
 	return r.characters.SetDeathPenaltyLevel(ctx, st.ID, st.DeathPenaltyLevel)
+}
+
+// SaveNoble persists the live character's noblesse status as soon as it
+// changes, ahead of the next full save.
+func (r *Roster) SaveNoble(ctx context.Context, objectID int32, noble bool) error {
+	return r.characters.SetNoble(ctx, objectID, noble)
 }
 
 // SaveOnlineRecency marks the live character in game and stamps the

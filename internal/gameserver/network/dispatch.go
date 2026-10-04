@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
+	"github.com/fatal10110/acis_golang/internal/gameserver/classmaster"
 	"github.com/fatal10110/acis_golang/internal/gameserver/craft"
 	"github.com/fatal10110/acis_golang/internal/gameserver/cursedweapon"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
@@ -26,6 +27,7 @@ import (
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/exchange"
 	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
+	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
 	"github.com/fatal10110/acis_golang/internal/gameserver/gatekeeper"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
@@ -421,6 +423,9 @@ type GameClientLink struct {
 	lottery       *lottery.Lottery
 	// hallFunctions are the functions the clan halls rent; nil rents none.
 	hallFunctions *clanhall.Functions
+	// fishChamp is the fishing championship; a disabled one keeps no
+	// ranking.
+	fishChamp *fishchamp.Championship
 	// wedding holds the couples and runs the marriage requests.
 	wedding *wedding.Manager
 	// derby is the monster race track the race managers answer for; nil
@@ -431,6 +436,8 @@ type GameClientLink struct {
 	npcSpawns atomic.Pointer[manager.Npcs]
 	// manor is what the seed and harvester items read.
 	manor ManorConfig
+	// classMaster is the class manager mod's settings.
+	classMaster classmaster.Config
 }
 
 // AIRegistry owns recurring actor-AI registrations.
@@ -642,6 +649,9 @@ type GameClientLinkConfig struct {
 	// Announcements are the server announcements; nil holds them in
 	// memory only, starting with none.
 	Announcements *announcement.Registry
+	// ClassMaster is the class manager mod's npcs.properties settings; the
+	// zero value offers no occupation change.
+	ClassMaster classmaster.Config
 	// SchemeBuffer is the scheme buffer's buffs and every player's
 	// schemes; nil offers no buff and starts with no scheme.
 	SchemeBuffer *schemebuffer.Manager
@@ -654,6 +664,8 @@ type GameClientLinkConfig struct {
 	// ClanHallFunctions are the functions the clan halls rent; nil rents
 	// none, so every hall shows bare and gives no recovery bonus.
 	ClanHallFunctions *clanhall.Functions
+	// FishingChampionship is the fishing championship; nil runs none.
+	FishingChampionship *fishchamp.Championship
 	// Derby is the monster race track; nil runs no race.
 	Derby *derby.Track
 }
@@ -766,6 +778,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	}
 	link.macros = cfg.Macros
 	link.manor = cfg.Manor
+	link.classMaster = cfg.ClassMaster
 	link.recommendations = cfg.Recommendations
 	// Built here, not lazily: every client goroutine shares this link.
 	enchantCfg := enchantflow.DefaultConfig()
@@ -794,6 +807,10 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	if link.wedding == nil {
 		ids, _ := cfg.IDs.(wedding.IDs)
 		link.wedding = wedding.NewManager(wedding.DefaultConfig(), ids, nil)
+	}
+	link.fishChamp = cfg.FishingChampionship
+	if link.fishChamp == nil {
+		link.fishChamp = fishchamp.New(fishchamp.Config{}, nil, nil, cfg.Queues.NewQueue("fishchamp"), cfg.Log)
 	}
 	link.lottery = cfg.Lottery
 	link.hallFunctions = cfg.ClanHallFunctions

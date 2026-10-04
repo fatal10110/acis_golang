@@ -535,6 +535,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if l.world != nil {
 				l.world.AddPlayer(selected)
 			}
+			if !l.takeOverSelected(selected) {
+				client.closeNow()
+				return
+			}
 
 		case clientpackets.OpcodeEnterWorld:
 			// Unreachable while the state gate admits EnterWorld only in
@@ -709,6 +713,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				if live != nil {
 					onLive(live, func() { l.sendBossRecord(live) })
+				}
+			case clientpackets.OpcodeRequestExFishRanking:
+				if live != nil {
+					onLive(live, func() { l.requestFishRanking(live) })
 				}
 			case clientpackets.OpcodeRequestCursedWeaponList:
 				if live == nil {

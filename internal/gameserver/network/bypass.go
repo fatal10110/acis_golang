@@ -249,6 +249,8 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		cpRecovery(live, f)
 	case npc.BypassClan:
 		l.villageMasterClan(live, f, command)
+	case npc.BypassClassMaster:
+		return l.classMasterBypass(live, f, command)
 	case npc.BypassSchemeBuffer:
 		return l.schemeBufferBypass(live, f, command)
 	case npc.BypassWedding:
@@ -257,6 +259,10 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		return l.lotteryBypass(live, f, command)
 	case npc.BypassDerby:
 		return l.derbyBypass(live, f, command)
+	case npc.BypassFishingChampionship:
+		l.fishermanChampionship(live, f)
+	case npc.BypassFishingReward:
+		l.fishermanReward(live, f)
 	case npc.BypassUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Str("command", command).Msg("bypass: npc dialog command not modeled")
 	case npc.BypassRefused:

@@ -167,9 +167,9 @@ func (l *GameClientLink) startFishing(live *livePlayer, bait location.Location, 
 
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCastLineAndStartFishing))
 	fishType, night := int32(run.stance.FishType(l.night())), run.stance.NightLure()
-	// ponytail: the ranking button shows under AllowFishChampionship once the championship lands, #254.
+	ranking := l.fishChamp.Enabled()
 	l.broadcastLiveFrame(live, func() wire.Frame {
-		return serverpackets.FrameExFishingStart(live.ObjectID(), fishType, bait, night, false)
+		return serverpackets.FrameExFishingStart(live.ObjectID(), fishType, bait, night, ranking)
 	})
 	live.SendFrame(serverpackets.FramePlaySoundAt(serverpackets.Sound{Type: soundTypeMusic, File: soundCastLine}))
 
@@ -336,7 +336,7 @@ func (l *GameClientLink) endFishing(live *livePlayer, win bool) {
 		} else {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouCaughtSomething))
 			live.AddCreatedItem(run.stance.Fish().ID, 1, l.nextObjectID)
-			// ponytail: the fishing championship's catch record joins here, #254.
+			measureCatch(live, l.fishChamp, run.stance.Lure())
 		}
 	}
 	if !run.stance.HasFish() {

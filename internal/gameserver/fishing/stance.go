@@ -10,6 +10,7 @@ import (
 // end and, once that fish bites, the fight with it. Its owner serializes
 // every call; Stance holds no lock.
 type Stance struct {
+	lure    int32
 	night   bool
 	fish    fish.Fish
 	hasFish bool
@@ -44,8 +45,12 @@ func (s *Stance) Fish() fish.Fish { return s.fish }
 // Cast puts a line baited with lureID in the water. The fish it is cast
 // for is set by Hook.
 func (s *Stance) Cast(lureID int32) {
+	s.lure = lureID
 	s.night = NightLure(lureID)
 }
+
+// Lure returns the lure the line now cast is baited with.
+func (s *Stance) Lure() int32 { return s.lure }
 
 // Hook sets f as the fish the line is cast for.
 func (s *Stance) Hook(f fish.Fish) {

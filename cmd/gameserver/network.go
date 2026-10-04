@@ -22,6 +22,7 @@ import (
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
 	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
+	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -124,6 +125,7 @@ func provideGameClientLink(
 	schemeBuffer *schemebuffer.Manager,
 	couples *wedding.Manager,
 	lotteryState *lottery.Lottery,
+	fishChamp *fishchamp.Championship,
 	derbyTrack *derby.Track,
 	hallFunctions *clanhall.Functions,
 	log zerolog.Logger,
@@ -248,6 +250,7 @@ func provideGameClientLink(
 		Teleports:        data.Teleports,
 		InstantTeleports: data.InstantTeleports,
 		FreeTeleport:     bool(gameplay.FreeTeleport),
+		ClassMaster:      gameplay.ClassMaster,
 		Log:              log,
 
 		Augmentations:       data.Augmentations,
@@ -265,16 +268,17 @@ func provideGameClientLink(
 		Punishments:    characters,
 		Petitions:      petitions,
 
-		Board:          board.Config,
-		Mailbox:        board.Mailbox,
-		Forums:         board.Forums,
-		Favorites:      board.Favorites,
-		ShowServerNews: board.ShowServerNews,
-		Announcements:  announcements,
-		SchemeBuffer:   schemeBuffer,
-		Wedding:        couples,
-		Lottery:        lotteryState,
-		Derby:          derbyTrack,
+		Board:               board.Config,
+		Mailbox:             board.Mailbox,
+		Forums:              board.Forums,
+		Favorites:           board.Favorites,
+		ShowServerNews:      board.ShowServerNews,
+		Announcements:       announcements,
+		SchemeBuffer:        schemeBuffer,
+		Wedding:             couples,
+		Lottery:             lotteryState,
+		FishingChampionship: fishChamp,
+		Derby:               derbyTrack,
 
 		ClanHallFunctions: hallFunctions,
 	})

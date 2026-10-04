@@ -506,7 +506,7 @@ var schemaStmts = []string{
 	olympiadNoblesSchema, olympiadNoblesEomSchema, olympiadFightsSchema, serverMemoSchema,
 	characterRaidPointsSchema, grandbossListSchema, cursedWeaponsSchema,
 	bufferSchemesSchema, modsWeddingSchema,
-	gamesSchema,
+	gamesSchema, fishingChampionshipSchema,
 	mdtBetsSchema, mdtHistorySchema,
 }
 
