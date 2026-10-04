@@ -724,6 +724,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	access := l.admin.Resolve(c.AccessLevel)
 	live := &livePlayer{Character: c, link: l, ctx: ctx, session: client.Session.SendFrame, npcs: l.npcs, items: items, shortcuts: shortcut.NewList(shortcuts), visibilitySend: client.Session.SendFrame, log: l.log}
 	live.access.Store(&access)
+	live.remoteIP = client.Session.remoteIP()
 	delivery.live = live
 	c.Attach(creatureLive, live)
 	moveCtl, err := move.NewController(c.Move(), c, live)

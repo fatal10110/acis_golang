@@ -52,6 +52,12 @@ var adminCommands = map[string]adminCommand{
 	"admin_force_peti":    (*GameClientLink).adminForcePetition,
 	"admin_add_peti_chat": (*GameClientLink).adminPetitionChat,
 
+	// Character pages and edits; see admin_editchar.go and admin_set.go.
+	"admin_debug":      (*GameClientLink).adminDebug,
+	"admin_info":       (*GameClientLink).adminInfo,
+	"admin_party_info": (*GameClientLink).adminPartyInfo,
+	"admin_remove":     (*GameClientLink).adminRemove,
+
 	// Announcements; see admin_announce.go.
 	"admin_announce": (*GameClientLink).adminAnnounce,
 	"admin_ann":      (*GameClientLink).adminAnnounceText,

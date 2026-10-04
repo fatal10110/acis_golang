@@ -1863,6 +1863,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Derby = derbyTrack
 	gclConfig.Relations, gclConfig.Characters = relations, chars
 	gclConfig.AccessLevels = chars
+	gclConfig.CharacterEdits = chars
 	gclConfig.Punishments = chars
 	petitions, petitionRows := bootPetitions(t, db, chars, ids, o.petitionConfig)
 	gclConfig.Petitions = petitions
