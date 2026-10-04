@@ -505,6 +505,7 @@ func (l *GameClientLink) applyLiveDeathPenalty(live *livePlayer, e event.DeathPe
 // bow shot that just ended, if any, and reports whether one was waiting:
 // the queue holds at most one, which replaces the attack.
 func (l *GameClientLink) finishQueuedBehindAttack(live *livePlayer) bool {
+	live.replaceAttackWithQueuedCast()
 	return l.finishDeferredPickup(live) ||
 		l.finishDeferredMagicSkill(live) ||
 		l.finishDeferredItemAICast(live) ||
