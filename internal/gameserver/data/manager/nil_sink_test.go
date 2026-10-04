@@ -72,7 +72,7 @@ func TestNewWorldObjectsWithoutSinkFactoryWarns(t *testing.T) {
 	geo, _, _ := newDoorGeo(t)
 
 	var logs bytes.Buffer
-	if _, err := NewWorldObjects(doors, statics, &worldObjectIDs{next: 1000}, geo, world.New(), doorTimers, nil, zerolog.New(&logs)); err != nil {
+	if _, err := NewWorldObjects(doors, statics, &worldObjectIDs{next: 1000}, geo, world.New(), doorTimers, task.NewDoorRegen(nil), nil, zerolog.New(&logs)); err != nil {
 		t.Fatalf("NewWorldObjects() error: %v", err)
 	}
 	if !strings.Contains(logs.String(), "no door event sink factory") {

@@ -42,6 +42,15 @@ func (r *deadlineRegistry[K, V]) add(key K, value V, deadline time.Time) {
 	r.mu.Unlock()
 }
 
+// addIfAbsent tracks value under key unless key already has a deadline.
+func (r *deadlineRegistry[K, V]) addIfAbsent(key K, value V, deadline time.Time) {
+	r.mu.Lock()
+	if _, ok := r.entries[key]; !ok {
+		r.entries[key] = deadlineEntry[V]{actor: value, deadline: deadline}
+	}
+	r.mu.Unlock()
+}
+
 // remove stops tracking key and reports whether it had been tracked.
 func (r *deadlineRegistry[K, V]) remove(key K) bool {
 	r.mu.Lock()
@@ -98,6 +107,29 @@ func (r *deadlineRegistry[K, V]) tickDueConcurrent(now time.Time, fire func(V)) 
 
 	for _, actor := range due {
 		fire(actor)
+	}
+}
+
+// sweepDueConcurrent calls fire for every entry whose deadline is not
+// after now, with the deadline the sweep read, leaving each one tracked:
+// the caller checks it with hasDeadline once it is ready to apply, so a
+// replacement in between wins and a mere re-add of an existing key does
+// not displace it. Like tickDueConcurrent, the due partition is allocated
+// fresh on every call, so it is safe to call from multiple goroutines at
+// once with no other coordination.
+func (r *deadlineRegistry[K, V]) sweepDueConcurrent(now time.Time, fire func(V, time.Time)) {
+	r.mu.Lock()
+	var due []deadlineEntry[V]
+	for _, entry := range r.entries {
+		if now.Before(entry.deadline) {
+			continue
+		}
+		due = append(due, entry)
+	}
+	r.mu.Unlock()
+
+	for _, entry := range due {
+		fire(entry.actor, entry.deadline)
 	}
 }
 

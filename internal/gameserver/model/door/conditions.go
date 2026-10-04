@@ -24,7 +24,7 @@ func (d doorConditionActor) HPRatio() float64 {
 	if d.o.MaxHP() <= 0 {
 		return 0
 	}
-	return float64(d.o.HP()) / float64(d.o.MaxHP())
+	return d.o.HPRatio()
 }
 
 func (doorConditionActor) MPRatio() float64 { return 0 }
