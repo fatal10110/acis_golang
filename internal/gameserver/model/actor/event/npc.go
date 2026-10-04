@@ -56,6 +56,13 @@ type SocialAction struct{ ID int32 }
 // after its death was shown.
 type RaidBossKilled struct{}
 
+// RaidDropAnnounced reports one item a raid or grand boss's kill dropped
+// or auto-looted, named to the boss's observers.
+type RaidDropAnnounced struct {
+	ItemID int32
+	Count  int32
+}
+
 // OnScreenMessage reports a text an NPC shows on its observers' screens
 // for DurationMs milliseconds.
 type OnScreenMessage struct {
@@ -69,14 +76,15 @@ type NpcSay struct {
 	Text  string
 }
 
-func (NPCInfoChanged) event()  {}
-func (OnScreenMessage) event() {}
-func (Status) event()          {}
-func (HPChanged) event()       {}
-func (SkillLaunched) event()   {}
-func (SkillCanceled) event()   {}
-func (ShotRecharged) event()   {}
-func (MoveTypeChanged) event() {}
-func (SocialAction) event()    {}
-func (NpcSay) event()          {}
-func (RaidBossKilled) event()  {}
+func (NPCInfoChanged) event()    {}
+func (OnScreenMessage) event()   {}
+func (Status) event()            {}
+func (HPChanged) event()         {}
+func (SkillLaunched) event()     {}
+func (SkillCanceled) event()     {}
+func (ShotRecharged) event()     {}
+func (MoveTypeChanged) event()   {}
+func (SocialAction) event()      {}
+func (NpcSay) event()            {}
+func (RaidBossKilled) event()    {}
+func (RaidDropAnnounced) event() {}

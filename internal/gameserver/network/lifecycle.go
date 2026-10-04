@@ -155,9 +155,11 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	if l.world != nil {
 		l.world.Despawn(live)
 	}
-	// Out of sight, still listed online: out of its party, then the trade
-	// cancel decided above, then its friends told it left.
+	// Out of sight, still listed online: out of its party and the
+	// Olympiad's waiting list, then the trade cancel decided above, then
+	// its friends told it left.
 	l.leaveParty(live)
+	l.dropOlympiadCompetitor(live)
 	if canceledTrade.Status == tradebook.CancelDone {
 		l.announceTradeCanceled(canceledTrade.Session, live)
 	}

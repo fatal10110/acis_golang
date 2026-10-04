@@ -113,6 +113,15 @@ const (
 	// BypassAuction runs any command on an auctioneer, whose own dialog
 	// answers every command.
 	BypassAuction
+	// BypassOlympiadNoble runs an Olympiad manager's "OlympiadNoble <n>"
+	// service Index for a talker its gates let through: 1 leaves the
+	// waiting list, 2 shows its size, 3 the talker's points, 4 and 5 register
+	// for non-classed and classed matches, 6 offers the points' trade for
+	// passes, 7 opens the passes' multisell and 10 makes the trade; any
+	// other answers nothing.
+	BypassOlympiadNoble
+	// BypassClassRanking shows the month's ranking of class Index.
+	BypassClassRanking
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -125,6 +134,14 @@ type Talker struct {
 	// InactiveHero is a player elected hero who has not claimed the status
 	// yet.
 	InactiveHero bool
+	// Noble and Hero are the talker's noble and hero status.
+	Noble, Hero bool
+	// CursedWeapon is set while the talker holds a cursed weapon.
+	CursedWeapon bool
+	// SubclassActive is set while the talker plays one of its subclasses.
+	SubclassActive bool
+	// ThirdClass is set when the talker's class is a third occupation.
+	ThirdClass bool
 }
 
 // BypassReply is a civilian NPC's answer to one dialog command.
@@ -201,8 +218,13 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	if _, ok := unportedFolkChats[kind]; ok {
 		return reply
 	}
-	if kind == "OlympiadManagerNpc" && strings.HasPrefix(command, "Olympiad") && !strings.HasPrefix(command, "OlympiadNoble") {
-		return f.olympiadCommand(pages, talker, command, reply)
+	if kind == "OlympiadManagerNpc" {
+		switch {
+		case strings.HasPrefix(command, "OlympiadNoble"):
+			return f.olympiadNobleCommand(pages, talker, command, reply)
+		case strings.HasPrefix(command, "Olympiad"):
+			return f.olympiadCommand(pages, talker, command, reply)
+		}
 	}
 	if _, ok := unportedFolkCommands[kind]; ok {
 		return reply
@@ -310,7 +332,12 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 				val = int(n)
 			}
 		}
-		reply.Outcome, reply.HTML = BypassChatWindow, f.chatPage(pages, chat, val)
+		reply.Outcome = BypassChatWindow
+		if kind == "OlympiadManagerNpc" {
+			reply.HTML = f.olympiadChat(pages, val, talker.Noble, talker.Hero, talker.InactiveHero)
+		} else {
+			reply.HTML = f.chatPage(pages, chat, val)
+		}
 		return reply
 	case strings.HasPrefix(command, "Link"):
 		if len(command) < 5 {
@@ -540,12 +567,13 @@ func commandChars(command string, begin, end int) (string, bool) {
 
 // olympiadCommand answers an Olympiad manager's "Olympiad <n>" command,
 // whose choice is the one character after "Olympiad ": a command too short
-// to hold it, or one that is no digit, stops the handling. 4 shows the
-// heroes; 5 asks an elected hero to confirm its claim and 6 claims the
-// status, answering nothing to anyone else; 7 opens the Monument of Heroes'
-// main page. The class rankings (2) and the stadium list (3) need the
-// Olympiad's registration and matches (#3281, #3340); any other choice
-// answers nothing.
+// to hold it, or one that is no digit, stops the handling. 2_<class> shows
+// the month's ranking of a class from 88 to 118, answering nothing for any
+// other, and stops the handling when the class is missing or does not
+// parse; 4 shows the heroes; 5 asks an elected hero to confirm its claim
+// and 6 claims the status, answering nothing to anyone else; 7 opens the
+// Monument of Heroes' main page. The stadium list (3) needs the matches
+// (#3340); any other choice answers nothing.
 func (f *Folk) olympiadCommand(pages Pages, talker Talker, command string, reply BypassReply) BypassReply {
 	arg, ok := commandChars(command, 9, 10)
 	if !ok {
@@ -558,7 +586,9 @@ func (f *Folk) olympiadCommand(pages Pages, talker Talker, command string, reply
 		return reply
 	}
 	switch choice {
-	case 2, 3:
+	case 2:
+		return classRankingCommand(reply, command)
+	case 3:
 		reply.Outcome = BypassUnported
 	case 4:
 		reply.Outcome = BypassHeroList

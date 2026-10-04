@@ -11,8 +11,11 @@
 // Whether the daily new cycle and the unreachable end should stay is open
 // (#3280).
 //
-// The rules of a match between two nobles are in game.go. Nothing runs the
-// matches yet: the competition window starts no game manager (#3340). The
+// The waiting lists nobles register on during a competition window, and
+// the trade of a cycle's points for Noblesse Gate Passes, are in
+// registration.go. The rules of a match between two nobles are in game.go.
+// Nothing runs the matches yet: the competition window starts no game
+// manager (#3340). The
 // end of an Olympiad elects the heroes, behind the save of the records
 // they are elected from.
 package olympiad
@@ -64,6 +67,14 @@ type Config struct {
 	// ClassedReward and NonClassedReward are the items the winner of a
 	// classed or non-classed match is given.
 	ClassedReward, NonClassedReward []Reward
+	// StartPoints are the points a noble's record starts a cycle with.
+	StartPoints int
+	// MinMatches is how many matches a noble needs in a month to stand in
+	// its class's ranking.
+	MinMatches int
+	// GPPerPoint is how many Noblesse Gate Passes one point trades for, and
+	// HeroPoints the points a hero trades on top of its own.
+	GPPerPoint, HeroPoints int
 }
 
 // Reward is a stack of items a match's winner is given.
@@ -76,13 +87,15 @@ type Reward struct {
 // it: a six-hour window opening at 18:00, three weekly points; matches
 // moving at most 10 points, a third of the lower total in classed matches
 // and a fifth in non-classed ones, their winners given 50 and 30 Noblesse
-// Gate Passes.
+// Gate Passes; records starting with 18 points, rankings counting nobles
+// with 5 matches, and 1000 passes a point with 300 more points for a hero.
 func DefaultConfig() Config {
 	return Config{
 		StartHour: 18, CompetitionMillis: 21600000, WeeklyPoints: 3,
 		MaxPoints: 10, DividerClassed: 3, DividerNonClassed: 5,
 		ClassedReward:    []Reward{{ItemID: 6651, Count: 50}},
 		NonClassedReward: []Reward{{ItemID: 6651, Count: 30}},
+		StartPoints:      18, MinMatches: 5, GPPerPoint: 1000, HeroPoints: 300,
 	}
 }
 
@@ -134,6 +147,10 @@ type Store interface {
 	SnapshotMonth(ctx context.Context) error
 	// SaveFight stores the result of one match.
 	SaveFight(ctx context.Context, f Fight) error
+	// ClassLeaders returns the names of the ten best of classID in the
+	// month's standings with at least minMatches matches, by points, then
+	// matches, then wins.
+	ClassLeaders(ctx context.Context, classID, minMatches int) ([]string, error)
 }
 
 // Heroes elects the heroes from the stored nobles' records.
@@ -181,6 +198,11 @@ type Olympiad struct {
 	// stays open; negative when it is not counting down.
 	registrationEnd int64
 
+	// order keeps the records' writes in the order the records changed: it
+	// is held from a change to the records, or the copy of them a write
+	// takes, until that write is queued.
+	order sync.Mutex
+
 	// mu guards the fields below it; never held across I/O or an
 	// announcement.
 	mu     sync.Mutex
@@ -189,6 +211,11 @@ type Olympiad struct {
 	// periodEnd is in Unix milliseconds.
 	periodEnd int64
 	nobles    map[int32]Noble
+	// classed holds the waiting list of each base class anyone registered
+	// for, nonClassed the one for non-classed matches, both in registration
+	// order.
+	classed    map[int][]int32
+	nonClassed []int32
 }
 
 // New returns an Olympiad persisting through store, its writes queued on
@@ -197,7 +224,7 @@ type Olympiad struct {
 // runs on queue, which it owns from then on. Restore then Start bring it
 // up.
 func New(cfg Config, store Store, writes Writer, out Announcer, heroes Heroes, queue *sim.Queue, log zerolog.Logger) *Olympiad {
-	return &Olympiad{cfg: cfg, store: store, writes: writes, out: out, heroes: heroes, queue: queue, log: log, registrationEnd: -1, nobles: map[int32]Noble{}}
+	return &Olympiad{cfg: cfg, store: store, writes: writes, out: out, heroes: heroes, queue: queue, log: log, registrationEnd: -1, nobles: map[int32]Noble{}, classed: map[int][]int32{}}
 }
 
 // Restore loads the cycle number, the first when none is stored, and the
@@ -481,6 +508,8 @@ func (o *Olympiad) saveStatus() {
 // saveNobles queues the save of every noble's record as it stands now;
 // none held writes nothing.
 func (o *Olympiad) saveNobles() {
+	o.order.Lock()
+	defer o.order.Unlock()
 	o.mu.Lock()
 	nobles := maps.Clone(o.nobles)
 	o.mu.Unlock()
@@ -493,6 +522,8 @@ func (o *Olympiad) saveNobles() {
 // deleteNobles removes every noble's record held and queues the removal of
 // the stored ones; the held ones go even when the stored ones cannot.
 func (o *Olympiad) deleteNobles() {
+	o.order.Lock()
+	defer o.order.Unlock()
 	o.write("delete nobles", func(ctx context.Context, st Store) error { return st.DeleteNobles(ctx) })
 	o.mu.Lock()
 	clear(o.nobles)

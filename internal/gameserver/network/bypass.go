@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/gatekeeper"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -193,6 +194,10 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 	rules.AllowWear = l.merchant.Config().AllowWear
 	talker := npc.Talker{Karma: live.Karma(), Level: live.Level(), LowLevelNewbie: live.LowLevelNewbie()}
 	talker.InactiveHero = l.heroes != nil && l.heroes.IsInactive(live.ObjectID())
+	talker.Noble, talker.Hero, talker.CursedWeapon = live.IsNoble(), live.IsHero(), live.CursedWeaponEquipped()
+	talker.SubclassActive = live.ClassIndex() != 0
+	classLevel, _ := player.ClassLevel(live.ClassID())
+	talker.ThirdClass = classLevel >= 3
 	reply := f.Bypass(setPages{l.html}, rules, talker, command)
 	if reply.LeadingActionFailed {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -274,6 +279,10 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		l.claimHero(live)
 	case npc.BypassAuction:
 		l.auctioneerBypass(live, f, command)
+	case npc.BypassOlympiadNoble:
+		l.olympiadNobleBypass(live, f, reply.Index)
+	case npc.BypassClassRanking:
+		l.showClassRanking(live, f, reply.Index)
 	case npc.BypassUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Str("command", command).Msg("bypass: npc dialog command not modeled")
 	case npc.BypassRefused:

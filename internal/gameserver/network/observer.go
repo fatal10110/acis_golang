@@ -57,8 +57,10 @@ func (l *GameClientLink) observe(live *livePlayer, id int) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotObserveInCombat))
 		return
 	}
-	// A player waiting for an Olympiad match is turned away silently;
-	// nobody is registered before Olympiad registration (#3281).
+	// A player waiting for an Olympiad match is turned away silently.
+	if l.olympiadRegistered(live) {
+		return
+	}
 	l.enterObserverMode(live, loc)
 }
 

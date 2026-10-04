@@ -154,6 +154,7 @@ type options struct {
 	autoLearnSkills        bool
 	deepBlueDropRules      bool
 	autoLoot               bool
+	autoLootRaid           bool
 	rateKarmaExpLost       float64
 	deathDrop              player.DeathDropRules
 	characterSelectDelay   time.Duration
@@ -182,6 +183,7 @@ type options struct {
 	board                  bbs.Config
 	seedBoard              func(db *sql.DB)
 	seedOlympiad           func(db *sql.DB)
+	olympiadWindow         *olympiadWindow
 	seedBoss               func(db *sql.DB)
 	serverNews             bool
 	announcements          string
@@ -481,6 +483,13 @@ func WithDeepBlueDropRules(enabled bool) Option {
 // onto the ground (default false).
 func WithAutoLoot(enabled bool) Option {
 	return func(o *options) { o.autoLoot = enabled }
+}
+
+// WithAutoLootRaid sets the server.properties AutoLootRaid gate: whether a
+// raid or grand boss kill's drops go straight into the killer's inventory
+// instead of onto the ground (default false).
+func WithAutoLootRaid(enabled bool) Option {
+	return func(o *options) { o.autoLootRaid = enabled }
 }
 
 // WithRateKarmaExpLost sets the server.properties RateKarmaExpLost
@@ -931,6 +940,7 @@ type Server struct {
 	levelTable          *player.LevelTable
 	deepBlueDrops       bool
 	autoLoot            bool
+	autoLootRaid        bool
 	ids                 *sequentialIDs
 	positions           *task.PositionUpdates
 	addr                net.Addr
@@ -2057,10 +2067,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.Doors = worldObjects
 	}
 	// The Olympiad's records are restored once the characters are seeded,
-	// below; its calendar is not started (see WithOlympiadSeed).
+	// below; its calendar is started only for WithOlympiadCompetition or
+	// WithOlympiadValidation.
 	heroes := hero.New(gamesql.NewHeroStore(db), gclConfig.Clans.Table(), persistWorker, HeroMinMatches, time.Now, o.log)
 	gclConfig.Heroes = heroes
-	olympiadState := olympiad.New(olympiad.DefaultConfig(), gamesql.NewOlympiadStore(db), persistWorker, network.NewOlympiadAnnouncer(state), heroes, queues.NewQueue("olympiad"), o.log)
+	olympiadQueue := queues.NewQueue("olympiad")
+	olympiadState := olympiad.New(o.olympiadWindow.config(olympiadQueue.Now()), gamesql.NewOlympiadStore(db), persistWorker, network.NewOlympiadAnnouncer(state), heroes, olympiadQueue, o.log)
 	gclConfig.Olympiad = olympiadState
 	raidPoints := raidpoint.New(gamesql.NewRaidPointStore(db), persistWorker, o.log)
 	gclConfig.RaidPoints = raidPoints
@@ -2225,6 +2237,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err := olympiadState.Restore(context.Background()); err != nil {
 		t.Fatalf("restore olympiad: %v", err)
 	}
+	if o.olympiadWindow != nil {
+		olympiadState.Start()
+		if err := queues.settle(); err != nil {
+			t.Fatalf("start olympiad: %v", err)
+		}
+	}
 	if err := heroes.Restore(context.Background()); err != nil {
 		t.Fatalf("restore heroes: %v", err)
 	}
@@ -2287,6 +2305,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		levelTable:          levels,
 		deepBlueDrops:       o.deepBlueDropRules,
 		autoLoot:            o.autoLoot,
+		autoLootRaid:        o.autoLootRaid,
 		DB:                  db,
 		RaidPoints:          raidPoints,
 		CursedWeapons:       cursedState,
