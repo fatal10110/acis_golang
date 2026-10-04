@@ -96,6 +96,12 @@ const (
 	BypassLottery
 	// BypassDerby runs a race manager's own command; see derby.Command.
 	BypassDerby
+	// BypassFishingChampionship opens a fisherman's fishing championship
+	// winners page.
+	BypassFishingChampionship
+	// BypassFishingReward claims a fishing championship prize at a
+	// fisherman.
+	BypassFishingReward
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -139,16 +145,12 @@ type BypassReply struct {
 	Index int
 }
 
-// fishermanCommands are the fisherman's championship commands, run before
-// the merchant karma gate it inherits; the championship is not in place
-// yet.
-var fishermanCommands = []string{"FishingChampionship", "FishingReward"}
-
 // Bypass answers command, the part of an npc_<objectId>_<command> dialog
 // link after the object id, sent by talker. A shop, fisherman, gatekeeper
 // or warehouse keeper first applies its karma gate to every command,
 // answering with its refusal page when that page exists. A fisherman's
-// FishSkillList opens the fishing skills list. A symbol maker's Draw and
+// FishSkillList opens the fishing skills list, and its FishingChampionship
+// and FishingReward go to the fishing championship. A symbol maker's Draw and
 // RemoveList open its windows. A merchant or fisherman then answers its
 // sell, multisell and shop commands, and a warehouse keeper its storage
 // commands. The trainer commands follow: SkillList and EnchantSkillList
@@ -210,10 +212,15 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			reply.Outcome = BypassFishSkillList
 			return reply
 		}
-		for _, own := range fishermanCommands {
-			if strings.HasPrefix(command, own) {
-				return reply
-			}
+		// The championship commands run before the merchant karma gate the
+		// fisherman inherits.
+		if strings.HasPrefix(command, "FishingChampionship") {
+			reply.Outcome = BypassFishingChampionship
+			return reply
+		}
+		if strings.HasPrefix(command, "FishingReward") {
+			reply.Outcome = BypassFishingReward
+			return reply
 		}
 		if page, refused := f.pkRefusal(pages, folkChats["Merchant"], rules, karma); refused {
 			reply.Outcome, reply.HTML = BypassChatWindow, page

@@ -101,7 +101,6 @@ Missing M3 data/UI client packets:
 - `RequestSetCrop`
 - `RequestExEnchantSkillInfo`
 - `RequestExEnchantSkill`
-- `RequestExFishRanking`
 
 `RequestExEnchantSkillInfo` and `RequestExEnchantSkill` currently have Go decoders and byte-layout
 tests only. They are still counted as gaps because the skill-enchant tree, trainer validation, cost
@@ -127,6 +126,7 @@ Implemented and wired M3 data/UI client packets in Go:
 - `RequestShowBoard` and `RequestBBSwrite` (the community board, behind `EnableCommunityBoard`: the home, mail, friends/block and clan boards answer with `ShowBoard`; the memo, favorites and region boards show the board's unknown-command page until #3201 and #3202; with the board off every board command answers `CB_OFFLINE`)
 - `RequestCursedWeaponList`
 - `RequestCursedWeaponLocation` (accepted; no response is emitted while no cursed weapon is active)
+- `RequestExFishRanking` (the fishing window's ranking button, `network/fishing_championship.go`: the running week's fishing championship ranking on `fish_event002`, or `fish_event003` while it is being taken anew once a minute; silent with `AllowFishChampionship` off, when `ExFishingStart` shows no button)
 
 Implemented and wired M4 movement/rotation/target client packets in Go:
 

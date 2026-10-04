@@ -26,6 +26,7 @@ import (
 	enchantflow "github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/exchange"
 	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
+	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
 	"github.com/fatal10110/acis_golang/internal/gameserver/gatekeeper"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
@@ -420,6 +421,9 @@ type GameClientLink struct {
 	lottery       *lottery.Lottery
 	// hallFunctions are the functions the clan halls rent; nil rents none.
 	hallFunctions *clanhall.Functions
+	// fishChamp is the fishing championship; a disabled one keeps no
+	// ranking.
+	fishChamp *fishchamp.Championship
 	// wedding holds the couples and runs the marriage requests.
 	wedding *wedding.Manager
 	// derby is the monster race track the race managers answer for; nil
@@ -657,6 +661,8 @@ type GameClientLinkConfig struct {
 	// ClanHallFunctions are the functions the clan halls rent; nil rents
 	// none, so every hall shows bare and gives no recovery bonus.
 	ClanHallFunctions *clanhall.Functions
+	// FishingChampionship is the fishing championship; nil runs none.
+	FishingChampionship *fishchamp.Championship
 	// Derby is the monster race track; nil runs no race.
 	Derby *derby.Track
 }
@@ -797,6 +803,10 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	if link.wedding == nil {
 		ids, _ := cfg.IDs.(wedding.IDs)
 		link.wedding = wedding.NewManager(wedding.DefaultConfig(), ids, nil)
+	}
+	link.fishChamp = cfg.FishingChampionship
+	if link.fishChamp == nil {
+		link.fishChamp = fishchamp.New(fishchamp.Config{}, nil, nil, cfg.Queues.NewQueue("fishchamp"), cfg.Log)
 	}
 	link.lottery = cfg.Lottery
 	link.hallFunctions = cfg.ClanHallFunctions

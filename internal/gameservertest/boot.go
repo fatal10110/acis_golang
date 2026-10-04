@@ -34,6 +34,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
 	"github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
+	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
@@ -218,6 +219,7 @@ type options struct {
 	schemeBuffer           *schemebuffer.Manager
 	weddingConfig          *wedding.Config
 	lottery                *lotteryFixture
+	fishChamp              *fishChampFixture
 	derby                  *derbyOptions
 	// rewardPartiesWrap wraps the link's kill-party resolver
 	// (WithRewardParties).
@@ -861,59 +863,62 @@ type Server struct {
 	State  *world.State
 	DB     *sql.DB
 	// RaidPoints is the players' raid points, restored at boot.
-	RaidPoints       *raidpoint.Points
-	Lottery          *lottery.Lottery    // the lottery WithLottery runs; nil without it
-	HallFunctions    *clanhall.Functions // the functions the clan halls rent, restored at boot
-	Chars            *gamesql.CharacterStore
-	Items            *gamesql.ItemStore
-	Shortcuts        *gamesql.ShortcutStore
-	Hennas           *gamesql.HennaStore
-	RecipeBooks      *gamesql.RecipeBookStore
-	KnownSkills      *gamesql.CharacterSkillStore
-	Pets             *gamesql.PetStore
-	InventoryUpdates *task.InventoryUpdates
-	ItemInstances    *task.ItemInstances
-	GroundItems      *task.GroundItems
-	ShadowItems      *task.ShadowItems
-	AttackStance     *task.AttackStance
-	Effects          *task.Effects
-	AI               *task.AI
-	Water            *task.Water // set by WithWater; nil otherwise
-	BuyListStock     *merchant.Stock
-	BuyListRows      *gamesql.BuyListStore
-	WorldObjects     *gamemanager.WorldObjects // doors spawned by WithDoors; nil otherwise
-	doors            *doorHarness              // geodata and regeneration of WithDoors' doors
-	Boats            *boat.Fleet               // boats sailing WithBoats' itineraries; nil otherwise
-	Derby            *derby.Track              // race track of WithDerbyTrack; nil otherwise
-	NpcSpawns        *gamemanager.Npcs         // live NPC population of WithNpcSpawns; nil otherwise
-	Relations        *relation.Manager         // friend and block lists the link was wired with
-	relationRows     *gamesql.RelationStore
-	Petitions        *petition.Manager // petitions the link was wired with
-	petitionRows     *gamesql.PetitionStore
-	Couples          *wedding.Manager // couples the link was wired with
-	coupleRows       *gamesql.CoupleStore
-	Clans            *clan.Service
-	Castles          *castle.Manager // the castles WithCastles loads, restored at boot
-	SevenSigns       *sevensigns.State
-	Festival         *festival.Manager
-	AnnounceFile     string // the announcements.xml the server reads and rewrites
-	account          string
-	templates        *player.TemplateTable
-	itemTable        *item.Table
-	levelTable       *player.LevelTable
-	deepBlueDrops    bool
-	autoLoot         bool
-	ids              *sequentialIDs
-	positions        *task.PositionUpdates
-	addr             net.Addr
-	sessions         *manager.SessionStore
-	groundStore      *gamesql.GroundItemStore
-	cursedWeapons    *entity.CursedWeaponTable
-	autosave         *task.Autosave
-	gameClock        *task.GameClock
-	autosaveClock    *autosaveClock
-	persist          *persist.Worker
-	logs             *lockedBuffer
+	RaidPoints *raidpoint.Points
+	Lottery    *lottery.Lottery // the lottery WithLottery runs; nil without it
+	// FishingChampionship is the championship WithFishingChampionship
+	// runs; nil without it.
+	FishingChampionship *fishchamp.Championship
+	HallFunctions       *clanhall.Functions // the functions the clan halls rent, restored at boot
+	Chars               *gamesql.CharacterStore
+	Items               *gamesql.ItemStore
+	Shortcuts           *gamesql.ShortcutStore
+	Hennas              *gamesql.HennaStore
+	RecipeBooks         *gamesql.RecipeBookStore
+	KnownSkills         *gamesql.CharacterSkillStore
+	Pets                *gamesql.PetStore
+	InventoryUpdates    *task.InventoryUpdates
+	ItemInstances       *task.ItemInstances
+	GroundItems         *task.GroundItems
+	ShadowItems         *task.ShadowItems
+	AttackStance        *task.AttackStance
+	Effects             *task.Effects
+	AI                  *task.AI
+	Water               *task.Water // set by WithWater; nil otherwise
+	BuyListStock        *merchant.Stock
+	BuyListRows         *gamesql.BuyListStore
+	WorldObjects        *gamemanager.WorldObjects // doors spawned by WithDoors; nil otherwise
+	doors               *doorHarness              // geodata and regeneration of WithDoors' doors
+	Boats               *boat.Fleet               // boats sailing WithBoats' itineraries; nil otherwise
+	Derby               *derby.Track              // race track of WithDerbyTrack; nil otherwise
+	NpcSpawns           *gamemanager.Npcs         // live NPC population of WithNpcSpawns; nil otherwise
+	Relations           *relation.Manager         // friend and block lists the link was wired with
+	relationRows        *gamesql.RelationStore
+	Petitions           *petition.Manager // petitions the link was wired with
+	petitionRows        *gamesql.PetitionStore
+	Couples             *wedding.Manager // couples the link was wired with
+	coupleRows          *gamesql.CoupleStore
+	Clans               *clan.Service
+	Castles             *castle.Manager // the castles WithCastles loads, restored at boot
+	SevenSigns          *sevensigns.State
+	Festival            *festival.Manager
+	AnnounceFile        string // the announcements.xml the server reads and rewrites
+	account             string
+	templates           *player.TemplateTable
+	itemTable           *item.Table
+	levelTable          *player.LevelTable
+	deepBlueDrops       bool
+	autoLoot            bool
+	ids                 *sequentialIDs
+	positions           *task.PositionUpdates
+	addr                net.Addr
+	sessions            *manager.SessionStore
+	groundStore         *gamesql.GroundItemStore
+	cursedWeapons       *entity.CursedWeaponTable
+	autosave            *task.Autosave
+	gameClock           *task.GameClock
+	autosaveClock       *autosaveClock
+	persist             *persist.Worker
+	logs                *lockedBuffer
 	// positionTicks is when TickPositions last posted a tick on the real
 	// pool, guarded by its mutex.
 	positionTicks struct {
@@ -2027,6 +2032,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	hallFunctions := clanhall.New(o.clanHalls, o.clanHallDecos, gclConfig.Clans.Table(), gamesql.NewClanHallFunctionStore(db), persistWorker, o.log)
 	gclConfig.ClanHallFunctions = hallFunctions
 	gclConfig.Lottery = lotteryState
+	fishChampState := o.fishChamp.newChampionship(db, persistWorker, queues, o.log)
+	gclConfig.FishingChampionship = fishChampState
 	gcl, err := network.NewGameClientLink(gclConfig)
 	if err != nil {
 		t.Fatalf("gameservertest: build game client link: %v", err)
@@ -2172,6 +2179,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	t.Cleanup(func() { olympiadState.Stop(context.Background()) })
 	o.lottery.start(t, db, lotteryState)
+	o.fishChamp.start(t, db, fishChampState)
 	if o.seedBoss != nil {
 		o.seedBoss(db)
 	}
@@ -2207,76 +2215,77 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	readCharSelectInfo(t, c, o.account, o.wantChars)
 
 	srv := &Server{
-		Client:           c,
-		State:            state,
-		WorldObjects:     worldObjects,
-		doors:            doors,
-		Boats:            boats,
-		Derby:            derbyTrack,
-		Clans:            gclConfig.Clans,
-		Castles:          gclConfig.Castles,
-		HallFunctions:    hallFunctions,
-		SevenSigns:       sevenSigns,
-		Festival:         fest,
-		itemTable:        itemTemplates,
-		levelTable:       levels,
-		deepBlueDrops:    o.deepBlueDropRules,
-		autoLoot:         o.autoLoot,
-		DB:               db,
-		RaidPoints:       raidPoints,
-		Lottery:          lotteryState,
-		Chars:            chars,
-		Relations:        relations,
-		relationRows:     relationRows,
-		Petitions:        petitions,
-		petitionRows:     petitionRows,
-		Couples:          couples,
-		coupleRows:       coupleRows,
-		Items:            items,
-		Shortcuts:        shortcuts,
-		Hennas:           hennas,
-		RecipeBooks:      recipeBooks,
-		KnownSkills:      knownSkills,
-		Pets:             petStore,
-		InventoryUpdates: inventoryUpdates,
-		ItemInstances:    itemInstances,
-		GroundItems:      groundItems,
-		ShadowItems:      shadowItems,
-		AttackStance:     attackStance,
-		Effects:          taskEffects,
-		effectEnv:        effectEnv,
-		castEffects:      gcl.HostileCastEffects(),
-		rewardParties:    o.rewardParties(gcl),
-		raidKills:        gcl,
-		lootChannels:     o.lootChannels(gcl),
-		stance:           gclConfig.AttackStance,
-		maxGeoPathFail:   o.maxGeoPathFailCount,
-		zones:            o.zones,
-		decay:            o.decay,
-		AI:               ai,
-		NpcSpawns:        npcSpawns,
-		Water:            water,
-		BuyListStock:     stock,
-		BuyListRows:      buyListStore,
-		account:          o.account,
-		templates:        templates,
-		ids:              ids,
-		positions:        positions,
-		addr:             ln.Addr(),
-		sessions:         sessions,
-		groundStore:      gamesql.NewGroundItemStore(db),
-		cursedWeapons:    cursed,
-		autosave:         autosave,
-		gameClock:        clock,
-		autosaveClock:    autosaveClock,
-		persist:          persistWorker,
-		queues:           queues,
-		traffic:          frames,
-		log:              o.log,
-		logs:             logs,
-		cancel:           cancel,
-		waitHandlers:     waitHandlers,
-		sendObserver:     sendObserver,
+		Client:              c,
+		State:               state,
+		WorldObjects:        worldObjects,
+		doors:               doors,
+		Boats:               boats,
+		Derby:               derbyTrack,
+		Clans:               gclConfig.Clans,
+		Castles:             gclConfig.Castles,
+		HallFunctions:       hallFunctions,
+		SevenSigns:          sevenSigns,
+		Festival:            fest,
+		itemTable:           itemTemplates,
+		levelTable:          levels,
+		deepBlueDrops:       o.deepBlueDropRules,
+		autoLoot:            o.autoLoot,
+		DB:                  db,
+		RaidPoints:          raidPoints,
+		Lottery:             lotteryState,
+		FishingChampionship: fishChampState,
+		Chars:               chars,
+		Relations:           relations,
+		relationRows:        relationRows,
+		Petitions:           petitions,
+		petitionRows:        petitionRows,
+		Couples:             couples,
+		coupleRows:          coupleRows,
+		Items:               items,
+		Shortcuts:           shortcuts,
+		Hennas:              hennas,
+		RecipeBooks:         recipeBooks,
+		KnownSkills:         knownSkills,
+		Pets:                petStore,
+		InventoryUpdates:    inventoryUpdates,
+		ItemInstances:       itemInstances,
+		GroundItems:         groundItems,
+		ShadowItems:         shadowItems,
+		AttackStance:        attackStance,
+		Effects:             taskEffects,
+		effectEnv:           effectEnv,
+		castEffects:         gcl.HostileCastEffects(),
+		rewardParties:       o.rewardParties(gcl),
+		raidKills:           gcl,
+		lootChannels:        o.lootChannels(gcl),
+		stance:              gclConfig.AttackStance,
+		maxGeoPathFail:      o.maxGeoPathFailCount,
+		zones:               o.zones,
+		decay:               o.decay,
+		AI:                  ai,
+		NpcSpawns:           npcSpawns,
+		Water:               water,
+		BuyListStock:        stock,
+		BuyListRows:         buyListStore,
+		account:             o.account,
+		templates:           templates,
+		ids:                 ids,
+		positions:           positions,
+		addr:                ln.Addr(),
+		sessions:            sessions,
+		groundStore:         gamesql.NewGroundItemStore(db),
+		cursedWeapons:       cursed,
+		autosave:            autosave,
+		gameClock:           clock,
+		autosaveClock:       autosaveClock,
+		persist:             persistWorker,
+		queues:              queues,
+		traffic:             frames,
+		log:                 o.log,
+		logs:                logs,
+		cancel:              cancel,
+		waitHandlers:        waitHandlers,
+		sendObserver:        sendObserver,
 	}
 	srv.AnnounceFile = announcementsPath
 	srv.refreshRecommendations = gcl.RefreshDailyRecommendations

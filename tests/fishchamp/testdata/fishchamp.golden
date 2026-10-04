@@ -1,0 +1,170 @@
+# setEndOfChamp
+end 2026-10-06T19:00:00Z -> 2026-10-13T19:00:00Z
+end 2026-10-06T18:59:59.999Z -> 2026-10-13T19:00:00.999Z
+end 2026-10-06T19:00:00.001Z -> 2026-10-13T19:00:00.001Z
+end 2026-10-07T10:30:15.123Z -> 2026-10-13T19:00:00.123Z
+end 2026-10-08T00:00:00Z -> 2026-10-13T19:00:00Z
+end 2026-10-09T23:59:59Z -> 2026-10-13T19:00:00Z
+end 2026-10-10T12:00:00Z -> 2026-10-13T19:00:00Z
+end 2026-10-11T00:00:00Z -> 2026-10-13T19:00:00Z
+end 2026-10-12T23:59:59.999Z -> 2026-10-20T19:00:00.999Z
+end 2026-10-13T00:00:00Z -> 2026-10-20T19:00:00Z
+end 2026-12-29T19:00:00Z -> 2027-01-05T19:00:00Z
+end 2026-12-31T08:00:00.500Z -> 2027-01-05T19:00:00.500Z
+end 2027-02-23T19:00:00Z -> 2027-03-02T19:00:00Z
+end 2028-02-28T19:00:00Z -> 2028-03-07T19:00:00Z
+# fresh table, Wednesday
+BOOT @2026-10-07T10:30:15.123Z minutes=9149
+CHAMP
+HTML fish_event001.htm <tr><td width=70 align=center>1</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>2</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>3</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>4</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>5</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr>|Adena|800000|500000|300000|200000|100000|9149|1000
+MID
+HTML fish_event003.htm
+MID
+HTML fish_event002.htm <tr><td width=70 align=center>1</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>2</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>3</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>4</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>5</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr>|Adena|800000|500000|300000|200000|100000
+FISH Alpha lure=6520
+MSG 1847 70.345
+MSG 1848
+FISH Bravo lure=6520
+MSG 1847 60.0
+MSG 1848
+FISH alpha lure=6520
+MSG 1847 65.0
+FISH Charlie lure=8484
+MSG 1847 82.0
+MSG 1848
+FISH Delta lure=6520
+MSG 1847 90.0
+MSG 1848
+FISH Echo lure=6520
+MSG 1847 75.123
+MSG 1848
+FISH Foxtrot lure=6520
+MSG 1847 60.0
+FISH Foxtrot lure=6520
+MSG 1847 61.999
+MSG 1848
+FISH ALPHA lure=8485
+MSG 1847 72.345
+MSG 1848
+FISH Golf lure=8486
+MSG 1847 78.39999999999999
+MSG 1848
+MID
+HTML fish_event002.htm <tr><td width=70 align=center>1</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>2</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>3</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>4</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>5</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr>|Adena|800000|500000|300000|200000|100000
+@2026-10-07T10:31:16Z minutes=9148
+MID
+HTML fish_event003.htm
+MID
+HTML fish_event002.htm <tr><td width=70 align=center>1</td><td width=110 align=center>Delta</td><td width=80 align=center>90.0</td></tr><tr><td width=70 align=center>2</td><td width=110 align=center>Charlie</td><td width=80 align=center>82.0</td></tr><tr><td width=70 align=center>3</td><td width=110 align=center>Golf</td><td width=80 align=center>78.39999999999999</td></tr><tr><td width=70 align=center>4</td><td width=110 align=center>Echo</td><td width=80 align=center>75.123</td></tr><tr><td width=70 align=center>5</td><td width=110 align=center>Alpha</td><td width=80 align=center>72.345</td></tr>|Adena|800000|500000|300000|200000|100000
+CHAMP
+HTML fish_event001.htm <tr><td width=70 align=center>1</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>2</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>3</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>4</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>5</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr>|Adena|800000|500000|300000|200000|100000|9148|1000
+REWARD Alpha
+HTML no_fish_event_reward001.htm
+@2026-10-13T19:00:00.123Z minutes=10080
+CHAMP
+HTML fish_event001.htm <tr><td width=70 align=center>1</td><td width=110 align=center>Delta</td><td width=80 align=center>90.0</td></tr><tr><td width=70 align=center>2</td><td width=110 align=center>Charlie</td><td width=80 align=center>82.0</td></tr><tr><td width=70 align=center>3</td><td width=110 align=center>Golf</td><td width=80 align=center>78.39999999999999</td></tr><tr><td width=70 align=center>4</td><td width=110 align=center>Echo</td><td width=80 align=center>75.123</td></tr><tr><td width=70 align=center>5</td><td width=110 align=center>Alpha</td><td width=80 align=center>72.345</td></tr>|Adena|800000|500000|300000|200000|100000|10080|1000
+MID
+HTML fish_event003.htm
+MID
+HTML fish_event002.htm <tr><td width=70 align=center>1</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>2</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>3</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>4</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>5</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr>|Adena|800000|500000|300000|200000|100000
+REWARD alpha
+HTML no_fish_event_reward001.htm
+REWARD Alpha
+ADD 57 100000
+HTML fish_event_reward001.htm
+REWARD Alpha
+REWARD Delta
+ADD 57 800000
+HTML fish_event_reward001.htm
+FISH Hotel lure=6520
+MSG 1847 63.003
+MSG 1848
+MEMO 1792522800123
+ROW Delta 90.0 2
+ROW Charlie 82.0 1
+ROW Golf 78.4 1
+ROW Echo 75.123 1
+ROW Alpha 72.345 2
+ROW Hotel 63.003 0
+RESTART @2026-10-13T19:00:00.123Z minutes=10080
+CHAMP
+HTML fish_event001.htm <tr><td width=70 align=center>1</td><td width=110 align=center>Delta</td><td width=80 align=center>90.0</td></tr><tr><td width=70 align=center>2</td><td width=110 align=center>Charlie</td><td width=80 align=center>82.0</td></tr><tr><td width=70 align=center>3</td><td width=110 align=center>Golf</td><td width=80 align=center>78.4</td></tr><tr><td width=70 align=center>4</td><td width=110 align=center>Echo</td><td width=80 align=center>75.123</td></tr><tr><td width=70 align=center>5</td><td width=110 align=center>Alpha</td><td width=80 align=center>72.345</td></tr>|Adena|800000|500000|300000|200000|100000|10080|1000
+REWARD Charlie
+ADD 57 500000
+HTML fish_event_reward001.htm
+@2026-10-20T19:00:00.123Z minutes=10080
+CHAMP
+HTML fish_event001.htm <tr><td width=70 align=center>1</td><td width=110 align=center>Hotel</td><td width=80 align=center>63.003</td></tr><tr><td width=70 align=center>2</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>3</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>4</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>5</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr>|Adena|800000|500000|300000|200000|100000|10080|1000
+REWARD Golf
+HTML no_fish_event_reward001.htm
+MEMO 1793127600123
+ROW Hotel 63.003 1
+# restored week still running, Sunday
+BOOT @2026-10-11T08:00:00Z minutes=3540
+CHAMP
+HTML fish_event001.htm <tr><td width=70 align=center>1</td><td width=110 align=center>Quebec</td><td width=80 align=center>90.0</td></tr><tr><td width=70 align=center>2</td><td width=110 align=center>Lima</td><td width=80 align=center>88.25</td></tr><tr><td width=70 align=center>3</td><td width=110 align=center>Oscar</td><td width=80 align=center>88.25</td></tr><tr><td width=70 align=center>4</td><td width=110 align=center>Mike</td><td width=80 align=center>61.0</td></tr><tr><td width=70 align=center>5</td><td width=110 align=center>Romeo</td><td width=80 align=center>60.5</td></tr>|Adena|800000|500000|300000|200000|100000|3540|1000
+REWARD Mike
+REWARD Sierra
+REWARD Oscar
+ADD 57 300000
+HTML fish_event_reward001.htm
+REWARD November
+HTML no_fish_event_reward001.htm
+MID
+HTML fish_event003.htm
+MID
+HTML fish_event002.htm <tr><td width=70 align=center>1</td><td width=110 align=center>Kilo</td><td width=80 align=center>75.5</td></tr><tr><td width=70 align=center>2</td><td width=110 align=center>Papa</td><td width=80 align=center>66.6</td></tr><tr><td width=70 align=center>3</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>4</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>5</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr>|Adena|800000|500000|300000|200000|100000
+FISH Uniform lure=6520
+MSG 1847 60.1
+MSG 1848
+FISH Kilo lure=6520
+MSG 1847 70.0
+@2026-10-13T18:59:59.999Z minutes=0
+@2026-10-13T19:00:00Z minutes=10080
+CHAMP
+HTML fish_event001.htm <tr><td width=70 align=center>1</td><td width=110 align=center>Kilo</td><td width=80 align=center>75.5</td></tr><tr><td width=70 align=center>2</td><td width=110 align=center>Papa</td><td width=80 align=center>66.6</td></tr><tr><td width=70 align=center>3</td><td width=110 align=center>Uniform</td><td width=80 align=center>60.1</td></tr><tr><td width=70 align=center>4</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>5</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr>|Adena|800000|500000|300000|200000|100000|10080|1000
+REWARD Lima
+HTML no_fish_event_reward001.htm
+REWARD Kilo
+ADD 57 800000
+HTML fish_event_reward001.htm
+MEMO 1792522800000
+ROW Kilo 75.5 2
+ROW Papa 66.6 1
+ROW Uniform 60.1 1
+# restored week over, boot ends it
+BOOT @2026-10-14T09:15:00.250Z minutes=9225
+CHAMP
+HTML fish_event001.htm <tr><td width=70 align=center>1</td><td width=110 align=center>Victor</td><td width=80 align=center>80.125</td></tr><tr><td width=70 align=center>2</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>3</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>4</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>5</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr>|Adena|800000|500000|300000|200000|100000|9225|1000
+REWARD Whiskey
+HTML no_fish_event_reward001.htm
+REWARD Victor
+ADD 57 800000
+HTML fish_event_reward001.htm
+MEMO 1792522800250
+ROW Victor 80.125 2
+# fresh table, Monday night
+BOOT @2026-10-12T23:59:59.999Z minutes=11220
+CHAMP
+HTML fish_event001.htm <tr><td width=70 align=center>1</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>2</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>3</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>4</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>5</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr>|Adena|800000|500000|300000|200000|100000|11220|1000
+MEMO 1792522800999
+# fresh table, Tuesday after the end hour
+BOOT @2026-10-13T19:30:00Z minutes=10050
+FISH Xray lure=6520
+MSG 1847 90.0
+MSG 1848
+FISH Yankee lure=6520
+MSG 1847 90.0
+MSG 1848
+@2026-10-20T19:30:00Z minutes=10050
+CHAMP
+HTML fish_event001.htm <tr><td width=70 align=center>1</td><td width=110 align=center>Xray</td><td width=80 align=center>90.0</td></tr><tr><td width=70 align=center>2</td><td width=110 align=center>Yankee</td><td width=80 align=center>90.0</td></tr><tr><td width=70 align=center>3</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>4</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr><tr><td width=70 align=center>5</td><td width=110 align=center>None</td><td width=80 align=center>0</td></tr>|Adena|800000|500000|300000|200000|100000|10050|1000
+REWARD Yankee
+ADD 57 500000
+HTML fish_event_reward001.htm
+REWARD Xray
+ADD 57 800000
+HTML fish_event_reward001.htm
+MEMO 1793127600000
+ROW Xray 90.0 2
+ROW Yankee 90.0 2
