@@ -251,7 +251,7 @@ func (p *Persistence) RestoreSkillState(ctx context.Context, c *player.Character
 	// The rows are filtered on p.now; the timers kept carry their stored
 	// expiry and are checked on c's queue clock from then on, and the
 	// staged effects run from c's queue clock instant (stageSkillState).
-	p.stageSkillState(c, rows, p.currentTime())
+	p.stageSkillState(c, rows, p.currentTime(), c.Now())
 	if _, err := p.store.DeleteByCharacter(ctx, c.ID, classIndex); err != nil {
 		return fmt.Errorf("clear restored skill state for character %d: %w", c.ID, err)
 	}
@@ -260,11 +260,11 @@ func (p *Persistence) RestoreSkillState(ctx context.Context, c *player.Character
 
 // stageSkillState restores rows' reuse timers onto c and stages their
 // effects for ReplayEffects, dropping what has run out by now. The staged
-// effects' schedules run from this instant on c's clock, as an effect
-// restored straight onto the character's list would.
-func (p *Persistence) stageSkillState(c *player.Character, rows []effect.SaveRow, now time.Time) {
+// effects' schedules run from restoredAt on c's clock, as an effect
+// restored straight onto the character's list would; a zero restoredAt
+// runs them from the replay itself, so it runs none of their ticks.
+func (p *Persistence) stageSkillState(c *player.Character, rows []effect.SaveRow, now, restoredAt time.Time) {
 	plan := effect.BuildRestorePlan(rows, now.UnixMilli(), p.lookup)
-	restoredAt := c.Now()
 	for _, reuse := range plan.Reuse {
 		def, ok := p.definition(reuse.Skill)
 		if !ok {
@@ -330,12 +330,13 @@ func (p *Persistence) ApplyClassSkills(c *player.Character, cs ClassSkills) erro
 
 // StageClassSkillState restores the reuse timers cs saved onto c and
 // stages its effects for ReplayEffects, dropping what has run out. Call it
-// on c's queue.
+// on c's queue, right before ReplayEffects: c is in the world, so its
+// effects run from that replay and it runs none of their ticks.
 func (p *Persistence) StageClassSkillState(c *player.Character, cs ClassSkills) {
 	if p == nil || c == nil {
 		return
 	}
-	p.stageSkillState(c, cs.saved, c.Now())
+	p.stageSkillState(c, cs.saved, c.Now(), time.Time{})
 }
 
 // RemoveAllSkills takes every skill c knows away, with its passive stats,
@@ -1224,7 +1225,9 @@ func (p *Persistence) RestoreDuelState(c *player.Character, st SaveState) {
 	if p == nil || c == nil {
 		return
 	}
-	p.stageSkillState(c, st.rows, c.Now())
+	// c is in the world: its effects run from the replay, which runs none
+	// of their ticks.
+	p.stageSkillState(c, st.rows, c.Now(), time.Time{})
 	p.ReplayEffects(c)
 }
 

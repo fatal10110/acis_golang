@@ -62,8 +62,11 @@ type restoreBatch struct {
 
 // Restore runs apply, whose AddRestored calls join l without their icon
 // refreshes, then the actions of the ticks of those effects that came due
-// before now, in time order across all of them (see catchUp), and then
-// refreshes the icons once. The reference schedules every restored effect
+// by the instant Restore began, in time order across all of them (see
+// catchUp), and then refreshes the icons once. A tick that comes due while
+// apply runs is left to the effects sweep: an effect anchored at the replay
+// itself has its first tick at least restoreMinDelay after its add, so
+// however long apply takes, the replay never runs it. The reference schedules every restored effect
 // at the restore instant on its own fixed-rate task, so the ticks due since
 // then interleave by time, not by the order the effects were saved in. A
 // Restore inside another one just runs apply: the outermost one catches up
@@ -82,6 +85,7 @@ func (l *List) Restore(apply func()) {
 	b := &restoreBatch{}
 	l.restoring = b
 	l.mu.Unlock()
+	start := l.now()
 	defer func() {
 		l.mu.Lock()
 		l.restoring = nil
@@ -97,7 +101,7 @@ func (l *List) Restore(apply func()) {
 		runHooks(exits)
 		return
 	}
-	exits = append(exits, l.catchUp(added)...)
+	exits = append(exits, l.catchUp(added, start)...)
 	l.notifyAbnormalUpdate()
 	runHooks(exits)
 	l.notifyActivityTransition()
@@ -136,8 +140,8 @@ func (l *List) addAnnounced(e *Effect, announce bool) {
 }
 
 // catchUp runs, in time order, the ticks of the restored effects that came
-// due before now: the ticks of the loading screen, which the restore instant
-// put behind the replay. It always runs the earliest due tick next, the
+// due by now, the instant the replay began: the ticks of the loading
+// screen, which the restore instant put behind the replay. It always runs the earliest due tick next, the
 // first restored effect first on a tie. Each runs as a scheduled tick does
 // (tickAt): it counts down, and the action of an in-use effect runs. When
 // the count runs out or an action reports false, the effect leaves the
@@ -145,8 +149,7 @@ func (l *List) addAnnounced(e *Effect, announce bool) {
 // icon refresh to the caller, which sends one for the whole replay; it
 // returns the exit hooks that removal queued, to run after that refresh as
 // Remove runs them. With no tick due it changes nothing.
-func (l *List) catchUp(restored []*Effect) []func() {
-	now := l.now()
+func (l *List) catchUp(restored []*Effect, now time.Time) []func() {
 	var exits []func()
 	for {
 		e := l.nextDue(restored, now)
