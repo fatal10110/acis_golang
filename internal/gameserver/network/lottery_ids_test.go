@@ -121,3 +121,60 @@ func TestLotteryClaimWithoutObjectIDKeepsTicket(t *testing.T) {
 		t.Fatalf("adena = %d after the claim, want 5000", got)
 	}
 }
+
+// countingIDs hands out ids from next and tracks those not yet given back.
+type countingIDs struct {
+	next        int32
+	outstanding map[int32]bool
+}
+
+func (c *countingIDs) NextID() (int32, error) {
+	c.next++
+	if c.outstanding == nil {
+		c.outstanding = map[int32]bool{}
+	}
+	c.outstanding[c.next] = true
+	return c.next, nil
+}
+
+func (c *countingIDs) ReleaseID(id int32) { delete(c.outstanding, id) }
+
+// TestLotteryUnpaidPurchaseHoldsNoObjectID: a purchase refused for want of
+// adena gives back the ticket id it took, however often it is repeated, so
+// resending the form's buy link cannot drain the id factory.
+func TestLotteryUnpaidPurchaseHoldsNoObjectID(t *testing.T) {
+	capture := &testsupport.FrameCapture{}
+	live := newEquipTestLivePlayer(t, 1, capture, lotteryTestTemplates(), []*item.Instance{
+		{ObjectID: 500, OwnerID: 1, TemplateID: item.AdenaID, Count: 1, Location: item.LocationInventory},
+	})
+	live.lottoPicks = firstFivePicks()
+	lot := lottery.New(lottery.DefaultConfig(), drawnRoundStore{}, nil, nil, idleQueue(), zerolog.Nop())
+	ids := &countingIDs{next: 9000}
+	l := &GameClientLink{log: zerolog.Nop(), ids: ids, lottery: lot}
+	prize := lot.Status().Prize
+
+	for range 100 {
+		if l.buyLotteryTicket(live) {
+			t.Fatal("an unpaid purchase went through")
+		}
+	}
+	if n := len(ids.outstanding); n != 0 {
+		t.Fatalf("%d object ids held after 100 unpaid purchases, want none", n)
+	}
+	if got := live.Inventory().Adena(); got != 1 {
+		t.Fatalf("adena = %d after unpaid purchases, want 1", got)
+	}
+	if got := lot.Status().Prize; got != prize {
+		t.Fatalf("jackpot = %d after unpaid purchases, want %d", got, prize)
+	}
+
+	if live.Inventory().AddNew(item.AdenaID, int(lottery.DefaultConfig().TicketPrice), 501) == nil {
+		t.Fatal("could not give the buyer the ticket price")
+	}
+	if !l.buyLotteryTicket(live) {
+		t.Fatal("a paid purchase was refused")
+	}
+	if n := len(ids.outstanding); n != 1 {
+		t.Fatalf("%d object ids held after one paid purchase, want the ticket's one", n)
+	}
+}

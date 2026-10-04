@@ -156,6 +156,7 @@ func (l *GameClientLink) buyLotteryTicket(live *livePlayer) bool {
 	round := lot.Status().Round
 	price := lot.Config().TicketPrice
 	if !reduceAdena(live, int(price)) {
+		l.releaseObjectID(id)
 		return false
 	}
 	lot.IncreasePrize(price)
@@ -163,6 +164,8 @@ func (l *GameClientLink) buyLotteryTicket(live *livePlayer) bool {
 		ticket.SetCustomType1(int(round))
 		inv.SetEnchantLevel(ticket, int(numbers.Low))
 		ticket.SetCustomType2(int(numbers.High))
+	} else {
+		l.releaseObjectID(id)
 	}
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageEarnedItemS1, lottery.TicketID))
 	return true
@@ -196,10 +199,24 @@ func (l *GameClientLink) claimLotteryTicket(live *livePlayer, objectID int32) {
 			return
 		}
 	}
-	if !destroyHeldItem(live, inst, st.Count) || adena <= 0 {
+	if !destroyHeldItem(live, inst, st.Count) {
+		if adena > 0 {
+			l.releaseObjectID(id)
+		}
 		return
 	}
-	live.AddRewardItem(item.AdenaID, int(adena), id)
+	if adena > 0 {
+		live.AddRewardItem(item.AdenaID, int(adena), id)
+	}
+}
+
+// releaseObjectID gives back id, taken for a ticket or payout that was then
+// refused, so a refused attempt holds no object id; an allocator that
+// cannot take ids back keeps it.
+func (l *GameClientLink) releaseObjectID(id int32) {
+	if r, ok := l.ids.(interface{ ReleaseID(int32) }); ok {
+		r.ReleaseID(id)
+	}
 }
 
 // destroyHeldItem destroys count units of inst out of live's inventory,
