@@ -23,6 +23,10 @@ type SocialGraph interface {
 	ClanLeaderID(clanID int32) int32
 	// AtWar reports whether clanID declared war on targetClanID.
 	AtWar(clanID, targetClanID int32) bool
+	// ClanCastleID and ClanHallID are the castle and clan hall the clan
+	// owns now, 0 when it owns none or there is no such clan.
+	ClanCastleID(clanID int32) int32
+	ClanHallID(clanID int32) int32
 }
 
 // socialPeer is the player state the social rules read from the player
