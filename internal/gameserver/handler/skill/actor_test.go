@@ -45,12 +45,11 @@ var (
 	_ earlyCastBreaker = (*player.Character)(nil)
 
 	// Caster-side surfaces resolved from Cast.Caster. cancelTarget above
-	// and these three share a Level() int requirement that *player.Character
+	// and magicCaster share a Level() int requirement that *player.Character
 	// could not meet until its persisted level field was renamed off of
 	// Level to make room for the method (see player.Character.CharLevel).
-	_ magicCaster   = (*player.Character)(nil)
-	_ sowCaster     = (*player.Character)(nil)
-	_ harvestCaster = (*player.Character)(nil)
+	_ magicCaster = (*player.Character)(nil)
+	_ harvester   = (*player.Character)(nil)
 
 	// Signet: the radius scan hands each found object to the tick as an
 	// Actor, and an anti-summon signet narrows that to a dismissable summon.

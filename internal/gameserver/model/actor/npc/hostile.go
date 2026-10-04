@@ -285,6 +285,7 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 		spiritshotRate:     spiritshotRate,
 	}
 	h.zones = newZoneMember(h)
+	h.initSeedState()
 	h.maxBuffsAmount.Store(maxBuffCount)
 	// Raid and grand bosses are raid-related from construction; minions
 	// are marked at spawn (see SetRaidRelated).

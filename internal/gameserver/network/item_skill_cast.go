@@ -235,6 +235,7 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 	sendSkillItemCharge(live, def, plan.ItemCharge)
 
 	handlers := l.castEffects()
+	payload := l.castCarrierPayload(carrier)
 	var affected []skilltarget.Actor
 	return func() {
 		controller.Schedule(plan, actorcast.Hooks{
@@ -244,7 +245,7 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 				return ok
 			},
 			Hit: func() {
-				l.applyCastHit(live, handlers, affected, def)
+				l.applyItemCastHit(live, handlers, affected, def, payload)
 			},
 			Failed: func(err error) {
 				sendMagicCastFailureReason(live, def, err)

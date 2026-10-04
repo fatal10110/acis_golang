@@ -22,6 +22,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/manor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
@@ -95,6 +96,10 @@ type gameData struct {
 	ArmorSets        *armorset.Table
 	// ClanHalls are the clan halls a clan can own.
 	ClanHalls *clanhall.Table
+	// Manors are the manor seed rows; ManorAreas the areas monsters are
+	// sown in.
+	Manors     *manor.Table
+	ManorAreas *manor.AreaIndex
 }
 
 type geodata struct {
@@ -213,6 +218,10 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
+	manors, manorAreas, err := loadManor(xmlRoot, log)
+	if err != nil {
+		return nil, err
+	}
 	geo, err := loadGeodata(paths, log)
 	if err != nil {
 		return nil, err
@@ -246,6 +255,8 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		Augmentations:    augmentations,
 		ArmorSets:        armorSets,
 		ClanHalls:        clanHalls,
+		Manors:           manors,
+		ManorAreas:       manorAreas,
 	}, nil
 }
 

@@ -394,6 +394,8 @@ type GameClientLink struct {
 	// npcSpawns is the live NPC population the admin spawn commands use;
 	// see SetNpcSpawns.
 	npcSpawns atomic.Pointer[manager.Npcs]
+	// manor is what the seed and harvester items read.
+	manor ManorConfig
 }
 
 // AIRegistry owns recurring actor-AI registrations.
@@ -552,6 +554,9 @@ type GameClientLinkConfig struct {
 	// enchant grants and revokes; nil grants none. The equip-time set
 	// skills come from the skill persistence's own table.
 	ArmorSets *armorset.Table
+	// Manor is what the seed and harvester items and the harvest read; the
+	// zero value turns the manor off.
+	Manor ManorConfig
 	// Macros persists each player's macro list; nil keeps macros in memory
 	// only.
 	Macros macroStore
@@ -677,6 +682,8 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 			Effects:   cfg.Effects,
 			Queues:    cfg.Queues,
 			Log:       cfg.Log,
+
+			ManorCropRate: cfg.Manor.CropRate,
 		}),
 		log:          cfg.Log,
 		now:          cfg.Now,
@@ -684,6 +691,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		noCipher:     cfg.NoCipher,
 	}
 	link.macros = cfg.Macros
+	link.manor = cfg.Manor
 	link.recommendations = cfg.Recommendations
 	// Built here, not lazily: every client goroutine shares this link.
 	enchantCfg := enchantflow.DefaultConfig()

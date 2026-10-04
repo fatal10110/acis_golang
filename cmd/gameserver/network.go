@@ -232,6 +232,7 @@ func provideGameClientLink(
 		Augmentations:       data.Augmentations,
 		AugmentationChances: gameplay.AugmentationChances,
 		ArmorSets:           data.ArmorSets,
+		Manor:               manorConfig(gameplay.Manor, data),
 
 		Relations:    relations,
 		Characters:   characters,

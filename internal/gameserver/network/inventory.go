@@ -104,6 +104,9 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool, ro
 	if l.usePaganKey(live, inv, inst, tmpl) {
 		return
 	}
+	if l.useManorItem(live, inv, inst, tmpl) {
+		return
+	}
 	if l.useTargetCastItem(live, inv, inst, ctrl) {
 		return
 	}

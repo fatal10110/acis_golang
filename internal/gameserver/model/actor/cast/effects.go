@@ -155,10 +155,17 @@ func ResolveAffected(handlers EffectHandlers, caster skilltarget.Actor, resolved
 // single selection. See ResolveAffected's doc for why a caller needs this
 // split.
 func ApplyResolvedEffectsResult(handlers EffectHandlers, caster skilltarget.Actor, affected []skilltarget.Actor, def modelskill.Definition) EffectResult {
+	return ApplyResolvedItemEffectsResult(handlers, caster, affected, def, nil)
+}
+
+// ApplyResolvedItemEffectsResult is ApplyResolvedEffectsResult for a cast
+// that carries the item it was cast with (e.g. a seed's SOW cast), threading
+// item through to the skill handler as handlerskill.Cast.Item.
+func ApplyResolvedItemEffectsResult(handlers EffectHandlers, caster skilltarget.Actor, affected []skilltarget.Actor, def modelskill.Definition, item any) EffectResult {
 	if handlers.Skills == nil || len(affected) == 0 {
 		return EffectResult{}
 	}
-	return dispatchEffects(handlers, caster, affected, def, nil)
+	return dispatchEffects(handlers, caster, affected, def, item)
 }
 
 func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected []skilltarget.Actor, def modelskill.Definition, item any) EffectResult {

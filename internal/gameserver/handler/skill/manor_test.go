@@ -1,6 +1,7 @@
 package skill
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
@@ -10,28 +11,62 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-// ---- from manor_test.go ----
+// Reference: Sow.java and Harvest.java. Only a player sows or harvests, only
+// a Monster is a target, and each gate answers the caster with its own
+// system message; a harvest takes the crop of the seed (its "id", not its
+// matureId) times RateDropManor, and the sower's party may harvest too.
+
 type manorFakeTarget struct {
 	neutralNPC
 	world.Presence
 	fakeActor
-	dead  bool
-	level int
-	state *npc.SeedState
+	dead    bool
+	level   int
+	monster bool
+	state   *npc.SeedState
 }
 
 func (m *manorFakeTarget) Kind() actor.Kind          { return actor.KindNPC }
 func (m *manorFakeTarget) Dead() bool                { return m.dead }
 func (m *manorFakeTarget) Level() int                { return m.level }
 func (m *manorFakeTarget) SeedState() *npc.SeedState { return m.state }
+func (m *manorFakeTarget) MonsterKind() bool         { return m.monster }
 
-// sownState is a seed state already sown by sowerID, carrying a crop that
-// matures into matureID.
-func sownState(sowerID int32, matureID int) *npc.SeedState {
-	state := &npc.SeedState{}
-	state.Sow(sowerID, manor.Seed{MatureID: matureID})
-	return state
+func freshMonster(level int) *manorFakeTarget {
+	return &manorFakeTarget{level: level, monster: true, state: &npc.SeedState{}}
 }
+
+// manorFakePlayer is a player caster that earns items and knows which
+// player ids share its party.
+type manorFakePlayer struct {
+	neutralPlayer
+	world.Presence
+	id    int32
+	level int
+	party []int32
+	items map[int32]int
+}
+
+func (p *manorFakePlayer) ObjectID() int32 { return p.id }
+func (p *manorFakePlayer) Level() int      { return p.level }
+func (p *manorFakePlayer) Dead() bool      { return false }
+func (p *manorFakePlayer) InPartyWith(id int32) bool {
+	return slices.Contains(p.party, id)
+}
+
+func (p *manorFakePlayer) AddEarnedItem(itemID int32, count int, nextID func() (int32, error)) bool {
+	if _, err := nextID(); err != nil {
+		return false
+	}
+	if p.items == nil {
+		p.items = make(map[int32]int)
+	}
+	p.items[itemID] += count
+	return true
+}
+
+// darkCoda is seed 5016 (manors.xml: crop 5073, mature 5103, level 10).
+var darkCoda = manor.Seed{CropID: 5073, SeedID: 5016, MatureID: 5103, Level: 10, CastleID: 1}
 
 type manorFakeItem struct {
 	seed manor.Seed
@@ -40,96 +75,144 @@ type manorFakeItem struct {
 
 func (i manorFakeItem) Seed() (manor.Seed, bool) { return i.seed, i.ok }
 
-func harvestRegistry() *Registry {
-	return NewRegistry(harvestHandler{ids: &fakeSignetIDs{}})
+func sowCast(caster Creature, target Actor) Cast {
+	return Cast{
+		Caster:  caster,
+		Item:    manorFakeItem{seed: darkCoda, ok: true},
+		Skill:   modelskill.Definition{SkillType: "SOW"},
+		Targets: []Actor{target},
+	}
 }
 
-func TestSowEventuallySucceedsAndMarksSeeded(t *testing.T) {
-	// Seed/target/player levels all equal give a 90% sow success rate — not
-	// a certainty, so the roll can't be forced deterministically. Retrying
-	// drives the false-negative chance for this assertion to effectively
-	// zero (0.1^300) without depending on a specific random outcome.
-	registry := NewDefaultRegistry()
-	caster := &manorFakeCaster{id: 7, level: 40}
-	item := manorFakeItem{seed: manor.Seed{Level: 40, Alternative: false}, ok: true}
+func harvestCast(caster Creature, target Actor) Cast {
+	return Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "HARVEST"}, Targets: []Actor{target}}
+}
 
-	for i := 0; i < 300; i++ {
-		target := &manorFakeTarget{level: 40, state: &npc.SeedState{}}
-		if !registry.Use(Cast{
-			Caster:  caster,
-			Item:    item,
-			Skill:   modelskill.Definition{SkillType: "SOW"},
-			Targets: []Actor{target},
-		}) {
-			t.Fatal("Use() returned false for SOW")
-		}
-		if target.state.Seeded() {
-			if !target.state.AllowedToHarvest(7) {
-				t.Fatal("sown state does not record the casting player as its sower")
+func manorMessages(t *testing.T, r *Registry, cast Cast) []any {
+	t.Helper()
+	result, ok := r.UseResult(cast)
+	if !ok {
+		t.Fatalf("UseResult(%s) handled = false", cast.Skill.SkillType)
+	}
+	return result.Messages
+}
+
+func TestSowMarksSeededOrAnswersFailedRoll(t *testing.T) {
+	// Seed, target and player levels all within reach give a 90% sow rate:
+	// each attempt either sows and says so, or leaves the target unsown and
+	// says so. Retrying reaches a sown target with near certainty.
+	registry := NewDefaultRegistry()
+	caster := &manorFakePlayer{id: 7, level: 10}
+	for range 300 {
+		target := freshMonster(10)
+		got := manorMessages(t, registry, sowCast(caster, target))
+		switch {
+		case slices.Equal(got, []any{SeedSown}):
+			if !target.state.Seeded() {
+				t.Fatal("SeedSown reported on an unsown target")
+			}
+			if claim := target.state.ClaimHarvest(7, nil); claim != npc.HarvestClaimed {
+				t.Fatalf("sower's own harvest claim = %v, want claimed", claim)
 			}
 			return
+		case slices.Equal(got, []any{SeedNotSown}):
+			if target.state.Seeded() {
+				t.Fatal("SeedNotSown reported on a sown target")
+			}
+		default:
+			t.Fatalf("sow messages = %v, want [SeedSown] or [SeedNotSown]", got)
 		}
 	}
 	t.Fatal("SOW never succeeded in 300 attempts at a 90% success rate")
 }
 
-func TestSowAlreadySeededIsNoop(t *testing.T) {
+func TestSowAlreadySownTargetKeepsSower(t *testing.T) {
 	registry := NewDefaultRegistry()
-	caster := &manorFakeCaster{id: 7, level: 40}
-	target := &manorFakeTarget{level: 40, state: sownState(3, 0)}
-	item := manorFakeItem{seed: manor.Seed{Level: 40}, ok: true}
+	target := freshMonster(10)
+	target.state.Sow(3, darkCoda)
 
-	registry.Use(Cast{Caster: caster, Item: item, Skill: modelskill.Definition{SkillType: "SOW"}, Targets: []Actor{target}})
-	if !target.state.AllowedToHarvest(3) {
-		t.Fatal("already-seeded target should keep its original sower")
+	got := manorMessages(t, registry, sowCast(&manorFakePlayer{id: 7, level: 10}, target))
+	if !slices.Equal(got, []any{SeedAlreadySown}) {
+		t.Fatalf("messages = %v, want [SeedAlreadySown]", got)
+	}
+	if claim := target.state.ClaimHarvest(3, nil); claim != npc.HarvestClaimed {
+		t.Fatalf("original sower's claim = %v, want claimed", claim)
 	}
 }
 
-func TestHarvestRewardsAllowedHarvester(t *testing.T) {
-	registry := harvestRegistry()
-	caster := &manorFakeCaster{id: 7, level: 40}
-	target := &manorFakeTarget{level: 40, state: sownState(7, 5001)}
-
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "HARVEST"}, Targets: []Actor{target}})
-
-	if !target.state.Harvested() {
-		t.Error("target should be marked harvested")
-	}
-	// Assert against the crop the seed state itself reports rather than a
-	// literal, so this still fails if the handler stops threading the count
-	// through and survives #240 changing what the count is.
-	wantID, wantCount := target.state.HarvestedCrop()
-	if wantID != 5001 {
-		t.Fatalf("sown state crop id = %d, want 5001", wantID)
-	}
-	if caster.items[wantID] != wantCount {
-		t.Fatalf("caster earned items = %v, want {%d: %d}", caster.items, wantID, wantCount)
-	}
-}
-
-func TestHarvestDisallowedHarvesterGetsNothing(t *testing.T) {
-	registry := harvestRegistry()
-	caster := &manorFakeCaster{id: 7, level: 40}
-	target := &manorFakeTarget{level: 40, state: sownState(3, 5001)}
-
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "HARVEST"}, Targets: []Actor{target}})
-
-	if target.state.Harvested() {
-		t.Error("a disallowed harvester should not mark the target harvested")
-	}
-	if len(caster.items) != 0 {
-		t.Fatalf("caster earned items = %v, want none", caster.items)
+func TestSowSilentGates(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		caster Creature
+		target *manorFakeTarget
+		item   any
+	}{
+		{"non-player caster", &manorFakeCaster{id: 7, level: 10}, freshMonster(10), manorFakeItem{seed: darkCoda, ok: true}},
+		{"non-monster target", &manorFakePlayer{id: 7, level: 10}, &manorFakeTarget{level: 10, state: &npc.SeedState{}}, manorFakeItem{seed: darkCoda, ok: true}},
+		{"dead target", &manorFakePlayer{id: 7, level: 10}, &manorFakeTarget{level: 10, monster: true, dead: true, state: &npc.SeedState{}}, manorFakeItem{seed: darkCoda, ok: true}},
+		{"no seed row", &manorFakePlayer{id: 7, level: 10}, freshMonster(10), manorFakeItem{}},
+		{"no item", &manorFakePlayer{id: 7, level: 10}, freshMonster(10), nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cast := sowCast(tc.caster, tc.target)
+			cast.Item = tc.item
+			result, _ := NewDefaultRegistry().UseResult(cast)
+			if len(result.Messages) != 0 || tc.target.state.Seeded() {
+				t.Fatalf("messages = %v, seeded = %v; want silent and unsown", result.Messages, tc.target.state.Seeded())
+			}
+		})
 	}
 }
 
-func TestHarvestAlreadyHarvestedIsNoop(t *testing.T) {
-	registry := harvestRegistry()
-	caster := &manorFakeCaster{id: 7, level: 40}
-	target := &manorFakeTarget{level: 40, state: sownState(7, 5001)}
-	target.state.MarkHarvested()
+func TestHarvestGates(t *testing.T) {
+	sownBy := func(sowerID int32) *manorFakeTarget {
+		target := freshMonster(10)
+		target.state.Sow(sowerID, darkCoda)
+		return target
+	}
+	for _, tc := range []struct {
+		name      string
+		target    *manorFakeTarget
+		party     []int32
+		want      []any
+		wantCrops int
+	}{
+		{"non-monster", &manorFakeTarget{level: 10, state: &npc.SeedState{}}, nil, []any{HarvestTargetNotSown}, 0},
+		{"never sown", freshMonster(10), nil, []any{HarvestTargetNotSown}, 0},
+		{"already harvested", func() *manorFakeTarget {
+			target := sownBy(7)
+			target.state.ClaimHarvest(7, nil)
+			return target
+		}(), nil, []any{HarvestFailed}, 0},
+		{"stranger's crop", sownBy(3), nil, []any{HarvestNotAuthorized}, 0},
+		{"own crop", sownBy(7), nil, []any{CropHarvested{CropID: 5073, Count: 3}}, 3},
+		{"party member's crop", sownBy(3), []int32{3}, []any{CropHarvested{CropID: 5073, Count: 3}}, 3},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// cropRate 3 stands in for RateDropManor; the levels are within
+			// five, so the harvest roll always succeeds.
+			registry := NewRegistry(harvestHandler{ids: &fakeSignetIDs{}, cropRate: 3})
+			caster := &manorFakePlayer{id: 7, level: 10, party: tc.party}
+			got := manorMessages(t, registry, harvestCast(caster, tc.target))
+			if !slices.Equal(got, tc.want) {
+				t.Fatalf("messages = %v, want %v", got, tc.want)
+			}
+			if caster.items[5073] != tc.wantCrops || len(caster.items) > 1 {
+				t.Fatalf("earned = %v, want %d of crop 5073", caster.items, tc.wantCrops)
+			}
+		})
+	}
+}
 
-	registry.Use(Cast{Caster: caster, Skill: modelskill.Definition{SkillType: "HARVEST"}, Targets: []Actor{target}})
-	if len(caster.items) != 0 {
-		t.Fatalf("caster earned items = %v, want none", caster.items)
+func TestHarvestIgnoresNonPlayerCaster(t *testing.T) {
+	target := freshMonster(10)
+	target.state.Sow(7, darkCoda)
+	registry := NewRegistry(harvestHandler{ids: &fakeSignetIDs{}, cropRate: 1})
+	result, _ := registry.UseResult(harvestCast(&manorFakeCaster{id: 7, level: 10}, target))
+	if len(result.Messages) != 0 {
+		t.Fatalf("messages = %v, want none", result.Messages)
+	}
+	if claim := target.state.ClaimHarvest(7, nil); claim != npc.HarvestClaimed {
+		t.Fatalf("crop after a non-player harvest: claim = %v, want still claimable", claim)
 	}
 }
