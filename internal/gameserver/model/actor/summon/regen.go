@@ -49,8 +49,9 @@ func (a *Actor) SettleRegen() {
 	a.regen.Settle(a.Queue(), a.regenShort)
 }
 
-// regenShort reports whether a regenerates: spawned, not dead, and below
-// its maximum HP or MP.
+// regenShort reports whether a regenerates: spawned (on the grid or off it
+// mid-relocation, as a hidden owner's summon is), not dead, and below its
+// maximum HP or MP.
 func (a *Actor) regenShort() bool {
-	return a.Visible() && !a.Dead() && (a.HP() < a.MaxHPValue() || a.MPValue() < a.MaxMPValue())
+	return a.Spawned() && !a.Dead() && (a.HP() < a.MaxHPValue() || a.MPValue() < a.MaxMPValue())
 }

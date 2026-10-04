@@ -32,15 +32,17 @@ func (c *Character) Regen() *creature.Regen { return &c.regen }
 // SettleRegen arms c's regeneration task when it is in the world, alive and
 // short of HP, MP or CP, its first tick one period from now, and disarms
 // it otherwise (CreatureStatus.setHp/setMp and PlayerStatus.setCp's start and
-// stop). A character not yet attached has no queue and stays idle.
+// stop). A character not yet attached has no queue and stays idle. A
+// teleport keeps the task on its grid: off the grid until Appearing, c is
+// still in the world.
 func (c *Character) SettleRegen() {
 	c.regen.Settle(c.liveLocked().Queue(), c.regenShort)
 }
 
-// regenShort reports whether c regenerates: in the world, not dead, and
-// below its maximum HP, MP or CP.
+// regenShort reports whether c regenerates: in the world (on the grid or
+// off it mid-teleport), not dead, and below its maximum HP, MP or CP.
 func (c *Character) regenShort() bool {
-	if !c.Visible() || c.Dead() {
+	if !c.Spawned() || c.Dead() {
 		return false
 	}
 	res := c.ResourceValues()

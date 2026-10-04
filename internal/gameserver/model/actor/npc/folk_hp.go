@@ -236,10 +236,10 @@ func (f *Folk) SettleRegen() {
 	f.regen.Settle(f.Queue(), f.regenShort)
 }
 
-// regenShort reports whether the NPC regenerates: spawned, not dead, and
-// below its maximum HP or MP.
+// regenShort reports whether the NPC regenerates: spawned (on the grid or
+// off it mid-relocation), not dead, and below its maximum HP or MP.
 func (f *Folk) regenShort() bool {
-	if !f.Visible() {
+	if !f.Spawned() {
 		return false
 	}
 	maxHP, maxMP := f.MaxHPValue(), f.MaxMPValue()

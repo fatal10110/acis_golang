@@ -129,6 +129,9 @@ func (a *Actor) revive() bool {
 		a.UpdateAbnormalEffect()
 	}
 	a.UpdateStatus()
+	// The restored HP starts the regeneration task, its first tick one
+	// period after the revive.
+	a.SettleRegen()
 	a.emit(event.Revived{})
 	if a.isPet {
 		a.CancelDecay()
