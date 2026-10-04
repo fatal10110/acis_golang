@@ -1,8 +1,11 @@
 package bbs
 
 import (
+	"context"
+	"database/sql"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
@@ -68,4 +71,36 @@ func TestMemoForumAnswersOnlyItsOwner(t *testing.T) {
 	if got := forumRows(t, p.srv); len(got) != 4 || got[3] != (forumRow{4, "MEMO", "ALL", p.bobbyID}) {
 		t.Fatalf("bbs_forum = %+v, want Bobby's memo forum 4", got)
 	}
+}
+
+// TestClanForumTopicIsOffLimits pins the post page of a topic stored in a
+// clan forum, which the memo board can no longer open (#3262) but a row
+// restored at boot still holds: its forum is no memo forum, so the page
+// names the forum off-limits, for the clan's member and an outsider alike,
+// rather than showing the post or calling the forum missing.
+func TestClanForumTopicIsOffLimits(t *testing.T) {
+	seed := gameservertest.WithBoardSeed(func(db *sql.DB) {
+		ctx := context.Background()
+		for _, q := range []struct {
+			query string
+			args  []any
+		}{
+			{`INSERT INTO bbs_forum (id, type, access, owner_id) VALUES (4, 'CLAN_ANN', 'ALL', ?)`, []any{seededClanID}},
+			{`INSERT INTO bbs_topic (id, forum_id, name, date, owner_name, owner_id) VALUES (1, 4, 'Notice', ?, 'Alice', 1)`, []any{time.Now().UnixMilli()}},
+			{`INSERT INTO bbs_post (id, owner_name, owner_id, date, topic_id, forum_id, txt) VALUES (0, 'Alice', 1, ?, 1, 4, 'clan text')`, []any{time.Now().UnixMilli()}},
+		} {
+			if _, err := db.ExecContext(ctx, q.query, q.args...); err != nil {
+				t.Fatalf("%s: %v", q.query, err)
+			}
+		}
+	})
+	p := bootPair(t, gameservertest.WithCommunityBoard(boardOn), seedClan(t, false, ""), seed)
+	p.enterAll(t)
+
+	if got := topicPostRows(t, p.srv, 4); len(got) != 1 || got[0] != "1|Notice|Alice|clan text" {
+		t.Fatalf("clan forum topics = %q, want the seeded topic", got)
+	}
+	const offLimits = "<html><body><br><br><center>The forum is off-limits.</center></body></html>"
+	assertPage(t, command(t, p.alice, "_bbsposts;read;4;1"), offLimits)
+	assertPage(t, command(t, p.bobby, "_bbsposts;read;4;1"), offLimits)
 }
