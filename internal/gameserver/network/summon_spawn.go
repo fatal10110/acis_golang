@@ -776,6 +776,10 @@ func (inertSummonMoveController) RecheckOffensiveFollow(attackable.Combatant, in
 	return false, nil
 }
 
+func (inertSummonMoveController) MaybeStartEntranceFollow(attackable.Combatant, int) (location.Location, bool) {
+	return location.Location{}, false
+}
+
 // summonAIActor adapts a live summon to the shared periodic AI task. The
 // task owns tick scheduling; the summon AI owns its intention state.
 type summonAIActor struct {

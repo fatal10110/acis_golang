@@ -466,7 +466,9 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 	if rider, ok := target.(boatRider); ok && mode == FollowFriendly && !c.selfPlayable() && rider.InBoat() {
 		// No NPC walks after a passenger (CreatureMove.friendlyFollowTask);
 		// the follow stays armed for when it steps ashore. A summon's follow
-		// (SummonMove) and a player's (PlayerMove) have no such check.
+		// (SummonMove) and a player's (PlayerMove) have no such check. No
+		// production NPC friendly-follows yet; the tests/boat coverage of
+		// this branch waits on that caller (#3425).
 		c.move.StartFriendlyFollow(target.ObjectID(), offset)
 		return false, nil
 	}

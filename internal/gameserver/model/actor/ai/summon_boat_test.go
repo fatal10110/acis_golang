@@ -19,6 +19,12 @@ type entranceMove struct {
 	walks          []location.Location
 }
 
+// MaybeStartEntranceFollow on the plain summon fake reports every target in
+// reach: the summon neither walks nor probes a boat entrance.
+func (m *summonMove) MaybeStartEntranceFollow(attackable.Combatant, int) (location.Location, bool) {
+	return location.Location{}, false
+}
+
 func (m *entranceMove) MaybeStartEntranceFollow(target attackable.Combatant, offset int) (location.Location, bool) {
 	m.entranceTarget = target
 	m.friendlyRange = offset

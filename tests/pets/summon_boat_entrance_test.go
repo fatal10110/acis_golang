@@ -119,6 +119,60 @@ func TestPetFollowOfOtherWalksToBoatEntrance(t *testing.T) {
 	}
 }
 
+// TestPetFollowOfOtherStaysWhenNoEntranceCrossed pins the refusal of
+// Playable.tryToPassBoatEntrance with a boat in sight: the pet's walk toward
+// the target crosses no entrance of the boat's dock, so the owner is
+// answered ActionFailed and the pet stays where it is. The pet stands where
+// TestPetFollowOfOtherWalksToBoatEntrance's does, in sight of the boat.
+func TestPetFollowOfOtherStaysWhenNoEntranceCrossed(t *testing.T) {
+	t.Parallel()
+	folkAt := offset(runeShore, 400, 0)
+	h, pet := bootPetOwnerAt(t, runeShore, folkAt, gameservertest.WithBoats(runeItinerary()))
+	x, y, z := pet.Position()
+	if _, ok := h.srv.Boats.Boats()[0].Dock().BoardingPoint(boat.Point{X: x, Y: y}, boat.Point{X: folkAt.X, Y: folkAt.Y}, false); ok {
+		t.Fatalf("the pet's walk from %d,%d to the folk crosses the dock's entrance", x, y)
+	}
+
+	h.client.Send(encodeRequestActionUse(moveToTargetAction, false))
+	dests, failed := petMoves(drainFrames(t, h.client), pet.ObjectID())
+	if len(dests) != 0 || failed != 1 {
+		t.Fatalf("pet moves %v, ActionFailed %d; want no move, one ActionFailed", dests, failed)
+	}
+	if gx, gy, gz := pet.Position(); gx != x || gy != y || gz != z {
+		t.Fatalf("pet at %d,%d,%d, want still at %d,%d,%d", gx, gy, gz, x, y, z)
+	}
+}
+
+// TestPetFollowOfOtherStaysAtBoatEntrance pins Playable.moveToBoatEntrance's
+// other branch: the pet's walk toward the target crosses the entrance, but
+// the shore point lies within 50 of the pet, so the owner is answered
+// ActionFailed and the pet is not walked to where it already stands.
+func TestPetFollowOfOtherStaysAtBoatEntrance(t *testing.T) {
+	t.Parallel()
+	h, pet := bootPetOwnerAt(t, runeShore, runeDock, gameservertest.WithBoats(runeItinerary()))
+	// Just shore-side of the middle of Rune's entrance line.
+	at := location.Location{X: 34475, Y: -37950, Z: runeDock.Z}
+	runOn(t, pet.Queue(), func() { pet.SetXYZ(at.X, at.Y, at.Z) })
+	drainUntilQuiet(t, h.client)
+	x, y, z := pet.Position()
+	point, ok := h.srv.Boats.Boats()[0].Dock().BoardingPoint(boat.Point{X: x, Y: y}, boat.Point{X: runeDock.X, Y: runeDock.Y}, false)
+	if !ok {
+		t.Fatalf("the pet's walk from %d,%d to the dock crosses no entrance", x, y)
+	}
+	if d := (location.Location{X: x, Y: y}).Distance2D(location.Location{X: point.X, Y: point.Y}); d > 50 {
+		t.Fatalf("the entrance %+v lies %.0f from the pet, want within 50", point, d)
+	}
+
+	h.client.Send(encodeRequestActionUse(moveToTargetAction, false))
+	dests, failed := petMoves(drainFrames(t, h.client), pet.ObjectID())
+	if len(dests) != 0 || failed != 1 {
+		t.Fatalf("pet moves %v, ActionFailed %d; want no move, one ActionFailed", dests, failed)
+	}
+	if gx, gy, gz := pet.Position(); gx != x || gy != y || gz != z {
+		t.Fatalf("pet at %d,%d,%d, want still at %d,%d,%d", gx, gy, gz, x, y, z)
+	}
+}
+
 func offset(l location.Location, dx, dy int) location.Location {
 	return location.Location{X: l.X + dx, Y: l.Y + dy, Z: l.Z}
 }

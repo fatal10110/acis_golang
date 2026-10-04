@@ -20,12 +20,6 @@ type BoatEntrance interface {
 	Refuse()
 }
 
-// entranceFollowMove is the move controller of a summon whose follow of
-// anyone but its owner heads for a boat entrance (move.Controller).
-type entranceFollowMove interface {
-	MaybeStartEntranceFollow(target attackable.Combatant, offset int) (location.Location, bool)
-}
-
 // movementDisabler is a summon that can be rooted, stunned, asleep, ...
 type movementDisabler interface {
 	MovementDisabled() bool
@@ -48,14 +42,13 @@ func (s *Summon) SetBoatEntrance(boats BoatEntrance) {
 // to head for, the owner is answered ActionFailed and the summon stays. It
 // reports whether it handled the run.
 func (s *Summon) followThroughBoatEntranceLocked(target attackable.Combatant) (bool, error) {
-	mover, ok := s.move.(entranceFollowMove)
-	if s.boats == nil || !ok {
+	if s.boats == nil {
 		return false, nil
 	}
 	if owner, ok := s.actor.Owner(); ok && owner != nil && sameCombatant(actingPlayer(target), owner) {
 		return false, nil
 	}
-	dest, outOfReach := mover.MaybeStartEntranceFollow(target, summonFollowOffset)
+	dest, outOfReach := s.move.MaybeStartEntranceFollow(target, summonFollowOffset)
 	if !outOfReach {
 		return true, nil
 	}
