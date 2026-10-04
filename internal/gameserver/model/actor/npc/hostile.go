@@ -73,6 +73,9 @@ type Hostile struct {
 	// remover takes this NPC out of the world for DeleteMe; nil despawns it
 	// with no respawn. Installed by Attach.
 	remover Remover
+	// hits watches the hits this NPC registers; nil watches none. Installed
+	// by Attach.
+	hits HitObserver
 	// interacted latches the first unlock attempt on a chest.
 	interacted atomic.Bool
 	// coreAIDisabled turns off this NPC's regular combat behavior; its only
@@ -368,6 +371,8 @@ type Runtime struct {
 	Rewards creature.Rewarder
 	Sink    event.Sink
 	Remover Remover
+	// Hits watches every hit this NPC registers; nil watches none.
+	Hits HitObserver
 }
 
 // Attach installs rt. Call it once, before exposing this NPC to other
@@ -383,6 +388,7 @@ func (h *Hostile) Attach(rt Runtime) {
 	h.rewards = rt.Rewards
 	h.sink = rt.Sink
 	h.remover = rt.Remover
+	h.hits = rt.Hits
 	if rt.Items == nil {
 		return
 	}

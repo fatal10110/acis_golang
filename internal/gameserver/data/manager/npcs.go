@@ -59,6 +59,9 @@ type KillRewardConfig struct {
 	// RaidKills credits a raid or grand boss kill to the killer's side;
 	// nil credits nobody.
 	RaidKills RaidKillRecorder
+	// Channels resolves the command channel that wins a raid or grand
+	// boss's loot rights; nil lets no channel win them.
+	Channels LootChannels
 }
 
 // RaidKillRecorder credits a raid or grand boss kill.
