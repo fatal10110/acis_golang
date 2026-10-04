@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -23,6 +24,9 @@ type DataReloads struct {
 	Admin func() error
 	// Crests reloads the crest images (CrestCache.reload).
 	Crests func() error
+	// CursedWeapons reads the cursed weapons anew (CursedWeaponManager.load),
+	// which the link then takes in place of the ones it had.
+	CursedWeapons func() (*entity.CursedWeaponTable, error)
 	// HTML reloads the HTML pages (HtmCache.reload).
 	HTML func() error
 	// Multisells reloads the multisell lists (MultisellData.reload).
@@ -48,9 +52,9 @@ type DataReloads struct {
 var errReloadNotPorted = errors.New("reload not ported yet")
 
 // reloadNotPorted answers a type no reload exists for yet, each tracked by
-// its issue: boat (#3404), buylist (#3405), config (#3406), cw (#3357), door
-// (#3407), item (#3408), skill (#3409), zone (#3410), and script with the
-// scripts half of npc (#3411).
+// its issue: boat (#3404), buylist (#3405), config (#3406), door (#3407),
+// item (#3408), skill (#3409), zone (#3410), and script with the scripts
+// half of npc (#3411).
 func reloadNotPorted(*GameClientLink) error { return errReloadNotPorted }
 
 // reloadHook runs hook, errReloadNotPorted without one.
@@ -81,7 +85,7 @@ var reloadTypes = []reloadType{
 	{word: "buylist", done: "Buylists have been reloaded.", run: reloadNotPorted},
 	{word: "config", done: "Configs files have been reloaded.", run: reloadNotPorted},
 	{word: "crest", done: "Crests have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Crests) }},
-	{word: "cw", done: "Cursed weapons have been reloaded.", run: reloadNotPorted},
+	{word: "cw", done: "Cursed weapons have been reloaded.", run: (*GameClientLink).reloadCursedWeapons},
 	{word: "door", done: "Doors instance has been reloaded.", run: reloadNotPorted},
 	{word: "htm", done: "The HTM cache has been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.HTML) }},
 	{word: "item", done: "Items' templates have been reloaded.", run: reloadNotPorted},

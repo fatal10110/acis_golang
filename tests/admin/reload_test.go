@@ -111,7 +111,7 @@ func TestAdminReload(t *testing.T) {
 	}
 
 	// Not ported yet: released, nothing reloaded, nothing said.
-	for _, word := range []string{"boat", "buylist", "config", "cw", "door", "item", "script", "skill", "zone"} {
+	for _, word := range []string{"boat", "buylist", "config", "door", "item", "script", "skill", "zone"} {
 		frames := exchange(t, gm, encodeBuildCmd("reload "+word))
 		if len(frames) != 1 || frames[0][0] != serverpackets.OpcodeActionFailed {
 			t.Fatalf("//reload %s frames = %x, want ActionFailed", word, testsupport.FrameOpcodes(frames))

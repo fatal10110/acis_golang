@@ -91,13 +91,13 @@ type Manager struct {
 	log    zerolog.Logger
 	now    func() time.Time
 
-	// byID and order are fixed at construction.
+	// mu guards the weapons and every weapon's state; a write is queued
+	// while it is held, so the lane order is the order the weapons changed
+	// in.
+	mu sync.Mutex
+	// byID and order are set at construction and by Reload.
 	byID  map[int32]*weapon
 	order []*weapon
-
-	// mu guards every weapon's state; a write is queued while it is held,
-	// so the lane order is the order the weapons changed in.
-	mu sync.Mutex
 }
 
 // weapon is one cursed weapon's definition and state.
@@ -105,6 +105,9 @@ type weapon struct {
 	def entity.CursedWeapon
 
 	activated, dropped bool
+	// reserved: a game master is handing the weapon out (Reserve), and
+	// nothing else may bring it out meanwhile.
+	reserved bool
 
 	// playerID is the holder, or the last one while the weapon lies where
 	// its holder dropped it.
@@ -129,17 +132,26 @@ func New(table *entity.CursedWeaponTable, store Store, writes Writer, log zerolo
 	if now == nil {
 		now = time.Now
 	}
-	m := &Manager{store: store, writes: writes, log: log, now: now, byID: map[int32]*weapon{}}
+	m := &Manager{store: store, writes: writes, log: log, now: now}
+	m.byID, m.order = weapons(table)
+	return m
+}
+
+// weapons returns the weapons of table, none of them out yet, by id and in
+// the reference's order.
+func weapons(table *entity.CursedWeaponTable) (map[int32]*weapon, []*weapon) {
+	byID := map[int32]*weapon{}
+	var order []*weapon
 	if table == nil {
-		return m
+		return byID, nil
 	}
 	for _, id := range hashOrder(table.IDs()) {
 		def, _ := table.Weapon(id)
 		w := &weapon{def: def, stage: 1}
-		m.byID[id] = w
-		m.order = append(m.order, w)
+		byID[id] = w
+		order = append(order, w)
 	}
-	return m
+	return byID, order
 }
 
 // hashOrder lists ids in the iteration order of a hash map the reference
@@ -170,6 +182,8 @@ func (m *Manager) IsCursed(itemID int32) bool {
 	if m == nil {
 		return false
 	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	_, ok := m.byID[itemID]
 	return ok
 }
@@ -179,12 +193,12 @@ func (m *Manager) Stage(itemID int32) int32 {
 	if m == nil {
 		return 0
 	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	w := m.byID[itemID]
 	if w == nil {
 		return 0
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	return w.stage
 }
 
@@ -193,6 +207,8 @@ func (m *Manager) Skill(itemID int32) (int32, bool) {
 	if m == nil {
 		return 0, false
 	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	w := m.byID[itemID]
 	if w == nil {
 		return 0, false
@@ -205,12 +221,12 @@ func (m *Manager) TimeLeft(itemID int32) time.Duration {
 	if m == nil {
 		return 0
 	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	w := m.byID[itemID]
 	if w == nil {
 		return 0
 	}
-	m.mu.Lock()
-	defer m.mu.Unlock()
 	return time.Duration(w.endTime-m.now().UnixMilli()) * time.Millisecond
 }
 
@@ -249,7 +265,9 @@ func (m *Manager) Active() []Status {
 	return out
 }
 
-func (w *weapon) active() bool { return w.activated || w.dropped }
+// active reports whether w is out: held, on the ground, or reserved for a
+// game master to hand out.
+func (w *weapon) active() bool { return w.activated || w.dropped || w.reserved }
 
 // RollDrop rolls a monster kill's cursed weapon: each weapon not out yet
 // rolls its drop rate in a million, in turn, until one drops. The dropped
@@ -281,20 +299,16 @@ func (m *Manager) RollDrop(roll Roll) (int32, bool) {
 // PlaceOnGround records where itemID's weapon lies: the ground item
 // objectID, at.
 func (m *Manager) PlaceOnGround(itemID, objectID int32, at location.Location) {
-	w := m.weapon(itemID)
-	if w == nil {
+	if m == nil {
 		return
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	w.groundObjectID, w.groundAt, w.hasGroundAt = objectID, at, true
-}
-
-func (m *Manager) weapon(itemID int32) *weapon {
-	if m == nil {
-		return nil
+	w := m.byID[itemID]
+	if w == nil {
+		return
 	}
-	return m.byID[itemID]
+	w.groundObjectID, w.groundAt, w.hasGroundAt = objectID, at, true
 }
 
 // Holder is the player obtaining a weapon.
@@ -325,12 +339,15 @@ type Activation struct {
 // a stage and the new one ends. ok is false for an item that is no cursed
 // weapon.
 func (m *Manager) Activate(itemID int32, h Holder, roll Roll) (Activation, bool) {
-	w := m.weapon(itemID)
-	if w == nil {
+	if m == nil {
 		return Activation{}, false
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	w := m.byID[itemID]
+	if w == nil {
+		return Activation{}, false
+	}
 	if held := m.byID[h.HeldItemID]; held != nil && h.HeldItemID != 0 {
 		ranked := held.rankUp()
 		// The new weapon ends in the player's inventory, which the caller
@@ -342,7 +359,7 @@ func (m *Manager) Activate(itemID int32, h Holder, roll Roll) (Activation, bool)
 		return Activation{Assimilated: true, HeldItemID: h.HeldItemID, RankedUp: ranked, End: end, Stage: held.stage}, true
 	}
 	now := m.now()
-	w.activated = true
+	w.activated, w.reserved = true, false
 	w.playerID, w.playerKarma, w.playerPK = h.ObjectID, h.Karma, h.PKKills
 	w.nextAt = w.rollStageKills(roll)
 	w.hungry = int32(w.def.DurationLost * 60)
@@ -385,12 +402,15 @@ type Death struct {
 // the roll in a hundred is at most its disappear chance, and drops with
 // its stage back to 1 otherwise. ok is false when the weapon is not held.
 func (m *Manager) HolderDied(itemID int32, roll Roll) (Death, bool) {
-	w := m.weapon(itemID)
-	if w == nil {
+	if m == nil {
 		return Death{}, false
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	w := m.byID[itemID]
+	if w == nil {
+		return Death{}, false
+	}
 	if !w.activated {
 		return Death{}, false
 	}
@@ -409,12 +429,15 @@ func (m *Manager) HolderDied(itemID int32, roll Roll) (Death, bool) {
 // hunger is fed, and once enough kills are in the weapon goes up a stage
 // and the count starts over. ok is false when playerID does not hold it.
 func (m *Manager) Kill(itemID, playerID int32, roll Roll) (rankedUp bool, stage int32, ok bool) {
-	w := m.weapon(itemID)
-	if w == nil {
+	if m == nil {
 		return false, 0, false
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	w := m.byID[itemID]
+	if w == nil {
+		return false, 0, false
+	}
 	if !w.activated || w.playerID != playerID {
 		return false, 0, false
 	}
@@ -447,6 +470,8 @@ func (m *Manager) Held(playerID int32) (itemID, stage int32, ok bool) {
 // EndOfLife is a weapon's end, for the caller to apply.
 type EndOfLife struct {
 	ItemID int32
+	// SkillID is the skill the weapon gave its holder.
+	SkillID int32
 	// Held: the weapon was held by HolderID, who gets Karma and PKKills
 	// back and loses the weapon.
 	Held     bool
@@ -461,12 +486,15 @@ type EndOfLife struct {
 // Expire ends itemID's weapon wherever it is. ok is false when it is not
 // out.
 func (m *Manager) Expire(itemID int32) (EndOfLife, bool) {
-	w := m.weapon(itemID)
-	if w == nil {
+	if m == nil {
 		return EndOfLife{}, false
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	w := m.byID[itemID]
+	if w == nil {
+		return EndOfLife{}, false
+	}
 	if !w.active() {
 		return EndOfLife{}, false
 	}
@@ -476,7 +504,7 @@ func (m *Manager) Expire(itemID int32) (EndOfLife, bool) {
 // endOfLifeLocked ends w: its timers stop, its row goes and its state
 // starts over. The caller holds mu.
 func (m *Manager) endOfLifeLocked(w *weapon) EndOfLife {
-	end := EndOfLife{ItemID: w.def.ItemID}
+	end := EndOfLife{ItemID: w.def.ItemID, SkillID: int32(w.def.Skill.ID)}
 	if w.activated {
 		end.Held = true
 		end.HolderID, end.Karma, end.PKKills = w.playerID, w.playerKarma, w.playerPK
