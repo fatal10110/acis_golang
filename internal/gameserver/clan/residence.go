@@ -39,3 +39,11 @@ func (t *Table) RestoreHalls(owners []HallOwner, exists func(hallID int32) bool)
 		cl.mu.Unlock()
 	}
 }
+
+// SetCastleID sets the castle the clan owns, 0 for none. The castle
+// manager is its only writer and stores the change itself.
+func (cl *Clan) SetCastleID(id int32) {
+	cl.mu.Lock()
+	cl.castleID = id
+	cl.mu.Unlock()
+}

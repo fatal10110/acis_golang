@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/debughttp"
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -114,6 +115,7 @@ func provideGameClientLink(
 	petitions *petition.Manager,
 	characters *gamesql.CharacterStore,
 	clans *clan.Service,
+	castles *castle.Manager,
 	board communityBoard,
 	announcements *announcement.Registry,
 	schemeBuffer *schemebuffer.Manager,
@@ -250,6 +252,7 @@ func provideGameClientLink(
 		Relations:      relations,
 		Characters:     characters,
 		Clans:          clans,
+		Castles:        castles,
 		AccessLevels:   characters,
 		CharacterEdits: characters,
 		Punishments:    characters,

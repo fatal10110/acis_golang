@@ -23,6 +23,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -51,6 +52,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
+	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -89,6 +91,8 @@ var HexID = []byte{0x01, 0x02, 0x03, 0x04}
 type Option func(*options)
 
 type options struct {
+	// castles is the castle data (WithCastles); nil loads none.
+	castles *castledata.Table
 	// slowStores delays every handler-issued persistence write (WithSlowStores).
 	slowStores             time.Duration
 	itemFlushFault         *ItemFlushFault
@@ -857,6 +861,7 @@ type Server struct {
 	Couples          *wedding.Manager // couples the link was wired with
 	coupleRows       *gamesql.CoupleStore
 	Clans            *clan.Service
+	Castles          *castle.Manager // the castles WithCastles loads, restored at boot
 	SevenSigns       *sevensigns.State
 	Festival         *festival.Manager
 	AnnounceFile     string // the announcements.xml the server reads and rewrites
@@ -1888,6 +1893,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		clanConfig = *o.clanConfig
 	}
 	gclConfig.Clans = clan.NewService(clan.NewTable(), clanStore, persistWorker, ids, clanConfig, o.clanClock, o.log)
+	gclConfig.Castles = newCastles(db, o.castles, gclConfig.Clans, persistWorker, o.log)
 	// The mail is restored once the characters are seeded, below.
 	mailStore := gamesql.NewMailStore(db)
 	gclConfig.Board, gclConfig.ShowServerNews = o.board, o.serverNews
@@ -2097,6 +2103,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	// The fixture loads no clan hall data, so every seeded hall counts.
 	gclConfig.Clans.Table().RestoreHalls(hallOwners, nil)
+	restoreCastles(t, db, gclConfig.Castles)
 	gclConfig.Clans.DropMissingCrests(crests)
 	gclConfig.Clans.DropDanglingAlliances()
 	clanDissolutions := queues.NewQueue("clan-dissolution")
@@ -2155,6 +2162,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Boats:            boats,
 		Derby:            derbyTrack,
 		Clans:            gclConfig.Clans,
+		Castles:          gclConfig.Castles,
 		SevenSigns:       sevenSigns,
 		Festival:         fest,
 		itemTable:        itemTemplates,
