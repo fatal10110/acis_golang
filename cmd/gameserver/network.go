@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
+	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -113,6 +114,7 @@ func provideGameClientLink(
 	board communityBoard,
 	announcements *announcement.Registry,
 	schemeBuffer *schemebuffer.Manager,
+	lotteryState *lottery.Lottery,
 	derbyTrack *derby.Track,
 	log zerolog.Logger,
 	gmAudit gmAuditLogger,
@@ -253,6 +255,7 @@ func provideGameClientLink(
 		ShowServerNews: board.ShowServerNews,
 		Announcements:  announcements,
 		SchemeBuffer:   schemeBuffer,
+		Lottery:        lotteryState,
 		Derby:          derbyTrack,
 	})
 	if err != nil {

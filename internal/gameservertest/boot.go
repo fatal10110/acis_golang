@@ -30,6 +30,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
 	"github.com/fatal10110/acis_golang/internal/gameserver/enchant"
+	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -197,6 +198,7 @@ type options struct {
 	boats                  []route.BoatItinerary
 	petitionConfig         *petition.Config
 	schemeBuffer           *schemebuffer.Manager
+	lottery                *lotteryFixture
 	derby                  *derbyOptions
 	// rewardPartiesWrap wraps the link's kill-party resolver
 	// (WithRewardParties).
@@ -798,6 +800,7 @@ type Server struct {
 	DB     *sql.DB
 	// RaidPoints is the players' raid points, restored at boot.
 	RaidPoints       *raidpoint.Points
+	Lottery          *lottery.Lottery // the lottery WithLottery runs; nil without it
 	Chars            *gamesql.CharacterStore
 	Items            *gamesql.ItemStore
 	Shortcuts        *gamesql.ShortcutStore
@@ -1926,6 +1929,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Olympiad = olympiadState
 	raidPoints := raidpoint.New(gamesql.NewRaidPointStore(db), persistWorker, o.log)
 	gclConfig.RaidPoints = raidPoints
+	lotteryState := o.lottery.newLottery(db, persistWorker, state, queues, o.log)
+	gclConfig.Lottery = lotteryState
 	gcl, err := network.NewGameClientLink(gclConfig)
 	if err != nil {
 		t.Fatalf("gameservertest: build game client link: %v", err)
@@ -2052,6 +2057,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("restore olympiad: %v", err)
 	}
 	t.Cleanup(func() { olympiadState.Stop(context.Background()) })
+	o.lottery.start(t, db, lotteryState)
 	if o.seedBoss != nil {
 		o.seedBoss(db)
 	}
@@ -2101,6 +2107,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		autoLoot:         o.autoLoot,
 		DB:               db,
 		RaidPoints:       raidPoints,
+		Lottery:          lotteryState,
 		Chars:            chars,
 		Relations:        relations,
 		relationRows:     relationRows,

@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
+	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -75,6 +76,9 @@ type livePlayer struct {
 	// list requests unanswered (see tempInventoryDisable). Set on the
 	// owner's queue; atomic for any reader.
 	inventoryDisabled atomic.Bool
+	// lottoPicks are the numbers chosen on a lottery seller's ticket form;
+	// only the owner's queue touches them.
+	lottoPicks lottery.Picks
 	// replayingEffects is set while EnterWorld replays the saved effects
 	// and then decides the weight penalty band, before the player is in the
 	// world. The effects' start hooks change its appearance and the band

@@ -493,6 +493,7 @@ var schemaStmts = []string{
 	olympiadNoblesSchema, olympiadNoblesEomSchema, serverMemoSchema,
 	characterRaidPointsSchema, grandbossListSchema,
 	bufferSchemesSchema,
+	gamesSchema,
 	mdtBetsSchema, mdtHistorySchema,
 }
 

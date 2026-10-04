@@ -15,8 +15,8 @@ type BypassOutcome int
 
 const (
 	// BypassUnported names a command of a system not in place yet (quests,
-	// lottery, observation, castles and the like), or one no dialog
-	// handles. It answers nothing of its own.
+	// observation, castles and the like), or one no dialog handles. It
+	// answers nothing of its own.
 	BypassUnported BypassOutcome = iota
 	// BypassChatWindow opens HTML, then releases the client with
 	// ActionFailed.
@@ -84,6 +84,9 @@ const (
 	// BypassSchemeBuffer runs a scheme buffer's own command; see
 	// schemebuffer.Command.
 	BypassSchemeBuffer
+	// BypassLottery runs a lottery seller's "Loto <n>" command; see
+	// lottery.Command.
+	BypassLottery
 	// BypassDerby runs a race manager's own command; see derby.Command.
 	BypassDerby
 )
@@ -145,8 +148,9 @@ var fishermanCommands = []string{"FishingChampionship", "FishingReward"}
 // open the skills to learn and to enchant, after an adventurer guildsman's
 // raidInfo and questlist. Then the generic ones: Chat <n> opens chat page n
 // (page 0 when n does not parse), Link <path> opens data/html/<path>,
-// multisell <list> and exc_multisell <list> open a multisell list, Augment
-// 1 and Augment 2 open the augmentation and removal windows,
+// Loto <n> runs the lottery dialog, multisell <list> and exc_multisell
+// <list> open a multisell list, Augment 1 and Augment 2 open the
+// augmentation and removal windows,
 // teleport_request opens the destination list, and teleport <index> and
 // instant_teleport <index> take the talker to a destination, and
 // CPRecovery has an arena manager restore the talker's CP for a fee and
@@ -267,6 +271,9 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			return reply
 		}
 		reply.Outcome, reply.HTML = BypassPage, f.page(pages, "data/html/"+path)
+		return reply
+	case strings.HasPrefix(command, "Loto"):
+		reply.Outcome = BypassLottery
 		return reply
 	case strings.HasPrefix(command, "multisell"):
 		reply.Outcome, reply.Multisell = BypassMultisell, strings.TrimFunc(command[len("multisell"):], javaSpace)
