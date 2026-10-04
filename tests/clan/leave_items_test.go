@@ -2,7 +2,6 @@ package clan
 
 import (
 	"context"
-	"database/sql"
 	"slices"
 	"sync"
 	"testing"
@@ -61,21 +60,16 @@ func castleClanOptions(t *testing.T) []gameservertest.Option {
 // bootCastleLeaver boots the founder leading a level 5 clan owning castle
 // (0 for none) and the recruit wearing worn, a castle item, in the world;
 // the recruit has then joined the clan. It returns the world and the worn
-// item's object id.
-func bootCastleLeaver(t *testing.T, castle int, worn int32) (*clanWorld, int32) {
+// item's object id. extra options follow the defaults.
+func bootCastleLeaver(t *testing.T, castle int, worn int32, extra ...gameservertest.Option) (*clanWorld, int32) {
 	t.Helper()
 	opts := castleClanOptions(t)
-	srv := gameservertest.Boot(t, append(opts,
+	srv := gameservertest.Boot(t, append(append(opts,
 		gameservertest.WithCharacter("Founder", 40, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithReuseDelays(0, 0),
-		gameservertest.WithClanSeed(func(db *sql.DB) {
-			seedStatements(t, db,
-				`INSERT INTO clan_data (clan_id, clan_name, clan_level, hasCastle, leader_id)
-					SELECT `+itoa(titleClanID)+`, 'Knights', 5, `+itoa(int32(castle))+`, obj_Id FROM characters WHERE char_name = 'Founder'`,
-				`UPDATE characters SET clanid = `+itoa(titleClanID)+`, power_grade = 0 WHERE char_name = 'Founder'`)
-		}),
-	)...)
+		knightsSeed(t, 5, castle),
+	), extra...)...)
 	w := &clanWorld{srv: srv, leader: srv.Client, leaderID: srv.SoleObjectID(t)}
 	w.memberID = srv.SeedCharacterFor(t, "player2", "Recruit", 40, 0).ID
 	objectID := srv.GiveItem(t, w.memberID, worn, 1)
@@ -154,6 +148,50 @@ func TestLeavingCastleClanChecksItemsWhileStillInIt(t *testing.T) {
 		}
 		if loc := itemLoc(t, w, circlet); loc != "PAPERDOLL" {
 			t.Fatalf("circlet after leaving = %s, want PAPERDOLL", loc)
+		}
+	})
+}
+
+// expelledOnly is an online expelled member's answer that takes nothing
+// off: its clan tab cleared, then CLAN_MEMBERSHIP_TERMINATED.
+var expelledOnly = []byte{
+	serverpackets.OpcodeSkillList, serverpackets.OpcodeUserInfo, serverpackets.OpcodePledgeShowMemberListDelAll,
+	serverpackets.OpcodeSystemMessage,
+}
+
+// TestExpellingOnlineMemberChecksItemsWhileStillInIt expels a member in
+// the world from a clan owning Gludio Castle. The check runs on its queue
+// before its clan state clears, as in a withdrawal: the Lord's Crown comes
+// off through the equip toggle ahead of the leave frames, while the
+// Circlet of Gludio stays on.
+func TestExpellingOnlineMemberChecksItemsWhileStillInIt(t *testing.T) {
+	t.Parallel()
+	t.Run("crown comes off", func(t *testing.T) {
+		t.Parallel()
+		w, crown := bootCastleLeaver(t, 1, lordsCrown)
+		got := expelRecruit(t, w)
+		want := append([]byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodeUserInfo}, expelledOnly...)
+		if string(opcodes(got)) != string(want) {
+			t.Fatalf("expelled member's answer = %x, want the unequip (SystemMessage, UserInfo), then %x", opcodes(got), expelledOnly)
+		}
+		if id, params := sysMsg(t, got[0]); id != serverpackets.SystemMessageS1Disarmed || !slices.Equal(params, []string{itoa(lordsCrown)}) {
+			t.Fatalf("unequip message = %d %v, want S1_DISARMED %d", id, params, lordsCrown)
+		}
+		if id, _ := sysMsg(t, got[len(got)-1]); id != serverpackets.SystemMessageClanMembershipTerminated {
+			t.Fatalf("last message = %d, want CLAN_MEMBERSHIP_TERMINATED", id)
+		}
+		if loc := itemLoc(t, w, crown); loc != "INVENTORY" {
+			t.Fatalf("crown after expulsion = %s, want INVENTORY", loc)
+		}
+	})
+	t.Run("circlet stays on", func(t *testing.T) {
+		t.Parallel()
+		w, circlet := bootCastleLeaver(t, 1, circletOfGludio)
+		if got := opcodes(expelRecruit(t, w)); string(got) != string(expelledOnly) {
+			t.Fatalf("expelled member's answer = %x, want %x", got, expelledOnly)
+		}
+		if loc := itemLoc(t, w, circlet); loc != "PAPERDOLL" {
+			t.Fatalf("circlet after expulsion = %s, want PAPERDOLL", loc)
 		}
 	})
 }

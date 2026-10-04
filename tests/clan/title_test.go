@@ -25,12 +25,7 @@ func bootSeededClan(t *testing.T, level, castle int, noble bool, extra ...gamese
 		gameservertest.WithCharacter("Founder", 40, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithReuseDelays(0, 0),
-		gameservertest.WithClanSeed(func(db *sql.DB) {
-			seedStatements(t, db,
-				`INSERT INTO clan_data (clan_id, clan_name, clan_level, hasCastle, leader_id)
-					SELECT `+itoa(titleClanID)+`, 'Knights', `+itoa(int32(level))+`, `+itoa(int32(castle))+`, obj_Id FROM characters WHERE char_name = 'Founder'`,
-				`UPDATE characters SET clanid = `+itoa(titleClanID)+`, power_grade = 0 WHERE char_name = 'Founder'`)
-		}),
+		knightsSeed(t, level, castle),
 	}, extra...)
 	srv := gameservertest.Boot(t, opts...)
 	w := &clanWorld{srv: srv, leader: srv.Client, leaderID: srv.SoleObjectID(t)}
@@ -46,6 +41,20 @@ func bootSeededClan(t *testing.T, level, castle int, noble bool, extra ...gamese
 	drainFrames(t, w.leader)
 	drainFrames(t, w.member)
 	return w
+}
+
+// knightsSeed seeds Knights, a clan of the given level owning castle (0
+// for none) led by the founder, then runs extra statements. A later
+// knightsSeed among a boot's options replaces an earlier one.
+func knightsSeed(t *testing.T, level, castle int, extra ...string) gameservertest.Option {
+	t.Helper()
+	return gameservertest.WithClanSeed(func(db *sql.DB) {
+		seedStatements(t, db, append([]string{
+			`INSERT INTO clan_data (clan_id, clan_name, clan_level, hasCastle, leader_id)
+				SELECT ` + itoa(titleClanID) + `, 'Knights', ` + itoa(int32(level)) + `, ` + itoa(int32(castle)) + `, obj_Id FROM characters WHERE char_name = 'Founder'`,
+			`UPDATE characters SET clanid = ` + itoa(titleClanID) + `, power_grade = 0 WHERE char_name = 'Founder'`,
+		}, extra...)...)
+	})
 }
 
 func encodeRequestGiveNickName(name, title string) []byte {
