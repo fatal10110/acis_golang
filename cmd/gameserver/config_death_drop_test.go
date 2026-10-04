@@ -77,4 +77,11 @@ ListOfNonDroppableItemsForPK = 57, 1147;425
 	if _, err := loadDeathDropRules(gameServerPaths{ConfigPath: empty, PlayersConfigPath: bad}); err == nil {
 		t.Fatal("loadDeathDropRules(malformed list) error = nil, want one")
 	}
+	// 4294969671 is 2375 plus 2^32: it must not wrap to the wolf collar.
+	for _, line := range []string{"ListOfPetItems = 4294969671\n", "ListOfNonDroppableItemsForPK = -2147483649\n"} {
+		huge := write("huge.properties", line)
+		if _, err := loadDeathDropRules(gameServerPaths{ConfigPath: empty, PlayersConfigPath: huge}); err == nil {
+			t.Fatalf("loadDeathDropRules(%q) error = nil, want an out-of-range error", line)
+		}
+	}
 }

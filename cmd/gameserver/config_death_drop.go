@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"math"
+
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 )
@@ -13,7 +16,8 @@ var (
 
 // loadDeathDropRules reads what a player's death may cost it in items: the
 // rates from server.properties, the PK threshold, the game-master switch
-// and the items no death drops from players.properties.
+// and the items no death drops from players.properties. An item id that
+// does not fit an item template id is an error, as a malformed list is.
 func loadDeathDropRules(paths gameServerPaths) (player.DeathDropRules, error) {
 	server, err := config.LoadFile(paths.ConfigPath)
 	if err != nil {
@@ -61,6 +65,9 @@ func loadDeathDropRules(paths gameServerPaths) (player.DeathDropRules, error) {
 			return player.DeathDropRules{}, err
 		}
 		for _, id := range ids {
+			if id < math.MinInt32 || id > math.MaxInt32 {
+				return player.DeathDropRules{}, fmt.Errorf("%s: item id %d out of range", list.key, id)
+			}
 			rules.Kept = append(rules.Kept, int32(id))
 		}
 	}
