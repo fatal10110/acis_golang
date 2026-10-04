@@ -363,7 +363,7 @@ func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture
 		t.Fatal("missing test class template")
 	}
 	ch := &player.Character{
-		ID: id, Name: "Player", BaseClassID: 0,
+		ID: id, Name: "Player",
 		Race: player.RaceHuman, Sex: player.SexMale,
 		CharLevel: 1,
 		Location:  location.Location{X: int(id) * 100, Y: 0, Z: 0},

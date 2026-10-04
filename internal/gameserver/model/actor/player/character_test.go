@@ -31,8 +31,8 @@ func TestNewCharacter(t *testing.T) {
 	if c.ID != 0x10000001 || c.AccountName != "acct1" || c.Name != "Newbie" {
 		t.Fatalf("NewCharacter() identity = %+v", c)
 	}
-	if c.ClassID() != 0 || c.BaseClassID != 0 {
-		t.Errorf("ClassID/BaseClassID = %d/%d, want 0/0", c.ClassID(), c.BaseClassID)
+	if c.ClassID() != 0 || c.BaseClassID() != 0 {
+		t.Errorf("ClassID/BaseClassID = %d/%d, want 0/0", c.ClassID(), c.BaseClassID())
 	}
 	if c.Race != RaceHuman {
 		t.Errorf("Race = %v, want %v", c.Race, RaceHuman)

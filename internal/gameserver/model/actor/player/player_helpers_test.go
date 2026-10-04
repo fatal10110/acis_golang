@@ -269,11 +269,12 @@ func combatItems() *item.Table {
 
 func liveCharacter(id int32, tmpl *Template, items *item.Table, equipped ...*item.Instance) *Character {
 	c := &Character{
-		ID: id, Name: "char", BaseClassID: tmpl.ID,
+		ID: id, Name: "char",
 		Race: RaceHuman, Sex: SexMale, CharLevel: 1,
 		Location: location.Location{X: int(id) * 100, Y: 0, Z: 0},
 	}
 	c.SetClassID(tmpl.ID)
+	c.SetBaseClassID(tmpl.ID)
 	c.SetResourceValues(Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 30, CurrentMP: 30})
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, items, equipped))
 	c.SetRollSource(zeroRoll)

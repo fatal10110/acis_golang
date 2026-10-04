@@ -73,7 +73,7 @@ func (l *GameClientLink) charInfoPage(target *livePlayer) string {
 		{"%objid%", strconv.Itoa(int(target.ObjectID()))},
 		{"%clan%", clanName},
 		{"%party%", partyText},
-		{"%baseclass%", player.ClassName(target.BaseClassID)},
+		{"%baseclass%", player.ClassName(target.BaseClassID())},
 		{"%xp%", strconv.FormatInt(target.ProgressionValues().Exp, 10)},
 		{"%curai%", current},
 		{"%nextai%", next},

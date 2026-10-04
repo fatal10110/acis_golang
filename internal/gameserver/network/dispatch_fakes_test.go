@@ -151,6 +151,15 @@ func (s *fakeCharStore) SetDeathPenaltyLevel(_ context.Context, id int32, level 
 	return nil
 }
 
+func (s *fakeCharStore) SetNoble(_ context.Context, id int32, noble bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if c, ok := s.byID[id]; ok {
+		c.SetNoble(noble)
+	}
+	return nil
+}
+
 func (s *fakeCharStore) SetOnline(_ context.Context, id int32, lastAccess int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

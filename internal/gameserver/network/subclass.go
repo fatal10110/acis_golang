@@ -83,7 +83,7 @@ func (l *GameClientLink) subclassBypass(live *livePlayer, f *npc.Folk, command s
 	// (#3071); nothing registers for it yet.
 	cmd := npc.ParseSubclassCommand(command)
 	subs := live.Subclasses()
-	base := live.BaseClassID
+	base := live.BaseClassID()
 	var page string
 	switch cmd.Choice {
 	case 0:
@@ -240,7 +240,7 @@ func (l *GameClientLink) mayAddSubclass(live *livePlayer, subs []player.SubClass
 func (l *GameClientLink) beginClassChange(live *livePlayer, ch *classChange) bool {
 	classID := ch.sub.ClassID
 	if ch.kind == classChangeSwitch {
-		classID = live.BaseClassID
+		classID = live.BaseClassID()
 		if ch.index != 0 {
 			sub, _ := live.Subclass(ch.index)
 			classID = sub.ClassID
@@ -457,7 +457,7 @@ func (l *GameClientLink) completeClassChange(live *livePlayer, ch *classChange, 
 // client is shown the result in the order the reference sends it.
 func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChangeRows) {
 	c := live.Character
-	classID := c.BaseClassID
+	classID := c.BaseClassID()
 	if index != 0 {
 		sub, _ := c.Subclass(index)
 		classID = sub.ClassID

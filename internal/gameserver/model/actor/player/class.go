@@ -188,7 +188,7 @@ func AvailableSubclasses(baseClassID int) []int {
 		}
 	}
 	var out []int
-	for id := 0; id <= maxClassID; id++ {
+	for id := 0; id <= MaxClassID; id++ {
 		if tier, ok := ClassLevel(id); !ok || tier != 2 {
 			continue
 		}
@@ -204,5 +204,5 @@ func AvailableSubclasses(baseClassID int) []int {
 	return out
 }
 
-// maxClassID is the highest profession id.
-const maxClassID = 118
+// MaxClassID is the highest profession id.
+const MaxClassID = 118

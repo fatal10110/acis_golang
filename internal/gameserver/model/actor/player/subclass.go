@@ -56,8 +56,18 @@ type subclassState struct {
 func (c *Character) ClassID() int { return int(c.activeClassID.Load()) }
 
 // SetClassID records the class c plays. Only restore and character
-// creation call it; a live class change goes through SwitchClass.
+// creation call it; a live class change goes through SwitchClass or
+// ChangeOccupation.
 func (c *Character) SetClassID(id int) { c.activeClassID.Store(int32(id)) }
+
+// BaseClassID returns the base class: the class the character was created
+// into, or the occupation it later moved to on that line. The class it
+// currently plays is ClassID, a subclass while one is active.
+func (c *Character) BaseClassID() int { return int(c.baseClassID.Load()) }
+
+// SetBaseClassID records the base class. Restore and character creation
+// set it, and an occupation change taken on the base class moves it.
+func (c *Character) SetBaseClassID(id int) { c.baseClassID.Store(int32(id)) }
 
 // ClassIndex returns the active class index: 0 for the base class, the
 // active subclass's slot otherwise.
@@ -121,7 +131,7 @@ func (c *Character) RestoreSubclasses(subs []SubClass) bool {
 		c.subclasses.slots[sub.Index] = sub
 	}
 	active := c.ClassID()
-	if active == c.BaseClassID {
+	if active == c.BaseClassID() {
 		return true
 	}
 	for _, sub := range subs {
@@ -199,7 +209,7 @@ func (c *Character) SwitchClass(index int, tmpl *Template) bool {
 	}
 	if index == 0 {
 		c.CharLevel, c.Exp, c.SP = c.subclasses.baseLevel, c.subclasses.baseExp, c.subclasses.baseSP
-		c.SetClassID(c.BaseClassID)
+		c.SetClassID(c.BaseClassID())
 	} else {
 		c.CharLevel, c.Exp, c.SP = next.Level, next.Exp, next.SP
 		c.SetClassID(next.ClassID)
@@ -226,7 +236,7 @@ func (c *Character) VisibleBaseClassID() int {
 	if c.ClassIndex() == 0 {
 		return c.ClassID()
 	}
-	return c.BaseClassID
+	return c.BaseClassID()
 }
 
 // StartingSubclassSkills returns the skills a new subclass of t's class

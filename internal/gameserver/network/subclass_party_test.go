@@ -21,7 +21,7 @@ func TestClassSwitchRecalculatesPartyLevel(t *testing.T) {
 	other := newTestLivePlayer(t, 2, &testsupport.FrameCapture{})
 	switcher.shortcuts = shortcut.NewList(nil)
 	switcher.CharLevel, other.CharLevel = 75, 52
-	if !switcher.AddSubclass(player.SubClass{ClassID: switcher.BaseClassID, Index: 1, Level: 40}) {
+	if !switcher.AddSubclass(player.SubClass{ClassID: switcher.BaseClassID(), Index: 1, Level: 40}) {
 		t.Fatal("add subclass refused")
 	}
 	if status, _ := link.parties.BeginInvite(switcher.ObjectID(), 0); status != party.InviteReady {

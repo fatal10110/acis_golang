@@ -646,7 +646,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	delivery := &playerInventoryDelivery{updates: l.inventoryUpdates, character: c}
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventoryWithDelivery(c.ID, l.itemTemplates, items, delivery, l.itemPersister(c.ID)))
 	// The body stays the base class's while a subclass is played.
-	if base, ok := l.templates.Get(c.BaseClassID); ok {
+	if base, ok := l.templates.Get(c.BaseClassID()); ok {
 		c.SetBaseTemplate(base)
 	}
 	// The characters row stores finalized max snapshots (Save writes
