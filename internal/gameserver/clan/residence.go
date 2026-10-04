@@ -48,6 +48,14 @@ func (cl *Clan) SetCastleID(id int32) {
 	cl.mu.Unlock()
 }
 
+// SetHallID sets the clan hall the clan owns, 0 for none. The clan hall
+// runtime is its only writer and stores the change itself.
+func (cl *Clan) SetHallID(id int32) {
+	cl.mu.Lock()
+	cl.hallID = id
+	cl.mu.Unlock()
+}
+
 // HallOwner is the clan owning clan hall hallID, 0 when no clan owns it.
 func (t *Table) HallOwner(hallID int32) int32 {
 	if t == nil || hallID <= 0 {

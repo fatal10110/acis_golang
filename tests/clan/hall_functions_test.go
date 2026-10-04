@@ -117,7 +117,8 @@ func seedHall(t *testing.T, db *sql.DB, s hallSetup) {
 		exec("UPDATE characters SET clanid = ? WHERE char_name = 'Newbie'", hallClanID)
 		exec(`INSERT INTO clan_data (clan_id, clan_name, clan_level, leader_id)
 			SELECT ?, 'Hallkeepers', 4, obj_Id FROM characters WHERE char_name = 'Newbie'`, hallClanID)
-		exec("INSERT INTO clanhall (id, ownerId, paid) VALUES (?, ?, 1)", s.owned, hallClanID)
+		// The hall's lease is paid well past every scenario's clock.
+		exec("INSERT INTO clanhall (id, ownerId, paid, paidUntil) VALUES (?, ?, 1, ?)", s.owned, hallClanID, time.Now().UnixMilli()+30*dayMs)
 	}
 	if s.warehouseAdena > 0 {
 		exec("INSERT INTO items (owner_id, object_id, item_id, count, loc, loc_data) VALUES (?, ?, ?, ?, 'CLANWH', 0)",

@@ -355,6 +355,17 @@ const clanhallSchema = "CREATE TABLE IF NOT EXISTS `clanhall` (\n" +
 	"  PRIMARY KEY `id` (`id`)\n" +
 	")"
 
+// auctionsSchema mirrors the shipped auctions table definition verbatim.
+const auctionsSchema = "CREATE TABLE IF NOT EXISTS `auctions` (\n" +
+	"\t`clanhall_id` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"\t`bidder_name` VARCHAR(35) NOT NULL DEFAULT '',\n" +
+	"\t`clan_oid` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"\t`clan_name` VARCHAR(20) NOT NULL DEFAULT '',\n" +
+	"\t`max_bid` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"\t`time_bid` BIGINT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"\tPRIMARY KEY (`clanhall_id`, `clan_oid`)\n" +
+	")"
+
 // clanhallFunctionsSchema mirrors the shipped clanhall_functions table
 // definition verbatim.
 const clanhallFunctionsSchema = "CREATE TABLE IF NOT EXISTS `clanhall_functions` (\n" +
@@ -499,7 +510,7 @@ var schemaStmts = []string{
 	sevenSignsSchema, sevenSignsStatusSchema, sevenSignsFestivalSchema, buylistsSchema, characterSubclassesSchema,
 	characterRelationsSchema, petitionSchema, petitionMessageSchema,
 	characterMacrosesSchema, characterRecommendsSchema,
-	clanDataSchema, clanPrivsSchema, clanSkillsSchema, clanSubpledgesSchema, clanWarsSchema, clanhallSchema, clanhallFunctionsSchema,
+	clanDataSchema, clanPrivsSchema, clanSkillsSchema, clanSubpledgesSchema, clanWarsSchema, clanhallSchema, clanhallFunctionsSchema, auctionsSchema,
 	siegeClansSchema, castleSchema,
 	accountsSchema,
 	bbsMailSchema, bbsForumSchema, bbsTopicSchema, bbsPostSchema, bbsFavoriteSchema,

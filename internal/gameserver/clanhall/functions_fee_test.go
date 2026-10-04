@@ -44,6 +44,8 @@ func (s *feeStore) DeleteFunction(context.Context, int32, int) error {
 	return nil
 }
 
+func (s *feeStore) DeleteFunctions(context.Context, int32) error { return nil }
+
 func (s *feeStore) saved() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -110,6 +110,9 @@ const (
 	BypassHeroList
 	// BypassHeroClaim has an elected hero claim the hero status.
 	BypassHeroClaim
+	// BypassAuction runs any command on an auctioneer, whose own dialog
+	// answers every command.
+	BypassAuction
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -181,13 +184,18 @@ type BypassReply struct {
 // to the subclass dialog, a class manager's own commands to its dialog,
 // a scheme buffer's own commands to its dialog, a race manager's own
 // commands to the race track, and every command on a wedding manager to
-// its dialog. Every other command belongs to a system not in place yet.
+// its dialog, as does every command on an auctioneer. Every other command
+// belongs to a system not in place yet.
 func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command string) BypassReply {
 	karma := talker.Karma
 	kind := hostileKind(f.Instance)
 	reply := BypassReply{LeadingActionFailed: kind == "DungeonGatekeeper"}
 	if kind == weddingManager {
 		reply.Outcome = BypassWedding
+		return reply
+	}
+	if kind == auctioneer {
+		reply.Outcome = BypassAuction
 		return reply
 	}
 	if _, ok := unportedFolkChats[kind]; ok {

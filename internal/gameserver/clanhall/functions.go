@@ -53,6 +53,8 @@ type Store interface {
 	SaveFunction(ctx context.Context, hallID int32, f Function) error
 	// DeleteFunction drops hall hallID's function of type funcType.
 	DeleteFunction(ctx context.Context, hallID int32, funcType int) error
+	// DeleteFunctions drops every function of hall hallID.
+	DeleteFunctions(ctx context.Context, hallID int32) error
 }
 
 // Writer runs a database job later, on ownerID's persistence lane, so the
@@ -265,6 +267,27 @@ func (f *Functions) scheduleLocked(hallID int32, fn *rented, delayMs int64) {
 	gen := fn.gen
 	fn.timer = f.queue.After(time.Duration(max(delayMs, 0))*time.Millisecond, func() {
 		f.payFee(hallID, fn, gen)
+	})
+}
+
+// RemoveAll drops every function hall hallID rents, stopping their fees,
+// and deletes the hall's stored functions, whether or not it rents any: a
+// hall changing hands or freed keeps none.
+func (f *Functions) RemoveAll(hallID int32) {
+	if f == nil {
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, fn := range f.byHall[hallID] {
+		if fn.timer != nil {
+			fn.timer.Stop()
+			fn.timer = nil
+		}
+	}
+	delete(f.byHall, hallID)
+	f.write("remove clan hall functions", hallID, func(ctx context.Context, st Store) error {
+		return st.DeleteFunctions(ctx, hallID)
 	})
 }
 
