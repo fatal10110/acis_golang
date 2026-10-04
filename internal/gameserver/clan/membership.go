@@ -137,11 +137,14 @@ func (s *Service) CheckJoin(cl *Clan, inviterID int32, target *player.Character,
 
 // checkJoinLocked runs the invitation rules. An invitation into a sub-unit
 // the clan has not founded finds no room: a crafted request could
-// otherwise fill a sub-unit no roster lists.
+// otherwise fill a sub-unit no roster lists. A destroyed clan takes no one:
+// Destroy sets the flag under mu before it empties the roster, so a join
+// answered while it runs, or later on a stale *Clan, is refused rather than
+// left on a roster nothing removes.
 func (cl *Clan) checkJoinLocked(inviterID int32, target *player.Character, blocksInviter bool, pledgeType int, now time.Time) JoinRefusal {
 	nowMs := now.UnixMilli()
 	switch {
-	case cl.memberPrivilegesLocked(inviterID)&int32(PrivInvite) == 0:
+	case cl.destroyed, cl.memberPrivilegesLocked(inviterID)&int32(PrivInvite) == 0:
 		return JoinNotAuthorized
 	case inviterID == target.ID:
 		return JoinInviteSelf

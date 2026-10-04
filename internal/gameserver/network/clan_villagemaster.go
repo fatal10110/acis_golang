@@ -70,6 +70,10 @@ func (l *GameClientLink) villageMasterClan(live *livePlayer, f *npc.Folk, comman
 		}
 	case "dissolve_ally":
 		l.dissolveAlly(live)
+	case "dissolve_clan":
+		l.dissolveClan(live)
+	case "recover_clan":
+		l.recoverClan(live)
 	}
 }
 

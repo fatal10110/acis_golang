@@ -2061,6 +2061,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Clans.Table().RestoreHalls(hallOwners, nil)
 	gclConfig.Clans.DropMissingCrests(crests)
 	gclConfig.Clans.DropDanglingAlliances()
+	clanDissolutions := queues.NewQueue("clan-dissolution")
+	t.Cleanup(clanDissolutions.Close)
+	gclConfig.Clans.StartDissolutions(clanDissolutions, gcl)
 	if o.seedBoard != nil {
 		o.seedBoard(db)
 	}
