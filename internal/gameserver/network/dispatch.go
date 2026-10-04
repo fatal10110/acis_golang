@@ -446,6 +446,10 @@ type GameClientLink struct {
 	// npcSpawns is the live NPC population the admin spawn commands use;
 	// see SetNpcSpawns.
 	npcSpawns atomic.Pointer[manager.Npcs]
+	// spawnAll runs one //unspawnall or //respawnall at a time, so two
+	// game masters respawning at once cannot leave both new populations
+	// in the world.
+	spawnAll sync.Mutex
 	// manor is what the seed and harvester items read.
 	manor ManorConfig
 	// classMaster is the class manager mod's settings.

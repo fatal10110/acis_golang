@@ -28,7 +28,8 @@ type DataReloads struct {
 	// Multisells reloads the multisell lists (MultisellData.reload).
 	Multisells func() error
 	// NPCs reloads the NPC templates (NpcData.reload); NPCs already in the
-	// world keep theirs.
+	// world keep theirs, and so do the respawns of spawns already in place
+	// (ASpawn's template is fixed when the spawn is built).
 	NPCs func() error
 	// WalkerRoutes reloads the walker routes (WalkerRouteData.reload).
 	WalkerRoutes func() error

@@ -19,6 +19,8 @@ const respawnAllTimeout = 30 * time.Second
 // is not operating, every NPC leaves the world for good, and every game
 // master online, hidden ones too, is told the unspawn is complete.
 func (l *GameClientLink) adminUnspawnAll(_ *livePlayer, _ string) {
+	l.spawnAll.Lock()
+	defer l.spawnAll.Unlock()
 	l.toAllPlayers(func() wire.Frame { return serverpackets.FrameSystemMessage(systemMessageNpcServerNotOperating) })
 	if npcs := l.npcSpawns.Load(); npcs != nil {
 		npcs.DespawnAll()
@@ -32,8 +34,12 @@ func (l *GameClientLink) adminUnspawnAll(_ *livePlayer, _ string) {
 // game master online, hidden ones too, is told the respawn is complete. The
 // standalone spawns are gone afterwards. When the templates or the spawn
 // list cannot be read, the failure is logged, the NPCs stay despawned and
-// no game master is told anything, as the reference's exception does.
+// no game master is told anything, as the reference's exception does. One
+// //respawnall or //unspawnall runs at a time: a second one waits for the
+// first to finish, so it despawns what the first placed.
 func (l *GameClientLink) adminRespawnAll(_ *livePlayer, _ string) {
+	l.spawnAll.Lock()
+	defer l.spawnAll.Unlock()
 	npcs := l.npcSpawns.Load()
 	if npcs != nil {
 		npcs.DespawnAll()

@@ -81,7 +81,10 @@ func (n *Npcs) scheduleRespawn(slot slotInfo, delay time.Duration) {
 // Respawn implements task.RespawnEffects: it re-instantiates the slot key
 // identifies, picking a fresh position (and, for a database-tracked slot,
 // resuming through the same persisted-state restore rule used at boot).
-// A slot DespawnAll dropped is not respawned.
+// A slot DespawnAll dropped is not respawned. The NPC is built from the
+// template the slot was declared with, not the one the table holds now:
+// ASpawn keeps its template for life, so //reload npc does not reach the
+// respawns of spawns already in place.
 func (n *Npcs) Respawn(key string) {
 	n.gate.RLock()
 	defer n.gate.RUnlock()
@@ -92,8 +95,8 @@ func (n *Npcs) Respawn(key string) {
 		return
 	}
 
-	tmpl, ok := n.templates.Get(int(slot.entry.NPCID))
-	if !ok {
+	tmpl := slot.tmpl
+	if tmpl == nil {
 		return
 	}
 	if slot.masterID != 0 {

@@ -56,7 +56,7 @@ func (n *Npcs) bootSpawnEntry(maker *spawn.Maker, entryIndex int, entry spawn.En
 		}
 		*remaining--
 		key := slotKey(fmt.Sprintf("%s#%d#%d", maker.Name, entryIndex, i), gen)
-		n.registerSlot(key, maker, entry, "")
+		n.registerSlot(key, maker, entry, "", tmpl)
 		n.spawnFresh(key, entry, tmpl, pos)
 	}
 }
@@ -65,15 +65,15 @@ func (n *Npcs) bootSpawnEntry(maker *spawn.Maker, entryIndex int, entry spawn.En
 // Max MP rather than a persisted CurrentMP value.
 const fullMP = -1
 
-func (n *Npcs) registerSlot(key string, maker *spawn.Maker, entry spawn.Entry, dbName string) {
+func (n *Npcs) registerSlot(key string, maker *spawn.Maker, entry spawn.Entry, dbName string, tmpl *npc.Template) {
 	n.mu.Lock()
-	n.slot[key] = slotInfo{key: key, maker: maker, entry: entry, dbName: dbName}
+	n.slot[key] = slotInfo{key: key, maker: maker, entry: entry, dbName: dbName, tmpl: tmpl}
 	n.mu.Unlock()
 }
 
-func (n *Npcs) registerPrivateSlot(key string, entry spawn.Entry, masterID int32) {
+func (n *Npcs) registerPrivateSlot(key string, entry spawn.Entry, masterID int32, tmpl *npc.Template) {
 	n.mu.Lock()
-	n.slot[key] = slotInfo{key: key, entry: entry, masterID: masterID}
+	n.slot[key] = slotInfo{key: key, entry: entry, masterID: masterID, tmpl: tmpl}
 	n.mu.Unlock()
 }
 
@@ -83,7 +83,7 @@ func (n *Npcs) registerPrivateSlot(key string, entry spawn.Entry, masterID int32
 // matching the persisted-state restore rule.
 func (n *Npcs) bootSpawnPersisted(maker *spawn.Maker, key string, entry spawn.Entry, tmpl *npc.Template) {
 	dbName := entry.DBName
-	n.registerSlot(key, maker, entry, dbName)
+	n.registerSlot(key, maker, entry, dbName, tmpl)
 
 	state, ok := n.currentSpawns().State(dbName)
 	if !ok {
@@ -267,7 +267,7 @@ func (n *Npcs) spawnPrivates(key string, entry spawn.Entry, master *npc.Hostile)
 		}
 		privateEntry := spawn.Entry{NPCID: private.NPCID, RespawnDelay: private.RespawnDelay}
 		privateKey := fmt.Sprintf("%s/private/%d", key, i)
-		n.registerPrivateSlot(privateKey, privateEntry, master.ObjectID())
+		n.registerPrivateSlot(privateKey, privateEntry, master.ObjectID(), tmpl)
 		n.instantiate(privateKey, privateEntry, tmpl, n.privateSpawnLocation(master, tmpl), master.Heading(), fullHP, fullMP, master)
 	}
 }

@@ -35,6 +35,12 @@ type slotInfo struct {
 	dbName   string
 	masterID int32
 	liveID   int32
+	// tmpl is the template resolved when the slot was declared. Every
+	// respawn of the slot builds from it, so a //reload npc swapping the
+	// template table leaves the slot's existing spawn unchanged: only slots
+	// declared afterwards (//respawnall, a new //spawn) use the reloaded
+	// templates.
+	tmpl *npc.Template
 	// fixed marks a standalone spawn placed at a point of its own, not
 	// declared under a maker: at and heading are that point. It never
 	// respawns.
