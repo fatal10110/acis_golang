@@ -14,9 +14,10 @@ import (
 
 // talkToFolk is a civilian NPC's answer to a player's interact in reach:
 // its talk animation for everyone watching it, then its chat window with
-// ActionFailed. A muted NPC does nothing. An NPC whose first dialog reads
-// state of a system not in place opens nothing; the interact's think has
-// already released the client.
+// ActionFailed. A muted NPC does nothing. A wedding manager greets with its
+// own page alone. An NPC whose first dialog reads state of a system not in
+// place opens nothing; the interact's think has already released the
+// client.
 func (l *GameClientLink) talkToFolk(live *livePlayer, f *npc.Folk) {
 	if f.Muted() {
 		return
@@ -25,6 +26,10 @@ func (l *GameClientLink) talkToFolk(live *livePlayer, f *npc.Folk) {
 		l.broadcastFolkFrame(f, func() wire.Frame { return serverpackets.FrameSocialAction(f.ObjectID(), id) })
 	}
 	html, outcome := f.ChatWindow(setPages{l.html}, l.playerConfig.chatRules(), live.Karma())
+	if outcome == npc.ChatWedding {
+		l.weddingGreeting(live, f)
+		return
+	}
 	if outcome == npc.ChatUnported {
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Msg("npc: chat window not modeled")
 		return

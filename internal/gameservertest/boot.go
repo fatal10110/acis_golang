@@ -70,6 +70,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/petition"
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/fatal10110/acis_golang/internal/gameserver/wedding"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/link"
 	"github.com/fatal10110/acis_golang/internal/loginserver"
@@ -196,6 +197,7 @@ type options struct {
 	boats                  []route.BoatItinerary
 	petitionConfig         *petition.Config
 	schemeBuffer           *schemebuffer.Manager
+	weddingConfig          *wedding.Config
 	// rewardPartiesWrap wraps the link's kill-party resolver
 	// (WithRewardParties).
 	rewardPartiesWrap func(gamemanager.RewardParties) gamemanager.RewardParties
@@ -821,6 +823,8 @@ type Server struct {
 	relationRows     *gamesql.RelationStore
 	Petitions        *petition.Manager // petitions the link was wired with
 	petitionRows     *gamesql.PetitionStore
+	Couples          *wedding.Manager // couples the link was wired with
+	coupleRows       *gamesql.CoupleStore
 	Clans            *clan.Service
 	SevenSigns       *sevensigns.State
 	AnnounceFile     string // the announcements.xml the server reads and rewrites
@@ -1854,6 +1858,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Punishments = chars
 	petitions, petitionRows := bootPetitions(t, db, chars, ids, o.petitionConfig)
 	gclConfig.Petitions = petitions
+	couples, coupleRows := bootWedding(t, db, ids, o.weddingConfig)
+	gclConfig.Wedding = couples
 	gclConfig.Macros = gamesql.NewMacroStore(db)
 	gclConfig.Recommendations = gamesql.NewRecommendationStore(db)
 	gclConfig.AugmentationChances = augmentation.DefaultChances()
@@ -2100,6 +2106,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		relationRows:     relationRows,
 		Petitions:        petitions,
 		petitionRows:     petitionRows,
+		Couples:          couples,
+		coupleRows:       coupleRows,
 		Items:            items,
 		Shortcuts:        shortcuts,
 		Hennas:           hennas,

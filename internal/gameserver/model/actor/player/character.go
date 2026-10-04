@@ -136,6 +136,9 @@ type Character struct {
 	noble atomic.Bool
 	// duel is the character's place in a duel; see character_duel.go.
 	duel duelStanding
+	// marriage is the marriage request the character is part of; see
+	// character_wedding.go.
+	marriage marriageRequest
 
 	// KarmaPoints is the persisted karma value. The field is named
 	// KarmaPoints, not Karma, so it doesn't collide with the Karma() method

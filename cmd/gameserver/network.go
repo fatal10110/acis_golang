@@ -33,6 +33,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/petition"
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/relation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
+	"github.com/fatal10110/acis_golang/internal/gameserver/wedding"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
@@ -112,6 +113,7 @@ func provideGameClientLink(
 	board communityBoard,
 	announcements *announcement.Registry,
 	schemeBuffer *schemebuffer.Manager,
+	couples *wedding.Manager,
 	log zerolog.Logger,
 	gmAudit gmAuditLogger,
 	chatLog chatLogger,
@@ -251,6 +253,7 @@ func provideGameClientLink(
 		ShowServerNews: board.ShowServerNews,
 		Announcements:  announcements,
 		SchemeBuffer:   schemeBuffer,
+		Wedding:        couples,
 	})
 	if err != nil {
 		return nil, err

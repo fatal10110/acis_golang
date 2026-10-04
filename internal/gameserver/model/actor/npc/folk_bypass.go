@@ -83,6 +83,9 @@ const (
 	// BypassSchemeBuffer runs a scheme buffer's own command; see
 	// schemebuffer.Command.
 	BypassSchemeBuffer
+	// BypassWedding runs any command on a wedding manager, whose own
+	// dialog answers every command.
+	BypassWedding
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -148,12 +151,16 @@ var fishermanCommands = []string{"FishingChampionship", "FishingReward"}
 // instant_teleport <index> take the talker to a destination, and
 // CPRecovery has an arena manager restore the talker's CP for a fee and
 // answers nothing at any other NPC. A village master's Subclass commands go
-// to the subclass dialog, and a scheme buffer's own commands to its
-// dialog. Every other command belongs to a system not in place yet.
+// to the subclass dialog, a scheme buffer's own commands to its dialog,
+// and every command on a wedding manager to its dialog. Every other command belongs to a system not in place yet.
 func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command string) BypassReply {
 	karma := talker.Karma
 	kind := hostileKind(f.Instance)
 	reply := BypassReply{LeadingActionFailed: kind == "DungeonGatekeeper"}
+	if kind == weddingManager {
+		reply.Outcome = BypassWedding
+		return reply
+	}
 	if _, ok := unportedFolkChats[kind]; ok {
 		return reply
 	}

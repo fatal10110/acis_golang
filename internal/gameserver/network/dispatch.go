@@ -67,6 +67,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/symbolmaker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
+	"github.com/fatal10110/acis_golang/internal/gameserver/wedding"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
@@ -400,6 +401,8 @@ type GameClientLink struct {
 	// on their schedules and managed by //announce.
 	announcements *announcement.Registry
 	schemeBuffer  *schemebuffer.Manager
+	// wedding holds the couples and runs the marriage requests.
+	wedding *wedding.Manager
 	// npcSpawns is the live NPC population the admin spawn commands use;
 	// see SetNpcSpawns.
 	npcSpawns atomic.Pointer[manager.Npcs]
@@ -606,6 +609,10 @@ type GameClientLinkConfig struct {
 	// SchemeBuffer is the scheme buffer's buffs and every player's
 	// schemes; nil offers no buff and starts with no scheme.
 	SchemeBuffer *schemebuffer.Manager
+	// Wedding holds the couples and the wedding settings; nil starts with
+	// no couple, the shipped settings, and couples numbered from IDs when
+	// it can free them too.
+	Wedding *wedding.Manager
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -733,6 +740,11 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.schemeBuffer = cfg.SchemeBuffer
 	if link.schemeBuffer == nil {
 		link.schemeBuffer = schemebuffer.New(schemebuffer.DefaultConfig(), nil, nil)
+	}
+	link.wedding = cfg.Wedding
+	if link.wedding == nil {
+		ids, _ := cfg.IDs.(wedding.IDs)
+		link.wedding = wedding.NewManager(wedding.DefaultConfig(), ids, nil)
 	}
 	link.announcements = cfg.Announcements
 	if link.announcements == nil {
