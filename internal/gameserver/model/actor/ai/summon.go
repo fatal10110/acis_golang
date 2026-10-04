@@ -65,6 +65,7 @@ type Summon struct {
 	move   SummonMoveController
 	attack AttackController
 	cast   SummonCastController
+	boats  BoatEntrance
 	log    zerolog.Logger
 
 	// mu guards current, next and previous. A Betray effect turns the
@@ -622,6 +623,9 @@ func (s *Summon) thinkFollowLocked() (bool, error) {
 		return false, err
 	}
 
+	if handled, err := s.followThroughBoatEntranceLocked(target); handled {
+		return true, err
+	}
 	_, err := s.move.MaybeStartFriendlyFollow(target, summonFollowOffset)
 	return true, err
 }

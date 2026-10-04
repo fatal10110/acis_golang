@@ -204,6 +204,7 @@ func TestAcceptOutOfRangeOpensTrade(t *testing.T) {
 
 	farX := int32(spawnX + 200)
 	h.first.Send(encodeMoveBackwardToLocation(farX, spawnY, spawnZ, spawnX, spawnY, spawnZ))
+	expectGroundClickAck(t, h.first)
 	assertFrameOpcode(t, h.first.Read(), serverpackets.OpcodeMoveToLocation, "first MoveToLocation")
 	waitForArrival(t, h, h.firstID, farX)
 	drainUntilQuiet(t, h.first)

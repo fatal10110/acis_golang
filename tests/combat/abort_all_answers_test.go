@@ -54,6 +54,7 @@ func TestDeathAbortsAllBeforeDie(t *testing.T) {
 		}, want: []byte{af, af, af, af, af, tu}},
 		{name: "walking", stage: func(t *testing.T, _ *gameservertest.Server, c *scriptedClient) {
 			c.Send(encodeMoveBackwardToLocation(-2000, 2000, 30))
+			expectGroundClickAck(t, c)
 			assertFrameOpcode(t, mustRead(t, c, "MoveToLocation"), serverpackets.OpcodeMoveToLocation, "MoveToLocation")
 		}, want: []byte{sm, af, af, af, af, af}},
 	}
@@ -113,6 +114,7 @@ func TestSilenceMagicPhysicalStopsWalkingPlayer(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeMoveBackwardToLocation(-2000, 2000, 30))
+	expectGroundClickAck(t, c)
 	assertFrameOpcode(t, mustRead(t, c, "MoveToLocation"), serverpackets.OpcodeMoveToLocation, "MoveToLocation")
 	drainUntilQuiet(t, c)
 

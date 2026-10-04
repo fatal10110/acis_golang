@@ -200,6 +200,7 @@ func TestWalkingReuseRejectionDoesNotStopMovement(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeMoveBackwardToLocation(80, 70, 30))
+	expectGroundClickAck(t, c)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "walk")
 
 	c.Send(encodeRequestMagicSkillUse(3, false, false))
@@ -243,6 +244,7 @@ func TestSuccessfulTargetedCastStopsMovementAndFacesTarget(t *testing.T) {
 
 	patientX, patientY, patientZ := srv.PlayerPosition(t, patientID)
 	caster.Send(encodeMoveBackwardToLocation(80, 70, 30))
+	expectGroundClickAck(t, caster)
 	walk := caster.Read()
 	assertFrameOpcode(t, walk, serverpackets.OpcodeMoveToLocation, "first walk")
 	_, standAt, _ := gameservertest.ReadMoveToLocationCoords(t, walk)
@@ -256,6 +258,7 @@ func TestSuccessfulTargetedCastStopsMovementAndFacesTarget(t *testing.T) {
 	drainUntilQuiet(t, patient)
 
 	caster.Send(encodeMoveBackwardToLocation(200, 70, 30))
+	expectGroundClickAck(t, caster)
 	assertFrameOpcode(t, caster.Read(), serverpackets.OpcodeMoveToLocation, "second walk")
 
 	caster.Send(encodeRequestMagicSkillUse(skillID, false, false))
@@ -558,6 +561,7 @@ func TestWalkingGroundCastStopsThenValidatesLocation(t *testing.T) {
 	startInWorld(t, c)
 
 	c.Send(encodeMoveBackwardToLocation(80, 70, 30))
+	expectGroundClickAck(t, c)
 	walk := c.Read()
 	assertFrameOpcode(t, walk, serverpackets.OpcodeMoveToLocation, "first walk")
 	_, standAt, _ := gameservertest.ReadMoveToLocationCoords(t, walk)
@@ -565,6 +569,7 @@ func TestWalkingGroundCastStopsThenValidatesLocation(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeMoveBackwardToLocation(200, 70, 30))
+	expectGroundClickAck(t, c)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "second walk")
 
 	c.Send(encodeRequestExMagicSkillUseGround(groundX, groundY, groundZ, skillID, false, false))
@@ -782,6 +787,7 @@ func TestTogglingSkillWhileWalkingStopsMovement(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeMoveBackwardToLocation(200, 70, 30))
+	expectGroundClickAck(t, c)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "walk")
 
 	c.Send(encodeRequestMagicSkillUse(skillID, false, false))
@@ -832,6 +838,7 @@ func TestSkillDisabledToggleRejectionDoesNotStopMovement(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeMoveBackwardToLocation(200, 70, 30))
+	expectGroundClickAck(t, c)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "walk with toggle's reuse key disabled")
 
 	c.Send(encodeRequestMagicSkillUse(toggleSkillID, false, false))

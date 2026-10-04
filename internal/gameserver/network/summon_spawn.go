@@ -559,6 +559,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	attackController := attack.NewPlayable(actor, sink)
 	attackController.SetQueue(queue)
 	brain := ai.NewSummon(actor, moveController, attackController)
+	brain.SetBoatEntrance(summonBoatEntrance{link: l, actor: actor})
 	sink.brain = brain
 	sink.attack = attackController
 	actor.SetRaidCursesDisabled(l.disableRaidCurse)
