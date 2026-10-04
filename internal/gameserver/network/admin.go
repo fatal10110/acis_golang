@@ -62,6 +62,10 @@ var adminCommands = map[string]adminCommand{
 	// Castles; see admin_castle.go.
 	"admin_castle": (*GameClientLink).adminCastle,
 
+	// Olympiad and heroes; see admin_olympiad.go.
+	"admin_endoly":  (*GameClientLink).adminEndOlympiad,
+	"admin_sethero": (*GameClientLink).adminSetHero,
+
 	// Announcements; see admin_announce.go.
 	"admin_announce": (*GameClientLink).adminAnnounce,
 	"admin_ann":      (*GameClientLink).adminAnnounceText,

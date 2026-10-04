@@ -230,6 +230,7 @@ func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, c 
 			}
 		}
 	}
+	l.restoreHeroStatus(c)
 	l.restoreCursedWeapon(c)
 	if c.ResourceValues().CurrentHP < 0.5 {
 		c.MarkDead()

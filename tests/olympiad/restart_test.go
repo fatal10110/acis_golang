@@ -26,7 +26,7 @@ func newOlympiad(t *testing.T, store olympiad.Store, at time.Time) (*olympiad.Ol
 	worker := persist.New(zerolog.Nop())
 	t.Cleanup(func() { _ = worker.Close(context.Background()) })
 	loop := sim.NewInline(at)
-	o := olympiad.New(olympiad.DefaultConfig(), store, worker, discard{}, loop.NewQueue("olympiad"), zerolog.Nop())
+	o := olympiad.New(olympiad.DefaultConfig(), store, worker, discard{}, nil, loop.NewQueue("olympiad"), zerolog.Nop())
 	if err := o.Restore(context.Background()); err != nil {
 		t.Fatalf("restore: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestOlympiadStopCancelsPendingStep(t *testing.T) {
 	tr := &trace{}
 	at := time.Date(2026, 10, 7, 20, 0, 0, 0, time.UTC)
 	loop := sim.NewInline(at)
-	o := olympiad.New(olympiad.DefaultConfig(), traceStore{gamesql.NewOlympiadStore(db), tr}, nil, traceAnnouncer{tr}, loop.NewQueue("olympiad"), zerolog.Nop())
+	o := olympiad.New(olympiad.DefaultConfig(), traceStore{gamesql.NewOlympiadStore(db), tr}, nil, traceAnnouncer{tr}, nil, loop.NewQueue("olympiad"), zerolog.Nop())
 	if err := o.Restore(ctx); err != nil {
 		t.Fatal(err)
 	}

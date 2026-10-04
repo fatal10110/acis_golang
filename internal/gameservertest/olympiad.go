@@ -5,10 +5,14 @@ import (
 	"testing"
 )
 
+// HeroMinMatches is the number of Olympiad matches a noble needs to be
+// elected hero in a booted server, the reference default.
+const HeroMinMatches = 5
+
 // WithOlympiadSeed adjusts the database once the characters are seeded and
 // before the Olympiad's records are restored from it: noble status in
-// characters.nobless, records in olympiad_nobles, the cycle in server_memo.
-// The fixture restores the records only; it never starts the Olympiad
+// characters.nobless, records in olympiad_nobles, the cycle in server_memo,
+// heroes in heroes. The fixture restores the records and the heroes only; it never starts the Olympiad
 // calendar, whose announcements would otherwise reach a test whenever the
 // clock crosses a competition window.
 func WithOlympiadSeed(seed func(db *sql.DB)) Option {

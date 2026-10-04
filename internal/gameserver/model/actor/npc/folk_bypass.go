@@ -106,6 +106,10 @@ const (
 	// BypassFishingReward claims a fishing championship prize at a
 	// fisherman.
 	BypassFishingReward
+	// BypassHeroList shows the heroes of the running era.
+	BypassHeroList
+	// BypassHeroClaim has an elected hero claim the hero status.
+	BypassHeroClaim
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -115,6 +119,9 @@ type Talker struct {
 	// LowLevelNewbie is a level 6 to 25 player who has made at most the
 	// first occupation change.
 	LowLevelNewbie bool
+	// InactiveHero is a player elected hero who has not claimed the status
+	// yet.
+	InactiveHero bool
 }
 
 // BypassReply is a civilian NPC's answer to one dialog command.
@@ -185,6 +192,9 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	}
 	if _, ok := unportedFolkChats[kind]; ok {
 		return reply
+	}
+	if kind == "OlympiadManagerNpc" && strings.HasPrefix(command, "Olympiad") && !strings.HasPrefix(command, "OlympiadNoble") {
+		return f.olympiadCommand(pages, talker, command, reply)
 	}
 	if _, ok := unportedFolkCommands[kind]; ok {
 		return reply
@@ -518,4 +528,43 @@ func commandChars(command string, begin, end int) (string, bool) {
 		return "", false
 	}
 	return string(utf16.Decode(units[begin:end])), true
+}
+
+// olympiadCommand answers an Olympiad manager's "Olympiad <n>" command,
+// whose choice is the one character after "Olympiad ": a command too short
+// to hold it, or one that is no digit, stops the handling. 4 shows the
+// heroes; 5 asks an elected hero to confirm its claim and 6 claims the
+// status, answering nothing to anyone else; 7 opens the Monument of Heroes'
+// main page. The class rankings (2) and the stadium list (3) need the
+// Olympiad's registration and matches (#3281, #3340); any other choice
+// answers nothing.
+func (f *Folk) olympiadCommand(pages Pages, talker Talker, command string, reply BypassReply) BypassReply {
+	arg, ok := commandChars(command, 9, 10)
+	if !ok {
+		reply.Outcome = BypassAborted
+		return reply
+	}
+	choice, err := commons.Atoi(arg)
+	if err != nil {
+		reply.Outcome = BypassAborted
+		return reply
+	}
+	switch choice {
+	case 2, 3:
+		reply.Outcome = BypassUnported
+	case 4:
+		reply.Outcome = BypassHeroList
+	case 5:
+		reply.Outcome = BypassRefused
+		if talker.InactiveHero {
+			reply.Outcome, reply.HTML = BypassPage, f.page(pages, olympiadPages+"hero_confirm.htm")
+		}
+	case 6:
+		reply.Outcome = BypassHeroClaim
+	case 7:
+		reply.Outcome, reply.HTML = BypassPage, f.heroMainPage(pages, talker.InactiveHero)
+	default:
+		reply.Outcome = BypassRefused
+	}
+	return reply
 }
