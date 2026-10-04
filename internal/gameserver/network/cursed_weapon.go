@@ -198,11 +198,10 @@ func (l *GameClientLink) giveCursedSkill(c *player.Character, itemID, stage int3
 	return true
 }
 
-// removeCursedSkill takes itemID's skill from live and resends its skill
-// list.
-func (l *GameClientLink) removeCursedSkill(live *livePlayer, itemID int32) {
-	skillID, ok := l.cursed.Skill(itemID)
-	if !ok || l.skills == nil {
+// removeCursedSkill takes a cursed weapon's skill skillID from live and
+// resends its skill list.
+func (l *GameClientLink) removeCursedSkill(live *livePlayer, skillID int32) {
+	if l.skills == nil {
 		return
 	}
 	l.removeLiveSkill(live, int(skillID), false)
@@ -274,7 +273,9 @@ func (l *GameClientLink) loseCursedWeapon(live *livePlayer) {
 	live.SetKarma(int(death.Karma))
 	live.SetPKKills(int(death.PKKills))
 	live.SetCursedWeapon(0, 0)
-	l.removeCursedSkill(live, itemID)
+	if skillID, ok := l.cursed.Skill(itemID); ok {
+		l.removeCursedSkill(live, skillID)
+	}
 	x, y, z := live.Position()
 	l.announceCursedRegion(serverpackets.SystemMessageS2WasDroppedInTheS1Region, x, y, z, itemID)
 }
@@ -286,10 +287,20 @@ func (l *GameClientLink) loseCursedWeapon(live *livePlayer) {
 // A holder out of the world has that done to its stored state. A weapon on
 // the ground leaves the world.
 func (l *GameClientLink) endCursedWeapon(end cursedweapon.EndOfLife, current *livePlayer) {
+	l.endCursedWeaponThen(end, current, nil)
+}
+
+// endCursedWeaponThen is endCursedWeapon running then, when not nil, once
+// every player was told the weapon disappeared: on the queue that told
+// them.
+func (l *GameClientLink) endCursedWeaponThen(end cursedweapon.EndOfLife, current *livePlayer, then func()) {
 	announce := func() {
 		l.toAllPlayers(func() wire.Frame {
 			return serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageS1HasDisappeared, end.ItemID)
 		})
+		if then != nil {
+			then()
+		}
 	}
 	switch {
 	case end.Held:
@@ -327,7 +338,7 @@ func (l *GameClientLink) releaseCursedHolder(live *livePlayer, end cursedweapon.
 	live.SetKarma(int(end.Karma))
 	live.SetPKKills(int(end.PKKills))
 	live.SetCursedWeapon(0, 0)
-	l.removeCursedSkill(live, end.ItemID)
+	l.removeCursedSkill(live, end.SkillID)
 	if inv := live.Inventory(); inv != nil {
 		if inst := inv.ItemByTemplateID(end.ItemID); inst != nil {
 			if tmpl, ok := inv.Templates().Get(end.ItemID); ok && inst.Equipped() && l.inventory != nil {

@@ -54,6 +54,9 @@ var adminCommands = map[string]adminCommand{
 	// Data reloads; see admin_reload.go.
 	"admin_reload": (*GameClientLink).adminReload,
 
+	// Cursed weapons; see admin_cursed.go.
+	"admin_cw": (*GameClientLink).adminCursedWeapons,
+
 	// Fences; see admin_fence.go.
 	"admin_spawnfence":  (*GameClientLink).adminSpawnFence,
 	"admin_deletefence": (*GameClientLink).adminDeleteFence,

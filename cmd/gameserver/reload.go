@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -38,6 +39,9 @@ func provideDataReloads(paths gameServerPaths, data *gameData, html *datacache.H
 			}
 			crests.Replace(fresh)
 			return nil
+		},
+		CursedWeapons: func() (*entity.CursedWeaponTable, error) {
+			return gamexml.LoadCursedWeapons(filepath.Join(xmlRoot, "cursedWeapons.xml"), data.Skills)
 		},
 		HTML: func() error {
 			fresh, err := loadHTMLCache(paths)
