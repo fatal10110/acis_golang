@@ -336,15 +336,17 @@ var walkerWalkModeIDs = map[int32]bool{
 // already placed ref's Hostile into world.State — Walker only ticks actors
 // it can find in-region, so calling this before the spawn lands is a
 // silent no-op forever, not a delayed start. Most templates have no alias,
-// or an alias with no route data — those are skipped silently via HasRoute,
-// so only a real failure to start an existing route is logged.
+// or an alias with no route data — those are skipped silently via HasRoute.
+// Past that check StartRoute fails only on the first move; the route stays
+// registered and Walker's tick retries it, logging at Error if it keeps
+// failing.
 func startWalkerRoute(walker *task.Walker, ref *walkerActorRef, inst *npc.Instance, log zerolog.Logger) {
 	alias := inst.Template.Alias
 	if walker == nil || alias == "" || !walker.HasRoute(alias, alias) {
 		return
 	}
 	if err := walker.StartRoute(ref, alias, alias); err != nil {
-		log.Warn().Err(err).Str("alias", alias).Msg("npc: walker route start failed")
+		log.Debug().Err(err).Str("alias", alias).Msg("npc: walker route first move failed, retrying on tick")
 	}
 }
 
