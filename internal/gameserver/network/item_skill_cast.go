@@ -80,15 +80,17 @@ func (l *GameClientLink) castItemSkills(live *livePlayer, inv *itemcontainer.Inv
 			continue
 		}
 		// Past the pre-attempt gate the attached skill is the CAST
-		// intention, started now or queued: it takes the attack's place.
-		if live.combat != nil {
-			live.combat.ReplaceWithCast()
-		}
+		// intention, started now or queued: it takes the attack's place,
+		// at once or, queued behind a swing, once the swing ends.
 		live.endFollow()
 		if run != nil || itemAICastBusy(live) {
 			live.deferItemAICast(inv, carrier, def, selected, ctrl)
+			live.queueCastIntention()
 			sendMagicActionFailed(live)
 			continue
+		}
+		if live.combat != nil {
+			live.combat.ReplaceWithCast()
 		}
 		next, rejected, failed := l.beginItemAICast(live, inv, carrier, selected, def, ctrl)
 		if failed {

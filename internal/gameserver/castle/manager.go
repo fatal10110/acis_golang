@@ -2,6 +2,7 @@ package castle
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 
@@ -28,6 +29,9 @@ type Store interface {
 	UpdateCurrentTax(ctx context.Context, castleID int32, percent int) error
 	UpdateNextTax(ctx context.Context, castleID int32, percent int) error
 	UpdateFinances(ctx context.Context, castleID int32, f Finances) error
+	// UpdateSiegeInfo stores the siege date, in Unix milliseconds, and
+	// whether it is no longer open to change.
+	UpdateSiegeInfo(ctx context.Context, castleID int32, date int64, regTimeOver bool) error
 	// UpdateOwner clears the castle from every clan_data row holding it,
 	// then gives it to clanID's row; 0 gives it to none.
 	UpdateOwner(ctx context.Context, castleID, clanID int32) error
@@ -148,6 +152,19 @@ func (m *Manager) All() []*Castle {
 		return nil
 	}
 	return append([]*Castle(nil), m.order...)
+}
+
+// ByNPC returns the castle whose residence NPCs include npcID.
+func (m *Manager) ByNPC(npcID int) (*Castle, bool) {
+	if m == nil {
+		return nil, false
+	}
+	for _, c := range m.order {
+		if slices.Contains(c.NPCs, npcID) {
+			return c, true
+		}
+	}
+	return nil, false
 }
 
 // SetOwner gives c to cl, unless cl already owns a castle, which it

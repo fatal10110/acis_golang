@@ -124,6 +124,33 @@ func (c *Castle) IsTimeRegistrationOver() bool {
 	return c.regTimeOver
 }
 
+// SetSiegeDate sets the siege date, in Unix milliseconds, without storing
+// it; see SaveSiegeInfo.
+func (c *Castle) SetSiegeDate(ms int64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.siegeDate = ms
+}
+
+// SetTimeRegistrationOver sets whether the siege date is no longer open to
+// change, without storing it; see SaveSiegeInfo.
+func (c *Castle) SetTimeRegistrationOver(over bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.regTimeOver = over
+}
+
+// SaveSiegeInfo stores the siege date and whether it is still open to
+// change, as they stand.
+func (c *Castle) SaveSiegeInfo() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	date, over := c.siegeDate, c.regTimeOver
+	c.write("update siege info", func(ctx context.Context, st Store) error {
+		return st.UpdateSiegeInfo(ctx, c.id(), date, over)
+	})
+}
+
 // restore sets the castle's state from its stored row, at boot.
 func (c *Castle) restore(r Row) {
 	c.mu.Lock()

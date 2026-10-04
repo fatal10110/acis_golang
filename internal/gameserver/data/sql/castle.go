@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
@@ -108,6 +109,13 @@ func (s *CastleStore) UpdateFinances(ctx context.Context, castleID int32, f cast
 	return s.exec(ctx, "update castle finances",
 		`UPDATE castle SET treasury=?, taxRevenue=?, seedIncome=?, currentTaxPercent=?, nextTaxPercent=? WHERE id=?`,
 		f.Treasury, f.TaxRevenue, f.SeedIncome, f.CurrentTaxPercent, f.NextTaxPercent, castleID)
+}
+
+// UpdateSiegeInfo stores castleID's siege date and whether it is no longer
+// open to change, as the column's 'true' or 'false'.
+func (s *CastleStore) UpdateSiegeInfo(ctx context.Context, castleID int32, date int64, regTimeOver bool) error {
+	return s.exec(ctx, "update castle siege info", `UPDATE castle SET siegeDate=?, regTimeOver=? WHERE id=?`,
+		date, strconv.FormatBool(regTimeOver), castleID)
 }
 
 // UpdateOwner clears castleID from every clan_data row holding it, then

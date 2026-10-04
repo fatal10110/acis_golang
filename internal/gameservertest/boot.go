@@ -75,6 +75,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/raidpoint"
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
@@ -100,6 +101,9 @@ type Option func(*options)
 type options struct {
 	// castles is the castle data (WithCastles); nil loads none.
 	castles *castledata.Table
+	// sieges is the castle siege configuration (WithSieges); nil runs no
+	// siege.
+	sieges *siege.Config
 	// slowStores delays every handler-issued persistence write (WithSlowStores).
 	slowStores             time.Duration
 	itemFlushFault         *ItemFlushFault
@@ -150,6 +154,7 @@ type options struct {
 	autoLearnSkills        bool
 	deepBlueDropRules      bool
 	autoLoot               bool
+	autoLootRaid           bool
 	rateKarmaExpLost       float64
 	deathDrop              player.DeathDropRules
 	characterSelectDelay   time.Duration
@@ -478,6 +483,13 @@ func WithDeepBlueDropRules(enabled bool) Option {
 // onto the ground (default false).
 func WithAutoLoot(enabled bool) Option {
 	return func(o *options) { o.autoLoot = enabled }
+}
+
+// WithAutoLootRaid sets the server.properties AutoLootRaid gate: whether a
+// raid or grand boss kill's drops go straight into the killer's inventory
+// instead of onto the ground (default false).
+func WithAutoLootRaid(enabled bool) Option {
+	return func(o *options) { o.autoLootRaid = enabled }
 }
 
 // WithRateKarmaExpLost sets the server.properties RateKarmaExpLost
@@ -918,6 +930,7 @@ type Server struct {
 	coupleRows          *gamesql.CoupleStore
 	Clans               *clan.Service
 	Castles             *castle.Manager // the castles WithCastles loads, restored at boot
+	Sieges              *siege.Engine   // the castle sieges WithSieges runs; nil otherwise
 	SevenSigns          *sevensigns.State
 	Festival            *festival.Manager
 	AnnounceFile        string // the announcements.xml the server reads and rewrites
@@ -927,6 +940,7 @@ type Server struct {
 	levelTable          *player.LevelTable
 	deepBlueDrops       bool
 	autoLoot            bool
+	autoLootRaid        bool
 	ids                 *sequentialIDs
 	positions           *task.PositionUpdates
 	addr                net.Addr
@@ -2072,6 +2086,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Lottery = lotteryState
 	fishChampState := o.fishChamp.newChampionship(db, persistWorker, queues, o.log)
 	gclConfig.FishingChampionship = fishChampState
+	gclConfig.Sieges = newSieges(db, o, gclConfig.Castles, gclConfig.Clans, persistWorker)
 	gcl, err := network.NewGameClientLink(gclConfig)
 	if err != nil {
 		t.Fatalf("gameservertest: build game client link: %v", err)
@@ -2207,6 +2222,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	t.Cleanup(hallQueue.Close)
 	halls.Start(hallQueue, gcl, network.ClanHallNotifier(gcl))
 	restoreCastles(t, db, gclConfig.Castles)
+	startSieges(t, gclConfig.Sieges, queues.NewQueue("sieges"), gcl)
 	gclConfig.Clans.DropMissingCrests(crests)
 	gclConfig.Clans.DropDanglingAlliances()
 	clanDissolutions := queues.NewQueue("clan-dissolution")
@@ -2280,6 +2296,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Derby:               derbyTrack,
 		Clans:               gclConfig.Clans,
 		Castles:             gclConfig.Castles,
+		Sieges:              gclConfig.Sieges,
 		HallFunctions:       hallFunctions,
 		Halls:               halls,
 		SevenSigns:          sevenSigns,
@@ -2288,6 +2305,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		levelTable:          levels,
 		deepBlueDrops:       o.deepBlueDropRules,
 		autoLoot:            o.autoLoot,
+		autoLootRaid:        o.autoLootRaid,
 		DB:                  db,
 		RaidPoints:          raidPoints,
 		CursedWeapons:       cursedState,

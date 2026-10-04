@@ -28,7 +28,7 @@ func (l *GameClientLink) talkToFolk(live *livePlayer, f *npc.Folk) {
 	if id, ok := f.TalkAnimation(time.Now()); ok {
 		l.broadcastFolkFrame(f, func() wire.Frame { return serverpackets.FrameSocialAction(f.ObjectID(), id) })
 	}
-	if showObserverGroups(live, f) {
+	if showObserverGroups(live, f) || l.showSiegeMessenger(live, f) {
 		return
 	}
 	html, outcome := f.ChatWindow(setPages{l.html}, l.playerConfig.chatRules(), live.Karma(), folkChatState{l: l, live: live})

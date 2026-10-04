@@ -158,8 +158,8 @@ func (c *Character) CanCastOnPlayable(t target.Actor, skill *modelskill.Definiti
 // Two duellists fighting each other need no force whatever else they
 // share.
 //
-// Olympiad matches (#216) and siege sides (#234) are not modeled, so their
-// rules never apply.
+// The Olympiad match (#216) and siege side (#3375) rules are not applied
+// yet.
 func (c *Character) SocialWithoutForce(self attackable.ArenaMember, attacker target.Actor) (allowed, decided bool) {
 	if c.inSameActiveDuel(attacker) {
 		return true, true
@@ -183,8 +183,8 @@ func (c *Character) SocialWithoutForce(self attackable.ArenaMember, attacker tar
 //
 // A duellist may cast anything offensive on the player it fights.
 //
-// Olympiad matches (#216) and siege sides (#234) are not modeled, so their
-// rules never apply.
+// The Olympiad match (#216) and siege side (#3375) rules are not applied
+// yet.
 func (c *Character) OffensiveCastAllowed(caster attackable.ArenaMember, t target.Actor, skill *modelskill.Definition, ctrl, mainTarget bool) bool {
 	targetPlayer, ok := socialPeerOf(t)
 	if !ok || targetPlayer.ObjectID() == c.ID {

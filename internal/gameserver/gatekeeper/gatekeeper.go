@@ -118,9 +118,7 @@ func (s *Service) Teleport(c *player.Character, npcID, index int) Trip {
 	}
 	t := list[index]
 	// ponytail: a destination tied to a castle (CastleID) is refused with
-	// CANNOT_PORT_VILLAGE_IN_SIEGE while that castle's siege runs. No siege
-	// can run until the siege engine (#234) exists; it adds the refusal
-	// here.
+	// CANNOT_PORT_VILLAGE_IN_SIEGE while that castle's siege runs (#3375).
 	trip := Trip{Depart: true, Destination: t.Location, Release: true}
 	if s.free || t.PriceCount == 0 {
 		return trip

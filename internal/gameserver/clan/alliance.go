@@ -83,8 +83,7 @@ func (s *Service) setAllyCrestLocked(cl *Clan, id int32) {
 type AllyCreateResult int
 
 // The founding outcomes, in the order they are checked. A founding while a
-// siege involving the clan is in progress is refused once sieges exist
-// (#3150).
+// siege involving the clan is in progress is not refused yet (#3150).
 const (
 	AllyCreated AllyCreateResult = iota
 	// AllyCreateNotLeader refuses a clanless player or a member that does
@@ -138,7 +137,7 @@ type AllyDissolveResult int
 
 // The dissolution outcomes, in the order they are checked. A dissolution
 // while any of the alliance's clans takes part in a siege in progress is
-// refused once sieges exist (#3150).
+// not refused yet (#3150).
 const (
 	AllyDissolved AllyDissolveResult = iota
 	// AllyDissolveNoClan is a clanless player; it is not answered.
@@ -211,8 +210,8 @@ func (s *Service) DissolveAlly(c *player.Character, files *datacache.Crests, now
 type AllyJoinRefusal int
 
 // The invitation refusals, in the order they are checked. A target clan
-// registered against the leading clan in a siege is refused once sieges
-// exist (#3150).
+// registered against the leading clan in a siege is not refused yet
+// (#3150).
 const (
 	AllyJoinAllowed AllyJoinRefusal = iota
 	AllyJoinNotAllyLeader

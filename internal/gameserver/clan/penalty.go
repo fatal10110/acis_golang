@@ -47,8 +47,8 @@ type Penalty struct {
 // PenaltyReport lists, in display order, the penalties c and its clan are
 // under at nowMs.
 //
-// A clan registered on a castle siege may not be dissolved either; no siege
-// takes registrations yet, so no clan is registered on one (#3211).
+// A clan registered on a castle siege may not be dissolved either, which
+// is not listed yet (#3211).
 func (s *Service) PenaltyReport(c *player.Character, nowMs int64) []Penalty {
 	var out []Penalty
 	if t := c.ClanJoinExpiryTime(); t > nowMs {

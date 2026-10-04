@@ -82,8 +82,29 @@ type ClanFields struct {
 	PledgeType int32
 }
 
-// clanLeaderRelation is UserInfo's relation bit for a clan leader.
-const clanLeaderRelation = 0x40
+// UserInfo's relation bits: a clan leader's, then a siege attacker's and a
+// siege defender's.
+const (
+	clanLeaderRelation    = 0x40
+	siegeAttackerRelation = 0x180
+	siegeDefenderRelation = 0x80
+)
+
+// userInfoRelation is UserInfo's relation field: the clan leader bit and
+// the bits of the siege state.
+func userInfoRelation(leader bool, siegeState int32) int32 {
+	var relation int32
+	if leader {
+		relation = clanLeaderRelation
+	}
+	switch siegeState {
+	case player.SiegeStateAttacker:
+		relation |= siegeAttackerRelation
+	case player.SiegeStateDefender:
+		relation |= siegeDefenderRelation
+	}
+	return relation
+}
 
 // EncodeUserInfo builds the UserInfo packet payload for an unframed send,
 // or nil when s cannot be encoded.
@@ -224,13 +245,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(s.Clan.CrestID)
 	w.WriteInt32(s.Clan.AllyID)
 	w.WriteInt32(s.Clan.AllyCrestID)
-	// The siege-state relation bits join the leader's once sieges exist
-	// (#3150).
-	if s.Clan.Leader {
-		w.WriteInt32(clanLeaderRelation)
-	} else {
-		w.WriteInt32(0)
-	}
+	w.WriteInt32(userInfoRelation(s.Clan.Leader, c.SiegeState()))
 	w.WriteUint8(uint8(c.MountType()))
 	w.WriteUint8(uint8(c.OperateType()))
 	w.WriteUint8(0) // crystallize flag: not modeled

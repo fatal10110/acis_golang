@@ -36,10 +36,10 @@ const (
 // the jail; every other town teleport (//sendhome, a starved flying mount,
 // a boss-zone ejection) still sends a jailed player to the nearest town.
 //
-// Neither castle nor clan hall sieges run yet (#234, #244): with no active
-// siege, the castle restart needs the clan to own a castle, the siege HQ
-// restart finds no flag and resolves to town, and no attacker waits out a
-// respawn delay (#3346). The clan hall restart does not restore experience
+// The siege-side rules are not ported yet (#3346, with the clan hall
+// sieges #244): the castle restart needs the clan to own a castle, the
+// siege HQ restart finds no flag and resolves to town, and no attacker
+// waits out a respawn delay. The clan hall restart does not restore experience
 // from a rented restore-exp function yet (#3347).
 func (l *GameClientLink) restartPointDestination(live *livePlayer, requestType int32) (location.Location, restartOutcome) {
 	switch {
@@ -105,7 +105,7 @@ func randomResidenceSpawn(spawns map[residence.SpawnType][]location.Location) (l
 // dieOptions are the restart choices the death window of live offers: the
 // clan hall and castle restarts while live's clan owns one, the fixed
 // restart for an access level allowed it. The siege HQ restart and the
-// castle restart of a siege defender wait on the siege engine (#3346).
+// castle restart of a siege defender are not ported yet (#3346).
 func dieOptions(live *livePlayer) serverpackets.DieOptions {
 	return serverpackets.DieOptions{
 		ClanHall: live.ClanHallID() != 0,

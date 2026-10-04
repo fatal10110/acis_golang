@@ -43,8 +43,9 @@ type castleWorld struct {
 }
 
 // bootCastleWorld boots the castle world; castle is the castle the clan's
-// row holds (0 for none) and seed runs once the clan is seeded.
-func bootCastleWorld(t *testing.T, castle int, seed func(*sql.DB)) *castleWorld {
+// row holds (0 for none), seed runs once the clan is seeded, and extra
+// adds boot options.
+func bootCastleWorld(t *testing.T, castle int, seed func(*sql.DB), extra ...gameservertest.Option) *castleWorld {
 	t.Helper()
 	datapack.Require(t)
 	skills, shippedItems := shippedData()
@@ -69,7 +70,7 @@ func bootCastleWorld(t *testing.T, castle int, seed func(*sql.DB)) *castleWorld 
 		t.Fatalf("read castle page: %v", err)
 	}
 	db := sqltest.SharedDB(t)
-	srv := gameservertest.Boot(t,
+	opts := []gameservertest.Option{
 		gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), skills, gamesql.NewCharacterSkillStore(db))),
 		gameservertest.WithItemTemplates(item.NewTable(templates)),
 		gameservertest.WithCharacter("Newbie", 40, 0),
@@ -97,7 +98,8 @@ func bootCastleWorld(t *testing.T, castle int, seed func(*sql.DB)) *castleWorld 
 				seed(db)
 			}
 		}),
-	)
+	}
+	srv := gameservertest.Boot(t, append(opts, extra...)...)
 	w := &castleWorld{srv: srv, leader: srv.Client, leaderID: srv.SoleObjectID(t)}
 	gmID := srv.SeedCharacterFor(t, "gm", "Admin", 10, 0).ID
 	if _, err := db.ExecContext(context.Background(), "UPDATE characters SET accesslevel = 7 WHERE obj_Id = ?", gmID); err != nil {

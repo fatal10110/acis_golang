@@ -411,6 +411,9 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	if c.ClanJoinExpiryTime() > time.Now().UnixMilli() {
 		client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageClanMembershipTerminated))
 	}
+	// ponytail: an attacker or spectator (siege state below 2) logging in
+	// on a battlefield under siege is sent to town here; it needs the login
+	// siege state, so both land together (#3150).
 	client.Session.SendFrame(serverpackets.FrameActionFailed())
 	return true
 }
@@ -727,6 +730,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	live.remoteIP = client.Session.remoteIP()
 	delivery.live = live
 	c.Attach(creatureLive, live)
+	c.SetWorldHandle(live)
 	moveCtl, err := move.NewController(c.Move(), c, live)
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)

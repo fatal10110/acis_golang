@@ -64,6 +64,10 @@ func (s *recordingStore) UpdateFinances(_ context.Context, id int32, f Finances)
 	return s.add("finances %d=%d/%d/%d/%d/%d", id, f.Treasury, f.TaxRevenue, f.SeedIncome, f.CurrentTaxPercent, f.NextTaxPercent)
 }
 
+func (s *recordingStore) UpdateSiegeInfo(_ context.Context, id int32, date int64, over bool) error {
+	return s.add("siege %d=%d/%t", id, date, over)
+}
+
 func (s *recordingStore) UpdateOwner(_ context.Context, id, clanID int32) error {
 	return s.add("owner %d=%d", id, clanID)
 }

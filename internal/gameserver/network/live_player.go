@@ -587,6 +587,14 @@ func (p *livePlayer) hasDeferredMagicSkill() bool {
 	return p.deferredMagic != nil
 }
 
+// hasParkedCast reports whether a skill request or item cast holds the
+// next-intention slot, queued or walking to its target.
+func (p *livePlayer) hasParkedCast() bool {
+	p.pickupMu.Lock()
+	defer p.pickupMu.Unlock()
+	return p.deferredMagic != nil || p.deferredItem != nil
+}
+
 // hasDeferredItemAICast reports whether an item cast is queued as the next
 // CAST intention.
 func (p *livePlayer) hasDeferredItemAICast() bool {

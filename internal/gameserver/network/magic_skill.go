@@ -51,9 +51,10 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	// is answered with ActionFailed; the swing's or cast's end runs it.
 	// Starting it now would pay its costs and broadcast MagicSkillUse (or
 	// switch a toggle) before what is in flight has finished. It replaces an
-	// attack queued behind the same cast, and the attack the swing in
-	// flight is for. itemAICastBusy is the wait predicate every cast request
-	// shares, the sit-down and stand-up transitions included.
+	// attack queued behind the same swing or cast; the attack the swing in
+	// flight is for stays current until the swing ends (queueCastIntention).
+	// itemAICastBusy is the wait predicate every cast request shares, the
+	// sit-down and stand-up transitions included.
 	//
 	// A pets-row read still in flight stands in for a cast the caster is
 	// still in, whether or not its hold already ended, so a servitor request
@@ -61,9 +62,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	// slot gate then refuses it before any cost.
 	if castable && (itemAICastBusy(live) || l.restoringServitor(live, def)) {
 		live.deferMagicSkill(req, selected)
-		if live.combat != nil {
-			live.combat.ReplaceWithCast()
-		}
+		live.queueCastIntention()
 		sendMagicActionFailed(live)
 		return
 	}

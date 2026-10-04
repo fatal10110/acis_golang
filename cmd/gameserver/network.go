@@ -35,6 +35,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/raidpoint"
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -122,6 +123,7 @@ func provideGameClientLink(
 	characters *gamesql.CharacterStore,
 	clans *clan.Service,
 	castles *castle.Manager,
+	sieges *siege.Engine,
 	board communityBoard,
 	announcements *announcement.Registry,
 	schemeBuffer *schemebuffer.Manager,
@@ -268,6 +270,7 @@ func provideGameClientLink(
 		Characters:     characters,
 		Clans:          clans,
 		Castles:        castles,
+		Sieges:         sieges,
 		AccessLevels:   characters,
 		CharacterEdits: characters,
 		Punishments:    characters,
