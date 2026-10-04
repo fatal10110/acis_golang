@@ -92,6 +92,8 @@ type Config struct {
 	MaxAttackers, MaxDefenders int
 	// AttackerRespawn is how long a dead attacker waits before it restarts
 	// (AttackerRespawn, in milliseconds).
+	//
+	// ponytail: not applied yet; the siege restart rules read it (#3346).
 	AttackerRespawn time.Duration
 }
 

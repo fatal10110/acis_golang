@@ -294,7 +294,7 @@ func (l *GameClientLink) siegeBanisher(field *zone.Siege) func(zone.Actor) {
 		if !active {
 			l.siegeBanishing.Store(live, struct{}{})
 		}
-		postLive(live, func() {
+		posted := postLive(live, func() {
 			defer l.siegeBanishing.Delete(live)
 			if dest, ok := l.restartDestination(live); ok {
 				l.teleportLivePlayer(live, dest, restartTeleportOffset)
@@ -303,6 +303,10 @@ func (l *GameClientLink) siegeBanisher(field *zone.Siege) func(zone.Actor) {
 				l.startPvPFlag(live, false)
 			}
 		})
+		if !posted {
+			// The player's queue is closed, so the job never runs.
+			l.siegeBanishing.Delete(live)
+		}
 	}
 }
 

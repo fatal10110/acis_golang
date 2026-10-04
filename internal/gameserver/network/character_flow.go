@@ -411,6 +411,9 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	if c.ClanJoinExpiryTime() > time.Now().UnixMilli() {
 		client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageClanMembershipTerminated))
 	}
+	// ponytail: an attacker or spectator (siege state below 2) logging in
+	// on a battlefield under siege is sent to town here; it needs the login
+	// siege state, so both land together (#3150).
 	client.Session.SendFrame(serverpackets.FrameActionFailed())
 	return true
 }

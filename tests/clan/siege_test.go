@@ -35,20 +35,12 @@ func bootSiegeWorld(t *testing.T) *clanWorld {
 	if err != nil {
 		t.Fatalf("load castles: %v", err)
 	}
-	pages := map[string]string{}
-	for _, name := range []string{"01.htm", "02.htm", "03.htm"} {
-		data, err := os.ReadFile(datapack.Path(t, "data", "html", "siege", name))
-		if err != nil {
-			t.Fatalf("read siege/%s: %v", name, err)
-		}
-		pages["siege/"+name] = string(data)
-	}
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Founder", 40, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithCastles(castles),
 		gameservertest.WithSieges(siege.DefaultConfig()),
-		gameservertest.WithHTMLPages(pages),
+		gameservertest.WithHTMLPages(siegePages(t)),
 		gameservertest.WithClanSeed(func(db *sql.DB) {
 			for _, q := range []string{
 				"UPDATE characters SET clanid = ? WHERE char_name = 'Founder'",
@@ -69,6 +61,20 @@ func bootSiegeWorld(t *testing.T) *clanWorld {
 	x, y, z := srv.PlayerPosition(t, w.leaderID)
 	w.at = location.Location{X: x, Y: y, Z: z}
 	return w
+}
+
+// siegePages are the castle messenger's pages, siege/01.htm to 03.htm.
+func siegePages(t *testing.T) map[string]string {
+	t.Helper()
+	pages := map[string]string{}
+	for _, name := range []string{"01.htm", "02.htm", "03.htm"} {
+		data, err := os.ReadFile(datapack.Path(t, "data", "html", "siege", name))
+		if err != nil {
+			t.Fatalf("read siege/%s: %v", name, err)
+		}
+		pages["siege/"+name] = string(data)
+	}
+	return pages
 }
 
 func encodeSiegeRequest(opcode byte, fields ...int32) []byte {
