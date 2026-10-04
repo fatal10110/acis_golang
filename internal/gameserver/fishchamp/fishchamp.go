@@ -154,7 +154,9 @@ type Championship struct {
 	// savePending is set while a save is queued that has not taken its
 	// state yet.
 	savePending bool
-	stopped     bool
+	// saveWanted is set by a change that unlock is to queue a save for.
+	saveWanted bool
+	stopped    bool
 }
 
 // New returns a championship persisting through store, a save queued on
@@ -216,7 +218,7 @@ func (c *Championship) Start() {
 		return
 	}
 	c.mu.Lock()
-	defer c.mu.Unlock()
+	defer c.unlock()
 	if now := c.now(); c.end <= now {
 		c.end = now
 		c.finish()
@@ -246,7 +248,7 @@ func (c *Championship) scheduleFinish() {
 	delay := time.Duration(max(c.end-c.now(), 0)) * time.Millisecond
 	c.queue.After(delay, func() {
 		c.mu.Lock()
-		defer c.mu.Unlock()
+		defer c.unlock()
 		if !c.stopped {
 			c.finish()
 		}
@@ -292,7 +294,7 @@ func (c *Championship) NewFish(name string, lureID int32) (catch Catch, ok bool)
 		return Catch{}, false
 	}
 	c.mu.Lock()
-	defer c.mu.Unlock()
+	defer c.unlock()
 	length := float64(60+c.roll(30)) + float64(c.roll(1001))/1000.
 	if lureID >= prizeLureFirst && lureID <= prizeLureLast {
 		length += float64(c.roll(3001)) / 1000.
@@ -374,7 +376,7 @@ func (c *Championship) IsWinner(name string) bool {
 // order.
 func (c *Championship) Claim(name string) []int32 {
 	c.mu.Lock()
-	defer c.mu.Unlock()
+	defer c.unlock()
 	var paid []int32
 	for _, e := range c.winners {
 		if e.Reward == RewardClaimed || !strings.EqualFold(e.Name, name) {
@@ -451,16 +453,34 @@ func (c *Championship) snapshot() (int64, []Entry) {
 	return c.end, out
 }
 
-// queueSave queues a save of the championship unless one is queued that
-// has yet to take its state. Runs under mu.
-func (c *Championship) queueSave() {
-	if c.savePending {
-		return
+// queueSave asks for a save once mu is released by unlock. Runs under mu.
+func (c *Championship) queueSave() { c.saveWanted = true }
+
+// unlock releases mu, then queues the save a change under it asked for.
+// The save is queued only once mu is free: a writer may run its job
+// inline, and the job takes mu.
+func (c *Championship) unlock() {
+	wanted := c.saveWanted
+	c.saveWanted = false
+	c.mu.Unlock()
+	if wanted {
+		c.enqueueSave()
 	}
+}
+
+// enqueueSave queues a save of the championship unless one is queued that
+// has yet to take its state. Runs without mu.
+func (c *Championship) enqueueSave() {
 	if c.writes == nil || c.store == nil {
 		return
 	}
+	c.mu.Lock()
+	pending := c.savePending
 	c.savePending = true
+	c.mu.Unlock()
+	if pending {
+		return
+	}
 	if !c.writes.Enqueue(writeLane, func() {
 		ctx, cancel := context.WithTimeout(context.Background(), TaskTimeout)
 		defer cancel()
@@ -468,7 +488,9 @@ func (c *Championship) queueSave() {
 			c.log.Error().Err(err).Msg("fishing championship: save")
 		}
 	}) {
+		c.mu.Lock()
 		c.savePending = false
+		c.mu.Unlock()
 		c.log.Error().Msg("fishing championship: save dropped")
 	}
 }
