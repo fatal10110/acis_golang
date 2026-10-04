@@ -81,12 +81,18 @@ func fishingCatalog() *item.Table {
 }
 
 // fishingSkills knows the three fishing skills at level 1, with the
-// datapack's level-1 power of 24, no hit time and no reuse.
+// datapack's level-1 power of 24, and pumping and reeling at
+// fishingActionPenaltyLevel too, with that level's power of 62; none has a
+// hit time or a reuse.
 func fishingSkills(t *testing.T) *skillstate.Persistence {
 	t.Helper()
 	db := sqltest.SharedDB(t)
 	active := func(id modelskill.ID, typ string, power float32) modelskill.Definition {
 		return modelskill.Definition{ID: id, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf, SkillType: typ, Power: power}
+	}
+	atLevel := func(d modelskill.Definition, level int, power float32) modelskill.Definition {
+		d.Level, d.Power = level, power
+		return d
 	}
 	return skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{
 		{ID: 248, Level: 3},
@@ -94,6 +100,8 @@ func fishingSkills(t *testing.T) *skillstate.Persistence {
 		active(fishingSkill, "FISHING", 0),
 		active(pumpingSkill, "PUMPING", 24),
 		active(reelingSkill, "REELING", 24),
+		atLevel(active(pumpingSkill, "PUMPING", 0), fishingActionPenaltyLevel, 62),
+		atLevel(active(reelingSkill, "REELING", 0), fishingActionPenaltyLevel, 62),
 		{ID: expertiseSkil, Level: 1, Activation: modelskill.ActivationPassive},
 	}), gamesql.NewCharacterSkillStore(db))
 }
@@ -135,6 +143,18 @@ func bootFishing(t *testing.T, opts ...gameservertest.Option) *fishingRig {
 // equipLure.
 func bootFishingWith(t *testing.T, equipLure bool, opts ...gameservertest.Option) *fishingRig {
 	t.Helper()
+	return bootFishingSpec(t, fishingSpec{equipLure: equipLure, actionLevel: 1}, opts...)
+}
+
+// fishingSpec is how bootFishingSpec readies the fisher: the lures on the
+// rod or not, and the level of its pumping and reeling skills.
+type fishingSpec struct {
+	equipLure   bool
+	actionLevel int
+}
+
+func bootFishingSpec(t *testing.T, spec fishingSpec, opts ...gameservertest.Option) *fishingRig {
+	t.Helper()
 	form, err := zone.NewCuboid(200, 600, -300, 300, -500, fishingWaterLevel)
 	if err != nil {
 		t.Fatal(err)
@@ -156,8 +176,8 @@ func bootFishingWith(t *testing.T, equipLure bool, opts ...gameservertest.Option
 		gameservertest.WithWantChars(1),
 	}, opts...)...)
 	r := &fishingRig{srv: srv, c: srv.Client, objID: srv.SoleObjectID(t), dice: dice}
-	for _, id := range []int{fishingSkill, pumpingSkill, reelingSkill, expertiseSkil} {
-		if err := srv.KnownSkills.SetKnownSkill(context.Background(), r.objID, 0, id, 1); err != nil {
+	for id, level := range map[int]int{fishingSkill: 1, pumpingSkill: spec.actionLevel, reelingSkill: spec.actionLevel, expertiseSkil: 1} {
+		if err := srv.KnownSkills.SetKnownSkill(context.Background(), r.objID, 0, id, level); err != nil {
 			t.Fatalf("grant skill %d: %v", id, err)
 		}
 	}
@@ -168,7 +188,7 @@ func bootFishingWith(t *testing.T, equipLure bool, opts ...gameservertest.Option
 	startInWorld(t, r.c)
 	r.c.Send(encodeUseItem(r.rod, false))
 	drainUntilQuiet(t, r.c)
-	if equipLure {
+	if spec.equipLure {
 		r.c.Send(encodeUseItem(r.lure, false))
 		drainUntilQuiet(t, r.c)
 	}
@@ -278,7 +298,12 @@ func requireEvents(t *testing.T, what string, got []string, want ...string) {
 // castStart is the caster's own start of a cast of skillID: MagicSkillUse,
 // then USE_S1 naming it.
 func castStart(skillID int) []string {
-	return []string{fmt.Sprintf("skill use %d", skillID), fmt.Sprintf("msg 46 %d/1", skillID)}
+	return castStartAt(skillID, 1)
+}
+
+// castStartAt is castStart for skillID at level.
+func castStartAt(skillID, level int) []string {
+	return []string{fmt.Sprintf("skill use %d", skillID), fmt.Sprintf("msg 46 %d/%d", skillID, level)}
 }
 
 // cast sends skillID and lets its cast land.
