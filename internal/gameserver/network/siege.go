@@ -261,18 +261,18 @@ func (l *GameClientLink) siegeCombatNotice(a zone.Actor, entering bool) {
 	za.live.SendFrame(serverpackets.FrameSystemMessage(id))
 }
 
-// siegeFlagPvP puts a player leaving a battlefield under siege on the
-// normal pvp flag timer, flagging it when it is not; a player thrown off
-// the battlefield as its siege starts is not flagged.
+// siegeFlagPvP marks a player leaving a battlefield under siege for the
+// pvp flag; a player thrown off the battlefield as its siege starts is not
+// flagged. Zone rules run with the player's zone state locked and the flag
+// broadcasts, so the revalidation that ran this rule applies the flag once
+// that lock is released, before its compass update, in the reference's
+// order (SiegeZone.onExit, then Player.revalidateZone's compass code).
 func (l *GameClientLink) siegeFlagPvP(a zone.Actor) {
 	za, ok := a.(*liveZoneActor)
 	if !ok || l.siegeBanished(za.live) {
 		return
 	}
-	live := za.live
-	// Zone rules run while the zone membership is locked; the flag
-	// broadcasts, so it runs on the player's queue.
-	postLive(live, func() { l.startPvPFlag(live, false) })
+	za.leftBattlefield = true
 }
 
 // siegeBanisher teleports a player thrown off field to its town restart
