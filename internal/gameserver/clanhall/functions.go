@@ -83,10 +83,13 @@ type Decoration struct {
 	Fixtures, CreateItem             int
 }
 
-// rented is one live function and the timer of its next fee.
+// rented is one live function and the timer of its next fee. gen counts
+// the timers armed for it: a fee whose timer was replaced since it was
+// armed carries an older gen and charges nothing.
 type rented struct {
 	Function
 	timer *sim.Timer
+	gen   uint64
 }
 
 // Functions holds the functions every clan hall rents. mu guards byHall,
@@ -258,19 +261,21 @@ func (f *Functions) scheduleLocked(hallID int32, fn *rented, delayMs int64) {
 		fn.timer.Stop()
 		fn.timer = nil
 	}
-	var timer *sim.Timer
-	timer = f.queue.After(time.Duration(max(delayMs, 0))*time.Millisecond, func() {
-		f.payFee(hallID, fn, timer)
+	fn.gen++
+	gen := fn.gen
+	fn.timer = f.queue.After(time.Duration(max(delayMs, 0))*time.Millisecond, func() {
+		f.payFee(hallID, fn, gen)
 	})
-	fn.timer = timer
 }
 
 // payFee charges fn's fee to the clan owning hall hallID when its term
 // ends. A free hall charges nothing and keeps the function as it is. Paid,
 // the function's next term starts now; unpaid, the function is removed.
-func (f *Functions) payFee(hallID int32, fn *rented, timer *sim.Timer) {
+// gen is the generation the fee's timer was armed with; one replaced since
+// charges nothing.
+func (f *Functions) payFee(hallID int32, fn *rented, gen uint64) {
 	f.mu.Lock()
-	if fn.timer != timer || f.byHall[hallID][fn.Type] != fn {
+	if fn.gen != gen || fn.timer == nil || f.byHall[hallID][fn.Type] != fn {
 		f.mu.Unlock()
 		return
 	}
