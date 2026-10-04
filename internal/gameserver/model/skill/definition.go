@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
 // ID identifies a skill, independent of its level.
@@ -197,6 +198,11 @@ type Definition struct {
 	// until something consumes it.
 	ExtractableItems string
 
+	// RecallType and TeleCoords are a RECALL or TELEPORT skill's
+	// destination: TeleCoords, when set, wins over RecallType.
+	RecallType RecallType
+	TeleCoords *location.Location
+
 	Conditions  []ConditionClause
 	Funcs       []FuncTemplate
 	Effects     []EffectTemplate
@@ -330,6 +336,9 @@ type DefinitionAttrs struct {
 	SimultaneousCast bool
 
 	ExtractableItems string
+
+	RecallType RecallType
+	TeleCoords *location.Location
 }
 
 // NewDefinition builds one level's Definition from id, level, name (the
@@ -451,6 +460,9 @@ func NewDefinition(id ID, level int, name string, a DefinitionAttrs) Definition 
 		SimultaneousCast: a.SimultaneousCast,
 
 		ExtractableItems: a.ExtractableItems,
+
+		RecallType: a.RecallType,
+		TeleCoords: a.TeleCoords,
 	}
 
 	d.Offensive = isTypeOffensive(d.SkillType) || d.Debuff || d.Target == TargetCorpseMob

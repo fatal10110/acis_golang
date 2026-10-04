@@ -444,6 +444,7 @@ func newDefaultRegistry(defs Definitions, magicFailures bool, healSps *modelskil
 		resurrectHandler{},
 		instantJumpHandler{},
 		getPlayerHandler{},
+		recallHandler{},
 		summonCreatureHandler{},
 		summonFriendHandler{},
 		cubicHandler{},

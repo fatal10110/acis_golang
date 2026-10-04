@@ -305,6 +305,10 @@ type SummonConfirmRequested struct {
 // Radius.
 type TeleportRequested struct{ X, Y, Z, Radius int }
 
+// RecallRequested reports a recall skill sending the character to the
+// place Destination names, resolved for the character where it stands.
+type RecallRequested struct{ Destination modelskill.RecallType }
+
 // Relocated reports that the server-authoritative position moved away from
 // Previous. Placed marks a position set outside movement (a forced flight's
 // landing) rather than a movement step.
@@ -386,6 +390,7 @@ func (FleeRequested) event()          {}
 func (Retargeted) event()             {}
 func (SummonConfirmRequested) event() {}
 func (TeleportRequested) event()      {}
+func (RecallRequested) event()        {}
 func (Relocated) event()              {}
 func (PvPFlagged) event()             {}
 func (RelationChanged) event()        {}

@@ -348,6 +348,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameConfirmDlgSummonFriendRequest(e.CasterName, e.CasterID, int32(e.X), int32(e.Y), int32(e.Z), e.Timeout))
 	case event.TeleportRequested:
 		l.teleportLivePlayer(live, location.Location{X: e.X, Y: e.Y, Z: e.Z}, e.Radius)
+	case event.RecallRequested:
+		l.recallLivePlayer(live, e.Destination)
 	case event.Relocated:
 		reason := revalidateStep
 		if e.Placed {

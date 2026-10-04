@@ -193,6 +193,7 @@ type Character struct {
 	insidePeaceZone          atomic.Bool
 	insideSiegeZone          atomic.Bool
 	insideNoSummonFriendZone atomic.Bool
+	insideBossZone           atomic.Bool
 	insideDangerArea         atomic.Bool
 	insideWater              atomic.Bool
 	swampMoveBonus           atomic.Int32
