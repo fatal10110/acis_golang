@@ -32,6 +32,35 @@ func TestIntPairsNonNumericValueReturnsEmptyList(t *testing.T) {
 	}
 }
 
+// TestIntPairsOutOfInt32ReturnsEmptyList: the reference reads each number
+// with Integer.parseInt, so one outside int32 is malformed and the tolerant
+// list is empty, while the strict comma list fails.
+func TestIntPairsOutOfInt32ReturnsEmptyList(t *testing.T) {
+	for _, value := range []string{"4294973947-50", "6651-2147483648", "57-1;2147483648-1"} {
+		p, err := ParseString("items=" + value + "\n")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, err := p.IntPairs("items", ""); err != nil || got != nil {
+			t.Errorf("IntPairs(%q) = (%v, %v), want (nil, nil)", value, got, err)
+		}
+	}
+	p, err := ParseString("items=4294973947-0\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := p.IntPairsComma("items", ""); err == nil {
+		t.Errorf("IntPairsComma(4294973947-0) = (%v, nil), want an error", got)
+	}
+	p, err = ParseString("items=2147483647-2147483647\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, err := p.IntPairs("items", ""); err != nil || len(got) != 1 || got[0] != (IntPair{First: 2147483647, Second: 2147483647}) {
+		t.Errorf("IntPairs(int32 bounds) = (%v, %v), want the one pair", got, err)
+	}
+}
+
 func TestFloat64TrimsWhitespace(t *testing.T) {
 	p, err := ParseString("rate= 1.5 \n")
 	if err != nil {

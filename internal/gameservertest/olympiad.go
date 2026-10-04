@@ -1,6 +1,9 @@
 package gameservertest
 
-import "database/sql"
+import (
+	"database/sql"
+	"testing"
+)
 
 // WithOlympiadSeed adjusts the database once the characters are seeded and
 // before the Olympiad's records are restored from it: noble status in
@@ -10,4 +13,20 @@ import "database/sql"
 // clock crosses a competition window.
 func WithOlympiadSeed(seed func(db *sql.DB)) Option {
 	return func(o *options) { o.seedOlympiad = seed }
+}
+
+// SetPlayerOlympiadMode puts the online player objID into an Olympiad
+// match on side 1 of stadium 0, or takes it out, the precondition of the
+// Olympiad gates no packet reaches until the matches run.
+func (s *Server) SetPlayerOlympiadMode(tb testing.TB, objID int32, on bool) {
+	tb.Helper()
+	c := s.onlineCharacter(tb, objID)
+	if on {
+		c.SetOlympiadGameID(0)
+		c.SetOlympiadSide(1)
+	} else {
+		c.SetOlympiadGameID(-1)
+		c.SetOlympiadSide(-1)
+	}
+	c.SetOlympiadMode(on)
 }

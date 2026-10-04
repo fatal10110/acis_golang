@@ -133,3 +133,14 @@ func (s *OlympiadStore) SnapshotMonth(ctx context.Context) error {
 	}
 	return nil
 }
+
+// SaveFight stores the result of one Olympiad match.
+func (s *OlympiadStore) SaveFight(ctx context.Context, f olympiad.Fight) error {
+	if _, err := s.db.ExecContext(ctx,
+		"INSERT INTO olympiad_fights (charOneId, charTwoId, charOneClass, charTwoClass, winner, start, time, classed) VALUES (?,?,?,?,?,?,?,?)",
+		f.CharOneID, f.CharTwoID, f.CharOneClass, f.CharTwoClass, f.Winner, f.Start, f.Time, f.Classed,
+	); err != nil {
+		return fmt.Errorf("save olympiad fight %d-%d: %w", f.CharOneID, f.CharTwoID, err)
+	}
+	return nil
+}

@@ -136,6 +136,9 @@ type Character struct {
 	noble atomic.Bool
 	// duel is the character's place in a duel; see character_duel.go.
 	duel duelStanding
+	// olympiad is the character's place in an Olympiad match; see
+	// character_olympiad.go.
+	olympiad olympiadStanding
 	// marriage is the marriage request the character is part of; see
 	// character_wedding.go.
 	marriage marriageRequest
