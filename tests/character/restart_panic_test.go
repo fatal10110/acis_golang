@@ -84,14 +84,13 @@ func TestPanicInQueuedRestartHandlerDropsSession(t *testing.T) {
 // TestPanicInsideDetachCompletesTeardown drives the panic into the middle of
 // detachLivePlayer rather than ahead of it, which is the case the policy's
 // "the deferred detach finishes the teardown the panicking task abandoned"
-// actually rests on: the first pass dies inside live.Stop(), before the
-// character save is enqueued and before the world removal, so every part of
-// the teardown that lands has to come from the re-entrant second pass.
+// actually rests on: the first pass dies at the attack-stance removal, after
+// the character save is enqueued but before the world removal, so the rest
+// of the teardown has to come from the re-entrant second pass.
 //
-// Damage applied before the request is the observable for it. The save is
-// enqueued after live.Stop() (lifecycle.go), so the panicking pass never
-// reached it; finding the reduced HP persisted proves the re-entrant detach
-// ran that far and not merely that the session closed.
+// Damage applied before the request must still reach the saved row, and the
+// second stance removal and the world removal prove the re-entrant detach
+// ran to the end and not merely that the session closed.
 func TestPanicInsideDetachCompletesTeardown(t *testing.T) {
 	t.Parallel()
 	stance := &panicOnStanceRemove{}
@@ -108,8 +107,6 @@ func TestPanicInsideDetachCompletesTeardown(t *testing.T) {
 	const damage = 10
 	wantHP := srv.PlayerCurrentHP(t, objID) - damage
 	srv.DamagePlayerHP(t, objID, damage)
-	// The stop path only reaches the tracker for a player in combat.
-	srv.SetPlayerInCombat(t, objID, true)
 
 	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
 
@@ -117,12 +114,10 @@ func TestPanicInsideDetachCompletesTeardown(t *testing.T) {
 		t.Fatal("session stayed open after detachLivePlayer panicked part-way")
 	}
 	srv.FlushPersistence(t)
-	// Two, not one. The first is live.Stop's stopLiveAutoAttack, which
-	// panics; the second is detachLivePlayer's own unconditional removal.
-	// stopLiveAutoAttack clears the in-combat flag before it reaches the
-	// tracker, so the resumed pass returns early there — without the
-	// unconditional removal the entry would survive the detach and, past
-	// q.Close, could never be swept.
+	// Two, not one. The first pass's removal panics; the resumed pass
+	// removes the entry again. Without that unconditional removal the
+	// entry would survive the detach and, past q.Close, could never be
+	// swept.
 	if got := stance.calls.Load(); got != 2 {
 		t.Fatalf("stance Remove calls = %d, want 2: the resumed detach must still drop the stance entry", got)
 	}

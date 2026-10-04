@@ -140,7 +140,9 @@ func (c *Character) revive() bool {
 }
 
 // Die runs this player's death sequence: the once-only dead-state
-// transition and zero-HP status, then the death packet broadcast to this
+// transition and zero-HP status, then the stop of its movement, attack and
+// cast and the reset of its target (abortAllOnDeath), then the death packet
+// broadcast to this
 // player's own session and every observer, so the corpse-fall animation
 // plays live and reaches clients before any death side effect's updates. A
 // rider's mount stops eating. The killer's PK/PvP credit follows, then this
@@ -167,7 +169,7 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	fakeDead := c.fakeDeath
 	c.stateMu.RUnlock()
 	c.BroadcastStatus()
-	c.StopCast()
+	c.abortAllOnDeath()
 	blessingStops, stripped := c.EffectList().StopOnDeath()
 	for range blessingStops {
 		c.BroadcastAbnormalEffect()
@@ -198,6 +200,18 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 		c.UpdateEffectIcons()
 	}
 	return true
+}
+
+// abortAllOnDeath stops c's movement, attack and cast and clears its
+// target. c is already dead, so the attack and cast stops each answer
+// ActionFailed twice, their idles refused, and the target reset answers
+// once more. Without a session nothing answers and only the cast needs
+// stopping.
+func (c *Character) abortAllOnDeath() {
+	if c.sink == nil {
+		c.StopCast()
+	}
+	c.AbortAll(true)
 }
 
 // Kill runs c's death sequence at once, whatever its HP, crediting killer;
