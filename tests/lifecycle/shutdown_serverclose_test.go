@@ -11,11 +11,15 @@ import (
 // game: like the reference's shutdown, the client reads ServerClose as its
 // last frame and then the close, so it leaves the world instead of hanging
 // on a dead connection.
+//
+// Each test stops through Stop, which also waits for the connection handlers:
+// on the driven clock a read cannot see a close the handler has not finished
+// making, and the handler's detach saves run on the wall clock.
 func TestStopSendsServerCloseToPlayerInWorld(t *testing.T) {
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	startInWorld(t, srv.Client)
 
-	srv.Close()
+	srv.Stop()
 
 	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeServerClose, "stop ServerClose")
 	srv.Client.ExpectClosed()
@@ -30,7 +34,7 @@ func TestStopSendsServerCloseToSelectedCharacter(t *testing.T) {
 	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
 	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeCharSelected, "game start CharSelected")
 
-	srv.Close()
+	srv.Stop()
 
 	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeServerClose, "stop ServerClose")
 	srv.Client.ExpectClosed()
@@ -43,7 +47,7 @@ func TestStopSendsServerCloseToSelectedCharacter(t *testing.T) {
 func TestStopClosesCharacterListWithoutServerClose(t *testing.T) {
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 
-	srv.Close()
+	srv.Stop()
 
 	srv.Client.ExpectClosed()
 }
