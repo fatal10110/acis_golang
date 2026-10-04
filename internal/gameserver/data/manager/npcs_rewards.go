@@ -209,7 +209,11 @@ func (d *deathRewards) rollDrops(receiver attackable.Combatant, attackerLevel in
 		autoLootItems = d.config.AutoLootRaid
 	}
 
-	NewKillReward(d.droppingCategories(), d.hostile.SpoilPool(), levelMultiplier, d.raid, d.config.Rates, autoLootItems, d.config.AutoLootHerbs, d.ids, d.items, d.ground, d.geo, x, y, z, heading, d.hostile.ObjectID()).From(d.hostile).CalculateRewards(receiver)
+	NewKillReward(d.droppingCategories(), d.hostile.SpoilPool(), levelMultiplier, d.raid, d.config.Rates, autoLootItems, d.config.AutoLootHerbs, d.ids, d.items, d.ground, d.geo, x, y, z, heading, d.hostile.ObjectID()).
+		From(d.hostile).
+		MultipleItemDrop(d.config.MultipleItemDrop).
+		AnnounceTo(d.hostile).
+		CalculateRewards(receiver)
 }
 
 // droppingCategories are the drop categories this death rolls: all of

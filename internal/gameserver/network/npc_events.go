@@ -54,6 +54,11 @@ func (s *hostileSink) Emit(ev event.Event) {
 			return serverpackets.FrameSystemMessage(serverpackets.SystemMessageRaidWasSuccessful)
 		})
 		s.broadcast(func() wire.Frame { return serverpackets.FramePlaySound(serverpackets.SoundRaidWasSuccessful) })
+	case event.RaidDropAnnounced:
+		s.broadcast(func() wire.Frame {
+			return serverpackets.FrameSystemMessageParams(serverpackets.SystemMessageS1DiedDroppedS3S2,
+				serverpackets.TextParam(h.CharacterName()), serverpackets.ItemNameParam(e.ItemID), serverpackets.NumberParam(e.Count))
+		})
 	case event.AttackStanceRequested, event.Attacked:
 		s.startAttackStance()
 	case event.AutoAttackStopped:

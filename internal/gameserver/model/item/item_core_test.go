@@ -865,17 +865,15 @@ func TestRollKillRewardSpoilRequiresMarkedPool(t *testing.T) {
 	categories := []DropCategory{guaranteedCategory(DropSpoil, 999, 1)}
 
 	t.Run("nil pool skips spoil category", func(t *testing.T) {
-		items, herbs := RollKillReward(categories, nil, 1, false, rates, false)
-		if items != nil || herbs != nil {
-			t.Fatalf("RollKillReward() = (%v, %v), want (nil, nil)", items, herbs)
+		if drops := RollKillReward(categories, nil, 1, false, rates, false); drops != nil {
+			t.Fatalf("RollKillReward() = %v, want nil", drops)
 		}
 	})
 
 	t.Run("unmarked pool skips spoil category", func(t *testing.T) {
 		var pool SpoilPool
-		items, herbs := RollKillReward(categories, &pool, 1, false, rates, false)
-		if items != nil || herbs != nil {
-			t.Fatalf("RollKillReward() = (%v, %v), want (nil, nil)", items, herbs)
+		if drops := RollKillReward(categories, &pool, 1, false, rates, false); drops != nil {
+			t.Fatalf("RollKillReward() = %v, want nil", drops)
 		}
 		if pool.Sweepable() {
 			t.Fatal("pool became sweepable despite being unmarked")
@@ -885,9 +883,8 @@ func TestRollKillRewardSpoilRequiresMarkedPool(t *testing.T) {
 	t.Run("marked pool collects the spoil roll", func(t *testing.T) {
 		var pool SpoilPool
 		pool.Mark(1)
-		items, herbs := RollKillReward(categories, &pool, 1, false, rates, false)
-		if items != nil || herbs != nil {
-			t.Fatalf("RollKillReward() = (%v, %v), want (nil, nil) — spoil goes to the pool", items, herbs)
+		if drops := RollKillReward(categories, &pool, 1, false, rates, false); drops != nil {
+			t.Fatalf("RollKillReward() = %v, want nil — spoil goes to the pool", drops)
 		}
 		got := pool.Sweep()
 		if !slices.Equal(got, []SpoilItem{{ItemID: 999, Count: 1}}) {
@@ -901,38 +898,33 @@ func TestRollKillRewardHerbSplitsIntoPickups(t *testing.T) {
 	categories := []DropCategory{guaranteedCategory(DropHerb, 500, 3)}
 
 	t.Run("auto loot collapses to one pickup", func(t *testing.T) {
-		items, herbs := RollKillReward(categories, nil, 1, false, rates, true)
-		if items != nil {
-			t.Fatalf("items = %v, want nil", items)
-		}
-		want := []HerbPickup{{ItemID: 500, Amount: 1, AutoLoot: true}}
-		if len(herbs) != 1 || herbs[0] != want[0] {
-			t.Fatalf("herbs = %v, want %v", herbs, want)
+		drops := RollKillReward(categories, nil, 1, false, rates, true)
+		want := []KillDrop{{ItemID: 500, Count: 1, Herb: true, AutoLoot: true}}
+		if !slices.Equal(drops, want) {
+			t.Fatalf("drops = %v, want %v", drops, want)
 		}
 	})
 
 	t.Run("manual pickup yields one per rolled unit", func(t *testing.T) {
-		_, herbs := RollKillReward(categories, nil, 1, false, rates, false)
-		if len(herbs) != 3 {
-			t.Fatalf("herbs = %v, want 3 entries", herbs)
+		drops := RollKillReward(categories, nil, 1, false, rates, false)
+		pickup := KillDrop{ItemID: 500, Count: 1, Herb: true}
+		if !slices.Equal(drops, []KillDrop{pickup, pickup, pickup}) {
+			t.Fatalf("drops = %v, want 3 herb pickups", drops)
 		}
 	})
 }
 
-func TestRollKillRewardMergesNormalAndCurrencyIntoItems(t *testing.T) {
+func TestRollKillRewardListsNormalAndCurrencyInItems(t *testing.T) {
 	rates := Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}
 	categories := []DropCategory{
 		guaranteedCategory(DropCurrency, 57, 10),
 		guaranteedCategory(DropNormal, 1000, 2),
 	}
 
-	items, herbs := RollKillReward(categories, nil, 1, false, rates, false)
-	if herbs != nil {
-		t.Fatalf("herbs = %v, want nil", herbs)
-	}
-	want := map[int32]int32{57: 10, 1000: 2}
-	if len(items) != len(want) || items[57] != want[57] || items[1000] != want[1000] {
-		t.Fatalf("items = %v, want %v", items, want)
+	drops := RollKillReward(categories, nil, 1, false, rates, false)
+	want := []KillDrop{{ItemID: 57, Count: 10}, {ItemID: 1000, Count: 2}}
+	if !slices.Equal(drops, want) {
+		t.Fatalf("drops = %v, want %v", drops, want)
 	}
 }
 
@@ -943,14 +935,14 @@ func TestRollKillRewardUsesRaidRateForNormalDrops(t *testing.T) {
 	rates := Rates{Item: 0, ItemRaid: 1}
 	categories := []DropCategory{guaranteedCategory(DropNormal, 1000, 5)}
 
-	items, _ := RollKillReward(categories, nil, 1, false, rates, false)
+	items := RollKillReward(categories, nil, 1, false, rates, false)
 	if items != nil {
 		t.Fatalf("non-raid items = %v, want nil (Item rate is 0)", items)
 	}
 
-	items, _ = RollKillReward(categories, nil, 1, true, rates, false)
-	if items[1000] != 5 {
-		t.Fatalf("raid items = %v, want {1000: 5} (ItemRaid rate is 1)", items)
+	items = RollKillReward(categories, nil, 1, true, rates, false)
+	if !slices.Equal(items, []KillDrop{{ItemID: 1000, Count: 5}}) {
+		t.Fatalf("raid items = %v, want [{1000 5}] (ItemRaid rate is 1)", items)
 	}
 }
 

@@ -111,7 +111,7 @@ func (l *lootKiller) AddRewardItem(itemID int32, count int, objectID int32) bool
 }
 
 func TestKillReward_DropsRolledItemsAtLocation(t *testing.T) {
-	items := item.NewTable([]*item.Template{{ID: 57, Name: "adena"}})
+	items := item.NewTable([]*item.Template{{ID: 57, Name: "adena", Stackable: true}})
 	ground := &recordingGround{}
 	ids := &sequentialIDs{}
 

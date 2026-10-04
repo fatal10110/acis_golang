@@ -104,18 +104,31 @@ const rollChanceScale = maxRollChance / 100.0
 // category picks at most one drop per attempt, weighted by each drop's
 // share of the category's cumulative chance.
 func (c DropCategory) Roll(levelMultiplier, rate float64) map[int32]int32 {
+	rolled := c.rollOrdered(levelMultiplier, rate)
+	if len(rolled) == 0 {
+		return nil
+	}
+	result := make(map[int32]int32, len(rolled))
+	for _, d := range rolled {
+		result[d.ItemID] = d.Count
+	}
+	return result
+}
+
+// rolledDrop is one item a category roll produced, with its merged count.
+type rolledDrop struct {
+	ItemID, Count int32
+}
+
+// rollOrdered is Roll returning the merged results in the order the
+// reference walks its per-category result map (see dropMerger), the order a
+// kill drops them in.
+func (c DropCategory) rollOrdered(levelMultiplier, rate float64) []rolledDrop {
 	if c.Chance == 0 || levelMultiplier == 0 || rate == 0 {
 		return nil
 	}
 
-	var result map[int32]int32
-	add := func(itemID, quantity int32) {
-		if result == nil {
-			result = make(map[int32]int32, 1)
-		}
-		result[itemID] += quantity
-	}
-
+	var result dropMerger
 	for i := 0; float64(i) < rate; i++ {
 		chance := c.Chance * levelMultiplier * rollChanceScale
 		if chance < maxRollChance && float64(rnd.Get(maxRollChance)) >= chance {
@@ -126,7 +139,7 @@ func (c DropCategory) Roll(levelMultiplier, rate float64) map[int32]int32 {
 			for _, d := range c.Drops {
 				dropChance := d.Chance * rollChanceScale
 				if dropChance >= maxRollChance || float64(rnd.Get(maxRollChance)) < dropChance {
-					add(d.ItemID, d.RandomAmount())
+					result.merge(d.ItemID, d.RandomAmount())
 				}
 			}
 			continue
@@ -137,12 +150,12 @@ func (c DropCategory) Roll(levelMultiplier, rate float64) map[int32]int32 {
 		for _, d := range c.Drops {
 			cumulative += d.Chance * rollChanceScale
 			if roll < cumulative {
-				add(d.ItemID, d.RandomAmount())
+				result.merge(d.ItemID, d.RandomAmount())
 				break
 			}
 		}
 	}
-	return result
+	return result.ordered()
 }
 
 // Rates holds the configured drop-rate multipliers, one per DropKind, that
