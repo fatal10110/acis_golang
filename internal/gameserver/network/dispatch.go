@@ -423,6 +423,9 @@ type GameClientLink struct {
 	lottery       *lottery.Lottery
 	// hallFunctions are the functions the clan halls rent; nil rents none.
 	hallFunctions *clanhall.Functions
+	// halls are the clan halls' owners, leases and auctions; nil holds no
+	// auction.
+	halls *clanhall.Halls
 	// fishChamp is the fishing championship; a disabled one keeps no
 	// ranking.
 	fishChamp *fishchamp.Championship
@@ -664,6 +667,9 @@ type GameClientLinkConfig struct {
 	// ClanHallFunctions are the functions the clan halls rent; nil rents
 	// none, so every hall shows bare and gives no recovery bonus.
 	ClanHallFunctions *clanhall.Functions
+	// ClanHalls are the clan halls' owners, leases and auctions; nil
+	// holds no auction, so an auctioneer has nothing for sale.
+	ClanHalls *clanhall.Halls
 	// FishingChampionship is the fishing championship; nil runs none.
 	FishingChampionship *fishchamp.Championship
 	// Derby is the monster race track; nil runs no race.
@@ -814,6 +820,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	}
 	link.lottery = cfg.Lottery
 	link.hallFunctions = cfg.ClanHallFunctions
+	link.halls = cfg.ClanHalls
 	if link.lottery == nil {
 		link.lottery = lottery.New(lottery.DefaultConfig(), nil, nil, nil, cfg.Queues.NewQueue("lottery"), cfg.Log)
 	}

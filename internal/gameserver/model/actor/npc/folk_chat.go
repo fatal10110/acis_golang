@@ -85,7 +85,6 @@ var folkChats = map[InstanceKind]folkChat{
 // unportedFolkChats are the civilian types whose chat window depends on
 // castle, clan hall, Seven Signs, Olympiad or manor state.
 var unportedFolkChats = map[InstanceKind]struct{}{
-	"Auctioneer":            {},
 	"CastleBlacksmith":      {},
 	"CastleChamberlain":     {},
 	"CastleDoorman":         {},
@@ -123,6 +122,9 @@ func (f *Folk) ChatWindow(pages Pages, rules ChatRules, karma int, state ChatSta
 	if kind == weddingManager {
 		return "", ChatWedding
 	}
+	if kind == auctioneer {
+		return f.AuctioneerChat(pages), ChatShown
+	}
 	if _, ok := unportedFolkChats[kind]; ok {
 		return "", ChatUnported
 	}
@@ -134,6 +136,17 @@ func (f *Folk) ChatWindow(pages Pages, rules ChatRules, karma int, state ChatSta
 		return page, ChatShown
 	}
 	return f.chatPage(pages, chat, 0), ChatShown
+}
+
+// auctioneer is the clan hall auctioneer's type.
+const auctioneer InstanceKind = "Auctioneer"
+
+// AuctioneerChat is an auctioneer's chat window: auction/auction.htm with
+// %objectId%, %npcId% and %npcname% naming this NPC.
+func (f *Folk) AuctioneerChat(pages Pages) string {
+	page := f.page(pages, "data/html/auction/auction.htm")
+	page = strings.ReplaceAll(page, "%npcId%", strconv.Itoa(f.NpcID()))
+	return strings.ReplaceAll(page, "%npcname%", f.CharacterName())
 }
 
 // pkRefusal is the karma gate of chat's type: the refusal page

@@ -128,6 +128,7 @@ func provideGameClientLink(
 	fishChamp *fishchamp.Championship,
 	derbyTrack *derby.Track,
 	hallFunctions *clanhall.Functions,
+	halls *clanhall.Halls,
 	log zerolog.Logger,
 	gmAudit gmAuditLogger,
 	chatLog chatLogger,
@@ -281,6 +282,7 @@ func provideGameClientLink(
 		Derby:               derbyTrack,
 
 		ClanHallFunctions: hallFunctions,
+		ClanHalls:         halls,
 	})
 	if err != nil {
 		return nil, err

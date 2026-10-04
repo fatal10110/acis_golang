@@ -42,3 +42,30 @@ func startClanHallFunctions(lc fx.Lifecycle, fns *clanhall.Functions, link *netw
 		},
 	})
 }
+
+// provideClanHalls restores the clan halls' owners, leases and auctions,
+// once the clans own their halls, writing through the persistence worker.
+func provideClanHalls(ctx bootContext, pool *sql.DB, worker *persist.Worker, data *gameData, clans *clan.Service, fns *clanhall.Functions, log zerolog.Logger) (*clanhall.Halls, error) {
+	halls := clanhall.NewHalls(data.ClanHalls, clans.Table(), fns, gamesql.NewClanHallStore(pool), worker, log)
+	if err := halls.Restore(ctx); err != nil {
+		return nil, fmt.Errorf("restore clan halls: %w", err)
+	}
+	return halls, nil
+}
+
+// startClanHalls runs the clan hall leases and auctions, paid and refunded
+// through the clan warehouses of link, before any character can log in; on
+// shutdown it stops them.
+func startClanHalls(lc fx.Lifecycle, halls *clanhall.Halls, link *network.GameClientLink, pool *sim.Pool) {
+	queue := pool.NewQueue("clanhalls")
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			halls.Start(queue, link, network.ClanHallNotifier(link))
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			queue.Close()
+			return nil
+		},
+	})
+}

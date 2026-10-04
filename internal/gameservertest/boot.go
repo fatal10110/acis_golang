@@ -879,6 +879,7 @@ type Server struct {
 	// runs; nil without it.
 	FishingChampionship *fishchamp.Championship
 	HallFunctions       *clanhall.Functions // the functions the clan halls rent, restored at boot
+	Halls               *clanhall.Halls     // the clan halls' owners, leases and auctions, restored at boot
 	Chars               *gamesql.CharacterStore
 	Items               *gamesql.ItemStore
 	Shortcuts           *gamesql.ShortcutStore
@@ -2053,6 +2054,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// The functions are restored once the clans own their halls, below.
 	hallFunctions := clanhall.New(o.clanHalls, o.clanHallDecos, gclConfig.Clans.Table(), gamesql.NewClanHallFunctionStore(db), persistWorker, o.log)
 	gclConfig.ClanHallFunctions = hallFunctions
+	halls := clanhall.NewHalls(o.clanHalls, gclConfig.Clans.Table(), hallFunctions, gamesql.NewClanHallStore(db), persistWorker, o.log)
+	gclConfig.ClanHalls = halls
 	gclConfig.Lottery = lotteryState
 	fishChampState := o.fishChamp.newChampionship(db, persistWorker, queues, o.log)
 	gclConfig.FishingChampionship = fishChampState
@@ -2184,6 +2187,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	hallFees := queues.NewQueue("clanhall-functions")
 	t.Cleanup(hallFees.Close)
 	hallFunctions.Start(hallFees, gcl)
+	if err := halls.Restore(context.Background()); err != nil {
+		t.Fatalf("restore clan halls: %v", err)
+	}
+	hallQueue := queues.NewQueue("clanhalls")
+	t.Cleanup(hallQueue.Close)
+	halls.Start(hallQueue, gcl, network.ClanHallNotifier(gcl))
 	restoreCastles(t, db, gclConfig.Castles)
 	gclConfig.Clans.DropMissingCrests(crests)
 	gclConfig.Clans.DropDanglingAlliances()
@@ -2249,6 +2258,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Clans:               gclConfig.Clans,
 		Castles:             gclConfig.Castles,
 		HallFunctions:       hallFunctions,
+		Halls:               halls,
 		SevenSigns:          sevenSigns,
 		Festival:            fest,
 		itemTable:           itemTemplates,

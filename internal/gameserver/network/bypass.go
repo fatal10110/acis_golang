@@ -263,6 +263,8 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		l.fishermanChampionship(live, f)
 	case npc.BypassFishingReward:
 		l.fishermanReward(live, f)
+	case npc.BypassAuction:
+		l.auctioneerBypass(live, f, command)
 	case npc.BypassUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Str("command", command).Msg("bypass: npc dialog command not modeled")
 	case npc.BypassRefused:

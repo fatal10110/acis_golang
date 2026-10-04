@@ -58,3 +58,11 @@ func (s *ClanHallFunctionStore) DeleteFunction(ctx context.Context, hallID int32
 	}
 	return nil
 }
+
+// DeleteFunctions drops every function of hall hallID.
+func (s *ClanHallFunctionStore) DeleteFunctions(ctx context.Context, hallID int32) error {
+	if _, err := s.db.ExecContext(ctx, "DELETE FROM clanhall_functions WHERE hall_id = ?", hallID); err != nil {
+		return fmt.Errorf("remove clan hall %d functions: %w", hallID, err)
+	}
+	return nil
+}
