@@ -31,6 +31,10 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		return nil
 	}
 	owners := []int32{live.ObjectID()}
+	// A player leaving from the loading screen still holds the effects its
+	// selection restored: they replay first, so the ticks due since then run
+	// and the saves below carry what they did.
+	l.replayLoadingScreenEffects(live)
 	l.abortFusionTargeting(live)
 	// Stop any in-flight attack/movement timers before the session detaches
 	// below — otherwise a timer goroutine can still fire after detach.
@@ -402,4 +406,19 @@ func (l *GameClientLink) notifyPlayerLogout(account string) {
 	if err := loginLink.SendPlayerLogout(account); err != nil {
 		l.log.Debug().Err(err).Str("account", account).Msg("notify player logout")
 	}
+}
+
+// replayLoadingScreenEffects replays the effects live's selection restored
+// when no EnterWorld has replayed them, inside the silent replay window:
+// live leaves without entering the world, so nothing is shown of what the
+// replay changes. The ticks due on the loading screen run their actions
+// there (see effect.ApplyRestored), so a drop never saves an effect whose
+// ticks were spent without them.
+func (l *GameClientLink) replayLoadingScreenEffects(live *livePlayer) {
+	if l.skills == nil || len(live.Character.ActiveSkillEffects()) == 0 {
+		return
+	}
+	live.replayingEffects.Store(true)
+	l.skills.ReplayEffects(live.Character)
+	live.replayingEffects.Store(false)
 }

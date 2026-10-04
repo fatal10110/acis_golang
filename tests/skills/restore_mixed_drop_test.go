@@ -1,12 +1,10 @@
 package skills
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
 // loadingRootPoisonID is a saved skill shaped like Poison of Death (4082):
@@ -34,37 +32,25 @@ func loadingRootPoisonDef() modelskill.Definition {
 // restored Root-then-poison skill ends on the loading screen, a drop saves
 // the poison behind it, as the reference writes the first effect of a skill
 // still in the list. The whole row is not dropped, so the poison is not
-// cleared by holding the loading screen past the Root and disconnecting.
+// cleared by holding the loading screen past the Root and disconnecting,
+// and the poison's ticks due on the loading screen have run their damage.
 func TestRestoredMixedSkillDropKeepsItsRunningPoison(t *testing.T) {
 	t.Parallel()
 	const elapsed = 1
-	srv := gameservertest.Boot(t,
-		gameservertest.WithCharacter("Newbie", 5, 0),
-		gameservertest.WithWantChars(1),
-		gameservertest.WithCapturedLog(),
-		gameservertest.WithSkills(skillPersistence(t, []modelskill.Definition{loadingRootPoisonDef()})),
-	)
-	if !srv.DrivesClock() {
-		t.Skip("holding the loading screen for a set time needs the driven clock")
-	}
-	objID := srv.SoleObjectID(t)
-	if _, err := srv.DB.ExecContext(context.Background(),
-		`INSERT INTO character_skills_save (char_obj_id, skill_id, skill_level, effect_count, effect_cur_time, reuse_delay, systime, restore_type, class_index, buff_index) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-		objID, loadingRootPoisonID, 1, loadingRootPoisonTicks, elapsed, 60_000, time.Now().Add(time.Minute).UnixMilli(), 0, 0, 1); err != nil {
-		t.Fatalf("seed saved root poison: %v", err)
-	}
+	srv, objID := bootSavedPoison(t, loadingRootPoisonDef(), loadingRootPoisonTicks, elapsed)
 	c := srv.Client
 	selectOnly(t, c)
+	// The Root ends 19s after the restore; the poison's ticks fall due 2s,
+	// 5s, ... 23s after it: eight by 25s, the last 2s before the drop.
 	srv.Advance(t, (loadingRootPoisonRoot+5)*time.Second)
 	dropOnLoadingScreen(t, srv, c, objID)
 
-	var count, curTime int32
-	if err := srv.DB.QueryRowContext(context.Background(),
-		`SELECT effect_count, effect_cur_time FROM character_skills_save WHERE char_obj_id = ? AND skill_id = ? AND restore_type = 0`,
-		objID, loadingRootPoisonID).Scan(&count, &curTime); err != nil {
-		t.Fatalf("read the saved root poison back after a drop past its root: %v", err)
+	count, curTime, ok := savedEffectRow(t, srv, objID, loadingRootPoisonID)
+	if !ok || count != loadingRootPoisonTicks-8 || curTime != 2 {
+		t.Fatalf("saved root poison after a drop past its root = count %d time %d (row %v), want the poison's count %d time 2",
+			count, curTime, ok, loadingRootPoisonTicks-8)
 	}
-	if count != loadingRootPoisonTicks || curTime != elapsed {
-		t.Fatalf("saved root poison after a drop past its root = count %d time %d, want the poison's read-back count %d time %d", count, curTime, loadingRootPoisonTicks, elapsed)
+	if hp, want := savedHP(t, srv, objID), float64(loadingPoisonHP-8*loadingPoisonDamage); hp != want {
+		t.Fatalf("saved HP after the drop = %g, want %g: eight ticks' damage", hp, want)
 	}
 }

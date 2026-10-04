@@ -205,7 +205,7 @@ func (p *Persistence) liveActiveEffects(c *player.Character, now time.Time) []ef
 // stagedActiveEffects is the save view at now of the effects a restore
 // staged on c and ReplayEffects has not reinstated yet: each has run from
 // its restore instant, as it would on the live effect list, and one that
-// has ended by now is left out.
+// has ended by now is left out (see effect.RestoredSaveState).
 func (p *Persistence) stagedActiveEffects(c *player.Character, now time.Time) []effect.ActiveEffect {
 	staged := c.ActiveSkillEffects()
 	out := staged[:0]
@@ -358,8 +358,10 @@ func (p *Persistence) RemoveAllSkills(c *player.Character) {
 // in the world sends nothing for them — this replay is what actually fires
 // their OnStart, schedules their ticks, and surfaces their icons, mirroring
 // Player.restoreEffects()'s template.getEffect(this, this, skill) ->
-// setCount/setTime -> scheduleEffect() chain. An effect that ran out
-// between the restore and the replay is not reinstated.
+// setCount/setTime -> scheduleEffect() chain. An effect whose ticks run an
+// action runs those of the ticks due between the restore and the replay, in
+// order, on c; one that ran out in between is not reinstated. A session
+// that ends before EnterWorld replays them too, ahead of its saves.
 func (p *Persistence) ReplayEffects(c *player.Character) {
 	if p == nil || c == nil {
 		return

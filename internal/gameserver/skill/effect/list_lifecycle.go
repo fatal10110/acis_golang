@@ -45,6 +45,10 @@ func (l *List) Add(e *Effect) {
 // felt/disappeared/expiry system messages. Effects are restored before the
 // player has a client, so those messages go nowhere; only the
 // later icon update reaches the client.
+//
+// Once e is active, the actions of its ticks already due run in order, as
+// they would have from the restore instant (see catchUp), before the icon
+// refresh: an effect they end is not in it.
 func (l *List) AddRestored(e *Effect) {
 	l.addAnnounced(e, false)
 }
@@ -64,9 +68,46 @@ func (l *List) addAnnounced(e *Effect, announce bool) {
 
 	runHooks(pending)
 	exits := l.dropDeferred(exiting, announce)
+	if !announce {
+		exits = append(exits, l.catchUp(e)...)
+	}
 	l.notifyAbnormalUpdate()
 	runHooks(exits)
 	l.notifyActivityTransition()
+}
+
+// catchUp runs, in order, the ticks of restored effect e that came due
+// before now: the ticks of the loading screen, which the restore instant
+// put behind the replay. Each runs as a scheduled tick does (tickAt): it
+// counts down, and the action of an in-use e runs. When the count runs out
+// or an action reports false, e leaves the list. That removal, and any its
+// actions make, is silent and leaves the icon refresh to the caller, which
+// sends one for the whole replay; it returns the exit hooks that removal
+// queued, to run after that refresh as Remove runs them.
+func (l *List) catchUp(e *Effect) []func() {
+	now := l.now()
+	l.catchingUp.Add(1)
+	defer l.catchingUp.Add(-1)
+	for {
+		run, remove := e.claimAction(now)
+		if !run && !remove {
+			return nil
+		}
+		if run && e.InUse() && !e.ActionTime() {
+			remove = true
+		}
+		if !remove {
+			continue
+		}
+		var pending, exits []func()
+		l.mu.Lock()
+		if l.holdsLocked(e) {
+			l.remove(e, &pending, &exits)
+		}
+		l.mu.Unlock()
+		runHooks(pending)
+		return exits
+	}
 }
 
 // Drop removes e, which its own exit hook is ending, when l still holds it —
@@ -279,7 +320,7 @@ func (l *List) strip(e *Effect) {
 // queueing an EffectList icon update on every add or remove attempt,
 // regardless of whether the attempt actually changed anything.
 func (l *List) notifyAbnormalUpdate() {
-	if l.owner != nil {
+	if l.owner != nil && l.catchingUp.Load() == 0 {
 		l.owner.UpdateEffectIcons()
 	}
 }
@@ -292,7 +333,7 @@ func (l *List) notifyAbnormalUpdate() {
 // e.Skill.Toggle wins over the count check even though a toggle's schedule
 // never reaches count 0: the toggle check comes first.
 func (l *List) notifyExpiry(e *Effect, wornOff bool, pending *[]func()) {
-	if !e.Template.Icon || l.silent {
+	if !e.Template.Icon || l.quietLocked() {
 		return
 	}
 	notifier := l.owner
@@ -345,7 +386,7 @@ func appendThunk(pending *[]func(), thunk func()) {
 // promoted stack loser resumes with whatever count it drained down to while
 // displaced instead of restarting from the template.
 func (l *List) beginActivate(e *Effect, onReject func(*Effect), announce bool) func() {
-	announce = announce && !l.silent
+	announce = announce && !l.quietLocked()
 	return func() {
 		ok := true
 		if e.OnStart != nil {

@@ -172,14 +172,19 @@ func (e *Effect) startSchedule(now time.Time) {
 }
 
 // startScheduleFromRestoreLocked seeds e.remaining and e.nextAction from a
-// persisted tick count and elapsed time, as resumeRestored resumes them
-// from the restore instant. An effect whose first tick came due before now
-// ends on the next tick, running no action. Called with e.scheduleMu
-// already held.
+// persisted tick count and elapsed time, run on from the restore instant. An
+// effect with a tick action keeps a first tick already due: List.AddRestored
+// runs the actions of every tick due by now. One without ends on the next
+// tick, running no action, when its first tick came due before now. Called
+// with e.scheduleMu already held.
 func (e *Effect) startScheduleFromRestoreLocked(r *restoreSeed, now time.Time) {
 	at := r.at
 	if at.IsZero() {
 		at = now
+	}
+	if e.OnAction != nil {
+		e.remaining, e.nextAction = restoredSchedule(e.Template, r.count, r.elapsed, at)
+		return
 	}
 	remaining, next, ok := resumeRestored(e.Template, r.count, r.elapsed, at, now)
 	if !ok {
@@ -189,29 +194,34 @@ func (e *Effect) startScheduleFromRestoreLocked(r *restoreSeed, now time.Time) {
 	e.remaining, e.nextAction = remaining, next
 }
 
-// resumeRestored is the schedule, at now, of an effect built from tmpl and
-// restored at the instant at from a persisted tick count and elapsed time,
-// mirroring AbstractEffect.setCount(newCount)/setTime(newTime) ahead of a
-// restored effect's scheduleEffect() call: the tick count is clamped to the
-// template's own count, and the elapsed time (seconds since the effect's
-// last tick at logout) is clamped to the template's period, so the first
-// tick comes due that much short of a period after at. Only an effect whose
-// ticks run no action resumes from an earlier at (restoreAnchor), and such
-// an effect ends on its first tick whatever count it has left, as
+// restoredSchedule is the tick count and first tick of an effect built from
+// tmpl and restored at the instant at from a persisted tick count and
+// elapsed time: the tick count is clamped to the template's own count, and
+// the elapsed time (seconds since the effect's last tick at logout) is
+// clamped to the template's period, so the first tick comes due that much
+// short of a period after at. An effect without a period only has its
+// count clamped.
+func restoredSchedule(tmpl modelskill.EffectTemplate, count, elapsedSeconds int32, at time.Time) (remaining int, next time.Time) {
+	remaining = int(min(count, int32(tmpl.Count)))
+	period := templatePeriod(tmpl)
+	if period <= 0 {
+		return remaining, time.Time{}
+	}
+	elapsed := min(time.Duration(elapsedSeconds)*time.Second, period)
+	return remaining, at.Add(max(period-elapsed, 0))
+}
+
+// resumeRestored is the schedule, at now, of an effect built from tmpl whose
+// ticks run no action, restored at the instant at (see restoredSchedule).
+// Such an effect ends on its first tick whatever count it has left, as
 // List.tickAt ends an in-use effect whose action reports false: a tick due
 // before now has ended it, and ok is false. (A restored effect stacked out
 // by another restored one would keep counting in the reference instead;
 // both are restored debuffs of one stack group, rare enough to leave
-// unmodelled.) An effect without a period only has its count clamped.
+// unmodelled.)
 func resumeRestored(tmpl modelskill.EffectTemplate, count, elapsedSeconds int32, at, now time.Time) (remaining int, next time.Time, ok bool) {
-	remaining = int(min(count, int32(tmpl.Count)))
-	period := templatePeriod(tmpl)
-	if period <= 0 {
-		return remaining, time.Time{}, true
-	}
-	elapsed := min(time.Duration(elapsedSeconds)*time.Second, period)
-	next = at.Add(max(period-elapsed, 0))
-	if next.Before(now) {
+	remaining, next = restoredSchedule(tmpl, count, elapsedSeconds, at)
+	if !next.IsZero() && next.Before(now) {
 		return 0, time.Time{}, false
 	}
 	return remaining, next, true
@@ -222,11 +232,14 @@ func resumeRestored(tmpl modelskill.EffectTemplate, count, elapsedSeconds int32,
 // not replayed yet saves at now: its schedule ran from at, as the replayed
 // effect's own does (see resumeRestored). The first template ApplyRestored
 // would build whose effect is still running at now is the one whose state
-// the replayed skill saves, as Player.storeEffect writes the first effect of
-// a skill still in the list: one that has ended passes the row on to the
+// the replayed skill saves, as a save of the live list writes the first
+// effect of a skill still in it: one that has ended passes the row on to the
 // next. ok is false only when every such effect has ended by now. A zero at,
 // a skill with no such template, or a first running one whose ticks run an
-// action (see restoreAnchor), saves count and elapsedSeconds unchanged.
+// action, saves count and elapsedSeconds unchanged: only a replay runs those
+// actions (ApplyRestored), and a save that skipped it must not spend their
+// ticks without them. A drop on the loading screen replays the staged
+// effects before it saves, so this is the save of effects no replay reached.
 func RestoredSaveState(templates []modelskill.EffectTemplate, count, elapsedSeconds int32, at, now time.Time) (savedCount, savedElapsed int32, ok bool) {
 	if at.IsZero() {
 		return count, elapsedSeconds, true
@@ -238,7 +251,7 @@ func RestoredSaveState(templates []modelskill.EffectTemplate, count, elapsedSeco
 		}
 		known = true
 		period := templatePeriod(tmpl)
-		if period <= 0 || restoreAnchor(tmpl, at).IsZero() {
+		if period <= 0 || actsOnTick(tmpl) {
 			return count, elapsedSeconds, true
 		}
 		remaining, next, alive := resumeRestored(tmpl, count, elapsedSeconds, at, now)
