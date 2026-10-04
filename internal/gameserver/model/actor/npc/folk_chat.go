@@ -27,9 +27,11 @@ const (
 	// ChatShown opens the returned page.
 	ChatShown ChatOutcome = iota
 	// ChatUnported names an NPC type whose dialog reads state of a system
-	// not in place yet (castles, clan halls, Seven Signs, Olympiad, manor,
-	// weddings); it opens nothing.
+	// not in place yet (castles, clan halls, Seven Signs, Olympiad, manor);
+	// it opens nothing.
 	ChatUnported
+	// ChatWedding is a wedding manager: its own dialog greets the talker.
+	ChatWedding
 )
 
 // folkChat is one type's chat window: the data/html folder its pages live
@@ -69,7 +71,7 @@ var folkChats = map[InstanceKind]folkChat{
 }
 
 // unportedFolkChats are the civilian types whose chat window depends on
-// castle, clan hall, Seven Signs, Olympiad, manor or wedding state.
+// castle, clan hall, Seven Signs, Olympiad or manor state.
 var unportedFolkChats = map[InstanceKind]struct{}{
 	"Auctioneer":            {},
 	"CastleBlacksmith":      {},
@@ -89,16 +91,18 @@ var unportedFolkChats = map[InstanceKind]struct{}{
 	"OlympiadManagerNpc":    {},
 	"SiegeNpc":              {},
 	"SignsPriest":           {},
-	"WeddingManagerNpc":     {},
 	"WyvernManagerNpc":      {},
 }
 
 // ChatWindow resolves the first chat page this NPC shows a talker carrying
-// karma: its page with %objectId% filled in, or, for a karma-gated type
+// karma, or names the wedding manager, whose own dialog greets: its page with %objectId% filled in, or, for a karma-gated type
 // whose gate refuses the talker and whose refusal page exists, that page
 // as is. A missing page reads as a "My html is missing" notice naming it.
 func (f *Folk) ChatWindow(pages Pages, rules ChatRules, karma int) (string, ChatOutcome) {
 	kind := hostileKind(f.Instance)
+	if kind == weddingManager {
+		return "", ChatWedding
+	}
 	if _, ok := unportedFolkChats[kind]; ok {
 		return "", ChatUnported
 	}

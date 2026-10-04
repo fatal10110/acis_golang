@@ -67,6 +67,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/symbolmaker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	tradebook "github.com/fatal10110/acis_golang/internal/gameserver/trade"
+	"github.com/fatal10110/acis_golang/internal/gameserver/wedding"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
@@ -401,6 +402,8 @@ type GameClientLink struct {
 	announcements *announcement.Registry
 	schemeBuffer  *schemebuffer.Manager
 	lottery       *lottery.Lottery
+	// wedding holds the couples and runs the marriage requests.
+	wedding *wedding.Manager
 	// derby is the monster race track the race managers answer for; nil
 	// runs no race.
 	derby *derby.Track
@@ -610,6 +613,10 @@ type GameClientLinkConfig struct {
 	// SchemeBuffer is the scheme buffer's buffs and every player's
 	// schemes; nil offers no buff and starts with no scheme.
 	SchemeBuffer *schemebuffer.Manager
+	// Wedding holds the couples and the wedding settings; nil starts with
+	// no couple, the shipped settings, and couples numbered from IDs when
+	// it can free them too.
+	Wedding *wedding.Manager
 	// Lottery is the Lucky Lottery; nil runs no round.
 	Lottery *lottery.Lottery
 	// Derby is the monster race track; nil runs no race.
@@ -742,6 +749,11 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.derby = cfg.Derby
 	if link.schemeBuffer == nil {
 		link.schemeBuffer = schemebuffer.New(schemebuffer.DefaultConfig(), nil, nil)
+	}
+	link.wedding = cfg.Wedding
+	if link.wedding == nil {
+		ids, _ := cfg.IDs.(wedding.IDs)
+		link.wedding = wedding.NewManager(wedding.DefaultConfig(), ids, nil)
 	}
 	link.lottery = cfg.Lottery
 	if link.lottery == nil {

@@ -23,6 +23,10 @@ const ConfirmDlgResurrectionRequest int32 = 1510
 // whose answer is handled as a resurrection offer's.
 const ConfirmDlgRestoreRequest int32 = 332
 
+// ConfirmDlgEngageRequest is the wedding manager's marriage request
+// dialog, a message id the client shows its one text parameter for.
+const ConfirmDlgEngageRequest int32 = 1983
+
 const (
 	confirmDlgTypeText     = 0
 	confirmDlgTypeZoneName = 7
@@ -58,5 +62,17 @@ func FrameConfirmDlgResurrectionRequest(reviverName string) wire.Frame {
 	w.WriteInt32(1)
 	w.WriteInt32(confirmDlgTypeText)
 	w.WriteString(reviverName)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameConfirmDlgEngageRequest builds the marriage request dialog: the
+// message id and text as its single TYPE_TEXT parameter, with no countdown
+// or requester id.
+func FrameConfirmDlgEngageRequest(text string) wire.Frame {
+	w := newFrameWriter(OpcodeConfirmDlg)
+	w.WriteInt32(ConfirmDlgEngageRequest)
+	w.WriteInt32(1)
+	w.WriteInt32(confirmDlgTypeText)
+	w.WriteString(text)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }

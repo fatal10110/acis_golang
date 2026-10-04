@@ -71,6 +71,7 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 		"startOlympiad":              {2 * olympiad.TaskTimeout, "TaskTimeout", "waits for a running calendar step, which does no I/O, then for its queued olympiad_nobles and server_memo writes and the final save on the persistence lane, each bounded by olympiad.TaskTimeout"},
 		"startBossZones":             {shutdownSaveTimeout, "shutdownSaveTimeout", "grandboss_list save"},
 		"startSchemeBuffer":          {shutdownSaveTimeout, "shutdownSaveTimeout", "buffer_schemes save"},
+		"startWedding":               {shutdownSaveTimeout, "shutdownSaveTimeout", "mods_wedding save"},
 		"startLottery":               {0, "", "stops the calendar under a lock held only across in-memory work; its queued games writes land when the persistence worker drains"},
 		"startAnnouncements":         {0, "", "stops timers under a lock held only across in-memory work and an announcements.xml rewrite"},
 		"provideGameServerLogger":    {0, "", "closes the log file"},

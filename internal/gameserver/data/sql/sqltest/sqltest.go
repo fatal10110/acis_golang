@@ -492,7 +492,7 @@ var schemaStmts = []string{
 	bbsMailSchema, bbsForumSchema, bbsTopicSchema, bbsPostSchema, bbsFavoriteSchema,
 	olympiadNoblesSchema, olympiadNoblesEomSchema, serverMemoSchema,
 	characterRaidPointsSchema, grandbossListSchema,
-	bufferSchemesSchema,
+	bufferSchemesSchema, modsWeddingSchema,
 	gamesSchema,
 	mdtBetsSchema, mdtHistorySchema,
 }
