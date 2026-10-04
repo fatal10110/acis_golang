@@ -141,6 +141,17 @@ func (l *GameClientLink) buyLotteryTicket(live *livePlayer) bool {
 	if !ok {
 		return false
 	}
+	inv := live.Inventory()
+	if inv == nil {
+		return false
+	}
+	// The ticket's id is taken before the price, so an exhausted id
+	// factory refuses the sale instead of charging for no ticket.
+	id, err := l.nextObjectID()
+	if err != nil {
+		l.log.Error().Err(err).Msg("lottery: no object id for a ticket")
+		return false
+	}
 	lot := l.lottery
 	round := lot.Status().Round
 	price := lot.Config().TicketPrice
@@ -148,14 +159,10 @@ func (l *GameClientLink) buyLotteryTicket(live *livePlayer) bool {
 		return false
 	}
 	lot.IncreasePrize(price)
-	if inv := live.Inventory(); inv != nil {
-		if id, err := l.nextObjectID(); err != nil {
-			l.log.Error().Err(err).Msg("lottery: no object id for a ticket")
-		} else if ticket := inv.AddNew(lottery.TicketID, 1, id); ticket != nil {
-			ticket.SetCustomType1(int(round))
-			inv.SetEnchantLevel(ticket, int(numbers.Low))
-			ticket.SetCustomType2(int(numbers.High))
-		}
+	if ticket := inv.AddNew(lottery.TicketID, 1, id); ticket != nil {
+		ticket.SetCustomType1(int(round))
+		inv.SetEnchantLevel(ticket, int(numbers.Low))
+		ticket.SetCustomType2(int(numbers.High))
 	}
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageEarnedItemS1, lottery.TicketID))
 	return true
@@ -177,16 +184,22 @@ func (l *GameClientLink) claimLotteryTicket(live *livePlayer, objectID int32) {
 	if st.TemplateID != lottery.TicketID || int32(st.CustomType1) >= l.lottery.Status().Round {
 		return
 	}
-	if !destroyHeldItem(live, inst, st.Count) {
-		return
-	}
+	// A past round's drawing never changes, so checking before the destroy
+	// reads what the reference reads after it; the payout's id is taken
+	// before the destroy, so an exhausted id factory keeps the ticket.
 	_, adena := l.lottery.Check(int32(st.CustomType1), lottery.Numbers{Low: int32(st.EnchantLevel), High: int32(st.CustomType2)})
-	if adena <= 0 {
+	var id int32
+	if adena > 0 {
+		var err error
+		if id, err = l.nextObjectID(); err != nil {
+			l.log.Error().Err(err).Msg("lottery: no object id for a payout")
+			return
+		}
+	}
+	if !destroyHeldItem(live, inst, st.Count) || adena <= 0 {
 		return
 	}
-	if id, err := l.nextObjectID(); err == nil {
-		live.AddRewardItem(item.AdenaID, int(adena), id)
-	}
+	live.AddRewardItem(item.AdenaID, int(adena), id)
 }
 
 // destroyHeldItem destroys count units of inst out of live's inventory,
