@@ -22,6 +22,9 @@ type CharInfoSnapshot struct {
 	// Hidden tells the viewer to draw Character invisible: it is invisible
 	// and the viewer is no game master.
 	Hidden bool
+	// HeroAura shows the hero aura on a Character that is no hero: a game
+	// master while GMHeroAura is set.
+	HeroAura bool
 }
 
 // FrameCharInfo builds a CharInfo packet for a visible player.
@@ -136,7 +139,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteUint8(uint8(c.DuelTeam()))
 	w.WriteInt32(s.Clan.CrestLargeID)
 	w.WriteUint8(boolUint8(c.IsNoble()))
-	w.WriteUint8(boolUint8(c.IsHero()))
+	w.WriteUint8(boolUint8(c.IsHero() || s.HeroAura))
 	bait := c.FishingBait()
 	w.WriteUint8(boolUint8(c.Fishing()))
 	w.WriteInt32(int32(bait.X))

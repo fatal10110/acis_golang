@@ -214,10 +214,12 @@ func (l *GameClientLink) sendLeftClan(live *livePlayer, cl *clan.Clan) {
 	live.SendFrame(serverpackets.FramePledgeShowMemberListDeleteAll())
 }
 
-// requestWithdrawPledge takes live out of its clan.
+// requestWithdrawPledge takes live out of its clan. Leaving a castle's
+// clan first checks what live wears (checkLeaverItems).
 func (l *GameClientLink) requestWithdrawPledge(live *livePlayer) {
 	c := live.Character
-	cl, _, refusal := l.clanService().Withdraw(c, time.Now())
+	now := time.Now()
+	cl, m, refusal := l.clanService().Withdraw(c, now)
 	switch refusal {
 	case clan.LeaveNotMember:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouAreNotAClanMember))
@@ -229,6 +231,8 @@ func (l *GameClientLink) requestWithdrawPledge(live *livePlayer) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotLeaveDuringCombat))
 		return
 	}
+	l.checkLeaverItems(live, cl)
+	l.clanService().ApplyLeft(c, m, now)
 	l.sendLeftClan(live, cl)
 	l.broadcastToClan(cl, 0,
 		func() wire.Frame {
@@ -241,7 +245,9 @@ func (l *GameClientLink) requestWithdrawPledge(live *livePlayer) {
 }
 
 // requestOustPledgeMember expels the member live names from live's clan.
-// An expelled member online learns it on its own queue.
+// An expelled member online learns it on its own queue, where a castle's
+// clan first checks what it wears (checkLeaverItems); an offline one's
+// circlets go back to its inventory.
 func (l *GameClientLink) requestOustPledgeMember(live *livePlayer, req clientpackets.RequestOustPledgeMember) {
 	online := func(id int32) *player.Character {
 		if target, ok := l.livePlayerByID(id); ok {
@@ -271,8 +277,11 @@ func (l *GameClientLink) requestOustPledgeMember(live *livePlayer, req clientpac
 	if m.Online {
 		target, _ = l.livePlayerByID(m.ObjectID)
 	}
-	if target != nil {
+	if target == nil {
+		l.unequipLeaverCirclets(cl, m.ObjectID)
+	} else {
 		postLive(target, func() {
+			l.checkLeaverItems(target, cl)
 			l.clanService().ApplyLeft(target.Character, m, now)
 			l.sendLeftClan(target, cl)
 			target.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageClanMembershipTerminated))

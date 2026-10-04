@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/config"
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
@@ -32,25 +33,33 @@ func loadHeroMinMatches(paths gameServerPaths) (int, error) {
 }
 
 // provideHeroes returns the heroes, persisting through the gameserver
-// database on worker's lanes and showing the clans clans holds.
-func provideHeroes(paths gameServerPaths, db *sql.DB, clans *clan.Service, worker *persist.Worker, log zerolog.Logger) (*hero.Manager, error) {
+// database on worker's lanes, showing the clans clans holds and naming the
+// raid bosses and castles of their diaries from data and castles.
+func provideHeroes(paths gameServerPaths, db *sql.DB, clans *clan.Service, data *gameData, castles *castle.Manager, worker *persist.Worker, log zerolog.Logger) (*hero.Manager, error) {
 	minMatches, err := loadHeroMinMatches(paths)
 	if err != nil {
 		return nil, err
 	}
-	return hero.New(gamesql.NewHeroStore(db), clans.Table(), worker, minMatches, time.Now, log), nil
+	names := hero.TableNames{NPCs: data.NPCs, Castles: castles}
+	return hero.New(gamesql.NewHeroStore(db), clans.Table(), names, worker, minMatches, time.Now, log), nil
 }
 
 // startHeroes restores the heroes before any character can log in and lets
-// an election reach the heroes online through link. Their writes need no
-// stop step: the persistence worker, stopped after the game server, lands
-// whatever is still queued.
+// an election reach the heroes online through link. At stop the heroes'
+// messages are queued for storing; the persistence worker, stopped after
+// the game server, lands that and whatever else is still queued.
 func startHeroes(lc fx.Lifecycle, heroes *hero.Manager, link *network.GameClientLink) {
-	lc.Append(fx.Hook{OnStart: func(ctx context.Context) error {
-		if err := heroes.Restore(ctx); err != nil {
-			return err
-		}
-		heroes.Start(link)
-		return nil
-	}})
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			if err := heroes.Restore(ctx); err != nil {
+				return err
+			}
+			heroes.Start(link)
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			heroes.Shutdown()
+			return nil
+		},
+	})
 }

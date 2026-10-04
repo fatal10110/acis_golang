@@ -326,8 +326,13 @@ func TestBypassCommandFamilies(t *testing.T) {
 	for _, command := range []string{"bbs_default", "_bbshome", "_friendlist_0_", "_maillist_0_1_0_", "_block"} {
 		assertAnswer(t, w.bypass(t, command), []byte{serverpackets.OpcodeSystemMessage}, nil, "")
 	}
-	for _, command := range []string{"manor_menu_select?ask=1", "_match?class=88&page=1", "_diary?class=88&page=1", "arenachange 1"} {
+	for _, command := range []string{"manor_menu_select?ask=1", "arenachange 1"} {
 		assertAnswer(t, w.bypass(t, command), releaseOnly, nil, "")
+	}
+	// The hero pages are ported: with no hero of the class the reference
+	// sends nothing (RequestBypassToServer's _match/_diary, heroid > 0).
+	for _, command := range []string{"_match?class=88&page=1", "_diary?class=88&page=1"} {
+		assertAnswer(t, w.bypass(t, command), nil, nil, "")
 	}
 	assertAnswer(t, w.bypass(t, "unknown_command"), nil, nil, "")
 }

@@ -114,6 +114,7 @@ var gameDecoders = []gameDecoder{
 	{"RequestDestroyItem", decodes(DecodeRequestDestroyItem), seedPacket(OpcodeRequestDestroyItem, seedObjectID, int32(1))},
 	{"CharacterRestore", decodes(DecodeCharacterRestore), seedPacket(OpcodeCharacterRestore, int32(0))},
 	{"RequestPledgeCrest", decodes(DecodeRequestPledgeCrest), seedPacket(OpcodeRequestPledgeCrest, int32(1))},
+	{"RequestGiveNickName", decodes(DecodeRequestGiveNickName), seedPacket(OpcodeRequestGiveNickName, "Member", "Knight")},
 	{"RequestAcquireSkillInfo", decodes(DecodeRequestAcquireSkillInfo), seedPacket(OpcodeRequestAcquireSkillInfo, int32(1177), int32(1), int32(0))},
 	{"RequestAcquireSkill", decodes(DecodeRequestAcquireSkill), seedPacket(OpcodeRequestAcquireSkill, int32(1177), int32(1), int32(0))},
 	{"RequestRestartPoint", decodes(DecodeRequestRestartPoint), seedPacket(OpcodeRequestRestartPoint, int32(0))},
@@ -170,6 +171,7 @@ var gameDecoders = []gameDecoder{
 	{"RequestConfirmCancelItem", decodes(DecodeRequestConfirmCancelItem), seedExtended(OpcodeRequestConfirmCancelItem, seedObjectID)},
 	{"RequestRefineCancel", decodes(DecodeRequestRefineCancel), seedExtended(OpcodeRequestRefineCancel, seedObjectID)},
 	{"RequestExMagicSkillUseGround", decodes(DecodeRequestExMagicSkillUseGround), seedExtended(OpcodeRequestExMagicSkillUseGround, seedX, seedY, seedZ, int32(1177), int32(0), byte(0))},
+	{"RequestWriteHeroWords", decodes(DecodeRequestWriteHeroWords), seedExtended(OpcodeRequestWriteHeroWords, "Glory to the heroes")},
 	{"RequestDuelStart", decodes(DecodeRequestDuelStart), seedExtended(OpcodeRequestDuelStart, "Rival", int32(1))},
 	{"RequestDuelAnswerStart", decodes(DecodeRequestDuelAnswerStart), seedExtended(OpcodeRequestDuelAnswerStart, int32(0), int32(0), int32(1))},
 }
