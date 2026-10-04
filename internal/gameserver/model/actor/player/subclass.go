@@ -253,9 +253,11 @@ func (t *Template) StartingSubclassSkills() SkillLevels {
 }
 
 // ClampResources lowers current HP, MP and CP to their maxima, as a class
-// change does once the new class's maxima apply.
+// change does once the new class's maxima apply. A clamp that leaves c full
+// stops the regeneration task.
 func (c *Character) ClampResources() {
 	res := c.ResourceValues()
+	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	c.curHP = min(c.curHP, res.MaxHP)

@@ -29,3 +29,11 @@ func (s *CharacterStore) SetClanPenalties(ctx context.Context, objectID int32, j
 	}
 	return nil
 }
+
+// SetSex stores objectID's sex.
+func (s *CharacterStore) SetSex(ctx context.Context, objectID int32, sex byte) error {
+	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET sex = ? WHERE obj_Id = ?", sex, objectID); err != nil {
+		return fmt.Errorf("set sex for %d: %w", objectID, err)
+	}
+	return nil
+}

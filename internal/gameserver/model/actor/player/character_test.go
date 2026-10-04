@@ -37,8 +37,8 @@ func TestNewCharacter(t *testing.T) {
 	if c.Race != RaceHuman {
 		t.Errorf("Race = %v, want %v", c.Race, RaceHuman)
 	}
-	if c.Sex != SexMale {
-		t.Errorf("Sex = %v, want %v", c.Sex, SexMale)
+	if c.Sex() != SexMale {
+		t.Errorf("Sex = %v, want %v", c.Sex(), SexMale)
 	}
 	if c.CharLevel != 1 {
 		t.Errorf("Level = %d, want 1", c.CharLevel)

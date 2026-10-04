@@ -520,12 +520,12 @@ func (a *Actor) SetHP(value float64) {
 	a.BroadcastStatus()
 }
 
-// HPStatusUpdate returns a's current HP and whether the players targeting a
-// must be sent it. Callers invoke it only when at least one player is
-// targeting a, so an unwatched summon's bar state stays where it was last
-// reported.
-func (a *Actor) HPStatusUpdate() (int, bool) {
-	return a.hpBar.Report(a.HP, float64(int(a.MaxHPValue())))
+// PublishHP hands send a's current HP when the players targeting a must be
+// sent it, under the health-bar lock (creature.HPBar.Publish). Callers
+// invoke it only when at least one player is targeting a, so an unwatched
+// summon's bar state stays where it was last reported.
+func (a *Actor) PublishHP(send func(hp int)) {
+	a.hpBar.Publish(a.HP, float64(int(a.MaxHPValue())), send)
 }
 
 // RestoreDead marks a pet restored from a save below creature.DeathHP as

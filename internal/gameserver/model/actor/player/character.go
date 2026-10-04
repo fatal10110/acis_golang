@@ -45,7 +45,9 @@ type Character struct {
 	// Other actors' queues read it (CharInfo), so it is atomic.
 	baseClassID atomic.Int32
 	Race        Race
-	Sex         Sex
+	// sex is read through Sex: an admin changes it while other actors'
+	// queues read it (CharInfo, clan rows), so it is atomic.
+	sex atomic.Uint32
 
 	// activeClassID is the class currently played: the base class, or the
 	// active subclass's class. Other actors' queues read it (CharInfo,
@@ -84,6 +86,8 @@ type Character struct {
 	// attacker's hit or skill writes them from the attacker's queue
 	// (ReduceHP, ReduceMP, TakeDamage), and its formulas read them.
 	vitalsMu sync.RWMutex
+	// regen is the HP/MP/CP regeneration task SettleRegen arms on a drop.
+	regen creature.Regen
 	// reviveMu makes a revive one step from dead to alive, so exactly one
 	// of two revives wins a death. The player's own restart-point request
 	// and a resurrecting caster's hit run on different queues. Without the
@@ -367,7 +371,6 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 		Name:        name,
 
 		Race: race,
-		Sex:  sex,
 
 		CharLevel: 1,
 
@@ -391,6 +394,7 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 		maxBuffsAmount: defaultMaxBuffsAmount,
 	}
 
+	c.SetSex(sex)
 	c.SetClassID(tmpl.ID)
 	c.SetBaseClassID(tmpl.ID)
 	if len(tmpl.Spawns) > 0 {

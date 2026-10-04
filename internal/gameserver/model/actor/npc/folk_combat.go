@@ -62,8 +62,10 @@ type folkCombat struct {
 	hp, mp         float64
 	dead, decayed  bool
 	corpseDeadline time.Time
-	// hpBar is the health-bar segment state HPStatusUpdate advances.
+	// hpBar is the health-bar segment state PublishHP advances.
 	hpBar creature.HPBar
+	// regen is the HP/MP regeneration task SettleRegen arms on a drop.
+	regen creature.Regen
 }
 
 // FolkRuntime is what a civilian NPC needs to take part in combat beyond
@@ -160,7 +162,7 @@ func (f *Folk) OnInactiveRegion() {
 }
 
 // CharacterName returns the template name.
-func (f *Folk) CharacterName() string { return f.Instance.Template.Name }
+func (f *Folk) CharacterName() string { return f.Instance.Name() }
 
 // Karma reports 0: NPCs carry no PK karma.
 func (f *Folk) Karma() int { return 0 }
@@ -287,6 +289,6 @@ func (f *Folk) UpdateAbnormalEffect() { f.emit(event.AbnormalEffectChanged{}) }
 // always shown, the view an NPC that cannot move is announced with.
 func (f *Folk) ServerObjectInfoSnapshot() npcinfo.Snapshot {
 	s := f.NPCInfoSnapshot()
-	s.Name = f.Instance.Template.Name
+	s.Name = f.Instance.Name()
 	return s
 }

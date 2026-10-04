@@ -328,10 +328,6 @@ func TestAdminSetAccess(t *testing.T) {
 	if frames := exchange(t, gm, encodeBuildCmd("set access")); len(frames) != 0 {
 		t.Fatalf("//set access frames = %x, want none", testsupport.FrameOpcodes(frames))
 	}
-	frames = exchange(t, gm, encodeBuildCmd("set sex female"))
-	if len(frames) != 1 || frames[0][0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("//set sex frames = %x, want ActionFailed", testsupport.FrameOpcodes(frames))
-	}
 }
 
 // TestAdminSetAccessSelf pins //set access without a selection acting on

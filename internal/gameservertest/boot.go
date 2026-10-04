@@ -147,6 +147,7 @@ type options struct {
 	pvpFlags               *task.PvPFlags
 	decay                  *task.Decay
 	npcSpawns              *spawn.Table
+	npcDropRates           item.Rates
 	attackStanceTracker    network.AttackStanceTracker
 	attackStanceNow        func() time.Time
 	spawnProtection        time.Duration
@@ -2097,6 +2098,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		npcSpawns = bootNpcSpawns(t, gcl, npcSpawnDeps{
 			state: state, templates: o.npcs, geo: bootGeo(o.geo), ids: ids, decay: o.decay, ai: ai, positions: positions,
 			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.AttackStance, log: o.log, makers: o.npcSpawns,
+			dropRates: o.npcDropRates,
 		})
 	}
 	if o.productionTickers {

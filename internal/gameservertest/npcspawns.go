@@ -31,6 +31,18 @@ func WithNpcSpawns(makers *spawn.Table) Option {
 	}
 }
 
+// WithNpcDropRates is WithNpcSpawns (no makers unless that option names
+// some) whose kills, and the admin drop pages, roll drop categories with
+// rates.
+func WithNpcDropRates(rates item.Rates) Option {
+	return func(o *options) {
+		if o.npcSpawns == nil {
+			o.npcSpawns = &spawn.Table{}
+		}
+		o.npcDropRates = rates
+	}
+}
+
 // npcSpawnDeps are the server parts a live NPC population is built over.
 type npcSpawnDeps struct {
 	state     *world.State
@@ -46,6 +58,7 @@ type npcSpawnDeps struct {
 	queues    *queues
 	stance    network.AttackStanceTracker
 	makers    *spawn.Table
+	dropRates item.Rates
 	log       zerolog.Logger
 }
 
@@ -77,7 +90,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 		templates = npc.NewTable(nil)
 	}
 	npcs, err := gamemanager.NewNpcsWithMaxBuffsAmount(gamemanager.NewSpawns(deps.makers, nil), templates, deps.geo, deps.state, deps.ids,
-		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{}, time.Now, deps.log,
+		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Rates: deps.dropRates}, time.Now, deps.log,
 		nil, actorcast.EffectHandlers{}, walker, network.HostileSinks(deps.state, deps.stance), network.FolkSinks(deps.state, deps.stance),
 		20, 0, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), deps.effects, deps.queues)
 	if err != nil {

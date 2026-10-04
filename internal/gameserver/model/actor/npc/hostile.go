@@ -155,9 +155,11 @@ type Hostile struct {
 
 	health creature.Health
 	hp     float64
-	// hpBar is the health-bar segment state HPStatusUpdate advances from
+	// hpBar is the health-bar segment state PublishHP advances from
 	// whichever goroutine changed HP.
 	hpBar creature.HPBar
+	// regen is the HP/MP regeneration task SettleRegen arms on a drop.
+	regen creature.Regen
 
 	// mpMu guards mp, the live MP value consumed by skill-resource handlers.
 	// A caster's mana-burn or mana-drain skill reduces it from the caster's
@@ -227,7 +229,7 @@ type Hostile struct {
 func (*Hostile) OffensiveFollowLead() bool { return true }
 
 // CharacterName returns this NPC's display name for character-name packets.
-func (h *Hostile) CharacterName() string { return h.Instance.Template.Name }
+func (h *Hostile) CharacterName() string { return h.Instance.Name() }
 
 // Attackable reports whether inst's instance type belongs to the set of
 // combat-capable NPC kinds NewHostile accepts. Callers deciding whether to
@@ -453,10 +455,10 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 	x, y, z := h.Position()
 	name, title := "", ""
 	if tmpl.UsingServerSideName {
-		name = tmpl.Name
+		name = h.Instance.Name()
 	}
 	if tmpl.UsingServerSideTitle {
-		title = tmpl.Title
+		title = h.Instance.Title()
 	}
 	pAtkSpd := h.AttackSpeed()
 	return npcinfo.Snapshot{
@@ -478,7 +480,7 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 // name always shown, the view an immobile NPC is announced with.
 func (h *Hostile) ServerObjectInfoSnapshot() npcinfo.Snapshot {
 	snapshot := h.NPCInfoSnapshot()
-	snapshot.Name = h.Instance.Template.Name
+	snapshot.Name = h.Instance.Name()
 	return snapshot
 }
 

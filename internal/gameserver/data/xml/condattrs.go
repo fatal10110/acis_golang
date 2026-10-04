@@ -4,6 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 // errTableRefNotAllowed marks a "#name" value where the reader takes no
@@ -142,7 +146,135 @@ func conditionAttrs(n condNode, role condRole, resolve tableResolver) (map[strin
 		}
 		vals[name] = val
 	}
+	if err := checkConditionValues(n, role, vals); err != nil {
+		return nil, err
+	}
 	return vals, nil
+}
+
+// condAttrDecode is how the condition reader decodes one attribute's value
+// when it loads the condition.
+type condAttrDecode int
+
+const (
+	condDecodeNone condAttrDecode = iota // read as written, or not at all
+	condDecodeInt                        // an int32 literal
+	condDecodeByte                       // an int8 literal
+	condDecodePair                       // the first two comma parts are int32 literals
+	condDecodeList                       // a comma list of int32 literals
+	condDecodeRace                       // a race name
+	condDecodeStat                       // a stat name
+)
+
+func conditionAttrDecode(role condRole, kind, name string) condAttrDecode {
+	switch role {
+	case condRolePolyZone:
+		if name == "minZ" || name == "maxZ" {
+			return condDecodeInt
+		}
+		return condDecodeNone
+	case condRolePolyNode:
+		if name == "x" || name == "y" {
+			return condDecodeInt
+		}
+		return condDecodeNone
+	case condRolePredicate:
+	default:
+		return condDecodeNone
+	}
+
+	// A <skill> condition reads only an attribute spelled exactly "stat";
+	// every other condition attribute matches case-insensitively.
+	if strings.EqualFold(kind, "skill") {
+		if name == "stat" {
+			return condDecodeStat
+		}
+		return condDecodeNone
+	}
+	name = strings.ToLower(name)
+	switch strings.ToLower(kind) {
+	case "player":
+		switch name {
+		case "level", "pkcount", "charges", "active_effect_id", "active_skill_id", "hp", "mp", "weight",
+			"invsize", "pledgeclass", "castle", "sex", "seed_fire", "seed_water", "seed_wind", "seed_various", "seed_any":
+			return condDecodeInt
+		case "battle_force", "spell_force":
+			return condDecodeByte
+		case "active_effect_id_lvl", "active_skill_id_lvl":
+			return condDecodePair
+		case "clanhall":
+			return condDecodeList
+		case "race":
+			return condDecodeRace
+		}
+	case "target":
+		switch name {
+		case "active_skill_id":
+			return condDecodeInt
+		case "hp_min_max":
+			return condDecodePair
+		case "race_id", "npcid":
+			return condDecodeList
+		}
+	}
+	return condDecodeNone
+}
+
+// conditionRequiredAttrs are the attributes the condition reader reads from
+// an element in role whether or not the element has them, so a missing one
+// fails the load.
+func conditionRequiredAttrs(n condNode, role condRole) []string {
+	switch role {
+	case condRolePolyZone:
+		return []string{"minZ", "maxZ"}
+	case condRolePolyNode:
+		return []string{"x", "y"}
+	case condRolePredicate:
+		if strings.EqualFold(n.XMLName.Local, "skill") {
+			return []string{"stat"}
+		}
+	}
+	return nil
+}
+
+// checkConditionValues fails a condition element whose values, as resolved
+// in vals, the condition reader cannot decode when it loads the condition,
+// or which lacks an attribute the reader requires. A <player insidePoly>
+// needs its <zone> child. Everything else the reader takes as written, or
+// only when the condition is tested.
+func checkConditionValues(n condNode, role condRole, vals map[string]string) error {
+	for _, name := range conditionRequiredAttrs(n, role) {
+		if _, ok := vals[name]; !ok {
+			return fmt.Errorf("attribute %q is missing", name)
+		}
+	}
+	for _, a := range n.Attrs {
+		name := a.Name.Local
+		val := vals[name]
+		var err error
+		switch conditionAttrDecode(role, n.XMLName.Local, name) {
+		case condDecodeInt:
+			_, err = conditions.DecodeInt(val)
+		case condDecodeByte:
+			_, err = conditions.DecodeByte(val)
+		case condDecodePair:
+			_, _, err = conditions.DecodePair(val)
+		case condDecodeList:
+			_, err = conditions.DecodeList(val)
+		case condDecodeRace:
+			_, err = restart.ParseRace(val)
+		case condDecodeStat:
+			_, err = stat.ByName(val)
+		}
+		if err != nil {
+			return fmt.Errorf("attribute %q: %w", name, err)
+		}
+		if role == condRolePredicate && strings.EqualFold(n.XMLName.Local, "player") &&
+			strings.EqualFold(name, "insidePoly") && len(n.Children) == 0 {
+			return fmt.Errorf("attribute %q: no <zone> child", name)
+		}
+	}
+	return nil
 }
 
 // resolveConditionPair reads an "a,b" value: the whole value first, then

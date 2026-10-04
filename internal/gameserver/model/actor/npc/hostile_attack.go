@@ -382,10 +382,13 @@ func (h *Hostile) BroadcastStop() {
 	h.emit(event.Stopped{})
 }
 
-// BroadcastStatus reports a change to this NPC's current HP, so the health
-// bar of every player targeting it reflects damage and regeneration.
+// BroadcastStatus reports a change to this NPC's current HP or MP, so the
+// health bar of every player targeting it reflects damage and
+// regeneration, then settles its regeneration task: every vitals change
+// reports through here.
 func (h *Hostile) BroadcastStatus() {
 	h.emit(event.HPChanged{})
+	h.SettleRegen()
 }
 
 // AttackableBy reports whether attacker may physically attack this NPC.

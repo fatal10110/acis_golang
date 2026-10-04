@@ -20,7 +20,7 @@ import (
 func TestFrameCharInfoCoreFields(t *testing.T) {
 	c := &player.Character{
 		ID: 0x10000001, Name: "Observer",
-		Race: player.RaceHuman, Sex: player.SexMale,
+		Race:        player.RaceHuman,
 		Location:    location.Location{X: 10, Y: 20, Z: 30},
 		LastHeading: 123,
 	}
@@ -67,7 +67,7 @@ func TestFrameCharInfoMirrorsPvPFlag(t *testing.T) {
 func TestFrameCharInfoUsesDoublePrecisionFloatFields(t *testing.T) {
 	c := &player.Character{
 		ID: 0x10000001, Name: "Observer",
-		Race: player.RaceHuman, Sex: player.SexMale,
+		Race:     player.RaceHuman,
 		Location: location.Location{X: 10, Y: 20, Z: 30},
 	}
 	tmpl := &player.Template{
@@ -94,7 +94,7 @@ func TestFrameCharInfoAndUserInfoWriteLiveSpeedMultipliers(t *testing.T) {
 		DEX: 30, RunSpeed: 120, WalkSpeed: 80, SwimSpeed: 50,
 		CollisionRadius: 9, CollisionHeight: 23,
 	}
-	c := &player.Character{ID: 0x10000001, Name: "Observer", Race: player.RaceHuman, Sex: player.SexMale}
+	c := &player.Character{ID: 0x10000001, Name: "Observer", Race: player.RaceHuman}
 	c.AttachRuntime(tmpl, nil)
 	c.AddStatFuncs([]effect.Mod{
 		{Stat: stat.RunSpeed, Op: effect.OpAdd, Value: 33},
@@ -204,7 +204,6 @@ func TestFrameUserInfo(t *testing.T) {
 		ID:        0x10000001,
 		Name:      "Newbie",
 		Race:      player.RaceHuman,
-		Sex:       player.SexMale,
 		CharLevel: 1,
 		Exp:       0,
 		SP:        0,
@@ -248,7 +247,7 @@ func TestFrameUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.ObjectID()))
 	want = append(want, encodeUTF16Z(c.Name)...)
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Race))
-	want = binary.LittleEndian.AppendUint32(want, uint32(c.Sex))
+	want = binary.LittleEndian.AppendUint32(want, uint32(c.Sex()))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID()))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.CharLevel))
 	want = binary.LittleEndian.AppendUint64(want, uint64(c.Exp))
@@ -396,7 +395,7 @@ func liveStatsCharacter() (*player.Character, *player.Template) {
 		{ID: 3, Kind: item.KindArmor, Slot: item.SlotChest, Armor: &item.ArmorDetail{}},
 		{ID: 4, Kind: item.KindArmor, Slot: item.SlotLFinger, Armor: &item.ArmorDetail{}},
 	})
-	c := &player.Character{ID: 0x10000001, Name: "Buffed", Race: player.RaceHuman, Sex: player.SexMale, CharLevel: 1}
+	c := &player.Character{ID: 0x10000001, Name: "Buffed", Race: player.RaceHuman, CharLevel: 1}
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, items, []*item.Instance{
 		{ObjectID: 100, TemplateID: 2, Count: 1, Location: item.LocationPaperdoll, LocationData: itemcontainer.RHand},
 		{ObjectID: 101, TemplateID: 3, Count: 1, Location: item.LocationPaperdoll, LocationData: itemcontainer.Chest},
@@ -521,8 +520,10 @@ func TestFrameUserInfo_FemaleUsesFemaleCollision(t *testing.T) {
 		CollisionRadius: 9, CollisionHeight: 23,
 		CollisionRadiusFemale: 17.5, CollisionHeightFemale: 42.25,
 	}
-	male := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: &player.Character{Sex: player.SexMale, Name: "M"}, Template: tmpl}))
-	female := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: &player.Character{Sex: player.SexFemale, Name: "M"}, Template: tmpl}))
+	male := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: &player.Character{Name: "M"}, Template: tmpl}))
+	femaleChar := &player.Character{Name: "M"}
+	femaleChar.SetSex(player.SexFemale)
+	female := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: femaleChar, Template: tmpl}))
 
 	if bytes.Equal(male, female) {
 		t.Fatal("male and female encodings are identical, want different collision fields")

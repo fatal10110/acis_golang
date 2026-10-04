@@ -39,6 +39,22 @@ func (b *HPBar) Report(current func() float64, maxHP float64) (int, bool) {
 	return int(hp), b.need(hp, maxHP)
 }
 
+// Publish is Report for delivery: when the players watching the bar must be
+// sent the HP current reads, it hands the int-truncated value to send while
+// still holding the bar's lock. Reading, gating and enqueueing are then one
+// step, so concurrent publishes for one creature reach every watcher in the
+// order HP was read: the last value a watcher gets is never older than one
+// it already got. send must not block, and must not take a lock held while
+// Publish is called.
+func (b *HPBar) Publish(current func() float64, maxHP float64, send func(hp int)) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	hp := current()
+	if b.need(hp, maxHP) {
+		send(int(hp))
+	}
+}
+
 func (b *HPBar) need(hp, maxHP float64) bool {
 	if hp <= 1.0 || maxHP < hpBarSize {
 		return true

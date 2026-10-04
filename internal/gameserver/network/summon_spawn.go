@@ -480,6 +480,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		CollisionHeight:  npcTmpl.CollisionHeight,
 		Name:             npcTmpl.Name,
 		Level:            npcTmpl.Level,
+		Undead:           npcTmpl.Race == npc.RaceUndead,
 		MaxBuffsAmount:   link.playerConfig.MaxBuffsAmount,
 		RespawnRestoreHP: link.playerConfig.RespawnRestoreHP,
 		OwnerInventory:   live.Inventory(),

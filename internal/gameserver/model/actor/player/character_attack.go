@@ -156,9 +156,11 @@ func (c *Character) BroadcastAbnormalEffect() {
 	c.emit(event.AbnormalEffectChanged{})
 }
 
-// BroadcastStatus reports a change to this character's current HP, MP or CP.
+// BroadcastStatus reports a change to this character's current HP, MP or
+// CP, then settles its regeneration task.
 func (c *Character) BroadcastStatus() {
 	c.emit(event.VitalsChanged{})
+	c.SettleRegen()
 }
 
 // NotifyBowDraw reports that a bow shot started drawing.
@@ -835,7 +837,7 @@ func (c *Character) CollisionRadius() float64 {
 	if tmpl == nil {
 		return 0
 	}
-	if c.Sex == SexFemale {
+	if c.Sex() != SexMale {
 		return tmpl.CollisionRadiusFemale
 	}
 	return tmpl.CollisionRadius
@@ -852,7 +854,7 @@ func (c *Character) CollisionHeight() float64 {
 	if tmpl == nil {
 		return 0
 	}
-	if c.Sex == SexFemale {
+	if c.Sex() != SexMale {
 		return tmpl.CollisionHeightFemale
 	}
 	return tmpl.CollisionHeight
