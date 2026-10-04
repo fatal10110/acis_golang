@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -93,6 +94,9 @@ func (f *Folk) Decay(worldState *world.State, respawn func()) bool {
 	f.corpseDeadline = time.Time{}
 	f.vitalsMu.Unlock()
 
+	// The NPC leaves its zones while its observers still know it.
+	x, y, z := f.Position()
+	f.zones.leave(location.Location{X: x, Y: y, Z: z})
 	if worldState != nil {
 		worldState.Despawn(f)
 	}

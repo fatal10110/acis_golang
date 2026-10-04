@@ -339,7 +339,7 @@ func TestFramePetInfo(t *testing.T) {
 	want = appendPetInfoInt32(want, int32(s.MAtkSpd))
 	want = appendPetInfoInt32(want, int32(s.AbnormalEffect))
 	want = appendPetInfoUint16(want, 1) // mountable
-	want = append(want, 0)              // move type
+	want = append(want, byte(s.MoveType))
 	want = appendPetInfoUint16(want, 0)
 	want = append(want, byte(s.Team))
 	want = appendPetInfoInt32(want, int32(s.SoulShotsPerHit))

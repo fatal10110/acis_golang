@@ -267,6 +267,8 @@ func (s *summonSink) Emit(ev event.Event) {
 		}
 	case event.Arrived:
 		actor.SyncPosition(s.move.Position())
+		// A move's end revalidates the zones at once.
+		actor.SettleZones()
 		if s.brain.Arrived() {
 			actor.TryToIdle()
 			return

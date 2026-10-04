@@ -67,5 +67,6 @@ func SpawnBesideOwner(state *world.State, actor *Actor, owner Owner, offset loca
 	x, y, z := owner.Position()
 	state.Spawn(actor, x+offset.X, y+offset.Y, z+offset.Z, owner.Heading())
 	state.AddSummon(owner.ObjectID(), actor)
+	actor.EnterZones()
 	actor.startBabyHeal()
 }

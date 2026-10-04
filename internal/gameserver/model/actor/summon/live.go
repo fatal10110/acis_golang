@@ -202,6 +202,11 @@ type Actor struct {
 	// skill shortcut.
 	skills map[int]int
 	zones  ZoneQuery
+	// membership is the summon's zone membership over zones.
+	membership *zoneMember
+	// swampMoveBonus is the move bonus, in percent, of the swamp the summon
+	// stands in, or 0 outside any swamp.
+	swampMoveBonus atomic.Int32
 
 	// followOff is set while the owner has told the summon to stop following
 	// it; the zero value follows. Atomic because an effect landing on the
@@ -487,6 +492,7 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 		zones:            cfg.Zones,
 		los:              cfg.LOS,
 	}
+	a.membership = newZoneMember(a, cfg.Zones)
 	a.bindOwner(cfg.Owner, cfg.OwnerInventory)
 	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {
 		return nil, err
@@ -538,6 +544,7 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 		zones:          cfg.Zones,
 		los:            cfg.LOS,
 	}
+	a.membership = newZoneMember(a, cfg.Zones)
 	a.bindOwner(cfg.Owner, cfg.OwnerInventory)
 	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {
 		return nil, err

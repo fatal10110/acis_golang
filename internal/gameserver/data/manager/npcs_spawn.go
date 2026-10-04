@@ -213,6 +213,7 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	}
 
 	n.state.Spawn(hostile, loc.X, loc.Y, loc.Z, heading)
+	hostile.EnterZones()
 	n.ai.Add(hostile)
 	// Walker only ticks in-region actors — must run after Spawn placed this
 	// NPC in world.State, not before.

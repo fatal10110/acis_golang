@@ -244,6 +244,8 @@ func (a *Actor) despawn(state *world.State) bool {
 		// The owner receives PetDelete even when outside the summon's view.
 		// Despawn's Forget callbacks then send DeleteObject to old observers.
 		a.emit(event.SummonRemoved{})
+		// The summon leaves its zones while its observers still know it.
+		a.LeaveZones()
 		state.Despawn(a)
 		// Stop the periodic effect sweep from reaching this summon's list
 		// once it leaves the world for good, even if it still holds a buff.

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
@@ -27,13 +28,20 @@ func mustPet(t testing.TB, cfg PetConfig) *Actor {
 	return a
 }
 
-type peaceZoneQueryStub bool
-
-func (q peaceZoneQueryStub) EffectRangeInPeaceZone(_, _, _, _, _, _ int) bool { return bool(q) }
-func (q peaceZoneQueryStub) SummonCombatZones(_, _, _ int) (pvp, siege bool)  { return false, false }
-
-func TestSummonInPeaceZoneQueriesCurrentZone(t *testing.T) {
-	pet := mustPet(t, PetConfig{ObjectID: 1, Zones: peaceZoneQueryStub(true)})
+// TestSummonInPeaceZoneReadsItsZones: a summon is in peace while its zones
+// hold it there.
+func TestSummonInPeaceZoneReadsItsZones(t *testing.T) {
+	form, err := zone.NewCuboid(-100, 100, -100, 100, -100, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zones := zone.NewIndex()
+	zones.Add(zone.NewPeace(1, form))
+	pet := mustPet(t, PetConfig{ObjectID: 1, Zones: zones})
+	if pet.InPeaceZone() {
+		t.Fatal("InPeaceZone() = true before the summon entered its zones")
+	}
+	pet.EnterZones()
 	if !pet.InPeaceZone() {
 		t.Fatal("InPeaceZone() = false for a summon inside a peace zone")
 	}

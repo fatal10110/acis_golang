@@ -169,6 +169,9 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	live.SetQueue(queue)
 	if zones != nil {
 		live.Move().SetWaterSurface(waterSurface(zones))
+		// The NPC swims while its water zones hold it, not wherever the
+		// water query finds it.
+		live.Move().UseCreatureZoneSwim()
 	}
 
 	locRef := &locatedRef{}
@@ -194,10 +197,8 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 			_, ok := zone.FindAt[*zone.Water](zones, at.X, at.Y, at.Z)
 			return ok
 		})
-		hostile.SetPeaceZone(func(at location.Location) bool {
-			return zones.NPCInPeaceZone(at.X, at.Y, at.Z)
-		})
 	}
+	hostile.SetZones(zones)
 
 	locRef.Actor = hostile
 	actorRef.CreatureActor = hostile
@@ -267,6 +268,8 @@ func (c *hostileControl) Emit(ev event.Event) {
 		// arrived position into the world-grid presence range checks
 		// actually read, or the next AI pass runs against a stale position.
 		c.hostile.SyncPosition(c.move.Position())
+		// A move's end revalidates the zones at once.
+		c.hostile.SettleZones()
 		// Only an arrival the walker task itself just moved toward counts as
 		// a route arrival — offensive-follow chase and MoveHome arrive the
 		// same way and must not advance/reissue the patrol route.

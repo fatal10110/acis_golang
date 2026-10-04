@@ -115,7 +115,7 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 		t.Fatalf("new hostile npc: %v", err)
 	}
 	hostile.SetMaxGeoPathFailCount(s.maxGeoPathFail)
-	s.installPeaceZone(hostile)
+	s.installZones(hostile)
 	hostile.Attach(npc.Runtime{
 		World: s.State,
 		Items: s.itemTable,
@@ -124,6 +124,7 @@ func (s *Server) spawnHostile(t *testing.T, tmpl *npc.Template, at location.Loca
 		Sink: network.HostileSinks(s.State, s.stance)(hostile),
 	})
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
+	hostile.EnterZones()
 	return hostile
 }
 
@@ -412,7 +413,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 		t.Fatalf("new hostile npc: %v", err)
 	}
 	hostile.SetMaxGeoPathFailCount(s.maxGeoPathFail)
-	s.installPeaceZone(hostile)
+	s.installZones(hostile)
 	locRef.Actor = hostile
 	actorRef.CreatureActor = hostile
 	statRef.StatOwner = hostile
@@ -430,6 +431,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 	}
 	hostile.Attach(rt)
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
+	hostile.EnterZones()
 	return hostile
 }
 
@@ -447,6 +449,7 @@ func (c *movingHostileControl) Emit(ev event.Event) {
 	switch e := ev.(type) {
 	case event.Arrived:
 		c.hostile.SyncPosition(c.move.Position())
+		c.hostile.SettleZones()
 		c.hostile.AI().Arrived()
 	case event.MoveBlocked:
 		c.move.BroadcastBlockedCorrection()
@@ -582,15 +585,13 @@ func (parkedAttack) CanAttack(attackable.Combatant) bool { return false }
 func (parkedAttack) DoAttack(attackable.Combatant)       {}
 func (parkedAttack) Stop()                               {}
 
-// installPeaceZone gives a fixture NPC the peace-zone query boot installs on
-// every live NPC, when the suite supplied zones through WithZones.
-func (s *Server) installPeaceZone(hostile *npc.Hostile) {
-	if s.zones == nil {
-		return
+// installZones gives a fixture NPC the zone membership boot gives every
+// live NPC, over the zones the suite supplied through WithZones.
+func (s *Server) installZones(hostile *npc.Hostile) {
+	hostile.SetZones(s.zones)
+	if s.zones != nil && hostile.Live != nil {
+		hostile.Move().UseCreatureZoneSwim()
 	}
-	hostile.SetPeaceZone(func(at location.Location) bool {
-		return s.zones.NPCInPeaceZone(at.X, at.Y, at.Z)
-	})
 }
 
 // FolkTemplate is a fixture civilian NPC template of the given instance

@@ -17,7 +17,7 @@ func TestFolkGeoPathFailCountWrapsPastMaximum(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new instance: %v", err)
 	}
-	f, err := NewFolk(inst, false)
+	f, err := NewFolk(inst)
 	if err != nil {
 		t.Fatalf("new folk: %v", err)
 	}

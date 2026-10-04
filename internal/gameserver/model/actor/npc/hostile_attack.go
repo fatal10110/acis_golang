@@ -377,6 +377,8 @@ func (h *Hostile) BroadcastMoveToPawn(target attackable.Combatant) {
 
 // BroadcastStop reports a stop in place.
 func (h *Hostile) BroadcastStop() {
+	// Stopping revalidates the zones at once, before observers see the stop.
+	h.zones.settle()
 	h.emit(event.Stopped{})
 }
 

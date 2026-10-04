@@ -1,11 +1,11 @@
 package summon
 
-// ZoneQuery is the position-based zone membership a summon reads: the peace
-// query launch revalidation uses, and the combat zones (PvP, siege) the
-// zones at its position give it.
+import "github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+
+// ZoneQuery is the position-based peace query launch revalidation uses. A
+// *zone.Index also gives the summon its zone membership.
 type ZoneQuery interface {
 	EffectRangeInPeaceZone(regionX, regionY, x, y, z, effectRange int) bool
-	SummonCombatZones(x, y, z int) (pvp, siege bool)
 }
 
 // EffectRangeInPeaceZone reports whether an effect overlaps a peace zone in
@@ -29,25 +29,11 @@ func (a *Actor) CollisionHeight() float64 {
 	return a.height
 }
 
-// InPvPZone reports whether this summon stands inside a PvP zone: an arena,
-// an active siege battlefield or a stadium with a match running, and no
-// peace zone. It is the summon's own membership, not its owner's.
-func (a *Actor) InPvPZone() bool {
-	pvp, _ := a.combatZones()
-	return pvp
-}
+// InPvPZone reports whether this summon's zones hold it in a PvP zone: an
+// arena, an active siege battlefield or a stadium with a match running, and
+// no peace zone. It is the summon's own membership, not its owner's.
+func (a *Actor) InPvPZone() bool { return a.membership.has(zone.FlagPvP) }
 
-// InSiegeZone reports whether this summon stands inside an active siege
+// InSiegeZone reports whether this summon's zones hold it in an active siege
 // battlefield.
-func (a *Actor) InSiegeZone() bool {
-	_, siege := a.combatZones()
-	return siege
-}
-
-func (a *Actor) combatZones() (pvp, siege bool) {
-	if a.zones == nil {
-		return false, false
-	}
-	x, y, z := a.Position()
-	return a.zones.SummonCombatZones(x, y, z)
-}
+func (a *Actor) InSiegeZone() bool { return a.membership.has(zone.FlagSiege) }

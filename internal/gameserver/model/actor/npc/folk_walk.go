@@ -89,6 +89,11 @@ func (f *Folk) EnableMovement(m FolkMovement) (*FolkWalker, error) {
 	if m.WaterSurface != nil {
 		cm.SetWaterSurface(m.WaterSurface)
 	}
+	if f.zones.ix != nil {
+		// The NPC swims while its water zones hold it, not wherever the
+		// water query finds it.
+		cm.UseCreatureZoneSwim()
+	}
 	motion := &folkMotion{Folk: f, cfg: m, move: cm}
 	ctl, err := move.NewController(cm, motion, motion)
 	if err != nil {
@@ -125,6 +130,8 @@ func (m *folkMotion) Emit(ev event.Event) {
 	case event.Arrived:
 		at := m.ctl.Position()
 		m.SyncPosition(at)
+		// A move's end revalidates the zones at once.
+		m.zones.settle()
 		if at == m.Instance.Home {
 			m.SetHeading(m.Instance.SpawnHeading)
 		}
@@ -142,18 +149,24 @@ func (m *folkMotion) emit(ev event.Event) {
 	}
 }
 
-// SyncPosition moves the NPC's world presence to position.
+// SyncPosition moves the NPC's world presence to position, a movement step.
 func (m *folkMotion) SyncPosition(position location.Location) {
 	if m.cfg.World != nil {
+		x, y, z := m.Folk.Position()
 		_ = m.cfg.World.Move(m.Folk, position.X, position.Y, position.Z)
+		m.zones.step(location.Location{X: x, Y: y, Z: z})
 	}
 }
 
 // BroadcastMove shows observers the walk.
 func (m *folkMotion) BroadcastMove(ev event.Move) { m.emit(ev) }
 
-// BroadcastStop shows observers a stop in place.
-func (m *folkMotion) BroadcastStop() { m.emit(event.Stopped{}) }
+// BroadcastStop shows observers a stop in place, once the stop has
+// revalidated the zones.
+func (m *folkMotion) BroadcastStop() {
+	m.zones.settle()
+	m.emit(event.Stopped{})
+}
 
 // OwnsOffensiveFollowTicker reports false: the controller rechecks the
 // offensive follow a cast desire starts.
@@ -223,16 +236,21 @@ func (m *folkMotion) TeleportTo(target location.Location) {
 	if !m.teleporting.CompareAndSwap(false, true) {
 		return
 	}
-	defer m.teleporting.Store(false)
 	m.ctl.Stop()
 	if m.cfg.InWater == nil || !m.cfg.InWater(target) {
 		target.Z = int(m.move.Height(target.X, target.Y, target.Z))
 	}
 	m.emit(event.Teleported{To: target})
+	// The NPC leaves the zones around its old position while its observers
+	// there still know it, and enters those at target once it has landed.
+	x, y, z := m.Folk.Position()
+	m.zones.leave(location.Location{X: x, Y: y, Z: z})
 	m.move.SetPosition(target)
 	if m.cfg.World != nil {
 		_ = m.cfg.World.Teleport(m.Folk, target.X, target.Y, target.Z)
 	}
+	m.teleporting.Store(false)
+	m.zones.enter()
 	m.ResetGeoPathFailCount()
 }
 

@@ -135,8 +135,10 @@ type CreatureMove struct {
 	accurateX, accurateY, accurateZ float64
 	flying                          bool
 	// zoneSwim marks a mover whose swimming follows swimming, set from its
-	// zone membership, instead of the water query.
-	zoneSwim, swimming bool
+	// zone membership, instead of the water query. capSwimmer marks one of
+	// them that is not a player: it is held at the water surface while it
+	// swims rather than while it flies.
+	zoneSwim, swimming, capSwimmer bool
 	// timedType is the move type the active leg's arrival was timed with;
 	// a position update that changes the type re-times the leg.
 	timedType    MoveType
@@ -449,6 +451,16 @@ func (m *CreatureMove) SetFlying(flying bool) {
 func (m *CreatureMove) UseZoneSwim() {
 	m.mu.Lock()
 	m.zoneSwim = true
+	m.mu.Unlock()
+}
+
+// UseCreatureZoneSwim is UseZoneSwim for a mover that is not a player (an
+// NPC or a summon): while its zones hold it in water it swims, held at the
+// surface of the water zone it stands in when the floor lies deeper than
+// waterDepthMin below it. Call it before the mover is exposed.
+func (m *CreatureMove) UseCreatureZoneSwim() {
+	m.mu.Lock()
+	m.zoneSwim, m.capSwimmer = true, true
 	m.mu.Unlock()
 }
 
@@ -1265,11 +1277,15 @@ func (m *CreatureMove) maxZLocked() int {
 // A UseZoneSwim mover (a player) is held at the surface only while it
 // flies, never while it swims: a flyer whose zones do not hold it in water
 // yet stays capped at the surface of the water zone it stands in until they
-// do.
+// do. A UseCreatureZoneSwim mover is held there only while it swims.
 func (m *CreatureMove) waterLocked() (MoveType, int) {
 	if m.zoneSwim {
 		moveType := m.flagTypeLocked()
-		if moveType == MoveFly {
+		capped := moveType == MoveFly
+		if m.capSwimmer {
+			capped = moveType == MoveSwim
+		}
+		if capped {
 			if surface, ok := m.surfaceCapLocked(); ok {
 				return moveType, surface
 			}

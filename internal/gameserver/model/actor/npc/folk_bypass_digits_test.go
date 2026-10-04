@@ -12,7 +12,7 @@ func digitsFolk(t *testing.T, kind string, id int) *Folk {
 	if err != nil {
 		t.Fatalf("%s: new instance: %v", kind, err)
 	}
-	f, err := NewFolk(inst, false)
+	f, err := NewFolk(inst)
 	if err != nil {
 		t.Fatalf("%s: new folk: %v", kind, err)
 	}

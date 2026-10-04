@@ -3,6 +3,7 @@ package npc
 import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 )
 
 var _ skilltarget.Actor = (*Folk)(nil)
@@ -21,8 +22,8 @@ func (f *Folk) AttackableBy(caster skilltarget.Actor) bool {
 }
 func (f *Folk) AttackableWithoutForceBy(skilltarget.Actor) bool { return false }
 
-// InPeaceZone reports whether the NPC stands in a peace zone.
-func (f *Folk) InPeaceZone() bool { return f.inPeace }
+// InPeaceZone reports whether the NPC's zones hold it in peace.
+func (f *Folk) InPeaceZone() bool { return f.zones.has(zone.FlagPeace) }
 
 // Undead reports the template's undead race.
 func (f *Folk) Undead() bool { return f.Instance.Template.Race == RaceUndead }

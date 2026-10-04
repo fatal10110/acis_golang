@@ -65,10 +65,13 @@ func (f *Folk) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
 	return location.Location{X: tx, Y: ty, Z: tz}
 }
 
-// SetXYZ moves the NPC's world presence to (x, y, z).
+// SetXYZ moves the NPC's world presence to (x, y, z), a position set
+// outside movement.
 func (f *Folk) SetXYZ(x, y, z int) {
 	if f.world != nil {
+		px, py, pz := f.Position()
 		_ = f.world.Move(f, x, y, z)
+		f.zones.place(location.Location{X: px, Y: py, Z: pz})
 	}
 }
 

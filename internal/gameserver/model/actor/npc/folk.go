@@ -90,7 +90,8 @@ const socialInterval = 12 * time.Second
 type Folk struct {
 	world.Presence
 	Instance *Instance
-	inPeace  bool
+	// zones is the NPC's zone membership; Attach gives it the zone index.
+	zones *zoneMember
 
 	// motion is the movement of an NPC that can move; nil for one that
 	// cannot. EnableMovement sets it before the NPC is published.
@@ -105,10 +106,9 @@ type Folk struct {
 }
 
 // NewFolk builds a civilian NPC from inst. skills, when provided, resolves
-// the template's passive skills into its stats. inPeace reports whether its
-// spawn point lies in a peace zone. Attach gives it the runtime it fights
-// with before it is published.
-func NewFolk(inst *Instance, inPeace bool, skills ...skillDefinitions) (*Folk, error) {
+// the template's passive skills into its stats. Attach gives it the runtime
+// it fights with before it is published.
+func NewFolk(inst *Instance, skills ...skillDefinitions) (*Folk, error) {
 	if inst == nil || inst.Template == nil {
 		return nil, errors.New("npc: nil folk instance")
 	}
@@ -123,7 +123,8 @@ func NewFolk(inst *Instance, inPeace bool, skills ...skillDefinitions) (*Folk, e
 	if err != nil {
 		return nil, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
 	}
-	f := &Folk{Instance: inst, inPeace: inPeace}
+	f := &Folk{Instance: inst}
+	f.zones = newZoneMember(f)
 	f.cast.desires = ai.NewDesireQueue()
 	f.initCombat(mods)
 	return f, nil
@@ -188,6 +189,7 @@ func (f *Folk) NPCInfoSnapshot() npcinfo.Snapshot {
 		MAtkSpd: f.MagicAttackSpeed(), PAtkSpd: pAtkSpd,
 		RunSpd: int(t.RunSpeed), WalkSpd: int(t.WalkSpeed),
 		MoveMultiplier: float64(f.MovementSpeedMultiplier()), AtkSpdMultiplier: npcinfo.AttackSpeedMultiplier(pAtkSpd, t.AtkSpd),
+		MoveType:  f.zones.moveType(),
 		CurrentHP: f.CurrentHP(), MaxHP: f.MaxHP(),
 		CollisionRadius: t.CollisionRadius, CollisionHeight: t.CollisionHeight,
 		RightHand: t.RightHand, LeftHand: t.LeftHand,

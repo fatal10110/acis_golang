@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -91,6 +92,9 @@ type FolkRuntime struct {
 	// Decay removes the NPC's corpse once its template corpse time has
 	// passed; nil leaves a dead NPC's corpse in place.
 	Decay *task.Decay
+	// Zones are the zones the NPC's membership follows; nil leaves it in
+	// none.
+	Zones *zone.Index
 }
 
 // folkAdmits reports whether a civilian NPC holds e: only plain buffs and
@@ -118,6 +122,7 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 		return errors.New("npc: folk runtime needs a queue")
 	}
 	f.world, f.queue, f.sink, f.los, f.decay = rt.World, rt.Queue, rt.Sink, rt.LOS, rt.Decay
+	f.zones.ix = rt.Zones
 	f.cast.ai = rt.AI
 	f.heldMask = templateHeldMask(f.Instance.Template, rt.Items)
 	if rt.MaxBuffsAmount > 0 {
