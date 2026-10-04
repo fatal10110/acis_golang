@@ -27,8 +27,8 @@ func (o *Object) CanSeeTarget(t skilltarget.Actor) bool {
 }
 
 // A door only answers attackability and unlocking; it never casts, moves,
-// dies into a corpse or belongs to any social group, so every method below is
-// the neutral answer.
+// leaves a corpse when broken or belongs to any social group, so every
+// method below is the neutral answer.
 func (o *Object) CanSeePoint(int, int, int) bool                 { return true }
 func (o *Object) EffectRangeInPeaceZone(int, int, int, int) bool { return false }
 func (o *Object) InPeaceZone() bool                              { return false }

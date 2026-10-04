@@ -42,6 +42,15 @@ func (r *deadlineRegistry[K, V]) add(key K, value V, deadline time.Time) {
 	r.mu.Unlock()
 }
 
+// addIfAbsent tracks value under key unless key already has a deadline.
+func (r *deadlineRegistry[K, V]) addIfAbsent(key K, value V, deadline time.Time) {
+	r.mu.Lock()
+	if _, ok := r.entries[key]; !ok {
+		r.entries[key] = deadlineEntry[V]{actor: value, deadline: deadline}
+	}
+	r.mu.Unlock()
+}
+
 // remove stops tracking key and reports whether it had been tracked.
 func (r *deadlineRegistry[K, V]) remove(key K) bool {
 	r.mu.Lock()
