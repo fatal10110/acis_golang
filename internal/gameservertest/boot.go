@@ -40,6 +40,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/fish"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -165,6 +166,8 @@ type options struct {
 	discardItemDisabled    bool
 	manufactureDelay       time.Duration
 	craftRoll              func(n int) int
+	fish                   *fish.Table
+	fishingRoll            func(n int) int
 	multisells             *multisell.Table
 	multisellDelay         time.Duration
 	rollDiceDelay          time.Duration
@@ -629,6 +632,18 @@ func WithManufactureDelay(d time.Duration) Option {
 // random source), so craft outcomes are deterministic.
 func WithCraftRoll(roll func(n int) int) Option {
 	return func(o *options) { o.craftRoll = roll }
+}
+
+// WithFish loads table as the fish a cast fishing line draws from
+// (default: none, so every line comes back empty).
+func WithFish(table *fish.Table) Option {
+	return func(o *options) { o.fish = table }
+}
+
+// WithFishingRoll supplies the fishing dice in [0,n) (default: the random
+// source), so a fishing run is deterministic.
+func WithFishingRoll(roll func(n int) int) Option {
+	return func(o *options) { o.fishingRoll = roll }
 }
 
 // WithMultisells loads table as the multisell lists (default: none).
@@ -1760,6 +1775,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Recipes:          cmp.Or(o.recipes, RecipeTemplates()),
 		Multisells:       o.multisells,
 		CraftRoll:        o.craftRoll,
+		Fish:             o.fish,
+		FishingRoll:      o.fishingRoll,
 		Templates:        templates,
 		ItemTemplates:    itemTemplates,
 		HTML:             HTMLCache(t, o.pages()),

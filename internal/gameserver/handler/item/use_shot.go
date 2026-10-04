@@ -8,9 +8,8 @@ import (
 )
 
 // Handler names for the direct-from-window shot etc items UseShot covers.
-// Beast (summon-charged) variants and fishing shots are not handled here:
-// they need charged-shot state on the summon actor and on the (currently
-// unmodeled) fishing state respectively, neither of which exists yet.
+// Beast (summon-charged) variants and fishing shots have their own paths
+// (UseBeastShot, UseFishShot).
 const (
 	SoulShotsHandler          = "SoulShots"
 	SpiritShotsHandler        = "SpiritShots"

@@ -20,6 +20,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/fish"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/manor"
@@ -94,6 +95,8 @@ type gameData struct {
 	Multisells       *multisell.Table
 	Augmentations    *augmentation.Table
 	ArmorSets        *armorset.Table
+	// Fish is the fish a cast fishing line draws from.
+	Fish *fish.Table
 	// ClanHalls are the clan halls a clan can own.
 	ClanHalls *clanhall.Table
 	// Manors are the manor seed rows; ManorAreas the areas monsters are
@@ -214,6 +217,10 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
+	fishTable, err := gamexml.LoadFish(filepath.Join(xmlRoot, "fish.xml"))
+	if err != nil {
+		return nil, err
+	}
 	clanHalls, err := gamexml.LoadClanHalls(filepath.Join(xmlRoot, "clanHalls.xml"))
 	if err != nil {
 		return nil, err
@@ -226,7 +233,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", npcs.Len()).Int("skills", skills.Len()).Int("hennas", hennas.Len()).Int("heal_sps", healSps.Count()).Int("recipes", recipes.Len()).Int("buylists", buyLists.Len()).Int("multisells", multisells.Count()).Int("augmentation_skills", augmentations.SkillCount()).Int("augmentation_stats", augmentations.StatCount()).Int("armor_sets", armorSets.Len()).Int("teleports", teleports.Count()).Int("instant_teleports", instantTeleports.Count()).Msg("game data loaded")
+	log.Info().Str("geodata_dir", geo.Dir).Str("geodata_type", string(geo.Type)).Int("npc_templates", npcs.Len()).Int("skills", skills.Len()).Int("hennas", hennas.Len()).Int("heal_sps", healSps.Count()).Int("recipes", recipes.Len()).Int("buylists", buyLists.Len()).Int("multisells", multisells.Count()).Int("augmentation_skills", augmentations.SkillCount()).Int("augmentation_stats", augmentations.StatCount()).Int("armor_sets", armorSets.Len()).Int("fish", fishTable.Len()).Int("teleports", teleports.Count()).Int("instant_teleports", instantTeleports.Count()).Msg("game data loaded")
 	return &gameData{
 		Players:          players,
 		Levels:           levels,
@@ -254,6 +261,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		Multisells:       multisells,
 		Augmentations:    augmentations,
 		ArmorSets:        armorSets,
+		Fish:             fishTable,
 		ClanHalls:        clanHalls,
 		Manors:           manors,
 		ManorAreas:       manorAreas,

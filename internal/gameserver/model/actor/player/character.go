@@ -271,6 +271,7 @@ type Character struct {
 	damagePermissionSet  bool
 	canGiveDamage        bool
 	fishing              bool
+	fishingBait          location.Location
 	hero                 bool
 	disabledItems        map[int32]time.Time
 	shortBuffTaskSkillID int32

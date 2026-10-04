@@ -95,6 +95,9 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool, ro
 	if l.useBeastShotItem(live, inv, inst) {
 		return
 	}
+	if l.useFishShotItem(live, inv, inst) {
+		return
+	}
 	if l.useRecipeItem(live, inst, tmpl) {
 		return
 	}
