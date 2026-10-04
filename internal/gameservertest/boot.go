@@ -147,6 +147,7 @@ type options struct {
 	pvpFlags               *task.PvPFlags
 	decay                  *task.Decay
 	npcSpawns              *spawn.Table
+	dataReloads            network.DataReloads
 	attackStanceTracker    network.AttackStanceTracker
 	attackStanceNow        func() time.Time
 	spawnProtection        time.Duration
@@ -922,6 +923,8 @@ type Server struct {
 	Boats               *boat.Fleet               // boats sailing WithBoats' itineraries; nil otherwise
 	Derby               *derby.Track              // race track of WithDerbyTrack; nil otherwise
 	NpcSpawns           *gamemanager.Npcs         // live NPC population of WithNpcSpawns; nil otherwise
+	NpcRespawns         *task.Respawn             // respawn timers of NpcSpawns; they never fire on their own
+	HTML                *datacache.HTML           // the HTML pages the link reads
 	Relations           *relation.Manager         // friend and block lists the link was wired with
 	relationRows        *gamesql.RelationStore
 	Petitions           *petition.Manager // petitions the link was wired with
@@ -1923,6 +1926,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Templates:        templates,
 		ItemTemplates:    itemTemplates,
 		HTML:             HTMLCache(t, o.pages()),
+		Reloads:          o.dataReloads,
 		Crests:           crests,
 		Skills:           o.skills,
 		Spellbooks:       o.spellbooks,
@@ -2093,8 +2097,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	effects.SetShadowItemExpiry(gcl.ExpireShadowItem)
 	var npcSpawns *gamemanager.Npcs
+	var npcRespawns *task.Respawn
 	if o.npcSpawns != nil {
-		npcSpawns = bootNpcSpawns(t, gcl, npcSpawnDeps{
+		npcSpawns, npcRespawns = bootNpcSpawns(t, gcl, npcSpawnDeps{
 			state: state, templates: o.npcs, geo: bootGeo(o.geo), ids: ids, decay: o.decay, ai: ai, positions: positions,
 			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.AttackStance, log: o.log, makers: o.npcSpawns,
 		})
@@ -2344,6 +2349,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		decay:               o.decay,
 		AI:                  ai,
 		NpcSpawns:           npcSpawns,
+		NpcRespawns:         npcRespawns,
+		HTML:                gclConfig.HTML,
 		Water:               water,
 		BuyListStock:        stock,
 		BuyListRows:         buyListStore,

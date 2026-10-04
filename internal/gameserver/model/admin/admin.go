@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 )
@@ -118,7 +119,15 @@ func NewAnnouncement(set *commons.StatSet) (Announcement, error) {
 	return a, nil
 }
 
+// Data is the access-level and admin-command tables. //reload admin
+// replaces them in place with Replace: every method call reads one
+// snapshot, the old tables or the new ones, never a mix.
 type Data struct {
+	cur atomic.Pointer[tables]
+}
+
+// tables is one loaded snapshot of the access-level and command tables.
+type tables struct {
 	accessLevels map[int]AccessLevel
 	commands     map[string]Command
 	// ordered holds the commands in the order the table lists them.
@@ -143,11 +152,28 @@ func NewData(levels []AccessLevel, commands []Command) (*Data, error) {
 		commandMap[key] = command
 	}
 
-	return &Data{accessLevels: accessLevels, commands: commandMap, ordered: slices.Clone(commands)}, nil
+	d := &Data{}
+	d.cur.Store(&tables{accessLevels: accessLevels, commands: commandMap, ordered: slices.Clone(commands)})
+	return d, nil
+}
+
+// Replace swaps d's tables for from's, at once for every holder of d:
+// AdminData.reload. A character keeps the access level it plays under
+// until that level is resolved again.
+func (d *Data) Replace(from *Data) {
+	d.cur.Store(from.cur.Load())
+}
+
+// load returns d's current snapshot; a nil table has an empty one.
+func (d *Data) load() *tables {
+	if d == nil {
+		return &tables{}
+	}
+	return d.cur.Load()
 }
 
 func (d *Data) AccessLevel(level int) (AccessLevel, bool) {
-	value, ok := d.accessLevels[level]
+	value, ok := d.load().accessLevels[level]
 	return value, ok
 }
 
@@ -166,28 +192,30 @@ func (d *Data) Resolve(level int) AccessLevel {
 	if level < 0 {
 		level = -1
 	}
-	if value, ok := d.accessLevels[level]; ok {
+	t := d.load()
+	if value, ok := t.accessLevels[level]; ok {
 		return value
 	}
-	if value, ok := d.accessLevels[0]; ok {
+	if value, ok := t.accessLevels[0]; ok {
 		return value
 	}
 	return defaultAccessLevel
 }
 
 func (d *Data) Command(name string) (Command, bool) {
-	value, ok := d.commands[strings.ToLower(name)]
+	return d.load().command(name)
+}
+
+func (t *tables) command(name string) (Command, bool) {
+	value, ok := t.commands[strings.ToLower(name)]
 	return value, ok
 }
 
 // Commands returns the command table in the order it lists the commands.
 // The slice is shared; callers must not modify it.
 func (d *Data) Commands() []Command {
-	if d == nil {
-		return nil
-	}
-	return d.ordered
+	return d.load().ordered
 }
 
-func (d *Data) AccessLevelCount() int { return len(d.accessLevels) }
-func (d *Data) CommandCount() int     { return len(d.commands) }
+func (d *Data) AccessLevelCount() int { return len(d.load().accessLevels) }
+func (d *Data) CommandCount() int     { return len(d.load().commands) }

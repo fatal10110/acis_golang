@@ -61,8 +61,15 @@ func (n *Npcs) Remove(h *npc.Hostile) {
 	h.Decay(n.state, n.RespawnHook(h.ObjectID()))
 }
 
+// scheduleRespawn arms slot's respawn delay from now, unless DespawnAll
+// dropped the slot since its NPC decayed: a despawned spawn stays gone.
 func (n *Npcs) scheduleRespawn(slot slotInfo, delay time.Duration) {
 	now := n.now()
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if _, ok := n.slot[slot.key]; !ok {
+		return
+	}
 	if slot.dbName != "" {
 		if state, ok := n.spawns.State(slot.dbName); ok {
 			state.SetRespawn(delay, now)
@@ -74,7 +81,10 @@ func (n *Npcs) scheduleRespawn(slot slotInfo, delay time.Duration) {
 // Respawn implements task.RespawnEffects: it re-instantiates the slot key
 // identifies, picking a fresh position (and, for a database-tracked slot,
 // resuming through the same persisted-state restore rule used at boot).
+// A slot DespawnAll dropped is not respawned.
 func (n *Npcs) Respawn(key string) {
+	n.gate.RLock()
+	defer n.gate.RUnlock()
 	n.mu.Lock()
 	slot, ok := n.slot[key]
 	n.mu.Unlock()
@@ -101,7 +111,7 @@ func (n *Npcs) Respawn(key string) {
 	}
 
 	if slot.dbName != "" {
-		state, ok := n.spawns.State(slot.dbName)
+		state, ok := n.currentSpawns().State(slot.dbName)
 		if !ok {
 			state = spawn.NewState(slot.dbName)
 		}
@@ -165,7 +175,7 @@ func (n *Npcs) SyncPersistedState() {
 		if !ok {
 			continue
 		}
-		state, ok := n.spawns.State(slot.dbName)
+		state, ok := n.currentSpawns().State(slot.dbName)
 		if !ok {
 			continue
 		}

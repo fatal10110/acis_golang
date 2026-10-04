@@ -28,6 +28,8 @@ func (n *Npcs) SpawnFixed(tmpl *npc.Template, x, y, z, heading int) error {
 
 // spawnFixed is SpawnFixed, also returning the placed NPC's object id.
 func (n *Npcs) spawnFixed(tmpl *npc.Template, x, y, z, heading int) (int32, error) {
+	n.gate.RLock()
+	defer n.gate.RUnlock()
 	if tmpl == nil {
 		return 0, ErrNotPlaceable
 	}

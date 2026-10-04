@@ -228,7 +228,7 @@ func (l *List) NPCOnly() bool {
 }
 
 // Table is an in-memory lookup of multisell lists keyed by list id, built
-// once at boot and read for the remainder of the process lifetime.
+// at boot and replaced in place by //reload multisell.
 type Table struct {
 	*commons.Lookup[int32, *List]
 }
@@ -240,6 +240,13 @@ func NewTable(lists []*List) (*Table, error) {
 		return nil, errors.New("multisell: table has no lists")
 	}
 	return &Table{commons.NewLookup(lists, func(l *List) int32 { return l.ID })}, nil
+}
+
+// Replace swaps t's lists for from's, at once for every holder of t:
+// MultisellData.reload. A list already prepared for a player stays as it
+// was prepared.
+func (t *Table) Replace(from *Table) {
+	t.Swap(from.Lookup)
 }
 
 // Count returns the number of lists loaded.

@@ -2,6 +2,7 @@ package manager
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -131,12 +132,14 @@ type Npcs struct {
 	// folk places civilian NPCs, walking the route walkers.
 	folk    FolkSpawner
 	rewards KillRewardConfig
-	spawns  *Spawns
-	now     func() time.Time
-	log     zerolog.Logger
-	walker  *task.Walker
-	zones   *zone.Index
-	queues  Queues
+	// spawns is the spawn list the makers come from; RespawnAll replaces
+	// it, under mu.
+	spawns *Spawns
+	now    func() time.Time
+	log    zerolog.Logger
+	walker *task.Walker
+	zones  *zone.Index
+	queues Queues
 
 	// castDefs and castEffects wire a live Hostile's cast.AIController at
 	// spawn (see newLiveHostile). castDefs is nil-checked so a caller with
@@ -146,9 +149,18 @@ type Npcs struct {
 	castDefs    actorcast.Definitions
 	castEffects actorcast.EffectHandlers
 
+	// gate orders the whole-population changes against every single spawn:
+	// DespawnAll and RespawnAll hold it, Respawn and SpawnFixed read-hold it,
+	// so a spawn never lands halfway through a despawn of everything.
+	gate sync.RWMutex
+
 	mu   sync.Mutex
 	slot map[string]slotInfo
 	live map[int32]string
+	// gen counts the RespawnAll runs; it suffixes the slot keys after the
+	// first, so a respawn armed for a slot of an earlier run never fires
+	// on the slot of the same maker entry spawned anew.
+	gen int
 
 	// liveCount is guarded by mu, not atomic: every update pairs it with a
 	// live map write/delete that must stay consistent with the count.
@@ -293,17 +305,44 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		Log:                 log,
 	}
 
+	n.spawnOnStart(spawns, 0)
+	return n, nil
+}
+
+// spawnOnStart spawns every on-start maker of spawns, as SpawnManager.spawn
+// does at boot, its slots keyed for RespawnAll run gen.
+func (n *Npcs) spawnOnStart(spawns *Spawns, gen int) {
 	for _, maker := range spawns.Table().Makers() {
 		if !isOnStartMaker(maker) {
 			continue
 		}
 		remaining := maker.MaximumNPCs
 		for entryIndex, entry := range maker.Entries {
-			n.bootSpawnEntry(maker, entryIndex, entry, &remaining)
+			n.bootSpawnEntry(maker, entryIndex, entry, &remaining, gen)
 		}
 	}
+}
 
-	return n, nil
+// slotKey is the key of the slot base names in RespawnAll run gen: base
+// itself at boot.
+func slotKey(base string, gen int) string {
+	if gen == 0 {
+		return base
+	}
+	return base + "@" + strconv.Itoa(gen)
+}
+
+// currentSpawns returns the spawn list in use.
+func (n *Npcs) currentSpawns() *Spawns {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	return n.spawns
+}
+
+// Spawns returns the spawn list in use: the one loaded at boot, or the one
+// the last RespawnAll put in its place.
+func (n *Npcs) Spawns() *Spawns {
+	return n.currentSpawns()
 }
 
 // isOnStartMaker reports whether maker should be populated at boot: it has

@@ -135,6 +135,7 @@ func provideGameClientLink(
 	halls *clanhall.Halls,
 	log zerolog.Logger,
 	gmAudit gmAuditLogger,
+	reloads network.DataReloads,
 	chatLog chatLogger,
 ) (*network.GameClientLink, error) {
 	enchantCfg := gameplay.Enchant
@@ -290,6 +291,8 @@ func provideGameClientLink(
 
 		ClanHallFunctions: hallFunctions,
 		ClanHalls:         halls,
+
+		Reloads: reloads,
 	})
 	if err != nil {
 		return nil, err

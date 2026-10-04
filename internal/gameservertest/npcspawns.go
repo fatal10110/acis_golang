@@ -49,9 +49,15 @@ type npcSpawnDeps struct {
 	log       zerolog.Logger
 }
 
+// WithDataReloads gives the link the //reload and //respawnall hooks; by
+// default it has none.
+func WithDataReloads(reloads network.DataReloads) Option {
+	return func(o *options) { o.dataReloads = reloads }
+}
+
 // bootNpcSpawns builds the WithNpcSpawns population over deps and hands it
-// to link.
-func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps) *gamemanager.Npcs {
+// to link. It returns the population and its respawn timers.
+func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps) (*gamemanager.Npcs, *task.Respawn) {
 	t.Helper()
 	decay := deps.decay
 	if decay == nil {
@@ -84,7 +90,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 		t.Fatalf("new npc spawns: %v", err)
 	}
 	link.SetNpcSpawns(npcs)
-	return npcs
+	return npcs, respawn
 }
 
 type noDecay struct{}
