@@ -514,12 +514,14 @@ func (l *GameClientLink) clanAdena(clanID int32) int {
 }
 
 // agitMap names the town map the location page shows: the one of the
-// region live's restart point covers, Aden's elsewhere.
+// restart point whose map regions cover live's tile, Aden's elsewhere.
+// It is the plain region point: no restart area and no banned-race
+// redirect applies.
 func (l *GameClientLink) agitMap(live *livePlayer) string {
 	if l.restarts == nil {
 		return "aden"
 	}
-	point, ok := l.restarts.CalculatedPoint(live.CurrentLocation(), live.Race)
+	point, ok := l.restarts.PointAt(live.CurrentLocation())
 	if !ok {
 		return "aden"
 	}

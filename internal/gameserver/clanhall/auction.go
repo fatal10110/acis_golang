@@ -221,7 +221,7 @@ func (hs *Halls) removeBidsLocked(h *hall, newOwner *clan.Clan) {
 		if !ok {
 			continue
 		}
-		hs.setBidAtLocked(hallID, cl.ID(), 0)
+		hs.setBidAtLocked(cl.ID(), 0)
 		if cl != newOwner {
 			hs.returnAdenaLocked(cl, b.Bid, true)
 		}
@@ -301,7 +301,7 @@ func (hs *Halls) Bid(hallID int32, cl *clan.Clan, name string, amount int) BidRe
 		b.Bid, b.Time = amount, now
 	}
 	a.recalculateHighest()
-	hs.setBidAtLocked(hallID, cl.ID(), hallID)
+	hs.setBidAtLocked(cl.ID(), hallID)
 	row := BidRow{HallID: hallID, ClanID: cl.ID(), Name: name, ClanName: info.Name, Bid: amount, Time: now}
 	hs.write("store clan hall bid", hallID, func(ctx context.Context, st HallStore) error {
 		return st.SaveBid(ctx, row)
@@ -333,7 +333,7 @@ func (hs *Halls) CancelBid(cl *clan.Clan) bool {
 		return st.DeleteBid(ctx, hallID, clanID)
 	})
 	hs.returnAdenaLocked(cl, b.Bid, true)
-	hs.setBidAtLocked(hallID, clanID, 0)
+	hs.setBidAtLocked(clanID, 0)
 	if b == a.highest {
 		a.recalculateHighest()
 	}

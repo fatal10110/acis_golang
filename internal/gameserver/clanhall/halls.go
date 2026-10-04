@@ -490,14 +490,16 @@ func (hs *Halls) updateLocked(h *hall) {
 }
 
 // setBidAtLocked records the hall clan clanID bid on, 0 for none, and
-// stores it on the clan's row.
-func (hs *Halls) setBidAtLocked(hallID, clanID, at int32) {
+// stores it on the clan's row. The write goes on the clan's lane, not a
+// hall's: a clan's bids on two halls would otherwise queue its writes on
+// two lanes that run concurrently, and an older 0 could land last.
+func (hs *Halls) setBidAtLocked(clanID, at int32) {
 	if at == 0 {
 		delete(hs.bidAt, clanID)
 	} else {
 		hs.bidAt[clanID] = at
 	}
-	hs.write("store clan auction bid", hallID, func(ctx context.Context, st HallStore) error {
+	hs.writeOn("store clan auction bid", "clan_id", clanID, func(ctx context.Context, st HallStore) error {
 		return st.SetClanBid(ctx, clanID, at)
 	})
 }
@@ -505,6 +507,12 @@ func (hs *Halls) setBidAtLocked(hallID, clanID, at int32) {
 // write queues fn on hallID's persistence lane, or runs it at once
 // without a writer. Each write gets taskTimeout.
 func (hs *Halls) write(what string, hallID int32, fn func(context.Context, HallStore) error) {
+	hs.writeOn(what, "hall_id", hallID, fn)
+}
+
+// writeOn queues fn on owner's persistence lane, owner being the id named
+// key, or runs it at once without a writer.
+func (hs *Halls) writeOn(what, key string, owner int32, fn func(context.Context, HallStore) error) {
 	store, log := hs.store, hs.log
 	if store == nil {
 		return
@@ -513,14 +521,14 @@ func (hs *Halls) write(what string, hallID int32, fn func(context.Context, HallS
 		ctx, cancel := context.WithTimeout(context.Background(), taskTimeout)
 		defer cancel()
 		if err := fn(ctx, store); err != nil {
-			log.Error().Err(err).Int32("hall_id", hallID).Msg("clanhall: " + what)
+			log.Error().Err(err).Int32(key, owner).Msg("clanhall: " + what)
 		}
 	}
 	if hs.writes == nil {
 		job()
 		return
 	}
-	if !hs.writes.Enqueue(hallID, job) {
-		log.Error().Int32("hall_id", hallID).Msg("clanhall: " + what + ": write dropped")
+	if !hs.writes.Enqueue(owner, job) {
+		log.Error().Int32(key, owner).Msg("clanhall: " + what + ": write dropped")
 	}
 }

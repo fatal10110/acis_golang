@@ -108,7 +108,7 @@ func auctionPage(t *testing.T, name string) string {
 	return page
 }
 
-func bootAuction(t *testing.T, s auctionSetup) *auctionWorld {
+func bootAuction(t *testing.T, s auctionSetup, extra ...gameservertest.Option) *auctionWorld {
 	t.Helper()
 	datapack.Require(t)
 	halls, err := gamexml.LoadClanHalls(datapack.Path(t, "data", "xml", "clanHalls.xml"))
@@ -119,11 +119,12 @@ func bootAuction(t *testing.T, s auctionSetup) *auctionWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w := bootFolkWorld(t, auctionPages(t),
+	opts := append([]gameservertest.Option{
 		gameservertest.WithClanHalls(halls, decos),
 		gameservertest.WithClanSeed(func(db *sql.DB) { seedAuction(t, db, s) }),
 		noBypassReuse,
-	)
+	}, extra...)
+	w := bootFolkWorld(t, auctionPages(t), opts...)
 	tmpl := folkTemplate("Auctioneer", auctioneerNpcID)
 	tmpl.Name = "Auctioneer"
 	return &auctionWorld{folkWorld: w, auctioneer: w.spawnFolk(t, tmpl, 60)}
