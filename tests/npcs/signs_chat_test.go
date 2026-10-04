@@ -302,23 +302,3 @@ func TestOlympiadManagerPages(t *testing.T) {
 		})
 	}
 }
-
-// The priests' own commands are not in place yet: a Chat or SevenSigns
-// command logs and releases the client.
-func TestPriestCommandsUnported(t *testing.T) {
-	t.Parallel()
-	pages := signsPages()
-	pages["seven_signs/dawn_priest_1.htm"] = `<html><body>` +
-		`<a action="bypass -h npc_%objectId%_Chat 0">Back</a>` +
-		`<a action="bypass -h npc_%objectId%_SevenSigns 3 2">Join</a>` +
-		`<a action="bypass -h npc_%objectId%_SevenSignsDesc 1">About</a></body></html>`
-	w := bootFolkWorld(t, pages, noBypassReuse)
-	priest := w.spawnFolk(t, folkTemplate("DawnPriest", 31078), 30)
-	w.talkPage(t, priest, true)
-	for _, command := range []string{"Chat 0", "SevenSigns 3 2", "SevenSignsDesc 1"} {
-		w.c.Send(encodeBypass(fmt.Sprintf("npc_%d_%s", priest.ObjectID(), command)))
-		if got := opcodes(drainFrames(t, w.c)); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
-			t.Fatalf("%s answer = %x, want ActionFailed only", command, got)
-		}
-	}
-}

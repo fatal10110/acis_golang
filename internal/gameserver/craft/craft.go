@@ -135,7 +135,7 @@ func (s *Service) MakeSelf(c *player.Character, recipeID int, busy bool) Attempt
 	if c.OperateType() == privatestore.OperateManufacture {
 		return Attempt{}
 	}
-	if c.InCombat() {
+	if c.InDuel() || c.InCombat() {
 		return Attempt{Notices: []any{InCombat{}}}
 	}
 	r, ok := s.Recipe(recipeID)

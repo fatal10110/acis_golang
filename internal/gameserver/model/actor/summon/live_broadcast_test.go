@@ -122,6 +122,7 @@ func (*fakeSummonOwner) Invul() bool                                { return fal
 func (*fakeSummonOwner) HP() float64                                { return 0 }
 func (*fakeSummonOwner) MaxHPValue() float64                        { return 0 }
 func (*fakeSummonOwner) ClearReviveOffer()                          {}
+func (*fakeSummonOwner) InDuel() bool                               { return false }
 func (*fakeSummonOwner) NoteServitorPvPAttack(attackable.Combatant) {}
 func (*fakeSummonOwner) NoteServitorPvPSkillTargets([]attackable.Combatant, bool, string) {
 }

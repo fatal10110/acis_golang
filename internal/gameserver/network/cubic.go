@@ -288,13 +288,13 @@ func (o cubicFireOwner) Target() world.Tracked { return o.livePlayer.Target() }
 func (o cubicFireOwner) Attacker() skilltarget.Actor { return o.Character }
 
 // lifeCubicParty returns live's party, in party order, as the Life Cubic's
-// heal scan reads it; nil outside a party, and in Olympiad mode, where the
-// cubic heals only its owner.
-//
-// A duel other than a party duel limits it to its owner too; that waits for
-// #3285.
+// heal scan reads it; nil outside a party, in Olympiad mode, and in a duel
+// other than a party duel, where the cubic heals only its owner.
 func (l *GameClientLink) lifeCubicParty(live *livePlayer) []actorcast.LifeCubicMember {
 	if l.parties == nil || live.OlympiadMode() {
+		return nil
+	}
+	if live.InDuel() && (l.duels == nil || !l.duels.PartyDuel(live)) {
 		return nil
 	}
 	view, ok := l.parties.View(live.ObjectID())

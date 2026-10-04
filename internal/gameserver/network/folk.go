@@ -37,6 +37,17 @@ func (l *GameClientLink) talkToFolk(live *livePlayer, f *npc.Folk) {
 		l.weddingGreeting(live, f)
 	case npc.ChatUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Msg("npc: chat window not modeled")
+	default:
+		sendFolkChat(live, f, html, outcome)
+	}
+}
+
+// sendFolkChat opens html, f's chat window, the way outcome says: with
+// ActionFailed first for a Seven Signs priest, after the page for everyone
+// else. A Mammon NPC refusing the talker says why instead, releasing the
+// client after a cabal refusal.
+func sendFolkChat(live *livePlayer, f *npc.Folk, html string, outcome npc.ChatOutcome) {
+	switch outcome {
 	case npc.ChatShownReleased:
 		live.SendFrame(serverpackets.FrameActionFailed())
 		sendFilledHTML(live, f.ObjectID(), html, 0)
