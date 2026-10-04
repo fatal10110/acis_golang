@@ -81,6 +81,7 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 		"startClanDissolutions":      {0, "", "closes the dissolution queue, cancelling its timers; in-memory only"},
 		"startClanHallFunctions":     {0, "", "closes the function fee queue, cancelling its timers; its queued clanhall_functions writes land when the persistence worker drains"},
 		"startClanHalls":             {0, "", "closes the lease and auction queue, cancelling its timers; its queued clanhall, auctions and clan_data writes land when the persistence worker drains"},
+		"startSieges":                {0, "", "closes the siege queue, cancelling its calendar and clock timers; its queued siege_clans and castle writes land when the persistence worker drains"},
 		"provideGameServerLogger":    {0, "", "closes the log file"},
 		"provideBootContext":         {0, "", "cancels a context"},
 		"provideGameServerDatabase":  {0, "", "closes the pool; the last database step, so running past the deadline loses nothing"},

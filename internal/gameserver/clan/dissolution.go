@@ -35,8 +35,8 @@ const (
 // RequestDissolve has c, its clan's leader, ask for the clan to be
 // dissolved as of now. A clan in an alliance, at war, or owning a castle or
 // clan hall may not be dissolved, nor one whose dissolution is already
-// pending. A clan registered on a castle siege may not be either; no siege
-// takes registrations yet, so no clan is registered on one (#3330).
+// pending. A clan registered on a castle siege may not be either, which
+// is not checked yet (#3330).
 func (s *Service) RequestDissolve(c *player.Character, now time.Time) (*Clan, DissolveResult) {
 	cl, ok := s.ClanOf(c)
 	if !ok || !cl.IsLeader(c.ID) {
@@ -114,9 +114,9 @@ type Dissolution struct {
 // its privileges, skills, sub-units, wars and siege registrations, and the
 // tax of a castle it held is reset. online resolves a member's live
 // character, nil when it is not in the world. The members' live state is
-// the caller's to clear (ApplyDispersed), as is the clan warehouse. No
-// siege engine holds registrations or siegable halls yet; dropping the clan
-// from them joins it (#3330).
+// the caller's to clear (ApplyDispersed), as is the clan warehouse.
+// Dropping the clan from the sieges' registrations and the siegable halls
+// is not ported yet (#3330).
 func (s *Service) Destroy(cl *Clan, due bool, online func(int32) *player.Character, now time.Time) (Dissolution, bool) {
 	cl.mu.Lock()
 	if cl.destroyed || (due && cl.dissolvingExpiry == 0) {

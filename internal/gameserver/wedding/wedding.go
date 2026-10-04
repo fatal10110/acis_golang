@@ -368,8 +368,7 @@ func TeleportRefusal(partner Destination) string {
 		return NoticePartnerStatus
 	}
 	// ponytail: a partner whose clan owns a castle under siege is refused
-	// with NoticePartnerInSiege. No siege can run until the siege engine
-	// (#234) exists; it adds the refusal here.
+	// with NoticePartnerInSiege (#3375).
 	return ""
 }
 

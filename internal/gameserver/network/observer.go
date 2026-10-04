@@ -45,8 +45,8 @@ func (l *GameClientLink) observe(live *livePlayer, id int) {
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoObserveWithPet))
 			return
 		}
-		// No siege runs before the siege engine (#234), so a castle
-		// viewpoint is always closed until that castle's siege is asked.
+		// ponytail: a castle viewpoint opens while that castle's siege
+		// is in progress (#3375); it is always closed until then.
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyViewSiege))
 		return
 	}

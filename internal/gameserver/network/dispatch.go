@@ -69,6 +69,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/raidpoint"
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -356,6 +357,7 @@ type GameClientLink struct {
 	partyPositions   partyPositions
 	clans            *clan.Service
 	castles          *castle.Manager
+	sieges           *siege.Engine
 	clanWarehouses   clanWarehouseBook
 	enchantState     *enchantflow.State
 	enchant          *enchantflow.Service
@@ -435,6 +437,9 @@ type GameClientLink struct {
 	fishChamp *fishchamp.Championship
 	// wedding holds the couples and runs the marriage requests.
 	wedding *wedding.Manager
+	// siegeBanishing holds the players (*livePlayer) thrown off a castle
+	// battlefield as its siege starts, until their teleport has run.
+	siegeBanishing sync.Map
 	// derby is the monster race track the race managers answer for; nil
 	// runs no race.
 	derby *derby.Track
@@ -646,6 +651,8 @@ type GameClientLinkConfig struct {
 	Clans *clan.Service
 	// Castles holds the castles' live state; nil runs with no castle.
 	Castles *castle.Manager
+	// Sieges holds the castle sieges; nil runs with no siege.
+	Sieges *siege.Engine
 	// Board is the community board's settings; the zero value keeps the
 	// board off.
 	Board bbs.Config
@@ -842,6 +849,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	}
 	link.clans = cfg.Clans
 	link.castles = cfg.Castles
+	link.sieges = cfg.Sieges
 	if link.clans == nil {
 		link.clans = clan.NewService(nil, nil, nil, cfg.IDs, clan.DefaultConfig(), nil, cfg.Log)
 	}
@@ -858,6 +866,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	}
 	link.wireZoneOccupantHooks()
 	link.wireClanHallZones()
+	link.wireSiegeZones()
 	return link, nil
 }
 
