@@ -154,7 +154,7 @@ func (l *GameClientLink) startFishing(live *livePlayer, bait location.Location, 
 	}
 	live.SetImmobilized(true)
 	run := &live.fishing
-	run.stance.Cast(bait, lureID)
+	run.stance.Cast(lureID)
 	live.SetFishingBait(bait)
 	f, ok := fishing.Choose(l.fishing.table, lureID, l.fishingLevel(live), l.fishing.dice)
 	if !ok {

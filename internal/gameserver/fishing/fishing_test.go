@@ -6,7 +6,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/fish"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
 // script returns a Roll answering the given values in order, failing the
@@ -175,7 +174,7 @@ func TestChooseDrawsLevelThenTypeThenRow(t *testing.T) {
 func TestStanceWaitBiteAndFight(t *testing.T) {
 	var s Stance
 	start := time.Unix(1000, 0)
-	s.Cast(location.Location{X: 1, Y: 2, Z: 3}, 6520)
+	s.Cast(6520)
 	s.Hook(testFish)
 	s.Wait(start)
 	if !s.Fishing() || s.Fighting() {
@@ -226,7 +225,7 @@ func TestStanceEnds(t *testing.T) {
 	start := time.Unix(1000, 0)
 	newStance := func(lure int32) *Stance {
 		s := &Stance{}
-		s.Cast(location.Location{}, lure)
+		s.Cast(lure)
 		s.Hook(testFish)
 		s.Wait(start)
 		return s

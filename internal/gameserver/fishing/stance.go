@@ -4,15 +4,12 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/fish"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
 // Stance is one player's fishing: the line it cast, the fish on the other
 // end and, once that fish bites, the fight with it. Its owner serializes
 // every call; Stance holds no lock.
 type Stance struct {
-	bait    location.Location
-	lureID  int32
 	night   bool
 	fish    fish.Fish
 	hasFish bool
@@ -44,17 +41,9 @@ func (s *Stance) HasFish() bool { return s.hasFish }
 // Fish returns the fish drawn for the line now cast.
 func (s *Stance) Fish() fish.Fish { return s.fish }
 
-// LureID returns the lure the line now cast is baited with.
-func (s *Stance) LureID() int32 { return s.lureID }
-
-// Bait returns where the line now cast is, the zero location when none is.
-func (s *Stance) Bait() location.Location { return s.bait }
-
-// Cast puts a line baited with lureID in the water at bait. The fish it is
-// cast for is set by Hook.
-func (s *Stance) Cast(bait location.Location, lureID int32) {
-	s.bait = bait
-	s.lureID = lureID
+// Cast puts a line baited with lureID in the water. The fish it is cast
+// for is set by Hook.
+func (s *Stance) Cast(lureID int32) {
 	s.night = NightLure(lureID)
 }
 
