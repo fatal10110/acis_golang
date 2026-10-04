@@ -135,7 +135,7 @@ func (l *GameClientLink) adminRespawn(live *livePlayer, change, settle, done fun
 	})
 }
 
-// storeLive saves live's character row, subclasses and skill state at once,
+// storeLive saves live's character row, position, subclasses and skill state at once,
 // on its persistence lane, as an autosave does.
 func (l *GameClientLink) storeLive(live *livePlayer) {
 	if l.roster == nil {
@@ -152,6 +152,9 @@ func (l *GameClientLink) storeLive(live *livePlayer) {
 		defer cancel()
 		if err := roster.Save(ctx, charState); err != nil {
 			log.Error().Err(err).Int32("object_id", charState.ID).Msg("admin: store player")
+		}
+		if err := roster.SavePosition(ctx, charState); err != nil {
+			log.Error().Err(err).Int32("object_id", charState.ID).Msg("admin: store player position")
 		}
 		if skills == nil {
 			return

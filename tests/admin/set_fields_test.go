@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"encoding/binary"
 	"slices"
 	"strings"
@@ -83,6 +84,13 @@ func TestAdminSetClass(t *testing.T) {
 		t.Fatalf("player frames after refused //set class = %x, want none", testsupport.FrameOpcodes(frames))
 	}
 
+	// The store writes the position as well: a stale stored one must be
+	// overwritten with where the player stands.
+	srv.FlushPersistence(t)
+	if _, err := srv.DB.ExecContext(context.Background(), "UPDATE characters SET x = 0, y = 0, z = 0 WHERE obj_Id = ?", userID); err != nil {
+		t.Fatalf("seed stale position: %v", err)
+	}
+
 	sent := exchange(t, gm, encodeBuildCmd("set class 1"))
 	frames := settle(t, user)
 	if !hasOpcodes(frames, serverpackets.OpcodeUserInfo, serverpackets.OpcodeDeleteObject) || !deletes(frames, userID) || !deletes(frames, gmID) {
@@ -122,6 +130,10 @@ func TestAdminSetClass(t *testing.T) {
 	}
 	storedColumn(t, srv, userID, "classid", "1")
 	storedColumn(t, srv, userID, "base_class", "1")
+	srv.FlushPersistence(t)
+	if x, y, z := target.Position(); storedPosition(t, srv, userID) != [3]int32{int32(x), int32(y), int32(z)} {
+		t.Fatalf("stored position = %v, want %d %d %d", storedPosition(t, srv, userID), x, y, z)
+	}
 
 	// A selection that is no player answers nothing.
 	monster := srv.SpawnHostileNPCAt(t, location.Location{X: spawnX + 40, Y: spawnY, Z: spawnZ})
@@ -161,6 +173,41 @@ func TestAdminSetSex(t *testing.T) {
 		t.Fatalf("player sex %v abnormal %#x, want female and no hold", target.Sex(), target.AbnormalEffect())
 	}
 	storedColumn(t, srv, userID, "sex", "1")
+}
+
+// TestAdminSetSexTargetLeaves pins the divergence the respawn takes when
+// its player leaves the world inside the 4 s: the change is dropped. The
+// reference's scheduled task would still change, respawn and store the
+// logged-out player; here the sex stays as it was, in memory and stored,
+// the GM is told nothing and the player does not come back into the world.
+func TestAdminSetSexTargetLeaves(t *testing.T) {
+	t.Parallel()
+	srv, gm, user, gmID, userID := bootSetAdmin(t)
+	target := onlineCharacter(t, srv, userID)
+	selectPlayer(t, gm, user, userID)
+
+	exchange(t, gm, encodeBuildCmd("set sex female"))
+	settle(t, gm)
+	srv.Advance(t, time.Second)
+	logout(t, user)
+	srv.FlushPersistence(t)
+	storedColumn(t, srv, userID, "sex", "0")
+
+	srv.Advance(t, respawnDelay)
+	srv.FlushPersistence(t)
+	if got := messages(settle(t, gm)); len(got) != 0 {
+		t.Fatalf("GM messages after the player left = %d, want none", len(got))
+	}
+	if _, ok := srv.State.Player(userID); ok {
+		t.Fatal("the player who left came back into the world")
+	}
+	if target.Sex() != player.SexMale {
+		t.Fatalf("player sex %v after leaving, want still male", target.Sex())
+	}
+	if onlineCharacter(t, srv, gmID).Knows(target) {
+		t.Fatal("the GM knows the player who left")
+	}
+	storedColumn(t, srv, userID, "sex", "0")
 }
 
 // npcNameTitle returns an NpcInfo frame's object id, name and title.
@@ -237,6 +284,24 @@ func TestAdminSetNPCNameTitle(t *testing.T) {
 	}
 	if strings.Contains(onlineCharacter(t, srv, userID).Name, "Renamed") {
 		t.Fatal("//set name renamed the player")
+	}
+}
+
+// TestAdminDeleteRenamedNPC pins //delete naming an NPC by the name //set
+// name gave it (AdminSpawn.java, targetNpc.getName()), not its template's.
+func TestAdminDeleteRenamedNPC(t *testing.T) {
+	t.Parallel()
+	srv, _ := bootSpawnAdmin(t, nil)
+	gm := srv.Client
+	exchange(t, gm, encodeBuildCmd("spawn 30001"))
+	grocers := npcsOf(srv, grocerID)
+	if len(grocers) != 1 {
+		t.Fatalf("spawned grocers = %d, want 1", len(grocers))
+	}
+	exchange(t, gm, encodeAction(grocers[0].ObjectID()))
+	exchange(t, gm, encodeBuildCmd("set name Bob"))
+	if got := textsIn(t, exchange(t, gm, encodeBuildCmd("delete"))); !slices.Equal(got, []string{"You deleted Bob."}) {
+		t.Fatalf("//delete messages = %q, want the new name", got)
 	}
 }
 
