@@ -183,6 +183,7 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	}
 	hostile.AI().SetRandomWalkRate(n.randomWalkRate)
 	hostile.SetRaidMultipliers(n.raidMultipliers)
+	hostile.SetAIConfig(n.aiConfig)
 
 	// MP goes first: a saved HP of zero leaves the NPC dead, and a dead
 	// NPC's MP no longer changes.

@@ -77,6 +77,7 @@ type gameplayConfig struct {
 	DisableRaidCurse         raidCursesDisabled
 	FreeTeleport             freeTeleport
 	RaidMultipliers          npc.RaidMultipliers
+	NpcAI                    npc.AIConfig
 	Enchant                  enchant.Config
 	Merchant                 merchant.Config
 	Freight                  network.FreightConfig
@@ -195,6 +196,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.RaidMultipliers, err = loadRaidMultipliers(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.NpcAI, err = loadNpcAIConfig(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.Enchant, err = loadEnchantConfig(paths); err != nil {
@@ -774,6 +778,25 @@ func loadRaidMultipliers(paths gameServerPaths) (npc.RaidMultipliers, error) {
 		return npc.RaidMultipliers{}, err
 	}
 	return m, nil
+}
+
+// loadNpcAIConfig reads the npcs.properties MobAggroInPeaceZone (default
+// true) and GuardAttackAggroMob (default false) target-selection switches.
+func loadNpcAIConfig(paths gameServerPaths) (npc.AIConfig, error) {
+	props, err := config.LoadFile(paths.NpcsConfigPath)
+	if err != nil {
+		return npc.AIConfig{}, err
+	}
+	def := npc.DefaultAIConfig()
+	f := config.NewFields(props, "npc ai")
+	c := npc.AIConfig{
+		MobAggroInPeaceZone: f.Bool("MobAggroInPeaceZone", def.MobAggroInPeaceZone),
+		GuardAttackAggroMob: f.Bool("GuardAttackAggroMob", def.GuardAttackAggroMob),
+	}
+	if err := f.Err(); err != nil {
+		return npc.AIConfig{}, err
+	}
+	return c, nil
 }
 
 // loadPvPFlagOptions takes the process logger so the fx graph builds it
