@@ -754,14 +754,12 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		}
 	}
 	link.wireZoneOccupantHooks()
-	debugStop := func(reason string, at location.Location) {
+	move.DebugStop = func(reason string, at location.Location) {
 		link.log.Debug().Str("reason", reason).Interface("at", at).Str("stack", string(debug.Stack())).Msg("movedbg: player walk stopped")
 	}
-	debugResolve := func(origin, target, destination location.Location, waypoints, outcome int, distance, ticks, speed float64) {
+	move.DebugResolve = func(origin, target, destination location.Location, waypoints, outcome int, distance, ticks, speed float64) {
 		link.log.Debug().Interface("origin", origin).Interface("target", target).Interface("destination", destination).Int("waypoints", waypoints).Int("outcome", outcome).Float64("distance", distance).Float64("ticks", ticks).Float64("speed", speed).Msg("movedbg: walk resolved")
 	}
-	move.DebugStop.Store(&debugStop)
-	move.DebugResolve.Store(&debugResolve)
 	return link, nil
 }
 

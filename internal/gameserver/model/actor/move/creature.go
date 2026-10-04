@@ -5,7 +5,6 @@ import (
 	"errors"
 	"math"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
@@ -727,8 +726,8 @@ func (m *CreatureMove) moveToLocationLocked(target location.Location, pawn Pawn,
 
 	distance := between(moveType, m.origin, destination)
 	ticks := m.travelTicksLocked(distance)
-	if f := DebugResolve.Load(); f != nil && m.playerStepsLocked() {
-		(*f)(m.origin, target, destination, len(waypoints), int(outcome), distance, ticks, m.speed)
+	if DebugResolve != nil && m.playerStepsLocked() {
+		DebugResolve(m.origin, target, destination, len(waypoints), int(outcome), distance, ticks, m.speed)
 	}
 	if math.IsNaN(ticks) || ticks > maxTravelTicks {
 		return event.Move{}, outcome, errors.New("move: duration exceeds limit")
@@ -981,15 +980,15 @@ func chain(first, second func()) func() {
 
 // DebugStop, when set, is told every time a player mover's walk stops.
 // Temporary diagnostics.
-var DebugStop atomic.Pointer[func(reason string, at location.Location)]
+var DebugStop func(reason string, at location.Location)
 
 // DebugResolve, when set, is told where each player walk resolves to.
 // Temporary diagnostics.
-var DebugResolve atomic.Pointer[func(origin, target, destination location.Location, waypoints, outcome int, distance, ticks, speed float64)]
+var DebugResolve func(origin, target, destination location.Location, waypoints, outcome int, distance, ticks, speed float64)
 
 func (m *CreatureMove) debugStopLocked(reason string) {
-	if f := DebugStop.Load(); f != nil && m.playerStepsLocked() && m.moving {
-		(*f)(reason, m.origin)
+	if DebugStop != nil && m.playerStepsLocked() && m.moving {
+		DebugStop(reason, m.origin)
 	}
 }
 
