@@ -28,6 +28,8 @@ func (n *Npcs) SpawnFixed(tmpl *npc.Template, x, y, z, heading int) error {
 
 // spawnFixed is SpawnFixed, also returning the placed NPC's object id.
 func (n *Npcs) spawnFixed(tmpl *npc.Template, x, y, z, heading int) (int32, error) {
+	n.gate.RLock()
+	defer n.gate.RUnlock()
 	if tmpl == nil {
 		return 0, ErrNotPlaceable
 	}
@@ -38,7 +40,7 @@ func (n *Npcs) spawnFixed(tmpl *npc.Template, x, y, z, heading int) (int32, erro
 	key := fmt.Sprintf("fixed#%d", n.fixedSeq.Add(1))
 	entry := spawn.Entry{NPCID: int32(tmpl.ID)}
 	n.mu.Lock()
-	n.slot[key] = slotInfo{key: key, entry: entry, fixed: true, at: at, heading: heading}
+	n.slot[key] = slotInfo{key: key, entry: entry, tmpl: tmpl, fixed: true, at: at, heading: heading}
 	n.mu.Unlock()
 
 	n.instantiate(key, entry, tmpl, at, heading, fullHP, fullMP, nil)

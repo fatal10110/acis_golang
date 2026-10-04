@@ -19,26 +19,27 @@ func (d *Data) HasAccess(command string, access AccessLevel) bool {
 	if d == nil {
 		return false
 	}
-	cmd, ok := d.Command(command)
+	t := d.load()
+	cmd, ok := t.command(command)
 	if !ok {
 		return false
 	}
-	required, ok := d.accessLevels[cmd.AccessLevel]
+	required, ok := t.accessLevels[cmd.AccessLevel]
 	if !ok {
 		return false
 	}
-	return required.Level == access.Level || d.hasChildAccess(access, required.Level)
+	return required.Level == access.Level || t.hasChildAccess(access, required.Level)
 }
 
 // hasChildAccess walks access's child levels (a positive childLevel naming a
 // defined level) and reports whether one of them is level. The walk is
 // bounded by the table size, so a cycle of child levels ends refused.
-func (d *Data) hasChildAccess(access AccessLevel, level int) bool {
-	for range d.accessLevels {
+func (t *tables) hasChildAccess(access AccessLevel, level int) bool {
+	for range t.accessLevels {
 		if access.ChildLevel <= 0 {
 			return false
 		}
-		child, ok := d.accessLevels[access.ChildLevel]
+		child, ok := t.accessLevels[access.ChildLevel]
 		if !ok {
 			return false
 		}

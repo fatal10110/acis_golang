@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
@@ -84,7 +85,8 @@ func (p GeoPath) HasPath(origin, target location.Location) bool {
 // on the one-second task tick. All methods are safe for concurrent use; mu
 // guards entries and their per-actor route state.
 type Walker struct {
-	routes route.WalkerRoutes
+	// routes are the loaded walker routes; //reload npcwalker swaps them.
+	routes atomic.Pointer[route.WalkerRoutes]
 	path   WalkerPath
 	now    func() time.Time
 	state  *world.State
@@ -117,13 +119,21 @@ func NewWalker(routes route.WalkerRoutes, path WalkerPath, now func() time.Time,
 	if now == nil {
 		now = time.Now
 	}
-	return &Walker{
-		routes:  routes,
+	w := &Walker{
 		path:    path,
 		now:     now,
 		state:   state,
 		entries: make(map[int32]*walkerEntry),
-	}, nil
+	}
+	w.SetRoutes(routes)
+	return w, nil
+}
+
+// SetRoutes replaces the walker routes with routes: WalkerRouteData.reload.
+// Like the reference's walkers, which look their route up at every node, a
+// walker already on a route takes its next node from the new routes.
+func (w *Walker) SetRoutes(routes route.WalkerRoutes) {
+	w.routes.Store(&routes)
 }
 
 // Start launches the fixed one-second walker task.
@@ -365,7 +375,7 @@ func (w *Walker) moveToNextPoint(entry *walkerEntry) error {
 }
 
 func (w *Walker) nodes(routeName, npcName string) ([]route.WalkerLocation, error) {
-	byNPC, ok := w.routes[routeName]
+	byNPC, ok := (*w.routes.Load())[routeName]
 	if !ok {
 		return nil, fmt.Errorf("task: walker route %q not found", routeName)
 	}

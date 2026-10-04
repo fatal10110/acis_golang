@@ -21,6 +21,8 @@ const (
 	KindItem
 	// KindBoat is a scheduled passenger boat.
 	KindBoat
+	// KindFence is a GM-placed fence, or one of its extra height layers.
+	KindFence
 )
 
 // Playable reports whether k is a player-controlled creature: a player or
@@ -28,7 +30,7 @@ const (
 func (k Kind) Playable() bool { return k == KindPlayer || k == KindSummon }
 
 // Creature reports whether k is a creature: a player, an NPC, a summon, a
-// door or a boat. Static objects and ground items are not.
+// door or a boat. Static objects, ground items and fences are not.
 func (k Kind) Creature() bool {
 	switch k {
 	case KindPlayer, KindNPC, KindSummon, KindDoor, KindBoat:

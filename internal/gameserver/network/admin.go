@@ -44,10 +44,20 @@ var adminCommands = map[string]adminCommand{
 	"admin_clan_skill":   (*GameClientLink).adminClanSkill,
 	"admin_help":         (*GameClientLink).adminHelp,
 
-	// Spawns; see admin_spawn.go.
+	// Spawns; see admin_spawn.go and admin_spawn_all.go.
 	"admin_spawn":       (*GameClientLink).adminSpawn,
 	"admin_delete":      (*GameClientLink).adminDelete,
 	"admin_list_spawns": (*GameClientLink).adminListSpawns,
+	"admin_unspawnall":  (*GameClientLink).adminUnspawnAll,
+	"admin_respawnall":  (*GameClientLink).adminRespawnAll,
+
+	// Data reloads; see admin_reload.go.
+	"admin_reload": (*GameClientLink).adminReload,
+
+	// Fences; see admin_fence.go.
+	"admin_spawnfence":  (*GameClientLink).adminSpawnFence,
+	"admin_deletefence": (*GameClientLink).adminDeleteFence,
+	"admin_listfence":   (*GameClientLink).adminListFence,
 
 	// Petitions; see admin_petition.go.
 	"admin_petition":      (*GameClientLink).adminPetition,

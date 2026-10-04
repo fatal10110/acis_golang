@@ -3,6 +3,7 @@ package network
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/fence"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
@@ -133,6 +134,8 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 		p.sendVisibilityFrame(serverpackets.FrameDoorStatusUpdate(o, false))
 	case staticObject:
 		p.sendVisibilityFrame(serverpackets.FrameStaticObjectInfo(o))
+	case fenceObject:
+		p.sendVisibilityFrame(fenceInfoFrame(o))
 	case *boat.Boat:
 		// A boat shows only the leg it sails: it never casts.
 		p.sendVisibilityFrame(vehicleInfoFrame(o))
@@ -310,9 +313,33 @@ type staticObject interface {
 	StaticObjectID() int
 }
 
+// fenceObject is a fence, or one of its extra height layers, shown as the
+// fence it belongs to.
+type fenceObject interface {
+	ObjectID() int32
+	Shown() *fence.Fence
+}
+
+// fenceInfoFrame is the ExColosseumFenceInfo obj is shown with: under its
+// own object id, its fence's type, position and size.
+func fenceInfoFrame(obj fenceObject) wire.Frame {
+	f := obj.Shown()
+	x, y, z := f.Position()
+	sizeX, sizeY := f.Size()
+	return serverpackets.FrameExColosseumFenceInfo(serverpackets.FenceInfo{
+		ObjectID: obj.ObjectID(),
+		Type:     int32(f.Type()),
+		X:        int32(x),
+		Y:        int32(y),
+		Z:        int32(z),
+		SizeX:    int32(sizeX),
+		SizeY:    int32(sizeY),
+	})
+}
+
 func rendersObject(obj world.Tracked) bool {
 	switch obj.(type) {
-	case *livePlayer, *npc.Hostile, *npc.Decoration, *npc.Folk, *summon.Actor, groundItemObject, doorObject, staticObject, *boat.Boat:
+	case *livePlayer, *npc.Hostile, *npc.Decoration, *npc.Folk, *summon.Actor, groundItemObject, doorObject, staticObject, fenceObject, *boat.Boat:
 		return true
 	default:
 		return false
