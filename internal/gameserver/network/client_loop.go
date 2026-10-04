@@ -162,6 +162,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			continue
 		}
 
+		if live != nil && opcode != clientpackets.OpcodeMoveBackwardToLocation {
+			l.log.Debug().Str("opcode", hex.EncodeToString(payload[:1])).Int("len", len(payload)).Msg("movedbg: inbound")
+		}
 		// Once in the world, everything a frame does to the player runs as a
 		// task on its queue (onLive), serialized with its timers and ticks.
 		// The loop waits for each task before reading on, so frames are
@@ -919,10 +922,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				continue
 			}
+			l.log.Debug().Bool("live_nil", live == nil).Interface("req", req).Msg("movedbg: MoveBackwardToLocation received")
 			if live == nil {
 				continue
 			}
 			if req.MoveMovement == 0 {
+				l.log.Debug().Msg("movedbg: rejected keyboard movement (MoveMovement=0)")
 				session.SendFrame(serverpackets.FrameActionFailed())
 				continue
 			}

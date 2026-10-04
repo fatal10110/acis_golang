@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -41,6 +42,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
@@ -752,6 +754,14 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		}
 	}
 	link.wireZoneOccupantHooks()
+	debugStop := func(reason string, at location.Location) {
+		link.log.Debug().Str("reason", reason).Interface("at", at).Str("stack", string(debug.Stack())).Msg("movedbg: player walk stopped")
+	}
+	debugResolve := func(origin, target, destination location.Location, waypoints, outcome int, distance, ticks, speed float64) {
+		link.log.Debug().Interface("origin", origin).Interface("target", target).Interface("destination", destination).Int("waypoints", waypoints).Int("outcome", outcome).Float64("distance", distance).Float64("ticks", ticks).Float64("speed", speed).Msg("movedbg: walk resolved")
+	}
+	move.DebugStop.Store(&debugStop)
+	move.DebugResolve.Store(&debugResolve)
 	return link, nil
 }
 
