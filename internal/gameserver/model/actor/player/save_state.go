@@ -10,8 +10,10 @@ import (
 // instant so the write can run later without reading the live character.
 type SaveState struct {
 	ID int32
-	// ClassID is the class played at the copy.
-	ClassID int
+	// ClassID is the class played at the copy, and BaseClassID the base
+	// class.
+	ClassID     int
+	BaseClassID int
 	// Progression is the base class's: the characters row always holds
 	// it, whichever class is active.
 	Progression Progression
@@ -43,6 +45,7 @@ func (c *Character) SaveState() SaveState {
 	return SaveState{
 		ID:                c.ID,
 		ClassID:           classID,
+		BaseClassID:       c.BaseClassID(),
 		Progression:       progression,
 		Subclasses:        subs,
 		Resources:         c.ResourceValues(),

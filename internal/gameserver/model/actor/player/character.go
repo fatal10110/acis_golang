@@ -40,11 +40,10 @@ type Character struct {
 	AccountName string
 	Name        string
 
-	// BaseClassID is the class the character was created into (or its
-	// later occupations); it never changes while the character is live.
-	// The class the character currently plays is ClassID, a subclass while
-	// one is active.
-	BaseClassID int
+	// baseClassID is the class the character was created into, or the
+	// occupation it later moved to on that class line; see BaseClassID.
+	// Other actors' queues read it (CharInfo), so it is atomic.
+	baseClassID atomic.Int32
 	Race        Race
 	Sex         Sex
 
@@ -344,9 +343,8 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 		AccountName: accountName,
 		Name:        name,
 
-		BaseClassID: tmpl.ID,
-		Race:        race,
-		Sex:         sex,
+		Race: race,
+		Sex:  sex,
 
 		CharLevel: 1,
 
@@ -371,6 +369,7 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 	}
 
 	c.SetClassID(tmpl.ID)
+	c.SetBaseClassID(tmpl.ID)
 	if len(tmpl.Spawns) > 0 {
 		c.Location = tmpl.Spawns[rand.IntN(len(tmpl.Spawns))]
 	}

@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/augment"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/classmaster"
 	"github.com/fatal10110/acis_golang/internal/gameserver/craft"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
@@ -405,6 +406,8 @@ type GameClientLink struct {
 	npcSpawns atomic.Pointer[manager.Npcs]
 	// manor is what the seed and harvester items read.
 	manor ManorConfig
+	// classMaster is the class manager mod's settings.
+	classMaster classmaster.Config
 }
 
 // AIRegistry owns recurring actor-AI registrations.
@@ -603,6 +606,9 @@ type GameClientLinkConfig struct {
 	// Announcements are the server announcements; nil holds them in
 	// memory only, starting with none.
 	Announcements *announcement.Registry
+	// ClassMaster is the class manager mod's npcs.properties settings; the
+	// zero value offers no occupation change.
+	ClassMaster classmaster.Config
 	// SchemeBuffer is the scheme buffer's buffs and every player's
 	// schemes; nil offers no buff and starts with no scheme.
 	SchemeBuffer *schemebuffer.Manager
@@ -711,6 +717,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	}
 	link.macros = cfg.Macros
 	link.manor = cfg.Manor
+	link.classMaster = cfg.ClassMaster
 	link.recommendations = cfg.Recommendations
 	// Built here, not lazily: every client goroutine shares this link.
 	enchantCfg := enchantflow.DefaultConfig()

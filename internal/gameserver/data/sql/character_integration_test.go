@@ -17,7 +17,6 @@ func testCharacter(objectID int32, name string) *player.Character {
 		ID:          objectID,
 		AccountName: "acct1",
 		Name:        name,
-		BaseClassID: 0,
 		Race:        player.RaceHuman,
 		Sex:         player.SexMale,
 		CharLevel:   1,

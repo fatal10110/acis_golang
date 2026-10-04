@@ -6,6 +6,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/classmaster"
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
 )
 
@@ -80,6 +81,9 @@ const (
 	// BypassClan runs a village master's clan command; see
 	// VillageMasterClanCommand.
 	BypassClan
+	// BypassClassMaster runs a class manager's own command; see
+	// classmaster.ParseCommand.
+	BypassClassMaster
 	// BypassSchemeBuffer runs a scheme buffer's own command; see
 	// schemebuffer.Command.
 	BypassSchemeBuffer
@@ -148,13 +152,18 @@ var fishermanCommands = []string{"FishingChampionship", "FishingReward"}
 // instant_teleport <index> take the talker to a destination, and
 // CPRecovery has an arena manager restore the talker's CP for a fee and
 // answers nothing at any other NPC. A village master's Subclass commands go
-// to the subclass dialog, and a scheme buffer's own commands to its
-// dialog. Every other command belongs to a system not in place yet.
+// to the subclass dialog, a class manager's own commands to its dialog
+// (ahead of every other), and a scheme buffer's own commands to its dialog.
+// Every other command belongs to a system not in place yet.
 func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command string) BypassReply {
 	karma := talker.Karma
 	kind := hostileKind(f.Instance)
 	reply := BypassReply{LeadingActionFailed: kind == "DungeonGatekeeper"}
 	if _, ok := unportedFolkChats[kind]; ok {
+		return reply
+	}
+	if _, ok := classmaster.ParseCommand(command); kind == "ClassMaster" && ok {
+		reply.Outcome = BypassClassMaster
 		return reply
 	}
 	if f.VillageMaster() && strings.HasPrefix(command, "Subclass") {

@@ -229,6 +229,7 @@ func provideGameClientLink(
 		Teleports:        data.Teleports,
 		InstantTeleports: data.InstantTeleports,
 		FreeTeleport:     bool(gameplay.FreeTeleport),
+		ClassMaster:      gameplay.ClassMaster,
 		Log:              log,
 
 		Augmentations:       data.Augmentations,

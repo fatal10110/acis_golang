@@ -24,6 +24,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/classmaster"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -185,6 +186,7 @@ type options struct {
 	extraClassTemplates    []*player.Template
 	subclassWithoutQuests  bool
 	subclassDelay          time.Duration
+	classMaster            classmaster.Config
 	log                    zerolog.Logger
 	geo                    move.Geo
 	itemTemplates          *item.Table
@@ -724,6 +726,12 @@ func WithClassTemplates(tmpls ...*player.Template) Option {
 // server.properties SubclassTime reuse delay (default false and none).
 func WithSubclassRules(withoutQuests bool, delay time.Duration) Option {
 	return func(o *options) { o.subclassWithoutQuests, o.subclassDelay = withoutQuests, delay }
+}
+
+// WithClassMaster sets the npcs.properties class manager settings
+// (default: no occupation change offered).
+func WithClassMaster(cfg classmaster.Config) Option {
+	return func(o *options) { o.classMaster = cfg }
 }
 
 // SubclassFault decides the outcome of one class change's
@@ -1844,6 +1852,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.Favorites = bbs.NewFavorites(favoriteStore, persistWorker, o.log)
 	}
 	gclConfig.PlayerConfig.AutoLearnSkills = o.autoLearnSkills
+	gclConfig.ClassMaster = o.classMaster
 	gclConfig.PlayerConfig.GMStartupInvulnerable, gclConfig.PlayerConfig.GMStartupInvisible, gclConfig.PlayerConfig.GMStartupBlockAll = o.gmStartupModes[0], o.gmStartupModes[1], o.gmStartupModes[2]
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
 	gclConfig.ArmorSets = o.armorSets

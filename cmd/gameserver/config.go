@@ -9,6 +9,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/db"
 	"github.com/fatal10110/acis_golang/internal/config"
+	"github.com/fatal10110/acis_golang/internal/gameserver/classmaster"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
@@ -86,6 +87,7 @@ type gameplayConfig struct {
 	Chat                     chatConfig
 	Petition                 petition.Config
 	Manor                    manorSettings
+	ClassMaster              classmaster.Config
 }
 
 // loadGameplayConfig reads every gameplay knob through the loader that owns
@@ -224,6 +226,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.Petition, err = loadPetitionConfig(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.ClassMaster, err = loadClassMasterConfig(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	return cfg, nil

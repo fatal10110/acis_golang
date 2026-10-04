@@ -249,6 +249,8 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		cpRecovery(live, f)
 	case npc.BypassClan:
 		l.villageMasterClan(live, f, command)
+	case npc.BypassClassMaster:
+		return l.classMasterBypass(live, f, command)
 	case npc.BypassSchemeBuffer:
 		return l.schemeBufferBypass(live, f, command)
 	case npc.BypassUnported:

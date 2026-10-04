@@ -57,7 +57,7 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 			 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		c.AccountName, c.ID, c.Name, c.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
 		c.Face, c.HairStyle, c.HairColor, byte(c.Sex), c.LastHeading, c.Location.X, c.Location.Y, c.Location.Z,
-		c.Exp, c.SP, int(c.Race), c.ClassID(), c.BaseClassID, c.Title(), c.AccessLevel, 0, time.Now().UnixMilli(),
+		c.Exp, c.SP, int(c.Race), c.ClassID(), c.BaseClassID(), c.Title(), c.AccessLevel, 0, time.Now().UnixMilli(),
 	)
 	if err != nil {
 		return fmt.Errorf("create character %q: %w", c.Name, err)
@@ -65,7 +65,7 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 	return nil
 }
 
-// Save persists a character's progress — the active class, the base
+// Save persists a character's progress — the active and base classes, the base
 // class's level, exp and sp, expBeforeDeath, cur/max HP/CP/MP,
 // karma/pvpkills/pkkills, death_penalty_level, the accumulated session
 // playtime, the personal-surrender flag, the noblesse status and each subclass's progression — so a later reload reflects everything gained
@@ -75,10 +75,10 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
 	resources, progression := st.Resources, st.Progression
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, death_penalty_level = ?, onlinetime = ?, wantspeace = ?, nobless = ?, online = 1
+		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, base_class = ?, death_penalty_level = ?, onlinetime = ?, wantspeace = ?, nobless = ?, online = 1
 			 WHERE obj_Id = ?`,
 		progression.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
-		progression.Exp, progression.ExpBeforeDeath, progression.SP, st.Karma, st.PvPKills, st.PKKills, st.ClassID, st.DeathPenaltyLevel, st.OnlineTime,
+		progression.Exp, progression.ExpBeforeDeath, progression.SP, st.Karma, st.PvPKills, st.PKKills, st.ClassID, st.BaseClassID, st.DeathPenaltyLevel, st.OnlineTime,
 		st.WantsPeace, st.Noble, st.ID,
 	)
 	if err != nil {
@@ -147,6 +147,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var punishTimer int64
 	var wantsPeace int
 	var noble int
+	var baseClassID int
 
 	err := row.Scan(
 		&c.ID, &c.AccountName, &c.Name,
@@ -154,7 +155,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 		&c.Face, &c.HairStyle, &c.HairColor, &sex,
 		&c.LastHeading, &c.Location.X, &c.Location.Y, &c.Location.Z,
 		&c.Exp, &c.ExpBeforeDeath, &c.SP, &c.KarmaPoints, &c.PvPKills, &c.PKKills, &clanID,
-		&race, &classID, &c.BaseClassID,
+		&race, &classID, &baseClassID,
 		&c.DeleteAt, &title, &c.AccessLevel, &hero, &c.LastAccess,
 		&onlineTime,
 		&deathPenaltyLevel, &recHave, &recLeft,
@@ -174,6 +175,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	c.SetNoble(noble == 1)
 	c.Race = player.Race(race)
 	c.SetClassID(classID)
+	c.SetBaseClassID(baseClassID)
 	c.SetHero(hero != 0)
 	c.SetDeathPenaltyLevel(deathPenaltyLevel)
 	c.SetRecommendationCounts(recHave, recLeft)
@@ -233,6 +235,14 @@ func (s *CharacterStore) SetPosition(ctx context.Context, objectID int32, loc lo
 func (s *CharacterStore) SetDeathPenaltyLevel(ctx context.Context, objectID int32, level int) error {
 	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET death_penalty_level = ? WHERE obj_Id = ?", level, objectID); err != nil {
 		return fmt.Errorf("set death penalty level for %d: %w", objectID, err)
+	}
+	return nil
+}
+
+// SetNoble stores the character's noblesse status.
+func (s *CharacterStore) SetNoble(ctx context.Context, objectID int32, noble bool) error {
+	if _, err := s.db.ExecContext(ctx, "UPDATE characters SET nobless = ? WHERE obj_Id = ?", noble, objectID); err != nil {
+		return fmt.Errorf("set noblesse for %d: %w", objectID, err)
 	}
 	return nil
 }

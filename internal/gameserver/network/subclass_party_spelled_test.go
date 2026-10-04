@@ -36,7 +36,7 @@ func TestClassSwitchRefreshesPartyIcons(t *testing.T) {
 			switcher := newTestLivePlayer(t, 1, switcherOut)
 			other := newTestLivePlayer(t, 2, otherOut)
 			switcher.shortcuts = shortcut.NewList(nil)
-			if !switcher.AddSubclass(player.SubClass{ClassID: switcher.BaseClassID, Index: 1, Level: 40}) {
+			if !switcher.AddSubclass(player.SubClass{ClassID: switcher.BaseClassID(), Index: 1, Level: 40}) {
 				t.Fatal("add subclass refused")
 			}
 			if status, _ := link.parties.BeginInvite(switcher.ObjectID(), 0); status != party.InviteReady {
