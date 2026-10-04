@@ -384,15 +384,23 @@ func Apply(effector, effected Actor, meta Skill, templates []modelskill.EffectTe
 // but sends no stack or expiry system messages.
 //
 // restoredAt, when set, is the instant the saved state was read back: each
-// effect's schedule runs from there, not from the replay, and one whose
-// first tick came due in between has ended and is not reinstated (see
-// resumeRestored).
-// An effect whose ticks run an action still runs from the replay (see
+// effect's schedule runs from there, not from the replay. One whose ticks
+// run no action and whose first tick came due in between has ended and is
+// not reinstated (see resumeRestored). One whose ticks run an action runs
+// the actions of the ticks due in between, in time order with those of the
+// other effects the same List.Restore reinstates (see List.Restore); only a
+// lethal damage-over-time tick still waits for the replay (see
 // restoreAnchor).
 func ApplyRestored(list *List, effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate, count, elapsedSeconds int32, restoredAt time.Time) {
 	if list == nil {
 		return
 	}
+	list.Restore(func() {
+		applyRestored(list, effector, effected, meta, templates, count, elapsedSeconds, restoredAt)
+	})
+}
+
+func applyRestored(list *List, effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate, count, elapsedSeconds int32, restoredAt time.Time) {
 	var now time.Time
 	if !restoredAt.IsZero() {
 		now = list.now()
@@ -402,8 +410,8 @@ func ApplyRestored(list *List, effector, effected Actor, meta Skill, templates [
 		if err != nil {
 			continue
 		}
-		at := restoreAnchor(tmpl, restoredAt)
-		if !at.IsZero() {
+		at := restoreAnchor(meta, tmpl, restoredAt)
+		if !at.IsZero() && e.OnAction == nil {
 			if _, _, ok := resumeRestored(tmpl, count, elapsedSeconds, at, now); !ok {
 				continue
 			}
@@ -415,18 +423,24 @@ func ApplyRestored(list *List, effector, effected Actor, meta Skill, templates [
 	}
 }
 
-// restoreAnchor is the instant from which an effect built from tmpl and
-// restored at restoredAt runs its schedule: restoredAt itself, or zero (the
-// replay) for an effect whose ticks run an action — damage, MP drain, a
-// fear step. Ticks due before the replay would pass without their action,
-// since a character not yet in the world is sent nothing, so a loading
-// screen held or dropped would clear such an effect at no cost; it waits
-// for the replay instead, until those ticks can run there (#3266).
-func restoreAnchor(tmpl modelskill.EffectTemplate, restoredAt time.Time) time.Time {
-	if restoredAt.IsZero() || actsOnTick(tmpl) {
+// restoreAnchor is the instant from which an effect built from tmpl for the
+// skill meta and restored at restoredAt runs its schedule: restoredAt
+// itself, or zero (the replay) for a damage-over-time tick that may kill.
+// Such a tick due on the loading screen would put the character through
+// death before it is in the world, so that effect still starts its schedule
+// at the replay (#3394).
+func restoreAnchor(meta Skill, tmpl modelskill.EffectTemplate, restoredAt time.Time) time.Time {
+	if restoredAt.IsZero() || lethalTick(meta, tmpl) {
 		return time.Time{}
 	}
 	return restoredAt
+}
+
+// lethalTick reports whether an effect built from tmpl for the skill meta
+// has a damage-over-time tick that may kill.
+func lethalTick(meta Skill, tmpl modelskill.EffectTemplate) bool {
+	k, ok := coreKinds[tmpl.Name]
+	return ok && k.typ == TypeDamOverTime && meta.KillByDOT
 }
 
 // actsOnTick reports whether an effect built from tmpl has a tick action.

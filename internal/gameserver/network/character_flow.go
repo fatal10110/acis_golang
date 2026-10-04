@@ -344,9 +344,9 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	client.Session.SendFrame(serverpackets.FrameExStorageMaxCount(c))
 	client.Session.SendFrame(serverpackets.FrameHennaInfo(c.HennaSnapshot()))
 	// Replay restored buffs into the live effect list here, at the effect
-	// icon refresh's place in the enter-world sequence: List.Add's
-	// notifyAbnormalUpdate hook fires the resulting AbnormalStatusUpdate
-	// frame (if any effect was restored) right where it belongs, ahead of
+	// icon refresh's place in the enter-world sequence: the replay's one
+	// icon refresh (List.Restore) fires the AbnormalStatusUpdate frame (if
+	// any effect was restored) right where it belongs, ahead of
 	// EtcStatusUpdate.
 	live.replayingEffects.Store(true)
 	if l.skills != nil {
