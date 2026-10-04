@@ -172,17 +172,22 @@ func (s *ClanStore) SaveMembership(ctx context.Context, r clan.MembershipRow) er
 	return nil
 }
 
-// RemoveMembership clears a character's clan columns as it leaves a clan.
+// RemoveMembership clears a character's clan columns as it leaves a clan;
+// an online noble keeps its title (RemovalRow.KeepTitle).
 func (s *ClanStore) RemoveMembership(ctx context.Context, r clan.RemovalRow) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("remove clan member %d: %w", r.ObjectID, err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if r.Online {
+	switch {
+	case r.Online && r.KeepTitle:
+		_, err = tx.ExecContext(ctx, `UPDATE characters SET clanid=0, power_grade=0, clan_join_expiry_time=?, clan_create_expiry_time=?, wantspeace=0,
+			subpledge=0, lvl_joined_academy=0, apprentice=0, sponsor=0 WHERE obj_Id=?`, r.JoinExpiry, r.CreateExpiry, r.ObjectID)
+	case r.Online:
 		_, err = tx.ExecContext(ctx, `UPDATE characters SET clanid=0, title='', power_grade=0, clan_join_expiry_time=?, clan_create_expiry_time=?, wantspeace=0,
 			subpledge=0, lvl_joined_academy=0, apprentice=0, sponsor=0 WHERE obj_Id=?`, r.JoinExpiry, r.CreateExpiry, r.ObjectID)
-	} else {
+	default:
 		_, err = tx.ExecContext(ctx, `UPDATE characters SET clanid=0, title='', clan_join_expiry_time=?, clan_create_expiry_time=?, wantspeace=0,
 			subpledge=0, lvl_joined_academy=0, apprentice=0, sponsor=0 WHERE obj_Id=?`, r.JoinExpiry, r.CreateExpiry, r.ObjectID)
 		if err == nil {

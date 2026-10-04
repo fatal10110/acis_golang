@@ -122,6 +122,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x51: true, // surrender a clan war
 		0x52: true, // answer a surrender proposal
 		0x53: true, // upload pledge crest
+		0x55: true, // give a title
 		0x57: true, // open the community board
 		0x58: true, // enchant item
 		0x59: true, // destroy item

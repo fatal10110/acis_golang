@@ -177,11 +177,11 @@ func (s *Service) forgetWars(cl *Clan) {
 
 // ApplyDispersed clears the clan state of m, removed at now when its clan
 // was dissolved, on its live character; it runs on that character's queue.
-// No join penalty follows, and any the member held is lifted unless it was
-// in the academy; the clan's leader may not found another clan for
-// CreateDays.
+// A noble keeps its title. No join penalty follows, and any the member
+// held is lifted unless it was in the academy; the clan's leader may not
+// found another clan for CreateDays.
 func (s *Service) ApplyDispersed(c *player.Character, m Member, leader bool, now time.Time) {
-	c.SetTitle("")
+	clearLeaverTitle(c)
 	c.SetClanID(0)
 	c.SetWantsPeace(false)
 	if m.PledgeType != SubunitAcademy {
