@@ -143,40 +143,72 @@ func systemMessageAmong(t *testing.T, frames [][]byte, ids ...int) int {
 	return 0
 }
 
-// TestSeedSowsTargetedMonster uses Seed: Dark Coda on a targeted Lesser
-// Succubus that spawned in a Gludio manor area and has since walked out of
-// it: Sowing (2097) starts at once on it, the cast spends the seed it
-// carries, and the landed sow either marks the monster sown, answering
-// THE_SEED_WAS_SUCCESSFULLY_SOWN, or answers THE_SEED_WAS_NOT_SOWN and
-// leaves it unsown.
+// maxSowTries bounds TestSeedSowsTargetedMonster's retries. Seed: Dark Coda
+// (level 10) on a level 20 Lesser Succubus by a level 20 sower lands at 65%,
+// so all tries fail in about 0.35^16 < 1e-7 of runs.
+const maxSowTries = 16
+
+// sowReuse clears Sowing's 10 s reuse between tries.
+const sowReuse = 11 * time.Second
+
+// TestSeedSowsTargetedMonster uses Seed: Dark Coda on targeted Lesser
+// Succubi that spawned in a Gludio manor area and have since walked out of
+// it: each use starts Sowing (2097) at once on the target and spends the
+// seed it carries. A failed roll answers THE_SEED_WAS_NOT_SOWN and leaves
+// the monster unsown; the test retries on fresh monsters until a sow lands,
+// which answers THE_SEED_WAS_SUCCESSFULLY_SOWN and marks the monster sown by
+// the user: the user may claim its harvest and a stranger may not.
 func TestSeedSowsTargetedMonster(t *testing.T) {
 	t.Parallel()
 	srv, succubus := bootManorItems(t, true)
 	c, objID := srv.Client, srv.SoleObjectID(t)
-	seed := srv.GiveItem(t, objID, darkCodaSeedID, 3)
+	seed := srv.GiveItem(t, objID, darkCodaSeedID, maxSowTries+1)
 	startInWorld(t, c)
-	mob := spawnGludioSuccubus(t, srv, succubus)
-	selectAt(t, c, mob.ObjectID(), targetCastSpot)
 
-	c.Send(encodeUseItem(seed, false))
-	assertTargetCast(t, c, objID, mob.ObjectID(), 2097, 1800)
-	srv.AdvanceUntil(t, "Sowing cast ends", func() bool { return !srv.PlayerCastingNow(t, objID) })
-	frames := collectUntilQuiet(t, c)
-	switch systemMessageAmong(t, frames, serverpackets.SystemMessageSeedSuccessfullySown, serverpackets.SystemMessageSeedNotSown) {
-	case serverpackets.SystemMessageSeedSuccessfullySown:
-		if !mob.Seeded() {
-			t.Fatal("THE_SEED_WAS_SUCCESSFULLY_SOWN on an unsown monster")
+	var sown *npc.Hostile
+	tries := 0
+	for sown == nil && tries < maxSowTries {
+		if tries > 0 {
+			srv.Advance(t, sowReuse)
 		}
-	case serverpackets.SystemMessageSeedNotSown:
-		if mob.Seeded() {
-			t.Fatal("THE_SEED_WAS_NOT_SOWN on a sown monster")
+		tries++
+		mob := spawnGludioSuccubus(t, srv, succubus)
+		selectAt(t, c, mob.ObjectID(), targetCastSpot)
+
+		c.Send(encodeUseItem(seed, false))
+		assertTargetCast(t, c, objID, mob.ObjectID(), 2097, 1800)
+		srv.AdvanceUntil(t, "Sowing cast ends", func() bool { return !srv.PlayerCastingNow(t, objID) })
+		frames := collectUntilQuiet(t, c)
+		switch systemMessageAmong(t, frames, serverpackets.SystemMessageSeedSuccessfullySown, serverpackets.SystemMessageSeedNotSown) {
+		case serverpackets.SystemMessageSeedSuccessfullySown:
+			if !mob.Seeded() {
+				t.Fatal("THE_SEED_WAS_SUCCESSFULLY_SOWN on an unsown monster")
+			}
+			sown = mob
+		case serverpackets.SystemMessageSeedNotSown:
+			if mob.Seeded() {
+				t.Fatal("THE_SEED_WAS_NOT_SOWN on a sown monster")
+			}
+			// Sowing's next action is an attack on the monster; end it so
+			// the next seed is not queued behind a swing.
+			killForCorpse(t, srv, mob)
+		default:
+			t.Fatalf("try %d: the landed sow answered neither sown nor not sown", tries)
 		}
-	default:
-		t.Fatal("the landed sow answered neither sown nor not sown")
+	}
+	if sown == nil {
+		t.Fatalf("no sow landed in %d tries", maxSowTries)
+	}
+	t.Logf("sow landed on try %d", tries)
+	if got := sown.SeedState().ClaimHarvest(objID+1, nil); got != npc.HarvestNotAuthorized {
+		t.Fatalf("stranger ClaimHarvest = %v, want HarvestNotAuthorized", got)
+	}
+	if got := sown.SeedState().ClaimHarvest(objID, nil); got != npc.HarvestClaimed {
+		t.Fatalf("sower ClaimHarvest = %v, want HarvestClaimed", got)
 	}
 	srv.InventoryUpdates.Tick()
 	drainUntilQuiet(t, c)
-	assertItemCount(t, srv, objID, seed, 2)
+	assertItemCount(t, srv, objID, seed, maxSowTries+1-tries)
 }
 
 // TestSeedRefusals pins Seeds.java's gates in order. None of them casts or
