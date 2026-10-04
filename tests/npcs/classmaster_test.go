@@ -120,6 +120,13 @@ type classManagerWorld struct {
 // beside the class manager, and opens its first page.
 func bootClassManagerWorld(t *testing.T, adena int32, extra ...gameservertest.Option) *classManagerWorld {
 	t.Helper()
+	return bootClassManagerWorldWith(t, adena, nil, extra...)
+}
+
+// bootClassManagerWorldWith is bootClassManagerWorld with before run once
+// the character is stored, before it enters the world.
+func bootClassManagerWorldWith(t *testing.T, adena int32, before func(srv *gameservertest.Server, objID int32), extra ...gameservertest.Option) *classManagerWorld {
+	t.Helper()
 	opts := append([]gameservertest.Option{
 		gameservertest.WithCharacter("Talker", playerLevel, 0),
 		gameservertest.WithWantChars(1),
@@ -133,6 +140,9 @@ func bootClassManagerWorld(t *testing.T, adena int32, extra ...gameservertest.Op
 	w := &folkWorld{srv: srv, c: srv.Client, player: srv.SoleObjectID(t)}
 	if adena > 0 {
 		srv.GiveItem(t, w.player, item.AdenaID, adena)
+	}
+	if before != nil {
+		before(srv, w.player)
 	}
 	startInWorld(t, srv, w.c)
 	x, y, z := srv.PlayerPosition(t, w.player)
