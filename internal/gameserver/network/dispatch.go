@@ -50,6 +50,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/observer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
@@ -336,6 +337,7 @@ type GameClientLink struct {
 	queues           Queues
 	queuedPets       queuedPets
 	restarts         *restart.Table
+	observers        *observer.Table
 	clanHallData     *hallmodel.Table
 	castleData       *castledata.Table
 	levels           *player.LevelTable
@@ -542,6 +544,9 @@ type GameClientLinkConfig struct {
 	Restarts     *restart.Table
 	ClanHallData *hallmodel.Table  // owner restart spawns; nil restarts to town
 	CastleData   *castledata.Table // owner restart spawns; nil restarts to town
+	// Observers are the viewpoints broadcasting towers offer; nil offers
+	// none.
+	Observers    *observer.Table
 	Levels       *player.LevelTable
 	Admin        *admin.Data
 	PlayerConfig PlayerConfig
@@ -736,6 +741,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		restarts:         cfg.Restarts,
 		clanHallData:     cfg.ClanHallData,
 		castleData:       cfg.CastleData,
+		observers:        cfg.Observers,
 		levels:           cfg.Levels,
 		admin:            cfg.Admin,
 		gmAudit:          cfg.GMAudit,

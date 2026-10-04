@@ -141,6 +141,9 @@ type Character struct {
 	// olympiad is the character's place in an Olympiad match; see
 	// character_olympiad.go.
 	olympiad olympiadStanding
+	// saved is the position the character returns to after observing; see
+	// character_observer.go.
+	saved savedLocation
 	// marriage is the marriage request the character is part of; see
 	// character_wedding.go.
 	marriage marriageRequest

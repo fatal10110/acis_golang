@@ -55,6 +55,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/observer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
@@ -126,6 +127,7 @@ type options struct {
 	restarts               *restart.Table
 	clanHallData           *hallmodel.Table
 	castleData             *castledata.Table
+	observers              *observer.Table
 	teleports              travel.TeleportTable
 	instantTeleports       travel.InstantTable
 	freeTeleport           bool
@@ -1931,6 +1933,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Restarts:         o.restarts,
 		ClanHallData:     o.clanHallData,
 		CastleData:       o.castleData,
+		Observers:        o.observers,
 		Teleports:        o.teleports,
 		InstantTeleports: o.instantTeleports,
 		FreeTeleport:     o.freeTeleport,

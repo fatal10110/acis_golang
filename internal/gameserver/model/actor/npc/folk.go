@@ -103,6 +103,10 @@ type Folk struct {
 	folkCombat
 
 	cast folkCast
+
+	// observerGroups are the viewpoint groups a broadcasting tower offers;
+	// see folk_observer.go.
+	observerGroups atomic.Pointer[[]int]
 }
 
 // NewFolk builds a civilian NPC from inst. skills, when provided, resolves

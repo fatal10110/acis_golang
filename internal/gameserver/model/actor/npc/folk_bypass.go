@@ -96,6 +96,10 @@ const (
 	BypassLottery
 	// BypassDerby runs a race manager's own command; see derby.Command.
 	BypassDerby
+	// BypassObserveGroup lists the viewpoints of group Index.
+	BypassObserveGroup
+	// BypassObserve takes the talker to watch from viewpoint Index.
+	BypassObserve
 	// BypassFishingChampionship opens a fisherman's fishing championship
 	// winners page.
 	BypassFishingChampionship
@@ -141,7 +145,8 @@ type BypassReply struct {
 	Warehouse     WarehouseCommand
 	FreightTarget string
 	// Index is the destination BypassTeleport and BypassInstantTeleport
-	// name.
+	// name, the viewpoint group BypassObserveGroup names, or the viewpoint
+	// BypassObserve names.
 	Index int
 }
 
@@ -160,6 +165,8 @@ type BypassReply struct {
 // Loto <n> runs the lottery dialog, multisell <list> and exc_multisell
 // <list> open a multisell list, Augment 1 and Augment 2 open the
 // augmentation and removal windows,
+// observe_group <id> lists a viewpoint group and observe <id> sends the
+// talker to watch from a viewpoint,
 // teleport_request opens the destination list, and teleport <index> and
 // instant_teleport <index> take the talker to a destination, and
 // CPRecovery has an arena manager restore the talker's CP for a fee and
@@ -302,6 +309,10 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	case strings.HasPrefix(command, "Loto"):
 		reply.Outcome = BypassLottery
 		return reply
+	case strings.HasPrefix(command, "observe_group"):
+		return observeCommand(reply, BypassObserveGroup, command)
+	case strings.HasPrefix(command, "observe"):
+		return observeCommand(reply, BypassObserve, command)
 	case strings.HasPrefix(command, "multisell"):
 		reply.Outcome, reply.Multisell = BypassMultisell, strings.TrimFunc(command[len("multisell"):], javaSpace)
 		return reply
@@ -344,6 +355,26 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			reply.Outcome = BypassCPRecovery
 		}
 	}
+	return reply
+}
+
+// observeCommand answers "<command> <id>", split on whitespace: outcome
+// names group or viewpoint id. A command without an id, or whose id does
+// not parse, aborts.
+func observeCommand(reply BypassReply, outcome BypassOutcome, command string) BypassReply {
+	words := strings.FieldsFunc(command, func(r rune) bool {
+		return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\f'
+	})
+	if len(words) < 2 {
+		reply.Outcome = BypassAborted
+		return reply
+	}
+	id, err := commons.ParseInt(words[1], 32)
+	if err != nil {
+		reply.Outcome = BypassAborted
+		return reply
+	}
+	reply.Outcome, reply.Index = outcome, int(id)
 	return reply
 }
 

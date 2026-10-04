@@ -187,6 +187,7 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0xb5: true, // workshop: craft window
 		0xb6: true, // workshop: order a craft
 		0xb7: true, // workshop: back to its list
+		0xb8: true, // leave observer mode
 		0xb9: true, // recommend a player
 		0xba: true, // symbol draw window
 		0xbb: true, // symbol draw details
