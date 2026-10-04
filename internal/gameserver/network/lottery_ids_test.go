@@ -1,12 +1,14 @@
 package network
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 	"github.com/rs/zerolog"
 )
@@ -122,13 +124,16 @@ func TestLotteryClaimWithoutObjectIDKeepsTicket(t *testing.T) {
 	}
 }
 
-// countingIDs hands out ids from next and tracks those not yet given back.
+// countingIDs hands out ids from next, counts every id taken and tracks
+// those not yet given back.
 type countingIDs struct {
 	next        int32
+	taken       int
 	outstanding map[int32]bool
 }
 
 func (c *countingIDs) NextID() (int32, error) {
+	c.taken++
 	c.next++
 	if c.outstanding == nil {
 		c.outstanding = map[int32]bool{}
@@ -158,8 +163,24 @@ func TestLotteryUnpaidPurchaseHoldsNoObjectID(t *testing.T) {
 			t.Fatal("an unpaid purchase went through")
 		}
 	}
+	// The production allocator never moves its cursor back, so a taken id
+	// is used up even when released: an unpaid purchase must take none.
+	if ids.taken != 0 {
+		t.Fatalf("%d object ids taken by 100 unpaid purchases, want none", ids.taken)
+	}
 	if n := len(ids.outstanding); n != 0 {
 		t.Fatalf("%d object ids held after 100 unpaid purchases, want none", n)
+	}
+	// The capture records payloads, without the 2-byte length prefix.
+	refusal := serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena).Bytes()[2:]
+	frames := capture.Frames()
+	if len(frames) != 100 {
+		t.Fatalf("100 unpaid purchases sent %d frames, want 100", len(frames))
+	}
+	for i, f := range frames {
+		if !bytes.Equal(f, refusal) {
+			t.Fatalf("frame %d of the unpaid purchases = % x, want not enough adena % x", i, f, refusal)
+		}
 	}
 	if got := live.Inventory().Adena(); got != 1 {
 		t.Fatalf("adena = %d after unpaid purchases, want 1", got)
@@ -173,6 +194,9 @@ func TestLotteryUnpaidPurchaseHoldsNoObjectID(t *testing.T) {
 	}
 	if !l.buyLotteryTicket(live) {
 		t.Fatal("a paid purchase was refused")
+	}
+	if ids.taken != 1 {
+		t.Fatalf("%d object ids taken by one paid purchase, want the ticket's one", ids.taken)
 	}
 	if n := len(ids.outstanding); n != 1 {
 		t.Fatalf("%d object ids held after one paid purchase, want the ticket's one", n)

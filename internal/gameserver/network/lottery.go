@@ -145,6 +145,16 @@ func (l *GameClientLink) buyLotteryTicket(live *livePlayer) bool {
 	if inv == nil {
 		return false
 	}
+	lot := l.lottery
+	round := lot.Status().Round
+	price := lot.Config().TicketPrice
+	// A buyer who cannot pay is refused before any id is taken: the
+	// allocator's cursor never moves back, so an id taken and released for
+	// each refused attempt would still use up the id range.
+	if int(price) > inv.Adena() {
+		reduceAdena(live, int(price))
+		return false
+	}
 	// The ticket's id is taken before the price, so an exhausted id
 	// factory refuses the sale instead of charging for no ticket.
 	id, err := l.nextObjectID()
@@ -152,9 +162,6 @@ func (l *GameClientLink) buyLotteryTicket(live *livePlayer) bool {
 		l.log.Error().Err(err).Msg("lottery: no object id for a ticket")
 		return false
 	}
-	lot := l.lottery
-	round := lot.Status().Round
-	price := lot.Config().TicketPrice
 	if !reduceAdena(live, int(price)) {
 		l.releaseObjectID(id)
 		return false
