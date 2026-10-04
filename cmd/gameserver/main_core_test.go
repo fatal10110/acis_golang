@@ -5,7 +5,9 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -53,8 +55,8 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 	}
 	hooks := map[string]stopBound{
 		"startGameServer": {
-			network.LivePlayerPersistWait, "",
-			"waits for the connection handlers; each exit waits at most LivePlayerPersistWait for its player's saves, in parallel, and cancelling closes the login link so its writes fail fast",
+			network.ShutdownCloseGrace + network.LivePlayerPersistWait, "",
+			"waits up to ShutdownCloseGrace for connections to flush their ServerClose, then for the connection handlers; each exit waits at most LivePlayerPersistWait for its player's saves, in parallel, and cancelling closes the login link so its writes fail fast",
 		},
 		"startDebugHTTP":           {debugHTTPStopTimeout, "debugHTTPStopTimeout", "graceful stop of the debug listener"},
 		"startNpcPersistence":      {shutdownSaveTimeout, "shutdownSaveTimeout", "spawn_data save"},
@@ -104,6 +106,30 @@ func TestGameServerStopTimeoutCoversEveryStopStep(t *testing.T) {
 	}
 	if gameServerStopTimeout < sum {
 		t.Fatalf("gameServerStopTimeout = %s, below the %s its stop hooks can take", gameServerStopTimeout, sum)
+	}
+}
+
+// TestSystemdStopTimeoutCoversGameServerStop checks that the shipped systemd
+// drop-in gives the process longer than its own stop budget, so systemd never
+// SIGKILLs a shutdown that is still saving.
+func TestSystemdStopTimeoutCoversGameServerStop(t *testing.T) {
+	const dropIn = "../../ops/systemd/acis-gameserver.service.d/stop-timeout.conf"
+	data, err := os.ReadFile(dropIn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stop time.Duration
+	for _, line := range strings.Split(string(data), "\n") {
+		if v, ok := strings.CutPrefix(strings.TrimSpace(line), "TimeoutStopSec="); ok {
+			secs, err := strconv.Atoi(v)
+			if err != nil {
+				t.Fatalf("%s: TimeoutStopSec=%q is not whole seconds", dropIn, v)
+			}
+			stop = time.Duration(secs) * time.Second
+		}
+	}
+	if stop <= gameServerStopTimeout {
+		t.Fatalf("%s: TimeoutStopSec = %s, want above gameServerStopTimeout = %s", dropIn, stop, gameServerStopTimeout)
 	}
 }
 

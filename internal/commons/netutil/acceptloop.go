@@ -36,11 +36,23 @@ const (
 // down the caller. The caller owns ln: AcceptLoop closes it on ctx cancellation
 // but does not create it. A zero-value logger disables logging.
 func AcceptLoop(ctx context.Context, ln net.Listener, handle func(conn net.Conn), log zerolog.Logger) error {
+	return AcceptLoopWithCloseGrace(ctx, ln, handle, 0, log)
+}
+
+// AcceptLoopWithCloseGrace is AcceptLoop for handlers that end their own
+// connection when ctx is canceled, with a last frame to flush: on
+// cancellation it waits up to grace for the handlers to return before it
+// force-closes the connections still open, so that close cannot cut off a
+// final write. A zero grace force-closes at once, as AcceptLoop does.
+func AcceptLoopWithCloseGrace(ctx context.Context, ln net.Listener, handle func(conn net.Conn), grace time.Duration, log zerolog.Logger) error {
 	var handlers sync.WaitGroup
 	var connsMu sync.Mutex
 	conns := make(map[net.Conn]struct{})
 	done := make(chan struct{})
 	defer func() {
+		if grace > 0 && ctx.Err() != nil {
+			waitTimeout(&handlers, grace)
+		}
 		connsMu.Lock()
 		pending := make([]net.Conn, 0, len(conns))
 		for conn := range conns {
@@ -119,5 +131,20 @@ func AcceptLoop(ctx context.Context, ln net.Listener, handle func(conn net.Conn)
 			}()
 			handle(conn)
 		}(conn)
+	}
+}
+
+// waitTimeout waits for wg, giving up after d.
+func waitTimeout(wg *sync.WaitGroup, d time.Duration) {
+	waited := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(waited)
+	}()
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-waited:
+	case <-timer.C:
 	}
 }
