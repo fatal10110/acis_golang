@@ -237,10 +237,9 @@ func TestAdminSetPlayerFields(t *testing.T) {
 	if got := opcodes(exchange(t, gm, encodeBuildCmd("set title Boss"))); !slices.Equal(got, []byte{serverpackets.OpcodeActionFailed}) {
 		t.Fatalf("//set title on an NPC frames = %x, want ActionFailed", got)
 	}
-	// //info on an NPC is not ported yet (#3325): it releases the client.
-	if got := opcodes(exchange(t, gm, encodeBuildCmd("info"))); !slices.Equal(got, []byte{serverpackets.OpcodeActionFailed}) {
-		t.Fatalf("//info on an NPC frames = %x, want ActionFailed", got)
-	}
+	// //info on an NPC opens its general page (see info_test.go), missing
+	// from this boot's page cache.
+	assertPage(t, exchange(t, gm, encodeBuildCmd("info")), "data/html/admin/npcinfo/general-0.htm")
 }
 
 // TestAdminRemove pins //remove (AdminEditChar.java admin_remove) on the
