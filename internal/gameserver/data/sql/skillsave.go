@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
@@ -23,25 +24,45 @@ func NewSkillSaveStore(db *sql.DB) *SkillSaveStore {
 // Replace deletes every row charObjID has stored for classIndex and inserts
 // rows in their place — the delete-then-insert a logout performs each time,
 // so a save that no longer carries a given skill's reuse timer doesn't
-// leave a stale row behind from an earlier logout.
+// leave a stale row behind from an earlier logout. Both run in one
+// transaction: a failed insert, a lost connection or a crash leaves the
+// previous rows whole, and no reader sees the character with none.
 func (s *SkillSaveStore) Replace(ctx context.Context, charObjID int32, classIndex int32, rows []effect.SaveRow) error {
-	if _, err := s.db.ExecContext(ctx,
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("save skill rows for character %d class %d: begin: %w", charObjID, classIndex, err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := tx.ExecContext(ctx,
 		`DELETE FROM character_skills_save WHERE char_obj_id = ? AND class_index = ?`,
 		charObjID, classIndex,
 	); err != nil {
 		return fmt.Errorf("clear skill save rows for character %d class %d: %w", charObjID, classIndex, err)
 	}
 
-	for _, row := range rows {
-		if _, err := s.db.ExecContext(ctx,
-			`INSERT INTO character_skills_save
-				(char_obj_id, skill_id, skill_level, effect_count, effect_cur_time, reuse_delay, systime, restore_type, class_index, buff_index)
-			 VALUES (?,?,?,?,?,?,?,?,?,?)`,
-			charObjID, row.Skill.ID, row.Skill.Level, row.EffectCount, row.EffectCurTime,
-			row.ReuseDelay, row.SystemTime, row.RestoreType, classIndex, row.BuffIndex,
-		); err != nil {
-			return fmt.Errorf("save skill row for character %d skill %d level %d: %w", charObjID, row.Skill.ID, row.Skill.Level, err)
+	if len(rows) > 0 {
+		const columns = 10
+		query := strings.Builder{}
+		query.WriteString(`INSERT INTO character_skills_save
+			(char_obj_id, skill_id, skill_level, effect_count, effect_cur_time, reuse_delay, systime, restore_type, class_index, buff_index)
+			VALUES `)
+		args := make([]any, 0, len(rows)*columns)
+		for i, row := range rows {
+			if i > 0 {
+				query.WriteString(",")
+			}
+			query.WriteString("(?,?,?,?,?,?,?,?,?,?)")
+			args = append(args, charObjID, row.Skill.ID, row.Skill.Level, row.EffectCount, row.EffectCurTime,
+				row.ReuseDelay, row.SystemTime, row.RestoreType, classIndex, row.BuffIndex)
 		}
+		if _, err := tx.ExecContext(ctx, query.String(), args...); err != nil {
+			return fmt.Errorf("save skill rows for character %d class %d: %w", charObjID, classIndex, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("save skill rows for character %d class %d: commit: %w", charObjID, classIndex, err)
 	}
 	return nil
 }

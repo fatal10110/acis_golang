@@ -25,20 +25,6 @@ func (l *GameClientLink) adminArgPlayer(gm *livePlayer, line string) *livePlayer
 	return adminTargetPlayer(gm, true)
 }
 
-// adminInfo answers //info on gm's selection, gm itself without one. A
-// player is shown its character page; the pages of the other kinds of
-// object are not ported yet (#3325): they log the gap and release the
-// client.
-func (l *GameClientLink) adminInfo(gm *livePlayer, _ string) {
-	target, ok := adminSelectedPlayer(gm)
-	if !ok {
-		l.log.Warn().Msg("admin: //info on a non-player target not implemented yet (#3325)")
-		gm.SendFrame(serverpackets.FrameActionFailed())
-		return
-	}
-	l.showCharInfo(gm, target)
-}
-
 // showCharInfo selects target for gm, then opens target's character page
 // on gm, built on target's queue.
 func (l *GameClientLink) showCharInfo(gm, target *livePlayer) {

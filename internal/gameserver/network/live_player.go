@@ -81,10 +81,12 @@ type livePlayer struct {
 	lottoPicks lottery.Picks
 	// replayingEffects is set while EnterWorld replays the saved effects
 	// and then decides the weight penalty band, before the player is in the
-	// world. The effects' start hooks change its appearance and the band
+	// world, and while a player leaving from the loading screen replays
+	// them. The effects' start hooks change its appearance, the actions of
+	// their ticks due on the loading screen change its vitals, and the band
 	// may move, but it has no observers yet and the EnterWorld frames that
-	// follow carry the result, so both refreshes stay silent. Written on the
-	// owner's queue; atomic for the Emit readers.
+	// follow carry the result, so those refreshes stay silent. Written on
+	// the owner's queue; atomic for the Emit readers.
 	replayingEffects atomic.Bool
 	shortcuts        *shortcut.List
 	macros           *macro.List

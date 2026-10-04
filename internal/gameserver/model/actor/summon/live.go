@@ -157,6 +157,7 @@ type Actor struct {
 	radius         float64
 	height         float64
 	passive        bool
+	undead         bool // a servitor of the UNDEAD race; immutable
 	maxBuffsAmount int
 
 	// statusMu guards level, pet growth state, name, fed, belowUnsummonLimit,
@@ -438,6 +439,8 @@ type ServitorConfig struct {
 	Name            string
 	Level           int
 	Passive         bool
+	// Undead marks a servitor whose npc template is of the UNDEAD race.
+	Undead bool
 
 	OwnerInventory   *itemcontainer.Inventory
 	Lifetime         LifetimeState
@@ -478,6 +481,7 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 		height:           cfg.CollisionHeight,
 		name:             cfg.Name,
 		passive:          cfg.Passive,
+		undead:           cfg.Undead,
 		intent:           IntentFollowOwner,
 		lifetime:         cfg.Lifetime,
 		timeLostIdle:     defaultPositive(cfg.TimeLostIdle, 1000),

@@ -25,11 +25,14 @@ func (a *Actor) ClanGroups() []string              { return nil }
 func (a *Actor) Folk() bool                        { return false }
 func (a *Actor) FolkOrGuard() bool                 { return false }
 func (a *Actor) MonsterKind() bool                 { return false }
-func (a *Actor) Undead() bool                      { return false }
 func (a *Actor) Holy() bool                        { return false }
 func (a *Actor) Unlockable() bool                  { return false }
 func (a *Actor) Spoiled() bool                     { return false }
 func (a *Actor) Seeded() bool                      { return false }
+
+// Undead reports whether a is a servitor of the UNDEAD race; a pet never
+// is.
+func (a *Actor) Undead() bool { return a.undead }
 
 // DuelID is the duel a's owner is in, 0 for none.
 func (a *Actor) DuelID() int32 { return max(a.ownerDuelID(), 0) }
