@@ -7,6 +7,7 @@ package gatekeeper
 import (
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -20,10 +21,16 @@ const ScatterRadius = 20
 
 // Service applies the teleport rules against the loaded destinations.
 type Service struct {
+	// tables are the destinations; //reload teleport swaps them.
+	tables atomic.Pointer[destinations]
+	free   bool
+	now    func() time.Time
+}
+
+// destinations is one loaded snapshot of both destination tables.
+type destinations struct {
 	teleports travel.TeleportTable
 	instants  travel.InstantTable
-	free      bool
-	now       func() time.Time
 }
 
 // NewService returns a Service over teleports and instants. free waives
@@ -33,7 +40,17 @@ func NewService(teleports travel.TeleportTable, instants travel.InstantTable, fr
 	if now == nil {
 		now = time.Now
 	}
-	return &Service{teleports: teleports, instants: instants, free: free, now: now}
+	s := &Service{free: free, now: now}
+	s.SetTables(teleports, instants)
+	return s
+}
+
+// SetTables replaces the destinations with teleports and instants, at once
+// for every later request: TeleportData.reload and
+// InstantTeleportData.reload. A request already running keeps the tables
+// it started with.
+func (s *Service) SetTables(teleports travel.TeleportTable, instants travel.InstantTable) {
+	s.tables.Store(&destinations{teleports: teleports, instants: instants})
 }
 
 // Notices a teleport reports, in the order they happen.
@@ -74,7 +91,7 @@ type Trip struct {
 // teleports are free. ok is false when npcID offers no destination, and
 // unported is true when a listed price is in ancient adena.
 func (s *Service) Window(objectID int32, npcID int, kind travel.Kind) (page string, ok, unported bool) {
-	list, ok := s.teleports[npcID]
+	list, ok := s.tables.Load().teleports[npcID]
 	if !ok {
 		return "", false, false
 	}
@@ -109,7 +126,7 @@ func (s *Service) Window(objectID int32, npcID int, kind travel.Kind) (page stri
 // A trip c cannot pay for is refused and released; a paid or free trip
 // departs, then releases.
 func (s *Service) Teleport(c *player.Character, npcID, index int) Trip {
-	list, ok := s.teleports[npcID]
+	list, ok := s.tables.Load().teleports[npcID]
 	if !ok || index > len(list) {
 		return Trip{}
 	}
@@ -136,7 +153,7 @@ func (s *Service) Teleport(c *player.Character, npcID, index int) Trip {
 // answers nothing; a negative index, or one equal to the list's length, is
 // only released.
 func (s *Service) Instant(npcID, index int) Trip {
-	list, ok := s.instants[npcID]
+	list, ok := s.tables.Load().instants[npcID]
 	if !ok || index > len(list) {
 		return Trip{}
 	}

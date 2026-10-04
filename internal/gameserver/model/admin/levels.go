@@ -23,17 +23,18 @@ func (d *Data) DefinesLevel(level int) bool {
 	if level < 0 {
 		level = -1
 	}
-	_, ok := d.accessLevels[level]
+	_, ok := d.load().accessLevels[level]
 	return ok
 }
 
 // MasterLevel is the highest level the table defines, 0 when it defines
 // none.
 func (d *Data) MasterLevel() int {
-	if d == nil || len(d.accessLevels) == 0 {
+	levels := d.load().accessLevels
+	if len(levels) == 0 {
 		return 0
 	}
-	return slices.Max(slices.Collect(maps.Keys(d.accessLevels)))
+	return slices.Max(slices.Collect(maps.Keys(levels)))
 }
 
 // Colors returns the name and title colors a character playing under a

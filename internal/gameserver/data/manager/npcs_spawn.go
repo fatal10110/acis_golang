@@ -29,7 +29,7 @@ func isOnStartMaker(maker *spawn.Maker) bool {
 // persisted slot for a database-tracked entry, or up to entry.Total fresh
 // slots otherwise. remaining is the maker's shared spawn budget, decremented
 // per instance placed and left untouched for a skipped/deferred entry.
-func (n *Npcs) bootSpawnEntry(maker *spawn.Maker, entryIndex int, entry spawn.Entry, remaining *int) {
+func (n *Npcs) bootSpawnEntry(maker *spawn.Maker, entryIndex int, entry spawn.Entry, remaining *int, gen int) {
 	tmpl, ok := n.templates.Get(int(entry.NPCID))
 	if !ok {
 		n.log.Warn().Int32("npc_id", entry.NPCID).Str("maker", maker.Name).Msg("spawn entry references unknown npc template")
@@ -41,7 +41,7 @@ func (n *Npcs) bootSpawnEntry(maker *spawn.Maker, entryIndex int, entry spawn.En
 			return
 		}
 		*remaining--
-		n.bootSpawnPersisted(maker, entry.DBName, entry, tmpl)
+		n.bootSpawnPersisted(maker, slotKey(entry.DBName, gen), entry, tmpl)
 		return
 	}
 
@@ -55,8 +55,8 @@ func (n *Npcs) bootSpawnEntry(maker *spawn.Maker, entryIndex int, entry spawn.En
 			return
 		}
 		*remaining--
-		key := fmt.Sprintf("%s#%d#%d", maker.Name, entryIndex, i)
-		n.registerSlot(key, maker, entry, "")
+		key := slotKey(fmt.Sprintf("%s#%d#%d", maker.Name, entryIndex, i), gen)
+		n.registerSlot(key, maker, entry, "", tmpl)
 		n.spawnFresh(key, entry, tmpl, pos)
 	}
 }
@@ -65,26 +65,27 @@ func (n *Npcs) bootSpawnEntry(maker *spawn.Maker, entryIndex int, entry spawn.En
 // Max MP rather than a persisted CurrentMP value.
 const fullMP = -1
 
-func (n *Npcs) registerSlot(key string, maker *spawn.Maker, entry spawn.Entry, dbName string) {
+func (n *Npcs) registerSlot(key string, maker *spawn.Maker, entry spawn.Entry, dbName string, tmpl *npc.Template) {
 	n.mu.Lock()
-	n.slot[key] = slotInfo{key: key, maker: maker, entry: entry, dbName: dbName}
+	n.slot[key] = slotInfo{key: key, maker: maker, entry: entry, dbName: dbName, tmpl: tmpl}
 	n.mu.Unlock()
 }
 
-func (n *Npcs) registerPrivateSlot(key string, entry spawn.Entry, masterID int32) {
+func (n *Npcs) registerPrivateSlot(key string, entry spawn.Entry, masterID int32, tmpl *npc.Template) {
 	n.mu.Lock()
-	n.slot[key] = slotInfo{key: key, entry: entry, masterID: masterID}
+	n.slot[key] = slotInfo{key: key, entry: entry, masterID: masterID, tmpl: tmpl}
 	n.mu.Unlock()
 }
 
 // bootSpawnPersisted restores or freshly spawns a database-tracked entry's
-// single slot at boot. A spawn still dead with a pending respawn deadline
-// is not instantiated: only its respawn timer is (re)armed, matching the
-// persisted-state restore rule.
-func (n *Npcs) bootSpawnPersisted(maker *spawn.Maker, dbName string, entry spawn.Entry, tmpl *npc.Template) {
-	n.registerSlot(dbName, maker, entry, dbName)
+// single slot key at boot. A spawn still dead with a pending respawn
+// deadline is not instantiated: only its respawn timer is (re)armed,
+// matching the persisted-state restore rule.
+func (n *Npcs) bootSpawnPersisted(maker *spawn.Maker, key string, entry spawn.Entry, tmpl *npc.Template) {
+	dbName := entry.DBName
+	n.registerSlot(key, maker, entry, dbName, tmpl)
 
-	state, ok := n.spawns.State(dbName)
+	state, ok := n.currentSpawns().State(dbName)
 	if !ok {
 		state = spawn.NewState(dbName)
 	}
@@ -95,12 +96,12 @@ func (n *Npcs) bootSpawnPersisted(maker *spawn.Maker, dbName string, entry spawn
 		if remaining < 0 {
 			remaining = 0
 		}
-		n.respawn.Add(dbName, now.Add(remaining))
+		n.respawn.Add(key, now.Add(remaining))
 		n.restoredDeadCount.Add(1)
 		return
 	}
 
-	n.spawnPersisted(dbName, maker, entry, tmpl, state)
+	n.spawnPersisted(key, maker, entry, tmpl, state)
 }
 
 // spawnPersisted places one instance of a database-tracked entry, reusing
@@ -266,7 +267,7 @@ func (n *Npcs) spawnPrivates(key string, entry spawn.Entry, master *npc.Hostile)
 		}
 		privateEntry := spawn.Entry{NPCID: private.NPCID, RespawnDelay: private.RespawnDelay}
 		privateKey := fmt.Sprintf("%s/private/%d", key, i)
-		n.registerPrivateSlot(privateKey, privateEntry, master.ObjectID())
+		n.registerPrivateSlot(privateKey, privateEntry, master.ObjectID(), tmpl)
 		n.instantiate(privateKey, privateEntry, tmpl, n.privateSpawnLocation(master, tmpl), master.Heading(), fullHP, fullMP, master)
 	}
 }

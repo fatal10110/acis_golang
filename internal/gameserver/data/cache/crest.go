@@ -3,6 +3,7 @@ package cache
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -178,6 +179,17 @@ func (c *Crests) Remove(typ CrestType, id int) error {
 		return fmt.Errorf("delete crest %s: %w", name, err)
 	}
 	return nil
+}
+
+// Replace swaps c's crests for a copy of from's: CrestCache.reload. c keeps
+// its own directory.
+func (c *Crests) Replace(from *Crests) {
+	from.mu.RLock()
+	crests := maps.Clone(from.byKey)
+	from.mu.RUnlock()
+	c.mu.Lock()
+	c.byKey = crests
+	c.mu.Unlock()
 }
 
 // Len returns the number of crests currently loaded.
