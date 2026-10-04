@@ -87,8 +87,8 @@ func (l *GameClientLink) userCommandLoc(live *livePlayer, _ int32) {
 // userCommandEscape (/unstuck) casts live's way back to town: five minutes
 // for a player, after its voice line and notice, one second for a GM. A
 // player at an Olympiad match, observing, in the festival, jailed or in a
-// boss zone is told to petition instead. The Escape skills' recall at the
-// cast's end has no handler yet (#3213).
+// boss zone is told to petition instead. The cast's end recalls live to its
+// nearest town.
 func (l *GameClientLink) userCommandEscape(live *livePlayer, _ int32) {
 	inBossZone := live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagBoss)
 	if live.OlympiadMode() || live.ObserverMode() || live.FestivalParticipant() || live.Jailed() || inBossZone {
