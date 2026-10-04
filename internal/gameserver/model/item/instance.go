@@ -417,21 +417,6 @@ func (inst *Instance) SetAugmentation(aug *Augmentation) bool {
 	return true
 }
 
-// SetCustomType1 changes the first custom-type flag and schedules persistence.
-func (inst *Instance) SetCustomType1(value int) bool {
-	mu := inst.lock()
-	mu.Lock()
-	if inst.CustomType1 == value {
-		mu.Unlock()
-		return false
-	}
-	inst.CustomType1 = value
-	mu.Unlock()
-
-	inst.persisted()
-	return true
-}
-
 // SetCustomType2 changes the second custom-type flag and schedules persistence.
 func (inst *Instance) SetCustomType2(value int) bool {
 	mu := inst.lock()

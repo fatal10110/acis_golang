@@ -494,6 +494,7 @@ var schemaStmts = []string{
 	characterRaidPointsSchema, grandbossListSchema,
 	bufferSchemesSchema,
 	gamesSchema,
+	mdtBetsSchema, mdtHistorySchema,
 }
 
-var seedStmts = []string{sevenSignsStatusSeed}
+var seedStmts = []string{sevenSignsStatusSeed, mdtBetsSeed}
