@@ -223,17 +223,23 @@ func (w *WorldObjects) ReviveDoor(id int, restoreHP float64) bool {
 }
 
 // RegenDoor implements task.DoorRegenEffects: it gives id's damaged door
-// its regeneration for the tick due at due and broadcasts the new HP. A
-// tick that a newer schedule replaced, or that reaches a broken or full
-// door, does nothing.
+// its regeneration for the tick due at due and broadcasts the new HP. A hit
+// that landed while the tick was in flight leaves it due, so it still
+// applies; a tick that a newer schedule replaced does nothing, and one that
+// reaches a broken or full door stops the door's regeneration.
 func (w *WorldObjects) RegenDoor(id int, due time.Time) {
 	obj, ok := w.Door(id)
 	if !ok {
+		w.doorRegen.Cancel(id)
 		return
 	}
 	w.doorMu.Lock()
 	defer w.doorMu.Unlock()
-	if w.doorRegen.Tracked(id) || obj.Dead() || obj.CurrentHP() >= float64(obj.MaxHP()) {
+	if !w.doorRegen.Due(id, due) {
+		return
+	}
+	if obj.Dead() || obj.CurrentHP() >= float64(obj.MaxHP()) {
+		w.doorRegen.Cancel(id)
 		return
 	}
 	w.doorRegen.Next(id, due)

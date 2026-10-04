@@ -110,6 +110,29 @@ func (r *deadlineRegistry[K, V]) tickDueConcurrent(now time.Time, fire func(V)) 
 	}
 }
 
+// sweepDueConcurrent calls fire for every entry whose deadline is not
+// after now, with the deadline the sweep read, leaving each one tracked:
+// the caller checks it with hasDeadline once it is ready to apply, so a
+// replacement in between wins and a mere re-add of an existing key does
+// not displace it. Like tickDueConcurrent, the due partition is allocated
+// fresh on every call, so it is safe to call from multiple goroutines at
+// once with no other coordination.
+func (r *deadlineRegistry[K, V]) sweepDueConcurrent(now time.Time, fire func(V, time.Time)) {
+	r.mu.Lock()
+	var due []deadlineEntry[V]
+	for _, entry := range r.entries {
+		if now.Before(entry.deadline) {
+			continue
+		}
+		due = append(due, entry)
+	}
+	r.mu.Unlock()
+
+	for _, entry := range due {
+		fire(entry.actor, entry.deadline)
+	}
+}
+
 // tickPending partitions entries into due (now strictly after deadline,
 // passed to expire) and pending (passed to update), each with the deadline
 // the sweep read. Matches PvPFlags's blink semantics, where an entry exactly

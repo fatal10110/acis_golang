@@ -71,8 +71,17 @@ func (r *DoorRegen) Tracked(id int) bool {
 	return r.tracked(id)
 }
 
-// Tick hands every due door tick to effects. A tick leaves the schedule as
-// it runs, so effects calls Next to keep the door regenerating.
+// Due reports whether id's pending tick is still the one due at due, so an
+// effect can drop a tick that Cancel and a fresh Begin replaced while it
+// was in flight.
+func (r *DoorRegen) Due(id int, due time.Time) bool {
+	return r.hasDeadline(id, due)
+}
+
+// Tick hands every due door tick to effects. A tick stays scheduled while
+// it runs, so a Begin for the same door meanwhile keeps it instead of
+// replacing it; effects confirms it with Due and then either calls Next to
+// keep the door regenerating or Cancel to stop it.
 func (r *DoorRegen) Tick(effects DoorRegenEffects) {
-	r.tickDueConcurrent(r.now(), func(d doorRegenDue) { effects.RegenDoor(d.id, d.due) })
+	r.sweepDueConcurrent(r.now(), func(d doorRegenDue, due time.Time) { effects.RegenDoor(d.id, due) })
 }
