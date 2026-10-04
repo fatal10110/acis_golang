@@ -336,14 +336,15 @@ var walkerWalkModeIDs = map[int32]bool{
 // already placed ref's Hostile into world.State — Walker only ticks actors
 // it can find in-region, so calling this before the spawn lands is a
 // silent no-op forever, not a delayed start. Most templates have no alias,
-// or an alias with no route data — StartRoute's "route not found" error is
-// the expected, silent outcome for those, not a fault.
+// or an alias with no route data — those are skipped silently via HasRoute,
+// so only a real failure to start an existing route is logged.
 func startWalkerRoute(walker *task.Walker, ref *walkerActorRef, inst *npc.Instance, log zerolog.Logger) {
-	if walker == nil || inst.Template.Alias == "" {
+	alias := inst.Template.Alias
+	if walker == nil || alias == "" || !walker.HasRoute(alias, alias) {
 		return
 	}
-	if err := walker.StartRoute(ref, inst.Template.Alias, inst.Template.Alias); err != nil {
-		log.Debug().Err(err).Str("alias", inst.Template.Alias).Msg("npc: not a route walker")
+	if err := walker.StartRoute(ref, alias, alias); err != nil {
+		log.Warn().Err(err).Str("alias", alias).Msg("npc: walker route start failed")
 	}
 }
 
