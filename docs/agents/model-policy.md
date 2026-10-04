@@ -15,7 +15,7 @@ hypotheses to test, not facts about cost or quality.
   threads is an operational rule unless a locally supported configuration key is verified.
 - Do not treat generated-token count as a proxy for subscription efficiency.
 
-Claude roles currently use Haiku for the narrow lookup, Sonnet for multi-file research, and Opus for
+Claude roles currently use Sonnet for the narrow lookup and (at high effort) for multi-file research, and Opus for
 selective high-risk review. Codex uses GPT-5.6 Luna at medium effort for narrow Java lookup and keeps
 GPT-5.5 at medium/high effort for multi-file research and high-risk review. Cursor uses Grok 4.5 at
 medium effort for the narrow lookup and keeps Grok 4.6 at medium/high effort for multi-file research
