@@ -440,6 +440,15 @@ func actsOnTick(tmpl modelskill.EffectTemplate) bool {
 	return probe.OnAction != nil
 }
 
+// Known reports whether New can build an effect named name. The match is
+// exact. The reference resolves an <effect name> to its implementation when
+// it loads the effect, and a name with none rejects the skill or item that
+// carries it.
+func Known(name string) bool {
+	_, ok := coreKinds[name]
+	return ok
+}
+
 // New builds a runtime effect from a parsed core effect template.
 func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 	k, ok := coreKinds[tmpl.Name]

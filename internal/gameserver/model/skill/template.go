@@ -1,6 +1,9 @@
 package skill
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // Condition is one node of a skill condition tree. Kind is the element
 // name, lowercased; Attrs are XML attributes after level-table resolution.
@@ -62,32 +65,29 @@ func (op FuncOp) String() string {
 	}
 }
 
-// ParseFuncOp resolves a stat-template element name to its operation.
+// funcOpTags lists each stat-template element name by operation.
+var funcOpTags = [...]string{
+	FuncAdd:     "add",
+	FuncAddMul:  "addMul",
+	FuncSub:     "sub",
+	FuncSubDiv:  "subDiv",
+	FuncMul:     "mul",
+	FuncBaseMul: "basemul",
+	FuncDiv:     "div",
+	FuncSet:     "set",
+	FuncEnchant: "enchant",
+	FuncBaseAdd: "baseadd",
+}
+
+// ParseFuncOp resolves a stat-template element name to its operation. The
+// name matches case-insensitively, as the reference matches it.
 func ParseFuncOp(tag string) (FuncOp, error) {
-	switch tag {
-	case "add", "ADD":
-		return FuncAdd, nil
-	case "addMul", "addmul", "ADDMUL":
-		return FuncAddMul, nil
-	case "sub", "SUB":
-		return FuncSub, nil
-	case "subDiv", "subdiv", "SUBDIV":
-		return FuncSubDiv, nil
-	case "mul", "MUL":
-		return FuncMul, nil
-	case "basemul", "baseMul", "BASEMUL":
-		return FuncBaseMul, nil
-	case "div", "DIV":
-		return FuncDiv, nil
-	case "set", "SET":
-		return FuncSet, nil
-	case "enchant", "ENCHANT":
-		return FuncEnchant, nil
-	case "baseadd", "baseAdd", "BASEADD":
-		return FuncBaseAdd, nil
-	default:
-		return 0, fmt.Errorf("skill: unknown stat template element %q", tag)
+	for op, name := range funcOpTags {
+		if strings.EqualFold(tag, name) {
+			return FuncOp(op), nil
+		}
 	}
+	return 0, fmt.Errorf("skill: unknown stat template element %q", tag)
 }
 
 // FuncTemplate is one stat function attached by a skill/effect <for> block.

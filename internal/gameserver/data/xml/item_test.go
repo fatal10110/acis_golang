@@ -121,7 +121,7 @@ func TestLoadItemTemplates(t *testing.T) {
 		<set name="bodypart" val="rhand" />
 		<for>
 			<bogus stat="pAtk" val="99" />
-			<effect name="Poison" val="1" />
+			<effect name="DamOverTime" val="1" />
 			<add stat="pAtk" val="1" />
 		</for>
 	</item>`)
@@ -458,7 +458,7 @@ func TestLoadItemTemplatesSkipsMalformedItems(t *testing.T) {
 		},
 		{
 			name:    "effect missing required val attribute",
-			content: `<item id="1" type="Weapon" name="x"><set name="bodypart" val="rhand"/><for><effect name="Poison" count="2" time="10"/></for></item>`,
+			content: `<item id="1" type="Weapon" name="x"><set name="bodypart" val="rhand"/><for><effect name="DamOverTime" count="2" time="10"/></for></item>`,
 		},
 	}
 
@@ -496,7 +496,7 @@ func TestLoadItemTemplatesEffectValidatedNotAttached(t *testing.T) {
 		<set name="bodypart" val="rhand"/>
 		<for>
 			<set stat="pAtk" val="5"/>
-			<effect name="Poison" val="1" count="2" time="10"/>
+			<effect name="DamOverTime" val="1" count="2" time="10"/>
 		</for>
 	</item>`)
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -23,6 +24,9 @@ func readEffectTemplate(vals map[string]string) (skill.EffectTemplate, error) {
 	}
 	if name == "" {
 		return skill.EffectTemplate{}, errors.New(`effect: attribute "name" is empty`)
+	}
+	if !effect.Known(name) {
+		return skill.EffectTemplate{}, fmt.Errorf("effect: no effect implementation named %q", name)
 	}
 	a.prefix = "effect " + name
 
