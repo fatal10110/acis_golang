@@ -2083,6 +2083,18 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.requestOustPledgeMember(live, req) })
 			}
 
+		case clientpackets.OpcodeRequestGiveNickName:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestGiveNickName)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestGiveNickName(live, req) })
+			}
+
 		case clientpackets.OpcodeRequestPledgeInfo:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPledgeInfo)
 			if err != nil {

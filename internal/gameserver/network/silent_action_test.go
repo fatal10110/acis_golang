@@ -221,6 +221,7 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"Say2 whisper to nobody online", encodeSay2Tell("hi", "Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestWithdrawPledge without a clan", wire.NewPacketWriter(clientpackets.OpcodeRequestWithdrawPledge).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestOustPledgeMember without a clan", encodeRequestOustPledgeMember("Nobody"), []byte{serverpackets.OpcodeSystemMessage}},
+		{"RequestGiveNickName without a clan", encodeRequestGiveNickName("Nobody", "Knight"), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestPetition with no game master online", encodeRequestPetition("help", 3), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodePlaySound}},
 		{"RequestPetitionCancel with no petition", wire.NewPacketWriter(clientpackets.OpcodeRequestPetitionCancel).Bytes(), []byte{serverpackets.OpcodeSystemMessage}},
 		{"Say2 petition line outside a petition", encodeSay2Petition("hello"), []byte{serverpackets.OpcodeSystemMessage}},
