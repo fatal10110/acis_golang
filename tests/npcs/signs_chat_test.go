@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -228,16 +229,18 @@ func TestMammonPagesAndRefusals(t *testing.T) {
 
 // A festival guide opens its oracle's guide page, and a festival witch the
 // witches' page, each counting down to the next festival: the schedule
-// started at boot awaits it 2 + 19 minutes later. During seal validation
-// the page says festivals resume next week. A guide's dialog commands are
-// not in place yet: they log and release the client.
+// started at boot awaits it 2 + 19 minutes later, read on a clock that
+// stands still so the count is exactly 21 minutes, plus one. During seal
+// validation the page says festivals resume next week. A guide's dialog
+// commands are not in place yet: they log and release the client.
 func TestFestivalGuidePages(t *testing.T) {
 	t.Parallel()
-	w := bootFolkWorld(t, signsPages())
+	boot := time.Date(2026, time.August, 26, 12, 0, 0, 0, time.UTC)
+	w := bootFolkWorld(t, signsPages(), gameservertest.WithFestivalClock(func() time.Time { return boot }))
 	dawnGuide := w.spawnFolk(t, folkTemplate("FestivalGuide", 31127), 30)
 	duskGuide := w.spawnFolk(t, folkTemplate("FestivalGuide", 31141), 35)
 	witch := w.spawnFolk(t, folkTemplate("FestivalGuide", 31146), 40)
-	countdown := `<font color="FF0000">The next festival will begin in 21 minute(s).</font>`
+	countdown := `<font color="FF0000">The next festival will begin in 22 minute(s).</font>`
 	for _, c := range []struct {
 		f    *npc.Folk
 		page string

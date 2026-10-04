@@ -154,6 +154,7 @@ type options struct {
 	seedHennas             func(db *sql.DB, hennas *gamesql.HennaStore)
 	seedSevenSigns         func(*gamesql.SevenSignsStore)
 	seedFestival           func(*gamesql.FestivalStore)
+	festivalClock          func() time.Time
 	clanConfig             *clan.Config
 	seedClans              func(db *sql.DB)
 	board                  bbs.Config
@@ -602,6 +603,12 @@ func WithClanClock(now func() time.Time) Option {
 // columns before the festival restores them.
 func WithFestivalSeed(seed func(*gamesql.FestivalStore)) Option {
 	return func(o *options) { o.seedFestival = seed }
+}
+
+// WithFestivalClock runs the Festival of Darkness schedule and its guide
+// countdown on now instead of the wall clock.
+func WithFestivalClock(now func() time.Time) Option {
+	return func(o *options) { o.festivalClock = now }
 }
 
 // WithSevenSignsSeed adjusts the seven_signs_status row before the Seven
@@ -1757,7 +1764,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if o.seedFestival != nil {
 		o.seedFestival(festivalStore)
 	}
-	fest := festival.New(festival.DefaultConfig(), festivalStore, sevenSigns, o.log, time.Now, nil)
+	festivalClock := time.Now
+	if o.festivalClock != nil {
+		festivalClock = o.festivalClock
+	}
+	fest := festival.New(festival.DefaultConfig(), festivalStore, sevenSigns, o.log, festivalClock, nil)
 	if err := fest.Restore(context.Background(), sevenSigns.CurrentCycle()); err != nil {
 		t.Fatalf("restore festival: %v", err)
 	}
