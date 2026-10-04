@@ -25,6 +25,7 @@ import (
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -398,6 +399,7 @@ type GameClientLink struct {
 	// on their schedules and managed by //announce.
 	announcements *announcement.Registry
 	schemeBuffer  *schemebuffer.Manager
+	lottery       *lottery.Lottery
 	// npcSpawns is the live NPC population the admin spawn commands use;
 	// see SetNpcSpawns.
 	npcSpawns atomic.Pointer[manager.Npcs]
@@ -604,6 +606,8 @@ type GameClientLinkConfig struct {
 	// SchemeBuffer is the scheme buffer's buffs and every player's
 	// schemes; nil offers no buff and starts with no scheme.
 	SchemeBuffer *schemebuffer.Manager
+	// Lottery is the Lucky Lottery; nil runs no round.
+	Lottery *lottery.Lottery
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -731,6 +735,10 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.schemeBuffer = cfg.SchemeBuffer
 	if link.schemeBuffer == nil {
 		link.schemeBuffer = schemebuffer.New(schemebuffer.DefaultConfig(), nil, nil)
+	}
+	link.lottery = cfg.Lottery
+	if link.lottery == nil {
+		link.lottery = lottery.New(lottery.DefaultConfig(), nil, nil, nil, cfg.Queues.NewQueue("lottery"), cfg.Log)
 	}
 	link.announcements = cfg.Announcements
 	if link.announcements == nil {
