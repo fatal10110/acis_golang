@@ -63,9 +63,13 @@ func (l *GameClientLink) DissolveDue(cl *clan.Clan) {
 // destroyClan destroys cl (clan.Service.Destroy; due as there): every
 // member in the world is told the clan dispersed, then leaves it as a
 // member who withdrew does, its clan tab cleared; the clan warehouse's
-// items are destroyed. actor is the player whose queue the caller runs on,
-// nil for none; its own leave runs inline, every other member's on its own
-// queue.
+// items are destroyed. An offline member of a clan holding a castle has
+// its circlets put back in its inventory (unequipLeaverCirclets). A member
+// in the world keeps them on: the reference checks its items while it
+// still holds the clan, where they pass, but here the clan has already
+// left the table, so a check would wrongly take them off. actor is the
+// player whose queue the caller runs on, nil for none; its own leave runs
+// inline, every other member's on its own queue.
 func (l *GameClientLink) destroyClan(cl *clan.Clan, actor *livePlayer, due bool) {
 	now := time.Now()
 	online := func(id int32) *player.Character {
@@ -85,12 +89,12 @@ func (l *GameClientLink) destroyClan(cl *clan.Clan, actor *livePlayer, due bool)
 	}
 	var leavers []leaver
 	for _, m := range out.Members {
-		if !m.Online {
+		live, ok := l.livePlayerByID(m.ObjectID)
+		if !m.Online || !ok {
+			l.unequipLeaverCirclets(cl, m.ObjectID)
 			continue
 		}
-		if live, ok := l.livePlayerByID(m.ObjectID); ok {
-			leavers = append(leavers, leaver{live, m})
-		}
+		leavers = append(leavers, leaver{live, m})
 	}
 	dispersed := func() wire.Frame {
 		return serverpackets.FrameSystemMessage(serverpackets.SystemMessageClanHasDispersed)

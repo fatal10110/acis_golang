@@ -34,7 +34,8 @@ const (
 	CreateFailed
 )
 
-// Create founds a clan named name with c as its leader.
+// Create founds a clan named name with c as its leader, which keeps its
+// title.
 func (s *Service) Create(c *player.Character, name string, now time.Time) (*Clan, CreateResult) {
 	switch {
 	case c.Level() < minCreateLevel:
@@ -61,7 +62,6 @@ func (s *Service) Create(c *player.Character, name string, now time.Time) (*Clan
 	}
 	cl := newClan(id, name, c.ID)
 	leader := LiveMember(c)
-	leader.Title = ""
 	leader.PowerGrade = LeaderPowerGrade
 	leader.PledgeType = SubunitMain
 	leader.Online = true
@@ -76,13 +76,12 @@ func (s *Service) Create(c *player.Character, name string, now time.Time) (*Clan
 	clanRow := Row{ID: id, Name: name, LeaderID: c.ID}
 	s.write(id, "store new clan", func(ctx context.Context, st Store) error { return st.InsertClan(ctx, clanRow) })
 	s.saveMembershipLocked(MembershipRow{
-		ObjectID: c.ID, ClanID: id, PowerGrade: leader.PowerGrade, PledgeType: leader.PledgeType,
+		ObjectID: c.ID, ClanID: id, Title: leader.Title, PowerGrade: leader.PowerGrade, PledgeType: leader.PledgeType,
 		JoinExpiry: c.ClanJoinExpiryTime(),
 	})
 	cl.mu.Unlock()
 
 	c.SetClanID(id)
-	c.SetTitle("")
 	c.SetPledgeClass(s.pledgeClass(c))
 	return cl, Created
 }
@@ -184,7 +183,7 @@ func academyAge(c *player.Character) bool {
 // re-checking the invitation rules first; blocksInviter reports whether c's
 // block list holds the inviter. A recruit takes rank 6 in the main clan, 7
 // in a royal guard, 8 in a knight order and 9 in the academy, which also
-// records the level it joined at.
+// records the level it joined at. The recruit keeps its title.
 func (s *Service) Join(cl *Clan, inviterID int32, c *player.Character, blocksInviter bool, pledgeType int, now time.Time) JoinRefusal {
 	m := LiveMember(c)
 	m.PledgeType = pledgeType
@@ -198,16 +197,14 @@ func (s *Service) Join(cl *Clan, inviterID int32, c *player.Character, blocksInv
 		cl.mu.Unlock()
 		return refusal
 	}
-	m.Title = ""
 	cl.members[c.ID] = &m
 	s.saveMembershipLocked(MembershipRow{
-		ObjectID: c.ID, ClanID: cl.id, PowerGrade: m.PowerGrade, PledgeType: m.PledgeType,
+		ObjectID: c.ID, ClanID: cl.id, Title: m.Title, PowerGrade: m.PowerGrade, PledgeType: m.PledgeType,
 		LvlJoinedAcademy: m.LvlJoinedAcademy,
 	})
 	cl.mu.Unlock()
 
 	c.SetClanID(cl.id)
-	c.SetTitle("")
 	c.SetPledgeClass(s.pledgeClass(c))
 	c.SetClanJoinExpiryTime(0)
 	return JoinAllowed
@@ -225,7 +222,8 @@ const (
 )
 
 // Withdraw takes c out of its clan, which it may not rejoin, nor join
-// another, for JoinDays.
+// another, for JoinDays. The caller clears c's clan state with ApplyLeft,
+// once whatever runs while c still holds the clan is done.
 func (s *Service) Withdraw(c *player.Character, now time.Time) (*Clan, Member, LeaveRefusal) {
 	cl, ok := s.ClanOf(c)
 	switch {
@@ -241,7 +239,6 @@ func (s *Service) Withdraw(c *player.Character, now time.Time) (*Clan, Member, L
 	if !removed {
 		return nil, Member{}, LeaveNotMember
 	}
-	s.ApplyLeft(c, m, now)
 	return cl, m, Left
 }
 
@@ -311,7 +308,7 @@ func (s *Service) remove(cl *Clan, objectID int32, joinExpiry int64, live *playe
 	}
 	delete(cl.members, objectID)
 	s.unlinkLeaverLocked(cl, m)
-	row := RemovalRow{ObjectID: objectID, JoinExpiry: joinExpiry, Online: live != nil}
+	row := RemovalRow{ObjectID: objectID, JoinExpiry: joinExpiry, Online: live != nil, KeepTitle: live != nil && live.IsNoble()}
 	switch {
 	case wasLeader:
 		row.CreateExpiry = now.UnixMilli() + int64(s.cfg.CreateDays)*dayMillis
@@ -326,17 +323,25 @@ func (s *Service) remove(cl *Clan, objectID int32, joinExpiry int64, live *playe
 }
 
 // ApplyLeft clears the clan state of m, removed at now, on its live
-// character; it runs on that character's queue. An academy member leaves
-// without a join penalty. A personal surrender is forgotten, so it does not
-// follow the character into its next clan.
+// character; it runs on that character's queue. A noble keeps its title.
+// An academy member leaves without a join penalty. A personal surrender is
+// forgotten, so it does not follow the character into its next clan.
 func (s *Service) ApplyLeft(c *player.Character, m Member, now time.Time) {
-	c.SetTitle("")
+	clearLeaverTitle(c)
 	c.SetClanID(0)
 	c.SetWantsPeace(false)
 	if m.PledgeType != SubunitAcademy {
 		c.SetClanJoinExpiryTime(s.joinExpiry(now))
 	}
 	c.SetPledgeClass(s.pledgeClass(c))
+}
+
+// clearLeaverTitle clears the title of c, leaving its clan, unless c is a
+// noble, whose title is its own to keep.
+func clearLeaverTitle(c *player.Character) {
+	if !c.IsNoble() {
+		c.SetTitle("")
+	}
 }
 
 // joinExpiry is when a join penalty starting at now ends.

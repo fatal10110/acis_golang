@@ -31,6 +31,9 @@ type RemovalRow struct {
 	// and its creation penalty written as given; the offline path leaves
 	// the power grade and clears the sponsor links pointing at the member.
 	Online bool
+	// KeepTitle leaves the title column as stored: an online noble keeps
+	// its title as it leaves. Every other leaver's title is cleared.
+	KeepTitle bool
 }
 
 // Store writes the clan rows.
