@@ -138,6 +138,9 @@ type Hostile struct {
 	// raidMultipliers scale the base defences and regeneration while
 	// raidRelated is set; nil leaves them unchanged. See SetRaidMultipliers.
 	raidMultipliers atomic.Pointer[RaidMultipliers]
+	// aiConfig holds the target-selection switches; nil means
+	// DefaultAIConfig. See SetAIConfig.
+	aiConfig atomic.Pointer[AIConfig]
 
 	// cast is the live cast controller; see SetCastController.
 	cast atomic.Pointer[CastControl]

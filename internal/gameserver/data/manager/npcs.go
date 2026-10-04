@@ -98,15 +98,17 @@ type Npcs struct {
 	// raidMultipliers scale every raid-related hostile's base defences and
 	// regeneration.
 	raidMultipliers npc.RaidMultipliers
-	geo             move.Geo
-	state           *world.State
-	ids             idAllocator
-	decay           *task.Decay
-	respawn         *task.Respawn
-	ai              *task.AI
-	positions       *task.PositionUpdates
-	items           *item.Table
-	ground          groundPlacer
+	// aiConfig holds every hostile's target-selection switches.
+	aiConfig  npc.AIConfig
+	geo       move.Geo
+	state     *world.State
+	ids       idAllocator
+	decay     *task.Decay
+	respawn   *task.Respawn
+	ai        *task.AI
+	positions *task.PositionUpdates
+	items     *item.Table
+	ground    groundPlacer
 	// newSink builds the event sink each spawned NPC reports through; nil
 	// leaves spawned NPCs silent.
 	newSink func(*npc.Hostile) event.Sink
@@ -151,7 +153,7 @@ type Npcs struct {
 // maker's qualifying entries into state, respecting persisted dead/alive
 // data for database-tracked entries.
 func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, effects effect.Env, queues Queues, zoneIndexes ...*zone.Index) (*Npcs, error) {
-	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, nil, 20, 30, 0, npc.DefaultRaidMultipliers(), effects, queues, zoneIndexes...)
+	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, nil, 20, 30, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), effects, queues, zoneIndexes...)
 }
 
 // Queues creates the queue one live NPC's work runs on; id names it in logs.
@@ -163,11 +165,11 @@ type Queues interface {
 // base, RandomWalkRate and raid base multipliers, each running its work on a
 // queue from queues. newFolkSink builds the sink a civilian NPC shows its
 // movement and status through.
-func NewNpcsWithMaxBuffsAmount(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, effects effect.Env, queues Queues, zoneIndexes ...*zone.Index) (*Npcs, error) {
-	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, newFolkSink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount, raidMultipliers, effects, queues, zoneIndexes...)
+func NewNpcsWithMaxBuffsAmount(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, aiConfig npc.AIConfig, effects effect.Env, queues Queues, zoneIndexes ...*zone.Index) (*Npcs, error) {
+	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, newFolkSink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount, raidMultipliers, aiConfig, effects, queues, zoneIndexes...)
 }
 
-func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, effects effect.Env, queues Queues, zoneIndexes ...*zone.Index) (*Npcs, error) {
+func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, aiConfig npc.AIConfig, effects effect.Env, queues Queues, zoneIndexes ...*zone.Index) (*Npcs, error) {
 	if spawns == nil || spawns.Table() == nil {
 		return nil, fmt.Errorf("npcs: nil spawn table")
 	}
@@ -233,6 +235,7 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		randomWalkRate:      randomWalkRate,
 		maxGeoPathFailCount: maxGeoPathFailCount,
 		raidMultipliers:     raidMultipliers,
+		aiConfig:            aiConfig,
 		geo:                 geo,
 		state:               state,
 		ids:                 ids,
