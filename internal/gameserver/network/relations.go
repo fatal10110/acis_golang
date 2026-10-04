@@ -13,8 +13,8 @@ import (
 // relationTo returns the RelationChanged bitmask subject shows observer:
 // its PvP flag and karma, its clan leadership, and the clan wars between
 // their two clans, which a clan academy member on either side neither
-// shows nor sees. The siege bits wait on the siege engine (#232/#234), so
-// they are always zero here.
+// shows nor sees. The siege bits are not computed yet (#1165), so they
+// are always zero here.
 func (l *GameClientLink) relationTo(subject, observer *player.Character) int32 {
 	var bits int32
 	if subject.PvPFlagState() != task.PvPFlagNone {

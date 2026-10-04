@@ -1286,6 +1286,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				return
 			}
 
+		case clientpackets.OpcodeRequestSiegeAttackerList, clientpackets.OpcodeRequestSiegeDefenderList,
+			clientpackets.OpcodeRequestJoinSiege, clientpackets.OpcodeRequestConfirmSiegeWaitingList:
+			if !l.dispatchSiege(client, live, opcode, payload) {
+				return
+			}
+
 		case clientpackets.OpcodeMultiSellChoose:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeMultiSellChoose)
 			if err != nil {

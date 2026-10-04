@@ -38,8 +38,8 @@ func (l *GameClientLink) adminCastle(gm *livePlayer, line string) {
 		c, _ = l.castles.ByAlias(args[1])
 	}
 	if c == nil {
-		// ponytail: the castle list shows each castle's siege status, which
-		// needs the siege engine (#234).
+		// ponytail: the castle list shows each castle's siege status
+		// (#3376).
 		l.log.Warn().Str("command", "admin_castle").Msg("admin: castle list not implemented yet")
 		gm.SendFrame(serverpackets.FrameActionFailed())
 		return
@@ -88,7 +88,7 @@ func (l *GameClientLink) adminCastleSet(gm *livePlayer, c *castle.Castle) {
 //
 // The page counts the life control towers standing, which outside a siege
 // is every one the castle has. During a siege only those still alive
-// count; tracking them needs the siege engine (#234). No mercenary ticket
+// count; tracking them needs the control towers (#465). No mercenary ticket
 // can be dropped yet (#238), so the dropped ticket count is 0.
 func (l *GameClientLink) showAdminCastle(gm *livePlayer, c *castle.Castle) {
 	const file = "data/html/admin/castle.htm"

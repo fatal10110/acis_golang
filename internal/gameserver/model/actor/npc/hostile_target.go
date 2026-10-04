@@ -156,9 +156,9 @@ func (h *Hostile) inRangeAndUnconcealed(target attackable.Combatant, rangeVal in
 // this is the owning player, matching AutoAttackTargetValid's own Owner()
 // resolution above; only the closing attackability and line-of-sight checks
 // use the raw target. Not modeled: the clan/siege-side DEFENDER/OWNER
-// exclusion inside a playable's siege-guard attackability branch — no
-// castle/siege state exists yet (#232/#234), so the attackability check
-// here falls through to whatever general AttackableBy the target exposes.
+// exclusion inside a playable's siege-guard attackability branch is not
+// wired to the castle sieges yet (#3375), so the attackability check here
+// falls through to whatever general AttackableBy the target exposes.
 func (h *Hostile) siegeGuardAutoAttackTargetValid(target attackable.Combatant) bool {
 	if target == nil {
 		return false

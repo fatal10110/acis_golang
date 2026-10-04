@@ -64,6 +64,11 @@ type liveZoneActor struct {
 	offGrid     bool
 	steps       int
 	lastCompass int32
+	// leftBattlefield is set, under mu, by the exit rule of a battlefield
+	// under siege. The revalidation that ran it applies the pvp flag once
+	// mu is released, still under deliveryMu, so the flag's UserInfo goes
+	// out before that revalidation's compass update.
+	leftBattlefield bool
 }
 
 // zoneStepsPerRevalidation is how many movement steps pass per zone
@@ -109,7 +114,9 @@ func (a *liveZoneActor) revalidate(ix *zone.Index) {
 	}
 	a.syncFlags()
 	code, changed, flagPvP := a.compassUpdate()
+	leftBattlefield := a.takeLeftBattlefield()
 	a.mu.Unlock()
+	a.flagLeftBattlefield(leftBattlefield)
 	a.sendCompass(code, changed, flagPvP)
 }
 
@@ -146,7 +153,9 @@ func (a *liveZoneActor) revalidateMove(ix *zone.Index, previous location.Locatio
 	}
 	a.syncFlags()
 	code, changed, flagPvP := a.compassUpdate()
+	leftBattlefield := a.takeLeftBattlefield()
 	a.mu.Unlock()
+	a.flagLeftBattlefield(leftBattlefield)
 	a.sendCompass(code, changed, flagPvP)
 }
 
@@ -157,6 +166,9 @@ func (a *liveZoneActor) removeFrom(ix *zone.Index, x, y int) {
 	defer a.mu.Unlock()
 	ix.RemoveFrom(a, x, y)
 	a.syncFlags()
+	// A player logging out is no longer tracked for the pvp flag, so
+	// leaving a battlefield on the way out does not flag it.
+	a.leftBattlefield = false
 }
 
 // leave takes the player off the grid for a teleport: it exits every zone
@@ -166,12 +178,14 @@ func (a *liveZoneActor) leave(ix *zone.Index, x, y int) {
 	a.deliveryMu.Lock()
 	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	a.offGrid = true
 	if ix != nil {
 		ix.RemoveFrom(a, x, y)
 	}
 	a.syncFlags()
+	leftBattlefield := a.takeLeftBattlefield()
+	a.mu.Unlock()
+	a.flagLeftBattlefield(leftBattlefield)
 }
 
 // rejoin puts the player back on the grid once its client has appeared,
@@ -187,8 +201,28 @@ func (a *liveZoneActor) rejoin(ix *zone.Index) {
 	}
 	a.syncFlags()
 	code, changed, flagPvP := a.compassUpdate()
+	leftBattlefield := a.takeLeftBattlefield()
 	a.mu.Unlock()
+	a.flagLeftBattlefield(leftBattlefield)
 	a.sendCompass(code, changed, flagPvP)
+}
+
+// takeLeftBattlefield reports and clears whether the revalidation just run
+// left a battlefield under siege. mu must be held.
+func (a *liveZoneActor) takeLeftBattlefield() bool {
+	left := a.leftBattlefield
+	a.leftBattlefield = false
+	return left
+}
+
+// flagLeftBattlefield puts a player that left a battlefield under siege on
+// the normal pvp flag timer, flagging it when it is not
+// (SiegeZone.onExit). It runs with deliveryMu held and mu released,
+// before the compass update of the same revalidation.
+func (a *liveZoneActor) flagLeftBattlefield(left bool) {
+	if left {
+		a.live.Emit(event.PvPFlagged{})
+	}
 }
 
 func (a *liveZoneActor) syncFlags() {

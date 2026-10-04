@@ -205,6 +205,7 @@ type Character struct {
 	insidePvPZone            atomic.Bool
 	insidePeaceZone          atomic.Bool
 	insideSiegeZone          atomic.Bool
+	siegeState               atomic.Int32
 	insideNoSummonFriendZone atomic.Bool
 	insideBossZone           atomic.Bool
 	insideClanHallZone       atomic.Bool
