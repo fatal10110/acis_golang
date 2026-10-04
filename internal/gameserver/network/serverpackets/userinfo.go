@@ -140,7 +140,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	}
 
 	collisionRadius, collisionHeight := t.CollisionRadius, t.CollisionHeight
-	if c.Sex == player.SexFemale {
+	if c.Sex() != player.SexMale {
 		collisionRadius, collisionHeight = t.CollisionRadiusFemale, t.CollisionHeightFemale
 	}
 
@@ -158,7 +158,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	w.WriteInt32(c.ObjectID())
 	w.WriteString(c.Name)
 	w.WriteInt32(int32(c.Race))
-	w.WriteInt32(int32(c.Sex))
+	w.WriteInt32(int32(c.Sex()))
 	w.WriteInt32(int32(c.VisibleBaseClassID()))
 	w.WriteInt32(int32(progression.CharLevel))
 	w.WriteInt64(progression.Exp)

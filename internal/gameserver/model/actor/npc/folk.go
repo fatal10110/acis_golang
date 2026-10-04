@@ -184,10 +184,10 @@ func (f *Folk) NPCInfoSnapshot() npcinfo.Snapshot {
 	x, y, z := f.Position()
 	name, title := "", ""
 	if t.UsingServerSideName {
-		name = t.Name
+		name = f.Instance.Name()
 	}
 	if t.UsingServerSideTitle {
-		title = t.Title
+		title = f.Instance.Title()
 	}
 	pAtkSpd := f.AttackSpeed()
 	return npcinfo.Snapshot{

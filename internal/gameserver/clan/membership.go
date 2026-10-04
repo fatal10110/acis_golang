@@ -92,7 +92,7 @@ func (s *Service) Create(c *player.Character, name string, now time.Time) (*Clan
 func LiveMember(c *player.Character) Member {
 	return Member{
 		ObjectID: c.ID, Name: c.Name, Title: c.Title(),
-		Level: c.Level(), ClassID: c.ClassID(), Sex: int(c.Sex), Race: int(c.Race),
+		Level: c.Level(), ClassID: c.ClassID(), Sex: int(c.Sex()), Race: int(c.Race),
 	}
 }
 

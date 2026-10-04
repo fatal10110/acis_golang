@@ -45,7 +45,9 @@ type Character struct {
 	// Other actors' queues read it (CharInfo), so it is atomic.
 	baseClassID atomic.Int32
 	Race        Race
-	Sex         Sex
+	// sex is read through Sex: an admin changes it while other actors'
+	// queues read it (CharInfo, clan rows), so it is atomic.
+	sex atomic.Uint32
 
 	// activeClassID is the class currently played: the base class, or the
 	// active subclass's class. Other actors' queues read it (CharInfo,
@@ -369,7 +371,6 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 		Name:        name,
 
 		Race: race,
-		Sex:  sex,
 
 		CharLevel: 1,
 
@@ -393,6 +394,7 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 		maxBuffsAmount: defaultMaxBuffsAmount,
 	}
 
+	c.SetSex(sex)
 	c.SetClassID(tmpl.ID)
 	c.SetBaseClassID(tmpl.ID)
 	if len(tmpl.Spawns) > 0 {

@@ -16,7 +16,6 @@ import (
 type Decoration struct {
 	world.Presence
 	*Instance
-	title string
 	stats fixedStats
 }
 
@@ -35,12 +34,11 @@ func NewDecoration(inst *Instance, title string, skills ...skillDefinitions) (*D
 	if err != nil {
 		return nil, err
 	}
-	return &Decoration{Instance: inst, title: title, stats: stats}, nil
+	inst.SetTitle(title)
+	return &Decoration{Instance: inst, stats: stats}, nil
 }
 
 func (d *Decoration) ObjectID() int32 { return d.Instance.ObjectID }
-
-func (d *Decoration) Name() string { return d.Instance.Template.Name }
 
 func (d *Decoration) CollisionRadius() float64 { return d.Instance.Template.CollisionRadius }
 
@@ -49,7 +47,7 @@ func (d *Decoration) NPCInfoSnapshot() npcinfo.Snapshot {
 	x, y, z := d.Position()
 	name := ""
 	if t.UsingServerSideName {
-		name = t.Name
+		name = d.Instance.Name()
 	}
 	return npcinfo.Snapshot{
 		ObjectID: d.ObjectID(), TemplateID: t.TemplateID,
@@ -59,7 +57,7 @@ func (d *Decoration) NPCInfoSnapshot() npcinfo.Snapshot {
 		MoveMultiplier: d.stats.moveMultiplier, AtkSpdMultiplier: d.stats.atkSpdMultiplier,
 		CollisionRadius: t.CollisionRadius, CollisionHeight: t.CollisionHeight,
 		RightHand: t.RightHand, LeftHand: t.LeftHand,
-		Running: !d.Instance.WalkMode, SummonAnimation: 2, Name: name, Title: d.title,
+		Running: !d.Instance.WalkMode, SummonAnimation: 2, Name: name, Title: d.Instance.Title(),
 	}
 }
 

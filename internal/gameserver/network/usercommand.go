@@ -123,7 +123,7 @@ func (l *GameClientLink) unsafeDismountHeight(live *livePlayer) bool {
 	}
 	at := live.CurrentLocation()
 	safe := live.Template().SafeFallHeightFemale
-	if live.Sex == player.SexMale {
+	if live.Sex() == player.SexMale {
 		safe = live.Template().SafeFallHeightMale
 	}
 	drop := at.Z - int(l.geo.Height(at.X, at.Y, at.Z))

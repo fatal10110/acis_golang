@@ -229,7 +229,7 @@ type Hostile struct {
 func (*Hostile) OffensiveFollowLead() bool { return true }
 
 // CharacterName returns this NPC's display name for character-name packets.
-func (h *Hostile) CharacterName() string { return h.Instance.Template.Name }
+func (h *Hostile) CharacterName() string { return h.Instance.Name() }
 
 // Attackable reports whether inst's instance type belongs to the set of
 // combat-capable NPC kinds NewHostile accepts. Callers deciding whether to
@@ -455,10 +455,10 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 	x, y, z := h.Position()
 	name, title := "", ""
 	if tmpl.UsingServerSideName {
-		name = tmpl.Name
+		name = h.Instance.Name()
 	}
 	if tmpl.UsingServerSideTitle {
-		title = tmpl.Title
+		title = h.Instance.Title()
 	}
 	pAtkSpd := h.AttackSpeed()
 	return npcinfo.Snapshot{
@@ -480,7 +480,7 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 // name always shown, the view an immobile NPC is announced with.
 func (h *Hostile) ServerObjectInfoSnapshot() npcinfo.Snapshot {
 	snapshot := h.NPCInfoSnapshot()
-	snapshot.Name = h.Instance.Template.Name
+	snapshot.Name = h.Instance.Name()
 	return snapshot
 }
 
