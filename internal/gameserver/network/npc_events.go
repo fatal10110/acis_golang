@@ -259,16 +259,21 @@ type doorSink struct {
 	known world.KnownBuffer
 }
 
-// Emit sends the door's open/close state to every known observer.
+// Emit sends the door's status (open/close state, HP and damage stage) or
+// its revive to every known observer.
 func (s *doorSink) Emit(ev event.Event) {
-	if _, ok := ev.(event.StatusChanged); !ok {
+	var build func() wire.Frame
+	switch ev.(type) {
+	case event.StatusChanged:
+		build = func() wire.Frame { return serverpackets.DoorFrameBuilder{}.StatusUpdate(s.door, false) }
+	case event.Revived:
+		build = func() wire.Frame { return serverpackets.FrameRevive(s.door.ObjectID()) }
+	default:
 		return
 	}
 	known := s.known.SnapshotCopy(s.world, s.door)
 	defer known.Release()
-	broadcastFrame(func() wire.Frame {
-		return serverpackets.DoorFrameBuilder{}.StatusUpdate(s.door, false)
-	}, func(send func(frameReceiver)) {
+	broadcastFrame(build, func(send func(frameReceiver)) {
 		for _, o := range known.Tracked() {
 			if receiver, ok := o.(frameReceiver); ok {
 				send(receiver)

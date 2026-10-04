@@ -184,6 +184,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideDecay,
 			provideAttackStance,
 			provideDoorTask,
+			provideDoorRegen,
 			provideWorldObjects,
 			provideBoats,
 			provideSpawns,
@@ -207,6 +208,6 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideAnnouncements,
 			provideGameClientLink,
 		),
-		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startOlympiad, startRaidPoints, startBossZones, startDebugHTTP, startGameServer),
+		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startDoorRegen, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startOlympiad, startRaidPoints, startBossZones, startDebugHTTP, startGameServer),
 	}
 }

@@ -795,6 +795,7 @@ type Server struct {
 	BuyListStock     *merchant.Stock
 	BuyListRows      *gamesql.BuyListStore
 	WorldObjects     *gamemanager.WorldObjects // doors spawned by WithDoors; nil otherwise
+	doors            *doorHarness              // geodata and regeneration of WithDoors' doors
 	Boats            *boat.Fleet               // boats sailing WithBoats' itineraries; nil otherwise
 	NpcSpawns        *gamemanager.Npcs         // live NPC population of WithNpcSpawns; nil otherwise
 	Relations        *relation.Manager         // friend and block lists the link was wired with
@@ -1646,8 +1647,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	ids := &sequentialIDs{next: 100}
 	var worldObjects *gamemanager.WorldObjects
+	var doors *doorHarness
 	if len(o.doors) > 0 {
-		worldObjects = bootDoors(t, o.doors, ids, state)
+		worldObjects, doors = bootDoors(t, o.doors, ids, state)
 	}
 	boats := bootBoats(t, o.boats, ids, state)
 	levels := o.levels
@@ -2054,6 +2056,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Client:           c,
 		State:            state,
 		WorldObjects:     worldObjects,
+		doors:            doors,
 		Boats:            boats,
 		Clans:            gclConfig.Clans,
 		SevenSigns:       sevenSigns,
