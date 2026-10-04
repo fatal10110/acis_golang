@@ -198,9 +198,10 @@ func (w *derbyWorld) tickets(t *testing.T) []*item.Instance {
 }
 
 // TestDerbyRaceManagerShowsTheRaceAndHidesItsRunners pins the race manager's
-// sight: a player coming to know it is shown the race ahead of the manager
-// itself, and one losing it sees the eight runners removed ahead of the
-// manager.
+// sight as a player walking up to it and away again has it: the race comes
+// ahead of the manager itself, and the eight runners leave ahead of the
+// manager. The manager is spawned out of sight first, as at boot, so only
+// the player's own crossing reveals and hides it.
 func TestDerbyRaceManagerShowsTheRaceAndHidesItsRunners(t *testing.T) {
 	w := bootDerby(t, 0)
 	w.tick(1)
@@ -208,22 +209,43 @@ func TestDerbyRaceManagerShowsTheRaceAndHidesItsRunners(t *testing.T) {
 	if !ok {
 		t.Fatal("no race after the first step")
 	}
-	f := w.srv.SpawnFolkNPCAt(t, folkTemplate("DerbyTrackManagerNpc", raceManagerID), location.Location{X: w.at.X + 60, Y: w.at.Y, Z: w.at.Z})
-	frames := drainFrames(t, w.c)
-	if len(frames) < 2 || frames[0][0] != serverpackets.OpcodeMonRaceInfo || frames[1][0] != serverpackets.OpcodeNPCInfo {
-		t.Fatalf("manager shown with %x, want MonRaceInfo then NpcInfo", opcodes(frames))
+	f := w.srv.SpawnFolkNPCAt(t, folkTemplate("DerbyTrackManagerNpc", raceManagerID), location.Location{X: w.at.X + 3*2048, Y: w.at.Y, Z: w.at.Z})
+	if frames := drainFrames(t, w.c); slices.ContainsFunc(frames, func(fr []byte) bool {
+		return fr[0] == serverpackets.OpcodeMonRaceInfo || fr[0] == serverpackets.OpcodeNPCInfo
+	}) {
+		t.Fatalf("manager three regions away shown with %x, want nothing", opcodes(frames))
 	}
-	if want := framePayload(serverpackets.FrameMonRaceInfo(race)); !bytes.Equal(frames[0], want) {
-		t.Fatalf("MonRaceInfo = %x, want %x", frames[0], want)
+	mover, ok := w.srv.State.Player(w.player)
+	if !ok {
+		t.Fatal("player missing from world state")
 	}
-	if got := int32(binaryLE(frames[0][1:5])); got != -1 {
+
+	// Two regions east the manager's region joins the player's neighborhood.
+	if err := w.srv.State.Move(mover, w.at.X+2*2048, w.at.Y, w.at.Z); err != nil {
+		t.Fatalf("move: %v", err)
+	}
+	var shown [][]byte
+	for _, fr := range drainFrames(t, w.c) {
+		if fr[0] == serverpackets.OpcodeMonRaceInfo || (fr[0] == serverpackets.OpcodeNPCInfo && int32(binaryLE(fr[1:5])) == f.ObjectID()) {
+			shown = append(shown, fr)
+		}
+	}
+	if len(shown) != 2 || shown[0][0] != serverpackets.OpcodeMonRaceInfo || shown[1][0] != serverpackets.OpcodeNPCInfo {
+		t.Fatalf("walking up to the manager shows %x, want MonRaceInfo then its NpcInfo", opcodes(shown))
+	}
+	if want := framePayload(serverpackets.FrameMonRaceInfo(race)); !bytes.Equal(shown[0], want) {
+		t.Fatalf("MonRaceInfo = %x, want %x", shown[0], want)
+	}
+	if got := int32(binaryLE(shown[0][1:5])); got != -1 {
 		t.Fatalf("MonRaceInfo first code = %d, want -1 before the start", got)
 	}
 
-	w.srv.State.Despawn(f)
-	frames = drainFrames(t, w.c)
+	// Back home the manager's region leaves the neighborhood again.
+	if err := w.srv.State.Move(mover, w.at.X, w.at.Y, w.at.Z); err != nil {
+		t.Fatalf("move back: %v", err)
+	}
 	var gone []int32
-	for _, fr := range frames {
+	for _, fr := range drainFrames(t, w.c) {
 		if fr[0] == serverpackets.OpcodeDeleteObject {
 			gone = append(gone, int32(binaryLE(fr[1:5])))
 		}

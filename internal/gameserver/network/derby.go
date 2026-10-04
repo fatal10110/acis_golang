@@ -82,7 +82,10 @@ func derbyFrames(part event.DerbyPart) []func() wire.Frame {
 
 // showDerbyRace shows p, coming to know race manager f, the race as it
 // stands. It runs ahead of f's NpcInfo, the order a player walking up to
-// the manager sees.
+// the manager sees. A manager spawned in sight of p is shown the same way,
+// although there the reference sends the race after the NpcInfo: Discover
+// is not told which side moved, and managers spawn at boot, before anyone
+// is in sight.
 func (p *livePlayer) showDerbyRace(f *npc.Folk) {
 	if p.link == nil || p.link.derby == nil || !f.DerbyTrackManager() {
 		return
@@ -93,7 +96,9 @@ func (p *livePlayer) showDerbyRace(f *npc.Folk) {
 }
 
 // hideDerbyRunners removes the race's runners from p, losing sight of race
-// manager f, ahead of f itself.
+// manager f, ahead of f itself: the order of a player walking away. A
+// manager despawned in sight of p goes the same way, although there the
+// reference deletes the manager before its runners.
 func (p *livePlayer) hideDerbyRunners(f *npc.Folk) {
 	if p.link == nil || p.link.derby == nil || !f.DerbyTrackManager() {
 		return
