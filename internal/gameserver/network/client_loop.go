@@ -911,10 +911,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 				continue
 			}
+			l.log.Debug().Bool("live_nil", live == nil).Interface("req", req).Msg("movedbg: MoveBackwardToLocation received")
 			if live == nil {
 				continue
 			}
 			if req.MoveMovement == 0 {
+				l.log.Debug().Msg("movedbg: rejected keyboard movement (MoveMovement=0)")
 				session.SendFrame(serverpackets.FrameActionFailed())
 				continue
 			}
