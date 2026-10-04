@@ -295,7 +295,7 @@ func (l *GameClientLink) endCursedWeapon(end cursedweapon.EndOfLife, current *li
 	case end.Held:
 		live, online := l.livePlayerByID(end.HolderID)
 		if !online {
-			l.cursed.ReleaseHolder(end, true)
+			l.cursed.ReleaseHolder(end)
 			break
 		}
 		release := func() {
@@ -315,7 +315,11 @@ func (l *GameClientLink) endCursedWeapon(end cursedweapon.EndOfLife, current *li
 // releaseCursedHolder takes the ended weapon end from live, on live's
 // queue: its karma and PK kills come back, the weapon's skill goes, the
 // weapon comes off and is destroyed, and its status is refreshed around
-// it. The karma and PK kills are stored at once.
+// it. The karma and PK kills are stored at once, and the weapon's stored
+// row is deleted as well: a release that runs after live's logout already
+// released its inventory's persistence and queued its last item save, so
+// the destroy above reaches no row, and the delete, queued on the same lane
+// after that save, is what takes the weapon out of the stored items.
 func (l *GameClientLink) releaseCursedHolder(live *livePlayer, end cursedweapon.EndOfLife) {
 	if live.attack != nil {
 		live.attack.Stop()
@@ -333,7 +337,7 @@ func (l *GameClientLink) releaseCursedHolder(live *livePlayer, end cursedweapon.
 		}
 	}
 	l.broadcastCharacterInfo(live)
-	l.cursed.ReleaseHolder(end, false)
+	l.cursed.ReleaseHolder(end)
 }
 
 // removeCursedGroundItem takes the ground item objectID out of the world,

@@ -80,6 +80,9 @@ func cursedTemplates() *item.Table {
 		if tmpl.ID == zaricheID {
 			lr := *tmpl
 			lr.Slot = item.SlotLRHand
+			// As in the datapack, a cursed weapon can be neither dropped,
+			// destroyed nor traded by its holder.
+			lr.Dropable, lr.Destroyable, lr.Tradable = false, false, false
 			templates[i] = &lr
 			akamanah := lr
 			akamanah.ID, akamanah.Name = akamanahID, "Blood Sword Akamanah"
@@ -755,5 +758,94 @@ func TestCursedWeaponExpiredWhileOffline(t *testing.T) {
 	}
 	if len(srv.CursedWeapons.Active()) != 0 {
 		t.Fatal("Zariche still out")
+	}
+}
+
+// TestCursedWeaponLeftOnGroundEnds: the weapon a holder's death dropped
+// (non-droppable, as the datapack ships it) lies on the ground for an
+// hour; then it leaves the world and S1_HAS_DISAPPEARED is heard. A minute
+// short of the hour it is still there.
+func TestCursedWeaponLeftOnGroundEnds(t *testing.T) {
+	t.Parallel()
+	base := time.Date(2026, 10, 4, 12, 0, 0, 0, time.UTC)
+	clock := newCursedClock(base)
+	srv := cursedBoot(t, 10,
+		gameservertest.WithSeed(seedDropVictim(25, 100, 3)),
+		gameservertest.WithCursedWeaponClock(clock.Now),
+	)
+	c, id := srv.Client, srv.SoleObjectID(t)
+	startInWorld(t, c)
+	pickUpCursed(t, srv, c, id)
+	setVictimRoll(t, srv, id, 51)
+	killByNPC(t, srv, id)
+	readQuiet(c)
+	ground := cursedGround(t, srv)
+
+	srv.TickCursedWeapons(base.Add(59 * time.Minute))
+	srv.Settle(t)
+	if _, ok := srv.State.Object(ground.ObjectID()); !ok || len(srv.CursedWeapons.Active()) != 1 {
+		t.Fatal("Zariche left the ground before its hour was up")
+	}
+
+	srv.TickCursedWeapons(base.Add(time.Hour))
+	srv.Settle(t)
+	frames := readQuiet(c)
+	if indexOfMessage(frames, 0, serverpackets.SystemMessageS1HasDisappeared, itemParam(zaricheID)) < 0 {
+		t.Fatal("no S1_HAS_DISAPPEARED when the hour on the ground ran out")
+	}
+	if _, ok := srv.State.Object(ground.ObjectID()); ok {
+		t.Fatal("Zariche still lies in the world")
+	}
+	if active := srv.CursedWeapons.Active(); len(active) != 0 {
+		t.Fatalf("weapons out = %+v, want none", active)
+	}
+}
+
+// TestCursedWeaponHolderLifeRunsOut: a holder whose hunger is far off
+// still loses the weapon on the first life check at or past its end time:
+// S1_HAS_DISAPPEARED, karma and PK kills back, and the weapon gone from
+// its inventory and its stored items.
+func TestCursedWeaponHolderLifeRunsOut(t *testing.T) {
+	t.Parallel()
+	base := time.Date(2026, 10, 4, 12, 0, 0, 0, time.UTC)
+	clock := newCursedClock(base)
+	srv := cursedBoot(t, 10,
+		gameservertest.WithSeed(seedDropVictim(25, 100, 3)),
+		gameservertest.WithCursedWeaponClock(clock.Now),
+	)
+	c, id := srv.Client, srv.SoleObjectID(t)
+	seedHolder(t, srv, id, 600, base.Add(30*time.Minute))
+	c.Send(encodeRequestGameStart(0))
+	mustRead(t, c, "SSQInfo")
+	mustRead(t, c, "CharSelected")
+	c.Send(encodeEnterWorld())
+	for f := mustRead(t, c, "login burst"); f[0] != serverpackets.OpcodeSkillCoolTime; f = mustRead(t, c, "login burst") {
+	}
+	drainUntilQuiet(t, c)
+
+	srv.TickCursedWeapons(base.Add(29 * time.Minute))
+	srv.Settle(t)
+	if _, _, ok := srv.CursedWeapons.Held(id); !ok {
+		t.Fatal("the weapon ended before its end time")
+	}
+
+	srv.TickCursedWeapons(base.Add(30 * time.Minute))
+	srv.Settle(t)
+	frames := readQuiet(c)
+	if indexOfMessage(frames, 0, serverpackets.SystemMessageS1HasDisappeared, itemParam(zaricheID)) < 0 {
+		t.Fatal("no S1_HAS_DISAPPEARED when the life ran out")
+	}
+	holder := victimCharacter(t, srv, id)
+	if holder.CursedWeaponEquipped() || holder.Karma() != 100 || holder.ProgressionValues().PKKills != 3 || holder.Inventory().ItemByTemplateID(zaricheID) != nil {
+		t.Fatalf("after the end: weapon %d karma %d pk %d, want none, 100, 3 and no Zariche",
+			holder.CursedWeaponID(), holder.Karma(), holder.ProgressionValues().PKKills)
+	}
+	srv.FlushPersistence(t)
+	var weapons int
+	if err := srv.DB.QueryRowContext(context.Background(), "SELECT COUNT(*) FROM items WHERE owner_id = ? AND item_id = ?", id, zaricheID).Scan(&weapons); err != nil {
+		t.Fatalf("count items: %v", err)
+	}
+	if weapons != 0 {
+		t.Fatalf("stored Zariche rows = %d, want 0", weapons)
 	}
 }

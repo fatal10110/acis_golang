@@ -71,9 +71,9 @@ type Store interface {
 	Insert(ctx context.Context, row Row) error
 	Update(ctx context.Context, row Row) error
 	Delete(ctx context.Context, itemID int32) error
-	// ReleaseHolder sets the former holder's karma and PK kills back and,
-	// with removeItem, deletes the weapon from its stored items.
-	ReleaseHolder(ctx context.Context, playerID, itemID, karma, pkKills int32, removeItem bool) error
+	// ReleaseHolder deletes the weapon from the former holder's stored
+	// items and sets its karma and PK kills back.
+	ReleaseHolder(ctx context.Context, playerID, itemID, karma, pkKills int32) error
 }
 
 // Writer runs a database write later, on ownerID's persistence lane.
@@ -604,7 +604,7 @@ func (m *Manager) Restore(ctx context.Context) error {
 		w.nbKills, w.stage, w.nextAt = row.NbKills, row.CurrentStage, row.NumberBeforeNextStage
 		w.hungry, w.endTime = row.HungryTime, row.EndTime
 		if w.endTime-now.UnixMilli() <= 0 {
-			m.releaseHolderLocked(m.endOfLifeLocked(w), true)
+			m.releaseHolderLocked(m.endOfLifeLocked(w))
 			continue
 		}
 		w.dailyAt, w.overallAt = now.Add(minute), now.Add(minute)
@@ -614,22 +614,24 @@ func (m *Manager) Restore(ctx context.Context) error {
 	return nil
 }
 
-// ReleaseHolder stores what an ended weapon gives its former holder back:
-// its karma and PK kills and, with removeItem, the weapon taken out of its
-// stored items, for a holder who is not online to lose it from its
-// inventory.
-func (m *Manager) ReleaseHolder(end EndOfLife, removeItem bool) {
+// ReleaseHolder stores what an ended weapon gives its former holder back,
+// on the holder's persistence lane: the weapon taken out of its stored
+// items, and its karma and PK kills. The item delete holds whether the
+// holder is offline, online (where it repeats the destroy the caller
+// already made) or leaving the world: queued after a logout's last item
+// save, it is what keeps the weapon from coming back with the holder.
+func (m *Manager) ReleaseHolder(end EndOfLife) {
 	if m == nil || !end.Held {
 		return
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.releaseHolderLocked(end, removeItem)
+	m.releaseHolderLocked(end)
 }
 
-func (m *Manager) releaseHolderLocked(end EndOfLife, removeItem bool) {
+func (m *Manager) releaseHolderLocked(end EndOfLife) {
 	m.writeOnLocked(end.HolderID, "release holder", func(ctx context.Context, st Store) error {
-		return st.ReleaseHolder(ctx, end.HolderID, end.ItemID, end.Karma, end.PKKills, removeItem)
+		return st.ReleaseHolder(ctx, end.HolderID, end.ItemID, end.Karma, end.PKKills)
 	})
 }
 

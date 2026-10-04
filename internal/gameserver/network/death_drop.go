@@ -71,11 +71,21 @@ func (l *GameClientLink) dropDeathItem(live *livePlayer, inv *itemcontainer.Inve
 	l.dropHeldItem(live, inv, inst, false)
 }
 
-// dropHeldItem is dropDeathItem returning the ground item it laid down;
-// protect keeps that item from the ground cleanup. ok is false when
-// nothing dropped.
-func (l *GameClientLink) dropHeldItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, protect bool) (*grounditem.Item, bool) {
-	res, ok, err := l.inventory.DropItem(inv, inst.ObjectID, inst.Snapshot().Count)
+// dropHeldItem is dropDeathItem returning the ground item it laid down.
+// cursed drops a cursed weapon: the item's droppable flag cannot refuse
+// it, and the ground cleanup leaves it be. ok is false when nothing
+// dropped.
+func (l *GameClientLink) dropHeldItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, cursed bool) (*grounditem.Item, bool) {
+	var (
+		res invops.DropResult
+		ok  bool
+		err error
+	)
+	if cursed {
+		res, ok, err = l.inventory.ForceDropItem(inv, inst.ObjectID)
+	} else {
+		res, ok, err = l.inventory.DropItem(inv, inst.ObjectID, inst.Snapshot().Count)
+	}
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", inst.ObjectID).Msg("drop item on death")
 	}
@@ -88,7 +98,7 @@ func (l *GameClientLink) dropHeldItem(live *livePlayer, inv *itemcontainer.Inven
 		l.log.Error().Err(err).Int32("object_id", inst.ObjectID).Msg("build item dropped on death")
 		return nil, false
 	}
-	ground.SetDestroyProtected(protect)
+	ground.SetDestroyProtected(cursed)
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageYouDroppedS1, res.Template.ID))
 	x, y, z := live.Position()
 	tx := x + rnd.GetRange(-deathDropOffset, deathDropOffset)
