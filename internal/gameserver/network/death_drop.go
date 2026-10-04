@@ -68,19 +68,37 @@ func (l *GameClientLink) dropItemsOnDeath(live *livePlayer, e event.DeathItemDro
 // reach, and tells live which item it dropped. An item that is no longer
 // there is answered as a drop of too few items.
 func (l *GameClientLink) dropDeathItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance) {
-	res, ok, err := l.inventory.DropItem(inv, inst.ObjectID, inst.Snapshot().Count)
+	l.dropHeldItem(live, inv, inst, false)
+}
+
+// dropHeldItem is dropDeathItem returning the ground item it laid down.
+// cursed drops a cursed weapon: the item's droppable flag cannot refuse
+// it, and the ground cleanup leaves it be. ok is false when nothing
+// dropped.
+func (l *GameClientLink) dropHeldItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, cursed bool) (*grounditem.Item, bool) {
+	var (
+		res invops.DropResult
+		ok  bool
+		err error
+	)
+	if cursed {
+		res, ok, err = l.inventory.ForceDropItem(inv, inst.ObjectID)
+	} else {
+		res, ok, err = l.inventory.DropItem(inv, inst.ObjectID, inst.Snapshot().Count)
+	}
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", inst.ObjectID).Msg("drop item on death")
 	}
 	if !ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotEnoughItems))
-		return
+		return nil, false
 	}
 	ground, err := grounditem.New(*res.Dropped, res.Template)
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", inst.ObjectID).Msg("build item dropped on death")
-		return
+		return nil, false
 	}
+	ground.SetDestroyProtected(cursed)
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageYouDroppedS1, res.Template.ID))
 	x, y, z := live.Position()
 	tx := x + rnd.GetRange(-deathDropOffset, deathDropOffset)
@@ -98,4 +116,5 @@ func (l *GameClientLink) dropDeathItem(live *livePlayer, inv *itemcontainer.Inve
 		PlayerDropped: true,
 		DropperID:     live.ObjectID(),
 	})
+	return ground, true
 }

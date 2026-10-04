@@ -89,6 +89,7 @@ func (s *Server) killRewards() gamemanager.KillRewardConfig {
 		Parties:           s.rewardParties,
 		RaidKills:         s.raidKills,
 		Channels:          s.lootChannels,
+		CursedWeapons:     s.cursedLink,
 		DeepBlueDropRules: s.deepBlueDrops,
 		AutoLoot:          s.autoLoot,
 	}

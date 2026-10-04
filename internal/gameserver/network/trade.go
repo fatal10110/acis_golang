@@ -24,11 +24,12 @@ const tradeChaoticRefusal = "You cannot trade in a chaotic state."
 
 // boundItems reports which of live's items may not leave its inventory by
 // drop, trade or hand-over to its pet: the collar of its pet that is out or
-// of its mount, and the enchant scroll it has selected. Each call reads them
-// as they stand then.
+// of its mount, the enchant scroll it has selected, and any cursed weapon.
+// Each call reads them as they stand then.
 func (l *GameClientLink) boundItems(live *livePlayer) tradebook.BoundItems {
 	return func(objectID int32) bool {
-		return live.ControlItemInUse(objectID) || objectID == l.enchantStateStore().Active(live.ObjectID())
+		return live.ControlItemInUse(objectID) || objectID == l.enchantStateStore().Active(live.ObjectID()) ||
+			l.cursedItem(live.Inventory(), objectID)
 	}
 }
 

@@ -822,10 +822,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if live == nil {
 					continue
 				}
-				// The location-list reply is not implemented yet; log so
-				// the accepted request is never a silent no-op.
-				l.log.Warn().Int32("object_id", live.ObjectID()).
-					Msg("game client: cursed-weapon location request not implemented yet")
+				onLive(live, func() { l.sendCursedWeaponLocations(live) })
 			default:
 				l.log.Info().
 					Uint16("opcode2", second).

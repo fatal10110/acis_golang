@@ -42,3 +42,30 @@ func FrameExCursedWeaponLocation(entries []CursedWeaponLocation) wire.Frame {
 	}
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
+
+// OpcodeEarthquake is the wire opcode for Earthquake, which shakes the
+// screen of every client near a point.
+const OpcodeEarthquake = 0xc4
+
+// FrameEarthquake builds an Earthquake at (x, y, z) of the given intensity
+// lasting duration seconds; npc marks one an NPC causes.
+func FrameEarthquake(x, y, z int, intensity, duration int32, npc bool) wire.Frame {
+	w := newFrameWriter(OpcodeEarthquake)
+	w.WriteInt32(int32(x))
+	w.WriteInt32(int32(y))
+	w.WriteInt32(int32(z))
+	w.WriteInt32(intensity)
+	w.WriteInt32(duration)
+	w.WriteInt32(wire.BoolInt32(npc))
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// Cursed weapon system message ids.
+const (
+	SystemMessageS2HoursOfUsageTimeLeftForS1   = 1813 // item-name then number parameter
+	SystemMessageS2MinutesOfUsageTimeLeftForS1 = 1814 // item-name then number parameter
+	SystemMessageS2WasDroppedInTheS1Region     = 1815 // zone-name then item-name parameter
+	SystemMessageOwnerOfS2AppearedInS1Region   = 1816 // zone-name then item-name parameter
+	SystemMessageS2OwnerLoggedIntoS1Region     = 1817 // zone-name then item-name parameter
+	SystemMessageS1HasDisappeared              = 1818 // item-name parameter
+)

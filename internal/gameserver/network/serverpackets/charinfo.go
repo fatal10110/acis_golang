@@ -147,7 +147,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteInt32(int32(c.PledgeClass()))
 	w.WriteInt32(s.Clan.PledgeType)
 	w.WriteInt32(c.TitleColor())
-	w.WriteInt32(0) // cursed weapon stage
+	w.WriteInt32(c.CursedWeaponStage())
 	return nil
 }
 

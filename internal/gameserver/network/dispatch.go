@@ -19,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/classmaster"
 	"github.com/fatal10110/acis_golang/internal/gameserver/craft"
+	"github.com/fatal10110/acis_golang/internal/gameserver/cursedweapon"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
@@ -290,6 +291,7 @@ type GameClientLink struct {
 	spellbooks    modelskill.BookPolicy
 	skillTrees    *modelskill.Trees
 	cursedWeapons *entity.CursedWeaponTable
+	cursed        *cursedweapon.Manager // the cursed weapons' lifecycle; nil when disabled
 	world         *world.State
 	npcs          *npc.Table
 	summonItems   *item.SummonItemTable
@@ -483,6 +485,7 @@ type GameClientLinkConfig struct {
 	// heal no correction term.
 	HealSps       *modelskill.HealSpsTable
 	CursedWeapons *entity.CursedWeaponTable
+	CursedRuntime *cursedweapon.Manager // the cursed weapons' lifecycle; nil when disabled
 	World         *world.State
 	NPCs          *npc.Table
 	SummonItems   *item.SummonItemTable
@@ -698,6 +701,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		spellbooks:    cfg.Spellbooks,
 		skillTrees:    cfg.SkillTrees,
 		cursedWeapons: cfg.CursedWeapons,
+		cursed:        cfg.CursedRuntime,
 		world:         cfg.World,
 		npcs:          cfg.NPCs,
 		summonItems:   cfg.SummonItems,

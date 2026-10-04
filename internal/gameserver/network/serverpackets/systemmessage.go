@@ -305,6 +305,14 @@ type SystemMessageParam struct {
 	Type  int32
 	Text  string
 	Value int32
+	// X, Y and Z are a zone-name parameter's point.
+	X, Y, Z int32
+}
+
+// ZoneNameParam is a zone-name parameter: the client names the region the
+// point lies in.
+func ZoneNameParam(x, y, z int) SystemMessageParam {
+	return SystemMessageParam{Type: SystemMessageParamZoneName, X: int32(x), Y: int32(y), Z: int32(z)}
 }
 
 // TextParam is a text parameter.
@@ -335,9 +343,14 @@ func FrameSystemMessageParams(id int, params ...SystemMessageParam) wire.Frame {
 	w.WriteInt32(int32(len(params)))
 	for _, p := range params {
 		w.WriteInt32(p.Type)
-		if p.Type == SystemMessageParamText {
+		switch p.Type {
+		case SystemMessageParamText:
 			w.WriteString(p.Text)
-		} else {
+		case SystemMessageParamZoneName:
+			w.WriteInt32(p.X)
+			w.WriteInt32(p.Y)
+			w.WriteInt32(p.Z)
+		default:
 			w.WriteInt32(p.Value)
 		}
 	}
@@ -360,6 +373,7 @@ const (
 	SystemMessageParamItemName   = 3
 	SystemMessageParamSkillName  = 4
 	SystemMessageParamItemNumber = 6
+	SystemMessageParamZoneName   = 7
 )
 
 // OpcodeSystemMessage is the wire opcode for a system message.

@@ -188,6 +188,26 @@ func (s *Service) DropItemFailure(inv *itemcontainer.Inventory, objectID int32, 
 
 // DropItem removes count units from inv for a world drop.
 func (s *Service) DropItem(inv *itemcontainer.Inventory, objectID int32, count int) (DropResult, bool, error) {
+	return s.dropItem(inv, objectID, count, false)
+}
+
+// ForceDropItem removes all of objectID from inv for a world drop that the
+// item's own flags cannot refuse: a non-droppable or quest item drops too,
+// as a cursed weapon leaves its dead holder.
+func (s *Service) ForceDropItem(inv *itemcontainer.Inventory, objectID int32) (DropResult, bool, error) {
+	if inv == nil {
+		return DropResult{}, false, nil
+	}
+	inst := inv.ItemByObjectID(objectID)
+	if inst == nil {
+		return DropResult{}, false, nil
+	}
+	return s.dropItem(inv, objectID, inst.Snapshot().Count, true)
+}
+
+// dropItem removes count units from inv for a world drop; forced skips the
+// droppable and quest item gates.
+func (s *Service) dropItem(inv *itemcontainer.Inventory, objectID int32, count int, forced bool) (DropResult, bool, error) {
 	if inv == nil || count <= 0 {
 		return DropResult{}, false, nil
 	}
@@ -197,7 +217,10 @@ func (s *Service) DropItem(inv *itemcontainer.Inventory, objectID int32, count i
 	}
 	tmpl, ok := inv.Templates().Get(inst.TemplateID)
 	st := inst.Snapshot()
-	if !ok || !inst.Dropable(tmpl) || inst.QuestItem(tmpl) || st.Count < count {
+	if !ok || st.Count < count {
+		return DropResult{}, false, nil
+	}
+	if !forced && (!inst.Dropable(tmpl) || inst.QuestItem(tmpl)) {
 		return DropResult{}, false, nil
 	}
 	if !tmpl.Stackable && count > 1 {

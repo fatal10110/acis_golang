@@ -27,6 +27,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/classmaster"
+	"github.com/fatal10110/acis_golang/internal/gameserver/cursedweapon"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -112,6 +113,7 @@ type options struct {
 	spellbooks             modelskill.BookPolicy
 	crests                 *datacache.Crests
 	cursedWeapons          []*entity.CursedWeaponTable
+	cursedWeaponClock      func() time.Time
 	karmaPlayerCanTeleport bool
 	karmaServiceGates      [3]bool
 	htmlPages              map[string]string
@@ -265,9 +267,17 @@ func WithSpellbooks(policy modelskill.BookPolicy) Option {
 // WithCrests supplies a pre-populated crest cache.
 func WithCrests(crests *datacache.Crests) Option { return func(o *options) { o.crests = crests } }
 
-// WithCursedWeapons supplies cursed weapon tables.
+// WithCursedWeapons supplies cursed weapon tables. The first one also
+// runs the cursed weapons' lifecycle (Server.CursedWeapons), restored from
+// cursed_weapons at boot, its timers driven by Server.TickCursedWeapons.
 func WithCursedWeapons(tables ...*entity.CursedWeaponTable) Option {
 	return func(o *options) { o.cursedWeapons = tables }
+}
+
+// WithCursedWeaponClock sets the clock the cursed weapons' lifecycle reads,
+// so a suite can pin the deadlines its ticks reach.
+func WithCursedWeaponClock(now func() time.Time) Option {
+	return func(o *options) { o.cursedWeaponClock = now }
 }
 
 // WithKarmaTeleport sets the players.properties KarmaPlayerCanTeleport gate
@@ -957,6 +967,13 @@ type Server struct {
 	closeOnce    sync.Once
 	cancel       context.CancelFunc
 	waitHandlers func()
+
+	// CursedWeapons is the cursed weapons' lifecycle WithCursedWeapons
+	// runs; nil without it.
+	CursedWeapons *cursedweapon.Manager
+	// cursedLink drops a monster kill's cursed weapon and runs the cursed
+	// weapons' timers.
+	cursedLink cursedLink
 }
 
 // autosaveClock is the harness clock task.Autosave reads. EnterWorld's
@@ -1697,6 +1714,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		crests = datacache.NewCrests()
 	}
 	var cursed *entity.CursedWeaponTable
+	var cursedState *cursedweapon.Manager
 	if len(o.cursedWeapons) > 0 {
 		cursed = o.cursedWeapons[0]
 	}
@@ -1768,6 +1786,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// Registered before the listener's cleanup, so it drains only after
 	// every connection's detach has enqueued its saves.
 	persistWorker := persist.New(o.log)
+	if cursed != nil {
+		cursedState = cursedweapon.New(cursed, gamesql.NewCursedWeaponStore(db), persistWorker, o.log, o.cursedWeaponClock)
+	}
 	// Known-skill writes run on the worker in production too, so suites see
 	// the same ordering (FlushPersistence waits for them).
 	o.skills.SetPersistWorker(persistWorker, o.log)
@@ -2027,6 +2048,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Olympiad = olympiadState
 	raidPoints := raidpoint.New(gamesql.NewRaidPointStore(db), persistWorker, o.log)
 	gclConfig.RaidPoints = raidPoints
+	gclConfig.CursedRuntime = cursedState
 	lotteryState := o.lottery.newLottery(db, persistWorker, state, queues, o.log)
 	// The functions are restored once the clans own their halls, below.
 	hallFunctions := clanhall.New(o.clanHalls, o.clanHallDecos, gclConfig.Clans.Table(), gamesql.NewClanHallFunctionStore(db), persistWorker, o.log)
@@ -2186,6 +2208,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err := raidPoints.Restore(context.Background()); err != nil {
 		t.Fatalf("restore raid points: %v", err)
 	}
+	if err := cursedState.Restore(context.Background()); err != nil {
+		t.Fatalf("restore cursed weapons: %v", err)
+	}
 	if o.zones != nil {
 		if err := gamesql.NewBossZoneStore(db).Restore(context.Background(), zone.OfKind[*zone.Boss](o.zones)); err != nil {
 			t.Fatalf("restore boss zones: %v", err)
@@ -2232,6 +2257,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		autoLoot:            o.autoLoot,
 		DB:                  db,
 		RaidPoints:          raidPoints,
+		CursedWeapons:       cursedState,
+		cursedLink:          gcl,
 		Lottery:             lotteryState,
 		FishingChampionship: fishChampState,
 		Chars:               chars,

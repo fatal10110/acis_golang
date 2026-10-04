@@ -187,14 +187,17 @@ func (l *GameClientLink) pickupGroundInto(inv *itemcontainer.Inventory, ground *
 // every later click — the same failure shape as an unanswered rejection.
 //
 // Every viewer, the picker included, then sees GetItem, then the item's
-// DeleteObject, then the attention line; what the picker or its party is
-// told it obtained comes after.
+// DeleteObject, then the attention line (none for a cursed weapon); what
+// the picker or its party is told it obtained comes after.
 func (l *GameClientLink) takeGroundFromWorld(live *livePlayer, ground *grounditem.Item) {
 	live.SendFrame(serverpackets.FrameActionFailed())
 	l.broadcastGroundPickup(ground, live.ObjectID())
 	l.groundItems.Remove(ground)
 	l.world.Despawn(ground)
-	l.broadcastPickupAttention(live, ground)
+	// A cursed weapon is announced by its own activation instead.
+	if !l.isCursedWeapon(ground.ItemID()) {
+		l.broadcastPickupAttention(live, ground)
+	}
 }
 
 // lockPickupParalysis briefly paralyzes live after a successful pickup,

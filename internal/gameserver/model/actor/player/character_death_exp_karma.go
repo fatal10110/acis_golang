@@ -29,6 +29,8 @@ func deathLossExemption(inPvP, inSiege, charmOfCourage, killedByPlayable bool) (
 // death's exp snapshot, so a later resurrection restores nothing unless this
 // death takes exp. The loss is skipped while the delevel gate is closed: the
 // AllowDelevel config off, or the Lucky skill still active below level 10.
+// A death to a player holding a cursed weapon, or its summon, costs
+// nothing.
 //
 // Inside a PvP zone two deaths cost nothing: in a siege zone, one while a
 // Charm of Courage is held, which uses the charm up; in any other PvP zone
@@ -58,6 +60,9 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 	c.progressionMu.Lock()
 	defer c.progressionMu.Unlock()
 	c.ExpBeforeDeath = 0
+	if pk != nil && pk.CursedWeaponEquipped() {
+		return
+	}
 	if loss.table == nil || !allow || (lucky && c.CharLevel <= 9) {
 		return
 	}
@@ -181,8 +186,7 @@ func (c *Character) UpdateKarmaLoss(table *LevelTable, exp int64) {
 
 // updateKarmaLoss reduces this character's karma by an experience amount
 // (gained from a kill or lost to a death), through the karma-lost formula.
-// A cursed-weapon holder keeps its karma; that
-// gate stays dormant until cursed weapons are modeled (#225).
+// A cursed-weapon holder keeps its karma.
 //
 // The caller holds progressionMu; the karma announcement, UserInfo and
 // relation broadcast run from hooks, in the karma-change order.

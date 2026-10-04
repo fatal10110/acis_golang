@@ -230,6 +230,7 @@ func (l *GameClientLink) restoreSelected(ctx context.Context, client *Client, c 
 			}
 		}
 	}
+	l.restoreCursedWeapon(c)
 	if c.ResourceValues().CurrentHP < 0.5 {
 		c.MarkDead()
 	}
@@ -394,6 +395,8 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// The chat of a petition still active is replayed after the login
 	// board pages, before the friends hear of the entry.
 	l.enterWorldPetition(client, live)
+	// A cursed weapon's holder is announced as it enters.
+	l.enterWorldCursedWeapon(live)
 	// A punishment served resumes its timer, and a jailed player outside
 	// the jail is taken back.
 	l.enterWorldPunishment(live)

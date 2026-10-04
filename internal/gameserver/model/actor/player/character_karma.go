@@ -37,11 +37,12 @@ func calculateKarmaGain(pkCount int, summon bool) int {
 // a PK-kill count. An actively-flagged, karma-free victim instead takes
 // the PvP-point branch; see awardKillerPvPKill.
 //
-// A kill between two players who are both in a duel changes nothing. A
-// kill also takes other karma-free outcomes when it happens in a PvP/siege
-// zone, when the killer wields a cursed weapon, or when the kill is a
-// clan-war kill. None of those states are tracked on Character yet, so
-// those gates stay dormant until their owning subsystems land.
+// A kill between two players who are both in a duel changes nothing, and
+// a killer wielding a cursed weapon never gets here: Die has the kill feed
+// the weapon instead. A kill also takes other karma-free outcomes when it
+// happens in a PvP/siege zone or when it is a clan-war kill. Those states
+// are not tracked on Character yet, so those gates stay dormant until
+// their owning subsystems land.
 func (c *Character) awardKillerPKKarma(killer attackable.Combatant) {
 	pk := actingCharacter(killer)
 	if pk == nil || pk == c || duelKillExempt(pk, c) || c.Karma() != 0 || c.PvPFlagState() != task.PvPFlagNone {
@@ -95,8 +96,9 @@ func (c *Character) publishPKKarma(karma int) {
 // of a kill's PvP/karma update. Only the killer's own UserInfo is resent;
 // no karma or PvP flag changes.
 //
-// Nothing is awarded when both players are in a duel. The whole update is
-// also gated behind cursed-weapon and PvP/siege-zone early returns, and
+// Nothing is awarded when both players are in a duel, nor to a killer
+// wielding a cursed weapon (see awardKillerPKKarma). The whole update is
+// also gated behind a PvP/siege-zone early return, and
 // this branch's own condition also allows a mutual clan-war kill between
 // non-academy members; the clan registry holds that state, not wired here
 // yet (#1301).
