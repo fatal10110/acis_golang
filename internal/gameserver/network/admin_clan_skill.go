@@ -33,7 +33,8 @@ const adminClanSkillPageLimit = 15
 // The command runs on the leader's queue, where its clan's skill learning
 // runs too, so a change never lands between a learn's payment and its
 // check that the skill is still to learn. A page number past the int range
-// ends the command where it is read, after any change already made.
+// ends the command where it is read: after a set or remove, gm is still
+// told the change or the usage, but gets no page.
 func (l *GameClientLink) adminClanSkill(gm *livePlayer, line string) {
 	target := adminTargetPlayer(gm, true)
 	args := handleradmin.Args(line)
@@ -79,18 +80,19 @@ func (l *GameClientLink) runAdminClanSkill(gm, target *livePlayer, args []string
 			case "set":
 				var listed bool
 				if report, listed = l.adminClanSkillSet(target, cl, next); listed {
-					l.replyAdminClanSkills(gm, target, cl, report, page)
+					l.replyAdminClanSkills(gm, target, cl, report, page, true)
 					return
 				}
 			case "remove":
 				report = l.adminClanSkillRemove(target, cl, next)
 			}
 			if tok, ok := next(); ok && !readPage(tok) {
+				l.replyAdminClanSkills(gm, target, cl, report, 0, false)
 				return
 			}
 		}
 	}
-	l.replyAdminClanSkills(gm, target, cl, report, page)
+	l.replyAdminClanSkills(gm, target, cl, report, page, true)
 }
 
 // adminClanSkillSet runs //clan_skill set on leader's queue: "all" has cl
@@ -209,16 +211,21 @@ func (l *GameClientLink) sendClanSkillsRemoved(cl *clan.Clan, ids []int, actor *
 	}
 }
 
-// replyAdminClanSkills tells gm report, when there is one, then opens page
-// of cl's clan skill page on it. A gm other than leader gets both on its
-// own queue, behind the clan skill changes posted there when it belongs to
-// cl.
-func (l *GameClientLink) replyAdminClanSkills(gm, leader *livePlayer, cl *clan.Clan, report string, page int) {
+// replyAdminClanSkills tells gm report, when there is one, then, when
+// showPage is set, opens page of cl's clan skill page on it. A gm other
+// than leader gets both on its own queue, behind the clan skill changes
+// posted there when it belongs to cl.
+func (l *GameClientLink) replyAdminClanSkills(gm, leader *livePlayer, cl *clan.Clan, report string, page int, showPage bool) {
+	if report == "" && !showPage {
+		return
+	}
 	onMemberQueue(leader, gm, func() {
 		if report != "" {
 			sendText(gm, report)
 		}
-		l.showAdminClanSkills(gm, cl, page)
+		if showPage {
+			l.showAdminClanSkills(gm, cl, page)
+		}
 	})
 }
 

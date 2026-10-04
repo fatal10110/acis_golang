@@ -276,7 +276,10 @@ func TestAdminClanSkillSetAllAndRemoveAll(t *testing.T) {
 // skill page shown; an id or level out of the clan skill range answers the
 // usage and the first page; a malformed set or remove answers the usage
 // and the page after it; removing a skill the clan lacks shows the page
-// alone, as does a page number; page 0 shows nothing.
+// alone, as does a page number; page 0 shows nothing. A page number past
+// the int range shows no page, but a malformed set or remove still answers
+// its usage before it (AdminSkill.java sends the message before parsing
+// the page).
 func TestAdminClanSkillRefusals(t *testing.T) {
 	w := bootAdminClanWorld(t, 1000)
 	const (
@@ -297,6 +300,12 @@ func TestAdminClanSkillRefusals(t *testing.T) {
 		{args: "2", page: "<td>Clan Imperium</td><td>1</td><td>391</td>"},
 		{args: "", page: "<td>Clan Vitality</td><td>3</td><td>370</td>"},
 		{args: "0"},
+		{args: "set x 99999999999", texts: []string{setUsage}},
+		{args: "remove x 99999999999", texts: []string{removeUsage}},
+		{args: "set 370 x 99999999999", texts: []string{setUsage}},
+		{args: "set 370 99999999999", texts: []string{setUsage}, page: "<font color=LEVEL>01</font>"},
+		{args: "remove 370 99999999999"},
+		{args: "99999999999"},
 	}
 	for _, tc := range cases {
 		gm, leader, member := w.clanSkill(t, tc.args)
@@ -323,6 +332,35 @@ func TestAdminClanSkillRefusals(t *testing.T) {
 	}
 	if got := storedClanSkills(t, w.clanWorld); len(got) != 0 {
 		t.Fatalf("stored clan skills = %v, want none", got)
+	}
+}
+
+// TestAdminClanSkillOverflowPageKeepsReport has each change followed by a
+// page number past the int range: the change is made and shown to the
+// members, and the game master is still told it, as AdminSkill.java sends
+// the message before the page parse throws, but is shown no page.
+func TestAdminClanSkillOverflowPageKeepsReport(t *testing.T) {
+	w := bootAdminClanWorld(t, 1000)
+	const overflow = " 99999999999"
+	for _, tc := range []struct {
+		args, text string
+		stored     int
+	}{
+		{args: "set 370 2", text: "You gave Clan Vitality skill to Seeded clan.", stored: 1},
+		{args: "remove 370", text: "You removed 370 skillId from Seeded clan."},
+		{args: "set all", text: "You gave all available skills to Seeded clan.", stored: clanSkillCount},
+		{args: "remove all", text: "You removed all skills from Seeded clan."},
+	} {
+		gm, leader, member := w.clanSkill(t, tc.args+overflow)
+		if texts, page := gmReply(t, gm); !slices.Equal(texts, []string{tc.text}) || page != "" {
+			t.Fatalf("//clan_skill %s%s told %q, page:\n%s\nwant %q and no page", tc.args, overflow, texts, page, tc.text)
+		}
+		if len(leader) == 0 || len(member) == 0 {
+			t.Fatalf("//clan_skill %s%s sent the members %x and %x, want the change shown", tc.args, overflow, opcodes(leader), opcodes(member))
+		}
+		if got := storedClanSkills(t, w.clanWorld); len(got) != tc.stored {
+			t.Fatalf("//clan_skill %s%s stored %v, want %d skills", tc.args, overflow, got, tc.stored)
+		}
 	}
 }
 
