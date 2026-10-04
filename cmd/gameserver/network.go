@@ -232,6 +232,7 @@ func provideGameClientLink(
 		Restarts:         data.Restarts,
 		ClanHallData:     data.ClanHalls,
 		CastleData:       data.Castles,
+		Observers:        data.Observers,
 		Levels:           data.Levels,
 		Admin:            data.Admin,
 		GMAudit:          gmAudit.enabled(gameplay.Admin.GMAudit),

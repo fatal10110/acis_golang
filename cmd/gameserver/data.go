@@ -25,6 +25,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/manor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/observer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
@@ -109,6 +110,8 @@ type gameData struct {
 	// sown in.
 	Manors     *manor.Table
 	ManorAreas *manor.AreaIndex
+	// Observers are the broadcasting towers and the viewpoints they offer.
+	Observers *observer.Table
 }
 
 type geodata struct {
@@ -243,6 +246,10 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
+	observers, err := gamexml.LoadObserverGroups(filepath.Join(xmlRoot, "observerGroups.xml"))
+	if err != nil {
+		return nil, err
+	}
 	geo, err := loadGeodata(paths, log)
 	if err != nil {
 		return nil, err
@@ -281,6 +288,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		Castles:          castles,
 		Manors:           manors,
 		ManorAreas:       manorAreas,
+		Observers:        observers,
 	}, nil
 }
 
