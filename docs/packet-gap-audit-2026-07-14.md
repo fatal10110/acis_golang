@@ -143,9 +143,9 @@ Implemented and wired boat passenger client packets in Go (`network/boat_passeng
 - `RequestGetOnVehicle`
 - `RequestGetOffVehicle`
 
-Missing M4 world/movement client packets:
+Implemented and wired observer client packets in Go (`network/observer.go`):
 
-- `ObserverReturn`
+- `ObserverReturn` (leaves a broadcasting tower's viewpoint; ignored outside observer mode)
 
 Implemented and wired M5 target/combat/item/stance/social client packets in Go:
 

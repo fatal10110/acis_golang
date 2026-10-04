@@ -22,11 +22,17 @@ var ErrNotPlaceable = errors.New("npcs: npc cannot be placed")
 // Only a template a live hostile or civilian NPC models can be placed; any
 // other reports ErrNotPlaceable and places nothing.
 func (n *Npcs) SpawnFixed(tmpl *npc.Template, x, y, z, heading int) error {
+	_, err := n.spawnFixed(tmpl, x, y, z, heading)
+	return err
+}
+
+// spawnFixed is SpawnFixed, also returning the placed NPC's object id.
+func (n *Npcs) spawnFixed(tmpl *npc.Template, x, y, z, heading int) (int32, error) {
 	if tmpl == nil {
-		return ErrNotPlaceable
+		return 0, ErrNotPlaceable
 	}
 	if probe := (&npc.Instance{Template: tmpl}); !npc.FolkKind(probe) && !npc.Attackable(probe) {
-		return fmt.Errorf("%w: npc %d instance type %q", ErrNotPlaceable, tmpl.ID, tmpl.Type)
+		return 0, fmt.Errorf("%w: npc %d instance type %q", ErrNotPlaceable, tmpl.ID, tmpl.Type)
 	}
 	at := location.Location{X: x, Y: y, Z: int(n.geo.Height(x, y, z))}
 	key := fmt.Sprintf("fixed#%d", n.fixedSeq.Add(1))
@@ -41,11 +47,12 @@ func (n *Npcs) SpawnFixed(tmpl *npc.Template, x, y, z, heading int) error {
 	defer n.mu.Unlock()
 	// A slot already gone held an NPC that has decayed since; one still
 	// without a live NPC never placed it.
-	if slot, ok := n.slot[key]; ok && slot.liveID == 0 {
+	slot, ok := n.slot[key]
+	if ok && slot.liveID == 0 {
 		delete(n.slot, key)
-		return fmt.Errorf("%w: npc %d", ErrNotPlaceable, tmpl.ID)
+		return 0, fmt.Errorf("%w: npc %d", ErrNotPlaceable, tmpl.ID)
 	}
-	return nil
+	return slot.liveID, nil
 }
 
 // DeleteFixed removes the live NPC id at once, with no corpse, when it was

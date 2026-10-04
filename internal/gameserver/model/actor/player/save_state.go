@@ -43,10 +43,13 @@ func (c *Character) SaveState() SaveState {
 	classID := c.ClassID()
 	c.progressionMu.RUnlock()
 	// A character aboard a boat is saved on the shore of the dock the boat
-	// serves, not out at sea.
+	// serves, not out at sea; an observer at the position it left to
+	// watch.
 	at := c.CurrentLocation()
 	if v := c.Boat(); v != nil {
 		at = v.OustLocation()
+	} else if saved, ok := c.SavedLocation(); ok && c.ObserverMode() {
+		at = saved
 	}
 	return SaveState{
 		ID:                c.ID,

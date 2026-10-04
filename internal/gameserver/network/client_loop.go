@@ -873,6 +873,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				// the client sends this second click expecting the action
 				// to resolve, and locks its own input until Attack or
 				// ActionFailed answers it.
+				if refuseObserverAction(live) {
+					return
+				}
 				if l.refuseFrozenDuellist(live, req.ObjectID) {
 					return
 				}
@@ -892,6 +895,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			onLive(live, func() {
+				if refuseObserverAttack(live) {
+					return
+				}
 				// A forced attack is an attack request on the object already
 				// selected; on any other object it only selects it.
 				selected := live.Target() != nil && live.Target().ObjectID() == req.ObjectID
@@ -1347,6 +1353,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			onLive(live, func() {
+				if refuseObserverActionUse(live) {
+					return
+				}
 				switch req.ActionID {
 				case actionSitStand:
 					l.requestChangeWaitType(live, !live.Standing())
@@ -1553,6 +1562,17 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					l.completeLivePlayerTeleport(live)
 					live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 				})
+			}
+
+		case clientpackets.OpcodeObserverReturn:
+			if _, err := decodeClientPacket(l, client, payload, clientpackets.DecodeObserverReturn); err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.observerReturn(live) })
 			}
 
 		case clientpackets.OpcodeStartRotating:

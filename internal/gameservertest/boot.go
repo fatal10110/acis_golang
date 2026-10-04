@@ -36,6 +36,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
 	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
+	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
@@ -55,6 +56,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/observer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
@@ -126,6 +128,7 @@ type options struct {
 	restarts               *restart.Table
 	clanHallData           *hallmodel.Table
 	castleData             *castledata.Table
+	observers              *observer.Table
 	teleports              travel.TeleportTable
 	instantTeleports       travel.InstantTable
 	freeTeleport           bool
@@ -874,7 +877,11 @@ type Server struct {
 	DB     *sql.DB
 	// RaidPoints is the players' raid points, restored at boot.
 	RaidPoints *raidpoint.Points
-	Lottery    *lottery.Lottery // the lottery WithLottery runs; nil without it
+	// Olympiad is the Olympiad, its records restored at boot and its
+	// calendar not started; Heroes its heroes, restored at boot.
+	Olympiad *olympiad.Olympiad
+	Heroes   *hero.Manager
+	Lottery  *lottery.Lottery // the lottery WithLottery runs; nil without it
 	// FishingChampionship is the championship WithFishingChampionship
 	// runs; nil without it.
 	FishingChampionship *fishchamp.Championship
@@ -1932,6 +1939,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Restarts:         o.restarts,
 		ClanHallData:     o.clanHallData,
 		CastleData:       o.castleData,
+		Observers:        o.observers,
 		Teleports:        o.teleports,
 		InstantTeleports: o.instantTeleports,
 		FreeTeleport:     o.freeTeleport,
@@ -2045,7 +2053,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	// The Olympiad's records are restored once the characters are seeded,
 	// below; its calendar is not started (see WithOlympiadSeed).
-	olympiadState := olympiad.New(olympiad.DefaultConfig(), gamesql.NewOlympiadStore(db), persistWorker, network.NewOlympiadAnnouncer(state), queues.NewQueue("olympiad"), o.log)
+	heroes := hero.New(gamesql.NewHeroStore(db), gclConfig.Clans.Table(), persistWorker, HeroMinMatches, time.Now, o.log)
+	gclConfig.Heroes = heroes
+	olympiadState := olympiad.New(olympiad.DefaultConfig(), gamesql.NewOlympiadStore(db), persistWorker, network.NewOlympiadAnnouncer(state), heroes, queues.NewQueue("olympiad"), o.log)
 	gclConfig.Olympiad = olympiadState
 	raidPoints := raidpoint.New(gamesql.NewRaidPointStore(db), persistWorker, o.log)
 	gclConfig.RaidPoints = raidPoints
@@ -2208,6 +2218,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err := olympiadState.Restore(context.Background()); err != nil {
 		t.Fatalf("restore olympiad: %v", err)
 	}
+	if err := heroes.Restore(context.Background()); err != nil {
+		t.Fatalf("restore heroes: %v", err)
+	}
+	heroes.Start(gcl)
 	t.Cleanup(func() { olympiadState.Stop(context.Background()) })
 	o.lottery.start(t, db, lotteryState)
 	o.fishChamp.start(t, db, fishChampState)
@@ -2269,6 +2283,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		RaidPoints:          raidPoints,
 		CursedWeapons:       cursedState,
 		cursedLink:          gcl,
+		Olympiad:            olympiadState,
+		Heroes:              heroes,
 		Lottery:             lotteryState,
 		FishingChampionship: fishChampState,
 		Chars:               chars,

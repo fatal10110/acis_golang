@@ -75,6 +75,7 @@ var gameDecoders = []gameDecoder{
 	{"ProtocolVersion", decodes(DecodeProtocolVersion), seedPacket(OpcodeProtocolVersion, seedRevision)},
 	{"MoveBackwardToLocation", decodes(DecodeMoveBackwardToLocation), seedPacket(OpcodeMoveBackwardToLocation, seedX+100, seedY+100, seedZ, seedX, seedY, seedZ, int32(1))},
 	{"Appearing", decodes(DecodeAppearing), seedPacket(OpcodeAppearing)},
+	{"ObserverReturn", decodes(DecodeObserverReturn), seedPacket(OpcodeObserverReturn)},
 	{"Action", decodes(DecodeAction), seedPacket(OpcodeAction, seedObjectID, seedX, seedY, seedZ, byte(0))},
 	{"AuthLogin", decodes(DecodeAuthLogin), seedPacket(OpcodeAuthLogin, "TestAccount", int32(0x2a2b2c2d), int32(0x1a1b1c1d), int32(0x0a0b0c0d), int32(0x3a3b3c3d))},
 	{"AttackRequest", decodes(DecodeAttackRequest), seedPacket(OpcodeAttackRequest, seedObjectID, seedX, seedY, seedZ, byte(1))},

@@ -28,6 +28,9 @@ func (l *GameClientLink) talkToFolk(live *livePlayer, f *npc.Folk) {
 	if id, ok := f.TalkAnimation(time.Now()); ok {
 		l.broadcastFolkFrame(f, func() wire.Frame { return serverpackets.FrameSocialAction(f.ObjectID(), id) })
 	}
+	if showObserverGroups(live, f) {
+		return
+	}
 	html, outcome := f.ChatWindow(setPages{l.html}, l.playerConfig.chatRules(), live.Karma(), folkChatState{l: l, live: live})
 	switch outcome {
 	case npc.ChatWedding:
@@ -74,6 +77,10 @@ func (s folkChatState) FestivalNotice() string {
 }
 
 func (s folkChatState) Noble() bool { return s.live.IsNoble() }
+
+func (s folkChatState) Hero() (isHero, inactive bool) {
+	return s.live.IsHero(), s.l.heroes != nil && s.l.heroes.IsInactive(s.live.ObjectID())
+}
 
 // broadcastFolkFrame sends one serialized frame to every player that knows
 // f, each an independently owned copy.

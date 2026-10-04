@@ -23,6 +23,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/derby"
 	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
 	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
+	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -99,6 +100,7 @@ func provideGameClientLink(
 	sevenSigns *sevensigns.State,
 	fest *festival.Manager,
 	olympiadState *olympiad.Olympiad,
+	heroes *hero.Manager,
 	raidPoints *raidpoint.Points,
 	cursedWeapons *cursedweapon.Manager,
 	inventoryUpdates *task.InventoryUpdates,
@@ -220,6 +222,7 @@ func provideGameClientLink(
 		SevenSigns:    sevenSigns,
 		Festival:      fest,
 		Olympiad:      olympiadState,
+		Heroes:        heroes,
 		RaidPoints:    raidPoints,
 		Water:         water,
 		ShadowItems:   shadowItems,
@@ -233,6 +236,7 @@ func provideGameClientLink(
 		Restarts:         data.Restarts,
 		ClanHallData:     data.ClanHalls,
 		CastleData:       data.Castles,
+		Observers:        data.Observers,
 		Levels:           data.Levels,
 		Admin:            data.Admin,
 		GMAudit:          gmAudit.enabled(gameplay.Admin.GMAudit),

@@ -79,8 +79,8 @@ func (l *GameClientLink) subclassBypass(live *livePlayer, f *npc.Folk, command s
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSubclassNoChangeWhileSkillInUse))
 		return true
 	}
-	// An Olympiad registration is dropped here once the Olympiad exists
-	// (#3071); nothing registers for it yet.
+	// An Olympiad registration is dropped here once players can register
+	// (#3281, #3203); nothing registers for it yet.
 	cmd := npc.ParseSubclassCommand(command)
 	subs := live.Subclasses()
 	base := live.BaseClassID()
@@ -502,9 +502,19 @@ func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChan
 		}
 		live.SendFrame(serverpackets.FrameSkillList(skillListEntries(c, l.skills)))
 		// The skills held outside the class come back after that list,
-		// which does not show them: the clan's skills here; the noble and
-		// hero skills before them (#3203) and a clan leader's siege skills
-		// after them (#3150) once those systems exist.
+		// which does not show them: a noble's skills, with its skill list
+		// and UserInfo; a hero's skills on the base class, which the
+		// status takes away on a subclass, with its skill list; then the
+		// clan's skills, and a clan leader's siege skills after them once
+		// sieges exist (#3150).
+		if c.IsNoble() {
+			l.giveNobleSkills(c)
+			live.SendFrame(serverpackets.FrameSkillList(skillListEntries(c, l.skills)))
+			live.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
+		}
+		if c.IsHero() {
+			l.setHero(live, true)
+		}
 		if cl, ok := l.clanService().ClanOf(c); ok {
 			l.giveClanSkills(live, cl, c.PledgeClass())
 		}

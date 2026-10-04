@@ -153,10 +153,10 @@ func (l *GameClientLink) stopLivePlayer(live *livePlayer) {
 }
 
 func (l *GameClientLink) validateLivePlayerPosition(live *livePlayer, reported location.Location, boatID int32) {
-	// Validation is skipped entirely while teleporting — no correction
-	// packet, unlike the other two gates
-	// here which answer ActionFailed.
-	if live.Teleporting() {
+	// Validation is skipped entirely while teleporting or observing — no
+	// correction packet, and the reported position is not taken: an
+	// observer's client reports its camera, not the character.
+	if live.Teleporting() || live.ObserverMode() {
 		return
 	}
 	// Under the free camera the reported position is taken as is, with no

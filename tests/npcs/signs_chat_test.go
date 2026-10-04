@@ -34,6 +34,7 @@ func signsPages() map[string]string {
 	pages["seven_signs/festival/festival_witch.htm"] = "<html><body>witch<br>%festivalMins%</body></html>"
 	add("olympiad/noble.htm")
 	add("olympiad/noble_main.htm")
+	add("olympiad/hero_main2.htm")
 	return pages
 }
 
@@ -269,8 +270,8 @@ func TestFestivalGuidePages(t *testing.T) {
 }
 
 // The Grand Olympiad Manager greets a noble with noble_main.htm and anyone
-// else with noble.htm. A Monument of Heroes reads the hero state, not in
-// place yet, and opens nothing.
+// else with noble.htm. A Monument of Heroes greets anyone who is no hero
+// with hero_main2.htm, noble or not (see TestMonumentOfHeroesPages).
 func TestOlympiadManagerPages(t *testing.T) {
 	t.Parallel()
 	for _, noble := range []bool{false, true} {
@@ -295,11 +296,8 @@ func TestOlympiadManagerPages(t *testing.T) {
 			}
 
 			monument := w.spawnFolk(t, folkTemplate("OlympiadManagerNpc", 31690), 40)
-			w.selectFolk(t, monument)
-			got := interactOrder(w.talk(t, monument, false))
-			want := []byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToPawn, serverpackets.OpcodeSocialAction}
-			if string(got) != string(want) {
-				t.Fatalf("monument talk = %x, want %x", got, want)
+			if got, want := w.talkPage(t, monument, false), wantSignsPage("olympiad/hero_main2.htm", monument); got != want {
+				t.Fatalf("monument page = %q, want %q", got, want)
 			}
 		})
 	}

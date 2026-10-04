@@ -104,8 +104,8 @@ var bypassRoutes = []bypassRoute{
 	{[]string{"manor_menu_select?"}, unportedBypass("manor (#240)")},
 	{[]string{"bbs_", "_bbs", "_friend", "_mail", "_block"}, (*GameClientLink).boardCommand},
 	{[]string{"Quest "}, (*GameClientLink).bypassQuest},
-	{[]string{"_match", "_diary"}, unportedBypass("hero records (#220)")},
-	{[]string{"arenachange"}, unportedBypass("olympiad observation (#219)")},
+	{[]string{"_match", "_diary"}, unportedBypass("hero records (#3361)")},
+	{[]string{"arenachange"}, unportedBypass("olympiad observation (#3356)")},
 }
 
 // requestBypassToServer routes a clicked HTML link to its command family.
@@ -192,6 +192,7 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 	rules := l.playerConfig.chatRules()
 	rules.AllowWear = l.merchant.Config().AllowWear
 	talker := npc.Talker{Karma: live.Karma(), Level: live.Level(), LowLevelNewbie: live.LowLevelNewbie()}
+	talker.InactiveHero = l.heroes != nil && l.heroes.IsInactive(live.ObjectID())
 	reply := f.Bypass(setPages{l.html}, rules, talker, command)
 	if reply.LeadingActionFailed {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -259,10 +260,18 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		return l.lotteryBypass(live, f, command)
 	case npc.BypassDerby:
 		return l.derbyBypass(live, f, command)
+	case npc.BypassObserveGroup:
+		l.observeGroup(live, f, reply.Index)
+	case npc.BypassObserve:
+		l.observe(live, reply.Index)
 	case npc.BypassFishingChampionship:
 		l.fishermanChampionship(live, f)
 	case npc.BypassFishingReward:
 		l.fishermanReward(live, f)
+	case npc.BypassHeroList:
+		l.sendHeroList(live)
+	case npc.BypassHeroClaim:
+		l.claimHero(live)
 	case npc.BypassAuction:
 		l.auctioneerBypass(live, f, command)
 	case npc.BypassUnported:

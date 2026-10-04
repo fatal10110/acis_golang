@@ -50,10 +50,7 @@ const mountNpcIdOffset = 1000000
 const teamBlue = 1
 
 // UserInfoSnapshot is everything UserInfo needs about one character at the
-// moment of encoding. It is deliberately narrower than the client's full
-// field list: systems this server hasn't built yet (hero status)
-// always report their at-rest default, matching a freshly entered
-// character that has none of them. The
+// moment of encoding. The
 // attributes and combat stats are Character's live values, so gear, buffs,
 // level and passives all reach the status window.
 type UserInfoSnapshot struct {
@@ -280,7 +277,7 @@ func writeUserInfo(w *wire.Writer, s UserInfoSnapshot) error {
 	}
 	w.WriteInt32(s.Clan.CrestLargeID)
 	w.WriteUint8(boolUint8(c.IsNoble()))
-	w.WriteUint8(0) // hero flag: heroism is not modeled
+	w.WriteUint8(boolUint8(c.IsHero()))
 	bait := c.FishingBait()
 	w.WriteUint8(boolUint8(c.Fishing()))
 	w.WriteInt32(int32(bait.X))

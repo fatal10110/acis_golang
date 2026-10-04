@@ -27,10 +27,6 @@ type SummonFriendRequester interface {
 	NoSummonFriendZone() bool
 }
 
-// ObserverMode always reports false: observer/spectate mode (#219) isn't
-// ported yet.
-func (c *Character) ObserverMode() bool { return false }
-
 // FestivalParticipant always reports false: the Festival of Darkness (#223)
 // isn't ported yet.
 func (c *Character) FestivalParticipant() bool { return false }

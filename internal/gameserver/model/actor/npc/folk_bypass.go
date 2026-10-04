@@ -96,12 +96,20 @@ const (
 	BypassLottery
 	// BypassDerby runs a race manager's own command; see derby.Command.
 	BypassDerby
+	// BypassObserveGroup lists the viewpoints of group Index.
+	BypassObserveGroup
+	// BypassObserve takes the talker to watch from viewpoint Index.
+	BypassObserve
 	// BypassFishingChampionship opens a fisherman's fishing championship
 	// winners page.
 	BypassFishingChampionship
 	// BypassFishingReward claims a fishing championship prize at a
 	// fisherman.
 	BypassFishingReward
+	// BypassHeroList shows the heroes of the running era.
+	BypassHeroList
+	// BypassHeroClaim has an elected hero claim the hero status.
+	BypassHeroClaim
 	// BypassAuction runs any command on an auctioneer, whose own dialog
 	// answers every command.
 	BypassAuction
@@ -114,6 +122,9 @@ type Talker struct {
 	// LowLevelNewbie is a level 6 to 25 player who has made at most the
 	// first occupation change.
 	LowLevelNewbie bool
+	// InactiveHero is a player elected hero who has not claimed the status
+	// yet.
+	InactiveHero bool
 }
 
 // BypassReply is a civilian NPC's answer to one dialog command.
@@ -144,7 +155,8 @@ type BypassReply struct {
 	Warehouse     WarehouseCommand
 	FreightTarget string
 	// Index is the destination BypassTeleport and BypassInstantTeleport
-	// name.
+	// name, the viewpoint group BypassObserveGroup names, or the viewpoint
+	// BypassObserve names.
 	Index int
 }
 
@@ -163,6 +175,8 @@ type BypassReply struct {
 // Loto <n> runs the lottery dialog, multisell <list> and exc_multisell
 // <list> open a multisell list, Augment 1 and Augment 2 open the
 // augmentation and removal windows,
+// observe_group <id> lists a viewpoint group and observe <id> sends the
+// talker to watch from a viewpoint,
 // teleport_request opens the destination list, and teleport <index> and
 // instant_teleport <index> take the talker to a destination, and
 // CPRecovery has an arena manager restore the talker's CP for a fee and
@@ -186,6 +200,9 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	}
 	if _, ok := unportedFolkChats[kind]; ok {
 		return reply
+	}
+	if kind == "OlympiadManagerNpc" && strings.HasPrefix(command, "Olympiad") && !strings.HasPrefix(command, "OlympiadNoble") {
+		return f.olympiadCommand(pages, talker, command, reply)
 	}
 	if _, ok := unportedFolkCommands[kind]; ok {
 		return reply
@@ -310,6 +327,10 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	case strings.HasPrefix(command, "Loto"):
 		reply.Outcome = BypassLottery
 		return reply
+	case strings.HasPrefix(command, "observe_group"):
+		return observeCommand(reply, BypassObserveGroup, command)
+	case strings.HasPrefix(command, "observe"):
+		return observeCommand(reply, BypassObserve, command)
 	case strings.HasPrefix(command, "multisell"):
 		reply.Outcome, reply.Multisell = BypassMultisell, strings.TrimFunc(command[len("multisell"):], javaSpace)
 		return reply
@@ -352,6 +373,26 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			reply.Outcome = BypassCPRecovery
 		}
 	}
+	return reply
+}
+
+// observeCommand answers "<command> <id>", split on whitespace: outcome
+// names group or viewpoint id. A command without an id, or whose id does
+// not parse, aborts.
+func observeCommand(reply BypassReply, outcome BypassOutcome, command string) BypassReply {
+	words := strings.FieldsFunc(command, func(r rune) bool {
+		return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\f'
+	})
+	if len(words) < 2 {
+		reply.Outcome = BypassAborted
+		return reply
+	}
+	id, err := commons.ParseInt(words[1], 32)
+	if err != nil {
+		reply.Outcome = BypassAborted
+		return reply
+	}
+	reply.Outcome, reply.Index = outcome, int(id)
 	return reply
 }
 
@@ -495,4 +536,43 @@ func commandChars(command string, begin, end int) (string, bool) {
 		return "", false
 	}
 	return string(utf16.Decode(units[begin:end])), true
+}
+
+// olympiadCommand answers an Olympiad manager's "Olympiad <n>" command,
+// whose choice is the one character after "Olympiad ": a command too short
+// to hold it, or one that is no digit, stops the handling. 4 shows the
+// heroes; 5 asks an elected hero to confirm its claim and 6 claims the
+// status, answering nothing to anyone else; 7 opens the Monument of Heroes'
+// main page. The class rankings (2) and the stadium list (3) need the
+// Olympiad's registration and matches (#3281, #3340); any other choice
+// answers nothing.
+func (f *Folk) olympiadCommand(pages Pages, talker Talker, command string, reply BypassReply) BypassReply {
+	arg, ok := commandChars(command, 9, 10)
+	if !ok {
+		reply.Outcome = BypassAborted
+		return reply
+	}
+	choice, err := commons.Atoi(arg)
+	if err != nil {
+		reply.Outcome = BypassAborted
+		return reply
+	}
+	switch choice {
+	case 2, 3:
+		reply.Outcome = BypassUnported
+	case 4:
+		reply.Outcome = BypassHeroList
+	case 5:
+		reply.Outcome = BypassRefused
+		if talker.InactiveHero {
+			reply.Outcome, reply.HTML = BypassPage, f.page(pages, olympiadPages+"hero_confirm.htm")
+		}
+	case 6:
+		reply.Outcome = BypassHeroClaim
+	case 7:
+		reply.Outcome, reply.HTML = BypassPage, f.heroMainPage(pages, talker.InactiveHero)
+	default:
+		reply.Outcome = BypassRefused
+	}
+	return reply
 }

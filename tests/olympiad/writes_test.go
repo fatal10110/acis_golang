@@ -73,7 +73,7 @@ func TestOlympiadStepsDoNotWaitOnTheDatabase(t *testing.T) {
 	t.Cleanup(func() { _ = worker.Close(context.Background()) })
 	store := &gatedStore{OlympiadStore: gamesql.NewOlympiadStore(db), release: make(chan struct{})}
 	loop := sim.NewInline(time.Date(2026, 10, 7, 20, 0, 0, 0, time.UTC))
-	o := olympiad.New(olympiad.DefaultConfig(), store, worker, discard{}, loop.NewQueue("olympiad"), zerolog.Nop())
+	o := olympiad.New(olympiad.DefaultConfig(), store, worker, discard{}, nil, loop.NewQueue("olympiad"), zerolog.Nop())
 	if err := o.Restore(ctx); err != nil {
 		t.Fatal(err)
 	}

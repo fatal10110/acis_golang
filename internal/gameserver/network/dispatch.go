@@ -31,6 +31,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/gatekeeper"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
@@ -50,6 +51,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/observer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
@@ -314,6 +316,7 @@ type GameClientLink struct {
 	sevenSigns  *sevensigns.State
 	festival    *festival.Manager
 	olympiad    *olympiad.Olympiad
+	heroes      *hero.Manager
 	raidPoints  *raidpoint.Points
 	water       *task.Water
 	shadowItems *task.ShadowItems
@@ -336,6 +339,7 @@ type GameClientLink struct {
 	queues           Queues
 	queuedPets       queuedPets
 	restarts         *restart.Table
+	observers        *observer.Table
 	clanHallData     *hallmodel.Table
 	castleData       *castledata.Table
 	levels           *player.LevelTable
@@ -536,6 +540,9 @@ type GameClientLinkConfig struct {
 	// Olympiad holds the nobles' Olympiad records. Nil is tolerated
 	// (tests) and holds none.
 	Olympiad *olympiad.Olympiad
+	// Heroes holds the heroes. Nil is tolerated (tests): nobody is a hero
+	// and none can be elected or claim the status.
+	Heroes *hero.Manager
 	// RaidPoints holds the players' raid points. Nil is tolerated (tests):
 	// kills credit none and every record reads empty.
 	RaidPoints *raidpoint.Points
@@ -545,6 +552,9 @@ type GameClientLinkConfig struct {
 	Restarts     *restart.Table
 	ClanHallData *hallmodel.Table  // owner restart spawns; nil restarts to town
 	CastleData   *castledata.Table // owner restart spawns; nil restarts to town
+	// Observers are the viewpoints broadcasting towers offer; nil offers
+	// none.
+	Observers    *observer.Table
 	Levels       *player.LevelTable
 	Admin        *admin.Data
 	PlayerConfig PlayerConfig
@@ -728,6 +738,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		sevenSigns:    cfg.SevenSigns,
 		festival:      cfg.Festival,
 		olympiad:      cfg.Olympiad,
+		heroes:        cfg.Heroes,
 		raidPoints:    cfg.RaidPoints,
 		water:         cfg.Water,
 		shadowItems:   cfg.ShadowItems,
@@ -742,6 +753,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		restarts:         cfg.Restarts,
 		clanHallData:     cfg.ClanHallData,
 		castleData:       cfg.CastleData,
+		observers:        cfg.Observers,
 		levels:           cfg.Levels,
 		admin:            cfg.Admin,
 		gmAudit:          cfg.GMAudit,

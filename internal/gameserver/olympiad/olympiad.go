@@ -12,8 +12,9 @@
 // (#3280).
 //
 // The rules of a match between two nobles are in game.go. Nothing runs the
-// matches yet: the competition window starts no game manager (#3340) and
-// the end of an Olympiad elects no heroes (#220).
+// matches yet: the competition window starts no game manager (#3340). The
+// end of an Olympiad elects the heroes, behind the save of the records
+// they are elected from.
 package olympiad
 
 import (
@@ -135,6 +136,13 @@ type Store interface {
 	SaveFight(ctx context.Context, f Fight) error
 }
 
+// Heroes elects the heroes from the stored nobles' records.
+type Heroes interface {
+	// Elect runs on the Olympiad's persistence lane, so it reads the
+	// records the Olympiad saved before it.
+	Elect(ctx context.Context)
+}
+
 // step is one scheduled calendar change. The order breaks ties between
 // steps due at the same moment: the earlier one runs first.
 type step int
@@ -156,6 +164,7 @@ type Olympiad struct {
 	store  Store
 	writes Writer
 	out    Announcer
+	heroes Heroes
 	log    zerolog.Logger
 	queue  *sim.Queue
 
@@ -183,11 +192,12 @@ type Olympiad struct {
 }
 
 // New returns an Olympiad persisting through store, its writes queued on
-// writes (run inline when nil), and announcing through out. Its calendar
+// writes (run inline when nil), announcing through out, and electing the
+// heroes at its end through heroes (none elected when nil). Its calendar
 // runs on queue, which it owns from then on. Restore then Start bring it
 // up.
-func New(cfg Config, store Store, writes Writer, out Announcer, queue *sim.Queue, log zerolog.Logger) *Olympiad {
-	return &Olympiad{cfg: cfg, store: store, writes: writes, out: out, queue: queue, log: log, registrationEnd: -1, nobles: map[int32]Noble{}}
+func New(cfg Config, store Store, writes Writer, out Announcer, heroes Heroes, queue *sim.Queue, log zerolog.Logger) *Olympiad {
+	return &Olympiad{cfg: cfg, store: store, writes: writes, out: out, heroes: heroes, queue: queue, log: log, registrationEnd: -1, nobles: map[int32]Noble{}}
 }
 
 // Restore loads the cycle number, the first when none is stored, and the
@@ -415,15 +425,47 @@ func (o *Olympiad) startCycle() {
 	o.out.Announce(NoticeCycleStarted, cycle)
 }
 
+// SelectHeroes ends the running Olympiad at once, as its end would: the
+// heroes are elected from the records as they stand. The pending calendar
+// step is cancelled and none is scheduled after the end, so the calendar
+// stands still until the next restart; the end itself still enters the
+// period the clock is in, opening a competition window when inside one.
+func (o *Olympiad) SelectHeroes() {
+	o.queue.Post(func() {
+		o.run.Lock()
+		defer o.run.Unlock()
+		if o.stopped {
+			return
+		}
+		if o.timer != nil {
+			o.timer.Stop()
+			o.timer = nil
+		}
+		o.olympiadEnd, o.nextPoints, o.registrationEnd = 0, 0, -1
+		o.mu.Lock()
+		o.periodEnd = 0
+		o.mu.Unlock()
+		o.endOlympiad()
+	})
+}
+
 // endOlympiad closes the running Olympiad: it saves the records, enters the
-// validation period, saves the status, keeps the month's standings and
-// enters the period the clock is in. No heroes are elected yet (#220).
+// validation period, elects the heroes from the saved records, saves the
+// status, keeps the month's standings and enters the period the clock is
+// in.
 func (o *Olympiad) endOlympiad() {
 	o.out.Announce(NoticeCycleEnded, o.Cycle())
 	o.saveNobles()
 	o.mu.Lock()
 	o.period = Validation
 	o.mu.Unlock()
+	if o.heroes != nil {
+		heroes := o.heroes
+		o.queueJob("elect heroes", func(ctx context.Context) error {
+			heroes.Elect(ctx)
+			return nil
+		})
+	}
 	o.saveStatus()
 	o.write("keep the month's standings", func(ctx context.Context, st Store) error { return st.SnapshotMonth(ctx) })
 	o.enterPeriod()
@@ -460,11 +502,18 @@ func (o *Olympiad) deleteNobles() {
 // write queues fn on the Olympiad's persistence lane, or runs it at once
 // without a writer. Each write gets TaskTimeout.
 func (o *Olympiad) write(what string, fn func(context.Context, Store) error) {
-	store, log := o.store, o.log
+	store := o.store
+	o.queueJob(what, func(ctx context.Context) error { return fn(ctx, store) })
+}
+
+// queueJob queues fn on the Olympiad's persistence lane, or runs it at once
+// without a writer. Each job gets TaskTimeout.
+func (o *Olympiad) queueJob(what string, fn func(context.Context) error) {
+	log := o.log
 	job := func() {
 		ctx, cancel := context.WithTimeout(context.Background(), TaskTimeout)
 		defer cancel()
-		if err := fn(ctx, store); err != nil {
+		if err := fn(ctx); err != nil {
 			log.Error().Err(err).Msg("olympiad: " + what)
 		}
 	}
