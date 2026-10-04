@@ -169,7 +169,7 @@ func (l *GameClientLink) recallGroup(group string, target *livePlayer) []*livePl
 }
 
 // adminSendHome sends the named player, else the selected one, else gm, to
-// the nearest town.
+// the nearest town, out of any Seven Signs dungeon.
 func (l *GameClientLink) adminSendHome(gm *livePlayer, args []string) {
 	target := adminTargetPlayer(gm, true)
 	if len(args) > 0 {
@@ -184,6 +184,7 @@ func (l *GameClientLink) adminSendHome(gm *livePlayer, args []string) {
 		if dest, ok := l.restartDestination(target); ok {
 			l.teleportLivePlayer(target, dest, restartTeleportOffset)
 		}
+		target.SetIn7sDungeon(false)
 	})
 }
 

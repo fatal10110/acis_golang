@@ -137,6 +137,9 @@ type Character struct {
 	seesInvisible atomic.Bool
 	// noble is the noblesse status; see character_noble.go.
 	noble atomic.Bool
+	// in7sDungeon is the Seven Signs dungeon membership; see
+	// character_sevensigns.go.
+	in7sDungeon atomic.Bool
 	// cursedWeapon is the cursed weapon held; see
 	// character_cursed_weapon.go.
 	cursedWeapon cursedWeaponHold

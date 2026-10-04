@@ -18,8 +18,8 @@ import (
 const restartTeleportOffset = 20
 
 // restartLivePlayer handles a dead player's restart-point selection: it
-// resolves the destination the request type names, revives the player, and
-// teleports them there. A selection the player may not use is ignored,
+// resolves the destination the request type names, takes the player out of
+// any Seven Signs dungeon, revives it, and teleports it there. A selection the player may not use is ignored,
 // leaving the player dead on the death screen.
 func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.RequestRestartPoint) {
 	if live == nil {
@@ -52,6 +52,7 @@ func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.R
 		return
 	}
 
+	live.SetIn7sDungeon(false)
 	live.Revive()
 	l.teleportLivePlayer(live, dest, restartTeleportOffset)
 }

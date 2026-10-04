@@ -16,6 +16,7 @@ type recallTraveler interface {
 	InDuel() bool
 	Riding() bool
 	Flying() bool
+	SetIn7sDungeon(in bool)
 	TeleportTo(x, y, z, radius int)
 	Recall(dest modelskill.RecallType)
 }
@@ -32,8 +33,8 @@ func (recallHandler) Types() []string { return []string{"RECALL", "TELEPORT"} }
 // caster that is afraid, at an Olympiad match or in a boss zone recalls
 // nobody and keeps its spiritshot. A target at the festival, jailed,
 // duelling, riding or flying stays; so does one other than the caster at an
-// Olympiad match or in a boss zone. The caster's spiritshot is spent
-// whoever moved.
+// Olympiad match or in a boss zone. Every player sent away leaves any Seven
+// Signs dungeon. The caster's spiritshot is spent whoever moved.
 func (recallHandler) Use(cast Cast) {
 	if p, ok := asPlayer(cast.Caster); ok {
 		c, ok := p.(recallCaster)
@@ -60,6 +61,7 @@ func (recallHandler) Use(cast Cast) {
 				continue
 			}
 		}
+		traveler.SetIn7sDungeon(false)
 		if at := cast.Skill.TeleCoords; at != nil {
 			traveler.TeleportTo(at.X, at.Y, at.Z, recallScatter)
 			continue

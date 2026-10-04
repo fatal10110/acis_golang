@@ -362,8 +362,10 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	live.replayingEffects.Store(false)
 	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(c)))
 	l.enterWorldClan(client, live)
-	// Taken once the clan block has given the clan's skills, so the login
-	// SkillList carries them.
+	// The Seal of Strife skill follows the clan block, ahead of the spawn.
+	l.enterWorldStrifeSkills(live)
+	// Taken once the clan block has given the clan's skills and the Seal of
+	// Strife skill is settled, so the login SkillList carries them.
 	skillList := skillListEntries(c, l.skills)
 	if l.world != nil {
 		x, y, z := c.Position()
@@ -399,6 +401,9 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	l.enterWorldPetition(client, live)
 	// A cursed weapon's holder is announced as it enters.
 	l.enterWorldCursedWeapon(live)
+	// A player in a Seven Signs dungeon it is no longer allowed in is sent
+	// to town.
+	l.enterWorldSevenSignsDungeon(live)
 	// A punishment served resumes its timer, and a jailed player outside
 	// the jail is taken back.
 	l.enterWorldPunishment(live)

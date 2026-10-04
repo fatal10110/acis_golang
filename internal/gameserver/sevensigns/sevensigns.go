@@ -11,7 +11,8 @@
 // from the moment they begin.
 //
 // Every period change is announced to the players online through a
-// Broadcaster and saved in full.
+// Broadcaster, acts on them through Online (the Seal of Strife skills, the
+// Seven Signs dungeons), and is saved in full.
 package sevensigns
 
 import (
@@ -180,6 +181,7 @@ type State struct {
 	store     Store
 	out       Broadcaster
 	festival  Festival
+	online    Online
 	now       func() time.Time
 	afterFunc func(time.Duration, func()) *time.Timer
 	log       zerolog.Logger
@@ -323,18 +325,19 @@ func (s *State) NextChange() time.Time {
 
 // advance moves the state into the following period — settling the
 // competition, or starting the next cycle after validation ends — announces
-// it, drives the festival, persists it, shows the new sky, and re-arms the
-// timer.
+// it, drives the festival and the Seal of Strife skills, persists it, sends
+// the players no longer allowed in a Seven Signs dungeon out, shows the new
+// sky, and re-arms the timer.
 func (s *State) advance() {
 	s.mu.Lock()
 	ended := s.row.Period
 	notices := s.changePeriodLocked()
 	s.nextChange = nextPeriodChange(s.row.Period, s.now())
 	cycle, period := s.row.Cycle, s.row.Period
+	online := s.online
 	s.mu.Unlock()
 
-	split := s.festivalChange(ended, cycle, notices)
-	s.broadcast(notices[split:])
+	s.announce(ended, cycle, notices, online)
 
 	ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
 	defer cancel()
@@ -342,6 +345,9 @@ func (s *State) advance() {
 		s.log.Error().Err(err).Int("cycle", cycle).Str("period", period.String()).Msg("save seven signs")
 	}
 
+	if online != nil {
+		online.ExpelFromDungeons()
+	}
 	s.broadcast([]Notice{{Kind: NoticeSky, Cabal: s.Sky()}})
 	s.log.Info().Int("cycle", cycle).Str("period", period.String()).Msg("seven signs period begun")
 
@@ -350,31 +356,41 @@ func (s *State) advance() {
 	s.scheduleLocked()
 }
 
-// festivalChange announces the notices of the period that ended up to
-// where the festival's change goes, makes that change, and returns how many
-// notices it announced. Recruiting's end starts the festival before
-// anything is announced; the competition's end stops it once its sound and
-// end are announced; seal validation's end resets it for the new cycle
-// once everything is announced.
-func (s *State) festivalChange(ended Period, cycle int, notices []Notice) int {
-	if s.festival == nil {
-		return 0
-	}
+// announce announces the notices of the period that ended, with the
+// festival's change and the Seal of Strife skills at their place among
+// them. Recruiting's end starts the festival before anything is announced;
+// the competition's end stops it once its sound and end are announced;
+// results' end gives the Seal of Strife skills before anything is
+// announced; seal validation's end takes them away once everything is
+// announced, then resets the festival for the new cycle.
+func (s *State) announce(ended Period, cycle int, notices []Notice, online Online) {
 	switch ended {
 	case Recruiting:
-		s.festival.CompetitionBegun()
-		return 0
+		if s.festival != nil {
+			s.festival.CompetitionBegun()
+		}
+		s.broadcast(notices)
 	case Competition:
 		split := min(2, len(notices))
 		s.broadcast(notices[:split])
-		s.festival.CompetitionEnded()
-		return split
+		if s.festival != nil {
+			s.festival.CompetitionEnded()
+		}
+		s.broadcast(notices[split:])
+	case Results:
+		if online != nil {
+			online.GiveStrifeSkills()
+		}
+		s.broadcast(notices)
 	case SealValidation:
 		s.broadcast(notices)
-		s.festival.CycleBegun(cycle)
-		return len(notices)
+		if online != nil {
+			online.RemoveStrifeSkills()
+		}
+		if s.festival != nil {
+			s.festival.CycleBegun(cycle)
+		}
 	}
-	return 0
 }
 
 func (s *State) broadcast(notices []Notice) {
