@@ -117,7 +117,7 @@ func TestClanBidWriteStaysInOrderAcrossHallLanes(t *testing.T) {
 	if err := hs.Restore(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	hs.Start(nil, adenaBank{}, nil)
+	hs.Start(nil, adenaBank{}, nil, nil)
 
 	if got := hs.Bid(laneHallA, cl, "Leader", 2000); got != BidPlaced {
 		t.Fatalf("bid on hall A = %v, want placed", got)

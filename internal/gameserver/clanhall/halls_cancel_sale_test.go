@@ -71,7 +71,7 @@ func TestCancelSaleRefundsAndTellsBidders(t *testing.T) {
 	}
 	bank := &refundBank{returned: map[int32]int{}}
 	told := &clanTold{told: map[int32][]Notice{}}
-	hs.Start(nil, bank, told)
+	hs.Start(nil, bank, told, nil)
 
 	if !hs.CancelSale(seller) {
 		t.Fatal("cancel sale refused")
