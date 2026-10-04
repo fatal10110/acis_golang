@@ -100,6 +100,9 @@ type livePlayer struct {
 	// replaced by setAccessLevel on p's queue; any goroutine reads it
 	// through accessLevel.
 	access atomic.Pointer[admin.AccessLevel]
+	// remoteIP is the address the client connected from, set at attach
+	// and read-only after.
+	remoteIP string
 	// teleportMode is how p's move clicks travel; owned by p's queue.
 	teleportMode teleportMode
 	// punishTimer ends the punishment p serves at punishDeadline; both

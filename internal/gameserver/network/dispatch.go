@@ -375,6 +375,9 @@ type GameClientLink struct {
 	// accessLevels stores the access levels admin commands change; nil
 	// keeps them in memory only.
 	accessLevels accessLevelStore
+	// characterEdits stores the character fields admin commands change at
+	// once; nil keeps them in memory only. See admin_set.go.
+	characterEdits characterEditStore
 	// punishments stores the chat bans and jail terms; nil keeps them in
 	// memory only. See punishment.go.
 	punishments punishmentStore
@@ -541,6 +544,9 @@ type GameClientLinkConfig struct {
 	// AccessLevels stores the access levels admin commands change; nil
 	// keeps them in memory only and finds no offline character.
 	AccessLevels accessLevelStore
+	// CharacterEdits stores the character fields admin commands change at
+	// once; nil keeps them in memory only.
+	CharacterEdits characterEditStore
 	// Punishments stores the chat bans and jail terms; nil keeps them in
 	// memory only and finds no offline character.
 	Punishments punishmentStore
@@ -704,6 +710,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		relations:        cmp.Or(cfg.Relations, relation.NewManager(nil)),
 		characters:       cfg.Characters,
 		accessLevels:     cfg.AccessLevels,
+		characterEdits:   cfg.CharacterEdits,
 		punishments:      cfg.Punishments,
 		petitions:        cmp.Or(cfg.Petitions, petition.NewManager(petition.DefaultConfig(), nil, nil, nil, nil)),
 		enchantState:     enchantflow.NewState(),
