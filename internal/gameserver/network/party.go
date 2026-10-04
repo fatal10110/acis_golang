@@ -77,16 +77,28 @@ func (l *GameClientLink) livePlayerByName(name string) (*livePlayer, bool) {
 	return live, ok
 }
 
+// Texts refusing a party invitation the client has no system message for.
+const (
+	partyInviteDetachedText = "The player you tried to invite is in offline mode."
+	partyInviteJailedText   = "The player you tried to invite is currently jailed."
+)
+
 // requestJoinParty invites the named player into live's party, or into a
 // new one live will lead.
 //
-// An invisible target is refused as the wrong target. The block-list,
-// offline-mode and jail refusals wait for the systems that own them
-// (#3159), the Olympiad one for the Olympiad (#3160).
+// A target blocking everything or blocking live refuses first, before
+// even an invitation of oneself; an invisible target is refused as the
+// wrong target; a target whose connection is gone, or either side in jail,
+// is refused once the party check passed. The Olympiad refusal waits for
+// the Olympiad (#3160).
 func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.RequestJoinParty) {
 	target, ok := l.livePlayerByName(req.Target)
 	if !ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageFirstSelectUserToInviteToParty))
+		return
+	}
+	if blocked := l.blockRefusal(live, target); blocked != 0 {
+		live.SendFrame(serverpackets.FrameSystemMessageString(blocked, target.Name))
 		return
 	}
 	if target.ObjectID() == live.ObjectID() || target.CursedWeaponEquipped() || live.CursedWeaponEquipped() || target.Invisible() {
@@ -95,6 +107,14 @@ func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.Re
 	}
 	if l.parties.InParty(target.ObjectID()) {
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsAlreadyInParty, target.Name))
+		return
+	}
+	if target.clientDetached() {
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, partyInviteDetachedText))
+		return
+	}
+	if target.Jailed() || live.Jailed() {
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, partyInviteJailedText))
 		return
 	}
 	book := l.tradeBook()
