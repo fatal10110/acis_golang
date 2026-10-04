@@ -73,10 +73,14 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	// is that player once EnterWorld took it.
 	var chars []*player.Character
 	var entering, live *livePlayer
+	// lost records a read loop ended by a lost connection, which keeps the
+	// player in the world a while before it detaches.
+	lost := false
 	defer func() {
 		// A connection lost between selection and EnterWorld takes the
 		// selected player out of the world as a logout would.
 		if leaving := cmp.Or(live, entering); leaving != nil {
+			awaitDetachDelay(ctx, session, leaving, detachDelay(leaving, lost))
 			var owners []int32
 			onLive(leaving, func() { owners = l.detachLivePlayer(leaving) })
 			_ = l.awaitPersistence(conn, owners...)
@@ -101,6 +105,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		}
 		payload, err := session.ReadFrame()
 		if err != nil {
+			lost = true
 			// ponytail: pre-auth EOF is a port probe (admin panel dials 7777
 			// every 5s) or an aborted handshake — not worth a log line.
 			// Ceiling: a real client dropping mid-handshake leaves no trace;
