@@ -2,7 +2,6 @@ package network
 
 import (
 	"strconv"
-	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -12,8 +11,10 @@ import (
 // owner, class and current intention, its vitals and karma, and for a pet
 // its inventory link, food and load.
 func (l *GameClientLink) summonInfoPage(s *summon.Actor) string {
+	// A servitor carries its template's name; a pet has none until its
+	// owner names it.
 	name := "N/A"
-	if s.IsNamed() {
+	if !s.IsPet() || s.IsNamed() {
 		name = s.Name()
 	}
 	owner, hasOwner := s.Owner()
@@ -88,13 +89,7 @@ func summonClassName(s *summon.Actor) string {
 func summonIntentionName(s *summon.Actor) string {
 	brain, ok := s.AI().(*ai.Summon)
 	if !ok {
-		return intentionEnumName(ai.IntentionIdle)
+		return ai.IntentionIdle.EnumName()
 	}
-	return intentionEnumName(brain.CurrentIntention())
-}
-
-// intentionEnumName is i's constant name in the reference IntentionType
-// enum.
-func intentionEnumName(i ai.Intention) string {
-	return strings.ToUpper(i.String())
+	return brain.CurrentIntention().EnumName()
 }

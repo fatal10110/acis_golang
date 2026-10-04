@@ -295,7 +295,7 @@ func npcDesireContent(h *npc.Hostile) string {
 	b.WriteString(npcInfoRefresh("desire"))
 	b.WriteString(`<br><table width="280"><tr><td><font color="LEVEL">Type</font></td><td><font color="LEVEL">Weight</font></td></tr>`)
 	for _, d := range desires {
-		b.WriteString("<tr><td>" + intentionEnumName(d.Kind) + "</td><td>" + commons.JavaDouble(d.Weight) + "</td></tr>")
+		b.WriteString("<tr><td>" + d.Kind.EnumName() + "</td><td>" + commons.JavaDouble(d.Weight) + "</td></tr>")
 	}
 	b.WriteString(`</table><img src="L2UI.SquareGray" width=280 height=1>`)
 	return b.String()

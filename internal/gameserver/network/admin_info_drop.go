@@ -36,12 +36,16 @@ func (l *GameClientLink) adminNpcDrops(gm *livePlayer, inst *npc.Instance, isDro
 		}
 		*dst = int(n)
 	}
+	var rates item.Rates
+	if npcs := l.npcSpawns.Load(); npcs != nil {
+		rates = npcs.DropRates()
+	}
 	var content string
 	if ok {
-		content, ok = l.npcDropContent(inst, page, subPage, isDrop)
+		content, ok = l.npcDropContent(inst, rates, page, subPage, isDrop)
 	}
 	if !ok {
-		if content, ok = l.npcDropContent(inst, 1, 1, true); !ok {
+		if content, ok = l.npcDropContent(inst, rates, 1, 1, true); !ok {
 			l.log.Warn().Int("npc_id", inst.Template.ID).Msg("admin: //info drop names an unknown item")
 			return
 		}
@@ -50,10 +54,11 @@ func (l *GameClientLink) adminNpcDrops(gm *livePlayer, inst *npc.Instance, isDro
 }
 
 // npcDropContent lists page of inst's drop categories (its spoil ones when
-// isDrop is false), each with subPage of its drops, most likely first. ok
-// is false where the reference list throws: a page or subpage below 1 with
-// entries to show, or a drop of an item no template defines.
-func (l *GameClientLink) npcDropContent(inst *npc.Instance, page, subPage int, isDrop bool) (content string, ok bool) {
+// isDrop is false), each with subPage of its drops, most likely first, and
+// the rate rates gives its kind (the raid item rate for a raid or grand
+// boss). ok is false where the reference list throws: a page or subpage
+// below 1 with entries to show, or a drop of an item no template defines.
+func (l *GameClientLink) npcDropContent(inst *npc.Instance, rates item.Rates, page, subPage int, isDrop bool) (content string, ok bool) {
 	var categories []item.DropCategory
 	for _, c := range inst.Template.Drops {
 		if (c.Kind != item.DropSpoil) == isDrop {
@@ -73,10 +78,6 @@ func (l *GameClientLink) npcDropContent(inst *npc.Instance, page, subPage int, i
 	sub := "spoil"
 	if isDrop {
 		sub = "drop"
-	}
-	var rates item.Rates
-	if npcs := l.npcSpawns.Load(); npcs != nil {
-		rates = npcs.DropRates()
 	}
 	raid := slices.Contains([]string{"RaidBoss", "GrandBoss"}, npcClassName(inst))
 

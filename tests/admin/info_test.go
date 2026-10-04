@@ -13,8 +13,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
@@ -25,6 +27,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
@@ -37,6 +40,9 @@ const (
 	infoPetID      = 12077
 	infoCollarID   = int32(9600)
 	infoSummonSkil = 2046
+	// infoServitorID is the servitor infoServitorSkill summons.
+	infoServitorID    = 14001
+	infoServitorSkill = 1129
 )
 
 // infoPage sends //cmd and returns the one page it opens.
@@ -266,6 +272,91 @@ func TestAdminInfoPetPage(t *testing.T) {
 	))
 }
 
+// infoServitorTemplate is an undead servitor, the necromancer's Reanimated
+// Man.
+func infoServitorTemplate() *npc.Template {
+	return &npc.Template{
+		ID: infoServitorID, TemplateID: infoServitorID, Type: "Servitor", Name: "Reanimated Man", Level: 20, Race: npc.RaceUndead,
+		HPMax: 500, MPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, BaseAttackRange: 40,
+		CollisionRadius: 8, CollisionHeight: 20, CorpseTime: 7, AIParams: commons.NewStatSet(),
+	}
+}
+
+// TestAdminInfoServitorPage pins the summon page on a servitor: its
+// template's name, its class, "yes" for an undead one, and no inventory,
+// food or load.
+func TestAdminInfoServitorPage(t *testing.T) {
+	t.Parallel()
+	db := sqltest.SharedDB(t)
+	skills := skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{{
+		ID: infoServitorSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+		SkillType: "SUMMON", NpcID: infoServitorID, SummonTotalLifeTime: 1_200_000, StaticHitTime: true, StaticReuse: true,
+	}}), gamesql.NewCharacterSkillStore(db))
+	srv, gmID := bootAdmin(t, adminLevel,
+		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{infoServitorTemplate()})),
+		gameservertest.WithSkills(skills),
+		gameservertest.WithHTMLPages(shippedAdminPages(t, "petinfo.htm")),
+	)
+	if _, err := srv.DB.ExecContext(t.Context(), "INSERT INTO character_skills (char_obj_id, skill_id, skill_level, class_index) VALUES (?, ?, 1, 0)", gmID, infoServitorSkill); err != nil {
+		t.Fatalf("seed servitor summon skill: %v", err)
+	}
+	gm := srv.Client
+	enterWorld(t, gm)
+
+	gm.Send(encodeMagicSkillUse(infoServitorSkill))
+	var servitor *summon.Actor
+	srv.AdvanceUntil(t, "servitor in the world", func() bool {
+		obj, ok := srv.State.Summon(gmID)
+		if ok {
+			servitor, ok = obj.(*summon.Actor)
+		}
+		return ok
+	})
+	drain(t, gm)
+	exchange(t, gm, encodeAction(servitor.ObjectID()))
+
+	assertInfoPage(t, gm, "info", shippedPage(t, "petinfo.htm",
+		"%name%", "Reanimated Man",
+		"%level%", "20",
+		"%exp%", "0",
+		"%owner%", ` <a action="bypass -h admin_debug Admin">Admin</a>`,
+		"%class%", "Servitor",
+		"%ai%", "FOLLOW",
+		"%hp%", fmt.Sprintf("%d/%d", int(servitor.HP()), int(servitor.MaxHPValue())),
+		"%mp%", fmt.Sprintf("%d/%d", int(servitor.MPValue()), int(servitor.MaxMPValue())),
+		"%karma%", "0",
+		"%undead%", "yes",
+		"%inv%", "none",
+		"%food%", "N/A",
+		"%load%", "N/A",
+	))
+}
+
+// TestAdminInfoOtherSelection pins //info on a selection with no info page
+// of its own, a ground item: an HTML window with no page.
+func TestAdminInfoOtherSelection(t *testing.T) {
+	t.Parallel()
+	srv, gmID := bootAdmin(t, adminLevel)
+	gm := srv.Client
+	enterWorld(t, gm)
+	tmpl, ok := gameservertest.ItemTemplates().Get(item.AdenaID)
+	if !ok {
+		t.Fatal("no adena template")
+	}
+	ground, err := grounditem.New(item.Instance{ObjectID: srv.NewObjectID(), TemplateID: item.AdenaID, Count: 10, ManaLeft: -1}, tmpl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv.GroundItems.Drop(ground, task.DropOptions{X: spawnX + 40, Y: spawnY, Z: spawnZ})
+	drain(t, gm)
+	// No client packet selects a ground item; a click on one picks it up.
+	onLearnerQueue(t, srv, gmID, func(pc *player.Character) { pc.StoreTarget(ground) })
+
+	if page := infoPage(t, gm, "info"); page != "" {
+		t.Fatalf("//info on a ground item page = %q, want none", page)
+	}
+}
+
 // infoGrocer is a merchant with every general-page field set apart.
 func infoGrocer() *npc.Template {
 	return &npc.Template{
@@ -455,6 +546,8 @@ func TestAdminInfoNpcDropPages(t *testing.T) {
 	srv, gmID := bootAdmin(t, adminLevel,
 		infoItems(),
 		gameservertest.WithHTMLPages(shippedAdminPages(t, infoNpcPages...)),
+		// The rates a default configuration gives.
+		gameservertest.WithNpcDropRates(item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1}),
 	)
 	gm := srv.Client
 	enterWorld(t, gm)
@@ -468,7 +561,7 @@ func TestAdminInfoNpcDropPages(t *testing.T) {
 		"%race%", "BEAST", "%clan%", "[wolf_clan, beast_clan]", "%clanRange%", "300", "%ignoredIds%", "[20121]",
 	))
 
-	header := "<br></center>Category: DROP - Rate: 70% - Iterations: x0<center>"
+	header := "<br></center>Category: DROP - Rate: 70% - Iterations: x1<center>"
 	firstDrops := header +
 		dropRow(0, "Wolf Pelt", "90EE90", "90", "1") +
 		dropRow(1, "Stem", "90EE90", "81", "1") +
@@ -490,13 +583,13 @@ func TestAdminInfoNpcDropPages(t *testing.T) {
 		pageBar("bypass admin_info drop 1 %page%", 2, 2)+
 		pageBar("bypass admin_info drop %page% 1", 1, 2)))
 	// A page past the last shows the last; its links keep the page asked.
-	currency := defaultPage(t, "<br></center>Category: CURRENCY - Rate: 100% - Iterations: x0<center>"+
+	currency := defaultPage(t, "<br></center>Category: CURRENCY - Rate: 100% - Iterations: x1<center>"+
 		dropRow(0, "Adena", "90EE90", "100", "1000")+
 		strings.Repeat("<img height=41>", 5)+
 		pageBar("bypass admin_info drop 9 %page%", 1, 1)+
 		pageBar("bypass admin_info drop %page% 1", 2, 2))
 	assertInfoPage(t, gm, "info drop 9", currency)
-	assertInfoPage(t, gm, "info spoil", defaultPage(t, "<br></center>Category: SPOIL - Rate: 100% - Iterations: x0<center>"+
+	assertInfoPage(t, gm, "info spoil", defaultPage(t, "<br></center>Category: SPOIL - Rate: 100% - Iterations: x1<center>"+
 		dropRow(0, "R: Soulshot (D)", "BDB76B", "25.5", "1 - 3")+
 		strings.Repeat("<img height=41>", 5)+
 		pageBar("bypass admin_info spoil 1 %page%", 1, 1)+
