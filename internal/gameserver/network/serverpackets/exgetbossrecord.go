@@ -9,6 +9,10 @@ const OpcodeExGetBossRecord uint16 = 0x0033
 // player.
 const SystemMessageRaidWasSuccessful = 1209
 
+// SystemMessageS1DiedDroppedS3S2 names one item a raid boss's kill dropped
+// or auto-looted: text (the boss), item-name, number parameters.
+const SystemMessageS1DiedDroppedS3S2 = 1208
+
 // SoundRaidWasSuccessful is the sound played with
 // SystemMessageRaidWasSuccessful.
 const SoundRaidWasSuccessful = "systemmsg_e.1209"

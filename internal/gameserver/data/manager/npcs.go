@@ -44,10 +44,13 @@ type slotInfo struct {
 
 // KillRewardConfig carries live reward settings loaded at game-server boot.
 type KillRewardConfig struct {
-	Rates             item.Rates
-	AutoLoot          bool
-	AutoLootRaid      bool
-	AutoLootHerbs     bool
+	Rates         item.Rates
+	AutoLoot      bool
+	AutoLootRaid  bool
+	AutoLootHerbs bool
+	// MultipleItemDrop drops a non-stackable item rolled with a count
+	// above one as that many ground items; false drops just one.
+	MultipleItemDrop  bool
 	DeepBlueDropRules bool
 	PlayerLevels      *player.LevelTable
 	PartyRange        int

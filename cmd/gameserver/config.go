@@ -999,6 +999,7 @@ func provideKillRewardConfig(paths gameServerPaths, serverProps *config.Properti
 		AutoLoot:          serverProps.Bool("AutoLoot", false),
 		AutoLootRaid:      serverProps.Bool("AutoLootRaid", false),
 		AutoLootHerbs:     serverProps.Bool("AutoLootHerbs", false),
+		MultipleItemDrop:  serverProps.Bool("MultipleItemDrop", true),
 		DeepBlueDropRules: playersProps.Bool("UseDeepBlueDropRules", true),
 		PlayerLevels:      data.Levels,
 		PartyRange:        partyRange,

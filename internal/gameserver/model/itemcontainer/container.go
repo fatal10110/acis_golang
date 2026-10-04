@@ -358,8 +358,8 @@ func (c *Container) insertLocked(inst *item.Instance) {
 // It always creates exactly one instance: a stackable template gets count
 // units on it, a non-stackable one gets a single unit regardless of count.
 // Splitting a non-stackable count > 1 across several freshly created
-// instances under the MultipleItemDrop setting is deliberately not done
-// here, since that path only matters for bulk GM item creation.
+// instances under the MultipleItemDrop setting is not done here; auto-loot
+// still needs it (#3379).
 func (c *Container) AddNew(templateID int32, count int, objectID int32) *item.Instance {
 	inst, ok := newInstance(c.templates, templateID, count, objectID)
 	if !ok {

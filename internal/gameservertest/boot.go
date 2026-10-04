@@ -150,6 +150,7 @@ type options struct {
 	autoLearnSkills        bool
 	deepBlueDropRules      bool
 	autoLoot               bool
+	autoLootRaid           bool
 	rateKarmaExpLost       float64
 	deathDrop              player.DeathDropRules
 	characterSelectDelay   time.Duration
@@ -478,6 +479,13 @@ func WithDeepBlueDropRules(enabled bool) Option {
 // onto the ground (default false).
 func WithAutoLoot(enabled bool) Option {
 	return func(o *options) { o.autoLoot = enabled }
+}
+
+// WithAutoLootRaid sets the server.properties AutoLootRaid gate: whether a
+// raid or grand boss kill's drops go straight into the killer's inventory
+// instead of onto the ground (default false).
+func WithAutoLootRaid(enabled bool) Option {
+	return func(o *options) { o.autoLootRaid = enabled }
 }
 
 // WithRateKarmaExpLost sets the server.properties RateKarmaExpLost
@@ -927,6 +935,7 @@ type Server struct {
 	levelTable          *player.LevelTable
 	deepBlueDrops       bool
 	autoLoot            bool
+	autoLootRaid        bool
 	ids                 *sequentialIDs
 	positions           *task.PositionUpdates
 	addr                net.Addr
@@ -2288,6 +2297,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		levelTable:          levels,
 		deepBlueDrops:       o.deepBlueDropRules,
 		autoLoot:            o.autoLoot,
+		autoLootRaid:        o.autoLootRaid,
 		DB:                  db,
 		RaidPoints:          raidPoints,
 		CursedWeapons:       cursedState,

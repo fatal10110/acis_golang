@@ -17,3 +17,9 @@ type HitObserver interface {
 func (h *Hostile) BroadcastOnScreen(durationMs int32, text string) {
 	h.emit(event.OnScreenMessage{Text: text, DurationMs: durationMs})
 }
+
+// AnnounceRaidDrop names one item this raid or grand boss's kill dropped or
+// auto-looted, count of it, to its observers.
+func (h *Hostile) AnnounceRaidDrop(itemID int32, count int) {
+	h.emit(event.RaidDropAnnounced{ItemID: itemID, Count: int32(count)})
+}
