@@ -2053,7 +2053,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.Doors = worldObjects
 	}
 	// The Olympiad's records are restored once the characters are seeded,
-	// below; its calendar is started only for WithOlympiadWindow.
+	// below; its calendar is started only for WithOlympiadCompetition or
+	// WithOlympiadValidation.
 	heroes := hero.New(gamesql.NewHeroStore(db), gclConfig.Clans.Table(), persistWorker, HeroMinMatches, time.Now, o.log)
 	gclConfig.Heroes = heroes
 	olympiadQueue := queues.NewQueue("olympiad")

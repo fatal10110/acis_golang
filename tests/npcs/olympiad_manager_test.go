@@ -29,6 +29,8 @@ const (
 	grandOlympiadManager = 31688
 	duelistClass         = 88
 	noblesseGatePass     = 6651
+	// overweightItemObject is the item filling Talker's one inventory slot.
+	overweightItemObject = 0x7f310001
 )
 
 // Olympiad system messages, by reference id.
@@ -41,6 +43,7 @@ const (
 	smAlreadyOnClassList       = 1689
 	smAlreadyOnAllClassesList  = 1690
 	smGameRequestCannotBeMade  = 1803
+	smOlympiadInventoryFull    = 1691
 	smYouPickedUpS2S1          = 29
 	olympiadDefaultStartPoints = 18
 )
@@ -290,6 +293,19 @@ func TestOlympiadRegistrationRefusals(t *testing.T) {
 		}
 		if w.srv.Olympiad.IsRegistered(w.player, duelistClass) {
 			t.Fatal("a noble without points registered")
+		}
+	})
+	t.Run("overweight", func(t *testing.T) {
+		t.Parallel()
+		w, manager := bootOlympiadManager(t, nobleDuelist(t,
+			`INSERT INTO items (owner_id, object_id, item_id, count, loc, loc_data)
+				SELECT obj_Id, `+strconv.Itoa(overweightItemObject)+`, `+strconv.Itoa(noblesseGatePass)+`, 1, 'INVENTORY', 0
+				FROM characters WHERE char_name = 'Talker'`),
+			gameservertest.WithInventorySlots(1, 1), gameservertest.WithOlympiadCompetition(time.Hour))
+		w.assertNoble(t, manager, "4", smOlympiadInventoryFull)
+		w.assertNoble(t, manager, "5", smOlympiadInventoryFull)
+		if w.srv.Olympiad.IsRegistered(w.player, duelistClass) {
+			t.Fatal("a noble with a full inventory registered")
 		}
 	})
 }
