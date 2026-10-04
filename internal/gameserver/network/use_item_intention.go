@@ -264,6 +264,12 @@ func (l *GameClientLink) finishDeferredUseItem(live *livePlayer, resume useItemR
 	if inPostureTransition(live) {
 		return live.hasDeferredUseItem()
 	}
+	return l.runDeferredUseItem(live, resume)
+}
+
+// runDeferredUseItem runs the queued item toggle, if any, whatever the
+// posture, and reports whether one was waiting.
+func (l *GameClientLink) runDeferredUseItem(live *livePlayer, resume useItemResume) bool {
 	queued := live.takeDeferredUseItem()
 	if queued == nil {
 		return false

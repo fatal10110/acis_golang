@@ -90,6 +90,12 @@ func (l *GameClientLink) finishDeferredFollow(live *livePlayer) bool {
 	if inPostureTransition(live) {
 		return live.hasDeferredFollow()
 	}
+	return l.runDeferredFollow(live)
+}
+
+// runDeferredFollow starts the queued follow, if any, whatever the posture,
+// and reports whether one was waiting.
+func (l *GameClientLink) runDeferredFollow(live *livePlayer) bool {
 	follow := live.takeDeferredFollow()
 	if follow == nil {
 		return false
