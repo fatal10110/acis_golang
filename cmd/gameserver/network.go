@@ -223,6 +223,8 @@ func provideGameClientLink(
 		ItemWrites:       itemWrites,
 		Queues:           pool,
 		Restarts:         data.Restarts,
+		ClanHallData:     data.ClanHalls,
+		CastleData:       data.Castles,
 		Levels:           data.Levels,
 		Admin:            data.Admin,
 		GMAudit:          gmAudit.enabled(gameplay.Admin.GMAudit),

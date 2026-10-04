@@ -449,10 +449,6 @@ func sevenSignsPeriodMessage(p sevensigns.Period) int {
 	}
 }
 
-func dieOptions(live *livePlayer) serverpackets.DieOptions {
-	return serverpackets.DieOptions{FixedRes: live.accessLevel().AllowFixedRes}
-}
-
 // socialActionLevelUp is the social animation id played for everyone who can
 // see a character that just gained a level.
 const socialActionLevelUp = 15

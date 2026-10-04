@@ -53,6 +53,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -117,6 +118,8 @@ type options struct {
 	gmAudit                zerolog.Logger
 	chat                   network.ChatConfig
 	restarts               *restart.Table
+	clanHallData           *clanhall.Table
+	castleData             *castledata.Table
 	teleports              travel.TeleportTable
 	instantTeleports       travel.InstantTable
 	freeTeleport           bool
@@ -320,6 +323,13 @@ func WithChat(cfg network.ChatConfig) Option { return func(o *options) { o.chat 
 // (default: none, so restart requests answer ActionFailed).
 func WithRestartPoints(table *restart.Table) Option {
 	return func(o *options) { o.restarts = table }
+}
+
+// WithResidences supplies the static clan hall and castle tables a
+// restart to the owned clan hall or castle picks its spawn from (default:
+// none, so those restarts land in town).
+func WithResidences(halls *clanhall.Table, castles *castledata.Table) Option {
+	return func(o *options) { o.clanHallData, o.castleData = halls, castles }
 }
 
 // WithTeleports supplies the destinations civilian NPCs offer (default:
@@ -1871,6 +1881,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Autosave:         autosave,
 		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, DeathDrop: o.deathDrop, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, RollDiceDelay: o.rollDiceDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight, PartyRange: fixturePartyRange},
 		Restarts:         o.restarts,
+		ClanHallData:     o.clanHallData,
+		CastleData:       o.castleData,
 		Teleports:        o.teleports,
 		InstantTeleports: o.instantTeleports,
 		FreeTeleport:     o.freeTeleport,

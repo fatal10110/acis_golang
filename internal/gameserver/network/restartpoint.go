@@ -18,15 +18,9 @@ import (
 const restartTeleportOffset = 20
 
 // restartLivePlayer handles a dead player's restart-point selection: it
-// resolves a destination, revives the player, and teleports them there.
-//
-// Clan hall, castle and siege-flag restarts (request types 1-3), the
-// GM/festival fixed-position restart (type 4) depend on clan/siege
-// ownership or a festival system that aren't modeled yet. req.RequestType
-// is accepted for wire-format completeness: a jailed player restarts in the
-// jail whatever the type, and every other request resolves to the same
-// destination an unrecognized type would: the player's nearest town
-// restart point.
+// resolves the destination the request type names, revives the player, and
+// teleports them there. A selection the player may not use is ignored,
+// leaving the player dead on the death screen.
 func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.RequestRestartPoint) {
 	if live == nil {
 		return
@@ -41,14 +35,11 @@ func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.R
 		return
 	}
 
-	// Only the restart request forces the jail; every other town teleport
-	// (//sendhome, a starved flying mount, a boss-zone ejection) still
-	// resolves a jailed player to the nearest town.
-	dest, ok := jailLocation, true
-	if !live.Jailed() {
-		dest, ok = l.restartDestination(live)
-	}
-	if !ok {
+	dest, outcome := l.restartPointDestination(live, req.RequestType)
+	switch outcome {
+	case restartRefused:
+		return
+	case restartNoPoint:
 		// This is a data-loading gap (no restart-point table loaded at
 		// all), not a normal rejection: the nearest-town lookup has nothing
 		// to return, and nothing downstream handles that safely.

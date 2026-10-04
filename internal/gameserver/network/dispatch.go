@@ -47,6 +47,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/multisell"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
+	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -329,6 +331,8 @@ type GameClientLink struct {
 	queues           Queues
 	queuedPets       queuedPets
 	restarts         *restart.Table
+	clanHallData     *clanhall.Table
+	castleData       *castledata.Table
 	levels           *player.LevelTable
 	admin            *admin.Data
 	playerConfig     PlayerConfig
@@ -523,6 +527,8 @@ type GameClientLinkConfig struct {
 	// handlers, timers and periodic ticks run on. Required.
 	Queues       Queues
 	Restarts     *restart.Table
+	ClanHallData *clanhall.Table   // owner restart spawns; nil restarts to town
+	CastleData   *castledata.Table // owner restart spawns; nil restarts to town
 	Levels       *player.LevelTable
 	Admin        *admin.Data
 	PlayerConfig PlayerConfig
@@ -706,6 +712,8 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		persistWait:      cfg.PersistWait,
 		queues:           cfg.Queues,
 		restarts:         cfg.Restarts,
+		clanHallData:     cfg.ClanHallData,
+		castleData:       cfg.CastleData,
 		levels:           cfg.Levels,
 		admin:            cfg.Admin,
 		gmAudit:          cfg.GMAudit,
