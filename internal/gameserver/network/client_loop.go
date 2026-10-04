@@ -535,6 +535,10 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if l.world != nil {
 				l.world.AddPlayer(selected)
 			}
+			if !l.takeOverSelected(selected) {
+				client.closeNow()
+				return
+			}
 
 		case clientpackets.OpcodeEnterWorld:
 			// Unreachable while the state gate admits EnterWorld only in
