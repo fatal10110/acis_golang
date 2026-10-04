@@ -123,7 +123,19 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool, ro
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotEquipItemDueToBadCondition))
 			return
 		}
+		// A cursed weapon's holder keeps it in hand: no other weapon or
+		// shield goes on. The refusal says nothing, but releases the
+		// client's pending use.
+		if live.CursedWeaponEquipped() {
+			live.SendFrame(serverpackets.FrameActionFailed())
+			return
+		}
 		l.tryToUseItem(live, inv, inst, tmpl)
+		return
+	}
+	// Nor does a holder put on formal wear.
+	if live.CursedWeaponEquipped() && inst.TemplateID == formalWearID {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
 	l.toggleEquipItem(live, inv, inst, tmpl, false)
@@ -516,6 +528,12 @@ func (l *GameClientLink) activeServitorTarget(live *livePlayer) skilltarget.Acto
 // to. An empty or unresolvable slot answers FrameActionFailed per the
 // packet-impact rule (#829); it is not a silent no-op.
 func (l *GameClientLink) unequipItem(live *livePlayer, bodySlot int32) {
+	// A cursed weapon cannot be taken off. The refusal says nothing, but
+	// releases the client's pending action.
+	if item.Slot(bodySlot) == item.SlotLRHand && live.CursedWeaponEquipped() {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
 	inv := live.Inventory()
 	if inv == nil {
 		live.SendFrame(serverpackets.FrameActionFailed())

@@ -62,6 +62,16 @@ type KillRewardConfig struct {
 	// Channels resolves the command channel that wins a raid or grand
 	// boss's loot rights; nil lets no channel win them.
 	Channels LootChannels
+	// CursedWeapons rolls a monster kill's cursed weapon drop; nil drops
+	// none.
+	CursedWeapons CursedWeaponDrops
+}
+
+// CursedWeaponDrops rolls whether a monster kill drops a cursed weapon.
+type CursedWeaponDrops interface {
+	// DropCursedWeapon rolls killer's kill of the monster dropperID, which
+	// died at (x, y, z).
+	DropCursedWeapon(killer *player.Character, dropperID int32, x, y, z int)
 }
 
 // RaidKillRecorder credits a raid or grand boss kill.

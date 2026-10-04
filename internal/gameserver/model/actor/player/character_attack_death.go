@@ -145,12 +145,14 @@ func (c *Character) revive() bool {
 // broadcast to this
 // player's own session and every observer, so the corpse-fall animation
 // plays live and reaches clients before any death side effect's updates. A
-// rider's mount stops eating. The killer's PK/PvP credit follows, then this
+// rider's mount stops eating. The killer's PK/PvP credit follows (a
+// killer holding a cursed weapon feeds the weapon instead), then this
 // player's own costs: charges, a further get-up out of fake death for a
 // player that was playing dead (the stripped Fake Death sent its own get-up
 // before the death packet), the items the death may drop, the clan-war kill
 // report, the experience/karma
-// loss, the stop of every
+// loss (all three replaced by the drop or end of the cursed weapon a
+// victim held when killed), the stop of every
 // fusion channel on this player, and the death-penalty level, whose karma
 // gate reads the karma left after that loss. A player whose Phoenix Blessing
 // survived the death is then offered its own resurrection, and the effect
@@ -181,15 +183,19 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	c.BroadcastStatus()
 	c.BroadcastDie()
 	c.stopMountFeed()
-	c.awardKillerPKKarma(killer)
-	c.awardKillerPvPKill(killer)
+	if !c.creditCursedWeaponKill(killer) {
+		c.awardKillerPKKarma(killer)
+		c.awardKillerPvPKill(killer)
+	}
 	c.ClearCharges()
 	if fakeDead {
 		c.GetUpFromFakeDeath()
 	}
-	c.reportDeathDrop(killer)
-	c.reportClanKill(killer)
-	c.applyDeathExpKarmaLoss(killer)
+	if !c.loseCursedWeapon(killer) {
+		c.reportDeathDrop(killer)
+		c.reportClanKill(killer)
+		c.applyDeathExpKarmaLoss(killer)
+	}
 	c.emit(event.FusionCastersStopRequested{})
 	c.RaiseDeathPenaltyLevel(killer, c.rollValue(100)+1)
 	c.emit(event.DeathSettled{})

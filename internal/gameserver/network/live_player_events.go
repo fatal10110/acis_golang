@@ -346,6 +346,11 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.consumeHerb(live, e.ItemID)
 	case event.ItemObtained:
 		live.SendFrame(itemObtainedFrame(e))
+		l.obtainCursedWeapon(live, e.ItemID)
+	case event.CursedWeaponKill:
+		l.feedCursedWeapon(live)
+	case event.CursedWeaponLost:
+		l.loseCursedWeapon(live)
 	case event.SummonConfirmRequested:
 		live.SendFrame(serverpackets.FrameConfirmDlgSummonFriendRequest(e.CasterName, e.CasterID, int32(e.X), int32(e.Y), int32(e.Z), e.Timeout))
 	case event.TeleportRequested:

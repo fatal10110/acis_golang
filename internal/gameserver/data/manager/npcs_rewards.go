@@ -62,6 +62,7 @@ func (d *deathRewards) CalculateRewards(killer attackable.Combatant) {
 		maxDealer = nil
 	}
 	if receiver := dropReceiver(killer, maxDealer); receiver != nil {
+		d.rollCursedWeapon(receiver)
 		d.rollDrops(receiver, d.hostile.HighestAttackerLevel(receiver.Level()))
 	}
 	d.grantExpAndSp(entries, summonDamage, totalDamage)
@@ -76,6 +77,21 @@ func (d *deathRewards) creditRaidKill(killer attackable.Combatant) {
 	if p, ok := actingCharacter(killer); ok {
 		d.config.RaidKills.RecordRaidKill(p, int32(d.tmpl.ID), d.tmpl.Level)
 	}
+}
+
+// rollCursedWeapon rolls, ahead of the drops, whether a Monster-family
+// death credited to receiver drops a cursed weapon. A grand boss or a
+// feedable beast never drops one.
+func (d *deathRewards) rollCursedWeapon(receiver attackable.Combatant) {
+	if d.config.CursedWeapons == nil || !d.hostile.MonsterKind() || d.hostile.FeedableBeast() || d.tmpl.Type == "GrandBoss" {
+		return
+	}
+	p, ok := actingCharacter(receiver)
+	if !ok {
+		return
+	}
+	x, y, z := d.hostile.Position()
+	d.config.CursedWeapons.DropCursedWeapon(p, d.hostile.ObjectID(), x, y, z)
 }
 
 // dropReceiver returns the player credited with the drops: the top damage

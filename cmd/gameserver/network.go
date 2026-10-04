@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
+	"github.com/fatal10110/acis_golang/internal/gameserver/cursedweapon"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -98,6 +99,7 @@ func provideGameClientLink(
 	fest *festival.Manager,
 	olympiadState *olympiad.Olympiad,
 	raidPoints *raidpoint.Points,
+	cursedWeapons *cursedweapon.Manager,
 	inventoryUpdates *task.InventoryUpdates,
 	itemInstances *task.ItemInstances,
 	water *task.Water,
@@ -195,6 +197,7 @@ func provideGameClientLink(
 		SkillTrees:    data.Trees,
 		HealSps:       data.HealSps,
 		CursedWeapons: data.CursedWeapons,
+		CursedRuntime: cursedWeapons,
 		World:         state,
 		NPCs:          data.NPCs,
 		SummonItems:   data.SummonItems,

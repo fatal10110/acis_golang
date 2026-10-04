@@ -19,8 +19,7 @@ func (c *Character) clanWarDeath(pk *Character) bool {
 // reportClanKill reports c's death to a clan member, or its summon, for the
 // clans to settle the reputation a kill between clans at war moves. A
 // death inside an arena moves none, nor does one where the victim or the
-// killer holds a cursed weapon (dormant until cursed weapons are modeled,
-// #225).
+// killer holds a cursed weapon.
 func (c *Character) reportClanKill(killer attackable.Combatant) {
 	pk := actingCharacter(killer)
 	if pk == nil || attackable.InArena(c) || c.CursedWeaponEquipped() || pk.CursedWeaponEquipped() {

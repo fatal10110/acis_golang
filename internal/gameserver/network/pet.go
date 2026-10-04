@@ -215,6 +215,13 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	// A pet never takes a cursed weapon: its owner hears the pickup
+	// failed, and the weapon stays where it lies.
+	if l.isCursedWeapon(ground.ItemID()) {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageFailedToPickupS1, ground.ItemID()))
+		return
+	}
 
 	herb, failure := petitem.ClaimGround(pet, petInv, ground)
 	switch failure {
