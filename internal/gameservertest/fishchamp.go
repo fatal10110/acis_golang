@@ -38,13 +38,13 @@ func (f *fishChampFixture) newChampionship(db *sql.DB, worker *persist.Worker, q
 }
 
 // start seeds, restores and starts c, stopping it when tb ends.
-func (f *fishChampFixture) start(tb testing.TB, db *sql.DB, c *fishchamp.Championship) {
+func (f *fishChampFixture) start(tb testing.TB, db *sql.DB, ids *sequentialIDs, c *fishchamp.Championship) {
 	tb.Helper()
 	if f == nil {
 		return
 	}
 	if f.seed != nil {
-		f.seed(db)
+		ids.seed(tb, db, func() { f.seed(db) })
 	}
 	if err := c.Restore(context.Background()); err != nil {
 		tb.Fatalf("restore fishing championship: %v", err)
