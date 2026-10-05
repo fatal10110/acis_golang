@@ -153,7 +153,11 @@ func (r *run) step(f []string) {
 			r.add("HTML " + path.Base(fishchamp.PageNotWinner))
 			break
 		}
-		for _, count := range r.champ.Claim(f[1]) {
+		paid, err := r.champ.Claim(context.Background(), f[1])
+		if err != nil {
+			t.Fatalf("claim: %v", err)
+		}
+		for _, count := range paid {
 			if count > 0 {
 				r.add("ADD " + strconv.Itoa(int(r.champ.Config().RewardItemID)) + " " + strconv.Itoa(int(count)))
 				r.add("HTML " + path.Base(fishchamp.PageRewarded))

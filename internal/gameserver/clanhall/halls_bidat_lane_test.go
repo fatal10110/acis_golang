@@ -81,8 +81,9 @@ func (w *heldLanes) drain(order ...int32) {
 // adenaBank pays every fee and takes every refund.
 type adenaBank struct{}
 
-func (adenaBank) PayHallFee(int32, int) bool { return true }
-func (adenaBank) ReturnAdena(int32, int)     {}
+func (adenaBank) PayHallFee(int32, int) bool           { return true }
+func (adenaBank) TakeAdena(int32, int) (Landing, bool) { return nil, true }
+func (adenaBank) ReturnAdena(int32, int) Landing       { return nil }
 
 // A clan cancelling its bid on hall A and bidding on hall B at once must
 // end with auction_bid_at = B stored, however far hall A's lane is behind:

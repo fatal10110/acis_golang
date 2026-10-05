@@ -2,6 +2,7 @@ package clanhall
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"time"
 
@@ -198,24 +199,24 @@ func (hs *Halls) endAuctionLocked(h *hall) {
 		hs.updateLocked(h)
 		return
 	}
+	var payouts []credit
 	if a.seller != nil {
 		seller, _ := hs.clans.ByName(a.seller.ClanName)
-		hs.returnAdenaLocked(seller, a.highest.Bid, true)
-		hs.returnAdenaLocked(seller, h.data.Lease, false)
+		payouts = append(owedBack(seller, a.highest.Bid, true), owedBack(seller, h.data.Lease, false)...)
 	}
 	winner, _ := hs.clans.ByName(a.highest.ClanName)
-	hs.setOwnerLocked(h, winner)
+	hs.setOwnerLocked(h, winner, payouts...)
 }
 
 // removeBidsLocked drops every bid on h, stored and live. Each bidding
 // clan still standing no longer bids anywhere, gets its bid back minus the
-// tax unless it is newOwner, and, with a newOwner, is told who won.
-func (hs *Halls) removeBidsLocked(h *hall, newOwner *clan.Clan) {
+// tax unless it is newOwner, and, with a newOwner, is told who won. The
+// refunds, and payouts, are paid once the bids' delete has landed
+// (writeThenCredit).
+func (hs *Halls) removeBidsLocked(h *hall, newOwner *clan.Clan, payouts ...credit) {
 	hallID := h.id()
-	hs.write("remove clan hall bids", hallID, func(ctx context.Context, st HallStore) error {
-		return st.DeleteBids(ctx, hallID)
-	})
 	a := h.auction
+	var refunds []credit
 	for _, b := range a.listed() {
 		cl, ok := hs.clans.ByName(b.ClanName)
 		if !ok {
@@ -223,12 +224,15 @@ func (hs *Halls) removeBidsLocked(h *hall, newOwner *clan.Clan) {
 		}
 		hs.setBidAtLocked(cl.ID(), 0)
 		if cl != newOwner {
-			hs.returnAdenaLocked(cl, b.Bid, true)
+			refunds = append(refunds, owedBack(cl, b.Bid, true)...)
 		}
 		if newOwner != nil {
 			hs.tellClan(cl, Notice{Kind: NoticeAwarded, Clan: newOwner.Name()})
 		}
 	}
+	hs.writeThenCredit("remove clan hall bids", hallID, func(ctx context.Context, st HallStore) error {
+		return st.DeleteBids(ctx, hallID)
+	}, append(refunds, payouts...))
 	a.bidders = nil
 }
 
@@ -259,7 +263,9 @@ const (
 // own no hall and have bid on no other hall, and the hall must be up for
 // auction: the same gates that open the bid form, checked again as the
 // form may be stale. A placed bid is the clan's leader's in the bid list
-// and stored under name; the clan is recorded as bidding on the hall.
+// and stored under name; the clan is recorded as bidding on the hall. The
+// adena it takes is written ahead of the bid's row, in the same lane job,
+// and a failed write of it stores no row: a stored bid is always paid.
 func (hs *Halls) Bid(hallID int32, cl *clan.Clan, name string, amount int) BidResult {
 	if hs == nil || cl == nil {
 		return BidIgnored
@@ -291,7 +297,11 @@ func (hs *Halls) Bid(hallID int32, cl *clan.Clan, name string, amount int) BidRe
 		}
 		required -= b.Bid
 	}
-	if hs.bank == nil || !hs.bank.PayHallFee(cl.ID(), required) {
+	if hs.bank == nil {
+		return BidNoAdena
+	}
+	paid, ok := hs.bank.TakeAdena(cl.ID(), required)
+	if !ok {
 		return BidNoAdena
 	}
 	now := hs.nowLocked()
@@ -304,15 +314,18 @@ func (hs *Halls) Bid(hallID int32, cl *clan.Clan, name string, amount int) BidRe
 	hs.setBidAtLocked(cl.ID(), hallID)
 	row := BidRow{HallID: hallID, ClanID: cl.ID(), Name: name, ClanName: info.Name, Bid: amount, Time: now}
 	hs.write("store clan hall bid", hallID, func(ctx context.Context, st HallStore) error {
+		if err := land(ctx, paid); err != nil {
+			return fmt.Errorf("write the adena bid: %w", err)
+		}
 		return st.SaveBid(ctx, row)
 	})
 	return BidPlaced
 }
 
 // CancelBid withdraws cl's bid on the hall it bid on, reporting false when
-// that hall holds no auction. The bid comes back minus the tax and the
-// clan bids nowhere; a clan whose bid is not in the auction any more gets
-// nothing.
+// that hall holds no auction. The bid comes back minus the tax, once its
+// row is deleted (writeThenCredit), and the clan bids nowhere; a clan
+// whose bid is not in the auction any more gets nothing.
 func (hs *Halls) CancelBid(cl *clan.Clan) bool {
 	if hs == nil || cl == nil {
 		return false
@@ -329,10 +342,9 @@ func (hs *Halls) CancelBid(cl *clan.Clan) bool {
 		return true
 	}
 	hallID, clanID := h.id(), cl.ID()
-	hs.write("remove clan hall bid", hallID, func(ctx context.Context, st HallStore) error {
+	hs.writeThenCredit("remove clan hall bid", hallID, func(ctx context.Context, st HallStore) error {
 		return st.DeleteBid(ctx, hallID, clanID)
-	})
-	hs.returnAdenaLocked(cl, b.Bid, true)
+	}, owedBack(cl, b.Bid, true))
 	hs.setBidAtLocked(clanID, 0)
 	if b == a.highest {
 		a.recalculateHighest()
@@ -375,7 +387,8 @@ const (
 
 // ConfirmSale registers the sale cl set up for the hall it owns: the
 // deposit, the hall's lease, is taken from cl's warehouse, the sale and
-// its end date are stored, and the auction runs until then.
+// its end date are stored, and the auction runs until then. The deposit
+// is written ahead of the sale, as a bid's adena is ahead of its row.
 func (hs *Halls) ConfirmSale(cl *clan.Clan) SaleResult {
 	if hs == nil || cl == nil {
 		return SaleIgnored
@@ -387,13 +400,20 @@ func (hs *Halls) ConfirmSale(cl *clan.Clan) SaleResult {
 		return SaleIgnored
 	}
 	a := h.auction
-	if hs.bank == nil || !hs.bank.PayHallFee(cl.ID(), h.data.Lease) {
+	if hs.bank == nil {
+		return SaleNoAdena
+	}
+	paid, ok := hs.bank.TakeAdena(cl.ID(), h.data.Lease)
+	if !ok {
 		return SaleNoAdena
 	}
 	seller := a.draft.seller
 	a.seller, a.endDate, a.draft = &seller, a.draft.endDate, nil
 	hallID, end := h.id(), a.endDate
 	hs.write("store clan hall sale", hallID, func(ctx context.Context, st HallStore) error {
+		if err := land(ctx, paid); err != nil {
+			return fmt.Errorf("write the deposit paid: %w", err)
+		}
 		return st.UpdateSale(ctx, hallID, seller, end)
 	})
 	hs.armAuctionLocked(h, end-hs.nowLocked())

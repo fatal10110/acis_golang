@@ -89,12 +89,37 @@ type Clans interface {
 	ByName(name string) (*clan.Clan, bool)
 }
 
+// Landing writes the warehouse rows one adena move changed to the
+// database now, and reports whether they landed. A nil Landing has
+// nothing to write.
+type Landing func(ctx context.Context) error
+
+// land runs l, which may be nil.
+func land(ctx context.Context, l Landing) error {
+	if l == nil {
+		return nil
+	}
+	return l(ctx)
+}
+
 // Bank moves adena in and out of a clan's warehouse.
+//
+// The auctions order every move against the auctions or clanhall row that
+// accounts for it, so that no crash can leave the database holding both
+// the adena and the bid or sale it went to (#3367). The adena a bid or a
+// sale deposit takes lands before the row recording it, in the same lane
+// job. The adena a refund or a payout gives back is added only once the
+// row it settles is written: the item persistence that writes it later
+// cannot then get there first.
 type Bank interface {
 	Treasury
+	// TakeAdena destroys adena from clan clanID's warehouse, as PayHallFee
+	// does, and returns the write that lands the change.
+	TakeAdena(clanID int32, adena int) (Landing, bool)
 	// ReturnAdena adds adena to clan clanID's warehouse, as much of it as
-	// keeps the warehouse's adena within a 32-bit count.
-	ReturnAdena(clanID int32, adena int)
+	// keeps the warehouse's adena within a 32-bit count, and returns the
+	// write that lands the change.
+	ReturnAdena(clanID int32, adena int) Landing
 }
 
 // NoticeKind names a message every online member of a clan is told.
@@ -333,9 +358,18 @@ func (hs *Halls) SetOwner(hallID int32, cl *clan.Clan) bool {
 // the hall, the hall loses its functions and closes its doors, and cl owns
 // it with a week's lease paid; both clans' headers are refreshed, the
 // players of other clans are thrown out of its grounds and the row stored.
-func (hs *Halls) setOwnerLocked(h *hall, cl *clan.Clan) {
+//
+// payouts, a sold hall's seller's due, are paid once the row naming the
+// new owner is stored, and without a new owner once the bids are deleted:
+// a crash before then leaves the sale standing, unpaid, rather than paid
+// and still standing.
+func (hs *Halls) setOwnerLocked(h *hall, cl *clan.Clan, payouts ...credit) {
 	if a := h.auction; a != nil {
-		hs.removeBidsLocked(h, cl)
+		var unowned []credit
+		if cl == nil {
+			unowned = payouts
+		}
+		hs.removeBidsLocked(h, cl, unowned...)
 		hs.resetAuctionLocked(h)
 	}
 	if cl == nil {
@@ -359,7 +393,7 @@ func (hs *Halls) setOwnerLocked(h *hall, cl *clan.Clan) {
 	if hs.grounds != nil {
 		hs.grounds.BanishForeigners(h.id(), h.ownerID)
 	}
-	hs.updateLocked(h)
+	hs.updateLocked(h, payouts...)
 }
 
 // freeLocked takes h from its owner: the lease stops, the owner loses the
@@ -478,16 +512,46 @@ func (hs *Halls) tellClan(cl *clan.Clan, n Notice) {
 	}
 }
 
-// returnAdenaLocked gives cl back adena, minus the 10% tax when taxed,
-// truncated. A nil cl, a clan gone since, gets nothing.
-func (hs *Halls) returnAdenaLocked(cl *clan.Clan, adena int, taxed bool) {
-	if cl == nil || hs.bank == nil {
-		return
+// credit is adena owed to a clan once the row write that settles it has
+// landed (writeThenCredit).
+type credit struct {
+	clanID int32
+	adena  int
+}
+
+// owedBack is what cl is owed back of adena, minus the 10% tax when
+// taxed, truncated. A nil cl, a clan gone since, is owed nothing.
+func owedBack(cl *clan.Clan, adena int, taxed bool) []credit {
+	if cl == nil {
+		return nil
 	}
 	if taxed {
 		adena = TaxedRefund(adena)
 	}
-	hs.bank.ReturnAdena(cl.ID(), adena)
+	return []credit{{clanID: cl.ID(), adena: adena}}
+}
+
+// payCredits returns what pays credits into the clans' warehouses, each
+// written at once; a clan gone by then gets nothing. It returns nil when
+// there is nothing to pay. It takes no lock of the halls, so a lane job
+// can run it.
+func (hs *Halls) payCredits(credits []credit) func(context.Context) {
+	if len(credits) == 0 || hs.bank == nil {
+		return nil
+	}
+	bank, clans, log := hs.bank, hs.clans, hs.log
+	return func(ctx context.Context) {
+		for _, c := range credits {
+			if _, ok := clans.Get(c.clanID); !ok {
+				continue
+			}
+			// A failed write stays with the item persistence, which retries
+			// it; the row it pays for is already settled.
+			if err := land(ctx, bank.ReturnAdena(c.clanID, c.adena)); err != nil {
+				log.Error().Err(err).Int32("clan_id", c.clanID).Int("adena", c.adena).Msg("clanhall: write the adena returned")
+			}
+		}
+	}
 }
 
 // TaxedRefund is what a bid of adena returns once the 10% tax is taken:
@@ -496,8 +560,9 @@ func TaxedRefund(adena int) int {
 	return int(float64(adena) * 0.9)
 }
 
-// updateLocked stores every column of h's row.
-func (hs *Halls) updateLocked(h *hall) {
+// updateLocked stores every column of h's row, then pays credits once it
+// has landed (writeThenCredit).
+func (hs *Halls) updateLocked(h *hall, credits ...credit) {
 	row := HallRow{ID: h.id(), OwnerID: h.ownerID, PaidUntil: h.paidUntil, Paid: h.paid}
 	if a := h.auction; a != nil {
 		if a.seller != nil {
@@ -505,9 +570,9 @@ func (hs *Halls) updateLocked(h *hall) {
 		}
 		row.EndDate = a.endDate
 	}
-	hs.write("store clan hall", row.ID, func(ctx context.Context, st HallStore) error {
+	hs.writeThenCredit("store clan hall", row.ID, func(ctx context.Context, st HallStore) error {
 		return st.UpdateHall(ctx, row)
-	})
+	}, credits)
 }
 
 // setBidAtLocked records the hall clan clanID bid on, 0 for none, and
@@ -522,20 +587,37 @@ func (hs *Halls) setBidAtLocked(clanID, at int32) {
 	}
 	hs.writeOn("store clan auction bid", "clan_id", clanID, func(ctx context.Context, st HallStore) error {
 		return st.SetClanBid(ctx, clanID, at)
-	})
+	}, nil)
 }
 
 // write queues fn on hallID's persistence lane, or runs it at once
 // without a writer. Each write gets taskTimeout.
 func (hs *Halls) write(what string, hallID int32, fn func(context.Context, HallStore) error) {
-	hs.writeOn(what, "hall_id", hallID, fn)
+	hs.writeOn(what, "hall_id", hallID, fn, nil)
+}
+
+// writeThenCredit is write, then, in the same lane job and only once fn
+// has landed, pays credits: the adena a refund or a payout gives back is
+// never added before the row change it settles is written, so a crash in
+// between loses the adena rather than leaving it claimable again. A fn
+// that fails, or is dropped, pays nothing: the row it left in place still
+// holds the bid or the sale, and with it the claim on the adena, for after
+// a restart. Without a store the credits are paid at once.
+func (hs *Halls) writeThenCredit(what string, hallID int32, fn func(context.Context, HallStore) error, credits []credit) {
+	hs.writeOn(what, "hall_id", hallID, fn, hs.payCredits(credits))
 }
 
 // writeOn queues fn on owner's persistence lane, owner being the id named
-// key, or runs it at once without a writer.
-func (hs *Halls) writeOn(what, key string, owner int32, fn func(context.Context, HallStore) error) {
+// key, or runs it at once without a writer; then, when set, runs right
+// after fn lands, in the same job.
+func (hs *Halls) writeOn(what, key string, owner int32, fn func(context.Context, HallStore) error, then func(context.Context)) {
 	store, log := hs.store, hs.log
 	if store == nil {
+		if then != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), taskTimeout)
+			defer cancel()
+			then(ctx)
+		}
 		return
 	}
 	job := func() {
@@ -543,6 +625,10 @@ func (hs *Halls) writeOn(what, key string, owner int32, fn func(context.Context,
 		defer cancel()
 		if err := fn(ctx, store); err != nil {
 			log.Error().Err(err).Int32(key, owner).Msg("clanhall: " + what)
+			return
+		}
+		if then != nil {
+			then(ctx)
 		}
 	}
 	if hs.writes == nil {
