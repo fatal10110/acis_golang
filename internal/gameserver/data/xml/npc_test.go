@@ -287,6 +287,19 @@ func TestLoadNPCTemplates(t *testing.T) {
 		}
 	})
 
+	t.Run("faction clan tags", func(t *testing.T) {
+		table := withNoItems
+		for id, want := range map[int]string{21324: "ketra_orc_clan", 21350: "varka_silenos_clan"} {
+			tmpl, ok := table.Get(id)
+			if !ok {
+				t.Fatalf("npc %d not loaded", id)
+			}
+			if len(tmpl.Clans) != 1 || tmpl.Clans[0] != want {
+				t.Fatalf("npc %d Clans = %v, want [%s]", id, tmpl.Clans, want)
+			}
+		}
+	})
+
 	t.Run("teachTo profession list", func(t *testing.T) {
 		table := withNoItems
 		auron, ok := table.Get(30010)
