@@ -223,10 +223,12 @@ func EffectPointSinks(state *world.State) func(*npc.EffectPoint) event.Sink {
 	return func(ep *npc.EffectPoint) event.Sink { return &effectPointSink{world: state, ep: ep} }
 }
 
-// effectPointSink maps one signet effect point's cast events to packets.
+// effectPointSink maps one signet effect point's cast events and view
+// refreshes to packets.
 type effectPointSink struct {
 	world *world.State
 	ep    *npc.EffectPoint
+	known world.KnownBuffer
 }
 
 // Emit maps ev to the frame every known observer receives.
@@ -238,6 +240,9 @@ func (s *effectPointSink) Emit(ev event.Event) {
 		frame = frames.SkillUse(e.CasterID, e.CasterAt, e.TargetID, e.TargetAt, e.SkillID, e.Level, e.HitTime, e.ReuseDelay, false)
 	case event.SkillLaunched:
 		frame = frames.SkillLaunched(s.ep.ObjectID(), e.SkillID, e.Level, e.TargetIDs)
+	case event.NPCInfoChanged:
+		broadcastKnown(&s.known, s.world, s.ep, func() wire.Frame { return npcViewFrame(s.ep, e.ServerObject) })
+		return
 	default:
 		return
 	}
@@ -251,6 +256,36 @@ func (s *effectPointSink) Emit(ev event.Event) {
 			receiver.BroadcastFrame(owned)
 		}
 	})
+}
+
+// npcView is an NPC with both client views.
+type npcView interface {
+	NPCInfoSnapshot() npcinfo.Snapshot
+	ServerObjectInfoSnapshot() npcinfo.Snapshot
+}
+
+// npcViewFrame is v's stationary view when serverObject is set, its full
+// view otherwise.
+func npcViewFrame(v npcView, serverObject bool) wire.Frame {
+	frames := serverpackets.NpcFrameBuilder{}
+	if serverObject {
+		return frames.ObjectInfo(v.ServerObjectInfoSnapshot())
+	}
+	return frames.Info(v.NPCInfoSnapshot())
+}
+
+// decorationSink shows one placed decoration's observers its view again.
+type decorationSink struct {
+	world *world.State
+	d     *npc.Decoration
+	known world.KnownBuffer
+}
+
+// Emit sends every known observer the decoration's view ev asks for.
+func (s *decorationSink) Emit(ev event.Event) {
+	if e, ok := ev.(event.NPCInfoChanged); ok {
+		broadcastKnown(&s.known, s.world, s.d, func() wire.Frame { return npcViewFrame(s.d, e.ServerObject) })
+	}
 }
 
 // DoorSinks returns the event-sink factory for doors spawned into state.

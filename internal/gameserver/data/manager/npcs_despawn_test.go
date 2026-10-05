@@ -114,7 +114,8 @@ func TestDespawnAllRemovesEveryNpcForGood(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewDecoration() error: %v", err)
 	}
-	f.state.Spawn(decoration, 80, 80, 0, 0)
+	decoration.Attach(npc.DecorationRuntime{World: f.state})
+	decoration.Spawn(80, 80, 0, 0)
 	if got := len(f.npcObjects()); got != 5 {
 		t.Fatalf("npcs in the world = %d, want 5", got)
 	}

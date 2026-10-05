@@ -820,6 +820,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 			IDs:       cfg.IDs,
 			World:     cfg.World,
 			NewSink:   EffectPointSinks(cfg.World),
+			Zones:     cfg.Zones,
 			Effects:   cfg.Effects,
 			Queues:    cfg.Queues,
 			Log:       cfg.Log,
@@ -911,6 +912,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.wireZoneOccupantHooks()
 	link.wireClanHallZones()
 	link.wireSiegeZones()
+	link.wireZonePulses()
 	return link, nil
 }
 

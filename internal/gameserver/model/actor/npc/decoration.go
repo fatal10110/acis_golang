@@ -3,9 +3,13 @@ package npc
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -17,6 +21,26 @@ type Decoration struct {
 	world.Presence
 	*Instance
 	stats fixedStats
+
+	// world, sink and zones are installed by Attach, before the NPC is
+	// published.
+	world *world.State
+	sink  event.Sink
+	zones *zoneMember
+	// placeMu serializes Spawn and Despawn: the player placing the
+	// decoration and a GM deleting it run on different queues, and a
+	// deletion landing between the spawn and its zone entry would leave
+	// the removed decoration in its zones.
+	placeMu sync.Mutex
+}
+
+// DecorationRuntime is what a placed decoration lives in: the world it
+// stands in, the zones its membership follows (nil for none) and the sink
+// its observers are told of its changes through (nil tells nobody).
+type DecorationRuntime struct {
+	World *world.State
+	Zones *zone.Index
+	Sink  event.Sink
 }
 
 // NewDecoration builds an item-placed NPC from inst, titled with title.
@@ -35,7 +59,57 @@ func NewDecoration(inst *Instance, title string, skills ...skillDefinitions) (*D
 		return nil, err
 	}
 	inst.SetTitle(title)
-	return &Decoration{Instance: inst, stats: stats}, nil
+	d := &Decoration{Instance: inst, stats: stats}
+	d.zones = newZoneMember(d)
+	return d, nil
+}
+
+// Attach installs rt. Call it once, before Spawn.
+func (d *Decoration) Attach(rt DecorationRuntime) {
+	d.world, d.sink = rt.World, rt.Sink
+	d.zones.ix = rt.Zones
+}
+
+// Spawn places the decoration in the world at (x, y, z) facing heading,
+// then enters the zones at its position. It is a no-op until Attach has
+// installed a world.
+func (d *Decoration) Spawn(x, y, z, heading int) {
+	if d.world == nil {
+		return
+	}
+	d.placeMu.Lock()
+	defer d.placeMu.Unlock()
+	d.world.Spawn(d, x, y, z, heading)
+	d.zones.enter()
+}
+
+// Despawn takes the decoration out of its zones, while its observers still
+// know it, then out of the world. It is a no-op until Attach has installed
+// a world.
+func (d *Decoration) Despawn() {
+	if d.world == nil {
+		return
+	}
+	d.placeMu.Lock()
+	defer d.placeMu.Unlock()
+	x, y, z := d.Position()
+	d.zones.leave(location.Location{X: x, Y: y, Z: z})
+	d.world.Despawn(d)
+}
+
+// InsideZone reports whether the decoration's zones hold flag.
+func (d *Decoration) InsideZone(flag zone.Flag) bool { return d.zones.has(flag) }
+
+// zoneTeleporting reports false: a decoration never moves.
+func (d *Decoration) zoneTeleporting() bool { return false }
+
+// swimStateChanged shows the decoration's observers its view again as it
+// enters or leaves water: the stationary one when it cannot move at its
+// speed, the full one otherwise (WaterZone.onEnter and onExit).
+func (d *Decoration) swimStateChanged(bool) {
+	if d.sink != nil {
+		d.sink.Emit(event.NPCInfoChanged{ServerObject: d.stats.moveSpeed == 0})
+	}
 }
 
 func (d *Decoration) ObjectID() int32 { return d.Instance.ObjectID }
@@ -43,21 +117,36 @@ func (d *Decoration) ObjectID() int32 { return d.Instance.ObjectID }
 func (d *Decoration) CollisionRadius() float64 { return d.Instance.Template.CollisionRadius }
 
 func (d *Decoration) NPCInfoSnapshot() npcinfo.Snapshot {
-	t := d.Instance.Template
-	x, y, z := d.Position()
+	return fixedNPCInfoSnapshot(d.Instance, d.stats, &d.Presence, d.zones.moveType())
+}
+
+// ServerObjectInfoSnapshot is NPCInfoSnapshot with the server-side name
+// always shown, the view an NPC that cannot move is announced with.
+func (d *Decoration) ServerObjectInfoSnapshot() npcinfo.Snapshot {
+	s := d.NPCInfoSnapshot()
+	s.Name = d.Instance.Name()
+	return s
+}
+
+// fixedNPCInfoSnapshot is the client view of an NPC with fixed stats,
+// standing where p is and moving by moveType.
+func fixedNPCInfoSnapshot(inst *Instance, stats fixedStats, p *world.Presence, moveType int) npcinfo.Snapshot {
+	t := inst.Template
+	x, y, z := p.Position()
 	name := ""
 	if t.UsingServerSideName {
-		name = d.Instance.Name()
+		name = inst.Name()
 	}
 	return npcinfo.Snapshot{
-		ObjectID: d.ObjectID(), TemplateID: t.TemplateID,
-		X: x, Y: y, Z: z, Heading: d.Heading(),
-		MAtkSpd: d.stats.mAtkSpd, PAtkSpd: d.stats.pAtkSpd,
+		ObjectID: inst.ObjectID, TemplateID: t.TemplateID,
+		X: x, Y: y, Z: z, Heading: p.Heading(),
+		MAtkSpd: stats.mAtkSpd, PAtkSpd: stats.pAtkSpd,
 		RunSpd: int(t.RunSpeed), WalkSpd: int(t.WalkSpeed),
-		MoveMultiplier: d.stats.moveMultiplier, AtkSpdMultiplier: d.stats.atkSpdMultiplier,
+		MoveMultiplier: stats.moveMultiplier, AtkSpdMultiplier: stats.atkSpdMultiplier,
+		MoveType:        moveType,
 		CollisionRadius: t.CollisionRadius, CollisionHeight: t.CollisionHeight,
 		RightHand: t.RightHand, LeftHand: t.LeftHand,
-		Running: !d.Instance.WalkMode, SummonAnimation: 2, Name: name, Title: d.Instance.Title(),
+		Running: !inst.WalkMode, SummonAnimation: 2, Name: name, Title: inst.Title(),
 	}
 }
 

@@ -83,8 +83,8 @@ type Effect struct {
 	// Target picks which occupant families the pulse touches.
 	Target TargetScope
 
-	// StartPulse begins the periodic effect task; nil until the skill
-	// system wires it. The zone fires it at most once until PulseStopped
+	// StartPulse begins the periodic effect task; nil leaves the zone
+	// harmless. The zone fires it at most once until PulseStopped
 	// resets the latch. Hook implementations must tolerate overlapping
 	// calls when a task resets the latch before its previous StartPulse
 	// invocation returns.
@@ -179,7 +179,11 @@ func (z *Effect) SetEnabled(v bool) {
 }
 
 // PulseStopped resets the pulse latch; the effect task calls it when it
-// shuts itself down, so the next entry can start a fresh pulse.
-func (z *Effect) PulseStopped() {
+// shuts itself down, so the next entry can start a fresh pulse. It reports
+// true, holding the latch again, when the zone still has occupants: one
+// entered after the task's last look, and its entry found the latch still
+// held, so the caller must start a fresh pulse for it.
+func (z *Effect) PulseStopped() bool {
 	z.pulsing.Store(false)
+	return len(z.Occupants()) > 0 && z.pulsing.CompareAndSwap(false, true)
 }

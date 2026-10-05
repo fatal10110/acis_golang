@@ -113,7 +113,7 @@ func (l *GameClientLink) adminDelete(gm *livePlayer, _ string) {
 	deleted := false
 	switch t := target.(type) {
 	case *npc.Decoration:
-		l.world.Despawn(t)
+		t.Despawn()
 		name, deleted = t.Name(), true
 	case *npc.Hostile, *npc.Folk:
 		if npcs := l.npcSpawns.Load(); npcs != nil && npcs.DeleteFixed(t.ObjectID()) {

@@ -911,7 +911,7 @@ func TestActorSinksHandEachObserverAnOwnedCopy(t *testing.T) {
 			actor.BroadcastSelfSkillUse(1422, 1)
 		}},
 		{"effect point", func(t *testing.T, state *world.State) {
-			ep, err := npc.NewEffectPoint(7, &npc.Template{ID: 13018, Type: "EffectPoint"}, 1, sim.NewInline(time.Unix(0, 0)).NewQueue("effect-point"))
+			ep, err := npc.NewEffectPoint(7, &npc.Template{ID: 13018, Type: "EffectPoint"}, 1, sim.NewInline(time.Unix(0, 0)).NewQueue("effect-point"), nil)
 			if err != nil {
 				t.Fatal(err)
 			}
