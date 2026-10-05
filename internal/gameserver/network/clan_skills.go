@@ -253,21 +253,28 @@ func (l *GameClientLink) sendReputationChange(cl *clan.Clan, change clan.Reputat
 		l.broadcastToClanQueued(cl, actor, func() wire.Frame { return framePledgeShowInfoUpdate(cl) })
 		return
 	}
-	message := serverpackets.SystemMessageClanSkillsActivatedReputation
-	if change.Crossed < 0 {
-		message = serverpackets.SystemMessageReputationLowClanSkillsDeactivated
-	}
 	for _, member := range l.onlineClanMembers(cl, 0) {
 		onMemberQueue(actor, member, func() {
 			if !cl.IsMember(member.ObjectID()) {
 				return
 			}
-			member.SendFrame(serverpackets.FrameSystemMessage(message))
-			l.applyReputationCrossing(member, cl, change.Crossed)
-			member.SendFrame(serverpackets.FrameSkillList(skillListEntries(member.Character, l.skills)))
-			member.SendFrame(framePledgeShowInfoUpdate(cl))
+			l.showReputationCrossing(member, cl, change.Crossed)
 		})
 	}
+}
+
+// showReputationCrossing shows member, on its own queue, that cl's score
+// crossed 0: whether its clan skills turned off or on, the skills taken
+// or given back, its skill list, then the clan's header.
+func (l *GameClientLink) showReputationCrossing(member *livePlayer, cl *clan.Clan, crossed int) {
+	message := serverpackets.SystemMessageClanSkillsActivatedReputation
+	if crossed < 0 {
+		message = serverpackets.SystemMessageReputationLowClanSkillsDeactivated
+	}
+	member.SendFrame(serverpackets.FrameSystemMessage(message))
+	l.applyReputationCrossing(member, cl, crossed)
+	member.SendFrame(serverpackets.FrameSkillList(skillListEntries(member.Character, l.skills)))
+	member.SendFrame(framePledgeShowInfoUpdate(cl))
 }
 
 // applyReputationCrossing takes cl's skills from member as the score fell
