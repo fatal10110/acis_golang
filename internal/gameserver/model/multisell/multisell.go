@@ -87,6 +87,8 @@ type Entry struct {
 	Ingredients []Ingredient
 	Products    []Ingredient
 	stackable   bool
+	// taxAmount is the castle tax a prepared entry adds to its adena.
+	taxAmount int
 }
 
 // NewEntry builds an Entry from its already-parsed ingredients and products.
@@ -106,33 +108,34 @@ func (e Entry) Stackable() bool {
 	return e.stackable
 }
 
-// TaxAmount is not populated by the M3 loader slice yet.
+// TaxAmount is the castle tax one unit of a prepared entry takes in adena,
+// which the castle collects once the exchange is made.
 func (e Entry) TaxAmount() int {
-	return 0
+	return e.taxAmount
 }
 
 // prepare returns e as a talker is shown it. Its adena ingredients leave
-// their places: the tax ingredients are dropped, as no castle collects tax
-// yet, and the rest become one adena ingredient at the end. When enchant is
-// set, every armor or weapon ingredient and product takes its level.
-//
-// ponytail: castle taxes (#239). Under a castle with an owner, a list
-// applying taxes adds its tax ingredients at the castle's rate, rounded
-// half up, to that adena ingredient, and the exchange pays the castle.
-func (e Entry) prepare(enchant *int) Entry {
+// their places: each tax ingredient becomes its count at taxRate, rounded
+// half up, of castle tax (nothing at a rate of 0), and the rest, the tax
+// added, become one adena ingredient at the end. When enchant is set, every
+// armor or weapon ingredient and product takes its level.
+func (e Entry) prepare(enchant *int, taxRate float64) Entry {
 	out := Entry{Ingredients: make([]Ingredient, 0, len(e.Ingredients)+1), stackable: true}
 	adena := 0
 	var adenaTemplate *item.Template
 	for _, in := range e.Ingredients {
 		if in.ItemID == item.AdenaID {
 			adenaTemplate = in.template
-			if !in.TaxIngredient {
+			if in.TaxIngredient {
+				out.taxAmount += int(commons.JavaRound(float64(in.Count) * taxRate))
+			} else {
 				adena += in.Count
 			}
 			continue
 		}
 		out.Ingredients = append(out.Ingredients, in.prepared(enchant))
 	}
+	adena += out.taxAmount
 	if adena > 0 {
 		out.Ingredients = append(out.Ingredients, Ingredient{ItemID: item.AdenaID, Count: adena, template: adenaTemplate})
 	}
@@ -171,12 +174,16 @@ type Held struct {
 	EnchantLevel int
 }
 
-// Prepare returns the list as a talker is shown it.
-func (l *List) Prepare() *List {
+// Prepare returns the list as a talker is shown it. taxRate is the tax
+// rate of the castle owning the NPC showing it, 0 when that castle has no
+// owner or the NPC belongs to none; it applies only on a list applying
+// taxes.
+func (l *List) Prepare(taxRate float64) *List {
 	out := l.preparedHeader()
+	taxRate = l.taxRate(taxRate)
 	out.Entries = make([]Entry, 0, len(l.Entries))
 	for _, e := range l.Entries {
-		out.Entries = append(out.Entries, e.prepare(nil))
+		out.Entries = append(out.Entries, e.prepare(nil, taxRate))
 	}
 	return out
 }
@@ -184,9 +191,11 @@ func (l *List) Prepare() *List {
 // PrepareFor returns the inventory-only form of the list: for each held
 // item in order, every entry taking that item as an ingredient, in list
 // order. On a list that maintains enchantment, those entries' armor and
-// weapon ingredients and products take the held item's level.
-func (l *List) PrepareFor(held []Held) *List {
+// weapon ingredients and products take the held item's level. taxRate is
+// as Prepare takes it.
+func (l *List) PrepareFor(held []Held, taxRate float64) *List {
 	out := l.preparedHeader()
+	taxRate = l.taxRate(taxRate)
 	for _, h := range held {
 		var enchant *int
 		if l.MaintainEnchantment {
@@ -195,7 +204,7 @@ func (l *List) PrepareFor(held []Held) *List {
 		for _, e := range l.Entries {
 			for _, in := range e.Ingredients {
 				if in.ItemID == h.ItemID {
-					out.Entries = append(out.Entries, e.prepare(enchant))
+					out.Entries = append(out.Entries, e.prepare(enchant, taxRate))
 					break
 				}
 			}
@@ -204,7 +213,17 @@ func (l *List) PrepareFor(held []Held) *List {
 	return out
 }
 
-// preparedHeader is the list's header as prepared: it applies no taxes.
+// taxRate is the castle tax rate the list takes: rate on a list applying
+// taxes, else 0.
+func (l *List) taxRate(rate float64) float64 {
+	if !l.ApplyTaxes {
+		return 0
+	}
+	return rate
+}
+
+// preparedHeader is the list's header as prepared: the castle tax, if
+// any, is in its entries.
 func (l *List) preparedHeader() *List {
 	return &List{ID: l.ID, MaintainEnchantment: l.MaintainEnchantment, NPCIDs: l.NPCIDs}
 }

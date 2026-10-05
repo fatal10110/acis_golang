@@ -182,6 +182,7 @@ type State struct {
 	out       Broadcaster
 	festival  Festival
 	online    Online
+	castles   Castles
 	now       func() time.Time
 	afterFunc func(time.Duration, func()) *time.Timer
 	log       zerolog.Logger
@@ -325,19 +326,21 @@ func (s *State) NextChange() time.Time {
 
 // advance moves the state into the following period — settling the
 // competition, or starting the next cycle after validation ends — announces
-// it, drives the festival and the Seal of Strife skills, persists it, sends
-// the players no longer allowed in a Seven Signs dungeon out, shows the new
-// sky, and re-arms the timer.
+// it, drives the festival, the castles and the Seal of Strife skills,
+// persists it, sends the players no longer allowed in a Seven Signs dungeon
+// out, shows the new sky, and re-arms the timer.
 func (s *State) advance() {
 	s.mu.Lock()
 	ended := s.row.Period
 	notices := s.changePeriodLocked()
 	s.nextChange = nextPeriodChange(s.row.Period, s.now())
 	cycle, period := s.row.Cycle, s.row.Period
-	online := s.online
+	online, castles := s.online, s.castles
+	strifeOwner := s.strifeOwnerLocked()
 	s.mu.Unlock()
 
 	s.announce(ended, cycle, notices, online)
+	s.settleCastles(ended, castles, strifeOwner)
 
 	ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
 	defer cancel()
@@ -390,6 +393,22 @@ func (s *State) announce(ended Period, cycle int, notices []Notice, online Onlin
 		if s.festival != nil {
 			s.festival.CycleBegun(cycle)
 		}
+	}
+}
+
+// settleCastles applies what the ended period settles for the castles: the
+// end of recruiting gives every castle its certificates back, and the end
+// of the competition caps their tax rates by the Seal of Strife's new
+// owner. Neither sends anything, so it follows the announcements.
+func (s *State) settleCastles(ended Period, castles Castles, strifeOwner Cabal) {
+	if castles == nil {
+		return
+	}
+	switch ended {
+	case Recruiting:
+		castles.ResetCertificates()
+	case Competition:
+		castles.ValidateTaxes(castleTaxCap(strifeOwner))
 	}
 }
 

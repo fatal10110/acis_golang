@@ -53,8 +53,10 @@ func NewService(lists *multisell.Table, keepMaintained bool, nextID func() (int3
 // Open prepares list name for c talking to the NPC npcID. It returns nil
 // when no list has that name or the NPC may not open it. An inventory-only
 // list holds, for each unworn armor or weapon c may part with, the entries
-// taking it.
-func (s *Service) Open(c *player.Character, name string, npcID int, inventoryOnly bool) *multisell.List {
+// taking it. taxRate is the tax rate of the castle owning the NPC, 0 when
+// it belongs to no castle or the castle has no owner; a list applying taxes
+// adds it to its entries' adena.
+func (s *Service) Open(c *player.Character, name string, npcID int, inventoryOnly bool, taxRate float64) *multisell.List {
 	if s.lists == nil {
 		return nil
 	}
@@ -63,9 +65,9 @@ func (s *Service) Open(c *player.Character, name string, npcID int, inventoryOnl
 		return nil
 	}
 	if !inventoryOnly {
-		return tmpl.Prepare()
+		return tmpl.Prepare(taxRate)
 	}
-	return tmpl.PrepareFor(offered(c.Inventory(), tmpl.MaintainEnchantment, npcID == newbieGuideID))
+	return tmpl.PrepareFor(offered(c.Inventory(), tmpl.MaintainEnchantment, npcID == newbieGuideID), taxRate)
 }
 
 // offered lists the items of inv an inventory-only list is matched
@@ -186,6 +188,9 @@ type Outcome struct {
 	// Forget drops the player's open list: every later choice from it is
 	// refused until a list is opened again.
 	Forget bool
+	// Tax is the castle tax a completed exchange took, for the castle of
+	// the NPC the player is trading with to collect.
+	Tax int
 }
 
 // Choose trades amount units of entry entryID of list, the list c was last
@@ -266,6 +271,7 @@ func (s *Service) Choose(c *player.Character, list *multisell.List, npcID int, r
 	}
 	s.giveProducts(c, inv, list, entry, amount, augmentations, &out)
 	out.Notices = append(out.Notices, Traded{})
+	out.Tax = entry.TaxAmount() * amount
 	return out
 }
 

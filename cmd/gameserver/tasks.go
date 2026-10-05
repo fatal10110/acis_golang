@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
@@ -154,12 +155,13 @@ func provideSevenSignsState(db *sql.DB, state *world.State, log zerolog.Logger) 
 
 // startSevenSigns restores the persisted status and sign-ups, then the
 // festival, before any character can log in; hands the period changes to
-// the festival and lets them reach the players online through link, starts
+// the festival and the castles and lets them reach the players online
+// through link, starts
 // the festival's schedule and arms the period-change timer —
 // firing an overdue period change immediately. On shutdown it stops both
 // timers, saves the festival scores unless seal validation is under way,
 // and saves the sign-ups and the status with the festival's columns.
-func startSevenSigns(lc fx.Lifecycle, state *sevensigns.State, fest *festival.Manager, link *network.GameClientLink, log zerolog.Logger) {
+func startSevenSigns(lc fx.Lifecycle, state *sevensigns.State, fest *festival.Manager, castles *castle.Manager, link *network.GameClientLink, log zerolog.Logger) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			if err := state.Restore(ctx); err != nil {
@@ -169,6 +171,7 @@ func startSevenSigns(lc fx.Lifecycle, state *sevensigns.State, fest *festival.Ma
 				return err
 			}
 			state.SetFestival(fest)
+			state.SetCastles(castles)
 			state.SetOnline(link)
 			fest.Start()
 			state.Start()
