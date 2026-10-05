@@ -141,7 +141,7 @@ func TestAttackableAIDoesNotPromoteWhileCasting(t *testing.T) {
 	cast := &recordingCast{casting: true}
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 	ai.SetCastController(cast)
-	ai.lifeTime = 1
+	ai.lifeTime.Store(1)
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionWander, Timer: 5, Weight: 5})
 
 	if err := ai.TickThink(); err != nil {

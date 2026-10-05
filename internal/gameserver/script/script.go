@@ -4,6 +4,9 @@ package script
 // hooks it reacts with. A behavior derives its hooks from its parent's with
 // Hooks.With; calling the parent is calling the captured parent Hooks.
 type Script struct {
+	// Name is the last element of the script's scripts.xml path; Build sets
+	// it. It keys the script's character_quests rows.
+	Name string
 	// QuestID, when positive, makes the script a real quest.
 	QuestID int32
 	// Bind lists, per NPC event, the NPC ids the script registers for

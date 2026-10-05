@@ -34,6 +34,8 @@ type SaveState struct {
 	Noble bool
 	// In7sDungeon is the Seven Signs dungeon membership (see In7sDungeon).
 	In7sDungeon bool
+	// VarkaKetraAlliance is the faction standing (see VarkaKetraAlliance).
+	VarkaKetraAlliance int
 	// ClientDetached marks a copy taken while the character lingers in the
 	// world after its connection dropped: the row's online column then
 	// records 2 instead of 1 (Player.isOnlineInt, Player.java:4504-4510).
@@ -59,21 +61,22 @@ func (c *Character) SaveState() SaveState {
 		at = saved
 	}
 	return SaveState{
-		ID:                c.ID,
-		ClassID:           classID,
-		BaseClassID:       c.BaseClassID(),
-		Progression:       progression,
-		Subclasses:        subs,
-		Resources:         c.ResourceValues(),
-		Karma:             progression.Karma,
-		PvPKills:          progression.PvPKills,
-		PKKills:           progression.PKKills,
-		DeathPenaltyLevel: c.DeathPenaltyLevel(),
-		OnlineTime:        c.TotalOnlineTime(time.Now()), // persisted wall-clock total, not a queue deadline
-		Location:          at,
-		Heading:           c.CurrentHeading(),
-		WantsPeace:        c.WantsPeace(),
-		Noble:             c.IsNoble(),
-		In7sDungeon:       c.In7sDungeon(),
+		ID:                 c.ID,
+		ClassID:            classID,
+		BaseClassID:        c.BaseClassID(),
+		Progression:        progression,
+		Subclasses:         subs,
+		Resources:          c.ResourceValues(),
+		Karma:              progression.Karma,
+		PvPKills:           progression.PvPKills,
+		PKKills:            progression.PKKills,
+		DeathPenaltyLevel:  c.DeathPenaltyLevel(),
+		OnlineTime:         c.TotalOnlineTime(time.Now()), // persisted wall-clock total, not a queue deadline
+		Location:           at,
+		Heading:            c.CurrentHeading(),
+		WantsPeace:         c.WantsPeace(),
+		Noble:              c.IsNoble(),
+		In7sDungeon:        c.In7sDungeon(),
+		VarkaKetraAlliance: c.VarkaKetraAlliance(),
 	}
 }

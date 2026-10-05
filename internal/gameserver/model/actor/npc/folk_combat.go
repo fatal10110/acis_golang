@@ -97,6 +97,9 @@ type FolkRuntime struct {
 	// Zones are the zones the NPC's membership follows; nil leaves it in
 	// none.
 	Zones *zone.Index
+	// Slot is the spawn slot that placed the NPC; nil leaves it with no
+	// spawn parameters and a script memory of its own.
+	Slot SpawnSlot
 }
 
 // folkAdmits reports whether a civilian NPC holds e: only plain buffs and
@@ -126,6 +129,7 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 	f.world, f.queue, f.sink, f.los, f.decay = rt.World, rt.Queue, rt.Sink, rt.LOS, rt.Decay
 	f.zones.ix = rt.Zones
 	f.cast.ai = rt.AI
+	f.bindSpawn(rt.Slot)
 	f.heldMask = templateHeldMask(f.Instance.Template, rt.Items)
 	if rt.MaxBuffsAmount > 0 {
 		f.maxBuffs.Store(int32(rt.MaxBuffsAmount))

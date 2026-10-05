@@ -51,7 +51,8 @@ const routeDesireWeight = 1_000_000
 // folkCast is a civilian NPC's AI and cast runtime: the controller its
 // casts run on and the desires its AI picks them from. The controller is
 // set once before the NPC is published; desires is safe for concurrent
-// use; step, lifeTime, acting and offRoute belong to the NPC's queue.
+// use; step, acting and offRoute belong to the NPC's queue, which alone
+// writes lifeTime.
 type folkCast struct {
 	control CastControl
 	castAI  FolkCastAI
@@ -61,7 +62,7 @@ type folkCast struct {
 	step    int
 	// lifeTime counts the AI ticks the NPC has lived through. Its AI acts
 	// on nothing, and does not idle, before the first one is over.
-	lifeTime int
+	lifeTime atomic.Int32
 	// acting marks an NPC whose AI last acted on a cast desire rather than
 	// going idle; the AI idles it at once when its desires run out.
 	acting bool
@@ -130,12 +131,17 @@ func (f *Folk) AbortCast() {
 	f.queue.Post(func() {
 		f.cast.desires.Clear()
 		f.setCurrentDesire(nil)
-		f.cast.offRoute, f.cast.acting, f.cast.lifeTime = false, false, 0
+		f.cast.offRoute, f.cast.acting = false, false
+		f.cast.lifeTime.Store(0)
 		if f.cast.ai != nil {
 			f.cast.ai.Remove(f)
 		}
 	})
 }
+
+// LifeTime returns the number of AI ticks f has lived through since it
+// spawned, zero again once it dies. Safe from any goroutine.
+func (f *Folk) LifeTime() int32 { return f.cast.lifeTime.Load() }
 
 // Tick does nothing: TickThink runs the whole AI step, in order.
 func (f *Folk) Tick() {}
@@ -152,11 +158,11 @@ func (f *Folk) TickThink() error {
 	}
 	f.AtHookPoint(ai.HookSeeCreature)
 	f.runAI()
-	if f.cast.desires.Len() == 0 && f.cast.lifeTime > 0 && !f.CastingNow() && !f.walksRoute() {
+	if f.cast.desires.Len() == 0 && f.cast.lifeTime.Load() > 0 && !f.CastingNow() && !f.walksRoute() {
 		f.thinkIdle()
 	}
 	f.cast.step++
-	f.cast.lifeTime++
+	f.cast.lifeTime.Add(1)
 	if f.cast.step%3 == 0 {
 		f.cast.desires.DecreaseWeightByType(ai.IntentionCast, castDesireDecay)
 		if f.currentDesire() != nil {
@@ -180,7 +186,7 @@ func (f *Folk) runAI() {
 			return d.FinalTarget != nil && (!f.Knows(d.FinalTarget) || d.FinalTarget.AlikeDead())
 		})
 	}
-	if f.denyAIAction() || f.CastingNow() || f.cast.lifeTime == 0 {
+	if f.denyAIAction() || f.CastingNow() || f.cast.lifeTime.Load() == 0 {
 		return
 	}
 	f.cancelFollow()

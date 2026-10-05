@@ -1297,12 +1297,13 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			onLive(live, func() { l.enchantLiveItem(ctx, live, req) })
 
 		case clientpackets.OpcodeRequestSkillList:
-			// While entering, 0x3f is the quest-list probe the client sends
-			// during loading: it must be answered or the quest panel stays
-			// empty. No quests are modeled yet, so the list is empty — the
-			// same frame the EnterWorld burst sends.
+			// While entering, 0x3f is the quest-list request the client
+			// sends during loading: it is answered with the selected
+			// character's quest list, or the quest panel stays empty.
 			if client.State() == StateEntering {
-				session.SendFrame(serverpackets.FrameQuestList(nil))
+				if entering != nil {
+					session.SendFrame(questListFrame(entering.Character))
+				}
 				continue
 			}
 			if live == nil {
@@ -2166,12 +2167,16 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { l.requestUserCommand(live, req.CommandID) })
 			}
 
+		case clientpackets.OpcodeRequestQuestListInGame:
+			if live != nil {
+				onLive(live, func() { live.SendFrame(questListFrame(live.Character)) })
+			}
+
 		case clientpackets.OpcodeDummy1A,
 			clientpackets.OpcodeDummy23,
 			clientpackets.OpcodeDummy2E,
 			clientpackets.OpcodeDummy34,
 			clientpackets.OpcodeDummy3E,
-			clientpackets.OpcodeRequestQuestListInGame,
 			clientpackets.OpcodeRequestQuestAbort,
 			clientpackets.OpcodeGameGuardReply:
 			l.log.Warn().Str("opcode", fmt.Sprintf("%#x", opcode)).Msg("Opcode not wired")

@@ -90,6 +90,9 @@ const socialInterval = 12 * time.Second
 type Folk struct {
 	world.Presence
 	Instance *Instance
+	// spawnBinding is the spawn slot that placed the NPC: its AI parameters
+	// and script memory.
+	spawnBinding
 	// zones is the NPC's zone membership; Attach gives it the zone index.
 	zones *zoneMember
 
@@ -127,7 +130,7 @@ func NewFolk(inst *Instance, skills ...skillDefinitions) (*Folk, error) {
 	if err != nil {
 		return nil, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
 	}
-	f := &Folk{Instance: inst}
+	f := &Folk{Instance: inst, spawnBinding: newSpawnBinding(inst.Template)}
 	f.zones = newZoneMember(f)
 	f.cast.desires = ai.NewDesireQueue()
 	f.initCombat(mods)

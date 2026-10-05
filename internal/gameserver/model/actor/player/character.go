@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
@@ -140,6 +141,9 @@ type Character struct {
 	// in7sDungeon is the Seven Signs dungeon membership; see
 	// character_sevensigns.go.
 	in7sDungeon atomic.Bool
+	// varkaKetraAlliance is the Ketra/Varka faction standing; see
+	// character_faction.go.
+	varkaKetraAlliance atomic.Int32
 	// cursedWeapon is the cursed weapon held; see
 	// character_cursed_weapon.go.
 	cursedWeapon cursedWeaponHold
@@ -346,6 +350,8 @@ type Character struct {
 	// boat is the boat ride state; it carries its own lock. See
 	// character_boat.go.
 	boat boatRide
+	// quests is the quest journal; it carries its own lock.
+	quests questlog.Journal
 }
 
 var _ effect.StatOwner = (*Character)(nil)

@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -79,7 +78,6 @@ func mpTestTemplate() *npc.Table {
 		HPMax:      100,
 		MPMax:      50,
 		RunSpeed:   100,
-		AIParams:   commons.NewStatSet(),
 	}})
 }
 

@@ -28,6 +28,9 @@ Contract-specific checks supplement unit tests:
 - script ports: `scriptfp.Check` against the committed reference fingerprints (literals,
   engine calls through `apimap.txt`, hook parent-call shape); regenerate the fingerprints and
   the engine call census with `cmd/scriptfp` when the reference or `apimap.txt` changes;
+- script engine contracts: run every row of the contract's goldens with `scriptcontract.Run`
+  (`scriptcontract.Contracts` lists the tables per contract and slice); the probe goldens are
+  regenerated only by `internal/gameserver/script/testdata/oracle/run.sh`;
 - persistence: integration tests against the expected schema and transaction effects;
 - concurrency: focused `-race` coverage and lifecycle cancellation.
 

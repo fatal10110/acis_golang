@@ -54,6 +54,13 @@ func (l *GameClientLink) selectCharacter(ctx context.Context, conn *Conn, client
 	if fresh.AccessLevel < 0 {
 		return nil, selectionRefused
 	}
+	// A journal that does not load refuses the selection silently, as an
+	// unwritten save does: entering with an empty journal would offer
+	// one-time quest rewards again.
+	if err := l.restoreQuests(ctx, fresh); err != nil {
+		l.log.Error().Err(err).Int32("object_id", objectID).Msg("select character: load quests")
+		return nil, selectionRefused
+	}
 	c = fresh
 	chars[slot] = fresh
 	l.clanService().RestoreMembership(c, time.Now())

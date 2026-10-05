@@ -3,7 +3,9 @@ package script
 import (
 	"fmt"
 	"slices"
+	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	"github.com/rs/zerolog"
 )
 
@@ -76,6 +78,9 @@ type Registry struct {
 	// npc holds, per (NPC id, event), the scripts that answer it, in
 	// dispatch order.
 	npc map[npcKey][]*Script
+	// byName holds, per lower-cased name, the first registered script of
+	// that name in list order.
+	byName map[string]*Script
 }
 
 type npcKey struct {
@@ -113,7 +118,7 @@ const (
 // except that first talk keeps a single script. So the last listed behavior wins and other
 // scripts accumulate in list order.
 func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
-	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}}
+	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}}
 	registered := 0
 	for _, l := range list {
 		e := entry{path: l.Path}
@@ -130,6 +135,7 @@ func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
 			continue
 		}
 		s.path = l.Path
+		s.Name = l.Path[strings.LastIndexByte(l.Path, '.')+1:]
 		e.bound = boundOf(&s, cfg.KindOf)
 		if err := gate(&s, e.bound, &cfg); err != nil {
 			r.log.Error().Err(err).Str("script", l.Path).Msg("script: refused; a hook it needs is not raised")
@@ -140,6 +146,9 @@ func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
 		e.script = &s
 		r.entries = append(r.entries, e)
 		r.register(e.script, e.bound)
+		if key := strings.ToLower(s.Name); r.byName[key] == nil {
+			r.byName[key] = e.script
+		}
 		registered++
 	}
 	r.log.Info().Int("listed", len(list)).Int("registered", registered).Msg("script: registry built")
@@ -244,4 +253,15 @@ func same(a, b *Script) bool {
 // dispatch order. The slice is shared: callers never modify it.
 func (r *Registry) scripts(npcID int32, ev NPCEvent) []*Script {
 	return r.npc[npcKey{npcID, ev}]
+}
+
+// JournalQuest returns the quest a journal row's quest name belongs to: the
+// first registered script, in list order, whose name matches name ignoring
+// case.
+func (r *Registry) JournalQuest(name string) (questlog.Quest, bool) {
+	s := r.byName[strings.ToLower(name)]
+	if s == nil {
+		return questlog.Quest{}, false
+	}
+	return questlog.Quest{Name: s.Name, ID: s.QuestID}, true
 }

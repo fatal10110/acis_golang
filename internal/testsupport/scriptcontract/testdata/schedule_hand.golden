@@ -1,0 +1,20 @@
+# Engine-contract golden derived by hand from the cited reference lines and reviewed blind.
+# The 5-minute rescan of scheduled scripts and the re-check after a firing.
+# Format: internal/gameserver/script/testdata/oracle/README.md, "Contract golden format".
+
+table schedule.rescan
+source java/net/sf/l2j/gameserver/data/xml/ScriptData.java 24-43 PERIOD load
+source java/net/sf/l2j/gameserver/data/xml/ScriptData.java 101-115 run
+source java/net/sf/l2j/gameserver/data/xml/ScriptData.java 176-196 Scheduler
+source java/net/sf/l2j/gameserver/scripting/ScheduledQuest.java 348-362 setTask cleanTask
+provenance hand
+note The rescan runs at load and then every 300000 ms (fixed rate). For each scheduled script it computes eta = now + 300000 - next (next is getTimeNext()); when eta > 0 it schedules the firing after 300000 - eta = next - now ms (a negative delay runs at once), replacing (cancelling) any firing already scheduled for that script. A firing runs notifyAndSchedule, then repeats the same check against its own clock.
+note Rows: at and next are ms on one clock; delay is the scheduled delay, or none.
+row due-inside-window check=rescan at=0 next=299999 delay=299999
+row due-at-window-end check=rescan at=0 next=300000 delay=none
+row due-at-next-rescan check=rescan at=300000 next=300000 delay=0
+row due-now check=rescan at=0 next=0 delay=0
+row overdue check=rescan at=1000 next=0 delay=-1000
+row due-in-second-window check=rescan at=300000 next=500000 delay=200000
+row after-hourly-firing check=firing at=3600000 next=7200000 delay=none
+row after-daily-firing check=firing at=86400000 next=172800000 delay=none
