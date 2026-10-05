@@ -118,7 +118,9 @@ func (l *GameClientLink) requestPetition(live *livePlayer, req clientpackets.Req
 		l.log.Warn().Err(err).Int32("object_id", live.ObjectID()).Int32("type", req.Type).Msg("petition refused")
 		live.SendFrame(serverpackets.FrameActionFailed())
 	case petition.Submitted:
-		l.tellGMsOfPetition(live.ObjectID(), live.Name+" has submitted a new petition.")
+		if s.NotifyGMs {
+			l.tellGMsOfPetition(live.ObjectID(), live.Name+" has submitted a new petition.")
+		}
 		maxPerPlayer := l.petitions.Config().MaxPerPlayer
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessagePetitionAcceptedRecentNoS1, s.ID))
 		live.SendFrame(serverpackets.FrameSystemMessageTwoNumbers(serverpackets.SystemMessageSubmittedYourS1ThPetitionS2Left, int32(s.PlayerCount), int32(maxPerPlayer-s.PlayerCount)))
@@ -130,16 +132,18 @@ func (l *GameClientLink) requestPetition(live *livePlayer, req clientpackets.Req
 // answered cannot be cancelled by its petitioner; a game master answering
 // one closes it instead, and any other responder leaves its chat.
 func (l *GameClientLink) requestPetitionCancel(live *livePlayer) {
-	result, remaining, notices := l.petitions.Cancel(petitionPerson(live), live.accessLevel().IsGM, petitionPresence{l})
+	c, notices := l.petitions.Cancel(petitionPerson(live), live.accessLevel().IsGM, petitionPresence{l})
 	l.deliverPetition(notices)
-	switch result {
+	switch c.Result {
 	case petition.CancelUnderProcess:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetitionUnderProcess))
 	case petition.CancelNotSubmitted:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePetitionNotSubmitted))
 	case petition.CancelDone:
-		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessagePetitionCanceledSubmitS1MoreToday, int32(remaining)))
-		l.tellGMsOfPetition(live.ObjectID(), live.Name+" has canceled a pending petition.")
+		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessagePetitionCanceledSubmitS1MoreToday, int32(c.Remaining)))
+		if c.NotifyGMs {
+			l.tellGMsOfPetition(live.ObjectID(), live.Name+" has canceled a pending petition.")
+		}
 	}
 }
 
