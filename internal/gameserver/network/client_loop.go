@@ -2172,12 +2172,23 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { live.SendFrame(questListFrame(live.Character)) })
 			}
 
+		case clientpackets.OpcodeRequestQuestAbort:
+			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestQuestAbort)
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.abortQuest(live, req.QuestID) })
+			}
+
 		case clientpackets.OpcodeDummy1A,
 			clientpackets.OpcodeDummy23,
 			clientpackets.OpcodeDummy2E,
 			clientpackets.OpcodeDummy34,
 			clientpackets.OpcodeDummy3E,
-			clientpackets.OpcodeRequestQuestAbort,
 			clientpackets.OpcodeGameGuardReply:
 			l.log.Warn().Str("opcode", fmt.Sprintf("%#x", opcode)).Msg("Opcode not wired")
 			continue

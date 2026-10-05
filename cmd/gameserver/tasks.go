@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -409,13 +410,16 @@ func provideItemInstances(pool *sql.DB, data *gameData, worker *persist.Worker, 
 }
 
 // startItemInstances launches the persistence tick and, at shutdown, forces
-// one final save of whatever is still pending.
-func startItemInstances(lc fx.Lifecycle, items *task.ItemInstances, worker *persist.Worker, log zerolog.Logger) {
+// one final save of whatever is still pending. Beside it, the quest
+// journals that left the world still owing writes get their last drain,
+// which the persistence worker's close runs.
+func startItemInstances(lc fx.Lifecycle, items *task.ItemInstances, journals *script.Quests, worker *persist.Worker, log zerolog.Logger) {
 	// Appended first so fx's reverse stop order runs it after the ticker
 	// has stopped: the final save then sees a pending set nothing else is
 	// still draining.
 	lc.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
+			journals.DrainSealed()
 			return drainItemInstances(ctx, items, worker, log, task.ItemInstanceSaveTimeout)
 		},
 	})

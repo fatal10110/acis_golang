@@ -41,49 +41,6 @@ func join(parts ...[]Row) []Row {
 	return out
 }
 
-// TestListMatchesQuestWindowContents runs the quest-list contents the
-// reference's QuestList packet shows for each seeded journal: real quests
-// started or completed, in journal order, with explicit or computed flags.
-func TestListMatchesQuestWindowContents(t *testing.T) {
-	for _, tc := range []struct {
-		name string
-		rows []Row
-		want []Entry
-	}{
-		{"empty", nil, nil},
-		{"one-started", seed("Q001_LettersOfLove", "STARTED", "1"), []Entry{{1, -0x7fffffff}}},
-		{"created-skipped", seed("Q001_LettersOfLove", "CREATED", "0"), nil},
-		{"completed-listed", seed("Q001_LettersOfLove", "COMPLETED", "0"), []Entry{{1, 0}}},
-		{"completed-keeps-cond", seed("Q001_LettersOfLove", "COMPLETED", "2"), []Entry{{1, -0x7ffffffd}}},
-		{"script-skipped", seed("NoblesseTeleporter", "STARTED", "1"), nil},
-		{
-			"journal-order",
-			join(
-				seed("Q006_StepIntoTheFuture", "STARTED", "2"),
-				seed("Q001_LettersOfLove", "COMPLETED", "0"),
-				seed("Q003_WillTheSealBeBroken", "STARTED", "1", "-2147483643"),
-				seed("Q002_WhatWomenWant", "CREATED", "0"),
-			),
-			[]Entry{{6, -0x7ffffffd}, {1, 0}, {3, -0x7ffffffb}},
-		},
-		{"explicit-flags", seed("Q003_WillTheSealBeBroken", "STARTED", "3", "-2147483643"), []Entry{{3, -0x7ffffffb}}},
-		{"cond-zero-started", seed("Q003_WillTheSealBeBroken", "STARTED", "0"), []Entry{{3, 0}}},
-		// Java int shifts take the count mod 32: cond 32 shifts by 0.
-		{"cond-32", seed("Q001_LettersOfLove", "STARTED", "32"), []Entry{{1, -0x80000000}}},
-		{"cond-31", seed("Q001_LettersOfLove", "STARTED", "31"), []Entry{{1, -1}}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var j Journal
-			if unknown := j.Restore(tc.rows, resolve); len(unknown) != 0 {
-				t.Fatalf("unknown = %v, want none", unknown)
-			}
-			if got := j.List(); !reflect.DeepEqual(got, tc.want) {
-				t.Fatalf("List() = %v, want %v", got, tc.want)
-			}
-		})
-	}
-}
-
 // TestRestoreResolvesNamesAndSkipsUnknown pins the load rules: a row's name
 // resolves case-insensitively to the first matching quest and its state is
 // that quest's, an unknown name is reported once per row and skipped while

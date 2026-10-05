@@ -45,6 +45,13 @@ func (l *GameClientLink) selectCharacter(ctx context.Context, conn *Conn, client
 	if l.awaitPersistence(conn, objectID) != nil {
 		return nil, selectionRefused
 	}
+	// Journal writes an earlier session could not land are applied before
+	// the journal loads; if they still fail, the selection is refused, as
+	// loading without them would offer one-time quest rewards again.
+	if err := l.settleQuests(objectID); err != nil {
+		l.log.Error().Err(err).Int32("object_id", objectID).Msg("select character: write quests")
+		return nil, selectionRefused
+	}
 	fresh, err := l.roster.Load(ctx, objectID)
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", objectID).Msg("select character: reload row")

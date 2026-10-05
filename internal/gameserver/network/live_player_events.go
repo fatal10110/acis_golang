@@ -287,6 +287,10 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOverHit))
 	case event.ClanGateOpened:
 		l.announceClanGate(live)
+	case event.QuestListChanged:
+		live.SendFrame(questListEntriesFrame(e.Entries))
+	case event.QuestMarked:
+		live.SendFrame(serverpackets.FrameExShowQuestMark(e.QuestID))
 	case event.ServitorVanished:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageServitorHasVanished))
 	case event.ShieldBlocked:
