@@ -51,7 +51,7 @@ func (l *GameClientLink) boardCommand(live *livePlayer, command string) {
 	case strings.HasPrefix(command, "_bbsgetfav"):
 		l.boardFavorites(live, command)
 	case strings.HasPrefix(command, "_bbsloc"):
-		l.boardUnported(live, command, "region board (#3202)")
+		l.boardRegion(live, command)
 	case strings.HasPrefix(command, "_bbsclan"):
 		l.boardClan(live, command)
 	case strings.HasPrefix(command, "_bbsmemo"), strings.HasPrefix(command, "_bbstopics"):
@@ -93,15 +93,6 @@ func (l *GameClientLink) requestBBSWrite(live *livePlayer, req clientpackets.Req
 		}
 		l.sendBoard(live, bbs.NotImplemented(name))
 	}
-}
-
-// boardUnported answers a board command whose board is not ported yet with
-// the page an unknown command shows.
-// ponytail: the region board needs the castle registry (#3202); until
-// then its commands show the unknown-command page and log the gap.
-func (l *GameClientLink) boardUnported(live *livePlayer, command, board string) {
-	l.log.Debug().Str("command", command).Str("board", board).Msg("community board: board not modeled")
-	l.sendBoard(live, bbs.NotImplemented(command))
 }
 
 // boardHome shows the home board: its index, or the page the command

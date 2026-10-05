@@ -71,8 +71,8 @@ func TestBoardHomeCommandConfigured(t *testing.T) {
 
 // TestBoardUnknownCommands pins the page an unknown command or form shows,
 // naming it: a board-prefixed command no board takes, an unknown form url,
-// a home command that names no page, the region board's form (named by its
-// first argument), and the region board, not built yet.
+// a home command that names no page, and the region board's form (named by
+// its first argument).
 func TestBoardUnknownCommands(t *testing.T) {
 	p := bootPair(t, gameservertest.WithCommunityBoard(boardOn))
 	p.enterAll(t)
@@ -80,7 +80,7 @@ func TestBoardUnknownCommands(t *testing.T) {
 	notImplemented := func(name string) string {
 		return "<html><body><br><br><center>The command: " + name + " isn't implemented.</center></body></html>"
 	}
-	for _, cmd := range []string{"bbs_default", "_bbshomepage", "_mailbox", "_bbsloc", "_bbsloc;1"} {
+	for _, cmd := range []string{"bbs_default", "_bbshomepage", "_mailbox"} {
 		assertPage(t, command(t, p.alice, cmd), notImplemented(cmd))
 	}
 	assertPage(t, write(t, p.alice, "Unknown", "a"), notImplemented("Unknown"))
