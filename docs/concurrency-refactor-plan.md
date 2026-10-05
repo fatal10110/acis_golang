@@ -33,9 +33,11 @@ their owner's queue (pet inventory lives in the owner inventory; `summon/` calls
 State splits into three kinds:
 
 - **Queue-owned** (no lock): progression, controllers (move/attack/cast/cubic), AI, stat
-  calculators, shortcuts, quests, henna, macros, item instances reachable only through the owner's
+  calculators, shortcuts, henna, macros, item instances reachable only through the owner's
   inventory, effect timers. Touched only on the owner queue; enforced by `sim.AssertOwner`.
-  Replaces ~80% of today's lock sites.
+  Replaces ~80% of today's lock sites. *Quest state is not in this list: kill hooks change
+  other players' quest state, so it is a leaf-locked container (`script-engine-plan.md`,
+  section 6).*
 - **Cross-mutable subset** (one small mutex per actor, `vitalsMu`): HP/MP/CP, dead flag, hate list,
   effect list. *Landed (Phase 3) as several per-actor leaf locks — vitals, progression, state,
   stat slots, controllers, AI brains, hate, the effect list — not one `vitalsMu`; see Phase 3's
