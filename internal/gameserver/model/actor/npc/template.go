@@ -87,11 +87,18 @@ type Template struct {
 	// i.e. the npc can be tamed/summoned as a pet or mount.
 	Pet *PetData
 
-	// Skills maps skill id to the level this template grants it, from the
-	// template's <skills> block. A pet/servitor may only cast a skill via
-	// its owner's commanded action-bar shortcut when its own template
-	// grants that skill id. Race-marker and type="PASSIVE" entries are
-	// excluded; unknown id/level pairs never reach this map.
+	// SkillsByType maps each non-PASSIVE type of the template's <skills>
+	// block to the skill it names; behaviors select the skill they cast
+	// through it. A type holds one skill: a later entry with the same type
+	// replaces an earlier one. Race-marker entries and unknown id/level
+	// pairs never reach it.
+	SkillsByType map[SkillType]skill.Ref
+
+	// Skills maps skill id to the level this template grants it: every
+	// skill in SkillsByType, at the level of its lowest type when one id is
+	// granted under several types at different levels. A pet/servitor may
+	// only cast a skill via its owner's commanded action-bar shortcut when
+	// its own template grants that skill id.
 	Skills map[int]int
 
 	// Passives are the type="PASSIVE" <skill> entries that resolved in the
@@ -223,10 +230,19 @@ func NewPetLevelStats(set *commons.StatSet) (PetLevelStats, error) {
 	return s, nil
 }
 
+// TemplateSkills is the resolved <skills> block of one template: its
+// typed skills and its passives. The zero value is a template with no
+// <skills> block.
+type TemplateSkills struct {
+	ByType   map[SkillType]skill.Ref
+	Passives []skill.Ref
+}
+
 // NewTemplate builds a Template from set, the merged <set> attributes of
-// one <npc> element plus the "aiParams", "drops", "privates", "teachTo",
-// "pet", "skills", and "passives" values the loader packed in.
-func NewTemplate(set *commons.StatSet) (*Template, error) {
+// one <npc> element plus the "aiParams", "drops", "privates", "teachTo"
+// and "pet" values the loader packed in, and from skills, its resolved
+// <skills> block.
+func NewTemplate(set *commons.StatSet, skills TemplateSkills) (*Template, error) {
 	idf := commons.NewFields(set, "npc template")
 	id := idf.Int("id")
 	if err := idf.Err(); err != nil {
@@ -323,12 +339,19 @@ func NewTemplate(set *commons.StatSet) (*Template, error) {
 		t.Pet = pet
 	}
 
-	if skills, ok := commons.FieldObject[map[int]int](f, "skills"); ok {
-		t.Skills = skills
-	}
-
-	if passives, ok := commons.FieldObject[[]skill.Ref](f, "passives"); ok {
-		t.Passives = passives
+	t.SkillsByType = skills.ByType
+	t.Passives = skills.Passives
+	if skills.ByType != nil {
+		t.Skills = make(map[int]int, len(skills.ByType))
+		for typ := range skillTypeCount {
+			ref, ok := skills.ByType[typ]
+			if !ok {
+				continue
+			}
+			if _, seen := t.Skills[int(ref.ID)]; !seen {
+				t.Skills[int(ref.ID)] = ref.Level
+			}
+		}
 	}
 
 	if err := f.Err(); err != nil {
