@@ -253,10 +253,7 @@ func TestReduceHPStandsUpSittingCharacterUnlessInStoreMode(t *testing.T) {
 // timer would.
 func sitDownSettled(c *Character) {
 	c.Sit()
-	c.stateMu.RLock()
-	gen := c.postureGen
-	c.stateMu.RUnlock()
-	c.settlePosture(gen, false)
+	c.settlePosture(false)
 }
 
 // TestDamageLeavesSitDownAndFakeDeathLieDownRunning pins the stand-up gate

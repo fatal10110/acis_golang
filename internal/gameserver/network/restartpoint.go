@@ -90,9 +90,10 @@ func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location
 
 // teleportLivePlayer relocates live to a scattered point near target, snapped
 // to ground height unless live is flying or the point is inside water,
-// cancelling any attack, cast or move in progress while keeping the attack
-// stance. It broadcasts the discontinuous-position packet to live's own
-// session and every observer, then takes live off the grid: it exits every
+// cancelling any attack, cast or move in progress and resetting the
+// selection while keeping the attack stance. It broadcasts the
+// discontinuous-position packet to live's own session and every observer,
+// then takes live off the grid: it exits every
 // zone around the old position, everything around the old position forgets
 // live and live forgets it, even what the destination still sees. live
 // rejoins the grid and enters the destination's zones once its client
@@ -134,9 +135,10 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 	// the old neighborhood.
 	l.leaveZones(live)
 	if l.world != nil {
-		// Forgetting a selected object clears the selection. Do it while
-		// the old neighborhood still sees live, so its observers get the
-		// TargetUnselected too. A self-selection is kept.
+		// The abort already reset the selection. One made since is
+		// forgotten with the old neighborhood, while it still sees live so
+		// its observers get the TargetUnselected too; live never knows
+		// itself, so a self-selection is not forgotten here.
 		if selected := live.Target(); selected != nil && selected.ObjectID() != live.ObjectID() && world.Knows(live, selected) {
 			live.forgetTarget(selected)
 		}
