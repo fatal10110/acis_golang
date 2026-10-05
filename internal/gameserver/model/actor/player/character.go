@@ -141,6 +141,9 @@ type Character struct {
 	// in7sDungeon is the Seven Signs dungeon membership; see
 	// character_sevensigns.go.
 	in7sDungeon atomic.Bool
+	// varkaKetraAlliance is the Ketra/Varka faction standing; see
+	// character_faction.go.
+	varkaKetraAlliance atomic.Int32
 	// cursedWeapon is the cursed weapon held; see
 	// character_cursed_weapon.go.
 	cursedWeapon cursedWeaponHold
