@@ -289,8 +289,9 @@ switches to real behavior when its script registers. The three ids claimed by a 
 child switch only when the child is ported.
 
 - They are never extended. They are deleted in one PR (#3497, M12) once every scripted NPC id
-  has its behavior, including the siegable-hall behaviors of #3502 (M12). No id is exempted,
-  and M10's exit does not include the deletion.
+  has its behavior, including the siegable-hall behaviors of #3502 (M12), and every scripted
+  maker type has its maker (#211 to #214). No id is exempted, and M10's exit does not include
+  the deletion.
 - The list: idle wander and follow, `attackedHateWeight`, Warrior-style party assist, the
   shot-recharge roll, the walker alias rule, `Party_Type` 2 privates, `despawnMinions`, and
   default treatment of the scripted maker type strings (predicate: no maker registered).
