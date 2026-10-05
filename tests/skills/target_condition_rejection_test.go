@@ -119,6 +119,7 @@ func TestWalkingCorpseMobRejectionStopsMovement(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeMoveBackwardToLocation(200, 70, 30))
+	expectGroundClickAck(t, c)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "walk")
 
 	c.Send(encodeRequestMagicSkillUse(int32(def.ID), false, false))

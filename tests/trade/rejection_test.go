@@ -138,6 +138,7 @@ func assertConfirmFromDistanceCancels(t *testing.T, dx int32) {
 	// The second trader walks dx units away before confirming.
 	farX := spawnX + dx
 	h.second.Send(encodeMoveBackwardToLocation(farX, spawnY, spawnZ, spawnX, spawnY, spawnZ))
+	expectGroundClickAck(t, h.second)
 	assertFrameOpcode(t, h.second.Read(), serverpackets.OpcodeMoveToLocation, "second MoveToLocation")
 	waitForArrival(t, h, h.secondID, farX)
 	drainUntilQuiet(t, h.first)
@@ -196,6 +197,7 @@ func TestAddTradeItemToleratesPartnerOutOfRange(t *testing.T) {
 
 	farX := int32(spawnX + 2*tradeInteractionDistance)
 	h.second.Send(encodeMoveBackwardToLocation(farX, spawnY, spawnZ, spawnX, spawnY, spawnZ))
+	expectGroundClickAck(t, h.second)
 	assertFrameOpcode(t, h.second.Read(), serverpackets.OpcodeMoveToLocation, "second MoveToLocation")
 	waitForArrival(t, h, h.secondID, farX)
 	drainUntilQuiet(t, h.first)
@@ -210,6 +212,7 @@ func TestAddTradeItemToleratesPartnerOutOfRange(t *testing.T) {
 	drainUntilQuiet(t, h.second)
 
 	h.second.Send(encodeMoveBackwardToLocation(spawnX, spawnY, spawnZ, farX, spawnY, spawnZ))
+	expectGroundClickAck(t, h.second)
 	assertFrameOpcode(t, h.second.Read(), serverpackets.OpcodeMoveToLocation, "second MoveToLocation back")
 	waitForArrival(t, h, h.secondID, spawnX)
 	drainUntilQuiet(t, h.first)

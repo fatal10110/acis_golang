@@ -47,14 +47,18 @@ func (c *Character) BoatObjectID() int32 {
 }
 
 // Board makes v the boat c rides. Leaving a boat (v nil) also clears c's
-// position on its deck.
+// position on its deck. The live movement simulation learns it too: a
+// passenger's own server-side steps are held at the water surface.
 func (c *Character) Board(v Vessel) {
 	c.boat.mu.Lock()
-	defer c.boat.mu.Unlock()
 	if v == nil && c.boat.vessel != nil {
 		c.boat.position, c.boat.heading = location.Location{}, 0
 	}
 	c.boat.vessel = v
+	c.boat.mu.Unlock()
+	if c.Live != nil {
+		c.Move().SetInBoat(v != nil)
+	}
 }
 
 // BoatPosition returns where c stands on its boat's deck, in the boat's

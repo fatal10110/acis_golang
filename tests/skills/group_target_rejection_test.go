@@ -79,6 +79,7 @@ func TestPartyOtherCastRejections(t *testing.T) {
 		selectSelf(t, srv, c)
 
 		c.Send(encodeMoveBackwardToLocation(200, 70, 30))
+		expectGroundClickAck(t, c)
 		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "walk")
 
 		c.Send(encodeRequestMagicSkillUse(partyOtherSkillID, false, false))

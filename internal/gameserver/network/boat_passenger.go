@@ -136,31 +136,31 @@ func (l *GameClientLink) moveToBoatEntrance(live *livePlayer, point boat.Point, 
 
 // probeBoatEntrance walks live, ashore, to a boat's entrance when its walk
 // toward target crosses the entrance of the dock a boat it knows serves,
-// and reports whether it did.
-//
-// ponytail: the reference answers ActionFailed whenever no boat is known or
-// the walk crosses no entrance, then walks the player as usual; that extra
-// ActionFailed on every ground click is not sent yet (#3342).
+// and reports whether it did. Otherwise, with no boat known or no entrance
+// crossed, live is answered ActionFailed: a ground click's own walk then
+// follows that answer, as the reference's MoveBackwardToLocation does.
 func (l *GameClientLink) probeBoatEntrance(live *livePlayer, target location.Location) bool {
 	b := l.knownBoat(live)
 	if b == nil {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
 	point, ok := b.Dock().BoardingPoint(livePoint(live), boat.Point{X: target.X, Y: target.Y}, false)
 	if !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
 	l.moveToBoatEntrance(live, point, b)
 	return true
 }
 
-// knownBoat returns a boat live knows, or nil.
-func (l *GameClientLink) knownBoat(live *livePlayer) *boat.Boat {
+// knownBoat returns a boat obj knows, or nil.
+func (l *GameClientLink) knownBoat(obj world.Tracked) *boat.Boat {
 	if l.world == nil {
 		return nil
 	}
 	var found *boat.Boat
-	l.world.ForEachKnown(live, func(obj world.Tracked) {
+	l.world.ForEachKnown(obj, func(obj world.Tracked) {
 		if b, ok := obj.(*boat.Boat); ok && found == nil {
 			found = b
 		}

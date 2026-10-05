@@ -559,6 +559,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	attackController := attack.NewPlayable(actor, sink)
 	attackController.SetQueue(queue)
 	brain := ai.NewSummon(actor, moveController, attackController)
+	brain.SetBoatEntrance(summonBoatEntrance{link: l, actor: actor})
 	sink.brain = brain
 	sink.attack = attackController
 	actor.SetRaidCursesDisabled(l.disableRaidCurse)
@@ -773,6 +774,10 @@ func (inertSummonMoveController) MaybeStartFriendlyFollow(attackable.Combatant, 
 
 func (inertSummonMoveController) RecheckOffensiveFollow(attackable.Combatant, int) (bool, error) {
 	return false, nil
+}
+
+func (inertSummonMoveController) MaybeStartEntranceFollow(attackable.Combatant, int) (location.Location, bool) {
+	return location.Location{}, false
 }
 
 // summonAIActor adapts a live summon to the shared periodic AI task. The

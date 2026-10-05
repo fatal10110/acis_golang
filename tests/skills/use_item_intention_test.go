@@ -103,6 +103,7 @@ func TestWeaponUseItemMidWalkWalksOnAfresh(t *testing.T) {
 	x, y, z := srv.PlayerPosition(t, objID)
 
 	c.Send(encodeMoveBackwardToLocation(int32(x+400), int32(y), int32(z)))
+	expectGroundClickAck(t, c)
 	walk := c.Read()
 	assertFrameOpcode(t, walk, serverpackets.OpcodeMoveToLocation, "walk")
 	_, dest, _ := gameservertest.ReadMoveToLocationCoords(t, walk)
@@ -247,6 +248,7 @@ func TestWeaponUseItemReplacedStopsRetoggling(t *testing.T) {
 	drainUntilQuiet(t, c)
 	x, y, z := srv.PlayerPosition(t, objID)
 	c.Send(encodeMoveBackwardToLocation(int32(x), int32(y+300), int32(z)))
+	expectGroundClickAck(t, c)
 	walk := c.Read()
 	for walk[0] != serverpackets.OpcodeMoveToLocation {
 		walk = c.Read()
@@ -311,6 +313,7 @@ func TestThinkMidWalkWalksOnAfresh(t *testing.T) {
 	x, y, z := srv.PlayerPosition(t, objID)
 
 	c.Send(encodeMoveBackwardToLocation(int32(x+400), int32(y), int32(z)))
+	expectGroundClickAck(t, c)
 	walk := c.Read()
 	assertFrameOpcode(t, walk, serverpackets.OpcodeMoveToLocation, "walk")
 	_, dest, _ := gameservertest.ReadMoveToLocationCoords(t, walk)
@@ -364,6 +367,7 @@ func TestWeaponUseItemAfterDeathMidWalkWalksNowhere(t *testing.T) {
 	x, y, z := srv.PlayerPosition(t, objID)
 
 	c.Send(encodeMoveBackwardToLocation(int32(x+2000), int32(y), int32(z)))
+	expectGroundClickAck(t, c)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "walk")
 	dieAndRevive(t, srv, objID)
 	drainUntilQuiet(t, c)
@@ -441,6 +445,7 @@ func TestWeaponUseItemMidWalkFacesFromCaughtUpCell(t *testing.T) {
 	x, y, z := srv.PlayerPosition(t, objID)
 
 	c.Send(encodeMoveBackwardToLocation(int32(x+400), int32(y+137), int32(z)))
+	expectGroundClickAck(t, c)
 	walk := c.Read()
 	assertFrameOpcode(t, walk, serverpackets.OpcodeMoveToLocation, "walk")
 	_, dest, _ := gameservertest.ReadMoveToLocationCoords(t, walk)

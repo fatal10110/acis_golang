@@ -81,6 +81,7 @@ func TestWalkOffBattlefieldFlagsBeforeCompass(t *testing.T) {
 			spawn := location.Location{X: 10, Y: 20, Z: 30}
 			target := location.Location{X: 300, Y: 20, Z: 30}
 			c.Send(encodeMoveBackwardToLocation(target, spawn, 1))
+			expectGroundClickAck(t, c)
 			if frame := c.Read(); frame[0] != serverpackets.OpcodeMoveToLocation {
 				t.Fatalf("walk opcode = %#x, want MoveToLocation", frame[0])
 			}

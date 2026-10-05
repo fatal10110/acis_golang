@@ -154,6 +154,7 @@ func TestDropGroundItemRoundTrip(t *testing.T) {
 
 	// Movement must still work after the pickup resolves.
 	c.Send(encodeMoveBackwardToLocation(80, 70, 30, spawnX, spawnY, spawnZ))
+	expectGroundClickAck(t, c)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "movement after pickup")
 }
 

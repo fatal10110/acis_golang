@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -19,7 +20,9 @@ const restartTeleportOffset = 20
 
 // restartLivePlayer handles a dead player's restart-point selection: it
 // resolves the destination the request type names, takes the player out of
-// any Seven Signs dungeon, revives it, and teleports it there. A selection the player may not use is ignored,
+// any Seven Signs dungeon, revives it (a clan hall restart first restoring
+// the experience its hall's restore-exp function gives back), and teleports
+// it there. A selection the player may not use is ignored,
 // leaving the player dead on the death screen.
 func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.RequestRestartPoint) {
 	if live == nil {
@@ -35,7 +38,8 @@ func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.R
 		return
 	}
 
-	dest, outcome := l.restartPointDestination(live, req.RequestType)
+	requestType := effectiveRestartType(live, req.RequestType)
+	dest, outcome := l.restartPointDestination(live, requestType)
 	switch outcome {
 	case restartRefused:
 		return
@@ -53,8 +57,27 @@ func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.R
 	}
 
 	live.SetIn7sDungeon(false)
-	live.Revive()
+	if restore := l.restartRestoreExp(live, requestType); restore > 0 {
+		live.ReviveRestoringExp(float64(restore))
+	} else {
+		live.Revive()
+	}
 	l.teleportLivePlayer(live, dest, restartTeleportOffset)
+}
+
+// restartRestoreExp is the percentage of the experience its last death took
+// that a restart of requestType gives back to live: the level of the
+// restore-exp function its clan's hall rents, for a clan hall restart only,
+// 0 for none. The reference restores it before the revive.
+func (l *GameClientLink) restartRestoreExp(live *livePlayer, requestType int32) int {
+	if requestType != restartToClanHall {
+		return 0
+	}
+	hallID := live.ClanHallID()
+	if hallID == 0 {
+		return 0
+	}
+	return l.hallFunctions.Level(hallID, hallmodel.FuncRestoreExp)
 }
 
 // restartDestination is live's nearest town restart point, jailed or not.

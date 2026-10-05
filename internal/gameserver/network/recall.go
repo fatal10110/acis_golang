@@ -1,28 +1,36 @@
 package network
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-// recallLivePlayer takes live where a recall skill sends it: its nearest
-// town restart point. A castle or clan hall recall lands there too while
-// live's clan owns no such residence.
+// recallLivePlayer takes live where a recall skill sends it
+// (RestartPointData.getLocationToTeleport): a castle or clan hall recall
+// lands at a random OWNER spawn of the residence live's clan owns, and any
+// other recall, or one for a clan owning no such residence, at live's
+// nearest town restart point. An owned residence with no OWNER spawn moves
+// no one, as the reference's null destination does.
 //
-// A castle or clan hall recall for a clan that owns one belongs at the
-// residence's owner spawn, which no residence data here serves yet (#3323);
-// until it does, that recall moves no one rather than sending the player to
-// a town it did not ask for.
+// The siege-side rules of that lookup (a castle defender's castle spawn,
+// the Seal of Strife and FlagWar town points) come with the sieges (#3346).
 func (l *GameClientLink) recallLivePlayer(live *livePlayer, dest modelskill.RecallType) {
+	var (
+		at location.Location
+		ok bool
+	)
+	castleID, hallID := live.ClanCastleID(), live.ClanHallID()
 	switch {
-	case dest == modelskill.RecallCastle && live.ClanCastleID() != 0,
-		dest == modelskill.RecallClanHall && live.ClanHallID() != 0:
-		l.log.Warn().Int32("object_id", live.ObjectID()).Uint8("recall_type", uint8(dest)).
-			Msg("recall: residence owner spawn not resolved")
-		return
+	case dest == modelskill.RecallCastle && castleID != 0:
+		at, ok = l.castleOwnerSpawn(castleID)
+	case dest == modelskill.RecallClanHall && hallID != 0:
+		at, ok = l.clanHallOwnerSpawn(hallID)
+	default:
+		at, ok = l.restartDestination(live)
 	}
-	at, ok := l.restartDestination(live)
 	if !ok {
-		l.log.Warn().Int32("object_id", live.ObjectID()).Msg("recall: no town restart point resolved")
+		l.log.Warn().Int32("object_id", live.ObjectID()).Uint8("recall_type", uint8(dest)).
+			Msg("recall: no destination resolved")
 		return
 	}
 	l.teleportLivePlayer(live, at, restartTeleportOffset)
