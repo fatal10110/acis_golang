@@ -68,7 +68,7 @@ go run ./cmd/gameserver \
 
 Add `-debug-addr 127.0.0.1:6060` to serve the debug endpoints described under [Debug Endpoints](#debug-endpoints).
 
-The gameserver loads the minimal XML tables, loads geodata from `geoengine.properties`, links to the loginserver, and binds the game-client listener from `GameserverHostname/GameserverPort`. Missing geodata region files use the null-region fallback; malformed region files that exist fail boot.
+The gameserver loads the minimal XML tables, loads geodata from `geoengine.properties`, links to the loginserver, and binds the game-client listener from `GameserverHostname/GameserverPort`. It loads exactly the regions listed as `X_Y` keys in `geoengine.properties`; unlisted regions use the null-region fallback even when their file exists, and a listed region whose file is missing, unreadable, or malformed fails boot with an error naming each failed file, `GeoDataPath`, and `GeoDataType`.
 
 ## Debug Endpoints
 

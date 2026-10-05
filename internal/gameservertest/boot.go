@@ -166,6 +166,7 @@ type options struct {
 	deathDrop              player.DeathDropRules
 	characterSelectDelay   time.Duration
 	persistWait            time.Duration
+	characterDeleteAfter   time.Duration
 	serverBypassDelay      time.Duration
 	maxBuffsAmount         int
 	weightLimitMultiplier  float64
@@ -1713,6 +1714,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		magicFailures:          true,
 		storeSkillCooltime:     true,
 		weightLimitMultiplier:  1,
+		characterDeleteAfter:   gamemanager.DefaultDeleteAfter,
 	}
 	for _, opt := range opts {
 		opt(o)
@@ -1907,7 +1909,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if rosterNPCs == nil {
 		rosterNPCs = npc.NewTable(nil)
 	}
-	roster := gamemanager.NewRoster(holdingCharacterStore{CharacterStore: chars, hold: o.selectionHold}, items, shortcuts, templates, itemTemplates, rosterNPCs, ids, gamemanager.DefaultDeleteAfter, time.Now)
+	roster := gamemanager.NewRoster(holdingCharacterStore{CharacterStore: chars, hold: o.selectionHold}, items, shortcuts, templates, itemTemplates, rosterNPCs, ids, o.characterDeleteAfter, time.Now)
 	roster.SetSubclasses(subclasses)
 	effects.SetAutosave(roster, o.skills, petStore, persistWorker, zerolog.Nop())
 	autosaveClock := &autosaveClock{now: time.Now()}

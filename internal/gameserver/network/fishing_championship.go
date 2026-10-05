@@ -1,6 +1,8 @@
 package network
 
 import (
+	"context"
+
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -62,6 +64,10 @@ func (l *GameClientLink) fishermanChampionship(live *livePlayer, f *npc.Folk) {
 // the prize item, then the thanks page. A player not among the last week's
 // winners is told so; a winner who already claimed, or who placed past
 // fifth, gets nothing and no page.
+//
+// The claim is stored before the prize is created (fishchamp Claim), so
+// the prize's row, written later by the item persistence, can never land
+// ahead of it. A claim that cannot be stored pays nothing and stays open.
 func (l *GameClientLink) fishermanReward(live *livePlayer, f *npc.Folk) {
 	champ := l.fishChamp
 	switch {
@@ -72,7 +78,14 @@ func (l *GameClientLink) fishermanReward(live *livePlayer, f *npc.Folk) {
 		sendFilledHTML(live, f.ObjectID(), l.setPage(fishchamp.PageNotWinner), 0)
 		return
 	}
-	for _, count := range champ.Claim(live.Name) {
+	ctx, cancel := context.WithTimeout(context.Background(), fishchamp.TaskTimeout)
+	paid, err := champ.Claim(ctx, live.Name)
+	cancel()
+	if err != nil {
+		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("fishing championship: store the claim")
+		return
+	}
+	for _, count := range paid {
 		if count <= 0 {
 			continue
 		}

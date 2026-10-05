@@ -234,7 +234,10 @@ func RestorePlayerInventoryWithDelivery(ownerID int32, templates *item.Table, it
 // of the pet's collar (not the pet's own world object id, nor its owner's).
 // The pet's world object id is transient, while its items must be found
 // again after an offline decay of its corpse and across a restart, both of
-// which leave only the collar and its pets row. A live pet must use
+// which leave only the collar and its pets row. The reference saves them
+// under the player instead (PetInventory.getOwnerId), which cannot tell two
+// collars' items apart, and never restores them; a character's purge finds
+// them through its collars (sql.CharacterStore.Purge). A live pet must use
 // NewPetInventoryWithDelivery to send inventory updates.
 func NewPetInventory(ownerID int32, templates *item.Table) *Inventory {
 	return NewInventory(ownerID, item.LocationPet, item.LocationPetEquip, templates)

@@ -20,9 +20,11 @@ const (
 // refundBank pays every fee and records each refund per clan.
 type refundBank struct{ returned map[int32]int }
 
-func (b *refundBank) PayHallFee(int32, int) bool { return true }
-func (b *refundBank) ReturnAdena(clanID int32, adena int) {
+func (b *refundBank) PayHallFee(int32, int) bool           { return true }
+func (b *refundBank) TakeAdena(int32, int) (Landing, bool) { return nil, true }
+func (b *refundBank) ReturnAdena(clanID int32, adena int) Landing {
 	b.returned[clanID] += adena
+	return nil
 }
 
 // clanTold records every notice per clan.
