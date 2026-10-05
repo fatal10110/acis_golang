@@ -345,6 +345,7 @@ type GameClientLink struct {
 	persistWait      time.Duration
 	queues           Queues
 	queuedPets       queuedPets
+	selections       selectingOwners
 	restarts         *restart.Table
 	observers        *observer.Table
 	clanHallData     *hallmodel.Table
