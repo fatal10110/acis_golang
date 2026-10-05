@@ -452,7 +452,7 @@ func TestFrameMultiSellList(t *testing.T) {
 	for range 40 {
 		entries = append(entries, multisell.NewEntry([]multisell.Ingredient{sword}, []multisell.Ingredient{unknown}))
 	}
-	list := (&multisell.List{ID: -7, Entries: entries}).Prepare()
+	list := (&multisell.List{ID: -7, Entries: entries}).Prepare(0)
 
 	got := framePayload(t, FrameMultiSellList(list, 0))
 	want := []byte{OpcodeMultiSellList}

@@ -10,10 +10,11 @@ import (
 
 // openMultisell shows live multisell list name as f prepares it, one
 // MultiSellList per page of multisell.PageSize entries and at least one,
-// and makes it the list live's exchanges choose from. A name naming no
+// and makes it the list live's exchanges choose from. A list applying
+// taxes adds the tax of f's castle when a clan owns it. A name naming no
 // list f may open shows nothing and keeps the list live had.
 func (l *GameClientLink) openMultisell(live *livePlayer, f *npc.Folk, name string, inventoryOnly bool) {
-	list := l.exchange.Open(live.Character, name, f.NpcID(), inventoryOnly)
+	list := l.exchange.Open(live.Character, name, f.NpcID(), inventoryOnly, l.npcOwnedCastleTaxRate(f.Instance))
 	if list == nil {
 		return
 	}
@@ -28,7 +29,8 @@ func (l *GameClientLink) openMultisell(live *livePlayer, f *npc.Folk, name strin
 
 // requestMultiSellChoose answers MultiSellChoose: an exchange from the
 // list live was last shown, at the civilian NPC live last selected. allowed
-// is false inside the multisell reuse window.
+// is false inside the multisell reuse window. The castle tax a completed
+// exchange took goes to the tax revenue of that NPC's castle.
 //
 // A choice inside the reuse window, or one that does not match the open
 // list, the NPC or live's reach, drops the list without a word, as
@@ -40,8 +42,9 @@ func (l *GameClientLink) requestMultiSellChoose(live *livePlayer, req clientpack
 		return
 	}
 	npcID, reachable := 0, false
-	if f := live.currentFolk.Load(); f != nil {
-		npcID, reachable = f.NpcID(), l.playerCanDoInteract(live, f)
+	folk := live.currentFolk.Load()
+	if folk != nil {
+		npcID, reachable = folk.NpcID(), l.playerCanDoInteract(live, folk)
 	}
 	out := l.exchange.Choose(live.Character, live.shownMultisell.Load(), npcID, reachable, exchange.Choice{
 		ListID: req.ListID, EntryID: req.EntryID, Amount: req.Amount,
@@ -81,6 +84,11 @@ func (l *GameClientLink) requestMultiSellChoose(live *livePlayer, req clientpack
 			live.SendFrame(serverpackets.FrameSystemMessageNumberItemName(serverpackets.SystemMessageAcquiredS1S2, int32(n.Enchant), n.ItemID))
 		case exchange.Traded:
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSuccessfullyTradedWithNpc))
+		}
+	}
+	if out.Tax > 0 && folk != nil {
+		if c, ok := l.npcCastle(folk.Instance); ok {
+			c.RiseTaxRevenue(int64(out.Tax))
 		}
 	}
 }

@@ -676,7 +676,7 @@ func (s *Server) folkSpawner(walker *task.Walker, geo move.Geo) gamemanager.Folk
 		Geo:                 geo,
 		Positions:           s.positions,
 		Queues:              s.queues,
-		NewSink:             network.FolkSinks(s.State, s.stance),
+		NewSink:             s.folkSinks,
 		Zones:               s.zones,
 		CastEffects:         s.castEffects,
 		AI:                  s.AI,
