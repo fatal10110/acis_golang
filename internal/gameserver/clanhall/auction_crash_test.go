@@ -237,7 +237,8 @@ type crashRun struct {
 
 // settle restarts the halls from db at the clock at, lets every auction
 // whose end has passed end, has every clan withdraw the bid it still
-// holds, and returns each clan's adena then.
+// holds and the sellers withdraw a sale they still list, and returns each
+// clan's adena then.
 func settle(t *testing.T, data *hallmodel.Table, db crashDB, at time.Time) map[int32]int {
 	t.Helper()
 	clans := crashClans(db.halls[crashHall].OwnerID == crashSellers)
@@ -253,6 +254,12 @@ func settle(t *testing.T, data *hallmodel.Table, db crashDB, at time.Time) map[i
 	for _, id := range []int32{crashSellers, crashBidders, crashRivals} {
 		cl, _ := clans.Get(id)
 		hs.CancelBid(cl)
+	}
+	// A bid row can outlive its clan's auction_bid_at (a sale cancel
+	// clears that first), so CancelBid cannot reach it: withdrawing the
+	// sale refunds every bid row still standing.
+	if cl, _ := clans.Get(crashSellers); cl.HallID() == crashHall {
+		hs.CancelSale(cl)
 	}
 	return bank.held
 }
