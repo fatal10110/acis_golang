@@ -326,6 +326,9 @@ func loadCrestCache(paths gameServerPaths, log zerolog.Logger) (*datacache.Crest
 	return crests, nil
 }
 
+// loadGeodata loads exactly the region files geoengine.properties lists by
+// their "X_Y" keys; unlisted tiles stay null-block. A listed region that
+// fails to load fails boot, as the reference GeoEngine exits the server.
 func loadGeodata(paths gameServerPaths, log zerolog.Logger) (*geodata, error) {
 	props, err := config.LoadFile(paths.GeoConfigPath)
 	if err != nil {
@@ -347,7 +350,7 @@ func loadGeodata(paths gameServerPaths, log zerolog.Logger) (*geodata, error) {
 		EngineOptions: engineOptions,
 		Pathfind:      pathOptions,
 	}
-	geo.Engine, err = probe.LoadEngine(geo.Dir, geo.Type, log, geo.EngineOptions)
+	geo.Engine, err = probe.LoadRegions(geo.Dir, geo.Type, probe.ListedRegions(props), log, geo.EngineOptions)
 	if err != nil {
 		return nil, err
 	}
