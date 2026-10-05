@@ -43,11 +43,14 @@ func encodeRequestShortCutDel(slot int32) []byte {
 }
 
 // registerItemShortcut puts objectID on the bar at the test slot and waits
-// for the row to land.
+// for the row to land. ShortCutRegister goes out before the handler queues
+// the row's insert, so on the real pool the reply can reach the test first:
+// Settle lets the handler finish before the flush drains the insert.
 func registerItemShortcut(t *testing.T, srv *gameservertest.Server, objectID int32) {
 	t.Helper()
 	srv.Client.Send(encodeRequestShortCutReg(int32(serverpackets.ShortcutItem), shortcutPage*12+shortcutSlot, objectID, 1))
 	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeShortCutRegister, "ShortCutRegister")
+	srv.Settle(t)
 	srv.FlushPersistence(t)
 	if !hasItemShortcutRow(t, srv, objectID) {
 		t.Fatalf("no shortcut row for item %d after registration", objectID)
