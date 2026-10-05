@@ -288,9 +288,9 @@ Stand-ins stay behind one predicate, "no behavior is bound to this NPC id". A te
 switches to real behavior when its script registers. The three ids claimed by a parent and a
 child switch only when the child is ported.
 
-- They are never extended and are deleted in one PR (#3497) once every scripted NPC id has
-  its behavior, including the siegable-hall behaviors of #3502 (M12). M10's exit does not
-  include the deletion.
+- They are never extended. They are deleted in one PR (#3497, M12) once every scripted NPC id
+  has its behavior, including the siegable-hall behaviors of #3502 (M12). No id is exempted,
+  and M10's exit does not include the deletion.
 - The list: idle wander and follow, `attackedHateWeight`, Warrior-style party assist, the
   shot-recharge roll, the walker alias rule, `Party_Type` 2 privates, `despawnMinions`, and
   default treatment of the scripted maker type strings (predicate: no maker registered).
@@ -381,7 +381,7 @@ Chains run in parallel. Each hot file allows one open PR: `attackable.go`, `host
 | A10 | See-creature tick scan with its gates, look-neighbor throttle, re-fire after teleport | A9 | #3491 |
 | A11 | Behavior base plus the first Warrior chain: Warrior base, Warrior, WarriorAggressive (first cut-over: 514 ids, 299 + 215) | A1–A10, E6, E7, E8 script events, X4 | #3494 |
 | A12 | Rest of the behavior spine (20 classes, about 840 ids in total) | A10, A11 | #3495 (+#2162, #2163, #2240, #3306, #176) |
-| A13 | Route movement as a weighted desire, with the walker script | A4, E6 | #2165 (+#3497) |
+| A13 | Route movement as a weighted desire, with the walker script | A4, E6 | #2165 (+#3497, M12) |
 | A14 | Folk-side desires for the 81 folk ids bound to behaviors | A4, A9 | #3492 |
 | M1 | Maker registry and hooks, with the default, no-on-start and event makers | E1 | #171 |
 | T1 | Schedule runner with three tasks | E1, V3 | #172 (+#3149) |
@@ -395,8 +395,8 @@ Chains run in parallel. Each hot file allows one open PR: `attackable.go`, `host
 | X4 | Ketra and Varka alliance level on the player: load and save, get and set, both ally checks, the faction exclusion in the auto-attack target check | — | #908 |
 
 X4 lands before A11 ports the petrify helper of the behavior base, which reads both ally
-checks, and before the alliance-gated proof quest registers. The faction quests, features and
-behaviors that use it stay in their M10 issues.
+checks, and before the alliance-gated proof quest Q607 (#175) registers. The faction quests,
+features and behaviors that use it stay in their M10 issues.
 
 Must land in the same PR:
 
@@ -421,10 +421,10 @@ engine call made by the 857 scripts has no unmapped row.
 - Quests are independent and never on the critical path: about 8 plain quests per PR; the 30
   remaining sagas are one data PR; any script over 500 lines goes alone.
 - Behaviors go parents-first in waves; a lane may take a parent and its children together.
-- Bosses last, after the global memo and makers. Siege-hall scripts wait for M12, and so
-  does the stand-in deletion (section 8).
-- The Dimensional Rift quest is M10 content, ported after its rift maker and the maker
-  registry (M1); it is not in the proof batch.
+- Bosses last, after the global memo and makers. Siege-hall scripts wait for M12 (#3502),
+  and so does the stand-in deletion of section 8 (#3497), which is not part of M10's exit.
+- The Dimensional Rift quest is M10 content in #184, ported after its rift maker (#213) and
+  the maker registry (M1, #171). It is not in the proof batch.
 - Content PRs never touch the engine or the script-facing API. A gap drops that script from
   the batch and files an issue.
 - Start with three canary batches (plain quests, one behavior subtree, one feature).
