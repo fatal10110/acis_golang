@@ -304,6 +304,11 @@ func (c *Character) addLevel(table *LevelTable, tmpl *Template, delta int, hooks
 	// UserInfo send below — the weight limit is CON-derived and therefore
 	// level-dependent.
 	hooks.add(c.RefreshWeightPenalty)
+	// The expertise penalty follows the weight penalty (PlayerStatus.addLevel):
+	// the level's skill grant above may have moved Expertise, and a flipped
+	// penalty's SkillList and EtcStatusUpdate trail the level's own SkillList
+	// and precede UserInfo.
+	hooks.add(c.RefreshExpertisePenalty)
 	// A rider's speeds halve once its mount outlevels it by more than 9.
 	hooks.add(c.refreshMoveSpeed)
 	hooks.add(c.UpdateUserInfo)
