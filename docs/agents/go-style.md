@@ -66,6 +66,52 @@ requirements remain in the outer `acis_public/CLAUDE.md`.
 - Keep periodic callbacks short. Move blocking database or network work out of a scheduler's critical
   path while preserving lifecycle ownership.
 
+### Lock order
+
+Actors are written from other actors' queues (a killer's queue applies the victim's death loss, a
+caster's queue lands a buff), so a lock taken in the wrong order deadlocks two queues. The rules:
+
+- **Leaf by default.** A leaf lock's critical section touches only the fields it guards, atomics,
+  pure helpers, immutable identity reads of another actor (`ObjectID`, `Kind`), and the owning
+  queue's scheduler (arming or stopping a task). It calls no other
+  object, takes no other lock, and emits no event. Only the locks marked "outer" below are held
+  across calls.
+- **Defer the follow-ups.** Events, packets and refreshes that a change triggers, and anything that
+  reads the state back, run after the lock is released: collect them as closures
+  (`progressionHooks`, the effect list's pending hooks) and run them after `Unlock`.
+- **Read prerequisites first.** Values a locked step needs from elsewhere are read before the lock
+  is taken (the death loss reads the Lucky skill and the level table before `progressionMu`).
+- **One actor at a time.** Never hold a leaf lock of one actor while taking any lock of another.
+  Read from one, release, then lock the other (`awardKillerPKKarma` reads the victim, then locks
+  the killer). The only cross-actor nesting is the one the table names for `reviveMu`.
+- **Callbacks under a lock say so.** An interface method called with the caller's lock held
+  documents it (`effect.StatOwner.AttachStatFuncs`, `MaxBuffCount`,
+  `effect.ActivityRegistry.SetActive`), and its implementations take only leaves below that lock.
+- **A new nesting updates this table** and comes with a test that drives both paths concurrently
+  and fails on a timeout (see `character_skill_lock_order_test.go`).
+
+`player.Character`, outer to inner. A goroutine takes a lock only while it holds none listed below
+it:
+
+| Order | Lock | Held across calls | Why |
+| --- | --- | --- | --- |
+| 1 | `reviveMu` | outer | A revive is one step: it reads and stops effects, restores exp (`progressionMu`), sets vitals (`vitalsMu`), emits events and restarts the mount feed under it. A resurrection offer for a dead summon reads the summon's effect list under it. Nothing takes it while holding another lock: a pet's revive, which closes its owner's offer, runs after the owner releases it. |
+| 2 | `charmMu` | outer, only around one effect-list read | It serializes the Charm of Courage mirror refresh. Taken before, never under, the effect list's lock; the charm's hooks run after the list unlocks. |
+| 3 | `effect.List.mu` (`EffectList()`) | only into the owner's `AttachStatFuncs` and `MaxBuffCount`, and the effect-tick registry (`task.Effects.SetActive`) | Start/exit hooks, `StatFuncsAttached`, icon refreshes and messages are queued and run after it is released. |
+| 4 | `stateMu`, `skills.mu`, `statMu`, each `effect.Calculator.mu` | leaf | These four are reachable under the effect list's lock: `MaxBuffCount` reads `stateMu` and the Divine Inspiration level (`skills.mu`), and `AttachStatFuncs` takes `statMu` and the calculators. Calling into the effect list while holding one of them (`IsAffected`, `Flags`, `AllSkillsDisabled`, `Stunned`, `Add`) deadlocks against a buff landing from another queue. |
+| 5 | `progressionMu`, `vitalsMu`, `locMu`, `summonFriendMu`, `saved.mu`, `boat.mu`, `recommendations.mu`, `mountFeed.mu` | leaf | Never held across a call; follow-ups go through hooks or run after unlock. |
+
+Leaves never nest in one another, so the order within a row does not matter. `stateMu` and
+`mountFeed.mu` may arm or stop a task on the character's queue (`afterLocked`, `stopLocked`); the
+queue's own lock is below every lock in the table. So is the effect-tick registry's lock
+(`task.Effects.mu`), which the effect list takes under its own in `notifyActivityTransition` (a
+list gains its first effect or loses its last) and `Untrack`: a registry-side path never reads a list
+while holding it (`Effects.Tick` and `Reset` snapshot the entries and unlock before touching a list).
+
+Creature locks follow the same rules. `creature.HPBar.Publish` holds the bar's lock while it reads
+HP and hands the value to `send`; `send` must not block and must not take a lock a `Publish`
+caller may hold.
+
 ## Numeric and contract fidelity
 
 - Use explicit integer widths when overflow, truncation, signedness, or wire size is observable.
