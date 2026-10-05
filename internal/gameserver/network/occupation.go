@@ -15,16 +15,15 @@ const occupationChangeSkillID = 5103
 // place of the old one (an active subclass's slot included), the transfer
 // announced, live's row refreshed in its party's and its clan's windows,
 // and, when the server grants skills automatically, every skill now
-// available granted. It reports false, having done nothing, while another
-// class change of live is in progress.
-//
-// An academy member taking its second occupation graduates here once
-// #3181 lands; until then it stays in the academy.
+// available granted. An academy member taking its second occupation first
+// graduates from its clan (graduateFromAcademy). It reports false, having
+// done nothing, while another class change of live is in progress.
 func (l *GameClientLink) changeOccupation(live *livePlayer, classID int, tmpl *player.Template) bool {
 	if !live.TryLockClassChange() {
 		return false
 	}
 	defer live.UnlockClassChange()
+	l.graduateFromAcademy(live, classID)
 	self := skillCastObject(live)
 	l.broadcastLiveFrame(live, func() wire.Frame {
 		return serverpackets.FrameMagicSkillUse(self, self, occupationChangeSkillID, 1, 1000, 0, false)

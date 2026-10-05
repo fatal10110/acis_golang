@@ -76,6 +76,7 @@ type fakeActor struct {
 	moveToPawnTo    attackable.Combatant
 	refusals        int
 	timers          []*fakeTimer
+	hooks           hookRecorder
 }
 
 func actor(id int32) *fakeActor {
