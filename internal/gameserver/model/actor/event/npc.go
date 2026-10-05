@@ -88,3 +88,19 @@ func (SocialAction) event()      {}
 func (NpcSay) event()            {}
 func (RaidBossKilled) event()    {}
 func (RaidDropAnnounced) event() {}
+
+// HallManagerBuffCheck reports a clan hall manager's idle check of its own
+// support buff, due once every five minutes.
+type HallManagerBuffCheck struct{}
+
+// HallSupportCast reports a clan hall manager's answer to the player
+// PlayerID it was asked to cast support magic on: NoMana when it lacked the
+// skill's MP and cast nothing, and its MP after the attempt.
+type HallSupportCast struct {
+	PlayerID int32
+	NoMana   bool
+	MP       int
+}
+
+func (HallManagerBuffCheck) event() {}
+func (HallSupportCast) event()      {}

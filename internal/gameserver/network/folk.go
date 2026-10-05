@@ -117,12 +117,21 @@ func FolkSinks(state *world.State, stance AttackStanceTracker) func(*npc.Folk) e
 	return func(f *npc.Folk) event.Sink { return &folkSink{world: state, stance: stance, f: f} }
 }
 
+// FolkSinks is the package FolkSinks whose sinks also carry out what a
+// clan hall manager's AI asks of l: the check of its own support buff and
+// its answers to the players it casts support magic on.
+func (l *GameClientLink) FolkSinks(state *world.State, stance AttackStanceTracker) func(*npc.Folk) event.Sink {
+	return func(f *npc.Folk) event.Sink { return &folkSink{world: state, stance: stance, f: f, link: l} }
+}
+
 // folkSink maps one civilian NPC's events to packets for its observers.
+// link, when set, carries out a clan hall manager's AI requests.
 type folkSink struct {
 	world  *world.State
 	stance AttackStanceTracker
 	f      *npc.Folk
 	known  world.KnownBuffer
+	link   *GameClientLink
 }
 
 // Emit maps ev to the frame every known observer receives.
@@ -170,6 +179,14 @@ func (s *folkSink) Emit(ev event.Event) {
 		s.broadcast(func() wire.Frame { return frames.ChangeMoveType(f.ObjectID(), e.Running) })
 	case event.AbnormalEffectChanged:
 		s.broadcast(func() wire.Frame { return frames.Info(f.NPCInfoSnapshot()) })
+	case event.HallManagerBuffCheck:
+		if s.link != nil {
+			s.link.hallManagerSelfBuff(f)
+		}
+	case event.HallSupportCast:
+		if s.link != nil {
+			s.link.hallSupportAnswer(f, e)
+		}
 	case event.NPCInfoChanged:
 		if e.ServerObject {
 			s.broadcast(func() wire.Frame { return frames.ObjectInfo(f.ServerObjectInfoSnapshot()) })
