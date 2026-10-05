@@ -71,15 +71,16 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 // playtime, the personal-surrender flag, the noblesse status, the Seven Signs dungeon membership and each subclass's progression — so a later reload reflects everything gained
 // since the last save instead of the row's creation-time values. Location and
 // appearance columns are not written here. The row is also marked online:
-// Save only runs for characters currently in game.
+// Save only runs for characters currently in game. Online is 1, or 2 for a
+// character lingering after its connection dropped (Player.isOnlineInt).
 func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
 	resources, progression := st.Resources, st.Progression
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, base_class = ?, death_penalty_level = ?, onlinetime = ?, wantspeace = ?, nobless = ?, isin7sdungeon = ?, online = 1
+		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, base_class = ?, death_penalty_level = ?, onlinetime = ?, wantspeace = ?, nobless = ?, isin7sdungeon = ?, online = ?
 			 WHERE obj_Id = ?`,
 		progression.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
 		progression.Exp, progression.ExpBeforeDeath, progression.SP, st.Karma, st.PvPKills, st.PKKills, st.ClassID, st.BaseClassID, st.DeathPenaltyLevel, st.OnlineTime,
-		st.WantsPeace, st.Noble, st.In7sDungeon, st.ID,
+		st.WantsPeace, st.Noble, st.In7sDungeon, onlineColumn(st.ClientDetached), st.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("save character %d: %w", st.ID, err)
@@ -87,6 +88,15 @@ func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
 	// The characters row carries the base class's progression; each
 	// subclass keeps its own in its row.
 	return updateSubclasses(ctx, s.db, st.ID, st.Subclasses)
+}
+
+// onlineColumn is the characters.online value of a character in game: 1,
+// or 2 once its client detached (Player.isOnlineInt).
+func onlineColumn(clientDetached bool) int {
+	if clientDetached {
+		return 2
+	}
+	return 1
 }
 
 // Get returns the character with the given object id, or

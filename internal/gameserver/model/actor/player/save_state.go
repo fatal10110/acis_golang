@@ -34,6 +34,11 @@ type SaveState struct {
 	Noble bool
 	// In7sDungeon is the Seven Signs dungeon membership (see In7sDungeon).
 	In7sDungeon bool
+	// ClientDetached marks a copy taken while the character lingers in the
+	// world after its connection dropped: the row's online column then
+	// records 2 instead of 1 (Player.isOnlineInt, Player.java:4504-4510).
+	// The character model does not know its session, so the caller sets it.
+	ClientDetached bool
 }
 
 // SaveState copies c's persisted character-row values.

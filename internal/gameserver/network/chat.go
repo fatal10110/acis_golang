@@ -140,12 +140,13 @@ func (l *GameClientLink) chatHeroVoice(client *Client, live *livePlayer, line ch
 }
 
 // chatTell whispers the line to the named player, and shows live the line
-// addressed "->" to that player. A player not in the world, a jailed or
+// addressed "->" to that player. A player not in the world or whose
+// connection is gone (lingering before it leaves), a jailed or
 // chat-banned one, one blocking everything, or one blocking live refuses
 // it; a game master's whisper passes either block.
 func (l *GameClientLink) chatTell(_ *Client, live *livePlayer, line chat.Line) {
 	target, ok := l.livePlayerByName(line.Target)
-	if !ok || target.detached() {
+	if !ok || target.clientDetached() {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
 		return
 	}

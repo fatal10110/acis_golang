@@ -476,6 +476,14 @@ func (p *livePlayer) clientDetached() bool {
 	return p.sessionEnded.Load() || p.detached()
 }
 
+// saveState copies p's character row for an in-game save, marking a copy
+// taken while p lingers after its connection dropped.
+func (p *livePlayer) saveState() player.SaveState {
+	st := p.Character.SaveState()
+	st.ClientDetached = p.clientDetached()
+	return st
+}
+
 // Departed reports whether p has begun leaving the world, for the party
 // registry: detach marks it before taking p out of its party.
 func (p *livePlayer) Departed() bool {
