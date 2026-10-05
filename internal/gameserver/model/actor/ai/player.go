@@ -377,13 +377,29 @@ func (p *PlayerAttack) thinkLocked(castStopping bool) (accepted, actionFailed bo
 		return false, true, nil
 	}
 
-	if !p.attack.CanAttack(p.target) {
+	if p.refusesAttackLocked(p.target) {
 		p.stopLocked()
 		return false, true, nil
 	}
 
 	p.attack.DoAttack(p.target)
 	return true, false, nil
+}
+
+// attackRefuser is the optional AttackController capability that refuses an
+// attack as CanAttack does and tells the player when the active weapon is
+// why.
+type attackRefuser interface {
+	RefuseAttack(attackable.Combatant) bool
+}
+
+// refusesAttackLocked runs the attack gate for the think about to swing at
+// target, telling the player a weapon refusal once per think.
+func (p *PlayerAttack) refusesAttackLocked(target attackable.Combatant) bool {
+	if r, ok := p.attack.(attackRefuser); ok {
+		return r.RefuseAttack(target)
+	}
+	return !p.attack.CanAttack(target)
 }
 
 func (p *PlayerAttack) stopLocked() {

@@ -193,8 +193,54 @@ func (c *Controller) InHitAnimation() bool {
 	return c.inHitAnimation
 }
 
-// CanAttack reports whether target may be physically attacked now.
+// CanAttack reports whether target may be physically attacked now. It is a
+// silent query; RefuseAttack is the think-time form that tells the player.
 func (c *Controller) CanAttack(target attackable.Combatant) bool {
+	ok, _ := c.check(target)
+	return ok
+}
+
+// RefuseAttack reports whether CanAttack refuses target. When the player's
+// active weapon is why (a fishing rod, or a bow without arrows or the MP to
+// fire), it also tells the player so, as the reference's
+// PlayerAttack.canAttack does each time the attack think asks it. The player
+// attack think calls it once per think that reaches the attack gate.
+func (c *Controller) RefuseAttack(target attackable.Combatant) bool {
+	ok, why := c.check(target)
+	if !ok && why != 0 {
+		c.emit(event.AttackWeaponRefused{Reason: why})
+	}
+	return !ok
+}
+
+// check runs the attack gate, naming the weapon refusal when that is why it
+// refuses (zero otherwise). The weapon gate runs last, as the reference
+// checks it only once every creature and playable rule allows the attack.
+func (c *Controller) check(target attackable.Combatant) (bool, event.AttackWeaponRefusal) {
+	if !c.gateAllows(target) {
+		return false, 0
+	}
+	if c.player != nil {
+		switch c.actor.AttackType() {
+		case item.WeaponFishingRod:
+			return false, event.AttackRefusedFishingRod
+		case item.WeaponBow:
+			if !c.player.CheckAndEquipArrows() {
+				return false, event.AttackRefusedNoArrows
+			}
+			if mp := c.player.WeaponMPConsume(); mp > 0 && mp > c.player.MP() {
+				return false, event.AttackRefusedNotEnoughMP
+			}
+		}
+	}
+	if c.attackable && target.FakeDeath() {
+		return false, 0
+	}
+	return true, 0
+}
+
+// gateAllows runs the creature and playable rules of the attack gate.
+func (c *Controller) gateAllows(target attackable.Combatant) bool {
 	if target == nil || c.actor == nil {
 		return false
 	}
@@ -227,27 +273,6 @@ func (c *Controller) CanAttack(target attackable.Combatant) bool {
 			}
 		}
 	}
-
-	if c.player != nil {
-		switch c.actor.AttackType() {
-		case item.WeaponFishingRod:
-			return false
-		case item.WeaponBow:
-			if !c.player.CheckAndEquipArrows() {
-				return false
-			}
-			if mp := c.player.WeaponMPConsume(); mp > 0 && mp > c.player.MP() {
-				return false
-			}
-		}
-	}
-
-	if c.attackable {
-		if target.FakeDeath() {
-			return false
-		}
-	}
-
 	return true
 }
 
