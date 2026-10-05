@@ -121,7 +121,7 @@ engine-queue `After` calls outside the timer registry: they are unkeyed, may ove
 never cancelled.
 
 **Scheduled tasks** are catalog scripts with one schedule hook. The reference alternates a
-start and an end hook when an entry sets `end`. No live task sets it (the only `end` in
+start and an end hook when an entry sets `end`. No live task sets it (the only live `end` in
 `scripts.xml` is on a plain quest, which the scheduler does not read) and every task's end
 hook is empty, so the start hook alone is observably equivalent. The four schedule kinds in
 live use are built (hourly, daily, weekly, monthly-by-week); any other attribute logs loudly.
@@ -174,7 +174,7 @@ Hooks run synchronously on the goroutine that raises them, with no lock held.
 | Attacked, from an aggression effect | where the effect is applied | no HP change, no skill |
 | No-desire, see-creature, move finished, out of territory | NPC queue, at the reference's point inside the think pass, with the brain mutex released per phase | a think raised from inside a hook or from another queue runs in place, not deferred |
 | Skill finished, attack finished | NPC queue, after the brain mutex is released | |
-| Created | spawner's goroutine, per NPC, right after its read-locked spawn call returns and before the maker's spawn hook | `RespawnAll` keeps the write lock only for the spawn-list swap |
+| Created | spawner's goroutine, per NPC, right after its read-locked spawn call returns and before the maker's spawn hook | E6 narrows `RespawnAll`'s write lock to the spawn-list swap |
 | Decayed | right after the decayed flag flips, before world removal | then behavior timers are cancelled, then removal. The script-facing delete is synchronous |
 | Dying | one 3 s timer on an engine-owned queue; all hooks in list order; no state re-check | corpse queues close at decay; 103 templates decay within 3 s |
 | Party died, clan died | killer's queue, inline with the death | |
@@ -359,7 +359,7 @@ Chains run in parallel. Each hot file allows one open PR: `attackable.go`, `host
 | E3 | Journal write: set/unset/state/cond flags/exit, lane persistence, seal, quest mark packet, abort, detach flag | E2, V3 | #167 |
 | E4 | Helpers: give, take, reward, four drop types, sounds, checks, party and clan-leader lookups, quest rates, radar, script random source | E3, V3 | #3487 |
 | E5 | Dialog path of section 7 for folk and hostile NPCs, with the first plain quest | E1, E3, E4 | #130 |
-| E6 | Created, dying (3 s), decayed; boot spawn pass moved; synchronous delete | E1, E4 | #3490 (+#2164) |
+| E6 | Created, dying (3 s), decayed; boot spawn pass moved; `RespawnAll` lock narrowed; synchronous delete | E1, E4 | #3490 (+#2164) |
 | E7 | Timer registry | E1, A3 | #168 |
 | E8 | One-off seams with their only consumers: item use, zone enter, player and summon death, script events | E5, E6 | #3493 (+#867) |
 | A0 | Brain phase locking: hooks at the reference's points, nested think in place | — | #3478 |
@@ -398,8 +398,9 @@ Must land in the same PR:
 
 **Proof batch.** It freezes the API: one script per mechanic (plain talk and collect; party
 credit; multi-item drop; quest attacked hook; newbie shots; timer and spawn; decayed hook;
-clan leader state; second-class change; saga core; item use; zone; player death; the four
-engine-referenced quests: the diary-write quest of E5, the two subclass-gate quests and the
+clan leader state; second-class change; saga core; item use; zone; player death; the five
+engine-referenced quests: the item-use quest above, whose state also gates the drain-soul
+skill handler of E8, the diary-write quest of E5, the two subclass-gate quests and the
 class-change quest of X1), the tutorial and newbie helper, four features, two teleporters,
 six tasks, three makers and the behavior spine. The API freezes when the census of every
 engine call made by the 857 scripts has no unmapped row.
