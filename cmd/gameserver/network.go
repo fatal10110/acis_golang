@@ -36,6 +36,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/raidpoint"
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 	"github.com/fatal10110/acis_golang/internal/gameserver/signspriest"
@@ -81,6 +82,8 @@ func provideGameClientLink(
 	recipeBooks *gamesql.RecipeBookStore,
 	macros *gamesql.MacroStore,
 	recommendations *gamesql.RecommendationStore,
+	quests *gamesql.QuestStore,
+	scripts *script.Registry,
 	subclasses *gamesql.SubclassStore,
 	shops *merchant.Service,
 	html *datacache.HTML,
@@ -264,6 +267,8 @@ func provideGameClientLink(
 		DisableRaidCurse: bool(gameplay.DisableRaidCurse),
 		Macros:           macros,
 		Recommendations:  recommendations,
+		Quests:           quests,
+		Scripts:          scripts,
 		Teleports:        data.Teleports,
 		InstantTeleports: data.InstantTeleports,
 		FreeTeleport:     bool(gameplay.FreeTeleport),

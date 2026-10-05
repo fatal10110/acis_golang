@@ -385,7 +385,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	if l.playerClock != nil && c.Race == player.RaceDarkElf {
 		l.playerClock.NotifyShadowSenseState(live)
 	}
-	client.Session.SendFrame(serverpackets.FrameQuestList(nil))
+	client.Session.SendFrame(questListFrame(c))
 	client.Session.SendFrame(serverpackets.FrameSkillList(skillList))
 	client.Session.SendFrame(serverpackets.FrameFriendList(l.friendListEntries(c.ID)))
 	client.Session.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))

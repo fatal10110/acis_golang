@@ -280,11 +280,12 @@ const petItemsOf = "SELECT pet.object_id FROM items AS pet JOIN items AS collar 
 	" WHERE collar.owner_id = ? AND pet.loc IN ('PET', 'PET_EQUIP')"
 
 // Purge removes the character row for objectID together with every row it
-// owns - its items, the items its pets carry, shortcuts, hennas, recipe book,
-// subclasses, skills, skill-save state, pets, item augmentations, the friend
-// and block relations naming it on either side, and its Olympiad record - as
-// one transaction, so a failure or cancellation partway through leaves all of
-// them in place instead of orphaning owned rows behind a deleted character.
+// owns - its items, the items its pets carry, shortcuts, macros, memos,
+// quest journal, hennas, recipe book, subclasses, skills, skill-save state,
+// pets, item augmentations, the friend and block relations naming it on
+// either side, and its Olympiad record - as one transaction, so a failure or
+// cancellation partway through leaves all of them in place instead of
+// orphaning owned rows behind a deleted character.
 //
 // A pet's items are saved under its collar rather than under the character
 // (the reference keys them on the player), so they are found through the
@@ -344,6 +345,12 @@ func (s *CharacterStore) Purge(ctx context.Context, objectID int32) (bool, error
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM character_macroses WHERE char_obj_id = ?", objectID); err != nil {
 		return false, fmt.Errorf("purge character %d macros: %w", objectID, err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM character_memo WHERE charId = ?", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d memos: %w", objectID, err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM character_quests WHERE charId = ?", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d quests: %w", objectID, err)
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM character_hennas WHERE char_obj_id = ?", objectID); err != nil {
 		return false, fmt.Errorf("purge character %d hennas: %w", objectID, err)
