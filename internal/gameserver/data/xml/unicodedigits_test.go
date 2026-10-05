@@ -13,7 +13,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/observer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
@@ -37,6 +36,13 @@ func TestDecimalListValuesReadUnicodeDigits(t *testing.T) {
 			s.Set(kv[i], kv[i+1])
 		}
 		return s
+	}
+	attrs := func(kv ...string) *attrValues {
+		vals := make(map[string]string, len(kv)/2)
+		for i := 0; i < len(kv); i += 2 {
+			vals[kv[i]] = kv[i+1]
+		}
+		return newAttrValues(vals, "test")
 	}
 	cases := []struct {
 		name string
@@ -73,14 +79,14 @@ func TestDecimalListValuesReadUnicodeDigits(t *testing.T) {
 			return z.Skills[0], nil
 		}, zone.SkillRef{ID: 12, Level: 7}},
 		{"boat messages", func() (any, error) {
-			b, err := route.NewBoatLocation(set("x", "1", "y", "2", "z", "3", "arrival", twelve+";"+seven, "scheduled", twelve+"-"+seven))
+			b, err := buildBoatLocation(attrs("x", "1", "y", "2", "z", "3", "arrival", twelve+";"+seven, "scheduled", twelve+"-"+seven))
 			if err != nil {
 				return nil, err
 			}
 			return fmt.Sprint(b.ArrivalMessages, b.Scheduled), nil
 		}, fmt.Sprint([]int{12, 7}, []route.ScheduledMessage{{ID: 12, Delay: 7}})},
 		{"recipe material", func() (any, error) {
-			r, err := recipe.New(set("id", "1", "material", twelve+"-"+seven, "product", "1-1", "itemId", "1",
+			r, err := buildRecipe(attrs("id", "1", "material", twelve+"-"+seven, "product", "1-1", "itemId", "1",
 				"level", "1", "mpConsume", "1", "successRate", "100", "isDwarven", "true", "alias", "a"))
 			if err != nil {
 				return nil, err
@@ -97,7 +103,7 @@ func TestDecimalListValuesReadUnicodeDigits(t *testing.T) {
 		{"item skill ref", func() (any, error) { return item.ParseSkillRef(twelve + "-" + seven) }, item.SkillRef{ID: 12, Level: 7}},
 		{"skill shared reuse ref", func() (any, error) { return skill.ParseRef(twelve + "-" + seven) }, skill.Ref{ID: 12, Level: 7}},
 		{"observer spawn groups", func() (any, error) {
-			s, err := observer.NewSpawn(set("id", "1", "x", "1", "y", "2", "z", "3", "groups", twelve+";"+seven))
+			s, err := buildObserverSpawn(attrs("id", "1", "x", "1", "y", "2", "z", "3", "groups", twelve+";"+seven))
 			return fmt.Sprint(s.Groups), err
 		}, fmt.Sprint([]int{12, 7})},
 		{"restart location", func() (any, error) { return restart.ParseLocationValue(twelve + ";" + seven + ";3") }, locationOf(12, 7, 3)},

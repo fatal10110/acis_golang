@@ -5,10 +5,10 @@ import (
 	"slices"
 	"strings"
 	"sync/atomic"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
+// AccessLevel is one accessLevels.xml row. NameColor and TitleColor are the
+// hex digits of an int32 literal with its "0x" left off.
 type AccessLevel struct {
 	Level            int
 	Name             string
@@ -22,38 +22,7 @@ type AccessLevel struct {
 	GiveDamage       bool
 }
 
-func NewAccessLevel(set *commons.StatSet) (AccessLevel, error) {
-	idf := commons.NewFields(set, "admin: access level")
-	level := idf.Int("level")
-	if err := idf.Err(); err != nil {
-		return AccessLevel{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("admin: access level %d", level))
-	accessLevel := AccessLevel{
-		Level:            level,
-		Name:             f.String("name"),
-		NameColor:        f.StringDefault("nameColor", "FFFFFF"),
-		TitleColor:       f.StringDefault("titleColor", "FFFF77"),
-		ChildLevel:       f.IntDefault("childLevel", 0),
-		IsGM:             f.BoolDefault("isGM", false),
-		AllowFixedRes:    f.BoolDefault("allowFixedRes", false),
-		AllowTransaction: f.BoolDefault("allowTransaction", true),
-		AllowAltG:        f.BoolDefault("allowAltg", false),
-		GiveDamage:       f.BoolDefault("giveDamage", true),
-	}
-	if err := f.Err(); err != nil {
-		return AccessLevel{}, err
-	}
-	// A color is the hex digits of an int32 literal with its "0x" left off.
-	for _, c := range [...]struct{ key, value string }{{"nameColor", accessLevel.NameColor}, {"titleColor", accessLevel.TitleColor}} {
-		if _, err := commons.DecodeInt32("0x" + c.value); err != nil {
-			return AccessLevel{}, fmt.Errorf("admin: access level %d: %s: %w", level, c.key, err)
-		}
-	}
-	return accessLevel, nil
-}
-
+// Command is one adminCommands.xml row.
 type Command struct {
 	Name        string
 	AccessLevel int
@@ -61,25 +30,8 @@ type Command struct {
 	Description string
 }
 
-func NewCommand(set *commons.StatSet) (Command, error) {
-	idf := commons.NewFields(set, "admin: command")
-	name := idf.String("name")
-	if err := idf.Err(); err != nil {
-		return Command{}, err
-	}
-	f := commons.NewFields(set, fmt.Sprintf("admin: command %q", name))
-	command := Command{
-		Name:        name,
-		AccessLevel: f.Int("accessLevel"),
-		Params:      f.StringDefault("params", ""),
-		Description: f.StringDefault("desc", ""),
-	}
-	if err := f.Err(); err != nil {
-		return Command{}, err
-	}
-	return command, nil
-}
-
+// Announcement is one announcement. InitialDelay, Delay and Limit apply only
+// to an automatic one.
 type Announcement struct {
 	Message      string
 	Critical     bool
@@ -87,36 +39,6 @@ type Announcement struct {
 	InitialDelay int
 	Delay        int
 	Limit        int
-}
-
-func NewAnnouncement(set *commons.StatSet) (Announcement, error) {
-	f := commons.NewFields(set, "admin: announcement")
-	message := f.String("message")
-	critical := f.BoolDefault("critical", false)
-	auto := f.BoolDefault("auto", false)
-	if err := f.Err(); err != nil {
-		return Announcement{}, err
-	}
-	a := Announcement{
-		Message:  message,
-		Critical: critical,
-		Auto:     auto,
-	}
-	if !a.Auto {
-		return a, nil
-	}
-
-	af := commons.NewFields(set, fmt.Sprintf("admin: announcement %q", message))
-	a.InitialDelay = af.Int("initial_delay")
-	a.Delay = af.Int("delay")
-	a.Limit = af.Int("limit")
-	if err := af.Err(); err != nil {
-		return Announcement{}, err
-	}
-	if a.Limit < 0 {
-		a.Limit = 0
-	}
-	return a, nil
 }
 
 // Data is the access-level and admin-command tables. //reload admin

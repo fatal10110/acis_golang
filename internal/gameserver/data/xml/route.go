@@ -3,7 +3,7 @@ package xml
 import (
 	"fmt"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 )
 
@@ -72,7 +72,7 @@ func buildBoatItinerary(el boatItineraryElement) (route.BoatItinerary, error) {
 	for i, routeEl := range el.Routes {
 		nodes := make([]route.BoatLocation, 0, len(routeEl.Nodes))
 		for _, node := range routeEl.Nodes {
-			loc, err := route.NewBoatLocation(commons.StatSetFromXMLAttrs(node.Attrs))
+			loc, err := buildBoatLocation(newAttrValues(foldAttrs(node.Attrs), "route: boat location"))
 			if err != nil {
 				return route.BoatItinerary{}, err
 			}
@@ -81,6 +81,19 @@ func buildBoatItinerary(el boatItineraryElement) (route.BoatItinerary, error) {
 		routes = append(routes, route.BoatRoute{Dock: docks[i], ItemID: items[i], Nodes: nodes})
 	}
 	return route.BoatItinerary{Heading: int(*el.Heading), Routes: routes}, nil
+}
+
+// buildBoatLocation builds one boat route <node>. x, y and z are required;
+// speed defaults to 350, rotation to 4000 and busy to 0.
+func buildBoatLocation(a *attrValues) (route.BoatLocation, error) {
+	loc := location.Location{X: a.int("x"), Y: a.int("y"), Z: a.int("z")}
+	speed := a.intDefault("speed", 350)
+	rotation := a.intDefault("rotation", 4000)
+	busy := a.intDefault("busy", 0)
+	if err := a.Err(); err != nil {
+		return route.BoatLocation{}, err
+	}
+	return route.NewBoatLocation(loc, speed, rotation, busy, a.strDefault("arrival", ""), a.strDefault("departure", ""), a.strDefault("scheduled", ""))
 }
 
 type walkerRouteFile struct {
@@ -110,7 +123,7 @@ func LoadWalkerRoutes(path string) (route.WalkerRoutes, error) {
 		for _, npcEl := range routeEl.NPCs {
 			nodes := make([]route.WalkerLocation, 0, len(npcEl.Nodes))
 			for _, node := range npcEl.Nodes {
-				loc, err := route.NewWalkerLocation(commons.StatSetFromXMLAttrs(node.Attrs))
+				loc, err := buildWalkerLocation(newAttrValues(foldAttrs(node.Attrs), "route: walker location"))
 				if err != nil {
 					return nil, fmt.Errorf("xml: %s: route %q npc %q: %w", path, routeEl.Name, npcEl.Name, err)
 				}
@@ -121,4 +134,17 @@ func LoadWalkerRoutes(path string) (route.WalkerRoutes, error) {
 		routes[routeEl.Name] = byNPC
 	}
 	return routes, nil
+}
+
+// buildWalkerLocation builds one walker route <node>. x, y and z are
+// required; delay, fstring and socialId default to 0.
+func buildWalkerLocation(a *attrValues) (route.WalkerLocation, error) {
+	loc := location.Location{X: a.int("x"), Y: a.int("y"), Z: a.int("z")}
+	delay := a.intDefault("delay", 0)
+	npcStringID := a.intDefault("fstring", 0)
+	socialID := a.intDefault("socialId", 0)
+	if err := a.Err(); err != nil {
+		return route.WalkerLocation{}, err
+	}
+	return route.NewWalkerLocation(loc, delay, npcStringID, socialID), nil
 }

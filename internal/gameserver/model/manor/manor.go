@@ -1,11 +1,6 @@
 package manor
 
-import (
-	"fmt"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-)
+import "github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 
 // Seed is one crop/seed row from manors.xml. SeedReferencePrice and
 // CropReferencePrice are the reference prices of its seed and crop items,
@@ -20,33 +15,6 @@ type Seed struct {
 	SeedsLimit, CropsLimit   int
 
 	SeedReferencePrice, CropReferencePrice int32
-}
-
-// NewSeed builds a Seed from set.
-func NewSeed(set *commons.StatSet) (Seed, error) {
-	idf := commons.NewFields(set, "manor: seed")
-	cropID := idf.Int("id")
-	if err := idf.Err(); err != nil {
-		return Seed{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("manor: seed crop %d", cropID))
-	seed := Seed{
-		CropID:      cropID,
-		SeedID:      f.Int("seedId"),
-		MatureID:    f.Int("matureId"),
-		Level:       f.Int("level"),
-		Reward1:     f.Int("reward1"),
-		Reward2:     f.Int("reward2"),
-		CastleID:    f.Int("castleId"),
-		Alternative: f.BoolDefault("isAlternative", false),
-		SeedsLimit:  f.Int("seedsLimit"),
-		CropsLimit:  f.Int("cropsLimit"),
-	}
-	if err := f.Err(); err != nil {
-		return Seed{}, err
-	}
-	return seed, nil
 }
 
 // Manor is one castle's seed list.

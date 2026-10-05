@@ -1,12 +1,6 @@
 // Package buylist models static NPC buylist data loaded at boot.
 package buylist
 
-import (
-	"fmt"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
-)
-
 // Product is one item offered by a buylist.
 type Product struct {
 	BuyListID          int
@@ -16,25 +10,13 @@ type Product struct {
 	MaxCount           int
 }
 
-// NewProduct builds a Product from one folded <product> element.
-func NewProduct(buyListID int, set *commons.StatSet) (Product, error) {
-	idf := commons.NewFields(set, fmt.Sprintf("buylist %d product", buyListID))
-	itemID := idf.Int32("id")
-	if err := idf.Err(); err != nil {
-		return Product{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("buylist %d product %d", buyListID, itemID))
-	price := f.IntDefault("price", 0)
-	restockDelay := f.Int64Default("restockDelay", -1)
-	maxCount := f.IntDefault("count", -1)
-	if err := f.Err(); err != nil {
-		return Product{}, err
-	}
+// NewProduct builds a Product of buylist buyListID. restockDelayMinutes is
+// converted to milliseconds; a maxCount of -1 means unlimited stock.
+func NewProduct(buyListID int, itemID int32, price int, restockDelayMinutes int64, maxCount int) Product {
 	return Product{
 		BuyListID: buyListID, ItemID: itemID, Price: price,
-		RestockDelayMillis: restockDelay * 60000, MaxCount: maxCount,
-	}, nil
+		RestockDelayMillis: restockDelayMinutes * 60000, MaxCount: maxCount,
+	}
 }
 
 // LimitedStock reports whether this product uses a restock counter.
@@ -55,19 +37,11 @@ type List struct {
 	Products []Product
 }
 
-// NewList builds a List from one folded <buyList> element and its products.
-// A product whose item id repeats an earlier one replaces it in place: the
-// list keeps the first position and the last definition.
-func NewList(set *commons.StatSet, products []Product) (List, error) {
-	id, err := set.GetInt("id")
-	if err != nil {
-		return List{}, fmt.Errorf("buylist: %w", err)
-	}
-	npcID, err := set.GetInt("npcId")
-	if err != nil {
-		return List{}, fmt.Errorf("buylist %d: %w", id, err)
-	}
-	return List{ID: id, NPCID: npcID, Products: dedupeProducts(products)}, nil
+// NewList builds a List from its id, npc id and products. A product whose
+// item id repeats an earlier one replaces it in place: the list keeps the
+// first position and the last definition.
+func NewList(id, npcID int, products []Product) List {
+	return List{ID: id, NPCID: npcID, Products: dedupeProducts(products)}
 }
 
 // dedupeProducts keeps one product per item id, at the position its id

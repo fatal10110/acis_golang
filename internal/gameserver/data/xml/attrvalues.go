@@ -116,6 +116,19 @@ func (a *attrValues) boolDefault(key string, def bool) bool {
 	return strings.EqualFold(raw, "true")
 }
 
+// boolean returns the value at key as a bool, recording an error if key is
+// absent. A present value reads the same lax way boolDefault does.
+func (a *attrValues) boolean(key string) bool {
+	if a.err != nil {
+		return false
+	}
+	if _, ok := a.vals[key]; !ok {
+		a.fail(fmt.Errorf("attribute %q is required", key))
+		return false
+	}
+	return a.boolDefault(key, false)
+}
+
 // intDefault returns the value at key as a base-10 int, or def if key is
 // absent.
 func (a *attrValues) intDefault(key string, def int) int {
@@ -143,6 +156,24 @@ func (a *attrValues) int32Default(key string, def int32) int32 {
 		return def
 	}
 	return int32(n)
+}
+
+// int64Default returns the value at key as a base-10 int64, or def if key
+// is absent. A present-but-malformed value is still an error.
+func (a *attrValues) int64Default(key string, def int64) int64 {
+	if a.err != nil {
+		return def
+	}
+	raw, ok := a.vals[key]
+	if !ok {
+		return def
+	}
+	n, err := commons.ParseInt(raw, 64)
+	if err != nil {
+		a.fail(fmt.Errorf("attribute %q: %w", key, err))
+		return def
+	}
+	return n
 }
 
 // int32Literal returns the value at key as an int32 integer literal (see

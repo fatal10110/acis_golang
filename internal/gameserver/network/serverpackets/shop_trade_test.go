@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
@@ -412,19 +411,6 @@ func TestFrameSymbolMakerPackets(t *testing.T) {
 
 // ---- multisell ----
 
-func multisellIngredient(t *testing.T, items *item.Table, attrs ...string) multisell.Ingredient {
-	t.Helper()
-	set := commons.NewStatSet()
-	for i := 0; i+1 < len(attrs); i += 2 {
-		set.Set(attrs[i], attrs[i+1])
-	}
-	in, err := multisell.NewIngredient(set, items)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return in
-}
-
 // TestFrameMultiSellList pins MultiSellList (0xd0) against the reference
 // writeImpl: list id, 1-based page, finished flag, page size 40, entry
 // count; per entry its 1-based number across the list, two zero ints, the
@@ -438,14 +424,14 @@ func TestFrameMultiSellList(t *testing.T) {
 		{ID: item.AdenaID, Kind: item.KindEtcItem, Stackable: true, EtcItem: &item.EtcItemDetail{}},
 		{ID: 1000, Kind: item.KindWeapon, Slot: item.SlotRHand, Weapon: &item.WeaponDetail{}},
 	})
-	sword := multisellIngredient(t, items, "id", "1000", "count", "1")
-	unknown := multisellIngredient(t, items, "id", "4242", "count", "3")
+	sword := multisell.NewIngredient(1000, 1, false, false, items)
+	unknown := multisell.NewIngredient(4242, 3, false, false, items)
 	entries := []multisell.Entry{multisell.NewEntry(
 		[]multisell.Ingredient{
-			multisellIngredient(t, items, "id", "57", "count", "500"),
-			multisellIngredient(t, items, "id", "57", "count", "9000", "isTaxIngredient", "true"),
+			multisell.NewIngredient(57, 500, false, false, items),
+			multisell.NewIngredient(57, 9000, true, false, items),
 			unknown,
-			multisellIngredient(t, items, "id", "57", "count", "20"),
+			multisell.NewIngredient(57, 20, false, false, items),
 		},
 		[]multisell.Ingredient{sword},
 	)}
