@@ -242,7 +242,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 	if err != nil {
 		return nil, err
 	}
-	manors, manorAreas, err := loadManor(xmlRoot, log)
+	manors, manorAreas, err := loadManor(xmlRoot, items, log)
 	if err != nil {
 		return nil, err
 	}
