@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/fish"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -25,7 +24,7 @@ const fishingActionPenaltyLevel = 4
 func fishingMonsters() *npc.Table {
 	return npc.NewTable([]*npc.Template{{
 		ID: caughtUndineID, TemplateID: caughtUndineID, Type: "Monster", Name: "Caught Undine", Level: 20,
-		HPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CanMove: true, AIParams: commons.NewStatSet(),
+		HPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CanMove: true,
 	}})
 }
 

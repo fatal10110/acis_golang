@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -33,8 +32,7 @@ func TestNpcSpawnCreatesPrivateMinion(t *testing.T) {
 	decay, _ := task.NewDecay(nopDecayEffects{}, time.Now)
 	respawn, _ := task.NewRespawn(nopRespawnEffects{}, time.Now)
 	walker, _ := task.NewWalker(nil, noRouteWalkerPath{}, time.Now, state)
-	partyAI := commons.NewStatSet()
-	partyAI.Set("Party_Type", 2)
+	partyAI := npc.AIParams{"Party_Type": "2"}
 	npcs, err := NewNpcs(NewSpawns(table, nil), npc.NewTable([]*npc.Template{
 		{ID: 1, TemplateID: 1, Type: "Monster", HPMax: 100, RunSpeed: 100, AIParams: partyAI},
 		{ID: 2, TemplateID: 2, Type: "Monster", HPMax: 100, RunSpeed: 100},
@@ -88,7 +86,7 @@ func TestNpcSpawnCreatesPrivateMinion(t *testing.T) {
 	if got := len(masterHostile.Minions()); got != 1 {
 		t.Fatalf("master minions after private respawn = %d, want 1", got)
 	}
-	partyAI.Unset("Party_Type")
+	delete(partyAI, "Party_Type")
 	npcs.spawnPrivates("skipped", npcs.slot["maker#0#0"].entry, masterHostile)
 	if got := npcs.LiveCount(); got != 2 {
 		t.Fatalf("LiveCount() after non-party private spawn = %d, want 2", got)
@@ -125,8 +123,7 @@ func TestNpcSpawnMarksRaidBossPrivatesRaidRelated(t *testing.T) {
 	decay, _ := task.NewDecay(nopDecayEffects{}, time.Now)
 	respawn, _ := task.NewRespawn(nopRespawnEffects{}, time.Now)
 	walker, _ := task.NewWalker(nil, noRouteWalkerPath{}, time.Now, state)
-	partyAI := commons.NewStatSet()
-	partyAI.Set("Party_Type", 2)
+	partyAI := npc.AIParams{"Party_Type": "2"}
 	npcs, err := NewNpcs(NewSpawns(table, nil), npc.NewTable([]*npc.Template{
 		{ID: 1, TemplateID: 1, Type: "RaidBoss", HPMax: 100, RunSpeed: 100, AIParams: partyAI},
 		{ID: 2, TemplateID: 2, Type: "Monster", HPMax: 100, RunSpeed: 100},

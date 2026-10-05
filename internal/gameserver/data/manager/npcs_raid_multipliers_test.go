@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -41,10 +40,9 @@ func TestNpcSpawnAppliesRaidMultipliersToRaidRelatedHostiles(t *testing.T) {
 	decay, _ := task.NewDecay(nopDecayEffects{}, time.Now)
 	respawn, _ := task.NewRespawn(nopRespawnEffects{}, time.Now)
 	walker, _ := task.NewWalker(nil, noRouteWalkerPath{}, time.Now, state)
-	partyAI := commons.NewStatSet()
-	partyAI.Set("Party_Type", 2)
+	partyAI := npc.AIParams{"Party_Type": "2"}
 	tmpl := func(id int, kind string) *npc.Template {
-		return &npc.Template{ID: id, TemplateID: id, Type: kind, Level: 11, PDef: 51, HPMax: 100, RunSpeed: 100, AIParams: commons.NewStatSet()}
+		return &npc.Template{ID: id, TemplateID: id, Type: kind, Level: 11, PDef: 51, HPMax: 100, RunSpeed: 100}
 	}
 	boss := tmpl(1, "RaidBoss")
 	boss.AIParams = partyAI

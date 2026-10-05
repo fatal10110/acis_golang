@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
@@ -210,8 +209,7 @@ func infoPetTemplate() *npc.Template {
 		ID: infoPetID, Name: "Wolf", Level: 10, Type: "Pet",
 		STR: 40, CON: 43, DEX: 30, INT: 22, WIT: 20, MEN: 20,
 		BaseAttackRange: 40, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 8, CollisionHeight: 20,
-		AIParams: commons.NewStatSet(),
-		Pet:      &npc.PetData{Food1: 2515, AutoFeedLimit: 0.55, HungryLimit: 0.3, UnsummonLimit: 0.1, Levels: map[int]npc.PetLevelStats{10: row, 11: row}},
+		Pet: &npc.PetData{Food1: 2515, AutoFeedLimit: 0.55, HungryLimit: 0.3, UnsummonLimit: 0.1, Levels: map[int]npc.PetLevelStats{10: row, 11: row}},
 	}
 }
 
@@ -278,7 +276,7 @@ func infoServitorTemplate() *npc.Template {
 	return &npc.Template{
 		ID: infoServitorID, TemplateID: infoServitorID, Type: "Servitor", Name: "Reanimated Man", Level: 20, Race: npc.RaceUndead,
 		HPMax: 500, MPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, BaseAttackRange: 40,
-		CollisionRadius: 8, CollisionHeight: 20, CorpseTime: 7, AIParams: commons.NewStatSet(),
+		CollisionRadius: 8, CollisionHeight: 20, CorpseTime: 7,
 	}
 }
 
@@ -366,7 +364,7 @@ func infoGrocer() *npc.Template {
 		BaseAttackRange: 40, BaseDamageRange: []int{0, 0, 80, 120}, BaseRandomDamage: 30, Race: npc.RaceHumanoid,
 		STR: 40, CON: 43, DEX: 30, INT: 21, WIT: 20, MEN: 82,
 		HPMax: 2444, MPMax: 1300, PAtk: 500, MAtk: 300, PDef: 400, MDef: 350, AtkSpd: 253, CritRate: 4,
-		RunSpeed: 120, WalkSpeed: 60, Undying: true, CanMove: true, AIParams: commons.NewStatSet(),
+		RunSpeed: 120, WalkSpeed: 60, Undying: true, CanMove: true,
 	}
 }
 
@@ -393,7 +391,7 @@ func infoWolf() *npc.Template {
 		BaseDamageRange: []int{0, 0, 40, 40}, Race: npc.RaceBeast,
 		Clans: []string{"wolf_clan", "beast_clan"}, ClanRange: 300, IgnoredIDs: []int{20121},
 		HPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 8, CollisionHeight: 20,
-		CanBeAttacked: true, CanMove: true, AIParams: commons.NewStatSet(),
+		CanBeAttacked: true, CanMove: true,
 		Drops: []item.DropCategory{
 			{Kind: item.DropNormal, Chance: 70, Drops: drops},
 			{Kind: item.DropCurrency, Chance: 100, Drops: []item.Drop{{ItemID: item.AdenaID, Min: 1000, Max: 1000, Chance: 100}}},

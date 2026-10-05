@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -46,7 +45,7 @@ func TestNpcSpawnInstallsAIConfig(t *testing.T) {
 			respawn, _ := task.NewRespawn(nopRespawnEffects{}, time.Now)
 			walker, _ := task.NewWalker(nil, noRouteWalkerPath{}, time.Now, state)
 			tmpl := func(id int, kind string, aggroRange int) *npc.Template {
-				return &npc.Template{ID: id, TemplateID: id, Type: kind, Level: 11, HPMax: 100, RunSpeed: 100, AggroRange: aggroRange, AIParams: commons.NewStatSet()}
+				return &npc.Template{ID: id, TemplateID: id, Type: kind, Level: 11, HPMax: 100, RunSpeed: 100, AggroRange: aggroRange}
 			}
 			_, err = NewNpcsWithMaxBuffsAmount(NewSpawns(table, nil), npc.NewTable([]*npc.Template{tmpl(1, "Guard", 300), tmpl(2, "Monster", 300)}),
 				fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),

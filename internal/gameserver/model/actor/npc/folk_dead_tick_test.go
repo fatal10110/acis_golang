@@ -28,7 +28,7 @@ func TestDeadFolkTickBeforeAbortCastDoesNotIdle(t *testing.T) {
 		t.Fatal("lethal hit reported no kill")
 	}
 	// The death's AbortCast reset is posted, not run: the tick runs first.
-	if r.f.cast.lifeTime == 0 {
+	if r.f.cast.lifeTime.Load() == 0 {
 		t.Fatal("lifetime already reset before the queued AbortCast ran")
 	}
 	before := len(r.events.events)

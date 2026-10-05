@@ -3,7 +3,6 @@ package manager
 import (
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -66,7 +65,6 @@ func TestLiveHostileMoveHomeTeleportsThroughLocatedRef(t *testing.T) {
 			ID:          9001,
 			Type:        "Monster",
 			RunSpeed:    100,
-			AIParams:    commons.NewStatSet(),
 			NoSleepMode: true,
 		},
 		Kind:    "SiegeGuard",
@@ -129,7 +127,7 @@ func TestLiveHostileMoveHomeTeleportsThroughLocatedRef(t *testing.T) {
 func TestHostileControlClosesAbortedCastWithCancelAnimation(t *testing.T) {
 	inst := &npc.Instance{
 		ObjectID: 7,
-		Template: &npc.Template{ID: 9001, Type: "Monster", RunSpeed: 100, AIParams: commons.NewStatSet()},
+		Template: &npc.Template{ID: 9001, Type: "Monster", RunSpeed: 100},
 		Kind:     "Monster",
 	}
 	state := world.New()
@@ -173,7 +171,7 @@ func newTeleportTestHostile(t *testing.T, id int32, geo move.Geo, zones *zone.In
 	t.Helper()
 	inst := &npc.Instance{
 		ObjectID: id,
-		Template: &npc.Template{ID: 9001, Type: "Monster", RunSpeed: 100, CanMove: true, AIParams: commons.NewStatSet()},
+		Template: &npc.Template{ID: 9001, Type: "Monster", RunSpeed: 100, CanMove: true},
 		Kind:     "Monster",
 	}
 	hostile, _, err := newLiveHostile(inst, 100, geo, task.NewPositionUpdates(state), zerolog.Nop(), nil, actorcast.EffectHandlers{}, nil, 20, 0, zones, effect.Env{}, npcQueues().NewQueue("npc"))

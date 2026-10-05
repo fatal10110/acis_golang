@@ -246,16 +246,24 @@ func (h *Hostile) RechargeShots(physical, magic bool) {
 // roll (the MonsterBehavior, WarriorBase and WizardBase scripts): on every
 // landed hit, an NPC configured with a nonzero
 // SoulShot/SpiritShot AI parameter rolls its matching *Rate parameter
-// (percent, [0,100)) and recharges that shot type on success. Callers are
-// the same three HP-reduction paths that record attacker hate — TakeDamage,
-// ReduceHP, and ReduceHPByDOT — since every HP reduction (DOT included)
-// records hate and then runs the attacked hook.
+// (percent, [0,100), the spawn's value before the template's) and
+// recharges that shot type on success. Callers are the same three
+// HP-reduction paths that record attacker hate — TakeDamage, ReduceHP, and
+// ReduceHPByDOT — since every HP reduction (DOT included) records hate and
+// then runs the attacked hook.
 func (h *Hostile) RollAttackedShotRecharge() {
-	physical := h.CurrentSoulshotCount() > 0 && h.soulshotRate > 0 && h.Roll(100) < h.soulshotRate
-	magic := h.CurrentSpiritshotCount() > 0 && h.spiritshotRate > 0 && h.Roll(100) < h.spiritshotRate
+	physical := h.CurrentSoulshotCount() > 0 && h.rollShotRate("SoulShotRate")
+	magic := h.CurrentSpiritshotCount() > 0 && h.rollShotRate("SpiritShotRate")
 	if physical || magic {
 		h.RechargeShots(physical, magic)
 	}
+}
+
+// rollShotRate reads the percent AI parameter name and rolls it. A rate of
+// zero or less never rolls.
+func (h *Hostile) rollShotRate(name string) bool {
+	rate := int(h.AIInt(name, 0))
+	return rate > 0 && h.Roll(100) < rate
 }
 
 func (h *Hostile) broadcastShotRecharge(skillID int32) {

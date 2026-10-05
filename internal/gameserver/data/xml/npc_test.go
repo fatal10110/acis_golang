@@ -131,9 +131,9 @@ func TestLoadNPCTemplates(t *testing.T) {
 
 		wantAI := map[string]string{"MoveAroundSocial": "0", "MoveAroundSocial1": "0", "MoveAroundSocial2": "0"}
 		for k, v := range wantAI {
-			got, err := gremlin.AIParams.GetString(k)
-			if err != nil || got != v {
-				t.Fatalf("Gremlin AIParams[%q] = %q, %v, want %q", k, got, err, v)
+			got, ok := gremlin.AIParams[k]
+			if !ok || got != v {
+				t.Fatalf("Gremlin AIParams[%q] = %q, %v, want %q", k, got, ok, v)
 			}
 		}
 

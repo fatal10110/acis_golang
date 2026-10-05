@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
@@ -184,7 +183,7 @@ func TestAdminReloadSwapsTheTables(t *testing.T) {
 
 // renamedWolfTemplates are spawnTemplates with the wolf renamed.
 func renamedWolfTemplates() *npc.Table {
-	out := []*npc.Template{{ID: wolfID, TemplateID: wolfID, Type: "Monster", Name: "Dire Wolf", Level: 1, HPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CanMove: true, AIParams: commons.NewStatSet()}}
+	out := []*npc.Template{{ID: wolfID, TemplateID: wolfID, Type: "Monster", Name: "Dire Wolf", Level: 1, HPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CanMove: true}}
 	for _, tmpl := range spawnTemplates().All() {
 		if tmpl.ID != wolfID {
 			out = append(out, tmpl)

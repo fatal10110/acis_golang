@@ -2,22 +2,21 @@ package npc
 
 import (
 	"math"
+	"strconv"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-func partyAI(partyType, loyalty int) *commons.StatSet {
-	set := commons.NewStatSet()
-	set.Set("Party_Type", partyType)
+func partyAI(partyType, loyalty int) AIParams {
+	params := AIParams{"Party_Type": strconv.Itoa(partyType)}
 	if loyalty != 0 {
-		set.Set("Party_Loyalty", loyalty)
+		params["Party_Loyalty"] = strconv.Itoa(loyalty)
 	}
-	return set
+	return params
 }
 
 func partyHostile(t *testing.T, id int32, partyType int, move ai.MoveController) *Hostile {
@@ -185,7 +184,7 @@ func spawnPartyWorld(t *testing.T, actors ...*Hostile) *world.State {
 func TestStationaryMinionHoldsAttackWhenPlayableInRange(t *testing.T) {
 	master := partyHostile(t, 1, 2, &hostileMove{})
 	minion := partyHostile(t, 2, 1, &hostileMove{})
-	minion.Instance.Template.AIParams.Set("MovingAttack", 0)
+	minion.Instance.Template.AIParams["MovingAttack"] = "0"
 	minion.Instance.Template.AggroRange = 500
 	master.AddMinion(minion)
 	minion.SetMaster(master)
@@ -214,7 +213,7 @@ func TestStationaryMinionHoldsAttackWhenPlayableInRange(t *testing.T) {
 func TestStationaryMinionDropsAttackWhenPlayableOutOfRangeAndIsTopDesire(t *testing.T) {
 	master := partyHostile(t, 1, 2, &hostileMove{})
 	minion := partyHostile(t, 2, 1, &hostileMove{})
-	minion.Instance.Template.AIParams.Set("MovingAttack", 0)
+	minion.Instance.Template.AIParams["MovingAttack"] = "0"
 	minion.Instance.Template.AggroRange = 20
 	master.AddMinion(minion)
 	minion.SetMaster(master)
