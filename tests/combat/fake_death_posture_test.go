@@ -163,7 +163,16 @@ func TestLateGetUpEndFreesThroneOfLaterSit(t *testing.T) {
 		t.Fatalf("after the stand and sit requests StandingNow=%v throne busy=%v, want getting up, the sit queued", victim.StandingNow(), throne.Busy())
 	}
 
-	srv.AdvanceUntil(t, "get-ups ended", func() bool { return !victim.StandingNow() })
+	// A driven clock ends both get-ups in the same step. On the wall clock
+	// each runs on its own timer, so the first end can clear StandingNow and
+	// start the queued sit before the second has run: wait there until the
+	// sit is under way on a free throne. The sit claims the throne before it
+	// raises SittingNow, so only the second end's release reaches that state.
+	gotUp := func() bool { return !victim.StandingNow() }
+	if !srv.DrivesClock() {
+		gotUp = func() bool { return !victim.StandingNow() && victim.SittingNow() && !throne.Busy() }
+	}
+	srv.AdvanceUntil(t, "get-ups ended", gotUp)
 	if !victim.SittingNow() || victim.Standing() {
 		t.Fatalf("after the get-ups SittingNow=%v Standing=%v, want the queued sit under way", victim.SittingNow(), victim.Standing())
 	}
