@@ -187,7 +187,8 @@ func bootPickupQueuedMidCast(t *testing.T, back int) (*gameservertest.Server, in
 // (PlayableAI.java:198-205). The refused tryToIdle and PlayerCast.stop answer
 // one each (PlayableAI.java:354-360, PlayerCast.java:381-387), and the
 // abort's target reset one more (Player.setTarget(null),
-// Player.java:2497-2499), before TeleportToLocation. The item stays on the ground in reach or not.
+// Player.java:2497-2499), before TeleportToLocation. The item stays on the
+// ground in reach or not.
 func TestTeleportMidCastRefusesQueuedPickup(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
