@@ -98,8 +98,8 @@ func TestHookPointNoDesireOnEventIdle(t *testing.T) {
 
 // TestHookPointSeeCreatureOpensOnlyThePeriodicCycle pins the see-creature
 // point at the start of the periodic cycle, ahead of desire selection: a
-// desire queued there is taken up by the same cycle. Event and continue
-// passes open no point.
+// desire queued there is taken up by the same cycle. Event passes open no
+// point; the continue pass is pinned in attackable_hook_point_continue_test.go.
 func TestHookPointSeeCreatureOpensOnlyThePeriodicCycle(t *testing.T) {
 	owner := actor(1)
 	owner.x = 100
@@ -109,7 +109,7 @@ func TestHookPointSeeCreatureOpensOnlyThePeriodicCycle(t *testing.T) {
 		t.Fatalf("first TickThink() error: %v", err)
 	}
 	for name, pass := range map[string]func() error{
-		"RunAI": brain.RunAI, "Think": brain.Think, "AttackFinished": brain.AttackFinished,
+		"RunAI": brain.RunAI, "AttackFinished": brain.AttackFinished,
 	} {
 		owner.hooks.points = nil
 		if err := pass(); err != nil {

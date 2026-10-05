@@ -141,11 +141,11 @@ func (f *Folk) AbortCast() {
 func (f *Folk) Tick() {}
 
 // TickThink runs one AI tick on f's queue: the see-creature point opens
-// it, then invalid cast desires are dropped and the heaviest one left is acted on unless a cast is in
-// flight; an NPC with no desire left and no cast in flight idles, unless it
-// walks a route; and every third tick the cast desires lose weight, an NPC
-// still acting on one switching to its run stance. A dead NPC's tick does
-// nothing.
+// it, then invalid cast desires are dropped and the heaviest one left is
+// acted on unless a cast is in flight; an NPC with no desire left and no
+// cast in flight idles, unless it walks a route; and every third tick the
+// cast desires lose weight, an NPC still acting on one switching to its
+// run stance. A dead NPC's tick does nothing.
 func (f *Folk) TickThink() error {
 	if f.Dead() {
 		return nil

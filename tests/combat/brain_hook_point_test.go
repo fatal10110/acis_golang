@@ -194,8 +194,17 @@ func TestBrainCyclesDuringAFight(t *testing.T) {
 	c.Send(encodeAttackRequest(id, int32(x), int32(y), int32(z), false))
 	frames := readUntilFrame(t, c, serverpackets.OpcodeStatusUpdate, id, "monster HP StatusUpdate")
 	// The hit's damage messages depend on its rolls (a critical adds one),
-	// so only the object frames are pinned.
-	frames = slices.DeleteFunc(frames, func(f []byte) bool { return f[0] == serverpackets.OpcodeSystemMessage })
+	// so only the object frames are pinned. The player keeps swinging on the
+	// wall clock, and on a loaded run its next swing can start before the
+	// monster reacts, so only its first Attack is pinned.
+	playerSwings := 0
+	frames = slices.DeleteFunc(frames, func(f []byte) bool {
+		if f[0] == serverpackets.OpcodeAttack && int32(binary.LittleEndian.Uint32(f[1:5])) == objID {
+			playerSwings++
+			return playerSwings > 1
+		}
+		return f[0] == serverpackets.OpcodeSystemMessage
+	})
 	want := []monsterFrame{
 		{serverpackets.OpcodeAttack, objID},
 		{serverpackets.OpcodeAutoAttackStart, objID},

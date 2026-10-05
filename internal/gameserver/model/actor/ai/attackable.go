@@ -713,8 +713,9 @@ const (
 
 // Think advances the current intention once, for a bow's reuse ending and
 // a control effect ending; an arrival does not think. It never selects a
-// queued desire, even from idle, follow or wander, and does not run
-// empty-queue idle abort: RunAI and TickThink do both. A walk an arrival
+// queued desire, even from idle, follow or wander, and never idles a busy
+// actor on an empty queue: RunAI and TickThink do both. An actor already
+// idle repeats its idle step and opens the no-desire point. A walk an arrival
 // finished is still current, so Think steps it again; a wander it finished
 // takes no step. A non-nil return
 // reports that an intention step ran but a broadcast within it failed; the
@@ -779,6 +780,9 @@ func (a *Attackable) think(mode thinkMode) error {
 	defer a.mu.Unlock()
 
 	updateTick := mode == thinkTick
+	// Only an actor idle when the pass starts repeats its idle step on a
+	// continue pass; one this pass drops to idle takes no step.
+	idleAtStart := a.current.kind == IntentionIdle
 	// The first-cycle promotion gate is decided before the see-creature
 	// point: an attack desire queued there does not open it.
 	instantRun := a.lifeTime == 0 && a.desires.hasKind(IntentionAttack)
@@ -839,7 +843,7 @@ func (a *Attackable) think(mode thinkMode) error {
 			a.idleAndRequeue()
 		}
 		if mode == thinkAttackFinished && canPromote {
-			return a.continueCurrent()
+			return a.continueCurrent(idleAtStart)
 		}
 		return nil
 	}
@@ -847,7 +851,7 @@ func (a *Attackable) think(mode thinkMode) error {
 		return nil
 	}
 	if mode == thinkContinue {
-		return a.continueCurrent()
+		return a.continueCurrent(idleAtStart)
 	}
 	err := a.promoteAndStep()
 	if idleAfterLatch {
@@ -873,11 +877,17 @@ func (a *Attackable) idleAndRequeue() {
 // TickThink. It neither takes nor updates the attack latch, leaves
 // lastDesire to desire selection, and does not re-select on a lost target.
 // A walk steps even when an arrival already finished it: one that stopped
-// short of its destination sets off again. Idle and wander take no step: a
-// truly idle actor already went through thinkIdle, so it stands walking
-// with nothing left to abort, and the continue pass has no wander step.
-func (a *Attackable) continueCurrent() error {
+// short of its destination sets off again. An actor that was idle when the
+// pass started (wasIdle) runs the idle step again, so the no-desire point
+// opens, but queues no idle follow or wander: that is the periodic cycle's.
+// An intention this pass dropped to idle takes no step. The continue pass
+// has no wander step.
+func (a *Attackable) continueCurrent(wasIdle bool) error {
 	switch a.current.kind {
+	case IntentionIdle:
+		if wasIdle {
+			a.thinkIdle()
+		}
 	case IntentionAttack:
 		_, err := a.thinkAttack()
 		return err
