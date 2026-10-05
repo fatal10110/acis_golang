@@ -30,6 +30,13 @@ This is **not** an official project. It is a standalone educational demonstratio
 
 This codebase is provided as-is for educational and research purposes. Users are solely responsible for ensuring their use complies with all applicable laws and regulations.
 
+## Running a server
+
+- [docs/run-servers.md](docs/run-servers.md): build and run the login and game servers directly.
+- [docs/ops/docker.md](docs/ops/docker.md): run MariaDB and both servers with Docker Compose.
+- [docs/ops/backup-restore.md](docs/ops/backup-restore.md): back up and restore the database, config and crests.
+- [docs/ops/migrating-from-java.md](docs/ops/migrating-from-java.md): move an aCis Java installation to the Go servers. It keeps the same database, config, datapack and geodata.
+
 ## Oracle diff tooling
 
 `cmd/datadiff` writes stable, field-level dumps for the M3 loader categories currently wired into the Go port and can compare them against an expected dump:

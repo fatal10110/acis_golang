@@ -1,0 +1,13 @@
+.git
+.github
+.githooks
+.worktrees
+config
+log
+backups
+docs
+tests
+ops
+**/testdata
+*.test
+*.out
