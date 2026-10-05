@@ -308,6 +308,15 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					reason = serverpackets.CharDeleteFailReasonClanLeaderMayNotDelete
 				}
 				session.SendFrame(serverpackets.FrameCharDeleteFail(reason))
+			} else if l.roster.PurgesOnDelete() && l.awaitPersistence(conn) != nil {
+				// An immediate purge deletes the character's rows, and its
+				// pets rows, inline. A save still queued, such as the pets
+				// row of a pet returned just before, would write its row back
+				// after them, so the purge waits for every lane first: a
+				// returned pet's row is on its collar's lane, which nothing
+				// the character's restart waited on. A wait that gave up
+				// fails the delete rather than purge under those saves.
+				session.SendFrame(serverpackets.FrameCharDeleteFail(serverpackets.CharDeleteFailReasonDeletionFailed))
 			} else if err := l.roster.MarkForDeletion(ctx, c.ID); err != nil {
 				l.log.Error().Err(err).Msg("mark character for deletion")
 				session.SendFrame(serverpackets.FrameCharDeleteFail(serverpackets.CharDeleteFailReasonDeletionFailed))
