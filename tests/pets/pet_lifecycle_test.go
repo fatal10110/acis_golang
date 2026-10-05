@@ -84,8 +84,8 @@ func TestGetItemFromPetReturnsStackToOwner(t *testing.T) {
 }
 
 // TestPetPickupGroundItem commands the pet to loot a dropped stack: GetItem
-// names the pet as picker, the ground object despawns, and the stack lands
-// in the pet's carried inventory.
+// names the pet as picker, the ground object despawns, the owner reads
+// PET_PICKED_S1_ADENA, and the stack lands in the pet's carried inventory.
 func TestPetPickupGroundItem(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: item.AdenaID, Count: 40})
@@ -113,6 +113,7 @@ func TestPetPickupGroundItem(t *testing.T) {
 		t.Fatalf("GetItem ground id = %d, want %d", got, groundID)
 	}
 	assertFrameOpcode(t, mustRead(t, h.client, "DeleteObject"), serverpackets.OpcodeDeleteObject, "DeleteObject")
+	requirePetPicked(t, [][]byte{mustRead(t, h.client, "PET_PICKED_S1_ADENA")}, petPickedS1Adena, smParam{smParamItemNumber, 40})
 
 	h.srv.InventoryUpdates.Tick()
 	assertFrameOpcode(t, mustRead(t, h.client, "PetInventoryUpdate"), serverpackets.OpcodePetInventoryUpdate, "PetInventoryUpdate")

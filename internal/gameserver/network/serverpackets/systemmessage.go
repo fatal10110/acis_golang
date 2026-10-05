@@ -143,6 +143,10 @@ const (
 	SystemMessageNoMoreSkillsToLearn               = 750
 	SystemMessageObserversCannotParticipate        = 781
 	SystemMessagePetCannotUseItem                  = 972
+	SystemMessagePetPickedS1                       = 1020 // item-name parameter
+	SystemMessagePetPickedS2S1S                    = 1021 // item-name then item-number parameter
+	SystemMessagePetPickedS1S2                     = 1022 // number (enchant) then item-name parameter
+	SystemMessagePetPickedS1Adena                  = 1023 // item-number parameter
 	SystemMessagePetPutOnS1                        = 1024
 	SystemMessagePetTookOffS1                      = 1025
 	SystemMessageItemCrystallized                  = 1258

@@ -274,6 +274,8 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 
 	if herb {
 		l.consumePetHerb(live, pet, petInv, ground.Instance.Clone())
+	} else {
+		live.SendFrame(petPickedFrame(ground.Instance.Snapshot()))
 	}
 	l.applyPersistActions(persist)
 	end()
@@ -310,6 +312,23 @@ func (l *GameClientLink) broadcastPetPickupAttention(owner *livePlayer, ground *
 		)
 	}
 	l.broadcastToSelfAndKnownInRadius(owner, pickupAttentionRadius, frame)
+}
+
+// petPickedFrame is the line a pet's owner reads when the pet keeps a ground
+// item it picked up (Pet.addItem with sendMessage): adena by amount, then
+// enchanted gear by enchant level, then a stack by count, else the item
+// alone.
+func petPickedFrame(st item.InstanceState) wire.Frame {
+	switch {
+	case st.TemplateID == item.AdenaID:
+		return serverpackets.FrameSystemMessageParams(serverpackets.SystemMessagePetPickedS1Adena, serverpackets.ItemNumberParam(int32(st.Count)))
+	case st.EnchantLevel > 0:
+		return serverpackets.FrameSystemMessageNumberItemName(serverpackets.SystemMessagePetPickedS1S2, int32(st.EnchantLevel), st.TemplateID)
+	case st.Count > 1:
+		return serverpackets.FrameSystemMessageItemNameItemNumber(serverpackets.SystemMessagePetPickedS2S1S, st.TemplateID, int32(st.Count))
+	default:
+		return serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetPickedS1, st.TemplateID)
+	}
 }
 
 func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req clientpackets.RequestPetUseItem) {

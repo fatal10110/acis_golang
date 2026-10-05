@@ -532,7 +532,6 @@ func (l *GameClientLink) refreshLiveLevelSkills(live *livePlayer) {
 	if err := l.giveOrRewardSkills(live.Character, live.Template()); err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("level change: refresh level skills")
 	}
-	live.RefreshExpertisePenalty()
 
 	// RewardSkills' grant loop refreshes shortcuts only for skills its own
 	// filter (known level below the granted level) restricts to level
