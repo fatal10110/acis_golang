@@ -11,6 +11,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -60,6 +63,9 @@ type npcSpawnDeps struct {
 	makers    *spawn.Table
 	dropRates item.Rates
 	log       zerolog.Logger
+	// sevenSigns is the state the Seven Signs groups follow, and whose
+	// period changes swap them.
+	sevenSigns *sevensigns.State
 }
 
 // WithDataReloads gives the link the //reload and //respawnall hooks; by
@@ -98,11 +104,16 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	npcs, err := gamemanager.NewNpcsWithMaxBuffsAmount(gamemanager.NewSpawns(deps.makers, nil), templates, deps.geo, deps.state, deps.ids,
 		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Rates: deps.dropRates}, time.Now, deps.log,
 		nil, actorcast.EffectHandlers{}, walker, network.HostileSinks(deps.state, deps.stance), link.FolkSinks(deps.state, deps.stance),
-		20, 0, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues)
+		20, 0, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues,
+		script.NewMakers(maker.Catalog(), maker.Default, deps.log))
 	if err != nil {
 		t.Fatalf("new npc spawns: %v", err)
 	}
 	link.SetNpcSpawns(npcs)
+	if deps.sevenSigns != nil {
+		deps.sevenSigns.SetSpawns(npcs)
+		npcs.StartSevenSigns(deps.sevenSigns)
+	}
 	return npcs, respawn
 }
 

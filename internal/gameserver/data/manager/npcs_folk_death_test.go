@@ -99,7 +99,7 @@ func TestMortalFolkDecaysAndRespawnsThroughItsSlot(t *testing.T) {
 		{ID: 1, TemplateID: 1, Type: "Folk", Name: "Huge Cursed Pig", Level: 1, HPMax: 100, CorpseTime: 7},
 		{ID: 2, TemplateID: 2, Type: "Merchant", Name: "Lector", Level: 1, HPMax: 100, CorpseTime: 7, Undying: true},
 	}), fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
-		&recordingGround{}, KillRewardConfig{}, clock, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, queues)
+		&recordingGround{}, KillRewardConfig{}, clock, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, queues, testMakers())
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}

@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"slices"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -40,10 +41,12 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 	}
 	n.walker.StopRouteByID(actorID)
 
-	// A maker whose spawn event is no longer listed keeps its dead NPC
-	// gone, like a spawn with no respawn delay.
+	if g := slot.group; g != nil {
+		return func() { n.groupNPCDeleted(g, slot) }
+	}
+
 	delay := spawn.CalculateRespawnDelay(slot.entry)
-	if delay <= 0 || !n.events.allows(slot.maker) {
+	if delay <= 0 {
 		n.mu.Lock()
 		delete(n.slot, key)
 		n.mu.Unlock()
@@ -51,6 +54,43 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 	}
 
 	return func() { n.scheduleRespawn(slot, delay) }
+}
+
+// groupNPCDeleted answers the NPC of an npcmaker's slot leaving the world:
+// the maker decides whether it respawns, then a database-tracked row
+// records a respawn time of its own when the spawn respawns at all, and a
+// spawn that never respawns drops its slot.
+func (n *Npcs) groupNPCDeleted(g *makerGroup, slot slotInfo) {
+	g.behavior.NPCDeleted(g, groupSpawn{g: g, i: slot.spawnIdx}, groupNPC{n: n, key: slot.key})
+
+	now := n.now()
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	if slot.entry.RespawnDelay <= 0 {
+		n.dropGroupSlotLocked(g, slot)
+		return
+	}
+	if slot.dbName == "" {
+		return
+	}
+	if _, ok := n.slot[slot.key]; !ok {
+		return
+	}
+	if state, ok := n.spawns.State(slot.dbName); ok {
+		state.SetRespawn(spawn.CalculateRespawnDelay(slot.entry), now)
+	}
+}
+
+// dropGroupSlotLocked drops the slot of g. The caller holds n.mu.
+func (n *Npcs) dropGroupSlotLocked(g *makerGroup, slot slotInfo) {
+	if _, ok := n.slot[slot.key]; !ok {
+		return
+	}
+	delete(n.slot, slot.key)
+	keys := g.keys[slot.spawnIdx]
+	if i := slices.Index(keys, slot.key); i >= 0 {
+		g.keys[slot.spawnIdx] = slices.Delete(keys, i, i+1)
+	}
 }
 
 // Remove takes h out of the world at once, with no corpse and no decay
@@ -90,12 +130,23 @@ func (n *Npcs) scheduleRespawn(slot slotInfo, delay time.Duration) {
 func (n *Npcs) Respawn(key string) {
 	n.gate.RLock()
 	defer n.gate.RUnlock()
+	n.respawnSlot(key)
+}
+
+// respawnSlot brings back the NPC of the slot key, a database-tracked one
+// with its saved respawn time cleared first. A slot whose NPC is in the
+// world, or is being placed, is left alone.
+func (n *Npcs) respawnSlot(key string) {
 	n.mu.Lock()
 	slot, ok := n.slot[key]
-	n.mu.Unlock()
-	if !ok {
+	if !ok || slot.spawning || n.liveLocked(key) {
+		n.mu.Unlock()
 		return
 	}
+	slot.spawning = true
+	n.slot[key] = slot
+	n.mu.Unlock()
+	defer n.endSpawn(key)
 
 	tmpl := slot.tmpl
 	if tmpl == nil {
@@ -120,6 +171,7 @@ func (n *Npcs) Respawn(key string) {
 		if !ok {
 			state = spawn.NewState(slot.dbName)
 		}
+		state.CancelRespawn()
 		n.spawnPersisted(key, slot.maker, slot.entry, tmpl, state)
 		return
 	}
