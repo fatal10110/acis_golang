@@ -131,6 +131,16 @@ func (a *AIController) CanDesire(target attackable.Combatant, ref modelskill.Ref
 	return def.HPConsume <= 0 || def.HPConsume <= actor.HP()
 }
 
+// SkillMP is the MP ref's data says its cast and its hit take together,
+// before any consume-rate stat; 0 for an unknown skill.
+func (a *AIController) SkillMP(ref modelskill.Ref) int {
+	def, ok := a.definition(ref)
+	if !ok {
+		return 0
+	}
+	return def.MPConsume + def.MPInitialConsume
+}
+
 // CanCast validates the final HP/MP/mute/reuse/item gates immediately before
 // the cast commits.
 func (a *AIController) CanCast(target attackable.Combatant, ref modelskill.Ref) bool {

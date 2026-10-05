@@ -139,3 +139,28 @@ func (n clanHallNotices) TellClan(cl *clan.Clan, notice clanhall.Notice) {
 	}
 	n.l.broadcastToClan(cl, 0, build)
 }
+
+// hallOccupants are the players inside the grounds of hall hallID: the
+// first clan hall zone the zone data gives that hall.
+func (l *GameClientLink) hallOccupants(hallID int32) []zone.Actor {
+	if l.zones == nil {
+		return nil
+	}
+	var grounds *zone.ClanHall
+	for _, hall := range zone.OfKind[*zone.ClanHall](l.zones) {
+		if int32(hall.ResidenceID) == hallID {
+			grounds = hall
+			break
+		}
+	}
+	if grounds == nil {
+		return nil
+	}
+	var players []zone.Actor
+	for _, a := range grounds.Occupants() {
+		if _, ok := a.(*liveZoneActor); ok {
+			players = append(players, a)
+		}
+	}
+	return players
+}

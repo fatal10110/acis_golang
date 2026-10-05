@@ -282,6 +282,8 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		l.claimHero(live)
 	case npc.BypassAuction:
 		l.auctioneerBypass(live, f, command)
+	case npc.BypassClanHallManager:
+		l.clanHallManagerBypass(live, f, command)
 	case npc.BypassOlympiadNoble:
 		l.olympiadNobleBypass(live, f, reply.Index)
 	case npc.BypassClassRanking:
