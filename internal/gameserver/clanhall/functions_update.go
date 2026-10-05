@@ -75,7 +75,9 @@ func (f *Functions) nowLocked() int64 {
 	return f.queue.Now().UnixMilli()
 }
 
-// stopLocked stops fn's fee timer; a fee already under way charges nothing.
+// stopLocked stops fn's fee timer. A fee already under way leaves fn as it
+// is: one not yet at the warehouse charges nothing, and one there neither
+// re-arms, re-stores nor removes fn once the warehouse answers.
 func (f *Functions) stopLocked(fn *rented) {
 	if fn.timer != nil {
 		fn.timer.Stop()
