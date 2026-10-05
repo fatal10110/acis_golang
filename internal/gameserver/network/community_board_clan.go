@@ -1,9 +1,9 @@
 package network
 
 import (
-	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -44,7 +44,7 @@ func (l *GameClientLink) boardClan(live *livePlayer, command string) {
 	if len(tokens) < 3 {
 		return
 	}
-	n, err := strconv.ParseInt(tokens[2], 10, 32)
+	n, err := commons.ParseInt(tokens[2], 32)
 	if err != nil {
 		return
 	}
@@ -98,7 +98,7 @@ func (l *GameClientLink) boardClanWrite(live *livePlayer, args [5]string) {
 
 // boardFormClan returns the player's clan when a clan form names it by id.
 func (l *GameClientLink) boardFormClan(live *livePlayer, id string) (*clan.Clan, bool) {
-	n, err := strconv.ParseInt(id, 10, 32)
+	n, err := commons.ParseInt(id, 32)
 	if err != nil || int32(n) != l.boardClanID(live) {
 		return nil, false
 	}

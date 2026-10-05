@@ -2,9 +2,9 @@ package clan
 
 import (
 	"context"
-	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 )
 
@@ -318,7 +318,7 @@ func (s *Service) RenameSubunit(c *player.Character, idArg, name string) (Subuni
 	if !ok || !cl.IsLeader(c.ID) {
 		return SubunitChange{}, SubunitNotLeader
 	}
-	id, err := strconv.ParseInt(idArg, 10, 32)
+	id, err := commons.ParseInt(idArg, 32)
 	if err != nil {
 		return SubunitChange{}, SubunitIgnored
 	}

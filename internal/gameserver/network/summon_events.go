@@ -432,14 +432,18 @@ func (l *GameClientLink) reclaimPetCorpse(live *livePlayer) {
 // carried inventory, without a capacity check or a stack merge, since the
 // inventory of a session that left holds nothing; the owner's next login
 // merges the stacks. The rows are written on the owner's persistence lane,
-// ahead of the collar delete the decay queues next.
+// ahead of the collar delete the decay queues next. A selection of the owner
+// under way holds the settle until it ends (settleWithLeftOwner).
 func (l *GameClientLink) settleLeftCorpseItems(actor *summon.Actor) {
 	petInv := actor.PetInventory()
 	if petInv == nil {
 		return
 	}
 	ownerID := actor.OwnerID()
-	offline := func() {
+	l.settleWithLeftOwner(ownerID, func(owner *livePlayer) {
+		l.transferPetInventory(actor, owner.Inventory())
+		l.flushItemPersistence(petInv)
+	}, func() {
 		// The pet's container stops persisting first, so the items leave
 		// it carrying no writer; the owner's rows are written below.
 		l.flushItemPersistence(petInv)
@@ -449,26 +453,7 @@ func (l *GameClientLink) settleLeftCorpseItems(actor *summon.Actor) {
 			petInv.TransferItem(st.ObjectID, st.Count, carried, 0)
 		}
 		l.flushItemPersistence(carried)
-	}
-	owner, ok := l.livePlayerByID(ownerID)
-	if !ok {
-		offline()
-		return
-	}
-	// A session on its way out has queued its inventory's last writes by
-	// the time it is marked detached or its queue refuses this: the owner is
-	// offline then.
-	posted := postLive(owner, func() {
-		if owner.detached() {
-			offline()
-			return
-		}
-		l.transferPetInventory(actor, owner.Inventory())
-		l.flushItemPersistence(petInv)
 	})
-	if !posted {
-		offline()
-	}
 }
 
 // liftLeftPetCollar sets the collar of a pet revived while its owner was
@@ -482,23 +467,10 @@ func (l *GameClientLink) liftLeftPetCollar(actor *summon.Actor) {
 		return
 	}
 	ownerID := actor.OwnerID()
-	offline := func() { l.setOfflineItemEnchant(ownerID, collarID, state.Level) }
-	owner, ok := l.livePlayerByID(ownerID)
-	if !ok {
-		offline()
-		return
-	}
-	posted := postLive(owner, func() {
-		if owner.detached() {
-			offline()
-			return
-		}
+	l.settleWithLeftOwner(ownerID, func(owner *livePlayer) {
 		inv := owner.Inventory()
 		inv.SetEnchantLevel(inv.ItemByObjectID(collarID), state.Level)
-	})
-	if !posted {
-		offline()
-	}
+	}, func() { l.setOfflineItemEnchant(ownerID, collarID, state.Level) })
 }
 
 // currentSummonOwner returns the connected player actor answers to. That is
@@ -552,32 +524,20 @@ type petRowDeleter interface {
 // collar then goes from the owner's current session, on that session's queue,
 // behind the items, or, with the owner offline, straight from the items table
 // on the owner's lane, behind the rows the owner's logout and the items
-// wrote.
+// wrote (settleWithLeftOwner).
 func (l *GameClientLink) destroyDecayedPet(actor *summon.Actor) {
 	itemObjectID := actor.ControlItemID()
-	switch owner, ok := l.currentSummonOwner(actor); {
-	case ok && !actor.OwnerLeft():
-		if inv := owner.Inventory(); inv != nil {
-			inv.DestroyByObjectID(itemObjectID, 1)
-		}
-	case ok:
-		// A session on its way out has queued its inventory's last writes
-		// by the time it is marked detached or its queue refuses this: the
-		// owner is offline then.
-		posted := postLive(owner, func() {
-			if owner.detached() {
-				l.deleteOfflineItem(actor.OwnerID(), itemObjectID)
-				return
-			}
+	if actor.OwnerLeft() {
+		ownerID := actor.OwnerID()
+		l.settleWithLeftOwner(ownerID, func(owner *livePlayer) {
 			if inv := owner.Inventory(); inv != nil {
 				inv.DestroyByObjectID(itemObjectID, 1)
 			}
-		})
-		if !posted {
-			l.deleteOfflineItem(actor.OwnerID(), itemObjectID)
+		}, func() { l.deleteOfflineItem(ownerID, itemObjectID) })
+	} else if owner, ok := liveSummonOwner(actor); ok {
+		if inv := owner.Inventory(); inv != nil {
+			inv.DestroyByObjectID(itemObjectID, 1)
 		}
-	case actor.OwnerLeft():
-		l.deleteOfflineItem(actor.OwnerID(), itemObjectID)
 	}
 	store, ok := l.petStore.(petRowDeleter)
 	if !ok || l.persist == nil {
