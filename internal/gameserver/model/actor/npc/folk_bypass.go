@@ -131,6 +131,9 @@ const (
 	// command the way its chat window answers an interact: Chat says how,
 	// and HTML is the page.
 	BypassSignsChat
+	// BypassTerritoryStatus shows the territory status of this NPC's
+	// castle.
+	BypassTerritoryStatus
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -342,10 +345,12 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	case strings.HasPrefix(command, "EnchantSkillList"):
 		reply.Outcome = BypassEnchantSkillList
 		return reply
-	case strings.EqualFold(command, "TerritoryStatus"), strings.HasPrefix(command, "Quest"):
-		// TerritoryStatus belongs to castles and Quest to the quest engine
-		// (#130): each is checked ahead of Chat, so neither falls through
-		// to it.
+	case strings.EqualFold(command, "TerritoryStatus"):
+		reply.Outcome = BypassTerritoryStatus
+		return reply
+	case strings.HasPrefix(command, "Quest"):
+		// Quest belongs to the quest engine (#130): it is checked ahead of
+		// Chat, so it does not fall through to it.
 		return reply
 	case strings.HasPrefix(command, "Chat"):
 		val := 0
