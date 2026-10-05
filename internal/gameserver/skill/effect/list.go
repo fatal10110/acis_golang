@@ -28,7 +28,9 @@ type StatOwner interface {
 	RemoveStatsByOwner(owner ModOwner)
 	// MaxBuffCount is the number of non-toggle, non-seven-signs buffs the
 	// owner can hold at once (base slot count plus any bonus the owner
-	// grants, e.g. from a known passive).
+	// grants, e.g. from a known passive). The list calls it under its own
+	// lock (the buff-cap eviction and the herb cap check), so it must not
+	// reach back into the list and may take only leaf locks.
 	MaxBuffCount() int
 
 	// UpdateEffectIcons refreshes the owner's effect icons after an add or
@@ -48,7 +50,9 @@ type StatOwner interface {
 // Option changes List behavior.
 type Option func(*List)
 
-// ActivityRegistry records whether a list has effects to tick.
+// ActivityRegistry records whether a list has effects to tick. The list
+// calls SetActive under its own lock, so an implementation must not reach
+// back into any list while holding the lock SetActive takes.
 type ActivityRegistry interface {
 	SetActive(*List, bool)
 }
