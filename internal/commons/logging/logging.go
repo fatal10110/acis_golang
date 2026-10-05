@@ -271,6 +271,13 @@ func Setup(root string, cfg Config, stderr io.Writer) (*Runtime, error) {
 	rt.GMAudit = newLogger(effectiveLevel(cfg.Level, cfg.Levels[SinkGMAudit]), gmFile)
 	rt.Item = newLogger(effectiveLevel(cfg.Level, cfg.Levels[SinkItem]), itemFile)
 
+	// The Go logger reads only the keys in supportedKeys; any other
+	// logging.properties key (a JUL handler option such as encoding, or a
+	// typo) has no effect, so name them once instead of ignoring them silently.
+	if len(cfg.UnsupportedKeys) > 0 {
+		rt.Logger.Warn().Strs("keys", cfg.UnsupportedKeys).Msg("logging.properties keys not supported; ignored")
+	}
+
 	return rt, nil
 }
 
