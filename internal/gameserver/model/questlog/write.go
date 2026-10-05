@@ -72,13 +72,6 @@ func (j *Journal) Seal() {
 	j.sealed = true
 }
 
-// Sealed reports whether Seal has run.
-func (j *Journal) Sealed() bool {
-	j.mu.Lock()
-	defer j.mu.Unlock()
-	return j.sealed
-}
-
 // Dirty reports whether the journal owes the database writes: writes no
 // drain has taken, or writes a drain took and has not yet reported applied.
 func (j *Journal) Dirty() bool {

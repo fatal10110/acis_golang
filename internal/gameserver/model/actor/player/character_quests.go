@@ -22,8 +22,9 @@ func (c *Character) NotifyQuestMarked(questID int32) {
 }
 
 // MarkDetaching marks c as leaving the world and seals its quest journal:
-// from here on no script gives or takes c's items and nothing writes its
-// journal, so nothing lands after the final saves of its departure.
+// from here on nothing writes its journal, so nothing lands after the final
+// saves of its departure. Detaching reports the mark to the item give and
+// take paths, which must refuse once it is set.
 func (c *Character) MarkDetaching() {
 	c.detaching.Store(true)
 	c.quests.Seal()

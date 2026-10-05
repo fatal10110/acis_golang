@@ -416,11 +416,21 @@ func TestDetachingPlayerGetsNoJournalWrite(t *testing.T) {
 		journalRow{objID, q001, "<cond>", val("1")},
 	)
 	enterWorld(t, srv)
-	var left *script.QuestState
+	var (
+		left *script.QuestState
+		char *player.Character
+	)
 	srv.RunQuest(t, objID, q001, func(q *script.Quests, c *player.Character, sc *script.Script) {
 		left = q.State(c, sc)
+		char = c
 	})
+	if char.Detaching() {
+		t.Fatal("a character in the world reports detaching")
+	}
 	restart(t, srv)
+	if !char.Detaching() {
+		t.Fatal("a detached character does not report detaching")
+	}
 	srv.FlushPersistence(t)
 	srv.TakeJournalWrites()
 
