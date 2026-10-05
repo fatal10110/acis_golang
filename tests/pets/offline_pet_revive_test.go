@@ -97,7 +97,11 @@ func (o *offlinePetWorld) npcResurrects(t *testing.T) {
 
 // npcResurrect spawns a monster that can cast a power-100 resurrection
 // beside the owner's spot, has it cast the resurrection on target and lets
-// the hit land.
+// time pass until the cast is over and target stands up.
+//
+// The hit lands from a timer on the monster's queue, which then posts the
+// revive to target's queue. On the wall clock both hops can run after any
+// fixed advance past the 500 ms hit time, so it waits on the outcome itself.
 func npcResurrect(t *testing.T, srv *gameservertest.Server, target *summon.Actor) {
 	t.Helper()
 	ref := modelskill.Ref{ID: npcResurrectID, Level: 1}
@@ -110,8 +114,10 @@ func npcResurrect(t *testing.T, srv *gameservertest.Server, target *summon.Actor
 		CastRange: 400, HitTime: 500, StaticHitTime: true, Power: 100,
 	}}))
 	runOn(t, hostile.Queue(), func() { aiCtl.Cast(target, ref) })
-	srv.Settle(t)
-	srv.Advance(t, 600*time.Millisecond)
+	srv.AdvanceUntil(t, "monster's resurrection landing on its target", func() bool {
+		return !aiCtl.CastingNow() && !target.Dead()
+	})
+	// The revive job may still be sending its frames when Dead flips.
 	srv.Settle(t)
 }
 
