@@ -333,10 +333,13 @@ func TestFriendListAndStatusNotices(t *testing.T) {
 
 // TestFriendListOrder pins the order of the login FriendList and of the
 // /friendlist lines: the iteration order of the hash table the list is
-// gathered into, so by id modulo the table size (the ids here are far below
-// 65536, where the hash's high-half fold changes nothing), not by id. The
-// table starts at 16 buckets and doubles once it holds more than 12 ids, or
-// when a ninth id lands in one bucket.
+// gathered into, so grouped by id modulo the table size (the ids here are
+// far below 65536, where the hash's high-half fold changes nothing), not by
+// id. The table starts at 16 buckets and doubles once it holds more than 12
+// ids, or when a ninth id lands in one bucket. Within a bucket the ids keep
+// the order the relation store walks them, the manager's order; that order
+// is pinned against the reference by the relation package's
+// TestListOrderMatchesReferenceProbe.
 func TestFriendListOrder(t *testing.T) {
 	for _, tc := range []struct {
 		name    string
@@ -370,10 +373,13 @@ func TestFriendListOrder(t *testing.T) {
 					p.srv.Relations.AddFriend(p.aliceID, c.ID)
 				}
 			}
-			want := slices.Clone(ids)
-			slices.SortStableFunc(want, func(a, b int32) int { return int(a%tc.buckets) - int(b%tc.buckets) })
-			if slices.Equal(want, ids) {
+			byBucket := func(a, b int32) int { return int(a%tc.buckets) - int(b%tc.buckets) }
+			if slices.IsSortedFunc(ids, byBucket) {
 				t.Fatalf("friend ids %v already ascend by bucket; the scenario needs ids past one lap", ids)
+			}
+			want := p.srv.Relations.FriendIDs(p.aliceID)
+			if !slices.IsSortedFunc(want, byBucket) || !slices.Equal(slices.Sorted(slices.Values(want)), ids) {
+				t.Fatalf("FriendIDs = %v, want the ids %v grouped by bucket of %d", want, ids, tc.buckets)
 			}
 
 			burst := startInWorld(t, p.alice)
