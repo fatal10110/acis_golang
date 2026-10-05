@@ -61,9 +61,9 @@ against its working directory.
    ```
 
 5. **Check the boot.** The login server logs `listening for gameservers` and `listening for login
-   clients`. The game server logs its data loads, then `linked to loginserver` with the server id
-   from `hexid.txt`, then `listening for game clients`. Log in with an existing account and enter
-   the world with an existing character.
+   clients`. The game server logs its data loads, then `listening for game clients`, and then,
+   once the login link is up, `linked to loginserver` with the server id from `hexid.txt`. Log in
+   with an existing account and enter the world with an existing character.
 
 ### What replaces the reference scripts
 
@@ -108,7 +108,9 @@ The login server unit is the same with `WorkingDirectory=/opt/acis/login` and
 1. Take the cold backup (step 1 above).
 2. Merge the two config directories: copy `gameserver/config/*`, then `login/config/loginserver.properties`
    and `login/config/banned_ips.properties`, into one directory. `hexid.txt` comes along with
-   them. Run `ops/docker/init-config.sh <that directory>`, then skip the registration step.
+   them. Run `ops/docker/init-config.sh <that directory>`, then skip the registration step. The
+   script sets `Login = root` and the `db` root password, because the `db` service creates no
+   other user and the dump does not carry MariaDB users. A dedicated Java DB user is not needed.
 3. Copy `gameserver/data/crests/` and `gameserver/data/xml/announcements.xml` into the datapack
    checkout you point `ACIS_DATAPACK_DIR` at. Use the same datapack version the Java server ran.
 4. `docker compose up -d --wait db`, then load the dump as in

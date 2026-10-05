@@ -10,6 +10,7 @@
 # differ inside the compose network:
 #   server.properties, loginserver.properties:
 #     URL       -> jdbc:mariadb://db/acis      (the db service)
+#     Login     -> root                         (the only user compose creates)
 #     Password  -> $ACIS_DB_ROOT_PASSWORD       (default 123321, as compose)
 #   server.properties:
 #     LoginHost -> loginserver                  (the loginserver service)
@@ -62,6 +63,7 @@ cp -R "$src/." "$dst/"
 
 for f in "$dst/server.properties" "$dst/loginserver.properties"; do
 	set_key "$f" URL "jdbc:mariadb://db/acis"
+	set_key "$f" Login root
 	set_key "$f" Password "$password"
 done
 set_key "$dst/server.properties" LoginHost loginserver

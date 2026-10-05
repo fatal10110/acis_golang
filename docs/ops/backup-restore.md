@@ -35,26 +35,38 @@ of backup:
 ```bash
 stamp=$(date +%Y%m%d-%H%M%S)
 mkdir -p backups
+# Absolute paths, so tar's -C options do not stack. Defaults as in docker-compose.yml.
+cfg=$(cd "${ACIS_CONFIG_DIR:-./config}" && pwd)
+datapack=$(cd "${ACIS_DATAPACK_DIR:-../aCis_datapack}" && pwd)
 
 # Cold backup only: stop the game server first, so its final save is included.
 docker compose --profile servers stop gameserver
 
 docker compose exec -T db sh -c 'exec mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" --single-transaction --routines --triggers --events acis' \
   | gzip > "backups/acis-db-$stamp.sql.gz"
-tar czf "backups/acis-files-$stamp.tar.gz" config \
-  -C "$ACIS_DATAPACK_DIR" data/crests data/xml/announcements.xml
+tar czf "backups/acis-files-$stamp.tar.gz" -C "$(dirname "$cfg")" "$(basename "$cfg")" \
+  -C "$datapack" data/crests data/xml/announcements.xml
 
 # Cold backup only: start it again.
 docker compose --profile servers start gameserver
 
-gzip -t "backups/acis-db-$stamp.sql.gz" && tar tzf "backups/acis-files-$stamp.tar.gz" >/dev/null && echo backup ok
+gzip -t "backups/acis-db-$stamp.sql.gz" \
+  && tar tzf "backups/acis-files-$stamp.tar.gz" "$(basename "$cfg")/hexid.txt" "$(basename "$cfg")/server.properties" \
+       data/crests data/xml/announcements.xml >/dev/null \
+  && echo backup ok
 ```
 
 The password is read from inside the `db` container, so it never appears on the host command
 line. `backups/` is ignored by git. Copy it off the host: a backup kept on the same disk does not
 survive losing that disk.
 
-For a nightly hot backup, put the four `stamp` to `tar` lines in a script and call it from cron.
+The archive stores the config directory under its own name (`config` by default) and the datapack
+files under `data/`. The last command prints `backup ok` only when the dump is intact and the
+archive holds `hexid.txt`, `server.properties`, the crests and the announcements, so a wrong
+`ACIS_CONFIG_DIR` or `ACIS_DATAPACK_DIR` shows up as `Not found in archive` instead.
+
+For a nightly hot backup, put this block without its two cold-backup lines in a script and call it
+from cron.
 For example, `15 4 * * * cd /srv/acis_golang && set -a && . ./.env && set +a && ./backup.sh`.
 Prune old files with `find backups -name 'acis-*' -mtime +14 -delete`.
 
@@ -78,13 +90,15 @@ restored rows, and the login server reads the registered game servers only at st
 ```bash
 db=backups/acis-db-<stamp>.sql.gz
 files=backups/acis-files-<stamp>.tar.gz
+cfg=$(cd "${ACIS_CONFIG_DIR:-./config}" && pwd)
+datapack=$(cd "${ACIS_DATAPACK_DIR:-../aCis_datapack}" && pwd)
 
 docker compose --profile servers stop gameserver loginserver
 
 docker compose exec -T db sh -c 'exec mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" -e "DROP DATABASE acis; CREATE DATABASE acis"'
 gunzip -c "$db" | docker compose exec -T db sh -c 'exec mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" acis'
-tar xzf "$files" config
-tar xzf "$files" -C "$ACIS_DATAPACK_DIR" data
+tar xzf "$files" -C "$(dirname "$cfg")" "$(basename "$cfg")"
+tar xzf "$files" -C "$datapack" data
 
 docker compose --profile servers start loginserver gameserver
 docker compose logs -f gameserver    # wait for "linked to loginserver"

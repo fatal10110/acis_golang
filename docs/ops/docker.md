@@ -54,7 +54,8 @@ docker compose --profile servers up -d --build
 docker compose logs -f gameserver
 ```
 
-The game server is up once it logs `linked to loginserver` and then `listening for game clients`.
+The game server is up once it has logged both `listening for game clients` and `linked to loginserver`.
+The login link is made in the background, so `linked to loginserver` usually comes last.
 Point a client at `ACIS_PUBLIC_HOST`, port 2106. With `AutoCreateAccounts = True` (the reference
 default), the first login creates the account.
 
@@ -63,6 +64,7 @@ default), the first login creates the account.
 | File | Key | Value | Why |
 | --- | --- | --- | --- |
 | both | `URL` | `jdbc:mariadb://db/acis` | The database is the `db` service, not `localhost`. |
+| both | `Login` | `root` | The `db` service creates only `root`. A dedicated user from a migrated Java config does not exist there. |
 | both | `Password` | `$ACIS_DB_ROOT_PASSWORD` (default `123321`) | Must match the `db` container's root password. |
 | `server.properties` | `LoginHost` | `loginserver` | The game server links to the `loginserver` service. |
 | `server.properties` | `Hostname` | `$ACIS_PUBLIC_HOST` (default `127.0.0.1`) | The address the login server gives clients for the game server. The reference `*` would give them the game container's internal address. |

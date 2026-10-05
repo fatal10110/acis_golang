@@ -63,7 +63,9 @@ func TestComposeStopGraceCoversGameServerStop(t *testing.T) {
 }
 
 // Shipped reference lines of the keys ops/docker/init-config.sh rewrites,
-// with the commented-out alternative URLs the reference files carry.
+// with the commented-out alternative URLs the reference files carry. Login
+// is a dedicated user, as in a migrated Java setup: the compose db creates
+// only root, so the script must rewrite it.
 const (
 	initConfigServerFixture = `# This is transmitted to the clients
 Hostname = *
@@ -73,7 +75,7 @@ LoginHost = 127.0.0.1
 LoginPort = 9014
 URL = jdbc:mariadb://localhost/acis
 #URL = jdbc:mysql://localhost/acis?serverTimezone=UTC
-Login = root
+Login = l2j
 Password =
 ServerListBrackets = False`
 	initConfigLoginFixture = `Hostname = localhost
@@ -82,7 +84,7 @@ LoginHostname = *
 LoginPort = 9014
 URL = jdbc:mariadb://localhost/acis
 #URL = jdbc:mysql://localhost/acis?serverTimezone=UTC
-Login = root
+Login = l2j
 Password =
 AutoCreateAccounts = True`
 )
@@ -135,8 +137,8 @@ func runInitConfig(t *testing.T, server, login string) (dst, datapack, out strin
 // TestInitConfigPointsServersAtComposeServices runs the shipped reference
 // key lines through ops/docker/init-config.sh and loads the result with the
 // servers' own config readers: the game server must reach the db and
-// loginserver services and advertise the public host, and every other key
-// and file must stay as shipped.
+// loginserver services as the db's root user and advertise the public
+// host, and every other key and file must stay as shipped.
 func TestInitConfigPointsServersAtComposeServices(t *testing.T) {
 	dst, datapack, out, err := runInitConfig(t, initConfigServerFixture, initConfigLoginFixture)
 	if err != nil {
