@@ -7,6 +7,7 @@ import (
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
 	"github.com/rs/zerolog"
 )
 
@@ -72,3 +73,9 @@ func npcKindOf(templates *npc.Table) func(int32) (script.NPCKind, bool) {
 // and every unported or refused script is reported, before the slices that
 // raise hooks take it as a dependency.
 func buildScripts(*script.Registry) {}
+
+// provideMakers returns the maker registry: every npcmaker runs the maker
+// of its type, the default maker when its type has none.
+func provideMakers(log zerolog.Logger) *script.Makers {
+	return script.NewMakers(maker.Catalog(), maker.Default, log)
+}

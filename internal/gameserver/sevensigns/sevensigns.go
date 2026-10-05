@@ -183,6 +183,7 @@ type State struct {
 	festival  Festival
 	online    Online
 	castles   Castles
+	spawns    Spawns
 	now       func() time.Time
 	afterFunc func(time.Duration, func()) *time.Timer
 	log       zerolog.Logger
@@ -335,7 +336,7 @@ func (s *State) advance() {
 	notices := s.changePeriodLocked()
 	s.nextChange = nextPeriodChange(s.row.Period, s.now())
 	cycle, period := s.row.Cycle, s.row.Period
-	online, castles := s.online, s.castles
+	online, castles, spawns := s.online, s.castles, s.spawns
 	strifeOwner := s.strifeOwnerLocked()
 	s.mu.Unlock()
 
@@ -352,6 +353,9 @@ func (s *State) advance() {
 		online.ExpelFromDungeons()
 	}
 	s.broadcast([]Notice{{Kind: NoticeSky, Cabal: s.Sky()}})
+	if spawns != nil {
+		spawns.SevenSignsChanged()
+	}
 	s.log.Info().Int("cycle", cycle).Str("period", period.String()).Msg("seven signs period begun")
 
 	s.mu.Lock()

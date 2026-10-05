@@ -29,8 +29,15 @@ import (
 // and forced to a single live instance: a database-tracked spawn ignores
 // its declared total and only ever has one instance.
 type slotInfo struct {
-	key      string
-	maker    *spawn.Maker
+	key   string
+	maker *spawn.Maker
+	// group is the run-time npcmaker the slot belongs to and spawnIdx its
+	// entry there; nil for a private's or a standalone spawn's slot.
+	group    *makerGroup
+	spawnIdx int
+	// spawning marks a slot whose NPC is being placed: no other spawn of
+	// the slot starts until it is done.
+	spawning bool
 	entry    spawn.Entry
 	dbName   string
 	masterID int32
@@ -143,19 +150,23 @@ type Npcs struct {
 	raidMultipliers npc.RaidMultipliers
 	// aiConfig holds every hostile's target-selection switches.
 	aiConfig npc.AIConfig
-	// events is the SpawnEvents list: the event makers it names spawn
-	// after the on-start makers, and it gates the spawn and respawn of
-	// event makers.
-	events    spawnEvents
-	geo       move.Geo
-	state     *world.State
-	ids       idAllocator
-	decay     *task.Decay
-	respawn   *task.Respawn
-	ai        *task.AI
-	positions *task.PositionUpdates
-	items     *item.Table
-	ground    groundPlacer
+	// events is the SpawnEvents list: the makers of the events it names
+	// start after the on-start makers, and the spawn condition of a maker
+	// with an event reads it.
+	events spawnEvents
+	// makers builds the maker each npcmaker runs; makerQueue runs the
+	// makers' timers.
+	makers     MakerBehaviors
+	makerQueue *sim.Queue
+	geo        move.Geo
+	state      *world.State
+	ids        idAllocator
+	decay      *task.Decay
+	respawn    *task.Respawn
+	ai         *task.AI
+	positions  *task.PositionUpdates
+	items      *item.Table
+	ground     groundPlacer
 	// newSink builds the event sink each spawned NPC reports through; nil
 	// leaves spawned NPCs silent.
 	newSink func(*npc.Hostile) event.Sink
@@ -191,6 +202,12 @@ type Npcs struct {
 	// first, so a respawn armed for a slot of an earlier run never fires
 	// on the slot of the same maker entry spawned anew.
 	gen int
+	// groups are the run-time npcmakers of the spawn list in use, in list
+	// order.
+	groups []*makerGroup
+	// sevenSigns is the Seven Signs state the ssq_* groups follow; nil
+	// until StartSevenSigns.
+	sevenSigns SevenSigns
 
 	// liveCount is guarded by mu, not atomic: every update pairs it with a
 	// live map write/delete that must stay consistent with the count.
@@ -210,8 +227,8 @@ type Npcs struct {
 // NewNpcs walks spawns' loaded table and instantiates every "on start"
 // maker's qualifying entries into state, respecting persisted dead/alive
 // data for database-tracked entries.
-func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, effects effect.Env, queues Queues, zoneIndexes ...*zone.Index) (*Npcs, error) {
-	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, nil, 20, 30, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), DefaultSpawnEvents(), effects, queues, zoneIndexes...)
+func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, effects effect.Env, queues Queues, makers MakerBehaviors, zoneIndexes ...*zone.Index) (*Npcs, error) {
+	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, nil, 20, 30, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), DefaultSpawnEvents(), effects, queues, makers, zoneIndexes...)
 }
 
 // Queues creates the queue one live NPC's work runs on; id names it in logs.
@@ -223,11 +240,11 @@ type Queues interface {
 // base, RandomWalkRate and raid base multipliers, each running its work on a
 // queue from queues. newFolkSink builds the sink a civilian NPC shows its
 // movement and status through. events is the SpawnEvents list.
-func NewNpcsWithMaxBuffsAmount(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, aiConfig npc.AIConfig, events []string, effects effect.Env, queues Queues, zoneIndexes ...*zone.Index) (*Npcs, error) {
-	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, newFolkSink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount, raidMultipliers, aiConfig, events, effects, queues, zoneIndexes...)
+func NewNpcsWithMaxBuffsAmount(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, aiConfig npc.AIConfig, events []string, effects effect.Env, queues Queues, makers MakerBehaviors, zoneIndexes ...*zone.Index) (*Npcs, error) {
+	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, newFolkSink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount, raidMultipliers, aiConfig, events, effects, queues, makers, zoneIndexes...)
 }
 
-func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, aiConfig npc.AIConfig, events []string, effects effect.Env, queues Queues, zoneIndexes ...*zone.Index) (*Npcs, error) {
+func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, aiConfig npc.AIConfig, events []string, effects effect.Env, queues Queues, makers MakerBehaviors, zoneIndexes ...*zone.Index) (*Npcs, error) {
 	if spawns == nil || spawns.Table() == nil {
 		return nil, fmt.Errorf("npcs: nil spawn table")
 	}
@@ -245,6 +262,9 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 	}
 	if queues == nil {
 		return nil, fmt.Errorf("npcs: nil queues")
+	}
+	if makers == nil {
+		return nil, fmt.Errorf("npcs: nil maker registry")
 	}
 	if newSink == nil {
 		// NPCs spawned without a sink factory never reach a client: no
@@ -312,6 +332,8 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		newSink:             newSink,
 		zones:               zones,
 		queues:              queues,
+		makers:              makers,
+		makerQueue:          queues.NewQueue("makers"),
 		castDefs:            castDefs,
 		castEffects:         castEffects,
 		slot:                make(map[string]slotInfo),
@@ -340,26 +362,21 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 	return n, nil
 }
 
-// spawnOnStart spawns every on-start maker of spawns its spawn condition
-// allows, then the makers of the listed spawn events, as SpawnManager.spawn
-// does at boot, its slots keyed for RespawnAll run gen.
+// spawnOnStart builds the npcmakers of spawns, their slots keyed for
+// RespawnAll run gen, and starts them as SpawnManager.spawn does: every
+// on-start maker in list order, then the makers of each listed spawn
+// event, then the Seven Signs groups once that state is known.
 func (n *Npcs) spawnOnStart(spawns *Spawns, gen int) {
-	makers := spawns.Table().Makers()
-	for _, maker := range makers {
-		if isOnStartMaker(maker) && n.events.allows(maker) {
-			n.spawnMaker(maker, gen)
+	groups := n.newGroups(spawns, gen)
+	for _, g := range groups {
+		if g.def.OnStart() {
+			g.behavior.Start(g)
 		}
 	}
-	n.spawnEventMakers(makers, gen)
-}
-
-// spawnMaker spawns maker's entries within its shared spawn budget, its
-// slots keyed for RespawnAll run gen.
-func (n *Npcs) spawnMaker(maker *spawn.Maker, gen int) {
-	remaining := maker.MaximumNPCs
-	for entryIndex, entry := range maker.Entries {
-		n.bootSpawnEntry(maker, entryIndex, entry, &remaining, gen)
+	for _, event := range n.events {
+		n.startEventLogged(event)
 	}
+	n.sevenSignsPass()
 }
 
 // slotKey is the key of the slot base names in RespawnAll run gen: base
@@ -383,11 +400,3 @@ func (n *Npcs) currentSpawns() *Spawns {
 func (n *Npcs) Spawns() *Spawns {
 	return n.currentSpawns()
 }
-
-// isOnStartMaker reports whether maker should be populated at boot: it has
-// no event gate and its ai params don't disable the initial spawn. Makers
-// with an "ai type" that scripts special spawn selection (random pick
-// among candidates, exclusive slots, day/night toggles, etc.) are treated
-// the same as the default "spawn every entry up to its total" behavior —
-// no scripted maker framework exists in this codebase yet — except that
-// spawnEvents.allows gates an event_maker on its EventName.
