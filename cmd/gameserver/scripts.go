@@ -32,9 +32,11 @@ func scriptCatalog(catalogs []script.Catalog) (script.Catalog, error) {
 }
 
 // provideScripts builds the script registry from scripts.xml and the
-// catalogs, against the NPC templates the boot loaded. Templates a later
-// //reload npc brings in keep the bindings of their ids: the registry is
-// keyed by NPC id and never rebuilt.
+// catalogs, against the NPC templates the boot loaded. Bindings and the
+// seam gate are computed once, here, and the registry is never rebuilt:
+// ids that had a template at boot keep their bindings across a later
+// //reload npc, ids a reload adds stay unbound, and a template whose kind
+// a reload changes is not re-checked by the seam gate until restart.
 func provideScripts(paths gameServerPaths, data *gameData, log zerolog.Logger) (*script.Registry, error) {
 	list, err := gamexml.LoadScriptList(filepath.Join(paths.DataRoot, "data", "xml", "scripts.xml"), log)
 	if err != nil {
