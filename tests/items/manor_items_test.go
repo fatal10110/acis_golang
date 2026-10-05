@@ -43,8 +43,8 @@ const (
 // gludioHome is a spawn point inside the Gludio manor area gludio_1621_001.
 var gludioHome = location.Location{X: -110000, Y: 110000, Z: -3000}
 
-// shippedManor loads the shipped seed rows, manor areas and the Lesser
-// Succubus template once.
+// shippedManor loads the shipped seed rows, priced from the shipped item
+// templates, the manor areas and the Lesser Succubus template once.
 var shippedManor = sync.OnceValues(func() (network.ManorConfig, *npc.Template) {
 	// Callers run datapack.Require first, so the checkout is present here.
 	dir, _ := datapack.Find()
@@ -62,6 +62,15 @@ var shippedManor = sync.OnceValues(func() (network.ManorConfig, *npc.Template) {
 		panic(skipped[0])
 	}
 	skills, items := shippedData()
+	// As the boot's loadManor does: reference prices from the item
+	// templates, 1 for an unknown item.
+	seeds.ApplyReferencePrices(func(id int32) (int32, bool) {
+		tmpl, ok := items.Get(id)
+		if !ok {
+			return 0, false
+		}
+		return tmpl.ReferencePrice, true
+	})
 	npcs, err := xmldata.LoadNPCTemplates(filepath.Join(root, "npcs"), items, skills, zerolog.Nop())
 	if err != nil {
 		panic(err)

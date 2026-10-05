@@ -511,7 +511,7 @@ var schemaStmts = []string{
 	characterRelationsSchema, petitionSchema, petitionMessageSchema,
 	characterMacrosesSchema, characterRecommendsSchema,
 	clanDataSchema, clanPrivsSchema, clanSkillsSchema, clanSubpledgesSchema, clanWarsSchema, clanhallSchema, clanhallFunctionsSchema, auctionsSchema,
-	siegeClansSchema, castleSchema,
+	siegeClansSchema, castleSchema, castleManorProductionSchema, castleManorProcureSchema,
 	accountsSchema,
 	bbsMailSchema, bbsForumSchema, bbsTopicSchema, bbsPostSchema, bbsFavoriteSchema,
 	olympiadNoblesSchema, olympiadNoblesEomSchema, olympiadFightsSchema, serverMemoSchema,

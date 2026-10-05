@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/augment"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
+	"github.com/fatal10110/acis_golang/internal/gameserver/castlemanor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/classmaster"
@@ -362,6 +363,7 @@ type GameClientLink struct {
 	partyPositions   partyPositions
 	clans            *clan.Service
 	castles          *castle.Manager
+	castleManor      *castlemanor.Manager
 	sieges           *siege.Engine
 	clanWarehouses   clanWarehouseBook
 	enchantState     *enchantflow.State
@@ -674,6 +676,8 @@ type GameClientLinkConfig struct {
 	Clans *clan.Service
 	// Castles holds the castles' live state; nil runs with no castle.
 	Castles *castle.Manager
+	// CastleManor is the castles' manor; nil runs none.
+	CastleManor *castlemanor.Manager
 	// Sieges holds the castle sieges; nil runs with no siege.
 	Sieges *siege.Engine
 	// Board is the community board's settings; the zero value keeps the
@@ -889,6 +893,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	}
 	link.clans = cfg.Clans
 	link.castles = cfg.Castles
+	link.castleManor = cfg.CastleManor
 	link.sieges = cfg.Sieges
 	if link.clans == nil {
 		link.clans = clan.NewService(nil, nil, nil, cfg.IDs, clan.DefaultConfig(), nil, cfg.Log)

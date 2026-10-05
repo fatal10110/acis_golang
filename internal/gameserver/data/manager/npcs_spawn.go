@@ -340,4 +340,5 @@ func NewHostileRewarder(hostile *npc.Hostile, tmpl *npc.Template, state *world.S
 // unregisters actorID from AI ticks and live tracking, and — when its slot
 // has a positive respawn delay — returns the closure that arms the next
 // respawn. It reports nil when actorID isn't a tracked spawn slot, or when
-// the slot's entry has no respawn delay (a permanent, one-shot spawn).
+// the slot's entry has no respawn delay (a permanent, one-shot spawn), or
+// when its maker's spawn event is not listed.

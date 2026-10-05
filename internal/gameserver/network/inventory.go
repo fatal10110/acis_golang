@@ -397,8 +397,9 @@ func (l *GameClientLink) ExpireShadowItem(live *livePlayer, inst *item.Instance)
 }
 
 func (l *GameClientLink) handleAutoSoulShot(live *livePlayer, req clientpackets.RequestAutoSoulShot) {
-	// Fake death does not block it: only a real death does.
-	if live == nil || live.Dead() || live.Operating() {
+	// Fake death does not block it: only a real death does. A player with
+	// a request still to answer is ignored too, enabling or disabling.
+	if live == nil || live.Dead() || live.Operating() || l.holdsActiveRequester(live) {
 		return
 	}
 	inv := live.Inventory()

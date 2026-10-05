@@ -44,15 +44,16 @@ func (l *GameClientLink) setCastleOwner(actor *livePlayer, c *castle.Castle, cl 
 }
 
 // removeCastleOwner takes c from the clan owning it, reporting false when c
-// has none. The clan's members in the world see its clan header refreshed
-// and the clan leaves c's siege, where it was registered as the owner. A
+// has none. The castle's manor lists, both periods', are emptied. The
+// clan's members in the world see its clan header refreshed and the clan
+// leaves c's siege, where it was registered as the owner. A
 // siege under way then turns to the castle having no owner
 // (siege.Siege.MidVictory); otherwise the clan's members take off the
 // items of c (checkCastleItems). actor is the player whose queue the
 // caller runs on.
 //
 // ponytail: the castle's dropped mercenary tickets and hired mercenaries
-// go with its owner (#238), as do its manor settings (#240).
+// go with its owner (#238).
 func (l *GameClientLink) removeCastleOwner(actor *livePlayer, c *castle.Castle) bool {
 	cl, ok := l.castles.RemoveOwner(c)
 	if !ok {
@@ -61,6 +62,7 @@ func (l *GameClientLink) removeCastleOwner(actor *livePlayer, c *castle.Castle) 
 	if cl == nil {
 		return true
 	}
+	l.castleManor.Reset(c.ID)
 	l.broadcastToClan(cl, 0, func() wire.Frame { return framePledgeShowInfoUpdate(cl) })
 	if s, ok := l.castleSiege(int32(c.ID)); ok {
 		s.DropOwner(cl.ID())
