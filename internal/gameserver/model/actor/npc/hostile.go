@@ -837,6 +837,10 @@ func (h *Hostile) Tick() {
 	h.brain.Tick()
 }
 
+// AtHookPoint is where h's AI loop gives the behavior bound to h's template
+// its turn. No behavior binds a hook point yet, so it does nothing.
+func (h *Hostile) AtHookPoint(ai.HookPoint) {}
+
 // Think continues the hostile AI's current intention after a bow's reuse
 // ending or a control effect ending. It never idles on an empty desire
 // queue: RunAI and TickThink do.
