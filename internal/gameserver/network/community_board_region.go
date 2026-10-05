@@ -3,8 +3,8 @@ package network
 import (
 	"cmp"
 	"slices"
-	"strconv"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 )
@@ -21,7 +21,7 @@ func (l *GameClientLink) boardRegion(live *livePlayer, command string) {
 	if len(tokens) < 2 {
 		return
 	}
-	id, err := strconv.ParseInt(tokens[1], 10, 32)
+	id, err := commons.ParseInt(tokens[1], 32)
 	if err != nil {
 		return
 	}

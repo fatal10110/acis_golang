@@ -8,6 +8,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf16"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // Command types a macro line can carry.
@@ -261,7 +263,7 @@ func DecodeCommands(s string) ([]Command, error) {
 		}
 		var nums [3]int32
 		for i := range nums {
-			n, err := strconv.ParseInt(fields[i], 10, 32)
+			n, err := commons.ParseInt(fields[i], 32)
 			if err != nil {
 				return nil, errBadCommand(line, err)
 			}
