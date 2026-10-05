@@ -283,7 +283,6 @@ type Character struct {
 	standing             bool
 	sittingNow           bool
 	standingNow          bool
-	postureGen           uint64
 	fakeDeath            bool
 	inCombat             bool
 	autoSoulShots        map[int32]bool

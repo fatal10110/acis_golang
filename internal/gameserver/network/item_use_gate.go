@@ -164,7 +164,7 @@ func parseConditionBool(raw string) bool {
 // A value that does not parse fails.
 func clanConditionHolds(live *livePlayer, name, raw string) bool {
 	cond, err := conditions.Compile(modelskill.Condition{Kind: "player", Attrs: map[string]string{name: raw}})
-	return err == nil && cond.Test(live.ConditionActor(), nil, nil)
+	return err == nil && cond != nil && cond.Test(live.ConditionActor(), nil, nil)
 }
 
 func parseConditionInt(raw string) (int, bool) {

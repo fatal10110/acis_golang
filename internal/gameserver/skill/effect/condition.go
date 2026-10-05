@@ -9,8 +9,9 @@ import (
 // funcCondition builds the Condition gate for one stat func from
 // its own direct predicate (a func element's child, e.g. <add ...><using
 // .../></add>) and/or the <cond> block attached to its enclosing <for>/
-// <effect> group, ANDing both when both are present. Returns (nil, nil)
-// when neither is set, matching every unconditional stat func today.
+// <effect> group, ANDing both when both are present. A predicate that holds
+// no condition (see conditions.Compile) gates nothing. Returns (nil, nil)
+// when neither gates, matching every unconditional stat func today.
 func funcCondition(direct *modelskill.Condition, attach *modelskill.ConditionClause) (Condition, error) {
 	var conds []conditions.Condition
 	if attach != nil {
@@ -18,14 +19,18 @@ func funcCondition(direct *modelskill.Condition, attach *modelskill.ConditionCla
 		if err != nil {
 			return nil, err
 		}
-		conds = append(conds, c)
+		if c != nil {
+			conds = append(conds, c)
+		}
 	}
 	if direct != nil {
 		c, err := conditions.Compile(*direct)
 		if err != nil {
 			return nil, err
 		}
-		conds = append(conds, c)
+		if c != nil {
+			conds = append(conds, c)
+		}
 	}
 	switch len(conds) {
 	case 0:
@@ -45,7 +50,8 @@ func funcCondition(direct *modelskill.Condition, attach *modelskill.ConditionCla
 // conditions.Actor (see model/actor/player/character_conditions.go,
 // model/actor/npc/hostile_conditions.go, model/actor/summon/conditions.go),
 // so this always resolves to that same owner, matching this package's doc:
-// a stat func is gated by its owner alone.
+// a stat func is gated by its owner alone. A test that aborts (it reached a
+// <not> around no condition, see conditions.Evaluate) does not hold.
 type conditionGate struct{ cond conditions.Condition }
 
 func (g conditionGate) Test(effector stat.Actor) bool {
