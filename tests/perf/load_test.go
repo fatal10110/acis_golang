@@ -4,6 +4,9 @@
 // ACIS_PERF_CLIENTS is set, so the default test run never pays for it.
 //
 //	ACIS_PERF_CLIENTS=50 ACIS_PERF_DURATION=30s go test ./tests/perf/ -run TestLoadBaseline -v -count=1
+//
+// ACIS_PERF_PROFILE_DIR=<dir> also writes the run's CPU, heap and goroutine
+// profiles there; docs/profiling.md reads them.
 package perf
 
 import (
@@ -50,12 +53,15 @@ const probeTimeout = 5 * time.Second
 // two loopback hops. A probe that needs no character (such as
 // RequestManorList) could be answered ahead of a step queued for the
 // character and would stop measuring it. Reported: process CPU time (server and clients share the process), step
-// latency p50/p99/max, GC count and pauses, frames received.
+// latency p50/p99/max, GC count, pauses and CPU share, heap and goroutines
+// at the end of the window, frames received.
 //
 // The run fails unless every client stayed connected, never timed out, never
 // died, left the spawn point, landed an attack and got exactly one probe
 // reply per probe: a run that sheds load or quietly drives a different
-// workload is not a comparable baseline.
+// workload is not a comparable baseline. It also fails when the process does
+// not return to its post-boot goroutine count once every client disconnected
+// (checkGoroutineLeak).
 func TestLoadBaseline(t *testing.T) {
 	clients := envInt(t, "ACIS_PERF_CLIENTS", 0)
 	if clients <= 0 {
@@ -69,6 +75,7 @@ func TestLoadBaseline(t *testing.T) {
 		gameservertest.WithProductionTickers(),
 		gameservertest.WithRealPool(), // measures the production executor
 	)
+	goroutineBaseline := runtime.NumGoroutine()
 	conns := []*testsupport.ScriptedClient{srv.Client}
 	ids := []int32{srv.SoleObjectID(t)}
 	for i := 1; i < clients; i++ {
@@ -82,11 +89,17 @@ func TestLoadBaseline(t *testing.T) {
 		enterWorld(t, c)
 		readers[i] = startReader(c, ids[i])
 	}
-	defer func() {
+	readersStopped := false
+	stopReaders := func() {
+		if readersStopped {
+			return
+		}
+		readersStopped = true
 		for _, r := range readers {
 			r.stop()
 		}
-	}()
+	}
+	defer stopReaders()
 
 	x, y, z := srv.PlayerPosition(t, ids[0])
 	origin := location.Location{X: x, Y: y, Z: z}
@@ -98,8 +111,12 @@ func TestLoadBaseline(t *testing.T) {
 	tmpl := gameservertest.MovingHostileTemplate("Monster")
 	tmpl.PAtk = 0.25
 	monsters := make([]*npc.Hostile, clients)
+	// Every monster starts 60+ away on x, out of melee reach, so each client
+	// walks to its first attack. At 40 the clients whose monster sat in reach
+	// from the start (0, 10, ...) attacked from the spawn point and their
+	// short walks never moved them, failing the "left the spawn point" check.
 	for i := range monsters {
-		at := location.Location{X: x + 40 + i%10*20, Y: y + i/10*20, Z: z}
+		at := location.Location{X: x + 60 + i%10*20, Y: y + i/10*20, Z: z}
 		monsters[i] = srv.SpawnMovingHostileNPCTemplate(t, tmpl, at, at)
 		srv.AI.Add(monsters[i])
 	}
@@ -110,10 +127,12 @@ func TestLoadBaseline(t *testing.T) {
 	}
 	var memBefore runtime.MemStats
 	runtime.ReadMemStats(&memBefore)
+	gcCPUBefore := readGCCPU()
 	for _, r := range readers {
 		r.frames.Store(0)
 	}
 
+	profile := startProfile(t)
 	start := time.Now()
 	deadline := start.Add(duration)
 	samples := make([][]time.Duration, clients)
@@ -133,6 +152,9 @@ func TestLoadBaseline(t *testing.T) {
 	}
 	var memAfter runtime.MemStats
 	runtime.ReadMemStats(&memAfter)
+	gcCPU := readGCCPU() - gcCPUBefore
+	goroutinesUnderLoad := runtime.NumGoroutine()
+	profile.stop(t)
 
 	var all []time.Duration
 	var frames int64
@@ -167,6 +189,7 @@ func TestLoadBaseline(t *testing.T) {
 	t.Logf("  step latency p50=%s p99=%s max=%s", percentile(all, 50), percentile(all, 99), all[len(all)-1])
 	t.Logf("  process CPU=%s (%.2f cores)", cpu.Round(time.Millisecond), cpu.Seconds()/elapsed.Seconds())
 	t.Logf("  GC count=%d pause_total=%s pause_max=%s", gcs, time.Duration(memAfter.PauseTotalNs-memBefore.PauseTotalNs), maxPause(&memAfter, gcs))
+	t.Logf("  GC CPU=%s (%.1f%% of process CPU) allocated=%dMiB heap_alloc=%dMiB heap_sys=%dMiB goroutines=%d", gcCPU.Round(time.Millisecond), 100*gcCPU.Seconds()/cpu.Seconds(), (memAfter.TotalAlloc-memBefore.TotalAlloc)>>20, memAfter.HeapAlloc>>20, memAfter.HeapSys>>20, goroutinesUnderLoad)
 	if disconnected > 0 || timeouts.Load() > 0 {
 		t.Errorf("%d clients disconnected and %d steps timed out; the numbers above are not a full-load baseline", disconnected, timeouts.Load())
 	}
@@ -176,6 +199,9 @@ func TestLoadBaseline(t *testing.T) {
 	if strayReplies > 0 {
 		t.Errorf("%d clients got a probe-reply count different from their probe count; an unsolicited SkillList would corrupt the latency samples", strayReplies)
 	}
+
+	stopReaders()
+	checkGoroutineLeak(t, goroutineBaseline)
 }
 
 // runClient drives one client until deadline and returns its step latencies.
