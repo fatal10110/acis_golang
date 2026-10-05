@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"math"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -57,52 +58,79 @@ func (l *GameClientLink) showClanHallInterior(hallID int32, a zone.Actor) {
 // restoring it first when no member opened it, and reports false, with
 // nothing taken, when it holds less or cannot be read.
 func (l *GameClientLink) PayHallFee(clanID int32, adena int) bool {
-	wh, err := l.clanWarehouse(clanID)
-	if err != nil {
-		l.log.Error().Err(err).Int32("clan_id", clanID).Msg("clan hall: restore clan warehouse for a function fee")
-		return false
-	}
-	end := l.itemInstances.BeginOperation(clanID)
-	defer end()
-	if adena > wh.Adena() {
-		return false
-	}
-	paid := wh.DestroyByTemplateID(item.AdenaID, adena)
-	if paid == nil {
-		return false
-	}
-	l.applyPersistActions([]invops.Persist{invops.DestroyedOrUpdated(clanID, paid)})
-	return true
+	_, ok := l.TakeAdena(clanID, adena)
+	return ok
 }
 
 var _ clanhall.Bank = (*GameClientLink)(nil)
 
+// TakeAdena is PayHallFee, also returning the write that lands the
+// warehouse's adena row as the fee left it. The fee's own row write is
+// queued as every item operation's is; the landing writes the same row
+// now, in its place in the row's write order, for a caller that has to
+// know it is in the database before it stores what the fee paid for.
+func (l *GameClientLink) TakeAdena(clanID int32, adena int) (clanhall.Landing, bool) {
+	wh, err := l.clanWarehouse(clanID)
+	if err != nil {
+		l.log.Error().Err(err).Int32("clan_id", clanID).Msg("clan hall: restore clan warehouse for a function fee")
+		return nil, false
+	}
+	end := l.itemInstances.BeginOperation(clanID)
+	defer end()
+	if adena > wh.Adena() {
+		return nil, false
+	}
+	paid := wh.DestroyByTemplateID(item.AdenaID, adena)
+	if paid == nil {
+		return nil, false
+	}
+	l.applyPersistActions([]invops.Persist{invops.DestroyedOrUpdated(clanID, paid)})
+	return l.landItems(paid), true
+}
+
 // ReturnAdena adds adena to the warehouse of the clan clanID, restoring it
 // first when no member opened it, as much of it as keeps the warehouse's
-// adena within a 32-bit count. A warehouse that cannot be read, or a new
+// adena within a 32-bit count, and returns the write that lands the
+// warehouse's adena row now. A warehouse that cannot be read, or a new
 // stack without an object id, gets nothing and is logged.
-func (l *GameClientLink) ReturnAdena(clanID int32, adena int) {
+func (l *GameClientLink) ReturnAdena(clanID int32, adena int) clanhall.Landing {
 	wh, err := l.clanWarehouse(clanID)
 	if err != nil {
 		l.log.Error().Err(err).Int32("clan_id", clanID).Int("adena", adena).Msg("clan hall: restore clan warehouse for a refund")
-		return
+		return nil
 	}
 	end := l.itemInstances.BeginOperation(clanID)
 	defer end()
 	adena = min(adena, math.MaxInt32-wh.Adena())
 	if adena <= 0 {
-		return
+		return nil
 	}
 	var id int32
 	if wh.Adena() == 0 {
 		if id, err = l.nextObjectID(); err != nil {
 			l.log.Error().Err(err).Int32("clan_id", clanID).Int("adena", adena).Msg("clan hall: no object id for a refund")
-			return
+			return nil
 		}
 	}
-	if wh.AddNew(item.AdenaID, adena, id) == nil && id != 0 {
-		l.releaseObjectID(id)
+	stack := wh.AddNew(item.AdenaID, adena, id)
+	if stack == nil {
+		if id != 0 {
+			l.releaseObjectID(id)
+		}
+		return nil
 	}
+	return l.landItems(stack)
+}
+
+// landItems returns the write that lands items' rows now, each in its
+// place in its row's write order (task.ItemInstances.UpdateItems), or nil
+// without item persistence.
+func (l *GameClientLink) landItems(items ...*item.Instance) clanhall.Landing {
+	instances := l.itemInstances
+	if instances == nil || l.items == nil {
+		return nil
+	}
+	return func(ctx context.Context) error { return instances.UpdateItems(ctx, items) }
 }
 
 // clanHallNotices tells the clans' members in the world what happened to
