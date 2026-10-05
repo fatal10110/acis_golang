@@ -44,7 +44,9 @@ func liveMemberRow(c *player.Character, m clan.Member) serverpackets.PledgeMembe
 
 // memberRow is m's roster row: an online member's values are read off its
 // live character, an offline member's are the stored ones. self, when not
-// nil, is a member still entering the world, not yet found there.
+// nil, is a member still entering the world, not yet found there. A member
+// whose connection dropped while it lingers in the world is listed offline
+// with its live values (ClanMember.isOnline, ClanMember.java:174-177).
 func (l *GameClientLink) memberRow(m clan.Member, self ...*livePlayer) serverpackets.PledgeMemberListMember {
 	if m.Online {
 		for _, s := range self {
@@ -53,7 +55,11 @@ func (l *GameClientLink) memberRow(m clan.Member, self ...*livePlayer) serverpac
 			}
 		}
 		if live, ok := l.livePlayerByID(m.ObjectID); ok {
-			return liveMemberRow(live.Character, m)
+			row := liveMemberRow(live.Character, m)
+			if live.clientDetached() {
+				row.OnlineObjectID = 0
+			}
+			return row
 		}
 	}
 	return serverpackets.PledgeMemberListMember{
@@ -135,18 +141,28 @@ func framePledgeShowInfoUpdate(cl *clan.Clan) wire.Frame {
 	})
 }
 
-// onlineClanMembers returns cl's members in the world, except exceptID.
+// onlineClanMembers returns cl's members in the world, except exceptID,
+// leaving out a member whose connection dropped while it lingers there, as
+// Clan.getOnlineMembers does (Clan.java:842-851, ClanMember.isOnline).
 func (l *GameClientLink) onlineClanMembers(cl *clan.Clan, exceptID int32) []*livePlayer {
 	var out []*livePlayer
 	for _, id := range cl.OnlineMemberIDs() {
 		if id == exceptID {
 			continue
 		}
-		if live, ok := l.livePlayerByID(id); ok {
+		if live, ok := l.livePlayerByID(id); ok && !live.clientDetached() {
 			out = append(out, live)
 		}
 	}
 	return out
+}
+
+// clanMemberConnected reports whether the member objectID, listed online,
+// is in the world with its client: false once its connection dropped while
+// it lingers there (ClanMember.isOnline).
+func (l *GameClientLink) clanMemberConnected(objectID int32) bool {
+	live, ok := l.livePlayerByID(objectID)
+	return ok && !live.clientDetached()
 }
 
 // broadcastToClan sends each built packet, in order, to every member of cl

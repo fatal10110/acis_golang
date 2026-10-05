@@ -29,9 +29,12 @@ func (l *GameClientLink) requestStartPledgeWar(live *livePlayer, req clientpacke
 
 // requestStopPledgeWar has live's clan stop its war on the clan it names.
 func (l *GameClientLink) requestStopPledgeWar(live *livePlayer, req clientpackets.RequestPledgeWarName) {
+	// A member lingering after its connection dropped is no online member
+	// (Clan.getOnlineMembers, RequestStopPledgeWar.java:46): its combat
+	// does not hold the war.
 	inCombat := func(id int32) bool {
 		member, ok := l.livePlayerByID(id)
-		return ok && member.Character.InCombat()
+		return ok && !member.clientDetached() && member.Character.InCombat()
 	}
 	war, result := l.clanService().StopWar(live.Character, req.PledgeName, inCombat, time.Now())
 	if result != clan.WarDone {

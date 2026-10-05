@@ -1,6 +1,7 @@
 package petition
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"sync"
@@ -13,6 +14,22 @@ import (
 // maxContentLength is the longest petition text, in UTF-16 code units, a
 // player may send.
 const maxContentLength = 255
+
+// Churn bounds, a divergence from the reference, which keeps every
+// cancelled petition until a reset and tells the game masters of every
+// submit and cancel: a player looping submit and cancel would otherwise
+// grow the petition list, and the rows stored at shutdown, without end and
+// flood every game master with notices.
+const (
+	// keptCancelled is how many of its cancelled petitions a player keeps
+	// listed; a cancel drops the oldest beyond it and frees their ids.
+	keptCancelled = 5
+	// gmNoticeBurst is how many submit and cancel notices one player's
+	// petitions send the game masters within gmNoticeWindow; the rest are
+	// not sent.
+	gmNoticeBurst  = 4
+	gmNoticeWindow = time.Minute
+)
 
 // IDs hands out and takes back the object ids petitions are numbered with.
 type IDs interface {
@@ -43,6 +60,15 @@ type Manager struct {
 	order     []int32 // petition ids, ascending
 	// names is the name each petitioner and responder last went by.
 	names map[int32]string
+	// noticeWindows counts the game master notices each player's
+	// petitions sent in its current window.
+	noticeWindows map[int32]noticeWindow
+}
+
+// noticeWindow is one player's game master notice count since start.
+type noticeWindow struct {
+	start time.Time
+	sent  int
 }
 
 // NewManager returns a Manager holding records, names naming their
@@ -52,7 +78,7 @@ func NewManager(cfg Config, ids IDs, now func() time.Time, records []Record, nam
 	if now == nil {
 		now = time.Now
 	}
-	m := &Manager{cfg: cfg, ids: ids, now: now, petitions: make(map[int32]*petition, len(records)), names: make(map[int32]string, len(names))}
+	m := &Manager{cfg: cfg, ids: ids, now: now, petitions: make(map[int32]*petition, len(records)), names: make(map[int32]string, len(names)), noticeWindows: make(map[int32]noticeWindow)}
 	for id, name := range names {
 		m.names[id] = name
 	}
@@ -161,12 +187,14 @@ const (
 
 // Submission is a petition submission's outcome. PlayerCount counts the
 // player's petitions and ServerCount the server's active ones, each with
-// this one; they are set from SubmitServerFull on.
+// this one; they are set from SubmitServerFull on. NotifyGMs, set only on
+// Submitted, is whether the game masters are told of the petition.
 type Submission struct {
 	Result      SubmitResult
 	ID          int32
 	PlayerCount int
 	ServerCount int
+	NotifyGMs   bool
 }
 
 // Submit files player's petition of type typ saying content.
@@ -203,7 +231,61 @@ func (m *Manager) Submit(player Person, typ int32, content string) (Submission, 
 		return s, err
 	}
 	s.ID = id
+	s.NotifyGMs = m.takeGMNotice(player.ID)
 	return s, nil
+}
+
+// takeGMNotice reports whether player's petitions may tell the game masters
+// one more thing in its current window, counting it when they may; m.mu is
+// held. Windows that have run out are dropped on the way, so the map only
+// holds players heard from within the last gmNoticeWindow.
+func (m *Manager) takeGMNotice(player int32) bool {
+	now := m.now()
+	for id, w := range m.noticeWindows {
+		if !now.Before(w.start.Add(gmNoticeWindow)) {
+			delete(m.noticeWindows, id)
+		}
+	}
+	w, ok := m.noticeWindows[player]
+	if !ok {
+		w = noticeWindow{start: now}
+	}
+	if w.sent >= gmNoticeBurst {
+		return false
+	}
+	w.sent++
+	m.noticeWindows[player] = w
+	return true
+}
+
+// dropOldCancelled drops player's cancelled petitions beyond the
+// keptCancelled most recently submitted, keep always among those kept, and
+// frees their ids; m.mu is held.
+func (m *Manager) dropOldCancelled(player int32, keep *petition) {
+	var old []*petition
+	m.each(func(p *petition) bool {
+		if p != keep && p.Petitioner == player && p.State == Cancelled {
+			old = append(old, p)
+		}
+		return true
+	})
+	if len(old) < keptCancelled {
+		return
+	}
+	// Most recently submitted first, the higher id first within a
+	// millisecond.
+	slices.SortFunc(old, func(a, b *petition) int {
+		return cmp.Or(cmp.Compare(b.SubmitDate, a.SubmitDate), cmp.Compare(b.ID, a.ID))
+	})
+	for _, p := range old[keptCancelled-1:] {
+		delete(m.petitions, p.ID)
+		if i, found := slices.BinarySearch(m.order, p.ID); found {
+			m.order = slices.Delete(m.order, i, i+1)
+		}
+		if m.ids != nil {
+			m.ids.ReleaseID(p.ID)
+		}
+	}
 }
 
 // create files a new pending petition; m.mu is held.
@@ -246,31 +328,41 @@ const (
 	CancelDone
 )
 
+// Cancellation is a cancel request's outcome. Remaining is how many
+// petitions the player may still send and NotifyGMs whether the game
+// masters are told of the cancel; both are set only on CancelDone.
+type Cancellation struct {
+	Result    CancelResult
+	Remaining int
+	NotifyGMs bool
+}
+
 // Cancel answers player's request to cancel: a petitioner's pending
 // petition is cancelled, a game master answering a petition closes it and
 // any other responder leaves its chat. gm is whether player plays as a game
-// master. remaining is how many petitions player may still send, set on
-// CancelDone.
-func (m *Manager) Cancel(player Person, gm bool, pres Presence) (result CancelResult, remaining int, notices []Notice) {
+// master. A cancel drops player's cancelled petitions beyond the
+// keptCancelled most recent.
+func (m *Manager) Cancel(player Person, gm bool, pres Presence) (c Cancellation, notices []Notice) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if p := m.inProcess(player.ID); p != nil {
 		if p.Petitioner == player.ID {
-			return CancelUnderProcess, 0, nil
+			return Cancellation{Result: CancelUnderProcess}, nil
 		}
 		if gm {
 			m.end(p, Closed, pres, &notices)
 		} else {
 			m.removeResponder(p, player, pres, &notices)
 		}
-		return CancelLeft, 0, notices
+		return Cancellation{Result: CancelLeft}, notices
 	}
 	p := m.find(func(p *petition) bool { return p.State == Pending && p.Petitioner == player.ID })
 	if p == nil {
-		return CancelNotSubmitted, 0, nil
+		return Cancellation{Result: CancelNotSubmitted}, nil
 	}
 	m.end(p, Cancelled, pres, &notices)
-	return CancelDone, m.cfg.MaxPerPlayer - m.countOf(player.ID), notices
+	m.dropOldCancelled(player.ID, p)
+	return Cancellation{Result: CancelDone, Remaining: m.cfg.MaxPerPlayer - m.countOf(player.ID), NotifyGMs: m.takeGMNotice(player.ID)}, notices
 }
 
 // Vote records the petitioner's rating of its closed petition. It reports

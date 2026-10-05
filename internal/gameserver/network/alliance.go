@@ -270,7 +270,7 @@ func (l *GameClientLink) requestAllyInfo(live *livePlayer) {
 	if cl, ok := l.clanService().ClanOf(live.Character); ok {
 		allyID = cl.AllyID()
 	}
-	info, ok := l.clanService().Table().AllianceInfo(allyID)
+	info, ok := l.clanService().Table().AllianceInfo(allyID, l.clanMemberConnected)
 	if !ok {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoCurrentAlliances))
 		return

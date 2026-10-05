@@ -380,7 +380,7 @@ func (e *TaskEffects) Save(actor task.AutosaveActor) {
 		return
 	}
 	sim.AssertOwner(live.Queue())
-	charState := live.Character.SaveState()
+	charState := live.saveState()
 	skillState := skills.SaveState(live.Character)
 	var petItemID int32
 	var savePetRow func(context.Context)
