@@ -151,11 +151,12 @@ func TestHeldItemSkillCastResumedWhileTeleportingGoesIdle(t *testing.T) {
 // doIdleIntention, whose prepareIntention clears the next intention,
 // CreatureAI.java:90-93, PlayableAI.java:31-40). After Appearing and the
 // stand-up's end, the scroll never casts and is kept. Ahead of the jump the
-// teleport's abortAll (Creature.java:1298-1306) answers four ActionFailed:
+// teleport's abortAll (Creature.java:1298-1306) answers five ActionFailed:
 // the attack stop's and the cast stop's, each after its tryToIdle refused
 // under denyAiAction answers one of its own, leaving the held cast in place
 // (PlayableAI.java:354-360, PlayerAttack.java:58-63,
-// PlayerCast.java:381-387).
+// PlayerCast.java:381-387), then the target reset's (Player.setTarget(null),
+// Player.java:2497-2499).
 func TestHeldItemSkillCastDroppedByTeleport(t *testing.T) {
 	t.Parallel()
 	srv, objID, scroll := bootDenyAICaster(t)
@@ -172,7 +173,7 @@ func TestHeldItemSkillCastDroppedByTeleport(t *testing.T) {
 	onlineLivePlayer(t, srv, objID).TeleportTo(x+300, y, z, 0)
 	jump := readUntilOpcode(t, c, serverpackets.OpcodeTeleportToLocation)
 	var af byte = serverpackets.OpcodeActionFailed
-	if got, want := opcodesOf(jump), []byte{af, af, af, af, serverpackets.OpcodeTeleportToLocation}; string(got) != string(want) {
+	if got, want := opcodesOf(jump), []byte{af, af, af, af, af, serverpackets.OpcodeTeleportToLocation}; string(got) != string(want) {
 		t.Fatalf("teleport during the stand-up sent opcodes %x up to TeleportToLocation, want %x", got, want)
 	}
 	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))

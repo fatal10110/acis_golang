@@ -162,9 +162,10 @@ func TestObserverGroupListsViewpoints(t *testing.T) {
 }
 
 // TestObserverEntryAndReturn walks a paid viewpoint end to end: the fee
-// taken, the stand-up, the abort answered as a teleport's twice, the jump
-// (which forgets the tower, the selection), ObserverStart, then the
-// dispatcher's release. Watching, the player is hidden, invulnerable and
+// taken, the stand-up, the abort answered as a teleport's twice, the first
+// resetting the selected tower (Player.enterObserverMode's abortAll(true),
+// Player.java:5260-5263), the jump, ObserverStart, then the dispatcher's
+// release. Watching, the player is hidden, invulnerable and
 // paralyzed, its position reports are ignored and its clicks refused.
 // ObserverReturn brings it back where it left.
 func TestObserverEntryAndReturn(t *testing.T) {
@@ -179,9 +180,9 @@ func TestObserverEntryAndReturn(t *testing.T) {
 	assertFrames(t, "observe 634", frames,
 		sysMsg(serverpackets.SystemMessageS1DisappearedAdena, numberParam(colosseumFee)),
 		[]byte{serverpackets.OpcodeChangeWaitType},
-		af, af, af, af, af, af, af, af,
+		af, af, af, af, af, []byte{serverpackets.OpcodeTargetUnselected},
+		af, af, af, af, af,
 		[]byte{serverpackets.OpcodeTeleportToLocation},
-		af, []byte{serverpackets.OpcodeTargetUnselected},
 		observerStart(colosseumSeat, 0, 0),
 		af)
 	assertLandedNear(t, landing(t, frames), colosseumSeat)
@@ -225,7 +226,7 @@ func TestObserverEntryAndReturn(t *testing.T) {
 	assertFrames(t, "ObserverReturn", frames,
 		af, af,
 		observerEnd(left),
-		af, af, af, af,
+		af, af, af, af, af,
 		[]byte{serverpackets.OpcodeTeleportToLocation})
 	assertLandedNear(t, landing(t, frames), left)
 	w.c.Send(encodeAppearing())
