@@ -38,6 +38,9 @@ type gameServerConfig struct {
 	EnableFallingDamage bool
 	UseBlowfishCipher   bool
 	TownCombatRule      int
+	// CharacterDeleteAfter is DeleteCharAfterDays: how long a deleted
+	// character waits before it is purged; zero purges it at once.
+	CharacterDeleteAfter time.Duration
 }
 
 // gameplayConfig aggregates the gameplay knobs read from the properties
@@ -918,6 +921,10 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 	if err != nil {
 		return gameServerConfig{}, err
 	}
+	deleteCharAfterDays, err := serverProps.Int("DeleteCharAfterDays", 7)
+	if err != nil {
+		return gameServerConfig{}, err
+	}
 	return gameServerConfig{
 		ListenAddr: listenAddress(serverProps.String("GameserverHostname", "*"), listenPort),
 		LoginAddr:  net.JoinHostPort(serverProps.String("LoginHost", "127.0.0.1"), strconv.Itoa(loginPort)),
@@ -949,6 +956,8 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 		EnableFallingDamage: serverProps.Bool("EnableFallingDamage", true),
 		UseBlowfishCipher:   serverProps.Bool("UseBlowfishCipher", true),
 		TownCombatRule:      townCombatRule,
+		// The reference adds DELETE_DAYS * 86400000L milliseconds to now.
+		CharacterDeleteAfter: time.Duration(deleteCharAfterDays) * 24 * time.Hour,
 	}, nil
 }
 

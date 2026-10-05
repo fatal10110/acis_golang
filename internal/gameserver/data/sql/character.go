@@ -271,14 +271,25 @@ func (s *CharacterStore) SetOffline(ctx context.Context, objectID int32, lastAcc
 	return nil
 }
 
+// petItemsOf selects the object ids of the items its pets carry for the
+// character bound as its one parameter: the rows saved under one of the
+// character's collars (see itemcontainer.NewPetInventory) at a pet location.
+const petItemsOf = "SELECT pet.object_id FROM items AS pet JOIN items AS collar ON pet.owner_id = collar.object_id" +
+	" WHERE collar.owner_id = ? AND pet.loc IN ('PET', 'PET_EQUIP')"
+
 // Purge removes the character row for objectID together with every row it
-// owns - its items, shortcuts, hennas, recipe book, subclasses, skills,
-// skill-save state, pets, item augmentations, the friend and block
-// relations naming it on either side, and its Olympiad record - as one transaction, so a failure or
-// cancellation partway through leaves all of them in place instead of
-// orphaning owned rows behind a deleted character. Pets and augmentations are deleted
-// before items, since both key off the character's still-live item ids. It
-// reports whether a character row was deleted.
+// owns - its items, the items its pets carry, shortcuts, hennas, recipe book,
+// subclasses, skills, skill-save state, pets, item augmentations, the friend
+// and block relations naming it on either side, and its Olympiad record - as
+// one transaction, so a failure or cancellation partway through leaves all of
+// them in place instead of orphaning owned rows behind a deleted character.
+//
+// A pet's items are saved under its collar rather than under the character
+// (the reference keys them on the player), so they are found through the
+// character's collars: their augmentations and pets rows, then the items
+// themselves, go first, while the collar rows still stand. Pets and
+// augmentations of the character's own items are deleted before those items
+// for the same reason. It reports whether a character row was deleted.
 func (s *CharacterStore) Purge(ctx context.Context, objectID int32) (bool, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -304,6 +315,18 @@ func (s *CharacterStore) Purge(ctx context.Context, objectID int32) (bool, error
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM character_skills_save WHERE char_obj_id = ?", objectID); err != nil {
 		return false, fmt.Errorf("purge character %d skills_save: %w", objectID, err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM augmentations WHERE item_oid IN ("+petItemsOf+")", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d pet item augmentations: %w", objectID, err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM pets WHERE item_obj_id IN ("+petItemsOf+")", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d pets of pet items: %w", objectID, err)
+	}
+	// A multi-table delete, not a subquery on items: MySQL refuses a DELETE
+	// that selects from its own target table.
+	if _, err := tx.ExecContext(ctx, "DELETE pet FROM items AS pet JOIN items AS collar ON pet.owner_id = collar.object_id"+
+		" WHERE collar.owner_id = ? AND pet.loc IN ('PET', 'PET_EQUIP')", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d pet items: %w", objectID, err)
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM pets WHERE item_obj_id IN (SELECT object_id FROM items WHERE items.owner_id = ?)", objectID); err != nil {
 		return false, fmt.Errorf("purge character %d pets: %w", objectID, err)

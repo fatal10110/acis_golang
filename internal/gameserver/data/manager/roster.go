@@ -339,9 +339,16 @@ func (r *Roster) purge(ctx context.Context, objectID int32) error {
 	return nil
 }
 
+// PurgesOnDelete reports whether MarkForDeletion purges a character at once
+// (DeleteCharAfterDays = 0) instead of scheduling it. A negative period,
+// which the reference stores as a deletion time already past and purges on
+// the character list that follows, purges at once here too.
+func (r *Roster) PurgesOnDelete() bool { return r.deleteAfter <= 0 }
+
 // MarkForDeletion schedules objectID for deletion after the Roster's grace
-// period, or purges it immediately when that period is zero. The caller
-// refuses a clan member's deletion first.
+// period, or purges it immediately when PurgesOnDelete. The caller refuses a
+// clan member's deletion first, and before an immediate purge waits for the
+// saves already queued, so none of them writes a row back after it.
 func (r *Roster) MarkForDeletion(ctx context.Context, objectID int32) error {
 	if r.deleteAfter <= 0 {
 		return r.purge(ctx, objectID)
