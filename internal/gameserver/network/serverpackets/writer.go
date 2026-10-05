@@ -43,8 +43,8 @@ func releaseFrameWriter(w *wire.Writer) {
 }
 
 // CopyFrame returns an independently owned pooled copy of frame for a session
-// that encrypts its outgoing bytes in place. It reports false when frame does
-// not contain a complete header.
-func CopyFrame(frame wire.Frame) (wire.Frame, bool) {
+// that encrypts its outgoing bytes in place. It returns an error instead when
+// frame is invalid or does not contain a complete header.
+func CopyFrame(frame wire.Frame) (wire.Frame, error) {
 	return wire.CopyFrame(frame)
 }

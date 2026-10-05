@@ -72,7 +72,13 @@ func (s *Session) sendLast(frame wire.Frame) {
 func (s *Session) send(frame wire.Frame, last bool) bool {
 	frameBytes := frame.Bytes()
 	if len(frameBytes) < frameHeaderSize {
+		// An invalid frame carries no bytes; report its own cause.
+		cause := frame.Err()
+		if cause == nil {
+			cause = wire.ShortFrameError(len(frameBytes))
+		}
 		frame.Release()
+		s.conn.rejects.report("session send", cause)
 		return false
 	}
 	if observe := s.conn.observeSend; observe != nil {
