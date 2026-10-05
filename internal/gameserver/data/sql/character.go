@@ -32,7 +32,7 @@ const characterColumns = `obj_Id, account_name, char_name,
 	COALESCE(onlinetime,0),
 	COALESCE(death_penalty_level,0), rec_have, rec_left,
 	clan_join_expiry_time, clan_create_expiry_time,
-	COALESCE(punish_level,0), COALESCE(punish_timer,0), COALESCE(wantspeace,0), nobless, isin7sdungeon`
+	COALESCE(punish_level,0), COALESCE(punish_timer,0), COALESCE(wantspeace,0), nobless, isin7sdungeon, varka_ketra_ally`
 
 // CharacterStore reads and writes the characters table.
 type CharacterStore struct {
@@ -68,7 +68,7 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 // Save persists a character's progress — the active and base classes, the base
 // class's level, exp and sp, expBeforeDeath, cur/max HP/CP/MP,
 // karma/pvpkills/pkkills, death_penalty_level, the accumulated session
-// playtime, the personal-surrender flag, the noblesse status, the Seven Signs dungeon membership and each subclass's progression — so a later reload reflects everything gained
+// playtime, the personal-surrender flag, the noblesse status, the Seven Signs dungeon membership, the Ketra/Varka faction standing and each subclass's progression — so a later reload reflects everything gained
 // since the last save instead of the row's creation-time values. Location and
 // appearance columns are not written here. The row is also marked online:
 // Save only runs for characters currently in game. Online is 1, or 2 for a
@@ -76,11 +76,11 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
 	resources, progression := st.Resources, st.Progression
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, base_class = ?, death_penalty_level = ?, onlinetime = ?, wantspeace = ?, nobless = ?, isin7sdungeon = ?, online = ?
+		`UPDATE characters SET level = ?, maxHp = ?, curHp = ?, maxCp = ?, curCp = ?, maxMp = ?, curMp = ?, exp = ?, expBeforeDeath = ?, sp = ?, karma = ?, pvpkills = ?, pkkills = ?, classid = ?, base_class = ?, death_penalty_level = ?, onlinetime = ?, wantspeace = ?, nobless = ?, isin7sdungeon = ?, varka_ketra_ally = ?, online = ?
 			 WHERE obj_Id = ?`,
 		progression.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
 		progression.Exp, progression.ExpBeforeDeath, progression.SP, st.Karma, st.PvPKills, st.PKKills, st.ClassID, st.BaseClassID, st.DeathPenaltyLevel, st.OnlineTime,
-		st.WantsPeace, st.Noble, st.In7sDungeon, onlineColumn(st.ClientDetached), st.ID,
+		st.WantsPeace, st.Noble, st.In7sDungeon, st.VarkaKetraAlliance, onlineColumn(st.ClientDetached), st.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("save character %d: %w", st.ID, err)
@@ -158,6 +158,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var wantsPeace int
 	var noble int
 	var in7sDungeon int
+	var varkaKetraAlliance int
 	var baseClassID int
 
 	err := row.Scan(
@@ -171,7 +172,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 		&onlineTime,
 		&deathPenaltyLevel, &recHave, &recLeft,
 		&clanJoinExpiry, &clanCreateExpiry,
-		&punishLevel, &punishTimer, &wantsPeace, &noble, &in7sDungeon,
+		&punishLevel, &punishTimer, &wantsPeace, &noble, &in7sDungeon, &varkaKetraAlliance,
 	)
 	if err != nil {
 		return nil, err
@@ -185,6 +186,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	c.SetWantsPeace(wantsPeace == 1)
 	c.SetNoble(noble == 1)
 	c.SetIn7sDungeon(in7sDungeon == 1)
+	c.SetVarkaKetraAlliance(varkaKetraAlliance)
 	c.Race = player.Race(race)
 	c.SetClassID(classID)
 	c.SetBaseClassID(baseClassID)
@@ -278,11 +280,12 @@ const petItemsOf = "SELECT pet.object_id FROM items AS pet JOIN items AS collar 
 	" WHERE collar.owner_id = ? AND pet.loc IN ('PET', 'PET_EQUIP')"
 
 // Purge removes the character row for objectID together with every row it
-// owns - its items, the items its pets carry, shortcuts, hennas, recipe book,
-// subclasses, skills, skill-save state, pets, item augmentations, the friend
-// and block relations naming it on either side, and its Olympiad record - as
-// one transaction, so a failure or cancellation partway through leaves all of
-// them in place instead of orphaning owned rows behind a deleted character.
+// owns - its items, the items its pets carry, shortcuts, macros, memos,
+// quest journal, hennas, recipe book, subclasses, skills, skill-save state,
+// pets, item augmentations, the friend and block relations naming it on
+// either side, and its Olympiad record - as one transaction, so a failure or
+// cancellation partway through leaves all of them in place instead of
+// orphaning owned rows behind a deleted character.
 //
 // A pet's items are saved under its collar rather than under the character
 // (the reference keys them on the player), so they are found through the
@@ -342,6 +345,12 @@ func (s *CharacterStore) Purge(ctx context.Context, objectID int32) (bool, error
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM character_macroses WHERE char_obj_id = ?", objectID); err != nil {
 		return false, fmt.Errorf("purge character %d macros: %w", objectID, err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM character_memo WHERE charId = ?", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d memos: %w", objectID, err)
+	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM character_quests WHERE charId = ?", objectID); err != nil {
+		return false, fmt.Errorf("purge character %d quests: %w", objectID, err)
 	}
 	if _, err := tx.ExecContext(ctx, "DELETE FROM character_hennas WHERE char_obj_id = ?", objectID); err != nil {
 		return false, fmt.Errorf("purge character %d hennas: %w", objectID, err)

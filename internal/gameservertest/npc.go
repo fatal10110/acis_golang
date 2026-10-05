@@ -640,7 +640,7 @@ func (s *Server) SpawnFolkNPCAt(t *testing.T, tmpl *npc.Template, at location.Lo
 		t.Fatalf("new npc instance: %v", err)
 	}
 	inst.Home, inst.HasHome = at, true
-	f, err := s.folkSpawner(nil, Geo{}).Spawn(inst, at, 0)
+	f, err := s.folkSpawner(nil, Geo{}).Spawn(inst, at, 0, nil)
 	if err != nil {
 		t.Fatalf("spawn folk npc: %v", err)
 	}
@@ -660,7 +660,7 @@ func (s *Server) SpawnCastingFolkNPCAt(t *testing.T, tmpl *npc.Template, at loca
 	inst.Home, inst.HasHome = at, true
 	spawner := s.folkSpawner(nil, Geo{})
 	spawner.Skills = defs
-	f, err := spawner.Spawn(inst, at, 0)
+	f, err := spawner.Spawn(inst, at, 0, nil)
 	if err != nil {
 		t.Fatalf("spawn folk npc: %v", err)
 	}
@@ -748,7 +748,7 @@ func (s *Server) SpawnRouteFolkNPC(t *testing.T, spec RouteFolkSpawn) (*npc.Folk
 	inst.SpawnHeading = spec.Heading
 	spawner := s.folkSpawner(walker, geo)
 	spawner.Skills = spec.Skills
-	f, err := spawner.Spawn(inst, spec.At, spec.Heading)
+	f, err := spawner.Spawn(inst, spec.At, spec.Heading, nil)
 	if err != nil {
 		t.Fatalf("spawn folk npc: %v", err)
 	}

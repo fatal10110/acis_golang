@@ -51,8 +51,9 @@ func (h *Hostile) Aggressive() bool {
 // attackable.Combatant, so a door can never be passed as target here. A
 // non-NPC target still within its post-fake-death grace period is excluded
 // too (the recent-fake-death check), and so is an invisible player or the
-// summon of one. Not modeled: the remaining Player-only sub-checks
-// (allied-Varka/allied-Ketra exclusion, rift-room memo). The follow gate's
+// summon of one, and a player — or the summon of one — allied with a
+// faction this NPC belongs to (see factionAllyTarget). Not modeled: the
+// rift-room memo sub-check. The follow gate's
 // distance decision reuses move.Controller.MaybeStartOffensiveFollow, which
 // reads the current intention's move-to-target flag, not the queued hold
 // desire's.
@@ -93,6 +94,9 @@ func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal in
 	if !targetIsNPC && attackable.HiddenActingPlayer(target) {
 		return false
 	}
+	if !targetIsNPC && h.factionAllyTarget(target) {
+		return false
+	}
 
 	cfg := h.aiSettings()
 	switch hostileKind(h.Instance) {
@@ -117,6 +121,39 @@ func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal in
 	}
 
 	return (allowPeaceful || h.Aggressive()) && h.CanSee(target)
+}
+
+// Faction clan tags an NPC template may carry, and the player alliance
+// each one spares.
+const (
+	varkaSilenosClan = "varka_silenos_clan"
+	ketraOrcClan     = "ketra_orc_clan"
+)
+
+// factionAlly is a player with a Ketra/Varka faction standing.
+type factionAlly interface {
+	AlliedWithVarka() bool
+	AlliedWithKetra() bool
+}
+
+// factionAllyTarget reports whether target's acting player — target
+// itself, or the owner of a summon — is allied with a faction h's template
+// is tagged with: Varka Silenos for varkaSilenosClan, the Ketra Orcs for
+// ketraOrcClan.
+func (h *Hostile) factionAllyTarget(target attackable.Combatant) bool {
+	acting := target
+	if owner, ok := target.Owner(); ok && owner != nil {
+		acting = owner
+	}
+	ally, ok := acting.(factionAlly)
+	if !ok {
+		return false
+	}
+	clans := h.Instance.Template.Clans
+	if ally.AlliedWithVarka() && slices.Contains(clans, varkaSilenosClan) {
+		return true
+	}
+	return ally.AlliedWithKetra() && slices.Contains(clans, ketraOrcClan)
 }
 
 // inRangeAndUnconcealed applies the range and silent-move gates the

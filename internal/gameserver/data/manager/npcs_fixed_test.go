@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -46,9 +45,9 @@ func fixedSpawnFixture(t *testing.T) (*Npcs, *world.State, *sim.Inline) {
 	walker, _ := task.NewWalker(nil, noRouteWalkerPath{}, time.Now, state)
 	queues := npcQueues()
 	npcs, err := NewNpcs(NewSpawns(table, nil), npc.NewTable([]*npc.Template{
-		{ID: 1, TemplateID: 1, Type: "Monster", Name: "Wolf", HPMax: 100, RunSpeed: 100, AIParams: commons.NewStatSet()},
-		{ID: 2, TemplateID: 2, Type: "Merchant", Name: "Lector", HPMax: 100, AIParams: commons.NewStatSet()},
-		{ID: 3, TemplateID: 3, Type: "HolyThing", Name: "Artifact", HPMax: 100, AIParams: commons.NewStatSet()},
+		{ID: 1, TemplateID: 1, Type: "Monster", Name: "Wolf", HPMax: 100, RunSpeed: 100},
+		{ID: 2, TemplateID: 2, Type: "Merchant", Name: "Lector", HPMax: 100},
+		{ID: 3, TemplateID: 3, Type: "HolyThing", Name: "Artifact", HPMax: 100},
 	}), groundGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
 		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, queues)
 	if err != nil {

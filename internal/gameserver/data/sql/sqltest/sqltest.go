@@ -177,6 +177,25 @@ const characterMacrosesSchema = "CREATE TABLE IF NOT EXISTS `character_macroses`
 	"  PRIMARY KEY (`char_obj_id`,`id`)\n" +
 	")"
 
+// characterQuestsSchema mirrors the shipped character_quests table
+// definition verbatim.
+const characterQuestsSchema = "CREATE TABLE IF NOT EXISTS `character_quests` (\n" +
+	"  `charId` INT UNSIGNED NOT NULL DEFAULT 0,\n" +
+	"  `name` VARCHAR(40) NOT NULL DEFAULT '',\n" +
+	"  `var` VARCHAR(20) NOT NULL DEFAULT '',\n" +
+	"  `value` VARCHAR(255),\n" +
+	"  PRIMARY KEY  (`charId`,`name`,`var`)\n" +
+	")"
+
+// characterMemoSchema mirrors the shipped character_memo table definition
+// verbatim.
+const characterMemoSchema = "CREATE TABLE IF NOT EXISTS `character_memo` (\n" +
+	"  `charId` INT(10) UNSIGNED NOT NULL,\n" +
+	"  `var` VARCHAR(255) NOT NULL,\n" +
+	"  `val` TEXT NOT NULL,\n" +
+	"  PRIMARY KEY (`charId`, `var`)\n" +
+	")"
+
 // characterRecommendsSchema mirrors the shipped character_recommends table
 // definition verbatim.
 const characterRecommendsSchema = "CREATE TABLE IF NOT EXISTS character_recommends ( \n" +
@@ -509,7 +528,7 @@ var schemaStmts = []string{
 	characterHennasSchema, characterRecipeBookSchema, petsSchema, characterSkillsSaveSchema,
 	sevenSignsSchema, sevenSignsStatusSchema, sevenSignsFestivalSchema, buylistsSchema, characterSubclassesSchema,
 	characterRelationsSchema, petitionSchema, petitionMessageSchema,
-	characterMacrosesSchema, characterRecommendsSchema,
+	characterMacrosesSchema, characterRecommendsSchema, characterQuestsSchema, characterMemoSchema,
 	clanDataSchema, clanPrivsSchema, clanSkillsSchema, clanSubpledgesSchema, clanWarsSchema, clanhallSchema, clanhallFunctionsSchema, auctionsSchema,
 	siegeClansSchema, castleSchema, castleManorProductionSchema, castleManorProcureSchema,
 	accountsSchema,

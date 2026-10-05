@@ -53,8 +53,7 @@ var errReloadNotPorted = errors.New("reload not ported yet")
 
 // reloadNotPorted answers a type no reload exists for yet, each tracked by
 // its issue: boat (#3404), buylist (#3405), config (#3406), door (#3407),
-// item (#3408), skill (#3409), zone (#3410), and script with the scripts
-// half of npc (#3411).
+// item (#3408), skill (#3409) and zone (#3410).
 func reloadNotPorted(*GameClientLink) error { return errReloadNotPorted }
 
 // reloadHook runs hook, errReloadNotPorted without one.
@@ -90,9 +89,9 @@ var reloadTypes = []reloadType{
 	{word: "htm", done: "The HTM cache has been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.HTML) }},
 	{word: "item", done: "Items' templates have been reloaded.", run: reloadNotPorted},
 	{word: "multisell", exact: true, done: "The multisell instance has been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Multisells) }},
-	{word: "npc", exact: true, done: "NPCs templates and Scripts have been reloaded.", run: (*GameClientLink).reloadNPCs},
+	{word: "npc", exact: true, done: "NPCs templates have been reloaded; scripts were not reloaded.", run: (*GameClientLink).reloadNPCs},
 	{word: "npcwalker", done: "Walking routes have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.WalkerRoutes) }},
-	{word: "script", exact: true, done: "Scripts have been reloaded.", run: reloadNotPorted},
+	{word: "script", exact: true, done: "Script reload is not supported; scripts load once, at server start.", run: reloadNothing},
 	{word: "skill", done: "Skills' XMLs have been reloaded.", run: reloadNotPorted},
 	{word: "teleport", done: "Teleport locations have been reloaded.", run: (*GameClientLink).reloadTeleports},
 	{word: "zone", done: "Zones have been reloaded.", run: reloadNotPorted},
@@ -154,9 +153,13 @@ func sendReloadUsage(live *livePlayer) {
 	}
 }
 
-// reloadNPCs reloads the NPC templates: NpcData.reload. The reference then
-// reloads the scripts (ScriptData.reload), which Go does not have yet
-// (#3411).
+// reloadNothing answers a type that is never reloaded: scripts are built
+// once, at boot, and their registry never changes.
+func reloadNothing(*GameClientLink) error { return nil }
+
+// reloadNPCs reloads the NPC templates: NpcData.reload. Scripts are not
+// reloaded with them; their bindings are keyed by NPC id, so the new
+// templates keep them.
 func (l *GameClientLink) reloadNPCs() error {
 	return reloadHook(l.reloads.NPCs)
 }

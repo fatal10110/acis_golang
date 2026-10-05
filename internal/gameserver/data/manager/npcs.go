@@ -47,7 +47,27 @@ type slotInfo struct {
 	fixed   bool
 	at      location.Location
 	heading int
+	// memory is what the slot hands every NPC it spawns: the entry's own
+	// AI parameters and the script memory carried from one life to the
+	// next.
+	memory *slotMemory
 }
+
+// slotMemory is a spawn slot as its NPCs see it (npc.SpawnSlot).
+type slotMemory struct {
+	params  npc.AIParams
+	scratch *npc.Scratch
+}
+
+func newSlotMemory(entry spawn.Entry) *slotMemory {
+	return &slotMemory{params: npc.AIParams(entry.AIParams), scratch: npc.NewScratch()}
+}
+
+// AIParams returns the spawn entry's <ai> values.
+func (m *slotMemory) AIParams() npc.AIParams { return m.params }
+
+// Scratch returns the slot's script memory.
+func (m *slotMemory) Scratch() *npc.Scratch { return m.scratch }
 
 // KillRewardConfig carries live reward settings loaded at game-server boot.
 type KillRewardConfig struct {

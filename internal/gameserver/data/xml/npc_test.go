@@ -131,9 +131,9 @@ func TestLoadNPCTemplates(t *testing.T) {
 
 		wantAI := map[string]string{"MoveAroundSocial": "0", "MoveAroundSocial1": "0", "MoveAroundSocial2": "0"}
 		for k, v := range wantAI {
-			got, err := gremlin.AIParams.GetString(k)
-			if err != nil || got != v {
-				t.Fatalf("Gremlin AIParams[%q] = %q, %v, want %q", k, got, err, v)
+			got, ok := gremlin.AIParams[k]
+			if !ok || got != v {
+				t.Fatalf("Gremlin AIParams[%q] = %q, %v, want %q", k, got, ok, v)
 			}
 		}
 
@@ -283,6 +283,19 @@ func TestLoadNPCTemplates(t *testing.T) {
 		for i, v := range want {
 			if buffalo.Clans[i] != v {
 				t.Fatalf("Trained Buffalo Clans = %v, want %v", buffalo.Clans, want)
+			}
+		}
+	})
+
+	t.Run("faction clan tags", func(t *testing.T) {
+		table := withNoItems
+		for id, want := range map[int]string{21324: "ketra_orc_clan", 21350: "varka_silenos_clan"} {
+			tmpl, ok := table.Get(id)
+			if !ok {
+				t.Fatalf("npc %d not loaded", id)
+			}
+			if len(tmpl.Clans) != 1 || tmpl.Clans[0] != want {
+				t.Fatalf("npc %d Clans = %v, want [%s]", id, tmpl.Clans, want)
 			}
 		}
 	})

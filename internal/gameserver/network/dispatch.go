@@ -419,6 +419,10 @@ type GameClientLink struct {
 	// recommendGate orders recommendations against the daily refresh; see
 	// RefreshDailyRecommendations.
 	recommendGate sync.RWMutex
+	// quests reads the quest journals selections load; scripts resolves
+	// their quest names. See quest.go.
+	quests  questStore
+	scripts scriptRegistry
 	// gms is the online game-master roster /gmlist reads and petitions
 	// notify.
 	gms admin.GMList[*livePlayer]
@@ -666,6 +670,10 @@ type GameClientLinkConfig struct {
 	// Recommendations persists who recommended whom and the counters; nil
 	// keeps them in memory only.
 	Recommendations recommendationStore
+	// Quests reads the quest journals; nil loads every journal empty.
+	Quests questStore
+	// Scripts is the script registry; nil resolves no journal quest.
+	Scripts scriptRegistry
 	// GMAudit records every admin command run (server.properties GMAudit);
 	// the zero logger records nothing.
 	GMAudit zerolog.Logger
@@ -838,6 +846,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.classMaster = cfg.ClassMaster
 	link.reloads = cfg.Reloads
 	link.recommendations = cfg.Recommendations
+	link.quests, link.scripts = cfg.Quests, cfg.Scripts
 	// Built here, not lazily: every client goroutine shares this link.
 	enchantCfg := enchantflow.DefaultConfig()
 	if cfg.PlayerConfig.Enchant != nil {

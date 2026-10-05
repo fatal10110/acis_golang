@@ -168,6 +168,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			gamesql.NewRecipeBookStore,
 			gamesql.NewMacroStore,
 			gamesql.NewRecommendationStore,
+			gamesql.NewQuestStore,
 			gamesql.NewSubclassStore,
 			gamesql.NewPetStore,
 			provideIDAllocator,
@@ -212,6 +213,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideKillRewardConfig,
 			provideSpellbookPolicy,
 			provideNpcs,
+			provideScripts,
 			network.NewSessionValidator,
 			provideLoginLinkState,
 			provideSkillPersistence,
@@ -232,6 +234,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideDataReloads,
 			provideGameClientLink,
 		),
+		fx.Invoke(buildScripts),
 		fx.Invoke(startClanDissolutions, startClanHallFunctions, startClanHalls, startSieges, startCastleManor),
 		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startDoorRegen, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startObserverTowers, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startHeroes, startOlympiad, startRaidPoints, startCursedWeapons, startBossZones, startSchemeBuffer, startWedding, startLottery, startFishingChampionship, startDerbyTrack, startDebugHTTP, startGameServer),
 	}
