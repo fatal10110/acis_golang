@@ -394,10 +394,10 @@ Chains run in parallel. Each hot file allows one open PR: `attackable.go`, `host
 | X3 | Admin NPC script info pages | A2, A11, E7 | #3398 |
 | X4 | Player alliance level and the faction capability | E3 | #908 |
 
-X4 (#908) is an M9 slice: it lands before the petrify branch of A11 (the petrify helper of the
-behavior base reads both ally checks) and before the alliance-gated proof quest Q607 (#175)
-registers. The faction quests, features and behaviors that use it stay in their M10 issues and
-depend on it.
+X4 (#908) is an M9 slice: it lands before the petrify branch of A11 (the petrify helper of
+the behavior base reads both ally checks) and before the alliance-gated proof quest Q607
+(#175) registers. The faction quests, features and behaviors that use it stay in their M10
+issues and depend on it.
 
 Must land in the same PR:
 
