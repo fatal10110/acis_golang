@@ -498,58 +498,14 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					continue
 				}
 			}
-			// A previous session of this character has left the world, so
-			// every save it queued is on the lane. Wait for them, then read
-			// the row fresh: the list above may predate those saves, and
-			// selection restores the character from its saved row.
-			// A wait that gave up refuses the selection silently, as the
-			// other early exits here do, rather than load unwritten rows.
-			if l.awaitPersistence(conn, c.ObjectID()) != nil {
+			selected, next := l.selectCharacter(ctx, conn, client, chars, req.Slot, c)
+			if selected != nil {
+				entering = selected
+			}
+			if next == selectionRefused {
 				continue
 			}
-			fresh, err := l.roster.Load(ctx, c.ObjectID())
-			if err != nil {
-				l.log.Error().Err(err).Int32("object_id", c.ObjectID()).Msg("select character: reload row")
-				continue
-			}
-			// The list may predate a ban stored since; the row is what
-			// counts.
-			if fresh.AccessLevel < 0 {
-				continue
-			}
-			c = fresh
-			chars[req.Slot] = fresh
-			l.clanService().RestoreMembership(c, time.Now())
-			l.applyLoadedAccessLevel(c)
-			tmpl, ok := l.templates.Get(c.ClassID())
-			if !ok {
-				l.log.Error().Int("class_id", c.ClassID()).Msg("select character: no template loaded")
-				return
-			}
-			// The selection restores the character in full. A restore that
-			// fails attaches nothing, and closes the connection.
-			selected, ok := l.restoreSelected(ctx, client, c)
-			if !ok {
-				client.closeNow()
-				return
-			}
-			entering = selected
-			session.SendFrame(ssqSkyFrame(l.sevenSigns))
-			client.SetState(StateEntering)
-			session.SendFrame(serverpackets.FrameCharSelected(serverpackets.CharSelectedSnapshot{
-				Character: c, Template: tmpl, SessionID: client.SessionKey().PlayKey1,
-				GameTime: l.gameTime(),
-			}))
-			// From here on lookups by name and id find the character, as
-			// the world checks above do for a later selection; it is spawned
-			// only once EnterWorld arrives. Registered after CharSelected,
-			// so nothing sent to it can reach its client ahead of the
-			// selection's answer.
-			if l.world != nil {
-				l.world.AddPlayer(selected)
-			}
-			if !l.takeOverSelected(selected) {
-				client.closeNow()
+			if next == selectionStopped {
 				return
 			}
 
