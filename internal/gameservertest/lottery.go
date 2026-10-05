@@ -38,13 +38,13 @@ func (f *lotteryFixture) newLottery(db *sql.DB, worker *persist.Worker, state *w
 }
 
 // start seeds, restores and starts l, stopping it when tb ends.
-func (f *lotteryFixture) start(tb testing.TB, db *sql.DB, l *lottery.Lottery) {
+func (f *lotteryFixture) start(tb testing.TB, db *sql.DB, ids *sequentialIDs, l *lottery.Lottery) {
 	tb.Helper()
 	if f == nil {
 		return
 	}
 	if f.seed != nil {
-		f.seed(db)
+		ids.seed(tb, db, func() { f.seed(db) })
 	}
 	if err := l.Restore(context.Background()); err != nil {
 		tb.Fatalf("restore lottery: %v", err)
