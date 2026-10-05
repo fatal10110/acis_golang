@@ -20,8 +20,9 @@ import (
 // suffixes that make a script's answer a page file. It is looked up under
 // pageDir, or under Root when it is a full "data/html/script/..." path. A
 // full path elsewhere under data/html is outside the index and not checked.
-// A literal starting with '-', '.' or '/', or holding a '%', is a fragment
-// of a name built at run time and is not checked.
+// A literal holding a '%', full path or not, or a short name starting with
+// '-', '.' or '/', is a fragment of a name built at run time and is not
+// checked.
 //
 // exempt lists literals that are not checked: fragments the rules above
 // cannot tell from names, and pages the script names but the datapack does
@@ -97,6 +98,9 @@ func pageKey(pageDir, lit string) (string, bool) {
 	if !strings.HasSuffix(lit, ".htm") && !strings.HasSuffix(lit, ".html") {
 		return "", false
 	}
+	if strings.ContainsRune(lit, '%') {
+		return "", false
+	}
 	full := strings.TrimPrefix(lit, "./")
 	if rest, ok := strings.CutPrefix(full, Root+"/"); ok {
 		return rest, true
@@ -104,7 +108,7 @@ func pageKey(pageDir, lit string) (string, bool) {
 	if strings.HasPrefix(full, "data/html/") {
 		return "", false
 	}
-	if strings.ContainsRune(lit, '%') || strings.ContainsAny(lit[:1], "-./") {
+	if strings.ContainsAny(lit[:1], "-./") {
 		return "", false
 	}
 	return pageDir + "/" + lit, true
