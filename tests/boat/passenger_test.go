@@ -75,9 +75,9 @@ func TestPassengerWithoutTicketIsPutAshore(t *testing.T) {
 	sail(srv, 1)
 	rest, _ := withoutChecks(passengerLog(t, srv, c))
 	// The teleport aborts whatever the passenger does, as every teleport
-	// does, with its ActionFailed acks.
+	// does, with its ActionFailed acks; the fifth is the target reset's.
 	assertLog(t, "second 308", rest,
-		af, af, af, af, teleport(me, runeOust), sm(serverpackets.SystemMessageExitPeacefulZone), sm(serverpackets.SystemMessageNotCorrectBoatTicket))
+		af, af, af, af, af, teleport(me, runeOust), sm(serverpackets.SystemMessageExitPeacefulZone), sm(serverpackets.SystemMessageNotCorrectBoatTicket))
 
 	sail(srv, 1)
 	if _, checks := withoutChecks(passengerLog(t, srv, c)); len(checks) != 0 {

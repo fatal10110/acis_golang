@@ -24,6 +24,17 @@ func (c *Character) StoreTarget(t world.Tracked) {
 	c.target = t
 }
 
+// TakeTarget clears the selection and returns the one it held, or nil. The
+// read and the clear are one step, so a selection made by another goroutine
+// in between is never dropped unannounced.
+func (c *Character) TakeTarget() world.Tracked {
+	c.stateMu.Lock()
+	defer c.stateMu.Unlock()
+	old := c.target
+	c.target = nil
+	return old
+}
+
 // ClearTargetIf clears the selection when it is t and reports whether it
 // did. The check and the clear are one step, so a selection made by the
 // character's own goroutine in between is never wiped by another goroutine.

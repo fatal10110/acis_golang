@@ -198,8 +198,11 @@ var (
 	// 1298-1306) stops the attack and the cast with the player already
 	// teleporting, and each stop answers ActionFailed twice, its refused
 	// tryToIdle's (PlayableAI.java:354-360) and its own (PlayerAttack.java:
-	// 58-63, PlayerCast.java:381-387).
+	// 58-63, PlayerCast.java:381-387). The abort's target reset answers one
+	// more even with nothing selected (Player.setTarget(null),
+	// Player.java:2497-2499).
 	jumped = [][]byte{
+		{serverpackets.OpcodeActionFailed},
 		{serverpackets.OpcodeActionFailed},
 		{serverpackets.OpcodeActionFailed},
 		{serverpackets.OpcodeActionFailed},

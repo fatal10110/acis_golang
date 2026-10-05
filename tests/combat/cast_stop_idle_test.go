@@ -182,6 +182,8 @@ func TestCastStopWalksThenStopsForQueuedMove(t *testing.T) {
 // runs the queued intention (or a nextActionAttack follow-up), whose think
 // is denied and answers ActionFailed; then tryToIdle answers ActionFailed,
 // leaving the next intention alone, and PlayerCast.stop answers its own.
+// abortAll(true) then resets the selected monster (Player.setTarget(null),
+// Player.java:2497-2505): ActionFailed, then TargetUnselected.
 // TeleportToLocation follows, and the TELEPORTED event's doIdleIntention
 // (CreatureAI.java:90-93) drops whatever was still queued.
 
@@ -208,6 +210,7 @@ func TestTeleportMidCastActionFailedCounts(t *testing.T) {
 	const (
 		af  byte = serverpackets.OpcodeActionFailed
 		msc byte = serverpackets.OpcodeMagicSkillCanceled
+		tu  byte = serverpackets.OpcodeTargetUnselected
 		ttl byte = serverpackets.OpcodeTeleportToLocation
 	)
 	cases := []struct {
@@ -216,14 +219,14 @@ func TestTeleportMidCastActionFailedCounts(t *testing.T) {
 		queue func(t *testing.T, c *scriptedClient, hostileID int32)
 		want  []byte
 	}{
-		{name: "nothing queued", long: queueLongSkillID, want: []byte{af, af, msc, af, af, ttl}},
-		{name: "attack queued", long: queueLongSkillID, queue: requestAttackMidCast, want: []byte{af, af, msc, af, af, af, ttl}},
+		{name: "nothing queued", long: queueLongSkillID, want: []byte{af, af, msc, af, af, af, tu, ttl}},
+		{name: "attack queued", long: queueLongSkillID, queue: requestAttackMidCast, want: []byte{af, af, msc, af, af, af, af, tu, ttl}},
 		{name: "walk queued", long: queueLongSkillID, queue: func(t *testing.T, c *scriptedClient, _ int32) {
 			c.Send(encodeMoveBackwardToLocation(int32(playerOrigin.X)-300, int32(playerOrigin.Y), int32(playerOrigin.Z)))
 			expectGroundClickAck(t, c)
 			assertFrameOpcode(t, mustRead(t, c, "mid-cast walk ActionFailed"), af, "mid-cast walk ActionFailed")
-		}, want: []byte{af, af, msc, af, af, af, ttl}},
-		{name: "nextActionAttack cast", long: queueFollowUpSkillID, want: []byte{af, af, msc, af, af, af, ttl}},
+		}, want: []byte{af, af, msc, af, af, af, af, tu, ttl}},
+		{name: "nextActionAttack cast", long: queueFollowUpSkillID, want: []byte{af, af, msc, af, af, af, af, tu, ttl}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -248,8 +251,9 @@ func TestTeleportMidCastActionFailedCounts(t *testing.T) {
 }
 
 // TestTeleportOutsideCastActionFailedCounts: with no cast in flight the
-// same abortAll answers the attack stop's two ActionFailed and the cast
-// stop's two, and no MagicSkillCanceled.
+// same abortAll answers the attack stop's two ActionFailed, the cast stop's
+// two and the target reset's one (Player.setTarget(null) answers even an
+// empty selection, Player.java:2497-2499), and no MagicSkillCanceled.
 func TestTeleportOutsideCastActionFailedCounts(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
@@ -262,7 +266,7 @@ func TestTeleportOutsideCastActionFailedCounts(t *testing.T) {
 
 	const af, ttl byte = serverpackets.OpcodeActionFailed, serverpackets.OpcodeTeleportToLocation
 	got := teleportOpcodes(t, srv, onlinePlayer(t, srv, srv.SoleObjectID(t)))
-	if want := []byte{af, af, af, af, ttl}; string(got) != string(want) {
+	if want := []byte{af, af, af, af, af, ttl}; string(got) != string(want) {
 		t.Fatalf("teleport outside a cast sent opcodes %x up to TeleportToLocation, want %x", got, want)
 	}
 }

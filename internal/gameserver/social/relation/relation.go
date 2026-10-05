@@ -46,8 +46,8 @@ func makePair(a, b int32) pair {
 	return pair{a, b}
 }
 
-// Manager holds every character's relations. mu guards relations and
-// changed; any goroutine may call any method.
+// Manager holds every character's relations. mu guards relations, changed
+// and order; any goroutine may call any method.
 type Manager struct {
 	mu sync.RWMutex
 	// relations keeps a pair whose flags were all cleared, with 0, until
@@ -56,17 +56,23 @@ type Manager struct {
 	// changed is every pair whose flags changed since load: the only rows
 	// the save writes.
 	changed map[pair]struct{}
+	// order is every pair of relations in the order a friend or block list
+	// is gathered in.
+	order pairTable
 }
 
-// NewManager returns a manager holding rows. A pair listed twice, in either
-// order, keeps the first row's flags.
+// NewManager returns a manager holding rows, given in the order they are
+// stored (the order the lists are gathered in depends on it). A pair listed
+// twice, in either order, keeps the first row's flags.
 func NewManager(rows []Row) *Manager {
 	m := &Manager{relations: make(map[pair]int32, len(rows)), changed: make(map[pair]struct{})}
 	for _, r := range rows {
 		k := makePair(r.CharID, r.FriendID)
-		if _, ok := m.relations[k]; !ok {
+		_, held := m.relations[k]
+		if !held {
 			m.relations[k] = r.Relation
 		}
+		m.order.update(k, !held)
 	}
 	return m
 }
@@ -91,11 +97,10 @@ func (m *Manager) IsBlocked(owner, target int32) bool {
 // FriendIDs returns the ids on id's friend list, in the order the client is
 // sent them (see clientOrder).
 func (m *Manager) FriendIDs(id int32) []int32 {
-	m.mu.RLock()
 	var ids []int32
-	for k, rel := range m.relations {
+	m.walk(func(k pair, rel int32) {
 		if rel&flagFriends == 0 {
-			continue
+			return
 		}
 		switch id {
 		case k.low:
@@ -103,31 +108,43 @@ func (m *Manager) FriendIDs(id int32) []int32 {
 		case k.high:
 			ids = append(ids, k.low)
 		}
-	}
-	m.mu.RUnlock()
+	})
 	return clientOrder(ids)
 }
 
 // BlockedIDs returns the ids on id's block list, in the order the client is
 // sent them (see clientOrder).
 func (m *Manager) BlockedIDs(id int32) []int32 {
-	m.mu.RLock()
 	var ids []int32
-	for k, rel := range m.relations {
+	m.walk(func(k pair, rel int32) {
 		switch {
 		case id == k.low && rel&flagLowBlocksHigh != 0:
 			ids = append(ids, k.high)
 		case id == k.high && rel&flagHighBlocksLow != 0:
 			ids = append(ids, k.low)
 		}
-	}
-	m.mu.RUnlock()
+	})
 	return clientOrder(ids)
 }
 
-// AddFriend puts a and b on each other's friend list.
+// walk calls fn on every pair and its flags, in the order a list is
+// gathered in.
+func (m *Manager) walk(fn func(k pair, rel int32)) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, b := range m.order.bins {
+		for _, k := range b.pairs {
+			fn(k, m.relations[k])
+		}
+	}
+}
+
+// AddFriend puts a and b on each other's friend list. The reference answer
+// to an invitation adds the pair once from each side: the second update
+// changes no flags but counts for the order (see pairTable).
 func (m *Manager) AddFriend(a, b int32) {
 	m.update(a, b, flagFriends, true)
+	m.update(b, a, flagFriends, true)
 }
 
 // RemoveFriend takes a and b off each other's friend list. It reports false,
@@ -169,6 +186,7 @@ func (m *Manager) update(a, b, flag int32, set bool) bool {
 			m.relations[k] = rel | flag
 			m.changed[k] = struct{}{}
 		}
+		m.order.update(k, !ok)
 		return true
 	}
 	if !ok || rel&flag == 0 {
@@ -176,6 +194,7 @@ func (m *Manager) update(a, b, flag int32, set bool) bool {
 	}
 	m.relations[k] = rel &^ flag
 	m.changed[k] = struct{}{}
+	m.order.update(k, false)
 	return true
 }
 
