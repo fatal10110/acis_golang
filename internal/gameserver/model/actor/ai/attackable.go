@@ -71,6 +71,10 @@ type AttackableActor interface {
 	// that clock, unless the returned timer is stopped first. The wander
 	// chain's firings use it.
 	After(d time.Duration, fn func()) Timer
+	// AtHookPoint gives the behavior bound to the actor's template its turn
+	// at p, on the goroutine that reached p, with the AI loop unlocked (see
+	// HookPoint).
+	AtHookPoint(p HookPoint)
 }
 
 // Timer is a pending one-shot task armed by AttackableActor.After.
@@ -175,6 +179,8 @@ type intention struct {
 // end reaches ClearCurrentDesire synchronously from the cast controller, so
 // code holding mu stops the cast controller only while no cast is in
 // flight: the idle aborts and every intention step first check castingNow.
+// A pass releases mu at each HookPoint, so another entry point may run a
+// whole pass there; the pass re-reads what mu guards after each point.
 type Attackable struct {
 	actor  AttackableActor
 	move   MoveController
@@ -471,6 +477,7 @@ func (a *Attackable) addFollowDesire(target attackable.Combatant, weight float64
 	})
 }
 
+// thinkIdle aborts every action, goes idle and opens the no-desire point.
 func (a *Attackable) thinkIdle() {
 	a.move.Stop()
 	a.attack.Stop()
@@ -479,6 +486,7 @@ func (a *Attackable) thinkIdle() {
 	}
 	a.actor.ForceWalkStance()
 	a.setCurrent(intention{kind: IntentionIdle})
+	a.atHookPoint(HookNoDesire)
 }
 
 func (a *Attackable) queueIdleFollow() {
@@ -705,8 +713,9 @@ const (
 
 // Think advances the current intention once, for a bow's reuse ending and
 // a control effect ending; an arrival does not think. It never selects a
-// queued desire, even from idle, follow or wander, and does not run
-// empty-queue idle abort: RunAI and TickThink do both. A walk an arrival
+// queued desire, even from idle, follow or wander, and never idles a busy
+// actor on an empty queue: RunAI and TickThink do both. An actor already
+// idle repeats its idle step and opens the no-desire point. A walk an arrival
 // finished is still current, so Think steps it again; a wander it finished
 // takes no step. A non-nil return
 // reports that an intention step ran but a broadcast within it failed; the
@@ -735,9 +744,12 @@ func (a *Attackable) TickThink() error {
 
 // AttackFinished is a swing finishing: RunAI's desire selection, followed
 // by the finished attack's think. An in-control actor's selection already
-// stepped the current intention, so only an out-of-control one, which
-// selects nothing, takes that think as a continue pass: a confused actor
-// keeps swinging at its current target while a stunned one does nothing.
+// stepped a busy intention; one left idle, whether it was idle already or
+// the selection's empty-queue idle idled it, runs the idle step again, so
+// the no-desire point opens once more, and queues no idle follow or wander.
+// An out-of-control actor selects nothing and takes that think as a
+// continue pass: a confused actor keeps swinging at its current target
+// while a stunned one does nothing.
 func (a *Attackable) AttackFinished() error {
 	return a.think(thinkAttackFinished)
 }
@@ -771,17 +783,26 @@ func (a *Attackable) think(mode thinkMode) error {
 	defer a.mu.Unlock()
 
 	updateTick := mode == thinkTick
+	// Only an actor idle when the pass starts repeats its idle step on a
+	// continue pass; one this pass drops to idle takes no step.
+	idleAtStart := a.current.kind == IntentionIdle
+	// The first-cycle promotion gate is decided before the see-creature
+	// point: an attack desire queued there does not open it.
+	instantRun := a.lifeTime == 0 && a.desires.hasKind(IntentionAttack)
+	if updateTick {
+		a.atHookPoint(HookSeeCreature)
+	}
 	a.passStep = a.step
 	if updateTick && a.ticked {
 		a.passStep = a.tickStep
 		a.ticked = false
 	}
-	instantRun := a.lifeTime == 0 && a.desires.hasKind(IntentionAttack)
 	outOfControl := a.actor.OutOfControl()
 	a.refreshCombatMemory()
 	a.pruneDesires(outOfControl)
 	onEvent := mode == thinkEvent || mode == thinkAttackFinished
 	if onEvent && !outOfControl && a.idleOnEmptyQueue() {
+		a.idleAfterFinishedAttack(mode, true)
 		return nil
 	}
 	if !outOfControl {
@@ -826,23 +847,39 @@ func (a *Attackable) think(mode thinkMode) error {
 			a.idleAndRequeue()
 		}
 		if mode == thinkAttackFinished && canPromote {
-			return a.continueCurrent()
+			return a.continueCurrent(idleAtStart)
 		}
 		return nil
 	}
-	if !canPromote {
-		return nil
-	}
 	if mode == thinkContinue {
-		return a.continueCurrent()
+		if !canPromote {
+			return nil
+		}
+		return a.continueCurrent(idleAtStart)
 	}
-	err := a.promoteAndStep()
+	var err error
+	if canPromote {
+		err = a.promoteAndStep()
+	}
 	if idleAfterLatch {
 		if _, ok := a.desires.Peek(); !ok && !a.castingNow() {
 			a.idleAndRequeue()
 		}
 	}
+	a.idleAfterFinishedAttack(mode, idleAtStart)
 	return err
+}
+
+// idleAfterFinishedAttack is the finished attack's think on an in-control
+// actor, after desire selection: an actor left idle runs the idle step
+// again, so the no-desire point opens, and queues no idle follow or wander.
+// wasIdle reports that the actor was idle when the pass started or that the
+// selection's empty-queue idle idled it; an attack or cast the pass silently
+// dropped to idle was neither and takes no idle step.
+func (a *Attackable) idleAfterFinishedAttack(mode thinkMode, wasIdle bool) {
+	if mode == thinkAttackFinished && wasIdle && a.current.kind == IntentionIdle {
+		a.thinkIdle()
+	}
 }
 
 // idleAndRequeue is the empty-queue idle: abort everything, go idle, and
@@ -860,11 +897,17 @@ func (a *Attackable) idleAndRequeue() {
 // TickThink. It neither takes nor updates the attack latch, leaves
 // lastDesire to desire selection, and does not re-select on a lost target.
 // A walk steps even when an arrival already finished it: one that stopped
-// short of its destination sets off again. Idle and wander take no step: a
-// truly idle actor already went through thinkIdle, so it stands walking
-// with nothing left to abort, and the continue pass has no wander step.
-func (a *Attackable) continueCurrent() error {
+// short of its destination sets off again. An actor that was idle when the
+// pass started (wasIdle) runs the idle step again, so the no-desire point
+// opens, but queues no idle follow or wander: that is the periodic cycle's.
+// An intention this pass dropped to idle takes no step. The continue pass
+// has no wander step.
+func (a *Attackable) continueCurrent(wasIdle bool) error {
 	switch a.current.kind {
+	case IntentionIdle:
+		if wasIdle {
+			a.thinkIdle()
+		}
 	case IntentionAttack:
 		_, err := a.thinkAttack()
 		return err
@@ -1078,6 +1121,9 @@ func (a *Attackable) tickOutOfTerritory() {
 	}
 }
 
+// syncOOTSweepLocked disarms the out-of-territory stale-hate sweep on an
+// arrival inside territory, and arms it on the first one outside, after
+// the out-of-territory point.
 func (a *Attackable) syncOOTSweepLocked() {
 	if a.actor.InTerritory() {
 		a.ootSweep = false
@@ -1087,6 +1133,7 @@ func (a *Attackable) syncOOTSweepLocked() {
 	if a.ootSweep {
 		return
 	}
+	a.atHookPoint(HookOutOfTerritory)
 	a.ootSweep = true
 	a.nextOOTSweep = a.now().Add(ootSweepInitialDelay)
 }
@@ -1238,6 +1285,7 @@ func (a *Attackable) thinkMoveTo() {
 		return
 	}
 	if ox, oy, oz := a.actor.Position(); (location.Location{X: ox, Y: oy, Z: oz}) == a.current.loc {
+		a.atHookPoint(HookMoveFinished)
 		a.clearCurrentDesire()
 		return
 	}
@@ -1250,16 +1298,24 @@ func (a *Attackable) thinkMoveTo() {
 // selection never steps it again without its desire (currentQueued). A
 // Think before then (a control effect ending) steps a walk once more and
 // leaves a wander alone. Arrival itself never thinks.
+// A MOVE_TO or FLEE opens the move-finished point before its desire is
+// dropped.
 // Escort FOLLOW returns without restoring spawn heading or arming the
 // out-of-territory stale-hate sweep; combat chase stays ATTACK and still
 // runs both.
 func (a *Attackable) Arrived() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.current.kind == IntentionFollow {
+	switch a.current.kind {
+	case IntentionFollow:
 		return
+	case IntentionMoveTo, IntentionFlee:
+		// IntentionFlee is dormant until promoteNext can make it current.
+		a.atHookPoint(HookMoveFinished)
+		a.clearCurrentDesire()
+	case IntentionWander:
+		a.clearCurrentDesire()
 	}
-	a.clearArrivalDesire()
 	a.actor.RestoreSpawnHeadingIfAtHome()
 	a.syncOOTSweepLocked()
 }
