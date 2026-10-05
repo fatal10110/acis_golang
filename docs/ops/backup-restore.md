@@ -90,6 +90,7 @@ restored rows, and the login server reads the registered game servers only at st
 ```bash
 db=backups/acis-db-<stamp>.sql.gz
 files=backups/acis-files-<stamp>.tar.gz
+mkdir -p "${ACIS_CONFIG_DIR:-./config}"    # a fresh host or checkout has no config dir yet
 cfg=$(cd "${ACIS_CONFIG_DIR:-./config}" && pwd)
 datapack=$(cd "${ACIS_DATAPACK_DIR:-../aCis_datapack}" && pwd)
 
