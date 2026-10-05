@@ -311,7 +311,8 @@ func TestPetPickupUnhandledHerbIsAcknowledged(t *testing.T) {
 // dropped while the wolf already carries some. The looted stack merges into
 // the carried one: the owner reads one PetInventoryUpdate, the carried row
 // grows to the sum, and the looted instance is deleted rather than saved as
-// a second pet row beside it.
+// a second pet row beside it. The owner reads PET_PICKED_S1_ADENA (1023) for
+// the looted 40 (Pet.addItem, Pet.java:159-160) before that update.
 func TestPetPickupMergesIntoCarriedStack(t *testing.T) {
 	t.Parallel()
 	h, wolf := bootHerbWolf(t, seedItem{TemplateID: item.AdenaID, Count: 50})
@@ -325,9 +326,10 @@ func TestPetPickupMergesIntoCarriedStack(t *testing.T) {
 	h.settleInventoryUpdates(t)
 
 	rest := requirePickupHead(t, h.petPickup(t, adena), wolf, adena)
-	if got, want := frameOpcodes(rest), []byte{serverpackets.OpcodePetInventoryUpdate}; !slices.Equal(got, want) {
-		t.Fatalf("merge pickup frames after the loot broadcast = %x, want one PetInventoryUpdate", got)
+	if got, want := frameOpcodes(rest), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodePetInventoryUpdate}; !slices.Equal(got, want) {
+		t.Fatalf("merge pickup frames after the loot broadcast = %x, want PET_PICKED_S1_ADENA then one PetInventoryUpdate", got)
 	}
+	requirePetPicked(t, rest, petPickedS1Adena, smParam{smParamItemNumber, 40})
 	h.srv.FlushItems(t)
 	rows, err := h.srv.Items.ListByOwner(petCtx(), h.collarID)
 	if err != nil {
