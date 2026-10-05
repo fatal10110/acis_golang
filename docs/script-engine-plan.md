@@ -117,8 +117,9 @@ The boot spawn pass moves out of the `Npcs` constructor
 **Spawn makers** have their own registry keyed by the spawnlist `<ai type>` string, one maker
 value per npcmaker, with the default maker for unknown types. 958 datapack makers
 (`random_spawn_treasurebox`, `random_maker`) stay default permanently. Maker timers are plain
-engine-queue `After` calls outside the timer registry: they are unkeyed, may overlap and are
-never cancelled.
+engine-queue `After` or `Every` calls outside the timer registry: they are unkeyed, may
+overlap and are not cancelled, except that the `benom_maker` siege maker stops its own
+periodic tower check, so `Every` hands the maker its ticker handle.
 
 **Scheduled tasks** are catalog scripts with one schedule hook. The reference alternates a
 start and an end hook when an entry sets `end`. No live task sets it (the only live `end` in
@@ -272,7 +273,8 @@ A nil NPC or player means "bound to none", never a wildcard.
   be in the world and strictly within 150 (3D, centre to centre); that NPC must have a
   talk-bound script equal to the named one (any two behaviors count as equal). Every
   rejection is silent.
-- The `npc_` handler always appends one ActionFailed. A page therefore gives page,
+- The `npc_` handler appends one ActionFailed to every accepted command; a whitelist
+  rejection or an id that does not parse sends nothing. A page therefore gives page,
   ActionFailed, ActionFailed.
 - Hostile-typed NPCs need the same path: 48 quests bind talk or quest start to guards.
 - Range checks are strict `<`, centre to centre. `party.InRange` (`<=` plus collision radii)
