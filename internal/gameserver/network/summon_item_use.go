@@ -269,7 +269,8 @@ func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x
 	if err != nil {
 		return false
 	}
-	l.world.Spawn(decoration, x, y, z, heading)
+	decoration.Attach(npc.DecorationRuntime{World: l.world, Zones: l.zones, Sink: &decorationSink{world: l.world, d: decoration}})
+	decoration.Spawn(x, y, z, heading)
 	return true
 }
 

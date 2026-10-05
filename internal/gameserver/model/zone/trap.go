@@ -18,12 +18,13 @@ type Trap struct {
 	EventID int
 	// Armed reports whether the castle owner armed the trap.
 	// Unsynchronized: dormant() may run on any actor goroutine that
-	// crosses the zone. No production writer exists yet; the trap-arming
+	// crosses the zone, and on the damage pulse's queue. No production
+	// writer exists yet (FlameTower zone enabling, #465); the trap-arming
 	// port must switch this to atomic.Bool (or equivalent) before a
 	// concurrent writer lands.
 	Armed bool
 	// SiegeActive reports whether the linked castle's siege is running;
-	// nil (until the siege system wires it) reads as not running.
+	// nil reads as not running. The game server wires it at boot.
 	SiegeActive func() bool
 }
 
@@ -58,11 +59,11 @@ type Damage struct {
 	InitialDelay time.Duration
 	ReuseDelay   time.Duration
 
-	// StartPulse begins the periodic damage task; nil until the combat
-	// system wires it. The zone fires it at most once until PulseStopped
-	// resets the latch. Hook implementations must tolerate overlapping
-	// calls when a task resets the latch before its previous StartPulse
-	// invocation returns.
+	// StartPulse begins the periodic damage task; nil leaves the zone
+	// harmless. The zone fires it at most once until PulseStopped resets
+	// the latch. Hook implementations must tolerate overlapping calls when
+	// a task resets the latch before its previous StartPulse invocation
+	// returns.
 	StartPulse func()
 
 	pulsing atomic.Bool
@@ -148,10 +149,18 @@ func exitDanger(a Actor) {
 	}
 }
 
+// Live reports whether the damage pulse keeps running: the zone deals
+// damage and is not a dormant castle trap (DamageZone's task stop rule).
+func (z *Damage) Live() bool { return z.HPDamage > 0 && !z.dormant() }
+
 // PulseStopped resets the pulse latch; the damage task calls it when it
-// shuts itself down, so the next entry can start a fresh pulse.
-func (z *Damage) PulseStopped() {
+// shuts itself down, so the next entry can start a fresh pulse. It reports
+// true, holding the latch again, when a live zone still has occupants: one
+// entered after the task's last look, and its entry found the latch still
+// held, so the caller must start a fresh pulse for it.
+func (z *Damage) PulseStopped() bool {
 	z.pulsing.Store(false)
+	return z.Live() && len(z.Occupants()) > 0 && z.pulsing.CompareAndSwap(false, true)
 }
 
 // Swamp is a trap that slows down everyone wading through it.
