@@ -1,6 +1,8 @@
 package npc
 
 import (
+	"sync"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
@@ -32,6 +34,11 @@ type EffectPoint struct {
 	stats fixedStats
 	// zones is its zone membership; SetZones gives it the zone index.
 	zones *zoneMember
+	// placeMu serializes Spawn and Despawn: the caster spawning the point
+	// and its own queue removing it (its effect ending, //unspawnall) run
+	// on different queues, and a removal landing between the spawn and its
+	// zone entry would leave the removed point in its zones.
+	placeMu sync.Mutex
 }
 
 // NewEffectPoint creates an unspawned EffectPoint from template, attributed
@@ -136,6 +143,8 @@ func (ep *EffectPoint) Spawn(x, y, z, heading int) {
 	if ep.world == nil {
 		return
 	}
+	ep.placeMu.Lock()
+	defer ep.placeMu.Unlock()
 	ep.world.Spawn(ep, x, y, z, heading)
 	ep.zones.enter()
 }
@@ -147,9 +156,11 @@ func (ep *EffectPoint) Despawn() {
 	if ep.world == nil {
 		return
 	}
+	ep.placeMu.Lock()
 	x, y, z := ep.Position()
 	ep.zones.leave(location.Location{X: x, Y: y, Z: z})
 	ep.world.Despawn(ep)
+	ep.placeMu.Unlock()
 	// Stop the periodic effect sweep from reaching this signet point's
 	// list: it exists only to host that list, so leaving the list
 	// registered after Despawn would tick a signet forever past its
