@@ -3,7 +3,9 @@ package npc
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -25,19 +27,63 @@ type EffectPoint struct {
 	world   *world.State
 	sink    event.Sink
 	log     zerolog.Logger
+	// stats are the client-visible stats it is shown with, fixed at
+	// creation.
+	stats fixedStats
+	// zones is its zone membership; SetZones gives it the zone index.
+	zones *zoneMember
 }
 
 // NewEffectPoint creates an unspawned EffectPoint from template, attributed
 // to ownerID (the acting player's object id), whose work runs on queue.
-func NewEffectPoint(objectID int32, template *Template, ownerID int32, queue *sim.Queue, opts ...effect.Option) (*EffectPoint, error) {
+// skills, when not nil, resolves the template's passive skills into the
+// stats it is shown with.
+func NewEffectPoint(objectID int32, template *Template, ownerID int32, queue *sim.Queue, skills skillDefinitions, opts ...effect.Option) (*EffectPoint, error) {
 	inst, err := NewInstance(objectID, template)
 	if err != nil {
 		return nil, err
 	}
-	ep := &EffectPoint{objectID: objectID, Instance: inst, ownerID: ownerID}
+	stats, err := settleFixedStats(inst, skills)
+	if err != nil {
+		return nil, err
+	}
+	ep := &EffectPoint{objectID: objectID, Instance: inst, ownerID: ownerID, stats: stats}
+	ep.zones = newZoneMember(ep)
 	ep.effects = effect.NewList(ep, opts...)
 	ep.effects.SetQueue(queue)
 	return ep, nil
+}
+
+// SetZones makes ix the zones the point's membership follows. Call it
+// before Spawn; without it the point stands in no zone.
+func (ep *EffectPoint) SetZones(ix *zone.Index) { ep.zones.ix = ix }
+
+// InsideZone reports whether the point's zones hold flag.
+func (ep *EffectPoint) InsideZone(flag zone.Flag) bool { return ep.zones.has(flag) }
+
+// zoneTeleporting reports false: an effect point never moves.
+func (ep *EffectPoint) zoneTeleporting() bool { return false }
+
+// swimStateChanged shows the point's observers its view again as it enters
+// or leaves water: the stationary one when it cannot move at its speed,
+// the full one otherwise (WaterZone.onEnter and onExit).
+func (ep *EffectPoint) swimStateChanged(bool) {
+	if ep.sink != nil {
+		ep.sink.Emit(event.NPCInfoChanged{ServerObject: ep.stats.moveSpeed == 0})
+	}
+}
+
+// NPCInfoSnapshot captures the point's client view.
+func (ep *EffectPoint) NPCInfoSnapshot() npcinfo.Snapshot {
+	return fixedNPCInfoSnapshot(ep.Instance, ep.stats, &ep.Presence, ep.zones.moveType())
+}
+
+// ServerObjectInfoSnapshot is NPCInfoSnapshot with the server-side name
+// always shown, the view an NPC that cannot move is announced with.
+func (ep *EffectPoint) ServerObjectInfoSnapshot() npcinfo.Snapshot {
+	s := ep.NPCInfoSnapshot()
+	s.Name = ep.Instance.Name()
+	return s
 }
 
 // Queue returns the queue this actor's work runs on.
@@ -83,21 +129,26 @@ func (ep *EffectPoint) Attach(rt Runtime) {
 // Kind reports KindNPC.
 func (ep *EffectPoint) Kind() actor.Kind { return actor.KindNPC }
 
-// Spawn places the actor in the world at (x, y, z), facing heading. It is a
-// no-op until Attach has installed a world.
+// Spawn places the actor in the world at (x, y, z), facing heading, then
+// enters the zones at its position. It is a no-op until Attach has
+// installed a world.
 func (ep *EffectPoint) Spawn(x, y, z, heading int) {
 	if ep.world == nil {
 		return
 	}
 	ep.world.Spawn(ep, x, y, z, heading)
+	ep.zones.enter()
 }
 
-// Despawn removes the actor from the world. It is a no-op until Attach has
-// installed a world.
+// Despawn takes the actor out of its zones, while its observers still know
+// it, then out of the world. It is a no-op until Attach has installed a
+// world.
 func (ep *EffectPoint) Despawn() {
 	if ep.world == nil {
 		return
 	}
+	x, y, z := ep.Position()
+	ep.zones.leave(location.Location{X: x, Y: y, Z: z})
 	ep.world.Despawn(ep)
 	// Stop the periodic effect sweep from reaching this signet point's
 	// list: it exists only to host that list, so leaving the list

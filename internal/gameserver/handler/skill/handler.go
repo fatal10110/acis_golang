@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -476,6 +477,8 @@ type SignetDeps struct {
 	// NewSink builds the event sink a spawned signet effect point reports
 	// through; nil disables signet spawning.
 	NewSink func(*npc.EffectPoint) event.Sink
+	// Zones are the zones a spawned effect point stands in; nil for none.
+	Zones *zone.Index
 	// Queues creates each spawned effect point's own queue; nil disables
 	// signet spawning.
 	Queues signetQueues
@@ -496,7 +499,7 @@ func NewDefaultRegistryWithSignet(defs Definitions, magicFailures bool, healSps 
 		r.Register(harvestHandler{ids: signet.IDs, cropRate: signet.ManorCropRate})
 		r.Register(sweepHandler{ids: signet.IDs})
 	}
-	r.Register(signetHandler{defs: defs, magicFailures: magicFailures, templates: signet.Templates, ids: signet.IDs, world: signet.World, newSink: signet.NewSink, effects: signet.Effects, queues: signet.Queues, log: signet.Log})
+	r.Register(signetHandler{defs: defs, magicFailures: magicFailures, templates: signet.Templates, ids: signet.IDs, world: signet.World, newSink: signet.NewSink, zones: signet.Zones, effects: signet.Effects, queues: signet.Queues, log: signet.Log})
 	return r
 }
 
