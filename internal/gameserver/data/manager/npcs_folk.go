@@ -55,8 +55,9 @@ type FolkSpawner struct {
 }
 
 // Spawn builds a civilian NPC from inst, places it at (loc, heading) and
-// on the AI task, and starts its route walk when it has one.
-func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading int) (*npc.Folk, error) {
+// on the AI task, and starts its route walk when it has one. slot is the
+// spawn slot placing it; nil for none.
+func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot) (*npc.Folk, error) {
 	f, err := npc.NewFolk(inst, s.Skills)
 	if err != nil {
 		return nil, err
@@ -69,6 +70,7 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 		Items:          s.Items,
 		Decay:          s.Decay,
 		Zones:          s.Zones,
+		Slot:           slot,
 	}
 	if s.NewSink != nil {
 		rt.Sink = s.NewSink(f)

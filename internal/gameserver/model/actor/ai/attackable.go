@@ -255,8 +255,9 @@ type Attackable struct {
 	roll func(n int) int
 	// lifeTime is the number of completed periodic AI cycles. Empty-queue
 	// idle abort and non-attack promotion run only after the first cycle.
-	// A queued ATTACK desire opens the first-cycle promotion gate.
-	lifeTime int
+	// A queued ATTACK desire opens the first-cycle promotion gate. It is
+	// written under mu and read by LifeTime without it.
+	lifeTime atomic.Int32
 }
 
 // NewAttackable builds an idle hostile NPC AI loop.
@@ -295,6 +296,13 @@ func (a *Attackable) SetRandomWalkRate(rate int) {
 func (a *Attackable) MaybeStartOffensiveFollow(target attackable.Combatant) (bool, error) {
 	return a.move.MaybeStartOffensiveFollow(target, a.actor.PhysicalAttackRange())
 }
+
+// LifeTime returns the number of periodic AI cycles the actor has
+// completed since it spawned. It takes no lock.
+func (a *Attackable) LifeTime() int32 { return a.lifeTime.Load() }
+
+// ResetLifeTime starts the cycle count over, as a death does.
+func (a *Attackable) ResetLifeTime() { a.lifeTime.Store(0) }
 
 // ObjectID returns the actor id controlled by this AI loop.
 func (a *Attackable) ObjectID() int32 {
@@ -775,7 +783,7 @@ func (a *Attackable) canPromote(updateTick bool, instantRun bool) bool {
 	if !updateTick {
 		return true
 	}
-	return a.lifeTime > 0 || instantRun
+	return a.lifeTime.Load() > 0 || instantRun
 }
 
 func (a *Attackable) think(mode thinkMode) error {
@@ -788,7 +796,7 @@ func (a *Attackable) think(mode thinkMode) error {
 	idleAtStart := a.current.kind == IntentionIdle
 	// The first-cycle promotion gate is decided before the see-creature
 	// point: an attack desire queued there does not open it.
-	instantRun := a.lifeTime == 0 && a.desires.hasKind(IntentionAttack)
+	instantRun := a.lifeTime.Load() == 0 && a.desires.hasKind(IntentionAttack)
 	if updateTick {
 		a.atHookPoint(HookSeeCreature)
 	}
@@ -816,7 +824,7 @@ func (a *Attackable) think(mode thinkMode) error {
 	if updateTick {
 		idled := false
 		if _, ok := a.desires.Peek(); !ok {
-			if a.lifeTime > 0 && !a.castingNow() {
+			if a.lifeTime.Load() > 0 && !a.castingNow() {
 				if a.hasLatch() {
 					idleAfterLatch = true
 				} else {
@@ -827,11 +835,11 @@ func (a *Attackable) think(mode thinkMode) error {
 			}
 		}
 		if _, ok := a.desires.Peek(); !ok {
-			if a.lifeTime > 0 && !a.castingNow() && !idleAfterLatch {
+			if a.lifeTime.Load() > 0 && !a.castingNow() && !idleAfterLatch {
 				a.queueIdleWander()
 			}
 		}
-		a.lifeTime++
+		a.lifeTime.Add(1)
 		if idled {
 			return nil
 		}
@@ -980,7 +988,7 @@ func (a *Attackable) currentQueued() bool {
 // caller skips it while the actor is out of control. It reports whether it
 // did; the idle then takes no further step this pass.
 func (a *Attackable) idleOnEmptyQueue() bool {
-	if a.lifeTime == 0 || a.current.kind == IntentionIdle || a.hasLatch() || a.castingNow() {
+	if a.lifeTime.Load() == 0 || a.current.kind == IntentionIdle || a.hasLatch() || a.castingNow() {
 		return false
 	}
 	if _, ok := a.desires.Peek(); ok {

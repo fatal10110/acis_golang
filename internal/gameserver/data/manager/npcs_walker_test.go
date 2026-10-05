@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -62,7 +61,6 @@ func walkerTestTemplate() *npc.Table {
 		Alias:      walkerTestAlias,
 		HPMax:      100,
 		RunSpeed:   100,
-		AIParams:   commons.NewStatSet(),
 		// Route-walking NPCs must keep patrolling with nobody around to see
 		// them, the same way the reference's Walkers-registered ids do —
 		// without it task.AI's own region-inactivity gate (unrelated to
@@ -283,7 +281,6 @@ func TestNpcLeashReturnDoesNotHijackWalkerRoute(t *testing.T) {
 		RunSpeed:    7000, // fast enough that both route and leash moves below finish in ~1 position tick
 		WalkSpeed:   7000, // the leash return walks
 		CanMove:     true,
-		AIParams:    commons.NewStatSet(),
 		NoSleepMode: true,
 	}})
 	spawns := NewSpawns(table, nil)
@@ -398,7 +395,6 @@ func TestWalkerWalkModeNPCsMoveAtWalkSpeed(t *testing.T) {
 		RunSpeed:   200,
 		WalkSpeed:  50,
 		DEX:        30,
-		AIParams:   commons.NewStatSet(),
 	}})
 	spawns := NewSpawns(table, nil)
 

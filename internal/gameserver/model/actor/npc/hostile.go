@@ -56,6 +56,9 @@ type Hostile struct {
 	*creature.Live
 
 	Instance *Instance
+	// spawnBinding is the spawn slot that placed the NPC: its AI parameters
+	// and script memory.
+	spawnBinding
 
 	brain *ai.Attackable
 	move  ai.MoveController
@@ -197,14 +200,6 @@ type Hostile struct {
 	currentSpiritshots int
 	shotsMask          int32
 
-	// soulshotRate and spiritshotRate are the template's SoulShotRate/
-	// SpiritShotRate AI parameters (percent, 0-100), read-only after
-	// construction. RollAttackedShotRecharge uses them together with
-	// currentSoulshots/currentSpiritshots to decide whether a landed hit
-	// recharges shots.
-	soulshotRate   int
-	spiritshotRate int
-
 	// statMu guards statCalcs slot creation; each slot's own Calculator
 	// then guards its own Mods independently, so a warm read only ever
 	// takes statMu's read lock. An attacker's formulas read these stats
@@ -274,20 +269,15 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 	if err != nil {
 		return nil, err
 	}
-	soulshotRate, spiritshotRate, err := shotRates(inst.Template)
-	if err != nil {
-		return nil, err
-	}
 
 	h := &Hostile{
 		Instance:           inst,
+		spawnBinding:       newSpawnBinding(inst.Template),
 		Live:               live,
 		move:               movement,
 		roll:               rand.Intn,
 		currentSoulshots:   currentSoulshots,
 		currentSpiritshots: currentSpiritshots,
-		soulshotRate:       soulshotRate,
-		spiritshotRate:     spiritshotRate,
 	}
 	h.zones = newZoneMember(h)
 	h.initSeedState()
@@ -320,32 +310,18 @@ func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController,
 	return h, nil
 }
 
+// shotCounts reads the template's own SoulShot/SpiritShot AI parameters,
+// the shots the NPC spawns with. A spawn's parameters do not change them.
 func shotCounts(tpl *Template) (soulshots, spiritshots int, err error) {
-	if tpl.AIParams == nil {
-		return 0, 0, nil
+	ss, err := tpl.AIParams.Int("SoulShot", 0)
+	if err != nil {
+		return 0, 0, fmt.Errorf("npc %d: %w", tpl.ID, err)
 	}
-	if soulshots, err = tpl.AIParams.GetIntDefault("SoulShot", 0); err != nil {
-		return 0, 0, fmt.Errorf("npc %d: SoulShot AI parameter: %w", tpl.ID, err)
+	sps, err := tpl.AIParams.Int("SpiritShot", 0)
+	if err != nil {
+		return 0, 0, fmt.Errorf("npc %d: %w", tpl.ID, err)
 	}
-	if spiritshots, err = tpl.AIParams.GetIntDefault("SpiritShot", 0); err != nil {
-		return 0, 0, fmt.Errorf("npc %d: SpiritShot AI parameter: %w", tpl.ID, err)
-	}
-	return soulshots, spiritshots, nil
-}
-
-// shotRates reads the template's SoulShotRate/SpiritShotRate AI parameters,
-// the percent chance RollAttackedShotRecharge rolls on each landed hit.
-func shotRates(tpl *Template) (soulshotRate, spiritshotRate int, err error) {
-	if tpl.AIParams == nil {
-		return 0, 0, nil
-	}
-	if soulshotRate, err = tpl.AIParams.GetIntDefault("SoulShotRate", 0); err != nil {
-		return 0, 0, fmt.Errorf("npc %d: SoulShotRate AI parameter: %w", tpl.ID, err)
-	}
-	if spiritshotRate, err = tpl.AIParams.GetIntDefault("SpiritShotRate", 0); err != nil {
-		return 0, 0, fmt.Errorf("npc %d: SpiritShotRate AI parameter: %w", tpl.ID, err)
-	}
-	return soulshotRate, spiritshotRate, nil
+	return int(ss), int(sps), nil
 }
 
 // ForEachKnownCombatantInRadius visits nearby combatants through the world grid.
@@ -375,6 +351,9 @@ type Runtime struct {
 	Remover Remover
 	// Hits watches every hit this NPC registers; nil watches none.
 	Hits HitObserver
+	// Slot is the spawn slot that placed the NPC; nil leaves it with no
+	// spawn parameters and a script memory of its own.
+	Slot SpawnSlot
 }
 
 // Attach installs rt. Call it once, before exposing this NPC to other
@@ -391,6 +370,7 @@ func (h *Hostile) Attach(rt Runtime) {
 	h.sink = rt.Sink
 	h.remover = rt.Remover
 	h.hits = rt.Hits
+	h.bindSpawn(rt.Slot)
 	if rt.Items == nil {
 		return
 	}
@@ -829,6 +809,10 @@ func (h *Hostile) RandomizeHate() bool {
 	}, h.roll)
 }
 
+// LifeTime returns the number of AI cycles h has completed since it
+// spawned, zero again once it dies. Safe from any goroutine.
+func (h *Hostile) LifeTime() int32 { return h.brain.LifeTime() }
+
 // Tick advances the hostile AI clock once.
 func (h *Hostile) Tick() {
 	if !h.canRunAI() {
@@ -1015,6 +999,7 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 	}
 	h.BroadcastStatus()
 	h.AbortAll(true)
+	h.brain.ResetLifeTime()
 	// A death strip ends each effect's stat change silently; the status
 	// broadcast below is the only refresh observers get.
 	h.EffectList().StopAllExceptThoseThatLastThroughDeath()

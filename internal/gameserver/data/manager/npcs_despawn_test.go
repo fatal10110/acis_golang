@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -60,9 +59,9 @@ func newDespawnFixture(t *testing.T, states map[string]*spawn.State) *despawnFix
 	f.respawn, _ = task.NewRespawn(nopRespawnEffects{}, time.Now)
 	walker, _ := task.NewWalker(nil, noRouteWalkerPath{}, time.Now, f.state)
 	f.templates = npc.NewTable([]*npc.Template{
-		{ID: 1, TemplateID: 1, Type: "Monster", Name: "Wolf", HPMax: 100, RunSpeed: 100, AIParams: commons.NewStatSet()},
-		{ID: 2, TemplateID: 2, Type: "Monster", Name: "Boss", HPMax: 100, RunSpeed: 100, AIParams: commons.NewStatSet()},
-		{ID: 3, TemplateID: 3, Type: "ChristmasTree", Name: "Tree", HPMax: 100, AIParams: commons.NewStatSet()},
+		{ID: 1, TemplateID: 1, Type: "Monster", Name: "Wolf", HPMax: 100, RunSpeed: 100},
+		{ID: 2, TemplateID: 2, Type: "Monster", Name: "Boss", HPMax: 100, RunSpeed: 100},
+		{ID: 3, TemplateID: 3, Type: "ChristmasTree", Name: "Tree", HPMax: 100},
 	})
 	var err error
 	f.npcs, err = NewNpcs(NewSpawns(despawnTable(t, despawnSpawnlist), states), f.templates, fakeGeo{}, f.state, &sequentialIDs{}, f.decay, f.respawn,

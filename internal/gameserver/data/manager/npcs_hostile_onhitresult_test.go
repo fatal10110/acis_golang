@@ -3,7 +3,6 @@ package manager
 import (
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -35,7 +34,6 @@ func TestNewLiveHostileWiresOnHitResultFromEffects(t *testing.T) {
 			ID:          9001,
 			Type:        "Monster",
 			RunSpeed:    100,
-			AIParams:    commons.NewStatSet(),
 			NoSleepMode: true,
 		},
 	}
@@ -85,7 +83,6 @@ func TestNewLiveHostileLeavesOnHitResultUnsetWithoutCastDefs(t *testing.T) {
 			ID:          9002,
 			Type:        "Monster",
 			RunSpeed:    100,
-			AIParams:    commons.NewStatSet(),
 			NoSleepMode: true,
 		},
 	}
