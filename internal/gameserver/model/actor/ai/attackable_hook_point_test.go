@@ -99,7 +99,9 @@ func TestHookPointNoDesireOnEventIdle(t *testing.T) {
 // TestHookPointSeeCreatureOpensOnlyThePeriodicCycle pins the see-creature
 // point at the start of the periodic cycle, ahead of desire selection: a
 // desire queued there is taken up by the same cycle. Event passes open no
-// point; the continue pass is pinned in attackable_hook_point_continue_test.go.
+// see-creature point: an idle actor's RunAI opens none, its AttackFinished
+// only the no-desire point of the finished attack's think. The continue pass
+// is pinned in attackable_hook_point_continue_test.go.
 func TestHookPointSeeCreatureOpensOnlyThePeriodicCycle(t *testing.T) {
 	owner := actor(1)
 	owner.x = 100
@@ -108,14 +110,19 @@ func TestHookPointSeeCreatureOpensOnlyThePeriodicCycle(t *testing.T) {
 	if err := brain.TickThink(); err != nil {
 		t.Fatalf("first TickThink() error: %v", err)
 	}
-	for name, pass := range map[string]func() error{
-		"RunAI": brain.RunAI, "AttackFinished": brain.AttackFinished,
+	for _, tc := range []struct {
+		name string
+		pass func() error
+		want []HookPoint
+	}{
+		{"RunAI", brain.RunAI, nil},
+		{"AttackFinished", brain.AttackFinished, []HookPoint{HookNoDesire}},
 	} {
 		owner.hooks.points = nil
-		if err := pass(); err != nil {
-			t.Fatalf("%s() error: %v", name, err)
+		if err := tc.pass(); err != nil {
+			t.Fatalf("%s() error: %v", tc.name, err)
 		}
-		assertHookPoints(t, owner, "on "+name)
+		assertHookPoints(t, owner, "on "+tc.name, tc.want...)
 	}
 
 	dest := location.Location{X: 300}

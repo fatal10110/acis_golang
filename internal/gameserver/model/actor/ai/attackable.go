@@ -744,9 +744,12 @@ func (a *Attackable) TickThink() error {
 
 // AttackFinished is a swing finishing: RunAI's desire selection, followed
 // by the finished attack's think. An in-control actor's selection already
-// stepped the current intention, so only an out-of-control one, which
-// selects nothing, takes that think as a continue pass: a confused actor
-// keeps swinging at its current target while a stunned one does nothing.
+// stepped a busy intention; one left idle, whether it was idle already or
+// the selection's empty-queue idle idled it, runs the idle step again, so
+// the no-desire point opens once more, and queues no idle follow or wander.
+// An out-of-control actor selects nothing and takes that think as a
+// continue pass: a confused actor keeps swinging at its current target
+// while a stunned one does nothing.
 func (a *Attackable) AttackFinished() error {
 	return a.think(thinkAttackFinished)
 }
@@ -799,6 +802,7 @@ func (a *Attackable) think(mode thinkMode) error {
 	a.pruneDesires(outOfControl)
 	onEvent := mode == thinkEvent || mode == thinkAttackFinished
 	if onEvent && !outOfControl && a.idleOnEmptyQueue() {
+		a.idleAfterFinishedAttack(mode, true)
 		return nil
 	}
 	if !outOfControl {
@@ -847,19 +851,35 @@ func (a *Attackable) think(mode thinkMode) error {
 		}
 		return nil
 	}
-	if !canPromote {
-		return nil
-	}
 	if mode == thinkContinue {
+		if !canPromote {
+			return nil
+		}
 		return a.continueCurrent(idleAtStart)
 	}
-	err := a.promoteAndStep()
+	var err error
+	if canPromote {
+		err = a.promoteAndStep()
+	}
 	if idleAfterLatch {
 		if _, ok := a.desires.Peek(); !ok && !a.castingNow() {
 			a.idleAndRequeue()
 		}
 	}
+	a.idleAfterFinishedAttack(mode, idleAtStart)
 	return err
+}
+
+// idleAfterFinishedAttack is the finished attack's think on an in-control
+// actor, after desire selection: an actor left idle runs the idle step
+// again, so the no-desire point opens, and queues no idle follow or wander.
+// wasIdle reports that the actor was idle when the pass started or that the
+// selection's empty-queue idle idled it; an attack or cast the pass silently
+// dropped to idle was neither and takes no idle step.
+func (a *Attackable) idleAfterFinishedAttack(mode thinkMode, wasIdle bool) {
+	if mode == thinkAttackFinished && wasIdle && a.current.kind == IntentionIdle {
+		a.thinkIdle()
+	}
 }
 
 // idleAndRequeue is the empty-queue idle: abort everything, go idle, and
