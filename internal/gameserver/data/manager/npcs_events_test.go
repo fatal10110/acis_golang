@@ -166,24 +166,23 @@ func TestSpawnEventsGateRespawn(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadSpawnlist() error: %v", err)
 	}
-	f := newEventsFixture(t, table, eventsTemplates(), DefaultSpawnEvents())
-
-	f.hostile(t, 2).DeleteMe()
-	f.queues.Run()
-	if !f.respawn.Tracked("sellers#0#0") {
-		t.Fatal("listed event maker NPC: respawn not armed")
+	f := newEventsFixture(t, table, eventsTemplates(), []string{"18age", "christmas", "extra_mob"})
+	if got, want := f.spawnedIDs(), []int{1, 2, 3, 4, 7}; !slices.Equal(got, want) {
+		t.Fatalf("boot spawned npc ids = %v, want %v", got, want)
 	}
 
-	// The list no longer names 18age or extra_mob.
-	f.npcs.events = newSpawnEvents([]string{"start_weapon"})
+	// The list keeps 18age and no longer names christmas or extra_mob.
+	f.npcs.events = newSpawnEvents([]string{"18age"})
 	for _, tc := range []struct {
 		npcID int
 		key   string
 		armed bool
 	}{
-		{4, "orc_seller#0#0", false},
-		{7, "extra#0#0", false},
-		{1, "plain#0#0", true},
+		{2, "sellers#0#0", true},    // event attribute, listed
+		{3, "tree#0#0", false},      // event attribute, delisted
+		{4, "orc_seller#0#0", true}, // event_maker, listed
+		{7, "extra#0#0", false},     // event_maker, delisted
+		{1, "plain#0#0", true},      // no spawn condition
 	} {
 		f.hostile(t, tc.npcID).DeleteMe()
 		f.queues.Run()

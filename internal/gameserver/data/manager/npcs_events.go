@@ -58,6 +58,8 @@ func (e spawnEvents) allows(maker *spawn.Maker) bool {
 	case maker == nil:
 		return true
 	case maker.Event != "":
+		// #171: replace the flat Seven Signs refusal with the period and seal
+		// owner check before any ssq_* maker spawns, or its NPCs never respawn.
 		return !sevenSignsEvent(maker.Event) && e.has(maker.Event)
 	case maker.AIType == eventMakerType:
 		return e.has(maker.AIParams["EventName"])
