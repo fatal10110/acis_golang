@@ -36,9 +36,12 @@ func truncate(v float64) int32 {
 
 // ApplyReferencePrices sets each seed's seed and crop reference prices to
 // the reference price price reports for the item, 1 for an item it does
-// not know.
+// not know. An id outside the int32 range names no item and also gets 1.
 func (t *Table) ApplyReferencePrices(price func(itemID int32) (int32, bool)) {
 	ref := func(id int) int32 {
+		if id < math.MinInt32 || id > math.MaxInt32 {
+			return 1
+		}
 		if p, ok := price(int32(id)); ok {
 			return p
 		}

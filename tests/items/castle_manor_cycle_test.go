@@ -35,6 +35,11 @@ func TestCastleManorCycleReachesTheOwner(t *testing.T) {
 	t.Parallel()
 	datapack.Require(t)
 	manorCfg, _ := shippedManor()
+	// The seeds carry the shipped reference prices, as at boot: Seed: Dark
+	// Coda sells for 5, Dark Coda for 50.
+	if s, ok := manorCfg.Seeds.Seed(darkCodaSeedID); !ok || s.SeedReferencePrice != 5 || s.CropReferencePrice != 50 {
+		t.Fatalf("Dark Coda seed = %+v, want reference prices 5 and 50", s)
+	}
 	_, shipped := shippedData()
 	templates := gameservertest.ItemTemplates().All()
 	for _, id := range []int32{circletOfGludioID, lordsCrownID, darkCodaMatureID, redCodaMatureID} {

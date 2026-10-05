@@ -1,6 +1,7 @@
 package manor
 
 import (
+	"math"
 	"slices"
 	"testing"
 )
@@ -44,6 +45,30 @@ func TestApplyReferencePrices(t *testing.T) {
 		if m := table.Manors[0].Seeds; !slices.Contains(m, s) {
 			t.Errorf("seed %d in the manor list does not carry its prices", tc.seedID)
 		}
+	}
+}
+
+// TestApplyReferencePricesOutOfRangeID gives a seed or crop id outside
+// the int32 range price 1, as for an unknown item, without asking price.
+func TestApplyReferencePricesOutOfRangeID(t *testing.T) {
+	t.Parallel()
+	if math.MaxInt == math.MaxInt32 {
+		t.Skip("int is 32 bits: no id is out of range")
+	}
+	var wide int64 = math.MaxInt32 + 5016
+	big := int(wide)
+	table := NewTable([]Manor{{ID: 1, Seeds: []Seed{{CropID: -big, SeedID: big, CastleID: 1}}}})
+	var asked []int32
+	table.ApplyReferencePrices(func(id int32) (int32, bool) {
+		asked = append(asked, id)
+		return 77, true
+	})
+	if len(asked) != 0 {
+		t.Fatalf("price asked for %v, want no lookup of an out-of-range id", asked)
+	}
+	s := table.Manors[0].Seeds[0]
+	if s.SeedReferencePrice != 1 || s.CropReferencePrice != 1 {
+		t.Fatalf("prices = %d/%d, want 1/1", s.SeedReferencePrice, s.CropReferencePrice)
 	}
 }
 
