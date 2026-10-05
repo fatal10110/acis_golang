@@ -272,11 +272,16 @@ type Character struct {
 	// takes statMu's read lock. An attacker's formulas read these stats
 	// from the attacker's queue, and removing an effect another actor
 	// dispels drops its mods (RemoveStatsByOwner) from that actor's queue.
+	// The effect list takes it under its own lock (AttachStatFuncs), so it
+	// is a leaf.
 	statMu    sync.RWMutex
 	statCalcs [stat.Count]*effect.Calculator
 
 	// stateMu guards transient live flags and item-use disabled timestamps.
 	// A killer's queue raises the death penalty (RaiseDeathPenaltyLevel).
+	// The effect list reads it under its own lock (MaxBuffCount), so it is
+	// a leaf: nothing that reaches the effect list runs while it is held.
+	// The full order of c's locks is in docs/agents/go-style.md.
 	stateMu              sync.RWMutex
 	stateInit            bool
 	running              bool

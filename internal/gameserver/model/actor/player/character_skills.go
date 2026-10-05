@@ -11,7 +11,10 @@ import (
 type skillState struct {
 	// mu is taken from other actors' queues: a killer's applies c's death
 	// exp loss, which reads the Lucky skill, and a caster's target
-	// conditions check c's skills.
+	// conditions check c's skills. It is a leaf taken under the effect
+	// list's lock (MaxBuffCount reads the Divine Inspiration level), so
+	// nothing that reaches the effect list runs while it is held; see the
+	// lock order in docs/agents/go-style.md.
 	mu       sync.Mutex
 	known    SkillLevels
 	effects  []effect.ActiveEffect
@@ -201,16 +204,23 @@ func (c *Character) SkillReuseTimers(now time.Time) []effect.ReuseTimer {
 // The AllSkillsDisabled lock only short-circuits every key when at least
 // one skill is already tracked as disabled — with no skill on cooldown at all, the
 // lock has no effect here.
+//
+// AllSkillsDisabled reads the effect list, whose lock is held while it asks
+// c for its buff cap (MaxBuffCount reads skills.mu). It therefore runs with
+// skills.mu released, between two short sections.
 func (c *Character) SkillDisabled(key int32) bool {
 	now := c.Now()
 	c.skills.mu.Lock()
-	defer c.skills.mu.Unlock()
-	if len(c.skills.disabled) == 0 {
+	tracked := len(c.skills.disabled) != 0
+	c.skills.mu.Unlock()
+	if !tracked {
 		return false
 	}
 	if c.AllSkillsDisabled() {
 		return true
 	}
+	c.skills.mu.Lock()
+	defer c.skills.mu.Unlock()
 	expiresAt, ok := c.skills.disabled[key]
 	if !ok {
 		return false
