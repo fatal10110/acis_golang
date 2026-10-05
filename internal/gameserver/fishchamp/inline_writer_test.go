@@ -65,8 +65,8 @@ func TestChangesSaveThroughAnInlineWriter(t *testing.T) {
 		if n, rows := store.last(); n != 1 || len(rows) != 1 || rows[0].Reward != RewardUnclaimed {
 			t.Errorf("after the week end: %d saves, last %+v; want 1 save with Angler unclaimed", n, rows)
 		}
-		if paid := c.Claim("angler"); len(paid) != 1 || paid[0] != 100 {
-			t.Errorf("Claim = %v, want [100]", paid)
+		if paid, err := c.Claim(context.Background(), "angler"); err != nil || len(paid) != 1 || paid[0] != 100 {
+			t.Errorf("Claim = %v, %v; want [100]", paid, err)
 		}
 		if n, rows := store.last(); n != 2 || len(rows) != 1 || rows[0].Reward != RewardClaimed {
 			t.Errorf("after the claim: %d saves, last %+v; want 2 saves with Angler claimed", n, rows)

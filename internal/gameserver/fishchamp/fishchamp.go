@@ -160,8 +160,9 @@ type Championship struct {
 }
 
 // New returns a championship persisting through store, a save queued on
-// writes after every change; without writes it saves only when it stops,
-// and without store never. Its calendar runs on queue, which it owns
+// writes after every change but a claim, which is stored at once (Claim);
+// without writes it saves only claims and when it stops, and without store
+// never. Its calendar runs on queue, which it owns
 // from then on, in the time zone of the queue's clock. Restore then Start
 // bring it up.
 func New(cfg Config, store Store, writes Writer, queue *sim.Queue, log zerolog.Logger, opts ...Option) *Championship {
@@ -374,10 +375,16 @@ func (c *Championship) IsWinner(name string) bool {
 // yet claimed is marked claimed, and pays the reward of name's place, none
 // outside the first five. It returns what each such entry pays, in winner
 // order.
-func (c *Championship) Claim(name string) []int32 {
+//
+// The claim is stored before Claim returns, not queued, so the prize a
+// caller pays on what it returns can never reach the database ahead of the
+// claim (#3355): a crash in between loses the prize, never leaves it
+// claimable again. A store that fails puts the entries back unclaimed and
+// returns its error with nothing to pay.
+func (c *Championship) Claim(ctx context.Context, name string) ([]int32, error) {
 	c.mu.Lock()
-	defer c.unlock()
 	var paid []int32
+	var claimed []*Entry
 	for _, e := range c.winners {
 		if e.Reward == RewardClaimed || !strings.EqualFold(e.Name, name) {
 			continue
@@ -389,12 +396,22 @@ func (c *Championship) Claim(name string) []int32 {
 			}
 		}
 		e.Reward = RewardClaimed
+		claimed = append(claimed, e)
 		paid = append(paid, count)
 	}
-	if paid != nil {
-		c.queueSave()
+	c.mu.Unlock()
+	if paid == nil {
+		return nil, nil
 	}
-	return paid
+	if err := c.save(ctx); err != nil {
+		c.mu.Lock()
+		for _, e := range claimed {
+			e.Reward = RewardUnclaimed
+		}
+		c.mu.Unlock()
+		return nil, err
+	}
+	return paid, nil
 }
 
 // Running returns the running ranking as a player sees it: the ranking as
