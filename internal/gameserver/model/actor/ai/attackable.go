@@ -71,6 +71,10 @@ type AttackableActor interface {
 	// that clock, unless the returned timer is stopped first. The wander
 	// chain's firings use it.
 	After(d time.Duration, fn func()) Timer
+	// AtHookPoint gives the behavior bound to the actor's template its turn
+	// at p, on the goroutine that reached p, with the AI loop unlocked (see
+	// HookPoint).
+	AtHookPoint(p HookPoint)
 }
 
 // Timer is a pending one-shot task armed by AttackableActor.After.
@@ -175,6 +179,8 @@ type intention struct {
 // end reaches ClearCurrentDesire synchronously from the cast controller, so
 // code holding mu stops the cast controller only while no cast is in
 // flight: the idle aborts and every intention step first check castingNow.
+// A pass releases mu at each HookPoint, so another entry point may run a
+// whole pass there; the pass re-reads what mu guards after each point.
 type Attackable struct {
 	actor  AttackableActor
 	move   MoveController
@@ -471,6 +477,7 @@ func (a *Attackable) addFollowDesire(target attackable.Combatant, weight float64
 	})
 }
 
+// thinkIdle aborts every action, goes idle and opens the no-desire point.
 func (a *Attackable) thinkIdle() {
 	a.move.Stop()
 	a.attack.Stop()
@@ -479,6 +486,7 @@ func (a *Attackable) thinkIdle() {
 	}
 	a.actor.ForceWalkStance()
 	a.setCurrent(intention{kind: IntentionIdle})
+	a.atHookPoint(HookNoDesire)
 }
 
 func (a *Attackable) queueIdleFollow() {
@@ -771,12 +779,17 @@ func (a *Attackable) think(mode thinkMode) error {
 	defer a.mu.Unlock()
 
 	updateTick := mode == thinkTick
+	// The first-cycle promotion gate is decided before the see-creature
+	// point: an attack desire queued there does not open it.
+	instantRun := a.lifeTime == 0 && a.desires.hasKind(IntentionAttack)
+	if updateTick {
+		a.atHookPoint(HookSeeCreature)
+	}
 	a.passStep = a.step
 	if updateTick && a.ticked {
 		a.passStep = a.tickStep
 		a.ticked = false
 	}
-	instantRun := a.lifeTime == 0 && a.desires.hasKind(IntentionAttack)
 	outOfControl := a.actor.OutOfControl()
 	a.refreshCombatMemory()
 	a.pruneDesires(outOfControl)
@@ -1078,6 +1091,9 @@ func (a *Attackable) tickOutOfTerritory() {
 	}
 }
 
+// syncOOTSweepLocked disarms the out-of-territory stale-hate sweep on an
+// arrival inside territory, and arms it on the first one outside, after
+// the out-of-territory point.
 func (a *Attackable) syncOOTSweepLocked() {
 	if a.actor.InTerritory() {
 		a.ootSweep = false
@@ -1087,6 +1103,7 @@ func (a *Attackable) syncOOTSweepLocked() {
 	if a.ootSweep {
 		return
 	}
+	a.atHookPoint(HookOutOfTerritory)
 	a.ootSweep = true
 	a.nextOOTSweep = a.now().Add(ootSweepInitialDelay)
 }
@@ -1238,6 +1255,7 @@ func (a *Attackable) thinkMoveTo() {
 		return
 	}
 	if ox, oy, oz := a.actor.Position(); (location.Location{X: ox, Y: oy, Z: oz}) == a.current.loc {
+		a.atHookPoint(HookMoveFinished)
 		a.clearCurrentDesire()
 		return
 	}
@@ -1250,16 +1268,24 @@ func (a *Attackable) thinkMoveTo() {
 // selection never steps it again without its desire (currentQueued). A
 // Think before then (a control effect ending) steps a walk once more and
 // leaves a wander alone. Arrival itself never thinks.
+// A MOVE_TO or FLEE opens the move-finished point before its desire is
+// dropped.
 // Escort FOLLOW returns without restoring spawn heading or arming the
 // out-of-territory stale-hate sweep; combat chase stays ATTACK and still
 // runs both.
 func (a *Attackable) Arrived() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.current.kind == IntentionFollow {
+	switch a.current.kind {
+	case IntentionFollow:
 		return
+	case IntentionMoveTo, IntentionFlee:
+		// IntentionFlee is dormant until promoteNext can make it current.
+		a.atHookPoint(HookMoveFinished)
+		a.clearCurrentDesire()
+	case IntentionWander:
+		a.clearCurrentDesire()
 	}
-	a.clearArrivalDesire()
 	a.actor.RestoreSpawnHeadingIfAtHome()
 	a.syncOOTSweepLocked()
 }

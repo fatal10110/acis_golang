@@ -140,8 +140,8 @@ func (f *Folk) AbortCast() {
 // Tick does nothing: TickThink runs the whole AI step, in order.
 func (f *Folk) Tick() {}
 
-// TickThink runs one AI tick on f's queue: invalid cast desires are
-// dropped and the heaviest one left is acted on unless a cast is in
+// TickThink runs one AI tick on f's queue: the see-creature point opens
+// it, then invalid cast desires are dropped and the heaviest one left is acted on unless a cast is in
 // flight; an NPC with no desire left and no cast in flight idles, unless it
 // walks a route; and every third tick the cast desires lose weight, an NPC
 // still acting on one switching to its run stance. A dead NPC's tick does
@@ -150,6 +150,7 @@ func (f *Folk) TickThink() error {
 	if f.Dead() {
 		return nil
 	}
+	f.AtHookPoint(ai.HookSeeCreature)
 	f.runAI()
 	if f.cast.desires.Len() == 0 && f.cast.lifeTime > 0 && !f.CastingNow() && !f.walksRoute() {
 		f.thinkIdle()
@@ -205,8 +206,8 @@ func (f *Folk) runAI() {
 }
 
 // thinkIdle is what an NPC with nothing left to do does: it stops any walk
-// and cast, and switches to its walk stance. A clan hall manager instead
-// checks its own support buff.
+// and cast, switches to its walk stance and opens the no-desire point. A
+// clan hall manager instead checks its own support buff, and opens none.
 func (f *Folk) thinkIdle() {
 	if f.ClanHallManager() {
 		f.hallManagerIdle()
@@ -215,7 +216,13 @@ func (f *Folk) thinkIdle() {
 	f.stopMoving()
 	f.StopCast()
 	f.forceWalkStance()
+	f.AtHookPoint(ai.HookNoDesire)
 }
+
+// AtHookPoint is where f's AI tick gives the behavior bound to f's template
+// its turn, on f's queue with no lock held: the tick's state is queue-owned.
+// No behavior binds a hook point yet, so it does nothing.
+func (f *Folk) AtHookPoint(ai.HookPoint) {}
 
 // walksRoute reports whether f walks a route.
 func (f *Folk) walksRoute() bool {
