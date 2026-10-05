@@ -84,6 +84,8 @@ curl -s 'http://127.0.0.1:6060/debug/pprof/goroutine?debug=1'
 
 **Bind this to loopback only.** The handlers are registered on `http.DefaultServeMux` with no authentication, and `net/http/pprof` exposes heap dumps, goroutine stacks, and `/debug/pprof/cmdline`. Never bind `-debug-addr` to `0.0.0.0` or a public interface. Omit the flag entirely to leave the listener off.
 
+[Profiling And GC Tuning](profiling.md) covers reading these profiles, spotting goroutine leaks, the load-test profiling harness, and why the servers keep the default GC settings.
+
 ## Smoke Checks
 
 - Loginserver should log both listeners: one for game clients from `LoginserverHostname/LoginserverPort`, and one for game servers from `LoginHostname/LoginPort`.
