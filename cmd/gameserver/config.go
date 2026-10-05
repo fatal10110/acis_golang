@@ -74,6 +74,7 @@ type gameplayConfig struct {
 	BlacksmithUseRecipes     blacksmithUseRecipes
 	AllowDiscardItem         allowDiscardItem
 	SpawnMultiplier          spawnMultiplier
+	SpawnEvents              []string
 	RandomWalkRate           randomWalkRate
 	MaxGeoPathFailCount      maxGeoPathFailCount
 	DisableRaidCurse         raidCursesDisabled
@@ -191,6 +192,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.SpawnMultiplier, err = loadSpawnMultiplier(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.SpawnEvents, err = loadSpawnEvents(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.RandomWalkRate, err = loadRandomWalkRate(paths); err != nil {
@@ -716,6 +720,16 @@ func loadSpawnMultiplier(paths gameServerPaths) (spawnMultiplier, error) {
 		return 0, err
 	}
 	return spawnMultiplier(config.NewFields(props, "spawn multiplier").Float64("SpawnMultiplier", 1)), nil
+}
+
+// loadSpawnEvents reads the npcs.properties SpawnEvents list: the spawn
+// events whose makers spawn at boot.
+func loadSpawnEvents(paths gameServerPaths) ([]string, error) {
+	props, err := config.LoadFile(paths.NpcsConfigPath)
+	if err != nil {
+		return nil, err
+	}
+	return props.Strings("SpawnEvents", manager.DefaultSpawnEvents()), nil
 }
 
 // randomWalkRate is the NPC random-walk rate, read from npcs.properties

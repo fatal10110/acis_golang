@@ -40,8 +40,10 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 	}
 	n.walker.StopRouteByID(actorID)
 
+	// A maker whose spawn event is no longer listed keeps its dead NPC
+	// gone, like a spawn with no respawn delay.
 	delay := spawn.CalculateRespawnDelay(slot.entry)
-	if delay <= 0 {
+	if delay <= 0 || !n.events.allows(slot.maker) {
 		n.mu.Lock()
 		delete(n.slot, key)
 		n.mu.Unlock()
