@@ -2,14 +2,10 @@ package npc
 
 import (
 	"testing"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 func TestShouldIdleWanderIgnoresMovingAttack(t *testing.T) {
-	params := commons.NewStatSet()
-	params.Set("MovingAttack", 0)
-	h := newCombatHostile(t, 1, &Template{ID: 20001, Type: "Monster", AIParams: params})
+	h := newCombatHostile(t, 1, &Template{ID: 20001, Type: "Monster", AIParams: AIParams{"MovingAttack": "0"}})
 	if !h.ShouldIdleWander() {
 		t.Fatal("ShouldIdleWander() = false with MovingAttack=0, want true")
 	}

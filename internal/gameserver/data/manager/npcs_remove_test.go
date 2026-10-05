@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -37,8 +36,7 @@ func TestNpcDeleteMeRemovesThroughRespawnHook(t *testing.T) {
 	decay, _ := task.NewDecay(nopDecayEffects{}, time.Now)
 	respawn, _ := task.NewRespawn(nopRespawnEffects{}, time.Now)
 	walker, _ := task.NewWalker(nil, noRouteWalkerPath{}, time.Now, state)
-	partyAI := commons.NewStatSet()
-	partyAI.Set("Party_Type", 2)
+	partyAI := npc.AIParams{"Party_Type": "2"}
 	queues := npcQueues()
 	npcs, err := NewNpcs(NewSpawns(table, nil), npc.NewTable([]*npc.Template{
 		{ID: 1, TemplateID: 1, Type: "Chest", HPMax: 100, RunSpeed: 100, AIParams: partyAI},

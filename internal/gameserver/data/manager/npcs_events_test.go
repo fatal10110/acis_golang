@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -91,7 +90,7 @@ func newEventsFixture(t *testing.T, table *spawn.Table, templates *npc.Table, ev
 func eventsTemplates() *npc.Table {
 	var templates []*npc.Template
 	for id := 1; id <= 7; id++ {
-		templates = append(templates, &npc.Template{ID: id, TemplateID: id, Type: "Monster", HPMax: 100, RunSpeed: 100, AIParams: commons.NewStatSet()})
+		templates = append(templates, &npc.Template{ID: id, TemplateID: id, Type: "Monster", HPMax: 100, RunSpeed: 100})
 	}
 	return npc.NewTable(templates)
 }
@@ -229,7 +228,7 @@ func TestShippedSpawnEventsSpawnEveryLotterySeller(t *testing.T) {
 	}
 	var templates []*npc.Template
 	for _, id := range lotterySellerIDs {
-		templates = append(templates, &npc.Template{ID: int(id), TemplateID: int(id), Type: "Folk", Name: "Lottery Ticket Seller", Level: 70, HPMax: 2444, AIParams: commons.NewStatSet()})
+		templates = append(templates, &npc.Template{ID: int(id), TemplateID: int(id), Type: "Folk", Name: "Lottery Ticket Seller", Level: 70, HPMax: 2444})
 	}
 
 	shipped := newEventsFixture(t, table, npc.NewTable(templates), DefaultSpawnEvents())

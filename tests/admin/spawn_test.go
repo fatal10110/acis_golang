@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -33,11 +32,11 @@ const (
 // model yet) and a Christmas tree.
 func spawnTemplates() *npc.Table {
 	tmpl := func(id int, typ, name string) *npc.Template {
-		return &npc.Template{ID: id, TemplateID: id, Type: typ, Name: name, Level: 1, HPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CanMove: true, AIParams: commons.NewStatSet()}
+		return &npc.Template{ID: id, TemplateID: id, Type: typ, Name: name, Level: 1, HPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CanMove: true}
 	}
 	wolf := tmpl(wolfID, "Monster", "Wolf")
 	// A wolf leads the privates its spawn declares.
-	wolf.AIParams.Set("Party_Type", 2)
+	wolf.AIParams = npc.AIParams{"Party_Type": "2"}
 	return npc.NewTable([]*npc.Template{
 		wolf,
 		tmpl(grocerID, "Merchant", "Grocer Lector"),

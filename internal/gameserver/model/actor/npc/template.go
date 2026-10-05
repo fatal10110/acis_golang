@@ -64,9 +64,10 @@ type Template struct {
 	Seedable      bool
 	CanSeeThrough bool
 
-	// AIParams carries the template's <ai> tuning values verbatim; it is
-	// never nil, even when the template defines no <ai> block.
-	AIParams *commons.StatSet
+	// AIParams carries the template's <ai> tuning values verbatim; nil
+	// when the template defines no <ai> block. A spawn's own values shadow
+	// them (see SpawnSlot).
+	AIParams AIParams
 
 	Drops    []item.DropCategory
 	Privates []PrivateEntry
@@ -317,10 +318,8 @@ func NewTemplate(set *commons.StatSet, skills TemplateSkills) (*Template, error)
 		t.Race = race
 	}
 
-	if aiParams, ok := commons.FieldObject[*commons.StatSet](f, "aiParams"); ok {
+	if aiParams, ok := commons.FieldObject[AIParams](f, "aiParams"); ok {
 		t.AIParams = aiParams
-	} else {
-		t.AIParams = commons.NewStatSet()
 	}
 
 	if f.Has("clan") {

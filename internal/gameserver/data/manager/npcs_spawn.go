@@ -67,13 +67,13 @@ const fullMP = -1
 
 func (n *Npcs) registerSlot(key string, maker *spawn.Maker, entry spawn.Entry, dbName string, tmpl *npc.Template) {
 	n.mu.Lock()
-	n.slot[key] = slotInfo{key: key, maker: maker, entry: entry, dbName: dbName, tmpl: tmpl}
+	n.slot[key] = slotInfo{key: key, maker: maker, entry: entry, dbName: dbName, tmpl: tmpl, memory: newSlotMemory(entry)}
 	n.mu.Unlock()
 }
 
 func (n *Npcs) registerPrivateSlot(key string, entry spawn.Entry, masterID int32, tmpl *npc.Template) {
 	n.mu.Lock()
-	n.slot[key] = slotInfo{key: key, entry: entry, masterID: masterID, tmpl: tmpl}
+	n.slot[key] = slotInfo{key: key, entry: entry, masterID: masterID, tmpl: tmpl, memory: newSlotMemory(entry)}
 	n.mu.Unlock()
 }
 
@@ -160,11 +160,19 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	inst.SpawnHeading = heading
 	inst.WalkMode = walkerWalkModeIDs[entry.NPCID]
 	n.mu.Lock()
-	inst.Maker = n.slot[key].maker
+	info := n.slot[key]
 	n.mu.Unlock()
+	inst.Maker = info.maker
+	// Each life of the slot starts with the script value cleared; its
+	// other script memory carries over.
+	var slot npc.SpawnSlot
+	if info.memory != nil {
+		info.memory.scratch.Respawned()
+		slot = info.memory
+	}
 
 	if npc.FolkKind(inst) {
-		n.spawnFolk(key, inst, loc, heading)
+		n.spawnFolk(key, inst, loc, heading, slot)
 		return nil
 	}
 	if !npc.Attackable(inst) {
@@ -197,7 +205,7 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	}
 	hostile.SetCurrentHP(hp)
 	rewards := n.rewarderFor(hostile, tmpl)
-	rt := npc.Runtime{World: n.state, Log: n.log, Items: n.items, Rewards: rewards, Remover: n}
+	rt := npc.Runtime{World: n.state, Log: n.log, Items: n.items, Rewards: rewards, Remover: n, Slot: slot}
 	if rewards.rights != nil {
 		rt.Hits = rewards.rights
 	}
@@ -233,8 +241,8 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 // heading) and tracks it under its spawn slot key, like a hostile: a mortal
 // one that dies decays and respawns through the slot. A route walker walks
 // its route while it lives.
-func (n *Npcs) spawnFolk(key string, inst *npc.Instance, loc location.Location, heading int) {
-	if _, err := n.folk.Spawn(inst, loc, heading); err != nil {
+func (n *Npcs) spawnFolk(key string, inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot) {
+	if _, err := n.folk.Spawn(inst, loc, heading, slot); err != nil {
 		n.log.Warn().Err(err).Int("npc_id", inst.Template.ID).Msg("spawn: cannot build folk npc")
 		return
 	}
@@ -255,8 +263,7 @@ func (n *Npcs) trackLive(key string, id int32) {
 
 func (n *Npcs) spawnPrivates(key string, entry spawn.Entry, master *npc.Hostile) {
 	// The generic monster behavior creates spawn-list privates only for Party_Type 2.
-	partyType, err := master.Instance.Template.AIParams.GetIntDefault("Party_Type", 0)
-	if err != nil || partyType != 2 {
+	if master.AIInt("Party_Type", 0) != 2 {
 		return
 	}
 	for i, private := range entry.Privates {

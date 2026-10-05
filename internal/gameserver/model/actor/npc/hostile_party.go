@@ -198,12 +198,5 @@ func partyDistance2D(h *Hostile, other attackable.Combatant) float64 {
 }
 
 func (h *Hostile) aiInt(key string, def int) int {
-	if h.Instance == nil || h.Instance.Template == nil || h.Instance.Template.AIParams == nil {
-		return def
-	}
-	v, err := h.Instance.Template.AIParams.GetIntDefault(key, def)
-	if err != nil {
-		return def
-	}
-	return v
+	return int(h.AIInt(key, int32(def)))
 }

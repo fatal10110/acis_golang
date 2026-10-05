@@ -105,9 +105,9 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 	npcID, _ := set.GetInt("id")
 
 	if len(el.AI) > 0 {
-		ai := commons.NewStatSetWithCapacity(len(el.AI))
+		ai := make(npc.AIParams, len(el.AI))
 		for _, s := range el.AI {
-			ai.Set(s.Name, s.Val)
+			ai[s.Name] = s.Val
 		}
 		set.Set("aiParams", ai)
 	}

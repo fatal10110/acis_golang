@@ -1,19 +1,18 @@
 package combat
 
 import (
+	"strconv"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
-func partyParams(partyType int) *commons.StatSet {
-	set := commons.NewStatSet()
-	set.Set("Party_Type", partyType)
-	return set
+func partyParams(partyType int) npc.AIParams {
+	return npc.AIParams{"Party_Type": strconv.Itoa(partyType)}
 }
 
 func TestMinionAssistsMasterOnCombatDamage(t *testing.T) {
@@ -64,10 +63,10 @@ func TestPartyPrivateFollowsMasterWhenIdle(t *testing.T) {
 	}
 }
 
-func partyParamsMoving(partyType, movingAttack int) *commons.StatSet {
-	set := partyParams(partyType)
-	set.Set("MovingAttack", movingAttack)
-	return set
+func partyParamsMoving(partyType, movingAttack int) npc.AIParams {
+	params := partyParams(partyType)
+	params["MovingAttack"] = strconv.Itoa(movingAttack)
+	return params
 }
 
 func liveCombatant(t *testing.T, srv *gameservertest.Server) attackable.Combatant {

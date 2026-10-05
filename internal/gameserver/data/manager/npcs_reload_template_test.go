@@ -3,7 +3,6 @@ package manager
 import (
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 )
 
@@ -25,8 +24,8 @@ func (f *despawnFixture) names(npcID int) []string {
 func TestRespawnKeepsTheSpawnTemplateAcrossReload(t *testing.T) {
 	f := newDespawnFixture(t, nil)
 	f.templates.Replace(npc.NewTable([]*npc.Template{
-		{ID: 1, TemplateID: 1, Type: "Monster", Name: "Reloaded Wolf", HPMax: 100, RunSpeed: 100, AIParams: commons.NewStatSet()},
-		{ID: 2, TemplateID: 2, Type: "Monster", Name: "Reloaded Boss", HPMax: 100, RunSpeed: 100, AIParams: commons.NewStatSet()},
+		{ID: 1, TemplateID: 1, Type: "Monster", Name: "Reloaded Wolf", HPMax: 100, RunSpeed: 100},
+		{ID: 2, TemplateID: 2, Type: "Monster", Name: "Reloaded Boss", HPMax: 100, RunSpeed: 100},
 	}))
 
 	f.hostile(t, 1).DeleteMe()
