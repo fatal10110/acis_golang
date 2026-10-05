@@ -120,7 +120,10 @@ value per npcmaker, with the default maker for unknown types. 958 datapack maker
 engine-queue `After` calls outside the timer registry: they are unkeyed, may overlap and are
 never cancelled.
 
-**Scheduled tasks** are catalog scripts with one schedule hook. The four schedule kinds in
+**Scheduled tasks** are catalog scripts with one schedule hook. The reference alternates a
+start and an end hook when an entry sets `end`. No live task sets it (the only `end` in
+`scripts.xml` is on a plain quest, which the scheduler does not read) and every task's end
+hook is empty, so the start hook alone is observably equivalent. The four schedule kinds in
 live use are built (hourly, daily, weekly, monthly-by-week); any other attribute logs loudly.
 The 5-minute rescan is kept, and the calendar arithmetic is pinned by a golden.
 
@@ -147,8 +150,8 @@ model/actor/{npc,ai,cast}, model/zone and model/door import nothing from script.
 ## 4. Seams
 
 - **NPC facts.** A consumer-side interface in package `npc`, injected through the existing
-  `npc.Runtime` and `npc.FolkRuntime` structs next to `Rewards` and `Hits`. It grows one
-  method per seam PR, each with a production consumer. No func fields on actors.
+  `npc.Runtime` struct, next to `Rewards` and `Hits`, and as a new field on `npc.FolkRuntime`.
+  It grows one method per seam PR, each with a production consumer. No func fields on actors.
 - **Other facts.** Interact, bypass, quest list and abort, tutorial opcodes, item use, zone
   enter, door change, player and summon death: direct engine calls from the owning package.
 - **Outbound.** Scripts never touch `serverpackets`. Handles call exported domain methods
@@ -207,8 +210,10 @@ Each item is a leaf-locked container. Nothing new is queue-owned.
 | exit, repeatable | delete every row of the quest |
 | new state (created) | nothing |
 
-- Load at character selection: `SELECT name,var,value … ORDER BY name,var`; names resolve
-  case-insensitively, first match in list order; unknown names are skipped with a warning.
+- Load at character selection: `SELECT name,var,value … WHERE charId=?`. Go adds
+  `ORDER BY name,var`, which pins the primary-key order `(charId, name, var)` the reference's
+  rows arrive in. Names resolve case-insensitively, first match in list order; unknown names
+  are skipped with a warning.
 - Sealed at detach. A dirty sealed journal is drained before the next selection loads; if
   that drain fails, the selection is refused. Nothing else writes a sealed journal.
 - Character purge deletes `character_quests` and `character_memo` rows.
@@ -368,7 +373,7 @@ Chains run in parallel. Each hot file allows one open PR: `attackable.go`, `host
 | A8 | Skill finished, attack finished with target, see-spell, spelled, abnormal status | A6 | #3488 |
 | A9 | No-desire, move finished, out of territory, for hostile and folk; gates idle stand-ins | A4 | #3489 (+#2148, #2162, #2163, #2240) |
 | A10 | See-creature tick scan with its gates, look-neighbor throttle, re-fire after teleport | A9 | #3491 |
-| A11 | Behavior base plus the first Warrior chain (first cut-over: 299 ids) | A1–A9, E6, E7 | #3494 |
+| A11 | Behavior base plus the first Warrior chain: Warrior base, Warrior, WarriorAggressive (first cut-over: 514 ids, 299 + 215) | A1–A10, E6, E7 | #3494 |
 | A12 | Rest of the behavior spine (20 classes, about 840 ids in total) | A10, A11 | #3495 (+#2162, #2163, #2240, #3306, #176) |
 | A13 | Route movement as a weighted desire, with the walker script | A4, E6 | #2165 (+#3497) |
 | A14 | Folk-side desires for the 81 folk ids bound to behaviors | A4, A9 | #3492 |
@@ -393,9 +398,10 @@ Must land in the same PR:
 
 **Proof batch.** It freezes the API: one script per mechanic (plain talk and collect; party
 credit; multi-item drop; quest attacked hook; newbie shots; timer and spawn; decayed hook;
-clan leader state; second-class change; saga core; item use; zone; player death; the three
-engine-referenced quests), the tutorial and newbie helper, four features, two teleporters,
-six tasks, four makers and the behavior spine. The API freezes when the census of every
+clan leader state; second-class change; saga core; item use; zone; player death; the four
+engine-referenced quests: the diary-write quest of E5, the two subclass-gate quests and the
+class-change quest of X1), the tutorial and newbie helper, four features, two teleporters,
+six tasks, three makers and the behavior spine. The API freezes when the census of every
 engine call made by the 857 scripts has no unmapped row.
 
 ### M10: content (about 165–175 PRs)
