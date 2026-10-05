@@ -471,8 +471,11 @@ type AllyClanInfo struct {
 }
 
 // AllianceInfo returns the alliance allyID's information, its clans in
-// ascending id order; false when no clan leads it.
-func (t *Table) AllianceInfo(allyID int32) (AllyInfo, bool) {
+// ascending id order; false when no clan leads it. connected reports
+// whether a member in the world still has its client: one lingering after
+// its connection dropped is not counted online (ClanInfo.java:13,
+// Clan.getOnlineMembersCount).
+func (t *Table) AllianceInfo(allyID int32, connected func(objectID int32) bool) (AllyInfo, bool) {
 	leader, ok := t.Get(allyID)
 	if !ok {
 		return AllyInfo{}, false
@@ -483,13 +486,24 @@ func (t *Table) AllianceInfo(allyID int32) (AllyInfo, bool) {
 		info := cl.Info()
 		entry := AllyClanInfo{
 			Name: info.Name, Level: info.Level, LeaderName: info.LeaderName,
-			Total: cl.MembersCount(), Online: len(cl.OnlineMemberIDs()),
+			Total: cl.MembersCount(), Online: countConnected(cl.OnlineMemberIDs(), connected),
 		}
 		out.Total += entry.Total
 		out.Online += entry.Online
 		out.Clans = append(out.Clans, entry)
 	}
 	return out, true
+}
+
+// countConnected counts the ids connected reports connected.
+func countConnected(ids []int32, connected func(int32) bool) int {
+	n := 0
+	for _, id := range ids {
+		if connected(id) {
+			n++
+		}
+	}
+	return n
 }
 
 // DropDanglingAlliances takes out of its alliance every clan whose

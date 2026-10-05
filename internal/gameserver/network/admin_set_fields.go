@@ -141,7 +141,7 @@ func (l *GameClientLink) storeLive(live *livePlayer) {
 	if l.roster == nil {
 		return
 	}
-	charState := live.SaveState()
+	charState := live.saveState()
 	var skillState skillstate.SaveState
 	if l.skills != nil {
 		skillState = l.skills.SaveState(live.Character)

@@ -165,7 +165,7 @@ func (l *GameClientLink) raiseClanLevel(live *livePlayer) {
 // nominateClanLeader names the member called name as live's clan's next
 // leader.
 func (l *GameClientLink) nominateClanLeader(live *livePlayer, f *npc.Folk, name string) {
-	switch l.clanService().NominateLeader(live.Character, name) {
+	switch l.clanService().NominateLeader(live.Character, name, l.clanMemberConnected) {
 	case clan.NominateNotLeader:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 	case clan.NominateUnknown:

@@ -47,8 +47,10 @@ func (l *GameClientLink) charInfoPage(target *livePlayer) string {
 			partyText = `<a action="bypass -h admin_party_info ` + target.Name + `">` + strconv.Itoa(len(view.Members)) + ` members</a>`
 		}
 	}
+	// A player lingering after its connection dropped shows as
+	// disconnected already (AdminEditChar.java:586).
 	ip := target.remoteIP
-	if target.SessionDetached() {
+	if target.clientDetached() {
 		ip = "Disconnected"
 	}
 	x, y, z := target.Position()
