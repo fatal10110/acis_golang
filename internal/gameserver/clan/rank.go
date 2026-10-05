@@ -91,7 +91,10 @@ const (
 // NominateLeader names the member called name as the clan's next leader,
 // on its leader c's request. The handover itself is a scheduled task
 // (#3149); until it runs a second nomination is refused as pending.
-func (s *Service) NominateLeader(c *player.Character, name string) NominationResult {
+// connected reports whether a member in the world still has its client:
+// one lingering after its connection dropped is refused as offline
+// (ClanMember.isOnline). It is called with the clan lock released.
+func (s *Service) NominateLeader(c *player.Character, name string, connected func(objectID int32) bool) NominationResult {
 	cl, ok := s.ClanOf(c)
 	switch {
 	case !ok || !cl.IsLeader(c.ID):
@@ -103,6 +106,23 @@ func (s *Service) NominateLeader(c *player.Character, name string) NominationRes
 	m, ok := cl.memberByNameLocked(name)
 	switch {
 	case !ok:
+		cl.mu.Unlock()
+		return NominateUnknown
+	case !m.Online:
+		cl.mu.Unlock()
+		return NominateOffline
+	}
+	nominee := m.ObjectID
+	cl.mu.Unlock()
+	if !connected(nominee) {
+		return NominateOffline
+	}
+	// The member is read again: it may have left the clan or the world
+	// while the lock was released.
+	cl.mu.Lock()
+	m, ok = cl.memberByNameLocked(name)
+	switch {
+	case !ok || m.ObjectID != nominee:
 		cl.mu.Unlock()
 		return NominateUnknown
 	case !m.Online:

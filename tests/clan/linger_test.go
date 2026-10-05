@@ -169,3 +169,23 @@ func TestLingeringMemberDoesNotHoldWarStop(t *testing.T) {
 	}
 	w.stillLingers(t, squireID)
 }
+
+// TestLingeringMemberRefusedAsNominee names the lingering recruit the next
+// leader: the village master refuses it as not online
+// (VillageMaster.java:239-243, ClanMember.isOnline) and no nominee is stored.
+func TestLingeringMemberRefusedAsNominee(t *testing.T) {
+	w := bootClanWorld(t, 10, 0, 0)
+	clanID := w.found(t, "Knights")
+	w.recruit(t)
+
+	w.dropInCombat(t, w.member, w.memberID)
+	drainFrames(t, w.leader)
+	if ids := messages(t, w.command(t, "change_clan_leader Recruit")); !slices.Equal(ids, []int{serverpackets.SystemMessageInvitedUserNotOnline}) {
+		t.Fatalf("lingering nominee = %v, want INVITED_USER_NOT_ONLINE", ids)
+	}
+	w.srv.FlushPersistence(t)
+	if got := queryInt(t, w, `SELECT new_leader_id FROM clan_data WHERE clan_id = ?`, clanID); got != 0 {
+		t.Fatalf("stored nominee = %d, want none", got)
+	}
+	w.stillLingers(t, w.memberID)
+}

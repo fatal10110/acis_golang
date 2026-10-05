@@ -474,8 +474,7 @@ type AllyClanInfo struct {
 // ascending id order; false when no clan leads it. connected reports
 // whether a member in the world still has its client: one lingering after
 // its connection dropped is not counted online (ClanInfo.java:13,
-// Clan.getOnlineMembersCount). A nil connected counts every member in the
-// world.
+// Clan.getOnlineMembersCount).
 func (t *Table) AllianceInfo(allyID int32, connected func(objectID int32) bool) (AllyInfo, bool) {
 	leader, ok := t.Get(allyID)
 	if !ok {
@@ -496,12 +495,8 @@ func (t *Table) AllianceInfo(allyID int32, connected func(objectID int32) bool) 
 	return out, true
 }
 
-// countConnected counts the ids connected reports connected, every id
-// when connected is nil.
+// countConnected counts the ids connected reports connected.
 func countConnected(ids []int32, connected func(int32) bool) int {
-	if connected == nil {
-		return len(ids)
-	}
 	n := 0
 	for _, id := range ids {
 		if connected(id) {
