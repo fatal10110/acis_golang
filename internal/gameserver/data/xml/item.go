@@ -7,6 +7,8 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/rs/zerolog"
 )
 
@@ -326,13 +328,16 @@ func buildItemClauses(id int32, el itemElement, tables map[string][]string) ([]i
 			tag := opEl.XMLName.Local
 			if strings.EqualFold(tag, "cond") {
 				// Only a <cond> that is the block's first node gates it, and
-				// only when it holds a predicate; any other one is never read.
-				if leadsWithCond(tag, i, forEl.LeadingNode) && len(opEl.Children) > 0 {
-					uc, err := buildUseCondition(id, opEl.Attrs, opEl.Children)
+				// only when its predicate holds a condition; any other one is
+				// never read.
+				if leadsWithCond(tag, i, forEl.LeadingNode) {
+					uc, null, err := buildUseCondition(id, opEl.Attrs, opEl.Children)
 					if err != nil {
 						return nil, nil, err
 					}
-					attachCond = &uc
+					if !null {
+						attachCond = &uc
+					}
 				}
 				continue
 			}
@@ -362,11 +367,14 @@ func buildItemClauses(id int32, el itemElement, tables map[string][]string) ([]i
 
 	var useConditions []item.UseCondition
 	for _, condEl := range el.Cond {
-		uc, err := buildUseCondition(id, condEl.Attrs, condEl.Children)
+		uc, null, err := buildUseCondition(id, condEl.Attrs, condEl.Children)
 		if err != nil {
 			return nil, nil, err
 		}
-		useConditions = append(useConditions, uc)
+		// A <cond> that holds no condition never bars the item.
+		if !null {
+			useConditions = append(useConditions, uc)
+		}
 	}
 
 	return modifiers, useConditions, nil
@@ -432,10 +440,10 @@ func validateItemEffect(id int32, opEl funcElement, tables map[string][]string) 
 		switch {
 		case strings.EqualFold(tag, "cond"):
 			// Only a <cond> that is the effect's first node is read.
-			if !leadsWithCond(tag, i, opEl.LeadingNode) || len(ch.Children) == 0 {
+			if !leadsWithCond(tag, i, opEl.LeadingNode) {
 				continue
 			}
-			if _, err := buildUseCondition(id, ch.Attrs, ch.Children); err != nil {
+			if _, _, err := buildUseCondition(id, ch.Attrs, ch.Children); err != nil {
 				return err
 			}
 		case strings.EqualFold(tag, "effect"):
@@ -477,24 +485,29 @@ func buildStatModifier(op item.FuncOp, vals map[string]string) (item.StatModifie
 }
 
 // buildUseCondition reads a <cond> element. An item has no tables, so
-// neither its msgId nor any condition value it reads may name one.
-func buildUseCondition(id int32, attrs []xml.Attr, children []condNode) (item.UseCondition, error) {
+// neither its msgId nor any condition value it reads may name one. A <cond>
+// with no predicate, or whose predicate holds no condition
+// (conditions.IsNull), reports null and reads none of msg, msgId and
+// addName.
+func buildUseCondition(id int32, attrs []xml.Attr, children []condNode) (uc item.UseCondition, null bool, err error) {
 	if len(children) == 0 {
-		return item.UseCondition{}, fmt.Errorf("item template %d: cond: no predicate defined", id)
+		return item.UseCondition{}, true, nil
 	}
 	root, err := buildCondition(children[0], condRolePredicate)
 	if err != nil {
-		return item.UseCondition{}, fmt.Errorf("item template %d: cond: %w", id, err)
+		return item.UseCondition{}, false, fmt.Errorf("item template %d: cond: %w", id, err)
+	}
+	if conditions.IsNull(skillCondition(root)) {
+		return item.UseCondition{}, true, nil
 	}
 	a := newAttrValues(foldAttrs(attrs), fmt.Sprintf("item template %d: use condition", id))
 
-	var uc item.UseCondition
 	switch {
 	case a.has("msg"):
 		uc.Message = a.strDefault("msg", "")
 	case a.has("msgId"):
 		if err := noTableRef("msgId", a.str("msgId")); err != nil {
-			return item.UseCondition{}, fmt.Errorf("item template %d: cond: %w", id, err)
+			return item.UseCondition{}, false, fmt.Errorf("item template %d: cond: %w", id, err)
 		}
 		uc.MessageID = a.int32LiteralDefault("msgId", 0)
 		if a.has("addName") && uc.MessageID > 0 {
@@ -502,10 +515,19 @@ func buildUseCondition(id int32, attrs []xml.Attr, children []condNode) (item.Us
 		}
 	}
 	if err := a.Err(); err != nil {
-		return item.UseCondition{}, err
+		return item.UseCondition{}, false, err
 	}
 	uc.Root = root
-	return uc, nil
+	return uc, false, nil
+}
+
+// skillCondition is c in the skill condition shape conditions.Compile reads.
+func skillCondition(c item.Condition) skill.Condition {
+	out := skill.Condition{Kind: c.Kind, Attrs: c.Attrs}
+	for _, ch := range c.Children {
+		out.Children = append(out.Children, skillCondition(ch))
+	}
+	return out
 }
 
 // buildCondition converts one decoded condition node in role into an

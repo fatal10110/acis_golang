@@ -906,11 +906,13 @@ func TestConditionMessagePrecedence(t *testing.T) {
 // TestSkillGrammarDegradesGracefully covers pr-reviews/478.md finding 2:
 // an empty/predicate-less <cond/> and an unrecognized tag inside a <for>
 // block tolerate the malformed content instead of failing the whole file,
-// matching DocumentBase.java's parseCondition (returns null, attach(null) is
-// a no-op) and parseTemplate (no fall-through branch for an unknown tag).
+// matching DocumentBase.java's parseCondition (returns null) and
+// parseTemplate (no fall-through branch for an unknown tag). L2Skill.attach
+// still adds the null condition, so the empty <cond/> stays as a clause
+// that holds no condition (see condnull_test.go).
 func TestSkillGrammarDegradesGracefully(t *testing.T) {
 	t.Parallel()
-	t.Run("empty cond is skipped, not a load failure", func(t *testing.T) {
+	t.Run("empty cond is not a load failure", func(t *testing.T) {
 		dir := t.TempDir()
 		content := skillFixture(`<cond/>`)
 		writeXMLFixture(t, filepath.Join(dir, "fixture.xml"), content)
@@ -922,8 +924,8 @@ func TestSkillGrammarDegradesGracefully(t *testing.T) {
 		if !ok {
 			t.Fatal("skill 1 level 1 not loaded")
 		}
-		if len(def.Conditions) != 0 {
-			t.Fatalf("Conditions = %+v, want none", def.Conditions)
+		if len(def.Conditions) != 1 || !conditions.IsNull(def.Conditions[0].Root) {
+			t.Fatalf("Conditions = %+v, want one clause that holds no condition", def.Conditions)
 		}
 	})
 
