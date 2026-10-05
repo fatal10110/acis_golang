@@ -292,6 +292,8 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		return l.sevenSignsBypass(live, f, command, reply.DawnPriest)
 	case npc.BypassSignsChat:
 		sendFolkChat(live, f, reply.HTML, reply.Chat)
+	case npc.BypassTerritoryStatus:
+		l.showTerritoryStatus(live, f)
 	case npc.BypassUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Str("command", command).Msg("bypass: npc dialog command not modeled")
 	case npc.BypassRefused:

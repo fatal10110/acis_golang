@@ -8,6 +8,7 @@ import (
 
 	"go.uber.org/fx"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/castlemanor"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/fishchamp"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
@@ -62,6 +63,7 @@ const (
 		shutdownSaveTimeout + // buffer_schemes
 		shutdownSaveTimeout + // mods_wedding
 		fishchamp.TaskTimeout + shutdownSaveTimeout + // fishing_championship and its server_memo end, behind a save already running
+		castlemanor.TaskTimeout + shutdownSaveTimeout + // castle_manor_production and castle_manor_procure, behind a save already running
 		gameServerStopSlack
 	// gameServerBootTimeout bounds constructor-time DB I/O (id scan, ground-item
 	// restore, spawn-state load). These run inside fx.New's constructor graph,
@@ -226,10 +228,11 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideDerbyTrack,
 			provideClanHallFunctions,
 			provideClanHalls,
+			provideCastleManor,
 			provideDataReloads,
 			provideGameClientLink,
 		),
-		fx.Invoke(startClanDissolutions, startClanHallFunctions, startClanHalls, startSieges),
+		fx.Invoke(startClanDissolutions, startClanHallFunctions, startClanHalls, startSieges, startCastleManor),
 		fx.Invoke(startPvPFlags, startGroundItems, startGroundItemPersistence, startPlayerClock, startGameClock, startSevenSigns, startWalker, startWater, startShadowItems, startAutosave, startDecay, startAttackStance, startDoorTask, startDoorRegen, startWorldObjects, startBoats, startRespawnTask, startAI, startPositionUpdates, startInventoryUpdates, startItemInstances, startBuyListRestock, startSimPool, startEffects, startNPCRegen, startNpcs, startObserverTowers, startNpcPersistence, startRelationPersistence, startPetitionPersistence, startAnnouncements, startHeroes, startOlympiad, startRaidPoints, startCursedWeapons, startBossZones, startSchemeBuffer, startWedding, startLottery, startFishingChampionship, startDerbyTrack, startDebugHTTP, startGameServer),
 	}
 }

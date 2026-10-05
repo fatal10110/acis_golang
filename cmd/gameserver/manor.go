@@ -7,17 +7,27 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/config"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/manor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 )
 
-// loadManor reads the manor seed rows and the manor areas. An area whose
-// nodes do not triangulate is left out with a warning; the rest still load.
-func loadManor(xmlRoot string, log zerolog.Logger) (*manor.Table, *manor.AreaIndex, error) {
+// loadManor reads the manor seed rows, each with the reference prices of
+// its seed and crop items (1 for an item not loaded), and the manor areas.
+// An area whose nodes do not triangulate is left out with a warning; the
+// rest still load.
+func loadManor(xmlRoot string, items *item.Table, log zerolog.Logger) (*manor.Table, *manor.AreaIndex, error) {
 	seeds, err := gamexml.LoadManors(filepath.Join(xmlRoot, "manors.xml"))
 	if err != nil {
 		return nil, nil, err
 	}
+	seeds.ApplyReferencePrices(func(id int32) (int32, bool) {
+		tmpl, ok := items.Get(id)
+		if !ok {
+			return 0, false
+		}
+		return tmpl.ReferencePrice, true
+	})
 	areas, err := gamexml.LoadManorAreas(filepath.Join(xmlRoot, "manorAreas.xml"))
 	if err != nil {
 		return nil, nil, err

@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -32,8 +34,9 @@ func (p *livePlayer) tempInventoryDisable() {
 	p.after(inventoryDisableWindow, func() { p.inventoryDisabled.Store(false) })
 }
 
-// showBuyWindow opens the buy window of buylist listID at merchant f. A
-// list f may not sell answers nothing.
+// showBuyWindow opens the buy window of buylist listID at merchant f, its
+// prices taxed at the rate of f's castle. A list f may not sell answers
+// nothing.
 func (l *GameClientLink) showBuyWindow(live *livePlayer, f *npc.Folk, listID int) {
 	list, ok := l.merchant.List(listID)
 	inv := live.Inventory()
@@ -41,9 +44,7 @@ func (l *GameClientLink) showBuyWindow(live *livePlayer, f *npc.Folk, listID int
 		return
 	}
 	live.tempInventoryDisable()
-	// ponytail: no castle taxes yet; the buy window shows untaxed prices
-	// until #239 gives a merchant its castle's tax rate.
-	frame, err := serverpackets.FrameBuyList(list, l.merchant.Count, inv.Adena(), 0, l.merchant.Config().SiegeGuardsPriceRate, l.itemTemplates)
+	frame, err := serverpackets.FrameBuyList(list, l.merchant.Count, inv.Adena(), l.npcTaxRate(f.Instance), l.merchant.Config().SiegeGuardsPriceRate, l.itemTemplates)
 	if err != nil {
 		l.log.Error().Err(err).Int("buylist", listID).Msg("build BuyList")
 		return
@@ -71,8 +72,10 @@ func (l *GameClientLink) showWearWindow(live *livePlayer, f *npc.Folk, listID in
 
 // requestBuyItem buys the rows of req from its buylist. A list sold by an
 // NPC needs that NPC, a merchant or mercenary manager, targeted and within
-// interaction reach. A completed purchase shows the merchant's -bought
-// page when it has one, then the full item list.
+// interaction reach; each unit price is then taxed at the rate of that
+// NPC's castle, whose tax revenue takes the tax on the purchase. A
+// completed purchase shows the merchant's -bought page when it has one,
+// then the full item list.
 //
 // Every refusal specified with a system message answers so here; the
 // others (an unknown list, an untargeted or unreachable seller, an item off
@@ -86,21 +89,26 @@ func (l *GameClientLink) requestBuyItem(live *livePlayer, req clientpackets.Requ
 	if !ok || inv == nil {
 		return
 	}
-	var seller *npc.Folk
+	var (
+		seller  *npc.Folk
+		taxRate float64
+		taxedBy *castle.Castle
+	)
 	if list.NPCID > 0 {
 		f, _ := live.Target().(*npc.Folk)
 		if f == nil || !(f.Merchant() || f.MercenaryManager()) || !list.AllowsNPC(f.NpcID()) || !l.playerCanDoInteract(live, f) {
 			return
 		}
 		seller = f
+		if c, ok := l.npcCastle(f.Instance); ok {
+			taxRate, taxedBy = c.TaxRate(), c
+		}
 	}
 	rows := make([]merchant.BuyRow, len(req.Items))
 	for i, it := range req.Items {
 		rows[i] = merchant.BuyRow{ItemID: it.ItemID, Count: it.Count}
 	}
-	// ponytail: no castle taxes yet; prices stay untaxed and no revenue
-	// reaches a castle until #239 gives a merchant its castle's tax rate.
-	res, err := l.merchant.Buy(inv, list, rows, 0, live.accessLevel().IsGM)
+	res, err := l.merchant.Buy(inv, list, rows, taxRate, live.accessLevel().IsGM)
 	if err != nil {
 		l.log.Error().Err(err).Int32("buylist", req.ListID).Msg("buy items: allocate item id")
 	}
@@ -120,6 +128,9 @@ func (l *GameClientLink) requestBuyItem(live *livePlayer, req clientpackets.Requ
 	case merchant.BuyDone:
 	default:
 		return
+	}
+	if taxedBy != nil {
+		taxedBy.RiseTaxRevenue(int64(commons.JavaInt(float64(res.Subtotal) * taxRate)))
 	}
 	if seller != nil {
 		if path, ok := seller.BoughtPage(); ok {

@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
+	"github.com/fatal10110/acis_golang/internal/gameserver/castlemanor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/cursedweapon"
@@ -126,6 +127,7 @@ func provideGameClientLink(
 	characters *gamesql.CharacterStore,
 	clans *clan.Service,
 	castles *castle.Manager,
+	castleManor *castlemanor.Manager,
 	sieges *siege.Engine,
 	board communityBoard,
 	announcements *announcement.Registry,
@@ -277,6 +279,7 @@ func provideGameClientLink(
 		Characters:     characters,
 		Clans:          clans,
 		Castles:        castles,
+		CastleManor:    castleManor,
 		Sieges:         sieges,
 		AccessLevels:   characters,
 		CharacterEdits: characters,
