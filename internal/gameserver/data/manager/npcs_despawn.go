@@ -40,6 +40,9 @@ func (n *Npcs) DespawnAll() int {
 		}
 	}
 	clear(n.slot)
+	for _, g := range n.groups {
+		clear(g.keys)
+	}
 	clear(n.live)
 	n.liveCount = 0
 	n.mu.Unlock()
@@ -99,9 +102,9 @@ func onQueue(q *sim.Queue, fn func()) {
 	q.Post(fn)
 }
 
-// RespawnAll puts spawns in place of the spawn list and spawns every
-// on-start maker of it and the makers of the listed spawn events, as
-// SpawnManager.reload does after //respawnall's
+// RespawnAll puts spawns in place of the spawn list and starts every
+// on-start maker of it, the makers of the listed spawn events and the
+// Seven Signs groups, as SpawnManager.reload does after //respawnall's
 // despawn: the database-tracked spawns come back as spawns' rows say. The
 // slots of an earlier spawn list are not touched; //respawnall runs
 // DespawnAll first, which drops them all.

@@ -1,0 +1,11 @@
+# Go names of the reference engine calls listed in census.golden.
+#
+#   <row> <Go name>    the Go call a port makes for that row; Check matches the
+#                      name after its last '.' against the package's calls
+#   <row> inline       the row has no Go call of its own (a getter the Go
+#                      handle folds into the next call)
+#
+# A row is a census row: Owner.method, Owner.new for a constructor. Rows are
+# added by the slices that build the matching Go call; the script-facing API
+# is frozen when census.golden has no unmapped row. A row that is no longer
+# in the census fails TestCommittedGoldensAreConsistent.

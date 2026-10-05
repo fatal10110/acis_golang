@@ -142,6 +142,7 @@ public final class ScriptProbe
 		}
 
 		QuestTrace.run(out);
+		ContractProbe.run(out);
 	}
 
 	/**

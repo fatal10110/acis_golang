@@ -52,6 +52,13 @@ func (r *Respawn) Add(key string, deadline time.Time) {
 	r.add(key, key, deadline)
 }
 
+// AddEarliest schedules key to respawn at deadline unless it already has an
+// earlier respawn pending: of two respawns armed for one slot, the first to
+// come due brings the NPC back.
+func (r *Respawn) AddEarliest(key string, deadline time.Time) {
+	r.addEarliest(key, key, deadline)
+}
+
 // Cancel stops tracking key and reports whether it had been tracked.
 func (r *Respawn) Cancel(key string) bool {
 	return r.remove(key)

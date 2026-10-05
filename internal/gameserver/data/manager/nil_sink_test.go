@@ -47,7 +47,7 @@ func TestNewNpcsWithoutSinkFactoryWarns(t *testing.T) {
 	if _, err := NewNpcs(NewSpawns(table, nil), npc.NewTable([]*npc.Template{{ID: 1, TemplateID: 1, Type: "Monster", HPMax: 100, RunSpeed: 100}}), fakeGeo{}, state, &sequentialIDs{},
 		decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
 		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.New(&logs), nil, actorcast.EffectHandlers{},
-		walker, nil, effect.Env{Activity: task.NewEffects()}, npcQueues()); err != nil {
+		walker, nil, effect.Env{Activity: task.NewEffects()}, npcQueues(), testMakers()); err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}
 	if !strings.Contains(logs.String(), "no NPC event sink factory") {
@@ -93,7 +93,7 @@ func TestNewNpcsRejectsMissingEffectRegistry(t *testing.T) {
 	_, err := NewNpcs(NewSpawns(&spawn.Table{}, nil), npc.NewTable(nil), fakeGeo{}, state, &sequentialIDs{},
 		decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
 		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{},
-		walker, nil, effect.Env{}, npcQueues())
+		walker, nil, effect.Env{}, npcQueues(), testMakers())
 	if err == nil || !strings.Contains(err.Error(), "effect activity registry") {
 		t.Fatalf("NewNpcs() error = %v, want missing effect activity registry", err)
 	}
