@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -106,6 +107,20 @@ func (w *WorldObjects) Door(id int) (*door.Object, bool) {
 	}
 	obj, ok := w.doors[id]
 	return obj, ok
+}
+
+// DoorByName returns the spawned door named name, ignoring case
+// (DoorData.getDoor(String)).
+func (w *WorldObjects) DoorByName(name string) (*door.Object, bool) {
+	if w == nil {
+		return nil, false
+	}
+	for _, obj := range w.doorOrder {
+		if strings.EqualFold(obj.Template.Name, name) {
+			return obj, true
+		}
+	}
+	return nil, false
 }
 
 // Doors returns spawned doors in template order.

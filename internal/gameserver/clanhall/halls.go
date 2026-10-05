@@ -130,11 +130,22 @@ type Notifier interface {
 	TellClan(cl *clan.Clan, n Notice)
 }
 
+// Grounds acts on the halls' doors and grounds in the world. Its calls
+// never call back into Halls.
+type Grounds interface {
+	// CloseDoors closes the doors named gates, a hall's gates list.
+	CloseDoors(gates []string)
+	// BanishForeigners teleports every player standing in hall hallID's
+	// grounds who is not a member of clan clanID to a banish point of the
+	// hall.
+	BanishForeigners(hallID, clanID int32)
+}
+
 // Halls holds every clan hall's owner, lease and auction.
 //
 // mu guards every field below it and every hall and auction, and is held
-// for a whole change, across the Bank, Notifier, Clans and Functions calls
-// it makes: none of them calls back into Halls.
+// for a whole change, across the Bank, Notifier, Grounds, Clans and
+// Functions calls it makes: none of them calls back into Halls.
 type Halls struct {
 	data   *hallmodel.Table
 	clans  Clans
@@ -147,10 +158,11 @@ type Halls struct {
 	byID  map[int32]*hall
 	order []*hall
 	// bidAt is the hall each clan bid on.
-	bidAt  map[int32]int32
-	queue  *sim.Queue
-	bank   Bank
-	notify Notifier
+	bidAt   map[int32]int32
+	queue   *sim.Queue
+	bank    Bank
+	notify  Notifier
+	grounds Grounds
 }
 
 // hall is one clan hall's live state.
@@ -259,15 +271,16 @@ func (hs *Halls) Restore(ctx context.Context) error {
 // Start runs the halls on queue from now on: each owned hall's lease falls
 // due when its paid term ends, at once when it already has, and each
 // auction ends at its end date. An auction whose end date has passed is
-// given a week from now, then ends at once. bank moves the clans' adena
-// and notify tells their members.
-func (hs *Halls) Start(queue *sim.Queue, bank Bank, notify Notifier) {
+// given a week from now, then ends at once. bank moves the clans' adena,
+// notify tells their members and grounds closes the halls' doors and clears
+// their grounds as they change hands.
+func (hs *Halls) Start(queue *sim.Queue, bank Bank, notify Notifier, grounds Grounds) {
 	if hs == nil {
 		return
 	}
 	hs.mu.Lock()
 	defer hs.mu.Unlock()
-	hs.queue, hs.bank, hs.notify = queue, bank, notify
+	hs.queue, hs.bank, hs.notify, hs.grounds = queue, bank, notify, grounds
 	for _, h := range hs.order {
 		if h.ownerID > 0 {
 			hs.scheduleFeeLocked(h, h.paidUntil-hs.nowLocked())
@@ -317,11 +330,9 @@ func (hs *Halls) SetOwner(hallID int32, cl *clan.Clan) bool {
 // losing bidders, minus the tax, telling each bidding clan who won, and
 // is reset. A nil cl, a winner gone since it bid, then restarts the
 // auction and leaves the owner as it is. Otherwise the former owner loses
-// the hall, the hall loses its functions, and cl owns it with a week's
-// lease paid; both clans' headers are refreshed and the row stored.
-//
-// ponytail: the reference also closes the hall's doors and throws the
-// players of other clans out of its grounds (#3364).
+// the hall, the hall loses its functions and closes its doors, and cl owns
+// it with a week's lease paid; both clans' headers are refreshed, the
+// players of other clans are thrown out of its grounds and the row stored.
 func (hs *Halls) setOwnerLocked(h *hall, cl *clan.Clan) {
 	if a := h.auction; a != nil {
 		hs.removeBidsLocked(h, cl)
@@ -338,21 +349,23 @@ func (hs *Halls) setOwnerLocked(h *hall, cl *clan.Clan) {
 		hs.tellHallChanged(former)
 	}
 	hs.fns.RemoveAll(h.id())
+	hs.closeDoorsLocked(h)
 	cl.SetHallID(h.id())
 	h.ownerID = cl.ID()
 	h.paidUntil = hs.nowLocked() + weekMs
 	h.paid = true
 	hs.scheduleFeeLocked(h, h.paidUntil-hs.nowLocked())
 	hs.tellHallChanged(cl)
+	if hs.grounds != nil {
+		hs.grounds.BanishForeigners(h.id(), h.ownerID)
+	}
 	hs.updateLocked(h)
 }
 
 // freeLocked takes h from its owner: the lease stops, the owner loses the
-// hall and sees its header refreshed, the hall loses its functions, and
-// its auction refunds its bidders, minus the tax, and starts over. The
-// row is stored.
-//
-// ponytail: the reference also closes the hall's doors (#3364).
+// hall and sees its header refreshed, the hall loses its functions and
+// closes its doors, and its auction refunds its bidders, minus the tax,
+// and starts over. The row is stored.
 func (hs *Halls) freeLocked(h *hall) {
 	hs.stopFeeLocked(h)
 	if owner, ok := hs.clans.Get(h.ownerID); ok && h.ownerID > 0 {
@@ -361,12 +374,20 @@ func (hs *Halls) freeLocked(h *hall) {
 	}
 	h.ownerID, h.paidUntil, h.paid = 0, 0, false
 	hs.fns.RemoveAll(h.id())
+	hs.closeDoorsLocked(h)
 	if h.auction != nil {
 		hs.removeBidsLocked(h, nil)
 		hs.resetAuctionLocked(h)
 		hs.startAuctionLocked(h)
 	}
 	hs.updateLocked(h)
+}
+
+// closeDoorsLocked closes h's gates.
+func (hs *Halls) closeDoorsLocked(h *hall) {
+	if hs.grounds != nil && len(h.data.Gates) > 0 {
+		hs.grounds.CloseDoors(h.data.Gates)
+	}
 }
 
 // scheduleFeeLocked arms h's next lease payment after delayMs, at once

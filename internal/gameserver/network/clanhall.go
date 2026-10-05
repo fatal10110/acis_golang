@@ -15,7 +15,8 @@ import (
 var _ clanhall.Treasury = (*GameClientLink)(nil)
 
 // wireClanHallZones has every clan hall's grounds show its decorations to
-// a player entering them.
+// a player entering them, and throw a player out to a banish point of the
+// hall.
 func (l *GameClientLink) wireClanHallZones() {
 	if l.zones == nil {
 		return
@@ -23,6 +24,7 @@ func (l *GameClientLink) wireClanHallZones() {
 	for _, hall := range zone.OfKind[*zone.ClanHall](l.zones) {
 		hallID := int32(hall.ResidenceID)
 		hall.ShowInterior = func(a zone.Actor) { l.showClanHallInterior(hallID, a) }
+		hall.Banish = func(a zone.Actor) { l.banishFromClanHall(hallID, a) }
 	}
 }
 
