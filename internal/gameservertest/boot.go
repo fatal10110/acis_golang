@@ -9,9 +9,11 @@ import (
 	"cmp"
 	"context"
 	"database/sql"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -19,6 +21,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
@@ -1640,6 +1643,8 @@ func (s *Server) AwaitHandled(tb testing.TB) {
 }
 
 // NewObjectID allocates the next object id from the server's id sequence.
+// A row a suite stores once Boot has returned takes its object id from here:
+// the sequence only skips the fixed ids stored while Boot ran.
 func (s *Server) NewObjectID() int32 {
 	id, err := s.ids.NextID()
 	if err != nil {
@@ -1663,17 +1668,79 @@ func (s *Server) Close() {
 	})
 }
 
-// sequentialIDs is the deterministic id source wired into the roster.
+// sequentialIDs is the deterministic id source wired into the roster. Like
+// the production allocator it never hands out an id the database already
+// stores: Boot reserves the stored ids before allocating and again around
+// every seed hook that runs once allocation has begun.
+//
+// mu guards next and reserved.
 type sequentialIDs struct {
-	mu   sync.Mutex
-	next int32
+	mu       sync.Mutex
+	start    int32 // ids up to start are never handed out
+	next     int32 // last id handed out (start before the first)
+	reserved map[int32]struct{}
+}
+
+func newSequentialIDs(start int32) *sequentialIDs {
+	return &sequentialIDs{start: start, next: start, reserved: make(map[int32]struct{})}
 }
 
 func (s *sequentialIDs) NextID() (int32, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.next++
-	return s.next, nil
+	for {
+		s.next++
+		if _, ok := s.reserved[s.next]; !ok {
+			return s.next, nil
+		}
+	}
+}
+
+// reserve keeps NextID off ids from now on and returns, in ascending order,
+// those of them it had already handed out.
+func (s *sequentialIDs) reserve(ids []int64) []int32 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var clash []int32
+	for _, id := range ids {
+		if id <= int64(s.start) || id > math.MaxInt32 {
+			continue
+		}
+		oid := int32(id)
+		if _, ok := s.reserved[oid]; ok {
+			continue
+		}
+		s.reserved[oid] = struct{}{}
+		if oid <= s.next {
+			clash = append(clash, oid)
+		}
+	}
+	slices.Sort(clash)
+	return clash
+}
+
+// reserveStored reserves every object id db stores in the tables the
+// production allocator scans, returning those already handed out.
+func (s *sequentialIDs) reserveStored(tb testing.TB, db *sql.DB) []int32 {
+	tb.Helper()
+	var stored []int64
+	if err := idfactory.ScanUsedIDs(context.Background(), db, func(id int64) { stored = append(stored, id) }); err != nil {
+		tb.Fatalf("gameservertest: scan stored object ids: %v", err)
+	}
+	return s.reserve(stored)
+}
+
+// seed runs a seed hook that writes db once allocation has begun. Ids the
+// stack itself stored are reserved first, so any already-allocated id
+// stored by the hook can only be the hook's own, and Boot fails on it: two
+// live objects would share that ObjectID.
+func (s *sequentialIDs) seed(tb testing.TB, db *sql.DB, hook func()) {
+	tb.Helper()
+	s.reserveStored(tb, db)
+	hook()
+	if clash := s.reserveStored(tb, db); len(clash) > 0 {
+		tb.Fatalf("gameservertest: seed stored object ids %v the harness already allocated to live objects; seed ids it has not reached, or seed them through WithSeed", clash)
+	}
 }
 
 // nextID allocates the next object id, panicking on allocation failure (the
@@ -1813,7 +1880,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if itemTemplates == nil {
 		itemTemplates = ItemTemplates()
 	}
-	ids := &sequentialIDs{next: 100}
+	ids := newSequentialIDs(100)
+	ids.reserveStored(t, db)
 	var worldObjects *gamemanager.WorldObjects
 	var doors *doorHarness
 	if len(o.doors) > 0 {
@@ -2213,10 +2281,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		}
 	}
 	if o.seedHennas != nil {
-		o.seedHennas(db, hennas)
+		ids.seed(t, db, func() { o.seedHennas(db, hennas) })
 	}
 	if o.seedClans != nil {
-		o.seedClans(db)
+		ids.seed(t, db, func() { o.seedClans(db) })
 	}
 	clanNow := time.Now()
 	if err := clanStore.DeleteExpiredWars(context.Background(), clanNow.UnixMilli()); err != nil {
@@ -2267,10 +2335,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	t.Cleanup(clanDissolutions.Close)
 	gclConfig.Clans.StartDissolutions(clanDissolutions, gcl)
 	if o.seedBoard != nil {
-		o.seedBoard(db)
+		ids.seed(t, db, func() { o.seedBoard(db) })
 	}
 	if o.seedOlympiad != nil {
-		o.seedOlympiad(db)
+		ids.seed(t, db, func() { o.seedOlympiad(db) })
 	}
 	if err := olympiadState.Restore(context.Background()); err != nil {
 		t.Fatalf("restore olympiad: %v", err)
@@ -2286,10 +2354,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	heroes.Start(gcl)
 	t.Cleanup(func() { olympiadState.Stop(context.Background()) })
-	o.lottery.start(t, db, lotteryState)
-	o.fishChamp.start(t, db, fishChampState)
+	o.lottery.start(t, db, ids, lotteryState)
+	o.fishChamp.start(t, db, ids, fishChampState)
 	if o.seedBoss != nil {
-		o.seedBoss(db)
+		ids.seed(t, db, func() { o.seedBoss(db) })
 	}
 	if err := raidPoints.Restore(context.Background()); err != nil {
 		t.Fatalf("restore raid points: %v", err)
