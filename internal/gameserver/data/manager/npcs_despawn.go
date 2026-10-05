@@ -68,7 +68,8 @@ func (n *Npcs) deleteNpc(obj world.Tracked) bool {
 			o.Decay(n.state, nil)
 		})
 	case *npc.Decoration:
-		n.state.Despawn(o)
+		// Out of its zones first, then out of the world.
+		o.Despawn()
 	case *npc.EffectPoint:
 		onQueue(o.Queue(), o.Despawn)
 	default:

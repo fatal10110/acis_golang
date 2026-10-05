@@ -60,7 +60,11 @@ func TestDangerZonesDriveTheEtcStatusDangerField(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	damage, err := zone.NewDamage(1, damageForm, commons.NewStatSet())
+	// No damage: the zone's pulse would otherwise hurt the player while
+	// the reads below move the clock.
+	noDamage := commons.NewStatSet()
+	noDamage.Set("hpDamage", "0")
+	damage, err := zone.NewDamage(1, damageForm, noDamage)
 	if err != nil {
 		t.Fatal(err)
 	}

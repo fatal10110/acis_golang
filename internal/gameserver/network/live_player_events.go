@@ -318,6 +318,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		})
 	case event.AttackTargetRefused:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetIncorrect))
+	case event.AttackWeaponRefused:
+		live.SendFrame(serverpackets.FrameSystemMessage(attackWeaponRefusalMessage(e.Reason)))
 	case event.AttackRequested:
 		if e.Target != nil {
 			// An attack an effect forces on the player holds no shift.

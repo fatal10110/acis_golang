@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -80,6 +81,7 @@ type signetHandler struct {
 	ids           objectIDAllocator
 	world         *world.State
 	newSink       func(*npc.EffectPoint) event.Sink
+	zones         *zone.Index
 	effects       effect.Env
 	queues        signetQueues
 	log           zerolog.Logger
@@ -181,12 +183,13 @@ func (h signetHandler) spawnActor(caster Actor, def modelskill.Definition) (*npc
 	// caster's session, and its list's OnExit is what despawns it, so a
 	// queue closed by the caster's logout would strand the point in world.
 	queue := h.queues.NewQueue(fmt.Sprintf("effectpoint-%d", id))
-	point, err := npc.NewEffectPoint(id, tmpl, ownerID, queue, effect.WithEnv(h.effects))
+	point, err := npc.NewEffectPoint(id, tmpl, ownerID, queue, h.defs, effect.WithEnv(h.effects))
 	if err != nil {
 		queue.Close()
 		return nil, false
 	}
 	point.Attach(npc.Runtime{World: h.world, Log: h.log, Sink: h.newSink(point)})
+	point.SetZones(h.zones)
 
 	pos, ok := caster.(signetPositioned)
 	if !ok {
