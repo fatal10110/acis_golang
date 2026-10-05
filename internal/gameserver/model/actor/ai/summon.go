@@ -53,9 +53,6 @@ type SummonMoveController interface {
 // owner.
 type SummonCastController interface {
 	CastController
-	// FinalTarget resolves the creature ref is cast on given the commanded
-	// target (nil when there is none), or nil when the skill has none.
-	FinalTarget(target attackable.Combatant, ref skill.Ref) attackable.Combatant
 	// AttemptCast is CanAttempt, reporting a refusal to the owner.
 	AttemptCast(target attackable.Combatant, ref skill.Ref) bool
 	// CanCastPlayable runs every gate checked as the cast commits (costs,
