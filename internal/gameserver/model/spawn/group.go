@@ -71,7 +71,8 @@ type GroupNPC interface {
 	// Delete takes the NPC out of the world at once, with no corpse.
 	Delete()
 	// ScheduleRespawn brings the NPC back once d has elapsed; nothing for
-	// a non-positive d.
+	// a non-positive d. A respawn already pending that comes due sooner
+	// stands: the earlier of the two brings the NPC back.
 	ScheduleRespawn(d time.Duration)
 }
 

@@ -271,7 +271,7 @@ func (c groupNPC) ScheduleRespawn(d time.Duration) {
 	c.n.mu.Lock()
 	defer c.n.mu.Unlock()
 	if _, ok := c.n.slot[c.key]; ok {
-		c.n.respawn.Add(c.key, now.Add(d))
+		c.n.respawn.AddEarliest(c.key, now.Add(d))
 	}
 }
 
@@ -339,7 +339,7 @@ func (n *Npcs) created(key string) {
 // not hold); a maker with a spawn time holds, and any other maker does not.
 func (n *Npcs) held(m *spawn.Maker) bool {
 	if event := m.EventName(); event != "" {
-		if held, ok := n.sevenSignsHeld(event); ok {
+		if held, ok := sevenSignsHeld(n.sevenSignsState(), event); ok {
 			return held
 		}
 		return !n.events.has(event)
@@ -348,10 +348,10 @@ func (n *Npcs) held(m *spawn.Maker) bool {
 	return kind != spawn.SpawnTimeNone
 }
 
-// sevenSignsHeld reports whether the Seven Signs state keeps the NPCs of
+// sevenSignsHeld reports whether the Seven Signs state ss keeps the NPCs of
 // event out of the world; ok is false for an event that is no Seven Signs
-// group. Before the state is known every group is held.
-func (n *Npcs) sevenSignsHeld(event string) (held, ok bool) {
+// group. Before the state is known (nil ss) every group is held.
+func sevenSignsHeld(ss SevenSigns, event string) (held, ok bool) {
 	var seal int
 	var cabal sevensigns.Cabal
 	switch event {
@@ -368,7 +368,6 @@ func (n *Npcs) sevenSignsHeld(event string) (held, ok bool) {
 	if strings.HasPrefix(event, "ssq_seal2") {
 		seal = 1
 	}
-	ss := n.sevenSignsState()
 	if ss == nil {
 		return true, true
 	}

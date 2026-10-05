@@ -28,7 +28,6 @@ func TestSevenSignsGroupsFollowThePeriod(t *testing.T) {
 			for _, avarice := range cabals {
 				for _, gnosis := range cabals {
 					ss := fakeSevenSigns{period: period, won: won, owners: [3]sevensigns.Cabal{avarice, gnosis, sevensigns.NoCabal}}
-					n := &Npcs{sevenSigns: ss}
 					contest := period == sevensigns.Recruiting || period == sevensigns.Competition
 					want := map[string]bool{"ssq_event": !contest}
 					for prefix, owner := range map[string]sevensigns.Cabal{"ssq_seal1": avarice, "ssq_seal2": gnosis} {
@@ -44,7 +43,7 @@ func TestSevenSignsGroupsFollowThePeriod(t *testing.T) {
 						started[sealGroup("ssq_seal2", gnosis, won)] = true
 					}
 					for _, event := range sevenSignsGroups {
-						held, ok := n.sevenSignsHeld(event)
+						held, ok := sevenSignsHeld(ss, event)
 						if !ok || held != want[event] {
 							t.Errorf("%v won=%v owners=%v/%v: %s held = %v (ok %v), want %v", period, won, avarice, gnosis, event, held, ok, want[event])
 						}
@@ -56,10 +55,10 @@ func TestSevenSignsGroupsFollowThePeriod(t *testing.T) {
 			}
 		}
 	}
-	if _, ok := (&Npcs{}).sevenSignsHeld("christmas"); ok {
+	if _, ok := sevenSignsHeld(nil, "christmas"); ok {
 		t.Error("christmas counted as a Seven Signs group")
 	}
-	if held, _ := (&Npcs{}).sevenSignsHeld("ssq_event"); !held {
+	if held, _ := sevenSignsHeld(nil, "ssq_event"); !held {
 		t.Error("a Seven Signs group spawns before the state is known")
 	}
 }
