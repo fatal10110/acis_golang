@@ -542,14 +542,14 @@ func TestIntAttrGrammarMatchesReferencePerField(t *testing.T) {
 			}
 			return v.tpl.Pet.Food2, nil
 		}},
-		{name: "npc skill id", attr: "id", doc: npcHead + `<skills><skill %s level="1"/></skills></npc></list>`, load: func(dir, path string) (int, error) {
+		{name: "npc skill id", attr: "id", doc: npcHead + `<skills><skill %s level="1" type="SKILL01_ID"/></skills></npc></list>`, load: func(dir, path string) (int, error) {
 			v, err := npcByName(dir, path)
 			if err != nil {
 				return 0, err
 			}
 			return probeInt(func(id int) bool { _, ok := v.tpl.Skills[id]; return ok })
 		}},
-		{name: "npc skill level", attr: "level", doc: npcHead + `<skills><skill id="1" %s/></skills></npc></list>`, load: func(dir, path string) (int, error) {
+		{name: "npc skill level", attr: "level", doc: npcHead + `<skills><skill id="1" %s type="SKILL01_ID"/></skills></npc></list>`, load: func(dir, path string) (int, error) {
 			v, err := npcByName(dir, path)
 			if err != nil {
 				return 0, err
