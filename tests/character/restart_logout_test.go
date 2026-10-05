@@ -30,6 +30,7 @@ func TestRestartReturnsToCharacterSelect(t *testing.T) {
 	target := location.Location{X: 80, Y: 70, Z: 30}
 	spawn := location.Location{X: 10, Y: 20, Z: 30}
 	c.Send(encodeMoveBackwardToLocation(target, spawn, 1))
+	expectGroundClickAck(t, c)
 	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
@@ -79,6 +80,7 @@ func TestLogoutPersistsAndLeavesWorld(t *testing.T) {
 	target := location.Location{X: 80, Y: 70, Z: 30}
 	spawn := location.Location{X: 10, Y: 20, Z: 30}
 	c.Send(encodeMoveBackwardToLocation(target, spawn, 1))
+	expectGroundClickAck(t, c)
 	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)

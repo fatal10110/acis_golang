@@ -158,6 +158,7 @@ func TestRemoveTargetStopsWalkingPlayer(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeMoveBackwardToLocation(-2000, 2000, 30))
+	expectGroundClickAck(t, c)
 	assertFrameOpcode(t, mustRead(t, c, "MoveToLocation"), serverpackets.OpcodeMoveToLocation, "MoveToLocation")
 	drainUntilQuiet(t, c)
 

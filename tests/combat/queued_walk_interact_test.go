@@ -66,10 +66,20 @@ func TestWalkReSteeredMidWalkSendsNoStopMove(t *testing.T) {
 	c.Send(encodeMoveBackwardToLocation(walkAwayX, walkAwayY, walkAwayZ))
 	before, second := readUntilOwnMove(t, c, objID, 2*time.Second, "re-steered walk")
 	assertMoveTo(t, second, walkAwayX, walkAwayY, "re-steered walk")
+	// The click itself is answered ActionFailed ahead of its walk, as every
+	// ground click away from a boat entrance is (Playable.tryToPassBoatEntrance).
+	acks := 0
 	for _, frame := range before {
-		if isOwnFrame(frame, serverpackets.OpcodeStopMove, objID) || frame[0] == serverpackets.OpcodeActionFailed {
+		if frame[0] == serverpackets.OpcodeActionFailed {
+			acks++
+			continue
+		}
+		if isOwnFrame(frame, serverpackets.OpcodeStopMove, objID) {
 			t.Fatalf("re-steered walk sent opcode %#x before its MoveToLocation", frame[0])
 		}
+	}
+	if acks != 1 {
+		t.Fatalf("re-steered walk sent %d ActionFailed before its MoveToLocation, want the click's 1", acks)
 	}
 	for _, frame := range srv.ReadQueued(t, c) {
 		if isOwnFrame(frame, serverpackets.OpcodeStopMove, objID) {

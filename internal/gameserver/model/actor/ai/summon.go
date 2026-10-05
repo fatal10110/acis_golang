@@ -41,6 +41,11 @@ type SummonMoveController interface {
 	// answers like MaybeStartOffensiveFollow, but measures whether target is
 	// already in reach as the follow task does (3D while swimming or flying).
 	RecheckOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error)
+	// MaybeStartEntranceFollow arms a friendly follow of target that never
+	// walks after it, returning target's position and true when it is out
+	// of reach, for the summon to head for a boat entrance instead
+	// (SummonMove.friendlyFollowTask).
+	MaybeStartEntranceFollow(target attackable.Combatant, offset int) (location.Location, bool)
 }
 
 // SummonCastController is the cast controller a summon AI drives: the shared
@@ -65,6 +70,7 @@ type Summon struct {
 	move   SummonMoveController
 	attack AttackController
 	cast   SummonCastController
+	boats  BoatEntrance
 	log    zerolog.Logger
 
 	// mu guards current, next and previous. A Betray effect turns the
@@ -622,6 +628,9 @@ func (s *Summon) thinkFollowLocked() (bool, error) {
 		return false, err
 	}
 
+	if handled, err := s.followThroughBoatEntranceLocked(target); handled {
+		return true, err
+	}
 	_, err := s.move.MaybeStartFriendlyFollow(target, summonFollowOffset)
 	return true, err
 }

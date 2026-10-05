@@ -57,6 +57,7 @@ func TestZoneEnterWaitsForFifthPositionUpdate(t *testing.T) {
 	spawn := besideWaterSpawn
 	mover := srv.PlayerMove(t, objID)
 	srv.Client.Send(encodeMoveBackwardToLocation(location.Location{X: spawn.X + 3_000, Y: spawn.Y, Z: spawn.Z}, spawn, 1))
+	expectGroundClickAck(t, srv.Client)
 	if reply := srv.Client.Read(); reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation", reply[0])
 	}
@@ -93,6 +94,7 @@ func TestZoneEnterOnArrivalBeforeFifthUpdate(t *testing.T) {
 	mover := srv.PlayerMove(t, objID)
 	dest := location.Location{X: spawn.X + 12, Y: spawn.Y, Z: spawn.Z}
 	srv.Client.Send(encodeMoveBackwardToLocation(dest, spawn, 1))
+	expectGroundClickAck(t, srv.Client)
 	if reply := srv.Client.Read(); reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation", reply[0])
 	}
@@ -122,6 +124,7 @@ func TestZoneEnterOnStopBeforeFifthUpdate(t *testing.T) {
 	mover := srv.PlayerMove(t, objID)
 	c := srv.Client
 	c.Send(encodeMoveBackwardToLocation(location.Location{X: spawn.X + 3_000, Y: spawn.Y, Z: spawn.Z}, spawn, 1))
+	expectGroundClickAck(t, c)
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation", reply[0])
 	}
@@ -177,6 +180,7 @@ func TestZoneEnterOnRegionCrossingBeforeFifthUpdate(t *testing.T) {
 	}
 
 	srv.Client.Send(encodeMoveBackwardToLocation(location.Location{X: start + 3_000, Y: y, Z: z}, from, 1))
+	expectGroundClickAck(t, srv.Client)
 	if reply := srv.Client.Read(); reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation", reply[0])
 	}
@@ -216,6 +220,7 @@ func TestTeleportMidWalkEntersNoZoneBeforeLeaving(t *testing.T) {
 	mover := srv.PlayerMove(t, objID)
 	c := srv.Client
 	c.Send(encodeMoveBackwardToLocation(location.Location{X: spawn.X + 3_000, Y: spawn.Y, Z: spawn.Z}, spawn, 1))
+	expectGroundClickAck(t, c)
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation", reply[0])
 	}

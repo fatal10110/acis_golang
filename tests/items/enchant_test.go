@@ -247,6 +247,7 @@ func TestWalkCancelsActiveEnchant(t *testing.T) {
 
 		assertEnchantResult(t, c.Read(), serverpackets.EnchantResultCancelled)
 		assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageEnchantScrollCancelled)
+		expectGroundClickAck(t, c)
 		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "walk after enchant cancel")
 
 		c.Send(encodeRequestEnchantItem(weapon))

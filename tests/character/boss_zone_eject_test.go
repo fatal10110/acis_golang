@@ -57,6 +57,7 @@ func TestBossZoneWalkInEjectsToOustLocation(t *testing.T) {
 	srv, _, objID := bootInZones(t, zones)
 	spawn := location.Location{X: 10, Y: 20, Z: 30}
 	srv.Client.Send(encodeMoveBackwardToLocation(location.Location{X: 300, Y: 20, Z: 30}, spawn, 1))
+	expectGroundClickAck(t, srv.Client)
 	if frame := srv.Client.Read(); frame[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation", frame[0])
 	}

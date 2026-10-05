@@ -163,6 +163,7 @@ func TestCastStopWalksThenStopsForQueuedMove(t *testing.T) {
 	srv, pc, _ := bootMidCastBesideHostile(t)
 	c := srv.Client
 	c.Send(encodeMoveBackwardToLocation(int32(playerOrigin.X)-300, int32(playerOrigin.Y), int32(playerOrigin.Z)))
+	expectGroundClickAck(t, c)
 	assertFrameOpcode(t, mustRead(t, c, "mid-cast walk ActionFailed"), serverpackets.OpcodeActionFailed, "mid-cast walk ActionFailed")
 
 	stopCastOnQueue(t, pc)
@@ -219,6 +220,7 @@ func TestTeleportMidCastActionFailedCounts(t *testing.T) {
 		{name: "attack queued", long: queueLongSkillID, queue: requestAttackMidCast, want: []byte{af, af, msc, af, af, af, ttl}},
 		{name: "walk queued", long: queueLongSkillID, queue: func(t *testing.T, c *scriptedClient, _ int32) {
 			c.Send(encodeMoveBackwardToLocation(int32(playerOrigin.X)-300, int32(playerOrigin.Y), int32(playerOrigin.Z)))
+			expectGroundClickAck(t, c)
 			assertFrameOpcode(t, mustRead(t, c, "mid-cast walk ActionFailed"), af, "mid-cast walk ActionFailed")
 		}, want: []byte{af, af, msc, af, af, af, ttl}},
 		{name: "nextActionAttack cast", long: queueFollowUpSkillID, want: []byte{af, af, msc, af, af, af, ttl}},

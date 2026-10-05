@@ -134,6 +134,9 @@ type CreatureMove struct {
 	waypoints                       []location.Location
 	accurateX, accurateY, accurateZ float64
 	flying                          bool
+	// inBoat marks a player riding a boat: like a flyer, it is held at the
+	// water surface.
+	inBoat bool
 	// zoneSwim marks a mover whose swimming follows swimming, set from its
 	// zone membership, instead of the water query. capSwimmer marks one of
 	// them that is not a player: it is held at the water surface while it
@@ -441,6 +444,16 @@ func (m *CreatureMove) SetWaterSurface(query func(location.Location) (int, bool)
 func (m *CreatureMove) SetFlying(flying bool) {
 	m.mu.Lock()
 	m.flying = flying
+	m.mu.Unlock()
+}
+
+// SetInBoat records whether the mover, a player, rides a boat. A passenger's
+// own server-side steps are held at the surface of the water zone it stands
+// in, as a flyer's are (PlayerMove.updatePosition, canBypassZCheck). Its
+// tests/boat coverage waits on a fixture for such a step (#3425).
+func (m *CreatureMove) SetInBoat(inBoat bool) {
+	m.mu.Lock()
+	m.inBoat = inBoat
 	m.mu.Unlock()
 }
 
@@ -1274,14 +1287,15 @@ func (m *CreatureMove) maxZLocked() int {
 // mover stands in when the floor lies deeper than waterDepthMin below it,
 // else the world max. It queries the water zone once. Callers hold mu.
 //
-// A UseZoneSwim mover (a player) is held at the surface only while it
-// flies, never while it swims: a flyer whose zones do not hold it in water
-// yet stays capped at the surface of the water zone it stands in until they
-// do. A UseCreatureZoneSwim mover is held there only while it swims.
+// A UseZoneSwim mover (a player) is held at the surface while it rides a
+// boat, swimming or not, and otherwise only while it flies, never while it
+// swims: a flyer whose zones do not hold it in water yet stays capped at the
+// surface of the water zone it stands in until they do. A UseCreatureZoneSwim mover is held there only
+// while it swims.
 func (m *CreatureMove) waterLocked() (MoveType, int) {
 	if m.zoneSwim {
 		moveType := m.flagTypeLocked()
-		capped := moveType == MoveFly
+		capped := moveType == MoveFly || m.inBoat
 		if m.capSwimmer {
 			capped = moveType == MoveSwim
 		}
