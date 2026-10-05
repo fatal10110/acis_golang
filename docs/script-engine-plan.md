@@ -1,6 +1,8 @@
 # Script engine: design and staging (M9 engine, M10 content)
 
-Status: decided 2026-10-05. Implementation has not started.
+Status: decided 2026-10-05, amended the same day with the owner decisions on the alliance
+level (X4), the script-event consumer (E8) and the stand-in deletion (section 8).
+Implementation has not started.
 
 ## Context
 
@@ -286,7 +288,9 @@ Stand-ins stay behind one predicate, "no behavior is bound to this NPC id". A te
 switches to real behavior when its script registers. The three ids claimed by a parent and a
 child switch only when the child is ported.
 
-- They are never extended and are deleted in one PR at M10 exit.
+- They are never extended and are deleted in one PR (#3497) once every scripted NPC id has
+  its behavior, including the siegable-hall behaviors of #3502 (M12). M10's exit does not
+  include the deletion.
 - The list: idle wander and follow, `attackedHateWeight`, Warrior-style party assist, the
   shot-recharge roll, the walker alias rule, `Party_Type` 2 privates, `despawnMinions`, and
   default treatment of the scripted maker type strings (predicate: no maker registered).
@@ -363,7 +367,7 @@ Chains run in parallel. Each hot file allows one open PR: `attackable.go`, `host
 | E5 | Dialog path of section 7 for folk and hostile NPCs, with the first plain quest | E1, E3, E4 | #130 |
 | E6 | Created, dying (3 s), decayed; boot spawn pass moved; `RespawnAll` lock narrowed; synchronous delete | E1, E4 | #3490 (+#2164) |
 | E7 | Timer registry | E1, A3 | #168 |
-| E8 | One-off seams with their only consumers: item use, zone enter, player and summon death, script events | E5, E6 | #3493 (+#867) |
+| E8 | One-off seams with their first consumers: item use, zone enter, player and summon death (proof quests); script events (the Warrior base of A11, which sends and receives them; own engine PR ahead of A11) | E5, E6; script events: E1 | #3493 (+#867) |
 | A0 | Brain phase locking: hooks at the reference's points, nested think in place | — | #3478 |
 | A1 | NPC skill types kept at load | — | #3479 (+#3470) |
 | A2 | Spawn-memo params first, then template; slot-owned scratch memory; life-time accessor | — | #3480 (+#3470) |
@@ -375,7 +379,7 @@ Chains run in parallel. Each hot file allows one open PR: `attackable.go`, `host
 | A8 | Skill finished, attack finished with target, see-spell, spelled, abnormal status | A6 | #3488 |
 | A9 | No-desire, move finished, out of territory, for hostile and folk; gates idle stand-ins | A4 | #3489 (+#2148, #2162, #2163, #2240) |
 | A10 | See-creature tick scan with its gates, look-neighbor throttle, re-fire after teleport | A9 | #3491 |
-| A11 | Behavior base plus the first Warrior chain: Warrior base, Warrior, WarriorAggressive (first cut-over: 514 ids, 299 + 215) | A1–A10, E6, E7 | #3494 |
+| A11 | Behavior base plus the first Warrior chain: Warrior base, Warrior, WarriorAggressive (first cut-over: 514 ids, 299 + 215) | A1–A10, E6, E7, E8 script events, X4 | #3494 |
 | A12 | Rest of the behavior spine (20 classes, about 840 ids in total) | A10, A11 | #3495 (+#2162, #2163, #2240, #3306, #176) |
 | A13 | Route movement as a weighted desire, with the walker script | A4, E6 | #2165 (+#3497) |
 | A14 | Folk-side desires for the 81 folk ids bound to behaviors | A4, A9 | #3492 |
@@ -388,6 +392,11 @@ Chains run in parallel. Each hot file allows one open PR: `attackable.go`, `host
 | X1 | Subclass gates on two quests and the class-change exit of a third | E5 | #3070 |
 | X2 | Academy graduation on class change | — | #3181 |
 | X3 | Admin NPC script info pages | A2, A11, E7 | #3398 |
+| X4 | Ketra and Varka alliance level on the player: load and save, get and set, both ally checks, the faction exclusion in the auto-attack target check | — | #908 |
+
+X4 lands before A11 ports the petrify helper of the behavior base, which reads both ally
+checks, and before the alliance-gated proof quest registers. The faction quests, features and
+behaviors that use it stay in their M10 issues.
 
 Must land in the same PR:
 
@@ -412,7 +421,10 @@ engine call made by the 857 scripts has no unmapped row.
 - Quests are independent and never on the critical path: about 8 plain quests per PR; the 30
   remaining sagas are one data PR; any script over 500 lines goes alone.
 - Behaviors go parents-first in waves; a lane may take a parent and its children together.
-- Bosses last, after the global memo and makers. Siege-hall scripts wait for M12.
+- Bosses last, after the global memo and makers. Siege-hall scripts wait for M12, and so
+  does the stand-in deletion (section 8).
+- The Dimensional Rift quest is M10 content, ported after its rift maker and the maker
+  registry (M1); it is not in the proof batch.
 - Content PRs never touch the engine or the script-facing API. A gap drops that script from
   the batch and files an issue.
 - Start with three canary batches (plain quests, one behavior subtree, one feature).
