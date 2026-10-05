@@ -17,8 +17,9 @@ import (
 // Party.distributeItem(owner, item, pet): adena is split among the members
 // in party range of the owner and the pet keeps none; anything else goes
 // to the looter the rule picks, into the pet's inventory when that is the
-// owner, silently, or else to the member, whom the others hear take it
-// (S1_OBTAINED_S3_S2, 299).
+// owner, who alone reads the pet's PET_PICKED_* line (pet_picked_msg_test.go),
+// or else to the member, whom the others hear take it (S1_OBTAINED_S3_S2,
+// 299).
 
 const partyPotionID int32 = 20
 
@@ -79,8 +80,8 @@ func requirePartyMessage(t *testing.T, who string, frames [][]byte, id int, para
 
 // TestPartyPetPickupFollowsTheTurn: the first pickup goes to Mate, whose
 // turn comes first, and the owner hears Mate take it; the next turn is the
-// owner's, so the stack goes into the wolf's inventory and nobody hears of
-// it.
+// owner's, so the stack goes into the wolf's inventory and no member hears
+// an S1_OBTAINED line for it.
 func TestPartyPetPickupFollowsTheTurn(t *testing.T) {
 	t.Parallel()
 	h, wolf, mate, mateID := partyPet(t, party.LootByTurn)

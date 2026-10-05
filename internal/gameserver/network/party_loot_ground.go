@@ -69,8 +69,8 @@ func (l *GameClientLink) pickupGroundForParty(live *livePlayer, ground *groundit
 // petPickupForParty finishes a pet's pickup of the claimed ground item under
 // its owner's party loot rule. Adena is shared among the members in range
 // of the owner and the stack destroyed. Anything else goes into the pet's
-// inventory when the rule picks the owner, silently, or else to the member
-// it picks, and the others are told who took it.
+// inventory when the rule picks the owner, who alone hears the pet pick it
+// up, or else to the member it picks, and the others are told who took it.
 func (l *GameClientLink) petPickupForParty(owner *livePlayer, pet *summon.Actor, petInv *itemcontainer.Inventory, ground *grounditem.Item, view party.View[*livePlayer]) {
 	st := ground.Instance.Snapshot()
 	if st.TemplateID == item.AdenaID {
@@ -92,6 +92,7 @@ func (l *GameClientLink) petPickupForParty(owner *livePlayer, pet *summon.Actor,
 		l.applyPersistActions(persist)
 		end()
 		l.takeGroundFromWorldByPet(owner, pet, ground)
+		owner.SendFrame(petPickedFrame(st))
 		return
 	}
 	if !l.storeGroundWith(looter.Inventory(), ground) {
