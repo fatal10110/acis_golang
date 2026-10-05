@@ -187,13 +187,23 @@ func releaseCopyFrameWriter(w *Writer) {
 
 // CopyFrame returns an independently owned pooled copy of frame, for a
 // recipient that encrypts or otherwise mutates its outgoing bytes in place.
-// It reports false when frame does not contain a complete header.
-func CopyFrame(frame Frame) (Frame, bool) {
+// It returns an error instead, wrapping frame's own Err, when frame is
+// invalid or does not contain a complete header.
+func CopyFrame(frame Frame) (Frame, error) {
+	if err := frame.Err(); err != nil {
+		return Frame{}, fmt.Errorf("wire: copy invalid frame: %w", err)
+	}
 	if len(frame.Bytes()) < FrameHeaderSize {
-		return Frame{}, false
+		return Frame{}, ShortFrameError(len(frame.Bytes()))
 	}
 	w := copyFramePool.Get().(*Writer)
 	w.ResetFrame(copyFrameWriterCapacity)
 	w.WriteBytes(frame.Bytes()[FrameHeaderSize:])
-	return OwnedFrame(w.Frame(), w, releaseCopyFrameWriter), true
+	return OwnedFrame(w.Frame(), w, releaseCopyFrameWriter), nil
+}
+
+// ShortFrameError describes an outbound frame of length bytes, too short to
+// hold its own length header.
+func ShortFrameError(length int) error {
+	return fmt.Errorf("wire: frame of %d bytes lacks the %d-byte header", length, FrameHeaderSize)
 }

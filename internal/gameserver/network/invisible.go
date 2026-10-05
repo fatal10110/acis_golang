@@ -30,15 +30,12 @@ func (l *GameClientLink) broadcastCharInfo(live *livePlayer, items []*item.Insta
 	}
 	info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.Template(), Items: items, Clan: l.clanFields(live.Character), HeroAura: l.heroAura(live)}
 	pet := l.summonOf(live)
-	var frames [2]wire.Frame
-	var built [2]bool
-	defer func() {
-		for i := range frames {
-			if built[i] {
-				frames[i].Release()
-			}
-		}
-	}()
+	frames := [2]fanout{
+		newFanout(func() wire.Frame { info.Hidden = false; return serverpackets.FrameCharInfo(info) }),
+		newFanout(func() wire.Frame { info.Hidden = true; return serverpackets.FrameCharInfo(info) }),
+	}
+	defer frames[0].release()
+	defer frames[1].release()
 	l.world.ForEachKnown(live, func(o world.Tracked) {
 		receiver, ok := o.(frameReceiver)
 		if !ok {
@@ -48,14 +45,7 @@ func (l *GameClientLink) broadcastCharInfo(live *livePlayer, items []*item.Insta
 		if hiddenFrom(live, o) {
 			hidden = 1
 		}
-		if !built[hidden] {
-			info.Hidden = hidden == 1
-			frames[hidden] = serverpackets.FrameCharInfo(info)
-			built[hidden] = true
-		}
-		if frame, ok := serverpackets.CopyFrame(frames[hidden]); ok {
-			receiver.BroadcastFrame(frame)
-		}
+		frames[hidden].send(receiver)
 		if observer, ok := o.(*livePlayer); ok {
 			l.sendRelations(live, pet, observer.Character, observer.BroadcastFrame)
 		}

@@ -722,15 +722,12 @@ func (l *GameClientLink) broadcastSummonStatus(actor *summon.Actor) {
 	}
 	// NpcInfo carries whether each viewer may attack the summon without
 	// forcing, so a viewer gets one of two frames, each built on first use.
-	var frames [2]wire.Frame
-	var built [2]bool
-	defer func() {
-		for i := range frames {
-			if built[i] {
-				frames[i].Release()
-			}
-		}
-	}()
+	frames := [2]fanout{
+		newFanout(func() wire.Frame { info.Attackable = false; return serverpackets.FrameNPCInfo(info) }),
+		newFanout(func() wire.Frame { info.Attackable = true; return serverpackets.FrameNPCInfo(info) }),
+	}
+	defer frames[0].release()
+	defer frames[1].release()
 	l.world.ForEachKnown(actor, func(object world.Tracked) {
 		if object.ObjectID() == owner.ObjectID() {
 			return
@@ -743,14 +740,7 @@ func (l *GameClientLink) broadcastSummonStatus(actor *summon.Actor) {
 		if viewer, ok := object.(*livePlayer); ok && actor.AttackableWithoutForceBy(viewer.Character) {
 			attackable = 1
 		}
-		if !built[attackable] {
-			info.Attackable = attackable == 1
-			frames[attackable] = serverpackets.FrameNPCInfo(info)
-			built[attackable] = true
-		}
-		if frame, ok := serverpackets.CopyFrame(frames[attackable]); ok {
-			receiver.BroadcastFrame(frame)
-		}
+		frames[attackable].send(receiver)
 	})
 }
 

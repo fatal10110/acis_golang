@@ -421,26 +421,6 @@ func (l *GameClientLink) broadcastLiveFrame(live *livePlayer, frame func() wire.
 	})
 }
 
-type frameReceiver interface {
-	BroadcastFrame(wire.Frame) bool
-}
-
-func broadcastFrame(build func() wire.Frame, recipients func(func(frameReceiver))) {
-	var serialized wire.Frame
-	built := false
-	defer func() { serialized.Release() }()
-	recipients(func(receiver frameReceiver) {
-		if !built {
-			serialized = build()
-			built = true
-		}
-		frame, ok := serverpackets.CopyFrame(serialized)
-		if ok {
-			receiver.BroadcastFrame(frame)
-		}
-	})
-}
-
 func (l *GameClientLink) updateLivePlayerPosition(live *livePlayer, position location.Location, heading int) {
 	previous := live.CurrentLocation()
 	live.Character.SetLastKnownPosition(position, heading)
