@@ -26,6 +26,7 @@ import net.sf.l2j.gameserver.network.GameClient.GameClientState;
 import net.sf.l2j.gameserver.network.clientpackets.Action;
 import net.sf.l2j.gameserver.network.clientpackets.L2GameClientPacket;
 import net.sf.l2j.gameserver.network.clientpackets.RequestBypassToServer;
+import net.sf.l2j.gameserver.scripting.QuestState;
 
 /**
  * Gate 2: two quests played through client packets (target and interact, bypasses) on a
@@ -40,6 +41,9 @@ final class QuestTrace
 	private static final int Y = 244579;
 	private static final int Z = -3730;
 	
+	private static final String Q001 = "Q001_LettersOfLove";
+	private static final String Q003 = "Q003_WillTheSealBeBroken";
+
 	/** Virtual time passed after each client packet: one run of every 333 ms task. */
 	private static final long STEP = 500;
 
@@ -88,17 +92,18 @@ final class QuestTrace
 		final Npc baulro = spawn(30033, 80);
 
 		record();
-		talk(darin);
-		bypass("Quest Q001_LettersOfLove 30048-03.htm");
-		bypass("Quest Q001_LettersOfLove 30048-04.htm");
-		bypass("Quest Q001_LettersOfLove 30048-06.htm");
-		talk(darin);
-		talk(roxxy);
-		talk(darin);
-		talk(baulro);
-		talk(darin);
-		talk(darin);
+		talk(darin, Q001);
+		bypass("Quest " + Q001 + " 30048-03.htm");
+		bypass("Quest " + Q001 + " 30048-04.htm");
+		bypass("Quest " + Q001 + " 30048-06.htm");
+		talk(darin, Q001);
+		talk(roxxy, Q001);
+		talk(darin, Q001);
+		talk(baulro, Q001);
+		talk(darin, Q001);
+		talk(darin, Q001);
 		stop();
+		requireCompleted(Q001);
 	}
 
 	private void seal() throws Exception
@@ -106,23 +111,41 @@ final class QuestTrace
 		final Npc talloth = spawn(30141, 40);
 
 		record();
-		talk(talloth);
-		bypass("Quest Q003_WillTheSealBeBroken 30141-03.htm");
-		talk(talloth);
+		talk(talloth, Q003);
+		bypass("Quest " + Q003 + " 30141-03.htm");
+		talk(talloth, Q003);
 		kill(20031);
 		kill(20041);
 		kill(20048);
-		talk(talloth);
+		talk(talloth, Q003);
 		stop();
+		requireCompleted(Q003);
 	}
 
-	/** Selects the NPC unless it is the current target, interacts with it, then opens its quest list. */
-	private void talk(Npc npc) throws Exception
+	/**
+	 * Selects the NPC unless it is the current target, interacts with it, then clicks the quest
+	 * link of its chat window. An NPC tied to more than one quest answers with the quest chooser
+	 * (Roxxy: Q001 and Q006); the probe then clicks the traced quest's entry, as a player would.
+	 * The chooser's entry is the only window link of that form, and every window replaces the
+	 * player's accepted links, so the check reads exactly what the last window offered.
+	 */
+	private void talk(Npc npc, String quest) throws Exception
 	{
 		if (_player.getTarget() != npc)
 			action(npc);
 		action(npc);
-		bypass("npc_" + npc.getObjectId() + "_Quest");
+		final String base = "npc_" + npc.getObjectId() + "_Quest";
+		bypass(base);
+		if (_player.validateBypass(base + " " + quest))
+			bypass(base + " " + quest);
+	}
+
+	/** Fails the run unless the traced quest reached its completed state. */
+	private void requireCompleted(String quest)
+	{
+		final QuestState st = _player.getQuestList().getQuestState(quest);
+		if (st == null || !st.isCompleted())
+			throw new IllegalStateException(quest + " trace did not complete: state " + (st == null ? "none" : st.getState() + " cond " + st.getCond()));
 	}
 
 	private void kill(int npcId) throws Exception

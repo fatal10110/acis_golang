@@ -188,10 +188,6 @@ func TestManifestFoldFollowsRegistrationRules(t *testing.T) {
 			if k.event != "FIRST_TALK" || len(list) == 0 {
 				list = append(slices.Clone(list), s.path)
 			}
-			if len(list) == 0 {
-				delete(derived, k)
-				continue
-			}
 			derived[k] = list
 		}
 	}

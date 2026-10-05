@@ -9,8 +9,9 @@ This directory holds the reference probe for the script engine (slice V0 of
   every server packet and SQL statement they caused (gate 2).
 
 Gate status at the committed revision: **gate 1 passes** (857 of 857 listed scripts built
-and recorded, no fallback in force); **gate 2 passes** (two consecutive runs produce
-byte-identical traces, no fallback in force).
+and recorded, no fallback in force); **gate 2 passes** (both quests are played to their
+completed state, which the probe requires before it writes a trace, and two consecutive
+runs produce byte-identical traces; no fallback in force).
 
 ## What the probe is
 
@@ -133,6 +134,16 @@ The player and NPCs stand within interaction range of each other, so no movement
 needed. Each quest uses its own player, created through the character-creation call
 and given the needed level. A bypass waits 150 ms of real time first, because the
 reference throttles bypasses to one per 100 ms.
+
+Talking to an NPC is: select it (unless it is already the target), interact, then click
+the `Quest` link of its chat window. An NPC tied to more than one quest answers that link
+with the quest chooser (Roxxy: Q001 and Q006); the probe then clicks the traced quest's
+chooser entry (`npc_<object>_Quest <quest name>`), as a player would. The reference only
+accepts a bypass the last window offered, so the probe cannot skip the chooser.
+
+After its last step each quest must be in its completed state; otherwise the probe throws
+and `run.sh` exits non-zero without writing any golden, so a stuck flow fails gate 2
+instead of being recorded.
 
 ## Fallbacks
 
