@@ -134,10 +134,8 @@ func New(ctx context.Context, db *sql.DB, log zerolog.Logger) (*Allocator, error
 	}
 
 	a.cleanup(ctx, db)
-	for _, query := range usedObjectIDQueries {
-		if err := a.loadUsedIDs(ctx, db, query); err != nil {
-			return nil, fmt.Errorf("idfactory: %w", err)
-		}
+	if err := ScanUsedIDs(ctx, db, a.markUsed); err != nil {
+		return nil, fmt.Errorf("idfactory: %w", err)
 	}
 
 	a.next = a.first
@@ -151,7 +149,7 @@ func New(ctx context.Context, db *sql.DB, log zerolog.Logger) (*Allocator, error
 // not one of those independent per-statement failures: every remaining
 // ExecContext would fail the same way, and running them anyway would bury
 // the boot-deadline cause under one warn line per statement plus whatever
-// unrelated error loadUsedIDs surfaces next. So each stage checks ctx.Err()
+// unrelated error the id scan surfaces next. So each stage checks ctx.Err()
 // once before starting and stops the whole pass there instead.
 func (a *Allocator) cleanup(ctx context.Context, db *sql.DB) {
 	cleanCount := int64(0)
@@ -207,7 +205,19 @@ func logRowsAffected(res sql.Result, total *int64) {
 	}
 }
 
-func (a *Allocator) loadUsedIDs(ctx context.Context, db *sql.DB, query string) error {
+// ScanUsedIDs calls fn with every object id stored in db by a table whose
+// ids an Allocator hands out, so another id source can avoid them too. An id
+// stored in several tables is passed once per table.
+func ScanUsedIDs(ctx context.Context, db *sql.DB, fn func(id int64)) error {
+	for _, query := range usedObjectIDQueries {
+		if err := scanIDs(ctx, db, query, fn); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func scanIDs(ctx context.Context, db *sql.DB, query string, fn func(id int64)) error {
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("query used object ids (%s): %w", query, err)
@@ -219,13 +229,19 @@ func (a *Allocator) loadUsedIDs(ctx context.Context, db *sql.DB, query string) e
 		if err := rows.Scan(&id); err != nil {
 			return fmt.Errorf("scan used object id (%s): %w", query, err)
 		}
-		if id < int64(a.first) {
-			a.log.Warn().Int64("object_id", id).Int32("minimum_id", a.first).Msg("idfactory: skipping object id below minimum")
-			continue
-		}
-		a.used[int32(id)] = struct{}{}
+		fn(id)
 	}
 	return rows.Err()
+}
+
+// markUsed records a stored id as in use; ids below the range never came
+// from this allocator and are skipped.
+func (a *Allocator) markUsed(id int64) {
+	if id < int64(a.first) {
+		a.log.Warn().Int64("object_id", id).Int32("minimum_id", a.first).Msg("idfactory: skipping object id below minimum")
+		return
+	}
+	a.used[int32(id)] = struct{}{}
 }
 
 // NextID returns the next available object id and marks it used, or
