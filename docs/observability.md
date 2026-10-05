@@ -21,8 +21,11 @@ Process events at or above `java.util.logging.ConsoleHandler.level` also go to s
 loginserver opens the same five files under its own `-log-root`. Only its console and error files
 receive events.
 
-**Give each process its own `-log-root`.** The shipped file has no `.append` keys, so each boot
-truncates generation 0. Two processes sharing a root write over each other's files.
+**Give each process its own `-log-root`.** The shipped file sets `.append = true` only for the
+chat, gmaudit and item handlers. Each boot truncates generation 0 of the console and error files,
+and appends to the other three. Two processes sharing a root wipe each other's console and error
+files, and they both append to and rotate the chat, gmaudit and item files, each process using its
+own size counter.
 
 Rotation follows the JUL file handler. Once generation 0 reaches `<prefix>.limit` bytes, the files
 shift up one generation, the oldest (`<prefix>.count - 1`) is dropped, and a new generation 0
@@ -98,6 +101,8 @@ At that point the log files may not exist yet.
 | log directory cannot be created or a log file cannot be opened | boot fails with the OS error | `logging.Setup` |
 | unsupported `logging.properties` key | boot continues; one `warn` event names the keys | `TestSetupWarnsUnsupportedKeysOnce` |
 | missing optional `logging.properties` key (e.g. `.append`) | boot continues with the default; a `config property missing` warning goes to stderr only, because the file sinks are not open yet | `config.Properties` |
-| a log file write or rotation fails at runtime (disk full, rename denied) | the event is lost for that sink only. The other sinks still get it, `zerolog: could not write event: ...` goes to stderr, and the server keeps running. | zerolog multi-writer |
+| a log file write fails at runtime (disk full) | the event is lost for that sink only. The other sinks still get it, `zerolog: could not write event: ...` goes to stderr, and the server keeps running. The next event is written normally. | zerolog multi-writer |
+| a rotation rename fails at runtime (rename denied, file locked) | as in the JUL file handler, the failed shift is skipped and generation 0 is reopened empty, so its old contents are lost and logging continues | `TestRotatingFileKeepsWritingAfterRenameFailure` |
+| generation 0 cannot be reopened after a rotation | that sink stops writing until restart; each later event prints `zerolog: could not write event: ...` to stderr, and the other sinks keep working | `rotatingFile.rotate` |
 | `-debug-addr` cannot be bound (port in use, bad address) | boot fails: `listen for debug http on <addr>: ...` | `TestListenBusyAddrFails` |
 | `-debug-addr` omitted | no listener, and nothing is exposed | `TestListenEmptyAddrIsNoop` |

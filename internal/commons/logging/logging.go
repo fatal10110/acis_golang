@@ -415,16 +415,14 @@ func (rf *rotatingFile) Write(p []byte) (int, error) {
 }
 
 // rotate shifts generation files up by one index, discarding whatever occupied the last
-// generation, then reopens an empty generation 0 for continued writing.
+// generation, then reopens an empty generation 0 for continued writing. Like the JUL
+// FileHandler, close, delete and rename failures are ignored so generation 0 is always
+// reopened; only a failed reopen is returned, and it leaves the sink closed.
 func (rf *rotatingFile) rotate() error {
-	if err := rf.file.Close(); err != nil {
-		return err
-	}
+	_ = rf.file.Close()
 	for g := rf.count - 1; g >= 1; g-- {
 		_ = os.Remove(rf.generationPath(g))
-		if err := os.Rename(rf.generationPath(g-1), rf.generationPath(g)); err != nil && !os.IsNotExist(err) {
-			return err
-		}
+		_ = os.Rename(rf.generationPath(g-1), rf.generationPath(g))
 	}
 	file, err := os.OpenFile(rf.generationPath(0), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
 	if err != nil {
