@@ -105,3 +105,11 @@ func (b regionBlock) Cells(cellX, cellY int) []block.Cell {
 	}
 	return b.region.Cells(b.blockX, b.blockY, cellX, cellY)
 }
+
+// AppendCells appends the cell's layers to dst; see block.Region.AppendCells.
+func (b regionBlock) AppendCells(dst []block.Cell, cellX, cellY int) []block.Cell {
+	if b.region == nil {
+		return append(dst, block.Cell{Height: 0, NSWE: block.AllDirections})
+	}
+	return b.region.AppendCells(dst, b.blockX, b.blockY, cellX, cellY)
+}

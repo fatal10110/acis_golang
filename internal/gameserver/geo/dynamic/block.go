@@ -163,6 +163,27 @@ func (b *Block) Cells(x, y int) []block.Cell {
 	return b.base.Cells(x, y)
 }
 
+// AppendActiveCells appends the cell's overridden layers to dst, copied under
+// one read lock so a concurrent Add/Remove can never be observed half-applied
+// across layers, and reports true. When no active object touches the cell it
+// returns dst unchanged and false: the cell then reads exactly as Base does.
+// dst never reaches an interface call, so a caller-owned stack buffer stays
+// on the stack.
+func (b *Block) AppendActiveCells(dst []block.Cell, x, y int) ([]block.Cell, bool) {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if ov, ok := b.overrides[cellIndex(x, y)]; ok && ov.active {
+		return append(dst, ov.current...), true
+	}
+	return dst, false
+}
+
+// Base returns the static block this overlay wraps. It is fixed at
+// construction and never mutated, so reading it needs no lock.
+func (b *Block) Base() block.Block {
+	return b.base
+}
+
 func (b *Block) HeightNearestIgnore(x, y int, z int32, ignore Object) int16 {
 	b.mu.RLock()
 	defer b.mu.RUnlock()

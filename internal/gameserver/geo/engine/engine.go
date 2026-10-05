@@ -158,11 +158,13 @@ func (e *Engine) NodeBelow(geoX, geoY, worldZ int) (height int16, nswe block.NSW
 // no layer both qualifies and satisfies accept.
 func (e *Engine) NodeAtOrAbove(geoX, geoY, worldZ int, accept func(height int16) bool) (height int16, nswe block.NSWE, ok bool) {
 	b := e.blockAtGeo(geoX, geoY)
-	// ponytail: Cells() copies every layer at this cell; cold path (only
-	// reached once per candidate that already missed NodeBelow's guess),
-	// so the allocation is left as-is. Upgrade to a Layers()+per-index
-	// accessor if profiling ever puts this on a hot path.
-	cells := b.Cells(localCell(geoX), localCell(geoY))
+	// Every backward pathfind candidate that misses NodeBelow's guess lands
+	// here, so the layers are copied into a stack buffer instead of a fresh
+	// Cells slice. One copy, not a per-index walk, keeps a dynamic overlay's
+	// layers from one consistent snapshot, and accept runs with no lock held
+	// (it queries the engine again).
+	var buf [block.MaxLayers]block.Cell
+	cells := b.AppendCells(buf[:0], localCell(geoX), localCell(geoY))
 	for i := len(cells) - 1; i >= 0; i-- {
 		if int(cells[i].Height) >= worldZ && accept(cells[i].Height) {
 			return cells[i].Height, cells[i].NSWE, true
