@@ -635,17 +635,14 @@ func (l *GameClientLink) broadcastSummon(actor *summon.Actor, build func() wire.
 // broadcastSummonFrame sends an already-built frame to every known observer
 // of actor capable of receiving one, taking ownership of frame.
 func (l *GameClientLink) broadcastSummonFrame(actor *summon.Actor, frame wire.Frame) {
-	defer frame.Release()
-	if l.world == nil {
-		return
-	}
-	l.world.ForEachKnown(actor, func(o world.Tracked) {
-		receiver, ok := o.(frameReceiver)
-		if !ok {
+	broadcastBuiltFrame(frame, func(send func(frameReceiver)) {
+		if l.world == nil {
 			return
 		}
-		if owned, ok := serverpackets.CopyFrame(frame); ok {
-			receiver.BroadcastFrame(owned)
-		}
+		l.world.ForEachKnown(actor, func(o world.Tracked) {
+			if receiver, ok := o.(frameReceiver); ok {
+				send(receiver)
+			}
+		})
 	})
 }

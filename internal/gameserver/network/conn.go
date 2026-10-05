@@ -41,6 +41,8 @@ func frameCost(frame wire.Frame) int {
 type Conn struct {
 	net.Conn
 	log zerolog.Logger
+	// rejects reports frames SendFrame and sendLast refuse as invalid.
+	rejects *frameRejectReporter
 
 	// mu guards queue, pending, sealed and closed. It is held only to append
 	// to or swap out the queue, never across I/O.
@@ -71,6 +73,7 @@ func newConn(c net.Conn, log zerolog.Logger) *Conn {
 	conn := &Conn{
 		Conn:     c,
 		log:      log,
+		rejects:  outboundRejects,
 		wake:     make(chan struct{}, 1),
 		stopping: make(chan struct{}),
 		stopped:  make(chan struct{}),
@@ -179,8 +182,9 @@ func releaseFrames(frames []wire.Frame) {
 // past outboundHighWater — the connection is aborted then, because dropping
 // one ordered frame would desynchronize the client.
 func (c *Conn) SendFrame(frame wire.Frame) bool {
-	if frame.Err() != nil {
+	if err := frame.Err(); err != nil {
 		frame.Release()
+		c.rejects.report("connection send", err)
 		return false
 	}
 	cost := frameCost(frame)
@@ -208,8 +212,9 @@ func (c *Conn) SendFrame(frame wire.Frame) bool {
 // written, and Close still flushes it before closing the socket. It reports
 // false, releasing frame, when the connection is already sealed or closed.
 func (c *Conn) sendLast(frame wire.Frame) bool {
-	if frame.Err() != nil {
+	if err := frame.Err(); err != nil {
 		frame.Release()
+		c.rejects.report("connection send", err)
 		return false
 	}
 	c.mu.Lock()

@@ -246,15 +246,12 @@ func (s *effectPointSink) Emit(ev event.Event) {
 	default:
 		return
 	}
-	defer frame.Release()
-	s.world.ForEachKnown(s.ep, func(o world.Tracked) {
-		receiver, ok := o.(frameReceiver)
-		if !ok {
-			return
-		}
-		if owned, ok := serverpackets.CopyFrame(frame); ok {
-			receiver.BroadcastFrame(owned)
-		}
+	broadcastBuiltFrame(frame, func(send func(frameReceiver)) {
+		s.world.ForEachKnown(s.ep, func(o world.Tracked) {
+			if receiver, ok := o.(frameReceiver); ok {
+				send(receiver)
+			}
+		})
 	})
 }
 
