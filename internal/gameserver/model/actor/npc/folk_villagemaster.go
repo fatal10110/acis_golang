@@ -4,7 +4,9 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode/utf16"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 )
 
@@ -62,43 +64,46 @@ type SubclassCommand struct {
 
 // ParseSubclassCommand reads command's single-digit choice at its tenth
 // character and its numbers from the twelfth: the first up to the next
-// space, the second the rest. Reading stops at the first part that does not
-// parse, leaving it and every later part 0.
+// space, the second the rest. Characters are counted as the client encodes
+// them, one per UTF-16 unit, and a number reads any Basic Multilingual Plane
+// decimal digit, as the reference's Integer.parseInt over String.substring
+// does. Reading stops at the first part that does not parse, leaving it and
+// every later part 0.
 func ParseSubclassCommand(command string) SubclassCommand {
 	var cmd SubclassCommand
-	if len(command) < 10 {
+	units := utf16.Encode([]rune(command))
+	if len(units) < 10 {
 		return cmd
 	}
-	n, ok := parseTrimmedInt(command[9:10])
+	n, ok := parseTrimmedInt(units[9:10])
 	if !ok {
 		return cmd
 	}
 	cmd.Choice = n
-	end := -1
-	if len(command) > 11 {
-		if i := strings.IndexByte(command[11:], ' '); i >= 0 {
-			end = i + 11
+	end := len(units)
+	for i := 11; i < len(units); i++ {
+		if units[i] == ' ' {
+			end = i
+			break
 		}
-	}
-	if end < 0 {
-		end = len(command)
 	}
 	if end < 11 {
 		return cmd
 	}
-	if cmd.One, ok = parseTrimmedInt(command[11:end]); !ok {
+	if cmd.One, ok = parseTrimmedInt(units[11:end]); !ok {
 		return cmd
 	}
-	if len(command) > end {
-		cmd.Two, _ = parseTrimmedInt(command[end:])
+	if len(units) > end {
+		cmd.Two, _ = parseTrimmedInt(units[end:])
 	}
 	return cmd
 }
 
-// parseTrimmedInt parses s, trimmed of every character up to the space, as
-// a 32-bit decimal.
-func parseTrimmedInt(s string) (int, bool) {
-	n, err := strconv.ParseInt(strings.TrimFunc(s, javaSpace), 10, 32)
+// parseTrimmedInt parses the characters in units, trimmed of every
+// character up to the space, as a 32-bit decimal. A surrogate left alone by
+// the range reads as U+FFFD, which no number reads.
+func parseTrimmedInt(units []uint16) (int, bool) {
+	n, err := commons.ParseInt(strings.TrimFunc(string(utf16.Decode(units)), javaSpace), 32)
 	return int(n), err == nil
 }
 

@@ -1,10 +1,10 @@
 package network
 
 import (
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -37,7 +37,7 @@ func (l *GameClientLink) boardMail(live *livePlayer, command string) {
 		folder, _ := bbs.ParseFolder(action)
 		q := bbs.MailQuery{Page: 1, Folder: folder}
 		if len(args) > 0 {
-			page, err := strconv.ParseInt(args[0], 10, 32)
+			page, err := commons.ParseInt(args[0], 32)
 			if err != nil {
 				return
 			}
@@ -58,7 +58,7 @@ func (l *GameClientLink) boardMail(live *livePlayer, command string) {
 	id := int64(-1)
 	if len(args) > 0 {
 		var err error
-		if id, err = strconv.ParseInt(args[0], 10, 32); err != nil {
+		if id, err = commons.ParseInt(args[0], 32); err != nil {
 			return
 		}
 	}

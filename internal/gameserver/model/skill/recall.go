@@ -1,9 +1,9 @@
 package skill
 
 import (
-	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -43,7 +43,7 @@ func ParseTeleCoords(s string) (loc location.Location, ok bool) {
 	}
 	vals := make([]int, len(parts))
 	for i, p := range parts {
-		n, err := strconv.ParseInt(strings.TrimSpace(p), 10, 32)
+		n, err := commons.ParseInt(strings.TrimSpace(p), 32)
 		if err != nil {
 			return location.Location{}, false
 		}
