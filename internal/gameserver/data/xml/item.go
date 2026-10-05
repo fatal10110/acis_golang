@@ -7,8 +7,8 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/rs/zerolog"
 )
 
@@ -497,7 +497,7 @@ func buildUseCondition(id int32, attrs []xml.Attr, children []condNode) (uc item
 	if err != nil {
 		return item.UseCondition{}, false, fmt.Errorf("item template %d: cond: %w", id, err)
 	}
-	if conditions.IsNull(skillCondition(root)) {
+	if conditions.IsNull(effect.ItemCondition(root)) {
 		return item.UseCondition{}, true, nil
 	}
 	a := newAttrValues(foldAttrs(attrs), fmt.Sprintf("item template %d: use condition", id))
@@ -519,15 +519,6 @@ func buildUseCondition(id int32, attrs []xml.Attr, children []condNode) (uc item
 	}
 	uc.Root = root
 	return uc, false, nil
-}
-
-// skillCondition is c in the skill condition shape conditions.Compile reads.
-func skillCondition(c item.Condition) skill.Condition {
-	out := skill.Condition{Kind: c.Kind, Attrs: c.Attrs}
-	for _, ch := range c.Children {
-		out.Children = append(out.Children, skillCondition(ch))
-	}
-	return out
 }
 
 // buildCondition converts one decoded condition node in role into an

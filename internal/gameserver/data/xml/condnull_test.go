@@ -1,6 +1,7 @@
 package xml
 
 import (
+	encxml "encoding/xml"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 // TestSkillCondThatHoldsNoConditionReadsNoFeedback: the reference reads a
@@ -182,19 +184,77 @@ func TestShippedConditionsHoldNoNullNode(t *testing.T) {
 	for _, tpl := range items.All() {
 		where := fmt.Sprintf("item %d", tpl.ID)
 		for _, uc := range tpl.UseConditions {
-			check(where+" cond", skillCondition(uc.Root))
+			check(where+" cond", effect.ItemCondition(uc.Root))
 		}
 		for _, mod := range tpl.Modifiers {
 			if mod.Condition != nil {
-				check(where+" func "+mod.Stat, skillCondition(*mod.Condition))
+				check(where+" func "+mod.Stat, effect.ItemCondition(*mod.Condition))
 			}
 			if mod.AttachCondition != nil {
-				check(where+" func "+mod.Stat+" attach", skillCondition(mod.AttachCondition.Root))
+				check(where+" func "+mod.Stat+" attach", effect.ItemCondition(mod.AttachCondition.Root))
 			}
 		}
 	}
 	if checked == 0 {
 		t.Fatal("no shipped condition checked")
+	}
+
+	// The item loader drops a top-level or <for>-leading <cond> that holds no
+	// condition, so the walk above cannot see one: read the raw elements and
+	// require each of them to build a condition.
+	docs, err := loadXMLDocuments[itemFile](datapackPath(t, filepath.Join("data", "xml", "items")), "item template")
+	if err != nil {
+		t.Fatalf("loadXMLDocuments: %v", err)
+	}
+	raw := 0
+	rawCond := func(where string, id int32, attrs []encxml.Attr, children []condNode) {
+		raw++
+		if _, null, err := buildUseCondition(id, attrs, children); err != nil {
+			t.Errorf("%s: %v", where, err)
+		} else if null {
+			t.Errorf("%s: <cond> holds no condition and is dropped", where)
+		}
+	}
+	for _, doc := range docs {
+		for _, el := range doc.Data.Items {
+			id := newAttrValues(foldAttrs(el.Attrs), "item").int32("id")
+			where := fmt.Sprintf("%s item %d", filepath.Base(doc.Path), id)
+			for _, c := range el.Cond {
+				rawCond(where+" cond", id, c.Attrs, c.Children)
+			}
+			for _, forEl := range el.For {
+				for i, op := range forEl.Ops {
+					if tag := op.XMLName.Local; strings.EqualFold(tag, "cond") && leadsWithCond(tag, i, forEl.LeadingNode) {
+						rawCond(where+" for cond", id, op.Attrs, op.Children)
+					}
+				}
+			}
+		}
+	}
+	if raw == 0 {
+		t.Fatal("no shipped item <cond> read")
+	}
+}
+
+// TestShippedItemCondGuardSeesDroppedCond: the raw <cond> check of
+// TestShippedConditionsHoldNoNullNode reports each <cond> the item loader
+// drops as null, which a walk over the loaded templates cannot see.
+func TestShippedItemCondGuardSeesDroppedCond(t *testing.T) {
+	t.Parallel()
+	leaf := func(kind string, attrs ...encxml.Attr) condNode {
+		return condNode{XMLName: encxml.Name{Local: kind}, Attrs: attrs}
+	}
+	lvl := encxml.Attr{Name: encxml.Name{Local: "lvl"}, Value: "40"}
+	for name, children := range map[string][]condNode{
+		"no predicate":      nil,
+		"unknown attribute": {leaf("player", lvl)},
+		"unknown element":   {leaf("bogus")},
+		"empty not":         {leaf("not")},
+	} {
+		attrs := []encxml.Attr{{Name: encxml.Name{Local: "msgId"}, Value: "113"}}
+		if _, null, err := buildUseCondition(1, attrs, children); err != nil || !null {
+			t.Errorf("%s: null = %v, err = %v; want a dropped null <cond>", name, null, err)
+		}
 	}
 }
 
