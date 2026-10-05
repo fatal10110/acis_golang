@@ -342,45 +342,45 @@ Chains run in parallel. Each hot file allows one open PR: `attackable.go`, `host
 `npcs_spawn.go`, `bypass.go` / `folk.go`, `character_flow.go` / `client_loop.go`,
 `live_player_events.go`, `gameservertest/boot.go`, `cmd/gameserver`.
 
-| ID | Slice | Depends on |
-|---|---|---|
-| V0 | Reference probe harness; registration manifest golden | — |
-| V1 | Static fingerprint extractor (literals, helper calls, parent-call shape) | V0 |
-| V2 | HTML index golden | — |
-| V3 | Engine-contract goldens | V0 |
-| V4 | Scenario runner for `tests/quest` and `tests/ai` | E5 |
-| E1 | Registry rules, `scripts.xml` loader, catalog lookup, dispatcher with panic isolation, registry dump, seam gate | — |
-| E2 | Journal read: store, test schema, load at selection, purge, real quest list, list request | E1 |
-| E3 | Journal write: set/unset/state/cond flags/exit, lane persistence, seal, quest mark packet, abort, detach flag | E2, V3 |
-| E4 | Helpers: give, take, reward, four drop types, sounds, checks, party and clan-leader lookups, quest rates, radar, script random source | E3, V3 |
-| E5 | Dialog path of section 7 for folk and hostile NPCs, with the first plain quest | E1, E3, E4 |
-| E6 | Created, dying (3 s), decayed; boot spawn pass moved; synchronous delete | E1, E4 |
-| E7 | Timer registry | E1, A3 |
-| E8 | One-off seams with their only consumers: item use, zone enter, player and summon death, script events | E5, E6 |
-| A0 | Brain phase locking: hooks at the reference's points, nested think in place | — |
-| A1 | NPC skill types kept at load | — |
-| A2 | Spawn-memo params first, then template; slot-owned scratch memory; life-time accessor | — |
-| A3 | Script spawn API: handle-returning spawn, privates from the template, timed despawn | A2 |
-| A4 | Desires I: cast (with hold and conditions), follow, wander, do-nothing, attack variants | A0, A1 |
-| A5 | Desires II: flee with its guard; social with the social-broadcast gate | A4 |
-| A6 | Attacked from three sources and party attacked, per called NPC; gates the matching stand-ins | E1, A2 |
-| A7 | Clan attacked scan, party died, clan died, folk attacked | A6 |
-| A8 | Skill finished, attack finished with target, see-spell, spelled, abnormal status | A6 |
-| A9 | No-desire, move finished, out of territory, for hostile and folk; gates idle stand-ins | A4 |
-| A10 | See-creature tick scan with its gates, look-neighbor throttle, re-fire after teleport | A9 |
-| A11 | Behavior base plus the first Warrior chain (first cut-over: 299 ids) | A1–A9, E6, E7 |
-| A12 | Rest of the behavior spine (20 classes, about 840 ids in total) | A10, A11 |
-| A13 | Route movement as a weighted desire, with the walker script | A4, E6 |
-| A14 | Folk-side desires for the 81 folk ids bound to behaviors | A4, A9 |
-| M1 | Maker registry and hooks, with the default, no-on-start and event makers | E1 |
-| T1 | Schedule runner with three tasks | E1, V3 |
-| T2 | The other three tasks | T1 |
-| U1 | Tutorial opcodes and packets, voice sound, radar, memo store, engine triggers | E3 |
-| U2 | Tutorial script and its creation-time state | U1, E5, E7 |
-| U3 | Newbie helper | U2, E6 |
-| X1 | Subclass gates on two quests and the class-change exit of a third | E5 |
-| X2 | Academy graduation on class change | — |
-| X3 | Admin NPC script info pages | A2, A11, E7 |
+| ID | Slice | Depends on | Issue |
+|---|---|---|---|
+| V0 | Reference probe harness; registration manifest golden | — | #3476 |
+| V1 | Static fingerprint extractor (literals, helper calls, parent-call shape) | V0 | #3482 |
+| V2 | HTML index golden | — | #3477 |
+| V3 | Engine-contract goldens | V0 | #3483 |
+| V4 | Scenario runner for `tests/quest` and `tests/ai` | E5 | #3481 |
+| E1 | Registry rules, `scripts.xml` loader, catalog lookup, dispatcher with panic isolation, registry dump, seam gate | — | #170 (+#3411) |
+| E2 | Journal read: store, test schema, load at selection, purge, real quest list, list request | E1 | #167 |
+| E3 | Journal write: set/unset/state/cond flags/exit, lane persistence, seal, quest mark packet, abort, detach flag | E2, V3 | #167 |
+| E4 | Helpers: give, take, reward, four drop types, sounds, checks, party and clan-leader lookups, quest rates, radar, script random source | E3, V3 | #3487 |
+| E5 | Dialog path of section 7 for folk and hostile NPCs, with the first plain quest | E1, E3, E4 | #130 |
+| E6 | Created, dying (3 s), decayed; boot spawn pass moved; synchronous delete | E1, E4 | #3490 (+#2164) |
+| E7 | Timer registry | E1, A3 | #168 |
+| E8 | One-off seams with their only consumers: item use, zone enter, player and summon death, script events | E5, E6 | #3493 (+#867) |
+| A0 | Brain phase locking: hooks at the reference's points, nested think in place | — | #3478 |
+| A1 | NPC skill types kept at load | — | #3479 (+#3470) |
+| A2 | Spawn-memo params first, then template; slot-owned scratch memory; life-time accessor | — | #3480 (+#3470) |
+| A3 | Script spawn API: handle-returning spawn, privates from the template, timed despawn | A2 | #3484 (+#2081, #3306) |
+| A4 | Desires I: cast (with hold and conditions), follow, wander, do-nothing, attack variants | A0, A1 | #3485 |
+| A5 | Desires II: flee with its guard; social with the social-broadcast gate | A4 | #1804 |
+| A6 | Attacked from three sources and party attacked, per called NPC; gates the matching stand-ins | E1, A2 | #3486 |
+| A7 | Clan attacked scan, party died, clan died, folk attacked | A6 | #1800 |
+| A8 | Skill finished, attack finished with target, see-spell, spelled, abnormal status | A6 | #3488 |
+| A9 | No-desire, move finished, out of territory, for hostile and folk; gates idle stand-ins | A4 | #3489 (+#2148, #2162, #2163, #2240) |
+| A10 | See-creature tick scan with its gates, look-neighbor throttle, re-fire after teleport | A9 | #3491 |
+| A11 | Behavior base plus the first Warrior chain (first cut-over: 299 ids) | A1–A9, E6, E7 | #3494 |
+| A12 | Rest of the behavior spine (20 classes, about 840 ids in total) | A10, A11 | #3495 (+#2162, #2163, #2240, #3306, #176) |
+| A13 | Route movement as a weighted desire, with the walker script | A4, E6 | #2165 (+#3497) |
+| A14 | Folk-side desires for the 81 folk ids bound to behaviors | A4, A9 | #3492 |
+| M1 | Maker registry and hooks, with the default, no-on-start and event makers | E1 | #171 |
+| T1 | Schedule runner with three tasks | E1, V3 | #172 (+#3149) |
+| T2 | The other three tasks | T1 | #172 (+#3149) |
+| U1 | Tutorial opcodes and packets, voice sound, radar, memo store, engine triggers | E3 | #174 |
+| U2 | Tutorial script and its creation-time state | U1, E5, E7 | #174 |
+| U3 | Newbie helper | U2, E6 | #174 |
+| X1 | Subclass gates on two quests and the class-change exit of a third | E5 | #3070 |
+| X2 | Academy graduation on class change | — | #3181 |
+| X3 | Admin NPC script info pages | A2, A11, E7 | #3398 |
 
 Must land in the same PR:
 
