@@ -90,8 +90,10 @@ func TestAdminReload(t *testing.T) {
 		{"reload crests", []string{"crest"}, []string{"Crests have been reloaded."}},
 		{"reload html", []string{"htm"}, []string{"The HTM cache has been reloaded."}},
 		{"reload multisell", []string{"multisell"}, []string{"The multisell instance has been reloaded."}},
-		{"reload npc", []string{"npc"}, []string{"NPCs templates and Scripts have been reloaded."}},
+		{"reload npc", []string{"npc"}, []string{"NPCs templates have been reloaded; scripts were not reloaded."}},
 		{"reload npcwalkers", []string{"npcwalker"}, []string{"Walking routes have been reloaded."}},
+		// Scripts load once, at boot: nothing runs, and the answer says so.
+		{"reload script", nil, []string{"Script reload is not supported; scripts load once, at server start."}},
 		{"reload teleports", []string{"teleport"}, []string{"Teleport locations have been reloaded."}},
 		{"reload htm crest admin", []string{"htm", "crest", "admin"}, []string{"The HTM cache has been reloaded.", "Crests have been reloaded.", "Admin data has been reloaded."}},
 		// Spelled-out types take no suffix.
@@ -111,7 +113,7 @@ func TestAdminReload(t *testing.T) {
 	}
 
 	// Not ported yet: released, nothing reloaded, nothing said.
-	for _, word := range []string{"boat", "buylist", "config", "door", "item", "script", "skill", "zone"} {
+	for _, word := range []string{"boat", "buylist", "config", "door", "item", "skill", "zone"} {
 		frames := exchange(t, gm, encodeBuildCmd("reload "+word))
 		if len(frames) != 1 || frames[0][0] != serverpackets.OpcodeActionFailed {
 			t.Fatalf("//reload %s frames = %x, want ActionFailed", word, testsupport.FrameOpcodes(frames))
@@ -166,7 +168,7 @@ func TestAdminReloadSwapsTheTables(t *testing.T) {
 		t.Fatalf("wolves = %d, want 1", len(before))
 	}
 
-	assertTexts(t, exchange(t, gm, encodeBuildCmd("reload htm npc")), "The HTM cache has been reloaded.", "NPCs templates and Scripts have been reloaded.")
+	assertTexts(t, exchange(t, gm, encodeBuildCmd("reload htm npc")), "The HTM cache has been reloaded.", "NPCs templates have been reloaded; scripts were not reloaded.")
 	assertPage(t, exchange(t, gm, encodeBuildCmd("admin")), "reloaded menu")
 	frames := exchange(t, gm, encodeBuildCmd("spawn 20120"))
 	if got := textsIn(t, frames); !slices.Equal(got, []string{"You spawned Dire Wolf. - Cmd: admin_spawn"}) {
@@ -247,7 +249,7 @@ func TestAdminReloadRaceFree(t *testing.T) {
 	}()
 	// The reader's moves and spawns reach the game master too; only its
 	// messages count.
-	want := []string{"The HTM cache has been reloaded.", "NPCs templates and Scripts have been reloaded.", "Admin data has been reloaded."}
+	want := []string{"The HTM cache has been reloaded.", "NPCs templates have been reloaded; scripts were not reloaded.", "Admin data has been reloaded."}
 	for range 10 {
 		if got := textsIn(t, exchange(t, gm, encodeBuildCmd("reload htm npc admin"))); !slices.Equal(got, want) {
 			t.Fatalf("//reload during reads answered %q, want %q", got, want)
