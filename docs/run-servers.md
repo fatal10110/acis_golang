@@ -1,6 +1,9 @@
 # Running Loginserver And Gameserver
 
-Run these commands from the repository root.
+Run these commands from the repository root. To run everything in containers instead, see
+[ops/docker.md](ops/docker.md). To move an existing aCis Java installation, see
+[ops/migrating-from-java.md](ops/migrating-from-java.md). For backups, see
+[ops/backup-restore.md](ops/backup-restore.md).
 
 ## Prerequisites
 

@@ -1,17 +1,96 @@
-version: '3.8'
+# MariaDB plus, under the "servers" profile, the login and game servers.
+# Full walkthrough: docs/ops/docker.md.
+#
+#   docker compose up -d                      # database only (local development)
+#   docker compose --profile servers up -d    # database, loginserver, gameserver
+#
+# Settings come from the environment or a .env file next to this one:
+#   ACIS_DATAPACK_DIR      aCis_datapack checkout (default ../aCis_datapack):
+#                          its sql/ and tools/ seed a new database, its data/
+#                          is the servers' datapack
+#   ACIS_CONFIG_DIR        server config directory (default ./config); create
+#                          it with ops/docker/init-config.sh
+#   ACIS_LOG_DIR           log root (default ./log); each server logs under
+#                          its own loginserver/ or gameserver/ subdirectory
+#   ACIS_DB_ROOT_PASSWORD  MariaDB root password (default 123321); must match
+#                          Password in both .properties files
+#   ACIS_DB_BIND           host address the database port is published on
+#                          (default 127.0.0.1, loopback only)
+#   ACIS_DB_PORT           host port for the database (default 3306)
+#   ACIS_MARIADB_TAG       mariadb image tag (default 11, the version CI tests)
+#   ACIS_UID, ACIS_GID     host user the servers run as (default 1000); must
+#                          be able to write the config, log and datapack
+#                          data/crests directories
+#   TZ                     server time zone (default UTC); Seven Signs,
+#                          Olympiad, sieges and other timers run on local time
+
+x-acis-server: &acis-server
+  build: .
+  image: acis-golang:local
+  profiles: ["servers"]
+  user: "${ACIS_UID:-1000}:${ACIS_GID:-1000}"
+  restart: unless-stopped
+  environment:
+    TZ: ${TZ:-UTC}
 
 services:
   db:
-    image: mariadb:latest
+    image: mariadb:${ACIS_MARIADB_TAG:-11}
     container_name: mariadb-server
     restart: always
     environment:
-      MARIADB_ROOT_PASSWORD: 123321
-      MARIADB_DATABASE: acis # Optional: creates this DB on startup
+      MARIADB_ROOT_PASSWORD: ${ACIS_DB_ROOT_PASSWORD:-123321}
+      MARIADB_DATABASE: acis
+      TZ: ${TZ:-UTC}
     ports:
-      - "3306:3306"
+      - "${ACIS_DB_BIND:-127.0.0.1}:${ACIS_DB_PORT:-3306}:3306"
     volumes:
       - mariadb_data:/var/lib/mysql
+      # Seeds an empty volume with the aCis schema, on its first start only.
+      - ./ops/docker/initdb:/docker-entrypoint-initdb.d:ro
+      - ${ACIS_DATAPACK_DIR:-../aCis_datapack}/sql:/acis/sql:ro
+      - ${ACIS_DATAPACK_DIR:-../aCis_datapack}/tools:/acis/tools:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+  loginserver:
+    <<: *acis-server
+    command: ["loginserver", "-server-names", "data/serverNames.xml"]
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "2106:2106"
+    volumes:
+      - ${ACIS_CONFIG_DIR:-./config}:/opt/acis/config
+      - ${ACIS_DATAPACK_DIR:-../aCis_datapack}/data:/opt/acis/data
+      - ${ACIS_LOG_DIR:-./log}/loginserver:/opt/acis/log
+    # Above the login server's 15s shutdown budget (fx's default).
+    stop_grace_period: 20s
+
+  gameserver:
+    <<: *acis-server
+    command: ["gameserver"]
+    depends_on:
+      db:
+        condition: service_healthy
+      loginserver:
+        condition: service_started
+    ports:
+      - "7777:7777"
+    volumes:
+      - ${ACIS_CONFIG_DIR:-./config}:/opt/acis/config
+      - ${ACIS_DATAPACK_DIR:-../aCis_datapack}/data:/opt/acis/data
+      - ${ACIS_LOG_DIR:-./log}/gameserver:/opt/acis/log
+    # Docker's default 10s stop grace SIGKILLs a shutdown that is still
+    # saving players and world state. Keep this above gameServerStopTimeout
+    # (cmd/gameserver/main.go); TestComposeStopGraceCoversGameServerStop
+    # checks it.
+    stop_grace_period: 240s
 
 volumes:
   mariadb_data:
