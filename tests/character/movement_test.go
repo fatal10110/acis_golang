@@ -31,6 +31,7 @@ func TestMovementUpdatesWorldState(t *testing.T) {
 	target := location.Location{X: 80, Y: 70, Z: 30}
 	spawn := location.Location{X: 10, Y: 20, Z: 30}
 	c.Send(encodeMoveBackwardToLocation(target, spawn, 1))
+	expectGroundClickAck(t, c)
 	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
@@ -69,6 +70,7 @@ func TestSwimmingPlayerRisesPastWaterSurface(t *testing.T) {
 	objID := srv.SoleObjectID(t)
 	target := location.Location{X: 300, Y: 200, Z: 200}
 	c.Send(encodeMoveBackwardToLocation(target, target, 1))
+	expectGroundClickAck(t, c)
 	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
@@ -123,6 +125,7 @@ func TestBlockedWalkBroadcastsSameCellMoveToLocation(t *testing.T) {
 	spawn := location.Location{X: 10, Y: 20, Z: 30}
 	target := location.Location{X: 80, Y: 20, Z: 30}
 	c.Send(encodeMoveBackwardToLocation(target, spawn, 1))
+	expectGroundClickAck(t, c)
 	reply := c.Read()
 	if reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
@@ -175,6 +178,7 @@ func TestRunStartsAtWalkSpeed(t *testing.T) {
 
 	spawn := location.Location{X: 10, Y: 20, Z: 30}
 	c.Send(encodeMoveBackwardToLocation(location.Location{X: 3_000, Y: 20, Z: 30}, spawn, 1))
+	expectGroundClickAck(t, c)
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
 	}
@@ -251,6 +255,7 @@ func TestRunStartWalkFloorAllowsMillisecondTruncation(t *testing.T) {
 
 	spawn := location.Location{X: 10, Y: 20, Z: 30}
 	c.Send(encodeMoveBackwardToLocation(location.Location{X: 3_000, Y: 20, Z: 30}, spawn, 1))
+	expectGroundClickAck(t, c)
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
 	}

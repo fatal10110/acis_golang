@@ -42,6 +42,7 @@ func TestLatePositionUpdateWalksElapsedTime(t *testing.T) {
 
 	spawn := location.Location{X: 10, Y: 20, Z: 30}
 	c.Send(encodeMoveBackwardToLocation(location.Location{X: 3_000, Y: 20, Z: 30}, spawn, 1))
+	expectGroundClickAck(t, c)
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation (%#x)", reply[0], serverpackets.OpcodeMoveToLocation)
 	}

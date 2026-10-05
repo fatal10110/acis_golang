@@ -232,6 +232,7 @@ func TestWalkingInsufficientMPTargetedCastLeavesHeading(t *testing.T) {
 	drainUntilQuiet(t, patient)
 
 	caster.Send(encodeMoveBackwardToLocation(200, 70, 30))
+	expectGroundClickAck(t, caster)
 	assertFrameOpcode(t, caster.Read(), serverpackets.OpcodeMoveToLocation, "walk")
 	drainUntilQuiet(t, patient)
 	headingBefore := playerHeading(t, srv, casterID)

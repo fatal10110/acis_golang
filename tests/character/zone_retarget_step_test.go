@@ -27,6 +27,7 @@ func TestZoneEnterCountsSameCellRetargets(t *testing.T) {
 	mover := srv.PlayerMove(t, objID)
 	c := srv.Client
 	c.Send(encodeMoveBackwardToLocation(location.Location{X: spawn.X + 3_000, Y: spawn.Y, Z: spawn.Z}, spawn, 1))
+	expectGroundClickAck(t, c)
 	if reply := c.Read(); reply[0] != serverpackets.OpcodeMoveToLocation {
 		t.Fatalf("walk opcode = %#x, want MoveToLocation", reply[0])
 	}
