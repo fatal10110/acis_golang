@@ -23,6 +23,8 @@ Contract-specific checks supplement unit tests:
 - formulas: independent oracle vectors, including boundary, rounding, and overflow cases;
 - loaders: same-file load counts and representative field dumps;
 - geodata: `geoprobe` comparisons for movement, line of sight, and paths;
+- script pages: `scriptpages.CheckPackage` against the committed page index (regenerate it with
+  `cmd/pageindex` only when the datapack changes);
 - persistence: integration tests against the expected schema and transaction effects;
 - concurrency: focused `-race` coverage and lifecycle cancellation.
 
