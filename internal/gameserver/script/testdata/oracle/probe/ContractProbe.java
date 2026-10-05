@@ -915,7 +915,7 @@ final class ContractProbe
 		g.table("timers.fixed_rate", src, note, "startQuestTimerAtFixedRate(name, npc, player, initial, period): fires at initial, then every period on a fixed grid; it stays in the set (a restart is refused) until cancelled.");
 		timerRow(g, "grid", (t, b, n1, n2, p1, p2, log) ->
 		{
-			log.add("start tick initial=1000 period=500 -> " + t.startQuestTimerAtFixedRate("tick", null, p1, 1000, 500));
+			log.add("start " + t._label + " tick npc=none player=" + t.role(p1) + " initial=1000 period=500 -> " + t.startQuestTimerAtFixedRate("tick", null, p1, 1000, 500));
 			ThreadPool.advance(2200);
 			start(log, t, "tick", null, p1, 100);
 			ThreadPool.advance(300);

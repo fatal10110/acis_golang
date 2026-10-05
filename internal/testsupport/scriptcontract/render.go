@@ -81,6 +81,11 @@ func Packet(payload []byte, roles map[int32]string) (string, error) {
 	if d.err != nil {
 		return "", d.err
 	}
+	// Every rendered packet ends at its last field; a trailing byte is an
+	// encoder writing a field the client does not read.
+	if len(d.b) != 0 {
+		return "", fmt.Errorf("%d trailing bytes", len(d.b))
+	}
 	return out, nil
 }
 

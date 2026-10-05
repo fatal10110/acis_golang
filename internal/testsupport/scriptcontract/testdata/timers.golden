@@ -63,7 +63,7 @@ provenance probe java=55ff8a4ec7e186d9816cd549246b4cf1f59c9f12 datapack=55ff8a4e
 note Each row runs a fresh script (and a second one, B, where named) on probe NPCs npc1, npc2 and players p1, p2. Lines: every start with its result, then every firing (at is the virtual time since the row began) and every cancel, in order. Timers due at the same time fire in start order (the probe's thread pool; the reference pool does not order ties).
 note startQuestTimerAtFixedRate(name, npc, player, initial, period): fires at initial, then every period on a fixed grid; it stays in the set (a restart is refused) until cancelled.
 row grid
-  start tick initial=1000 period=500 -> true
+  start A tick npc=none player=p1 initial=1000 period=500 -> true
   fire A tick npc=none player=p1 at=1000
   fire A tick npc=none player=p1 at=1500
   fire A tick npc=none player=p1 at=2000

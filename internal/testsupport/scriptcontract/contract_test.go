@@ -231,6 +231,11 @@ func TestPacketMatchesProbeLines(t *testing.T) {
 	if _, err := Packet([]byte{0x0f, 0x01}, nil); err == nil {
 		t.Error("Packet rendered a truncated packet")
 	}
+	for _, c := range cases {
+		if got, err := Packet(append(slices.Clone(c.payload), 0), roles); err == nil {
+			t.Errorf("%s: Packet rendered a payload with a trailing byte as %s", c.name, got)
+		}
+	}
 }
 
 // Every statement line of the goldens is a journal statement, and the exit

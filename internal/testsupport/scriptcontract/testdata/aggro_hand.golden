@@ -7,6 +7,7 @@ source java/net/sf/l2j/gameserver/model/actor/ai/type/NpcAI.java 449-496 runAI s
 source java/net/sf/l2j/gameserver/model/actor/ai/type/NpcAI.java 916-924 cleanupForNextSpawn
 source java/net/sf/l2j/gameserver/model/actor/Npc.java 2279-2282 getSeeRange
 source java/net/sf/l2j/gameserver/model/actor/instance/RaidBoss.java 35-44 getSeeRange isRaidBoss
+source java/net/sf/l2j/gameserver/model/actor/instance/GrandBoss.java 29-39 getSeeRange isRaidBoss
 provenance hand
 note The tick scan of runAI(true) runs only when the template has a see-creature script, over every known playable (players and summons; the gates read the acting player), before invalid desires are pruned and before a desire is picked. A nested runAI(false) does not scan.
 note in_range is the 3D distance strictly below the see range, centre to centre: DefaultSeeRange (450) for NPCs, the template aggro range for raid and grand bosses.
@@ -55,13 +56,26 @@ row z-501 creature=player protected=false flying=false invisible=false silent=fa
 table aggro.teleport_see
 source java/net/sf/l2j/gameserver/model/actor/Creature.java 1921-1938 forceSeeCreature
 source java/net/sf/l2j/gameserver/model/actor/Creature.java 386-430 teleportTo
+source java/net/sf/l2j/gameserver/model/actor/Creature.java 221-227 onTeleported
+source java/net/sf/l2j/gameserver/model/actor/Creature.java 332-364 instantTeleportTo
+source java/net/sf/l2j/gameserver/model/WorldObject.java 497-504 forEachKnownType
+source java/net/sf/l2j/gameserver/model/WorldObject.java 625-639 refreshKnownlist
+source java/net/sf/l2j/gameserver/model/actor/Summon.java 335-349 onSpawn
 provenance hand
-note After a teleport the teleported creature, if it is a playable, makes every known NPC within that NPC's see range (3D, strict, centre to centre) and at most 500 Z apart call see-creature on it once. It is skipped when the acting player is spawn-protected or flying. There is no invisibility, silent-move or seen-set check, and the NPC's seen set is not updated.
-row player creature=player protected=false flying=false invisible=false in_range=true dz=0 calls=1
-row summon creature=summon protected=false flying=false invisible=false in_range=true dz=0 calls=1
-row npc creature=npc protected=- flying=- invisible=- in_range=true dz=0 calls=0
-row spawn-protected creature=player protected=true flying=false invisible=false in_range=true dz=0 calls=0
-row flying creature=player protected=false flying=true invisible=false in_range=true dz=0 calls=0
-row invisible creature=player protected=false flying=false invisible=true in_range=true dz=0 calls=1
-row out-of-range creature=player protected=false flying=false invisible=false in_range=false dz=0 calls=0
-row z-501 creature=player protected=false flying=false invisible=false in_range=true dz=501 calls=0
+note The re-fire scan runs at the end of teleportTo, at the end of instantTeleportTo and when a summon spawns. It walks the NPCs of the regions around the creature's current region and does nothing while the creature has no region.
+note teleportTo takes the creature out of its region and gives it back before the scan (onTeleported) only for a non-player or a player whose client is detached. Any other player (client attached, or no client) gets its region back later from the Appearing packet, which does not scan, so its teleportTo makes no call. instantTeleportTo keeps the creature's region (the pre-teleport one; it refreshes the known list from it) and scans the NPCs around that region, measuring distance from the new position. A summon's spawn scans from its spawn region.
+note When the scan runs: if the creature is a playable, every scanned NPC within that NPC's see range (3D, strict, centre to centre) and at most 500 Z apart calls see-creature on it once. It is skipped when the acting player is spawn-protected or flying. There is no invisibility, silent-move or seen-set check, and the NPC's seen set is not updated.
+note entry is teleportTo, instantTeleportTo or summon-spawn; client is the player's client state (attached, detached or none), - for other creatures.
+row teleport-player-attached entry=teleportTo creature=player client=attached protected=false flying=false invisible=false in_range=true dz=0 calls=0
+row teleport-player-no-client entry=teleportTo creature=player client=none protected=false flying=false invisible=false in_range=true dz=0 calls=0
+row teleport-player-detached entry=teleportTo creature=player client=detached protected=false flying=false invisible=false in_range=true dz=0 calls=1
+row teleport-summon entry=teleportTo creature=summon client=- protected=false flying=false invisible=false in_range=true dz=0 calls=1
+row teleport-npc entry=teleportTo creature=npc client=- protected=- flying=- invisible=- in_range=true dz=0 calls=0
+row instant-player entry=instantTeleportTo creature=player client=attached protected=false flying=false invisible=false in_range=true dz=0 calls=1
+row summon-spawn entry=summon-spawn creature=summon client=- protected=false flying=false invisible=false in_range=true dz=0 calls=1
+row spawn-protected entry=instantTeleportTo creature=player client=attached protected=true flying=false invisible=false in_range=true dz=0 calls=0
+row flying entry=instantTeleportTo creature=player client=attached protected=false flying=true invisible=false in_range=true dz=0 calls=0
+row invisible entry=instantTeleportTo creature=player client=attached protected=false flying=false invisible=true in_range=true dz=0 calls=1
+row out-of-range entry=instantTeleportTo creature=player client=attached protected=false flying=false invisible=false in_range=false dz=0 calls=0
+row z-500 entry=instantTeleportTo creature=player client=attached protected=false flying=false invisible=false in_range=true dz=500 calls=1
+row z-501 entry=instantTeleportTo creature=player client=attached protected=false flying=false invisible=false in_range=true dz=501 calls=0
