@@ -301,6 +301,11 @@ func (s *Service) Oust(c *player.Character, targetName string, online func(int32
 func (s *Service) remove(cl *Clan, objectID int32, joinExpiry int64, live *player.Character, now time.Time) (Member, bool) {
 	cl.mu.Lock()
 	defer cl.mu.Unlock()
+	return s.removeLocked(cl, objectID, joinExpiry, live, now)
+}
+
+// removeLocked is remove with cl.mu held.
+func (s *Service) removeLocked(cl *Clan, objectID int32, joinExpiry int64, live *player.Character, now time.Time) (Member, bool) {
 	m, ok := cl.members[objectID]
 	wasLeader := objectID == cl.leaderID
 	if !ok {
@@ -327,11 +332,17 @@ func (s *Service) remove(cl *Clan, objectID int32, joinExpiry int64, live *playe
 // An academy member leaves without a join penalty. A personal surrender is
 // forgotten, so it does not follow the character into its next clan.
 func (s *Service) ApplyLeft(c *player.Character, m Member, now time.Time) {
+	s.applyLeft(c, m, s.joinExpiry(now))
+}
+
+// applyLeft clears the clan state of m on its live character; a member
+// outside the academy takes joinExpiry as its join penalty's end.
+func (s *Service) applyLeft(c *player.Character, m Member, joinExpiry int64) {
 	clearLeaverTitle(c)
 	c.SetClanID(0)
 	c.SetWantsPeace(false)
 	if m.PledgeType != SubunitAcademy {
-		c.SetClanJoinExpiryTime(s.joinExpiry(now))
+		c.SetClanJoinExpiryTime(joinExpiry)
 	}
 	c.SetPledgeClass(s.pledgeClass(c))
 }
