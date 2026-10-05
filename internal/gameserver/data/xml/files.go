@@ -39,14 +39,14 @@ func loadXMLDocuments[T any](dir, kind string) ([]xmlDocument[T], error) {
 	return docs, nil
 }
 
-// buildAll parses each element in els into a T via ctor, wrapping any
-// constructor error with path. It is the shared shape for a flat XML list:
-// element attributes fold into a StatSet, then the domain constructor
-// validates and builds the model value.
-func buildAll[T any](path string, els []attrsElement, ctor func(*commons.StatSet) (T, error)) ([]T, error) {
+// buildAll builds each element in els into a T via build, wrapping any
+// error with path. It is the shared shape for a flat XML list: build reads
+// the element's attributes through an attrValues (setting its prefix to name
+// the element) and returns the typed model value.
+func buildAll[T any](path string, els []attrsElement, build func(*attrValues) (T, error)) ([]T, error) {
 	out := make([]T, 0, len(els))
 	for _, el := range els {
-		v, err := ctor(commons.StatSetFromXMLAttrs(el.Attrs))
+		v, err := build(newAttrValues(foldAttrs(el.Attrs), ""))
 		if err != nil {
 			return nil, fmt.Errorf("xml: %s: %w", path, err)
 		}

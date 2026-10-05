@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/armorset"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/augmentation"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
@@ -215,11 +214,46 @@ func LoadRecipes(path string) (*recipe.Table, error) {
 	if err := readXML(path, &file); err != nil {
 		return nil, fmt.Errorf("recipes: %w", err)
 	}
-	recipes, err := buildAll(path, file.Recipes, recipe.New)
+	recipes, err := buildAll(path, file.Recipes, buildRecipe)
 	if err != nil {
 		return nil, err
 	}
 	return recipe.NewTable(recipes), nil
+}
+
+// buildRecipe builds one <recipe>. Every attribute is required.
+func buildRecipe(a *attrValues) (recipe.Recipe, error) {
+	a.prefix = "recipe"
+	id := a.int("id")
+	if err := a.Err(); err != nil {
+		return recipe.Recipe{}, err
+	}
+	a.prefix = fmt.Sprintf("recipe %d", id)
+	rawMaterials := a.str("material")
+	materials, err := recipe.ParseIngredients(rawMaterials)
+	if err != nil {
+		a.fail(fmt.Errorf("material %q: %w", rawMaterials, err))
+	}
+	rawProduct := a.str("product")
+	product, err := recipe.ParseIngredient(rawProduct)
+	if err != nil {
+		a.fail(fmt.Errorf("product %q: %w", rawProduct, err))
+	}
+	r := recipe.Recipe{
+		Materials:   materials,
+		Product:     product,
+		ID:          id,
+		ItemID:      a.int32("itemId"),
+		Level:       a.int("level"),
+		MPCost:      a.int("mpConsume"),
+		SuccessRate: a.int("successRate"),
+		Dwarven:     a.boolean("isDwarven"),
+		Alias:       a.str("alias"),
+	}
+	if err := a.Err(); err != nil {
+		return recipe.Recipe{}, err
+	}
+	return r, nil
 }
 
 // LoadBuyLists parses buyLists.xml and returns buylists keyed by list id.
@@ -232,24 +266,23 @@ func LoadBuyLists(path string, items *item.Table) (*buylist.Table, error) {
 	}
 	lists := make([]buylist.List, 0, len(file.BuyLists))
 	for _, el := range file.BuyLists {
-		set := commons.StatSetFromXMLAttrs(el.Attrs)
-		if err := decodeLiteralAttrs(set, "id", "npcId"); err != nil {
-			return nil, fmt.Errorf("xml: %s: buylist: %w", path, err)
-		}
-		id, err := set.GetInt("id")
-		if err != nil {
+		a := newAttrValues(foldAttrs(el.Attrs), "buylist")
+		id := int(a.int32Literal("id"))
+		if err := a.Err(); err != nil {
 			return nil, fmt.Errorf("xml: %s: %w", path, err)
 		}
-		products, err := buildAll(path, el.Products, func(set *commons.StatSet) (buylist.Product, error) {
-			return buylist.NewProduct(id, set)
+		a.prefix = fmt.Sprintf("buylist %d", id)
+		npcID := int(a.int32Literal("npcId"))
+		if err := a.Err(); err != nil {
+			return nil, fmt.Errorf("xml: %s: %w", path, err)
+		}
+		products, err := buildAll(path, el.Products, func(a *attrValues) (buylist.Product, error) {
+			return buildBuyListProduct(a, id)
 		})
 		if err != nil {
 			return nil, err
 		}
-		list, err := buylist.NewList(set, products)
-		if err != nil {
-			return nil, fmt.Errorf("xml: %s: %w", path, err)
-		}
+		list := buylist.NewList(id, npcID, products)
 		if items != nil {
 			for _, p := range list.Products {
 				if _, ok := items.Get(p.ItemID); !ok {
@@ -260,6 +293,24 @@ func LoadBuyLists(path string, items *item.Table) (*buylist.Table, error) {
 		lists = append(lists, list)
 	}
 	return buylist.NewTable(lists), nil
+}
+
+// buildBuyListProduct builds one <product> of buylist buyListID. id is
+// required; price defaults to 0, restockDelay (minutes) and count to -1.
+func buildBuyListProduct(a *attrValues, buyListID int) (buylist.Product, error) {
+	a.prefix = fmt.Sprintf("buylist %d product", buyListID)
+	itemID := a.int32("id")
+	if err := a.Err(); err != nil {
+		return buylist.Product{}, err
+	}
+	a.prefix = fmt.Sprintf("buylist %d product %d", buyListID, itemID)
+	price := a.intDefault("price", 0)
+	restockDelay := a.int64Default("restockDelay", -1)
+	maxCount := a.intDefault("count", -1)
+	if err := a.Err(); err != nil {
+		return buylist.Product{}, err
+	}
+	return buylist.NewProduct(buyListID, itemID, price, restockDelay, maxCount), nil
 }
 
 // LoadHennas parses hennas.xml and returns hennas keyed by symbol id.
@@ -285,11 +336,38 @@ func LoadArmorSets(path string) (*armorset.Table, error) {
 	if err := readXML(path, &file); err != nil {
 		return nil, fmt.Errorf("armor sets: %w", err)
 	}
-	sets, err := buildAll(path, file.Sets, armorset.New)
+	sets, err := buildAll(path, file.Sets, buildArmorSet)
 	if err != nil {
 		return nil, err
 	}
 	return armorset.NewTable(sets), nil
+}
+
+// buildArmorSet builds one <armorset>. Every attribute is required; every
+// one but name is an int32 item or skill id.
+func buildArmorSet(a *attrValues) (armorset.Set, error) {
+	a.prefix = "armorset"
+	name := a.str("name")
+	if err := a.Err(); err != nil {
+		return armorset.Set{}, err
+	}
+	a.prefix = fmt.Sprintf("armorset %q", name)
+	s := armorset.Set{
+		Name:          name,
+		Chest:         a.int32("chest"),
+		Legs:          a.int32("legs"),
+		Head:          a.int32("head"),
+		Gloves:        a.int32("gloves"),
+		Feet:          a.int32("feet"),
+		SkillID:       a.int32("skillId"),
+		Shield:        a.int32("shield"),
+		ShieldSkillID: a.int32("shieldSkillId"),
+		Enchant6Skill: a.int32("enchant6Skill"),
+	}
+	if err := a.Err(); err != nil {
+		return armorset.Set{}, err
+	}
+	return s, nil
 }
 
 // LoadFish parses fish.xml and returns fish rows keyed by fish id.

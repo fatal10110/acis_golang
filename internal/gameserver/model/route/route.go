@@ -54,44 +54,38 @@ type BoatLocation struct {
 	Scheduled         []ScheduledMessage
 }
 
-// NewBoatLocation builds a BoatLocation from set. x, y and z are required;
-// speed defaults to 350 and rotation defaults to 4000.
-func NewBoatLocation(set *commons.StatSet) (BoatLocation, error) {
-	f := commons.NewFields(set, "route: boat location")
-	loc := location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")}
-	speed := f.IntDefault("speed", 350)
-	rotation := f.IntDefault("rotation", 4000)
-	busy := f.IntDefault("busy", 0)
-	arrival, err := parseMessageList(f.StringArrayDefault("arrival", nil))
+// NewBoatLocation builds a BoatLocation from its decoded attributes.
+// arrival and departure are ";"-separated message id lists and scheduled a
+// ";"-separated list of id-delay pairs; an empty value means none.
+func NewBoatLocation(loc location.Location, speed, rotation, busy int, arrival, departure, scheduled string) (BoatLocation, error) {
+	arrivalIDs, err := parseMessageList(arrival)
 	if err != nil {
-		f.Fail(fmt.Errorf("arrival: %w", err))
+		return BoatLocation{}, fmt.Errorf("route: boat location: arrival: %w", err)
 	}
-	departure, err := parseMessageList(f.StringArrayDefault("departure", nil))
+	departureIDs, err := parseMessageList(departure)
 	if err != nil {
-		f.Fail(fmt.Errorf("departure: %w", err))
+		return BoatLocation{}, fmt.Errorf("route: boat location: departure: %w", err)
 	}
-	scheduled, err := parseScheduled(f.StringDefault("scheduled", ""))
+	scheduledMessages, err := parseScheduled(scheduled)
 	if err != nil {
-		f.Fail(fmt.Errorf("scheduled: %w", err))
-	}
-	if err := f.Err(); err != nil {
-		return BoatLocation{}, err
+		return BoatLocation{}, fmt.Errorf("route: boat location: scheduled: %w", err)
 	}
 	return BoatLocation{
 		Location:          loc,
 		Speed:             speed,
 		Rotation:          rotation,
 		BusyMessage:       busy,
-		ArrivalMessages:   arrival,
-		DepartureMessages: departure,
-		Scheduled:         scheduled,
+		ArrivalMessages:   arrivalIDs,
+		DepartureMessages: departureIDs,
+		Scheduled:         scheduledMessages,
 	}, nil
 }
 
-func parseMessageList(parts []string) ([]int, error) {
-	if len(parts) == 0 {
+func parseMessageList(raw string) ([]int, error) {
+	if raw == "" {
 		return nil, nil
 	}
+	parts := strings.Split(raw, ";")
 	out := make([]int, 0, len(parts))
 	for _, p := range parts {
 		if p == "" {
@@ -160,20 +154,15 @@ type WalkerLocation struct {
 	SocialID    int
 }
 
-// NewWalkerLocation builds a WalkerLocation from set. x, y and z are
-// required; delay seconds are converted to milliseconds.
-func NewWalkerLocation(set *commons.StatSet) (WalkerLocation, error) {
-	f := commons.NewFields(set, "route: walker location")
-	walker := WalkerLocation{
-		Location:    location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")},
-		DelayMillis: f.IntDefault("delay", 0) * 1000,
-		NPCStringID: f.IntDefault("fstring", 0),
-		SocialID:    f.IntDefault("socialId", 0),
+// NewWalkerLocation builds a WalkerLocation, converting delaySeconds to
+// milliseconds.
+func NewWalkerLocation(loc location.Location, delaySeconds, npcStringID, socialID int) WalkerLocation {
+	return WalkerLocation{
+		Location:    loc,
+		DelayMillis: delaySeconds * 1000,
+		NPCStringID: npcStringID,
+		SocialID:    socialID,
 	}
-	if err := f.Err(); err != nil {
-		return WalkerLocation{}, err
-	}
-	return walker, nil
 }
 
 // WalkerRoutes stores walking routes keyed by route name then npc name.

@@ -52,40 +52,6 @@ type Point struct {
 	BannedPoint   string
 }
 
-// NewPoint builds a Point from set.
-func NewPoint(set *commons.StatSet) (Point, error) {
-	idf := commons.NewFields(set, "restart: point")
-	name := idf.String("name")
-	if err := idf.Err(); err != nil {
-		return Point{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("restart: point %q", name))
-	points := commons.FieldList[location.Location](f, "points")
-	chaoPoints := commons.FieldList[location.Location](f, "chaoPoints")
-	mapRegions := commons.FieldList[location.Point](f, "mapRegions")
-	p := Point{
-		Name:       name,
-		Points:     append([]location.Location(nil), points...),
-		ChaoPoints: append([]location.Location(nil), chaoPoints...),
-		MapRegions: append([]location.Point(nil), mapRegions...),
-		BBS:        f.Int("bbs"),
-		LocName:    f.Int("locName"),
-	}
-	if f.Has("bannedRace") {
-		raw := f.String("bannedRace")
-		if race, bannedPoint, err := ParseBannedRace(raw); err != nil {
-			f.Fail(err)
-		} else {
-			p.BannedRace, p.BannedPoint, p.HasBannedRace = race, bannedPoint, true
-		}
-	}
-	if err := f.Err(); err != nil {
-		return Point{}, err
-	}
-	return p, nil
-}
-
 // Table stores all restart areas and points.
 type Table struct {
 	Areas  []Area

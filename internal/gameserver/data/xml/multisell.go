@@ -68,12 +68,12 @@ func LoadMultiSellLists(dir string, items *item.Table) (*multisell.Table, error)
 
 func buildMultiSellList(path string, file multiSellFile, items *item.Table) (*multisell.List, error) {
 	id := commons.LegacyStringHash(multisellFilenameXML.ReplaceAllString(filepath.Base(path), ""))
-	set := commons.StatSetFromXMLAttrs(file.Attrs)
+	attrs := newAttrValues(foldAttrs(file.Attrs), "")
 
 	list := &multisell.List{
 		ID:                  id,
-		ApplyTaxes:          set.GetBoolDefault("applyTaxes", false),
-		MaintainEnchantment: set.GetBoolDefault("maintainEnchantment", false),
+		ApplyTaxes:          attrs.boolDefault("applyTaxes", false),
+		MaintainEnchantment: attrs.boolDefault("maintainEnchantment", false),
 		Entries:             make([]multisell.Entry, 0, len(file.Items)),
 	}
 
@@ -86,7 +86,7 @@ func buildMultiSellList(path string, file multiSellFile, items *item.Table) (*mu
 	for itemIndex, el := range file.Items {
 		ingredients := make([]multisell.Ingredient, 0, len(el.Ingredients))
 		for _, ingredientEl := range el.Ingredients {
-			in, err := multisell.NewIngredient(commons.StatSetFromXMLAttrs(ingredientEl.Attrs), items)
+			in, err := buildMultiSellIngredient(newAttrValues(foldAttrs(ingredientEl.Attrs), ""), items)
 			if err != nil {
 				return nil, fmt.Errorf("data/xml: %s: item %d ingredient: %w", path, itemIndex+1, err)
 			}
@@ -95,7 +95,7 @@ func buildMultiSellList(path string, file multiSellFile, items *item.Table) (*mu
 
 		products := make([]multisell.Ingredient, 0, len(el.Products))
 		for _, productEl := range el.Products {
-			in, err := multisell.NewIngredient(commons.StatSetFromXMLAttrs(productEl.Attrs), items)
+			in, err := buildMultiSellIngredient(newAttrValues(foldAttrs(productEl.Attrs), ""), items)
 			if err != nil {
 				return nil, fmt.Errorf("data/xml: %s: item %d production: %w", path, itemIndex+1, err)
 			}
@@ -106,4 +106,23 @@ func buildMultiSellList(path string, file multiSellFile, items *item.Table) (*mu
 	}
 
 	return list, nil
+}
+
+// buildMultiSellIngredient builds one <ingredient> or <production>. id and
+// count are required; isTaxIngredient and maintainIngredient default to
+// false.
+func buildMultiSellIngredient(a *attrValues, items *item.Table) (multisell.Ingredient, error) {
+	a.prefix = "multisell ingredient"
+	itemID := a.int32("id")
+	if err := a.Err(); err != nil {
+		return multisell.Ingredient{}, err
+	}
+	a.prefix = fmt.Sprintf("multisell ingredient %d", itemID)
+	count := a.int("count")
+	taxIngredient := a.boolDefault("isTaxIngredient", false)
+	maintainIngredient := a.boolDefault("maintainIngredient", false)
+	if err := a.Err(); err != nil {
+		return multisell.Ingredient{}, err
+	}
+	return multisell.NewIngredient(itemID, count, taxIngredient, maintainIngredient, items), nil
 }

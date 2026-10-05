@@ -3,7 +3,6 @@ package xml
 import (
 	"fmt"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
@@ -89,7 +88,7 @@ func buildRestartArea(el restartAreaElement) (restart.Area, error) {
 }
 
 func buildRestartPoint(el restartPointElement) (restart.Point, error) {
-	set := commons.NewStatSet()
+	vals := make(map[string]string, len(el.Sets))
 	var points []location.Location
 	var chaoPoints []location.Location
 	var mapRegions []location.Point
@@ -114,11 +113,33 @@ func buildRestartPoint(el restartPointElement) (restart.Point, error) {
 			}
 			mapRegions = append(mapRegions, point)
 		default:
-			set.Set(s.Name, s.Val)
+			vals[s.Name] = s.Val
 		}
 	}
-	set.Set("points", points)
-	set.Set("chaoPoints", chaoPoints)
-	set.Set("mapRegions", mapRegions)
-	return restart.NewPoint(set)
+
+	a := newAttrValues(vals, "restart: point")
+	name := a.str("name")
+	if err := a.Err(); err != nil {
+		return restart.Point{}, err
+	}
+	a.prefix = fmt.Sprintf("restart: point %q", name)
+	p := restart.Point{
+		Name:       name,
+		Points:     points,
+		ChaoPoints: chaoPoints,
+		MapRegions: mapRegions,
+		BBS:        a.int("bbs"),
+		LocName:    a.int("locName"),
+	}
+	if a.has("bannedRace") {
+		if race, bannedPoint, err := restart.ParseBannedRace(a.str("bannedRace")); err != nil {
+			a.fail(err)
+		} else {
+			p.BannedRace, p.BannedPoint, p.HasBannedRace = race, bannedPoint, true
+		}
+	}
+	if err := a.Err(); err != nil {
+		return restart.Point{}, err
+	}
+	return p, nil
 }
