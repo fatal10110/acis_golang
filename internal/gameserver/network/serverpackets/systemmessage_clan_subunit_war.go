@@ -24,6 +24,8 @@ const (
 	SystemMessageS1NotMeetAcademyRequirements   = 1735 // text parameter
 	SystemMessageClanAlreadyHasAcademy          = 1738 // no parameter
 	SystemMessageS1ClanAcademyCreated           = 1741 // text parameter
+	SystemMessageClanMemberGraduatedFromAcademy = 1748 // text then number parameter
+	SystemMessageAcademyMembershipTerminated    = 1749 // no parameter
 	SystemMessageS2DesignatedApprenticeOfS1     = 1755 // two text parameters
 	SystemMessageNoRightToDismissApprentice     = 1762 // no parameter
 	SystemMessageS2ApprenticeOfS1Removed        = 1763 // two text parameters
