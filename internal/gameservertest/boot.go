@@ -115,6 +115,8 @@ type options struct {
 	slowStores             time.Duration
 	itemFlushFault         *ItemFlushFault
 	selectionHold          func(objectID int32)
+	scripts                *scriptOptions
+	questLoadErr           error
 	subclassFault          SubclassFault
 	petNameLookupErr       error
 	captureLog             bool
@@ -2104,6 +2106,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Wedding = couples
 	gclConfig.Macros = gamesql.NewMacroStore(db)
 	gclConfig.Recommendations = gamesql.NewRecommendationStore(db)
+	gclConfig.Quests, gclConfig.Scripts = bootQuests(db, o)
 	gclConfig.AugmentationChances = augmentation.DefaultChances()
 	if o.augmentationChances != nil {
 		gclConfig.AugmentationChances = *o.augmentationChances

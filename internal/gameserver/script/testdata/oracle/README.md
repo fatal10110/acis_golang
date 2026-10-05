@@ -7,6 +7,8 @@ This directory holds the reference probe for the script engine (slice V0 of
   `data/xml/scripts.xml` lists (gate 1).
 - `trace_q001.golden`, `trace_q003.golden`: two quests played through client packets, with
   every server packet and SQL statement they caused (gate 2).
+- the engine-contract goldens of slice V3 (section 11 item 3), written to
+  `internal/testsupport/scriptcontract/testdata/` (see "Engine-contract goldens" below).
 
 Gate status at the committed revision: **gate 1 passes** (857 of 857 listed scripts built
 and recorded, no fallback in force); **gate 2 passes** (both quests are played to their
@@ -37,6 +39,58 @@ captured, including registrations driven by collections, loops and the behavior
 reflection pass (`Quest.feedEventHandlers`), and including registrations the template then
 refuses (a second first-talk script).
 
+## Engine-contract goldens
+
+`probe/ContractProbe.java` runs last. It drops every task the boot queued
+(`ThreadPool.cancelAll`), so no boot task runs inside a scene (the festival manager, due
+120 s of virtual time after boot, blocks in real time), then exercises the reference classes behind each engine contract on
+probe-made players, NPCs and scripts, and writes one golden file per contract family to
+`internal/testsupport/scriptcontract/testdata/` (`journal`, `questlist`, `drops`,
+`range`, `dialog`, `timers`, `schedule`, `fanout`, `aggro_tick`). The `*_hand.golden`
+files beside them are derived by hand from the cited lines and reviewed blind; `run.sh`
+never writes them. Package `scriptcontract` embeds both and lists, per contract, the
+tables and the slices that implement it.
+
+Two more build-time changes serve these goldens, and leave the reference behavior alone
+until a contract scene uses them:
+
+- the shadow random source can be scripted (`Rnd.script`): its int draws then return given
+  values and record each draw's bound; any other draw while scripted is an error;
+- `scripting/ScheduledQuest.java` is compiled with its clock read and its
+  `Calendar.getInstance()` pointed at `ProbeClock`
+  (`probe/net/sf/l2j/commons/probe/ProbeClock.java`), which answers as the reference
+  does until the schedule scene sets an instant, zone and locale.
+
+## Contract golden format
+
+Line-oriented. `#` lines are comments. Each table:
+
+```
+table <name>
+source <path below aCis_gameserver> <from>[-<to>] <symbol...>   one or more
+provenance probe java=<sha> datapack=<sha> | hand
+note <text>                                                       zero or more
+row <id> <key>=<value> ...                                        one or more
+  <output line>                                                   the row's ordered outputs
+```
+
+A value is bare when it is printable ASCII without space, `"`, `\` or `=`; otherwise it is
+double-quoted with backslash escapes for backslash, quote, `\n`, `\r`, `\t` and `\u00XX`
+for other control characters. `-` stands for "none" or the empty list; lists are
+comma-separated. The revision is the last commit of `aCis_gameserver/java` and of
+`aCis_datapack/data` the probe ran on.
+
+Output lines, in the order they happened:
+
+- `S <packet>`: a server packet to the scene's player. NpcHtmlMessage, SystemMessage,
+  PlaySound, ExShowQuestMark, QuestList and ActionFailed are decoded from the wire bytes
+  (`scriptcontract.Packet` renders Go packets the same way); any other packet keeps its
+  class name and hex body. Object ids are replaced by role names (`obj=darin`), and by
+  `{role}` inside page text.
+- `Q <sql> | <param> | ...`: an executed statement; `{player}` is the player's object id
+  (`scriptcontract.ParseStatement` maps the journal statements to kinds).
+- other lines (timers, fan-out, aggro scenes): the script hook calls the scene recorded.
+
 ## Regenerating
 
 From the repository root, with the reference server and datapack checkouts:
@@ -47,8 +101,9 @@ ACIS_JAVA=../aCis_gameserver ACIS_DATAPACK=../aCis_datapack \
 ```
 
 Both default to the siblings of the repository root, so from the primary checkout in the
-workspace no variable is needed. The script builds the probe, runs it and copies the three
-`.golden` files here; it needs Docker and nothing else. `PROBE_LOG=<file>` keeps the
+workspace no variable is needed. The script builds the probe, runs it, copies the three
+`.golden` files here and the contract goldens to `internal/testsupport/scriptcontract/testdata/`;
+it needs Docker and nothing else. `PROBE_LOG=<file>` keeps the
 reference server's log. Build and run together take under half a minute.
 
 Committed outputs were generated from the reference at workspace commit

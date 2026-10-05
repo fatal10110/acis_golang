@@ -194,7 +194,8 @@ func TestDuplicateCharacterLoginClosesPreviousClientAndAbortsNewSelection(t *tes
 
 // TestQuestListProbeDuringEnteringAnswersEmptyQuestList pins the 0x3f probe
 // the client sends while loading: it must be answered with QuestList during
-// ENTERING even though no skill list or live player exists yet.
+// ENTERING, before the player is in the world; an empty journal gives the
+// empty list.
 func TestQuestListProbeDuringEnteringAnswersEmptyQuestList(t *testing.T) {
 	c, _, _, _ := newLinkedGameClientSeedOneChar(t)
 
@@ -241,21 +242,21 @@ func TestKnownExtendedOpcodeWhileEnteringCountsTowardDisconnect(t *testing.T) {
 }
 
 // TestMappedButUnimplementedOpcodeDoesNotCountAsUnknown pins that an in-game
-// opcode the Java switch maps to a handler (0x63, RequestQuestList) is
+// opcode the Java switch maps to a handler (0xca, GameGuardReply) is
 // accepted and does not advance the unknown-packet counter, even though no
-// Go handler exists for it yet: sending it more than maxUnknownPerMin times
+// Go handler exists for it: sending it more than maxUnknownPerMin times
 // must not disconnect the client.
 func TestMappedButUnimplementedOpcodeDoesNotCountAsUnknown(t *testing.T) {
 	c, _, _, _, _ := newLinkedGameClientEnterWorld(t)
 
 	for i := 0; i < maxUnknownPerMin+5; i++ {
-		c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestQuestListInGame))
+		c.Send(encodeSingleOpcode(clientpackets.OpcodeGameGuardReply))
 	}
 
 	// The connection is still dispatching: manor list still answers.
 	c.Send(encodeRequestManorList())
 	if frame := c.Read(); frame[0] != serverpackets.OpcodeExtended {
-		t.Fatalf("post-quest-list-spam opcode = %#x, want ExSendManorList under Extended (%#x)", frame[0], serverpackets.OpcodeExtended)
+		t.Fatalf("post-game-guard-spam opcode = %#x, want ExSendManorList under Extended (%#x)", frame[0], serverpackets.OpcodeExtended)
 	}
 }
 

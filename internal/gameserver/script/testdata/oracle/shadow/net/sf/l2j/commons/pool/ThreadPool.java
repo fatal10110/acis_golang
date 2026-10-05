@@ -106,6 +106,18 @@ public final class ThreadPool
 	}
 
 	/**
+	 * Cancels every queued task, so boot tasks (AI ticks, managers such as the festival one,
+	 * which blocks in real time once due) cannot run inside a later scene. Tasks queued
+	 * afterwards run as usual.
+	 */
+	public static void cancelAll()
+	{
+		for (Pending p : QUEUE)
+			p.cancel(false);
+		QUEUE.clear();
+	}
+
+	/**
 	 * A queued task.
 	 */
 	public static final class Pending implements ScheduledFuture<Object>

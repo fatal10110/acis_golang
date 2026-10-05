@@ -25,6 +25,9 @@ Contract-specific checks supplement unit tests:
 - geodata: `geoprobe` comparisons for movement, line of sight, and paths;
 - script pages: `scriptpages.CheckPackage` against the committed page index (regenerate it with
   `cmd/pageindex` only when the datapack changes);
+- script engine contracts: run every row of the contract's goldens with `scriptcontract.Run`
+  (`scriptcontract.Contracts` lists the tables per contract and slice); the probe goldens are
+  regenerated only by `internal/gameserver/script/testdata/oracle/run.sh`;
 - persistence: integration tests against the expected schema and transaction effects;
 - concurrency: focused `-race` coverage and lifecycle cancellation.
 
