@@ -108,6 +108,11 @@ func FishingOfferFor(c *player.Character, trees *modelskill.Trees, skills *Persi
 }
 
 // LearnGeneral applies a general trainer skill-learning request.
+//
+// A non-nil error comes only with LearnDone and reports a malformed passive
+// definition whose stat functions could not be built: the skill is already
+// known and its costs are paid, so the learn stands and the error is the
+// caller's to log. LearnFishing follows the same contract.
 func LearnGeneral(c *player.Character, tmpl *player.Template, skills *Persistence, books modelskill.BookPolicy, skillID, level int) (LearnResult, LearnOutcome, error) {
 	if c == nil {
 		return LearnResult{}, LearnUnavailable, nil
@@ -130,13 +135,12 @@ func LearnGeneral(c *player.Character, tmpl *player.Template, skills *Persistenc
 			return result, LearnMissingItem, nil
 		}
 	}
-	if err := setKnownSkill(skills, c, grant.SkillID, grant.Level); err != nil {
-		return result, LearnDone, err
-	}
+	// The SP comes off before the skill is added, as the reference charges it
+	// (RequestAcquireSkill: removeExpAndSp, then addSkill).
 	if result.Cost > 0 {
 		c.RemoveExpAndSp(nil, tmpl, 0, result.Cost)
 	}
-	return result, LearnDone, nil
+	return result, LearnDone, setKnownSkill(skills, c, grant.SkillID, grant.Level)
 }
 
 // LearnFishing applies a fishing trainer skill-learning request.
@@ -154,10 +158,7 @@ func LearnFishing(c *player.Character, trees *modelskill.Trees, skills *Persiste
 	if c.Inventory() == nil || c.Inventory().DestroyByTemplateID(node.ItemID, node.ItemCount) == nil {
 		return result, LearnMissingItem, nil
 	}
-	if err := setKnownSkill(skills, c, skillID, level); err != nil {
-		return result, LearnDone, err
-	}
-	return result, LearnDone, nil
+	return result, LearnDone, setKnownSkill(skills, c, skillID, level)
 }
 
 // TreeSkillLevels converts player skill levels to the skill-tree model key

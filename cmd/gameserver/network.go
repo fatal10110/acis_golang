@@ -187,6 +187,7 @@ func provideGameClientLink(
 		GMHeroAura:                 gameplay.Admin.GMHeroAura,
 		PartyRange:                 rewards.PartyRange,
 	}
+	network.SetOutboundRejectLog(log)
 	link, err := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,
 		Effects:       effectEnv,

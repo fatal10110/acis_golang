@@ -93,9 +93,10 @@ func (l *GameClientLink) sendGeneralAcquireSkillInfo(live *livePlayer, req clien
 func (l *GameClientLink) learnGeneralAcquireSkill(live *livePlayer, trainer *npc.Folk, req clientpackets.RequestAcquireSkill) {
 	_, status, err := skillstate.LearnGeneral(live.Character, live.Template(), l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
 	if err != nil {
-		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn skill")
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
-		return
+		// The skill is learned and paid for; only its passive stats failed to
+		// build from a malformed definition. The reference cannot fail here
+		// (Player.addSkill), so the client gets the full learn reply.
+		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn skill: bad passive definition")
 	}
 	switch status {
 	case skillstate.LearnDone:
@@ -130,9 +131,8 @@ func (l *GameClientLink) sendFishingAcquireSkillInfo(live *livePlayer, req clien
 func (l *GameClientLink) learnFishingAcquireSkill(live *livePlayer, req clientpackets.RequestAcquireSkill) {
 	result, status, err := skillstate.LearnFishing(live.Character, l.skillTrees, l.skills, int(req.SkillID), int(req.Level))
 	if err != nil {
-		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn fishing skill")
-		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
-		return
+		// As in learnGeneralAcquireSkill: the learn stands, the definition is bad.
+		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn fishing skill: bad passive definition")
 	}
 	switch status {
 	case skillstate.LearnDone:
