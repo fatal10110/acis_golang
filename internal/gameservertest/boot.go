@@ -24,6 +24,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
+	"github.com/fatal10110/acis_golang/internal/gameserver/castlemanor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/classmaster"
@@ -104,6 +105,8 @@ type options struct {
 	// sieges is the castle siege configuration (WithSieges); nil runs no
 	// siege.
 	sieges *siege.Config
+	// castleManor is the manor (WithCastleManor); nil runs none.
+	castleManor *castleManorOptions
 	// slowStores delays every handler-issued persistence write (WithSlowStores).
 	slowStores             time.Duration
 	itemFlushFault         *ItemFlushFault
@@ -945,8 +948,10 @@ type Server struct {
 	Couples             *wedding.Manager // couples the link was wired with
 	coupleRows          *gamesql.CoupleStore
 	Clans               *clan.Service
-	Castles             *castle.Manager // the castles WithCastles loads, restored at boot
-	Sieges              *siege.Engine   // the castle sieges WithSieges runs; nil otherwise
+	Castles             *castle.Manager      // the castles WithCastles loads, restored at boot
+	Sieges              *siege.Engine        // the castle sieges WithSieges runs; nil otherwise
+	CastleManor         *castlemanor.Manager // the manor WithCastleManor runs; nil otherwise
+	CastleManorClock    *sim.Inline          // the clock the manor's cycle runs on; nil without a manor
 	SevenSigns          *sevensigns.State
 	Festival            *festival.Manager
 	AnnounceFile        string // the announcements.xml the server reads and rewrites
@@ -2105,6 +2110,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	fishChampState := o.fishChamp.newChampionship(db, persistWorker, queues, o.log)
 	gclConfig.FishingChampionship = fishChampState
 	gclConfig.Sieges = newSieges(db, o, gclConfig.Castles, gclConfig.Clans, persistWorker)
+	gclConfig.CastleManor = newCastleManor(db, o, gclConfig.Castles, gclConfig.Clans, persistWorker, o.log)
 	gcl, err := network.NewGameClientLink(gclConfig)
 	if err != nil {
 		t.Fatalf("gameservertest: build game client link: %v", err)
@@ -2246,6 +2252,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	t.Cleanup(hallQueue.Close)
 	halls.Start(hallQueue, gcl, network.ClanHallNotifier(gcl), network.ClanHallGrounds(gcl))
 	restoreCastles(t, db, gclConfig.Castles)
+	castleManorClock := startCastleManor(t, gclConfig.CastleManor, o, gcl)
 	startSieges(t, gclConfig.Sieges, queues.NewQueue("sieges"), gcl)
 	gclConfig.Clans.DropMissingCrests(crests)
 	gclConfig.Clans.DropDanglingAlliances()
@@ -2321,6 +2328,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Clans:               gclConfig.Clans,
 		Castles:             gclConfig.Castles,
 		Sieges:              gclConfig.Sieges,
+		CastleManor:         gclConfig.CastleManor,
+		CastleManorClock:    castleManorClock,
 		HallFunctions:       hallFunctions,
 		Halls:               halls,
 		SevenSigns:          sevenSigns,
