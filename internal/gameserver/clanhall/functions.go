@@ -317,7 +317,9 @@ func (f *Functions) payFee(hallID int32, fn *rented, gen uint64) {
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	if f.byHall[hallID][fn.Type] != fn {
+	// Removed or changed while the warehouse paid: a change started a new
+	// term, which owns the next charge.
+	if fn.gen != gen || f.byHall[hallID][fn.Type] != fn {
 		return
 	}
 	if !paid {

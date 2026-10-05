@@ -63,6 +63,7 @@ type scriptedFolkCastAI struct {
 	canDesire bool
 	canCast   bool
 	castRange int
+	skillMP   int
 	casts     []modelskill.Ref
 }
 
@@ -75,6 +76,8 @@ func (a *scriptedFolkCastAI) CastingNow() bool { return a.control.casting }
 func (a *scriptedFolkCastAI) Stop()            {}
 
 func (a *scriptedFolkCastAI) CanDesire(attackable.Combatant, modelskill.Ref) bool { return a.canDesire }
+
+func (a *scriptedFolkCastAI) SkillMP(modelskill.Ref) int { return a.skillMP }
 
 func (a *scriptedFolkCastAI) MeetsHPMPDisabled(attackable.Combatant, modelskill.Ref) bool {
 	return true

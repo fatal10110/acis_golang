@@ -131,6 +131,9 @@ const (
 	// command the way its chat window answers an interact: Chat says how,
 	// and HTML is the page.
 	BypassSignsChat
+	// BypassClanHallManager runs any command on a clan hall manager, whose
+	// own dialog answers every command.
+	BypassClanHallManager
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -219,9 +222,10 @@ type BypassReply struct {
 // to the subclass dialog, a class manager's own commands to its dialog,
 // a scheme buffer's own commands to its dialog, a race manager's own
 // commands to the race track, and every command on a wedding manager to
-// its dialog, as does every command on an auctioneer. A Seven Signs
-// priest's and a Mammon NPC's own commands go to signsPriestBypass. Every
-// other command belongs to a system not in place yet.
+// its dialog, as does every command on an auctioneer or a clan hall
+// manager. A Seven Signs priest's and a Mammon NPC's own commands go to
+// signsPriestBypass. Every other command belongs to a system not in place
+// yet.
 func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command string) BypassReply {
 	karma := talker.Karma
 	kind := hostileKind(f.Instance)
@@ -232,6 +236,10 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	}
 	if kind == auctioneer {
 		reply.Outcome = BypassAuction
+		return reply
+	}
+	if kind == clanHallManager {
+		reply.Outcome = BypassClanHallManager
 		return reply
 	}
 	if _, ok := unportedFolkChats[kind]; ok {

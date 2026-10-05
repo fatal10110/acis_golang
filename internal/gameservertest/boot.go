@@ -40,6 +40,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -978,6 +979,9 @@ type Server struct {
 	effectEnv effect.Env
 	// castEffects is the link's hostile-NPC cast seam, as boot wires it.
 	castEffects actorcast.EffectHandlers
+	// folkSinks builds the sinks fixture civilian NPCs report to, carrying
+	// out a clan hall manager's AI requests through the link.
+	folkSinks func(*npc.Folk) event.Sink
 	// rewardParties resolves a kill's party for the hostiles the suite spawns.
 	rewardParties gamemanager.RewardParties
 	// raidKills credits the raid boss kills of the hostiles the suite
@@ -2359,6 +2363,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Effects:             taskEffects,
 		effectEnv:           effectEnv,
 		castEffects:         gcl.HostileCastEffects(),
+		folkSinks:           gcl.FolkSinks(state, gclConfig.AttackStance),
 		rewardParties:       o.rewardParties(gcl),
 		raidKills:           gcl,
 		lootChannels:        o.lootChannels(gcl),

@@ -591,6 +591,13 @@ func sameObject(a, b Actor) bool {
 	return id != 0 && id == b.ObjectID()
 }
 
+// clanHallManager reports whether a is a clan hall manager, whose buffs
+// land on a cursed-weapon holder.
+func clanHallManager(a Actor) bool {
+	f, ok := a.(*npc.Folk)
+	return ok && f.ClanHallManager()
+}
+
 // cursed reports whether a wields a cursed weapon; only a player can.
 func cursed(a Actor) bool {
 	p, ok := asPlayer(a)

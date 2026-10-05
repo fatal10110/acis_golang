@@ -99,7 +99,7 @@ func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids
 	rewards.Channels = link
 	rewards.CursedWeapons = link
 	npcs, err := manager.NewNpcsWithMaxBuffsAmount(spawns, data.NPCs, move.NewGeo(data.Geo, data.Finder), state, ids, decay, respawnTask, ai, positions, data.Items, ground, rewards, time.Now, log,
-		data.Skills, link.HostileCastEffects(), walker, network.HostileSinks(state, attackStance), network.FolkSinks(state, attackStance), int(gameplay.MaxBuffsAmount), int(gameplay.RandomWalkRate), int(gameplay.MaxGeoPathFailCount), gameplay.RaidMultipliers, gameplay.NpcAI, effects, pool, data.Zones)
+		data.Skills, link.HostileCastEffects(), walker, network.HostileSinks(state, attackStance), link.FolkSinks(state, attackStance), int(gameplay.MaxBuffsAmount), int(gameplay.RandomWalkRate), int(gameplay.MaxGeoPathFailCount), gameplay.RaidMultipliers, gameplay.NpcAI, effects, pool, data.Zones)
 	if err != nil {
 		return nil, err
 	}

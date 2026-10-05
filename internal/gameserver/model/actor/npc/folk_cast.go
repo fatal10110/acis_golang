@@ -2,6 +2,7 @@ package npc
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
@@ -26,6 +27,9 @@ type FolkCastAI interface {
 	// CanDesire runs the gates a cast request passes before it is queued:
 	// the skill's reuse, and the MP and HP its hit takes.
 	CanDesire(target attackable.Combatant, ref modelskill.Ref) bool
+	// SkillMP is the MP ref's data says its cast and its hit take together,
+	// before any consume-rate stat; 0 for an unknown skill.
+	SkillMP(ref modelskill.Ref) int
 }
 
 // FolkAI is the AI task a civilian NPC ticks on from its spawn: once a
@@ -64,6 +68,10 @@ type folkCast struct {
 	// offRoute marks a route walker its AI took off its route to act on a
 	// cast desire, until it is back on it.
 	offRoute bool
+	// buffCheckAt is when a clan hall manager last checked its own support
+	// buff, in Unix milliseconds: read and set on the NPC's queue, reset
+	// from a dialog command.
+	buffCheckAt atomic.Int64
 
 	// currentMu guards current, the cast desire the AI last acted on (nil
 	// when none): a cast break from another actor's queue closes it.
@@ -197,8 +205,13 @@ func (f *Folk) runAI() {
 }
 
 // thinkIdle is what an NPC with nothing left to do does: it stops any walk
-// and cast, and switches to its walk stance.
+// and cast, and switches to its walk stance. A clan hall manager instead
+// checks its own support buff.
 func (f *Folk) thinkIdle() {
+	if f.ClanHallManager() {
+		f.hallManagerIdle()
+		return
+	}
 	f.stopMoving()
 	f.StopCast()
 	f.forceWalkStance()
@@ -231,12 +244,22 @@ func (f *Folk) backOnRoute() {
 	}
 }
 
-// thinkCast acts on a cast desire: f closes in on a target out of the
+// thinkCast acts on a cast desire; a clan hall manager's support magic on
+// a player goes through supportCast.
+func (f *Folk) thinkCast(d *ai.Desire) {
+	if f.castsSupport(d) {
+		f.supportCast(d)
+		return
+	}
+	f.castOn(d)
+}
+
+// castOn acts on a cast desire: f closes in on a target out of the
 // skill's range, or in range but out of its sight, in its run stance, and
 // waits for it where it cannot walk; in reach it stops and faces its target
 // for a cast long enough to show, and when the final gates refuse turns
 // toward its target instead.
-func (f *Folk) thinkCast(d *ai.Desire) {
+func (f *Folk) castOn(d *ai.Desire) {
 	castAI := f.cast.castAI
 	target, ref := d.FinalTarget, d.Skill
 	if !f.Knows(target) && castAI.SkillType(ref) != "SUMMON_FRIEND" && target.ObjectID() != f.ObjectID() {
