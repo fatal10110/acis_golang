@@ -60,7 +60,7 @@ func startClanHalls(lc fx.Lifecycle, halls *clanhall.Halls, link *network.GameCl
 	queue := pool.NewQueue("clanhalls")
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
-			halls.Start(queue, link, network.ClanHallNotifier(link))
+			halls.Start(queue, link, network.ClanHallNotifier(link), network.ClanHallGrounds(link))
 			return nil
 		},
 		OnStop: func(context.Context) error {

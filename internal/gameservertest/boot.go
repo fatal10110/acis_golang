@@ -2244,7 +2244,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	hallQueue := queues.NewQueue("clanhalls")
 	t.Cleanup(hallQueue.Close)
-	halls.Start(hallQueue, gcl, network.ClanHallNotifier(gcl))
+	halls.Start(hallQueue, gcl, network.ClanHallNotifier(gcl), network.ClanHallGrounds(gcl))
 	restoreCastles(t, db, gclConfig.Castles)
 	startSieges(t, gclConfig.Sieges, queues.NewQueue("sieges"), gcl)
 	gclConfig.Clans.DropMissingCrests(crests)
