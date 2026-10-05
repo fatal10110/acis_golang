@@ -92,7 +92,8 @@ func LoadNPCTemplates(dir string, items *item.Table, skills *skill.Table, log ze
 // buildNPCTemplate packs one parsed <npc> element into the StatSet shape
 // npc.NewTemplate consumes: its own attributes and <set> children merged
 // flat, plus the "aiParams", "drops", "privates", "race", "teachTo" and
-// "pet" values built from its other child blocks.
+// "pet" values built from its other child blocks. The <skills> block is
+// resolved into a typed npc.TemplateSkills.
 func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table, log zerolog.Logger) (*npc.Template, error) {
 	set := commons.StatSetFromXMLAttrs(el.Attrs)
 	if err := decodeLiteralAttrs(set, "id", "idTemplate"); err != nil {
@@ -173,29 +174,23 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 	}
 
 	// Race-marker skill ids (secondary, or the dedicated primary race
-	// skill) resolve race from the XML id/level and never enter the skills
-	// or passives lists. Other entries are looked up in the skill table:
-	// unknown id/level pairs are logged and skipped. Each type token
-	// (';'-separated) of "PASSIVE" appends the ref to passives; any other
-	// token records the id/level in the skills map used by pet/servitor
-	// commanded-skill lookups.
+	// skill while no race is set) resolve race from the XML id/level and
+	// grant nothing. Other entries are looked up in the skill table:
+	// unknown id/level pairs are logged and skipped before their types are
+	// read. Each token of the ';'-separated type list files the skill under
+	// that type, or among the passives for PASSIVE.
+	var skills npc.TemplateSkills
 	if len(el.Skills) > 0 {
-		skills := make(map[int]int, len(el.Skills))
-		passives := make([]skill.Ref, 0)
+		skills.ByType = make(map[npc.SkillType]skill.Ref, len(el.Skills))
+		skills.Passives = make([]skill.Ref, 0)
 		for _, s := range el.Skills {
-			skillSet := commons.StatSetFromXMLAttrs(s.Attrs)
-			if err := decodeLiteralAttrs(skillSet, "id", "level"); err != nil {
-				return nil, fmt.Errorf("npc %d: skill: %w", npcID, err)
-			}
-			skillID32, err := skillSet.GetInt32("id")
-			if err != nil {
-				return nil, fmt.Errorf("npc %d: skill: %w", npcID, err)
+			a := newAttrValues(foldAttrs(s.Attrs), fmt.Sprintf("npc %d: skill", npcID))
+			skillID32 := a.int32Literal("id")
+			level := int(a.int32Literal("level"))
+			if err := a.Err(); err != nil {
+				return nil, err
 			}
 			skillID := int(skillID32)
-			level, err := skillSet.GetInt("level")
-			if err != nil {
-				return nil, fmt.Errorf("npc %d: skill: %w", npcID, err)
-			}
 
 			if race := npc.RaceBySecondarySkillID(skillID); race != npc.RaceDummy {
 				set.Set("race", race)
@@ -210,22 +205,30 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 				continue
 			}
 
+			typeList := a.str("type")
+			if err := a.Err(); err != nil {
+				return nil, err
+			}
+
 			id := skill.ID(skillID32)
 			if _, ok := skillsTable.Get(id, level); !ok {
 				log.Warn().Int("npc_id", npcID).Int("skill_id", skillID).Int("level", level).Msg("data/xml: skipping skill with undefined id/level")
 				continue
 			}
 
-			for _, nst := range strings.Split(skillSet.GetStringDefault("type", ""), ";") {
-				if nst == "PASSIVE" {
-					passives = append(passives, skill.Ref{ID: id, Level: level})
+			ref := skill.Ref{ID: id, Level: level}
+			for _, token := range splitSkillTypeList(typeList) {
+				typ, ok := npc.ParseSkillType(token)
+				if !ok {
+					return nil, fmt.Errorf("npc %d: skill %d: unknown type %q", npcID, skillID, token)
+				}
+				if typ == npc.SkillTypePassive {
+					skills.Passives = append(skills.Passives, ref)
 					continue
 				}
-				skills[skillID] = level
+				skills.ByType[typ] = ref
 			}
 		}
-		set.Set("skills", skills)
-		set.Set("passives", passives)
 	}
 
 	if el.TeachTo != nil {
@@ -241,5 +244,19 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 		set.Set("teachTo", classes)
 	}
 
-	return npc.NewTemplate(set)
+	return npc.NewTemplate(set, skills)
+}
+
+// splitSkillTypeList splits a <skill> type list on ';'. A list with no
+// separator is its own single token, even when empty; otherwise trailing
+// empty tokens are dropped, so "BUFF;" is one token and ";;" is none.
+func splitSkillTypeList(list string) []string {
+	tokens := strings.Split(list, ";")
+	if len(tokens) == 1 {
+		return tokens
+	}
+	for len(tokens) > 0 && tokens[len(tokens)-1] == "" {
+		tokens = tokens[:len(tokens)-1]
+	}
+	return tokens
 }
