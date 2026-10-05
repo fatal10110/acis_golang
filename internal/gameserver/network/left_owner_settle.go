@@ -19,19 +19,26 @@ import "sync"
 // runs offline does so under the same lock a selection begins under, so its
 // writes are queued either before the selection waits for the character's
 // saves or not at all.
+//
+// The held settles run in the order they were held, and the character's entry
+// stays until they all have: a settle arriving while they run is held behind
+// them, so the corpse's items still reach the owner ahead of its collar's
+// delete.
 type selectingOwners struct {
 	mu      sync.Mutex
 	pending map[int32]*ownerSelection
 }
 
-// ownerSelection is the selections of one character under way and the
-// settles held for them.
+// ownerSelection is the selections of one character under way, the settles
+// held for them, and whether the last selection to end is running those.
 type ownerSelection struct {
 	selections int
+	draining   bool
 	held       []func()
 }
 
-// begin marks a selection of ownerID under way.
+// begin marks a selection of ownerID under way. A selection beginning while
+// the held settles of an earlier one run holds the rest of them for itself.
 func (s *selectingOwners) begin(ownerID int32) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -48,7 +55,8 @@ func (s *selectingOwners) begin(ownerID int32) {
 
 // end closes a selection of ownerID that begin opened. The last one to end
 // runs the settles held for it, in the order they were held, on the calling
-// goroutine.
+// goroutine, including those held while it runs them. It stops when a new
+// selection of ownerID begins, which then runs the rest as it ends.
 func (s *selectingOwners) end(ownerID int32) {
 	s.mu.Lock()
 	sel, ok := s.pending[ownerID]
@@ -57,28 +65,51 @@ func (s *selectingOwners) end(ownerID int32) {
 		return
 	}
 	sel.selections--
-	if sel.selections > 0 {
+	if sel.selections > 0 || sel.draining {
 		s.mu.Unlock()
 		return
 	}
-	delete(s.pending, ownerID)
-	held := sel.held
-	s.mu.Unlock()
-	for _, settle := range held {
-		settle()
+	sel.draining = true
+	for {
+		if sel.selections > 0 {
+			sel.draining = false
+			s.mu.Unlock()
+			return
+		}
+		if len(sel.held) == 0 {
+			delete(s.pending, ownerID)
+			s.mu.Unlock()
+			return
+		}
+		next := sel.held[0]
+		sel.held = sel.held[1:]
+		s.mu.Unlock()
+		next()
+		s.mu.Lock()
 	}
 }
 
 // settle runs offline for ownerID unless a selection of ownerID is under
-// way, which holds retry until it ends, or lookup, when given, finds ownerID
-// in the world: settle then returns that session and leaves the settle to the
-// caller. It reports whether it returned a session.
-func (s *selectingOwners) settle(ownerID int32, lookup func(int32) (*livePlayer, bool), offline, retry func()) (*livePlayer, bool) {
+// way, or its held settles are running, which holds retry until they have
+// run, or lookup, when given, finds ownerID in the world: settle then returns
+// that session and leaves the settle to the caller. It reports whether it
+// returned a session.
+//
+// draining marks a held settle that end is running again: it goes ahead of
+// the settles held behind it, unless a new selection has begun, which holds it
+// again at the front.
+func (s *selectingOwners) settle(ownerID int32, lookup func(int32) (*livePlayer, bool), offline, retry func(), draining bool) (*livePlayer, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if sel, ok := s.pending[ownerID]; ok {
-		sel.held = append(sel.held, retry)
-		return nil, false
+		switch {
+		case !draining:
+			sel.held = append(sel.held, retry)
+			return nil, false
+		case sel.selections > 0:
+			sel.held = append([]func(){retry}, sel.held...)
+			return nil, false
+		}
 	}
 	if lookup != nil {
 		if owner, ok := lookup(ownerID); ok {
@@ -96,20 +127,28 @@ func (s *selectingOwners) settle(ownerID int32, lookup func(int32) (*livePlayer,
 // or its queue refuses this: the owner is offline then. A selection of the
 // owner under way holds the settle until it ends (selectingOwners).
 func (l *GameClientLink) settleWithLeftOwner(ownerID int32, online func(*livePlayer), offline func()) {
-	retry := func() { l.settleWithLeftOwner(ownerID, online, offline) }
-	owner, ok := l.selections.settle(ownerID, l.livePlayerByID, offline, retry)
+	l.settleLeftOwnerPart(ownerID, online, offline, false)
+}
+
+// settleLeftOwnerPart is settleWithLeftOwner, with draining set when the
+// selection gate runs it again as a held settle.
+func (l *GameClientLink) settleLeftOwnerPart(ownerID int32, online func(*livePlayer), offline func(), draining bool) {
+	retry := func() { l.settleLeftOwnerPart(ownerID, online, offline, true) }
+	owner, ok := l.selections.settle(ownerID, l.livePlayerByID, offline, retry, draining)
 	if !ok {
 		return
 	}
-	leaving := func() { l.selections.settle(ownerID, nil, offline, retry) }
+	// A session found leaving settles offline instead: on its queue, as a
+	// settle arriving now; on a refused post, still in this settle's place.
+	leaving := func(draining bool) { l.selections.settle(ownerID, nil, offline, retry, draining) }
 	posted := postLive(owner, func() {
 		if owner.detached() {
-			leaving()
+			leaving(false)
 			return
 		}
 		online(owner)
 	})
 	if !posted {
-		leaving()
+		leaving(draining)
 	}
 }
