@@ -9,6 +9,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/rs/zerolog"
 )
 
@@ -302,7 +303,9 @@ func (sl *skillLoader) applyTemplates(def *skill.Definition, conds []condElement
 			return err
 		}
 		if clause == nil {
-			continue
+			// A skill-level <cond> with no predicate still attaches: its
+			// zero Root holds no condition, which refuses every cast.
+			clause = &skill.ConditionClause{}
 		}
 		def.Conditions = append(def.Conditions, *clause)
 	}
@@ -455,10 +458,10 @@ const (
 
 // conditionClause resolves a <cond> element into a clause, its predicate
 // resolving table references with resolve. A cond with no predicate child
-// returns (nil, nil): a missing condition element parses to no condition,
-// and attaching no condition is a tolerated no-op rather than a load
-// failure. The cond's own msg is read as written and its msgId may not name
-// a table.
+// returns (nil, nil). A predicate that holds no condition
+// (conditions.IsNull) has no feedback: none of msg, msgId and addName is
+// read. Otherwise the cond's own msg is read as written and its msgId may
+// not name a table.
 func conditionClause(attrs []xml.Attr, children []condNode, resolve tableResolver, msgMode condMsgMode) (*skill.ConditionClause, error) {
 	if len(children) == 0 {
 		return nil, nil
@@ -467,8 +470,11 @@ func conditionClause(attrs []xml.Attr, children []condNode, resolve tableResolve
 	if err != nil {
 		return nil, fmt.Errorf("cond: %w", err)
 	}
-	a := newAttrValues(foldAttrs(attrs), "cond")
 	clause := skill.ConditionClause{Root: root}
+	if conditions.IsNull(root) {
+		return &clause, nil
+	}
+	a := newAttrValues(foldAttrs(attrs), "cond")
 	if msgMode != condMsgModeEnchant && !a.has("msg") && a.has("msgId") {
 		if err := noTableRef("msgId", a.str("msgId")); err != nil {
 			return nil, fmt.Errorf("cond: %w", err)

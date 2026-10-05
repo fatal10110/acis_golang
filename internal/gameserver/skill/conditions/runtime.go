@@ -23,7 +23,10 @@ func ActorOf(v any) Actor {
 // caster/target pair, with the feedback that clause carries. target is
 // whatever the caster has selected (see ActorOf); a nil or non-creature
 // target fails every target-side test. A clause that does not compile, or a
-// nil caster, rejects rather than letting the cast through.
+// nil caster, rejects rather than letting the cast through. A clause whose
+// test aborts (its root holds no condition, or the test reached a <not>
+// around one, see Evaluate) rejects with no feedback: only its Root is
+// reported.
 func EvaluateSkill(def modelskill.Definition, caster Source, target any) (modelskill.ConditionClause, bool) {
 	if len(def.Conditions) == 0 {
 		return modelskill.ConditionClause{}, true
@@ -32,7 +35,14 @@ func EvaluateSkill(def modelskill.Definition, caster Source, target any) (models
 	effected := ActorOf(target)
 	for _, clause := range def.Conditions {
 		cond, err := Compile(clause.Root)
-		if err != nil || effector == nil || !cond.Test(effector, effected, nil) {
+		if err != nil || effector == nil {
+			return clause, false
+		}
+		held, aborted := Evaluate(cond, effector, effected, nil)
+		if aborted {
+			return modelskill.ConditionClause{Root: clause.Root}, false
+		}
+		if !held {
 			return clause, false
 		}
 	}
