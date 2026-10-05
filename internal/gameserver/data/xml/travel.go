@@ -3,7 +3,6 @@ package xml
 import (
 	"fmt"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 )
@@ -44,7 +43,7 @@ func LoadTeleports(path string) (travel.TeleportTable, error) {
 		npcID := int(*list.NPCID)
 		teleports := make([]travel.Teleport, 0, len(list.Locs))
 		for _, loc := range list.Locs {
-			t, err := travel.NewTeleport(commons.StatSetFromXMLAttrs(loc.Attrs))
+			t, err := buildTeleport(newAttrValues(foldAttrs(loc.Attrs), ""))
 			if err != nil {
 				return nil, fmt.Errorf("xml: %s: npc %d: %w", path, npcID, err)
 			}
@@ -53,6 +52,29 @@ func LoadTeleports(path string) (travel.TeleportTable, error) {
 		table[npcID] = teleports
 	}
 	return table, nil
+}
+
+// buildTeleport builds one gatekeeper <loc>. desc, priceId, priceCount, x,
+// y and z are required; type defaults to STANDARD and castleId to 0.
+func buildTeleport(a *attrValues) (travel.Teleport, error) {
+	a.prefix = "travel: teleport"
+	desc := a.str("desc")
+	if err := a.Err(); err != nil {
+		return travel.Teleport{}, err
+	}
+	a.prefix = fmt.Sprintf("travel: teleport %q", desc)
+	t := travel.Teleport{
+		Location:    location.Location{X: a.int("x"), Y: a.int("y"), Z: a.int("z")},
+		Description: desc,
+		Kind:        attrEnumDefault(a, "type", travel.ParseKind, travel.KindStandard),
+		PriceID:     a.int("priceId"),
+		PriceCount:  a.int("priceCount"),
+		CastleID:    a.intDefault("castleId", 0),
+	}
+	if err := a.Err(); err != nil {
+		return travel.Teleport{}, err
+	}
+	return t, nil
 }
 
 // LoadInstantTeleports parses instant teleport destinations keyed by npc id.

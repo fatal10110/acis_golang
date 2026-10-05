@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -65,28 +64,6 @@ func (o *Object) Kind() actor.Kind { return actor.KindStatic }
 // SetBusy updates whether this static object is occupied and reports whether it changed.
 func (o *Object) SetBusy(busy bool) bool {
 	return o.busy.CompareAndSwap(!busy, busy)
-}
-
-// NewTemplate builds a static object template from XML attributes.
-func NewTemplate(set *commons.StatSet) (*Template, error) {
-	idf := commons.NewFields(set, "static object")
-	id := idf.Int("id")
-	if err := idf.Err(); err != nil {
-		return nil, err
-	}
-	f := commons.NewFields(set, fmt.Sprintf("static object %d", id))
-	t := &Template{
-		ID:       id,
-		Location: location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")},
-		Type:     f.Int("type"),
-		Texture:  f.String("texture"),
-		MapX:     f.Int("mapX"),
-		MapY:     f.Int("mapY"),
-	}
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
-	return t, nil
 }
 
 // Table stores static object templates keyed by static object id.

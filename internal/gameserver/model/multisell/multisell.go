@@ -3,7 +3,6 @@ package multisell
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -21,31 +20,21 @@ type Ingredient struct {
 }
 
 // NewIngredient builds an Ingredient from one <ingredient> or <production>
-// element's attributes. id and count are required. If items is non-nil and
-// contains ItemID, the matching template is attached for stackability and
-// weight queries; otherwise those queries fall back to the same defaults the
-// source behavior uses for unknown items.
-func NewIngredient(set *commons.StatSet, items *item.Table) (Ingredient, error) {
-	idf := commons.NewFields(set, "multisell ingredient")
-	itemID := idf.Int32("id")
-	if err := idf.Err(); err != nil {
-		return Ingredient{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("multisell ingredient %d", itemID))
+// element's decoded attributes. If items is non-nil and contains itemID, the
+// matching template is attached for stackability and weight queries;
+// otherwise those queries fall back to the same defaults the source behavior
+// uses for unknown items.
+func NewIngredient(itemID int32, count int, taxIngredient, maintainIngredient bool, items *item.Table) Ingredient {
 	in := Ingredient{
 		ItemID:             itemID,
-		Count:              f.Int("count"),
-		TaxIngredient:      f.BoolDefault("isTaxIngredient", false),
-		MaintainIngredient: f.BoolDefault("maintainIngredient", false),
-	}
-	if err := f.Err(); err != nil {
-		return Ingredient{}, err
+		Count:              count,
+		TaxIngredient:      taxIngredient,
+		MaintainIngredient: maintainIngredient,
 	}
 	if items != nil && itemID > 0 {
 		in.template, _ = items.Get(itemID)
 	}
-	return in, nil
+	return in
 }
 
 // Template returns the resolved item template, if one was attached at load

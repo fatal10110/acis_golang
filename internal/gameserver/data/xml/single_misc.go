@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/observer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
@@ -322,7 +323,7 @@ func LoadAdminData(dir string) (*admin.Data, error) {
 	if err := readXML(accessPath, &accessDoc); err != nil {
 		return nil, fmt.Errorf("admin access levels: %w", err)
 	}
-	levels, err := buildAll(accessPath, accessDoc.Entries, admin.NewAccessLevel)
+	levels, err := buildAll(accessPath, accessDoc.Entries, buildAccessLevel)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +332,7 @@ func LoadAdminData(dir string) (*admin.Data, error) {
 	if err := readXML(commandPath, &commandDoc); err != nil {
 		return nil, fmt.Errorf("admin commands: %w", err)
 	}
-	commands, err := buildAll(commandPath, commandDoc.Entries, admin.NewCommand)
+	commands, err := buildAll(commandPath, commandDoc.Entries, buildAdminCommand)
 	if err != nil {
 		return nil, err
 	}
@@ -341,6 +342,60 @@ func LoadAdminData(dir string) (*admin.Data, error) {
 		return nil, fmt.Errorf("xml: admin data in %s: %w", dir, err)
 	}
 	return data, nil
+}
+
+// buildAccessLevel builds one <access> element. level and name are
+// required; every other attribute has its default.
+func buildAccessLevel(a *attrValues) (admin.AccessLevel, error) {
+	a.prefix = "admin: access level"
+	level := a.int("level")
+	if err := a.Err(); err != nil {
+		return admin.AccessLevel{}, err
+	}
+	a.prefix = fmt.Sprintf("admin: access level %d", level)
+	l := admin.AccessLevel{
+		Level:            level,
+		Name:             a.str("name"),
+		NameColor:        a.strDefault("nameColor", "FFFFFF"),
+		TitleColor:       a.strDefault("titleColor", "FFFF77"),
+		ChildLevel:       a.intDefault("childLevel", 0),
+		IsGM:             a.boolDefault("isGM", false),
+		AllowFixedRes:    a.boolDefault("allowFixedRes", false),
+		AllowTransaction: a.boolDefault("allowTransaction", true),
+		AllowAltG:        a.boolDefault("allowAltg", false),
+		GiveDamage:       a.boolDefault("giveDamage", true),
+	}
+	// A color is the hex digits of an int32 literal with its "0x" left off.
+	for _, c := range [...]struct{ key, value string }{{"nameColor", l.NameColor}, {"titleColor", l.TitleColor}} {
+		if _, err := commons.DecodeInt32("0x" + c.value); err != nil {
+			a.fail(fmt.Errorf("%s: %w", c.key, err))
+		}
+	}
+	if err := a.Err(); err != nil {
+		return admin.AccessLevel{}, err
+	}
+	return l, nil
+}
+
+// buildAdminCommand builds one <aCar> element. name and accessLevel are
+// required.
+func buildAdminCommand(a *attrValues) (admin.Command, error) {
+	a.prefix = "admin: command"
+	name := a.str("name")
+	if err := a.Err(); err != nil {
+		return admin.Command{}, err
+	}
+	a.prefix = fmt.Sprintf("admin: command %q", name)
+	c := admin.Command{
+		Name:        name,
+		AccessLevel: a.int("accessLevel"),
+		Params:      a.strDefault("params", ""),
+		Description: a.strDefault("desc", ""),
+	}
+	if err := a.Err(); err != nil {
+		return admin.Command{}, err
+	}
+	return c, nil
 }
 
 type announcementFile struct {
@@ -355,20 +410,25 @@ func LoadAnnouncements(path string) ([]admin.Announcement, error) {
 
 	announcements := make([]admin.Announcement, 0, len(doc.Entries))
 	for _, el := range doc.Entries {
-		set := commons.StatSetFromXMLAttrs(el.Attrs)
-		message, err := set.GetString("message")
-		if err != nil || message == "" {
+		a := newAttrValues(foldAttrs(el.Attrs), "admin: announcement")
+		message := a.strDefault("message", "")
+		if message == "" {
 			continue
 		}
-		// Only an automatic announcement reads its schedule, so only its
-		// values are parsed.
-		if set.GetBoolDefault("auto", false) {
-			if err := decodeLiteralAttrs(set, "initial_delay", "delay", "limit"); err != nil {
-				return nil, fmt.Errorf("xml: %s: announcement %q: %w", path, message, err)
-			}
+		announcement := admin.Announcement{
+			Message:  message,
+			Critical: a.boolDefault("critical", false),
+			Auto:     a.boolDefault("auto", false),
 		}
-		announcement, err := admin.NewAnnouncement(set)
-		if err != nil {
+		// Only an automatic announcement reads its schedule, so only its
+		// values are parsed, and all three are then required.
+		if announcement.Auto {
+			a.prefix = fmt.Sprintf("admin: announcement %q", message)
+			announcement.InitialDelay = int(a.int32Literal("initial_delay"))
+			announcement.Delay = int(a.int32Literal("delay"))
+			announcement.Limit = max(int(a.int32Literal("limit")), 0)
+		}
+		if err := a.Err(); err != nil {
 			return nil, fmt.Errorf("xml: %s: %w", path, err)
 		}
 		announcements = append(announcements, announcement)
@@ -400,7 +460,7 @@ func LoadObserverGroups(path string) (*observer.Table, error) {
 		id := int(*groupEl.ID)
 		entries := groups[id]
 		for _, el := range groupEl.Entries {
-			entry, err := observer.NewLocation(commons.StatSetFromXMLAttrs(el.Attrs))
+			entry, err := buildObserverLocation(newAttrValues(foldAttrs(el.Attrs), ""))
 			if err != nil {
 				return nil, fmt.Errorf("xml: %s: group %d: %w", path, id, err)
 			}
@@ -411,17 +471,57 @@ func LoadObserverGroups(path string) (*observer.Table, error) {
 
 	spawns := make([]observer.Spawn, 0, len(doc.Spawns))
 	for _, el := range doc.Spawns {
-		set := commons.StatSetFromXMLAttrs(el.Attrs)
-		if err := decodeLiteralAttrs(set, "id", "x", "y", "z"); err != nil {
-			return nil, fmt.Errorf("xml: %s: observer spawn: %w", path, err)
-		}
-		entry, err := observer.NewSpawn(set)
+		entry, err := buildObserverSpawn(newAttrValues(foldAttrs(el.Attrs), ""))
 		if err != nil {
 			return nil, fmt.Errorf("xml: %s: %w", path, err)
 		}
 		spawns = append(spawns, entry)
 	}
 	return observer.NewTable(groups, spawns), nil
+}
+
+// buildObserverLocation builds one group <entry>. Every attribute is a
+// required decimal int.
+func buildObserverLocation(a *attrValues) (observer.Location, error) {
+	a.prefix = "observer location"
+	id := a.int("locId")
+	if err := a.Err(); err != nil {
+		return observer.Location{}, err
+	}
+	a.prefix = fmt.Sprintf("observer location %d", id)
+	entry := observer.Location{
+		ID:       id,
+		Location: location.Location{X: a.int("x"), Y: a.int("y"), Z: a.int("z")},
+		Yaw:      a.int("yaw"),
+		Pitch:    a.int("pitch"),
+		Cost:     a.int("cost"),
+		CastleID: a.int("castle"),
+	}
+	if err := a.Err(); err != nil {
+		return observer.Location{}, err
+	}
+	return entry, nil
+}
+
+// buildObserverSpawn builds one <spawn>. id, x, y and z are required int32
+// literals; groups is a required ";"-separated list of group ids.
+func buildObserverSpawn(a *attrValues) (observer.Spawn, error) {
+	a.prefix = "observer spawn"
+	npcID := int(a.int32Literal("id"))
+	if err := a.Err(); err != nil {
+		return observer.Spawn{}, err
+	}
+	a.prefix = fmt.Sprintf("observer spawn %d", npcID)
+	loc := location.Location{X: int(a.int32Literal("x")), Y: int(a.int32Literal("y")), Z: int(a.int32Literal("z"))}
+	groupText := a.str("groups")
+	if err := a.Err(); err != nil {
+		return observer.Spawn{}, err
+	}
+	groups, err := observer.ParseGroups(groupText)
+	if err != nil {
+		return observer.Spawn{}, fmt.Errorf("observer spawn %d: %w", npcID, err)
+	}
+	return observer.Spawn{NPCID: npcID, Location: loc, Groups: groups}, nil
 }
 
 type staticObjectFile struct {
@@ -434,11 +534,33 @@ func LoadStaticObjects(path string) (*staticobject.Table, error) {
 		return nil, fmt.Errorf("static objects: %w", err)
 	}
 
-	templates, err := buildAll(path, doc.Objects, staticobject.NewTemplate)
+	templates, err := buildAll(path, doc.Objects, buildStaticObject)
 	if err != nil {
 		return nil, err
 	}
 	return staticobject.NewTable(templates)
+}
+
+// buildStaticObject builds one <object>. Every attribute is required.
+func buildStaticObject(a *attrValues) (*staticobject.Template, error) {
+	a.prefix = "static object"
+	id := a.int("id")
+	if err := a.Err(); err != nil {
+		return nil, err
+	}
+	a.prefix = fmt.Sprintf("static object %d", id)
+	t := &staticobject.Template{
+		ID:       id,
+		Location: location.Location{X: a.int("x"), Y: a.int("y"), Z: a.int("z")},
+		Type:     a.int("type"),
+		Texture:  a.str("texture"),
+		MapX:     a.int("mapX"),
+		MapY:     a.int("mapY"),
+	}
+	if err := a.Err(); err != nil {
+		return nil, err
+	}
+	return t, nil
 }
 
 // cursedWeaponElement is one <item> element. Every attribute is required.

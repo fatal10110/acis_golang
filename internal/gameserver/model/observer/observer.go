@@ -19,28 +19,6 @@ type Location struct {
 	CastleID int
 }
 
-// NewLocation builds one observer location from XML attributes.
-func NewLocation(set *commons.StatSet) (Location, error) {
-	idf := commons.NewFields(set, "observer location")
-	id := idf.Int("locId")
-	if err := idf.Err(); err != nil {
-		return Location{}, err
-	}
-	f := commons.NewFields(set, fmt.Sprintf("observer location %d", id))
-	entry := Location{
-		ID:       id,
-		Location: location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")},
-		Yaw:      f.Int("yaw"),
-		Pitch:    f.Int("pitch"),
-		Cost:     f.Int("cost"),
-		CastleID: f.Int("castle"),
-	}
-	if err := f.Err(); err != nil {
-		return Location{}, err
-	}
-	return entry, nil
-}
-
 // Spawn is one observer NPC spawn entry with its allowed group ids.
 type Spawn struct {
 	NPCID    int
@@ -48,33 +26,18 @@ type Spawn struct {
 	Groups   []int
 }
 
-// NewSpawn builds one observer spawn from XML attributes.
-func NewSpawn(set *commons.StatSet) (Spawn, error) {
-	npcID, err := set.GetInt("id")
-	if err != nil {
-		return Spawn{}, fmt.Errorf("observer spawn: %w", err)
-	}
-	wrap := func(err error) error { return fmt.Errorf("observer spawn %d: %w", npcID, err) }
-
-	f := commons.NewFields(set, fmt.Sprintf("observer spawn %d", npcID))
-	loc := location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")}
-	if err := f.Err(); err != nil {
-		return Spawn{}, err
-	}
-	groupText, err := set.GetString("groups")
-	if err != nil {
-		return Spawn{}, wrap(err)
-	}
-	parts := strings.Split(groupText, ";")
+// ParseGroups parses a spawn's ";"-separated group id list.
+func ParseGroups(raw string) ([]int, error) {
+	parts := strings.Split(raw, ";")
 	groups := make([]int, 0, len(parts))
 	for _, part := range parts {
 		groupID, err := commons.Atoi(part)
 		if err != nil {
-			return Spawn{}, wrap(fmt.Errorf("groups %q: %w", groupText, err))
+			return nil, fmt.Errorf("groups %q: %w", raw, err)
 		}
 		groups = append(groups, groupID)
 	}
-	return Spawn{NPCID: npcID, Location: loc, Groups: groups}, nil
+	return groups, nil
 }
 
 // Table stores observer groups keyed by group id plus observer spawns.

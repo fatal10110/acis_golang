@@ -3,7 +3,6 @@ package xml
 import (
 	"fmt"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/manor"
 )
@@ -33,9 +32,7 @@ func LoadManors(path string) (*manor.Table, error) {
 		id := int(*el.ID)
 		seeds := make([]manor.Seed, 0, len(el.Crops))
 		for _, crop := range el.Crops {
-			set := commons.StatSetFromXMLAttrs(crop.Attrs)
-			set.Set("castleId", id)
-			seed, err := manor.NewSeed(set)
+			seed, err := buildSeed(newAttrValues(foldAttrs(crop.Attrs), ""), id)
 			if err != nil {
 				return nil, fmt.Errorf("xml: %s: manor %d: %w", path, id, err)
 			}
@@ -44,6 +41,33 @@ func LoadManors(path string) (*manor.Table, error) {
 		manors = append(manors, manor.Manor{ID: id, Name: el.Name, Seeds: seeds})
 	}
 	return manor.NewTable(manors), nil
+}
+
+// buildSeed builds one <crop> of the manor whose castle id is castleID.
+// Every attribute but isAlternative is a required decimal int.
+func buildSeed(a *attrValues, castleID int) (manor.Seed, error) {
+	a.prefix = "manor: seed"
+	cropID := a.int("id")
+	if err := a.Err(); err != nil {
+		return manor.Seed{}, err
+	}
+	a.prefix = fmt.Sprintf("manor: seed crop %d", cropID)
+	seed := manor.Seed{
+		CropID:      cropID,
+		SeedID:      a.int("seedId"),
+		MatureID:    a.int("matureId"),
+		Level:       a.int("level"),
+		Reward1:     a.int("reward1"),
+		Reward2:     a.int("reward2"),
+		CastleID:    castleID,
+		Alternative: a.boolDefault("isAlternative", false),
+		SeedsLimit:  a.int("seedsLimit"),
+		CropsLimit:  a.int("cropsLimit"),
+	}
+	if err := a.Err(); err != nil {
+		return manor.Seed{}, err
+	}
+	return seed, nil
 }
 
 type manorAreaFile struct {

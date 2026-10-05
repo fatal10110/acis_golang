@@ -27,55 +27,12 @@ type Recipe struct {
 	Dwarven     bool
 }
 
-// New builds a Recipe from one folded <recipe> element.
-func New(set *commons.StatSet) (Recipe, error) {
-	idf := commons.NewFields(set, "recipe")
-	id := idf.Int("id")
-	if err := idf.Err(); err != nil {
-		return Recipe{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("recipe %d", id))
-	rawMaterials := f.String("material")
-	materials, err := parseIngredients(rawMaterials)
-	if err != nil {
-		f.Fail(fmt.Errorf("material %q: %w", rawMaterials, err))
-	}
-	rawProduct := f.String("product")
-	product, err := parseIngredient(rawProduct)
-	if err != nil {
-		f.Fail(fmt.Errorf("product %q: %w", rawProduct, err))
-	}
-
-	itemID := f.Int32("itemId")
-	level := f.Int("level")
-	mpCost := f.Int("mpConsume")
-	successRate := f.Int("successRate")
-	dwarven := f.Bool("isDwarven")
-	alias := f.String("alias")
-
-	recipe := Recipe{
-		Materials:   materials,
-		Product:     product,
-		ID:          id,
-		Level:       level,
-		ItemID:      itemID,
-		Alias:       alias,
-		SuccessRate: successRate,
-		MPCost:      mpCost,
-		Dwarven:     dwarven,
-	}
-	if err := f.Err(); err != nil {
-		return Recipe{}, err
-	}
-	return recipe, nil
-}
-
-func parseIngredients(raw string) ([]Ingredient, error) {
+// ParseIngredients parses a ";"-separated list of item-count pairs.
+func ParseIngredients(raw string) ([]Ingredient, error) {
 	parts := strings.Split(raw, ";")
 	out := make([]Ingredient, len(parts))
 	for i, part := range parts {
-		ingredient, err := parseIngredient(part)
+		ingredient, err := ParseIngredient(part)
 		if err != nil {
 			return nil, err
 		}
@@ -84,7 +41,8 @@ func parseIngredients(raw string) ([]Ingredient, error) {
 	return out, nil
 }
 
-func parseIngredient(raw string) (Ingredient, error) {
+// ParseIngredient parses one "item-count" pair.
+func ParseIngredient(raw string) (Ingredient, error) {
 	parts := strings.Split(raw, "-")
 	if len(parts) != 2 {
 		return Ingredient{}, fmt.Errorf("want item-count")
