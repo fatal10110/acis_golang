@@ -99,7 +99,8 @@ func onQueue(q *sim.Queue, fn func()) {
 }
 
 // RespawnAll puts spawns in place of the spawn list and spawns every
-// on-start maker of it, as SpawnManager.reload does after //respawnall's
+// on-start maker of it and the makers of the listed spawn events, as
+// SpawnManager.reload does after //respawnall's
 // despawn: the database-tracked spawns come back as spawns' rows say. The
 // slots of an earlier spawn list are not touched; //respawnall runs
 // DespawnAll first, which drops them all.

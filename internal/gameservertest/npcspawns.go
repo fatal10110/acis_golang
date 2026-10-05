@@ -98,7 +98,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	npcs, err := gamemanager.NewNpcsWithMaxBuffsAmount(gamemanager.NewSpawns(deps.makers, nil), templates, deps.geo, deps.state, deps.ids,
 		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Rates: deps.dropRates}, time.Now, deps.log,
 		nil, actorcast.EffectHandlers{}, walker, network.HostileSinks(deps.state, deps.stance), link.FolkSinks(deps.state, deps.stance),
-		20, 0, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), deps.effects, deps.queues)
+		20, 0, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues)
 	if err != nil {
 		t.Fatalf("new npc spawns: %v", err)
 	}
