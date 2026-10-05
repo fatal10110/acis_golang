@@ -1,9 +1,9 @@
 package network
 
 import (
-	"strconv"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -78,7 +78,7 @@ func boardSelection(command string) (string, int32, bool) {
 	if tokens[1] != "select" && tokens[1] != "deselect" {
 		return tokens[1], 0, true
 	}
-	id, err := strconv.ParseInt(tokens[2], 10, 32)
+	id, err := commons.ParseInt(tokens[2], 32)
 	if err != nil {
 		return "", 0, false
 	}

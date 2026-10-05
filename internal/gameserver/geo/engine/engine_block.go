@@ -115,3 +115,20 @@ func (b engineBlock) Cells(cellX, cellY int) []block.Cell {
 	}
 	return b.static().Cells(cellX, cellY)
 }
+
+// AppendCells appends the cell's layers, in Cells order, to dst without
+// allocating when dst has room for block.MaxLayers. A dynamic block's active
+// override is copied under its one read lock; an untouched cell of a dynamic
+// block reads straight from the static block it wraps.
+func (b engineBlock) AppendCells(dst []block.Cell, cellX, cellY int) []block.Cell {
+	if b.dyn == nil {
+		return b.static().AppendCells(dst, cellX, cellY)
+	}
+	if cells, ok := b.dyn.AppendActiveCells(dst, cellX, cellY); ok {
+		return cells
+	}
+	if base, ok := b.dyn.Base().(regionBlock); ok {
+		return base.AppendCells(dst, cellX, cellY)
+	}
+	return append(dst, b.dyn.Cells(cellX, cellY)...)
+}
