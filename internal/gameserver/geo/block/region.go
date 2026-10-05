@@ -320,21 +320,28 @@ func (r *Region) NSWE(blockX, blockY, layer int) NSWE {
 
 // Cells returns a copy of a cell's stored layers.
 func (r *Region) Cells(blockX, blockY, cellX, cellY int) []Cell {
+	return r.AppendCells(make([]Cell, 0, r.Layers(blockX, blockY, cellX, cellY)), blockX, blockY, cellX, cellY)
+}
+
+// AppendCells appends a cell's stored layers, in Cells order, to dst and
+// returns the extended slice. With a dst whose capacity covers MaxLayers it
+// never allocates, so hot paths can walk a cell's layers through a
+// caller-owned buffer instead of Cells' fresh slice.
+func (r *Region) AppendCells(dst []Cell, blockX, blockY, cellX, cellY int) []Cell {
 	entry := r.entry(blockX, blockY)
 	switch regionKind(entry) {
 	case regionFlat:
-		return []Cell{{Height: int16(uint16(regionValue(entry))), NSWE: AllDirections}}
+		return append(dst, Cell{Height: int16(uint16(regionValue(entry))), NSWE: AllDirections})
 	case regionComplex:
-		return []Cell{DecodeCell(r.complexCode(entry, cellX, cellY))}
+		return append(dst, DecodeCell(r.complexCode(entry, cellX, cellY)))
 	case regionMultilayer:
 		count := r.Layers(blockX, blockY, cellX, cellY)
-		out := make([]Cell, count)
-		for i := range out {
-			out[i] = DecodeCell(r.multilayerCode(entry, cellX, cellY, i))
+		for i := 0; i < count; i++ {
+			dst = append(dst, DecodeCell(r.multilayerCode(entry, cellX, cellY, i)))
 		}
-		return out
+		return dst
 	default:
-		return []Cell{{Height: 0, NSWE: AllDirections}}
+		return append(dst, Cell{Height: 0, NSWE: AllDirections})
 	}
 }
 
