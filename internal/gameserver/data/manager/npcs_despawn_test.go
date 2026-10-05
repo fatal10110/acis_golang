@@ -97,6 +97,17 @@ func (f *despawnFixture) hostile(t *testing.T, npcID int) *npc.Hostile {
 	return nil
 }
 
+// hostiles returns every hostile of the template in the world.
+func (f *despawnFixture) hostiles(npcID int) []*npc.Hostile {
+	var out []*npc.Hostile
+	for _, obj := range f.npcObjects() {
+		if h, ok := obj.(*npc.Hostile); ok && h.Instance.Template.ID == npcID {
+			out = append(out, h)
+		}
+	}
+	return out
+}
+
 // DespawnAll is SpawnManager.despawn plus World.deleteVisibleNpcSpawns:
 // every NPC leaves, the maker's, the standalone and the one no spawn
 // placed; a respawn already armed is cancelled, a corpse decaying meanwhile
@@ -104,6 +115,12 @@ func (f *despawnFixture) hostile(t *testing.T, npcID int) *npc.Hostile {
 // it.
 func TestDespawnAllRemovesEveryNpcForGood(t *testing.T) {
 	f := newDespawnFixture(t, nil)
+	// The maker's wolves, taken before the standalone wolf of the same
+	// template joins them: world iteration order cannot tell them apart.
+	makerWolves := f.hostiles(1)
+	if len(makerWolves) != 2 {
+		t.Fatalf("maker wolves = %d, want 2", len(makerWolves))
+	}
 	wolf, _ := f.templates.Get(1)
 	if err := f.npcs.SpawnFixed(wolf, 70, 70, 0, 0); err != nil {
 		t.Fatalf("SpawnFixed() error: %v", err)
@@ -124,7 +141,7 @@ func TestDespawnAllRemovesEveryNpcForGood(t *testing.T) {
 	}
 
 	// One wolf is removed: its slot's respawn is armed.
-	first := f.hostile(t, 1)
+	first := makerWolves[0]
 	first.DeleteMe()
 	f.queues.Run()
 	if !f.respawn.Tracked("wolves#0#0") && !f.respawn.Tracked("wolves#0#1") {
@@ -132,17 +149,18 @@ func TestDespawnAllRemovesEveryNpcForGood(t *testing.T) {
 	}
 	// The other wolf's corpse decays while the despawn runs: its respawn
 	// hook resolved first, the arming lands after.
-	second := f.hostile(t, 1)
+	second := makerWolves[1]
 	arm := f.npcs.RespawnHook(second.ObjectID())
+	if arm == nil {
+		t.Fatal("maker wolf resolved no respawn hook")
+	}
 	boss := f.hostile(t, 2)
 	f.decay.Add(boss, time.Minute)
 
 	if got := f.npcs.DespawnAll(); got != 4 {
 		t.Fatalf("DespawnAll() = %d, want 4 npcs deleted", got)
 	}
-	if arm != nil {
-		arm()
-	}
+	arm()
 	f.queues.Run()
 
 	if got := f.npcObjects(); len(got) != 0 {
