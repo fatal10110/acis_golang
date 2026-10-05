@@ -1,6 +1,9 @@
 # Running Loginserver And Gameserver
 
-Run these commands from the repository root.
+Run these commands from the repository root. To run everything in containers instead, see
+[ops/docker.md](ops/docker.md). To move an existing aCis Java installation, see
+[ops/migrating-from-java.md](ops/migrating-from-java.md). For backups, see
+[ops/backup-restore.md](ops/backup-restore.md).
 
 ## Prerequisites
 
@@ -45,10 +48,10 @@ go run ./cmd/loginserver \
   -logging ../aCis_gameserver/config/logging.properties \
   -server-names ../aCis_datapack/data/serverNames.xml \
   -banned-ips ../aCis_gameserver/config/banned_ips.properties \
-  -log-root .
+  -log-root log/login
 ```
 
-Add `-debug-addr 127.0.0.1:6060` to serve the debug endpoints described under [Debug Endpoints](#debug-endpoints).
+Add `-debug-addr 127.0.0.1:6061` to serve the debug endpoints described under [Debug Endpoints](#debug-endpoints).
 
 The loginserver binds the client listener from `LoginserverHostname/LoginserverPort` and the gameserver-link listener from `LoginHostname/LoginPort`.
 
@@ -63,10 +66,12 @@ go run ./cmd/gameserver \
   -hexid ../aCis_gameserver/config/hexid.txt \
   -geo-config ../aCis_gameserver/config/geoengine.properties \
   -data-root ../aCis_datapack \
-  -log-root .
+  -log-root log/gameserver
 ```
 
 Add `-debug-addr 127.0.0.1:6060` to serve the debug endpoints described under [Debug Endpoints](#debug-endpoints).
+
+Give each process its own `-log-root` and its own `-debug-addr` port. Both binaries open the same relative log paths from `logging.properties`. At boot each one truncates the console and error files, and it appends to the chat, gmaudit and item files and rotates them on its own size counter. A shared root therefore makes the two processes wipe and interleave each other's files, and a second listener on a port already in use fails boot. Log files, their JSON format, and every logging and metrics failure mode are described in [Logs, Metrics, And Failure Modes](observability.md).
 
 The gameserver loads the minimal XML tables, loads geodata from `geoengine.properties`, links to the loginserver, and binds the game-client listener from `GameserverHostname/GameserverPort`. It loads exactly the regions listed as `X_Y` keys in `geoengine.properties`; unlisted regions use the null-region fallback even when their file exists, and a listed region whose file is missing, unreadable, or malformed fails boot with an error naming each failed file, `GeoDataPath`, and `GeoDataType`.
 
