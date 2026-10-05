@@ -185,8 +185,9 @@ func bootPickupQueuedMidCast(t *testing.T, back int) (*gameservertest.Server, in
 // runs the queued PICK_UP (PlayableAI.java:43-63), whose thinkPickUp answers
 // ActionFailed and, under denyAiAction, idles without collecting or walking
 // (PlayableAI.java:198-205). The refused tryToIdle and PlayerCast.stop answer
-// one each (PlayableAI.java:354-360, PlayerCast.java:381-387) before
-// TeleportToLocation. The item stays on the ground in reach or not.
+// one each (PlayableAI.java:354-360, PlayerCast.java:381-387), and the
+// abort's target reset one more (Player.setTarget(null),
+// Player.java:2497-2499), before TeleportToLocation. The item stays on the ground in reach or not.
 func TestTeleportMidCastRefusesQueuedPickup(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -205,7 +206,7 @@ func TestTeleportMidCastRefusesQueuedPickup(t *testing.T) {
 			onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.TeleportTo(x, y, z, 0) })
 			const af, msc, ttl byte = serverpackets.OpcodeActionFailed, serverpackets.OpcodeMagicSkillCanceled, serverpackets.OpcodeTeleportToLocation
 			jump := readUntilOpcode(t, c, ttl)
-			if got, want := opcodesOf(jump), []byte{af, af, msc, af, af, af, ttl}; string(got) != string(want) {
+			if got, want := opcodesOf(jump), []byte{af, af, msc, af, af, af, af, ttl}; string(got) != string(want) {
 				t.Fatalf("teleport mid-cast with a pickup queued sent opcodes %x up to TeleportToLocation, want %x", got, want)
 			}
 			c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))

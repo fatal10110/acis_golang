@@ -383,7 +383,9 @@ func (p *livePlayer) Stop() {
 // with two ActionFailed, the refused idle's and the stop's own, and a cast
 // in flight is stopped with the intention queued behind it still in place:
 // the stopped cast's end thinks it once, refused, before the teleport drops
-// it with everything else.
+// it with everything else. Last, a teleport's abort resets the selection
+// (Creature.abortAll(true)): ActionFailed always, then TargetUnselected to
+// p and its observers when something, p itself included, was selected.
 func (p *livePlayer) abortAll(teleport bool) {
 	queuedForCast := teleport && p.cast != nil && p.cast.CastingNow()
 	if queuedForCast {
@@ -408,11 +410,26 @@ func (p *livePlayer) abortAll(teleport bool) {
 	if queuedForCast {
 		p.goIdle()
 	}
+	if teleport {
+		p.resetTarget()
+	}
 	// Free the chair for others but keep seated identity so observers still
 	// receive the stand-then-delete animation when this player despawns.
 	p.freeChair()
 	// Cubics are left alone: across a teleport they keep acting and ageing.
 	// Detach stops them (stopCubics); death removes them (removeAllCubics).
+}
+
+// resetTarget clears p's selection the way Player.setTarget(null) answers
+// it, with no early return for an empty selection: ActionFailed, then
+// TargetUnselected to p and its observers when one was held.
+func (p *livePlayer) resetTarget() {
+	old := p.TakeTarget()
+	if p.link != nil {
+		p.link.announceTargetCleared(p, old)
+		return
+	}
+	p.SendFrame(serverpackets.FrameActionFailed())
 }
 
 // dropQueuedIntentions drops every intention p holds, active and queued,

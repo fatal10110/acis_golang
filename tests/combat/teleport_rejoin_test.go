@@ -18,12 +18,11 @@ import (
 
 // TestPlayerTeleportLeavesAndRejoinsTheGrid pins a short player teleport
 // that lands inside the same region neighborhood (Creature.teleportTo,
-// Creature.java:386-429). After TeleportToLocation the player leaves the
-// grid: its selected monster is cleared (ActionFailed, TargetUnselected)
-// before that monster's DeleteObject, every other nearby object is deleted
-// too, and a watcher sees TeleportToLocation, the player's TargetUnselected
-// (the old region is still set while the old area is forgotten,
-// WorldObject.setRegion) and then DeleteObject for the player. Nothing is
+// Creature.java:386-429). Its abortAll(true) clears the selected monster
+// (ActionFailed, TargetUnselected) before TeleportToLocation; after it the
+// player leaves the grid: the monster and every other nearby object are
+// deleted, and a watcher sees the player's TargetUnselected,
+// TeleportToLocation and then DeleteObject for the player. Nothing is
 // re-sent until the client's Appearing, which rejoins the grid (Appearing.java
 // → Player.onTeleported): the player gets NpcInfo and CharInfo again before
 // its UserInfo, the watcher gets the player's CharInfo, the selection stays
@@ -65,12 +64,15 @@ func TestPlayerTeleportLeavesAndRejoinsTheGrid(t *testing.T) {
 	if tp < 0 {
 		t.Fatalf("no TeleportToLocation for the player in %s", opcodes(frames))
 	}
-	failed := indexOf(frames, tp, serverpackets.OpcodeActionFailed, -1)
-	unselected := indexOf(frames, tp, serverpackets.OpcodeTargetUnselected, objID)
+	failed := indexOf(frames, 0, serverpackets.OpcodeActionFailed, -1)
+	unselected := indexOf(frames, 0, serverpackets.OpcodeTargetUnselected, objID)
 	hostileDeleted := indexOf(frames, tp, serverpackets.OpcodeDeleteObject, hostile.ObjectID())
 	watcherDeleted := indexOf(frames, tp, serverpackets.OpcodeDeleteObject, watcherID)
-	if failed < 0 || unselected < failed || hostileDeleted < unselected || watcherDeleted < 0 {
-		t.Fatalf("after TeleportToLocation got %s, want ActionFailed → TargetUnselected → DeleteObject(monster) and DeleteObject(watcher)", opcodes(frames[tp:]))
+	if failed < 0 || unselected < failed || tp < unselected || hostileDeleted < 0 || watcherDeleted < 0 {
+		t.Fatalf("teleport got %s, want ActionFailed → TargetUnselected → TeleportToLocation → DeleteObject(monster) and DeleteObject(watcher)", opcodes(frames))
+	}
+	if again := indexOf(frames, tp, serverpackets.OpcodeTargetUnselected, objID); again >= 0 {
+		t.Fatalf("after TeleportToLocation got %s, want no second TargetUnselected", opcodes(frames[tp:]))
 	}
 	for _, f := range frames {
 		if f[0] == serverpackets.OpcodeNPCInfo || f[0] == serverpackets.OpcodeCharInfo || f[0] == serverpackets.OpcodeUserInfo {
@@ -85,10 +87,10 @@ func TestPlayerTeleportLeavesAndRejoinsTheGrid(t *testing.T) {
 	}
 
 	watched := readQuiet(w)
+	wUnselected := indexOf(watched, 0, serverpackets.OpcodeTargetUnselected, objID)
 	wtp := indexOf(watched, 0, serverpackets.OpcodeTeleportToLocation, objID)
-	wUnselected := indexOf(watched, wtp+1, serverpackets.OpcodeTargetUnselected, objID)
-	if wtp < 0 || wUnselected < 0 || indexOf(watched, wUnselected, serverpackets.OpcodeDeleteObject, objID) < 0 {
-		t.Fatalf("watcher got %s, want TeleportToLocation → TargetUnselected → DeleteObject for the player", opcodes(watched))
+	if wUnselected < 0 || wtp < wUnselected || indexOf(watched, wtp, serverpackets.OpcodeDeleteObject, objID) < 0 {
+		t.Fatalf("watcher got %s, want TargetUnselected → TeleportToLocation → DeleteObject for the player", opcodes(watched))
 	}
 
 	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
