@@ -78,13 +78,13 @@ func ItemModifierFuncs(owner ItemOwner) ([]Mod, error) {
 func itemModifierCondition(mod item.StatModifier) (Condition, error) {
 	var direct *modelskill.Condition
 	if mod.Condition != nil {
-		c := convertItemCondition(*mod.Condition)
+		c := ItemCondition(*mod.Condition)
 		direct = &c
 	}
 	var attach *modelskill.ConditionClause
 	if mod.AttachCondition != nil {
 		attach = &modelskill.ConditionClause{
-			Root:      convertItemCondition(mod.AttachCondition.Root),
+			Root:      ItemCondition(mod.AttachCondition.Root),
 			Message:   mod.AttachCondition.Message,
 			MessageID: mod.AttachCondition.MessageID,
 			AddName:   mod.AttachCondition.AddName,
@@ -93,10 +93,12 @@ func itemModifierCondition(mod item.StatModifier) (Condition, error) {
 	return funcCondition(direct, attach)
 }
 
-func convertItemCondition(c item.Condition) modelskill.Condition {
+// ItemCondition is c in the skill condition shape the condition compiler
+// reads.
+func ItemCondition(c item.Condition) modelskill.Condition {
 	out := modelskill.Condition{Kind: c.Kind, Attrs: c.Attrs}
 	for _, ch := range c.Children {
-		out.Children = append(out.Children, convertItemCondition(ch))
+		out.Children = append(out.Children, ItemCondition(ch))
 	}
 	return out
 }

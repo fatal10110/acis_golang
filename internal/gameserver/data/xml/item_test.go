@@ -421,10 +421,6 @@ func TestLoadItemTemplatesSkipsMalformedItems(t *testing.T) {
 			content: `<item id="1" type="Weapon" name="x"><set name="bodypart" val="rhand"/><for><set stat="pAtk" val="notanumber"/></for></item>`,
 		},
 		{
-			name:    "cond block with no predicate",
-			content: `<item id="1" type="Weapon" name="x"><set name="bodypart" val="rhand"/><cond msgId="1"></cond></item>`,
-		},
-		{
 			name:    "malformed item_skill reference",
 			content: `<item id="1" type="Weapon" name="x"><set name="bodypart" val="rhand"/><set name="item_skill" val="notapair"/></item>`,
 		},
@@ -715,9 +711,9 @@ func TestLoadItemTemplatesDecodesConditionMessageIDLiterals(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	writeItemFile(t, dir, "fixture.xml", `
-		<item id="1" type="EtcItem" name="decimal"><cond msgId="100"><player /></cond></item>
-		<item id="2" type="EtcItem" name="octal"><cond msgId="0144"><player /></cond></item>
-		<item id="3" type="EtcItem" name="hex"><cond msgId="0x64" addName="1"><player /></cond></item>`)
+		<item id="1" type="EtcItem" name="decimal"><cond msgId="100"><player level="1" /></cond></item>
+		<item id="2" type="EtcItem" name="octal"><cond msgId="0144"><player level="1" /></cond></item>
+		<item id="3" type="EtcItem" name="hex"><cond msgId="0x64" addName="1"><player level="1" /></cond></item>`)
 
 	table, err := LoadItemTemplates(dir, zerolog.Nop())
 	if err != nil {

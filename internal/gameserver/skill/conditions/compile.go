@@ -13,28 +13,41 @@ import (
 )
 
 // Compile turns one parsed condition node into its runnable Condition.
-// Element and attribute names match case-insensitively, and every attribute
-// of one <player>/<target>/<using>/<game> element must hold (they are
-// ANDed). An element or attribute this package cannot evaluate is an error,
+// Element and attribute names match case-insensitively, and every
+// recognized attribute of one <player>/<target>/<using>/<game> element must
+// hold (they are ANDed); an unrecognized attribute is ignored.
+//
+// A node that holds no condition compiles to (nil, nil): an unknown element
+// (the zero Condition among them), a <player>/<target>/<using>/<game> with
+// no recognized attribute, or a <not> with no child. <and>/<or> drop such a
+// child, a <not> wraps it (testing that <not> aborts, see Evaluate), and
+// each caller decides what a nil root means: EvaluateSkill refuses the cast
+// without feedback, a stat func gate is no gate. A <not> reads only its
+// first child.
+//
+// A recognized element or attribute this package cannot evaluate yet
+// (<skill>, <player race>) or a value that does not decode is an error,
 // never a silent pass.
 func Compile(node modelskill.Condition) (Condition, error) {
 	switch strings.ToLower(node.Kind) {
 	case "and", "or":
-		children := make([]Condition, 0, len(node.Children))
+		var children []Condition
 		for _, ch := range node.Children {
 			c, err := Compile(ch)
 			if err != nil {
 				return nil, err
 			}
-			children = append(children, c)
+			if c != nil {
+				children = append(children, c)
+			}
 		}
 		if strings.EqualFold(node.Kind, "and") {
 			return &And{Conditions: children}, nil
 		}
 		return &Or{Conditions: children}, nil
 	case "not":
-		if len(node.Children) != 1 {
-			return nil, fmt.Errorf("condition: not: want exactly one child, got %d", len(node.Children))
+		if len(node.Children) == 0 {
+			return nil, nil
 		}
 		child, err := Compile(node.Children[0])
 		if err != nil {
@@ -44,35 +57,70 @@ func Compile(node modelskill.Condition) (Condition, error) {
 	case "player":
 		return compilePlayer(node)
 	case "target":
-		return compileAttrs(node, compileTargetAttr)
+		return compileAttrs(node, targetAttrs, compileTargetAttr)
 	case "using":
-		return compileAttrs(node, compileUsingAttr)
+		return compileAttrs(node, usingAttrs, compileUsingAttr)
 	case "game":
-		return compileAttrs(node, compileGameAttr)
+		return compileAttrs(node, gameAttrs, compileGameAttr)
+	case "skill":
+		return nil, fmt.Errorf("condition: <%s> is not evaluated", node.Kind)
 	default:
-		return nil, fmt.Errorf("condition: unsupported element %q", node.Kind)
+		return nil, nil
 	}
 }
 
-// compileAttrs ANDs one leaf per attribute of node, in attribute-name order
-// so a compiled tree is deterministic.
-func compileAttrs(node modelskill.Condition, leaf func(name, value string) (Condition, error)) (Condition, error) {
-	names := sortedAttrNames(node.Attrs)
-	if len(names) == 0 {
-		return nil, fmt.Errorf("condition: <%s> has no attribute", node.Kind)
+// IsNull reports whether node holds no condition (see Compile). A node that
+// does not compile is not null: it names a condition that cannot be built.
+func IsNull(node modelskill.Condition) bool {
+	c, err := Compile(node)
+	return err == nil && c == nil
+}
+
+// The attributes each leaf element recognizes, lowercased; any other is
+// ignored.
+var (
+	targetAttrs = attrSet("hp_min_max", "active_skill_id", "race_id", "npcid")
+	usingAttrs  = attrSet("kind")
+	gameAttrs   = attrSet("night")
+	playerAttrs = attrSet("race", "level", "resting", "riding", "flying", "moving", "running", "behind",
+		"front", "olympiad", "ishero", "hp", "mp", "pkcount", "battle_force", "spell_force", "charges",
+		"weight", "invsize", "pledgeclass", "clanhall", "castle", "sex", "active_effect_id",
+		"active_effect_id_lvl", "active_skill_id", "active_skill_id_lvl", "seed_fire", "seed_water",
+		"seed_wind", "seed_various", "seed_any", "insidepoly")
+)
+
+func attrSet(names ...string) map[string]bool {
+	set := make(map[string]bool, len(names))
+	for _, n := range names {
+		set[n] = true
 	}
-	conds := make([]Condition, 0, len(names))
-	for _, name := range names {
-		c, err := leaf(strings.ToLower(name), node.Attrs[name])
+	return set
+}
+
+// compileAttrs ANDs one leaf per recognized attribute of node, in
+// attribute-name order so a compiled tree is deterministic. A node with no
+// recognized attribute holds no condition.
+func compileAttrs(node modelskill.Condition, recognized map[string]bool, leaf func(name, value string) (Condition, error)) (Condition, error) {
+	var conds []Condition
+	for _, name := range sortedAttrNames(node.Attrs) {
+		lower := strings.ToLower(name)
+		if !recognized[lower] {
+			continue
+		}
+		c, err := leaf(lower, node.Attrs[name])
 		if err != nil {
 			return nil, fmt.Errorf("condition: <%s %s=%q>: %w", node.Kind, name, node.Attrs[name], err)
 		}
 		conds = append(conds, c)
 	}
-	if len(conds) == 1 {
+	switch len(conds) {
+	case 0:
+		return nil, nil
+	case 1:
 		return conds[0], nil
+	default:
+		return &And{Conditions: conds}, nil
 	}
-	return &And{Conditions: conds}, nil
 }
 
 func sortedAttrNames(attrs map[string]string) []string {
@@ -84,9 +132,11 @@ func sortedAttrNames(attrs map[string]string) []string {
 	return names
 }
 
-// compilePlayer handles <player>: most attributes are one leaf each, but
-// the five elemental-seed attributes fold into one ElementSeed and the two
-// force attributes into one ForceBuff, each appended once after the rest.
+// compilePlayer handles <player>: most recognized attributes are one leaf
+// each, but the five elemental-seed attributes fold into one ElementSeed
+// and the two force attributes into one ForceBuff, each appended once after
+// the rest and only when some seed is positive or the forces sum positive.
+// A <player> left with no leaf holds no condition.
 func compilePlayer(node modelskill.Condition) (Condition, error) {
 	var seeds [5]int
 	var forces [2]int
@@ -107,6 +157,9 @@ func compilePlayer(node modelskill.Condition) (Condition, error) {
 			c, err = compileInsidePoly(node, value)
 			conds = append(conds, c)
 		default:
+			if !playerAttrs[lower] {
+				continue
+			}
 			var c Condition
 			c, err = compilePlayerAttr(lower, value)
 			conds = append(conds, c)
@@ -126,7 +179,7 @@ func compilePlayer(node modelskill.Condition) (Condition, error) {
 	}
 	switch len(conds) {
 	case 0:
-		return nil, fmt.Errorf("condition: <player> has no recognized attribute in %v", node.Attrs)
+		return nil, nil
 	case 1:
 		return conds[0], nil
 	default:
@@ -178,6 +231,8 @@ func compilePlayerAttr(name, value string) (Condition, error) {
 			return nil, err
 		}
 		return HasClanHall{ClanHallIDs: ids}, nil
+	case "race":
+		return nil, fmt.Errorf("%s is not evaluated", name)
 	}
 	n, err := DecodeInt(value)
 	if err != nil {
@@ -205,7 +260,7 @@ func compilePlayerAttr(name, value string) (Condition, error) {
 	case "sex":
 		return Sex{Sex: n}, nil
 	}
-	return nil, fmt.Errorf("unsupported player attribute")
+	return nil, fmt.Errorf("%s is not evaluated", name)
 }
 
 // compileInsidePoly reads the <zone minZ maxZ><node x y/>...</zone> child
@@ -273,24 +328,19 @@ func compileTargetAttr(name, value string) (Condition, error) {
 		}
 		return TargetNpcID{IDs: ids}, nil
 	}
-	return nil, fmt.Errorf("unsupported target attribute")
+	return nil, fmt.Errorf("%s is not evaluated", name)
 }
 
-func compileUsingAttr(name, value string) (Condition, error) {
-	if name != "kind" {
-		return nil, fmt.Errorf("unsupported using attribute")
-	}
+func compileUsingAttr(_, value string) (Condition, error) {
 	return UsingItemType{Mask: int(item.ParseWornKindMask(value))}, nil
 }
 
-// compileGameAttr reads the one <game> attribute a data file can set. A
-// chance roll is a GameChance built in code (weapon cast/crit triggers),
-// never a <game chance> attribute, which is as unsupported as any other.
-func compileGameAttr(name, value string) (Condition, error) {
-	if name == "night" {
-		return GameTime{Night: parseBool(value)}, nil
-	}
-	return nil, fmt.Errorf("unsupported game attribute")
+// compileGameAttr reads the one <game> attribute a data file can set,
+// "night". A chance roll is a GameChance built in code (weapon cast/crit
+// triggers), never a <game chance> attribute, which is ignored like any
+// other unrecognized one.
+func compileGameAttr(_, value string) (Condition, error) {
+	return GameTime{Night: parseBool(value)}, nil
 }
 
 // parseBool is true only for a case-insensitive "true"; anything else,

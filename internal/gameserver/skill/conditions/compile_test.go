@@ -413,17 +413,13 @@ func TestCompileRejectsWhatItCannotEvaluate(t *testing.T) {
 		name string
 		node modelskill.Condition
 	}{
-		{"unknown player attribute", leaf("player", map[string]string{"level": "40", "bogus": "1"})},
-		{"unknown target attribute", leaf("target", map[string]string{"bogus": "1"})},
-		{"unknown game attribute", leaf("game", map[string]string{"bogus": "1"})},
-		{"unknown using attribute", leaf("using", map[string]string{"bogus": "1"})},
-		{"unknown element", leaf("bogus", map[string]string{"level": "1"})},
-		{"empty target", leaf("target", nil)},
-		{"player with only zero seeds", leaf("player", map[string]string{"seed_fire": "0"})},
-		{"not with two children", leaf("not", nil, leaf("player", map[string]string{"level": "1"}), leaf("player", map[string]string{"level": "2"}))},
+		{"player race", leaf("player", map[string]string{"race": "Elf"})},
+		{"skill stat", leaf("skill", map[string]string{"stat": "pAtk"})},
 		{"bad number", leaf("player", map[string]string{"level": "forty"})},
+		{"bad number beside an unknown attribute", leaf("player", map[string]string{"level": "forty", "bogus": "1"})},
 		{"one-value hp_min_max", leaf("target", map[string]string{"hp_min_max": "25"})},
-		{"bad child under and", leaf("and", nil, leaf("player", map[string]string{"level": "1"}), leaf("player", map[string]string{"bogus": "1"}))},
+		{"bad child under and", leaf("and", nil, leaf("player", map[string]string{"level": "1"}), leaf("player", map[string]string{"level": "x"}))},
+		{"bad child under not", leaf("not", nil, leaf("player", map[string]string{"level": "x"}))},
 	}
 	for _, tc := range cases {
 		if c, err := Compile(tc.node); err == nil {
@@ -452,7 +448,7 @@ func TestEvaluateSkillReportsFirstFailingClause(t *testing.T) {
 		t.Fatalf("low level: got (%+v, %v), want the first clause refused", failed, ok)
 	}
 
-	broken := modelskill.Definition{Conditions: []modelskill.ConditionClause{{Root: leaf("player", map[string]string{"bogus": "1"}), MessageID: 3}}}
+	broken := modelskill.Definition{Conditions: []modelskill.ConditionClause{{Root: leaf("player", map[string]string{"level": "forty"}), MessageID: 3}}}
 	if failed, ok := EvaluateSkill(broken, caster, nil); ok || failed.MessageID != 3 {
 		t.Fatalf("uncompilable clause: got (%+v, %v), want it refused", failed, ok)
 	}
@@ -516,8 +512,9 @@ func TestCompileIntegersFollowReferenceGrammar(t *testing.T) {
 // TestGameConditionReadsOnlyNight: the reference's <game> reader recognizes
 // only "night" (DocumentBase.parseGameCondition); a "chance" attribute is
 // unrecognized, exactly like any other unknown <game> attribute, so it never
-// becomes a random roll. A certain chance of 100 used to compile to a roll
-// that always passed.
+// becomes a random roll and the <game> holds no condition. A certain chance
+// of 100 used to compile to a roll that always passed. As a skill <cond>
+// root that refuses every cast with no feedback (see null_test.go).
 func TestGameConditionReadsOnlyNight(t *testing.T) {
 	for _, attrs := range []map[string]string{
 		{"chance": "50"},
@@ -525,13 +522,13 @@ func TestGameConditionReadsOnlyNight(t *testing.T) {
 		{"Chance": "0"},
 	} {
 		node := leaf("game", attrs)
-		if c, err := Compile(node); err == nil {
-			t.Errorf("<game %v> compiled to %#v, want the unsupported-attribute error of <game bogus>", attrs, c)
+		if c, err := Compile(node); c != nil || err != nil {
+			t.Errorf("<game %v> compiled to (%#v, %v), want no condition", attrs, c, err)
 		}
 		clause := modelskill.ConditionClause{Root: node, MessageID: 4}
 		def := modelskill.Definition{Conditions: []modelskill.ConditionClause{clause}}
-		if _, ok := EvaluateSkill(def, source{&player{}}, nil); ok {
-			t.Errorf("<game %v>: cast allowed, want it refused like any condition that does not compile", attrs)
+		if failed, ok := EvaluateSkill(def, source{&player{}}, nil); ok || failed.MessageID != 0 {
+			t.Errorf("<game %v>: got (%+v, %v), want the cast refused with no feedback", attrs, failed, ok)
 		}
 	}
 

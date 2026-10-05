@@ -42,7 +42,7 @@ func TestItemModifierFuncsRejectsConditionalModifier(t *testing.T) {
 	tmpl := &item.Template{
 		ID: 101,
 		Modifiers: []item.StatModifier{
-			{Op: item.FuncAdd, Stat: "pAtk", Value: 10, Condition: &item.Condition{}},
+			{Op: item.FuncAdd, Stat: "pAtk", Value: 10, Condition: &item.Condition{Kind: "skill", Attrs: map[string]string{"stat": "pAtk"}}},
 		},
 	}
 	owner := ItemOwner{Inst: &item.Instance{ObjectID: 1, TemplateID: 101}, Tmpl: tmpl}
