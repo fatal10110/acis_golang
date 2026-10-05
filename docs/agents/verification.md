@@ -25,6 +25,9 @@ Contract-specific checks supplement unit tests:
 - geodata: `geoprobe` comparisons for movement, line of sight, and paths;
 - script pages: `scriptpages.CheckPackage` against the committed page index (regenerate it with
   `cmd/pageindex` only when the datapack changes);
+- script ports: `scriptfp.Check` against the committed reference fingerprints (literals,
+  engine calls through `apimap.txt`, hook parent-call shape); regenerate the fingerprints and
+  the engine call census with `cmd/scriptfp` when the reference or `apimap.txt` changes;
 - persistence: integration tests against the expected schema and transaction effects;
 - concurrency: focused `-race` coverage and lifecycle cancellation.
 
