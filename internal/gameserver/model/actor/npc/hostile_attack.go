@@ -252,13 +252,18 @@ func (h *Hostile) RechargeShots(physical, magic bool) {
 // ReduceHPByDOT — since every HP reduction (DOT included) records hate and
 // then runs the attacked hook.
 func (h *Hostile) RollAttackedShotRecharge() {
-	soulshotRate := int(h.AIInt("SoulShotRate", 0))
-	spiritshotRate := int(h.AIInt("SpiritShotRate", 0))
-	physical := h.CurrentSoulshotCount() > 0 && soulshotRate > 0 && h.Roll(100) < soulshotRate
-	magic := h.CurrentSpiritshotCount() > 0 && spiritshotRate > 0 && h.Roll(100) < spiritshotRate
+	physical := h.CurrentSoulshotCount() > 0 && h.rollShotRate("SoulShotRate")
+	magic := h.CurrentSpiritshotCount() > 0 && h.rollShotRate("SpiritShotRate")
 	if physical || magic {
 		h.RechargeShots(physical, magic)
 	}
+}
+
+// rollShotRate reads the percent AI parameter name and rolls it. A rate of
+// zero or less never rolls.
+func (h *Hostile) rollShotRate(name string) bool {
+	rate := int(h.AIInt(name, 0))
+	return rate > 0 && h.Roll(100) < rate
 }
 
 func (h *Hostile) broadcastShotRecharge(skillID int32) {

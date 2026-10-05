@@ -255,8 +255,9 @@ type Attackable struct {
 	roll func(n int) int
 	// lifeTime is the number of completed periodic AI cycles. Empty-queue
 	// idle abort and non-attack promotion run only after the first cycle.
-	// A queued ATTACK desire opens the first-cycle promotion gate. It is
-	// written under mu and read by LifeTime without it.
+	// A queued ATTACK desire opens the first-cycle promotion gate. think
+	// increments it under mu; ResetLifeTime stores 0 at death from the
+	// killer's goroutine without mu; LifeTime reads it without a lock.
 	lifeTime atomic.Int32
 }
 

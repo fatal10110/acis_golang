@@ -17,6 +17,8 @@ type SpawnSlot interface {
 // spawnBinding is what a live NPC keeps of its spawn slot. It is set
 // before the NPC is published and read-only after.
 type spawnBinding struct {
+	// template is the NPC's own template, the same pointer as
+	// Instance.Template; both are set once at construction.
 	template *Template
 	spawn    AIParams
 	scratch  *Scratch
