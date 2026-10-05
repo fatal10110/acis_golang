@@ -28,6 +28,7 @@ class quest.Q900_Fixture extends Quest
   call Player.getSummons 1
   call Quest.giveItems 1
   call Quest.playSound 1
+  hook onAdvEvent direct same
   hook onAttacked direct same
   hook onCreated direct changed
   hook onDecayed helper same

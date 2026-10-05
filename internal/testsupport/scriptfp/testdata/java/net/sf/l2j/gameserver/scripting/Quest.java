@@ -19,6 +19,11 @@ public class Quest
 	{
 	}
 	
+	public String onAdvEvent(String event, Npc npc, Player player)
+	{
+		return null;
+	}
+	
 	public String onTalk(Npc npc, Player player)
 	{
 		return null;

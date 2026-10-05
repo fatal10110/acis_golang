@@ -157,7 +157,7 @@ func (pkg *goPackage) hookFields(lit *ast.CompositeLit, funcs map[string]*ast.Fu
 				ftype, body = fn.Type, fn.Body
 			}
 		}
-		name := "on" + invoker
+		name := referenceHookName(invoker)
 		if body == nil {
 			pkg.hooks = append(pkg.hooks, Hook{Name: name, Shape: "none"})
 			continue
@@ -180,6 +180,19 @@ func (pkg *goPackage) hookFields(lit *ast.CompositeLit, funcs map[string]*ast.Fu
 		}
 		pkg.hooks = append(pkg.hooks, Hook{Name: name, Shape: shape})
 	}
+}
+
+// renamedHooks names the reference hooks whose Go field is not On plus the
+// reference name: the bypass-event hook is OnEvent, invoked as Event.
+var renamedHooks = map[string]string{"Event": "onAdvEvent"}
+
+// referenceHookName returns the reference hook name of the Hooks field OnX,
+// given X.
+func referenceHookName(invoker string) string {
+	if name, ok := renamedHooks[invoker]; ok {
+		return name
+	}
+	return "on" + invoker
 }
 
 func paramNames(ft *ast.FuncType) []string {

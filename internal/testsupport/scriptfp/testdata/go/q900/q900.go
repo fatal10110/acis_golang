@@ -21,6 +21,9 @@ var guards map[int32]*script.NPC
 func New() script.Script {
 	base := script.Hooks{}
 	return script.Script{Name: "Fixture \"quoted\"\n", QuestID: 900, Hooks: base.With(script.Hooks{
+		OnEvent: func(s *script.Script, e script.Event) string {
+			return base.Event(s, e)
+		},
 		OnTalk: func(s *script.Script, e script.Talk) string {
 			if e.NPC.ID() == keeper {
 				reward(e.Player)

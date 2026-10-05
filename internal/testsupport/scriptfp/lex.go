@@ -153,7 +153,7 @@ func javaQuoted(s string) (string, int, error) {
 			if i+4 > len(s) {
 				return "", 0, fmt.Errorf("short unicode escape")
 			}
-			r, err := strconv.ParseUint(s[i:i+4], 16, 32)
+			r, err := strconv.ParseUint(s[i:i+4], 16, 16)
 			if err != nil {
 				return "", 0, fmt.Errorf("bad unicode escape %q", s[i:i+4])
 			}

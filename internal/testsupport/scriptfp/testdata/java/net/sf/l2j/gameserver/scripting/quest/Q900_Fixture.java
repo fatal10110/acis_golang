@@ -27,6 +27,12 @@ public class Q900_Fixture extends Quest
 	}
 	
 	@Override
+	public String onAdvEvent(String event, Npc npc, Player player)
+	{
+		return super.onAdvEvent(event, npc, player);
+	}
+	
+	@Override
 	public String onTalk(Npc npc, Player player)
 	{
 		if (npc.getNpcId() == KEEPER)

@@ -92,7 +92,8 @@ A family package names every class it ports; their fingerprints are compared as 
   calls (matched on the name after its last `.`); a call mapped from a `Quest` helper row
   that none of the classes makes;
 - an `on*` hook whose name or shape differs. The Go hook is the `OnX` field of a `Hooks`
-  composite literal (a function literal or a package function); its parent call is a call
+  composite literal (a function literal or a package function), named `onX` except
+  `OnEvent`, which is the reference's `onAdvEvent`; its parent call is a call
   to `X` on any receiver but the hook's first parameter (which is the script: `s.X` is a
   re-entry), with `same` when the arguments are the hook's parameters in order.
 
