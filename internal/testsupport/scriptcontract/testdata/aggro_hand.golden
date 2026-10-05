@@ -1,0 +1,67 @@
+# Engine-contract golden derived by hand from the cited reference lines and reviewed blind.
+# See-creature gates of the tick scan, the look-neighbour call and the teleport re-fire.
+# Format: internal/gameserver/script/testdata/oracle/README.md, "Contract golden format".
+
+table aggro.scan_gates
+source java/net/sf/l2j/gameserver/model/actor/ai/type/NpcAI.java 449-496 runAI see-creature scan
+source java/net/sf/l2j/gameserver/model/actor/ai/type/NpcAI.java 916-924 cleanupForNextSpawn
+source java/net/sf/l2j/gameserver/model/actor/Npc.java 2279-2282 getSeeRange
+source java/net/sf/l2j/gameserver/model/actor/instance/RaidBoss.java 35-44 getSeeRange isRaidBoss
+provenance hand
+note The tick scan of runAI(true) runs only when the template has a see-creature script, over every known playable (players and summons; the gates read the acting player), before invalid desires are pruned and before a desire is picked. A nested runAI(false) does not scan.
+note in_range is the 3D distance strictly below the see range, centre to centre: DefaultSeeRange (450) for NPCs, the template aggro range for raid and grand bosses.
+note Non-raid NPCs keep a seen set, cleared at spawn: a creature in it gets no call; a creature in it found out of range leaves it. Raid bosses ignore the set. moving names who is moving (creature, npc or none). calls is the number of see-creature calls for the creature this tick; seen_after is whether it is in the seen set afterwards.
+row first-sight raid=false seen=false protected=false flying=false invisible=false in_range=true dz=0 silent=false see_through=false moving=none calls=1 seen_after=true
+row already-seen raid=false seen=true protected=false flying=false invisible=false in_range=true dz=0 silent=false see_through=false moving=none calls=0 seen_after=true
+row seen-leaves-range raid=false seen=true protected=false flying=false invisible=false in_range=false dz=0 silent=false see_through=false moving=none calls=0 seen_after=false
+row out-of-range raid=false seen=false protected=false flying=false invisible=false in_range=false dz=0 silent=false see_through=false moving=none calls=0 seen_after=false
+row spawn-protected raid=false seen=false protected=true flying=false invisible=false in_range=true dz=0 silent=false see_through=false moving=none calls=0 seen_after=false
+row flying raid=false seen=false protected=false flying=true invisible=false in_range=true dz=0 silent=false see_through=false moving=none calls=0 seen_after=false
+row invisible raid=false seen=false protected=false flying=false invisible=true in_range=true dz=0 silent=false see_through=false moving=none calls=0 seen_after=false
+row gated-keeps-seen raid=false seen=true protected=true flying=false invisible=false in_range=false dz=0 silent=false see_through=false moving=none calls=0 seen_after=true
+row silent-moving raid=false seen=false protected=false flying=false invisible=false in_range=true dz=0 silent=true see_through=false moving=creature calls=0 seen_after=false
+row silent-moving-see-through raid=false seen=false protected=false flying=false invisible=false in_range=true dz=0 silent=true see_through=true moving=creature calls=1 seen_after=true
+row silent-moving-already-seen raid=false seen=true protected=false flying=false invisible=false in_range=true dz=0 silent=true see_through=false moving=creature calls=0 seen_after=true
+row raid-creature-moving raid=true seen=false protected=false flying=false invisible=false in_range=true dz=0 silent=false see_through=false moving=creature calls=1 seen_after=false
+row raid-npc-moving raid=true seen=false protected=false flying=false invisible=false in_range=true dz=0 silent=false see_through=false moving=npc calls=1 seen_after=false
+row raid-still raid=true seen=false protected=false flying=false invisible=false in_range=true dz=0 silent=false see_through=false moving=none calls=0 seen_after=false
+row raid-ignores-seen-set raid=true seen=true protected=false flying=false invisible=false in_range=true dz=0 silent=false see_through=false moving=creature calls=1 seen_after=true
+row raid-high-z raid=true seen=false protected=false flying=false invisible=false in_range=true dz=501 silent=false see_through=false moving=none calls=1 seen_after=true
+row raid-high-z-silent raid=true seen=false protected=false flying=false invisible=false in_range=true dz=501 silent=true see_through=false moving=none calls=0 seen_after=false
+row raid-out-of-range-keeps-seen raid=true seen=true protected=false flying=false invisible=false in_range=false dz=0 silent=false see_through=false moving=creature calls=0 seen_after=true
+
+table aggro.look_neighbor
+source java/net/sf/l2j/gameserver/model/actor/Npc.java 2058-2082 lookNeighbor
+source java/net/sf/l2j/gameserver/model/WorldObject.java 549-558 forEachKnownTypeInRadius
+source java/net/sf/l2j/commons/math/MathUtil.java 182-217 checkIfInRange
+provenance hand
+note lookNeighbor (called by behaviors) runs at most once per 30 s per NPC: it returns when now - last < 30000 ms; otherwise it stores now as last before scanning, whatever the scan finds. last starts at 0.
+note The scan covers every known creature, NPCs included, within the see range by the known-list rule (3D, inclusive, see range plus both collision radii), with no seen set. Gates: the acting player (if any) not spawn-protected, not flying, visible; a silent-moving creature only for raid bosses or templates that see through; at most 500 Z apart.
+note Throttle rows give elapsed (now - last, ms) and runs; gate rows give the creature and calls.
+row throttle-first elapsed=first runs=true
+row throttle-29999 elapsed=29999 runs=false
+row throttle-30000 elapsed=30000 runs=true
+row player creature=player protected=false flying=false invisible=false silent=false raid=false see_through=false dz=0 calls=1
+row npc creature=npc protected=- flying=- invisible=- silent=false raid=false see_through=false dz=0 calls=1
+row summon-of-protected-player creature=summon protected=true flying=false invisible=false silent=false raid=false see_through=false dz=0 calls=0
+row player-flying creature=player protected=false flying=true invisible=false silent=false raid=false see_through=false dz=0 calls=0
+row player-invisible creature=player protected=false flying=false invisible=true silent=false raid=false see_through=false dz=0 calls=0
+row silent-moving creature=player protected=false flying=false invisible=false silent=true raid=false see_through=false dz=0 calls=0
+row silent-moving-raid creature=player protected=false flying=false invisible=false silent=true raid=true see_through=false dz=0 calls=1
+row silent-moving-see-through creature=player protected=false flying=false invisible=false silent=true raid=false see_through=true dz=0 calls=1
+row z-500 creature=player protected=false flying=false invisible=false silent=false raid=false see_through=false dz=500 calls=1
+row z-501 creature=player protected=false flying=false invisible=false silent=false raid=false see_through=false dz=501 calls=0
+
+table aggro.teleport_see
+source java/net/sf/l2j/gameserver/model/actor/Creature.java 1921-1938 forceSeeCreature
+source java/net/sf/l2j/gameserver/model/actor/Creature.java 386-430 teleportTo
+provenance hand
+note After a teleport the teleported creature, if it is a playable, makes every known NPC within that NPC's see range (3D, strict, centre to centre) and at most 500 Z apart call see-creature on it once. It is skipped when the acting player is spawn-protected or flying. There is no invisibility, silent-move or seen-set check, and the NPC's seen set is not updated.
+row player creature=player protected=false flying=false invisible=false in_range=true dz=0 calls=1
+row summon creature=summon protected=false flying=false invisible=false in_range=true dz=0 calls=1
+row npc creature=npc protected=- flying=- invisible=- in_range=true dz=0 calls=0
+row spawn-protected creature=player protected=true flying=false invisible=false in_range=true dz=0 calls=0
+row flying creature=player protected=false flying=true invisible=false in_range=true dz=0 calls=0
+row invisible creature=player protected=false flying=false invisible=true in_range=true dz=0 calls=1
+row out-of-range creature=player protected=false flying=false invisible=false in_range=false dz=0 calls=0
+row z-501 creature=player protected=false flying=false invisible=false in_range=true dz=501 calls=0

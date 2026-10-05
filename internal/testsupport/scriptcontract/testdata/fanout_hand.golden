@@ -1,0 +1,23 @@
+# Engine-contract golden derived by hand from the cited reference lines and reviewed blind.
+# The fan-out line-of-sight gate, which the probe cannot exercise (it loads no geodata).
+# Format: internal/gameserver/script/testdata/oracle/README.md, "Contract golden format".
+
+table fanout.line_of_sight
+source java/net/sf/l2j/gameserver/model/actor/Npc.java 442-463 canSeeTarget in the reduceCurrentHp clan scan
+source java/net/sf/l2j/gameserver/model/actor/Npc.java 533-554 canSeeTarget in the doDie clan scan
+source java/net/sf/l2j/gameserver/model/actor/cast/CreatureCast.java 542-563 canSeeTarget in the callSkill clan scan
+source java/net/sf/l2j/gameserver/model/actor/ai/type/AttackableAI.java 154-183 canSeeTarget in the onEvtAggression clan scan
+source java/net/sf/l2j/gameserver/geoengine/GeoEngine.java 523-547 canSeeTarget
+provenance hand
+note One row per fan-out loop. los says whether the loop checks line of sight, and between which two objects (canSeeTarget checks both directions, from each object's eye height). A called NPC that fails the check is skipped; the loop goes on with the next one. The check is the last gate of the clan scans, after dead, self, clan and ignored-id.
+note The party loops (self, master, minions) never check line of sight, and neither do the self calls of the clan scans (hit and aggression). reachable=false: the aggression scan returns for every NPC other than the caller, and the caller is not in its own known list, so that check never runs.
+row hit-party source=hit loop=party los=none
+row hit-clan-self source=hit loop=clan-self los=none
+row hit-clan source=hit loop=clan los=caller,called when_blocked=skip
+row aggression-party source=aggression loop=party los=none
+row aggression-clan-self source=aggression loop=clan-self los=none
+row aggression-clan source=aggression loop=clan los=caller,called when_blocked=skip reachable=false
+row skill-party source=skill loop=party los=none
+row skill-clan source=skill loop=clan los=target,called when_blocked=skip
+row death-party source=death loop=party los=none
+row death-clan source=death loop=clan los=caller,called when_blocked=skip
