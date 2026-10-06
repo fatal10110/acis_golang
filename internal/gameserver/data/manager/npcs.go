@@ -37,8 +37,11 @@ type slotInfo struct {
 	group    *makerGroup
 	spawnIdx int
 	// spawning marks a slot whose NPC is being placed: no other spawn of
-	// the slot starts until it is done.
+	// the slot starts until it is done. first marks that placement as the
+	// slot's first: an npcmaker's NPC deleted before it is done is not yet
+	// one of its spawn's NPCs, so the maker is not told it left.
 	spawning bool
+	first    bool
 	entry    spawn.Entry
 	dbName   string
 	masterID int32
@@ -198,8 +201,9 @@ type Npcs struct {
 	castEffects actorcast.EffectHandlers
 
 	// gate orders the whole-population changes against every single spawn:
-	// DespawnAll and RespawnAll hold it, Respawn and SpawnFixed read-hold it,
-	// so a spawn never lands halfway through a despawn of everything.
+	// DespawnAll holds it, RespawnAll while it swaps the spawn list, and
+	// each NPC's placement read-holds it, so a placement never lands
+	// halfway through a despawn of everything. No hook runs under it.
 	gate sync.RWMutex
 
 	mu   sync.Mutex
@@ -235,11 +239,16 @@ type Npcs struct {
 	scripts npc.ScriptHooks
 }
 
-// NewNpcs walks spawns' loaded table and instantiates every "on start"
-// maker's qualifying entries into state, respecting persisted dead/alive
-// data for database-tracked entries.
+// NewNpcs builds a population that raises no script hook and spawns it at
+// once, as SpawnOnStart does: every "on start" maker's qualifying entries,
+// respecting persisted dead/alive data for database-tracked entries.
 func NewNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, effects effect.Env, queues Queues, makers MakerBehaviors, zoneIndexes ...*zone.Index) (*Npcs, error) {
-	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, nil, 20, 30, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), DefaultSpawnEvents(), effects, queues, makers, nil, zoneIndexes...)
+	n, err := newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, nil, 20, 30, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), DefaultSpawnEvents(), effects, queues, makers, nil, zoneIndexes...)
+	if err != nil {
+		return nil, err
+	}
+	n.SpawnOnStart()
+	return n, nil
 }
 
 // Queues creates the queue one live NPC's work runs on; id names it in logs.
@@ -251,7 +260,8 @@ type Queues interface {
 // base, RandomWalkRate and raid base multipliers, each running its work on a
 // queue from queues. newFolkSink builds the sink a civilian NPC shows its
 // movement and status through. events is the SpawnEvents list. scripts
-// raises the script hooks of every live hostile NPC.
+// raises the script hooks of every live NPC. Nothing spawns until
+// SpawnOnStart: the caller wires what the hooks reach first.
 func NewNpcsWithMaxBuffsAmount(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.State, ids idAllocator, decay *task.Decay, respawnTask *task.Respawn, ai *task.AI, positions *task.PositionUpdates, items *item.Table, ground groundPlacer, rewards KillRewardConfig, now func() time.Time, log zerolog.Logger, castDefs actorcast.Definitions, castEffects actorcast.EffectHandlers, walker *task.Walker, newSink func(*npc.Hostile) event.Sink, newFolkSink func(*npc.Folk) event.Sink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount int, raidMultipliers npc.RaidMultipliers, aiConfig npc.AIConfig, events []string, effects effect.Env, queues Queues, makers MakerBehaviors, scripts npc.ScriptHooks, zoneIndexes ...*zone.Index) (*Npcs, error) {
 	return newNpcs(spawns, templates, geo, state, ids, decay, respawnTask, ai, positions, items, ground, rewards, now, log, castDefs, castEffects, walker, newSink, newFolkSink, maxBuffsAmount, randomWalkRate, maxGeoPathFailCount, raidMultipliers, aiConfig, events, effects, queues, makers, scripts, zoneIndexes...)
 }
@@ -369,10 +379,17 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		MaxBuffsAmount:      maxBuffsAmount,
 		MaxGeoPathFailCount: maxGeoPathFailCount,
 		Log:                 log,
+		Scripts:             scripts,
+		Remover:             n,
 	}
-
-	n.spawnOnStart(spawns, 0)
 	return n, nil
+}
+
+// SpawnOnStart runs the boot spawn pass over the spawn list the population
+// was built with. Each NPC's created hooks run as it enters the world, so
+// everything they reach is wired before it is called. Call it once.
+func (n *Npcs) SpawnOnStart() {
+	n.spawnOnStart(n.currentSpawns(), 0)
 }
 
 // spawnOnStart builds the npcmakers of spawns, their slots keyed for

@@ -43,11 +43,15 @@ func (h *Hostile) Kill(killer attackable.Combatant) bool { return h.Die(killer, 
 // arms its spawn's respawn. The removal runs on this NPC's own queue, the
 // same queue its corpse decay would run on.
 func (h *Hostile) DeleteMe() {
-	h.Queue().Post(func() {
-		if h.remover != nil {
-			h.remover.Remove(h)
-			return
-		}
-		h.Decay(h.world, nil)
-	})
+	h.Queue().Post(h.DeleteNow)
+}
+
+// DeleteNow is DeleteMe run on the calling goroutine: the NPC is out of
+// the world when it returns.
+func (h *Hostile) DeleteNow() {
+	if h.remover != nil {
+		h.remover.Remove(h)
+		return
+	}
+	h.Decay(h.world, nil)
 }

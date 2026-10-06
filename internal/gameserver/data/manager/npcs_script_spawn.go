@@ -61,21 +61,7 @@ func (n *Npcs) placeStandalone(tmpl *npc.Template, x, y, z, heading int, summone
 	if heading < 0 {
 		heading = rnd.Get(65536)
 	}
-	id, err := n.spawnStandalone(tmpl, x, y, z, heading, summoner)
-	if err != nil {
-		return nil, err
-	}
-	return n.liveNPC(id, tmpl)
-}
-
-// liveNPC returns the NPC of object id, of template tmpl, the world holds.
-func (n *Npcs) liveNPC(id int32, tmpl *npc.Template) (attackable.Combatant, error) {
-	obj, _ := n.state.Object(id)
-	live, ok := obj.(attackable.Combatant)
-	if !ok {
-		return nil, fmt.Errorf("%w: npc %d left the world as it was placed", ErrNotPlaceable, tmpl.ID)
-	}
-	return live, nil
+	return n.spawnStandalone(tmpl, x, y, z, heading, summoner)
 }
 
 // CreatePrivate places one NPC of template npcID as a private of master
@@ -150,8 +136,6 @@ func (n *Npcs) createPrivate(master *npc.Hostile, tmpl *npc.Template, at *locati
 	if probe := (&npc.Instance{Template: tmpl}); npc.FolkKind(probe) || !npc.Attackable(probe) {
 		return nil, fmt.Errorf("%w: private npc %d instance type %q", ErrNotPlaceable, tmpl.ID, tmpl.Type)
 	}
-	n.gate.RLock()
-	defer n.gate.RUnlock()
 
 	entry := spawn.Entry{NPCID: int32(tmpl.ID), RespawnDelay: respawn}
 	slot := slotInfo{entry: entry, masterID: master.ObjectID(), tmpl: tmpl, scripted: true, memory: newSlotMemory(entry)}
@@ -167,7 +151,7 @@ func (n *Npcs) createPrivate(master *npc.Hostile, tmpl *npc.Template, at *locati
 	if at != nil {
 		loc, face = location.Location{X: at.X, Y: at.Y, Z: int(n.geo.Height(at.X, at.Y, at.Z))}, heading
 	}
-	private := n.instantiate(slot.key, entry, tmpl, loc, face, fullHP, fullMP, master)
+	private, _ := n.instantiate(slot.key, entry, tmpl, loc, face, fullHP, fullMP, master).(*npc.Hostile)
 	if private == nil {
 		n.mu.Lock()
 		delete(n.slot, slot.key)
@@ -196,16 +180,17 @@ func (n *Npcs) ScheduleDespawn(live attackable.Combatant, d time.Duration) {
 		if q := o.Queue(); q != nil {
 			q.After(d, func() {
 				if !o.Decayed() {
-					n.removeFolk(o)
+					n.RemoveFolk(o)
 				}
 			})
 		}
 	}
 }
 
-// removeFolk takes f out of the world at once, with no corpse, and answers
-// its spawn slot as for a decayed corpse. It runs on f's own queue.
-func (n *Npcs) removeFolk(f *npc.Folk) {
+// RemoveFolk takes f out of the world at once, with no corpse, and answers
+// its spawn slot as for a decayed corpse (npc.FolkRemover). It runs on the
+// calling goroutine.
+func (n *Npcs) RemoveFolk(f *npc.Folk) {
 	n.decay.Cancel(f)
 	f.Decay(n.state, n.RespawnHook(f.ObjectID()))
 }

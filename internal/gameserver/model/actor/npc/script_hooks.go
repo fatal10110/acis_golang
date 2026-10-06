@@ -5,9 +5,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-// ScriptHooks is the script engine as a hostile NPC raises its hooks. Each
-// method runs the hooks synchronously on the caller's goroutine, with no
-// NPC lock held.
+// ScriptHooks is the script engine as an NPC and its spawner raise its
+// hooks. Each method runs the hooks synchronously on the caller's
+// goroutine, with no NPC lock held, except the dying ones, which only
+// schedule theirs.
 type ScriptHooks interface {
 	// Behaves reports whether a behavior is bound to the NPC template id.
 	// Such an NPC leaves its reactions to the behavior: the built-in
@@ -19,6 +20,20 @@ type ScriptHooks interface {
 	// HostilePartyAttacked runs called's party-attacked hooks: caller,
 	// attacked by target for damage, called its party member called.
 	HostilePartyAttacked(caller, called *Hostile, target attackable.Combatant, damage int32)
+	// HostileCreated runs h's created hooks: h has just entered the world.
+	HostileCreated(h *Hostile)
+	// FolkCreated runs f's created hooks: f has just entered the world.
+	FolkCreated(f *Folk)
+	// HostileDecayed runs h's decayed hooks once h has decayed, before it
+	// leaves the world.
+	HostileDecayed(h *Hostile)
+	// FolkDecayed runs f's decayed hooks once f has decayed, before it
+	// leaves the world.
+	FolkDecayed(f *Folk)
+	// HostileDying schedules h's dying hooks: killer has just killed it.
+	HostileDying(h *Hostile, killer attackable.Combatant)
+	// FolkDying schedules f's dying hooks: killer has just killed it.
+	FolkDying(f *Folk, killer attackable.Combatant)
 }
 
 // behaves reports whether a behavior is bound to h's template id.
@@ -43,5 +58,33 @@ func (h *Hostile) partyAttacked(caller *Hostile, target attackable.Combatant, da
 	}
 	if assist && !h.behaves() {
 		h.reactPartyAttacked(caller, target, damage)
+	}
+}
+
+// raiseDecayed runs h's decayed hooks.
+func (h *Hostile) raiseDecayed() {
+	if h.scripts != nil {
+		h.scripts.HostileDecayed(h)
+	}
+}
+
+// raiseDying schedules h's dying hooks.
+func (h *Hostile) raiseDying(killer attackable.Combatant) {
+	if h.scripts != nil {
+		h.scripts.HostileDying(h, killer)
+	}
+}
+
+// raiseDecayed runs f's decayed hooks.
+func (f *Folk) raiseDecayed() {
+	if f.scripts != nil {
+		f.scripts.FolkDecayed(f)
+	}
+}
+
+// raiseDying schedules f's dying hooks.
+func (f *Folk) raiseDying(killer attackable.Combatant) {
+	if f.scripts != nil {
+		f.scripts.FolkDying(f, killer)
 	}
 }

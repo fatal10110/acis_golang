@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
 )
 
@@ -51,6 +52,10 @@ func kinds(ks ...NPCKind) kindSet {
 var raisedHooks = map[hook]kindSet{
 	hookAttacked:      kinds(KindHostile),
 	hookPartyAttacked: kinds(KindHostile),
+	// The spawner and the NPC's death and decay (lifecycle.go).
+	hookCreated: kinds(KindFolk, KindHostile),
+	hookDecayed: kinds(KindFolk, KindHostile),
+	hookMyDying: kinds(KindFolk, KindHostile),
 	// The schedule runner (StartSchedule).
 	hookStart: kinds(KindOther),
 	// The tutorial events (TutorialEvent); the NPC dialog's bypass events
@@ -66,6 +71,9 @@ type Config struct {
 	Log    zerolog.Logger
 	// Env is what the registered scripts' helpers act through.
 	Env *Env
+	// Queue is the engine queue: the dying hooks run on it, as they come
+	// after the NPC's own queue may have closed at its decay.
+	Queue *sim.Queue
 
 	// raises overrides raisedHooks; tests use it.
 	raises func(hook, NPCKind) bool
@@ -93,6 +101,8 @@ type Registry struct {
 	byName map[string]*Script
 	// behaves holds the NPC ids a behavior is bound to.
 	behaves map[int32]bool
+	// queue is the engine queue (Config.Queue).
+	queue *sim.Queue
 }
 
 type npcKey struct {
@@ -133,7 +143,7 @@ const (
 // except that first talk keeps a single script. So the last listed behavior wins and other
 // scripts accumulate in list order.
 func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
-	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}, behaves: map[int32]bool{}}
+	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}, behaves: map[int32]bool{}, queue: cfg.Queue}
 	registered := 0
 	for _, l := range list {
 		e := entry{path: l.Path}

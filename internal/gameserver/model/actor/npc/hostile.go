@@ -1040,6 +1040,7 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 	if h.RaidBoss() && killedByPlayer(killer) {
 		h.emit(event.RaidBossKilled{})
 	}
+	h.raiseDying(killer)
 	return true
 }
 
@@ -1068,7 +1069,8 @@ func (h *Hostile) Decayed() bool {
 }
 
 // Decay removes this NPC's corpse from the world, stops every effect it
-// still holds and runs the respawn hook, if any. It is idempotent: a repeat
+// still holds and runs the respawn hook, if any. Its decayed script hooks
+// run first, while it is still in the world. It is idempotent: a repeat
 // call is a no-op, matching the once-only guarantee the corpse decay task
 // relies on.
 //
@@ -1087,6 +1089,7 @@ func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
 	h.dead = true
 	h.corpseDeadline = time.Time{}
 	h.deathMu.Unlock()
+	h.raiseDecayed()
 
 	// The NPC leaves its zones while its observers still know it.
 	h.zones.leave(h.location())

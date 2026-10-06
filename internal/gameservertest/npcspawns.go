@@ -112,6 +112,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 		t.Fatalf("new npc spawns: %v", err)
 	}
 	link.SetNpcSpawns(npcs)
+	npcs.SpawnOnStart()
 	if deps.sevenSigns != nil {
 		deps.sevenSigns.SetSpawns(npcs)
 		npcs.StartSevenSigns(deps.sevenSigns)

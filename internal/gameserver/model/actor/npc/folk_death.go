@@ -3,6 +3,7 @@ package npc
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -29,8 +30,8 @@ func (f *Folk) Decayed() bool {
 // stop and its cast desires drop, every effect that does not last through
 // death ends, observers see it die and leave its attack stance, and its
 // corpse is registered for decay after the template corpse time. A
-// civilian NPC pays no reward.
-func (f *Folk) die() bool {
+// civilian NPC pays no reward. Its dying script hooks are scheduled last.
+func (f *Folk) die(killer attackable.Combatant) bool {
 	f.vitalsMu.Lock()
 	if f.dead {
 		f.vitalsMu.Unlock()
@@ -51,6 +52,7 @@ func (f *Folk) die() bool {
 		f.motion.cfg.Control.Emit(event.Died{})
 	}
 	f.scheduleDecay()
+	f.raiseDying(killer)
 	return true
 }
 
@@ -89,7 +91,8 @@ func (f *Folk) CorpseTime() time.Duration {
 }
 
 // Decay removes the NPC's corpse from the world, ends every effect it still
-// holds and runs respawn, if any, then closes its queue. It runs once; a
+// holds and runs respawn, if any, then closes its queue. Its decayed script
+// hooks run first, while it is still in the world. It runs once; a
 // repeat call reports false. worldState may be nil when the NPC was never
 // placed.
 func (f *Folk) Decay(worldState *world.State, respawn func()) bool {
@@ -101,6 +104,7 @@ func (f *Folk) Decay(worldState *world.State, respawn func()) bool {
 	f.decayed, f.dead = true, true
 	f.corpseDeadline = time.Time{}
 	f.vitalsMu.Unlock()
+	f.raiseDecayed()
 
 	// The NPC leaves its zones while its observers still know it.
 	x, y, z := f.Position()
@@ -121,4 +125,15 @@ func (f *Folk) Decay(worldState *world.State, respawn func()) bool {
 		f.queue.Close()
 	}
 	return true
+}
+
+// DeleteNow takes the NPC out of the world at once, leaving no corpse, on
+// the calling goroutine, and answers its spawn as for a decayed corpse: it
+// is out of the world when it returns.
+func (f *Folk) DeleteNow() {
+	if f.remover != nil {
+		f.remover.RemoveFolk(f)
+		return
+	}
+	f.Decay(f.world, nil)
 }
