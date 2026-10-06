@@ -84,17 +84,7 @@ func (n *Npcs) DeleteFixed(id int32) bool {
 	case *npc.Hostile:
 		a.DeleteMe()
 	case *npc.Folk:
-		remove := func() {
-			if n.decay != nil {
-				n.decay.Cancel(a)
-			}
-			a.Decay(n.state, n.RespawnHook(id))
-		}
-		if q := a.Queue(); q != nil {
-			q.Post(remove)
-		} else {
-			remove()
-		}
+		onQueue(a.Queue(), func() { n.removeFolk(a) })
 	default:
 		return false
 	}

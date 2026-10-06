@@ -119,11 +119,14 @@ func (s *Spawner) CreatePrivates(master *NPC) {
 }
 
 // ScheduleDespawn deletes n once d has passed, unless it has left the
-// world by then. A d that is not positive schedules nothing.
+// world by then. A d that is not positive schedules nothing. A handle on
+// nothing panics.
 func (s *Spawner) ScheduleDespawn(n *NPC, d time.Duration) {
-	if c := combatantOf(n); c != nil {
-		s.pop.ScheduleDespawn(c, d)
+	c := combatantOf(n)
+	if c == nil {
+		panic("script: schedule the despawn of a handle on nothing")
 	}
+	s.pop.ScheduleDespawn(c, d)
 }
 
 // logRefused logs a spawn of npcID that placed nothing; a missing template

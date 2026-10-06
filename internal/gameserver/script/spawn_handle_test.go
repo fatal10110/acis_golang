@@ -2,8 +2,10 @@ package script
 
 import (
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/rs/zerolog"
 )
 
 // A handle on a civilian NPC reports the creature it was spawned for, a
@@ -43,5 +45,21 @@ func TestNPCHandleSummonerAndDecayed(t *testing.T) {
 	var none *NPC
 	if !none.Decayed() || none.Summoner() != nil || NPCOf(nil) != nil || PlayerOf(nil) != nil {
 		t.Fatal("a handle on nothing is not empty")
+	}
+}
+
+// Scheduling the despawn of a handle on nothing panics, as the place of
+// one does: the invocation aborts there.
+func TestScheduleDespawnOfNothingPanics(t *testing.T) {
+	s := NewSpawner(nil, zerolog.Nop())
+	for name, h := range map[string]*NPC{"nil handle": nil, "handle of nil": NPCOf(nil)} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Fatalf("%s: ScheduleDespawn did not panic", name)
+				}
+			}()
+			s.ScheduleDespawn(h, time.Second)
+		}()
 	}
 }

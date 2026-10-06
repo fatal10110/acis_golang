@@ -492,9 +492,6 @@ func (n *Npcs) deleteLive(id int32) {
 	case *npc.Hostile:
 		a.DeleteMe()
 	case *npc.Folk:
-		onQueue(a.Queue(), func() {
-			n.decay.Cancel(a)
-			a.Decay(n.state, n.RespawnHook(id))
-		})
+		onQueue(a.Queue(), func() { n.removeFolk(a) })
 	}
 }
