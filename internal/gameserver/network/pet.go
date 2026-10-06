@@ -268,6 +268,7 @@ func (l *GameClientLink) petGetItem(ctx context.Context, live *livePlayer, req c
 	}
 
 	l.broadcastGroundPickup(ground, pet.ObjectID())
+	tutorialPickedUp(live, ground.ItemID())
 	l.groundItems.Remove(ground)
 	l.world.Despawn(ground)
 	l.broadcastPetPickupAttention(live, ground)

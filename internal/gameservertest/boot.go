@@ -116,6 +116,7 @@ type options struct {
 	itemFlushFault         *ItemFlushFault
 	selectionHold          func(objectID int32)
 	scripts                *scriptOptions
+	memoLoadErr            error
 	scheduleStart          time.Time // WithScheduledTasks; zero runs no task
 	questLoadErr           error
 	subclassFault          SubclassFault
@@ -2112,6 +2113,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Recommendations = gamesql.NewRecommendationStore(db)
 	quests := bootQuests(db, persistWorker, o)
 	gclConfig.Quests, gclConfig.Scripts, gclConfig.Journals = quests.store, quests.registry, quests.journals
+	gclConfig.Memos = memoStore{MemoStore: gamesql.NewMemoStore(db), loadErr: o.memoLoadErr}
 	gclConfig.AugmentationChances = augmentation.DefaultChances()
 	if o.augmentationChances != nil {
 		gclConfig.AugmentationChances = *o.augmentationChances

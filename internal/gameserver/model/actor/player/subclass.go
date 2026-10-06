@@ -260,7 +260,9 @@ func (c *Character) ClampResources() {
 	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	c.curHP = min(c.curHP, res.MaxHP)
+	if c.curHP > res.MaxHP {
+		c.writeHPLocked(res.MaxHP)
+	}
 	c.curMP = min(c.curMP, res.MaxMP)
 	c.curCP = min(c.curCP, res.MaxCP)
 }

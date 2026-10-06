@@ -33,7 +33,7 @@ func (c *Character) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 		return false
 	}
 	if c.landHit(float64(dmg), attacker, false, false) {
-		return c.Die(attacker)
+		return c.DieFromDamage(attacker)
 	}
 	return false
 }
@@ -61,14 +61,27 @@ func (c *Character) AlikeDead() bool {
 	return c.Dead() || c.FakeDead()
 }
 
-// MarkDead clears HP and transitions this player into its dead state.
+// MarkDead clears HP and transitions this player into its dead state, as
+// the selection of a character saved dead does. Clearing the HP of a
+// character restored dead is no HP write: it raises no low-HP tutorial
+// event.
 func (c *Character) MarkDead() bool {
+	return c.markDead(false)
+}
+
+// markDead is MarkDead; hpWrite makes the HP clear an HP write, as the
+// death Die runs is.
+func (c *Character) markDead(hpWrite bool) bool {
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.dead.Load() {
 		return false
 	}
-	c.curHP = 0
+	if hpWrite {
+		c.writeHPLocked(0)
+	} else {
+		c.curHP = 0
+	}
 	c.dead.Store(true)
 	return true
 }
@@ -121,9 +134,10 @@ func (c *Character) revive() bool {
 		return false
 	}
 	if blessed {
-		c.curHP, c.curMP = res.MaxHP, res.MaxMP
+		c.writeHPLocked(res.MaxHP)
+		c.curMP = res.MaxMP
 	} else {
-		c.curHP = min(res.MaxHP*c.respawnRestoreHP, res.MaxHP)
+		c.writeHPLocked(min(res.MaxHP*c.respawnRestoreHP, res.MaxHP))
 	}
 	c.vitalsMu.Unlock()
 
@@ -165,7 +179,7 @@ func (c *Character) revive() bool {
 // without a stat refresh per effect, and the player and its observers get
 // its full view once the strip ends.
 func (c *Character) Die(killer attackable.Combatant) bool {
-	if !c.MarkDead() {
+	if !c.markDead(true) {
 		return false
 	}
 	c.stateMu.RLock()

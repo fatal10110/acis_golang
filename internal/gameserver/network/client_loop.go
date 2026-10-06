@@ -2172,6 +2172,19 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				onLive(live, func() { live.SendFrame(questListFrame(live.Character)) })
 			}
 
+		case clientpackets.OpcodeRequestTutorialLinkHTML, clientpackets.OpcodeRequestTutorialPassCmdToServer,
+			clientpackets.OpcodeRequestTutorialQuestionMark, clientpackets.OpcodeRequestTutorialClientEvent:
+			req, err := decodeClientPacket(l, client, payload, tutorialDecoder(opcode))
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.tutorialRequest(live, req.Name) })
+			}
+
 		case clientpackets.OpcodeRequestQuestAbort:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestQuestAbort)
 			if err != nil {

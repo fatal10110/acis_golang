@@ -192,6 +192,7 @@ func (l *GameClientLink) pickupGroundInto(inv *itemcontainer.Inventory, ground *
 func (l *GameClientLink) takeGroundFromWorld(live *livePlayer, ground *grounditem.Item) {
 	live.SendFrame(serverpackets.FrameActionFailed())
 	l.broadcastGroundPickup(ground, live.ObjectID())
+	tutorialPickedUp(live, ground.ItemID())
 	l.groundItems.Remove(ground)
 	l.world.Despawn(ground)
 	// A cursed weapon is announced by its own activation instead.
