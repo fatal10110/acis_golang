@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 const partyAttackedWeight = 1.0
@@ -35,7 +36,8 @@ const flatAttackedHateWeight = 200
 // DOT tick contributes zero hate and an unbounded
 // zero-defence hit a finite MaxInt32-sized one), and falls back to the
 // flat pre-existing weight for everything else — an approximation, not the
-// full per-script behavior.
+// full per-script behavior. It runs only for an NPC with no bound behavior:
+// a bound behavior's attacked hook decides the hate instead.
 func (h *Hostile) attackedHateWeight(attacker attackable.Combatant, damage float64) float64 {
 	if !creature.Playable(attacker) {
 		return flatAttackedHateWeight
@@ -43,47 +45,76 @@ func (h *Hostile) attackedHateWeight(attacker attackable.Combatant, damage float
 	return float64(commons.JavaInt(damage)) / (float64(h.Level()) + 7) * 100
 }
 
-// NotifyAggression records the incoming aggression on this NPC and fans it
-// out to the master/minion party so escorts assist the same target. power
-// goes through attackedHateWeight before reaching the threat table: the
-// AGGRESSION event routes into the same per-script attacked-hook chain a
-// real hit uses, with aggro standing in for damage.
+// NotifyAggression is an aggression effect source landed on this NPC with
+// power: no HP change and no skill. The attacked hooks run with power as
+// the damage, then the party is called: the NPC itself, its master (alive),
+// and every live minion of the party, the NPC itself again when it is one.
+// Without a bound behavior, power first goes through attackedHateWeight
+// into an attack desire.
 func (h *Hostile) NotifyAggression(source attackable.Combatant, power int) {
 	if source == nil {
 		return
 	}
-	h.AddAttackDesire(source, h.attackedHateWeight(source, float64(power)))
-	h.propagatePartyAttacked(h, source, power, true)
+	if !h.behaves() {
+		h.AddAttackDesire(source, h.attackedHateWeight(source, float64(power)))
+	}
+	h.raiseAttacked(source, int32(power), skill.Ref{})
+	h.propagatePartyAttacked(h, source, power, true, true)
 }
 
-// registerHit records hate, the shot-recharge roll, and the party/minion
-// attacked call for a live hit, one layer above the invul/damage-permission
+// SkillAttacked is caster's offensive skill sk landing on this NPC, once
+// its effects applied, for a skill that is a debuff or carries aggro
+// points. The attacked hooks run with max(120, aggro points) as the damage,
+// then the party is called as for a hit. A dead NPC is called too, and
+// nothing else reacts: a skill's call has no built-in reaction.
+func (h *Hostile) SkillAttacked(caster attackable.Combatant, sk skill.Definition) {
+	if caster == nil {
+		return
+	}
+	value := max(120, sk.AggroPoints)
+	h.raiseAttacked(caster, int32(value), skill.Ref{ID: sk.ID, Level: sk.Level})
+	h.propagatePartyAttacked(h, caster, value, false, false)
+}
+
+// registerHit records hate, the shot-recharge roll, and the attacked hooks
+// and party call for a live hit, one layer above the invul/damage-permission
 // guard. ReduceHP and ReduceHPByDOT run it whatever the amount, a
 // zero-damage hit included (there is no damage check at that layer).
 // TakeDamage only ever sees positive damage, since the auto-attack path
 // drops zero hits before reaching it, so its dmg > 0 gate never skips a
-// real hit. isDOT selects ReduceHPByDOT's unconditional zero-weight hate
-// call plus its own attackedHateWeight-derived attack Desire, instead of
-// AddCombatDamageHate's combined write for TakeDamage/ReduceHP. A no-op when
-// attacker isn't a Combatant (e.g. an environmental DOT source). Pulled out
-// after this exact block drifted out of order between copies twice (#2326,
-// #2328) — one place to keep the ordering right. The hit observer sees the
-// hit first, ahead of everything it causes.
-func (h *Hostile) registerHit(combatant attackable.Combatant, amount float64, isDOT bool) {
+// real hit. sk is the skill that dealt the hit, the zero Ref for none. A
+// no-op when attacker isn't a Combatant (e.g. an environmental DOT source).
+// Pulled out after this exact block drifted out of order between copies
+// twice (#2326, #2328) — one place to keep the ordering right. The hit
+// observer sees the hit first, ahead of everything it causes.
+//
+// The damage enters the threat table at zero hate. Without a bound
+// behavior the built-in reactions follow: an attack desire weighted by
+// attackedHateWeight (isDOT adds it apart from the damage, as
+// ReduceHPByDOT does; otherwise AddCombatDamageHate writes both), and the
+// shot-recharge roll. The attacked hooks then run with the damage truncated
+// to an int, and the party is called.
+func (h *Hostile) registerHit(combatant attackable.Combatant, amount float64, isDOT bool, sk skill.Ref) {
 	if combatant == nil {
 		return
 	}
 	if h.hits != nil {
 		h.hits.Hit(combatant)
 	}
-	if isDOT {
+	switch {
+	case h.behaves():
+		h.AddDamageHate(combatant, amount, 0)
+	case isDOT:
 		h.AddDamageHate(combatant, amount, 0)
 		h.AddAttackDesire(combatant, h.attackedHateWeight(combatant, amount))
-	} else {
+		h.RollAttackedShotRecharge()
+	default:
 		h.AddCombatDamageHate(combatant, amount)
+		h.RollAttackedShotRecharge()
 	}
-	h.RollAttackedShotRecharge()
-	h.propagatePartyAttacked(h, combatant, int(commons.JavaInt(amount)), false)
+	damage := int(commons.JavaInt(amount))
+	h.raiseAttacked(combatant, int32(damage), sk)
+	h.propagatePartyAttacked(h, combatant, damage, false, true)
 }
 
 func (h *Hostile) inParty() bool {
@@ -97,13 +128,19 @@ func (h *Hostile) partyMinions() []*Hostile {
 	return h.Minions()
 }
 
-func (h *Hostile) propagatePartyAttacked(caller *Hostile, target attackable.Combatant, aggro int, includeSelfInMinionLoop bool) {
+// propagatePartyAttacked calls the party of caller, an NPC in a party
+// attacked by target for damage: caller itself, then its master when
+// alive, then every live minion of the party. The minion loop skips caller
+// unless includeSelfInMinionLoop, as an aggression effect's does not.
+// assist turns on the built-in party assist of the called NPCs that have
+// no bound behavior.
+func (h *Hostile) propagatePartyAttacked(caller *Hostile, target attackable.Combatant, damage int, includeSelfInMinionLoop, assist bool) {
 	if !h.inParty() {
 		return
 	}
-	h.reactPartyAttacked(caller, target, aggro)
+	h.partyAttacked(caller, target, damage, assist)
 	if master := h.Master(); master != nil && !master.AlikeDead() {
-		master.reactPartyAttacked(caller, target, aggro)
+		master.partyAttacked(caller, target, damage, assist)
 	}
 	for _, minion := range h.partyMinions() {
 		if minion.AlikeDead() {
@@ -112,7 +149,7 @@ func (h *Hostile) propagatePartyAttacked(caller *Hostile, target attackable.Comb
 		if !includeSelfInMinionLoop && minion == caller {
 			continue
 		}
-		minion.reactPartyAttacked(caller, target, aggro)
+		minion.partyAttacked(caller, target, damage, assist)
 	}
 }
 

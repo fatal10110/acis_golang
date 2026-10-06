@@ -1,6 +1,10 @@
 package script
 
-import "context"
+import (
+	"context"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+)
 
 // The hook payloads, one per fact. Each carries the handles and values the
 // hook reacts to. A skill, item or door the fact also involves is added, in
@@ -12,11 +16,14 @@ type AbnormalStatusChanged struct {
 	Caster Creature
 }
 
-// Attacked: Attacker hit NPC for Damage.
+// Attacked: Attacker attacked NPC for Damage, with Skill when a skill did
+// it. Skill is the zero Ref for an attack with no skill: a plain hit or an
+// aggression effect.
 type Attacked struct {
 	NPC      *NPC
 	Attacker Creature
 	Damage   int32
+	Skill    skill.Ref
 }
 
 // AttackFinished: NPC finished an attack on Target.

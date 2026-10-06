@@ -87,7 +87,7 @@ func newEventsFixtureAt(t *testing.T, table *spawn.Table, templates *npc.Table, 
 	f.npcs, err = newNpcs(NewSpawns(table, nil), templates, fakeGeo{}, f.state, &sequentialIDs{}, decay, f.respawn,
 		task.NewAI(f.state, zerolog.Nop()), task.NewPositionUpdates(f.state), item.NewTable(nil), &recordingGround{}, KillRewardConfig{}, now, zerolog.Nop(),
 		nil, actorcast.EffectHandlers{}, walker, nil, nil, 20, 30, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), events,
-		effect.Env{Activity: task.NewEffects()}, f.queues, testMakers())
+		effect.Env{Activity: task.NewEffects()}, f.queues, testMakers(), nil)
 	if err != nil {
 		t.Fatalf("newNpcs() error: %v", err)
 	}

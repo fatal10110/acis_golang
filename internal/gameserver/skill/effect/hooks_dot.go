@@ -1,5 +1,13 @@
 package effect
 
+import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+
+// skillDOTTarget is a target whose hits name the skill that dealt them: a
+// damage-over-time tick on it names the effect's skill.
+type skillDOTTarget interface {
+	ReduceHPBySkillDOT(damage float64, effector Actor, sk modelskill.Ref)
+}
+
 func damageOverTimeAction(e *Effect) bool {
 	target := e.Effected
 	result := DamageOverTimeTick(DamageOverTimeInput{
@@ -23,6 +31,8 @@ func damageOverTimeAction(e *Effect) bool {
 		// Every other creature already skips those for any DOT tick.
 		if player, ok := asPlayer(target); ok && e.Skill.Toggle {
 			player.ReduceHPByToggleUpkeep(result.Damage, e.Effector)
+		} else if named, ok := target.(skillDOTTarget); ok {
+			named.ReduceHPBySkillDOT(result.Damage, e.Effector, modelskill.Ref{ID: e.Skill.ID, Level: e.Skill.Level})
 		} else {
 			target.ReduceHPByDOT(result.Damage, e.Effector, true)
 		}

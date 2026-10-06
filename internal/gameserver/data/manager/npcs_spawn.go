@@ -165,7 +165,7 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	}
 	hostile.SetCurrentHP(hp)
 	rewards := n.rewarderFor(hostile, tmpl)
-	rt := npc.Runtime{World: n.state, Log: n.log, Items: n.items, Rewards: rewards, Remover: n, Slot: slot}
+	rt := npc.Runtime{World: n.state, Log: n.log, Items: n.items, Rewards: rewards, Remover: n, Slot: slot, Scripts: n.scripts}
 	if rewards.rights != nil {
 		rt.Hits = rewards.rights
 	}

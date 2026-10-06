@@ -94,13 +94,13 @@ func provideSpawns(ctx bootContext, paths gameServerPaths, pool *sql.DB, log zer
 // then wires the decay/respawn tasks' late-bound hooks to it — manager.Npcs
 // needs *task.Decay and *task.Respawn to register actors with, so those
 // tasks' own effects can only point back at Npcs after it exists.
-func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids *idfactory.Allocator, decay *task.Decay, decayHooks *worldDecayEffects, respawnTask *task.Respawn, respawnHooks *npcRespawnEffects, ai *task.AI, positions *task.PositionUpdates, ground *task.GroundItems, rewards manager.KillRewardConfig, gameplay gameplayConfig, log zerolog.Logger, walker *task.Walker, link *network.GameClientLink, attackStance *task.AttackStance, effects effect.Env, pool *sim.Pool, makers *script.Makers) (*manager.Npcs, error) {
+func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids *idfactory.Allocator, decay *task.Decay, decayHooks *worldDecayEffects, respawnTask *task.Respawn, respawnHooks *npcRespawnEffects, ai *task.AI, positions *task.PositionUpdates, ground *task.GroundItems, rewards manager.KillRewardConfig, gameplay gameplayConfig, log zerolog.Logger, walker *task.Walker, link *network.GameClientLink, attackStance *task.AttackStance, effects effect.Env, pool *sim.Pool, makers *script.Makers, scripts *script.Registry) (*manager.Npcs, error) {
 	rewards.Parties = link
 	rewards.RaidKills = link
 	rewards.Channels = link
 	rewards.CursedWeapons = link
 	npcs, err := manager.NewNpcsWithMaxBuffsAmount(spawns, data.NPCs, move.NewGeo(data.Geo, data.Finder), state, ids, decay, respawnTask, ai, positions, data.Items, ground, rewards, time.Now, log,
-		data.Skills, link.HostileCastEffects(), walker, network.HostileSinks(state, attackStance), link.FolkSinks(state, attackStance), int(gameplay.MaxBuffsAmount), int(gameplay.RandomWalkRate), int(gameplay.MaxGeoPathFailCount), gameplay.RaidMultipliers, gameplay.NpcAI, gameplay.SpawnEvents, effects, pool, makers, data.Zones)
+		data.Skills, link.HostileCastEffects(), walker, network.HostileSinks(state, attackStance), link.FolkSinks(state, attackStance), int(gameplay.MaxBuffsAmount), int(gameplay.RandomWalkRate), int(gameplay.MaxGeoPathFailCount), gameplay.RaidMultipliers, gameplay.NpcAI, gameplay.SpawnEvents, effects, pool, makers, scripts, data.Zones)
 	if err != nil {
 		return nil, err
 	}

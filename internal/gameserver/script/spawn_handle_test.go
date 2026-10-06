@@ -4,14 +4,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/rs/zerolog"
 )
 
+// playerCombatant is a player the world tracks under objectID.
+type playerCombatant struct{ combatant }
+
+func (*playerCombatant) Kind() actor.Kind { return actor.KindPlayer }
+
 // A handle on a civilian NPC reports the creature it was spawned for, a
 // player's handle, and reports the NPC gone once it decays.
 func TestNPCHandleSummonerAndDecayed(t *testing.T) {
-	summoner := &combatant{objectID: 7}
+	summoner := &playerCombatant{combatant{objectID: 7}}
 	inst, err := npc.NewInstance(100, &npc.Template{ID: 30001, TemplateID: 30001, Type: "Merchant", Name: "Grocer", Level: 1, HPMax: 10})
 	if err != nil {
 		t.Fatal(err)

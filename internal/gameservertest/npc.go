@@ -135,6 +135,7 @@ func (s *Server) spawnHostileInstance(t *testing.T, inst *npc.Instance, at locat
 		Rewards: rewards,
 		Hits:    hits,
 		Sink:    network.HostileSinks(s.State, s.stance)(hostile),
+		Scripts: s.quests.registry,
 	})
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
 	hostile.EnterZones()
@@ -445,6 +446,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 		Rewards: rewards,
 		Hits:    hits,
 		Sink:    network.HostileSinks(s.State, s.stance)(hostile),
+		Scripts: s.quests.registry,
 	}
 	// Production takes line of sight from the same geodata (npcs_spawn.go).
 	if los, ok := geo.(npc.LineOfSight); ok {

@@ -60,6 +60,12 @@ type SkillCaster interface {
 	NotePvPSkillTargets(targets []attackable.Combatant, offensive bool, skillType string)
 }
 
+// skillAttackedTarget is an NPC that reacts to being hit by an offensive
+// debuff or a skill with aggro points.
+type skillAttackedTarget interface {
+	SkillAttacked(caster attackable.Combatant, def modelskill.Definition)
+}
+
 // ApplyEffects resolves def's affected target set from caster and the
 // already cast-validated single selection, then routes the skill's effects
 // to the resolved set. It reports whether a skill handler actually ran.
@@ -220,6 +226,15 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 		Item:    item,
 		Sink:    handlers.Sink,
 	})
+	// An offensive debuff, or an offensive skill with aggro points, calls
+	// each NPC it hit once its effects applied, dead or not.
+	if def.Offensive && (def.Debuff || def.AggroPoints > 0) {
+		for _, target := range affected {
+			if attacked, ok := target.(skillAttackedTarget); ok {
+				attacked.SkillAttacked(castCaster, def)
+			}
+		}
+	}
 	// PvP flagging follows the skill's effects, so a skill that makes its
 	// caster a PKer flags it again after the kill ended its flag.
 	castCaster.NotePvPSkillTargets(notifyTargets, def.Offensive, def.SkillType)

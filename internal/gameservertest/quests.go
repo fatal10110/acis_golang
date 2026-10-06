@@ -22,6 +22,8 @@ type scriptOptions struct {
 	rand    func(n int) int
 	// singleItemDrop turns MultipleItemDrop off.
 	singleItemDrop bool
+	// kinds are the NPC ids that have a template, with its kind.
+	kinds map[int32]script.NPCKind
 }
 
 // WithScripts boots the script registry from list and catalog, as the
@@ -61,6 +63,16 @@ func (o *options) scriptHelpers() *scriptOptions {
 	return o.scripts
 }
 
+// WithNPCScripts is WithScripts where each NPC id in kinds has a template
+// of that kind, so the scripts' bindings to those ids hold and the hooks
+// they subscribe to must be raised for that kind.
+func WithNPCScripts(kinds map[int32]script.NPCKind, list []script.Listing, catalog script.Catalog) Option {
+	return func(o *options) {
+		so := o.scriptHelpers()
+		so.list, so.catalog, so.kinds = list, catalog, kinds
+	}
+}
+
 // WithQuestLoadFault makes every quest journal read at a character
 // selection fail with err.
 func WithQuestLoadFault(err error) Option {
@@ -96,8 +108,11 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, o *optio
 	if so.rand != nil {
 		env.Rand = so.rand
 	}
-	noTemplate := func(int32) (script.NPCKind, bool) { return script.KindOther, false }
-	registry := script.Build(so.list, so.catalog, script.Config{KindOf: noTemplate, Log: o.log, Env: env})
+	kindOf := func(id int32) (script.NPCKind, bool) {
+		k, ok := so.kinds[id]
+		return k, ok
+	}
+	registry := script.Build(so.list, so.catalog, script.Config{KindOf: kindOf, Log: o.log, Env: env})
 	return &questBoot{store: store, registry: registry, journals: journals, env: env}
 }
 

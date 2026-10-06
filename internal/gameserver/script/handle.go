@@ -1,6 +1,7 @@
 package script
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -21,11 +22,23 @@ type Player struct {
 	self attackable.Combatant
 }
 
-// Creature is a script's handle on any creature: an NPC or a player.
+// Creature is a script's handle on any creature: an NPC, a player, or
+// another creature such as a summon.
 type Creature interface {
+	// ObjectID returns the creature's world object id, 0 for a handle on
+	// nothing.
+	ObjectID() int32
 	// combatant is the creature as the world tracks it, nil for a handle on
 	// nothing.
 	combatant() attackable.Combatant
+}
+
+// creature is a handle on a creature that is neither an NPC nor a player.
+type creature struct{ self attackable.Combatant }
+
+// NewNPC returns a handle on the hostile NPC h.
+func NewNPC(h *npc.Hostile) *NPC {
+	return &NPC{self: h, brain: h.AI()}
 }
 
 // NPCOf returns the handle on the live NPC n, a hostile or a civilian
@@ -33,7 +46,7 @@ type Creature interface {
 func NPCOf(n attackable.Combatant) *NPC {
 	switch o := n.(type) {
 	case *npc.Hostile:
-		return &NPC{self: o, brain: o.AI()}
+		return NewNPC(o)
 	case *npc.Folk:
 		// A civilian NPC's AI takes no desires yet (#3492): its handle
 		// has no brain, and the registration gate of #3517 keeps desire
@@ -51,16 +64,21 @@ func PlayerOf(p attackable.Combatant) *Player {
 	return &Player{self: p}
 }
 
-// creatureOf returns the handle on c: an NPC's for an NPC, a player's
-// otherwise; nil for nil.
+// creatureOf returns a handle on c: an NPC handle on an NPC, a player
+// handle on a player, a creature handle otherwise, and nil for nil.
+// A player is told by its kind, not its Go type: the world tracks a player
+// wrapped with its connection, and the handle keeps that tracked value.
 func creatureOf(c attackable.Combatant) Creature {
+	if c == nil {
+		return nil
+	}
 	if n := NPCOf(c); n != nil {
 		return n
 	}
-	if p := PlayerOf(c); p != nil {
-		return p
+	if c.Kind() == actor.KindPlayer {
+		return PlayerOf(c)
 	}
-	return nil
+	return &creature{self: c}
 }
 
 // Decayed reports whether the NPC has left the world for good: its corpse
@@ -101,6 +119,29 @@ func (p *Player) combatant() attackable.Combatant {
 		return nil
 	}
 	return p.self
+}
+
+func (c *creature) combatant() attackable.Combatant {
+	if c == nil {
+		return nil
+	}
+	return c.self
+}
+
+// ObjectID returns the NPC's world object id.
+func (n *NPC) ObjectID() int32 { return objectID(n) }
+
+// ObjectID returns the player's world object id.
+func (p *Player) ObjectID() int32 { return objectID(p) }
+
+// ObjectID returns the creature's world object id.
+func (c *creature) ObjectID() int32 { return objectID(c) }
+
+func objectID(c Creature) int32 {
+	if self := c.combatant(); self != nil {
+		return self.ObjectID()
+	}
+	return 0
 }
 
 // combatantOf resolves c to the creature the world tracks, nil when c is a
