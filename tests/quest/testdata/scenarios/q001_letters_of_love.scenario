@@ -1,0 +1,164 @@
+# Letters of Love (Q001): accept at Darin, deliver the letter to Roxxy through her quest
+# choice list, back to Darin, to Baulro, back to Darin for the necklace; then relog.
+# Every step up to the relog replays the reference trace, packet for packet and statement
+# for statement. Q006 and the Noblesse teleporter are registered as in the reference so
+# Roxxy's windows list what the reference lists.
+trace internal/gameserver/script/testdata/oracle/trace_q001.golden
+character Talker 20
+script quest.Q001_LettersOfLove
+stub quest.Q006_StepIntoTheFuture
+stub script.teleport.NoblesseTeleporter
+item 687 688 1079 1080 906
+page default/30048.htm
+page gatekeeper/30006.htm
+page trainer/30033.htm
+page script/quest/Q001_LettersOfLove/
+npc darin 30048 Folk 10 0 0
+npc roxxy 30006 Gatekeeper 20 0 0
+npc baulro 30033 Trainer 30 0 0
+
+# Darin: select, talk, open his quest window. The window creates the quest, unsaved.
+action darin
+action darin
+  S ActionFailed
+  S NpcHtmlMessage obj=darin item=0 page=default/30048.htm
+  S ActionFailed
+bypass npc_{darin}_Quest
+  S NpcHtmlMessage obj=darin item=0 page=script/quest/Q001_LettersOfLove/30048-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q001_LettersOfLove CREATED
+  rows Q001_LettersOfLove -
+bypass Quest Q001_LettersOfLove 30048-03.htm
+  S NpcHtmlMessage obj=darin item=0 page=script/quest/Q001_LettersOfLove/30048-03.htm
+  S ActionFailed
+bypass Quest Q001_LettersOfLove 30048-04.htm
+  S NpcHtmlMessage obj=darin item=0 page=script/quest/Q001_LettersOfLove/30048-04.htm
+  S ActionFailed
+
+# Accept: the quest starts with Darin's letter.
+bypass Quest Q001_LettersOfLove 30048-06.htm
+  S QuestList 1:0x80000001
+  S ExShowQuestMark quest=1
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:687
+  S NpcHtmlMessage obj=darin item=0 page=script/quest/Q001_LettersOfLove/30048-06.htm
+  S ActionFailed
+  Q upsert Q001_LettersOfLove | <state> | STARTED
+  Q upsert Q001_LettersOfLove | <cond> | 1
+  state Q001_LettersOfLove STARTED
+  rows Q001_LettersOfLove <cond>=1 <state>=STARTED
+  items 687=1 688=0 1079=0 1080=0 906=0
+
+# Darin again: still waiting for Roxxy's answer.
+action darin
+  S ActionFailed
+  S NpcHtmlMessage obj=darin item=0 page=default/30048.htm
+  S ActionFailed
+bypass npc_{darin}_Quest
+  S NpcHtmlMessage obj=darin item=0 page=script/quest/Q001_LettersOfLove/30048-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Roxxy: her quest window lists both her quests; the letter becomes her kerchief.
+action roxxy
+action roxxy
+  S ActionFailed
+  S NpcHtmlMessage obj=roxxy item=0 page=gatekeeper/30006.htm
+  S ActionFailed
+bypass npc_{roxxy}_Quest
+  S NpcHtmlMessage obj=roxxy item=0 html="<html><body><a action=\"bypass -h npc_{roxxy}_Quest Q001_LettersOfLove\">[Letters of Love (In Progress)]</a><br><a action=\"bypass -h npc_{roxxy}_Quest Q006_StepIntoTheFuture\">[Step into the Future]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{roxxy}_Quest Q001_LettersOfLove
+  S QuestList 1:0x80000003
+  S ExShowQuestMark quest=1
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:687
+  S SystemMessage id=54 3:688
+  S NpcHtmlMessage obj=roxxy item=0 page=script/quest/Q001_LettersOfLove/30006-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q001_LettersOfLove | <cond> | 2
+  rows Q001_LettersOfLove <cond>=2 <state>=STARTED
+  items 687=0 688=1
+
+# Darin: the kerchief becomes his receipt for Baulro.
+action darin
+action darin
+  S ActionFailed
+  S NpcHtmlMessage obj=darin item=0 page=default/30048.htm
+  S ActionFailed
+bypass npc_{darin}_Quest
+  S QuestList 1:0x80000007
+  S ExShowQuestMark quest=1
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:688
+  S SystemMessage id=54 3:1079
+  S NpcHtmlMessage obj=darin item=0 page=script/quest/Q001_LettersOfLove/30048-08.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q001_LettersOfLove | <cond> | 3
+  items 688=0 1079=1
+
+# Baulro: the receipt becomes the potion.
+action baulro
+action baulro
+  S ActionFailed
+  S NpcHtmlMessage obj=baulro item=0 page=trainer/30033.htm
+  S ActionFailed
+bypass npc_{baulro}_Quest
+  S QuestList 1:0x8000000f
+  S ExShowQuestMark quest=1
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1079
+  S SystemMessage id=54 3:1080
+  S NpcHtmlMessage obj=baulro item=0 page=script/quest/Q001_LettersOfLove/30033-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q001_LettersOfLove | <cond> | 4
+  rows Q001_LettersOfLove <cond>=4 <state>=STARTED
+  items 1079=0 1080=1
+
+# Darin: the potion for the necklace; the quest completes, leaving its state row.
+action darin
+action darin
+  S ActionFailed
+  S NpcHtmlMessage obj=darin item=0 page=default/30048.htm
+  S ActionFailed
+bypass npc_{darin}_Quest
+  S SystemMessage id=302 3:1080
+  S SystemMessage id=54 3:906
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 1:0x00000000
+  S NpcHtmlMessage obj=darin item=0 page=script/quest/Q001_LettersOfLove/30048-10.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q001_LettersOfLove | <state> | COMPLETED
+  Q delete-except-state Q001_LettersOfLove
+  state Q001_LettersOfLove COMPLETED
+  rows Q001_LettersOfLove <state>=COMPLETED
+  items 687=0 688=0 1079=0 1080=0 906=1
+action darin
+  S ActionFailed
+  S NpcHtmlMessage obj=darin item=0 page=default/30048.htm
+  S ActionFailed
+bypass npc_{darin}_Quest
+  S NpcHtmlMessage obj=darin item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+# Relog: the completed quest loads from its one row, and the necklace stays.
+relog
+  state Q001_LettersOfLove COMPLETED
+  rows Q001_LettersOfLove <state>=COMPLETED
+  items 687=0 688=0 1079=0 1080=0 906=1
+action darin
+action darin
+  S ActionFailed
+  S NpcHtmlMessage obj=darin item=0 page=default/30048.htm
+  S ActionFailed
+bypass npc_{darin}_Quest
+  S NpcHtmlMessage obj=darin item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
