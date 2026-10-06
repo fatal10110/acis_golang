@@ -95,6 +95,14 @@ func (q *Quests) Abort(c *player.Character, questID int32) {
 	(&QuestState{quests: q, player: c, state: st}).Exit(true)
 }
 
+// Exit exits c's state in the quest named name, as QuestState.Exit does. A
+// quest c has no state in does nothing.
+func (q *Quests) Exit(c *player.Character, name string, repeatable bool) {
+	if qs := q.stateNamed(c, name); qs != nil {
+		qs.Exit(repeatable)
+	}
+}
+
 // Get returns the state's variable key.
 func (qs *QuestState) Get(key string) (string, bool) { return qs.state.Get(key) }
 
