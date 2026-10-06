@@ -23,3 +23,9 @@ func (s *Server) AddPlayerLevel(tb testing.TB, objID int32, delta int) {
 		tb.Fatalf("player %d level change did not run", objID)
 	}
 }
+
+// PlayerPledgeClass is the live player's clan rank.
+func (s *Server) PlayerPledgeClass(tb testing.TB, objID int32) int {
+	tb.Helper()
+	return s.onlineCharacter(tb, objID).PledgeClass()
+}

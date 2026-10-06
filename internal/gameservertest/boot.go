@@ -116,6 +116,7 @@ type options struct {
 	itemFlushFault         *ItemFlushFault
 	selectionHold          func(objectID int32)
 	scripts                *scriptOptions
+	scheduleStart          time.Time // WithScheduledTasks; zero runs no task
 	questLoadErr           error
 	subclassFault          SubclassFault
 	petNameLookupErr       error
@@ -959,6 +960,7 @@ type Server struct {
 	Sieges              *siege.Engine        // the castle sieges WithSieges runs; nil otherwise
 	CastleManor         *castlemanor.Manager // the manor WithCastleManor runs; nil otherwise
 	CastleManorClock    *sim.Inline          // the clock the manor's cycle runs on; nil without a manor
+	ScheduleClock       *sim.Inline          // the clock the scheduled tasks run on; nil without WithScheduledTasks
 	SevenSigns          *sevensigns.State
 	Festival            *festival.Manager
 	AnnounceFile        string // the announcements.xml the server reads and rewrites
@@ -2384,6 +2386,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.Mailbox.Restore(mails)
 		restoreBoardForums(t, forumStore, favoriteStore, gclConfig.Forums, gclConfig.Favorites, gclConfig.Clans)
 	}
+	scheduleClock := startSchedule(t, o, quests.registry, gcl)
 
 	c := testsupport.Dial(t, ln.Addr().String())
 	c.SendProtocolVersion(746)
@@ -2411,6 +2414,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Sieges:              gclConfig.Sieges,
 		CastleManor:         gclConfig.CastleManor,
 		CastleManorClock:    castleManorClock,
+		ScheduleClock:       scheduleClock,
 		HallFunctions:       hallFunctions,
 		Halls:               halls,
 		SevenSigns:          sevenSigns,

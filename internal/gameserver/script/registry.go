@@ -51,6 +51,8 @@ func kinds(ks ...NPCKind) kindSet {
 var raisedHooks = map[hook]kindSet{
 	hookAttacked:      kinds(KindHostile),
 	hookPartyAttacked: kinds(KindHostile),
+	// The schedule runner (StartSchedule).
+	hookStart: kinds(KindOther),
 }
 
 // Config is what Build needs besides the list and the catalog.
@@ -102,6 +104,9 @@ type entry struct {
 	// bound are the bindings the script asked for, with ids that have no
 	// NPC template left out.
 	bound Bindings
+	// sched is the schedule of a scheduled task, nil for any other script
+	// and for a task its entry does not schedule.
+	sched *schedule
 }
 
 type entryState uint8
@@ -149,6 +154,7 @@ func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
 			continue
 		}
 		e.script = &s
+		e.sched = scheduleOf(&s, l, r.log)
 		r.entries = append(r.entries, e)
 		r.register(e.script, e.bound)
 		if key := strings.ToLower(s.Name); r.byName[key] == nil {
@@ -214,12 +220,43 @@ func gate(s *Script, bound Bindings, cfg *Config) error {
 		}
 	}
 	set := s.Hooks.set()
-	for _, h := range []hook{hookEvent, hookTimer} {
+	for _, h := range []hook{hookEvent, hookStart, hookTimer} {
 		if set.has(h) && !cfg.raised(h, KindOther) && !cfg.raised(h, KindFolk) && !cfg.raised(h, KindHostile) {
 			return fmt.Errorf("hook %s is not raised", h)
 		}
 	}
 	return nil
+}
+
+// scheduleOf returns the schedule l gives s: none unless s is a scheduled
+// task (it has a start hook) and l names a schedule. A task whose entry has
+// no start, a schedule kind the runner does not build or a start stamp
+// that does not parse is logged and not scheduled; so is one whose end
+// differs from its start, as no task reacts to its end. A schedule on any
+// other script is ignored.
+func scheduleOf(s *Script, l Listing, log zerolog.Logger) *schedule {
+	if s.Hooks.OnStart == nil || l.Schedule == "" {
+		return nil
+	}
+	if l.Start == "" {
+		log.Warn().Str("script", l.Path).Msg("script: scheduled task has no start; not scheduled")
+		return nil
+	}
+	sc, unknownDay, err := parseSchedule(l.Schedule, l.Start)
+	if err == nil && l.End != "" {
+		var end schedule
+		if end, _, err = parseSchedule(l.Schedule, l.End); err == nil && end != sc {
+			err = fmt.Errorf("end %q differs from start %q: no task reacts to its end", l.End, l.Start)
+		}
+	}
+	if err != nil {
+		log.Error().Err(err).Str("script", l.Path).Msg("script: bad schedule; not scheduled")
+		return nil
+	}
+	if unknownDay != "" {
+		log.Error().Str("script", l.Path).Str("day", unknownDay).Msg("script: unknown day of week in schedule; Monday is used")
+	}
+	return &sc
 }
 
 // register adds s to the list of every (NPC, event) it is bound to.

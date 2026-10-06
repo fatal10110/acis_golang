@@ -1,6 +1,10 @@
 package script
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+import (
+	"context"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+)
 
 // The hook payloads, one per fact. Each carries the handles and values the
 // hook reacts to. A skill, item or door the fact also involves is added, in
@@ -124,6 +128,13 @@ type SeeSpell struct {
 type Spelled struct {
 	NPC    *NPC
 	Caster *Player
+}
+
+// Start: a scheduled task's start time came. Ctx ends when the schedule
+// runner stops; Server is what the task acts on.
+type Start struct {
+	Ctx    context.Context
+	Server Server
 }
 
 // StaticObjectClanAttacked: a door, attacked by Attacker, called the NPC
