@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -56,11 +57,13 @@ func TestScriptCatalogCompleteness(t *testing.T) {
 }
 
 // manifestScript is what the reference manifest records for one script:
-// its kind, its class's own hooks and its bind lines.
+// its kind, its class's own hooks, its bind lines and whether its entry
+// schedules it.
 type manifestScript struct {
-	kind  string
-	hooks []string
-	binds []string
+	kind      string
+	hooks     []string
+	binds     []string
+	scheduled bool
 }
 
 // quest hook methods: the reference's on-methods a script overrides to
@@ -74,6 +77,9 @@ var questHookMethods = map[string]bool{
 	"onScriptEvent": true, "onSeeCreature": true, "onSeeItem": true, "onSeeSpell": true, "onSpelled": true,
 	"onStaticObjectClanAttacked": true, "onTalk": true, "onTimer": true, "onUseSkillFinished": true,
 	"onZoneEnter": true, "onZoneExit": true,
+	// A scheduled task's start hook. Its end hook is left out: no task
+	// reacts to its end, and the engine builds no end hook.
+	"onStart": true,
 }
 
 func readScriptManifest(t *testing.T) map[string]*manifestScript {
@@ -100,6 +106,8 @@ func readScriptManifest(t *testing.T) map[string]*manifestScript {
 			cur.kind = fields[1]
 		case strings.HasPrefix(line, "  bind "):
 			cur.binds = append(cur.binds, strings.TrimSpace(line))
+		case line == "  scheduled" && cur != nil:
+			cur.scheduled = true
 		case strings.HasPrefix(line, "class "):
 			class = fields[1]
 		case strings.HasPrefix(line, "  hook ") && class != "":
@@ -154,6 +162,8 @@ func manifestMismatches(t *testing.T, list []script.Listing, catalog script.Cata
 			cur.hooks = strings.Split(fields[1], ",")
 		case strings.HasPrefix(line, "  bind "):
 			cur.binds = append(cur.binds, strings.TrimSpace(line))
+		case line == "  scheduled":
+			cur.scheduled = true
 		}
 	}
 	for path, g := range got {
@@ -170,6 +180,9 @@ func manifestMismatches(t *testing.T, list []script.Listing, catalog script.Cata
 			}
 			if !slices.Equal(g.binds, w.binds) {
 				out = append(out, path+": binds "+strings.Join(g.binds, "; ")+", reference "+strings.Join(w.binds, "; "))
+			}
+			if g.scheduled != w.scheduled {
+				out = append(out, fmt.Sprintf("%s: scheduled %v, reference %v", path, g.scheduled, w.scheduled))
 			}
 		}
 	}
@@ -200,6 +213,13 @@ func TestManifestComparisonCatchesDifferences(t *testing.T) {
 	got = manifestMismatches(t, list, q001, script.Config{KindOf: noTemplates, Log: zerolog.Nop()})
 	if len(got) != 2 || !strings.Contains(got[0], ": binds ") || !strings.Contains(got[1], ": own hooks onTalk, reference onAdvEvent,onTalk") {
 		t.Fatalf("a script without its bindings and hooks gave %q, want a bind and a hook mismatch", got)
+	}
+
+	// A task its entry does not schedule.
+	tasks := script.Catalog{"task.CastleTaxRefresh": taskCatalog()["task.CastleTaxRefresh"]}
+	got = manifestMismatches(t, []script.Listing{{Path: "task.CastleTaxRefresh"}}, tasks, script.Config{KindOf: noTemplates, Log: zerolog.Nop()})
+	if !slices.Equal(got, []string{"task.CastleTaxRefresh: scheduled false, reference true"}) {
+		t.Fatalf("an unscheduled task gave %q, want a scheduled mismatch", got)
 	}
 }
 

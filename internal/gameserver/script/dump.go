@@ -15,9 +15,10 @@ import (
 // lists.
 //
 //	script <path>                    one block per listed script, in list order
-//	  kind behavior|quest|script
+//	  kind behavior|quest|scheduled|script
 //	  hooks <method>,...             the hooks the script's own constructor sets
 //	  bind <EVENT>,... <npc ids>     events with identical id sets share a line
+//	  scheduled                      a scheduled task its entry schedules
 //	script <path> missing|refused    not registered
 //
 //	# folded npc events
@@ -39,6 +40,9 @@ func (r *Registry) Dump(w io.Writer) error {
 		}
 		for _, g := range byIDs(e.bound) {
 			fmt.Fprintf(bw, "  bind %s %s\n", g.events, g.ids)
+		}
+		if e.sched != nil {
+			fmt.Fprint(bw, "  scheduled\n")
 		}
 	}
 
@@ -82,6 +86,8 @@ func kindOf(s *Script) string {
 		return "behavior"
 	case s.QuestID > 0:
 		return "quest"
+	case s.Hooks.OnStart != nil:
+		return "scheduled"
 	default:
 		return "script"
 	}
