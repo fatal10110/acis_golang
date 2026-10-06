@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
@@ -222,12 +223,25 @@ func (l *GameClientLink) mayAddSubclass(live *livePlayer, subs []player.SubClass
 			return false
 		}
 	}
-	// A noble, or a character who has completed Fate's Whisper and Mimir's
-	// Elixir, may add one without SubClassWithoutQuests. Neither gate is
-	// wired here yet: noble status exists (player.Character.IsNoble) but
-	// checking it is #3070's to wire, and quest states do not exist yet,
-	// so none passes that way.
-	return l.playerConfig.SubclassWithoutQuests
+	if l.playerConfig.SubclassWithoutQuests || live.IsNoble() {
+		return true
+	}
+	return questCompleted(live.Character, fatesWhisperQuest) && questCompleted(live.Character, mimirsElixirQuest)
+}
+
+// The quests a subclass reads by name: the two a character who is not
+// noble completes before adding one, and the one every class change ends.
+const (
+	fatesWhisperQuest   = "Q234_FatesWhisper"
+	mimirsElixirQuest   = "Q235_MimirsElixir"
+	repentYourSinsQuest = "Q422_RepentYourSins"
+)
+
+// questCompleted reports whether c's state in the quest named name is
+// completed.
+func questCompleted(c *player.Character, name string) bool {
+	st := c.Quests().State(name)
+	return st != nil && st.Status() == questlog.StatusCompleted
 }
 
 // beginClassChange starts ch on live's queue: it takes the class-change
@@ -531,7 +545,11 @@ func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChan
 		l.updateEffectIcons(live)
 	}
 	live.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(c)))
-	// Repent Your Sins ends here once quests exist (#3070).
+	// A class change ends Repent Your Sins, as a quest that may be taken
+	// again: its quest window and the loss of its items come here.
+	if l.journals != nil {
+		l.journals.Exit(c, repentYourSinsQuest, true)
+	}
 	c.ClampResources()
 	c.RefreshWeightPenalty()
 	c.RefreshExpertisePenalty()
