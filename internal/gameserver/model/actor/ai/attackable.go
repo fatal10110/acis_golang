@@ -182,6 +182,8 @@ type intention struct {
 	// moveToTarget is an attack or cast intention's desire to close in on
 	// its target; every other kind never moves toward one.
 	moveToTarget bool
+	// route is a route walk's route name.
+	route string
 }
 
 // Attackable drives one hostile NPC's combat and wander intentions.
@@ -209,6 +211,9 @@ type Attackable struct {
 	threats      *attackable.ThreatTable
 	hates        *attackable.HateTable
 	desires      *DesireQueue
+	// route is the walker route route desires walk, nil for none; set once
+	// before the actor is published.
+	route Route
 
 	// cast is read without mu so AbortAll can run from inside the think
 	// loop, which holds mu (a return-home teleport aborts the actor).
@@ -242,6 +247,9 @@ type Attackable struct {
 	// reports that no periodic pass has consumed it yet.
 	tickStep int
 	ticked   bool
+	// onRoute reports that the actor walks its route: a route intention
+	// stepped since the AI last took up another desire.
+	onRoute bool
 
 	// now returns the current time, the actor's queue clock by default;
 	// tests replace it to simulate staleThreatAge elapsing without a real
@@ -1002,6 +1010,8 @@ func (a *Attackable) continueCurrent(wasIdle bool) error {
 		return a.thinkFollow()
 	case IntentionMoveTo:
 		a.thinkMoveTo()
+	case IntentionMoveRoute:
+		a.thinkMoveRoute()
 	}
 	return nil
 }
@@ -1062,6 +1072,9 @@ func (a *Attackable) promoteAndStep() error {
 			}
 			a.thinkMoveTo()
 			a.lastDesire = IntentionMoveTo
+		case IntentionMoveRoute:
+			a.thinkMoveRoute()
+			a.lastDesire = IntentionMoveRoute
 		}
 		return nil
 	}
@@ -1112,7 +1125,8 @@ func (a *Attackable) hasLatch() bool {
 // intention is, so a heavier attack on another target, a cast or a walk
 // takes over a running attack. Replacing the intention with a different
 // one drops any follow task and the queued next intention the old one left
-// behind.
+// behind. Taking up any desire but a route walk takes the actor off its
+// route.
 func (a *Attackable) promoteNext() (fromLatch, promoted bool) {
 	if a.inHitAnimation() {
 		return false, false
@@ -1123,6 +1137,9 @@ func (a *Attackable) promoteNext() (fromLatch, promoted bool) {
 	}
 	if a.current.kind == IntentionWander && next.kind == IntentionWander {
 		return false, false
+	}
+	if next.kind != IntentionMoveRoute {
+		a.leaveRoute()
 	}
 	if next.kind == IntentionAttack && (a.lastDesire == IntentionIdle || a.lastDesire == IntentionWander) {
 		a.latched = next
@@ -1139,9 +1156,10 @@ func (a *Attackable) promoteNext() (fromLatch, promoted bool) {
 }
 
 // same reports whether o is the same intention as i: same kind, aimed at
-// the same target with the same skill, or walking to the same location.
+// the same target with the same skill, or walking to the same location or
+// route.
 func (i intention) same(o intention) bool {
-	return i.kind == o.kind && sameCombatant(i.target, o.target) && i.skill == o.skill && i.loc == o.loc && i.socialID == o.socialID
+	return i.kind == o.kind && sameCombatant(i.target, o.target) && i.skill == o.skill && i.loc == o.loc && i.socialID == o.socialID && i.route == o.route
 }
 
 // nextToDo returns the latched attack when one is set, else the heaviest
@@ -1172,6 +1190,8 @@ func (a *Attackable) nextToDo() (next intention, fromLatch, ok bool) {
 		next = intention{kind: IntentionSocial, socialID: desire.ItemObjectID, timer: desire.Timer}
 	case IntentionMoveTo:
 		next = intention{kind: IntentionMoveTo, loc: desire.Location}
+	case IntentionMoveRoute:
+		next = intention{kind: IntentionMoveRoute, route: desire.RouteName}
 	default:
 		return intention{}, false, false
 	}
@@ -1449,7 +1469,7 @@ func (a *Attackable) clearArrivalDesire() {
 }
 
 func (a *Attackable) clearCurrentDesire() {
-	probe := &Desire{Kind: a.current.kind, Location: a.current.loc, FinalTarget: a.current.target, Skill: a.current.skill, ItemObjectID: a.current.socialID}
+	probe := &Desire{Kind: a.current.kind, Location: a.current.loc, FinalTarget: a.current.target, Skill: a.current.skill, ItemObjectID: a.current.socialID, RouteName: a.current.route}
 	a.desires.RemoveIf(func(d *Desire) bool { return d.Equal(probe) })
 }
 

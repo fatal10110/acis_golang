@@ -16,6 +16,11 @@ type ScriptHooks interface {
 	// attacked hate, party assist, shot recharge and idle follow and wander
 	// stay off.
 	Behaves(npcID int32) bool
+	// ReactsToCreated reports whether any script, a behavior or not,
+	// reacts to the creation of an NPC with template id npcID. Such an NPC
+	// walks only the routes its scripts ask for: the built-in walker route
+	// stays off.
+	ReactsToCreated(npcID int32) bool
 	// HostileAttacked runs h's attacked hooks: attacker attacked it for
 	// damage, with sk when a skill did it (the zero Ref otherwise).
 	HostileAttacked(h *Hostile, attacker attackable.Combatant, damage int32, sk skill.Ref)

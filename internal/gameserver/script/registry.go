@@ -371,6 +371,12 @@ func (r *Registry) Behaves(npcID int32) bool {
 	return r != nil && r.behaves[npcID]
 }
 
+// ReactsToCreated reports whether a script, a behavior or not, reacts to
+// the creation of an NPC with id npcID; a nil registry binds none.
+func (r *Registry) ReactsToCreated(npcID int32) bool {
+	return len(r.scripts(npcID, EventCreated)) > 0
+}
+
 // behaviorOn reports whether s is a behavior left on any event list of the
 // NPC id npcID.
 func (r *Registry) behaviorOn(s *Script, npcID int32) bool {

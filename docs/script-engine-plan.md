@@ -286,7 +286,10 @@ A nil NPC or player means "bound to none", never a wildcard.
 
 Stand-ins stay behind one predicate, "no behavior is bound to this NPC id". A template
 switches to real behavior when its script registers. The three ids claimed by a parent and a
-child switch only when the child is ported.
+child switch only when the child is ported. The walker alias rule and its walk-stance list
+also step aside for an id whose creation any script reacts to: the walker script is a plain
+script in the reference manifest (`kind script`, not a behavior), and the created hook is
+where the reference asks an NPC to walk a route (A13).
 
 - They are never extended. They are deleted in one PR (#3497, M12) once every scripted NPC id
   has its behavior, including the siegable-hall behaviors of #3502 (M12), and every scripted

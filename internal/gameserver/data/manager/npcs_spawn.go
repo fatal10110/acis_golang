@@ -148,7 +148,7 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	inst.Home = loc
 	inst.HasHome = true
 	inst.SpawnHeading = heading
-	inst.WalkMode = walkerWalkModeIDs[entry.NPCID]
+	inst.WalkMode = walkerWalkModeIDs[entry.NPCID] && routeStandIn(n.scripts, entry.NPCID)
 	n.mu.Lock()
 	info := n.slot[key]
 	n.mu.Unlock()
@@ -224,7 +224,7 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	n.ai.Add(hostile)
 	// Walker only ticks in-region actors — must run after Spawn placed this
 	// NPC in world.State, not before.
-	startWalkerRoute(n.walker, walkerRef, inst, n.log)
+	startWalkerRoute(n.walker, walkerRef, inst, n.scripts, n.log)
 
 	if !n.trackLive(key, id) {
 		n.deleteNpc(hostile)

@@ -256,6 +256,17 @@ func (f *Folk) NotifyEvaded(attackable.Combatant) {}
 // BroadcastAutoAttackStop reports that the attack stance expired.
 func (f *Folk) BroadcastAutoAttackStop() { f.emit(event.AutoAttackStopped{}) }
 
+// SetRunStance puts the NPC in its run stance when run is true, in its
+// walk stance otherwise, as a script asks; a change is shown as the AI's
+// own stance changes are.
+func (f *Folk) SetRunStance(run bool) {
+	if run {
+		f.forceRunStance()
+		return
+	}
+	f.forceWalkStance()
+}
+
 // forceRunStance switches a walking NPC to its run stance, as any hit
 // does: the movement speeds up, and observers see the stance change and
 // the NPC's info again.

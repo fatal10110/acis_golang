@@ -167,3 +167,14 @@ Player.isNoble script.Player.IsNoble
 Player.reduceDeathPenaltyBuffLevel script.Player.ReduceDeathPenaltyLevel
 Quest.addEventIds inline
 StringUtil.isDigit script.IsDigit
+
+# Route desire and the walker script (A13). The NPC handle stands for the
+# NPC, its AI and its template; a created binding is a field of the script;
+# an id list is a Go slice.
+ArraysUtil.contains inline
+Npc.getAI inline
+Npc.getTemplate inline
+Npc.setWalkOrRun script.NPC.SetRunning
+NpcAI.addMoveRouteDesire script.NPC.AddMoveRouteDesire
+NpcTemplate.getAlias script.NPC.Alias
+Quest.addCreated inline
