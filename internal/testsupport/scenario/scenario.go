@@ -190,11 +190,11 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 		if len(args) != 2 || sc.Character != "" {
 			return fmt.Errorf("one character line: character <name> <level>")
 		}
-		level, err := strconv.Atoi(args[1])
+		level, err := strconv.ParseInt(args[1], 10, 32)
 		if err != nil {
 			return fmt.Errorf("level %q: %w", args[1], err)
 		}
-		sc.Character, sc.Level = args[0], level
+		sc.Character, sc.Level = args[0], int(level)
 	case "script", "stub":
 		if len(args) != 1 {
 			return fmt.Errorf("%s <path>", key)
@@ -231,11 +231,11 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 		}
 		var offsets [3]int
 		for i, a := range args[3:] {
-			v, err := strconv.Atoi(a)
+			v, err := strconv.ParseInt(a, 10, 32)
 			if err != nil {
 				return fmt.Errorf("npc number %q: %w", a, err)
 			}
-			offsets[i] = v
+			offsets[i] = int(v)
 		}
 		role := args[0]
 		if roles[role] || role == "player" {
@@ -259,7 +259,7 @@ func checkStep(verb string, args []string, roles map[string]bool) error {
 	}
 	switch verb {
 	case "hit":
-		if _, err := strconv.Atoi(args[1]); err != nil {
+		if _, err := strconv.ParseInt(args[1], 10, 32); err != nil {
 			return fmt.Errorf("damage %q: %w", args[1], err)
 		}
 	case "kill":

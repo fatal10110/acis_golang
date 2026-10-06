@@ -224,8 +224,8 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		if h == nil || h.AlikeDead() {
 			fail("NPC %s is not a live attackable", st.Args[0])
 		}
-		damage, _ := strconv.Atoi(st.Args[1])
-		r.onPlayer(t, func(p attackable.Combatant) { h.TakeDamage(damage, p) })
+		damage, _ := strconv.ParseInt(st.Args[1], 10, 32)
+		r.onPlayer(t, func(p attackable.Combatant) { h.TakeDamage(int(damage), p) })
 	case "kill":
 		n := 1
 		if len(st.Args) == 2 {
