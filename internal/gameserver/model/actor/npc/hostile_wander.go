@@ -18,10 +18,15 @@ const minWanderOffset = 10
 const randomWalkLoopLimit = 3
 
 // ShouldIdleWander reports whether an empty desire queue should become a
-// wander desire. Hold-position kinds stay put. MovingAttack is not a
-// wander gate for the Warrior and Wizard scripts; only the MonsterBehavior
-// script's no-desire hook reads it. Script-accurate eligibility: #2148.
+// wander desire. An NPC a behavior is bound to never does: its no-desire
+// hooks decide. Otherwise hold-position kinds stay put. MovingAttack is not
+// a wander gate for the Warrior and Wizard scripts; only the
+// MonsterBehavior script's no-desire hook reads it. This kind rule stands
+// in for the unbound ids until their behaviors are ported (#2148).
 func (h *Hostile) ShouldIdleWander() bool {
+	if h.behaves() {
+		return false
+	}
 	switch hostileKind(h.Instance) {
 	case "Guard", "SiegeGuard", "Chest", "HalishaChest":
 		return false

@@ -56,6 +56,11 @@ var raisedHooks = map[hook]kindSet{
 	hookCreated: kinds(KindFolk, KindHostile),
 	hookDecayed: kinds(KindFolk, KindHostile),
 	hookMyDying: kinds(KindFolk, KindHostile),
+	// The AI's idle and arrival (idle.go). A civilian NPC walks no point
+	// and keeps no territory yet (#3492).
+	hookNoDesire:       kinds(KindFolk, KindHostile),
+	hookMoveToFinished: kinds(KindHostile),
+	hookOutOfTerritory: kinds(KindHostile),
 	// The schedule runner (StartSchedule).
 	hookStart: kinds(KindOther),
 	// The tutorial events (TutorialEvent) and the quest event links

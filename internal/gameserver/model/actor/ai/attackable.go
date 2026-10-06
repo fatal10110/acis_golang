@@ -849,6 +849,9 @@ func (a *Attackable) think(mode thinkMode) error {
 		a.idleAfterFinishedAttack(mode, true)
 		return nil
 	}
+	// busy is whether the actor is doing something as desire selection
+	// starts; an intention dropped below for its lost desire still counts.
+	busy := a.current.kind != IntentionIdle
 	if !outOfControl {
 		a.dropCurrentIfUnqueued(mode)
 	}
@@ -859,27 +862,28 @@ func (a *Attackable) think(mode thinkMode) error {
 	idleAfterLatch := false
 	if updateTick {
 		idled := false
-		if _, ok := a.desires.Peek(); !ok {
-			if a.lifeTime.Load() > 0 && !a.castingNow() {
-				switch {
-				case held:
-					// The cycle's idle does not wait for a held selection,
-					// but only the selection switches to idle.
+		if _, ok := a.desires.Peek(); !ok && a.lifeTime.Load() > 0 && !a.castingNow() {
+			switch {
+			case held:
+				// The cycle's idle does not wait for a held selection,
+				// but only the selection switches to idle.
+				a.idleStep(false)
+				a.queueIdleStandIns()
+				idled = true
+			case a.hasLatch():
+				idleAfterLatch = true
+			default:
+				// An in-control actor that is not idle yet is idled by
+				// the selection first; the cycle's own idle then runs
+				// again unless the first queued a desire, so the
+				// no-desire point opens twice.
+				again := !outOfControl && busy
+				a.thinkIdle()
+				a.queueIdleStandIns()
+				if _, ok := a.desires.Peek(); again && !ok {
 					a.idleStep(false)
-					a.queueIdleFollow()
-					idled = true
-				case a.hasLatch():
-					idleAfterLatch = true
-				default:
-					a.thinkIdle()
-					a.queueIdleFollow()
-					idled = true
 				}
-			}
-		}
-		if _, ok := a.desires.Peek(); !ok {
-			if a.lifeTime.Load() > 0 && !a.castingNow() && !idleAfterLatch {
-				a.queueIdleWander()
+				idled = true
 			}
 		}
 		a.lifeTime.Add(1)
@@ -956,9 +960,16 @@ func (a *Attackable) idleAfterFinishedAttack(mode thinkMode, wasIdle bool) {
 }
 
 // idleAndRequeue is the empty-queue idle: abort everything, go idle, and
-// queue the idle follow, else the idle wander.
+// queue the idle stand-ins.
 func (a *Attackable) idleAndRequeue() {
 	a.thinkIdle()
+	a.queueIdleStandIns()
+}
+
+// queueIdleStandIns queues, after the no-desire point, the idle follow,
+// else the idle wander: what an NPC no behavior is bound to does with
+// nothing to do. The actor refuses both when a behavior is bound to it.
+func (a *Attackable) queueIdleStandIns() {
 	a.queueIdleFollow()
 	if _, ok := a.desires.Peek(); !ok {
 		a.queueIdleWander()

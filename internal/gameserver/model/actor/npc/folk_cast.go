@@ -225,11 +225,6 @@ func (f *Folk) thinkIdle() {
 	f.AtHookPoint(ai.HookNoDesire)
 }
 
-// AtHookPoint is where f's AI tick gives the behavior bound to f's template
-// its turn, on f's queue with no lock held: the tick's state is queue-owned.
-// No behavior binds a hook point yet, so it does nothing.
-func (f *Folk) AtHookPoint(ai.HookPoint) {}
-
 // walksRoute reports whether f walks a route.
 func (f *Folk) walksRoute() bool {
 	return f.motion != nil && f.motion.cfg.Route != nil

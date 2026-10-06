@@ -20,9 +20,10 @@ const (
 )
 
 // IdleFollowTarget returns this NPC's living master when it is a party
-// private that should escort while idle.
+// private that should escort while idle. An NPC a behavior is bound to has
+// none: its no-desire hooks decide whether it follows.
 func (h *Hostile) IdleFollowTarget() attackable.Combatant {
-	if h.aiInt("Party_Type", 0) != 1 {
+	if h.behaves() || h.aiInt("Party_Type", 0) != 1 {
 		return nil
 	}
 	master := h.Master()

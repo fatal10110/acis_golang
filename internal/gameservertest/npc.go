@@ -696,6 +696,7 @@ func (s *Server) folkSpawner(walker *task.Walker, geo move.Geo) gamemanager.Folk
 		Effects:             s.effectEnv,
 		MaxGeoPathFailCount: s.maxGeoPathFail,
 		Log:                 s.log,
+		Scripts:             s.quests.registry,
 	}
 }
 
