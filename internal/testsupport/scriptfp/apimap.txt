@@ -94,6 +94,24 @@ QuestState.getPlayer script.QuestState.Player
 Rnd.get script.Script.Rnd
 Rnd.nextBoolean script.Script.RndBool
 
+# Dialog path and the first quest (E5). The quest list and the player's
+# status are getters the handles fold into the state lookup and the level;
+# the bindings and the quest items are fields of the script.
+Npc.getNpcId script.NPC.NpcID
+Player.getQuestList inline
+Player.getStatus inline
+PlayerStatus.getLevel script.Player.Level
+Quest.addQuestStart inline
+Quest.addTalkId inline
+Quest.getAlreadyCompletedMsg script.AlreadyCompletedMsg
+Quest.getNoQuestMsg script.NoQuestMsg
+Quest.setItemsIds inline
+QuestList.getQuestState script.Script.QuestState
+QuestState.exitQuest script.QuestState.Exit
+QuestState.getState script.QuestState.Status
+QuestState.setCond script.QuestState.SetCond
+QuestState.setState script.QuestState.SetStatus
+
 # Script timers (E7). The timer calls are methods of the registered script.
 # The six overloads of cancelQuestTimers are one call taking the filters it
 # matches on: script.TimerName, script.TimerNPC and script.TimerPlayer.

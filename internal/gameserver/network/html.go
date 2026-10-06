@@ -53,6 +53,11 @@ func (l *GameClientLink) sendPlayerHelp(live *livePlayer, requestedPath string) 
 		}
 		itemID = int32(id)
 	}
+	// The last page of Lidia's diary marks the diary read in her quest; a
+	// quest state that holds no number there aborts the request.
+	if l.journals != nil && !l.journals.ReadHelpPage(live.Character, parts[0], itemID) {
+		return
+	}
 
 	html, ok := l.html.Get(file)
 	if !ok {

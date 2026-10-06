@@ -32,3 +32,28 @@ func (c *Character) MarkDetaching() {
 
 // Detaching reports whether MarkDetaching has run.
 func (c *Character) Detaching() bool { return c.detaching.Load() }
+
+// SetLastQuestNPC records objectID as the NPC c last talked to about
+// quests: the one a quest event link c sends acts through.
+func (c *Character) SetLastQuestNPC(objectID int32) { c.lastQuestNPC.Store(objectID) }
+
+// LastQuestNPC returns the object id SetLastQuestNPC recorded, 0 when none.
+func (c *Character) LastQuestNPC() int32 { return c.lastQuestNPC.Load() }
+
+// ShowDialogPage opens a dialog window on c, as the NPC objectID's (0 for
+// none), showing the datapack page file, or html when file is empty; the
+// client is then released.
+func (c *Character) ShowDialogPage(objectID int32, file, html string) {
+	c.emit(event.DialogPageShown{ObjectID: objectID, File: file, HTML: html})
+}
+
+// ReleaseDialog releases c's client from the dialog it is waiting on.
+func (c *Character) ReleaseDialog() { c.emit(event.DialogReleased{}) }
+
+// NotifyScriptMessage shows c the chat line text.
+func (c *Character) NotifyScriptMessage(text string) {
+	c.emit(event.ScriptMessage{Text: text})
+}
+
+// NotifyQuestOverweight tells c it carries too much to talk about a quest.
+func (c *Character) NotifyQuestOverweight() { c.emit(event.QuestOverweight{}) }

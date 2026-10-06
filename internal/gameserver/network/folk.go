@@ -14,7 +14,9 @@ import (
 )
 
 // talkToFolk is a civilian NPC's answer to a player's interact in reach:
-// its talk animation for everyone watching it, then its chat window with
+// its talk animation for everyone watching it; the NPC becomes the player's
+// last quest NPC, and a script holding its first talk answers instead of
+// it; a wedding manager skips both. Otherwise its chat window opens, with
 // ActionFailed — first for a Seven Signs priest, after the page for
 // everyone else. A muted NPC does nothing. A wedding manager greets with
 // its own page alone. A Mammon NPC refusing the talker says why instead,
@@ -26,7 +28,10 @@ func (l *GameClientLink) talkToFolk(live *livePlayer, f *npc.Folk) {
 		return
 	}
 	if id, ok := f.TalkAnimation(time.Now()); ok {
-		l.broadcastFolkFrame(f, func() wire.Frame { return serverpackets.FrameSocialAction(f.ObjectID(), id) })
+		l.broadcastNPCFrame(f, func() wire.Frame { return serverpackets.FrameSocialAction(f.ObjectID(), id) })
+	}
+	if f.QuestTalker() && l.talkThroughScripts(live, f) {
+		return
 	}
 	if showObserverGroups(live, f) || l.showSiegeMessenger(live, f) {
 		return
@@ -93,9 +98,9 @@ func (s folkChatState) Hero() (isHero, inactive bool) {
 	return s.live.IsHero(), s.l.heroes != nil && s.l.heroes.IsInactive(s.live.ObjectID())
 }
 
-// broadcastFolkFrame sends one serialized frame to every player that knows
-// f, each an independently owned copy.
-func (l *GameClientLink) broadcastFolkFrame(f *npc.Folk, build func() wire.Frame) {
+// broadcastNPCFrame sends one serialized frame to every player that knows
+// f, an NPC, each an independently owned copy.
+func (l *GameClientLink) broadcastNPCFrame(f world.Tracked, build func() wire.Frame) {
 	if l.world == nil {
 		return
 	}

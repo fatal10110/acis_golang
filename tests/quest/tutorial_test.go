@@ -51,7 +51,7 @@ func (l *tutorialLog) take() []string {
 // UC shows question mark 1, QM<n> question mark n, CE<n> enables client
 // event n, and the commands "page <file>", "close", "voice <file>",
 // "radar x y z", "unradar x y z", "memo <key> <value>" and "unmemo <key>"
-// drive the helper they name.
+// drive the helper they name; "answer <text>" answers text.
 func tutorialScripts(heard *tutorialLog) gameservertest.Option {
 	hook := func(_ *script.Script, e script.Event) string {
 		heard.add(e.Name)
@@ -81,12 +81,16 @@ func tutorialScripts(heard *tutorialLog) gameservertest.Option {
 			p.SetMemo(f[1], f[2])
 		case f[0] == "unmemo":
 			p.UnsetMemo(f[1])
+		case f[0] == "answer":
+			return strings.TrimPrefix(e.Name, "answer ")
 		}
 		return ""
 	}
 	path := "script.feature." + tutorial
 	return gameservertest.WithScripts([]script.Listing{{Path: path}}, script.Catalog{
-		path: func() script.Script { return script.Script{QuestID: -1, Hooks: script.Hooks{OnEvent: hook}} },
+		path: func() script.Script {
+			return script.Script{QuestID: -1, Dir: "feature", Hooks: script.Hooks{OnEvent: hook}}
+		},
 	})
 }
 

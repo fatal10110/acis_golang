@@ -171,6 +171,7 @@ type options struct {
 	autoLoot               bool
 	autoLootRaid           bool
 	rateKarmaExpLost       float64
+	rateXP, rateSP         float64
 	deathDrop              player.DeathDropRules
 	characterSelectDelay   time.Duration
 	persistWait            time.Duration
@@ -511,6 +512,12 @@ func WithAutoLoot(enabled bool) Option {
 // instead of onto the ground (default false).
 func WithAutoLootRaid(enabled bool) Option {
 	return func(o *options) { o.autoLootRaid = enabled }
+}
+
+// WithRateXpSp sets the server.properties RateXp and RateSp multipliers
+// applied to every kill's exp and sp reward (default 1).
+func WithRateXpSp(xp, sp float64) Option {
+	return func(o *options) { o.rateXP, o.rateSP = xp, sp }
 }
 
 // WithRateKarmaExpLost sets the server.properties RateKarmaExpLost
@@ -973,6 +980,7 @@ type Server struct {
 	deepBlueDrops       bool
 	autoLoot            bool
 	autoLootRaid        bool
+	rateXP, rateSP      float64
 	ids                 *sequentialIDs
 	positions           *task.PositionUpdates
 	addr                net.Addr
@@ -1789,6 +1797,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		magicFailures:          true,
 		storeSkillCooltime:     true,
 		weightLimitMultiplier:  1,
+		rateXP:                 1,
+		rateSP:                 1,
 		characterDeleteAfter:   gamemanager.DefaultDeleteAfter,
 	}
 	for _, opt := range opts {
@@ -2430,6 +2440,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		deepBlueDrops:       o.deepBlueDropRules,
 		autoLoot:            o.autoLoot,
 		autoLootRaid:        o.autoLootRaid,
+		rateXP:              o.rateXP,
+		rateSP:              o.rateSP,
 		DB:                  db,
 		RaidPoints:          raidPoints,
 		CursedWeapons:       cursedState,

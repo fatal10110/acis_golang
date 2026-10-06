@@ -1007,6 +1007,14 @@ func provideKillRewardConfig(paths gameServerPaths, serverProps *config.Properti
 	if err != nil {
 		return manager.KillRewardConfig{}, err
 	}
+	rateXP, err := serverProps.Float64("RateXp", 1)
+	if err != nil {
+		return manager.KillRewardConfig{}, err
+	}
+	rateSP, err := serverProps.Float64("RateSp", 1)
+	if err != nil {
+		return manager.KillRewardConfig{}, err
+	}
 	partyXP, err := partyXPRules(playersProps, serverProps)
 	if err != nil {
 		return manager.KillRewardConfig{}, err
@@ -1027,6 +1035,8 @@ func provideKillRewardConfig(paths gameServerPaths, serverProps *config.Properti
 		DeepBlueDropRules: playersProps.Bool("UseDeepBlueDropRules", true),
 		PlayerLevels:      data.Levels,
 		PartyRange:        partyRange,
+		RateXP:            rateXP,
+		RateSP:            rateSP,
 		PartyXP:           partyXP,
 	}, nil
 }

@@ -110,7 +110,7 @@ func encodeItemsBypass(command string) []byte {
 // book), then ActionFailed, and the book is kept. A book without a page
 // shows the missing-page notice naming the path. The page goes through the
 // validated path (NpcHtmlMessage.runImpl): its links replace the player's
-// valid bypasses, so a Quest link on the page is answered afterwards.
+// valid bypasses, so an npc_ link on the page is answered afterwards.
 func TestUseBookOpensItsHelpPage(t *testing.T) {
 	t.Parallel()
 	tutorial := shippedHelpPage(t, "5588.htm")
@@ -119,7 +119,7 @@ func TestUseBookOpensItsHelpPage(t *testing.T) {
 		"help/5588.htm": tutorial,
 		// The test stands in a page whose link is one the server validates,
 		// so recording the book's links is observable.
-		"help/6317.htm": `<html><body><a action="bypass -h Quest Q999_Probe start">probe</a></body></html>`,
+		"help/6317.htm": `<html><body><a action="bypass -h npc_999999_Probe">probe</a></body></html>`,
 	}))
 	c := srv.Client
 	startInWorld(t, c)
@@ -136,14 +136,14 @@ func TestUseBookOpensItsHelpPage(t *testing.T) {
 	assertStillHeld(t, srv, objID, held[tutorialGuideID])
 
 	// The probe link is not on the last page yet: it is dropped silently.
-	c.Send(encodeItemsBypass("Quest Q999_Probe start"))
+	c.Send(encodeItemsBypass("npc_999999_Probe"))
 	assertQuiet(t, c, "probe link before the book")
 	c.Send(encodeUseItem(held[mixingManualID], false))
 	if _, _, itemID := readNpcHtml(t, c.Read()); itemID != mixingManualID {
 		t.Fatalf("Mixing Manual page item id = %d, want %d", itemID, mixingManualID)
 	}
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "after the probe page")
-	c.Send(encodeItemsBypass("Quest Q999_Probe start"))
+	c.Send(encodeItemsBypass("npc_999999_Probe"))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "probe link from the book page")
 	assertQuiet(t, c, "probe link")
 }

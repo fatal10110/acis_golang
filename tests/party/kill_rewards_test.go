@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
 // The expected gains below are the reference's party kill arithmetic
@@ -28,9 +29,9 @@ func partyRewardMonster() *npc.Template {
 
 // rewardParty boots a party of Leader 40, Member 30 and Novice 19, plus
 // the partyless Outsider 40, all beside a fresh reward monster.
-func rewardParty(t *testing.T) (*group, *npc.Hostile) {
+func rewardParty(t *testing.T, opts ...gameservertest.Option) (*group, *npc.Hostile) {
 	t.Helper()
-	g := bootGroup(t, []seat{{"Leader", 40}, {"Member", 30}, {"Novice", 19}, {"Outsider", 40}})
+	g := bootGroup(t, []seat{{"Leader", 40}, {"Member", 30}, {"Novice", 19}, {"Outsider", 40}}, opts...)
 	g.invite(t, 0, 1, 0)
 	g.invite(t, 0, 2, 0)
 	x, y, z := g.srv.PlayerPosition(t, g.players[0].id)
@@ -109,6 +110,25 @@ func TestPartyKillSharedWithOutsider(t *testing.T) {
 		t.Fatal("member's hit did not kill the monster")
 	}
 	want := []gain{{1498, 74, true}, {842, 42, true}, {0, 0, true}, {2000, 100, true}}
+	if got := g.earned(t); !equalGains(got, want) {
+		t.Fatalf("gains = %+v, want %+v", got, want)
+	}
+}
+
+// TestKillRewardsApplyServerRates pins RateXp and RateSp on the same kill:
+// the monster's 5000 exp and 250 SP become 500000 and 312 (312.5 narrowed
+// to an int) before the partyless Outsider takes its 40% and the party
+// splits its 60% pool. Expected gains follow the reference's
+// Npc.getExpReward/getSpReward feeding Monster.calculateExpAndSp, with the
+// party arithmetic of TestPartyKillSharedWithOutsider; 312.5 un-narrowed
+// would pay the Outsider 125 SP instead of 124.
+func TestKillRewardsApplyServerRates(t *testing.T) {
+	g, monster := rewardParty(t, gameservertest.WithRateXpSp(100, 1.25))
+	monster.TakeDamage(400, g.combatant(t, 3))
+	if !monster.TakeDamage(600, g.combatant(t, 1)) {
+		t.Fatal("member's hit did not kill the monster")
+	}
+	want := []gain{{149760, 92, true}, {84240, 52, true}, {0, 0, true}, {200000, 124, true}}
 	if got := g.earned(t); !equalGains(got, want) {
 		t.Fatalf("gains = %+v, want %+v", got, want)
 	}
