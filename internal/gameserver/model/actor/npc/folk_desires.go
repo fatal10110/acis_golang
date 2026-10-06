@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
@@ -151,15 +150,4 @@ func (f *Folk) arrivedBlocked() {
 	if cur := f.currentDesire(); cur != nil && (cur.Kind == ai.IntentionMoveTo || cur.Kind == ai.IntentionWander) {
 		f.cast.desires.RemoveIf(cur.Equal)
 	}
-}
-
-// inCastReach reports whether target stands strictly within castRange plus
-// both collision radii of f, measured flat; the reach is truncated to
-// whole units first.
-func (f *Folk) inCastReach(target attackable.Combatant, castRange int) bool {
-	reach := int(float64(castRange) + f.CollisionRadius() + target.CollisionRadius())
-	ox, oy, oz := f.Position()
-	tx, ty, tz := target.Position()
-	from := location.Location{X: ox, Y: oy, Z: oz}
-	return from.Distance2D(location.Location{X: tx, Y: ty, Z: tz}) < float64(reach)
 }

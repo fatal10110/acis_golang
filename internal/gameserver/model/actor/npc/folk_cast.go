@@ -117,7 +117,7 @@ func (f *Folk) AddCastDesire(target attackable.Combatant, ref modelskill.Ref, we
 		if checkConditions && !castAI.CanDesire(target, ref) {
 			return
 		}
-		if !moveToTarget && !f.inCastReach(target, castAI.Range(ref)) {
+		if !moveToTarget && !ai.InCastReach(f, target, castAI.Range(ref)) {
 			return
 		}
 		final := castAI.FinalTarget(target, ref)
@@ -347,7 +347,10 @@ func (f *Folk) cancelFollow() {
 }
 
 // denyAIAction reports a state in which the NPC's AI does nothing: a
-// teleport under way, or death.
+// teleport under way, or death. The stun, sleep, paralyze, fear and
+// hold-until-attacked states never hold here: folkAdmits keeps every
+// effect but a plain buff or debuff off the NPC, and those carry no such
+// flag.
 func (f *Folk) denyAIAction() bool {
 	return f.AlikeDead() || (f.motion != nil && f.motion.teleporting.Load())
 }
