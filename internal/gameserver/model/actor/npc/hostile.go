@@ -542,6 +542,14 @@ func (h *Hostile) RemoveMinion(id int32) {
 	h.minionsMu.Unlock()
 }
 
+// ClearMinions forgets every child, leaving them in the world; the NPC
+// stays a master.
+func (h *Hostile) ClearMinions() {
+	h.minionsMu.Lock()
+	h.minions = make(map[int32]*Hostile)
+	h.minionsMu.Unlock()
+}
+
 // Minions returns a stable snapshot of this NPC's current children.
 func (h *Hostile) Minions() []*Hostile {
 	h.minionsMu.RLock()

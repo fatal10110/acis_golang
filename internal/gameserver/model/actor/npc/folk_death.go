@@ -16,6 +16,14 @@ func (f *Folk) Dead() bool {
 	return f.dead
 }
 
+// Decayed reports whether the NPC has left the world for good: its corpse
+// decayed or it was deleted.
+func (f *Folk) Decayed() bool {
+	f.vitalsMu.Lock()
+	defer f.vitalsMu.Unlock()
+	return f.decayed
+}
+
 // die runs the NPC's death once and reports whether this call ran it: its
 // HP drops to zero, observers see the empty health bar, its walk and cast
 // stop and its cast desires drop, every effect that does not last through

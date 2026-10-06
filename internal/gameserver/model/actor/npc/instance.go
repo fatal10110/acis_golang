@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 )
@@ -35,6 +36,9 @@ type Instance struct {
 	// use its polygon when this is set. A nil Maker keeps the home-offset
 	// walk unless the NPC is a private, which offsets from current position.
 	Maker *spawn.Maker
+	// Summoner is the creature the NPC was spawned for, a caught monster's
+	// fisher; nil for none. Set before the NPC is placed, read-only after.
+	Summoner attackable.Combatant
 
 	// name and title, once set, replace the template's; see Name and Title.
 	name, title atomic.Pointer[string]
