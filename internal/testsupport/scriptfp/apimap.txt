@@ -93,3 +93,7 @@ QuestState.getCond script.QuestState.Cond
 QuestState.getPlayer script.QuestState.Player
 Rnd.get script.Script.Rnd
 Rnd.nextBoolean script.Script.RndBool
+
+# Desires II (A5): flee and social.
+NpcAI.addFleeDesire AddFleeDesire
+NpcAI.addSocialDesire AddSocialDesire
