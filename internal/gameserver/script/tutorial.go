@@ -15,10 +15,8 @@ const tutorialPages = "data/html/script/feature/Tutorial/"
 // TutorialEvent runs the event hook of c's tutorial quest with the event
 // name and no NPC, when c has a state in that quest; otherwise nothing
 // happens. The tutorial client requests and the game's tutorial triggers
-// raise it, on the goroutine they run on.
-//
-// What the hook answers is not shown yet: showing an answer with no NPC is
-// the dialog path's (#130), and the tutorial quest answers nothing.
+// raise it, on the goroutine they run on. What the hook answers is shown to
+// c with no NPC.
 func (r *Registry) TutorialEvent(c *player.Character, name string) {
 	st := c.Quests().State(tutorialQuest)
 	if st == nil {
@@ -29,9 +27,7 @@ func (r *Registry) TutorialEvent(c *player.Character, name string) {
 		return
 	}
 	res := r.answer(s, hookEvent, func() string { return s.Hooks.Event(s, Event{Name: name, Player: PlayerOf(c)}) })
-	if res.Kind != ResultNone && res.Kind != ResultAborted {
-		r.log.Warn().Str("script", s.path).Str("event", name).Msg("script: tutorial event answer not shown")
-	}
+	s.show(c, nil, res)
 }
 
 var _ player.TutorialEvents = (*Registry)(nil)

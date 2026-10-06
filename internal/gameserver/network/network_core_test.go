@@ -1113,6 +1113,10 @@ func TestLivePlayerSessionOnlyEventSet(t *testing.T) {
 		event.VitalsChanged{},
 		event.ItemsTaken{},
 		event.SoundPlayed{},
+		event.DialogPageShown{},
+		event.DialogReleased{},
+		event.ScriptMessage{},
+		event.QuestOverweight{},
 	}
 	// Hooks detach left wired: these must keep flowing.
 	stillDelivered := []event.Event{

@@ -31,7 +31,7 @@ func TestTasksMatchReferenceFingerprints(t *testing.T) {
 		`string "TRUNCATE character_recommends"`,
 		`string "UPDATE characters SET rec_left=?, rec_have=? WHERE obj_Id=?"`,
 		`string "level"`, `string "obj_Id"`, `string "rec_have"`,
-		"call CLogger.error", "call ConnectionPool.getConnection", "call Player.getStatus",
+		"call CLogger.error", "call ConnectionPool.getConnection",
 		"call Player.sendPacket", "call PlayerStatus.getLevel", "call UserInfo.new",
 		// The raid point reset reads a clan's level and credits its
 		// reputation through Server.MemberClan and Server.AddClanReputation;

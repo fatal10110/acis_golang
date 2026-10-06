@@ -268,3 +268,16 @@ func (st *State) unset(key string) {
 	delete(st.vars, key)
 	st.j.pending = append(st.j.pending, Write{Op: OpUnset, Quest: st.quest.Name, Var: key})
 }
+
+// Started returns how many real quests of the journal are started.
+func (j *Journal) Started() int {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	n := 0
+	for _, st := range j.states {
+		if st.quest.Real() && st.status() == StatusStarted {
+			n++
+		}
+	}
+	return n
+}

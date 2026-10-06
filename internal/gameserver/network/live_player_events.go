@@ -64,7 +64,8 @@ func sessionOnly(ev event.Event) bool {
 		event.SkillResisted, event.MagicResisted, event.DamageReceived, event.ServitorDamageShared, event.SkillDamageDealt, event.UserInfoChanged,
 		event.PvPFlagged, event.RelationChanged, event.LevelChanged,
 		event.WeightPenaltyChanged, event.VitalsChanged, event.Evaded, event.MountFeedGauge,
-		event.ItemsTaken, event.SoundPlayed:
+		event.ItemsTaken, event.SoundPlayed,
+		event.DialogPageShown, event.DialogReleased, event.ScriptMessage, event.QuestOverweight:
 		return true
 	}
 	return false
@@ -292,6 +293,14 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(questListEntriesFrame(e.Entries))
 	case event.QuestMarked:
 		live.SendFrame(serverpackets.FrameExShowQuestMark(e.QuestID))
+	case event.DialogPageShown:
+		l.showDialogPage(live, e)
+	case event.DialogReleased:
+		live.SendFrame(serverpackets.FrameActionFailed())
+	case event.ScriptMessage:
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, e.Text))
+	case event.QuestOverweight:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInventoryLessThan80Percent))
 	case event.TutorialPageShown, event.TutorialPageClosed, event.TutorialQuestionMarkShown,
 		event.TutorialClientEventEnabled, event.TutorialVoicePlayed, event.RadarMarkerAdded, event.RadarMarkerRemoved:
 		l.sendTutorial(live, e)

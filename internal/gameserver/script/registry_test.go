@@ -159,13 +159,13 @@ func TestFirstTalkSlot(t *testing.T) {
 	}
 	r, _ := build(t, listOf("script.First", "script.Second", "ai.Old", "ai.New"), catalog)
 
-	if res, bound := r.FirstTalk(1, FirstTalk{}); !bound || res != (Result{ResultPageFile, "first.htm"}) {
+	if _, res, bound := r.FirstTalk(1, FirstTalk{}); !bound || res != (Result{ResultPageFile, "first.htm"}) {
 		t.Fatalf("npc 1 first talk = %+v, %v; want the first registered script", res, bound)
 	}
-	if res, bound := r.FirstTalk(2, FirstTalk{}); !bound || res != (Result{ResultPageFile, "new.htm"}) {
+	if _, res, bound := r.FirstTalk(2, FirstTalk{}); !bound || res != (Result{ResultPageFile, "new.htm"}) {
 		t.Fatalf("npc 2 first talk = %+v, %v; want the later behavior", res, bound)
 	}
-	if _, bound := r.FirstTalk(3, FirstTalk{}); bound {
+	if _, _, bound := r.FirstTalk(3, FirstTalk{}); bound {
 		t.Fatal("npc 3 has no first-talk script but reported one")
 	}
 	if got := len(r.scripts(1, EventFirstTalk)); got != 1 {
@@ -257,11 +257,17 @@ func TestSeamGateRefusesUnraisedHooks(t *testing.T) {
 		t.Fatalf("id without a template bound: %v", got)
 	}
 
-	// Production raises talk on no NPC yet, and attacked on hostile NPCs
-	// only.
-	r = Build(listOf("quest.Talker", "ai.HostileOnly", "ai.FolkAttacked"), catalog, Config{KindOf: kindOf, Log: zerolog.Nop()})
-	if got := []entryState{r.entries[0].state, r.entries[1].state, r.entries[2].state}; !slices.Equal(got, []entryState{entryRefused, entryRegistered, entryRefused}) {
-		t.Fatalf("production gate states = %v, want talk and folk attacked refused, hostile attacked registered", got)
+	// Production raises talk and first talk on both NPC kinds, and
+	// attacked on hostile NPCs only.
+	catalog["quest.FolkFirstTalk"] = quest(Bindings{EventFirstTalk: {1}})
+	catalog["quest.HostileFirstTalk"] = quest(Bindings{EventFirstTalk: {2}})
+	r = Build(listOf("quest.Talker", "ai.HostileOnly", "ai.FolkAttacked", "quest.FolkFirstTalk", "quest.HostileFirstTalk"), catalog, Config{KindOf: kindOf, Log: zerolog.Nop()})
+	var got []entryState
+	for _, e := range r.entries {
+		got = append(got, e.state)
+	}
+	if want := []entryState{entryRegistered, entryRegistered, entryRefused, entryRegistered, entryRegistered}; !slices.Equal(got, want) {
+		t.Fatalf("production gate states = %v, want %v: talk, hostile attacked and first talk registered; folk attacked refused", got, want)
 	}
 }
 
@@ -296,7 +302,7 @@ func TestRegistryHasNoWritePath(t *testing.T) {
 	for i := range typ.NumMethod() {
 		got = append(got, typ.Method(i).Name)
 	}
-	if want := []string{"AbnormalStatusChanged", "Behaves", "Dump", "FirstTalk", "HostileAttacked", "HostilePartyAttacked", "Invoke", "JournalQuest", "TutorialEvent"}; !slices.Equal(got, want) {
+	if want := []string{"AbnormalStatusChanged", "Behaves", "Dump", "FirstTalk", "HostileAttacked", "HostilePartyAttacked", "Interact", "Invoke", "JournalQuest", "QuestEvent", "QuestWindow", "TutorialEvent"}; !slices.Equal(got, want) {
 		t.Fatalf("Registry methods = %v, want only the reads %v; a new method must not change the registry", got, want)
 	}
 	for i := range reflect.TypeFor[Registry]().NumField() {

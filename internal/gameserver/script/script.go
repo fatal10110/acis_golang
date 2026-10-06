@@ -7,6 +7,11 @@ type Script struct {
 	// Name is the last element of the script's scripts.xml path; Build sets
 	// it. It keys the script's character_quests rows.
 	Name string
+	// Title is a real quest's title, as the quest choice window lists it.
+	Title string
+	// Dir is the page directory, below data/html/script, of a script that
+	// is not a real quest; a real quest's pages are in quest/<Name>.
+	Dir string
 	// QuestID, when positive, makes the script a real quest.
 	QuestID int32
 	// Items are the item ids the quest takes from the player when it ends.

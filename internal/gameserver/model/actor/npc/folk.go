@@ -161,6 +161,11 @@ const weddingManager InstanceKind = "WeddingManagerNpc"
 // Muted reports a civilian NPC a player's interact does nothing on.
 func (f *Folk) Muted() bool { return hostileKind(f.Instance) == "MutedFolk" }
 
+// QuestTalker reports whether a player's interact goes through the quest
+// dialog first: every civilian NPC but the wedding manager, whose own
+// greeting answers every interact.
+func (f *Folk) QuestTalker() bool { return hostileKind(f.Instance) != weddingManager }
+
 // TalkAnimation claims the talk animation an interact at now plays: a
 // random social action id in [0, 8), at most one per socialInterval, the
 // first one always. ok is false when none plays. A wedding manager greets
