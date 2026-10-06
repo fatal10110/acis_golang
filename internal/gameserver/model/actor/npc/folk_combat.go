@@ -324,3 +324,16 @@ func (f *Folk) ServerObjectInfoSnapshot() npcinfo.Snapshot {
 	s.Name = f.Instance.Name()
 	return s
 }
+
+// ForEachKnownCombatantInRadius visits the combatants within radius of f,
+// as Hostile.ForEachKnownCombatantInRadius does.
+func (f *Folk) ForEachKnownCombatantInRadius(radius int, fn func(attackable.Combatant)) {
+	if f.world == nil {
+		return
+	}
+	f.world.ForEachKnownInRadius(f, radius, func(candidate world.Tracked) {
+		if combatant, ok := candidate.(attackable.Combatant); ok {
+			fn(combatant)
+		}
+	})
+}

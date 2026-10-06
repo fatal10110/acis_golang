@@ -66,6 +66,18 @@ func (s *Script) TakeItems(p *Player, itemID, count int32) {
 	p.character().TakeScriptItems(itemID, int(count))
 }
 
+// AddItems gives p count units of itemID as GiveItems does, with the chat
+// line of items picked up.
+func (s *Script) AddItems(p *Player, itemID, count int32) {
+	p.character().AddScriptItems(itemID, int(count), s.env.MultipleItemDrop, s.env.NewItemID)
+}
+
+// DestroyItems destroys count units of itemID held by p, with no chat line,
+// and reports whether it did: p must hold that many in one instance.
+func (s *Script) DestroyItems(p *Player, itemID, count int32) bool {
+	return p.character().DestroyScriptItems(itemID, int(count))
+}
+
 // RewardItems gives p count units of itemID scaled by the reward rate, the
 // adena rate for adena.
 func (s *Script) RewardItems(p *Player, itemID, count int32) {

@@ -62,6 +62,11 @@ Rules:
   (`HoldPersistenceLane`) to keep a database round trip outstanding — a slow store does not.
   `ACIS_SIM_EXECUTOR=pool` runs the same suite on the real pool, where those calls wait for real;
   `WithRealPool()` pins one test there (pool task-panic recovery, the slow-task watchdog, perf).
+- Per-script behavior (a quest's dialog, an NPC behavior's reactions) is a scenario file, not Go
+  code: `tests/quest/testdata/scenarios/*.scenario` or `tests/ai/testdata/scenarios/*.scenario`,
+  run by each suite's `TestScenarios` (format: package `internal/testsupport/scenario`). A ported
+  script joins the suite's `scenarioScripts` catalog; a scenario with a reference trace names it
+  in a `trace` line, so its steps are checked against the trace before they run.
 
 ### Tier 2 — pure-function core tests (`<pkg>_core_test.go`)
 

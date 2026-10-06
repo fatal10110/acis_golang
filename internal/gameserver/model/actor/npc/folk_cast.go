@@ -494,8 +494,10 @@ func (f *Folk) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) 
 // NotePvPSkillTargets does nothing: NPCs take no part in PvP flagging.
 func (f *Folk) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
 
-// ConsumeHP takes a skill's HP cost from f, never below its floor.
-func (f *Folk) ConsumeHP(amount float64) { f.reduceHP(amount, f) }
+// ConsumeHP takes a skill's HP cost from f, never below its floor. The
+// cost is a consumption, not a hit: it raises no attacked hook and makes no
+// clan call.
+func (f *Folk) ConsumeHP(amount float64) { f.loseHP(amount, f, modelskill.Ref{}, false) }
 
 // SkillDisabled reports whether key is still waiting for its reuse delay.
 func (f *Folk) SkillDisabled(key int32) bool {

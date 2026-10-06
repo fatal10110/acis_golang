@@ -11,6 +11,13 @@ func (c *Character) Quests() *questlog.Journal {
 	return &c.quests
 }
 
+// QuestStarted reports whether c's state in the quest named name is
+// started.
+func (c *Character) QuestStarted(name string) bool {
+	st := c.quests.State(name)
+	return st != nil && st.Status() == questlog.StatusStarted
+}
+
 // NotifyQuestList shows c the quest window entries.
 func (c *Character) NotifyQuestList(entries []questlog.Entry) {
 	c.emit(event.QuestListChanged{Entries: entries})
