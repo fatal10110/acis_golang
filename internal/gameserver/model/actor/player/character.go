@@ -352,6 +352,9 @@ type Character struct {
 	boat boatRide
 	// quests is the quest journal; it carries its own lock.
 	quests questlog.Journal
+	// detaching is set once the character starts leaving the world; see
+	// MarkDetaching.
+	detaching atomic.Bool
 }
 
 var _ effect.StatOwner = (*Character)(nil)

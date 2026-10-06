@@ -981,6 +981,7 @@ type Server struct {
 	gameClock           *task.GameClock
 	autosaveClock       *autosaveClock
 	persist             *persist.Worker
+	quests              *questBoot
 	logs                *lockedBuffer
 	// positionTicks is when TickPositions last posted a tick on the real
 	// pool, guarded by its mutex.
@@ -1518,6 +1519,7 @@ func (s *Server) Shutdown(tb testing.TB) {
 	if err := s.ItemInstances.Save(ctx); err != nil {
 		tb.Fatalf("shutdown item flush: %v", err)
 	}
+	s.quests.journals.DrainSealed()
 	if err := s.persist.Flush(ctx); err != nil {
 		tb.Fatalf("shutdown persistence flush: %v", err)
 	}
@@ -2108,8 +2110,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Wedding = couples
 	gclConfig.Macros = gamesql.NewMacroStore(db)
 	gclConfig.Recommendations = gamesql.NewRecommendationStore(db)
-	quests, scripts := bootQuests(db, o)
-	gclConfig.Quests, gclConfig.Scripts = quests, scripts
+	quests := bootQuests(db, persistWorker, o)
+	gclConfig.Quests, gclConfig.Scripts, gclConfig.Journals = quests.store, quests.registry, quests.journals
 	gclConfig.AugmentationChances = augmentation.DefaultChances()
 	if o.augmentationChances != nil {
 		gclConfig.AugmentationChances = *o.augmentationChances
@@ -2384,7 +2386,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.Mailbox.Restore(mails)
 		restoreBoardForums(t, forumStore, favoriteStore, gclConfig.Forums, gclConfig.Favorites, gclConfig.Clans)
 	}
-	scheduleClock := startSchedule(t, o, scripts, gcl)
+	scheduleClock := startSchedule(t, o, quests.registry, gcl)
 
 	c := testsupport.Dial(t, ln.Addr().String())
 	c.SendProtocolVersion(746)
@@ -2478,6 +2480,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gameClock:           clock,
 		autosaveClock:       autosaveClock,
 		persist:             persistWorker,
+		quests:              quests,
 		queues:              queues,
 		traffic:             frames,
 		log:                 o.log,

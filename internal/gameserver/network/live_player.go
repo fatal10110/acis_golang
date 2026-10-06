@@ -491,10 +491,14 @@ func (p *livePlayer) Departed() bool {
 }
 
 // markDetaching runs on p's queue, where autosave and shadow-item expiry
-// check detached, so neither enqueues after detach's own writes (#1948).
+// check detached, so neither enqueues after detach's own writes (#1948). It
+// also marks the character, whose quest journal then takes no change.
 func (p *livePlayer) markDetaching() {
 	sim.AssertOwner(p.Queue())
 	p.deliveryStopped.Store(true)
+	if p.Character != nil {
+		p.Character.MarkDetaching()
+	}
 }
 
 // stopCubics cancels every live cubic runtime's timers on detach, so a

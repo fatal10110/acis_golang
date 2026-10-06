@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"path/filepath"
 
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
 	scripttask "github.com/fatal10110/acis_golang/internal/gameserver/script/task"
@@ -62,6 +64,12 @@ func provideScripts(paths gameServerPaths, data *gameData, log zerolog.Logger) (
 		return nil, err
 	}
 	return script.Build(list, catalog, script.Config{KindOf: npcKindOf(data.NPCs), Log: log}), nil
+}
+
+// provideQuestJournals returns the quest journal writer, draining each
+// player's journal writes on its persistence lane.
+func provideQuestJournals(store *gamesql.QuestStore, worker *persist.Worker, log zerolog.Logger) *script.Quests {
+	return script.NewQuests(store, worker, log)
 }
 
 // npcKindOf returns the kind each NPC template spawns as.

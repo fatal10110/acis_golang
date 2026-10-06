@@ -2,18 +2,6 @@ package script
 
 import "context"
 
-// NPC is a script's handle on one NPC.
-type NPC struct{}
-
-// Player is a script's handle on one player.
-type Player struct{}
-
-// Creature is a script's handle on any creature: an NPC or a player.
-type Creature interface{ creature() }
-
-func (*NPC) creature()    {}
-func (*Player) creature() {}
-
 // The hook payloads, one per fact. Each carries the handles and values the
 // hook reacts to. A skill, item or door the fact also involves is added, in
 // its script-facing form, by the change that raises the hook.
