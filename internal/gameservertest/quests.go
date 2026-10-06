@@ -20,6 +20,8 @@ type scriptOptions struct {
 	catalog script.Catalog
 	rates   *script.Rates
 	rand    func(n int) int
+	// singleItemDrop turns MultipleItemDrop off.
+	singleItemDrop bool
 }
 
 // WithScripts boots the script registry from list and catalog, as the
@@ -43,6 +45,13 @@ func WithScriptRates(r script.Rates) Option {
 // without it the draws are random.
 func WithScriptRand(rand func(n int) int) Option {
 	return func(o *options) { o.scriptHelpers().rand = rand }
+}
+
+// WithScriptSingleItemDrop turns MultipleItemDrop off, so a script give of
+// a non-stackable creates one instance whatever the count; without it the
+// setting is on, as shipped.
+func WithScriptSingleItemDrop() Option {
+	return func(o *options) { o.scriptHelpers().singleItemDrop = true }
 }
 
 func (o *options) scriptHelpers() *scriptOptions {
@@ -77,7 +86,7 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, o *optio
 		Quests:           journals,
 		Rates:            script.Rates{Drop: 1, Reward: 1, RewardAdena: 1, XP: 1, SP: 1},
 		PartyRange:       fixturePartyRange,
-		MultipleItemDrop: true,
+		MultipleItemDrop: !so.singleItemDrop,
 		NewItemID:        ids.NextID,
 		Rand:             rnd.Get,
 	}

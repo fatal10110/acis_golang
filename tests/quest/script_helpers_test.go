@@ -20,11 +20,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/testsupport/scriptcontract"
 )
 
-// The drop goldens' items: three stackable quest items.
+// The drop goldens' quest item, and the shared catalog's weapons and
+// arrows.
 const (
 	dropItem      = 1081
 	swordID       = 30
 	shadowSwordID = 7884
+	bowID         = 14
 	arrowID       = 17
 )
 
@@ -211,18 +213,26 @@ func dropRow(t *testing.T, srv *gameservertest.Server, objID int32, rs *rolls, i
 		}
 		rs.script(next)
 		typ := dropTypeOf(t, r.Str(t, "type"))
+		// The row is parsed here, on the test goroutine: a malformed field
+		// fails the test instead of the player's queue worker.
+		var (
+			drops                 []script.DropInfo
+			count, needed, chance int32
+		)
+		if table == "drop.multiple" {
+			for _, info := range r.List(t, "infos") {
+				f := strings.Split(info, ":")
+				drops = append(drops, script.DropInfo{ItemID: atoi32(t, f[0]), Count: atoi32(t, f[1]), Needed: atoi32(t, f[2]), Chance: atoi32(t, f[3])})
+			}
+		} else {
+			count, needed, chance = int32(r.Int(t, "count")), int32(r.Int(t, "needed")), int32(r.Int(t, "chance"))
+		}
 		var result bool
 		run(t, srv, objID, func(sc *script.Script, p *script.Player) {
 			if table == "drop.multiple" {
-				var drops []script.DropInfo
-				for _, info := range r.List(t, "infos") {
-					f := strings.Split(info, ":")
-					drops = append(drops, script.DropInfo{ItemID: atoi32(t, f[0]), Count: atoi32(t, f[1]), Needed: atoi32(t, f[2]), Chance: atoi32(t, f[3])})
-				}
 				result = sc.DropMultipleItems(p, drops, typ)
 				return
 			}
-			count, needed, chance := int32(r.Int(t, "count")), int32(r.Int(t, "needed")), int32(r.Int(t, "chance"))
 			if typ == script.DropFixedRate && chance == script.MaxChance {
 				result = sc.DropItemsAlways(p, dropItem, count, needed)
 				return
@@ -376,44 +386,98 @@ func progression(t *testing.T, srv *gameservertest.Server, objID int32) player.P
 	return out
 }
 
-// TestScriptTakeUnequipsAWornItem takes a worn stack and a worn weapon:
-// each is taken off first with no chat line of its own, the wearer's look
-// is resent, and then the take names it.
+// TestScriptTakeUnequipsAWornItem takes a worn weapon and part of a worn
+// stack: each is taken off first with no chat line of its own, the
+// wearer's look is resent, and then the take names it. What is left of the
+// stack stays held but is no longer worn.
 func TestScriptTakeUnequipsAWornItem(t *testing.T) {
 	t.Parallel()
 	srv, objID := bootHelpers(t)
-	run(t, srv, objID, func(sc *script.Script, p *script.Player) { sc.GiveItems(p, swordID, 1) })
-	srv.ReadQueued(t, srv.Client)
-	sword := srv.PlayerInventory(t, objID).ItemByTemplateID(swordID)
-	srv.Client.Send(encodeUseItem(sword.ObjectID))
-	srv.ReadQueued(t, srv.Client)
-	if !sword.Equipped() {
-		t.Fatal("the sword was not put on")
+	inv := srv.PlayerInventory(t, objID)
+	wear := func(itemID int32) *item.Instance {
+		t.Helper()
+		inst := inv.ItemByTemplateID(itemID)
+		srv.Client.Send(encodeUseItem(inst.ObjectID))
+		srv.ReadQueued(t, srv.Client)
+		if !inst.Equipped() {
+			t.Fatalf("item %d was not put on", itemID)
+		}
+		return inst
 	}
-
-	run(t, srv, objID, func(sc *script.Script, p *script.Player) { sc.TakeItems(p, swordID, 1) })
-	var opcodes []byte
-	var lines []string
-	for _, f := range srv.ReadQueued(t, srv.Client) {
-		opcodes = append(opcodes, f[0])
-		if f[0] == serverpackets.OpcodeSystemMessage {
-			line, err := scriptcontract.Packet(f, nil)
-			if err != nil {
-				t.Fatal(err)
+	// take runs the take and checks its chat lines, and that the look is
+	// resent before the first of them.
+	take := func(itemID, n int32, want ...string) {
+		t.Helper()
+		run(t, srv, objID, func(sc *script.Script, p *script.Player) { sc.TakeItems(p, itemID, n) })
+		var opcodes []byte
+		var lines []string
+		for _, f := range srv.ReadQueued(t, srv.Client) {
+			opcodes = append(opcodes, f[0])
+			if f[0] == serverpackets.OpcodeSystemMessage {
+				line, err := scriptcontract.Packet(f, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				lines = append(lines, line)
 			}
-			lines = append(lines, line)
+		}
+		if !slices.Equal(lines, want) {
+			t.Fatalf("chat lines = %q, want only the take's %q", lines, want)
+		}
+		ui := slices.Index(opcodes, serverpackets.OpcodeUserInfo)
+		msg := slices.Index(opcodes, serverpackets.OpcodeSystemMessage)
+		if ui < 0 || ui > msg {
+			t.Fatalf("opcodes %x: want UserInfo before the take's message", opcodes)
 		}
 	}
-	if !slices.Equal(lines, []string{"S SystemMessage id=302 3:30"}) {
-		t.Fatalf("chat lines = %q, want only the take's", lines)
-	}
-	ui := slices.Index(opcodes, serverpackets.OpcodeUserInfo)
-	msg := slices.Index(opcodes, serverpackets.OpcodeSystemMessage)
-	if ui < 0 || ui > msg {
-		t.Fatalf("opcodes %x: want UserInfo before the take's message", opcodes)
-	}
+
+	run(t, srv, objID, func(sc *script.Script, p *script.Player) { sc.GiveItems(p, swordID, 1) })
+	srv.ReadQueued(t, srv.Client)
+	sword := wear(swordID)
+	take(swordID, 1, "S SystemMessage id=302 3:30")
 	if srv.PlayerItemCount(t, objID, swordID) != 0 || sword.Equipped() {
 		t.Fatal("the worn sword is still held or worn")
+	}
+
+	run(t, srv, objID, func(sc *script.Script, p *script.Player) {
+		sc.GiveItems(p, bowID, 1)
+		sc.GiveItems(p, arrowID, 10)
+	})
+	srv.ReadQueued(t, srv.Client)
+	wear(bowID)
+	arrows := inv.ItemByTemplateID(arrowID)
+	if !arrows.Equipped() {
+		wear(arrowID)
+	}
+	take(arrowID, 4, "S SystemMessage id=301 3:17 6:4")
+	if got := srv.PlayerItemCount(t, objID, arrowID); got != 6 {
+		t.Fatalf("held %d arrows after the take, want 6", got)
+	}
+	if arrows.Equipped() || inv.ItemByTemplateID(arrowID) != arrows {
+		t.Fatal("the rest of the arrow stack is still worn, or is not the stack it was")
+	}
+	srv.FlushItems(t)
+	if got := itemRows(t, srv, objID); got[arrowID] != 6 {
+		t.Fatalf("inventory rows = %v, want the 6 arrows left in the inventory", got)
+	}
+}
+
+// TestScriptGiveWithSingleItemDrop gives three non-stackables with
+// MultipleItemDrop off: one instance and one row arrive, and the chat line
+// still names the three asked for.
+func TestScriptGiveWithSingleItemDrop(t *testing.T) {
+	t.Parallel()
+	srv, objID := bootHelpers(t, gameservertest.WithScriptSingleItemDrop())
+	run(t, srv, objID, func(sc *script.Script, p *script.Player) { sc.GiveItems(p, swordID, 3) })
+	if got, want := immediateLines(t, srv), []string{"S SystemMessage id=53 3:30 6:3"}; !slices.Equal(got, want) {
+		t.Fatalf("packets:\n got %q\nwant %q", got, want)
+	}
+	if got := len(srv.PlayerInventory(t, objID).ItemsByTemplateID(swordID)); got != 1 {
+		t.Fatalf("%d sword instances, want 1", got)
+	}
+	srv.FlushItems(t)
+	if got := itemRows(t, srv, objID); !maps.Equal(got, map[int32]int{swordID: 1}) {
+		t.Fatalf("item rows = %v, want one sword", got)
 	}
 }
 
