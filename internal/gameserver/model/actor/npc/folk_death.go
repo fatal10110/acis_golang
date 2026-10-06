@@ -96,6 +96,15 @@ func (f *Folk) CorpseTime() time.Duration {
 // repeat call reports false. worldState may be nil when the NPC was never
 // placed.
 func (f *Folk) Decay(worldState *world.State, respawn func()) bool {
+	return f.DecayWithRespawn(worldState, func(int32) func() { return respawn })
+}
+
+// DecayWithRespawn is Decay with the respawn hook resolved by respawnFor,
+// called with this NPC's object id only once this call has won the decay
+// and before its decayed hooks run. Of several concurrent decays, only the
+// winner claims the spawn's respawn, so it is armed exactly once.
+// respawnFor may be nil.
+func (f *Folk) DecayWithRespawn(worldState *world.State, respawnFor func(id int32) func()) bool {
 	f.vitalsMu.Lock()
 	if f.decayed {
 		f.vitalsMu.Unlock()
@@ -104,6 +113,10 @@ func (f *Folk) Decay(worldState *world.State, respawn func()) bool {
 	f.decayed, f.dead = true, true
 	f.corpseDeadline = time.Time{}
 	f.vitalsMu.Unlock()
+	var respawn func()
+	if respawnFor != nil {
+		respawn = respawnFor(f.ObjectID())
+	}
 	f.raiseDecayed()
 
 	// The NPC leaves its zones while its observers still know it.

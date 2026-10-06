@@ -189,8 +189,9 @@ func (n *Npcs) ScheduleDespawn(live attackable.Combatant, d time.Duration) {
 
 // RemoveFolk takes f out of the world at once, with no corpse, and answers
 // its spawn slot as for a decayed corpse (npc.FolkRemover). It runs on the
-// calling goroutine.
+// calling goroutine, so it may race the corpse decay on f's own queue: the
+// slot is claimed only by the call that wins f's decay.
 func (n *Npcs) RemoveFolk(f *npc.Folk) {
 	n.decay.Cancel(f)
-	f.Decay(n.state, n.RespawnHook(f.ObjectID()))
+	f.DecayWithRespawn(n.state, n.RespawnHook)
 }

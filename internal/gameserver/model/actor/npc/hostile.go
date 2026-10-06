@@ -1080,6 +1080,15 @@ func (h *Hostile) Decayed() bool {
 // linkage and call spawn.CalculateRespawnDelay plus spawn.State.SetRespawn
 // there, since Hostile itself carries no spawn linkage yet.
 func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
+	return h.DecayWithRespawn(worldState, func(int32) func() { return respawn })
+}
+
+// DecayWithRespawn is Decay with the respawn hook resolved by respawnFor,
+// called with this NPC's object id only once this call has won the decay
+// and before its decayed hooks run. Of several concurrent decays, only the
+// winner claims the spawn's respawn, so it is armed exactly once.
+// respawnFor may be nil.
+func (h *Hostile) DecayWithRespawn(worldState *world.State, respawnFor func(id int32) func()) bool {
 	h.deathMu.Lock()
 	if h.decayed {
 		h.deathMu.Unlock()
@@ -1089,6 +1098,10 @@ func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
 	h.dead = true
 	h.corpseDeadline = time.Time{}
 	h.deathMu.Unlock()
+	var respawn func()
+	if respawnFor != nil {
+		respawn = respawnFor(h.ObjectID())
+	}
 	h.raiseDecayed()
 
 	// The NPC leaves its zones while its observers still know it.

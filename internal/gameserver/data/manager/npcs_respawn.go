@@ -107,12 +107,14 @@ func (n *Npcs) dropGroupSlotLocked(g *makerGroup, slot slotInfo) {
 
 // Remove takes h out of the world at once, with no corpse and no decay
 // wait, and arms its spawn slot's respawn exactly as a decayed corpse does.
-// It runs on h's own queue (npc.Hostile.DeleteMe posts it there).
+// It runs on the calling goroutine (npc.Hostile.DeleteNow), so it may race
+// the corpse decay on h's own queue: the slot is claimed only by the call
+// that wins h's decay.
 func (n *Npcs) Remove(h *npc.Hostile) {
 	if n.decay != nil {
 		n.decay.Cancel(h)
 	}
-	h.Decay(n.state, n.RespawnHook(h.ObjectID()))
+	h.DecayWithRespawn(n.state, n.RespawnHook)
 }
 
 // scheduleRespawn arms slot's respawn delay from now, unless DespawnAll
