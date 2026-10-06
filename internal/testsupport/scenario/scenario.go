@@ -225,20 +225,24 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 		if len(args) != 6 {
 			return fmt.Errorf("npc <role> <npc id> <type> <dx> <dy> <dz>")
 		}
-		var nums [4]int
-		for i, a := range []string{args[1], args[3], args[4], args[5]} {
+		id, err := strconv.ParseInt(args[1], 10, 32)
+		if err != nil {
+			return fmt.Errorf("npc number %q: %w", args[1], err)
+		}
+		var offsets [3]int
+		for i, a := range args[3:] {
 			v, err := strconv.Atoi(a)
 			if err != nil {
 				return fmt.Errorf("npc number %q: %w", a, err)
 			}
-			nums[i] = v
+			offsets[i] = v
 		}
 		role := args[0]
 		if roles[role] || role == "player" {
 			return fmt.Errorf("role %q named twice", role)
 		}
 		roles[role] = true
-		sc.NPCs = append(sc.NPCs, NPC{Role: role, ID: int32(nums[0]), Type: args[2], DX: nums[1], DY: nums[2], DZ: nums[3]})
+		sc.NPCs = append(sc.NPCs, NPC{Role: role, ID: int32(id), Type: args[2], DX: offsets[0], DY: offsets[1], DZ: offsets[2]})
 	default:
 		return fmt.Errorf("unknown header line %q", key)
 	}
