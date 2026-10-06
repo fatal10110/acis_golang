@@ -149,3 +149,6 @@ TutorialEvent.qmc24Htm inline
 TutorialEvent.qmc35Htm inline
 TutorialEvent.qmc9Htm inline
 TutorialEvent.qmc9Loc inline
+
+# Clan and Alliance features.
+Player.isClanLeader script.Player.IsClanLeader

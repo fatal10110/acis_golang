@@ -239,8 +239,11 @@ func TestAttackableAIArrivedThinkDoesNotAbortInFlightAttack(t *testing.T) {
 	if err := tickThinkIdle(ai); err != nil {
 		t.Fatalf("TickThink() error: %v", err)
 	}
-	if strike.stopCalls != stops+1 {
-		t.Fatalf("attack Stop calls = %d after TickThink, want %d", strike.stopCalls, stops+1)
+	// The finished wander is busy with an empty queue: desire selection
+	// idles it, and the cycle's own idle, with still nothing queued, aborts
+	// once more.
+	if strike.stopCalls != stops+2 {
+		t.Fatalf("attack Stop calls = %d after TickThink, want %d", strike.stopCalls, stops+2)
 	}
 }
 
