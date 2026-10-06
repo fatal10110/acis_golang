@@ -192,25 +192,32 @@ func manifestMismatches(t *testing.T, list []script.Listing, catalog script.Cata
 
 // TestManifestComparisonCatchesDifferences checks the comparison itself on
 // stand-ins for the reference's first quest: one the seam gate refuses, as
-// it refuses every subscribing script until its hooks are raised, and one
-// that registers without the bindings the reference records.
+// it refuses a script whose hook is not raised, one that registers with a
+// hook the reference's lacks, and one that registers without the bindings
+// the reference records.
 func TestManifestComparisonCatchesDifferences(t *testing.T) {
 	list := []script.Listing{{Path: "quest.Q001_LettersOfLove"}}
-	q001 := script.Catalog{"quest.Q001_LettersOfLove": func() script.Script {
-		return script.Script{
-			QuestID: 1,
-			Bind:    script.Bindings{script.EventQuestStart: {30048}, script.EventTalked: {30006, 30033, 30048}},
-			Hooks:   script.Hooks{OnTalk: func(*script.Script, script.Talk) string { return "" }},
-		}
-	}}
+	stand := func(bind script.Bindings) script.Catalog {
+		return script.Catalog{"quest.Q001_LettersOfLove": func() script.Script {
+			return script.Script{
+				QuestID: 1,
+				Bind:    bind,
+				Hooks:   script.Hooks{OnTalk: func(*script.Script, script.Talk) string { return "" }},
+			}
+		}}
+	}
+	q001 := stand(script.Bindings{script.EventQuestStart: {30048}, script.EventTalked: {30006, 30033, 30048}})
 	folk := func(int32) (script.NPCKind, bool) { return script.KindFolk, true }
-	got := manifestMismatches(t, list, q001, script.Config{KindOf: folk, Log: zerolog.Nop()})
-	if !slices.Equal(got, []string{"script quest.Q001_LettersOfLove refused"}) {
+	unraised := stand(script.Bindings{script.EventSeeItem: {30048}})
+	if got := manifestMismatches(t, list, unraised, script.Config{KindOf: folk, Log: zerolog.Nop()}); !slices.Equal(got, []string{"script quest.Q001_LettersOfLove refused"}) {
 		t.Fatalf("a refused script gave %q", got)
+	}
+	if got := manifestMismatches(t, list, q001, script.Config{KindOf: folk, Log: zerolog.Nop()}); !slices.Equal(got, []string{"quest.Q001_LettersOfLove: own hooks onTalk, reference onAdvEvent,onTalk"}) {
+		t.Fatalf("a script missing a hook gave %q, want a hook mismatch", got)
 	}
 
 	noTemplates := func(int32) (script.NPCKind, bool) { return script.KindOther, false }
-	got = manifestMismatches(t, list, q001, script.Config{KindOf: noTemplates, Log: zerolog.Nop()})
+	got := manifestMismatches(t, list, q001, script.Config{KindOf: noTemplates, Log: zerolog.Nop()})
 	if len(got) != 2 || !strings.Contains(got[0], ": binds ") || !strings.Contains(got[1], ": own hooks onTalk, reference onAdvEvent,onTalk") {
 		t.Fatalf("a script without its bindings and hooks gave %q, want a bind and a hook mismatch", got)
 	}

@@ -139,17 +139,6 @@ func (l *GameClientLink) bypassPlayerHelp(live *livePlayer, command string) {
 	l.sendPlayerHelp(live, strings.TrimPrefix(command, "player_help "))
 }
 
-// bypassQuest handles a validated "Quest <quest> [event]" link. A command
-// not on the last page is dropped silently, as specified.
-// ponytail: quest events need the quest engine; the command is logged and
-// the client released until #130 routes it to the quest's event handler.
-func (l *GameClientLink) bypassQuest(live *livePlayer, command string) {
-	if !live.bypasses.allows(command) {
-		return
-	}
-	unportedBypass("quest events (#130)")(l, live, command)
-}
-
 // bypassNpc handles npc_<objectId>_<command>: a command on the last page
 // sent reaches the named NPC when the player can interact with it, and
 // the client is then released with ActionFailed. A command not on that
@@ -179,6 +168,10 @@ func (l *GameClientLink) bypassNpc(live *livePlayer, command string) {
 			case *npc.Folk:
 				if l.playerCanDoInteract(live, target) && !l.folkBypass(live, target, command[end+1:]) {
 					return
+				}
+			case *npc.Hostile:
+				if l.playerCanDoInteract(live, target) {
+					l.hostileBypass(live, target, command[end+1:])
 				}
 			default:
 				l.log.Debug().Int32("object_id", obj.ObjectID()).Str("command", command).Msg("bypass: dialog of a non-civilian NPC not modeled")
@@ -294,11 +287,24 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		sendFolkChat(live, f, reply.HTML, reply.Chat)
 	case npc.BypassTerritoryStatus:
 		l.showTerritoryStatus(live, f)
+	case npc.BypassQuest:
+		l.questWindow(live, f, command)
 	case npc.BypassUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Str("command", command).Msg("bypass: npc dialog command not modeled")
 	case npc.BypassRefused:
 	}
 	return true
+}
+
+// hostileBypass runs command on the hostile NPC h for live: a "Quest"
+// command opens its quest windows; the rest of a hostile NPC's dialog is
+// not modeled yet and is logged.
+func (l *GameClientLink) hostileBypass(live *livePlayer, h *npc.Hostile, command string) {
+	if strings.HasPrefix(command, "Quest") {
+		l.questWindow(live, h, command)
+		return
+	}
+	l.log.Debug().Int("npc_id", h.NpcID()).Str("command", command).Msg("bypass: dialog of a hostile NPC not modeled")
 }
 
 // cpRecovery has arena manager f restore live's CP for its fee: the fee

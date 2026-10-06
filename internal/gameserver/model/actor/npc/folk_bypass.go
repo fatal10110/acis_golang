@@ -74,6 +74,9 @@ const (
 	BypassInstantTeleport
 	// BypassQuestInfo opens the client's quest information window.
 	BypassQuestInfo
+	// BypassQuest opens the quest windows the "Quest [name]" command asks
+	// for.
+	BypassQuest
 	// BypassSubclass runs a village master's subclass command; see
 	// ParseSubclassCommand.
 	BypassSubclass
@@ -357,8 +360,7 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		reply.Outcome = BypassTerritoryStatus
 		return reply
 	case strings.HasPrefix(command, "Quest"):
-		// Quest belongs to the quest engine (#130): it is checked ahead of
-		// Chat, so it does not fall through to it.
+		reply.Outcome = BypassQuest
 		return reply
 	case strings.HasPrefix(command, "Chat"):
 		val := 0
