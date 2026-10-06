@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"slices"
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -146,6 +147,13 @@ func (q *DesireQueue) hasKind(kind Intention) bool {
 		}
 	}
 	return false
+}
+
+// anyMatch reports whether a queued Desire matches.
+func (q *DesireQueue) anyMatch(match func(*Desire) bool) bool {
+	q.mu.RLock()
+	defer q.mu.RUnlock()
+	return slices.ContainsFunc(q.desires, match)
 }
 
 // Has reports whether a queued Desire is Equal to probe.

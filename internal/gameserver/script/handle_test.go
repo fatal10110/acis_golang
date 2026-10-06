@@ -45,6 +45,14 @@ func (b *recordingBrain) AddDoNothingDesire(timer int, weight float64) {
 	b.record("nothing %d %v", timer, weight)
 }
 
+func (b *recordingBrain) AddFleeDesire(target attackable.Combatant, distance int, weight float64) {
+	b.record("flee %v %d %v", id(target), distance, weight)
+}
+
+func (b *recordingBrain) AddSocialDesire(socialID, timer int, weight float64) {
+	b.record("social %d %d %v", socialID, timer, weight)
+}
+
 // combatant is a creature the world tracks under objectID.
 type combatant struct {
 	attackabletest.Combatant
@@ -79,6 +87,8 @@ func TestNPCDesireRequests(t *testing.T) {
 	n.AddFollowDesire(n, 5)
 	n.AddWanderDesire(5, 5)
 	n.AddDoNothingDesire(40, 30)
+	n.AddFleeDesire(p, 500, 10000)
+	n.AddSocialDesire(3, 7000, 1000)
 	n.AddAttackDesire(nil, 1)
 	n.AddFollowDesire((*Player)(nil), 1)
 	n.AddCastDesire(&Player{}, ref, 1)
@@ -93,6 +103,8 @@ func TestNPCDesireRequests(t *testing.T) {
 		"follow 1 5",
 		"wander 5 5",
 		"nothing 40 30",
+		"flee 2 500 10000",
+		"social 3 7000 1000",
 		"attack nil 1",
 		"follow nil 1",
 		"cast nil {4107 1} 1 check=true move=true",
