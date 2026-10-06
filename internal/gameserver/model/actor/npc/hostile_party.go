@@ -49,8 +49,9 @@ func (h *Hostile) attackedHateWeight(attacker attackable.Combatant, damage float
 // power: no HP change and no skill. The attacked hooks run with power as
 // the damage, then the party is called: the NPC itself, its master (alive),
 // and every live minion of the party, the NPC itself again when it is one.
-// Without a bound behavior, power first goes through attackedHateWeight
-// into an attack desire.
+// Then the NPC makes its clan call to itself only. Without a bound
+// behavior, power first goes through attackedHateWeight into an attack
+// desire.
 func (h *Hostile) NotifyAggression(source attackable.Combatant, power int) {
 	if source == nil {
 		return
@@ -60,20 +61,24 @@ func (h *Hostile) NotifyAggression(source attackable.Combatant, power int) {
 	}
 	h.raiseAttacked(source, int32(power), skill.Ref{})
 	h.propagatePartyAttacked(h, source, power, true, true)
+	raiseClanAttacked(h.scripts, h.world, h, source, int32(power), skill.Ref{}, clanAttackedByAggression)
 }
 
 // SkillAttacked is caster's offensive skill sk landing on this NPC, once
 // its effects applied, for a skill that is a debuff or carries aggro
 // points. The attacked hooks run with max(120, aggro points) as the damage,
-// then the party is called as for a hit. A dead NPC is called too, and
-// nothing else reacts: a skill's call has no built-in reaction.
+// then the party is called as for a hit, then the hostile NPCs of its clan
+// in range, not the NPC itself. A dead NPC is called too, and nothing else
+// reacts: a skill's call has no built-in reaction.
 func (h *Hostile) SkillAttacked(caster attackable.Combatant, sk skill.Definition) {
 	if caster == nil {
 		return
 	}
 	value := max(120, sk.AggroPoints)
-	h.raiseAttacked(caster, int32(value), skill.Ref{ID: sk.ID, Level: sk.Level})
+	ref := skill.Ref{ID: sk.ID, Level: sk.Level}
+	h.raiseAttacked(caster, int32(value), ref)
 	h.propagatePartyAttacked(h, caster, value, false, false)
+	raiseClanAttacked(h.scripts, h.world, h, caster, int32(value), ref, clanAttackedBySkill)
 }
 
 // registerHit records hate, the shot-recharge roll, and the attacked hooks
@@ -93,7 +98,8 @@ func (h *Hostile) SkillAttacked(caster attackable.Combatant, sk skill.Definition
 // attackedHateWeight (isDOT adds it apart from the damage, as
 // ReduceHPByDOT does; otherwise AddCombatDamageHate writes both), and the
 // shot-recharge roll. The attacked hooks then run with the damage truncated
-// to an int, and the party is called.
+// to an int, the party is called, and then the clan: the NPC itself, then
+// every NPC of its clan in range.
 func (h *Hostile) registerHit(combatant attackable.Combatant, amount float64, isDOT bool, sk skill.Ref) {
 	if combatant == nil {
 		return
@@ -115,6 +121,7 @@ func (h *Hostile) registerHit(combatant attackable.Combatant, amount float64, is
 	damage := int(commons.JavaInt(amount))
 	h.raiseAttacked(combatant, int32(damage), sk)
 	h.propagatePartyAttacked(h, combatant, damage, false, true)
+	raiseClanAttacked(h.scripts, h.world, h, combatant, int32(damage), sk, clanAttackedByHit)
 }
 
 func (h *Hostile) inParty() bool {
@@ -236,4 +243,30 @@ func partyDistance2D(h *Hostile, other attackable.Combatant) float64 {
 
 func (h *Hostile) aiInt(key string, def int) int {
 	return int(h.AIInt(key, int32(def)))
+}
+
+// partyDied tells h's party that h has just died: h itself, then its
+// master, then every minion of the party but h, dead ones included. A
+// dying master then lets its minions go: they no longer have a master,
+// while it keeps them as its minions.
+func (h *Hostile) partyDied() {
+	if !h.inParty() {
+		return
+	}
+	if h.scripts != nil {
+		h.scripts.HostilePartyDied(h, h)
+		if master := h.Master(); master != nil && master != h {
+			h.scripts.HostilePartyDied(h, master)
+		}
+		for _, minion := range h.partyMinions() {
+			if minion != h {
+				h.scripts.HostilePartyDied(h, minion)
+			}
+		}
+	}
+	if h.IsMaster() {
+		for _, minion := range h.Minions() {
+			minion.SetMaster(nil)
+		}
+	}
 }

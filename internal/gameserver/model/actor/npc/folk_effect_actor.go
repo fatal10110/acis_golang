@@ -168,12 +168,12 @@ func (f *Folk) LethalInput(caster creature.FormulaActor, def modelskill.Definiti
 }
 
 // ApplyLethalOutcome applies a lethal-strike tier to the NPC.
-func (f *Folk) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster attackable.Combatant, _ modelskill.Definition) {
+func (f *Folk) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster attackable.Combatant, def modelskill.Definition) {
 	switch outcome {
 	case formulas.LethalFull:
-		f.reduceHP(f.HP()-1, caster)
+		f.reduceHP(f.HP()-1, caster, skillRef(def))
 	case formulas.LethalHalf:
-		f.reduceHP(f.HP()/2, caster)
+		f.reduceHP(f.HP()/2, caster, skillRef(def))
 	}
 }
 
