@@ -15,7 +15,7 @@ import (
 )
 
 // attackedLog records a behavior's attacked hooks as lines naming the
-// attacker by object id. Hooks run on the caster's queue.
+// attacker by handle type and object id. Hooks run on the caster's queue.
 type attackedLog struct {
 	mu    sync.Mutex
 	lines []string
@@ -27,7 +27,7 @@ func (l *attackedLog) behavior(ids ...int32) func() script.Script {
 			OnAttacked: func(_ *script.Script, e script.Attacked) {
 				l.mu.Lock()
 				defer l.mu.Unlock()
-				l.lines = append(l.lines, fmt.Sprintf("attacker=%d damage=%d skill=%d-%d", e.Attacker.ObjectID(), e.Damage, e.Skill.ID, e.Skill.Level))
+				l.lines = append(l.lines, fmt.Sprintf("attacker=%T:%d damage=%d skill=%d-%d", e.Attacker, e.Attacker.ObjectID(), e.Damage, e.Skill.ID, e.Skill.Level))
 			},
 		}}
 	}
@@ -102,7 +102,7 @@ func TestSkillCastRaisesAttacked(t *testing.T) {
 					// The hook sees the damage truncated to an int.
 					w = fmt.Sprintf("damage=%d %s", int(math.Trunc(before-hostile.HP()+1e-9)), rest)
 				}
-				want = append(want, fmt.Sprintf("attacker=%d %s", objID, w))
+				want = append(want, fmt.Sprintf("attacker=*script.Player:%d %s", objID, w))
 			}
 			if got := log.snapshot(); !slices.Equal(got, want) {
 				t.Fatalf("attacked hooks = %q, want %q", got, want)

@@ -63,14 +63,30 @@ func (l *hookLog) take() ([]string, []float64) {
 	return lines, hp
 }
 
+// nameOf names c by its role. A tracked NPC's handle must be a
+// *script.NPC and a named player's a *script.Player; a handle of another
+// shape is named with its type, so a golden line no longer matches.
 func (l *hookLog) nameOf(c script.Creature) string {
 	if c == nil {
 		return "none"
 	}
-	if n, ok := l.names[c.ObjectID()]; ok {
-		return n
+	id := c.ObjectID()
+	n, ok := l.names[id]
+	if !ok {
+		return strconv.Itoa(int(id))
 	}
-	return strconv.Itoa(int(c.ObjectID()))
+	_, isNPC := l.npcs[id]
+	switch c.(type) {
+	case *script.NPC:
+		if isNPC {
+			return n
+		}
+	case *script.Player:
+		if !isNPC {
+			return n
+		}
+	}
+	return fmt.Sprintf("%s(%T)", n, c)
 }
 
 // behavior is a behavior bound to ids that records its attacked and

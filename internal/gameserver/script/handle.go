@@ -1,10 +1,10 @@
 package script
 
 import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -41,24 +41,21 @@ func NewNPC(h *npc.Hostile) *NPC {
 	return &NPC{self: h, brain: h.AI()}
 }
 
-// NewPlayer returns a handle on the player c.
-func NewPlayer(c *player.Character) *Player {
-	return &Player{self: c}
-}
-
 // creatureOf returns a handle on c: an NPC handle on a hostile NPC, a
 // player handle on a player, a creature handle otherwise, and nil for nil.
+// A player is told by its kind, not its Go type: the world tracks a player
+// wrapped with its connection, and the handle keeps that tracked value.
 func creatureOf(c attackable.Combatant) Creature {
 	switch c := c.(type) {
 	case nil:
 		return nil
 	case *npc.Hostile:
 		return NewNPC(c)
-	case *player.Character:
-		return NewPlayer(c)
-	default:
-		return &creature{self: c}
 	}
+	if c.Kind() == actor.KindPlayer {
+		return &Player{self: c}
+	}
+	return &creature{self: c}
 }
 
 func (n *NPC) combatant() attackable.Combatant {
