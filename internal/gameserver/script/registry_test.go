@@ -295,14 +295,15 @@ func TestBehavesNamesTheIDsABehaviorIsBoundTo(t *testing.T) {
 }
 
 // TestRegistryHasNoWritePath pins the registry's exported surface to
-// reads: nothing changes it after Build.
+// reads and hook raises: nothing changes it after Build. HostileDecayed
+// and PlayerDetached change only the timers, a container of their own.
 func TestRegistryHasNoWritePath(t *testing.T) {
 	var got []string
 	typ := reflect.TypeFor[*Registry]()
 	for i := range typ.NumMethod() {
 		got = append(got, typ.Method(i).Name)
 	}
-	if want := []string{"AbnormalStatusChanged", "Behaves", "Dump", "FirstTalk", "HostileAttacked", "HostilePartyAttacked", "Interact", "Invoke", "JournalQuest", "QuestEvent", "QuestWindow", "TutorialEvent"}; !slices.Equal(got, want) {
+	if want := []string{"AbnormalStatusChanged", "Behaves", "Dump", "FirstTalk", "HostileAttacked", "HostileDecayed", "HostilePartyAttacked", "Interact", "Invoke", "JournalQuest", "PlayerDetached", "QuestEvent", "QuestWindow", "TutorialEvent"}; !slices.Equal(got, want) {
 		t.Fatalf("Registry methods = %v, want only the reads %v; a new method must not change the registry", got, want)
 	}
 	for i := range reflect.TypeFor[Registry]().NumField() {

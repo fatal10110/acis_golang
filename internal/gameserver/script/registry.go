@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
 )
 
@@ -56,6 +57,9 @@ var raisedHooks = map[hook]kindSet{
 	// The tutorial events (TutorialEvent) and the quest event links
 	// (QuestEvent).
 	hookEvent: kinds(KindOther),
+	// The timer registry, on the kinds whose decay stops a behavior's
+	// timers (HostileDecayed).
+	hookTimer: kinds(KindOther, KindHostile),
 	// The quest windows (QuestWindow), for both NPC kinds a dialog command
 	// reaches.
 	hookTalk: kinds(KindFolk, KindHostile),
@@ -72,6 +76,9 @@ type Config struct {
 	Log    zerolog.Logger
 	// Env is what the registered scripts' helpers act through.
 	Env *Env
+	// Queue is the engine queue: a script timer whose NPC and player have
+	// no queue to run it on runs on it.
+	Queue *sim.Queue
 
 	// raises overrides raisedHooks; tests use it.
 	raises func(hook, NPCKind) bool
@@ -99,6 +106,12 @@ type Registry struct {
 	byName map[string]*Script
 	// behaves holds the NPC ids a behavior is bound to.
 	behaves map[int32]bool
+	// behaviors holds, per NPC id, the behaviors left on any of its event
+	// lists.
+	behaviors map[int32]map[*Script]bool
+	// timers are the scripts' timers. They are not part of the registry:
+	// a leaf-locked container of their own.
+	timers *timers
 }
 
 type npcKey struct {
@@ -139,7 +152,8 @@ const (
 // except that first talk keeps a single script. So the last listed behavior wins and other
 // scripts accumulate in list order.
 func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
-	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}, behaves: map[int32]bool{}}
+	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}, behaves: map[int32]bool{}, behaviors: map[int32]map[*Script]bool{}}
+	r.timers = newTimers(r, cfg.Queue)
 	registered := 0
 	for _, l := range list {
 		e := entry{path: l.Path}
@@ -157,6 +171,7 @@ func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
 		}
 		s.path = l.Path
 		s.env = cfg.Env
+		s.timers = r.timers
 		s.Name = l.Path[strings.LastIndexByte(l.Path, '.')+1:]
 		e.bound = boundOf(&s, cfg.KindOf)
 		if err := gate(&s, e.bound, &cfg); err != nil {
@@ -173,6 +188,16 @@ func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
 			r.byName[key] = e.script
 		}
 		registered++
+	}
+	for k, list := range r.npc {
+		for _, s := range list {
+			if s.Behavior {
+				if r.behaviors[k.npc] == nil {
+					r.behaviors[k.npc] = map[*Script]bool{}
+				}
+				r.behaviors[k.npc][s] = true
+			}
+		}
 	}
 	r.log.Info().Int("listed", len(list)).Int("registered", registered).Msg("script: registry built")
 	return r
@@ -220,7 +245,9 @@ func boundOf(s *Script, kindOf func(int32) (NPCKind, bool)) Bindings {
 
 // gate checks that the engine raises every hook s subscribes to: for each
 // binding, the event's hook on that NPC's kind, and the event and timer
-// hooks when s sets them.
+// hooks when s sets them. A behavior's timers stop when its NPC decays, so
+// a behavior that sets the timer hook needs it raised on the kind of every
+// NPC it is bound to.
 func gate(s *Script, bound Bindings, cfg *Config) error {
 	for ev := range npcEventCount {
 		h := npcEvents[ev].hook
@@ -232,6 +259,15 @@ func gate(s *Script, bound Bindings, cfg *Config) error {
 		}
 	}
 	set := s.Hooks.set()
+	if s.Behavior && set.has(hookTimer) {
+		for ev := range npcEventCount {
+			for _, id := range bound[ev] {
+				if k, _ := cfg.KindOf(id); !cfg.raised(hookTimer, k) {
+					return fmt.Errorf("behavior timers on npc %d: their removal at decay is not raised for %s npcs", id, k)
+				}
+			}
+		}
+	}
 	for _, h := range []hook{hookEvent, hookStart, hookTimer} {
 		if set.has(h) && !cfg.raised(h, KindOther) && !cfg.raised(h, KindFolk) && !cfg.raised(h, KindHostile) {
 			return fmt.Errorf("hook %s is not raised", h)
@@ -321,6 +357,12 @@ func (r *Registry) scripts(npcID int32, ev NPCEvent) []*Script {
 // built-in stand-in reactions.
 func (r *Registry) Behaves(npcID int32) bool {
 	return r != nil && r.behaves[npcID]
+}
+
+// behaviorOn reports whether s is a behavior left on any event list of the
+// NPC id npcID.
+func (r *Registry) behaviorOn(s *Script, npcID int32) bool {
+	return r.behaviors[npcID][s]
 }
 
 // JournalQuest returns the quest a journal row's quest name belongs to: the
