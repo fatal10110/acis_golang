@@ -78,6 +78,11 @@ type fakeActor struct {
 	refusals        int
 	timers          []*fakeTimer
 	hooks           hookRecorder
+	// immobile fails MovementDisabled; sleeping is the AI task leaving the
+	// actor alone; socials records each social animation broadcast.
+	immobile bool
+	sleeping bool
+	socials  []int
 }
 
 func actor(id int32) *fakeActor {
@@ -127,6 +132,10 @@ func (a *fakeActor) MoveFromSpawnUsingRandomOffset(offset int) {
 }
 
 func (*fakeActor) Now() time.Time { return time.Now() }
+
+func (a *fakeActor) MovementDisabled() bool { return a.immobile }
+func (a *fakeActor) AISleeping() bool       { return a.sleeping }
+func (a *fakeActor) SocialAction(id int)    { a.socials = append(a.socials, id) }
 
 // fakeTimer is a task armed by fakeActor.After; tests run it by hand.
 type fakeTimer struct {

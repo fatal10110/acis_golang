@@ -81,3 +81,41 @@ func (a *Attackable) AddDoNothingDesire(timer int, weight float64) {
 		QueuedAt: a.now(),
 	})
 }
+
+// AddFleeDesire queues a request to run distance away from target with
+// weight, measured from where the actor stands now; an equal desire (one
+// from the same target) already queued gains the weight instead and keeps
+// its start and distance. While the flee is current and its desire queued,
+// desire selection holds; its arrival drops the desire. A nil target or an
+// actor that cannot move is refused.
+func (a *Attackable) AddFleeDesire(target attackable.Combatant, distance int, weight float64) {
+	if target == nil || a.actor.MovementDisabled() {
+		return
+	}
+	x, y, z := a.actor.Position()
+	a.desires.AddOrUpdate(&Desire{
+		Kind:        IntentionFlee,
+		FinalTarget: target,
+		Location:    location.Location{X: x, Y: y, Z: z},
+		Distance:    distance,
+		Weight:      weight,
+		QueuedAt:    a.now(),
+	})
+}
+
+// AddSocialDesire queues a request to play social animation id with weight;
+// an equal desire (same id) already queued gains the weight instead. Once
+// played, desire selection holds for timer milliseconds. Refused while the
+// actor's AI sleeps.
+func (a *Attackable) AddSocialDesire(id, timer int, weight float64) {
+	if a.actor.AISleeping() {
+		return
+	}
+	a.desires.AddOrUpdate(&Desire{
+		Kind:         IntentionSocial,
+		ItemObjectID: int32(id),
+		Timer:        timer,
+		Weight:       weight,
+		QueuedAt:     a.now(),
+	})
+}

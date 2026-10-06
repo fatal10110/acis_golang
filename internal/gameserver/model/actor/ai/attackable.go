@@ -75,6 +75,11 @@ type AttackableActor interface {
 	// at p, on the goroutine that reached p, with the AI loop unlocked (see
 	// HookPoint).
 	AtHookPoint(p HookPoint)
+	// AISleeping reports whether the AI task leaves the actor alone: it is
+	// dead, out of the world, or asleep in an inactive region.
+	AISleeping() bool
+	// SocialAction shows observers the actor playing social animation id.
+	SocialAction(id int)
 }
 
 // Timer is a pending one-shot task armed by AttackableActor.After.
@@ -164,9 +169,16 @@ type intention struct {
 	target attackable.Combatant
 	skill  skill.Ref
 	// ctrl is a summon cast's CTRL (forced-use) modifier.
-	ctrl  bool
-	loc   location.Location
+	ctrl bool
+	// loc is a walk's destination, or where a flee started.
+	loc location.Location
+	// timer is a wander's chain period in seconds, or a social's hold in
+	// milliseconds.
 	timer int
+	// distance is how far a flee runs from its start.
+	distance int
+	// socialID is a social's animation id.
+	socialID int32
 	// moveToTarget is an attack or cast intention's desire to close in on
 	// its target; every other kind never moves toward one.
 	moveToTarget bool
@@ -259,6 +271,10 @@ type Attackable struct {
 	randomWalkRate int
 	// roll draws a uniform integer in [0, n) for the wander-rate check.
 	roll func(n int) int
+	// socialHold is when the last social animation's hold ends: until then
+	// no desire is chosen and the event idle waits. The zero time holds
+	// nothing; a respawn builds a new loop, so it starts there.
+	socialHold time.Time
 	// lifeTime is the number of completed periodic AI cycles. Empty-queue
 	// idle abort and non-attack promotion run only after the first cycle.
 	// A queued ATTACK desire opens the first-cycle promotion gate. think
@@ -502,14 +518,21 @@ func (a *Attackable) AddFollowDesire(target attackable.Combatant, weight float64
 }
 
 // thinkIdle aborts every action, goes idle and opens the no-desire point.
-func (a *Attackable) thinkIdle() {
+func (a *Attackable) thinkIdle() { a.idleStep(true) }
+
+// idleStep aborts every action, switches to walk stance and opens the
+// no-desire point. toIdle also makes idle the current intention; the
+// periodic cycle's idle under a held selection leaves the current one.
+func (a *Attackable) idleStep(toIdle bool) {
 	a.move.Stop()
 	a.attack.Stop()
 	if cast := a.CastController(); cast != nil {
 		cast.Stop()
 	}
 	a.actor.ForceWalkStance()
-	a.setCurrent(intention{kind: IntentionIdle})
+	if toIdle {
+		a.setCurrent(intention{kind: IntentionIdle})
+	}
 	a.atHookPoint(HookNoDesire)
 }
 
@@ -747,7 +770,8 @@ func (a *Attackable) Think() error {
 // cycle, an actor that is not casting, has an empty desire queue and is
 // not idle aborts everything and goes idle; otherwise it makes the
 // heaviest queued desire current and steps it. An out-of-control actor
-// does neither.
+// does neither, and neither runs while a social's hold or a flee holds the
+// selection (selectionHeld).
 func (a *Attackable) RunAI() error {
 	return a.think(thinkEvent)
 }
@@ -819,8 +843,9 @@ func (a *Attackable) think(mode thinkMode) error {
 	outOfControl := a.actor.OutOfControl()
 	a.refreshCombatMemory()
 	a.pruneDesires(outOfControl)
+	held := a.selectionHeld()
 	onEvent := mode == thinkEvent || mode == thinkAttackFinished
-	if onEvent && !outOfControl && a.idleOnEmptyQueue() {
+	if onEvent && !outOfControl && !held && a.idleOnEmptyQueue() {
 		a.idleAfterFinishedAttack(mode, true)
 		return nil
 	}
@@ -836,9 +861,16 @@ func (a *Attackable) think(mode thinkMode) error {
 		idled := false
 		if _, ok := a.desires.Peek(); !ok {
 			if a.lifeTime.Load() > 0 && !a.castingNow() {
-				if a.hasLatch() {
+				switch {
+				case held:
+					// The cycle's idle does not wait for a held selection,
+					// but only the selection switches to idle.
+					a.idleStep(false)
+					a.queueIdleFollow()
+					idled = true
+				case a.hasLatch():
 					idleAfterLatch = true
-				} else {
+				default:
 					a.thinkIdle()
 					a.queueIdleFollow()
 					idled = true
@@ -877,7 +909,7 @@ func (a *Attackable) think(mode thinkMode) error {
 		return a.continueCurrent(idleAtStart)
 	}
 	var err error
-	if canPromote {
+	if canPromote && !held {
 		err = a.promoteAndStep()
 	}
 	if idleAfterLatch {
@@ -887,6 +919,28 @@ func (a *Attackable) think(mode thinkMode) error {
 	}
 	a.idleAfterFinishedAttack(mode, idleAtStart)
 	return err
+}
+
+// selectionHeld reports whether desire selection and its event idle wait
+// this pass: a social animation's hold has not run out, or a flee is
+// current with its own desire still queued. Neither holds the periodic
+// cycle's idle or a continue pass.
+//
+// The flee's own desire is the one it was taken up from: same target, start
+// and distance. A later flee from the same target, queued once the first
+// one's desire is gone, starts elsewhere and does not hold the selection, so
+// it can be taken up.
+func (a *Attackable) selectionHeld() bool {
+	if a.now().Before(a.socialHold) {
+		return true
+	}
+	if a.current.kind != IntentionFlee {
+		return false
+	}
+	return a.desires.anyMatch(func(d *Desire) bool {
+		return d.Kind == IntentionFlee && sameCombatant(d.FinalTarget, a.current.target) &&
+			d.Location == a.current.loc && d.Distance == a.current.distance
+	})
 }
 
 // idleAfterFinishedAttack is the finished attack's think on an in-control
@@ -969,6 +1023,20 @@ func (a *Attackable) promoteAndStep() error {
 			// Doing nothing has no step: the actor keeps still while the
 			// desire outweighs the rest.
 			a.lastDesire = IntentionNothing
+		case IntentionFlee:
+			// A flee steps once, on the pass that promotes it; while its
+			// desire stays queued, the selection holds.
+			if !promoted {
+				return nil
+			}
+			a.thinkFlee()
+			a.lastDesire = IntentionFlee
+		case IntentionSocial:
+			if !promoted {
+				return nil
+			}
+			a.thinkSocial()
+			a.lastDesire = IntentionSocial
 		case IntentionWander:
 			// A wander steps only on the pass that promotes it; while it
 			// stays current, its chain fires on its own.
@@ -1062,7 +1130,7 @@ func (a *Attackable) promoteNext() (fromLatch, promoted bool) {
 // same reports whether o is the same intention as i: same kind, aimed at
 // the same target with the same skill, or walking to the same location.
 func (i intention) same(o intention) bool {
-	return i.kind == o.kind && sameCombatant(i.target, o.target) && i.skill == o.skill && i.loc == o.loc
+	return i.kind == o.kind && sameCombatant(i.target, o.target) && i.skill == o.skill && i.loc == o.loc && i.socialID == o.socialID
 }
 
 // nextToDo returns the latched attack when one is set, else the heaviest
@@ -1087,6 +1155,10 @@ func (a *Attackable) nextToDo() (next intention, fromLatch, ok bool) {
 		next = intention{kind: IntentionWander, timer: desire.Timer}
 	case IntentionNothing:
 		next = intention{kind: IntentionNothing, timer: desire.Timer}
+	case IntentionFlee:
+		next = intention{kind: IntentionFlee, target: desire.FinalTarget, loc: desire.Location, distance: desire.Distance}
+	case IntentionSocial:
+		next = intention{kind: IntentionSocial, socialID: desire.ItemObjectID, timer: desire.Timer}
 	case IntentionMoveTo:
 		next = intention{kind: IntentionMoveTo, loc: desire.Location}
 	default:
@@ -1163,8 +1235,10 @@ func (a *Attackable) syncOOTSweepLocked() {
 	a.nextOOTSweep = a.now().Add(ootSweepInitialDelay)
 }
 
-// pruneDesires drops invalid cast desires, then, unless the actor is out of
-// control, attack desires whose target is beyond attackDesireRange.
+// pruneDesires drops invalid cast desires, then flee desires from a
+// creature the actor no longer knows or that is dead, then, unless the actor
+// is out of control, attack desires whose target is beyond
+// attackDesireRange.
 func (a *Attackable) pruneDesires(outOfControl bool) {
 	a.desires.RemoveIf(func(d *Desire) bool {
 		if d.Kind != IntentionCast {
@@ -1175,6 +1249,9 @@ func (a *Attackable) pruneDesires(outOfControl bool) {
 		}
 		cast := a.CastController()
 		return cast != nil && !cast.MeetsHPMPDisabled(d.FinalTarget, d.Skill)
+	})
+	a.desires.RemoveIf(func(d *Desire) bool {
+		return d.Kind == IntentionFlee && d.FinalTarget != nil && (!a.actor.Knows(d.FinalTarget) || d.FinalTarget.AlikeDead())
 	})
 	if outOfControl {
 		return
@@ -1335,7 +1412,6 @@ func (a *Attackable) Arrived() {
 	case IntentionFollow:
 		return
 	case IntentionMoveTo, IntentionFlee:
-		// IntentionFlee is dormant until promoteNext can make it current.
 		a.atHookPoint(HookMoveFinished)
 		a.clearCurrentDesire()
 	case IntentionWander:
@@ -1357,14 +1433,48 @@ func (a *Attackable) ArrivedBlocked() {
 func (a *Attackable) clearArrivalDesire() {
 	switch a.current.kind {
 	case IntentionMoveTo, IntentionFlee, IntentionWander:
-		// IntentionFlee is dormant until promoteNext can make it current.
 		a.clearCurrentDesire()
 	}
 }
 
 func (a *Attackable) clearCurrentDesire() {
-	probe := &Desire{Kind: a.current.kind, Location: a.current.loc, FinalTarget: a.current.target, Skill: a.current.skill}
+	probe := &Desire{Kind: a.current.kind, Location: a.current.loc, FinalTarget: a.current.target, Skill: a.current.skill, ItemObjectID: a.current.socialID}
 	a.desires.RemoveIf(func(d *Desire) bool { return d.Equal(probe) })
+}
+
+// thinkFlee is the flee step: the actor runs, in run stance, its distance
+// straight away from where the target stands now. It does not move when it
+// cannot, flees from itself, has a distance under 10, or already stands its
+// distance or more from where the flee was queued.
+func (a *Attackable) thinkFlee() {
+	if a.actor.MovementDisabled() {
+		return
+	}
+	target, distance := a.current.target, a.current.distance
+	if target == nil || target.ObjectID() == a.actor.ObjectID() || distance < 10 {
+		return
+	}
+	ox, oy, oz := a.actor.Position()
+	from := location.Location{X: ox, Y: oy, Z: oz}
+	if from.Distance2D(a.current.loc) >= float64(distance) {
+		return
+	}
+	a.actor.ForceRunStance()
+	tx, ty, _ := target.Position()
+	_, _ = a.move.MoveToLocation(from.FleeFrom(tx, ty, distance))
+}
+
+// thinkSocial is the social step: the desire leaves the queue, and an actor
+// still in control stops, plays the animation and holds desire selection for
+// the social's timer.
+func (a *Attackable) thinkSocial() {
+	a.clearCurrentDesire()
+	if a.actor.DenyAIAction() {
+		return
+	}
+	a.socialHold = a.now().Add(time.Duration(a.current.timer) * time.Millisecond)
+	a.move.Stop()
+	a.actor.SocialAction(int(a.current.socialID))
 }
 
 // thinkWander is the wander step: the promotion of a WANDER desire and

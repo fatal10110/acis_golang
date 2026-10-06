@@ -917,6 +917,19 @@ func (h *Hostile) SleepWhenRegionInactive() bool {
 	return !h.Instance.Template.NoSleepMode && h.InTerritory()
 }
 
+// AISleeping reports whether the AI task leaves the NPC alone: it is dead,
+// out of the world, or in an inactive region it sleeps in.
+func (h *Hostile) AISleeping() bool {
+	if h.Dead() {
+		return true
+	}
+	if h.world == nil {
+		return false
+	}
+	placed, active := h.world.RegionActivity(h)
+	return !placed || (!active && h.SleepWhenRegionInactive())
+}
+
 func (h *Hostile) canRunAI() bool {
 	if h.world == nil {
 		h.regionInactive.Store(false)
