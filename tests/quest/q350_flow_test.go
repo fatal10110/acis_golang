@@ -320,6 +320,32 @@ func TestQ350DrainSoulNeedsTheStartedQuest(t *testing.T) {
 	}
 }
 
+// TestQ350TwoCrystalsResonate: a player holding two Red Soul Crystals who
+// charges one on a wounded Timak Orc Archer, which needs the crystal's
+// skill, is registered on it; the archer's death sends the resonation line
+// and exchanges neither crystal, whatever the roll.
+func TestQ350TwoCrystalsResonate(t *testing.T) {
+	t.Parallel()
+	w := bootSeamQuest(t, timakLevel, nil, func(srv *gameservertest.Server, objID int32) {
+		seedJournal(t, srv, objID, []string{q350Name + ":STARTED"})
+		srv.GiveItem(t, objID, redCrystal, 1)
+		srv.GiveItem(t, objID, redCrystal, 1)
+	}, q350Fixture(t, 50)...)
+	mob := w.chargeCrystal(t, heldObject(t, w, redCrystal), false)
+	if ai, ok := mob.Absorber(w.player); !ok || !ai.Registered {
+		t.Fatalf("absorber = %+v, %v; want registered", ai, ok)
+	}
+	lines := w.killAndDie(t, mob, mob.Dead)
+	w.srv.Advance(t, 3500*time.Millisecond)
+	lines = append(lines, scriptLines(t, w.srv.ReadQueued(t, w.srv.Client))...)
+	if want := []string{"S SystemMessage id=977"}; !slices.Equal(lines, want) {
+		t.Fatalf("death sent %q, want %q", lines, want)
+	}
+	if r, s := w.srv.PlayerItemCount(t, w.player, redCrystal), w.srv.PlayerItemCount(t, w.player, redStage1); r != 2 || s != 0 {
+		t.Fatalf("crystals after the death = %d red, %d stage 1; want 2 and 0", r, s)
+	}
+}
+
 // heldObject returns the object id of the player's one instance of itemID.
 func heldObject(t *testing.T, w *dialogWorld, itemID int32) int32 {
 	t.Helper()

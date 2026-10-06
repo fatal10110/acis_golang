@@ -141,6 +141,60 @@ func visitorMarkFadesAtTheGate(t *testing.T, opts ...gameservertest.Option) {
 	}
 }
 
+// TestQ636FadesOneMarkPerEntry: a player with no Q636 state holding two
+// stacked Visitor's Marks walks into the gate twice. Each entry fades
+// exactly one mark with one picked-up line, so a hook raised twice for one
+// entry would show as both marks fading on the first; a third entry with no
+// mark left changes nothing. It runs on the inline executor and on the real
+// pool.
+func TestQ636FadesOneMarkPerEntry(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name string
+		opts []gameservertest.Option
+	}{
+		{"inline", nil},
+		{"pool", []gameservertest.Option{gameservertest.WithRealPool()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			fadesOneMarkPerEntry(t, tc.opts...)
+		})
+	}
+}
+
+func fadesOneMarkPerEntry(t *testing.T, opts ...gameservertest.Option) {
+	w := bootSeamQuest(t, 20, q636Pages(), func(srv *gameservertest.Server, objID int32) {
+		srv.GiveItem(t, objID, visitorMark, 2)
+	}, append(q636Fixture(t), opts...)...)
+	if n := w.srv.PlayerItemCount(t, w.player, visitorMark); n != 2 {
+		t.Fatalf("Visitor's Marks = %d, want 2", n)
+	}
+
+	inside := location.Location{X: 300, Y: 20, Z: 30}
+	outside := location.Location{X: 100, Y: 20, Z: 30}
+	for i, want := range []struct{ visitor, faded int }{{1, 1}, {0, 2}} {
+		if i > 0 {
+			w.walkTo(t, outside)
+		}
+		lines := scriptLines(t, w.walkTo(t, inside))
+		if wantLines := []string{itemMessage(pickedUpS1, fadedMark)}; !slices.Equal(lines, wantLines) {
+			t.Fatalf("entry %d sent %q, want %q", i+1, lines, wantLines)
+		}
+		if v, f := w.srv.PlayerItemCount(t, w.player, visitorMark), w.srv.PlayerItemCount(t, w.player, fadedMark); v != want.visitor || f != want.faded {
+			t.Fatalf("marks after entry %d = %d visitor, %d faded; want %d and %d", i+1, v, f, want.visitor, want.faded)
+		}
+	}
+
+	w.walkTo(t, outside)
+	if lines := scriptLines(t, w.walkTo(t, inside)); len(lines) != 0 {
+		t.Fatalf("entry 3 sent %q, want nothing", lines)
+	}
+	if v, f := w.srv.PlayerItemCount(t, w.player, visitorMark), w.srv.PlayerItemCount(t, w.player, fadedMark); v != 0 || f != 2 {
+		t.Fatalf("marks after entry 3 = %d visitor, %d faded; want 0 and 2", v, f)
+	}
+}
+
 // TestQ636EliyahRefusesALowLevelPlayer: with no state, Eliyah's quest window
 // creates the quest and answers 31329-01.htm below level 73.
 func TestQ636EliyahRefusesALowLevelPlayer(t *testing.T) {

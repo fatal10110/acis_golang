@@ -13,10 +13,12 @@ import (
 )
 
 // The script-event fixture's NPC templates: a sentinel kind that both
-// sends and hears script events, and a deaf kind no script hears through.
+// sends and hears script events, its civilian counterpart, and a deaf kind
+// no script hears through.
 const (
-	sentinelID = 21301
-	deafID     = 21302
+	sentinelID     = 21301
+	deafID         = 21302
+	folkSentinelID = 21303
 )
 
 // eventLog records the script-event hooks of the fixture's scripts and the
@@ -54,19 +56,19 @@ func (l *eventLog) hook(who string) func(*script.Script, script.ScriptEvent) {
 func bootScriptEvents(t *testing.T) (*gameservertest.Server, int32, *eventLog) {
 	t.Helper()
 	log := &eventLog{names: map[int32]string{}}
-	kinds := map[int32]script.NPCKind{sentinelID: script.KindHostile, deafID: script.KindHostile}
+	kinds := map[int32]script.NPCKind{sentinelID: script.KindHostile, deafID: script.KindHostile, folkSentinelID: script.KindFolk}
 	list := []script.Listing{{Path: "ai.Sentinel"}, {Path: "quest.Listener"}}
 	catalog := script.Catalog{
 		"ai.Sentinel": func() script.Script {
-			return script.Script{Behavior: true, NPCs: []int32{sentinelID}, Hooks: script.Hooks{OnScriptEvent: log.hook("sentinel")}}
+			return script.Script{Behavior: true, NPCs: []int32{sentinelID, folkSentinelID}, Hooks: script.Hooks{OnScriptEvent: log.hook("sentinel")}}
 		},
 		"quest.Listener": func() script.Script {
-			return script.Script{Bind: script.Bindings{script.EventScriptEvent: {sentinelID}}, Hooks: script.Hooks{OnScriptEvent: log.hook("listener")}}
+			return script.Script{Bind: script.Bindings{script.EventScriptEvent: {sentinelID, folkSentinelID}}, Hooks: script.Hooks{OnScriptEvent: log.hook("listener")}}
 		},
 	}
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Talker", playerLevel, 0), gameservertest.WithWantChars(1),
-		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{spawnMonster(sentinelID, "Sentinel"), spawnMonster(deafID, "Deaf")})),
+		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{spawnMonster(sentinelID, "Sentinel"), spawnMonster(deafID, "Deaf"), gameservertest.FolkTemplate("Folk", folkSentinelID)})),
 		gameservertest.WithNPCScripts(kinds, list, catalog),
 	)
 	c := srv.Client
@@ -134,5 +136,42 @@ func TestScriptEventsReachBoundScriptsInline(t *testing.T) {
 		"returned",
 	}; !slices.Equal(got, want) {
 		t.Fatalf("send = %q, want %q", got, want)
+	}
+}
+
+// TestScriptEventsFromAndToCivilians: a civilian NPC's radius broadcast
+// reaches the civilian and hostile NPCs around it, each heard by every
+// script bound to it, and leaves out the sender and an NPC out of range.
+func TestScriptEventsFromAndToCivilians(t *testing.T) {
+	t.Parallel()
+	srv, objID, log := bootScriptEvents(t)
+	folk := func(name string, x int) *script.NPC {
+		f := srv.SpawnFolkNPCAt(t, gameservertest.FolkTemplate("Folk", folkSentinelID), location.Location{X: x, Y: 20, Z: 30})
+		log.names[f.ObjectID()] = name
+		return script.NPCOf(f)
+	}
+	sender := folk("sender", 40)
+	folk("civilian", 240)
+	folk("far", 1400)
+	h := srv.SpawnHostileNPCTemplateAt(t, spawnMonster(sentinelID, "Sentinel"), location.Location{X: 340, Y: 20, Z: 30})
+	log.names[h.ObjectID()] = "hostile"
+	srv.Settle(t)
+
+	if !srv.RunScript(t, objID, "Listener", func(s *script.Script, _ *script.Player) {
+		s.BroadcastScriptEvent(sender, 10002, 4, 600)
+		log.add("returned")
+	}) {
+		t.Fatal("the send panicked")
+	}
+	got := log.take()
+	if len(got) != 5 || got[4] != "returned" {
+		t.Fatalf("broadcast = %q, want two NPCs heard by two scripts each, then the return", got)
+	}
+	slices.Sort(got[:4])
+	if want := []string{
+		"listener civilian event=10002 arg1=4 arg2=0", "listener hostile event=10002 arg1=4 arg2=0",
+		"sentinel civilian event=10002 arg1=4 arg2=0", "sentinel hostile event=10002 arg1=4 arg2=0",
+	}; !slices.Equal(got[:4], want) {
+		t.Fatalf("broadcast = %q, want %q", got[:4], want)
 	}
 }
