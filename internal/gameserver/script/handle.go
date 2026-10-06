@@ -134,6 +134,9 @@ func (n *NPC) NpcID() int32 {
 // Level returns the player's level.
 func (p *Player) Level() int32 { return int32(p.character().Level()) }
 
+// IsClanLeader reports whether the player leads its clan.
+func (p *Player) IsClanLeader() bool { return p.character().IsClanLeader() }
+
 func (n *NPC) combatant() attackable.Combatant {
 	if n == nil || n.self == nil {
 		return nil
