@@ -38,12 +38,10 @@ func AlreadyCompletedMsg() string { return alreadyCompletedPage }
 func (r *Registry) Interact(p *Player, n *NPC) bool {
 	c := p.character()
 	c.SetLastQuestNPC(n.ObjectID())
-	list := r.scripts(n.NpcID(), EventFirstTalk)
-	if len(list) != 1 {
+	s, res, bound := r.FirstTalk(n.NpcID(), FirstTalk{NPC: n, Player: p})
+	if !bound {
 		return false
 	}
-	s := list[0]
-	res := r.answer(s, hookFirstTalk, func() string { return s.Hooks.FirstTalk(s, FirstTalk{NPC: n, Player: p}) })
 	if res.Kind == ResultNone {
 		c.ReleaseDialog()
 		return true
@@ -228,8 +226,8 @@ const (
 // ReadHelpPage runs what opening the help page file, shown for the item
 // itemID, does to c's quests: the last page of Lidia's diary marks the diary
 // read in that quest at condition 5 when it is not yet. It reports false
-// when c's state in that quest holds a value that is not a number: the
-// page is then not shown, as in the reference.
+// when the condition, or at condition 5 the diary mark, is set to something
+// that is not a number: the page is then not shown.
 func (q *Quests) ReadHelpPage(c *player.Character, file string, itemID int32) bool {
 	if itemID != diaryItem || !strings.EqualFold(file, diaryPage) {
 		return true
@@ -242,11 +240,14 @@ func (q *Quests) ReadHelpPage(c *player.Character, file string, itemID int32) bo
 	if !ok {
 		return false
 	}
+	if cond != 5 {
+		return true
+	}
 	diary, ok := st.intVar("diary")
 	if !ok {
 		return false
 	}
-	if cond == 5 && diary == 0 {
+	if diary == 0 {
 		st.Set("diary", "1")
 	}
 	return true

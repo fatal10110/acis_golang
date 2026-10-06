@@ -216,13 +216,17 @@ func TestLidiasDiaryHelpPageMarksTheDiaryRead(t *testing.T) {
 	for _, tc := range []struct {
 		name, cond, diary, help string
 		want                    string
+		// hidden: the page is not shown.
+		hidden bool
 	}{
-		{"marks", "5", "", "player_help lidias_diary/7064-16.htm#7064", "1"},
-		{"any case", "5", "0", "player_help LIDIAS_DIARY/7064-16.htm#7064", "1"},
-		{"other condition", "4", "", "player_help lidias_diary/7064-16.htm#7064", ""},
-		{"already read", "5", "1", "player_help lidias_diary/7064-16.htm#7064", "1"},
-		{"other page", "5", "", "player_help lidias_diary/7064-15.htm#7064", ""},
-		{"no item", "5", "", "player_help lidias_diary/7064-16.htm", ""},
+		{"marks", "5", "", "player_help lidias_diary/7064-16.htm#7064", "1", false},
+		{"any case", "5", "0", "player_help LIDIAS_DIARY/7064-16.htm#7064", "1", false},
+		{"other condition", "4", "", "player_help lidias_diary/7064-16.htm#7064", "", false},
+		{"already read", "5", "1", "player_help lidias_diary/7064-16.htm#7064", "1", false},
+		{"other page", "5", "", "player_help lidias_diary/7064-15.htm#7064", "", false},
+		{"no item", "5", "", "player_help lidias_diary/7064-16.htm", "", false},
+		{"bad diary unread at other condition", "4", "abc", "player_help lidias_diary/7064-16.htm#7064", "abc", false},
+		{"bad diary at condition 5", "5", "abc", "player_help lidias_diary/7064-16.htm#7064", "abc", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
@@ -236,7 +240,11 @@ func TestLidiasDiaryHelpPageMarksTheDiaryRead(t *testing.T) {
 				}
 			})
 			got := w.bypass(t, tc.help)
-			if len(got) != 1 || !strings.HasPrefix(got[0], "S NpcHtmlMessage obj=0") {
+			if tc.hidden {
+				if len(got) != 0 {
+					t.Fatalf("help page = %q, want nothing", got)
+				}
+			} else if len(got) != 1 || !strings.HasPrefix(got[0], "S NpcHtmlMessage obj=0") {
 				t.Fatalf("help page = %q, want the page", got)
 			}
 			if got := w.srv.QuestVars(t, w.player, q023)["diary"]; got != tc.want {

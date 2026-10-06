@@ -3,7 +3,6 @@ package npc
 import (
 	"math/rand/v2"
 	"strconv"
-	"time"
 )
 
 // silentGuards are the guards of the starting villages and the patrols:
@@ -40,22 +39,13 @@ func (h *Hostile) ChatPage(exists func(file string) bool) string {
 	return "data/html/npcdefault.htm"
 }
 
-// TalkAnimation claims the talk animation an interact at now plays: a
-// random social action id in [0, 8), at most one per socialInterval, the
-// first one always, and none while the NPC cannot act. ok is false when
-// none plays.
-func (h *Hostile) TalkAnimation(now time.Time) (id int32, ok bool) {
-	if h.DenyAIAction() {
+// TalkAnimation claims the talk animation an interact plays: a random
+// social action id in [0, 8), none while the NPC cannot act, and otherwise
+// as the AI's social clock allows (see ai.Attackable.ClaimTalkSocial). ok
+// is false when none plays.
+func (h *Hostile) TalkAnimation() (id int32, ok bool) {
+	if h.DenyAIAction() || !h.brain.ClaimTalkSocial() {
 		return 0, false
 	}
-	ms := now.UnixMilli()
-	for {
-		last := h.lastSocial.Load()
-		if last != 0 && ms-last <= socialInterval.Milliseconds() {
-			return 0, false
-		}
-		if h.lastSocial.CompareAndSwap(last, ms) {
-			return int32(rand.IntN(8)), true
-		}
-	}
+	return int32(rand.IntN(8)), true
 }

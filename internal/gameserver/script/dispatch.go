@@ -84,15 +84,15 @@ func (r *Registry) answer(s *Script, h hook, fn func() string) Result {
 }
 
 // FirstTalk runs the first-talk hook of the NPC with id npcID when exactly
-// one script holds its first talk; bound is false otherwise, and the NPC
-// answers with its own window.
-func (r *Registry) FirstTalk(npcID int32, e FirstTalk) (res Result, bound bool) {
+// one script holds its first talk, and returns that script and its answer;
+// bound is false otherwise, and the NPC answers with its own window.
+func (r *Registry) FirstTalk(npcID int32, e FirstTalk) (s *Script, res Result, bound bool) {
 	list := r.scripts(npcID, EventFirstTalk)
 	if len(list) != 1 {
-		return Result{}, false
+		return nil, Result{}, false
 	}
-	s := list[0]
-	return r.answer(s, hookFirstTalk, func() string { return s.Hooks.FirstTalk(s, e) }), true
+	s = list[0]
+	return s, r.answer(s, hookFirstTalk, func() string { return s.Hooks.FirstTalk(s, e) }), true
 }
 
 // AbnormalStatusChanged runs the abnormal-status hook of every script that

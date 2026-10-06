@@ -25,7 +25,7 @@ func TestHelperPanicAbortsTheStringHook(t *testing.T) {
 		},
 	}
 	r, logs := build(t, listOf("script.Giver"), catalog)
-	res, bound := r.FirstTalk(2, FirstTalk{})
+	_, res, bound := r.FirstTalk(2, FirstTalk{})
 	if !bound || res != (Result{Kind: ResultAborted}) {
 		t.Fatalf("first talk = %+v, %v; want ResultAborted", res, bound)
 	}

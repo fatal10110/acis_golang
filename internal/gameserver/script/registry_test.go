@@ -159,13 +159,13 @@ func TestFirstTalkSlot(t *testing.T) {
 	}
 	r, _ := build(t, listOf("script.First", "script.Second", "ai.Old", "ai.New"), catalog)
 
-	if res, bound := r.FirstTalk(1, FirstTalk{}); !bound || res != (Result{ResultPageFile, "first.htm"}) {
+	if _, res, bound := r.FirstTalk(1, FirstTalk{}); !bound || res != (Result{ResultPageFile, "first.htm"}) {
 		t.Fatalf("npc 1 first talk = %+v, %v; want the first registered script", res, bound)
 	}
-	if res, bound := r.FirstTalk(2, FirstTalk{}); !bound || res != (Result{ResultPageFile, "new.htm"}) {
+	if _, res, bound := r.FirstTalk(2, FirstTalk{}); !bound || res != (Result{ResultPageFile, "new.htm"}) {
 		t.Fatalf("npc 2 first talk = %+v, %v; want the later behavior", res, bound)
 	}
-	if _, bound := r.FirstTalk(3, FirstTalk{}); bound {
+	if _, _, bound := r.FirstTalk(3, FirstTalk{}); bound {
 		t.Fatal("npc 3 has no first-talk script but reported one")
 	}
 	if got := len(r.scripts(1, EventFirstTalk)); got != 1 {

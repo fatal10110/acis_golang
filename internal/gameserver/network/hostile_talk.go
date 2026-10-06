@@ -3,7 +3,6 @@ package network
 import (
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -20,7 +19,7 @@ func (l *GameClientLink) talkToHostile(live *livePlayer, h *npc.Hostile) {
 	if !h.Talks() {
 		return
 	}
-	if id, ok := h.TalkAnimation(time.Now()); ok {
+	if id, ok := h.TalkAnimation(); ok {
 		l.broadcastNPCFrame(h, func() wire.Frame { return serverpackets.FrameSocialAction(h.ObjectID(), id) })
 	}
 	if l.talkThroughScripts(live, h) {

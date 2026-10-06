@@ -63,8 +63,6 @@ type Hostile struct {
 	brain *ai.Attackable
 	move  ai.MoveController
 	world *world.State
-	// lastSocial is the Unix millisecond time of the last talk animation.
-	lastSocial atomic.Int64
 	// sink receives this NPC's events. Attach installs it before the NPC is
 	// published into world.State; nil drops every event.
 	sink event.Sink
