@@ -25,10 +25,10 @@ type ScriptHooks interface {
 	// FolkCreated runs f's created hooks: f has just entered the world.
 	FolkCreated(f *Folk)
 	// HostileDecayed runs h's decayed hooks once h has decayed, before it
-	// leaves the world.
+	// leaves the world, then stops the behavior timers bound to h.
 	HostileDecayed(h *Hostile)
 	// FolkDecayed runs f's decayed hooks once f has decayed, before it
-	// leaves the world.
+	// leaves the world, then stops the behavior timers bound to f.
 	FolkDecayed(f *Folk)
 	// HostileDying schedules h's dying hooks: killer has just killed it.
 	HostileDying(h *Hostile, killer attackable.Combatant)

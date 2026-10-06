@@ -113,6 +113,14 @@ QuestState.getState script.QuestState.Status
 QuestState.setCond script.QuestState.SetCond
 QuestState.setState script.QuestState.SetStatus
 
+# Script timers (E7). The timer calls are methods of the registered script.
+# The six overloads of cancelQuestTimers are one call taking the filters it
+# matches on: script.TimerName, script.TimerNPC and script.TimerPlayer.
+Quest.cancelQuestTimer script.Script.CancelTimer
+Quest.cancelQuestTimers script.Script.CancelTimers
+Quest.startQuestTimer script.Script.StartTimer
+Quest.startQuestTimerAtFixedRate script.Script.StartTimerAtFixedRate
+
 # Desires II (A5): flee and social.
 NpcAI.addFleeDesire AddFleeDesire
 NpcAI.addSocialDesire AddSocialDesire

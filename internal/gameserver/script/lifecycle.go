@@ -34,14 +34,17 @@ func (r *Registry) created(npcID int32, self attackable.Combatant) {
 
 // HostileDecayed runs the decayed hook of every script bound to h's
 // template, in list order: h has decayed or was deleted and has not left
-// the world yet.
+// the world yet. Then the timers bound to h whose script is a behavior
+// bound to h's template stop, so a decayed hook still sees them.
 func (r *Registry) HostileDecayed(h *npc.Hostile) {
 	r.decayed(int32(h.NpcID()), h)
+	r.timers.npcDecayed(h.Scratch())
 }
 
 // FolkDecayed is HostileDecayed for the civilian NPC f.
 func (r *Registry) FolkDecayed(f *npc.Folk) {
 	r.decayed(int32(f.NpcID()), f)
+	r.timers.npcDecayed(f.Scratch())
 }
 
 func (r *Registry) decayed(npcID int32, self attackable.Combatant) {
