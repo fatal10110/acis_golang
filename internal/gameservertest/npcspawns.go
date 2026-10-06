@@ -66,6 +66,8 @@ type npcSpawnDeps struct {
 	// sevenSigns is the state the Seven Signs groups follow, and whose
 	// period changes swap them.
 	sevenSigns *sevensigns.State
+	// scripts raises the spawned NPCs' script hooks.
+	scripts *script.Registry
 }
 
 // WithDataReloads gives the link the //reload and //respawnall hooks; by
@@ -105,7 +107,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Rates: deps.dropRates}, time.Now, deps.log,
 		nil, actorcast.EffectHandlers{}, walker, network.HostileSinks(deps.state, deps.stance), link.FolkSinks(deps.state, deps.stance),
 		20, 0, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues,
-		script.NewMakers(maker.Catalog(), maker.Default, deps.log))
+		script.NewMakers(maker.Catalog(), maker.Default, deps.log), deps.scripts)
 	if err != nil {
 		t.Fatalf("new npc spawns: %v", err)
 	}

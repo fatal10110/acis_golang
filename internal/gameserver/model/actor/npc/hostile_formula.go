@@ -203,19 +203,19 @@ func (h *Hostile) whileAliveMP(write func()) {
 // above the invul/damage-permission guard: an invulnerable NPC, or one hit
 // by an attacker without damage permission, still aggroes and calls its
 // party, but takes no damage. See reduceHP.
-func (h *Hostile) ReduceHP(amount float64, attacker attackable.Combatant, _ modelskill.Definition) {
+func (h *Hostile) ReduceHP(amount float64, attacker attackable.Combatant, def modelskill.Definition) {
 	if h.AlikeDead() {
 		return
 	}
 	h.breakCastOnDamage(amount)
-	h.reduceHP(amount, attacker)
+	h.reduceHP(amount, attacker, skillRef(def))
 }
 
 // ReduceHPWithoutCastBreak is ReduceHP for a skill hit whose cast-break roll
 // the caller already ran through BreakCastOnDamage, ahead of other per-hit
 // work.
-func (h *Hostile) ReduceHPWithoutCastBreak(amount float64, attacker attackable.Combatant, _ modelskill.Definition) {
-	h.reduceHP(amount, attacker)
+func (h *Hostile) ReduceHPWithoutCastBreak(amount float64, attacker attackable.Combatant, def modelskill.Definition) {
+	h.reduceHP(amount, attacker, skillRef(def))
 }
 
 // reduceHP is ReduceHP without the cast-break roll, for HP loss that is not
@@ -224,8 +224,8 @@ func (h *Hostile) ReduceHPWithoutCastBreak(amount float64, attacker attackable.C
 // share is zero, a lethal strike on an NPC at 1 HP) still registers the hit
 // and, for a permitted attacker on a vulnerable NPC, still wakes it and
 // rolls the stun break; only the HP write and its status report need a
-// positive amount.
-func (h *Hostile) reduceHP(amount float64, attacker attackable.Combatant) {
+// positive amount. sk is the skill that dealt the loss.
+func (h *Hostile) reduceHP(amount float64, attacker attackable.Combatant, sk modelskill.Ref) {
 	if h.AlikeDead() {
 		return
 	}
@@ -236,7 +236,7 @@ func (h *Hostile) reduceHP(amount float64, attacker attackable.Combatant) {
 		amount = 0
 	}
 	h.testOverhit(attacker, amount)
-	h.registerHit(attacker, amount, false)
+	h.registerHit(attacker, amount, false, sk)
 	if h.Invul() || !creature.CanDealDamage(attacker) {
 		return
 	}
@@ -279,6 +279,16 @@ func (h *Hostile) ConsumeHP(amount float64) {
 // included (there is no isDOT gate on that path). A zero-damage tick
 // registers the hit the same way and writes no HP.
 func (h *Hostile) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT bool) {
+	h.reduceHPByDOT(amount, attacker, isDOT, modelskill.Ref{})
+}
+
+// ReduceHPBySkillDOT is ReduceHPByDOT for one damage-over-time tick of the
+// skill sk: the hit it registers names sk.
+func (h *Hostile) ReduceHPBySkillDOT(amount float64, attacker effect.Actor, sk modelskill.Ref) {
+	h.reduceHPByDOT(amount, attacker, true, sk)
+}
+
+func (h *Hostile) reduceHPByDOT(amount float64, attacker effect.Actor, isDOT bool, sk modelskill.Ref) {
 	if h.AlikeDead() {
 		return
 	}
@@ -286,7 +296,7 @@ func (h *Hostile) ReduceHPByDOT(amount float64, attacker effect.Actor, isDOT boo
 	killer, _ := attacker.(attackable.Combatant)
 	creature.InterruptDuelOnNPCHit(killer)
 	h.testOverhit(killer, amount)
-	h.registerHit(killer, amount, true)
+	h.registerHit(killer, amount, true, sk)
 	if h.Invul() || !creature.CanDealDamage(killer) {
 		return
 	}
@@ -432,12 +442,12 @@ func (h *Hostile) LethalInput(caster creature.FormulaActor, def modelskill.Defin
 
 // ApplyLethalOutcome applies a lethal-strike tier to h. The HP loss rolls
 // no cast break of its own.
-func (h *Hostile) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster attackable.Combatant, _ modelskill.Definition) {
+func (h *Hostile) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster attackable.Combatant, def modelskill.Definition) {
 	switch outcome {
 	case formulas.LethalFull:
-		h.reduceHP(h.HP()-1, caster)
+		h.reduceHP(h.HP()-1, caster, skillRef(def))
 	case formulas.LethalHalf:
-		h.reduceHP(h.HP()/2, caster)
+		h.reduceHP(h.HP()/2, caster, skillRef(def))
 	}
 }
 
@@ -478,3 +488,8 @@ func raceStats(r Race) (atk, res stat.Stat, ok bool) {
 // WeaponGradePenalty reports false: NPCs carry no weapon grade to be
 // under-skilled for.
 func (h *Hostile) WeaponGradePenalty() bool { return false }
+
+// skillRef names def's skill and level.
+func skillRef(def modelskill.Definition) modelskill.Ref {
+	return modelskill.Ref{ID: def.ID, Level: def.Level}
+}
