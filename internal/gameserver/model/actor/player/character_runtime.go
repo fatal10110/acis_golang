@@ -500,6 +500,10 @@ func (c *Character) SetWorldHandle(t world.Tracked) {
 	c.stateMu.Unlock()
 }
 
+// WorldHandle returns the object the world registers c under: the one
+// SetWorldHandle named, else c.
+func (c *Character) WorldHandle() world.Tracked { return c.tracked() }
+
 // tracked returns the object the world registers c under.
 func (c *Character) tracked() world.Tracked {
 	if c.worldHandle != nil {

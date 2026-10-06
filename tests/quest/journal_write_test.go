@@ -25,6 +25,9 @@ const (
 	noblesse = "NoblesseTeleporter"
 )
 
+// q001Items are Q001's quest items, which its exit takes.
+var q001Items = []int32{687, 688, 1079, 1080}
+
 // bootJournal boots one character with the journal scripts.
 func bootJournal(t *testing.T, opts ...gameservertest.Option) (*gameservertest.Server, int32) {
 	t.Helper()
@@ -33,6 +36,7 @@ func bootJournal(t *testing.T, opts ...gameservertest.Option) (*gameservertest.S
 		gameservertest.WithWantChars(1),
 		gameservertest.WithReuseDelays(0, 0),
 		journalScripts(),
+		questItemTemplates(),
 	}, opts...)...)
 	return srv, srv.SoleObjectID(t)
 }
@@ -119,9 +123,9 @@ func varsLine(vars map[string]string) string {
 // packets in order while the database gets the reference's statements in
 // order, leaving the rows and the journal the reference leaves.
 //
-// The golden's item-removal system messages are not expected: removing a
-// quest's items on exit belongs to the script item helpers, and the seeded
-// character holds none.
+// An exit of the real quest starts with one of its quest items held, which
+// an exit that ends the quest takes; the inventory update that follows is
+// sent later and is not part of the golden.
 func TestJournalWritesMatchReferenceOrder(t *testing.T) {
 	t.Parallel()
 	scriptcontract.Run(t, "journal.write_order", func(t *testing.T, r scriptcontract.Row) {
@@ -130,6 +134,9 @@ func TestJournalWritesMatchReferenceOrder(t *testing.T) {
 		quest := q001
 		if r.Str(t, "quest") == "script" {
 			quest = noblesse
+		}
+		if quest == q001 && strings.HasPrefix(r.Str(t, "op"), "exitQuest") {
+			srv.GiveItem(t, objID, q001Items[0], 1)
 		}
 		if seed := r.Str(t, "seed_state"); seed != "-" {
 			rows := []journalRow{{objID, quest, questlog.KeyState, val(seed)}}
@@ -169,7 +176,6 @@ func TestJournalWritesMatchReferenceOrder(t *testing.T) {
 		var wantS, wantQ []string
 		for _, line := range r.Lines {
 			switch {
-			case strings.HasPrefix(line, "S SystemMessage"):
 			case strings.HasPrefix(line, "S "):
 				wantS = append(wantS, line)
 			default:
@@ -180,8 +186,11 @@ func TestJournalWritesMatchReferenceOrder(t *testing.T) {
 				wantQ = append(wantQ, string(s.Kind)+" "+strings.Join(s.Params[1:], " | "))
 			}
 		}
-		if got := sentLines(t, srv); !slices.Equal(got, wantS) {
+		if got := immediateLines(t, srv); !slices.Equal(got, wantS) {
 			t.Fatalf("packets:\n got %q\nwant %q", got, wantS)
+		}
+		if got := srv.PlayerItemCount(t, objID, q001Items[0]); got != int(r.Int(t, "items")) {
+			t.Fatalf("items after = %d, want %d", got, r.Int(t, "items"))
 		}
 		srv.FlushPersistence(t)
 		if got := statementLines(srv.TakeJournalWrites()); !slices.Equal(got, wantQ) {

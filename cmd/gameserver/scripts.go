@@ -5,6 +5,11 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/config"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -54,7 +59,7 @@ func scriptCatalog(catalogs []script.Catalog) (script.Catalog, error) {
 // ids that had a template at boot keep their bindings across a later
 // //reload npc, ids a reload adds stay unbound, and a template whose kind
 // a reload changes is not re-checked by the seam gate until restart.
-func provideScripts(paths gameServerPaths, data *gameData, log zerolog.Logger) (*script.Registry, error) {
+func provideScripts(paths gameServerPaths, data *gameData, env *script.Env, log zerolog.Logger) (*script.Registry, error) {
 	list, err := gamexml.LoadScriptList(filepath.Join(paths.DataRoot, "data", "xml", "scripts.xml"), log)
 	if err != nil {
 		return nil, err
@@ -63,7 +68,38 @@ func provideScripts(paths gameServerPaths, data *gameData, log zerolog.Logger) (
 	if err != nil {
 		return nil, err
 	}
-	return script.Build(list, catalog, script.Config{KindOf: npcKindOf(data.NPCs), Log: log}), nil
+	return script.Build(list, catalog, script.Config{KindOf: npcKindOf(data.NPCs), Log: log, Env: env}), nil
+}
+
+// provideScriptEnv returns what the script helpers act through: the quest
+// rates of server.properties, the party range and multiple item drop the
+// kill rewards read, the item id allocator and the shared random source.
+func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator) (*script.Env, error) {
+	var rates script.Rates
+	for _, r := range []struct {
+		key string
+		dst *float64
+	}{
+		{"RateQuestDrop", &rates.Drop},
+		{"RateQuestReward", &rates.Reward},
+		{"RateQuestRewardXP", &rates.XP},
+		{"RateQuestRewardSP", &rates.SP},
+		{"RateQuestRewardAdena", &rates.RewardAdena},
+	} {
+		v, err := serverProps.Float64(r.key, 1)
+		if err != nil {
+			return nil, err
+		}
+		*r.dst = v
+	}
+	return &script.Env{
+		Quests:           journals,
+		Rates:            rates,
+		PartyRange:       rewards.PartyRange,
+		MultipleItemDrop: rewards.MultipleItemDrop,
+		NewItemID:        ids.NextID,
+		Rand:             rnd.Get,
+	}, nil
 }
 
 // provideQuestJournals returns the quest journal writer, draining each

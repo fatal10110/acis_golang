@@ -3,11 +3,14 @@ package script
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
@@ -65,7 +68,7 @@ func (q *Quests) State(c *player.Character, s *Script) *QuestState {
 // NewState adds a state of s to c's journal, created, and returns it. It
 // writes nothing.
 func (q *Quests) NewState(c *player.Character, s *Script) *QuestState {
-	st := c.Quests().Create(questlog.Quest{Name: s.Name, ID: s.QuestID})
+	st := c.Quests().Create(questlog.Quest{Name: s.Name, ID: s.QuestID, Items: s.Items})
 	return &QuestState{quests: q, player: c, state: st}
 }
 
@@ -85,6 +88,26 @@ func (qs *QuestState) Get(key string) (string, bool) { return qs.state.Get(key) 
 
 // Status returns the state's status.
 func (qs *QuestState) Status() questlog.Status { return qs.state.Status() }
+
+// Cond returns the quest's condition, 0 when it has none. A condition that
+// is not a 32-bit integer panics.
+func (qs *QuestState) Cond() int32 {
+	v, ok := qs.state.Get(questlog.KeyCond)
+	if !ok {
+		return 0
+	}
+	n, err := strconv.ParseInt(v, 10, 32)
+	if err != nil {
+		panic(fmt.Sprintf("script: quest %s condition %q: %v", qs.state.Quest().Name, v, err))
+	}
+	return int32(n)
+}
+
+// Player returns the handle on the state's player.
+func (qs *QuestState) Player() *Player {
+	self, _ := qs.player.WorldHandle().(attackable.Combatant)
+	return PlayerOf(self)
+}
 
 // Set sets the variable key to value and writes it.
 func (qs *QuestState) Set(key, value string) {
@@ -122,15 +145,20 @@ func (qs *QuestState) SetCond(cond int32) {
 }
 
 // Exit ends a started quest: a repeatable one is forgotten, any other is
-// kept completed. A real quest then shows the player its quest window.
+// kept completed. A real quest then shows the player its quest window, and
+// the player loses every unit of the quest's items.
 func (qs *QuestState) Exit(repeatable bool) {
 	list, ok := qs.state.Exit(repeatable)
 	if !ok {
 		return
 	}
 	qs.quests.commit(qs.player)
-	if qs.state.Quest().Real() {
+	q := qs.state.Quest()
+	if q.Real() {
 		qs.player.NotifyQuestList(list)
+	}
+	for _, id := range q.Items {
+		qs.player.TakeScriptItems(id, -1)
 	}
 }
 

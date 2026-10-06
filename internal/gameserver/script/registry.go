@@ -61,6 +61,8 @@ type Config struct {
 	// no template has that id. A binding to such an id is skipped.
 	KindOf func(npcID int32) (NPCKind, bool)
 	Log    zerolog.Logger
+	// Env is what the registered scripts' helpers act through.
+	Env *Env
 
 	// raises overrides raisedHooks; tests use it.
 	raises func(hook, NPCKind) bool
@@ -145,6 +147,7 @@ func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
 			continue
 		}
 		s.path = l.Path
+		s.env = cfg.Env
 		s.Name = l.Path[strings.LastIndexByte(l.Path, '.')+1:]
 		e.bound = boundOf(&s, cfg.KindOf)
 		if err := gate(&s, e.bound, &cfg); err != nil {
@@ -319,5 +322,5 @@ func (r *Registry) JournalQuest(name string) (questlog.Quest, bool) {
 	if s == nil {
 		return questlog.Quest{}, false
 	}
-	return questlog.Quest{Name: s.Name, ID: s.QuestID}, true
+	return questlog.Quest{Name: s.Name, ID: s.QuestID, Items: s.Items}, true
 }
