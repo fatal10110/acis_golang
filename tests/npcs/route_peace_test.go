@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -104,5 +105,62 @@ func TestRouteWalkCarriesOnThroughTheReturnToPeace(t *testing.T) {
 		if fr.opcode == serverpackets.OpcodeStopMove {
 			t.Fatal("patrol shown StopMove as it went back to peace, want it walking on")
 		}
+	}
+}
+
+// A fight that ends while the monster is still attacking hands it back to its
+// route: the return to peace leaves it idle, and its next AI pass takes the
+// route desire up again toward the nearest node. The fight ends the two ways
+// it usually does: the target is lost (AggroList.stopHate), or the region
+// goes inactive (Npc.onInactiveRegion runs setBackToPeace directly).
+func TestRouteIsTakenUpAgainWhenAFightEnds(t *testing.T) {
+	t.Parallel()
+	for _, end := range []struct {
+		name  string
+		endIt func(w *routeWorld, h *npc.Hostile) func()
+	}{
+		{"target lost", func(w *routeWorld, h *npc.Hostile) func() {
+			return func() {
+				obj, _ := w.srv.State.Object(w.player)
+				h.StopAggroHate(obj.(attackable.Combatant))
+			}
+		}},
+		{"back to peace", func(_ *routeWorld, h *npc.Hostile) func() {
+			return func() { h.AI().SetBackToPeace() }
+		}},
+	} {
+		t.Run(end.name, func(t *testing.T) {
+			t.Parallel()
+			executors(t, func(t *testing.T, opts ...gameservertest.Option) {
+				w, h := bootPatrol(t, 10, opts...)
+
+				w.attack(t, h, 1000)
+				for i := range 2 {
+					w.tickAI(t)
+					if got := h.AI().CurrentIntention(); got != ai.IntentionAttack {
+						t.Fatalf("intention on AI tick %d of the fight = %v, want attack", i, got)
+					}
+				}
+				drainFrames(t, w.c)
+
+				onQueueOf(t, h, end.endIt(w, h))
+				if got := h.AI().CurrentIntention(); got != ai.IntentionIdle {
+					t.Fatalf("intention right after the fight ended = %v, want idle", got)
+				}
+
+				var shown []npcFrame
+				for i := range 4 {
+					shown = append(shown, aboutNPC(w.tickAI(t), h.ObjectID())...)
+					if got := h.AI().CurrentIntention(); got != ai.IntentionMoveRoute {
+						t.Fatalf("intention on AI tick %d after the fight = %v, want move_route", i, got)
+					}
+				}
+				if dests, _ := legs(shown); len(dests) == 0 {
+					t.Fatal("patrol walked no leg after the fight, want it back on its route")
+				}
+				w.routeLegsOnly(t, shown)
+				w.srv.AdvanceUntil(t, "patrol walks to a route node", func() bool { return w.onRouteNode(h) })
+			})
+		})
 	}
 }
