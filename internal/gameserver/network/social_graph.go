@@ -23,6 +23,21 @@ func (g socialGraph) SameParty(a, b int32) bool {
 	return g.parties != nil && g.parties.SameParty(a, b)
 }
 
+func (g socialGraph) PartyMembers(objectID int32) []*player.Character {
+	if g.parties == nil {
+		return nil
+	}
+	view, ok := g.parties.View(objectID)
+	if !ok {
+		return nil
+	}
+	out := make([]*player.Character, len(view.Members))
+	for i, m := range view.Members {
+		out[i] = m.Character
+	}
+	return out
+}
+
 func (g socialGraph) SameChannel(a, b int32) bool {
 	return g.parties != nil && g.parties.SameChannel(a, b)
 }

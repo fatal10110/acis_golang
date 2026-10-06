@@ -59,6 +59,20 @@ func (r *Registry) run(s *Script, h hook, fn func()) (ok bool) {
 	return true
 }
 
+// Invoke runs fn once with the registered script named name, found as a
+// journal row's quest name is, as one invocation of that script: a panic
+// is recovered and logged with its stack. It reports false when no script
+// has that name or fn panicked. It exists for the test harness, which
+// drives the helpers through it; it is not a lookup for scripts to reach
+// each other.
+func (r *Registry) Invoke(name string, fn func(s *Script)) bool {
+	s := r.byName[strings.ToLower(name)]
+	if s == nil {
+		return false
+	}
+	return r.run(s, hookEvent, func() { fn(s) })
+}
+
 // answer calls fn, one invocation of s's string hook h, and classifies its
 // answer; a panic gives ResultAborted.
 func (r *Registry) answer(s *Script, h hook, fn func() string) Result {

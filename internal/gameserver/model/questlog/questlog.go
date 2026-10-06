@@ -63,6 +63,9 @@ type Quest struct {
 	// ID is the quest id; only a positive id is a real quest, shown in the
 	// client's quest window.
 	ID int32
+	// Items are the item ids the quest takes from the player when it ends;
+	// shared with the script, never modified.
+	Items []int32
 }
 
 // Real reports whether q is a real quest.

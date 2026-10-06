@@ -150,6 +150,10 @@ var allowedOpcodes = map[State]map[byte]bool{
 		0x76: true, // private store sell: quit
 		0x77: true, // private store sell: set title
 		0x79: true, // buy from a private store
+		0x7b: true, // tutorial: follow a link
+		0x7c: true, // tutorial: send a command
+		0x7d: true, // tutorial: click a question mark
+		0x7e: true, // tutorial: report a client event
 		0x7f: true, // send a petition
 		0x80: true, // cancel or leave a petition
 		0x81: true, // online game-master list

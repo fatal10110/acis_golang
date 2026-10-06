@@ -420,6 +420,10 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// ponytail: an attacker or spectator (siege state below 2) logging in
 	// on a battlefield under siege is sent to town here; it needs the login
 	// siege state, so both land together (#3150).
+
+	// The tutorial quest hears of the entry last, ahead of the closing
+	// ActionFailed.
+	live.NotifyTutorial(player.TutorialEnterWorld)
 	client.Session.SendFrame(serverpackets.FrameActionFailed())
 	return true
 }
@@ -681,9 +685,12 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		// PartyLoot hands a partied character's auto-loot and sweep to its
 		// party's loot rule.
 		PartyLoot: l,
-		Skills:    l.skills,
-		Levels:    l.levels,
-		Log:       l.log,
+		// Tutorial hands the tutorial events to the player's tutorial
+		// quest.
+		Tutorial: l.scripts,
+		Skills:   l.skills,
+		Levels:   l.levels,
+		Log:      l.log,
 		Rules: player.Rules{
 			RateKarmaExpLost:       l.playerConfig.RateKarmaExpLost,
 			RespawnRestoreHP:       l.playerConfig.RespawnRestoreHP,

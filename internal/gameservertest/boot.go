@@ -116,6 +116,8 @@ type options struct {
 	itemFlushFault         *ItemFlushFault
 	selectionHold          func(objectID int32)
 	scripts                *scriptOptions
+	memoLoadErr            error
+	respawnRestoreHP       float64
 	scheduleStart          time.Time // WithScheduledTasks; zero runs no task
 	questLoadErr           error
 	subclassFault          SubclassFault
@@ -2092,6 +2094,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.Favorites = bbs.NewFavorites(favoriteStore, persistWorker, o.log)
 	}
 	gclConfig.PlayerConfig.AutoLearnSkills = o.autoLearnSkills
+	if o.respawnRestoreHP != 0 {
+		gclConfig.PlayerConfig.RespawnRestoreHP = o.respawnRestoreHP
+	}
 	gclConfig.ClassMaster = o.classMaster
 	gclConfig.PlayerConfig.GMStartupInvulnerable, gclConfig.PlayerConfig.GMStartupInvisible, gclConfig.PlayerConfig.GMStartupBlockAll = o.gmStartupModes[0], o.gmStartupModes[1], o.gmStartupModes[2]
 	gclConfig.PlayerConfig.GMHeroAura = o.gmHeroAura
@@ -2110,8 +2115,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Wedding = couples
 	gclConfig.Macros = gamesql.NewMacroStore(db)
 	gclConfig.Recommendations = gamesql.NewRecommendationStore(db)
-	quests := bootQuests(db, persistWorker, o)
+	quests := bootQuests(db, persistWorker, ids, o)
 	gclConfig.Quests, gclConfig.Scripts, gclConfig.Journals = quests.store, quests.registry, quests.journals
+	gclConfig.Memos = memoStore{MemoStore: gamesql.NewMemoStore(db), loadErr: o.memoLoadErr}
 	gclConfig.AugmentationChances = augmentation.DefaultChances()
 	if o.augmentationChances != nil {
 		gclConfig.AugmentationChances = *o.augmentationChances

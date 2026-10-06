@@ -14,6 +14,9 @@ import (
 type SocialGraph interface {
 	InParty(objectID int32) bool
 	SameParty(a, b int32) bool
+	// PartyMembers returns the characters of objectID's party, in party
+	// order, nil when it is in none.
+	PartyMembers(objectID int32) []*Character
 	// SameChannel reports whether b is in the command channel a's party
 	// belongs to.
 	SameChannel(a, b int32) bool

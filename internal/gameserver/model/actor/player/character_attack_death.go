@@ -33,7 +33,7 @@ func (c *Character) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 		return false
 	}
 	if c.landHit(float64(dmg), attacker, false, false) {
-		return c.Die(attacker)
+		return c.DieFromDamage(attacker)
 	}
 	return false
 }
@@ -61,14 +61,27 @@ func (c *Character) AlikeDead() bool {
 	return c.Dead() || c.FakeDead()
 }
 
-// MarkDead clears HP and transitions this player into its dead state.
+// MarkDead clears HP and transitions this player into its dead state, as
+// the selection of a character saved dead does. Clearing the HP of a
+// character restored dead is no HP write: it raises no low-HP tutorial
+// event.
 func (c *Character) MarkDead() bool {
+	return c.markDead(false)
+}
+
+// markDead is MarkDead; hpWrite makes the HP clear an HP write, as the
+// death Die runs is.
+func (c *Character) markDead(hpWrite bool) bool {
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.dead.Load() {
 		return false
 	}
-	c.curHP = 0
+	if hpWrite {
+		c.writeHPLocked(0)
+	} else {
+		c.curHP = 0
+	}
 	c.dead.Store(true)
 	return true
 }
@@ -82,8 +95,12 @@ func (c *Character) MarkDead() bool {
 // starts eating anew.
 func (c *Character) Revive() bool {
 	c.reviveMu.Lock()
-	defer c.reviveMu.Unlock()
-	return c.revive()
+	revived, blessed := c.revive()
+	c.reviveMu.Unlock()
+	if revived {
+		c.finishRevive(blessed)
+	}
+	return revived
 }
 
 // ReviveRestoringExp is a resurrection's revive: it restores restorePercent
@@ -92,41 +109,57 @@ func (c *Character) Revive() bool {
 // back to town keeps the loss — and reports whether it revived.
 func (c *Character) ReviveRestoringExp(restorePercent float64) bool {
 	c.reviveMu.Lock()
-	defer c.reviveMu.Unlock()
-	return c.reviveRestoringExp(restorePercent)
+	revived, blessed := c.reviveRestoringExp(restorePercent)
+	c.reviveMu.Unlock()
+	if revived {
+		c.finishRevive(blessed)
+	}
+	return revived
 }
 
-// reviveRestoringExp is ReviveRestoringExp; the caller holds reviveMu.
-func (c *Character) reviveRestoringExp(restorePercent float64) bool {
+// reviveRestoringExp is ReviveRestoringExp's locked step; the caller holds
+// reviveMu and runs finishRevive after releasing it when it revived.
+func (c *Character) reviveRestoringExp(restorePercent float64) (revived, blessed bool) {
 	if !c.dead.Load() {
-		return false
+		return false, false
 	}
 	c.RestoreExp(restorePercent)
 	return c.revive()
 }
 
-// revive is Revive's state transition and its follow-ups; the caller holds
-// reviveMu. A player in the middle of a teleport is not revived. HP (and MP
-// for a Phoenix Blessing) is set in the same step that clears the dead
-// flag, so no hit lands on a living player at 0 HP.
-func (c *Character) revive() bool {
+// revive is Revive's state transition; the caller holds reviveMu and runs
+// finishRevive after releasing it when it revived. A player in the middle
+// of a teleport is not revived. HP (and MP for a Phoenix Blessing) is set
+// in the same step that clears the dead flag, so no hit lands on a living
+// player at 0 HP. Any pending resurrection offer lapses. blessed reports
+// whether a Phoenix Blessing made the revive.
+func (c *Character) revive() (revived, blessed bool) {
 	if live := c.liveLocked(); live != nil && live.Teleporting() {
-		return false
+		return false, false
 	}
 	res := c.ResourceValues()
-	blessed := c.EffectList().IsAffected(effect.FlagPhoenixBlessing)
+	blessed = c.EffectList().IsAffected(effect.FlagPhoenixBlessing)
 	c.vitalsMu.Lock()
 	if !c.dead.CompareAndSwap(true, false) {
 		c.vitalsMu.Unlock()
-		return false
+		return false, false
 	}
 	if blessed {
-		c.curHP, c.curMP = res.MaxHP, res.MaxMP
+		c.writeHPLocked(res.MaxHP)
+		c.curMP = res.MaxMP
 	} else {
-		c.curHP = min(res.MaxHP*c.respawnRestoreHP, res.MaxHP)
+		c.writeHPLocked(min(res.MaxHP*c.respawnRestoreHP, res.MaxHP))
 	}
 	c.vitalsMu.Unlock()
+	c.reviveRequested, c.revivePower = false, 0
+	return true, blessed
+}
 
+// finishRevive runs a revive's follow-ups once reviveMu is released: the
+// status report (and with it the low-HP tutorial event the restored HP
+// may raise), the revive itself, the lapse of a used Phoenix Blessing and
+// of a Charm of Courage, and the rider's mount feeding anew.
+func (c *Character) finishRevive(blessed bool) {
 	if blessed {
 		c.stopPhoenixBlessing()
 	}
@@ -134,9 +167,7 @@ func (c *Character) revive() bool {
 	c.emit(event.Revived{})
 	c.EffectList().StopByType(effect.TypeCharmOfCourage)
 	c.emit(event.EtcStatusChanged{})
-	c.reviveRequested, c.revivePower = false, 0
 	c.StartMountFeed()
-	return true
 }
 
 // Die runs this player's death sequence: the once-only dead-state
@@ -165,7 +196,7 @@ func (c *Character) revive() bool {
 // without a stat refresh per effect, and the player and its observers get
 // its full view once the strip ends.
 func (c *Character) Die(killer attackable.Combatant) bool {
-	if !c.MarkDead() {
+	if !c.markDead(true) {
 		return false
 	}
 	c.stateMu.RLock()

@@ -226,7 +226,10 @@ type Runtime struct {
 	// PartyLoot shares the items a partied character auto-loots or sweeps
 	// by its party's loot rule; nil keeps every item with the character.
 	PartyLoot PartyLoot
-	Mounts    MountBodies
+	// Tutorial takes the tutorial events the character raises; nil drops
+	// them.
+	Tutorial TutorialEvents
+	Mounts   MountBodies
 	// MountData resolves a mount's pet data; nil leaves every mount unfed
 	// and riding at its rider's own speeds.
 	MountData MountDataSource
@@ -246,6 +249,7 @@ func (c *Character) Configure(rt Runtime) {
 	c.social = rt.Social
 	c.hallFunctions = rt.HallFunctions
 	c.partyLoot = rt.PartyLoot
+	c.tutorial = rt.Tutorial
 	c.mounts = rt.Mounts
 	c.mountData = rt.MountData
 	c.skillDefs = rt.Skills
@@ -499,6 +503,10 @@ func (c *Character) SetWorldHandle(t world.Tracked) {
 	c.worldHandle = t
 	c.stateMu.Unlock()
 }
+
+// WorldHandle returns the object the world registers c under: the one
+// SetWorldHandle named, else c.
+func (c *Character) WorldHandle() world.Tracked { return c.tracked() }
 
 // tracked returns the object the world registers c under.
 func (c *Character) tracked() world.Tracked {

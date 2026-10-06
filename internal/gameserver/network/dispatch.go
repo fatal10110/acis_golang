@@ -424,6 +424,8 @@ type GameClientLink struct {
 	quests   questStore
 	scripts  scriptRegistry
 	journals questJournals
+	// memos reads and writes the scripts' memos; see tutorial.go.
+	memos memoStore
 	// gms is the online game-master roster /gmlist reads and petitions
 	// notify.
 	gms admin.GMList[*livePlayer]
@@ -677,6 +679,9 @@ type GameClientLinkConfig struct {
 	Scripts scriptRegistry
 	// Journals writes the quest journals; nil leaves them unwritten.
 	Journals questJournals
+	// Memos reads and writes the scripts' memos; nil loads every
+	// character's memos empty and saves none.
+	Memos memoStore
 	// GMAudit records every admin command run (server.properties GMAudit);
 	// the zero logger records nothing.
 	GMAudit zerolog.Logger
@@ -850,6 +855,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.reloads = cfg.Reloads
 	link.recommendations = cfg.Recommendations
 	link.quests, link.scripts, link.journals = cfg.Quests, cfg.Scripts, cfg.Journals
+	link.memos = cfg.Memos
 	// Built here, not lazily: every client goroutine shares this link.
 	enchantCfg := enchantflow.DefaultConfig()
 	if cfg.PlayerConfig.Enchant != nil {
