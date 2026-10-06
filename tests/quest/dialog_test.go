@@ -9,10 +9,18 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scriptcontract"
 )
+
+// traceRenders are the opcodes scriptcontract.Packet renders: the
+// dialog's, the quest's and the item messages.
+var traceRenders = []byte{
+	serverpackets.OpcodeActionFailed, serverpackets.OpcodeNpcHtmlMessage, serverpackets.OpcodeSystemMessage,
+	serverpackets.OpcodePlaySound, serverpackets.OpcodeQuestList, 0xfe,
+}
 
 // renderTail renders frames as the goldens write packets, leaving out
 // those the goldens do not render (selection, approach, animation).

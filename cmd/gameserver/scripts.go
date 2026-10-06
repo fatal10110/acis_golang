@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/alliance"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/blackjudge"
 	featureclan "github.com/fatal10110/acis_golang/internal/gameserver/script/feature/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/tutorial"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
@@ -25,6 +26,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q350"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q636"
 	scripttask "github.com/fatal10110/acis_golang/internal/gameserver/script/task"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/noblesseteleporter"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
@@ -33,7 +35,7 @@ import (
 // scriptCatalogs are the literal script catalogs, one per range or family;
 // scriptCatalog joins them. crystals are the soul crystals a quest charges.
 func scriptCatalogs(crystals *item.SoulCrystalTable) []script.Catalog {
-	return []script.Catalog{questCatalog(crystals), featureCatalog(), taskCatalog()}
+	return []script.Catalog{questCatalog(crystals), featureCatalog(), teleportCatalog(), taskCatalog()}
 }
 
 // questCatalog lists the quests.
@@ -48,9 +50,17 @@ func questCatalog(crystals *item.SoulCrystalTable) script.Catalog {
 // featureCatalog lists the scripted features.
 func featureCatalog() script.Catalog {
 	return script.Catalog{
-		"script.feature.Alliance": alliance.New,
-		"script.feature.Clan":     featureclan.New,
-		"script.feature.Tutorial": tutorial.New,
+		"script.feature.Alliance":   alliance.New,
+		"script.feature.BlackJudge": blackjudge.New,
+		"script.feature.Clan":       featureclan.New,
+		"script.feature.Tutorial":   tutorial.New,
+	}
+}
+
+// teleportCatalog lists the scripted teleporters.
+func teleportCatalog() script.Catalog {
+	return script.Catalog{
+		"script.teleport.NoblesseTeleporter": noblesseteleporter.New,
 	}
 }
 
