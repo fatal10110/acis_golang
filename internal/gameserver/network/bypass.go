@@ -324,8 +324,15 @@ func cpRecovery(live *livePlayer, f *npc.Folk) {
 // showTeleportList opens f's list of standard destinations, priced for
 // live. An NPC offering none answers nothing of its own.
 func (l *GameClientLink) showTeleportList(live *livePlayer, f *npc.Folk) {
-	if page, ok := l.gatekeeper.Window(f.ObjectID(), f.NpcID(), travel.KindStandard, live.ObjectID()); ok {
-		sendValidatedHTML(live, f.ObjectID(), page, 0)
+	l.showTeleports(live, f.ObjectID(), f.NpcID(), travel.KindStandard)
+}
+
+// showTeleports opens the list of the destinations of kind the NPC
+// objectID, of template npcID, offers, priced for live; its links become
+// the ones live may send back. An NPC offering none sends nothing.
+func (l *GameClientLink) showTeleports(live *livePlayer, objectID int32, npcID int, kind travel.Kind) {
+	if page, ok := l.gatekeeper.Window(objectID, npcID, kind, live.ObjectID()); ok {
+		sendValidatedHTML(live, objectID, page, 0)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 )
 
 // NPC is a script's handle on one NPC.
@@ -136,6 +137,39 @@ func (p *Player) Level() int32 { return int32(p.character().Level()) }
 
 // IsClanLeader reports whether the player leads its clan.
 func (p *Player) IsClanLeader() bool { return p.character().IsClanLeader() }
+
+// IsNoble reports whether the player is a noblesse.
+func (p *Player) IsNoble() bool { return p.character().IsNoble() }
+
+// Adena returns the adena the player carries.
+func (p *Player) Adena() int32 {
+	inv := p.character().Inventory()
+	if inv == nil {
+		return 0
+	}
+	return int32(inv.Adena())
+}
+
+// DeathPenaltyLevel returns the level of the player's death penalty, 0 for
+// none.
+func (p *Player) DeathPenaltyLevel() int32 { return int32(p.character().DeathPenaltyLevel()) }
+
+// ReduceDeathPenaltyLevel lowers the player's death penalty by one level,
+// telling the player the level left or that the penalty is lifted. A
+// player with no death penalty is left as is, and so is a detaching one,
+// which no script gives or takes anything.
+func (p *Player) ReduceDeathPenaltyLevel() {
+	if c := p.character(); !c.Detaching() {
+		c.ReduceDeathPenaltyLevel()
+	}
+}
+
+// ShowTeleportWindow opens on p the list of the destinations of kind the
+// NPC offers, each priced for p. An NPC offering no destination shows
+// nothing.
+func (n *NPC) ShowTeleportWindow(p *Player, kind travel.Kind) {
+	p.character().ShowTeleportWindow(n.ObjectID(), int(n.NpcID()), kind)
+}
 
 func (n *NPC) combatant() attackable.Combatant {
 	if n == nil || n.self == nil {
