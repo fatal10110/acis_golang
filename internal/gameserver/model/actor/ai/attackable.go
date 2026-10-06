@@ -634,9 +634,10 @@ func (a *Attackable) AddDefaultHate(attacker attackable.Combatant) {
 	a.hates.AddDefault(attacker, a.actor.InTerritory())
 }
 
-// SetBackToPeace clears combat memory and cancels the current action. It
-// does not start a return-home walk; an out-of-territory owner stays idle
-// until a later Think queues a new desire.
+// SetBackToPeace clears combat memory and cancels the current action, except
+// a walk on the actor's route, whose desire stays queued. It does not start a
+// return-home walk; an out-of-territory owner stays idle until a later Think
+// queues a new desire.
 func (a *Attackable) SetBackToPeace() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -661,13 +662,20 @@ func (a *Attackable) ReduceAllAggroHate(amount float64) {
 	a.reduceAllAggroHateLocked(amount)
 }
 
+// setBackToPeaceLocked ends combat. The route desire outlives it: an actor
+// walking its route walks on, and one that left its route for a fight goes
+// back to it on its next pass.
 func (a *Attackable) setBackToPeaceLocked() {
 	a.threats.Clear()
 	a.hates.Clear()
-	a.desires.Clear()
+	a.desires.RemoveIf(func(d *Desire) bool { return d.Kind != IntentionMoveRoute })
 	a.next = intention{}
-	a.setCurrent(intention{kind: IntentionIdle})
 	a.stopWanderChain()
+	if a.current.kind == IntentionMoveRoute {
+		return
+	}
+	a.leaveRoute()
+	a.setCurrent(intention{kind: IntentionIdle})
 	a.move.Stop()
 }
 
