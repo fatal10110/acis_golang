@@ -10,7 +10,8 @@ type HookPoint uint8
 
 const (
 	// HookNoDesire ends the idle: after the abort, the walk stance and the
-	// switch to idle, before the idle follow or wander is queued.
+	// switch to idle (which the periodic cycle's idle skips while desire
+	// selection is held), before the idle follow or wander is queued.
 	HookNoDesire HookPoint = iota + 1
 	// HookSeeCreature opens the periodic cycle, before invalid desires are
 	// dropped and a desire is chosen.

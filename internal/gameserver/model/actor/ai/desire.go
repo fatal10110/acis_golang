@@ -34,9 +34,15 @@ type Desire struct {
 	CtrlPressed  bool
 	ShiftPressed bool
 
+	// ItemObjectID is a pick-up's item, or a social desire's animation id.
 	ItemObjectID int32
 	RouteName    string
-	Timer        int
+	// Timer is a wander's chain period in seconds, or how long a social
+	// animation holds off desire selection, in milliseconds.
+	Timer int
+	// Distance is how far a flee runs from its target, measured from
+	// Location, where the actor stood when the flee was queued.
+	Distance     int
 	MoveToTarget bool
 
 	Weight   float64

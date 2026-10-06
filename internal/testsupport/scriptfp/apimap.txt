@@ -111,3 +111,7 @@ QuestState.exitQuest script.QuestState.Exit
 QuestState.getState script.QuestState.Status
 QuestState.setCond script.QuestState.SetCond
 QuestState.setState script.QuestState.SetStatus
+
+# Desires II (A5): flee and social.
+NpcAI.addFleeDesire AddFleeDesire
+NpcAI.addSocialDesire AddSocialDesire

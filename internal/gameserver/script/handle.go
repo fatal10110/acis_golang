@@ -176,6 +176,8 @@ type brain interface {
 	AddFollowDesire(target attackable.Combatant, weight float64)
 	AddWanderDesire(timer int, weight float64)
 	AddDoNothingDesire(timer int, weight float64)
+	AddFleeDesire(target attackable.Combatant, distance int, weight float64)
+	AddSocialDesire(id, timer int, weight float64)
 }
 
 var (
@@ -243,4 +245,18 @@ func (n *NPC) AddWanderDesire(timer int, weight float64) {
 // the rest. Its weight decays as the NPC's AI runs; timer times nothing.
 func (n *NPC) AddDoNothingDesire(timer int, weight float64) {
 	n.brain.AddDoNothingDesire(timer, weight)
+}
+
+// AddFleeDesire asks the NPC to run distance away from target, counted from
+// where it stands now. While it flees it takes up no other desire; reaching
+// the end of the run drops the flee. Refused for an NPC that cannot move.
+func (n *NPC) AddFleeDesire(target Creature, distance int, weight float64) {
+	n.brain.AddFleeDesire(combatantOf(target), distance, weight)
+}
+
+// AddSocialDesire asks the NPC to play social animation id. Once it plays,
+// the NPC takes up no other desire for timer milliseconds. Refused while the
+// NPC's AI sleeps.
+func (n *NPC) AddSocialDesire(id, timer int, weight float64) {
+	n.brain.AddSocialDesire(id, timer, weight)
 }
