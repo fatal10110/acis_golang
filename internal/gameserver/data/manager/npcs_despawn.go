@@ -107,16 +107,17 @@ func onQueue(q *sim.Queue, fn func()) {
 // Seven Signs groups, as SpawnManager.reload does after //respawnall's
 // despawn: the database-tracked spawns come back as spawns' rows say. The
 // slots of an earlier spawn list are not touched; //respawnall runs
-// DespawnAll first, which drops them all.
+// DespawnAll first, which drops them all. Only the swap holds the gate:
+// each NPC then read-holds it while it is placed, and its created hooks
+// run with no lock held.
 func (n *Npcs) RespawnAll(spawns *Spawns) {
 	n.gate.Lock()
-	defer n.gate.Unlock()
-
 	n.mu.Lock()
 	n.spawns = spawns
 	n.gen++
 	gen := n.gen
 	n.mu.Unlock()
+	n.gate.Unlock()
 
 	n.spawnOnStart(spawns, gen)
 }

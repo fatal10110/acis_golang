@@ -101,28 +101,22 @@ func (g *makerGroup) SendEvent(maker, name string, int1, int2 int) {
 	g.n.MakerEvent(maker, name, int1, int2)
 }
 
+// After runs fn on the makers' queue once d has passed. Each spawn fn
+// makes read-holds the population gate on its own, so fn runs unlocked.
 func (g *makerGroup) After(d time.Duration, fn func()) {
-	g.n.makerQueue.After(d, g.n.gated(fn))
+	g.n.makerQueue.After(d, fn)
 }
 
+// Every is After every d.
 func (g *makerGroup) Every(d time.Duration, fn func()) *sim.Ticker {
-	return g.n.makerQueue.Every(d, g.n.gated(fn))
-}
-
-// gated runs fn under the population gate's read side, as a respawn does:
-// a maker timer is an entry point, never nested in another one.
-func (n *Npcs) gated(fn func()) func() {
-	return func() {
-		n.gate.RLock()
-		defer n.gate.RUnlock()
-		fn()
-	}
+	return g.n.makerQueue.Every(d, fn)
 }
 
 // DeleteAll deletes every NPC of g, and its database-tracked rows go back
 // to uninitialized. Its slots are dropped first, so no maker hook runs for
 // the deleted NPCs and no respawn comes back; a master's privates leave
-// with it.
+// with it. Each NPC is out of the world, its decayed hooks run, when it
+// returns.
 func (g *makerGroup) DeleteAll() {
 	n := g.n
 	var ids []int32
@@ -151,15 +145,15 @@ func (g *makerGroup) DeleteAll() {
 		if !ok {
 			continue
 		}
-		if h, ok := obj.(*npc.Hostile); ok {
-			onQueue(h.Queue(), func() {
-				n.despawnMinions(h)
-				n.forget(h, id)
-				h.Decay(n.state, nil)
-			})
-			continue
+		switch o := obj.(type) {
+		case *npc.Hostile:
+			n.despawnMinions(o)
+			n.forget(o, id)
+			o.Decay(n.state, nil)
+		case *npc.Folk:
+			n.forget(o, id)
+			o.Decay(n.state, nil)
 		}
-		n.deleteNpc(obj)
 	}
 }
 
@@ -319,18 +313,12 @@ func (n *Npcs) spawnGroupEntry(g *makerGroup, i int) {
 	n.endSpawn(key)
 }
 
-// created runs the maker hook of the slot key's npcmaker once the slot's
-// NPC is in the world.
-func (n *Npcs) created(key string) {
-	n.mu.Lock()
-	slot := n.slot[key]
-	live := n.liveLocked(key)
-	n.mu.Unlock()
-	if !live || slot.group == nil {
-		return
-	}
-	g := slot.group
-	g.behavior.NPCCreated(g, groupSpawn{g: g, i: slot.spawnIdx}, groupNPC{n: n, key: key})
+// created runs the maker hook of the npcmaker g for the NPC its entry i
+// placed under the slot key, once that NPC's created hooks have run. A
+// created hook may have deleted the NPC already: the maker still hears of
+// it, and finds it decayed.
+func (n *Npcs) created(g *makerGroup, i int, key string) {
+	g.behavior.NPCCreated(g, groupSpawn{g: g, i: i}, groupNPC{n: n, key: key})
 }
 
 // held reports whether the spawn condition of m holds, keeping its NPCs out
@@ -406,8 +394,6 @@ func (n *Npcs) StartSevenSigns(ss SevenSigns) {
 // the period, the winner and the seal owners call for: the event NPCs
 // while recruiting and competing, then a group of each seal's NPCs.
 func (n *Npcs) SevenSignsChanged() {
-	n.gate.RLock()
-	defer n.gate.RUnlock()
 	n.sevenSignsPass()
 }
 
@@ -481,8 +467,8 @@ func (n *Npcs) MakerEvent(maker, name string, int1, int2 int) bool {
 	return false
 }
 
-// deleteLive deletes the live NPC id at once, with no corpse, on its own
-// queue: its spawn slot answers as for a decayed corpse.
+// deleteLive deletes the live NPC id at once, with no corpse, on the
+// calling goroutine: its spawn slot answers as for a decayed corpse.
 func (n *Npcs) deleteLive(id int32) {
 	obj, ok := n.state.Object(id)
 	if !ok {
@@ -490,8 +476,8 @@ func (n *Npcs) deleteLive(id int32) {
 	}
 	switch a := obj.(type) {
 	case *npc.Hostile:
-		a.DeleteMe()
+		a.DeleteNow()
 	case *npc.Folk:
-		onQueue(a.Queue(), func() { n.removeFolk(a) })
+		a.DeleteNow()
 	}
 }

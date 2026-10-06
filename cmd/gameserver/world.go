@@ -90,10 +90,12 @@ func provideSpawns(ctx bootContext, paths gameServerPaths, pool *sql.DB, log zer
 	return spawns, store, nil
 }
 
-// provideNpcs instantiates every "on start" spawn entry into state at boot,
-// then wires the decay/respawn tasks' late-bound hooks to it — manager.Npcs
-// needs *task.Decay and *task.Respawn to register actors with, so those
-// tasks' own effects can only point back at Npcs after it exists.
+// provideNpcs builds the NPC population, wires the decay/respawn tasks'
+// late-bound hooks and the link to it — manager.Npcs needs *task.Decay and
+// *task.Respawn to register actors with, so those tasks' own effects can
+// only point back at Npcs after it exists — and only then instantiates
+// every "on start" spawn entry into state: each NPC's created script hooks
+// run as it spawns, against a population already wired.
 func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids *idfactory.Allocator, decay *task.Decay, decayHooks *worldDecayEffects, respawnTask *task.Respawn, respawnHooks *npcRespawnEffects, ai *task.AI, positions *task.PositionUpdates, ground *task.GroundItems, rewards manager.KillRewardConfig, gameplay gameplayConfig, log zerolog.Logger, walker *task.Walker, link *network.GameClientLink, attackStance *task.AttackStance, effects effect.Env, pool *sim.Pool, makers *script.Makers, scripts *script.Registry) (*manager.Npcs, error) {
 	rewards.Parties = link
 	rewards.RaidKills = link
@@ -107,6 +109,7 @@ func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids
 	decayHooks.SetRespawnHook(npcs.RespawnHook)
 	respawnHooks.SetHook(npcs.Respawn)
 	link.SetNpcSpawns(npcs)
+	npcs.SpawnOnStart()
 	return npcs, nil
 }
 

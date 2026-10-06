@@ -30,15 +30,18 @@ var (
 // damage, heal and debuff it from their own queues; its regeneration and
 // effect ticks run on its own.
 type folkCombat struct {
-	// world, queue, sink, los, decay, scripts and heldMask are set by
-	// Attach before the NPC is published.
+	// world, queue, sink, los, decay, scripts, remover and heldMask are set
+	// by Attach before
+	// the NPC is published.
 	world *world.State
 	queue *sim.Queue
 	sink  event.Sink
 	los   LineOfSight
 	decay *task.Decay
-	// scripts raises the NPC's script hooks; nil raises none.
+	// scripts raises the NPC's script hooks; nil raises none. remover takes
+	// it out of the world for DeleteNow; nil decays it with no respawn.
 	scripts ScriptHooks
+	remover FolkRemover
 	// heldMask is the item-type bits of the template's weapon and shield.
 	heldMask int32
 
@@ -104,6 +107,15 @@ type FolkRuntime struct {
 	Slot SpawnSlot
 	// Scripts raises the NPC's script hooks; nil raises none.
 	Scripts ScriptHooks
+	// Remover takes the NPC out of the world for DeleteNow; nil decays it
+	// with no respawn.
+	Remover FolkRemover
+}
+
+// FolkRemover takes a civilian NPC out of the world at once, with no
+// corpse, and answers its spawn as for a decayed corpse.
+type FolkRemover interface {
+	RemoveFolk(f *Folk)
 }
 
 // folkAdmits reports whether a civilian NPC holds e: only plain buffs and
@@ -131,7 +143,7 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 		return errors.New("npc: folk runtime needs a queue")
 	}
 	f.world, f.queue, f.sink, f.los, f.decay = rt.World, rt.Queue, rt.Sink, rt.LOS, rt.Decay
-	f.scripts = rt.Scripts
+	f.scripts, f.remover = rt.Scripts, rt.Remover
 	f.zones.ix = rt.Zones
 	f.cast.ai = rt.AI
 	f.bindSpawn(rt.Slot)

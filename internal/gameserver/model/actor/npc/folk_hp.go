@@ -105,7 +105,7 @@ func (f *Folk) reduceHP(amount float64, attacker attackable.Combatant) bool {
 	if damaged {
 		f.BroadcastStatus()
 	}
-	return dying && f.die()
+	return dying && f.die(attacker)
 }
 
 // SetHP sets the current HP, clamped to [0, max HP], and offers the
@@ -124,7 +124,7 @@ func (f *Folk) SetHP(value float64) {
 
 // Kill puts the NPC to death whatever its HP, undying or not, and reports
 // whether this call killed it.
-func (f *Folk) Kill(attackable.Combatant) bool { return f.die() }
+func (f *Folk) Kill(killer attackable.Combatant) bool { return f.die(killer) }
 
 // AddHP restores HP, clamped to max HP, and returns the amount applied;
 // anything applied refreshes the targeters' health bar.

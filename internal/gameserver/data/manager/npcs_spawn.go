@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -22,7 +23,7 @@ const fullMP = -1
 func (n *Npcs) registerSlot(key string, g *makerGroup, i int, dbName string, tmpl *npc.Template) {
 	entry := g.def.Entries[i]
 	n.mu.Lock()
-	n.slot[key] = slotInfo{key: key, maker: g.def, group: g, spawnIdx: i, entry: entry, dbName: dbName, tmpl: tmpl, memory: newSlotMemory(entry), spawning: true}
+	n.slot[key] = slotInfo{key: key, maker: g.def, group: g, spawnIdx: i, entry: entry, dbName: dbName, tmpl: tmpl, memory: newSlotMemory(entry), spawning: true, first: true}
 	g.keys[i] = append(g.keys[i], key)
 	n.mu.Unlock()
 }
@@ -76,11 +77,7 @@ func (n *Npcs) spawnPersisted(key string, maker *spawn.Maker, entry spawn.Entry,
 	if state.CheckAlive(pos.Location, pos.Heading, int(tmpl.HPMax), int(tmpl.MPMax), now) {
 		loc, heading, hp, mp = state.Location, state.Heading, state.CurrentHP, state.CurrentMP
 	}
-	master := n.instantiate(key, entry, tmpl, loc, heading, hp, mp, nil)
-	if master != nil {
-		n.spawnPrivates(key, entry, master)
-	}
-	n.created(key)
+	n.spawnMaster(key, entry, tmpl, loc, heading, hp, mp)
 }
 
 // fullHP tells instantiate to seed the spawned Hostile at its own calculated
@@ -91,18 +88,52 @@ const fullHP = -1
 // position, always alive at full HP/MP — HP/MP/position are never restored
 // across restarts for a spawn without a database name.
 func (n *Npcs) spawnFresh(key string, entry spawn.Entry, tmpl *npc.Template, pos spawn.Position) {
-	master := n.instantiate(key, entry, tmpl, pos.Location, pos.Heading, fullHP, fullMP, nil)
-	if master != nil {
-		n.spawnPrivates(key, entry, master)
-	}
-	n.created(key)
+	n.spawnMaster(key, entry, tmpl, pos.Location, pos.Heading, fullHP, fullMP)
 }
 
-// instantiate builds one live Hostile from tmpl and places it in the world
-// at (loc, heading) with hp current HP and mp current MP (or fullHP/fullMP,
-// its calculated Max HP/MP), registering it for AI ticks and corpse
-// decay/respawn.
-func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int, master *npc.Hostile) *npc.Hostile {
+// spawnMaster places the NPC of the maker slot key and its spawn-list
+// privates, then runs its npcmaker's hook: after the NPC's own created
+// hooks, which instantiate runs.
+func (n *Npcs) spawnMaster(key string, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int) {
+	n.mu.Lock()
+	slot := n.slot[key]
+	n.mu.Unlock()
+	live := n.instantiate(key, entry, tmpl, loc, heading, hp, mp, nil)
+	if live == nil {
+		return
+	}
+	if master, ok := live.(*npc.Hostile); ok && !master.Decayed() {
+		n.spawnPrivates(key, entry, master)
+	}
+	if slot.group != nil {
+		n.created(slot.group, slot.spawnIdx, key)
+	}
+}
+
+// instantiate places one NPC, as place does, then runs its created hooks
+// with no lock held. It returns the NPC placed, nil when none was; a
+// created hook may have deleted it again.
+func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int, master *npc.Hostile) attackable.Combatant {
+	live := n.place(key, entry, tmpl, loc, heading, hp, mp, master)
+	if n.scripts != nil {
+		switch o := live.(type) {
+		case *npc.Hostile:
+			n.scripts.HostileCreated(o)
+		case *npc.Folk:
+			n.scripts.FolkCreated(o)
+		}
+	}
+	return live
+}
+
+// place builds one live NPC from tmpl, a Hostile or a civilian one, and
+// places it in the world at (loc, heading) with hp current HP and mp
+// current MP (or fullHP/fullMP, its calculated Max HP/MP), registering it
+// for AI ticks and corpse decay/respawn. It read-holds the gate: a
+// placement never lands halfway through DespawnAll.
+func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int, master *npc.Hostile) attackable.Combatant {
+	n.gate.RLock()
+	defer n.gate.RUnlock()
 	id, err := n.ids.NextID()
 	if err != nil {
 		n.log.Warn().Err(err).Int32("npc_id", entry.NPCID).Msg("spawn: id space exhausted")
@@ -132,7 +163,9 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	}
 
 	if npc.FolkKind(inst) {
-		n.spawnFolk(key, inst, loc, heading, slot)
+		if f := n.spawnFolk(key, inst, loc, heading, slot); f != nil {
+			return f
+		}
 		return nil
 	}
 	if !npc.Attackable(inst) {
@@ -203,17 +236,19 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 // spawnFolk places a civilian NPC built from inst in the world at (loc,
 // heading) and tracks it under its spawn slot key, like a hostile: a mortal
 // one that dies decays and respawns through the slot. A route walker walks
-// its route while it lives.
-func (n *Npcs) spawnFolk(key string, inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot) {
+// its route while it lives. It returns the NPC, nil when none stays placed.
+func (n *Npcs) spawnFolk(key string, inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot) *npc.Folk {
 	f, err := n.folk.Spawn(inst, loc, heading, slot)
 	if err != nil {
 		n.log.Warn().Err(err).Int("npc_id", inst.Template.ID).Msg("spawn: cannot build folk npc")
-		return
+		return nil
 	}
 	n.folkCount.Add(1)
 	if !n.trackLive(key, inst.ObjectID) {
 		n.deleteNpc(f)
+		return nil
 	}
+	return f
 }
 
 // endSpawn marks the spawn of the slot key done.
@@ -221,7 +256,7 @@ func (n *Npcs) endSpawn(key string) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if slot, ok := n.slot[key]; ok {
-		slot.spawning = false
+		slot.spawning, slot.first = false, false
 		n.slot[key] = slot
 	}
 }
