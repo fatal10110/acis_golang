@@ -49,39 +49,51 @@ var usWeek = weekRules{first: time.Sunday, minDays: 1}
 
 // parseSchedule parses an entry's schedule attribute kind and start stamp.
 // Day names other than MON-SUN read as Monday, as the reference reads them;
-// unknownDay reports such a name.
+// unknownDay reports such a name. Fields past the ones a kind reads are
+// ignored.
 func parseSchedule(kind, start string) (sc schedule, unknownDay string, err error) {
-	defer func() {
-		if p := recover(); p != nil {
-			err = fmt.Errorf("start %q does not fit schedule %s", start, kind)
-		}
-	}()
+	misfit := fmt.Errorf("start %q does not fit schedule %s", start, kind)
 	switch kind {
 	case "HOURLY":
 		// "mm:ss"
-		ts := strings.Split(start, ":")
-		sc = schedule{kind: scheduleHourly, minute: atoi(ts[0]), second: atoi(ts[1])}
-		return sc, "", nil
+		ms, ok := stampInts(start, ":", 2)
+		if !ok {
+			return schedule{}, "", misfit
+		}
+		return schedule{kind: scheduleHourly, minute: ms[0], second: ms[1]}, "", nil
 	case "DAILY":
 		// "hh:mm:ss"
 		sc = schedule{kind: scheduleDaily}
-		sc.setTime(strings.Split(start, ":"))
+		if !sc.setTime(start) {
+			return schedule{}, "", misfit
+		}
 		return sc, "", nil
 	case "WEEKLY":
 		// "DAY hh:mm:ss"
 		params := strings.Split(start, " ")
 		sc = schedule{kind: scheduleWeekly}
-		sc.setTime(strings.Split(params[1], ":"))
+		if len(params) < 2 || !sc.setTime(params[1]) {
+			return schedule{}, "", misfit
+		}
 		sc.weekday, unknownDay = weekday(params[0])
 		return sc, unknownDay, nil
 	case "MONTHLY_WEEK":
 		// "DAY-n hh:mm:ss"
 		params := strings.Split(start, " ")
+		if len(params) < 2 {
+			return schedule{}, "", misfit
+		}
 		date := strings.Split(params[0], "-")
 		sc = schedule{kind: scheduleMonthlyWeek}
-		sc.setTime(strings.Split(params[1], ":"))
+		if len(date) < 2 || !sc.setTime(params[1]) {
+			return schedule{}, "", misfit
+		}
+		week, err := strconv.Atoi(date[1])
+		if err != nil {
+			return schedule{}, "", misfit
+		}
 		sc.weekday, unknownDay = weekday(date[0])
-		sc.week = atoi(date[1])
+		sc.week = week
 		return sc, unknownDay, nil
 	}
 	if unbuiltKinds[kind] {
@@ -90,18 +102,32 @@ func parseSchedule(kind, start string) (sc schedule, unknownDay string, err erro
 	return schedule{}, "", fmt.Errorf("unknown schedule %q", kind)
 }
 
-func (sc *schedule) setTime(ts []string) {
-	sc.hour, sc.minute, sc.second = atoi(ts[0]), atoi(ts[1]), atoi(ts[2])
+// setTime reads an "hh:mm:ss" stamp into sc, reporting whether it fits.
+func (sc *schedule) setTime(stamp string) bool {
+	hms, ok := stampInts(stamp, ":", 3)
+	if !ok {
+		return false
+	}
+	sc.hour, sc.minute, sc.second = hms[0], hms[1], hms[2]
+	return true
 }
 
-// atoi parses a stamp field, panicking on a malformed one: parseSchedule
-// turns the panic into its error.
-func atoi(s string) int {
-	n, err := strconv.Atoi(s)
-	if err != nil {
-		panic(err)
+// stampInts splits s on sep and parses its first n fields as integers,
+// reporting false when s has fewer fields or one of them is not a number.
+func stampInts(s, sep string, n int) ([]int, bool) {
+	fields := strings.Split(s, sep)
+	if len(fields) < n {
+		return nil, false
 	}
-	return n
+	out := make([]int, n)
+	for i := range out {
+		v, err := strconv.Atoi(fields[i])
+		if err != nil {
+			return nil, false
+		}
+		out[i] = v
+	}
+	return out, true
 }
 
 var weekdays = map[string]time.Weekday{

@@ -48,6 +48,13 @@ func shippedTask(t *testing.T, path string, ctor func() script.Script) gameserve
 // crown's object id.
 func bootLeaderTransfer(t *testing.T, extra ...gameservertest.Option) (*clanWorld, int32) {
 	t.Helper()
+	return bootLeaderTransferWith(t, nil, extra...)
+}
+
+// bootLeaderTransferWith is bootLeaderTransfer with seed run on the
+// founder before it enters the world.
+func bootLeaderTransferWith(t *testing.T, seed func(srv *gameservertest.Server, leaderID int32), extra ...gameservertest.Option) (*clanWorld, int32) {
+	t.Helper()
 	opts := append(castleClanOptions(t),
 		gameservertest.WithCharacter("Founder", 40, 0),
 		gameservertest.WithWantChars(1),
@@ -62,6 +69,9 @@ func bootLeaderTransfer(t *testing.T, extra ...gameservertest.Option) (*clanWorl
 	crown := srv.GiveItem(t, w.leaderID, lordsCrown, 1)
 	if _, err := srv.DB.ExecContext(context.Background(), `UPDATE items SET loc = 'PAPERDOLL', loc_data = ? WHERE object_id = ?`, faceSlot, crown); err != nil {
 		t.Fatalf("wear the crown: %v", err)
+	}
+	if seed != nil {
+		seed(srv, w.leaderID)
 	}
 	w.memberID = srv.SeedCharacterFor(t, "player2", "Recruit", 40, 0).ID
 	w.member = srv.DialClient(t, "player2", 1)
@@ -126,6 +136,40 @@ func checkStatusTail(t *testing.T, who string, frames [][]byte) [][]byte {
 	return frames[:n]
 }
 
+// formerLeaderPart is what the former leader receives ahead of the status
+// tail: its new rank (UserInfo), the crown it may no longer wear coming off
+// (S1_DISARMED, UserInfo), then the new leader showing its rank (CharInfo,
+// RelationChanged).
+var formerLeaderPart = []byte{
+	serverpackets.OpcodeUserInfo, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeUserInfo,
+	serverpackets.OpcodeCharInfo, serverpackets.OpcodeRelationChanged,
+}
+
+// newLeaderPart is what the new leader receives ahead of the status tail:
+// the former leader's rank and then its unequip shown first (CharInfo,
+// RelationChanged each), then its own new rank (UserInfo).
+var newLeaderPart = []byte{
+	serverpackets.OpcodeCharInfo, serverpackets.OpcodeRelationChanged,
+	serverpackets.OpcodeCharInfo, serverpackets.OpcodeRelationChanged,
+	serverpackets.OpcodeUserInfo,
+}
+
+// checkOpcodes checks frames carry exactly the opcodes want, in order.
+func checkOpcodes(t *testing.T, who string, frames [][]byte, want []byte) {
+	t.Helper()
+	if got := opcodes(frames); !slices.Equal(got, want) {
+		t.Fatalf("%s frames before the clan window = %x, want %x", who, got, want)
+	}
+}
+
+// checkCrownDisarmed checks f is S1_DISARMED naming the Lord's Crown.
+func checkCrownDisarmed(t *testing.T, f []byte) {
+	t.Helper()
+	if id, params := sysMsg(t, f); id != serverpackets.SystemMessageS1Disarmed || !slices.Equal(params, []string{itoa(lordsCrown)}) {
+		t.Fatalf("former leader message = %d %v, want S1_DISARMED naming the Lord's Crown", id, params)
+	}
+}
+
 // TestClanLeaderTransfer runs the weekly leader transfer on a clan whose
 // leader nominated the recruit, on both executors. At the task's start,
 // not before, the recruit leads: the clan row names it and clears the
@@ -150,23 +194,10 @@ func TestClanLeaderTransfer(t *testing.T) {
 			runTransfer(t, w)
 
 			founder := checkStatusTail(t, "former leader", drainFrames(t, w.leader))
-			if len(founder) == 0 || founder[0][0] != serverpackets.OpcodeUserInfo {
-				t.Fatalf("former leader frames = %x, want its UserInfo first", opcodes(founder))
-			}
-			disarmed := slices.IndexFunc(founder, func(f []byte) bool {
-				if f[0] != serverpackets.OpcodeSystemMessage {
-					return false
-				}
-				id, params := sysMsg(t, f)
-				return id == serverpackets.SystemMessageS1Disarmed && slices.Equal(params, []string{itoa(lordsCrown)})
-			})
-			if disarmed < 1 || disarmed+1 >= len(founder) || founder[disarmed+1][0] != serverpackets.OpcodeUserInfo {
-				t.Fatalf("former leader frames = %x, want the crown's S1_DISARMED then UserInfo after its first UserInfo", opcodes(founder))
-			}
+			checkOpcodes(t, "former leader", founder, formerLeaderPart)
+			checkCrownDisarmed(t, founder[1])
 			recruit := checkStatusTail(t, "new leader", drainFrames(t, w.member))
-			if slices.IndexFunc(recruit, func(f []byte) bool { return f[0] == serverpackets.OpcodeUserInfo }) < 0 {
-				t.Fatalf("new leader frames = %x, want its UserInfo before the clan window", opcodes(recruit))
-			}
+			checkOpcodes(t, "new leader", recruit, newLeaderPart)
 
 			if got := w.srv.PlayerPledgeClass(t, w.leaderID); got != 2 {
 				t.Errorf("former leader's rank = %d, want 2 (a level 5 member)", got)
