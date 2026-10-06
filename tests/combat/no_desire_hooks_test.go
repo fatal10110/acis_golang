@@ -345,6 +345,9 @@ func TestMoveFinishedHookOnFleeArrival(t *testing.T) {
 	if got := h.AI().CurrentIntention(); got != ai.IntentionFlee || !h.Move().Moving() {
 		t.Fatalf("after the flee cycle: intention %v, moving %v; want a flight under way", got, h.Move().Moving())
 	}
+	if !h.Running() {
+		t.Fatal("the monster flees at a walk; want its run stance")
+	}
 	walkUntilArrived(t, srv, h)
 	hx, hy, hz := h.Position()
 	want := []string{fmt.Sprintf("MOVE_TO_FINISHED stander at=%d,%d,%d", hx, hy, hz)}
@@ -353,5 +356,18 @@ func TestMoveFinishedHookOnFleeArrival(t *testing.T) {
 	}
 	if (location.Location{X: hx, Y: hy, Z: hz}) == home {
 		t.Fatal("the monster never left its spawn")
+	}
+
+	// The idle after the flight switches back to the walk stance before the
+	// no-desire hook runs.
+	runAICycle(t, srv)
+	got := log.take()
+	if len(got) == 0 {
+		t.Fatal("no no-desire hook on the cycle after the flight")
+	}
+	for _, l := range got {
+		if !strings.HasPrefix(l, "NO_DESIRE stander running=false") {
+			t.Fatalf("hooks on the cycle after the flight = %q, want only no-desire calls in the walk stance", got)
+		}
 	}
 }
