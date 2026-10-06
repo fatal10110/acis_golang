@@ -65,7 +65,8 @@ func sessionOnly(ev event.Event) bool {
 		event.PvPFlagged, event.RelationChanged, event.LevelChanged,
 		event.WeightPenaltyChanged, event.VitalsChanged, event.Evaded, event.MountFeedGauge,
 		event.ItemsTaken, event.SoundPlayed,
-		event.DialogPageShown, event.DialogReleased, event.ScriptMessage, event.QuestOverweight:
+		event.DialogPageShown, event.DialogReleased, event.ScriptMessage, event.QuestOverweight,
+		event.TeleportWindowShown:
 		return true
 	}
 	return false
@@ -295,6 +296,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameExShowQuestMark(e.QuestID))
 	case event.DialogPageShown:
 		l.showDialogPage(live, e)
+	case event.TeleportWindowShown:
+		l.showTeleports(live, e.ObjectID, e.NpcID, e.Kind)
 	case event.DialogReleased:
 		live.SendFrame(serverpackets.FrameActionFailed())
 	case event.ScriptMessage:
