@@ -19,6 +19,9 @@ type ScriptHooks interface {
 	// HostilePartyAttacked runs called's party-attacked hooks: caller,
 	// attacked by target for damage, called its party member called.
 	HostilePartyAttacked(caller, called *Hostile, target attackable.Combatant, damage int32)
+	// HostileDecayed runs once h has decayed, before it leaves the world:
+	// the behavior timers bound to h stop.
+	HostileDecayed(h *Hostile)
 }
 
 // behaves reports whether a behavior is bound to h's template id.
@@ -43,5 +46,12 @@ func (h *Hostile) partyAttacked(caller *Hostile, target attackable.Combatant, da
 	}
 	if assist && !h.behaves() {
 		h.reactPartyAttacked(caller, target, damage)
+	}
+}
+
+// raiseDecayed tells the script engine that h has decayed.
+func (h *Hostile) raiseDecayed() {
+	if h.scripts != nil {
+		h.scripts.HostileDecayed(h)
 	}
 }

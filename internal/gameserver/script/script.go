@@ -28,6 +28,8 @@ type Script struct {
 	path string
 	// env is what the script's helpers act through; Build sets it.
 	env *Env
+	// timers are the timers of every script; Build sets them.
+	timers *timers
 }
 
 // Bindings maps an NPC event to the NPC ids a script registers for.

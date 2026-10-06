@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 )
 
 type scriptOptions struct {
@@ -114,8 +115,9 @@ type questBoot struct {
 
 // bootQuests builds the journal store, the journal writer draining on
 // worker, the script helpers' environment allocating item ids from ids,
-// and the script registry.
-func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, o *options) *questBoot {
+// and the script registry, whose timers bound to no NPC or player queue
+// run on timers.
+func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, timers *sim.Queue, o *options) *questBoot {
 	so := o.scriptHelpers()
 	store := &journalStore{QuestStore: gamesql.NewQuestStore(db), loadErr: o.questLoadErr}
 	journals := script.NewQuests(store, worker, o.log)
@@ -137,7 +139,7 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, o *optio
 		k, ok := so.kinds[id]
 		return k, ok
 	}
-	registry := script.Build(so.list, so.catalog, script.Config{KindOf: kindOf, Log: o.log, Env: env})
+	registry := script.Build(so.list, so.catalog, script.Config{KindOf: kindOf, Log: o.log, Env: env, Queue: timers})
 	return &questBoot{store: store, registry: registry, journals: journals, env: env}
 }
 

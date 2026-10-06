@@ -1074,6 +1074,7 @@ func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
 	h.dead = true
 	h.corpseDeadline = time.Time{}
 	h.deathMu.Unlock()
+	h.raiseDecayed()
 
 	// The NPC leaves its zones while its observers still know it.
 	h.zones.leave(h.location())

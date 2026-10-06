@@ -20,6 +20,8 @@ type scriptRegistry interface {
 	// JournalQuest resolves a journal row's quest name.
 	JournalQuest(name string) (questlog.Quest, bool)
 	player.TutorialEvents
+	// PlayerDetached stops the script timers bound to c as it leaves.
+	PlayerDetached(c *player.Character)
 }
 
 // questJournals writes the quest journals and aborts quests.
