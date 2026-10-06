@@ -30,9 +30,10 @@ type scriptRegistry interface {
 	QuestEvent(p *script.Player, last *script.NPC, name, event string)
 }
 
-// questJournals writes the quest journals and aborts quests.
+// questJournals writes the quest journals, and aborts and exits quests.
 type questJournals interface {
 	Abort(c *player.Character, questID int32)
+	Exit(c *player.Character, name string, repeatable bool)
 	Seal(c *player.Character)
 	Settle(ctx context.Context, ownerID int32) error
 	ReadHelpPage(c *player.Character, file string, itemID int32) bool
