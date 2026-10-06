@@ -1,5 +1,7 @@
 package script
 
+import "context"
+
 // NPC is a script's handle on one NPC.
 type NPC struct{}
 
@@ -131,6 +133,13 @@ type SeeSpell struct {
 type Spelled struct {
 	NPC    *NPC
 	Caster *Player
+}
+
+// Start: a scheduled task's start time came. Ctx ends when the schedule
+// runner stops; Server is what the task acts on.
+type Start struct {
+	Ctx    context.Context
+	Server Server
 }
 
 // StaticObjectClanAttacked: a door, attacked by Attacker, called the NPC

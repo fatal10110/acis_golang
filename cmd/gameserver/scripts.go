@@ -1,20 +1,34 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
+	scripttask "github.com/fatal10110/acis_golang/internal/gameserver/script/task"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
+	"go.uber.org/fx"
 )
 
 // scriptCatalogs are the literal script catalogs, one per range or family;
 // scriptCatalog joins them.
 func scriptCatalogs() []script.Catalog {
-	return nil
+	return []script.Catalog{taskCatalog()}
+}
+
+// taskCatalog lists the scheduled tasks.
+func taskCatalog() script.Catalog {
+	return script.Catalog{
+		"task.CastleTaxRefresh":   scripttask.CastleTaxRefresh,
+		"task.ClanLeaderTransfer": scripttask.ClanLeaderTransfer,
+		"task.SevenSignsUpdate":   scripttask.SevenSignsUpdate,
+	}
 }
 
 // scriptCatalog joins catalogs into one. A path in two catalogs is an
@@ -78,4 +92,24 @@ func buildScripts(*script.Registry) {}
 // of its type, the default maker when its type has none.
 func provideMakers(log zerolog.Logger) *script.Makers {
 	return script.NewMakers(maker.Catalog(), maker.Default, log)
+}
+
+// startSchedule runs the scheduled tasks against link. It starts once
+// everything the tasks act on is restored (it is invoked after the Seven
+// Signs, castles and clans start), so a task due at boot never stores
+// state that is not loaded yet; on shutdown it stops before their final
+// saves.
+func startSchedule(lc fx.Lifecycle, scripts *script.Registry, link *network.GameClientLink, pool *sim.Pool) {
+	queue := pool.NewQueue("script-schedule")
+	var sch *script.Schedule
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			sch = script.StartSchedule(scripts, queue, link)
+			return nil
+		},
+		OnStop: func(context.Context) error {
+			sch.Stop()
+			return nil
+		},
+	})
 }
