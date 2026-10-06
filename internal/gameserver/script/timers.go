@@ -203,18 +203,21 @@ func (ts *timers) start(s *Script, name string, n *NPC, p *Player, d, period tim
 		t.decays = ts.r.behaviorOn(s, int32(live.NpcID()))
 	}
 	pl, _ := p.combatant().(timerPlayer)
-	// onNPC and onPlayer are the owner of the home queue, nil for the
-	// engine queue.
-	var onNPC timerNPC
-	var onPlayer timerPlayer
+	// The removals this timer is subject to, read before it registers:
+	// the decay of its NPC when it decays with it, and the departure of its
+	// player, whatever its home queue. A removal already under way here
+	// came before the start, and does not take the timer.
+	watchDecay := t.decays && !live.Decayed()
+	watchDetach := pl != nil && !pl.Detaching()
+	onNPCQueue := false
 	switch {
 	case t.decays && !n.combatant().Dead():
-		t.queue, onNPC = live.Queue(), live
+		t.queue, onNPCQueue = live.Queue(), true
 	case pl != nil && !pl.Detaching():
-		t.queue, onPlayer = pl.Queue(), pl
+		t.queue = pl.Queue()
 	}
 	if t.queue == nil {
-		t.queue, onNPC, onPlayer = ts.engine, nil, nil
+		t.queue = ts.engine
 	}
 	if t.queue == nil {
 		panic("script: a timer bound to no live NPC or player needs the engine queue")
@@ -237,11 +240,12 @@ func (ts *timers) start(s *Script, name string, n *NPC, p *Player, d, period tim
 	ts.arm(t)
 	ts.mu.Unlock()
 
-	// A start that raced the decay or the departure owning its home queue
-	// may have come in after that removal: it is taken as started just
-	// before it, and removed, rather than left on a closed queue holding
-	// its key.
-	if (onNPC != nil && onNPC.Decayed()) || (onPlayer != nil && onPlayer.Detaching()) {
+	// A start that raced a removal it is subject to may have registered
+	// after that removal ran: it is taken as started just before it, and
+	// removed, rather than left holding its key, on a closed queue or bound
+	// to a departed player. A timer on the NPC's queue never outlives its
+	// decay.
+	if ((watchDecay || onNPCQueue) && live.Decayed()) || (watchDetach && pl.Detaching()) {
 		ts.mu.Lock()
 		if ts.byScript[s][t.key] == t {
 			ts.remove(t)

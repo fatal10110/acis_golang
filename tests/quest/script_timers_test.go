@@ -2,6 +2,7 @@ package quest
 
 import (
 	"fmt"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -23,11 +24,44 @@ const timerWolfID = 20120
 // is bound to, so a firing reaches the client.
 const timerSound = "ItemSound.quest_middle"
 
+// rearmDelay is the delay of a timer the plain timer script starts again
+// from inside its own hook.
+const rearmDelay = 200 * time.Millisecond
+
 // timerLog records the firings of the timer scripts. Hooks run on their
 // timers' home queues, so it is guarded by mu.
 type timerLog struct {
 	mu    sync.Mutex
 	lines []string
+	// rearms is how many more times the plain timer script starts the
+	// timer that fired again from inside its own hook; rearmed records what
+	// each of those starts reported.
+	rearms  atomic.Int32
+	rearmed []bool
+}
+
+// rearm starts e's timer again from inside its hook, once per rearms left.
+func (l *timerLog) rearm(s *script.Script, e script.Timer, d time.Duration) {
+	for {
+		n := l.rearms.Load()
+		if n <= 0 {
+			return
+		}
+		if l.rearms.CompareAndSwap(n, n-1) {
+			break
+		}
+	}
+	ok := s.StartTimer(e.Name, e.NPC, e.Player, d)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.rearmed = append(l.rearmed, ok)
+}
+
+// fires reports how many firings were recorded and not yet taken.
+func (l *timerLog) fires() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.lines)
 }
 
 func (l *timerLog) record(label string, e script.Timer) {
@@ -76,6 +110,7 @@ func bootTimers(t *testing.T, log *timerLog, opts ...gameservertest.Option) (*ga
 				if e.Player != nil {
 					s.PlaySound(e.Player, timerSound)
 				}
+				log.rearm(s, e, rearmDelay)
 				return ""
 			}}}
 		},
@@ -225,36 +260,107 @@ func TestNPCTimersStopAtDecay(t *testing.T) {
 	}
 }
 
-// Starts of one key race from many goroutines while the key's NPC decays
-// and its player leaves: exactly one start wins, and no timer bound to
-// either is left once both are gone.
+// A one-shot timer whose hook starts its own key again from inside the
+// firing: the start is accepted, since the firing timer is no longer
+// pending, and the timer fires once more, reaching the player both times.
+func TestTimerHookRearmsItsOwnKey(t *testing.T) {
+	t.Parallel()
+	log := &timerLog{}
+	log.rearms.Store(1)
+	srv, objID, _ := bootTimers(t, log)
+	enterWorld(t, srv)
+	p := fmt.Sprint(objID)
+	want := []string{"TimerQuest remind npc=none player=" + p}
+
+	sc, pl := runTimers(t, srv, objID, "TimerQuest", func(s *script.Script, p *script.Player) {
+		if !s.StartTimer("remind", nil, p, rearmDelay) {
+			t.Error("the first start was refused")
+		}
+	})
+	// Each step passes the timer's delay but not twice that.
+	step := rearmDelay + rearmDelay/4
+	srv.Advance(t, step)
+	if got := log.take(); !slices.Equal(got, want) {
+		t.Fatalf("first firing %q, want %q", got, want)
+	}
+	log.mu.Lock()
+	rearmed := slices.Clone(log.rearmed)
+	log.mu.Unlock()
+	if !slices.Equal(rearmed, []bool{true}) {
+		t.Fatalf("starts from inside the hook reported %v, want one accepted", rearmed)
+	}
+	if !sc.HasTimer("remind", nil, pl) {
+		t.Fatal("the timer started from inside its hook is not pending")
+	}
+	if got := sounds(t, srv); len(got) != 1 {
+		t.Fatalf("sounds after the first firing = %q, want one", got)
+	}
+
+	srv.Advance(t, step)
+	if got := log.take(); !slices.Equal(got, want) {
+		t.Fatalf("second firing %q, want %q", got, want)
+	}
+	if got := sounds(t, srv); len(got) != 1 {
+		t.Fatalf("sounds after the second firing = %q, want one", got)
+	}
+	if sc.HasTimer("remind", nil, pl) {
+		t.Fatal("the one-shot is still pending after its second firing")
+	}
+}
+
+// Starts of one key bound to an NPC and a player race from many goroutines
+// with the player's departure, while the key's fixed-rate timer keeps
+// firing on the NPC's queue; another timer of the NPC keeps firing through
+// its despawn. Some start wins, and once both are gone nothing bound to
+// either is pending or fires.
 func TestTimerRacesWithDecayAndDetach(t *testing.T) {
 	t.Parallel()
 	log := &timerLog{}
 	srv, objID, spawner := bootTimers(t, log, gameservertest.WithRealPool())
 	enterWorld(t, srv)
 	x, y, z := srv.PlayerPosition(t, objID)
-	wolf := spawner.AddSpawn(timerWolfID, script.Loc{X: x + 50, Y: y, Z: z}, false, 50*time.Millisecond)
+	wolf := spawner.AddSpawn(timerWolfID, script.Loc{X: x + 50, Y: y, Z: z}, false, 0)
+	if wolf == nil {
+		t.Fatal("no wolf spawned")
+	}
 
-	behavior, p := runTimers(t, srv, objID, "TimerWolf", func(*script.Script, *script.Player) {})
+	behavior, p := runTimers(t, srv, objID, "TimerWolf", func(s *script.Script, _ *script.Player) {
+		s.StartTimerAtFixedRate("pulse", wolf, nil, 0, time.Millisecond)
+	})
+	// Starts keep coming until the departure is over: a start that loses
+	// to the running timer is refused, one after the departure removed it
+	// wins again.
 	var won atomic.Int32
+	var stop atomic.Bool
 	var wg sync.WaitGroup
 	for range 8 {
 		wg.Go(func() {
-			if behavior.StartTimerAtFixedRate("race", wolf, p, 0, time.Millisecond) {
-				won.Add(1)
+			for !stop.Load() {
+				if behavior.StartTimerAtFixedRate("race", wolf, p, 0, time.Millisecond) {
+					won.Add(1)
+				}
+				runtime.Gosched()
 			}
 		})
 	}
+	srv.AdvanceUntil(t, "a raced timer's firing", func() bool { return log.fires() > 1 })
 	restart(t, srv)
+	stop.Store(true)
 	wg.Wait()
-	if won.Load() != 1 {
-		t.Fatalf("%d starts of one key won, want 1", won.Load())
+	if won.Load() < 1 {
+		t.Fatal("no start of the raced key won")
 	}
+
+	spawner.ScheduleDespawn(wolf, 10*time.Millisecond)
 	srv.AdvanceUntil(t, "the wolf's despawn", wolf.Decayed)
 	srv.Settle(t)
-	if behavior.HasTimer("race", wolf, p) {
-		t.Fatal("the raced timer outlived its NPC and its player")
+	if behavior.HasTimer("race", wolf, p) || behavior.HasTimer("pulse", wolf, nil) {
+		t.Fatal("a timer outlived its NPC and its player")
+	}
+	log.take()
+	srv.Advance(t, 50*time.Millisecond)
+	if got := log.take(); len(got) != 0 {
+		t.Fatalf("fired %q after the decay", got)
 	}
 	if c, ok := wolfOf(srv, wolf); ok {
 		t.Fatalf("wolf %d still in the world", c.ObjectID())
