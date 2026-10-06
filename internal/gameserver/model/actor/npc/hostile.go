@@ -156,6 +156,7 @@ type Hostile struct {
 
 	spoil          item.SpoilPool
 	seed           SeedState
+	absorb         absorbers
 	overhit        overhitState
 	corpseDeadline time.Time
 

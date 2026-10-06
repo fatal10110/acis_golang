@@ -66,7 +66,7 @@ func sessionOnly(ev event.Event) bool {
 		event.WeightPenaltyChanged, event.VitalsChanged, event.Evaded, event.MountFeedGauge,
 		event.ItemsTaken, event.SoundPlayed,
 		event.DialogPageShown, event.DialogReleased, event.ScriptMessage, event.QuestOverweight,
-		event.TeleportWindowShown:
+		event.SystemMessageShown, event.TeleportWindowShown:
 		return true
 	}
 	return false
@@ -304,6 +304,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, e.Text))
 	case event.QuestOverweight:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInventoryLessThan80Percent))
+	case event.SystemMessageShown:
+		live.SendFrame(serverpackets.FrameSystemMessage(e.ID))
 	case event.TutorialPageShown, event.TutorialPageClosed, event.TutorialQuestionMarkShown,
 		event.TutorialClientEventEnabled, event.TutorialVoicePlayed, event.RadarMarkerAdded, event.RadarMarkerRemoved:
 		l.sendTutorial(live, e)

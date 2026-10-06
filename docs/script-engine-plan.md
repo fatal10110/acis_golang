@@ -182,6 +182,7 @@ Hooks run synchronously on the goroutine that raises them, with no lock held.
 | Dying | one 3 s timer on an engine-owned queue; all hooks in list order; no state re-check | corpse queues close at decay; 103 templates decay within 3 s |
 | Party died, clan died | killer's queue, inline with the death | |
 | Zone enter | mover's goroutine, collected under the zone lock and fired after unlock | one quest uses it |
+| Script event | the sender's goroutine, inline: every receiver's hook runs before the send returns | a radius broadcast passes 0 as the second argument; the extended broadcast and the send to one NPC pass their own |
 | Tutorial HP and level triggers | caller, after the vitals lock is released | |
 
 Fan-out rules differ per source and each gets its own function and golden:

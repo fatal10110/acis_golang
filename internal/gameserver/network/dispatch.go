@@ -929,6 +929,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		}
 	}
 	link.wireZoneOccupantHooks()
+	link.wireScriptZones()
 	link.wireClanHallZones()
 	link.wireSiegeZones()
 	link.wireZonePulses()
