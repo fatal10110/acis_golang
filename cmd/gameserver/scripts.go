@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/alliance"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/blackjudge"
 	featureclan "github.com/fatal10110/acis_golang/internal/gameserver/script/feature/clan"
@@ -35,7 +36,7 @@ import (
 // scriptCatalogs are the literal script catalogs, one per range or family;
 // scriptCatalog joins them. crystals are the soul crystals a quest charges.
 func scriptCatalogs(crystals *item.SoulCrystalTable) []script.Catalog {
-	return []script.Catalog{questCatalog(crystals), featureCatalog(), teleportCatalog(), taskCatalog()}
+	return []script.Catalog{questCatalog(crystals), featureCatalog(), teleportCatalog(), taskCatalog(), aiCatalog()}
 }
 
 // questCatalog lists the quests.
@@ -61,6 +62,13 @@ func featureCatalog() script.Catalog {
 func teleportCatalog() script.Catalog {
 	return script.Catalog{
 		"script.teleport.NoblesseTeleporter": noblesseteleporter.New,
+	}
+}
+
+// aiCatalog lists the NPC behaviors.
+func aiCatalog() script.Catalog {
+	return script.Catalog{
+		"script.ai.group.Walkers": group.Walkers,
 	}
 }
 

@@ -41,18 +41,19 @@ type FolkMovement struct {
 	// its destination, after the NPC's position settles there, and
 	// event.Died when the NPC dies; nil for none.
 	Control event.Sink
-	// Route is the route walk the NPC steps off while it acts on a cast
-	// desire, and back onto once none outweighs the walk; nil for none.
+	// Route is the route walk task the NPC's route desires walk it on; nil
+	// leaves those desires moving it nowhere.
 	Route FolkRoute
 	// Log reports a failed-pathfinding streak that overflows.
 	Log zerolog.Logger
 }
 
-// FolkRoute is the route walk task a walking civilian NPC is registered
-// with (see task.Walker).
+// FolkRoute is the route walk task a walking civilian NPC walks its route
+// desires on (see task.Walker): Walk puts it on a route, LeaveRoute takes it
+// off while its AI acts on another desire.
 type FolkRoute interface {
+	Walk(actor task.WalkerActor, routeName, npcName string) error
 	LeaveRoute(task.WalkerActor)
-	ResumeRoute(task.WalkerActor) error
 }
 
 // folkMotion is a movable civilian NPC's movement: the moving actor its

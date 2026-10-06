@@ -105,7 +105,7 @@ type walkerEntry struct {
 	reverse  bool
 	wakeTime time.Time
 	// left marks an actor taken off its route by LeaveRoute: neither an
-	// arrival nor the end of a node delay moves it until ResumeRoute.
+	// arrival nor the end of a node delay moves it until Walk.
 	left bool
 }
 
@@ -223,9 +223,9 @@ func (w *Walker) Arrived(actor WalkerActor) error {
 	return w.moveToNextPoint(entry)
 }
 
-// LeaveRoute takes actor off its route while it acts on something else,
-// such as a cast: an arrival no longer advances the route, and a node delay
-// that runs out is dropped instead of walking on. ResumeRoute puts it back.
+// LeaveRoute takes actor off its route while its AI acts on another
+// desire: an arrival no longer advances the route, and a node delay that
+// runs out is dropped instead of walking on. Walk puts it back.
 func (w *Walker) LeaveRoute(actor WalkerActor) {
 	if actor == nil {
 		return
@@ -237,20 +237,29 @@ func (w *Walker) LeaveRoute(actor WalkerActor) {
 	}
 }
 
-// ResumeRoute puts actor, taken off its route by LeaveRoute, back on it:
-// it walks to the route node nearest to where it stands and goes on from
-// there. An actor still on its route is left alone.
-func (w *Walker) ResumeRoute(actor WalkerActor) error {
+// Walk puts actor on routeName/npcName as its AI's route desire asks. An
+// actor not registered on that route is registered and heads for the node
+// nearest to it; one taken off it by LeaveRoute goes back on, from the node
+// nearest to where it stands; one already on it walks on undisturbed.
+func (w *Walker) Walk(actor WalkerActor, routeName, npcName string) error {
 	if actor == nil {
 		return errors.New("task: nil walker actor")
 	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	entry, ok := w.entries[actor.ObjectID()]
-	if !ok || !entry.left {
-		return nil
+	if ok && entry.actor == actor && entry.route == routeName && entry.npc == npcName {
+		if !entry.left {
+			return nil
+		}
+		entry.left = false
+		return w.moveToNextPoint(entry)
 	}
-	entry.left = false
+	if _, err := w.nodes(routeName, npcName); err != nil {
+		return err
+	}
+	entry = &walkerEntry{actor: actor, route: routeName, npc: npcName}
+	w.entries[actor.ObjectID()] = entry
 	return w.moveToNextPoint(entry)
 }
 

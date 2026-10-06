@@ -132,6 +132,34 @@ func (n *NPC) NpcID() int32 {
 	panic("script: the template of a handle on nothing")
 }
 
+// Alias returns the alias of the NPC's template, the key its walker routes
+// are listed under; a handle on nothing panics.
+func (n *NPC) Alias() string {
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		return o.Instance.Template.Alias
+	case *npc.Folk:
+		return o.Instance.Template.Alias
+	}
+	panic("script: the template of a handle on nothing")
+}
+
+// SetRunning puts the NPC in its run stance when run is true, in its walk
+// stance otherwise; a change is shown to the players around it. A handle on
+// nothing does nothing.
+func (n *NPC) SetRunning(run bool) {
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		if run {
+			o.ForceRunStance()
+		} else {
+			o.ForceWalkStance()
+		}
+	case *npc.Folk:
+		o.SetRunStance(run)
+	}
+}
+
 // Level returns the player's level.
 func (p *Player) Level() int32 { return int32(p.character().Level()) }
 
@@ -302,6 +330,20 @@ func (n *NPC) AddDoNothingDesire(timer int, weight float64) {
 // the end of the run drops the flee. Refused for an NPC that cannot move.
 func (n *NPC) AddFleeDesire(target Creature, distance int, weight float64) {
 	n.brain.AddFleeDesire(combatantOf(target), distance, weight)
+}
+
+// AddMoveRouteDesire asks the NPC to walk the walker route named route,
+// listed under the NPC's template alias; a route with no node for it moves
+// the NPC nowhere. The desire never loses weight and stays queued while the
+// NPC lives, so the NPC walks the route whenever nothing outweighs it, and
+// goes back to the node nearest to it once nothing does again.
+func (n *NPC) AddMoveRouteDesire(route string, weight float64) {
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		o.AI().AddMoveRouteDesire(route, weight)
+	case *npc.Folk:
+		o.AddMoveRouteDesire(route, weight)
+	}
 }
 
 // AddSocialDesire asks the NPC to play social animation id. Once it plays,
