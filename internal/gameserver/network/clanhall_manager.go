@@ -323,7 +323,7 @@ func (d hallDialog) support(val string, tokens []string) {
 			return
 		}
 	}
-	d.f.AddCastDesire(d.live.Character, modelskill.Ref{ID: modelskill.ID(id), Level: int(level)}, supportCastWeight)
+	d.f.AddCastDesire(d.live.Character, modelskill.Ref{ID: modelskill.ID(id), Level: int(level)}, supportCastWeight, true, true)
 }
 
 // supportBack opens the support magic list again, once the hall rents

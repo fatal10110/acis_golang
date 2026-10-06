@@ -304,7 +304,7 @@ func TestRegistryHasNoWritePath(t *testing.T) {
 	for i := range typ.NumMethod() {
 		got = append(got, typ.Method(i).Name)
 	}
-	if want := []string{"AbnormalStatusChanged", "Behaves", "CharacterCreated", "Dump", "FirstTalk", "FolkCreated", "FolkDecayed", "FolkDying", "FolkNoDesire", "HostileAttacked", "HostileCreated", "HostileDecayed", "HostileDying", "HostileMoveToFinished", "HostileNoDesire", "HostileOutOfTerritory", "HostilePartyAttacked", "Interact", "Invoke", "ItemUsed", "JournalQuest", "PlayerDetached", "QuestEvent", "QuestWindow", "TutorialEvent", "ZoneEnterIDs", "ZoneEntered"}; !slices.Equal(got, want) {
+	if want := []string{"AbnormalStatusChanged", "Behaves", "CharacterCreated", "Dump", "FirstTalk", "FolkCreated", "FolkDecayed", "FolkDying", "FolkMoveToFinished", "FolkNoDesire", "HostileAttacked", "HostileCreated", "HostileDecayed", "HostileDying", "HostileMoveToFinished", "HostileNoDesire", "HostileOutOfTerritory", "HostilePartyAttacked", "Interact", "Invoke", "ItemUsed", "JournalQuest", "PlayerDetached", "QuestEvent", "QuestWindow", "TutorialEvent", "ZoneEnterIDs", "ZoneEntered"}; !slices.Equal(got, want) {
 		t.Fatalf("Registry methods = %v, want only the reads %v; a new method must not change the registry", got, want)
 	}
 	for i := range reflect.TypeFor[Registry]().NumField() {

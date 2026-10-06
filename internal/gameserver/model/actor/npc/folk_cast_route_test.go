@@ -65,7 +65,7 @@ func TestFolkOffRouteWalkerWaitsOutTeleportBeforeResuming(t *testing.T) {
 	}
 	// The AI acts on nothing on the NPC's first tick.
 	tick()
-	f.AddCastDesire(target, modelskill.Ref{ID: 4380, Level: 1}, 2*routeDesireWeight)
+	f.AddCastDesire(target, modelskill.Ref{ID: 4380, Level: 1}, 2*routeDesireWeight, true, true)
 	in.Run()
 
 	tick()
