@@ -21,6 +21,8 @@ type scriptRegistry interface {
 	// JournalQuest resolves a journal row's quest name.
 	JournalQuest(name string) (questlog.Quest, bool)
 	player.TutorialEvents
+	// PlayerDetached stops the script timers bound to c as it leaves.
+	PlayerDetached(c *player.Character)
 	// Interact, QuestWindow and QuestEvent are the quest dialog; see
 	// quest_dialog.go.
 	Interact(p *script.Player, n *script.NPC) bool
@@ -28,9 +30,10 @@ type scriptRegistry interface {
 	QuestEvent(p *script.Player, last *script.NPC, name, event string)
 }
 
-// questJournals writes the quest journals and aborts quests.
+// questJournals writes the quest journals, and aborts and exits quests.
 type questJournals interface {
 	Abort(c *player.Character, questID int32)
+	Exit(c *player.Character, name string, repeatable bool)
 	Seal(c *player.Character)
 	Settle(ctx context.Context, ownerID int32) error
 	ReadHelpPage(c *player.Character, file string, itemID int32) bool

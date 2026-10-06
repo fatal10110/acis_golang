@@ -59,6 +59,10 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 	// The journal took its last change: what it still owes goes on the lane
 	// ahead of the saves below.
 	l.sealQuests(live.Character)
+	// Every script timer bound to the character stops with it.
+	if l.scripts != nil {
+		l.scripts.PlayerDetached(live.Character)
+	}
 	// Out of party matching while still in sight, so its observers see it
 	// leave its room; marked as departing first, so no room or waiting
 	// list takes it back in.

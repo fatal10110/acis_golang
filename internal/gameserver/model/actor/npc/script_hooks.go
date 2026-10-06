@@ -31,6 +31,9 @@ type ScriptHooks interface {
 	// HostileOutOfTerritory runs h's out-of-territory hooks: h arrived
 	// outside its territory, the first time since it was last inside.
 	HostileOutOfTerritory(h *Hostile)
+	// HostileDecayed runs once h has decayed, before it leaves the world:
+	// the behavior timers bound to h stop.
+	HostileDecayed(h *Hostile)
 }
 
 // behaves reports whether a behavior is bound to h's template id.
@@ -83,5 +86,12 @@ func (h *Hostile) AtHookPoint(p ai.HookPoint) {
 func (f *Folk) AtHookPoint(p ai.HookPoint) {
 	if f.scripts != nil && p == ai.HookNoDesire {
 		f.scripts.FolkNoDesire(f)
+	}
+}
+
+// raiseDecayed tells the script engine that h has decayed.
+func (h *Hostile) raiseDecayed() {
+	if h.scripts != nil {
+		h.scripts.HostileDecayed(h)
 	}
 }
