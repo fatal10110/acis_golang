@@ -112,6 +112,9 @@ type gameData struct {
 	ManorAreas *manor.AreaIndex
 	// Observers are the broadcasting towers and the viewpoints they offer.
 	Observers *observer.Table
+	// SoulCrystals are the soul crystals and the monsters that charge
+	// them.
+	SoulCrystals *item.SoulCrystalTable
 }
 
 type geodata struct {
@@ -171,6 +174,10 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		return nil, err
 	}
 	summonItems, err := gamexml.LoadSummonItems(filepath.Join(xmlRoot, "summonItems.xml"))
+	if err != nil {
+		return nil, err
+	}
+	soulCrystals, err := gamexml.LoadSoulCrystalData(filepath.Join(xmlRoot, "soulCrystals.xml"))
 	if err != nil {
 		return nil, err
 	}
@@ -267,6 +274,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		Routes:           routes,
 		NPCs:             npcs,
 		SummonItems:      summonItems,
+		SoulCrystals:     soulCrystals,
 		Doors:            doors,
 		Statics:          statics,
 		Restarts:         restarts,

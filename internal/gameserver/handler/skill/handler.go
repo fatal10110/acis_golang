@@ -454,6 +454,7 @@ func newDefaultRegistry(defs Definitions, magicFailures bool, healSps *modelskil
 		sowHandler{},
 		harvestHandler{},
 		spoilHandler{},
+		drainSoulHandler{},
 		sweepHandler{},
 		seedHandler{},
 		continuousHandler{defs: defs},

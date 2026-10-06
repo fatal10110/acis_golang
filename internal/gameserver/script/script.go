@@ -27,6 +27,12 @@ type Script struct {
 	// event whose hook is set after With; a parent's ids are never
 	// inherited. Only a behavior's NPCs bind anything.
 	NPCs []int32
+	// UsedItems are the item ids whose use by a player with the quest
+	// started reaches the item-use hook.
+	UsedItems []int32
+	// EnteredZones are the zone ids whose entry reaches the zone-enter
+	// hook.
+	EnteredZones []int32
 	Hooks
 
 	// path is the scripts.xml path the script was registered under.
@@ -35,6 +41,9 @@ type Script struct {
 	env *Env
 	// timers are the timers of every script; Build sets them.
 	timers *timers
+	// registry is the registry that registered the script; Build sets it.
+	// The script-event sends dispatch through it.
+	registry *Registry
 }
 
 // Bindings maps an NPC event to the NPC ids a script registers for.

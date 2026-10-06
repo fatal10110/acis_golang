@@ -37,6 +37,12 @@ type ScriptMessage struct{ Text string }
 
 func (ScriptMessage) event() {}
 
+// SystemMessageShown reports the system message ID, which takes no
+// parameter, shown to the character.
+type SystemMessageShown struct{ ID int }
+
+func (SystemMessageShown) event() {}
+
 // QuestOverweight reports a quest dialog refused because the character
 // carries too much.
 type QuestOverweight struct{}

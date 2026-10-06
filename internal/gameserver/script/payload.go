@@ -64,6 +64,16 @@ type FirstTalk struct {
 	Player *Player
 }
 
+// ItemUse: Player used the item ObjectID, of template ItemID, with Target
+// selected; Target is nil when nothing is selected or the selection is not
+// a creature.
+type ItemUse struct {
+	Player   *Player
+	ItemID   int32
+	ObjectID int32
+	Target   Creature
+}
+
 // MoveToFinished: NPC arrived at X, Y, Z.
 type MoveToFinished struct {
 	NPC     *NPC
@@ -96,7 +106,8 @@ type PartyDied struct{ Caller, Called *NPC }
 // PickedItem: NPC picked up an item.
 type PickedItem struct{ NPC *NPC }
 
-// ScriptEvent: NPC received the script event EventID with two arguments.
+// ScriptEvent: NPC received the script event EventID with two arguments,
+// sent to it or broadcast around another NPC.
 type ScriptEvent struct {
 	NPC        *NPC
 	EventID    int32
@@ -163,4 +174,10 @@ type UseSkillFinished struct {
 	NPC      *NPC
 	Creature Creature
 	Success  bool
+}
+
+// ZoneEnter: Creature entered the zone ZoneID.
+type ZoneEnter struct {
+	Creature Creature
+	ZoneID   int32
 }

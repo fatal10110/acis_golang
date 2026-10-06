@@ -13,6 +13,7 @@ import (
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
@@ -21,6 +22,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/tutorial"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q001"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q350"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q636"
 	scripttask "github.com/fatal10110/acis_golang/internal/gameserver/script/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
@@ -28,15 +31,17 @@ import (
 )
 
 // scriptCatalogs are the literal script catalogs, one per range or family;
-// scriptCatalog joins them.
-func scriptCatalogs() []script.Catalog {
-	return []script.Catalog{questCatalog(), featureCatalog(), taskCatalog()}
+// scriptCatalog joins them. crystals are the soul crystals a quest charges.
+func scriptCatalogs(crystals *item.SoulCrystalTable) []script.Catalog {
+	return []script.Catalog{questCatalog(crystals), featureCatalog(), taskCatalog()}
 }
 
 // questCatalog lists the quests.
-func questCatalog() script.Catalog {
+func questCatalog(crystals *item.SoulCrystalTable) script.Catalog {
 	return script.Catalog{
-		"quest.Q001_LettersOfLove": q001.New,
+		"quest.Q001_LettersOfLove":      q001.New,
+		"quest.Q350_EnhanceYourWeapon":  func() script.Script { return q350.New(crystals) },
+		"quest.Q636_TruthBeyondTheGate": q636.New,
 	}
 }
 
@@ -91,7 +96,7 @@ func provideScripts(lc fx.Lifecycle, paths gameServerPaths, data *gameData, env 
 	if err != nil {
 		return nil, err
 	}
-	catalog, err := scriptCatalog(scriptCatalogs())
+	catalog, err := scriptCatalog(scriptCatalogs(data.SoulCrystals))
 	if err != nil {
 		return nil, err
 	}
