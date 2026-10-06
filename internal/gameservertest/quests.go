@@ -38,6 +38,12 @@ func WithMemoLoadFault(err error) Option {
 	return func(o *options) { o.memoLoadErr = err }
 }
 
+// WithRespawnRestoreHP sets the players.properties RespawnRestoreHP: the
+// share of max HP a revive restores (default 0.7).
+func WithRespawnRestoreHP(share float64) Option {
+	return func(o *options) { o.respawnRestoreHP = share }
+}
+
 // memoStore is the real memo store, with the read fault a suite sets.
 type memoStore struct {
 	*gamesql.MemoStore

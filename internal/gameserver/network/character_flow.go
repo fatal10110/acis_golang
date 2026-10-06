@@ -420,6 +420,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// ponytail: an attacker or spectator (siege state below 2) logging in
 	// on a battlefield under siege is sent to town here; it needs the login
 	// siege state, so both land together (#3150).
+
 	// The tutorial quest hears of the entry last, ahead of the closing
 	// ActionFailed.
 	live.NotifyTutorial(player.TutorialEnterWorld)

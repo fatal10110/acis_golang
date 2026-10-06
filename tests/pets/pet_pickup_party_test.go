@@ -30,6 +30,14 @@ func partyPet(t *testing.T, rule party.LootRule) (*petWorld, *summon.Actor, *tes
 	h := bootOwnerWithCollar(t)
 	wolf, _ := h.spawnWolf(t)
 	h.settleInventoryUpdates(t)
+	mate, mateID := formPetParty(t, h, rule)
+	return h, wolf, mate, mateID
+}
+
+// formPetParty brings the partyless Mate in and forms a party of the owner
+// and Mate under rule, the owner leading.
+func formPetParty(t *testing.T, h *petWorld, rule party.LootRule) (*testsupport.ScriptedClient, int32) {
+	t.Helper()
 	mateID := h.srv.SeedCharacterFor(t, "player2", "Mate", 1, 0).ID
 	mate := h.srv.DialClient(t, "player2", 1)
 	startInWorld(t, mate)
@@ -44,7 +52,7 @@ func partyPet(t *testing.T, rule party.LootRule) (*petWorld, *summon.Actor, *tes
 	mate.Send(answer.Bytes())
 	drainUntilQuiet(t, mate)
 	drainUntilQuiet(t, h.client)
-	return h, wolf, mate, mateID
+	return mate, mateID
 }
 
 // partyMessages returns the SystemMessage ids in frames with their
