@@ -3,6 +3,7 @@ package npc
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 // MaxHP returns this NPC's calculated maximum hit points (CreatureStatus.
@@ -79,7 +80,7 @@ func (h *Hostile) TakeDamage(dmg int, attacker attackable.Combatant) bool {
 	h.testOverhit(attacker, float64(dmg))
 	if dmg > 0 {
 		h.RecordAttacker(attacker)
-		h.registerHit(attacker, float64(dmg), false)
+		h.registerHit(attacker, float64(dmg), false, skill.Ref{})
 	}
 	if h.Invul() || !creature.CanDealDamage(attacker) {
 		return false

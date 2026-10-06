@@ -257,10 +257,34 @@ func TestSeamGateRefusesUnraisedHooks(t *testing.T) {
 		t.Fatalf("id without a template bound: %v", got)
 	}
 
-	// Production raises no hook yet: every subscribing script is refused.
-	r = Build(listOf("quest.Talker"), catalog, Config{KindOf: kindOf, Log: zerolog.Nop()})
-	if r.entries[0].state != entryRefused {
-		t.Fatal("a script registered on a hook the engine does not raise")
+	// Production raises talk on no NPC yet, and attacked on hostile NPCs
+	// only.
+	r = Build(listOf("quest.Talker", "ai.HostileOnly", "ai.FolkAttacked"), catalog, Config{KindOf: kindOf, Log: zerolog.Nop()})
+	if got := []entryState{r.entries[0].state, r.entries[1].state, r.entries[2].state}; !slices.Equal(got, []entryState{entryRefused, entryRegistered, entryRefused}) {
+		t.Fatalf("production gate states = %v, want talk and folk attacked refused, hostile attacked registered", got)
+	}
+}
+
+// TestBehavesNamesTheIDsABehaviorIsBoundTo: an NPC id is behavior-bound
+// when a behavior registered on it for any event; a quest bound to it, a
+// behavior with no hook and an id with no template do not count.
+func TestBehavesNamesTheIDsABehaviorIsBoundTo(t *testing.T) {
+	catalog := Catalog{
+		"ai.Created": func() Script {
+			return Script{Behavior: true, NPCs: []int32{1, 99}, Hooks: Hooks{OnCreated: func(*Script, Created) {}}}
+		},
+		"ai.Idle":     func() Script { return Script{Behavior: true, NPCs: []int32{2}} },
+		"quest.Kills": quest(Bindings{EventAttacked: {3}}),
+	}
+	kindOf := func(id int32) (NPCKind, bool) { return KindHostile, id != 99 }
+	r := Build(listOf("ai.Created", "ai.Idle", "quest.Kills"), catalog, RaiseAll(Config{KindOf: kindOf, Log: zerolog.Nop()}))
+	for id, want := range map[int32]bool{1: true, 2: false, 3: false, 99: false} {
+		if got := r.Behaves(id); got != want {
+			t.Errorf("Behaves(%d) = %v, want %v", id, got, want)
+		}
+	}
+	if (*Registry)(nil).Behaves(1) {
+		t.Error("a nil registry binds a behavior")
 	}
 }
 
@@ -272,7 +296,7 @@ func TestRegistryHasNoWritePath(t *testing.T) {
 	for i := range typ.NumMethod() {
 		got = append(got, typ.Method(i).Name)
 	}
-	if want := []string{"AbnormalStatusChanged", "Dump", "FirstTalk", "JournalQuest", "TutorialEvent"}; !slices.Equal(got, want) {
+	if want := []string{"AbnormalStatusChanged", "Behaves", "Dump", "FirstTalk", "HostileAttacked", "HostilePartyAttacked", "JournalQuest", "TutorialEvent"}; !slices.Equal(got, want) {
 		t.Fatalf("Registry methods = %v, want only the reads %v; a new method must not change the registry", got, want)
 	}
 	for i := range reflect.TypeFor[Registry]().NumField() {

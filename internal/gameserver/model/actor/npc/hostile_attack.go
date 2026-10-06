@@ -250,7 +250,8 @@ func (h *Hostile) RechargeShots(physical, magic bool) {
 // recharges that shot type on success. Callers are the same three
 // HP-reduction paths that record attacker hate — TakeDamage, ReduceHP, and
 // ReduceHPByDOT — since every HP reduction (DOT included) records hate and
-// then runs the attacked hook.
+// then runs the attacked hook. They roll it only for an NPC with no bound
+// behavior, whose attacked hook rolls it otherwise.
 func (h *Hostile) RollAttackedShotRecharge() {
 	physical := h.CurrentSoulshotCount() > 0 && h.rollShotRate("SoulShotRate")
 	magic := h.CurrentSpiritshotCount() > 0 && h.rollShotRate("SpiritShotRate")
