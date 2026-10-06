@@ -58,11 +58,23 @@ type QuestState struct {
 
 // State returns c's state in s, nil when c has none.
 func (q *Quests) State(c *player.Character, s *Script) *QuestState {
-	st := c.Quests().State(s.Name)
+	return q.stateNamed(c, s.Name)
+}
+
+// stateNamed returns c's state in the quest named name, nil when c has
+// none.
+func (q *Quests) stateNamed(c *player.Character, name string) *QuestState {
+	st := c.Quests().State(name)
 	if st == nil {
 		return nil
 	}
 	return &QuestState{quests: q, player: c, state: st}
+}
+
+// QuestState returns p's state in the quest named name, nil when p has
+// none.
+func (s *Script) QuestState(p *Player, name string) *QuestState {
+	return s.env.Quests.stateNamed(p.character(), name)
 }
 
 // NewState adds a state of s to c's journal, created, and returns it. It

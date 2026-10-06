@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 )
 
 // questStore reads the saved quest journal rows.
@@ -20,6 +21,11 @@ type scriptRegistry interface {
 	// JournalQuest resolves a journal row's quest name.
 	JournalQuest(name string) (questlog.Quest, bool)
 	player.TutorialEvents
+	// Interact, QuestWindow and QuestEvent are the quest dialog; see
+	// quest_dialog.go.
+	Interact(p *script.Player, n *script.NPC) bool
+	QuestWindow(p *script.Player, n *script.NPC, name string)
+	QuestEvent(p *script.Player, last *script.NPC, name, event string)
 }
 
 // questJournals writes the quest journals and aborts quests.
@@ -27,6 +33,7 @@ type questJournals interface {
 	Abort(c *player.Character, questID int32)
 	Seal(c *player.Character)
 	Settle(ctx context.Context, ownerID int32) error
+	ReadHelpPage(c *player.Character, file string, itemID int32) bool
 }
 
 // abortQuest answers RequestQuestAbort: the first quest of live's journal

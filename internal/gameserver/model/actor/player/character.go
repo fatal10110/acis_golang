@@ -362,6 +362,9 @@ type Character struct {
 	// detaching is set once the character starts leaving the world; see
 	// MarkDetaching.
 	detaching atomic.Bool
+	// lastQuestNPC is the object id of the NPC c last talked to about
+	// quests; see SetLastQuestNPC.
+	lastQuestNPC atomic.Int32
 }
 
 var _ effect.StatOwner = (*Character)(nil)

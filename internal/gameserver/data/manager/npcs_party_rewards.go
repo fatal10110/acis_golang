@@ -69,7 +69,8 @@ func (d *deathRewards) grantParty(attacker *player.Character, group RewardParty,
 		ownDamage[id] = entries[i].damage
 	}
 
-	exp, sp := player.PartyKillPool(d.tmpl.RewardExp, d.tmpl.RewardSp, partyDamage, totalDamage, partyLevel-d.tmpl.Level)
+	rewardExp, rewardSp := d.ratedReward()
+	exp, sp := player.PartyKillPool(rewardExp, rewardSp, partyDamage, totalDamage, partyLevel-d.tmpl.Level)
 	if d.hostile.OverhitValid(attacker) {
 		attacker.NotifyOverHit()
 		exp += d.hostile.OverhitBonus(exp)

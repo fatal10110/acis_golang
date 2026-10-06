@@ -120,6 +120,20 @@ func (n *NPC) Summoner() Creature {
 	return creatureOf(inst.Summoner)
 }
 
+// NpcID returns the NPC's template id; a handle on nothing panics.
+func (n *NPC) NpcID() int32 {
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		return int32(o.NpcID())
+	case *npc.Folk:
+		return int32(o.NpcID())
+	}
+	panic("script: the template of a handle on nothing")
+}
+
+// Level returns the player's level.
+func (p *Player) Level() int32 { return int32(p.character().Level()) }
+
 func (n *NPC) combatant() attackable.Combatant {
 	if n == nil || n.self == nil {
 		return nil

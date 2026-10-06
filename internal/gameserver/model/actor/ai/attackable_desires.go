@@ -1,6 +1,8 @@
 package ai
 
 import (
+	"time"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -101,6 +103,26 @@ func (a *Attackable) AddFleeDesire(target attackable.Combatant, distance int, we
 		Weight:      weight,
 		QueuedAt:    a.now(),
 	})
+}
+
+// talkSocialInterval is the least time from one social animation, or the
+// end of a social desire's hold, to a talk animation.
+const talkSocialInterval = 12 * time.Second
+
+// ClaimTalkSocial claims the animation a player's talk plays: it reports
+// true, and restarts the social clock at now, only once talkSocialInterval
+// has passed since the last animation's hold ended. A social desire's hold
+// still running, or ended less than the interval ago, refuses it. The
+// caller checks that the actor can act.
+func (a *Attackable) ClaimTalkSocial() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	now := a.now()
+	if now.Sub(a.socialHold) <= talkSocialInterval {
+		return false
+	}
+	a.socialHold = now
+	return true
 }
 
 // AddSocialDesire queues a request to play social animation id with weight;

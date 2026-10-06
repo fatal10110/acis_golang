@@ -73,7 +73,7 @@ func TestPanickingHookIsIsolated(t *testing.T) {
 		t.Fatalf("panic logged without the hook's stack: %s", out)
 	}
 
-	res, bound := r.FirstTalk(2, FirstTalk{})
+	_, res, bound := r.FirstTalk(2, FirstTalk{})
 	if !bound || res != (Result{Kind: ResultAborted}) {
 		t.Fatalf("panicking first talk = %+v, %v; want ResultAborted", res, bound)
 	}
@@ -106,10 +106,10 @@ func TestDispatchFromManyQueues(t *testing.T) {
 	}
 	dispatch := func(t *testing.T, r *Registry, npc int32) {
 		r.AbnormalStatusChanged(npc, AbnormalStatusChanged{})
-		if res, bound := r.FirstTalk(3, FirstTalk{}); !bound || res.Kind != ResultPageFile {
+		if _, res, bound := r.FirstTalk(3, FirstTalk{}); !bound || res.Kind != ResultPageFile {
 			t.Errorf("first talk = %+v, %v", res, bound)
 		}
-		if res, bound := r.FirstTalk(1, FirstTalk{}); !bound || res.Kind != ResultAborted {
+		if _, res, bound := r.FirstTalk(1, FirstTalk{}); !bound || res.Kind != ResultAborted {
 			t.Errorf("panicking first talk = %+v, %v", res, bound)
 		}
 	}

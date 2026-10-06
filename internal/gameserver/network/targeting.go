@@ -98,6 +98,8 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 			live.deferInteract(pet, shift)
 		} else if f, ok := target.(*npc.Folk); ok && !ctrl {
 			live.deferInteract(f, shift)
+		} else if h, ok := target.(*npc.Hostile); ok && interactsWith(live, h, ctrl) {
+			live.deferInteract(h, shift)
 		} else {
 			run := l.queuedSelectedTargetAction(live, target, ctrl, shift)
 			live.deferAction(func() {
@@ -125,7 +127,18 @@ func (l *GameClientLink) actOnSelectedTarget(live *livePlayer, target world.Trac
 	if l.actOnFolk(live, target, ctrl, shift) {
 		return
 	}
+	if h, ok := target.(*npc.Hostile); ok && interactsWith(live, h, ctrl) {
+		l.tryToInteract(live, h, shift)
+		return
+	}
 	l.attackLiveTarget(live, target, shift)
+}
+
+// interactsWith reports whether a click on the selected hostile NPC h is an
+// interact rather than an attack: live may not attack h without forcing,
+// and does not force an attack h would take.
+func interactsWith(live *livePlayer, h *npc.Hostile, ctrl bool) bool {
+	return !h.AttackableWithoutForceBy(live.Character) && !(ctrl && h.AttackableBy(live.Character))
 }
 
 // actOnStaticObject answers a click on an already-selected static object
@@ -522,7 +535,7 @@ func (l *GameClientLink) thinkInteract(live *livePlayer, target interactTarget, 
 	}
 	// A walking NPC is answered with the player's StopMove, without turning
 	// toward it; any other target is faced with MoveToPawn.
-	if f, ok := target.(*npc.Folk); ok && f.IsMoving() {
+	if movingNPC(target) {
 		l.broadcastLiveStopMove(live, live.CurrentLocation(), live.CurrentHeading())
 	} else {
 		at := live.CurrentLocation()
@@ -535,9 +548,20 @@ func (l *GameClientLink) thinkInteract(live *livePlayer, target interactTarget, 
 	endInteractIdle(live)
 }
 
+// movingNPC reports whether target is an NPC on the move.
+func movingNPC(target interactTarget) bool {
+	switch n := target.(type) {
+	case *npc.Folk:
+		return n.IsMoving()
+	case *npc.Hostile:
+		return n.IsMoving()
+	}
+	return false
+}
+
 // onInteract acts on an interact target in reach: the player's own summon
-// shows its status window, a civilian NPC talks, a player running a store
-// shows its store window.
+// shows its status window, a civilian NPC talks, a talking hostile NPC
+// too, a player running a store shows its store window.
 func (l *GameClientLink) onInteract(live *livePlayer, target interactTarget) {
 	switch t := target.(type) {
 	case *livePlayer:
@@ -546,6 +570,8 @@ func (l *GameClientLink) onInteract(live *livePlayer, target interactTarget) {
 		live.SendFrame(serverpackets.FramePetStatusShow(t.SummonType()))
 	case *npc.Folk:
 		l.talkToFolk(live, t)
+	case *npc.Hostile:
+		l.talkToHostile(live, t)
 	case *staticobject.Object:
 		l.showStaticObject(live, t)
 	}
