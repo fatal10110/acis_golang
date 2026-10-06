@@ -162,6 +162,11 @@ import (
 // registers no pending client action; tests/character, tests/party and
 // tests/clan assert those silences.
 //
+// RequestQuestAbort is absent where the reference is silent: a quest id the
+// player has no state of, or a state that is not started. The client sends
+// it once the player confirmed the abort and waits on no answer;
+// tests/quest asserts those silences.
+//
 // RequestSSQStatus for the seal prediction page is absent too: once the
 // competition is over (results, seal validation) the reference sends
 // nothing, and the record window holds no pending action. tests/lifecycle

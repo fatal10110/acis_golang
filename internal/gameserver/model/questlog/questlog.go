@@ -83,22 +83,36 @@ type Entry struct {
 	Flags   int32
 }
 
-// Journal is one player's quest states, in the order they were added. The
-// zero value is an empty journal. mu guards the states, so any goroutine
-// may use it; it is a leaf lock.
+// Journal is one player's quest states, in the order they were added, and
+// the character_quests writes its changes still owe the database. The zero
+// value is an empty journal. mu guards every field and every state's
+// variables, so any goroutine may use it; it is a leaf lock.
 type Journal struct {
 	mu     sync.Mutex
-	states []*state
+	states []*State
+	// pending are the writes not yet handed to a drain, in the order the
+	// changes were made.
+	pending []Write
+	// scheduled is set while a drain is owed for pending: from the change
+	// that asked for one until that drain takes the writes.
+	scheduled bool
+	// inflight is set while a drain applies the writes it took.
+	inflight bool
+	// sealed refuses every further change: the player is leaving.
+	sealed bool
 }
 
-// state is one quest's variables.
-type state struct {
+// State is one quest's variables in a journal. Its journal's lock guards
+// them. A state an exit took out of its journal keeps working on its own:
+// its changes are still written, as the reference writes them.
+type State struct {
+	j     *Journal
 	quest Quest
 	vars  map[string]string
 }
 
-func newState(q Quest) *state {
-	return &state{quest: q, vars: map[string]string{KeyState: StatusCreated.String()}}
+func newState(j *Journal, q Quest) *State {
+	return &State{j: j, quest: q, vars: map[string]string{KeyState: StatusCreated.String()}}
 }
 
 // Restore replaces the journal with the states rows describe, in row order.
@@ -108,7 +122,7 @@ func newState(q Quest) *state {
 // of the row's own variable. A row with an empty variable or value adds no
 // variable, though it still adds its quest's state.
 func (j *Journal) Restore(rows []Row, resolve func(name string) (Quest, bool)) (unknown []string) {
-	var states []*state
+	var states []*State
 	for _, r := range rows {
 		q, ok := resolve(r.Quest)
 		if !ok {
@@ -117,7 +131,7 @@ func (j *Journal) Restore(rows []Row, resolve func(name string) (Quest, bool)) (
 		}
 		st := find(states, q.Name)
 		if st == nil {
-			st = newState(q)
+			st = newState(j, q)
 			states = append(states, st)
 		}
 		if r.Var == "" || r.Value == "" {
@@ -132,7 +146,7 @@ func (j *Journal) Restore(rows []Row, resolve func(name string) (Quest, bool)) (
 }
 
 // find returns the state of the quest named name, nil when there is none.
-func find(states []*state, name string) *state {
+func find(states []*State, name string) *State {
 	for _, st := range states {
 		if st.quest.Name == name {
 			return st
@@ -146,6 +160,11 @@ func find(states []*state, name string) *state {
 func (j *Journal) List() []Entry {
 	j.mu.Lock()
 	defer j.mu.Unlock()
+	return j.list()
+}
+
+// list is List with mu held.
+func (j *Journal) list() []Entry {
 	var out []Entry
 	for _, st := range j.states {
 		if !st.quest.Real() {
@@ -160,16 +179,21 @@ func (j *Journal) List() []Entry {
 }
 
 // status is the state's <state>.
-func (st *state) status() Status { return parseStatus(st.vars[KeyState]) }
+func (st *State) status() Status { return parseStatus(st.vars[KeyState]) }
 
 // flags is the state's <flags> when set, otherwise the flags its <cond>
-// gives: none for no condition, else every step up to the condition plus
-// the high bit.
-func (st *state) flags() int32 {
+// gives.
+func (st *State) flags() int32 {
 	if v, ok := st.int(KeyFlags); ok {
 		return v
 	}
 	cond, _ := st.int(KeyCond)
+	return condFlags(cond)
+}
+
+// condFlags is the quest window flags condition cond gives: none for no
+// condition, else every step up to it plus the high bit.
+func condFlags(cond int32) int32 {
 	if cond == 0 {
 		return 0
 	}
@@ -178,7 +202,7 @@ func (st *state) flags() int32 {
 
 // int reads the variable key as a 32-bit decimal integer; ok is false when
 // it is unset or not such an integer.
-func (st *state) int(key string) (int32, bool) {
+func (st *State) int(key string) (int32, bool) {
 	v, ok := st.vars[key]
 	if !ok {
 		return 0, false

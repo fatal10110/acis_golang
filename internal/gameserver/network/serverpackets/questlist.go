@@ -25,3 +25,15 @@ func FrameQuestList(quests []QuestListEntry) wire.Frame {
 	}
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
+
+// OpcodeExShowQuestMark is the extended sub-opcode of ExShowQuestMark.
+const OpcodeExShowQuestMark uint16 = 0x001a
+
+// FrameExShowQuestMark builds the packet that marks questID in the client's
+// quest window as moved to a new step.
+func FrameExShowQuestMark(questID int32) wire.Frame {
+	w := newFrameWriter(OpcodeExtended)
+	w.WriteUint16(OpcodeExShowQuestMark)
+	w.WriteInt32(questID)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
