@@ -9,3 +9,22 @@
 # added by the slices that build the matching Go call; the script-facing API
 # is frozen when census.golden has no unmapped row. A row that is no longer
 # in the census fails TestCommittedGoldensAreConsistent.
+
+# Scheduled tasks (T1). A manager's getInstance is the singleton lookup the
+# Server handle stands for. The leader handover loop (the clan list, each
+# clan's nominee lookup and the cleared nomination) runs inside
+# Server.TransferClanLeaders.
+CastleManager.getInstance inline
+CastleManager.updateTaxes script.Server.UpdateCastleTaxes
+Clan.getClanMember inline
+Clan.getNewLeaderId inline
+Clan.setNewLeader script.Server.TransferClanLeaders
+Clan.setNewLeaderId inline
+ClanTable.getClans inline
+ClanTable.getInstance inline
+FestivalOfDarknessManager.getInstance inline
+FestivalOfDarknessManager.saveFestivalData script.Server.SaveFestivalScores
+SevenSignsManager.getInstance inline
+SevenSignsManager.isSealValidationPeriod script.Server.SealValidationPeriod
+SevenSignsManager.saveSevenSignsData script.Server.SaveSevenSigns
+SevenSignsManager.saveSevenSignsStatus script.Server.SaveSevenSigns

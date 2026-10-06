@@ -25,6 +25,7 @@ type Hooks struct {
 	OnSeeItem                  func(*Script, SeeItem)
 	OnSeeSpell                 func(*Script, SeeSpell)
 	OnSpelled                  func(*Script, Spelled)
+	OnStart                    func(*Script, Start)
 	OnStaticObjectClanAttacked func(*Script, StaticObjectClanAttacked)
 	OnTalk                     func(*Script, Talk) string
 	OnTimer                    func(*Script, Timer) string
@@ -62,6 +63,7 @@ const (
 	hookSeeItem
 	hookSeeSpell
 	hookSpelled
+	hookStart
 	hookStaticObjectClanAttacked
 	hookTalk
 	hookTimer
@@ -93,6 +95,7 @@ var hookMethods = [hookCount]string{
 	hookSeeItem:                  "onSeeItem",
 	hookSeeSpell:                 "onSeeSpell",
 	hookSpelled:                  "onSpelled",
+	hookStart:                    "onStart",
 	hookStaticObjectClanAttacked: "onStaticObjectClanAttacked",
 	hookTalk:                     "onTalk",
 	hookTimer:                    "onTimer",
@@ -135,6 +138,7 @@ func (h *Hooks) set() hookSet {
 	add(h.OnSeeItem != nil, hookSeeItem)
 	add(h.OnSeeSpell != nil, hookSeeSpell)
 	add(h.OnSpelled != nil, hookSpelled)
+	add(h.OnStart != nil, hookStart)
 	add(h.OnStaticObjectClanAttacked != nil, hookStaticObjectClanAttacked)
 	add(h.OnTalk != nil, hookTalk)
 	add(h.OnTimer != nil, hookTimer)
@@ -217,6 +221,9 @@ func (h Hooks) With(o Hooks) Hooks {
 		}
 		if o.OnSpelled != nil {
 			dst.OnSpelled = o.OnSpelled
+		}
+		if o.OnStart != nil {
+			dst.OnStart = o.OnStart
 		}
 		if o.OnStaticObjectClanAttacked != nil {
 			dst.OnStaticObjectClanAttacked = o.OnStaticObjectClanAttacked
@@ -367,6 +374,12 @@ func (h *Hooks) SeeSpell(s *Script, e SeeSpell) {
 func (h *Hooks) Spelled(s *Script, e Spelled) {
 	if h.OnSpelled != nil {
 		h.OnSpelled(s, e)
+	}
+}
+
+func (h *Hooks) Start(s *Script, e Start) {
+	if h.OnStart != nil {
+		h.OnStart(s, e)
 	}
 }
 
