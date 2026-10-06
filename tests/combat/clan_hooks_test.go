@@ -421,8 +421,8 @@ func TestClanCallsNeedLineOfSight(t *testing.T) {
 
 // TestFolkAttackedRaisesItsHooksAndClanCalls: a hit on a civilian NPC runs
 // its attacked hooks before the HP change, then its clan calls: itself,
-// then its clan members in range of either kind. A skill calls the hostile
-// ones only, and its death tells them all.
+// then its clan members in range of either kind. A skill landing on it
+// makes no clan call, and its death tells them all.
 func TestFolkAttackedRaisesItsHooksAndClanCalls(t *testing.T) {
 	t.Parallel()
 	const caller, mate = int32(30049), int32(30050)
@@ -459,7 +459,6 @@ func TestFolkAttackedRaisesItsHooksAndClanCalls(t *testing.T) {
 		"CLAN_ATTACKED caller=F called=mate attacker=p damage=10 skill=none",
 		"CLAN_ATTACKED caller=F called=same attacker=p damage=10 skill=none",
 		"ATTACKED npc=F attacker=p damage=120 skill=1160",
-		"CLAN_ATTACKED caller=F called=same attacker=p damage=120 skill=1160",
 		fmt.Sprintf("ATTACKED npc=F attacker=p damage=%d skill=none", lethal),
 		fmt.Sprintf("CLAN_ATTACKED caller=F called=F attacker=p damage=%d skill=none", lethal),
 		fmt.Sprintf("CLAN_ATTACKED caller=F called=mate attacker=p damage=%d skill=none", lethal),

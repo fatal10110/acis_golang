@@ -78,17 +78,14 @@ func (f *Folk) ReduceHPBySkillDOT(amount float64, attacker effect.Actor, sk mode
 
 // SkillAttacked is caster's offensive skill def landing on this NPC, once
 // its effects applied, for a skill that is a debuff or carries aggro
-// points: the attacked hooks run with max(120, aggro points) as the damage,
-// then the hostile NPCs of its clan in range are called. A dead NPC is
-// called too.
+// points: the attacked hooks run with max(120, aggro points) as the damage.
+// A dead NPC is called too. Unlike a hostile NPC, a civilian NPC makes no
+// clan call for a skill: a clan member is never told of one.
 func (f *Folk) SkillAttacked(caster attackable.Combatant, def modelskill.Definition) {
 	if caster == nil {
 		return
 	}
-	value := int32(max(120, def.AggroPoints))
-	ref := skillRef(def)
-	f.raiseAttacked(caster, value, ref)
-	raiseClanAttacked(f.scripts, f.world, f, caster, value, ref, clanAttackedBySkill)
+	f.raiseAttacked(caster, int32(max(120, def.AggroPoints)), skillRef(def))
 }
 
 // raiseAttacked runs f's attacked hooks.
