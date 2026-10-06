@@ -276,6 +276,9 @@ const (
 	// ObtainEarned names an item earned by template id, such as a swept
 	// spoil: a stack's count as an item number.
 	ObtainEarned
+	// ObtainGiven names items a script gave as earned: adena's amount and a
+	// stack's count as an item number.
+	ObtainGiven
 )
 
 // AttackRequested reports an aggression effect provoking an attack on Target.

@@ -51,3 +51,30 @@ Quest.showQuestionMark ShowQuestionMark
 Quest.showTutorialHTML ShowTutorialHTML
 RadarList.addMarker AddRadarMarker
 RadarList.removeMarker RemoveRadarMarker
+
+# Script helpers (E4). The helpers are methods of the registered script, so a
+# port keeps the reference's arguments: s.GiveItems(player, id, count). The
+# condition and variable overloads of a party lookup are one call taking
+# script.ByCond or script.ByVar. A quest state's condition and player are
+# read on its handle.
+Quest.checkClanLeaderCondition script.Script.CheckClanLeaderCondition
+Quest.checkClanLeaderVariable script.Script.CheckClanLeaderVariable
+Quest.checkPlayerCondition script.Script.CheckPlayerCondition
+Quest.checkPlayerState script.Script.CheckPlayerState
+Quest.dropItems script.Script.DropItems
+Quest.dropItemsAlways script.Script.DropItemsAlways
+Quest.dropMultipleItems script.Script.DropMultipleItems
+Quest.getClanLeaderQuestState script.Script.ClanLeaderQuestState
+Quest.getPartyMembers script.Script.PartyMembers
+Quest.getPartyMembersState script.Script.PartyMembersState
+Quest.getRandomPartyMember script.Script.RandomPartyMember
+Quest.getRandomPartyMemberState script.Script.RandomPartyMemberState
+Quest.giveItems script.Script.GiveItems
+Quest.playSound script.Script.PlaySound
+Quest.rewardExpAndSp script.Script.RewardExpAndSp
+Quest.rewardItems script.Script.RewardItems
+Quest.takeItems script.Script.TakeItems
+QuestState.getCond script.QuestState.Cond
+QuestState.getPlayer script.QuestState.Player
+Rnd.get script.Script.Rnd
+Rnd.nextBoolean script.Script.RndBool

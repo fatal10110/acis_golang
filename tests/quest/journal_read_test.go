@@ -15,13 +15,13 @@ import (
 )
 
 // journalScripts are the scripts the suites boot: four real quests and a
-// script that is not a quest.
+// script that is not a quest. Q001 takes the golden's quest items on exit.
 func journalScripts() gameservertest.Option {
-	quest := func(id int32) func() script.Script {
-		return func() script.Script { return script.Script{QuestID: id} }
+	quest := func(id int32, items ...int32) func() script.Script {
+		return func() script.Script { return script.Script{QuestID: id, Items: items} }
 	}
 	catalog := script.Catalog{
-		"quest.Q001_LettersOfLove":           quest(1),
+		"quest.Q001_LettersOfLove":           quest(1, q001Items...),
 		"quest.Q002_WhatWomenWant":           quest(2),
 		"quest.Q003_WillTheSealBeBroken":     quest(3),
 		"quest.Q006_StepIntoTheFuture":       quest(6),

@@ -36,9 +36,9 @@ func (r *Registry) TutorialEvent(c *player.Character, name string) {
 
 var _ player.TutorialEvents = (*Registry)(nil)
 
-// character returns the player the handle is on, nil for a handle on
+// characterOrNil returns the player the handle is on, nil for a handle on
 // nothing.
-func (p *Player) character() *player.Character {
+func (p *Player) characterOrNil() *player.Character {
 	if h, ok := p.combatant().(player.CharacterHolder); ok {
 		return h.PlayerCharacter()
 	}
@@ -50,21 +50,21 @@ func (p *Player) character() *player.Character {
 // ShowTutorialHTML opens the player's tutorial window on the tutorial page
 // file.
 func (p *Player) ShowTutorialHTML(file string) {
-	if c := p.character(); c != nil {
+	if c := p.characterOrNil(); c != nil {
 		c.ShowTutorialPage(tutorialPages + file)
 	}
 }
 
 // CloseTutorialHTML closes the player's tutorial window.
 func (p *Player) CloseTutorialHTML() {
-	if c := p.character(); c != nil {
+	if c := p.characterOrNil(); c != nil {
 		c.CloseTutorialPage()
 	}
 }
 
 // ShowQuestionMark shows the player the tutorial question mark id.
 func (p *Player) ShowQuestionMark(id int32) {
-	if c := p.character(); c != nil {
+	if c := p.characterOrNil(); c != nil {
 		c.ShowTutorialQuestionMark(id)
 	}
 }
@@ -72,28 +72,28 @@ func (p *Player) ShowQuestionMark(id int32) {
 // EnableTutorialEvent makes the player's client report the tutorial client
 // event id when it happens.
 func (p *Player) EnableTutorialEvent(id int32) {
-	if c := p.character(); c != nil {
+	if c := p.characterOrNil(); c != nil {
 		c.EnableTutorialClientEvent(id)
 	}
 }
 
 // PlayTutorialVoice plays the player the tutorial voice file.
 func (p *Player) PlayTutorialVoice(voice string) {
-	if c := p.character(); c != nil {
+	if c := p.characterOrNil(); c != nil {
 		c.PlayTutorialVoice(voice)
 	}
 }
 
 // AddRadarMarker marks x, y, z on the player's radar.
 func (p *Player) AddRadarMarker(x, y, z int32) {
-	if c := p.character(); c != nil {
+	if c := p.characterOrNil(); c != nil {
 		c.AddRadarMarker(x, y, z)
 	}
 }
 
 // RemoveRadarMarker removes the mark at x, y, z from the player's radar.
 func (p *Player) RemoveRadarMarker(x, y, z int32) {
-	if c := p.character(); c != nil {
+	if c := p.characterOrNil(); c != nil {
 		c.RemoveRadarMarker(x, y, z)
 	}
 }

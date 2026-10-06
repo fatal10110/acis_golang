@@ -63,7 +63,8 @@ func sessionOnly(ev event.Event) bool {
 		event.ServitorVanished, event.ShieldBlocked, event.AttackFailed, event.HitDealt,
 		event.SkillResisted, event.MagicResisted, event.DamageReceived, event.ServitorDamageShared, event.SkillDamageDealt, event.UserInfoChanged,
 		event.PvPFlagged, event.RelationChanged, event.LevelChanged,
-		event.WeightPenaltyChanged, event.VitalsChanged, event.Evaded, event.MountFeedGauge:
+		event.WeightPenaltyChanged, event.VitalsChanged, event.Evaded, event.MountFeedGauge,
+		event.ItemsTaken, event.SoundPlayed:
 		return true
 	}
 	return false
@@ -294,6 +295,12 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.TutorialPageShown, event.TutorialPageClosed, event.TutorialQuestionMarkShown,
 		event.TutorialClientEventEnabled, event.TutorialVoicePlayed, event.RadarMarkerAdded, event.RadarMarkerRemoved:
 		l.sendTutorial(live, e)
+	case event.ItemsTaken:
+		sendTakenMessage(live, e)
+	case event.UnequipRequested:
+		l.unequipTakenItem(live, e.ObjectID)
+	case event.SoundPlayed:
+		live.SendFrame(serverpackets.FramePlaySound(e.File))
 	case event.ServitorVanished:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageServitorHasVanished))
 	case event.ShieldBlocked:
@@ -344,7 +351,11 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.consumeHerb(live, e.ItemID)
 	case event.ItemObtained:
 		live.SendFrame(itemObtainedFrame(e))
-		l.obtainCursedWeapon(live, e.ItemID)
+		// A script's give adds straight to the inventory, which never
+		// arms a cursed weapon.
+		if e.Notice != event.ObtainGiven {
+			l.obtainCursedWeapon(live, e.ItemID)
+		}
 	case event.CursedWeaponKill:
 		l.feedCursedWeapon(live)
 	case event.CursedWeaponLost:

@@ -9,6 +9,8 @@ type Script struct {
 	Name string
 	// QuestID, when positive, makes the script a real quest.
 	QuestID int32
+	// Items are the item ids the quest takes from the player when it ends.
+	Items []int32
 	// Bind lists, per NPC event, the NPC ids the script registers for
 	// explicitly: quests, features, teleporters, and behaviors that bind
 	// more than their own events.
@@ -24,6 +26,8 @@ type Script struct {
 
 	// path is the scripts.xml path the script was registered under.
 	path string
+	// env is what the script's helpers act through; Build sets it.
+	env *Env
 }
 
 // Bindings maps an NPC event to the NPC ids a script registers for.

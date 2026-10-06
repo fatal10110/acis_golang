@@ -1111,6 +1111,8 @@ func TestLivePlayerSessionOnlyEventSet(t *testing.T) {
 		event.LevelChanged{},
 		event.WeightPenaltyChanged{},
 		event.VitalsChanged{},
+		event.ItemsTaken{},
+		event.SoundPlayed{},
 	}
 	// Hooks detach left wired: these must keep flowing.
 	stillDelivered := []event.Event{
@@ -1150,6 +1152,7 @@ func TestLivePlayerSessionOnlyEventSet(t *testing.T) {
 		event.CastStopAck{},
 		event.CastFinished{},
 		event.FusionCastersStopRequested{},
+		event.UnequipRequested{},
 	}
 	for _, ev := range sessionOnlyEvents {
 		if !sessionOnly(ev) {

@@ -6,7 +6,9 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
@@ -16,6 +18,10 @@ import (
 type scriptOptions struct {
 	list    []script.Listing
 	catalog script.Catalog
+	rates   *script.Rates
+	rand    func(n int) int
+	// singleItemDrop turns MultipleItemDrop off.
+	singleItemDrop bool
 	// kinds are the NPC ids that have a template, with its kind.
 	kinds map[int32]script.NPCKind
 }
@@ -25,14 +31,46 @@ type scriptOptions struct {
 // the registry is empty. Every NPC id reads as having no template, so a
 // script's NPC bindings are dropped: the scripts serve the quest journal.
 func WithScripts(list []script.Listing, catalog script.Catalog) Option {
-	return func(o *options) { o.scripts = &scriptOptions{list: list, catalog: catalog} }
+	return func(o *options) {
+		so := o.scriptHelpers()
+		so.list, so.catalog = list, catalog
+	}
+}
+
+// WithScriptRates sets the quest drop and reward rates the script helpers
+// scale by; without it every rate is 1.
+func WithScriptRates(r script.Rates) Option {
+	return func(o *options) { o.scriptHelpers().rates = &r }
+}
+
+// WithScriptRand makes rand the random source of every script draw;
+// without it the draws are random.
+func WithScriptRand(rand func(n int) int) Option {
+	return func(o *options) { o.scriptHelpers().rand = rand }
+}
+
+// WithScriptSingleItemDrop turns MultipleItemDrop off, so a script give of
+// a non-stackable creates one instance whatever the count; without it the
+// setting is on, as shipped.
+func WithScriptSingleItemDrop() Option {
+	return func(o *options) { o.scriptHelpers().singleItemDrop = true }
+}
+
+func (o *options) scriptHelpers() *scriptOptions {
+	if o.scripts == nil {
+		o.scripts = &scriptOptions{}
+	}
+	return o.scripts
 }
 
 // WithNPCScripts is WithScripts where each NPC id in kinds has a template
 // of that kind, so the scripts' bindings to those ids hold and the hooks
 // they subscribe to must be raised for that kind.
 func WithNPCScripts(kinds map[int32]script.NPCKind, list []script.Listing, catalog script.Catalog) Option {
-	return func(o *options) { o.scripts = &scriptOptions{list: list, catalog: catalog, kinds: kinds} }
+	return func(o *options) {
+		so := o.scriptHelpers()
+		so.list, so.catalog, so.kinds = list, catalog, kinds
+	}
 }
 
 // WithQuestLoadFault makes every quest journal read at a character
@@ -71,24 +109,36 @@ type questBoot struct {
 	store    *journalStore
 	registry *script.Registry
 	journals *script.Quests
+	env      *script.Env
 }
 
-// bootQuests builds the journal store, the script registry and the journal
-// writer draining on worker.
-func bootQuests(db *sql.DB, worker *persist.Worker, o *options) *questBoot {
-	var list []script.Listing
-	var catalog script.Catalog
-	var kinds map[int32]script.NPCKind
-	if o.scripts != nil {
-		list, catalog, kinds = o.scripts.list, o.scripts.catalog, o.scripts.kinds
+// bootQuests builds the journal store, the journal writer draining on
+// worker, the script helpers' environment allocating item ids from ids,
+// and the script registry.
+func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, o *options) *questBoot {
+	so := o.scriptHelpers()
+	store := &journalStore{QuestStore: gamesql.NewQuestStore(db), loadErr: o.questLoadErr}
+	journals := script.NewQuests(store, worker, o.log)
+	env := &script.Env{
+		Quests:           journals,
+		Rates:            script.Rates{Drop: 1, Reward: 1, RewardAdena: 1, XP: 1, SP: 1},
+		PartyRange:       fixturePartyRange,
+		MultipleItemDrop: !so.singleItemDrop,
+		NewItemID:        ids.NextID,
+		Rand:             rnd.Get,
+	}
+	if so.rates != nil {
+		env.Rates = *so.rates
+	}
+	if so.rand != nil {
+		env.Rand = so.rand
 	}
 	kindOf := func(id int32) (script.NPCKind, bool) {
-		k, ok := kinds[id]
+		k, ok := so.kinds[id]
 		return k, ok
 	}
-	registry := script.Build(list, catalog, script.Config{KindOf: kindOf, Log: o.log})
-	store := &journalStore{QuestStore: gamesql.NewQuestStore(db), loadErr: o.questLoadErr}
-	return &questBoot{store: store, registry: registry, journals: script.NewQuests(store, worker, o.log)}
+	registry := script.Build(so.list, so.catalog, script.Config{KindOf: kindOf, Log: o.log, Env: env})
+	return &questBoot{store: store, registry: registry, journals: journals, env: env}
 }
 
 // journalStore is the real journal store, with the faults a suite sets and
@@ -148,20 +198,40 @@ func (s *Server) TakeJournalWrites() []questlog.Write {
 // player and the script WithScripts registered under name.
 func (s *Server) RunQuest(tb testing.TB, objID int32, name string, fn func(q *script.Quests, c *player.Character, sc *script.Script)) {
 	tb.Helper()
-	quest, ok := s.quests.registry.JournalQuest(name)
+	c := s.onlineCharacter(tb, objID)
+	s.runScript(tb, c, name, func(sc *script.Script) { fn(s.quests.journals, c, sc) })
+}
+
+// RunScript runs fn on the online player objID's queue as one invocation
+// of the script WithScripts registered under name, the way a hook runs,
+// and waits for it: fn gets the script and a handle on the player. A panic
+// in fn is recovered and logged, as a hook's is; RunScript reports whether
+// fn returned.
+func (s *Server) RunScript(tb testing.TB, objID int32, name string, fn func(sc *script.Script, p *script.Player)) bool {
+	tb.Helper()
+	obj, ok := s.State.Player(objID)
 	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	self, ok := obj.(attackable.Combatant)
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T is not a combatant", objID, obj)
+	}
+	return s.runScript(tb, s.onlineCharacter(tb, objID), name, func(sc *script.Script) { fn(sc, script.PlayerOf(self)) })
+}
+
+// runScript runs fn on c's queue as one invocation of the script name and
+// waits for it, reporting whether fn returned.
+func (s *Server) runScript(tb testing.TB, c *player.Character, name string, fn func(sc *script.Script)) bool {
+	tb.Helper()
+	if _, ok := s.quests.registry.JournalQuest(name); !ok {
 		tb.Fatalf("no script %q registered", name)
 	}
-	sc := &script.Script{Name: quest.Name, QuestID: quest.ID}
-	c := s.onlineCharacter(tb, objID)
-	done := make(chan struct{})
-	if !c.Queue().Post(func() {
-		defer close(done)
-		fn(s.quests.journals, c, sc)
-	}) {
-		tb.Fatalf("player %d's queue is closed", objID)
+	done := make(chan bool, 1)
+	if !c.Queue().Post(func() { done <- s.quests.registry.Invoke(name, fn) }) {
+		tb.Fatalf("player %d's queue is closed", c.ObjectID())
 	}
-	<-done
+	return <-done
 }
 
 // QuestVars returns the online player objID's variables in the quest named
@@ -173,4 +243,11 @@ func (s *Server) QuestVars(tb testing.TB, objID int32, name string) map[string]s
 		return nil
 	}
 	return st.Vars()
+}
+
+// PlayerItemCount returns how many units of templateID the online player
+// objID holds: a stack's count, or the number of instances.
+func (s *Server) PlayerItemCount(tb testing.TB, objID, templateID int32) int {
+	tb.Helper()
+	return s.onlineCharacter(tb, objID).ItemCount(int(templateID))
 }
