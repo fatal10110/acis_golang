@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
@@ -28,6 +29,12 @@ func (n *Npcs) SpawnFixed(tmpl *npc.Template, x, y, z, heading int) error {
 
 // spawnFixed is SpawnFixed, also returning the placed NPC's object id.
 func (n *Npcs) spawnFixed(tmpl *npc.Template, x, y, z, heading int) (int32, error) {
+	return n.spawnStandalone(tmpl, x, y, z, heading, nil)
+}
+
+// spawnStandalone is spawnFixed for an NPC spawned for summoner, nil for
+// none.
+func (n *Npcs) spawnStandalone(tmpl *npc.Template, x, y, z, heading int, summoner attackable.Combatant) (int32, error) {
 	n.gate.RLock()
 	defer n.gate.RUnlock()
 	if tmpl == nil {
@@ -40,7 +47,7 @@ func (n *Npcs) spawnFixed(tmpl *npc.Template, x, y, z, heading int) (int32, erro
 	key := fmt.Sprintf("fixed#%d", n.fixedSeq.Add(1))
 	entry := spawn.Entry{NPCID: int32(tmpl.ID)}
 	n.mu.Lock()
-	n.slot[key] = slotInfo{key: key, entry: entry, tmpl: tmpl, fixed: true, at: at, heading: heading, memory: newSlotMemory(entry)}
+	n.slot[key] = slotInfo{key: key, entry: entry, tmpl: tmpl, fixed: true, at: at, heading: heading, summoner: summoner, memory: newSlotMemory(entry)}
 	n.mu.Unlock()
 
 	n.instantiate(key, entry, tmpl, at, heading, fullHP, fullMP, nil)

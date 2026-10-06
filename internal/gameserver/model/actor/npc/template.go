@@ -1,6 +1,7 @@
 package npc
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -358,6 +359,9 @@ func NewTemplate(set *commons.StatSet, skills TemplateSkills) (*Template, error)
 	}
 	return t, nil
 }
+
+// ErrNoTemplate reports an NPC id no template has.
+var ErrNoTemplate = errors.New("npc: no template")
 
 // Table is an in-memory lookup of NPC templates keyed by id, built at boot
 // and replaced in place by //reload npc. The zero value is not usable;

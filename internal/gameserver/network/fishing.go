@@ -354,7 +354,7 @@ func (l *GameClientLink) endFishing(live *livePlayer, win bool) {
 }
 
 // spawnFishingMonster places the monster live's catch turned into at its
-// feet and reports whether there was one to place.
+// feet, spawned for live, and reports whether there was one to place.
 func (l *GameClientLink) spawnFishingMonster(live *livePlayer) bool {
 	if l.npcs == nil {
 		return false
@@ -366,7 +366,7 @@ func (l *GameClientLink) spawnFishingMonster(live *livePlayer) bool {
 	// ponytail: the monster's own AI (attack its fisher, leave when idle) waits for AI scripts, #3306.
 	if npcs := l.npcSpawns.Load(); npcs != nil {
 		x, y, z := live.Position()
-		if err := npcs.SpawnFixed(tmpl, x, y, z, live.CurrentHeading()); err != nil {
+		if err := npcs.SpawnSummoned(tmpl, x, y, z, live.CurrentHeading(), live.Character); err != nil {
 			l.log.Warn().Err(err).Int("npc_id", tmpl.ID).Msg("fishing: caught monster placed nothing")
 		}
 	}
