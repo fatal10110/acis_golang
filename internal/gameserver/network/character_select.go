@@ -68,6 +68,12 @@ func (l *GameClientLink) selectCharacter(ctx context.Context, conn *Conn, client
 		l.log.Error().Err(err).Int32("object_id", objectID).Msg("select character: load quests")
 		return nil, selectionRefused
 	}
+	// Memos record one-time rewards too: one that does not load refuses
+	// the selection the same way.
+	if err := l.restoreMemos(ctx, fresh); err != nil {
+		l.log.Error().Err(err).Int32("object_id", objectID).Msg("select character: load memos")
+		return nil, selectionRefused
+	}
 	c = fresh
 	chars[slot] = fresh
 	l.clanService().RestoreMembership(c, time.Now())

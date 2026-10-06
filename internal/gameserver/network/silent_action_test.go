@@ -167,6 +167,10 @@ import (
 // it once the player confirmed the abort and waits on no answer;
 // tests/quest asserts those silences.
 //
+// The four tutorial requests are absent where the reference is silent: a
+// player with no tutorial quest state. The tutorial window and its question
+// marks hold no pending action; tests/quest asserts that silence.
+//
 // RequestSSQStatus for the seal prediction page is absent too: once the
 // competition is over (results, seal validation) the reference sends
 // nothing, and the record window holds no pending action. tests/lifecycle

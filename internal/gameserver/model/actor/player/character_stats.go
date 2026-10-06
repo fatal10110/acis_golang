@@ -402,7 +402,7 @@ func (c *Character) AddHP(amount float64) float64 {
 	if c.curHP+amount > maxHP {
 		amount = maxHP - c.curHP
 	}
-	c.curHP += amount
+	c.writeHPLocked(c.curHP + amount)
 	return amount
 }
 
@@ -500,18 +500,21 @@ func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Com
 		c.curCP -= drained
 		amount -= drained
 	}
-	if amount > 0 && c.curHP-amount <= 0 && c.InDuel() {
-		// A duel never kills: the hit leaves 1 HP, and a character still
-		// fighting is defeated.
-		hit.duelDefeat = c.DuelState() == duel.Duelling
-		c.curHP = 1
-	} else {
-		c.curHP -= amount
+	// Only damage left over once CP has absorbed its share writes HP.
+	if amount > 0 {
+		hp := c.curHP - amount
+		if hp <= 0 && c.InDuel() {
+			// A duel never kills: the hit leaves 1 HP, and a character
+			// still fighting is defeated.
+			hit.duelDefeat = c.DuelState() == duel.Duelling
+			hp = 1
+		}
+		if hp < creature.DeathHP {
+			hp = 0
+		}
+		c.writeHPLocked(hp)
 	}
 	hit.dead = c.curHP < creature.DeathHP
-	if hit.dead {
-		c.curHP = 0
-	}
 	return hit
 }
 
@@ -701,7 +704,7 @@ func (c *Character) reduceSkillHP(amount float64, attacker attackable.Combatant,
 		return
 	}
 	if c.landHit(amount, attacker, skill.DirectHPDamage, false) {
-		c.Die(attacker)
+		c.DieFromDamage(attacker)
 	}
 }
 
@@ -761,7 +764,7 @@ func (c *Character) reducePeriodicHP(amount float64, attacker effect.Actor, isDO
 		return
 	}
 	if c.landHit(amount, killer, false, isDOT) {
-		c.Die(killer)
+		c.DieFromDamage(killer)
 	}
 }
 
@@ -804,7 +807,7 @@ func (c *Character) SetHP(value float64) {
 	if value > maxHP {
 		value = maxHP
 	}
-	c.curHP = value
+	c.writeHPLocked(value)
 }
 
 // SetCP sets current CP, clamped to [0, MaxCP]. It has no effect on a dead

@@ -142,6 +142,7 @@ func (l *GameClientLink) destroyGroundRow(st item.InstanceState) {
 // line.
 func (l *GameClientLink) takeGroundFromWorldByPet(owner *livePlayer, pet *summon.Actor, ground *grounditem.Item) {
 	l.broadcastGroundPickup(ground, pet.ObjectID())
+	tutorialPickedUp(owner, ground.ItemID())
 	l.groundItems.Remove(ground)
 	l.world.Despawn(ground)
 	l.broadcastPetPickupAttention(owner, ground)

@@ -53,6 +53,9 @@ var raisedHooks = map[hook]kindSet{
 	hookPartyAttacked: kinds(KindHostile),
 	// The schedule runner (StartSchedule).
 	hookStart: kinds(KindOther),
+	// The tutorial events (TutorialEvent); the NPC dialog's bypass events
+	// come with the dialog path.
+	hookEvent: kinds(KindOther),
 }
 
 // Config is what Build needs besides the list and the catalog.

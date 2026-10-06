@@ -90,7 +90,7 @@ func (c *Character) RestoreDuelVitals(cp, hp, mp float64) {
 		return
 	}
 	c.curCP = clampVital(cp, res.MaxCP)
-	c.curHP = clampVital(hp, res.MaxHP)
+	c.writeHPLocked(clampVital(hp, res.MaxHP))
 	c.curMP = clampVital(mp, res.MaxMP)
 	c.vitalsMu.Unlock()
 	c.BroadcastStatus()

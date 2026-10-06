@@ -68,7 +68,8 @@ func (c *Character) SetResourceValues(res Resources) {
 	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	c.maxHP, c.curHP = res.MaxHP, res.CurrentHP
+	c.maxHP = res.MaxHP
+	c.writeHPLocked(res.CurrentHP)
 	c.maxMP, c.curMP = res.MaxMP, res.CurrentMP
 	c.maxCP, c.curCP = res.MaxCP, res.CurrentCP
 }
@@ -135,11 +136,12 @@ func (c *Character) ReduceCurrentHP(amount int) bool {
 	if c.Dead() {
 		return false
 	}
-	c.curHP -= float64(amount)
-	if c.curHP >= creature.DeathHP {
+	hp := c.curHP - float64(amount)
+	if hp >= creature.DeathHP {
+		c.writeHPLocked(hp)
 		return false
 	}
-	c.curHP = 0
+	c.writeHPLocked(0)
 	return true
 }
 
@@ -177,7 +179,8 @@ func (c *Character) refillResources(maxHP, maxMP, maxCP float64) {
 	if c.dead.Load() {
 		return
 	}
-	c.curHP, c.curMP, c.curCP = currentHP, currentMP, currentCP
+	c.writeHPLocked(currentHP)
+	c.curMP, c.curCP = currentMP, currentCP
 }
 
 // ChangesTo reports which resources differ in next.

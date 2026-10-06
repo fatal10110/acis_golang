@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/henna"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/memo"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/recipe"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -83,6 +84,9 @@ type Character struct {
 	maxHP, curHP float64
 	maxCP, curCP float64
 	maxMP, curMP float64
+	// hpWritten marks an HP write lowHPNotice has not yet looked at; see
+	// writeHPLocked.
+	hpWritten atomic.Bool
 	// vitalsMu guards maxHP/curHP, maxCP/curCP and maxMP/curMP. An
 	// attacker's hit or skill writes them from the attacker's queue
 	// (ReduceHP, ReduceMP, TakeDamage), and its formulas read them.
@@ -210,6 +214,7 @@ type Character struct {
 	social                   SocialGraph
 	hallFunctions            HallFunctions
 	partyLoot                PartyLoot
+	tutorial                 TutorialEvents
 	mounts                   MountBodies
 	mountData                MountDataSource
 	mountFeed                mountFeedState
@@ -352,6 +357,8 @@ type Character struct {
 	boat boatRide
 	// quests is the quest journal; it carries its own lock.
 	quests questlog.Journal
+	// memos are the scripts' saved memos; they carry their own lock.
+	memos memo.Memos
 	// detaching is set once the character starts leaving the world; see
 	// MarkDetaching.
 	detaching atomic.Bool

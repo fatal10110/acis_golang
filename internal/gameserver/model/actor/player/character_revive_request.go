@@ -110,19 +110,23 @@ func (c *Character) ReviveAnswer(answer int32) {
 		return
 	}
 
+	power := c.revivePower
+	var revived, blessed bool
 	switch {
 	case answer == 0 && c.EffectList().IsAffected(effect.FlagPhoenixBlessing):
 		c.stopPhoenixBlessing()
 	case answer == 1 && !c.revivePet:
-		if c.revivePower != 0 {
-			c.reviveRestoringExp(c.revivePower)
+		if power != 0 {
+			revived, blessed = c.reviveRestoringExp(power)
 		} else {
-			c.revive()
+			revived, blessed = c.revive()
 		}
 	}
-	power := c.revivePower
 	c.reviveRequested, c.revivePower = false, 0
 	c.reviveMu.Unlock()
+	if revived {
+		c.finishRevive(blessed)
+	}
 
 	if answer != 1 || pet == nil {
 		return

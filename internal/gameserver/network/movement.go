@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -281,6 +282,9 @@ func (l *GameClientLink) changeLiveWaitType(live *livePlayer, stand bool) bool {
 	}
 	dropPostureQueuedIntentions(live)
 	l.broadcastLiveWaitType(live, stand)
+	if !stand {
+		live.NotifyTutorial(player.TutorialSat)
+	}
 	return true
 }
 

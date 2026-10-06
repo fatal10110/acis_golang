@@ -79,6 +79,31 @@ func WithQuestLoadFault(err error) Option {
 	return func(o *options) { o.questLoadErr = err }
 }
 
+// WithMemoLoadFault makes every memo read at a character selection fail
+// with err.
+func WithMemoLoadFault(err error) Option {
+	return func(o *options) { o.memoLoadErr = err }
+}
+
+// WithRespawnRestoreHP sets the players.properties RespawnRestoreHP: the
+// share of max HP a revive restores (default 0.7).
+func WithRespawnRestoreHP(share float64) Option {
+	return func(o *options) { o.respawnRestoreHP = share }
+}
+
+// memoStore is the real memo store, with the read fault a suite sets.
+type memoStore struct {
+	*gamesql.MemoStore
+	loadErr error
+}
+
+func (s memoStore) ListMemos(ctx context.Context, ownerID int32) (map[string]string, error) {
+	if s.loadErr != nil {
+		return nil, s.loadErr
+	}
+	return s.MemoStore.ListMemos(ctx, ownerID)
+}
+
 // questBoot is the quest journal wiring Boot hands the link.
 type questBoot struct {
 	store    *journalStore

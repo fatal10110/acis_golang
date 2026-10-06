@@ -35,8 +35,12 @@ func (c *Character) Regen() *creature.Regen { return &c.regen }
 // stop). A character not yet attached has no queue and stays idle. A
 // teleport keeps the task on its grid: off the grid until Appearing, c is
 // still in the world.
+//
+// Every vitals write reaches it once its lock is released, so it then
+// raises the low-HP tutorial event an HP write owes (lowHPNotice).
 func (c *Character) SettleRegen() {
 	c.regen.Settle(c.liveLocked().Queue(), c.regenShort)
+	c.lowHPNotice()
 }
 
 // regenShort reports whether c regenerates: in the world (on the grid or

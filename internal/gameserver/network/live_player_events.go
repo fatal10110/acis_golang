@@ -292,6 +292,9 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(questListEntriesFrame(e.Entries))
 	case event.QuestMarked:
 		live.SendFrame(serverpackets.FrameExShowQuestMark(e.QuestID))
+	case event.TutorialPageShown, event.TutorialPageClosed, event.TutorialQuestionMarkShown,
+		event.TutorialClientEventEnabled, event.TutorialVoicePlayed, event.RadarMarkerAdded, event.RadarMarkerRemoved:
+		l.sendTutorial(live, e)
 	case event.ItemsTaken:
 		sendTakenMessage(live, e)
 	case event.UnequipRequested:

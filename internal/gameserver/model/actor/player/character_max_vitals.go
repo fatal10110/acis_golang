@@ -11,7 +11,7 @@ func (c *Character) SetMaxCpHpMp() {
 	}
 	c.curCP = res.MaxCP
 	c.curMP = res.MaxMP
-	c.curHP = res.MaxHP
+	c.writeHPLocked(res.MaxHP)
 	c.vitalsMu.Unlock()
 	c.BroadcastStatus()
 }

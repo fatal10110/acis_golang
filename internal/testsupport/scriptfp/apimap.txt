@@ -38,6 +38,20 @@ SevenSignsManager.isSealValidationPeriod script.Server.SealValidationPeriod
 SevenSignsManager.saveSevenSignsData script.Server.SaveSevenSigns
 SevenSignsManager.saveSevenSignsStatus script.Server.SaveSevenSigns
 
+# Tutorial window, voice, radar and memos (U1). The radar list and the memo
+# set are getters the Player handle folds into its radar and memo calls;
+# the memo set's own reads and writes share their MemoSet rows with the
+# quest state's variables.
+Player.getMemos inline
+Player.getRadarList inline
+Quest.closeTutorialHtml CloseTutorialHTML
+Quest.onTutorialClientEvent EnableTutorialEvent
+Quest.playTutorialVoice PlayTutorialVoice
+Quest.showQuestionMark ShowQuestionMark
+Quest.showTutorialHTML ShowTutorialHTML
+RadarList.addMarker AddRadarMarker
+RadarList.removeMarker RemoveRadarMarker
+
 # Script helpers (E4). The helpers are methods of the registered script, so a
 # port keeps the reference's arguments: s.GiveItems(player, id, count). The
 # condition and variable overloads of a party lookup are one call taking

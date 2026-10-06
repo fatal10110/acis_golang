@@ -303,8 +303,9 @@ child switch only when the child is ported.
 1. A detaching player gets no script give, take or journal write. Enforced by one new flag
    on `player.Character`, set where `markDetaching` runs, before inventory persistence is
    released. This closes a relog duplication window.
-2. A failed quest load refuses the character selection. The reference continues with an
-   empty journal, which lets one-time rewards be taken again.
+2. A failed quest or memo load refuses the character selection. The reference continues
+   with an empty journal or an empty memo set, which lets one-time rewards be taken again
+   (memos hold the `<quest>_OneTimeQuestFlag` and class-change flags).
 3. The top-level `Quest` bypass is refused with ActionFailed while the player trades or runs
    a private store. This closes a check-then-take race.
 

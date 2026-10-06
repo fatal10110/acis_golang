@@ -296,6 +296,9 @@ func (c *Character) addLevel(table *LevelTable, tmpl *Template, delta int, hooks
 			hp, mp, cp := tmpl.HPTable[idx], tmpl.MPTable[idx], tmpl.CPTable[idx]
 			hooks.add(func() { c.refillResources(hp, mp, cp) })
 		}
+		// The tutorial hears of a level gain, never of a loss, ahead of the
+		// level-up announcement.
+		hooks.add(func() { c.NotifyTutorial(tutorialLeveledUp) })
 		hooks.add(c.announceLevelUp)
 	}
 
