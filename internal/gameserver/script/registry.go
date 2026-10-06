@@ -49,6 +49,8 @@ func kinds(ks ...NPCKind) kindSet {
 // Until then no script subscribing to it registers, so no script waits on a
 // hook that never fires.
 var raisedHooks = map[hook]kindSet{
+	hookAttacked:      kinds(KindHostile),
+	hookPartyAttacked: kinds(KindHostile),
 	// The schedule runner (StartSchedule).
 	hookStart: kinds(KindOther),
 }
@@ -84,6 +86,8 @@ type Registry struct {
 	// byName holds, per lower-cased name, the first registered script of
 	// that name in list order.
 	byName map[string]*Script
+	// behaves holds the NPC ids a behavior is bound to.
+	behaves map[int32]bool
 }
 
 type npcKey struct {
@@ -124,7 +128,7 @@ const (
 // except that first talk keeps a single script. So the last listed behavior wins and other
 // scripts accumulate in list order.
 func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
-	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}}
+	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}, behaves: map[int32]bool{}}
 	registered := 0
 	for _, l := range list {
 		e := entry{path: l.Path}
@@ -261,6 +265,9 @@ func (r *Registry) register(s *Script, bound Bindings) {
 		for _, id := range ids {
 			k := npcKey{id, ev}
 			r.npc[k] = registerOn(r.npc[k], s, ev)
+			if s.Behavior {
+				r.behaves[id] = true
+			}
 		}
 	}
 }
@@ -288,9 +295,20 @@ func same(a, b *Script) bool {
 }
 
 // scripts returns the scripts that answer ev on the NPC with id npcID, in
-// dispatch order. The slice is shared: callers never modify it.
+// dispatch order; a nil registry has none. The slice is shared: callers
+// never modify it.
 func (r *Registry) scripts(npcID int32, ev NPCEvent) []*Script {
+	if r == nil {
+		return nil
+	}
 	return r.npc[npcKey{npcID, ev}]
+}
+
+// Behaves reports whether a behavior is bound to the NPC with id npcID, on
+// any event; a nil registry binds none. Until one is, the NPC keeps its
+// built-in stand-in reactions.
+func (r *Registry) Behaves(npcID int32) bool {
+	return r != nil && r.behaves[npcID]
 }
 
 // JournalQuest returns the quest a journal row's quest name belongs to: the

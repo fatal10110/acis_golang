@@ -16,6 +16,8 @@ import (
 type scriptOptions struct {
 	list    []script.Listing
 	catalog script.Catalog
+	// kinds are the NPC ids that have a template, with its kind.
+	kinds map[int32]script.NPCKind
 }
 
 // WithScripts boots the script registry from list and catalog, as the
@@ -24,6 +26,13 @@ type scriptOptions struct {
 // script's NPC bindings are dropped: the scripts serve the quest journal.
 func WithScripts(list []script.Listing, catalog script.Catalog) Option {
 	return func(o *options) { o.scripts = &scriptOptions{list: list, catalog: catalog} }
+}
+
+// WithNPCScripts is WithScripts where each NPC id in kinds has a template
+// of that kind, so the scripts' bindings to those ids hold and the hooks
+// they subscribe to must be raised for that kind.
+func WithNPCScripts(kinds map[int32]script.NPCKind, list []script.Listing, catalog script.Catalog) Option {
+	return func(o *options) { o.scripts = &scriptOptions{list: list, catalog: catalog, kinds: kinds} }
 }
 
 // WithQuestLoadFault makes every quest journal read at a character
@@ -44,11 +53,15 @@ type questBoot struct {
 func bootQuests(db *sql.DB, worker *persist.Worker, o *options) *questBoot {
 	var list []script.Listing
 	var catalog script.Catalog
+	var kinds map[int32]script.NPCKind
 	if o.scripts != nil {
-		list, catalog = o.scripts.list, o.scripts.catalog
+		list, catalog, kinds = o.scripts.list, o.scripts.catalog, o.scripts.kinds
 	}
-	noTemplate := func(int32) (script.NPCKind, bool) { return script.KindOther, false }
-	registry := script.Build(list, catalog, script.Config{KindOf: noTemplate, Log: o.log})
+	kindOf := func(id int32) (script.NPCKind, bool) {
+		k, ok := kinds[id]
+		return k, ok
+	}
+	registry := script.Build(list, catalog, script.Config{KindOf: kindOf, Log: o.log})
 	store := &journalStore{QuestStore: gamesql.NewQuestStore(db), loadErr: o.questLoadErr}
 	return &questBoot{store: store, registry: registry, journals: script.NewQuests(store, worker, o.log)}
 }

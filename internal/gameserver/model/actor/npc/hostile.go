@@ -79,6 +79,9 @@ type Hostile struct {
 	// hits watches the hits this NPC registers; nil watches none. Installed
 	// by Attach.
 	hits HitObserver
+	// scripts raises this NPC's script hooks; nil raises none and leaves
+	// every built-in reaction on. Installed by Attach.
+	scripts ScriptHooks
 	// interacted latches the first unlock attempt on a chest.
 	interacted atomic.Bool
 	// coreAIDisabled turns off this NPC's regular combat behavior; its only
@@ -351,6 +354,8 @@ type Runtime struct {
 	Remover Remover
 	// Hits watches every hit this NPC registers; nil watches none.
 	Hits HitObserver
+	// Scripts raises the NPC's script hooks; nil raises none.
+	Scripts ScriptHooks
 	// Slot is the spawn slot that placed the NPC; nil leaves it with no
 	// spawn parameters and a script memory of its own.
 	Slot SpawnSlot
@@ -370,6 +375,7 @@ func (h *Hostile) Attach(rt Runtime) {
 	h.sink = rt.Sink
 	h.remover = rt.Remover
 	h.hits = rt.Hits
+	h.scripts = rt.Scripts
 	h.bindSpawn(rt.Slot)
 	if rt.Items == nil {
 		return
@@ -598,7 +604,8 @@ func (h *Hostile) RemoveAttackDesire(target attackable.Combatant) {
 // AddCombatDamageHate records attacker's combat damage against this NPC,
 // queuing its ATTACKED-event attack Desire at attackedHateWeight's
 // approximation of the per-script attacked-hate formula (see
-// ai.Attackable.AddCombatDamageHate).
+// ai.Attackable.AddCombatDamageHate). A hit adds it only for an NPC with no
+// bound behavior.
 func (h *Hostile) AddCombatDamageHate(attacker attackable.Combatant, damage float64) {
 	h.brain.AddCombatDamageHate(attacker, damage, h.attackedHateWeight(attacker, damage))
 }
