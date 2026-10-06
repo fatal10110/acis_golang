@@ -71,8 +71,9 @@ func scriptCatalog(catalogs []script.Catalog) (script.Catalog, error) {
 // //reload npc, ids a reload adds stay unbound, and a template whose kind
 // a reload changes is not re-checked by the seam gate until restart.
 //
-// The script timers bound to no NPC or player queue run on an engine queue
-// of pool, closed on shutdown before the persistence worker drains.
+// The engine's own work (the NPC dying hooks, and the script timers bound to
+// no NPC or player queue) runs on an engine queue of pool, closed on
+// shutdown before the persistence worker drains.
 func provideScripts(lc fx.Lifecycle, paths gameServerPaths, data *gameData, env *script.Env, pool *sim.Pool, log zerolog.Logger) (*script.Registry, error) {
 	list, err := gamexml.LoadScriptList(filepath.Join(paths.DataRoot, "data", "xml", "scripts.xml"), log)
 	if err != nil {
@@ -82,12 +83,12 @@ func provideScripts(lc fx.Lifecycle, paths gameServerPaths, data *gameData, env 
 	if err != nil {
 		return nil, err
 	}
-	timers := pool.NewQueue("script-timers")
+	engine := pool.NewQueue("script-engine")
 	lc.Append(fx.Hook{OnStop: func(context.Context) error {
-		timers.Close()
+		engine.Close()
 		return nil
 	}})
-	return script.Build(list, catalog, script.Config{KindOf: npcKindOf(data.NPCs), Log: log, Env: env, Queue: timers}), nil
+	return script.Build(list, catalog, script.Config{KindOf: npcKindOf(data.NPCs), Log: log, Env: env, Queue: engine}), nil
 }
 
 // provideScriptEnv returns what the script helpers act through: the quest

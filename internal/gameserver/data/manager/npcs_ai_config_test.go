@@ -47,13 +47,14 @@ func TestNpcSpawnInstallsAIConfig(t *testing.T) {
 			tmpl := func(id int, kind string, aggroRange int) *npc.Template {
 				return &npc.Template{ID: id, TemplateID: id, Type: kind, Level: 11, HPMax: 100, RunSpeed: 100, AggroRange: aggroRange}
 			}
-			_, err = NewNpcsWithMaxBuffsAmount(NewSpawns(table, nil), npc.NewTable([]*npc.Template{tmpl(1, "Guard", 300), tmpl(2, "Monster", 300)}),
+			npcs, err := NewNpcsWithMaxBuffsAmount(NewSpawns(table, nil), npc.NewTable([]*npc.Template{tmpl(1, "Guard", 300), tmpl(2, "Monster", 300)}),
 				fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
 				&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, nil, 20, 30, 0,
 				npc.DefaultRaidMultipliers(), tc.cfg, DefaultSpawnEvents(), effect.Env{Activity: task.NewEffects()}, npcQueues(), testMakers(), nil)
 			if err != nil {
 				t.Fatalf("NewNpcsWithMaxBuffsAmount() error: %v", err)
 			}
+			npcs.SpawnOnStart()
 			var guard, mob *npc.Hostile
 			for _, obj := range state.Objects() {
 				if h, ok := obj.(*npc.Hostile); ok {

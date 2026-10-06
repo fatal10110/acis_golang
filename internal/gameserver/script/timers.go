@@ -361,12 +361,6 @@ func (ts *timers) playerDetached(id any) {
 	}
 }
 
-// HostileDecayed runs once h has decayed, before it leaves the world: the
-// timers bound to h whose script is a behavior bound to h's template stop.
-func (r *Registry) HostileDecayed(h *npc.Hostile) {
-	r.timers.npcDecayed(h.Scratch())
-}
-
 // PlayerDetached runs as c leaves the world: every script timer bound to c
 // stops.
 func (r *Registry) PlayerDetached(c *player.Character) {

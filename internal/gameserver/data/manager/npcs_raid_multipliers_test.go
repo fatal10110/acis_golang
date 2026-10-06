@@ -46,13 +46,14 @@ func TestNpcSpawnAppliesRaidMultipliersToRaidRelatedHostiles(t *testing.T) {
 	}
 	boss := tmpl(1, "RaidBoss")
 	boss.AIParams = partyAI
-	_, err = NewNpcsWithMaxBuffsAmount(NewSpawns(table, nil), npc.NewTable([]*npc.Template{boss, tmpl(2, "Monster"), tmpl(3, "Guard"), tmpl(4, "Monster")}),
+	npcs, err := NewNpcsWithMaxBuffsAmount(NewSpawns(table, nil), npc.NewTable([]*npc.Template{boss, tmpl(2, "Monster"), tmpl(3, "Guard"), tmpl(4, "Monster")}),
 		fakeGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
 		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, nil, 20, 30, 0,
 		npc.RaidMultipliers{Defence: 2, HPRegen: 1, MPRegen: 1}, npc.DefaultAIConfig(), DefaultSpawnEvents(), effect.Env{Activity: task.NewEffects()}, npcQueues(), testMakers(), nil)
 	if err != nil {
 		t.Fatalf("NewNpcsWithMaxBuffsAmount() error: %v", err)
 	}
+	npcs.SpawnOnStart()
 	pDef := map[bool]float64{true: 102, false: 51}
 	seen, raid := 0, 0
 	for _, obj := range state.Objects() {

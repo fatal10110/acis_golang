@@ -93,6 +93,19 @@ func (n *NPC) Decayed() bool {
 	return true
 }
 
+// DeleteMe takes the NPC out of the world at once, leaving no corpse: its
+// decayed hooks run, then its spawn answers as for a decayed corpse. It has
+// left the world when the call returns. A handle on nothing, or on an NPC
+// already gone, does nothing.
+func (n *NPC) DeleteMe() {
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		o.DeleteNow()
+	case *npc.Folk:
+		o.DeleteNow()
+	}
+}
+
 // Summoner returns the creature the NPC was spawned for, nil for none.
 func (n *NPC) Summoner() Creature {
 	var inst *npc.Instance

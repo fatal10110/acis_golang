@@ -52,6 +52,11 @@ type FolkSpawner struct {
 	MaxBuffsAmount      int
 	MaxGeoPathFailCount int
 	Log                 zerolog.Logger
+	// Scripts raises the NPC's script hooks; nil raises none.
+	Scripts npc.ScriptHooks
+	// Remover takes the NPC out of the world for a script delete; nil
+	// decays it with no respawn.
+	Remover npc.FolkRemover
 }
 
 // Spawn builds a civilian NPC from inst, places it at (loc, heading) and
@@ -71,6 +76,8 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 		Decay:          s.Decay,
 		Zones:          s.Zones,
 		Slot:           slot,
+		Scripts:        s.Scripts,
+		Remover:        s.Remover,
 	}
 	if s.NewSink != nil {
 		rt.Sink = s.NewSink(f)

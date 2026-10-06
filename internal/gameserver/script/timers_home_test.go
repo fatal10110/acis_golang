@@ -217,9 +217,15 @@ func TestBehaviorTimersNeedTheDecayRemoval(t *testing.T) {
 		}
 		return KindHostile, true
 	}
-	// Attacked is taken as raised on every kind; the timer hook keeps its
-	// production kinds.
-	raises := func(h hook, k NPCKind) bool { return h == hookAttacked || raisedHooks[h]&kinds(k) != 0 }
+	// Attacked is taken as raised on every kind; the timer hook is raised
+	// on every production kind but the civilian one, standing for a kind
+	// whose decay does not stop the timers.
+	if raisedHooks[hookTimer]&kinds(KindFolk) == 0 {
+		t.Fatal("the timer hook is not raised on civilian NPCs, whose decay stops their timers")
+	}
+	raises := func(h hook, k NPCKind) bool {
+		return h == hookAttacked || h == hookTimer && k != KindFolk && raisedHooks[h]&kinds(k) != 0
+	}
 	logs := &logBuffer{}
 	r := Build(listOf("ai.Folk", "ai.Hostile", "quest.Folk"), catalog, Config{KindOf: kindOf, Log: zerolog.New(logs), raises: raises})
 	states := []entryState{r.entries[0].state, r.entries[1].state, r.entries[2].state}
