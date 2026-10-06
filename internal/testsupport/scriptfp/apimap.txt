@@ -123,3 +123,6 @@ Quest.startQuestTimerAtFixedRate script.Script.StartTimerAtFixedRate
 # Desires II (A5): flee and social.
 NpcAI.addFleeDesire AddFleeDesire
 NpcAI.addSocialDesire AddSocialDesire
+
+# Clan and Alliance features.
+Player.isClanLeader script.Player.IsClanLeader
