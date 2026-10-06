@@ -1,8 +1,6 @@
 package network
 
 import (
-	"time"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -27,7 +25,7 @@ func (l *GameClientLink) talkToFolk(live *livePlayer, f *npc.Folk) {
 	if f.Muted() {
 		return
 	}
-	if id, ok := f.TalkAnimation(time.Now()); ok {
+	if id, ok := f.TalkAnimation(); ok {
 		l.broadcastNPCFrame(f, func() wire.Frame { return serverpackets.FrameSocialAction(f.ObjectID(), id) })
 	}
 	if f.QuestTalker() && l.talkThroughScripts(live, f) {

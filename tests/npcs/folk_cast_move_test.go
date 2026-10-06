@@ -57,7 +57,7 @@ func (w *folkWorld) spawnCastingWalker(t *testing.T, at location.Location, skill
 // script does, and waits for f's queue to take it.
 func queueCastDesire(t *testing.T, f *npc.Folk, target attackable.Combatant, ref modelskill.Ref, weight float64) {
 	t.Helper()
-	f.AddCastDesire(target, ref, weight)
+	f.AddCastDesire(target, ref, weight, true, true)
 	done := make(chan struct{})
 	if !f.Queue().Post(func() { close(done) }) {
 		t.Fatal("post to folk queue: queue closed")

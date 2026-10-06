@@ -44,6 +44,6 @@ func (f *Folk) CPRecovery(talker *player.Character) CPRecoveryOutcome {
 	if inv.DestroyByTemplateID(item.AdenaID, CPRecoveryFee) == nil {
 		return CPRecoveryUnpaid
 	}
-	f.AddCastDesire(talker, arenaCPRecovery, cpRecoveryWeight)
+	f.AddCastDesire(talker, arenaCPRecovery, cpRecoveryWeight, true, true)
 	return CPRecoveryPaid
 }

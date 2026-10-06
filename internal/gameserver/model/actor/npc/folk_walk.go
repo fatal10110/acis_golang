@@ -123,8 +123,9 @@ func (f *Folk) MovingTo() (location.Location, bool) {
 }
 
 // Emit settles the NPC's controller events: an arrival syncs its world
-// position, faces its spawn heading when back on its spawn point, and is
-// passed on to Control; a blocked walk shows observers where it stopped.
+// position, ends the AI's walk, faces its spawn heading when back on its
+// spawn point, and is passed on to Control; a blocked walk ends the AI's
+// walk and shows observers where it stopped.
 func (m *folkMotion) Emit(ev event.Event) {
 	switch ev.(type) {
 	case event.Arrived:
@@ -132,6 +133,7 @@ func (m *folkMotion) Emit(ev event.Event) {
 		m.SyncPosition(at)
 		// A move's end revalidates the zones at once.
 		m.zones.settle()
+		m.arrived()
 		if at == m.Instance.Home {
 			m.SetHeading(m.Instance.SpawnHeading)
 		}
@@ -139,6 +141,7 @@ func (m *folkMotion) Emit(ev event.Event) {
 			m.cfg.Control.Emit(ev)
 		}
 	case event.MoveBlocked:
+		m.arrivedBlocked()
 		m.ctl.BroadcastBlockedCorrection()
 	}
 }
