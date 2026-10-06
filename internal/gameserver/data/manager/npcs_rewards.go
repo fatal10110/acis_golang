@@ -5,6 +5,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -251,6 +252,12 @@ func (d *deathRewards) grantExpAndSp(entries []playerRewardEntry, summonDamage m
 	}
 }
 
+// ratedReward is the victim's full exp and sp reward at the server rates,
+// each narrowed to the 32-bit reward the kill is split from.
+func (d *deathRewards) ratedReward() (exp, sp float64) {
+	return float64(commons.JavaInt(d.tmpl.RewardExp * d.config.RateXP)), float64(commons.JavaInt(d.tmpl.RewardSp * d.config.RateSP))
+}
+
 // grantSolo pays a partyless attacker its own damage share.
 func (d *deathRewards) grantSolo(entry playerRewardEntry, summonDamage map[int32]float64, totalDamage float64) {
 	// Only real death forfeits the exp; Fake Death keeps it.
@@ -258,7 +265,8 @@ func (d *deathRewards) grantSolo(entry playerRewardEntry, summonDamage map[int32
 		return
 	}
 	own := d.summonOf(entry.actor)
-	exp, sp := player.KillRewardExpAndSp(d.tmpl.RewardExp, d.tmpl.RewardSp, entry.damage, totalDamage, entry.actor.Level()-d.tmpl.Level)
+	rewardExp, rewardSp := d.ratedReward()
+	exp, sp := player.KillRewardExpAndSp(rewardExp, rewardSp, entry.damage, totalDamage, entry.actor.Level()-d.tmpl.Level)
 	var penalty float32
 	if own != nil && !own.IsPet() {
 		penalty = own.ExpPenalty()
