@@ -16,6 +16,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/tutorial"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q001"
 	scripttask "github.com/fatal10110/acis_golang/internal/gameserver/script/task"
@@ -27,13 +28,20 @@ import (
 // scriptCatalogs are the literal script catalogs, one per range or family;
 // scriptCatalog joins them.
 func scriptCatalogs() []script.Catalog {
-	return []script.Catalog{questCatalog(), taskCatalog()}
+	return []script.Catalog{questCatalog(), featureCatalog(), taskCatalog()}
 }
 
 // questCatalog lists the quests.
 func questCatalog() script.Catalog {
 	return script.Catalog{
 		"quest.Q001_LettersOfLove": q001.New,
+	}
+}
+
+// featureCatalog lists the scripted features.
+func featureCatalog() script.Catalog {
+	return script.Catalog{
+		"script.feature.Tutorial": tutorial.New,
 	}
 }
 
