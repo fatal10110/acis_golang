@@ -29,19 +29,22 @@ func (n *Npcs) SpawnFixed(tmpl *npc.Template, x, y, z, heading int) error {
 
 // spawnFixed is SpawnFixed, also returning the placed NPC's object id.
 func (n *Npcs) spawnFixed(tmpl *npc.Template, x, y, z, heading int) (int32, error) {
-	return n.spawnStandalone(tmpl, x, y, z, heading, nil)
+	live, err := n.spawnStandalone(tmpl, x, y, z, heading, nil)
+	if err != nil {
+		return 0, err
+	}
+	return live.ObjectID(), nil
 }
 
 // spawnStandalone is spawnFixed for an NPC spawned for summoner, nil for
-// none.
-func (n *Npcs) spawnStandalone(tmpl *npc.Template, x, y, z, heading int, summoner attackable.Combatant) (int32, error) {
-	n.gate.RLock()
-	defer n.gate.RUnlock()
+// none, returning the NPC placed. Its created hooks have run by then; one
+// may have deleted it again.
+func (n *Npcs) spawnStandalone(tmpl *npc.Template, x, y, z, heading int, summoner attackable.Combatant) (attackable.Combatant, error) {
 	if tmpl == nil {
-		return 0, ErrNotPlaceable
+		return nil, ErrNotPlaceable
 	}
 	if probe := (&npc.Instance{Template: tmpl}); !npc.FolkKind(probe) && !npc.Attackable(probe) {
-		return 0, fmt.Errorf("%w: npc %d instance type %q", ErrNotPlaceable, tmpl.ID, tmpl.Type)
+		return nil, fmt.Errorf("%w: npc %d instance type %q", ErrNotPlaceable, tmpl.ID, tmpl.Type)
 	}
 	at := location.Location{X: x, Y: y, Z: int(n.geo.Height(x, y, z))}
 	key := fmt.Sprintf("fixed#%d", n.fixedSeq.Add(1))
@@ -50,18 +53,14 @@ func (n *Npcs) spawnStandalone(tmpl *npc.Template, x, y, z, heading int, summone
 	n.slot[key] = slotInfo{key: key, entry: entry, tmpl: tmpl, fixed: true, at: at, heading: heading, summoner: summoner, memory: newSlotMemory(entry)}
 	n.mu.Unlock()
 
-	n.instantiate(key, entry, tmpl, at, heading, fullHP, fullMP, nil)
-
-	n.mu.Lock()
-	defer n.mu.Unlock()
-	// A slot already gone held an NPC that has decayed since; one still
-	// without a live NPC never placed it.
-	slot, ok := n.slot[key]
-	if ok && slot.liveID == 0 {
+	live := n.instantiate(key, entry, tmpl, at, heading, fullHP, fullMP, nil)
+	if live == nil {
+		n.mu.Lock()
 		delete(n.slot, key)
-		return 0, fmt.Errorf("%w: npc %d", ErrNotPlaceable, tmpl.ID)
+		n.mu.Unlock()
+		return nil, fmt.Errorf("%w: npc %d", ErrNotPlaceable, tmpl.ID)
 	}
-	return slot.liveID, nil
+	return live, nil
 }
 
 // DeleteFixed removes the live NPC id at once, with no corpse, when it was
@@ -84,7 +83,7 @@ func (n *Npcs) DeleteFixed(id int32) bool {
 	case *npc.Hostile:
 		a.DeleteMe()
 	case *npc.Folk:
-		onQueue(a.Queue(), func() { n.removeFolk(a) })
+		onQueue(a.Queue(), func() { n.RemoveFolk(a) })
 	default:
 		return false
 	}

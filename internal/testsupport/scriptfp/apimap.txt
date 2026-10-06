@@ -9,6 +9,7 @@
 # added by the slices that build the matching Go call; the script-facing API
 # is frozen when census.golden has no unmapped row. A row that is no longer
 # in the census fails TestCommittedGoldensAreConsistent.
+Npc.deleteMe DeleteMe
 Npc.getPrivateData CreatePrivates
 Npc.isDecayed Decayed
 Npc.scheduleDespawn ScheduleDespawn

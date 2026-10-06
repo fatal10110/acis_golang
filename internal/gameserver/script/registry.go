@@ -52,14 +52,18 @@ func kinds(ks ...NPCKind) kindSet {
 var raisedHooks = map[hook]kindSet{
 	hookAttacked:      kinds(KindHostile),
 	hookPartyAttacked: kinds(KindHostile),
+	// The spawner and the NPC's death and decay (lifecycle.go).
+	hookCreated: kinds(KindFolk, KindHostile),
+	hookDecayed: kinds(KindFolk, KindHostile),
+	hookMyDying: kinds(KindFolk, KindHostile),
 	// The schedule runner (StartSchedule).
 	hookStart: kinds(KindOther),
 	// The tutorial events (TutorialEvent) and the quest event links
 	// (QuestEvent).
 	hookEvent: kinds(KindOther),
 	// The timer registry, on the kinds whose decay stops a behavior's
-	// timers (HostileDecayed).
-	hookTimer: kinds(KindOther, KindHostile),
+	// timers (HostileDecayed, FolkDecayed).
+	hookTimer: kinds(KindOther, KindFolk, KindHostile),
 	// The quest windows (QuestWindow), for both NPC kinds a dialog command
 	// reaches.
 	hookTalk: kinds(KindFolk, KindHostile),
@@ -76,8 +80,9 @@ type Config struct {
 	Log    zerolog.Logger
 	// Env is what the registered scripts' helpers act through.
 	Env *Env
-	// Queue is the engine queue: a script timer whose NPC and player have
-	// no queue to run it on runs on it.
+	// Queue is the engine queue. The dying hooks run on it, as they come
+	// after the NPC's own queue may have closed at its decay, and so does a
+	// script timer whose NPC and player have no queue to run it on.
 	Queue *sim.Queue
 
 	// raises overrides raisedHooks; tests use it.
@@ -109,6 +114,8 @@ type Registry struct {
 	// behaviors holds, per NPC id, the behaviors left on any of its event
 	// lists.
 	behaviors map[int32]map[*Script]bool
+	// queue is the engine queue (Config.Queue).
+	queue *sim.Queue
 	// timers are the scripts' timers. They are not part of the registry:
 	// a leaf-locked container of their own.
 	timers *timers
@@ -152,7 +159,7 @@ const (
 // except that first talk keeps a single script. So the last listed behavior wins and other
 // scripts accumulate in list order.
 func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
-	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}, behaves: map[int32]bool{}, behaviors: map[int32]map[*Script]bool{}}
+	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}, behaves: map[int32]bool{}, behaviors: map[int32]map[*Script]bool{}, queue: cfg.Queue}
 	r.timers = newTimers(r, cfg.Queue)
 	registered := 0
 	for _, l := range list {

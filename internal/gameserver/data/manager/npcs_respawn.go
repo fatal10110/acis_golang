@@ -64,14 +64,22 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 // the maker decides whether it respawns, then a database-tracked row
 // records a respawn time of its own when the spawn respawns at all, and a
 // spawn that never respawns drops its slot.
+//
+// An NPC that leaves during its slot's first placement, before the maker
+// counts it as one of its spawn's NPCs, is not reported to the maker, and
+// its slot stays, decayed, whatever the respawn delay.
 func (n *Npcs) groupNPCDeleted(g *makerGroup, slot slotInfo) {
-	g.behavior.NPCDeleted(g, groupSpawn{g: g, i: slot.spawnIdx}, groupNPC{n: n, key: slot.key})
+	if !slot.first {
+		g.behavior.NPCDeleted(g, groupSpawn{g: g, i: slot.spawnIdx}, groupNPC{n: n, key: slot.key})
+	}
 
 	now := n.now()
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	if slot.entry.RespawnDelay <= 0 {
-		n.dropGroupSlotLocked(g, slot)
+		if !slot.first {
+			n.dropGroupSlotLocked(g, slot)
+		}
 		return
 	}
 	if slot.dbName == "" {
@@ -99,12 +107,14 @@ func (n *Npcs) dropGroupSlotLocked(g *makerGroup, slot slotInfo) {
 
 // Remove takes h out of the world at once, with no corpse and no decay
 // wait, and arms its spawn slot's respawn exactly as a decayed corpse does.
-// It runs on h's own queue (npc.Hostile.DeleteMe posts it there).
+// It runs on the calling goroutine (npc.Hostile.DeleteNow), so it may race
+// the corpse decay on h's own queue: the slot is claimed only by the call
+// that wins h's decay.
 func (n *Npcs) Remove(h *npc.Hostile) {
 	if n.decay != nil {
 		n.decay.Cancel(h)
 	}
-	h.Decay(n.state, n.RespawnHook(h.ObjectID()))
+	h.DecayWithRespawn(n.state, n.RespawnHook)
 }
 
 // scheduleRespawn arms slot's respawn delay from now, unless DespawnAll
@@ -132,8 +142,6 @@ func (n *Npcs) scheduleRespawn(slot slotInfo, delay time.Duration) {
 // ASpawn keeps its template for life, so //reload npc does not reach the
 // respawns of spawns already in place.
 func (n *Npcs) Respawn(key string) {
-	n.gate.RLock()
-	defer n.gate.RUnlock()
 	n.respawnSlot(key)
 }
 

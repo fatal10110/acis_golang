@@ -91,6 +91,7 @@ func newEventsFixtureAt(t *testing.T, table *spawn.Table, templates *npc.Table, 
 	if err != nil {
 		t.Fatalf("newNpcs() error: %v", err)
 	}
+	f.npcs.SpawnOnStart()
 	return f
 }
 
