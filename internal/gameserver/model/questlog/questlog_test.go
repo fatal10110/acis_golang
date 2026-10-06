@@ -72,7 +72,7 @@ func TestRestoreResolvesNamesAndSkipsUnknown(t *testing.T) {
 		t.Fatalf("states = %d, want %d", len(j.states), len(want))
 	}
 	for i, w := range want {
-		if st := j.states[i]; st.quest != w.quest || !reflect.DeepEqual(st.vars, w.vars) {
+		if st := j.states[i]; !reflect.DeepEqual(st.quest, w.quest) || !reflect.DeepEqual(st.vars, w.vars) {
 			t.Fatalf("state %d = %+v %v, want %+v %v", i, st.quest, st.vars, w.quest, w.vars)
 		}
 	}

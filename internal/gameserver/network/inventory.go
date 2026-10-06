@@ -823,9 +823,11 @@ func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets
 // item reads as earned rather than picked up.
 func itemObtainedFrame(e event.ItemObtained) wire.Frame {
 	switch {
-	case e.Notice == event.ObtainEarned && e.Count > 1:
+	case e.Notice == event.ObtainGiven && e.ItemID == item.AdenaID:
+		return serverpackets.FrameSystemMessageParams(serverpackets.SystemMessageEarnedS1Adena, serverpackets.SystemMessageParam{Type: serverpackets.SystemMessageParamItemNumber, Value: int32(e.Count)})
+	case (e.Notice == event.ObtainEarned || e.Notice == event.ObtainGiven) && e.Count > 1:
 		return serverpackets.FrameSystemMessageItemNameItemNumber(serverpackets.SystemMessageEarnedS2S1S, e.ItemID, int32(e.Count))
-	case e.Notice == event.ObtainEarned:
+	case e.Notice == event.ObtainEarned || e.Notice == event.ObtainGiven:
 		return serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessageEarnedItemS1, e.ItemID)
 	case e.Notice == event.ObtainAdena:
 		return serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageEarnedS1Adena, int32(e.Count))

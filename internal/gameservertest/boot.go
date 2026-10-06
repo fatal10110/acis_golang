@@ -2110,7 +2110,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Wedding = couples
 	gclConfig.Macros = gamesql.NewMacroStore(db)
 	gclConfig.Recommendations = gamesql.NewRecommendationStore(db)
-	quests := bootQuests(db, persistWorker, o)
+	quests := bootQuests(db, persistWorker, ids, o)
 	gclConfig.Quests, gclConfig.Scripts, gclConfig.Journals = quests.store, quests.registry, quests.journals
 	gclConfig.AugmentationChances = augmentation.DefaultChances()
 	if o.augmentationChances != nil {

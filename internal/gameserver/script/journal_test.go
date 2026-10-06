@@ -1,6 +1,7 @@
 package script
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
@@ -34,7 +35,7 @@ func TestJournalQuestResolvesNamesLikeTheScriptList(t *testing.T) {
 		{"", questlog.Quest{}, false},
 	} {
 		got, ok := r.JournalQuest(tc.name)
-		if got != tc.want || ok != tc.ok {
+		if !reflect.DeepEqual(got, tc.want) || ok != tc.ok {
 			t.Errorf("JournalQuest(%q) = %+v, %v; want %+v, %v", tc.name, got, ok, tc.want, tc.ok)
 		}
 	}
