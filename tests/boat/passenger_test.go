@@ -1,6 +1,7 @@
 package boat
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -16,7 +17,7 @@ import (
 // the player onto the deck; boarding sets the player at the boat, at peace,
 // and shows it aboard; once the boat sails each of its position updates
 // carries the passenger along and tells it where the boat is; five seconds
-// after the departure one ticket is taken.
+// after the departure one ticket is taken, shown taken and stored taken.
 func TestPassengerBoardsSailsAndPays(t *testing.T) {
 	t.Parallel()
 	srv, c, me, b := bootPassenger(t, runeBoarding, 2)
@@ -58,6 +59,25 @@ func TestPassengerBoardsSailsAndPays(t *testing.T) {
 	assertLog(t, "second 308", rest, sm(serverpackets.SystemMessageS1Disappeared))
 	if got := srv.PlayerInventory(t, me).ItemCount(ticketID, -1, false); got != 1 {
 		t.Fatalf("tickets left %d, want 1", got)
+	}
+	srv.InventoryUpdates.Tick()
+	var updates int
+	for _, f := range srv.ReadQueued(t, c) {
+		if f[0] == serverpackets.OpcodeInventoryUpdate {
+			updates++
+		}
+	}
+	if updates != 1 {
+		t.Fatalf("InventoryUpdate frames after the fare %d, want 1", updates)
+	}
+	srv.FlushItems(t)
+	var stored int
+	if err := srv.DB.QueryRowContext(context.Background(),
+		"SELECT COALESCE(SUM(count), 0) FROM items WHERE owner_id = ? AND item_id = ?", me, ticketID).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored != 1 {
+		t.Fatalf("stored tickets %d, want 1", stored)
 	}
 }
 
