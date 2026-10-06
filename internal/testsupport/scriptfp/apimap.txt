@@ -152,3 +152,18 @@ TutorialEvent.qmc9Loc inline
 
 # Clan and Alliance features.
 Player.isClanLeader script.Player.IsClanLeader
+
+# Black Judge and the Noblesse teleporter. A fee table's pairs are Go struct
+# literals; the bindings are fields of the script; the adena count is read
+# on the Player handle.
+IntIntHolder.getId inline
+IntIntHolder.getValue inline
+IntIntHolder.new inline
+Npc.showTeleportWindow script.NPC.ShowTeleportWindow
+PcInventory.getAdena script.Player.Adena
+Player.getAdena script.Player.Adena
+Player.getDeathPenaltyBuffLevel script.Player.DeathPenaltyLevel
+Player.isNoble script.Player.IsNoble
+Player.reduceDeathPenaltyBuffLevel script.Player.ReduceDeathPenaltyLevel
+Quest.addEventIds inline
+StringUtil.isDigit script.IsDigit
