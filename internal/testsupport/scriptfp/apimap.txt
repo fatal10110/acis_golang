@@ -125,5 +125,30 @@ Quest.startQuestTimerAtFixedRate script.Script.StartTimerAtFixedRate
 NpcAI.addFleeDesire AddFleeDesire
 NpcAI.addSocialDesire AddSocialDesire
 
+# Tutorial script (U2). The class id, the inventory and a reference location
+# are folded into the handle calls and plain Go values; a quest state's
+# variables are set through its handle, which also reads them as numbers.
+# The tutorial's per-class record is a plain Go value of its package.
+ClassId.getId inline
+ItemContainer.hasItem script.Player.HasItem
+Location.equals inline
+Location.new inline
+MemoSet.set script.QuestState.Set
+Player.getClassId script.Player.ClassID
+Player.getInventory inline
+Player.getRace script.Player.Race
+Player.isMageClass script.Player.IsMageClass
+QuestState.getInteger script.QuestState.GetInt
+TutorialEvent.ce47Loc inline
+TutorialEvent.ce8Htm inline
+TutorialEvent.ce8Loc inline
+TutorialEvent.initialHtm inline
+TutorialEvent.initialVoice inline
+TutorialEvent.new inline
+TutorialEvent.qmc24Htm inline
+TutorialEvent.qmc35Htm inline
+TutorialEvent.qmc9Htm inline
+TutorialEvent.qmc9Loc inline
+
 # Clan and Alliance features.
 Player.isClanLeader script.Player.IsClanLeader

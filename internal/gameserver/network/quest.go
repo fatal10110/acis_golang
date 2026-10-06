@@ -23,6 +23,9 @@ type scriptRegistry interface {
 	player.TutorialEvents
 	// PlayerDetached stops the script timers bound to c as it leaves.
 	PlayerDetached(c *player.Character)
+	// CharacterCreated gives a character just created its creation-time
+	// quest state.
+	CharacterCreated(c *player.Character)
 	// Interact, QuestWindow and QuestEvent are the quest dialog; see
 	// quest_dialog.go.
 	Interact(p *script.Player, n *script.NPC) bool

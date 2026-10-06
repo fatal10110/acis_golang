@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/alliance"
 	featureclan "github.com/fatal10110/acis_golang/internal/gameserver/script/feature/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/tutorial"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q001"
 	scripttask "github.com/fatal10110/acis_golang/internal/gameserver/script/task"
@@ -44,6 +45,7 @@ func featureCatalog() script.Catalog {
 	return script.Catalog{
 		"script.feature.Alliance": alliance.New,
 		"script.feature.Clan":     featureclan.New,
+		"script.feature.Tutorial": tutorial.New,
 	}
 }
 
