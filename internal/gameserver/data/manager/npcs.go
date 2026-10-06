@@ -372,6 +372,7 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		MaxBuffsAmount:      maxBuffsAmount,
 		MaxGeoPathFailCount: maxGeoPathFailCount,
 		Log:                 log,
+		Scripts:             scripts,
 	}
 
 	n.spawnOnStart(spawns, 0)

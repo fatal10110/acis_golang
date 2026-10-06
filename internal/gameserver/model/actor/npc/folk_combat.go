@@ -30,13 +30,15 @@ var (
 // damage, heal and debuff it from their own queues; its regeneration and
 // effect ticks run on its own.
 type folkCombat struct {
-	// world, queue, sink, los, decay and heldMask are set by Attach before
-	// the NPC is published.
+	// world, queue, sink, los, decay, scripts and heldMask are set by
+	// Attach before the NPC is published.
 	world *world.State
 	queue *sim.Queue
 	sink  event.Sink
 	los   LineOfSight
 	decay *task.Decay
+	// scripts raises the NPC's script hooks; nil raises none.
+	scripts ScriptHooks
 	// heldMask is the item-type bits of the template's weapon and shield.
 	heldMask int32
 
@@ -100,6 +102,8 @@ type FolkRuntime struct {
 	// Slot is the spawn slot that placed the NPC; nil leaves it with no
 	// spawn parameters and a script memory of its own.
 	Slot SpawnSlot
+	// Scripts raises the NPC's script hooks; nil raises none.
+	Scripts ScriptHooks
 }
 
 // folkAdmits reports whether a civilian NPC holds e: only plain buffs and
@@ -127,6 +131,7 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 		return errors.New("npc: folk runtime needs a queue")
 	}
 	f.world, f.queue, f.sink, f.los, f.decay = rt.World, rt.Queue, rt.Sink, rt.LOS, rt.Decay
+	f.scripts = rt.Scripts
 	f.zones.ix = rt.Zones
 	f.cast.ai = rt.AI
 	f.bindSpawn(rt.Slot)
