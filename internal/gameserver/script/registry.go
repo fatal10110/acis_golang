@@ -77,6 +77,12 @@ var raisedHooks = map[hook]kindSet{
 	// The quest windows (QuestWindow), for both NPC kinds a dialog command
 	// reaches.
 	hookTalk: kinds(KindFolk, KindHostile),
+	// The use of an item (ItemUsed) and the entry into a zone (ZoneEntered).
+	hookItemUse:   kinds(KindOther),
+	hookZoneEnter: kinds(KindOther),
+	// The script-event sends (SendScriptEvent, BroadcastScriptEvent), to an
+	// NPC of either kind.
+	hookScriptEvent: kinds(KindFolk, KindHostile),
 	// The interact of a civilian NPC and of a talking hostile one
 	// (Interact).
 	hookFirstTalk: kinds(KindFolk, KindHostile),
@@ -124,6 +130,11 @@ type Registry struct {
 	// behaviors holds, per NPC id, the behaviors left on any of its event
 	// lists.
 	behaviors map[int32]map[*Script]bool
+	// items holds, per item id, the scripts its use reaches, in list order.
+	items map[int32][]*Script
+	// zones holds, per zone id, the scripts its entry reaches, in list
+	// order.
+	zones map[int32][]*Script
 	// queue is the engine queue (Config.Queue).
 	queue *sim.Queue
 	// timers are the scripts' timers. They are not part of the registry:
@@ -169,7 +180,7 @@ const (
 // except that first talk keeps a single script. So the last listed behavior wins and other
 // scripts accumulate in list order.
 func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
-	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}, behaves: map[int32]bool{}, behaviors: map[int32]map[*Script]bool{}, queue: cfg.Queue}
+	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}, behaves: map[int32]bool{}, behaviors: map[int32]map[*Script]bool{}, items: map[int32][]*Script{}, zones: map[int32][]*Script{}, queue: cfg.Queue}
 	r.timers = newTimers(r, cfg.Queue)
 	registered := 0
 	for _, l := range list {
@@ -189,6 +200,7 @@ func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
 		s.path = l.Path
 		s.env = cfg.Env
 		s.timers = r.timers
+		s.registry = r
 		s.Name = l.Path[strings.LastIndexByte(l.Path, '.')+1:]
 		e.bound = boundOf(&s, cfg.KindOf)
 		if err := gate(&s, e.bound, &cfg); err != nil {
@@ -285,7 +297,7 @@ func gate(s *Script, bound Bindings, cfg *Config) error {
 			}
 		}
 	}
-	for _, h := range []hook{hookEvent, hookStart, hookTimer} {
+	for _, h := range []hook{hookEvent, hookStart, hookTimer, hookItemUse, hookZoneEnter} {
 		if set.has(h) && !cfg.raised(h, KindOther) && !cfg.raised(h, KindFolk) && !cfg.raised(h, KindHostile) {
 			return fmt.Errorf("hook %s is not raised", h)
 		}
@@ -324,8 +336,17 @@ func scheduleOf(s *Script, l Listing, log zerolog.Logger) *schedule {
 	return &sc
 }
 
-// register adds s to the list of every (NPC, event) it is bound to.
+// register adds s to the list of every (NPC, event) it is bound to, of
+// every item whose use it reacts to and of every zone whose entry it reacts
+// to. An item keeps every registration, a zone keeps one per script.
 func (r *Registry) register(s *Script, bound Bindings) {
+	for _, id := range s.UsedItems {
+		r.items[id] = append(r.items[id], s)
+	}
+	for _, id := range s.EnteredZones {
+		list := slices.DeleteFunc(r.zones[id], func(o *Script) bool { return o.path == s.path })
+		r.zones[id] = append(list, s)
+	}
 	for ev, ids := range bound {
 		for _, id := range ids {
 			k := npcKey{id, ev}

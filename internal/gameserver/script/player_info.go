@@ -24,6 +24,34 @@ func (p *Player) HasItem(itemID int32) bool {
 	return inv != nil && inv.HasItem(itemID)
 }
 
+// Dead reports whether the player is dead.
+func (p *Player) Dead() bool { return p.character().Dead() }
+
+// HeldItem is one item instance a player holds.
+type HeldItem struct {
+	ItemID   int32
+	ObjectID int32
+}
+
+// HeldItems returns every item instance the player's inventory holds,
+// worn ones included.
+func (p *Player) HeldItems() []HeldItem {
+	inv := p.character().Inventory()
+	if inv == nil {
+		return nil
+	}
+	items := inv.Items()
+	out := make([]HeldItem, len(items))
+	for i, inst := range items {
+		out[i] = HeldItem{ItemID: inst.TemplateID, ObjectID: inst.ObjectID}
+	}
+	return out
+}
+
+// SystemMessage shows the player the system message id, which takes no
+// parameter.
+func (p *Player) SystemMessage(id int) { p.character().NotifySystemMessage(id) }
+
 // GetInt returns the state's variable key as a number, 0 when it is not
 // set. A value that is not a 32-bit integer panics, so the invocation
 // aborts there.
