@@ -122,6 +122,7 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 	info := n.slot[key]
 	n.mu.Unlock()
 	inst.Maker = info.maker
+	inst.Summoner = info.summoner
 	// Each life of the slot starts with the script value cleared; its
 	// other script memory carries over.
 	var slot npc.SpawnSlot

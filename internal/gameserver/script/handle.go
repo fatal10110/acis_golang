@@ -41,21 +41,70 @@ func NewNPC(h *npc.Hostile) *NPC {
 	return &NPC{self: h, brain: h.AI()}
 }
 
-// creatureOf returns a handle on c: an NPC handle on a hostile NPC, a
-// player handle on a player, a creature handle otherwise, and nil for nil.
+// NPCOf returns the handle on the live NPC n, a hostile or a civilian
+// NPC; nil for anything else.
+func NPCOf(n attackable.Combatant) *NPC {
+	switch o := n.(type) {
+	case *npc.Hostile:
+		return NewNPC(o)
+	case *npc.Folk:
+		// A civilian NPC's AI takes no desires yet (#3492): its handle
+		// has no brain, and the registration gate of #3517 keeps desire
+		// calls off it.
+		return &NPC{self: o}
+	}
+	return nil
+}
+
+// PlayerOf returns the handle on the player p; nil for nil.
+func PlayerOf(p attackable.Combatant) *Player {
+	if p == nil {
+		return nil
+	}
+	return &Player{self: p}
+}
+
+// creatureOf returns a handle on c: an NPC handle on an NPC, a player
+// handle on a player, a creature handle otherwise, and nil for nil.
 // A player is told by its kind, not its Go type: the world tracks a player
 // wrapped with its connection, and the handle keeps that tracked value.
 func creatureOf(c attackable.Combatant) Creature {
-	switch c := c.(type) {
-	case nil:
+	if c == nil {
 		return nil
-	case *npc.Hostile:
-		return NewNPC(c)
+	}
+	if n := NPCOf(c); n != nil {
+		return n
 	}
 	if c.Kind() == actor.KindPlayer {
-		return &Player{self: c}
+		return PlayerOf(c)
 	}
 	return &creature{self: c}
+}
+
+// Decayed reports whether the NPC has left the world for good: its corpse
+// decayed or it was deleted. A handle on nothing reports true.
+func (n *NPC) Decayed() bool {
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		return o.Decayed()
+	case *npc.Folk:
+		return o.Decayed()
+	}
+	return true
+}
+
+// Summoner returns the creature the NPC was spawned for, nil for none.
+func (n *NPC) Summoner() Creature {
+	var inst *npc.Instance
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		inst = o.Instance
+	case *npc.Folk:
+		inst = o.Instance
+	default:
+		return nil
+	}
+	return creatureOf(inst.Summoner)
 }
 
 func (n *NPC) combatant() attackable.Combatant {
@@ -115,7 +164,11 @@ type brain interface {
 	AddDoNothingDesire(timer int, weight float64)
 }
 
-var _ brain = (*ai.Attackable)(nil)
+var (
+	_ brain                = (*ai.Attackable)(nil)
+	_ attackable.Combatant = (*npc.Hostile)(nil)
+	_ attackable.Combatant = (*npc.Folk)(nil)
+)
 
 // Every desire below is ranked by weight against the NPC's other desires,
 // and the heaviest is acted on at the NPC's next think. A request equal to

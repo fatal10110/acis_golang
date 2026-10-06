@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
@@ -54,6 +55,12 @@ type slotInfo struct {
 	fixed   bool
 	at      location.Location
 	heading int
+	// scripted marks a private a script created: no respawn is armed when
+	// it decays, the script brings it back (#3531).
+	scripted bool
+	// summoner is the creature the slot's NPC was spawned for; nil for
+	// none.
+	summoner attackable.Combatant
 	// memory is what the slot hands every NPC it spawns: the entry's own
 	// AI parameters and the script memory carried from one life to the
 	// next.

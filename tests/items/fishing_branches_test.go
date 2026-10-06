@@ -45,7 +45,8 @@ func (r *fishingRig) biteOn(t *testing.T, check int32) []string {
 // TestFishingCatchTurnsIntoMonster pins FishingStance.end's monster catch
 // (Rnd.get(100) < 5): the Caught Undine of the fisher's level is placed at
 // its feet, YOU_CAUGHT_SOMETHING_SMELLY_THROW_IT_BACK replaces
-// YOU_CAUGHT_SOMETHING, and no fish is added.
+// YOU_CAUGHT_SOMETHING, and no fish is added. The monster is spawned for
+// the fisher, its summoner.
 func TestFishingCatchTurnsIntoMonster(t *testing.T) {
 	t.Parallel()
 	r := bootFishing(t, gameservertest.WithNPCs(fishingMonsters()), gameservertest.WithNpcSpawns(nil))
@@ -69,6 +70,10 @@ func TestFishingCatchTurnsIntoMonster(t *testing.T) {
 	for _, obj := range r.srv.State.Objects() {
 		if h, ok := obj.(*npc.Hostile); ok && h.Instance.Template.ID == caughtUndineID {
 			undines = append(undines, h.ObjectID())
+			// Spawned for the fisher: its summoner.
+			if s := h.Instance.Summoner; s == nil || s.ObjectID() != id {
+				t.Fatalf("caught undine summoner = %v, want the fisher %d", s, id)
+			}
 		}
 	}
 	if len(undines) != 1 {

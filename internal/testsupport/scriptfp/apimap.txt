@@ -9,6 +9,15 @@
 # added by the slices that build the matching Go call; the script-facing API
 # is frozen when census.golden has no unmapped row. A row that is no longer
 # in the census fails TestCommittedGoldensAreConsistent.
+Npc.getPrivateData CreatePrivates
+Npc.isDecayed Decayed
+Npc.scheduleDespawn ScheduleDespawn
+PrivateData.id inline
+PrivateData.respawnTime inline
+PrivateData.weight inline
+Quest.addSpawn AddSpawn
+Quest.createOnePrivate CreateOnePrivate
+Quest.createOnePrivateEx CreateOnePrivateEx
 
 # Scheduled tasks (T1). A manager's getInstance is the singleton lookup the
 # Server handle stands for. The leader handover loop (the clan list, each

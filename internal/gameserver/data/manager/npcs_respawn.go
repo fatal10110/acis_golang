@@ -52,6 +52,10 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 		n.mu.Unlock()
 		return nil
 	}
+	if slot.scripted {
+		// The script that created the private brings it back, if ever.
+		return nil
+	}
 
 	return func() { n.scheduleRespawn(slot, delay) }
 }
