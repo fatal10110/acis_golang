@@ -3,6 +3,7 @@ package npc
 import (
 	"math"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -54,34 +55,77 @@ func (f *Folk) BroadcastStatus() {
 // TakeDamage applies a landed auto-attack hit and reports whether it
 // killed the NPC.
 func (f *Folk) TakeDamage(damage int, attacker attackable.Combatant) bool {
-	return f.reduceHP(float64(damage), attacker)
+	return f.reduceHP(float64(damage), attacker, modelskill.Ref{})
 }
 
 // ReduceHP applies skill damage.
-func (f *Folk) ReduceHP(amount float64, attacker attackable.Combatant, _ modelskill.Definition) {
-	f.reduceHP(amount, attacker)
+func (f *Folk) ReduceHP(amount float64, attacker attackable.Combatant, def modelskill.Definition) {
+	f.reduceHP(amount, attacker, skillRef(def))
 }
 
 // ReduceHPByDOT applies periodic damage.
 func (f *Folk) ReduceHPByDOT(amount float64, attacker effect.Actor, _ bool) {
 	killer, _ := attacker.(attackable.Combatant)
-	f.reduceHP(amount, killer)
+	f.reduceHP(amount, killer, modelskill.Ref{})
+}
+
+// ReduceHPBySkillDOT is ReduceHPByDOT for one damage-over-time tick of the
+// skill sk: the hit it registers names sk.
+func (f *Folk) ReduceHPBySkillDOT(amount float64, attacker effect.Actor, sk modelskill.Ref) {
+	killer, _ := attacker.(attackable.Combatant)
+	f.reduceHP(amount, killer, sk)
+}
+
+// SkillAttacked is caster's offensive skill def landing on this NPC, once
+// its effects applied, for a skill that is a debuff or carries aggro
+// points: the attacked hooks run with max(120, aggro points) as the damage,
+// then the hostile NPCs of its clan in range are called. A dead NPC is
+// called too.
+func (f *Folk) SkillAttacked(caster attackable.Combatant, def modelskill.Definition) {
+	if caster == nil {
+		return
+	}
+	value := int32(max(120, def.AggroPoints))
+	ref := skillRef(def)
+	f.raiseAttacked(caster, value, ref)
+	raiseClanAttacked(f.scripts, f.world, f, caster, value, ref, clanAttackedBySkill)
+}
+
+// raiseAttacked runs f's attacked hooks.
+func (f *Folk) raiseAttacked(attacker attackable.Combatant, damage int32, sk modelskill.Ref) {
+	if f.scripts != nil {
+		f.scripts.FolkAttacked(f, attacker, damage, sk)
+	}
 }
 
 // reduceHP is an NPC's HP reduction: a dead NPC takes nothing; a hit from a
-// creature first puts a walking NPC in run stance; an invulnerable NPC, or
-// a hit from an attacker without damage permission, then takes nothing.
+// creature first puts a walking NPC in run stance, then runs its attacked
+// hooks with the damage truncated to an int and sk the skill that dealt it,
+// then its clan calls: itself, then every NPC of its clan in range. An
+// invulnerable NPC, or a hit from an attacker without damage permission,
+// then takes nothing.
 // The HP left is never under folkMinHP for an undying template, nor under
 // zero otherwise, and an NPC left under folkDeathHP dies. It reports
 // whether this call killed the NPC. A hit has no sleep, hold or stun to
 // break: none lands on a civilian NPC.
-func (f *Folk) reduceHP(amount float64, attacker attackable.Combatant) bool {
+func (f *Folk) reduceHP(amount float64, attacker attackable.Combatant, sk modelskill.Ref) bool {
+	return f.loseHP(amount, attacker, sk, true)
+}
+
+// loseHP is reduceHP; hit false leaves out the attacked hooks and the clan
+// calls, for an HP loss that is not a hit.
+func (f *Folk) loseHP(amount float64, attacker attackable.Combatant, sk modelskill.Ref, hit bool) bool {
 	if f.Dead() {
 		return false
 	}
 	creature.InterruptDuelOnNPCHit(attacker)
 	if attacker != nil {
 		f.forceRunStance()
+	}
+	if attacker != nil && hit {
+		damage := commons.JavaInt(amount)
+		f.raiseAttacked(attacker, damage, sk)
+		raiseClanAttacked(f.scripts, f.world, f, attacker, damage, sk, clanAttackedByHit)
 	}
 	if f.Invul() || !creature.CanDealDamage(attacker) {
 		return false

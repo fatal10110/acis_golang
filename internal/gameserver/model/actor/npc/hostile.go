@@ -1009,7 +1009,8 @@ func (h *Hostile) MarkDead() bool {
 
 // Die runs this NPC's death sequence: the once-only dead-state
 // transition, the strip of every effect that does not last through death,
-// then its reward hook. rewards may be nil — the drop and
+// then its reward hook, then its dying hooks, its party's and its clan's
+// calls (partyDied, raiseClanDied). rewards may be nil — the drop and
 // experience/SP systems land separately and plug in here once ready. It
 // reports whether the death was newly applied by this call.
 //
@@ -1037,6 +1038,8 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 		h.emit(event.RaidBossKilled{})
 	}
 	h.raiseDying(killer)
+	h.partyDied()
+	raiseClanDied(h.scripts, h.world, h, killer)
 	return true
 }
 

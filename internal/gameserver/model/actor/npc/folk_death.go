@@ -30,7 +30,8 @@ func (f *Folk) Decayed() bool {
 // stop and its cast desires drop, every effect that does not last through
 // death ends, observers see it die and leave its attack stance, and its
 // corpse is registered for decay after the template corpse time. A
-// civilian NPC pays no reward. Its dying script hooks are scheduled last.
+// civilian NPC pays no reward. Its dying script hooks are scheduled, then
+// its clan members in range are told.
 func (f *Folk) die(killer attackable.Combatant) bool {
 	f.vitalsMu.Lock()
 	if f.dead {
@@ -53,6 +54,7 @@ func (f *Folk) die(killer attackable.Combatant) bool {
 	}
 	f.scheduleDecay()
 	f.raiseDying(killer)
+	raiseClanDied(f.scripts, f.world, f, killer)
 	return true
 }
 
