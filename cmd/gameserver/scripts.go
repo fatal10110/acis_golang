@@ -32,9 +32,12 @@ func scriptCatalogs() []script.Catalog {
 // taskCatalog lists the scheduled tasks.
 func taskCatalog() script.Catalog {
 	return script.Catalog{
-		"task.CastleTaxRefresh":   scripttask.CastleTaxRefresh,
-		"task.ClanLeaderTransfer": scripttask.ClanLeaderTransfer,
-		"task.SevenSignsUpdate":   scripttask.SevenSignsUpdate,
+		"task.CastleTaxRefresh":     scripttask.CastleTaxRefresh,
+		"task.ClanLadderRefresh":    scripttask.ClanLadderRefresh,
+		"task.ClanLeaderTransfer":   scripttask.ClanLeaderTransfer,
+		"task.RaidPointReset":       scripttask.RaidPointReset,
+		"task.RecommendationUpdate": scripttask.RecommendationUpdate,
+		"task.SevenSignsUpdate":     scripttask.SevenSignsUpdate,
 	}
 }
 

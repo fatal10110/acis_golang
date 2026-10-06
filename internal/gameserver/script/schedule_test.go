@@ -94,15 +94,9 @@ func TestParseScheduleRefusals(t *testing.T) {
 	}
 }
 
-// recordingServer is a Server that records nothing; the start hooks of the
-// tests below record their own firings.
-type recordingServer struct{}
-
-func (recordingServer) UpdateCastleTaxes()                 {}
-func (recordingServer) SealValidationPeriod() bool         { return false }
-func (recordingServer) SaveFestivalScores(context.Context) {}
-func (recordingServer) SaveSevenSigns(context.Context)     {}
-func (recordingServer) TransferClanLeaders()               {}
+// recordingServer is a Server the start hooks of the tests below never
+// call; they record their own firings.
+type recordingServer struct{ Server }
 
 // firings returns a catalog entry whose start hook appends the clock's
 // time to *at, panicking on its first firing when panicFirst is set.

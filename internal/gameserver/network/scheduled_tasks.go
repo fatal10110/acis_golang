@@ -52,3 +52,59 @@ func (l *GameClientLink) SaveSevenSigns(ctx context.Context) {
 		l.log.Error().Err(err).Msg("scheduled save: seven signs")
 	}
 }
+
+// RefreshClanLadder ranks the clans again by reputation
+// (clan.Table.RefreshLadder).
+func (l *GameClientLink) RefreshClanLadder() {
+	l.clanService().Table().RefreshLadder()
+}
+
+// RefreshRecommendations runs the daily recommendation refresh
+// (RefreshDailyRecommendations), logging a failure. Its stored half holds
+// every persistence lane while it runs, so it gets scheduledSaveTimeout: a
+// hung database cannot stall every save past that.
+func (l *GameClientLink) RefreshRecommendations(ctx context.Context) {
+	ctx, cancel := context.WithTimeout(ctx, scheduledSaveTimeout)
+	defer cancel()
+	if err := l.RefreshDailyRecommendations(ctx); err != nil {
+		l.log.Error().Err(err).Msg("scheduled refresh: recommendations")
+	}
+}
+
+// RaidPointWinners returns the first 100 players of the raid point
+// ranking (raidpoint.Points.Winners).
+func (l *GameClientLink) RaidPointWinners() []int32 {
+	if l.raidPoints == nil {
+		return nil
+	}
+	return l.raidPoints.Winners()
+}
+
+// MemberClan returns the id and level of the clan objectID is a member of.
+func (l *GameClientLink) MemberClan(objectID int32) (int32, int, bool) {
+	cl, ok := l.clanService().Table().MemberClan(objectID)
+	if !ok {
+		return 0, 0, false
+	}
+	return cl.ID(), cl.Level(), true
+}
+
+// AddClanReputation adds points to clan clanID's reputation and shows its
+// members in the world the new score, as any reputation change does.
+func (l *GameClientLink) AddClanReputation(clanID int32, points int) {
+	cl, ok := l.clanService().Table().Get(clanID)
+	if !ok {
+		return
+	}
+	if change, changed := l.clanService().AddReputation(cl, points); changed {
+		l.sendReputationChange(cl, change, nil)
+	}
+}
+
+// CleanUpRaidPoints forgets and clears every player's raid points
+// (raidpoint.Points.CleanUp).
+func (l *GameClientLink) CleanUpRaidPoints() {
+	if l.raidPoints != nil {
+		l.raidPoints.CleanUp()
+	}
+}

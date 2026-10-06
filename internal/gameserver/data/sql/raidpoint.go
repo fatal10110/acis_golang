@@ -51,3 +51,11 @@ func (s *RaidPointStore) Save(ctx context.Context, row raidpoint.Row) error {
 	}
 	return nil
 }
+
+// Clear removes every row.
+func (s *RaidPointStore) Clear(ctx context.Context) error {
+	if _, err := s.db.ExecContext(ctx, "TRUNCATE character_raid_points"); err != nil {
+		return fmt.Errorf("clear raid points: %w", err)
+	}
+	return nil
+}
