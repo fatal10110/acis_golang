@@ -22,6 +22,22 @@ type Server interface {
 	// TransferClanLeaders hands every clan with a pending leader
 	// nomination to its nominee.
 	TransferClanLeaders()
+	// RefreshClanLadder ranks the clans again by reputation.
+	RefreshClanLadder()
+	// RefreshRecommendations gives every player, online and stored, its
+	// daily recommendations.
+	RefreshRecommendations(ctx context.Context)
+	// RaidPointWinners returns the object ids of the first 100 players of
+	// the raid point ranking, first place first.
+	RaidPointWinners() []int32
+	// MemberClan returns the id and level of the clan objectID is a
+	// member of; ok is false when it is in none.
+	MemberClan(objectID int32) (clanID int32, level int, ok bool)
+	// AddClanReputation adds points to the reputation of clan clanID and
+	// shows its members the new score.
+	AddClanReputation(clanID int32, points int)
+	// CleanUpRaidPoints forgets and clears every player's raid points.
+	CleanUpRaidPoints()
 }
 
 // rescanPeriod is how often the runner looks for the tasks whose next

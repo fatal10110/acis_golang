@@ -37,3 +37,18 @@ SevenSignsManager.getInstance inline
 SevenSignsManager.isSealValidationPeriod script.Server.SealValidationPeriod
 SevenSignsManager.saveSevenSignsData script.Server.SaveSevenSigns
 SevenSignsManager.saveSevenSignsStatus script.Server.SaveSevenSigns
+
+# Scheduled tasks (T2). The recommendation refresh's per-player calls run
+# inside Server.RefreshRecommendations; the world lookup is the singleton
+# the Server handle stands for. The raid point reset finds each winner's
+# clan through Server.MemberClan.
+Clan.isMember script.Server.MemberClan
+ClanTable.refreshClansLadder script.Server.RefreshClanLadder
+Player.editRecomHave script.Server.RefreshRecommendations
+Player.getRecomChars script.Server.RefreshRecommendations
+Player.setRecomLeft script.Server.RefreshRecommendations
+RaidPointManager.cleanUp script.Server.CleanUpRaidPoints
+RaidPointManager.getInstance inline
+RaidPointManager.getWinners script.Server.RaidPointWinners
+World.getInstance inline
+World.getPlayers script.Server.RefreshRecommendations

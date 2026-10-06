@@ -2,13 +2,14 @@
 // grand bosses: each player's points per boss, the ranking built from their
 // totals, and their persistence in character_raid_points.
 //
-// The monthly reset that turns the top 100 players' points into clan
-// reputation and wipes them all is a scheduled job of the script engine
-// (#172).
+// The monthly reset that turns the best players' points into clan
+// reputation reads Winners, then wipes every point with CleanUp.
 package raidpoint
 
 import (
+	"cmp"
 	"context"
+	"slices"
 	"sync"
 	"time"
 
@@ -18,6 +19,9 @@ import (
 
 // taskTimeout bounds one database write.
 const taskTimeout = 10 * time.Second
+
+// winnerCount is how many players Winners returns.
+const winnerCount = 100
 
 // writeLane is the persistence owner every raid point write is queued
 // under: one lane keeps the writes in the order the points changed, so a
@@ -42,6 +46,8 @@ type Store interface {
 	// Save stores the player's total for one boss, replacing any earlier
 	// one.
 	Save(ctx context.Context, row Row) error
+	// Clear removes every stored row.
+	Clear(ctx context.Context) error
 }
 
 // Writer runs a database write later, on ownerID's persistence lane.
@@ -136,6 +142,42 @@ func (p *Points) Record(objectID int32) Record {
 		out.Rank = 1 + p.aheadLocked(objectID, out.Total)
 	}
 	return out
+}
+
+// Winners returns the object ids of the first 100 players of the ranking,
+// first place first: totals above 0, the highest first, equal totals by
+// object id, as Record ranks them.
+func (p *Points) Winners() []int32 {
+	type standing struct{ id, total int32 }
+	p.mu.Lock()
+	ranked := make([]standing, 0, len(p.records))
+	for id, r := range p.records {
+		if t := r.total(); t > 0 {
+			ranked = append(ranked, standing{id, t})
+		}
+	}
+	p.mu.Unlock()
+	slices.SortFunc(ranked, func(a, b standing) int {
+		if c := cmp.Compare(b.total, a.total); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.id, b.id)
+	})
+	out := make([]int32, 0, min(len(ranked), winnerCount))
+	for _, s := range ranked[:min(len(ranked), winnerCount)] {
+		out = append(out, s.id)
+	}
+	return out
+}
+
+// CleanUp forgets every player's points and clears the stored ones. The
+// wipe is queued behind every total stored before it, so none of them
+// lands after it.
+func (p *Points) CleanUp() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	clear(p.records)
+	p.writeLocked("clean up", func(ctx context.Context, st Store) error { return st.Clear(ctx) })
 }
 
 // aheadLocked counts the players ranked before objectID, whose total is
