@@ -49,7 +49,7 @@ func fixedSpawnFixture(t *testing.T) (*Npcs, *world.State, *sim.Inline) {
 		{ID: 2, TemplateID: 2, Type: "Merchant", Name: "Lector", HPMax: 100},
 		{ID: 3, TemplateID: 3, Type: "HolyThing", Name: "Artifact", HPMax: 100},
 	}), groundGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
-		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, queues)
+		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, queues, testMakers())
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}

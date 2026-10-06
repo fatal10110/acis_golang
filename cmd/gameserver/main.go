@@ -215,6 +215,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			provideNpcs,
 			provideScripts,
 			provideQuestJournals,
+			provideMakers,
 			network.NewSessionValidator,
 			provideLoginLinkState,
 			provideSkillPersistence,

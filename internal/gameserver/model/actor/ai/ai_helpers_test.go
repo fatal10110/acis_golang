@@ -71,6 +71,7 @@ type fakeActor struct {
 	runStanceCalls  int
 	headingRestores int
 	x, y, z         int
+	radius          float64
 	headingTarget   attackable.Combatant
 	moveToPawnCalls int
 	moveToPawnTo    attackable.Combatant
@@ -104,6 +105,7 @@ func (a *fakeActor) ReturnHome() bool {
 func (a *fakeActor) IsMoving() bool            { return a.moving }
 func (a *fakeActor) InTerritory() bool         { return a.inTerritory }
 func (a *fakeActor) Position() (int, int, int) { return a.x, a.y, a.z }
+func (a *fakeActor) CollisionRadius() float64  { return a.radius }
 func (a *fakeActor) SetHeadingTo(target attackable.Combatant) {
 	a.headingTarget = target
 }
@@ -253,6 +255,8 @@ type recordingCast struct {
 	canAttempt bool
 	canCast    bool
 	hpMpFail   bool
+	// desireFail fails CanDesire, the gates a checked cast desire passes.
+	desireFail bool
 	stopsMove  bool
 	castRange  int
 	skillType  string
@@ -283,6 +287,10 @@ func (c *recordingCast) CanAttempt(target attackable.Combatant, ref skill.Ref) b
 
 func (c *recordingCast) CanCast(target attackable.Combatant, ref skill.Ref) bool {
 	return c.canCast
+}
+
+func (c *recordingCast) CanDesire(target attackable.Combatant, ref skill.Ref) bool {
+	return !c.desireFail
 }
 
 func (c *recordingCast) FinalTarget(target attackable.Combatant, ref skill.Ref) attackable.Combatant {

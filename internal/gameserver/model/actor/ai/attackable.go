@@ -146,6 +146,12 @@ type CastController interface {
 	// and is not muted for ref against target. Queued CAST desires that
 	// fail this check are dropped before promotion, separately from CanCast.
 	MeetsHPMPDisabled(target attackable.Combatant, ref skill.Ref) bool
+	// CanDesire runs the gates a cast desire queued with its conditions
+	// checked passes: ref's reuse, then the MP and the HP its hit takes.
+	CanDesire(target attackable.Combatant, ref skill.Ref) bool
+	// FinalTarget resolves the creature ref is cast on given the commanded
+	// target (nil when there is none), or nil when the skill has none.
+	FinalTarget(target attackable.Combatant, ref skill.Ref) attackable.Combatant
 	// Cast starts the cast against target. Delayed scheduling and effect
 	// application are the implementation's responsibility.
 	Cast(target attackable.Combatant, ref skill.Ref)
@@ -394,21 +400,28 @@ func (a *Attackable) AddCombatDamageHate(attacker attackable.Combatant, damage, 
 // When the threat table has no most-hated attacker, the AI loop runs
 // immediately so the first reaction does not wait for the next tick.
 func (a *Attackable) AddAttackDesire(attacker attackable.Combatant, hate float64) {
-	a.queueAttackDesire(attacker, hate, true)
+	a.queueAttackDesire(attacker, 0, hate, true)
 }
 
 // AddAttackDesireHold queues an attack intention that stays in place instead
 // of closing on the target. Same first-reaction Think as AddAttackDesire.
 func (a *Attackable) AddAttackDesireHold(attacker attackable.Combatant, hate float64) {
-	a.queueAttackDesire(attacker, hate, false)
+	a.queueAttackDesire(attacker, 0, hate, false)
 }
 
-func (a *Attackable) queueAttackDesire(attacker attackable.Combatant, hate float64, moveToTarget bool) {
+// AddAttackDesireDamage is AddAttackDesire that also records damage
+// against attacker in the threat table.
+func (a *Attackable) AddAttackDesireDamage(attacker attackable.Combatant, damage int, hate float64) {
+	a.queueAttackDesire(attacker, float64(damage), hate, true)
+}
+
+func (a *Attackable) queueAttackDesire(attacker attackable.Combatant, damage, hate float64, moveToTarget bool) {
 	if attacker == nil || (a.actor.SiegeGuard() && attacker.SiegeGuard()) {
 		return
 	}
 	_, hadMostHated := a.threats.MostHated()
-	a.addAttackDesireWithMove(attacker, hate, moveToTarget)
+	a.queueAttackDesireOnly(attacker, hate, moveToTarget)
+	a.threats.AddDamage(attacker, damage, hate)
 	a.thinkIfNoMostHated(hadMostHated, attacker)
 }
 
@@ -474,7 +487,9 @@ func (a *Attackable) AddMoveToDesire(loc location.Location, weight float64) bool
 	return true
 }
 
-func (a *Attackable) addFollowDesire(target attackable.Combatant, weight float64) {
+// AddFollowDesire queues a request to follow target with weight; an equal
+// desire already queued gains the weight instead.
+func (a *Attackable) AddFollowDesire(target attackable.Combatant, weight float64) {
 	if target == nil {
 		return
 	}
@@ -499,19 +514,14 @@ func (a *Attackable) thinkIdle() {
 }
 
 func (a *Attackable) queueIdleFollow() {
-	a.addFollowDesire(a.actor.IdleFollowTarget(), escortFollowWeight)
+	a.AddFollowDesire(a.actor.IdleFollowTarget(), escortFollowWeight)
 }
 
 func (a *Attackable) queueIdleWander() {
 	if !a.actor.ShouldIdleWander() {
 		return
 	}
-	a.desires.AddOrUpdate(&Desire{
-		Kind:     IntentionWander,
-		Timer:    defaultWanderTimer,
-		Weight:   defaultWanderWeight,
-		QueuedAt: a.now(),
-	})
+	a.AddWanderDesire(defaultWanderTimer, defaultWanderWeight)
 }
 
 func (a *Attackable) thinkFollow() error {
@@ -955,6 +965,10 @@ func (a *Attackable) promoteAndStep() error {
 		case IntentionFollow:
 			a.lastDesire = IntentionFollow
 			return a.thinkFollow()
+		case IntentionNothing:
+			// Doing nothing has no step: the actor keeps still while the
+			// desire outweighs the rest.
+			a.lastDesire = IntentionNothing
 		case IntentionWander:
 			// A wander steps only on the pass that promotes it; while it
 			// stays current, its chain fires on its own.
@@ -1071,6 +1085,8 @@ func (a *Attackable) nextToDo() (next intention, fromLatch, ok bool) {
 		next = intention{kind: IntentionFollow, target: desire.FinalTarget}
 	case IntentionWander:
 		next = intention{kind: IntentionWander, timer: desire.Timer}
+	case IntentionNothing:
+		next = intention{kind: IntentionNothing, timer: desire.Timer}
 	case IntentionMoveTo:
 		next = intention{kind: IntentionMoveTo, loc: desire.Location}
 	default:

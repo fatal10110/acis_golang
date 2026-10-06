@@ -157,12 +157,13 @@ func provideSevenSignsState(db *sql.DB, state *world.State, log zerolog.Logger) 
 // startSevenSigns restores the persisted status and sign-ups, then the
 // festival, before any character can log in; hands the period changes to
 // the festival and the castles and lets them reach the players online
-// through link, starts
+// through link; spawns the Seven Signs NPC groups of the restored period
+// and hands the period changes' swap of them to npcs; starts
 // the festival's schedule and arms the period-change timer —
 // firing an overdue period change immediately. On shutdown it stops both
 // timers, saves the festival scores unless seal validation is under way,
 // and saves the sign-ups and the status with the festival's columns.
-func startSevenSigns(lc fx.Lifecycle, state *sevensigns.State, fest *festival.Manager, castles *castle.Manager, link *network.GameClientLink, log zerolog.Logger) {
+func startSevenSigns(lc fx.Lifecycle, state *sevensigns.State, fest *festival.Manager, castles *castle.Manager, link *network.GameClientLink, npcs *manager.Npcs, log zerolog.Logger) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			if err := state.Restore(ctx); err != nil {
@@ -174,6 +175,8 @@ func startSevenSigns(lc fx.Lifecycle, state *sevensigns.State, fest *festival.Ma
 			state.SetFestival(fest)
 			state.SetCastles(castles)
 			state.SetOnline(link)
+			state.SetSpawns(npcs)
+			npcs.StartSevenSigns(state)
 			fest.Start()
 			state.Start()
 			return nil

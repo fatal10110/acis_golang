@@ -66,7 +66,7 @@ func newDespawnFixture(t *testing.T, states map[string]*spawn.State) *despawnFix
 	var err error
 	f.npcs, err = NewNpcs(NewSpawns(despawnTable(t, despawnSpawnlist), states), f.templates, fakeGeo{}, f.state, &sequentialIDs{}, f.decay, f.respawn,
 		task.NewAI(f.state, zerolog.Nop()), task.NewPositionUpdates(f.state), item.NewTable(nil), &recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(),
-		nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, f.queues)
+		nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, f.queues, testMakers())
 	if err != nil {
 		t.Fatalf("NewNpcs() error: %v", err)
 	}

@@ -150,12 +150,18 @@ func (s *Server) spawnHostileInstance(t *testing.T, inst *npc.Instance, at locat
 func (s *Server) SpawnCastingHostileNPC(t *testing.T, tmpl *npc.Template, defs actorcast.Definitions) (*npc.Hostile, *actorcast.AIController) {
 	t.Helper()
 	hostile := s.spawnHostile(t, tmpl, hostileNPCSpawn, parkedAttack{})
+	return hostile, s.installCastSeam(hostile, defs)
+}
+
+// installCastSeam wires hostile's AI-cast seam over defs (see
+// SpawnCastingHostileNPC) and returns the AIController the AI loop drives.
+func (s *Server) installCastSeam(hostile *npc.Hostile, defs actorcast.Definitions) *actorcast.AIController {
 	ctl := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, castCanceledBroadcast{hostile})
 	ctl.SetQueue(hostile.Queue())
 	aiCtl := &actorcast.AIController{Controller: ctl, Definitions: defs, Effects: s.castEffects, Caster: hostile, OnHitResult: s.castEffects.OnHitResult}
 	hostile.AI().SetCastController(aiCtl)
 	hostile.SetCastController(ctl)
-	return hostile, aiCtl
+	return aiCtl
 }
 
 // castCanceledBroadcast closes an aborted fixture AI cast with its cancel
