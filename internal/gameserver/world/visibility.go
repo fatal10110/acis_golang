@@ -594,6 +594,21 @@ func (s *State) AppendKnown(out []Tracked, t Tracked) []Tracked {
 	return out
 }
 
+// AppendAround appends every object in the regions surrounding the one
+// holding (x, y) to out, excluding the object except: what an object in
+// that region knows. It does nothing for a point off the grid.
+func (s *State) AppendAround(out []Tracked, x, y int, except int32) []Tracked {
+	r, ok := s.RegionAt(x, y)
+	if !ok {
+		return out
+	}
+	var regionBuf [9]*Region
+	for _, region := range s.AppendNeighbors(regionBuf[:0], r, 1) {
+		out = region.appendObjectsExcept(out, except)
+	}
+	return out
+}
+
 // ForEachKnownInRadius calls fn for every object within radius units of t
 // in 3D, excluding t itself, widened by each bodied side's collision
 // radius. The search widens to as many region rings as the radius spans,
