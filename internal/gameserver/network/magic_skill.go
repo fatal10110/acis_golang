@@ -992,6 +992,8 @@ func (l *GameClientLink) sendSkillHandlerResultVia(send frameSender, live *liveP
 			if live != nil {
 				send(live, liveStatusFrame(live))
 				statusSent = true
+				// The HP write's low-HP tutorial event follows its status.
+				live.SettleRegen()
 			}
 		case skillhandler.Counterattack:
 			attacker, attackerOnline := l.livePlayerByID(m.AttackerID)

@@ -130,7 +130,7 @@ func (c *Character) ReduceCurrentHP(amount int) bool {
 	if amount < 0 {
 		amount = 0
 	}
-	defer c.SettleRegen() // after the unlock below
+	defer c.settleRegenTask() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.Dead() {
