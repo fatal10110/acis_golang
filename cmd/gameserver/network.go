@@ -191,6 +191,7 @@ func provideGameClientLink(
 		GMStartupBlockAll:          gameplay.Admin.GMStartupBlockAll,
 		GMHeroAura:                 gameplay.Admin.GMHeroAura,
 		PartyRange:                 rewards.PartyRange,
+		MultipleItemDrop:           rewards.MultipleItemDrop,
 	}
 	network.SetOutboundRejectLog(log)
 	link, err := network.NewGameClientLink(network.GameClientLinkConfig{

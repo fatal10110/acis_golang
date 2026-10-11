@@ -56,12 +56,7 @@ func (l *GameClientLink) shareAdena(members []*livePlayer, adena int, origin par
 			m.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageEarnedS1Adena, 0))
 			continue
 		}
-		id, err := l.nextObjectID()
-		if err != nil {
-			l.log.Error().Err(err).Msg("allocate shared adena")
-			continue
-		}
-		m.AddRewardItem(item.AdenaID, share, id)
+		m.AddRewardItem(item.AdenaID, share, false, l.nextObjectID)
 	}
 }
 
@@ -118,10 +113,8 @@ func (l *GameClientLink) lootForParty(picker *livePlayer, itemID int32, count in
 	}
 	if spoil {
 		looter.AddEarnedItem(itemID, count, l.nextObjectID)
-	} else if id, err := l.nextObjectID(); err == nil {
-		looter.AddRewardItem(itemID, count, id)
 	} else {
-		l.log.Error().Err(err).Msg("allocate party loot")
+		looter.AddRewardItem(itemID, count, l.playerConfig.MultipleItemDrop, l.nextObjectID)
 	}
 	sendPartyLootNotice(members, looter, spoil, itemID, count, 0)
 	return true

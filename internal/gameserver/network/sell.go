@@ -70,13 +70,12 @@ func (l *GameClientLink) requestSellItem(live *livePlayer, req clientpackets.Req
 	if err != nil {
 		l.log.Error().Err(err).Msg("sell items")
 		live.SendFrame(serverpackets.FrameActionFailed())
-		return
-	}
-	if !sold {
-		return
 	}
 	if len(res.Changed) > 0 {
 		l.applyEquipStatChanges(live, inv, res.Result)
+	}
+	if err != nil || !sold {
+		return
 	}
 	if page, ok := f.SoldPage(setPages{l.html}); ok {
 		sendFilledHTML(live, f.ObjectID(), page, 0)

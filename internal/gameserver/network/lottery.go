@@ -195,26 +195,35 @@ func (l *GameClientLink) claimLotteryTicket(live *livePlayer, objectID int32) {
 		return
 	}
 	// A past round's drawing never changes, so checking before the destroy
-	// reads what the reference reads after it; the payout's id is taken
-	// before the destroy, so an exhausted id factory keeps the ticket.
+	// reads what the reference reads after it. A payout that needs a new
+	// adena stack takes its id before the destroy, so an exhausted id
+	// factory keeps the ticket; one joining held adena takes none, since an
+	// id taken and given back is still spent.
 	_, adena := l.lottery.Check(int32(st.CustomType1), lottery.Numbers{Low: int32(st.EnchantLevel), High: int32(st.CustomType2)})
 	var id int32
-	if adena > 0 {
+	if adena > 0 && inv.ItemByTemplateID(item.AdenaID) == nil {
 		var err error
 		if id, err = l.nextObjectID(); err != nil {
 			l.log.Error().Err(err).Msg("lottery: no object id for a payout")
 			return
 		}
 	}
-	if !destroyHeldItem(live, inst, st.Count) {
-		if adena > 0 {
+	defer func() {
+		if id != 0 {
 			l.releaseObjectID(id)
 		}
+	}()
+	if !destroyHeldItem(live, inst, st.Count) || adena <= 0 {
 		return
 	}
-	if adena > 0 {
-		live.AddRewardItem(item.AdenaID, int(adena), id)
-	}
+	live.AddRewardItem(item.AdenaID, int(adena), false, func() (int32, error) {
+		if reserved := id; reserved != 0 {
+			id = 0
+			return reserved, nil
+		}
+		// The held adena went since the check: take a late id.
+		return l.nextObjectID()
+	})
 }
 
 // releaseObjectID gives back id, taken for a ticket or payout that was then

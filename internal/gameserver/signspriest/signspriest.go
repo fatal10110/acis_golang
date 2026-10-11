@@ -743,11 +743,7 @@ func (h *handler) add(itemID int32, count int) {
 	if inv == nil || count < 1 || h.t.NextID == nil {
 		return
 	}
-	id, err := h.t.NextID()
-	if err != nil {
-		return
-	}
-	inv.AddNew(itemID, count, id)
+	_, _ = inv.AddCreated(itemID, count, h.t.NextID)
 }
 
 // isStone reports whether id is a seal stone.

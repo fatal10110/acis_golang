@@ -95,9 +95,6 @@ func (w activeWeapon) grade() int {
 // AttachRuntime records the static template and restored inventory used by
 // live combat and visibility code. Call it before exposing c to the world.
 
-// AddRewardItem creates and adds one kill-reward item stack to this live
-// character's inventory. objectID must be allocated by the reward caller.
-
 // Inventory returns the carried item collection attached by AttachRuntime,
 // or nil if the character has none yet.
 
