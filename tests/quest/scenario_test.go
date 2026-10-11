@@ -6,6 +6,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/blackjudge"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/cabalbuffer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/newbiehelper"
 	featuretutorial "github.com/fatal10110/acis_golang/internal/gameserver/script/feature/tutorial"
 	quest001 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q001"
@@ -31,6 +32,7 @@ var scenarioScripts = script.Catalog{
 	"script.feature.NewbieHelper":        func() script.Script { return newbiehelper.New(modelskill.NewNewbieBuffTable(nil)) },
 	"script.feature.Tutorial":            featuretutorial.New,
 	"script.feature.BlackJudge":          blackjudge.New,
+	"script.feature.CabalBuffer":         cabalbuffer.New,
 	"script.teleport.NoblesseTeleporter": noblesseteleporter.New,
 	"script.teleport.PrimevalSummoner":   primevalsummoner.New,
 	"quest.Q001_LettersOfLove":           quest001.New,

@@ -1,0 +1,19 @@
+# A Preacher of Doom (CabalBuffer) beside a character of Dawn, which leads the Seven Signs: the
+# priest starts preaching as it appears, a minute later and then every minute, a line drawn from
+# its four (onCreated, onTimer). Seeing the character it draws 100 then 10000 and leaves him
+# alone: it curses only the losing cabal (onSeeCreature). The curse of a Dusk character is in
+# cabal_buffer_test.go: whether it lands is the world's roll, which a scenario cannot pin.
+# Expectations are derived from the reference source (CabalBuffer.java).
+character Seeker 20
+cabal dawn gnosis
+festival 100 0
+random 3 50 0 0
+script script.feature.CabalBuffer
+npc preacher 31093 Folk 100 0 0
+
+advance 59s
+advance 1s
+  S NpcSay obj=preacher type=0 npc=1031093 text="The end of time has come! The prophecy of destruction has been fulfilled!"
+tick x4
+advance 1m
+  S NpcSay obj=preacher type=0 npc=1031093 text="This world will soon be annihilated!"

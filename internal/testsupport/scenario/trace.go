@@ -16,8 +16,8 @@ import (
 )
 
 // renders are the opcodes a step compares: the dialog's, the quest's, the
-// tutorial's and the item messages, the radar marks, the drops and the casts
-// a script makes. The rest (selection, approach, movement, NPC info, the
+// tutorial's and the item messages, the radar marks, the drops, the casts
+// and the NPC chat lines a script makes. The rest (selection, approach, movement, NPC info, the
 // deferred inventory and status updates) is not the script's.
 var renders = []byte{
 	serverpackets.OpcodeActionFailed, serverpackets.OpcodeNpcHtmlMessage, serverpackets.OpcodeSystemMessage,
@@ -25,6 +25,7 @@ var renders = []byte{
 	serverpackets.OpcodeTutorialShowHTML, serverpackets.OpcodeTutorialShowQuestionMark,
 	serverpackets.OpcodeTutorialEnableClientEvent, serverpackets.OpcodeTutorialCloseHTML,
 	serverpackets.OpcodeRadarControl, serverpackets.OpcodeDropItem, serverpackets.OpcodeMagicSkillUse,
+	serverpackets.OpcodeNpcSay,
 }
 
 // render renders a server packet payload as an S line, with roles naming

@@ -2,9 +2,9 @@
 # for the quest and is refused, kills Shadith with no quest and gets no head, relogs (an offer
 # that was not taken leaves no row), and is refused again. Kadun's first-talk script
 # (KetraOrcSupport) is not listed, so his chat window is the default page, as the reference
-# serves it for an NPC with no page of its own (Npc.getHtmlPath). A scenario seeds neither the
-# Ketra standing nor an item: the offer to an ally, the head going to every ally of the party
-# and the trade for the totem are in q607_flow_test.go. Shadith is a fixture monster: the raid
+# serves it for an NPC with no page of its own (Npc.getHtmlPath). The offer to an ally and the
+# trade for the totem are q607_prove_your_courage_ally.scenario; the head going to every ally of
+# the party is in q607_flow_test.go. Shadith is a fixture monster: the raid
 # kill messages are the raid boss's, not the quest's. Expectations are derived from the
 # reference source (Q607_ProveYourCourage.java).
 trace internal/gameserver/script/testdata/oracle/scenarios/q607_prove_your_courage.golden

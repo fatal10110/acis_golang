@@ -17,6 +17,21 @@
 //	clan <level>                              optional: the character leads a clan of that level
 //	quest <quest> <var>=<value> ...           character_quests rows of the character before it enters the world,
 //	                                          one line per quest, as a rows check lists them
+//	hold <item id> <count>                    optional: the character holds that many of the item before it enters
+//	                                          the world, as one stack (that many single items of a template that
+//	                                          does not stack); the template must be in the catalog (an item line or
+//	                                          the shared one)
+//	equip <item id>                           optional: the character wears one of the item, in the paperdoll slot of
+//	                                          its body part, as if it logged out wearing it; the template must be in
+//	                                          the catalog and equipable
+//	standing <n>                              optional: the character's Ketra/Varka alliance standing, 1 to 5 for a
+//	                                          Ketra ally of that level, -1 to -5 for a Varka one (default 0, none)
+//	pk <n>                                    optional: the character's PK count (default 0)
+//	cabal <dawn|dusk> <avarice|gnosis|strife> optional: the character is signed up for that Seven Signs cabal,
+//	                                          choosing that seal, with no stones turned in
+//	festival <dawn score> <dusk score>        optional: the Seven Signs festival scores the server restores; with no
+//	                                          stones turned in they are the cabals' scores, so the higher cabal is
+//	                                          winning and the other losing, neither on a tie (default 0 0)
 //	random <draw> ...                         optional: the script random draws, in order; each must be inside
 //	                                          [0, n) of its call, and every one must be drawn
 //	random always <draw>                      optional: every script random draw is that one
@@ -28,6 +43,11 @@
 //	npc <role> <npc id> <type> <dx> <dy> <dz> a fixture NPC template of that instance type, spawned at that offset from the character;
 //	                                          the templates a script may spawn more NPCs of
 //
+// Each NPC line's NPC runs the created hooks of the scripts bound to it as
+// it appears, as the spawn pass runs them, and a civilian casts the shipped
+// skills (data/xml/skills) a script or dialog asks of it on a later AI
+// tick.
+//
 // Then the steps, each a verb line followed by its indented expectations:
 //
 //	action <role>          an Action packet on the NPC: the first selects it, the next talks
@@ -38,6 +58,8 @@
 //	advance <duration>     time passes, as time.ParseDuration reads it
 //	approach <role>        the character steps to 100 in front of the NPC, inside its see range, and one
 //	                       AI tick runs, whose see-creature scan notices it
+//	tick [xN]              one AI tick runs (N ticks with xN), each let settle: what the NPCs' AI does
+//	                       on its own, as casting what a script asked of them
 //	pickup <item id>       an Action packet on the one ground item of that template, then time passes
 //	                       until the item has left the ground
 //	mark <id>              a RequestTutorialQuestionMark: the character clicks that tutorial question mark
@@ -46,8 +68,8 @@
 //	enter                  the character is selected and enters the world (the EnterWorld burst)
 //	create                 the first step only: a RequestCharacterCreate of a human fighter named as the
 //	                       character line says, instead of a seeded character; the character line's level
-//	                       must be 1, and the class, clan and quest lines are left out (the creation
-//	                       writes its own rows)
+//	                       must be 1, and the class, clan, quest, hold, equip, standing, pk and cabal
+//	                       lines are left out (the creation writes its own rows)
 //
 //	  S <packet>           the packets of the step, in order, as scriptcontract.Packet renders them;
 //	                       "page=<path>" ends an NpcHtmlMessage whose text is that page, %objectId% filled in
@@ -68,8 +90,8 @@
 // are the dialog's, the quest's, the tutorial's and the item messages:
 // ActionFailed, NpcHtmlMessage, SystemMessage, PlaySound, QuestList,
 // ExShowQuestMark, TutorialShowHtml, TutorialShowQuestionMark,
-// TutorialEnableClientEvent, TutorialCloseHtml, RadarControl, DropItem and
-// MagicSkillUse. "page=<path>" also ends a TutorialShowHtml line.
+// TutorialEnableClientEvent, TutorialCloseHtml, RadarControl, DropItem,
+// MagicSkillUse and NpcSay. "page=<path>" also ends a TutorialShowHtml line.
 //
 // Without a random line the script draws are random. A draw outside
 // [0, n), or past the listed ones, fails the step that drew it.
@@ -89,11 +111,13 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 )
 
 // Scenario is one parsed scenario file.
@@ -112,6 +136,23 @@ type Scenario struct {
 	// Quests are the character_quests rows seeded before the character
 	// enters the world.
 	Quests []QuestRows
+	// Holds are the hold lines: what the character holds before it enters
+	// the world.
+	Holds []Hold
+	// Equips are the equip lines' items, worn before the character enters
+	// the world.
+	Equips []int32
+	// Standing is the Ketra/Varka alliance standing: positive Ketra,
+	// negative Varka, 0 none.
+	Standing int
+	// PK is the character's PK count.
+	PK int
+	// Cabal is the cabal the character is signed up for choosing Seal,
+	// NoCabal for none.
+	Cabal sevensigns.Cabal
+	Seal  sevensigns.Seal
+	// Festival is the festival line's Dawn and Dusk scores, nil for none.
+	Festival *[2]int
 	// Random is the script random source, nil for random draws.
 	Random  *Random
 	Scripts []ScriptLine
@@ -125,6 +166,12 @@ type Scenario struct {
 type QuestRows struct {
 	Quest string
 	Vars  [][2]string
+}
+
+// Hold is one hold line: Count of the item template Item.
+type Hold struct {
+	Item  int32
+	Count int32
 }
 
 // Random is the random line: the draws in order, or one draw always.
@@ -172,6 +219,9 @@ type Check struct {
 // maxClanLevel is the highest clan level.
 const maxClanLevel = 8
 
+// maxStanding is the highest Ketra/Varka alliance level.
+const maxStanding = 5
+
 // argCount is, per verb, the arguments it takes: min and max.
 var argCount = map[string][2]int{
 	"action":   {1, 1},
@@ -183,6 +233,7 @@ var argCount = map[string][2]int{
 	"approach": {1, 1},
 	"pickup":   {1, 1},
 	"mark":     {1, 1},
+	"tick":     {0, 1},
 	"relog":    {0, 0},
 	"restart":  {0, 0},
 	"enter":    {0, 0},
@@ -275,6 +326,8 @@ func (sc *Scenario) checkFlow() error {
 				return fail("a created character starts at level 1, not %d", sc.Level)
 			case sc.Class != 0 || sc.Clan >= 0 || len(sc.Quests) > 0:
 				return fail("a created character takes no class, clan or quest line")
+			case len(sc.Holds) > 0 || len(sc.Equips) > 0 || sc.Standing != 0 || sc.PK != 0 || sc.Cabal != sevensigns.NoCabal:
+				return fail("a created character takes no hold, equip, standing, pk or cabal line")
 			}
 			inWorld = false
 		case "enter":
@@ -389,6 +442,8 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 			}
 		}
 		sc.Scripts = append(sc.Scripts, ScriptLine{Path: args[0], Stub: key == "stub"})
+	case "hold", "equip", "standing", "pk", "cabal", "festival":
+		return sc.holdings(key, args)
 	case "item":
 		if len(args) == 0 {
 			return fmt.Errorf("item takes one or more ids")
@@ -433,6 +488,88 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 	return nil
 }
 
+// holdings reads the lines of what the character holds and stands for:
+// hold, equip, standing, pk, cabal and festival.
+func (sc *Scenario) holdings(key string, args []string) error {
+	switch key {
+	case "hold":
+		if len(args) != 2 {
+			return fmt.Errorf("hold <item id> <count>")
+		}
+		id, err := strconv.ParseInt(args[0], 10, 32)
+		if err != nil {
+			return fmt.Errorf("hold item %q: %w", args[0], err)
+		}
+		count, err := strconv.ParseInt(args[1], 10, 32)
+		if err != nil || count < 1 {
+			return fmt.Errorf("hold count %q is not a number of 1 or more", args[1])
+		}
+		for _, h := range sc.Holds {
+			if h.Item == int32(id) {
+				return fmt.Errorf("item %d held twice", id)
+			}
+		}
+		sc.Holds = append(sc.Holds, Hold{Item: int32(id), Count: int32(count)})
+	case "equip":
+		if len(args) != 1 {
+			return fmt.Errorf("equip <item id>")
+		}
+		id, err := strconv.ParseInt(args[0], 10, 32)
+		if err != nil {
+			return fmt.Errorf("equip item %q: %w", args[0], err)
+		}
+		if slices.Contains(sc.Equips, int32(id)) {
+			return fmt.Errorf("item %d worn twice", id)
+		}
+		sc.Equips = append(sc.Equips, int32(id))
+	case "standing":
+		if len(args) != 1 || sc.Standing != 0 {
+			return fmt.Errorf("one standing line: standing <n>")
+		}
+		n, err := strconv.Atoi(args[0])
+		if err != nil || n == 0 || n < -maxStanding || n > maxStanding {
+			return fmt.Errorf("standing %q is not 1 to %d (Ketra) or -1 to -%d (Varka)", args[0], maxStanding, maxStanding)
+		}
+		sc.Standing = n
+	case "pk":
+		if len(args) != 1 || sc.PK != 0 {
+			return fmt.Errorf("one pk line: pk <n>")
+		}
+		n, err := strconv.ParseInt(args[0], 10, 32)
+		if err != nil || n < 1 {
+			return fmt.Errorf("pk count %q is not a number of 1 or more", args[0])
+		}
+		sc.PK = int(n)
+	case "cabal":
+		if len(args) != 2 || sc.Cabal != sevensigns.NoCabal {
+			return fmt.Errorf("one cabal line: cabal <dawn|dusk> <avarice|gnosis|strife>")
+		}
+		cabal, err := sevensigns.ParseCabal(strings.ToUpper(args[0]))
+		if err != nil || cabal == sevensigns.NoCabal {
+			return fmt.Errorf("cabal %q is not dawn or dusk", args[0])
+		}
+		seal, err := sevensigns.ParseSeal(strings.ToUpper(args[1]))
+		if err != nil || seal == sevensigns.NoSeal {
+			return fmt.Errorf("seal %q is not avarice, gnosis or strife", args[1])
+		}
+		sc.Cabal, sc.Seal = cabal, seal
+	case "festival":
+		if len(args) != 2 || sc.Festival != nil {
+			return fmt.Errorf("one festival line: festival <dawn score> <dusk score>")
+		}
+		var scores [2]int
+		for i, a := range args {
+			n, err := strconv.ParseInt(a, 10, 32)
+			if err != nil || n < 0 {
+				return fmt.Errorf("festival score %q is not a number of 0 or more", a)
+			}
+			scores[i] = int(n)
+		}
+		sc.Festival = &scores
+	}
+	return nil
+}
+
 // checkStep validates a step's arguments against the declared roles.
 func checkStep(verb string, args []string, roles map[string]bool) error {
 	switch verb {
@@ -450,6 +587,12 @@ func checkStep(verb string, args []string, roles map[string]bool) error {
 		if len(args) == 2 {
 			if _, err := killCount(args[1]); err != nil {
 				return err
+			}
+		}
+	case "tick":
+		if len(args) == 1 {
+			if _, err := killCount(args[0]); err != nil {
+				return fmt.Errorf("tick count %q is not xN", args[0])
 			}
 		}
 	case "advance":
