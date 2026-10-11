@@ -26,8 +26,8 @@ func (f *Folk) Decayed() bool {
 }
 
 // die runs the NPC's death once and reports whether this call ran it: its
-// HP drops to zero, observers see the empty health bar, its walk and cast
-// stop and its cast desires drop, every effect that does not last through
+// HP drops to zero, observers see the empty health bar, its walk, swing and
+// cast stop and its desires drop, every effect that does not last through
 // death ends, observers see it die and leave its attack stance, and its
 // corpse is registered for decay after the template corpse time. A
 // civilian NPC pays no reward. Its dying script hooks are scheduled, then
@@ -44,6 +44,7 @@ func (f *Folk) die(killer attackable.Combatant) bool {
 
 	f.BroadcastStatus()
 	f.stopMoving()
+	f.stopAttack()
 	f.AbortCast()
 	f.effects.StopAllExceptThoseThatLastThroughDeath()
 	f.BroadcastStatus()

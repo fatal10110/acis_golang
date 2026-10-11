@@ -96,8 +96,8 @@ func (f *Folk) raiseAttacked(attacker attackable.Combatant, damage int32, sk mod
 }
 
 // reduceHP is an NPC's HP reduction: a dead NPC takes nothing; a hit from a
-// creature first puts a walking NPC in run stance, then runs its attacked
-// hooks with the damage truncated to an int and sk the skill that dealt it,
+// creature first puts a walking NPC in run stance and adds the damage to its
+// aggro list, at no hate, then runs its attacked hooks with the damage truncated to an int and sk the skill that dealt it,
 // then its clan calls: itself, then every NPC of its clan in range. An
 // invulnerable NPC, or a hit from an attacker without damage permission,
 // then takes nothing.
@@ -109,8 +109,8 @@ func (f *Folk) reduceHP(amount float64, attacker attackable.Combatant, sk models
 	return f.loseHP(amount, attacker, sk, true)
 }
 
-// loseHP is reduceHP; hit false leaves out the attacked hooks and the clan
-// calls, for an HP loss that is not a hit.
+// loseHP is reduceHP; hit false leaves out the aggro, the attacked hooks
+// and the clan calls, for an HP loss that is not a hit.
 func (f *Folk) loseHP(amount float64, attacker attackable.Combatant, sk modelskill.Ref, hit bool) bool {
 	if f.Dead() {
 		return false
@@ -120,6 +120,7 @@ func (f *Folk) loseHP(amount float64, attacker attackable.Combatant, sk modelski
 		f.forceRunStance()
 	}
 	if attacker != nil && hit {
+		f.fight.aggro.AddDamage(attacker, amount, 0)
 		damage := commons.JavaInt(amount)
 		f.raiseAttacked(attacker, damage, sk)
 		raiseClanAttacked(f.scripts, f.world, f, attacker, damage, sk, clanAttackedByHit)

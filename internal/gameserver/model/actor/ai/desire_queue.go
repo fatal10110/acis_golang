@@ -149,6 +149,13 @@ func (q *DesireQueue) hasKind(kind Intention) bool {
 	return false
 }
 
+// HasKind reports whether any queued Desire has the given kind.
+func (q *DesireQueue) HasKind(kind Intention) bool { return q.hasKind(kind) }
+
+// AnyMatch reports whether a queued Desire matches. match runs under the
+// queue's read lock and must not call back into the queue.
+func (q *DesireQueue) AnyMatch(match func(*Desire) bool) bool { return q.anyMatch(match) }
+
 // anyMatch reports whether a queued Desire matches.
 func (q *DesireQueue) anyMatch(match func(*Desire) bool) bool {
 	q.mu.RLock()

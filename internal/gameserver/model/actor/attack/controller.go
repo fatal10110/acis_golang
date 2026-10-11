@@ -119,7 +119,12 @@ type Controller struct {
 	playable PlayableActor
 	player   PlayerActor
 
+	// attackable marks a hostile NPC's controller: it reports its attack's
+	// end (AttackEnded) and never swings at a creature faking death.
 	attackable bool
+	// npc marks any NPC's controller: its AI re-runs desire selection as the
+	// hit animation ends and as a bow shot lands (AttackRethink).
+	npc bool
 
 	mu             sync.RWMutex
 	attacking      bool
@@ -162,7 +167,14 @@ func NewPlayer(actor PlayerActor, sink event.Sink) *Controller {
 // NewAttackable returns an attack controller with hostile NPC-specific
 // rules.
 func NewAttackable(actor CreatureActor, sink event.Sink) *Controller {
-	return &Controller{actor: actor, attackable: true, sink: sink}
+	return &Controller{actor: actor, attackable: true, npc: true, sink: sink}
+}
+
+// NewNPC returns the attack controller of an NPC that is not attackable, a
+// civilian NPC: the base creature rules, with its AI re-running desire
+// selection on the attack phases as any NPC's does.
+func NewNPC(actor CreatureActor, sink event.Sink) *Controller {
+	return &Controller{actor: actor, npc: true, sink: sink}
 }
 
 func (c *Controller) emit(e event.Event) {
@@ -755,7 +767,7 @@ func (c *Controller) endHitAnimation() {
 // emitRethink asks an NPC's AI to re-run desire selection. Other actors'
 // AI does not re-run on attack phases.
 func (c *Controller) emitRethink() {
-	if c.attackable {
+	if c.npc {
 		c.emit(event.AttackRethink{})
 	}
 }
