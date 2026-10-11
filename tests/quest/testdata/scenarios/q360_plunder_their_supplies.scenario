@@ -1,0 +1,103 @@
+# Plunder Their Supplies (Q360): accept at Coleman (a guard), kill five Taik Orc Seekers,
+# each dropping a suspicious document and a supply item (one roll per item, both pinned to
+# succeed); the fifth document turns the five into a recipe of supply. Coleman pays 6000,
+# 100 per supply item and 6000 per recipe, then the player quits the repeatable quest.
+# Expectations are derived from the reference source (Q360_PlunderTheirSupplies.java,
+# Quest.dropMultipleItems, Player.addItem / destroyItemByItemId).
+character Raider 52
+random always 0
+script quest.Q360_PlunderTheirSupplies
+item 5870 5871 5872
+page guard/30873.htm
+page script/quest/Q360_PlunderTheirSupplies/
+npc coleman 30873 Guard 10 0 0
+npc seeker 20666 Monster 40 0 0
+
+action coleman
+action coleman
+  S ActionFailed
+  S NpcHtmlMessage obj=coleman item=0 page=guard/30873.htm
+  S ActionFailed
+bypass npc_{coleman}_Quest
+  S NpcHtmlMessage obj=coleman item=0 page=script/quest/Q360_PlunderTheirSupplies/30873-0.htm
+  S ActionFailed
+  S ActionFailed
+  state Q360_PlunderTheirSupplies CREATED
+bypass Quest Q360_PlunderTheirSupplies 30873-1.htm
+  S NpcHtmlMessage obj=coleman item=0 page=script/quest/Q360_PlunderTheirSupplies/30873-1.htm
+  S ActionFailed
+bypass Quest Q360_PlunderTheirSupplies 30873-2.htm
+  S QuestList 360:0x80000001
+  S ExShowQuestMark quest=360
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=coleman item=0 page=script/quest/Q360_PlunderTheirSupplies/30873-2.htm
+  S ActionFailed
+  Q upsert Q360_PlunderTheirSupplies | <state> | STARTED
+  Q upsert Q360_PlunderTheirSupplies | <cond> | 1
+  rows Q360_PlunderTheirSupplies <cond>=1 <state>=STARTED
+
+# Nothing plundered yet.
+action coleman
+  S ActionFailed
+  S NpcHtmlMessage obj=coleman item=0 page=guard/30873.htm
+  S ActionFailed
+bypass npc_{coleman}_Quest
+  S NpcHtmlMessage obj=coleman item=0 page=script/quest/Q360_PlunderTheirSupplies/30873-3.htm
+  S ActionFailed
+  S ActionFailed
+
+# Five seekers: a document and a supply item each, one sound per death; the fifth
+# document makes the recipe.
+kill seeker x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5871
+  S SystemMessage id=54 3:5872
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5871
+  S SystemMessage id=54 3:5872
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5871
+  S SystemMessage id=54 3:5872
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5871
+  S SystemMessage id=54 3:5872
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:5871
+  S SystemMessage id=54 3:5872
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:5871 6:5
+  S SystemMessage id=54 3:5870
+  items 5870=1 5871=0 5872=5
+
+# Coleman pays 6000 + 5 x 100 + 1 x 6000 and keeps the quest going.
+action coleman
+  S ActionFailed
+  S NpcHtmlMessage obj=coleman item=0 page=guard/30873.htm
+  S ActionFailed
+bypass npc_{coleman}_Quest
+  S SystemMessage id=301 3:5872 6:5
+  S SystemMessage id=302 3:5870
+  S SystemMessage id=52 6:12500
+  S NpcHtmlMessage obj=coleman item=0 page=script/quest/Q360_PlunderTheirSupplies/30873-5.htm
+  S ActionFailed
+  S ActionFailed
+  items 57=12500 5870=0 5871=0 5872=0
+
+# Quit: the repeatable quest leaves no row.
+bypass Quest Q360_PlunderTheirSupplies 30873-6.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=coleman item=0 page=script/quest/Q360_PlunderTheirSupplies/30873-6.htm
+  S ActionFailed
+  Q delete-quest Q360_PlunderTheirSupplies
+  state Q360_PlunderTheirSupplies -
+  rows Q360_PlunderTheirSupplies -
+
+relog
+  state Q360_PlunderTheirSupplies -
+  rows Q360_PlunderTheirSupplies -
+  items 57=12500

@@ -1,0 +1,95 @@
+# Hunt the Orcs (Q260): an elven fighter of level 6 accepts at Rayen (a guard), kills two
+# Kaboo orcs (an amulet each) and a Kaboo orc fighter (a necklace), every roll pinned to
+# succeed. Rayen pays 12 per amulet and 30 per necklace, and, the first time only, 6000
+# no-grade soulshots with the tutorial voice. A second payment gives no shots; then the
+# player quits the repeatable quest. Expectations are derived from the reference source
+# (Q260_HuntTheOrcs.java, Quest.rewardNewbieShots, Quest.playTutorialVoice).
+character Hunter 6
+class 18
+random always 0
+script quest.Q260_HuntTheOrcs
+item 1114 1115 5789
+page guard/30221.htm
+page script/quest/Q260_HuntTheOrcs/
+npc rayen 30221 Guard 10 0 0
+npc orc 20468 Monster 40 0 0
+npc fighter 20471 Monster 0 40 0
+
+action rayen
+action rayen
+  S ActionFailed
+  S NpcHtmlMessage obj=rayen item=0 page=guard/30221.htm
+  S ActionFailed
+bypass npc_{rayen}_Quest
+  S NpcHtmlMessage obj=rayen item=0 page=script/quest/Q260_HuntTheOrcs/30221-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q260_HuntTheOrcs CREATED
+bypass Quest Q260_HuntTheOrcs 30221-03.htm
+  S QuestList 260:0x80000001
+  S ExShowQuestMark quest=260
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rayen item=0 page=script/quest/Q260_HuntTheOrcs/30221-03.htm
+  S ActionFailed
+  Q upsert Q260_HuntTheOrcs | <state> | STARTED
+  Q upsert Q260_HuntTheOrcs | <cond> | 1
+  rows Q260_HuntTheOrcs <cond>=1 <state>=STARTED
+
+kill orc x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1114
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1114
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+kill fighter
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1115
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1114=2 1115=1
+
+# First payment: 2 x 12 + 1 x 30, then the beginner soulshots of a fighter.
+action rayen
+  S ActionFailed
+  S NpcHtmlMessage obj=rayen item=0 page=guard/30221.htm
+  S ActionFailed
+bypass npc_{rayen}_Quest
+  S SystemMessage id=301 3:1114 6:2
+  S SystemMessage id=302 3:1115
+  S SystemMessage id=52 6:54
+  S SystemMessage id=53 3:5789 6:6000
+  S PlaySound type=2 file=tutorial_voice_026 bind=1 obj=player loc=10,20,30 delay=0
+  S NpcHtmlMessage obj=rayen item=0 page=script/quest/Q260_HuntTheOrcs/30221-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 57=54 1114=0 1115=0 5789=6000
+
+# Second payment: one more amulet, and no shots this time.
+kill orc
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1114
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+action rayen
+  S ActionFailed
+  S NpcHtmlMessage obj=rayen item=0 page=guard/30221.htm
+  S ActionFailed
+bypass npc_{rayen}_Quest
+  S SystemMessage id=302 3:1114
+  S SystemMessage id=52 6:12
+  S NpcHtmlMessage obj=rayen item=0 page=script/quest/Q260_HuntTheOrcs/30221-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 57=66 1114=0 5789=6000
+
+bypass Quest Q260_HuntTheOrcs 30221-06.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=rayen item=0 page=script/quest/Q260_HuntTheOrcs/30221-06.htm
+  S ActionFailed
+  Q delete-quest Q260_HuntTheOrcs
+  state Q260_HuntTheOrcs -
+  rows Q260_HuntTheOrcs -
+
+# The adena and the shots stay across a relog.
+relog
+  items 57=66 5789=6000

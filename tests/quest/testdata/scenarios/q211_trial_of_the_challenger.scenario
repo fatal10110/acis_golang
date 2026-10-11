@@ -1,0 +1,247 @@
+# Trial of the Challenger (Q211), a second class-change trial, played by a level 36
+# Warrior: Kash starts it and pays the level 35 set's Dimensional Diamonds (61 for a
+# Warrior, once per character); Shyslassys' death gives the broken key and the scroll and
+# leaves his chest, which pays the jackpot (draws 0 then 95: the five patterns); Kash
+# trades the scroll for his letter; Martien takes the letter, then Gorr's eye; Raldo takes
+# Baraham's eye; Filaur sends the player to the Succubus Queen; Raldo hands over the Mark
+# of Challenger and completes the quest. Expectations are derived from the reference
+# source (Q211_TrialOfTheChallenger.java, SecondClassQuest.java, Quest.dropItemsAlways).
+character Challenger 36
+class 1
+random 0 95 0 0
+script quest.Q211_TrialOfTheChallenger
+item 2627 2628 2629 2630 2631 2632 7562 1940 1943 1946 2918 2927
+page default/30644.htm
+page default/30645.htm
+page default/30646.htm
+page default/30647.htm
+page default/30535.htm
+page script/quest/Q211_TrialOfTheChallenger/
+npc kash 30644 Folk 10 0 0
+npc martien 30645 Folk -10 0 0
+npc raldo 30646 Folk 0 10 0
+npc chest 30647 Folk 0 -10 0
+npc filaur 30535 Folk 20 20 0
+npc shyslassys 27110 Monster 40 0 0
+npc gorr 27112 Monster -40 0 0
+npc baraham 27113 Monster 0 40 0
+npc succubus 27114 Monster 0 -40 0
+
+# Kash: a Warrior of level 36 may start; the first trial of the set pays the diamonds,
+# which turns the accept page into 30644-05a.htm.
+action kash
+action kash
+  S ActionFailed
+  S NpcHtmlMessage obj=kash item=0 page=default/30644.htm
+  S ActionFailed
+bypass npc_{kash}_Quest
+  S NpcHtmlMessage obj=kash item=0 page=script/quest/Q211_TrialOfTheChallenger/30644-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q211_TrialOfTheChallenger CREATED
+bypass Quest Q211_TrialOfTheChallenger 30644-04.htm
+  S NpcHtmlMessage obj=kash item=0 page=script/quest/Q211_TrialOfTheChallenger/30644-04.htm
+  S ActionFailed
+bypass Quest Q211_TrialOfTheChallenger 30644-05.htm
+  S QuestList 211:0x80000001
+  S ExShowQuestMark quest=211
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:7562 6:61
+  S NpcHtmlMessage obj=kash item=0 page=script/quest/Q211_TrialOfTheChallenger/30644-05a.htm
+  S ActionFailed
+  Q upsert Q211_TrialOfTheChallenger | <state> | STARTED
+  Q upsert Q211_TrialOfTheChallenger | <cond> | 1
+  items 7562=61
+
+# Shyslassys: the key and the scroll; his chest appears where he fell.
+kill shyslassys
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 211:0x80000003
+  S ExShowQuestMark quest=211
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2632
+  S SystemMessage id=54 3:2631
+  Q upsert Q211_TrialOfTheChallenger | <cond> | 2
+  items 2631=1 2632=1
+
+# The chest: the key opens it (draw 0, under 2 of 10) and the jackpot (draw 95, over 90)
+# gives the five patterns.
+action chest
+action chest
+  S ActionFailed
+  S NpcHtmlMessage obj=chest item=0 page=default/30647.htm
+  S ActionFailed
+bypass npc_{chest}_Quest
+  S NpcHtmlMessage obj=chest item=0 page=script/quest/Q211_TrialOfTheChallenger/30647-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q211_TrialOfTheChallenger 30647-04.htm
+  S PlaySound type=0 file=ItemSound.quest_jackpot bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2632
+  S SystemMessage id=54 3:2927
+  S SystemMessage id=54 3:1940
+  S SystemMessage id=54 3:1943
+  S SystemMessage id=54 3:2918
+  S SystemMessage id=54 3:1946
+  S NpcHtmlMessage obj=chest item=0 page=script/quest/Q211_TrialOfTheChallenger/30647-03.htm
+  S ActionFailed
+  items 2632=0 2927=1 1940=1 1943=1 2918=1 1946=1
+
+# Kash: the scroll for his letter.
+action kash
+action kash
+  S ActionFailed
+  S NpcHtmlMessage obj=kash item=0 page=default/30644.htm
+  S ActionFailed
+bypass npc_{kash}_Quest
+  S QuestList 211:0x80000007
+  S ExShowQuestMark quest=211
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2631
+  S SystemMessage id=54 3:2628
+  S NpcHtmlMessage obj=kash item=0 page=script/quest/Q211_TrialOfTheChallenger/30644-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q211_TrialOfTheChallenger | <cond> | 3
+
+# Martien takes the letter and sends the player after Gorr.
+action martien
+action martien
+  S ActionFailed
+  S NpcHtmlMessage obj=martien item=0 page=default/30645.htm
+  S ActionFailed
+bypass npc_{martien}_Quest
+  S NpcHtmlMessage obj=martien item=0 page=script/quest/Q211_TrialOfTheChallenger/30645-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q211_TrialOfTheChallenger 30645-02.htm
+  S QuestList 211:0x8000000f
+  S ExShowQuestMark quest=211
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2628
+  S NpcHtmlMessage obj=martien item=0 page=script/quest/Q211_TrialOfTheChallenger/30645-02.htm
+  S ActionFailed
+  Q upsert Q211_TrialOfTheChallenger | <cond> | 4
+
+# Gorr's eye: the always-drop's roll (draw 0) completes the one needed.
+kill gorr
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2629
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 211:0x8000001f
+  S ExShowQuestMark quest=211
+  Q upsert Q211_TrialOfTheChallenger | <cond> | 5
+
+action martien
+  S ActionFailed
+  S NpcHtmlMessage obj=martien item=0 page=default/30645.htm
+  S ActionFailed
+bypass npc_{martien}_Quest
+  S QuestList 211:0x8000003f
+  S ExShowQuestMark quest=211
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2629
+  S NpcHtmlMessage obj=martien item=0 page=script/quest/Q211_TrialOfTheChallenger/30645-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q211_TrialOfTheChallenger | <cond> | 6
+
+# Baraham's eye; another Raldo appears where Baraham fell.
+kill baraham
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2630
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 211:0x8000007f
+  S ExShowQuestMark quest=211
+  Q upsert Q211_TrialOfTheChallenger | <cond> | 7
+
+# Raldo takes the eye.
+action raldo
+action raldo
+  S ActionFailed
+  S NpcHtmlMessage obj=raldo item=0 page=default/30646.htm
+  S ActionFailed
+bypass npc_{raldo}_Quest
+  S NpcHtmlMessage obj=raldo item=0 page=script/quest/Q211_TrialOfTheChallenger/30646-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q211_TrialOfTheChallenger 30646-02.htm
+  S NpcHtmlMessage obj=raldo item=0 page=script/quest/Q211_TrialOfTheChallenger/30646-02.htm
+  S ActionFailed
+bypass Quest Q211_TrialOfTheChallenger 30646-03.htm
+  S NpcHtmlMessage obj=raldo item=0 page=script/quest/Q211_TrialOfTheChallenger/30646-03.htm
+  S ActionFailed
+bypass Quest Q211_TrialOfTheChallenger 30646-04.htm
+  S QuestList 211:0x800000ff
+  S ExShowQuestMark quest=211
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2630
+  S NpcHtmlMessage obj=raldo item=0 page=script/quest/Q211_TrialOfTheChallenger/30646-04.htm
+  S ActionFailed
+  Q upsert Q211_TrialOfTheChallenger | <cond> | 8
+
+# Filaur: level 36 is enough; then the Mithril Mines on the radar.
+action filaur
+action filaur
+  S ActionFailed
+  S NpcHtmlMessage obj=filaur item=0 page=default/30535.htm
+  S ActionFailed
+bypass npc_{filaur}_Quest
+  S QuestList 211:0x800001ff
+  S ExShowQuestMark quest=211
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q211_TrialOfTheChallenger/30535-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q211_TrialOfTheChallenger | <cond> | 9
+action filaur
+  S ActionFailed
+  S NpcHtmlMessage obj=filaur item=0 page=default/30535.htm
+  S ActionFailed
+bypass npc_{filaur}_Quest
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q211_TrialOfTheChallenger/30535-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# The Succubus Queen; Raldo appears again.
+kill succubus
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 211:0x800003ff
+  S ExShowQuestMark quest=211
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q211_TrialOfTheChallenger | <cond> | 10
+
+# Raldo: the Mark of Challenger, experience and the finish; the key went to the chest,
+# so taking it takes nothing.
+action raldo
+action raldo
+  S ActionFailed
+  S NpcHtmlMessage obj=raldo item=0 page=default/30646.htm
+  S ActionFailed
+bypass npc_{raldo}_Quest
+  S SystemMessage id=54 3:2627
+  S SystemMessage id=95 1:72394 1:11250
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 211:0x00000000
+  S NpcHtmlMessage obj=raldo item=0 page=script/quest/Q211_TrialOfTheChallenger/30646-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q211_TrialOfTheChallenger | <state> | COMPLETED
+  Q delete-except-state Q211_TrialOfTheChallenger
+  state Q211_TrialOfTheChallenger COMPLETED
+  rows Q211_TrialOfTheChallenger <state>=COMPLETED
+  items 2627=1 2628=0 2629=0 2630=0 2631=0 2632=0
+
+relog
+  state Q211_TrialOfTheChallenger COMPLETED
+  rows Q211_TrialOfTheChallenger <state>=COMPLETED
+  items 2627=1 7562=61
+action kash
+action kash
+  S ActionFailed
+  S NpcHtmlMessage obj=kash item=0 page=default/30644.htm
+  S ActionFailed
+bypass npc_{kash}_Quest
+  S NpcHtmlMessage obj=kash item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

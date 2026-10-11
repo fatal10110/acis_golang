@@ -194,8 +194,13 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		catalog[l.Path] = ctor
 	}
 	kinds := map[int32]script.NPCKind{}
+	var templates []*npc.Template
 	for _, n := range r.sc.NPCs {
-		inst := &npc.Instance{Template: template(n)}
+		tmpl := template(n)
+		if _, dup := kinds[n.ID]; !dup {
+			templates = append(templates, tmpl)
+		}
+		inst := &npc.Instance{Template: tmpl}
 		switch {
 		case npc.FolkKind(inst):
 			kinds[n.ID] = script.KindFolk
@@ -214,6 +219,11 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		gameservertest.WithItemTemplates(itemTemplates(t, r.sc.Items)),
 		// The AI task ticks only on an approach step.
 		gameservertest.WithAITask(),
+		gameservertest.WithLevels(scenarioLevels(t)),
+		// The NPC population, with no maker, over the scenario's templates:
+		// the scripts' spawner places NPCs through it.
+		gameservertest.WithNPCs(npc.NewTable(templates)),
+		gameservertest.WithNpcSpawns(nil),
 	}
 	if r.sc.Class != 0 {
 		tmpl := gameservertest.ClassTemplate()
@@ -238,8 +248,10 @@ func (r *run) boot(t *testing.T, cfg Config) {
 			t.Fatalf("%s: the clan line's clan is not restored at level %d", r.sc.Name, r.sc.Clan)
 		}
 	}
-	// The journal is read when the character is selected.
+	// The journal and the experience are read when the character is
+	// selected.
 	seedQuests(t, r.srv.DB, r.player, r.sc.Quests)
+	seedExp(t, r.srv.DB, r.player, r.sc.Level)
 	r.enterWorld(t)
 	x, y, z := r.srv.PlayerPosition(t, r.player)
 	r.origin = location.Location{X: x, Y: y, Z: z}
@@ -265,6 +277,34 @@ func seedClan(t *testing.T, db *sql.DB, name string, level int) {
 	}
 	if _, err := db.ExecContext(ctx, "UPDATE characters SET clanid = ? WHERE char_name = ?", scenarioClan, name); err != nil {
 		t.Fatalf("seed clan member: %v", err)
+	}
+}
+
+// levelExp is the experience each level adds in the scenario level table.
+const levelExp = 1_000_000
+
+// scenarioLevels is the level table scenarios run with: level L is reached
+// at (L-1) x levelExp experience, up to level 85.
+func scenarioLevels(t *testing.T) *player.LevelTable {
+	t.Helper()
+	levels := make(map[int]player.Level, 85)
+	for lvl := 1; lvl <= 85; lvl++ {
+		levels[lvl] = player.Level{RequiredExpToLevelUp: int64(lvl-1) * levelExp}
+	}
+	table, err := player.NewLevelTable(levels)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return table
+}
+
+// seedExp gives the character obj the experience its level starts at, so
+// the experience a kill earns (none, from the fixture monsters) keeps the
+// level the character line set.
+func seedExp(t *testing.T, db *sql.DB, obj int32, level int) {
+	t.Helper()
+	if _, err := db.ExecContext(context.Background(), "UPDATE characters SET exp = ? WHERE obj_Id = ?", int64(level-1)*levelExp, obj); err != nil {
+		t.Fatalf("seed experience: %v", err)
 	}
 }
 
