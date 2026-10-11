@@ -175,8 +175,9 @@ func (c *Character) finishRevive(blessed bool) {
 // cast and the reset of its target (abortAllOnDeath), then the death packet
 // broadcast to this
 // player's own session and every observer, so the corpse-fall animation
-// plays live and reaches clients before any death side effect's updates. A
-// rider's mount stops eating. The killer's PK/PvP credit follows (a
+// plays live and reaches clients before any death side effect's updates.
+// The player's quests then hear of the death (DeathEvents), and a rider's
+// mount stops eating. The killer's PK/PvP credit follows (a
 // killer holding a cursed weapon feeds the weapon instead), then this
 // player's own costs: charges, a further get-up out of fake death for a
 // player that was playing dead (the stripped Fake Death sent its own get-up
@@ -213,6 +214,7 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	}
 	c.BroadcastStatus()
 	c.BroadcastDie()
+	c.notifyDeath(c.combatant(), killer)
 	c.stopMountFeed()
 	if !c.creditCursedWeaponKill(killer) {
 		c.awardKillerPKKarma(killer)

@@ -57,11 +57,12 @@ func TestScriptCatalogCompleteness(t *testing.T) {
 }
 
 // manifestScript is what the reference manifest records for one script:
-// its kind, its class's own hooks, its bind lines and whether its entry
-// schedules it.
+// its kind, its class's own hooks, its player-level triggers, its bind
+// lines and whether its entry schedules it.
 type manifestScript struct {
 	kind      string
 	hooks     []string
+	on        []string
 	binds     []string
 	scheduled bool
 }
@@ -104,6 +105,8 @@ func readScriptManifest(t *testing.T) map[string]*manifestScript {
 			scripts[fields[1]] = cur
 		case strings.HasPrefix(line, "  kind "):
 			cur.kind = fields[1]
+		case strings.HasPrefix(line, "  on ") && cur != nil:
+			cur.on = append(cur.on, fields[1])
 		case strings.HasPrefix(line, "  bind "):
 			cur.binds = append(cur.binds, strings.TrimSpace(line))
 		case line == "  scheduled" && cur != nil:
@@ -129,7 +132,8 @@ func readScriptManifest(t *testing.T) map[string]*manifestScript {
 
 // manifestMismatches builds the registry from list and catalog with cfg
 // and returns every way a catalog script's dump differs from the reference
-// manifest: not registered, kind, own hooks, bind lines.
+// manifest: not registered, kind, own hooks, player-level triggers, bind
+// lines.
 func manifestMismatches(t *testing.T, list []script.Listing, catalog script.Catalog, cfg script.Config) []string {
 	t.Helper()
 	want := readScriptManifest(t)
@@ -163,6 +167,8 @@ func manifestMismatches(t *testing.T, list []script.Listing, catalog script.Cata
 			cur.kind = fields[1]
 		case strings.HasPrefix(line, "  hooks "):
 			cur.hooks = strings.Split(fields[1], ",")
+		case strings.HasPrefix(line, "  on "):
+			cur.on = append(cur.on, fields[1])
 		case strings.HasPrefix(line, "  bind "):
 			cur.binds = append(cur.binds, strings.TrimSpace(line))
 		case line == "  scheduled":
@@ -180,6 +186,9 @@ func manifestMismatches(t *testing.T, list []script.Listing, catalog script.Cata
 			}
 			if !slices.Equal(g.hooks, w.hooks) {
 				out = append(out, path+": own hooks "+strings.Join(g.hooks, ",")+", reference "+strings.Join(w.hooks, ","))
+			}
+			if !slices.Equal(g.on, w.on) {
+				out = append(out, path+": on "+strings.Join(g.on, ",")+", reference "+strings.Join(w.on, ","))
 			}
 			if !slices.Equal(g.binds, w.binds) {
 				out = append(out, path+": binds "+strings.Join(g.binds, "; ")+", reference "+strings.Join(w.binds, "; "))

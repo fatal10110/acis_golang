@@ -385,3 +385,10 @@ Player.setPkKills script.Player.SetPkKills
 Quest.getHtmlText script.Script.HTMLText
 Summon.getNpcId script.SummonNpcID
 UserInfo.new script.Player.SendUserInfo
+# Test of the Summoner (#3567). Setting the death hook (Hooks.OnDeath) is
+# what makes a quest one its player's death reaches. Its duel records the
+# summon of the creature that started it, a summon, which has no summon of
+# its own: the recorded summon is always none, so the foul test reduces to
+# whether the attacker is a summon (Creature.Summon) and reads no summon.
+Creature.getSummon inline
+Quest.setTriggeredOnDeath inline
