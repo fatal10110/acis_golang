@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
+	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -17,6 +19,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -169,6 +172,20 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *
 	}
 	registry := script.Build(so.list, so.catalog, script.Config{KindOf: kindOf, Log: o.log, Env: env, Queue: engine})
 	return &questBoot{store: store, registry: registry, journals: journals, env: env}
+}
+
+// bindResidences gives the scripts the doors they open and close and the
+// castles NPCs belong to, with their sieges; a nil one stays unset.
+func (q *questBoot) bindResidences(doors *gamemanager.WorldObjects, castles *castle.Manager, sieges *siege.Engine) {
+	if doors != nil {
+		q.env.Doors = doors
+	}
+	if castles != nil {
+		q.env.Castles = castles
+	}
+	if sieges != nil {
+		q.env.Sieges = sieges
+	}
 }
 
 // journalStore is the real journal store, with the faults a suite sets and

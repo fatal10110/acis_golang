@@ -71,25 +71,50 @@ func (*benchRegenActor) TickRegen()               {}
 func (*benchRegenActor) SettleRegen()             {}
 
 // BenchmarkNPCRegenTickManyIdleActors reproduces the review's 30k tracked
-// population for NPCRegen.Tick: a reused scratch buffer removes
-// State.Objects()'s per-tick snapshot allocation, so once its capacity
-// stabilizes a sweep over idle phases allocates nothing, and a backstop
-// sweep costs one allocation per NPC: the SettleRegen task posted to its
-// queue, which production pays too.
+// population for NPCRegen.Tick, 1% of it short with its phase armed (never
+// due on the stopped clock): a sweep walks only the armed phases, and the
+// backstop pass every regenBackstopEvery sweeps visits every tracked object
+// through a reused scratch buffer, costing one allocation per NPC: the
+// SettleRegen task posted to its queue, which production pays too.
 func BenchmarkNPCRegenTickManyIdleActors(b *testing.B) {
-	const total = 30000
-
-	state := world.New()
-	for i := 0; i < total; i++ {
-		state.AddObject(&benchRegenActor{id: int32(i) + 1})
-	}
-	regen := NewNPCRegen(state)
-	regen.Tick()
-	testLoop.Run()
+	regen := benchRegenPopulation()
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		regen.Tick()
+		testLoop.Run()
+	}
+}
+
+// benchRegenPopulation returns a sweep over 30k tracked actors, 1% of them
+// short with their phase armed, after its first backstop pass.
+func benchRegenPopulation() *NPCRegen {
+	const total, armed = 30000, 300
+	state := world.New()
+	for i := range total {
+		a := &benchRegenActor{id: int32(i) + 1}
+		if i%(total/armed) == 0 {
+			a.regen.Settle(testQueue, func() bool { return true })
+		}
+		state.AddObject(a)
+	}
+	regen := NewNPCRegen(state)
+	regen.Tick()
+	testLoop.Run()
+	return regen
+}
+
+// BenchmarkNPCRegenSweepBetweenBackstops is BenchmarkNPCRegenTickManyIdleActors
+// without the backstop passes: the cost of the sweeps that only run due
+// ticks.
+func BenchmarkNPCRegenSweepBetweenBackstops(b *testing.B) {
+	regen := benchRegenPopulation()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		regen.sweeps = 1 // never a backstop pass
 		regen.Tick()
 		testLoop.Run()
 	}

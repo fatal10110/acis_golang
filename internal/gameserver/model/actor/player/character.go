@@ -93,6 +93,9 @@ type Character struct {
 	vitalsMu sync.RWMutex
 	// regen is the HP/MP/CP regeneration task SettleRegen arms on a drop.
 	regen creature.Regen
+	// seenMaxHP, seenMaxMP and seenMaxCP are the whole-point maxima the
+	// last ResourceValues read finalized; see noteMaxima.
+	seenMaxHP, seenMaxMP, seenMaxCP atomic.Int64
 	// reviveMu makes a revive one step from dead to alive, so exactly one
 	// of two revives wins a death. The player's own restart-point request
 	// and a resurrecting caster's hit run on different queues. Without the

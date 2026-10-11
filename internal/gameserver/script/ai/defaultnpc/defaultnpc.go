@@ -104,3 +104,69 @@ func TryToAttack(s *script.Script, n *script.NPC, c script.Creature) {
 func CreatePrivates(s *script.Script, n *script.NPC) {
 	s.Spawner().CreatePrivates(n)
 }
+
+// MakeAttackEvent runs the script's own attacked hook as if attacker had
+// attacked the NPC for damage, with no skill. When generatePartyAttacked is
+// set and the NPC is in a party, it then calls the party-attacked hooks of
+// its master, when alive and not the NPC itself, and of every live private
+// of its party but the NPC: the NPC attacked by attacker called each.
+func MakeAttackEvent(s *script.Script, n *script.NPC, attacker script.Creature, damage int32, generatePartyAttacked bool) {
+	s.RunAttacked(n, attacker, damage)
+	if !generatePartyAttacked || (!n.IsMaster() && !n.HasMaster()) {
+		return
+	}
+	if master := n.Master(); master != nil && !master.Dead() && !script.Same(n, master) {
+		s.RaisePartyAttacked(n, master, attacker, damage)
+	}
+	for _, minion := range n.Minions() {
+		if script.Same(minion, n) || minion.Dead() {
+			continue
+		}
+		s.RaisePartyAttacked(n, minion, attacker, damage)
+	}
+}
+
+// OpenCloseDoor opens the door named doorName when state is 0 and closes it
+// otherwise; no such door, nothing happens.
+func OpenCloseDoor(s *script.Script, doorName string, state int32) {
+	d := s.Door(doorName)
+	if d == nil {
+		return
+	}
+	if state == 0 {
+		d.Open()
+	} else {
+		d.Close()
+	}
+}
+
+// PledgeCastleState returns where c's player stands towards the castle the
+// NPC belongs to: 2 when its clan defends or owns the castle in the
+// castle's siege under way, or owns the castle; 1 when its clan attacks
+// the castle in that siege; 0 otherwise, and for a creature no player
+// controls, a player in no clan or an NPC of no castle.
+func PledgeCastleState(s *script.Script, n *script.NPC, c script.Creature) int32 {
+	if !c.Playable() {
+		return 0
+	}
+	p := script.ActingPlayer(c)
+	if p == nil {
+		return 0
+	}
+	castle := s.Castle(n)
+	if !p.InClan() || castle == nil {
+		return 0
+	}
+	if castle.SiegeInProgress() {
+		if castle.OnSiegeSide(p, script.SiegeDefender, script.SiegeOwner) {
+			return 2
+		}
+		if castle.OnSiegeSide(p, script.SiegeAttacker) {
+			return 1
+		}
+	}
+	if castle.ID() == p.ClanCastleID() {
+		return 2
+	}
+	return 0
+}

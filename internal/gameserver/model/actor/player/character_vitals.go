@@ -47,7 +47,30 @@ func (c *Character) ResourceValues() Resources {
 	res.MaxHP = c.finalMax(stat.MaxHP, res.MaxHP)
 	res.MaxMP = c.finalMax(stat.MaxMP, res.MaxMP)
 	res.MaxCP = c.finalMax(stat.MaxCP, res.MaxCP)
+	c.noteMaxima(res)
 	return res
+}
+
+// noteMaxima settles the regeneration task when a read finds a maximum
+// changed since the last read, so a maximum raised under a full resource
+// starts regenerating from the change. A read runs under the regeneration
+// task's own lock (regenShort) and under other actors' locks, so the
+// settle is posted to c's queue. A character not in the world has no
+// queue; it settles as it enters (SettleEnteredRegen).
+func (c *Character) noteMaxima(res Resources) {
+	hp, mp, cp := int64(res.MaxHP), int64(res.MaxMP), int64(res.MaxCP)
+	if c.seenMaxHP.Load() == hp && c.seenMaxMP.Load() == mp && c.seenMaxCP.Load() == cp {
+		return
+	}
+	changed := c.seenMaxHP.Swap(hp) != hp
+	changed = c.seenMaxMP.Swap(mp) != mp || changed
+	changed = c.seenMaxCP.Swap(cp) != cp || changed
+	if !changed {
+		return
+	}
+	if q := c.liveLocked().Queue(); q != nil {
+		q.Post(c.settleRegenTask)
+	}
 }
 
 // finalMax finalizes a raw HP/MP/CP maximum through c's calculator and drops

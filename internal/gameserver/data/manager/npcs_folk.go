@@ -145,6 +145,7 @@ func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading in
 	}
 	s.State.Spawn(f, loc.X, loc.Y, loc.Z, heading)
 	f.EnterZones()
+	f.SettleRegen() // vitals below max regenerate one period from the spawn
 	// The AI and walker tasks only work actors already in the world grid;
 	// the alias rule's walk starts before the AI task holds the NPC.
 	if control != nil && routeStandIn(s.Scripts, int32(inst.Template.ID)) {

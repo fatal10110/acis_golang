@@ -44,6 +44,11 @@ func TestPlayerRegenTickRestoresResourcesAndSendsStatus(t *testing.T) {
 	if !ok {
 		t.Fatalf("world player %T does not expose resources", obj)
 	}
+	// Full first: a fixture restored short regenerates from its entry,
+	// and the drop must start the phase.
+	p.SetResourceValues(player.Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 100, CurrentMP: 100, MaxCP: 100, CurrentCP: 100})
+	full := p.ResourceValues()
+	p.SetResourceValues(player.Resources{MaxHP: 100, CurrentHP: full.MaxHP, MaxMP: 100, CurrentMP: full.MaxMP, MaxCP: 100, CurrentCP: full.MaxCP})
 	dropped := player.Resources{MaxHP: 100, CurrentHP: 10, MaxMP: 100, CurrentMP: 10, MaxCP: 100, CurrentCP: 10}
 	p.SetResourceValues(dropped)
 

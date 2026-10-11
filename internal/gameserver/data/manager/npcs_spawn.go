@@ -227,6 +227,8 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 
 	n.state.Spawn(hostile, loc.X, loc.Y, loc.Z, heading)
 	hostile.EnterZones()
+	// A saved HP or MP below max regenerates one period from the spawn.
+	hostile.SettleRegen()
 	n.ai.Add(hostile)
 	// Walker only ticks in-region actors — must run after Spawn placed this
 	// NPC in world.State, not before.

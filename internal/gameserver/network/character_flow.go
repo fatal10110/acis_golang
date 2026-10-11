@@ -373,6 +373,8 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 		// Registered since its selection; from here on it is in the world
 		// for the view refreshes its burst carried until now.
 		live.entered.Store(true)
+		// Vitals restored short regenerate one period from the entry.
+		c.SettleEnteredRegen()
 		if live.zoneActor != nil {
 			live.zoneActor.revalidate(l.zones)
 		}
