@@ -94,9 +94,10 @@ func (c *creature) Summon() bool { return tracked(c).Kind() == actor.KindSummon 
 
 func (c *creature) loc() Loc { return locOf(c) }
 
-// Distance2D returns the NPC's distance to c on the ground plane.
-func (n *NPC) Distance2D(c Creature) float64 {
-	a, b := locOf(n), locOf(c)
+// Distance2D returns the NPC's distance to at, a creature or a point, on the
+// ground plane.
+func (n *NPC) Distance2D(at Place) float64 {
+	a, b := locOf(n), at.loc()
 	return math.Hypot(float64(a.X-b.X), float64(a.Y-b.Y))
 }
 

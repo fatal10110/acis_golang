@@ -29,15 +29,18 @@ const (
 	unboundID       = int32(29990) // no behavior
 )
 
-// warriorScripts are the behavior chain down to the Warrior behaviors, in
-// scripts.xml order, as the server registers them.
+// warriorScripts are the behavior chain down to the Warrior behaviors and
+// their children, in scripts.xml order, as the server registers them.
 func warriorScripts() ([]script.Listing, script.Catalog) {
 	catalog := script.Catalog{
-		"script.ai.individual.DefaultNpc":                                                      defaultnpc.New,
-		"script.ai.individual.Monster.MonsterAI":                                               monster.New,
-		"script.ai.individual.Monster.WarriorBase.WarriorBase":                                 warrior.Base,
-		"script.ai.individual.Monster.WarriorBase.Warrior.Warrior":                             warrior.Warrior,
-		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive": warrior.Aggressive,
+		"script.ai.individual.DefaultNpc":                                                                defaultnpc.New,
+		"script.ai.individual.Monster.MonsterAI":                                                         monster.New,
+		"script.ai.individual.Monster.WarriorBase.WarriorBase":                                           warrior.Base,
+		"script.ai.individual.Monster.WarriorBase.Warrior.Warrior":                                       warrior.Warrior,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive":           warrior.Aggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHold.WarriorHold":                       warrior.Hold,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorFishingBlock":    warrior.FishingBlock,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorPhysicalSpecial": warrior.PhysicalSpecial,
 	}
 	var list []script.Listing
 	for _, path := range []string{
@@ -46,6 +49,9 @@ func warriorScripts() ([]script.Listing, script.Catalog) {
 		"script.ai.individual.Monster.WarriorBase.WarriorBase",
 		"script.ai.individual.Monster.WarriorBase.Warrior.Warrior",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHold.WarriorHold",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorFishingBlock",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorPhysicalSpecial",
 	} {
 		list = append(list, script.Listing{Path: path})
 	}
