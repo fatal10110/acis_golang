@@ -812,7 +812,8 @@ func loadRaidMultipliers(paths gameServerPaths) (npc.RaidMultipliers, error) {
 }
 
 // loadNpcAIConfig reads the npcs.properties MobAggroInPeaceZone (default
-// true) and GuardAttackAggroMob (default false) target-selection switches.
+// true) and GuardAttackAggroMob (default false) target-selection switches
+// and the DefaultSeeRange (default 450) NPC see range.
 func loadNpcAIConfig(paths gameServerPaths) (npc.AIConfig, error) {
 	props, err := config.LoadFile(paths.NpcsConfigPath)
 	if err != nil {
@@ -823,6 +824,7 @@ func loadNpcAIConfig(paths gameServerPaths) (npc.AIConfig, error) {
 	c := npc.AIConfig{
 		MobAggroInPeaceZone: f.Bool("MobAggroInPeaceZone", def.MobAggroInPeaceZone),
 		GuardAttackAggroMob: f.Bool("GuardAttackAggroMob", def.GuardAttackAggroMob),
+		SeeRange:            f.Int("DefaultSeeRange", def.SeeRange),
 	}
 	if err := f.Err(); err != nil {
 		return npc.AIConfig{}, err

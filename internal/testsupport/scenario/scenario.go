@@ -27,6 +27,8 @@
 //	hit <role> <damage>    the character lands a hit of that damage on the NPC
 //	kill <role> [xN]       the character lands a lethal hit on the NPC, N times; a dead NPC is replaced by a fresh one first
 //	advance <duration>     time passes, as time.ParseDuration reads it
+//	approach <role>        the character steps to 100 in front of the NPC, inside its see range, and one
+//	                       AI tick runs, whose see-creature scan notices it
 //	relog                  back to character select and into the world again
 //
 //	  S <packet>           the packets of the step, in order, as scriptcontract.Packet renders them;
@@ -110,13 +112,14 @@ type Check struct {
 
 // argCount is, per verb, the arguments it takes: min and max.
 var argCount = map[string][2]int{
-	"action":  {1, 1},
-	"bypass":  {1, -1},
-	"link":    {1, 1},
-	"hit":     {2, 2},
-	"kill":    {1, 2},
-	"advance": {1, 1},
-	"relog":   {0, 0},
+	"action":   {1, 1},
+	"bypass":   {1, -1},
+	"link":     {1, 1},
+	"hit":      {2, 2},
+	"kill":     {1, 2},
+	"advance":  {1, 1},
+	"approach": {1, 1},
+	"relog":    {0, 0},
 }
 
 // Parse reads a scenario file.
@@ -252,7 +255,7 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 // checkStep validates a step's arguments against the declared roles.
 func checkStep(verb string, args []string, roles map[string]bool) error {
 	switch verb {
-	case "action", "hit", "kill":
+	case "action", "hit", "kill", "approach":
 		if !roles[args[0]] {
 			return fmt.Errorf("unknown role %q", args[0])
 		}

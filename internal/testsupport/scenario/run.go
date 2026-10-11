@@ -152,6 +152,8 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		gameservertest.WithHTMLPages(r.pages),
 		gameservertest.WithNPCScripts(kinds, list, catalog),
 		gameservertest.WithItemTemplates(itemTemplates(t, r.sc.Items)),
+		// The AI task ticks only on an approach step.
+		gameservertest.WithAITask(),
 	)
 	r.player = r.srv.SoleObjectID(t)
 	r.roles[r.player] = "player"
@@ -176,6 +178,7 @@ func (r *run) spawn(t *testing.T, n NPC) {
 		obj = r.srv.SpawnFolkNPCAt(t, tmpl, at).ObjectID()
 	} else {
 		h := r.srv.SpawnHostileNPCTemplateAt(t, tmpl, at)
+		r.srv.AI.Add(h)
 		r.live[n.Role], obj = h, h.ObjectID()
 	}
 	r.roles[obj], r.objs[n.Role] = n.Role, obj
@@ -246,6 +249,8 @@ func (r *run) step(t *testing.T, i int, st Step) {
 	case "advance":
 		d, _ := time.ParseDuration(st.Args[0])
 		r.srv.Advance(t, d)
+	case "approach":
+		r.approach(t, st.Args[0])
 	case "relog":
 		c.Send(wire.NewPacketWriter(clientpackets.OpcodeRequestRestart).Bytes())
 		r.readUntil(t, serverpackets.OpcodeCharSelectInfo)
@@ -280,6 +285,32 @@ func (r *run) step(t *testing.T, i int, st Step) {
 			fail("%s (line %d)", d, ck.Line)
 		}
 	}
+}
+
+// approach puts the character 100 in front of role's NPC, on the -x side,
+// within every NPC's see range, then runs one AI tick and lets it settle.
+func (r *run) approach(t *testing.T, role string) {
+	t.Helper()
+	obj, ok := r.srv.State.Player(r.player)
+	if !ok {
+		t.Fatal("the character is not in the world")
+	}
+	target, ok := r.srv.State.Object(r.objs[role])
+	if !ok {
+		t.Fatalf("NPC %s is not in the world", role)
+	}
+	n, ok := target.(attackable.Combatant)
+	if !ok {
+		t.Fatalf("NPC %s (%T) is not a combatant", role, target)
+	}
+	x, y, z := n.Position()
+	if err := r.srv.State.Move(obj, x-100, y, z); err != nil {
+		t.Fatalf("approach %s: %v", role, err)
+	}
+	if err := r.srv.AI.Tick(); err != nil {
+		t.Fatalf("AI tick: %v", err)
+	}
+	r.srv.Settle(t)
 }
 
 // onPlayer runs fn on the character's queue, where its hits land, and
