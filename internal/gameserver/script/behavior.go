@@ -107,18 +107,51 @@ func (n *NPC) InSpawnTerritory(c Creature) bool {
 // MostHated returns the creature the NPC hates most, nil when it hates
 // none.
 func (n *NPC) MostHated() Creature {
-	t, ok := n.hostile("read the hate").AI().Threats().MostHated()
+	var (
+		c  attackable.Combatant
+		ok bool
+	)
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		var t attackable.Threat
+		t, ok = o.AI().Threats().MostHated()
+		c = t.Attacker
+	case *npc.Folk:
+		c, ok = o.MostHated()
+	default:
+		panic("script: the hate of a handle on nothing")
+	}
 	if !ok {
 		return nil
 	}
-	return creatureOf(t.Attacker)
+	return creatureOf(c)
 }
 
 // StopHate zeroes the NPC's hate of c and drops its attack desire on c;
 // the NPC goes back to peace when it then hates no one.
 func (n *NPC) StopHate(c Creature) {
-	if t := combatantOf(c); t != nil {
-		n.hostile("stop a hate").StopAggroHate(t)
+	t := combatantOf(c)
+	if t == nil {
+		return
+	}
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		o.StopAggroHate(t)
+	case *npc.Folk:
+		o.StopHate(t)
+	default:
+		panic("script: the hate of a handle on nothing")
+	}
+}
+
+// ClearDesires drops every desire the NPC holds, whatever its kind. A
+// handle on nothing does nothing.
+func (n *NPC) ClearDesires() {
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		o.AI().Desires().Clear()
+	case *npc.Folk:
+		o.ClearDesires()
 	}
 }
 

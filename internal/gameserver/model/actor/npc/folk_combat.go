@@ -156,6 +156,7 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 	f.cast.ai = rt.AI
 	f.bindSpawn(rt.Slot)
 	f.heldMask = templateHeldMask(f.Instance.Template, rt.Items)
+	f.resolveWeapon(rt.Items)
 	if rt.MaxBuffsAmount > 0 {
 		f.maxBuffs.Store(int32(rt.MaxBuffsAmount))
 	}
@@ -236,13 +237,13 @@ func (f *Folk) SiegeGuard() bool { return false }
 // Guard reports false: a civilian NPC is no guard.
 func (f *Folk) Guard() bool { return false }
 
-// Attackable reports false: a civilian NPC keeps no hate or aggro, so the
-// aggro controls below do nothing.
+// Attackable reports false: a civilian NPC is no attackable NPC, so the
+// aggro controls that act only on one do nothing on it.
 func (f *Folk) Attackable() bool { return false }
 
 // Running reports the NPC's run stance: it spawns running, or walking
-// for a route walker in walk mode; a hit or a cast desire it acts on
-// switches it to run, and its AI going idle back to walk.
+// for a route walker in walk mode; a hit, or an attack or cast desire it
+// acts on, switches it to run, and its AI going idle back to walk.
 func (f *Folk) Running() bool { return f.running.Load() }
 
 // InCombat reports whether the NPC holds an attack stance.

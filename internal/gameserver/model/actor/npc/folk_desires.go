@@ -87,6 +87,12 @@ func (f *Folk) socialHeld() bool {
 // do-nothing have no step on a civilian NPC.
 func (f *Folk) act(d *ai.Desire) {
 	switch d.Kind {
+	case ai.IntentionAttack:
+		f.thinkAttack(d)
+	case ai.IntentionFlee:
+		f.thinkFlee(d)
+	case ai.IntentionFollow:
+		f.thinkFollow(d)
 	case ai.IntentionCast:
 		f.thinkCast(d)
 	case ai.IntentionMoveTo:
@@ -127,15 +133,15 @@ func (f *Folk) thinkSocial(d *ai.Desire) {
 }
 
 // arrived is f's AI on a walk reaching its destination, on f's queue: a
-// walk to a point opens the move-finished point, then drops its desire; a
-// wander drops its desire.
+// walk to a point or a flee opens the move-finished point, then drops its
+// desire; a wander drops its desire.
 func (f *Folk) arrived() {
 	cur := f.currentDesire()
 	if cur == nil {
 		return
 	}
 	switch cur.Kind {
-	case ai.IntentionMoveTo:
+	case ai.IntentionMoveTo, ai.IntentionFlee:
 		f.AtHookPoint(ai.HookMoveFinished)
 		f.cast.desires.RemoveIf(cur.Equal)
 	case ai.IntentionWander:
@@ -144,10 +150,10 @@ func (f *Folk) arrived() {
 }
 
 // arrivedBlocked is f's AI on a walk stopped short by a blocked path: a
-// walk to a point or a wander drops its desire, with no move-finished
-// point.
+// walk to a point, a flee or a wander drops its desire, with no
+// move-finished point.
 func (f *Folk) arrivedBlocked() {
-	if cur := f.currentDesire(); cur != nil && (cur.Kind == ai.IntentionMoveTo || cur.Kind == ai.IntentionWander) {
+	if cur := f.currentDesire(); cur != nil && (cur.Kind == ai.IntentionMoveTo || cur.Kind == ai.IntentionFlee || cur.Kind == ai.IntentionWander) {
 		f.cast.desires.RemoveIf(cur.Equal)
 	}
 }
