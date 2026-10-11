@@ -44,7 +44,7 @@ type FolkAI interface {
 const castDesireDecay = 66000
 
 // folkCast is a civilian NPC's AI and cast runtime: the controller its
-// casts run on and the desires its AI picks them from. The controller is
+// casts run on and the desires its AI picks its actions from. The controller is
 // set once before the NPC is published; desires is safe for concurrent
 // use; step, acting and onRoute belong to the NPC's queue, which alone
 // writes lifeTime.
@@ -69,8 +69,8 @@ type folkCast struct {
 	// from a dialog command.
 	buffCheckAt atomic.Int64
 
-	// currentMu guards current, the cast desire the AI last acted on (nil
-	// when none): a cast break from another actor's queue closes it.
+	// currentMu guards current, the desire the AI last acted on (nil when
+	// idle): a cast break from another actor's queue closes it.
 	currentMu sync.Mutex
 	current   *ai.Desire
 
@@ -91,17 +91,28 @@ func (f *Folk) SetCaster(control CastControl, castAI FolkCastAI) {
 func (f *Folk) CastControl() CastControl { return f.cast.control }
 
 // AddCastDesire asks f to cast ref at target with weight, the way a dialog
-// command or script asks an NPC: a skill still in reuse, or one whose hit
-// f cannot pay, is refused, and an equal desire already queued gains the
-// weight instead. f's AI starts the cast on its next tick, closing in
-// first when target is out of the skill's range or out of its sight.
-func (f *Folk) AddCastDesire(target attackable.Combatant, ref modelskill.Ref, weight float64) {
+// command or script asks an NPC; an equal desire already queued gains the
+// weight instead. f's AI starts the cast on its next tick, closing in first
+// when target is out of the skill's range or out of its sight. Every
+// refusal is silent:
+//
+//   - checkConditions refuses a skill still in reuse, or one whose hit f
+//     cannot pay; without it the request skips those gates.
+//   - A hold (moveToTarget false) is refused when target is not strictly
+//     within the skill's cast range plus both collision radii, measured
+//     flat, since only walking would bring it in range.
+//   - A skill whose target type resolves no creature from target is
+//     refused.
+func (f *Folk) AddCastDesire(target attackable.Combatant, ref modelskill.Ref, weight float64, checkConditions, moveToTarget bool) {
 	if target == nil || f.cast.castAI == nil || f.queue == nil {
 		return
 	}
 	f.queue.Post(func() {
 		castAI := f.cast.castAI
-		if !castAI.CanDesire(target, ref) {
+		if checkConditions && !castAI.CanDesire(target, ref) {
+			return
+		}
+		if !moveToTarget && !ai.InCastReach(f, target, castAI.Range(ref)) {
 			return
 		}
 		final := castAI.FinalTarget(target, ref)
@@ -110,7 +121,7 @@ func (f *Folk) AddCastDesire(target attackable.Combatant, ref modelskill.Ref, we
 		}
 		f.cast.desires.AddOrUpdate(&ai.Desire{
 			Kind: ai.IntentionCast, FinalTarget: final, Skill: ref,
-			MoveToTarget: true, Weight: weight, QueuedAt: f.now(),
+			MoveToTarget: moveToTarget, Weight: weight, QueuedAt: f.now(),
 		})
 	})
 }
@@ -143,11 +154,12 @@ func (f *Folk) Tick() {}
 
 // TickThink runs one AI tick on f's queue: the see-creature point opens
 // it, then invalid cast desires are dropped and the heaviest desire left is
-// acted on unless a cast is in flight; an NPC with no desire left and no
-// cast in flight idles; and every third tick the cast desires lose weight,
-// an NPC still acting on one switching to its run stance. A route desire
-// never leaves the queue, so a route walker never idles. A dead NPC's tick
-// does nothing.
+// acted on unless a cast is in flight or a social animation holds the
+// selection; an NPC with no desire left and no cast in flight idles; and
+// every third tick the cast and do-nothing desires lose weight, an NPC
+// still acting on a cast switching to its run stance. A route desire never
+// leaves the queue, so a route walker never idles. A dead NPC's tick does
+// nothing.
 func (f *Folk) TickThink() error {
 	if f.Dead() {
 		return nil
@@ -161,7 +173,8 @@ func (f *Folk) TickThink() error {
 	f.cast.lifeTime.Add(1)
 	if f.cast.step%3 == 0 {
 		f.cast.desires.DecreaseWeightByType(ai.IntentionCast, castDesireDecay)
-		if f.currentDesire() != nil {
+		f.cast.desires.DecreaseWeightByType(ai.IntentionNothing, nothingDesireDecay)
+		if cur := f.currentDesire(); cur != nil && cur.Kind == ai.IntentionCast {
 			f.forceRunStance()
 		}
 		f.cast.step = 0
@@ -169,10 +182,11 @@ func (f *Folk) TickThink() error {
 	return nil
 }
 
-// runAI prunes f's cast desires and, once f has lived through an AI tick
-// and is not casting, acts on the heaviest desire: a route walk puts f on
-// its route, a cast takes it off. An NPC that just ran out of desires
-// idles.
+// runAI prunes f's cast desires and, once f has lived through an AI tick,
+// is not casting and no social animation holds the selection, acts on the
+// heaviest desire: a route walk puts f on its route, any other desire takes
+// it off. A wander already current is not taken up again over a wander. An
+// NPC that just ran out of desires idles.
 func (f *Folk) runAI() {
 	if castAI := f.cast.castAI; castAI != nil {
 		f.cast.desires.RemoveIf(func(d *ai.Desire) bool {
@@ -182,7 +196,7 @@ func (f *Folk) runAI() {
 			return d.FinalTarget != nil && (!f.Knows(d.FinalTarget) || d.FinalTarget.AlikeDead())
 		})
 	}
-	if f.denyAIAction() || f.CastingNow() || f.cast.lifeTime.Load() == 0 {
+	if f.denyAIAction() || f.CastingNow() || f.cast.lifeTime.Load() == 0 || f.socialHeld() {
 		return
 	}
 	f.cancelFollow()
@@ -201,9 +215,12 @@ func (f *Folk) runAI() {
 		f.thinkMoveRoute(desire.RouteName)
 		return
 	}
+	if cur := f.currentDesire(); cur != nil && cur.Kind == ai.IntentionWander && desire.Kind == ai.IntentionWander {
+		return
+	}
 	f.leaveRoute()
 	f.setCurrentDesire(desire)
-	f.thinkCast(desire)
+	f.act(desire)
 }
 
 // thinkIdle is what an NPC with nothing left to do does: it stops any walk
@@ -334,7 +351,10 @@ func (f *Folk) cancelFollow() {
 }
 
 // denyAIAction reports a state in which the NPC's AI does nothing: a
-// teleport under way, or death.
+// teleport under way, or death. The stun, sleep, paralyze, fear and
+// hold-until-attacked states never hold here: folkAdmits keeps every
+// effect but a plain buff or debuff off the NPC, and those carry no such
+// flag.
 func (f *Folk) denyAIAction() bool {
 	return f.AlikeDead() || (f.motion != nil && f.motion.teleporting.Load())
 }

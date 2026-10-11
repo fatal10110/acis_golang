@@ -158,7 +158,7 @@ func newFolkCastRig(t *testing.T, dist int) *folkCastRig {
 
 // desire queues a cast of skill id at target and runs the NPC's queue.
 func (r *folkCastRig) desire(target attackable.Combatant, id modelskill.ID, weight float64) {
-	r.f.AddCastDesire(target, modelskill.Ref{ID: id, Level: 1}, weight)
+	r.f.AddCastDesire(target, modelskill.Ref{ID: id, Level: 1}, weight, true, true)
 	r.in.Run()
 }
 
