@@ -313,3 +313,11 @@ WorldObject.getY inline
 WorldObject.getZ inline
 WorldObject.isBehind script.NPC.Behind
 WorldObject.isIn2DRadius script.NPC.InRadius2D
+
+# Proof quests, first group (#175). A quest's attacked binding is an entry
+# of its Bind table, and its started test reads the state's status.
+Quest.addAttacked inline
+QuestState.isStarted inline
+
+# Proof quests, second group (#175). A spawn spot is a script.Loc literal.
+SpawnLocation.new inline

@@ -29,8 +29,16 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/tutorial"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q001"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q211"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q260"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q316"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q350"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q360"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q508"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q510"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q636"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q646"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q651"
 	scripttask "github.com/fatal10110/acis_golang/internal/gameserver/script/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/noblesseteleporter"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -50,9 +58,17 @@ func scriptCatalogs(crystals *item.SoulCrystalTable, buffs *skill.NewbieBuffTabl
 // questCatalog lists the quests.
 func questCatalog(crystals *item.SoulCrystalTable) script.Catalog {
 	return script.Catalog{
-		"quest.Q001_LettersOfLove":      q001.New,
-		"quest.Q350_EnhanceYourWeapon":  func() script.Script { return q350.New(crystals) },
-		"quest.Q636_TruthBeyondTheGate": q636.New,
+		"quest.Q001_LettersOfLove":         q001.New,
+		"quest.Q211_TrialOfTheChallenger":  q211.New,
+		"quest.Q260_HuntTheOrcs":           q260.New,
+		"quest.Q316_DestroyPlagueCarriers": q316.New,
+		"quest.Q350_EnhanceYourWeapon":     func() script.Script { return q350.New(crystals) },
+		"quest.Q360_PlunderTheirSupplies":  q360.New,
+		"quest.Q508_AClansReputation":      q508.New,
+		"quest.Q510_AClansReputation":      q510.New,
+		"quest.Q636_TruthBeyondTheGate":    q636.New,
+		"quest.Q646_SignsOfRevolt":         q646.New,
+		"quest.Q651_RunawayYouth":          q651.New,
 	}
 }
 

@@ -11,7 +11,7 @@
 // header comes first:
 //
 //	trace <path below the module root>        optional: the reference trace the first steps replay
-//	character <name> <level>                  the character the client plays
+//	character <name> <level>                  the character the client plays, with the experience its level starts at
 //	class <class id>                          optional: the character's class, and so its race (default 0, a human
 //	                                          fighter); the class template keeps the fixture's stats
 //	clan <level>                              optional: the character leads a clan of that level
@@ -25,7 +25,8 @@
 //	                                          registration manifest (quest id, title, items, bindings) with no hook
 //	item <id> ...                             shipped item templates added to the fixture catalog
 //	page <path below data/html>               a shipped page the server serves; a path ending in / serves its directory
-//	npc <role> <npc id> <type> <dx> <dy> <dz> a fixture NPC template of that instance type, spawned at that offset from the character
+//	npc <role> <npc id> <type> <dx> <dy> <dz> a fixture NPC template of that instance type, spawned at that offset from the character;
+//	                                          the templates a script may spawn more NPCs of
 //
 // Then the steps, each a verb line followed by its indented expectations:
 //
