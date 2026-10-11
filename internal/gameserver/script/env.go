@@ -2,6 +2,7 @@ package script
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -34,6 +35,12 @@ type Env struct {
 	Skills *skill.Table
 	// GameHour returns the in-game hour, 0 to 23.
 	GameHour func() int
+	// Items are the item templates a script reads an item's name from.
+	Items *item.Table
+	// Page returns the datapack page at path, relative to the server root
+	// as a script names it ("./data/html/..."); false when there is none.
+	// nil finds none.
+	Page func(path string) (string, bool)
 }
 
 // Rates are the quest drop and reward multipliers.

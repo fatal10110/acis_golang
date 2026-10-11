@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/rs/zerolog"
 )
@@ -107,64 +106,81 @@ func LoadSpawnlist(dir string, log zerolog.Logger, spawnMultiplier float64) (*sp
 func buildTerritory(el territoryElement) (*spawn.Territory, error) {
 	nodes := make([]spawn.Node, 0, len(el.Nodes))
 	for _, nodeEl := range el.Nodes {
-		set := commons.StatSetFromXMLAttrs(nodeEl.Attrs)
-		if err := decodeLiteralAttrs(set, "x", "y"); err != nil {
+		a := newAttrValues(foldAttrs(nodeEl.Attrs), "spawn territory node")
+		node := spawn.Node{X: int(a.int32Literal("x")), Y: int(a.int32Literal("y"))}
+		if err := a.Err(); err != nil {
 			return nil, err
 		}
-		x, err := set.GetInt("x")
-		if err != nil {
-			return nil, err
-		}
-		y, err := set.GetInt("y")
-		if err != nil {
-			return nil, err
-		}
-		nodes = append(nodes, spawn.Node{X: x, Y: y})
+		nodes = append(nodes, node)
 	}
-	set := commons.StatSetFromXMLAttrs(el.Attrs)
-	if err := decodeLiteralAttrs(set, "minZ", "maxZ"); err != nil {
-		return nil, fmt.Errorf("territory %q: %w", set.GetStringDefault("name", "?"), err)
+	a := newAttrValues(foldAttrs(el.Attrs), "spawn territory")
+	name := a.str("name")
+	if err := a.Err(); err != nil {
+		return nil, err
 	}
-	return spawn.NewTerritory(set, nodes)
+	a.prefix = fmt.Sprintf("spawn territory %q", name)
+	minZ := int(a.int32Literal("minZ"))
+	maxZ := int(a.int32Literal("maxZ"))
+	if err := a.Err(); err != nil {
+		return nil, err
+	}
+	return spawn.NewTerritory(name, minZ, maxZ, nodes)
 }
 
 func buildMaker(el makerElement, territories map[string]*spawn.Territory, log zerolog.Logger, spawnMultiplier float64) (*spawn.Maker, error) {
-	set := commons.StatSetFromXMLAttrs(el.Attrs)
-	f := commons.NewFields(set, "spawn maker loader")
-	name := f.StringDefault("name", "?")
+	a := newAttrValues(foldAttrs(el.Attrs), "spawn maker")
+	logName := a.strDefault("name", "?")
 
-	refs := resolveTerritories(name, f.StringDefault("territory", ""), territories, log)
-	banned := resolveTerritories(name, f.StringDefault("ban", ""), territories, log)
+	refs := resolveTerritories(logName, a.strDefault("territory", ""), territories, log)
+	banned := resolveTerritories(logName, a.strDefault("ban", ""), territories, log)
 
 	aiType, aiParams := flattenAI(el.AI, true)
-	if aiType != "" {
-		set.Set("maker", aiType)
+	if aiType == "" {
+		aiType = a.strDefault("maker", "")
 	}
 
 	entries := make([]spawn.Entry, 0, len(el.NPCs))
 	for _, npcEl := range el.NPCs {
 		entry, err := buildEntry(npcEl, spawnMultiplier)
 		if err != nil {
-			return nil, fmt.Errorf("maker %q: %w", name, err)
+			return nil, fmt.Errorf("maker %q: %w", logName, err)
 		}
 		entries = append(entries, entry)
 	}
 
-	return spawn.NewMaker(set, refs, banned, entries, aiParams, spawnMultiplier)
+	name := a.str("name")
+	if err := a.Err(); err != nil {
+		return nil, err
+	}
+	a.prefix = fmt.Sprintf("spawn maker %q", name)
+	maker := spawn.Maker{
+		Name:              name,
+		Territories:       refs,
+		BannedTerritories: banned,
+		AIType:            aiType,
+		AIParams:          aiParams,
+		MaximumNPCs:       a.int("maximumNpcs"),
+		Event:             a.strDefault("event", ""),
+		SpawnTime:         a.strDefault("spawnTime", ""),
+		Entries:           entries,
+	}
+	if err := a.Err(); err != nil {
+		return nil, err
+	}
+	return spawn.NewMaker(maker, spawnMultiplier), nil
 }
 
 func buildEntry(el spawnNPCElement, spawnMultiplier float64) (spawn.Entry, error) {
-	set := commons.StatSetFromXMLAttrs(el.Attrs)
-	f := commons.NewFields(set, "spawn entry loader")
-	npcID := f.StringDefault("id", "?")
-	if err := decodeLiteralAttrs(set, "id", "total"); err != nil {
+	a := newAttrValues(foldAttrs(el.Attrs), "spawn entry")
+	npcID := a.strDefault("id", "?")
+	if err := canonicalizeLiteralAttrs(a.vals, "id", "total"); err != nil {
 		return spawn.Entry{}, fmt.Errorf("npc %q: %w", npcID, err)
 	}
 
 	privates := make([]spawn.Private, 0)
 	for _, group := range el.Privates {
 		for _, privateEl := range group.Entries {
-			privateSpawn, err := spawn.NewPrivate(commons.StatSetFromXMLAttrs(privateEl.Attrs))
+			privateSpawn, err := buildSpawnPrivate(newAttrValues(foldAttrs(privateEl.Attrs), "spawn private"))
 			if err != nil {
 				return spawn.Entry{}, fmt.Errorf("npc %q private: %w", npcID, err)
 			}
@@ -173,24 +189,56 @@ func buildEntry(el spawnNPCElement, spawnMultiplier float64) (spawn.Entry, error
 	}
 
 	_, aiParams := flattenAI(el.AI, false)
-	positions, err := spawn.ParsePositions(f.StringDefault("pos", ""))
+	positions, err := spawn.ParsePositions(a.strDefault("pos", ""))
 	if err != nil {
 		return spawn.Entry{}, fmt.Errorf("npc %q: %w", npcID, err)
 	}
 
-	entry, err := spawn.NewEntry(set, positions, privates, aiParams, spawnMultiplier)
-	if err != nil {
+	id := a.int32("id")
+	if err := a.Err(); err != nil {
 		return spawn.Entry{}, fmt.Errorf("npc %q: %w", npcID, err)
 	}
-	return entry, nil
+	a.prefix = fmt.Sprintf("spawn entry %d", id)
+	entry := spawn.Entry{
+		NPCID:         id,
+		Total:         a.int("total"),
+		RespawnDelay:  a.gameDuration("respawn"),
+		RespawnRandom: a.gameDuration("respawnRand"),
+		Positions:     positions,
+		Privates:      privates,
+		AIParams:      aiParams,
+		DBName:        a.strDefault("dbName", ""),
+	}
+	if a.has("dbSaving") {
+		entry.DBSaving = a.strArray("dbSaving")
+	}
+	if err := a.Err(); err != nil {
+		return spawn.Entry{}, fmt.Errorf("npc %q: %w", npcID, err)
+	}
+	return spawn.NewEntry(entry, spawnMultiplier), nil
+}
+
+// buildSpawnPrivate builds one private spawn row under a spawn entry's
+// <privates> block. id and weight are required; respawn defaults to 0.
+func buildSpawnPrivate(a *attrValues) (spawn.Private, error) {
+	p := spawn.Private{
+		NPCID:        a.int32("id"),
+		Weight:       a.int("weight"),
+		RespawnDelay: a.gameDuration("respawn"),
+	}
+	if err := a.Err(); err != nil {
+		return spawn.Private{}, err
+	}
+	return p, nil
 }
 
 func flattenAI(ai []aiElement, stripAt bool) (string, map[string]string) {
 	var kind string
 	params := make(map[string]string)
 	for _, el := range ai {
-		set := commons.StatSetFromXMLAttrs(el.Attrs)
-		kind = set.GetStringDefault("type", kind)
+		if t, ok := foldAttrs(el.Attrs)["type"]; ok {
+			kind = t
+		}
 		for _, param := range el.Sets {
 			value := param.Val
 			if stripAt {

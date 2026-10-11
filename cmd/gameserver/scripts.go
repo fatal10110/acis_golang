@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/config"
+	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -170,9 +171,9 @@ func provideScriptSpawner(log zerolog.Logger) *script.Spawner {
 // provideScriptEnv returns what the script helpers act through: the quest
 // rates of server.properties, the party range and multiple item drop the
 // kill rewards read, the item id allocator, the NPC spawner, the shared
-// random source, the world the scripts look NPCs up in, the skill
-// definitions and the in-game clock.
-func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner, state *world.State, data *gameData, clock *task.GameClock) (*script.Env, error) {
+// random source, the world the scripts look NPCs up in, the skill and item
+// definitions, the in-game clock and the datapack pages a script reads.
+func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner, state *world.State, data *gameData, clock *task.GameClock, html *datacache.HTML) (*script.Env, error) {
 	var rates script.Rates
 	for _, r := range []struct {
 		key string
@@ -201,6 +202,8 @@ func provideScriptEnv(serverProps *config.Properties, rewards manager.KillReward
 		World:            state,
 		Skills:           data.Skills,
 		GameHour:         clock.Hour,
+		Items:            data.Items,
+		Page:             html.Get,
 	}, nil
 }
 

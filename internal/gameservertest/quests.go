@@ -7,9 +7,11 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
@@ -129,10 +131,11 @@ type questBoot struct {
 
 // bootQuests builds the journal store, the journal writer draining on
 // worker, the script helpers' environment allocating item ids from ids,
-// with a script spawner bootNpcSpawns binds to the NPC population, and the
-// script registry, whose own work (the dying hooks, and the timers
-// bound to no NPC or player queue) runs on engine.
-func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, state *world.State, clock *task.GameClock, o *options) *questBoot {
+// with a script spawner bootNpcSpawns binds to the NPC population, the
+// item templates items and the link's page cache html, and the script
+// registry, whose own work (the dying hooks, and the timers bound to no NPC
+// or player queue) runs on engine.
+func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, state *world.State, clock *task.GameClock, items *item.Table, html *cache.HTML, o *options) *questBoot {
 	so := o.scriptHelpers()
 	store := &journalStore{QuestStore: gamesql.NewQuestStore(db), loadErr: o.questLoadErr}
 	journals := script.NewQuests(store, worker, o.log)
@@ -147,6 +150,8 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *
 		World:            state,
 		Skills:           modelskill.NewTable(so.skills),
 		GameHour:         clock.Hour,
+		Items:            items,
+		Page:             html.Get,
 	}
 	if so.rates != nil {
 		env.Rates = *so.rates

@@ -36,3 +36,13 @@ func (c *Character) BroadcastSkillAnimation(casterID int32, casterAt location.Lo
 		SkillID: skillID, Level: level, HitTime: hitTime, ReuseDelay: reuseDelay,
 	})
 }
+
+// ActiveWeaponItemID returns the item id of the weapon c attacks with
+// (Player.getActiveWeaponItem): the one in its right hand, or its class's
+// fists when that hand holds no weapon; 0 when its class has no fists.
+func (c *Character) ActiveWeaponItemID() int32 {
+	if tmpl := c.activeWeapon().tmpl; tmpl != nil {
+		return tmpl.ID
+	}
+	return 0
+}
