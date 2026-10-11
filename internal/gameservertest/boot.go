@@ -2282,14 +2282,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	sendObserver := new(atomic.Pointer[func(payload []byte)])
 	frames := new(traffic)
 	serve := func(ctx context.Context, conn *network.Conn) {
-		sent, closed := frames.track(conn)
-		defer closed()
-		conn.ObserveSends(func(payload []byte) {
-			sent()
-			if observe := sendObserver.Load(); observe != nil {
-				(*observe)(payload)
-			}
-		})
+		// Counted first so the count drops last: once Stop sees every
+		// handler returned, each connection already reads as closed to
+		// awaitFrame, which otherwise lets a read's whole wait pass on the
+		// driven clock and report a timeout instead of the close.
 		handlers.Lock()
 		handlers.count++
 		handlers.Unlock()
@@ -2299,6 +2295,14 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			handlersDone.Broadcast()
 			handlers.Unlock()
 		}()
+		sent, closed := frames.track(conn)
+		defer closed()
+		conn.ObserveSends(func(payload []byte) {
+			sent()
+			if observe := sendObserver.Load(); observe != nil {
+				(*observe)(payload)
+			}
+		})
 		gcl.Handle(ctx, conn)
 	}
 	// Serve returns once cleanup cancels ctx; nothing waits on its error.
