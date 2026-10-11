@@ -343,7 +343,7 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 		landings = []scheduledHit{{hits: hits, delay: attackTime / 2}}
 	}
 
-	c.start(attackType, attackTime, landings, bowReuse)
+	c.start(target, attackType, attackTime, landings, bowReuse)
 	if attackType == item.WeaponBow && c.player != nil {
 		c.player.NotifyBowDraw(int(attackTime/time.Millisecond) + int(bowReuse/time.Millisecond))
 	}
@@ -381,7 +381,7 @@ type scheduledHit struct {
 	delay time.Duration
 }
 
-func (c *Controller) start(weapon item.WeaponType, attackTime time.Duration, hits []scheduledHit, bowReuse time.Duration) {
+func (c *Controller) start(target attackable.Combatant, weapon item.WeaponType, attackTime time.Duration, hits []scheduledHit, bowReuse time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -393,9 +393,9 @@ func (c *Controller) start(weapon item.WeaponType, attackTime time.Duration, hit
 	c.inHitAnimation = true
 
 	finishAt := attackTime
-	finish := func() { c.finishAttack(seq) }
+	finish := func() { c.finishAttack(seq, target) }
 	if weapon == item.WeaponBow {
-		finish = func() { c.finishBow(seq, bowReuse) }
+		finish = func() { c.finishBow(seq, target, bowReuse) }
 	}
 	if weapon == item.WeaponDual || weapon == item.WeaponDualFist {
 		finishAt = attackTime * 3 / 2
@@ -689,7 +689,7 @@ func (c *Controller) reportHit(hit Hit) {
 	c.emit(e)
 }
 
-func (c *Controller) finishBow(seq uint64, reuse time.Duration) {
+func (c *Controller) finishBow(seq uint64, target attackable.Combatant, reuse time.Duration) {
 	c.mu.Lock()
 	if seq != c.attackSeq {
 		c.mu.Unlock()
@@ -703,6 +703,7 @@ func (c *Controller) finishBow(seq uint64, reuse time.Duration) {
 	if reuse > 0 {
 		c.scheduleLocked(reuse, func() { c.clearBowCooldown(seq) })
 		c.mu.Unlock()
+		c.emitEnded(target)
 		c.emitRethink()
 		if c.player != nil {
 			c.emit(event.BowShotFinished{})
@@ -713,11 +714,12 @@ func (c *Controller) finishBow(seq uint64, reuse time.Duration) {
 	c.bowCooling = false
 	c.mu.Unlock()
 
+	c.emitEnded(target)
 	c.emitRethink()
 	c.emit(event.AttackFinished{BowReuse: true})
 }
 
-func (c *Controller) finishAttack(seq uint64) {
+func (c *Controller) finishAttack(seq uint64, target attackable.Combatant) {
 	c.mu.Lock()
 	if seq != c.attackSeq {
 		c.mu.Unlock()
@@ -728,7 +730,16 @@ func (c *Controller) finishAttack(seq uint64) {
 	c.inHitAnimation = false
 	c.mu.Unlock()
 
+	c.emitEnded(target)
 	c.emit(event.AttackFinished{})
+}
+
+// emitEnded tells an NPC's AI that its attack on target ended, ahead of
+// the re-run that end causes. Other actors' attacks report no such end.
+func (c *Controller) emitEnded(target attackable.Combatant) {
+	if c.attackable {
+		c.emit(event.AttackEnded{Target: target})
+	}
 }
 
 // endHitAnimation closes the hit animation window 300ms after the first hit

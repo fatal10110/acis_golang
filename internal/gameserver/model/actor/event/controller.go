@@ -12,12 +12,17 @@ type CastAborted struct{}
 // CastFinished reports an in-flight cast ending, Interrupted by an abort or
 // completed naturally. Broken marks an abort that went through the
 // window-gated interrupt path. Target is the cast's final target when it is
-// a creature, nil otherwise.
+// a creature, nil otherwise. LaunchTarget is the first creature the
+// caster's latest AI-driven launch resolved, nil when it resolved none or
+// no AI cast launched yet: like the reference's target list, it outlives
+// its cast, so a cast that ends before its launch reports the previous
+// launch's.
 type CastFinished struct {
-	Interrupted bool
-	Broken      bool
-	Skill       modelskill.Definition
-	Target      attackable.Combatant
+	Interrupted  bool
+	Broken       bool
+	Skill        modelskill.Definition
+	Target       attackable.Combatant
+	LaunchTarget attackable.Combatant
 }
 
 // CastStopAck reports a cast stop request, whether or not a cast was in
@@ -38,6 +43,11 @@ type SkillMasteryProc struct{}
 // act again. BowReuse marks the finish of a bow's reuse delay rather than of
 // a swing.
 type AttackFinished struct{ BowReuse bool }
+
+// AttackEnded reports, from an attackable NPC's attack controller only, that
+// its attack on Target ended: a swing finished, or a bow shot landed (not
+// its reuse delay). It precedes everything else that end reports.
+type AttackEnded struct{ Target attackable.Combatant }
 
 // BowShotFinished reports a player's bow shot ending while the bow's reuse
 // delay still runs; AttackFinished with BowReuse follows once the reuse
@@ -121,6 +131,7 @@ func (CastFinished) event()           {}
 func (CastStopAck) event()            {}
 func (SkillMasteryProc) event()       {}
 func (AttackFinished) event()         {}
+func (AttackEnded) event()            {}
 func (AttackRethink) event()          {}
 func (ShotsRechargeRequested) event() {}
 func (BowShotFinished) event()        {}

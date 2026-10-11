@@ -180,7 +180,7 @@ func (c castCanceledBroadcast) Emit(ev event.Event) {
 	case event.CastAborted:
 		c.hostile.BroadcastSkillCanceled(c.hostile.ObjectID())
 	case event.CastFinished:
-		_ = c.hostile.CastFinished(e.Interrupted)
+		_ = c.hostile.CastFinished(e)
 	}
 }
 
@@ -197,9 +197,9 @@ type AttackingHostile struct {
 }
 
 // attackFinishedSignal is the attack controller sink of an AttackingHostile:
-// it signals every finished swing on its channel, and enters the stance and
-// runs the chance procs of every landed hit, as production's hostile
-// controller sink does.
+// it signals every finished swing on its channel, and raises the
+// attack-finished hooks, enters the stance and runs the chance procs of
+// every landed hit, as production's hostile controller sink does.
 type attackFinishedSignal struct {
 	finished chan struct{}
 	chance   *actorcast.ChanceProcs
@@ -213,6 +213,8 @@ func (c *attackFinishedSignal) Emit(ev event.Event) {
 		case c.finished <- struct{}{}:
 		default:
 		}
+	case event.AttackEnded:
+		c.hostile.AttackEnded(e.Target)
 	case event.AttackStanceRequested:
 		c.hostile.EnterAttackStance()
 	case event.HitLanded:
@@ -480,6 +482,8 @@ func (c *movingHostileControl) Emit(ev event.Event) {
 	case event.MoveBlocked:
 		c.move.BroadcastBlockedCorrection()
 		c.hostile.AI().ArrivedBlocked()
+	case event.AttackEnded:
+		c.hostile.AttackEnded(e.Target)
 	case event.AttackFinished:
 		if e.BowReuse {
 			c.server.think(c.hostile)

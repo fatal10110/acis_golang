@@ -238,6 +238,13 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 	// PvP flagging follows the skill's effects, so a skill that makes its
 	// caster a PKer flags it again after the kill ended its flag.
 	castCaster.NotePvPSkillTargets(notifyTargets, def.Offensive, def.SkillType)
+	// A player's skill, or its summon's, then reaches the NPCs whose
+	// scripts watch spells: the targets it landed on, then the NPCs around
+	// the caster.
+	if player, isPet, acting := actingPlayer(caster); acting {
+		spelled(player, def, affected)
+		seeSpell(castCaster, player, def, affected, isPet)
+	}
 	if !ok {
 		return EffectResult{}
 	}

@@ -408,11 +408,12 @@ func (f *Folk) setCurrentDesire(d *ai.Desire) {
 	f.cast.currentMu.Unlock()
 }
 
-// castFinished closes the cast desire that drove f's last cast; a cast
-// that ran to its end, on f's queue, has the AI pick the next one at once.
+// castFinished closes the cast desire that drove f's last cast, then runs
+// the skill-finished hooks; a cast that ran to its end, on f's queue, has
+// the AI pick the next one at once.
 // An abort can come from another actor's queue: a hit's cast break or a
 // crowd-control effect.
-func (f *Folk) castFinished(interrupted bool) {
+func (f *Folk) castFinished(e event.CastFinished) {
 	f.cast.currentMu.Lock()
 	cur := f.cast.current
 	f.cast.current = nil
@@ -420,7 +421,8 @@ func (f *Folk) castFinished(interrupted bool) {
 	if cur != nil {
 		f.cast.desires.RemoveIf(cur.Equal)
 	}
-	if !interrupted {
+	raiseSkillFinished(f.scripts, f, e)
+	if !e.Interrupted {
 		f.runAI()
 	}
 }
@@ -440,7 +442,7 @@ func (s folkCastSink) Emit(ev event.Event) {
 	case event.AttackStanceRequested:
 		f.emit(event.AttackStanceRequested{})
 	case event.CastFinished:
-		f.castFinished(e.Interrupted)
+		f.castFinished(e)
 	}
 }
 

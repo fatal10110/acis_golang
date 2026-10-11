@@ -245,16 +245,22 @@ func (p *ChanceProcs) weaponMagicSkill(casterObj any, target skilltarget.Actor, 
 			return EffectResult{Messages: []any{WeaponSkillActivated{Skill: def}}}
 		})
 	}
-	if p.Skills == nil {
-		return
+	if p.Skills != nil {
+		p.deliver(caster, true, func(sink handlerskill.MessageSink) EffectResult {
+			result, ok := p.Skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: []handlerskill.Actor{target}, Sink: sink})
+			if !ok {
+				return EffectResult{}
+			}
+			return handlerEffectResult(result)
+		})
 	}
-	p.deliver(caster, true, func(sink handlerskill.MessageSink) EffectResult {
-		result, ok := p.Skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: []handlerskill.Actor{target}, Sink: sink})
-		if !ok {
-			return EffectResult{}
-		}
-		return handlerEffectResult(result)
-	})
+	// A player's proc is seen by the NPCs around it, then reaches its
+	// target NPC when it is not offensive; a summon's is not reported.
+	if player, ok := caster.(skilltarget.Actor); ok && caster.Kind() == actor.KindPlayer {
+		targets := []skilltarget.Actor{target}
+		seeSpell(caster, player, def, targets, false)
+		spelled(player, def, targets)
+	}
 }
 
 // fire runs owner's procs whose trigger event is in events, each against

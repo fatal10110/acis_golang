@@ -311,6 +311,11 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 			}
 			launchTargets, launchResolved = ResolveAffected(a.Effects, a.Caster, castTarget, def)
 			a.Controller.SetLaunchTargets(len(launchTargets))
+			var first attackable.Combatant
+			if len(launchTargets) > 0 {
+				first, _ = launchTargets[0].(attackable.Combatant)
+			}
+			a.Controller.setLaunchFirst(first)
 			// The target list is recomputed at the launch timer and that
 			// full set is broadcast; when resolution finds no affected
 			// targets, the empty list is broadcast as-is

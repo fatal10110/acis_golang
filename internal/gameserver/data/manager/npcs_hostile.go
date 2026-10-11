@@ -285,6 +285,8 @@ func (c *hostileControl) Emit(ev event.Event) {
 	case event.MoveBlocked:
 		c.move.BroadcastBlockedCorrection()
 		c.hostile.AI().ArrivedBlocked()
+	case event.AttackEnded:
+		c.hostile.AttackEnded(e.Target)
 	case event.AttackFinished:
 		// A swing finishing re-runs desire selection, then continues an
 		// out-of-control NPC's current intention; a bow's reuse ending only
@@ -299,7 +301,7 @@ func (c *hostileControl) Emit(ev event.Event) {
 	case event.AttackRethink:
 		c.runAI()
 	case event.CastFinished:
-		if err := c.hostile.CastFinished(e.Interrupted); err != nil {
+		if err := c.hostile.CastFinished(e); err != nil {
 			c.log.Warn().Err(err).Msg("ai: hostile cast finished")
 		}
 	case event.CastAborted:
