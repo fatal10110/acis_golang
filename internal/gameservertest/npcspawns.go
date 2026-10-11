@@ -54,6 +54,14 @@ func WithWalkerRoutes(routes route.WalkerRoutes) Option {
 	return func(o *options) { o.walkerRoutes = routes }
 }
 
+// WithNpcSpawnSkills gives the WithNpcSpawns population defs as the skills
+// its NPCs cast, their effects dispatched through the link's NPC cast seam,
+// as the game server gives it the skill data; by default its NPCs cast
+// nothing.
+func WithNpcSpawnSkills(defs actorcast.Definitions) Option {
+	return func(o *options) { o.npcSpawnSkills = defs }
+}
+
 // npcSpawnDeps are the server parts a live NPC population is built over.
 type npcSpawnDeps struct {
 	state     *world.State
@@ -81,6 +89,9 @@ type npcSpawnDeps struct {
 	spawner *script.Spawner
 	// routes is the walker route data.
 	routes route.WalkerRoutes
+	// skills are the skills the NPCs cast, nil for none.
+	skills actorcast.Definitions
+
 	// zones is the WithZones index the spawned NPCs enter, as production
 	// hands the population its zones; nil when none was supplied.
 	zones *zone.Index
@@ -123,9 +134,13 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	if templates == nil {
 		templates = npc.NewTable(nil)
 	}
+	castEffects := actorcast.EffectHandlers{}
+	if deps.skills != nil {
+		castEffects = link.HostileCastEffects()
+	}
 	npcs, err := gamemanager.NewNpcsWithMaxBuffsAmount(gamemanager.NewSpawns(deps.makers, nil), templates, deps.geo, deps.state, deps.ids,
 		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Rates: deps.dropRates, RateXP: 1, RateSP: 1}, time.Now, deps.log,
-		nil, actorcast.EffectHandlers{}, walker, network.HostileSinks(deps.state, deps.stance), link.FolkSinks(deps.state, deps.stance),
+		deps.skills, castEffects, walker, network.HostileSinks(deps.state, deps.stance), link.FolkSinks(deps.state, deps.stance),
 		20, 0, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues,
 		script.NewMakers(maker.Catalog(), maker.Default, deps.log), deps.scripts, deps.zones)
 	if err != nil {

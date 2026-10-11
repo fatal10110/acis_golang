@@ -29,6 +29,10 @@ func (p *livePlayer) accessLevel() admin.AccessLevel {
 	return admin.AccessLevel{}
 }
 
+// IsGM reports whether p plays under a game master's access level: what a
+// script's player handle reads (Player.isGM).
+func (p *livePlayer) IsGM() bool { return p.accessLevel().IsGM }
+
 // applyAccessAppearance gives c what playing under access at level shows: a
 // level above 0 takes the access level's name as title, even a level the
 // table does not define and so reads as the user level, and the access

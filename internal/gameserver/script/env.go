@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -41,6 +42,9 @@ type Env struct {
 	// as a script names it ("./data/html/..."); false when there is none.
 	// nil finds none.
 	Page func(path string) (string, bool)
+	// SevenSigns is the Seven Signs state a script reads the players'
+	// cabals and the standings from.
+	SevenSigns *sevensigns.State
 }
 
 // Rates are the quest drop and reward multipliers.

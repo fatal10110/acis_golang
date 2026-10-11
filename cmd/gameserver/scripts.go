@@ -27,6 +27,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/wizard"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/alliance"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/blackjudge"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/cabalbuffer"
 	featureclan "github.com/fatal10110/acis_golang/internal/gameserver/script/feature/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/newbiehelper"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/tutorial"
@@ -47,6 +48,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q651"
 	scripttask "github.com/fatal10110/acis_golang/internal/gameserver/script/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/noblesseteleporter"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/primevalsummoner"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -87,6 +90,7 @@ func featureCatalog(buffs *skill.NewbieBuffTable) script.Catalog {
 	return script.Catalog{
 		"script.feature.Alliance":     alliance.New,
 		"script.feature.BlackJudge":   blackjudge.New,
+		"script.feature.CabalBuffer":  cabalbuffer.New,
 		"script.feature.Clan":         featureclan.New,
 		"script.feature.NewbieHelper": func() script.Script { return newbiehelper.New(buffs) },
 		"script.feature.Tutorial":     tutorial.New,
@@ -97,6 +101,7 @@ func featureCatalog(buffs *skill.NewbieBuffTable) script.Catalog {
 func teleportCatalog() script.Catalog {
 	return script.Catalog{
 		"script.teleport.NoblesseTeleporter": noblesseteleporter.New,
+		"script.teleport.PrimevalSummoner":   primevalsummoner.New,
 	}
 }
 
@@ -185,8 +190,9 @@ func provideScriptSpawner(log zerolog.Logger) *script.Spawner {
 // rates of server.properties, the party range and multiple item drop the
 // kill rewards read, the item id allocator, the NPC spawner, the shared
 // random source, the world the scripts look NPCs up in, the skill and item
-// definitions, the in-game clock and the datapack pages a script reads.
-func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner, state *world.State, data *gameData, clock *task.GameClock, html *datacache.HTML) (*script.Env, error) {
+// definitions, the in-game clock, the datapack pages a script reads and the
+// Seven Signs state.
+func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner, state *world.State, data *gameData, clock *task.GameClock, html *datacache.HTML, sevenSigns *sevensigns.State) (*script.Env, error) {
 	var rates script.Rates
 	for _, r := range []struct {
 		key string
@@ -217,6 +223,7 @@ func provideScriptEnv(serverProps *config.Properties, rewards manager.KillReward
 		GameHour:         clock.Hour,
 		Items:            data.Items,
 		Page:             html.Get,
+		SevenSigns:       sevenSigns,
 	}, nil
 }
 
