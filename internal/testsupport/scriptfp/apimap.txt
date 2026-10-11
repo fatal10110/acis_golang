@@ -178,3 +178,6 @@ Npc.setWalkOrRun script.NPC.SetRunning
 NpcAI.addMoveRouteDesire script.NPC.AddMoveRouteDesire
 NpcTemplate.getAlias script.NPC.Alias
 Quest.addCreated inline
+
+# See-creature (A10). The look-neighbour throttle is a call on the NPC handle.
+Npc.lookNeighbor script.NPC.LookNeighbor
