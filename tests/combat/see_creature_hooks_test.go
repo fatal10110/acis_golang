@@ -355,7 +355,10 @@ func (l *seeLog) takeOrdered() []string {
 
 // TestLookNeighborThrottlesPerNPC pins the look-around a behavior asks of
 // its NPC: it tells the behavior about every creature in its see range,
-// NPCs included, then does nothing until 30 s have passed since.
+// NPCs included, then does nothing until 30 s have passed since. Both
+// executors check a second look right after the first; only the driven
+// clock can place a look 1 ms either side of the 30 s mark, since on the
+// wall clock the time between two looks is never that exact.
 func TestLookNeighborThrottlesPerNPC(t *testing.T) {
 	t.Parallel()
 	log := newSeeLog()
@@ -371,8 +374,17 @@ func TestLookNeighborThrottlesPerNPC(t *testing.T) {
 		script.NPCOf(looker).LookNeighbor()
 	}
 
+	before := time.Now()
 	look()
 	wantSeeLines(t, log, "on the first look", "SEE looker bystander", "SEE looker p")
+	look()
+	if time.Since(before) >= 30*time.Second {
+		t.Skip("30 s of wall time passed between the first two looks")
+	}
+	wantSeeLines(t, log, "right after the first look")
+	if !srv.DrivesClock() {
+		return
+	}
 	srv.Advance(t, 30*time.Second-time.Millisecond)
 	look()
 	wantSeeLines(t, log, "29.999 s after the first look")
