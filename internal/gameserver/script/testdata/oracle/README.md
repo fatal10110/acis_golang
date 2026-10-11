@@ -87,7 +87,8 @@ what the reference does in the scenario's own world:
   a scripting class takes the next listed value (a ranged draw takes its minimum plus a value
   of the range's size, a boolean is a value of bound 2, true when 0), and any other draw comes
   from the seeded generator, reseeded per scenario. A script draw past the listed values, or
-  outside its bound, fails the run.
+  outside its bound, fails the run. Each pinned draw is a `# draw` line of the step that drew
+  it; the Go run of the same step must draw the same bounds in the same order.
 
 The steps run in order until the first one a trace does not record: action, bypass and link
 are fed as client packets, followed by 500 ms; a kill of N kills N monsters one by one, a fresh

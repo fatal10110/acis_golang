@@ -76,11 +76,13 @@ func expandPackets(lines []string, pages map[string]string) ([]string, error) {
 }
 
 // traceStep is one client packet of a reference trace with what the
-// server answered: the rendered packets and the journal statements.
+// server answered: the rendered packets, the journal statements and the
+// pinned script draws, each "<bound>:<value>".
 type traceStep struct {
 	client string
 	sent   []string
 	stmts  []string
+	draws  []string
 }
 
 var (
@@ -88,6 +90,7 @@ var (
 	traceKill    = regexp.MustCompile(`^# kill (\d+) \(object (\d+)\)$`)
 	traceHit     = regexp.MustCompile(`^# hit (\d+) \(object (\d+)\) (\d+)$`)
 	traceAdvance = regexp.MustCompile(`^# advance (\d+)$`)
+	traceDraw    = regexp.MustCompile(`^# draw (\d+:\d+) \S+$`)
 )
 
 // readTrace reads a reference trace (format: the oracle directory's
@@ -135,6 +138,14 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			raw = append(raw, rawStep{client: "advance " + traceAdvance.FindStringSubmatch(line)[1]})
 		case (strings.HasPrefix(line, "S ") || strings.HasPrefix(line, "Q ")) && len(raw) > 0:
 			raw[len(raw)-1].lines = append(raw[len(raw)-1].lines, line)
+		case strings.HasPrefix(line, "# draw "):
+			if !traceDraw.MatchString(line) {
+				return nil, nil, fmt.Errorf("trace line %q is not a draw <bound>:<value> <class>", line)
+			}
+			if len(raw) == 0 {
+				return nil, nil, fmt.Errorf("trace line %q comes before the first client packet", line)
+			}
+			raw[len(raw)-1].lines = append(raw[len(raw)-1].lines, line)
 		}
 	}
 	if err := sb.Err(); err != nil {
@@ -164,11 +175,19 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 	for _, r := range raw {
 		step := traceStep{client: r.client}
 		for _, line := range r.lines {
+			if m := traceDraw.FindStringSubmatch(line); m != nil {
+				step.draws = append(step.draws, m[1])
+				continue
+			}
 			if strings.HasPrefix(line, "Q ") {
 				st, err := scriptcontract.ParseStatement(line)
 				if err != nil {
-					// Another table's statement (a player memo, raid points):
-					// the Q lines are the quest journal's.
+					// Another table's statement (a player memo, raid points)
+					// is not compared: the Q lines are the quest journal's.
+					// A journal statement must be one the format knows.
+					if sql, _, _ := strings.Cut(line, " | "); strings.Contains(sql, "character_quests") {
+						return nil, nil, fmt.Errorf("trace line %q: %w", line, err)
+					}
 					continue
 				}
 				step.stmts = append(step.stmts, string(st.Kind)+" "+strings.Join(st.Params[1:], " | "))
@@ -195,15 +214,17 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 // checkTrace requires the scenario's first steps to replay the trace:
 // the same client packets, and S and Q lines equal to the trace's rendered
 // packets and statements. A kill step of N kills replays N kills of the
-// trace, its lines theirs in order.
-func checkTrace(sc *Scenario, data []byte, pages map[string]string) error {
+// trace, its lines theirs in order. It returns the script draws the
+// reference pinned in each traced step, each "<bound>:<value>", for the run
+// to compare with its own; a trace that pins draws needs a random line.
+func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws [][]string, err error) {
 	steps, objs, err := readTrace(sc, data)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for i, next := 0, 0; next < len(steps); i++ {
 		if i >= len(sc.Steps) {
-			return fmt.Errorf("the trace has %d client packets, the scenario %d steps", len(steps), len(sc.Steps))
+			return nil, fmt.Errorf("the trace has %d client packets, the scenario %d steps", len(steps), len(sc.Steps))
 		}
 		st := sc.Steps[i]
 		n := 1
@@ -213,32 +234,49 @@ func checkTrace(sc *Scenario, data []byte, pages map[string]string) error {
 		ts := traceStep{client: steps[next].client}
 		where := fmt.Sprintf("step %d (line %d) %q against trace %q", i+1, st.Line, st, ts.client)
 		if next+n > len(steps) {
-			return fmt.Errorf("%s: the trace ends after %d of its %d kills", where, len(steps)-next, n)
+			return nil, fmt.Errorf("%s: the trace ends after %d of its %d kills", where, len(steps)-next, n)
 		}
 		client, err := traceClient(st, objs, sc)
 		if err != nil {
-			return fmt.Errorf("%s: %w", where, err)
+			return nil, fmt.Errorf("%s: %w", where, err)
 		}
 		for _, s := range steps[next : next+n] {
 			if client != s.client {
-				return fmt.Errorf("%s: the step sends %q", where, client)
+				return nil, fmt.Errorf("%s: the step sends %q", where, client)
 			}
 			ts.sent = append(ts.sent, s.sent...)
 			ts.stmts = append(ts.stmts, s.stmts...)
+			ts.draws = append(ts.draws, s.draws...)
 		}
 		next += n
 		want, err := expandPackets(st.Packets, pages)
 		if err != nil {
-			return fmt.Errorf("%s: %w", where, err)
+			return nil, fmt.Errorf("%s: %w", where, err)
 		}
 		if d := FirstDiff("packet", want, ts.sent); d != "" {
-			return fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
+			return nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
 		}
 		if d := FirstDiff("statement", st.Statements, ts.stmts); d != "" {
-			return fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
+			return nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
 		}
+		draws = append(draws, ts.draws)
 	}
-	return nil
+	// The run pins and records its script draws only with a random line.
+	if sc.Random == nil && slices.ContainsFunc(draws, func(d []string) bool { return len(d) > 0 }) {
+		return nil, fmt.Errorf("the trace pins script draws and the scenario has no random line")
+	}
+	return draws, nil
+}
+
+// traceDrawDiff compares the script draws step i made, each
+// "<bound>:<value>", with those the reference made in that step: a traced
+// step draws the same bounds in the same order. A step past the trace is
+// not compared.
+func traceDrawDiff(traceDraws [][]string, i int, drawn []string) string {
+	if i >= len(traceDraws) {
+		return ""
+	}
+	return FirstDiff("script draw", drawn, traceDraws[i])
 }
 
 // traceClient writes the client packet of st the way a trace does, with

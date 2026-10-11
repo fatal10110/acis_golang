@@ -90,16 +90,19 @@ type run struct {
 	objs  map[string]int32
 	npcs  map[string]NPC
 	live  map[string]*npc.Hostile
-	// draws is the random line's source.
-	draws draws
+	// draws is the random line's source; traceDraws the draws the
+	// reference pinned in each traced step.
+	draws      draws
+	traceDraws [][]string
 }
 
 // draws hands the script draws the random line lists, recording each draw
-// it cannot serve for the step that drew it.
+// as "<bound>:<value>" and each it cannot serve for the step that drew it.
 type draws struct {
 	mu     sync.Mutex
 	random *Random
 	next   int
+	drawn  []string
 	bad    []string
 }
 
@@ -124,16 +127,17 @@ func (d *draws) draw(n int) int {
 		d.bad = append(d.bad, fmt.Sprintf("draw %d is %d, outside [0, %d)", i+1, v, n))
 		return 0
 	}
+	d.drawn = append(d.drawn, fmt.Sprintf("%d:%d", n, v))
 	return v
 }
 
-// take returns the draws not served since the last call.
-func (d *draws) take() []string {
+// take returns the draws served and those not served since the last call.
+func (d *draws) take() (drawn, bad []string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	bad := d.bad
-	d.bad = nil
-	return bad
+	drawn, bad = d.drawn, d.bad
+	d.drawn, d.bad = nil, nil
+	return drawn, bad
 }
 
 // unused is how many listed draws were never drawn.
@@ -158,7 +162,7 @@ func Run(t *testing.T, sc *Scenario, cfg Config) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := checkTrace(sc, data, r.texts); err != nil {
+		if r.traceDraws, err = checkTrace(sc, data, r.texts); err != nil {
 			t.Fatalf("%s does not replay %s: %v", sc.Name, sc.Trace, err)
 		}
 	}
@@ -453,8 +457,12 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		r.setPlayer(t)
 	}
 	frames = append(frames, r.srv.ReadQueued(t, c)...)
-	if bad := r.draws.take(); len(bad) > 0 {
+	drawn, bad := r.draws.take()
+	if len(bad) > 0 {
 		fail("script random: %s", strings.Join(bad, "; "))
+	}
+	if d := traceDrawDiff(r.traceDraws, i, drawn); d != "" {
+		fail("%s (want: the trace's)", d)
 	}
 	if st.Verb != "relog" {
 		var got []string

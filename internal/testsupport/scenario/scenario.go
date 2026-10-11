@@ -78,7 +78,10 @@
 // the trace's client packets, kills, hits and advances must be the
 // scenario's first steps (a kill step of N kills is N kills of the trace),
 // and their rendered packets and journal statements must be those steps' S
-// and Q lines. A trace under the oracle's scenarios directory is the
+// and Q lines; a statement on another table than character_quests is not
+// compared, an unknown one on it fails. The script draws the trace pins
+// (needing a random line) must be those the run's same steps draw: the
+// same bounds, in order. A trace under the oracle's scenarios directory is the
 // reference probe's play of this scenario itself (the oracle README).
 package scenario
 
