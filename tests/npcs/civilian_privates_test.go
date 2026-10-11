@@ -69,17 +69,17 @@ func (l *partyLog) pupBehavior() script.Script {
 
 // bootCivilianParty boots the script spawn world over the civilian party
 // table, with log's behavior bound to the pup.
-func bootCivilianParty(t *testing.T, log *partyLog) *scriptSpawnWorld {
+func bootCivilianParty(t *testing.T, log *partyLog, extra ...gameservertest.Option) *scriptSpawnWorld {
 	t.Helper()
 	kinds := map[int32]script.NPCKind{
 		spawnWolfID: script.KindHostile, spawnPupID: script.KindHostile,
 		spawnTabletID: script.KindFolk, spawnClerkID: script.KindFolk,
 	}
-	return bootScriptSpawns(t,
+	return bootScriptSpawns(t, append([]gameservertest.Option{
 		gameservertest.WithNPCs(civilianPartyTemplates()),
 		gameservertest.WithNPCScripts(kinds, []script.Listing{{Path: "ai.PupRecorder"}},
 			script.Catalog{"ai.PupRecorder": log.pupBehavior}),
-	)
+	}, extra...)...)
 }
 
 // assertPrivateOf fails unless live is a linked private of master, placed
