@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -340,7 +339,7 @@ func raidLootRights(hostile *npc.Hostile, tmpl *npc.Template, channels LootChann
 // out. The hit observer, nil for anything but a raid or grand boss with
 // channels configured, watches the hits that win a command channel the
 // boss's loot rights.
-func NewHostileRewarder(hostile *npc.Hostile, tmpl *npc.Template, state *world.State, config KillRewardConfig, items *item.Table, ids idAllocator, ground groundPlacer) (creature.Rewarder, npc.HitObserver) {
+func NewHostileRewarder(hostile *npc.Hostile, tmpl *npc.Template, state *world.State, config KillRewardConfig, items *item.Table, ids idAllocator, ground groundPlacer) (npc.Rewards, npc.HitObserver) {
 	rights := raidLootRights(hostile, tmpl, config.Channels)
 	rewards := &deathRewards{
 		hostile:    hostile,
