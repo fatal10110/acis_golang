@@ -364,3 +364,24 @@ QuestList.setLastQuestNpcObjectId inline
 QuestState.getQuest script.QuestState.Quest
 SpawnLocation.getHeading inline
 World.getPlayer script.Script.WorldPlayer
+
+# The X1 quests Q234, Q235 and Q422 (#3617). A page's text is read from
+# the script's page directory; an item template's name is a script helper;
+# the active weapon, the PK count, the summon and an item's enchant level
+# are calls on the player handle, and a summon's template id is read from
+# its creature handle. The getters in front of them (the item table, the
+# weapon template, the inventory's item lookup) fold into those calls.
+ItemContainer.getItemByItemId inline
+ItemContainer.hasItems script.Player.HasItems
+ItemData.getInstance inline
+ItemData.getTemplate inline
+Item.getItemId inline
+Item.getName script.Script.ItemName
+ItemInstance.getEnchantLevel script.Player.ItemEnchantLevel
+Player.getActiveWeaponItem script.Player.ActiveWeaponItemID
+Player.getPkKills script.Player.PkKills
+Player.getSummon script.Player.ActiveSummon
+Player.setPkKills script.Player.SetPkKills
+Quest.getHtmlText script.Script.HTMLText
+Summon.getNpcId script.SummonNpcID
+UserInfo.new script.Player.SendUserInfo
