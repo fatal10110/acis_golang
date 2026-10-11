@@ -286,8 +286,7 @@ var (
 
 // AddAttackDesire asks the NPC to attack target, closing in on it, and adds
 // weight to the NPC's hate of target. An NPC that hates no one yet runs its
-// desire selection at once: a hostile NPC on the calling goroutine, a
-// civilian NPC on its own queue.
+// desire selection at once, on the calling goroutine.
 func (n *NPC) AddAttackDesire(target Creature, weight float64) {
 	n.brain.AddAttackDesire(combatantOf(target), weight)
 }
