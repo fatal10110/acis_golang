@@ -95,10 +95,10 @@ func (r *Registry) FirstTalk(npcID int32, e FirstTalk) (s *Script, res Result, b
 	return s, r.answer(s, hookFirstTalk, func() string { return s.Hooks.FirstTalk(s, e) }), true
 }
 
-// AbnormalStatusChanged runs the abnormal-status hook of every script that
+// abnormalStatusChanged runs the abnormal-status hook of every script that
 // sees spells on the NPC with id npcID, in list order: the hook is
 // dispatched over the see-spell list, not over its own registrations.
-func (r *Registry) AbnormalStatusChanged(npcID int32, e AbnormalStatusChanged) {
+func (r *Registry) abnormalStatusChanged(npcID int32, e AbnormalStatusChanged) {
 	for _, s := range r.scripts(npcID, EventSeeSpell) {
 		r.run(s, hookAbnormalStatusChanged, func() { s.Hooks.AbnormalStatusChanged(s, e) })
 	}

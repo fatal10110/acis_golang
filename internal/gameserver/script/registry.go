@@ -89,6 +89,15 @@ var raisedHooks = map[hook]kindSet{
 	// The interact of a civilian NPC and of a talking hostile one
 	// (Interact).
 	hookFirstTalk: kinds(KindFolk, KindHostile),
+	// The end of an NPC's cast, and of a hostile NPC's attack (spell.go):
+	// only an attackable NPC reports its attack's end.
+	hookUseSkillFinished: kinds(KindFolk, KindHostile),
+	hookAttackFinished:   kinds(KindHostile),
+	// A player's skill seen around an NPC or landing on it, and an effect
+	// about to land on an NPC, over the see-spell list (spell.go).
+	hookSeeSpell:              kinds(KindFolk, KindHostile),
+	hookSpelled:               kinds(KindFolk, KindHostile),
+	hookAbnormalStatusChanged: kinds(KindFolk, KindHostile),
 }
 
 // Config is what Build needs besides the list and the catalog.

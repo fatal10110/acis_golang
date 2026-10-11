@@ -3,6 +3,7 @@ package npc
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -77,6 +78,24 @@ type ScriptHooks interface {
 	HostileDying(h *Hostile, killer attackable.Combatant)
 	// FolkDying schedules f's dying hooks: killer has just killed it.
 	FolkDying(f *Folk, killer attackable.Combatant)
+	// UseSkillFinished runs n's skill-finished hooks: n's cast of sk on
+	// target ended, completed when success, aborted otherwise. n is a
+	// *Hostile or a *Folk.
+	UseSkillFinished(n, target attackable.Combatant, sk skill.Ref, success bool)
+	// HostileAttackFinished runs h's attack-finished hooks: h's attack on
+	// target ended.
+	HostileAttackFinished(h *Hostile, target attackable.Combatant)
+	// SeeSpell runs n's see-spell hooks: caster, a player, cast sk on
+	// targets near n, through its summon when isPet. n is a *Hostile or a
+	// *Folk.
+	SeeSpell(n, caster attackable.Combatant, sk skill.Ref, targets []attackable.Combatant, isPet bool)
+	// Spelled runs n's spelled hooks: sk, not offensive, landed on n from
+	// caster, a player. n is a *Hostile or a *Folk.
+	Spelled(n, caster attackable.Combatant, sk skill.Ref)
+	// AbnormalStatusChanged runs the abnormal-status hooks of the scripts
+	// that see spells on n: an effect of caster's sk is about to land on n.
+	// caster is nil for a sourceless effect. n is a *Hostile or a *Folk.
+	AbnormalStatusChanged(n, caster attackable.Combatant, sk skill.Ref)
 }
 
 // behaves reports whether a behavior is bound to h's template id.
@@ -140,6 +159,76 @@ func (f *Folk) AtHookPoint(p ai.HookPoint) {
 	case ai.HookMoveFinished:
 		x, y, z := f.Position()
 		f.scripts.FolkMoveToFinished(f, int32(x), int32(y), int32(z))
+	}
+}
+
+// raiseSkillFinished runs n's skill-finished hooks for the cast end e: the
+// target is the first creature the launch resolved, else the cast's own
+// target.
+func raiseSkillFinished(hooks ScriptHooks, n attackable.Combatant, e event.CastFinished) {
+	if hooks == nil {
+		return
+	}
+	target := e.LaunchTarget
+	if target == nil {
+		target = e.Target
+	}
+	hooks.UseSkillFinished(n, target, skill.Ref{ID: e.Skill.ID, Level: e.Skill.Level}, !e.Interrupted)
+}
+
+// AttackEnded runs h's attack-finished hooks: h's attack on target ended.
+// The attack controller reports it ahead of the AI re-run that end causes.
+func (h *Hostile) AttackEnded(target attackable.Combatant) {
+	if h.scripts != nil {
+		h.scripts.HostileAttackFinished(h, target)
+	}
+}
+
+// SeeSpell runs h's see-spell hooks: caster, a player, cast sk on targets
+// near h, through its summon when isPet.
+func (h *Hostile) SeeSpell(caster attackable.Combatant, sk skill.Ref, targets []attackable.Combatant, isPet bool) {
+	if h.scripts != nil {
+		h.scripts.SeeSpell(h, caster, sk, targets, isPet)
+	}
+}
+
+// Spelled runs h's spelled hooks: sk, not offensive, landed on h from
+// caster, a player.
+func (h *Hostile) Spelled(caster attackable.Combatant, sk skill.Ref) {
+	if h.scripts != nil {
+		h.scripts.Spelled(h, caster, sk)
+	}
+}
+
+// AbnormalStatusChanged runs the abnormal-status hooks of the scripts that
+// see spells on h: an effect of caster's sk is about to land on h.
+func (h *Hostile) AbnormalStatusChanged(caster attackable.Combatant, sk skill.Ref) {
+	if h.scripts != nil {
+		h.scripts.AbnormalStatusChanged(h, caster, sk)
+	}
+}
+
+// SeeSpell runs f's see-spell hooks: caster, a player, cast sk on targets
+// near f, through its summon when isPet.
+func (f *Folk) SeeSpell(caster attackable.Combatant, sk skill.Ref, targets []attackable.Combatant, isPet bool) {
+	if f.scripts != nil {
+		f.scripts.SeeSpell(f, caster, sk, targets, isPet)
+	}
+}
+
+// Spelled runs f's spelled hooks: sk, not offensive, landed on f from
+// caster, a player.
+func (f *Folk) Spelled(caster attackable.Combatant, sk skill.Ref) {
+	if f.scripts != nil {
+		f.scripts.Spelled(f, caster, sk)
+	}
+}
+
+// AbnormalStatusChanged runs the abnormal-status hooks of the scripts that
+// see spells on f: an effect of caster's sk is about to land on f.
+func (f *Folk) AbnormalStatusChanged(caster attackable.Combatant, sk skill.Ref) {
+	if f.scripts != nil {
+		f.scripts.AbnormalStatusChanged(f, caster, sk)
 	}
 }
 

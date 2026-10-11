@@ -300,6 +300,9 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 	// resolutions 400ms apart.
 	var launchTargets []skilltarget.Actor
 	var launchResolved bool
+	// launchRan is true once the launch's target handler ran, even when it
+	// found no target: such a cast lands nowhere but is still seen.
+	var launchRan bool
 
 	a.Controller.Schedule(plan, Hooks{
 		Launch: func() bool {
@@ -309,8 +312,17 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 				}
 				return false
 			}
-			launchTargets, launchResolved = ResolveAffected(a.Effects, a.Caster, castTarget, def)
+			launchTargets, launchRan = resolveLaunchTargets(a.Effects, a.Caster, castTarget, def)
+			launchResolved = launchRan && len(launchTargets) > 0
+			if !launchResolved {
+				launchTargets = nil
+			}
 			a.Controller.SetLaunchTargets(len(launchTargets))
+			var first attackable.Combatant
+			if len(launchTargets) > 0 {
+				first, _ = launchTargets[0].(attackable.Combatant)
+			}
+			a.Controller.setLaunchFirst(first)
 			// The target list is recomputed at the launch timer and that
 			// full set is broadcast; when resolution finds no affected
 			// targets, the empty list is broadcast as-is
@@ -330,11 +342,17 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 			// drives every non-player-initiated cast, so it must skip
 			// FUSION here rather than let it reach fusionHandler, which
 			// has no caster-type gate of its own.
-			if def.SkillType == "FUSION" || !launchResolved {
+			if def.SkillType == "FUSION" || !launchRan {
 				return
 			}
 			// Off the grid, an object knows nothing, itself included.
 			if a.HitNeedsPresence && !a.Caster.Knows(a.Caster) {
+				return
+			}
+			if !launchResolved {
+				if a.Effects.Skills != nil {
+					castWithoutTargets(a.Caster, def)
+				}
 				return
 			}
 			handlers := a.Effects

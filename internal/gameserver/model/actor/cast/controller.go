@@ -175,6 +175,10 @@ type Controller struct {
 	// one target. A naturally finished offensive cast that had any puts its
 	// caster in attack stance.
 	hasTargets bool
+	// launchFirst is the first creature the latest AI launch resolved, nil
+	// when it resolved none. The cast's clear leaves it, as the reference
+	// keeps its target list past its cast: CastFinished reports it.
+	launchFirst attackable.Combatant
 
 	// castSeq increments every time the active cast is cleared (Stop,
 	// Finish, or the start of a fresh cast), so a scheduled Launch/Hit/
@@ -686,6 +690,7 @@ func (c *Controller) abortLocked() (func(), func(bool)) {
 	aborted := c.casting
 	current := c.current
 	target, _ := c.target.(attackable.Combatant)
+	first := c.launchFirst
 	fusionEnd := c.fusionEnd
 	c.clearLocked()
 	if !aborted {
@@ -697,7 +702,7 @@ func (c *Controller) abortLocked() (func(), func(bool)) {
 			}
 			c.emit(event.CastAborted{})
 		}, func(interrupted bool) {
-			c.emit(event.CastFinished{Interrupted: true, Broken: interrupted, Skill: current, Target: target})
+			c.emit(event.CastFinished{Interrupted: true, Broken: interrupted, Skill: current, Target: target, LaunchTarget: first})
 		}
 }
 
@@ -707,6 +712,7 @@ func (c *Controller) finishLocked() func(bool) {
 	}
 	current := c.current
 	target, _ := c.target.(attackable.Combatant)
+	first := c.launchFirst
 	fusionEnd := c.fusionEnd
 	stance := current.Offensive && c.hasTargets
 	// A fusion channel closes without the finalizer that charges shots.
@@ -725,7 +731,7 @@ func (c *Controller) finishLocked() func(bool) {
 		if stance && !aborted {
 			c.emit(event.AttackStanceRequested{})
 		}
-		c.emit(event.CastFinished{Interrupted: aborted, Skill: current, Target: target})
+		c.emit(event.CastFinished{Interrupted: aborted, Skill: current, Target: target, LaunchTarget: first})
 	}
 }
 
@@ -737,6 +743,17 @@ func (c *Controller) SetLaunchTargets(n int) {
 	defer c.mu.Unlock()
 	if c.casting {
 		c.hasTargets = n > 0
+	}
+}
+
+// setLaunchFirst records first as the first creature the active cast's
+// launch resolved, nil when it resolved none. It does nothing when no cast
+// is in flight.
+func (c *Controller) setLaunchFirst(first attackable.Combatant) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.casting {
+		c.launchFirst = first
 	}
 }
 

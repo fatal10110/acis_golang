@@ -10,10 +10,12 @@ import (
 // hook reacts to. A skill, item or door the fact also involves is added, in
 // its script-facing form, by the change that raises the hook.
 
-// AbnormalStatusChanged: an effect is about to land on NPC.
+// AbnormalStatusChanged: an effect of Caster's Skill is about to land on
+// NPC. Caster is nil for an effect with no source.
 type AbnormalStatusChanged struct {
 	NPC    *NPC
 	Caster Creature
+	Skill  skill.Ref
 }
 
 // Attacked: Attacker attacked NPC for Damage, with Skill when a skill did
@@ -130,19 +132,21 @@ type SeeItem struct {
 	Quantity int32
 }
 
-// SeeSpell: NPC saw Caster cast a spell on Targets; IsPet when the caster's
+// SeeSpell: NPC saw Caster cast Skill on Targets; IsPet when the caster's
 // summon cast it.
 type SeeSpell struct {
 	NPC     *NPC
 	Caster  *Player
+	Skill   skill.Ref
 	Targets []Creature
 	IsPet   bool
 }
 
-// Spelled: Caster's spell landed on NPC.
+// Spelled: Caster's Skill, not offensive, landed on NPC.
 type Spelled struct {
 	NPC    *NPC
 	Caster *Player
+	Skill  skill.Ref
 }
 
 // Start: a scheduled task's start time came. Ctx ends when the schedule
@@ -173,10 +177,12 @@ type Timer struct {
 	Player *Player
 }
 
-// UseSkillFinished: NPC finished casting a skill on Creature.
+// UseSkillFinished: NPC's cast of Skill on Creature ended; Success is
+// false for a cast that was aborted.
 type UseSkillFinished struct {
 	NPC      *NPC
 	Creature Creature
+	Skill    skill.Ref
 	Success  bool
 }
 
