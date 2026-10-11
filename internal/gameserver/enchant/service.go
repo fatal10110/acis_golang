@@ -501,14 +501,11 @@ func (s *Service) addCrystalReward(inv *itemcontainer.Inventory, crystalID int32
 	if s.ids == nil {
 		return nil, nil
 	}
-	if _, ok := inv.Templates().Get(crystalID); !ok {
-		return nil, nil
-	}
-	objectID, err := s.ids.NextID()
+	inst, err := inv.AddCreated(crystalID, count, s.ids.NextID)
 	if err != nil {
 		return nil, fmt.Errorf("allocate enchant crystal item id: %w", err)
 	}
-	return inv.AddNew(crystalID, count, objectID), nil
+	return inst, nil
 }
 
 func messageStep(message Message) Step {

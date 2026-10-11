@@ -266,6 +266,10 @@ type PlayerConfig struct {
 	// PartyRange is how near the loot a party member must be to share it,
 	// body to body; -1 is unlimited. It is the kill reward's party range.
 	PartyRange int
+	// MultipleItemDrop is server.properties MultipleItemDrop: a
+	// non-stackable item auto-looted with a count above one reaches the
+	// party member who takes it as that many instances instead of one.
+	MultipleItemDrop bool
 }
 
 // GameClientLink accepts and drives connections from Interlude game

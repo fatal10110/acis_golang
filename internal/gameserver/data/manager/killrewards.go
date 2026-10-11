@@ -30,10 +30,12 @@ type groundPlacer interface {
 
 // rewardItemReceiver takes auto-looted items straight into its inventory.
 // RewardItemFits is the slot check an auto-loot must pass first; an item
-// that does not fit falls to the ground instead.
+// that does not fit falls to the ground instead. AddRewardItem splits a
+// non-stackable count into single instances when multiple, and asks nextID
+// for an object id only for each instance it creates.
 type rewardItemReceiver interface {
 	RewardItemFits(itemID int32, count int) bool
-	AddRewardItem(itemID int32, count int, objectID int32) bool
+	AddRewardItem(itemID int32, count int, multiple bool, nextID func() (int32, error)) bool
 }
 
 // partyLooter hands an auto-looted item to its receiver's party, by the
@@ -87,8 +89,8 @@ type KillReward struct {
 	origin party.LootOrigin
 
 	// multipleItemDrop is server.properties MultipleItemDrop: a
-	// non-stackable item rolled N times falls as N ground items instead of
-	// one.
+	// non-stackable item rolled N times falls as N ground items, or is
+	// auto-looted as N instances, instead of one.
 	multipleItemDrop bool
 
 	// announcer names a raid kill's every dropped or auto-looted item to
@@ -135,7 +137,8 @@ func (k *KillReward) From(origin party.LootOrigin) *KillReward {
 
 // MultipleItemDrop sets server.properties MultipleItemDrop: whether a
 // non-stackable item rolled with a count above one falls as that many
-// ground items, or as a single one. It returns k.
+// ground items, or is auto-looted as that many instances, or as a single
+// one either way. It returns k.
 func (k *KillReward) MultipleItemDrop(enabled bool) *KillReward {
 	k.multipleItemDrop = enabled
 	return k
@@ -236,11 +239,7 @@ func (k *KillReward) addToInventory(receiver rewardItemReceiver, itemID int32, c
 	if !receiver.RewardItemFits(itemID, count) {
 		return false
 	}
-	id, err := k.ids.NextID()
-	if err != nil {
-		return false
-	}
-	return receiver.AddRewardItem(itemID, count, id)
+	return receiver.AddRewardItem(itemID, count, k.multipleItemDrop, k.ids.NextID)
 }
 
 // drop places one rolled item on the ground: a stackable one as a single

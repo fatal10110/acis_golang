@@ -803,6 +803,10 @@ func (l *GameClientLink) crystallizeLiveItem(live *livePlayer, req clientpackets
 	if err != nil {
 		l.log.Error().Err(err).Msg("allocate crystal item id")
 		live.SendFrame(serverpackets.FrameActionFailed())
+		if len(res.Changed) > 0 {
+			l.applyEquipStatChanges(live, inv, res.Result)
+			l.broadcastEquipmentChange(live)
+		}
 		return
 	}
 	switch failure {

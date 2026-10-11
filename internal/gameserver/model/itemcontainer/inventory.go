@@ -274,6 +274,22 @@ func (inv *Inventory) AddNew(templateID int32, count int, objectID int32) *item.
 	return result
 }
 
+// AddCreated creates count units of templateID per Container.AddCreated,
+// taking an object id from nextID only for a new instance, and queues the
+// same notification Add does.
+func (inv *Inventory) AddCreated(templateID int32, count int, nextID func() (int32, error)) (*item.Instance, error) {
+	result, joined, err := inv.Container.addCreated(templateID, count, nextID)
+	if result == nil {
+		return nil, err
+	}
+	if joined {
+		inv.queueUpdate(result, UpdateModified)
+	} else {
+		inv.queueUpdate(result, UpdateAdded)
+	}
+	return result, nil
+}
+
 // Restore replaces inv's current contents with persisted item rows without
 // changing their locations and without queuing inventory updates. The only
 // writes it schedules are those of a stackable row merged into an earlier

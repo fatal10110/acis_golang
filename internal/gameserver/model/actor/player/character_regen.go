@@ -50,6 +50,14 @@ func (c *Character) SettleRegen() {
 	c.lowHPNotice()
 }
 
+// SettleEnteredRegen arms c's regeneration task as c enters the world short
+// of HP, MP or CP restored before it was in the world, its first tick one
+// period from the entry. It raises no tutorial event: the restore reported
+// its HP at the selection (NotifyRestoredHP).
+func (c *Character) SettleEnteredRegen() {
+	c.settleRegenTask()
+}
+
 // settleRegenTask is SettleRegen without the low-HP tutorial event: the
 // HP writers whose caller reports the status run it, so the event follows
 // that report (writeHPLocked).

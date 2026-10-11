@@ -171,12 +171,9 @@ func (s *Service) Buy(inv *itemcontainer.Inventory, list buylist.List, rows []Bu
 		if p.LimitedStock() && (s.stock == nil || !s.stock.Decrease(p, int(row.Count))) {
 			continue
 		}
-		id, err := s.ids.NextID()
-		if err != nil {
+		if _, err := inv.AddCreated(row.ItemID, int(row.Count), s.ids.NextID); err != nil {
 			errs = append(errs, err)
-			continue
 		}
-		inv.AddNew(row.ItemID, int(row.Count), id)
 	}
 	return Purchase{Outcome: BuyDone, Subtotal: subtotal}, errors.Join(errs...)
 }

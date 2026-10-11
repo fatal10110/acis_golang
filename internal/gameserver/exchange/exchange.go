@@ -484,18 +484,9 @@ func (s *Service) payReputation(c *player.Character, points int, out *Outcome) {
 }
 
 // add creates count units of itemID in inv as one new instance, joining a
-// held stack of a stackable item. It returns nil when itemID has no
-// template or no object id could be allocated.
+// held stack of a stackable item, which takes no object id. It returns nil
+// when itemID has no template or no object id could be allocated.
 func (s *Service) add(inv *itemcontainer.Inventory, itemID int32, count int) *item.Instance {
-	if s.nextID == nil {
-		return nil
-	}
-	if _, ok := inv.Templates().Get(itemID); !ok {
-		return nil
-	}
-	id, err := s.nextID()
-	if err != nil {
-		return nil
-	}
-	return inv.AddNew(itemID, count, id)
+	inst, _ := inv.AddCreated(itemID, count, s.nextID)
+	return inst
 }
