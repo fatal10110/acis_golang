@@ -41,7 +41,7 @@ func bootFolkCaster(t *testing.T, defs []modelskill.Definition) (*gameservertest
 // script does, and waits for the NPC's queue to take it.
 func addCastDesire(t *testing.T, folk *npc.Folk, ref modelskill.Ref) {
 	t.Helper()
-	folk.AddCastDesire(folk, ref, 1_000_000)
+	folk.AddCastDesire(folk, ref, 1_000_000, true, true)
 	done := make(chan struct{})
 	if !folk.Queue().Post(func() { close(done) }) {
 		t.Fatal("post to folk queue: queue closed")

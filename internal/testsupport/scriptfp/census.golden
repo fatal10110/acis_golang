@@ -299,7 +299,7 @@ call NpcAI.addDoNothingDesire classes 5 sites 5 go -
 call NpcAI.addFleeDesire classes 24 sites 25 go AddFleeDesire
 call NpcAI.addFollowDesire classes 9 sites 9 go -
 call NpcAI.addMoveRouteDesire classes 5 sites 5 go script.NPC.AddMoveRouteDesire
-call NpcAI.addMoveToDesire classes 51 sites 92 go -
+call NpcAI.addMoveToDesire classes 51 sites 92 go script.NPC.AddMoveToDesire
 call NpcAI.addPickUpDesire classes 2 sites 2 go -
 call NpcAI.addSocialDesire classes 20 sites 39 go AddSocialDesire
 call NpcAI.addWanderDesire classes 27 sites 31 go -

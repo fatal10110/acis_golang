@@ -42,6 +42,19 @@ func (r *Registry) HostileMoveToFinished(h *npc.Hostile, x, y, z int32) {
 	}
 }
 
+// FolkMoveToFinished runs the move-finished hook of every script bound to
+// f's template, in list order: a walk to a point ended with f at x, y, z.
+func (r *Registry) FolkMoveToFinished(f *npc.Folk, x, y, z int32) {
+	list := r.scripts(int32(f.NpcID()), EventMoveToFinished)
+	if len(list) == 0 {
+		return
+	}
+	e := MoveToFinished{NPC: NPCOf(f), X: x, Y: y, Z: z}
+	for _, s := range list {
+		r.run(s, hookMoveToFinished, func() { s.Hooks.MoveToFinished(s, e) })
+	}
+}
+
 // HostileOutOfTerritory runs the out-of-territory hook of every script
 // bound to h's template, in list order: h arrived outside its territory.
 func (r *Registry) HostileOutOfTerritory(h *npc.Hostile) {

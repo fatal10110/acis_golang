@@ -9,9 +9,9 @@ import (
 )
 
 // TestProductionGateIdleAndArrivalHooks pins the production seam gate for
-// the AI's idle and arrival hooks: no-desire is raised on civilian and
-// hostile NPCs, move-finished and out-of-territory on hostile NPCs only, so
-// a civilian behavior that waits on an arrival is refused at boot.
+// the AI's idle and arrival hooks: no-desire and move-finished are raised on
+// civilian and hostile NPCs, out-of-territory on hostile NPCs only, so a
+// civilian behavior that waits on leaving its territory is refused at boot.
 func TestProductionGateIdleAndArrivalHooks(t *testing.T) {
 	kindOf := func(id int32) (NPCKind, bool) {
 		switch id {
@@ -49,19 +49,17 @@ func TestProductionGateIdleAndArrivalHooks(t *testing.T) {
 		registered[e.path] = e.state == entryRegistered
 	}
 	want := map[string]bool{
-		"ai.FolkMoveFinished": false, "ai.FolkOutOfTerritory": false, "ai.FolkNoDesire": true,
+		"ai.FolkMoveFinished": true, "ai.FolkOutOfTerritory": false, "ai.FolkNoDesire": true,
 		"ai.HostileMoveFinished": true, "ai.HostileOutOfTerritory": true, "ai.HostileNoDesire": true,
 	}
 	if !reflect.DeepEqual(registered, want) {
 		t.Fatalf("registered = %v, want %v", registered, want)
 	}
-	if n := logs.count("script: refused"); n != 2 {
-		t.Fatalf("refusals logged %d times, want 2: %s", n, logs)
+	if n := logs.count("script: refused"); n != 1 {
+		t.Fatalf("refusals logged %d times, want 1: %s", n, logs)
 	}
-	for _, p := range []string{"ai.FolkMoveFinished", "ai.FolkOutOfTerritory"} {
-		if !strings.Contains(logs.String(), `"script":"`+p+`"`) {
-			t.Errorf("no refusal logged for %s: %s", p, logs)
-		}
+	if !strings.Contains(logs.String(), `"script":"ai.FolkOutOfTerritory"`) {
+		t.Errorf("no refusal logged for ai.FolkOutOfTerritory: %s", logs)
 	}
 	if !r.Behaves(1) || !r.Behaves(2) {
 		t.Fatalf("Behaves(1)=%v Behaves(2)=%v, want both bound", r.Behaves(1), r.Behaves(2))

@@ -115,8 +115,9 @@ func (l *idleLog) hostileBehavior(wanderer int32, ids ...int32) func() script.Sc
 }
 
 // folkBehavior returns the catalog entry of a behavior bound to the
-// civilian ids that records its no-desire hook: a civilian NPC raises no
-// arrival hook, so a behavior bound to one that sets them would be refused.
+// civilian ids that records its no-desire hook: a civilian NPC keeps no
+// territory, so a behavior bound to one that waits on leaving it would be
+// refused. Its walks and move-finished hook are covered in tests/ai.
 func (l *idleLog) folkBehavior(ids ...int32) func() script.Script {
 	return func() script.Script {
 		return script.Script{Behavior: true, NPCs: ids, Hooks: script.Hooks{OnNoDesire: l.noDesire(0)}}

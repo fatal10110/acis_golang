@@ -30,7 +30,7 @@ func (a *Attackable) AddCastDesire(target attackable.Combatant, ref skill.Ref, w
 	if checkConditions && !cast.CanDesire(target, ref) {
 		return
 	}
-	if !moveToTarget && !a.inCastReach(target, cast.Range(ref)) {
+	if !moveToTarget && !InCastReach(a.actor, target, cast.Range(ref)) {
 		return
 	}
 	final := cast.FinalTarget(target, ref)
@@ -47,12 +47,18 @@ func (a *Attackable) AddCastDesire(target attackable.Combatant, ref skill.Ref, w
 	})
 }
 
-// inCastReach reports whether target stands strictly within castRange plus
-// both collision radii of the actor, measured flat. The reach is truncated
-// to whole units before the comparison.
-func (a *Attackable) inCastReach(target attackable.Combatant, castRange int) bool {
-	reach := int(float64(castRange) + a.actor.CollisionRadius() + target.CollisionRadius())
-	ox, oy, oz := a.actor.Position()
+// body is a creature with a world position and a collision radius.
+type body interface {
+	Position() (x, y, z int)
+	CollisionRadius() float64
+}
+
+// InCastReach reports whether target stands strictly within castRange plus
+// both collision radii of self, measured flat. The reach is truncated to
+// whole units before the comparison.
+func InCastReach(self, target body, castRange int) bool {
+	reach := int(float64(castRange) + self.CollisionRadius() + target.CollisionRadius())
+	ox, oy, oz := self.Position()
 	tx, ty, tz := target.Position()
 	from := location.Location{X: ox, Y: oy, Z: oz}
 	return from.Distance2D(location.Location{X: tx, Y: ty, Z: tz}) < float64(reach)

@@ -57,6 +57,9 @@ type ScriptHooks interface {
 	// HostileMoveToFinished runs h's move-finished hooks: a walk to a
 	// point, or a flight, ended with h at x, y, z.
 	HostileMoveToFinished(h *Hostile, x, y, z int32)
+	// FolkMoveToFinished runs f's move-finished hooks: a walk to a point
+	// ended with f at x, y, z.
+	FolkMoveToFinished(f *Folk, x, y, z int32)
 	// HostileOutOfTerritory runs h's out-of-territory hooks: h arrived
 	// outside its territory, the first time since it was last inside.
 	HostileOutOfTerritory(h *Hostile)
@@ -121,9 +124,10 @@ func (h *Hostile) AtHookPoint(p ai.HookPoint) {
 	}
 }
 
-// AtHookPoint is where f's AI tick gives the behavior bound to f's template
-// its turn, on f's queue with no lock held: the tick's state is queue-owned.
-// The see-creature scan and the no-desire hooks run there.
+// AtHookPoint is where f's AI tick, or its arrival, gives the behavior bound
+// to f's template its turn, on f's queue with no lock held: the AI's state
+// is queue-owned. The see-creature scan, the no-desire and move-finished
+// hooks run there; a civilian NPC keeps no territory to leave.
 func (f *Folk) AtHookPoint(p ai.HookPoint) {
 	if f.scripts == nil {
 		return
@@ -133,6 +137,9 @@ func (f *Folk) AtHookPoint(p ai.HookPoint) {
 		scanSight(f)
 	case ai.HookNoDesire:
 		f.scripts.FolkNoDesire(f)
+	case ai.HookMoveFinished:
+		x, y, z := f.Position()
+		f.scripts.FolkMoveToFinished(f, int32(x), int32(y), int32(z))
 	}
 }
 

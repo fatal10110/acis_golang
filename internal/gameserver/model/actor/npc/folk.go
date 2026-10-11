@@ -100,7 +100,9 @@ type Folk struct {
 	// cannot. EnableMovement sets it before the NPC is published.
 	motion *folkMotion
 
-	// lastSocial is the Unix millisecond time of the last talk animation.
+	// lastSocial is the social stamp, in Unix milliseconds on the NPC's
+	// queue clock: when the last talk animation played, or when the hold of
+	// the last social desire ends. Zero for never.
 	lastSocial atomic.Int64
 
 	folkCombat
@@ -166,15 +168,16 @@ func (f *Folk) Muted() bool { return hostileKind(f.Instance) == "MutedFolk" }
 // greeting answers every interact.
 func (f *Folk) QuestTalker() bool { return hostileKind(f.Instance) != weddingManager }
 
-// TalkAnimation claims the talk animation an interact at now plays: a
-// random social action id in [0, 8), at most one per socialInterval, the
-// first one always. ok is false when none plays. A wedding manager greets
-// with its own dialog and plays none.
-func (f *Folk) TalkAnimation(now time.Time) (id int32, ok bool) {
-	if f.Muted() || hostileKind(f.Instance) == weddingManager {
+// TalkAnimation claims the talk animation an interact plays: a random
+// social action id in [0, 8), only once socialInterval has passed since
+// the last one or since the hold of a social desire ended, the first one
+// always. ok is false when none plays, or when f cannot act. A wedding
+// manager greets with its own dialog and plays none.
+func (f *Folk) TalkAnimation() (id int32, ok bool) {
+	if f.Muted() || hostileKind(f.Instance) == weddingManager || f.denyAIAction() {
 		return 0, false
 	}
-	ms := now.UnixMilli()
+	ms := f.now().UnixMilli()
 	for {
 		last := f.lastSocial.Load()
 		if last != 0 && ms-last <= socialInterval.Milliseconds() {

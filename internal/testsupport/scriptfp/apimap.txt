@@ -125,6 +125,9 @@ Quest.startQuestTimerAtFixedRate script.Script.StartTimerAtFixedRate
 NpcAI.addFleeDesire AddFleeDesire
 NpcAI.addSocialDesire AddSocialDesire
 
+# Folk-side desires (A14): the walk to a point, on both NPC kinds.
+NpcAI.addMoveToDesire script.NPC.AddMoveToDesire
+
 # Tutorial script (U2). The class id, the inventory and a reference location
 # are folded into the handle calls and plain Go values; a quest state's
 # variables are set through its handle, which also reads them as numbers.
