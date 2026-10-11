@@ -92,12 +92,13 @@ func TestLoadHTMLRecordsIncludesContentIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadHTMLRecords error: %v", err)
 	}
-	if got, want := len(records), 15320; got != want {
+	// The 12 pages that are not valid UTF-8 are left out.
+	if got, want := len(records), 15308; got != want {
 		t.Fatalf("len(records) = %d, want %d", got, want)
 	}
 
 	rec := recordByID(t, records, "territorynoclan.htm")
-	html, err := datacache.LoadHTML(filepath.Join(root, "data", "html"))
+	html, _, err := datacache.LoadHTML(filepath.Join(root, "data", "html"))
 	if err != nil {
 		t.Fatal(err)
 	}

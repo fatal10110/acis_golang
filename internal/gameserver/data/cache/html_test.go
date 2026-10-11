@@ -29,7 +29,7 @@ func TestLoadHTML(t *testing.T) {
 	writeHTML(t, dir, "merchant/extra.html", "<html>extra</html>")
 	writeHTML(t, dir, "readme.txt", "ignored")
 
-	cache, err := LoadHTML(dir)
+	cache, _, err := LoadHTML(dir)
 	if err != nil {
 		t.Fatalf("LoadHTML: %v", err)
 	}
@@ -55,10 +55,10 @@ func TestLoadHTML(t *testing.T) {
 }
 
 func TestLoadHTMLMissingAndEmpty(t *testing.T) {
-	if _, err := LoadHTML(filepath.Join(t.TempDir(), "missing")); err == nil {
+	if _, _, err := LoadHTML(filepath.Join(t.TempDir(), "missing")); err == nil {
 		t.Fatal("LoadHTML(missing) error = nil")
 	}
-	if _, err := LoadHTML(t.TempDir()); err == nil {
+	if _, _, err := LoadHTML(t.TempDir()); err == nil {
 		t.Fatal("LoadHTML(empty) error = nil")
 	}
 }
@@ -68,7 +68,7 @@ func TestHTMLPathsAreSorted(t *testing.T) {
 	writeHTML(t, dir, "z.htm", "z")
 	writeHTML(t, dir, "a/b.htm", "b")
 
-	cache, err := LoadHTML(dir)
+	cache, _, err := LoadHTML(dir)
 	if err != nil {
 		t.Fatalf("LoadHTML: %v", err)
 	}
@@ -80,11 +80,12 @@ func TestHTMLPathsAreSorted(t *testing.T) {
 func TestLoadHTMLAgainstDatapack(t *testing.T) {
 	dir := datapack.Path(t, "data", "html")
 
-	cache, err := LoadHTML(dir)
+	cache, _, err := LoadHTML(dir)
 	if err != nil {
 		t.Fatalf("LoadHTML(%q): %v", dir, err)
 	}
-	if got, want := cache.Len(), 15320; got != want {
+	// 15320 page files, less the 12 that are not valid UTF-8.
+	if got, want := cache.Len(), 15308; got != want {
 		t.Fatalf("Len() = %d, want %d", got, want)
 	}
 

@@ -44,7 +44,7 @@ func provideDataReloads(paths gameServerPaths, data *gameData, html *datacache.H
 			return gamexml.LoadCursedWeapons(filepath.Join(xmlRoot, "cursedWeapons.xml"), data.Skills)
 		},
 		HTML: func() error {
-			fresh, err := loadHTMLCache(paths)
+			fresh, err := loadHTMLCache(paths, log)
 			if err != nil {
 				return err
 			}
