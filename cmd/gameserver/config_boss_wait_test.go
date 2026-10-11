@@ -44,12 +44,19 @@ func TestLoadBossWaitTimesUsesNpcsProperties(t *testing.T) {
 			}
 		})
 	}
-	configPath := filepath.Join(t.TempDir(), "npcs.properties")
-	if err := os.WriteFile(configPath, []byte("ValakasWaitTime = soon\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := loadBossWaitTimes(gameServerPaths{NpcsConfigPath: configPath}); err == nil {
-		t.Fatal("a wait time that is no number was accepted")
+	for _, body := range []string{
+		"ValakasWaitTime = soon\n",
+		// Past the 32-bit range the minute count itself does not parse.
+		"AntharasWaitTime = 3000000000\n",
+		"FrintezzaWaitTime = -2147483649\n",
+	} {
+		configPath := filepath.Join(t.TempDir(), "npcs.properties")
+		if err := os.WriteFile(configPath, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := loadBossWaitTimes(gameServerPaths{NpcsConfigPath: configPath}); err == nil {
+			t.Fatalf("wait time %q was accepted", strings.TrimSpace(body))
+		}
 	}
 }
 

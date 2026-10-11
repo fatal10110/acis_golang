@@ -60,7 +60,8 @@ func (m *GlobalMemo) Remove(key string) {
 
 // Creature returns the creature whose object id key holds: nil when key
 // holds none or 0, when no creature of that id is in the world, and when
-// it is an NPC that has decayed.
+// it is an NPC that has decayed. A respawned NPC comes back under a new
+// object id, so a key stored in its earlier life resolves to nil.
 func (m *GlobalMemo) Creature(key string) Creature {
 	id := m.Int(key, 0)
 	if id == 0 || m.world == nil {

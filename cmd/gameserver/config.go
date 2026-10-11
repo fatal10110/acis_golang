@@ -840,8 +840,8 @@ func loadNpcAIConfig(paths gameServerPaths) (npc.AIConfig, error) {
 // loadBossWaitTimes reads the npcs.properties AntharasWaitTime (default
 // 30), ValakasWaitTime (default 20) and FrintezzaWaitTime (default 10), in
 // minutes. Each is held as a 32-bit count of milliseconds, so a value past
-// about 35,791 minutes wraps as the reference's does. A malformed value
-// fails boot.
+// about 35,791 minutes wraps. A malformed value, or a minute count outside
+// the 32-bit range, fails boot.
 func loadBossWaitTimes(paths gameServerPaths) (script.BossWaitTimes, error) {
 	props, err := config.LoadFile(paths.NpcsConfigPath)
 	if err != nil {
@@ -850,7 +850,12 @@ func loadBossWaitTimes(paths gameServerPaths) (script.BossWaitTimes, error) {
 	def := script.DefaultBossWaitTimes()
 	f := config.NewFields(props, "boss wait times")
 	minutes := func(key string, d time.Duration) time.Duration {
-		ms := int32(f.Int(key, int(d/time.Minute)) * 60000)
+		m := f.Int(key, int(d/time.Minute))
+		if m < math.MinInt32 || m > math.MaxInt32 {
+			f.Fail(fmt.Errorf("%s: %d is outside the 32-bit range", key, m))
+			return d
+		}
+		ms := int32(m) * 60000
 		return time.Duration(ms) * time.Millisecond
 	}
 	w := script.BossWaitTimes{
