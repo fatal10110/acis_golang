@@ -74,6 +74,9 @@ type ScriptHooks interface {
 	// FolkDecayed runs f's decayed hooks once f has decayed, before it
 	// leaves the world, then stops the behavior timers bound to f.
 	FolkDecayed(f *Folk)
+	// HostileHidden stops the behavior timers bound to h, which a script
+	// hid: it leaves the world with no decay of its own, and no hook runs.
+	HostileHidden(h *Hostile)
 	// HostileDying schedules h's dying hooks: killer has just killed it.
 	HostileDying(h *Hostile, killer attackable.Combatant)
 	// FolkDying schedules f's dying hooks: killer has just killed it.

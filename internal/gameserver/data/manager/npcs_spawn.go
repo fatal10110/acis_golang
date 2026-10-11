@@ -277,7 +277,13 @@ func (n *Npcs) trackLive(key string, id int32) bool {
 	return true
 }
 
+// spawnPrivates is the stand-in for the privates a behavior creates: it
+// places master's spawn-list privates for a Party_Type 2 master no
+// behavior is bound to. A bound master's behavior creates its own.
 func (n *Npcs) spawnPrivates(key string, entry spawn.Entry, master *npc.Hostile) {
+	if n.scripts != nil && n.scripts.Behaves(int32(master.NpcID())) {
+		return
+	}
 	// The generic monster behavior creates spawn-list privates only for Party_Type 2.
 	if master.AIInt("Party_Type", 0) != 2 {
 		return

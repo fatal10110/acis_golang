@@ -128,6 +128,18 @@ NpcAI.addSocialDesire AddSocialDesire
 # Folk-side desires (A14): the walk to a point, on both NPC kinds.
 NpcAI.addMoveToDesire script.NPC.AddMoveToDesire
 
+# Party leader and private (A12, #3602). The master and the privates are
+# read on the NPC handle. A private's respawn and the hide of an NPC go
+# through the spawner, as its despawn does: the spawn's respawn delay is
+# read there, in seconds.
+ASpawn.getRespawnDelay script.Spawner.RespawnDelay
+Npc.getMaster script.NPC.Master
+Npc.hasMaster script.NPC.HasMaster
+Npc.isMaster script.NPC.IsMaster
+Npc.scheduleRespawn script.Spawner.ScheduleRespawn
+NpcAI.addFollowDesire AddFollowDesire
+WorldObject.decayMe script.Spawner.DecayMe
+
 # Tutorial script (U2). The class id, the inventory and a reference location
 # are folded into the handle calls and plain Go values; a quest state's
 # variables are set through its handle, which also reads them as numbers.

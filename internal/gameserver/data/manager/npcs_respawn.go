@@ -61,6 +61,7 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 	}
 	if slot.scripted {
 		// The script that created the private brings it back, if ever.
+		n.dropOrphanScriptSlot(key, slot)
 		return nil
 	}
 
