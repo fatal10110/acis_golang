@@ -2,16 +2,15 @@ package script
 
 import (
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/rs/zerolog"
 )
 
 // TestProductionGateIdleAndArrivalHooks pins the production seam gate for
-// the AI's idle and arrival hooks: no-desire and move-finished are raised on
-// civilian and hostile NPCs, out-of-territory on hostile NPCs only, so a
-// civilian behavior that waits on leaving its territory is refused at boot.
+// the AI's idle and arrival hooks: no-desire, move-finished and
+// out-of-territory are raised on civilian and hostile NPCs alike, so every
+// behavior waiting on one registers at boot.
 func TestProductionGateIdleAndArrivalHooks(t *testing.T) {
 	kindOf := func(id int32) (NPCKind, bool) {
 		switch id {
@@ -49,17 +48,14 @@ func TestProductionGateIdleAndArrivalHooks(t *testing.T) {
 		registered[e.path] = e.state == entryRegistered
 	}
 	want := map[string]bool{
-		"ai.FolkMoveFinished": true, "ai.FolkOutOfTerritory": false, "ai.FolkNoDesire": true,
+		"ai.FolkMoveFinished": true, "ai.FolkOutOfTerritory": true, "ai.FolkNoDesire": true,
 		"ai.HostileMoveFinished": true, "ai.HostileOutOfTerritory": true, "ai.HostileNoDesire": true,
 	}
 	if !reflect.DeepEqual(registered, want) {
 		t.Fatalf("registered = %v, want %v", registered, want)
 	}
-	if n := logs.count("script: refused"); n != 1 {
-		t.Fatalf("refusals logged %d times, want 1: %s", n, logs)
-	}
-	if !strings.Contains(logs.String(), `"script":"ai.FolkOutOfTerritory"`) {
-		t.Errorf("no refusal logged for ai.FolkOutOfTerritory: %s", logs)
+	if n := logs.count("script: refused"); n != 0 {
+		t.Fatalf("refusals logged %d times, want none: %s", n, logs)
 	}
 	if !r.Behaves(1) || !r.Behaves(2) {
 		t.Fatalf("Behaves(1)=%v Behaves(2)=%v, want both bound", r.Behaves(1), r.Behaves(2))

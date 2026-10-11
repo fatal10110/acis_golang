@@ -103,13 +103,13 @@ func (f *Folk) act(d *ai.Desire) {
 }
 
 // thinkMoveTo is the walk step: f already standing on the point opens the
-// move-finished point and drops the walk's desire; otherwise f, when it can
-// act and move, walks there.
+// move-finished point and drops the desire of its current intention;
+// otherwise f, when it can act and move, walks there.
 func (f *Folk) thinkMoveTo(d *ai.Desire) {
 	x, y, z := f.Position()
 	if (location.Location{X: x, Y: y, Z: z}) == d.Location {
-		f.AtHookPoint(ai.HookMoveFinished)
-		f.cast.desires.RemoveIf(d.Equal)
+		f.atHookPoint(ai.HookMoveFinished)
+		f.clearCurrentDesire()
 		return
 	}
 	if f.denyAIAction() || f.motion == nil || f.MovementDisabled() {
@@ -133,18 +133,34 @@ func (f *Folk) thinkSocial(d *ai.Desire) {
 }
 
 // arrived is f's AI on a walk reaching its destination, on f's queue: a
-// walk to a point or a flee opens the move-finished point, then drops its
-// desire; a wander drops its desire.
+// walk to a point or a flee opens the move-finished point, then drops the
+// desire of f's current intention; a wander drops its desire. A follow
+// stops there. Otherwise f faces its spawn heading when it stands on its
+// spawn point, then settles its out-of-territory state (syncOutOfTerritory).
 func (f *Folk) arrived() {
-	cur := f.currentDesire()
-	if cur == nil {
-		return
+	f.cast.brain.Lock()
+	defer f.cast.brain.Unlock()
+	if cur := f.currentDesire(); cur != nil {
+		switch cur.Kind {
+		case ai.IntentionFollow:
+			return
+		case ai.IntentionMoveTo, ai.IntentionFlee:
+			f.atHookPoint(ai.HookMoveFinished)
+			f.clearCurrentDesire()
+		case ai.IntentionWander:
+			f.cast.desires.RemoveIf(cur.Equal)
+		}
 	}
-	switch cur.Kind {
-	case ai.IntentionMoveTo, ai.IntentionFlee:
-		f.AtHookPoint(ai.HookMoveFinished)
-		f.cast.desires.RemoveIf(cur.Equal)
-	case ai.IntentionWander:
+	if f.location() == f.Instance.Home {
+		f.SetHeading(f.Instance.SpawnHeading)
+	}
+	f.syncOutOfTerritory()
+}
+
+// clearCurrentDesire drops the desire equal to f's current intention, as it
+// stands now: a hook just run may have changed it.
+func (f *Folk) clearCurrentDesire() {
+	if cur := f.currentDesire(); cur != nil {
 		f.cast.desires.RemoveIf(cur.Equal)
 	}
 }
@@ -153,6 +169,8 @@ func (f *Folk) arrived() {
 // walk to a point, a flee or a wander drops its desire, with no
 // move-finished point.
 func (f *Folk) arrivedBlocked() {
+	f.cast.brain.Lock()
+	defer f.cast.brain.Unlock()
 	if cur := f.currentDesire(); cur != nil && (cur.Kind == ai.IntentionMoveTo || cur.Kind == ai.IntentionFlee || cur.Kind == ai.IntentionWander) {
 		f.cast.desires.RemoveIf(cur.Equal)
 	}

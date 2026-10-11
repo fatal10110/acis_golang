@@ -67,3 +67,16 @@ func (r *Registry) HostileOutOfTerritory(h *npc.Hostile) {
 		r.run(s, hookOutOfTerritory, func() { s.Hooks.OutOfTerritory(s, e) })
 	}
 }
+
+// FolkOutOfTerritory runs the out-of-territory hook of every script bound
+// to f's template, in list order: f arrived outside its territory.
+func (r *Registry) FolkOutOfTerritory(f *npc.Folk) {
+	list := r.scripts(int32(f.NpcID()), EventOutOfTerritory)
+	if len(list) == 0 {
+		return
+	}
+	e := OutOfTerritory{NPC: NPCOf(f)}
+	for _, s := range list {
+		r.run(s, hookOutOfTerritory, func() { s.Hooks.OutOfTerritory(s, e) })
+	}
+}

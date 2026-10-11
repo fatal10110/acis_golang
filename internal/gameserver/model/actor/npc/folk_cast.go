@@ -46,13 +46,24 @@ const castDesireDecay = 66000
 // folkCast is a civilian NPC's AI and cast runtime: the controller its
 // casts run on and the desires its AI picks its actions from. The controller is
 // set once before the NPC is published; desires is safe for concurrent
-// use; step, acting and onRoute belong to the NPC's queue, which alone
-// writes lifeTime.
+// use; brain guards step, acting, onRoute, oot and the fight state the
+// selection keeps (folkFight.next, latched and lastKind).
 type folkCast struct {
 	control CastControl
 	castAI  FolkCastAI
 	ai      FolkAI
 
+	// brain serializes the AI's entry points: the tick, desire selection
+	// run in place from the goroutine that queued a first attack, the
+	// attack and cast ends, and the arrivals. A pass releases it at each
+	// hook point (atHookPoint), so a hook may raise a whole nested pass,
+	// and the outer one reads what brain guards afresh after the point.
+	// Code holding it stops the cast controller only while no cast is in
+	// flight: the abort would run the skill-finished hooks with brain
+	// held, and a hook that queues a first attack takes brain. A cast only
+	// starts from a selection, which marks the NPC acting, and the idles
+	// that stop a cast run only once the NPC is no longer acting.
+	brain   sync.Mutex
 	desires *ai.DesireQueue
 	step    int
 	// lifeTime counts the AI ticks the NPC has lived through. Its AI does
@@ -65,8 +76,11 @@ type folkCast struct {
 	// onRoute marks an NPC its AI put on its route, until the AI takes up
 	// another desire.
 	onRoute bool
+	// oot is the NPC's out-of-territory state: whether its last arrival was
+	// outside and the stale-aggro sweep that arrival armed.
+	oot folkOutOfTerritory
 	// buffCheckAt is when a clan hall manager last checked its own support
-	// buff, in Unix milliseconds: read and set on the NPC's queue, reset
+	// buff, in Unix milliseconds: read and set by the AI under brain, reset
 	// from a dialog command.
 	buffCheckAt atomic.Int64
 
@@ -93,7 +107,8 @@ func (f *Folk) CastControl() CastControl { return f.cast.control }
 
 // AddCastDesire asks f to cast ref at target with weight, the way a dialog
 // command or script asks an NPC; an equal desire already queued gains the
-// weight instead. f's AI starts the cast on its next tick, closing in first
+// weight instead. The gates run and the desire is queued at once, on the
+// caller's goroutine. f's AI starts the cast on its next tick, closing in first
 // when target is out of the skill's range or out of its sight. Every
 // refusal is silent:
 //
@@ -105,25 +120,23 @@ func (f *Folk) CastControl() CastControl { return f.cast.control }
 //   - A skill whose target type resolves no creature from target is
 //     refused.
 func (f *Folk) AddCastDesire(target attackable.Combatant, ref modelskill.Ref, weight float64, checkConditions, moveToTarget bool) {
-	if target == nil || f.cast.castAI == nil || f.queue == nil {
+	castAI := f.cast.castAI
+	if target == nil || castAI == nil {
 		return
 	}
-	f.queue.Post(func() {
-		castAI := f.cast.castAI
-		if checkConditions && !castAI.CanDesire(target, ref) {
-			return
-		}
-		if !moveToTarget && !ai.InCastReach(f, target, castAI.Range(ref)) {
-			return
-		}
-		final := castAI.FinalTarget(target, ref)
-		if final == nil {
-			return
-		}
-		f.cast.desires.AddOrUpdate(&ai.Desire{
-			Kind: ai.IntentionCast, FinalTarget: final, Skill: ref,
-			MoveToTarget: moveToTarget, Weight: weight, QueuedAt: f.now(),
-		})
+	if checkConditions && !castAI.CanDesire(target, ref) {
+		return
+	}
+	if !moveToTarget && !ai.InCastReach(f, target, castAI.Range(ref)) {
+		return
+	}
+	final := castAI.FinalTarget(target, ref)
+	if final == nil {
+		return
+	}
+	f.cast.desires.AddOrUpdate(&ai.Desire{
+		Kind: ai.IntentionCast, FinalTarget: final, Skill: ref,
+		MoveToTarget: moveToTarget, Weight: weight, QueuedAt: f.now(),
 	})
 }
 
@@ -136,6 +149,8 @@ func (f *Folk) AbortCast() {
 		return
 	}
 	f.queue.Post(func() {
+		f.cast.brain.Lock()
+		defer f.cast.brain.Unlock()
 		f.cast.desires.Clear()
 		f.setCurrentDesire(nil)
 		f.cast.onRoute, f.cast.acting = false, false
@@ -165,9 +180,11 @@ func (f *Folk) TickThink() error {
 	return nil
 }
 
-// runAI is f's desire selection, on f's queue. updateTick makes it the AI
-// tick's: the see-creature point opens it, and the tick's idle, clock and
-// decay close it. In order:
+// runAI is f's desire selection, under brain, on whichever goroutine asks
+// for it: f's queue for the tick and the attack and cast ends, the caller's
+// for a first attack desire. updateTick makes it the AI tick's: the
+// see-creature point opens it, and the tick's idle, clock and decay close
+// it. In order:
 //
 //   - Invalid desires are dropped: a cast that has lost its weight or its
 //     HP, MP or mute gate, and any desire aimed at a creature f no longer
@@ -189,9 +206,16 @@ func (f *Folk) TickThink() error {
 //     stance. A route desire never leaves the queue, so a route walker never
 //     idles.
 func (f *Folk) runAI(updateTick bool) {
+	f.cast.brain.Lock()
+	defer f.cast.brain.Unlock()
+	f.runAILocked(updateTick)
+}
+
+// runAILocked is runAI for a caller holding brain.
+func (f *Folk) runAILocked(updateTick bool) {
 	instantRun := f.cast.lifeTime.Load() == 0 && f.cast.desires.HasKind(ai.IntentionAttack)
 	if updateTick {
-		f.AtHookPoint(ai.HookSeeCreature)
+		f.atHookPoint(ai.HookSeeCreature)
 	}
 	f.pruneDesires()
 	if !f.denyAIAction() {
@@ -320,7 +344,7 @@ func (f *Folk) thinkIdle() {
 	f.stopAttack()
 	f.StopCast()
 	f.forceWalkStance()
-	f.AtHookPoint(ai.HookNoDesire)
+	f.atHookPoint(ai.HookNoDesire)
 }
 
 // AddMoveRouteDesire asks f to walk the route named name with weight; an

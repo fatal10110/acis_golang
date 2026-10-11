@@ -57,19 +57,19 @@ func (l *folkLog) take() []string {
 }
 
 // bootFolkDesires boots one character in the world, with the AI task, and
-// the behaviors of catalog listed.
-func bootFolkDesires(t *testing.T, catalog script.Catalog) (*gameservertest.Server, location.Location) {
+// the behaviors of catalog listed; opts are added to the boot's.
+func bootFolkDesires(t *testing.T, catalog script.Catalog, opts ...gameservertest.Option) (*gameservertest.Server, location.Location) {
 	t.Helper()
 	var list []script.Listing
 	for path := range catalog {
 		list = append(list, script.Listing{Path: path})
 	}
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Watcher", 20, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithAITask(),
 		gameservertest.WithNPCScripts(map[int32]script.NPCKind{folkPatrolID: script.KindFolk, folkOfferingID: script.KindFolk}, list, catalog),
-	)
+	}, opts...)...)
 	c := srv.Client
 	c.Send(encodeGameStart())
 	for i := 0; ; i++ {
