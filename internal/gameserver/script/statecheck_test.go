@@ -28,6 +28,13 @@ import (
 // one or a factory of one included), and a local is mutable when anything
 // but its own declaration writes it (an assignment, an increment, its
 // address taken, a delete, clear or copy into it, or a send on it).
+//
+// State a family of scripts shares (the third-class saga core and its 31
+// sagas) follows from the same rule: a value of a family type the catalog
+// builds once and hands to the constructor of every member, holding engine
+// cells only. Its plain fields can only be read: writing one through the
+// constructor's parameter, a hook's capture of it or a method's receiver is
+// each a breach above.
 
 // Every committed script package keeps to the rule.
 func TestScriptPackagesKeepSharedStateInCells(t *testing.T) {
@@ -57,6 +64,9 @@ func TestScriptStateCheckCatchesFixture(t *testing.T) {
 		"bad.go:28: closure captures mutable constructor-local other",
 		"bad.go:29: go statement",
 		"bad.go:34: closure captures mutable constructor-local ptr",
+		"family.go:13: bump writes through its receiver f",
+		"family.go:18: Member writes through its parameter f",
+		"family.go:20: closure captures mutable constructor-local f",
 		"receiver.go:21: onTalk writes through its receiver q",
 		"receiver.go:30: onFirstTalk writes through its receiver q",
 		"receiver.go:36: remember writes through its parameter q",

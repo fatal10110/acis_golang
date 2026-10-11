@@ -54,11 +54,23 @@ type QuestState struct {
 	quests *Quests
 	player *player.Character
 	state  *questlog.State
+	// registry is the registry of the script whose call found the state,
+	// nil when no registered script did; Quest resolves through it.
+	registry *Registry
 }
 
 // State returns c's state in s, nil when c has none.
 func (q *Quests) State(c *player.Character, s *Script) *QuestState {
-	return q.stateNamed(c, s.Name)
+	return q.stateNamed(c, s.Name).foundBy(s)
+}
+
+// foundBy records s as the script whose call found qs and returns qs; a
+// nil qs stays nil.
+func (qs *QuestState) foundBy(s *Script) *QuestState {
+	if qs != nil {
+		qs.registry = s.registry
+	}
+	return qs
 }
 
 // stateNamed returns c's state in the quest named name, nil when c has
@@ -74,14 +86,14 @@ func (q *Quests) stateNamed(c *player.Character, name string) *QuestState {
 // QuestState returns p's state in the quest named name, nil when p has
 // none.
 func (s *Script) QuestState(p *Player, name string) *QuestState {
-	return s.env.Quests.stateNamed(p.character(), name)
+	return s.env.Quests.stateNamed(p.character(), name).foundBy(s)
 }
 
 // NewState adds a state of s to c's journal, created, and returns it. It
 // writes nothing.
 func (q *Quests) NewState(c *player.Character, s *Script) *QuestState {
 	st := c.Quests().Create(questlog.Quest{Name: s.Name, ID: s.QuestID, Items: s.Items})
-	return &QuestState{quests: q, player: c, state: st}
+	return &QuestState{quests: q, player: c, state: st, registry: s.registry}
 }
 
 // Abort exits, as repeatable, the first quest of c's journal whose quest id
