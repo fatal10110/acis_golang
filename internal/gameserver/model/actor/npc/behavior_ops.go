@@ -2,6 +2,7 @@ package npc
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -62,15 +63,24 @@ func (inst *Instance) spawnTerritoryContains(at location.Location) bool {
 	return at.In3DRadius(inst.Home, defaultDriftRange)
 }
 
-// InstantTeleportTo moves the NPC to target in one step, staying on the
-// world grid: target is grounded unless it lies in water, the observers
-// see the jump without its fade, and the NPC's geo-path fail streak
-// restarts. Unlike TeleportTo it aborts nothing and forgets no one.
-func (h *Hostile) InstantTeleportTo(target location.Location) {
-	if h.Live != nil && (h.inWater == nil || !h.inWater(target)) {
-		target.Z = int(h.Move().Height(target.X, target.Y, target.Z))
+// InstantTeleportTo moves the NPC in one step to where j lands, grounded
+// unless it lies in water: the observers see the jump without its fade,
+// and the NPC's geo-path fail streak restarts. The NPC stays in its region
+// until it next moves, so what knows it and what it knows are unchanged.
+// Unlike TeleportTo it aborts nothing and forgets no one.
+func (h *Hostile) InstantTeleportTo(j location.Jump) {
+	target := j.To
+	if h.Live != nil {
+		target = move.Land(h.Move(), j, h.inWater)
 	}
 	h.emit(event.Teleported{To: target, Instant: true})
-	h.SetXYZ(target.X, target.Y, target.Z)
+	if h.Live != nil {
+		h.Move().SetPosition(target)
+	}
+	if h.world != nil {
+		previous := h.location()
+		h.world.SetPosition(h, target.X, target.Y, target.Z)
+		h.zones.place(previous)
+	}
 	h.ResetGeoPathFailCount()
 }

@@ -330,6 +330,13 @@ where the reference asks an NPC to walk a route (A13).
    (memos hold the `<quest>_OneTimeQuestFlag` and class-change flags).
 3. The top-level `Quest` bypass is refused with ActionFailed while the player trades or runs
    a private store. This closes a check-then-take race.
+4. A script's instant teleport of a player or a summon runs on the moved creature's own
+   queue once the calling task is done; the reference moves it inside the call. The packets
+   and the landing are the same, but code after the call (the rest of the hook, other NPCs'
+   hooks in the same broadcast) still reads the old position. Running it inline would write
+   another player's position from the caller's queue while that player's own queue moves
+   it, or wait on that queue, which deadlocks when two players' hooks swap each other
+   (WarriorBase `SwapPosition`). An NPC's instant teleport, hostile or civilian, stays inline.
 
 Everything else follows the reference, including its quirks (abort by id, the 25-quest check
 only at talk, the abnormal-status dispatch list).
