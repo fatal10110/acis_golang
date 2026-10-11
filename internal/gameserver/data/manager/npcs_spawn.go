@@ -112,7 +112,7 @@ func (n *Npcs) spawnMaster(key string, entry spawn.Entry, tmpl *npc.Template, lo
 // instantiate places one NPC, as place does, then runs its created hooks
 // with no lock held. It returns the NPC placed, nil when none was; a
 // created hook may have deleted it again.
-func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int, master *npc.Hostile) attackable.Combatant {
+func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int, master npc.PartyMember) attackable.Combatant {
 	live := n.place(key, entry, tmpl, loc, heading, hp, mp, master)
 	if n.scripts != nil {
 		switch o := live.(type) {
@@ -128,9 +128,10 @@ func (n *Npcs) instantiate(key string, entry spawn.Entry, tmpl *npc.Template, lo
 // place builds one live NPC from tmpl, a Hostile or a civilian one, and
 // places it in the world at (loc, heading) with hp current HP and mp
 // current MP (or fullHP/fullMP, its calculated Max HP/MP), registering it
-// for AI ticks and corpse decay/respawn. It read-holds the gate: a
+// for AI ticks and corpse decay/respawn. A non-nil master makes it one of
+// master's privates before it enters the world. It read-holds the gate: a
 // placement never lands halfway through DespawnAll.
-func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int, master *npc.Hostile) attackable.Combatant {
+func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc location.Location, heading, hp, mp int, master npc.PartyMember) attackable.Combatant {
 	n.gate.RLock()
 	defer n.gate.RUnlock()
 	id, err := n.ids.NextID()
@@ -162,7 +163,7 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	}
 
 	if npc.FolkKind(inst) {
-		if f := n.spawnFolk(key, inst, loc, heading, slot); f != nil {
+		if f := n.spawnFolk(key, inst, loc, heading, slot, master); f != nil {
 			return f
 		}
 		return nil
@@ -211,9 +212,9 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	if master != nil {
 		hostile.SetMaster(master)
 		master.AddMinion(hostile)
-		// MinionSpawn.doSpawn: a Monster-family private of a raid boss
-		// joins the raid (no lethal strikes, raid curse, see-through).
-		if master.RaidBoss() && hostile.MonsterKind() {
+		// A Monster-family private of a raid boss joins the raid (no
+		// lethal strikes, raid curse, see-through).
+		if boss, ok := master.(*npc.Hostile); ok && boss.RaidBoss() && hostile.MonsterKind() {
 			hostile.SetRaidRelated(true)
 		}
 	}
@@ -235,9 +236,10 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 // spawnFolk places a civilian NPC built from inst in the world at (loc,
 // heading) and tracks it under its spawn slot key, like a hostile: a mortal
 // one that dies decays and respawns through the slot. A route walker walks
-// its route while it lives. It returns the NPC, nil when none stays placed.
-func (n *Npcs) spawnFolk(key string, inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot) *npc.Folk {
-	f, err := n.folk.Spawn(inst, loc, heading, slot)
+// its route while it lives. A non-nil master makes it one of master's
+// privates. It returns the NPC, nil when none stays placed.
+func (n *Npcs) spawnFolk(key string, inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot, master npc.PartyMember) *npc.Folk {
+	f, err := n.folk.spawn(inst, loc, heading, slot, master)
 	if err != nil {
 		n.log.Warn().Err(err).Int("npc_id", inst.Template.ID).Msg("spawn: cannot build folk npc")
 		return nil
@@ -301,10 +303,10 @@ func (n *Npcs) spawnPrivates(key string, entry spawn.Entry, master *npc.Hostile)
 	}
 }
 
-func (n *Npcs) privateSpawnLocation(master *npc.Hostile, tmpl *npc.Template) location.Location {
+func (n *Npcs) privateSpawnLocation(master npc.PartyMember, tmpl *npc.Template) location.Location {
 	x, y, z := master.Position()
-	minOffset := int(master.Instance.Template.CollisionRadius + 30)
-	maxOffset := int(100 + master.Instance.Template.CollisionRadius + tmpl.CollisionRadius)
+	minOffset := int(master.Template().CollisionRadius + 30)
+	maxOffset := int(100 + master.Template().CollisionRadius + tmpl.CollisionRadius)
 	dest := location.Location{X: x, Y: y, Z: z}.AddRandomOffsetBetween(minOffset, maxOffset)
 	return n.geo.ValidLocation(x, y, z, dest.X, dest.Y, dest.Z)
 }

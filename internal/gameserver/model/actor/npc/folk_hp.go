@@ -78,14 +78,17 @@ func (f *Folk) ReduceHPBySkillDOT(amount float64, attacker effect.Actor, sk mode
 
 // SkillAttacked is caster's offensive skill def landing on this NPC, once
 // its effects applied, for a skill that is a debuff or carries aggro
-// points: the attacked hooks run with max(120, aggro points) as the damage.
-// A dead NPC is called too. Unlike a hostile NPC, a civilian NPC makes no
-// clan call for a skill: a clan member is never told of one.
+// points: the attacked hooks run with max(120, aggro points) as the damage,
+// then the party is called as for a hit, with no built-in assist. A dead
+// NPC is called too. Unlike a hostile NPC, a civilian NPC makes no clan
+// call for a skill: a clan member is never told of one.
 func (f *Folk) SkillAttacked(caster attackable.Combatant, def modelskill.Definition) {
 	if caster == nil {
 		return
 	}
-	f.raiseAttacked(caster, int32(max(120, def.AggroPoints)), skillRef(def))
+	value := max(120, def.AggroPoints)
+	f.raiseAttacked(caster, int32(value), skillRef(def))
+	propagatePartyAttacked(f, caster, value, false, false)
 }
 
 // raiseAttacked runs f's attacked hooks.
@@ -97,8 +100,9 @@ func (f *Folk) raiseAttacked(attacker attackable.Combatant, damage int32, sk mod
 
 // reduceHP is an NPC's HP reduction: a dead NPC takes nothing; a hit from a
 // creature first puts a walking NPC in run stance and adds the damage to its
-// aggro list, at no hate, then runs its attacked hooks with the damage truncated to an int and sk the skill that dealt it,
-// then its clan calls: itself, then every NPC of its clan in range. An
+// aggro list, at no hate, then runs its attacked hooks with the damage
+// truncated to an int and sk the skill that dealt it, then calls its party,
+// then makes its clan calls: itself, then every NPC of its clan in range. An
 // invulnerable NPC, or a hit from an attacker without damage permission,
 // then takes nothing.
 // The HP left is never under folkMinHP for an undying template, nor under
@@ -123,6 +127,7 @@ func (f *Folk) loseHP(amount float64, attacker attackable.Combatant, sk modelski
 		f.fight.aggro.AddDamage(attacker, amount, 0)
 		damage := commons.JavaInt(amount)
 		f.raiseAttacked(attacker, damage, sk)
+		propagatePartyAttacked(f, attacker, int(damage), false, true)
 		raiseClanAttacked(f.scripts, f.world, f, attacker, damage, sk, clanAttackedByHit)
 	}
 	if f.Invul() || !creature.CanDealDamage(attacker) {

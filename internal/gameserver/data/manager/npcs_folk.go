@@ -71,6 +71,12 @@ type FolkSpawner struct {
 // on the AI task, and starts its route walk when it has one. slot is the
 // spawn slot placing it; nil for none.
 func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot) (*npc.Folk, error) {
+	return s.spawn(inst, loc, heading, slot, nil)
+}
+
+// spawn is Spawn for a private of master, which a nil master spawns none
+// for: the NPC is linked to master before it enters the world.
+func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot, master npc.PartyMember) (*npc.Folk, error) {
 	f, err := npc.NewFolk(inst, s.Skills)
 	if err != nil {
 		return nil, err
@@ -132,6 +138,10 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 		if control != nil {
 			control.ref = walker
 		}
+	}
+	if master != nil {
+		f.SetMaster(master)
+		master.AddMinion(f)
 	}
 	s.State.Spawn(f, loc.X, loc.Y, loc.Z, heading)
 	f.EnterZones()

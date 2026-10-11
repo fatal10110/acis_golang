@@ -36,9 +36,11 @@ func (h *Hostile) SpawnTerritoryContains(at location.Location) bool {
 }
 
 // SpawnTerritoryContains reports whether at lies in the territory of the
-// spawn that placed the civilian NPC, as for a hostile NPC that is no
-// private.
+// spawn that placed the civilian NPC, as for a hostile NPC.
 func (f *Folk) SpawnTerritoryContains(at location.Location) bool {
+	if f.IsPrivate() {
+		return true
+	}
 	return f.Instance.spawnTerritoryContains(at)
 }
 

@@ -65,7 +65,7 @@ func (n *Npcs) ScheduleRespawn(h *npc.Hostile, d time.Duration) error {
 // would find that master dead anyway, so the slot would stay for good.
 func (n *Npcs) dropOrphanScriptSlot(key string, slot slotInfo) {
 	obj, _ := n.state.Object(slot.masterID)
-	if master, ok := obj.(*npc.Hostile); ok && !master.Dead() {
+	if master, ok := obj.(npc.PartyMember); ok && !master.Dead() {
 		return
 	}
 	n.mu.Lock()
