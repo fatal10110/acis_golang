@@ -38,10 +38,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q023"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q211"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q230"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q234"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q235"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q260"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q316"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q350"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q360"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q422"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q508"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q510"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q607"
@@ -73,10 +76,13 @@ func questCatalog(crystals *item.SoulCrystalTable) script.Catalog {
 		"quest.Q023_LidiasHeart":           q023.New,
 		"quest.Q211_TrialOfTheChallenger":  q211.New,
 		"quest.Q230_TestOfTheSummoner":     q230.New,
+		"quest.Q234_FatesWhisper":          q234.New,
+		"quest.Q235_MimirsElixir":          q235.New,
 		"quest.Q260_HuntTheOrcs":           q260.New,
 		"quest.Q316_DestroyPlagueCarriers": q316.New,
 		"quest.Q350_EnhanceYourWeapon":     func() script.Script { return q350.New(crystals) },
 		"quest.Q360_PlunderTheirSupplies":  q360.New,
+		"quest.Q422_RepentYourSins":        q422.New,
 		"quest.Q508_AClansReputation":      q508.New,
 		"quest.Q510_AClansReputation":      q510.New,
 		"quest.Q607_ProveYourCourage":      q607.New,
