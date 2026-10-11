@@ -38,6 +38,9 @@ type scriptRegistry interface {
 	// see zone_scripts.go.
 	ZoneEnterIDs() []int32
 	ZoneEntered(zoneID int32, c attackable.Combatant)
+	// npcScriptInfo is what the //info NPC script pages read; see
+	// admin_info_script.go.
+	npcScriptInfo
 }
 
 // questJournals writes the quest journals, and aborts and exits quests.

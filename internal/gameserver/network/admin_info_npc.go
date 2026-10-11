@@ -41,8 +41,12 @@ func (l *GameClientLink) adminNpcInfo(gm *livePlayer, obj world.Tracked, inst *n
 		switch page {
 		case 1, 2:
 			l.npcInfoGap(gm, "ai "+strconv.Itoa(page), 3396)
+		case 3:
+			sendFilledHTML(gm, 0, l.npcDefaultPage(npcScratchContent(obj)), 0)
 		default:
-			l.npcInfoGap(gm, "ai "+strconv.Itoa(page), 3398)
+			// Any other page, and one that does not read as an int, is the
+			// AI path.
+			sendFilledHTML(gm, 0, l.npcDefaultPage(l.npcAIPathContent(inst.Template)), 0)
 		}
 	case "aggro":
 		sendFilledHTML(gm, 0, l.npcDefaultPage(npcAggroContent(obj)), 0)
@@ -56,7 +60,7 @@ func (l *GameClientLink) adminNpcInfo(gm *livePlayer, obj world.Tracked, inst *n
 	case "drop", "spoil":
 		l.adminNpcDrops(gm, inst, sub == "drop", args[1:])
 	case "script":
-		l.npcInfoGap(gm, sub, 3398)
+		sendFilledHTML(gm, 0, l.npcScriptPage(obj, inst.Template), 0)
 	case "shop", "skill":
 		l.npcInfoGap(gm, sub, 3396)
 	case "spawn":

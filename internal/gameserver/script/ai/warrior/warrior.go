@@ -150,7 +150,7 @@ func WarriorHooks() script.Hooks {
 				e.NPC.Shout(script.NpcString(shoutMsg4))
 			}
 		},
-	})
+	}).Named("Warrior")
 }
 
 // targets reports whether c is among list; no creature is among none.
