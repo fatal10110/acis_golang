@@ -132,10 +132,12 @@ func (n *NPC) InstantTeleportTo(at Place) {
 }
 
 // InstantTeleportTo moves the player to at in one step, on the player's
-// own queue once the caller's task is done, staying on the world grid: at is grounded unless the player flies or at lies in water,
-// the player and the players around see the jump without its fade, the
-// player goes idle and the NPCs around at notice it. A player in a teleport
-// already is left to it.
+// own queue once the caller's task is done, staying on the world grid: at
+// is grounded unless the player flies or at lies in water, the player and
+// the players around see the jump without its fade, the player goes idle,
+// and each NPC around the region it jumped from that sees at runs its
+// see-creature hooks for it once. A player in a teleport already is left
+// to it.
 func (p *Player) InstantTeleportTo(at Place) {
 	l := at.loc()
 	p.character().InstantTeleportTo(location.Location{X: l.X, Y: l.Y, Z: l.Z})
@@ -155,6 +157,11 @@ func (p *Player) AlliedWithKetra() bool { return p.character().AlliedWithKetra()
 // AlliedWithVarka reports whether the player is allied with the Varka
 // Silenos.
 func (p *Player) AlliedWithVarka() bool { return p.character().AlliedWithVarka() }
+
+// VarkaKetraAlliance returns the player's standing with the two factions:
+// positive is the Ketra Orc alliance level, negative the Varka Silenos one,
+// 0 neither.
+func (p *Player) VarkaKetraAlliance() int32 { return int32(p.character().VarkaKetraAlliance()) }
 
 // The class groups an NPC's hate parameters name, by class id.
 var classGroups = map[string][]int{

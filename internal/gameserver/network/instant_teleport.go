@@ -13,22 +13,26 @@ import (
 // or target lies in water; live and its observers get the jump without its
 // fade; live stays on the grid, so what still sees it keeps knowing it.
 // live then goes idle, and, once the teleport lock is released (their
-// see-creature hooks may move live again), the NPCs around target notice
-// it. A player already in a teleport is left to it.
+// see-creature hooks may move live again), the NPCs that see target notice
+// it: those around the region live jumped from, as the reference keeps an
+// instantly teleported creature in its old region. A player already in a
+// teleport is left to it.
 func (l *GameClientLink) instantTeleportLivePlayer(live *livePlayer, target location.Location) {
-	if l.jumpLivePlayer(live, target) {
-		npc.ForceSeeCreature(l.world, live)
+	if from, ok := l.jumpLivePlayer(live, target); ok {
+		npc.ForceSeeCreatureFrom(l.world, live, from)
 	}
 }
 
 // jumpLivePlayer is instantTeleportLivePlayer under live's teleport lock,
-// up to the NPCs' notice; it reports whether live jumped.
-func (l *GameClientLink) jumpLivePlayer(live *livePlayer, target location.Location) bool {
+// up to the NPCs' notice; it reports where live jumped from and whether it
+// jumped.
+func (l *GameClientLink) jumpLivePlayer(live *livePlayer, target location.Location) (location.Location, bool) {
 	live.teleportMu.Lock()
 	defer live.teleportMu.Unlock()
 	if live.Teleporting() {
-		return false
+		return location.Location{}, false
 	}
+	from := live.CurrentLocation()
 	target = move.RandomNearbyLocation(l.geo, target, 0, func(at location.Location) bool {
 		return live.Flying() || l.inWater(at)
 	})
@@ -38,5 +42,5 @@ func (l *GameClientLink) jumpLivePlayer(live *livePlayer, target location.Locati
 	})
 	l.updateLivePlayerPosition(live, target, heading)
 	live.goIdle()
-	return true
+	return from, true
 }

@@ -327,16 +327,13 @@ func (ts *timers) fire(t *scriptTimer) {
 	ts.mu.Unlock()
 }
 
-// show answers the timer's player with res. Only a timer bound to a player
-// shows anything.
-//
-// Showing an answer is the dialog path's (#130); until it lands a
-// non-empty answer for a player is logged and dropped.
+// show sends the timer's player what its hook answered, through the
+// timer's NPC when it has one: a page then ActionFailed, or a chat line.
+// A timer bound to no player shows nothing.
 func (ts *timers) show(t *scriptTimer, res Result) {
-	if t.key.player == nil || res.Kind == ResultNone || res.Kind == ResultAborted {
-		return
+	if c, ok := t.key.player.(*player.Character); ok {
+		t.s.show(c, t.npc, res)
 	}
-	ts.r.log.Warn().Str("script", t.s.path).Str("timer", t.key.name).Msg("script: timer answer not shown")
 }
 
 // npcDecayed removes the timers bound to the NPC with identity id whose

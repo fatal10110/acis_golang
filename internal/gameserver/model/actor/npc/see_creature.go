@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -308,20 +309,46 @@ func (f *Folk) LookNeighbor() { lookNeighbor(f, &f.Scratch().lookNeighbor) }
 // caller holds no lock.
 func ForceSeeCreature(w *world.State, c attackable.Combatant) {
 	t, ok := c.(world.Tracked)
-	if w == nil || !ok || !playable(c) {
+	if w == nil || !ok || !seenOnArrival(c) {
 		return
 	}
-	if p := actingPlayer(c); p != nil && unseenPlayer(p) {
+	tellOnlookers(c, w.AppendKnown(nil, t))
+}
+
+// ForceSeeCreatureFrom is ForceSeeCreature for c, a player or a summon that
+// has just jumped on the grid from from, as an instant teleport moves it.
+// The reference's instant teleport keeps the creature in its pre-jump
+// region, so the NPCs told are those of the regions around from's; each
+// one's see range is still measured to c's new position. Nothing happens
+// while c is off the grid.
+func ForceSeeCreatureFrom(w *world.State, c attackable.Combatant, from location.Location) {
+	t, ok := c.(world.Tracked)
+	if w == nil || !ok || !seenOnArrival(c) {
 		return
 	}
-	var npcs []seer
-	w.ForEachKnown(t, func(o world.Tracked) {
-		if n, ok := o.(seer); ok {
-			npcs = append(npcs, n)
-		}
-	})
-	for _, n := range npcs {
-		if n.scriptHooks() == nil {
+	if placed, _ := w.RegionActivity(t); !placed {
+		return
+	}
+	tellOnlookers(c, w.AppendAround(nil, from.X, from.Y, t.ObjectID()))
+}
+
+// seenOnArrival reports whether c's arrival is told to the NPCs around it:
+// c is a playable whose acting player is neither spawn-protected nor
+// flying.
+func seenOnArrival(c attackable.Combatant) bool {
+	if !playable(c) {
+		return false
+	}
+	p := actingPlayer(c)
+	return p == nil || !unseenPlayer(p)
+}
+
+// tellOnlookers runs the see-creature hooks for c of each NPC among around
+// that has c strictly within its see range and at most 500 apart in height.
+func tellOnlookers(c attackable.Combatant, around []world.Tracked) {
+	for _, o := range around {
+		n, ok := o.(seer)
+		if !ok || n.scriptHooks() == nil {
 			continue
 		}
 		if inSight(n, c, n.seeRange()) && zApart(n, c) <= seeMaxZ {
