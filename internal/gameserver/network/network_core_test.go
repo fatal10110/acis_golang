@@ -1113,6 +1113,7 @@ func TestLivePlayerSessionOnlyEventSet(t *testing.T) {
 		event.VitalsChanged{},
 		event.ItemsTaken{},
 		event.SoundPlayed{},
+		event.ScenePlayed{},
 		event.DialogPageShown{},
 		event.DialogReleased{},
 		event.ScriptMessage{},

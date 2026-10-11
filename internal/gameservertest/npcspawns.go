@@ -1,10 +1,13 @@
 package gameservertest
 
 import (
+	"context"
+	"maps"
 	"testing"
 	"time"
 
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -62,6 +65,19 @@ func WithNpcSpawnSkills(defs actorcast.Definitions) Option {
 	return func(o *options) { o.npcSpawnSkills = defs }
 }
 
+// WithSpawnData backs the WithNpcSpawns population's database-tracked
+// spawns with the spawn_data table, as the game server does: their rows
+// are restored at boot, and Shutdown saves them.
+func WithSpawnData() Option {
+	return func(o *options) { o.spawnData = true }
+}
+
+// WithMakers gives the WithNpcSpawns population catalog's makers beside
+// the server's own; a type in both runs catalog's.
+func WithMakers(catalog script.MakerCatalog) Option {
+	return func(o *options) { o.makerCatalog = catalog }
+}
+
 // npcSpawnDeps are the server parts a live NPC population is built over.
 type npcSpawnDeps struct {
 	state     *world.State
@@ -95,6 +111,12 @@ type npcSpawnDeps struct {
 	// zones is the WithZones index the spawned NPCs enter, as production
 	// hands the population its zones; nil when none was supplied.
 	zones *zone.Index
+
+	// spawnStore restores and saves the database-tracked spawns' rows; nil
+	// keeps them in memory only.
+	spawnStore *gamesql.SpawnStore
+	// makerCatalog are makers added to the server's own.
+	makerCatalog script.MakerCatalog
 }
 
 // WithDataReloads gives the link the //reload and //respawnall hooks; by
@@ -138,11 +160,19 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	if deps.skills != nil {
 		castEffects = link.HostileCastEffects()
 	}
-	npcs, err := gamemanager.NewNpcsWithMaxBuffsAmount(gamemanager.NewSpawns(deps.makers, nil), templates, deps.geo, deps.state, deps.ids,
+	var states map[string]*spawn.State
+	if deps.spawnStore != nil {
+		if states, err = deps.spawnStore.LoadStates(context.Background()); err != nil {
+			t.Fatalf("load spawn data: %v", err)
+		}
+	}
+	makers := maker.Catalog()
+	maps.Copy(makers, deps.makerCatalog)
+	npcs, err := gamemanager.NewNpcsWithMaxBuffsAmount(gamemanager.NewSpawns(deps.makers, states), templates, deps.geo, deps.state, deps.ids,
 		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Rates: deps.dropRates, RateXP: 1, RateSP: 1}, time.Now, deps.log,
 		deps.skills, castEffects, walker, network.HostileSinks(deps.state, deps.stance), link.FolkSinks(deps.state, deps.stance),
 		20, 0, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues,
-		script.NewMakers(maker.Catalog(), maker.Default, deps.log), deps.scripts, deps.zones)
+		script.NewMakers(makers, maker.Default, deps.log), deps.scripts, deps.zones)
 	if err != nil {
 		t.Fatalf("new npc spawns: %v", err)
 	}

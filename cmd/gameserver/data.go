@@ -313,8 +313,15 @@ func applyTownCombatRule(index *zone.Index, rule int) {
 	}
 }
 
-func loadHTMLCache(paths gameServerPaths) (*datacache.HTML, error) {
-	return datacache.LoadHTML(filepath.Join(paths.DataRoot, "data", "html"))
+// loadHTMLCache loads the datapack HTML pages. A page that is not valid
+// UTF-8 is logged at error level and left out, so every send of it shows
+// the missing-page notice.
+func loadHTMLCache(paths gameServerPaths, log zerolog.Logger) (*datacache.HTML, error) {
+	html, undecodable, err := datacache.LoadHTML(filepath.Join(paths.DataRoot, "data", "html"))
+	for _, name := range undecodable {
+		log.Error().Str("page", name).Msg("error caching html page: not valid UTF-8; it is treated as missing")
+	}
+	return html, err
 }
 
 // loadCrestCache loads the datapack crest images. As in the reference, a

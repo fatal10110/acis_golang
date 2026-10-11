@@ -723,7 +723,7 @@ func HTMLCache(t testing.TB, pages map[string]string) *cache.HTML {
 			t.Fatal(err)
 		}
 	}
-	html, err := cache.LoadHTML(dir)
+	html, _, err := cache.LoadHTML(dir)
 	if err != nil {
 		t.Fatalf("LoadHTML: %v", err)
 	}

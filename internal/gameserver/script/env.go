@@ -1,6 +1,8 @@
 package script
 
 import (
+	"time"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -45,6 +47,21 @@ type Env struct {
 	// SevenSigns is the Seven Signs state a script reads the players'
 	// cabals and the standings from.
 	SevenSigns *sevensigns.State
+	// BossWaits are the grand boss wait times.
+	BossWaits BossWaitTimes
+}
+
+// BossWaitTimes are how long a grand boss lair waits, once it is entered,
+// before its boss appears: npcs.properties AntharasWaitTime,
+// ValakasWaitTime and FrintezzaWaitTime.
+type BossWaitTimes struct {
+	Antharas, Valakas, Frintezza time.Duration
+}
+
+// DefaultBossWaitTimes are the wait times npcs.properties gives when it
+// sets none: 30, 20 and 10 minutes.
+func DefaultBossWaitTimes() BossWaitTimes {
+	return BossWaitTimes{Antharas: 30 * time.Minute, Valakas: 20 * time.Minute, Frintezza: 10 * time.Minute}
 }
 
 // Rates are the quest drop and reward multipliers.
@@ -72,3 +89,6 @@ func (s *Script) RndBool() bool { return s.env.Rand(2) == 0 }
 
 // Spawner returns the spawner the script places NPCs in the world with.
 func (s *Script) Spawner() *Spawner { return s.env.Spawner }
+
+// BossWaitTimes returns the grand boss wait times.
+func (s *Script) BossWaitTimes() BossWaitTimes { return s.env.BossWaits }
