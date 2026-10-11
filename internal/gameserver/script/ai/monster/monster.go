@@ -24,5 +24,5 @@ func Hooks() script.Hooks {
 				}
 			}
 		},
-	})
+	}).Named("MonsterAI")
 }

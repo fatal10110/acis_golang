@@ -132,7 +132,7 @@ func BaseHooks() script.Hooks {
 				e.NPC.DoDie(e.NPC)
 			}
 		},
-	})
+	}).Named("WarriorBase")
 }
 
 // attacked is WarriorBase's attacked hook up to its parent call.

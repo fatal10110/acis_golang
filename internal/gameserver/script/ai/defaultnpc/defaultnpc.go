@@ -11,9 +11,9 @@ import (
 )
 
 // New is DefaultNpc. It sets no hook, so its own NPCs are bound to no
-// event.
+// event; its hooks are named, as every behavior derives from them.
 func New() script.Script {
-	return script.Script{Dir: "ai", Behavior: true, NPCs: npcIDs()}
+	return script.Script{Dir: "ai", Behavior: true, NPCs: npcIDs(), Hooks: script.Hooks{}.Named("DefaultNpc")}
 }
 
 // npcIDs are DefaultNpc's own NPCs.
