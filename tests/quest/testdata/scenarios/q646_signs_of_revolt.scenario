@@ -1,0 +1,60 @@
+# Signs Of Revolt (Q646): accept at Torrant, kill two ragnas, each dropping a cursed doll to
+# the only party member, the player alone (the member draw and the 75 % drop roll both
+# pinned to 0), relog and ask Torrant again while the 180 dolls are not all in. The 180th
+# doll, the party draw and the reward are in proof_quests_2_test.go: a scenario cannot hold
+# 180 dolls before a kill. Expectations are derived from the reference source
+# (Q646_SignsOfRevolt.java, Quest.getRandomPartyMember, Quest.dropItems).
+character Scout 40
+random always 0
+script quest.Q646_SignsOfRevolt
+item 8087
+page default/32016.htm
+page script/quest/Q646_SignsOfRevolt/
+npc torrant 32016 Folk 10 0 0
+npc ragna 22029 Monster 40 0 0
+
+action torrant
+action torrant
+  S ActionFailed
+  S NpcHtmlMessage obj=torrant item=0 page=default/32016.htm
+  S ActionFailed
+bypass npc_{torrant}_Quest
+  S NpcHtmlMessage obj=torrant item=0 page=script/quest/Q646_SignsOfRevolt/32016-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q646_SignsOfRevolt CREATED
+bypass Quest Q646_SignsOfRevolt 32016-03.htm
+  S QuestList 646:0x80000001
+  S ExShowQuestMark quest=646
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=torrant item=0 page=script/quest/Q646_SignsOfRevolt/32016-03.htm
+  S ActionFailed
+  Q upsert Q646_SignsOfRevolt | <state> | STARTED
+  Q upsert Q646_SignsOfRevolt | <cond> | 1
+  rows Q646_SignsOfRevolt <cond>=1 <state>=STARTED
+
+kill ragna x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8087
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8087
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8087=2
+
+relog
+  state Q646_SignsOfRevolt STARTED
+  rows Q646_SignsOfRevolt <cond>=1 <state>=STARTED
+  items 8087=2
+
+# Still at cond 1: Torrant waits for the rest.
+action torrant
+action torrant
+  S ActionFailed
+  S NpcHtmlMessage obj=torrant item=0 page=default/32016.htm
+  S ActionFailed
+bypass npc_{torrant}_Quest
+  S NpcHtmlMessage obj=torrant item=0 page=script/quest/Q646_SignsOfRevolt/32016-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 8087=2
