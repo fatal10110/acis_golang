@@ -1112,21 +1112,35 @@ func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
 // winner claims the spawn's respawn, so it is armed exactly once.
 // respawnFor may be nil.
 func (h *Hostile) DecayWithRespawn(worldState *world.State, respawnFor func(id int32) func()) bool {
-	h.deathMu.Lock()
-	if h.decayed {
-		h.deathMu.Unlock()
+	if !h.markDecayed() {
 		return false
 	}
-	h.decayed = true
-	h.dead = true
-	h.corpseDeadline = time.Time{}
-	h.deathMu.Unlock()
 	var respawn func()
 	if respawnFor != nil {
 		respawn = respawnFor(h.ObjectID())
 	}
 	h.raiseDecayed()
+	h.leaveWorld(worldState, respawn)
+	return true
+}
 
+// markDecayed marks this NPC decayed, and dead, and reports whether this
+// call did: of several concurrent decays, only one wins.
+func (h *Hostile) markDecayed() bool {
+	h.deathMu.Lock()
+	defer h.deathMu.Unlock()
+	if h.decayed {
+		return false
+	}
+	h.decayed = true
+	h.dead = true
+	h.corpseDeadline = time.Time{}
+	return true
+}
+
+// leaveWorld takes this decayed NPC out of the world, then runs respawn
+// when it is not nil, and closes its queue.
+func (h *Hostile) leaveWorld(worldState *world.State, respawn func()) {
 	// The NPC leaves its zones while its observers still know it.
 	h.zones.leave(h.location())
 	if worldState != nil {
@@ -1144,7 +1158,6 @@ func (h *Hostile) DecayWithRespawn(worldState *world.State, respawnFor func(id i
 	}
 	// A respawn is a new Hostile on a new queue; this one takes no more work.
 	h.Queue().Close()
-	return true
 }
 
 // DenyAIAction reports whether this NPC is unable to act: dead, teleporting,
