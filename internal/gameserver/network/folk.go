@@ -153,6 +153,8 @@ func (s *folkSink) Emit(ev event.Event) {
 	case event.Status:
 		attrs := npcStatusAttributes(e.Attrs)
 		s.broadcast(func() wire.Frame { return frames.Status(f.ObjectID(), attrs) })
+	case event.Attack:
+		s.broadcast(func() wire.Frame { return frames.Attack(e) })
 	case event.Attacked, event.AttackStanceRequested:
 		s.startAttackStance()
 	case event.Died:

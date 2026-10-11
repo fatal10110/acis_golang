@@ -80,10 +80,11 @@ const socialInterval = 12 * time.Second
 
 // Folk is a live civilian NPC. It stands where it spawned, or walks its
 // route when it has one, is shown to nearby players, can be selected, and
-// answers a player's interact with its chat window. It never attacks, but
-// casts the skills a dialog command or script asks of it once given a cast
-// runtime (SetCaster), walking toward its target first when it can move
-// (EnableMovement). Any other creature may attack
+// answers a player's interact with its chat window. It attacks the
+// creatures and casts the skills a dialog command or script asks of it once
+// given an attack runtime (SetAttacker) and a cast runtime (SetCaster),
+// walking toward its target first when it can move (EnableMovement), and
+// flees and follows as a script asks. Any other creature may attack
 // it by force: it takes damage, regenerates, and holds the buffs and
 // debuffs cast on it (no other effect lands on it). An undying template
 // keeps at least 1 HP; any other dies, and its corpse decays.
@@ -107,7 +108,8 @@ type Folk struct {
 
 	folkCombat
 
-	cast folkCast
+	cast  folkCast
+	fight folkFight
 
 	// observerGroups are the viewpoint groups a broadcasting tower offers;
 	// see folk_observer.go.
@@ -135,6 +137,7 @@ func NewFolk(inst *Instance, skills ...skillDefinitions) (*Folk, error) {
 	f := &Folk{Instance: inst, spawnBinding: newSpawnBinding(inst.Template)}
 	f.zones = newZoneMember(f)
 	f.cast.desires = ai.NewDesireQueue()
+	f.fight.aggro = attackable.NewThreatTable(f, f.now)
 	f.initCombat(mods)
 	return f, nil
 }

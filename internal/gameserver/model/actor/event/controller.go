@@ -55,7 +55,7 @@ type AttackEnded struct{ Target attackable.Combatant }
 // player attack controllers emit it.
 type BowShotFinished struct{}
 
-// AttackRethink reports a hostile NPC's attack reaching a point where its AI
+// AttackRethink reports an NPC's attack reaching a point where its AI
 // re-runs desire selection: the hit animation ending or a bow shot landing.
 // A finished swing reports AttackFinished instead. Only NPC attack
 // controllers emit it.

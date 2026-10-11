@@ -55,8 +55,9 @@ type folkCast struct {
 
 	desires *ai.DesireQueue
 	step    int
-	// lifeTime counts the AI ticks the NPC has lived through. Its AI acts
-	// on nothing, and does not idle, before the first one is over.
+	// lifeTime counts the AI ticks the NPC has lived through. Its AI does
+	// not idle before the first one is over, and acts on nothing then
+	// unless it holds an attack desire.
 	lifeTime atomic.Int32
 	// acting marks an NPC whose AI last acted on a desire rather than going
 	// idle; the AI idles it at once when its desires run out.
@@ -138,6 +139,7 @@ func (f *Folk) AbortCast() {
 		f.cast.desires.Clear()
 		f.setCurrentDesire(nil)
 		f.cast.onRoute, f.cast.acting = false, false
+		f.fight.next, f.fight.latched = nil, nil
 		f.cast.lifeTime.Store(0)
 		if f.cast.ai != nil {
 			f.cast.ai.Remove(f)
@@ -152,79 +154,162 @@ func (f *Folk) LifeTime() int32 { return f.cast.lifeTime.Load() }
 // Tick does nothing: TickThink runs the whole AI step, in order.
 func (f *Folk) Tick() {}
 
-// TickThink runs one AI tick on f's queue: the see-creature point opens
-// it, then invalid cast desires are dropped and the heaviest desire left is
-// acted on unless a cast is in flight or a social animation holds the
-// selection; an NPC with no desire left and no cast in flight idles; and
-// every third tick the cast and do-nothing desires lose weight, an NPC
-// still acting on a cast switching to its run stance. A route desire never
-// leaves the queue, so a route walker never idles. A dead NPC's tick does
-// nothing.
+// TickThink runs one AI tick on f's queue: desire selection with its
+// see-creature point (runAI), then the tick's own idle, clock and decay. A
+// dead NPC's tick does nothing.
 func (f *Folk) TickThink() error {
 	if f.Dead() {
 		return nil
 	}
-	f.AtHookPoint(ai.HookSeeCreature)
-	f.runAI()
+	f.runAI(true)
+	return nil
+}
+
+// runAI is f's desire selection, on f's queue. updateTick makes it the AI
+// tick's: the see-creature point opens it, and the tick's idle, clock and
+// decay close it. In order:
+//
+//   - Invalid desires are dropped: a cast that has lost its weight or its
+//     HP, MP or mute gate, and any desire aimed at a creature f no longer
+//     knows or that is dead; then, unless f is out of control, an attack
+//     on a creature more than 1500 away.
+//   - Unless f is out of control, casting, held by a social animation or
+//     fleeing on a desire still queued, and only once f has lived through
+//     an AI tick or holds an attack desire: an f with no desire and no
+//     latched attack idles, and otherwise, outside its hit animation, the
+//     latched attack or the heaviest desire is taken up. A wander already
+//     current is not taken up again over a wander. An attack taken up right
+//     after a wander, or before any other desire, is latched for the next
+//     selection. A route walk puts f on its route, any other desire takes
+//     it off.
+//   - The tick then idles an f with no desire left and no cast in flight,
+//     and every third tick refreshes the aggro list, lowers every hate and
+//     attack desire by 6.6, every cast desire by 66000 and every do-nothing
+//     desire by 0.5, and switches an f attacking or casting to its run
+//     stance. A route desire never leaves the queue, so a route walker never
+//     idles.
+func (f *Folk) runAI(updateTick bool) {
+	instantRun := f.cast.lifeTime.Load() == 0 && f.cast.desires.HasKind(ai.IntentionAttack)
+	if updateTick {
+		f.AtHookPoint(ai.HookSeeCreature)
+	}
+	f.pruneDesires()
+	if !f.denyAIAction() {
+		f.pruneFarAttacks()
+		if !f.CastingNow() && (f.cast.lifeTime.Load() > 0 || instantRun) && !f.socialHeld() && !f.fleeHeld() {
+			f.selectDesire()
+		}
+	}
+	if !updateTick {
+		return
+	}
 	if f.cast.desires.Len() == 0 && f.cast.lifeTime.Load() > 0 && !f.CastingNow() {
 		f.thinkIdle()
 	}
 	f.cast.step++
 	f.cast.lifeTime.Add(1)
 	if f.cast.step%3 == 0 {
+		f.refreshAggro()
+		f.reduceAggro(folkAttackHateDecay)
+		f.cast.desires.DecreaseWeightByType(ai.IntentionAttack, folkAttackHateDecay)
 		f.cast.desires.DecreaseWeightByType(ai.IntentionCast, castDesireDecay)
 		f.cast.desires.DecreaseWeightByType(ai.IntentionNothing, nothingDesireDecay)
-		if cur := f.currentDesire(); cur != nil && cur.Kind == ai.IntentionCast {
+		if cur := f.currentDesire(); cur != nil && (cur.Kind == ai.IntentionAttack || cur.Kind == ai.IntentionCast) {
 			f.forceRunStance()
 		}
 		f.cast.step = 0
 	}
-	return nil
 }
 
-// runAI prunes f's cast desires and, once f has lived through an AI tick,
-// is not casting and no social animation holds the selection, acts on the
-// heaviest desire: a route walk puts f on its route, any other desire takes
-// it off. A wander already current is not taken up again over a wander. An
-// NPC that just ran out of desires idles.
-func (f *Folk) runAI() {
-	if castAI := f.cast.castAI; castAI != nil {
-		f.cast.desires.RemoveIf(func(d *ai.Desire) bool {
-			if d.Kind == ai.IntentionCast && (d.Weight <= 0 || !castAI.MeetsHPMPDisabled(d.FinalTarget, d.Skill)) {
-				return true
-			}
-			return d.FinalTarget != nil && (!f.Knows(d.FinalTarget) || d.FinalTarget.AlikeDead())
-		})
+// pruneDesires drops the cast desires that lost their weight or their HP,
+// MP or mute gate, and every desire aimed at a creature f no longer knows
+// or that is dead.
+func (f *Folk) pruneDesires() {
+	castAI := f.cast.castAI
+	f.cast.desires.RemoveIf(func(d *ai.Desire) bool {
+		if castAI != nil && d.Kind == ai.IntentionCast && (d.Weight <= 0 || !castAI.MeetsHPMPDisabled(d.FinalTarget, d.Skill)) {
+			return true
+		}
+		return d.FinalTarget != nil && (!f.Knows(d.FinalTarget) || d.FinalTarget.AlikeDead())
+	})
+}
+
+// pruneFarAttacks drops the attack desires on a creature more than
+// folkAttackDesireRange from f, measured in 3D.
+func (f *Folk) pruneFarAttacks() {
+	from := f.location()
+	f.cast.desires.RemoveIf(func(d *ai.Desire) bool {
+		return d.Kind == ai.IntentionAttack && d.FinalTarget != nil && from.Distance3D(combatantLocation(d.FinalTarget)) > folkAttackDesireRange
+	})
+}
+
+// fleeHeld reports whether f flees on a desire still queued: the one it
+// took the flee up from, same target, start and distance.
+func (f *Folk) fleeHeld() bool {
+	cur := f.currentDesire()
+	if cur == nil || cur.Kind != ai.IntentionFlee {
+		return false
 	}
-	if f.denyAIAction() || f.CastingNow() || f.cast.lifeTime.Load() == 0 || f.socialHeld() {
-		return
+	return f.cast.desires.AnyMatch(func(d *ai.Desire) bool {
+		return d.Kind == ai.IntentionFlee && d.Equal(cur) && d.Location == cur.Location && d.Distance == cur.Distance
+	})
+}
+
+// selectDesire takes up the latched attack or the heaviest desire, or idles
+// an f that has neither (see runAI).
+func (f *Folk) selectDesire() {
+	desire := f.fight.latched
+	if desire == nil {
+		if d, ok := f.cast.desires.Peek(); ok {
+			desire = d
+		}
 	}
-	f.cancelFollow()
-	desire, ok := f.cast.desires.Peek()
-	if !ok {
+	if desire == nil {
 		f.setCurrentDesire(nil)
 		if f.cast.acting {
 			f.cast.acting = false
+			f.cancelFollow()
+			f.fight.next = nil
 			f.thinkIdle()
 		}
 		return
 	}
-	f.cast.acting = true
-	if desire.Kind == ai.IntentionMoveRoute {
-		f.setCurrentDesire(nil)
-		f.thinkMoveRoute(desire.RouteName)
+	if f.inHitAnimation() {
 		return
 	}
 	if cur := f.currentDesire(); cur != nil && cur.Kind == ai.IntentionWander && desire.Kind == ai.IntentionWander {
 		return
 	}
+	if desire.Kind == ai.IntentionAttack && (f.fight.lastKind == ai.IntentionIdle || f.fight.lastKind == ai.IntentionWander) {
+		f.fight.latched = desire
+	} else {
+		f.fight.latched = nil
+	}
+	f.fight.lastKind = desire.Kind
+	f.cast.acting = true
+	if desire.Kind == ai.IntentionMoveRoute {
+		f.cancelFollow()
+		f.fight.next = nil
+		f.setCurrentDesire(nil)
+		f.thinkMoveRoute(desire.RouteName)
+		return
+	}
 	f.leaveRoute()
-	f.setCurrentDesire(desire)
-	f.act(desire)
+	f.doIntention(desire)
 }
 
-// thinkIdle is what an NPC with nothing left to do does: it stops any walk
-// and cast, switches to its walk stance and opens the no-desire point. A
+// doIntention makes d f's current intention and takes its step: any follow
+// under way is dropped, and so is an attack put aside for the end of a
+// swing.
+func (f *Folk) doIntention(d *ai.Desire) {
+	f.cancelFollow()
+	f.fight.next = nil
+	f.setCurrentDesire(d)
+	f.act(d)
+}
+
+// thinkIdle is what an NPC with nothing left to do does: it stops any walk,
+// swing and cast, switches to its walk stance and opens the no-desire point. A
 // clan hall manager instead checks its own support buff, and opens none.
 func (f *Folk) thinkIdle() {
 	if f.ClanHallManager() {
@@ -232,6 +317,7 @@ func (f *Folk) thinkIdle() {
 		return
 	}
 	f.stopMoving()
+	f.stopAttack()
 	f.StopCast()
 	f.forceWalkStance()
 	f.AtHookPoint(ai.HookNoDesire)
@@ -309,7 +395,7 @@ func (f *Folk) castOn(d *ai.Desire) {
 	if castAI.StopsMovement(ref) {
 		f.stopMoving()
 		if !self {
-			f.setHeadingTo(target)
+			f.SetHeadingTo(target)
 		}
 	}
 	if !castAI.CanCast(target, ref) || (castRange > 0 && !self && !f.canSee(target)) {
@@ -382,7 +468,8 @@ func (f *Folk) stopMoving() {
 	}
 }
 
-func (f *Folk) setHeadingTo(target attackable.Combatant) {
+// SetHeadingTo turns f to face target.
+func (f *Folk) SetHeadingTo(target attackable.Combatant) {
 	sx, sy, _ := f.Position()
 	tx, ty, _ := target.Position()
 	f.SetHeading(location.Location{X: sx, Y: sy}.HeadingTo(location.Location{X: tx, Y: ty}))
@@ -423,7 +510,7 @@ func (f *Folk) castFinished(e event.CastFinished) {
 	}
 	raiseSkillFinished(f.scripts, f, e)
 	if !e.Interrupted {
-		f.runAI()
+		f.runAI(false)
 	}
 }
 
