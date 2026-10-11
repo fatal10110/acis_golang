@@ -1,0 +1,20 @@
+# Prove Your Courage (Q607), the level gate: below level 75 Kadun Zu Ketra turns the character
+# away before he looks at the alliance (Q607_ProveYourCourage.onTalk). As in
+# q607_prove_your_courage.scenario, his chat window is the default page.
+character Recruit 74
+script quest.Q607_ProveYourCourage
+item 7235
+page npcdefault.htm
+page script/quest/Q607_ProveYourCourage/
+npc kadun 31370 Folk 10 0 0
+
+action kadun
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{kadun}_Quest
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q607_ProveYourCourage/31370-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q607_ProveYourCourage CREATED

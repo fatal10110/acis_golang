@@ -1,0 +1,48 @@
+# Prove Your Courage (Q607): a level 75 character outside the Ketra alliance asks Kadun Zu Ketra
+# for the quest and is refused, kills Shadith with no quest and gets no head, relogs (an offer
+# that was not taken leaves no row), and is refused again. Kadun's first-talk script
+# (KetraOrcSupport) is not listed, so his chat window is the default page, as the reference
+# serves it for an NPC with no page of its own (Npc.getHtmlPath). A scenario seeds neither the
+# Ketra standing nor an item: the offer to an ally, the head going to every ally of the party
+# and the trade for the totem are in q607_flow_test.go. Shadith is a fixture monster: the raid
+# kill messages are the raid boss's, not the quest's. Expectations are derived from the
+# reference source (Q607_ProveYourCourage.java).
+character Scout 75
+script quest.Q607_ProveYourCourage
+item 7235 7219 7213
+page npcdefault.htm
+page script/quest/Q607_ProveYourCourage/
+npc kadun 31370 Folk 10 0 0
+npc shadith 25309 Monster 40 0 0
+
+action kadun
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{kadun}_Quest
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q607_ProveYourCourage/31370-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q607_ProveYourCourage CREATED
+  rows Q607_ProveYourCourage -
+
+kill shadith
+  S SystemMessage id=95 1:0 1:0
+  items 7235=0
+  state Q607_ProveYourCourage CREATED
+
+relog
+  state Q607_ProveYourCourage -
+  rows Q607_ProveYourCourage -
+
+action kadun
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{kadun}_Quest
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q607_ProveYourCourage/31370-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q607_ProveYourCourage CREATED
