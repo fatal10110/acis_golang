@@ -154,6 +154,22 @@ func (h *HateTable) Refresh(visible func(Combatant) bool) []Combatant {
 	return changed
 }
 
+// RemoveIf drops every entry whose attacker drop reports, and returns
+// those attackers. drop runs under the table's lock.
+func (h *HateTable) RemoveIf(drop func(Combatant) bool) []Combatant {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	var removed []Combatant
+	for id, e := range h.entries {
+		if drop(e.Attacker) {
+			delete(h.entries, id)
+			removed = append(removed, e.Attacker)
+		}
+	}
+	return removed
+}
+
 // ZeroHate zeroes every entry's hate without dropping any entries.
 func (h *HateTable) ZeroHate() {
 	h.mu.Lock()
