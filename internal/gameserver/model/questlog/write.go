@@ -40,6 +40,18 @@ func (j *Journal) State(name string) *State {
 	return find(j.states, name)
 }
 
+// Quests returns the quest of every state, in journal order and whatever
+// its status: a quest holding two states is listed twice.
+func (j *Journal) Quests() []Quest {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	out := make([]Quest, len(j.states))
+	for i, st := range j.states {
+		out[i] = st.quest
+	}
+	return out
+}
+
 // StateByID returns the first state whose quest has id, nil when there is
 // none.
 func (j *Journal) StateByID(id int32) *State {

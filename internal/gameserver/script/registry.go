@@ -80,9 +80,11 @@ var raisedHooks = map[hook]kindSet{
 	// The quest windows (QuestWindow), for both NPC kinds a dialog command
 	// reaches.
 	hookTalk: kinds(KindFolk, KindHostile),
-	// The use of an item (ItemUsed) and the entry into a zone (ZoneEntered).
+	// The use of an item (ItemUsed), the entry into a zone (ZoneEntered)
+	// and the death of a player or its summon (PlayableDied).
 	hookItemUse:   kinds(KindOther),
 	hookZoneEnter: kinds(KindOther),
+	hookDeath:     kinds(KindOther),
 	// The script-event sends (SendScriptEvent, BroadcastScriptEvent), to an
 	// NPC of either kind.
 	hookScriptEvent: kinds(KindFolk, KindHostile),
@@ -309,7 +311,7 @@ func gate(s *Script, bound Bindings, cfg *Config) error {
 			}
 		}
 	}
-	for _, h := range []hook{hookEvent, hookStart, hookTimer, hookItemUse, hookZoneEnter} {
+	for _, h := range []hook{hookEvent, hookStart, hookTimer, hookItemUse, hookZoneEnter, hookDeath} {
 		if set.has(h) && !cfg.raised(h, KindOther) && !cfg.raised(h, KindFolk) && !cfg.raised(h, KindHostile) {
 			return fmt.Errorf("hook %s is not raised", h)
 		}

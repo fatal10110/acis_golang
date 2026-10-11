@@ -85,6 +85,9 @@ type Owner interface {
 	ServitorVanished()
 	// PvPFlagState is the owner's PvP flag, which its summon carries too.
 	PvPFlagState() task.PvPFlagState
+	// SummonDied tells the owner its summon died, killed by killer (nil
+	// when no creature caused it).
+	SummonDied(summon, killer attackable.Combatant)
 	// AwardSummonKillKarma credits killer for killing the owner's summon.
 	AwardSummonKillKarma(killer attackable.Combatant)
 	// NoteServitorPvPAttack flags the owner for a physical hit its summon
