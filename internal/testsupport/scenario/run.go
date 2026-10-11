@@ -2,6 +2,7 @@ package scenario
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"path"
@@ -88,6 +89,60 @@ type run struct {
 	objs  map[string]int32
 	npcs  map[string]NPC
 	live  map[string]*npc.Hostile
+	// draws is the random line's source.
+	draws draws
+}
+
+// draws hands the script draws the random line lists, recording each draw
+// it cannot serve for the step that drew it.
+type draws struct {
+	mu     sync.Mutex
+	random *Random
+	next   int
+	bad    []string
+}
+
+// draw is the script random source: the next listed draw, which must be
+// inside [0, n).
+func (d *draws) draw(n int) int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	i := d.next
+	d.next++
+	var v int
+	switch {
+	case d.random.Always:
+		v = d.random.Draws[0]
+	case i < len(d.random.Draws):
+		v = d.random.Draws[i]
+	default:
+		d.bad = append(d.bad, fmt.Sprintf("draw %d of [0, %d): the random line lists only %d", i+1, n, len(d.random.Draws)))
+		return 0
+	}
+	if v >= n {
+		d.bad = append(d.bad, fmt.Sprintf("draw %d is %d, outside [0, %d)", i+1, v, n))
+		return 0
+	}
+	return v
+}
+
+// take returns the draws not served since the last call.
+func (d *draws) take() []string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	bad := d.bad
+	d.bad = nil
+	return bad
+}
+
+// unused is how many listed draws were never drawn.
+func (d *draws) unused() int {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.random.Always {
+		return 0
+	}
+	return max(len(d.random.Draws)-d.next, 0)
 }
 
 // Run boots the scenario's server, enters the world and runs every step,
@@ -95,6 +150,7 @@ type run struct {
 func Run(t *testing.T, sc *Scenario, cfg Config) {
 	t.Helper()
 	r := &run{sc: sc, pages: loadPages(t, sc.Pages), roles: map[int32]string{}, objs: map[string]int32{}, npcs: map[string]NPC{}, live: map[string]*npc.Hostile{}}
+	r.draws.random = sc.Random
 	r.texts = pageTexts(t, r.pages)
 	if sc.Trace != "" {
 		data, err := os.ReadFile(filepath.Join(moduleRoot(t), filepath.FromSlash(sc.Trace)))
@@ -108,6 +164,11 @@ func Run(t *testing.T, sc *Scenario, cfg Config) {
 	r.boot(t, cfg)
 	for i, st := range sc.Steps {
 		r.step(t, i, st)
+	}
+	if sc.Random != nil {
+		if n := r.draws.unused(); n > 0 {
+			t.Fatalf("%s: %d draws of the random line were never drawn", sc.Name, n)
+		}
 	}
 }
 
@@ -145,8 +206,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		}
 		r.npcs[n.Role] = n
 	}
-	r.srv = gameservertest.Boot(t,
-		gameservertest.WithCharacter(r.sc.Character, r.sc.Level, 0),
+	opts := []gameservertest.Option{
 		gameservertest.WithWantChars(1),
 		gameservertest.WithReuseDelays(0, 0),
 		gameservertest.WithHTMLPages(r.pages),
@@ -154,9 +214,32 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		gameservertest.WithItemTemplates(itemTemplates(t, r.sc.Items)),
 		// The AI task ticks only on an approach step.
 		gameservertest.WithAITask(),
-	)
+	}
+	if r.sc.Class != 0 {
+		tmpl := gameservertest.ClassTemplate()
+		tmpl.ID = r.sc.Class
+		opts = append(opts, gameservertest.WithClassTemplates(tmpl),
+			gameservertest.WithClassCharacter(r.sc.Character, r.sc.Level, 0, r.sc.Class))
+	} else {
+		opts = append(opts, gameservertest.WithCharacter(r.sc.Character, r.sc.Level, 0))
+	}
+	if r.sc.Clan >= 0 {
+		opts = append(opts, gameservertest.WithClanSeed(func(db *sql.DB) { seedClan(t, db, r.sc.Character, r.sc.Clan) }))
+	}
+	if r.sc.Random != nil {
+		opts = append(opts, gameservertest.WithScriptRand(r.draws.draw))
+	}
+	r.srv = gameservertest.Boot(t, opts...)
 	r.player = r.srv.SoleObjectID(t)
 	r.roles[r.player] = "player"
+	if r.sc.Clan >= 0 {
+		// The seeded clan must be restored as written.
+		if cl, ok := r.srv.Clans.Table().Get(scenarioClan); !ok || cl.Level() != r.sc.Clan {
+			t.Fatalf("%s: the clan line's clan is not restored at level %d", r.sc.Name, r.sc.Clan)
+		}
+	}
+	// The journal is read when the character is selected.
+	seedQuests(t, r.srv.DB, r.player, r.sc.Quests)
 	r.enterWorld(t)
 	x, y, z := r.srv.PlayerPosition(t, r.player)
 	r.origin = location.Location{X: x, Y: y, Z: z}
@@ -166,6 +249,36 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	r.srv.ReadQueued(t, r.srv.Client)
 	r.srv.FlushPersistence(t)
 	r.srv.TakeJournalWrites()
+}
+
+// scenarioClan is the object id of the clan a clan line seeds.
+const scenarioClan = 900000
+
+// seedClan stores a clan of level led by the character name.
+func seedClan(t *testing.T, db *sql.DB, name string, level int) {
+	t.Helper()
+	ctx := context.Background()
+	if _, err := db.ExecContext(ctx,
+		"INSERT INTO clan_data (clan_id, clan_name, clan_level, reputation_score, leader_id) SELECT ?, 'Scenario', ?, 0, obj_Id FROM characters WHERE char_name = ?",
+		scenarioClan, level, name); err != nil {
+		t.Fatalf("seed clan: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, "UPDATE characters SET clanid = ? WHERE char_name = ?", scenarioClan, name); err != nil {
+		t.Fatalf("seed clan member: %v", err)
+	}
+}
+
+// seedQuests stores the quest lines' rows of the character obj.
+func seedQuests(t *testing.T, db *sql.DB, obj int32, quests []QuestRows) {
+	t.Helper()
+	for _, q := range quests {
+		for _, kv := range q.Vars {
+			if _, err := db.ExecContext(context.Background(),
+				"INSERT INTO character_quests (charId,name,var,value) VALUES (?,?,?,?)", obj, q.Quest, kv[0], kv[1]); err != nil {
+				t.Fatalf("seed quest %s %s=%s: %v", q.Quest, kv[0], kv[1], err)
+			}
+		}
+	}
 }
 
 // spawn places a fresh NPC of n's template at n's offset under n's role.
@@ -257,6 +370,9 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		r.enterWorld(t)
 	}
 	frames := r.srv.ReadQueued(t, c)
+	if bad := r.draws.take(); len(bad) > 0 {
+		fail("script random: %s", strings.Join(bad, "; "))
+	}
 	if st.Verb != "relog" {
 		var got []string
 		for _, f := range frames {
