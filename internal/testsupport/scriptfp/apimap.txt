@@ -234,3 +234,82 @@ WorldObject.getActingPlayer script.ActingPlayer
 
 # See-creature (A10). The look-neighbour throttle is a call on the NPC handle.
 Npc.lookNeighbor script.NPC.LookNeighbor
+
+# Behavior base and the Warrior chain (A11). The AI parameters, the hate
+# list, the NPC's state and its skills are read through the NPC handle; the
+# getters that lead to them (spawn, template, status, move, attack, AI,
+# aggro list, positions) fold into those calls. A skill is a reference the
+# script reads with Script.Skill; an effect's level is Script.AbnormalLevel.
+ASpawn.getMemo inline
+ASpawn.isInMyTerritory script.NPC.InSpawnTerritory
+ASpawn.setRespawnDelay inline
+AbstractAI.getCurrentIntention script.NPC.Intention
+AbstractEffect.getSkill inline
+AbstractEffect.getTemplate inline
+AggroList.getMostHatedCreature script.NPC.MostHated
+AggroList.stopHate script.NPC.StopHate
+ClassId.getType script.ClassTypeOf
+ClassId.isInGroup script.Player.InClassGroup
+ClassId.isSameOccupation script.Player.SameOccupation
+ClassRace.isSameRace script.Player.SameRace
+Creature.abortAll AbortAll
+Creature.getAllEffects inline
+Creature.getAttack inline
+Creature.getMove inline
+Creature.getStatus inline
+Creature.instantTeleportTo InstantTeleportTo
+Creature.isDead Dead
+Creature.isParalyzed script.NPC.Paralyzed
+Creature.isStunned script.NPC.Stunned
+CreatureAttack.canAttack script.NPC.CanAttack
+CreatureMove.getGeoPathFailCount script.NPC.GeoPathFailCount
+CreatureStatus.getHpRatio HPRatio
+CreatureStatus.getLevel Level
+EffectTemplate.getStackOrder inline
+EffectTemplate.getStackType inline
+GameTimeTaskManager.getGameHour script.Script.GameHour
+GameTimeTaskManager.getInstance inline
+Intention.getType inline
+L2Skill.getAbnormalLvl inline
+L2Skill.getAggroPoints script.SkillInfo.AggroPoints
+L2Skill.getEffectTemplates inline
+L2Skill.getId inline
+L2Skill.getPower script.SkillInfo.Power
+L2Skill.isOffensive script.SkillInfo.Offensive
+MemoSet.getInteger inline
+MemoSet.getOrDefault inline
+Npc.broadcastNpcShout script.NPC.Shout
+Npc.doDie script.NPC.DoDie
+Npc.getSpawn inline
+Npc.getStatus inline
+Npc.instantTeleportTo InstantTeleportTo
+Npc.isInMyTerritory script.NPC.InMyTerritory
+Npc.rechargeShots script.NPC.RechargeShots
+Npc.removeAllAttackDesire script.NPC.RemoveAllAttackDesire
+NpcAI.addAttackDesire AddAttackDesire
+NpcAI.addCastDesire AddCastDesire
+NpcAI.addWanderDesire AddWanderDesire
+NpcAI.getAggroList inline
+NpcAI.getLifeTime script.NPC.LifeTime
+NpcStatus.getLevel Level
+NpcStringId.getNpcMessage script.NpcString
+NpcTemplate.getAiParams inline
+NpcTemplate.getClans script.NPC.Clans
+NpcTemplate.getSkill script.NPC.SkillByType
+Player.isAlliedWithKetra script.Player.AlliedWithKetra
+Player.isAlliedWithVarka script.Player.AlliedWithVarka
+Quest.broadcastScriptEvent script.Script.BroadcastScriptEvent
+SkillTable.getInfo inline
+SkillTable.getInstance inline
+SpawnLocation.clone inline
+World.getObject script.Script.Object
+WorldObject.distance2D script.NPC.Distance2D
+WorldObject.getHeading inline
+WorldObject.getName Name
+WorldObject.getObjectId ObjectID
+WorldObject.getPosition inline
+WorldObject.getX inline
+WorldObject.getY inline
+WorldObject.getZ inline
+WorldObject.isBehind script.NPC.Behind
+WorldObject.isIn2DRadius script.NPC.InRadius2D

@@ -49,8 +49,11 @@ func (NpcFrameBuilder) ChangeMoveType(objectID int32, running bool) wire.Frame {
 	return FrameChangeMoveType(objectID, running, false)
 }
 
-// NpcSay builds a chat-line broadcast packet.
-func (NpcFrameBuilder) NpcSay(objectID int32, npcID int, text string) wire.Frame {
+// NpcSay builds a chat-line broadcast packet, a shout when shout is set.
+func (NpcFrameBuilder) NpcSay(objectID int32, npcID int, text string, shout bool) wire.Frame {
+	if shout {
+		return FrameNpcSay(objectID, npcID, SayTypeShout, text)
+	}
 	return FrameNpcSay(objectID, npcID, SayTypeAll, text)
 }
 

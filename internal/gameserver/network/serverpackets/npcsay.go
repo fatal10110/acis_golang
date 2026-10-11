@@ -5,7 +5,11 @@ import "github.com/fatal10110/acis_golang/internal/commons/wire"
 // OpcodeNpcSay is the wire opcode for NpcSay.
 const OpcodeNpcSay = 0x02
 
-const SayTypeAll int32 = 0
+// The chat types an NPC line is sent as.
+const (
+	SayTypeAll   int32 = 0
+	SayTypeShout int32 = 1
+)
 
 // FrameNpcSay builds a chat line spoken by a live NPC or summon.
 func FrameNpcSay(objectID int32, npcID int, sayType int32, text string) wire.Frame {

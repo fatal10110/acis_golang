@@ -311,6 +311,10 @@ type SummonConfirmRequested struct {
 // Radius.
 type TeleportRequested struct{ X, Y, Z, Radius int }
 
+// InstantTeleportRequested reports a jump to To that keeps the character on
+// the world grid, shown without the teleport fade.
+type InstantTeleportRequested struct{ To location.Location }
+
 // RecallRequested reports a recall skill sending the character to the
 // place Destination names, resolved for the character where it stands.
 type RecallRequested struct{ Destination modelskill.RecallType }
@@ -485,3 +489,5 @@ func (MountOutOfFeed) event() {}
 type DuelDefeated struct{}
 
 func (DuelDefeated) event() {}
+
+func (InstantTeleportRequested) event() {}
