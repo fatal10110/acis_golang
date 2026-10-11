@@ -475,6 +475,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.addScriptClanReputation(live, e.Points)
 	case event.ClanInfoBroadcast:
 		l.broadcastScriptClanInfo(live)
+	case event.ClassChangeRequested, event.BaseClassChangeRequested, event.UserInfoBroadcast:
+		l.applyScriptClassEvent(live, e)
 	}
 }
 

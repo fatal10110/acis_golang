@@ -328,3 +328,35 @@ SpawnLocation.new inline
 NpcAI.addDoNothingDesire script.NPC.AddDoNothingDesire
 NpcStringId.get script.NpcString
 Point2D.distance2D script.NPC.Distance2D
+
+# Third-class saga core (#3598). The class change, the cast helper's two
+# animations, the raw party and world lookups and a state's quest are calls
+# on the handles; Player.setClassId runs the whole occupation change. The
+# NPC's AI is the NPC handle, the decayed and see-spell bindings are entries
+# of the script's Bind table, and a spawn spot's coordinates and heading are
+# fields of a script.Loc literal. The script's own name is its Name field
+# (or its package's quest-name constant). The last quest NPC is set by the
+# engine on every interact before the first talk hook runs (section 7 of
+# docs/script-engine-plan.md), so the hook's own set of the same NPC is a
+# no-op.
+Attackable.getAI inline
+ClassId.getParent script.ClassParent
+Location.getZ inline
+MagicSkillUse.new script.Player.BroadcastMagicSkillUse
+Party.getMembers script.Player.PartyMembers
+Player.broadcastUserInfo script.Player.BroadcastUserInfo
+Player.getBaseClass script.Player.BaseClass
+Player.getParty inline
+Player.isInParty script.Player.InParty
+Player.isSubClassActive script.Player.SubClassActive
+Player.setBaseClass script.Player.SetBaseClass
+Player.setClassId script.Player.SetClassID
+Point2D.getX inline
+Point2D.getY inline
+Quest.addDecayed inline
+Quest.addSeeSpell inline
+Quest.getName inline
+QuestList.setLastQuestNpcObjectId inline
+QuestState.getQuest script.QuestState.Quest
+SpawnLocation.getHeading inline
+World.getPlayer script.Script.WorldPlayer

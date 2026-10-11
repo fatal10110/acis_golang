@@ -239,6 +239,16 @@ only, with no closure-taking update method. A `go/types` test fails any script p
 declares a package-level variable, uses `go`, `sync` or `sync/atomic`, or has a hook closure
 referencing a mutable constructor-local.
 
+State a family of scripts shares (the third-class saga core and its 31 sagas keep three
+static maps: class → saga, busy tablet → its spawn, defender → attacker) is a family value
+of a type the family's package declares, holding engine cells only. The catalog builds it
+once and hands it to the constructor of every member, as it hands tables to other
+constructors; a member registers itself in it from its constructor, as the reference's
+constructor does. The same `go/types` test covers it: a family's plain fields can only be
+read. A map keyed by NPC is `NPCMapCell`, keyed by the NPC itself, with the reference's
+removal of a value. A member reaches another member's helpers through
+`QuestState.Quest()`, the registered script of a state it found.
+
 ### Timers
 
 One registry keyed by (script, name, NPC, player) identity. NPC identity is the spawn slot's.
