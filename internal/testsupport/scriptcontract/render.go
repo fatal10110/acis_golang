@@ -20,9 +20,9 @@ import (
 // NpcHtmlMessage, SystemMessage, PlaySound, ExShowQuestMark, QuestList,
 // ActionFailed, the tutorial window's packets (TutorialShowHtml,
 // TutorialShowQuestionMark, TutorialEnableClientEvent, TutorialCloseHtml),
-// RadarControl, DropItem and MagicSkillUse are decoded; any other packet is an
-// error, because the goldens write those with the reference class name and
-// raw bytes.
+// RadarControl, DropItem, MagicSkillUse and NpcSay are decoded; any other
+// packet is an error, because the goldens write those with the reference
+// class name and raw bytes.
 //
 // DropItem leaves out the dropped object's id and place, and MagicSkillUse
 // the caster's and the target's places: the world draws those (the object id
@@ -115,6 +115,11 @@ func Packet(payload []byte, roles map[int32]string) (string, error) {
 		d.int32()
 		d.int32()
 		out = fmt.Sprintf("S MagicSkillUse caster=%s target=%s skill=%d-%d hit=%d reuse=%d success=%d", caster, target, skill, level, hit, reuse, success)
+	case 0x02:
+		// The speaker's npc field is the client's NPC name id: 1000000 plus
+		// the template id.
+		speaker, typ, npcID := role(d.int32(), roles), d.int32(), d.int32()
+		out = fmt.Sprintf("S NpcSay obj=%s type=%d npc=%d text=%s", speaker, typ, npcID, Quote(d.str()))
 	case 0xfe:
 		if sub := d.uint16(); sub != 0x1a {
 			return "", fmt.Errorf("extended packet 0x%04x is not rendered", sub)

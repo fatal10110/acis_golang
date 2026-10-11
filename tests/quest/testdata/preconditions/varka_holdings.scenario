@@ -1,0 +1,21 @@
+# A Varka ally of level 2 with 7 PKs, holding 5000 adena and the level 3 Ketra mark, wearing the
+# Pipette Knife, signed up for Dusk while Dusk leads the festival: the probe's page shows each.
+# The defaults and a tied competition are in ketra_holdings.scenario.
+character Varka 40
+standing -2
+pk 7
+hold 57 5000
+hold 7213 1
+equip 4665
+cabal dusk avarice
+festival 10 250
+script test.HoldingsProbe
+item 7213 4665
+npc probe 30002 Folk 10 0 0
+
+action probe
+action probe
+  S ActionFailed
+  S NpcHtmlMessage obj=probe item=0 html="<html><body>standing=-2 pk=7 mark=1 adena=5000 weapon=4665 cabal=DUSK winning=DUSK losing=DAWN</body></html>"
+  S ActionFailed
+  items 57=5000 7213=1 4665=1

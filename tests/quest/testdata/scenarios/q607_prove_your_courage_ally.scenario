@@ -1,0 +1,90 @@
+# Prove Your Courage (Q607) for a Ketra ally: a level 75 Ketra ally of level 3 holding the level 3
+# alliance mark is offered the quest by Kadun Zu Ketra and takes it; without the head he is told to
+# bring it. Shadith's death gives him the head (cond 2, the middle sound first), and Kadun trades it
+# for the Totem of Valor and 10000 experience, ending the repeatable quest. Holding the totem he is
+# no longer offered it. As in q607_prove_your_courage.scenario, Kadun's chat window is the default
+# page. The head going to every ally of the killer's party is in q607_flow_test.go. Expectations
+# are derived from the reference source (Q607_ProveYourCourage.java).
+character Ally 75
+standing 3
+hold 7213 1
+script quest.Q607_ProveYourCourage
+item 7235 7219 7213
+page npcdefault.htm
+page script/quest/Q607_ProveYourCourage/
+npc kadun 31370 Folk 10 0 0
+npc shadith 25309 Monster 40 0 0
+
+action kadun
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{kadun}_Quest
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q607_ProveYourCourage/31370-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q607_ProveYourCourage CREATED
+bypass Quest Q607_ProveYourCourage 31370-04.htm
+  S QuestList 607:0x80000001
+  S ExShowQuestMark quest=607
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q607_ProveYourCourage/31370-04.htm
+  S ActionFailed
+  Q upsert Q607_ProveYourCourage | <state> | STARTED
+  Q upsert Q607_ProveYourCourage | <cond> | 1
+  rows Q607_ProveYourCourage <cond>=1 <state>=STARTED
+
+# Started, no head yet.
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{kadun}_Quest
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q607_ProveYourCourage/31370-06.htm
+  S ActionFailed
+  S ActionFailed
+
+kill shadith
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 607:0x80000003
+  S ExShowQuestMark quest=607
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7235
+  Q upsert Q607_ProveYourCourage | <cond> | 2
+  rows Q607_ProveYourCourage <cond>=2 <state>=STARTED
+  items 7235=1
+
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{kadun}_Quest
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q607_ProveYourCourage/31370-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# The trade: one head taken, the totem and the experience given, the quest ended.
+bypass Quest Q607_ProveYourCourage 31370-07.htm
+  S SystemMessage id=302 3:7235
+  S SystemMessage id=54 3:7219
+  S SystemMessage id=45 1:10000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q607_ProveYourCourage/31370-07.htm
+  S ActionFailed
+  Q delete-quest Q607_ProveYourCourage
+  rows Q607_ProveYourCourage -
+  state Q607_ProveYourCourage -
+  items 7235=0 7219=1 7213=1
+
+# Holding the totem: no offer.
+action kadun
+  S ActionFailed
+  S NpcHtmlMessage obj=kadun item=0 page=npcdefault.htm
+  S ActionFailed
+bypass npc_{kadun}_Quest
+  S NpcHtmlMessage obj=kadun item=0 page=script/quest/Q607_ProveYourCourage/31370-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q607_ProveYourCourage CREATED

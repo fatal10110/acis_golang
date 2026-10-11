@@ -1,8 +1,9 @@
 # Vervato (PrimevalSummoner): a character in no party asks him to summon a corpse. With no dead
 # party member on the isle there is no body: vervato002.htm, and no adena is taken. A scenario
-# seeds no party and no dead player and runs no cast, so the paid summon, the fee taken twice
-# during a summon (vervato005.htm), the Corpse Revival cast, the body brought to Vervato, the
-# closing page (vervato004.htm) and the isle territory check are in primeval_summoner_test.go.
+# seeds no party and no dead player, and its NPCs stand in no npcmaker territory (the isle), so
+# the paid summon, the fee taken twice during a summon (vervato005.htm), the Corpse Revival
+# cast, the body brought to Vervato, the closing page (vervato004.htm) and the isle territory
+# check are in primeval_summoner_test.go.
 # Expectations are derived from the reference source (PrimevalSummoner.onTalk).
 character Loner 20
 script script.teleport.PrimevalSummoner
