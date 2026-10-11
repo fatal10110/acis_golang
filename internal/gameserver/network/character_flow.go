@@ -745,6 +745,10 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	live.access.Store(&access)
 	live.remoteIP = client.Session.remoteIP()
 	delivery.live = live
+	// The restored HP raises its low-HP tutorial event here, with the
+	// journal loaded and the tutorial seam installed, but no event sink
+	// yet: the tutorial's packets reach no client, its journal writes stay.
+	c.NotifyRestoredHP()
 	c.Attach(creatureLive, live)
 	c.SetWorldHandle(live)
 	moveCtl, err := move.NewController(c.Move(), c, live)

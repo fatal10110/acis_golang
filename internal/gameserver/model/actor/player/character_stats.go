@@ -387,13 +387,14 @@ func (c *Character) levelTableValue(values []float64, fallback float64) float64 
 // caller's earlier liveness check cannot race a death into a corpse heal.
 // Callers that change HP outside a client request broadcast the resulting
 // status themselves; the cast and item paths already send their own batched
-// StatusUpdate at the call site.
+// StatusUpdate at the call site. The low-HP tutorial event the write owes
+// waits for that status report (see writeHPLocked).
 func (c *Character) AddHP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
 	}
 	maxHP := c.MaxHPValue()
-	defer c.SettleRegen() // after the unlock below
+	defer c.settleRegenTask() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.dead.Load() || c.curHP >= maxHP {
@@ -792,10 +793,11 @@ func (c *Character) applyNonConsumptionDamageEffects(isDOT bool) {
 }
 
 // SetHP sets current HP, clamped to [0, MaxHP]. It has no effect on a dead
-// character; Revive is the only way back to positive HP.
+// character; Revive is the only way back to positive HP. Like AddHP it
+// leaves the low-HP tutorial event to the caller's status report.
 func (c *Character) SetHP(value float64) {
 	maxHP := c.MaxHPValue()
-	defer c.SettleRegen() // after the unlock below
+	defer c.settleRegenTask() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.dead.Load() {
@@ -941,7 +943,10 @@ func (c *Character) LethalInput(caster creature.FormulaActor, def modelskill.Def
 func (c *Character) ApplyLethalOutcome(outcome formulas.LethalOutcome, _ attackable.Combatant, _ modelskill.Definition) {
 	switch outcome {
 	case formulas.LethalFull:
+		// This HP write reports no status, so its low-HP event comes at
+		// once, before the CP write.
 		c.SetHP(1)
+		c.lowHPNotice()
 		c.SetCP(1)
 	case formulas.LethalHalf:
 		c.SetCP(1)

@@ -63,11 +63,10 @@ var raisedHooks = map[hook]kindSet{
 	hookCreated: kinds(KindFolk, KindHostile),
 	hookDecayed: kinds(KindFolk, KindHostile),
 	hookMyDying: kinds(KindFolk, KindHostile),
-	// The AI's idle and arrival (idle.go). A civilian NPC keeps no
-	// territory: no behavior bound to one waits on leaving it.
+	// The AI's idle and arrival (idle.go).
 	hookNoDesire:       kinds(KindFolk, KindHostile),
 	hookMoveToFinished: kinds(KindFolk, KindHostile),
-	hookOutOfTerritory: kinds(KindHostile),
+	hookOutOfTerritory: kinds(KindFolk, KindHostile),
 	// The AI tick's scan, the look-neighbour call and the re-fire after a
 	// playable's teleport or summoning (see_creature.go).
 	hookSeeCreature: kinds(KindFolk, KindHostile),

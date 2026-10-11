@@ -188,7 +188,7 @@ Hooks run synchronously on the goroutine that raises them, with no lock held.
 | Zone enter | mover's goroutine, collected under the zone lock and fired after unlock | one quest uses it |
 | Player and summon death | the goroutine running the death, after the death broadcast and before the killer's karma | every quest of the journal with a death hook, in journal order and any status; no killer passes the one that died |
 | Script event | the sender's goroutine, inline: every receiver's hook runs before the send returns | a radius broadcast passes 0 as the second argument; the extended broadcast and the send to one NPC pass their own |
-| Tutorial HP and level triggers | caller, after the vitals lock is released | |
+| Tutorial HP and level triggers | caller, after the vitals lock is released | an HP write whose status is reported raises CE45 after that StatusUpdate; the restored HP raises it at selection, before the player has an event sink |
 
 Fan-out rules differ per source and each gets its own function and golden:
 

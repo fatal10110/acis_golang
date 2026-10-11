@@ -64,6 +64,9 @@ type ScriptHooks interface {
 	// HostileOutOfTerritory runs h's out-of-territory hooks: h arrived
 	// outside its territory, the first time since it was last inside.
 	HostileOutOfTerritory(h *Hostile)
+	// FolkOutOfTerritory runs f's out-of-territory hooks: f arrived
+	// outside its territory, the first time since it was last inside.
+	FolkOutOfTerritory(f *Folk)
 	// HostileCreated runs h's created hooks: h has just entered the world.
 	HostileCreated(h *Hostile)
 	// FolkCreated runs f's created hooks: f has just entered the world.
@@ -146,10 +149,10 @@ func (h *Hostile) AtHookPoint(p ai.HookPoint) {
 	}
 }
 
-// AtHookPoint is where f's AI tick, or its arrival, gives the behavior bound
-// to f's template its turn, on f's queue with no lock held: the AI's state
-// is queue-owned. The see-creature scan, the no-desire and move-finished
-// hooks run there; a civilian NPC keeps no territory to leave.
+// AtHookPoint is where f's AI pass, or its arrival, gives the behavior bound
+// to f's template its turn, with the AI's brain released: the see-creature
+// scan, and the no-desire, move-finished and out-of-territory hooks run
+// there.
 func (f *Folk) AtHookPoint(p ai.HookPoint) {
 	if f.scripts == nil {
 		return
@@ -162,6 +165,8 @@ func (f *Folk) AtHookPoint(p ai.HookPoint) {
 	case ai.HookMoveFinished:
 		x, y, z := f.Position()
 		f.scripts.FolkMoveToFinished(f, int32(x), int32(y), int32(z))
+	case ai.HookOutOfTerritory:
+		f.scripts.FolkOutOfTerritory(f)
 	}
 }
 
