@@ -46,6 +46,19 @@ func raidScripts() ([]script.Listing, script.Catalog) {
 // its private.
 func raidParty(t *testing.T, leaderLevel, privateLevel int) (*warriorWorld, *npc.Hostile, *npc.Hostile) {
 	t.Helper()
+	return raidPartyWith(t, raidBoot{}, leaderLevel, privateLevel)
+}
+
+// raidBoot is what a scenario adds to the raid world's boot: options, and a
+// step run on the seeded character before it enters the world.
+type raidBoot struct {
+	opts  []gameservertest.Option
+	ready func(srv *gameservertest.Server, objID int32)
+}
+
+// raidPartyWith is raidParty booted with extra.
+func raidPartyWith(t *testing.T, extra raidBoot, leaderLevel, privateLevel int) (*warriorWorld, *npc.Hostile, *npc.Hostile) {
+	t.Helper()
 	leaderTmpl := warriorTemplate(leaderID, nil)
 	leaderTmpl.Level = leaderLevel
 	leaderTmpl.Privates = []npc.PrivateEntry{{NpcID: int(raidPrivateID), Weight: 1, RespawnDelay: 240 * time.Second}}
@@ -53,21 +66,21 @@ func raidParty(t *testing.T, leaderLevel, privateLevel int) (*warriorWorld, *npc
 	privateTmpl.Name = "Raid Private"
 	privateTmpl.Level = privateLevel
 	leaderTmpl.CanMove, privateTmpl.CanMove = false, false
-	w := bootRaid(t, leaderTmpl, privateTmpl)
+	w := bootRaid(t, extra, leaderTmpl, privateTmpl)
 	leader := w.spawn(t, leaderID, 400, 0)
 	return w, leader, privatesOf(t, leader, 1)[0]
 }
 
-// bootRaid is bootParty with RaidPrivateStandard registered and no
-// npcmakers.
-func bootRaid(t *testing.T, templates ...*npc.Template) *warriorWorld {
+// bootRaid is bootParty with RaidPrivateStandard registered, no npcmakers
+// and extra.
+func bootRaid(t *testing.T, extra raidBoot, templates ...*npc.Template) *warriorWorld {
 	t.Helper()
 	list, catalog := raidScripts()
 	kinds := map[int32]script.NPCKind{}
 	for _, tmpl := range templates {
 		kinds[int32(tmpl.ID)] = script.KindHostile
 	}
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Hunter", 20, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithNPCs(npc.NewTable(templates)),
@@ -75,7 +88,10 @@ func bootRaid(t *testing.T, templates ...*npc.Template) *warriorWorld {
 		gameservertest.WithAITask(),
 		gameservertest.WithScriptRand(func(int) int { return 0 }),
 		gameservertest.WithNPCScripts(kinds, list, catalog),
-	)
+	}, extra.opts...)...)
+	if extra.ready != nil {
+		extra.ready(srv, srv.SoleObjectID(t))
+	}
 	c := srv.Client
 	c.Send(encodeGameStart())
 	for i := 0; ; i++ {

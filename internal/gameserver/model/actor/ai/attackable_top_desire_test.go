@@ -73,3 +73,45 @@ func TestTopDesireTargetOutlivesEventIdle(t *testing.T) {
 	tickThink(t, brain)
 	topIs(t, brain, nil, "after the periodic cycle's idle")
 }
+
+// TestTopDesireTargetClearedByEveryCycleIdle pins NpcAI.runAI's cycle idle
+// clearing the top desire target whatever defers or holds it: the idle
+// deferred past a latched attack, in control or out of it, and the idle
+// that runs while a social animation holds desire selection.
+func TestTopDesireTargetClearedByEveryCycleIdle(t *testing.T) {
+	for _, row := range []struct {
+		name   string
+		before func(*Attackable, *fakeActor)
+	}{
+		{"latched attack, in control", nil},
+		{"latched attack, out of control", func(_ *Attackable, owner *fakeActor) { owner.denyAction = true }},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			brain, owner, _ := latchedAttackAI(t)
+			if !brain.hasLatch() {
+				t.Fatal("setup: no latched attack")
+			}
+			topIs(t, brain, actor(2), "after the attack was taken up")
+			if row.before != nil {
+				row.before(brain, owner)
+			}
+			tickThink(t, brain)
+			topIs(t, brain, nil, "after the cycle's idle past the latch")
+		})
+	}
+
+	t.Run("held by a social animation", func(t *testing.T) {
+		brain, _, _, _, _ := fleeSocialAI(t)
+		other := actor(3)
+		brain.AddSocialDesire(3, 2000, 50)
+		runAI(t, brain)
+		if !brain.selectionHeld() {
+			t.Fatal("setup: the social animation does not hold selection")
+		}
+		brain.SetTopDesireTarget(other)
+		runAI(t, brain)
+		topIs(t, brain, other, "after an event pass while held")
+		tickThink(t, brain)
+		topIs(t, brain, nil, "after the cycle's idle while held")
+	})
+}
