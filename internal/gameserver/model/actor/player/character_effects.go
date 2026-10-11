@@ -88,6 +88,7 @@ func (c *Character) RemoveStatsByOwner(owner effect.ModOwner) {
 	if owner.Stripped() {
 		if len(stats) > 0 {
 			c.refreshMoveSpeed()
+			c.ResourceValues() // a maximum the strip raised settles the regeneration task
 		}
 		return
 	}
@@ -105,6 +106,9 @@ func (c *Character) statsModified(stats []stat.Stat) {
 		return
 	}
 	c.refreshMoveSpeed()
+	// Reading the maxima settles the regeneration task when the change
+	// raised one (noteMaxima).
+	c.ResourceValues()
 	if slices.Contains(stats, stat.RunSpeed) {
 		c.emit(event.RunSpeedChanged{})
 		return
