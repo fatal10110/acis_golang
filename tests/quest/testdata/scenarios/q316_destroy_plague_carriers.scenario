@@ -43,8 +43,9 @@ kill wererat x2
   S SystemMessage id=95 1:0 1:0
   items 1042=1
 
-# Varool is struck (his cry is a chat line, not compared here), then killed: his one fang.
+# Varool is struck and cries out, then is killed: his one fang.
 hit varool 10
+  S NpcSay obj=varool type=0 npc=1027020 text="Why do you oppress us so?"
 kill varool
   S SystemMessage id=95 1:0 1:0
   S SystemMessage id=54 3:1043

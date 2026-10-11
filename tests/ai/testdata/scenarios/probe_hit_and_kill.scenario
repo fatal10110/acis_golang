@@ -1,8 +1,10 @@
 # The runner's hit and kill steps raise the hooks they stand for: a hit raises the attacked
 # hook with its damage; a kill lands a lethal hit (max HP + 1), which raises the attacked
 # hook, then the dying hook three seconds after the death; a kill of a dead NPC kills a
-# fresh one. The probe behavior answers each hook with a sound to the player; each kill
-# also earns the fixture monster's reward (no experience).
+# fresh one, which raises the created hook as it appears. The probe behavior answers each
+# hook with a sound to the player, the created hook with a chat line; each kill also earns
+# the fixture monster's reward (no experience). (The first wolf's chat line is sent as the
+# NPC lines' NPCs spawn, before the first step.)
 character Hunter 20
 script ai.Probe
 npc wolf 20120 Monster 40 0 0
@@ -13,6 +15,7 @@ kill wolf x2
   S PlaySound type=0 file=Probe.attacked_441 bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
   S PlaySound type=0 file=Probe.dying bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcSay obj=wolf type=0 npc=1020120 text="Probe.created"
   S PlaySound type=0 file=Probe.attacked_441 bind=0 obj=0 loc=0,0,0 delay=0
   S SystemMessage id=95 1:0 1:0
   S PlaySound type=0 file=Probe.dying bind=0 obj=0 loc=0,0,0 delay=0

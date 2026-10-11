@@ -12,9 +12,10 @@ import (
 const probeID = 20120
 
 // probe is a behavior that answers its NPC's attacked and dying hooks with
-// a sound to the attacker or killer, naming the hook and the damage, and
-// its see-creature hook with a sound to the player seen, so a scenario sees
-// through packets which hooks its hit, kill and approach steps raised.
+// a sound to the attacker or killer, naming the hook and the damage, its
+// see-creature hook with a sound to the player seen, and its created hook
+// with a chat line, so a scenario sees through packets which hooks its
+// hit, kill and approach steps and its NPCs' spawns raised.
 // It stands in for the behavior scripts until the first one is ported.
 func probe() script.Script {
 	sound := func(s *script.Script, c script.Creature, name string) {
@@ -28,6 +29,7 @@ func probe() script.Script {
 		},
 		OnMyDying:     func(s *script.Script, e script.MyDying) { sound(s, e.Killer, "Probe.dying") },
 		OnSeeCreature: func(s *script.Script, e script.SeeCreature) { sound(s, e.Creature, "Probe.see") },
+		OnCreated:     func(_ *script.Script, e script.Created) { e.NPC.Say("Probe.created") },
 	}}
 }
 

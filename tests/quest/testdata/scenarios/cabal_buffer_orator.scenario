@@ -1,0 +1,21 @@
+# An Orator of Revelations (CabalBuffer) beside a character of Dawn, which leads the Seven Signs:
+# the priest starts preaching as it appears, a minute later and then every minute, a line drawn
+# from its four (onCreated, onTimer). Seeing the character, who holds no blessing, it draws 100
+# then 10000 and blesses him with the fighter blessing at level 1, with no line: the draw of
+# 10000 is not 0 (onSeeCreature). The blessing lands. Expectations are derived from the
+# reference source (CabalBuffer.java).
+character Seeker 20
+cabal dawn gnosis
+festival 100 0
+random 3 50 1 0
+script script.feature.CabalBuffer
+npc orator 31094 Folk 100 0 0
+
+advance 59s
+advance 1s
+  S NpcSay obj=orator type=0 npc=1031094 text="The prophecy of darkness has come to pass!"
+tick x4
+  S MagicSkillUse caster=orator target=player skill=4364-1 hit=0 reuse=0 success=0
+  S SystemMessage id=110 4:4364,1
+advance 1m
+  S NpcSay obj=orator type=0 npc=1031094 text="The day of judgment is near!"
