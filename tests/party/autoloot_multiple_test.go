@@ -83,7 +83,7 @@ func TestPartyAutoLootSplitsNonStackable(t *testing.T) {
 
 // TestPartyAdenaShareOntoHeldStacksTakesNoObjectID: the first auto-looted
 // adena starts each member's stack, one object id each; the second grows
-// those stacks and keeps none.
+// those stacks and takes none.
 func TestPartyAdenaShareOntoHeldStacksTakesNoObjectID(t *testing.T) {
 	g := lootGroup(t, []seat{{"Leader", 20}, {"Member", 20}}, 2, party.LootByTurn, nil, gameservertest.WithAutoLoot(true))
 
@@ -91,15 +91,15 @@ func TestPartyAdenaShareOntoHeldStacksTakesNoObjectID(t *testing.T) {
 		x, y, z := g.srv.PlayerPosition(t, g.players[0].id)
 		monster := g.srv.SpawnHostileNPCTemplateAt(t, partyDropMonster(item.AdenaID, 10), location.Location{X: x + 60, Y: y, Z: z})
 		g.quiet(t)
-		before := g.srv.HeldObjectIDs()
+		before := g.srv.IssuedObjectIDs()
 		if !monster.TakeDamage(1_000_000, g.combatant(t, 0)) {
 			t.Fatal("leader's hit did not kill the monster")
 		}
 		for _, p := range g.players {
 			drainFrames(t, p.c)
 		}
-		if got := g.srv.HeldObjectIDs() - before; got != wantIDs {
-			t.Fatalf("kill %d kept %d object ids, want %d", kill+1, got, wantIDs)
+		if got := g.srv.IssuedObjectIDs() - before; got != wantIDs {
+			t.Fatalf("kill %d spent %d object ids, want %d", kill+1, got, wantIDs)
 		}
 		for i := range 2 {
 			if got := g.carried(t, i, item.AdenaID); got != 5*(kill+1) {

@@ -110,8 +110,8 @@ func TestAutoLootKeepsOneInstanceWithoutMultipleItemDrop(t *testing.T) {
 }
 
 // TestAutoLootOntoHeldStackTakesNoObjectID: adena auto-looted onto the
-// adena the killer holds grows that stack and keeps no object id, while a
-// new stack keeps exactly one.
+// adena the killer holds grows that stack and takes no object id, while a
+// new stack takes exactly one.
 func TestAutoLootOntoHeldStackTakesNoObjectID(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
@@ -145,7 +145,7 @@ func TestAutoLootOntoHeldStackTakesNoObjectID(t *testing.T) {
 			if !ok {
 				t.Fatalf("player %T is not an online character", obj)
 			}
-			before := srv.HeldObjectIDs()
+			before := srv.IssuedObjectIDs()
 			if !monster.TakeDamage(1_000_000, killer) {
 				t.Fatal("lethal hit did not kill the npc")
 			}
@@ -154,8 +154,8 @@ func TestAutoLootOntoHeldStackTakesNoObjectID(t *testing.T) {
 			if got := carriedCount(t, srv, objID, item.AdenaID); got != int(tt.held)+100 {
 				t.Fatalf("carried adena = %d, want %d", got, tt.held+100)
 			}
-			if got := srv.HeldObjectIDs() - before; got != tt.wantIDs {
-				t.Fatalf("object ids kept by the kill = %d, want %d", got, tt.wantIDs)
+			if got := srv.IssuedObjectIDs() - before; got != tt.wantIDs {
+				t.Fatalf("object ids spent by the kill = %d, want %d", got, tt.wantIDs)
 			}
 		})
 	}

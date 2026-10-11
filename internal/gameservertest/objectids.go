@@ -8,11 +8,12 @@ func WithSingleItemDrop() Option {
 	return func(o *options) { o.singleItemDrop = true }
 }
 
-// HeldObjectIDs reports how many object ids the server's allocator has
-// handed out and not taken back: comparing it around an action shows how
-// many ids the action kept.
-func (s *Server) HeldObjectIDs() int {
+// IssuedObjectIDs reports how many object ids the server's allocator has
+// handed out. Like the production allocator's cursor it never goes back:
+// an id given back is still counted, since nothing hands it out again.
+// Comparing it around an action shows how many ids the action spent.
+func (s *Server) IssuedObjectIDs() int {
 	s.ids.mu.Lock()
 	defer s.ids.mu.Unlock()
-	return s.ids.issued - s.ids.released
+	return s.ids.issued
 }

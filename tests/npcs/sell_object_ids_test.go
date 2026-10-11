@@ -6,16 +6,16 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
 
-// TestSellOntoHeldAdenaKeepsNoObjectID: the proceeds of a sale join the
+// TestSellOntoHeldAdenaSpendsNoObjectID: the proceeds of a sale join the
 // adena the seller holds (ItemContainer.addItem grows a held stackable
-// without creating an instance), so the sale keeps no object id.
-func TestSellOntoHeldAdenaKeepsNoObjectID(t *testing.T) {
+// without creating an instance), so the sale takes no object id from the allocator.
+func TestSellOntoHeldAdenaSpendsNoObjectID(t *testing.T) {
 	t.Parallel()
 	w := bootSeller(t, [2]int32{potionID, 10})
 	f := w.spawnFolk(t, folkTemplate("Merchant", merchantID), 50)
 	w.selectFolk(t, f)
 
-	before := w.srv.HeldObjectIDs()
+	before := w.srv.IssuedObjectIDs()
 	w.c.Send(encodeRequestSellItem(merchantID+listOffset, sellRow{w.items[potionID], potionID, 4}))
 	drainFrames(t, w.c)
 
@@ -25,7 +25,7 @@ func TestSellOntoHeldAdenaKeepsNoObjectID(t *testing.T) {
 	if got := w.srv.PlayerInventory(t, w.player).ItemsByTemplateID(item.AdenaID); len(got) != 1 || got[0].ObjectID != w.items[item.AdenaID] {
 		t.Fatalf("adena stacks = %d, want the one held stack %d", len(got), w.items[item.AdenaID])
 	}
-	if got := w.srv.HeldObjectIDs() - before; got != 0 {
-		t.Fatalf("object ids kept by the sale = %d, want 0", got)
+	if got := w.srv.IssuedObjectIDs() - before; got != 0 {
+		t.Fatalf("object ids spent by the sale = %d, want 0", got)
 	}
 }

@@ -534,10 +534,11 @@ func (s *Service) CrystallizeItem(inv *itemcontainer.Inventory, objectID int32, 
 	if _, ok := inv.Templates().Get(crystalItemID); !ok {
 		return CrystallizeResult{}, CrystallizeNoop, nil
 	}
-	crystalObjectID, ok, err := s.nextID()
+	grant, ok, err := s.reserveGrant(inv, crystalItemID)
 	if err != nil || !ok {
 		return CrystallizeResult{}, CrystallizeNoop, err
 	}
+	defer grant.release()
 
 	if count > st.Count {
 		count = st.Count
@@ -545,18 +546,16 @@ func (s *Service) CrystallizeItem(inv *itemcontainer.Inventory, objectID int32, 
 	wasEquipped := st.Equipped() && st.Count <= count
 	changed := unequipConsumed(inv, inst, wasEquipped)
 	if inv.DestroyItem(inst, count) == nil {
-		s.releaseID(crystalObjectID)
 		return CrystallizeResult{}, CrystallizeNoop, nil
 	}
-	crystals := inv.AddNew(crystalItemID, int(crystalCount), crystalObjectID)
-	if !holds(crystals, crystalObjectID) {
-		s.releaseID(crystalObjectID)
-	}
+	taken := Result{EquipmentChanged: wasEquipped, Changed: changed}
+	crystals, err := inv.AddCreated(crystalItemID, int(crystalCount), grant.next)
 	if crystals == nil {
-		return CrystallizeResult{}, CrystallizeNoop, nil
+		// The source is gone either way: report what came off with it.
+		return CrystallizeResult{Result: taken}, CrystallizeNoop, err
 	}
 	return CrystallizeResult{
-		Result:             Result{EquipmentChanged: wasEquipped, Changed: changed},
+		Result:             taken,
 		SourceItemID:       st.TemplateID,
 		SourceEnchantLevel: st.EnchantLevel,
 		CrystalItemID:      crystalItemID,
@@ -564,22 +563,55 @@ func (s *Service) CrystallizeItem(inv *itemcontainer.Inventory, objectID int32, 
 	}, CrystallizeOK, nil
 }
 
-// releaseID gives back id, taken for an item that then needed none, such as
-// units that joined a held stack; an allocator that cannot take ids back
-// keeps it, and a zero id is no id at all.
-func (s *Service) releaseID(id int32) {
-	if id == 0 || s == nil {
-		return
-	}
-	if r, ok := s.ids.(interface{ ReleaseID(int32) }); ok {
-		r.ReleaseID(id)
-	}
+// grantID is the object id of an item granted after its source is
+// destroyed. It is taken before the destroy, so that running out of ids
+// refuses the request instead of taking the source unpaid, unless the
+// inventory already holds a stack the grant joins: the allocator never hands
+// out an id behind its cursor again, so an id taken for nothing is spent for
+// the rest of the session.
+type grantID struct {
+	s  *Service
+	id int32 // 0 once handed out, or when none was taken
 }
 
-// holds reports whether inst, the instance an AddNew returned, carries id:
-// false when the units joined a held stack instead, leaving id unused.
-func holds(inst *item.Instance, id int32) bool {
-	return inst != nil && inst.ObjectID == id
+// reserveGrant takes the id a grant of templateID into inv may need. It
+// reports false, taking nothing, when s has no allocator.
+func (s *Service) reserveGrant(inv *itemcontainer.Inventory, templateID int32) (*grantID, bool, error) {
+	if s == nil || s.ids == nil {
+		return nil, false, nil
+	}
+	g := &grantID{s: s}
+	if tmpl, ok := inv.Templates().Get(templateID); ok && tmpl.Stackable && inv.ItemByTemplateID(templateID) != nil {
+		return g, true, nil
+	}
+	id, _, err := s.nextID()
+	if err != nil {
+		return nil, false, err
+	}
+	g.id = id
+	return g, true, nil
+}
+
+// next is the nextID of the grant's AddCreated: the reserved id, or a late
+// one when the held stack the reservation counted on has gone since.
+func (g *grantID) next() (int32, error) {
+	if id := g.id; id != 0 {
+		g.id = 0
+		return id, nil
+	}
+	return g.s.ids.NextID()
+}
+
+// release gives back a reserved id the grant never used; an allocator that
+// cannot take ids back keeps it.
+func (g *grantID) release() {
+	if g.id == 0 {
+		return
+	}
+	if r, ok := g.s.ids.(interface{ ReleaseID(int32) }); ok {
+		r.ReleaseID(g.id)
+	}
+	g.id = 0
 }
 
 func (s *Service) nextID() (int32, bool, error) {

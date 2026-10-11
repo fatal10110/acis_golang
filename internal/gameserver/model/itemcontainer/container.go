@@ -394,15 +394,11 @@ func (c *Container) addCreated(templateID int32, count int, nextID func() (int32
 	if !ok || nextID == nil {
 		return nil, false, nil
 	}
-	count = max(count, 1)
-	if !tmpl.Stackable {
-		count = 1
-	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if tmpl.Stackable {
 		if held := c.itemByTemplateIDLocked(templateID); held != nil {
-			held.AddCount(count)
+			held.AddCount(max(count, 1))
 			return held, true, nil
 		}
 	}
@@ -413,7 +409,7 @@ func (c *Container) addCreated(templateID int32, count int, nextID func() (int32
 	if id == 0 {
 		return nil, false, errNoObjectID
 	}
-	inst := &item.Instance{ObjectID: id, TemplateID: templateID, Count: count, ManaLeft: tmpl.InitialManaLeft()}
+	inst := buildInstance(tmpl, count, id)
 	c.insertLocked(inst)
 	return inst, false, nil
 }
@@ -423,18 +419,21 @@ func newInstance(templates *item.Table, templateID int32, count int, objectID in
 	if !ok {
 		return nil, false
 	}
-	if count < 1 {
-		count = 1
-	}
-	if !tmpl.Stackable {
+	return buildInstance(tmpl, count, objectID), true
+}
+
+// buildInstance is a fresh instance of tmpl under objectID: count units,
+// at least one, and exactly one for a template that does not stack.
+func buildInstance(tmpl *item.Template, count int, objectID int32) *item.Instance {
+	if count < 1 || !tmpl.Stackable {
 		count = 1
 	}
 	return &item.Instance{
 		ObjectID:   objectID,
-		TemplateID: templateID,
+		TemplateID: tmpl.ID,
 		Count:      count,
 		ManaLeft:   tmpl.InitialManaLeft(),
-	}, true
+	}
 }
 
 // Remove removes inst from the container, leaving its ownership and
