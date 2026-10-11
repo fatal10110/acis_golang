@@ -52,9 +52,13 @@ type ScriptMessage struct{ Text string }
 
 func (ScriptMessage) event() {}
 
-// SystemMessageShown reports the system message ID, which takes no
-// parameter, shown to the character.
-type SystemMessageShown struct{ ID int }
+// SystemMessageShown reports the system message ID shown to the
+// character, with its number parameters in order; none for a message that
+// takes no parameter.
+type SystemMessageShown struct {
+	ID      int
+	Numbers []int32
+}
 
 func (SystemMessageShown) event() {}
 
