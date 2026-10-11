@@ -6,7 +6,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -299,37 +298,21 @@ func (h *Hostile) LookNeighbor() { lookNeighbor(h, &h.Scratch().lookNeighbor) }
 // it, at most once per 30 s (see lookNeighbor).
 func (f *Folk) LookNeighbor() { lookNeighbor(f, &f.Scratch().lookNeighbor) }
 
-// ForceSeeCreature tells every NPC around c, a player or a summon that has
-// just teleported or been summoned, about it: each NPC with c strictly
-// within its see range, centre to centre, and at most 500 apart in height
-// runs its see-creature hooks once. Nothing happens for any other creature,
-// for one off the grid, or while c's acting player is spawn-protected or
-// flying. Invisibility and silent moving do not hide c here, and no NPC's
-// tick-scan memory changes. The hooks run on the caller's goroutine; the
-// caller holds no lock.
+// ForceSeeCreature tells the NPCs around c, a player or a summon that has
+// just teleported, jumped or been summoned, about it. The NPCs are those
+// around the region holding c, which after an instant teleport is still
+// the one it jumped from; each with c strictly within its see range, centre
+// to centre, and at most 500 apart in height runs its see-creature hooks
+// once. Nothing happens for any other creature, for one off the grid, or
+// while c's acting player is spawn-protected or flying. Invisibility and
+// silent moving do not hide c here, and no NPC's tick-scan memory changes.
+// The hooks run on the caller's goroutine; the caller holds no lock.
 func ForceSeeCreature(w *world.State, c attackable.Combatant) {
 	t, ok := c.(world.Tracked)
 	if w == nil || !ok || !seenOnArrival(c) {
 		return
 	}
 	tellOnlookers(c, w.AppendKnown(nil, t))
-}
-
-// ForceSeeCreatureFrom is ForceSeeCreature for c, a player or a summon that
-// has just jumped on the grid from from, as an instant teleport moves it.
-// The reference's instant teleport keeps the creature in its pre-jump
-// region, so the NPCs told are those of the regions around from's; each
-// one's see range is still measured to c's new position. Nothing happens
-// while c is off the grid.
-func ForceSeeCreatureFrom(w *world.State, c attackable.Combatant, from location.Location) {
-	t, ok := c.(world.Tracked)
-	if w == nil || !ok || !seenOnArrival(c) {
-		return
-	}
-	if placed, _ := w.RegionActivity(t); !placed {
-		return
-	}
-	tellOnlookers(c, w.AppendAround(nil, from.X, from.Y, t.ObjectID()))
 }
 
 // seenOnArrival reports whether c's arrival is told to the NPCs around it:

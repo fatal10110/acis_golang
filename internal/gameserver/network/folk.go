@@ -141,7 +141,7 @@ func (s *folkSink) Emit(ev event.Event) {
 		at := location.Location{X: x, Y: y, Z: z}
 		s.broadcast(func() wire.Frame { return frames.Stop(f.ObjectID(), at, f.Heading()) })
 	case event.Teleported:
-		s.broadcast(func() wire.Frame { return serverpackets.FrameTeleportToLocation(f.ObjectID(), e.To, false) })
+		s.broadcast(func() wire.Frame { return serverpackets.FrameTeleportToLocation(f.ObjectID(), e.To, e.Instant) })
 	case event.SocialAction:
 		s.broadcast(func() wire.Frame { return frames.SocialAction(f.ObjectID(), e.ID) })
 	case event.NpcSay:

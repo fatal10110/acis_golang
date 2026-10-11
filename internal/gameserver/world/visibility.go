@@ -124,6 +124,28 @@ func (s *State) Move(t Tracked, x, y, z int) error {
 	return nil
 }
 
+// SetPosition changes t's position and nothing else: t stays in the region
+// holding it, so what it knows, who sees it and the region scans that find
+// it follow that region until a later Move or Teleport puts it in the
+// region of its position. It delivers nothing.
+func (s *State) SetPosition(t Tracked, x, y, z int) {
+	p := t.presence()
+	if p.tryLatch() {
+		if !p.busy.Load() {
+			p.setPosition(x, y, z)
+			p.releaseLatch()
+			return
+		}
+		p.releaseLatch()
+	}
+	s.mu.Lock()
+	s.awaitIdleLocked(p)
+	p.acquireLatch()
+	p.setPosition(x, y, z)
+	p.releaseLatch()
+	s.mu.Unlock()
+}
+
 // Teleport moves t to (x, y, z) as a discontinuous relocation: t leaves the
 // grid and re-enters it, so every observer around its old region forgets it
 // and every observer around the new one discovers it, including observers in

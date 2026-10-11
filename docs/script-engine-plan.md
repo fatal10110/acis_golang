@@ -188,7 +188,7 @@ Hooks run synchronously on the goroutine that raises them, with no lock held.
 | Zone enter | mover's goroutine, collected under the zone lock and fired after unlock | one quest uses it |
 | Player and summon death | the goroutine running the death, after the death broadcast and before the killer's karma | every quest of the journal with a death hook, in journal order and any status; no killer passes the one that died |
 | Script event | the sender's goroutine, inline: every receiver's hook runs before the send returns | a radius broadcast passes 0 as the second argument; the extended broadcast and the send to one NPC pass their own |
-| Tutorial HP and level triggers | caller, after the vitals lock is released | |
+| Tutorial HP and level triggers | caller, after the vitals lock is released | an HP write whose status is reported raises CE45 after that StatusUpdate; the restored HP raises it at selection, before the player has an event sink |
 
 Fan-out rules differ per source and each gets its own function and golden:
 
@@ -247,7 +247,10 @@ once and hands it to the constructor of every member, as it hands tables to othe
 constructors; a member registers itself in it from its constructor, as the reference's
 constructor does. The same `go/types` test covers it: a family's plain fields can only be
 read. A map keyed by NPC is `NPCMapCell`, with the reference's removal of a value; its keys
-and values match by NPC identity, the spawn slot's, as the timers' do. A member reaches another member's helpers through
+and values match by NPC identity, the spawn slot's, as the timers' do. A field holding one
+player is `PlayerCell`; a list is `ListCell`, ordered and keeping duplicates, whose creature
+handles match by the same identity (a player's is its character) and other values by `==`.
+A member reaches another member's helpers through
 `QuestState.Quest()`, the registered script of a state it found.
 
 ### Timers
@@ -327,6 +330,13 @@ where the reference asks an NPC to walk a route (A13).
    (memos hold the `<quest>_OneTimeQuestFlag` and class-change flags).
 3. The top-level `Quest` bypass is refused with ActionFailed while the player trades or runs
    a private store. This closes a check-then-take race.
+4. A script's instant teleport of a player or a summon runs on the moved creature's own
+   queue once the calling task is done; the reference moves it inside the call. The packets
+   and the landing are the same, but code after the call (the rest of the hook, other NPCs'
+   hooks in the same broadcast) still reads the old position. Running it inline would write
+   another player's position from the caller's queue while that player's own queue moves
+   it, or wait on that queue, which deadlocks when two players' hooks swap each other
+   (WarriorBase `SwapPosition`). An NPC's instant teleport, hostile or civilian, stays inline.
 
 Everything else follows the reference, including its quirks (abort by id, the 25-quest check
 only at talk, the abnormal-status dispatch list).

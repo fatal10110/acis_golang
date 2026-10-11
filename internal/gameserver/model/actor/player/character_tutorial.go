@@ -42,8 +42,11 @@ func (c *Character) NotifyTutorial(name string) {
 
 // writeHPLocked is the one place c's current HP is written, except the HP
 // clear of a character restored dead (MarkDead). It marks the write for
-// lowHPNotice, which every writer reaches after it releases vitalsMu
-// (SettleRegen runs it). The caller holds vitalsMu.
+// lowHPNotice, which SettleRegen runs after vitalsMu is released. A writer
+// that reports its own status reaches it after that report. AddHP, SetHP and
+// ReduceCurrentHP leave it to their caller's status report (BroadcastStatus),
+// so the event follows the StatusUpdate, as a reported HP write raises it.
+// The caller holds vitalsMu.
 func (c *Character) writeHPLocked(hp float64) {
 	c.curHP = hp
 	c.hpWritten.Store(true)
@@ -54,6 +57,20 @@ func (c *Character) writeHPLocked(hp float64) {
 // right after the writer's own status report when it sends one.
 func (c *Character) lowHPNotice() {
 	if !c.hpWritten.Swap(false) || c.tutorial == nil {
+		return
+	}
+	if res := c.ResourceValues(); res.CurrentHP/res.MaxHP < lowHPRatio {
+		c.NotifyTutorial(tutorialLowHP)
+	}
+}
+
+// NotifyRestoredHP raises tutorialLowHP when c's restored HP is below
+// lowHPRatio of its maximum, as restoring the saved HP does, dead or not.
+// The selection runs it once, after c's journal is loaded and its tutorial
+// seam installed and before c has an event sink: what the tutorial answers
+// reaches no client, and its journal writes are kept.
+func (c *Character) NotifyRestoredHP() {
+	if c.tutorial == nil {
 		return
 	}
 	if res := c.ResourceValues(); res.CurrentHP/res.MaxHP < lowHPRatio {
