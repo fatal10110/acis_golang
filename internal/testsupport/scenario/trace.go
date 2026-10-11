@@ -9,17 +9,22 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scriptcontract"
 )
 
-// renders are the opcodes a step compares: the dialog's, the quest's and
-// the item messages. The rest (selection, approach, animation, NPC info,
-// the deferred inventory and status updates) is not the script's.
+// renders are the opcodes a step compares: the dialog's, the quest's, the
+// tutorial's and the item messages, the radar marks, the drops and the casts
+// a script makes. The rest (selection, approach, movement, NPC info, the
+// deferred inventory and status updates) is not the script's.
 var renders = []byte{
 	serverpackets.OpcodeActionFailed, serverpackets.OpcodeNpcHtmlMessage, serverpackets.OpcodeSystemMessage,
 	serverpackets.OpcodePlaySound, serverpackets.OpcodeQuestList, 0xfe,
+	serverpackets.OpcodeTutorialShowHTML, serverpackets.OpcodeTutorialShowQuestionMark,
+	serverpackets.OpcodeTutorialEnableClientEvent, serverpackets.OpcodeTutorialCloseHTML,
+	serverpackets.OpcodeRadarControl, serverpackets.OpcodeDropItem, serverpackets.OpcodeMagicSkillUse,
 }
 
 // render renders a server packet payload as an S line, with roles naming
@@ -38,20 +43,24 @@ func render(payload []byte, roles map[int32]string) (string, bool, error) {
 	return strings.TrimPrefix(line, "S "), true, nil
 }
 
-// expandPage replaces a trailing "page=<path>" of an NpcHtmlMessage line
-// with the page's text, %objectId% filled in with the packet's NPC, as the
-// rendered packet writes it.
+// expandPage replaces a trailing "page=<path>" of an NpcHtmlMessage or a
+// TutorialShowHtml line with the page's text, as the rendered packet writes
+// it: in an NpcHtmlMessage, %objectId% filled in with the packet's NPC.
 func expandPage(line string, pages map[string]string) (string, error) {
 	head, path, ok := strings.Cut(line, " page=")
-	if !ok || !strings.HasPrefix(line, "NpcHtmlMessage obj=") {
+	npcPage := strings.HasPrefix(line, "NpcHtmlMessage obj=")
+	if !ok || !npcPage && head != "TutorialShowHtml" {
 		return line, nil
 	}
 	text, ok := pages[path]
 	if !ok {
 		return "", fmt.Errorf("page %s is not a page line of the scenario", path)
 	}
-	obj, _, _ := strings.Cut(strings.TrimPrefix(head, "NpcHtmlMessage obj="), " ")
-	return head + " html=" + scriptcontract.Quote(strings.ReplaceAll(text, "%objectId%", "{"+obj+"}")), nil
+	if npcPage {
+		obj, _, _ := strings.Cut(strings.TrimPrefix(head, "NpcHtmlMessage obj="), " ")
+		text = strings.ReplaceAll(text, "%objectId%", "{"+obj+"}")
+	}
+	return head + " html=" + scriptcontract.Quote(text), nil
 }
 
 // expandPackets is expandPage over a step's packets.
@@ -67,16 +76,21 @@ func expandPackets(lines []string, pages map[string]string) ([]string, error) {
 }
 
 // traceStep is one client packet of a reference trace with what the
-// server answered: the rendered packets and the journal statements.
+// server answered: the rendered packets, the journal statements and the
+// pinned script draws, each "<bound>:<value>".
 type traceStep struct {
 	client string
 	sent   []string
 	stmts  []string
+	draws  []string
 }
 
 var (
-	traceAction = regexp.MustCompile(`^C Action (\d+) \(object (\d+)\)$`)
-	traceKill   = regexp.MustCompile(`^# kill (\d+) \(object (\d+)\)$`)
+	traceAction  = regexp.MustCompile(`^C Action (\d+) \(object (\d+)\)$`)
+	traceKill    = regexp.MustCompile(`^# kill (\d+) \(object (\d+)\)$`)
+	traceHit     = regexp.MustCompile(`^# hit (\d+) \(object (\d+)\) (\d+)$`)
+	traceAdvance = regexp.MustCompile(`^# advance (\d+)$`)
+	traceDraw    = regexp.MustCompile(`^# draw (\d+:\d+) \S+$`)
 )
 
 // readTrace reads a reference trace (format: the oracle directory's
@@ -116,7 +130,21 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			m := traceKill.FindStringSubmatch(line)
 			seen[atoi32(m[2])] = atoi32(m[1])
 			raw = append(raw, rawStep{client: "kill " + m[1]})
+		case traceHit.MatchString(line):
+			m := traceHit.FindStringSubmatch(line)
+			seen[atoi32(m[2])] = atoi32(m[1])
+			raw = append(raw, rawStep{client: "hit " + m[1] + " " + m[3]})
+		case traceAdvance.MatchString(line):
+			raw = append(raw, rawStep{client: "advance " + traceAdvance.FindStringSubmatch(line)[1]})
 		case (strings.HasPrefix(line, "S ") || strings.HasPrefix(line, "Q ")) && len(raw) > 0:
+			raw[len(raw)-1].lines = append(raw[len(raw)-1].lines, line)
+		case strings.HasPrefix(line, "# draw "):
+			if !traceDraw.MatchString(line) {
+				return nil, nil, fmt.Errorf("trace line %q is not a draw <bound>:<value> <class>", line)
+			}
+			if len(raw) == 0 {
+				return nil, nil, fmt.Errorf("trace line %q comes before the first client packet", line)
+			}
 			raw[len(raw)-1].lines = append(raw[len(raw)-1].lines, line)
 		}
 	}
@@ -147,10 +175,20 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 	for _, r := range raw {
 		step := traceStep{client: r.client}
 		for _, line := range r.lines {
+			if m := traceDraw.FindStringSubmatch(line); m != nil {
+				step.draws = append(step.draws, m[1])
+				continue
+			}
 			if strings.HasPrefix(line, "Q ") {
 				st, err := scriptcontract.ParseStatement(line)
 				if err != nil {
-					return nil, nil, err
+					// Another table's statement (a player memo, raid points)
+					// is not compared: the Q lines are the quest journal's.
+					// A journal statement must be one the format knows.
+					if sql, _, _ := strings.Cut(line, " | "); strings.Contains(sql, "character_quests") {
+						return nil, nil, fmt.Errorf("trace line %q: %w", line, err)
+					}
+					continue
 				}
 				step.stmts = append(step.stmts, string(st.Kind)+" "+strings.Join(st.Params[1:], " | "))
 				continue
@@ -175,35 +213,70 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 
 // checkTrace requires the scenario's first steps to replay the trace:
 // the same client packets, and S and Q lines equal to the trace's rendered
-// packets and statements.
-func checkTrace(sc *Scenario, data []byte, pages map[string]string) error {
+// packets and statements. A kill step of N kills replays N kills of the
+// trace, its lines theirs in order. It returns the script draws the
+// reference pinned in each traced step, each "<bound>:<value>", for the run
+// to compare with its own; a trace that pins draws needs a random line.
+func checkTrace(sc *Scenario, data []byte, pages map[string]string) (draws [][]string, err error) {
 	steps, objs, err := readTrace(sc, data)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	for i, ts := range steps {
+	for i, next := 0, 0; next < len(steps); i++ {
 		if i >= len(sc.Steps) {
-			return fmt.Errorf("the trace has %d client packets, the scenario %d steps", len(steps), len(sc.Steps))
+			return nil, fmt.Errorf("the trace has %d client packets, the scenario %d steps", len(steps), len(sc.Steps))
 		}
 		st := sc.Steps[i]
-		where := fmt.Sprintf("step %d (line %d) %q against trace %q", i+1, st.Line, st, ts.client)
-		if client, err := traceClient(st, objs, sc); err != nil {
-			return fmt.Errorf("%s: %w", where, err)
-		} else if client != ts.client {
-			return fmt.Errorf("%s: the step sends %q", where, client)
+		n := 1
+		if st.Verb == "kill" && len(st.Args) == 2 {
+			n, _ = killCount(st.Args[1])
 		}
+		ts := traceStep{client: steps[next].client}
+		where := fmt.Sprintf("step %d (line %d) %q against trace %q", i+1, st.Line, st, ts.client)
+		if next+n > len(steps) {
+			return nil, fmt.Errorf("%s: the trace ends after %d of its %d kills", where, len(steps)-next, n)
+		}
+		client, err := traceClient(st, objs, sc)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", where, err)
+		}
+		for _, s := range steps[next : next+n] {
+			if client != s.client {
+				return nil, fmt.Errorf("%s: the step sends %q", where, client)
+			}
+			ts.sent = append(ts.sent, s.sent...)
+			ts.stmts = append(ts.stmts, s.stmts...)
+			ts.draws = append(ts.draws, s.draws...)
+		}
+		next += n
 		want, err := expandPackets(st.Packets, pages)
 		if err != nil {
-			return fmt.Errorf("%s: %w", where, err)
+			return nil, fmt.Errorf("%s: %w", where, err)
 		}
 		if d := FirstDiff("packet", want, ts.sent); d != "" {
-			return fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
+			return nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
 		}
 		if d := FirstDiff("statement", st.Statements, ts.stmts); d != "" {
-			return fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
+			return nil, fmt.Errorf("%s: scenario %s (got: the scenario, want: the trace)", where, d)
 		}
+		draws = append(draws, ts.draws)
 	}
-	return nil
+	// The run pins and records its script draws only with a random line.
+	if sc.Random == nil && slices.ContainsFunc(draws, func(d []string) bool { return len(d) > 0 }) {
+		return nil, fmt.Errorf("the trace pins script draws and the scenario has no random line")
+	}
+	return draws, nil
+}
+
+// traceDrawDiff compares the script draws step i made, each
+// "<bound>:<value>", with those the reference made in that step: a traced
+// step draws the same bounds in the same order. A step past the trace is
+// not compared.
+func traceDrawDiff(traceDraws [][]string, i int, drawn []string) string {
+	if i >= len(traceDraws) {
+		return ""
+	}
+	return FirstDiff("script draw", drawn, traceDraws[i])
 }
 
 // traceClient writes the client packet of st the way a trace does, with
@@ -220,15 +293,20 @@ func traceClient(st Step, objs map[string]int32, sc *Scenario) (string, error) {
 		return "C RequestBypassToServer " + expandRoles(st.Args[0], objs), nil
 	case "link":
 		return "C RequestLinkHtml " + st.Args[0], nil
-	case "kill":
-		// A trace records each kill alone.
-		if len(st.Args) == 1 || st.Args[1] == "x1" {
-			for _, n := range sc.NPCs {
-				if n.Role == st.Args[0] {
-					return fmt.Sprintf("kill %d", n.ID), nil
+	case "kill", "hit":
+		// A trace records each kill alone: a kill step of N kills is N of
+		// them.
+		for _, n := range sc.NPCs {
+			if n.Role == st.Args[0] {
+				if st.Verb == "hit" {
+					return fmt.Sprintf("hit %d %s", n.ID, st.Args[1]), nil
 				}
+				return fmt.Sprintf("kill %d", n.ID), nil
 			}
 		}
+	case "advance":
+		d, _ := time.ParseDuration(st.Args[0])
+		return "advance " + strconv.FormatInt(d.Milliseconds(), 10), nil
 	}
 	return "", fmt.Errorf("a %s step is not a client packet a trace records", st.Verb)
 }

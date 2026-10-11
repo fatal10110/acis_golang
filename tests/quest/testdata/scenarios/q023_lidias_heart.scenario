@@ -8,6 +8,7 @@
 # the tombstone takes 10 s and finds a second silver key; Violet, the box and Violet again
 # complete the quest. Expectations are derived from the reference source
 # (Q023_LidiasHeart.java, QuestState.setCond, Quest.addSpawn, RequestBypassToServer).
+trace internal/gameserver/script/testdata/oracle/scenarios/q023_lidias_heart.golden
 character Lidia 64
 quest Q022_TragedyInVonHellmannForest <state>=COMPLETED
 stub quest.Q022_TragedyInVonHellmannForest

@@ -3,6 +3,7 @@
 # (bits 1-4 from cond 4, bit 6 for cond 6, the sign bit) and QuestList shows them.
 # Expectations are derived from the reference source (Q023_LidiasHeart.java,
 # QuestState.setCond and calculateFlags).
+trace internal/gameserver/script/testdata/oracle/scenarios/q023_lidias_heart_flags.golden
 character Lidia 64
 quest Q022_TragedyInVonHellmannForest <state>=COMPLETED
 quest Q023_LidiasHeart <cond>=4 <state>=STARTED

@@ -7,6 +7,7 @@
 # and the trade for the totem are in q607_flow_test.go. Shadith is a fixture monster: the raid
 # kill messages are the raid boss's, not the quest's. Expectations are derived from the
 # reference source (Q607_ProveYourCourage.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q607_prove_your_courage.golden
 character Scout 75
 script quest.Q607_ProveYourCourage
 item 7235 7219 7213

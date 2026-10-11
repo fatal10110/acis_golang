@@ -9,6 +9,8 @@ This directory holds the reference probe for the script engine (slice V0 of
   every server packet and SQL statement they caused (gate 2).
 - the engine-contract goldens of slice V3 (section 11 item 3), written to
   `internal/testsupport/scriptcontract/testdata/` (see "Engine-contract goldens" below).
+- `scenarios/*.golden`: the reference traces of the quest scenarios in
+  `tests/quest/testdata/scenarios` (see "Quest scenario traces" below).
 
 Gate status at the committed revision: **gate 1 passes** (857 of 857 listed scripts built
 and recorded, no fallback in force); **gate 2 passes** (both quests are played to their
@@ -23,7 +25,7 @@ the `eclipse-temurin:21-jdk-alpine` image, with four infrastructure classes repl
 | Reference class | Probe version |
 |---|---|
 | `commons/pool/ThreadPool.java` | `shadow/.../ThreadPool.java`: no threads. `execute` runs inline; scheduled tasks wait on a virtual clock that only the probe advances, then run inline in due-time order (ties in scheduling order). |
-| `commons/random/Rnd.java` | `shadow/.../Rnd.java`: one seeded `java.util.Random` with the reference bounds; the trace reseeds it before each quest. |
+| `commons/random/Rnd.java` | `shadow/.../Rnd.java`: one seeded `java.util.Random` with the reference bounds; the trace reseeds it before each quest. A scenario trace can pin the script draws alone (`Rnd.scriptCallers`, below). |
 | `gameserver/network/GameClient.java` | the reference file, with the socket write of `sendPacket` replaced at build time by `ProbeWire.capture` (`probe/net/sf/l2j/commons/mmocore/ProbeWire.java`), which writes the packet into a little-endian buffer exactly as the selector does before encryption. The `runImpl` after the send is kept. |
 | `commons/pool/ConnectionPool.java` | `shadow/.../ConnectionPool.java`: no database. Updates touch nothing; a `SELECT` from a table the datapack's install scripts (`aCis_datapack/sql/*.sql`) seed returns those rows, as a fresh install would (castle, clan hall, seven signs status and festival, derby bets); any other query returns no row. |
 
@@ -60,6 +62,42 @@ until a contract scene uses them:
   `Calendar.getInstance()` pointed at `ProbeClock`
   (`probe/net/sf/l2j/commons/probe/ProbeClock.java`), which answers as the reference
   does until the schedule scene sets an instant, zone and locale.
+
+## Quest scenario traces
+
+`probe/ScenarioTrace.java` runs last, after the contract scenes. It plays every quest scenario
+file of `tests/quest/testdata/scenarios` whose `trace` line names a file under
+`oracle/scenarios/`, from the scenario file itself, and writes that file. Each scenario is set
+up the way the Go runner (`internal/testsupport/scenario`) sets it up, so the trace answers
+what the reference does in the scenario's own world:
+
+- the player is created at the character line's level and the class line's class (default 0),
+  standing where the Go fixture character enters the world (10, 20, 30); a clan line creates a
+  clan the player leads and sets its level; each quest line puts its rows in the player's quest
+  state before anything is recorded;
+- each NPC line's NPC is spawned at its offset from the player. Every NPC template is bound to
+  the scenario's script and stub lines only, from the bindings the script loader left (copied
+  before the contract scenes change some), since the Go runner registers no other script:
+  another quest on the same NPC is not in its chooser, and a monster's own behavior does not
+  run;
+- an NPC the scenario kills or hits is made the Go runner's fixture monster of the NPC line's
+  type: level 1, 1000 HP, no experience, SP, drops, skills, minions or aggression, its script
+  bindings kept;
+- a random line pins the script draws alone: an int draw whose first caller outside `Rnd` is
+  a scripting class takes the next listed value (a ranged draw takes its minimum plus a value
+  of the range's size, a boolean is a value of bound 2, true when 0), and any other draw comes
+  from the seeded generator, reseeded per scenario. A script draw past the listed values, or
+  outside its bound, fails the run. Each pinned draw is a `# draw` line of the step that drew
+  it; the Go run of the same step must draw the same bounds in the same order.
+
+The steps run in order until the first one a trace does not record: action, bypass and link
+are fed as client packets, followed by 500 ms; a kill of N kills N monsters one by one, a fresh
+one at the NPC line's offset once the last one is dead, each followed by 3.5 s (the Go
+runner's kill wait); a hit takes the damage, followed by 500 ms; an advance passes its time in
+500 ms ticks. A relog or an approach ends the trace (a relog needs the character restored from
+the database, which the probe does not keep), and a scenario that creates its character is not
+traced. `internal/testsupport/scenario` then requires the scenario's first steps to replay the
+trace (package doc there). Two consecutive runs produce byte-identical traces.
 
 ## Contract golden format
 
@@ -102,8 +140,9 @@ ACIS_JAVA=../aCis_gameserver ACIS_DATAPACK=../aCis_datapack \
 
 Both default to the siblings of the repository root, so from the primary checkout in the
 workspace no variable is needed. The script builds the probe, runs it, copies the three
-`.golden` files here and the contract goldens to `internal/testsupport/scriptcontract/testdata/`;
-it needs Docker and nothing else. `PROBE_LOG=<file>` keeps the
+`.golden` files here, the scenario traces to `scenarios/` (replacing the directory) and the
+contract goldens to `internal/testsupport/scriptcontract/testdata/`; it needs Docker and nothing
+else; it reads the scenario files from `tests/quest/testdata/scenarios`. `PROBE_LOG=<file>` keeps the
 reference server's log. Build and run together take under half a minute.
 
 Committed outputs were generated from the reference at workspace commit
@@ -183,6 +222,10 @@ T <ms>                          virtual time passed; due tasks run (inventory up
 S <packet class> <hex body>     a server packet sent to the player: opcode first, little-endian
 Q <sql> | <param> | ...         an executed statement with its bound parameters in index order
 # kill <npc id> (object <id>)   the probe kills a monster for the player
+# hit <npc id> (object <id>) <damage>   a scenario trace: the player lands a hit of that damage
+# advance <ms>                  a scenario trace: that much virtual time passes, in T ticks
+# draw <bound>:<value> <class>  a scenario trace: a script draw the random line pinned, and the
+                                class that drew it
 ```
 
 The player and NPCs stand within interaction range of each other, so no movement is

@@ -38,7 +38,16 @@
 //	advance <duration>     time passes, as time.ParseDuration reads it
 //	approach <role>        the character steps to 100 in front of the NPC, inside its see range, and one
 //	                       AI tick runs, whose see-creature scan notices it
+//	pickup <item id>       an Action packet on the one ground item of that template, then time passes
+//	                       until the item has left the ground
+//	mark <id>              a RequestTutorialQuestionMark: the character clicks that tutorial question mark
 //	relog                  back to character select and into the world again
+//	restart                a RequestRestart: back to character select
+//	enter                  the character is selected and enters the world (the EnterWorld burst)
+//	create                 the first step only: a RequestCharacterCreate of a human fighter named as the
+//	                       character line says, instead of a seeded character; the character line's level
+//	                       must be 1, and the class, clan and quest lines are left out (the creation
+//	                       writes its own rows)
 //
 //	  S <packet>           the packets of the step, in order, as scriptcontract.Packet renders them;
 //	                       "page=<path>" ends an NpcHtmlMessage whose text is that page, %objectId% filled in
@@ -47,18 +56,33 @@
 //	  rows <quest> <var>=<value> ... | -    the quest's character_quests rows after the step, all of them
 //	  state <quest> <status> | -            the quest's state in memory after the step
 //
+// A step other than create and enter acts in the world: a scenario starting
+// with create, or a restart, is followed by an enter before any of them. The
+// NPC lines' NPCs are spawned when the character first enters the world.
+// The items and state checks read the character in the world, so a create
+// or restart step takes rows checks only.
+//
 // The S and Q lists are exact: a step without S lines must send none of
 // the rendered packets (relog excepted: its enter burst is not compared),
 // and one without Q lines must write no statement. The rendered packets
-// are the dialog's, the quest's and the item messages: ActionFailed,
-// NpcHtmlMessage, SystemMessage, PlaySound, QuestList and ExShowQuestMark.
+// are the dialog's, the quest's, the tutorial's and the item messages:
+// ActionFailed, NpcHtmlMessage, SystemMessage, PlaySound, QuestList,
+// ExShowQuestMark, TutorialShowHtml, TutorialShowQuestionMark,
+// TutorialEnableClientEvent, TutorialCloseHtml, RadarControl, DropItem and
+// MagicSkillUse. "page=<path>" also ends a TutorialShowHtml line.
 //
 // Without a random line the script draws are random. A draw outside
 // [0, n), or past the listed ones, fails the step that drew it.
 //
 // A trace header ties the scenario to the reference server: before the run
-// the trace's client packets must be the scenario's first steps, and their
-// rendered packets and statements must be those steps' S and Q lines.
+// the trace's client packets, kills, hits and advances must be the
+// scenario's first steps (a kill step of N kills is N kills of the trace),
+// and their rendered packets and journal statements must be those steps' S
+// and Q lines; a statement on another table than character_quests is not
+// compared, an unknown one on it fails. The script draws the trace pins
+// (needing a random line) must be those the run's same steps draw: the
+// same bounds, in order. A trace under the oracle's scenarios directory is the
+// reference probe's play of this scenario itself (the oracle README).
 package scenario
 
 import (
@@ -157,7 +181,12 @@ var argCount = map[string][2]int{
 	"kill":     {1, 2},
 	"advance":  {1, 1},
 	"approach": {1, 1},
+	"pickup":   {1, 1},
+	"mark":     {1, 1},
 	"relog":    {0, 0},
+	"restart":  {0, 0},
+	"enter":    {0, 0},
+	"create":   {0, 0},
 }
 
 // Parse reads a scenario file.
@@ -217,7 +246,57 @@ func Parse(name string, data []byte) (*Scenario, error) {
 	if len(sc.Steps) == 0 {
 		return nil, fmt.Errorf("%s: no step", name)
 	}
+	if err := sc.checkFlow(); err != nil {
+		return nil, fmt.Errorf("%s:%w", name, err)
+	}
 	return sc, nil
+}
+
+// Creates reports whether the scenario creates its character through the
+// client: its first step is create.
+func (sc *Scenario) Creates() bool { return sc.Steps[0].Verb == "create" }
+
+// checkFlow requires each step to find the character where it acts: create
+// first and only on a character no precondition line seeds, enter at the
+// character select, every other step in the world.
+func (sc *Scenario) checkFlow() error {
+	inWorld := true
+	for i, st := range sc.Steps {
+		fail := func(format string, args ...any) error {
+			return fmt.Errorf("%d: %s", st.Line, fmt.Sprintf(format, args...))
+		}
+		switch st.Verb {
+		case "create":
+			if i != 0 {
+				return fail("create is the first step only")
+			}
+			switch {
+			case sc.Level != 1:
+				return fail("a created character starts at level 1, not %d", sc.Level)
+			case sc.Class != 0 || sc.Clan >= 0 || len(sc.Quests) > 0:
+				return fail("a created character takes no class, clan or quest line")
+			}
+			inWorld = false
+		case "enter":
+			if inWorld {
+				return fail("enter needs the character select: after create or restart")
+			}
+			inWorld = true
+		default:
+			if !inWorld {
+				return fail("%s needs the character in the world: enter first", st.Verb)
+			}
+			if st.Verb == "restart" {
+				inWorld = false
+			}
+		}
+		for _, ck := range st.Checks {
+			if !inWorld && ck.Kind != "rows" {
+				return fmt.Errorf("%d: a %s check reads the character in the world: after %s, only rows", ck.Line, ck.Kind, st.Verb)
+			}
+		}
+	}
+	return nil
 }
 
 func (sc *Scenario) header(key string, args []string, roles map[string]bool) error {
@@ -376,6 +455,10 @@ func checkStep(verb string, args []string, roles map[string]bool) error {
 	case "advance":
 		if _, err := time.ParseDuration(args[0]); err != nil {
 			return err
+		}
+	case "pickup", "mark":
+		if _, err := strconv.ParseInt(args[0], 10, 32); err != nil {
+			return fmt.Errorf("%s number %q: %w", verb, args[0], err)
 		}
 	}
 	return nil

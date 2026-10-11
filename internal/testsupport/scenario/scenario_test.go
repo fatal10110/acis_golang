@@ -155,7 +155,7 @@ func traceScenario(t *testing.T, steps string) *Scenario {
 
 func TestCheckTraceAcceptsAReplayingScenario(t *testing.T) {
 	sc := traceScenario(t, "action darin\n  S ActionFailed\nbypass npc_{darin}_Quest\n  S PlaySound type=0 file=a bind=0 obj=0 loc=0,0,0 delay=0\n  Q upsert Q001_LettersOfLove | <cond> | 1\nkill wolf\n  S ActionFailed\nrelog\n")
-	if err := checkTrace(sc, []byte(traceText), nil); err != nil {
+	if _, err := checkTrace(sc, []byte(traceText), nil); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -165,11 +165,12 @@ func TestCheckTraceNamesTheFirstDeparture(t *testing.T) {
 		{"packet", "action darin\nbypass npc_{darin}_Quest\n", "step 1 (line 4) \"action darin\" against trace \"C Action 30048 (object 600)\": scenario packet 1 missing"},
 		{"statement", "action darin\n  S ActionFailed\nbypass npc_{darin}_Quest\n  S PlaySound type=0 file=a bind=0 obj=0 loc=0,0,0 delay=0\nkill wolf\n", "step 2 (line 6) \"bypass npc_{darin}_Quest\" against trace \"C RequestBypassToServer npc_600_Quest\": scenario statement 1 missing"},
 		{"client", "action darin\n  S ActionFailed\nbypass npc_{darin}_Chat\n", `the step sends "C RequestBypassToServer npc_600_Chat"`},
-		{"kill count", "action darin\n  S ActionFailed\nbypass npc_{darin}_Quest\n  S PlaySound type=0 file=a bind=0 obj=0 loc=0,0,0 delay=0\n  Q upsert Q001_LettersOfLove | <cond> | 1\nkill wolf x2\n", "a kill step is not a client packet a trace records"},
+		{"kill count", "action darin\n  S ActionFailed\nbypass npc_{darin}_Quest\n  S PlaySound type=0 file=a bind=0 obj=0 loc=0,0,0 delay=0\n  Q upsert Q001_LettersOfLove | <cond> | 1\nkill wolf x2\n", "the trace ends after 1 of its 2 kills"},
+		{"untraced step", "action darin\n  S ActionFailed\nrelog\n", "a relog step is not a client packet a trace records"},
 		{"short", "action darin\n  S ActionFailed\n", "the trace has 3 client packets, the scenario 1 steps"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			err := checkTrace(traceScenario(t, tc.steps), []byte(traceText), nil)
+			_, err := checkTrace(traceScenario(t, tc.steps), []byte(traceText), nil)
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("checkTrace error = %v, want one containing %q", err, tc.want)
 			}
