@@ -6,10 +6,14 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q422"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport/scriptcontract"
 )
 
 // What the Repent Your Sins (Q422) scenario cannot show, since it sets no
@@ -51,7 +55,7 @@ func (d *q422Draws) rand(n int) int {
 
 // bootQ422 boots a character of level with pk PK kills, the Black Judge
 // and Pushkin; before seeds what precedes the selection.
-func bootQ422(t *testing.T, level, pk int, draws *q422Draws, before func(srv *gameservertest.Server, objID int32)) (w *dialogWorld, judge, pushkin int32) {
+func bootQ422(t *testing.T, level, pk int, draws *q422Draws, before func(srv *gameservertest.Server, objID int32), opts ...gameservertest.Option) (w *dialogWorld, judge, pushkin int32) {
 	t.Helper()
 	w = bootX1Quest(t, level, q422Path, q422.New, []int32{q422BlackJudge, q422Pushkin}, nil,
 		func(srv *gameservertest.Server, objID int32) {
@@ -63,11 +67,13 @@ func bootQ422(t *testing.T, level, pk int, draws *q422Draws, before func(srv *ga
 				before(srv, objID)
 			}
 		},
-		x1Items([]int32{
-			q422QitemManacles, q422ManualOfManacles, q422PenitentManacles, q422LeftManacles,
-			q422Silver, q422Adamantine, q422Frame, q422Cokes, q422Steel, q422VenomSac,
-		}),
-		gameservertest.WithScriptRand(draws.rand),
+		append([]gameservertest.Option{
+			x1Items([]int32{
+				q422QitemManacles, q422ManualOfManacles, q422PenitentManacles, q422LeftManacles,
+				q422Silver, q422Adamantine, q422Frame, q422Cokes, q422Steel, q422VenomSac,
+			}),
+			gameservertest.WithScriptRand(draws.rand),
+		}, opts...)...,
 	)
 	return w, w.spawnFolk(t, "judge", q422BlackJudge, 10, 0, 0).ObjectID(), w.spawnFolk(t, "pushkin", q422Pushkin, -10, 0, 0).ObjectID()
 }
@@ -282,5 +288,129 @@ func TestQ422QuitTakesTheQuestItems(t *testing.T) {
 	w.bypass(t, "Quest "+q422Name+" 30981-19.htm")
 	if vars := w.srv.QuestVars(t, w.player, q422Name); vars["<state>"] != "STARTED" || vars["<cond>"] != "16" {
 		t.Fatalf("Q422 after the return = %v, want started at cond 16", vars)
+	}
+}
+
+// TestQ422PkWithTheSinEaterOutOnlyWarns: with the Sin Eater (12564) out,
+// the Pk link answers 30981-16.htm alone, even with manacles grown past the
+// kept level: no manacles taken or given, no PK taken away, the kept level
+// and the PK count unchanged, no UserInfo and no draw. That guard keeps the
+// relief from taking the control item of a summon in the world.
+func TestQ422PkWithTheSinEaterOutOnlyWarns(t *testing.T) {
+	t.Parallel()
+	draws := &q422Draws{draw: 4}
+	w, judge, _ := bootQ422(t, 47, 7, draws, func(srv *gameservertest.Server, objID int32) {
+		insertJournal(t, srv.DB,
+			journalRow{objID, q422Name, "<state>", val("STARTED")},
+			journalRow{objID, q422Name, "<cond>", val("16")},
+			journalRow{objID, q422Name, "level", val("45")},
+		)
+	}, gameservertest.WithNPCs(npc.NewTable([]*npc.Template{{
+		ID: x1ServitorID, TemplateID: x1ServitorID, Type: "Servitor", Name: "Sin Eater", Level: 20,
+		HPMax: 500, MPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 8, CollisionHeight: 20,
+	}})))
+	// The manacles' Sin Eater has grown past the kept level 45: without the
+	// summon out, this Pk would take PKs away.
+	w.srv.RunScript(t, w.player, q422Name, func(s *script.Script, p *script.Player) {
+		s.GiveItemsEnchanted(p, q422PenitentManacles, 1, 46)
+	})
+	w.srv.RunQuest(t, w.player, q422Name, func(_ *script.Quests, c *player.Character, _ *script.Script) {
+		c.SummonServitor(modelskill.Definition{ID: 1111, Level: 1, SkillType: "SUMMON", NpcID: x1ServitorID, SummonTotalLifeTime: 1_200_000})
+	})
+	w.srv.AdvanceUntil(t, "the Sin Eater is in the world", func() bool {
+		_, ok := w.srv.State.Summon(w.player)
+		return ok
+	})
+	w.srv.ReadQueued(t, w.srv.Client)
+	w.questWindow(t, judge)
+
+	w.srv.Client.Send(encodeBypass("Quest " + q422Name + " Pk"))
+	frames := w.srv.ReadQueued(t, w.srv.Client)
+	if n := len(framesOf(frames, serverpackets.OpcodeUserInfo)); n != 0 {
+		t.Fatalf("the Pk link with the Sin Eater out sent %d UserInfo, want none", n)
+	}
+	if got := scriptLines(t, frames); len(got) != 0 {
+		t.Fatalf("the Pk link with the Sin Eater out sent %q, want no item message or sound", got)
+	}
+	want := w.page(t, "judge", q422Name, "30981-16.htm")
+	var pages int
+	for _, f := range frames {
+		if f[0] != serverpackets.OpcodeNpcHtmlMessage {
+			continue
+		}
+		pages++
+		if line, err := scriptcontract.Packet(f, w.roles); err != nil || line != want {
+			t.Fatalf("the Pk link with the Sin Eater out showed %q (%v), want 30981-16.htm", line, err)
+		}
+	}
+	if pages != 1 {
+		t.Fatalf("the Pk link with the Sin Eater out showed %d pages, want 30981-16.htm once", pages)
+	}
+	for id, n := range map[int32]int{q422PenitentManacles: 1, q422LeftManacles: 0} {
+		if c := w.srv.PlayerItemCount(t, w.player, id); c != n {
+			t.Errorf("item %d after the warning = %d, want %d", id, c, n)
+		}
+	}
+	if got := w.pkKills(t); got != 7 {
+		t.Errorf("PK kills after the warning = %d, want 7", got)
+	}
+	if vars := w.srv.QuestVars(t, w.player, q422Name); vars["<cond>"] != "16" || vars["level"] != "45" {
+		t.Errorf("Q422 after the warning = %v, want cond 16 and level 45", vars)
+	}
+	if len(draws.bounds) != 0 {
+		t.Errorf("draw bounds = %v, want none", draws.bounds)
+	}
+}
+
+// TestQ422PkBeforeTheSinEaterGrowsAnswersTheLink: with no summon out and
+// manacles not grown past the kept level, the Pk link answers its own
+// name as a chat line and changes nothing. The link is only on the pages
+// of grown manacles (30981-13.htm) and of the warning (30981-16.htm): the
+// player opens it over grown manacles, then holds other manacles that have
+// not grown, as a trade would leave it.
+func TestQ422PkBeforeTheSinEaterGrowsAnswersTheLink(t *testing.T) {
+	t.Parallel()
+	draws := &q422Draws{draw: 4}
+	w, judge, _ := bootQ422(t, 47, 7, draws, func(srv *gameservertest.Server, objID int32) {
+		insertJournal(t, srv.DB,
+			journalRow{objID, q422Name, "<state>", val("STARTED")},
+			journalRow{objID, q422Name, "<cond>", val("16")},
+			journalRow{objID, q422Name, "level", val("45")},
+		)
+	})
+	hold := func(enchant int32) {
+		w.srv.RunScript(t, w.player, q422Name, func(s *script.Script, p *script.Player) {
+			s.TakeItems(p, q422PenitentManacles, -1)
+			s.GiveItemsEnchanted(p, q422PenitentManacles, 1, enchant)
+		})
+		w.srv.ReadQueued(t, w.srv.Client)
+	}
+	hold(46)
+	if got := w.questWindow(t, judge); !slices.Contains(got, w.page(t, "judge", q422Name, "30981-13.htm")) {
+		t.Fatalf("the Black Judge's window with the grown Sin Eater = %q, want 30981-13.htm", got)
+	}
+	hold(45)
+
+	w.srv.Client.Send(encodeBypass("Quest " + q422Name + " Pk"))
+	frames := w.srv.ReadQueued(t, w.srv.Client)
+	if n := len(framesOf(frames, serverpackets.OpcodeUserInfo)); n != 0 {
+		t.Fatalf("the Pk link before the Sin Eater grows sent %d UserInfo, want none", n)
+	}
+	if got, want := scriptLines(t, frames), []string{`S SystemMessage id=1987 0:"Pk"`}; !slices.Equal(got, want) {
+		t.Fatalf("the Pk link before the Sin Eater grows = %q, want %q", got, want)
+	}
+	for id, n := range map[int32]int{q422PenitentManacles: 1, q422LeftManacles: 0} {
+		if c := w.srv.PlayerItemCount(t, w.player, id); c != n {
+			t.Errorf("item %d after the link = %d, want %d", id, c, n)
+		}
+	}
+	if got := w.pkKills(t); got != 7 {
+		t.Errorf("PK kills after the link = %d, want 7", got)
+	}
+	if vars := w.srv.QuestVars(t, w.player, q422Name); vars["<cond>"] != "16" || vars["level"] != "45" {
+		t.Errorf("Q422 after the link = %v, want cond 16 and level 45", vars)
+	}
+	if len(draws.bounds) != 0 {
+		t.Errorf("draw bounds = %v, want none", draws.bounds)
 	}
 }
