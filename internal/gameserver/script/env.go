@@ -3,6 +3,10 @@ package script
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
+	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -49,6 +53,34 @@ type Env struct {
 	SevenSigns *sevensigns.State
 	// BossWaits are the grand boss wait times.
 	BossWaits BossWaitTimes
+	// Doors are the doors a script opens and closes by name; nil finds
+	// none.
+	Doors Doors
+	// Castles are the castles an NPC belongs to; nil finds none.
+	Castles Castles
+	// Sieges are the castles' sieges; nil finds none.
+	Sieges Sieges
+}
+
+// Doors finds the doors of the world by name and opens and closes them.
+type Doors interface {
+	// DoorByName returns the door named name, ignoring case.
+	DoorByName(name string) (*door.Object, bool)
+	// SetDoorOpen opens or closes the door id, as every state change of a
+	// door does.
+	SetDoorOpen(id int, open bool) bool
+}
+
+// Castles finds the castle an NPC template belongs to.
+type Castles interface {
+	// ByNPC returns the castle whose residence NPCs include npcID.
+	ByNPC(npcID int) (*castle.Castle, bool)
+}
+
+// Sieges finds a castle's siege.
+type Sieges interface {
+	// Get returns the siege of the castle castleID.
+	Get(castleID int) (*siege.Siege, bool)
 }
 
 // BossWaitTimes are how long a grand boss lair waits, once it is entered,

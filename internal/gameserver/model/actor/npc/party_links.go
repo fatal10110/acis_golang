@@ -40,6 +40,10 @@ type PartyMember interface {
 	ClearMinions()
 	// Minions returns a snapshot of the NPC's current privates.
 	Minions() []PartyMember
+	// PartyMinions returns a snapshot of the privates of the NPC's party:
+	// its master's when it has one. Otherwise they are its own, and the
+	// NPC is a master from then on, with no private at first.
+	PartyMinions() []PartyMember
 	// IsMaster reports whether the NPC has ever recorded a private.
 	IsMaster() bool
 
@@ -149,6 +153,21 @@ func (p *partyLinks) Minions() []PartyMember {
 		minions = append(minions, minion)
 	}
 	return minions
+}
+
+// PartyMinions returns a snapshot of the privates of this NPC's party: its
+// master's when it has one. Otherwise they are its own, and the NPC is a
+// master from then on, with no private at first.
+func (p *partyLinks) PartyMinions() []PartyMember {
+	if master := p.Master(); master != nil {
+		return master.Minions()
+	}
+	p.partyMu.Lock()
+	if p.minions == nil {
+		p.minions = make(map[int32]PartyMember)
+	}
+	p.partyMu.Unlock()
+	return p.Minions()
 }
 
 // IsMaster reports whether this NPC has ever recorded a private.
