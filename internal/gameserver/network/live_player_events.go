@@ -387,8 +387,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.InstantTeleportRequested:
 		// A script asks it from any queue (a swap moves two players from
 		// an NPC hook): the jump runs on live's own queue.
-		to := e.To
-		postLive(live, func() { l.instantTeleportLivePlayer(live, to) })
+		j := e.Jump
+		postLive(live, func() { l.instantTeleportLivePlayer(live, j) })
 	case event.RecallRequested:
 		l.recallLivePlayer(live, e.Destination)
 	case event.Relocated:

@@ -43,6 +43,10 @@ type Creature interface {
 	// combatant is the creature as the world tracks it, nil for a handle on
 	// nothing.
 	combatant() attackable.Combatant
+	// InstantTeleportTo moves the creature to a place in one step, staying
+	// in its region until it next moves; see InstantTeleportTo of NPC and
+	// Player. It panics for a creature no instant teleport moves.
+	InstantTeleportTo(at Place)
 	// loc is where the creature stands and the way it faces: a creature is
 	// a Place.
 	loc() Loc

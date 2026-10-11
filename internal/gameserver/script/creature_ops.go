@@ -1,6 +1,7 @@
 package script
 
 import (
+	"fmt"
 	"math"
 	"slices"
 
@@ -147,24 +148,70 @@ func (n *NPC) TeleportTo(at Place) {
 	}
 }
 
-// InstantTeleportTo moves the NPC to at in one step, staying on the world
-// grid: at is grounded unless it lies in water, the players around see the
-// jump without its fade, and its path-failure count restarts.
-func (n *NPC) InstantTeleportTo(at Place) {
-	l := at.loc()
-	n.hostile("teleport").InstantTeleportTo(location.Location{X: l.X, Y: l.Y, Z: l.Z})
+// instantTeleporter is a creature an instant teleport moves: a hostile
+// NPC, a player or a summon.
+type instantTeleporter interface {
+	InstantTeleportTo(j location.Jump)
 }
 
-// InstantTeleportTo moves the player to at in one step, on the player's
-// own queue once the caller's task is done, staying on the world grid: at
-// is grounded unless the player flies or at lies in water, the player and
-// the players around see the jump without its fade, the player goes idle,
-// and each NPC around the region it jumped from that sees at runs its
-// see-creature hooks for it once. A player in a teleport already is left
-// to it.
-func (p *Player) InstantTeleportTo(at Place) {
+// instantTeleport makes c jump as j says; a creature no instant teleport
+// moves, or a handle on nothing, panics.
+func instantTeleport(c Creature, j location.Jump) {
+	switch o := tracked(c).(type) {
+	case instantTeleporter:
+		o.InstantTeleportTo(j)
+	case player.CharacterHolder:
+		o.PlayerCharacter().InstantTeleportTo(j)
+	default:
+		panic(fmt.Sprintf("script: the instant teleport of %T", o))
+	}
+}
+
+// jumpTo is a jump to at with no scatter.
+func jumpTo(at Place) location.Jump {
 	l := at.loc()
-	p.character().InstantTeleportTo(location.Location{X: l.X, Y: l.Y, Z: l.Z})
+	return location.Jump{To: location.Location{X: l.X, Y: l.Y, Z: l.Z}}
+}
+
+// InstantTeleportTo moves the NPC to at in one step: at is grounded unless
+// it lies in water, the players around see the jump without its fade, and
+// its path-failure count restarts. It stays in its region until it next
+// moves, so what knows it and what it knows are unchanged until then.
+func (n *NPC) InstantTeleportTo(at Place) {
+	n.hostile("teleport").InstantTeleportTo(jumpTo(at))
+}
+
+// InstantTeleportTo moves the player to at in one step: at is grounded
+// unless the player flies or at lies in water, the player and the players
+// around see the jump without its fade, the player goes idle, and each NPC
+// around the region it jumped from that sees at runs its see-creature hooks
+// for it once. It stays in its region until its next position update. A
+// player in a teleport already is left to it.
+//
+// The jump runs on the player's own queue once the caller's task is done,
+// not inside the call as in the reference (docs/script-engine-plan.md
+// section 9): code after the call still reads the player's old position.
+func (p *Player) InstantTeleportTo(at Place) { instantTeleport(p, jumpTo(at)) }
+
+// InstantTeleportTo moves the creature to at in one step: a summon jumps
+// as a player does (InstantTeleportTo of Player), on its own queue, and
+// then follows its owner again.
+func (c *creature) InstantTeleportTo(at Place) { instantTeleport(c, jumpTo(at)) }
+
+// InstantTeleportNear is c's InstantTeleportTo aimed at a point up to
+// offset away from at on each axis: the script random source draws the x
+// offset, then the y one, each in [-offset, offset], and c lands as far as
+// a straight walk from at toward that point gets on the geodata. An offset
+// of 0 or less aims at at itself.
+func (s *Script) InstantTeleportNear(c Creature, at Place, offset int) {
+	j := jumpTo(at)
+	if offset > 0 {
+		dx := s.env.Rand(2*offset+1) - offset
+		dy := s.env.Rand(2*offset+1) - offset
+		j.Toward = location.Location{X: j.To.X + dx, Y: j.To.Y + dy, Z: j.To.Z}
+		j.Scattered = true
+	}
+	instantTeleport(c, j)
 }
 
 // ClassTypeOf returns the teaching line of the class classID: fighter,
