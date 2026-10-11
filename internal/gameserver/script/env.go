@@ -20,6 +20,8 @@ type Env struct {
 	MultipleItemDrop bool
 	// NewItemID allocates an item instance's object id.
 	NewItemID func() (int32, error)
+	// Spawner spawns the NPCs scripts place in the world.
+	Spawner *Spawner
 	// Rand returns a uniform random int in [0, n). It panics when n is not
 	// positive. Every random draw of a script and its helpers is made
 	// through it.
@@ -50,3 +52,6 @@ func (s *Script) Rnd(n int) int { return s.env.Rand(n) }
 
 // RndBool returns true or false with even odds.
 func (s *Script) RndBool() bool { return s.env.Rand(2) == 0 }
+
+// Spawner returns the spawner the script places NPCs in the world with.
+func (s *Script) Spawner() *Spawner { return s.env.Spawner }

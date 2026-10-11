@@ -2238,7 +2238,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		npcSpawns, npcRespawns = bootNpcSpawns(t, gcl, npcSpawnDeps{
 			state: state, templates: o.npcs, geo: bootGeo(o.geo), ids: ids, decay: o.decay, ai: ai, positions: positions,
 			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.AttackStance, log: o.log, makers: o.npcSpawns,
-			dropRates: o.npcDropRates, sevenSigns: sevenSigns, scripts: quests.registry, routes: o.walkerRoutes,
+			dropRates: o.npcDropRates, sevenSigns: sevenSigns, scripts: quests.registry, spawner: quests.env.Spawner, routes: o.walkerRoutes,
 		})
 	}
 	if o.productionTickers {
