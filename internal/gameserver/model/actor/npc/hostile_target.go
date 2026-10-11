@@ -248,12 +248,7 @@ func (h *Hostile) siegeGuardAutoAttackTargetValid(target attackable.Combatant) b
 // zero call sites); this ships as the same available, unwired API — see
 // acis_golang#977.
 func (h *Hostile) ReconsiderTarget(rangeVal int) (attackable.Combatant, bool) {
-	valid := func(target attackable.Combatant) bool {
-		if h.SiegeGuard() {
-			return h.siegeGuardAutoAttackTargetValid(target)
-		}
-		return h.AutoAttackTargetValid(target, h.Instance.Template.AggroRange, false)
-	}
+	valid := h.CanAutoAttack
 	inRange := func(target attackable.Combatant) bool {
 		if rangeVal <= 0 {
 			return true

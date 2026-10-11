@@ -22,7 +22,9 @@ func (n *NPC) Rooted() bool { return n.hostile("check a root").Rooted() }
 
 // CanAutoAttack reports whether the NPC may attack c on its own: c is alive
 // and, unless the NPC already closes on it for a queued attack, passes the
-// automatic target rule at the NPC's aggro range. Nil never passes.
+// automatic target rule at the NPC's aggro range. Nil never passes. The
+// check may move the NPC: when it holds a stationary attack on c and c is
+// out of its reach, it starts closing on c and reports false.
 func (n *NPC) CanAutoAttack(c Creature) bool {
 	h := n.hostile("check an automatic attack")
 	t := combatantOf(c)
