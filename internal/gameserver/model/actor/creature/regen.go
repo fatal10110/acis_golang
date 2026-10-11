@@ -19,12 +19,62 @@ const RegenPeriod = 3 * time.Second
 // nothing is short or the creature is dead, so the next drop starts a fresh
 // phase. The regeneration sweep runs the ticks that come due (Claim).
 //
-// The zero value is idle. All methods are safe for concurrent use.
+// A phase bound to a RegenSet (Bind) reports each arm and disarm to it, so
+// the sweep walks only the armed phases rather than every creature.
+//
+// The zero value is idle and unbound. All methods are safe for concurrent
+// use.
 type Regen struct {
 	mu sync.Mutex
 	// due is the next tick's deadline in Unix nanoseconds, zero while
 	// idle. It is written under mu and read without it by Due.
 	due atomic.Int64
+	// set and owner are the binding Bind installed, guarded by mu: while
+	// the phase is armed and bound, set holds owner.
+	set   RegenSet
+	owner any
+}
+
+// RegenSet keeps the armed phases bound to it, keyed by the owner each was
+// bound with. A phase calls Arm and Disarm under its own lock, so they must
+// not call back into a phase; Arm may repeat for an owner already held.
+type RegenSet interface {
+	Arm(owner any)
+	Disarm(owner any)
+}
+
+// Bind reports r's arms and disarms to set under owner from now on, moving
+// an armed phase out of the set it was bound to before. Binding again to
+// the same set and owner changes nothing. owner must be comparable.
+func (r *Regen) Bind(set RegenSet, owner any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.set == set && r.owner == owner {
+		return
+	}
+	armed := r.due.Load() != 0
+	if armed && r.set != nil {
+		r.set.Disarm(r.owner)
+	}
+	r.set, r.owner = set, owner
+	if armed && set != nil {
+		set.Arm(owner)
+	}
+}
+
+// Unbind drops r's binding to set, taking an armed phase out of it, and
+// leaves the phase itself as it is. A phase bound to another set is left
+// alone.
+func (r *Regen) Unbind(set RegenSet) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.set != set || set == nil {
+		return
+	}
+	if r.due.Load() != 0 {
+		set.Disarm(r.owner)
+	}
+	r.set, r.owner = nil, nil
 }
 
 // Settle arms or disarms the phase to match short, which reports whether the
@@ -40,12 +90,19 @@ type Regen struct {
 func (r *Regen) Settle(q *sim.Queue, short func() bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	armed := r.due.Load() != 0
 	if q == nil || !short() {
 		r.due.Store(0)
+		if armed && r.set != nil {
+			r.set.Disarm(r.owner)
+		}
 		return
 	}
-	if r.due.Load() == 0 {
+	if !armed {
 		r.due.Store(q.Now().Add(RegenPeriod).UnixNano())
+		if r.set != nil {
+			r.set.Arm(r.owner)
+		}
 	}
 }
 
