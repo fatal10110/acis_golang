@@ -36,7 +36,7 @@ func TestReturnHomeMovementDisabledSkipsWalkButKeepsRecoveryTeleport(t *testing.
 			if !hostile.MovementDisabled() || !hostile.ReturnHome() {
 				t.Fatal("movement-disabled ReturnHome should return true outside drift range")
 			}
-			assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
+			assertStanceShown(t, c, "ChangeMoveType", hostile.ObjectID(), false)
 			if hostile.Move().Moving() {
 				t.Fatal("movement-disabled NPC started walking home")
 			}

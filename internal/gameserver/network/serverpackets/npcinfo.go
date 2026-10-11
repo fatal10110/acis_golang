@@ -67,7 +67,8 @@ func FrameNPCInfo(s NPCInfoSnapshot) wire.Frame {
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
-// FrameServerObjectInfo builds the stationary-NPC update packet.
+// FrameServerObjectInfo builds the stationary-NPC update packet. The HP
+// pair is shown only to a viewer the NPC is attackable by; any other sees 0.
 func FrameServerObjectInfo(s NPCInfoSnapshot) wire.Frame {
 	w := newFrameWriter(OpcodeServerObjectInfo)
 	w.WriteInt32(s.ObjectID)
@@ -82,8 +83,12 @@ func FrameServerObjectInfo(s NPCInfoSnapshot) wire.Frame {
 	w.WriteFloat64(1) // attack speed multiplier
 	w.WriteFloat64(s.CollisionRadius)
 	w.WriteFloat64(s.CollisionHeight)
-	w.WriteInt32(int32(s.CurrentHP))
-	w.WriteInt32(int32(s.MaxHP))
+	hp, maxHP := 0, 0
+	if s.Attackable {
+		hp, maxHP = s.CurrentHP, s.MaxHP
+	}
+	w.WriteInt32(int32(hp))
+	w.WriteInt32(int32(maxHP))
 	w.WriteInt32(1)
 	w.WriteInt32(0)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)

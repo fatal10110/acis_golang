@@ -15,10 +15,10 @@ func (f *Folk) Folk() bool        { return true }
 func (f *Folk) FolkOrGuard() bool { return true }
 
 // AttackableBy reports whether caster may affect this NPC offensively: any
-// other creature may, with a forced attack. AttackableWithoutForceBy is
-// always false.
+// other creature may while the NPC lives, with a forced attack.
+// AttackableWithoutForceBy is always false.
 func (f *Folk) AttackableBy(caster skilltarget.Actor) bool {
-	return caster != nil && caster.ObjectID() != f.ObjectID()
+	return caster != nil && caster.ObjectID() != f.ObjectID() && !f.AlikeDead()
 }
 func (f *Folk) AttackableWithoutForceBy(skilltarget.Actor) bool { return false }
 
