@@ -27,11 +27,21 @@ func (r *Registry) HostileAttacked(h *npc.Hostile, attacker attackable.Combatant
 // damage, called its party member called. caller is a hostile or a
 // civilian NPC.
 func (r *Registry) HostilePartyAttacked(caller npc.PartyMember, called *npc.Hostile, target attackable.Combatant, damage int32) {
+	r.raisePartyAttacked(called, func() PartyAttacked {
+		return PartyAttacked{Caller: NPCOf(caller), Called: NewNPC(called), Target: creatureOf(target), Damage: damage}
+	})
+}
+
+// raisePartyAttacked runs the party-attacked hook of every script bound to
+// called's template, in list order, each as one recovered invocation on the
+// caller's goroutine. event builds the hook's argument, only when a script
+// is bound.
+func (r *Registry) raisePartyAttacked(called *npc.Hostile, event func() PartyAttacked) {
 	list := r.scripts(int32(called.NpcID()), EventPartyAttacked)
 	if len(list) == 0 {
 		return
 	}
-	e := PartyAttacked{Caller: NPCOf(caller), Called: NewNPC(called), Target: creatureOf(target), Damage: damage}
+	e := event()
 	for _, s := range list {
 		r.run(s, hookPartyAttacked, func() { s.Hooks.PartyAttacked(s, e) })
 	}

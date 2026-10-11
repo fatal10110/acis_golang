@@ -485,3 +485,30 @@ Npc.getCast inline
 Npc.removeAttackDesire script.NPC.RemoveAttackDesire
 NpcAI.addAttackDesireHold AddAttackDesireHold
 Quest.broadcastScriptEventEx script.Script.BroadcastScriptEventEx
+
+# The DefaultNpc helpers makeAttackEvent, openCloseDoor and
+# getPledgeCastleState (#3597), and the cast animation shown around an NPC
+# (#3609). The animation from an NPC has the player handle's name, mapped
+# above for MagicSkillUse.new. The privates of an NPC's party are read on
+# its handle. The script's own attacked hook is re-entered through
+# Script.RunAttacked, and the party-attacked hooks bound to a called NPC's
+# template (its template's script list folded in) run through
+# Script.RaisePartyAttacked. A door is found by name on the script and
+# opened or closed on its handle. The castle an NPC belongs to is found on
+# the script; its siege is read on the castle handle, which checks a
+# player's clan for the siege sides; the castle a player's clan owns is
+# read on the player handle.
+Castle.getSiege inline
+Clan.getCastleId script.Player.ClanCastleID
+Door.closeMe script.Door.Close
+Door.openMe script.Door.Open
+DoorData.getDoor script.Script.Door
+DoorData.getInstance inline
+Npc.getCastle script.Script.Castle
+Npc.getMinions script.NPC.Minions
+NpcTemplate.getEventQuests inline
+Quest.onAttacked script.Script.RunAttacked
+Quest.onPartyAttacked script.Script.RaisePartyAttacked
+Residence.getId script.Castle.ID
+Siege.checkSides script.Castle.OnSiegeSide
+Siege.isInProgress script.Castle.SiegeInProgress
