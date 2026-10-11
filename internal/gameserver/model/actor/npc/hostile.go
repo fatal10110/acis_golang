@@ -888,12 +888,13 @@ func (h *Hostile) AttackFinished() error {
 	return h.brain.AttackFinished()
 }
 
-// CastFinished ends the AI's hold on a cast that completed or was aborted:
-// the desire that drove it is dropped, and only a completed cast re-runs
-// desire selection.
-func (h *Hostile) CastFinished(interrupted bool) error {
+// CastFinished ends the AI's hold on the cast e reports, completed or
+// aborted: the desire that drove it is dropped, the skill-finished hooks
+// run, and only a completed cast re-runs desire selection.
+func (h *Hostile) CastFinished(e event.CastFinished) error {
 	h.brain.ClearCurrentDesire()
-	if interrupted {
+	raiseSkillFinished(h.scripts, h, e)
+	if e.Interrupted {
 		return nil
 	}
 	return h.RunAI()

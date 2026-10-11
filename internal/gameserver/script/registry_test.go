@@ -199,7 +199,7 @@ func TestAbnormalStatusReachesSeeSpellList(t *testing.T) {
 		},
 	}
 	r, _ := build(t, listOf("ai.Seer", "quest.Q", "script.Blind"), catalog)
-	r.AbnormalStatusChanged(1, AbnormalStatusChanged{})
+	r.abnormalStatusChanged(1, AbnormalStatusChanged{})
 	if want := []string{"ai.Seer", "quest.Q"}; !slices.Equal(got, want) {
 		t.Fatalf("abnormal status reached %v, want the see-spell list %v", got, want)
 	}
@@ -314,7 +314,7 @@ func TestRegistryHasNoWritePath(t *testing.T) {
 	for i := range typ.NumMethod() {
 		got = append(got, typ.Method(i).Name)
 	}
-	if want := []string{"AbnormalStatusChanged", "Behaves", "CharacterCreated", "ClanAttacked", "ClanDied", "Dump", "FirstTalk", "FolkAttacked", "FolkCreated", "FolkDecayed", "FolkDying", "FolkMoveToFinished", "FolkNoDesire", "FolkSeeCreature", "HostileAttacked", "HostileCreated", "HostileDecayed", "HostileDying", "HostileMoveToFinished", "HostileNoDesire", "HostileOutOfTerritory", "HostilePartyAttacked", "HostilePartyDied", "HostileSeeCreature", "Interact", "Invoke", "ItemUsed", "JournalQuest", "PlayerDetached", "QuestEvent", "QuestWindow", "ReactsToCreated", "SeesCreatures", "TutorialEvent", "ZoneEnterIDs", "ZoneEntered"}; !slices.Equal(got, want) {
+	if want := []string{"AbnormalStatusChanged", "Behaves", "CharacterCreated", "ClanAttacked", "ClanDied", "Dump", "FirstTalk", "FolkAttacked", "FolkCreated", "FolkDecayed", "FolkDying", "FolkMoveToFinished", "FolkNoDesire", "FolkSeeCreature", "HostileAttackFinished", "HostileAttacked", "HostileCreated", "HostileDecayed", "HostileDying", "HostileMoveToFinished", "HostileNoDesire", "HostileOutOfTerritory", "HostilePartyAttacked", "HostilePartyDied", "HostileSeeCreature", "Interact", "Invoke", "ItemUsed", "JournalQuest", "PlayerDetached", "QuestEvent", "QuestWindow", "ReactsToCreated", "SeeSpell", "SeesCreatures", "Spelled", "TutorialEvent", "UseSkillFinished", "ZoneEnterIDs", "ZoneEntered"}; !slices.Equal(got, want) {
 		t.Fatalf("Registry methods = %v, want only the reads %v; a new method must not change the registry", got, want)
 	}
 	for i := range reflect.TypeFor[Registry]().NumField() {

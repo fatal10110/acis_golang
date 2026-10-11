@@ -57,12 +57,18 @@ func bootArmed(t *testing.T, catalog *item.Table, roll func(int) int, equip []in
 // bootArmedWith is bootArmed over the skill table defs.
 func bootArmedWith(t *testing.T, defs []modelskill.Definition, catalog *item.Table, roll func(int) int, equip []int32, skills ...int) (*gameservertest.Server, *testsupport.ScriptedClient, int32) {
 	t.Helper()
-	srv := gameservertest.Boot(t,
+	return bootArmedOpts(t, nil, defs, catalog, roll, equip, skills...)
+}
+
+// bootArmedOpts is bootArmedWith booted with the extra options opts.
+func bootArmedOpts(t *testing.T, opts []gameservertest.Option, defs []modelskill.Definition, catalog *item.Table, roll func(int) int, equip []int32, skills ...int) (*gameservertest.Server, *testsupport.ScriptedClient, int32) {
+	t.Helper()
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithSkills(skillPersistence(t, defs)),
 		gameservertest.WithItemTemplates(catalog),
-	)
+	}, opts...)...)
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	objects := make([]int32, 0, len(equip))
 	for _, templateID := range equip {
