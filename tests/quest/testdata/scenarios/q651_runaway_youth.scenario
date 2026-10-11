@@ -1,0 +1,65 @@
+# Runaway Youth (Q651): a level 26 player without a Scroll of Escape offers Ivan one, which
+# ends the new quest; then, from a started quest, Batidae pays 2883 adena and ends the
+# repeatable quest after a relog. The scroll, Ivan's three seconds and his move are in
+# proof_quests_2_test.go: a scenario cannot hold a scroll before its first step.
+# Expectations are derived from the reference source (Q651_RunawayYouth.java,
+# Quest.rewardItems, QuestState.exitQuest).
+character Runner 26
+quest Q651_RunawayYouth <state>=STARTED <cond>=1
+script quest.Q651_RunawayYouth
+item 736
+page default/32014.htm
+page fisherman/31989.htm
+page script/quest/Q651_RunawayYouth/
+npc ivan 32014 Folk 10 0 0
+npc batidae 31989 Fisherman -10 0 0
+
+# The seeded quest is started: Ivan only waves the player on.
+action ivan
+action ivan
+  S ActionFailed
+  S NpcHtmlMessage obj=ivan item=0 page=default/32014.htm
+  S ActionFailed
+bypass npc_{ivan}_Quest
+  S NpcHtmlMessage obj=ivan item=0 page=script/quest/Q651_RunawayYouth/32014-04a.htm
+  S ActionFailed
+  S ActionFailed
+
+relog
+  state Q651_RunawayYouth STARTED
+  rows Q651_RunawayYouth <cond>=1 <state>=STARTED
+
+# Batidae rewards the started quest and ends it.
+action batidae
+action batidae
+  S ActionFailed
+  S NpcHtmlMessage obj=batidae item=0 page=fisherman/31989.htm
+  S ActionFailed
+bypass npc_{batidae}_Quest
+  S SystemMessage id=52 6:2883
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=batidae item=0 page=script/quest/Q651_RunawayYouth/31989-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q651_RunawayYouth
+  state Q651_RunawayYouth -
+  rows Q651_RunawayYouth -
+  items 57=2883
+
+# A new quest: at level 26 Ivan asks for a scroll. Without one the offer exits the quest,
+# which does nothing to a quest not started (QuestState.exitQuest): it stays created.
+action ivan
+action ivan
+  S ActionFailed
+  S NpcHtmlMessage obj=ivan item=0 page=default/32014.htm
+  S ActionFailed
+bypass npc_{ivan}_Quest
+  S NpcHtmlMessage obj=ivan item=0 page=script/quest/Q651_RunawayYouth/32014-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q651_RunawayYouth CREATED
+bypass Quest Q651_RunawayYouth 32014-04.htm
+  S NpcHtmlMessage obj=ivan item=0 page=script/quest/Q651_RunawayYouth/32014-04.htm
+  S ActionFailed
+  state Q651_RunawayYouth CREATED

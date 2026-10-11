@@ -239,3 +239,6 @@ Npc.lookNeighbor script.NPC.LookNeighbor
 # of its Bind table, and its started test reads the state's status.
 Quest.addAttacked inline
 QuestState.isStarted inline
+
+# Proof quests, second group (#175). A spawn spot is a script.Loc literal.
+SpawnLocation.new inline

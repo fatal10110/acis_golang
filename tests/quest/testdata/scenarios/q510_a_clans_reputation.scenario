@@ -1,0 +1,91 @@
+# A Clan's Reputation (Q510): the leader of a level 5 clan takes Valdis's hunt, kills two
+# tyrannosaurs for two claws, relogs, and trades the claws for 2 x 50 reputation points,
+# then quits the repeatable quest. Each claw is an always-drop to the clan leader, whose
+# roll cannot miss. Expectations are derived from the reference source
+# (Q510_AClansReputation.java, Quest.getClanLeaderQuestState, Quest.dropItemsAlways,
+# Clan.addReputationScore).
+character Leader 40
+clan 5
+random always 0
+script quest.Q510_AClansReputation
+item 8767
+page villagemaster/31331.htm
+page script/quest/Q510_AClansReputation/
+npc valdis 31331 VillageMasterMystic 10 0 0
+npc tyrannosaurus 22215 Monster 40 0 0
+
+action valdis
+action valdis
+  S ActionFailed
+  S NpcHtmlMessage obj=valdis item=0 page=villagemaster/31331.htm
+  S ActionFailed
+bypass npc_{valdis}_Quest
+  S NpcHtmlMessage obj=valdis item=0 page=script/quest/Q510_AClansReputation/31331-1.htm
+  S ActionFailed
+  S ActionFailed
+  state Q510_AClansReputation CREATED
+bypass Quest Q510_AClansReputation 31331-2.htm
+  S NpcHtmlMessage obj=valdis item=0 page=script/quest/Q510_AClansReputation/31331-2.htm
+  S ActionFailed
+bypass Quest Q510_AClansReputation 31331-3.htm
+  S QuestList 510:0x80000001
+  S ExShowQuestMark quest=510
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=valdis item=0 page=script/quest/Q510_AClansReputation/31331-3.htm
+  S ActionFailed
+  Q upsert Q510_AClansReputation | <state> | STARTED
+  Q upsert Q510_AClansReputation | <cond> | 1
+  rows Q510_AClansReputation <cond>=1 <state>=STARTED
+
+# No claw yet.
+action valdis
+  S ActionFailed
+  S NpcHtmlMessage obj=valdis item=0 page=villagemaster/31331.htm
+  S ActionFailed
+bypass npc_{valdis}_Quest
+  S NpcHtmlMessage obj=valdis item=0 page=script/quest/Q510_AClansReputation/31331-4.htm
+  S ActionFailed
+  S ActionFailed
+  items 8767=0
+
+# Two tyrannosaurs: a claw each, with no limit to reach.
+kill tyrannosaurus x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8767
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8767
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8767=2
+
+# Relog: the started quest comes back from character_quests, the claws from the inventory.
+relog
+  state Q510_AClansReputation STARTED
+  rows Q510_AClansReputation <cond>=1 <state>=STARTED
+  items 8767=2
+
+# Two claws for 100 reputation points. The seeded clan starts at 0 reputation, so the gain
+# also reactivates its clan skills (Clan.setReputationScore).
+action valdis
+action valdis
+  S ActionFailed
+  S NpcHtmlMessage obj=valdis item=0 page=villagemaster/31331.htm
+  S ActionFailed
+bypass npc_{valdis}_Quest
+  S SystemMessage id=301 3:8767 6:2
+  S SystemMessage id=1862
+  S SystemMessage id=1777 1:100
+  S NpcHtmlMessage obj=valdis item=0 page=script/quest/Q510_AClansReputation/31331-7.htm
+  S ActionFailed
+  S ActionFailed
+  items 8767=0
+  state Q510_AClansReputation STARTED
+
+bypass Quest Q510_AClansReputation 31331-6.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=valdis item=0 page=script/quest/Q510_AClansReputation/31331-6.htm
+  S ActionFailed
+  Q delete-quest Q510_AClansReputation
+  state Q510_AClansReputation -
+  rows Q510_AClansReputation -
