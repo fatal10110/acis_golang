@@ -1,0 +1,58 @@
+# Lidia's Heart (Q023) at cond 4, through Innocentin's "Yes, I read it" link (31328-12):
+# cond 4 jumps to 6 without cond 5, so QuestState.setCond sets the progression flags
+# (bits 1-4 from cond 4, bit 6 for cond 6, the sign bit) and QuestList shows them.
+# Expectations are derived from the reference source (Q023_LidiasHeart.java,
+# QuestState.setCond and calculateFlags).
+character Lidia 64
+quest Q022_TragedyInVonHellmannForest <state>=COMPLETED
+quest Q023_LidiasHeart <cond>=4 <state>=STARTED
+stub quest.Q022_TragedyInVonHellmannForest
+script quest.Q023_LidiasHeart
+item 7063 7064 7148 7149 7150
+page villagemaster/31328.htm
+page script/quest/Q023_LidiasHeart/
+npc innocentin 31328 VillageMasterPriest 10 0 0
+
+action innocentin
+action innocentin
+  S ActionFailed
+  S NpcHtmlMessage obj=innocentin item=0 page=villagemaster/31328.htm
+  S ActionFailed
+bypass npc_{innocentin}_Quest
+  S NpcHtmlMessage obj=innocentin item=0 html="<html><body><a action=\"bypass -h npc_{innocentin}_Quest Q022_TragedyInVonHellmannForest\">[Tragedy in von Hellmann Forest (Done)]</a><br><a action=\"bypass -h npc_{innocentin}_Quest Q023_LidiasHeart\">[Lidia's Heart (In Progress)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{innocentin}_Quest Q023_LidiasHeart
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q023_LidiasHeart/31328-08.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q023_LidiasHeart 31328-09.htm
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q023_LidiasHeart/31328-09.htm
+  S ActionFailed
+bypass Quest Q023_LidiasHeart 31328-10.htm
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q023_LidiasHeart/31328-10.htm
+  S ActionFailed
+bypass Quest Q023_LidiasHeart 31328-12.htm
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q023_LidiasHeart/31328-12.htm
+  S ActionFailed
+bypass Quest Q023_LidiasHeart 31328-15.htm
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q023_LidiasHeart/31328-15.htm
+  S ActionFailed
+bypass Quest Q023_LidiasHeart 31328-16.htm
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q023_LidiasHeart/31328-16.htm
+  S ActionFailed
+bypass Quest Q023_LidiasHeart 31328-17.htm
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q023_LidiasHeart/31328-17.htm
+  S ActionFailed
+bypass Quest Q023_LidiasHeart 31328-18.htm
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q023_LidiasHeart/31328-18.htm
+  S ActionFailed
+bypass Quest Q023_LidiasHeart 31328-19.htm
+  S QuestList 22:0x00000000 23:0x8000002f
+  S ExShowQuestMark quest=23
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=innocentin item=0 page=script/quest/Q023_LidiasHeart/31328-19.htm
+  S ActionFailed
+  Q upsert Q023_LidiasHeart | <flags> | -2147483601
+  Q upsert Q023_LidiasHeart | <cond> | 6
+  rows Q023_LidiasHeart <cond>=6 <flags>=-2147483601 <state>=STARTED
