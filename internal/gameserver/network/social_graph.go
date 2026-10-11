@@ -81,3 +81,10 @@ func (g socialGraph) ClanHallID(clanID int32) int32 {
 	}
 	return 0
 }
+
+func (g socialGraph) ClanLevel(clanID int32) int {
+	if cl, ok := g.clan(clanID); ok {
+		return cl.Level()
+	}
+	return 0
+}
