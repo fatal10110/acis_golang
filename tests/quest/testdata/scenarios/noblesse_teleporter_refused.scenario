@@ -1,0 +1,20 @@
+# The Noblesse teleporter (NoblesseTeleporter): a gatekeeper's Noblesse link, followed by a
+# character who is no noblesse, answers the refusal page. A scenario seeds no noblesse status
+# and no teleport list, so the Noblesse page and its hunting-ground windows are in
+# tests/npcs/proof_features_test.go. Expectations are derived from the reference source
+# (NoblesseTeleporter.onTalk).
+character Commoner 20
+script script.teleport.NoblesseTeleporter
+page gatekeeper/30080.htm
+page script/teleport/NoblesseTeleporter/
+npc gatekeeper 30080 Gatekeeper 10 0 0
+
+action gatekeeper
+action gatekeeper
+  S ActionFailed
+  S NpcHtmlMessage obj=gatekeeper item=0 page=gatekeeper/30080.htm
+  S ActionFailed
+bypass npc_{gatekeeper}_Quest NoblesseTeleporter
+  S NpcHtmlMessage obj=gatekeeper item=0 page=script/teleport/NoblesseTeleporter/nobleteleporter-no.htm
+  S ActionFailed
+  S ActionFailed

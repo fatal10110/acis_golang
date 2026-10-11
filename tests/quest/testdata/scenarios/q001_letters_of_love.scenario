@@ -7,7 +7,7 @@ trace internal/gameserver/script/testdata/oracle/trace_q001.golden
 character Talker 20
 script quest.Q001_LettersOfLove
 stub quest.Q006_StepIntoTheFuture
-stub script.teleport.NoblesseTeleporter
+script script.teleport.NoblesseTeleporter
 item 687 688 1079 1080 906
 page default/30048.htm
 page gatekeeper/30006.htm

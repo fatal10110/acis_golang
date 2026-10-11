@@ -9,7 +9,7 @@ import (
 // that placed it: its maker's territories less the banned ones, else a
 // strict sphere of the drift range around its spawn point. An NPC with no
 // spawn point is always in it.
-func (f *Folk) InTerritory() bool { return f.Instance.territoryContains(f.location()) }
+func (f *Folk) InTerritory() bool { return f.SpawnTerritoryContains(f.location()) }
 
 // TeleportTo jumps the NPC to target. It stops its walk, swing and cast,
 // then observers see the jump and the NPC leaves and re-enters the world

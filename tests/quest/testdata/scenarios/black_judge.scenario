@@ -1,0 +1,21 @@
+# The Black Judge (BlackJudge): his first talk answers his own page, its link the fee page of
+# a level 20 character, and the fee link of that page, with no death penalty to lift, says
+# there is nothing to heal. A scenario seeds no death penalty and no adena, so the payment and
+# the refused fee links are in tests/npcs/proof_features_test.go. Expectations are derived
+# from the reference source (BlackJudge.onFirstTalk, onAdvEvent).
+character Judged 20
+script script.feature.BlackJudge
+page script/feature/BlackJudge/
+npc judge 30981 Folk 10 0 0
+
+action judge
+action judge
+  S ActionFailed
+  S NpcHtmlMessage obj=judge item=0 page=script/feature/BlackJudge/black_judge001.htm
+  S ActionFailed
+bypass Quest BlackJudge test_dp
+  S NpcHtmlMessage obj=judge item=0 page=script/feature/BlackJudge/black_judge003.htm
+  S ActionFailed
+bypass Quest BlackJudge remove_dp 4
+  S NpcHtmlMessage obj=judge item=0 page=script/feature/BlackJudge/black_judge009.htm
+  S ActionFailed

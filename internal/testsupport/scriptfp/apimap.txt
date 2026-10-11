@@ -417,6 +417,26 @@ HateList.refresh script.HateList.Refresh
 HateList.removeIfOutOfRange script.HateList.RemoveIfOutOfRange
 NpcAI.getHateList script.NPC.HateList
 
+# Cabal buffer and Primeval summoner (#176). The cabals are read on the
+# script, the access level, the visibility, a held effect and the adena
+# payment on the player handle. A page file sent through the NPC is shown
+# on the player handle, its release included; the page path reads the
+# script's directory, and a creature's party is the player handle's.
+Creature.getFirstEffect script.Player.HasEffect
+Creature.getParty inline
+Creature.sendPacket inline
+NpcHtmlMessage.new inline
+NpcHtmlMessage.setFile script.Player.ShowPage
+Player.isGM script.Player.IsGM
+Player.reduceAdena script.Player.ReduceAdena
+Player.teleportTo script.Player.TeleportTo
+Quest.addUseSkillFinished inline
+Quest.getDescr inline
+SevenSignsManager.getLosingCabal script.Script.LosingCabal
+SevenSignsManager.getPlayerCabal script.Script.PlayerCabal
+SevenSignsManager.getWinningCabal script.Script.WinningCabal
+WorldObject.isVisible script.Player.Visible
+
 # RaidPrivateStandard (A12, #2162). The top desire target is the AI's own
 # field, set by every promotion and cleared by the periodic idle (#3545).
 # The hit points and the zone check are read on the NPC handle; the attack

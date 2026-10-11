@@ -32,14 +32,22 @@ func (h *Hostile) SpawnTerritoryContains(at location.Location) bool {
 	if h.IsPrivate() {
 		return true
 	}
-	return h.Instance.territoryContains(at)
+	return h.Instance.spawnTerritoryContains(at)
 }
 
-// territoryContains reports whether at lies in the territory of the spawn
-// that placed inst: the maker's territories less its banned ones for a
-// maker NPC, and a strict sphere of the drift range around the spawn point
-// otherwise. An NPC with no spawn point has no territory to leave.
-func (inst *Instance) territoryContains(at location.Location) bool {
+// SpawnTerritoryContains reports whether at lies in the territory of the
+// spawn that placed the civilian NPC, as for a hostile NPC that is no
+// private.
+func (f *Folk) SpawnTerritoryContains(at location.Location) bool {
+	return f.Instance.spawnTerritoryContains(at)
+}
+
+// spawnTerritoryContains reports whether at lies in the territory of the
+// spawn that placed an NPC that is no private: the maker's territories
+// less its banned ones for a maker NPC, and a strict sphere of the drift
+// range around the spawn point otherwise; anywhere for an NPC with no spawn
+// point.
+func (inst *Instance) spawnTerritoryContains(at location.Location) bool {
 	if maker := inst.Maker; maker != nil && len(maker.Territories) > 0 {
 		if maker.ContainsBanned(at) {
 			return false

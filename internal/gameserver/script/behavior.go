@@ -109,7 +109,14 @@ func (n *NPC) InMyTerritory() bool {
 // that placed the NPC.
 func (n *NPC) InSpawnTerritory(c Creature) bool {
 	l := locOf(c)
-	return n.hostile("check the spawn territory").SpawnTerritoryContains(location.Location{X: l.X, Y: l.Y, Z: l.Z})
+	at := location.Location{X: l.X, Y: l.Y, Z: l.Z}
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		return o.SpawnTerritoryContains(at)
+	case *npc.Folk:
+		return o.SpawnTerritoryContains(at)
+	}
+	panic("script: the spawn territory of a handle on nothing")
 }
 
 // MostHated returns the creature the NPC hates most, nil when it hates

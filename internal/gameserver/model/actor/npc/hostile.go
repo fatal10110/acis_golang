@@ -1233,7 +1233,7 @@ func (h *Hostile) InTerritory() bool {
 	if h.IsPrivate() {
 		return true
 	}
-	return h.Instance.territoryContains(h.location())
+	return h.Instance.spawnTerritoryContains(h.location())
 }
 
 func hostileKind(inst *Instance) InstanceKind {

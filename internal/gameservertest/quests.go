@@ -16,6 +16,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -134,8 +135,9 @@ type questBoot struct {
 // with a script spawner bootNpcSpawns binds to the NPC population, the
 // item templates items and the link's page cache html, and the script
 // registry, whose own work (the dying hooks, and the timers bound to no NPC
-// or player queue) runs on engine.
-func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, state *world.State, clock *task.GameClock, items *item.Table, html *cache.HTML, o *options) *questBoot {
+// or player queue) runs on engine. The scripts read the Seven Signs from
+// sevenSigns.
+func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, state *world.State, clock *task.GameClock, items *item.Table, html *cache.HTML, sevenSigns *sevensigns.State, o *options) *questBoot {
 	so := o.scriptHelpers()
 	store := &journalStore{QuestStore: gamesql.NewQuestStore(db), loadErr: o.questLoadErr}
 	journals := script.NewQuests(store, worker, o.log)
@@ -152,6 +154,7 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *
 		GameHour:         clock.Hour,
 		Items:            items,
 		Page:             html.Get,
+		SevenSigns:       sevenSigns,
 	}
 	if so.rates != nil {
 		env.Rates = *so.rates
