@@ -48,7 +48,12 @@ func (q *queues) NewQueue(id string) *sim.Queue {
 // shutdownDrainTimeout.
 var errUnsettled = errors.New("actor queues did not settle")
 
-// settle waits until every task posted so far to a still-open queue has run.
+// settle waits until every task posted so far to a still-open queue has run,
+// and until a closed queue's in-flight drain has returned. A task can close
+// its own queue and keep running (a corpse's decay closes the corpse's queue
+// partway through its despawn cleanup); its queue then refuses the barrier
+// post, but the rest of that task's work still has to land before settle
+// returns.
 func (q *queues) settle() error {
 	q.mu.Lock()
 	all := append([]*sim.Queue(nil), q.all...)
@@ -57,7 +62,10 @@ func (q *queues) settle() error {
 	for _, queue := range all {
 		done := make(chan struct{})
 		if !queue.Post(func() { close(done) }) {
-			continue
+			go func() {
+				sim.RunOwned(queue, func() {})
+				close(done)
+			}()
 		}
 		select {
 		case <-done:
