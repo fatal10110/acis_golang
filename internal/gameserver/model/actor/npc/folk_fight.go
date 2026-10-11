@@ -69,6 +69,17 @@ type folkFight struct {
 	// lastKind is the kind of the desire selection last took up,
 	// IntentionIdle before the first one.
 	lastKind ai.Intention
+	// roll draws the follow step's dice, a uniform integer in [0, n); nil
+	// uses the server's random source. Tests set it before the NPC runs.
+	roll func(n int) int
+}
+
+// followRoll draws a uniform integer in [0, n) for the follow step.
+func (f *Folk) followRoll(n int) int {
+	if r := f.fight.roll; r != nil {
+		return r(n)
+	}
+	return rnd.Get(n)
 }
 
 // SetAttacker gives f the attack controller it swings with. Call it once,
@@ -91,7 +102,9 @@ func (f *Folk) resolveWeapon(items *item.Table) {
 // AttackEvents returns the sink f's attack controller reports to: a
 // damaging hit puts f in its attack stance, the end of the hit animation
 // and of a bow shot re-run desire selection, and a finished swing re-runs
-// it, then goes on with the attack or the current intention.
+// it, then goes on with the attack or the current intention. A bow's reuse
+// ending takes one more step of the current intention only while no attack
+// was put aside; an attack put aside waits for the next desire selection.
 func (f *Folk) AttackEvents() event.Sink { return folkAttackSink{f} }
 
 type folkAttackSink struct{ f *Folk }
@@ -104,16 +117,20 @@ func (s folkAttackSink) Emit(ev event.Event) {
 	case event.AttackRethink:
 		f.runAI(false)
 	case event.AttackFinished:
-		if !e.BowReuse {
-			f.runAI(false)
+		if e.BowReuse {
+			if f.fight.next == nil {
+				f.thinkCurrent()
+			}
+			return
 		}
+		f.runAI(false)
 		f.attackFinished()
 	}
 }
 
-// attackFinished is f's AI on a swing, or a bow's reuse, ending: the attack
-// put aside while the swing was in flight is taken up, or else the current
-// intention takes one more step.
+// attackFinished is f's AI on a swing ending: the attack put aside while
+// the swing was in flight is taken up, or else the current intention takes
+// one more step.
 func (f *Folk) attackFinished() {
 	if next := f.fight.next; next != nil {
 		f.doIntention(next)
@@ -209,6 +226,10 @@ func (f *Folk) AddFleeDesire(target attackable.Combatant, distance int, weight f
 // ClearDesires drops every desire f holds, whatever its kind. Safe from
 // any goroutine.
 func (f *Folk) ClearDesires() { f.cast.desires.Clear() }
+
+// Desires returns f's desire queue, for reads. It is safe for concurrent
+// use.
+func (f *Folk) Desires() *ai.DesireQueue { return f.cast.desires }
 
 // MostHated returns the creature f hates most, false when it hates none or
 // is dead.
@@ -343,11 +364,11 @@ func (f *Folk) thinkFollow(d *ai.Desire) {
 		return
 	}
 	pos := combatantLocation(target)
-	if f.location().Distance2D(pos) <= folkFollowLooseRadius || rnd.Get(100) <= 50 || f.IsMoving() {
+	if f.location().Distance2D(pos) <= folkFollowLooseRadius || f.followRoll(100) <= 50 || f.IsMoving() {
 		return
 	}
-	distance := math.Sqrt(float64(rnd.Get(1000000))/1000000) * folkFollowScatter
-	angle := float64(rnd.Get(1000000)) / 1000000 * math.Pi * 2
+	distance := math.Sqrt(float64(f.followRoll(1000000))/1000000) * folkFollowScatter
+	angle := float64(f.followRoll(1000000)) / 1000000 * math.Pi * 2
 	_, _ = f.motion.ctl.MoveToLocation(location.Location{
 		X: int(distance*math.Cos(angle)) + pos.X,
 		Y: int(distance*math.Sin(angle)) + pos.Y,
@@ -360,7 +381,7 @@ func (f *Folk) thinkFollow(d *ai.Desire) {
 func (f *Folk) teleportNear(target attackable.Combatant, offset int) {
 	pos := combatantLocation(target)
 	if geo := f.motion.cfg.Geo; geo != nil && offset > 0 {
-		valid := geo.ValidLocation(pos.X, pos.Y, pos.Z, pos.X+rnd.GetRange(-offset, offset), pos.Y+rnd.GetRange(-offset, offset), pos.Z)
+		valid := geo.ValidLocation(pos.X, pos.Y, pos.Z, pos.X-offset+f.followRoll(2*offset+1), pos.Y-offset+f.followRoll(2*offset+1), pos.Z)
 		pos.X, pos.Y = valid.X, valid.Y
 	}
 	f.motion.TeleportTo(pos)
