@@ -439,7 +439,7 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		c.Send(w.Bytes())
 	case "relog":
 		c.Send(wire.NewPacketWriter(clientpackets.OpcodeRequestRestart).Bytes())
-		r.readUntil(t, serverpackets.OpcodeCharSelectInfo)
+		r.readThrough(t, serverpackets.OpcodeCharSelectInfo)
 		r.enterWorld(t)
 	case "restart":
 		c.Send(wire.NewPacketWriter(clientpackets.OpcodeRequestRestart).Bytes())
@@ -636,12 +636,6 @@ func (r *run) enterWorld(t *testing.T) [][]byte {
 	frames = append(frames, r.srv.ReadQueued(t, r.srv.Client)...)
 	r.spawnNPCs(t)
 	return frames
-}
-
-// readUntil reads frames until one with opcode arrives.
-func (r *run) readUntil(t *testing.T, opcode byte) {
-	t.Helper()
-	r.readThrough(t, opcode)
 }
 
 // readThrough reads frames until one with opcode arrives and returns them
