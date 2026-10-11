@@ -59,6 +59,9 @@ type FolkSpawner struct {
 	// Remover takes the NPC out of the world for a script delete; nil
 	// decays it with no respawn.
 	Remover npc.FolkRemover
+	// SeeRange is the configured NPC see range; zero keeps the shipped
+	// default.
+	SeeRange int
 }
 
 // Spawn builds a civilian NPC from inst, places it at (loc, heading) and
@@ -80,6 +83,7 @@ func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading in
 		Slot:           slot,
 		Scripts:        s.Scripts,
 		Remover:        s.Remover,
+		SeeRange:       s.SeeRange,
 	}
 	if s.NewSink != nil {
 		rt.Sink = s.NewSink(f)

@@ -66,6 +66,9 @@ var raisedHooks = map[hook]kindSet{
 	hookNoDesire:       kinds(KindFolk, KindHostile),
 	hookMoveToFinished: kinds(KindHostile),
 	hookOutOfTerritory: kinds(KindHostile),
+	// The AI tick's scan, the look-neighbour call and the re-fire after a
+	// playable's teleport or summoning (see_creature.go).
+	hookSeeCreature: kinds(KindFolk, KindHostile),
 	// The schedule runner (StartSchedule).
 	hookStart: kinds(KindOther),
 	// The tutorial events (TutorialEvent) and the quest event links

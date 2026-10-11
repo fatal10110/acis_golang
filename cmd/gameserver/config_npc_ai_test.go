@@ -10,17 +10,18 @@ import (
 
 // TestLoadNpcAIConfigUsesNpcsProperties pins the npcs.properties
 // MobAggroInPeaceZone (default True) and GuardAttackAggroMob (default False)
-// switches; any value other than a case-insensitive "true" reads as false.
+// switches, where any value other than a case-insensitive "true" reads as
+// false, and the DefaultSeeRange (default 450) see range.
 func TestLoadNpcAIConfigUsesNpcsProperties(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		body string
 		want npc.AIConfig
 	}{
-		{name: "defaults", body: "", want: npc.AIConfig{MobAggroInPeaceZone: true}},
-		{name: "shipped", body: "MobAggroInPeaceZone = True\nGuardAttackAggroMob = False\n", want: npc.AIConfig{MobAggroInPeaceZone: true}},
-		{name: "flipped", body: "MobAggroInPeaceZone = False\nGuardAttackAggroMob = TRUE\n", want: npc.AIConfig{GuardAttackAggroMob: true}},
-		{name: "not a boolean", body: "MobAggroInPeaceZone = yes\n", want: npc.AIConfig{}},
+		{name: "defaults", body: "", want: npc.AIConfig{MobAggroInPeaceZone: true, SeeRange: 450}},
+		{name: "shipped", body: "MobAggroInPeaceZone = True\nGuardAttackAggroMob = False\nDefaultSeeRange = 450\n", want: npc.AIConfig{MobAggroInPeaceZone: true, SeeRange: 450}},
+		{name: "flipped", body: "MobAggroInPeaceZone = False\nGuardAttackAggroMob = TRUE\nDefaultSeeRange = 600\n", want: npc.AIConfig{GuardAttackAggroMob: true, SeeRange: 600}},
+		{name: "not a boolean", body: "MobAggroInPeaceZone = yes\n", want: npc.AIConfig{SeeRange: 450}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			configPath := filepath.Join(t.TempDir(), "npcs.properties")

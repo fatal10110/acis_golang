@@ -171,14 +171,30 @@ func (l *GameClientLink) inWater(at location.Location) bool {
 	return ok
 }
 
+// completeLivePlayerTeleport lands live once its client reports it appeared:
+// live rejoins the grid and its zones, and its summon jumps to it.
+//
+// A summon that followed live tells the NPCs around its landing point about
+// itself (npc.ForceSeeCreature) once the teleport lock is released, as its
+// see-creature hooks may teleport live again. live's own landing tells
+// nobody: the reference's re-fire runs before an Appearing gives a player
+// its region back.
 func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) {
 	if live == nil {
 		return
 	}
+	if followed := l.landLivePlayer(live); followed != nil {
+		npc.ForceSeeCreature(l.world, followed)
+	}
+}
+
+// landLivePlayer is completeLivePlayerTeleport under live's teleport lock.
+// It returns the summon that jumped to live, nil for none.
+func (l *GameClientLink) landLivePlayer(live *livePlayer) *summon.Actor {
 	live.teleportMu.Lock()
 	defer live.teleportMu.Unlock()
 	if !live.SetTeleporting(false) {
-		return
+		return nil
 	}
 	if l.world != nil {
 		l.world.Rejoin(live)
@@ -187,15 +203,15 @@ func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) {
 	l.activateSpawnProtection(live)
 	closeStoreOnTeleport(live)
 	if l.world == nil {
-		return
+		return nil
 	}
 	active, ok := l.world.Summon(live.ObjectID())
 	if !ok {
-		return
+		return nil
 	}
 	actor, ok := active.(*summon.Actor)
 	if !ok {
-		return
+		return nil
 	}
 	destination := live.CurrentLocation()
 	// The summon leaves the zones around its old position before the jump
@@ -210,4 +226,5 @@ func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) {
 	_ = l.world.Teleport(actor, destination.X, destination.Y, destination.Z)
 	actor.EnterZones()
 	actor.OnTeleported()
+	return actor
 }

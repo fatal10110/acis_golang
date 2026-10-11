@@ -42,6 +42,10 @@ type folkCombat struct {
 	// it out of the world for DeleteNow; nil decays it with no respawn.
 	scripts ScriptHooks
 	remover FolkRemover
+	// sight is what the NPC's tick scan has told its see-creature scripts
+	// about; seeDistance is its see range, zero for the shipped default.
+	sight       sight
+	seeDistance int
 	// heldMask is the item-type bits of the template's weapon and shield.
 	heldMask int32
 
@@ -110,6 +114,9 @@ type FolkRuntime struct {
 	// Remover takes the NPC out of the world for DeleteNow; nil decays it
 	// with no respawn.
 	Remover FolkRemover
+	// SeeRange is the configured see range (DefaultSeeRange); zero keeps
+	// the shipped default.
+	SeeRange int
 }
 
 // FolkRemover takes a civilian NPC out of the world at once, with no
@@ -144,6 +151,7 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 	}
 	f.world, f.queue, f.sink, f.los, f.decay = rt.World, rt.Queue, rt.Sink, rt.LOS, rt.Decay
 	f.scripts, f.remover = rt.Scripts, rt.Remover
+	f.seeDistance = rt.SeeRange
 	f.zones.ix = rt.Zones
 	f.cast.ai = rt.AI
 	f.bindSpawn(rt.Slot)
