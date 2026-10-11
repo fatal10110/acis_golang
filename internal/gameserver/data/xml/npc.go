@@ -89,31 +89,35 @@ func LoadNPCTemplates(dir string, items *item.Table, skills *skill.Table, log ze
 	return npc.NewTable(templates), nil
 }
 
-// buildNPCTemplate packs one parsed <npc> element into the StatSet shape
-// npc.NewTemplate consumes: its own attributes and <set> children merged
-// flat, plus the "aiParams", "drops", "privates", "race", "teachTo" and
-// "pet" values built from its other child blocks. The <skills> block is
-// resolved into a typed npc.TemplateSkills.
+// buildNPCTemplate builds one parsed <npc> element: its own attributes and
+// <set> children merged flat (a <set> overrides an attribute of the same
+// name), plus the AI parameters, drops, privates, race, teachTo and pet data
+// built from its other child blocks, and its <skills> block resolved into a
+// typed npc.TemplateSkills.
 func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table, log zerolog.Logger) (*npc.Template, error) {
-	set := commons.StatSetFromXMLAttrs(el.Attrs)
-	if err := decodeLiteralAttrs(set, "id", "idTemplate"); err != nil {
-		return nil, fmt.Errorf("npc %s: %w", set.GetStringDefault("id", "?"), err)
+	vals := foldAttrs(el.Attrs)
+	if err := canonicalizeLiteralAttrs(vals, "id", "idTemplate"); err != nil {
+		return nil, fmt.Errorf("npc %s: %w", newAttrValues(vals, "").strDefault("id", "?"), err)
 	}
 	for _, s := range el.Sets {
-		set.Set(s.Name, s.Val)
+		vals[s.Name] = s.Val
 	}
-	npcID, _ := set.GetInt("id")
+	var npcID int
+	if n, err := commons.Atoi(vals["id"]); err == nil {
+		npcID = n
+	}
 
+	var aiParams npc.AIParams
 	if len(el.AI) > 0 {
-		ai := make(npc.AIParams, len(el.AI))
+		aiParams = make(npc.AIParams, len(el.AI))
 		for _, s := range el.AI {
-			ai[s.Name] = s.Val
+			aiParams[s.Name] = s.Val
 		}
-		set.Set("aiParams", ai)
 	}
 
+	var categories []item.DropCategory
 	if len(el.Drops) > 0 {
-		categories := make([]item.DropCategory, 0, len(el.Drops))
+		categories = make([]item.DropCategory, 0, len(el.Drops))
 		for _, catEl := range el.Drops {
 			drops := make([]item.Drop, 0, len(catEl.Drops))
 			for _, dropEl := range catEl.Drops {
@@ -133,44 +137,41 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 			}
 			categories = append(categories, category)
 		}
-		set.Set("drops", categories)
 	}
 
+	var privates []npc.PrivateEntry
 	if len(el.Privates) > 0 {
-		privates := make([]npc.PrivateEntry, 0, len(el.Privates))
+		privates = make([]npc.PrivateEntry, 0, len(el.Privates))
 		for _, p := range el.Privates {
-			entry, err := npc.NewPrivateEntry(commons.StatSetFromXMLAttrs(p.Attrs))
+			entry, err := buildNPCPrivate(newAttrValues(foldAttrs(p.Attrs), ""))
 			if err != nil {
 				return nil, fmt.Errorf("npc %d: %w", npcID, err)
 			}
 			privates = append(privates, entry)
 		}
-		set.Set("privates", privates)
 	}
 
+	var pet *npc.PetData
 	if el.PetData != nil {
 		levels := make(map[int]npc.PetLevelStats, len(el.PetData.Stats))
 		for _, s := range el.PetData.Stats {
-			statSet := commons.StatSetFromXMLAttrs(s.Attrs)
-			level, err := statSet.GetInt("level")
-			if err != nil {
-				return nil, fmt.Errorf("npc %d: pet level: %w", npcID, err)
+			a := newAttrValues(foldAttrs(s.Attrs), fmt.Sprintf("npc %d: pet level", npcID))
+			level := a.int("level")
+			if err := a.Err(); err != nil {
+				return nil, err
 			}
-			stats, err := npc.NewPetLevelStats(statSet)
+			stats, err := buildPetLevelStats(a)
 			if err != nil {
 				return nil, fmt.Errorf("npc %d: %w", npcID, err)
 			}
 			levels[level] = stats
 		}
-		petSet := commons.StatSetFromXMLAttrs(el.PetData.Attrs)
-		if err := decodeLiteralAttrs(petSet, "food1", "food2"); err != nil {
-			return nil, fmt.Errorf("npc %d: petdata: %w", npcID, err)
-		}
-		pet, err := npc.NewPetData(petSet, levels)
+		a := newAttrValues(foldAttrs(el.PetData.Attrs), fmt.Sprintf("npc %d: petdata", npcID))
+		var err error
+		pet, err = buildPetData(a, levels)
 		if err != nil {
-			return nil, fmt.Errorf("npc %d: %w", npcID, err)
+			return nil, err
 		}
-		set.Set("pet", pet)
 	}
 
 	// Race-marker skill ids (secondary, or the dedicated primary race
@@ -179,7 +180,11 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 	// unknown id/level pairs are logged and skipped before their types are
 	// read. Each token of the ';'-separated type list files the skill under
 	// that type, or among the passives for PASSIVE.
-	var skills npc.TemplateSkills
+	var (
+		skills  npc.TemplateSkills
+		race    npc.Race
+		hasRace bool
+	)
 	if len(el.Skills) > 0 {
 		skills.ByType = make(map[npc.SkillType]skill.Ref, len(el.Skills))
 		skills.Passives = make([]skill.Ref, 0)
@@ -192,16 +197,16 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 			}
 			skillID := int(skillID32)
 
-			if race := npc.RaceBySecondarySkillID(skillID); race != npc.RaceDummy {
-				set.Set("race", race)
+			if r := npc.RaceBySecondarySkillID(skillID); r != npc.RaceDummy {
+				race, hasRace = r, true
 				continue
 			}
-			if skillID == npc.RaceSkillID && !set.Has("race") {
-				race, ok := npc.RaceByOrdinal(level)
+			if skillID == npc.RaceSkillID && !hasRace {
+				r, ok := npc.RaceByOrdinal(level)
 				if !ok {
 					return nil, fmt.Errorf("npc %d: race skill level %d out of range", npcID, level)
 				}
-				set.Set("race", race)
+				race, hasRace = r, true
 				continue
 			}
 
@@ -231,20 +236,184 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 		}
 	}
 
+	var teachTo []int
 	if el.TeachTo != nil {
-		classes, err := commons.StatSetFromXMLAttrs(el.TeachTo.Attrs).GetIntArray("classes")
-		if err != nil {
-			return nil, fmt.Errorf("npc %d: teachTo: %w", npcID, err)
+		a := newAttrValues(foldAttrs(el.TeachTo.Attrs), fmt.Sprintf("npc %d: teachTo", npcID))
+		teachTo = a.intArray("classes")
+		if err := a.Err(); err != nil {
+			return nil, err
 		}
-		for _, classID := range classes {
+		for _, classID := range teachTo {
 			if classID < 0 || classID > maxClassID {
 				return nil, fmt.Errorf("npc %d: teachTo: class id %d out of range", npcID, classID)
 			}
 		}
-		set.Set("teachTo", classes)
 	}
 
-	return npc.NewTemplate(set, skills)
+	a := newAttrValues(vals, "npc template")
+	id := a.int("id")
+	if err := a.Err(); err != nil {
+		return nil, err
+	}
+	a.prefix = fmt.Sprintf("npc template %d", id)
+	t := npc.Template{
+		ID:         id,
+		TemplateID: a.intDefault("idTemplate", id),
+		Name:       a.str("name"),
+
+		Title: a.strDefault("title", ""),
+		Alias: a.strDefault("alias", ""),
+
+		UsingServerSideName:  a.boolDefault("usingServerSideName", false),
+		UsingServerSideTitle: a.boolDefault("usingServerSideTitle", false),
+
+		Type:          a.str("type"),
+		Level:         a.intDefault("level", 1),
+		HitTimeFactor: a.float64Default("hitTimeFactor", 0),
+		RightHand:     a.intDefault("rHand", 0),
+		LeftHand:      a.intDefault("lHand", 0),
+		RewardExp:     a.float64Default("exp", 0),
+		RewardSp:      a.float64Default("sp", 0),
+
+		BaseAttackRange:  a.intDefault("baseAttackRange", 0),
+		BaseDamageRange:  a.intArray("baseDamageRange"),
+		BaseRandomDamage: a.intDefault("baseRandomDamage", 0),
+
+		Race: race,
+
+		STR: a.intDefault("str", 40),
+		CON: a.intDefault("con", 21),
+		DEX: a.intDefault("dex", 30),
+		INT: a.intDefault("int", 20),
+		WIT: a.intDefault("wit", 43),
+		MEN: a.intDefault("men", 20),
+
+		HPMax:   a.float64Default("hp", 0),
+		MPMax:   a.float64Default("mp", 0),
+		HPRegen: a.float64Default("hpRegen", 1.5),
+		MPRegen: a.float64Default("mpRegen", 0.9),
+		PAtk:    a.float64("pAtk"),
+		MAtk:    a.float64("mAtk"),
+		PDef:    a.float64("pDef"),
+		MDef:    a.float64("mDef"),
+
+		AtkSpd:    a.float64Default("atkSpd", 300),
+		CritRate:  a.float64Default("crit", 4),
+		WalkSpeed: a.float64Default("walkSpd", 0),
+		RunSpeed:  a.float64Default("runSpd", 1),
+
+		CollisionRadius: a.float64("radius"),
+		CollisionHeight: a.float64("height"),
+
+		SSCount:  a.intDefault("ssCount", 0),
+		SPSCount: a.intDefault("spsCount", 0),
+
+		Undying:       a.boolDefault("undying", false),
+		CanBeAttacked: a.boolDefault("canBeAttacked", true),
+		CorpseTime:    a.intDefault("corpseTime", 7),
+		NoSleepMode:   a.boolDefault("noSleepMode", false),
+		AggroRange:    a.intDefault("aggroRange", 0),
+		CanMove:       a.boolDefault("canMove", true),
+		Seedable:      a.boolDefault("seedable", false),
+		CanSeeThrough: a.boolDefault("canSeeThrough", false),
+
+		AIParams: aiParams,
+		Drops:    categories,
+		Privates: privates,
+		TeachTo:  teachTo,
+		Pet:      pet,
+	}
+	if a.has("clan") {
+		t.Clans = a.strArray("clan")
+		t.ClanRange = a.int("clanRange")
+		if a.has("ignoredIds") {
+			t.IgnoredIDs = a.intArray("ignoredIds")
+		}
+	}
+	if err := a.Err(); err != nil {
+		return nil, err
+	}
+	return npc.NewTemplate(t, skills), nil
+}
+
+// buildNPCPrivate builds one template <private> escort entry. id, weight
+// and respawn are all required.
+func buildNPCPrivate(a *attrValues) (npc.PrivateEntry, error) {
+	a.prefix = "npc: private entry"
+	id := a.int("id")
+	if err := a.Err(); err != nil {
+		return npc.PrivateEntry{}, err
+	}
+	a.prefix = fmt.Sprintf("npc: private entry %d", id)
+	weight := a.int("weight")
+	respawnStr := a.str("respawn")
+	if err := a.Err(); err != nil {
+		return npc.PrivateEntry{}, err
+	}
+	respawn, err := commons.ParseGameDuration(respawnStr)
+	if err != nil {
+		return npc.PrivateEntry{}, fmt.Errorf("npc: private entry %d: %w", id, err)
+	}
+	return npc.PrivateEntry{NpcID: id, Weight: weight, RespawnDelay: respawn}, nil
+}
+
+// buildPetData builds a <petdata> element from its attributes and its
+// already-built per-level stat rows. food1 and food2 are integer literals;
+// every attribute is required.
+func buildPetData(a *attrValues, levels map[int]npc.PetLevelStats) (*npc.PetData, error) {
+	p := &npc.PetData{
+		Food1:         int(a.int32Literal("food1")),
+		Food2:         int(a.int32Literal("food2")),
+		AutoFeedLimit: a.float64("autoFeedLimit"),
+		HungryLimit:   a.float64("hungryLimit"),
+		UnsummonLimit: a.float64("unsummonLimit"),
+		Levels:        levels,
+	}
+	if err := a.Err(); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+// buildPetLevelStats builds one <petdata> <stat> row. The mounted fields
+// default to 0 when the row defines no "*OnRide"/"speedOnRide" attributes at
+// all, matching a pet that cannot be ridden at this level.
+func buildPetLevelStats(a *attrValues) (npc.PetLevelStats, error) {
+	a.prefix = "npc: pet level stats"
+	s := npc.PetLevelStats{
+		MaxExp:       a.int64("exp"),
+		MaxMeal:      a.int("maxMeal"),
+		ExpType:      a.int("expType"),
+		MealInBattle: a.int("mealInBattle"),
+		MealInNormal: a.int("mealInNormal"),
+		PAtk:         a.float64("pAtk"),
+		PDef:         a.float64("pDef"),
+		MAtk:         a.float64("mAtk"),
+		MDef:         a.float64("mDef"),
+		MaxHP:        a.float64("hp"),
+		MaxMP:        a.float64("mp"),
+		HPRegen:      a.float64("hpRegen"),
+		MPRegen:      a.float64("mpRegen"),
+		SSCount:      a.int("ssCount"),
+		SPSCount:     a.int("spsCount"),
+
+		MountMealInBattle: a.intDefault("mealInBattleOnRide", 0),
+		MountMealInNormal: a.intDefault("mealInNormalOnRide", 0),
+		MountAtkSpd:       a.float64Default("atkSpdOnRide", 0),
+		MountPAtk:         a.float64Default("pAtkOnRide", 0),
+		MountMAtk:         a.float64Default("mAtkOnRide", 0),
+	}
+	if a.has("speedOnRide") {
+		if speeds := a.intArray("speedOnRide"); len(speeds) >= 5 {
+			s.MountBaseSpeed, s.MountWaterSpeed, s.MountFlySpeed = speeds[0], speeds[2], speeds[4]
+		} else {
+			a.fail(fmt.Errorf("attribute %q: want at least 5 values, got %d", "speedOnRide", len(speeds)))
+		}
+	}
+	if err := a.Err(); err != nil {
+		return npc.PetLevelStats{}, err
+	}
+	return s, nil
 }
 
 // splitSkillTypeList splits a <skill> type list on ';'. A list with no

@@ -2,10 +2,7 @@ package npc
 
 import (
 	"sort"
-	"strings"
 	"testing"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // ---- from instance_test.go ----
@@ -89,23 +86,6 @@ func TestRaceByOrdinal(t *testing.T) {
 }
 
 // ---- from template_test.go ----
-func TestNewPrivateEntryKeepsIDInFieldError(t *testing.T) {
-	for _, missing := range []string{"weight", "respawn"} {
-		t.Run(missing, func(t *testing.T) {
-			set := commons.NewStatSet()
-			set.Set("id", 123)
-			set.Set("weight", 1)
-			set.Set("respawn", "1sec")
-			set.Unset(missing)
-
-			_, err := NewPrivateEntry(set)
-			if err == nil || !strings.Contains(err.Error(), "npc: private entry 123") {
-				t.Fatalf("NewPrivateEntry() error = %v, want entry id", err)
-			}
-		})
-	}
-}
-
 func TestTable_All(t *testing.T) {
 	table := NewTable([]*Template{
 		{ID: 30, Name: "c"},

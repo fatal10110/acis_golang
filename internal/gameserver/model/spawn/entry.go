@@ -36,65 +36,21 @@ type Entry struct {
 	DBSaving      []string
 }
 
-// NewPrivate builds one private spawn row from its XML attributes.
-func NewPrivate(set *commons.StatSet) (Private, error) {
-	f := commons.NewFields(set, "spawn private")
-	private := Private{
-		NPCID:        f.Int32("id"),
-		Weight:       f.Int("weight"),
-		RespawnDelay: parseDuration(f, "respawn"),
+// NewEntry returns e as the spawnlist loads it: Total is scaled and
+// rounded by multiplier (the configured spawn multiplier) only when
+// Positions is empty, distinguishing a fixed/weighted "pos" list (total
+// kept as declared) from a coordinate-less territory spawn (total scaled).
+// Empty Positions, Privates, AIParams and DBSaving read as nil, and blank
+// DBSaving names are dropped.
+func NewEntry(e Entry, multiplier float64) Entry {
+	if len(e.Positions) == 0 {
+		e.Total = scaleBySpawnMultiplier(e.Total, multiplier)
 	}
-	if err := f.Err(); err != nil {
-		return Private{}, err
-	}
-	return private, nil
-}
-
-// NewEntry builds one spawn entry from its XML attributes and already-parsed
-// child blocks. multiplier is the configured spawn multiplier: it scales and
-// rounds Total only when positions is empty, distinguishing a fixed/weighted
-// "pos" list (total kept as declared) from a coordinate-less territory spawn
-// (total scaled).
-func NewEntry(set *commons.StatSet, positions []Position, privates []Private, aiParams map[string]string, multiplier float64) (Entry, error) {
-	idf := commons.NewFields(set, "spawn entry")
-	npcID := idf.Int32("id")
-	if err := idf.Err(); err != nil {
-		return Entry{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("spawn entry %d", npcID))
-	total := f.Int("total")
-	if len(positions) == 0 {
-		total = scaleBySpawnMultiplier(total, multiplier)
-	}
-	entry := Entry{
-		NPCID:         npcID,
-		Total:         total,
-		RespawnDelay:  parseDuration(f, "respawn"),
-		RespawnRandom: parseDuration(f, "respawnRand"),
-		Positions:     append([]Position(nil), positions...),
-		Privates:      append([]Private(nil), privates...),
-		AIParams:      copyStringMap(aiParams),
-		DBName:        f.StringDefault("dbName", ""),
-		DBSaving:      cleanStrings(f.StringArrayDefault("dbSaving", nil)),
-	}
-	if err := f.Err(); err != nil {
-		return Entry{}, err
-	}
-	return entry, nil
-}
-
-func parseDuration(f *commons.Fields, key string) time.Duration {
-	raw := f.StringDefault(key, "")
-	if raw == "" {
-		return 0
-	}
-	d, err := commons.ParseGameDuration(raw)
-	if err != nil {
-		f.Fail(fmt.Errorf("%s: %w", key, err))
-		return 0
-	}
-	return d
+	e.Positions = append([]Position(nil), e.Positions...)
+	e.Privates = append([]Private(nil), e.Privates...)
+	e.AIParams = copyStringMap(e.AIParams)
+	e.DBSaving = cleanStrings(e.DBSaving)
+	return e
 }
 
 // ParsePositions decodes the semicolon-separated "pos" attribute shape used
