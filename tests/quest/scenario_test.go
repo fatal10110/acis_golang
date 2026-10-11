@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	quest001 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q001"
+	quest023 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q023"
 	quest211 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q211"
 	quest260 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q260"
 	quest316 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q316"
@@ -17,6 +18,7 @@ import (
 // scripts.xml path, as the server's catalogs map them.
 var scenarioScripts = script.Catalog{
 	"quest.Q001_LettersOfLove":         quest001.New,
+	"quest.Q023_LidiasHeart":           quest023.New,
 	"quest.Q211_TrialOfTheChallenger":  quest211.New,
 	"quest.Q260_HuntTheOrcs":           quest260.New,
 	"quest.Q316_DestroyPlagueCarriers": quest316.New,

@@ -26,6 +26,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/tutorial"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q001"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q023"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q211"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q260"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q316"
@@ -52,6 +53,7 @@ func scriptCatalogs(crystals *item.SoulCrystalTable, buffs *skill.NewbieBuffTabl
 func questCatalog(crystals *item.SoulCrystalTable) script.Catalog {
 	return script.Catalog{
 		"quest.Q001_LettersOfLove":         q001.New,
+		"quest.Q023_LidiasHeart":           q023.New,
 		"quest.Q211_TrialOfTheChallenger":  q211.New,
 		"quest.Q260_HuntTheOrcs":           q260.New,
 		"quest.Q316_DestroyPlagueCarriers": q316.New,

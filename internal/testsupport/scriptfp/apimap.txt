@@ -238,4 +238,5 @@ Npc.lookNeighbor script.NPC.LookNeighbor
 # Proof quests, first group (#175). A quest's attacked binding is an entry
 # of its Bind table, and its started test reads the state's status.
 Quest.addAttacked inline
+Quest.addDecayed inline
 QuestState.isStarted inline
