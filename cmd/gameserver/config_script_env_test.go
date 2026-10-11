@@ -34,7 +34,7 @@ func TestScriptEnvReadsQuestRates(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		env, err := provideScriptEnv(props, manager.KillRewardConfig{PartyRange: 1500, MultipleItemDrop: true}, nil, nil, nil, nil, &gameData{}, task.NewGameClock(nil), nil, nil)
+		env, err := provideScriptEnv(props, manager.KillRewardConfig{PartyRange: 1500, MultipleItemDrop: true}, nil, nil, nil, nil, &gameData{}, task.NewGameClock(nil), nil, nil, gameplayConfig{})
 		if err != nil {
 			t.Fatalf("provideScriptEnv(%q) error = %v", tc.body, err)
 		}
@@ -49,7 +49,7 @@ func TestScriptEnvReadsQuestRates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provideScriptEnv(props, manager.KillRewardConfig{}, nil, nil, nil, nil, &gameData{}, task.NewGameClock(nil), nil, nil); err == nil {
+	if _, err := provideScriptEnv(props, manager.KillRewardConfig{}, nil, nil, nil, nil, &gameData{}, task.NewGameClock(nil), nil, nil, gameplayConfig{}); err == nil {
 		t.Fatal("a rate that is no number was accepted")
 	}
 }

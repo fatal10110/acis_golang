@@ -136,7 +136,7 @@ func (n *Npcs) createPrivate(master npc.PartyMember, tmpl *npc.Template, at *loc
 	}
 
 	entry := spawn.Entry{NPCID: int32(tmpl.ID), RespawnDelay: respawn}
-	slot := slotInfo{entry: entry, masterID: master.ObjectID(), tmpl: tmpl, scripted: true, memory: newSlotMemory(entry)}
+	slot := slotInfo{entry: entry, masterID: master.ObjectID(), tmpl: tmpl, scripted: true, memory: newSlotMemory(entry, nil)}
 	for i, p := range params {
 		slot.memory.scratch.SetInt(npc.IntParam1+npc.IntSlot(i), p)
 	}

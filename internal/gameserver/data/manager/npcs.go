@@ -74,11 +74,48 @@ type slotInfo struct {
 type slotMemory struct {
 	params  npc.AIParams
 	scratch *npc.Scratch
+	// row is the persisted row of a database-tracked slot, nil for any
+	// other.
+	row *dbRow
 }
 
-func newSlotMemory(entry spawn.Entry) *slotMemory {
-	return &slotMemory{params: npc.AIParams(entry.AIParams), scratch: npc.NewScratch()}
+func newSlotMemory(entry spawn.Entry, row *dbRow) *slotMemory {
+	return &slotMemory{params: npc.AIParams(entry.AIParams), scratch: npc.NewScratch(), row: row}
 }
+
+// Row returns the slot's persisted row; nil when it keeps none.
+func (m *slotMemory) Row() npc.SpawnRow {
+	if m.row == nil {
+		return nil
+	}
+	return m.row
+}
+
+// dbRow is the database-tracked spawn of an npcmaker entry as its NPCs see
+// it (npc.SpawnRow): the spawn_data row of the spawn list the entry was
+// declared from, and whether the entry's NPC was last placed from a live
+// row. Every slot the entry declares shares it, so the flag outlives a
+// slot dropped by the group's DeleteAll.
+type dbRow struct {
+	rows *Spawns
+	name string
+	// loaded is set when a placement restores a live row, cleared when a
+	// boot finds the row dead or the entry's maker clears it; a placement
+	// from a fresh or expired row leaves it as it was.
+	loaded atomic.Bool
+}
+
+// DBValue returns the row's script value.
+func (r *dbRow) DBValue() int {
+	v, _ := r.rows.DBValue(r.name)
+	return v
+}
+
+// SetDBValue stores the row's script value.
+func (r *dbRow) SetDBValue(v int) { r.rows.SetDBValue(r.name, v) }
+
+// DBLoaded reports whether the entry's NPC was last placed from a live row.
+func (r *dbRow) DBLoaded() bool { return r.loaded.Load() }
 
 // AIParams returns the spawn entry's <ai> values.
 func (m *slotMemory) AIParams() npc.AIParams { return m.params }

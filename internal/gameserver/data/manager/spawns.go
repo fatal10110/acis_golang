@@ -3,6 +3,7 @@ package manager
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
@@ -16,7 +17,10 @@ type spawnStateStore interface {
 
 // Spawns combines the static spawnlist table with dynamic DB-backed state.
 type Spawns struct {
-	table  *spawn.Table
+	table *spawn.Table
+	// mu guards the rows' DBValue: scripts set it from the NPCs' queues
+	// while a save may be reading the rows.
+	mu     sync.Mutex
 	states map[string]*spawn.State
 }
 
@@ -90,7 +94,40 @@ func (s *Spawns) StateCount() int {
 	return len(s.states)
 }
 
-// Save persists initialized dynamic state rows through store.
+// DBValue returns the script value of the row name; false when the spawn
+// list has no such row.
+func (s *Spawns) DBValue(name string) (int, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state, ok := s.states[name]
+	if !ok || state == nil {
+		return 0, false
+	}
+	return state.DBValue, true
+}
+
+// SetDBValue stores v as the script value of the row name, saved with the
+// row; nothing when the spawn list has no such row.
+func (s *Spawns) SetDBValue(name string, v int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if state, ok := s.states[name]; ok && state != nil {
+		state.DBValue = v
+	}
+}
+
+// Save persists initialized dynamic state rows through store. The rows are
+// copied first, so the database writes run with no lock held.
 func (s *Spawns) Save(ctx context.Context, store spawnStateStore) error {
-	return store.SaveStates(ctx, s.states)
+	s.mu.Lock()
+	rows := make(map[string]*spawn.State, len(s.states))
+	for name, state := range s.states {
+		if state == nil {
+			continue
+		}
+		row := *state
+		rows[name] = &row
+	}
+	s.mu.Unlock()
+	return store.SaveStates(ctx, rows)
 }

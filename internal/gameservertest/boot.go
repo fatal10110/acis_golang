@@ -79,6 +79,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/privatestore"
 	"github.com/fatal10110/acis_golang/internal/gameserver/raidpoint"
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -160,6 +161,8 @@ type options struct {
 	pvpFlags               *task.PvPFlags
 	decay                  *task.Decay
 	npcSpawns              *spawn.Table
+	spawnData              bool
+	makerCatalog           script.MakerCatalog
 	dataReloads            network.DataReloads
 	npcDropRates           item.Rates
 	walkerRoutes           route.WalkerRoutes
@@ -1000,6 +1003,7 @@ type Server struct {
 	addr                net.Addr
 	sessions            *manager.SessionStore
 	groundStore         *gamesql.GroundItemStore
+	spawnStore          *gamesql.SpawnStore
 	cursedWeapons       *entity.CursedWeaponTable
 	autosave            *task.Autosave
 	gameClock           *task.GameClock
@@ -1549,6 +1553,12 @@ func (s *Server) Shutdown(tb testing.TB) {
 	}
 	if err := s.groundStore.Save(ctx, s.GroundItems.Snapshots(s.skipCursedGroundItem)); err != nil {
 		tb.Fatalf("shutdown ground-item save: %v", err)
+	}
+	if s.spawnStore != nil {
+		s.NpcSpawns.SyncPersistedState()
+		if err := s.NpcSpawns.Spawns().Save(ctx, s.spawnStore); err != nil {
+			tb.Fatalf("shutdown spawn data save: %v", err)
+		}
 	}
 	s.Close()
 	// Boot's own t.Cleanup(taskEffects.Reset) only fires at the end of the
@@ -2235,8 +2245,13 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	sevenSigns.SetCastles(gclConfig.Castles)
 	var npcSpawns *gamemanager.Npcs
 	var npcRespawns *task.Respawn
+	var spawnStore *gamesql.SpawnStore
+	if o.npcSpawns != nil && o.spawnData {
+		spawnStore = gamesql.NewSpawnStore(db)
+	}
 	if o.npcSpawns != nil {
 		npcSpawns, npcRespawns = bootNpcSpawns(t, gcl, npcSpawnDeps{
+			spawnStore: spawnStore, makerCatalog: o.makerCatalog,
 			state: state, templates: o.npcs, geo: bootGeo(o.geo), ids: ids, decay: o.decay, ai: ai, positions: positions,
 			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.AttackStance, log: o.log, makers: o.npcSpawns,
 			dropRates: o.npcDropRates, sevenSigns: sevenSigns, scripts: quests.registry, spawner: quests.env.Spawner, routes: o.walkerRoutes,
@@ -2500,6 +2515,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		decay:               o.decay,
 		AI:                  ai,
 		NpcSpawns:           npcSpawns,
+		spawnStore:          spawnStore,
 		NpcRespawns:         npcRespawns,
 		HTML:                gclConfig.HTML,
 		Water:               water,

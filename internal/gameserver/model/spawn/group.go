@@ -62,6 +62,10 @@ type GroupSpawn interface {
 	Respawn()
 	// LoadDBInfo runs the maker's npc DB info hook for this spawn.
 	LoadDBInfo()
+	// ClearDBLoaded clears the mark a database-tracked spawn's NPC
+	// carries when it was placed from a live row (npc.SpawnRow.DBLoaded);
+	// nothing for any other spawn.
+	ClearDBLoaded()
 }
 
 // GroupNPC is one NPC a GroupSpawn keeps, in the world or not.

@@ -192,7 +192,7 @@ func (n *Npcs) respawnSlot(key string) {
 			state = spawn.NewState(slot.dbName)
 		}
 		state.CancelRespawn()
-		n.spawnPersisted(key, slot.maker, slot.entry, tmpl, state)
+		n.spawnPersisted(key, slot.maker, slot.entry, tmpl, state, slot.memory.row)
 		return
 	}
 	pos, ok := n.pickSpawnPosition(slot.maker, slot.entry)

@@ -21,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/social/petition"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/link"
@@ -85,6 +86,7 @@ type gameplayConfig struct {
 	FreeTeleport             freeTeleport
 	RaidMultipliers          npc.RaidMultipliers
 	NpcAI                    npc.AIConfig
+	BossWaits                script.BossWaitTimes
 	Enchant                  enchant.Config
 	Merchant                 merchant.Config
 	Freight                  network.FreightConfig
@@ -217,6 +219,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.NpcAI, err = loadNpcAIConfig(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.BossWaits, err = loadBossWaitTimes(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.Enchant, err = loadEnchantConfig(paths); err != nil {
@@ -830,6 +835,38 @@ func loadNpcAIConfig(paths gameServerPaths) (npc.AIConfig, error) {
 		return npc.AIConfig{}, err
 	}
 	return c, nil
+}
+
+// loadBossWaitTimes reads the npcs.properties AntharasWaitTime (default
+// 30), ValakasWaitTime (default 20) and FrintezzaWaitTime (default 10), in
+// minutes. Each is held as a 32-bit count of milliseconds, so a value past
+// about 35,791 minutes wraps. A malformed value, or a minute count outside
+// the 32-bit range, fails boot.
+func loadBossWaitTimes(paths gameServerPaths) (script.BossWaitTimes, error) {
+	props, err := config.LoadFile(paths.NpcsConfigPath)
+	if err != nil {
+		return script.BossWaitTimes{}, err
+	}
+	def := script.DefaultBossWaitTimes()
+	f := config.NewFields(props, "boss wait times")
+	minutes := func(key string, d time.Duration) time.Duration {
+		m := f.Int(key, int(d/time.Minute))
+		if m < math.MinInt32 || m > math.MaxInt32 {
+			f.Fail(fmt.Errorf("%s: %d is outside the 32-bit range", key, m))
+			return d
+		}
+		ms := int32(m) * 60000
+		return time.Duration(ms) * time.Millisecond
+	}
+	w := script.BossWaitTimes{
+		Antharas:  minutes("AntharasWaitTime", def.Antharas),
+		Valakas:   minutes("ValakasWaitTime", def.Valakas),
+		Frintezza: minutes("FrintezzaWaitTime", def.Frintezza),
+	}
+	if err := f.Err(); err != nil {
+		return script.BossWaitTimes{}, err
+	}
+	return w, nil
 }
 
 // loadPvPFlagOptions takes the process logger so the fx graph builds it

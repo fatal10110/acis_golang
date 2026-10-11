@@ -43,6 +43,9 @@ type makerGroup struct {
 	// guarded by n.mu.
 	keys [][]string
 	seq  []int
+	// rows are, per entry, its persisted row; nil for an entry that is
+	// not database-tracked.
+	rows []*dbRow
 }
 
 // newGroups builds the run-time npcmakers of spawns for RespawnAll run gen
@@ -51,9 +54,15 @@ func (n *Npcs) newGroups(spawns *Spawns, gen int) []*makerGroup {
 	makers := spawns.Table().Makers()
 	groups := make([]*makerGroup, 0, len(makers))
 	for _, def := range makers {
+		rows := make([]*dbRow, len(def.Entries))
+		for i, entry := range def.Entries {
+			if entry.DBName != "" {
+				rows[i] = &dbRow{rows: spawns, name: entry.DBName}
+			}
+		}
 		groups = append(groups, &makerGroup{
 			n: n, def: def, gen: gen, behavior: n.makers.New(def.AIType),
-			keys: make([][]string, len(def.Entries)), seq: make([]int, len(def.Entries)),
+			keys: make([][]string, len(def.Entries)), seq: make([]int, len(def.Entries)), rows: rows,
 		})
 	}
 	n.mu.Lock()
@@ -234,6 +243,12 @@ func (s groupSpawn) Respawn() {
 }
 
 func (s groupSpawn) LoadDBInfo() { s.g.behavior.NPCDBInfo(s.g, s) }
+
+func (s groupSpawn) ClearDBLoaded() {
+	if row := s.g.rows[s.i]; row != nil {
+		row.loaded.Store(false)
+	}
+}
 
 // groupNPC is the NPC one spawn slot keeps (spawn.GroupNPC): the slot
 // lives on across the NPC's respawns.

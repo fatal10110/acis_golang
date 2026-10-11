@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 )
 
@@ -155,6 +156,9 @@ type Registry struct {
 	// timers are the scripts' timers. They are not part of the registry:
 	// a leaf-locked container of their own.
 	timers *timers
+	// memo is the scripts' global memo, a leaf-locked container of its
+	// own like the timers.
+	memo *GlobalMemo
 }
 
 type npcKey struct {
@@ -197,6 +201,11 @@ const (
 func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
 	r := &Registry{log: cfg.Log, npc: map[npcKey][]*Script{}, byName: map[string]*Script{}, behaves: map[int32]bool{}, behaviors: map[int32]map[*Script]bool{}, items: map[int32][]*Script{}, zones: map[int32][]*Script{}, queue: cfg.Queue}
 	r.timers = newTimers(r, cfg.Queue)
+	var w *world.State
+	if cfg.Env != nil {
+		w = cfg.Env.World
+	}
+	r.memo = newGlobalMemo(w)
 	registered := 0
 	for _, l := range list {
 		e := entry{path: l.Path}
