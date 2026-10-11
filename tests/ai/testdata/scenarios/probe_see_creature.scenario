@@ -1,0 +1,12 @@
+# The approach step raises the see-creature hook the way the AI tick's scan does: the
+# character steps into the NPC's see range and one AI tick runs. A non-raid NPC tells
+# its behavior about a creature once while it stays in range. The probe behavior answers
+# the hook with a sound to the player seen.
+character Hunter 20
+script ai.Probe
+npc wolf 20120 Monster 1000 0 0
+
+approach wolf
+  S PlaySound type=0 file=Probe.see bind=0 obj=0 loc=0,0,0 delay=0
+# Still in range: the next tick tells nothing.
+approach wolf

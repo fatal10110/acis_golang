@@ -66,7 +66,7 @@ func sessionOnly(ev event.Event) bool {
 		event.WeightPenaltyChanged, event.VitalsChanged, event.Evaded, event.MountFeedGauge,
 		event.ItemsTaken, event.SoundPlayed,
 		event.DialogPageShown, event.DialogReleased, event.ScriptMessage, event.QuestOverweight,
-		event.SystemMessageShown, event.TeleportWindowShown:
+		event.SystemMessageShown, event.TeleportWindowShown, event.NPCChatShown:
 		return true
 	}
 	return false
@@ -300,6 +300,10 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.showTeleports(live, e.ObjectID, e.NpcID, e.Kind)
 	case event.DialogReleased:
 		live.SendFrame(serverpackets.FrameActionFailed())
+	case event.NPCChatShown:
+		l.showNPCChat(live, e.ObjectID)
+	case event.SkillCalled:
+		l.callSkill(live, e)
 	case event.ScriptMessage:
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, e.Text))
 	case event.QuestOverweight:

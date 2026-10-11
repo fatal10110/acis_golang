@@ -67,3 +67,10 @@ func (SystemMessageShown) event() {}
 type QuestOverweight struct{}
 
 func (QuestOverweight) event() {}
+
+// NPCChatShown reports a script opening, on the character, the NPC
+// ObjectID's own chat window, as the NPC opens it when talked to with no
+// script answering.
+type NPCChatShown struct{ ObjectID int32 }
+
+func (NPCChatShown) event() {}

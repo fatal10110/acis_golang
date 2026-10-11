@@ -72,7 +72,7 @@ type Hostile struct {
 	// kills it. It is nil until Attach installs one, in which case death
 	// still latches but grants nothing — matching Die's own "rewards may be
 	// nil" contract.
-	rewards creature.Rewarder
+	rewards Rewards
 	// remover takes this NPC out of the world for DeleteMe; nil despawns it
 	// with no respawn. Installed by Attach.
 	remover Remover
@@ -82,6 +82,8 @@ type Hostile struct {
 	// scripts raises this NPC's script hooks; nil raises none and leaves
 	// every built-in reaction on. Installed by Attach.
 	scripts ScriptHooks
+	// sight is what h's tick scan has told its see-creature scripts about.
+	sight sight
 	// interacted latches the first unlock attempt on a chest.
 	interacted atomic.Bool
 	// coreAIDisabled turns off this NPC's regular combat behavior; its only
@@ -354,7 +356,7 @@ type Runtime struct {
 	LOS     LineOfSight
 	Log     zerolog.Logger
 	Items   *item.Table
-	Rewards creature.Rewarder
+	Rewards Rewards
 	Sink    event.Sink
 	Remover Remover
 	// Hits watches every hit this NPC registers; nil watches none.

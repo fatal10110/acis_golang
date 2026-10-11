@@ -64,6 +64,9 @@ type Scratch struct {
 	ints        [intSlotCount]int32
 	creatures   [creatureSlotCount]ScratchCreature
 	scriptValue int32
+	// lookNeighbor is when the slot's NPC last looked around; it carries
+	// over to the next life, as the reference keeps it on the reused NPC.
+	lookNeighbor lookNeighborClock
 }
 
 // NewScratch returns the memory of an NPC that has never lived: every slot

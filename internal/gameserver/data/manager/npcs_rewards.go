@@ -323,3 +323,19 @@ func petReward(expType int, petDamage, totalDamage float64, exp int64, sp int) (
 	share := 1 - float64(expType)/100
 	return int64(math.Round(float64(exp) * share)), int(math.Round(float64(sp) * share))
 }
+
+// DropItem drops count units of itemID around the NPC, as its death drops
+// fall: a stackable as one stack, a non-stackable as count items under
+// MultipleItemDrop, else one. The drop is reserved for to when to acts
+// for a player, for as long as a drop of this NPC's death is.
+func (d *deathRewards) DropItem(to attackable.Combatant, itemID int32, count int) {
+	x, y, z := d.hostile.Position()
+	k := NewKillReward(nil, nil, 1, d.raid, d.config.Rates, false, false, d.ids, d.items, d.ground, d.geo, x, y, z, d.hostile.Heading(), d.hostile.ObjectID()).
+		MultipleItemDrop(d.config.MultipleItemDrop)
+	if to != nil {
+		if _, acting := actingCharacter(to); acting {
+			k.protectOwnerID = to.ObjectID()
+		}
+	}
+	k.drop(itemID, count)
+}

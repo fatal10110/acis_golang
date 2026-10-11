@@ -42,6 +42,14 @@ type ScriptHooks interface {
 	// told its clan member called. caller and called are each a *Hostile
 	// or a *Folk.
 	ClanDied(caller, called, killer attackable.Combatant)
+	// SeesCreatures reports whether any script reacts to an NPC with
+	// template id npcID seeing a creature. Only such an NPC scans its
+	// surroundings.
+	SeesCreatures(npcID int32) bool
+	// HostileSeeCreature runs h's see-creature hooks: h noticed c.
+	HostileSeeCreature(h *Hostile, c attackable.Combatant)
+	// FolkSeeCreature runs f's see-creature hooks: f noticed c.
+	FolkSeeCreature(f *Folk, c attackable.Combatant)
 	// HostileNoDesire runs h's no-desire hooks: h has nothing left to do.
 	HostileNoDesire(h *Hostile)
 	// FolkNoDesire runs f's no-desire hooks: f has nothing left to do.
@@ -97,14 +105,15 @@ func (h *Hostile) partyAttacked(caller *Hostile, target attackable.Combatant, da
 }
 
 // AtHookPoint is where h's AI loop gives the behavior bound to h's template
-// its turn, with the AI loop unlocked: the no-desire, move-finished and
-// out-of-territory hooks run there. The see-creature point raises nothing
-// yet.
+// its turn, with the AI loop unlocked: the see-creature scan, and the
+// no-desire, move-finished and out-of-territory hooks run there.
 func (h *Hostile) AtHookPoint(p ai.HookPoint) {
 	if h.scripts == nil {
 		return
 	}
 	switch p {
+	case ai.HookSeeCreature:
+		scanSight(h)
 	case ai.HookNoDesire:
 		h.scripts.HostileNoDesire(h)
 	case ai.HookMoveFinished:
@@ -117,14 +126,15 @@ func (h *Hostile) AtHookPoint(p ai.HookPoint) {
 
 // AtHookPoint is where f's AI tick, or its arrival, gives the behavior bound
 // to f's template its turn, on f's queue with no lock held: the AI's state
-// is queue-owned. The no-desire and move-finished hooks run there; the
-// see-creature point raises nothing yet, and a civilian NPC keeps no
-// territory to leave.
+// is queue-owned. The see-creature scan, the no-desire and move-finished
+// hooks run there; a civilian NPC keeps no territory to leave.
 func (f *Folk) AtHookPoint(p ai.HookPoint) {
 	if f.scripts == nil {
 		return
 	}
 	switch p {
+	case ai.HookSeeCreature:
+		scanSight(f)
 	case ai.HookNoDesire:
 		f.scripts.FolkNoDesire(f)
 	case ai.HookMoveFinished:
