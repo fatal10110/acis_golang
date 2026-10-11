@@ -50,8 +50,13 @@ func kinds(ks ...NPCKind) kindSet {
 // Until then no script subscribing to it registers, so no script waits on a
 // hook that never fires.
 var raisedHooks = map[hook]kindSet{
-	hookAttacked:      kinds(KindHostile),
+	// The attacks and deaths (attacked.go, clan.go). Only a hostile NPC
+	// has a party.
+	hookAttacked:      kinds(KindFolk, KindHostile),
 	hookPartyAttacked: kinds(KindHostile),
+	hookClanAttacked:  kinds(KindFolk, KindHostile),
+	hookPartyDied:     kinds(KindHostile),
+	hookClanDied:      kinds(KindFolk, KindHostile),
 	// The spawner and the NPC's death and decay (lifecycle.go).
 	hookCreated: kinds(KindFolk, KindHostile),
 	hookDecayed: kinds(KindFolk, KindHostile),
@@ -390,6 +395,12 @@ func (r *Registry) scripts(npcID int32, ev NPCEvent) []*Script {
 // built-in stand-in reactions.
 func (r *Registry) Behaves(npcID int32) bool {
 	return r != nil && r.behaves[npcID]
+}
+
+// ReactsToCreated reports whether a script, a behavior or not, reacts to
+// the creation of an NPC with id npcID; a nil registry binds none.
+func (r *Registry) ReactsToCreated(npcID int32) bool {
+	return len(r.scripts(npcID, EventCreated)) > 0
 }
 
 // behaviorOn reports whether s is a behavior left on any event list of the

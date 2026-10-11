@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
@@ -46,6 +47,12 @@ func WithNpcDropRates(rates item.Rates) Option {
 	}
 }
 
+// WithWalkerRoutes gives the WithNpcSpawns population routes as its walker
+// route data, walked on the actor queues' clock; by default it has none.
+func WithWalkerRoutes(routes route.WalkerRoutes) Option {
+	return func(o *options) { o.walkerRoutes = routes }
+}
+
 // npcSpawnDeps are the server parts a live NPC population is built over.
 type npcSpawnDeps struct {
 	state     *world.State
@@ -68,6 +75,8 @@ type npcSpawnDeps struct {
 	sevenSigns *sevensigns.State
 	// scripts raises the spawned NPCs' script hooks.
 	scripts *script.Registry
+	// routes is the walker route data.
+	routes route.WalkerRoutes
 }
 
 // WithDataReloads gives the link the //reload and //respawnall hooks; by
@@ -95,7 +104,11 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	if ai == nil {
 		ai = task.NewAI(deps.state, deps.log)
 	}
-	walker, err := task.NewWalker(nil, task.GeoPath{Geo: Geo{}}, time.Now, deps.state)
+	now := time.Now
+	if deps.queues != nil && deps.queues.inline != nil {
+		now = deps.queues.inline.Now
+	}
+	walker, err := task.NewWalker(deps.routes, task.GeoPath{Geo: Geo{}}, now, deps.state)
 	if err != nil {
 		t.Fatalf("new walker: %v", err)
 	}

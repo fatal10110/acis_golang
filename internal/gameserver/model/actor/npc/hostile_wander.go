@@ -75,7 +75,7 @@ func (h *Hostile) randomWalkLocation(from location.Location, offset int) (locati
 
 func (h *Hostile) homeOffsetWalk(from location.Location, offset int) location.Location {
 	dest := h.Instance.Home
-	if h.Master() != nil {
+	if h.IsPrivate() {
 		dest = from
 	}
 	dest.X += rnd.GetRange(-offset, offset)

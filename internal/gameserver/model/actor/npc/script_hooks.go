@@ -16,12 +16,32 @@ type ScriptHooks interface {
 	// attacked hate, party assist, shot recharge and idle follow and wander
 	// stay off.
 	Behaves(npcID int32) bool
+	// ReactsToCreated reports whether any script, a behavior or not,
+	// reacts to the creation of an NPC with template id npcID. Such an NPC
+	// walks only the routes its scripts ask for: the built-in walker route
+	// stays off.
+	ReactsToCreated(npcID int32) bool
 	// HostileAttacked runs h's attacked hooks: attacker attacked it for
 	// damage, with sk when a skill did it (the zero Ref otherwise).
 	HostileAttacked(h *Hostile, attacker attackable.Combatant, damage int32, sk skill.Ref)
 	// HostilePartyAttacked runs called's party-attacked hooks: caller,
 	// attacked by target for damage, called its party member called.
 	HostilePartyAttacked(caller, called *Hostile, target attackable.Combatant, damage int32)
+	// FolkAttacked runs f's attacked hooks: attacker attacked it for
+	// damage, with sk when a skill did it (the zero Ref otherwise).
+	FolkAttacked(f *Folk, attacker attackable.Combatant, damage int32, sk skill.Ref)
+	// ClanAttacked runs called's clan-attacked hooks: caller, attacked by
+	// attacker for damage, with sk when a skill did it, called its clan
+	// member called. caller and called are each a *Hostile or a *Folk, and
+	// are the same NPC for the caller's call to itself.
+	ClanAttacked(caller, called, attacker attackable.Combatant, damage int32, sk skill.Ref)
+	// HostilePartyDied runs called's party-died hooks: caller, a member of
+	// called's party or called itself, has just died.
+	HostilePartyDied(caller, called *Hostile)
+	// ClanDied runs called's clan-died hooks: caller, killed by killer,
+	// told its clan member called. caller and called are each a *Hostile
+	// or a *Folk.
+	ClanDied(caller, called, killer attackable.Combatant)
 	// HostileNoDesire runs h's no-desire hooks: h has nothing left to do.
 	HostileNoDesire(h *Hostile)
 	// FolkNoDesire runs f's no-desire hooks: f has nothing left to do.

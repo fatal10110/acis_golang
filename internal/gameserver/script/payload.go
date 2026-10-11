@@ -32,11 +32,14 @@ type AttackFinished struct {
 	Target Creature
 }
 
-// ClanAttacked: Caller, attacked by Attacker, called its clan member Called.
+// ClanAttacked: Caller, attacked by Attacker, called its clan member Called,
+// Caller itself included. Skill is the skill that did it, the zero Ref for
+// an attack with no skill.
 type ClanAttacked struct {
 	Caller, Called *NPC
 	Attacker       Creature
 	Damage         int32
+	Skill          skill.Ref
 }
 
 // ClanDied: Caller, killed by Killer, told its clan member Called.
@@ -100,7 +103,8 @@ type PartyAttacked struct {
 	Damage         int32
 }
 
-// PartyDied: Caller died and told its party member Called.
+// PartyDied: Caller died and told its party member Called, Caller itself
+// included.
 type PartyDied struct{ Caller, Called *NPC }
 
 // PickedItem: NPC picked up an item.

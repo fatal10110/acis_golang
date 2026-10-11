@@ -31,14 +31,16 @@ type hookLog struct {
 	// names maps an object id to the role name the lines use.
 	names map[int32]string
 	// npcs are the NPCs by object id, for reading their HP from a hook.
-	npcs  map[int32]*npc.Hostile
+	npcs map[int32]*npc.Hostile
+	// folk are the civilian NPCs by object id.
+	folk  map[int32]*npc.Folk
 	lines []string
 	// hp is, per attacked line, the attacked NPC's HP when the hook ran.
 	hp []float64
 }
 
 func newHookLog() *hookLog {
-	return &hookLog{names: map[int32]string{}, npcs: map[int32]*npc.Hostile{}}
+	return &hookLog{names: map[int32]string{}, npcs: map[int32]*npc.Hostile{}, folk: map[int32]*npc.Folk{}}
 }
 
 func (l *hookLog) name(id int32, role string) {
@@ -75,7 +77,7 @@ func (l *hookLog) nameOf(c script.Creature) string {
 	if !ok {
 		return strconv.Itoa(int(id))
 	}
-	_, isNPC := l.npcs[id]
+	isNPC := l.npcs[id] != nil || l.folk[id] != nil
 	switch c.(type) {
 	case *script.NPC:
 		if isNPC {
@@ -104,6 +106,9 @@ func (l *hookLog) behavior(ids ...int32) func() script.Script {
 				l.lines = append(l.lines, fmt.Sprintf("ATTACKED npc=%s attacker=%s damage=%d skill=%s", l.nameOf(e.NPC), l.nameOf(e.Attacker), e.Damage, sk))
 				if h := l.npcs[e.NPC.ObjectID()]; h != nil {
 					l.hp = append(l.hp, h.HP())
+				}
+				if f := l.folk[e.NPC.ObjectID()]; f != nil {
+					l.hp = append(l.hp, f.HP())
 				}
 			},
 			OnPartyAttacked: func(_ *script.Script, e script.PartyAttacked) {
@@ -158,8 +163,8 @@ func onAttackerQueue(t *testing.T, srv *gameservertest.Server, objID int32, fn f
 }
 
 // replayFanout runs every row of the fan-out golden table that is not a
-// clan row: the clan scans are A7's (#1800). attack applies the row's
-// source to target from the player p.
+// clan row; replayClanFanout (clan_hooks_test.go) runs those. attack
+// applies the row's source to target from the player p.
 func replayFanout(t *testing.T, table string, attack func(target *npc.Hostile, p attackable.Combatant)) {
 	t.Helper()
 	ids := []int32{fanoutRoles["M"], fanoutRoles["m1"], fanoutRoles["m2"]}
@@ -171,7 +176,7 @@ func replayFanout(t *testing.T, table string, attack func(target *npc.Hostile, p
 
 	scriptcontract.Run(t, table, func(t *testing.T, r scriptcontract.Row) {
 		if strings.HasPrefix(r.ID, "clan") {
-			t.Skip("the clan scan is A7's (#1800)")
+			t.Skip("a clan row: replayed by replayClanFanout")
 		}
 		roles := map[string]*npc.Hostile{}
 		for i, role := range r.List(t, "npcs") {

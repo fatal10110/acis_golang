@@ -25,7 +25,9 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 	if obj, ok := n.state.Object(actorID); ok {
 		if h, ok := obj.(*npc.Hostile); ok {
 			n.despawnMinions(h)
-			if master := h.Master(); master != nil && slot.entry.RespawnDelay <= 0 {
+			// A one-time private leaves its spawn master's minions, even
+			// when that master's death already unlinked it.
+			if master := h.SpawnMaster(); master != nil && slot.entry.RespawnDelay <= 0 {
 				master.RemoveMinion(actorID)
 				h.SetMaster(nil)
 			}

@@ -59,6 +59,10 @@ func (b *recordingBrain) AddSocialDesire(socialID, timer int, weight float64) {
 	b.record("social %d %d %v", socialID, timer, weight)
 }
 
+func (b *recordingBrain) AddMoveRouteDesire(name string, weight float64) {
+	b.record("route %s %v", name, weight)
+}
+
 // combatant is a creature the world tracks under objectID.
 type combatant struct {
 	attackabletest.Combatant
@@ -96,6 +100,7 @@ func TestNPCDesireRequests(t *testing.T) {
 	n.AddMoveToDesire(Loc{X: 10, Y: -20, Z: 30, Heading: 400}, 30)
 	n.AddFleeDesire(p, 500, 10000)
 	n.AddSocialDesire(3, 7000, 1000)
+	n.AddMoveRouteDesire("walk", 1000000)
 	n.AddAttackDesire(nil, 1)
 	n.AddFollowDesire((*Player)(nil), 1)
 	n.AddCastDesire(&Player{}, ref, 1)
@@ -113,6 +118,7 @@ func TestNPCDesireRequests(t *testing.T) {
 		"move-to 10,-20,30 30",
 		"flee 2 500 10000",
 		"social 3 7000 1000",
+		"route walk 1e+06",
 		"attack nil 1",
 		"follow nil 1",
 		"cast nil {4107 1} 1 check=true move=true",
@@ -151,8 +157,9 @@ func TestFolkHandleRefusesFighterDesires(t *testing.T) {
 		}()
 	}
 	n.AddSocialDesire(3, 7000, 1000)
-	if calls := b.rec.calls; len(calls) != 1 || calls[0] != "social 3 7000 1000" {
-		t.Fatalf("calls = %q, want the social desire only", calls)
+	n.AddMoveRouteDesire("walk", 5)
+	if calls := b.rec.calls; len(calls) != 2 || calls[0] != "social 3 7000 1000" || calls[1] != "route walk 5" {
+		t.Fatalf("calls = %q, want the social and route desires only", calls)
 	}
 }
 
@@ -178,4 +185,8 @@ func (b *folkOnlyBrain) AddDoNothingDesire(timer int, weight float64) {
 
 func (b *folkOnlyBrain) AddSocialDesire(socialID, timer int, weight float64) {
 	b.rec.AddSocialDesire(socialID, timer, weight)
+}
+
+func (b *folkOnlyBrain) AddMoveRouteDesire(name string, weight float64) {
+	b.rec.AddMoveRouteDesire(name, weight)
 }

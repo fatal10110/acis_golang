@@ -43,15 +43,10 @@ type FolkAI interface {
 // tick.
 const castDesireDecay = 66000
 
-// routeDesireWeight is the weight of a route walker's wish to walk its
-// route, which it holds for as long as it lives: only a heavier desire
-// takes it off the route.
-const routeDesireWeight = 1_000_000
-
 // folkCast is a civilian NPC's AI and cast runtime: the controller its
 // casts run on and the desires its AI picks its actions from. The controller is
 // set once before the NPC is published; desires is safe for concurrent
-// use; step, acting and offRoute belong to the NPC's queue, which alone
+// use; step, acting and onRoute belong to the NPC's queue, which alone
 // writes lifeTime.
 type folkCast struct {
 	control CastControl
@@ -66,9 +61,9 @@ type folkCast struct {
 	// acting marks an NPC whose AI last acted on a desire rather than going
 	// idle; the AI idles it at once when its desires run out.
 	acting bool
-	// offRoute marks a route walker its AI took off its route to act on
-	// another desire, until it is back on it.
-	offRoute bool
+	// onRoute marks an NPC its AI put on its route, until the AI takes up
+	// another desire.
+	onRoute bool
 	// buffCheckAt is when a clan hall manager last checked its own support
 	// buff, in Unix milliseconds: read and set on the NPC's queue, reset
 	// from a dialog command.
@@ -142,7 +137,7 @@ func (f *Folk) AbortCast() {
 	f.queue.Post(func() {
 		f.cast.desires.Clear()
 		f.setCurrentDesire(nil)
-		f.cast.offRoute, f.cast.acting = false, false
+		f.cast.onRoute, f.cast.acting = false, false
 		f.cast.lifeTime.Store(0)
 		if f.cast.ai != nil {
 			f.cast.ai.Remove(f)
@@ -160,17 +155,18 @@ func (f *Folk) Tick() {}
 // TickThink runs one AI tick on f's queue: the see-creature point opens
 // it, then invalid cast desires are dropped and the heaviest desire left is
 // acted on unless a cast is in flight or a social animation holds the
-// selection; an NPC with no desire left and no cast in flight idles, unless
-// it walks a route; and every third tick the cast and do-nothing desires
-// lose weight, an NPC still acting on a cast switching to its run stance. A
-// dead NPC's tick does nothing.
+// selection; an NPC with no desire left and no cast in flight idles; and
+// every third tick the cast and do-nothing desires lose weight, an NPC
+// still acting on a cast switching to its run stance. A route desire never
+// leaves the queue, so a route walker never idles. A dead NPC's tick does
+// nothing.
 func (f *Folk) TickThink() error {
 	if f.Dead() {
 		return nil
 	}
 	f.AtHookPoint(ai.HookSeeCreature)
 	f.runAI()
-	if f.cast.desires.Len() == 0 && f.cast.lifeTime.Load() > 0 && !f.CastingNow() && !f.walksRoute() {
+	if f.cast.desires.Len() == 0 && f.cast.lifeTime.Load() > 0 && !f.CastingNow() {
 		f.thinkIdle()
 	}
 	f.cast.step++
@@ -188,10 +184,9 @@ func (f *Folk) TickThink() error {
 
 // runAI prunes f's cast desires and, once f has lived through an AI tick,
 // is not casting and no social animation holds the selection, acts on the
-// heaviest desire. A route walker acts on it only when it outweighs the
-// walk, and otherwise goes back to its route; any other NPC that just ran
-// out of desires idles. A wander already current is not taken up again
-// over a wander.
+// heaviest desire: a route walk puts f on its route, any other desire takes
+// it off. A wander already current is not taken up again over a wander. An
+// NPC that just ran out of desires idles.
 func (f *Folk) runAI() {
 	if castAI := f.cast.castAI; castAI != nil {
 		f.cast.desires.RemoveIf(func(d *ai.Desire) bool {
@@ -206,7 +201,7 @@ func (f *Folk) runAI() {
 	}
 	f.cancelFollow()
 	desire, ok := f.cast.desires.Peek()
-	if !ok && !f.walksRoute() {
+	if !ok {
 		f.setCurrentDesire(nil)
 		if f.cast.acting {
 			f.cast.acting = false
@@ -214,10 +209,10 @@ func (f *Folk) runAI() {
 		}
 		return
 	}
-	if !ok || (f.walksRoute() && desire.Weight <= routeDesireWeight) {
+	f.cast.acting = true
+	if desire.Kind == ai.IntentionMoveRoute {
 		f.setCurrentDesire(nil)
-		f.cast.acting = false
-		f.backOnRoute()
+		f.thinkMoveRoute(desire.RouteName)
 		return
 	}
 	if cur := f.currentDesire(); cur != nil && cur.Kind == ai.IntentionWander && desire.Kind == ai.IntentionWander {
@@ -225,7 +220,6 @@ func (f *Folk) runAI() {
 	}
 	f.leaveRoute()
 	f.setCurrentDesire(desire)
-	f.cast.acting = true
 	f.act(desire)
 }
 
@@ -243,31 +237,41 @@ func (f *Folk) thinkIdle() {
 	f.AtHookPoint(ai.HookNoDesire)
 }
 
-// walksRoute reports whether f walks a route.
-func (f *Folk) walksRoute() bool {
-	return f.motion != nil && f.motion.cfg.Route != nil
+// AddMoveRouteDesire asks f to walk the route named name with weight; an
+// equal desire already queued gains the weight instead. The desire never
+// loses weight and stays queued while f lives, so f walks the route
+// whenever nothing outweighs it.
+func (f *Folk) AddMoveRouteDesire(name string, weight float64) {
+	f.cast.desires.AddOrUpdate(&ai.Desire{Kind: ai.IntentionMoveRoute, RouteName: name, Weight: weight, QueuedAt: f.now()})
+}
+
+// StartRoute puts f on the route named name at once, as its AI does when it
+// acts on a route desire. Call it before f is on the AI task: the AI's
+// route state is its queue's from then on.
+func (f *Folk) StartRoute(name string) { f.thinkMoveRoute(name) }
+
+// thinkMoveRoute acts on a route desire: f, when not on the route named
+// name, heads for its node nearest to f, and walks on when already on it.
+// An NPC with no route walk task, or a route with no node keyed under its
+// template alias, moves nowhere.
+func (f *Folk) thinkMoveRoute(name string) {
+	if f.motion == nil || f.motion.cfg.Route == nil {
+		return
+	}
+	f.cast.onRoute = true
+	if err := f.motion.cfg.Route.Walk(f.motion.walker, name, f.Instance.Template.Alias); err != nil {
+		f.motion.cfg.Log.Debug().Err(err).Str("route", name).Msg("npc: folk route walk")
+	}
 }
 
 // leaveRoute takes a route walker off its route while it acts on another
 // desire.
 func (f *Folk) leaveRoute() {
-	if !f.walksRoute() {
+	if !f.cast.onRoute {
 		return
 	}
-	f.cast.offRoute = true
+	f.cast.onRoute = false
 	f.motion.cfg.Route.LeaveRoute(f.motion.walker)
-}
-
-// backOnRoute sends a route walker its AI took off its route back to it,
-// from the route node nearest to where it stands.
-func (f *Folk) backOnRoute() {
-	if !f.cast.offRoute {
-		return
-	}
-	f.cast.offRoute = false
-	if err := f.motion.cfg.Route.ResumeRoute(f.motion.walker); err != nil {
-		f.motion.cfg.Log.Warn().Err(err).Msg("npc: folk route resume")
-	}
 }
 
 // thinkCast acts on a cast desire; a clan hall manager's support magic on
@@ -510,8 +514,10 @@ func (f *Folk) TestCursesOnSkillSee(modelskill.Definition, []skilltarget.Actor) 
 // NotePvPSkillTargets does nothing: NPCs take no part in PvP flagging.
 func (f *Folk) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
 
-// ConsumeHP takes a skill's HP cost from f, never below its floor.
-func (f *Folk) ConsumeHP(amount float64) { f.reduceHP(amount, f) }
+// ConsumeHP takes a skill's HP cost from f, never below its floor. The
+// cost is a consumption, not a hit: it raises no attacked hook and makes no
+// clan call.
+func (f *Folk) ConsumeHP(amount float64) { f.loseHP(amount, f, modelskill.Ref{}, false) }
 
 // SkillDisabled reports whether key is still waiting for its reuse delay.
 func (f *Folk) SkillDisabled(key int32) bool {
