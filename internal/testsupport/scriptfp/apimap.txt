@@ -416,3 +416,14 @@ HateList.isEmpty script.HateList.Empty
 HateList.refresh script.HateList.Refresh
 HateList.removeIfOutOfRange script.HateList.RemoveIfOutOfRange
 NpcAI.getHateList script.NPC.HateList
+
+# RaidPrivateStandard (A12, #2162). The top desire target is the AI's own
+# field, set by every promotion and cleared by the periodic idle (#3545).
+# The hit points and the zone check are read on the NPC handle; the attack
+# reshuffle is the randomize-hate effect's.
+AggroList.randomizeAttack script.NPC.RandomizeAttack
+Creature.isInsideZone script.NPC.InsideZone
+CreatureStatus.getHp script.NPC.HP
+CreatureStatus.getMaxHp script.NPC.MaxHP
+NpcAI.getTopDesireTarget script.NPC.TopDesireTarget
+NpcAI.setTopDesireTarget script.NPC.SetTopDesireTarget
