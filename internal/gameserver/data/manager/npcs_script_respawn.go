@@ -59,6 +59,20 @@ func (n *Npcs) ScheduleRespawn(h *npc.Hostile, d time.Duration) error {
 	return nil
 }
 
+// dropOrphanScriptSlot drops the slot key of a private a script created,
+// whose NPC is decaying, once its master is dead or out of the world:
+// nothing asks a dead master's private back, and a request already pending
+// would find that master dead anyway, so the slot would stay for good.
+func (n *Npcs) dropOrphanScriptSlot(key string, slot slotInfo) {
+	obj, _ := n.state.Object(slot.masterID)
+	if master, ok := obj.(*npc.Hostile); ok && !master.Dead() {
+		return
+	}
+	n.mu.Lock()
+	delete(n.slot, key)
+	n.mu.Unlock()
+}
+
 // DecayMe hides h, as the reference's decayMe hides an NPC: it leaves the
 // world with no decayed hook, and its spawn is not told, so it never
 // respawns and an npcmaker keeps counting it. It takes no more AI turns
