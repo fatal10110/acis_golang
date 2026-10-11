@@ -328,3 +328,7 @@ SpawnLocation.new inline
 NpcAI.addDoNothingDesire script.NPC.AddDoNothingDesire
 NpcStringId.get script.NpcString
 Point2D.distance2D script.NPC.Distance2D
+
+# Ketra/Varka alliance level (#3595): the stored standing, positive Ketra,
+# negative Varka.
+Player.getAllianceWithVarkaKetra script.Player.VarkaKetraAlliance
