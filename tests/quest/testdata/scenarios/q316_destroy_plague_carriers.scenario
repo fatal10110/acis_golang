@@ -1,0 +1,83 @@
+# Destroy Plague Carriers (Q316): an elf accepts at Ellenia, kills two Sukar wererats (the
+# first roll drops a fang, the second misses), strikes Varool Foulclaw and kills him (his
+# fang, the one he can give, completes with the middle sound). Ellenia pays 30 per wererat
+# fang and 10000 per Varool fang, then the player quits the repeatable quest. Expectations
+# are derived from the reference source (Q316_DestroyPlagueCarriers.java, Quest.dropItems).
+character Ranger 18
+class 18
+random 0 999999 0
+script quest.Q316_DestroyPlagueCarriers
+item 1042 1043
+page trainer/30155.htm
+page script/quest/Q316_DestroyPlagueCarriers/
+npc ellenia 30155 Trainer 10 0 0
+npc wererat 20040 Monster 40 0 0
+npc varool 27020 Monster 0 40 0
+
+action ellenia
+action ellenia
+  S ActionFailed
+  S NpcHtmlMessage obj=ellenia item=0 page=trainer/30155.htm
+  S ActionFailed
+bypass npc_{ellenia}_Quest
+  S NpcHtmlMessage obj=ellenia item=0 page=script/quest/Q316_DestroyPlagueCarriers/30155-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q316_DestroyPlagueCarriers CREATED
+bypass Quest Q316_DestroyPlagueCarriers 30155-04.htm
+  S QuestList 316:0x80000001
+  S ExShowQuestMark quest=316
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=ellenia item=0 page=script/quest/Q316_DestroyPlagueCarriers/30155-04.htm
+  S ActionFailed
+  Q upsert Q316_DestroyPlagueCarriers | <state> | STARTED
+  Q upsert Q316_DestroyPlagueCarriers | <cond> | 1
+  rows Q316_DestroyPlagueCarriers <cond>=1 <state>=STARTED
+
+# Two wererats: the first roll (0) is under 400000, the second (999999) is not.
+kill wererat x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1042
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  items 1042=1
+
+# Varool is struck (his cry is a chat line, not compared here), then killed: his one fang.
+hit varool 10
+kill varool
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1043
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1043=1
+
+# Ellenia pays 1 x 30 + 1 x 10000.
+action ellenia
+  S ActionFailed
+  S NpcHtmlMessage obj=ellenia item=0 page=trainer/30155.htm
+  S ActionFailed
+bypass npc_{ellenia}_Quest
+  S SystemMessage id=302 3:1042
+  S SystemMessage id=302 3:1043
+  S SystemMessage id=52 6:10030
+  S NpcHtmlMessage obj=ellenia item=0 page=script/quest/Q316_DestroyPlagueCarriers/30155-07.htm
+  S ActionFailed
+  S ActionFailed
+  items 57=10030 1042=0 1043=0
+
+# Nothing more to pay: the started window offers the quit link.
+action ellenia
+  S ActionFailed
+  S NpcHtmlMessage obj=ellenia item=0 page=trainer/30155.htm
+  S ActionFailed
+bypass npc_{ellenia}_Quest
+  S NpcHtmlMessage obj=ellenia item=0 page=script/quest/Q316_DestroyPlagueCarriers/30155-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q316_DestroyPlagueCarriers 30155-08.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=ellenia item=0 page=script/quest/Q316_DestroyPlagueCarriers/30155-08.htm
+  S ActionFailed
+  Q delete-quest Q316_DestroyPlagueCarriers
+  state Q316_DestroyPlagueCarriers -
+  rows Q316_DestroyPlagueCarriers -

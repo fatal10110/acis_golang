@@ -1,0 +1,84 @@
+# A Clan's Reputation (Q508): the leader of a level 5 clan picks Palibati Queen Themis
+# (raid 1) at Sir Eric Rodemai, kills her for the Themis scale and trades it for 65 + a
+# draw of 0 to 35 reputation points (the draw pinned to 10: 75 points), then quits the
+# repeatable quest. The first draw is the always-drop's roll, which cannot miss. Expectations are derived from the reference source
+# (Q508_AClansReputation.java, Quest.getClanLeaderQuestState, Quest.dropItemsAlways).
+character Leader 40
+clan 5
+random 0 10
+script quest.Q508_AClansReputation
+item 8277
+page default/30868.htm
+page script/quest/Q508_AClansReputation/
+npc eric 30868 Folk 10 0 0
+npc themis 25252 RaidBoss 40 0 0
+
+action eric
+action eric
+  S ActionFailed
+  S NpcHtmlMessage obj=eric item=0 page=default/30868.htm
+  S ActionFailed
+bypass npc_{eric}_Quest
+  S NpcHtmlMessage obj=eric item=0 page=script/quest/Q508_AClansReputation/30868-0c.htm
+  S ActionFailed
+  S ActionFailed
+  state Q508_AClansReputation CREATED
+bypass Quest Q508_AClansReputation 30868-0.htm
+  S NpcHtmlMessage obj=eric item=0 page=script/quest/Q508_AClansReputation/30868-0.htm
+  S ActionFailed
+
+# Raid 1: the quest starts on Themis, with her radar mark.
+bypass Quest Q508_AClansReputation 1
+  S QuestList 508:0x80000001
+  S ExShowQuestMark quest=508
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=eric item=0 page=script/quest/Q508_AClansReputation/30868-1.htm
+  S ActionFailed
+  Q upsert Q508_AClansReputation | <state> | STARTED
+  Q upsert Q508_AClansReputation | <cond> | 1
+  Q upsert Q508_AClansReputation | raid | 1
+  rows Q508_AClansReputation <cond>=1 <state>=STARTED raid=1
+
+# No proof yet.
+action eric
+  S ActionFailed
+  S NpcHtmlMessage obj=eric item=0 page=default/30868.htm
+  S ActionFailed
+bypass npc_{eric}_Quest
+  S NpcHtmlMessage obj=eric item=0 page=script/quest/Q508_AClansReputation/30868-1a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Themis dies (the raid-success line is the raid boss's own); three seconds later her
+# scale goes to the clan leader, completing the one needed.
+kill themis
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=1209
+  S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8277
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 8277=1
+
+# The scale for 65 + 10 reputation points. The seeded clan starts at 0 reputation, so the
+# gain also reactivates its clan skills (Clan.setReputationScore).
+action eric
+  S ActionFailed
+  S NpcHtmlMessage obj=eric item=0 page=default/30868.htm
+  S ActionFailed
+bypass npc_{eric}_Quest
+  S SystemMessage id=302 3:8277
+  S SystemMessage id=1862
+  S SystemMessage id=1777 1:75
+  S NpcHtmlMessage obj=eric item=0 page=script/quest/Q508_AClansReputation/30868-1b.htm
+  S ActionFailed
+  S ActionFailed
+  items 8277=0
+
+bypass Quest Q508_AClansReputation 30868-7.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=eric item=0 page=script/quest/Q508_AClansReputation/30868-7.htm
+  S ActionFailed
+  Q delete-quest Q508_AClansReputation
+  state Q508_AClansReputation -
+  rows Q508_AClansReputation -
