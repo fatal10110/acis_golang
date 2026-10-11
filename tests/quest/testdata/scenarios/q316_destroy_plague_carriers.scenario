@@ -50,7 +50,14 @@ kill varool
   S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
   items 1043=1
 
-# Ellenia pays 1 x 30 + 1 x 10000.
+# Relog: the started quest and both fangs come back.
+relog
+  state Q316_DestroyPlagueCarriers STARTED
+  rows Q316_DestroyPlagueCarriers <cond>=1 <state>=STARTED
+  items 1042=1 1043=1
+
+# Ellenia pays 1 x 30 + 1 x 10000 on the reloaded state.
+action ellenia
 action ellenia
   S ActionFailed
   S NpcHtmlMessage obj=ellenia item=0 page=trainer/30155.htm

@@ -39,7 +39,13 @@ bypass Quest Q508_AClansReputation 1
   Q upsert Q508_AClansReputation | raid | 1
   rows Q508_AClansReputation <cond>=1 <state>=STARTED raid=1
 
-# No proof yet.
+# Relog: the started quest and its chosen raid come back from character_quests.
+relog
+  state Q508_AClansReputation STARTED
+  rows Q508_AClansReputation <cond>=1 <state>=STARTED raid=1
+
+# No proof yet: the reloaded raid still picks Themis's page.
+action eric
 action eric
   S ActionFailed
   S NpcHtmlMessage obj=eric item=0 page=default/30868.htm
