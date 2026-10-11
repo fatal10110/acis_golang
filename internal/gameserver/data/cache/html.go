@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync/atomic"
+	"unicode/utf8"
 )
 
 // HTML stores loaded datapack HTML pages, keyed by path relative to data/html.
@@ -19,14 +20,17 @@ type HTML struct {
 	pages atomic.Pointer[map[string]string]
 }
 
-// LoadHTML reads every .htm and .html file under dir into memory.
-func LoadHTML(dir string) (*HTML, error) {
+// LoadHTML reads every .htm and .html file under dir into memory. A file
+// that is not valid UTF-8 cannot be read as a page: it is left out, so Get
+// reports it missing, and its path relative to dir is returned in
+// undecodable, sorted, for the caller to report.
+func LoadHTML(dir string) (h *HTML, undecodable []string, err error) {
 	info, err := os.Stat(dir)
 	if err != nil {
-		return nil, fmt.Errorf("data/cache: stat html dir %s: %w", dir, err)
+		return nil, nil, fmt.Errorf("data/cache: stat html dir %s: %w", dir, err)
 	}
 	if !info.IsDir() {
-		return nil, fmt.Errorf("data/cache: html path %s is not a directory", dir)
+		return nil, nil, fmt.Errorf("data/cache: html path %s is not a directory", dir)
 	}
 
 	pages := make(map[string]string)
@@ -48,18 +52,23 @@ func LoadHTML(dir string) (*HTML, error) {
 			return fmt.Errorf("data/cache: html path %s relative to %s: %w", name, dir, err)
 		}
 		key := path.Clean(filepath.ToSlash(rel))
+		if !utf8.Valid(data) {
+			undecodable = append(undecodable, key)
+			return nil
+		}
 		pages[key] = normalizeHTML(string(data))
 		return nil
 	}); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if len(pages) == 0 {
-		return nil, fmt.Errorf("data/cache: no html files found in %s", dir)
+		return nil, nil, fmt.Errorf("data/cache: no html files found in %s", dir)
 	}
+	sort.Strings(undecodable)
 
-	h := &HTML{}
+	h = &HTML{}
 	h.pages.Store(&pages)
-	return h, nil
+	return h, undecodable, nil
 }
 
 // Replace swaps h's pages for from's, at once for every holder of h:

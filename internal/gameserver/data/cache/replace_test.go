@@ -25,7 +25,7 @@ func TestHTMLReplace(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "admin/main.htm", []byte("<html>old</html>"))
 	writeFile(t, dir, "admin/gone.htm", []byte("<html>gone</html>"))
-	html, err := LoadHTML(dir)
+	html, _, err := LoadHTML(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func TestHTMLReplace(t *testing.T) {
 	if err := os.Remove(filepath.Join(dir, "admin/gone.htm")); err != nil {
 		t.Fatal(err)
 	}
-	fresh, err := LoadHTML(dir)
+	fresh, _, err := LoadHTML(dir)
 	if err != nil {
 		t.Fatal(err)
 	}

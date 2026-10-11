@@ -187,7 +187,7 @@ func formatItemModifiers(modifiers []item.StatModifier) string {
 }
 
 func loadHTMLRecords(root string) ([]datadiff.Record, error) {
-	html, err := datacache.LoadHTML(filepath.Join(root, "data", "html"))
+	html, _, err := datacache.LoadHTML(filepath.Join(root, "data", "html"))
 	if err != nil {
 		return nil, err
 	}

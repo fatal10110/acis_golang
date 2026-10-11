@@ -151,7 +151,7 @@ func testHTMLCache(t *testing.T, pages map[string]string) *datacache.HTML {
 			t.Fatal(err)
 		}
 	}
-	html, err := datacache.LoadHTML(dir)
+	html, _, err := datacache.LoadHTML(dir)
 	if err != nil {
 		t.Fatalf("LoadHTML: %v", err)
 	}
