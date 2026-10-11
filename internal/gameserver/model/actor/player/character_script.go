@@ -104,6 +104,28 @@ func (c *Character) TakeScriptItems(itemID int32, count int) {
 	c.emit(event.ItemsTaken{ItemID: itemID, Count: count, Short: !taken})
 }
 
+// ReduceScriptAdena takes count adena from c for a script, and reports
+// whether it did. Short of count, c is told so and keeps its adena; a
+// payment the inventory refuses fails silently; a count below one is paid
+// at once. A character leaving the world pays nothing and reports false.
+func (c *Character) ReduceScriptAdena(count int) bool {
+	if c.Detaching() || c.inventory == nil {
+		return false
+	}
+	if count > c.inventory.Adena() {
+		c.emit(event.ItemsTaken{ItemID: item.AdenaID, Short: true})
+		return false
+	}
+	if count <= 0 {
+		return true
+	}
+	if c.inventory.DestroyByTemplateID(item.AdenaID, count) == nil {
+		return false
+	}
+	c.emit(event.ItemsTaken{ItemID: item.AdenaID, Count: count})
+	return true
+}
+
 // unequipForTake takes inst off when c wears it.
 func (c *Character) unequipForTake(inst *item.Instance) {
 	if inst.Equipped() {
