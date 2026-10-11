@@ -55,3 +55,8 @@ func (c *Character) BroadcastSocialAction(id int32) {
 func (c *Character) NotifySystemMessageNumbers(id int, numbers ...int32) {
 	c.emit(event.SystemMessageShown{ID: id, Numbers: numbers})
 }
+
+// PlayScene plays the client's built-in scene for c alone.
+func (c *Character) PlayScene() {
+	c.emit(event.ScenePlayed{})
+}

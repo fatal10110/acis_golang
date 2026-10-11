@@ -31,3 +31,15 @@ func (f *Folk) Say(text string) {
 func (f *Folk) SocialAction(id int) {
 	f.emit(event.SocialAction{ID: int32(id)})
 }
+
+// PlayCameraShot plays the cutscene camera shot, centred on h, for the
+// players around it.
+func (h *Hostile) PlayCameraShot(shot event.CameraShot) {
+	h.emit(event.CameraShotPlayed{Shot: shot})
+}
+
+// PlayCameraShot plays the cutscene camera shot, centred on f, for the
+// players around it.
+func (f *Folk) PlayCameraShot(shot event.CameraShot) {
+	f.emit(event.CameraShotPlayed{Shot: shot})
+}
