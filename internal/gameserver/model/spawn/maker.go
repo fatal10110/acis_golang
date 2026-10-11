@@ -1,11 +1,6 @@
 package spawn
 
-import (
-	"fmt"
-	"math"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
-)
+import "math"
 
 // Maker is one <npcmaker> group plus its resolved territory references.
 type Maker struct {
@@ -20,37 +15,23 @@ type Maker struct {
 	Entries           []Entry
 }
 
-// NewMaker builds a Maker from set plus already-resolved references and
-// decoded child entries. multiplier is the configured spawn multiplier:
-// maximumNpcs is scaled and rounded by it (see scaleBySpawnMultiplier).
-func NewMaker(set *commons.StatSet, territories []*Territory, banned []*Territory, entries []Entry, aiParams map[string]string, multiplier float64) (*Maker, error) {
-	idf := commons.NewFields(set, "spawn maker")
-	name := idf.String("name")
-	if err := idf.Err(); err != nil {
-		return nil, err
-	}
-	f := commons.NewFields(set, fmt.Sprintf("spawn maker %q", name))
-	maximum := f.Int("maximumNpcs")
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
-
-	// SpawnManager.findTerritory resolves an unknown name to null and still
-	// builds the NpcMaker; a maker with no resolvable territory just never
-	// finds a spawn position (randomTerritoryPosition already treats a nil
-	// or empty Territories the same way), matching that tolerance instead
-	// of failing the whole spawnlist load.
-	return &Maker{
-		Name:              name,
-		Territories:       append([]*Territory(nil), territories...),
-		BannedTerritories: append([]*Territory(nil), banned...),
-		AIType:            f.StringDefault("maker", ""),
-		AIParams:          copyStringMap(aiParams),
-		MaximumNPCs:       scaleBySpawnMultiplier(maximum, multiplier),
-		Event:             f.StringDefault("event", ""),
-		SpawnTime:         f.StringDefault("spawnTime", ""),
-		Entries:           append([]Entry(nil), entries...),
-	}, nil
+// NewMaker returns m as the spawnlist loads it: MaximumNPCs is scaled and
+// rounded by multiplier, the configured spawn multiplier (see
+// scaleBySpawnMultiplier). Empty Territories, BannedTerritories, Entries and
+// AIParams read as nil.
+//
+// SpawnManager.findTerritory resolves an unknown name to null and still
+// builds the NpcMaker; a maker with no resolvable territory just never
+// finds a spawn position (randomTerritoryPosition already treats a nil or
+// empty Territories the same way), matching that tolerance instead of
+// failing the whole spawnlist load.
+func NewMaker(m Maker, multiplier float64) *Maker {
+	m.Territories = append([]*Territory(nil), m.Territories...)
+	m.BannedTerritories = append([]*Territory(nil), m.BannedTerritories...)
+	m.AIParams = copyStringMap(m.AIParams)
+	m.MaximumNPCs = scaleBySpawnMultiplier(m.MaximumNPCs, multiplier)
+	m.Entries = append([]Entry(nil), m.Entries...)
+	return &m
 }
 
 // scaleBySpawnMultiplier applies the spawn multiplier as n * multiplier

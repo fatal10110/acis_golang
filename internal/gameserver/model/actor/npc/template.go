@@ -2,7 +2,6 @@ package npc
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -118,53 +117,12 @@ type PrivateEntry struct {
 	RespawnDelay time.Duration
 }
 
-// NewPrivateEntry builds a PrivateEntry from set, the folded attributes of
-// one <private> element. id, weight and respawn are all required.
-func NewPrivateEntry(set *commons.StatSet) (PrivateEntry, error) {
-	idf := commons.NewFields(set, "npc: private entry")
-	id := idf.Int("id")
-	if err := idf.Err(); err != nil {
-		return PrivateEntry{}, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("npc: private entry %d", id))
-	weight := f.Int("weight")
-	respawnStr := f.String("respawn")
-	if err := f.Err(); err != nil {
-		return PrivateEntry{}, err
-	}
-	respawn, err := commons.ParseGameDuration(respawnStr)
-	if err != nil {
-		return PrivateEntry{}, fmt.Errorf("npc: private entry %d: %w", id, err)
-	}
-	return PrivateEntry{NpcID: id, Weight: weight, RespawnDelay: respawn}, nil
-}
-
 // PetData is the feeding and mount data carried by a template whose npc can
 // be tamed or summoned as a pet.
 type PetData struct {
 	Food1, Food2                              int
 	AutoFeedLimit, HungryLimit, UnsummonLimit float64
 	Levels                                    map[int]PetLevelStats
-}
-
-// NewPetData builds a PetData from set, the folded attributes of one
-// <petdata> element, and its already-parsed per-level stat rows. Every
-// attribute is required.
-func NewPetData(set *commons.StatSet, levels map[int]PetLevelStats) (*PetData, error) {
-	f := commons.NewFields(set, "npc: pet data")
-	p := &PetData{
-		Food1:         f.Int("food1"),
-		Food2:         f.Int("food2"),
-		AutoFeedLimit: f.Float64("autoFeedLimit"),
-		HungryLimit:   f.Float64("hungryLimit"),
-		UnsummonLimit: f.Float64("unsummonLimit"),
-		Levels:        levels,
-	}
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
-	return p, nil
 }
 
 // PetLevelStats is one level's row of a pet's growth table: its stats
@@ -187,51 +145,6 @@ type PetLevelStats struct {
 	MountFlySpeed                        int
 }
 
-// NewPetLevelStats builds a PetLevelStats from set, the folded attributes
-// of one <stat> element. The mounted fields default to 0 when the row
-// defines no "*OnRide"/"speedOnRide" attributes at all, matching a pet that
-// cannot be ridden at this level.
-func NewPetLevelStats(set *commons.StatSet) (PetLevelStats, error) {
-	f := commons.NewFields(set, "npc: pet level stats")
-	s := PetLevelStats{
-		MaxExp:       f.Int64("exp"),
-		MaxMeal:      f.Int("maxMeal"),
-		ExpType:      f.Int("expType"),
-		MealInBattle: f.Int("mealInBattle"),
-		MealInNormal: f.Int("mealInNormal"),
-		PAtk:         f.Float64("pAtk"),
-		PDef:         f.Float64("pDef"),
-		MAtk:         f.Float64("mAtk"),
-		MDef:         f.Float64("mDef"),
-		MaxHP:        f.Float64("hp"),
-		MaxMP:        f.Float64("mp"),
-		HPRegen:      f.Float64("hpRegen"),
-		MPRegen:      f.Float64("mpRegen"),
-		SSCount:      f.Int("ssCount"),
-		SPSCount:     f.Int("spsCount"),
-
-		MountMealInBattle: f.IntDefault("mealInBattleOnRide", 0),
-		MountMealInNormal: f.IntDefault("mealInNormalOnRide", 0),
-		MountAtkSpd:       f.Float64Default("atkSpdOnRide", 0),
-		MountPAtk:         f.Float64Default("pAtkOnRide", 0),
-		MountMAtk:         f.Float64Default("mAtkOnRide", 0),
-	}
-
-	if f.Has("speedOnRide") {
-		speeds := f.IntArray("speedOnRide")
-		if len(speeds) < 5 {
-			f.Fail(fmt.Errorf("attribute %q: want at least 5 values, got %d", "speedOnRide", len(speeds)))
-		} else {
-			s.MountBaseSpeed, s.MountWaterSpeed, s.MountFlySpeed = speeds[0], speeds[2], speeds[4]
-		}
-	}
-
-	if err := f.Err(); err != nil {
-		return PetLevelStats{}, err
-	}
-	return s, nil
-}
-
 // TemplateSkills is the resolved <skills> block of one template: its
 // typed skills and its passives. The zero value is a template with no
 // <skills> block.
@@ -240,107 +153,13 @@ type TemplateSkills struct {
 	Passives []skill.Ref
 }
 
-// NewTemplate builds a Template from set, the merged <set> attributes of
-// one <npc> element plus the "aiParams", "drops", "privates", "teachTo"
-// and "pet" values the loader packed in, and from skills, its resolved
-// <skills> block.
-func NewTemplate(set *commons.StatSet, skills TemplateSkills) (*Template, error) {
-	idf := commons.NewFields(set, "npc template")
-	id := idf.Int("id")
-	if err := idf.Err(); err != nil {
-		return nil, err
-	}
-
-	f := commons.NewFields(set, fmt.Sprintf("npc template %d", id))
-	t := &Template{
-		ID:         id,
-		TemplateID: f.IntDefault("idTemplate", id),
-		Name:       f.String("name"),
-
-		Title: f.StringDefault("title", ""),
-		Alias: f.StringDefault("alias", ""),
-
-		UsingServerSideName:  f.BoolDefault("usingServerSideName", false),
-		UsingServerSideTitle: f.BoolDefault("usingServerSideTitle", false),
-
-		Type:          f.String("type"),
-		Level:         f.IntDefault("level", 1),
-		HitTimeFactor: f.Float64Default("hitTimeFactor", 0),
-		RightHand:     f.IntDefault("rHand", 0),
-		LeftHand:      f.IntDefault("lHand", 0),
-		RewardExp:     f.Float64Default("exp", 0),
-		RewardSp:      f.Float64Default("sp", 0),
-
-		BaseAttackRange:  f.IntDefault("baseAttackRange", 0),
-		BaseDamageRange:  f.IntArray("baseDamageRange"),
-		BaseRandomDamage: f.IntDefault("baseRandomDamage", 0),
-
-		STR: f.IntDefault("str", 40),
-		CON: f.IntDefault("con", 21),
-		DEX: f.IntDefault("dex", 30),
-		INT: f.IntDefault("int", 20),
-		WIT: f.IntDefault("wit", 43),
-		MEN: f.IntDefault("men", 20),
-
-		HPMax:   f.Float64Default("hp", 0),
-		MPMax:   f.Float64Default("mp", 0),
-		HPRegen: f.Float64Default("hpRegen", 1.5),
-		MPRegen: f.Float64Default("mpRegen", 0.9),
-		PAtk:    f.Float64("pAtk"),
-		MAtk:    f.Float64("mAtk"),
-		PDef:    f.Float64("pDef"),
-		MDef:    f.Float64("mDef"),
-
-		AtkSpd:    f.Float64Default("atkSpd", 300),
-		CritRate:  f.Float64Default("crit", 4),
-		WalkSpeed: f.Float64Default("walkSpd", 0),
-		RunSpeed:  f.Float64Default("runSpd", 1),
-
-		CollisionRadius: f.Float64("radius"),
-		CollisionHeight: f.Float64("height"),
-
-		SSCount:  f.IntDefault("ssCount", 0),
-		SPSCount: f.IntDefault("spsCount", 0),
-
-		Undying:       f.BoolDefault("undying", false),
-		CanBeAttacked: f.BoolDefault("canBeAttacked", true),
-		CorpseTime:    f.IntDefault("corpseTime", 7),
-		NoSleepMode:   f.BoolDefault("noSleepMode", false),
-		AggroRange:    f.IntDefault("aggroRange", 0),
-		CanMove:       f.BoolDefault("canMove", true),
-		Seedable:      f.BoolDefault("seedable", false),
-		CanSeeThrough: f.BoolDefault("canSeeThrough", false),
-
-		Drops:    commons.FieldList[item.DropCategory](f, "drops"),
-		Privates: commons.FieldList[PrivateEntry](f, "privates"),
-	}
-
-	if race, ok := commons.FieldObject[Race](f, "race"); ok {
-		t.Race = race
-	}
-
-	if aiParams, ok := commons.FieldObject[AIParams](f, "aiParams"); ok {
-		t.AIParams = aiParams
-	}
-
-	if f.Has("clan") {
-		t.Clans = f.StringArray("clan")
-		t.ClanRange = f.Int("clanRange")
-		if f.Has("ignoredIds") {
-			t.IgnoredIDs = f.IntArray("ignoredIds")
-		}
-	}
-
-	if f.Has("teachTo") {
-		t.TeachTo = f.IntArray("teachTo")
-	}
-
-	if pet, ok := commons.FieldObject[*PetData](f, "pet"); ok {
-		t.Pet = pet
-	}
-
+// NewTemplate returns t with its <skills> block applied: SkillsByType and
+// Passives from skills, and Skills derived from them. The loader decodes
+// every other field.
+func NewTemplate(t Template, skills TemplateSkills) *Template {
 	t.SkillsByType = skills.ByType
 	t.Passives = skills.Passives
+	t.Skills = nil
 	if skills.ByType != nil {
 		t.Skills = make(map[int]int, len(skills.ByType))
 		for typ := range skillTypeCount {
@@ -353,11 +172,7 @@ func NewTemplate(set *commons.StatSet, skills TemplateSkills) (*Template, error)
 			}
 		}
 	}
-
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
-	return t, nil
+	return &t
 }
 
 // ErrNoTemplate reports an NPC id no template has.

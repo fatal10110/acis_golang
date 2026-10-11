@@ -5,6 +5,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 )
@@ -174,6 +175,73 @@ func (a *attrValues) int64Default(key string, def int64) int64 {
 		return def
 	}
 	return n
+}
+
+// int64 returns the value at key as a base-10 int64, recording an error if
+// key is absent or its value fails to parse.
+func (a *attrValues) int64(key string) int64 {
+	if a.err != nil {
+		return 0
+	}
+	if _, ok := a.vals[key]; !ok {
+		a.fail(fmt.Errorf("attribute %q is required", key))
+		return 0
+	}
+	return a.int64Default(key, 0)
+}
+
+// intArray returns the value at key split on ";" with each part read as a
+// base-10 int, recording an error if key is absent or any part, including
+// an empty one, fails to parse.
+func (a *attrValues) intArray(key string) []int {
+	if a.err != nil {
+		return nil
+	}
+	raw, ok := a.vals[key]
+	if !ok {
+		a.fail(fmt.Errorf("attribute %q is required", key))
+		return nil
+	}
+	parts := strings.Split(raw, ";")
+	out := make([]int, len(parts))
+	for i, p := range parts {
+		n, err := commons.Atoi(p)
+		if err != nil {
+			a.fail(fmt.Errorf("attribute %q: %w", key, err))
+			return nil
+		}
+		out[i] = n
+	}
+	return out
+}
+
+// strArray returns the value at key split on ";", recording an error if key
+// is absent. Empty parts are kept.
+func (a *attrValues) strArray(key string) []string {
+	if a.err != nil {
+		return nil
+	}
+	raw, ok := a.vals[key]
+	if !ok {
+		a.fail(fmt.Errorf("attribute %q is required", key))
+		return nil
+	}
+	return strings.Split(raw, ";")
+}
+
+// gameDuration returns the value at key as a commons.ParseGameDuration
+// duration, or 0 when key is absent or empty.
+func (a *attrValues) gameDuration(key string) time.Duration {
+	raw := a.strDefault(key, "")
+	if a.err != nil || raw == "" {
+		return 0
+	}
+	d, err := commons.ParseGameDuration(raw)
+	if err != nil {
+		a.fail(fmt.Errorf("%s: %w", key, err))
+		return 0
+	}
+	return d
 }
 
 // int32Literal returns the value at key as an int32 integer literal (see

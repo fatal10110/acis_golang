@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/geometry"
 )
 
@@ -86,26 +85,17 @@ func (t *Territory) Intersects(other *geometry.Territory) bool {
 
 // ErrTerritoryBuild marks a territory whose polygon could not be built (too
 // few nodes, an inverted Z range, or a shape triangulation rejects). It
-// marks the per-territory recovery boundary: the name and minZ/maxZ
-// attribute reads happen before it and their errors still propagate, but a
-// failure while building the triangulated territory is caught, warned
-// about, and skipped by the caller instead of aborting the whole spawnlist
-// load.
+// marks the per-territory recovery boundary: the loader's name and
+// minZ/maxZ attribute reads happen before it and their errors still
+// propagate, but a failure while building the triangulated territory is
+// caught, warned about, and skipped by the caller instead of aborting the
+// whole spawnlist load.
 var ErrTerritoryBuild = errors.New("spawn: territory build failed")
 
-// NewTerritory builds a Territory from set plus its decoded polygon nodes.
-func NewTerritory(set *commons.StatSet, nodes []Node) (*Territory, error) {
-	idf := commons.NewFields(set, "spawn territory")
-	name := idf.String("name")
-	if err := idf.Err(); err != nil {
-		return nil, err
-	}
-	f := commons.NewFields(set, fmt.Sprintf("spawn territory %q", name))
-	minZ := f.Int("minZ")
-	maxZ := f.Int("maxZ")
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
+// NewTerritory builds a Territory named name spanning minZ..maxZ from its
+// decoded polygon nodes. A polygon that cannot be built fails with
+// ErrTerritoryBuild.
+func NewTerritory(name string, minZ, maxZ int, nodes []Node) (*Territory, error) {
 	if len(nodes) < 3 {
 		return nil, fmt.Errorf("%w: territory %q needs at least 3 nodes", ErrTerritoryBuild, name)
 	}
