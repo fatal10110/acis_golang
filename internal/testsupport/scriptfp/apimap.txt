@@ -218,6 +218,11 @@ SocialAction.new script.Player.SocialAction
 SystemMessage.addNumber script.Player.SystemMessageNumbers
 SystemMessage.getSystemMessage inline
 
+# Cutscene camera (#3500). The shot is always centred on the NPC that
+# broadcasts it, so the object id is the NPC handle's; the scene a quest
+# plays for one player is a static packet, PlayScene on the player handle.
+SpecialCamera.new script.NPC.SpecialCamera
+
 # Route desire and the walker script (A13). The NPC handle stands for the
 # NPC, its AI and its template; a created binding is a field of the script;
 # an id list is a Go slice.
