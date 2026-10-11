@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -23,9 +24,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 	"github.com/rs/zerolog"
@@ -90,6 +93,8 @@ type run struct {
 	objs  map[string]int32
 	npcs  map[string]NPC
 	live  map[string]*npc.Hostile
+	// items is the item catalog the server runs with.
+	items *item.Table
 	// draws is the random line's source; traceDraws the draws the
 	// reference pinned in each traced step.
 	draws      draws
@@ -157,6 +162,7 @@ func Run(t *testing.T, sc *Scenario, cfg Config) {
 	r := &run{sc: sc, pages: loadPages(t, sc.Pages), roles: map[int32]string{}, objs: map[string]int32{}, npcs: map[string]NPC{}, live: map[string]*npc.Hostile{}}
 	r.draws.random = sc.Random
 	r.texts = pageTexts(t, r.pages)
+	r.items = itemTemplates(t, sc.Items)
 	if sc.Trace != "" {
 		data, err := os.ReadFile(filepath.Join(moduleRoot(t), filepath.FromSlash(sc.Trace)))
 		if err != nil {
@@ -221,8 +227,8 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		gameservertest.WithReuseDelays(0, 0),
 		gameservertest.WithHTMLPages(r.pages),
 		gameservertest.WithNPCScripts(kinds, list, catalog),
-		gameservertest.WithItemTemplates(itemTemplates(t, r.sc.Items)),
-		// The AI task ticks only on an approach step.
+		gameservertest.WithItemTemplates(r.items),
+		// The AI task ticks only on an approach or a tick step.
 		gameservertest.WithAITask(),
 		gameservertest.WithLevels(scenarioLevels(t)),
 		// The NPC population, with no maker, over the scenario's templates:
@@ -248,6 +254,9 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	if r.sc.Random != nil {
 		opts = append(opts, gameservertest.WithScriptRand(r.draws.draw))
 	}
+	if f := r.sc.Festival; f != nil {
+		opts = append(opts, gameservertest.WithSevenSignsSeed(func(store *gamesql.SevenSignsStore) { seedFestival(t, store, f) }))
+	}
 	r.srv = gameservertest.Boot(t, opts...)
 	if r.sc.Creates() {
 		return
@@ -263,6 +272,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	// selected.
 	seedQuests(t, r.srv.DB, r.player, r.sc.Quests)
 	seedExp(t, r.srv.DB, r.player, r.sc.Level)
+	r.seedHoldings(t)
 	r.enterWorld(t)
 	r.srv.FlushPersistence(t)
 	r.srv.TakeJournalWrites()
@@ -349,20 +359,83 @@ func seedQuests(t *testing.T, db *sql.DB, obj int32, quests []QuestRows) {
 	}
 }
 
-// spawn places a fresh NPC of n's template at n's offset under n's role.
+// seedFestival writes the festival line's scores into the Seven Signs
+// status row the server restores.
+func seedFestival(t *testing.T, store *gamesql.SevenSignsStore, scores *[2]int) {
+	t.Helper()
+	ctx := context.Background()
+	row, found, err := store.LoadStatus(ctx)
+	if err != nil || !found {
+		t.Fatalf("seed festival: load the status row: found=%v err=%v", found, err)
+	}
+	row.DawnFestivalScore, row.DuskFestivalScore = scores[0], scores[1]
+	if err := store.SaveStatus(ctx, row); err != nil {
+		t.Fatalf("seed festival: %v", err)
+	}
+}
+
+// seedHoldings stores what the hold, equip, standing, pk and cabal lines
+// say the character holds and stands for, before it is selected.
+func (r *run) seedHoldings(t *testing.T) {
+	t.Helper()
+	ctx := context.Background()
+	for _, h := range r.sc.Holds {
+		tmpl, ok := r.items.Get(h.Item)
+		switch {
+		case !ok:
+			t.Fatalf("%s: hold %d: no such template in the catalog; add an item line", r.sc.Name, h.Item)
+		case tmpl.Stackable:
+			r.srv.GiveItem(t, r.player, h.Item, h.Count)
+		default:
+			for range h.Count {
+				r.srv.GiveItem(t, r.player, h.Item, 1)
+			}
+		}
+	}
+	for _, id := range r.sc.Equips {
+		tmpl, ok := r.items.Get(id)
+		if !ok {
+			t.Fatalf("%s: equip %d: no such template in the catalog; add an item line", r.sc.Name, id)
+		}
+		inst := item.NewStackOrEquip(r.srv.NewObjectID(), tmpl, 1, true)
+		if !inst.Equipped() {
+			t.Fatalf("%s: equip %d: the item is not worn in any paperdoll slot", r.sc.Name, id)
+		}
+		inst.OwnerID = r.player
+		if err := r.srv.Items.Create(ctx, r.player, inst); err != nil {
+			t.Fatalf("%s: equip %d: %v", r.sc.Name, id, err)
+		}
+	}
+	if r.sc.Standing != 0 || r.sc.PK != 0 {
+		if _, err := r.srv.DB.ExecContext(ctx, "UPDATE characters SET varka_ketra_ally = ?, pkkills = ? WHERE obj_Id = ?",
+			r.sc.Standing, r.sc.PK, r.player); err != nil {
+			t.Fatalf("seed standing and pk: %v", err)
+		}
+	}
+	if r.sc.Cabal != sevensigns.NoCabal {
+		if err := r.srv.SevenSigns.SetPlayerInfo(ctx, r.player, r.sc.Cabal, r.sc.Seal); err != nil {
+			t.Fatalf("seed cabal: %v", err)
+		}
+	}
+}
+
+// spawn places a fresh NPC of n's template at n's offset under n's role,
+// then runs its created hooks, as the spawn pass does. A civilian casts
+// the shipped skills.
 func (r *run) spawn(t *testing.T, n NPC) {
 	t.Helper()
 	at := location.Location{X: r.origin.X + n.DX, Y: r.origin.Y + n.DY, Z: r.origin.Z + n.DZ}
 	tmpl := template(n)
-	var obj int32
+	var live attackable.Combatant
 	if npc.FolkKind(&npc.Instance{Template: tmpl}) {
-		obj = r.srv.SpawnFolkNPCAt(t, tmpl, at).ObjectID()
+		live = r.srv.SpawnCastingFolkNPCAt(t, tmpl, at, shippedSkills(t))
 	} else {
 		h := r.srv.SpawnHostileNPCTemplateAt(t, tmpl, at)
 		r.srv.AI.Add(h)
-		r.live[n.Role], obj = h, h.ObjectID()
+		r.live[n.Role], live = h, h
 	}
-	r.roles[obj], r.objs[n.Role] = n.Role, obj
+	r.roles[live.ObjectID()], r.objs[n.Role] = n.Role, live.ObjectID()
+	r.srv.RunCreated(t, live)
 }
 
 // template is the fixture template of n: a civilian one, undying like the
@@ -434,6 +507,17 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		r.srv.Advance(t, d)
 	case "approach":
 		r.approach(t, st.Args[0])
+	case "tick":
+		n := 1
+		if len(st.Args) == 1 {
+			n, _ = killCount(st.Args[0])
+		}
+		for range n {
+			if err := r.srv.AI.Tick(); err != nil {
+				fail("AI tick: %v", err)
+			}
+			r.srv.Settle(t)
+		}
 	case "pickup":
 		r.pickup(t, st.Args[0])
 	case "mark":
@@ -749,6 +833,28 @@ var shipped struct {
 	once  sync.Once
 	table *item.Table
 	err   error
+}
+
+// shippedSkillTable is the shipped skill table, loaded once per test
+// binary.
+var shippedSkillTable struct {
+	once  sync.Once
+	table *modelskill.Table
+	err   error
+}
+
+// shippedSkills is the shipped skill table the scenario civilians cast
+// from.
+func shippedSkills(t *testing.T) *modelskill.Table {
+	t.Helper()
+	dir := datapack.Path(t, "data", "xml", "skills")
+	shippedSkillTable.once.Do(func() {
+		shippedSkillTable.table, shippedSkillTable.err = gamexml.LoadSkillDefinitions(dir, zerolog.Nop())
+	})
+	if shippedSkillTable.err != nil {
+		t.Fatalf("load shipped skills: %v", shippedSkillTable.err)
+	}
+	return shippedSkillTable.table
 }
 
 // itemTemplates is the fixture item catalog with the shipped templates of

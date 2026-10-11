@@ -1,0 +1,14 @@
+# A level 3 Ketra ally signed up for Dawn, holding and wearing nothing, with no festival line:
+# the probe's page shows the standing, no PK, no mark, no adena, no weapon, and a tied
+# competition (no winning and no losing cabal).
+character Ketra 40
+standing 3
+cabal dawn gnosis
+script test.HoldingsProbe
+npc probe 30002 Folk 10 0 0
+
+action probe
+action probe
+  S ActionFailed
+  S NpcHtmlMessage obj=probe item=0 html="<html><body>standing=3 pk=0 mark=0 adena=0 weapon=0 cabal=DAWN winning=NORMAL losing=NORMAL</body></html>"
+  S ActionFailed
