@@ -39,9 +39,12 @@ func (c *Character) Regen() *creature.Regen { return &c.regen }
 // teleport keeps the task on its grid: off the grid until Appearing, c is
 // still in the world.
 //
-// Every vitals write and every status report reaches it once its lock is
-// released, so it then raises the low-HP tutorial event an HP write owes
-// (lowHPNotice).
+// Every status report (BroadcastStatus) and every vitals write except
+// AddHP, SetHP and ReduceCurrentHP reaches it once its lock is released,
+// so it then raises the low-HP tutorial event an HP write owes
+// (lowHPNotice). Those three run settleRegenTask instead and leave the
+// event to their caller's status report (writeHPLocked); a caller that
+// skips the report delays the event to the next settle.
 func (c *Character) SettleRegen() {
 	c.settleRegenTask()
 	c.lowHPNotice()
