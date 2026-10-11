@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/config"
+	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 
@@ -55,6 +56,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/noblesseteleporter"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/primevalsummoner"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -205,8 +207,9 @@ func provideScriptSpawner(log zerolog.Logger) *script.Spawner {
 // kill rewards read, the item id allocator, the NPC spawner, the shared
 // random source, the world the scripts look NPCs up in, the skill and item
 // definitions, the in-game clock, the datapack pages a script reads, the
-// Seven Signs state and the grand boss wait times.
-func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner, state *world.State, data *gameData, clock *task.GameClock, html *datacache.HTML, sevenSigns *sevensigns.State, gameplay gameplayConfig) (*script.Env, error) {
+// Seven Signs state, the grand boss wait times, the doors scripts open and
+// close, and the castles NPCs belong to with their sieges.
+func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner, state *world.State, data *gameData, clock *task.GameClock, html *datacache.HTML, sevenSigns *sevensigns.State, gameplay gameplayConfig, doors *manager.WorldObjects, castles *castle.Manager, sieges *siege.Engine) (*script.Env, error) {
 	var rates script.Rates
 	for _, r := range []struct {
 		key string
@@ -239,6 +242,9 @@ func provideScriptEnv(serverProps *config.Properties, rewards manager.KillReward
 		Page:             html.Get,
 		SevenSigns:       sevenSigns,
 		BossWaits:        gameplay.BossWaits,
+		Doors:            doors,
+		Castles:          castles,
+		Sieges:           sieges,
 	}, nil
 }
 

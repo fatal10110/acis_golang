@@ -23,6 +23,21 @@ func (n *NPC) HasMaster() bool { return n.Master() != nil }
 // in this life, even ones gone since. A handle on nothing panics.
 func (n *NPC) IsMaster() bool { return memberOf(n, "the privates").IsMaster() }
 
+// Minions returns the privates of the NPC's party, dead ones included, in
+// no particular order: its master's, the NPC among them, when it has a
+// master. Otherwise they are its own, and the NPC is a master from then
+// on (IsMaster), with no private at first. A handle on nothing panics.
+func (n *NPC) Minions() []*NPC {
+	members := memberOf(n, "the privates").PartyMinions()
+	out := make([]*NPC, 0, len(members))
+	for _, m := range members {
+		if h := NPCOf(m); h != nil {
+			out = append(out, h)
+		}
+	}
+	return out
+}
+
 // memberOf returns the NPC n handles, a hostile or a civilian one. A handle
 // on nothing panics.
 func memberOf(n *NPC, what string) npc.PartyMember {
