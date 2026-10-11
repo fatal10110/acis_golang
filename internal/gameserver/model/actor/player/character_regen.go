@@ -16,6 +16,9 @@ func (c *Character) TickRegen() {
 		return
 	}
 	changed := c.AddHP(math.Max(1, c.HPRegenRate())) > 0
+	// A regeneration write reports its status only once the tick is done,
+	// so its low-HP event comes first.
+	c.lowHPNotice()
 	changed = c.AddMP(math.Max(1, c.MPRegenRate())) > 0 || changed
 	changed = c.AddCP(math.Max(1, c.CPRegenRate())) > 0 || changed
 	if changed {
@@ -36,11 +39,19 @@ func (c *Character) Regen() *creature.Regen { return &c.regen }
 // teleport keeps the task on its grid: off the grid until Appearing, c is
 // still in the world.
 //
-// Every vitals write reaches it once its lock is released, so it then
-// raises the low-HP tutorial event an HP write owes (lowHPNotice).
+// Every vitals write and every status report reaches it once its lock is
+// released, so it then raises the low-HP tutorial event an HP write owes
+// (lowHPNotice).
 func (c *Character) SettleRegen() {
-	c.regen.Settle(c.liveLocked().Queue(), c.regenShort)
+	c.settleRegenTask()
 	c.lowHPNotice()
+}
+
+// settleRegenTask is SettleRegen without the low-HP tutorial event: the
+// HP writers whose caller reports the status run it, so the event follows
+// that report (writeHPLocked).
+func (c *Character) settleRegenTask() {
+	c.regen.Settle(c.liveLocked().Queue(), c.regenShort)
 }
 
 // regenShort reports whether c regenerates: in the world (on the grid or
