@@ -688,9 +688,12 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		// Tutorial hands the tutorial events to the player's tutorial
 		// quest.
 		Tutorial: l.scripts,
-		Skills:   l.skills,
-		Levels:   l.levels,
-		Log:      l.log,
+		// Deaths hands the deaths of the player and its summon to the
+		// player's quests.
+		Deaths: l.scripts,
+		Skills: l.skills,
+		Levels: l.levels,
+		Log:    l.log,
 		Rules: player.Rules{
 			RateKarmaExpLost:       l.playerConfig.RateKarmaExpLost,
 			RespawnRestoreHP:       l.playerConfig.RespawnRestoreHP,

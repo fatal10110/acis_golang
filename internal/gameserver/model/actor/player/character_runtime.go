@@ -229,7 +229,10 @@ type Runtime struct {
 	// Tutorial takes the tutorial events the character raises; nil drops
 	// them.
 	Tutorial TutorialEvents
-	Mounts   MountBodies
+	// Deaths takes the deaths of the character and of its summon; nil
+	// drops them.
+	Deaths DeathEvents
+	Mounts MountBodies
 	// MountData resolves a mount's pet data; nil leaves every mount unfed
 	// and riding at its rider's own speeds.
 	MountData MountDataSource
@@ -250,6 +253,7 @@ func (c *Character) Configure(rt Runtime) {
 	c.hallFunctions = rt.HallFunctions
 	c.partyLoot = rt.PartyLoot
 	c.tutorial = rt.Tutorial
+	c.deaths = rt.Deaths
 	c.mounts = rt.Mounts
 	c.mountData = rt.MountData
 	c.skillDefs = rt.Skills

@@ -215,6 +215,7 @@ type Character struct {
 	hallFunctions            HallFunctions
 	partyLoot                PartyLoot
 	tutorial                 TutorialEvents
+	deaths                   DeathEvents
 	mounts                   MountBodies
 	mountData                MountDataSource
 	mountFeed                mountFeedState

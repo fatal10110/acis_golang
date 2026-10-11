@@ -53,6 +53,13 @@ type ClanDied struct {
 // Created: NPC spawned or respawned.
 type Created struct{ NPC *NPC }
 
+// Death: Player died, or its summon did, killed by Killer. A death no
+// creature caused passes the one that died as Killer.
+type Death struct {
+	Killer Creature
+	Player *Player
+}
+
 // Decayed: NPC's corpse decayed.
 type Decayed struct{ NPC *NPC }
 

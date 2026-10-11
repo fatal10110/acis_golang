@@ -547,6 +547,7 @@ func TestUseItemRejectsIneligibleFood(t *testing.T) {
 func (*pickupTestOwner) ServitorVanished()                          {}
 func (*pickupTestOwner) PvPFlagState() task.PvPFlagState            { return task.PvPFlagNone }
 func (*pickupTestOwner) AwardSummonKillKarma(attackable.Combatant)  {}
+func (*pickupTestOwner) SummonDied(_, _ attackable.Combatant)       {}
 func (*pickupTestOwner) OfferSummonRevive()                         {}
 func (*pickupTestOwner) Invul() bool                                { return false }
 func (*pickupTestOwner) HP() float64                                { return 0 }

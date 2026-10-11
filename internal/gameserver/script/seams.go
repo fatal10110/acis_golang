@@ -3,9 +3,12 @@ package script
 import (
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 )
 
@@ -29,6 +32,37 @@ func (r *Registry) ItemUsed(p *Player, itemID, objectID int32, target attackable
 		}
 		r.run(s, hookItemUse, func() { s.Hooks.ItemUse(s, e) })
 	}
+}
+
+// PlayableDied runs the death hook of each quest of c's journal that has
+// one, in journal order and whatever the quest's status: victim, c itself
+// or its summon, was killed by killer. A death no creature caused (nil
+// killer) passes victim as the killer. It runs on the goroutine running the
+// death, once observers have seen it and before the killer is credited.
+func (r *Registry) PlayableDied(c *player.Character, victim, killer attackable.Combatant) {
+	if r == nil {
+		return
+	}
+	if killer == nil {
+		killer = victim
+	}
+	e := Death{Killer: creatureOf(killer), Player: PlayerOf(c)}
+	for _, q := range c.Quests().Quests() {
+		s := r.byName[strings.ToLower(q.Name)]
+		if s == nil || s.Hooks.OnDeath == nil {
+			continue
+		}
+		r.run(s, hookDeath, func() { s.Hooks.Death(s, e) })
+	}
+}
+
+var _ player.DeathEvents = (*Registry)(nil)
+
+// Attackable reports whether the NPC is one players attack: a hostile NPC,
+// monster or guard, not a civilian one. A handle on nothing reports false.
+func (n *NPC) Attackable() bool {
+	_, ok := n.combatant().(*npc.Hostile)
+	return ok
 }
 
 // ZoneEnterIDs returns, sorted, the ids of the zones whose entry reaches a

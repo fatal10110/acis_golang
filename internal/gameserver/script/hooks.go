@@ -10,6 +10,7 @@ type Hooks struct {
 	OnClanAttacked             func(*Script, ClanAttacked)
 	OnClanDied                 func(*Script, ClanDied)
 	OnCreated                  func(*Script, Created)
+	OnDeath                    func(*Script, Death)
 	OnDecayed                  func(*Script, Decayed)
 	OnEvent                    func(*Script, Event) string
 	OnFirstTalk                func(*Script, FirstTalk) string
@@ -66,6 +67,7 @@ const (
 	hookClanAttacked
 	hookClanDied
 	hookCreated
+	hookDeath
 	hookDecayed
 	hookEvent
 	hookFirstTalk
@@ -100,6 +102,7 @@ var hookMethods = [hookCount]string{
 	hookClanAttacked:             "onClanAttacked",
 	hookClanDied:                 "onClanDied",
 	hookCreated:                  "onCreated",
+	hookDeath:                    "onDeath",
 	hookDecayed:                  "onDecayed",
 	hookEvent:                    "onAdvEvent",
 	hookFirstTalk:                "onFirstTalk",
@@ -145,6 +148,7 @@ func (h *Hooks) set() hookSet {
 	add(h.OnClanAttacked != nil, hookClanAttacked)
 	add(h.OnClanDied != nil, hookClanDied)
 	add(h.OnCreated != nil, hookCreated)
+	add(h.OnDeath != nil, hookDeath)
 	add(h.OnDecayed != nil, hookDecayed)
 	add(h.OnEvent != nil, hookEvent)
 	add(h.OnFirstTalk != nil, hookFirstTalk)
@@ -201,6 +205,9 @@ func (h Hooks) With(o Hooks) Hooks {
 		}
 		if o.OnCreated != nil {
 			dst.OnCreated = o.OnCreated
+		}
+		if o.OnDeath != nil {
+			dst.OnDeath = o.OnDeath
 		}
 		if o.OnDecayed != nil {
 			dst.OnDecayed = o.OnDecayed
@@ -317,6 +324,12 @@ func (h *Hooks) ClanDied(s *Script, e ClanDied) {
 func (h *Hooks) Created(s *Script, e Created) {
 	if h.OnCreated != nil {
 		h.OnCreated(s, e)
+	}
+}
+
+func (h *Hooks) Death(s *Script, e Death) {
+	if h.OnDeath != nil {
+		h.OnDeath(s, e)
 	}
 }
 
