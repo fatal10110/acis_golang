@@ -3,7 +3,10 @@ package quest
 import (
 	"testing"
 
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/newbiehelper"
+	featuretutorial "github.com/fatal10110/acis_golang/internal/gameserver/script/feature/tutorial"
 	quest001 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q001"
 	quest023 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q023"
 	quest211 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q211"
@@ -19,8 +22,11 @@ import (
 )
 
 // scenarioScripts are the ported scripts a quest scenario may list, by
-// scripts.xml path, as the server's catalogs map them.
+// scripts.xml path, as the server's catalogs map them; the newbie helper
+// casts from an empty newbie buff table.
 var scenarioScripts = script.Catalog{
+	"script.feature.NewbieHelper":      func() script.Script { return newbiehelper.New(modelskill.NewNewbieBuffTable(nil)) },
+	"script.feature.Tutorial":          featuretutorial.New,
 	"quest.Q001_LettersOfLove":         quest001.New,
 	"quest.Q023_LidiasHeart":           quest023.New,
 	"quest.Q211_TrialOfTheChallenger":  quest211.New,

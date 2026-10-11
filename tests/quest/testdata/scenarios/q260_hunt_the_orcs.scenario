@@ -57,6 +57,7 @@ bypass npc_{rayen}_Quest
   S SystemMessage id=301 3:1114 6:2
   S SystemMessage id=302 3:1115
   S SystemMessage id=52 6:54
+  S TutorialShowQuestionMark id=26
   S SystemMessage id=53 3:5789 6:6000
   S PlaySound type=2 file=tutorial_voice_026 bind=1 obj=player loc=10,20,30 delay=0
   S NpcHtmlMessage obj=rayen item=0 page=script/quest/Q260_HuntTheOrcs/30221-05.htm

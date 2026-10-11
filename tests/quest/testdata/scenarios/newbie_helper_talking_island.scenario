@@ -1,0 +1,116 @@
+# Newbie helper on Talking Island: a human fighter with the tutorial STARTED (done with its
+# enter-world steps) meets the newbie helper Carl and the grand master Roien. Roien opens his
+# own chat window before the helper is met; Carl's first talk starts the helper and arms the
+# 30 s voice; the tutorial gremlin's death shows question mark 3 and, under the 25 % roll
+# (every script draw pinned to 0), drops a Blue Gemstone reserved for the player, whose pickup
+# the tutorial hears (question mark 5). With the gemstone Carl takes it, gives the
+# recommendation and the beginner soulshots with their voice, and his timer plays the class
+# voice. Roien then takes the recommendation, marks himself on the radar, rewards 50 SP and the
+# shots, and his 60 s timer shows question mark 7; Carl then has nothing more to say.
+# Expectations are derived from the reference source (NewbieHelper.java onFirstTalk,
+# onAdvEvent, onTimer, onMyDying; Tutorial.java CE6353; ItemInstance.pickupMe) and restate
+# newbie_helper_test.go (TestNewbieHelperRecommendationShotsAndRadar), which stays the primary
+# check.
+character Fighter 1
+random always 0
+quest Tutorial <state>=STARTED onlyone=1
+script script.feature.NewbieHelper
+script script.feature.Tutorial
+item 1067 5789 6353 8542
+page default/30008.htm
+page script/feature/NewbieHelper/
+npc carl 30009 Folk 20 0 0
+npc roien 30008 Folk 0 20 0
+npc gremlin 18342 Monster -20 0 0
+
+# Roien before the helper: his own chat window.
+action roien
+action roien
+  S ActionFailed
+  S NpcHtmlMessage obj=roien item=0 page=default/30008.htm
+  S ActionFailed
+  S ActionFailed
+  state NewbieHelper CREATED
+
+action carl
+action carl
+  S ActionFailed
+  S NpcHtmlMessage obj=carl item=0 page=script/feature/NewbieHelper/newbiehelper_fig_01.htm
+  S ActionFailed
+  Q upsert Tutorial | Ex | 0
+  Q upsert NewbieHelper | step | 1
+  Q upsert NewbieHelper | <state> | STARTED
+  rows NewbieHelper <state>=STARTED step=1
+
+advance 29s
+advance 1s
+  S PlaySound type=2 file=tutorial_voice_009a bind=1 obj=player loc=10,20,30 delay=0
+  Q upsert Tutorial | Ex | 1
+
+kill gremlin
+  S SystemMessage id=95 1:0 1:0
+  S TutorialShowQuestionMark id=3
+  S PlaySound type=2 file=tutorial_voice_011 bind=1 obj=player loc=10,20,30 delay=0
+  S DropItem by=gremlin item=6353 count=1 stackable=1 animate=1
+  S PlaySound type=0 file=ItemSound.quest_tutorial bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Tutorial | Ex | 2
+
+pickup 6353
+  S ActionFailed
+  S TutorialShowQuestionMark id=5
+  S PlaySound type=0 file=ItemSound.quest_tutorial bind=0 obj=0 loc=0,0,0 delay=0
+  S PlaySound type=2 file=tutorial_voice_013 bind=1 obj=player loc=10,20,30 delay=0
+  S SystemMessage id=30 3:6353
+  Q upsert Tutorial | Gemstone | 1
+  items 6353=1
+advance 1s
+
+# Carl is still the target: one click talks.
+action carl
+  S ActionFailed
+  S SystemMessage id=302 3:6353
+  S SystemMessage id=54 3:1067
+  S SystemMessage id=53 3:5789 6:200
+  S PlaySound type=2 file=tutorial_voice_026 bind=1 obj=player loc=10,20,30 delay=0
+  S NpcHtmlMessage obj=carl item=0 page=script/feature/NewbieHelper/30009-03.htm
+  S ActionFailed
+  Q upsert Tutorial | Ex | 3
+  Q upsert Tutorial | ucMemo | 3
+  Q upsert NewbieHelper | step | 2
+  items 6353=0 1067=1 5789=200
+
+advance 30s
+  S PlaySound type=2 file=tutorial_voice_010a bind=1 obj=player loc=10,20,30 delay=0
+  Q upsert Tutorial | Ex | 4
+  rows Tutorial <state>=STARTED Ex=4 Gemstone=1 onlyone=1 ucMemo=3
+
+action roien
+action roien
+  S ActionFailed
+  S NpcHtmlMessage obj=roien item=0 page=script/feature/NewbieHelper/30008-02.htm
+  S ActionFailed
+
+bypass Quest NewbieHelper 30008-03.htm
+  S RadarControl show=2 type=2 loc=-84058,243239,-3730
+  S RadarControl show=0 type=1 loc=-84058,243239,-3730
+  S SystemMessage id=302 3:1067
+  S SystemMessage id=331 1:50
+  S PlaySound type=2 file=tutorial_voice_026 bind=1 obj=player loc=10,20,30 delay=0
+  S SystemMessage id=53 3:5789 6:200
+  S NpcHtmlMessage obj=roien item=0 page=script/feature/NewbieHelper/30008-03.htm
+  S ActionFailed
+  Q delete-var NewbieHelper | step
+  Q upsert NewbieHelper | onlyone | 1
+  items 1067=0 5789=400
+  rows NewbieHelper <state>=STARTED onlyone=1
+
+advance 60s
+  S TutorialShowQuestionMark id=7
+  S PlaySound type=0 file=ItemSound.quest_tutorial bind=0 obj=0 loc=0,0,0 delay=0
+  S PlaySound type=2 file=tutorial_voice_025 bind=1 obj=player loc=10,20,30 delay=0
+
+action carl
+action carl
+  S ActionFailed
+  S NpcHtmlMessage obj=carl item=0 page=script/feature/NewbieHelper/newbiehelper_03.htm
+  S ActionFailed

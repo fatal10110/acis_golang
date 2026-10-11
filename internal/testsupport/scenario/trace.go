@@ -14,12 +14,16 @@ import (
 	"github.com/fatal10110/acis_golang/internal/testsupport/scriptcontract"
 )
 
-// renders are the opcodes a step compares: the dialog's, the quest's and
-// the item messages. The rest (selection, approach, animation, NPC info,
-// the deferred inventory and status updates) is not the script's.
+// renders are the opcodes a step compares: the dialog's, the quest's, the
+// tutorial's and the item messages, the radar marks, the drops and the casts
+// a script makes. The rest (selection, approach, movement, NPC info, the
+// deferred inventory and status updates) is not the script's.
 var renders = []byte{
 	serverpackets.OpcodeActionFailed, serverpackets.OpcodeNpcHtmlMessage, serverpackets.OpcodeSystemMessage,
 	serverpackets.OpcodePlaySound, serverpackets.OpcodeQuestList, 0xfe,
+	serverpackets.OpcodeTutorialShowHTML, serverpackets.OpcodeTutorialShowQuestionMark,
+	serverpackets.OpcodeTutorialEnableClientEvent, serverpackets.OpcodeTutorialCloseHTML,
+	serverpackets.OpcodeRadarControl, serverpackets.OpcodeDropItem, serverpackets.OpcodeMagicSkillUse,
 }
 
 // render renders a server packet payload as an S line, with roles naming
@@ -38,20 +42,24 @@ func render(payload []byte, roles map[int32]string) (string, bool, error) {
 	return strings.TrimPrefix(line, "S "), true, nil
 }
 
-// expandPage replaces a trailing "page=<path>" of an NpcHtmlMessage line
-// with the page's text, %objectId% filled in with the packet's NPC, as the
-// rendered packet writes it.
+// expandPage replaces a trailing "page=<path>" of an NpcHtmlMessage or a
+// TutorialShowHtml line with the page's text, as the rendered packet writes
+// it: in an NpcHtmlMessage, %objectId% filled in with the packet's NPC.
 func expandPage(line string, pages map[string]string) (string, error) {
 	head, path, ok := strings.Cut(line, " page=")
-	if !ok || !strings.HasPrefix(line, "NpcHtmlMessage obj=") {
+	npcPage := strings.HasPrefix(line, "NpcHtmlMessage obj=")
+	if !ok || !npcPage && head != "TutorialShowHtml" {
 		return line, nil
 	}
 	text, ok := pages[path]
 	if !ok {
 		return "", fmt.Errorf("page %s is not a page line of the scenario", path)
 	}
-	obj, _, _ := strings.Cut(strings.TrimPrefix(head, "NpcHtmlMessage obj="), " ")
-	return head + " html=" + scriptcontract.Quote(strings.ReplaceAll(text, "%objectId%", "{"+obj+"}")), nil
+	if npcPage {
+		obj, _, _ := strings.Cut(strings.TrimPrefix(head, "NpcHtmlMessage obj="), " ")
+		text = strings.ReplaceAll(text, "%objectId%", "{"+obj+"}")
+	}
+	return head + " html=" + scriptcontract.Quote(text), nil
 }
 
 // expandPackets is expandPage over a step's packets.

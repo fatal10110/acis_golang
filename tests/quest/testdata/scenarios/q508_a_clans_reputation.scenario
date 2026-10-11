@@ -32,6 +32,8 @@ bypass Quest Q508_AClansReputation 1
   S QuestList 508:0x80000001
   S ExShowQuestMark quest=508
   S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S RadarControl show=2 type=2 loc=192346,21528,-3648
+  S RadarControl show=0 type=1 loc=192346,21528,-3648
   S NpcHtmlMessage obj=eric item=0 page=script/quest/Q508_AClansReputation/30868-1.htm
   S ActionFailed
   Q upsert Q508_AClansReputation | <state> | STARTED
