@@ -182,6 +182,7 @@ Hooks run synchronously on the goroutine that raises them, with no lock held.
 | Dying | one 3 s timer on an engine-owned queue; all hooks in list order; no state re-check | corpse queues close at decay; 103 templates decay within 3 s |
 | Party died, clan died | killer's queue, inline with the death | |
 | Zone enter | mover's goroutine, collected under the zone lock and fired after unlock | one quest uses it |
+| Script event | the sender's goroutine, inline: every receiver's hook runs before the send returns | a radius broadcast passes 0 as the second argument; the extended broadcast and the send to one NPC pass their own |
 | Tutorial HP and level triggers | caller, after the vitals lock is released | |
 
 Fan-out rules differ per source and each gets its own function and golden:
@@ -286,7 +287,10 @@ A nil NPC or player means "bound to none", never a wildcard.
 
 Stand-ins stay behind one predicate, "no behavior is bound to this NPC id". A template
 switches to real behavior when its script registers. The three ids claimed by a parent and a
-child switch only when the child is ported.
+child switch only when the child is ported. The walker alias rule and its walk-stance list
+also step aside for an id whose creation any script reacts to: the walker script is a plain
+script in the reference manifest (`kind script`, not a behavior), and the created hook is
+where the reference asks an NPC to walk a route (A13).
 
 - They are never extended. They are deleted in one PR (#3497, M12) once every scripted NPC id
   has its behavior, including the siegable-hall behaviors of #3502 (M12), and every scripted

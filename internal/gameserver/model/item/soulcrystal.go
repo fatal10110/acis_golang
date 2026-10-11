@@ -1,6 +1,10 @@
 package item
 
-import "fmt"
+import (
+	"fmt"
+	"maps"
+	"slices"
+)
 
 type SoulCrystal struct {
 	Level         int
@@ -55,3 +59,10 @@ func (t *SoulCrystalTable) LevelingInfo(npcID int32) (SoulCrystalLevelingInfo, b
 
 func (t *SoulCrystalTable) CrystalCount() int      { return len(t.crystals) }
 func (t *SoulCrystalTable) LevelingInfoCount() int { return len(t.npcs) }
+
+// CrystalIDs returns, sorted, the initial item ids of every soul crystal.
+func (t *SoulCrystalTable) CrystalIDs() []int32 { return slices.Sorted(maps.Keys(t.crystals)) }
+
+// LevelingNPCIDs returns, sorted, the ids of every NPC that charges soul
+// crystals.
+func (t *SoulCrystalTable) LevelingNPCIDs() []int32 { return slices.Sorted(maps.Keys(t.npcs)) }

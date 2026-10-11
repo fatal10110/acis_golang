@@ -182,6 +182,8 @@ type intention struct {
 	// moveToTarget is an attack or cast intention's desire to close in on
 	// its target; every other kind never moves toward one.
 	moveToTarget bool
+	// route is a route walk's route name.
+	route string
 }
 
 // Attackable drives one hostile NPC's combat and wander intentions.
@@ -209,6 +211,9 @@ type Attackable struct {
 	threats      *attackable.ThreatTable
 	hates        *attackable.HateTable
 	desires      *DesireQueue
+	// route is the walker route route desires walk, nil for none; set once
+	// before the actor is published.
+	route Route
 
 	// cast is read without mu so AbortAll can run from inside the think
 	// loop, which holds mu (a return-home teleport aborts the actor).
@@ -242,6 +247,9 @@ type Attackable struct {
 	// reports that no periodic pass has consumed it yet.
 	tickStep int
 	ticked   bool
+	// onRoute reports that the actor walks its route: a route intention
+	// stepped since the AI last took up another desire.
+	onRoute bool
 
 	// now returns the current time, the actor's queue clock by default;
 	// tests replace it to simulate staleThreatAge elapsing without a real
@@ -626,9 +634,10 @@ func (a *Attackable) AddDefaultHate(attacker attackable.Combatant) {
 	a.hates.AddDefault(attacker, a.actor.InTerritory())
 }
 
-// SetBackToPeace clears combat memory and cancels the current action. It
-// does not start a return-home walk; an out-of-territory owner stays idle
-// until a later Think queues a new desire.
+// SetBackToPeace clears combat memory and cancels the current action, except
+// a walk on the actor's route, whose desire stays queued. It does not start a
+// return-home walk; an out-of-territory owner stays idle until a later Think
+// queues a new desire.
 func (a *Attackable) SetBackToPeace() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -653,13 +662,20 @@ func (a *Attackable) ReduceAllAggroHate(amount float64) {
 	a.reduceAllAggroHateLocked(amount)
 }
 
+// setBackToPeaceLocked ends combat. The route desire outlives it: an actor
+// walking its route walks on, and one that left its route for a fight goes
+// back to it on its next pass.
 func (a *Attackable) setBackToPeaceLocked() {
 	a.threats.Clear()
 	a.hates.Clear()
-	a.desires.Clear()
+	a.desires.RemoveIf(func(d *Desire) bool { return d.Kind != IntentionMoveRoute })
 	a.next = intention{}
-	a.setCurrent(intention{kind: IntentionIdle})
 	a.stopWanderChain()
+	if a.current.kind == IntentionMoveRoute {
+		return
+	}
+	a.leaveRoute()
+	a.setCurrent(intention{kind: IntentionIdle})
 	a.move.Stop()
 }
 
@@ -849,6 +865,9 @@ func (a *Attackable) think(mode thinkMode) error {
 		a.idleAfterFinishedAttack(mode, true)
 		return nil
 	}
+	// busy is whether the actor is doing something as desire selection
+	// starts; an intention dropped below for its lost desire still counts.
+	busy := a.current.kind != IntentionIdle
 	if !outOfControl {
 		a.dropCurrentIfUnqueued(mode)
 	}
@@ -859,27 +878,28 @@ func (a *Attackable) think(mode thinkMode) error {
 	idleAfterLatch := false
 	if updateTick {
 		idled := false
-		if _, ok := a.desires.Peek(); !ok {
-			if a.lifeTime.Load() > 0 && !a.castingNow() {
-				switch {
-				case held:
-					// The cycle's idle does not wait for a held selection,
-					// but only the selection switches to idle.
+		if _, ok := a.desires.Peek(); !ok && a.lifeTime.Load() > 0 && !a.castingNow() {
+			switch {
+			case held:
+				// The cycle's idle does not wait for a held selection,
+				// but only the selection switches to idle.
+				a.idleStep(false)
+				a.queueIdleStandIns()
+				idled = true
+			case a.hasLatch():
+				idleAfterLatch = true
+			default:
+				// An in-control actor that is not idle yet is idled by
+				// the selection first; the cycle's own idle then runs
+				// again unless the first queued a desire, so the
+				// no-desire point opens twice.
+				again := !outOfControl && busy
+				a.thinkIdle()
+				a.queueIdleStandIns()
+				if _, ok := a.desires.Peek(); again && !ok {
 					a.idleStep(false)
-					a.queueIdleFollow()
-					idled = true
-				case a.hasLatch():
-					idleAfterLatch = true
-				default:
-					a.thinkIdle()
-					a.queueIdleFollow()
-					idled = true
 				}
-			}
-		}
-		if _, ok := a.desires.Peek(); !ok {
-			if a.lifeTime.Load() > 0 && !a.castingNow() && !idleAfterLatch {
-				a.queueIdleWander()
+				idled = true
 			}
 		}
 		a.lifeTime.Add(1)
@@ -956,9 +976,16 @@ func (a *Attackable) idleAfterFinishedAttack(mode thinkMode, wasIdle bool) {
 }
 
 // idleAndRequeue is the empty-queue idle: abort everything, go idle, and
-// queue the idle follow, else the idle wander.
+// queue the idle stand-ins.
 func (a *Attackable) idleAndRequeue() {
 	a.thinkIdle()
+	a.queueIdleStandIns()
+}
+
+// queueIdleStandIns queues, after the no-desire point, the idle follow,
+// else the idle wander: what an NPC no behavior is bound to does with
+// nothing to do. The actor refuses both when a behavior is bound to it.
+func (a *Attackable) queueIdleStandIns() {
 	a.queueIdleFollow()
 	if _, ok := a.desires.Peek(); !ok {
 		a.queueIdleWander()
@@ -991,6 +1018,8 @@ func (a *Attackable) continueCurrent(wasIdle bool) error {
 		return a.thinkFollow()
 	case IntentionMoveTo:
 		a.thinkMoveTo()
+	case IntentionMoveRoute:
+		a.thinkMoveRoute()
 	}
 	return nil
 }
@@ -1051,6 +1080,9 @@ func (a *Attackable) promoteAndStep() error {
 			}
 			a.thinkMoveTo()
 			a.lastDesire = IntentionMoveTo
+		case IntentionMoveRoute:
+			a.thinkMoveRoute()
+			a.lastDesire = IntentionMoveRoute
 		}
 		return nil
 	}
@@ -1101,7 +1133,8 @@ func (a *Attackable) hasLatch() bool {
 // intention is, so a heavier attack on another target, a cast or a walk
 // takes over a running attack. Replacing the intention with a different
 // one drops any follow task and the queued next intention the old one left
-// behind.
+// behind. Taking up any desire but a route walk takes the actor off its
+// route.
 func (a *Attackable) promoteNext() (fromLatch, promoted bool) {
 	if a.inHitAnimation() {
 		return false, false
@@ -1112,6 +1145,9 @@ func (a *Attackable) promoteNext() (fromLatch, promoted bool) {
 	}
 	if a.current.kind == IntentionWander && next.kind == IntentionWander {
 		return false, false
+	}
+	if next.kind != IntentionMoveRoute {
+		a.leaveRoute()
 	}
 	if next.kind == IntentionAttack && (a.lastDesire == IntentionIdle || a.lastDesire == IntentionWander) {
 		a.latched = next
@@ -1128,9 +1164,10 @@ func (a *Attackable) promoteNext() (fromLatch, promoted bool) {
 }
 
 // same reports whether o is the same intention as i: same kind, aimed at
-// the same target with the same skill, or walking to the same location.
+// the same target with the same skill, or walking to the same location or
+// route.
 func (i intention) same(o intention) bool {
-	return i.kind == o.kind && sameCombatant(i.target, o.target) && i.skill == o.skill && i.loc == o.loc && i.socialID == o.socialID
+	return i.kind == o.kind && sameCombatant(i.target, o.target) && i.skill == o.skill && i.loc == o.loc && i.socialID == o.socialID && i.route == o.route
 }
 
 // nextToDo returns the latched attack when one is set, else the heaviest
@@ -1161,6 +1198,8 @@ func (a *Attackable) nextToDo() (next intention, fromLatch, ok bool) {
 		next = intention{kind: IntentionSocial, socialID: desire.ItemObjectID, timer: desire.Timer}
 	case IntentionMoveTo:
 		next = intention{kind: IntentionMoveTo, loc: desire.Location}
+	case IntentionMoveRoute:
+		next = intention{kind: IntentionMoveRoute, route: desire.RouteName}
 	default:
 		return intention{}, false, false
 	}
@@ -1438,7 +1477,7 @@ func (a *Attackable) clearArrivalDesire() {
 }
 
 func (a *Attackable) clearCurrentDesire() {
-	probe := &Desire{Kind: a.current.kind, Location: a.current.loc, FinalTarget: a.current.target, Skill: a.current.skill, ItemObjectID: a.current.socialID}
+	probe := &Desire{Kind: a.current.kind, Location: a.current.loc, FinalTarget: a.current.target, Skill: a.current.skill, ItemObjectID: a.current.socialID, RouteName: a.current.route}
 	a.desires.RemoveIf(func(d *Desire) bool { return d.Equal(probe) })
 }
 

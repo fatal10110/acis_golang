@@ -7,6 +7,7 @@ import (
 	itemhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/item"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	invops "github.com/fatal10110/acis_golang/internal/gameserver/inventory"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -16,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
@@ -71,50 +73,20 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool, ro
 	if !inst.Equipped() && rejectUseItemConditions(live, tmpl) {
 		return
 	}
-	if l.useEnchantScroll(live, inst) {
-		return
-	}
-	if l.useConsumableSkillItem(live, inv, inst) {
-		return
-	}
-	if l.useItemAICast(live, inv, inst, ctrl) {
-		return
-	}
-	if l.useResurrectionScroll(live, inv, inst) {
-		return
-	}
-	if l.useSummonItem(live, inv, inst) {
-		return
-	}
-	if l.eatPetFood(live, inv, inst) {
-		return
-	}
-	if l.useShotItem(live, inv, inst) {
-		return
-	}
-	if l.useBeastShotItem(live, inv, inst) {
-		return
-	}
-	if l.useFishShotItem(live, inv, inst) {
-		return
-	}
-	if l.useRecipeItem(live, inst, tmpl) {
-		return
-	}
-	if l.useWindowItem(live, tmpl, rollDice) {
-		return
-	}
-	if l.usePaganKey(live, inv, inst, tmpl) {
-		return
-	}
-	if l.useManorItem(live, inv, inst, tmpl) {
-		return
-	}
-	if l.useTargetCastItem(live, inv, inst, ctrl) {
+	if l.useItemHandler(live, inv, inst, tmpl, ctrl, rollDice) {
+		l.raiseItemUse(live, inst, tmpl)
 		return
 	}
 	if tmpl.Kind == item.KindEtcItem && tmpl.Slot != item.SlotNone {
-		l.useOffHandItem(live, inv, inst, tmpl)
+		if !l.useOffHandItem(live, inv, inst, tmpl) {
+			l.raiseItemUse(live, inst, tmpl)
+		}
+		return
+	}
+	if tmpl.Slot == item.SlotNone {
+		// Nothing uses the item: it is not equipment either.
+		l.toggleEquipItem(live, inv, inst, tmpl, false)
+		l.raiseItemUse(live, inst, tmpl)
 		return
 	}
 	switch tmpl.Slot {
@@ -141,19 +113,58 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool, ro
 	l.toggleEquipItem(live, inv, inst, tmpl, false)
 }
 
+// useItemHandler runs the handler of the item inst, when it has one, and
+// reports whether it did. A handler answers its item's use, refusal
+// included.
+func (l *GameClientLink) useItemHandler(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template, ctrl bool, rollDice func() bool) bool {
+	return l.useEnchantScroll(live, inst) ||
+		l.useConsumableSkillItem(live, inv, inst) ||
+		l.useItemAICast(live, inv, inst, ctrl) ||
+		l.useResurrectionScroll(live, inv, inst) ||
+		l.useSummonItem(live, inv, inst) ||
+		l.eatPetFood(live, inv, inst) ||
+		l.useShotItem(live, inv, inst) ||
+		l.useBeastShotItem(live, inv, inst) ||
+		l.useFishShotItem(live, inv, inst) ||
+		l.useRecipeItem(live, inst, tmpl) ||
+		l.useWindowItem(live, tmpl, rollDice) ||
+		l.usePaganKey(live, inv, inst, tmpl) ||
+		l.useManorItem(live, inv, inst, tmpl) ||
+		l.useTargetCastItem(live, inv, inst, ctrl)
+}
+
+// raiseItemUse hands live's use of inst, once the item's own use is done,
+// to the scripts bound to its item, with live's target. Equipment is never
+// used this way: arrows and lures are not equipment.
+func (l *GameClientLink) raiseItemUse(live *livePlayer, inst *item.Instance, tmpl *item.Template) {
+	if l.scripts == nil {
+		return
+	}
+	if tmpl.Slot != item.SlotNone && (tmpl.EtcItem == nil || (tmpl.EtcItem.Type != item.EtcItemArrow && tmpl.EtcItem.Type != item.EtcItemLure)) {
+		return
+	}
+	var target attackable.Combatant
+	if c, ok := live.CurrentTarget().(attackable.Combatant); ok {
+		target = c
+	}
+	l.scripts.ItemUsed(script.PlayerOf(live), inst.TemplateID, inst.ObjectID, target)
+}
+
 // useOffHandItem answers UseItem on arrows or a lure, the etc items that go
-// in the left hand. They are not equipment a player puts on or takes off:
-// a bow takes its arrows into the left hand by itself, and a lure only goes
-// on over a fishing rod, replacing the lure worn, with no message and no
-// toggle off. Anything else answers ActionFailed, as UseItem does for any
-// item nothing uses (the specified behavior drops it silently).
-func (l *GameClientLink) useOffHandItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) {
+// in the left hand, and reports whether a lure went on. They are not
+// equipment a player puts on or takes off: a bow takes its arrows into the
+// left hand by itself, and a lure only goes on over a fishing rod,
+// replacing the lure worn, with no message and no toggle off. Anything else
+// answers ActionFailed, as UseItem does for any item nothing uses (the
+// specified behavior drops it silently).
+func (l *GameClientLink) useOffHandItem(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) bool {
 	if tmpl.EtcItem == nil || tmpl.EtcItem.Type != item.EtcItemLure || !wieldsFishingRod(inv) {
 		live.SendFrame(serverpackets.FrameActionFailed())
-		return
+		return false
 	}
 	inv.SetPaperdollItem(itemcontainer.LHand, inst, tmpl)
 	l.broadcastEquipmentChange(live)
+	return true
 }
 
 // wieldsFishingRod reports whether inv's right hand holds a fishing rod.

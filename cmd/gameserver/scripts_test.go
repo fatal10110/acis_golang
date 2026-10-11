@@ -33,7 +33,7 @@ func TestScriptCatalogCompleteness(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := scriptCatalog(scriptCatalogs())
+	catalog, err := scriptCatalog(scriptCatalogs(nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,10 +140,13 @@ func manifestMismatches(t *testing.T, list []script.Listing, catalog script.Cata
 	got := map[string]*manifestScript{}
 	var out []string
 	var cur *manifestScript
+	var gotOther []string
 	for line := range strings.Lines(dump.String()) {
 		line = strings.TrimSuffix(line, "\n")
 		fields := strings.Fields(line)
 		switch {
+		case isOtherFold(line):
+			gotOther = append(gotOther, line)
 		case strings.HasPrefix(line, "script "):
 			cur = nil
 			if _, ported := catalog[fields[1]]; !ported {
@@ -186,7 +189,42 @@ func manifestMismatches(t *testing.T, list []script.Listing, catalog script.Cata
 			}
 		}
 	}
+	var wantOther []string
+	for _, line := range readOtherFolds(t) {
+		for _, path := range strings.Split(strings.Fields(line)[4], ",") {
+			if _, ported := catalog[path]; ported {
+				wantOther = append(wantOther, line)
+				break
+			}
+		}
+	}
+	slices.Sort(gotOther)
+	slices.Sort(wantOther)
+	if !slices.Equal(gotOther, wantOther) {
+		out = append(out, fmt.Sprintf("item and zone folds %q, reference %q", gotOther, wantOther))
+	}
 	slices.Sort(out)
+	return out
+}
+
+// isOtherFold reports a fold line of an item or a zone.
+func isOtherFold(line string) bool {
+	return strings.HasPrefix(line, "fold item ") || strings.HasPrefix(line, "fold zone ")
+}
+
+// readOtherFolds returns the reference manifest's item and zone fold lines.
+func readOtherFolds(t *testing.T) []string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("..", "..", "internal", "gameserver", "script", "testdata", "oracle", "manifest.golden"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for line := range strings.Lines(string(data)) {
+		if line = strings.TrimSuffix(line, "\n"); isOtherFold(line) {
+			out = append(out, line)
+		}
+	}
 	return out
 }
 
@@ -239,7 +277,11 @@ func TestScriptCatalogMatchesManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := scriptCatalog(scriptCatalogs())
+	crystals, err := gamexml.LoadSoulCrystalData(filepath.Join(root, "soulCrystals.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := scriptCatalog(scriptCatalogs(crystals))
 	if err != nil {
 		t.Fatal(err)
 	}

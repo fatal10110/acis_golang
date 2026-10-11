@@ -253,7 +253,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				session.SendFrame(serverpackets.FrameCharCreateFail(serverpackets.CharCreateFailReasonCreationFailed))
 				continue
 			}
-			_, outcome, err := l.roster.Create(ctx, client.AccountName(), manager.CreateRequest{
+			created, outcome, err := l.roster.Create(ctx, client.AccountName(), manager.CreateRequest{
 				Name: req.Name, ClassID: int(req.ClassID), Race: int(req.Race), Sex: sex,
 				HairStyle: req.HairStyle, HairColor: req.HairColor, Face: req.Face,
 			})
@@ -266,6 +266,9 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			session.SendFrame(serverpackets.FrameCharCreateOk())
+			if l.scripts != nil {
+				l.scripts.CharacterCreated(created)
+			}
 			list, err := l.sendCharSelectInfo(ctx, client)
 			if err != nil {
 				l.log.Error().Err(err).Msg("list characters")

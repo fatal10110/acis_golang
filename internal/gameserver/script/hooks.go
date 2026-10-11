@@ -13,6 +13,7 @@ type Hooks struct {
 	OnDecayed                  func(*Script, Decayed)
 	OnEvent                    func(*Script, Event) string
 	OnFirstTalk                func(*Script, FirstTalk) string
+	OnItemUse                  func(*Script, ItemUse)
 	OnMoveToFinished           func(*Script, MoveToFinished)
 	OnMyDying                  func(*Script, MyDying)
 	OnNoDesire                 func(*Script, NoDesire)
@@ -30,6 +31,7 @@ type Hooks struct {
 	OnTalk                     func(*Script, Talk) string
 	OnTimer                    func(*Script, Timer) string
 	OnUseSkillFinished         func(*Script, UseSkillFinished)
+	OnZoneEnter                func(*Script, ZoneEnter)
 
 	// own is the set of hooks the last With overlaid; derived reports that
 	// With built these hooks. Hooks written as a literal own every hook
@@ -51,6 +53,7 @@ const (
 	hookDecayed
 	hookEvent
 	hookFirstTalk
+	hookItemUse
 	hookMoveToFinished
 	hookMyDying
 	hookNoDesire
@@ -68,6 +71,7 @@ const (
 	hookTalk
 	hookTimer
 	hookUseSkillFinished
+	hookZoneEnter
 	hookCount
 )
 
@@ -83,6 +87,7 @@ var hookMethods = [hookCount]string{
 	hookDecayed:                  "onDecayed",
 	hookEvent:                    "onAdvEvent",
 	hookFirstTalk:                "onFirstTalk",
+	hookItemUse:                  "onItemUse",
 	hookMoveToFinished:           "onMoveToFinished",
 	hookMyDying:                  "onMyDying",
 	hookNoDesire:                 "onNoDesire",
@@ -100,6 +105,7 @@ var hookMethods = [hookCount]string{
 	hookTalk:                     "onTalk",
 	hookTimer:                    "onTimer",
 	hookUseSkillFinished:         "onUseSkillFinished",
+	hookZoneEnter:                "onZoneEnter",
 }
 
 func (h hook) String() string { return hookMethods[h] }
@@ -126,6 +132,7 @@ func (h *Hooks) set() hookSet {
 	add(h.OnDecayed != nil, hookDecayed)
 	add(h.OnEvent != nil, hookEvent)
 	add(h.OnFirstTalk != nil, hookFirstTalk)
+	add(h.OnItemUse != nil, hookItemUse)
 	add(h.OnMoveToFinished != nil, hookMoveToFinished)
 	add(h.OnMyDying != nil, hookMyDying)
 	add(h.OnNoDesire != nil, hookNoDesire)
@@ -143,6 +150,7 @@ func (h *Hooks) set() hookSet {
 	add(h.OnTalk != nil, hookTalk)
 	add(h.OnTimer != nil, hookTimer)
 	add(h.OnUseSkillFinished != nil, hookUseSkillFinished)
+	add(h.OnZoneEnter != nil, hookZoneEnter)
 	return s
 }
 
@@ -185,6 +193,9 @@ func (h Hooks) With(o Hooks) Hooks {
 		}
 		if o.OnFirstTalk != nil {
 			dst.OnFirstTalk = o.OnFirstTalk
+		}
+		if o.OnItemUse != nil {
+			dst.OnItemUse = o.OnItemUse
 		}
 		if o.OnMoveToFinished != nil {
 			dst.OnMoveToFinished = o.OnMoveToFinished
@@ -236,6 +247,9 @@ func (h Hooks) With(o Hooks) Hooks {
 		}
 		if o.OnUseSkillFinished != nil {
 			dst.OnUseSkillFinished = o.OnUseSkillFinished
+		}
+		if o.OnZoneEnter != nil {
+			dst.OnZoneEnter = o.OnZoneEnter
 		}
 	}
 	out := h
@@ -303,6 +317,12 @@ func (h *Hooks) FirstTalk(s *Script, e FirstTalk) string {
 		return h.OnFirstTalk(s, e)
 	}
 	return ""
+}
+
+func (h *Hooks) ItemUse(s *Script, e ItemUse) {
+	if h.OnItemUse != nil {
+		h.OnItemUse(s, e)
+	}
 }
 
 func (h *Hooks) MoveToFinished(s *Script, e MoveToFinished) {
@@ -406,5 +426,11 @@ func (h *Hooks) Timer(s *Script, e Timer) string {
 func (h *Hooks) UseSkillFinished(s *Script, e UseSkillFinished) {
 	if h.OnUseSkillFinished != nil {
 		h.OnUseSkillFinished(s, e)
+	}
+}
+
+func (h *Hooks) ZoneEnter(s *Script, e ZoneEnter) {
+	if h.OnZoneEnter != nil {
+		h.OnZoneEnter(s, e)
 	}
 }

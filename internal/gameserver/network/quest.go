@@ -5,6 +5,7 @@ import (
 	"context"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -23,11 +24,20 @@ type scriptRegistry interface {
 	player.TutorialEvents
 	// PlayerDetached stops the script timers bound to c as it leaves.
 	PlayerDetached(c *player.Character)
+	// CharacterCreated gives a character just created its creation-time
+	// quest state.
+	CharacterCreated(c *player.Character)
 	// Interact, QuestWindow and QuestEvent are the quest dialog; see
 	// quest_dialog.go.
 	Interact(p *script.Player, n *script.NPC) bool
 	QuestWindow(p *script.Player, n *script.NPC, name string)
 	QuestEvent(p *script.Player, last *script.NPC, name, event string)
+	// ItemUsed hands a player's use of an item to the scripts bound to it.
+	ItemUsed(p *script.Player, itemID, objectID int32, target attackable.Combatant)
+	// ZoneEnterIDs and ZoneEntered are the zone entries scripts react to;
+	// see zone_scripts.go.
+	ZoneEnterIDs() []int32
+	ZoneEntered(zoneID int32, c attackable.Combatant)
 }
 
 // questJournals writes the quest journals, and aborts and exits quests.

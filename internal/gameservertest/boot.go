@@ -162,6 +162,7 @@ type options struct {
 	npcSpawns              *spawn.Table
 	dataReloads            network.DataReloads
 	npcDropRates           item.Rates
+	walkerRoutes           route.WalkerRoutes
 	attackStanceTracker    network.AttackStanceTracker
 	attackStanceNow        func() time.Time
 	spawnProtection        time.Duration
@@ -2125,7 +2126,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Wedding = couples
 	gclConfig.Macros = gamesql.NewMacroStore(db)
 	gclConfig.Recommendations = gamesql.NewRecommendationStore(db)
-	quests := bootQuests(db, persistWorker, ids, queues.NewQueue("script-timers"), o)
+	quests := bootQuests(db, persistWorker, ids, queues.NewQueue("script-engine"), o)
 	gclConfig.Quests, gclConfig.Scripts, gclConfig.Journals = quests.store, quests.registry, quests.journals
 	gclConfig.Memos = memoStore{MemoStore: gamesql.NewMemoStore(db), loadErr: o.memoLoadErr}
 	gclConfig.AugmentationChances = augmentation.DefaultChances()
@@ -2225,7 +2226,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		npcSpawns, npcRespawns = bootNpcSpawns(t, gcl, npcSpawnDeps{
 			state: state, templates: o.npcs, geo: bootGeo(o.geo), ids: ids, decay: o.decay, ai: ai, positions: positions,
 			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.AttackStance, log: o.log, makers: o.npcSpawns,
-			dropRates: o.npcDropRates, sevenSigns: sevenSigns, scripts: quests.registry,
+			dropRates: o.npcDropRates, sevenSigns: sevenSigns, scripts: quests.registry, routes: o.walkerRoutes,
 		})
 	}
 	if o.productionTickers {

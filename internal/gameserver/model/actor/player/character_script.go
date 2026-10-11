@@ -13,6 +13,16 @@ import (
 // allocates each new instance's object id. A count below one, an unknown
 // item and a character leaving the world get nothing.
 func (c *Character) GiveScriptItems(itemID int32, count, enchant int, multiple bool, nextID func() (int32, error)) {
+	c.addScriptItems(itemID, count, enchant, multiple, nextID, event.ObtainGiven)
+}
+
+// AddScriptItems is GiveScriptItems with no enchant, whose chat line reads
+// as items picked up rather than earned.
+func (c *Character) AddScriptItems(itemID int32, count int, multiple bool, nextID func() (int32, error)) {
+	c.addScriptItems(itemID, count, 0, multiple, nextID, event.ObtainCreated)
+}
+
+func (c *Character) addScriptItems(itemID int32, count, enchant int, multiple bool, nextID func() (int32, error), notice event.ObtainNotice) {
 	if count <= 0 || c.Detaching() || c.inventory == nil {
 		return
 	}
@@ -43,7 +53,7 @@ func (c *Character) GiveScriptItems(itemID int32, count, enchant int, multiple b
 	if enchant > 0 {
 		c.inventory.SetEnchantLevel(last, enchant)
 	}
-	c.emit(event.ItemObtained{ItemID: itemID, Count: count, Notice: event.ObtainGiven})
+	c.emit(event.ItemObtained{ItemID: itemID, Count: count, Notice: notice})
 }
 
 // TakeScriptItems removes count units of itemID from c's inventory the way
@@ -98,6 +108,33 @@ func (c *Character) unequipForTake(inst *item.Instance) {
 	if inst.Equipped() {
 		c.emit(event.UnequipRequested{ObjectID: inst.ObjectID})
 	}
+}
+
+// DestroyScriptItems destroys count units of itemID, from the first
+// instance of it c holds, with no chat line, and reports whether it did. An
+// instance holding fewer units and a character leaving the world lose
+// nothing.
+func (c *Character) DestroyScriptItems(itemID int32, count int) bool {
+	if c.Detaching() || c.inventory == nil {
+		return false
+	}
+	inst := c.inventory.ItemByTemplateID(itemID)
+	if inst == nil || inst.CountValue() < count {
+		return false
+	}
+	return c.inventory.DestroyItem(inst, count) != nil
+}
+
+// HoldsItem reports whether c's inventory holds the item instance
+// objectID.
+func (c *Character) HoldsItem(objectID int32) bool {
+	return c.inventory != nil && c.inventory.ItemByObjectID(objectID) != nil
+}
+
+// NotifySystemMessage shows c the system message id, which takes no
+// parameter.
+func (c *Character) NotifySystemMessage(id int) {
+	c.emit(event.SystemMessageShown{ID: id})
 }
 
 // NotifySound plays the sound file for c alone.

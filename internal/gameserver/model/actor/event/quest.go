@@ -1,6 +1,9 @@
 package event
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
+)
 
 // QuestListChanged reports that the character's quest window changed:
 // Entries is the window as the change left it.
@@ -26,6 +29,18 @@ type DialogPageShown struct {
 
 func (DialogPageShown) event() {}
 
+// TeleportWindowShown reports a script opening, on the character, the
+// list of the destinations of Kind the NPC ObjectID (template NpcID)
+// offers. An NPC offering no destination shows nothing, and the client is
+// not released.
+type TeleportWindowShown struct {
+	ObjectID int32
+	NpcID    int
+	Kind     travel.Kind
+}
+
+func (TeleportWindowShown) event() {}
+
 // DialogReleased reports that the dialog the character's client waits on
 // ends with nothing shown.
 type DialogReleased struct{}
@@ -36,6 +51,12 @@ func (DialogReleased) event() {}
 type ScriptMessage struct{ Text string }
 
 func (ScriptMessage) event() {}
+
+// SystemMessageShown reports the system message ID, which takes no
+// parameter, shown to the character.
+type SystemMessageShown struct{ ID int }
+
+func (SystemMessageShown) event() {}
 
 // QuestOverweight reports a quest dialog refused because the character
 // carries too much.

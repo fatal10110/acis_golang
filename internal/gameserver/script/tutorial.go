@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 )
 
 // tutorialQuest is the quest the tutorial events go to.
@@ -31,6 +32,21 @@ func (r *Registry) TutorialEvent(c *player.Character, name string) {
 }
 
 var _ player.TutorialEvents = (*Registry)(nil)
+
+// CharacterCreated gives c, a character just created and never in the
+// world, a started tutorial quest state when the tutorial is registered,
+// so its first enter world reaches the tutorial. The state's row is
+// written on c's persistence lane; c's journal is then sealed, so its
+// first selection waits for that write and is refused if it never lands.
+func (r *Registry) CharacterCreated(c *player.Character) {
+	s := r.byName[strings.ToLower(tutorialQuest)]
+	if s == nil || s.env == nil || s.env.Quests == nil {
+		return
+	}
+	q := s.env.Quests
+	q.NewState(c, s).SetStatus(questlog.StatusStarted)
+	q.Seal(c)
+}
 
 // characterOrNil returns the player the handle is on, nil for a handle on
 // nothing.

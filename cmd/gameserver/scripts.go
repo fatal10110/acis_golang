@@ -13,27 +13,62 @@ import (
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/alliance"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/blackjudge"
+	featureclan "github.com/fatal10110/acis_golang/internal/gameserver/script/feature/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/tutorial"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q001"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q350"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q636"
 	scripttask "github.com/fatal10110/acis_golang/internal/gameserver/script/task"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/noblesseteleporter"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
 )
 
 // scriptCatalogs are the literal script catalogs, one per range or family;
-// scriptCatalog joins them.
-func scriptCatalogs() []script.Catalog {
-	return []script.Catalog{questCatalog(), taskCatalog()}
+// scriptCatalog joins them. crystals are the soul crystals a quest charges.
+func scriptCatalogs(crystals *item.SoulCrystalTable) []script.Catalog {
+	return []script.Catalog{questCatalog(crystals), featureCatalog(), teleportCatalog(), taskCatalog(), aiCatalog()}
 }
 
 // questCatalog lists the quests.
-func questCatalog() script.Catalog {
+func questCatalog(crystals *item.SoulCrystalTable) script.Catalog {
 	return script.Catalog{
-		"quest.Q001_LettersOfLove": q001.New,
+		"quest.Q001_LettersOfLove":      q001.New,
+		"quest.Q350_EnhanceYourWeapon":  func() script.Script { return q350.New(crystals) },
+		"quest.Q636_TruthBeyondTheGate": q636.New,
+	}
+}
+
+// featureCatalog lists the scripted features.
+func featureCatalog() script.Catalog {
+	return script.Catalog{
+		"script.feature.Alliance":   alliance.New,
+		"script.feature.BlackJudge": blackjudge.New,
+		"script.feature.Clan":       featureclan.New,
+		"script.feature.Tutorial":   tutorial.New,
+	}
+}
+
+// teleportCatalog lists the scripted teleporters.
+func teleportCatalog() script.Catalog {
+	return script.Catalog{
+		"script.teleport.NoblesseTeleporter": noblesseteleporter.New,
+	}
+}
+
+// aiCatalog lists the NPC behaviors.
+func aiCatalog() script.Catalog {
+	return script.Catalog{
+		"script.ai.group.Walkers": group.Walkers,
 	}
 }
 
@@ -71,23 +106,24 @@ func scriptCatalog(catalogs []script.Catalog) (script.Catalog, error) {
 // //reload npc, ids a reload adds stay unbound, and a template whose kind
 // a reload changes is not re-checked by the seam gate until restart.
 //
-// The script timers bound to no NPC or player queue run on an engine queue
-// of pool, closed on shutdown before the persistence worker drains.
+// The engine's own work (the NPC dying hooks, and the script timers bound to
+// no NPC or player queue) runs on an engine queue of pool, closed on
+// shutdown before the persistence worker drains.
 func provideScripts(lc fx.Lifecycle, paths gameServerPaths, data *gameData, env *script.Env, pool *sim.Pool, log zerolog.Logger) (*script.Registry, error) {
 	list, err := gamexml.LoadScriptList(filepath.Join(paths.DataRoot, "data", "xml", "scripts.xml"), log)
 	if err != nil {
 		return nil, err
 	}
-	catalog, err := scriptCatalog(scriptCatalogs())
+	catalog, err := scriptCatalog(scriptCatalogs(data.SoulCrystals))
 	if err != nil {
 		return nil, err
 	}
-	timers := pool.NewQueue("script-timers")
+	engine := pool.NewQueue("script-engine")
 	lc.Append(fx.Hook{OnStop: func(context.Context) error {
-		timers.Close()
+		engine.Close()
 		return nil
 	}})
-	return script.Build(list, catalog, script.Config{KindOf: npcKindOf(data.NPCs), Log: log, Env: env, Queue: timers}), nil
+	return script.Build(list, catalog, script.Config{KindOf: npcKindOf(data.NPCs), Log: log, Env: env, Queue: engine}), nil
 }
 
 // provideScriptEnv returns what the script helpers act through: the quest

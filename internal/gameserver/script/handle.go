@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 )
 
 // NPC is a script's handle on one NPC.
@@ -93,6 +94,19 @@ func (n *NPC) Decayed() bool {
 	return true
 }
 
+// DeleteMe takes the NPC out of the world at once, leaving no corpse: its
+// decayed hooks run, then its spawn answers as for a decayed corpse. It has
+// left the world when the call returns. A handle on nothing, or on an NPC
+// already gone, does nothing.
+func (n *NPC) DeleteMe() {
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		o.DeleteNow()
+	case *npc.Folk:
+		o.DeleteNow()
+	}
+}
+
 // Summoner returns the creature the NPC was spawned for, nil for none.
 func (n *NPC) Summoner() Creature {
 	var inst *npc.Instance
@@ -118,8 +132,72 @@ func (n *NPC) NpcID() int32 {
 	panic("script: the template of a handle on nothing")
 }
 
+// Alias returns the alias of the NPC's template, the key its walker routes
+// are listed under; a handle on nothing panics.
+func (n *NPC) Alias() string {
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		return o.Instance.Template.Alias
+	case *npc.Folk:
+		return o.Instance.Template.Alias
+	}
+	panic("script: the template of a handle on nothing")
+}
+
+// SetRunning puts the NPC in its run stance when run is true, in its walk
+// stance otherwise; a change is shown to the players around it. A handle on
+// nothing does nothing.
+func (n *NPC) SetRunning(run bool) {
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		if run {
+			o.ForceRunStance()
+		} else {
+			o.ForceWalkStance()
+		}
+	case *npc.Folk:
+		o.SetRunStance(run)
+	}
+}
+
 // Level returns the player's level.
 func (p *Player) Level() int32 { return int32(p.character().Level()) }
+
+// IsClanLeader reports whether the player leads its clan.
+func (p *Player) IsClanLeader() bool { return p.character().IsClanLeader() }
+
+// IsNoble reports whether the player is a noblesse.
+func (p *Player) IsNoble() bool { return p.character().IsNoble() }
+
+// Adena returns the adena the player carries.
+func (p *Player) Adena() int32 {
+	inv := p.character().Inventory()
+	if inv == nil {
+		return 0
+	}
+	return int32(inv.Adena())
+}
+
+// DeathPenaltyLevel returns the level of the player's death penalty, 0 for
+// none.
+func (p *Player) DeathPenaltyLevel() int32 { return int32(p.character().DeathPenaltyLevel()) }
+
+// ReduceDeathPenaltyLevel lowers the player's death penalty by one level,
+// telling the player the level left or that the penalty is lifted. A
+// player with no death penalty is left as is, and so is a detaching one,
+// which no script gives or takes anything.
+func (p *Player) ReduceDeathPenaltyLevel() {
+	if c := p.character(); !c.Detaching() {
+		c.ReduceDeathPenaltyLevel()
+	}
+}
+
+// ShowTeleportWindow opens on p the list of the destinations of kind the
+// NPC offers, each priced for p. An NPC offering no destination shows
+// nothing.
+func (n *NPC) ShowTeleportWindow(p *Player, kind travel.Kind) {
+	p.character().ShowTeleportWindow(n.ObjectID(), int(n.NpcID()), kind)
+}
 
 func (n *NPC) combatant() attackable.Combatant {
 	if n == nil || n.self == nil {
@@ -252,6 +330,20 @@ func (n *NPC) AddDoNothingDesire(timer int, weight float64) {
 // the end of the run drops the flee. Refused for an NPC that cannot move.
 func (n *NPC) AddFleeDesire(target Creature, distance int, weight float64) {
 	n.brain.AddFleeDesire(combatantOf(target), distance, weight)
+}
+
+// AddMoveRouteDesire asks the NPC to walk the walker route named route,
+// listed under the NPC's template alias; a route with no node for it moves
+// the NPC nowhere. The desire never loses weight and stays queued while the
+// NPC lives, so the NPC walks the route whenever nothing outweighs it, and
+// goes back to the node nearest to it once nothing does again.
+func (n *NPC) AddMoveRouteDesire(route string, weight float64) {
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		o.AI().AddMoveRouteDesire(route, weight)
+	case *npc.Folk:
+		o.AddMoveRouteDesire(route, weight)
+	}
 }
 
 // AddSocialDesire asks the NPC to play social animation id. Once it plays,

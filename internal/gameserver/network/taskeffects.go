@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
@@ -69,6 +70,38 @@ type liveZoneActor struct {
 	// mu is released, still under deliveryMu, so the flag's UserInfo goes
 	// out before that revalidation's compass update.
 	leftBattlefield bool
+	// scriptZones are the zones a script reacts to that a revalidation just
+	// entered, collected under mu. The revalidation hands them to scripts
+	// once it has released both locks (fireScriptZones).
+	scriptZones []int32
+	// scripts are the scripts zone entries reach; nil reaches none.
+	scripts zoneScripts
+}
+
+// zoneScripts is what a player's zone entries ask of the script registry.
+type zoneScripts interface {
+	ZoneEntered(zoneID int32, c attackable.Combatant)
+}
+
+// noteScriptZone records, under mu, that the revalidation running entered
+// the zone zoneID, which a script reacts to.
+func (a *liveZoneActor) noteScriptZone(zoneID int32) {
+	a.scriptZones = append(a.scriptZones, zoneID)
+}
+
+// fireScriptZones hands the script zones the last revalidations entered to
+// their scripts, in entry order, with no zone lock held.
+func (a *liveZoneActor) fireScriptZones() {
+	a.mu.Lock()
+	ids := a.scriptZones
+	a.scriptZones = nil
+	a.mu.Unlock()
+	if a.scripts == nil {
+		return
+	}
+	for _, id := range ids {
+		a.scripts.ZoneEntered(id, a.live)
+	}
 }
 
 // zoneStepsPerRevalidation is how many movement steps pass per zone
@@ -101,6 +134,7 @@ func (a *liveZoneActor) Race() player.Race           { return a.live.Character.R
 func (a *liveZoneActor) ClanID() int32               { return a.live.Character.ClanID() }
 
 func (a *liveZoneActor) revalidate(ix *zone.Index) {
+	defer a.fireScriptZones()
 	a.deliveryMu.Lock()
 	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
@@ -125,6 +159,7 @@ func (a *liveZoneActor) revalidate(ix *zone.Index) {
 // regions at once and restarts the step count; a step then counts toward
 // the next revalidation.
 func (a *liveZoneActor) revalidateMove(ix *zone.Index, previous location.Location, reason zoneRevalidation) {
+	defer a.fireScriptZones()
 	a.deliveryMu.Lock()
 	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
@@ -191,6 +226,7 @@ func (a *liveZoneActor) leave(ix *zone.Index, x, y int) {
 // rejoin puts the player back on the grid once its client has appeared,
 // entering the zones at its current position.
 func (a *liveZoneActor) rejoin(ix *zone.Index) {
+	defer a.fireScriptZones()
 	a.deliveryMu.Lock()
 	defer a.deliveryMu.Unlock()
 	a.mu.Lock()

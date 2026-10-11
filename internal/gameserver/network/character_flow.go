@@ -758,6 +758,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	live.attack, live.move, live.combat = attackCtl, moveCtl, combat
 	live.kick = client.Session.Close
 	live.zoneActor = &liveZoneActor{live: live}
+	if l.scripts != nil {
+		live.zoneActor.scripts = l.scripts
+	}
 	// Build cast eagerly, like attackCtl above: pickup-lock's timer goroutine
 	// reads live.cast unguarded, so a lazy first write from the read-loop
 	// goroutine would race it (issue #1183).

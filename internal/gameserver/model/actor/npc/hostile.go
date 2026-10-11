@@ -100,12 +100,16 @@ type Hostile struct {
 	attackedByMu sync.Mutex
 	attackedBy   map[int32]attackable.Combatant
 
-	// minionsMu guards master and the minion list. A minion claims its
-	// follow slot under its master's lock from the minion's own queue
-	// (claimFollowSlot).
+	// minionsMu guards master, spawnMaster and the minion list. A minion
+	// claims its follow slot under its master's lock from the minion's own
+	// queue (claimFollowSlot).
 	minionsMu sync.RWMutex
 	master    *Hostile
-	minions   map[int32]*Hostile
+	// spawnMaster is the master this private was spawned for. It outlives
+	// the master link, which the master's death clears: a private stays one
+	// for its whole life.
+	spawnMaster *Hostile
+	minions     map[int32]*Hostile
 	// followSlots are the eight escort points around this NPC, occupied by
 	// minion object ids (0 is empty). Only a master uses them.
 	followSlots [escortSlotCount]int32
@@ -156,6 +160,7 @@ type Hostile struct {
 
 	spoil          item.SpoilPool
 	seed           SeedState
+	absorb         absorbers
 	overhit        overhitState
 	corpseDeadline time.Time
 
@@ -521,12 +526,28 @@ func (h *Hostile) Master() *Hostile {
 	return h.master
 }
 
-// SetMaster records this NPC's spawning master.
+// SetMaster links this NPC to its master, or unlinks it for nil. Linking
+// makes the NPC a private of master for the rest of its life.
 func (h *Hostile) SetMaster(master *Hostile) {
 	h.minionsMu.Lock()
 	h.master = master
+	if master != nil {
+		h.spawnMaster = master
+	}
 	h.minionsMu.Unlock()
 }
+
+// SpawnMaster returns the master this private was spawned for, nil for an
+// NPC that is not a private. Unlike Master it stays set once the master
+// died and let the private go.
+func (h *Hostile) SpawnMaster() *Hostile {
+	h.minionsMu.RLock()
+	defer h.minionsMu.RUnlock()
+	return h.spawnMaster
+}
+
+// IsPrivate reports whether this NPC was spawned as a master's private.
+func (h *Hostile) IsPrivate() bool { return h.SpawnMaster() != nil }
 
 // AddMinion records a child spawned for this NPC.
 func (h *Hostile) AddMinion(minion *Hostile) {
@@ -836,10 +857,6 @@ func (h *Hostile) Tick() {
 	h.brain.Tick()
 }
 
-// AtHookPoint is where h's AI loop gives the behavior bound to h's template
-// its turn. No behavior binds a hook point yet, so it does nothing.
-func (h *Hostile) AtHookPoint(ai.HookPoint) {}
-
 // Think continues the hostile AI's current intention after a bow's reuse
 // ending or a control effect ending. It never idles on an empty desire
 // queue: RunAI and TickThink do.
@@ -1013,7 +1030,8 @@ func (h *Hostile) MarkDead() bool {
 
 // Die runs this NPC's death sequence: the once-only dead-state
 // transition, the strip of every effect that does not last through death,
-// then its reward hook. rewards may be nil — the drop and
+// then its reward hook, then its dying hooks, its party's and its clan's
+// calls (partyDied, raiseClanDied). rewards may be nil — the drop and
 // experience/SP systems land separately and plug in here once ready. It
 // reports whether the death was newly applied by this call.
 //
@@ -1040,6 +1058,9 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 	if h.RaidBoss() && killedByPlayer(killer) {
 		h.emit(event.RaidBossKilled{})
 	}
+	h.raiseDying(killer)
+	h.partyDied()
+	raiseClanDied(h.scripts, h.world, h, killer)
 	return true
 }
 
@@ -1068,7 +1089,8 @@ func (h *Hostile) Decayed() bool {
 }
 
 // Decay removes this NPC's corpse from the world, stops every effect it
-// still holds and runs the respawn hook, if any. It is idempotent: a repeat
+// still holds and runs the respawn hook, if any. Its decayed script hooks
+// run first, while it is still in the world. It is idempotent: a repeat
 // call is a no-op, matching the once-only guarantee the corpse decay task
 // relies on.
 //
@@ -1078,6 +1100,15 @@ func (h *Hostile) Decayed() bool {
 // linkage and call spawn.CalculateRespawnDelay plus spawn.State.SetRespawn
 // there, since Hostile itself carries no spawn linkage yet.
 func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
+	return h.DecayWithRespawn(worldState, func(int32) func() { return respawn })
+}
+
+// DecayWithRespawn is Decay with the respawn hook resolved by respawnFor,
+// called with this NPC's object id only once this call has won the decay
+// and before its decayed hooks run. Of several concurrent decays, only the
+// winner claims the spawn's respawn, so it is armed exactly once.
+// respawnFor may be nil.
+func (h *Hostile) DecayWithRespawn(worldState *world.State, respawnFor func(id int32) func()) bool {
 	h.deathMu.Lock()
 	if h.decayed {
 		h.deathMu.Unlock()
@@ -1087,6 +1118,10 @@ func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
 	h.dead = true
 	h.corpseDeadline = time.Time{}
 	h.deathMu.Unlock()
+	var respawn func()
+	if respawnFor != nil {
+		respawn = respawnFor(h.ObjectID())
+	}
 	h.raiseDecayed()
 
 	// The NPC leaves its zones while its observers still know it.
@@ -1166,8 +1201,9 @@ func (h *Hostile) ReturnHome() bool {
 }
 
 // InTerritory reports whether this NPC is inside its spawn territory.
-// A living private uses its master's territory. A dead master is treated
-// as unlinked, so the private stays in-territory for the corpse window.
+// A linked private uses its master's territory; a dead master leaves it
+// in territory, and so does a master that died and let it go: a private
+// is always in its own territory.
 // Maker NPCs with a resolved territory use banned-then-allowed polygon
 // containment. A nil maker, or a maker with no territories, uses a strict
 // 200-unit 3D sphere around Home.
@@ -1177,6 +1213,9 @@ func (h *Hostile) InTerritory() bool {
 			return true
 		}
 		return master.InTerritory()
+	}
+	if h.IsPrivate() {
+		return true
 	}
 	if maker := h.Instance.Maker; maker != nil && len(maker.Territories) > 0 {
 		loc := h.location()

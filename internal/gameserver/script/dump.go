@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,6 +24,10 @@ import (
 //
 //	# folded npc events
 //	fold npc <EVENT>,... <path>,... <npc ids>
+//
+//	# folded other events
+//	fold item <id> ITEM_USE <path>,...
+//	fold zone <id> ZONE_ENTER <path>,...
 func (r *Registry) Dump(w io.Writer) error {
 	bw := bufio.NewWriter(w)
 	for _, e := range r.entries {
@@ -74,6 +79,20 @@ func (r *Registry) Dump(w io.Writer) error {
 		}
 		for _, g := range byIDs(b) {
 			fmt.Fprintf(bw, "fold npc %s %s %s\n", g.events, key, g.ids)
+		}
+	}
+
+	fmt.Fprint(bw, "\n# folded other events\n")
+	for _, other := range []struct {
+		kind, event string
+		lists       map[int32][]*Script
+	}{{"item", "ITEM_USE", r.items}, {"zone", "ZONE_ENTER", r.zones}} {
+		for _, id := range slices.Sorted(maps.Keys(other.lists)) {
+			paths := make([]string, len(other.lists[id]))
+			for i, s := range other.lists[id] {
+				paths[i] = s.path
+			}
+			fmt.Fprintf(bw, "fold %s %d %s %s\n", other.kind, id, other.event, strings.Join(paths, ","))
 		}
 	}
 	return bw.Flush()

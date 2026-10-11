@@ -269,21 +269,30 @@ type decayableActor interface {
 	Decay(*world.State, func()) bool
 }
 
+// spawnDecayer is an actor whose removal can race this corpse decay off its
+// queue; it resolves the respawn hook only once it has won its decay.
+type spawnDecayer interface {
+	DecayWithRespawn(*world.State, func(id int32) func()) bool
+}
+
 func (w *worldDecayEffects) Decay(actor task.DecayActor) {
 	obj, ok := w.state.Object(actor.ObjectID())
 	if !ok {
 		return
 	}
 
-	var respawn func()
 	w.mu.RLock()
 	hook := w.respawnHook
 	w.mu.RUnlock()
-	if hook != nil {
-		respawn = hook(actor.ObjectID())
-	}
 
-	if d, ok := obj.(decayableActor); ok {
+	switch d := obj.(type) {
+	case spawnDecayer:
+		d.DecayWithRespawn(w.state, hook)
+	case decayableActor:
+		var respawn func()
+		if hook != nil {
+			respawn = hook(actor.ObjectID())
+		}
 		d.Decay(w.state, respawn)
 	}
 }

@@ -32,11 +32,14 @@ type AttackFinished struct {
 	Target Creature
 }
 
-// ClanAttacked: Caller, attacked by Attacker, called its clan member Called.
+// ClanAttacked: Caller, attacked by Attacker, called its clan member Called,
+// Caller itself included. Skill is the skill that did it, the zero Ref for
+// an attack with no skill.
 type ClanAttacked struct {
 	Caller, Called *NPC
 	Attacker       Creature
 	Damage         int32
+	Skill          skill.Ref
 }
 
 // ClanDied: Caller, killed by Killer, told its clan member Called.
@@ -62,6 +65,16 @@ type Event struct {
 type FirstTalk struct {
 	NPC    *NPC
 	Player *Player
+}
+
+// ItemUse: Player used the item ObjectID, of template ItemID, with Target
+// selected; Target is nil when nothing is selected or the selection is not
+// a creature.
+type ItemUse struct {
+	Player   *Player
+	ItemID   int32
+	ObjectID int32
+	Target   Creature
 }
 
 // MoveToFinished: NPC arrived at X, Y, Z.
@@ -90,13 +103,15 @@ type PartyAttacked struct {
 	Damage         int32
 }
 
-// PartyDied: Caller died and told its party member Called.
+// PartyDied: Caller died and told its party member Called, Caller itself
+// included.
 type PartyDied struct{ Caller, Called *NPC }
 
 // PickedItem: NPC picked up an item.
 type PickedItem struct{ NPC *NPC }
 
-// ScriptEvent: NPC received the script event EventID with two arguments.
+// ScriptEvent: NPC received the script event EventID with two arguments,
+// sent to it or broadcast around another NPC.
 type ScriptEvent struct {
 	NPC        *NPC
 	EventID    int32
@@ -163,4 +178,10 @@ type UseSkillFinished struct {
 	NPC      *NPC
 	Creature Creature
 	Success  bool
+}
+
+// ZoneEnter: Creature entered the zone ZoneID.
+type ZoneEnter struct {
+	Creature Creature
+	ZoneID   int32
 }
