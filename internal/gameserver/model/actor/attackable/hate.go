@@ -196,6 +196,14 @@ func (h *HateTable) IsEmpty() bool {
 	return len(h.entries) == 0
 }
 
+// Len returns the number of entries.
+func (h *HateTable) Len() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	return len(h.entries)
+}
+
 // Snapshot returns a copy of every entry, in no particular order.
 func (h *HateTable) Snapshot() []HateEntry {
 	h.mu.RLock()
