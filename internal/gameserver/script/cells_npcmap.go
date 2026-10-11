@@ -8,8 +8,11 @@ import (
 
 // NPCMapCell maps NPCs to NPCs, empty at first: the reference's map keyed
 // by an NPC object (the third-class sagas' busy tablets and their fights).
-// A key or value is the NPC itself, not its template or object id: another
-// NPC of the same template is another key. Like the other cells it is
+// Keys and values match by NPC identity, the one the timers use: the spawn
+// slot's, shared by every life the slot spawns, as the reference reuses
+// one NPC object across respawns; an NPC with no slot is its own identity.
+// Neither the template nor the object id is the identity: another NPC of
+// the same template is another key. Like the other cells it is
 // leaf-locked, takes no closure, and its zero value is ready to use.
 type NPCMapCell struct {
 	mu sync.Mutex
@@ -17,11 +20,16 @@ type NPCMapCell struct {
 	entries []npcPair
 }
 
-type npcPair struct{ key, value attackable.Combatant }
+// npcPair is one entry: the key's identity, the value's identity, and the
+// value as last handed to Set, which Get hands back.
+type npcPair struct {
+	key, valueID any
+	value        attackable.Combatant
+}
 
-// index returns the position of key's entry, -1 when key is not held.
-// The caller holds mu.
-func (c *NPCMapCell) index(key attackable.Combatant) int {
+// index returns the position of the entry keyed by identity key, -1 when
+// key is not held. The caller holds mu.
+func (c *NPCMapCell) index(key any) int {
 	for i, e := range c.entries {
 		if e.key == key {
 			return i
@@ -30,10 +38,10 @@ func (c *NPCMapCell) index(key attackable.Combatant) int {
 	return -1
 }
 
-// Get returns the NPC key maps to; nil when key is not held, or is nil or a
-// handle on nothing.
+// Get returns the NPC key maps to, as last handed to Set; nil when key is
+// not held, or is nil or a handle on nothing.
 func (c *NPCMapCell) Get(key *NPC) *NPC {
-	k := combatantOf(key)
+	k := npcIdentity(key)
 	if k == nil {
 		return nil
 	}
@@ -48,7 +56,7 @@ func (c *NPCMapCell) Get(key *NPC) *NPC {
 
 // Has reports whether key is held.
 func (c *NPCMapCell) Has(key *NPC) bool {
-	k := combatantOf(key)
+	k := npcIdentity(key)
 	if k == nil {
 		return false
 	}
@@ -60,22 +68,22 @@ func (c *NPCMapCell) Has(key *NPC) bool {
 // Set maps key to value, replacing what key mapped to. A nil key or value,
 // or a handle on nothing, stores nothing.
 func (c *NPCMapCell) Set(key, value *NPC) {
-	k, v := combatantOf(key), combatantOf(value)
-	if k == nil || v == nil {
+	k, vid, v := npcIdentity(key), npcIdentity(value), combatantOf(value)
+	if k == nil || vid == nil {
 		return
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if i := c.index(k); i >= 0 {
-		c.entries[i].value = v
+		c.entries[i].valueID, c.entries[i].value = vid, v
 		return
 	}
-	c.entries = append(c.entries, npcPair{key: k, value: v})
+	c.entries = append(c.entries, npcPair{key: k, valueID: vid, value: v})
 }
 
 // Delete removes key and reports whether it was held.
 func (c *NPCMapCell) Delete(key *NPC) bool {
-	k := combatantOf(key)
+	k := npcIdentity(key)
 	if k == nil {
 		return false
 	}
@@ -94,14 +102,14 @@ func (c *NPCMapCell) Delete(key *NPC) bool {
 // reference's removal of a value from the map's values. Other entries
 // mapping to value stay.
 func (c *NPCMapCell) DeleteValue(value *NPC) bool {
-	v := combatantOf(value)
+	v := npcIdentity(value)
 	if v == nil {
 		return false
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	for i, e := range c.entries {
-		if e.value == v {
+		if e.valueID == v {
 			c.entries = append(c.entries[:i], c.entries[i+1:]...)
 			return true
 		}
