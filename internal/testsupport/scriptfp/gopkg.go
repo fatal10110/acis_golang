@@ -53,24 +53,33 @@ func readGoPackage(dir string) (*goPackage, error) {
 			}
 		}
 	}
-	for _, file := range files {
-		ast.Inspect(file, func(n ast.Node) bool {
-			switch n := n.(type) {
-			case *ast.ImportSpec:
-				return false
-			case *ast.BasicLit:
-				pkg.literal(n)
-			case *ast.CallExpr:
-				if name := calledName(n); name != "" {
-					pkg.calls[name]++
-				}
-			case *ast.CompositeLit:
-				if isHooksType(n.Type) {
-					pkg.hookFields(n, funcs)
-				}
+	var visit func(ast.Node) bool
+	visit = func(n ast.Node) bool {
+		switch n := n.(type) {
+		case *ast.ImportSpec:
+			return false
+		case *ast.BasicLit:
+			pkg.literal(n)
+		case *ast.CallExpr:
+			name := calledName(n)
+			if name != "" {
+				pkg.calls[name]++
 			}
-			return true
-		})
+			if name == "Named" {
+				// Hooks.Named takes the reference class name, which is no
+				// literal of the class: only its receiver is read.
+				ast.Inspect(n.Fun, visit)
+				return false
+			}
+		case *ast.CompositeLit:
+			if isHooksType(n.Type) {
+				pkg.hookFields(n, funcs)
+			}
+		}
+		return true
+	}
+	for _, file := range files {
+		ast.Inspect(file, visit)
 	}
 	slices.SortStableFunc(pkg.hooks, func(a, b Hook) int { return strings.Compare(a.Name, b.Name) })
 	return pkg, nil

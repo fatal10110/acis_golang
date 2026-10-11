@@ -62,6 +62,10 @@ type Script struct {
 - **Nil-safe invokers:** `func (h *Hooks) Attacked(s, e)`, one per field. A parent call is
   `base.Attacked(s, e)` even when no ancestor reacts, so every parent call ports 1:1.
 - **Derive:** `base.With(Hooks{…})` overlays the non-nil fields.
+- **Class chain:** a class others derive from names its hooks, `base.With(…).Named("Warrior")`,
+  so `Script.Classes()` gives the script's `Name` and then each named ancestor, root last:
+  the class chain the `//info ai` page prints (X3). A `cmd/gameserver` test pins every
+  catalog script the page can print to the manifest's `chain`.
 - **Event set:** a behavior is bound, for each of its own `NPCs`, to every NPC event whose
   field is non-nil after `With`. A parent's ids are never inherited.
 - **Re-entry into the final script:** `s.Attacked(e)`. The reference has 10 such sites (7

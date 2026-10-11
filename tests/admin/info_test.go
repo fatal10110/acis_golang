@@ -528,7 +528,7 @@ func TestAdminInfoNpcGeneralPages(t *testing.T) {
 	assertInfoPage(t, gm, "info spoil", defaultPage(t, "This NPC doesn't hold any spoils."))
 
 	// The pages that read state Go does not keep yet release the client.
-	for _, cmd := range []string{"info ai", "info ai 1", "info ai x", "info desire", "info script", "info shop", "info skill", "info spawn"} {
+	for _, cmd := range []string{"info ai 1", "info desire", "info shop", "info skill", "info spawn"} {
 		assertActionFailed(t, gm, cmd)
 	}
 }

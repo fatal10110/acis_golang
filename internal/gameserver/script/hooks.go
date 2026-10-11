@@ -38,6 +38,22 @@ type Hooks struct {
 	// they set.
 	own     hookSet
 	derived bool
+	// class is the reference class these hooks are the hooks of, as Named
+	// set it; "" until named. With does not carry it over.
+	class string
+	// ancestors are the named classes With derived these hooks from,
+	// nearest first, root last.
+	ancestors []string
+}
+
+// Named returns h as the hooks of the reference class name. Hooks a child
+// derives from them with With list name among their ancestors, which the
+// //info AI page prints as the reference prints the class chain, so every
+// class a child derives from names its hooks. A script's own class is its
+// Name and needs no naming.
+func (h Hooks) Named(name string) Hooks {
+	h.class = name
+	return h
 }
 
 // hook names one Hooks field, in field order.
@@ -164,7 +180,8 @@ func (h *Hooks) ownSet() hookSet {
 }
 
 // With returns h with every hook o sets replaced by o's: a child behavior
-// overriding its parent's handlers.
+// overriding its parent's handlers. The result descends from h's class
+// when h is named (see Named), and is itself unnamed.
 func (h Hooks) With(o Hooks) Hooks {
 	pick := func(dst *Hooks) {
 		if o.OnAbnormalStatusChanged != nil {
@@ -256,6 +273,10 @@ func (h Hooks) With(o Hooks) Hooks {
 	pick(&out)
 	out.own = o.set()
 	out.derived = true
+	out.class = ""
+	if h.class != "" {
+		out.ancestors = append([]string{h.class}, h.ancestors...)
+	}
 	return out
 }
 
