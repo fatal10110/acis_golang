@@ -95,7 +95,15 @@ func (n *NPC) LifeTime() int32 {
 
 // InMyTerritory reports whether the NPC stands in its territory, its
 // master's for a private.
-func (n *NPC) InMyTerritory() bool { return n.hostile("check the territory").InTerritory() }
+func (n *NPC) InMyTerritory() bool {
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		return o.InTerritory()
+	case *npc.Folk:
+		return o.InTerritory()
+	}
+	panic("script: the territory of a handle on nothing")
+}
 
 // InSpawnTerritory reports whether c stands in the territory of the spawn
 // that placed the NPC.

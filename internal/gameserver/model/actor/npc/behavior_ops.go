@@ -32,16 +32,24 @@ func (h *Hostile) SpawnTerritoryContains(at location.Location) bool {
 	if h.IsPrivate() {
 		return true
 	}
-	if maker := h.Instance.Maker; maker != nil && len(maker.Territories) > 0 {
+	return h.Instance.territoryContains(at)
+}
+
+// territoryContains reports whether at lies in the territory of the spawn
+// that placed inst: the maker's territories less its banned ones for a
+// maker NPC, and a strict sphere of the drift range around the spawn point
+// otherwise. An NPC with no spawn point has no territory to leave.
+func (inst *Instance) territoryContains(at location.Location) bool {
+	if maker := inst.Maker; maker != nil && len(maker.Territories) > 0 {
 		if maker.ContainsBanned(at) {
 			return false
 		}
 		return maker.Contains(at)
 	}
-	if !h.Instance.HasHome {
+	if !inst.HasHome {
 		return true
 	}
-	return at.In3DRadius(h.Instance.Home, defaultDriftRange)
+	return at.In3DRadius(inst.Home, defaultDriftRange)
 }
 
 // InstantTeleportTo moves the NPC to target in one step, staying on the

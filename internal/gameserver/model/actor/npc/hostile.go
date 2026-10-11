@@ -1233,17 +1233,7 @@ func (h *Hostile) InTerritory() bool {
 	if h.IsPrivate() {
 		return true
 	}
-	if maker := h.Instance.Maker; maker != nil && len(maker.Territories) > 0 {
-		loc := h.location()
-		if maker.ContainsBanned(loc) {
-			return false
-		}
-		return maker.Contains(loc)
-	}
-	if !h.Instance.HasHome {
-		return true
-	}
-	return h.location().In3DRadius(h.Instance.Home, defaultDriftRange)
+	return h.Instance.territoryContains(h.location())
 }
 
 func hostileKind(inst *Instance) InstanceKind {
