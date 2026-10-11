@@ -156,6 +156,11 @@ func (p *Player) AlliedWithKetra() bool { return p.character().AlliedWithKetra()
 // Silenos.
 func (p *Player) AlliedWithVarka() bool { return p.character().AlliedWithVarka() }
 
+// VarkaKetraAlliance returns the player's standing with the two factions:
+// positive is the Ketra Orc alliance level, negative the Varka Silenos one,
+// 0 neither.
+func (p *Player) VarkaKetraAlliance() int32 { return int32(p.character().VarkaKetraAlliance()) }
+
 // The class groups an NPC's hate parameters name, by class id.
 var classGroups = map[string][]int{
 	"@attacker_group":      {0, 1, 2, 3, 7, 8, 9, 18, 22, 23, 24, 31, 35, 36, 37, 44, 45, 46, 47, 48, 53, 88, 89, 92, 93, 101, 102, 108, 109, 113, 114},
