@@ -21,11 +21,12 @@ import (
 // The Warrior chain's NPC ids the scenarios spawn, each a fixture monster
 // of level 1, and an id no behavior is bound to.
 const (
-	warriorID    = int32(20001) // Warrior
-	warriorTwoID = int32(20003) // Warrior
-	warriorFarID = int32(20004) // Warrior
-	aggressiveID = int32(20012) // WarriorAggressive
-	unboundID    = int32(29990) // no behavior
+	warriorID       = int32(20001) // Warrior
+	warriorTwoID    = int32(20003) // Warrior
+	warriorFarID    = int32(20004) // Warrior
+	aggressiveID    = int32(20012) // WarriorAggressive
+	aggressiveTwoID = int32(20080) // WarriorAggressive
+	unboundID       = int32(29990) // no behavior
 )
 
 // warriorScripts are the behavior chain down to the Warrior behaviors, in
@@ -179,66 +180,100 @@ func TestWarriorAggressiveAttacksOnSight(t *testing.T) {
 	}
 }
 
-// TestWarriorAssistsItsClanOnceSettled shows the Warrior clan call: a hit
-// on one Warrior NPC makes a clan member in range want to attack the
-// attacker, with the damage formula's hate, once the member has lived more
-// than 7 AI cycles; before that it does not react. The clan call reaches
-// the victim itself first, so a settled victim adds the formula's hate
-// twice: once from its attacked hook, once from its own clan call.
+// TestWarriorAssistsItsClanOnceSettled shows the Warrior clan call, for
+// Warrior and WarriorAggressive ids alike: a hit on one NPC makes a clan
+// member in range want to attack the attacker, with the damage formula's
+// hate, once the member has lived more than 7 AI cycles; before that it
+// does not react. The clan call reaches the victim itself first, so a
+// settled victim adds the formula's hate twice: once from its attacked
+// hook, once from its own clan call. The NPCs stand beyond the see range
+// of the character, so the aggressive ones do not turn on it on sight.
 func TestWarriorAssistsItsClanOnceSettled(t *testing.T) {
 	t.Parallel()
-	clan := func(id int32) *npc.Template {
-		tmpl := warriorTemplate(id, nil)
-		tmpl.Clans, tmpl.ClanRange = []string{"gremlins"}, 500
-		return tmpl
-	}
-	w := bootWarriors(t, clan(warriorID), clan(warriorTwoID))
-	victim := w.spawn(t, warriorID, 150, 0)
-	member := w.spawn(t, warriorTwoID, 150, 100)
+	for _, row := range []struct {
+		name             string
+		victimID, member int32
+	}{
+		{"Warrior", warriorID, warriorTwoID},
+		{"WarriorAggressive", aggressiveID, aggressiveTwoID},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			t.Parallel()
+			clan := func(id int32) *npc.Template {
+				tmpl := warriorTemplate(id, nil)
+				tmpl.Clans, tmpl.ClanRange = []string{"gremlins"}, 500
+				return tmpl
+			}
+			w := bootWarriors(t, clan(row.victimID), clan(row.member))
+			victim := w.spawn(t, row.victimID, 700, 0)
+			member := w.spawn(t, row.member, 700, 100)
 
-	w.ticks(t, 2)
-	w.hit(t, victim, 10)
-	if got := victim.AggroHate(w.player); got != 125 {
-		t.Fatalf("unsettled victim hate after a hit of 10 = %v, want 125", got)
-	}
-	if got := member.AggroHate(w.player); got != 0 {
-		t.Fatalf("clan member hate after a hit at life time %d = %v, want none", member.LifeTime(), got)
-	}
+			w.ticks(t, 2)
+			for _, h := range []*npc.Hostile{victim, member} {
+				if got := h.AggroHate(w.player); got != 0 {
+					t.Fatalf("npc %d hate before any hit = %v, want none", h.NpcID(), got)
+				}
+			}
+			w.hit(t, victim, 10)
+			if got := victim.AggroHate(w.player); got != 125 {
+				t.Fatalf("unsettled victim hate after a hit of 10 = %v, want 125", got)
+			}
+			if got := member.AggroHate(w.player); got != 0 {
+				t.Fatalf("clan member hate after a hit at life time %d = %v, want none", member.LifeTime(), got)
+			}
 
-	w.ticks(t, 8)
-	if member.LifeTime() <= 7 {
-		t.Fatalf("clan member life time = %d, want past 7", member.LifeTime())
-	}
-	before := victim.AggroHate(w.player)
-	w.hit(t, victim, 10)
-	if got := member.AggroHate(w.player); got != 125 {
-		t.Fatalf("clan member hate after a hit of 10 = %v, want 125", got)
-	}
-	if got := victim.AggroHate(w.player) - before; got < 249.99 || got > 250.01 {
-		t.Fatalf("settled victim hate gained from a hit of 10 = %v, want 250", got)
+			w.ticks(t, 8)
+			if member.LifeTime() <= 7 {
+				t.Fatalf("clan member life time = %d, want past 7", member.LifeTime())
+			}
+			before := victim.AggroHate(w.player)
+			w.hit(t, victim, 10)
+			if got := member.AggroHate(w.player); got != 125 {
+				t.Fatalf("clan member hate after a hit of 10 = %v, want 125", got)
+			}
+			if got := victim.AggroHate(w.player) - before; got < 249.99 || got > 250.01 {
+				t.Fatalf("settled victim hate gained from a hit of 10 = %v, want 250", got)
+			}
+		})
 	}
 }
 
-// TestWarriorCreatedTimerPlaysSocial shows the timer a Warrior arms when it
-// is created with a MoveAroundSocial parameter: every 10 s, while it is
-// idle or wandering, it plays its social animation (the draw under 20 wins
-// with every draw 0), and an NPC without the parameter arms nothing.
+// TestWarriorCreatedTimerPlaysSocial shows the timer a Warrior or
+// WarriorAggressive NPC arms when it is created with a MoveAroundSocial
+// parameter: every 10 s, while it is idle or wandering, it plays its
+// social animation (the draw under 20 wins with every draw 0), and an NPC
+// without the parameter arms nothing. The NPCs stand beyond the see range
+// of the character, so the aggressive ones stay idle.
 func TestWarriorCreatedTimerPlaysSocial(t *testing.T) {
 	t.Parallel()
-	w := bootWarriors(t, warriorTemplate(warriorID, npc.AIParams{"MoveAroundSocial": "42"}), warriorTemplate(warriorTwoID, nil))
-	social := w.spawn(t, warriorID, 150, 0)
-	still := w.spawn(t, warriorTwoID, 0, 150)
+	for _, row := range []struct {
+		name            string
+		socialID, still int32
+	}{
+		{"Warrior", warriorID, warriorTwoID},
+		{"WarriorAggressive", aggressiveID, aggressiveTwoID},
+	} {
+		t.Run(row.name, func(t *testing.T) {
+			t.Parallel()
+			w := bootWarriors(t, warriorTemplate(row.socialID, npc.AIParams{"MoveAroundSocial": "42"}), warriorTemplate(row.still, nil))
+			social := w.spawn(t, row.socialID, 700, 0)
+			still := w.spawn(t, row.still, 700, 150)
 
-	if frames := w.ticks(t, 2); len(framesOf(frames, serverpackets.OpcodeSocialAction, social.ObjectID())) != 0 {
-		t.Fatal("the warrior played a social animation before its timer fired")
-	}
-	w.srv.Advance(t, 10*time.Second)
-	frames := append(w.srv.ReadQueued(t, w.srv.Client), w.ticks(t, 2)...)
-	if got := framesOf(frames, serverpackets.OpcodeSocialAction, social.ObjectID()); len(got) != 1 {
-		t.Fatalf("social animations of the warrior after its timer = %d, want 1", len(got))
-	}
-	if got := framesOf(frames, serverpackets.OpcodeSocialAction, still.ObjectID()); len(got) != 0 {
-		t.Fatalf("social animations of the warrior without the parameter = %d, want none", len(got))
+			if frames := w.ticks(t, 2); len(framesOf(frames, serverpackets.OpcodeSocialAction, social.ObjectID())) != 0 {
+				t.Fatal("the warrior played a social animation before its timer fired")
+			}
+			w.srv.Advance(t, 10*time.Second)
+			frames := append(w.srv.ReadQueued(t, w.srv.Client), w.ticks(t, 2)...)
+			if got := framesOf(frames, serverpackets.OpcodeSocialAction, social.ObjectID()); len(got) != 1 {
+				t.Fatalf("social animations of the warrior after its timer = %d, want 1", len(got))
+			}
+			if got := framesOf(frames, serverpackets.OpcodeSocialAction, still.ObjectID()); len(got) != 0 {
+				t.Fatalf("social animations of the warrior without the parameter = %d, want none", len(got))
+			}
+			if got := social.AggroHate(w.player); got != 0 {
+				t.Fatalf("social warrior hate of the character = %v, want none", got)
+			}
+		})
 	}
 }
 
