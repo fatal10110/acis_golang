@@ -267,6 +267,11 @@ type Attackable struct {
 	// is set the empty-queue idle waits. kind is IntentionIdle when unset.
 	// A respawn builds a new loop, so it starts unset.
 	latched intention
+	// topDesireTarget is the final target of the desire desire selection
+	// last took up, nil for a desire with none. Only the periodic cycle's
+	// empty-queue idle clears it; the event idle and a desire leaving the
+	// queue leave it as it is.
+	topDesireTarget attackable.Combatant
 	// wanderTask is the wander chain's pending firing, nil when no chain
 	// runs. The chain is a self-rescheduling task on the actor's queue,
 	// independent of desire selection: each firing rolls randomWalkRate,
@@ -726,18 +731,23 @@ func (a *Attackable) setCurrent(next intention) {
 	a.currentMovesToTarget.Store(next.moveToTarget)
 }
 
-// TopDesireTarget is the creature the currently executing attack or cast
-// intention is aimed at. Idle and follow intentions have no top desire
-// target.
+// TopDesireTarget is the final target of the desire desire selection last
+// took up: the creature an attack, cast, flee or follow it took up is aimed
+// at, nil once it took up a desire with no target. It outlives that
+// desire and the event idle; the periodic cycle's empty-queue idle clears
+// it.
 func (a *Attackable) TopDesireTarget() attackable.Combatant {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	switch a.current.kind {
-	case IntentionAttack, IntentionCast:
-		return a.current.target
-	default:
-		return nil
-	}
+	return a.topDesireTarget
+}
+
+// SetTopDesireTarget replaces the top desire target until desire selection
+// next takes up a desire or the periodic cycle idles.
+func (a *Attackable) SetTopDesireTarget(target attackable.Combatant) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.topDesireTarget = target
 }
 
 // NextIntention returns the queued intention, if one exists.
@@ -904,6 +914,7 @@ func (a *Attackable) think(mode thinkMode) error {
 		}
 		a.lifeTime.Add(1)
 		if idled {
+			a.topDesireTarget = nil
 			return nil
 		}
 	}
@@ -916,6 +927,7 @@ func (a *Attackable) think(mode thinkMode) error {
 	if outOfControl && mode != thinkContinue {
 		if idleAfterLatch {
 			a.idleAndRequeue()
+			a.topDesireTarget = nil
 		}
 		if mode == thinkAttackFinished && canPromote {
 			return a.continueCurrent(idleAtStart)
@@ -935,6 +947,7 @@ func (a *Attackable) think(mode thinkMode) error {
 	if idleAfterLatch {
 		if _, ok := a.desires.Peek(); !ok && !a.castingNow() {
 			a.idleAndRequeue()
+			a.topDesireTarget = nil
 		}
 	}
 	a.idleAfterFinishedAttack(mode, idleAtStart)
@@ -1160,6 +1173,7 @@ func (a *Attackable) promoteNext() (fromLatch, promoted bool) {
 	}
 	a.lastKind = a.current.kind
 	a.setCurrent(next)
+	a.topDesireTarget = next.target
 	return fromLatch, true
 }
 
