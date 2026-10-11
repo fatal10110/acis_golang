@@ -53,5 +53,5 @@ func PhysicalSpecialHooks() script.Hooks {
 			}
 			base.ClanAttacked(s, e)
 		},
-	})
+	}).Named("WarriorPhysicalSpecial")
 }
