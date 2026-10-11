@@ -146,6 +146,8 @@ func (s *folkSink) Emit(ev event.Event) {
 		s.broadcast(func() wire.Frame { return frames.SocialAction(f.ObjectID(), e.ID) })
 	case event.NpcSay:
 		s.broadcast(func() wire.Frame { return frames.NpcSay(f.ObjectID(), e.NpcID, e.Text, e.Shout) })
+	case event.CameraShotPlayed:
+		s.broadcast(func() wire.Frame { return serverpackets.FrameSpecialCamera(f.ObjectID(), e.Shot) })
 	case event.HPChanged:
 		known := s.known.SnapshotCopy(s.world, f)
 		defer known.Release()
