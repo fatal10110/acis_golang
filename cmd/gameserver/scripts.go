@@ -14,6 +14,7 @@ import (
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
@@ -21,6 +22,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/alliance"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/blackjudge"
 	featureclan "github.com/fatal10110/acis_golang/internal/gameserver/script/feature/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/newbiehelper"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/tutorial"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q001"
@@ -29,14 +31,16 @@ import (
 	scripttask "github.com/fatal10110/acis_golang/internal/gameserver/script/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/noblesseteleporter"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
 )
 
 // scriptCatalogs are the literal script catalogs, one per range or family;
-// scriptCatalog joins them. crystals are the soul crystals a quest charges.
-func scriptCatalogs(crystals *item.SoulCrystalTable) []script.Catalog {
-	return []script.Catalog{questCatalog(crystals), featureCatalog(), teleportCatalog(), taskCatalog(), aiCatalog()}
+// scriptCatalog joins them. crystals are the soul crystals a quest charges,
+// buffs the buffs the newbie guides cast.
+func scriptCatalogs(crystals *item.SoulCrystalTable, buffs *skill.NewbieBuffTable) []script.Catalog {
+	return []script.Catalog{questCatalog(crystals), featureCatalog(buffs), teleportCatalog(), taskCatalog(), aiCatalog()}
 }
 
 // questCatalog lists the quests.
@@ -48,13 +52,15 @@ func questCatalog(crystals *item.SoulCrystalTable) script.Catalog {
 	}
 }
 
-// featureCatalog lists the scripted features.
-func featureCatalog() script.Catalog {
+// featureCatalog lists the scripted features; the newbie guides cast
+// buffs.
+func featureCatalog(buffs *skill.NewbieBuffTable) script.Catalog {
 	return script.Catalog{
-		"script.feature.Alliance":   alliance.New,
-		"script.feature.BlackJudge": blackjudge.New,
-		"script.feature.Clan":       featureclan.New,
-		"script.feature.Tutorial":   tutorial.New,
+		"script.feature.Alliance":     alliance.New,
+		"script.feature.BlackJudge":   blackjudge.New,
+		"script.feature.Clan":         featureclan.New,
+		"script.feature.NewbieHelper": func() script.Script { return newbiehelper.New(buffs) },
+		"script.feature.Tutorial":     tutorial.New,
 	}
 }
 
@@ -114,7 +120,7 @@ func provideScripts(lc fx.Lifecycle, paths gameServerPaths, data *gameData, env 
 	if err != nil {
 		return nil, err
 	}
-	catalog, err := scriptCatalog(scriptCatalogs(data.SoulCrystals))
+	catalog, err := scriptCatalog(scriptCatalogs(data.SoulCrystals, data.NewbieBuffs))
 	if err != nil {
 		return nil, err
 	}
@@ -128,8 +134,9 @@ func provideScripts(lc fx.Lifecycle, paths gameServerPaths, data *gameData, env 
 
 // provideScriptEnv returns what the script helpers act through: the quest
 // rates of server.properties, the party range and multiple item drop the
-// kill rewards read, the item id allocator and the shared random source.
-func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator) (*script.Env, error) {
+// kill rewards read, the item id allocator, the shared random source and
+// the world the scripts look NPCs up in.
+func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, state *world.State) (*script.Env, error) {
 	var rates script.Rates
 	for _, r := range []struct {
 		key string
@@ -154,6 +161,7 @@ func provideScriptEnv(serverProps *config.Properties, rewards manager.KillReward
 		MultipleItemDrop: rewards.MultipleItemDrop,
 		NewItemID:        ids.NextID,
 		Rand:             rnd.Get,
+		World:            state,
 	}, nil
 }
 

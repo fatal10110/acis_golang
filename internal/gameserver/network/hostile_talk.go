@@ -1,9 +1,6 @@
 package network
 
 import (
-	"strconv"
-	"strings"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -25,18 +22,5 @@ func (l *GameClientLink) talkToHostile(live *livePlayer, h *npc.Hostile) {
 	if l.talkThroughScripts(live, h) {
 		return
 	}
-	file := h.ChatPage(func(file string) bool {
-		if l.html == nil {
-			return false
-		}
-		_, ok := l.html.Get(file)
-		return ok
-	})
-	page := "<html><body>My html is missing:<br>" + file + "</body></html>"
-	if l.html != nil {
-		page = l.setPage(file)
-	}
-	page = strings.ReplaceAll(page, "%objectId%", strconv.Itoa(int(h.ObjectID())))
-	sendFilledHTML(live, h.ObjectID(), page, 0)
-	live.SendFrame(serverpackets.FrameActionFailed())
+	l.openHostileChat(live, h)
 }

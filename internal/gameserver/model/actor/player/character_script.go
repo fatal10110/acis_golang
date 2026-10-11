@@ -3,6 +3,7 @@ package player
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
 // GiveScriptItems adds count units of itemID to c's inventory the way a
@@ -167,4 +168,11 @@ func (c *Character) OnlineClanLeader() (*Character, bool) {
 		return nil, false
 	}
 	return h.PlayerCharacter(), true
+}
+
+// CallSkill makes c use ref on the creature targetID at once, as a script
+// does: the cast animation shows and the skill's effects land, with no cast
+// time, cost, reuse or target check.
+func (c *Character) CallSkill(targetID int32, ref modelskill.Ref) {
+	c.emit(event.SkillCalled{TargetID: targetID, Skill: ref})
 }

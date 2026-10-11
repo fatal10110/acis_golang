@@ -36,15 +36,7 @@ func (l *GameClientLink) talkToFolk(live *livePlayer, f *npc.Folk) {
 	if showObserverGroups(live, f) || l.showSiegeMessenger(live, f) {
 		return
 	}
-	html, outcome := f.ChatWindow(setPages{l.html}, l.playerConfig.chatRules(), live.Karma(), folkChatState{l: l, live: live})
-	switch outcome {
-	case npc.ChatWedding:
-		l.weddingGreeting(live, f)
-	case npc.ChatUnported:
-		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Msg("npc: chat window not modeled")
-	default:
-		sendFolkChat(live, f, html, outcome)
-	}
+	l.openFolkChat(live, f)
 }
 
 // sendFolkChat opens html, f's chat window, the way outcome says: with

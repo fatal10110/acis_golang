@@ -115,6 +115,8 @@ type gameData struct {
 	// SoulCrystals are the soul crystals and the monsters that charge
 	// them.
 	SoulCrystals *item.SoulCrystalTable
+	// NewbieBuffs are the buffs the newbie guides cast.
+	NewbieBuffs *skill.NewbieBuffTable
 }
 
 type geodata struct {
@@ -178,6 +180,10 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		return nil, err
 	}
 	soulCrystals, err := gamexml.LoadSoulCrystalData(filepath.Join(xmlRoot, "soulCrystals.xml"))
+	if err != nil {
+		return nil, err
+	}
+	newbieBuffs, err := gamexml.LoadNewbieBuffs(filepath.Join(xmlRoot, "newbieBuffs.xml"))
 	if err != nil {
 		return nil, err
 	}
@@ -275,6 +281,7 @@ func loadGameData(paths gameServerPaths, cfg gameServerConfig, log zerolog.Logge
 		NPCs:             npcs,
 		SummonItems:      summonItems,
 		SoulCrystals:     soulCrystals,
+		NewbieBuffs:      newbieBuffs,
 		Doors:            doors,
 		Statics:          statics,
 		Restarts:         restarts,
