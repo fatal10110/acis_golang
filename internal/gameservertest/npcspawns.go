@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
@@ -90,6 +91,10 @@ type npcSpawnDeps struct {
 	routes route.WalkerRoutes
 	// skills are the skills the NPCs cast, nil for none.
 	skills actorcast.Definitions
+
+	// zones is the WithZones index the spawned NPCs enter, as production
+	// hands the population its zones; nil when none was supplied.
+	zones *zone.Index
 }
 
 // WithDataReloads gives the link the //reload and //respawnall hooks; by
@@ -137,7 +142,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Rates: deps.dropRates, RateXP: 1, RateSP: 1}, time.Now, deps.log,
 		deps.skills, castEffects, walker, network.HostileSinks(deps.state, deps.stance), link.FolkSinks(deps.state, deps.stance),
 		20, 0, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues,
-		script.NewMakers(maker.Catalog(), maker.Default, deps.log), deps.scripts)
+		script.NewMakers(maker.Catalog(), maker.Default, deps.log), deps.scripts, deps.zones)
 	if err != nil {
 		t.Fatalf("new npc spawns: %v", err)
 	}
