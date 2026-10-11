@@ -333,7 +333,7 @@ where the reference asks an NPC to walk a route (A13).
    hooks in the same broadcast) still reads the old position. Running it inline would write
    another player's position from the caller's queue while that player's own queue moves
    it, or wait on that queue, which deadlocks when two players' hooks swap each other
-   (WarriorBase `SwapPosition`). A hostile NPC's instant teleport stays inline.
+   (WarriorBase `SwapPosition`). An NPC's instant teleport, hostile or civilian, stays inline.
 
 Everything else follows the reference, including its quirks (abort by id, the 25-quest check
 only at talk, the abnormal-status dispatch list).

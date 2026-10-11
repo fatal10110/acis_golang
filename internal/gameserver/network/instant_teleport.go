@@ -15,24 +15,22 @@ import (
 // its fade; live stays in its region until its next position update, so
 // what knows it and what it knows are unchanged. live then goes idle, and,
 // once the teleport lock is released (their see-creature hooks may move
-// live again), the NPCs around the region live jumped from that see the
-// landing notice it. A player already in a teleport is left to it.
+// live again), the NPCs around the region live is still held in that see
+// the landing notice it. A player already in a teleport is left to it.
 func (l *GameClientLink) instantTeleportLivePlayer(live *livePlayer, j location.Jump) {
-	if from, ok := l.jumpLivePlayer(live, j); ok {
-		npc.ForceSeeCreatureFrom(l.world, live, from)
+	if l.jumpLivePlayer(live, j) {
+		npc.ForceSeeCreature(l.world, live)
 	}
 }
 
 // jumpLivePlayer is instantTeleportLivePlayer under live's teleport lock,
-// up to the NPCs' notice; it reports where live jumped from and whether it
-// jumped.
-func (l *GameClientLink) jumpLivePlayer(live *livePlayer, j location.Jump) (location.Location, bool) {
+// up to the NPCs' notice; it reports whether live jumped.
+func (l *GameClientLink) jumpLivePlayer(live *livePlayer, j location.Jump) bool {
 	live.teleportMu.Lock()
 	defer live.teleportMu.Unlock()
 	if live.Teleporting() {
-		return location.Location{}, false
+		return false
 	}
-	from := live.CurrentLocation()
 	target := l.landing(j, func(at location.Location) bool {
 		return live.Flying() || l.inWater(at)
 	})
@@ -42,25 +40,23 @@ func (l *GameClientLink) jumpLivePlayer(live *livePlayer, j location.Jump) (loca
 	})
 	l.placeLivePlayer(live, target, heading, true)
 	live.goIdle()
-	return from, true
+	return true
 }
 
 // instantTeleportSummon moves actor in one step to where j lands, on its
 // queue: the landing is grounded unless it lies in water, its observers
 // get the jump without its fade, it stays in its region until it next
-// moves and follows its owner again, and the NPCs around the region it
-// jumped from that see the landing notice it. A summon in a teleport
+// moves and follows its owner again, and the NPCs around the region it is
+// still held in that see the landing notice it. A summon in a teleport
 // already, or gone from the world, is left as it is.
 func (l *GameClientLink) instantTeleportSummon(actor *summon.Actor, j location.Jump) {
 	if actor.Teleporting() || !actor.Spawned() {
 		return
 	}
-	x, y, z := actor.Position()
-	from := location.Location{X: x, Y: y, Z: z}
 	target := l.landing(j, l.inWater)
 	l.broadcastSummonFrame(actor, serverpackets.FrameTeleportToLocation(actor.ObjectID(), target, true))
 	actor.LandInstantly(target)
-	npc.ForceSeeCreatureFrom(l.world, actor, from)
+	npc.ForceSeeCreature(l.world, actor)
 }
 
 // landing returns where j lands on the server's geodata; keepHeight

@@ -17,12 +17,60 @@ import (
 
 // The monsters whose attacked hooks jump their attacker onto them, as
 // PartyLeaderCoupleCaptain pulls the creature in its slot to itself
-// (offset 0) and Q620 drops each party member near a point (offset 80).
+// (offset 0) and Q620 drops each party member near a point (offset 80);
+// the monsters whose see-creature hooks count what they are told of; and a
+// civilian NPC that fights.
 const (
 	pullerID      = int32(20082)
 	scattererID   = int32(20083)
+	watcherID     = int32(20084)
+	fighterID     = int32(30085)
 	scatterOffset = 80
 )
+
+// sightings counts, per watching NPC, the see-creature calls for each
+// creature; hooks run on other queues, so it is guarded by mu.
+type sightings struct {
+	mu    sync.Mutex
+	calls map[[2]int32]int
+}
+
+func (s *sightings) add(npcID, creatureID int32) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls[[2]int32{npcID, creatureID}]++
+}
+
+// take returns the calls npcID had for creatureID since the last take.
+func (s *sightings) take(npcID, creatureID int32) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	k := [2]int32{npcID, creatureID}
+	n := s.calls[k]
+	delete(s.calls, k)
+	return n
+}
+
+// pulls records the attackers the puller's hook pulled, once the jump call
+// returned to it.
+type pulls struct {
+	mu  sync.Mutex
+	ids []int32
+}
+
+func (p *pulls) add(id int32) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.ids = append(p.ids, id)
+}
+
+func (p *pulls) take() []int32 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	ids := p.ids
+	p.ids = nil
+	return ids
+}
 
 // jumpGeo is open terrain that records the walks a scattered jump checks
 // and stops the walk toward stop halfway.
@@ -63,23 +111,46 @@ func (d *scriptDraws) rand(n int) int {
 	return v
 }
 
-// jumpWorld is the owner in the world beside a puller and a scatterer.
+// jumpWorld is the owner in the world beside a puller, a scatterer and a
+// watcher next to the puller, with two more pullers and a watcher between
+// them three regions away.
 type jumpWorld struct {
 	*petWorld
-	geo       *jumpGeo
-	draws     *scriptDraws
-	puller    *npc.Hostile
-	scatterer *npc.Hostile
+	geo        *jumpGeo
+	draws      *scriptDraws
+	seen       *sightings
+	pulled     *pulls
+	puller     *npc.Hostile
+	scatterer  *npc.Hostile
+	watcher    *npc.Hostile
+	farPullers [2]*npc.Hostile
+	farWatcher *npc.Hostile
 }
+
+// farAway is far enough from the owner to lie outside the 3x3 block of
+// regions around it.
+const farAway = 6000
 
 func bootJumpers(t *testing.T) *jumpWorld {
 	t.Helper()
 	geo := &jumpGeo{}
 	draws := &scriptDraws{}
+	seen := &sightings{calls: map[[2]int32]int{}}
+	pulled := &pulls{}
 	catalog := script.Catalog{
 		"ai.Puller": func() script.Script {
 			return script.Script{Behavior: true, NPCs: []int32{pullerID}, Hooks: script.Hooks{
-				OnAttacked: func(_ *script.Script, e script.Attacked) { e.Attacker.InstantTeleportTo(e.NPC) },
+				OnAttacked: func(_ *script.Script, e script.Attacked) {
+					e.Attacker.InstantTeleportTo(e.NPC)
+					pulled.add(e.Attacker.ObjectID())
+				},
+			}}
+		},
+		"ai.Watcher": func() script.Script {
+			return script.Script{Behavior: true, NPCs: []int32{watcherID}, Hooks: script.Hooks{
+				OnSeeCreature: func(_ *script.Script, e script.SeeCreature) {
+					seen.add(e.NPC.ObjectID(), e.Creature.ObjectID())
+				},
 			}}
 		},
 		"ai.Scatterer": func() script.Script {
@@ -93,8 +164,9 @@ func bootJumpers(t *testing.T) *jumpWorld {
 	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
 		gameservertest.WithGeo(geo),
 		gameservertest.WithScriptRand(draws.rand),
-		gameservertest.WithNPCScripts(map[int32]script.NPCKind{pullerID: script.KindHostile, scattererID: script.KindHostile},
-			[]script.Listing{{Path: "ai.Puller"}, {Path: "ai.Scatterer"}}, catalog),
+		gameservertest.WithNPCScripts(map[int32]script.NPCKind{
+			pullerID: script.KindHostile, scattererID: script.KindHostile, watcherID: script.KindHostile,
+		}, []script.Listing{{Path: "ai.Puller"}, {Path: "ai.Scatterer"}, {Path: "ai.Watcher"}}, catalog),
 	})
 	x, y, z := h.srv.PlayerPosition(t, h.ownerID)
 	spawn := func(id int32, at location.Location) *npc.Hostile {
@@ -103,9 +175,15 @@ func bootJumpers(t *testing.T) *jumpWorld {
 		return h.srv.SpawnHostileNPCTemplateAt(t, tmpl, at)
 	}
 	w := &jumpWorld{
-		petWorld: h, geo: geo, draws: draws,
+		petWorld: h, geo: geo, draws: draws, seen: seen, pulled: pulled,
 		puller:    spawn(pullerID, location.Location{X: x + 400, Y: y, Z: z}),
 		scatterer: spawn(scattererID, location.Location{X: x - 400, Y: y + 100, Z: z}),
+		watcher:   spawn(watcherID, location.Location{X: x + 550, Y: y, Z: z}),
+		farPullers: [2]*npc.Hostile{
+			spawn(pullerID, location.Location{X: x + farAway, Y: y, Z: z}),
+			spawn(pullerID, location.Location{X: x + farAway + 300, Y: y, Z: z}),
+		},
+		farWatcher: spawn(watcherID, location.Location{X: x + farAway + 150, Y: y, Z: z}),
 	}
 	drainUntilQuiet(t, h.client)
 	return w
@@ -218,5 +296,82 @@ func TestScriptInstantTeleportWithRandomOffset(t *testing.T) {
 	}
 	if x, y, z := w.srv.PlayerPosition(t, w.ownerID); (location.Location{X: x, Y: y, Z: z}) != landing {
 		t.Fatalf("player stands at %d,%d,%d, want %v", x, y, z, landing)
+	}
+}
+
+// TestScriptInstantTeleportOfASummonTellsTheNPCsAroundItsRegion
+// (Creature.instantTeleportTo, forceSeeCreature over the knownlist of the
+// region kept): a summon pulled next to a watching NPC is seen by it once.
+// Pulled three regions away, it stays in its owner's region, so the NPC
+// beside its landing is not told; pulled again before it next moves, the
+// NPCs told are still those around that region, not around the point it
+// jumped from.
+func TestScriptInstantTeleportOfASummonTellsTheNPCsAroundItsRegion(t *testing.T) {
+	t.Parallel()
+	w := bootJumpers(t)
+	wolf, _ := w.spawnWolf(t)
+	drainUntilQuiet(t, w.client)
+	w.seen.take(w.watcher.ObjectID(), wolf.ObjectID())
+
+	w.hitFrom(t, w.puller, wolf)
+	if got := w.pulled.take(); !slices.Equal(got, []int32{wolf.ObjectID()}) {
+		t.Fatalf("pulled = %v, want the summon", got)
+	}
+	if got := w.seen.take(w.watcher.ObjectID(), wolf.ObjectID()); got != 1 {
+		t.Fatalf("see-creature calls of the NPC beside the landing = %d, want 1", got)
+	}
+
+	for i, puller := range w.farPullers {
+		pullTo := positionOf(puller)
+		frames := w.hitFrom(t, puller, wolf)
+		if got := fastTeleports(t, frames, wolf.ObjectID()); !slices.Equal(got, []location.Location{pullTo}) {
+			t.Fatalf("far pull %d: summon jumps = %v, want one to %v", i, got, pullTo)
+		}
+		if got := positionOf(wolf); got != pullTo {
+			t.Fatalf("far pull %d: summon stands at %v, want %v", i, got, pullTo)
+		}
+		if got := w.seen.take(w.farWatcher.ObjectID(), wolf.ObjectID()); got != 0 {
+			t.Fatalf("far pull %d: see-creature calls of the NPC beside the landing = %d, want none outside the kept region's block", i, got)
+		}
+		if got := w.seen.take(w.watcher.ObjectID(), wolf.ObjectID()); got != 0 {
+			t.Fatalf("far pull %d: see-creature calls of the NPC out of sight = %d, want none", i, got)
+		}
+	}
+}
+
+// TestScriptInstantTeleportOfACivilianNPC (Npc.instantTeleportTo): a
+// civilian NPC that fights can sit in a script's attacker slot, and the
+// script pulls it onto its NPC like any other creature. The player sees
+// one fast TeleportToLocation for it, it stands on the point, and the hook
+// carries on past the jump.
+func TestScriptInstantTeleportOfACivilianNPC(t *testing.T) {
+	t.Parallel()
+	w := bootJumpers(t)
+	x, y, z := w.srv.PlayerPosition(t, w.ownerID)
+	tmpl := gameservertest.FolkTemplate("Folk", int(fighterID))
+	tmpl.CanMove = true
+	folk := w.srv.SpawnFolkNPCAt(t, tmpl, location.Location{X: x + 200, Y: y - 300, Z: z})
+	drainUntilQuiet(t, w.client)
+	pullTo := positionOf(w.puller)
+
+	done := make(chan struct{})
+	if !folk.Queue().Post(func() {
+		defer close(done)
+		w.puller.TakeDamage(10, folk)
+	}) {
+		t.Fatal("the civilian NPC's queue is closed")
+	}
+	<-done
+	w.srv.Settle(t)
+	frames := drainFrames(t, w.client)
+
+	if got := w.pulled.take(); !slices.Equal(got, []int32{folk.ObjectID()}) {
+		t.Fatalf("pulled = %v, want the civilian NPC, with the hook run past the jump", got)
+	}
+	if got := fastTeleports(t, frames, folk.ObjectID()); !slices.Equal(got, []location.Location{pullTo}) {
+		t.Fatalf("civilian NPC jumps = %v, want one to %v", got, pullTo)
+	}
+	if got := positionOf(folk); got != pullTo {
+		t.Fatalf("civilian NPC stands at %v, want %v", got, pullTo)
 	}
 }

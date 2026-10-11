@@ -148,8 +148,8 @@ func (n *NPC) TeleportTo(at Place) {
 	}
 }
 
-// instantTeleporter is a creature an instant teleport moves: a hostile
-// NPC, a player or a summon.
+// instantTeleporter is a creature an instant teleport moves itself: an
+// NPC or a summon.
 type instantTeleporter interface {
 	InstantTeleportTo(j location.Jump)
 }
@@ -173,29 +173,29 @@ func jumpTo(at Place) location.Jump {
 	return location.Jump{To: location.Location{X: l.X, Y: l.Y, Z: l.Z}}
 }
 
-// InstantTeleportTo moves the NPC to at in one step: at is grounded unless
-// it lies in water, the players around see the jump without its fade, and
-// its path-failure count restarts. It stays in its region until it next
-// moves, so what knows it and what it knows are unchanged until then.
-func (n *NPC) InstantTeleportTo(at Place) {
-	n.hostile("teleport").InstantTeleportTo(jumpTo(at))
-}
+// InstantTeleportTo moves the NPC, hostile or civilian, to at in one step:
+// at is grounded unless it lies in water, the players around see the jump
+// without its fade, and its path-failure count restarts. It stays in its
+// region until it next moves, so what knows it and what it knows are
+// unchanged until then.
+func (n *NPC) InstantTeleportTo(at Place) { instantTeleport(n, jumpTo(at)) }
 
 // InstantTeleportTo moves the player to at in one step: at is grounded
 // unless the player flies or at lies in water, the player and the players
 // around see the jump without its fade, the player goes idle, and each NPC
-// around the region it jumped from that sees at runs its see-creature hooks
-// for it once. It stays in its region until its next position update. A
-// player in a teleport already is left to it.
+// around the region it is still held in that sees at runs its see-creature
+// hooks for it once. It stays in its region until its next position update.
+// A player in a teleport already is left to it.
 //
 // The jump runs on the player's own queue once the caller's task is done,
 // not inside the call as in the reference (docs/script-engine-plan.md
 // section 9): code after the call still reads the player's old position.
 func (p *Player) InstantTeleportTo(at Place) { instantTeleport(p, jumpTo(at)) }
 
-// InstantTeleportTo moves the creature to at in one step: a summon jumps
-// as a player does (InstantTeleportTo of Player), on its own queue, and
-// then follows its owner again.
+// InstantTeleportTo moves the creature to at in one step: an NPC jumps as
+// InstantTeleportTo of NPC says, and a summon as a player does
+// (InstantTeleportTo of Player), on its own queue, and then follows its
+// owner again.
 func (c *creature) InstantTeleportTo(at Place) { instantTeleport(c, jumpTo(at)) }
 
 // InstantTeleportNear is c's InstantTeleportTo aimed at a point up to
