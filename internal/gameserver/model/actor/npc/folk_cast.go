@@ -356,8 +356,8 @@ func (f *Folk) AddMoveRouteDesire(name string, weight float64) {
 }
 
 // StartRoute puts f on the route named name at once, as its AI does when it
-// acts on a route desire. Call it before f is on the AI task: the AI's
-// route state is its queue's from then on.
+// acts on a route desire. Call it before f is on the AI task: from then on
+// brain guards the AI's route state.
 func (f *Folk) StartRoute(name string) { f.thinkMoveRoute(name) }
 
 // thinkMoveRoute acts on a route desire: f, when not on the route named
