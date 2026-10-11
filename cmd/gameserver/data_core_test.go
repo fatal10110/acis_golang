@@ -46,7 +46,7 @@ func TestLoadHTMLCacheUsesDatapackRoot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	html, err := loadHTMLCache(gameServerPaths{DataRoot: root})
+	html, err := loadHTMLCache(gameServerPaths{DataRoot: root}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("loadHTMLCache: %v", err)
 	}

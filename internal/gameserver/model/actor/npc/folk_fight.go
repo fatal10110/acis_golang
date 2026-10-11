@@ -46,8 +46,8 @@ type FolkAttack interface {
 // folkFight is a civilian NPC's fighting state: what it swings with, its
 // aggro list, and the parts of its AI's desire selection that only the
 // fighting desires use. attack, weapon and crystal are set before the NPC is
-// published; aggro is safe for concurrent use; next, latched and lastKind
-// belong to the NPC's queue.
+// published; aggro is safe for concurrent use; folkCast.brain guards next,
+// latched and lastKind.
 type folkFight struct {
 	// attack is the NPC's attack controller; nil leaves it unable to swing.
 	attack FolkAttack
@@ -117,13 +117,15 @@ func (s folkAttackSink) Emit(ev event.Event) {
 	case event.AttackRethink:
 		f.runAI(false)
 	case event.AttackFinished:
+		f.cast.brain.Lock()
+		defer f.cast.brain.Unlock()
 		if e.BowReuse {
 			if f.fight.next == nil {
 				f.thinkCurrent()
 			}
 			return
 		}
-		f.runAI(false)
+		f.runAILocked(false)
 		f.attackFinished()
 	}
 }
@@ -164,7 +166,9 @@ func (f *Folk) thinkCurrent() {
 // AddAttackDesire asks f to attack target with weight, closing in on it,
 // and adds weight to f's hate of target; an equal desire (same target)
 // already queued gains the weight instead. While f hates no one, its AI
-// runs desire selection at once, on its queue. Safe from any goroutine.
+// runs desire selection at once, in place on the caller's goroutine, before
+// the hate is added: a hit's attacked hook has f react before the hit's HP
+// change. Safe from any goroutine, a hook's included.
 func (f *Folk) AddAttackDesire(target attackable.Combatant, weight float64) {
 	f.addAttackDesire(target, 0, weight, true)
 }
@@ -187,18 +191,9 @@ func (f *Folk) addAttackDesire(target attackable.Combatant, damage int, weight f
 	}
 	f.cast.desires.AddOrUpdate(&ai.Desire{Kind: ai.IntentionAttack, FinalTarget: target, MoveToTarget: moveToTarget, Weight: weight, QueuedAt: f.now()})
 	if _, ok := f.fight.aggro.MostHated(); !ok {
-		f.postRunAI()
+		f.runAI(false)
 	}
 	f.fight.aggro.AddDamage(target, float64(damage), weight)
-}
-
-// postRunAI runs desire selection on f's queue, which alone runs its AI.
-func (f *Folk) postRunAI() {
-	if f.queue == nil {
-		f.runAI(false)
-		return
-	}
-	f.queue.Post(func() { f.runAI(false) })
 }
 
 // AddFollowDesire asks f to follow target with weight; an equal desire
