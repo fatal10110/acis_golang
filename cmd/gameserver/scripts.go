@@ -37,6 +37,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q360"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q508"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q510"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q607"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q636"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q646"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q651"
@@ -67,6 +68,7 @@ func questCatalog(crystals *item.SoulCrystalTable) script.Catalog {
 		"quest.Q360_PlunderTheirSupplies":  q360.New,
 		"quest.Q508_AClansReputation":      q508.New,
 		"quest.Q510_AClansReputation":      q510.New,
+		"quest.Q607_ProveYourCourage":      q607.New,
 		"quest.Q636_TruthBeyondTheGate":    q636.New,
 		"quest.Q646_SignsOfRevolt":         q646.New,
 		"quest.Q651_RunawayYouth":          q651.New,
