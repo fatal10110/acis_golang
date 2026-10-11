@@ -404,3 +404,15 @@ UserInfo.new script.Player.SendUserInfo
 # whether the attacker is a summon (Creature.Summon) and reads no summon.
 Creature.getSummon inline
 Quest.setTriggeredOnDeath inline
+
+# Wizard chain (A12, #3603). The NPC's hate list, the one its spells are
+# aimed by, is a view the NPC handle returns; its operations are the view's.
+# The mute check is read on the NPC handle.
+Creature.isMuted script.NPC.Muted
+HateList.addHateInfo script.HateList.Add
+HateList.clear script.HateList.Clear
+HateList.getMostHatedCreature script.HateList.MostHated
+HateList.isEmpty script.HateList.Empty
+HateList.refresh script.HateList.Refresh
+HateList.removeIfOutOfRange script.HateList.RemoveIfOutOfRange
+NpcAI.getHateList script.NPC.HateList

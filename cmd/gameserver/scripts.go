@@ -23,6 +23,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monster"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/warrior"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/wizard"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/alliance"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/blackjudge"
 	featureclan "github.com/fatal10110/acis_golang/internal/gameserver/script/feature/clan"
@@ -112,6 +113,8 @@ func aiCatalog() script.Catalog {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorFishingBlock":    warrior.FishingBlock,
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarrior":         warrior.PartyLeader,
 		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateWarrior":       warrior.PartyPrivate,
+		"script.ai.individual.Monster.WizardBase.WizardBase":                                             wizard.Base,
+		"script.ai.individual.Monster.WizardBase.Wizard.Wizard":                                          wizard.Wizard,
 	}
 }
 
