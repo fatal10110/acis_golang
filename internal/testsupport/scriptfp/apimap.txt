@@ -171,6 +171,28 @@ Player.reduceDeathPenaltyBuffLevel script.Player.ReduceDeathPenaltyLevel
 Quest.addEventIds inline
 StringUtil.isDigit script.IsDigit
 
+# Handle operations of the first proof quests (#3569). A packet a script
+# sends or broadcasts is named by the handle call that builds it, so the
+# send and broadcast calls and a packet's builder fold into it; the player's
+# clan is read through the Player handle.
+Clan.addReputationScore script.Player.AddClanReputation
+Clan.broadcastToMembers script.Player.BroadcastClanInfo
+Clan.getLevel script.Player.ClanLevel
+Creature.broadcastPacket inline
+ItemContainer.getItemCount script.Player.ItemCount
+Npc.broadcastNpcSay script.NPC.Say
+Npc.getScriptValue script.NPC.ScriptValue
+Npc.isScriptValue script.NPC.IsScriptValue
+Npc.setScriptValue script.NPC.SetScriptValue
+NpcStringId.getMessage script.NpcString
+Player.getClan inline
+Player.sendPacket inline
+PledgeShowInfoUpdate.new inline
+Quest.rewardNewbieShots script.Script.RewardNewbieShots
+SocialAction.new script.Player.SocialAction
+SystemMessage.addNumber script.Player.SystemMessageNumbers
+SystemMessage.getSystemMessage inline
+
 # Route desire and the walker script (A13). The NPC handle stands for the
 # NPC, its AI and its template; a created binding is a field of the script;
 # an id list is a Go slice.

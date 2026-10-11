@@ -30,6 +30,8 @@ type SocialGraph interface {
 	// owns now, 0 when it owns none or there is no such clan.
 	ClanCastleID(clanID int32) int32
 	ClanHallID(clanID int32) int32
+	// ClanLevel is the clan's level, 0 when there is no such clan.
+	ClanLevel(clanID int32) int
 }
 
 // socialPeer is the player state the social rules read from the player
