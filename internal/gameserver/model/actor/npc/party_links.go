@@ -159,15 +159,14 @@ func (p *partyLinks) Minions() []PartyMember {
 // master's when it has one. Otherwise they are its own, and the NPC is a
 // master from then on, with no private at first.
 func (p *partyLinks) PartyMinions() []PartyMember {
-	if master := p.Master(); master != nil {
-		return master.Minions()
+	if p.Master() == nil {
+		p.partyMu.Lock()
+		if p.minions == nil {
+			p.minions = make(map[int32]PartyMember)
+		}
+		p.partyMu.Unlock()
 	}
-	p.partyMu.Lock()
-	if p.minions == nil {
-		p.minions = make(map[int32]PartyMember)
-	}
-	p.partyMu.Unlock()
-	return p.Minions()
+	return p.partyMinions()
 }
 
 // IsMaster reports whether this NPC has ever recorded a private.

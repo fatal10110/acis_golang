@@ -51,13 +51,7 @@ func (s *Script) RaisePartyAttacked(caller, called *NPC, target Creature, damage
 	if !ok {
 		return
 	}
-	r := s.registry
-	list := r.scripts(int32(h.NpcID()), EventPartyAttacked)
-	if len(list) == 0 {
-		return
-	}
-	e := PartyAttacked{Caller: caller, Called: called, Target: target, Damage: damage}
-	for _, sc := range list {
-		r.run(sc, hookPartyAttacked, func() { sc.Hooks.PartyAttacked(sc, e) })
-	}
+	s.registry.raisePartyAttacked(h, func() PartyAttacked {
+		return PartyAttacked{Caller: caller, Called: called, Target: target, Damage: damage}
+	})
 }
