@@ -76,7 +76,7 @@ func TestFolkOffRouteWalkerWaitsOutTeleportBeforeResuming(t *testing.T) {
 	if route.walks != 1 || !f.cast.onRoute {
 		t.Fatalf("walks = %d, onRoute = %v on the second tick, want 1, true", route.walks, f.cast.onRoute)
 	}
-	f.AddCastDesire(target, modelskill.Ref{ID: 4380, Level: 1}, 2*routeWeight)
+	f.AddCastDesire(target, modelskill.Ref{ID: 4380, Level: 1}, 2*routeWeight, true, true)
 	in.Run()
 
 	tick()
