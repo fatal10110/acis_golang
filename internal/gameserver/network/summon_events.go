@@ -276,6 +276,13 @@ func (s *summonSink) Emit(ev event.Event) {
 		s.brain.Think()
 	case event.MoveBlocked:
 		s.move.BroadcastBlockedCorrection()
+	case event.InstantTeleportRequested:
+		// A script asks it from any queue: the jump runs on the summon's
+		// own queue, as a player's does.
+		j := e.Jump
+		if q := actor.Queue(); q != nil {
+			q.Post(func() { l.instantTeleportSummon(actor, j) })
+		}
 	case event.Unsummoning:
 		if actor.OwnerLeft() {
 			// A corpse its owner left behind has not acted since its row was
