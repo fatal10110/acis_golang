@@ -82,6 +82,8 @@ type Hostile struct {
 	// scripts raises this NPC's script hooks; nil raises none and leaves
 	// every built-in reaction on. Installed by Attach.
 	scripts ScriptHooks
+	// sight is what h's tick scan has told its see-creature scripts about.
+	sight sight
 	// interacted latches the first unlock attempt on a chest.
 	interacted atomic.Bool
 	// coreAIDisabled turns off this NPC's regular combat behavior; its only

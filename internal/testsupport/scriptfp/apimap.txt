@@ -209,3 +209,6 @@ SkillTable.FrequentSkill.getSkill inline
 ThreadPool.schedule script.Player.After
 World.getNpc script.Script.WorldNPC
 WorldObject.getActingPlayer script.ActingPlayer
+
+# See-creature (A10). The look-neighbour throttle is a call on the NPC handle.
+Npc.lookNeighbor script.NPC.LookNeighbor

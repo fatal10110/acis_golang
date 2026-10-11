@@ -405,6 +405,8 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	summon.SpawnBesideOwner(link.world, pet, live, offset)
 	pet.TryToFollow(live)
 	link.broadcastSummonSpawnRelation(live, pet)
+	// The NPCs around the pet see it arrive.
+	npc.ForceSeeCreature(link.world, pet)
 }
 
 // newPetInventory builds the live inventory of live's pet called out of the
@@ -518,6 +520,8 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	summon.SpawnBesideOwner(link.world, servitor, live, location.Location{X: petSpawnOffset})
 	servitor.TryToFollow(live)
 	link.broadcastSummonSpawnRelation(live, servitor)
+	// The NPCs around the servitor see it arrive.
+	npc.ForceSeeCreature(link.world, servitor)
 	return true
 }
 

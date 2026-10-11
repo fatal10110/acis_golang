@@ -9,12 +9,15 @@ type AIConfig struct {
 	// GuardAttackAggroMob (GuardAttackAggroMob) lets a Guard pick an
 	// aggressive Monster-family NPC.
 	GuardAttackAggroMob bool
+	// SeeRange (DefaultSeeRange) is how far an NPC other than a raid or
+	// grand boss sees around itself; zero keeps the shipped 450.
+	SeeRange int
 }
 
 // DefaultAIConfig is the shipped npcs.properties setting: peace-zone aggro
-// allowed, guards ignore aggressive monsters.
+// allowed, guards ignore aggressive monsters, a see range of 450.
 func DefaultAIConfig() AIConfig {
-	return AIConfig{MobAggroInPeaceZone: true}
+	return AIConfig{MobAggroInPeaceZone: true, SeeRange: DefaultSeeRange}
 }
 
 // SetAIConfig installs the target-selection switches h consults. Until set,
