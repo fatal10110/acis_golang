@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 type scriptOptions struct {
@@ -118,7 +119,7 @@ type questBoot struct {
 // with a script spawner bootNpcSpawns binds to the NPC population, and the
 // script registry, whose own work (the dying hooks, and the timers
 // bound to no NPC or player queue) runs on engine.
-func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, o *options) *questBoot {
+func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, state *world.State, o *options) *questBoot {
 	so := o.scriptHelpers()
 	store := &journalStore{QuestStore: gamesql.NewQuestStore(db), loadErr: o.questLoadErr}
 	journals := script.NewQuests(store, worker, o.log)
@@ -130,6 +131,7 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *
 		NewItemID:        ids.NextID,
 		Spawner:          script.NewSpawner(nil, o.log),
 		Rand:             rnd.Get,
+		World:            state,
 	}
 	if so.rates != nil {
 		env.Rates = *so.rates

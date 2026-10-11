@@ -2,6 +2,7 @@ package script
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // Env is the server state the script helpers act through. Build hands the
@@ -25,6 +26,8 @@ type Env struct {
 	// positive. Every random draw of a script and its helpers is made
 	// through it.
 	Rand func(n int) int
+	// World is the world a script looks NPCs up in; nil finds none.
+	World *world.State
 }
 
 // Rates are the quest drop and reward multipliers.

@@ -182,5 +182,33 @@ NpcAI.addMoveRouteDesire script.NPC.AddMoveRouteDesire
 NpcTemplate.getAlias script.NPC.Alias
 Quest.addCreated inline
 
+# Newbie helper (U3). The registration calls are fields of the script; the
+# newbie buff table is handed to the script's constructor, so its lookup
+# and a buff's skill are plain Go values, and a frequent skill is a skill
+# reference literal. The pooled delayed task runs on the player's queue.
+ClassId.getLevel script.Player.ClassLevel
+Creature.teleportTo script.Player.TeleportTo
+ItemContainer.hasAtLeastOneItem script.Player.HasAtLeastOneItem
+MemoSet.unset script.QuestState.Unset
+NewbieBuff.getSkill inline
+NewbieBuffData.getInstance inline
+NewbieBuffData.getLowestBuffLevel skill.NewbieBuffTable.LowestBuffLevel
+NewbieBuffData.getValidBuffs skill.NewbieBuffTable.ValidBuffs
+Npc.dropItem script.NPC.DropItem
+Npc.getSpawnLocation script.NPC.SpawnLocation
+Npc.showChatWindow script.NPC.ShowChatWindow
+NpcTemplate.getRace script.NPC.Race
+Player.isCursedWeaponEquipped script.Player.CursedWeaponEquipped
+Player.isNewbie script.Player.IsNewbie
+Quest.addFirstTalkId inline
+Quest.addMyDying inline
+Quest.callSkill script.Script.CallSkill
+Quest.newQuestState script.Script.NewQuestState
+QuestState.isCompleted script.QuestState.IsCompleted
+SkillTable.FrequentSkill.getSkill inline
+ThreadPool.schedule script.Player.After
+World.getNpc script.Script.WorldNPC
+WorldObject.getActingPlayer script.ActingPlayer
+
 # See-creature (A10). The look-neighbour throttle is a call on the NPC handle.
 Npc.lookNeighbor script.NPC.LookNeighbor

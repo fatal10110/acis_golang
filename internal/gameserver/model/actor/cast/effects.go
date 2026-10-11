@@ -241,6 +241,26 @@ func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected
 	if !ok {
 		return EffectResult{}
 	}
+	return effectResultOf(result)
+}
+
+// CallSkill lands def's effects from caster on target alone, through def's
+// skill handler, as a script makes a creature use a skill: no target
+// resolution, cost, chance procs, aggression or PvP flagging. Handlers'
+// Sink takes the handler's messages.
+func CallSkill(handlers EffectHandlers, caster handlerskill.Creature, target handlerskill.Actor, def modelskill.Definition) EffectResult {
+	if handlers.Skills == nil {
+		return EffectResult{}
+	}
+	result, ok := handlers.Skills.UseResult(handlerskill.Cast{Caster: caster, Skill: def, Targets: []handlerskill.Actor{target}, Sink: handlers.Sink})
+	if !ok {
+		return EffectResult{}
+	}
+	return effectResultOf(result)
+}
+
+// effectResultOf is the caster-visible part of a handler's result.
+func effectResultOf(result handlerskill.Result) EffectResult {
 	return EffectResult{
 		Handled:           true,
 		Messages:          result.Messages,

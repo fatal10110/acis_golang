@@ -33,7 +33,7 @@ func TestScriptCatalogCompleteness(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := scriptCatalog(scriptCatalogs(nil))
+	catalog, err := scriptCatalog(scriptCatalogs(nil, nil))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -281,7 +281,11 @@ func TestScriptCatalogMatchesManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	catalog, err := scriptCatalog(scriptCatalogs(crystals))
+	buffs, err := gamexml.LoadNewbieBuffs(filepath.Join(root, "newbieBuffs.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := scriptCatalog(scriptCatalogs(crystals, buffs))
 	if err != nil {
 		t.Fatal(err)
 	}
