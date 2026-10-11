@@ -30,9 +30,22 @@ type Creature interface {
 	// ObjectID returns the creature's world object id, 0 for a handle on
 	// nothing.
 	ObjectID() int32
+	// Name, Level, Dead and HPRatio describe the creature; each panics on
+	// a handle on nothing.
+	Name() string
+	Level() int32
+	Dead() bool
+	HPRatio() float64
+	// Playable reports whether a player controls the creature: a player or
+	// its summon. Summon reports whether it is a pet or a servitor.
+	Playable() bool
+	Summon() bool
 	// combatant is the creature as the world tracks it, nil for a handle on
 	// nothing.
 	combatant() attackable.Combatant
+	// loc is where the creature stands and the way it faces: a creature is
+	// a Place.
+	loc() Loc
 }
 
 // creature is a handle on a creature that is neither an NPC nor a player.

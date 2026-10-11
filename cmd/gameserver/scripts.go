@@ -18,7 +18,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monster"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/warrior"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/alliance"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/blackjudge"
 	featureclan "github.com/fatal10110/acis_golang/internal/gameserver/script/feature/clan"
@@ -39,6 +42,7 @@ import (
 	scripttask "github.com/fatal10110/acis_golang/internal/gameserver/script/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/noblesseteleporter"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/rs/zerolog"
 	"go.uber.org/fx"
@@ -90,7 +94,12 @@ func teleportCatalog() script.Catalog {
 // aiCatalog lists the NPC behaviors.
 func aiCatalog() script.Catalog {
 	return script.Catalog{
-		"script.ai.group.Walkers": group.Walkers,
+		"script.ai.group.Walkers":                                                              group.Walkers,
+		"script.ai.individual.DefaultNpc":                                                      defaultnpc.New,
+		"script.ai.individual.Monster.MonsterAI":                                               monster.New,
+		"script.ai.individual.Monster.WarriorBase.WarriorBase":                                 warrior.Base,
+		"script.ai.individual.Monster.WarriorBase.Warrior.Warrior":                             warrior.Warrior,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive": warrior.Aggressive,
 	}
 }
 
@@ -158,8 +167,9 @@ func provideScriptSpawner(log zerolog.Logger) *script.Spawner {
 // provideScriptEnv returns what the script helpers act through: the quest
 // rates of server.properties, the party range and multiple item drop the
 // kill rewards read, the item id allocator, the NPC spawner, the shared
-// random source and the world the scripts look NPCs up in.
-func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner, state *world.State) (*script.Env, error) {
+// random source, the world the scripts look NPCs up in, the skill
+// definitions and the in-game clock.
+func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner, state *world.State, data *gameData, clock *task.GameClock) (*script.Env, error) {
 	var rates script.Rates
 	for _, r := range []struct {
 		key string
@@ -186,6 +196,8 @@ func provideScriptEnv(serverProps *config.Properties, rewards manager.KillReward
 		Spawner:          spawner,
 		Rand:             rnd.Get,
 		World:            state,
+		Skills:           data.Skills,
+		GameHour:         clock.Hour,
 	}, nil
 }
 

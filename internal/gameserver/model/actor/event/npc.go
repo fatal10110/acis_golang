@@ -74,6 +74,8 @@ type OnScreenMessage struct {
 type NpcSay struct {
 	NpcID int
 	Text  string
+	// Shout sends the line as a shout.
+	Shout bool
 }
 
 func (NPCInfoChanged) event()    {}

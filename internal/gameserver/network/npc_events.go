@@ -90,7 +90,7 @@ func (s *hostileSink) Emit(ev event.Event) {
 			return frames.FlyTo(h.ObjectID(), e.Dest, location.Location{X: x, Y: y, Z: z}, e.Flight)
 		})
 	case event.Teleported:
-		s.broadcast(func() wire.Frame { return serverpackets.FrameTeleportToLocation(h.ObjectID(), e.To, false) })
+		s.broadcast(func() wire.Frame { return serverpackets.FrameTeleportToLocation(h.ObjectID(), e.To, e.Instant) })
 	case event.PositionCorrected:
 		x, y, z := h.Position()
 		s.broadcast(func() wire.Frame {
@@ -99,7 +99,7 @@ func (s *hostileSink) Emit(ev event.Event) {
 	case event.SocialAction:
 		s.broadcast(func() wire.Frame { return frames.SocialAction(h.ObjectID(), e.ID) })
 	case event.NpcSay:
-		s.broadcast(func() wire.Frame { return frames.NpcSay(h.ObjectID(), e.NpcID, e.Text) })
+		s.broadcast(func() wire.Frame { return frames.NpcSay(h.ObjectID(), e.NpcID, e.Text, e.Shout) })
 	case event.OnScreenMessage:
 		s.broadcast(func() wire.Frame { return serverpackets.FrameExShowScreenMessage(e.Text, e.DurationMs) })
 	case event.ShotRecharged:

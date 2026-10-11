@@ -11,9 +11,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -26,6 +28,8 @@ type scriptOptions struct {
 	singleItemDrop bool
 	// kinds are the NPC ids that have a template, with its kind.
 	kinds map[int32]script.NPCKind
+	// skills are the skill definitions the scripts read.
+	skills []modelskill.Definition
 }
 
 // WithScripts boots the script registry from list and catalog, as the
@@ -75,6 +79,15 @@ func WithNPCScripts(kinds map[int32]script.NPCKind, list []script.Listing, catal
 	}
 }
 
+// WithScriptSkills gives the scripts the skill definitions defs to read
+// skill powers, aggro points and effects from (default: none).
+func WithScriptSkills(defs ...modelskill.Definition) Option {
+	return func(o *options) {
+		so := o.scriptHelpers()
+		so.skills = append(so.skills, defs...)
+	}
+}
+
 // WithQuestLoadFault makes every quest journal read at a character
 // selection fail with err.
 func WithQuestLoadFault(err error) Option {
@@ -119,7 +132,7 @@ type questBoot struct {
 // with a script spawner bootNpcSpawns binds to the NPC population, and the
 // script registry, whose own work (the dying hooks, and the timers
 // bound to no NPC or player queue) runs on engine.
-func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, state *world.State, o *options) *questBoot {
+func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, state *world.State, clock *task.GameClock, o *options) *questBoot {
 	so := o.scriptHelpers()
 	store := &journalStore{QuestStore: gamesql.NewQuestStore(db), loadErr: o.questLoadErr}
 	journals := script.NewQuests(store, worker, o.log)
@@ -132,6 +145,8 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *
 		Spawner:          script.NewSpawner(nil, o.log),
 		Rand:             rnd.Get,
 		World:            state,
+		Skills:           modelskill.NewTable(so.skills),
+		GameHour:         clock.Hour,
 	}
 	if so.rates != nil {
 		env.Rates = *so.rates

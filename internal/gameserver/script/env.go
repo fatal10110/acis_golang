@@ -2,6 +2,7 @@ package script
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -28,6 +29,11 @@ type Env struct {
 	Rand func(n int) int
 	// World is the world a script looks NPCs up in; nil finds none.
 	World *world.State
+	// Skills are the skill definitions a script reads a skill's power,
+	// aggro points and effects from.
+	Skills *skill.Table
+	// GameHour returns the in-game hour, 0 to 23.
+	GameHour func() int
 }
 
 // Rates are the quest drop and reward multipliers.

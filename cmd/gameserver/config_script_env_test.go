@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
 // TestScriptEnvReadsQuestRates pins the server.properties quest rates into
@@ -33,7 +34,7 @@ func TestScriptEnvReadsQuestRates(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		env, err := provideScriptEnv(props, manager.KillRewardConfig{PartyRange: 1500, MultipleItemDrop: true}, nil, nil, nil, nil)
+		env, err := provideScriptEnv(props, manager.KillRewardConfig{PartyRange: 1500, MultipleItemDrop: true}, nil, nil, nil, nil, &gameData{}, task.NewGameClock(nil))
 		if err != nil {
 			t.Fatalf("provideScriptEnv(%q) error = %v", tc.body, err)
 		}
@@ -48,7 +49,7 @@ func TestScriptEnvReadsQuestRates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provideScriptEnv(props, manager.KillRewardConfig{}, nil, nil, nil, nil); err == nil {
+	if _, err := provideScriptEnv(props, manager.KillRewardConfig{}, nil, nil, nil, nil, &gameData{}, task.NewGameClock(nil)); err == nil {
 		t.Fatal("a rate that is no number was accepted")
 	}
 }
