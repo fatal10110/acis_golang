@@ -15,8 +15,8 @@ import (
 // Population is the live NPC population scripts spawn NPCs into.
 type Population interface {
 	AddSpawn(npcID int32, x, y, z, heading int, scatter bool, despawn time.Duration) (attackable.Combatant, error)
-	CreatePrivate(master *npc.Hostile, npcID int32, at *location.Location, heading int, despawn time.Duration, params [3]int32) (*npc.Hostile, error)
-	CreatePrivates(master *npc.Hostile) error
+	CreatePrivate(master npc.PartyMember, npcID int32, at *location.Location, heading int, despawn time.Duration, params [3]int32) (npc.PartyMember, error)
+	CreatePrivates(master npc.PartyMember) error
 	ScheduleDespawn(live attackable.Combatant, d time.Duration)
 	RespawnDelay(live *npc.Hostile) time.Duration
 	ScheduleRespawn(live *npc.Hostile, d time.Duration) error
@@ -119,7 +119,8 @@ func (s *Spawner) AddSpawn(npcID int32, at Place, randomOffset bool, despawn tim
 
 // CreateOnePrivate spawns an NPC of npcID around master as one of its
 // privates and returns it; nil when npcID has no template or the private
-// cannot be placed. A private leaves the world with its master, and one
+// cannot be placed. master and the private are each a hostile or a
+// civilian NPC. A private leaves the world with its master, and one
 // that cannot respawn stops being master's private when it decays. A
 // positive despawn deletes it once that time has passed, unless it has
 // left the world by then.
@@ -136,8 +137,8 @@ func (s *Spawner) CreateOnePrivateEx(master *NPC, npcID int32, at Place, despawn
 }
 
 func (s *Spawner) createPrivate(master *NPC, npcID int32, at *location.Location, heading int, despawn time.Duration, params Params) *NPC {
-	h := hostileOf(master, "create a private")
-	pvt, err := s.population().CreatePrivate(h, npcID, at, heading, despawn, [3]int32{params.P1, params.P2, params.P3})
+	m := memberOf(master, "create a private")
+	pvt, err := s.population().CreatePrivate(m, npcID, at, heading, despawn, [3]int32{params.P1, params.P2, params.P3})
 	if err != nil {
 		s.logRefused(npcID, err)
 		return nil
@@ -151,7 +152,7 @@ func (s *Spawner) createPrivate(master *NPC, npcID int32, at *location.Location,
 // delay and weight point its declaration gives. It panics on a declaration
 // naming an NPC id no template has, the privates before it placed.
 func (s *Spawner) CreatePrivates(master *NPC) {
-	if err := s.population().CreatePrivates(hostileOf(master, "create privates")); err != nil {
+	if err := s.population().CreatePrivates(memberOf(master, "create privates")); err != nil {
 		panic(fmt.Sprintf("script: create privates: %v", err))
 	}
 }
@@ -173,14 +174,4 @@ func (s *Spawner) logRefused(npcID int32, err error) {
 	if !errors.Is(err, npc.ErrNoTemplate) {
 		s.log.Error().Err(err).Int32("npc_id", npcID).Msg("script: spawn placed nothing")
 	}
-}
-
-// hostileOf returns the hostile NPC master handles. A master that is no
-// hostile NPC panics: only a hostile NPC keeps privates yet (#3530).
-func hostileOf(master *NPC, what string) *npc.Hostile {
-	h, ok := combatantOf(master).(*npc.Hostile)
-	if !ok {
-		panic(fmt.Sprintf("script: %s for %T: only a hostile npc keeps privates", what, combatantOf(master)))
-	}
-	return h
 }

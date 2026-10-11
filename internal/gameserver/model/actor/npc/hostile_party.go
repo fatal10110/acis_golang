@@ -60,7 +60,7 @@ func (h *Hostile) NotifyAggression(source attackable.Combatant, power int) {
 		h.AddAttackDesire(source, h.attackedHateWeight(source, float64(power)))
 	}
 	h.raiseAttacked(source, int32(power), skill.Ref{})
-	h.propagatePartyAttacked(h, source, power, true, true)
+	propagatePartyAttacked(h, source, power, true, true)
 	raiseClanAttacked(h.scripts, h.world, h, source, int32(power), skill.Ref{}, clanAttackedByAggression)
 }
 
@@ -77,7 +77,7 @@ func (h *Hostile) SkillAttacked(caster attackable.Combatant, sk skill.Definition
 	value := max(120, sk.AggroPoints)
 	ref := skill.Ref{ID: sk.ID, Level: sk.Level}
 	h.raiseAttacked(caster, int32(value), ref)
-	h.propagatePartyAttacked(h, caster, value, false, false)
+	propagatePartyAttacked(h, caster, value, false, false)
 	raiseClanAttacked(h.scripts, h.world, h, caster, int32(value), ref, clanAttackedBySkill)
 }
 
@@ -120,47 +120,11 @@ func (h *Hostile) registerHit(combatant attackable.Combatant, amount float64, is
 	}
 	damage := int(commons.JavaInt(amount))
 	h.raiseAttacked(combatant, int32(damage), sk)
-	h.propagatePartyAttacked(h, combatant, damage, false, true)
+	propagatePartyAttacked(h, combatant, damage, false, true)
 	raiseClanAttacked(h.scripts, h.world, h, combatant, int32(damage), sk, clanAttackedByHit)
 }
 
-func (h *Hostile) inParty() bool {
-	return h.IsMaster() || h.Master() != nil
-}
-
-func (h *Hostile) partyMinions() []*Hostile {
-	if master := h.Master(); master != nil {
-		return master.Minions()
-	}
-	return h.Minions()
-}
-
-// propagatePartyAttacked calls the party of caller, an NPC in a party
-// attacked by target for damage: caller itself, then its master when
-// alive, then every live minion of the party. The minion loop skips caller
-// unless includeSelfInMinionLoop, as an aggression effect's does not.
-// assist turns on the built-in party assist of the called NPCs that have
-// no bound behavior.
-func (h *Hostile) propagatePartyAttacked(caller *Hostile, target attackable.Combatant, damage int, includeSelfInMinionLoop, assist bool) {
-	if !h.inParty() {
-		return
-	}
-	h.partyAttacked(caller, target, damage, assist)
-	if master := h.Master(); master != nil && !master.AlikeDead() {
-		master.partyAttacked(caller, target, damage, assist)
-	}
-	for _, minion := range h.partyMinions() {
-		if minion.AlikeDead() {
-			continue
-		}
-		if !includeSelfInMinionLoop && minion == caller {
-			continue
-		}
-		minion.partyAttacked(caller, target, damage, assist)
-	}
-}
-
-func (h *Hostile) reactPartyAttacked(caller *Hostile, target attackable.Combatant, aggro int) {
+func (h *Hostile) reactPartyAttacked(caller PartyMember, target attackable.Combatant, aggro int) {
 	if h.aiInt("IsHealer", 0) == 1 {
 		return
 	}
@@ -243,30 +207,4 @@ func partyDistance2D(h *Hostile, other attackable.Combatant) float64 {
 
 func (h *Hostile) aiInt(key string, def int) int {
 	return int(h.AIInt(key, int32(def)))
-}
-
-// partyDied tells h's party that h has just died: h itself, then its
-// master, then every minion of the party but h, dead ones included. A
-// dying master then lets its minions go: they no longer have a master,
-// while it keeps them as its minions.
-func (h *Hostile) partyDied() {
-	if !h.inParty() {
-		return
-	}
-	if h.scripts != nil {
-		h.scripts.HostilePartyDied(h, h)
-		if master := h.Master(); master != nil && master != h {
-			h.scripts.HostilePartyDied(h, master)
-		}
-		for _, minion := range h.partyMinions() {
-			if minion != h {
-				h.scripts.HostilePartyDied(h, minion)
-			}
-		}
-	}
-	if h.IsMaster() {
-		for _, minion := range h.Minions() {
-			minion.SetMaster(nil)
-		}
-	}
 }
