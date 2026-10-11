@@ -264,6 +264,9 @@ type characterSpec struct {
 	level int
 	sp    int
 	sex   player.Sex
+	// class is the class template the character is created from, and so
+	// its race.
+	class int
 }
 
 // WithAccount sets the login account the scripted client authenticates as
@@ -613,6 +616,15 @@ func WithCharacter(name string, level, sp int) Option {
 func WithCharacterSex(name string, level, sp int, sex player.Sex) Option {
 	return func(o *options) {
 		o.characters = append(o.characters, characterSpec{name: name, level: level, sp: sp, sex: sex})
+	}
+}
+
+// WithClassCharacter seeds a selectable character of class: created from
+// that class template, which the table must hold (WithClassTemplates), so
+// it has that class's race.
+func WithClassCharacter(name string, level, sp, class int) Option {
+	return func(o *options) {
+		o.characters = append(o.characters, characterSpec{name: name, level: level, sp: sp, sex: player.SexMale, class: class})
 	}
 }
 
@@ -2226,7 +2238,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		npcSpawns, npcRespawns = bootNpcSpawns(t, gcl, npcSpawnDeps{
 			state: state, templates: o.npcs, geo: bootGeo(o.geo), ids: ids, decay: o.decay, ai: ai, positions: positions,
 			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.AttackStance, log: o.log, makers: o.npcSpawns,
-			dropRates: o.npcDropRates, sevenSigns: sevenSigns, scripts: quests.registry, routes: o.walkerRoutes,
+			dropRates: o.npcDropRates, sevenSigns: sevenSigns, scripts: quests.registry, spawner: quests.env.Spawner, routes: o.walkerRoutes,
 		})
 	}
 	if o.productionTickers {
@@ -2291,9 +2303,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	go func() { _ = network.Serve(ctx, ln, serve, zerolog.Nop()) }()
 
 	for _, spec := range o.characters {
-		tmpl, ok := templates.Get(0)
+		tmpl, ok := templates.Get(spec.class)
 		if !ok {
-			t.Fatal("missing test class template")
+			t.Fatalf("missing test class template %d", spec.class)
 		}
 		ch, err := player.NewCharacter(ids.nextID(), tmpl, o.account, spec.name, 1, 0, 0, spec.sex)
 		if err != nil {

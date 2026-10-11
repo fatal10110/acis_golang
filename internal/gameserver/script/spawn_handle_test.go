@@ -5,7 +5,9 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/rs/zerolog"
 )
 
@@ -69,3 +71,40 @@ func TestScheduleDespawnOfNothingPanics(t *testing.T) {
 		}()
 	}
 }
+
+// A spawner built over no population places nothing until it is bound,
+// and is bound once only.
+func TestSpawnerBindOnce(t *testing.T) {
+	s := NewSpawner(nil, zerolog.Nop())
+	mustPanic := func(what string, fn func()) {
+		t.Helper()
+		defer func() {
+			if recover() == nil {
+				t.Fatalf("%s did not panic", what)
+			}
+		}()
+		fn()
+	}
+	mustPanic("spawn through an unbound spawner", func() { s.AddSpawn(1, Loc{}, false, 0) })
+	mustPanic("bind to no population", func() { s.Bind(nil) })
+	s.Bind(nopPopulation{})
+	if got := s.AddSpawn(1, Loc{}, false, 0); got != nil {
+		t.Fatalf("spawn placed %v, want nothing", got)
+	}
+	mustPanic("second bind", func() { s.Bind(nopPopulation{}) })
+}
+
+// nopPopulation places nothing: every NPC id lacks a template.
+type nopPopulation struct{}
+
+func (nopPopulation) AddSpawn(int32, int, int, int, int, bool, time.Duration) (attackable.Combatant, error) {
+	return nil, npc.ErrNoTemplate
+}
+
+func (nopPopulation) CreatePrivate(*npc.Hostile, int32, *location.Location, int, time.Duration, [3]int32) (*npc.Hostile, error) {
+	return nil, npc.ErrNoTemplate
+}
+
+func (nopPopulation) CreatePrivates(*npc.Hostile) error { return nil }
+
+func (nopPopulation) ScheduleDespawn(attackable.Combatant, time.Duration) {}

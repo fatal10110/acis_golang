@@ -12,6 +12,14 @@
 //
 //	trace <path below the module root>        optional: the reference trace the first steps replay
 //	character <name> <level>                  the character the client plays
+//	class <class id>                          optional: the character's class, and so its race (default 0, a human
+//	                                          fighter); the class template keeps the fixture's stats
+//	clan <level>                              optional: the character leads a clan of that level
+//	quest <quest> <var>=<value> ...           character_quests rows of the character before it enters the world,
+//	                                          one line per quest, as a rows check lists them
+//	random <draw> ...                         optional: the script random draws, in order; each must be inside
+//	                                          [0, n) of its call, and every one must be drawn
+//	random always <draw>                      optional: every script random draw is that one
 //	script <scripts.xml path>                 a script of the suite's catalog; script and stub lines in scripts.xml order
 //	stub <scripts.xml path>                   a script not ported yet that a dialog lists: registered from the reference
 //	                                          registration manifest (quest id, title, items, bindings) with no hook
@@ -44,6 +52,9 @@
 // are the dialog's, the quest's and the item messages: ActionFailed,
 // NpcHtmlMessage, SystemMessage, PlaySound, QuestList and ExShowQuestMark.
 //
+// Without a random line the script draws are random. A draw outside
+// [0, n), or past the listed ones, fails the step that drew it.
+//
 // A trace header ties the scenario to the reference server: before the run
 // the trace's client packets must be the scenario's first steps, and their
 // rendered packets and statements must be those steps' S and Q lines.
@@ -56,6 +67,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 )
 
 // Scenario is one parsed scenario file.
@@ -67,11 +80,32 @@ type Scenario struct {
 	Trace     string
 	Character string
 	Level     int
-	Scripts   []ScriptLine
-	Items     []int32
-	Pages     []string
-	NPCs      []NPC
-	Steps     []Step
+	// Class is the character's class id.
+	Class int
+	// Clan is the level of the clan the character leads, -1 for none.
+	Clan int
+	// Quests are the character_quests rows seeded before the character
+	// enters the world.
+	Quests []QuestRows
+	// Random is the script random source, nil for random draws.
+	Random  *Random
+	Scripts []ScriptLine
+	Items   []int32
+	Pages   []string
+	NPCs    []NPC
+	Steps   []Step
+}
+
+// QuestRows is one quest line: a quest's rows as var=value.
+type QuestRows struct {
+	Quest string
+	Vars  [][2]string
+}
+
+// Random is the random line: the draws in order, or one draw always.
+type Random struct {
+	Draws  []int
+	Always bool
 }
 
 // ScriptLine is one script or stub line.
@@ -110,6 +144,9 @@ type Check struct {
 	Args []string
 }
 
+// maxClanLevel is the highest clan level.
+const maxClanLevel = 8
+
 // argCount is, per verb, the arguments it takes: min and max.
 var argCount = map[string][2]int{
 	"action":   {1, 1},
@@ -124,7 +161,7 @@ var argCount = map[string][2]int{
 
 // Parse reads a scenario file.
 func Parse(name string, data []byte) (*Scenario, error) {
-	sc := &Scenario{Name: name}
+	sc := &Scenario{Name: name, Clan: -1}
 	roles := map[string]bool{}
 	sb := bufio.NewScanner(bytes.NewReader(data))
 	sb.Buffer(make([]byte, 1<<20), 1<<20)
@@ -198,6 +235,70 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 			return fmt.Errorf("level %q: %w", args[1], err)
 		}
 		sc.Character, sc.Level = args[0], int(level)
+	case "class":
+		if len(args) != 1 || sc.Class != 0 {
+			return fmt.Errorf("one class line: class <class id>")
+		}
+		id, err := strconv.Atoi(args[0])
+		if err != nil {
+			return fmt.Errorf("class %q: %w", args[0], err)
+		}
+		if id == 0 {
+			return fmt.Errorf("class 0 is the default: leave the line out")
+		}
+		if _, ok := player.ClassRace(id); !ok {
+			return fmt.Errorf("class %d has no race", id)
+		}
+		sc.Class = id
+	case "clan":
+		if len(args) != 1 || sc.Clan >= 0 {
+			return fmt.Errorf("one clan line: clan <level>")
+		}
+		level, err := strconv.Atoi(args[0])
+		if err != nil || level < 0 || level > maxClanLevel {
+			return fmt.Errorf("clan level %q is not 0 to %d", args[0], maxClanLevel)
+		}
+		sc.Clan = level
+	case "quest":
+		if len(args) < 2 {
+			return fmt.Errorf("quest <quest> <var>=<value>, one or more")
+		}
+		q := QuestRows{Quest: args[0]}
+		for _, l := range sc.Quests {
+			if l.Quest == q.Quest {
+				return fmt.Errorf("quest %s listed twice", q.Quest)
+			}
+		}
+		for _, a := range args[1:] {
+			k, v, ok := strings.Cut(a, "=")
+			if !ok || k == "" {
+				return fmt.Errorf("row %q is not <var>=<value>", a)
+			}
+			q.Vars = append(q.Vars, [2]string{k, v})
+		}
+		sc.Quests = append(sc.Quests, q)
+	case "random":
+		if sc.Random != nil {
+			return fmt.Errorf("one random line")
+		}
+		rd := &Random{}
+		if len(args) > 0 && args[0] == "always" {
+			if len(args) != 2 {
+				return fmt.Errorf("random always <draw>")
+			}
+			rd.Always, args = true, args[1:]
+		}
+		if len(args) == 0 {
+			return fmt.Errorf("random <draw> ... | random always <draw>")
+		}
+		for _, a := range args {
+			v, err := strconv.Atoi(a)
+			if err != nil || v < 0 {
+				return fmt.Errorf("draw %q is not a number of 0 or more", a)
+			}
+			rd.Draws = append(rd.Draws, v)
+		}
+		sc.Random = rd
 	case "script", "stub":
 		if len(args) != 1 {
 			return fmt.Errorf("%s <path>", key)

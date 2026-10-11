@@ -116,7 +116,8 @@ type questBoot struct {
 
 // bootQuests builds the journal store, the journal writer draining on
 // worker, the script helpers' environment allocating item ids from ids,
-// and the script registry, whose own work (the dying hooks, and the timers
+// with a script spawner bootNpcSpawns binds to the NPC population, and the
+// script registry, whose own work (the dying hooks, and the timers
 // bound to no NPC or player queue) runs on engine.
 func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, state *world.State, o *options) *questBoot {
 	so := o.scriptHelpers()
@@ -128,6 +129,7 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *
 		PartyRange:       fixturePartyRange,
 		MultipleItemDrop: !so.singleItemDrop,
 		NewItemID:        ids.NextID,
+		Spawner:          script.NewSpawner(nil, o.log),
 		Rand:             rnd.Get,
 		World:            state,
 	}
