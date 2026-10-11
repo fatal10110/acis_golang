@@ -94,12 +94,15 @@ func teleportCatalog() script.Catalog {
 // aiCatalog lists the NPC behaviors.
 func aiCatalog() script.Catalog {
 	return script.Catalog{
-		"script.ai.group.Walkers":                                                              group.Walkers,
-		"script.ai.individual.DefaultNpc":                                                      defaultnpc.New,
-		"script.ai.individual.Monster.MonsterAI":                                               monster.New,
-		"script.ai.individual.Monster.WarriorBase.WarriorBase":                                 warrior.Base,
-		"script.ai.individual.Monster.WarriorBase.Warrior.Warrior":                             warrior.Warrior,
-		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive": warrior.Aggressive,
+		"script.ai.group.Walkers":                                                                        group.Walkers,
+		"script.ai.individual.DefaultNpc":                                                                defaultnpc.New,
+		"script.ai.individual.Monster.MonsterAI":                                                         monster.New,
+		"script.ai.individual.Monster.WarriorBase.WarriorBase":                                           warrior.Base,
+		"script.ai.individual.Monster.WarriorBase.Warrior.Warrior":                                       warrior.Warrior,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive":           warrior.Aggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHold.WarriorHold":                       warrior.Hold,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorPhysicalSpecial": warrior.PhysicalSpecial,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorFishingBlock":    warrior.FishingBlock,
 	}
 }
 

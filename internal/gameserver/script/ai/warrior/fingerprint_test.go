@@ -18,7 +18,7 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 	for _, id := range npcStrings {
 		exempt = append(exempt, fmt.Sprintf("number %d", id))
 	}
-	problems, err := scriptfp.Check(".", []string{"script.ai.individual.Monster.WarriorBase.WarriorBase", "script.ai.individual.Monster.WarriorBase.Warrior.Warrior", "script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive"}, exempt...)
+	problems, err := scriptfp.Check(".", []string{"script.ai.individual.Monster.WarriorBase.WarriorBase", "script.ai.individual.Monster.WarriorBase.Warrior.Warrior", "script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive", "script.ai.individual.Monster.WarriorBase.Warrior.WarriorHold.WarriorHold", "script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorPhysicalSpecial", "script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorFishingBlock"}, exempt...)
 	if err != nil {
 		t.Fatal(err)
 	}

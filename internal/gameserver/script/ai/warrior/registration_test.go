@@ -26,6 +26,9 @@ var chain = []struct {
 	{"script.ai.individual.Monster.WarriorBase.WarriorBase", Base},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.Warrior", Warrior},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive", Aggressive},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHold.WarriorHold", Hold},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorFishingBlock", FishingBlock},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorPhysicalSpecial", PhysicalSpecial},
 }
 
 // manifestView is what the reference manifest records of the chain: per
@@ -109,7 +112,9 @@ func readView(t *testing.T, path string, text *bufio.Scanner) manifestView {
 
 // TestRegistrationMatchesReferenceManifest registers the chain's Go
 // scripts through the engine registry, with the engine's own seam gate and
-// every id a hostile NPC, as all 514 Warrior ids are in the datapack. None
+// every id a hostile NPC, as all 619 ids the chain binds are in the
+// datapack (514 Warrior and WarriorAggressive, 105 WarriorHold,
+// WarriorPhysicalSpecial and WarriorFishingBlock). None
 // is refused, and the registry dump equals the reference manifest for the
 // chain: each script's kind and bind lines, and every folded per-(npc,
 // event) list restricted to the chain's scripts.
@@ -137,8 +142,8 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	want := readView(t, path, sc)
-	if len(want.folds) != 514*10 {
-		t.Fatalf("reference folds = %d entries, want the 514 ids on 10 events each", len(want.folds))
+	if len(want.folds) != 619*10 {
+		t.Fatalf("reference folds = %d entries, want the 619 ids on 10 events each", len(want.folds))
 	}
 
 	for _, c := range chain {
@@ -152,7 +157,7 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ: %d entries, reference %d", len(got.folds), len(want.folds))
 	}
-	for _, id := range []int32{20001, 20012} {
+	for _, id := range []int32{20001, 20012, 27102, 20084, 18319} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}
