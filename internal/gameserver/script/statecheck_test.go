@@ -20,11 +20,14 @@ import (
 // between the players and NPCs it serves lives in the engine's cells only.
 // A script package (every package below this one) may not declare a
 // package-level variable, start a goroutine, import sync or sync/atomic,
-// or let a closure inside a constructor capture a local that is mutable: a
-// constructor is a function returning a Script, Hooks, Maker or MakerHooks
-// of this package, and a local is mutable when anything but its own
-// declaration writes it (an assignment, an increment, its address taken,
-// a delete, clear or copy into it, or a send on it).
+// write through a function's receiver or parameters (a hook bound as a
+// method value reaches its receiver's state on every invocation), or let a
+// closure inside a constructor capture a local that is mutable: a
+// constructor is a function whose result type mentions a Script, Hooks,
+// Maker, MakerHooks, Catalog or MakerCatalog of this package (a pointer to
+// one or a factory of one included), and a local is mutable when anything
+// but its own declaration writes it (an assignment, an increment, its
+// address taken, a delete, clear or copy into it, or a send on it).
 
 // Every committed script package keeps to the rule.
 func TestScriptPackagesKeepSharedStateInCells(t *testing.T) {
@@ -54,6 +57,11 @@ func TestScriptStateCheckCatchesFixture(t *testing.T) {
 		"bad.go:28: closure captures mutable constructor-local other",
 		"bad.go:29: go statement",
 		"bad.go:34: closure captures mutable constructor-local ptr",
+		"receiver.go:21: onTalk writes through its receiver q",
+		"receiver.go:30: onFirstTalk writes through its receiver q",
+		"receiver.go:36: remember writes through its parameter q",
+		"receiver.go:44: closure captures mutable constructor-local count",
+		"receiver.go:54: closure captures mutable constructor-local count",
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("violations:\n  %s\nwant:\n  %s", strings.Join(got, "\n  "), strings.Join(want, "\n  "))
@@ -161,6 +169,7 @@ func checkScriptState(t *testing.T, dir string) []string {
 					}
 					return true
 				})
+				checkReceiverWrites(d, info, report)
 				if isConstructor(d) {
 					checkConstructorCaptures(d, info, report)
 				}
@@ -184,23 +193,131 @@ func splitPos(s string) (string, int) {
 	return parts[0], line
 }
 
-// isConstructor reports whether d returns a Script, Hooks, Maker or
-// MakerHooks of the script package.
+// isConstructor reports whether a result of d mentions a Script, Hooks,
+// Maker, MakerHooks, Catalog or MakerCatalog of the script package anywhere
+// in its type: a pointer to one, a factory returning one, or a collection
+// of them builds hooks as much as the plain value does.
 func isConstructor(d *ast.FuncDecl) bool {
 	if d.Type.Results == nil {
 		return false
 	}
+	found := false
 	for _, r := range d.Type.Results.List {
-		if sel, ok := r.Type.(*ast.SelectorExpr); ok {
+		ast.Inspect(r.Type, func(n ast.Node) bool {
+			sel, ok := n.(*ast.SelectorExpr)
+			if !ok {
+				return !found
+			}
 			if x, ok := sel.X.(*ast.Ident); ok && x.Name == "script" {
 				switch sel.Sel.Name {
-				case "Script", "Hooks", "Maker", "MakerHooks":
-					return true
+				case "Script", "Hooks", "Maker", "MakerHooks", "Catalog", "MakerCatalog":
+					found = true
+				}
+			}
+			return false
+		})
+	}
+	return found
+}
+
+// forEachWrite calls write with the root identifier of every place n
+// writes: an assignment or increment target, a range variable assigned
+// with =, an operand whose address is taken, the first argument of
+// delete, clear, copy or close, and a channel sent on. through says
+// whether the write reaches the root through a field, index or pointer
+// rather than replacing the variable itself.
+func forEachWrite(n ast.Node, info *types.Info, write func(root *ast.Ident, through bool)) {
+	mark := func(e ast.Expr) {
+		through := false
+		for {
+			switch x := e.(type) {
+			case *ast.ParenExpr:
+				e = x.X
+			case *ast.IndexExpr:
+				e, through = x.X, true
+			case *ast.IndexListExpr:
+				e, through = x.X, true
+			case *ast.SelectorExpr:
+				e, through = x.X, true
+			case *ast.StarExpr:
+				e, through = x.X, true
+			case *ast.Ident:
+				write(x, through)
+				return
+			default:
+				return
+			}
+		}
+	}
+	ast.Inspect(n, func(n ast.Node) bool {
+		switch s := n.(type) {
+		case *ast.AssignStmt:
+			for _, lhs := range s.Lhs {
+				mark(lhs)
+			}
+		case *ast.IncDecStmt:
+			mark(s.X)
+		case *ast.RangeStmt:
+			if s.Tok == token.ASSIGN {
+				if s.Key != nil {
+					mark(s.Key)
+				}
+				if s.Value != nil {
+					mark(s.Value)
+				}
+			}
+		case *ast.UnaryExpr:
+			if s.Op == token.AND {
+				mark(s.X)
+			}
+		case *ast.SendStmt:
+			mark(s.Chan)
+		case *ast.CallExpr:
+			if id, ok := s.Fun.(*ast.Ident); ok && len(s.Args) > 0 {
+				if _, builtin := info.Uses[id].(*types.Builtin); builtin {
+					switch id.Name {
+					case "delete", "clear", "copy", "close":
+						// Every one of them writes what its operand
+						// refers to, never the variable itself.
+						mark(&ast.StarExpr{X: s.Args[0]})
+					}
+				}
+			}
+		}
+		return true
+	})
+}
+
+// checkReceiverWrites reports each write of the function d through its
+// receiver or one of its parameters. A hook bound as a method value, or a
+// helper handed a pointer, reaches state every invocation shares through
+// them exactly as a closure does through a captured local.
+func checkReceiverWrites(d *ast.FuncDecl, info *types.Info, report func(token.Pos, string, ...any)) {
+	params := map[types.Object]string{}
+	add := func(fields *ast.FieldList, kind string) {
+		if fields == nil {
+			return
+		}
+		for _, f := range fields.List {
+			for _, name := range f.Names {
+				if obj := info.Defs[name]; obj != nil {
+					params[obj] = kind
 				}
 			}
 		}
 	}
-	return false
+	add(d.Recv, "receiver")
+	add(d.Type.Params, "parameter")
+	reported := map[types.Object]bool{}
+	forEachWrite(d.Body, info, func(root *ast.Ident, through bool) {
+		obj := info.Uses[root]
+		kind, ok := params[obj]
+		if !ok || !through || reported[obj] {
+			return
+		}
+		reported[obj] = true
+		report(root.Pos(), "%s writes through its %s %s", d.Name.Name, kind, obj.Name())
+	})
 }
 
 // checkConstructorCaptures reports each local of the constructor d, not
@@ -223,61 +340,10 @@ func checkConstructorCaptures(d *ast.FuncDecl, info *types.Info, report func(tok
 	ast.Inspect(d.Body, collect)
 
 	written := map[types.Object]bool{}
-	markRoot := func(e ast.Expr) {
-		for {
-			switch x := e.(type) {
-			case *ast.ParenExpr:
-				e = x.X
-			case *ast.IndexExpr:
-				e = x.X
-			case *ast.SelectorExpr:
-				e = x.X
-			case *ast.StarExpr:
-				e = x.X
-			case *ast.Ident:
-				if obj := info.Uses[x]; obj != nil {
-					written[obj] = true
-				}
-				return
-			default:
-				return
-			}
+	forEachWrite(d.Body, info, func(root *ast.Ident, _ bool) {
+		if obj := info.Uses[root]; obj != nil {
+			written[obj] = true
 		}
-	}
-	ast.Inspect(d.Body, func(n ast.Node) bool {
-		switch s := n.(type) {
-		case *ast.AssignStmt:
-			for _, lhs := range s.Lhs {
-				markRoot(lhs)
-			}
-		case *ast.IncDecStmt:
-			markRoot(s.X)
-		case *ast.RangeStmt:
-			if s.Tok == token.ASSIGN {
-				if s.Key != nil {
-					markRoot(s.Key)
-				}
-				if s.Value != nil {
-					markRoot(s.Value)
-				}
-			}
-		case *ast.UnaryExpr:
-			if s.Op == token.AND {
-				markRoot(s.X)
-			}
-		case *ast.SendStmt:
-			markRoot(s.Chan)
-		case *ast.CallExpr:
-			if id, ok := s.Fun.(*ast.Ident); ok && len(s.Args) > 0 {
-				if _, builtin := info.Uses[id].(*types.Builtin); builtin {
-					switch id.Name {
-					case "delete", "clear", "copy", "close":
-						markRoot(s.Args[0])
-					}
-				}
-			}
-		}
-		return true
 	})
 
 	reported := map[types.Object]bool{}
