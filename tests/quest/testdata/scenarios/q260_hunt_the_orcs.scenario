@@ -4,6 +4,7 @@
 # no-grade soulshots with the tutorial voice. A second payment gives no shots; then the
 # player quits the repeatable quest. Expectations are derived from the reference source
 # (Q260_HuntTheOrcs.java, Quest.rewardNewbieShots, Quest.playTutorialVoice).
+trace internal/gameserver/script/testdata/oracle/scenarios/q260_hunt_the_orcs.golden
 character Hunter 6
 class 18
 random always 0

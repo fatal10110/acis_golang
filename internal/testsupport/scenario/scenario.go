@@ -75,8 +75,11 @@
 // [0, n), or past the listed ones, fails the step that drew it.
 //
 // A trace header ties the scenario to the reference server: before the run
-// the trace's client packets must be the scenario's first steps, and their
-// rendered packets and statements must be those steps' S and Q lines.
+// the trace's client packets, kills, hits and advances must be the
+// scenario's first steps (a kill step of N kills is N kills of the trace),
+// and their rendered packets and journal statements must be those steps' S
+// and Q lines. A trace under the oracle's scenarios directory is the
+// reference probe's play of this scenario itself (the oracle README).
 package scenario
 
 import (

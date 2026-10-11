@@ -4,6 +4,7 @@
 # 100 per supply item and 6000 per recipe, then the player quits the repeatable quest.
 # Expectations are derived from the reference source (Q360_PlunderTheirSupplies.java,
 # Quest.dropMultipleItems, Player.addItem / destroyItemByItemId).
+trace internal/gameserver/script/testdata/oracle/scenarios/q360_plunder_their_supplies.golden
 character Raider 52
 random always 0
 script quest.Q360_PlunderTheirSupplies

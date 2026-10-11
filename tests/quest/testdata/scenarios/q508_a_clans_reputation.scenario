@@ -3,6 +3,7 @@
 # draw of 0 to 35 reputation points (the draw pinned to 10: 75 points), then quits the
 # repeatable quest. The first draw is the always-drop's roll, which cannot miss. Expectations are derived from the reference source
 # (Q508_AClansReputation.java, Quest.getClanLeaderQuestState, Quest.dropItemsAlways).
+trace internal/gameserver/script/testdata/oracle/scenarios/q508_a_clans_reputation.golden
 character Leader 40
 clan 5
 random 0 10

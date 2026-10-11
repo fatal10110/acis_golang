@@ -104,7 +104,8 @@ import org.w3c.dom.Node;
 /**
  * Boots the reference server to its script loader with the probe's shadowed thread pool,
  * random source, send path and connection pool, then writes the registration manifest
- * (gate 1) and the quest packet traces (gate 2).
+ * (gate 1), the quest packet traces (gate 2), the engine-contract goldens and the quest
+ * scenario traces.
  */
 public final class ScriptProbe
 {
@@ -141,8 +142,10 @@ public final class ScriptProbe
 			new Manifest(w, paths, loaded, attempts, templates).write();
 		}
 
+		final Map<NpcTemplate, Map<EventHandler, List<Quest>>> bindings = ScenarioTrace.snapshot();
 		QuestTrace.run(out);
 		ContractProbe.run(out);
+		ScenarioTrace.run(new File(System.getProperty("probe.scenarios")), out, bindings);
 	}
 
 	/**
