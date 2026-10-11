@@ -50,7 +50,7 @@ func (n *Npcs) spawnStandalone(tmpl *npc.Template, x, y, z, heading int, summone
 	key := fmt.Sprintf("fixed#%d", n.fixedSeq.Add(1))
 	entry := spawn.Entry{NPCID: int32(tmpl.ID)}
 	n.mu.Lock()
-	n.slot[key] = slotInfo{key: key, entry: entry, tmpl: tmpl, fixed: true, at: at, heading: heading, summoner: summoner, memory: newSlotMemory(entry)}
+	n.slot[key] = slotInfo{key: key, entry: entry, tmpl: tmpl, fixed: true, at: at, heading: heading, summoner: summoner, memory: newSlotMemory(entry, nil)}
 	n.mu.Unlock()
 
 	live := n.instantiate(key, entry, tmpl, at, heading, fullHP, fullMP, nil)

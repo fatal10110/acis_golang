@@ -204,9 +204,9 @@ func provideScriptSpawner(log zerolog.Logger) *script.Spawner {
 // rates of server.properties, the party range and multiple item drop the
 // kill rewards read, the item id allocator, the NPC spawner, the shared
 // random source, the world the scripts look NPCs up in, the skill and item
-// definitions, the in-game clock, the datapack pages a script reads and the
-// Seven Signs state.
-func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner, state *world.State, data *gameData, clock *task.GameClock, html *datacache.HTML, sevenSigns *sevensigns.State) (*script.Env, error) {
+// definitions, the in-game clock, the datapack pages a script reads, the
+// Seven Signs state and the grand boss wait times.
+func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner, state *world.State, data *gameData, clock *task.GameClock, html *datacache.HTML, sevenSigns *sevensigns.State, gameplay gameplayConfig) (*script.Env, error) {
 	var rates script.Rates
 	for _, r := range []struct {
 		key string
@@ -238,6 +238,7 @@ func provideScriptEnv(serverProps *config.Properties, rewards manager.KillReward
 		Items:            data.Items,
 		Page:             html.Get,
 		SevenSigns:       sevenSigns,
+		BossWaits:        gameplay.BossWaits,
 	}, nil
 }
 

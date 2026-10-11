@@ -68,6 +68,19 @@ Quest.showTutorialHTML ShowTutorialHTML
 RadarList.addMarker AddRadarMarker
 RadarList.removeMarker RemoveRadarMarker
 
+# Global memo, spawn db value and DB-loaded mark (#3499). The global memo is
+# the Script handle's; its remove is the map's own, counted as the memo
+# set's. The spawn data row is a getter the NPC handle folds into its db
+# value calls; a maker clears the mark through its spawn.
+ASpawn.getDBLoaded script.NPC.DBLoaded
+ASpawn.getSpawnData inline
+ASpawn.setDBLoaded ClearDBLoaded
+GlobalMemo.getCreature script.GlobalMemo.Creature
+GlobalMemo.getInstance script.Script.GlobalMemo
+MemoSet.remove script.GlobalMemo.Remove
+SpawnData.getDBValue script.NPC.DBValue
+SpawnData.setDBValue script.NPC.SetDBValue
+
 # Script helpers (E4). The helpers are methods of the registered script, so a
 # port keeps the reference's arguments: s.GiveItems(player, id, count). The
 # condition and variable overloads of a party lookup are one call taking
