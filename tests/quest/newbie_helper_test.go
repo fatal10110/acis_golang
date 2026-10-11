@@ -86,7 +86,8 @@ type newbieWorld struct {
 // newbie helper registered, the helper's datapack pages, the shipped skills
 // and items, buffs as the newbie buff table and roll as every script draw.
 // The tutorial state is seeded STARTED and done with its enter-world steps.
-func bootNewbieHelper(t *testing.T, level, roll int, buffs []modelskill.NewbieBuff) *newbieWorld {
+// opts add to the boot.
+func bootNewbieHelper(t *testing.T, level, roll int, buffs []modelskill.NewbieBuff, opts ...gameservertest.Option) *newbieWorld {
 	t.Helper()
 	datapack.Require(t)
 	skills, shipped := shippedSeamData()
@@ -106,7 +107,7 @@ func bootNewbieHelper(t *testing.T, level, roll int, buffs []modelskill.NewbieBu
 		insertJournal(t, srv.DB,
 			journalRow{objID, tutorial, "<state>", val("STARTED")},
 			journalRow{objID, tutorial, "onlyone", val("1")})
-	},
+	}, append([]gameservertest.Option{
 		gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), skills, gamesql.NewCharacterSkillStore(db))),
 		gameservertest.WithItemTemplates(item.NewTable(templates)),
 		gameservertest.WithScriptRand(func(int) int { return roll }),
@@ -118,7 +119,7 @@ func bootNewbieHelper(t *testing.T, level, roll int, buffs []modelskill.NewbieBu
 				"script.feature.Tutorial":     featuretutorial.New,
 			},
 		),
-	)
+	}, opts...)...)
 	w.srv.ReadQueued(t, w.srv.Client)
 	return &newbieWorld{dialogWorld: w, files: files}
 }

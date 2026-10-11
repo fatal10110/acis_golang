@@ -5,6 +5,7 @@
 package newbiehelper
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -331,15 +332,17 @@ func (f feature) onAdvEvent(s *script.Script, e script.Event) string {
 			return ""
 		}
 	case strings.HasPrefix(event, "NpcLocationInfo"):
-		// A malformed id aborts the event here.
-		npcID, err := strconv.Atoi(event[16:])
+		// A malformed id, or one outside the int32 range, aborts the event
+		// here.
+		npcID, err := strconv.ParseInt(event[16:], 10, 32)
 		if err != nil {
 			panic(err)
 		}
-		if !contains(radars(), npcID) {
+		id := int32(npcID)
+		if !slices.Contains(radars(), id) {
 			return ""
 		}
-		if target := s.WorldNPC(int32(npcID)); target != nil {
+		if target := s.WorldNPC(id); target != nil {
 			at := target.SpawnLocation()
 			p.AddRadarMarker(int32(at.X), int32(at.Y), int32(at.Z))
 		}
@@ -524,14 +527,4 @@ func itemIDOf(npcID int32) int32 {
 		return voucherOfFlame
 	}
 	return 0
-}
-
-// contains reports whether ids holds id.
-func contains(ids []int32, id int) bool {
-	for _, v := range ids {
-		if int(v) == id {
-			return true
-		}
-	}
-	return false
 }

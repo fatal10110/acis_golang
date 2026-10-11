@@ -72,7 +72,7 @@ type Hostile struct {
 	// kills it. It is nil until Attach installs one, in which case death
 	// still latches but grants nothing — matching Die's own "rewards may be
 	// nil" contract.
-	rewards creature.Rewarder
+	rewards Rewards
 	// remover takes this NPC out of the world for DeleteMe; nil despawns it
 	// with no respawn. Installed by Attach.
 	remover Remover
@@ -354,7 +354,7 @@ type Runtime struct {
 	LOS     LineOfSight
 	Log     zerolog.Logger
 	Items   *item.Table
-	Rewards creature.Rewarder
+	Rewards Rewards
 	Sink    event.Sink
 	Remover Remover
 	// Hits watches every hit this NPC registers; nil watches none.
