@@ -233,21 +233,24 @@ type IntSlot = npc.IntSlot
 type CreatureSlot = npc.CreatureSlot
 
 // The script memory slots a behavior reads and writes. Param1 to Param3
-// hold the spawn parameters a private started with.
+// hold the spawn parameters a private started with; WeightPoint, 1 until a
+// script sets it, holds a private's weight point from its declaration.
 const (
-	SlotIntAI0    = npc.IntAI0
-	SlotIntAI1    = npc.IntAI1
-	SlotIntAI2    = npc.IntAI2
-	SlotIntAI3    = npc.IntAI3
-	SlotIntAI4    = npc.IntAI4
-	SlotParam1    = npc.IntParam1
-	SlotParam2    = npc.IntParam2
-	SlotParam3    = npc.IntParam3
-	SlotCreature0 = npc.CreatureAI0
-	SlotCreature1 = npc.CreatureAI1
-	SlotCreature2 = npc.CreatureAI2
-	SlotCreature3 = npc.CreatureAI3
-	SlotCreature4 = npc.CreatureAI4
+	SlotIntAI0      = npc.IntAI0
+	SlotIntAI1      = npc.IntAI1
+	SlotIntAI2      = npc.IntAI2
+	SlotIntAI3      = npc.IntAI3
+	SlotIntAI4      = npc.IntAI4
+	SlotParam1      = npc.IntParam1
+	SlotParam2      = npc.IntParam2
+	SlotParam3      = npc.IntParam3
+	SlotFlag        = npc.IntFlag
+	SlotWeightPoint = npc.IntWeightPoint
+	SlotCreature0   = npc.CreatureAI0
+	SlotCreature1   = npc.CreatureAI1
+	SlotCreature2   = npc.CreatureAI2
+	SlotCreature3   = npc.CreatureAI3
+	SlotCreature4   = npc.CreatureAI4
 )
 
 // Int returns the integer the NPC's script memory holds in slot.

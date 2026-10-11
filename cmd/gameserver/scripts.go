@@ -110,6 +110,8 @@ func aiCatalog() script.Catalog {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorHold.WarriorHold":                       warrior.Hold,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorPhysicalSpecial": warrior.PhysicalSpecial,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorFishingBlock":    warrior.FishingBlock,
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarrior":         warrior.PartyLeader,
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateWarrior":       warrior.PartyPrivate,
 	}
 }
 
