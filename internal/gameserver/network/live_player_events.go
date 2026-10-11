@@ -309,7 +309,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.QuestOverweight:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInventoryLessThan80Percent))
 	case event.SystemMessageShown:
-		live.SendFrame(serverpackets.FrameSystemMessage(e.ID))
+		live.SendFrame(systemMessageNumbersFrame(e.ID, e.Numbers))
 	case event.TutorialPageShown, event.TutorialPageClosed, event.TutorialQuestionMarkShown,
 		event.TutorialClientEventEnabled, event.TutorialVoicePlayed, event.RadarMarkerAdded, event.RadarMarkerRemoved:
 		l.sendTutorial(live, e)
@@ -464,6 +464,12 @@ func (p *livePlayer) Emit(ev event.Event) {
 		}
 	case event.ServitorSummonRequested:
 		(&gameSummonSpawner{link: l, live: live}).SpawnServitor(live.Character, e.Skill)
+	case event.SocialAction:
+		l.broadcastLiveFrame(live, func() wire.Frame { return serverpackets.FrameSocialAction(live.ObjectID(), e.ID) })
+	case event.ClanReputationAdded:
+		l.addScriptClanReputation(live, e.Points)
+	case event.ClanInfoBroadcast:
+		l.broadcastScriptClanInfo(live)
 	}
 }
 
