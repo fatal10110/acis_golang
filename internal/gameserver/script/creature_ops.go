@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
@@ -44,6 +45,12 @@ func conditionOf(c Creature) conditions.Actor {
 // hpRatio returns c's current HP over its max HP; a creature with no HP
 // reports 0.
 func hpRatio(c Creature) float64 {
+	if f, ok := tracked(c).(*npc.Folk); ok {
+		if maxHP := f.MaxHPValue(); maxHP > 0 {
+			return f.HP() / maxHP
+		}
+		return 0
+	}
 	if a := conditionOf(c); a != nil {
 		return a.HPRatio()
 	}
@@ -122,6 +129,23 @@ func (n *NPC) AbortAll() { n.hostile("abort its actions").AbortAll(false) }
 // AbortAll stops the player's movement, attack and cast, keeping its
 // target.
 func (p *Player) AbortAll() { p.character().AbortAll(false) }
+
+// TeleportTo jumps the NPC to at: it stops its movement, attack and cast,
+// lands on the ground at at unless at lies in water, and the players around
+// either end see it go and arrive. A teleport that starts while another is
+// under way is dropped.
+func (n *NPC) TeleportTo(at Place) {
+	l := at.loc()
+	to := location.Location{X: l.X, Y: l.Y, Z: l.Z}
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		o.TeleportTo(to)
+	case *npc.Folk:
+		o.TeleportTo(to)
+	default:
+		panic("script: the teleport of a handle on nothing")
+	}
+}
 
 // InstantTeleportTo moves the NPC to at in one step, staying on the world
 // grid: at is grounded unless it lies in water, the players around see the

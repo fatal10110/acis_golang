@@ -24,6 +24,9 @@ func (p *Player) HasItem(itemID int32) bool {
 	return inv != nil && inv.HasItem(itemID)
 }
 
+// Karma returns the player's karma, 0 for a player with none.
+func (p *Player) Karma() int32 { return int32(p.character().Karma()) }
+
 // Dead reports whether the player is dead.
 func (p *Player) Dead() bool { return p.character().Dead() }
 

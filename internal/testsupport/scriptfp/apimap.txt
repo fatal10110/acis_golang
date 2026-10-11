@@ -221,7 +221,7 @@ Quest.addCreated inline
 # and a buff's skill are plain Go values, and a frequent skill is a skill
 # reference literal. The pooled delayed task runs on the player's queue.
 ClassId.getLevel script.Player.ClassLevel
-Creature.teleportTo script.Player.TeleportTo
+Creature.teleportTo TeleportTo
 ItemContainer.hasAtLeastOneItem script.Player.HasAtLeastOneItem
 MemoSet.unset script.QuestState.Unset
 NewbieBuff.getSkill inline
@@ -447,3 +447,8 @@ CreatureStatus.getHp script.NPC.HP
 CreatureStatus.getMaxHp script.NPC.MaxHP
 NpcAI.getTopDesireTarget script.NPC.TopDesireTarget
 NpcAI.setTopDesireTarget script.NPC.SetTopDesireTarget
+
+# Guard, GuardStand and GuardMoveAround (A12, #2240). Guard teleports the NPC
+# home through Creature.teleportTo, mapped above as TeleportTo: the NPC handle
+# has it as the player handle does.
+Player.getKarma script.Player.Karma

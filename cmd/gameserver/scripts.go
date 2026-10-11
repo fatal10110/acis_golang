@@ -21,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/guard"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monster"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/raid"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/warrior"
@@ -110,6 +111,9 @@ func aiCatalog() script.Catalog {
 	return script.Catalog{
 		"script.ai.group.Walkers":                                                                        group.Walkers,
 		"script.ai.individual.DefaultNpc":                                                                defaultnpc.New,
+		"script.ai.individual.Guard.Guard":                                                               guard.Guard,
+		"script.ai.individual.Guard.GuardMoveAround":                                                     guard.MoveAround,
+		"script.ai.individual.Guard.GuardStand":                                                          guard.Stand,
 		"script.ai.individual.Monster.MonsterAI":                                                         monster.New,
 		"script.ai.individual.Monster.RaidPrivate.RaidPrivateStandard":                                   raid.PrivateStandard,
 		"script.ai.individual.Monster.WarriorBase.WarriorBase":                                           warrior.Base,
