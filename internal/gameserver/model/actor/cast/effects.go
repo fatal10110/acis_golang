@@ -141,6 +141,16 @@ func applyEffectsResult(handlers EffectHandlers, caster skilltarget.Actor, resol
 // caster/target, no registered handler, or an empty affected set);
 // affected is nil in that case.
 func ResolveAffected(handlers EffectHandlers, caster skilltarget.Actor, resolved Target, def modelskill.Definition) (affected []skilltarget.Actor, ok bool) {
+	affected, ok = resolveLaunchTargets(handlers, caster, resolved, def)
+	if !ok {
+		return nil, false
+	}
+	return nonEmpty(affected)
+}
+
+// resolveLaunchTargets is ResolveAffected keeping an empty affected set:
+// ok is true whenever def's target handler ran, whatever it found.
+func resolveLaunchTargets(handlers EffectHandlers, caster skilltarget.Actor, resolved Target, def modelskill.Definition) (affected []skilltarget.Actor, ok bool) {
 	if caster == nil || handlers.Targets == nil {
 		return nil, false
 	}
@@ -152,7 +162,7 @@ func ResolveAffected(handlers EffectHandlers, caster skilltarget.Actor, resolved
 	if !ok {
 		return nil, false
 	}
-	return nonEmpty(handler.Targets(caster, selected, &def))
+	return handler.Targets(caster, selected, &def), true
 }
 
 // ApplyResolvedEffectsResult dispatches def's effects to affected — an
@@ -167,11 +177,38 @@ func ApplyResolvedEffectsResult(handlers EffectHandlers, caster skilltarget.Acto
 // ApplyResolvedItemEffectsResult is ApplyResolvedEffectsResult for a cast
 // that carries the item it was cast with (e.g. a seed's SOW cast), threading
 // item through to the skill handler as handlerskill.Cast.Item.
+//
+// When the launch resolved no target, no effect is dispatched, but a
+// player's skill, or its summon's, is still seen by the NPCs around its
+// caster (castWithoutTargets).
 func ApplyResolvedItemEffectsResult(handlers EffectHandlers, caster skilltarget.Actor, affected []skilltarget.Actor, def modelskill.Definition, item any) EffectResult {
-	if handlers.Skills == nil || len(affected) == 0 {
+	if handlers.Skills == nil {
+		return EffectResult{}
+	}
+	if len(affected) == 0 {
+		castWithoutTargets(caster, def)
 		return EffectResult{}
 	}
 	return dispatchEffects(handlers, caster, affected, def, item)
+}
+
+// castWithoutTargets is the skill call of a cast whose launch resolved no
+// target: once the raid curses, which have no target to test, let it
+// through, a player's skill, or its summon's, reaches every NPC around the
+// caster that watches spells, with no targets.
+func castWithoutTargets(caster skilltarget.Actor, def modelskill.Definition) {
+	castCaster, ok := caster.(SkillCaster)
+	if !ok {
+		return
+	}
+	player, isPet, acting := actingPlayer(caster)
+	if !acting {
+		return
+	}
+	if def.Activation != modelskill.ActivationToggle && castCaster.TestCursesOnSkillSee(def, nil) {
+		return
+	}
+	seeSpell(castCaster, player, def, nil, isPet)
 }
 
 func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected []skilltarget.Actor, def modelskill.Definition, item any) EffectResult {
