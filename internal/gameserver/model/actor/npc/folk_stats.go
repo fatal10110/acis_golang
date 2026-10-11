@@ -176,11 +176,16 @@ func (f *Folk) Evasion() int { return int(f.CalcStat(stat.EvasionRate, 0)) }
 // LethalRate returns the lethal-strike rate multiplier.
 func (f *Folk) LethalRate() float64 { return f.CalcStat(stat.LethalRate, 1) }
 
-// AttackType reports a fist: a civilian NPC never attacks, so its weapon
-// takes part in no formula.
-func (f *Folk) AttackType() item.WeaponType { return item.WeaponFist }
+// AttackType returns the kind of the template's right-hand weapon, a fist
+// when it holds none.
+func (f *Folk) AttackType() item.WeaponType {
+	if f.fight.weapon == nil {
+		return item.WeaponFist
+	}
+	return f.fight.weapon.Type
+}
 
-// SoulshotCharged reports false: a civilian NPC never attacks.
+// SoulshotCharged reports false: nothing charges a civilian NPC's shots.
 func (f *Folk) SoulshotCharged() bool { return false }
 
 // SpiritshotCharged reports false: a civilian NPC never casts.

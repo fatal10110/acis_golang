@@ -39,17 +39,20 @@ func (f *Folk) AddChanceTrigger(e *effect.Effect) { f.effects.AddChanceTrigger(e
 // RemoveChanceTrigger drops an exiting chance-skill trigger.
 func (f *Folk) RemoveChanceTrigger(e *effect.Effect) { f.effects.RemoveChanceTrigger(e) }
 
-// AbortAll stops the NPC's cast in flight.
-func (f *Folk) AbortAll(bool) { f.StopCast() }
+// AbortAll stops the NPC's walk, its swing in flight and its cast in
+// flight. The NPC keeps no selected target to reset.
+func (f *Folk) AbortAll(bool) { f.abortAll() }
 
-// The NPC keeps no attack or selected target, and the effects that stop,
-// redirect, frighten, bluff or throw a creature never land on it, so the
-// hooks below that only those reach do nothing. FearImmune and BluffExempt
-// report the civilian NPC's own immunity.
+// StopAttack aborts the NPC's swing in flight, if any.
+func (f *Folk) StopAttack() { f.stopAttack() }
+
+// The NPC keeps no selected target, and the effects that stop, redirect,
+// frighten, bluff or throw a creature never land on it, so the hooks below
+// that only those reach do nothing. FearImmune and BluffExempt report the
+// civilian NPC's own immunity.
 func (f *Folk) StopMove()                                  {}
 func (f *Folk) TryToIdle()                                 {}
 func (f *Folk) ClearTarget()                               {}
-func (f *Folk) StopAttack()                                {}
 func (f *Folk) FearImmune() bool                           { return true }
 func (f *Folk) FleeFrom(effect.Actor, int)                 {}
 func (f *Folk) BluffExempt() bool                          { return true }
@@ -75,8 +78,9 @@ func (f *Folk) SetXYZ(x, y, z int) {
 	}
 }
 
-// A civilian NPC keeps no hate, aggro or overhit state: the aggro controls
-// act only on an attackable NPC.
+// The skills and effects that reach these aggro and overhit controls act
+// only on an attackable NPC's lists, so they do nothing here: a civilian
+// NPC's aggro list is its AI's alone (see folk_fight.go).
 func (f *Folk) NotifyAggression(attackable.Combatant, int) {}
 func (f *Folk) ReduceAllAggroHate(float64)                 {}
 func (f *Folk) StopAggroHate(attackable.Combatant)         {}
