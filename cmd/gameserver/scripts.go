@@ -126,10 +126,18 @@ func provideScripts(lc fx.Lifecycle, paths gameServerPaths, data *gameData, env 
 	return script.Build(list, catalog, script.Config{KindOf: npcKindOf(data.NPCs), Log: log, Env: env, Queue: engine}), nil
 }
 
+// provideScriptSpawner returns the spawner scripts place NPCs with. It is
+// built ahead of the NPC population, which takes the script registry, and
+// provideNpcs binds it to that population before the first NPC spawns.
+func provideScriptSpawner(log zerolog.Logger) *script.Spawner {
+	return script.NewSpawner(nil, log)
+}
+
 // provideScriptEnv returns what the script helpers act through: the quest
 // rates of server.properties, the party range and multiple item drop the
-// kill rewards read, the item id allocator and the shared random source.
-func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator) (*script.Env, error) {
+// kill rewards read, the item id allocator, the NPC spawner and the shared
+// random source.
+func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner) (*script.Env, error) {
 	var rates script.Rates
 	for _, r := range []struct {
 		key string
@@ -153,6 +161,7 @@ func provideScriptEnv(serverProps *config.Properties, rewards manager.KillReward
 		PartyRange:       rewards.PartyRange,
 		MultipleItemDrop: rewards.MultipleItemDrop,
 		NewItemID:        ids.NextID,
+		Spawner:          spawner,
 		Rand:             rnd.Get,
 	}, nil
 }

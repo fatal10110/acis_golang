@@ -3,6 +3,7 @@ package script
 import (
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -21,14 +22,48 @@ type Population interface {
 
 // Spawner spawns NPCs for scripts. Every NPC it spawns is in the world,
 // seen by the players around it, when the call returns.
+//
+// The boot builds the spawner before the NPC population, which needs the
+// script registry the spawner is handed to through Env, and binds it to
+// the population once that exists, before the first NPC spawns. A spawn
+// through a spawner bound to nothing panics.
 type Spawner struct {
-	pop Population
+	pop atomic.Pointer[populationRef]
 	log zerolog.Logger
 }
 
-// NewSpawner returns the spawner placing NPCs into pop.
+// populationRef boxes a Population for the atomic pointer.
+type populationRef struct{ Population }
+
+// NewSpawner returns the spawner placing NPCs into pop; with a nil pop it
+// places nothing until Bind.
 func NewSpawner(pop Population, log zerolog.Logger) *Spawner {
-	return &Spawner{pop: pop, log: log}
+	s := &Spawner{log: log}
+	if pop != nil {
+		s.pop.Store(&populationRef{pop})
+	}
+	return s
+}
+
+// Bind makes s place NPCs into pop. It panics when pop is nil or s is
+// already bound: the population a spawner places into never changes.
+func (s *Spawner) Bind(pop Population) {
+	if pop == nil {
+		panic("script: bind a spawner to no population")
+	}
+	if !s.pop.CompareAndSwap(nil, &populationRef{pop}) {
+		panic("script: spawner bound twice")
+	}
+}
+
+// population returns the population s places into. A spawner bound to
+// nothing panics, so the script's invocation aborts there.
+func (s *Spawner) population() Population {
+	ref := s.pop.Load()
+	if ref == nil {
+		panic("script: spawn before the spawner is bound to the NPC population")
+	}
+	return ref.Population
 }
 
 // Place is where a spawn stands: a Loc, or a creature's position and
@@ -71,7 +106,7 @@ type Params struct {
 // that time has passed, unless it has left the world by then.
 func (s *Spawner) AddSpawn(npcID int32, at Place, randomOffset bool, despawn time.Duration) *NPC {
 	loc := at.loc()
-	live, err := s.pop.AddSpawn(npcID, loc.X, loc.Y, loc.Z, loc.Heading, randomOffset, despawn)
+	live, err := s.population().AddSpawn(npcID, loc.X, loc.Y, loc.Z, loc.Heading, randomOffset, despawn)
 	if err != nil {
 		s.logRefused(npcID, err)
 		return nil
@@ -99,7 +134,7 @@ func (s *Spawner) CreateOnePrivateEx(master *NPC, npcID int32, at Place, despawn
 
 func (s *Spawner) createPrivate(master *NPC, npcID int32, at *location.Location, heading int, despawn time.Duration, params Params) *NPC {
 	h := hostileOf(master, "create a private")
-	pvt, err := s.pop.CreatePrivate(h, npcID, at, heading, despawn, [3]int32{params.P1, params.P2, params.P3})
+	pvt, err := s.population().CreatePrivate(h, npcID, at, heading, despawn, [3]int32{params.P1, params.P2, params.P3})
 	if err != nil {
 		s.logRefused(npcID, err)
 		return nil
@@ -113,7 +148,7 @@ func (s *Spawner) createPrivate(master *NPC, npcID int32, at *location.Location,
 // delay and weight point its declaration gives. It panics on a declaration
 // naming an NPC id no template has, the privates before it placed.
 func (s *Spawner) CreatePrivates(master *NPC) {
-	if err := s.pop.CreatePrivates(hostileOf(master, "create privates")); err != nil {
+	if err := s.population().CreatePrivates(hostileOf(master, "create privates")); err != nil {
 		panic(fmt.Sprintf("script: create privates: %v", err))
 	}
 }
@@ -126,7 +161,7 @@ func (s *Spawner) ScheduleDespawn(n *NPC, d time.Duration) {
 	if c == nil {
 		panic("script: schedule the despawn of a handle on nothing")
 	}
-	s.pop.ScheduleDespawn(c, d)
+	s.population().ScheduleDespawn(c, d)
 }
 
 // logRefused logs a spawn of npcID that placed nothing; a missing template

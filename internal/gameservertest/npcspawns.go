@@ -75,6 +75,9 @@ type npcSpawnDeps struct {
 	sevenSigns *sevensigns.State
 	// scripts raises the spawned NPCs' script hooks.
 	scripts *script.Registry
+	// spawner is the scripts' spawner, bound to the population before the
+	// first NPC spawns.
+	spawner *script.Spawner
 	// routes is the walker route data.
 	routes route.WalkerRoutes
 }
@@ -123,6 +126,9 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 		script.NewMakers(maker.Catalog(), maker.Default, deps.log), deps.scripts)
 	if err != nil {
 		t.Fatalf("new npc spawns: %v", err)
+	}
+	if deps.spawner != nil {
+		deps.spawner.Bind(npcs)
 	}
 	link.SetNpcSpawns(npcs)
 	npcs.SpawnOnStart()
