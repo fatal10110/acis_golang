@@ -1,0 +1,20 @@
+# Mimir's Elixir (Q235): Ladd turns away a level 75 character without the Star of Destiny
+# Fate's Whispers gives. Expectations are derived from the reference source
+# (Q235_MimirsElixir.onTalk).
+trace internal/gameserver/script/testdata/oracle/scenarios/q235_mimirs_elixir_no_star.golden
+character Seeker 75
+script quest.Q235_MimirsElixir
+page trainer/30721.htm
+page script/quest/Q235_MimirsElixir/
+npc ladd 30721 Trainer 10 0 0
+
+action ladd
+action ladd
+  S ActionFailed
+  S NpcHtmlMessage obj=ladd item=0 page=trainer/30721.htm
+  S ActionFailed
+bypass npc_{ladd}_Quest
+  S NpcHtmlMessage obj=ladd item=0 page=script/quest/Q235_MimirsElixir/30721-01a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q235_MimirsElixir CREATED

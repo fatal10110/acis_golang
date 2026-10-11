@@ -1,0 +1,262 @@
+# Fate's Whispers (Q234), up to the pipette knife: a level 75 character accepts at Reorin;
+# Cabrio's death leaves the Coffer of the Dead and its Reiria soul orb; the three raid boss
+# chests give their infernium scepters; Cliff the varnish, Ferris the hammer; Zenkin sends
+# the player to Kaspar, who gives the pipette knife. A blow at Baium with bare hands takes no
+# blood, so Kaspar still waits. The crystals, the weapon choice and the knife's blood are in
+# tests/quest/q234_flow_test.go (a scenario holds no item). Expectations are derived from the
+# reference source (Q234_FatesWhisper.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q234_fates_whisper.golden
+character Seeker 75
+script quest.Q234_FatesWhisper
+item 4665 4666 4667 4668 4669 4670 4672
+page default/31002.htm
+page default/31027.htm
+page default/31028.htm
+page default/31029.htm
+page default/31030.htm
+page warehouse/30182.htm
+page villagemaster/30847.htm
+page merchant/30178.htm
+page trainer/30833.htm
+page script/quest/Q234_FatesWhisper/
+npc reorin 31002 Folk 10 0 0
+npc coffer 31027 Folk -10 0 0
+npc kernon 31028 Folk 0 10 0
+npc golkonda 31029 Folk 0 -10 0
+npc hallate 31030 Folk 20 20 0
+npc cliff 30182 WarehouseKeeper -20 20 0
+npc ferris 30847 VillageMasterDwarf 20 -20 0
+npc zenkin 30178 Merchant -20 -20 0
+npc kaspar 30833 Trainer 30 0 0
+npc cabrio 25035 Monster 60 0 0
+npc baium 29020 Monster -60 0 0
+
+action reorin
+action reorin
+  S ActionFailed
+  S NpcHtmlMessage obj=reorin item=0 page=default/31002.htm
+  S ActionFailed
+bypass npc_{reorin}_Quest
+  S NpcHtmlMessage obj=reorin item=0 page=script/quest/Q234_FatesWhisper/31002-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q234_FatesWhisper 31002-02a.htm
+  S NpcHtmlMessage obj=reorin item=0 page=script/quest/Q234_FatesWhisper/31002-02a.htm
+  S ActionFailed
+bypass Quest Q234_FatesWhisper 31002-02b.htm
+  S NpcHtmlMessage obj=reorin item=0 page=script/quest/Q234_FatesWhisper/31002-02b.htm
+  S ActionFailed
+bypass Quest Q234_FatesWhisper 31002-02c.htm
+  S NpcHtmlMessage obj=reorin item=0 page=script/quest/Q234_FatesWhisper/31002-02c.htm
+  S ActionFailed
+bypass Quest Q234_FatesWhisper 31002-03.htm
+  S QuestList 234:0x80000001
+  S ExShowQuestMark quest=234
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=reorin item=0 page=script/quest/Q234_FatesWhisper/31002-03.htm
+  S ActionFailed
+  Q upsert Q234_FatesWhisper | <state> | STARTED
+  Q upsert Q234_FatesWhisper | <cond> | 1
+  state Q234_FatesWhisper STARTED
+
+# Cabrio's death leaves the Coffer of the Dead, which holds the soul orb.
+action reorin
+  S ActionFailed
+  S NpcHtmlMessage obj=reorin item=0 page=default/31002.htm
+  S ActionFailed
+bypass npc_{reorin}_Quest
+  S NpcHtmlMessage obj=reorin item=0 page=script/quest/Q234_FatesWhisper/31002-04b.htm
+  S ActionFailed
+  S ActionFailed
+kill cabrio
+  S SystemMessage id=95 1:0 1:0
+action coffer
+action coffer
+  S ActionFailed
+  S NpcHtmlMessage obj=coffer item=0 page=default/31027.htm
+  S ActionFailed
+bypass npc_{coffer}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4666
+  S NpcHtmlMessage obj=coffer item=0 page=script/quest/Q234_FatesWhisper/31027-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 4666=1
+action reorin
+action reorin
+  S ActionFailed
+  S NpcHtmlMessage obj=reorin item=0 page=default/31002.htm
+  S ActionFailed
+bypass npc_{reorin}_Quest
+  S QuestList 234:0x80000003
+  S ExShowQuestMark quest=234
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4666
+  S NpcHtmlMessage obj=reorin item=0 page=script/quest/Q234_FatesWhisper/31002-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q234_FatesWhisper | <cond> | 2
+action kernon
+action kernon
+  S ActionFailed
+  S NpcHtmlMessage obj=kernon item=0 page=default/31028.htm
+  S ActionFailed
+bypass npc_{kernon}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4667
+  S NpcHtmlMessage obj=kernon item=0 page=script/quest/Q234_FatesWhisper/31028-01.htm
+  S ActionFailed
+  S ActionFailed
+action golkonda
+action golkonda
+  S ActionFailed
+  S NpcHtmlMessage obj=golkonda item=0 page=default/31029.htm
+  S ActionFailed
+bypass npc_{golkonda}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4668
+  S NpcHtmlMessage obj=golkonda item=0 page=script/quest/Q234_FatesWhisper/31029-01.htm
+  S ActionFailed
+  S ActionFailed
+action hallate
+action hallate
+  S ActionFailed
+  S NpcHtmlMessage obj=hallate item=0 page=default/31030.htm
+  S ActionFailed
+bypass npc_{hallate}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4669
+  S NpcHtmlMessage obj=hallate item=0 page=script/quest/Q234_FatesWhisper/31030-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 4667=1 4668=1 4669=1
+action reorin
+action reorin
+  S ActionFailed
+  S NpcHtmlMessage obj=reorin item=0 page=default/31002.htm
+  S ActionFailed
+bypass npc_{reorin}_Quest
+  S QuestList 234:0x80000007
+  S ExShowQuestMark quest=234
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4668
+  S SystemMessage id=302 3:4669
+  S SystemMessage id=302 3:4667
+  S NpcHtmlMessage obj=reorin item=0 page=script/quest/Q234_FatesWhisper/31002-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q234_FatesWhisper | <cond> | 3
+  items 4666=0 4667=0 4668=0 4669=0
+action cliff
+action cliff
+  S ActionFailed
+  S NpcHtmlMessage obj=cliff item=0 page=warehouse/30182.htm
+  S ActionFailed
+bypass npc_{cliff}_Quest
+  S NpcHtmlMessage obj=cliff item=0 page=script/quest/Q234_FatesWhisper/30182-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q234_FatesWhisper 30182-01a.htm
+  S NpcHtmlMessage obj=cliff item=0 page=script/quest/Q234_FatesWhisper/30182-01a.htm
+  S ActionFailed
+bypass Quest Q234_FatesWhisper 30182-01b.htm
+  S NpcHtmlMessage obj=cliff item=0 page=script/quest/Q234_FatesWhisper/30182-01b.htm
+  S ActionFailed
+bypass Quest Q234_FatesWhisper 30182-01c.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4672
+  S NpcHtmlMessage obj=cliff item=0 page=script/quest/Q234_FatesWhisper/30182-01c.htm
+  S ActionFailed
+action reorin
+action reorin
+  S ActionFailed
+  S NpcHtmlMessage obj=reorin item=0 page=default/31002.htm
+  S ActionFailed
+bypass npc_{reorin}_Quest
+  S QuestList 234:0x8000000f
+  S ExShowQuestMark quest=234
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4672
+  S NpcHtmlMessage obj=reorin item=0 page=script/quest/Q234_FatesWhisper/31002-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q234_FatesWhisper | <cond> | 4
+action ferris
+action ferris
+  S ActionFailed
+  S NpcHtmlMessage obj=ferris item=0 page=villagemaster/30847.htm
+  S ActionFailed
+bypass npc_{ferris}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4670
+  S NpcHtmlMessage obj=ferris item=0 page=script/quest/Q234_FatesWhisper/30847-01.htm
+  S ActionFailed
+  S ActionFailed
+action reorin
+action reorin
+  S ActionFailed
+  S NpcHtmlMessage obj=reorin item=0 page=default/31002.htm
+  S ActionFailed
+bypass npc_{reorin}_Quest
+  S QuestList 234:0x8000001f
+  S ExShowQuestMark quest=234
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:4670
+  S NpcHtmlMessage obj=reorin item=0 page=script/quest/Q234_FatesWhisper/31002-08.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q234_FatesWhisper | <cond> | 5
+action zenkin
+action zenkin
+  S ActionFailed
+  S NpcHtmlMessage obj=zenkin item=0 page=merchant/30178.htm
+  S ActionFailed
+bypass npc_{zenkin}_Quest
+  S NpcHtmlMessage obj=zenkin item=0 page=script/quest/Q234_FatesWhisper/30178-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q234_FatesWhisper 30178-01a.htm
+  S QuestList 234:0x8000003f
+  S ExShowQuestMark quest=234
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=zenkin item=0 page=script/quest/Q234_FatesWhisper/30178-01a.htm
+  S ActionFailed
+  Q upsert Q234_FatesWhisper | <cond> | 6
+action kaspar
+action kaspar
+  S ActionFailed
+  S NpcHtmlMessage obj=kaspar item=0 page=trainer/30833.htm
+  S ActionFailed
+bypass npc_{kaspar}_Quest
+  S NpcHtmlMessage obj=kaspar item=0 page=script/quest/Q234_FatesWhisper/30833-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q234_FatesWhisper 30833-01a.htm
+  S NpcHtmlMessage obj=kaspar item=0 page=script/quest/Q234_FatesWhisper/30833-01a.htm
+  S ActionFailed
+bypass Quest Q234_FatesWhisper 30833-01b.htm
+  S QuestList 234:0x8000007f
+  S ExShowQuestMark quest=234
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:4665
+  S NpcHtmlMessage obj=kaspar item=0 page=script/quest/Q234_FatesWhisper/30833-01b.htm
+  S ActionFailed
+  Q upsert Q234_FatesWhisper | <cond> | 7
+  items 4665=1
+
+# Bare hands take none of Baium's blood: Kaspar still waits for the red knife.
+hit baium 10
+action kaspar
+  S ActionFailed
+  S NpcHtmlMessage obj=kaspar item=0 page=trainer/30833.htm
+  S ActionFailed
+bypass npc_{kaspar}_Quest
+  S NpcHtmlMessage obj=kaspar item=0 page=script/quest/Q234_FatesWhisper/30833-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Relog: the started quest at cond 7 and the knife come back.
+relog
+  state Q234_FatesWhisper STARTED
+  rows Q234_FatesWhisper <cond>=7 <state>=STARTED
+  items 4665=1 4670=0 4672=0

@@ -11,9 +11,12 @@ import (
 	quest001 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q001"
 	quest023 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q023"
 	quest211 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q211"
+	quest234 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q234"
+	quest235 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q235"
 	quest260 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q260"
 	quest316 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q316"
 	quest360 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q360"
+	quest422 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q422"
 	quest508 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q508"
 	quest510 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q510"
 	quest607 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q607"
@@ -36,9 +39,12 @@ var scenarioScripts = script.Catalog{
 	"quest.Q001_LettersOfLove":           quest001.New,
 	"quest.Q023_LidiasHeart":             quest023.New,
 	"quest.Q211_TrialOfTheChallenger":    quest211.New,
+	"quest.Q234_FatesWhisper":            quest234.New,
+	"quest.Q235_MimirsElixir":            quest235.New,
 	"quest.Q260_HuntTheOrcs":             quest260.New,
 	"quest.Q316_DestroyPlagueCarriers":   quest316.New,
 	"quest.Q360_PlunderTheirSupplies":    quest360.New,
+	"quest.Q422_RepentYourSins":          quest422.New,
 	"quest.Q508_AClansReputation":        quest508.New,
 	"quest.Q510_AClansReputation":        quest510.New,
 	"quest.Q607_ProveYourCourage":        quest607.New,

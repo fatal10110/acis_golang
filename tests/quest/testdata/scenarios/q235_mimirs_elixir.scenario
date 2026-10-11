@@ -1,0 +1,111 @@
+# Mimir's Elixir (Q235), from cond 3 (a scenario holds no Star of Destiny, so the offer and
+# the accept are in tests/quest/q235_flow_test.go): Joan sends the player after a Chimera
+# Piece, whose sage stone (draw 0, under 200000 of 1000000) she trades for true gold; Ladd
+# takes the gold for the magister's mixing stone; a Bloody Guardian's blood fire (draw 0)
+# readies the mixing; the urn takes the mixing stone, then turns the player away for want of
+# pure silver. Expectations are derived from the reference source (Q235_MimirsElixir.java,
+# Quest.dropItems).
+trace internal/gameserver/script/testdata/oracle/scenarios/q235_mimirs_elixir.golden
+character Alchemist 75
+quest Q235_MimirsElixir <state>=STARTED <cond>=3
+random 0 0
+script quest.Q235_MimirsElixir
+item 5905 6318 6322 6321
+page trainer/30718.htm
+page trainer/30721.htm
+page default/31149.htm
+page script/quest/Q235_MimirsElixir/
+npc joan 30718 Trainer 10 0 0
+npc ladd 30721 Trainer -10 0 0
+npc urn 31149 Folk 0 10 0
+npc chimera 20965 Monster 40 0 0
+npc guardian 21090 Monster -40 0 0
+
+action joan
+action joan
+  S ActionFailed
+  S NpcHtmlMessage obj=joan item=0 page=trainer/30718.htm
+  S ActionFailed
+bypass npc_{joan}_Quest
+  S NpcHtmlMessage obj=joan item=0 page=script/quest/Q235_MimirsElixir/30718-04.htm
+  S ActionFailed
+  S ActionFailed
+kill chimera
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:6322
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 235:0x8000000f
+  S ExShowQuestMark quest=235
+  Q upsert Q235_MimirsElixir | <cond> | 4
+  items 6322=1
+action joan
+  S ActionFailed
+  S NpcHtmlMessage obj=joan item=0 page=trainer/30718.htm
+  S ActionFailed
+bypass npc_{joan}_Quest
+  S QuestList 235:0x8000001f
+  S ExShowQuestMark quest=235
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:6322
+  S SystemMessage id=54 3:6321
+  S NpcHtmlMessage obj=joan item=0 page=script/quest/Q235_MimirsElixir/30718-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q235_MimirsElixir | <cond> | 5
+  items 6322=0 6321=1
+action ladd
+action ladd
+  S ActionFailed
+  S NpcHtmlMessage obj=ladd item=0 page=trainer/30721.htm
+  S ActionFailed
+bypass npc_{ladd}_Quest
+  S NpcHtmlMessage obj=ladd item=0 page=script/quest/Q235_MimirsElixir/30721-11.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q235_MimirsElixir 30721-12.htm
+  S QuestList 235:0x8000003f
+  S ExShowQuestMark quest=235
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:5905
+  S NpcHtmlMessage obj=ladd item=0 page=script/quest/Q235_MimirsElixir/30721-12.htm
+  S ActionFailed
+  Q upsert Q235_MimirsElixir | <cond> | 6
+  items 5905=1 6321=1
+kill guardian
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:6318
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 235:0x8000007f
+  S ExShowQuestMark quest=235
+  Q upsert Q235_MimirsElixir | <cond> | 7
+  items 6318=1
+action urn
+action urn
+  S ActionFailed
+  S NpcHtmlMessage obj=urn item=0 page=default/31149.htm
+  S ActionFailed
+bypass npc_{urn}_Quest
+  S NpcHtmlMessage obj=urn item=0 page=script/quest/Q235_MimirsElixir/31149-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q235_MimirsElixir 31149-02.htm
+  S NpcHtmlMessage obj=urn item=0 page=script/quest/Q235_MimirsElixir/31149-02.htm
+  S ActionFailed
+bypass Quest Q235_MimirsElixir 31149-03.htm
+  S NpcHtmlMessage obj=urn item=0 page=script/quest/Q235_MimirsElixir/31149-havent.htm
+  S ActionFailed
+action ladd
+action ladd
+  S ActionFailed
+  S NpcHtmlMessage obj=ladd item=0 page=trainer/30721.htm
+  S ActionFailed
+bypass npc_{ladd}_Quest
+  S NpcHtmlMessage obj=ladd item=0 page=script/quest/Q235_MimirsElixir/30721-13.htm
+  S ActionFailed
+  S ActionFailed
+
+# Relog: the started quest at cond 7 and the ingredients come back.
+relog
+  state Q235_MimirsElixir STARTED
+  rows Q235_MimirsElixir <cond>=7 <state>=STARTED
+  items 5905=1 6318=1 6321=1
