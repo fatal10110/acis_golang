@@ -132,10 +132,12 @@ func (n *NPC) InstantTeleportTo(at Place) {
 }
 
 // InstantTeleportTo moves the player to at in one step, on the player's
-// own queue once the caller's task is done, staying on the world grid: at is grounded unless the player flies or at lies in water,
-// the player and the players around see the jump without its fade, the
-// player goes idle and the NPCs around at notice it. A player in a teleport
-// already is left to it.
+// own queue once the caller's task is done, staying on the world grid: at
+// is grounded unless the player flies or at lies in water, the player and
+// the players around see the jump without its fade, the player goes idle,
+// and each NPC around the region it jumped from that sees at runs its
+// see-creature hooks for it once. A player in a teleport already is left
+// to it.
 func (p *Player) InstantTeleportTo(at Place) {
 	l := at.loc()
 	p.character().InstantTeleportTo(location.Location{X: l.X, Y: l.Y, Z: l.Z})
