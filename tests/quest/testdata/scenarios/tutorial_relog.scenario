@@ -1,0 +1,56 @@
+# Tutorial relog: after its first two steps a new human fighter goes back to the character
+# select and enters again. The rows are kept; the enter world shows question mark 1 with the
+# tutorial sound and voice; clicking it marks the newbie guide on the radar, plays its voice
+# and opens its page. Expectations are derived from the reference source (Tutorial.java
+# onAdvEvent UC and QM1) and restate tutorial_script_test.go
+# (TestNewCharacterTutorialFirstSteps), which stays the primary check.
+character Newbie 1
+script script.feature.Tutorial
+item 5588
+page script/feature/Tutorial/
+
+create
+  Q upsert Tutorial | <state> | STARTED
+
+enter
+  S SystemMessage id=34
+  S SystemMessage id=1261
+  S QuestList
+  S TutorialEnableClientEvent id=0
+  S ActionFailed
+  Q upsert Tutorial | Ex | -2
+  Q upsert Tutorial | ucMemo | 1
+
+advance 10s
+  S SystemMessage id=54 3:5588
+  S PlaySound type=2 file=tutorial_voice_001a bind=1 obj=player loc=10,20,30 delay=0
+  S TutorialShowHtml page=script/feature/Tutorial/tutorial_human_fighter001.htm
+  Q upsert Tutorial | Ex | -3
+
+advance 30s
+  S PlaySound type=2 file=tutorial_voice_002 bind=1 obj=player loc=10,20,30 delay=0
+  Q upsert Tutorial | Ex | 0
+
+restart
+  rows Tutorial <state>=STARTED Ex=0 ucMemo=1
+
+enter
+  S SystemMessage id=34
+  S SystemMessage id=1261
+  S QuestList
+  S TutorialShowQuestionMark id=1
+  S PlaySound type=0 file=ItemSound.quest_tutorial bind=0 obj=0 loc=0,0,0 delay=0
+  S PlaySound type=2 file=tutorial_voice_006 bind=1 obj=player loc=10,20,30 delay=0
+  S TutorialEnableClientEvent id=0
+  S ActionFailed
+  rows Tutorial <state>=STARTED Ex=0 ucMemo=1
+  state Tutorial STARTED
+
+mark 1
+  S RadarControl show=2 type=2 loc=-71424,258336,-3109
+  S RadarControl show=0 type=1 loc=-71424,258336,-3109
+  S PlaySound type=2 file=tutorial_voice_007 bind=1 obj=player loc=10,20,30 delay=0
+  S TutorialShowHtml page=script/feature/Tutorial/tutorial_human_fighter007.htm
+  Q upsert Tutorial | Ex | -5
+  Q upsert Tutorial | ucMemo | 2
+  rows Tutorial <state>=STARTED Ex=-5 ucMemo=2

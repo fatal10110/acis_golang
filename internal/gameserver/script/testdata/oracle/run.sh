@@ -1,6 +1,7 @@
 #!/bin/sh
 # Builds the reference probe and regenerates the script registration manifest, the
-# quest packet traces and the engine-contract goldens. See README.md in this directory.
+# quest packet traces, the engine-contract goldens and the quest scenario traces. See
+# README.md in this directory.
 #
 # usage: run.sh [JAVA_TREE [DATAPACK]]
 #   JAVA_TREE  reference server checkout (default: $ACIS_JAVA, else ../../../../../../aCis_gameserver
@@ -66,11 +67,15 @@ docker run --rm --user "$(id -u):$(id -g)" \
 
 docker run --rm --user "$(id -u):$(id -g)" \
 	-v "$java_tree/lib:/reflib:ro" -v "$datapack/data:/work/run/data:ro" -v "$datapack/sql:/refsql:ro" -v "$work/geodata:/work/run/data/geodata:ro" \
-	-v "$work:/work" -w /work/run \
-	"$image" java -Xmx2g -Dprobe.sql=/refsql -Dprobe.revision="$revision" -cp "/work/classes:/reflib/*" ScriptProbe /work/out \
+	-v "$repo/tests/quest/testdata/scenarios:/scenarios:ro" -v "$work:/work" -w /work/run \
+	"$image" java -Xmx2g -Dprobe.sql=/refsql -Dprobe.revision="$revision" -Dprobe.scenarios=/scenarios -cp "/work/classes:/reflib/*" ScriptProbe /work/out \
 	2> "$work/probe.log" || { tail -40 "$work/probe.log" >&2; exit 1; }
 
 cp "$work"/out/*.golden "$here/"
+# The quest scenario traces replace the whole directory, so a trace whose scenario is gone goes too.
+rm -rf "$here/scenarios"
+mkdir -p "$here/scenarios"
+[ -z "$(ls "$work"/out/scenarios 2>/dev/null)" ] || cp "$work"/out/scenarios/*.golden "$here/scenarios/"
 contracts="$repo/internal/testsupport/scriptcontract/testdata"
 mkdir -p "$contracts"
 cp "$work"/out/contracts/*.golden "$contracts/"

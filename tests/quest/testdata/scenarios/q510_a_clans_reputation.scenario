@@ -4,6 +4,7 @@
 # roll cannot miss. Expectations are derived from the reference source
 # (Q510_AClansReputation.java, Quest.getClanLeaderQuestState, Quest.dropItemsAlways,
 # Clan.addReputationScore).
+trace internal/gameserver/script/testdata/oracle/scenarios/q510_a_clans_reputation.golden
 character Leader 40
 clan 5
 random always 0

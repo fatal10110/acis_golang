@@ -6,6 +6,7 @@
 # Baraham's eye; Filaur sends the player to the Succubus Queen; Raldo hands over the Mark
 # of Challenger and completes the quest. Expectations are derived from the reference
 # source (Q211_TrialOfTheChallenger.java, SecondClassQuest.java, Quest.dropItemsAlways).
+trace internal/gameserver/script/testdata/oracle/scenarios/q211_trial_of_the_challenger.golden
 character Challenger 36
 class 1
 random 0 95 0 0
@@ -199,6 +200,8 @@ action filaur
   S NpcHtmlMessage obj=filaur item=0 page=default/30535.htm
   S ActionFailed
 bypass npc_{filaur}_Quest
+  S RadarControl show=2 type=2 loc=176560,-184969,-3729
+  S RadarControl show=0 type=1 loc=176560,-184969,-3729
   S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q211_TrialOfTheChallenger/30535-02.htm
   S ActionFailed
   S ActionFailed

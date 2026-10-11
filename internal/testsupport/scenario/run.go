@@ -78,9 +78,10 @@ type run struct {
 	sc     *Scenario
 	srv    *gameservertest.Server
 	player int32
-	// origin is where the character entered the world; NPCs stand at
-	// their offsets from it.
-	origin location.Location
+	// origin is where the character first entered the world; NPCs stand
+	// at their offsets from it. spawned reports whether they stand there.
+	origin  location.Location
+	spawned bool
 	// pages are the shipped pages as read, texts as the server shows them.
 	pages, texts map[string]string
 	// roles names object ids in rendered packets; objs and npcs are each
@@ -89,16 +90,19 @@ type run struct {
 	objs  map[string]int32
 	npcs  map[string]NPC
 	live  map[string]*npc.Hostile
-	// draws is the random line's source.
-	draws draws
+	// draws is the random line's source; traceDraws the draws the
+	// reference pinned in each traced step.
+	draws      draws
+	traceDraws [][]string
 }
 
 // draws hands the script draws the random line lists, recording each draw
-// it cannot serve for the step that drew it.
+// as "<bound>:<value>" and each it cannot serve for the step that drew it.
 type draws struct {
 	mu     sync.Mutex
 	random *Random
 	next   int
+	drawn  []string
 	bad    []string
 }
 
@@ -123,16 +127,17 @@ func (d *draws) draw(n int) int {
 		d.bad = append(d.bad, fmt.Sprintf("draw %d is %d, outside [0, %d)", i+1, v, n))
 		return 0
 	}
+	d.drawn = append(d.drawn, fmt.Sprintf("%d:%d", n, v))
 	return v
 }
 
-// take returns the draws not served since the last call.
-func (d *draws) take() []string {
+// take returns the draws served and those not served since the last call.
+func (d *draws) take() (drawn, bad []string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	bad := d.bad
-	d.bad = nil
-	return bad
+	drawn, bad = d.drawn, d.bad
+	d.drawn, d.bad = nil, nil
+	return drawn, bad
 }
 
 // unused is how many listed draws were never drawn.
@@ -157,7 +162,7 @@ func Run(t *testing.T, sc *Scenario, cfg Config) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := checkTrace(sc, data, r.texts); err != nil {
+		if r.traceDraws, err = checkTrace(sc, data, r.texts); err != nil {
 			t.Fatalf("%s does not replay %s: %v", sc.Name, sc.Trace, err)
 		}
 	}
@@ -225,12 +230,16 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		gameservertest.WithNPCs(npc.NewTable(templates)),
 		gameservertest.WithNpcSpawns(nil),
 	}
-	if r.sc.Class != 0 {
+	switch {
+	case r.sc.Creates():
+		// The create step makes the character at the character select.
+		opts = append(opts, gameservertest.WithWantChars(0))
+	case r.sc.Class != 0:
 		tmpl := gameservertest.ClassTemplate()
 		tmpl.ID = r.sc.Class
 		opts = append(opts, gameservertest.WithClassTemplates(tmpl),
 			gameservertest.WithClassCharacter(r.sc.Character, r.sc.Level, 0, r.sc.Class))
-	} else {
+	default:
 		opts = append(opts, gameservertest.WithCharacter(r.sc.Character, r.sc.Level, 0))
 	}
 	if r.sc.Clan >= 0 {
@@ -240,8 +249,10 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		opts = append(opts, gameservertest.WithScriptRand(r.draws.draw))
 	}
 	r.srv = gameservertest.Boot(t, opts...)
-	r.player = r.srv.SoleObjectID(t)
-	r.roles[r.player] = "player"
+	if r.sc.Creates() {
+		return
+	}
+	r.setPlayer(t)
 	if r.sc.Clan >= 0 {
 		// The seeded clan must be restored as written.
 		if cl, ok := r.srv.Clans.Table().Get(scenarioClan); !ok || cl.Level() != r.sc.Clan {
@@ -253,14 +264,31 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	seedQuests(t, r.srv.DB, r.player, r.sc.Quests)
 	seedExp(t, r.srv.DB, r.player, r.sc.Level)
 	r.enterWorld(t)
+	r.srv.FlushPersistence(t)
+	r.srv.TakeJournalWrites()
+}
+
+// setPlayer names the account's one character the player.
+func (r *run) setPlayer(t *testing.T) {
+	t.Helper()
+	r.player = r.srv.SoleObjectID(t)
+	r.roles[r.player] = "player"
+}
+
+// spawnNPCs places the NPC lines' NPCs around where the character stands,
+// the first time it enters the world, and drops what their spawning sent.
+func (r *run) spawnNPCs(t *testing.T) {
+	t.Helper()
+	if r.spawned {
+		return
+	}
+	r.spawned = true
 	x, y, z := r.srv.PlayerPosition(t, r.player)
 	r.origin = location.Location{X: x, Y: y, Z: z}
 	for _, n := range r.sc.NPCs {
 		r.spawn(t, n)
 	}
 	r.srv.ReadQueued(t, r.srv.Client)
-	r.srv.FlushPersistence(t)
-	r.srv.TakeJournalWrites()
 }
 
 // scenarioClan is the object id of the clan a clan line seeds.
@@ -357,6 +385,8 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		t.Fatalf("%s step %d (line %d) %q: %s", r.sc.Name, i+1, st.Line, st, fmt.Sprintf(format, args...))
 	}
 	c := r.srv.Client
+	// frames is what the step sent, when the verb reads it itself.
+	var frames [][]byte
 	switch st.Verb {
 	case "action":
 		x, y, z := r.srv.PlayerPosition(t, r.player)
@@ -404,14 +434,35 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		r.srv.Advance(t, d)
 	case "approach":
 		r.approach(t, st.Args[0])
+	case "pickup":
+		r.pickup(t, st.Args[0])
+	case "mark":
+		id, _ := strconv.ParseInt(st.Args[0], 10, 32)
+		w := wire.NewPacketWriter(clientpackets.OpcodeRequestTutorialQuestionMark)
+		w.WriteInt32(int32(id))
+		c.Send(w.Bytes())
 	case "relog":
 		c.Send(wire.NewPacketWriter(clientpackets.OpcodeRequestRestart).Bytes())
-		r.readUntil(t, serverpackets.OpcodeCharSelectInfo)
+		r.readThrough(t, serverpackets.OpcodeCharSelectInfo)
 		r.enterWorld(t)
+	case "restart":
+		c.Send(wire.NewPacketWriter(clientpackets.OpcodeRequestRestart).Bytes())
+		frames = r.readThrough(t, serverpackets.OpcodeCharSelectInfo)
+	case "enter":
+		frames = r.enterWorld(t)
+	case "create":
+		c.Send(characterCreate(r.sc.Character))
+		frames = r.readThrough(t, serverpackets.OpcodeCharCreateOk)
+		frames = append(frames, r.readThrough(t, serverpackets.OpcodeCharSelectInfo)...)
+		r.setPlayer(t)
 	}
-	frames := r.srv.ReadQueued(t, c)
-	if bad := r.draws.take(); len(bad) > 0 {
+	frames = append(frames, r.srv.ReadQueued(t, c)...)
+	drawn, bad := r.draws.take()
+	if len(bad) > 0 {
 		fail("script random: %s", strings.Join(bad, "; "))
+	}
+	if d := traceDrawDiff(r.traceDraws, i, drawn); d != "" {
+		fail("%s (want: the trace's)", d)
 	}
 	if st.Verb != "relog" {
 		var got []string
@@ -441,6 +492,34 @@ func (r *run) step(t *testing.T, i int, st Step) {
 			fail("%s (line %d)", d, ck.Line)
 		}
 	}
+}
+
+// pickup sends an Action on the one ground item of template id, from where
+// the character stands, and lets time pass until it has left the ground.
+func (r *run) pickup(t *testing.T, id string) {
+	t.Helper()
+	tmpl, _ := strconv.ParseInt(id, 10, 32)
+	onGround := func(obj int32) (found []int32) {
+		for _, g := range r.srv.GroundItems.Snapshots(nil) {
+			if g.TemplateID == int32(tmpl) && (obj == 0 || g.ObjectID == obj) {
+				found = append(found, g.ObjectID)
+			}
+		}
+		return found
+	}
+	items := onGround(0)
+	if len(items) != 1 {
+		t.Fatalf("%s: pickup %s: %d ground items of that template, want 1", r.sc.Name, id, len(items))
+	}
+	x, y, z := r.srv.PlayerPosition(t, r.player)
+	w := wire.NewPacketWriter(clientpackets.OpcodeAction)
+	w.WriteInt32(items[0])
+	w.WriteInt32(int32(x))
+	w.WriteInt32(int32(y))
+	w.WriteInt32(int32(z))
+	w.WriteUint8(0)
+	r.srv.Client.Send(w.Bytes())
+	r.srv.AdvanceUntil(t, "item "+id+" picked up", func() bool { return len(onGround(items[0])) == 0 })
 }
 
 // approach puts the character 100 in front of role's NPC, on the -x side,
@@ -549,8 +628,9 @@ func (r *run) rows(t *testing.T, quest string) []string {
 	return out
 }
 
-// enterWorld selects the character and enters the world.
-func (r *run) enterWorld(t *testing.T) {
+// enterWorld selects the character and enters the world, returning what
+// it was sent; the first time, the NPC lines' NPCs are spawned after.
+func (r *run) enterWorld(t *testing.T) [][]byte {
 	t.Helper()
 	w := wire.NewPacketWriter(clientpackets.OpcodeRequestGameStart)
 	w.WriteInt32(0)
@@ -559,20 +639,42 @@ func (r *run) enterWorld(t *testing.T) {
 	w.WriteInt32(0)
 	w.WriteInt32(0)
 	r.srv.Client.Send(w.Bytes())
-	r.readUntil(t, serverpackets.OpcodeCharSelected)
+	frames := r.readThrough(t, serverpackets.OpcodeCharSelected)
 	r.srv.Client.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
-	r.srv.ReadQueued(t, r.srv.Client)
+	frames = append(frames, r.srv.ReadQueued(t, r.srv.Client)...)
+	r.spawnNPCs(t)
+	return frames
 }
 
-// readUntil reads frames until one with opcode arrives.
-func (r *run) readUntil(t *testing.T, opcode byte) {
+// readThrough reads frames until one with opcode arrives and returns them
+// all, that one last.
+func (r *run) readThrough(t *testing.T, opcode byte) [][]byte {
 	t.Helper()
+	var frames [][]byte
 	for range 100 {
-		if f := r.srv.Client.Read(); f[0] == opcode {
-			return
+		f := r.srv.Client.Read()
+		frames = append(frames, f)
+		if f[0] == opcode {
+			return frames
 		}
 	}
 	t.Fatalf("no frame with opcode %#x within 100 frames", opcode)
+	return nil
+}
+
+// characterCreate is a RequestCharacterCreate of a human fighter named
+// name: race, sex, class and the six stats 0, hair style 1, hair color and
+// face 0.
+func characterCreate(name string) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeRequestCharacterCreate)
+	w.WriteString(name)
+	for range 9 {
+		w.WriteInt32(0)
+	}
+	w.WriteInt32(1)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	return w.Bytes()
 }
 
 // statements renders journal writes as Q lines.

@@ -3,6 +3,7 @@
 # fang, the one he can give, completes with the middle sound). Ellenia pays 30 per wererat
 # fang and 10000 per Varool fang, then the player quits the repeatable quest. Expectations
 # are derived from the reference source (Q316_DestroyPlagueCarriers.java, Quest.dropItems).
+trace internal/gameserver/script/testdata/oracle/scenarios/q316_destroy_plague_carriers.golden
 character Ranger 18
 class 18
 random 0 999999 0

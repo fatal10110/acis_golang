@@ -88,11 +88,11 @@ func TestDrawsServeTheListInOrder(t *testing.T) {
 	if got := []int{d.draw(10), d.draw(1)}; !slices.Equal(got, []int{3, 0}) {
 		t.Fatalf("draws = %v", got)
 	}
-	if bad := d.take(); bad != nil || d.unused() != 0 {
-		t.Fatalf("bad %v unused %d", bad, d.unused())
+	if drawn, bad := d.take(); bad != nil || d.unused() != 0 || !slices.Equal(drawn, []string{"10:3", "1:0"}) {
+		t.Fatalf("drawn %v bad %v unused %d", drawn, bad, d.unused())
 	}
 	d.draw(5)
-	if bad := d.take(); len(bad) != 1 || !strings.Contains(bad[0], "lists only 2") {
+	if _, bad := d.take(); len(bad) != 1 || !strings.Contains(bad[0], "lists only 2") {
 		t.Fatalf("past the list: %v", bad)
 	}
 }
@@ -102,7 +102,7 @@ func TestDrawsRejectADrawOutsideItsRange(t *testing.T) {
 	if v := d.draw(40); v != 0 {
 		t.Fatalf("out of range draw = %d, want 0", v)
 	}
-	if bad := d.take(); len(bad) != 1 || !strings.Contains(bad[0], "draw 1 is 40, outside [0, 40)") {
+	if _, bad := d.take(); len(bad) != 1 || !strings.Contains(bad[0], "draw 1 is 40, outside [0, 40)") {
 		t.Fatalf("bad = %v", bad)
 	}
 	if d.unused() != 1 {
@@ -118,7 +118,7 @@ func TestDrawsAlwaysRepeatTheDraw(t *testing.T) {
 		}
 	}
 	d.draw(2)
-	if bad := d.take(); len(bad) != 1 || d.unused() != 0 {
+	if _, bad := d.take(); len(bad) != 1 || d.unused() != 0 {
 		t.Fatalf("bad %v unused %d", bad, d.unused())
 	}
 }

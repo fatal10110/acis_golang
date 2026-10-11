@@ -4,6 +4,7 @@
 # proof_quests_2_test.go: a scenario cannot hold a scroll before its first step.
 # Expectations are derived from the reference source (Q651_RunawayYouth.java,
 # Quest.rewardItems, QuestState.exitQuest).
+trace internal/gameserver/script/testdata/oracle/scenarios/q651_runaway_youth.golden
 character Runner 26
 quest Q651_RunawayYouth <state>=STARTED <cond>=1
 script quest.Q651_RunawayYouth

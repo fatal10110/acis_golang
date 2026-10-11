@@ -1,6 +1,7 @@
 # Prove Your Courage (Q607), the level gate: below level 75 Kadun Zu Ketra turns the character
 # away before he looks at the alliance (Q607_ProveYourCourage.onTalk). As in
 # q607_prove_your_courage.scenario, his chat window is the default page.
+trace internal/gameserver/script/testdata/oracle/scenarios/q607_prove_your_courage_level.golden
 character Recruit 74
 script quest.Q607_ProveYourCourage
 item 7235

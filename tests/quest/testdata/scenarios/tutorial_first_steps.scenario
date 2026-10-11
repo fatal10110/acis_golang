@@ -1,0 +1,42 @@
+# Tutorial: a human fighter created through the client starts with the tutorial STARTED. The
+# first enter world arms the 10 s step and enables no client event; the step gives the missing
+# tutorial guide, plays the class's first voice and opens its first page; 30 s later the second
+# voice plays. Expectations are derived from the reference source (RequestCharacterCreate.java
+# 167-170; Tutorial.java onTimer QT and onAdvEvent UC) and restate
+# tutorial_script_test.go (TestNewCharacterTutorialFirstSteps, TestTutorialFirstStepGivesAMissingGuide),
+# which stays the primary check.
+character Newbie 1
+script script.feature.Tutorial
+item 5588
+page script/feature/Tutorial/
+
+create
+  Q upsert Tutorial | <state> | STARTED
+  rows Tutorial <state>=STARTED
+
+enter
+  S SystemMessage id=34
+  S SystemMessage id=1261
+  S QuestList
+  S TutorialEnableClientEvent id=0
+  S ActionFailed
+  Q upsert Tutorial | Ex | -2
+  Q upsert Tutorial | ucMemo | 1
+  rows Tutorial <state>=STARTED Ex=-2 ucMemo=1
+
+# Nothing before the tenth second.
+advance 9s
+  items 5588=0
+
+advance 1s
+  S SystemMessage id=54 3:5588
+  S PlaySound type=2 file=tutorial_voice_001a bind=1 obj=player loc=10,20,30 delay=0
+  S TutorialShowHtml page=script/feature/Tutorial/tutorial_human_fighter001.htm
+  Q upsert Tutorial | Ex | -3
+  items 5588=1
+
+advance 30s
+  S PlaySound type=2 file=tutorial_voice_002 bind=1 obj=player loc=10,20,30 delay=0
+  Q upsert Tutorial | Ex | 0
+  rows Tutorial <state>=STARTED Ex=0 ucMemo=1
+  items 5588=1

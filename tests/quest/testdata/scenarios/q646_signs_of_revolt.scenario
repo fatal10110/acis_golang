@@ -4,6 +4,7 @@
 # doll, the party draw and the reward are in proof_quests_2_test.go: a scenario cannot hold
 # 180 dolls before a kill. Expectations are derived from the reference source
 # (Q646_SignsOfRevolt.java, Quest.getRandomPartyMember, Quest.dropItems).
+trace internal/gameserver/script/testdata/oracle/scenarios/q646_signs_of_revolt.golden
 character Scout 40
 random always 0
 script quest.Q646_SignsOfRevolt

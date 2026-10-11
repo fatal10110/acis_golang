@@ -17,9 +17,16 @@ import (
 // roles maps object ids to the role names the golden uses; they replace the
 // ids in object fields and, as {role}, inside page text.
 //
-// NpcHtmlMessage, SystemMessage, PlaySound, ExShowQuestMark, QuestList and
-// ActionFailed are decoded; any other packet is an error, because the goldens
-// write those with the reference class name and raw bytes.
+// NpcHtmlMessage, SystemMessage, PlaySound, ExShowQuestMark, QuestList,
+// ActionFailed, the tutorial window's packets (TutorialShowHtml,
+// TutorialShowQuestionMark, TutorialEnableClientEvent, TutorialCloseHtml),
+// RadarControl, DropItem and MagicSkillUse are decoded; any other packet is an
+// error, because the goldens write those with the reference class name and
+// raw bytes.
+//
+// DropItem leaves out the dropped object's id and place, and MagicSkillUse
+// the caster's and the target's places: the world draws those (the object id
+// sequence, the drop scatter, where each creature stands), not the script.
 func Packet(payload []byte, roles map[int32]string) (string, error) {
 	if len(payload) == 0 {
 		return "", errors.New("empty packet")
@@ -70,6 +77,44 @@ func Packet(payload []byte, roles map[int32]string) (string, error) {
 			fmt.Fprintf(&sb, " %d:0x%08x", d.int32(), uint32(d.int32()))
 		}
 		out = sb.String()
+	case 0xa0:
+		html := d.str()
+		for _, id := range sortedIDs(roles) {
+			html = strings.ReplaceAll(html, strconv.Itoa(int(id)), "{"+roles[id]+"}")
+		}
+		out = "S TutorialShowHtml html=" + Quote(html)
+	case 0xa1:
+		out = fmt.Sprintf("S TutorialShowQuestionMark id=%d", d.int32())
+	case 0xa2:
+		out = fmt.Sprintf("S TutorialEnableClientEvent id=%d", d.int32())
+	case 0xa3:
+		out = "S TutorialCloseHtml"
+	case 0xeb:
+		show, typ := d.int32(), d.int32()
+		out = fmt.Sprintf("S RadarControl show=%d type=%d loc=%d,%d,%d", show, typ, d.int32(), d.int32(), d.int32())
+	case 0x0c:
+		by := role(d.int32(), roles)
+		d.int32() // the dropped object
+		item := d.int32()
+		d.int32() // x, y, z
+		d.int32()
+		d.int32()
+		stackable, count := d.int32(), d.int32()
+		out = fmt.Sprintf("S DropItem by=%s item=%d count=%d stackable=%d animate=%d", by, item, count, stackable, d.int32())
+	case 0x48:
+		caster, target := role(d.int32(), roles), role(d.int32(), roles)
+		skill, level, hit, reuse := d.int32(), d.int32(), d.int32(), d.int32()
+		d.int32() // the caster's x, y, z
+		d.int32()
+		d.int32()
+		success := d.int32()
+		if success != 0 {
+			d.uint16()
+		}
+		d.int32() // the target's x, y, z
+		d.int32()
+		d.int32()
+		out = fmt.Sprintf("S MagicSkillUse caster=%s target=%s skill=%d-%d hit=%d reuse=%d success=%d", caster, target, skill, level, hit, reuse, success)
 	case 0xfe:
 		if sub := d.uint16(); sub != 0x1a {
 			return "", fmt.Errorf("extended packet 0x%04x is not rendered", sub)
