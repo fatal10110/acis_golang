@@ -15,8 +15,13 @@ func WithPetitionConfig(cfg petition.Config) Option {
 	return func(o *options) { o.petitionConfig = &cfg }
 }
 
-// ReleaseID takes nothing back: the sequence never hands an id out twice.
-func (s *sequentialIDs) ReleaseID(int32) {}
+// ReleaseID counts id as given back without handing it out again: the
+// sequence never hands an id out twice.
+func (s *sequentialIDs) ReleaseID(int32) {
+	s.mu.Lock()
+	s.released++
+	s.mu.Unlock()
+}
 
 // bootPetitions loads the stored petitions as the boot path does.
 func bootPetitions(t *testing.T, db *sql.DB, chars *gamesql.CharacterStore, ids petition.IDs, cfg *petition.Config) (*petition.Manager, *gamesql.PetitionStore) {

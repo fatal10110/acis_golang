@@ -213,7 +213,14 @@ func (l *GameClientLink) claimLotteryTicket(live *livePlayer, objectID int32) {
 		return
 	}
 	if adena > 0 {
-		live.AddRewardItem(item.AdenaID, int(adena), id)
+		taken := false
+		live.AddRewardItem(item.AdenaID, int(adena), false, func() (int32, error) {
+			taken = true
+			return id, nil
+		})
+		if !taken {
+			l.releaseObjectID(id)
+		}
 	}
 }
 

@@ -545,9 +545,14 @@ func (s *Service) CrystallizeItem(inv *itemcontainer.Inventory, objectID int32, 
 	wasEquipped := st.Equipped() && st.Count <= count
 	changed := unequipConsumed(inv, inst, wasEquipped)
 	if inv.DestroyItem(inst, count) == nil {
+		s.releaseID(crystalObjectID)
 		return CrystallizeResult{}, CrystallizeNoop, nil
 	}
-	if inv.AddNew(crystalItemID, int(crystalCount), crystalObjectID) == nil {
+	crystals := inv.AddNew(crystalItemID, int(crystalCount), crystalObjectID)
+	if !holds(crystals, crystalObjectID) {
+		s.releaseID(crystalObjectID)
+	}
+	if crystals == nil {
 		return CrystallizeResult{}, CrystallizeNoop, nil
 	}
 	return CrystallizeResult{
@@ -557,6 +562,24 @@ func (s *Service) CrystallizeItem(inv *itemcontainer.Inventory, objectID int32, 
 		CrystalItemID:      crystalItemID,
 		CrystalCount:       int(crystalCount),
 	}, CrystallizeOK, nil
+}
+
+// releaseID gives back id, taken for an item that then needed none, such as
+// units that joined a held stack; an allocator that cannot take ids back
+// keeps it, and a zero id is no id at all.
+func (s *Service) releaseID(id int32) {
+	if id == 0 || s == nil {
+		return
+	}
+	if r, ok := s.ids.(interface{ ReleaseID(int32) }); ok {
+		r.ReleaseID(id)
+	}
+}
+
+// holds reports whether inst, the instance an AddNew returned, carries id:
+// false when the units joined a held stack instead, leaving id unused.
+func holds(inst *item.Instance, id int32) bool {
+	return inst != nil && inst.ObjectID == id
 }
 
 func (s *Service) nextID() (int32, bool, error) {

@@ -37,12 +37,10 @@ func (c *Character) addScriptItems(itemID int32, count, enchant int, multiple bo
 	}
 	var last *item.Instance
 	for range instances {
-		id, err := nextID()
+		inst, err := c.inventory.AddCreated(itemID, count, nextID)
 		if err != nil {
 			c.log.Error().Err(err).Int32("item_id", itemID).Msg("allocate script item id")
-			break
 		}
-		inst := c.inventory.AddNew(itemID, count, id)
 		if inst == nil {
 			break
 		}

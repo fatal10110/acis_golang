@@ -175,6 +175,7 @@ type options struct {
 	deepBlueDropRules      bool
 	autoLoot               bool
 	autoLootRaid           bool
+	singleItemDrop         bool
 	rateKarmaExpLost       float64
 	rateXP, rateSP         float64
 	deathDrop              player.DeathDropRules
@@ -997,6 +998,7 @@ type Server struct {
 	deepBlueDrops       bool
 	autoLoot            bool
 	autoLootRaid        bool
+	singleItemDrop      bool
 	rateXP, rateSP      float64
 	ids                 *sequentialIDs
 	positions           *task.PositionUpdates
@@ -1713,12 +1715,15 @@ func (s *Server) Close() {
 // stores: Boot reserves the stored ids before allocating and again around
 // every seed hook that runs once allocation has begun.
 //
-// mu guards next and reserved.
+// mu guards next, reserved, issued and released.
 type sequentialIDs struct {
 	mu       sync.Mutex
 	start    int32 // ids up to start are never handed out
 	next     int32 // last id handed out (start before the first)
 	reserved map[int32]struct{}
+	// issued and released count the ids handed out and those given back
+	// with ReleaseID.
+	issued, released int
 }
 
 func newSequentialIDs(start int32) *sequentialIDs {
@@ -1731,6 +1736,7 @@ func (s *sequentialIDs) NextID() (int32, error) {
 	for {
 		s.next++
 		if _, ok := s.reserved[s.next]; !ok {
+			s.issued++
 			return s.next, nil
 		}
 	}
@@ -2088,7 +2094,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, DeathDrop: o.deathDrop, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, RollDiceDelay: o.rollDiceDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight, PartyRange: fixturePartyRange},
+		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, DeathDrop: o.deathDrop, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, RollDiceDelay: o.rollDiceDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight, PartyRange: fixturePartyRange, MultipleItemDrop: !o.singleItemDrop},
 		Restarts:         o.restarts,
 		ClanHallData:     o.clanHallData,
 		CastleData:       o.castleData,
@@ -2474,6 +2480,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		deepBlueDrops:       o.deepBlueDropRules,
 		autoLoot:            o.autoLoot,
 		autoLootRaid:        o.autoLootRaid,
+		singleItemDrop:      o.singleItemDrop,
 		rateXP:              o.rateXP,
 		rateSP:              o.rateSP,
 		DB:                  db,

@@ -1,12 +1,17 @@
 package itemcontainer
 
 import (
+	"errors"
 	"slices"
 	"sync"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
+
+// errNoObjectID is AddCreated's refusal of a zero object id: an instance
+// needs a world id to be held.
+var errNoObjectID = errors.New("itemcontainer: zero object id")
 
 // nowMillis stamps an item as it enters a container. Containers order their
 // contents newest-first, so this is the ordering key, not just bookkeeping.
@@ -357,9 +362,10 @@ func (c *Container) insertLocked(inst *item.Instance) {
 //
 // It always creates exactly one instance: a stackable template gets count
 // units on it, a non-stackable one gets a single unit regardless of count.
-// Splitting a non-stackable count > 1 across several freshly created
-// instances under the MultipleItemDrop setting is not done here; auto-loot
-// still needs it (#3379).
+// When the units join a stack the container already holds, objectID is not
+// used: the returned instance carries another id, and the caller must give
+// objectID back to its allocator. AddCreated takes an id only when one is
+// needed.
 func (c *Container) AddNew(templateID int32, count int, objectID int32) *item.Instance {
 	inst, ok := newInstance(c.templates, templateID, count, objectID)
 	if !ok {
@@ -367,6 +373,49 @@ func (c *Container) AddNew(templateID int32, count int, objectID int32) *item.In
 	}
 	result, _ := c.Add(inst)
 	return result
+}
+
+// AddCreated creates count units of templateID the way AddNew does, but
+// takes the new instance's object id from nextID only when an instance is
+// created: units of a stackable template the container already holds join
+// that stack and take no id. It returns nil and no error when templateID
+// isn't a loaded template, and nil with nextID's error when no id could be
+// taken.
+func (c *Container) AddCreated(templateID int32, count int, nextID func() (int32, error)) (*item.Instance, error) {
+	result, _, err := c.addCreated(templateID, count, nextID)
+	return result, err
+}
+
+// addCreated is AddCreated, also reporting whether the units joined a held
+// stack. The held-stack check and the insert share one critical section, so
+// an id is taken exactly when a new instance goes in.
+func (c *Container) addCreated(templateID int32, count int, nextID func() (int32, error)) (result *item.Instance, joined bool, err error) {
+	tmpl, ok := c.templates.Get(templateID)
+	if !ok || nextID == nil {
+		return nil, false, nil
+	}
+	count = max(count, 1)
+	if !tmpl.Stackable {
+		count = 1
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if tmpl.Stackable {
+		if held := c.itemByTemplateIDLocked(templateID); held != nil {
+			held.AddCount(count)
+			return held, true, nil
+		}
+	}
+	id, err := nextID()
+	if err != nil {
+		return nil, false, err
+	}
+	if id == 0 {
+		return nil, false, errNoObjectID
+	}
+	inst := &item.Instance{ObjectID: id, TemplateID: templateID, Count: count, ManaLeft: tmpl.InitialManaLeft()}
+	c.insertLocked(inst)
+	return inst, false, nil
 }
 
 func newInstance(templates *item.Table, templateID int32, count int, objectID int32) (*item.Instance, bool) {

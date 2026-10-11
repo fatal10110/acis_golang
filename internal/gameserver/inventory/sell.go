@@ -123,8 +123,8 @@ func (s *Service) Sell(inv *itemcontainer.Inventory, rows []SaleRow, bound func(
 		}
 		res.Adena += int(sl.price)
 	}
-	if res.Adena > 0 {
-		inv.AddNew(item.AdenaID, res.Adena, adenaID)
+	if res.Adena == 0 || !holds(inv.AddNew(item.AdenaID, res.Adena, adenaID), adenaID) {
+		s.releaseID(adenaID)
 	}
 	return res, true, nil
 }
