@@ -105,7 +105,6 @@ func readView(t *testing.T, path string, text *bufio.Scanner) manifestView {
 	return v
 }
 
-// TestRegistrationMatchesReferenceManifest registers the chain's Go
 // folkIDs are the guard ids the datapack types as civilian NPCs: four of
 // GuardStand's and one of GuardMoveAround's.
 var folkIDs = []int32{31677, 31678, 31681, 31682, 31853}
