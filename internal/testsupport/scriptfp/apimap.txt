@@ -452,3 +452,18 @@ NpcAI.setTopDesireTarget script.NPC.SetTopDesireTarget
 # home through Creature.teleportTo, mapped above as TeleportTo: the NPC handle
 # has it as the player handle does.
 Player.getKarma script.Player.Karma
+
+# MonsterBehavior, WarriorBehavior and WizardBehavior (A12, #3628). The
+# attack stance, the cast in flight, the root, the automatic attack check
+# and the drop of one attack desire are read and done on the NPC handle; the
+# cast controller is folded into its cast check. The held attack desire and
+# the extended script event broadcast were built before.
+Creature.isInCombat script.NPC.InCombat
+Creature.isRooted script.NPC.Rooted
+CreatureCast.isCastingNow script.NPC.CastingNow
+HateList.size script.HateList.Size
+Npc.canAutoAttack script.NPC.CanAutoAttack
+Npc.getCast inline
+Npc.removeAttackDesire script.NPC.RemoveAttackDesire
+NpcAI.addAttackDesireHold AddAttackDesireHold
+Quest.broadcastScriptEventEx script.Script.BroadcastScriptEventEx
