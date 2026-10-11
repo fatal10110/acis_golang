@@ -213,7 +213,7 @@ func replayFanout(t *testing.T, table string, attack func(target *npc.Hostile, p
 		}
 		for _, a := range r.List(t, "after") {
 			minion, master, _ := strings.Cut(a, ".master=")
-			if h := roles[minion]; h == nil || h.Master() != roles[master] {
+			if h := roles[minion]; h == nil || !masterIs(h, roles[master]) {
 				t.Fatalf("after: %s.master is not %s", minion, master)
 			}
 		}

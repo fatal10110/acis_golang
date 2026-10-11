@@ -102,24 +102,8 @@ type Hostile struct {
 	attackedByMu sync.Mutex
 	attackedBy   map[int32]attackable.Combatant
 
-	// minionsMu guards master, spawnMaster and the minion list. A minion
-	// claims its follow slot under its master's lock from the minion's own
-	// queue (claimFollowSlot).
-	minionsMu sync.RWMutex
-	master    *Hostile
-	// spawnMaster is the master this private was spawned for. It outlives
-	// the master link, which the master's death clears: a private stays one
-	// for its whole life.
-	spawnMaster *Hostile
-	minions     map[int32]*Hostile
-	// followSlots are the eight escort points around this NPC, occupied by
-	// minion object ids (0 is empty). Only a master uses them.
-	followSlots [escortSlotCount]int32
-	// lastFollowingLoc is the master position this minion's last escort step
-	// laid the slots out around, taken before the move; hasLastFollow reports
-	// whether it is set.
-	lastFollowingLoc location.Location
-	hasLastFollow    bool
+	// partyLinks is the NPC's master, privates and escort points.
+	partyLinks
 
 	// inWater reports whether a location lies in a water zone; nil means
 	// none does. Set before the NPC is published.
@@ -520,82 +504,6 @@ func (h *Hostile) Kind() actor.Kind { return actor.KindNPC }
 
 // Unlockable reports whether this hostile NPC is a chest.
 func (h *Hostile) Unlockable() bool { return hostileKind(h.Instance) == "Chest" }
-
-// Master returns the NPC that spawned this minion, if any.
-func (h *Hostile) Master() *Hostile {
-	h.minionsMu.RLock()
-	defer h.minionsMu.RUnlock()
-	return h.master
-}
-
-// SetMaster links this NPC to its master, or unlinks it for nil. Linking
-// makes the NPC a private of master for the rest of its life.
-func (h *Hostile) SetMaster(master *Hostile) {
-	h.minionsMu.Lock()
-	h.master = master
-	if master != nil {
-		h.spawnMaster = master
-	}
-	h.minionsMu.Unlock()
-}
-
-// SpawnMaster returns the master this private was spawned for, nil for an
-// NPC that is not a private. Unlike Master it stays set once the master
-// died and let the private go.
-func (h *Hostile) SpawnMaster() *Hostile {
-	h.minionsMu.RLock()
-	defer h.minionsMu.RUnlock()
-	return h.spawnMaster
-}
-
-// IsPrivate reports whether this NPC was spawned as a master's private.
-func (h *Hostile) IsPrivate() bool { return h.SpawnMaster() != nil }
-
-// AddMinion records a child spawned for this NPC.
-func (h *Hostile) AddMinion(minion *Hostile) {
-	if minion == nil {
-		return
-	}
-	h.minionsMu.Lock()
-	if h.minions == nil {
-		h.minions = make(map[int32]*Hostile)
-	}
-	h.minions[minion.ObjectID()] = minion
-	h.minionsMu.Unlock()
-}
-
-// RemoveMinion forgets a child that has decayed or been removed.
-func (h *Hostile) RemoveMinion(id int32) {
-	h.minionsMu.Lock()
-	delete(h.minions, id)
-	h.minionsMu.Unlock()
-}
-
-// ClearMinions forgets every child, leaving them in the world; the NPC
-// stays a master.
-func (h *Hostile) ClearMinions() {
-	h.minionsMu.Lock()
-	h.minions = make(map[int32]*Hostile)
-	h.minionsMu.Unlock()
-}
-
-// Minions returns a stable snapshot of this NPC's current children.
-func (h *Hostile) Minions() []*Hostile {
-	h.minionsMu.RLock()
-	defer h.minionsMu.RUnlock()
-	minions := make([]*Hostile, 0, len(h.minions))
-	for _, minion := range h.minions {
-		minions = append(minions, minion)
-	}
-	return minions
-}
-
-// IsMaster reports whether this NPC has ever recorded a minion spawn.
-func (h *Hostile) IsMaster() bool {
-	h.minionsMu.RLock()
-	defer h.minionsMu.RUnlock()
-	return h.minions != nil
-}
 
 // AI returns the hostile NPC brain.
 func (h *Hostile) AI() *ai.Attackable {
@@ -1062,7 +970,7 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 		h.emit(event.RaidBossKilled{})
 	}
 	h.raiseDying(killer)
-	h.partyDied()
+	partyDied(h.scripts, h)
 	raiseClanDied(h.scripts, h.world, h, killer)
 	return true
 }
@@ -1224,14 +1132,8 @@ func (h *Hostile) ReturnHome() bool {
 // containment. A nil maker, or a maker with no territories, uses a strict
 // 200-unit 3D sphere around Home.
 func (h *Hostile) InTerritory() bool {
-	if master := h.Master(); master != nil {
-		if master.Dead() {
-			return true
-		}
-		return master.InTerritory()
-	}
-	if h.IsPrivate() {
-		return true
+	if in, decided := h.privateInTerritory(); decided {
+		return in
 	}
 	return h.Instance.spawnTerritoryContains(h.location())
 }

@@ -105,9 +105,13 @@ func leaderTemplate(id int32, ai npc.AIParams, privates int) *npc.Template {
 // privatesOf returns master's privates, sorted by object id.
 func privatesOf(t *testing.T, master *npc.Hostile, want int) []*npc.Hostile {
 	t.Helper()
-	privates := master.Minions()
-	if len(privates) != want {
-		t.Fatalf("master %d privates = %d, want %d", master.NpcID(), len(privates), want)
+	minions := master.Minions()
+	if len(minions) != want {
+		t.Fatalf("master %d privates = %d, want %d", master.NpcID(), len(minions), want)
+	}
+	privates := make([]*npc.Hostile, 0, len(minions))
+	for _, m := range minions {
+		privates = append(privates, m.(*npc.Hostile))
 	}
 	slices.SortFunc(privates, func(a, b *npc.Hostile) int { return int(a.ObjectID() - b.ObjectID()) })
 	return privates
