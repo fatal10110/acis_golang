@@ -258,8 +258,7 @@ func TestSeamGateRefusesUnraisedHooks(t *testing.T) {
 	}
 
 	// Production raises talk, first talk, attacked, clan attacked and clan
-	// died on both NPC kinds, and the party hooks on hostile NPCs only: a
-	// civilian NPC has no party.
+	// died on both NPC kinds, and the party hooks on hostile NPCs only.
 	catalog["quest.FolkFirstTalk"] = quest(Bindings{EventFirstTalk: {1}})
 	catalog["quest.HostileFirstTalk"] = quest(Bindings{EventFirstTalk: {2}})
 	catalog["ai.FolkClan"] = func() Script {

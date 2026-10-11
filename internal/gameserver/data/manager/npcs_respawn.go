@@ -23,18 +23,18 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 	}
 
 	if obj, ok := n.state.Object(actorID); ok {
-		if h, ok := obj.(*npc.Hostile); ok {
+		if m, ok := obj.(npc.PartyMember); ok {
 			// The privates leave with their master only while no behavior
 			// is bound to it: a behavior's privates outlive a master that
 			// decays or is deleted, as a transforming NPC's successor does.
-			if n.scripts == nil || !n.scripts.Behaves(int32(h.NpcID())) {
-				n.despawnMinions(h)
+			if n.scripts == nil || !n.scripts.Behaves(int32(m.NpcID())) {
+				n.despawnMinions(m)
 			}
 			// A one-time private leaves its spawn master's minions, even
 			// when that master's death already unlinked it.
-			if master := h.SpawnMaster(); master != nil && slot.entry.RespawnDelay <= 0 {
+			if master := m.SpawnMaster(); master != nil && slot.entry.RespawnDelay <= 0 {
 				master.RemoveMinion(actorID)
-				h.SetMaster(nil)
+				m.SetMaster(nil)
 			}
 		}
 	}
@@ -174,7 +174,7 @@ func (n *Npcs) respawnSlot(key string) {
 	}
 	if slot.masterID != 0 {
 		obj, _ := n.state.Object(slot.masterID)
-		master, ok := obj.(*npc.Hostile)
+		master, ok := obj.(npc.PartyMember)
 		if !ok || master.Dead() {
 			n.mu.Lock()
 			delete(n.slot, key)
@@ -203,12 +203,18 @@ func (n *Npcs) respawnSlot(key string) {
 	n.spawnFresh(key, slot.entry, tmpl, pos)
 }
 
-func (n *Npcs) despawnMinions(master *npc.Hostile) {
+func (n *Npcs) despawnMinions(master npc.PartyMember) {
 	for _, minion := range master.Minions() {
 		id := minion.ObjectID()
-		n.ai.Remove(minion)
 		n.walker.StopRouteByID(id)
-		minion.Decay(n.state, nil)
+		switch o := minion.(type) {
+		case *npc.Hostile:
+			n.ai.Remove(o)
+			o.Decay(n.state, nil)
+		case *npc.Folk:
+			n.ai.Remove(o)
+			o.Decay(n.state, nil)
+		}
 		minion.SetMaster(nil)
 		master.RemoveMinion(id)
 

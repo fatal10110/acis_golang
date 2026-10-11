@@ -151,6 +151,7 @@ func (g *makerGroup) DeleteAll() {
 			n.forget(o, id)
 			o.Decay(n.state, nil)
 		case *npc.Folk:
+			n.despawnMinions(o)
 			n.forget(o, id)
 			o.Decay(n.state, nil)
 		}

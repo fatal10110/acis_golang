@@ -67,7 +67,7 @@ func (w *scriptRespawnWorld) private(t *testing.T) *npc.Hostile {
 	if len(minions) != 1 {
 		t.Fatalf("master's privates = %d, want 1", len(minions))
 	}
-	return minions[0]
+	return minions[0].(*npc.Hostile)
 }
 
 // livePrivates counts the NPCs of template 2 in the world.

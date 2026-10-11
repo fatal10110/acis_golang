@@ -59,50 +59,51 @@ func (h *Hostile) ThinkFollow(target attackable.Combatant, lastWasFollow bool) (
 	return false
 }
 
-func (h *Hostile) thinkMasterEscort(master *Hostile, lastWasFollow bool) {
-	h.minionsMu.RLock()
+func (h *Hostile) thinkMasterEscort(master PartyMember, lastWasFollow bool) {
+	h.partyMu.RLock()
 	hasLast := h.hasLastFollow
 	lastLoc := h.lastFollowingLoc
-	h.minionsMu.RUnlock()
-	dest, masterLoc, ok := master.claimFollowSlot(h, lastWasFollow, hasLast, lastLoc)
+	h.partyMu.RUnlock()
+	dest, masterLoc, ok := claimFollowSlot(master, h, lastWasFollow, hasLast, lastLoc)
 	if !ok {
 		return
 	}
 	h.moveTo(dest)
-	h.minionsMu.Lock()
+	h.partyMu.Lock()
 	h.lastFollowingLoc = masterLoc
 	h.hasLastFollow = true
-	h.minionsMu.Unlock()
+	h.partyMu.Unlock()
 }
 
 // claimFollowSlot picks minion's escort point around master and records it
 // in master.followSlots. The slots and the minion occupants are snapshotted
-// under minionsMu; other occupants are resolved through the world and every
+// under the master's partyMu; other occupants are resolved through the world and every
 // position is read after unlock, so no world or actor lookup runs under the
 // lock. The result is written back with a re-check (commitFollowSlots).
 // masterLoc is the master position the escort points were laid out around.
-func (master *Hostile) claimFollowSlot(minion *Hostile, lastWasFollow, hasLast bool, lastLoc location.Location) (dest, masterLoc location.Location, ok bool) {
-	var occupants [escortSlotCount]*Hostile
-	master.minionsMu.RLock()
-	slots := master.followSlots
+func claimFollowSlot(master PartyMember, minion *Hostile, lastWasFollow, hasLast bool, lastLoc location.Location) (dest, masterLoc location.Location, ok bool) {
+	var occupants [escortSlotCount]PartyMember
+	p := master.links()
+	p.partyMu.RLock()
+	slots := p.followSlots
 	filled := 0
 	for i, id := range slots {
 		if id != 0 {
 			filled++
-			occupants[i] = master.minions[id]
+			occupants[i] = p.minions[id]
 		}
 	}
-	allFilled := filled == len(master.minions)
-	master.minionsMu.RUnlock()
+	allFilled := filled == len(p.minions)
+	p.partyMu.RUnlock()
 
-	if allFilled && hasLast && master.location().Distance2D(lastLoc) < escortMasterMoveSkip {
+	if allFilled && hasLast && combatantLocation(master).Distance2D(lastLoc) < escortMasterMoveSkip {
 		return location.Location{}, location.Location{}, false
 	}
 	if minion.roll(100) >= 70 {
 		return location.Location{}, location.Location{}, false
 	}
 
-	masterLoc = master.location()
+	masterLoc = combatantLocation(master)
 	rndNum := minion.roll(1000000)
 	slotHolder := -1
 	distHolder := 10000.0
@@ -125,7 +126,7 @@ func (master *Hostile) claimFollowSlot(minion *Hostile, lastWasFollow, hasLast b
 		if objectID != 0 {
 			if objectID == minion.ObjectID() {
 				claimed[idx] = 0
-			} else if occupant := master.slotOccupant(occupants[idx], objectID); occupant != nil && occupant.location().Distance2D(newPos) <= escortStayRadius {
+			} else if occupant := minion.slotOccupant(occupants[idx], objectID); occupant != nil && combatantLocation(occupant).Distance2D(newPos) <= escortStayRadius {
 				continue
 			}
 		}
@@ -139,7 +140,7 @@ func (master *Hostile) claimFollowSlot(minion *Hostile, lastWasFollow, hasLast b
 	if slotHolder != -1 {
 		claimed[slotHolder] = minion.ObjectID()
 	}
-	master.commitFollowSlots(slots, claimed)
+	p.commitFollowSlots(slots, claimed)
 
 	mx, my, _ := minion.Position()
 	heading := int((math.Atan2(float64(my-masterLoc.Y), float64(mx-masterLoc.X))*360.0/(2*math.Pi) + 360.0)) % 360
@@ -154,31 +155,32 @@ func (master *Hostile) claimFollowSlot(minion *Hostile, lastWasFollow, hasLast b
 // commitFollowSlots writes back each slot a claim changed from its snapshot,
 // unless another minion changed that slot since: the other minion's write
 // stands, as it would under per-slot writes with no lock across the scan.
-func (master *Hostile) commitFollowSlots(snapshot, claimed [escortSlotCount]int32) {
-	master.minionsMu.Lock()
-	defer master.minionsMu.Unlock()
+func (p *partyLinks) commitFollowSlots(snapshot, claimed [escortSlotCount]int32) {
+	p.partyMu.Lock()
+	defer p.partyMu.Unlock()
 	for i, id := range claimed {
-		if id != snapshot[i] && master.followSlots[i] == snapshot[i] {
-			master.followSlots[i] = id
+		if id != snapshot[i] && p.followSlots[i] == snapshot[i] {
+			p.followSlots[i] = id
 		}
 	}
 }
 
-// slotOccupant resolves the NPC holding slot id: minion when the snapshot
-// found it among master's minions, otherwise whatever the world holds.
-func (master *Hostile) slotOccupant(minion *Hostile, id int32) *Hostile {
-	if minion != nil {
-		return minion
+// slotOccupant resolves the NPC holding slot id of h's master: occupant
+// when the snapshot found it among the master's privates, otherwise
+// whatever the world holds.
+func (h *Hostile) slotOccupant(occupant PartyMember, id int32) PartyMember {
+	if occupant != nil {
+		return occupant
 	}
-	if master.world == nil {
+	if h.world == nil {
 		return nil
 	}
-	obj, ok := master.world.Object(id)
+	obj, ok := h.world.Object(id)
 	if !ok {
 		return nil
 	}
-	occupant, _ := obj.(*Hostile)
-	return occupant
+	found, _ := obj.(PartyMember)
+	return found
 }
 
 func (h *Hostile) thinkLooseFollow(target attackable.Combatant) {

@@ -24,13 +24,14 @@ func (r *Registry) HostileAttacked(h *npc.Hostile, attacker attackable.Combatant
 
 // HostilePartyAttacked runs the party-attacked hook of every script bound
 // to called's template, in list order: caller, attacked by target for
-// damage, called its party member called.
-func (r *Registry) HostilePartyAttacked(caller, called *npc.Hostile, target attackable.Combatant, damage int32) {
+// damage, called its party member called. caller is a hostile or a
+// civilian NPC.
+func (r *Registry) HostilePartyAttacked(caller npc.PartyMember, called *npc.Hostile, target attackable.Combatant, damage int32) {
 	list := r.scripts(int32(called.NpcID()), EventPartyAttacked)
 	if len(list) == 0 {
 		return
 	}
-	e := PartyAttacked{Caller: NewNPC(caller), Called: NewNPC(called), Target: creatureOf(target), Damage: damage}
+	e := PartyAttacked{Caller: NPCOf(caller), Called: NewNPC(called), Target: creatureOf(target), Damage: damage}
 	for _, s := range list {
 		r.run(s, hookPartyAttacked, func() { s.Hooks.PartyAttacked(s, e) })
 	}

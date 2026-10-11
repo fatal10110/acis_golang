@@ -8,8 +8,14 @@ import (
 // InTerritory reports whether the NPC stands in the territory of the spawn
 // that placed it: its maker's territories less the banned ones, else a
 // strict sphere of the drift range around its spawn point. An NPC with no
-// spawn point is always in it.
-func (f *Folk) InTerritory() bool { return f.SpawnTerritoryContains(f.location()) }
+// spawn point is always in it. A private is in its master's territory, as
+// a hostile private is.
+func (f *Folk) InTerritory() bool {
+	if in, decided := f.privateInTerritory(); decided {
+		return in
+	}
+	return f.SpawnTerritoryContains(f.location())
+}
 
 // TeleportTo jumps the NPC to target. It stops its walk, swing and cast,
 // then observers see the jump and the NPC leaves and re-enters the world

@@ -94,6 +94,8 @@ type Folk struct {
 	// spawnBinding is the spawn slot that placed the NPC: its AI parameters
 	// and script memory.
 	spawnBinding
+	// partyLinks is the NPC's master, privates and escort points.
+	partyLinks
 	// zones is the NPC's zone membership; Attach gives it the zone index.
 	zones *zoneMember
 

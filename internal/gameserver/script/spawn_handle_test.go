@@ -101,11 +101,11 @@ func (nopPopulation) AddSpawn(int32, int, int, int, int, bool, time.Duration) (a
 	return nil, npc.ErrNoTemplate
 }
 
-func (nopPopulation) CreatePrivate(*npc.Hostile, int32, *location.Location, int, time.Duration, [3]int32) (*npc.Hostile, error) {
+func (nopPopulation) CreatePrivate(npc.PartyMember, int32, *location.Location, int, time.Duration, [3]int32) (npc.PartyMember, error) {
 	return nil, npc.ErrNoTemplate
 }
 
-func (nopPopulation) CreatePrivates(*npc.Hostile) error { return nil }
+func (nopPopulation) CreatePrivates(npc.PartyMember) error { return nil }
 
 func (nopPopulation) ScheduleDespawn(attackable.Combatant, time.Duration) {}
 
