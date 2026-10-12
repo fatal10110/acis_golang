@@ -20,7 +20,8 @@ func (n *NPC) Master() *NPC {
 func (n *NPC) HasMaster() bool { return n.Master() != nil }
 
 // IsMaster reports whether the NPC keeps privates: it has created privates
-// in this life, even ones gone since. A handle on nothing panics.
+// in this life or an earlier one of its spawn, even ones gone since. A
+// handle on nothing panics.
 func (n *NPC) IsMaster() bool { return memberOf(n, "the privates").IsMaster() }
 
 // Minions returns the privates of the NPC's party, dead ones included, in

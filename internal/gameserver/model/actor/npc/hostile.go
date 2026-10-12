@@ -368,6 +368,7 @@ func (h *Hostile) Attach(rt Runtime) {
 	h.hits = rt.Hits
 	h.scripts = rt.Scripts
 	h.bindSpawn(rt.Slot)
+	h.Scratch().setLife(h)
 	if rt.Items == nil {
 		return
 	}

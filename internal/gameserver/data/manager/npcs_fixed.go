@@ -119,7 +119,10 @@ func (n *Npcs) SpawnOf(id int32) (SpawnRecord, bool) {
 	if !ok {
 		return SpawnRecord{}, false
 	}
-	rec := SpawnRecord{MasterID: slot.masterID, Fixed: slot.fixed, At: slot.at, Heading: slot.heading}
+	rec := SpawnRecord{Fixed: slot.fixed, At: slot.at, Heading: slot.heading}
+	if master := npc.Current(slot.master); master != nil {
+		rec.MasterID = master.ObjectID()
+	}
 	if slot.maker != nil {
 		rec.Maker = slot.maker.Name
 	}
