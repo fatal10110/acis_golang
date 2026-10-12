@@ -194,6 +194,13 @@ func asCaster(a Actor) (CasterActor, bool) {
 	return c, ok
 }
 
+// sameActor reports whether a and b are one creature. It compares object
+// ids, not values: a player reaches an effect both as its model and as the
+// object the world registers it under.
+func sameActor(a, b Actor) bool {
+	return a != nil && b != nil && a.ObjectID() == b.ObjectID()
+}
+
 func asPlayer(a Actor) (PlayerActor, bool) {
 	p, ok := a.(PlayerActor)
 	return p, ok

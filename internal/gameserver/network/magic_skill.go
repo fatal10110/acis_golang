@@ -226,14 +226,14 @@ func (l *GameClientLink) startFusionCast(live *livePlayer, controller *actorcast
 	finishFusion := func() {
 		// Only a creature carries the triggered fusion effect to decrease.
 		if effected, ok := target.(attackable.Combatant); ok {
-			skillhandler.DecreaseFusion(l.skills, live.Character, effected, def)
+			skillhandler.DecreaseFusion(l.skills, live, effected, def)
 		}
 		live.clearFusionTarget(target.ObjectID())
 	}
 	// The force lands on the target the cast committed to, its conditions
 	// not judged again.
 	if effected, ok := target.(attackable.Combatant); ok {
-		skillhandler.StartFusion(l.skills, live.Character, effected, def)
+		skillhandler.StartFusion(l.skills, live, effected, def)
 	}
 
 	l.broadcastCastStart(live, target, def, plan)
@@ -254,7 +254,7 @@ func (l *GameClientLink) startFusionCast(live *livePlayer, controller *actorcast
 func (l *GameClientLink) startSignetCast(live *livePlayer, controller *actorcast.Controller, handlers actorcast.EffectHandlers, target actorcast.Target, def modelskill.Definition, plan actorcast.Plan) {
 	if resolved, ok := target.(skilltarget.Actor); ok {
 		handlers.Sink = l.playerMessageSink(live, nil)
-		result := actorcast.ApplyResolvedEffectsResult(handlers, live.Character, []skilltarget.Actor{resolved}, def)
+		result := actorcast.ApplyResolvedEffectsResult(handlers, live, []skilltarget.Actor{resolved}, def)
 		l.settlePvPChanges(live)
 		l.syncCubicTargets(live, result, def)
 	}
@@ -298,7 +298,7 @@ func (l *GameClientLink) broadcastLaunchTargets(live *livePlayer, target actorca
 	if !ok {
 		return nil, false
 	}
-	affected = handler.Targets(live.Character, resolvedTarget, &def)
+	affected = handler.Targets(live, resolvedTarget, &def)
 	targetIDs := make([]int32, 0, len(affected))
 	for _, affectedTarget := range affected {
 		targetIDs = append(targetIDs, affectedTarget.ObjectID())
@@ -326,7 +326,7 @@ func (l *GameClientLink) applyCastHit(live *livePlayer, handlers actorcast.Effec
 func (l *GameClientLink) applyItemCastHit(live *livePlayer, handlers actorcast.EffectHandlers, affected []skilltarget.Actor, def modelskill.Definition, item any) {
 	actorcast.RefreshSummonTargets(affected)
 	handlers.Sink = l.playerMessageSink(live, nil)
-	result := actorcast.ApplyResolvedItemEffectsResult(handlers, live.Character, affected, def, item)
+	result := actorcast.ApplyResolvedItemEffectsResult(handlers, live, affected, def, item)
 	l.settlePvPChanges(live)
 	l.syncCubicTargets(live, result, def)
 }
@@ -733,7 +733,7 @@ func (l *GameClientLink) handleToggleSkillUse(live *livePlayer, req clientpacket
 	if activated {
 		// Each cost CastToggle paid already sent its own status.
 		handlers.Sink = l.playerMessageSink(live, nil)
-		result := actorcast.ApplyEffectsResult(handlers, live.Character, target, def)
+		result := actorcast.ApplyEffectsResult(handlers, live, target, def)
 		l.syncCubicTargets(live, result, def)
 	} else {
 		skillhandler.StopEffect(live.Character, def.ID)
