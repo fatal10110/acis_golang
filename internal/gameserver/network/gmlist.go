@@ -27,7 +27,7 @@ func (l *GameClientLink) requestGmList(live *livePlayer) {
 	}
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageGMList))
 	for _, gm := range l.gms.Entries(includeHidden) {
-		name := gm.Player.Name
+		name := gm.Player.CharacterName()
 		if gm.Hidden {
 			name += " (invis)"
 		}

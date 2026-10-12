@@ -19,11 +19,12 @@ import (
 // ---- from charinfo_test.go ----
 func TestFrameCharInfoCoreFields(t *testing.T) {
 	c := &player.Character{
-		ID: 0x10000001, Name: "Observer",
+		ID:          0x10000001,
 		Race:        player.RaceHuman,
 		Location:    location.Location{X: 10, Y: 20, Z: 30},
 		LastHeading: 123,
 	}
+	c.SetName("Observer")
 	tmpl := &player.Template{CollisionRadius: 9, CollisionHeight: 23, RunSpeed: 120, WalkSpeed: 80, SwimSpeed: 50}
 	items := []*item.Instance{{ObjectID: 100, TemplateID: 2369, Location: item.LocationPaperdoll, LocationData: rhandPaperdollIndex}}
 
@@ -52,11 +53,12 @@ func TestFrameCharInfoCoreFields(t *testing.T) {
 }
 
 func TestFrameCharInfoMirrorsPvPFlag(t *testing.T) {
-	c := &player.Character{Name: "Observer"}
+	c := &player.Character{}
+	c.SetName("Observer")
 	c.UpdatePvPFlag(task.PvPFlagOn)
 
 	got := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: &player.Template{}}))
-	offset := 1 + 5*4 + (len(c.Name)+1)*2 + 3*4 + len(charInfoPaperdollOrder)*4 + 4*2 + 4 + 12*2 + 4 + 4*2
+	offset := 1 + 5*4 + (len(c.CharacterName())+1)*2 + 3*4 + len(charInfoPaperdollOrder)*4 + 4*2 + 4 + 12*2 + 4 + 4*2
 	for _, fieldOffset := range []int{offset, offset + 4*4} {
 		if v := binary.LittleEndian.Uint32(got[fieldOffset:]); v != uint32(task.PvPFlagOn) {
 			t.Fatalf("PvP flag at offset %d = %d, want %d", fieldOffset, v, task.PvPFlagOn)
@@ -66,10 +68,11 @@ func TestFrameCharInfoMirrorsPvPFlag(t *testing.T) {
 
 func TestFrameCharInfoUsesDoublePrecisionFloatFields(t *testing.T) {
 	c := &player.Character{
-		ID: 0x10000001, Name: "Observer",
+		ID:       0x10000001,
 		Race:     player.RaceHuman,
 		Location: location.Location{X: 10, Y: 20, Z: 30},
 	}
+	c.SetName("Observer")
 	tmpl := &player.Template{
 		CollisionRadius: 9, CollisionHeight: 23,
 		RunSpeed: 120, WalkSpeed: 80, SwimSpeed: 50,
@@ -94,7 +97,8 @@ func TestFrameCharInfoAndUserInfoWriteLiveSpeedMultipliers(t *testing.T) {
 		DEX: 30, RunSpeed: 120, WalkSpeed: 80, SwimSpeed: 50,
 		CollisionRadius: 9, CollisionHeight: 23,
 	}
-	c := &player.Character{ID: 0x10000001, Name: "Observer", Race: player.RaceHuman}
+	c := &player.Character{ID: 0x10000001, Race: player.RaceHuman}
+	c.SetName("Observer")
 	c.AttachRuntime(tmpl, nil)
 	c.AddStatFuncs([]effect.Mod{
 		{Stat: stat.RunSpeed, Op: effect.OpAdd, Value: 33},
@@ -122,8 +126,10 @@ func TestFrameCharInfoAndUserInfoWriteLiveSpeedMultipliers(t *testing.T) {
 
 func TestFrameCharInfo_CubicsSerializeCountAndIDs(t *testing.T) {
 	tmpl := &player.Template{}
-	empty := &player.Character{Name: "C"}
-	withCubics := &player.Character{Name: "C"}
+	empty := &player.Character{}
+	empty.SetName("C")
+	withCubics := &player.Character{}
+	withCubics.SetName("C")
 	withCubics.SetSkillLevel(143, 5) // Cubic Mastery: room for more than one cubic
 	withCubics.AddOrRefreshCubic(1, false)
 	withCubics.AddOrRefreshCubic(3, false)
@@ -151,8 +157,10 @@ func TestFrameCharInfo_CubicsSerializeCountAndIDs(t *testing.T) {
 
 func TestFrameCharInfoCarriesAbnormalEffectMask(t *testing.T) {
 	tmpl := &player.Template{}
-	plain := &player.Character{Name: "C"}
-	bigHead := &player.Character{Name: "C"}
+	plain := &player.Character{}
+	plain.SetName("C")
+	bigHead := &player.Character{}
+	bigHead.SetName("C")
 	bigHead.StartAbnormalEffect(0x002000)
 
 	base := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: plain, Template: tmpl}))
@@ -202,7 +210,6 @@ func TestFrameRelationChanged(t *testing.T) {
 func TestFrameUserInfo(t *testing.T) {
 	c := &player.Character{
 		ID:        0x10000001,
-		Name:      "Newbie",
 		Race:      player.RaceHuman,
 		CharLevel: 1,
 		Exp:       0,
@@ -213,6 +220,7 @@ func TestFrameUserInfo(t *testing.T) {
 		KarmaPoints: 0, PKKills: 1, PvPKills: 2,
 		AccessLevel: 1,
 	}
+	c.SetName("Newbie")
 	c.SetTitle("Hero")
 	c.SetClanID(5)
 	c.SetColors(0x00CCFF, 0x0033CC)
@@ -245,7 +253,7 @@ func TestFrameUserInfo(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, uint32(z))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.LastHeading))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.ObjectID()))
-	want = append(want, encodeUTF16Z(c.Name)...)
+	want = append(want, encodeUTF16Z(c.CharacterName())...)
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Race))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.Sex()))
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.ClassID()))
@@ -395,7 +403,8 @@ func liveStatsCharacter() (*player.Character, *player.Template) {
 		{ID: 3, Kind: item.KindArmor, Slot: item.SlotChest, Armor: &item.ArmorDetail{}},
 		{ID: 4, Kind: item.KindArmor, Slot: item.SlotLFinger, Armor: &item.ArmorDetail{}},
 	})
-	c := &player.Character{ID: 0x10000001, Name: "Buffed", Race: player.RaceHuman, CharLevel: 1}
+	c := &player.Character{ID: 0x10000001, Race: player.RaceHuman, CharLevel: 1}
+	c.SetName("Buffed")
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, items, []*item.Instance{
 		{ObjectID: 100, TemplateID: 2, Count: 1, Location: item.LocationPaperdoll, LocationData: itemcontainer.RHand},
 		{ObjectID: 101, TemplateID: 3, Count: 1, Location: item.LocationPaperdoll, LocationData: itemcontainer.Chest},
@@ -434,7 +443,7 @@ func TestFrameUserInfoWritesLiveStats(t *testing.T) {
 	c, tmpl := liveStatsCharacter()
 	got := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl}))
 
-	attrs := 1 + 5*4 + (len(c.Name)+1)*2 + 4*4 + 8
+	attrs := 1 + 5*4 + (len(c.CharacterName())+1)*2 + 4*4 + 8
 	wantAttrs := []uint32{42, 30, 43, 21, 11, 25}
 	for i, want := range wantAttrs {
 		if v := binary.LittleEndian.Uint32(got[attrs+4*i:]); v != want {
@@ -471,7 +480,7 @@ func TestFrameUserInfoWritesLiveStats(t *testing.T) {
 func TestFrameCharInfoWritesLiveCastAndAttackSpeed(t *testing.T) {
 	c, tmpl := liveStatsCharacter()
 	got := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: tmpl}))
-	offset := 1 + 5*4 + (len(c.Name)+1)*2 + 3*4 + len(charInfoPaperdollOrder)*4 + 4*2 + 4 + 12*2 + 4 + 4*2 + 2*4
+	offset := 1 + 5*4 + (len(c.CharacterName())+1)*2 + 3*4 + len(charInfoPaperdollOrder)*4 + 4*2 + 4 + 12*2 + 4 + 4*2 + 2*4
 	if v := binary.LittleEndian.Uint32(got[offset:]); v != 277 {
 		t.Errorf("M.Atk. speed = %d, want 277", v)
 	}
@@ -487,7 +496,8 @@ func TestFrameCharInfoWritesLiveCastAndAttackSpeed(t *testing.T) {
 // to refresh.
 func TestFrameUserInfo_PvPFlagByteFollowsPvPFlagState(t *testing.T) {
 	tmpl := &player.Template{}
-	c := &player.Character{Name: "M"}
+	c := &player.Character{}
+	c.SetName("M")
 
 	unflagged := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl}))
 	c.UpdatePvPFlag(task.PvPFlagOn)
@@ -505,7 +515,8 @@ func TestFrameUserInfo_PvPFlagByteFollowsPvPFlagState(t *testing.T) {
 // though its AccessLevel is positive.
 func TestFrameUserInfo_GMByteFollowsIsGMNotAccessLevel(t *testing.T) {
 	tmpl := &player.Template{}
-	c := &player.Character{Name: "M", AccessLevel: 3}
+	c := &player.Character{AccessLevel: 3}
+	c.SetName("M")
 
 	notGM := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl, IsGM: false}))
 	gm := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl, IsGM: true}))
@@ -520,8 +531,11 @@ func TestFrameUserInfo_FemaleUsesFemaleCollision(t *testing.T) {
 		CollisionRadius: 9, CollisionHeight: 23,
 		CollisionRadiusFemale: 17.5, CollisionHeightFemale: 42.25,
 	}
-	male := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: &player.Character{Name: "M"}, Template: tmpl}))
-	femaleChar := &player.Character{Name: "M"}
+	maleChar := &player.Character{}
+	maleChar.SetName("M")
+	male := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: maleChar, Template: tmpl}))
+	femaleChar := &player.Character{}
+	femaleChar.SetName("M")
 	femaleChar.SetSex(player.SexFemale)
 	female := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: femaleChar, Template: tmpl}))
 
@@ -538,8 +552,12 @@ func TestFrameUserInfo_FemaleUsesFemaleCollision(t *testing.T) {
 
 func TestFrameUserInfo_DwarfUsesDwarfInventoryLimit(t *testing.T) {
 	tmpl := &player.Template{}
-	human := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: &player.Character{Race: player.RaceHuman, Name: "H"}, Template: tmpl}))
-	dwarf := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: &player.Character{Race: player.RaceDwarf, Name: "H"}, Template: tmpl}))
+	humanChar := &player.Character{Race: player.RaceHuman}
+	humanChar.SetName("H")
+	human := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: humanChar, Template: tmpl}))
+	dwarfChar := &player.Character{Race: player.RaceDwarf}
+	dwarfChar.SetName("H")
+	dwarf := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: dwarfChar, Template: tmpl}))
 
 	if len(human) != len(dwarf) {
 		t.Fatalf("human and dwarf encodings differ in length: %d vs %d", len(human), len(dwarf))
@@ -558,7 +576,8 @@ func TestFrameUserInfo_DwarfUsesDwarfInventoryLimit(t *testing.T) {
 // ExStorageMaxCount's inventory-limit field to the character's live limit:
 // the configured race base plus the inventoryLimit stat.
 func TestStorageLimitPacketsReportLiveInventoryLimit(t *testing.T) {
-	c := &player.Character{Race: player.RaceDwarf, Name: "D"}
+	c := &player.Character{Race: player.RaceDwarf}
+	c.SetName("D")
 	c.Configure(player.Runtime{Rules: player.Rules{InventorySlots: player.InventorySlots{NoDwarf: 90, Dwarf: 117, Configured: true}}})
 	c.AddStatFuncs([]effect.Mod{{Stat: stat.InvLim, Op: effect.OpAdd, Value: 1}})
 
@@ -568,7 +587,8 @@ func TestStorageLimitPacketsReportLiveInventoryLimit(t *testing.T) {
 	}
 
 	full := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: &player.Template{}}))
-	plain := &player.Character{Race: player.RaceDwarf, Name: "D"}
+	plain := &player.Character{Race: player.RaceDwarf}
+	plain.SetName("D")
 	base := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: plain, Template: &player.Template{}}))
 	if len(full) != len(base) {
 		t.Fatalf("UserInfo lengths differ: %d vs %d", len(full), len(base))
@@ -595,8 +615,10 @@ func TestStorageLimitPacketsReportLiveInventoryLimit(t *testing.T) {
 
 func TestFrameUserInfo_CubicsSerializeCountAndIDs(t *testing.T) {
 	tmpl := &player.Template{}
-	empty := &player.Character{Name: "C"}
-	withCubics := &player.Character{Name: "C"}
+	empty := &player.Character{}
+	empty.SetName("C")
+	withCubics := &player.Character{}
+	withCubics.SetName("C")
 	withCubics.SetSkillLevel(143, 5) // Cubic Mastery: room for more than one cubic
 	withCubics.AddOrRefreshCubic(1, false)
 	withCubics.AddOrRefreshCubic(3, false)
@@ -624,8 +646,10 @@ func TestFrameUserInfo_CubicsSerializeCountAndIDs(t *testing.T) {
 
 func TestFrameUserInfoCarriesAbnormalEffectMask(t *testing.T) {
 	tmpl := &player.Template{}
-	plain := &player.Character{Name: "C"}
-	bigHead := &player.Character{Name: "C"}
+	plain := &player.Character{}
+	plain.SetName("C")
+	bigHead := &player.Character{}
+	bigHead.SetName("C")
 	bigHead.StartAbnormalEffect(0x002000)
 
 	base := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: plain, Template: tmpl}))
@@ -654,7 +678,8 @@ func TestFrameUserInfoCarriesAbnormalEffectMask(t *testing.T) {
 // mount id space (+1000000); an unmounted character reports 0.
 func TestFrameUserInfo_MountNpcIdCarriesOffset(t *testing.T) {
 	tmpl := &player.Template{}
-	c := &player.Character{Name: "M"}
+	c := &player.Character{}
+	c.SetName("M")
 
 	unmounted := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl}))
 	if bytes.Contains(unmounted, binary.LittleEndian.AppendUint32(nil, 12621)) {
@@ -673,7 +698,8 @@ func TestFrameUserInfo_MountNpcIdCarriesOffset(t *testing.T) {
 // unassigned team.
 func TestFrameUserInfo_TeamByteBlueWhileSpawnProtected(t *testing.T) {
 	tmpl := &player.Template{}
-	c := &player.Character{Name: "M"}
+	c := &player.Character{}
+	c.SetName("M")
 
 	unprotected := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl}))
 	protected := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl, SpawnProtectedTeam: true}))
@@ -706,7 +732,8 @@ func TestFrameUserInfo_TeamByteBlueWhileSpawnProtected(t *testing.T) {
 // alone.
 func TestFrameUserAndCharInfoCarryOperateType(t *testing.T) {
 	tmpl := &player.Template{}
-	c := &player.Character{Name: "M"}
+	c := &player.Character{}
+	c.SetName("M")
 	encode := map[string]func() []byte{
 		"UserInfo": func() []byte { return framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl})) },
 		"CharInfo": func() []byte { return framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: tmpl})) },

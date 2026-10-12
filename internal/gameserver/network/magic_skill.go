@@ -1000,11 +1000,11 @@ func (l *GameClientLink) sendSkillHandlerResultVia(send frameSender, live *liveP
 			defender, defenderOnline := l.livePlayerByID(m.DefenderID)
 			attackerName := m.AttackerName
 			if attackerOnline {
-				attackerName = attacker.Name
+				attackerName = attacker.CharacterName()
 			}
 			defenderName := m.DefenderName
 			if defenderOnline {
-				defenderName = defender.Name
+				defenderName = defender.CharacterName()
 			}
 			if defenderOnline {
 				send(defender, serverpackets.FrameSystemMessageString(serverpackets.SystemMessageCounteredS1Attack, attackerName))
@@ -1017,11 +1017,11 @@ func (l *GameClientLink) sendSkillHandlerResultVia(send frameSender, live *liveP
 			defender, defenderOnline := l.livePlayerByID(m.DefenderID)
 			attackerName := m.AttackerName
 			if attackerOnline {
-				attackerName = attacker.Name
+				attackerName = attacker.CharacterName()
 			}
 			defenderName := m.DefenderName
 			if defenderOnline {
-				defenderName = defender.Name
+				defenderName = defender.CharacterName()
 			}
 			if attackerOnline {
 				send(attacker, serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DodgesAttack, defenderName))

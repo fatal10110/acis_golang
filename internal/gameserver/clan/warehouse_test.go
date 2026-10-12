@@ -34,10 +34,10 @@ func TestWarehouseRightsEndWithMembership(t *testing.T) {
 		}
 		for _, c := range []*player.Character{leader, member} {
 			if got := s.CanWithdraw(c, orderClanID+100); got != WithdrawSilent {
-				t.Fatalf("members=%v: %s withdrawing from another clan = %v, want silent", members, c.Name, got)
+				t.Fatalf("members=%v: %s withdrawing from another clan = %v, want silent", members, c.CharacterName(), got)
 			}
 			if s.InClan(c, orderClanID+100) {
-				t.Fatalf("members=%v: %s is in another clan", members, c.Name)
+				t.Fatalf("members=%v: %s is in another clan", members, c.CharacterName())
 			}
 		}
 

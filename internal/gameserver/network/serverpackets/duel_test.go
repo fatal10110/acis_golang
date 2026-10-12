@@ -60,7 +60,8 @@ func TestDuelPacketBytes(t *testing.T) {
 // payload changing with it. Spawn protection still shows BLUE in UserInfo.
 func TestFrameUserAndCharInfoCarryDuelTeam(t *testing.T) {
 	tmpl := &player.Template{}
-	c := &player.Character{Name: "M"}
+	c := &player.Character{}
+	c.SetName("M")
 	encode := map[string]func() []byte{
 		"UserInfo": func() []byte { return framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl})) },
 		"CharInfo": func() []byte { return framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: tmpl})) },

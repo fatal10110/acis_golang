@@ -201,7 +201,8 @@ func orderedClan(t *testing.T, reputation, members int) (*Service, *Clan, *fakeS
 }
 
 func inClan(id int32, name string, clanID int32) *player.Character {
-	c := &player.Character{ID: id, Name: name, CharLevel: 40}
+	c := &player.Character{ID: id, CharLevel: 40}
+	c.SetName(name)
 	c.SetClanID(clanID)
 	return c
 }

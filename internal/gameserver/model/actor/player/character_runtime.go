@@ -548,9 +548,6 @@ func (c *Character) ObjectID() int32 {
 // Kind reports KindPlayer.
 func (c *Character) Kind() actor.Kind { return actor.KindPlayer }
 
-// CharacterName returns this player's display name for character-name packets.
-func (c *Character) CharacterName() string { return c.Name }
-
 // LevelValue returns the player's current level for live-owned actors.
 func (c *Character) LevelValue() int {
 	return c.Level()

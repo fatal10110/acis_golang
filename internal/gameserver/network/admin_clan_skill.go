@@ -45,7 +45,7 @@ func (l *GameClientLink) adminClanSkill(gm *livePlayer, line string) {
 func (l *GameClientLink) runAdminClanSkill(gm, target *livePlayer, args []string) {
 	cl, ok := l.clanService().ClanOf(target.Character)
 	if !ok || !cl.IsLeader(target.ObjectID()) {
-		gm.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsNotAClanLeader, target.Name))
+		gm.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsNotAClanLeader, target.CharacterName()))
 		l.showAdminSkills(gm, target, 1)
 		return
 	}

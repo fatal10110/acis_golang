@@ -116,7 +116,7 @@ func (l *GameClientLink) boardFriendAction(live *livePlayer, action string, id i
 			// removal runs the two are no longer friends.
 			if friend, online := l.livePlayerByID(friendID); online {
 				if l.relations.RemoveFriend(friendID, live.ObjectID()) {
-					friend.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeletedFromFriendsList, live.Name))
+					friend.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeletedFromFriendsList, live.CharacterName()))
 				}
 				friend.SendFrame(serverpackets.FrameFriendList(l.friendListEntries(friendID)))
 			}

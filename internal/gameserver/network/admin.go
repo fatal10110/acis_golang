@@ -149,10 +149,10 @@ func (l *GameClientLink) runAdminCommand(gm *livePlayer, entry adminEntry, word,
 			l.log.Warn().Str("command", word).Msg("admin: no rights defined for admin command")
 		}
 		sendText(gm, entry.refusal)
-		l.log.Warn().Str("player", gm.Name).Str("command", word).Msg("admin: " + entry.logText)
+		l.log.Warn().Str("player", gm.CharacterName()).Str("command", word).Msg("admin: " + entry.logText)
 		return
 	}
-	l.gmAudit.Info().Msgf("%s [%d] used '%s' command on: %s", gm.Name, gm.ObjectID(), audited, trackedName(gm.Target()))
+	l.gmAudit.Info().Msgf("%s [%d] used '%s' command on: %s", gm.CharacterName(), gm.ObjectID(), audited, trackedName(gm.Target()))
 	if !ported {
 		l.log.Warn().Str("command", word).Msg("admin: command not implemented yet")
 		gm.SendFrame(serverpackets.FrameActionFailed())

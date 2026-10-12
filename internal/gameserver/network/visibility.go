@@ -382,7 +382,7 @@ func summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table, in
 		if owner.Invisible() && (viewer == nil || viewer.ObjectID() != owner.ObjectID()) {
 			return serverpackets.NPCInfoSnapshot{}, false
 		}
-		title = owner.Name
+		title = owner.CharacterName()
 		pvpFlag = int(owner.PvPFlagState())
 		karma = owner.Karma()
 		team = owner.DuelTeam()

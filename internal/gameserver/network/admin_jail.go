@@ -40,11 +40,11 @@ func (l *GameClientLink) adminBanChat(gm, target *livePlayer, name string, minut
 		return
 	}
 	if kind, _ := target.Punishment(); kind != player.PunishNone {
-		sendText(gm, target.Name+" is already "+kind.Description()+", and can't receive another punishment.")
+		sendText(gm, target.CharacterName()+" is already "+kind.Description()+", and can't receive another punishment.")
 		return
 	}
 	l.punishTarget(gm, target, player.PunishChat, minutes)
-	sendText(gm, target.Name+" is chat banned"+forMinutes(minutes))
+	sendText(gm, target.CharacterName()+" is chat banned"+forMinutes(minutes))
 }
 
 // adminUnbanChat answers //unban chat: an online target's chat ban is
@@ -56,11 +56,11 @@ func (l *GameClientLink) adminUnbanChat(gm, target *livePlayer, name string) {
 		return
 	}
 	if !target.ChatBanned() {
-		sendText(gm, target.Name+" isn't currently chat banned.")
+		sendText(gm, target.CharacterName()+" isn't currently chat banned.")
 		return
 	}
 	l.punishTarget(gm, target, player.PunishNone, 0)
-	sendText(gm, target.Name+"'s chat ban has been lifted.")
+	sendText(gm, target.CharacterName()+"'s chat ban has been lifted.")
 }
 
 // adminJail answers //jail [name [minutes]]: the named player, else the
@@ -99,7 +99,7 @@ func (l *GameClientLink) adminJail(gm *livePlayer, line string) {
 		return
 	}
 	l.punishTarget(gm, target, player.PunishJail, minutes)
-	sendText(gm, target.Name+" is jailed"+forMinutes(minutes))
+	sendText(gm, target.CharacterName()+" is jailed"+forMinutes(minutes))
 }
 
 // adminUnjail answers //unjail [name]: the named player, else the selected
@@ -122,7 +122,7 @@ func (l *GameClientLink) adminUnjail(gm *livePlayer, line string) {
 		return
 	}
 	l.punishTarget(gm, target, player.PunishNone, 0)
-	sendText(gm, target.Name+" has been unjailed.")
+	sendText(gm, target.CharacterName()+" has been unjailed.")
 }
 
 // reportOfflinePunishment stores kind and timer as the punishment of the

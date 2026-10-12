@@ -301,14 +301,14 @@ func (l *GameClientLink) broadcastPetPickupAttention(owner *livePlayer, ground *
 		if st.EnchantLevel > 0 {
 			return serverpackets.FrameSystemMessageStringNumberItemName(
 				serverpackets.SystemMessageAttentionS1PetPickedUpS2S3,
-				owner.Name,
+				owner.CharacterName(),
 				int32(st.EnchantLevel),
 				st.TemplateID,
 			)
 		}
 		return serverpackets.FrameSystemMessageStringItemName(
 			serverpackets.SystemMessageAttentionS1PetPickedUpS2,
-			owner.Name,
+			owner.CharacterName(),
 			st.TemplateID,
 		)
 	}

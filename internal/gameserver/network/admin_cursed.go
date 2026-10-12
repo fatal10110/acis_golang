@@ -191,7 +191,7 @@ func (l *GameClientLink) sendCursedWeaponsPage(gm *livePlayer) {
 		case w.Activated:
 			owner := "null"
 			if holder, online := l.livePlayerByID(w.HolderID); online {
-				owner = holder.Name
+				owner = holder.CharacterName()
 			}
 			sb.WriteString("<tr><td>Owner:</td><td>" + owner + "</td></tr>" +
 				"<tr><td>Stored values:</td><td>Karma=" + itoa32(w.Karma) + " PKs=" + itoa32(w.PKKills) + "</td></tr>" +

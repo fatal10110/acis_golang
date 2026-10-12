@@ -244,7 +244,7 @@ func (l *GameClientLink) useDecorativeSummonItem(live *livePlayer, inv *itemcont
 	}
 	live.move.Stop()
 	x, y, z := live.Position()
-	if !l.placeDecoration(template, live.Character.Name, x, y, z, live.Heading()) {
+	if !l.placeDecoration(template, live.Character.CharacterName(), x, y, z, live.Heading()) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
 	}
 	return true

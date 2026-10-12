@@ -103,7 +103,7 @@ func (l *GameClientLink) adminPetitionChat(gm *livePlayer, _ string) {
 	}
 	result, notices := l.petitions.AddToChat(petitionPerson(gm), petitionPerson(target), petitionPresence{l})
 	if result != petition.Added {
-		gm.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessagePetitionAddingS1FailedErrorNumberS2, target.Name, int32(result)))
+		gm.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessagePetitionAddingS1FailedErrorNumberS2, target.CharacterName(), int32(result)))
 		return
 	}
 	l.deliverPetition(notices)
@@ -120,17 +120,17 @@ func (l *GameClientLink) adminForcePetition(gm *livePlayer, _ string) {
 	result, id, err := l.petitions.Force(petitionPerson(gm), petitionPerson(target))
 	switch result {
 	case petition.ForceSelf:
-		gm.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessagePetitionFailedForS1ErrorNumberS2, target.Name, 1))
+		gm.SendFrame(serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessagePetitionFailedForS1ErrorNumberS2, target.CharacterName(), 1))
 		return
 	case petition.ForceAlreadySubmitted:
-		gm.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessagePetitionFailedS1AlreadySubmitted, target.Name))
+		gm.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessagePetitionFailedS1AlreadySubmitted, target.CharacterName()))
 		return
 	case petition.ForceNoID:
 		l.log.Error().Err(err).Int32("object_id", target.ObjectID()).Msg("admin: //force_peti")
 		gm.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	l.tellGMsOfPetition(target.ObjectID(), target.Name+" has submitted a new petition.")
+	l.tellGMsOfPetition(target.ObjectID(), target.CharacterName()+" has submitted a new petition.")
 	ok, notices := l.petitions.Join(petitionPerson(gm), id, true, petitionPresence{l})
 	l.deliverPetition(notices)
 	if !ok {
@@ -153,7 +153,7 @@ func (l *GameClientLink) showPetitions(gm *livePlayer, page int) {
 	for i, p := range list[pg.Start:pg.End] {
 		name, status := p.PetitionerName, "4"
 		if petitioner, ok := l.livePlayerByID(p.Petitioner); ok && !petitioner.detached() {
-			name, status = petitioner.Name, "1"
+			name, status = petitioner.CharacterName(), "1"
 		}
 		read := "QuestWndInfoIcon_5"
 		if !p.Unread {

@@ -439,7 +439,7 @@ func (l *GameClientLink) restoreStorage(ctx context.Context, account string, c *
 		if other.ID == c.ID {
 			continue
 		}
-		st.accountChars = append(st.accountChars, serverpackets.PackageRecipient{ObjectID: other.ID, Name: other.Name})
+		st.accountChars = append(st.accountChars, serverpackets.PackageRecipient{ObjectID: other.ID, Name: other.CharacterName()})
 		if f := l.restoreDepositedFreight(ctx, other.ID); f != nil {
 			st.deposits[other.ID] = f
 		}

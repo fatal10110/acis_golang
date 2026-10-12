@@ -71,12 +71,12 @@ func (l *GameClientLink) adminServer(gm *livePlayer, line string) {
 	switch tokens[1] {
 	case "shutdown", "restart":
 		if seconds, ok := number(); ok {
-			l.shutdown.Start(gm.Name, seconds, tokens[1] == "restart")
+			l.shutdown.Start(gm.CharacterName(), seconds, tokens[1] == "restart")
 		} else {
 			usage = true
 		}
 	case "abort":
-		l.shutdown.Abort(gm.Name)
+		l.shutdown.Abort(gm.CharacterName())
 	case "gmonly":
 		l.loginStatus.SetGMOnly(true)
 		sendText(gm, "Server is now set as GMonly.")

@@ -337,7 +337,7 @@ func cpRecovery(live *livePlayer, f *npc.Folk) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena))
 	case npc.CPRecoveryPaid:
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DisappearedAdena, npc.CPRecoveryFee))
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CPWillBeRestored, live.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1CPWillBeRestored, live.CharacterName()))
 	case npc.CPRecoveryUnpaid:
 	}
 }

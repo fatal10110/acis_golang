@@ -32,12 +32,12 @@ func (l *GameClientLink) requestJoinAlly(live *livePlayer, req clientpackets.Req
 		return
 	}
 	if check := l.clanService().CheckAllyJoin(c.ID, target.Character, time.Now()); check.Refusal != clan.AllyJoinAllowed {
-		sendAllyJoinRefusal(live, target.Name, check)
+		sendAllyJoinRefusal(live, target.CharacterName(), check)
 		return
 	}
-	switch l.clanService().Invites().Send(clan.InviteJoinAlly, c.ID, c.Name, target.ObjectID(), 0) {
+	switch l.clanService().Invites().Send(clan.InviteJoinAlly, c.ID, c.CharacterName(), target.ObjectID(), 0) {
 	case clan.InviteTargetBusy:
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.CharacterName()))
 		return
 	case clan.InviteRequesterBusy:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWaitingForAnotherReply))
@@ -45,7 +45,7 @@ func (l *GameClientLink) requestJoinAlly(live *livePlayer, req clientpackets.Req
 	}
 	allyName := cl.Info().AllyName
 	target.SendFrame(serverpackets.FrameSystemMessageParams(serverpackets.SystemMessageS2AllianceLeaderOfS1Requested,
-		serverpackets.TextParam(allyName), serverpackets.TextParam(c.Name)))
+		serverpackets.TextParam(allyName), serverpackets.TextParam(c.CharacterName())))
 	target.SendFrame(serverpackets.FrameAskJoinAlly(c.ObjectID(), allyName))
 }
 
@@ -111,7 +111,7 @@ func (l *GameClientLink) requestAnswerJoinAlly(live *livePlayer, req clientpacke
 	}
 	check := l.clanService().JoinAlly(invite.RequesterID, c, time.Now())
 	if check.Refusal != clan.AllyJoinAllowed {
-		sendAllyJoinRefusal(requester, c.Name, check)
+		sendAllyJoinRefusal(requester, c.CharacterName(), check)
 		return
 	}
 	l.refreshClanAppearance(live, check.Target)

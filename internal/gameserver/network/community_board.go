@@ -144,7 +144,7 @@ func (l *GameClientLink) sendBoardEdit(live *livePlayer, html, text, title, date
 	if frame, ok := serverpackets.FrameShowBoardEdit(html); ok {
 		live.SendFrame(frame)
 	}
-	live.SendFrame(serverpackets.FrameShowBoardFields(bbs.EditFields(live.Name, live.ObjectID(), live.AccountName(), text, title, date)))
+	live.SendFrame(serverpackets.FrameShowBoardFields(bbs.EditFields(live.CharacterName(), live.ObjectID(), live.AccountName(), text, title, date)))
 }
 
 // sendLoginBoardPages sends, at login, the new-mail notice when live has

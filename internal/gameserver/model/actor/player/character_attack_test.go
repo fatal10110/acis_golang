@@ -18,7 +18,9 @@ import (
 
 // ---- from character_target_test.go ----
 func targetCharacter(id int32) *Character {
-	return &Character{ID: id, Name: "target", CharLevel: 1}
+	c := &Character{ID: id, CharLevel: 1}
+	c.SetName("target")
+	return c
 }
 
 func TestCharacterTargetRoundTrips(t *testing.T) {

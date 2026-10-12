@@ -30,11 +30,11 @@ func newDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *
 	firstDelivery := &playerInventoryDelivery{updates: updates}
 	first := newTestLivePlayer(t, 1, firstCap, firstDelivery)
 	firstDelivery.live, firstDelivery.character = first, first.Character
-	first.Name = "TraderOne"
+	first.SetName("TraderOne")
 	secondDelivery := &playerInventoryDelivery{updates: updates}
 	second := newTestLivePlayer(t, 2, secondCap, secondDelivery)
 	secondDelivery.live, secondDelivery.character = second, second.Character
-	second.Name = "TraderTwo"
+	second.SetName("TraderTwo")
 	state.Spawn(first, 0, 0, 0, 0)
 	state.AddPlayer(first)
 	state.Spawn(second, 100, 0, 0, 0)
