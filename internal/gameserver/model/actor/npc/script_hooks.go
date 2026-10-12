@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -102,6 +103,12 @@ type ScriptHooks interface {
 	// that see spells on n: an effect of caster's sk is about to land on n.
 	// caster is nil for a sourceless effect. n is a *Hostile or a *Folk.
 	AbnormalStatusChanged(n, caster attackable.Combatant, sk skill.Ref)
+	// SeeItem runs n's see-item hooks: n looked for ground items and found
+	// items, with quantity. n is a *Hostile or a *Folk.
+	SeeItem(n attackable.Combatant, quantity int32, items []*grounditem.Item)
+	// PickedItem runs n's picked-item hooks: n picked up ground, which is
+	// still in the world. n is a *Hostile or a *Folk.
+	PickedItem(n attackable.Combatant, ground *grounditem.Item)
 }
 
 // behaves reports whether a behavior is bound to h's template id.

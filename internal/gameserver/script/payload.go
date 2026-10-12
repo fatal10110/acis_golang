@@ -116,8 +116,11 @@ type PartyAttacked struct {
 // included.
 type PartyDied struct{ Caller, Called *NPC }
 
-// PickedItem: NPC picked up an item.
-type PickedItem struct{ NPC *NPC }
+// PickedItem: NPC picked up Item, which still lies on the ground.
+type PickedItem struct {
+	NPC  *NPC
+	Item GroundItem
+}
 
 // ScriptEvent: NPC received the script event EventID with two arguments,
 // sent to it or broadcast around another NPC.
@@ -133,10 +136,11 @@ type SeeCreature struct {
 	Creature Creature
 }
 
-// SeeItem: NPC noticed Quantity items.
+// SeeItem: NPC looked for Quantity items and noticed Items on the ground.
 type SeeItem struct {
 	NPC      *NPC
 	Quantity int32
+	Items    []GroundItem
 }
 
 // SeeSpell: NPC saw Caster cast Skill on Targets; IsPet when the caster's
