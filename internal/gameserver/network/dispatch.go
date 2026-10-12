@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
 	"github.com/fatal10110/acis_golang/internal/gameserver/augment"
 	"github.com/fatal10110/acis_golang/internal/gameserver/bbs"
+	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castlemanor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
@@ -481,6 +482,9 @@ type GameClientLink struct {
 	// derby is the monster race track the race managers answer for; nil
 	// runs no race.
 	derby *derby.Track
+	// boats is the scheduled boat fleet //reload boat rebuilds; nil has
+	// no reload.
+	boats *boat.Fleet
 	// fences are the fences the admin fence commands place and remove.
 	fences *fence.Manager
 	// npcSpawns is the live NPC population the admin spawn commands use;
@@ -778,6 +782,9 @@ type GameClientLinkConfig struct {
 	FishingChampionship *fishchamp.Championship
 	// Derby is the monster race track; nil runs no race.
 	Derby *derby.Track
+	// Boats is the scheduled boat fleet //reload boat rebuilds; nil leaves
+	// that reload not ported.
+	Boats *boat.Fleet
 	// Reloads re-read the data tables //reload and //respawnall name; a
 	// nil hook leaves its table as booted.
 	Reloads DataReloads
@@ -943,6 +950,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	}
 	link.schemeBuffer = cfg.SchemeBuffer
 	link.derby = cfg.Derby
+	link.boats = cfg.Boats
 	if link.schemeBuffer == nil {
 		link.schemeBuffer = schemebuffer.New(schemebuffer.DefaultConfig(), nil, nil)
 	}

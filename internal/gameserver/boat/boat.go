@@ -62,6 +62,10 @@ func (*Boat) Kind() actor.Kind { return actor.KindBoat }
 // before the boat is spawned.
 func (b *Boat) Attach(sink event.Sink) { b.sink = sink }
 
+// Remove takes b, retired from its fleet, out of the world: whoever sees
+// it forgets it.
+func (b *Boat) Remove() { b.world.Despawn(b) }
+
 // Departure reports the leg the boat is under way on: where it heads and
 // the move and rotation speeds it travels with. ok is false while the boat
 // stands still.
