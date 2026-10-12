@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -22,4 +23,13 @@ func reduceAdena(live *livePlayer, count int) bool {
 	}
 	live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageS1DisappearedAdena, int32(count)))
 	return true
+}
+
+// takeAdena takes count adena from inv without a notice, reporting false,
+// taking none, when inv holds less. A count of 0 or less takes nothing.
+func takeAdena(inv *itemcontainer.Inventory, count int) bool {
+	if count > inv.Adena() {
+		return false
+	}
+	return count <= 0 || inv.DestroyByTemplateID(item.AdenaID, count) != nil
 }
