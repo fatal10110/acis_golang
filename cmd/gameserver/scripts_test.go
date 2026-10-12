@@ -314,7 +314,7 @@ func TestScriptCatalogMatchesManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := script.Config{KindOf: npcKindOf(npcs), Log: zerolog.Nop()}
+	cfg := script.Config{KindOf: npcKindOf(npcs), Log: zerolog.Nop(), HandleOps: scriptHandleOps}
 	for _, m := range manifestMismatches(t, list, catalog, cfg) {
 		t.Error(m)
 	}

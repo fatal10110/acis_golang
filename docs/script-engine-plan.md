@@ -387,6 +387,9 @@ uses.
      placeholders, hashes; no page text).
    - One unit test covers the four hand-kept `Hooks` lists (fields, invokers, `With`, bound
      set).
+   - The kind-specific handle operations each hook reaches, which the handle half of the
+     seam gate reads at boot (`cmd/gameserver/scripts_handleops.go`), equal a `go/types`
+     scan of the script sources.
 3. **Engine contracts, once.** About 45 reference-derived goldens: cond and flags bits; set
    cond and exit packet and SQL order; quest list contents; four drop types with roll counts
    and a fractional rate; range checks; the dialog rules of section 7; the fan-out rules of

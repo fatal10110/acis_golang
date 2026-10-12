@@ -111,6 +111,10 @@ type Config struct {
 	Log    zerolog.Logger
 	// Env is what the registered scripts' helpers act through.
 	Env *Env
+	// HandleOps holds, per scripts.xml path, the kind-specific handle
+	// operations the script's hooks reach. A script missing from it reaches
+	// none.
+	HandleOps map[string]HandleOps
 	// Queue is the engine queue. The dying hooks run on it, as they come
 	// after the NPC's own queue may have closed at its decay, and so does a
 	// script timer whose NPC and player have no queue to run it on.
@@ -191,7 +195,9 @@ const (
 // catalog has. A listed path with no script, or whose constructor panics,
 // is logged at error level and skipped; a catalog entry that is not listed
 // is never built. A script whose hooks the engine does not raise for the
-// NPC kinds it is bound to is refused: logged and skipped.
+// NPC kinds it is bound to is refused: logged and skipped. So is a script
+// whose hooks call a handle operation that does not exist for the kind of
+// an NPC the hook runs for (Config.HandleOps).
 //
 // For each (NPC, event) a behavior first removes any other behavior and a
 // script removes an earlier registration of itself; it is then appended,
@@ -226,8 +232,14 @@ func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
 		s.registry = r
 		s.Name = l.Path[strings.LastIndexByte(l.Path, '.')+1:]
 		e.bound = boundOf(&s, cfg.KindOf)
-		if err := gate(&s, e.bound, &cfg); err != nil {
-			r.log.Error().Err(err).Str("script", l.Path).Msg("script: refused; a hook it needs is not raised")
+		err := gate(&s, e.bound, &cfg)
+		refusal := "script: refused; a hook it needs is not raised"
+		if err == nil {
+			err = gateHandles(&s, e.bound, &cfg)
+			refusal = "script: refused; a handle operation it calls does not exist for an NPC kind it is bound to"
+		}
+		if err != nil {
+			r.log.Error().Err(err).Str("script", l.Path).Msg(refusal)
 			e.state = entryRefused
 			r.entries = append(r.entries, e)
 			continue
