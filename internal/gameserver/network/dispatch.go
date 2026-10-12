@@ -251,6 +251,9 @@ type PlayerConfig struct {
 	// MultisellDelay is the reuse delay between two multisell exchanges on
 	// one client session.
 	MultisellDelay time.Duration
+	// ManorDelay is the reuse delay between two seed purchases on one
+	// client session.
+	ManorDelay time.Duration
 	// RollDiceDelay is the reuse delay between two dice throws on one
 	// client session.
 	RollDiceDelay time.Duration

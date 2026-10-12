@@ -635,6 +635,19 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				if live != nil {
 					onLive(live, func() { l.requestSetCrop(live, req) })
 				}
+			case clientpackets.OpcodeRequestProcureCropList:
+				req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestProcureCropList, error) {
+					return clientpackets.DecodeRequestProcureCropList(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+				})
+				if err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					continue
+				}
+				if live != nil {
+					onLive(live, func() { l.requestProcureCropList(live, req) })
+				}
 			case clientpackets.OpcodeRequestExPledgeCrestLarge:
 				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestExPledgeCrestLarge)
 				if err != nil {
@@ -1899,6 +1912,42 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if live != nil {
 				onLive(live, func() { l.requestBuyItem(live, req) })
 			}
+
+		case clientpackets.OpcodeRequestBuySeed:
+			req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestBuySeed, error) {
+				return clientpackets.DecodeRequestBuySeed(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+			})
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			// The reuse gate is spent before anything else, with or without
+			// a player in the world. A gated purchase answers nothing, as
+			// specified: the seed window's submit leaves no client action
+			// pending.
+			if !client.performFloodProtected(floodProtectorManor, l.playerConfig.ManorDelay, time.Now()) {
+				continue
+			}
+			if live != nil {
+				onLive(live, func() { l.requestBuySeed(live, req) })
+			}
+
+		case clientpackets.OpcodeRequestBuyProcure:
+			// No window the server opens sends it, and no request decodes:
+			// the refusal answers nothing, as specified, and leaves no
+			// client action pending.
+			req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestBuyProcure, error) {
+				return clientpackets.DecodeRequestBuyProcure(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+			})
+			if err != nil {
+				if errors.Is(err, errMalformedPacketDisconnect) {
+					return
+				}
+				continue
+			}
+			l.log.Warn().Int("rows", len(req.Items)).Int32("manor", req.ManorID).Msg("RequestBuyProcure: normally unused")
 
 		case clientpackets.OpcodeRequestPreviewItem:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestPreviewItem)
