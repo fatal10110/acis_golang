@@ -1013,6 +1013,7 @@ type Server struct {
 	SevenSigns          *sevensigns.State
 	Festival            *festival.Manager
 	AnnounceFile        string // the announcements.xml the server reads and rewrites
+	shutdown            *shutdownHarness
 	account             string
 	templates           *player.TemplateTable
 	itemTable           *item.Table
@@ -1906,11 +1907,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 
 	loginAddr, servers, sessions := startLoginServerAcceptor(t, loginsql.NewAccountStore(db))
 	servers.Register(1, HexID)
+	shutdownState := newShutdownHarness(servers)
 
 	validator := network.NewSessionValidator()
 	loginLink, err := network.DialLoginLink(context.Background(), loginAddr,
 		network.LoginServerAuth{ServerID: 1, HexID: HexID, HostName: "*", Port: 7777, MaxPlayers: 300},
-		network.LoginLinkHandlers{PlayerAuthResponse: validator.Resolve}, zerolog.Nop())
+		network.LoginLinkHandlers{PlayerAuthResponse: shutdownState.authResponse(validator.Resolve)}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("DialLoginLink: %v", err)
 	}
@@ -2264,6 +2266,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Sieges = newSieges(db, o, gclConfig.Castles, gclConfig.Clans, persistWorker)
 	quests.bindResidences(worldObjects, gclConfig.Castles, gclConfig.Sieges)
 	gclConfig.CastleManor = newCastleManor(db, o, gclConfig.Castles, gclConfig.Clans, persistWorker, o.log)
+	gclConfig.LoginStatus, gclConfig.Shutdown = shutdownState.wire(loginLink, 300, queues, network.NewShutdownNotices(state), o.log)
 	gcl, err := network.NewGameClientLink(gclConfig)
 	if err != nil {
 		t.Fatalf("gameservertest: build game client link: %v", err)
@@ -2484,6 +2487,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	readCharSelectInfo(t, c, o.account, o.wantChars)
 
 	srv := &Server{
+		shutdown:            shutdownState,
 		Client:              c,
 		State:               state,
 		WorldObjects:        worldObjects,
