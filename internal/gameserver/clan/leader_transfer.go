@@ -22,9 +22,9 @@ type Handover struct {
 // two characters (their clan rank, their equipment) is the caller's to
 // refresh, on their own queues.
 //
-// Both grades change in the roster, an offline member's included, so the
-// clan window shows them at once; the stored grades are what either member
-// reads at its next login anyway.
+// Only a member in the world shows its new grade at once. An offline
+// one's roster entry keeps showing its old grade to the rest of the clan
+// until it logs in again, when the stored grade shows.
 func (s *Service) HandOverLeadership() []Handover {
 	clans := s.table.allClans()
 	slices.SortFunc(clans, func(a, b *Clan) int { return cmp.Compare(a.id, b.id) })
@@ -56,10 +56,10 @@ func (s *Service) handOver(cl *Clan) (Handover, bool) {
 	cl.newLeaderID = 0
 	s.updateClanLocked(cl)
 
-	leader.PowerGrade = LeaderPowerGrade
+	cl.regradeLocked(leader, LeaderPowerGrade)
 	former := Member{ObjectID: formerID}
 	if m, ok := cl.members[formerID]; ok {
-		m.PowerGrade = MemberPowerGrade
+		cl.regradeLocked(m, MemberPowerGrade)
 		former = *m
 	}
 	leaderID := leader.ObjectID
@@ -70,4 +70,15 @@ func (s *Service) handOver(cl *Clan) (Handover, bool) {
 		return st.SetPowerGrade(ctx, formerID, MemberPowerGrade)
 	})
 	return Handover{Clan: cl, Former: former, Leader: *leader}, true
+}
+
+// regradeLocked gives m power grade grade: at once when m is in the world,
+// else from its next login.
+func (cl *Clan) regradeLocked(m *Member, grade int) {
+	if m.Online {
+		m.PowerGrade = grade
+		delete(cl.loginGrades, m.ObjectID)
+		return
+	}
+	cl.loginGrades[m.ObjectID] = grade
 }

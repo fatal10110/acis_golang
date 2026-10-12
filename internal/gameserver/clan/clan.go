@@ -76,8 +76,12 @@ type Clan struct {
 	destroyed bool
 	board     board
 
-	members    map[int32]*Member
-	privileges map[int]int32
+	members map[int32]*Member
+	// loginGrades holds the stored power grade of an offline member whose
+	// roster entry still shows an older one; the entry takes it when the
+	// member logs in.
+	loginGrades map[int32]int
+	privileges  map[int]int32
 	// skills maps each skill the clan learnt to its level.
 	skills map[int]int
 	// subunits are the academy, royal guards and knight orders the clan
@@ -96,6 +100,7 @@ func newClan(id int32, name string, leaderID int32) *Clan {
 	return &Clan{
 		id: id, name: name, leaderID: leaderID,
 		members:      map[int32]*Member{},
+		loginGrades:  map[int32]int{},
 		privileges:   map[int]int32{},
 		skills:       map[int]int{},
 		subunits:     map[int]*SubPledge{},
@@ -342,7 +347,8 @@ func (cl *Clan) PowerGradeCounts() [10]int {
 }
 
 // SetOnline marks objectID online with its live values, reporting whether
-// it is a member.
+// it is a member. A stored power grade its entry did not show yet shows
+// from now on.
 func (cl *Clan) SetOnline(objectID int32, live Member) bool {
 	return cl.setPresence(objectID, live, true)
 }
@@ -362,6 +368,10 @@ func (cl *Clan) setPresence(objectID int32, live Member, online bool) bool {
 	}
 	m.Title, m.Level, m.ClassID, m.Sex, m.Race = live.Title, live.Level, live.ClassID, live.Sex, live.Race
 	m.Online = online
+	if grade, ok := cl.loginGrades[objectID]; ok && online {
+		m.PowerGrade = grade
+		delete(cl.loginGrades, objectID)
+	}
 	return true
 }
 
