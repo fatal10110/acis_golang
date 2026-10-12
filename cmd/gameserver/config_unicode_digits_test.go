@@ -10,18 +10,20 @@ import (
 // server.properties integers to the reference's Config, which reads them
 // with Integer.parseInt: fullwidth and Arabic-Indic digits read as their
 // value (a Java probe on OpenJDK 21.0.11, recorded in #3091, prints
-// Integer.parseInt("１２") and Integer.parseInt("١٢") as 12).
+// Integer.parseInt("１２") and Integer.parseInt("١٢") as 12). The digits are
+// \u escapes: a .properties file reads as ISO-8859-1, so an escape is the
+// only way such a character reaches a value.
 func TestGameServerConfigReadsUnicodeDigits(t *testing.T) {
 	serverProps, err := config.ParseString(`
 URL = jdbc:mariadb://localhost/acis
-GameserverPort = ١٧٧٧٧
-MaximumOnlineUsers = １２３
+GameserverPort = \u0661\u0667\u0667\u0667\u0667
+MaximumOnlineUsers = \uFF11\uFF12\uFF13
 `)
 	if err != nil {
 		t.Fatalf("ParseString server: %v", err)
 	}
 	hexProps, err := config.ParseString(`
-ServerID = ３
+ServerID = \uFF13
 HexID = -7fff
 `)
 	if err != nil {

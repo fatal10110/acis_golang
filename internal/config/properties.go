@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/rs/zerolog"
 
@@ -89,29 +91,27 @@ type IntPair struct {
 // Parse reads .properties content: key=value lines (also accepting ':' or
 // whitespace as the separator), '#'/'!' comment lines, backslash line
 // continuations, and '\t'/'\n'/'\r'/'\f'/'\uXXXX' escapes in keys and
-// values.
+// values. Each input byte is one ISO-8859-1 character, so a non-ASCII value
+// is reachable only through a \uXXXX escape; an escaped UTF-16 surrogate
+// pair reads as its one character.
 func Parse(r io.Reader) (*Properties, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}
-	lines := logicalLines(string(data))
 	p := &Properties{values: make(map[string]string)}
-	for i, line := range lines {
-		line = strings.TrimLeftFunc(line, isSpaceRune)
-		if line == "" || line[0] == '#' || line[0] == '!' {
-			continue
-		}
-		key, value, err := splitProperty(line)
+	for _, line := range logicalLines(decodeLatin1(data)) {
+		key, value, err := splitProperty(line.text)
 		if err != nil {
-			return nil, fmt.Errorf("line %d: %w", i+1, err)
+			return nil, fmt.Errorf("line %d: %w", line.number, err)
 		}
 		p.values[key] = value
 	}
 	return p, nil
 }
 
-// ParseString reads .properties content (see Parse) from a string.
+// ParseString reads .properties content (see Parse) from a string holding
+// the file's bytes.
 func ParseString(s string) (*Properties, error) {
 	return Parse(strings.NewReader(s))
 }
@@ -436,29 +436,55 @@ func (p *Properties) intPairsSep(sep, key, def string, tolerant bool) ([]IntPair
 	return out, nil
 }
 
-func logicalLines(data string) []string {
+// decodeLatin1 reads every byte of data as the ISO-8859-1 character of the
+// same value.
+func decodeLatin1(data []byte) string {
+	var out strings.Builder
+	out.Grow(len(data))
+	for _, b := range data {
+		out.WriteRune(rune(b))
+	}
+	return out.String()
+}
+
+// logicalLine is one key/value entry with its continuations joined and
+// leading whitespace removed; number is the 1-based line it starts on.
+type logicalLine struct {
+	number int
+	text   string
+}
+
+// logicalLines joins backslash continuations and drops blank and comment
+// lines. A '#' or '!' starts a comment only where it is the first
+// character of an entry, so a comment never continues onto the next line
+// and a continued line starting with one is ordinary text.
+func logicalLines(data string) []logicalLine {
 	data = strings.ReplaceAll(data, "\r\n", "\n")
 	data = strings.ReplaceAll(data, "\r", "\n")
 
-	var lines []string
+	var lines []logicalLine
 	var current strings.Builder
-	continued := false
-	for _, line := range strings.Split(data, "\n") {
-		if continued {
-			line = strings.TrimLeftFunc(line, isSpaceRune)
+	start := 0
+	for i, line := range strings.Split(data, "\n") {
+		line = strings.TrimLeftFunc(line, isSpaceRune)
+		if current.Len() == 0 {
+			start = i + 1
+			if line != "" && (line[0] == '#' || line[0] == '!') {
+				continue
+			}
 		}
 		if hasContinuation(line) {
 			current.WriteString(line[:len(line)-1])
-			continued = true
 			continue
 		}
 		current.WriteString(line)
-		lines = append(lines, current.String())
+		if current.Len() > 0 {
+			lines = append(lines, logicalLine{number: start, text: current.String()})
+		}
 		current.Reset()
-		continued = false
 	}
-	if continued {
-		lines = append(lines, current.String())
+	if current.Len() > 0 {
+		lines = append(lines, logicalLine{number: start, text: current.String()})
 	}
 	return lines
 }
@@ -553,17 +579,48 @@ func unescape(s string) (string, error) {
 			if i+4 >= len(s) {
 				return "", fmt.Errorf("short unicode escape")
 			}
-			n, err := strconv.ParseInt(s[i+1:i+5], 16, 32)
-			if err != nil {
+			r, ok := hexUnit(s[i+1 : i+5])
+			if !ok {
 				return "", fmt.Errorf("bad unicode escape %q", s[i+1:i+5])
 			}
-			out.WriteRune(rune(n))
 			i += 4
+			// A high surrogate escape followed by a low one is a single
+			// character; an unpaired surrogate has no UTF-8 form and
+			// reads as U+FFFD.
+			if utf16.IsSurrogate(r) && i+6 < len(s) && s[i+1] == '\\' && s[i+2] == 'u' {
+				if low, ok := hexUnit(s[i+3 : i+7]); ok {
+					if pair := utf16.DecodeRune(r, low); pair != utf8.RuneError {
+						r = pair
+						i += 6
+					}
+				}
+			}
+			out.WriteRune(r)
 		default:
 			out.WriteByte(s[i])
 		}
 	}
 	return out.String(), nil
+}
+
+// hexUnit reads exactly four hex digits, with no sign or prefix, as one
+// UTF-16 code unit.
+func hexUnit(s string) (rune, bool) {
+	var r rune
+	for i := range len(s) {
+		c := s[i]
+		switch {
+		case '0' <= c && c <= '9':
+			r = r<<4 | rune(c-'0')
+		case 'a' <= c && c <= 'f':
+			r = r<<4 | rune(c-'a'+10)
+		case 'A' <= c && c <= 'F':
+			r = r<<4 | rune(c-'A'+10)
+		default:
+			return 0, false
+		}
+	}
+	return r, true
 }
 
 func splitTrimTrailingEmpty(re *regexp.Regexp, s string) []string {
