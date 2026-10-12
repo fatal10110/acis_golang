@@ -217,6 +217,9 @@ func (l *GameClientLink) applyPKKarmaSideEffects(live *livePlayer) {
 	l.queuePvPChange(live, pvpChange{reset: true})
 }
 
+// runPKKarmaSideEffects runs that work. A use condition test that aborts
+// ends only the item sweep: the flag still resets, so an item condition
+// that cannot be tested never leaves a fresh PKer flagged.
 func (l *GameClientLink) runPKKarmaSideEffects(live *livePlayer) {
 	l.unequipRestrictedItems(live)
 	if l.pvpFlags != nil {
