@@ -147,6 +147,7 @@ func provideGameClientLink(
 	log zerolog.Logger,
 	gmAudit gmAuditLogger,
 	reloads network.DataReloads,
+	bossZones *gamesql.BossZoneStore,
 	loginStatus *network.LoginStatus,
 	countdown *shutdown.Countdown,
 	chatLog chatLogger,
@@ -318,7 +319,8 @@ func provideGameClientLink(
 		ClanHallFunctions: hallFunctions,
 		ClanHalls:         halls,
 
-		Reloads: reloads,
+		Reloads:   reloads,
+		BossZones: bossZones,
 
 		Shutdown:    countdown,
 		LoginStatus: loginStatus,

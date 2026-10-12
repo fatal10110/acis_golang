@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/rs/zerolog"
@@ -20,7 +21,7 @@ import (
 // the same files the boot read, and swaps the loaded table into the one the
 // server already holds, so every holder sees the new data at once. A file
 // that cannot be read leaves the table as it was.
-func provideDataReloads(paths gameServerPaths, data *gameData, html *datacache.HTML, crests *datacache.Crests, walker *task.Walker, spawnStore *gamesql.SpawnStore, gameplay gameplayConfig, log zerolog.Logger) network.DataReloads {
+func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameData, html *datacache.HTML, crests *datacache.Crests, walker *task.Walker, spawnStore *gamesql.SpawnStore, gameplay gameplayConfig, log zerolog.Logger) network.DataReloads {
 	xmlRoot := filepath.Join(paths.DataRoot, "data", "xml")
 	return network.DataReloads{
 		Admin: func() error {
@@ -114,6 +115,14 @@ func provideDataReloads(paths gameServerPaths, data *gameData, html *datacache.H
 				log.Warn().Err(err).Msg("save spawn data before the spawn list reload")
 			}
 			return manager.LoadSpawns(ctx, filepath.Join(xmlRoot, "spawnlist"), spawnStore, log, float64(gameplay.SpawnMultiplier))
+		},
+		Zones: func() (*zone.Index, error) {
+			fresh, err := gamexml.LoadZones(filepath.Join(xmlRoot, "zones"))
+			if err != nil {
+				return nil, err
+			}
+			applyTownCombatRule(fresh, cfg.TownCombatRule)
+			return fresh, nil
 		},
 	}
 }

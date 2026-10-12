@@ -19,22 +19,25 @@ const systemMessageTrapDeviceTripped = 714
 // run on a queue of their own, and the castle traps their siege: a castle
 // trap is live only while its castle's siege is in progress
 // (CastleZoneType.getCastle().getSiege().isInProgress()).
-func (l *GameClientLink) wireZonePulses() {
-	if l.zones == nil || l.world == nil {
+func (l *GameClientLink) wireZonePulses(ix *zone.Index) {
+	if l.world == nil {
 		return
 	}
-	for _, z := range zone.OfKind[*zone.Damage](l.zones) {
+	for _, z := range zone.OfKind[*zone.Damage](ix) {
 		if z.CastleID > 0 {
 			z.SiegeActive = l.castleSiegeInProgress(z.CastleID)
 		}
 	}
-	for _, z := range zone.OfKind[*zone.Swamp](l.zones) {
+	for _, z := range zone.OfKind[*zone.Swamp](ix) {
 		if z.CastleID > 0 {
 			z.SiegeActive = l.castleSiegeInProgress(z.CastleID)
 		}
 	}
-	zonepulse.Wire(l.zones, zonepulse.Config{
-		Queue:       l.queues.NewQueue("zone-pulses"),
+	if l.zonePulses == nil {
+		l.zonePulses = l.queues.NewQueue("zone-pulses")
+	}
+	zonepulse.Wire(ix, zonepulse.Config{
+		Queue:       l.zonePulses,
 		Objects:     l.world,
 		Skills:      l.skills,
 		Effects:     zonePulseEffects{},

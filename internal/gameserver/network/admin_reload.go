@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -60,6 +61,9 @@ type DataReloads struct {
 	// spawn list and those rows anew, for //respawnall
 	// (SpawnManager.reload's save and load).
 	SpawnList func(ctx context.Context, current *manager.Spawns) (*manager.Spawns, error)
+	// Zones reads the zones anew, set up as at boot, which then replace the
+	// ones the server holds (ZoneManager.reload's load).
+	Zones func() (*zone.Index, error)
 }
 
 // errReloadNotPorted answers a //reload type whose table has no reload
@@ -67,7 +71,7 @@ type DataReloads struct {
 var errReloadNotPorted = errors.New("reload not ported yet")
 
 // reloadNotPorted answers a type no reload exists for yet, each tracked by
-// its issue: boat (#3404), config (#3406), door (#3407) and zone (#3410).
+// its issue: boat (#3404), config (#3406) and door (#3407).
 func reloadNotPorted(*GameClientLink) error { return errReloadNotPorted }
 
 // reloadHook runs hook, errReloadNotPorted without one.
@@ -108,7 +112,7 @@ var reloadTypes = []reloadType{
 	{word: "script", exact: true, done: "Script reload is not supported; scripts load once, at server start.", run: reloadNothing},
 	{word: "skill", done: "Skills' XMLs have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Skills) }},
 	{word: "teleport", done: "Teleport locations have been reloaded.", run: (*GameClientLink).reloadTeleports},
-	{word: "zone", done: "Zones have been reloaded.", run: reloadNotPorted},
+	{word: "zone", done: "Zones have been reloaded.", run: (*GameClientLink).reloadZones},
 }
 
 // reloadUsage is what //reload answers a type it does not take.

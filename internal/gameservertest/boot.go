@@ -2092,6 +2092,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		ItemTemplates:    itemTemplates,
 		HTML:             HTMLCache(t, o.pages()),
 		Reloads:          o.dataReloads,
+		BossZones:        gamesql.NewBossZoneStore(db),
 		Crests:           crests,
 		Skills:           o.skills,
 		Spellbooks:       o.spellbooks,

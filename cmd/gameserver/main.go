@@ -172,6 +172,7 @@ func newGameServerAppOptions(paths gameServerPaths) []fx.Option {
 			gamesql.NewMemoStore,
 			gamesql.NewSubclassStore,
 			gamesql.NewPetStore,
+			gamesql.NewBossZoneStore,
 			provideIDAllocator,
 			loadClanConfig,
 			provideClans,

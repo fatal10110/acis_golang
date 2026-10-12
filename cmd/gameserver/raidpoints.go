@@ -27,17 +27,16 @@ func startRaidPoints(lc fx.Lifecycle, points *raidpoint.Points) {
 
 // startBossZones gives the players allowed into a boss zone before the
 // last shutdown their permission back, and saves the allowed players once
-// the game server has let every player go.
-func startBossZones(lc fx.Lifecycle, data *gameData, db *sql.DB, log zerolog.Logger) {
-	store := gamesql.NewBossZoneStore(db)
-	zones := zone.OfKind[*zone.Boss](data.Zones)
+// the game server has let every player go: those of the boss zones held
+// then, which a zone reload may have read anew.
+func startBossZones(lc fx.Lifecycle, data *gameData, store *gamesql.BossZoneStore, log zerolog.Logger) {
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			return store.Restore(ctx, zones)
+			return store.Restore(ctx, zone.OfKind[*zone.Boss](data.Zones))
 		},
 		OnStop: func(ctx context.Context) error {
 			saveOnStop(ctx, shutdownSaveTimeout, log, "save boss zones", func(ctx context.Context) error {
-				return store.SaveZones(ctx, zones)
+				return store.SaveZones(ctx, zone.OfKind[*zone.Boss](data.Zones))
 			})
 			return nil
 		},

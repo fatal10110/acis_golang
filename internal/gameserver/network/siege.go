@@ -228,11 +228,8 @@ func (l *GameClientLink) showSiegeMessenger(live *livePlayer, f *npc.Folk) bool 
 //
 // ponytail: the forced dismount of a wyvern rider on a battlefield under
 // siege, as on no-landing ground, is not wired (#3377).
-func (l *GameClientLink) wireSiegeZones() {
-	if l.zones == nil {
-		return
-	}
-	for _, field := range zone.OfKind[*zone.Siege](l.zones) {
+func (l *GameClientLink) wireSiegeZones(ix *zone.Index) {
+	for _, field := range zone.OfKind[*zone.Siege](ix) {
 		field.CombatNotice = l.siegeCombatNotice
 		field.FlagPvP = l.siegeFlagPvP
 		field.Banish = l.siegeBanisher(field)
