@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -21,6 +22,9 @@ type Decoration struct {
 	world.Presence
 	*Instance
 	stats fixedStats
+	// RespawnDelay is the respawn delay its spawn declares. It is set
+	// before Spawn and schedules nothing: a decoration never respawns.
+	RespawnDelay time.Duration
 
 	// world, sink and zones are installed by Attach, before the NPC is
 	// published.
@@ -164,6 +168,10 @@ type fixedStats struct {
 	moveMultiplier, atkSpdMultiplier float64
 	// moveSpeed is the speed the NPC walks or runs at, by its stance.
 	moveSpeed float64
+	// template and mods are what every other stat is finalized from: the
+	// NPC's template and its passives' stat funcs.
+	template *Template
+	mods     []effect.Mod
 }
 
 // settleFixedStats finalizes inst's stats through the builtin stat funcs
@@ -174,24 +182,10 @@ func settleFixedStats(inst *Instance, lookup skillDefinitions) (fixedStats, erro
 		return fixedStats{}, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
 	}
 	t := inst.Template
-	calc := func(s stat.Stat, base float64) float64 {
-		c := effect.NewCalculator(defaultBuiltin(s))
-		for _, m := range mods {
-			if m.Stat == s {
-				c.AddMod(m)
-			}
-		}
-		v := c.Calc(templateStatActor{t: t}, base)
-		if s.CantBeNegative() && v <= 0 {
-			return 1
-		}
-		return v
-	}
-	fs := fixedStats{
-		maxHP:   int(calc(stat.MaxHP, t.HPMax)),
-		pAtkSpd: int(calc(stat.PowerAttackSpeed, t.AtkSpd)),
-		mAtkSpd: int(calc(stat.MagicAttackSpeed, magicAttackSpeedBase)),
-	}
+	fs := fixedStats{template: t, mods: mods}
+	fs.maxHP = int(fs.calc(stat.MaxHP, t.HPMax))
+	fs.pAtkSpd = int(fs.calc(stat.PowerAttackSpeed, t.AtkSpd))
+	fs.mAtkSpd = int(fs.calc(stat.MagicAttackSpeed, magicAttackSpeedBase))
 	fs.atkSpdMultiplier = npcinfo.AttackSpeedMultiplier(fs.pAtkSpd, t.AtkSpd)
 	// The move speed over the base speed the stance picks, as a moving NPC
 	// computes it; 0 for an NPC whose base is 0.
@@ -200,9 +194,25 @@ func settleFixedStats(inst *Instance, lookup skillDefinitions) (fixedStats, erro
 		base = int(t.WalkSpeed)
 	}
 	if base != 0 {
-		speed := float32(calc(stat.RunSpeed, float64(base)))
+		speed := float32(fs.calc(stat.RunSpeed, float64(base)))
 		fs.moveMultiplier = float64(speed / float32(base))
 		fs.moveSpeed = float64(speed)
 	}
 	return fs, nil
+}
+
+// calc finalizes base for s through the builtin stat funcs and the
+// passives, flooring a non-positive stat that can't go negative at one.
+func (fs fixedStats) calc(s stat.Stat, base float64) float64 {
+	c := effect.NewCalculator(defaultBuiltin(s))
+	for _, m := range fs.mods {
+		if m.Stat == s {
+			c.AddMod(m)
+		}
+	}
+	v := c.Calc(templateStatActor{t: fs.template}, base)
+	if s.CantBeNegative() && v <= 0 {
+		return 1
+	}
+	return v
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -58,6 +59,9 @@ type Env struct {
 	Doors Doors
 	// Castles are the castles an NPC belongs to; nil finds none.
 	Castles Castles
+	// SiegableHall reports whether a residence id names a siegable clan
+	// hall; nil names none.
+	SiegableHall func(id int) bool
 	// Sieges are the castles' sieges; nil finds none.
 	Sieges Sieges
 }
@@ -71,10 +75,13 @@ type Doors interface {
 	SetDoorOpen(id int, open bool) bool
 }
 
-// Castles finds the castle an NPC template belongs to.
+// Castles finds the castle an NPC belongs to.
 type Castles interface {
-	// ByNPC returns the castle whose residence NPCs include npcID.
-	ByNPC(npcID int) (*castle.Castle, bool)
+	// ForNPC returns the castle an NPC of template npcID placed by maker
+	// (nil for none) belongs to: the one the maker's spawn time names,
+	// none when that names a siegable clan hall, else the castle whose
+	// residence NPCs include npcID.
+	ForNPC(npcID int, maker *spawn.Maker, siegableHall func(id int) bool) (*castle.Castle, bool)
 }
 
 // Sieges finds a castle's siege.
