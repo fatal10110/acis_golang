@@ -449,8 +449,7 @@ func (m *CreatureMove) SetFlying(flying bool) {
 
 // SetInBoat records whether the mover, a player, rides a boat. A passenger's
 // own server-side steps are held at the surface of the water zone it stands
-// in, as a flyer's are (PlayerMove.updatePosition, canBypassZCheck). Its
-// tests/boat coverage waits on a fixture for such a step (#3425).
+// in, as a flyer's are (PlayerMove.updatePosition, canBypassZCheck).
 func (m *CreatureMove) SetInBoat(inBoat bool) {
 	m.mu.Lock()
 	m.inBoat = inBoat
