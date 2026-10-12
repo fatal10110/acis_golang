@@ -113,27 +113,54 @@ func TestItemLogRecordsNonStackableChanges(t *testing.T) {
 	drainUntilQuiet(t, c)
 	assertItemRecords(t, &sink, "the unequip", named("MODIFIED", "INVENTORY"))
 
-	c.Send(encodeRequestDropItem(adena, 40, spawnX, spawnY, spawnZ))
-	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeDropItem, "adena DropItem")
-	drainUntilQuiet(t, c)
-	assertItemRecords(t, &sink, "a stackable drop")
+	drop := func(objectID, count int32, what string) int32 {
+		t.Helper()
+		c.Send(encodeRequestDropItem(objectID, count, spawnX, spawnY, spawnZ))
+		frame := c.Read()
+		assertFrameOpcode(t, frame, serverpackets.OpcodeDropItem, what+" DropItem")
+		r := wire.NewReader(frame[1:])
+		r.ReadInt32() // dropper
+		groundID := r.ReadInt32()
+		drainUntilQuiet(t, c)
+		return groundID
+	}
+	pickUp := func(groundID int32, what string) {
+		t.Helper()
+		c.Send(encodeAction(groundID, spawnX, spawnY, spawnZ, false))
+		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, what+" pending-action release")
+		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeGetItem, what+" GetItem")
+		drainUntilQuiet(t, c)
+	}
 
-	c.Send(encodeRequestDropItem(sword, 1, spawnX, spawnY, spawnZ))
-	frame := c.Read()
-	assertFrameOpcode(t, frame, serverpackets.OpcodeDropItem, "sword DropItem")
-	r := wire.NewReader(frame[1:])
-	r.ReadInt32() // dropper
-	groundID := r.ReadInt32()
-	drainUntilQuiet(t, c)
+	partAdena := drop(adena, 40, "partial adena")
+	assertItemRecords(t, &sink, "a partial stackable drop")
+
+	groundSword := drop(sword, 1, "sword")
 	assertItemRecords(t, &sink, "the sword drop", named("REMOVED", "VOID"))
 
-	c.Send(encodeAction(groundID, spawnX, spawnY, spawnZ, false))
-	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "pickup pending-action release")
-	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeGetItem, "GetItem")
-	drainUntilQuiet(t, c)
+	pickUp(groundSword, "sword pickup")
 	picked := named("ADDED", "INVENTORY")
-	picked.ObjectID = groundID
+	picked.ObjectID = groundSword
 	assertItemRecords(t, &sink, "the sword pickup", picked)
+
+	// The rest of the adena leaves as a whole stack, then both ground stacks
+	// come back: the first creates a new carried stack, the second merges
+	// into it. None of these stackable moves is recorded.
+	restAdena := drop(adena, 60, "whole adena")
+	assertItemRecords(t, &sink, "a whole stackable drop")
+	if got := carriedCount(t, srv, objID, item.AdenaID); got != 0 {
+		t.Fatalf("carried adena after dropping it all = %d, want 0", got)
+	}
+	pickUp(partAdena, "first adena pickup")
+	assertItemRecords(t, &sink, "a stackable pickup into an empty slot")
+	if got := carriedCount(t, srv, objID, item.AdenaID); got != 40 {
+		t.Fatalf("carried adena after the first pickup = %d, want 40", got)
+	}
+	pickUp(restAdena, "second adena pickup")
+	assertItemRecords(t, &sink, "a stackable pickup onto a carried stack")
+	if got := carriedCount(t, srv, objID, item.AdenaID); got != 100 {
+		t.Fatalf("carried adena after the second pickup = %d, want 100", got)
+	}
 }
 
 // TestItemLogRecordsWornItemsAtLogin pins the login side of LogItems: putting
