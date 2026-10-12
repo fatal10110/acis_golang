@@ -12,17 +12,19 @@ import (
 // Integer.parseInt("１２") and Integer.parseInt("١٢") as 12; the other
 // digits follow from the same Character.digit(c, 10) call, which reads every
 // Unicode decimal digit and reads a fullwidth letter as a value of ten or
-// more, so parseInt rejects "ａ".
+// more, so parseInt rejects "ａ". The digits are written as \u escapes: the
+// loader reads file bytes as ISO-8859-1, so an escape is the only way such
+// a character reaches a value.
 func TestIntegerReadsAcceptUnicodeDigits(t *testing.T) {
 	t.Parallel()
-	p, err := ParseString("fw=１２\n" +
-		"ar=١٢\n" +
-		"dev=-१२\n" +
-		"mixed=1２\n" +
-		"letter=ａ\n" +
-		"list=１,٢;-३\n" +
-		"pairs=５７-１００;٦٦٥١-٣\n" +
-		"comma=５７-0,5575-٠\n")
+	p, err := ParseString("fw=\\uFF11\\uFF12\n" +
+		"ar=\\u0661\\u0662\n" +
+		"dev=-\\u0967\\u0968\n" +
+		"mixed=1\\uFF12\n" +
+		"letter=\\uFF41\n" +
+		"list=\\uFF11,\\u0662;-\\u0969\n" +
+		"pairs=\\uFF15\\uFF17-\\uFF11\\uFF10\\uFF10;\\u0666\\u0666\\u0665\\u0661-\\u0663\n" +
+		"comma=\\uFF15\\uFF17-0,5575-\\u0660\n")
 	if err != nil {
 		t.Fatalf("ParseString: %v", err)
 	}
@@ -69,7 +71,7 @@ func TestIntegerReadsAcceptUnicodeDigits(t *testing.T) {
 // "１.５".
 func TestFloatReadsStayASCII(t *testing.T) {
 	t.Parallel()
-	p, err := ParseString("rate=１.５\nlist=1.5,٢\n")
+	p, err := ParseString("rate=\\uFF11.\\uFF15\nlist=1.5,\\u0662\n")
 	if err != nil {
 		t.Fatalf("ParseString: %v", err)
 	}
