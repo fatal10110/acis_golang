@@ -66,6 +66,18 @@ func Range() script.Script {
 	}}}
 }
 
+type stepFn func(*script.NPC, float32)
+
+var named = []stepFn{func(n *script.NPC, _ float32) { _ = n.Stunned() }}
+
+// Named calls it through an element of a slice of a named function type,
+// set from a function literal of the unnamed signature.
+func Named() script.Script {
+	return script.Script{Hooks: script.Hooks{OnAttacked: func(_ *script.Script, e script.Attacked) {
+		named[0](e.NPC, 0)
+	}}}
+}
+
 func lookup() func(*script.NPC, uint16) {
 	return func(n *script.NPC, _ uint16) { _ = n.InCombat() }
 }

@@ -12,8 +12,8 @@
 // hook reaches every function the script assigns to that hook, its
 // ancestors' included. A call through any other function value that is not
 // a local variable with seen assignments (a struct field, a map or slice
-// element, a call result) reaches every function value of that type the
-// content packages make, and is an error when they make none; the engine's
+// element, a call result) reaches every function value of that signature
+// the content packages make, and is an error when they make none; the engine's
 // own function values count at the engine function that makes them. The
 // result over-approximates and never misses a statically visible call.
 package handleops
@@ -616,13 +616,15 @@ func (p *Program) Script(ctors []*types.Func) (map[string][]string, error) {
 	for field := range roots {
 		ops := map[string]bool{}
 		p.walk(roots[field], func(nd node, visit func(node), hook func(string)) {
-			// anyOf visits every function value of type t the content
-			// packages make, at a call through a value the scan does not
-			// follow.
+			// anyOf visits every function value whose signature is t's
+			// that the content packages make, at a call through a value the
+			// scan does not follow. Signatures are compared, not types: a
+			// value of an unnamed signature is assignable to a named
+			// function type and the other way round.
 			anyOf := func(at ast.Node, t types.Type) {
 				found := false
 				for _, fv := range p.funcValues {
-					if types.Identical(fv.sig, t) {
+					if types.Identical(fv.sig.Underlying(), t.Underlying()) {
 						found = true
 						visit(fv.nd)
 					}
