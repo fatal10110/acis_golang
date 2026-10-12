@@ -203,6 +203,9 @@ func (n *Npcs) respawnSlot(key string) {
 	n.spawnFresh(key, slot.entry, tmpl, pos)
 }
 
+// despawnMinions takes master's minions out of the world with it, each
+// decayed on the calling goroutine without waiting for its own queue (the
+// npc package's off-queue delete contract), and drops their spawn slots.
 func (n *Npcs) despawnMinions(master npc.PartyMember) {
 	for _, minion := range master.Minions() {
 		id := minion.ObjectID()
