@@ -27,7 +27,11 @@ import (
 // Maker, MakerHooks, Catalog or MakerCatalog of this package (a pointer to
 // one or a factory of one included), and a local is mutable when anything
 // but its own declaration writes it (an assignment, an increment, its
-// address taken, a delete, clear or copy into it, or a send on it).
+// address taken, a delete, clear, copy or append into it, or a send on it).
+// A write through a local is also a write through every variable that
+// local, or a field of it, was assigned from: s := f.seen; s[k] = true
+// writes f, as does w.m = f.seen; w.m[k] = true, and p := ptr; *p = 1
+// writes ptr.
 //
 // State a family of scripts shares (the third-class saga core and its 31
 // sagas) follows from the same rule: a value of a family type the catalog
@@ -56,6 +60,29 @@ func TestScriptPackagesKeepSharedStateInCells(t *testing.T) {
 func TestScriptStateCheckCatchesFixture(t *testing.T) {
 	got := checkScriptState(t, filepath.Join("testdata", "statecheck", "bad"))
 	want := []string{
+		"alias.go:10: closure captures mutable constructor-local f",
+		"alias.go:11: Alias writes through its parameter f",
+		"alias.go:20: closure captures mutable constructor-local seen",
+		"alias.go:30: closure captures mutable constructor-local f",
+		"alias.go:32: Chain writes through its parameter f",
+		"alias.go:41: closure captures mutable constructor-local total",
+		"alias.go:52: closure captures mutable constructor-local order",
+		"alias.go:68: closure captures mutable constructor-local r",
+		"alias.go:69: Ranged writes through its parameter r",
+		"alias.go:78: mark writes through its receiver r",
+		"alias.go:85: keep writes through its parameter r",
+		"alias.go:91: closure captures mutable constructor-local f",
+		"alias.go:92: Wrapped writes through its parameter f",
+		"alias.go:110: ResliceAppend writes through its parameter b",
+		"alias.go:110: closure captures mutable constructor-local b",
+		"alias.go:119: ResliceCopy writes through its parameter b",
+		"alias.go:119: closure captures mutable constructor-local b",
+		"alias.go:127: ResliceStore writes through its parameter b",
+		"alias.go:127: closure captures mutable constructor-local b",
+		"alias.go:136: closure captures mutable constructor-local f",
+		"alias.go:137: FieldAssign writes through its parameter f",
+		"alias.go:145: closure captures mutable constructor-local b",
+		"alias.go:147: Switched writes through its parameter b",
 		"bad.go:5: imports sync",
 		"bad.go:8: package-level variable counter",
 		"bad.go:10: package-level variable _",
@@ -143,7 +170,12 @@ func checkScriptState(t *testing.T, dir string) []string {
 		}
 		files = append(files, f)
 	}
-	info := &types.Info{Defs: map[*ast.Ident]types.Object{}, Uses: map[*ast.Ident]types.Object{}}
+	info := &types.Info{
+		Defs:      map[*ast.Ident]types.Object{},
+		Uses:      map[*ast.Ident]types.Object{},
+		Types:     map[ast.Expr]types.TypeAndValue{},
+		Implicits: map[ast.Node]types.Object{},
+	}
 	conf := types.Config{Importer: stubImporter{}, Error: func(error) {}}
 	_, _ = conf.Check(dir, fset, files, info)
 
@@ -230,32 +262,30 @@ func isConstructor(d *ast.FuncDecl) bool {
 	return found
 }
 
-// forEachWrite calls write with the root identifier of every place n
-// writes: an assignment or increment target, a range variable assigned
-// with =, an operand whose address is taken, the first argument of
-// delete, clear, copy or close, and a channel sent on. through says
-// whether the write reaches the root through a field, index or pointer
-// rather than replacing the variable itself.
-func forEachWrite(n ast.Node, info *types.Info, write func(root *ast.Ident, through bool)) {
+// forEachWrite calls write with the variable behind every place n writes:
+// an assignment or increment target, a range variable assigned with =, an
+// operand whose address is taken, the first argument of delete, clear,
+// copy, close or append, and a channel sent on. through says whether the
+// write reaches the variable through a field, index, slice or pointer
+// rather than replacing the variable itself. A write of a local of n that
+// goes through a reference it holds (a pointer, map, slice or interface)
+// is also a write through every variable that local was ever assigned from
+// (see aliasSources), at the same position.
+func forEachWrite(n ast.Node, info *types.Info, write func(v types.Object, pos token.Pos, through bool)) {
+	aliases := aliasSources(n, info)
 	mark := func(e ast.Expr) {
-		through := false
-		for {
-			switch x := e.(type) {
-			case *ast.ParenExpr:
-				e = x.X
-			case *ast.IndexExpr:
-				e, through = x.X, true
-			case *ast.IndexListExpr:
-				e, through = x.X, true
-			case *ast.SelectorExpr:
-				e, through = x.X, true
-			case *ast.StarExpr:
-				e, through = x.X, true
-			case *ast.Ident:
-				write(x, through)
-				return
-			default:
-				return
+		id, through, deref := placeRoot(e, info)
+		if id == nil {
+			return
+		}
+		v := info.Uses[id]
+		if v == nil {
+			return
+		}
+		write(v, id.Pos(), through)
+		if deref {
+			for _, src := range sharedWith(v, aliases) {
+				write(src, id.Pos(), true)
 			}
 		}
 	}
@@ -286,9 +316,10 @@ func forEachWrite(n ast.Node, info *types.Info, write func(root *ast.Ident, thro
 			if id, ok := s.Fun.(*ast.Ident); ok && len(s.Args) > 0 {
 				if _, builtin := info.Uses[id].(*types.Builtin); builtin {
 					switch id.Name {
-					case "delete", "clear", "copy", "close":
+					case "delete", "clear", "copy", "close", "append":
 						// Every one of them writes what its operand
-						// refers to, never the variable itself.
+						// refers to (append the backing array past the
+						// length), never the variable itself.
 						mark(&ast.StarExpr{X: s.Args[0]})
 					}
 				}
@@ -296,6 +327,235 @@ func forEachWrite(n ast.Node, info *types.Info, write func(root *ast.Ident, thro
 		}
 		return true
 	})
+}
+
+// placeRoot walks a written place down to the variable it belongs to, if
+// any. through says whether the place is a part of the variable (a field,
+// element, slice or pointee) rather than the variable itself, deref whether
+// reaching it follows a reference the variable holds instead of staying in
+// the variable's own storage (a field of a struct value, an element of an
+// array value). A step through a value of unresolved type counts as a
+// reference.
+func placeRoot(e ast.Expr, info *types.Info) (id *ast.Ident, through, deref bool) {
+	viaRef := func(x ast.Expr) bool {
+		tv, ok := info.Types[x]
+		if !ok || tv.Type == nil {
+			return true
+		}
+		switch tv.Type.Underlying().(type) {
+		case *types.Struct, *types.Array:
+			return false
+		}
+		return true
+	}
+	for {
+		switch x := e.(type) {
+		case *ast.ParenExpr:
+			e = x.X
+		case *ast.IndexExpr:
+			deref = deref || viaRef(x.X)
+			e, through = x.X, true
+		case *ast.IndexListExpr:
+			deref = deref || viaRef(x.X)
+			e, through = x.X, true
+		case *ast.SliceExpr:
+			deref = deref || viaRef(x.X)
+			e, through = x.X, true
+		case *ast.SelectorExpr:
+			deref = deref || viaRef(x.X)
+			e, through = x.X, true
+		case *ast.StarExpr:
+			e, through, deref = x.X, true, true
+		case *ast.Ident:
+			return x, through, deref
+		default:
+			return nil, false, false
+		}
+	}
+}
+
+// aliasSources maps each variable assigned anywhere in n to the variables
+// its value may share memory with: the root of every value assigned to it,
+// or stored in its own storage (a field of it, an element of it as an
+// array), by =, :=, var, range or a type switch guard. A value stored past
+// a reference the variable holds lands in memory the variable only refers
+// to, and that store is itself a write through the variable. A variable
+// whose type holds no reference holds a copy and aliases nothing. The map is flow- and field-insensitive, so a local
+// that once held a captured map keeps aliasing it after it is reassigned;
+// the check errs toward reporting.
+func aliasSources(n ast.Node, info *types.Info) map[types.Object][]types.Object {
+	aliases := map[types.Object][]types.Object{}
+	alias := func(v types.Object, rhs ast.Expr) {
+		if v == nil || !mayShare(v.Type()) {
+			return
+		}
+		for _, src := range valueRoots(rhs, info) {
+			if src != v {
+				aliases[v] = append(aliases[v], src)
+			}
+		}
+	}
+	bind := func(lhs, rhs ast.Expr) {
+		if id, _, deref := placeRoot(lhs, info); id != nil && !deref {
+			alias(info.ObjectOf(id), rhs)
+		}
+	}
+	bindAll := func(lhs, rhs []ast.Expr) {
+		switch {
+		case len(lhs) == len(rhs):
+			for i := range lhs {
+				bind(lhs[i], rhs[i])
+			}
+		case len(rhs) == 1:
+			// v, ok := m[k] and its kin: the first result is the value.
+			bind(lhs[0], rhs[0])
+		}
+	}
+	ast.Inspect(n, func(n ast.Node) bool {
+		switch s := n.(type) {
+		case *ast.AssignStmt:
+			if s.Tok == token.ASSIGN || s.Tok == token.DEFINE {
+				bindAll(s.Lhs, s.Rhs)
+			}
+		case *ast.ValueSpec:
+			names := make([]ast.Expr, len(s.Names))
+			for i, name := range s.Names {
+				names[i] = name
+			}
+			bindAll(names, s.Values)
+		case *ast.RangeStmt:
+			for _, v := range []ast.Expr{s.Key, s.Value} {
+				if v != nil {
+					bind(v, s.X)
+				}
+			}
+		case *ast.TypeSwitchStmt:
+			// The guard's variable is a separate object in every clause,
+			// each holding the asserted value.
+			guard, ok := s.Assign.(*ast.AssignStmt)
+			if !ok || len(guard.Rhs) != 1 {
+				break
+			}
+			for _, c := range s.Body.List {
+				alias(info.Implicits[c], guard.Rhs[0])
+			}
+		}
+		return true
+	})
+	return aliases
+}
+
+// valueRoots returns the variables a value is read out of: the root of a
+// field, index, slice, dereference, address or type assertion chain, and
+// the roots of every element of a composite literal or argument of append.
+// A value whose type holds no reference (a number, a string, a struct or
+// array of them) is a copy and has none, as has any other value, a call's
+// result among them. A slice spread into append is copied element by
+// element, so it shares only when its element type does.
+func valueRoots(e ast.Expr, info *types.Info) []types.Object {
+	if tv, ok := info.Types[e]; ok && !mayShare(tv.Type) {
+		return nil
+	}
+	for {
+		switch x := e.(type) {
+		case *ast.ParenExpr:
+			e = x.X
+		case *ast.SelectorExpr:
+			e = x.X
+		case *ast.IndexExpr:
+			e = x.X
+		case *ast.IndexListExpr:
+			e = x.X
+		case *ast.SliceExpr:
+			e = x.X
+		case *ast.StarExpr:
+			e = x.X
+		case *ast.TypeAssertExpr:
+			e = x.X
+		case *ast.KeyValueExpr:
+			return valueRoots(x.Value, info)
+		case *ast.UnaryExpr:
+			if x.Op != token.AND {
+				return nil
+			}
+			e = x.X
+		case *ast.CompositeLit:
+			return rootsOf(x.Elts, info)
+		case *ast.CallExpr:
+			id, ok := x.Fun.(*ast.Ident)
+			if !ok || id.Name != "append" {
+				return nil
+			}
+			if _, builtin := info.Uses[id].(*types.Builtin); !builtin {
+				return nil
+			}
+			args := x.Args
+			if last := len(args) - 1; x.Ellipsis.IsValid() && last > 0 {
+				if tv, ok := info.Types[args[last]]; ok {
+					if sl, ok := tv.Type.Underlying().(*types.Slice); ok && !mayShare(sl.Elem()) {
+						args = args[:last]
+					}
+				}
+			}
+			return rootsOf(args, info)
+		case *ast.Ident:
+			if v := info.Uses[x]; v != nil {
+				return []types.Object{v}
+			}
+			return nil
+		default:
+			return nil
+		}
+	}
+}
+
+func rootsOf(es []ast.Expr, info *types.Info) []types.Object {
+	var out []types.Object
+	for _, e := range es {
+		out = append(out, valueRoots(e, info)...)
+	}
+	return out
+}
+
+// mayShare reports whether a value of type t can reach memory a copy of
+// it shares: whether t is or holds a pointer, slice, map, channel, function
+// or interface, or is a type the stub importer left unresolved.
+func mayShare(t types.Type) bool {
+	switch u := t.Underlying().(type) {
+	case *types.Basic:
+		return u.Kind() == types.Invalid || u.Kind() == types.UnsafePointer
+	case *types.Array:
+		return mayShare(u.Elem())
+	case *types.Struct:
+		for f := range u.Fields() {
+			if mayShare(f.Type()) {
+				return true
+			}
+		}
+		return false
+	default:
+		return true
+	}
+}
+
+// sharedWith returns every variable v aliases, directly or through other
+// aliases, v itself excluded.
+func sharedWith(v types.Object, aliases map[types.Object][]types.Object) []types.Object {
+	var out []types.Object
+	seen := map[types.Object]bool{v: true}
+	stack := []types.Object{v}
+	for len(stack) > 0 {
+		cur := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		for _, src := range aliases[cur] {
+			if !seen[src] {
+				seen[src] = true
+				out = append(out, src)
+				stack = append(stack, src)
+			}
+		}
+	}
+	return out
 }
 
 // checkReceiverWrites reports each write of the function d through its
@@ -319,14 +579,13 @@ func checkReceiverWrites(d *ast.FuncDecl, info *types.Info, report func(token.Po
 	add(d.Recv, "receiver")
 	add(d.Type.Params, "parameter")
 	reported := map[types.Object]bool{}
-	forEachWrite(d.Body, info, func(root *ast.Ident, through bool) {
-		obj := info.Uses[root]
-		kind, ok := params[obj]
-		if !ok || !through || reported[obj] {
+	forEachWrite(d.Body, info, func(v types.Object, pos token.Pos, through bool) {
+		kind, ok := params[v]
+		if !ok || !through || reported[v] {
 			return
 		}
-		reported[obj] = true
-		report(root.Pos(), "%s writes through its %s %s", d.Name.Name, kind, obj.Name())
+		reported[v] = true
+		report(pos, "%s writes through its %s %s", d.Name.Name, kind, v.Name())
 	})
 }
 
@@ -350,10 +609,8 @@ func checkConstructorCaptures(d *ast.FuncDecl, info *types.Info, report func(tok
 	ast.Inspect(d.Body, collect)
 
 	written := map[types.Object]bool{}
-	forEachWrite(d.Body, info, func(root *ast.Ident, _ bool) {
-		if obj := info.Uses[root]; obj != nil {
-			written[obj] = true
-		}
+	forEachWrite(d.Body, info, func(v types.Object, _ token.Pos, _ bool) {
+		written[v] = true
 	})
 
 	reported := map[types.Object]bool{}
