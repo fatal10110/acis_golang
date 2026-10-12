@@ -112,6 +112,13 @@ uses `restart: unless-stopped`, so a crashed server comes back up. The reference
 also restarted on the admin restart exit code. The Go server has no admin shutdown or restart
 command yet ([#3369](https://github.com/fatal10110/acis_golang/issues/3369)).
 
+CI runs `ops/docker/smoke-test.sh` on every change. It checks that `docker-compose.yml` parses,
+that the image builds and each of its binaries starts, and that the `db` service's first start
+loads every table file of a stub datapack and stops when `tools/full_install.sql` is missing. It
+does not load the real datapack schema
+([#3697](https://github.com/fatal10110/acis_golang/issues/3697)). To run it locally, stop any
+compose database first: the `db` container name is fixed.
+
 Backups: [backup-restore.md](backup-restore.md). Moving an existing Java server:
 [migrating-from-java.md](migrating-from-java.md).
 
@@ -119,7 +126,7 @@ Backups: [backup-restore.md](backup-restore.md). Moving an existing Java server:
 
 | Symptom | Cause and fix |
 | --- | --- |
-| `db` exits on first start and its log shows `acis schema: ... not found`. | `ACIS_DATAPACK_DIR` does not point at an `aCis_datapack` checkout. The data directory was already created, so the next start skips the schema load. Run `docker compose down -v` (it **deletes** the database volume), fix the path, and start again. |
+| `db` exits on first start and its log shows `acis schema: ... not found`. | `ACIS_DATAPACK_DIR` does not point at an `aCis_datapack` checkout. The data directory was already created, so the next start skips the schema load; `restart: always` makes that start happen on its own, and it reports healthy with an empty database ([#3696](https://github.com/fatal10110/acis_golang/issues/3696)). Run `docker compose down -v` (it **deletes** the database volume), fix the path, and start again. |
 | The game server exits with `open config/hexid.txt: no such file or directory`. | Step 4 was skipped, or the file was not renamed to `hexid.txt`. |
 | The game server log shows `wrong hexid`, or it keeps retrying the login link. | `config/hexid.txt` does not match the `gameservers` table, for example after the database was recreated. Register again (step 4), then restart **both** services: the login server reads the registered servers only at startup. |
 | Clients see the server list, but entering the game times out. | `Hostname` in `config/server.properties` is not reachable from the client. Set it to the public IP or DNS name and restart `gameserver`. |
