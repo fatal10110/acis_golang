@@ -16,6 +16,7 @@ import (
 // mutation so the items row equals the final in-memory state, and the next
 // boot must restore that state rather than the pre-drop one.
 func TestShutdownFlushMatchesFinalInventoryState(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)
@@ -53,6 +54,7 @@ func TestShutdownFlushMatchesFinalInventoryState(t *testing.T) {
 // server down before any flush tick: the shutdown drain must delete the row,
 // not leave a phantom stack behind for the next boot to resurrect.
 func TestShutdownFlushPersistsDestruction(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)

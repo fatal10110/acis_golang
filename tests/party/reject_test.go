@@ -12,6 +12,7 @@ import (
 // inviter's side alone: an unknown name, oneself, a target already in a
 // party, a member who does not lead, and a full party.
 func TestInviteRefusals(t *testing.T) {
+	t.Parallel()
 	t.Run("unknown name", func(t *testing.T) {
 		g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}})
 		g.players[0].c.Send(encodeJoinParty("Nobody", 0))
@@ -50,6 +51,7 @@ func TestInviteRefusals(t *testing.T) {
 // can be asked for nothing else, a trade request to it is refused as busy,
 // and it cannot answer the invitation as a trade request.
 func TestInviteWaitsForReply(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}, {"Third", 40}})
 	leader, member, third := g.players[0], g.players[1], g.players[2]
 
@@ -82,6 +84,7 @@ func TestInviteWaitsForReply(t *testing.T) {
 // TestPartyFull pins the nine-member cap: a full party's leader is told
 // the party is full.
 func TestPartyFull(t *testing.T) {
+	t.Parallel()
 	seats := []seat{{"Leader", 20}}
 	for _, name := range []string{"Mone", "Mtwo", "Mthree", "Mfour", "Mfive", "Msix", "Mseven", "Meight", "Mnine"} {
 		seats = append(seats, seat{name, 20})

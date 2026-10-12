@@ -156,6 +156,7 @@ func (g *group) persisted(t *testing.T, i int, templateID int32) int {
 // starting at the first member, then comes back to the leader. The picker
 // hears who took it; the looter hears it picked the stack up.
 func TestPartyPickupByTurnGoesToNextMember(t *testing.T) {
+	t.Parallel()
 	g := lootGroup(t, []seat{{"Leader", 20}, {"Member", 20}}, 2, party.LootByTurn, nil)
 
 	frames := g.pickUp(t, 0, 0, lootPotionID, 5)
@@ -189,6 +190,7 @@ func TestPartyPickupByTurnGoesToNextMember(t *testing.T) {
 // over a member out of party range of the picker; with nobody else to take
 // it, the picker keeps the item.
 func TestPartyPickupSkipsMembersOutOfRange(t *testing.T) {
+	t.Parallel()
 	for name, rule := range map[string]party.LootRule{"random": party.LootRandom, "by turn": party.LootByTurn} {
 		t.Run(name, func(t *testing.T) {
 			g := lootGroup(t, []seat{{"Leader", 20}, {"Member", 20}}, 2, rule, []int{1})
@@ -209,6 +211,7 @@ func TestPartyPickupSkipsMembersOutOfRange(t *testing.T) {
 // among the members in range of the picker, the remainder lost; a member
 // out of range and a player outside the party get nothing.
 func TestPartyPickupSplitsAdena(t *testing.T) {
+	t.Parallel()
 	g := lootGroup(t, []seat{{"Leader", 20}, {"Member", 20}, {"Far", 20}, {"Outsider", 20}}, 3, party.LootFindersKeepers, []int{2})
 
 	frames := g.pickUp(t, 0, 0, item.AdenaID, 101)
@@ -233,6 +236,7 @@ func TestPartyPickupSplitsAdena(t *testing.T) {
 // be picked up by another member of the party, whom the owner hears take
 // it; a player outside the party is still refused.
 func TestPartyPickupLootLockAdmitsTheParty(t *testing.T) {
+	t.Parallel()
 	g := lootGroup(t, []seat{{"Leader", 20}, {"Member", 20}, {"Outsider", 20}}, 2, party.LootFindersKeepers, nil)
 
 	frames := g.pickUp(t, 0, g.players[1].id, lootPotionID, 3)
@@ -265,6 +269,7 @@ func partyLootMonster() *npc.Template {
 // rule around the monster: the adena is split between the members, the
 // weapon goes to the member whose turn it is, and the killer hears it.
 func TestPartyAutoLootFollowsTheRule(t *testing.T) {
+	t.Parallel()
 	g := lootGroup(t, []seat{{"Leader", 20}, {"Member", 20}}, 2, party.LootByTurn, nil, gameservertest.WithAutoLoot(true))
 	x, y, z := g.srv.PlayerPosition(t, g.players[0].id)
 	monster := g.srv.SpawnHostileNPCTemplateAt(t, partyLootMonster(), location.Location{X: x + 60, Y: y, Z: z})

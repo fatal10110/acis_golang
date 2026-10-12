@@ -89,6 +89,7 @@ type gain struct {
 // still gets a zero gain; the partyless Outsider, who never fought, gets
 // nothing.
 func TestPartyKillSharesExpAcrossMembers(t *testing.T) {
+	t.Parallel()
 	g, monster := rewardParty(t)
 	if !monster.TakeDamage(1000, g.combatant(t, 0)) {
 		t.Fatal("leader's hit did not kill the monster")
@@ -104,6 +105,7 @@ func TestPartyKillSharesExpAcrossMembers(t *testing.T) {
 // reward twice before the bonus, and a member that did not fight shares
 // it as much as the one that did.
 func TestPartyKillSharedWithOutsider(t *testing.T) {
+	t.Parallel()
 	g, monster := rewardParty(t)
 	monster.TakeDamage(400, g.combatant(t, 3))
 	if !monster.TakeDamage(600, g.combatant(t, 1)) {
@@ -123,6 +125,7 @@ func TestPartyKillSharedWithOutsider(t *testing.T) {
 // party arithmetic of TestPartyKillSharedWithOutsider; 312.5 un-narrowed
 // would pay the Outsider 125 SP instead of 124.
 func TestKillRewardsApplyServerRates(t *testing.T) {
+	t.Parallel()
 	g, monster := rewardParty(t, gameservertest.WithRateXpSp(100, 1.25))
 	monster.TakeDamage(400, g.combatant(t, 3))
 	if !monster.TakeDamage(600, g.combatant(t, 1)) {
@@ -137,6 +140,7 @@ func TestKillRewardsApplyServerRates(t *testing.T) {
 // TestPartyKillOverhitAddsToPool adds the overhitting member's bonus to the
 // pool the party splits; only that member is told of the overhit.
 func TestPartyKillOverhitAddsToPool(t *testing.T) {
+	t.Parallel()
 	g, monster := rewardParty(t)
 	monster.EnableOverhit()
 	if !monster.TakeDamage(int(monster.CurrentHP())*2, g.combatant(t, 0)) {
@@ -165,6 +169,7 @@ func TestPartyKillOverhitAddsToPool(t *testing.T) {
 // out of the split altogether: no gain, and no part in the bonus or the
 // squared-level sum, though it is the party's highest level.
 func TestPartyKillSkipsMemberOutOfRange(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 40}, {"Member", 30}, {"Far", 45}})
 	g.invite(t, 0, 1, 0)
 	g.invite(t, 0, 2, 0)
