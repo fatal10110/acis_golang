@@ -38,11 +38,11 @@ const (
 	SystemMessageYouHaveExpelledAClan             = 521 // no parameter
 	SystemMessageAllianceDissolved                = 523 // no parameter
 	SystemMessageS2AllianceLeaderOfS1Requested    = 527 // text: the alliance's name, the inviter's name
-	SystemMessageNoAllyCreationInSiege            = 721 // no parameter
-	SystemMessageCannotDissolveAllyInSiege        = 722 // no parameter
-	SystemMessageOpposingClanInSiege              = 723 // no parameter
 	SystemMessageCreateAllyClanLevel5Needed       = 549 // no parameter
 	SystemMessageCannotCreateAllyWhileDissolving  = 550 // no parameter
 	SystemMessageS1ClanAlreadyMemberOfS2Alliance  = 691 // text: the clan's name, its alliance's name
+	SystemMessageNoAllyCreationInSiege            = 721 // no parameter
+	SystemMessageCannotDissolveAllyInSiege        = 722 // no parameter
+	SystemMessageOpposingClanInSiege              = 723 // no parameter
 	SystemMessageS1CantEnterAllianceWithin1Day    = 761 // text: the clan's name
 )
