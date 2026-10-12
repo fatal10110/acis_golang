@@ -74,5 +74,5 @@ func (n *NPC) LookItem(radius int, quantity int32, ids ...int32) {
 // by someone else or no longer known to the NPC stays queued and does
 // nothing.
 func (n *NPC) AddPickUpDesire(itemObjectID int32, weight float64) {
-	n.brain.AddPickUpDesire(itemObjectID, weight)
+	n.mind().AddPickUpDesire(itemObjectID, weight)
 }
