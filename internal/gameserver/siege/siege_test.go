@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
@@ -231,11 +230,8 @@ func newWorld(t *testing.T, cfg Config, rows ...ClanRow) *world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	set := commons.NewStatSet()
-	set.Set("castleId", 1)
-	if w.field, err = zone.NewSiege(11, form, set); err != nil {
-		t.Fatal(err)
-	}
+	w.field = zone.NewSiege(11, form)
+	w.field.ResidenceID = 1
 	w.e = New(cfg, w.castles, w.clans, []*zone.Siege{w.field}, w.store, nil, zerolog.Nop())
 	if err := w.e.Restore(context.Background()); err != nil {
 		t.Fatal(err)

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/pathfind"
@@ -22,10 +21,7 @@ func TestApplyTownCombatRuleUsesZoneTown(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	town, err := zone.NewTown(1, form, commons.NewStatSet())
-	if err != nil {
-		t.Fatal(err)
-	}
+	town := zone.NewTown(1, form)
 	index := zone.NewIndex()
 	index.Add(town)
 

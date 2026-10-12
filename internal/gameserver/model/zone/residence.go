@@ -3,7 +3,6 @@ package zone
 import (
 	"math/rand/v2"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -17,15 +16,9 @@ type Castle struct {
 	Banish func(a Actor)
 }
 
-// NewCastle builds a castle zone from its data settings.
-func NewCastle(id int, form Form, set *commons.StatSet) (*Castle, error) {
-	f := commons.NewFields(set, "zone: castle")
-	castleID := f.IntDefault("castleId", 0)
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
-	return &Castle{Zone: newZone(id, form), ResidenceID: castleID}, nil
-}
+// NewCastle builds a castle zone; the loader sets ResidenceID from the
+// zone's data settings before publishing it.
+func NewCastle(id int, form Form) *Castle { return &Castle{Zone: newZone(id, form)} }
 
 // Core exposes the shared zone state.
 func (z *Castle) Core() *Zone { return &z.Zone }
@@ -61,15 +54,9 @@ type ClanHall struct {
 	Banish func(a Actor)
 }
 
-// NewClanHall builds a clan hall zone from its data settings.
-func NewClanHall(id int, form Form, set *commons.StatSet) (*ClanHall, error) {
-	f := commons.NewFields(set, "zone: clan hall")
-	hallID := f.IntDefault("clanHallId", 0)
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
-	return &ClanHall{Zone: newZone(id, form), ResidenceID: hallID}, nil
-}
+// NewClanHall builds a clan hall zone; the loader sets ResidenceID from the
+// zone's data settings before publishing it.
+func NewClanHall(id int, form Form) *ClanHall { return &ClanHall{Zone: newZone(id, form)} }
 
 // Core exposes the shared zone state.
 func (z *ClanHall) Core() *Zone { return &z.Zone }
@@ -122,27 +109,11 @@ type CastleTeleport struct {
 	Eject func(a Actor, to location.Location)
 }
 
-// NewCastleTeleport builds a mass-gatekeeper zone from its data settings.
-func NewCastleTeleport(id int, form Form, set *commons.StatSet) (*CastleTeleport, error) {
-	f := commons.NewFields(set, "zone: castle teleport")
-	castleID := f.IntDefault("castleId", 0)
-	minX := f.IntDefault("spawnMinX", 0)
-	maxX := f.IntDefault("spawnMaxX", 0)
-	minY := f.IntDefault("spawnMinY", 0)
-	maxY := f.IntDefault("spawnMaxY", 0)
-	exitZ := f.IntDefault("spawnZ", 0)
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
-	return &CastleTeleport{
-		Zone:     newZone(id, form),
-		CastleID: castleID,
-		ExitMinX: minX,
-		ExitMaxX: maxX,
-		ExitMinY: minY,
-		ExitMaxY: maxY,
-		ExitZ:    exitZ,
-	}, nil
+// NewCastleTeleport builds a mass-gatekeeper zone; the loader sets the
+// castle link and exit box from the zone's data settings before publishing
+// it.
+func NewCastleTeleport(id int, form Form) *CastleTeleport {
+	return &CastleTeleport{Zone: newZone(id, form)}
 }
 
 // Core exposes the shared zone state.

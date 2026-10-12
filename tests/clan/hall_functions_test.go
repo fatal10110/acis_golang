@@ -5,11 +5,9 @@ import (
 	"context"
 	"database/sql"
 	"math"
-	"strconv"
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -75,12 +73,8 @@ func bootHall(t *testing.T, s hallSetup) *gameservertest.Server {
 		if err != nil {
 			t.Fatal(err)
 		}
-		set := commons.NewStatSet()
-		set.Set("clanHallId", strconv.Itoa(s.zoneHall))
-		hz, err := zone.NewClanHall(1, form, set)
-		if err != nil {
-			t.Fatal(err)
-		}
+		hz := zone.NewClanHall(1, form)
+		hz.ResidenceID = s.zoneHall
 		zones.Add(hz)
 	}
 	return gameservertest.Boot(t,

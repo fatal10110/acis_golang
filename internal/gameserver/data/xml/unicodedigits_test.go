@@ -30,13 +30,6 @@ import (
 func TestDecimalListValuesReadUnicodeDigits(t *testing.T) {
 	t.Parallel()
 	const twelve, seven = "１２", "٧"
-	set := func(kv ...string) *commons.StatSet {
-		s := commons.NewStatSet()
-		for i := 0; i < len(kv); i += 2 {
-			s.Set(kv[i], kv[i+1])
-		}
-		return s
-	}
 	attrs := func(kv ...string) *attrValues {
 		vals := make(map[string]string, len(kv)/2)
 		for i := 0; i < len(kv); i += 2 {
@@ -68,15 +61,11 @@ func TestDecimalListValuesReadUnicodeDigits(t *testing.T) {
 			return [2]int{a.Position.X, a.Heading}, err
 		}, [2]int{12, 7}},
 		{"effect zone skill", func() (any, error) {
-			form, err := zone.NewCuboid(0, 1, 0, 1, 0, 1)
+			refs, err := zone.ParseSkillRefs(twelve + "-" + seven)
 			if err != nil {
 				return nil, err
 			}
-			z, err := zone.NewEffect(1, form, set("skill", twelve+"-"+seven))
-			if err != nil {
-				return nil, err
-			}
-			return z.Skills[0], nil
+			return refs[0], nil
 		}, zone.SkillRef{ID: 12, Level: 7}},
 		{"boat messages", func() (any, error) {
 			b, err := buildBoatLocation(attrs("x", "1", "y", "2", "z", "3", "arrival", twelve+";"+seven, "scheduled", twelve+"-"+seven))

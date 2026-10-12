@@ -4,11 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/binary"
-	"strconv"
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -81,12 +79,8 @@ func bootOwnerChange(t *testing.T, s ownerChangeSetup) *gameservertest.Server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	set := commons.NewStatSet()
-	set.Set("clanHallId", strconv.Itoa(moonstoneHall))
-	grounds, err := zone.NewClanHall(1, form, set)
-	if err != nil {
-		t.Fatal(err)
-	}
+	grounds := zone.NewClanHall(1, form)
+	grounds.ResidenceID = moonstoneHall
 	zones := zone.NewIndex()
 	zones.Add(grounds)
 	srv := gameservertest.Boot(t,
