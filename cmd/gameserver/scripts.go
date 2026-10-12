@@ -198,7 +198,7 @@ func provideScripts(lc fx.Lifecycle, paths gameServerPaths, data *gameData, env 
 		engine.Close()
 		return nil
 	}})
-	return script.Build(list, catalog, script.Config{KindOf: npcKindOf(data.NPCs), Log: log, Env: env, Queue: engine}), nil
+	return script.Build(list, catalog, script.Config{KindOf: npcKindOf(data.NPCs), Log: log, Env: env, HandleOps: scriptHandleOps, Queue: engine}), nil
 }
 
 // provideScriptSpawner returns the spawner scripts place NPCs with. It is

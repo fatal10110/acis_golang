@@ -34,9 +34,5 @@ func (n *NPC) ShowChatWindow(p *Player) {
 // its death drops fall, reserved for to while to acts for a player. Only a
 // hostile NPC drops anything; a handle on any other NPC panics.
 func (n *NPC) DropItem(to Creature, itemID, amount int32) {
-	h, ok := n.combatant().(*npc.Hostile)
-	if !ok {
-		panic("script: only a hostile npc drops items")
-	}
-	h.DropItem(combatantOf(to), itemID, int(amount))
+	n.hostile("drop items").DropItem(combatantOf(to), itemID, int(amount))
 }
