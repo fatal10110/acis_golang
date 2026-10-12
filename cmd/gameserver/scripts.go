@@ -37,6 +37,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/maker"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q001"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q023"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q070"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q211"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q230"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q234"
@@ -52,6 +53,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q636"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q646"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q651"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/thirdclass"
 	scripttask "github.com/fatal10110/acis_golang/internal/gameserver/script/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/noblesseteleporter"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/primevalsummoner"
@@ -71,26 +73,30 @@ func scriptCatalogs(crystals *item.SoulCrystalTable, buffs *skill.NewbieBuffTabl
 	return []script.Catalog{questCatalog(crystals), featureCatalog(buffs), teleportCatalog(), taskCatalog(), aiCatalog()}
 }
 
-// questCatalog lists the quests.
+// questCatalog lists the quests. The saga core and the sagas share one
+// family.
 func questCatalog(crystals *item.SoulCrystalTable) script.Catalog {
+	sagas := thirdclass.NewFamily()
 	return script.Catalog{
-		"quest.Q001_LettersOfLove":         q001.New,
-		"quest.Q023_LidiasHeart":           q023.New,
-		"quest.Q211_TrialOfTheChallenger":  q211.New,
-		"quest.Q230_TestOfTheSummoner":     q230.New,
-		"quest.Q234_FatesWhisper":          q234.New,
-		"quest.Q235_MimirsElixir":          q235.New,
-		"quest.Q260_HuntTheOrcs":           q260.New,
-		"quest.Q316_DestroyPlagueCarriers": q316.New,
-		"quest.Q350_EnhanceYourWeapon":     func() script.Script { return q350.New(crystals) },
-		"quest.Q360_PlunderTheirSupplies":  q360.New,
-		"quest.Q422_RepentYourSins":        q422.New,
-		"quest.Q508_AClansReputation":      q508.New,
-		"quest.Q510_AClansReputation":      q510.New,
-		"quest.Q607_ProveYourCourage":      q607.New,
-		"quest.Q636_TruthBeyondTheGate":    q636.New,
-		"quest.Q646_SignsOfRevolt":         q646.New,
-		"quest.Q651_RunawayYouth":          q651.New,
+		"quest.Q001_LettersOfLove":          q001.New,
+		"quest.Q023_LidiasHeart":            q023.New,
+		"quest.Q070_SagaOfThePhoenixKnight": func() script.Script { return q070.New(sagas) },
+		"quest.Q211_TrialOfTheChallenger":   q211.New,
+		"quest.Q230_TestOfTheSummoner":      q230.New,
+		"quest.Q234_FatesWhisper":           q234.New,
+		"quest.Q235_MimirsElixir":           q235.New,
+		"quest.Q260_HuntTheOrcs":            q260.New,
+		"quest.Q316_DestroyPlagueCarriers":  q316.New,
+		"quest.Q350_EnhanceYourWeapon":      func() script.Script { return q350.New(crystals) },
+		"quest.Q360_PlunderTheirSupplies":   q360.New,
+		"quest.Q422_RepentYourSins":         q422.New,
+		"quest.Q508_AClansReputation":       q508.New,
+		"quest.Q510_AClansReputation":       q510.New,
+		"quest.Q607_ProveYourCourage":       q607.New,
+		"quest.Q636_TruthBeyondTheGate":     q636.New,
+		"quest.Q646_SignsOfRevolt":          q646.New,
+		"quest.Q651_RunawayYouth":           q651.New,
+		"quest.ThirdClassQuest":             func() script.Script { return thirdclass.NewCore(sagas) },
 	}
 }
 

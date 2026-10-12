@@ -326,39 +326,22 @@ func TestAttackableWanderFirstStepAfterOtherDesireCancelsChain(t *testing.T) {
 	}
 }
 
-// TestAttackableWanderBackToPeaceStopsChainAndDropsStaleFiring pins the
-// chain ending on a return to peace, and a firing of that ended chain,
-// run after a new WANDER promotion armed the next one, neither walking
-// nor touching the new firing.
-func TestAttackableWanderBackToPeaceStopsChainAndDropsStaleFiring(t *testing.T) {
+// TestAttackableWanderBackToPeaceKeepsChain pins that a return to peace,
+// which clears only the hate tables, leaves a running wander and its chain's
+// pending firing alone.
+func TestAttackableWanderBackToPeaceKeepsChain(t *testing.T) {
 	brain, owner, _, _ := wanderArrivedThenPromoted(t, time.Unix(1_000, 0))
-	old := owner.pendingTimers()[0]
+	pending := owner.pendingTimers()
 
 	brain.SetBackToPeace()
-	if got := len(owner.pendingTimers()); got != 0 {
-		t.Fatalf("pending timers after back to peace = %d, want 0 (chain stopped)", got)
+	if got := owner.pendingTimers(); len(got) != 1 || got[0] != pending[0] {
+		t.Fatalf("pending timers after back to peace = %d, want the chain's firing kept", len(got))
 	}
-
-	if err := thinkWanderOnce(brain); err != nil {
-		t.Fatalf("wander RunAI() error: %v", err)
+	if got := brain.CurrentIntention(); got != IntentionWander {
+		t.Fatalf("CurrentIntention() after back to peace = %v, want %v kept", got, IntentionWander)
 	}
-	pending := owner.pendingTimers()
-	if len(pending) != 1 || pending[0] == old {
-		t.Fatalf("pending timers after the wander promotion = %d, want one fresh timer", len(pending))
-	}
-	fresh := pending[0]
-
-	timers := len(owner.timers)
-	old.fn()
-	if owner.wanderCalls != 1 || len(owner.timers) != timers {
-		t.Fatalf("wander walks/timers after the stale firing = %d/%d, want 1/%d", owner.wanderCalls, len(owner.timers), timers)
-	}
-	if pending := owner.pendingTimers(); len(pending) != 1 || pending[0] != fresh {
-		t.Fatal("stale firing disturbed the fresh chain")
-	}
-	owner.fireTimer(t, defaultWanderTimer*time.Second)
-	if owner.wanderCalls != 2 {
-		t.Fatalf("wander walks after the fresh firing = %d, want 2", owner.wanderCalls)
+	if !brain.Desires().Has(&Desire{Kind: IntentionWander}) {
+		t.Fatal("wander desire dropped by back to peace, want it kept")
 	}
 }
 

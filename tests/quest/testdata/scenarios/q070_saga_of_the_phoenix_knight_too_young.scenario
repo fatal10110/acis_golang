@@ -1,0 +1,40 @@
+# Saga of the Phoenix Knight (Q070) offered to a level 75 Paladin: Sedrick sends the player
+# away until level 76. Expectations of the traced steps are the reference trace's; the rest are derived from the
+# reference source (ThirdClassQuest.java, Q070_SagaOfThePhoenixKnight.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q070_saga_of_the_phoenix_knight_too_young.golden
+character Paladin 75
+class 5
+script quest.Q070_SagaOfThePhoenixKnight
+item 7093
+page villagemaster/30849.htm
+page trainer/31277.htm
+page default/31624.htm
+page default/31646.htm
+page default/31647.htm
+page default/31650.htm
+page default/31654.htm
+page default/31655.htm
+page default/31657.htm
+page script/quest/Q070_SagaOfThePhoenixKnight/
+npc sedrick 30849 VillageMasterFighter 10 0 0
+npc felix 31277 Trainer -10 0 0
+npc donath 31624 Folk 0 10 0
+npc tablet1 31646 Folk 0 -10 0
+npc tablet2 31647 Folk 20 20 0
+npc tablet3 31650 Folk -20 20 0
+npc tablet4 31654 Folk 20 -20 0
+npc tablet5 31655 Folk -20 -20 0
+npc tablet6 31657 Folk 30 0 0
+
+action sedrick
+action sedrick
+  S ActionFailed
+  S NpcHtmlMessage obj=sedrick item=0 page=villagemaster/30849.htm
+  S ActionFailed
+bypass npc_{sedrick}_Quest
+  S NpcHtmlMessage obj=sedrick item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/0-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q070_SagaOfThePhoenixKnight 0-1
+  S NpcHtmlMessage obj=sedrick item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/0-02.htm
+  S ActionFailed

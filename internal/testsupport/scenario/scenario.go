@@ -13,7 +13,8 @@
 //	trace <path below the module root>        optional: the reference trace the first steps replay
 //	character <name> <level>                  the character the client plays, with the experience its level starts at
 //	class <class id>                          optional: the character's class, and so its race (default 0, a human
-//	                                          fighter); the class template keeps the fixture's stats
+//	                                          fighter); every class then has a template with the fixture's
+//	                                          stats, so the class's parents load and a script may change it
 //	clan <level>                              optional: the character leads a clan of that level
 //	quest <quest> <var>=<value> ...           character_quests rows of the character before it enters the world,
 //	                                          one line per quest, as a rows check lists them

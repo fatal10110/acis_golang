@@ -1,0 +1,163 @@
+# Saga of the Phoenix Knight (Q070) from cond 13, with the saga core: the fourth tablet takes
+# the fourth amulet; Felix, the fourth NPC, sends the player after Halisha; a Shrine of
+# Loyalty monster's death drops a Mark of Halisha through the core (the always-drop's roll,
+# draw 0); an Archon of Halisha of the Four Sepulchers gives the fifth amulet and takes the
+# marks; the fifth tablet takes the amulet; the sixth tablet calls the defender and its
+# attacker, far away at their spots, and answers the same player that its fight is on. Expectations of the traced steps are the reference trace's; the rest are derived from the
+# reference source (ThirdClassQuest.java, Q070_SagaOfThePhoenixKnight.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q070_saga_of_the_phoenix_knight_halisha.golden
+character Paladin 76
+class 5
+quest Q070_SagaOfThePhoenixKnight <state>=STARTED <cond>=13
+random 0
+script quest.Q070_SagaOfThePhoenixKnight
+script quest.ThirdClassQuest
+item 7093 7361 7485 7392
+page villagemaster/30849.htm
+page trainer/31277.htm
+page default/31624.htm
+page default/31646.htm
+page default/31647.htm
+page default/31650.htm
+page default/31654.htm
+page default/31655.htm
+page default/31657.htm
+page script/quest/Q070_SagaOfThePhoenixKnight/
+npc sedrick 30849 VillageMasterFighter 10 0 0
+npc felix 31277 Trainer -10 0 0
+npc donath 31624 Folk 0 10 0
+npc tablet1 31646 Folk 0 -10 0
+npc tablet2 31647 Folk 20 20 0
+npc tablet3 31650 Folk -20 20 0
+npc tablet4 31654 Folk 20 -20 0
+npc tablet5 31655 Folk -20 -20 0
+npc tablet6 31657 Folk 30 0 0
+npc scarab 21646 Monster 40 0 0
+npc archon 18212 Monster -40 0 0
+npc defender 31631 Folk 0 40 0
+npc attacker 27278 Monster 0 -40 0
+
+action sedrick
+action sedrick
+  S ActionFailed
+  S NpcHtmlMessage obj=sedrick item=0 page=villagemaster/30849.htm
+  S ActionFailed
+bypass npc_{sedrick}_Quest
+  S NpcHtmlMessage obj=sedrick item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/3-06.htm
+  S ActionFailed
+  S ActionFailed
+action tablet4
+action tablet4
+  S ActionFailed
+  S NpcHtmlMessage obj=tablet4 item=0 page=default/31654.htm
+  S ActionFailed
+bypass npc_{tablet4}_Quest
+  S NpcHtmlMessage obj=tablet4 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/8-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q070_SagaOfThePhoenixKnight 8-1
+  S QuestList 70:0x80003fff
+  S ExShowQuestMark quest=70
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S MagicSkillUse caster=player target=player skill=4546-1 hit=6000 reuse=1 success=0
+  S MagicSkillUse caster=tablet4 target=tablet4 skill=4546-1 hit=6000 reuse=1 success=0
+  S NpcHtmlMessage obj=tablet4 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/8-02.htm
+  S ActionFailed
+  Q upsert Q070_SagaOfThePhoenixKnight | <cond> | 14
+action tablet4
+  S ActionFailed
+  S NpcHtmlMessage obj=tablet4 item=0 page=default/31654.htm
+  S ActionFailed
+bypass npc_{tablet4}_Quest
+  S NpcHtmlMessage obj=tablet4 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/8-03.htm
+  S ActionFailed
+  S ActionFailed
+action felix
+action felix
+  S ActionFailed
+  S NpcHtmlMessage obj=felix item=0 page=trainer/31277.htm
+  S ActionFailed
+bypass npc_{felix}_Quest
+  S NpcHtmlMessage obj=felix item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/11-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q070_SagaOfThePhoenixKnight 11-9
+  S QuestList 70:0x80007fff
+  S ExShowQuestMark quest=70
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=felix item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/11-03.htm
+  S ActionFailed
+  Q upsert Q070_SagaOfThePhoenixKnight | <cond> | 15
+action felix
+  S ActionFailed
+  S NpcHtmlMessage obj=felix item=0 page=trainer/31277.htm
+  S ActionFailed
+bypass npc_{felix}_Quest
+  S NpcHtmlMessage obj=felix item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/11-02.htm
+  S ActionFailed
+  S ActionFailed
+kill scarab
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7485
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7485=1
+kill archon
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 70:0x8000ffff
+  S ExShowQuestMark quest=70
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7485
+  S SystemMessage id=54 3:7392
+  Q upsert Q070_SagaOfThePhoenixKnight | <cond> | 16
+  items 7485=0 7392=1
+action tablet5
+action tablet5
+  S ActionFailed
+  S NpcHtmlMessage obj=tablet5 item=0 page=default/31655.htm
+  S ActionFailed
+bypass npc_{tablet5}_Quest
+  S NpcHtmlMessage obj=tablet5 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/9-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q070_SagaOfThePhoenixKnight 9-1
+  S QuestList 70:0x8001ffff
+  S ExShowQuestMark quest=70
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7392
+  S MagicSkillUse caster=player target=player skill=4546-1 hit=6000 reuse=1 success=0
+  S MagicSkillUse caster=tablet5 target=tablet5 skill=4546-1 hit=6000 reuse=1 success=0
+  S NpcHtmlMessage obj=tablet5 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/9-03.htm
+  S ActionFailed
+  Q upsert Q070_SagaOfThePhoenixKnight | <cond> | 17
+action tablet5
+  S ActionFailed
+  S NpcHtmlMessage obj=tablet5 item=0 page=default/31655.htm
+  S ActionFailed
+bypass npc_{tablet5}_Quest
+  S NpcHtmlMessage obj=tablet5 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/9-04.htm
+  S ActionFailed
+  S ActionFailed
+action tablet6
+action tablet6
+  S ActionFailed
+  S NpcHtmlMessage obj=tablet6 item=0 page=default/31657.htm
+  S ActionFailed
+bypass npc_{tablet6}_Quest
+  S NpcHtmlMessage obj=tablet6 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/10-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q070_SagaOfThePhoenixKnight 10-1
+  S NpcHtmlMessage obj=tablet6 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/10-02.htm
+  S ActionFailed
+  Q delete-var Q070_SagaOfThePhoenixKnight | attacks
+action tablet6
+  S ActionFailed
+  S NpcHtmlMessage obj=tablet6 item=0 page=default/31657.htm
+  S ActionFailed
+bypass npc_{tablet6}_Quest
+  S NpcHtmlMessage obj=tablet6 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/10-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q070_SagaOfThePhoenixKnight 10-1
+  S NpcHtmlMessage obj=tablet6 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/10-03.htm
+  S ActionFailed

@@ -218,7 +218,7 @@ func TestDoNothingDesireKeepsTheActorStill(t *testing.T) {
 
 	// 1 - 0.5 - 0.5 leaves 0; the next decay would go below zero and drops it.
 	for range 9 {
-		brain.Tick()
+		tickDecay(brain)
 	}
 	if n := brain.Desires().Len(); n != 0 {
 		t.Fatalf("desires after the do-nothing weight decayed = %d, want 0", n)

@@ -339,11 +339,6 @@ func (c *recordingCast) Stop() {
 	}
 }
 
-func tickOOTSweepDue(ai *Attackable, at time.Time) {
-	ai.now = func() time.Time { return at }
-	ai.Tick()
-}
-
 type summonMove struct {
 	recordingMove
 	friendlyTarget attackable.Combatant

@@ -233,17 +233,12 @@ func TestRaidPrivateHatesForItsParty(t *testing.T) {
 // 20000), which the curse then stops.
 func TestRaidPrivateCursesOverLevelledAttacker(t *testing.T) {
 	t.Parallel()
-	w, leader, private := raidParty(t, 20, 1)
+	w, _, private := raidParty(t, 20, 1)
 	w.srv.InstallNPCCastSeam(t, private, modelskill.NewTable([]modelskill.Definition{{
 		ID: raidCurseID, Level: 1, Activation: modelskill.ActivationActive,
 		Target: modelskill.TargetOne, Offensive: true, Magic: true, SkillType: "MDAM",
 		CastRange: 600, HitTime: 1000, StaticHitTime: true, StaticReuse: true, Power: 1,
 	}}))
-
-	// Another creature on its hate list keeps the stopped hate from sending
-	// the private back to peace, which in Go still drops every queued
-	// desire (#3576); the reference's back to peace keeps them.
-	w.onQueue(t, private, func() { private.AI().Hates().Add(leader, 1) })
 
 	w.hit(t, private, 10)
 	d, ok := desire(private, actorai.IntentionCast)
