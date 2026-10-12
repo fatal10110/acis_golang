@@ -178,3 +178,123 @@ func (i *ItemInstances) pendingInstance(objectID int32) *item.Instance {
 	}
 	return nil
 }
+
+// markOrphans takes the rows the pending cap just dropped (finishOwner) and
+// records each of their groups whose every row is dead — deleted, or an
+// instance used up or destroyed — for the next Save to release
+// (releaseOrphans).
+//
+// A dropped row's group otherwise stays until a write lands every one of its
+// rows (Landed), and the tick no longer writes a dropped row. A row whose
+// item still exists may yet be written by its owner — a handler's write, the
+// container's last flush at logout — and that write must carry the dropped
+// rows along (Widen), or one leg of the operation would land without the
+// other. So only a group with no such row left is released.
+//
+// A dead row's last write can still be on its way into pending: an instance
+// changes first and reports the change after (item.Persister), so a row just
+// used up may not be pending yet. Releasing at once would let that write land
+// alone; marking here and releasing on the next Save, which first checks that
+// no row of the group is pending or in flight, leaves a whole Save for it to
+// arrive and keep the group.
+func (i *ItemInstances) markOrphans(dropped []int32) {
+	if len(dropped) == 0 {
+		return
+	}
+	var dead []int32
+	for _, rows := range i.groupsOf(dropped) {
+		if allDead(rows) {
+			dead = append(dead, rows[0].ObjectID)
+		}
+	}
+	if len(dead) == 0 {
+		return
+	}
+	i.groupsMu.Lock()
+	defer i.groupsMu.Unlock()
+	for _, id := range dead {
+		i.orphans[id] = struct{}{}
+	}
+}
+
+// releaseOrphans ends every group markOrphans recorded whose rows are all
+// still dead and none of which is pending or in flight: nothing is left to
+// write any of them, so the group would only hold its instances for the life
+// of the process. A group that has a row written again keeps it, and is
+// marked again if that write is dropped too. A group merged into a newer one
+// since (Bind) is left to that one.
+func (i *ItemInstances) releaseOrphans() {
+	i.groupsMu.Lock()
+	if len(i.orphans) == 0 {
+		i.groupsMu.Unlock()
+		return
+	}
+	ids := make([]int32, 0, len(i.orphans))
+	for id := range i.orphans {
+		ids = append(ids, id)
+	}
+	clear(i.orphans)
+	i.groupsMu.Unlock()
+
+	var release []*rowGroup
+	for g, rows := range i.groupsOf(ids) {
+		if allDead(rows) && !i.anyOutstanding(rows) {
+			release = append(release, g)
+		}
+	}
+	if len(release) == 0 {
+		return
+	}
+	i.groupsMu.Lock()
+	defer i.groupsMu.Unlock()
+	for _, g := range release {
+		for member := range g.rows {
+			if i.groups[member] == g {
+				delete(i.groups, member)
+			}
+		}
+	}
+}
+
+// groupsOf returns a copy of the rows of each group bound to one of ids.
+func (i *ItemInstances) groupsOf(ids []int32) map[*rowGroup][]BoundRow {
+	i.groupsMu.Lock()
+	defer i.groupsMu.Unlock()
+	out := make(map[*rowGroup][]BoundRow)
+	for _, id := range ids {
+		g := i.groups[id]
+		if g == nil {
+			continue
+		}
+		if _, ok := out[g]; ok {
+			continue
+		}
+		rows := make([]BoundRow, 0, len(g.rows))
+		for _, row := range g.rows {
+			rows = append(rows, row)
+		}
+		out[g] = rows
+	}
+	return out
+}
+
+// allDead reports whether every row is a delete or an instance whose count is
+// gone, which no later change brings back.
+func allDead(rows []BoundRow) bool {
+	for _, row := range rows {
+		if row.Inst != nil && row.Inst.Snapshot().Count > 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// anyOutstanding reports whether a write of any row is pending or in flight.
+func (i *ItemInstances) anyOutstanding(rows []BoundRow) bool {
+	for _, row := range rows {
+		if i.ContainsID(row.ObjectID) {
+			return true
+		}
+	}
+	return false
+}
