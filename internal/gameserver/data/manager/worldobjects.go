@@ -6,6 +6,7 @@ import (
 	"math"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
@@ -26,17 +27,28 @@ type WorldObjects struct {
 	doorTimers *task.Door
 	doorRegen  *task.DoorRegen
 	newSink    func(*door.Object) event.Sink
+	ids        idAllocator
+	log        zerolog.Logger
 	now        func() time.Time
 
 	// doorMu serializes door state changes, so a flag flip or an HP change
 	// and its geodata, broadcast and timer follow-up land as one step
 	// whichever goroutine (the door timer, the regeneration sweep, a
-	// player's unlock or hit) makes it.
+	// player's unlock or hit, a reload) makes it. A change looks its door
+	// up under doorMu, so it never lands on a door a reload replaced.
 	doorMu sync.Mutex
 
-	doors       map[int]*door.Object
-	doorOrder   []*door.Object
+	// doors is replaced whole, under doorMu, by ReloadDoors; lookups read
+	// it without the lock.
+	doors       atomic.Pointer[doorSet]
 	staticOrder []*staticobject.Object
+}
+
+// doorSet is the spawned doors, by door id and in template order. It is
+// never changed once published.
+type doorSet struct {
+	byID  map[int]*door.Object
+	order []*door.Object
 }
 
 // NewWorldObjects allocates, spawns, and indexes door and static-object
@@ -75,20 +87,17 @@ func NewWorldObjects(doors *door.Table, statics *staticobject.Table, ids idAlloc
 		doorTimers: doorTimers,
 		doorRegen:  doorRegen,
 		newSink:    newSink,
+		ids:        ids,
+		log:        log,
 		now:        time.Now,
-		doors:      make(map[int]*door.Object),
 	}
-	for _, tmpl := range doors.All() {
-		obj, err := w.spawnDoor(tmpl, ids)
-		if err != nil {
-			if errors.Is(err, door.ErrEmptyFootprint) || errors.Is(err, dynamic.ErrDegenerateFootprint) {
-				log.Warn().Err(err).Int("door", tmpl.ID).Msg("data/manager: skipping door with degenerate footprint")
-				continue
-			}
-			return nil, err
-		}
-		w.doors[obj.DoorID()] = obj
-		w.doorOrder = append(w.doorOrder, obj)
+	set, err := w.newDoors(doors)
+	if err != nil {
+		return nil, err
+	}
+	w.doors.Store(set)
+	for _, obj := range set.order {
+		w.spawnDoor(obj)
 	}
 	for _, tmpl := range statics.All() {
 		obj, err := w.spawnStaticObject(tmpl, ids)
@@ -105,7 +114,7 @@ func (w *WorldObjects) Door(id int) (*door.Object, bool) {
 	if w == nil {
 		return nil, false
 	}
-	obj, ok := w.doors[id]
+	obj, ok := w.doors.Load().byID[id]
 	return obj, ok
 }
 
@@ -115,7 +124,7 @@ func (w *WorldObjects) DoorByName(name string) (*door.Object, bool) {
 	if w == nil {
 		return nil, false
 	}
-	for _, obj := range w.doorOrder {
+	for _, obj := range w.doors.Load().order {
 		if strings.EqualFold(obj.Template.Name, name) {
 			return obj, true
 		}
@@ -128,7 +137,7 @@ func (w *WorldObjects) Doors() []*door.Object {
 	if w == nil {
 		return nil
 	}
-	return append([]*door.Object(nil), w.doorOrder...)
+	return append([]*door.Object(nil), w.doors.Load().order...)
 }
 
 // StaticObjects returns spawned static objects in template order.
@@ -144,12 +153,12 @@ func (w *WorldObjects) StaticObjects() []*staticobject.Object {
 // open/close timer from its template's openTime/closeTime/randomTime, and
 // propagates the same state to a linked controller door (Template.TriggeredID).
 func (w *WorldObjects) SetDoorOpen(id int, open bool) bool {
+	w.doorMu.Lock()
+	defer w.doorMu.Unlock()
 	obj, ok := w.Door(id)
 	if !ok {
 		return false
 	}
-	w.doorMu.Lock()
-	defer w.doorMu.Unlock()
 	return w.changeDoorState(obj, open, false)
 }
 
@@ -182,12 +191,12 @@ func (w *WorldObjects) changeDoorState(obj *door.Object, open, triggered bool) b
 // ToggleDoor implements task.DoorEffects: it flips id's door to the opposite
 // of its current state once a scheduled timer fires.
 func (w *WorldObjects) ToggleDoor(id int) {
+	w.doorMu.Lock()
+	defer w.doorMu.Unlock()
 	obj, ok := w.Door(id)
 	if !ok {
 		return
 	}
-	w.doorMu.Lock()
-	defer w.doorMu.Unlock()
 	w.changeDoorState(obj, !obj.Opened(), false)
 }
 
@@ -196,13 +205,10 @@ func (w *WorldObjects) ToggleDoor(id int) {
 // and breaks the door once less than half a point is left. A broken door
 // takes no more damage.
 func (w *WorldObjects) ReduceDoorHP(id int, amount float64) {
-	obj, ok := w.Door(id)
-	if !ok {
-		return
-	}
 	w.doorMu.Lock()
 	defer w.doorMu.Unlock()
-	if obj.Dead() {
+	obj, ok := w.Door(id)
+	if !ok || obj.Dead() {
 		return
 	}
 	if amount > 0 {
@@ -218,13 +224,10 @@ func (w *WorldObjects) ReduceDoorHP(id int, amount float64) {
 // state is closed, regains restoreHP of its maximum HP, and observers see
 // the HP and then the revive. It reports whether the door was broken.
 func (w *WorldObjects) ReviveDoor(id int, restoreHP float64) bool {
-	obj, ok := w.Door(id)
-	if !ok {
-		return false
-	}
 	w.doorMu.Lock()
 	defer w.doorMu.Unlock()
-	if !obj.Dead() {
+	obj, ok := w.Door(id)
+	if !ok || !obj.Dead() {
 		return false
 	}
 	obj.SetOpened(obj.Template.Opened)
@@ -243,13 +246,13 @@ func (w *WorldObjects) ReviveDoor(id int, restoreHP float64) bool {
 // applies; a tick that a newer schedule replaced does nothing, and one that
 // reaches a broken or full door stops the door's regeneration.
 func (w *WorldObjects) RegenDoor(id int, due time.Time) {
+	w.doorMu.Lock()
+	defer w.doorMu.Unlock()
 	obj, ok := w.Door(id)
 	if !ok {
 		w.doorRegen.Cancel(id)
 		return
 	}
-	w.doorMu.Lock()
-	defer w.doorMu.Unlock()
 	if !w.doorRegen.Due(id, due) {
 		return
 	}
@@ -318,8 +321,78 @@ func (w *WorldObjects) scheduleDoorTimer(obj *door.Object) {
 	w.doorTimers.Add(obj.DoorID(), w.now().Add(time.Duration(delay)*time.Second))
 }
 
-func (w *WorldObjects) spawnDoor(tmpl *door.Template, ids idAllocator) (*door.Object, error) {
-	id, err := ids.NextID()
+// newDoors builds a door for every template of doors, not yet spawned. A
+// door whose triangulated footprint is degenerate or samples to no geodata
+// cells is logged and left out.
+func (w *WorldObjects) newDoors(doors *door.Table) (*doorSet, error) {
+	set := &doorSet{byID: make(map[int]*door.Object)}
+	for _, tmpl := range doors.All() {
+		obj, err := w.newDoor(tmpl)
+		if err != nil {
+			if errors.Is(err, door.ErrEmptyFootprint) || errors.Is(err, dynamic.ErrDegenerateFootprint) {
+				w.log.Warn().Err(err).Int("door", tmpl.ID).Msg("data/manager: skipping door with degenerate footprint")
+				continue
+			}
+			return nil, err
+		}
+		set.byID[obj.DoorID()] = obj
+		set.order = append(set.order, obj)
+	}
+	return set, nil
+}
+
+// ReloadDoors replaces every spawned door with one built from doors
+// (DoorData.reload). Each door standing opens first, as an open does, so
+// no blocker of an old door is in the geodata the new doors are measured
+// against. The new doors are built, the old ones leave the world with
+// their timers and regeneration, and each new door enters the world in
+// the state opposite to its template's, so observers see it so first, and
+// then takes its template's state as any state change does (geodata,
+// broadcast, a linked new door, the auto timer); a linked door not in the
+// world yet takes the change too. When a new door cannot be built, the
+// doors that opened close again and stay.
+//
+// Doors are looked up by id when they act, so scripts, clan hall grounds,
+// keys, timers and regeneration reach the new doors. No siege gate is
+// carried over: a new door has none, as one built at boot. A door change
+// that comes in during the reload waits for it and lands on the new door.
+func (w *WorldObjects) ReloadDoors(doors *door.Table) error {
+	w.doorMu.Lock()
+	defer w.doorMu.Unlock()
+	old := w.doors.Load().order
+	var opened []*door.Object
+	for _, obj := range old {
+		if w.changeDoorState(obj, true, false) {
+			opened = append(opened, obj)
+		}
+	}
+	fresh, err := w.newDoors(doors)
+	if err != nil {
+		for _, obj := range opened {
+			w.changeDoorState(obj, false, false)
+		}
+		return err
+	}
+	for _, obj := range fresh.order {
+		obj.SetOpened(!obj.Template.Opened)
+	}
+	for _, obj := range old {
+		w.doorTimers.Cancel(obj.DoorID())
+		w.doorRegen.Cancel(obj.DoorID())
+		w.state.Despawn(obj)
+	}
+	w.doors.Store(fresh)
+	for _, obj := range fresh.order {
+		pos := obj.Template.Position
+		w.state.Spawn(obj, pos.X, pos.Y, pos.Z, 0)
+		w.changeDoorState(obj, obj.Template.Opened, false)
+	}
+	return nil
+}
+
+// newDoor builds the door of tmpl, not yet spawned.
+func (w *WorldObjects) newDoor(tmpl *door.Template) (*door.Object, error) {
+	id, err := w.ids.NextID()
 	if err != nil {
 		return nil, fmt.Errorf("world objects: door %d: %w", tmpl.ID, err)
 	}
@@ -336,12 +409,19 @@ func (w *WorldObjects) spawnDoor(tmpl *door.Template, ids idAllocator) (*door.Ob
 	}
 	obj.SetOwner(w)
 	obj.SetSight(doorSight{geo: w.geo})
-	w.state.Spawn(obj, tmpl.Position.X, tmpl.Position.Y, tmpl.Position.Z, 0)
+	return obj, nil
+}
+
+// spawnDoor puts obj into the world as the boot does: in its template's
+// state, its geodata blocker in place when closed, its auto timer
+// scheduled.
+func (w *WorldObjects) spawnDoor(obj *door.Object) {
+	pos := obj.Template.Position
+	w.state.Spawn(obj, pos.X, pos.Y, pos.Z, 0)
 	if !obj.Opened() {
 		w.geo.AddObject(obj)
 	}
 	w.scheduleDoorTimer(obj)
-	return obj, nil
 }
 
 // doorSight runs a door's line-of-sight queries on the world geodata.

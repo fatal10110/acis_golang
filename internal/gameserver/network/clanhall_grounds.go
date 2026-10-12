@@ -8,12 +8,15 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 )
 
-// WorldDoors are the doors spawned in the world: their state changes, and
-// their lookup by name.
+// WorldDoors are the doors spawned in the world: their state changes,
+// their lookup by name, and their reload.
 type WorldDoors interface {
 	door.StateOwner
 	// DoorByName returns the door named name, ignoring case.
 	DoorByName(name string) (*door.Object, bool)
+	// ReloadDoors replaces the doors in the world with doors built from
+	// the given table.
+	ReloadDoors(doors *door.Table) error
 }
 
 // clanHallBanishOffset is the random offset of a player thrown out of a
