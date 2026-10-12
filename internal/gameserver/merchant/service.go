@@ -1,8 +1,11 @@
 package merchant
 
 import (
+	"context"
 	"errors"
 	"math"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
@@ -37,15 +40,39 @@ type IDs interface {
 // Service answers the merchant windows from the buylists and their stock.
 // A nil *Service has no buylists.
 type Service struct {
-	lists *buylist.Table
+	lists atomic.Pointer[buylist.Table]
 	stock *Stock
 	ids   IDs
 	cfg   Config
+
+	// reloadMu keeps one reload's stock and lists swaps together.
+	reloadMu sync.Mutex
 }
 
 // NewService builds a Service over lists and their stock.
 func NewService(lists *buylist.Table, stock *Stock, ids IDs, cfg Config) *Service {
-	return &Service{lists: lists, stock: stock, ids: ids, cfg: cfg}
+	s := &Service{stock: stock, ids: ids, cfg: cfg}
+	s.lists.Store(lists)
+	return s
+}
+
+// Reload replaces the buylists with lists and rebuilds their stock from
+// the saved rows (Stock.Reload). The stock takes the new products before
+// the lists are handed out, so a list read from now on is never sold
+// against the old stock. A purchase still holding a list read before buys
+// from that list, but a limited product of it the reload changed has no
+// stock left. When the rows cannot be read, the buylists and their stock
+// stay as they were.
+func (s *Service) Reload(ctx context.Context, lists *buylist.Table) error {
+	s.reloadMu.Lock()
+	defer s.reloadMu.Unlock()
+	if s.stock != nil {
+		if err := s.stock.Reload(ctx, lists); err != nil {
+			return err
+		}
+	}
+	s.lists.Store(lists)
+	return nil
 }
 
 // Config returns the shop settings.
@@ -58,10 +85,14 @@ func (s *Service) Config() Config {
 
 // List returns buylist id.
 func (s *Service) List(id int) (buylist.List, bool) {
-	if s == nil || s.lists == nil {
+	if s == nil {
 		return buylist.List{}, false
 	}
-	return s.lists.Find(id)
+	lists := s.lists.Load()
+	if lists == nil {
+		return buylist.List{}, false
+	}
+	return lists.Find(id)
 }
 
 // Count returns p's current stock count, 0 for an unlimited product.

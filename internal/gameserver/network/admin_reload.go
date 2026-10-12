@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -22,6 +24,10 @@ type DataReloads struct {
 	// Admin reloads the access levels and admin commands
 	// (AdminData.reload).
 	Admin func() error
+	// BuyLists reads the buylists anew, which the merchant then sells
+	// from, its limited stock rebuilt from the saved rows
+	// (BuyListManager.reload).
+	BuyLists func() (*buylist.Table, error)
 	// Crests reloads the crest images (CrestCache.reload).
 	Crests func() error
 	// CursedWeapons reads the cursed weapons anew (CursedWeaponManager.load),
@@ -61,8 +67,7 @@ type DataReloads struct {
 var errReloadNotPorted = errors.New("reload not ported yet")
 
 // reloadNotPorted answers a type no reload exists for yet, each tracked by
-// its issue: boat (#3404), buylist (#3405), config (#3406), door (#3407)
-// and zone (#3410).
+// its issue: boat (#3404), config (#3406), door (#3407) and zone (#3410).
 func reloadNotPorted(*GameClientLink) error { return errReloadNotPorted }
 
 // reloadHook runs hook, errReloadNotPorted without one.
@@ -90,7 +95,7 @@ var reloadTypes = []reloadType{
 	{word: "admin", done: "Admin data has been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Admin) }},
 	{word: "announcement", done: "The content of announcements.xml has been reloaded.", run: func(l *GameClientLink) error { return l.announcements.Load() }},
 	{word: "boat", done: "Boat have been reloaded.", run: reloadNotPorted},
-	{word: "buylist", done: "Buylists have been reloaded.", run: reloadNotPorted},
+	{word: "buylist", done: "Buylists have been reloaded.", run: (*GameClientLink).reloadBuyLists},
 	{word: "config", done: "Configs files have been reloaded.", run: reloadNotPorted},
 	{word: "crest", done: "Crests have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Crests) }},
 	{word: "cw", done: "Cursed weapons have been reloaded.", run: (*GameClientLink).reloadCursedWeapons},
@@ -185,4 +190,22 @@ func (l *GameClientLink) reloadTeleports() error {
 	}
 	l.gatekeeper.SetTables(teleports, instants)
 	return nil
+}
+
+// reloadBuyListsTimeout bounds the stock rows read of //reload buylist.
+const reloadBuyListsTimeout = 30 * time.Second
+
+// reloadBuyLists reads the buylists anew and hands them to the merchant,
+// which rebuilds their limited stock from the saved rows.
+func (l *GameClientLink) reloadBuyLists() error {
+	if l.reloads.BuyLists == nil || l.merchant == nil {
+		return errReloadNotPorted
+	}
+	lists, err := l.reloads.BuyLists()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), reloadBuyListsTimeout)
+	defer cancel()
+	return l.merchant.Reload(ctx, lists)
 }
