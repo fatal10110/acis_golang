@@ -47,7 +47,7 @@ func TestDataReloadsSwapItemAndSkillTemplates(t *testing.T) {
 </list>`)
 	data := &gameData{Items: item.NewTable(nil), Skills: skill.NewTable(nil)}
 	items, skills := data.Items, data.Skills
-	reloads := provideDataReloads(gameServerPaths{DataRoot: root}, data, nil, nil, nil, nil, gameplayConfig{}, zerolog.Nop())
+	reloads := provideDataReloads(gameServerPaths{DataRoot: root}, gameServerConfig{}, data, nil, nil, nil, nil, gameplayConfig{}, zerolog.Nop())
 
 	if err := reloads.Items(); err != nil {
 		t.Fatalf("item reload: %v", err)

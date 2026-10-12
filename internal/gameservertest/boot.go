@@ -2092,6 +2092,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		ItemTemplates:    itemTemplates,
 		HTML:             HTMLCache(t, o.pages()),
 		Reloads:          o.dataReloads,
+		BossZones:        gamesql.NewBossZoneStore(db),
 		Crests:           crests,
 		Skills:           o.skills,
 		Spellbooks:       o.spellbooks,
@@ -2296,6 +2297,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			dropRates: o.npcDropRates, sevenSigns: sevenSigns, scripts: quests.registry, spawner: quests.env.Spawner, routes: o.walkerRoutes,
 			skills: o.npcSpawnSkills, zones: o.zones,
 		})
+		// As the game server does once the spawns are up, every castle's
+		// holy artifacts are placed, built from the WithNPCs templates.
+		if gclConfig.Castles != nil {
+			gclConfig.Castles.SpawnArtifacts(npcSpawns.SpawnArtifact)
+		}
 	}
 	if o.productionTickers {
 		for _, start := range []func(zerolog.Logger) *scheduler.Ticker{

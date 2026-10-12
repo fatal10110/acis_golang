@@ -494,6 +494,14 @@ type GameClientLink struct {
 	// reloads re-read the data tables //reload and //respawnall name; see
 	// admin_reload.go.
 	reloads DataReloads
+	// bossZones keeps who may enter the boss zones across a zone reload;
+	// nil keeps nobody.
+	bossZones BossZoneStore
+	// zoneReloadMu runs one //reload zone at a time.
+	zoneReloadMu sync.Mutex
+	// zonePulses runs the effect and damage zones' pulses, those of every
+	// zone set the link wired.
+	zonePulses *sim.Queue
 }
 
 // AIRegistry owns recurring actor-AI registrations.
@@ -770,6 +778,9 @@ type GameClientLinkConfig struct {
 	// Reloads re-read the data tables //reload and //respawnall name; a
 	// nil hook leaves its table as booted.
 	Reloads DataReloads
+	// BossZones saves and restores who may enter the boss zones around a
+	// zone reload; nil keeps nobody's permission across one.
+	BossZones BossZoneStore
 	// Shutdown is the timed shutdown //server starts and aborts; required
 	// for //server.
 	Shutdown *shutdown.Countdown
@@ -897,6 +908,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.manor = cfg.Manor
 	link.classMaster = cfg.ClassMaster
 	link.reloads = cfg.Reloads
+	link.bossZones = cfg.BossZones
 	link.recommendations = cfg.Recommendations
 	link.quests, link.scripts, link.journals = cfg.Quests, cfg.Scripts, cfg.Journals
 	link.memos = cfg.Memos
@@ -966,17 +978,9 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		clans := link.clans
 		link.roster.SetPurged(func(objectID int32) { clans.RemoveDeleted(objectID, time.Now()) })
 	}
+	link.skillHandlers.Register(takeCastleHandler{l: link})
 	link.chance = &actorcast.ChanceProcs{Definitions: link.skills, Targets: link.targets, Skills: link.skillHandlers, Deliver: link.deliverChanceCast}
-	if link.zones != nil {
-		for _, boss := range zone.OfKind[*zone.Boss](link.zones) {
-			boss.Eject = func(a zone.Actor) { link.ejectBossPlayer(boss, a) }
-		}
-	}
-	link.wireZoneOccupantHooks()
-	link.wireScriptZones()
-	link.wireClanHallZones()
-	link.wireSiegeZones()
-	link.wireZonePulses()
+	link.wireZones(link.zones)
 	return link, nil
 }
 

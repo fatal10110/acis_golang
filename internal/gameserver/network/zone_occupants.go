@@ -25,11 +25,11 @@ func (p *livePlayer) ZonePlayer() (zone.Player, bool) {
 //
 // A zone rule runs while the occupant's zone membership is locked, so each
 // effect is posted to the occupant's own queue rather than run in place.
-func (l *GameClientLink) wireZoneOccupantHooks() {
-	if l.zones == nil || l.world == nil {
+func (l *GameClientLink) wireZoneOccupantHooks(ix *zone.Index) {
+	if l.world == nil {
 		return
 	}
-	for _, boss := range zone.OfKind[*zone.Boss](l.zones) {
+	for _, boss := range zone.OfKind[*zone.Boss](ix) {
 		boss.Unsummon = l.unsummonZoneOccupant
 		boss.RecallNPC = l.recallRaidOccupant
 		boss.RecallRaids = func() {
@@ -38,7 +38,7 @@ func (l *GameClientLink) wireZoneOccupantHooks() {
 			}
 		}
 	}
-	for _, siege := range zone.OfKind[*zone.Siege](l.zones) {
+	for _, siege := range zone.OfKind[*zone.Siege](ix) {
 		siege.Unsummon = l.unsummonSiegeOccupant
 	}
 }

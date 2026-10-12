@@ -3,7 +3,8 @@
 // the clans' siege kills and deaths.
 //
 // Other systems read a siege through a narrow surface: ActiveAt (the siege
-// in progress whose battlefield holds a point), Get (a castle's siege),
+// in progress whose battlefield holds a point), At (the siege whose
+// battlefield holds a point), Get (a castle's siege),
 // Siege.InProgress, Siege.Side, Siege.CheckSides, Siege.OnOppositeSides,
 // Engine.Registered and the kill counters.
 package siege
@@ -167,7 +168,7 @@ type registration struct {
 
 // Siege is one castle's siege.
 //
-// Every field is guarded by the engine's mu.
+// field is guarded by the engine's fieldMu, every other field by its mu.
 type Siege struct {
 	e      *Engine
 	castle *castle.Castle
@@ -189,6 +190,10 @@ type Siege struct {
 	startGen uint64
 	clock    *sim.Timer
 	clockGen uint64
+
+	// engraved maps each of the castle's artifacts a clan engraved the
+	// ruler on this siege to that clan's id.
+	engraved map[int32]int32
 }
 
 // counters are a clan's siege kills and deaths.
@@ -210,7 +215,12 @@ type Engine struct {
 	writes  Writer
 	log     zerolog.Logger
 
-	mu       sync.Mutex
+	mu sync.Mutex
+	// fieldMu guards every siege's battlefield. It is held while a
+	// battlefield is switched or swept, so a zone reload's Rebind never
+	// lands between a siege reading its battlefield and acting on it. It is
+	// taken after mu when both are held.
+	fieldMu  sync.Mutex
 	byID     map[int]*Siege
 	order    []*Siege
 	counters map[int32]*counters
@@ -331,7 +341,7 @@ func (e *Engine) ActiveAt(x, y, z int) (*Siege, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	for _, s := range e.order {
-		if s.status == StatusInProgress && s.field != nil && s.field.ContainsPoint(x, y, z) {
+		if f := s.Battlefield(); s.status == StatusInProgress && f != nil && f.ContainsPoint(x, y, z) {
 			return s, true
 		}
 	}
@@ -343,6 +353,20 @@ func (e *Engine) ActiveAt(x, y, z int) (*Siege, bool) {
 func (e *Engine) AttackerAt(clanID int32, x, y, z int) bool {
 	s, ok := e.ActiveAt(x, y, z)
 	return ok && s.CheckSides(clanID, SideAttacker)
+}
+
+// At returns the siege whose battlefield holds the point (x, y, z), being
+// fought or not.
+func (e *Engine) At(x, y, z int) (*Siege, bool) {
+	if e == nil {
+		return nil, false
+	}
+	for _, s := range e.order {
+		if f := s.Battlefield(); f != nil && f.ContainsPoint(x, y, z) {
+			return s, true
+		}
+	}
+	return nil, false
 }
 
 // Registered reports whether clanID is registered, on any side, on any
@@ -434,7 +458,46 @@ func (e *Engine) Now() time.Time {
 func (s *Siege) Castle() *castle.Castle { return s.castle }
 
 // Battlefield is the siege zone the siege turns on, nil for none.
-func (s *Siege) Battlefield() *zone.Siege { return s.field }
+func (s *Siege) Battlefield() *zone.Siege {
+	s.e.fieldMu.Lock()
+	defer s.e.fieldMu.Unlock()
+	return s.field
+}
+
+// withBattlefield runs fn on the siege's battlefield, when it has one, with
+// the battlefield held.
+func (s *Siege) withBattlefield(fn func(f *zone.Siege)) {
+	s.e.fieldMu.Lock()
+	defer s.e.fieldMu.Unlock()
+	if s.field != nil {
+		fn(s.field)
+	}
+}
+
+// Rebind moves each siege onto the battlefield of fields whose residence is
+// its castle (none when fields has none), as a zone reload reads the
+// battlefields anew: the new battlefield is on while the one it replaces
+// is. Call it before fields hold anyone.
+func (e *Engine) Rebind(fields []*zone.Siege) {
+	if e == nil {
+		return
+	}
+	e.fieldMu.Lock()
+	defer e.fieldMu.Unlock()
+	for _, s := range e.order {
+		var next *zone.Siege
+		for _, f := range fields {
+			if f.ResidenceID == s.castle.ID {
+				next = f
+				break
+			}
+		}
+		if next != nil && s.field != nil && s.field.Active() {
+			next.SetActive(true)
+		}
+		s.field = next
+	}
+}
 
 // Status is where the siege stands in its cycle.
 func (s *Siege) Status() Status {
