@@ -113,12 +113,12 @@ func TestFrameCharDeleteOk(t *testing.T) {
 func TestFrameCharSelected(t *testing.T) {
 	c := &player.Character{
 		ID:       0x10000001,
-		Name:     "Newbie",
 		Race:     player.RaceHuman,
 		Location: location.Location{X: 10, Y: 20, Z: 30},
 		SP:       7, Exp: 12345, CharLevel: 3,
 		KarmaPoints: 1, PKKills: 2,
 	}
+	c.SetName("Newbie")
 	c.SetTitle("Hero")
 	c.SetClanID(5)
 	c.SetResourceValues(player.Resources{CurrentHP: 75, CurrentMP: 30})
@@ -129,7 +129,7 @@ func TestFrameCharSelected(t *testing.T) {
 
 	want := []byte{OpcodeCharSelected}
 	x, y, z := c.Position()
-	want = append(want, encodeUTF16Z(c.Name)...)
+	want = append(want, encodeUTF16Z(c.CharacterName())...)
 	want = binary.LittleEndian.AppendUint32(want, uint32(c.ObjectID()))
 	want = append(want, encodeUTF16Z(c.Title())...)
 	want = binary.LittleEndian.AppendUint32(want, 999) // session id

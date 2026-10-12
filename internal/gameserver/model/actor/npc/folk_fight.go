@@ -160,6 +160,8 @@ func (f *Folk) thinkCurrent() {
 		f.thinkFollow(cur)
 	case ai.IntentionMoveTo:
 		f.thinkMoveTo(cur)
+	case ai.IntentionPickUp:
+		f.thinkPickUp(cur)
 	}
 }
 

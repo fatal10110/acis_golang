@@ -666,7 +666,7 @@ func setWaterSurface(mover *move.CreatureMove, zones *zone.Index) {
 func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
 	delivery := &playerInventoryDelivery{updates: l.inventoryUpdates, character: c}
 	inv := itemcontainer.NewPlayerInventoryWithDelivery(c.ID, l.itemTemplates, delivery, l.itemPersister(c.ID))
-	inv.SetItemLog(l.itemLog, func() string { return c.Name })
+	inv.SetItemLog(l.itemLog, func() string { return c.CharacterName() })
 	inv.Restore(items)
 	c.AttachRuntime(tmpl, inv)
 	// The body stays the base class's while a subclass is played.
@@ -721,6 +721,12 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	}
 	if l.zones != nil {
 		rt.Zones = l.zones
+	}
+	if l.sieges != nil {
+		rt.Sieges = l.sieges
+	}
+	if l.sevenSigns != nil {
+		rt.Seals = l.sevenSigns
 	}
 	if l.npcs != nil {
 		rt.Mounts = l.npcs

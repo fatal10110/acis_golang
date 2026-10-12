@@ -3,8 +3,6 @@ package skill
 import (
 	"reflect"
 	"testing"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // ---- from buffer_test.go ----
@@ -272,28 +270,22 @@ func TestParseEnums(t *testing.T) {
 }
 
 // ---- from enum_test.go ----
-func TestActivationFromStatSet(t *testing.T) {
-	set := commons.NewStatSet()
-	set.Set("operateType", "TOGGLE")
-	got, err := commons.GetEnum[Activation](set, "operateType", activationNames)
+func TestParseActivation(t *testing.T) {
+	got, err := ParseActivation("TOGGLE")
 	if err != nil || got != ActivationToggle {
-		t.Fatalf("Activation = %v, %v, want ActivationToggle", got, err)
+		t.Fatalf("ParseActivation(\"TOGGLE\") = %v, %v, want ActivationToggle", got, err)
 	}
 	if got.String() != "TOGGLE" {
 		t.Fatalf("String() = %q, want TOGGLE", got.String())
 	}
-
-	set.Set("operateType", "BOGUS")
-	if _, err := commons.GetEnum[Activation](set, "operateType", activationNames); err == nil {
+	if _, err := ParseActivation("BOGUS"); err == nil {
 		t.Fatal("expected an error for an unknown operateType tag, got nil")
 	}
 }
 
-func TestTargetFromStatSet(t *testing.T) {
+func TestParseTargetRoundTrip(t *testing.T) {
 	for _, name := range targetStrings {
-		set := commons.NewStatSet()
-		set.Set("target", name)
-		got, err := commons.GetEnum[Target](set, "target", targetNames)
+		got, err := ParseTarget(name)
 		if err != nil {
 			t.Fatalf("target %q: %v", name, err)
 		}
@@ -303,17 +295,10 @@ func TestTargetFromStatSet(t *testing.T) {
 	}
 }
 
-func TestElementDefault(t *testing.T) {
-	set := commons.NewStatSet()
-	got, err := commons.GetEnumDefault[Element](set, "element", elementNames, ElementNone)
-	if err != nil || got != ElementNone {
-		t.Fatalf("Element default = %v, %v, want ElementNone", got, err)
-	}
-
-	set.Set("element", "FIRE")
-	got, err = commons.GetEnumDefault[Element](set, "element", elementNames, ElementNone)
+func TestParseElement(t *testing.T) {
+	got, err := ParseElement("FIRE")
 	if err != nil || got != ElementFire {
-		t.Fatalf("Element = %v, %v, want ElementFire", got, err)
+		t.Fatalf("ParseElement(\"FIRE\") = %v, %v, want ElementFire", got, err)
 	}
 }
 

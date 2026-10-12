@@ -99,7 +99,7 @@ func (l *GameClientLink) askWedding(live *livePlayer, f *npc.Folk, command strin
 		l.sendWeddingPage(live, f, page)
 		return
 	}
-	partner.SendFrame(serverpackets.FrameConfirmDlgEngageRequest(wedding.RequestText(live.Name)))
+	partner.SendFrame(serverpackets.FrameConfirmDlgEngageRequest(wedding.RequestText(live.CharacterName())))
 }
 
 // tokenizerSpace is the default delimiter set of a command's words: space,
@@ -178,8 +178,8 @@ func (l *GameClientLink) engageAnswer(live *livePlayer, answer int32) {
 // have each paid the price: each is congratulated, each shows the wedding march then
 // the fireworks to everyone watching, and every player online hears of it.
 func (l *GameClientLink) celebrateWedding(requester, partner *livePlayer) {
-	sendText(requester, wedding.MarriedNotice(partner.Name))
-	sendText(partner, wedding.MarriedNotice(requester.Name))
+	sendText(requester, wedding.MarriedNotice(partner.CharacterName()))
+	sendText(partner, wedding.MarriedNotice(requester.CharacterName()))
 	for _, skillID := range []int32{wedding.MarchSkillID, wedding.FireworksSkillID} {
 		for _, spouse := range []*livePlayer{requester, partner} {
 			l.broadcastLiveFrame(spouse, func() wire.Frame {
@@ -188,5 +188,5 @@ func (l *GameClientLink) celebrateWedding(requester, partner *livePlayer) {
 			})
 		}
 	}
-	announceToOnline(l.world, wedding.MarriedAnnouncement(requester.Name, partner.Name), false)
+	announceToOnline(l.world, wedding.MarriedAnnouncement(requester.CharacterName(), partner.CharacterName()), false)
 }

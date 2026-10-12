@@ -99,6 +99,8 @@ func (f *Folk) act(d *ai.Desire) {
 		f.thinkMoveTo(d)
 	case ai.IntentionSocial:
 		f.thinkSocial(d)
+	case ai.IntentionPickUp:
+		f.thinkPickUp(d)
 	}
 }
 

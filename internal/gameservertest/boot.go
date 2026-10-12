@@ -123,6 +123,7 @@ type options struct {
 	questLoadErr           error
 	subclassFault          SubclassFault
 	petNameLookupErr       error
+	characterNameFault     CharacterNameFault
 	captureLog             bool
 	account                string
 	characters             []characterSpec
@@ -2174,6 +2175,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Relations, gclConfig.Characters = relations, chars
 	gclConfig.AccessLevels = chars
 	gclConfig.CharacterEdits = chars
+	if f := o.characterNameFault; f.Lookup != nil || f.Store != nil {
+		gclConfig.CharacterEdits = faultyCharacterNameStore{CharacterStore: chars, fault: o.characterNameFault}
+	}
 	gclConfig.Punishments = chars
 	petitions, petitionRows := bootPetitions(t, db, chars, ids, o.petitionConfig)
 	gclConfig.Petitions = petitions

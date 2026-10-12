@@ -60,7 +60,7 @@ func TestChatCommandChannelDelivery(t *testing.T) {
 			line := chat.Line{Type: tc.typ, Text: "hold"}
 			chatHandlers[tc.typ](l, nil, players[tc.speaker], line)
 
-			frame := serverpackets.FrameCreatureSay(tc.speaker, int32(tc.typ), players[tc.speaker].Name, "hold")
+			frame := serverpackets.FrameCreatureSay(tc.speaker, int32(tc.typ), players[tc.speaker].CharacterName(), "hold")
 			want := string(frame.Bytes()[2:]) // the capture records payloads without the length prefix
 			frame.Release()
 			heard := map[int32]bool{}

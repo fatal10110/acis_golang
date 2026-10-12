@@ -82,6 +82,16 @@ type AttackableActor interface {
 	AISleeping() bool
 	// SocialAction shows observers the actor playing social animation id.
 	SocialAction(id int)
+	// PickUpTarget returns where the ground item itemObjectID lies, ok
+	// false once the actor can no longer pick it up: it left the world or
+	// the ground, or the actor does not know it.
+	PickUpTarget(itemObjectID int32) (at location.Location, ok bool)
+	// PickUp picks up the ground item itemObjectID: it takes the item
+	// before any other pickup can, gives the behavior bound to the actor's
+	// template its picked-item turn, then takes the item out of the world.
+	// The AI loop is unlocked for the call. It reports false, having done
+	// nothing, when the item is gone or another pickup holds it.
+	PickUp(itemObjectID int32) bool
 }
 
 // Timer is a pending one-shot task armed by AttackableActor.After.
@@ -179,8 +189,8 @@ type intention struct {
 	timer int
 	// distance is how far a flee runs from its start.
 	distance int
-	// socialID is a social's animation id.
-	socialID int32
+	// itemObjectID is a pick-up's item, or a social's animation id.
+	itemObjectID int32
 	// moveToTarget is an attack or cast intention's desire to close in on
 	// its target; every other kind never moves toward one.
 	moveToTarget bool
@@ -1054,6 +1064,8 @@ func (a *Attackable) continueCurrent(wasIdle bool) error {
 		a.thinkMoveTo()
 	case IntentionMoveRoute:
 		a.thinkMoveRoute()
+	case IntentionPickUp:
+		a.thinkPickUp()
 	}
 	return nil
 }
@@ -1117,6 +1129,9 @@ func (a *Attackable) promoteAndStep() error {
 		case IntentionMoveRoute:
 			a.thinkMoveRoute()
 			a.lastDesire = IntentionMoveRoute
+		case IntentionPickUp:
+			a.thinkPickUp()
+			a.lastDesire = IntentionPickUp
 		}
 		return nil
 	}
@@ -1202,7 +1217,7 @@ func (a *Attackable) promoteNext() (fromLatch, promoted bool) {
 // the same target with the same skill, or walking to the same location or
 // route.
 func (i intention) same(o intention) bool {
-	return i.kind == o.kind && sameCombatant(i.target, o.target) && i.skill == o.skill && i.loc == o.loc && i.socialID == o.socialID && i.route == o.route
+	return i.kind == o.kind && sameCombatant(i.target, o.target) && i.skill == o.skill && i.loc == o.loc && i.itemObjectID == o.itemObjectID && i.route == o.route
 }
 
 // nextToDo returns the latched attack when one is set, else the heaviest
@@ -1230,7 +1245,9 @@ func (a *Attackable) nextToDo() (next intention, fromLatch, ok bool) {
 	case IntentionFlee:
 		next = intention{kind: IntentionFlee, target: desire.FinalTarget, loc: desire.Location, distance: desire.Distance}
 	case IntentionSocial:
-		next = intention{kind: IntentionSocial, socialID: desire.ItemObjectID, timer: desire.Timer}
+		next = intention{kind: IntentionSocial, itemObjectID: desire.ItemObjectID, timer: desire.Timer}
+	case IntentionPickUp:
+		next = intention{kind: IntentionPickUp, itemObjectID: desire.ItemObjectID}
 	case IntentionMoveTo:
 		next = intention{kind: IntentionMoveTo, loc: desire.Location}
 	case IntentionMoveRoute:
@@ -1344,7 +1361,8 @@ func (a *Attackable) sweepStaleThreats(seq uint64) {
 // is out of control, attack desires whose target is beyond
 // attackDesireRange. It only drops desires: hate, the current intention and
 // the next one stay as they are. No queued kind carries a non-creature
-// target yet, so there is no unknown-object prune.
+// target: a pick-up names its item by object id only, so the unknown-object
+// prune never drops one, and one whose item is gone stays queued.
 func (a *Attackable) pruneDesires(outOfControl bool) {
 	a.desires.RemoveIf(func(d *Desire) bool {
 		if d.Kind != IntentionCast {
@@ -1545,7 +1563,7 @@ func (a *Attackable) clearArrivalDesire() {
 }
 
 func (a *Attackable) clearCurrentDesire() {
-	probe := &Desire{Kind: a.current.kind, Location: a.current.loc, FinalTarget: a.current.target, Skill: a.current.skill, ItemObjectID: a.current.socialID, RouteName: a.current.route}
+	probe := &Desire{Kind: a.current.kind, Location: a.current.loc, FinalTarget: a.current.target, Skill: a.current.skill, ItemObjectID: a.current.itemObjectID, RouteName: a.current.route}
 	a.desires.RemoveIf(func(d *Desire) bool { return d.Equal(probe) })
 }
 
@@ -1581,7 +1599,7 @@ func (a *Attackable) thinkSocial() {
 	}
 	a.socialHold = a.now().Add(time.Duration(a.current.timer) * time.Millisecond)
 	a.move.Stop()
-	a.actor.SocialAction(int(a.current.socialID))
+	a.actor.SocialAction(int(a.current.itemObjectID))
 }
 
 // thinkWander is the wander step: the promotion of a WANDER desire and

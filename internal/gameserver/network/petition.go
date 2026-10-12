@@ -27,7 +27,7 @@ func (p petitionPresence) GM(objectID int32) bool {
 }
 
 func petitionPerson(live *livePlayer) petition.Person {
-	return petition.Person{ID: live.ObjectID(), Name: live.Name}
+	return petition.Person{ID: live.ObjectID(), Name: live.CharacterName()}
 }
 
 // deliverPetition sends each notice to its recipient still in the world,
@@ -119,7 +119,7 @@ func (l *GameClientLink) requestPetition(live *livePlayer, req clientpackets.Req
 		live.SendFrame(serverpackets.FrameActionFailed())
 	case petition.Submitted:
 		if s.NotifyGMs {
-			l.tellGMsOfPetition(live.ObjectID(), live.Name+" has submitted a new petition.")
+			l.tellGMsOfPetition(live.ObjectID(), live.CharacterName()+" has submitted a new petition.")
 		}
 		maxPerPlayer := l.petitions.Config().MaxPerPlayer
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessagePetitionAcceptedRecentNoS1, s.ID))
@@ -142,7 +142,7 @@ func (l *GameClientLink) requestPetitionCancel(live *livePlayer) {
 	case petition.CancelDone:
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessagePetitionCanceledSubmitS1MoreToday, int32(c.Remaining)))
 		if c.NotifyGMs {
-			l.tellGMsOfPetition(live.ObjectID(), live.Name+" has canceled a pending petition.")
+			l.tellGMsOfPetition(live.ObjectID(), live.CharacterName()+" has canceled a pending petition.")
 		}
 	}
 }

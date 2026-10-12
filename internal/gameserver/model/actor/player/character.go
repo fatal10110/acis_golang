@@ -40,7 +40,10 @@ type Character struct {
 
 	ID          int32
 	AccountName string
-	Name        string
+	// name is read through CharacterName: an admin renames a live
+	// character while other actors' queues read it (CharInfo, clan and
+	// party rows, item logs), so it is atomic. See character_name.go.
+	name atomic.Pointer[string]
 
 	// baseClassID is the class the character was created into, or the
 	// occupation it later moved to on that class line; see BaseClassID.
@@ -216,6 +219,8 @@ type Character struct {
 	zones                    PeaceZoneQuery
 	social                   SocialGraph
 	hallFunctions            HallFunctions
+	sieges                   SiegeGround
+	seals                    SealRules
 	partyLoot                PartyLoot
 	tutorial                 TutorialEvents
 	deaths                   DeathEvents
@@ -229,6 +234,7 @@ type Character struct {
 	insideNoSummonFriendZone atomic.Bool
 	insideBossZone           atomic.Bool
 	insideClanHallZone       atomic.Bool
+	insideCastleZone         atomic.Bool
 	insideDangerArea         atomic.Bool
 	insideWater              atomic.Bool
 	swampMoveBonus           atomic.Int32
@@ -401,7 +407,6 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 	c := &Character{
 		ID:          objectID,
 		AccountName: accountName,
-		Name:        name,
 
 		Race: race,
 
@@ -427,6 +432,7 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 		maxBuffsAmount: defaultMaxBuffsAmount,
 	}
 
+	c.SetName(name)
 	c.SetSex(sex)
 	c.SetClassID(tmpl.ID)
 	c.SetBaseClassID(tmpl.ID)

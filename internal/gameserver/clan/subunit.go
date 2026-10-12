@@ -348,7 +348,7 @@ func (s *Service) AssignSubunitCaptain(c *player.Character, unitName, captainNam
 		return SubunitChange{}, SubunitNotLeader
 	case nameLength(captainName) > maxCaptainNameLength:
 		return SubunitChange{}, SubunitCaptainNameTooLong
-	case c.Name == captainName:
+	case c.CharacterName() == captainName:
 		return SubunitChange{}, SubunitCaptainSelf
 	}
 	cl.mu.Lock()

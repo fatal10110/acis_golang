@@ -101,6 +101,10 @@ var raisedHooks = map[hook]kindSet{
 	hookSeeSpell:              kinds(KindFolk, KindHostile),
 	hookSpelled:               kinds(KindFolk, KindHostile),
 	hookAbnormalStatusChanged: kinds(KindFolk, KindHostile),
+	// An NPC's look for ground items (LookItem) and its pick-up of one, in
+	// its AI's think pass (ground_item.go).
+	hookSeeItem:    kinds(KindFolk, KindHostile),
+	hookPickedItem: kinds(KindFolk, KindHostile),
 }
 
 // Config is what Build needs besides the list and the catalog.

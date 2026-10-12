@@ -18,6 +18,10 @@ type characterEditStore interface {
 	SetTitle(ctx context.Context, objectID int32, title string) error
 	SetClanPenalties(ctx context.Context, objectID int32, joinExpiry, createExpiry int64) error
 	SetSex(ctx context.Context, objectID int32, sex byte) error
+	SetName(ctx context.Context, objectID int32, name string) error
+	// NameTaken reports whether a character, online or not, is named name,
+	// matched case-insensitively.
+	NameTaken(ctx context.Context, name string) (bool, error)
 }
 
 // adminSet answers //set <field> [value] for gm's selection, gm itself
@@ -69,7 +73,7 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 			}
 			target.SetColors(color, target.TitleColor())
 			l.broadcastCharacterInfo(target)
-			sendText(gm, "You successfully set color name of "+target.Name+".")
+			sendText(gm, "You successfully set color name of "+target.CharacterName()+".")
 		})
 	case "tcolor":
 		edit(func() {
@@ -88,7 +92,7 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 			}
 			target.SetColors(target.NameColor(), color)
 			l.broadcastCharacterInfo(target)
-			sendText(gm, "You successfully set title color name of "+target.Name+".")
+			sendText(gm, "You successfully set title color name of "+target.CharacterName()+".")
 		})
 	case "exp":
 		edit(func() {
@@ -99,7 +103,7 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 			}
 			l.setExp(target, exp)
 			l.broadcastCharacterInfo(target)
-			sendText(gm, "You successfully set "+target.Name+"'s XP to "+strconv.FormatInt(exp, 10)+".")
+			sendText(gm, "You successfully set "+target.CharacterName()+"'s XP to "+strconv.FormatInt(exp, 10)+".")
 		})
 	case "karma":
 		edit(func() {
@@ -113,7 +117,7 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 				return
 			}
 			target.SetKarma(int(karma))
-			sendText(gm, "You successfully set "+target.Name+"'s karma to "+strconv.Itoa(int(karma))+".")
+			sendText(gm, "You successfully set "+target.CharacterName()+"'s karma to "+strconv.Itoa(int(karma))+".")
 		})
 	case "level":
 		edit(func() {
@@ -132,12 +136,12 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 				return
 			}
 			l.setExp(target, row.RequiredExpToLevelUp)
-			sendText(gm, "You successfully set "+target.Name+"'s level to "+strconv.Itoa(int(level))+".")
+			sendText(gm, "You successfully set "+target.CharacterName()+"'s level to "+strconv.Itoa(int(level))+".")
 		})
 	case "noble":
 		edit(func() {
 			l.toggleNoble(target)
-			sendText(gm, "You have modified "+target.Name+"'s noble status.")
+			sendText(gm, "You have modified "+target.CharacterName()+"'s noble status.")
 		})
 	case "rec":
 		edit(func() {
@@ -148,7 +152,7 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 			}
 			target.SetRecommendationsHave(int(rec))
 			l.broadcastCharacterInfo(target)
-			sendText(gm, "You successfully set "+target.Name+" to "+strconv.Itoa(int(rec))+".")
+			sendText(gm, "You successfully set "+target.CharacterName()+" to "+strconv.Itoa(int(rec))+".")
 		})
 	case "sp":
 		edit(func() {
@@ -159,7 +163,7 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 			}
 			l.setSP(target, sp)
 			l.broadcastCharacterInfo(target)
-			sendText(gm, "You successfully set "+target.Name+"'s SP to "+strconv.Itoa(int(sp))+".")
+			sendText(gm, "You successfully set "+target.CharacterName()+"'s SP to "+strconv.Itoa(int(sp))+".")
 		})
 	case "title":
 		l.adminSetTitle(gm, value, hasValue)

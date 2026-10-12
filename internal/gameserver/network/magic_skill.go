@@ -873,6 +873,10 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
 	case errors.Is(err, actorcast.ErrSiegeSummonUnavailable):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
+	case errors.Is(err, actorcast.ErrSiegeSummonInCastle):
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotCallPetFromThisLocation))
+	case errors.Is(err, actorcast.ErrStrifeForbidsSummoning):
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSealOfStrifeForbidsSummoning))
 	}
 }
 
@@ -1000,11 +1004,11 @@ func (l *GameClientLink) sendSkillHandlerResultVia(send frameSender, live *liveP
 			defender, defenderOnline := l.livePlayerByID(m.DefenderID)
 			attackerName := m.AttackerName
 			if attackerOnline {
-				attackerName = attacker.Name
+				attackerName = attacker.CharacterName()
 			}
 			defenderName := m.DefenderName
 			if defenderOnline {
-				defenderName = defender.Name
+				defenderName = defender.CharacterName()
 			}
 			if defenderOnline {
 				send(defender, serverpackets.FrameSystemMessageString(serverpackets.SystemMessageCounteredS1Attack, attackerName))
@@ -1017,11 +1021,11 @@ func (l *GameClientLink) sendSkillHandlerResultVia(send frameSender, live *liveP
 			defender, defenderOnline := l.livePlayerByID(m.DefenderID)
 			attackerName := m.AttackerName
 			if attackerOnline {
-				attackerName = attacker.Name
+				attackerName = attacker.CharacterName()
 			}
 			defenderName := m.DefenderName
 			if defenderOnline {
-				defenderName = defender.Name
+				defenderName = defender.CharacterName()
 			}
 			if attackerOnline {
 				send(attacker, serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DodgesAttack, defenderName))

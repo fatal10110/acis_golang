@@ -21,7 +21,7 @@ func hitFeedbackVictim() *Character {
 
 func hitFeedbackAttacker() *Character {
 	a := liveCharacter(2, combatTemplate(), combatItems())
-	a.Name = "attacker"
+	a.SetName("attacker")
 	return a
 }
 

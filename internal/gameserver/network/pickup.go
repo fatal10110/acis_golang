@@ -267,14 +267,14 @@ func (l *GameClientLink) broadcastPickupAttention(live *livePlayer, ground *grou
 		if st.EnchantLevel > 0 {
 			return serverpackets.FrameSystemMessageStringNumberItemName(
 				serverpackets.SystemMessageAttentionS1PickedUpS2S3,
-				live.Name,
+				live.CharacterName(),
 				int32(st.EnchantLevel),
 				st.TemplateID,
 			)
 		}
 		return serverpackets.FrameSystemMessageStringItemName(
 			serverpackets.SystemMessageAttentionS1PickedUpS2,
-			live.Name,
+			live.CharacterName(),
 			st.TemplateID,
 		)
 	}

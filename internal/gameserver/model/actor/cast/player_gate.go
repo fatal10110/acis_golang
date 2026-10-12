@@ -26,6 +26,12 @@ var (
 	// ErrSiegeSummonUnavailable means a siege-summon skill was requested by a
 	// caster who is not an attacker of an active siege.
 	ErrSiegeSummonUnavailable = errors.New("cast: siege summon outside siege")
+	// ErrSiegeSummonInCastle means a siege attacker requested a siege-summon
+	// skill inside the castle's grounds.
+	ErrSiegeSummonInCastle = errors.New("cast: siege summon inside castle")
+	// ErrStrifeForbidsSummoning means the Seal of Strife forbids the caster a
+	// siege summon.
+	ErrStrifeForbidsSummoning = errors.New("cast: seal of strife forbids summoning")
 )
 
 // CanPlayerAttemptCast is a live player's pre-attempt gate: the checks that
@@ -78,14 +84,24 @@ func (c *Controller) playerAttemptRules(caster *player.Character, target Target,
 	if outsideCasterDuel(caster, target) {
 		return ErrInvalidTarget
 	}
-	if def.SiegeSummonSkill && !caster.ActiveSiegeAttacker() {
-		return ErrSiegeSummonUnavailable
+	if def.SiegeSummonSkill {
+		return siegeSummonRefusal(caster)
 	}
-	// With siege summons (#235), a siege attacker's summon is next refused
-	// inside a castle zone (NOT_CALL_PET_FROM_THIS_LOCATION) and by a
-	// Dawn-held Seal of Strife for a Dusk member
-	// (SEAL_OF_STRIFE_FORBIDS_SUMMONING). Neither is reachable while
-	// ActiveSiegeAttacker is always false.
+	return nil
+}
+
+// siegeSummonRefusal is the siege-summon gate: the caster's clan must attack
+// the siege in progress where the caster stands, outside the castle's
+// grounds, and the Seal of Strife must not forbid the caster to summon.
+func siegeSummonRefusal(caster *player.Character) error {
+	switch {
+	case !caster.ActiveSiegeAttacker():
+		return ErrSiegeSummonUnavailable
+	case caster.InCastleZone():
+		return ErrSiegeSummonInCastle
+	case caster.StrifeForbidsSummoning():
+		return ErrStrifeForbidsSummoning
+	}
 	return nil
 }
 

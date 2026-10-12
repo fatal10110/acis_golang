@@ -28,7 +28,7 @@ func TestNewCharacter(t *testing.T) {
 		t.Fatalf("NewCharacter() unexpected error: %v", err)
 	}
 
-	if c.ID != 0x10000001 || c.AccountName != "acct1" || c.Name != "Newbie" {
+	if c.ID != 0x10000001 || c.AccountName != "acct1" || c.CharacterName() != "Newbie" {
 		t.Fatalf("NewCharacter() identity = %+v", c)
 	}
 	if c.ClassID() != 0 || c.BaseClassID() != 0 {

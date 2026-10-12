@@ -415,7 +415,7 @@ func (l *GameClientLink) newPetInventory(live *livePlayer, controlItemID int32, 
 	}, l.itemPersister(controlItemID))
 	// The pet built around inv does not exist yet, so its records name the
 	// player it is called out for.
-	inv.SetItemLog(l.itemLog, func() string { return live.Name })
+	inv.SetItemLog(l.itemLog, func() string { return live.CharacterName() })
 	inv.Restore(l.restoreRows(controlItemID, items, restoredPetItemLocation))
 	// Restored rows never queue an update, so the carried weight stays 0
 	// unless recomputed here; the pet built around inv takes its
@@ -479,6 +479,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		Name:             npcTmpl.Name,
 		Level:            npcTmpl.Level,
 		Undead:           npcTmpl.Race == npc.RaceUndead,
+		SiegeSummon:      npcTmpl.Type == "SiegeSummon",
 		MaxBuffsAmount:   link.playerConfig.MaxBuffsAmount,
 		RespawnRestoreHP: link.playerConfig.RespawnRestoreHP,
 		OwnerInventory:   live.Inventory(),
@@ -519,10 +520,18 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	}
 	link.wireSummonAI(servitor)
 	summon.SpawnBesideOwner(link.world, servitor, live, location.Location{X: petSpawnOffset})
-	servitor.TryToFollow(live)
+	// A siege summon that lands off an active battlefield is shown, then
+	// vanishes at once; it never starts following.
+	offBattlefield := servitor.OffBattlefield()
+	if !offBattlefield {
+		servitor.TryToFollow(live)
+	}
 	link.broadcastSummonSpawnRelation(live, servitor)
 	// The NPCs around the servitor see it arrive.
 	npc.ForceSeeCreature(link.world, servitor)
+	if offBattlefield {
+		servitor.Vanish()
+	}
 	return true
 }
 

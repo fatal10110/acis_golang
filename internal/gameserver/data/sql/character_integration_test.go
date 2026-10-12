@@ -16,7 +16,6 @@ func testCharacter(objectID int32, name string) *player.Character {
 	c := &player.Character{
 		ID:          objectID,
 		AccountName: "acct1",
-		Name:        name,
 		Race:        player.RaceHuman,
 		CharLevel:   1,
 		Face:        1, HairStyle: 2, HairColor: 3,
@@ -25,6 +24,7 @@ func testCharacter(objectID int32, name string) *player.Character {
 		Location:    location.Location{X: -56733, Y: -113459, Z: -690},
 		LastHeading: 32768,
 	}
+	c.SetName(name)
 	c.SetResourceValues(player.Resources{
 		MaxHP: 80, CurrentHP: 80,
 		MaxCP: 32, CurrentCP: 32,
@@ -58,7 +58,7 @@ func TestCharacterStore_CreateAndReadBack(t *testing.T) {
 	}
 	gotRes := got.ResourceValues()
 	wantRes := c.ResourceValues()
-	if got.AccountName != c.AccountName || got.Name != c.Name || got.ClassID() != c.ClassID() ||
+	if got.AccountName != c.AccountName || got.CharacterName() != c.CharacterName() || got.ClassID() != c.ClassID() ||
 		got.Race != c.Race || got.Sex() != c.Sex() || got.CharLevel != c.CharLevel ||
 		gotRes != wantRes ||
 		got.Face != c.Face || got.HairStyle != c.HairStyle || got.HairColor != c.HairColor {
@@ -90,8 +90,8 @@ func TestCharacterStore_RestartReload(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get() after reload unexpected error: %v", err)
 	}
-	if got.Name != c.Name {
-		t.Fatalf("Get() after reload Name = %q, want %q", got.Name, c.Name)
+	if got.CharacterName() != c.CharacterName() {
+		t.Fatalf("Get() after reload Name = %q, want %q", got.CharacterName(), c.CharacterName())
 	}
 }
 
@@ -107,7 +107,7 @@ func TestCharacterStore_ListByAccount(t *testing.T) {
 
 	for _, c := range []*player.Character{a1, a2, other} {
 		if err := store.Create(ctx, c); err != nil {
-			t.Fatalf("Create(%q) unexpected error: %v", c.Name, err)
+			t.Fatalf("Create(%q) unexpected error: %v", c.CharacterName(), err)
 		}
 	}
 

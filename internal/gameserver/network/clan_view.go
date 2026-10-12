@@ -36,7 +36,7 @@ func (l *GameClientLink) clanFields(c *player.Character) serverpackets.ClanField
 // member-list update about a player is built.
 func liveMemberRow(c *player.Character, m clan.Member) serverpackets.PledgeMemberListMember {
 	return serverpackets.PledgeMemberListMember{
-		Name: c.Name, Level: int32(c.Level()), ClassID: int32(c.ClassID()),
+		Name: c.CharacterName(), Level: int32(c.Level()), ClassID: int32(c.ClassID()),
 		Sex: int32(c.Sex()), Race: int32(c.Race), OnlineObjectID: c.ObjectID(),
 		PledgeType: int32(m.PledgeType), HasSponsor: m.Sponsor != 0 || m.Apprentice != 0,
 	}

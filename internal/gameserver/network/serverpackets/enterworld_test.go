@@ -53,7 +53,8 @@ func TestFrameExStorageMaxCountFollowsConfigAndLimitStats(t *testing.T) {
 		{player.RaceHuman, []int32{90, 12, 15, 17, 18, 21, 23}},
 		{player.RaceDwarf, []int32{117, 13, 15, 18, 19, 21, 23}},
 	} {
-		c := &player.Character{Race: tc.race, Name: "S"}
+		c := &player.Character{Race: tc.race}
+		c.SetName("S")
 		c.Configure(player.Runtime{Rules: player.Rules{
 			InventorySlots: player.InventorySlots{NoDwarf: 90, Dwarf: 117, Configured: true},
 			StorageSlots:   slots,

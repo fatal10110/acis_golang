@@ -100,7 +100,7 @@ func (s *Service) NominateLeader(c *player.Character, name string, connected fun
 	switch {
 	case !ok || !cl.IsLeader(c.ID):
 		return NominateNotLeader
-	case strings.EqualFold(c.Name, name):
+	case strings.EqualFold(c.CharacterName(), name):
 		return NominateSelf
 	}
 	cl.mu.Lock()

@@ -13,7 +13,7 @@ import (
 // championship and tells live its length, then whether it entered the
 // running ranking. A disabled championship measures nothing.
 func measureCatch(live *livePlayer, champ *fishchamp.Championship, lure int32) {
-	catch, ok := champ.NewFish(live.Name, lure)
+	catch, ok := champ.NewFish(live.CharacterName(), lure)
 	if !ok {
 		return
 	}
@@ -74,12 +74,12 @@ func (l *GameClientLink) fishermanReward(live *livePlayer, f *npc.Folk) {
 	case !champ.Enabled():
 		sendFilledHTML(live, f.ObjectID(), l.setPage(fishchamp.PageDisabled), 0)
 		return
-	case !champ.IsWinner(live.Name):
+	case !champ.IsWinner(live.CharacterName()):
 		sendFilledHTML(live, f.ObjectID(), l.setPage(fishchamp.PageNotWinner), 0)
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), fishchamp.TaskTimeout)
-	paid, err := champ.Claim(ctx, live.Name)
+	paid, err := champ.Claim(ctx, live.CharacterName())
 	cancel()
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("fishing championship: store the claim")

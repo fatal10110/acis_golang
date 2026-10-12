@@ -178,6 +178,7 @@ const (
 	SystemMessageExchangeHasEnded                  = 1266
 	SystemMessagePetRefusingOrder                  = 1864
 	SystemMessagePetTooHighToControl               = 1918
+	SystemMessageSealOfStrifeForbidsSummoning      = 1925 // no parameter
 	SystemMessageS1                                = 1987
 	SystemMessageCreateLvlTooLowToRegister         = 404
 	SystemMessageItemMixingFailed                  = 719
@@ -220,6 +221,7 @@ const (
 	SystemMessageNamingAlreadyInUseByAnotherPet    = 584
 	SystemMessageNamingPetnameContainsInvalidChars = 591
 	SystemMessageNamingYouCannotSetNameOfThePet    = 695
+	SystemMessageIncorrectNameTryAgain             = 204
 	SystemMessageDistTooFarCastingStopped          = 748
 
 	// Experience, SP and level change feedback.
