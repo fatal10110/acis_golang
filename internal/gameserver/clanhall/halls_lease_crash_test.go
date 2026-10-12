@@ -2,6 +2,7 @@ package clanhall
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"testing"
 	"time"
@@ -63,5 +64,53 @@ func TestLeasePaymentSurvivesACrashAnywhere(t *testing.T) {
 		if a := got.adena[crashSellers]; a > limit {
 			t.Errorf("crash after write %d of %d: owner keeps %d adena with the week paid, more than %d without the crash", i, n, a, limit)
 		}
+	}
+}
+
+// failedLeaseBank takes the adena like crashBank, but the write landing
+// the debit fails.
+type failedLeaseBank struct{ *crashBank }
+
+func (b failedLeaseBank) TakeAdena(clanID int32, adena int) (Landing, bool) {
+	if _, ok := b.crashBank.TakeAdena(clanID, adena); !ok {
+		return nil, false
+	}
+	return func(context.Context) error { return errors.New("warehouse write failed") }, true
+}
+
+func TestLeasePaymentWhoseAdenaFailsToLandStoresNoTerm(t *testing.T) {
+	start := time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC)
+	base := crashBase(map[int32]int{crashSellers: 1200})
+	base.halls[crashHall] = HallRow{ID: crashHall, OwnerID: crashSellers, PaidUntil: start.Add(time.Minute).UnixMilli(), Paid: true}
+
+	log := &crashLog{}
+	lanes := &fifoLanes{}
+	hs := NewHalls(crashHallData(t), crashClans(true), nil, &crashStore{base: base, log: log}, lanes, zerolog.Nop())
+	if err := hs.Restore(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	loop := sim.NewInline(start)
+	hs.Start(loop.NewQueue("halls"), failedLeaseBank{&crashBank{log: log, held: maps.Clone(base.adena)}}, nil, nil)
+	loop.Advance(2 * time.Minute)
+	if len(lanes.jobs) == 0 {
+		t.Fatal("the lease queued no write")
+	}
+	lanes.drain()
+
+	// Start arms the hall's auction, which writes its end date; the
+	// lease's term must not reach the row.
+	db := log.replay(base, len(log.writes))
+	if got, want := db.halls[crashHall], base.halls[crashHall]; got.OwnerID != want.OwnerID || got.PaidUntil != want.PaidUntil || got.Paid != want.Paid {
+		t.Fatalf("the lease's adena failed to land, yet the stored hall row is %+v, want the term of %+v", got, want)
+	}
+	if db.adena[crashSellers] != base.adena[crashSellers] {
+		t.Fatalf("stored adena %d, want %d", db.adena[crashSellers], base.adena[crashSellers])
+	}
+	hs.mu.Lock()
+	h := hs.byID[crashHall]
+	paidUntil, paid := h.paidUntil, h.paid
+	hs.mu.Unlock()
+	if want := base.halls[crashHall].PaidUntil + weekMs; paidUntil != want || !paid {
+		t.Fatalf("live term paid until %d (paid %v), want %d and paid", paidUntil, paid, want)
 	}
 }

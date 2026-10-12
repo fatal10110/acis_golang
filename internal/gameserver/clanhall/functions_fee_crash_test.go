@@ -2,6 +2,7 @@ package clanhall
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"sync"
 	"testing"
@@ -160,5 +161,44 @@ func TestFunctionFeeSurvivesACrashAnywhere(t *testing.T) {
 		if got.adena > limit {
 			t.Errorf("crash after write %d of %d: clan keeps %d adena with the term paid, more than %d without the crash", i, n, got.adena, limit)
 		}
+	}
+}
+
+// failedFeeTreasury takes the fee like feeCrashTreasury, but the write
+// landing the debit fails.
+type failedFeeTreasury struct{ *feeCrashTreasury }
+
+func (b failedFeeTreasury) TakeAdena(clanID int32, adena int) (Landing, bool) {
+	if _, ok := b.feeCrashTreasury.TakeAdena(clanID, adena); !ok {
+		return nil, false
+	}
+	return func(context.Context) error { return errors.New("warehouse write failed") }, true
+}
+
+func TestFunctionFeeWhoseAdenaFailsToLandStoresNoTerm(t *testing.T) {
+	start := time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC)
+	const lease, rate = 1000, int64(7 * 24 * time.Hour / time.Millisecond)
+	stored := Function{Type: hallmodel.FuncRestoreHP, Level: 80, Lease: lease, Rate: rate, EndTime: start.Add(time.Minute).UnixMilli()}
+	base := feeDB{adena: 2500, rows: map[int]Function{hallmodel.FuncRestoreHP: stored}}
+
+	log := &feeLog{}
+	lanes := &fifoLanes{}
+	f := crashFunctions(t, &feeCrashStore{base: base, log: log}, lanes)
+	loop := sim.NewInline(start)
+	f.Start(loop.NewQueue("clanhall-functions"), failedFeeTreasury{&feeCrashTreasury{log: log, held: base.adena}})
+	loop.Advance(2 * time.Minute)
+	if len(lanes.jobs) == 0 {
+		t.Fatal("the fee queued no write")
+	}
+	lanes.drain()
+
+	if n := len(log.writes); n != 0 {
+		t.Fatalf("the fee's adena failed to land, yet %d writes reached the database", n)
+	}
+	if got := log.replay(base, 0).rows[hallmodel.FuncRestoreHP]; got != stored {
+		t.Fatalf("stored function %+v, want it unchanged at %+v", got, stored)
+	}
+	if got, ok := f.Get(feeHall, hallmodel.FuncRestoreHP); !ok || got.EndTime <= stored.EndTime {
+		t.Fatalf("live function %+v (rented %v), want a new term past %d", got, ok, stored.EndTime)
 	}
 }
