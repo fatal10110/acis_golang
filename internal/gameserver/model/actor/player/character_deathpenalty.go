@@ -65,7 +65,7 @@ func (c *Character) ReduceDeathPenaltyLevel() int {
 func (c *Character) RaiseDeathPenaltyLevel(killer attackable.Combatant, roll int) (int, bool) {
 	// Everything read from the killer, the karma counters, zones and the
 	// effect list is gathered before stateMu, which holds no other lock.
-	_, byPlayer := killer.(*Character)
+	_, byPlayer := killer.(CharacterHolder)
 	karma := c.Karma()
 	inExemptZone := c.InPvPZone() || c.InSiegeZone()
 	charmOfLuck := c.EffectList().IsAffected(effect.FlagCharmOfLuck) && (killer == nil || killer.RaidRelated())
