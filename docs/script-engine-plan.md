@@ -324,7 +324,9 @@ where the reference asks an NPC to walk a route (A13).
 
 1. A detaching player gets no script give, take or journal write. Enforced by one new flag
    on `player.Character`, set where `markDetaching` runs, before inventory persistence is
-   released. This closes a relog duplication window.
+   released. This closes a relog duplication window. A give or take raised from another queue
+   checks the flag and changes the inventory under a read lock that `MarkDetaching` takes for
+   writing after it sets the flag, so it lands before the final saves or not at all.
 2. A failed quest or memo load refuses the character selection. The reference continues
    with an empty journal or an empty memo set, which lets one-time rewards be taken again
    (memos hold the `<quest>_OneTimeQuestFlag` and class-change flags).

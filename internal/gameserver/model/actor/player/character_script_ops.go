@@ -32,10 +32,14 @@ func (c *Character) ClanLevel() (level int, ok bool) {
 // reputation change, and a clan below level 5 gains nothing. A character
 // leaving the world gets nothing, as no script gives it anything.
 func (c *Character) AddScriptClanReputation(points int) {
-	if c.Detaching() {
-		return
-	}
-	c.emit(event.ClanReputationAdded{Points: points})
+	c.whileAttached(func() { c.emit(event.ClanReputationAdded{Points: points}) })
+}
+
+// ReduceScriptDeathPenaltyLevel lowers c's death penalty by one level, as
+// a script lifts it. A character leaving the world keeps its penalty, as no
+// script gives it anything.
+func (c *Character) ReduceScriptDeathPenaltyLevel() {
+	c.whileAttached(func() { c.ReduceDeathPenaltyLevel() })
 }
 
 // BroadcastClanInfo shows every online member of c's clan the clan's

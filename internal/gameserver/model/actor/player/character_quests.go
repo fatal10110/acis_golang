@@ -31,11 +31,29 @@ func (c *Character) NotifyQuestMarked(questID int32) {
 
 // MarkDetaching marks c as leaving the world and seals its quest journal:
 // from here on nothing writes its journal, so nothing lands after the final
-// saves of its departure. Detaching reports the mark to the item give and
-// take paths, which must refuse once it is set.
+// saves of its departure. The script's give and take paths refuse once the
+// mark is set, and one already past that check, raised from another queue,
+// finishes before MarkDetaching returns, ahead of those saves.
 func (c *Character) MarkDetaching() {
 	c.detaching.Store(true)
+	// The write lock waits out every give or take that read the mark
+	// unset; any that comes later reads it set.
+	c.detachGate.Lock()
+	defer c.detachGate.Unlock()
 	c.quests.Seal()
+}
+
+// whileAttached runs fn unless c is leaving the world. fn holds off
+// MarkDetaching, so whatever it changes is in place before the final saves
+// of c's departure are taken, whichever queue it runs on. fn must not
+// reach whileAttached again: a nested read lock waits behind a pending
+// MarkDetaching, which waits for fn.
+func (c *Character) whileAttached(fn func()) {
+	c.detachGate.RLock()
+	defer c.detachGate.RUnlock()
+	if !c.Detaching() {
+		fn()
+	}
 }
 
 // Detaching reports whether MarkDetaching has run.

@@ -24,9 +24,13 @@ func (c *Character) AddScriptItems(itemID int32, count int, multiple bool, nextI
 }
 
 func (c *Character) addScriptItems(itemID int32, count, enchant int, multiple bool, nextID func() (int32, error), notice event.ObtainNotice) {
-	if count <= 0 || c.Detaching() || c.inventory == nil {
+	if count <= 0 || c.inventory == nil {
 		return
 	}
+	c.whileAttached(func() { c.createScriptItems(itemID, count, enchant, multiple, nextID, notice) })
+}
+
+func (c *Character) createScriptItems(itemID int32, count, enchant int, multiple bool, nextID func() (int32, error), notice event.ObtainNotice) {
 	tmpl, ok := c.inventory.Templates().Get(itemID)
 	if !ok {
 		return
@@ -62,9 +66,13 @@ func (c *Character) addScriptItems(itemID int32, count, enchant int, multiple bo
 // worn instance is taken off first. An unknown item, one c does not hold
 // and a character leaving the world lose nothing.
 func (c *Character) TakeScriptItems(itemID int32, count int) {
-	if c.Detaching() || c.inventory == nil {
+	if c.inventory == nil {
 		return
 	}
+	c.whileAttached(func() { c.takeScriptItems(itemID, count) })
+}
+
+func (c *Character) takeScriptItems(itemID int32, count int) {
 	tmpl, ok := c.inventory.Templates().Get(itemID)
 	if !ok {
 		return
@@ -107,9 +115,15 @@ func (c *Character) TakeScriptItems(itemID int32, count int) {
 // payment the inventory refuses fails silently; a count below one is paid
 // at once. A character leaving the world pays nothing and reports false.
 func (c *Character) ReduceScriptAdena(count int) bool {
-	if c.Detaching() || c.inventory == nil {
+	if c.inventory == nil {
 		return false
 	}
+	paid := false
+	c.whileAttached(func() { paid = c.reduceScriptAdena(count) })
+	return paid
+}
+
+func (c *Character) reduceScriptAdena(count int) bool {
 	if count > c.inventory.Adena() {
 		c.emit(event.ItemsTaken{ItemID: item.AdenaID, Short: true})
 		return false
@@ -136,14 +150,15 @@ func (c *Character) unequipForTake(inst *item.Instance) {
 // instance holding fewer units and a character leaving the world lose
 // nothing.
 func (c *Character) DestroyScriptItems(itemID int32, count int) bool {
-	if c.Detaching() || c.inventory == nil {
+	if c.inventory == nil {
 		return false
 	}
-	inst := c.inventory.ItemByTemplateID(itemID)
-	if inst == nil || inst.CountValue() < count {
-		return false
-	}
-	return c.inventory.DestroyItem(inst, count) != nil
+	destroyed := false
+	c.whileAttached(func() {
+		inst := c.inventory.ItemByTemplateID(itemID)
+		destroyed = inst != nil && inst.CountValue() >= count && c.inventory.DestroyItem(inst, count) != nil
+	})
+	return destroyed
 }
 
 // HoldsItem reports whether c's inventory holds the item instance
