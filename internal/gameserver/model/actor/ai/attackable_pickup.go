@@ -44,10 +44,15 @@ func (a *Attackable) thinkPickUp() {
 		}
 		return
 	}
-	a.mu.Unlock()
-	picked := a.actor.PickUp(id)
-	a.mu.Lock()
-	if picked {
+	if a.pickUpUnlocked(id) {
 		a.clearCurrentDesire()
 	}
+}
+
+// pickUpUnlocked has the actor pick up the ground item id with mu released.
+// The caller holds mu and holds it again on return, a panic included.
+func (a *Attackable) pickUpUnlocked(id int32) bool {
+	a.mu.Unlock()
+	defer a.mu.Lock()
+	return a.actor.PickUp(id)
 }

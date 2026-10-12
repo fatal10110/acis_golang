@@ -147,10 +147,16 @@ func (f *Folk) thinkPickUp(d *ai.Desire) {
 		}
 		return
 	}
-	f.cast.brain.Unlock()
-	picked := pickUp(f.world, f, f.scripts, f.ground, d.ItemObjectID)
-	f.cast.brain.Lock()
-	if picked {
+	if f.pickUpUnlocked(d.ItemObjectID) {
 		f.clearCurrentDesire()
 	}
+}
+
+// pickUpUnlocked has f pick up the ground item itemObjectID with brain
+// released. The caller holds brain and holds it again on return, a panic
+// included.
+func (f *Folk) pickUpUnlocked(itemObjectID int32) bool {
+	f.cast.brain.Unlock()
+	defer f.cast.brain.Lock()
+	return pickUp(f.world, f, f.scripts, f.ground, itemObjectID)
 }
