@@ -561,7 +561,8 @@ func (s *Summon) thinkAttackLocked() (bool, error) {
 	}
 
 	s.move.Stop()
-	if !s.attack.CanAttack(target) {
+	// The owner is told a sight or peace-zone refusal, once per think.
+	if refusesAttack(s.attack, target) {
 		s.current = intention{kind: IntentionIdle}
 		return false, nil
 	}
