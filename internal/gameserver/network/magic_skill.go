@@ -873,6 +873,10 @@ func sendMagicCastFailureReason(live *livePlayer, def modelskill.Definition, err
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotMoveWhileSitting))
 	case errors.Is(err, actorcast.ErrSiegeSummonUnavailable):
 		live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageS1CannotBeUsed, int32(def.ID), int32(def.Level)))
+	case errors.Is(err, actorcast.ErrSiegeSummonInCastle):
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotCallPetFromThisLocation))
+	case errors.Is(err, actorcast.ErrStrifeForbidsSummoning):
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageSealOfStrifeForbidsSummoning))
 	}
 }
 

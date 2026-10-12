@@ -116,3 +116,12 @@ func (s *State) ExpelledAtLogin(objectID int32) bool {
 	}
 	return cabal == NoCabal
 }
+
+// StrifeForbidsSummoning reports whether objectID may not call a siege
+// summon: during seal validation, while Dawn owns the Seal of Strife, a
+// Dusk member may not.
+func (s *State) StrifeForbidsSummoning(objectID int32) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.row.Period == SealValidation && s.strifeOwnerLocked() == Dawn && s.playerCabalLocked(objectID) == Dusk
+}

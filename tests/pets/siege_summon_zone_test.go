@@ -28,15 +28,23 @@ var siegeServitorCases = []struct {
 // covers the owner and the servitor but not the ground 5000 east of them.
 func bootSiegeServitor(t *testing.T, tmpl *npc.Template, skillID int) (*petWorld, *zone.Siege) {
 	t.Helper()
-	siege := zone.NewSiege(1, summonZoneBox(t, -1_000, 1_000))
-	siege.SetActive(true)
-	zones := zone.NewIndex()
-	zones.Add(siege)
+	zones := battlefieldZones(t, -1_000, 1_000, true)
 	h, servitor, _ := bootFearServitor(t, tmpl, skillID, gameservertest.WithZones(zones))
 	if !servitor.InsideZone(zone.FlagSiege) {
 		t.Fatal("servitor summoned on an active battlefield is not in it")
 	}
-	return h, siege
+	return h, zone.OfKind[*zone.Siege](zones)[0]
+}
+
+// battlefieldZones holds one siege battlefield over x in [minX, maxX],
+// running when active.
+func battlefieldZones(t *testing.T, minX, maxX int, active bool) *zone.Index {
+	t.Helper()
+	siege := zone.NewSiege(1, summonZoneBox(t, minX, maxX))
+	siege.SetActive(active)
+	zones := zone.NewIndex()
+	zones.Add(siege)
+	return zones
 }
 
 // assertSiegeDismissal checks the servitor's fate: a siege summon is

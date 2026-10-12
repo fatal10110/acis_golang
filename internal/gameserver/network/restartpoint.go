@@ -286,6 +286,9 @@ func (l *GameClientLink) landTeleportedPlayer(live *livePlayer) (bool, *summon.A
 	// The summon leaves the zones around its old position before the jump
 	// and enters those at the destination once it has landed.
 	actor.LeaveZones()
+	// Leaving its zones takes a siege summon off its battlefield, so its
+	// jump dismisses it wherever it lands, and its owner hears it vanished.
+	vanishes := actor.OffBattlefield()
 	actor.AbortForTeleport()
 	// The summon's jump is a teleport of its own: hostiles around its old
 	// position forget it too.
@@ -295,5 +298,13 @@ func (l *GameClientLink) landTeleportedPlayer(live *livePlayer) (bool, *summon.A
 	_ = l.world.Teleport(actor, destination.X, destination.Y, destination.Z)
 	actor.EnterZones()
 	actor.OnTeleported()
+	if vanishes {
+		// Posted behind the dismissal its battlefield exit already posted.
+		// Leaving, it is seen by no NPC at its landing point.
+		if q := actor.Queue(); q != nil {
+			q.Post(actor.Vanish)
+		}
+		return true, nil
+	}
 	return true, actor
 }
