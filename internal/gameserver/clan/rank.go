@@ -45,6 +45,7 @@ func (s *Service) SetMemberGrade(c *player.Character, name string, grade int) (*
 	}
 	m := cl.members[target.ObjectID]
 	m.PowerGrade = grade
+	delete(cl.loginGrades, m.ObjectID)
 	updated := *m
 	s.write(updated.ObjectID, "set member power grade", func(ctx context.Context, st Store) error {
 		return st.SetPowerGrade(ctx, updated.ObjectID, grade)
