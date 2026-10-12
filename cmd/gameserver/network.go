@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/debughttp"
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/gameserver/announcement"
+	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castlemanor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
@@ -142,6 +143,7 @@ func provideGameClientLink(
 	lotteryState *lottery.Lottery,
 	fishChamp *fishchamp.Championship,
 	derbyTrack *derby.Track,
+	fleet *boat.Fleet,
 	hallFunctions *clanhall.Functions,
 	halls *clanhall.Halls,
 	log zerolog.Logger,
@@ -316,6 +318,7 @@ func provideGameClientLink(
 		Lottery:             lotteryState,
 		FishingChampionship: fishChamp,
 		Derby:               derbyTrack,
+		Boats:               fleet,
 
 		ClanHallFunctions: hallFunctions,
 		ClanHalls:         halls,

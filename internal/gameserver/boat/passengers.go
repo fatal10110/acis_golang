@@ -44,16 +44,20 @@ func (b *Boat) setDock(d *Dock) {
 	b.mu.Unlock()
 }
 
-// AddPassenger takes the player objectID aboard and reports whether it was
-// not aboard already.
-func (b *Boat) AddPassenger(objectID int32) bool {
+// AddPassenger takes the player objectID aboard. ok is false when b is
+// retired from its fleet, which takes no one aboard; added reports whether
+// the player was not aboard already.
+func (b *Boat) AddPassenger(objectID int32) (added, ok bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if b.retired {
+		return false, false
+	}
 	if slices.Contains(b.passengers, objectID) {
-		return false
+		return false, true
 	}
 	b.passengers = append(b.passengers, objectID)
-	return true
+	return true, true
 }
 
 // RemovePassenger puts the player objectID off b. Any passenger leaving

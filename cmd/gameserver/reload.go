@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
@@ -32,6 +33,9 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 			}
 			data.Admin.Replace(fresh)
 			return nil
+		},
+		BoatRoutes: func() ([]route.BoatItinerary, error) {
+			return loadBoatRoutes(paths)
 		},
 		BuyLists: func() (*buylist.Table, error) {
 			return gamexml.LoadBuyLists(filepath.Join(xmlRoot, "buyLists.xml"), data.Items)

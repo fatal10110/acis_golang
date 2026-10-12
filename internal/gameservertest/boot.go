@@ -1001,7 +1001,7 @@ type Server struct {
 	BuyListRows         *gamesql.BuyListStore
 	WorldObjects        *gamemanager.WorldObjects // doors spawned by WithDoors; nil otherwise
 	doors               *doorHarness              // geodata and regeneration of WithDoors' doors
-	Boats               *boat.Fleet               // boats sailing WithBoats' itineraries; nil otherwise
+	Boats               *boat.Fleet               // boats sailing WithBoats' itineraries; empty otherwise
 	Derby               *derby.Track              // race track of WithDerbyTrack; nil otherwise
 	NpcSpawns           *gamemanager.Npcs         // live NPC population of WithNpcSpawns; nil otherwise
 	NpcRespawns         *task.Respawn             // respawn timers of NpcSpawns; they never fire on their own
@@ -2100,6 +2100,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		ItemTemplates:    itemTemplates,
 		HTML:             HTMLCache(t, o.pages()),
 		Reloads:          o.dataReloads,
+		Boats:            boats,
 		BossZones:        gamesql.NewBossZoneStore(db),
 		Crests:           crests,
 		Skills:           o.skills,
