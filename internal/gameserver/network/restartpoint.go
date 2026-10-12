@@ -98,13 +98,55 @@ func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location
 // live and live forgets it, even what the destination still sees. live
 // rejoins the grid and enters the destination's zones once its client
 // reports it appeared (completeLivePlayerTeleport). A player lingering after
-// its connection dropped has no client to report it, so it lands at once
-// instead, on its own queue (landLingeringPlayer).
+// its connection dropped has no client to report it, so it lands at once,
+// before the enchant, trade and boat cancels. The caller runs on live's queue.
 func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Location, randomOffset int) {
+	l.teleportLivePlayerFrom(live, target, randomOffset, true)
+}
+
+// teleportLivePlayerFrom is teleportLivePlayer for a caller that may run off
+// live's queue (onQueue false): a lingering player then lands on its own
+// queue after the cancels instead (landLingeringPlayer).
+func (l *GameClientLink) teleportLivePlayerFrom(live *livePlayer, target location.Location, randomOffset int, onQueue bool) {
 	live.teleportMu.Lock()
-	defer live.teleportMu.Unlock()
-	if !live.SetTeleporting(true) {
+	locked := true
+	defer func() {
+		if locked {
+			live.teleportMu.Unlock()
+		}
+	}()
+	if !l.relocateLivePlayer(live, target, randomOffset) {
 		return
+	}
+	if onQueue && live.clientDetached() && !live.detached() {
+		landed, followed := l.landTeleportedPlayer(live)
+		// The NPCs around the landing point notice the summon that followed
+		// and live itself with the teleport lock released: their
+		// see-creature hooks may teleport live again.
+		live.teleportMu.Unlock()
+		locked = false
+		if landed {
+			l.tellLandingOnlookers(live, followed)
+		}
+		live.teleportMu.Lock()
+		locked = true
+	}
+	// A completed teleport drops the scroll-of-enchant selection, then ends
+	// any open trade for both sides, naming the one who moved, then takes
+	// a passenger off its boat.
+	l.cancelActiveEnchant(live)
+	l.cancelActiveTrade(live)
+	l.leaveBoat(live)
+	if !onQueue && live.clientDetached() {
+		postLive(live, func() { l.landLingeringPlayer(live) })
+	}
+}
+
+// relocateLivePlayer is teleportLivePlayer up to the position update, under
+// live's teleport lock. It reports whether live was not already teleporting.
+func (l *GameClientLink) relocateLivePlayer(live *livePlayer, target location.Location, randomOffset int) bool {
+	if !live.SetTeleporting(true) {
+		return false
 	}
 	// Fusion channels targeting live are left alone here: fusion has no
 	// teleport hook, only death/class-change/logout/party abort triggers.
@@ -155,33 +197,27 @@ func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Lo
 		live.zoneActor.sendCurrentCompass()
 	}
 	l.updateLivePlayerPosition(live, target, heading)
-	// A completed teleport drops the scroll-of-enchant selection, then ends
-	// any open trade for both sides, naming the one who moved, then takes
-	// a passenger off its boat.
-	l.cancelActiveEnchant(live)
-	l.cancelActiveTrade(live)
-	l.leaveBoat(live)
-	// A teleport may run off live's queue (a script hook moving a party
-	// member), so the landing is posted there, where detach runs too.
-	if live.clientDetached() {
-		postLive(live, func() { l.landLingeringPlayer(live) })
-	}
+	return true
 }
 
-// landLingeringPlayer lands live, teleported while it lingers without a
-// client, as an Appearing would, then has the NPCs around its landing point
-// notice the summon that followed it and live itself (npc.ForceSeeCreature),
-// once the teleport lock is released: their see-creature hooks may teleport
-// live again. A player that has begun leaving the world stays off the grid,
-// as its detach already took it out of its zones. It runs on live's queue.
+// landLingeringPlayer lands live, teleported off its queue while it lingers
+// without a client, as an Appearing would, then has the NPCs around its
+// landing point notice the summon that followed it and live itself. A player
+// that has begun leaving the world stays off the grid, as its detach already
+// took it out of its zones. It runs on live's queue.
 func (l *GameClientLink) landLingeringPlayer(live *livePlayer) {
 	if live.detached() {
 		return
 	}
-	landed, followed := l.landLivePlayer(live)
-	if !landed {
-		return
+	if landed, followed := l.landLivePlayer(live); landed {
+		l.tellLandingOnlookers(live, followed)
 	}
+}
+
+// tellLandingOnlookers has the NPCs around a lingering player's landing
+// point run their see-creature hooks (npc.ForceSeeCreature) for the summon
+// that followed it, nil for none, then for the player.
+func (l *GameClientLink) tellLandingOnlookers(live *livePlayer, followed *summon.Actor) {
 	if followed != nil {
 		npc.ForceSeeCreature(l.world, followed)
 	}
@@ -221,6 +257,11 @@ func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) {
 func (l *GameClientLink) landLivePlayer(live *livePlayer) (bool, *summon.Actor) {
 	live.teleportMu.Lock()
 	defer live.teleportMu.Unlock()
+	return l.landTeleportedPlayer(live)
+}
+
+// landTeleportedPlayer is landLivePlayer with live's teleport lock held.
+func (l *GameClientLink) landTeleportedPlayer(live *livePlayer) (bool, *summon.Actor) {
 	if !live.SetTeleporting(false) {
 		return false, nil
 	}

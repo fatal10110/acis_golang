@@ -33,5 +33,6 @@ func (l *GameClientLink) recallLivePlayer(live *livePlayer, dest modelskill.Reca
 			Msg("recall: no destination resolved")
 		return
 	}
-	l.teleportLivePlayer(live, at, restartTeleportOffset)
+	// A party recall reaches live from its caster's queue.
+	l.teleportLivePlayerFrom(live, at, restartTeleportOffset, false)
 }

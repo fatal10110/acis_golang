@@ -1,6 +1,7 @@
 package character
 
 import (
+	"context"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -8,14 +9,17 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
+	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 )
 
 // lingerWatcherID is the monster template the see-creature recorder is
@@ -104,7 +108,8 @@ func enterQuiet(t *testing.T, c *testsupport.ScriptedClient) {
 
 // lingerTeleport is a player that dropped its connection in combat and
 // lingers in the world, an observer standing next to a peace zone far
-// away, and a watching monster inside that zone.
+// away, and a watching monster inside that zone. A game master observer
+// stands inside the zone instead, at dest.
 type lingerTeleport struct {
 	srv      *gameservertest.Server
 	observer *testsupport.ScriptedClient
@@ -115,10 +120,22 @@ type lingerTeleport struct {
 	dest     location.Location
 }
 
-func bootLingerTeleport(t *testing.T, opts ...gameservertest.Option) *lingerTeleport {
+// lingerGMLevel is the datapack's Admin access level, which may //recall.
+const lingerGMLevel = 7
+
+func bootLingerTeleport(t *testing.T, gm bool, opts ...gameservertest.Option) *lingerTeleport {
 	t.Helper()
 	dest := location.Location{X: spawnOrigin.X + 20_000, Y: spawnOrigin.Y, Z: spawnOrigin.Z}
 	peace := newPlayerPeace(t, dest.X-300, dest.X+300, dest.Y-300, dest.Y+300)
+	observerAt, observerEnters := location.Location{X: dest.X + 800, Y: dest.Y, Z: dest.Z}, int32(0)
+	if gm {
+		observerAt, observerEnters = dest, 1
+		data, err := gamexml.LoadAdminData(datapack.Path(t, "data", "xml"))
+		if err != nil {
+			t.Fatalf("load admin data: %v", err)
+		}
+		opts = append(opts, gameservertest.WithAdmin(data))
+	}
 	zones := zone.NewIndex()
 	zones.Add(peace)
 	seen := &seenPlayers{}
@@ -137,11 +154,16 @@ func bootLingerTeleport(t *testing.T, opts ...gameservertest.Option) *lingerTele
 	objID := srv.SoleObjectID(t)
 
 	watched := srv.SeedCharacterFor(t, "player2", "Second", 1, 0)
+	if gm {
+		if _, err := srv.DB.ExecContext(context.Background(), "UPDATE characters SET accesslevel = ? WHERE obj_Id = ?", lingerGMLevel, watched.ID); err != nil {
+			t.Fatalf("set access level: %v", err)
+		}
+	}
 	observer := srv.DialClient(t, "player2", 1)
 	enterQuiet(t, observer)
 	drainQuiet(t, c)
-	// The observer waits next to the zone, outside it, with the lingering
-	// player out of its sight.
+	// The observer waits next to the zone, outside it, or a game master
+	// inside it, with the lingering player out of its sight.
 	watcherObj, ok := srv.State.Player(watched.ID)
 	if !ok {
 		t.Fatal("observer missing from the world")
@@ -150,7 +172,7 @@ func bootLingerTeleport(t *testing.T, opts ...gameservertest.Option) *lingerTele
 	if !ok {
 		t.Fatalf("observer = %T, want an online character", watcherObj)
 	}
-	watcher.TeleportTo(dest.X+800, dest.Y, dest.Z, 0)
+	watcher.TeleportTo(observerAt.X, observerAt.Y, observerAt.Z, 0)
 	mustReadOpcode(t, observer, serverpackets.OpcodeTeleportToLocation, "observer TeleportToLocation")
 	appear(t, observer)
 	drainQuiet(t, observer)
@@ -162,7 +184,7 @@ func bootLingerTeleport(t *testing.T, opts ...gameservertest.Option) *lingerTele
 	srv.Settle(t)
 	drainQuiet(t, observer)
 	seen.take()
-	peace.assert(t, "before the drop", 0, 0, objID, false)
+	peace.assert(t, "before the drop", observerEnters, 0, objID, false)
 
 	obj, ok := srv.State.Player(objID)
 	if !ok {
@@ -216,7 +238,7 @@ func TestLingeringPlayerTeleportLandsAtOnce(t *testing.T) {
 	t.Parallel()
 	t.Run("protection off", func(t *testing.T) {
 		t.Parallel()
-		h := bootLingerTeleport(t)
+		h := bootLingerTeleport(t, false)
 		h.lingerer.TeleportTo(h.dest.X, h.dest.Y, h.dest.Z, 0)
 		h.srv.Settle(t)
 		readCharInfoOf(t, h.observer, h.objID)
@@ -233,7 +255,7 @@ func TestLingeringPlayerTeleportLandsAtOnce(t *testing.T) {
 	})
 	t.Run("protection on", func(t *testing.T) {
 		t.Parallel()
-		h := bootLingerTeleport(t, gameservertest.WithSpawnProtection(time.Minute))
+		h := bootLingerTeleport(t, false, gameservertest.WithSpawnProtection(time.Minute))
 		h.lingerer.TeleportTo(h.dest.X, h.dest.Y, h.dest.Z, 0)
 		h.srv.Settle(t)
 		readCharInfoOf(t, h.observer, h.objID)
@@ -245,4 +267,29 @@ func TestLingeringPlayerTeleportLandsAtOnce(t *testing.T) {
 			t.Fatalf("see-creature calls on a spawn-protected landing = %v, want none", got)
 		}
 	})
+	// A game master's //recall runs the teleport on the lingering player's
+	// own queue, as a zone expel does: it lands before the command returns.
+	t.Run("gm recall", func(t *testing.T) {
+		t.Parallel()
+		h := bootLingerTeleport(t, true)
+		h.observer.Send(encodeLingerBuildCmd("recall Newbie"))
+		readCharInfoOf(t, h.observer, h.objID)
+		h.srv.Settle(t)
+		if x, y, _ := h.srv.PlayerPosition(t, h.objID); x != h.dest.X || y != h.dest.Y {
+			t.Fatalf("recalled lingering player position = %d %d, want the GM's %d %d", x, y, h.dest.X, h.dest.Y)
+		}
+		if !h.lingerer.InPeaceZone() {
+			t.Fatal("recalled lingering player not in the GM's peace zone")
+		}
+		h.peace.assert(t, "after the recall", 2, 0, h.objID, true)
+		if got := h.seen.take(); !slices.Equal(got, []int32{h.objID}) {
+			t.Fatalf("see-creature calls on the recall landing = %v, want one for %d", got, h.objID)
+		}
+	})
+}
+
+func encodeLingerBuildCmd(command string) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeSendBypassBuildCmd)
+	w.WriteString(command)
+	return w.Bytes()
 }
