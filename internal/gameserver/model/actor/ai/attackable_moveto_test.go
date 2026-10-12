@@ -283,9 +283,8 @@ func TestAttackableAIFollowArrivedSkipsSpawnHeadingAndOOTSweep(t *testing.T) {
 		t.Fatalf("heading restores = %d, want 0 on FOLLOW arrival", owner.headingRestores)
 	}
 
-	tickOOTSweepDue(ai, start.Add(91*time.Second))
-	if got := ai.Desires().Has(&Desire{Kind: IntentionAttack, FinalTarget: target}); !got {
-		t.Fatal("FOLLOW arrival armed the OOT sweep, want it skipped")
+	if pending := owner.pendingTimers(); len(pending) != 0 {
+		t.Fatalf("pending timers after the FOLLOW arrival = %d, want 0 (OOT sweep skipped)", len(pending))
 	}
 }
 
@@ -311,7 +310,7 @@ func TestAttackableAIAttackArrivedRestoresHeadingAndArmsOOTSweep(t *testing.T) {
 		t.Fatalf("heading restores = %d, want 1 on ATTACK arrival", owner.headingRestores)
 	}
 
-	tickOOTSweepDue(ai, start.Add(91*time.Second))
+	fireOOTSweepAt(t, ai, owner, start.Add(91*time.Second), ootSweepInitialDelay)
 	if got := ai.Desires().Has(&Desire{Kind: IntentionAttack, FinalTarget: target}); got {
 		t.Fatal("ATTACK arrival did not arm the OOT sweep")
 	}

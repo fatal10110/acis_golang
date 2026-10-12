@@ -243,13 +243,17 @@ func TestAttackableAttackFinishedContinuesAttackWhenOutOfControl(t *testing.T) {
 	}
 }
 
-func TestAttackableThinkDropsCurrentAttackWhenTargetMovesBeyond1500(t *testing.T) {
+// TestAttackableRunAIDropsCurrentAttackWhenTargetMovesBeyond1500 pins the
+// distance prune of desire selection; the continue pass prunes nothing.
+func TestAttackableRunAIDropsCurrentAttackWhenTargetMovesBeyond1500(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	owner.known = map[int32]bool{target.ObjectID(): true}
 	strike := &recordingAttack{canAttack: true}
 	ai := NewAttackable(owner, &recordingMove{}, strike)
 	addAttackHate(ai, target, 0, 20)
+	// The second pass takes the one-pass attack latch the first set.
+	ai.RunAI()
 	ai.RunAI()
 	if strike.target != target {
 		t.Fatalf("RunAI attacked = %v, want target", strike.target)
@@ -257,10 +261,10 @@ func TestAttackableThinkDropsCurrentAttackWhenTargetMovesBeyond1500(t *testing.T
 
 	target.x = 2000
 	strike.target = nil
-	ai.Think()
+	ai.RunAI()
 
 	if strike.target != nil {
-		t.Fatalf("second Think attacked = %v, want none after distance prune", strike.target)
+		t.Fatalf("second RunAI attacked = %v, want none after distance prune", strike.target)
 	}
 	if got := ai.CurrentIntention(); got != IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionIdle)
@@ -313,25 +317,37 @@ func TestAttackableAITickRefreshesStaleThreatAndHate(t *testing.T) {
 	}
 }
 
-func armOOTSweep(ai *Attackable, owner *fakeActor) {
+// arriveOutside has the owner arrive outside its territory at at, which
+// arms the out-of-territory stale-hate sweep on the first such arrival.
+func arriveOutside(ai *Attackable, owner *fakeActor, at time.Time) {
 	owner.inTerritory = false
+	ai.now = func() time.Time { return at }
 	ai.Arrived()
 }
 
-// TestAttackableAITickClearsStaleThreatOutOfTerritory: a threat entry
-// whose last damage is at least staleThreatAge old gets its hate stopped
-// and its queued attack desire dropped on the first due firing after an
-// out-of-territory arrival arms the sweep.
-func TestAttackableAITickClearsStaleThreatOutOfTerritory(t *testing.T) {
+// fireOOTSweepAt runs the sweep's sole pending firing at at, failing unless
+// it was armed with delay want.
+func fireOOTSweepAt(t *testing.T, ai *Attackable, owner *fakeActor, at time.Time, want time.Duration) {
+	t.Helper()
+	ai.now = func() time.Time { return at }
+	owner.fireTimer(t, want)
+}
+
+// TestAttackableAIOOTSweepClearsStaleThreat: a threat entry whose last
+// damage is at least staleThreatAge old gets its hate stopped and its
+// queued attack desire dropped by the sweep's first firing, 100 ms after
+// the out-of-territory arrival that armed it.
+func TestAttackableAIOOTSweepClearsStaleThreat(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
-	addAttackHate(ai, target, 0, 20)
-
 	start := time.Now()
 	ai.now = func() time.Time { return start }
-	armOOTSweep(ai, owner)
-	tickOOTSweepDue(ai, start.Add(91*time.Second))
+	addAttackHate(ai, target, 0, 20)
+
+	arrival := start.Add(91 * time.Second)
+	arriveOutside(ai, owner, arrival)
+	fireOOTSweepAt(t, ai, owner, arrival.Add(ootSweepInitialDelay), ootSweepInitialDelay)
 
 	if got := ai.Threats().Hate(target); got != 0 {
 		t.Fatalf("hate after stale sweep = %v, want 0 (stopped)", got)
@@ -344,110 +360,143 @@ func TestAttackableAITickClearsStaleThreatOutOfTerritory(t *testing.T) {
 	}
 }
 
-// TestAttackableAITickKeepsFreshThreatOutOfTerritory confirms the sweep
-// only touches entries whose last damage is stale; an attacker still
-// dealing damage within staleThreatAge keeps its desire queued.
-func TestAttackableAITickKeepsFreshThreatOutOfTerritory(t *testing.T) {
+// TestAttackableAIOOTSweepKeepsFreshThreat confirms the sweep only touches
+// entries whose last damage is stale, and re-arms one period later.
+func TestAttackableAIOOTSweepKeepsFreshThreat(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
-	addAttackHate(ai, target, 0, 20)
-
 	start := time.Now()
 	ai.now = func() time.Time { return start }
-	armOOTSweep(ai, owner)
-	tickOOTSweepDue(ai, start.Add(10*time.Second))
+	addAttackHate(ai, target, 0, 20)
+
+	arriveOutside(ai, owner, start)
+	fireOOTSweepAt(t, ai, owner, start.Add(ootSweepInitialDelay), ootSweepInitialDelay)
 
 	if got := ai.Desires().Len(); got != 1 {
 		t.Fatalf("desires len = %d, want 1 (fresh attack desire kept)", got)
 	}
-}
-
-// TestAttackableAITickSkipsStaleSweepInTerritory confirms the sweep never
-// runs while the owner is in its territory.
-func TestAttackableAITickSkipsStaleSweepInTerritory(t *testing.T) {
-	owner := actor(1)
-	target := actor(2)
-	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
-	addAttackHate(ai, target, 0, 20)
-
-	start := time.Now()
-	ai.now = func() time.Time { return start }
-	ai.Arrived()
-	tickOOTSweepDue(ai, start.Add(91*time.Second))
-
-	if got := ai.Desires().Len(); got != 1 {
-		t.Fatalf("desires len = %d, want 1 (in-territory owner never runs the OOT sweep)", got)
+	if pending := owner.pendingTimers(); len(pending) != 1 || pending[0].delay != ootSweepPeriod {
+		t.Fatalf("pending sweep after the first firing = %+v, want one in %v", pending, ootSweepPeriod)
 	}
 }
 
-// TestAttackableAITickSkipsStaleSweepWithoutArrival confirms a stationary
-// out-of-territory owner never arms the sweep, so stale hate is kept.
-func TestAttackableAITickSkipsStaleSweepWithoutArrival(t *testing.T) {
+// TestAttackableAIOOTSweepArmsOnlyOnOutsideArrival confirms an arrival in
+// territory and a stationary out-of-territory owner arm no sweep, and that
+// the AI tick never sweeps.
+func TestAttackableAIOOTSweepArmsOnlyOnOutsideArrival(t *testing.T) {
 	owner := actor(1)
-	owner.inTerritory = false
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 	addAttackHate(ai, target, 0, 1000)
 
+	ai.Arrived()
+	owner.inTerritory = false
 	future := time.Now().Add(91 * time.Second)
 	ai.now = func() time.Time { return future }
 	for range 10 {
 		ai.Tick()
 	}
 
-	if got := ai.Desires().Len(); got != 1 {
-		t.Fatalf("desires len = %d, want 1 (no arrival means no OOT sweep)", got)
+	if pending := owner.pendingTimers(); len(pending) != 0 {
+		t.Fatalf("pending timers = %d, want 0 (no arrival outside, no sweep)", len(pending))
+	}
+	if _, ok := ai.Threats().Get(target); !ok || ai.Desires().Len() != 1 {
+		t.Fatalf("threat kept = %v, desires = %d; want the stale entry and its desire kept", ok, ai.Desires().Len())
 	}
 }
 
-// TestAttackableAITickOutOfTerritorySweepKeepsPhaseAcrossInTerritoryTicks
-// confirms an in-territory Tick skips that firing but does not cancel the
-// schedule, so a later out-of-territory Tick still sweeps.
-func TestAttackableAITickOutOfTerritorySweepKeepsPhaseAcrossInTerritoryTicks(t *testing.T) {
+// TestAttackableAIOOTSweepKeepsPhaseAcrossInTerritoryFirings confirms a
+// firing that finds the owner back in territory, with no arrival, skips its
+// sweep but keeps the fixed-rate schedule, so a later firing outside still
+// sweeps.
+func TestAttackableAIOOTSweepKeepsPhaseAcrossInTerritoryFirings(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
-	addAttackHate(ai, target, 0, 1000)
-
 	start := time.Now()
 	ai.now = func() time.Time { return start }
-	armOOTSweep(ai, owner)
+	addAttackHate(ai, target, 0, 1000)
 
+	arriveOutside(ai, owner, start)
 	owner.inTerritory = true
-	tickOOTSweepDue(ai, start.Add(ootSweepInitialDelay))
+	at := start.Add(ootSweepInitialDelay)
+	fireOOTSweepAt(t, ai, owner, at, ootSweepInitialDelay)
 	if got := ai.Desires().Len(); got != 1 {
 		t.Fatalf("desires len after in-territory firing = %d, want 1", got)
 	}
 
 	owner.inTerritory = false
-	tickOOTSweepDue(ai, start.Add(91*time.Second))
-
+	for at.Sub(start) < staleThreatAge {
+		at = at.Add(ootSweepPeriod)
+		fireOOTSweepAt(t, ai, owner, at, ootSweepPeriod)
+	}
 	if got := ai.Desires().Len(); got != 0 {
-		t.Fatalf("desires len = %d, want 0 (phase kept across in-territory tick)", got)
+		t.Fatalf("desires len = %d, want 0 (phase kept across the in-territory firing)", got)
 	}
 }
 
-// TestAttackableAIArrivedInTerritoryCancelsOOTSweep confirms only an
-// in-territory arrival cancels the schedule; later out-of-territory ticks
-// without a new arrival do not sweep.
+// TestAttackableAIOOTSweepLateFiringKeepsGrid confirms a late firing re-arms
+// on the fixed grid of the first deadline, skipping any deadline it missed.
+func TestAttackableAIOOTSweepLateFiringKeepsGrid(t *testing.T) {
+	owner := actor(1)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	start := time.Now()
+
+	arriveOutside(ai, owner, start)
+	fireOOTSweepAt(t, ai, owner, start.Add(ootSweepInitialDelay+3*time.Second), ootSweepInitialDelay)
+	fireOOTSweepAt(t, ai, owner, start.Add(ootSweepInitialDelay+25*time.Second), 7*time.Second)
+	if pending := owner.pendingTimers(); len(pending) != 1 || pending[0].delay != 5*time.Second {
+		t.Fatalf("pending sweep after a firing 15 s late = %+v, want one in 5s (next grid deadline)", pending)
+	}
+}
+
+// TestAttackableAIArrivedInTerritoryCancelsOOTSweep confirms an arrival back
+// in territory cancels the pending firing, and the next arrival outside
+// re-arms from 100 ms.
 func TestAttackableAIArrivedInTerritoryCancelsOOTSweep(t *testing.T) {
+	owner := actor(1)
+	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	start := time.Now()
+
+	arriveOutside(ai, owner, start)
+	owner.inTerritory = true
+	ai.Arrived()
+	if pending := owner.pendingTimers(); len(pending) != 0 {
+		t.Fatalf("pending timers after an arrival back inside = %d, want 0", len(pending))
+	}
+
+	arriveOutside(ai, owner, start.Add(time.Second))
+	if pending := owner.pendingTimers(); len(pending) != 1 || pending[0].delay != ootSweepInitialDelay {
+		t.Fatalf("pending sweep after the next arrival outside = %+v, want one in %v", pending, ootSweepInitialDelay)
+	}
+}
+
+// TestAttackableAIOOTSweepStaleFiringDoesNothing confirms a firing already
+// taken off the timer when an arrival back inside cancelled it runs no sweep
+// and arms nothing.
+func TestAttackableAIOOTSweepStaleFiringDoesNothing(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
-	addAttackHate(ai, target, 0, 1000)
-
 	start := time.Now()
 	ai.now = func() time.Time { return start }
-	armOOTSweep(ai, owner)
+	addAttackHate(ai, target, 0, 1000)
 
+	arrival := start.Add(91 * time.Second)
+	arriveOutside(ai, owner, arrival)
+	stale := owner.pendingTimers()[0]
 	owner.inTerritory = true
 	ai.Arrived()
 	owner.inTerritory = false
-	tickOOTSweepDue(ai, start.Add(91*time.Second))
+	ai.now = func() time.Time { return arrival.Add(ootSweepInitialDelay) }
+	stale.fn()
 
 	if got := ai.Desires().Len(); got != 1 {
-		t.Fatalf("desires len = %d, want 1 (in-territory arrival cancelled the sweep)", got)
+		t.Fatalf("desires len = %d, want 1 (cancelled firing must not sweep)", got)
+	}
+	if pending := owner.pendingTimers(); len(pending) != 0 {
+		t.Fatalf("pending timers = %d, want 0 (cancelled firing must not re-arm)", len(pending))
 	}
 }
 

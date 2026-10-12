@@ -112,10 +112,14 @@ func TestAttackableAIFirstTickPromotesHighestWeightWhenAttackOpensGate(t *testin
 	}
 }
 
+// TestAttackableAIFirstTickPromotesAfterAttackDesirePruned pins that the
+// first-cycle promotion gate is decided before the prune: an attack desire on
+// a creature the actor no longer knows opens it, then leaves the queue, and
+// the wander is taken up.
 func TestAttackableAIFirstTickPromotesAfterAttackDesirePruned(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
-	owner.known = map[int32]bool{target.ObjectID(): true}
+	owner.known = map[int32]bool{target.ObjectID(): false}
 	owner.moveSpeed = 40
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionAttack, FinalTarget: target, Weight: 10})
@@ -131,7 +135,7 @@ func TestAttackableAIFirstTickPromotesAfterAttackDesirePruned(t *testing.T) {
 		t.Fatalf("wander move = %d, want 1", owner.wanderCalls)
 	}
 	if ai.Desires().Has(&Desire{Kind: IntentionAttack, FinalTarget: target}) {
-		t.Fatal("ATTACK desire still queued after empty-threat prune")
+		t.Fatal("ATTACK desire still queued after the lost-target prune")
 	}
 }
 
@@ -209,8 +213,10 @@ func TestAttackableAIIdleAbortsInFlightAttackWhenQueueEmpty(t *testing.T) {
 	if owner.walkStanceCalls != 1 {
 		t.Fatalf("walk stance calls = %d, want 1", owner.walkStanceCalls)
 	}
-	if got := ai.CurrentIntention(); got != IntentionIdle {
-		t.Fatalf("CurrentIntention() = %v, want idle after empty-queue abort", got)
+	// The abort is the periodic cycle's own idle, after the latched attack's
+	// step: it leaves the latched attack current.
+	if got := ai.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() = %v, want attack kept by the cycle's idle", got)
 	}
 }
 

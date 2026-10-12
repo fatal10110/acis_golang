@@ -109,10 +109,10 @@ func TestRouteWalkCarriesOnThroughTheReturnToPeace(t *testing.T) {
 }
 
 // A fight that ends while the monster is still attacking hands it back to its
-// route: the return to peace leaves it idle, and its next AI pass takes the
-// route desire up again toward the nearest node. The fight ends the two ways
-// it usually does: the target is lost (AggroList.stopHate), or the region
-// goes inactive (Npc.onInactiveRegion runs setBackToPeace directly).
+// route: stopping the hate on its target (AggroList.stopHate) drops the
+// attack desire and returns the monster to peace, which clears only the hate
+// lists, so it stays on the attack until its next AI pass takes the route
+// desire up again toward the nearest node.
 func TestRouteIsTakenUpAgainWhenAFightEnds(t *testing.T) {
 	t.Parallel()
 	for _, end := range []struct {
@@ -124,9 +124,6 @@ func TestRouteIsTakenUpAgainWhenAFightEnds(t *testing.T) {
 				obj, _ := w.srv.State.Object(w.player)
 				h.StopAggroHate(obj.(attackable.Combatant))
 			}
-		}},
-		{"back to peace", func(_ *routeWorld, h *npc.Hostile) func() {
-			return func() { h.AI().SetBackToPeace() }
 		}},
 	} {
 		t.Run(end.name, func(t *testing.T) {
@@ -144,8 +141,8 @@ func TestRouteIsTakenUpAgainWhenAFightEnds(t *testing.T) {
 				drainFrames(t, w.c)
 
 				onQueueOf(t, h, end.endIt(w, h))
-				if got := h.AI().CurrentIntention(); got != ai.IntentionIdle {
-					t.Fatalf("intention right after the fight ended = %v, want idle", got)
+				if got := h.AI().CurrentIntention(); got != ai.IntentionAttack {
+					t.Fatalf("intention right after the fight ended = %v, want attack kept until the next pass", got)
 				}
 
 				var shown []npcFrame

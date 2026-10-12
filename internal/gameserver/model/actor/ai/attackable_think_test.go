@@ -166,35 +166,40 @@ func TestAttackableTickRunsLatchedAttackThenIdles(t *testing.T) {
 	if strike.stopCalls <= stops {
 		t.Fatal("latched tick did not abort the attack for the empty-queue idle")
 	}
-	if got := a.CurrentIntention(); got != IntentionIdle {
-		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionIdle)
+	// The cycle's own idle aborts the latched step but leaves it current.
+	if got := a.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionAttack)
 	}
 	if !a.Desires().Has(&Desire{Kind: IntentionWander}) {
 		t.Fatal("wander desire missing after the latched tick's idle")
 	}
 }
 
+// TestAttackableThinkNeitherRunsNorClearsLatch pins that Think steps the
+// current attack, whose desire left the queue, without taking or clearing
+// the latch: the next RunAI still takes the latched attack, and the one after
+// idles on the empty queue.
 func TestAttackableThinkNeitherRunsNorClearsLatch(t *testing.T) {
 	a, _, strike := latchedAttackAI(t)
 
 	if err := a.Think(); err != nil {
 		t.Fatalf("Think() error: %v", err)
 	}
-	if strike.doAttackCalls != 1 {
-		t.Fatalf("DoAttack calls after Think = %d, want 1", strike.doAttackCalls)
+	if strike.doAttackCalls != 2 {
+		t.Fatalf("DoAttack calls after Think = %d, want 2", strike.doAttackCalls)
 	}
 
 	if err := a.RunAI(); err != nil {
 		t.Fatalf("RunAI() error: %v", err)
 	}
-	if strike.doAttackCalls != 2 {
-		t.Fatalf("DoAttack calls after the latched RunAI = %d, want 2", strike.doAttackCalls)
+	if strike.doAttackCalls != 3 {
+		t.Fatalf("DoAttack calls after the latched RunAI = %d, want 3", strike.doAttackCalls)
 	}
 	if err := a.RunAI(); err != nil {
 		t.Fatalf("RunAI() error: %v", err)
 	}
-	if strike.doAttackCalls != 2 {
-		t.Fatalf("DoAttack calls after the latch cleared = %d, want 2", strike.doAttackCalls)
+	if strike.doAttackCalls != 3 {
+		t.Fatalf("DoAttack calls after the latch cleared = %d, want 3", strike.doAttackCalls)
 	}
 	if got := a.CurrentIntention(); got != IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionIdle)
@@ -215,8 +220,8 @@ func TestAttackableThinkLeavesQueuedMoveToAndLatchForRunAI(t *testing.T) {
 	if err := a.RunAI(); err != nil {
 		t.Fatalf("RunAI() error: %v", err)
 	}
-	if strike.doAttackCalls != 2 {
-		t.Fatalf("DoAttack calls after the latched RunAI = %d, want 2", strike.doAttackCalls)
+	if strike.doAttackCalls != 3 {
+		t.Fatalf("DoAttack calls after Think and the latched RunAI = %d, want 3", strike.doAttackCalls)
 	}
 	if got := a.CurrentIntention(); got != IntentionAttack {
 		t.Fatalf("CurrentIntention() after the latched RunAI = %v, want %v", got, IntentionAttack)

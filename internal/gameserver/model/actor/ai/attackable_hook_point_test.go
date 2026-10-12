@@ -284,7 +284,7 @@ func TestHookPointOutOfTerritoryOnFirstOutsideArrival(t *testing.T) {
 			return
 		}
 		brain.mu.Lock()
-		armed := brain.ootSweep
+		armed := brain.ootSweep != nil
 		brain.mu.Unlock()
 		if armed {
 			t.Fatal("stale-hate sweep armed before the out-of-territory point")
@@ -300,7 +300,12 @@ func TestHookPointOutOfTerritoryOnFirstOutsideArrival(t *testing.T) {
 	assertHookPoints(t, owner, "on the first outside arrival", HookMoveFinished, HookOutOfTerritory)
 
 	// Idle, so later arrivals finish no walk.
-	brain.SetBackToPeace()
+	if err := tickThinkIdle(brain); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("intention after the idle cycles = %v, want idle", got)
+	}
 	owner.hooks.points = nil
 	brain.Arrived()
 	assertHookPoints(t, owner, "on a second outside arrival")
