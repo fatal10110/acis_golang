@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"unicode/utf16"
+	"unicode/utf8"
 )
 
 // Uint16Count validates a count encoded in an unsigned 16-bit packet field.
@@ -89,18 +90,41 @@ func (w *Writer) WriteBytes(b []byte) {
 
 // WriteString appends s as null-terminated UTF-16LE: each rune as one or two
 // 16-bit code units, followed by a trailing 0x0000 unit.
+//
+// A surrogate code unit spelled in its three-byte generalized UTF-8 form
+// (ED A0..BF 80..BF, as CESU-8 and WTF-8 write it) is emitted as that single
+// unit, so a string carrying an unpaired surrogate keeps it on the wire. Any
+// other invalid byte is emitted as U+FFFD.
 func (w *Writer) WriteString(s string) {
-	for _, r := range s {
-		// Ranging over a string replaces invalid UTF-8, including encoded surrogates, with RuneError.
-		if r < 0x10000 {
+	for i := 0; i < len(s); {
+		r, n := utf8.DecodeRuneInString(s[i:])
+		switch {
+		case r == utf8.RuneError && n == 1:
+			if unit, ok := encodedSurrogate(s[i:]); ok {
+				w.WriteUint16(unit)
+				n = 3
+			} else {
+				w.WriteUint16(uint16(utf8.RuneError))
+			}
+		case r < 0x10000:
 			w.WriteUint16(uint16(r))
-			continue
+		default:
+			high, low := utf16.EncodeRune(r)
+			w.WriteUint16(uint16(high))
+			w.WriteUint16(uint16(low))
 		}
-		high, low := utf16.EncodeRune(r)
-		w.WriteUint16(uint16(high))
-		w.WriteUint16(uint16(low))
+		i += n
 	}
 	w.WriteUint16(0)
+}
+
+// encodedSurrogate reports the surrogate code unit whose generalized UTF-8
+// form begins s.
+func encodedSurrogate(s string) (uint16, bool) {
+	if len(s) < 3 || s[0] != 0xED || s[1]&0xE0 != 0xA0 || s[2]&0xC0 != 0x80 {
+		return 0, false
+	}
+	return 0xD000 | uint16(s[1]&0x3F)<<6 | uint16(s[2]&0x3F), true
 }
 
 // BoolByte returns the packet byte value for b.
