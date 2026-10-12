@@ -5,6 +5,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door/doorhit"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -132,7 +134,7 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		return result
 	}
 	for _, obj := range cast.Targets {
-		target, ok := asCreature(obj)
+		target, ok := asDamageTarget(obj)
 		if !ok || target.Dead() {
 			continue
 		}
@@ -184,7 +186,7 @@ func (chargeDamHandler) UseResult(cast Cast) Result {
 		modifier = .8 + .2*float64(caster.Charges()+cast.Skill.NumCharges)
 	}
 	for _, obj := range cast.Targets {
-		target, ok := asCreature(obj)
+		target, ok := asDamageTarget(obj)
 		if !ok || target.Dead() {
 			continue
 		}
@@ -253,7 +255,7 @@ func (h mdamHandler) UseResult(cast Cast) Result {
 		return result
 	}
 	for _, obj := range cast.Targets {
-		target, ok := asCreature(obj)
+		target, ok := asDamageTarget(obj)
 		if !ok || target.Dead() {
 			continue
 		}
@@ -291,6 +293,10 @@ func (h mdamHandler) UseResult(cast Cast) Result {
 // already-resolved shield outcome for the landing roll.
 func applyMdamEffects(cast Cast, obj Actor, bss bool, shield formulas.ShieldDefense, result *Result) {
 	if len(cast.Skill.Effects) == 0 {
+		return
+	}
+	if d, ok := obj.(*door.Object); ok {
+		rollDoorEffects(cast, d, bss, shield, 1, result) // id-only addSkillName overload: level 1
 		return
 	}
 	elt, ok := obj.(effect.Actor)
@@ -339,7 +345,7 @@ func (h drainHandler) UseResult(cast Cast) Result {
 	}
 	corpseMob := cast.Skill.Target == modelskill.TargetCorpseMob
 	for _, obj := range cast.Targets {
-		target, ok := asCreature(obj)
+		target, ok := asDamageTarget(obj)
 		if !ok || (alikeDead(target) && !corpseMob) {
 			continue
 		}
@@ -389,7 +395,7 @@ func (h drainHandler) UseResult(cast Cast) Result {
 // playable caster drains only what gets past a player target's CP; any
 // other drain is capped at the target's current HP. Both pools count in
 // whole points.
-func drainAbsorb(cast Cast, target Creature, damage int) float64 {
+func drainAbsorb(cast Cast, target damageTarget, damage int) float64 {
 	targetCP := 0
 	if p, ok := asPlayer(target); ok {
 		targetCP = int(p.CP())
@@ -417,6 +423,10 @@ func drainAbsorb(cast Cast, target Creature, damage int) float64 {
 // state gates it, and the effects land with neither.
 func applyDrainEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, bss bool, result *Result) {
 	if len(cast.Skill.Effects) == 0 {
+		return
+	}
+	if d, ok := obj.(*door.Object); ok {
+		rollDoorEffects(cast, d, bss, shield, 1, result) // id-only addSkillName overload: level 1
 		return
 	}
 	elt, ok := obj.(effect.Actor)
@@ -453,7 +463,7 @@ func (blowHandler) UseResult(cast Cast) Result {
 		return result
 	}
 	for _, obj := range cast.Targets {
-		target, ok := asCreature(obj)
+		target, ok := asDamageTarget(obj)
 		if !ok || alikeDead(target) {
 			continue
 		}
@@ -506,7 +516,7 @@ func (blowHandler) UseResult(cast Cast) Result {
 // applyPhysicalSkillCounter turns a countered physical skill back onto its
 // caster: the counter notices, the caster's HP loss, then the countering
 // target's damage feedback, which carries the skill's physical-critical flag.
-func applyPhysicalSkillCounter(cast Cast, target Creature, damage, counter float64, pcrit bool, result *Result) bool {
+func applyPhysicalSkillCounter(cast Cast, target damageTarget, damage, counter float64, pcrit bool, result *Result) bool {
 	if !counterSkillReflects(cast.Skill, counter) {
 		return false
 	}
@@ -576,7 +586,7 @@ func counterattackObjectID(obj Actor) int32 {
 }
 
 func actorName(obj Actor) string {
-	if target, ok := asEffected(obj); ok {
+	if target, ok := obj.(interface{ CharacterName() string }); ok {
 		return target.CharacterName()
 	}
 	return ""
@@ -697,6 +707,10 @@ func applyBlowEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, count
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
+	if d, ok := obj.(*door.Object); ok {
+		rollDoorEffects(cast, d, true, shield, cast.Skill.Level, result)
+		return
+	}
 	elt, ok := obj.(effect.Actor)
 	if !ok {
 		return
@@ -715,6 +729,10 @@ func applyChargeDamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, 
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
+	if d, ok := obj.(*door.Object); ok {
+		rollDoorEffects(cast, d, true, shield, cast.Skill.Level, result)
+		return
+	}
 	elt, ok := obj.(effect.Actor)
 	if !ok {
 		return
@@ -724,6 +742,20 @@ func applyChargeDamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, 
 		return
 	}
 	landRolledDamageEffects(cast, elt, shield, result)
+}
+
+// rollDoorEffects is a damage skill's effect step on door d: d never
+// reflects, and the landing roll runs as on a creature, a failure reporting
+// the resist at level, but a success lands nothing, since a door holds no
+// effects.
+func rollDoorEffects(cast Cast, d *door.Object, bss bool, shield formulas.ShieldDefense, level int, result *Result) {
+	in, ok := doorhit.Of(d).SkillSuccessInput(cast.Caster, cast.Skill, bss, shield)
+	if !ok {
+		return
+	}
+	if !formulas.SkillSucceeds(formulas.SkillSuccessRate(in), landingRoll(cast.Caster)) {
+		appendResisted(result, d, cast.Skill, level, true)
+	}
 }
 
 // landRolledDamageEffects is the unreflected BLOW/CHARGEDAM landing: the

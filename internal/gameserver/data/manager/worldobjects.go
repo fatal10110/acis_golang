@@ -30,6 +30,9 @@ type WorldObjects struct {
 	ids        idAllocator
 	log        zerolog.Logger
 	now        func() time.Time
+	// strife is the Seven Signs state door defences read, installed on
+	// every door built, at boot and by ReloadDoors. Guarded by doorMu.
+	strife door.Strife
 
 	// doorMu serializes door state changes, so a flag flip or an HP change
 	// and its geodata, broadcast and timer follow-up land as one step
@@ -146,6 +149,20 @@ func (w *WorldObjects) StaticObjects() []*staticobject.Object {
 		return nil
 	}
 	return append([]*staticobject.Object(nil), w.staticOrder...)
+}
+
+// SetStrife installs the Seven Signs state every door's defences read, on
+// the doors standing and on every door a reload builds later.
+func (w *WorldObjects) SetStrife(s door.Strife) {
+	if w == nil {
+		return
+	}
+	w.doorMu.Lock()
+	defer w.doorMu.Unlock()
+	w.strife = s
+	for _, obj := range w.doors.Load().order {
+		obj.SetStrife(s)
+	}
 }
 
 // SetDoorOpen changes a door's open state, applies the matching geodata,
@@ -409,6 +426,7 @@ func (w *WorldObjects) newDoor(tmpl *door.Template) (*door.Object, error) {
 	}
 	obj.SetOwner(w)
 	obj.SetSight(doorSight{geo: w.geo})
+	obj.SetStrife(w.strife)
 	return obj, nil
 }
 

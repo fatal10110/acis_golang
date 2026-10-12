@@ -13,6 +13,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door/doorhit"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
@@ -836,7 +838,7 @@ func (l *GameClientLink) attackQueuedTarget(live *livePlayer, target world.Track
 }
 
 func (l *GameClientLink) attackLiveTargetWithGate(live *livePlayer, target world.Tracked, shift, request bool) bool {
-	combatant, ok := target.(attackable.Combatant)
+	combatant, ok := hitTarget(target)
 	if !ok {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
@@ -874,6 +876,17 @@ func (l *GameClientLink) attackLiveTargetWithGate(live *livePlayer, target world
 		return false
 	}
 	return true
+}
+
+// hitTarget returns target as the creature a physical hit lands on: a
+// creature as itself, a door through its hit surface. Any other object is
+// never attacked.
+func hitTarget(target any) (attackable.Combatant, bool) {
+	if d, ok := target.(*door.Object); ok {
+		return doorhit.Of(d), true
+	}
+	c, ok := target.(attackable.Combatant)
+	return c, ok
 }
 
 // liveOutOfControl reports whether live is out of control: stunned,

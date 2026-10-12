@@ -194,10 +194,10 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 	})
 }
 
-// castCombatant is a cast's final target as a creature, nil when it is not
-// one.
+// castCombatant is a cast's final target as the creature a follow-up attack
+// hits, nil when it is neither a creature nor a door.
 func castCombatant(target actorcast.Target) attackable.Combatant {
-	combatant, _ := target.(attackable.Combatant)
+	combatant, _ := hitTarget(target)
 	return combatant
 }
 

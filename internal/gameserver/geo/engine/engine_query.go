@@ -95,8 +95,10 @@ func (e *Engine) CanSeeWithHeights(ox, oy, oz int, oheight float64, tx, ty, tz i
 }
 
 // CanSeeWithHeightsIgnoring reports mutual line of sight while ignoring one
-// dynamic geodata object, such as the target door itself.
+// dynamic geodata object, such as the target door itself. A stand-in for
+// a stored object ignores the object it stands for.
 func (e *Engine) CanSeeWithHeightsIgnoring(ox, oy, oz int, oheight float64, tx, ty, tz int, theight float64, ignore dynamic.Object) bool {
+	ignore = dynamic.Stored(ignore)
 	return e.canSee(ox, oy, oz, oheight, tx, ty, tz, theight, ignore) &&
 		e.canSee(tx, ty, tz, theight, ox, oy, oz, oheight, ignore)
 }

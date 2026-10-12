@@ -23,7 +23,6 @@ func (l *GameClientLink) doorInfoPage(d *door.Object) string {
 	if t.Opened {
 		initial = "Opened"
 	}
-	pDef, mDef := l.doorDefences(t)
 	return fillPage(l.adminHTML("doorinfo.htm"),
 		"%name%", t.Name,
 		"%objid%", strconv.Itoa(int(d.ObjectID())),
@@ -40,27 +39,11 @@ func (l *GameClientLink) doorInfoPage(d *door.Object) string {
 		"%hp%", strconv.Itoa(d.HP()),
 		"%hpmax%", strconv.Itoa(d.MaxHP()*doorUpgradeHPRatio),
 		"%hpratio%", strconv.Itoa(doorUpgradeHPRatio),
-		"%pdef%", strconv.Itoa(pDef),
-		"%mdef%", strconv.Itoa(mDef),
+		"%pdef%", strconv.Itoa(d.PhysicalDefence()),
+		"%mdef%", strconv.Itoa(d.MagicDefence()),
 		"%spawn%", strconv.Itoa(x)+", "+strconv.Itoa(y)+", "+strconv.Itoa(z)+", "+strconv.Itoa(d.Heading()),
 		"%height%", commons.JavaDouble(float64(d.Height())),
 	)
-}
-
-// doorDefences returns t's P.Def and M.Def under the Seal of Strife: the
-// template values raised by a fifth while Dawn owns the seal, cut to 30%
-// while Dusk does, truncated.
-func (l *GameClientLink) doorDefences(t *door.Template) (pDef, mDef int) {
-	factor := 1.0
-	if l.sevenSigns != nil {
-		switch l.sevenSigns.Record(0).Seals[sealStrifeIndex].Owner {
-		case sevensigns.Dawn:
-			factor = 1.2
-		case sevensigns.Dusk:
-			factor = 0.3
-		}
-	}
-	return int(float64(t.PDef) * factor), int(float64(t.MDef) * factor)
 }
 
 // sealStrifeIndex is the Seal of Strife's place in a Record's seals.
