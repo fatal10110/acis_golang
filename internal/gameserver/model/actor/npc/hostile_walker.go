@@ -79,7 +79,8 @@ func (h *Hostile) SocialAction(id int) {
 }
 
 // SayNPCString broadcasts a walkerRoutes.xml node's fstring chat line,
-// resolved through the NpcString text table. An unmapped id is a no-op:
+// resolved through the NpcString text table, as Say does: named by the npc
+// id, not the client template id. An unmapped id is a no-op:
 // the complete id set has no such gap, but staying
 // silent beats fabricating text the client would show as this NPC's line.
 func (h *Hostile) SayNPCString(id int) {
@@ -87,5 +88,5 @@ func (h *Hostile) SayNPCString(id int) {
 	if !ok {
 		return
 	}
-	h.emit(event.NpcSay{NpcID: h.Instance.Template.TemplateID, Text: text})
+	h.Say(text)
 }

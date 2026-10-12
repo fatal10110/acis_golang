@@ -273,15 +273,19 @@ func (c *hostileControl) Emit(ev event.Event) {
 		c.hostile.SyncPosition(c.move.Position())
 		// A move's end revalidates the zones at once.
 		c.hostile.SettleZones()
+		// The AI settles the arrival before any route step: it drops the
+		// arrival desire, faces the spawn heading on the spawn point and
+		// raises the out-of-territory point.
+		c.hostile.AI().Arrived()
 		// Only an arrival the walker task itself just moved toward counts as
 		// a route arrival — offensive-follow chase and MoveHome arrive the
-		// same way and must not advance/reissue the patrol route.
+		// same way and must not advance/reissue the patrol route. It is read
+		// after the AI's arrival, whose hook may have started another move.
 		if c.walker != nil && c.routeMove.Load() {
 			if err := c.walker.Arrived(c.walkerRef); err != nil {
 				c.log.Warn().Err(err).Msg("task: walker arrived")
 			}
 		}
-		c.hostile.AI().Arrived()
 	case event.MoveBlocked:
 		c.move.BroadcastBlockedCorrection()
 		c.hostile.AI().ArrivedBlocked()

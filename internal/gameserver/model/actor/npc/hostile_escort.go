@@ -76,25 +76,32 @@ func (h *Hostile) thinkMasterEscort(master PartyMember, lastWasFollow bool) {
 }
 
 // claimFollowSlot picks minion's escort point around master and records it
-// in master.followSlots. The slots and the minion occupants are snapshotted
-// under the master's partyMu; other occupants are resolved through the world and every
+// in master.followSlots. The slots are snapshotted under the master's
+// partyMu and matched against a snapshot of its privates; other occupants are resolved through the world and every
 // position is read after unlock, so no world or actor lookup runs under the
 // lock. The result is written back with a re-check (commitFollowSlots).
 // masterLoc is the master position the escort points were laid out around.
 func claimFollowSlot(master PartyMember, minion *Hostile, lastWasFollow, hasLast bool, lastLoc location.Location) (dest, masterLoc location.Location, ok bool) {
 	var occupants [escortSlotCount]PartyMember
+	minions := master.Minions()
 	p := master.links()
 	p.partyMu.RLock()
 	slots := p.followSlots
+	p.partyMu.RUnlock()
 	filled := 0
 	for i, id := range slots {
-		if id != 0 {
-			filled++
-			occupants[i] = p.minions[id]
+		if id == 0 {
+			continue
+		}
+		filled++
+		for _, m := range minions {
+			if m.ObjectID() == id {
+				occupants[i] = m
+				break
+			}
 		}
 	}
-	allFilled := filled == len(p.minions)
-	p.partyMu.RUnlock()
+	allFilled := filled == len(minions)
 
 	if allFilled && hasLast && combatantLocation(master).Distance2D(lastLoc) < escortMasterMoveSkip {
 		return location.Location{}, location.Location{}, false
