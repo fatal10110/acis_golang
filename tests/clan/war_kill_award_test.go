@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
 // killStanding is a killer's stored PvP kills, PK kills and karma.
@@ -24,7 +25,9 @@ func storedKillStanding(t *testing.T, w *clanWorld, id int32) killStanding {
 // A kill between clans at war with each other, neither side in its
 // academy, is a PvP kill: the killer gains a PvP point and its UserInfo,
 // and no karma. Any other kill of an innocent is a PK: a PK kill and 240
-// karma. Nothing is awarded when both players stand in a PvP zone.
+// karma. Nothing is awarded when both players stand in a PvP zone. A
+// karma-holding victim is a PvP kill only while AwardPKKillPVPPoint is on;
+// with it off the killer gains nothing at all.
 func TestKillAwardBetweenClans(t *testing.T) {
 	t.Parallel()
 	mutual := []string{warStmt(knightsClanID, rivalsClanID), warStmt(rivalsClanID, knightsClanID)}
@@ -36,6 +39,8 @@ func TestKillAwardBetweenClans(t *testing.T) {
 		academyVictim bool
 		killerInPvP   bool
 		victimInPvP   bool
+		victimKarma   bool
+		awardPKKill   bool
 		want          killStanding
 	}{
 		{name: "no war", want: pk},
@@ -47,6 +52,9 @@ func TestKillAwardBetweenClans(t *testing.T) {
 		{name: "both in a pvp zone", killerInPvP: true, victimInPvP: true, want: none},
 		{name: "both in a pvp zone at war", wars: mutual, killerInPvP: true, victimInPvP: true, want: none},
 		{name: "only the victim in a pvp zone", victimInPvP: true, want: pk},
+		{name: "karma victim, award option on", victimKarma: true, awardPKKill: true, want: pvp},
+		{name: "karma victim, award option off", victimKarma: true, want: none},
+		{name: "innocent victim, award option on", awardPKKill: true, want: pk},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -57,7 +65,10 @@ func TestKillAwardBetweenClans(t *testing.T) {
 			stmts := append([]string{
 				`UPDATE characters SET clanid = ` + itoa(pupilClanID) + `, subpledge = -1, power_grade = 9, lvl_joined_academy = 10 WHERE obj_Id = ` + itoa(pupilID),
 			}, tt.wars...)
-			w := bootAllianceCast(t, []castMember{{pupilID, "player3", "Pupil"}}, stmts)
+			if tt.victimKarma {
+				stmts = append(stmts, `UPDATE characters SET karma = 500 WHERE char_name = 'Founder'`)
+			}
+			w := bootAllianceCast(t, []castMember{{pupilID, "player3", "Pupil"}}, stmts, gameservertest.WithAwardPKKillPVPPoint(tt.awardPKKill))
 			killerID, killerClient, victimID := w.memberID, w.member, w.leaderID
 			if tt.byPupil || tt.academyVictim {
 				pupil := w.srv.DialClient(t, "player3", 1)
