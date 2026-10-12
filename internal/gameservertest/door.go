@@ -9,8 +9,10 @@ import (
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -107,14 +109,18 @@ func (s *Server) DoorRegenerating(tb testing.TB, doorID int) bool {
 }
 
 // siegeInProgress stands in for the siege of a door's residence while the
-// castle sieges install no door gate (#3373): it lets every hit through, as
-// a castle siege in progress does for any attacker but a Swoop Cannon.
+// castle sieges install no door gate (#3373): it lets every playable attack
+// a door but no wall, as a castle siege in progress does for its attacker
+// side's players, and every hit through, as it does for any attacker but a
+// Swoop Cannon.
 type siegeInProgress struct{}
+
+func (siegeInProgress) AllowsDoorAttack(_ skilltarget.Actor, wall bool) bool { return !wall }
 
 func (siegeInProgress) AllowsDoorDamage(attackable.Combatant) bool { return true }
 
-// BeginDoorSiege puts doorID's door under a siege that lets hits lower its
-// HP.
+// BeginDoorSiege puts doorID's door under a siege that lets players attack
+// it and their hits lower its HP.
 func (s *Server) BeginDoorSiege(tb testing.TB, doorID int) {
 	tb.Helper()
 	s.spawnedDoor(tb, doorID).SetSiege(siegeInProgress{})
@@ -124,7 +130,7 @@ func (s *Server) BeginDoorSiege(tb testing.TB, doorID int) {
 // attackerObjID, through the door's own damage entry point.
 func (s *Server) HitDoor(tb testing.TB, doorID int, attackerObjID int32, damage float64) {
 	tb.Helper()
-	s.spawnedDoor(tb, doorID).ReduceHP(damage, s.onlineCharacter(tb, attackerObjID))
+	s.spawnedDoor(tb, doorID).ReduceHP(damage, s.onlineCharacter(tb, attackerObjID), modelskill.Definition{})
 }
 
 func (s *Server) spawnedDoor(tb testing.TB, doorID int) *door.Object {

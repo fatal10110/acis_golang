@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -32,12 +33,14 @@ func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.Cha
 // state at boot, applying closed doors to geodata immediately, and wires the
 // door-timer task's late-bound hook to it — manager.WorldObjects needs
 // *task.Door to schedule timers with, so that task's own effects can only
-// point back at WorldObjects after it exists.
-func provideWorldObjects(data *gameData, ids *idfactory.Allocator, state *world.State, doorTimers *task.Door, doorHooks *doorTimerEffects, doorRegen *task.DoorRegen, log zerolog.Logger) (*manager.WorldObjects, error) {
+// point back at WorldObjects after it exists. The doors' defences read the
+// Seal of Strife from sevenSigns.
+func provideWorldObjects(data *gameData, ids *idfactory.Allocator, state *world.State, doorTimers *task.Door, doorHooks *doorTimerEffects, doorRegen *task.DoorRegen, sevenSigns *sevensigns.State, log zerolog.Logger) (*manager.WorldObjects, error) {
 	objs, err := manager.NewWorldObjects(data.Doors, data.Statics, ids, data.Geo, state, doorTimers, doorRegen, network.DoorSinks(state), log)
 	if err != nil {
 		return nil, err
 	}
+	objs.SetStrife(sevenSigns)
 	doorHooks.SetHook(objs.ToggleDoor)
 	return objs, nil
 }
