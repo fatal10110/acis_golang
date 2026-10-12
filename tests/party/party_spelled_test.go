@@ -98,6 +98,7 @@ func framesOf(frames [][]byte, opcode byte) [][]byte {
 // AbnormalStatusUpdate, then every member, the leader too, gets the
 // leader's PartySpelled. A partyless player's buff sends no PartySpelled.
 func TestBuffShowsIconsToParty(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}, {"Loner", 40}})
 	leader, member, loner := g.players[0], g.players[1], g.players[2]
 	g.invite(t, 0, 1, 0)
@@ -130,6 +131,7 @@ func TestBuffShowsIconsToParty(t *testing.T) {
 // member's icons are never sent, and nobody gets an AbnormalStatusUpdate.
 // The permanent buff's -1 ms reads as 0 seconds (-1 / 1000).
 func TestJoinShowsBuffedMemberIcons(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}})
 	leader, member := g.players[0], g.players[1]
 	g.buffFor(t, leader.id, -1)
@@ -170,6 +172,7 @@ func TestJoinShowsBuffedMemberIcons(t *testing.T) {
 // is shown its icon list once more after the death, now empty. An unbuffed
 // member's death sends neither an AbnormalStatusUpdate nor a PartySpelled.
 func TestDeathRefreshesPartyIcons(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}})
 	leader, member := g.players[0], g.players[1]
 	g.invite(t, 0, 1, 0)

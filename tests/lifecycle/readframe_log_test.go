@@ -14,6 +14,7 @@ import (
 // leaves no "Read frame" line, while an authenticated client's disconnect is
 // still logged.
 func TestReadFrameEOFLoggedOnlyAfterAuth(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCapturedLog())
 	readFrameLines := func() int { return strings.Count(srv.LogText(), `"Read frame"`) }
 

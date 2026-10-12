@@ -21,6 +21,7 @@ const lootHerbID int32 = 8600
 // never hand an item to a dead member or to one with no room for it; with
 // nobody else to take it, the picker keeps it.
 func TestPartyPickupPassesOverDeadAndFullMembers(t *testing.T) {
+	t.Parallel()
 	for name, rule := range map[string]party.LootRule{"random": party.LootRandom, "by turn": party.LootByTurn} {
 		t.Run(name, func(t *testing.T) {
 			g := lootGroup(t, []seat{{"Leader", 20}, {"Dead", 20}, {"Full", 20}}, 3, rule, nil)
@@ -46,6 +47,7 @@ func TestPartyPickupPassesOverDeadAndFullMembers(t *testing.T) {
 // by turn its own room is not checked: with no member able to take the
 // item, the full picker keeps it.
 func TestPartyPickupPickerCapacity(t *testing.T) {
+	t.Parallel()
 	t.Run("finders keepers", func(t *testing.T) {
 		g := lootGroup(t, []seat{{"Leader", 20}, {"Member", 20}}, 2, party.LootFindersKeepers, nil)
 		g.srv.SetInventorySlotLimit(t, g.players[0].id, 0)
@@ -81,6 +83,7 @@ func TestPartyPickupPickerCapacity(t *testing.T) {
 // capacity check for no slot always passes, so under every loot rule even a
 // picker already past its slot limit uses the herb it picks up.
 func TestPartyHerbPickupIgnoresPickerCapacity(t *testing.T) {
+	t.Parallel()
 	for name, rule := range map[string]party.LootRule{"finders keepers": party.LootFindersKeepers, "random": party.LootRandom, "by turn": party.LootByTurn} {
 		t.Run(name, func(t *testing.T) {
 			g := lootGroup(t, []seat{{"Leader", 20}, {"Member", 20}}, 2, rule, []int{1})
@@ -110,6 +113,7 @@ func TestPartyHerbPickupIgnoresPickerCapacity(t *testing.T) {
 // party's loot rule. The picker keeps it, even under by turn and even
 // with a full inventory, and the other members hear nothing.
 func TestPartyPickupCursedWeaponStaysWithPicker(t *testing.T) {
+	t.Parallel()
 	const cursedID int32 = 30
 	table, err := entity.NewCursedWeaponTable([]entity.CursedWeapon{{ItemID: cursedID}})
 	if err != nil {

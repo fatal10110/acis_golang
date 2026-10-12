@@ -17,6 +17,7 @@ import (
 // row is deleted. Otherwise the absorbed row survives and is added to the
 // stack again on every later login.
 func TestRestoreMergedStackWritesBothRows(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
@@ -109,6 +110,7 @@ func assertPersistedAdena(t *testing.T, srv *gameservertest.Server, ownerID int3
 // merged stack comes back unequipped. The equipped row is inserted first so
 // that a restore reading rows in insertion order would keep it instead.
 func TestRestoreMergedStackKeepsInventoryRowOverEquippedRow(t *testing.T) {
+	t.Parallel()
 	const woodenArrow = 17
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
