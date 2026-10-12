@@ -81,9 +81,9 @@ var dataSpawnParams = []string{
 	"Skill02_Target", "Skill03_Target", "Skill03_Type", "SoulShot", "SoulShotRate", "SpiritShot", "SpiritShotRate",
 }
 
-// dataMakers are three makers: a wolf at a fixed point leading a private,
-// two wolves at one of two points, and a grocer anywhere in the territory
-// whose spawn declares dataSpawnParams.
+// dataMakers are four makers: a wolf at a fixed point leading a private,
+// two wolves at one of two points, a wolf that never respawns, and a
+// grocer anywhere in the territory whose spawn declares dataSpawnParams.
 func dataMakers(t *testing.T) *spawn.Table {
 	t.Helper()
 	var sets strings.Builder
@@ -98,6 +98,9 @@ func dataMakers(t *testing.T) *spawn.Table {
 	</npcmaker>
 	<npcmaker name="wolf_pack" territory="den" maximumNpcs="2">
 		<npc id="20120" total="2" pos="100;100;30;0;50%;120;140;30;0;50%" respawn="1hour"/>
+	</npcmaker>
+	<npcmaker name="wolf_lair" territory="den" maximumNpcs="1">
+		<npc id="20120" total="1" pos="300;300;30;0" respawn="no" respawnRand="30sec"/>
 	</npcmaker>
 	<npcmaker name="grocer_row" territory="den" maximumNpcs="1">
 		<npc id="30001" total="1" respawn="0"><ai>` + sets.String() + `</ai></npc>
@@ -269,7 +272,8 @@ var spawnInfoLoc = regexp.MustCompile(`loc: (-?\d+), (-?\d+), (-?\d+), (-?\d+)`)
 
 // TestAdminInfoNpcSpawnPage pins AdminInfo.java's spawn page
 // (sendSpawnInfos): a maker's NPC by its maker, linked, and its declared
-// positions; a master with its privates and one of them, by its master
+// positions, a delay that never respawns clamping its random part to
+// -1s; a master with its privates and one of them, by its master
 // and a point drawn around it; a //spawn NPC and a tree by their point and
 // the respawn delay //spawn declared; and an NPC no spawn placed, every
 // spawn field struck out.
@@ -339,6 +343,20 @@ func TestAdminInfoNpcSpawnPage(t *testing.T) {
 		"%spawninfo%", "loc: fixed random 1 of 2",
 		"%loc2d%", "0", "%loc3d%", "0",
 		"%resp%", "1h", "%rand_resp%", " 0s", "%privates%", "false",
+		"%minion%", "I'm a regular NPC, as the most random BR/RU leaker.",
+	)...))
+
+	// The wolf of wolf_lair never respawns: its delay floors at zero, its
+	// random part is clamped against the declared -1s.
+	lair := dataSpawned(t, srv, wolfID, "wolf_lair")[0]
+	exchange(t, gm, encodeAction(lair.(*npc.Hostile).ObjectID()))
+	assertInfoPage(t, gm, "info spawn", dataSpawnPage(t, append(whereabouts(lair, admin),
+		"%corpse%", " 7s",
+		"%spawn%", "MultiSpawn [id=20120]",
+		"%spawndesc%", `<a action="bypass -h admin_maker wolf_lair">NpcMaker: wolf_lair</a>`,
+		"%spawninfo%", "loc: fixed 300, 300, 30",
+		"%loc2d%", "0", "%loc3d%", "0",
+		"%resp%", " 0s", "%rand_resp%", " -1s", "%privates%", "false",
 		"%minion%", "I'm a regular NPC, as the most random BR/RU leaker.",
 	)...))
 

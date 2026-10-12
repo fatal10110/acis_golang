@@ -457,6 +457,7 @@ var infoNpcPages = []string{
 func TestAdminInfoNpcGeneralPages(t *testing.T) {
 	t.Parallel()
 	srv, _ := bootAdmin(t, adminLevel,
+		gameservertest.WithCastles(infoCastles(t)),
 		gameservertest.WithResidences(nil, infoCastles(t)),
 		gameservertest.WithHTMLPages(shippedAdminPages(t, infoNpcPages...)),
 	)

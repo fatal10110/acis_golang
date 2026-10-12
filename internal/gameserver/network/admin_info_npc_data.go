@@ -213,7 +213,14 @@ func (l *GameClientLink) npcSpawnPage(gm *livePlayer, obj world.Tracked, inst *n
 			home = inst.Home
 		}
 		delay := max(rec.Entry.RespawnDelay, 0)
-		random := min(max(rec.Entry.RespawnRandom, 0), delay)
+		// A maker's spawn clamps its random part against the declared
+		// delay, so an entry that never respawns ("no", -1s) reads -1s;
+		// any other spawn clamps it against the delay floored at zero.
+		bound := delay
+		if rec.Maker != "" {
+			bound = rec.Entry.RespawnDelay
+		}
+		random := min(max(rec.Entry.RespawnRandom, 0), bound)
 		pairs = append(pairs,
 			"%spawn%", label,
 			"%spawndesc%", desc,

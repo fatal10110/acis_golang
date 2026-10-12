@@ -151,27 +151,14 @@ func npcClassName(inst *npc.Instance) string {
 	return inst.Template.Type
 }
 
-// npcResidenceName names the residence the NPC inst serves: the castle or
-// siegable clan hall its maker names, else the first castle listing its
-// template, else the first clan hall, else "none".
+// npcResidenceName names the residence the NPC inst serves (see
+// npcResidence), or "none".
 func (l *GameClientLink) npcResidenceName(inst *npc.Instance) string {
-	if id, ok := inst.Maker.ResidenceParam(); ok {
-		if c, ok := l.castleData.Get(id); ok {
-			return c.Name
-		}
-		if h, ok := l.clanHallData.Get(id); ok && h.IsSiegable() {
-			return h.Name
-		}
-	}
-	for _, c := range l.castleData.All() {
-		if slices.Contains(c.NPCs, inst.Template.ID) {
-			return c.Name
-		}
-	}
-	for _, h := range l.clanHallData.All() {
-		if slices.Contains(h.NPCs, inst.Template.ID) {
-			return h.Name
-		}
+	switch c, h := l.npcResidence(inst); {
+	case c != nil:
+		return c.Name
+	case h != nil:
+		return h.Name
 	}
 	return "none"
 }
