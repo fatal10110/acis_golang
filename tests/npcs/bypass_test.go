@@ -204,7 +204,9 @@ func TestBypassChatPagePaths(t *testing.T) {
 }
 
 // TestBypassDungeonGatekeeperReleasesFirst pins the dungeon gatekeeper,
-// which releases the client ahead of every command.
+// which releases the client ahead of every command, its own (see
+// dungeon_gatekeeper_test.go) and the generic ones alike, even one nothing
+// answers.
 func TestBypassDungeonGatekeeperReleasesFirst(t *testing.T) {
 	t.Parallel()
 	pages := dialogPages()
@@ -216,7 +218,7 @@ func TestBypassDungeonGatekeeperReleasesFirst(t *testing.T) {
 	want := append([]byte{serverpackets.OpcodeActionFailed}, chatWindowAnswer...)
 	assertAnswer(t, w.bypass(t, npcCommand(f, "Chat 1")), want, f, wantChatPage(pages["gatekeeper/31095-1.htm"], f))
 	w.openAnyNpcPage(t)
-	assertAnswer(t, w.bypass(t, npcCommand(f, "necro")), []byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeActionFailed}, f, "")
+	assertAnswer(t, w.bypass(t, npcCommand(f, "unknown")), []byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeActionFailed}, f, "")
 }
 
 // TestBypassKarmaGateCoversEveryCommand pins the shop karma gate on
