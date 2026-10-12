@@ -123,9 +123,9 @@ type ItemInstances struct {
 	// groups maps each row of a write that has not landed yet to every row
 	// that must land with it (Bind).
 	groups map[int32]*rowGroup
-	// orphans holds one row of each group the pending cap left with no row
-	// alive, for the next Save to release (markOrphans). Guarded by groupsMu.
-	orphans map[int32]struct{}
+	// orphans holds each group the pending cap left with no row alive, for
+	// the next Save to release (markOrphans). Guarded by groupsMu.
+	orphans map[*rowGroup]struct{}
 	// ops keeps UpdateItems, and the writes of operations on the same
 	// owners, from reading rows while a multi-row operation has changed them
 	// but not yet bound them (BeginOperation). Its lock is taken before
@@ -208,7 +208,7 @@ func NewItemInstances(flusher ItemFlusher, templates *item.Table, worker *persis
 		pendingCap: ItemInstancePendingCap,
 		rounds:     make(map[*saveRound]struct{}),
 		groups:     make(map[int32]*rowGroup),
-		orphans:    make(map[int32]struct{}),
+		orphans:    make(map[*rowGroup]struct{}),
 	}
 	i.ops.init()
 	return i

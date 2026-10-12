@@ -212,3 +212,26 @@ func TestItemInstancesCapDropReleaseLeavesMergedGroup(t *testing.T) {
 		t.Fatalf("Widen([3]) = %v, want the merged group kept [1 2]", got)
 	}
 }
+
+// TestItemInstancesCapDropReleaseLeavesUnmarkedMergedGroup pins that only the
+// group the cap marked is released: a newer group the marked one merged into,
+// none of whose own writes was dropped, is left to its own writes even when
+// every row of it is dead and none is pending.
+func TestItemInstancesCapDropReleaseLeavesUnmarkedMergedGroup(t *testing.T) {
+	flusher := &outageFlusher{down: true}
+	instances := NewItemInstances(flusher, item.NewTable(nil), nil, nil, zerolog.Nop())
+	instances.pendingCap = 0
+	receiver := usedUpTrade(instances)
+	if err := instances.Save(context.Background()); err == nil {
+		t.Fatal("Save() succeeded, want the outage error")
+	}
+
+	instances.Bind([]BoundRow{{ObjectID: 2, OwnerID: 200, Inst: receiver}, {ObjectID: 3, OwnerID: 200}})
+	_ = instances.Save(context.Background())
+	if n := boundRowCount(instances); n != 3 {
+		t.Fatalf("bound rows after the Save = %d, want the unmarked merged group kept (3)", n)
+	}
+	if got := widenedIDs(instances, 3); !slices.Equal(got, []int32{1, 2}) {
+		t.Fatalf("Widen([3]) = %v, want the merged group kept [1 2]", got)
+	}
+}

@@ -201,10 +201,10 @@ func (i *ItemInstances) markOrphans(dropped []int32) {
 	if len(dropped) == 0 {
 		return
 	}
-	var dead []int32
-	for _, rows := range i.groupsOf(dropped) {
+	var dead []*rowGroup
+	for g, rows := range i.groupsOf(dropped) {
 		if allDead(rows) {
-			dead = append(dead, rows[0].ObjectID)
+			dead = append(dead, g)
 		}
 	}
 	if len(dead) == 0 {
@@ -212,8 +212,8 @@ func (i *ItemInstances) markOrphans(dropped []int32) {
 	}
 	i.groupsMu.Lock()
 	defer i.groupsMu.Unlock()
-	for _, id := range dead {
-		i.orphans[id] = struct{}{}
+	for _, g := range dead {
+		i.orphans[g] = struct{}{}
 	}
 }
 
@@ -221,23 +221,34 @@ func (i *ItemInstances) markOrphans(dropped []int32) {
 // still dead and none of which is pending or in flight: nothing is left to
 // write any of them, so the group would only hold its instances for the life
 // of the process. A group that has a row written again keeps it, and is
-// marked again if that write is dropped too. A group merged into a newer one
-// since (Bind) is left to that one.
+// marked again if that write is dropped too.
+//
+// Only the marked groups are released, and only rows still bound to them: a
+// row bound again since (Bind merges it into a newer group) belongs to an
+// operation none of whose writes the cap dropped, so that newer group is left
+// to its own writes.
 func (i *ItemInstances) releaseOrphans() {
 	i.groupsMu.Lock()
 	if len(i.orphans) == 0 {
 		i.groupsMu.Unlock()
 		return
 	}
-	ids := make([]int32, 0, len(i.orphans))
-	for id := range i.orphans {
-		ids = append(ids, id)
+	marked := make(map[*rowGroup][]BoundRow, len(i.orphans))
+	for g := range i.orphans {
+		if !i.stillBound(g) {
+			continue
+		}
+		rows := make([]BoundRow, 0, len(g.rows))
+		for _, row := range g.rows {
+			rows = append(rows, row)
+		}
+		marked[g] = rows
 	}
 	clear(i.orphans)
 	i.groupsMu.Unlock()
 
 	var release []*rowGroup
-	for g, rows := range i.groupsOf(ids) {
+	for g, rows := range marked {
 		if allDead(rows) && !i.anyOutstanding(rows) {
 			release = append(release, g)
 		}
@@ -254,6 +265,17 @@ func (i *ItemInstances) releaseOrphans() {
 			}
 		}
 	}
+}
+
+// stillBound reports whether any row is still bound to g rather than to a
+// newer group. The caller holds groupsMu.
+func (i *ItemInstances) stillBound(g *rowGroup) bool {
+	for member := range g.rows {
+		if i.groups[member] == g {
+			return true
+		}
+	}
+	return false
 }
 
 // groupsOf returns a copy of the rows of each group bound to one of ids.
