@@ -392,6 +392,18 @@ func (cl *Clan) RefreshLevel(objectID int32, level int) bool {
 	return ok
 }
 
+// RefreshName records objectID's new name, reporting whether it is a
+// member.
+func (cl *Clan) RefreshName(objectID int32, name string) bool {
+	cl.mu.Lock()
+	defer cl.mu.Unlock()
+	m, ok := cl.members[objectID]
+	if ok {
+		m.Name = name
+	}
+	return ok
+}
+
 func (cl *Clan) rowLocked() Row {
 	return Row{
 		ID: cl.id, Name: cl.name, Level: cl.level, Reputation: cl.reputation,

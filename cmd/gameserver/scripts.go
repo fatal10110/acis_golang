@@ -250,6 +250,7 @@ func provideScriptEnv(serverProps *config.Properties, rewards manager.KillReward
 		BossWaits:        gameplay.BossWaits,
 		Doors:            doors,
 		Castles:          castles,
+		SiegableHall:     data.ClanHalls.Siegable,
 		Sieges:           sieges,
 	}, nil
 }

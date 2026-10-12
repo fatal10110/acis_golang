@@ -53,7 +53,7 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteInt32(int32(z))
 	w.WriteInt32(c.BoatObjectID())
 	w.WriteInt32(c.ObjectID())
-	w.WriteString(c.Name)
+	w.WriteString(c.CharacterName())
 	w.WriteInt32(int32(c.Race))
 	w.WriteInt32(int32(c.Sex()))
 	w.WriteInt32(int32(c.VisibleBaseClassID()))

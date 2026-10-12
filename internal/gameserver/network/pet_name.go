@@ -10,8 +10,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-// petNamePattern is the valid pet name: 1 to 16 ASCII letters or digits.
-var petNamePattern = regexp.MustCompile(`^[A-Za-z0-9]{1,16}$`)
+// shortNamePattern is 1 to 16 ASCII letters or digits: a valid pet name,
+// and the name //set name gives a player.
+var shortNamePattern = regexp.MustCompile(`^[A-Za-z0-9]{1,16}$`)
 
 type petNameStore interface {
 	NameTaken(context.Context, string) (bool, error)
@@ -76,7 +77,7 @@ func (l *GameClientLink) beginChangePetName(live *livePlayer, req clientpackets.
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNamingYouCannotSetNameOfThePet))
 		return nil
 	}
-	if !petNamePattern.MatchString(req.Name) {
+	if !shortNamePattern.MatchString(req.Name) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNamingPetnameContainsInvalidChars))
 		return nil
 	}

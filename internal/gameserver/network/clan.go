@@ -34,7 +34,7 @@ func (l *GameClientLink) enterWorldClan(client *Client, live *livePlayer) {
 	row := liveMemberRow(c, m)
 	l.broadcastToClan(cl, c.ID,
 		func() wire.Frame {
-			return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageClanMemberS1LoggedIn, c.Name)
+			return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageClanMemberS1LoggedIn, c.CharacterName())
 		},
 		func() wire.Frame { return serverpackets.FramePledgeShowMemberListUpdate(row) })
 	client.Session.SendFrame(serverpackets.FramePledgeShowMemberListUpdate(row))
@@ -89,12 +89,12 @@ func (l *GameClientLink) requestJoinPledge(live *livePlayer, req clientpackets.R
 	}
 	blocksInviter := l.relations.IsBlocked(target.ObjectID(), c.ID)
 	if refusal := l.clanService().CheckJoin(cl, c.ID, target.Character, blocksInviter, int(req.PledgeType), time.Now()); refusal != clan.JoinAllowed {
-		sendJoinRefusal(live, cl, target.Name, refusal)
+		sendJoinRefusal(live, cl, target.CharacterName(), refusal)
 		return
 	}
-	switch l.clanService().Invites().Send(clan.InviteJoinPledge, c.ID, c.Name, target.ObjectID(), int(req.PledgeType)) {
+	switch l.clanService().Invites().Send(clan.InviteJoinPledge, c.ID, c.CharacterName(), target.ObjectID(), int(req.PledgeType)) {
 	case clan.InviteTargetBusy:
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.CharacterName()))
 		return
 	case clan.InviteRequesterBusy:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWaitingForAnotherReply))
@@ -102,7 +102,7 @@ func (l *GameClientLink) requestJoinPledge(live *livePlayer, req clientpackets.R
 	}
 	name := cl.Name()
 	target.SendFrame(serverpackets.FrameSystemMessageParams(serverpackets.SystemMessageS1HasInvitedYouToJoinTheClanS2,
-		serverpackets.TextParam(c.Name), serverpackets.TextParam(name)))
+		serverpackets.TextParam(c.CharacterName()), serverpackets.TextParam(name)))
 	target.SendFrame(serverpackets.FrameAskJoinPledge(c.ObjectID(), name))
 }
 
@@ -155,7 +155,7 @@ func (l *GameClientLink) requestAnswerJoinPledge(live *livePlayer, req clientpac
 	if req.Answer == 0 {
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageYouDidNotRespondToS1ClanInvitation, invite.RequesterName))
 		if requester != nil {
-			requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DidNotRespondToClanInvitation, c.Name))
+			requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DidNotRespondToClanInvitation, c.CharacterName()))
 		}
 		l.clanService().Invites().Answered(c.ID)
 		return
@@ -174,7 +174,7 @@ func (l *GameClientLink) requestAnswerJoinPledge(live *livePlayer, req clientpac
 	rank := c.PledgeClass()
 	blocksInviter := l.relations.IsBlocked(c.ID, invite.RequesterID)
 	if refusal := l.clanService().Join(cl, invite.RequesterID, c, blocksInviter, sent.PledgeType, time.Now()); refusal != clan.JoinAllowed {
-		sendJoinRefusal(requester, cl, c.Name, refusal)
+		sendJoinRefusal(requester, cl, c.CharacterName(), refusal)
 	} else {
 		l.giveClanSkills(live, cl, rank)
 		l.sendJoinedClan(live, cl)
@@ -193,7 +193,7 @@ func (l *GameClientLink) sendJoinedClan(live *livePlayer, cl *clan.Clan) {
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageEnteredTheClan))
 	l.broadcastToClan(cl, c.ID,
 		func() wire.Frame {
-			return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1HasJoinedClan, c.Name)
+			return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1HasJoinedClan, c.CharacterName())
 		},
 		func() wire.Frame { return serverpackets.FramePledgeShowMemberListAdd(row) })
 	l.broadcastToClan(cl, 0, func() wire.Frame { return framePledgeShowInfoUpdate(cl) })
@@ -236,9 +236,9 @@ func (l *GameClientLink) requestWithdrawPledge(live *livePlayer) {
 	l.sendLeftClan(live, cl)
 	l.broadcastToClan(cl, 0,
 		func() wire.Frame {
-			return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1HasWithdrawnFromTheClan, c.Name)
+			return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1HasWithdrawnFromTheClan, c.CharacterName())
 		},
-		func() wire.Frame { return serverpackets.FramePledgeShowMemberListDelete(c.Name) })
+		func() wire.Frame { return serverpackets.FramePledgeShowMemberListDelete(c.CharacterName()) })
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouHaveWithdrawnFromClan))
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageMustWaitBeforeJoiningAnotherClan))
 	l.refreshWarTags(live, cl)

@@ -79,7 +79,7 @@ func (l *GameClientLink) olympiadHero(live *livePlayer) bool {
 func (l *GameClientLink) registerOlympiad(live *livePlayer, f *npc.Folk, kind olympiad.GameType) {
 	cursedWeapon := live.CursedWeaponID()
 	result := l.olympiad.Register(olympiad.Applicant{
-		ObjectID: live.ObjectID(), Name: live.Name, BaseClass: live.BaseClassID(), Noble: live.IsNoble(),
+		ObjectID: live.ObjectID(), Name: live.CharacterName(), BaseClass: live.BaseClassID(), Noble: live.IsNoble(),
 		SubclassActive: live.ClassIndex() != 0, CursedWeaponID: cursedWeapon, Overweight: live.Overweight(),
 	}, kind)
 	var msg int

@@ -49,10 +49,10 @@ func applyAccessAppearance(c *player.Character, level int, access admin.AccessLe
 // user level, and the master level.
 func (l *GameClientLink) resolveAccessLevel(c *player.Character, level int) admin.AccessLevel {
 	if !l.admin.DefinesLevel(level) {
-		l.log.Warn().Int("level", level).Str("player", c.Name).Msg("access level: undefined level granted, reset to the user level")
+		l.log.Warn().Int("level", level).Str("player", c.CharacterName()).Msg("access level: undefined level granted, reset to the user level")
 	}
 	if level > 0 && level == l.admin.MasterLevel() {
-		l.log.Info().Str("player", c.Name).Msg("access level: logged in with master access level")
+		l.log.Info().Str("player", c.CharacterName()).Msg("access level: logged in with master access level")
 	}
 	return l.admin.Resolve(level)
 }

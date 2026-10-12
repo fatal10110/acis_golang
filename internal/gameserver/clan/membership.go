@@ -90,7 +90,7 @@ func (s *Service) Create(c *player.Character, name string, now time.Time) (*Clan
 // founding, or being marked online or offline.
 func LiveMember(c *player.Character) Member {
 	return Member{
-		ObjectID: c.ID, Name: c.Name, Title: c.Title(),
+		ObjectID: c.ID, Name: c.CharacterName(), Title: c.Title(),
 		Level: c.Level(), ClassID: c.ClassID(), Sex: int(c.Sex()), Race: int(c.Race),
 	}
 }
@@ -272,7 +272,7 @@ func (s *Service) Oust(c *player.Character, targetName string, online func(int32
 		return nil, Member{}, OustUnknownTarget
 	case !cl.HasPrivilege(c.ID, PrivDismiss):
 		return nil, Member{}, OustNotAuthorized
-	case strings.EqualFold(c.Name, targetName):
+	case strings.EqualFold(c.CharacterName(), targetName):
 		return nil, Member{}, OustSelf
 	case cl.IsLeader(target.ObjectID):
 		return nil, Member{}, OustNotAuthorized

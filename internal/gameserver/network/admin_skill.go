@@ -134,7 +134,7 @@ func (l *GameClientLink) adminSkillRemove(gm, target *livePlayer, next func() (s
 	}
 	return onPlayer(gm, target, func() {
 		l.removeLiveSkill(target, int(id), true)
-		sendText(gm, "You removed "+strconv.Itoa(int(id))+" skillId from "+target.Name+".")
+		sendText(gm, "You removed "+strconv.Itoa(int(id))+" skillId from "+target.CharacterName()+".")
 	})
 }
 
@@ -150,7 +150,7 @@ func (l *GameClientLink) rewardAdminSkills(gm, target *livePlayer) {
 		}
 		l.sendSkillChanges(target, before, raisedSkill)
 	}
-	sendText(gm, "You gave all available skills to "+target.Name+".")
+	sendText(gm, "You gave all available skills to "+target.CharacterName()+".")
 }
 
 // giveAdminSkill runs //skill set <id> <level> on target's queue: target
@@ -170,7 +170,7 @@ func (l *GameClientLink) giveAdminSkill(gm, target *livePlayer, def modelskill.D
 		}
 	}
 	l.sendSkillChanges(target, before, changedSkill)
-	sendText(gm, "You gave "+def.Name+" skill to "+target.Name+".")
+	sendText(gm, "You gave "+def.Name+" skill to "+target.CharacterName()+".")
 }
 
 // removeAdminSkills runs //skill remove all on target's queue: every skill
@@ -186,7 +186,7 @@ func (l *GameClientLink) removeAdminSkills(gm, target *livePlayer) {
 	for _, id := range ids {
 		l.removeLiveSkill(target, id, true)
 	}
-	sendText(gm, "You removed all skills from "+target.Name+".")
+	sendText(gm, "You removed all skills from "+target.CharacterName()+".")
 	l.sendSkillChanges(target, nil, nil)
 }
 
@@ -243,7 +243,7 @@ func (l *GameClientLink) showAdminSkills(gm, target *livePlayer, page int) {
 	}
 	pg.Space(&b, 20)
 	pg.Links(&b, "bypass admin_skill %page%")
-	l.sendAdminSkillPage(gm, "char_skills.htm", target.Name, b.String())
+	l.sendAdminSkillPage(gm, "char_skills.htm", target.CharacterName(), b.String())
 }
 
 // showAdminSkillTable opens page of the server's skill table on gm, every
@@ -262,7 +262,7 @@ func (l *GameClientLink) showAdminSkillTable(gm, target *livePlayer, page int) {
 	}
 	pg.Space(&b, 20)
 	pg.Links(&b, "bypass admin_skill list %page%")
-	l.sendAdminSkillPage(gm, "char_skills_list.htm", target.Name, b.String())
+	l.sendAdminSkillPage(gm, "char_skills_list.htm", target.CharacterName(), b.String())
 }
 
 // adminSkillRow writes one row of a //skill page: id, label and level, on

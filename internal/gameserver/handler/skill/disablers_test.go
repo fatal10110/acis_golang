@@ -563,10 +563,11 @@ func liveShieldCharacter(t *testing.T, id int32, items *item.Table, equipped ...
 	t.Helper()
 	tmpl := liveShieldTemplate()
 	c := &player.Character{
-		ID: id, Name: "char",
+		ID:   id,
 		Race: player.RaceHuman, CharLevel: 1,
 		Location: location.Location{X: int(id) * 100, Y: 0, Z: 0},
 	}
+	c.SetName("char")
 	c.SetClassID(tmpl.ID)
 	c.SetBaseClassID(tmpl.ID)
 	c.SetResourceValues(player.Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 30, CurrentMP: 30})

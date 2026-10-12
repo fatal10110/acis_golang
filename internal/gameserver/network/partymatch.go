@@ -158,10 +158,10 @@ func (l *GameClientLink) requestAskJoinPartyRoom(live *livePlayer, req clientpac
 		return
 	}
 	if l.tradeBook().Invite(tradebook.KindPartyRoom, live.ObjectID(), target.ObjectID(), false).Status != tradebook.RequestStarted {
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.CharacterName()))
 		return
 	}
-	target.SendFrame(serverpackets.FrameExAskJoinPartyRoom(live.Name))
+	target.SendFrame(serverpackets.FrameExAskJoinPartyRoom(live.CharacterName()))
 }
 
 // answerJoinPartyRoom answers live's pending room invitation. With none
@@ -197,7 +197,7 @@ func (l *GameClientLink) requestListWaitingPlayers(live *livePlayer, req clientp
 	players := l.rooms.Waiting(live, req.MinLevel, req.MaxLevel)
 	rows := make([]serverpackets.WaitingPlayer, len(players))
 	for i, p := range players {
-		rows[i] = serverpackets.WaitingPlayer{Name: p.Name, ClassID: int32(p.ClassID()), Level: int32(p.Level())}
+		rows[i] = serverpackets.WaitingPlayer{Name: p.CharacterName(), ClassID: int32(p.ClassID()), Level: int32(p.Level())}
 	}
 	live.SendFrame(serverpackets.FrameExListPartyMatchingWaitingRoom(req.Mode, rows))
 }
@@ -300,7 +300,7 @@ func (l *GameClientLink) roomMemberRow(m, leader *livePlayer) serverpackets.Part
 	}
 	return serverpackets.PartyRoomMember{
 		ObjectID: m.ObjectID(),
-		Name:     m.Name,
+		Name:     m.CharacterName(),
 		ClassID:  int32(m.ClassID()),
 		Level:    int32(m.Level()),
 		Location: l.roomLocation(m),
@@ -339,7 +339,7 @@ func roomRows(rooms []partymatch.Room[*livePlayer]) []serverpackets.PartyRoom {
 			MaxLevel:   r.Settings.MaxLevel,
 			Members:    int32(len(r.Members)),
 			MaxMembers: r.Settings.MaxMembers,
-			LeaderName: r.Leader().Name,
+			LeaderName: r.Leader().CharacterName(),
 		}
 	}
 	return rows

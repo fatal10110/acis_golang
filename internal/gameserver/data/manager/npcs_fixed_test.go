@@ -74,7 +74,7 @@ func TestSpawnFixedPlacesStandaloneSpawns(t *testing.T) {
 		return got
 	}
 
-	if err := npcs.SpawnFixed(tmpl(1), 500, 600, 70, 1234); err != nil {
+	if err := npcs.SpawnFixed(tmpl(1), 500, 600, 70, 1234, time.Minute); err != nil {
 		t.Fatalf("SpawnFixed(monster) error: %v", err)
 	}
 	obj, ok := state.Object(2)
@@ -89,14 +89,20 @@ func TestSpawnFixedPlacesStandaloneSpawns(t *testing.T) {
 		t.Fatalf("fixed monster home = %v (%v), maker %v; want its spawn point and no maker", wolf.Instance.Home, wolf.Instance.HasHome, wolf.Instance.Maker)
 	}
 	rec, ok := npcs.SpawnOf(2)
-	if want := (SpawnRecord{Fixed: true, At: location.Location{X: 500, Y: 600, Z: 63}, Heading: 1234}); !ok || rec != want {
-		t.Fatalf("SpawnOf(fixed) = %+v, %v; want %+v", rec, ok, want)
+	if !ok || !rec.Fixed || rec.Maker != "" || rec.MasterID != 0 || rec.At != (location.Location{X: 500, Y: 600, Z: 63}) || rec.Heading != 1234 || rec.Entry.RespawnDelay != time.Minute {
+		t.Fatalf("SpawnOf(fixed) = %+v, %v; want the fixed point, facing 1234, respawning after a minute", rec, ok)
 	}
-	if rec, ok := npcs.SpawnOf(1); !ok || rec != (SpawnRecord{Maker: "field_maker"}) {
+	if rec, ok := npcs.SpawnOf(1); !ok || rec.Fixed || rec.Maker != "field_maker" || rec.MasterID != 0 || rec.Entry.NPCID != 1 {
 		t.Fatalf("SpawnOf(maker spawn) = %+v, %v; want the maker", rec, ok)
 	}
+	if at, heading, ok := npcs.SpawnPoint(2); !ok || at != (location.Location{X: 500, Y: 600, Z: 63}) || heading != 1234 {
+		t.Fatalf("SpawnPoint(fixed) = %v, %d, %v; want its own point", at, heading, ok)
+	}
+	if _, _, ok := npcs.SpawnPoint(1); ok {
+		t.Fatal("SpawnPoint(maker spawn) found a point; want the maker's entry to declare them")
+	}
 
-	if err := npcs.SpawnFixed(tmpl(2), -10, -20, 0, 5); err != nil {
+	if err := npcs.SpawnFixed(tmpl(2), -10, -20, 0, 5, 0); err != nil {
 		t.Fatalf("SpawnFixed(merchant) error: %v", err)
 	}
 	if obj, ok := state.Object(3); !ok {
@@ -105,7 +111,7 @@ func TestSpawnFixedPlacesStandaloneSpawns(t *testing.T) {
 		t.Fatalf("fixed merchant is %T, want a civilian NPC", obj)
 	}
 
-	if err := npcs.SpawnFixed(tmpl(3), 0, 0, 0, 0); !errors.Is(err, ErrNotPlaceable) {
+	if err := npcs.SpawnFixed(tmpl(3), 0, 0, 0, 0, 0); !errors.Is(err, ErrNotPlaceable) {
 		t.Fatalf("SpawnFixed(artifact) error = %v, want ErrNotPlaceable", err)
 	}
 	if got := npcs.LiveCount(); got != 3 {
@@ -120,13 +126,18 @@ func TestSpawnFixedPlacesStandaloneSpawns(t *testing.T) {
 // and SpawnManager.deleteSpawn: only a standalone spawn's NPC is removed,
 // at once and for good, hostile or civilian; a maker's NPC is refused and
 // stays. A standalone spawn whose NPC dies never respawns either
-// (Spawn.onDecay schedules nothing).
+// (Spawn.onDecay schedules nothing), whatever respawn delay it declares.
 func TestDeleteFixedRemovesWithoutRespawn(t *testing.T) {
 	npcs, state, queues := fixedSpawnFixture(t)
 	wolfTmpl, _ := npcs.templates.Get(1)
 	merchantTmpl, _ := npcs.templates.Get(2)
-	for _, spawn := range []*npc.Template{wolfTmpl, merchantTmpl, wolfTmpl} {
-		if err := npcs.SpawnFixed(spawn, 100, 100, 0, 0); err != nil {
+	// The last one declares a respawn delay, which schedules nothing.
+	for i, spawn := range []*npc.Template{wolfTmpl, merchantTmpl, wolfTmpl} {
+		respawn := time.Duration(0)
+		if i == 2 {
+			respawn = time.Minute
+		}
+		if err := npcs.SpawnFixed(spawn, 100, 100, 0, 0, respawn); err != nil {
 			t.Fatalf("SpawnFixed(%d) error: %v", spawn.ID, err)
 		}
 	}

@@ -107,7 +107,7 @@ func (l *GameClientLink) sendCropHarvested(harvester *livePlayer, m skillhandler
 		return
 	}
 	broadcastFrame(func() wire.Frame {
-		name := serverpackets.TextParam(harvester.Name)
+		name := serverpackets.TextParam(harvester.CharacterName())
 		crop := serverpackets.ItemNameParam(m.CropID)
 		if m.Count > 1 {
 			return serverpackets.FrameSystemMessageParams(serverpackets.SystemMessageS1HarvestedS3S2, name, crop, serverpackets.NumberParam(int32(m.Count)))

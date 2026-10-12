@@ -234,8 +234,7 @@ func TestAdminInfoNpcScriptPages(t *testing.T) {
 	nones := [10]string{none, none, none, none, none, none, none, none, none, none}
 	assertInfoPage(t, gm, "info ai 3", defaultPage(t, aiTabs(3)+scratchRows(zeros, nones, [6]string{"0", "0", "0", "0", "0", "1"})))
 
-	// Pages 1 and 2 are not ported yet (#3396).
-	for _, cmd := range []string{"info ai 1", "info ai 2"} {
-		assertActionFailed(t, gm, cmd)
-	}
+	// No template AI parameter, and a spawn of a script declaring none.
+	assertInfoPage(t, gm, "info ai 1", defaultPage(t, strings.Replace(aiTabs(1), "[Template]", "[Template]</a>", 1)+"This NPC's template doesn't hold any AI parameters."))
+	assertInfoPage(t, gm, "info ai 2", defaultPage(t, aiTabs(2)+"This NPC Spawn doesn't hold any memos."))
 }

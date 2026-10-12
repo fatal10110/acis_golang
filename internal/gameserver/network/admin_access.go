@@ -43,7 +43,7 @@ func (l *GameClientLink) adminSetAccess(gm *livePlayer, args []string) {
 			return
 		}
 		l.changeAccessLevel(gm, target, int(level), func() {
-			sendText(gm, target.Name+"'s access level is now set to "+strconv.Itoa(int(level))+".")
+			sendText(gm, target.CharacterName()+"'s access level is now set to "+strconv.Itoa(int(level))+".")
 		})
 	case 2:
 		name := args[0]
@@ -54,7 +54,7 @@ func (l *GameClientLink) adminSetAccess(gm *livePlayer, args []string) {
 		}
 		if target, ok := l.livePlayerByName(name); ok {
 			l.changeAccessLevel(gm, target, int(level), func() {
-				sendText(gm, target.Name+"'s access level is now set to "+strconv.Itoa(int(level))+".")
+				sendText(gm, target.CharacterName()+"'s access level is now set to "+strconv.Itoa(int(level))+".")
 			})
 			return
 		}
@@ -212,7 +212,7 @@ func (l *GameClientLink) adminUnban(gm *livePlayer, line string) {
 	switch kind {
 	case "account":
 		if target != nil {
-			sendText(gm, target.Name+" account isn't actually banned.")
+			sendText(gm, target.CharacterName()+" account isn't actually banned.")
 			return
 		}
 		l.sendAccountAccessLevel(name, accountUnbannedLevel)
@@ -221,7 +221,7 @@ func (l *GameClientLink) adminUnban(gm *livePlayer, line string) {
 		l.adminUnbanChat(gm, target, name)
 	case "player":
 		if target != nil {
-			sendText(gm, target.Name+" player isn't actually banned.")
+			sendText(gm, target.CharacterName()+" player isn't actually banned.")
 			return
 		}
 		l.changeCharAccessLevel(gm, nil, name, characterUnbannedLevel)
@@ -239,7 +239,7 @@ func (l *GameClientLink) changeCharAccessLevel(gm, target *livePlayer, name stri
 		}) {
 			l.storeLeavingAccessLevel(target, level)
 		}
-		sendText(gm, target.Name+" has been banned.")
+		sendText(gm, target.CharacterName()+" has been banned.")
 		return
 	}
 	if name == "" {

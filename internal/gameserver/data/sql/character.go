@@ -55,12 +55,12 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 				(account_name, obj_Id, char_name, level, maxHp, curHp, maxCp, curCp, maxMp, curMp,
 				 face, hairStyle, hairColor, sex, heading, x, y, z, exp, sp, race, classid, base_class, title, accesslevel, online, lastAccess)
 			 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		c.AccountName, c.ID, c.Name, c.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
+		c.AccountName, c.ID, c.CharacterName(), c.CharLevel, resources.MaxHP, resources.CurrentHP, resources.MaxCP, resources.CurrentCP, resources.MaxMP, resources.CurrentMP,
 		c.Face, c.HairStyle, c.HairColor, byte(c.Sex()), c.LastHeading, c.Location.X, c.Location.Y, c.Location.Z,
 		c.Exp, c.SP, int(c.Race), c.ClassID(), c.BaseClassID(), c.Title(), c.AccessLevel, 0, time.Now().UnixMilli(),
 	)
 	if err != nil {
-		return fmt.Errorf("create character %q: %w", c.Name, err)
+		return fmt.Errorf("create character %q: %w", c.CharacterName(), err)
 	}
 	return nil
 }
@@ -151,7 +151,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var deathPenaltyLevel, onlineTime int
 	var recHave, recLeft int
 	var clanID int32
-	var title string
+	var name, title string
 	var clanJoinExpiry, clanCreateExpiry int64
 	var punishLevel int
 	var punishTimer int64
@@ -162,7 +162,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	var baseClassID int
 
 	err := row.Scan(
-		&c.ID, &c.AccountName, &c.Name,
+		&c.ID, &c.AccountName, &name,
 		&c.CharLevel, &maxHP, &curHP, &maxCP, &curCP, &maxMP, &curMP,
 		&c.Face, &c.HairStyle, &c.HairColor, &sex,
 		&c.LastHeading, &c.Location.X, &c.Location.Y, &c.Location.Z,
@@ -177,6 +177,7 @@ func scanCharacter(row rowScanner) (*player.Character, error) {
 	if err != nil {
 		return nil, err
 	}
+	c.SetName(name)
 	c.SetSex(player.Sex(sex))
 	c.SetClanID(clanID)
 	c.SetTitle(title)

@@ -93,9 +93,9 @@ func (l *GameClientLink) notifyFriends(live *livePlayer, online bool) {
 		if !ok {
 			continue
 		}
-		friend.SendFrame(serverpackets.FrameL2FriendStatus(online, live.Name, live.ObjectID()))
+		friend.SendFrame(serverpackets.FrameL2FriendStatus(online, live.CharacterName(), live.ObjectID()))
 		if online {
-			friend.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageFriendS1HasLoggedIn, live.Name))
+			friend.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageFriendS1HasLoggedIn, live.CharacterName()))
 		}
 	}
 }
@@ -119,7 +119,7 @@ func (l *GameClientLink) handleRequestFriendInvite(live *livePlayer, req clientp
 	// other kind of request; only the target being busy refuses it there.
 	if refusal == relation.InviteAllowed &&
 		l.tradeBook().Invite(tradebook.KindFriend, live.ObjectID(), target.ObjectID(), false).Status == tradebook.RequestStarted {
-		target.SendFrame(serverpackets.FrameFriendAddRequest(live.Name))
+		target.SendFrame(serverpackets.FrameFriendAddRequest(live.CharacterName()))
 		return
 	}
 	live.SendFrame(friendInviteRefusalMessage(refusal, req.Name))
@@ -174,13 +174,13 @@ func (l *GameClientLink) handleRequestAnswerFriendInvite(live *livePlayer, req c
 	l.relations.AddFriend(inv.RequesterID, live.ObjectID())
 	if requester != nil {
 		requester.SendFrame(serverpackets.FrameFriendAddRequestResult(true))
-		requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1AddedToFriends, live.Name))
-		requester.SendFrame(serverpackets.FrameL2Friend(serverpackets.L2FriendAdd, live.Name, true, live.ObjectID()))
+		requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1AddedToFriends, live.CharacterName()))
+		requester.SendFrame(serverpackets.FrameL2Friend(serverpackets.L2FriendAdd, live.CharacterName(), true, live.ObjectID()))
 	}
 	// A login that left is named as its character is stored.
 	var requesterName string
 	if requester != nil {
-		requesterName = requester.Name
+		requesterName = requester.CharacterName()
 	} else {
 		requesterName = l.characterNames([]int32{inv.RequesterID})[inv.RequesterID]
 	}
@@ -221,8 +221,8 @@ func (l *GameClientLink) handleRequestFriendDel(live *livePlayer, req clientpack
 	}
 	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeletedFromFriendsList, ref.Name))
 	if target, online := l.livePlayerByName(req.Name); online {
-		live.SendFrame(serverpackets.FrameL2Friend(serverpackets.L2FriendRemove, target.Name, true, target.ObjectID()))
-		target.SendFrame(serverpackets.FrameL2Friend(serverpackets.L2FriendRemove, live.Name, true, live.ObjectID()))
+		live.SendFrame(serverpackets.FrameL2Friend(serverpackets.L2FriendRemove, target.CharacterName(), true, target.ObjectID()))
+		target.SendFrame(serverpackets.FrameL2Friend(serverpackets.L2FriendRemove, live.CharacterName(), true, live.ObjectID()))
 		return
 	}
 	live.SendFrame(serverpackets.FrameL2Friend(serverpackets.L2FriendRemove, req.Name, false, 0))
@@ -253,7 +253,7 @@ func (l *GameClientLink) handleRequestBlock(live *livePlayer, req clientpackets.
 		}
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1AddedToYourIgnoreList, ref.Name))
 		if target, online := l.livePlayerByID(ref.ID); online {
-			target.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1HasAddedYouToIgnoreList, live.Name))
+			target.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1HasAddedYouToIgnoreList, live.CharacterName()))
 		}
 		l.relations.Block(live.ObjectID(), ref.ID)
 
@@ -311,9 +311,9 @@ func (l *GameClientLink) handleRequestSendL2FriendSay(live *livePlayer, req clie
 		return
 	}
 	if l.relations.IsBlocked(recipient.ObjectID(), live.ObjectID()) {
-		live.SendFrame(serverpackets.FrameL2FriendSay(serverpackets.SystemMessageS1HasAddedYouToIgnoreList2, live.Name, req.Recipient, req.Message))
+		live.SendFrame(serverpackets.FrameL2FriendSay(serverpackets.SystemMessageS1HasAddedYouToIgnoreList2, live.CharacterName(), req.Recipient, req.Message))
 		return
 	}
-	l.chat.Log.Info().Msg(chat.FriendLogEntry(live.Name, req.Recipient, req.Message))
-	recipient.SendFrame(serverpackets.FrameL2FriendSay(0, req.Recipient, live.Name, req.Message))
+	l.chat.Log.Info().Msg(chat.FriendLogEntry(live.CharacterName(), req.Recipient, req.Message))
+	recipient.SendFrame(serverpackets.FrameL2FriendSay(0, req.Recipient, live.CharacterName(), req.Message))
 }

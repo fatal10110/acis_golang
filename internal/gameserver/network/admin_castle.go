@@ -80,7 +80,7 @@ func (l *GameClientLink) adminCastleSet(gm *livePlayer, c *castle.Castle) {
 		return
 	}
 	if !l.setCastleOwner(gm, c, cl) {
-		sendText(gm, target.Name+"'s clan already owns a castle.")
+		sendText(gm, target.CharacterName()+"'s clan already owns a castle.")
 	}
 }
 

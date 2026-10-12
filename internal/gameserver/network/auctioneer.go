@@ -182,7 +182,7 @@ func (l *GameClientLink) placeHallBid(live *livePlayer, cl *clan.Clan, tokens []
 		}
 	}
 	var message int
-	switch l.halls.Bid(int32(hallID), cl, live.Name, int(amount)) {
+	switch l.halls.Bid(int32(hallID), cl, live.CharacterName(), int(amount)) {
 	case clanhall.BidPlaced:
 		message = serverpackets.SystemMessageBidInClanHallAuction
 	case clanhall.BidTooLow:

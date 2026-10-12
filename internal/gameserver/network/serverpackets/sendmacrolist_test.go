@@ -57,9 +57,11 @@ func TestFrameSendMacroList(t *testing.T) {
 func recommendationDiff(t *testing.T, frame func(*player.Character) []byte) ([]byte, []byte, int) {
 	t.Helper()
 	const mask = 0x55aa33cc
-	plain := &player.Character{Name: "R"}
+	plain := &player.Character{}
+	plain.SetName("R")
 	plain.StartAbnormalEffect(mask)
-	recommended := &player.Character{Name: "R"}
+	recommended := &player.Character{}
+	recommended.SetName("R")
 	recommended.StartAbnormalEffect(mask)
 	recommended.SetRecommendationCounts(200, 3)
 	base, got := frame(plain), frame(recommended)

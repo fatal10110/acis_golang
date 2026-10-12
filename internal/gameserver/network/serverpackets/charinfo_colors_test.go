@@ -10,7 +10,8 @@ import (
 // TestFrameCharInfoColors pins CharInfo's name and title colors to the
 // character's, the shipped defaults until something sets them.
 func TestFrameCharInfoColors(t *testing.T) {
-	c := &player.Character{Name: "Observer"}
+	c := &player.Character{}
+	c.SetName("Observer")
 	colors := func() (uint32, uint32) {
 		got := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: &player.Template{}}))
 		n := len(got)

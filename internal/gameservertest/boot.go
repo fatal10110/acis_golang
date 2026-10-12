@@ -123,6 +123,7 @@ type options struct {
 	questLoadErr           error
 	subclassFault          SubclassFault
 	petNameLookupErr       error
+	characterNameFault     CharacterNameFault
 	captureLog             bool
 	account                string
 	characters             []characterSpec
@@ -2174,6 +2175,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Relations, gclConfig.Characters = relations, chars
 	gclConfig.AccessLevels = chars
 	gclConfig.CharacterEdits = chars
+	if f := o.characterNameFault; f.Lookup != nil || f.Store != nil {
+		gclConfig.CharacterEdits = faultyCharacterNameStore{CharacterStore: chars, fault: o.characterNameFault}
+	}
 	gclConfig.Punishments = chars
 	petitions, petitionRows := bootPetitions(t, db, chars, ids, o.petitionConfig)
 	gclConfig.Petitions = petitions
@@ -2265,7 +2269,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	fishChampState := o.fishChamp.newChampionship(db, persistWorker, queues, o.log)
 	gclConfig.FishingChampionship = fishChampState
 	gclConfig.Sieges = newSieges(db, o, gclConfig.Castles, gclConfig.Clans, persistWorker)
-	quests.bindResidences(worldObjects, gclConfig.Castles, gclConfig.Sieges)
+	quests.bindResidences(worldObjects, gclConfig.Castles, o.clanHallData, gclConfig.Sieges)
 	gclConfig.CastleManor = newCastleManor(db, o, gclConfig.Castles, gclConfig.Clans, persistWorker, o.log)
 	gclConfig.LoginStatus, gclConfig.Shutdown = shutdownState.wire(loginLink, 300, queues, network.NewShutdownNotices(state), o.log)
 	gcl, err := network.NewGameClientLink(gclConfig)

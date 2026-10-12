@@ -357,14 +357,14 @@ func (s *Service) MakeFor(crafter, customer *player.Character, r recipe.Recipe, 
 	}
 	product := r.Product
 	if s.roll(100) >= r.SuccessRate {
-		a.ToCrafter = append(a.ToCrafter, CraftForFailed{Customer: customer.Name, ItemID: product.ItemID, Price: price})
-		a.ToCustomer = append(a.ToCustomer, CraftByFailed{Crafter: crafter.Name, ItemID: product.ItemID, Price: price})
+		a.ToCrafter = append(a.ToCrafter, CraftForFailed{Customer: customer.CharacterName(), ItemID: product.ItemID, Price: price})
+		a.ToCustomer = append(a.ToCustomer, CraftByFailed{Crafter: crafter.CharacterName(), ItemID: product.ItemID, Price: price})
 		return a
 	}
 	customer.AddCraftedItem(product.ItemID, product.Count, s.nextID)
-	a.ToCrafter = append(a.ToCrafter, CraftedFor{Customer: customer.Name, ItemID: product.ItemID, Count: product.Count, Price: price})
+	a.ToCrafter = append(a.ToCrafter, CraftedFor{Customer: customer.CharacterName(), ItemID: product.ItemID, Count: product.Count, Price: price})
 	a.ToCustomer = append(a.ToCustomer,
-		CraftedBy{Crafter: crafter.Name, ItemID: product.ItemID, Count: product.Count, Price: price},
+		CraftedBy{Crafter: crafter.CharacterName(), ItemID: product.ItemID, Count: product.Count, Price: price},
 		ProductEarned{ItemID: product.ItemID, Count: product.Count})
 	a.Success = true
 	return a
