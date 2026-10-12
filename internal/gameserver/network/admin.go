@@ -85,6 +85,9 @@ var adminCommands = map[string]adminCommand{
 	"admin_ann":      (*GameClientLink).adminAnnounceText,
 	"admin_say":      (*GameClientLink).adminAnnounceText,
 	"admin_gmchat":   (*GameClientLink).adminGMChat,
+
+	// Server maintenance; see admin_server.go.
+	"admin_server": (*GameClientLink).adminServer,
 }
 
 // adminEntry is one of the two ways a command reaches the server; they

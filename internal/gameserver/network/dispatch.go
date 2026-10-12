@@ -71,6 +71,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/raidpoint"
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/shutdown"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 	"github.com/fatal10110/acis_golang/internal/gameserver/signspriest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -324,6 +325,8 @@ type GameClientLink struct {
 	positions   *task.PositionUpdates
 	playerClock *task.PlayerClock
 	gameClock   *task.GameClock
+	shutdown    *shutdown.Countdown
+	loginStatus *LoginStatus
 	sevenSigns  *sevensigns.State
 	festival    *festival.Manager
 	olympiad    *olympiad.Olympiad
@@ -754,6 +757,12 @@ type GameClientLinkConfig struct {
 	// Reloads re-read the data tables //reload and //respawnall name; a
 	// nil hook leaves its table as booted.
 	Reloads DataReloads
+	// Shutdown is the timed shutdown //server starts and aborts; required
+	// for //server.
+	Shutdown *shutdown.Countdown
+	// LoginStatus is the status the login server lists the server under;
+	// required for //server.
+	LoginStatus *LoginStatus
 }
 
 // NewGameClientLink builds a GameClientLink from its collaborators.
@@ -805,6 +814,8 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		positions:     cfg.Positions,
 		playerClock:   cfg.PlayerClock,
 		gameClock:     cfg.GameClock,
+		shutdown:      cfg.Shutdown,
+		loginStatus:   cfg.LoginStatus,
 		sevenSigns:    cfg.SevenSigns,
 		festival:      cfg.Festival,
 		olympiad:      cfg.Olympiad,
