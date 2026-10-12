@@ -93,8 +93,6 @@ type Config struct {
 	MaxAttackers, MaxDefenders int
 	// AttackerRespawn is how long a dead attacker waits before it restarts
 	// (AttackerRespawn, in milliseconds).
-	//
-	// ponytail: not applied yet; the siege restart rules read it (#3346).
 	AttackerRespawn time.Duration
 }
 
@@ -306,6 +304,15 @@ func (e *Engine) Start(queue *sim.Queue, notify Notifier) {
 	}
 	e.mu.Unlock()
 	fx.run()
+}
+
+// AttackerRespawn is how long a dead attacker of a siege in progress waits
+// before its restart takes it away.
+func (e *Engine) AttackerRespawn() time.Duration {
+	if e == nil {
+		return 0
+	}
+	return e.cfg.AttackerRespawn
 }
 
 // Get returns castleID's siege.

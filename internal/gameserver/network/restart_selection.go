@@ -5,6 +5,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 )
 
 // The restart-point request types the death window and the server send.
@@ -48,10 +50,14 @@ func effectiveRestartType(live *livePlayer, requestType int32) int32 {
 // restartPointDestination resolves where a restart-point request of
 // requestType sends the dead live (RequestRestartPoint.portPlayer).
 //
-// The siege-side rules are not ported yet (#3346, with the clan hall
-// sieges #244): the castle restart needs the clan to own a castle, the
-// siege HQ restart finds no flag and resolves to town, and no attacker
-// waits out a respawn delay.
+// The castle restart during a siege at live's position follows its clan's
+// side: an owner or defender restarts at a castle, an attacker in town, and
+// any other clan may not use it. Without a siege it needs the clan to own a
+// castle.
+//
+// ponytail: no clan holds a siege headquarters yet (#3374), so the siege
+// HQ restart always resolves to town; the clan hall siege branches wait for
+// the hall sieges (#244).
 //
 // requestType is the type effectiveRestartType already enforced.
 func (l *GameClientLink) restartPointDestination(live *livePlayer, requestType int32) (location.Location, restartOutcome) {
@@ -65,16 +71,25 @@ func (l *GameClientLink) restartPointDestination(live *livePlayer, requestType i
 			return at, restartResolved
 		}
 	case restartToCastle:
-		castleID := live.ClanCastleID()
-		if castleID == 0 {
+		if s, ok := l.siegeAt(live); ok {
+			switch s.Side(live.ClanID()) {
+			case siege.SideOwner, siege.SideDefender:
+			case siege.SideAttacker:
+				return l.townRestart(live)
+			default:
+				return location.Location{}, restartRefused
+			}
+		} else if live.ClanCastleID() == 0 {
 			return location.Location{}, restartRefused
 		}
-		if at, ok := l.castleOwnerSpawn(castleID); ok {
-			return at, restartResolved
+		if castleID := l.restartCastleID(live); castleID != 0 {
+			if at, ok := l.castleOwnerSpawn(castleID); ok {
+				return at, restartResolved
+			}
 		}
 	case restartToSiegeHQ:
-		// A siege flag only stands during a siege; without one the
-		// request falls back to town.
+		// No clan holds a siege headquarters yet; the request falls back to
+		// town.
 	case restartFixed:
 		if !live.accessLevel().IsGM && !live.FestivalParticipant() {
 			return location.Location{}, restartRefused
@@ -86,12 +101,45 @@ func (l *GameClientLink) restartPointDestination(live *livePlayer, requestType i
 		}
 		return jailLocation, restartResolved
 	}
+	return l.townRestart(live)
+}
 
+// townRestart is the town restart of live as a restart outcome.
+func (l *GameClientLink) townRestart(live *livePlayer) (location.Location, restartOutcome) {
 	at, ok := l.restartDestination(live)
 	if !ok {
 		return location.Location{}, restartNoPoint
 	}
 	return at, restartResolved
+}
+
+// siegeAt returns the siege in progress at live's position.
+func (l *GameClientLink) siegeAt(live *livePlayer) (*siege.Siege, bool) {
+	at := live.CurrentLocation()
+	return l.sieges.ActiveAt(at.X, at.Y, at.Z)
+}
+
+// dawnHoldsStrife reports whether the Seven Signs are in seal validation
+// with Dawn holding the Seal of Strife.
+func (l *GameClientLink) dawnHoldsStrife() bool {
+	return l.SealValidationPeriod() && l.sevenSigns.SealOwners()[sealStrifeIndex] == sevensigns.Dawn
+}
+
+// restartCastleID is the castle whose OWNER spawns a castle restart or
+// recall of live lands at: its clan's own castle, else the castle besieged
+// at live's position when its clan owns or defends it; 0 for none.
+func (l *GameClientLink) restartCastleID(live *livePlayer) int32 {
+	if id := live.ClanCastleID(); id != 0 {
+		return id
+	}
+	clanID := live.ClanID()
+	if clanID == 0 {
+		return 0
+	}
+	if s, ok := l.siegeAt(live); ok && s.CheckSides(clanID, siege.SideDefender, siege.SideOwner) {
+		return int32(s.Castle().ID)
+	}
+	return 0
 }
 
 // clanHallOwnerSpawn is a random OWNER spawn of clan hall hallID, false when
@@ -101,7 +149,7 @@ func (l *GameClientLink) clanHallOwnerSpawn(hallID int32) (location.Location, bo
 	if !ok {
 		return location.Location{}, false
 	}
-	return randomResidenceSpawn(hall.Spawns)
+	return randomSpawn(hall.Spawns, residence.SpawnOwner)
 }
 
 // castleOwnerSpawn is a random OWNER spawn of castle castleID, false when
@@ -111,27 +159,30 @@ func (l *GameClientLink) castleOwnerSpawn(castleID int32) (location.Location, bo
 	if !ok {
 		return location.Location{}, false
 	}
-	return randomResidenceSpawn(c.Spawns)
+	return randomSpawn(c.Spawns, residence.SpawnOwner)
 }
 
-// randomResidenceSpawn picks one of a residence's owner spawns at random
-// (Residence.getRndSpawn(SpawnType.OWNER)).
-func randomResidenceSpawn(spawns map[residence.SpawnType][]location.Location) (location.Location, bool) {
-	owners := spawns[residence.SpawnOwner]
-	if len(owners) == 0 {
+// randomSpawn picks one of a residence's spawns of kind at random
+// (Residence.getRndSpawn).
+func randomSpawn(spawns map[residence.SpawnType][]location.Location, kind residence.SpawnType) (location.Location, bool) {
+	list := spawns[kind]
+	if len(list) == 0 {
 		return location.Location{}, false
 	}
-	return owners[rnd.Get(len(owners))], true
+	return list[rnd.Get(len(list))], true
 }
 
 // dieOptions are the restart choices the death window of live offers: the
-// clan hall and castle restarts while live's clan owns one, the fixed
-// restart for an access level allowed it. The siege HQ restart and the
-// castle restart of a siege defender are not ported yet (#3346).
-func dieOptions(live *livePlayer) serverpackets.DieOptions {
+// clan hall and castle restarts while live's clan owns one, the castle
+// restart also while it owns or defends the siege in progress at live's
+// position, and the fixed restart for an access level allowed it.
+//
+// ponytail: the siege HQ restart waits for the clans' siege headquarters
+// (#3374), and the clan hall siege branch for the hall sieges (#244).
+func (l *GameClientLink) dieOptions(live *livePlayer) serverpackets.DieOptions {
 	return serverpackets.DieOptions{
 		ClanHall: live.ClanHallID() != 0,
-		Castle:   live.ClanCastleID() != 0,
+		Castle:   l.restartCastleID(live) != 0,
 		FixedRes: live.accessLevel().AllowFixedRes,
 	}
 }
