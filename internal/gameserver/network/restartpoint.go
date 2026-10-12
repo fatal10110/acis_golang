@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence"
 	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -24,6 +25,10 @@ const restartTeleportOffset = 20
 // the experience its hall's restore-exp function gives back), and teleports
 // it there. A selection the player may not use is ignored,
 // leaving the player dead on the death screen.
+//
+// A dead attacker of the siege in progress where it lies waits out the
+// attacker respawn delay first; the restart then resolves as the player
+// stands when the wait ends.
 func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.RequestRestartPoint) {
 	if live == nil {
 		return
@@ -37,8 +42,49 @@ func (l *GameClientLink) restartLivePlayer(live *livePlayer, req clientpackets.R
 	if !live.Dead() {
 		return
 	}
+	if l.siegeAttackerAt(live) {
+		l.delaySiegeRestart(live, req.RequestType)
+		return
+	}
+	l.portDeadPlayer(live, req.RequestType)
+}
 
-	requestType := effectiveRestartType(live, req.RequestType)
+// siegeAttackerAt reports whether live's clan attacks the siege in progress
+// at live's position.
+func (l *GameClientLink) siegeAttackerAt(live *livePlayer) bool {
+	clanID := live.ClanID()
+	if clanID == 0 {
+		return false
+	}
+	at := live.CurrentLocation()
+	return l.sieges.AttackerAt(clanID, at.X, at.Y, at.Z)
+}
+
+// delaySiegeRestart runs the restart of requestType once the siege
+// attacker respawn delay has passed, on live's queue. Nothing answers the
+// request meanwhile: the revive and teleport that end the wait are its
+// answer, and the death window stays up until then. A request made while
+// one is already waiting is dropped: the waiting one restarts the player,
+// and a second one would only teleport the player again once revived. The
+// wait ends with nothing done when the player was revived meanwhile or has
+// left the world.
+func (l *GameClientLink) delaySiegeRestart(live *livePlayer, requestType int32) {
+	if live.siegeRestart != nil {
+		return
+	}
+	live.siegeRestart = live.after(l.sieges.AttackerRespawn(), func() {
+		live.siegeRestart = nil
+		if live.detached() || !live.Dead() {
+			return
+		}
+		l.portDeadPlayer(live, requestType)
+	})
+}
+
+// portDeadPlayer restarts the dead live as a request of requestType asks.
+// It runs on live's queue.
+func (l *GameClientLink) portDeadPlayer(live *livePlayer, requestType int32) {
+	requestType = effectiveRestartType(live, requestType)
 	dest, outcome := l.restartPointDestination(live, requestType)
 	switch outcome {
 	case restartRefused:
@@ -80,8 +126,28 @@ func (l *GameClientLink) restartRestoreExp(live *livePlayer, requestType int32) 
 	return l.hallFunctions.Level(hallID, hallmodel.FuncRestoreExp)
 }
 
-// restartDestination is live's nearest town restart point, jailed or not.
+// restartDestination is where a restart, recall or other teleport to town
+// sends live, jailed or not (RestartPointData.getLocationToTeleport, past
+// the residence branches): during a siege in progress at live's position,
+// while Dawn holds the Seal of Strife in seal validation, a random spawn of
+// the besieged castle, a CHAOTIC one for a player with karma and an OTHER
+// one otherwise; else live's nearest town restart point. A castle listing
+// no such spawn falls back to the nearest town.
+//
+// ponytail: the FlagWar clan restart point of a clan hall siege waits for
+// the hall sieges (#244).
 func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location, bool) {
+	if s, ok := l.siegeAt(live); ok && l.dawnHoldsStrife() {
+		kind := residence.SpawnOther
+		if live.Karma() > 0 {
+			kind = residence.SpawnChaotic
+		}
+		if c, ok := l.castleData.Get(s.Castle().ID); ok {
+			if at, ok := randomSpawn(c.Spawns, kind); ok {
+				return at, true
+			}
+		}
+	}
 	if l.restarts == nil {
 		return location.Location{}, false
 	}
