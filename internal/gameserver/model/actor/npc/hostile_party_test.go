@@ -414,6 +414,14 @@ func TestMinionThinkFollowTeleportsAfterGeoPathFails(t *testing.T) {
 func TestIdlePartyPrivateQueuesFollowOnThink(t *testing.T) {
 	master := partyHostile(t, 1, 2, &hostileMove{})
 	minion := partyHostile(t, 2, 1, &hostileMove{})
+	// The minion must know its master, or desire selection drops the follow
+	// desire before taking it up; with no player near, it must not sleep.
+	minion.Instance.Template.NoSleepMode = true
+	state := world.New()
+	master.Attach(Runtime{World: state})
+	minion.Attach(Runtime{World: state})
+	state.Spawn(master, 500, 0, 0, 0)
+	state.Spawn(minion, 0, 0, 0, 0)
 	master.AddMinion(minion)
 	minion.SetMaster(master)
 
