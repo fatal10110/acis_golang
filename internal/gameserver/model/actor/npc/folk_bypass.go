@@ -140,6 +140,16 @@ const (
 	// BypassClanHallManager runs any command on a clan hall manager, whose
 	// own dialog answers every command.
 	BypassClanHallManager
+	// BypassDungeonEnter takes the talker down into the Seven Signs dungeon
+	// behind a dungeon gatekeeper: its instant destination 0, then the
+	// dungeon membership.
+	BypassDungeonEnter
+	// BypassDungeonExit takes the talker out of a Seven Signs dungeon: the
+	// gatekeeper's instant destination 0, then the membership cleared.
+	BypassDungeonExit
+	// BypassDungeonRefused turns the talker away from a Seven Signs dungeon:
+	// the message DungeonOnly names, when set, then HTML alone.
+	BypassDungeonRefused
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -202,11 +212,16 @@ type BypassReply struct {
 	Chat ChatOutcome
 	// DawnPriest is set when BypassSevenSigns runs at a Priest of Dawn.
 	DawnPriest bool
+	// DungeonOnly is the cabal BypassDungeonRefused says alone may enter,
+	// NoCabal when the refusal gives no reason.
+	DungeonOnly sevensigns.Cabal
 }
 
 // Bypass answers command, the part of an npc_<objectId>_<command> dialog
-// link after the object id, sent by talker. A shop, fisherman, gatekeeper
-// or warehouse keeper first applies its karma gate to every command,
+// link after the object id, sent by talker. A dungeon gatekeeper first
+// answers its own necro, cata and exit; see dungeonGatekeeperCommand. A
+// shop, fisherman, gatekeeper or warehouse keeper first applies its karma
+// gate to every command,
 // answering with its refusal page when that page exists. A fisherman's
 // FishSkillList opens the fishing skills list, and its FishingChampionship
 // and FishingReward go to the fishing championship. A symbol maker's Draw and
@@ -236,6 +251,9 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	karma := talker.Karma
 	kind := hostileKind(f.Instance)
 	reply := BypassReply{LeadingActionFailed: kind == "DungeonGatekeeper"}
+	if out, ok := f.dungeonGatekeeperCommand(pages, kind, talker, command, reply); ok {
+		return out
+	}
 	if kind == weddingManager {
 		reply.Outcome = BypassWedding
 		return reply
