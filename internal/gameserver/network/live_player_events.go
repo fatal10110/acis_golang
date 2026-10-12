@@ -174,7 +174,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 		// hit sends.
 		l.settlePvPChanges(live)
 	case event.HitLanded:
-		l.chance.AttackHit(live.Character, e)
+		l.chance.AttackHit(live, e)
 	case event.ShotsRechargeRequested:
 		l.rechargeShots(live, live.Inventory(), e.Physical, e.Magic)
 	case event.Move:

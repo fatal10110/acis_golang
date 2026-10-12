@@ -373,6 +373,12 @@ func (p *Persistence) ReplayEffects(c *player.Character) {
 	if list == nil {
 		return
 	}
+	// Each effect is c's own, named by the object the world registers c
+	// under, as every effect that player casts is.
+	self, ok := c.WorldHandle().(effect.Actor)
+	if !ok {
+		self = c
+	}
 	// One restore for all of them: the ticks due since the restore run in
 	// time order across the effects, and the icons refresh once.
 	list.Restore(func() {
@@ -381,7 +387,7 @@ func (p *Persistence) ReplayEffects(c *player.Character) {
 			if !ok {
 				continue
 			}
-			effect.ApplyRestored(list, c, c, effect.SkillFromDefinition(def), def.Effects, eff.Count, eff.Time, eff.RestoredAt)
+			effect.ApplyRestored(list, self, self, effect.SkillFromDefinition(def), def.Effects, eff.Count, eff.Time, eff.RestoredAt)
 		}
 	})
 	// The registry's only purpose is staging Restore's effects until the live

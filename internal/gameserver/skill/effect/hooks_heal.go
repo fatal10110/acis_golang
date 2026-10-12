@@ -90,7 +90,7 @@ func notifyHealRestored(e *Effect, amount float64, mp bool) {
 	if e.Effector != nil {
 		name = e.Effector.CharacterName()
 	}
-	byOther := e.Effector != e.Effected
+	byOther := !sameActor(e.Effector, e.Effected)
 	restored := int(amount)
 	if mp {
 		notifier.NotifyMPRestored(name, restored, byOther)
