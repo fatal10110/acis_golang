@@ -202,9 +202,7 @@ func (p *Player) DeathPenaltyLevel() int32 { return int32(p.character().DeathPen
 // player with no death penalty is left as is, and so is a detaching one,
 // which no script gives or takes anything.
 func (p *Player) ReduceDeathPenaltyLevel() {
-	if c := p.character(); !c.Detaching() {
-		c.ReduceDeathPenaltyLevel()
-	}
+	p.character().ReduceScriptDeathPenaltyLevel()
 }
 
 // ShowTeleportWindow opens on p the list of the destinations of kind the
