@@ -42,12 +42,16 @@ type siegeRestarter struct {
 	// dawnStrife puts the Seven Signs in seal validation with Dawn holding
 	// the Seal of Strife; otherwise Dusk holds it.
 	dawnStrife bool
+	// x, when set, stores the player at that x coordinate instead of the
+	// default one.
+	x int
 }
 
 // bootSiegeRestart boots r stored dead inside castle restartCastleID's
 // battlefield with that castle's siege under way, enters the world and
-// returns the server, the object id and the login's Die window.
-func bootSiegeRestart(t *testing.T, r siegeRestarter) (*gameservertest.Server, int32, deathWindow) {
+// returns the server, the object id and the login's Die window. opts add to
+// the world's boot options.
+func bootSiegeRestart(t *testing.T, r siegeRestarter, opts ...gameservertest.Option) (*gameservertest.Server, int32, deathWindow) {
 	t.Helper()
 	datapack.Require(t)
 	halls, err := gamexml.LoadClanHalls(datapack.Path(t, "data", "xml", "clanHalls.xml"))
@@ -68,7 +72,7 @@ func bootSiegeRestart(t *testing.T, r siegeRestarter) (*gameservertest.Server, i
 	zones.Add(field)
 	cfg := siege.DefaultConfig()
 	cfg.AttackerRespawn = siegeRespawn
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Newbie", 40, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithRestartPoints(restartTable()),
@@ -94,7 +98,7 @@ func bootSiegeRestart(t *testing.T, r siegeRestarter) (*gameservertest.Server, i
 		}),
 		// No period change fires during the test.
 		gameservertest.WithSevenSignsTimer(func(time.Duration, func()) *time.Timer { return nil }),
-	)
+	}, opts...)...)
 	s, ok := srv.Sieges.Get(restartCastleID)
 	if !ok {
 		t.Fatalf("no siege of castle %d", restartCastleID)
@@ -141,6 +145,9 @@ func seedSiegeRestarter(t *testing.T, db *sql.DB, r siegeRestarter) {
 		}
 	}
 	exec("UPDATE characters SET curHp = 0, karma = ? WHERE char_name = 'Newbie'", r.karma)
+	if r.x != 0 {
+		exec("UPDATE characters SET x = ? WHERE char_name = 'Newbie'", r.x)
+	}
 	exec("INSERT INTO characters (account_name, obj_Id, char_name, level, clanid) VALUES ('rival', ?, 'Red', 40, ?)", siegeRivalLeaderID, siegeRivalClanID)
 	exec("INSERT INTO clan_data (clan_id, clan_name, clan_level, leader_id) VALUES (?, 'Rivals', 5, ?)", siegeRivalClanID, siegeRivalLeaderID)
 	exec("INSERT INTO siege_clans (castle_id, clan_id, type) VALUES (?, ?, 'ATTACKER')", restartCastleID, siegeRivalClanID)
