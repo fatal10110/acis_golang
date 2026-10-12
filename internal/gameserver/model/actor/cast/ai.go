@@ -299,9 +299,9 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 	// effect-affected set as one snapshot instead of two independent
 	// resolutions 400ms apart.
 	var launchTargets []skilltarget.Actor
-	var launchResolved bool
 	// launchRan is true once the launch's target handler ran, even when it
-	// found no target: such a cast lands nowhere but is still seen.
+	// found no target: such a cast still runs its skill handler, with no
+	// targets.
 	var launchRan bool
 
 	a.Controller.Schedule(plan, Hooks{
@@ -313,10 +313,6 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 				return false
 			}
 			launchTargets, launchRan = resolveLaunchTargets(a.Effects, a.Caster, castTarget, def)
-			launchResolved = launchRan && len(launchTargets) > 0
-			if !launchResolved {
-				launchTargets = nil
-			}
 			a.Controller.SetLaunchTargets(len(launchTargets))
 			var first attackable.Combatant
 			if len(launchTargets) > 0 {
@@ -347,12 +343,6 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 			}
 			// Off the grid, an object knows nothing, itself included.
 			if a.HitNeedsPresence && !a.Caster.Knows(a.Caster) {
-				return
-			}
-			if !launchResolved {
-				if a.Effects.Skills != nil {
-					castWithoutTargets(a.Caster, def)
-				}
 				return
 			}
 			handlers := a.Effects
