@@ -135,8 +135,8 @@ func (f *floatAttr) UnmarshalXMLAttr(attr xml.Attr) error {
 }
 
 // boolAttr coerces an attribute value permissively: case-insensitively
-// "true" is true, anything else present is false. It never fails to parse, matching that
-// laxness exactly rather than encoding/xml's stricter native bool decode.
+// "true" is true, anything else present is false. It never fails to parse,
+// unlike encoding/xml's stricter native bool decode.
 type boolAttr bool
 
 func (b *boolAttr) UnmarshalXMLAttr(attr xml.Attr) error {

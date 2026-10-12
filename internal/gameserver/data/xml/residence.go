@@ -334,8 +334,8 @@ func buildControlTower(t castleTowerElement) (castle.ControlTower, error) {
 	if len(t.Position) == 0 {
 		return castle.ControlTower{}, fmt.Errorf("castle: control tower %q: position is required", t.Alias)
 	}
-	// Last element wins: every <position>/<stats> child merges in document
-	// order, so a later child's attrs overwrite an earlier one's.
+	// Last element wins: each <position>/<stats> child carries the full value,
+	// so a later child replaces an earlier one.
 	loc, err := t.Position[len(t.Position)-1].loc()
 	if err != nil {
 		return castle.ControlTower{}, fmt.Errorf("castle: control tower %q: %w", t.Alias, err)
