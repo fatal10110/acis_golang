@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/geometry"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 // Compile turns one parsed condition node into its runnable Condition.
@@ -25,9 +26,8 @@ import (
 // without feedback, a stat func gate is no gate. A <not> reads only its
 // first child.
 //
-// A recognized element or attribute this package cannot evaluate yet
-// (<skill>, <player race>) or a value that does not decode is an error,
-// never a silent pass.
+// A value that does not decode, or a <skill> without a "stat" attribute,
+// is an error, never a silent pass.
 func Compile(node modelskill.Condition) (Condition, error) {
 	switch strings.ToLower(node.Kind) {
 	case "and", "or":
@@ -63,7 +63,7 @@ func Compile(node modelskill.Condition) (Condition, error) {
 	case "game":
 		return compileAttrs(node, gameAttrs, compileGameAttr)
 	case "skill":
-		return nil, fmt.Errorf("condition: <%s> is not evaluated", node.Kind)
+		return compileSkill(node)
 	default:
 		return nil, nil
 	}
@@ -232,7 +232,11 @@ func compilePlayerAttr(name, value string) (Condition, error) {
 		}
 		return HasClanHall{ClanHallIDs: ids}, nil
 	case "race":
-		return nil, fmt.Errorf("%s is not evaluated", name)
+		race, err := DecodeRace(value)
+		if err != nil {
+			return nil, err
+		}
+		return Race{Race: race}, nil
 	}
 	n, err := DecodeInt(value)
 	if err != nil {
@@ -331,6 +335,20 @@ func compileTargetAttr(name, value string) (Condition, error) {
 	return nil, fmt.Errorf("%s is not evaluated", name)
 }
 
+// compileSkill reads <skill stat="...">: the attribute name is exact, its
+// value a data-file stat spelling. Every other attribute is ignored.
+func compileSkill(node modelskill.Condition) (Condition, error) {
+	value, ok := node.Attrs["stat"]
+	if !ok {
+		return nil, fmt.Errorf("condition: <%s> has no stat attribute", node.Kind)
+	}
+	s, err := stat.ByName(value)
+	if err != nil {
+		return nil, fmt.Errorf("condition: <%s stat=%q>: %w", node.Kind, value, err)
+	}
+	return SkillStats{Stat: s}, nil
+}
+
 func compileUsingAttr(_, value string) (Condition, error) {
 	return UsingItemType{Mask: int(item.ParseWornKindMask(value))}, nil
 }
@@ -346,6 +364,20 @@ func compileGameAttr(_, value string) (Condition, error) {
 // parseBool is true only for a case-insensitive "true"; anything else,
 // including "1", is false.
 func parseBool(v string) bool { return strings.EqualFold(v, "true") }
+
+// raceNames are the exact race spellings a <player race> names, by race
+// ordinal (see PlayerActor.Race).
+var raceNames = [...]string{"HUMAN", "ELF", "DARK_ELF", "ORC", "DWARF"}
+
+// DecodeRace reads an exact, case-sensitive race name to its ordinal.
+func DecodeRace(v string) (int, error) {
+	for i, name := range raceNames {
+		if v == name {
+			return i, nil
+		}
+	}
+	return 0, fmt.Errorf("%q: unknown race", v)
+}
 
 // DecodeInt reads an int32 integer literal: decimal, "0x"/"#" hex or
 // leading-zero octal (see commons.DecodeInt32).

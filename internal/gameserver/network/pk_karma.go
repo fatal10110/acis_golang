@@ -258,7 +258,8 @@ func (l *GameClientLink) startPvPFlag(live *livePlayer, useFlaggedDuration bool)
 // paperdoll item whose use conditions live fails or that its Olympiad match
 // bars; a barred item is announced just before it comes off. Taking off a weapon also
 // aborts the attack in progress. An item an earlier removal in the same
-// pass already took off is not toggled back on.
+// pass already took off is not toggled back on. A use condition test that
+// aborts ends the pass, leaving that item and the rest worn.
 func (l *GameClientLink) unequipRestrictedItems(live *livePlayer) {
 	inv := live.Inventory()
 	if inv == nil || l.inventory == nil {
@@ -266,9 +267,15 @@ func (l *GameClientLink) unequipRestrictedItems(live *livePlayer) {
 	}
 	for _, inst := range inv.PaperdollItems() {
 		tmpl, ok := inv.Templates().Get(inst.TemplateID)
-		if !ok || !inst.Equipped() || itemRestrictionHolds(live, tmpl) {
+		if !ok || !inst.Equipped() {
 			continue
 		}
-		l.toggleEquipItem(live, inv, inst, tmpl, tmpl.Kind == item.KindWeapon)
+		holds, aborted := itemRestrictionHolds(live, tmpl)
+		if aborted {
+			return
+		}
+		if !holds {
+			l.toggleEquipItem(live, inv, inst, tmpl, tmpl.Kind == item.KindWeapon)
+		}
 	}
 }

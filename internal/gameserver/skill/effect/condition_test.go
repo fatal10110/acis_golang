@@ -149,10 +149,10 @@ func TestFuncConditionDirectAndAttachAreANDed(t *testing.T) {
 	}
 }
 
-func TestFuncConditionUnsupportedTagErrors(t *testing.T) {
-	direct := modelskill.Condition{Kind: "skill", Attrs: map[string]string{"stat": "pAtk"}}
+func TestFuncConditionUndecodableErrors(t *testing.T) {
+	direct := modelskill.Condition{Kind: "skill", Attrs: map[string]string{"stat": "PATK"}}
 	if _, err := funcCondition(&direct, nil); err == nil {
-		t.Error("a condition that cannot be evaluated should error, not silently pass")
+		t.Error("a condition that does not decode should error, not silently pass")
 	}
 }
 
