@@ -123,6 +123,9 @@ type ItemInstances struct {
 	// groups maps each row of a write that has not landed yet to every row
 	// that must land with it (Bind).
 	groups map[int32]*rowGroup
+	// orphans holds each group the pending cap left with no row alive, for
+	// the next Save to release (markOrphans). Guarded by groupsMu.
+	orphans map[*rowGroup]struct{}
 	// ops keeps UpdateItems, and the writes of operations on the same
 	// owners, from reading rows while a multi-row operation has changed them
 	// but not yet bound them (BeginOperation). Its lock is taken before
@@ -205,6 +208,7 @@ func NewItemInstances(flusher ItemFlusher, templates *item.Table, worker *persis
 		pendingCap: ItemInstancePendingCap,
 		rounds:     make(map[*saveRound]struct{}),
 		groups:     make(map[int32]*rowGroup),
+		orphans:    make(map[*rowGroup]struct{}),
 	}
 	i.ops.init()
 	return i
@@ -514,7 +518,8 @@ func (i *ItemInstances) pendingInstances(objectIDs []int32) []*item.Instance {
 //
 // A backlog that outgrows ItemInstancePendingCap loses the failed writes past
 // the cap, logged, rather than growing memory without bound; see that
-// constant and finishOwner.
+// constant and finishOwner. Save first releases the bound groups such a drop
+// left with nothing to write them (releaseOrphans).
 //
 // Concurrent callers of Add and RemoveItems are safe. A Save may overlap
 // the owner jobs of an earlier one that returned on its ctx; each keeps its
@@ -522,6 +527,7 @@ func (i *ItemInstances) pendingInstances(objectIDs []int32) []*item.Instance {
 // ticker's, so fx's reverse stop order runs the final Save only after the
 // ticker has stopped.
 func (i *ItemInstances) Save(ctx context.Context) error {
+	i.releaseOrphans()
 	i.mu.Lock()
 	inflight := i.pending
 	i.pending = make(map[int32]pendingItem)
@@ -661,8 +667,12 @@ func (i *ItemInstances) nextSeq() uint64 {
 // are the ones dropped. The round's drops are logged once, by the job that
 // closes it: during an outage every owner job of a tick fails, and one line
 // per owner would be a line per online player each tick.
+//
+// A dropped row may be the last of a bound group that nothing will write
+// again; markOrphans hands such groups to the next Save to release.
 func (i *ItemInstances) finishOwner(round *saveRound, failed []pendingItem, err error) {
-	drops, pending, closed := i.mergeBack(round, failed, err)
+	drops, dropped, pending, closed := i.mergeBack(round, failed, err)
+	i.markOrphans(dropped)
 	if closed && drops.count > 0 {
 		i.log.Error().Err(drops.err).Int("dropped", drops.count).Ints32("object_ids", drops.sample).
 			Int("pending", pending).Int("cap", i.pendingCap).
@@ -671,11 +681,12 @@ func (i *ItemInstances) finishOwner(round *saveRound, failed []pendingItem, err 
 }
 
 // mergeBack is finishOwner's bookkeeping under mu. It returns the round's
-// cap drops so far, the pending count it left, and whether this job closed
-// the round.
-func (i *ItemInstances) mergeBack(round *saveRound, failed []pendingItem, err error) (capDrops, int, bool) {
+// cap drops so far, the ids this job dropped, the pending count it left, and
+// whether this job closed the round.
+func (i *ItemInstances) mergeBack(round *saveRound, failed []pendingItem, err error) (capDrops, []int32, int, bool) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
+	var dropped []int32
 	for _, entry := range failed {
 		objectID := entry.inst.ObjectID
 		if _, wasRemoved := round.removed[objectID]; wasRemoved {
@@ -694,6 +705,7 @@ func (i *ItemInstances) mergeBack(round *saveRound, failed []pendingItem, err er
 			if len(round.drops.sample) < capDropSample {
 				round.drops.sample = append(round.drops.sample, objectID)
 			}
+			dropped = append(dropped, objectID)
 			continue
 		}
 		// Keeps the owner this round resolved: a retry of a destroyed item
@@ -709,7 +721,7 @@ func (i *ItemInstances) mergeBack(round *saveRound, failed []pendingItem, err er
 		delete(i.rounds, round)
 		close(round.done)
 	}
-	return round.drops, len(i.pending), closed
+	return round.drops, dropped, len(i.pending), closed
 }
 
 // laneKey picks the persistence lane an item's write runs on: its owner's,
