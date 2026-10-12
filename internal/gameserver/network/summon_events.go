@@ -198,6 +198,10 @@ func (s *summonSink) Emit(ev event.Event) {
 		if owner, ok := l.currentSummonOwner(actor); ok {
 			owner.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetIncorrect))
 		}
+	case event.AttackRefused:
+		if owner, ok := l.currentSummonOwner(actor); ok {
+			owner.SendFrame(serverpackets.FrameSystemMessage(attackRefusalMessage(e.Reason)))
+		}
 	case event.ExpGained:
 		if owner, ok := l.livePlayerByID(actor.OwnerID()); ok {
 			owner.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessagePetEarnedS1Exp, int32(e.Exp)))
