@@ -88,8 +88,7 @@ func (l *GameClientLink) adminCastleSet(gm *livePlayer, c *castle.Castle) {
 //
 // The page counts the life control towers standing, which outside a siege
 // is every one the castle has. During a siege only those still alive
-// count; tracking them needs the control towers (#465). No mercenary ticket
-// can be dropped yet (#238), so the dropped ticket count is 0.
+// count; tracking them needs the control towers (#465).
 func (l *GameClientLink) showAdminCastle(gm *livePlayer, c *castle.Castle) {
 	const file = "data/html/admin/castle.htm"
 	page, ok := l.html.Get(file)
@@ -114,7 +113,7 @@ func (l *GameClientLink) showAdminCastle(gm *livePlayer, c *castle.Castle) {
 		"%castleAlias%", c.Alias,
 		"%circletId%", strconv.Itoa(c.CircletID),
 		"%ticketsNumber%", strconv.Itoa(len(c.Tickets)),
-		"%droppedTicketsNumber%", "0",
+		"%droppedTicketsNumber%", strconv.Itoa(c.DroppedTickets()),
 		"%npcsNumber%", strconv.Itoa(len(c.NPCs)),
 		"%certificates%", strconv.Itoa(c.LeftCertificates()),
 		"%parent%", strconv.Itoa(c.ParentID),
