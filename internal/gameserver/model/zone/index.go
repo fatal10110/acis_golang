@@ -1,6 +1,8 @@
 package zone
 
 import (
+	"sync/atomic"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
@@ -11,22 +13,45 @@ const regionEdge = (world.MaxX - world.MinX + 1) / world.RegionsX
 
 // Index holds every loaded zone and attaches each one to the world grid
 // regions its footprint touches, so position lookups only scan the zones
-// near a point. Build it once at load time; it is immutable afterwards
-// and safe for concurrent readers (per-zone occupancy state has its own
-// locking).
+// near a point. Build it with Add before it is shared; afterwards its zones
+// only change all at once, through Swap, and it is safe for concurrent
+// readers (per-zone occupancy state has its own locking).
 type Index struct {
+	zones atomic.Pointer[zoneSet]
+}
+
+// zoneSet is the zones an Index holds at one time.
+type zoneSet struct {
 	all      []Kind
 	byRegion [world.RegionsX][world.RegionsY][]Kind
 }
 
 // NewIndex returns an empty Index.
-func NewIndex() *Index { return &Index{} }
+func NewIndex() *Index {
+	ix := &Index{}
+	ix.zones.Store(&zoneSet{})
+	return ix
+}
+
+// set returns the zones ix holds now.
+func (ix *Index) set() *zoneSet { return ix.zones.Load() }
+
+// Swap makes the zones of next the ones ix holds, for every holder of ix at
+// once, and returns an index of the zones ix held until then. next must not
+// be used afterwards.
+func (ix *Index) Swap(next *Index) *Index {
+	old := &Index{}
+	old.zones.Store(ix.zones.Swap(next.set()))
+	return old
+}
 
 // Add registers k and attaches it to every region whose rectangle its
 // footprint overlaps. Region rectangles span to the start of the next
-// region, so a footprint on a boundary attaches to both sides.
+// region, so a footprint on a boundary attaches to both sides. Add only
+// builds an index no one else holds yet.
 func (ix *Index) Add(k Kind) {
-	ix.all = append(ix.all, k)
+	set := ix.set()
+	set.all = append(set.all, k)
 	form := k.Core().Form()
 	// Only the rows near the footprint can overlap it. Columns cannot be
 	// narrowed the same way: IntersectsRect's corner-in-ring probe wraps in
@@ -41,7 +66,7 @@ func (ix *Index) Add(k Kind) {
 			y1 := world.MinY + ry*regionEdge
 			y2 := y1 + regionEdge
 			if form.IntersectsRect(x1, x2, y1, y2) {
-				ix.byRegion[rx][ry] = append(ix.byRegion[rx][ry], k)
+				set.byRegion[rx][ry] = append(set.byRegion[rx][ry], k)
 			}
 		}
 	}
@@ -60,11 +85,11 @@ func regionSpan(lo, hi, origin, n int) (first, last int) {
 }
 
 // All returns every zone in load order.
-func (ix *Index) All() []Kind { return ix.all }
+func (ix *Index) All() []Kind { return ix.set().all }
 
 // ByID returns the first zone with the given id.
 func (ix *Index) ByID(id int) (Kind, bool) {
-	for _, k := range ix.all {
+	for _, k := range ix.set().all {
 		if k.Core().ID() == id {
 			return k, true
 		}
@@ -78,7 +103,7 @@ func (ix *Index) At(x, y int) []Kind {
 	if x < world.MinX || x > world.MaxX || y < world.MinY || y > world.MaxY {
 		return nil
 	}
-	return ix.byRegion[(x-world.MinX)/regionEdge][(y-world.MinY)/regionEdge]
+	return ix.set().byRegion[(x-world.MinX)/regionEdge][(y-world.MinY)/regionEdge]
 }
 
 // Revalidate syncs a's zone occupancy against its current position: every
@@ -187,7 +212,7 @@ func peaceCapable(k Kind) bool {
 // OfKind returns every zone of type T, in load order.
 func OfKind[T Kind](ix *Index) []T {
 	var out []T
-	for _, k := range ix.all {
+	for _, k := range ix.set().all {
 		if t, ok := k.(T); ok {
 			out = append(out, t)
 		}

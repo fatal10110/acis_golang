@@ -88,3 +88,10 @@ func (f *Flags) Has(flag Flag) bool {
 	}
 	return f.counts[flag] > 0
 }
+
+// Reset releases every hold on every flag.
+func (f *Flags) Reset() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.counts = [FlagCount]int32{}
+}

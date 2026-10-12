@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 )
 
 const (
@@ -183,12 +184,12 @@ func (s *Siege) startLocked(fx *effects) {
 		s.formerOwner = owner
 	}
 	s.status = StatusInProgress
-	if f := s.field; f != nil {
-		fx.add(func() {
+	fx.add(func() {
+		s.withBattlefield(func(f *zone.Siege) {
 			f.BanishForeigners(owner)
 			f.SetActive(true)
 		})
-	}
+	})
 	s.siegeStatesLocked(fx, false)
 	s.announceLocked(fx, castleMsg(MsgSiegeStarted, castleID))
 	if n := s.e.notify; n != nil {
@@ -311,15 +312,11 @@ func (s *Siege) endLocked(fx *effects) {
 		delete(e.counters, r.clanID)
 	}
 	s.reputationLocked(fx, ownerID)
-	if f := s.field; f != nil {
-		fx.add(func() { f.BanishForeigners(ownerID) })
-	}
+	fx.add(func() { s.withBattlefield(func(f *zone.Siege) { f.BanishForeigners(ownerID) }) })
 	s.siegeStatesLocked(fx, true)
 	s.saveSiegeLocked(fx, true)
 	s.clearAllLocked()
-	if f := s.field; f != nil {
-		fx.add(func() { f.SetActive(false) })
-	}
+	fx.add(func() { s.withBattlefield(func(f *zone.Siege) { f.SetActive(false) }) })
 }
 
 // reputationLocked moves the reputation a siege's end decides: a former
@@ -395,9 +392,7 @@ func (s *Siege) midVictoryLocked(fx *effects) {
 			}
 		}
 	}
-	if f := s.field; f != nil {
-		fx.add(func() { f.BanishForeigners(ownerID) })
-	}
+	fx.add(func() { s.withBattlefield(func(f *zone.Siege) { f.BanishForeigners(ownerID) }) })
 	s.siegeStatesLocked(fx, false)
 }
 
