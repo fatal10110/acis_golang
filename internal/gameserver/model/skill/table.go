@@ -14,7 +14,7 @@ const enchantLevelFloor = 99
 // Table is an in-memory lookup of skill definitions keyed by id and level,
 // built at boot and replaced in place by //reload skill. Every read works on
 // one loaded set of definitions, so a reload never shows a reader half of
-// it. The zero value is not usable; construct with NewTable.
+// it. The zero value reads as an empty table; construct with NewTable.
 type Table struct {
 	defs atomic.Pointer[definitions]
 }
@@ -24,6 +24,17 @@ type Table struct {
 type definitions struct {
 	byID map[ID]map[int]Definition
 	max  map[ID]int
+}
+
+// noDefinitions is what a Table reads before anything was stored in it.
+var noDefinitions = &definitions{}
+
+// snapshot returns the definitions every read of one call works on.
+func (t *Table) snapshot() *definitions {
+	if d := t.defs.Load(); d != nil {
+		return d
+	}
+	return noDefinitions
 }
 
 // NewTable returns a Table backed by defs. A later entry silently overwrites
@@ -52,12 +63,12 @@ func NewTable(defs []Definition) *Table {
 // template's skills, a running effect) keeps what it was read with; every
 // lookup afterwards reads the new ones.
 func (t *Table) Replace(from *Table) {
-	t.defs.Store(from.defs.Load())
+	t.defs.Store(from.snapshot())
 }
 
 // Get returns the definition for id at level, or false if none was loaded.
 func (t *Table) Get(id ID, level int) (Definition, bool) {
-	levels, ok := t.defs.Load().byID[id]
+	levels, ok := t.snapshot().byID[id]
 	if !ok {
 		return Definition{}, false
 	}
@@ -75,12 +86,12 @@ func (t *Table) Definition(ref Ref) (Definition, bool) {
 // MaxLevel returns the highest regular (non-enchant) level loaded for id, or
 // 0 if no definition was loaded for it.
 func (t *Table) MaxLevel(id ID) int {
-	return t.defs.Load().max[id]
+	return t.snapshot().max[id]
 }
 
 // Len returns the total number of (id, level) definitions in the table.
 func (t *Table) Len() int {
-	return t.defs.Load().len()
+	return t.snapshot().len()
 }
 
 func (d *definitions) len() int {
@@ -96,7 +107,7 @@ func (t *Table) All() []Definition {
 	if t == nil {
 		return nil
 	}
-	d := t.defs.Load()
+	d := t.snapshot()
 	defs := make([]Definition, 0, d.len())
 	for _, levels := range d.byID {
 		for _, def := range levels {
@@ -118,7 +129,7 @@ func (t *Table) TopLevels() []Definition {
 	if t == nil {
 		return nil
 	}
-	d := t.defs.Load()
+	d := t.snapshot()
 	defs := make([]Definition, 0, len(d.max))
 	for id, level := range d.max {
 		if level > 0 {
