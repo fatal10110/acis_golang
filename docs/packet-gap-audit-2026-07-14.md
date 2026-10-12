@@ -97,8 +97,6 @@ Missing M3 data/UI client packets:
 - `RequestBuyProcure`
 - `RequestBuySeed`
 - `RequestProcureCropList`
-- `RequestSetSeed`
-- `RequestSetCrop`
 - `RequestExEnchantSkillInfo`
 - `RequestExEnchantSkill`
 
@@ -113,7 +111,7 @@ are implemented and wired ([#593](https://github.com/fatal10110/acis_golang/issu
 
 Implemented and wired M3 data/UI client packets in Go:
 
-- `RequestBypassToServer` (`player_help` help pages; `npc_<objectId>_<command>` validated against the last sent page and routed to the civilian NPC in interaction distance for its `Chat`, `Link`, merchant `Sell` and karma-gate answers and a merchant's `Buy` and `Wear` windows; community board links go to the board; the other NPC dialog commands and the admin, quest, hero, olympiad, and manor families are logged and answered `ActionFailed` until their systems exist)
+- `RequestBypassToServer` (`player_help` help pages; `npc_<objectId>_<command>` validated against the last sent page and routed to the civilian NPC in interaction distance for its `Chat`, `Link`, merchant `Sell` and karma-gate answers and a merchant's `Buy` and `Wear` windows; community board links go to the board; `manor_menu_select` opens the targeted manor manager's or castle chamberlain's manor windows, its seed purchase, crop sale and crop sale detail windows logged and answered `ActionFailed`; the other NPC dialog commands and the admin, quest, hero, and olympiad families are logged and answered `ActionFailed` until their systems exist)
 - `RequestSellItem` (sells to the targeted merchant or mercenary manager in interaction distance: sellable rows go for half their reference price in adena, then the merchant's sold page)
 - `RequestLinkHtml`
 - `RequestBuyItem`
@@ -127,6 +125,7 @@ Implemented and wired M3 data/UI client packets in Go:
 - `RequestCursedWeaponList`
 - `RequestCursedWeaponLocation` (answers `ExCursedWeaponLocation` with every cursed weapon out in the world; nothing is sent while none is)
 - `RequestExFishRanking` (the fishing window's ranking button, `network/fishing_championship.go`: the running week's fishing championship ranking on `fish_event002`, or `fish_event003` while it is being taken anew once a minute; silent with `AllowFishChampionship` off, when `ExFishingStart` shows no button)
+- `RequestSetSeed` and `RequestSetCrop` (`network/castle_manor_setup.go`: the next manor period's seed and crop lists of the castle the player's clan owns, set while the manor is modifiable by a player holding the manor privilege within reach of the NPC talked to, each entry kept only within its limit and price bounds)
 
 Implemented and wired M4 movement/rotation/target client packets in Go:
 
@@ -231,11 +230,6 @@ Missing M3 data/UI server packets:
 
 - `SellListProcure`
 - `BuyListSeed`
-- `ExShowSeedInfo`
-- `ExShowCropInfo`
-- `ExShowManorDefaultInfo`
-- `ExShowSeedSetting`
-- `ExShowCropSetting`
 - `ExShowSellCropList`
 - `ExShowProcureCropDetail`
 
@@ -249,6 +243,7 @@ Implemented and wired M3 data/UI server packets in Go:
 - `PledgeCrest`
 - `ShopPreviewInfo`
 - `ShopPreviewList`
+- `ExShowSeedInfo`, `ExShowCropInfo`, `ExShowManorDefaultInfo`, `ExShowSeedSetting` and `ExShowCropSetting` (the manor manager's and castle chamberlain's `manor_menu_select` windows)
 
 Implemented and wired M4 movement/rotation/static-object server packets in Go:
 

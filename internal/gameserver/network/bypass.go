@@ -102,7 +102,7 @@ var bypassRoutes = []bypassRoute{
 	{[]string{"admin_"}, (*GameClientLink).bypassAdmin},
 	{[]string{"player_help "}, (*GameClientLink).bypassPlayerHelp},
 	{[]string{"npc_"}, (*GameClientLink).bypassNpc},
-	{[]string{"manor_menu_select?"}, unportedBypass("manor (#240)")},
+	{[]string{"manor_menu_select?"}, (*GameClientLink).bypassManorMenu},
 	{[]string{"bbs_", "_bbs", "_friend", "_mail", "_block"}, (*GameClientLink).boardCommand},
 	{[]string{"Quest "}, (*GameClientLink).bypassQuest},
 	{[]string{"_match"}, (*GameClientLink).bypassHeroFights},
