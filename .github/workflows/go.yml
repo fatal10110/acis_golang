@@ -151,11 +151,26 @@ jobs:
         with:
           version: v2.14
 
+  # Builds the Dockerfile, runs its binaries, and seeds the compose db from a
+  # stub datapack (ops/docker/smoke-test.sh). Not path-filtered: a Go change
+  # (a cgo-only dependency, a package under an ignored directory) can break
+  # the static image build as surely as a Dockerfile change can.
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Docker smoke test
+        run: ops/docker/smoke-test.sh
+
   # The ruleset requires a single check named "go"; it passes only when
-  # every shard and the lint job do.
+  # every shard, the lint job and the Docker smoke test do.
   go:
     if: always()
-    needs: [test, lint]
+    needs: [test, lint, docker]
     runs-on: ubuntu-latest
     steps:
-      - run: '[ "${{ needs.test.result }}" = success ] && [ "${{ needs.lint.result }}" = success ]'
+      - run: '[ "${{ needs.test.result }}" = success ] && [ "${{ needs.lint.result }}" = success ] && [ "${{ needs.docker.result }}" = success ]'

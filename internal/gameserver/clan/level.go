@@ -136,7 +136,7 @@ func (s *Service) addReputationLocked(cl *Clan, delta int) (ReputationChanged, b
 	}
 	before := cl.reputation
 	after := clampReputation(before + delta)
-	cl.reputation = after
+	cl.reputation, cl.storedReputation = after, after
 	change := ReputationChanged{Score: after}
 	switch {
 	case before > 0 && after <= 0:
