@@ -195,6 +195,10 @@ func (s *folkSink) Emit(ev event.Event) {
 		if s.link != nil {
 			s.link.hallSupportAnswer(f, e)
 		}
+	case event.HeadquartersAttacked:
+		if s.link != nil {
+			s.link.warnHeadquartersAttacked(f)
+		}
 	case event.NPCInfoChanged:
 		broadcastNPCView(s.link, &s.known, s.world, f, e.ServerObject || f.ServerObjectView())
 	}

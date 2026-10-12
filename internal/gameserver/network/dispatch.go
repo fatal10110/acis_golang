@@ -992,6 +992,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		link.roster.SetPurged(func(objectID int32) { clans.RemoveDeleted(objectID, time.Now()) })
 	}
 	link.skillHandlers.Register(takeCastleHandler{l: link})
+	link.skillHandlers.Register(siegeFlagHandler{l: link})
 	link.chance = &actorcast.ChanceProcs{Definitions: link.skills, Targets: link.targets, Skills: link.skillHandlers, Deliver: link.deliverChanceCast}
 	link.wireZones(link.zones)
 	link.wireCastleTickets()

@@ -121,6 +121,10 @@ type Definition struct {
 	SuicideAttack    bool
 	SiegeSummonSkill bool
 
+	// Advanced marks a SIEGE_FLAG skill putting up an advanced siege
+	// headquarters, with twice the HP.
+	Advanced bool
+
 	// IsCubic and NpcID select the cubic branch of a SUMMON skill: NpcID is
 	// the cubic type id (matching cubic.ID) the skill grants when IsCubic
 	// is set. The same NpcID attribute also carries a servitor's spawn
@@ -294,6 +298,8 @@ type DefinitionAttrs struct {
 	SuicideAttack    bool
 	SiegeSummonSkill bool
 
+	Advanced bool
+
 	IsCubic bool
 	NpcID   int
 
@@ -426,6 +432,8 @@ func NewDefinition(id ID, level int, name string, a DefinitionAttrs) Definition 
 		KillByDOT:        a.KillByDOT,
 		SuicideAttack:    a.SuicideAttack,
 		SiegeSummonSkill: a.SiegeSummonSkill,
+
+		Advanced: a.Advanced,
 
 		IsCubic: a.IsCubic,
 		NpcID:   a.NpcID,
