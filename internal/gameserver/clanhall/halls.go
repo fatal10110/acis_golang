@@ -2,6 +2,7 @@ package clanhall
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"sync"
 	"time"
@@ -104,18 +105,15 @@ func land(ctx context.Context, l Landing) error {
 
 // Bank moves adena in and out of a clan's warehouse.
 //
-// The auctions order every move against the auctions or clanhall row that
-// accounts for it, so that no crash can leave the database holding both
-// the adena and the bid or sale it went to (#3367). The adena a bid or a
-// sale deposit takes lands before the row recording it, in the same lane
-// job. The adena a refund or a payout gives back is added only once the
-// row it settles is written: the item persistence that writes it later
-// cannot then get there first.
+// The auctions and the lease order every move against the auctions or
+// clanhall row that accounts for it, so that no crash can leave the
+// database holding both the adena and the bid, sale or paid week it went to
+// (#3367, #3454). The adena a bid, a sale deposit or a lease takes lands
+// before the row recording it, in the same lane job. The adena a refund or
+// a payout gives back is added only once the row it settles is written:
+// the item persistence that writes it later cannot then get there first.
 type Bank interface {
 	Treasury
-	// TakeAdena destroys adena from clan clanID's warehouse, as PayHallFee
-	// does, and returns the write that lands the change.
-	TakeAdena(clanID int32, adena int) (Landing, bool)
 	// ReturnAdena adds adena to clan clanID's warehouse, as much of it as
 	// keeps the warehouse's adena within a 32-bit count, and returns the
 	// write that lands the change.
@@ -445,7 +443,10 @@ func (hs *Halls) stopFeeLocked(h *hall) {
 
 // payFee charges h's weekly lease to its owner when its paid term ends.
 // A free hall charges nothing, and an owner that is no clan any more loses
-// the hall. A paid lease extends the term by a week. An unpaid one gives a
+// the hall. A paid lease extends the term by a week; the adena it takes is
+// written ahead of the row recording the term, in the same lane job, and a
+// failed write of it stores no row, so no crash leaves the owner both the
+// adena and the week (#3454). An unpaid one gives a
 // day's grace, the owner's members told the lease is due, then, unpaid
 // again, takes the hall, the members told it is lost. gen is the
 // generation the payment's timer was armed with.
@@ -465,12 +466,23 @@ func (hs *Halls) payFee(h *hall, gen uint64) {
 		return
 	}
 	lease := h.data.Lease
+	var paid Landing
+	covered := lease <= 0
+	if !covered && hs.bank != nil {
+		paid, covered = hs.bank.TakeAdena(owner.ID(), lease)
+	}
 	switch {
-	case lease <= 0 || (hs.bank != nil && hs.bank.PayHallFee(owner.ID(), lease)):
+	case covered:
 		hs.scheduleFeeLocked(h, weekMs)
 		h.paidUntil += weekMs
 		h.paid = true
-		hs.updateLocked(h)
+		row := hs.rowLocked(h)
+		hs.write("store clan hall", row.ID, func(ctx context.Context, st HallStore) error {
+			if err := land(ctx, paid); err != nil {
+				return fmt.Errorf("write the lease paid: %w", err)
+			}
+			return st.UpdateHall(ctx, row)
+		})
 	case h.paid:
 		hs.scheduleFeeLocked(h, dayMs)
 		h.paidUntil += dayMs
@@ -563,6 +575,14 @@ func TaxedRefund(adena int) int {
 // updateLocked stores every column of h's row, then pays credits once it
 // has landed (writeThenCredit).
 func (hs *Halls) updateLocked(h *hall, credits ...credit) {
+	row := hs.rowLocked(h)
+	hs.writeThenCredit("store clan hall", row.ID, func(ctx context.Context, st HallStore) error {
+		return st.UpdateHall(ctx, row)
+	}, credits)
+}
+
+// rowLocked is h's clanhall row as it stands now.
+func (hs *Halls) rowLocked(h *hall) HallRow {
 	row := HallRow{ID: h.id(), OwnerID: h.ownerID, PaidUntil: h.paidUntil, Paid: h.paid}
 	if a := h.auction; a != nil {
 		if a.seller != nil {
@@ -570,9 +590,7 @@ func (hs *Halls) updateLocked(h *hall, credits ...credit) {
 		}
 		row.EndDate = a.endDate
 	}
-	hs.writeThenCredit("store clan hall", row.ID, func(ctx context.Context, st HallStore) error {
-		return st.UpdateHall(ctx, row)
-	}, credits)
+	return row
 }
 
 // setBidAtLocked records the hall clan clanID bid on, 0 for none, and

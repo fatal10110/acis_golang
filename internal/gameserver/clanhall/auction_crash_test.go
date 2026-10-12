@@ -152,11 +152,6 @@ type crashBank struct {
 	held map[int32]int
 }
 
-func (b *crashBank) PayHallFee(clanID int32, adena int) bool {
-	_, ok := b.TakeAdena(clanID, adena)
-	return ok
-}
-
 func (b *crashBank) TakeAdena(clanID int32, adena int) (Landing, bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()

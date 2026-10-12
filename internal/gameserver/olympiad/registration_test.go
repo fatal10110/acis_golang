@@ -222,7 +222,7 @@ func TestPasses(t *testing.T) {
 		{120, true, 420000},
 	} {
 		o, store := newRegistrationOlympiad(Validation, time.Hour, map[int32]Noble{1: {ClassID: 88, Points: tc.points, CompDone: 9}})
-		if got := o.Passes(1, tc.hero); got != tc.want {
+		if got := passes(t, o, 1, tc.hero); got != tc.want {
 			t.Errorf("Passes(%d points, hero %v) = %d, want %d", tc.points, tc.hero, got, tc.want)
 		}
 		want := Noble{ClassID: 88, CompDone: 9, Rewarded: true}
@@ -232,22 +232,32 @@ func TestPasses(t *testing.T) {
 		if len(store.saves) != 1 || store.saves[0][1] != want || len(store.saves[0]) != 1 {
 			t.Errorf("saves = %+v, want the claimed record alone", store.saves)
 		}
-		if got := o.Passes(1, tc.hero); got != 0 || len(store.saves) != 1 {
+		if got := passes(t, o, 1, tc.hero); got != 0 || len(store.saves) != 1 {
 			t.Errorf("second claim = %d with %d saves, want 0 and no write", got, len(store.saves))
 		}
 	}
 
 	o, store := newRegistrationOlympiad(Competition, time.Hour, map[int32]Noble{1: {Points: 100}})
-	if got := o.Passes(1, true); got != 0 || len(store.saves) != 0 {
+	if got := passes(t, o, 1, true); got != 0 || len(store.saves) != 0 {
 		t.Fatalf("claim in the window = %d, %d saves", got, len(store.saves))
 	}
 	if n, _ := o.Noble(1); n.Points != 100 || n.Rewarded {
 		t.Fatalf("record after a refused claim = %+v", n)
 	}
 	o.period = Validation
-	if got := o.Passes(2, true); got != 0 {
+	if got := passes(t, o, 2, true); got != 0 {
 		t.Fatalf("claim without a record = %d", got)
 	}
+}
+
+// passes is o.Passes with no deadline, failing t on a store error.
+func passes(t *testing.T, o *Olympiad, objectID int32, hero bool) int {
+	t.Helper()
+	n, err := o.Passes(context.Background(), objectID, hero)
+	if err != nil {
+		t.Errorf("Passes(%d): %v", objectID, err)
+	}
+	return n
 }
 
 // TestPassesRace runs claims, registrations and saves of the records at
@@ -260,7 +270,7 @@ func TestPassesRace(t *testing.T) {
 	paid := make(chan int, 8)
 	for range 8 {
 		wg.Go(func() {
-			paid <- o.Passes(1, false)
+			paid <- passes(t, o, 1, false)
 			o.saveNobles()
 			o.Register(eligible(3), Classed)
 			_ = o.IsRegisteredInComp(3, 88)
