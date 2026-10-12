@@ -130,7 +130,8 @@ func (l *GameClientLink) useItemHandler(live *livePlayer, inv *itemcontainer.Inv
 		l.useWindowItem(live, tmpl, rollDice) ||
 		l.usePaganKey(live, inv, inst, tmpl) ||
 		l.useManorItem(live, inv, inst, tmpl) ||
-		l.useTargetCastItem(live, inv, inst, ctrl)
+		l.useTargetCastItem(live, inv, inst, ctrl) ||
+		l.useMercenaryTicket(live, inv, inst, tmpl)
 }
 
 // raiseItemUse hands live's use of inst, once the item's own use is done,
@@ -631,18 +632,24 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 		return
 	}
 
-	res, ok, err := l.inventory.DropItem(inv, req.ObjectID, count)
+	if _, ok := l.dropToGround(live, inv, req.ObjectID, count, int(req.X), int(req.Y), int(req.Z)); !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
+	}
+}
+
+// dropToGround drops count of live's item objectID on the ground at
+// (x, y, z) and returns it there, reporting false when nothing was
+// dropped. A worn item leaves the paperdoll before it reaches the ground:
+// its stat functions, item skills and shot charges go with it.
+func (l *GameClientLink) dropToGround(live *livePlayer, inv *itemcontainer.Inventory, objectID int32, count, x, y, z int) (*grounditem.Item, bool) {
+	res, ok, err := l.inventory.DropItem(inv, objectID, count)
 	if err != nil {
 		l.log.Error().Err(err).Msg("allocate dropped item id")
-		live.SendFrame(serverpackets.FrameActionFailed())
-		return
+		return nil, false
 	}
 	if !ok {
-		live.SendFrame(serverpackets.FrameActionFailed())
-		return
+		return nil, false
 	}
-	// A worn item leaves the paperdoll before it reaches the ground: its
-	// stat functions, item skills and shot charges go with it.
 	for _, unequipped := range res.Changed {
 		unequipped.UnchargeAllShots()
 	}
@@ -654,18 +661,18 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 	ground, err := grounditem.New(*res.Dropped, res.Template)
 	if err != nil {
 		l.log.Error().Err(err).Msg("build dropped ground item")
-		live.SendFrame(serverpackets.FrameActionFailed())
-		return
+		return nil, false
 	}
 
 	l.groundItems.Drop(ground, task.DropOptions{
-		X:             int(req.X),
-		Y:             int(req.Y),
-		Z:             int(req.Z),
+		X:             x,
+		Y:             y,
+		Z:             z,
 		Heading:       live.CurrentHeading(),
 		PlayerDropped: true,
 		DropperID:     live.ObjectID(),
 	})
+	return ground, true
 }
 
 // destroyLiveItem answers RequestDestroyItem. A player running a private
