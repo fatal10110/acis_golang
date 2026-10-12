@@ -247,12 +247,12 @@ of a type the family's package declares, holding engine cells only. The catalog 
 once and hands it to the constructor of every member, as it hands tables to other
 constructors; a member registers itself in it from its constructor, as the reference's
 constructor does. The same `go/types` test covers it: a family's plain fields can only be
-read. A map keyed by NPC is `NPCMapCell`, with the reference's removal of a value; its keys
-and values match by NPC identity, the spawn slot's, as the timers' do. A field holding one
-player is `PlayerCell`; a list is `ListCell`, ordered and keeping duplicates, whose creature
-handles match by the same identity (a player's is its character) and other values by `==`.
-A member reaches another member's helpers through
-`QuestState.Quest()`, the registered script of a state it found.
+read, directly or through a local copied from them. A map keyed by NPC is `NPCMapCell`,
+with the reference's removal of a value; its keys and values match by NPC identity, the
+spawn slot's, as the timers' do. A field holding one player is `PlayerCell`; a list is
+`ListCell`, ordered and keeping duplicates, whose creature handles match by the same
+identity (a player's is its character) and other values by `==`. A member reaches another
+member's helpers through `QuestState.Quest()`, the registered script of a state it found.
 
 ### Timers
 
