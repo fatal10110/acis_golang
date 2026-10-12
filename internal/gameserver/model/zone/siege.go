@@ -2,8 +2,6 @@ package zone
 
 import (
 	"sync/atomic"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // Siege covers a besiegeable residence's battlefield. While a siege runs,
@@ -35,19 +33,11 @@ type Siege struct {
 	active atomic.Bool
 }
 
-// NewSiege builds a siege battlefield zone from its data settings.
-func NewSiege(id int, form Form, set *commons.StatSet) (*Siege, error) {
-	f := commons.NewFields(set, "zone: siege")
-	residence := -1
-	for _, key := range []string{"castleId", "clanHallId"} {
-		if f.Has(key) {
-			residence = f.Int(key)
-		}
-	}
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
-	return &Siege{Zone: newZone(id, form), ResidenceID: residence}, nil
+// NewSiege builds an inactive siege battlefield zone not yet tied to a
+// residence; the loader sets ResidenceID from the zone's data settings
+// before publishing it.
+func NewSiege(id int, form Form) *Siege {
+	return &Siege{Zone: newZone(id, form), ResidenceID: -1}
 }
 
 // Core exposes the shared zone state.

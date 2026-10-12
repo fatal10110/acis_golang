@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -97,12 +96,8 @@ func TestRecallRefusedInBossZone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build zone form: %v", err)
 	}
-	set := commons.NewStatSet()
-	set.Set("InvadeTime", "600000")
-	boss, err := zone.NewBoss(1, form, set)
-	if err != nil {
-		t.Fatalf("build boss zone: %v", err)
-	}
+	boss := zone.NewBoss(1, form)
+	boss.InvadeWindow = 10 * time.Minute
 	zones := zone.NewIndex()
 	zones.Add(boss)
 	town := location.Location{X: -5000, Y: 2000, Z: 30}

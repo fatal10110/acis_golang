@@ -212,25 +212,27 @@ func (c *Controller) CanAttack(target attackable.Combatant) bool {
 	return ok
 }
 
-// RefuseAttack reports whether CanAttack refuses target. When the player's
-// active weapon is why (a fishing rod, or a bow without arrows or the MP to
-// fire), it also tells the player so, as the reference's
-// PlayerAttack.canAttack does each time the attack think asks it. The player
-// attack think calls it once per think that reaches the attack gate.
+// RefuseAttack reports whether CanAttack refuses target. When the refusal is
+// one the player is told of (the geodata hides the target, a peace zone holds
+// either side of a playable-on-playable attack, or the player's active weapon
+// cannot attack), it also emits AttackRefused naming why; a summon's sink
+// hands it to the owner. The player and summon attack thinks call it once per
+// think that reaches the attack gate.
 func (c *Controller) RefuseAttack(target attackable.Combatant) bool {
 	ok, why := c.check(target)
 	if !ok && why != 0 {
-		c.emit(event.AttackWeaponRefused{Reason: why})
+		c.emit(event.AttackRefused{Reason: why})
 	}
 	return !ok
 }
 
-// check runs the attack gate, naming the weapon refusal when that is why it
-// refuses (zero otherwise). The weapon gate runs last, as the reference
-// checks it only once every creature and playable rule allows the attack.
-func (c *Controller) check(target attackable.Combatant) (bool, event.AttackWeaponRefusal) {
-	if !c.gateAllows(target) {
-		return false, 0
+// check runs the attack gate, naming the refusal its actor is told of (zero
+// for a silent one). The sight check precedes the peace-zone checks, and the
+// weapon gate runs last, only once every creature and playable rule allows
+// the attack.
+func (c *Controller) check(target attackable.Combatant) (bool, event.AttackRefusal) {
+	if ok, why := c.gateAllows(target); !ok {
+		return false, why
 	}
 	if c.player != nil {
 		switch c.actor.AttackType() {
@@ -251,41 +253,43 @@ func (c *Controller) check(target attackable.Combatant) (bool, event.AttackWeapo
 	return true, 0
 }
 
-// gateAllows runs the creature and playable rules of the attack gate.
-func (c *Controller) gateAllows(target attackable.Combatant) bool {
+// gateAllows runs the creature and playable rules of the attack gate, naming
+// the sight or peace-zone refusal its actor is told of.
+func (c *Controller) gateAllows(target attackable.Combatant) (bool, event.AttackRefusal) {
 	if target == nil || c.actor == nil {
-		return false
+		return false, 0
 	}
 	if c.actor.AttackDisabled() {
-		return false
+		return false, 0
 	}
 	c.mu.RLock()
 	busy := c.attacking || c.bowCooling
 	c.mu.RUnlock()
 	if busy {
-		return false
+		return false, 0
 	}
 	if c.actor.MovementDisabled() && !c.actor.InAttackRange(target) {
-		return false
+		return false, 0
 	}
 	if !c.actor.Knows(target) {
-		return false
+		return false, 0
 	}
 	if t, ok := target.(skilltarget.Actor); !ok || !t.AttackableBy(c.actor) {
-		return false
+		return false, 0
 	}
 	if !c.actor.CanSee(target) {
-		return false
+		return false, event.AttackRefusedCantSeeTarget
 	}
 
-	if c.playable != nil {
-		if target.Kind().Playable() {
-			if c.playable.InPeaceZone() || target.InPeaceZone() {
-				return false
-			}
+	if c.playable != nil && target.Kind().Playable() {
+		if c.playable.InPeaceZone() {
+			return false, event.AttackRefusedInPeaceZone
+		}
+		if target.InPeaceZone() {
+			return false, event.AttackRefusedTargetInPeaceZone
 		}
 	}
-	return true
+	return true, 0
 }
 
 // DoAttack starts one physical attack animation against target. The hit

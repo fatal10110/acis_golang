@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence"
@@ -161,12 +160,8 @@ func gludioBattlefield(t *testing.T) *zone.Index {
 	if err != nil {
 		t.Fatal(err)
 	}
-	set := commons.NewStatSet()
-	set.Set("castleId", strconv.Itoa(taxCastleID))
-	field, err := zone.NewSiege(1, form, set)
-	if err != nil {
-		t.Fatal(err)
-	}
+	field := zone.NewSiege(1, form)
+	field.ResidenceID = taxCastleID
 	zones := zone.NewIndex()
 	zones.Add(field)
 	return zones

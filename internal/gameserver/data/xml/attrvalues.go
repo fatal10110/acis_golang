@@ -215,6 +215,31 @@ func (a *attrValues) intArray(key string) []int {
 	return out
 }
 
+// float64Array returns the value at key split on ";" with each part read as
+// a float64, recording an error if key is absent or any part, including an
+// empty one, fails to parse.
+func (a *attrValues) float64Array(key string) []float64 {
+	if a.err != nil {
+		return nil
+	}
+	raw, ok := a.vals[key]
+	if !ok {
+		a.fail(fmt.Errorf("attribute %q is required", key))
+		return nil
+	}
+	parts := strings.Split(raw, ";")
+	out := make([]float64, len(parts))
+	for i, p := range parts {
+		n, err := strconv.ParseFloat(p, 64)
+		if err != nil {
+			a.fail(fmt.Errorf("attribute %q: %w", key, err))
+			return nil
+		}
+		out[i] = n
+	}
+	return out
+}
+
 // strArray returns the value at key split on ";", recording an error if key
 // is absent. Empty parts are kept.
 func (a *attrValues) strArray(key string) []string {

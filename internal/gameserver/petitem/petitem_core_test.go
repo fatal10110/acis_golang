@@ -568,7 +568,8 @@ func TestPetLevelConditionReadsIntegerLiterals(t *testing.T) {
 		"50": true, "0x32": true, "#32": true, "062": true, "５０": true,
 		"0x33": false, "063": false, "08": false, "0b1": false,
 	} {
-		if got := petPlayerConditionHolds(pet, map[string]string{"level": raw}); got != want {
+		uses := []item.UseCondition{{Root: item.Condition{Kind: "player", Attrs: map[string]string{"level": raw}}}}
+		if got, _ := checkUseConditions(pet, uses); got != want {
 			t.Errorf("level=%q on a level 50 pet holds = %v, want %v", raw, got, want)
 		}
 	}

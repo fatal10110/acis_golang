@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -262,7 +261,7 @@ func checkConditionValues(n condNode, role condRole, vals map[string]string) err
 		case condDecodeList:
 			_, err = conditions.DecodeList(val)
 		case condDecodeRace:
-			_, err = restart.ParseRace(val)
+			_, err = conditions.DecodeRace(val)
 		case condDecodeStat:
 			_, err = stat.ByName(val)
 		}

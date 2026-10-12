@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -42,10 +41,7 @@ func activeSiegeEverywhere(t *testing.T) *zone.Index {
 	if err != nil {
 		t.Fatalf("siege form: %v", err)
 	}
-	siege, err := zone.NewSiege(1, form, commons.NewStatSet())
-	if err != nil {
-		t.Fatalf("siege zone: %v", err)
-	}
+	siege := zone.NewSiege(1, form)
 	siege.SetActive(true)
 	zones := zone.NewIndex()
 	zones.Add(siege)

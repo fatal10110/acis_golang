@@ -4,12 +4,10 @@ import (
 	"encoding/xml"
 	"fmt"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 )
 
-// playerLevelEntry is the wire shape of a single <playerLevel> element: its
-// attributes are folded into a StatSet for player.NewLevel to consume.
+// playerLevelEntry is the wire shape of a single <playerLevel> element.
 type playerLevelEntry struct {
 	Attrs []xml.Attr `xml:",any,attr"`
 }
@@ -33,14 +31,20 @@ func LoadPlayerLevels(path string) (*player.LevelTable, error) {
 
 	levels := make(map[int]player.Level, len(doc.Entries))
 	for _, e := range doc.Entries {
-		set := commons.StatSetFromXMLAttrs(e.Attrs)
-
-		level, err := set.GetInt("level")
-		if err != nil {
+		a := newAttrValues(foldAttrs(e.Attrs), "player level")
+		level := a.int("level")
+		if err := a.Err(); err != nil {
 			return nil, fmt.Errorf("parse player level table %q: %w", path, err)
 		}
-		l, err := player.NewLevel(set)
-		if err != nil {
+		// requiredExpToLevelUp is required; karmaModifier and
+		// expLossAtDeath default to 0 when absent (the sentinel entry above
+		// the level cap carries neither).
+		l := player.Level{
+			RequiredExpToLevelUp: a.int64("requiredExpToLevelUp"),
+			KarmaModifier:        a.float64Default("karmaModifier", 0),
+			ExpLossAtDeath:       a.float64Default("expLossAtDeath", 0),
+		}
+		if err := a.Err(); err != nil {
 			return nil, fmt.Errorf("parse player level table %q: level %d: %w", path, level, err)
 		}
 		levels[level] = l

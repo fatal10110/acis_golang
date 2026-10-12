@@ -92,7 +92,8 @@ type PlayerActor interface {
 	IsWearingType(mask int) bool
 }
 
-// Skill is what ConditionSkillStats needs from the skill under test.
+// Skill is what SkillStats needs from the skill under test: the stat its
+// "stat" set value names, and false when it names none.
 type Skill interface {
-	Stat() stat.Stat
+	Stat() (stat.Stat, bool)
 }

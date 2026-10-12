@@ -3,7 +3,6 @@ package pets
 import (
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
@@ -29,10 +28,7 @@ var siegeServitorCases = []struct {
 // covers the owner and the servitor but not the ground 5000 east of them.
 func bootSiegeServitor(t *testing.T, tmpl *npc.Template, skillID int) (*petWorld, *zone.Siege) {
 	t.Helper()
-	siege, err := zone.NewSiege(1, summonZoneBox(t, -1_000, 1_000), commons.NewStatSet())
-	if err != nil {
-		t.Fatalf("build siege zone: %v", err)
-	}
+	siege := zone.NewSiege(1, summonZoneBox(t, -1_000, 1_000))
 	siege.SetActive(true)
 	zones := zone.NewIndex()
 	zones.Add(siege)
