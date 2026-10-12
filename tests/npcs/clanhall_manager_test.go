@@ -12,7 +12,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -108,12 +107,8 @@ func hallGrounds(t *testing.T) *zone.Index {
 	if err != nil {
 		t.Fatal(err)
 	}
-	set := commons.NewStatSet()
-	set.Set("clanHallId", strconv.Itoa(hallMoonstone))
-	hz, err := zone.NewClanHall(1, form, set)
-	if err != nil {
-		t.Fatal(err)
-	}
+	hz := zone.NewClanHall(1, form)
+	hz.ResidenceID = hallMoonstone
 	zones.Add(hz)
 	return zones
 }

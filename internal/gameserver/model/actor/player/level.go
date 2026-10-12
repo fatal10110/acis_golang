@@ -3,8 +3,6 @@ package player
 import (
 	"errors"
 	"sort"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // Level holds the experience and death-penalty parameters associated with
@@ -18,23 +16,6 @@ type Level struct {
 	// ExpLossAtDeath is the percentage of the level's experience span lost
 	// on death.
 	ExpLossAtDeath float64
-}
-
-// NewLevel builds a Level from set. requiredExpToLevelUp is required;
-// karmaModifier and expLossAtDeath default to 0 when absent (the sentinel
-// entry above the level cap carries neither), but a present value that
-// fails to parse is still an error.
-func NewLevel(set *commons.StatSet) (Level, error) {
-	f := commons.NewFields(set, "player level")
-	l := Level{
-		RequiredExpToLevelUp: f.Int64("requiredExpToLevelUp"),
-		KarmaModifier:        f.Float64Default("karmaModifier", 0),
-		ExpLossAtDeath:       f.Float64Default("expLossAtDeath", 0),
-	}
-	if err := f.Err(); err != nil {
-		return Level{}, err
-	}
-	return l, nil
 }
 
 // LevelTable is an in-memory lookup of per-level experience/penalty

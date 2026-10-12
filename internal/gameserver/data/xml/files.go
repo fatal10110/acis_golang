@@ -101,34 +101,12 @@ func (l *literal32) UnmarshalXMLAttr(attr xml.Attr) error {
 	return nil
 }
 
-// decodeLiteralAttrs replaces the raw value of each present key in set with
-// its integer-literal value (see literal32), for attributes a model
-// constructor reads from a StatSet. An absent key stays absent so the
-// constructor's own required/default handling still applies.
-func decodeLiteralAttrs(set *commons.StatSet, keys ...string) error {
-	for _, key := range keys {
-		if !set.Has(key) {
-			continue
-		}
-		raw, err := set.GetString(key)
-		if err != nil {
-			return err
-		}
-		n, err := commons.DecodeInt32(raw)
-		if err != nil {
-			return fmt.Errorf("%s: %w", key, err)
-		}
-		set.Set(key, int(n))
-	}
-	return nil
-}
-
 // canonicalizeLiteralAttrs replaces the raw value of each present key in
 // vals with the decimal form of its integer-literal value (see literal32),
-// so a later plain base-10 read sees the decoded number. It is the
-// attribute-map form of decodeLiteralAttrs, for an element whose values
-// can still be overridden by its <set> children after decoding. An absent
-// key stays absent.
+// so a later plain base-10 read sees the decoded number. It suits an
+// element whose values can still be overridden by later attributes (its
+// <set> children, a door's stats) after decoding. An absent key stays
+// absent.
 func canonicalizeLiteralAttrs(vals map[string]string, keys ...string) error {
 	for _, key := range keys {
 		raw, ok := vals[key]

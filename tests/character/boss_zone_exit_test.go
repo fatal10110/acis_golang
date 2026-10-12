@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -21,12 +20,8 @@ func bootInBossZone(t *testing.T) (*gameservertest.Server, *zone.Boss, int32) {
 	if err != nil {
 		t.Fatalf("build zone form: %v", err)
 	}
-	set := commons.NewStatSet()
-	set.Set("InvadeTime", "600000")
-	boss, err := zone.NewBoss(1, form, set)
-	if err != nil {
-		t.Fatalf("build boss zone: %v", err)
-	}
+	boss := zone.NewBoss(1, form)
+	boss.InvadeWindow = 10 * time.Minute
 	zones := zone.NewIndex()
 	zones.Add(boss)
 	srv := gameservertest.Boot(t,

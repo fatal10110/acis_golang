@@ -6,7 +6,6 @@ import (
 	"math"
 	"sync/atomic"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
@@ -29,9 +28,14 @@ const (
 	KindWall
 )
 
-var kindNames = map[string]Kind{
-	"DOOR": KindDoor,
-	"WALL": KindWall,
+// ParseKind maps a door's XML type spelling onto its Kind.
+func ParseKind(s string) (Kind, error) {
+	for k, name := range kindStrings {
+		if name == s {
+			return Kind(k), nil
+		}
+	}
+	return 0, fmt.Errorf("door: unknown type %q", s)
 }
 
 var kindStrings = [...]string{"DOOR", "WALL"}
@@ -54,11 +58,14 @@ const (
 	OpenNPC
 )
 
-var openKindNames = map[string]OpenKind{
-	"CLICK": OpenClick,
-	"TIME":  OpenTime,
-	"SKILL": OpenSkill,
-	"NPC":   OpenNPC,
+// ParseOpenKind maps a door's XML openType spelling onto its OpenKind.
+func ParseOpenKind(s string) (OpenKind, error) {
+	for o, name := range openKindStrings {
+		if name == s {
+			return OpenKind(o), nil
+		}
+	}
+	return 0, fmt.Errorf("door: unknown openType %q", s)
 }
 
 var openKindStrings = [...]string{"CLICK", "TIME", "SKILL", "NPC"}
@@ -342,56 +349,6 @@ func cloneGeoData(data [][]block.NSWE) [][]block.NSWE {
 		out[i] = append([]block.NSWE(nil), data[i]...)
 	}
 	return out
-}
-
-// NewTemplate builds a Template from set. The XML attributes, position,
-// coordinates, and stats are required; function attributes use the shipped
-// defaults when absent.
-func NewTemplate(set *commons.StatSet) (*Template, error) {
-	idf := commons.NewFields(set, "door: template")
-	id := idf.Int("id")
-	if err := idf.Err(); err != nil {
-		return nil, err
-	}
-	f := commons.NewFields(set, fmt.Sprintf("door: template %d", id))
-	kind := commons.FieldEnum[Kind](f, "type", kindNames)
-	level := f.Int("level")
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
-	position := location.Location{X: f.Int("x"), Y: f.Int("y"), Z: f.Int("z")}
-	coords := commons.FieldList[location.Point](f, "coords")
-	if len(coords) < 3 {
-		f.Fail(fmt.Errorf("coords requires at least 3 points"))
-	}
-
-	t := &Template{
-		ID:          id,
-		Name:        f.StringDefault("name", ""),
-		Kind:        kind,
-		Level:       level,
-		Position:    position,
-		Coordinates: append([]location.Point(nil), coords...),
-	}
-	if t.Name == "" {
-		f.Fail(fmt.Errorf("name is required"))
-	}
-	t.HP = f.Int("hp")
-	t.PDef = f.Int("pDef")
-	t.MDef = f.Int("mDef")
-	t.Height = f.Int("height")
-	t.CastleID = f.IntDefault("castle", 0)
-	t.ClanHallID = f.IntDefault("clanHall", 0)
-	t.TriggeredID = f.IntDefault("triggeredId", 0)
-	t.Opened = f.BoolDefault("opened", false)
-	t.OpenKind = commons.FieldEnumDefault[OpenKind](f, "openType", openKindNames, OpenNPC)
-	t.OpenTime = f.IntDefault("openTime", 0)
-	t.RandomTime = f.IntDefault("randomTime", 0)
-	t.CloseTime = f.IntDefault("closeTime", 0)
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
-	return t, nil
 }
 
 // Table stores door templates keyed by door id.

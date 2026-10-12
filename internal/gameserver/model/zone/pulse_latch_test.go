@@ -3,7 +3,6 @@ package zone
 import (
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
 
@@ -15,16 +14,9 @@ import (
 // a fresh pulse. A damage zone gone dormant frees it too.
 func TestPulseLatchHandsOverToARacingEntry(t *testing.T) {
 	form := testCuboid(t, 0, 1000, 0, 1000)
-	effect, err := NewEffect(1, form, commons.NewStatSet())
-	if err != nil {
-		t.Fatal(err)
-	}
-	castle := commons.NewStatSet()
-	castle.Set("castleId", "1")
-	damage, err := NewDamage(2, form, castle)
-	if err != nil {
-		t.Fatal(err)
-	}
+	effect := NewEffect(1, form)
+	damage := NewDamage(2, form)
+	damage.CastleID = 1
 	damage.Armed = true
 	siege := true
 	damage.SiegeActive = func() bool { return siege }

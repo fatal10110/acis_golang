@@ -3,8 +3,6 @@ package zone
 import (
 	"sync/atomic"
 	"time"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // Trap ties a zone to a castle defense device. A castle-linked trap is
@@ -26,18 +24,6 @@ type Trap struct {
 	// SiegeActive reports whether the linked castle's siege is running;
 	// nil reads as not running. The game server wires it at boot.
 	SiegeActive func() bool
-}
-
-func newTrap(set *commons.StatSet) (Trap, error) {
-	f := commons.NewFields(set, "zone: trap")
-	t := Trap{
-		CastleID: f.IntDefault("castleId", 0),
-		EventID:  f.IntDefault("eventId", 0),
-	}
-	if err := f.Err(); err != nil {
-		return Trap{}, err
-	}
-	return t, nil
 }
 
 // dormant reports whether the trap's effect is currently suppressed.
@@ -69,26 +55,16 @@ type Damage struct {
 	pulsing atomic.Bool
 }
 
-// NewDamage builds a damage trap zone from its data settings.
-func NewDamage(id int, form Form, set *commons.StatSet) (*Damage, error) {
-	trap, err := newTrap(set)
-	if err != nil {
-		return nil, err
-	}
-	f := commons.NewFields(set, "zone: damage trap")
-	hp := f.IntDefault("hpDamage", 200)
-	initial := f.IntDefault("initialDelay", 1000)
-	reuse := f.IntDefault("reuseDelay", 5000)
-	if err := f.Err(); err != nil {
-		return nil, err
-	}
+// NewDamage builds an unlinked damage trap dealing 200 HP every 5 seconds
+// after a 1 second delay; the loader overrides these from the zone's data
+// settings before publishing it.
+func NewDamage(id int, form Form) *Damage {
 	return &Damage{
 		Zone:         newZone(id, form),
-		Trap:         trap,
-		HPDamage:     hp,
-		InitialDelay: time.Duration(initial) * time.Millisecond,
-		ReuseDelay:   time.Duration(reuse) * time.Millisecond,
-	}, nil
+		HPDamage:     200,
+		InitialDelay: time.Second,
+		ReuseDelay:   5 * time.Second,
+	}
 }
 
 // Core exposes the shared zone state.
@@ -180,17 +156,11 @@ type Wader interface {
 	SwampStateChanged(z *Swamp)
 }
 
-// NewSwamp builds a swamp trap zone from its data settings.
-func NewSwamp(id int, form Form, set *commons.StatSet) (*Swamp, error) {
-	trap, err := newTrap(set)
-	if err != nil {
-		return nil, err
-	}
-	bonus, err := set.GetIntDefault("move_bonus", -50)
-	if err != nil {
-		return nil, err
-	}
-	return &Swamp{Zone: newZone(id, form), Trap: trap, MoveBonus: bonus}, nil
+// NewSwamp builds an unlinked swamp trap slowing movement by 50 percent;
+// the loader overrides these from the zone's data settings before
+// publishing it.
+func NewSwamp(id int, form Form) *Swamp {
+	return &Swamp{Zone: newZone(id, form), MoveBonus: -50}
 }
 
 // Core exposes the shared zone state.
