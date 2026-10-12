@@ -228,6 +228,15 @@ func (p *PlayerAttack) AttackAfterCast(target attackable.Combatant, shift, stopp
 	return actionFailed
 }
 
+// HasNext reports whether an attack is the next intention: one queued
+// behind a swing, a bow reuse or a cast, or one requested mid-cast that
+// waits for the cast to end.
+func (p *PlayerAttack) HasNext() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.next != nil || p.deferred
+}
+
 // Stop clears the attack intention and stops any movement toward it.
 func (p *PlayerAttack) Stop() {
 	p.mu.Lock()

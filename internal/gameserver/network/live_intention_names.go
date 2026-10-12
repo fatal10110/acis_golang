@@ -4,7 +4,9 @@ package network
 // character page shows them, IDLE for none. The current one is read from
 // the slot that holds it: the cast in flight or its approach, the attack,
 // a pickup, an interact walk, a friendly follow, a walk to a point or an
-// equip toggle. The next one is whatever is queued behind it.
+// equip toggle. The next one is whatever is queued behind it: a queued
+// pickup, cast, follow, equip toggle or interact runs ahead of a queued
+// attack when the swing or cast ends, so it is named first.
 func (p *livePlayer) intentionNames() (current, next string) {
 	current = "IDLE"
 	switch {
@@ -27,20 +29,29 @@ func (p *livePlayer) intentionNames() (current, next string) {
 		}
 	}
 
+	if next = p.queuedIntentionName(); next == "IDLE" && p.combat != nil && p.combat.HasNext() {
+		next = "ATTACK"
+	}
+	return current, next
+}
+
+// queuedIntentionName names the intention queued in p's own next-intention
+// slots, IDLE for none.
+func (p *livePlayer) queuedIntentionName() string {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	switch {
 	case p.deferredPickup != nil:
-		return current, "PICK_UP"
+		return "PICK_UP"
 	case p.deferredMagic != nil && p.deferredMagic.approach == 0, p.deferredItem != nil && p.deferredItem.approach == 0:
 		// A cast still walking to its target is the current intention.
-		return current, "CAST"
+		return "CAST"
 	case p.deferredFollow != nil:
-		return current, "FOLLOW"
+		return "FOLLOW"
 	case p.deferredUseItem != nil:
-		return current, "USE_ITEM"
+		return "USE_ITEM"
 	case p.deferredInteract != nil:
-		return current, "INTERACT"
+		return "INTERACT"
 	}
-	return current, "IDLE"
+	return "IDLE"
 }
