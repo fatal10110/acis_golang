@@ -11,6 +11,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door/doorhit"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -155,6 +157,31 @@ type Summon interface {
 // asCreature returns a as a creature, or false for a cast participant that
 // is not one (a door or a signet effect point).
 func asCreature(a Actor) (Creature, bool) {
+	c, ok := a.(Creature)
+	return c, ok
+}
+
+// damageTarget is what a damage skill reads and hits on its target: every
+// creature, and a door, which takes the damage but holds no effects and
+// counters, reflects or dies to a lethal strike never.
+type damageTarget interface {
+	attackable.Combatant
+	Invul() bool
+	HP() float64
+	PhysicalSkillInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.PhysicalSkillInput, bool)
+	MagicDamageInput(caster creature.FormulaActor, skill modelskill.Definition, magicFailures bool) (formulas.MagicDamageInput, bool)
+	BlowInput(caster creature.FormulaActor, skill modelskill.Definition) (formulas.BlowInput, bool)
+	CounterSkillPhysical() float64
+	ReduceHP(amount float64, attacker attackable.Combatant, skill modelskill.Definition)
+}
+
+// asDamageTarget returns a as the target of a damage skill: a creature as
+// itself, a door through its hit surface. Any other participant (a signet
+// effect point) takes no damage.
+func asDamageTarget(a Actor) (damageTarget, bool) {
+	if d, ok := a.(*door.Object); ok {
+		return doorhit.Of(d), true
+	}
 	c, ok := a.(Creature)
 	return c, ok
 }

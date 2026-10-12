@@ -27,6 +27,9 @@ type WorldObjects struct {
 	doorRegen  *task.DoorRegen
 	newSink    func(*door.Object) event.Sink
 	now        func() time.Time
+	// strife is the Seven Signs state door defences read, set once at boot
+	// before the world runs.
+	strife door.Strife
 
 	// doorMu serializes door state changes, so a flag flip or an HP change
 	// and its geodata, broadcast and timer follow-up land as one step
@@ -137,6 +140,18 @@ func (w *WorldObjects) StaticObjects() []*staticobject.Object {
 		return nil
 	}
 	return append([]*staticobject.Object(nil), w.staticOrder...)
+}
+
+// SetStrife installs the Seven Signs state every door's defences read. Call
+// it once at boot, before players enter the world.
+func (w *WorldObjects) SetStrife(s door.Strife) {
+	if w == nil {
+		return
+	}
+	w.strife = s
+	for _, obj := range w.doorOrder {
+		obj.SetStrife(s)
+	}
 }
 
 // SetDoorOpen changes a door's open state, applies the matching geodata,
@@ -336,6 +351,7 @@ func (w *WorldObjects) spawnDoor(tmpl *door.Template, ids idAllocator) (*door.Ob
 	}
 	obj.SetOwner(w)
 	obj.SetSight(doorSight{geo: w.geo})
+	obj.SetStrife(w.strife)
 	w.state.Spawn(obj, tmpl.Position.X, tmpl.Position.Y, tmpl.Position.Z, 0)
 	if !obj.Opened() {
 		w.geo.AddObject(obj)

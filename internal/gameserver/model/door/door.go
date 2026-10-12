@@ -12,6 +12,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -127,25 +129,40 @@ type Object struct {
 
 	// hp holds the current HP as math.Float64bits; it and dead change only
 	// through the state owner, under the lock it applies door changes with.
-	hp    atomic.Uint64
-	dead  atomic.Bool
-	siege atomic.Pointer[siegeRef]
+	hp     atomic.Uint64
+	dead   atomic.Bool
+	siege  atomic.Pointer[siegeRef]
+	strife atomic.Pointer[strifeRef]
 
 	sink  event.Sink
 	owner StateOwner
 	sight Sight
 }
 
-// Siege is the siege state of the residence a door belongs to, deciding
-// whether a hit lowers the door's HP: a castle's siege in progress lets
-// every attacker but the anti-infantry Swoop Cannon through, and a siegable
-// clan hall's active siege zone lets any attacker through. A door with no
-// siege never loses HP, whoever hits it.
+// Siege is the siege state of the residence a door belongs to. A door with
+// no siege can be neither attacked nor damaged, whoever hits it.
 type Siege interface {
+	// AllowsDoorAttack reports whether attacker, a playable, may attack the
+	// door: during a castle siege in progress only the attacker side may,
+	// and a wall only through a siege summon other than the anti-infantry
+	// Swoop Cannon; during a siegable clan hall's siege only the attacker
+	// side may, once the siege lets its doors be attacked.
+	AllowsDoorAttack(attacker skilltarget.Actor, wall bool) bool
+	// AllowsDoorDamage reports whether a hit lowers the door's HP: a
+	// castle's siege in progress lets every attacker but the Swoop Cannon
+	// through, and a siegable clan hall's active siege zone any attacker.
 	AllowsDoorDamage(attacker attackable.Combatant) bool
 }
 
 type siegeRef struct{ siege Siege }
+
+// Strife is the Seven Signs state a door's defences read: the owner of each
+// seal, in Avarice, Gnosis, Strife order.
+type Strife interface {
+	SealOwners() [3]sevensigns.Cabal
+}
+
+type strifeRef struct{ strife Strife }
 
 // HPRegen is the HP a damaged door regains on each regeneration tick: the
 // creature base HP regeneration, which no door overrides.
@@ -210,9 +227,15 @@ func (o *Object) SetDead(dead bool) bool {
 // Unlockable reports whether a skill can open this door.
 func (o *Object) Unlockable() bool { return o.Template.OpenKind == OpenSkill }
 
-// ponytail: siege ownership is unported (#236); add its attacker-side check here.
-// AttackableBy stays false until then.
-func (*Object) AttackableBy(skilltarget.Actor) bool { return false }
+// AttackableBy reports whether attacker may attack the door: a standing
+// door is attacked only by a playable its residence's siege lets through.
+func (o *Object) AttackableBy(attacker skilltarget.Actor) bool {
+	if o.Dead() || attacker == nil || attacker.ObjectID() == o.objectID || !attacker.Kind().Playable() {
+		return false
+	}
+	ref := o.siege.Load()
+	return ref != nil && ref.siege.AllowsDoorAttack(attacker, o.Template.Kind == KindWall)
+}
 
 // AttackableWithoutForceBy matches the door attackability rule.
 func (o *Object) AttackableWithoutForceBy(caster skilltarget.Actor) bool {
@@ -224,6 +247,44 @@ func (o *Object) Kind() actor.Kind { return actor.KindDoor }
 
 // DoorID returns the static door id from doors.xml.
 func (o *Object) DoorID() int { return o.Template.ID }
+
+// Level returns the door's template level.
+func (o *Object) Level() int { return o.Template.Level }
+
+// CharacterName returns the door's template name, the name messages show.
+func (o *Object) CharacterName() string { return o.Template.Name }
+
+// SetStrife installs the Seven Signs state the door's defences read.
+func (o *Object) SetStrife(s Strife) {
+	if s == nil {
+		o.strife.Store(nil)
+		return
+	}
+	o.strife.Store(&strifeRef{strife: s})
+}
+
+// PhysicalDefence returns the door's P.Def: the template value under the
+// Seal of Strife, truncated.
+func (o *Object) PhysicalDefence() int { return o.underStrife(o.Template.PDef) }
+
+// MagicDefence returns the door's M.Def: the template value under the Seal
+// of Strife, truncated.
+func (o *Object) MagicDefence() int { return o.underStrife(o.Template.MDef) }
+
+// underStrife scales a template defence by the Seal of Strife: raised by a
+// fifth while Dawn owns the seal, cut to 30% while Dusk does.
+func (o *Object) underStrife(base int) int {
+	factor := 1.0
+	if ref := o.strife.Load(); ref != nil {
+		switch ref.strife.SealOwners()[sevensigns.Strife-sevensigns.Avarice] {
+		case sevensigns.Dawn:
+			factor = 1.2
+		case sevensigns.Dusk:
+			factor = 0.3
+		}
+	}
+	return int(float64(base) * factor)
+}
 
 // MaxHP returns the door's maximum HP.
 func (o *Object) MaxHP() int { return o.Template.HP }
@@ -263,11 +324,13 @@ func (o *Object) SetSiege(s Siege) {
 	o.siege.Store(&siegeRef{siege: s})
 }
 
-// ReduceHP applies a hit's damage to the door. Only a hit its residence's
-// siege allows lowers HP, and an attacker whose access level deals no damage
-// lowers nothing; the state owner applies the loss, its status broadcast,
-// the regeneration schedule and, once HP runs out, the door's death.
-func (o *Object) ReduceHP(amount float64, attacker attackable.Combatant) {
+// ReduceHP applies a hit's damage to the door: an auto-attack's, with no
+// skill, or a damage skill's. Every hit routed onto a door ends here. Only a
+// hit its residence's siege allows lowers HP, and an attacker whose access
+// level deals no damage lowers nothing; the state owner applies the loss,
+// its status broadcast, the regeneration schedule and, once HP runs out,
+// the door's death.
+func (o *Object) ReduceHP(amount float64, attacker attackable.Combatant, _ modelskill.Definition) {
 	ref := o.siege.Load()
 	if ref == nil || !ref.siege.AllowsDoorDamage(attacker) {
 		return
