@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/duel"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -600,8 +601,9 @@ func (l *GameClientLink) sendDuelVitals(live *livePlayer, cpOrHP bool) {
 	l.broadcastToMembers(opponents, func() wire.Frame { return serverpackets.FrameExDuelUpdateUserInfo(info) })
 }
 
-// refuseFrozenDuellist answers an action on a player, or a player's summon,
-// that lost its duel: the other side is frozen. It reports whether it did.
+// refuseFrozenDuellist answers an action on a player that lost its duel, or
+// on its summon or signet effect point: the other side is frozen. It reports
+// whether it did.
 func (l *GameClientLink) refuseFrozenDuellist(live *livePlayer, objectID int32) bool {
 	target := l.resolveTarget(objectID)
 	if target == nil {
@@ -614,6 +616,10 @@ func (l *GameClientLink) refuseFrozenDuellist(live *livePlayer, objectID int32) 
 	case *summon.Actor:
 		if owner, ok := liveSummonOwner(t); ok {
 			p = owner
+		}
+	case *npc.EffectPoint:
+		if owner, ok := l.world.Player(t.OwnerID()); ok {
+			p, _ = owner.(*livePlayer)
 		}
 	}
 	if p == nil || p.DuelState() != duel.Dead {
