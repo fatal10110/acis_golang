@@ -118,27 +118,31 @@ func TestDecimalListValuesReadUnicodeDigits(t *testing.T) {
 	}
 }
 
-// TestStatSetIntegersReadUnicodeDigits covers the StatSet getters the
-// loaders read <set>-style values through (StatSet.getInteger, getLong,
-// getByte and getIntegerArray in the reference, all Character.digit based).
-func TestStatSetIntegersReadUnicodeDigits(t *testing.T) {
+// TestAttrValuesIntegersReadUnicodeDigits covers the attribute readers the
+// loaders read <set>-style values through (getInteger, getLong and
+// getIntegerArray in the reference, all Character.digit based).
+func TestAttrValuesIntegersReadUnicodeDigits(t *testing.T) {
 	t.Parallel()
-	s := commons.NewStatSet()
-	s.Set("int", "１２")
-	s.Set("long", "-०१")
-	s.Set("byte", "１２７")
-	s.Set("array", "１;٢")
-	if v, err := s.GetInt("int"); err != nil || v != 12 {
-		t.Errorf("GetInt = %d, %v, want 12", v, err)
+	a := newAttrValues(map[string]string{
+		"int":   "１２",
+		"int32": "１２７",
+		"long":  "-०१",
+		"array": "１;٢",
+	}, "unicode digits")
+	if v := a.int("int"); v != 12 {
+		t.Errorf("int = %d, want 12", v)
 	}
-	if v, err := s.GetInt64("long"); err != nil || v != -1 {
-		t.Errorf("GetInt64 = %d, %v, want -1", v, err)
+	if v := a.int32("int32"); v != 127 {
+		t.Errorf("int32 = %d, want 127", v)
 	}
-	if v, err := s.GetByte("byte"); err != nil || v != 127 {
-		t.Errorf("GetByte = %d, %v, want 127", v, err)
+	if v := a.int64("long"); v != -1 {
+		t.Errorf("int64 = %d, want -1", v)
 	}
-	if v, err := s.GetIntArray("array"); err != nil || fmt.Sprint(v) != "[1 2]" {
-		t.Errorf("GetIntArray = %v, %v, want [1 2]", v, err)
+	if v := a.intArray("array"); fmt.Sprint(v) != "[1 2]" {
+		t.Errorf("intArray = %v, want [1 2]", v)
+	}
+	if err := a.Err(); err != nil {
+		t.Fatalf("Err() = %v", err)
 	}
 }
 
