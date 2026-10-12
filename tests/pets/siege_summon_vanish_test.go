@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -207,4 +208,72 @@ func frameObjectID(frame []byte, at int) int32 {
 		return 0
 	}
 	return int32(binary.LittleEndian.Uint32(frame[at:]))
+}
+
+// TestDeadSiegeSummonHidesOnTeleport pins the jump of a siege summon's
+// corpse after its owner's teleport (Creature.teleportTo, Summon.unSummon,
+// SiegeSummon.onTeleported): a corpse cannot be dismissed, so its owner gets
+// no PetDelete, but it leaves the grid all the same, so a watcher by its old
+// spot forgets it and one at the landing point never sees it, and its owner
+// is still told YOUR_SERVITOR_HAS_VANISHED. The corpse keeps its owner's
+// summon slot.
+func TestDeadSiegeSummonHidesOnTeleport(t *testing.T) {
+	t.Parallel()
+	h, _ := bootSiegeServitor(t, siegeGolemTemplate(), summonGolemSkillID)
+	obj, ok := h.srv.State.Summon(h.ownerID)
+	if !ok {
+		t.Fatal("servitor missing from world")
+	}
+	golem := obj.(*summon.Actor)
+	x, y, z := h.srv.PlayerPosition(t, h.ownerID)
+	const dx = 5_000
+	nearby := h.joinSecondPlayer(t, "Nearby")
+	landing := joinPlayer(t, h, "player3", "Landing")
+	teleportAndAppear(t, h, landing.id, landing.client, x+dx, y, z)
+	drainUntilQuiet(t, landing.client)
+	killPet(t, h, golem)
+	drainUntilQuiet(t, nearby.client)
+	drainUntilQuiet(t, landing.client)
+	if !golem.InsideZone(zone.FlagSiege) {
+		t.Fatal("dead golem is not on the battlefield before the jump")
+	}
+
+	teleportAndAppear(t, h, h.ownerID, h.client, x+dx, y, z)
+	frames := drainFrames(t, h.client)
+	vanished := 0
+	for _, f := range frames {
+		switch {
+		case f[0] == serverpackets.OpcodePetDelete:
+			t.Fatalf("owner opcodes %x, want no PetDelete for a corpse", frameOpcodes(frames))
+		case f[0] == serverpackets.OpcodeSystemMessage && systemMessageID(t, f) == serverpackets.SystemMessageServitorHasVanished:
+			vanished++
+		}
+	}
+	if vanished != 1 {
+		t.Fatalf("owner got YOUR_SERVITOR_HAS_VANISHED %d times in %x, want once", vanished, frameOpcodes(frames))
+	}
+	if near := drainFrames(t, nearby.client); !sawDeleteObject(near, golem.ObjectID()) {
+		t.Fatalf("watcher by the old spot opcodes %x, want DeleteObject for the corpse", frameOpcodes(near))
+	}
+	if watched := drainFrames(t, landing.client); showsObject(watched, golem.ObjectID()) {
+		t.Fatalf("watcher at the landing point opcodes %x, want the corpse never shown", frameOpcodes(watched))
+	}
+	h.srv.Settle(t)
+	if got, ok := h.srv.State.Summon(h.ownerID); !ok || got.ObjectID() != golem.ObjectID() {
+		t.Fatal("the corpse gave up its owner's summon slot")
+	}
+}
+
+// joinPlayer brings character name of account into the world.
+func joinPlayer(t *testing.T, h *petWorld, account, name string) secondPlayer {
+	t.Helper()
+	id := h.srv.SeedCharacterFor(t, account, name, 1, 0).ID
+	c := h.srv.DialClient(t, account, 1)
+	startInWorld(t, c)
+	if _, ok := h.srv.State.Player(id); !ok {
+		t.Fatalf("%s not in world", name)
+	}
+	drainUntilQuiet(t, h.client)
+	drainUntilQuiet(t, c)
+	return secondPlayer{client: c, id: id}
 }
