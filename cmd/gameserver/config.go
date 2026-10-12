@@ -73,6 +73,7 @@ type gameplayConfig struct {
 	ManufactureDelay         manufactureDelay
 	CraftingEnabled          craftingEnabled
 	MultisellDelay           multisellDelay
+	ManorDelay               manorDelay
 	RollDiceDelay            rollDiceDelay
 	SubclassDelay            subclassDelay
 	SubclassWithoutQuests    subclassWithoutQuests
@@ -179,6 +180,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.MultisellDelay, err = loadMultisellDelay(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.ManorDelay, err = loadManorDelay(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.RollDiceDelay, err = loadRollDiceDelay(paths); err != nil {
@@ -650,6 +654,18 @@ func loadMultisellDelay(paths gameServerPaths) (multisellDelay, error) {
 		return 0, err
 	}
 	return multisellDelay(time.Duration(config.NewFields(props, "multisell reuse delay").Int("MultisellTime", 100)) * time.Millisecond), nil
+}
+
+// manorDelay is the reuse delay between two seed purchases on one client
+// session, read from server.properties.
+type manorDelay time.Duration
+
+func loadManorDelay(paths gameServerPaths) (manorDelay, error) {
+	props, err := config.LoadFile(paths.ConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return manorDelay(time.Duration(config.NewFields(props, "manor reuse delay").Int("ManorTime", 3000)) * time.Millisecond), nil
 }
 
 // rollDiceDelay is the reuse delay between two dice throws on one client
