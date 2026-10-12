@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 )
 
 // errDisconnect is what an inbound handler returns to close the connection.
@@ -27,7 +29,25 @@ type inboundRegistry[K inboundOpcode] map[K]inboundFunc
 // gameInbound holds the handlers of the frame's opcode byte. The read loop
 // asks it first and falls back to its own opcode switch for an opcode with
 // no entry.
-var gameInbound = inboundRegistry[byte]{}
+var gameInbound = newGameInbound()
+
+// newGameInbound lists every opcode-byte handler. Which opcodes a client
+// may send in its current state is the state gate's business, decided
+// before any of these runs.
+func newGameInbound() inboundRegistry[byte] {
+	reg := inboundRegistry[byte]{}
+	register(reg, clientpackets.OpcodeProtocolVersion, clientpackets.DecodeProtocolVersion, (*GameClientLink).handleProtocolVersion)
+	register(reg, clientpackets.OpcodeAuthLogin, clientpackets.DecodeAuthLogin, (*GameClientLink).handleAuthLogin)
+	register(reg, clientpackets.OpcodeRequestNewCharacter, noPayload, (*GameClientLink).handleRequestNewCharacter)
+	register(reg, clientpackets.OpcodeRequestCharacterCreate, clientpackets.DecodeRequestCharacterCreate, (*GameClientLink).handleRequestCharacterCreate)
+	register(reg, clientpackets.OpcodeRequestCharacterDelete, clientpackets.DecodeRequestCharacterDelete, (*GameClientLink).handleRequestCharacterDelete)
+	register(reg, clientpackets.OpcodeCharacterRestore, clientpackets.DecodeCharacterRestore, (*GameClientLink).handleCharacterRestore)
+	register(reg, clientpackets.OpcodeRequestGameStart, clientpackets.DecodeRequestGameStart, (*GameClientLink).handleRequestGameStart)
+	register(reg, clientpackets.OpcodeEnterWorld, noPayload, (*GameClientLink).handleEnterWorld)
+	register(reg, clientpackets.OpcodeRequestPledgeCrest, clientpackets.DecodeRequestPledgeCrest, (*GameClientLink).handleRequestPledgeCrest)
+	register(reg, clientpackets.OpcodeRequestAllyCrest, clientpackets.DecodeRequestAllyCrest, (*GameClientLink).handleRequestAllyCrest)
+	return reg
+}
 
 // register binds op to handle, behind the one decode policy every client
 // frame goes through: a frame whose decode calls for a disconnect closes the
