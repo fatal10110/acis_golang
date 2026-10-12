@@ -31,11 +31,11 @@ func (g *stallingGate) Test(stat.Actor) bool {
 // to the movement, while a slow lands and refreshes. The movement must end
 // at the slowed speed, not the unslowed one the first refresh read.
 func TestSummonMoveSpeedRefreshKeepsLatestStats(t *testing.T) {
-	a := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 44, Roll: zeroSummonRoll})
-	if err := a.InitMovement(location.Location{}, 120, openGeo{}); err != nil {
+	a := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 44, Roll: zeroSummonRoll, RunSpeed: 120})
+	if err := a.InitMovement(location.Location{}, openGeo{}); err != nil {
 		t.Fatalf("InitMovement: %v", err)
 	}
-	full := a.MoveSpeed(120)
+	full := a.MoveSpeed()
 
 	gate := &stallingGate{entered: make(chan struct{}), release: make(chan struct{})}
 	gate.armed.Store(true)

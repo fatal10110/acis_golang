@@ -54,10 +54,9 @@ func (s summonStatActor) Z() int { return s.a.Z() }
 // CreatureMove, so this reports false rather than erroring.
 func (s summonStatActor) IsMoving() bool { return s.a.IsMoving() }
 
-// IsRunning satisfies conditions.Actor. Always true, matching
-// hostileStatActor: a creature's walk/run toggle defaults to run stance
-// and nothing puts a summon back into walk stance.
-func (s summonStatActor) IsRunning() bool { return true }
+// IsRunning satisfies conditions.Actor via Actor.Running: a summon runs
+// unless a hungry pet walks.
+func (s summonStatActor) IsRunning() bool { return s.a.Running() }
 
 // IsRiding satisfies conditions.Actor. Always false: summons are never
 // mounted, matching Creature.isRiding's un-overridden default.

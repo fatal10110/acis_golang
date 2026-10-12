@@ -102,10 +102,13 @@ func (a *Actor) FearImmune() bool { return a.SiegeSummon() }
 // summon's current intention, the way a move request does. A summon that
 // could not take AI actions before the effect in progress landed, which
 // includes one already afraid, stays put; one that cannot move goes idle.
-// Summons are always in run stance, so no stance change is sent; hungry-pet
-// walk stance arrives with the feed tick (#2378).
+// Whichever it does, a walking (hungry) pet is put in its run stance first.
 func (a *Actor) FleeFrom(effector effect.Actor, distance int) {
-	if effector == nil || effector.ObjectID() == a.ObjectID() || distance < 10 || a.brain == nil {
+	if effector == nil || effector.ObjectID() == a.ObjectID() || distance < 10 {
+		return
+	}
+	a.forceRunStance()
+	if a.brain == nil {
 		return
 	}
 	if a.aiDeniedBeforeEffect() {

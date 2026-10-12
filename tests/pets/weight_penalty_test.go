@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -82,7 +83,10 @@ func TestPetWeightPenaltyBands(t *testing.T) {
 		{"past 80%", 730, true, petLoad{3, 43610, 66, float64(float32(0.55)), 1.5642, 0.54351}},
 		{"at the limit", 1090, true, petLoad{4, 54510, 0, 0, 0.31284, 0.108702}},
 	}
-	for _, step := range steps {
+	for i, step := range steps {
+		if i == 3 {
+			passPetMeal(t, h, observer)
+		}
 		frames := h.giveToPet(t, ballast, step.give)
 		requirePetLoad(t, step.name, h, observer, wolf, frames, step.crossing, step.want)
 	}
@@ -279,6 +283,21 @@ func requirePetLoad(t *testing.T, name string, h *petWorld, observer *testsuppor
 	if hp, mp := wolf.HPRegenRate(), wolf.MPRegenRate(); math.Abs(hp-want.hpRegen) > 1e-9 || math.Abs(mp-want.mpRegen) > 1e-9 {
 		t.Fatalf("%s: regen HP/MP = %v/%v, want %v/%v", name, hp, mp, want.hpRegen, want.mpRegen)
 	}
+}
+
+// passPetMeal lets the wolf's first meal pass between two steps on a driven
+// clock: the pet eats every 10 seconds and each meal republishes its status,
+// which a step must not count. The steps take longer than that in all, so
+// the clock jumps over the meal at once, its frames drained, leaving the
+// steps after it short of the next one.
+func passPetMeal(t *testing.T, h *petWorld, observer *testsupport.ScriptedClient) {
+	t.Helper()
+	if !h.srv.DrivesClock() {
+		return
+	}
+	h.srv.Advance(t, 6*time.Second)
+	drainUntilQuiet(t, h.client)
+	drainUntilQuiet(t, observer)
 }
 
 // takeFromPet moves count of the pet's stack objectID back to the owner and

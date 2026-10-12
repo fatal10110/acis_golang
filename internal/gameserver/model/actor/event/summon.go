@@ -51,7 +51,46 @@ type OwnerRelinked struct{}
 // dropped: it was revived, or is about to be.
 type DecayCanceled struct{}
 
+// LifetimeShown reports a servitor's remaining lifetime, in ms out of its
+// total, for its owner's summon window.
+type LifetimeShown struct{ Total, Remaining int }
+
+// UpkeepPaid reports that a servitor's owner paid Count units of the upkeep
+// item ItemID at a lifetime checkpoint.
+type UpkeepPaid struct {
+	ItemID int32
+	Count  int
+}
+
+// UpkeepShort reports that a servitor's owner could not pay its upkeep at a
+// lifetime checkpoint; the servitor leaves.
+type UpkeepShort struct{}
+
+// PetFoodDue reports that a hungry pet eats the food item ObjectID from its
+// own inventory on a feed tick.
+type PetFoodDue struct{ ObjectID int32 }
+
+// PetHungry reports a feed tick that left a pet with no food to eat and
+// close to starving: Starving when its meal gauge is empty.
+type PetHungry struct{ Starving bool }
+
+// PetLeavingHungry reports that a starving pet is about to leave its owner
+// for good.
+type PetLeavingHungry struct{}
+
+// PetDeserted reports that a pet that left its owner from hunger has left
+// the world. As with a decayed corpse, its owner loses the collar and the
+// pet's saved state with it.
+type PetDeserted struct{}
+
 func (OwnerInfoChanged) event() {}
+func (LifetimeShown) event()    {}
+func (UpkeepPaid) event()       {}
+func (UpkeepShort) event()      {}
+func (PetFoodDue) event()       {}
+func (PetHungry) event()        {}
+func (PetLeavingHungry) event() {}
+func (PetDeserted) event()      {}
 func (Damaged) event()          {}
 func (ExpGained) event()        {}
 func (PetUsedSkill) event()     {}

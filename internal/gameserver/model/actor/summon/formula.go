@@ -350,11 +350,11 @@ func (a *Actor) CriticalRate(baseCritRate float64) float64 {
 }
 
 // MoveSpeed returns this summon's current move speed from its template
-// run speed: a summon stays in run stance, the swamp it stands in and then
-// a pet's weight-penalty band scale the base, and the RUN_SPEED stat
+// speed for its stance (baseMoveSpeed): the swamp it stands in and then a
+// pet's weight-penalty band scale the base, and the RUN_SPEED stat
 // finalizes the speed, narrowed to float32 like the client-facing speed.
-func (a *Actor) MoveSpeed(baseRunSpeed float64) float64 {
-	base := float64(int(baseRunSpeed))
+func (a *Actor) MoveSpeed() float64 {
+	base := float64(a.baseMoveSpeed())
 	if bonus := a.swampMoveBonus.Load(); bonus != 0 {
 		base = float64(float32(base * (float64(100+bonus) / 100)))
 	}
@@ -364,15 +364,24 @@ func (a *Actor) MoveSpeed(baseRunSpeed float64) float64 {
 	return float64(float32(a.calcStat(stat.RunSpeed, base)))
 }
 
-// MovementSpeedMultiplier is the current move speed over the template run
-// speed, or 0 when that base is 0. The client scales the base run and walk
-// speeds it is sent by this value.
-func (a *Actor) MovementSpeedMultiplier(baseRunSpeed float64) float32 {
-	base := int(baseRunSpeed)
+// MovementSpeedMultiplier is the current move speed over the template speed
+// of the summon's stance, or 0 when that base is 0. The client scales the
+// base run and walk speeds it is sent by this value.
+func (a *Actor) MovementSpeedMultiplier() float32 {
+	base := a.baseMoveSpeed()
 	if base == 0 {
 		return 0
 	}
-	return float32(a.MoveSpeed(baseRunSpeed)) / float32(base)
+	return float32(a.MoveSpeed()) / float32(base)
+}
+
+// baseMoveSpeed is the template speed of the summon's stance, in whole
+// points: its run speed while it runs, its walk speed while it walks.
+func (a *Actor) baseMoveSpeed() int {
+	if a.Running() {
+		return int(a.runSpeed)
+	}
+	return int(a.walkSpeed)
 }
 
 // hungryHalved reports whether a pet's attack speed should be halved for
