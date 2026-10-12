@@ -7,10 +7,15 @@
 // accessor, the one helper that panics on any NPC but a hostile one. A hook
 // reaches an operation when its function, or anything it references in the
 // script packages, references the operation. A call through the Hooks
-// invokers (a parent call, a re-entry into the final script) or a Hooks
-// field reaches every function the script assigns to that hook, its
-// ancestors' included, so the result over-approximates and never misses a
-// statically visible call.
+// invokers (a parent call, a re-entry into the final script), through a
+// Hooks field or through an engine function that runs the script's own
+// hook reaches every function the script assigns to that hook, its
+// ancestors' included. A call through any other function value that is not
+// a local variable with seen assignments (a struct field, a map or slice
+// element, a call result) reaches every function value of that type the
+// content packages make, and is an error when they make none; the engine's
+// own function values count at the engine function that makes them. The
+// result over-approximates and never misses a statically visible call.
 package handleops
 
 import (
@@ -54,9 +59,25 @@ type Program struct {
 	hooks map[*types.Var]string
 	// hooksType is the engine's Hooks type.
 	hooksType *types.Named
-	// funcVars holds, per local variable of function type, the
-	// expressions assigned to it.
+	// funcVars holds, per variable of function type, the expressions
+	// assigned to it.
 	funcVars map[*types.Var][]node
+	// dynVars are the variables of function type set from a value the scan
+	// does not follow: a range variable, one side of a multi-value
+	// assignment.
+	dynVars map[*types.Var]bool
+	// funcValues are the function values the content packages make: every
+	// function literal and every function referenced other than called.
+	funcValues []funcValue
+	// reentry holds, per engine function, the Hooks fields of the script it
+	// is called on that it runs.
+	reentry map[*types.Func][]string
+}
+
+// funcValue is a function value made in the code at n, of type sig.
+type funcValue struct {
+	sig types.Type
+	nd  node
 }
 
 type decl struct {
@@ -105,6 +126,7 @@ func Load(root string, patterns ...string) (*Program, error) {
 		byName:   map[string][]*types.Func{},
 		hooks:    map[*types.Var]string{},
 		funcVars: map[*types.Var][]node{},
+		dynVars:  map[*types.Var]bool{},
 	}
 	compiled := importer.ForCompiler(prog.fset, "gc", func(path string) (io.ReadCloser, error) {
 		f, ok := exports[path]
@@ -169,6 +191,9 @@ func (p *Program) check(l listed, imp types.Importer) error {
 	p.pkgs[l.ImportPath] = pkg
 	for _, f := range files {
 		p.indexFuncVars(f, info)
+		if l.ImportPath != ScriptPkg {
+			p.indexFuncValues(f, info)
+		}
 		for _, d := range f.Decls {
 			fd, ok := d.(*ast.FuncDecl)
 			if !ok || fd.Body == nil {
@@ -184,37 +209,108 @@ func (p *Program) check(l listed, imp types.Importer) error {
 	return nil
 }
 
-// indexFuncVars records what f assigns to its local variables of function
-// type.
+// indexFuncVars records what f assigns to its variables of function type.
 func (p *Program) indexFuncVars(f *ast.File, info *types.Info) {
-	record := func(id *ast.Ident, value ast.Expr) {
+	funcVar := func(e ast.Expr) *types.Var {
+		if sel, ok := e.(*ast.SelectorExpr); ok {
+			if info.Selections[sel] != nil {
+				return nil
+			}
+			e = sel.Sel
+		}
+		id, ok := e.(*ast.Ident)
+		if !ok {
+			return nil
+		}
 		obj := info.Defs[id]
 		if obj == nil {
 			obj = info.Uses[id]
 		}
 		if v, ok := obj.(*types.Var); ok && isFuncVar(v) {
-			p.funcVars[v] = append(p.funcVars[v], node{value, info})
+			return v
+		}
+		return nil
+	}
+	record := func(lhs []ast.Expr, rhs []ast.Expr) {
+		for i, e := range lhs {
+			v := funcVar(e)
+			switch {
+			case v == nil:
+			case len(lhs) == len(rhs):
+				p.funcVars[v] = append(p.funcVars[v], node{rhs[i], info})
+			default:
+				p.dynVars[v] = true
+			}
 		}
 	}
 	ast.Inspect(f, func(n ast.Node) bool {
 		switch n := n.(type) {
 		case *ast.AssignStmt:
-			if len(n.Lhs) == len(n.Rhs) {
-				for i, lhs := range n.Lhs {
-					if id, ok := lhs.(*ast.Ident); ok {
-						record(id, n.Rhs[i])
-					}
-				}
-			}
+			record(n.Lhs, n.Rhs)
 		case *ast.ValueSpec:
-			if len(n.Names) == len(n.Values) {
+			if len(n.Values) > 0 {
+				lhs := make([]ast.Expr, len(n.Names))
 				for i, id := range n.Names {
-					record(id, n.Values[i])
+					lhs[i] = id
+				}
+				record(lhs, n.Values)
+			}
+		case *ast.RangeStmt:
+			for _, e := range []ast.Expr{n.Key, n.Value} {
+				if v := funcVar(e); v != nil {
+					p.dynVars[v] = true
 				}
 			}
 		}
 		return true
 	})
+}
+
+// indexFuncValues records the function values f makes: its function
+// literals and the functions it references other than as the callee of a
+// call.
+func (p *Program) indexFuncValues(f *ast.File, info *types.Info) {
+	called := map[ast.Expr]bool{}
+	ast.Inspect(f, func(n ast.Node) bool {
+		if call, ok := n.(*ast.CallExpr); ok {
+			fun := ast.Unparen(call.Fun)
+			switch ix := fun.(type) {
+			case *ast.IndexExpr:
+				fun = ast.Unparen(ix.X)
+			case *ast.IndexListExpr:
+				fun = ast.Unparen(ix.X)
+			}
+			called[fun] = true
+		}
+		return true
+	})
+	add := func(e ast.Expr) {
+		if t := info.TypeOf(e); t != nil {
+			if _, ok := t.Underlying().(*types.Signature); ok {
+				p.funcValues = append(p.funcValues, funcValue{t, node{e, info}})
+			}
+		}
+	}
+	var inspect func(ast.Node) bool
+	inspect = func(n ast.Node) bool {
+		switch n := n.(type) {
+		case *ast.FuncLit:
+			add(n)
+		case *ast.SelectorExpr:
+			// The selector stands for the function, not its name.
+			if _, ok := info.Uses[n.Sel].(*types.Func); ok && !called[n] {
+				add(n)
+			}
+			ast.Inspect(n.X, inspect)
+			return false
+		case *ast.Ident:
+			if _, ok := info.Uses[n].(*types.Func); ok && !called[n] {
+				add(n)
+			}
+		}
+		return true
+	}
+	ast.Inspect(f, inspect)
 }
 
 // isFuncVar reports whether v is a variable of function type that is no
@@ -264,7 +360,93 @@ func (p *Program) index() error {
 			}
 		}
 	}
+	p.indexReentry(engine)
 	return nil
+}
+
+// indexReentry finds the engine functions that run a hook of the script
+// they are called on: a method of Script that runs a hook of its receiver
+// (directly or through an invoker), and every engine function that
+// references one. A registry dispatch runs the hooks of the scripts bound
+// to an event, each an invocation of its own that the gate checks against
+// that script's bindings, so it is no re-entry.
+func (p *Program) indexReentry(engine *types.Package) {
+	script, _ := engine.Scope().Lookup("Script").(*types.TypeName)
+	p.reentry = map[*types.Func][]string{}
+	for fn, d := range p.decls {
+		if script == nil || fn.Pkg() != engine || d.fn.Recv == nil || len(d.fn.Recv.List[0].Names) == 0 {
+			continue
+		}
+		recv, _ := d.info.Defs[d.fn.Recv.List[0].Names[0]].(*types.Var)
+		if recv == nil || !isNamed(recv.Type(), script) {
+			continue
+		}
+		var hooks []string
+		ast.Inspect(d.fn.Body, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			sel, ok := ast.Unparen(call.Fun).(*ast.SelectorExpr)
+			if !ok || rootObj(sel.X, d.info) != recv {
+				return true
+			}
+			switch obj := d.info.Uses[sel.Sel].(type) {
+			case *types.Func:
+				if p.isInvoker(obj) {
+					hooks = append(hooks, "On"+obj.Name())
+				}
+			case *types.Var:
+				if name, ok := p.hooks[obj]; ok {
+					hooks = append(hooks, name)
+				}
+			}
+			return true
+		})
+		if len(hooks) > 0 {
+			p.reentry[fn] = hooks
+		}
+	}
+	for changed := true; changed; {
+		changed = false
+		for fn, d := range p.decls {
+			if fn.Pkg() != engine {
+				continue
+			}
+			for _, ref := range p.refs(d.fn.Body, d.info) {
+				for _, h := range p.reentry[ref] {
+					if !slices.Contains(p.reentry[fn], h) {
+						p.reentry[fn] = append(p.reentry[fn], h)
+						changed = true
+					}
+				}
+			}
+		}
+	}
+}
+
+// isNamed reports whether t is the named type of obj or a pointer to it.
+func isNamed(t types.Type, obj *types.TypeName) bool {
+	if ptr, ok := t.(*types.Pointer); ok {
+		t = ptr.Elem()
+	}
+	named, ok := t.(*types.Named)
+	return ok && named.Obj() == obj
+}
+
+// rootObj returns the object the selector chain e starts at, nil when it
+// starts at no identifier.
+func rootObj(e ast.Expr, info *types.Info) types.Object {
+	for {
+		switch x := ast.Unparen(e).(type) {
+		case *ast.SelectorExpr:
+			e = x.X
+		case *ast.Ident:
+			return info.Uses[x]
+		default:
+			return nil
+		}
+	}
 }
 
 // refs returns the functions n references, an interface method expanded to
@@ -423,9 +605,10 @@ type node struct {
 
 // Script returns, per Hooks field the script built by ctors sets ("OnTalk"),
 // the hostile-only operations that hook reaches, sorted; a hook that
-// reaches none is left out. A hook that calls a function-typed parameter,
-// or a variable it cannot see the value of, is an error: what it calls is
-// unknown.
+// reaches none is left out. A call through a function value the scan
+// cannot follow (a function-typed parameter, a variable with no seen
+// assignment, a function type the content packages make no value of) is an
+// error: what it calls is unknown.
 func (p *Program) Script(ctors []*types.Func) (map[string][]string, error) {
 	roots := p.hookRoots(ctors)
 	out := map[string][]string{}
@@ -433,39 +616,67 @@ func (p *Program) Script(ctors []*types.Func) (map[string][]string, error) {
 	for field := range roots {
 		ops := map[string]bool{}
 		p.walk(roots[field], func(nd node, visit func(node), hook func(string)) {
-			ast.Inspect(nd.n, func(n ast.Node) bool {
-				id, ok := n.(*ast.Ident)
-				if !ok {
-					return true
-				}
-				switch obj := nd.info.Uses[id].(type) {
-				case *types.Var:
-					if name, ok := p.hooks[obj]; ok {
-						hook(name)
-					} else if isFuncVar(obj) {
-						vals, ok := p.funcVars[obj]
-						if !ok {
-							unresolved = append(unresolved, p.fset.Position(id.Pos()).String()+": "+id.Name)
-						}
-						for _, v := range vals {
-							visit(v)
-						}
+			// anyOf visits every function value of type t the content
+			// packages make, at a call through a value the scan does not
+			// follow.
+			anyOf := func(at ast.Node, t types.Type) {
+				found := false
+				for _, fv := range p.funcValues {
+					if types.Identical(fv.sig, t) {
+						found = true
+						visit(fv.nd)
 					}
-				case *types.Func:
-					for _, fn := range p.targets(obj.Origin()) {
-						switch {
-						case fn.Pkg() != nil && fn.Pkg().Path() == ScriptPkg:
-							if p.kinded[fn] {
-								if name, ok := opName(fn); ok {
-									ops[name] = true
+				}
+				if !found {
+					unresolved = append(unresolved, fmt.Sprintf("%s: a %s value", p.fset.Position(at.Pos()), t))
+				}
+			}
+			ast.Inspect(nd.n, func(n ast.Node) bool {
+				switch n := n.(type) {
+				case *ast.CallExpr:
+					if t, ok := p.dynamicCallee(n.Fun, nd.info); ok {
+						anyOf(n.Fun, t)
+					}
+				case *ast.Ident:
+					switch obj := nd.info.Uses[n].(type) {
+					case *types.Var:
+						if name, ok := p.hooks[obj]; ok {
+							hook(name)
+						} else if isFuncVar(obj) {
+							vals, ok := p.funcVars[obj]
+							if !ok && !p.dynVars[obj] {
+								unresolved = append(unresolved, p.fset.Position(n.Pos()).String()+": "+n.Name)
+							}
+							if p.dynVars[obj] {
+								anyOf(n, obj.Type())
+							}
+							for _, v := range vals {
+								if t, ok := p.dynamic(v.n.(ast.Expr), v.info); ok {
+									anyOf(v.n, t)
+								} else {
+									visit(v)
 								}
 							}
-							if p.isInvoker(fn) {
-								hook("On" + fn.Name())
-							}
-						default:
-							if d, ok := p.decls[fn]; ok {
-								visit(node{d.fn, d.info})
+						}
+					case *types.Func:
+						for _, fn := range p.targets(obj.Origin()) {
+							switch {
+							case fn.Pkg() != nil && fn.Pkg().Path() == ScriptPkg:
+								if p.kinded[fn] {
+									if name, ok := opName(fn); ok {
+										ops[name] = true
+									}
+								}
+								if p.isInvoker(fn) {
+									hook("On" + fn.Name())
+								}
+								for _, h := range p.reentry[fn] {
+									hook(h)
+								}
+							default:
+								if d, ok := p.decls[fn]; ok {
+									visit(node{d.fn, d.info})
+								}
 							}
 						}
 					}
@@ -482,6 +693,62 @@ func (p *Program) Script(ctors []*types.Func) (map[string][]string, error) {
 		return nil, fmt.Errorf("handleops: calls through function values of unknown origin: %s", strings.Join(slices.Compact(unresolved), "; "))
 	}
 	return out, nil
+}
+
+// dynamicCallee returns the type of the function value fun, the callee of
+// a call, when the scan does not follow it to the functions it may hold.
+func (p *Program) dynamicCallee(fun ast.Expr, info *types.Info) (types.Type, bool) {
+	if tv, ok := info.Types[fun]; !ok || !tv.IsValue() {
+		return nil, false // a conversion
+	}
+	return p.dynamic(fun, info)
+}
+
+// dynamic returns the type of e, an expression of function type, when the
+// scan does not follow it to the functions it may hold: everything but a
+// function literal, a function or method, a Hooks field and a variable of
+// function type (which the walk follows to its assignments).
+func (p *Program) dynamic(e ast.Expr, info *types.Info) (types.Type, bool) {
+	e = ast.Unparen(e)
+	t := info.TypeOf(e)
+	if t == nil {
+		return nil, false
+	}
+	if _, ok := t.Underlying().(*types.Signature); !ok {
+		return nil, false
+	}
+	switch x := e.(type) {
+	case *ast.FuncLit, *ast.Ident:
+		return nil, false
+	case *ast.SelectorExpr:
+		sel := info.Selections[x]
+		if sel == nil || sel.Kind() != types.FieldVal {
+			return nil, false // a qualified name, a method value or expression
+		}
+		if _, ok := p.hooks[sel.Obj().(*types.Var)]; ok {
+			return nil, false
+		}
+	case *ast.IndexExpr:
+		if _, ok := info.Uses[selName(x.X)].(*types.Func); ok {
+			return nil, false // an instantiated generic function
+		}
+	case *ast.IndexListExpr:
+		if _, ok := info.Uses[selName(x.X)].(*types.Func); ok {
+			return nil, false
+		}
+	}
+	return t, true
+}
+
+// selName returns the identifier e names: e itself, or a selector's name.
+func selName(e ast.Expr) *ast.Ident {
+	switch x := ast.Unparen(e).(type) {
+	case *ast.Ident:
+		return x
+	case *ast.SelectorExpr:
+		return x.Sel
+	}
+	return nil
 }
 
 // isInvoker reports whether fn is a Hooks invoker: the method of the hook

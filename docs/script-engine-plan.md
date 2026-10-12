@@ -319,7 +319,9 @@ where the reference asks an NPC to walk a route (A13).
   shot-recharge roll, the walker alias rule, `Party_Type` 2 privates, `despawnMinions`, and
   default treatment of the scripted maker type strings (predicate: no maker registered).
 - A script cannot register until every seam it subscribes to, and every handle operation it
-  calls, is implemented for the NPC kinds it is bound to (boot check and test).
+  calls, is implemented for the NPC kinds it is bound to (boot check and test). Handle
+  operations are checked per hook: a hook raised for NPC events against the NPCs bound to
+  those events, any other hook against every NPC the script is bound to.
 
 ## 9. Deliberate differences from the reference
 
