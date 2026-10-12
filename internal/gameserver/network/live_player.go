@@ -121,6 +121,9 @@ type livePlayer struct {
 	// owned by p's queue. See punishment.go.
 	punishTimer    *sim.Timer
 	punishDeadline time.Time
+	// siegeRestart is the restart a dead siege attacker waits out, nil for
+	// none; owned by p's queue. See restartpoint.go.
+	siegeRestart *sim.Timer
 	// handlerPanicked records that a task this player's connection waited on
 	// panicked. Written by onLive and read by the dispatch loop, both on the
 	// owning connection goroutine and nowhere else.
