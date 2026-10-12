@@ -3,6 +3,7 @@
 # there is nothing to heal. A scenario seeds no death penalty and no adena, so the payment and
 # the refused fee links are in tests/npcs/proof_features_test.go. Expectations are derived
 # from the reference source (BlackJudge.onFirstTalk, onAdvEvent).
+trace internal/gameserver/script/testdata/oracle/scenarios/black_judge.golden
 character Judged 20
 script script.feature.BlackJudge
 page script/feature/BlackJudge/

@@ -4,6 +4,7 @@
 # then 10000 and blesses him with the fighter blessing at level 1, with no line: the draw of
 # 10000 is not 0 (onSeeCreature). The blessing lands. Expectations are derived from the
 # reference source (CabalBuffer.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/cabal_buffer_orator.golden
 character Seeker 20
 cabal dawn gnosis
 festival 100 0

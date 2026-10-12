@@ -27,7 +27,12 @@ the `eclipse-temurin:21-jdk-alpine` image, with four infrastructure classes repl
 | `commons/pool/ThreadPool.java` | `shadow/.../ThreadPool.java`: no threads. `execute` runs inline; scheduled tasks wait on a virtual clock that only the probe advances, then run inline in due-time order (ties in scheduling order). |
 | `commons/random/Rnd.java` | `shadow/.../Rnd.java`: one seeded `java.util.Random` with the reference bounds; the trace reseeds it before each quest. A scenario trace can pin the script draws alone (`Rnd.scriptCallers`, below). |
 | `gameserver/network/GameClient.java` | the reference file, with the socket write of `sendPacket` replaced at build time by `ProbeWire.capture` (`probe/net/sf/l2j/commons/mmocore/ProbeWire.java`), which writes the packet into a little-endian buffer exactly as the selector does before encryption. The `runImpl` after the send is kept. |
-| `commons/pool/ConnectionPool.java` | `shadow/.../ConnectionPool.java`: no database. Updates touch nothing; a `SELECT` from a table the datapack's install scripts (`aCis_datapack/sql/*.sql`) seed returns those rows, as a fresh install would (castle, clan hall, seven signs status and festival, derby bets); any other query returns no row. |
+| `commons/pool/ConnectionPool.java` | `shadow/.../ConnectionPool.java`: no database. Updates touch nothing; a `SELECT` from a table the datapack's install scripts (`aCis_datapack/sql/*.sql`) seed returns those rows, as a fresh install would (castle, clan hall, seven signs status and festival, derby bets); any other query returns no row. While a scenario trace plays, the rows of the tables it keeps (`characters`, `items`, `character_quests`, `character_memo`) live in `shadow/.../ProbeStore.java`: the statements on them change and read those rows as the database would (see "Quest scenario traces"). |
+
+Every other read of the wall clock in the reference tree (`System.currentTimeMillis()`) is
+pointed at `ProbeClock.wall()` at build time: the real clock, except while a scenario trace
+plays, when it is a virtual one (2026-01-01 00:00 UTC at the scenario's start, moving with the
+virtual time), so a trace does not depend on when the probe ran.
 
 `probe/ScriptProbe.java` then runs the reference boot sequence of the game server up to and
 including the script loader (`ScriptData`), minus logging setup, sockets and the login
@@ -71,8 +76,8 @@ file of `tests/quest/testdata/scenarios` whose `trace` line names a file under
 up the way the Go runner (`internal/testsupport/scenario`) sets it up, so the trace answers
 what the reference does in the scenario's own world:
 
-- the player is created at the character line's level and the class line's class (default 0),
-  standing where the Go fixture character enters the world (10, 20, 30); a clan line creates a
+- unless its first step creates it, the player is created at the character line's level and
+  the class line's class (default 0), standing where the Go fixture character enters the world (10, 20, 30); a clan line creates a
   clan the player leads and sets its level; each quest line puts its rows in the player's quest
   state before anything is recorded;
 - each NPC line's NPC is spawned at its offset from the player. Every NPC template is bound to
@@ -88,16 +93,33 @@ what the reference does in the scenario's own world:
   of the range's size, a boolean is a value of bound 2, true when 0), and any other draw comes
   from the seeded generator, reseeded per scenario. A script draw past the listed values, or
   outside its bound, fails the run. Each pinned draw is a `# draw` line of the step that drew
-  it; the Go run of the same step must draw the same bounds in the same order.
+  it; the Go run of the same step must draw the same bounds in the same order;
+- the hold, equip, standing, pk, cabal and festival lines are seeded as the Go runner seeds
+  them (inventory items, a worn item, the Ketra/Varka standing, the PK count, the Seven Signs
+  sign-up, the festival scores, given back after the scenario); a traced scenario with a header
+  line the probe does not read fails the run;
+- each scenario's character has an account of its own; its character, item, quest and memo rows
+  are kept from its creation on (the quest lines' rows written as the Go runner writes them), so
+  a relog stores the character at its logout and restores it from the rows the run wrote, read
+  back by the reference's own restore queries; a statement on a kept table the store cannot run
+  fails the run;
+- the game time is noon of the first game day at each scenario's start.
 
-The steps run in order until the first one a trace does not record: action, bypass and link
-are fed as client packets, followed by 500 ms; a kill of N kills N monsters one by one, a fresh
-one at the NPC line's offset once the last one is dead, each followed by 3.5 s (the Go
-runner's kill wait); a hit takes the damage, followed by 500 ms; an advance passes its time in
-500 ms ticks. A relog or an approach ends the trace (a relog needs the character restored from
-the database, which the probe does not keep), and a scenario that creates its character is not
-traced. `internal/testsupport/scenario` then requires the scenario's first steps to replay the
-trace (package doc there). Two consecutive runs produce byte-identical traces.
+Every step is played, in order, and the trace records them all: action, bypass, link and mark
+(`RequestTutorialQuestionMark`) are fed as client packets, followed by 500 ms; a relog is a
+restart and an enter; a restart is a `RequestRestart`, an enter a `RequestGameStart` of slot 0
+(the character select's flood protector reset first: the Go runner selects again at once) and an
+`EnterWorld`, a create a `RequestCharacterCreate` of the Go runner's human fighter, the created
+character then moved, in its kept row, to where the Go fixture character enters the world; each
+of these packets is followed by 500 ms. A kill of N kills N monsters one by one, a fresh one at
+the NPC line's offset once the last one is dead, each followed by 3.5 s (the Go runner's kill
+wait); a hit takes the damage, followed by 500 ms; an advance passes its time in 500 ms ticks; a
+pickup is an `Action` on the one ground item of the template, then 500 ms ticks until the item
+has left the ground; an approach puts the player 100 in front of the NPC, on the -x side, and
+runs the NPC AI task once; a tick runs it once. The NPC lines' NPCs are spawned when the
+character first stands in the world (after the first enter of a created character), what their
+spawning sends unrecorded. `internal/testsupport/scenario` then requires the scenario's steps to
+replay the whole trace (package doc there). Two consecutive runs produce byte-identical traces.
 
 ## Contract golden format
 
@@ -226,6 +248,10 @@ Q <sql> | <param> | ...         an executed statement with its bound parameters 
 # advance <ms>                  a scenario trace: that much virtual time passes, in T ticks
 # draw <bound>:<value> <class>  a scenario trace: a script draw the random line pinned, and the
                                 class that drew it
+# npc <role> <npc id> (object <id>)   a scenario trace: the probe spawned the NPC line's NPC
+# approach <npc id> (object <id>)     a scenario trace: the player steps up to the NPC, one AI tick
+# tick                          a scenario trace: one run of the NPC AI task
+C Action item <item id> (object <id>)   a scenario trace: the pickup's action on the ground item
 ```
 
 The player and NPCs stand within interaction range of each other, so no movement is

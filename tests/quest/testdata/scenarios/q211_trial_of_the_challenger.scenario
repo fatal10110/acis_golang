@@ -52,6 +52,7 @@ bypass Quest Q211_TrialOfTheChallenger 30644-05.htm
   S ActionFailed
   Q upsert Q211_TrialOfTheChallenger | <state> | STARTED
   Q upsert Q211_TrialOfTheChallenger | <cond> | 1
+  M set secondClassChange35 | true
   items 7562=61
 
 # Shyslassys: the key and the scroll; his chest appears where he fell.

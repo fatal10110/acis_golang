@@ -64,6 +64,7 @@ bypass npc_{rayen}_Quest
   S NpcHtmlMessage obj=rayen item=0 page=script/quest/Q260_HuntTheOrcs/30221-05.htm
   S ActionFailed
   S ActionFailed
+  M set Q260_HuntTheOrcs_OneTimeQuestFlag | true
   items 57=54 1114=0 1115=0 5789=6000
 
 # Second payment: one more amulet, and no shots this time.

@@ -1,10 +1,12 @@
-# Tutorial: a human fighter created through the client starts with the tutorial STARTED. The
-# first enter world arms the 10 s step and enables no client event; the step gives the missing
-# tutorial guide, plays the class's first voice and opens its first page; 30 s later the second
-# voice plays. Expectations are derived from the reference source (RequestCharacterCreate.java
-# 167-170; Tutorial.java onTimer QT and onAdvEvent UC) and restate
-# tutorial_script_test.go (TestNewCharacterTutorialFirstSteps, TestTutorialFirstStepGivesAMissingGuide),
-# which stays the primary check.
+# Tutorial: a human fighter created through the client starts with the tutorial STARTED and holds
+# the tutorial guide its class template gives. The first enter world arms the 10 s step and
+# enables no client event; the step plays the class's first voice and opens its first page (the
+# guide is held, so none is given); 30 s later the second voice plays. Expectations are derived
+# from the reference source (RequestCharacterCreate.java 167-170; Tutorial.java onTimer QT and
+# onAdvEvent UC), replay the reference trace and restate tutorial_script_test.go
+# (TestNewCharacterTutorialFirstSteps), which stays the primary check; the guide a character
+# lacks is given in TestTutorialFirstStepGivesAMissingGuide.
+trace internal/gameserver/script/testdata/oracle/scenarios/tutorial_first_steps.golden
 character Newbie 1
 script script.feature.Tutorial
 item 5588
@@ -26,10 +28,9 @@ enter
 
 # Nothing before the tenth second.
 advance 9s
-  items 5588=0
+  items 5588=1
 
 advance 1s
-  S SystemMessage id=54 3:5588
   S PlaySound type=2 file=tutorial_voice_001a bind=1 obj=player loc=10,20,30 delay=0
   S TutorialShowHtml page=script/feature/Tutorial/tutorial_human_fighter001.htm
   Q upsert Tutorial | Ex | -3

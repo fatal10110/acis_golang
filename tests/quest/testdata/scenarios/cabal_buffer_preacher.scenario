@@ -4,6 +4,7 @@
 # alone: it curses only the losing cabal (onSeeCreature). The curse of a Dusk character is in
 # cabal_buffer_test.go: whether it lands is the world's roll, which a scenario cannot pin.
 # Expectations are derived from the reference source (CabalBuffer.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/cabal_buffer_preacher.golden
 character Seeker 20
 cabal dawn gnosis
 festival 100 0
