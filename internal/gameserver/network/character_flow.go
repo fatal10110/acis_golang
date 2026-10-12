@@ -421,9 +421,13 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	if c.ClanJoinExpiryTime() > time.Now().UnixMilli() {
 		client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageClanMembershipTerminated))
 	}
-	// ponytail: an attacker or spectator (siege state below 2) logging in
-	// on a battlefield under siege is sent to town here; it needs the login
-	// siege state, so both land together (#3150).
+	// An attacker or a spectator (siege state below the defender's) logging
+	// in on a battlefield under siege is sent to town.
+	if live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagSiege) && c.SiegeState() < player.SiegeStateDefender {
+		if dest, ok := l.restartDestination(live); ok {
+			l.teleportLivePlayer(live, dest, restartTeleportOffset)
+		}
+	}
 
 	// The tutorial quest hears of the entry last, ahead of the closing
 	// ActionFailed.

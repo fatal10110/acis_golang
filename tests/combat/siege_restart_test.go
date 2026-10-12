@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
@@ -45,12 +46,16 @@ type siegeRestarter struct {
 	// x, when set, stores the player at that x coordinate instead of the
 	// default one.
 	x int
+	// fieldEast, when set, is the battlefield's east edge instead of 1000.
+	fieldEast int
 }
 
 // bootSiegeRestart boots r stored dead inside castle restartCastleID's
 // battlefield with that castle's siege under way, enters the world and
 // returns the server, the object id and the login's Die window. opts add to
-// the world's boot options.
+// the world's boot options. An attacker or a player of no side entering
+// the world on the battlefield is sent to the town restart point, which
+// lies on the battlefield too; it lands there before this returns.
 func bootSiegeRestart(t *testing.T, r siegeRestarter, opts ...gameservertest.Option) (*gameservertest.Server, int32, deathWindow) {
 	t.Helper()
 	datapack.Require(t)
@@ -62,7 +67,11 @@ func bootSiegeRestart(t *testing.T, r siegeRestarter, opts ...gameservertest.Opt
 	if err != nil {
 		t.Fatalf("load castles: %v", err)
 	}
-	form, err := zone.NewCuboid(-1_000, 1_000, -1_000, 1_000, -10_000, 10_000)
+	east := 1_000
+	if r.fieldEast != 0 {
+		east = r.fieldEast
+	}
+	form, err := zone.NewCuboid(-1_000, east, -1_000, 1_000, -10_000, 10_000)
 	if err != nil {
 		t.Fatalf("battlefield: %v", err)
 	}
@@ -131,7 +140,10 @@ func bootSiegeRestart(t *testing.T, r siegeRestarter, opts ...gameservertest.Opt
 		window.fixed = w.ReadInt32() == 1
 		break
 	}
-	drainUntilQuiet(t, c)
+	if indexOf(readQuiet(c), 0, serverpackets.OpcodeTeleportToLocation, objID) >= 0 {
+		c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+		drainUntilQuiet(t, c)
+	}
 	return srv, objID, window
 }
 
@@ -295,13 +307,13 @@ func TestSiegeRestartSealOfStrife(t *testing.T) {
 		{"dawn", siegeRestarter{side: "DEFENDER", dawnStrife: true}, func(t *testing.T) []location.Location {
 			return castleSpawns(t, residence.SpawnOther)
 		}},
-		{"dawn with karma", siegeRestarter{noClan: true, karma: 100, dawnStrife: true}, func(t *testing.T) []location.Location {
+		{"dawn with karma", siegeRestarter{side: "DEFENDER", karma: 100, dawnStrife: true}, func(t *testing.T) []location.Location {
 			return castleSpawns(t, residence.SpawnChaotic)
 		}},
 		{"dusk", siegeRestarter{side: "DEFENDER"}, func(*testing.T) []location.Location {
 			return []location.Location{townRestartPoint}
 		}},
-		{"dusk with karma", siegeRestarter{noClan: true, karma: 100}, func(*testing.T) []location.Location {
+		{"dusk with karma", siegeRestarter{side: "DEFENDER", karma: 100}, func(*testing.T) []location.Location {
 			return []location.Location{chaosRestartPoint}
 		}},
 	} {

@@ -83,3 +83,10 @@ func (s *Server) PlayerSiegeState(tb testing.TB, objID int32) int32 {
 	tb.Helper()
 	return s.onlineCharacter(tb, objID).SiegeState()
 }
+
+// PlayerSkillLevel returns the level the online player objID knows skillID
+// at, 0 when it does not know it.
+func (s *Server) PlayerSkillLevel(tb testing.TB, objID int32, skillID int) int {
+	tb.Helper()
+	return s.onlineCharacter(tb, objID).SkillLevel(skillID)
+}

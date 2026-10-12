@@ -29,19 +29,25 @@ const (
 	DissolveInAlliance
 	DissolveAtWar
 	DissolveOwnsResidence
+	// DissolveSiegeRegistered refuses a clan registered on a castle siege
+	// not under way yet; DissolveInSiege one whose siege is under way.
+	DissolveSiegeRegistered
+	DissolveInSiege
 	DissolveInProgress
 )
 
 // RequestDissolve has c, its clan's leader, ask for the clan to be
 // dissolved as of now. A clan in an alliance, at war, or owning a castle or
-// clan hall may not be dissolved, nor one whose dissolution is already
-// pending. A clan registered on a castle siege may not be either, which
-// is not checked yet (#3330).
-func (s *Service) RequestDissolve(c *player.Character, now time.Time) (*Clan, DissolveResult) {
+// clan hall may not be dissolved, nor one registered on a castle siege
+// (sieges; the first siege it is registered on decides the refusal), nor
+// one whose dissolution is already pending.
+func (s *Service) RequestDissolve(c *player.Character, now time.Time, sieges Sieges) (*Clan, DissolveResult) {
 	cl, ok := s.ClanOf(c)
 	if !ok || !cl.IsLeader(c.ID) {
 		return nil, DissolveNotLeader
 	}
+	// Read before the clan's lock is taken: the sieges read the clans.
+	registered, inSiege := siegeRegistration(sieges, cl.id)
 	nowMs := now.UnixMilli()
 	cl.mu.Lock()
 	defer cl.mu.Unlock()
@@ -54,6 +60,10 @@ func (s *Service) RequestDissolve(c *player.Character, now time.Time) (*Clan, Di
 		return cl, DissolveAtWar
 	case cl.castleID > 0 || cl.hallID > 0:
 		return cl, DissolveOwnsResidence
+	case registered && inSiege:
+		return cl, DissolveInSiege
+	case registered:
+		return cl, DissolveSiegeRegistered
 	case cl.dissolvingExpiry > nowMs:
 		return cl, DissolveInProgress
 	}
@@ -114,9 +124,8 @@ type Dissolution struct {
 // its privileges, skills, sub-units, wars and siege registrations, and the
 // tax of a castle it held is reset. online resolves a member's live
 // character, nil when it is not in the world. The members' live state is
-// the caller's to clear (ApplyDispersed), as is the clan warehouse.
-// Dropping the clan from the sieges' registrations and the siegable halls
-// is not ported yet (#3330).
+// the caller's to clear (ApplyDispersed), as are the clan warehouse and
+// the clan's place on the sieges.
 func (s *Service) Destroy(cl *Clan, due bool, online func(int32) *player.Character, now time.Time) (Dissolution, bool) {
 	cl.mu.Lock()
 	if cl.destroyed || (due && cl.dissolvingExpiry == 0) {
@@ -177,13 +186,14 @@ func (s *Service) forgetWars(cl *Clan) {
 
 // ApplyDispersed clears the clan state of m, removed at now when its clan
 // was dissolved, on its live character; it runs on that character's queue.
-// A noble keeps its title. No join penalty follows, and any the member
-// held is lifted unless it was in the academy; the clan's leader may not
-// found another clan for CreateDays.
+// A noble keeps its title; the siege state clears. No join penalty
+// follows, and any the member held is lifted unless it was in the academy;
+// the clan's leader may not found another clan for CreateDays.
 func (s *Service) ApplyDispersed(c *player.Character, m Member, leader bool, now time.Time) {
 	clearLeaverTitle(c)
 	c.SetClanID(0)
 	c.SetWantsPeace(false)
+	c.SetSiegeState(player.SiegeStateNone)
 	if m.PledgeType != SubunitAcademy {
 		c.SetClanJoinExpiryTime(0)
 	}

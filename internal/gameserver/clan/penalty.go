@@ -45,11 +45,9 @@ type Penalty struct {
 }
 
 // PenaltyReport lists, in display order, the penalties c and its clan are
-// under at nowMs.
-//
-// A clan registered on a castle siege may not be dissolved either, which
-// is not listed yet (#3211).
-func (s *Service) PenaltyReport(c *player.Character, nowMs int64) []Penalty {
+// under at nowMs; sieges tells a clan registered on a castle siege, which
+// may not be dissolved.
+func (s *Service) PenaltyReport(c *player.Character, nowMs int64, sieges Sieges) []Penalty {
 	var out []Penalty
 	if t := c.ClanJoinExpiryTime(); t > nowMs {
 		out = append(out, Penalty{PenaltyJoinClan, t})
@@ -61,6 +59,8 @@ func (s *Service) PenaltyReport(c *player.Character, nowMs int64) []Penalty {
 	if !ok {
 		return out
 	}
+	// Read before the clan's lock is taken: the sieges read the clans.
+	registered, _ := siegeRegistration(sieges, cl.id)
 	cl.mu.RLock()
 	defer cl.mu.RUnlock()
 	if cl.charPenaltyExpiry > nowMs {
@@ -79,7 +79,7 @@ func (s *Service) PenaltyReport(c *player.Character, nowMs int64) []Penalty {
 	if cl.dissolvingExpiry > nowMs {
 		out = append(out, Penalty{PenaltyDissolving, cl.dissolvingExpiry})
 	}
-	if cl.allyID != 0 || len(cl.wars) > 0 || cl.castleID > 0 || cl.hallID > 0 {
+	if cl.allyID != 0 || len(cl.wars) > 0 || cl.castleID > 0 || cl.hallID > 0 || registered {
 		out = append(out, Penalty{Kind: PenaltyNoDissolve})
 	}
 	return out

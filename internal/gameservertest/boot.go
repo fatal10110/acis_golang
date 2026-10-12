@@ -2019,6 +2019,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err := sevenSigns.Restore(context.Background()); err != nil {
 		t.Fatalf("restore seven signs status: %v", err)
 	}
+	worldObjects.SetStrife(sevenSigns)
 	festivalStore := gamesql.NewFestivalStore(db)
 	if o.seedFestival != nil {
 		o.seedFestival(festivalStore)

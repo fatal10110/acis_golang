@@ -82,8 +82,7 @@ func (s *Service) setAllyCrestLocked(cl *Clan, id int32) {
 // AllyCreateResult is the outcome of founding an alliance.
 type AllyCreateResult int
 
-// The founding outcomes, in the order they are checked. A founding while a
-// siege involving the clan is in progress is not refused yet (#3150).
+// The founding outcomes, in the order they are checked.
 const (
 	AllyCreated AllyCreateResult = iota
 	// AllyCreateNotLeader refuses a clanless player or a member that does
@@ -98,10 +97,12 @@ const (
 	AllyCreateNameInvalid
 	AllyCreateNameLength
 	AllyCreateNameTaken
+	// AllyCreateInSiege refuses a clan registered on a siege in progress.
+	AllyCreateInSiege
 )
 
 // CreateAlly founds the alliance name with c's clan as its leading clan.
-func (s *Service) CreateAlly(c *player.Character, name string, now time.Time) AllyCreateResult {
+func (s *Service) CreateAlly(c *player.Character, name string, now time.Time, sieges Sieges) AllyCreateResult {
 	cl, ok := s.ClanOf(c)
 	if !ok || !cl.IsLeader(c.ID) {
 		return AllyCreateNotLeader
@@ -125,6 +126,8 @@ func (s *Service) CreateAlly(c *player.Character, name string, now time.Time) Al
 		return AllyCreateNameLength
 	case s.table.allyNameTaken(name):
 		return AllyCreateNameTaken
+	case siegeFighting(sieges, cl.id):
+		return AllyCreateInSiege
 	}
 	cl.mu.Lock()
 	s.setAllyLocked(cl, cl.id, name, 0, 0)
@@ -135,15 +138,16 @@ func (s *Service) CreateAlly(c *player.Character, name string, now time.Time) Al
 // AllyDissolveResult is the outcome of dissolving an alliance.
 type AllyDissolveResult int
 
-// The dissolution outcomes, in the order they are checked. A dissolution
-// while any of the alliance's clans takes part in a siege in progress is
-// not refused yet (#3150).
+// The dissolution outcomes, in the order they are checked.
 const (
 	AllyDissolved AllyDissolveResult = iota
 	// AllyDissolveNoClan is a clanless player; it is not answered.
 	AllyDissolveNoClan
 	AllyDissolveNoAlly
 	AllyDissolveNotAllyLeader
+	// AllyDissolveInSiege refuses an alliance one of whose clans is
+	// registered on a siege in progress.
+	AllyDissolveInSiege
 )
 
 // AllyDissolution is a dissolved alliance.
@@ -162,7 +166,7 @@ type AllyDissolution struct {
 // and cleared on every clan in no alliance, as the reference clears it by
 // the now-zero alliance id; with consistent rows that is only the
 // dissolved alliance's clans.
-func (s *Service) DissolveAlly(c *player.Character, files *datacache.Crests, now time.Time) (AllyDissolution, AllyDissolveResult) {
+func (s *Service) DissolveAlly(c *player.Character, files *datacache.Crests, now time.Time, sieges Sieges) (AllyDissolution, AllyDissolveResult) {
 	cl, ok := s.ClanOf(c)
 	if !ok {
 		return AllyDissolution{}, AllyDissolveNoClan
@@ -177,6 +181,11 @@ func (s *Service) DissolveAlly(c *player.Character, files *datacache.Crests, now
 		return AllyDissolution{}, AllyDissolveNotAllyLeader
 	}
 	out := AllyDissolution{Clans: s.table.Allies(allyID)}
+	for _, member := range out.Clans {
+		if siegeFighting(sieges, member.id) {
+			return AllyDissolution{}, AllyDissolveInSiege
+		}
+	}
 	for _, member := range out.Clans {
 		if member == cl {
 			continue
@@ -209,9 +218,7 @@ func (s *Service) DissolveAlly(c *player.Character, files *datacache.Crests, now
 // refused. Every refusal is answered to the inviter.
 type AllyJoinRefusal int
 
-// The invitation refusals, in the order they are checked. A target clan
-// registered against the leading clan in a siege is not refused yet
-// (#3150).
+// The invitation refusals, in the order they are checked.
 const (
 	AllyJoinAllowed AllyJoinRefusal = iota
 	AllyJoinNotAllyLeader
@@ -228,6 +235,9 @@ const (
 	// AllyJoinTargetDismissedPenalty refuses a clan dismissed from an
 	// alliance less than AllyJoinDaysWhenDismissed ago.
 	AllyJoinTargetDismissedPenalty
+	// AllyJoinOpposedInSiege refuses a clan registered on the side opposite
+	// the leading clan's on a castle's siege.
+	AllyJoinOpposedInSiege
 	AllyJoinAtWar
 	AllyJoinFull
 )
@@ -242,16 +252,16 @@ type AllyJoinCheck struct {
 
 // CheckAllyJoin reports whether requesterID may invite target's clan into
 // the alliance its own clan leads now.
-func (s *Service) CheckAllyJoin(requesterID int32, target *player.Character, now time.Time) AllyJoinCheck {
+func (s *Service) CheckAllyJoin(requesterID int32, target *player.Character, now time.Time, sieges Sieges) AllyJoinCheck {
 	s.allyMu.Lock()
 	defer s.allyMu.Unlock()
-	check, _ := s.checkAllyJoinLocked(requesterID, target, now)
+	check, _ := s.checkAllyJoinLocked(requesterID, target, now, sieges)
 	return check
 }
 
 // checkAllyJoinLocked runs the invitation rules under allyMu, which keeps
 // every clan's alliance fixed; it also returns the leading clan.
-func (s *Service) checkAllyJoinLocked(requesterID int32, target *player.Character, now time.Time) (AllyJoinCheck, *Clan) {
+func (s *Service) checkAllyJoinLocked(requesterID int32, target *player.Character, now time.Time, sieges Sieges) (AllyJoinCheck, *Clan) {
 	nowMs := now.UnixMilli()
 	leader, ok := s.table.MemberClan(requesterID)
 	if !ok {
@@ -282,6 +292,8 @@ func (s *Service) checkAllyJoinLocked(requesterID int32, target *player.Characte
 		check.Refusal = AllyJoinTargetLeftPenalty
 	case ti.AllyPenaltyExpiry > nowMs && ti.AllyPenaltyType == AllyPenaltyClanDismissed:
 		check.Refusal = AllyJoinTargetDismissedPenalty
+	case siegeOpposed(sieges, leader.id, targetClan.id):
+		check.Refusal = AllyJoinOpposedInSiege
 	case leader.AtWarWith(targetClan.id):
 		check.Refusal = AllyJoinAtWar
 	case len(s.table.Allies(info.AllyID)) >= s.cfg.MaxClansInAlly:
@@ -293,10 +305,10 @@ func (s *Service) checkAllyJoinLocked(requesterID int32, target *player.Characte
 // JoinAlly puts target's clan into the alliance requesterID's clan leads,
 // re-checking the invitation rules first. The clan takes the alliance's
 // name and crest and drops any alliance penalty it had.
-func (s *Service) JoinAlly(requesterID int32, target *player.Character, now time.Time) AllyJoinCheck {
+func (s *Service) JoinAlly(requesterID int32, target *player.Character, now time.Time, sieges Sieges) AllyJoinCheck {
 	s.allyMu.Lock()
 	defer s.allyMu.Unlock()
-	check, leader := s.checkAllyJoinLocked(requesterID, target, now)
+	check, leader := s.checkAllyJoinLocked(requesterID, target, now, sieges)
 	if check.Refusal != AllyJoinAllowed {
 		return check
 	}

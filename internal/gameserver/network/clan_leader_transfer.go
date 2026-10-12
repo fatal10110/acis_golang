@@ -15,15 +15,13 @@ func (l *GameClientLink) TransferClanLeaders() {
 }
 
 // showHandover shows one leader change, in this order: the former leader
-// in the world gets off a flying mount, takes its new clan rank and shows
-// it, then takes off what that rank no longer allows; the new leader in
-// the world takes its rank and shows it; then every member in the world
-// gets its clan window and status refreshed and is told who leads now.
-// Each leader's part runs on its own queue and the next part follows it,
-// so every member sees the parts in that order.
-//
-// The siege skills a clan of siege level moves from the former leader to
-// the new one wait for the siege engine (#3150).
+// in the world gets off a flying mount, loses the siege skills of a clan of
+// siege level, takes its new clan rank and shows it, then takes off what
+// that rank no longer allows; the new leader in the world takes its rank
+// and the siege skills of a clan of siege level, and shows it; then every
+// member in the world gets its clan window and status refreshed and is
+// told who leads now. Each leader's part runs on its own queue and the
+// next part follows it, so every member sees the parts in that order.
 func (l *GameClientLink) showHandover(h clan.Handover) {
 	announce := func() {
 		l.broadcastClanStatus(h.Clan)
@@ -32,15 +30,22 @@ func (l *GameClientLink) showHandover(h clan.Handover) {
 			return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageClanLeaderPrivilegesTransferredToS1, name)
 		})
 	}
+	siegeLevel := h.Clan.Level() >= l.sieges.MinClanLevel()
 	newLeader := func() {
 		l.thenOn(l.onlineMember(h.Leader), func(live *livePlayer) {
 			l.clanService().RefreshPledgeClass(live.Character)
+			if siegeLevel {
+				l.giveSiegeSkills(live)
+			}
 			l.broadcastCharacterInfo(live)
 		}, announce)
 	}
 	l.thenOn(l.onlineMember(h.Former), func(live *livePlayer) {
 		if live.Character.Flying() {
 			live.Character.Dismount()
+		}
+		if siegeLevel {
+			l.takeSiegeSkills(live)
 		}
 		l.clanService().RefreshPledgeClass(live.Character)
 		l.broadcastCharacterInfo(live)
