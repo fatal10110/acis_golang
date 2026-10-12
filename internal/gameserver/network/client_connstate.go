@@ -8,6 +8,9 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player
 // needs no lock. Handle's deferred teardown reads the same value, so it sees
 // whatever the last handler left.
 type connState struct {
+	// client is the connection's client; it stays the same for the whole
+	// connection.
+	client *Client
 	// chars resolves the character-list slot indices RequestCharacterDelete,
 	// CharacterRestore and RequestGameStart address.
 	chars []*player.Character
