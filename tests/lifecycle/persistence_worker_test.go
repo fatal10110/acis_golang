@@ -15,6 +15,7 @@ import (
 // its player's saves before returning, so once serving has stopped the
 // characters row holds the final HP and is marked offline.
 func TestStopSavesConnectedPlayer(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	startInWorld(t, srv.Client)
 	objID := srv.SoleObjectID(t)
@@ -36,6 +37,7 @@ func TestStopSavesConnectedPlayer(t *testing.T) {
 // the relogged character carries the post-hit HP rather than the HP the
 // character list read before those saves landed.
 func TestRelogMidFightRestoresSavedHP(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	startInWorld(t, srv.Client)
 	objID := srv.SoleObjectID(t)
@@ -95,6 +97,7 @@ func TestRelogMidFightRestoresSavedHP(t *testing.T) {
 // rows the old session has not written; once the lane drains, a new
 // selection goes through.
 func TestSelectRefusedWhenQueuedSavesTimeOut(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),

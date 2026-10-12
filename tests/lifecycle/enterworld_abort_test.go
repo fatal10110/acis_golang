@@ -27,6 +27,7 @@ import (
 // character who is not online and destroys the item at zero, so the tracker
 // is run past the weapon's whole remaining duration.
 func TestEnterWorldAbortAfterAttachReleasesThePlayer(t *testing.T) {
+	t.Parallel()
 	templates := gameservertest.ItemTemplates()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),

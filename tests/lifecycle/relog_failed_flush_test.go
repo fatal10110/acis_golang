@@ -23,6 +23,7 @@ import (
 // survived the same failure. A pending entry is not by itself a reason to
 // restore or to drop; only the state it carries is.
 func TestFailedDetachFlushKeepsInventoryOnRelog(t *testing.T) {
+	t.Parallel()
 	fault := &gameservertest.ItemFlushFault{}
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),

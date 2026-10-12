@@ -17,6 +17,7 @@ import (
 // with an unflushed change as stale and leave the stack gone, rather than
 // handing it back and duplicating it.
 func TestDestroyedStackDoesNotReturnOnRelog(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),

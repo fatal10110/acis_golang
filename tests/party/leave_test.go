@@ -21,6 +21,7 @@ func threeMemberParty(t *testing.T) *group {
 // leaver is told it left and its window cleared; the others are told who
 // left and drop it from their windows.
 func TestWithdrawFromParty(t *testing.T) {
+	t.Parallel()
 	g := threeMemberParty(t)
 	third := g.players[2]
 
@@ -42,6 +43,7 @@ func TestWithdrawFromParty(t *testing.T) {
 // disperses, and both members get their window cleared and the dispersal
 // message.
 func TestLastTwoDisperse(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}})
 	g.invite(t, 0, 1, 0)
 
@@ -62,6 +64,7 @@ func TestLastTwoDisperse(t *testing.T) {
 // TestLeaderLeavingDisperses pins the leader withdrawing from a party of
 // three: a leader leaving other than by disconnecting disperses the party.
 func TestLeaderLeavingDisperses(t *testing.T) {
+	t.Parallel()
 	g := threeMemberParty(t)
 	g.players[0].c.Send(encodeSingle(clientpackets.OpcodeRequestWithdrawParty))
 	for _, p := range g.players {
@@ -74,6 +77,7 @@ func TestLeaderLeavingDisperses(t *testing.T) {
 // case-insensitively; a member who does not lead expels no one and hears
 // nothing.
 func TestExpelMember(t *testing.T) {
+	t.Parallel()
 	g := threeMemberParty(t)
 	leader, member, third := g.players[0], g.players[1], g.players[2]
 
@@ -98,6 +102,7 @@ func TestExpelMember(t *testing.T) {
 // over, not to itself, and the handover rebuilds every member's window
 // around the new leader before telling each who leads.
 func TestChangeLeader(t *testing.T) {
+	t.Parallel()
 	g := threeMemberParty(t)
 	leader, member := g.players[0], g.players[1]
 
@@ -137,6 +142,7 @@ func TestChangeLeader(t *testing.T) {
 // a disconnect does not disperse the party; the next member leads, and the
 // one left is dropped from the windows of those who stay.
 func TestLeaderDisconnectHandsOver(t *testing.T) {
+	t.Parallel()
 	g := threeMemberParty(t)
 	leader, member, third := g.players[0], g.players[1], g.players[2]
 
@@ -170,6 +176,7 @@ func TestLeaderDisconnectHandsOver(t *testing.T) {
 // party branch: a member's HP change moves its row on the other members'
 // windows, not its own.
 func TestVitalsRefreshPartyWindow(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}})
 	leader, member := g.players[0], g.players[1]
 	g.invite(t, 0, 1, 0)

@@ -53,6 +53,7 @@ func killPartyDrop(t *testing.T, g *group, tmpl *npc.Template) [][][]byte {
 // MultipleItemDrop, as one without it; either way the looter hears the
 // whole amount and the killer hears who took it.
 func TestPartyAutoLootSplitsNonStackable(t *testing.T) {
+	t.Parallel()
 	for _, tt := range []struct {
 		name string
 		opts []gameservertest.Option
@@ -85,6 +86,7 @@ func TestPartyAutoLootSplitsNonStackable(t *testing.T) {
 // adena starts each member's stack, one object id each; the second grows
 // those stacks and takes none.
 func TestPartyAdenaShareOntoHeldStacksTakesNoObjectID(t *testing.T) {
+	t.Parallel()
 	g := lootGroup(t, []seat{{"Leader", 20}, {"Member", 20}}, 2, party.LootByTurn, nil, gameservertest.WithAutoLoot(true))
 
 	for kill, wantIDs := range []int{2, 0} {

@@ -16,6 +16,7 @@ import (
 // on the driven clock a read cannot see a close the handler has not finished
 // making, and the handler's detach saves run on the wall clock.
 func TestStopSendsServerCloseToPlayerInWorld(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	startInWorld(t, srv.Client)
 
@@ -29,6 +30,7 @@ func TestStopSendsServerCloseToPlayerInWorld(t *testing.T) {
 // selected but has not sent EnterWorld: it is already registered in the
 // world, so it is closed the same way.
 func TestStopSendsServerCloseToSelectedCharacter(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 	srv.Client.Send(encodeRequestGameStart(0))
 	assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
@@ -45,6 +47,7 @@ func TestStopSendsServerCloseToSelectedCharacter(t *testing.T) {
 // so the connection just closes, as the reference's network shutdown closes
 // it.
 func TestStopClosesCharacterListWithoutServerClose(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t, gameservertest.WithCharacter("Newbie", 5, 0), gameservertest.WithWantChars(1))
 
 	srv.Stop()

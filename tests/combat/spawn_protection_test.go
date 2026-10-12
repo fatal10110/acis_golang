@@ -28,6 +28,12 @@ func enterAfterRestart(t *testing.T, srv *gameservertest.Server) {
 	srv.MarkPlayerDead(t, objID)
 	c.Send(encodeRequestRestartPoint(0))
 	assertRestartTeleport(t, c, objID, townRestartPoint)
+	// The restart request acted under the EnterWorld protection, which ends
+	// once its handler has sent the teleport: notice, then UserInfo.
+	if got := readProtectionMessage(t, c); got != "As you acted, you are no longer under spawn protection." {
+		t.Fatalf("restart protection message = %q", got)
+	}
+	assertFrameOpcode(t, mustRead(t, c, "acted UserInfo"), serverpackets.OpcodeUserInfo, "acted UserInfo")
 	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
 	assertFrameOpcode(t, mustRead(t, c, "post-teleport UserInfo"), serverpackets.OpcodeUserInfo, "post-teleport UserInfo")
 	drainUntilQuiet(t, c)

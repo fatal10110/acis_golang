@@ -22,15 +22,30 @@ jobs:
         # The slowest behavior suites get their own runners. In a single
         # `go test ./...` they queue behind compiling every other package.
         # Keep the `rest` exclusion list in sync with these packages.
+        #
+        # A shard runs either `pkgs` on the inline executor or `pool` on the
+        # real pool, so the two passes over a suite run side by side. Each
+        # shard saves its own cache, which also holds its test results; until
+        # it has one, it starts from its inline sibling's (`cache`). A restore
+        # key matches by prefix, so no shard name may begin with another's.
         shard:
           - name: skills-pets
+            cache: skills-pets
             pkgs: ./tests/skills ./tests/pets
+          - name: pool-skills-pets
+            cache: skills-pets
             pool: ./tests/skills ./tests/pets
           - name: combat-items
+            cache: combat-items
             pkgs: ./tests/combat ./tests/items
+          - name: pool-combat-items
+            cache: combat-items
             pool: ./tests/combat ./tests/items
           - name: rest
-            pkgs: ""
+            cache: rest
+            pkgs: all
+          - name: pool-rest
+            cache: rest
             pool: ./tests/character ./tests/lifecycle ./tests/trade ./tests/social
     services:
       mariadb:
@@ -63,7 +78,9 @@ jobs:
             ~/.cache/go-build
             ~/go/pkg/mod
           key: go-${{ runner.os }}-${{ matrix.shard.name }}-${{ github.sha }}
-          restore-keys: go-${{ runner.os }}-${{ matrix.shard.name }}-
+          restore-keys: |
+            go-${{ runner.os }}-${{ matrix.shard.name }}-
+            go-${{ runner.os }}-${{ matrix.shard.cache }}-
 
       # main saves only the build cache entries its own run used, so the cache
       # does not carry every earlier build forward and grow without bound. Go
@@ -85,15 +102,18 @@ jobs:
         if: matrix.shard.name == 'rest'
         run: go vet ./...
 
+      # gotest.sh keeps the log to package results and failing tests' output,
+      # and ends it with the slowest packages and tests.
       - name: Test
+        if: matrix.shard.pkgs
         env:
           PKGS: ${{ matrix.shard.pkgs }}
         run: |
-          if [ -z "$PKGS" ]; then
+          if [ "$PKGS" = all ]; then
             PKGS="$(go list ./... | grep -vE '/tests/(skills|pets|combat|items)$')"
           fi
           # shellcheck disable=SC2086 # PKGS is a space-separated package list
-          go test -race $PKGS
+          .github/scripts/gotest.sh -race $PKGS
 
       # Behavior suites run on sim.Inline with a test-driven clock by
       # default; this keeps their run on the real pool, with real
@@ -101,17 +121,17 @@ jobs:
       # cast, swing and stand-up times, so far more tests than GOMAXPROCS
       # run at once.
       - name: Test (real pool)
-        if: matrix.shard.pool != ''
+        if: matrix.shard.pool
         env:
           ACIS_SIM_EXECUTOR: pool
           PKGS: ${{ matrix.shard.pool }}
         run: |
           # shellcheck disable=SC2086 # PKGS is a space-separated package list
-          go test -race -parallel 16 $PKGS
+          .github/scripts/gotest.sh -race -parallel 16 $PKGS
 
       - name: Test (simdebug)
         if: matrix.shard.name == 'rest'
-        run: go test -race -tags simdebug ./internal/gameserver/sim/...
+        run: .github/scripts/gotest.sh -race -tags simdebug ./internal/gameserver/sim/...
 
       # Go skips writing an output it already holds byte for byte, so an
       # action entry written this run can name an output file left backdated;

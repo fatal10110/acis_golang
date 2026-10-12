@@ -51,6 +51,14 @@ func provideDataReloads(paths gameServerPaths, data *gameData, html *datacache.H
 			html.Replace(fresh)
 			return nil
 		},
+		Items: func() error {
+			fresh, err := gamexml.LoadItemTemplates(filepath.Join(xmlRoot, "items"), log)
+			if err != nil {
+				return err
+			}
+			data.Items.Replace(fresh)
+			return nil
+		},
 		Multisells: func() error {
 			fresh, err := gamexml.LoadMultiSellLists(filepath.Join(xmlRoot, "multisell"), data.Items)
 			if err != nil {
@@ -65,6 +73,15 @@ func provideDataReloads(paths gameServerPaths, data *gameData, html *datacache.H
 				return err
 			}
 			data.NPCs.Replace(fresh)
+			return nil
+		},
+		Skills: func() error {
+			fresh, err := gamexml.LoadSkillDefinitions(filepath.Join(xmlRoot, "skills"), log)
+			if err != nil {
+				return err
+			}
+			logUnsupportedSkillEffects(fresh, log)
+			data.Skills.Replace(fresh)
 			return nil
 		},
 		WalkerRoutes: func() error {

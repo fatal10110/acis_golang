@@ -40,6 +40,7 @@ var errMalformedPacketDisconnect = errors.New("malformed packet requires disconn
 func decodeClientPacket[T any](l *GameClientLink, client *Client, payload []byte, decode func([]byte) (T, error)) (T, error) {
 	req, err := decode(payload)
 	if err != nil {
+		client.frameUnread = true
 		l.log.Warn().Err(err).Msg("game client")
 		if errors.Is(err, wire.ErrShortPacket) && (client.State() == StateConnected || client.countUnderflow()) {
 			client.closeNow()
@@ -89,6 +90,11 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	// lost records a read loop ended by a lost connection, which keeps the
 	// player in the world a while before it detaches.
 	lost := false
+	// acted records that the previous frame's handler ran for an opcode
+	// that ends spawn protection; the protection ends once that handler is
+	// done, before the next frame is read, so the handler itself still sees
+	// the player protected.
+	acted := false
 	defer func() {
 		// A connection lost between selection and EnterWorld takes the
 		// selected player out of the world as a logout would.
@@ -106,6 +112,14 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	}()
 
 	for {
+		// The player the handler left in the world acted, unless the frame
+		// never reached its handler or the handler panicked. A handler that
+		// took the player out (restart to character select) leaves no one
+		// to clear.
+		if acted && !client.frameUnread && live != nil && !live.handlerPanicked {
+			onLive(live, func() { l.clearSpawnProtectionOnAction(live) })
+		}
+		acted, client.frameUnread = false, false
 		// A task this goroutine waited on panicked. sim recovered it, but the
 		// handler stopped part-way through its mutation and the client was
 		// told nothing, so the session ends exactly as a fatal decode error
@@ -120,19 +134,20 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		payload, err := session.ReadFrame()
 		if err != nil {
 			lost = true
-			// ponytail: pre-auth EOF is a port probe (admin panel dials 7777
-			// every 5s) or an aborted handshake — not worth a log line.
-			// Ceiling: a real client dropping mid-handshake leaves no trace;
-			// log it again once the admin panel stops dialing 7777 or
-			// pre-auth disconnects need diagnosing.
-			if errors.Is(err, io.EOF) && client.State() == StateConnected {
+			// ponytail: pre-auth EOF, whole or mid-frame, is a port probe
+			// (admin panel dials 7777 every 5s, internet scanners send a
+			// stray "GET /" read as a frame header) or an aborted handshake —
+			// not worth a log line. Ceiling: a real client dropping
+			// mid-handshake leaves no trace; log it again once pre-auth
+			// disconnects need diagnosing.
+			if hangUp(err) && client.State() == StateConnected {
 				return
 			}
+			ev := l.log.Error()
 			if normalReadFrameError(err) {
-				l.log.Debug().Err(err).Msg("Read frame")
-			} else {
-				l.log.Error().Err(err).Msg("Read frame")
+				ev = l.log.Debug()
 			}
+			ev.Err(err).Str("addr", session.remoteIP()).Str("account", client.AccountName()).Msg("Read frame")
 			return
 		}
 		if len(payload) == 0 {
@@ -186,13 +201,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		// The loop waits for each task before reading on, so frames are
 		// still handled one at a time in read order; decoding and the
 		// protection gates above stay on this goroutine.
-		if clearsSpawnProtection(opcode) {
-			// A panic here must not let this frame's own handler run behind
-			// it; the check at the top of the loop ends the session.
-			if !onLive(live, func() { l.clearSpawnProtectionOnAction(live) }) {
-				continue
-			}
-		}
+		acted = clearsSpawnProtection(opcode)
 		switch opcode {
 		case clientpackets.OpcodeProtocolVersion:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeProtocolVersion)
@@ -543,6 +552,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			second := r.ReadUint16()
 			if r.Err() != nil {
 				l.log.Warn().Str("state", client.State().String()).Msg("game client: extended opcode missing")
+				acted = false
 				continue
 			}
 			// While entering, only the manor-list sub-opcode is dispatched;
@@ -553,6 +563,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 					Uint16("opcode2", second).
 					Str("state", client.State().String()).
 					Msg("game client: accepted extended opcode not handled while entering")
+				acted = false
 				if client.countUnknownPacket() {
 					client.closeNow()
 					return
@@ -824,6 +835,8 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				// (see allowedOpcodes), so unlike the top-level Accept gate there is
 				// no pre-auth immediate-disconnect case here; just count toward the
 				// same sliding-60s threshold as GameClient.onUnknownPacket.
+				// An unknown packet never runs, so it is no action.
+				acted = false
 				if client.countUnknownPacket() {
 					client.closeNow()
 					return
@@ -2220,15 +2233,21 @@ func clearsSpawnProtection(opcode byte) bool {
 	switch opcode {
 	case clientpackets.OpcodeEnterWorld, clientpackets.OpcodeAction,
 		clientpackets.OpcodeRequestPledgeCrest, clientpackets.OpcodeAppearing,
-		clientpackets.OpcodeRequestPledgeInfo:
+		clientpackets.OpcodeRequestPledgeInfo, clientpackets.OpcodeSay2:
 		return false
 	default:
 		return true
 	}
 }
 
+// hangUp reports a read ended by the peer closing its side, between frames
+// or part-way through one.
+func hangUp(err error) bool {
+	return errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
+}
+
 func normalReadFrameError(err error) bool {
-	return errors.Is(err, io.EOF) || errors.Is(err, net.ErrClosed) || errors.Is(err, os.ErrDeadlineExceeded)
+	return hangUp(err) || errors.Is(err, net.ErrClosed) || errors.Is(err, os.ErrDeadlineExceeded)
 }
 
 // authenticate validates req against the login server over the game

@@ -1,6 +1,9 @@
 package skill
 
-import "sort"
+import (
+	"sort"
+	"sync/atomic"
+)
 
 // enchantLevelFloor is the first enchant-level number a Definition can carry
 // (levels below it are regular, non-enchanted levels). It is used to keep
@@ -9,35 +12,63 @@ import "sort"
 const enchantLevelFloor = 99
 
 // Table is an in-memory lookup of skill definitions keyed by id and level,
-// built once at boot and read for the remainder of the process lifetime.
-// The zero value is not usable; construct with NewTable.
+// built at boot and replaced in place by //reload skill. Every read works on
+// one loaded set of definitions, so a reload never shows a reader half of
+// it. The zero value reads as an empty table; construct with NewTable.
 type Table struct {
+	defs atomic.Pointer[definitions]
+}
+
+// definitions is one loaded set of skill definitions with its max-level
+// index. It is never changed once built.
+type definitions struct {
 	byID map[ID]map[int]Definition
 	max  map[ID]int
+}
+
+// noDefinitions is what a Table reads before anything was stored in it.
+var noDefinitions = &definitions{}
+
+// snapshot returns the definitions every read of one call works on.
+func (t *Table) snapshot() *definitions {
+	if d := t.defs.Load(); d != nil {
+		return d
+	}
+	return noDefinitions
 }
 
 // NewTable returns a Table backed by defs. A later entry silently overwrites
 // an earlier one at the same id and level.
 func NewTable(defs []Definition) *Table {
-	t := &Table{byID: make(map[ID]map[int]Definition), max: make(map[ID]int)}
-	for _, d := range defs {
-		levels, ok := t.byID[d.ID]
+	d := &definitions{byID: make(map[ID]map[int]Definition), max: make(map[ID]int)}
+	for _, def := range defs {
+		levels, ok := d.byID[def.ID]
 		if !ok {
 			levels = make(map[int]Definition)
-			t.byID[d.ID] = levels
+			d.byID[def.ID] = levels
 		}
-		levels[d.Level] = d
+		levels[def.Level] = def
 
-		if d.Level < enchantLevelFloor && d.Level > t.max[d.ID] {
-			t.max[d.ID] = d.Level
+		if def.Level < enchantLevelFloor && def.Level > d.max[def.ID] {
+			d.max[def.ID] = def.Level
 		}
 	}
+	t := &Table{}
+	t.defs.Store(d)
 	return t
+}
+
+// Replace swaps t's definitions and their max-level index for from's, at
+// once for every holder of t. A definition already resolved (an NPC
+// template's skills, a running effect) keeps what it was read with; every
+// lookup afterwards reads the new ones.
+func (t *Table) Replace(from *Table) {
+	t.defs.Store(from.snapshot())
 }
 
 // Get returns the definition for id at level, or false if none was loaded.
 func (t *Table) Get(id ID, level int) (Definition, bool) {
-	levels, ok := t.byID[id]
+	levels, ok := t.snapshot().byID[id]
 	if !ok {
 		return Definition{}, false
 	}
@@ -55,13 +86,17 @@ func (t *Table) Definition(ref Ref) (Definition, bool) {
 // MaxLevel returns the highest regular (non-enchant) level loaded for id, or
 // 0 if no definition was loaded for it.
 func (t *Table) MaxLevel(id ID) int {
-	return t.max[id]
+	return t.snapshot().max[id]
 }
 
 // Len returns the total number of (id, level) definitions in the table.
 func (t *Table) Len() int {
+	return t.snapshot().len()
+}
+
+func (d *definitions) len() int {
 	n := 0
-	for _, levels := range t.byID {
+	for _, levels := range d.byID {
 		n += len(levels)
 	}
 	return n
@@ -72,8 +107,9 @@ func (t *Table) All() []Definition {
 	if t == nil {
 		return nil
 	}
-	defs := make([]Definition, 0, t.Len())
-	for _, levels := range t.byID {
+	d := t.snapshot()
+	defs := make([]Definition, 0, d.len())
+	for _, levels := range d.byID {
 		for _, def := range levels {
 			defs = append(defs, def)
 		}
@@ -93,10 +129,11 @@ func (t *Table) TopLevels() []Definition {
 	if t == nil {
 		return nil
 	}
-	defs := make([]Definition, 0, len(t.max))
-	for id, level := range t.max {
+	d := t.snapshot()
+	defs := make([]Definition, 0, len(d.max))
+	for id, level := range d.max {
 		if level > 0 {
-			defs = append(defs, t.byID[id][level])
+			defs = append(defs, d.byID[id][level])
 		}
 	}
 	sort.Slice(defs, func(i, j int) bool { return defs[i].ID < defs[j].ID })

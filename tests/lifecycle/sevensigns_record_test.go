@@ -57,6 +57,7 @@ func assertQuietClient(t *testing.T, c *testsupport.ScriptedClient, what string)
 // pot is dawn 40 / dusk 10: stone shares 400 / 100, totals 405 / 100,
 // percents 405/505 -> 80 and 100/505 -> 20.
 func TestRequestSSQStatusAnswersEachRecordPage(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
@@ -122,6 +123,7 @@ func TestRequestSSQStatusAnswersEachRecordPage(t *testing.T) {
 // Once the competition is over the prediction page is not answered at all;
 // the other pages still are.
 func TestRequestSSQStatusPredictionSilentAfterCompetition(t *testing.T) {
+	t.Parallel()
 	for _, period := range []sevensigns.Period{sevensigns.Results, sevensigns.SealValidation} {
 		t.Run(period.String(), func(t *testing.T) {
 			srv := gameservertest.Boot(t,
@@ -145,6 +147,7 @@ func TestRequestSSQStatusPredictionSilentAfterCompetition(t *testing.T) {
 
 // Choosing a character shows the sky of the cabal leading seal validation.
 func TestGameStartShowsValidationWinnerSky(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
@@ -164,6 +167,7 @@ func TestGameStartShowsValidationWinnerSky(t *testing.T) {
 // competition-ended message, each seal a cabal obtained, the winner, and
 // then the new period's sky.
 func TestPeriodChangeBroadcastsToPlayersOnline(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
