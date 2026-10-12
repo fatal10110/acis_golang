@@ -50,9 +50,9 @@ func TestWriterStringEncodedPairMatchesSupplementaryCharacter(t *testing.T) {
 // Every non-zero code unit, written as its generalized UTF-8 form, comes out
 // as exactly that unit.
 func TestWriterStringWritesEveryEncodedUnitVerbatim(t *testing.T) {
-	var w Writer
+	w := NewFrameWriter(8)
 	for unit := 1; unit <= 0xFFFF; unit++ {
-		w.buf, w.payloadOffset = w.buf[:0], 0
+		w.ResetFrame(8)
 		w.WriteString(string(generalizedUTF8(uint16(unit))))
 		want := []byte{byte(unit), byte(unit >> 8), 0, 0}
 		if got := w.Bytes(); !bytes.Equal(got, want) {
