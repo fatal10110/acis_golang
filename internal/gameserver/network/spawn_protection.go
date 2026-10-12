@@ -42,8 +42,10 @@ func (l *GameClientLink) clearSpawnProtectionOnAction(live *livePlayer) {
 	if !live.SpawnProtected() {
 		return
 	}
+	// The acted notice goes out ahead of the status that drops the
+	// protection; the timer's end reverses the two.
+	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, spawnProtectionActed))
 	live.spawnProtectionGen++
 	live.SetSpawnProtection(false)
 	live.UpdateUserInfo()
-	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, spawnProtectionActed))
 }

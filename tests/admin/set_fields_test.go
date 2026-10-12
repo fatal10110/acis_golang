@@ -308,9 +308,8 @@ func TestAdminDeleteRenamedNPC(t *testing.T) {
 // TestAdminInvul pins //invul (AdminEffects.java admin_invul): the GM's
 // flag is turned to the opposite of what Invul reads, and the message says
 // what Invul reads after; a GM logged in invulnerable turns it off; a level
-// the table does not allow is refused. The spawn-protected read is not
-// reachable from a client packet until #3400: protection ends before the
-// handler runs.
+// the table does not allow is refused. TestAdminInvulWhileSpawnProtected
+// covers the spawn-protected read.
 func TestAdminInvul(t *testing.T) {
 	t.Parallel()
 	t.Run("toggle", func(t *testing.T) {

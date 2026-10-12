@@ -41,6 +41,9 @@ type Client struct {
 	// while the loop stays parked, so the loop still owns it.
 	stats           clientStats
 	floodProtectors [numFloodProtectors]time.Time
+	// frameUnread marks the frame in hand as one that failed to decode, so
+	// no handler ran for it. The read loop owns it like stats.
+	frameUnread bool
 }
 
 // NewClient returns a Client wrapping session, starting in StateConnected.
