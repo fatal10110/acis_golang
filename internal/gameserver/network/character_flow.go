@@ -395,6 +395,9 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	client.Session.SendFrame(serverpackets.FrameShortCutInit(serverShortcutList(live.Inventory(), live.shortcuts.All())))
 	if c.Dead() {
 		client.Session.SendFrame(serverpackets.FrameDie(c.ObjectID(), dieOptions(live)))
+		// A death on the loading screen offered its resurrection and told the
+		// tutorial; the client hears both after the death they follow.
+		live.releaseHeldForEnterWorld()
 	}
 	l.sendLoginBoardPages(client, live)
 	// The chat of a petition still active is replayed after the login

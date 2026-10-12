@@ -1,6 +1,8 @@
 package network
 
 import (
+	"sync"
+
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	skillhandler "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
@@ -49,6 +51,55 @@ func (p *livePlayer) deathOnLoadingScreen() bool {
 	return p.replayMayDie.Load() && p.Dead()
 }
 
+// loadingDeathEvents is the list a death on the loading screen holds back
+// for the EnterWorld burst. Its own mutex guards it: the replay's goroutine
+// fills it while another may emit to the same player.
+type loadingDeathEvents struct {
+	mu     sync.Mutex
+	events []event.Event
+}
+
+// holdForEnterWorld keeps ev for the EnterWorld burst instead of sending it,
+// when p died on the loading screen and ev asks its client for an answer or
+// shows it a mark whose state the death keeps: the resurrection offer, which
+// stays open until answered, and the tutorial's answer to the death, whose
+// memo stops it from ever being shown again. The burst carries neither, so
+// it emits them after its Die frame (releaseHeldForEnterWorld).
+func (p *livePlayer) holdForEnterWorld(ev event.Event) bool {
+	switch ev.(type) {
+	case event.ReviveRequested, event.SoundPlayed,
+		event.TutorialPageShown, event.TutorialPageClosed, event.TutorialQuestionMarkShown,
+		event.TutorialClientEventEnabled, event.TutorialVoicePlayed, event.RadarMarkerAdded, event.RadarMarkerRemoved:
+	default:
+		return false
+	}
+	if !p.deathOnLoadingScreen() {
+		return false
+	}
+	p.loadingDeath.mu.Lock()
+	p.loadingDeath.events = append(p.loadingDeath.events, ev)
+	p.loadingDeath.mu.Unlock()
+	return true
+}
+
+// takeHeldForEnterWorld returns and clears the events holdForEnterWorld
+// kept.
+func (p *livePlayer) takeHeldForEnterWorld() []event.Event {
+	p.loadingDeath.mu.Lock()
+	defer p.loadingDeath.mu.Unlock()
+	held := p.loadingDeath.events
+	p.loadingDeath.events = nil
+	return held
+}
+
+// releaseHeldForEnterWorld emits, in the order they were raised, the events
+// a death on the loading screen held back.
+func (p *livePlayer) releaseHeldForEnterWorld() {
+	for _, ev := range p.takeHeldForEnterWorld() {
+		p.Emit(ev)
+	}
+}
+
 // sendHeldFrame sends a frame that waited behind the player's PvP flag
 // changes.
 func (p *livePlayer) sendHeldFrame(f heldFrame) {
@@ -93,6 +144,9 @@ func (p *livePlayer) Emit(ev event.Event) {
 		p.removeAllCubics()
 	}
 	if p.SessionDetached() && sessionOnly(ev) {
+		return
+	}
+	if p.holdForEnterWorld(ev) {
 		return
 	}
 	l, live := p.link, p

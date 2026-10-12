@@ -91,9 +91,13 @@ type livePlayer struct {
 	// replayMayDie is set for the replay window of a player that entered
 	// it alive: a damage-over-time tick due on the loading screen may kill
 	// it there, before it is in the world. Every frame its own client would
-	// get from then on is dropped (see deathOnLoadingScreen). Written on the
-	// owner's queue; atomic for the send paths.
+	// get from then on is dropped (see deathOnLoadingScreen), except the
+	// events loadingDeath holds for the burst. Written on the owner's
+	// queue; atomic for the send paths.
 	replayMayDie atomic.Bool
+	// loadingDeath holds the events of that death whose state outlives it
+	// and that no EnterWorld frame carries (see holdForEnterWorld).
+	loadingDeath loadingDeathEvents
 	shortcuts    *shortcut.List
 	macros       *macro.List
 	// board is the player's community board session; owned by its queue.
