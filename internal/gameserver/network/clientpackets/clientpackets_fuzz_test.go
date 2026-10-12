@@ -170,6 +170,8 @@ var gameDecoders = []gameDecoder{
 	{"RequestRefine", decodes(DecodeRequestRefine), seedExtended(OpcodeRequestRefine, seedObjectID, seedObjectID+1, seedObjectID+2, int32(20))},
 	{"RequestConfirmCancelItem", decodes(DecodeRequestConfirmCancelItem), seedExtended(OpcodeRequestConfirmCancelItem, seedObjectID)},
 	{"RequestRefineCancel", decodes(DecodeRequestRefineCancel), seedExtended(OpcodeRequestRefineCancel, seedObjectID)},
+	{"RequestSetSeed", decodesList(DecodeRequestSetSeed), seedExtended(OpcodeRequestSetSeed, int32(1), int32(1), int32(5016), int32(10), int32(5))},
+	{"RequestSetCrop", decodesList(DecodeRequestSetCrop), seedExtended(OpcodeRequestSetCrop, int32(1), int32(1), int32(5073), int32(100), int32(50), byte(1))},
 	{"RequestExMagicSkillUseGround", decodes(DecodeRequestExMagicSkillUseGround), seedExtended(OpcodeRequestExMagicSkillUseGround, seedX, seedY, seedZ, int32(1177), int32(0), byte(0))},
 	{"RequestWriteHeroWords", decodes(DecodeRequestWriteHeroWords), seedExtended(OpcodeRequestWriteHeroWords, "Glory to the heroes")},
 	{"RequestDuelStart", decodes(DecodeRequestDuelStart), seedExtended(OpcodeRequestDuelStart, "Rival", int32(1))},

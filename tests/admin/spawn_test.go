@@ -22,13 +22,13 @@ import (
 
 // Template ids of the spawn fixtures.
 const (
-	wolfID     = 20120
-	grocerID   = 30001
-	artifactID = 35063
-	treeID     = 13006
+	wolfID   = 20120
+	grocerID = 30001
+	towerID  = 13002
+	treeID   = 13006
 )
 
-// spawnTemplates are a monster, a merchant, a castle artifact (no live
+// spawnTemplates are a monster, a merchant, a control tower (no live
 // model yet) and a Christmas tree.
 func spawnTemplates() *npc.Table {
 	tmpl := func(id int, typ, name string) *npc.Template {
@@ -40,7 +40,7 @@ func spawnTemplates() *npc.Table {
 	return npc.NewTable([]*npc.Template{
 		wolf,
 		tmpl(grocerID, "Merchant", "Grocer Lector"),
-		tmpl(artifactID, "HolyThing", "Artifact"),
+		tmpl(towerID, "LifeTower", "Life Control Tower"),
 		tmpl(treeID, "ChristmasTree", "Christmas Tree"),
 	})
 }
@@ -138,15 +138,15 @@ func TestAdminSpawn(t *testing.T) {
 			t.Fatalf("//%s frames = %x, want the spawns.htm page", cmd, testsupport.FrameOpcodes(frames))
 		}
 	}
-	for _, cmd := range []string{"spawn 4242", "spawn No_Such_Npc", "spawn 35063"} {
+	for _, cmd := range []string{"spawn 4242", "spawn No_Such_Npc", "spawn 13002"} {
 		frames := exchange(t, gm, encodeBuildCmd(cmd))
 		if len(frames) != 1 {
 			t.Fatalf("//%s frames = %x, want APPLICANT_INFORMATION_INCORRECT", cmd, testsupport.FrameOpcodes(frames))
 		}
 		assertStatic(t, frames[0], 12)
 	}
-	if got := npcsOf(srv, artifactID); len(got) != 0 {
-		t.Fatalf("refused //spawn placed %d artifacts", len(got))
+	if got := npcsOf(srv, towerID); len(got) != 0 {
+		t.Fatalf("refused //spawn placed %d towers", len(got))
 	}
 
 	frames := exchange(t, gm, encodeBuildCmd("spawn 20120 30"))

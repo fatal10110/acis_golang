@@ -15,6 +15,8 @@ type Message struct {
 const (
 	MsgEnteredCombatZone            = 283
 	MsgLeftCombatZone               = 284
+	MsgClanEngravedRuler            = 285 // clan name
+	MsgOpponentStartedEngraving     = 287
 	MsgClanVictoriousOverSiege      = 291 // clan name, castle name
 	MsgAnnouncedSiegeTime           = 292 // castle name
 	MsgRegistrationTermEnded        = 293 // castle name

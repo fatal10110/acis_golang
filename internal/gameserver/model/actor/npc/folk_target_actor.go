@@ -15,10 +15,10 @@ func (f *Folk) Folk() bool        { return true }
 func (f *Folk) FolkOrGuard() bool { return true }
 
 // AttackableBy reports whether caster may affect this NPC offensively: any
-// other creature may while the NPC lives, with a forced attack.
-// AttackableWithoutForceBy is always false.
+// other creature may while the NPC lives, with a forced attack, unless the
+// NPC is a holy artifact. AttackableWithoutForceBy is always false.
 func (f *Folk) AttackableBy(caster skilltarget.Actor) bool {
-	return caster != nil && caster.ObjectID() != f.ObjectID() && !f.AlikeDead()
+	return caster != nil && caster.ObjectID() != f.ObjectID() && !f.AlikeDead() && !f.HolyThing()
 }
 func (f *Folk) AttackableWithoutForceBy(skilltarget.Actor) bool { return false }
 
@@ -35,14 +35,16 @@ func (f *Folk) ClanGroups() []string { return f.Instance.Template.Clans }
 // sight its casts are checked against.
 func (f *Folk) CanSeeTarget(target skilltarget.Actor) bool { return f.canSee(target) }
 
+// Holy reports a holy artifact, the target of a HOLY skill.
+func (f *Folk) Holy() bool { return f.HolyThing() }
+
 // A civilian NPC casts only at creatures: it holds no ground point, summon,
 // party, clan, duel, Olympiad, spoil or seed state, and is not a monster,
-// artifact, chest or pet.
+// chest or pet.
 func (f *Folk) CanSeePoint(int, int, int) bool             { return true }
 func (f *Folk) EffectRangeInPeaceZone(_, _, _, _ int) bool { return false }
 func (f *Folk) GroundTarget() (x, y, z int)                { return 0, 0, 0 }
 func (f *Folk) MonsterKind() bool                          { return false }
-func (f *Folk) Holy() bool                                 { return false }
 func (f *Folk) Unlockable() bool                           { return false }
 func (f *Folk) IsPet() bool                                { return false }
 func (f *Folk) Spoiled() bool                              { return false }

@@ -274,12 +274,13 @@ func (s *Siege) End() {
 // reputation moves (see reputationLocked), the players of other clans
 // than the owner's are thrown off the battlefield, the siege states are
 // cleared, the next date is set and every registration dropped, the owner
-// registered again, and the battlefield turns off.
+// registered again, and the battlefield turns off. Last, the rulers
+// engraved on the castle's artifacts are wiped.
 //
 // ponytail: the reference also drops each registered clan's headquarters
 // flag with its counters (#3374), unpolymorphs the control towers (#465),
 // despawns the siege guards and revives the doors (#3373) before the
-// battlefield turns off, and resets the artifacts after (#2220).
+// battlefield turns off.
 func (s *Siege) endLocked(fx *effects) {
 	if s.status != StatusInProgress {
 		return
@@ -317,6 +318,7 @@ func (s *Siege) endLocked(fx *effects) {
 	s.saveSiegeLocked(fx, true)
 	s.clearAllLocked()
 	fx.add(func() { s.withBattlefield(func(f *zone.Siege) { f.SetActive(false) }) })
+	clear(s.engraved)
 }
 
 // reputationLocked moves the reputation a siege's end decides: a former

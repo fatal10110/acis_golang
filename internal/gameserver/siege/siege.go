@@ -3,7 +3,8 @@
 // the clans' siege kills and deaths.
 //
 // Other systems read a siege through a narrow surface: ActiveAt (the siege
-// in progress whose battlefield holds a point), Get (a castle's siege),
+// in progress whose battlefield holds a point), At (the siege whose
+// battlefield holds a point), Get (a castle's siege),
 // Siege.InProgress, Siege.Side, Siege.CheckSides, Siege.OnOppositeSides,
 // Engine.Registered and the kill counters.
 package siege
@@ -191,6 +192,10 @@ type Siege struct {
 	startGen uint64
 	clock    *sim.Timer
 	clockGen uint64
+
+	// engraved maps each of the castle's artifacts a clan engraved the
+	// ruler on this siege to that clan's id.
+	engraved map[int32]int32
 }
 
 // counters are a clan's siege kills and deaths.
@@ -341,6 +346,20 @@ func (e *Engine) ActiveAt(x, y, z int) (*Siege, bool) {
 func (e *Engine) AttackerAt(clanID int32, x, y, z int) bool {
 	s, ok := e.ActiveAt(x, y, z)
 	return ok && s.CheckSides(clanID, SideAttacker)
+}
+
+// At returns the siege whose battlefield holds the point (x, y, z), being
+// fought or not.
+func (e *Engine) At(x, y, z int) (*Siege, bool) {
+	if e == nil {
+		return nil, false
+	}
+	for _, s := range e.order {
+		if f := s.Battlefield(); f != nil && f.ContainsPoint(x, y, z) {
+			return s, true
+		}
+	}
+	return nil, false
 }
 
 // Registered reports whether clanID is registered, on any side, on any

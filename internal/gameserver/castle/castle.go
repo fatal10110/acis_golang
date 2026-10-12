@@ -1,7 +1,7 @@
 // Package castle holds the castles' live state: the clan owning each, its
 // tax rates, treasury, tax revenue and seed income, its left certificates
 // and its stored siege date, restored from the castle table at boot and
-// written back as they change.
+// written back as they change, and the holy artifacts placed for it.
 package castle
 
 import (
@@ -33,6 +33,9 @@ type Castle struct {
 	leftCertificates  int
 	siegeDate         int64
 	regTimeOver       bool
+	// artifacts are the object ids of the holy artifacts placed for the
+	// castle at boot (SpawnArtifacts).
+	artifacts []int32
 }
 
 // Row is a castle table row.
