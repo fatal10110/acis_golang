@@ -41,6 +41,9 @@ type DataReloads struct {
 	//   - Enchant, MagicFailures, CraftingDisabled and
 	//     KeepMaintainedIngredients keep their boot value: the enchant,
 	//     skill, craft and multisell services are built with them;
+	//   - PartyRange and MultipleItemDrop keep their boot value: the kill
+	//     rewards and the scripts read their own copies of both, so the
+	//     reload leaves the ones in force for party loot too;
 	//   - every setting outside PlayerConfig keeps its boot value; the
 	//     composition root that builds this hook lists them.
 	Config func() (PlayerConfig, error)
@@ -210,7 +213,9 @@ func (l *GameClientLink) reloadNPCs() error {
 
 // reloadConfig reads the properties files anew and puts the player settings
 // read in force in place of the ones before; a file that cannot be read
-// leaves them as they were.
+// leaves them as they were. PartyRange and MultipleItemDrop keep the value
+// in force: the kill rewards and the scripts hold their own boot copies of
+// both, and party loot must agree with them.
 func (l *GameClientLink) reloadConfig() error {
 	if l.reloads.Config == nil {
 		return errReloadNotPorted
@@ -219,6 +224,8 @@ func (l *GameClientLink) reloadConfig() error {
 	if err != nil {
 		return err
 	}
+	prev := l.playerConfig()
+	settings.PartyRange, settings.MultipleItemDrop = prev.PartyRange, prev.MultipleItemDrop
 	l.playerSettings.Store(&settings)
 	return nil
 }

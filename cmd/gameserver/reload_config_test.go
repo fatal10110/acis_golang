@@ -11,7 +11,8 @@ import (
 
 // TestDataReloadsReadConfig requires the config reload hook to read the
 // server and players properties anew into the player settings, and to fail
-// on a value boot would refuse.
+// on a value boot would refuse, PartyRange among them: the reload keeps the
+// party range in force, but a malformed one still fails the whole read.
 func TestDataReloadsReadConfig(t *testing.T) {
 	dir := t.TempDir()
 	write := func(name, body string) string {
@@ -25,7 +26,7 @@ func TestDataReloadsReadConfig(t *testing.T) {
 	paths := gameServerPaths{
 		ConfigPath:        write("server.properties", "AllowDiscardItem = True\n"),
 		HexIDPath:         write("hexid.txt", "ServerID = 3\nHexID = -7fff\n"),
-		PlayersConfigPath: write("players.properties", "KarmaPlayerCanTrade = True\nPartyRange = 900\n"),
+		PlayersConfigPath: write("players.properties", "KarmaPlayerCanTrade = True\n"),
 		NpcsConfigPath:    write("npcs.properties", ""),
 		GeoConfigPath:     write("geoengine.properties", ""),
 	}
@@ -35,20 +36,20 @@ func TestDataReloadsReadConfig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("config reload: %v", err)
 	}
-	if settings.DiscardItemDisabled || !settings.KarmaPlayerCanTrade || settings.PartyRange != 900 {
-		t.Fatalf("reloaded settings = discard disabled %v, karma trade %v, party range %d; want false, true, 900",
-			settings.DiscardItemDisabled, settings.KarmaPlayerCanTrade, settings.PartyRange)
+	if settings.DiscardItemDisabled || !settings.KarmaPlayerCanTrade {
+		t.Fatalf("reloaded settings = discard disabled %v, karma trade %v; want false, true",
+			settings.DiscardItemDisabled, settings.KarmaPlayerCanTrade)
 	}
 
 	write("server.properties", "AllowDiscardItem = False\nServerBypassTime = 2500\n")
-	write("players.properties", "KarmaPlayerCanTrade = False\nPartyRange = 300\n")
+	write("players.properties", "KarmaPlayerCanTrade = False\n")
 	settings, err = reloads.Config()
 	if err != nil {
 		t.Fatalf("second config reload: %v", err)
 	}
-	if !settings.DiscardItemDisabled || settings.KarmaPlayerCanTrade || settings.PartyRange != 300 || settings.ServerBypassDelay != 2500*time.Millisecond {
-		t.Fatalf("reloaded settings = discard disabled %v, karma trade %v, party range %d, bypass delay %s; want the edited files' values",
-			settings.DiscardItemDisabled, settings.KarmaPlayerCanTrade, settings.PartyRange, settings.ServerBypassDelay)
+	if !settings.DiscardItemDisabled || settings.KarmaPlayerCanTrade || settings.ServerBypassDelay != 2500*time.Millisecond {
+		t.Fatalf("reloaded settings = discard disabled %v, karma trade %v, bypass delay %s; want the edited files' values",
+			settings.DiscardItemDisabled, settings.KarmaPlayerCanTrade, settings.ServerBypassDelay)
 	}
 
 	write("players.properties", "PartyRange = far\n")

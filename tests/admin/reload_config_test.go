@@ -2,7 +2,6 @@ package admin
 
 import (
 	"errors"
-	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -137,7 +136,9 @@ func TestAdminReloadConfig(t *testing.T) {
 
 // TestAdminReloadConfigRaceFree reloads the settings back and forth while a
 // player drops, each drop reading AllowDiscardItem: under -race, every drop
-// sees one config or the other and nothing races.
+// sees one config or the other and nothing races. The reloads are sent from
+// a second goroutine, which only writes; their replies are read on the test
+// goroutine once the drops are done.
 func TestAdminReloadConfigRaceFree(t *testing.T) {
 	t.Parallel()
 	files := &configFiles{}
@@ -148,22 +149,34 @@ func TestAdminReloadConfigRaceFree(t *testing.T) {
 	drain(t, gm)
 
 	const rounds = 20
-	var wg sync.WaitGroup
-	wg.Add(1)
+	sent := make(chan error, 1)
 	go func() {
-		defer wg.Done()
 		for i := range rounds {
 			files.discardDisabled.Store(i%2 == 0)
-			if frames := exchange(t, gm, encodeBuildCmd("reload config")); !hasText(t, frames, configReloaded) {
-				t.Errorf("reload %d frames = %x, want %q", i, testsupport.FrameOpcodes(frames), configReloaded)
+			if err := gm.TrySend(encodeBuildCmd("reload config")); err != nil {
+				sent <- err
 				return
 			}
 		}
+		sent <- gm.TrySend(encodeManorBarrier())
 	}()
 	for range rounds {
 		dropOutcome(t, user, adena)
 	}
-	wg.Wait()
+	if err := <-sent; err != nil {
+		t.Fatalf("send reload: %v", err)
+	}
+	// The game master also sees the drops; count the reload replies alone.
+	frames := testsupport.SyncBarrierFrames(t, gm, func() {}, serverpackets.OpcodeExtended)
+	replies := 0
+	for _, frame := range frames {
+		if hasText(t, [][]byte{frame}, configReloaded) {
+			replies++
+		}
+	}
+	if replies != rounds {
+		t.Fatalf("reload replies = %d among %x, want %d", replies, testsupport.FrameOpcodes(frames), rounds)
+	}
 	if got := files.reads.Load(); got != rounds {
 		t.Fatalf("config read %d times, want %d", got, rounds)
 	}

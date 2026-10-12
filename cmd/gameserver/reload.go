@@ -149,7 +149,8 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 //   - the geodata and the town combat rule the zones were set up with,
 //     which //reload zone reapplies as booted;
 //   - AllowCursedWeapons, AllowBoat and DeleteCharAfterDays;
-//   - the kill rewards (drop and XP/SP rates, auto-loot, party XP), the PvP
+//   - the kill rewards (drop and XP/SP rates, auto-loot, party XP, and
+//     PartyRange and MultipleItemDrop, which party loot keeps too), the PvP
 //     flag times, the ground item settings, the pet settings, the spellbook
 //     needs, StoreSkillCooltime and CancelLesserEffect;
 //   - the clan, siege, manor, Olympiad, hero, Seven Signs, festival,
