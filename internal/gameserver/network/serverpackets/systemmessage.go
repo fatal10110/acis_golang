@@ -127,8 +127,11 @@ const (
 	SystemMessagePetCannotSentBackDuringBattle     = 579
 	SystemMessageDeadPetCannotBeReturned           = 589
 	SystemMessageCannotGiveItemsToDeadPet          = 590
+	SystemMessageStarvingPetHasLeft                = 593
 	SystemMessageYouCannotRestoreHungryPets        = 594
+	SystemMessageYourPetIsVeryHungry               = 595
 	SystemMessageYourPetAteALittleButIsStillHungry = 596
+	SystemMessageYourPetIsVeryHungryBeCareful      = 597
 	SystemMessageOutOfFeedMountCanceled            = 1248
 	SystemMessagePetTookS1BecauseHeWasHungry       = 1527
 	SystemMessageItemNotForPets                    = 544

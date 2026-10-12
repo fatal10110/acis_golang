@@ -96,7 +96,9 @@ func (l *GameClientLink) consumePetPotion(live *livePlayer, pet *summon.Actor, p
 // consumePetFood runs the pet-food feed path for a pet-eaten food item:
 // destroy one unit, broadcast the feed skill's visual effect, and raise the
 // pet's meal gauge by the skill's Feed value scaled by the configured pet
-// food rate, alerting the owner if the pet is still hungry afterward.
+// food rate, alerting the owner if the pet is still hungry afterward. live
+// is the owner, or nil for a pet whose owner is not in the world, which
+// eats with no one to tell.
 func (l *GameClientLink) consumePetFood(live *livePlayer, pet *summon.Actor, petInv *itemcontainer.Inventory, inst *item.Instance) {
 	amount, ok := petFoodFeedAmount(l.skills, l.petConfig.FoodRate, inst.TemplateID)
 	if !ok {
@@ -108,12 +110,17 @@ func (l *GameClientLink) consumePetFood(live *livePlayer, pet *summon.Actor, pet
 	}
 
 	self := skillCastObject(pet)
-	l.broadcastPetFrame(live, pet, func() wire.Frame {
+	feedEffect := func() wire.Frame {
 		return serverpackets.FrameMagicSkillUse(self, self, magicID, 1, 0, 0, false)
-	})
+	}
+	if live != nil {
+		l.broadcastPetFrame(live, pet, feedEffect)
+	} else {
+		l.broadcastSummon(pet, feedEffect)
+	}
 
 	_, stillHungry := pet.AddFed(amount)
-	if stillHungry {
+	if stillHungry && live != nil {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYourPetAteALittleButIsStillHungry))
 	}
 }

@@ -190,8 +190,8 @@ const avoidRoll = 3
 func newAvoidFixture(t *testing.T, summonAt location.Location) (*Actor, *avoidOwner, *stepAsideAI, *event.Recorder) {
 	t.Helper()
 	owner := &avoidOwner{fakeSummonOwner: fakeSummonOwner{id: 42}, x: 1000, y: 1000, z: 0, inCombat: true}
-	a := mustServitor(t, ServitorConfig{ObjectID: 7, Owner: owner})
-	if err := a.InitMovement(summonAt, 100, openGeo{}); err != nil {
+	a := mustServitor(t, ServitorConfig{ObjectID: 7, Owner: owner, RunSpeed: 100})
+	if err := a.InitMovement(summonAt, openGeo{}); err != nil {
 		t.Fatalf("InitMovement: %v", err)
 	}
 	SpawnBesideOwner(world.New(), a, owner, location.Location{X: summonAt.X - owner.x, Y: summonAt.Y - owner.y, Z: summonAt.Z - owner.z})

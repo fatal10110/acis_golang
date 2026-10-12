@@ -22,7 +22,7 @@ func (g movingGate) Test(effector stat.Actor) bool {
 }
 
 func TestSummonConditionalStatFuncGatesOnRealMovement(t *testing.T) {
-	a := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 44, Roll: zeroSummonRoll})
+	a := mustServitor(t, ServitorConfig{ObjectID: 1, Level: 44, Roll: zeroSummonRoll, RunSpeed: 100})
 
 	// HealEffectiveness carries no default summon stat func (see
 	// defaultStatFuncs), so its finalized value is driven purely by what
@@ -31,7 +31,7 @@ func TestSummonConditionalStatFuncGatesOnRealMovement(t *testing.T) {
 		{Stat: stat.HealEffectiveness, Op: effect.OpAdd, Value: 25, Cond: movingGate{}},
 	})
 
-	if err := a.InitMovement(location.Location{X: 0, Y: 0, Z: 0}, 100, openGeo{}); err != nil {
+	if err := a.InitMovement(location.Location{X: 0, Y: 0, Z: 0}, openGeo{}); err != nil {
 		t.Fatalf("InitMovement: %v", err)
 	}
 

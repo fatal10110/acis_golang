@@ -104,11 +104,10 @@ func TestSummonZonesFollowOwnerTeleport(t *testing.T) {
 	if got, gotExits := enters.Load(), exits.Load(); got != 1 || gotExits != 0 {
 		t.Fatalf("after the summon: wolf peace enters/exits = %d/%d, want 1/0", got, gotExits)
 	}
-	base := wolfTemplate().RunSpeed
 	if !wolf.InsideZone(zone.FlagSwamp) {
 		t.Fatal("wolf spawned in a swamp is not in it")
 	}
-	swampSpeed := wolf.MoveSpeed(base)
+	swampSpeed := wolf.MoveSpeed()
 	drainUntilQuiet(t, h.client)
 
 	obj, ok := h.srv.State.Player(h.ownerID)
@@ -133,7 +132,7 @@ func TestSummonZonesFollowOwnerTeleport(t *testing.T) {
 	}
 	// The swamp scales the base speed before the RUN_SPEED stat, which
 	// only multiplies it here.
-	speed := wolf.MoveSpeed(base)
+	speed := wolf.MoveSpeed()
 	if want := speed * float64(100+swamp.MoveBonus) / 100; swampSpeed != want {
 		t.Fatalf("wolf move speed in the swamp = %v, want %v (%v out of it)", swampSpeed, want, speed)
 	}

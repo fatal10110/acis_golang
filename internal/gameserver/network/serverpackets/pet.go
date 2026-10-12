@@ -19,6 +19,9 @@ const (
 	// OpcodePetDelete tells the owner to remove a pet/servitor object from
 	// the client.
 	OpcodePetDelete = 0xb6
+	// OpcodeSetSummonRemainTime is the wire opcode for a servitor's
+	// remaining-lifetime bar.
+	OpcodeSetSummonRemainTime = 0xd1
 )
 
 // FramePetStatusShow builds a PetStatusShow packet for summonType.
@@ -33,6 +36,15 @@ func FramePetDelete(summonType int, objectID int32) wire.Frame {
 	w := newFrameWriter(OpcodePetDelete)
 	w.WriteInt32(int32(summonType))
 	w.WriteInt32(objectID)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameSetSummonRemainTime builds a SetSummonRemainTime packet: the
+// servitor's total and remaining lifetime, in ms.
+func FrameSetSummonRemainTime(total, remaining int32) wire.Frame {
+	w := newFrameWriter(OpcodeSetSummonRemainTime)
+	w.WriteInt32(total)
+	w.WriteInt32(remaining)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
