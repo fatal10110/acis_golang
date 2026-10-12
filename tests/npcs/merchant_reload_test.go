@@ -182,26 +182,28 @@ func TestAdminReloadBuyListRebuildsStock(t *testing.T) {
 	assertStockRows(t, w.stockRows(t), merchant.StockRow{ListID: 7, ItemID: shopPotionID, Count: 1, NextRestock: now.Add(-time.Minute)})
 }
 
-// raceList is the merchant's list priced for a reload race: a potion and
-// a tunic at the given prices, and arrows limited the same way in every
-// version of the list.
-func raceList(potion, tunic int) buylist.List {
+// raceList is the merchant's list priced for a reload race: a potion, a
+// tunic and limited arrows at the given prices. Arrows priced differently
+// are a different limited product, which the reload replaces.
+func raceList(potion, tunic, arrows int) buylist.List {
 	return buylist.List{ID: shopListID, NPCID: merchantID, Products: []buylist.Product{
 		{BuyListID: shopListID, ItemID: shopPotionID, Price: potion, MaxCount: -1, RestockDelayMillis: -60000},
 		{BuyListID: shopListID, ItemID: shopTunicID, Price: tunic, MaxCount: -1, RestockDelayMillis: -60000},
-		{BuyListID: shopListID, ItemID: arrowID, Price: 1, MaxCount: 1000, RestockDelayMillis: 3600000},
+		{BuyListID: shopListID, ItemID: arrowID, Price: arrows, MaxCount: 1000, RestockDelayMillis: 3600000},
 	}}
 }
 
 // TestAdminReloadBuyListRacesPurchases runs //reload buylist from a game
-// master, flipping the merchant's list between two prices, while a player
-// buys from it: under -race, every purchase pays one list's prices for all
-// its rows, never a mix of both, and gets every item it paid for.
+// master, flipping the merchant's list between two versions that price
+// every product, the limited arrows included, differently, while a player
+// buys from it. Under -race, every purchase either pays one list's prices
+// for all its rows, never a mix of both, and gets every item it paid for,
+// or, holding a list the reload replaced, is refused before it pays.
 func TestAdminReloadBuyListRacesPurchases(t *testing.T) {
 	t.Parallel()
 	const rounds = 15
-	cheap := buylist.NewTable([]buylist.List{raceList(50, 300)})
-	dear := buylist.NewTable([]buylist.List{raceList(70, 400)})
+	cheap := buylist.NewTable([]buylist.List{raceList(50, 300, 1)})
+	dear := buylist.NewTable([]buylist.List{raceList(70, 400, 2)})
 	var flip atomic.Bool
 	reloads := network.DataReloads{BuyLists: func() (*buylist.Table, error) {
 		if flip.Load() {
@@ -211,7 +213,7 @@ func TestAdminReloadBuyListRacesPurchases(t *testing.T) {
 		flip.Store(true)
 		return dear, nil
 	}}
-	w := bootShop(t, 100000, gameservertest.WithBuyLists(raceList(50, 300)), reloadAdmin(t), gameservertest.WithDataReloads(reloads))
+	w := bootShop(t, 100000, gameservertest.WithBuyLists(raceList(50, 300, 1)), reloadAdmin(t), gameservertest.WithDataReloads(reloads))
 	w.srv.SeedCharacterFor(t, "master", "Master", 1, 0)
 	grantReload(t, w.srv.DB, "Master")
 	gm := w.srv.DialClient(t, "master", 1)
@@ -233,11 +235,32 @@ func TestAdminReloadBuyListRacesPurchases(t *testing.T) {
 			}
 		}
 	})
+	bought := []int32{shopPotionID, shopTunicID, arrowID}
+	held := func() [3]int {
+		var n [3]int
+		for i, id := range bought {
+			n[i] = w.countOf(t, id)
+		}
+		return n
+	}
+	paidPurchases := 0
 	for i := range rounds {
-		adena := w.countOf(t, item.AdenaID)
+		adena, before := w.countOf(t, item.AdenaID), held()
 		w.send(t, encodeRequestBuyItem(shopListID, buyRow{shopPotionID, 1}, buyRow{shopTunicID, 1}, buyRow{arrowID, 1}))
-		if paid := adena - w.countOf(t, item.AdenaID); paid != 50+300+1 && paid != 70+400+1 {
-			t.Fatalf("purchase %d paid %d, want one list's prices: 351 or 471", i, paid)
+		paid, after := adena-w.countOf(t, item.AdenaID), held()
+		want := before
+		switch paid {
+		case 0:
+		case 50 + 300 + 1, 70 + 400 + 2:
+			paidPurchases++
+			for j := range want {
+				want[j]++
+			}
+		default:
+			t.Fatalf("purchase %d paid %d, want one list's prices: 351 or 472, or nothing", i, paid)
+		}
+		if after != want {
+			t.Fatalf("purchase %d paid %d and left potions, tunics, arrows %v, want %v", i, paid, after, want)
 		}
 	}
 	wg.Wait()
@@ -249,7 +272,7 @@ func TestAdminReloadBuyListRacesPurchases(t *testing.T) {
 			t.Fatalf("//reload buylist answered %x, want the %q notice", frame, buyListsReloaded)
 		}
 	}
-	if potions, tunics, arrows := w.countOf(t, shopPotionID), w.countOf(t, shopTunicID), w.countOf(t, arrowID); potions != rounds || tunics != rounds || arrows != rounds {
-		t.Fatalf("bought potions %d tunics %d arrows %d, want %d each", potions, tunics, arrows, rounds)
+	if potions, tunics, arrows := w.countOf(t, shopPotionID), w.countOf(t, shopTunicID), w.countOf(t, arrowID); potions != paidPurchases || tunics != paidPurchases || arrows != paidPurchases {
+		t.Fatalf("bought potions %d tunics %d arrows %d, want %d each, one per paid purchase", potions, tunics, arrows, paidPurchases)
 	}
 }

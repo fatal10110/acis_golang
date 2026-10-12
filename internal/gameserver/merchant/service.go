@@ -45,8 +45,10 @@ type Service struct {
 	ids   IDs
 	cfg   Config
 
-	// reloadMu keeps one reload's stock and lists swaps together.
-	reloadMu sync.Mutex
+	// reloadMu keeps one reload's stock and lists swaps together (write
+	// lock) and holds a purchase's stock check and its sale on one side of
+	// any reload (read lock).
+	reloadMu sync.RWMutex
 }
 
 // NewService builds a Service over lists and their stock.
@@ -59,10 +61,11 @@ func NewService(lists *buylist.Table, stock *Stock, ids IDs, cfg Config) *Servic
 // Reload replaces the buylists with lists and rebuilds their stock from
 // the saved rows (Stock.Reload). The stock takes the new products before
 // the lists are handed out, so a list read from now on is never sold
-// against the old stock. A purchase still holding a list read before buys
-// from that list, but a limited product of it the reload changed has no
-// stock left. When the rows cannot be read, the buylists and their stock
-// stay as they were.
+// against the old stock. A reload waits for the purchases in progress, so
+// one that passed its stock check also sells; a purchase starting after the
+// reload with a list read before it finds no stock left on a limited
+// product the reload changed, and is refused before it pays. When the rows
+// cannot be read, the buylists and their stock stay as they were.
 func (s *Service) Reload(ctx context.Context, lists *buylist.Table) error {
 	s.reloadMu.Lock()
 	defer s.reloadMu.Unlock()
@@ -143,8 +146,10 @@ type Purchase struct {
 // total within the adena range, the buyer's weight limit, free slots and
 // adena. Then the adena is taken and each item created; a limited item
 // whose count ran out in the meantime is not created, its price already
-// paid.
+// paid. A reload never lands between the checks and the sale.
 func (s *Service) Buy(inv *itemcontainer.Inventory, list buylist.List, rows []BuyRow, taxRate float64, gm bool) (Purchase, error) {
+	s.reloadMu.RLock()
+	defer s.reloadMu.RUnlock()
 	var subtotal, slots, weight int64
 	for _, row := range rows {
 		p, ok := list.FindProduct(row.ItemID)
