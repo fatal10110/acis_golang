@@ -28,16 +28,14 @@ func (a *Actor) ObjectID() int32 { return a.id }
 func (a *Actor) Move() *move.CreatureMove { return &a.movement }
 
 // InitMovement wires real geodata into this summon's movement state,
-// matching creature.NewLive's Init call, moving at baseRunSpeed (the
-// template run speed) through the RUN_SPEED stat. Call it once, before
-// building a move.Controller over Move() (see GameClientLink.wireSummonAI);
-// a summon left uninitialized (no geodata available) keeps a stationary,
-// never-moving zero-value CreatureMove.
-func (a *Actor) InitMovement(origin location.Location, baseRunSpeed float64, geo move.Geo) error {
-	if err := a.movement.Init(origin, a.MoveSpeed(baseRunSpeed), geo); err != nil {
+// matching creature.NewLive's Init call, moving at its MoveSpeed. Call it
+// once, before building a move.Controller over Move() (see
+// GameClientLink.wireSummonAI); a summon left uninitialized (no geodata
+// available) keeps a stationary, never-moving zero-value CreatureMove.
+func (a *Actor) InitMovement(origin location.Location, geo move.Geo) error {
+	if err := a.movement.Init(origin, a.MoveSpeed(), geo); err != nil {
 		return err
 	}
-	a.baseRunSpeed = baseRunSpeed
 	a.movementReady.Store(true)
 	return nil
 }
@@ -52,7 +50,7 @@ func (a *Actor) refreshMoveSpeed() {
 	}
 	a.speedMu.Lock()
 	defer a.speedMu.Unlock()
-	a.movement.SetSpeed(a.MoveSpeed(a.baseRunSpeed))
+	a.movement.SetSpeed(a.MoveSpeed())
 }
 
 // SetQueue makes q, the owner's queue, the queue this summon's work runs on,

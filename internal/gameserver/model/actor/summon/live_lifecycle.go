@@ -1,14 +1,11 @@
 package summon
 
 import (
-	"time"
-
-	"github.com/fatal10110/acis_golang/internal/commons/scheduler"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
-	"github.com/rs/zerolog"
 )
 
 func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
@@ -51,13 +48,19 @@ func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
 	return result
 }
 
-// TickServitor advances a servitor's live lifetime and consumes owner
-// upkeep when a checkpoint is crossed. A dead servitor's lifetime stops.
-func (a *Actor) TickServitor(state *world.State) TickResult {
+// TickServitor is one second of a servitor's lifetime, which its lifetime
+// task runs on the summon's queue. The servitor loses its idle or, while its
+// owner is in combat, its active time cost, and leaves once its lifetime runs
+// out. Crossing an upkeep checkpoint makes its owner pay the upkeep item, and
+// an owner who cannot pay loses the servitor. Once the remaining lifetime has
+// dropped far enough since it was last shown (1/352 of the total), the
+// owner's summon window is shown it again, even on the tick the servitor
+// leaves, and the effect icons of a servitor still here that ever held an
+// effect are refreshed. A dead servitor's lifetime stands still.
+func (a *Actor) TickServitor(state *world.State) {
 	if a == nil || a.isPet || a.Dead() {
-		return TickResult{}
+		return
 	}
-
 	cost := a.timeLostIdle
 	if a.InCombat() {
 		cost = a.timeLostActive
@@ -65,45 +68,55 @@ func (a *Actor) TickServitor(state *world.State) TickResult {
 	a.statusMu.Lock()
 	next, expired, upkeep := Tick(a.lifetime, cost)
 	a.lifetime = next
+	show := a.lifetimeShown-next.TimeRemaining > next.TotalLifeTime/352
+	if show {
+		a.lifetimeShown = next.TimeRemaining
+	}
 	a.statusMu.Unlock()
 
-	result := TickResult{
-		TimeRemaining: next.TimeRemaining,
-		Expired:       expired,
-		UpkeepDue:     upkeep,
-	}
-	if expired {
+	left := false
+	if expired || (upkeep && a.itemConsumeID != 0 && a.itemConsumeCount > 0 && !a.payUpkeep()) {
 		a.despawn(state)
-		result.Unsummoned = true
-		return result
+		left = true
 	}
-	if !upkeep || a.itemConsumeID == 0 || a.itemConsumeCount <= 0 {
-		return result
+	if !show {
+		return
 	}
-	if inv := a.ownerInv(); inv == nil || inv.DestroyByTemplateID(a.itemConsumeID, a.itemConsumeCount) == nil {
-		a.despawn(state)
-		result.Unsummoned = true
-		return result
+	// The owner still reads the remaining time after the servitor's
+	// PetDelete. Its icon refresh waits on the effects stopping at
+	// departure, which a leaving summon does not do yet (#3719).
+	a.emit(event.LifetimeShown{Total: next.TotalLifeTime, Remaining: next.TimeRemaining})
+	if !left && a.EffectList().HasHeld() {
+		a.UpdateEffectIcons()
 	}
-	result.UpkeepConsumed = true
-	return result
 }
 
-// StartServitorTicks schedules fixed-rate servitor lifetime/upkeep ticks.
-func (a *Actor) StartServitorTicks(period time.Duration, state *world.State, log zerolog.Logger) *scheduler.Ticker {
-	return scheduler.Start(period, func() {
-		a.TickServitor(state)
-	}, log)
+// payUpkeep takes a's upkeep item out of its owner's inventory and reports
+// whether the owner had enough of it. The owner is told what disappeared, or
+// that it had not enough items.
+func (a *Actor) payUpkeep() bool {
+	inv := a.ownerInv()
+	if inv == nil || inv.ItemCount(a.itemConsumeID, -1, false) < a.itemConsumeCount || inv.DestroyByTemplateID(a.itemConsumeID, a.itemConsumeCount) == nil {
+		a.emit(event.UpkeepShort{})
+		return false
+	}
+	a.emit(event.UpkeepPaid{ItemID: a.itemConsumeID, Count: a.itemConsumeCount})
+	return true
 }
 
-// TickPet advances a pet's live food gauge and consumes food from its own
-// inventory when the auto-feed threshold is crossed. A dead pet is not fed:
-// its gauge and food stay as they were until it is revived.
-func (a *Actor) TickPet(state *world.State) PetTickResult {
+// TickPet is one meal of a pet, which its feeding task runs on the summon's
+// queue every petFeedPeriod. The pet eats its normal or, while its owner is
+// in combat, its battle meal off its gauge. A pet below its auto-feed limit
+// with food in its own inventory (its first food, else its second) eats one
+// unit of it (event.PetFoodDue). Without food, a pet with less than a tenth
+// of its gauge left is very hungry, and may leave its owner for good: 3% of
+// the time, or 30% once its gauge is empty. A pet that stays then walks
+// while hungry and runs otherwise, and its status is broadcast. A dead pet
+// is not fed: its gauge and food stay as they were until it is revived.
+func (a *Actor) TickPet(state *world.State) {
 	if a == nil || !a.isPet || a.Dead() {
-		return PetTickResult{}
+		return
 	}
-
 	inCombat := a.InCombat()
 	a.statusMu.Lock()
 	consume := a.mealInNormal
@@ -115,42 +128,46 @@ func (a *Actor) TickPet(state *world.State) PetTickResult {
 	fed, maxMeal := a.fed, a.maxMeal
 	a.statusMu.Unlock()
 
-	result := PetTickResult{Fed: fed}
-	if a.petInventory != nil && petmodel.BelowShare(fed, maxMeal, a.autoFeedLimit) {
-		food := a.petInventory.ItemByTemplateID(a.food1)
-		restore := a.foodRestore1
-		if food == nil && a.food2 != 0 {
-			food = a.petInventory.ItemByTemplateID(a.food2)
-			restore = a.foodRestore2
-		}
-		if food != nil && a.petInventory.DestroyItem(food, 1) != nil {
-			a.statusMu.Lock()
-			a.fed += restore
-			if a.fed > a.maxMeal {
-				a.fed = a.maxMeal
-			}
-			a.belowUnsummonLimit = petmodel.BelowShare(a.fed, a.maxMeal, a.unsummonLimit)
-			fed = a.fed
-			a.statusMu.Unlock()
-			result.AutoFed = true
-			result.Fed = fed
-			return result
+	if food := a.petFood(); food != nil && petmodel.BelowShare(fed, maxMeal, a.autoFeedLimit) {
+		a.emit(event.PetFoodDue{ObjectID: food.ObjectID})
+	} else if tier := petmodel.Classify(fed, maxMeal); tier != petmodel.StarvationNone {
+		a.emit(event.PetHungry{Starving: tier == petmodel.StarvationSevere})
+		if a.roll(100) < tier.LeaveChancePercent() {
+			a.leaveHungry(state)
+			return
 		}
 	}
-	result.Starvation = petmodel.Classify(fed, maxMeal)
-	if result.Starvation != petmodel.StarvationNone && a.roll(100) < result.Starvation.LeaveChancePercent() {
-		a.despawn(state)
-		result.LeftOwner = true
-		result.Unsummoned = true
+	if a.Hungry() {
+		a.forceWalkStance()
+	} else {
+		a.forceRunStance()
 	}
-	return result
+	a.BroadcastStatus()
 }
 
-// StartPetFeed schedules pet feeding/starvation ticks.
-func (a *Actor) StartPetFeed(period time.Duration, state *world.State, log zerolog.Logger) *scheduler.Ticker {
-	return scheduler.Start(period, func() {
-		a.TickPet(state)
-	}, log)
+// petFood is the food a pet would eat from its own inventory: its first
+// food, else its second, or nil when it carries neither.
+func (a *Actor) petFood() *item.Instance {
+	if a.petInventory == nil {
+		return nil
+	}
+	food := a.petInventory.ItemByTemplateID(a.food1)
+	if food == nil && a.food2 != 0 {
+		food = a.petInventory.ItemByTemplateID(a.food2)
+	}
+	return food
+}
+
+// leaveHungry has a starving pet leave its owner for good. Its feeding stops
+// and its owner is told it left; it then leaves the world as any departing
+// pet does, its items going back to its owner, and, once gone, its owner
+// loses its collar and its saved state (event.PetDeserted).
+func (a *Actor) leaveHungry(state *world.State) {
+	a.stopLifeTask(true)
+	a.emit(event.PetLeavingHungry{})
+	if a.despawn(state) {
+		a.emit(event.PetDeserted{})
+	}
 }
 
 // Unsummon despawns this summon and detaches it from its owner. A dead
@@ -237,6 +254,7 @@ func (a *Actor) despawn(state *world.State) bool {
 	a.despawnOnce.Do(func() {
 		ran = true
 		a.stopBabyHeal(true)
+		a.stopLifeTask(true)
 		// Unsummoning aborts in-flight actions and settles a pet, while
 		// observers still know this summon.
 		a.emit(event.Unsummoning{})

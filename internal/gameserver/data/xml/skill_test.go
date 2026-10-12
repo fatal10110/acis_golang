@@ -274,6 +274,26 @@ func TestLoadSkillDefinitions(t *testing.T) {
 		}
 	})
 
+	t.Run("servitor lifetime and upkeep", func(t *testing.T) {
+		// Summon Kat the Cat: a 20-minute lifetime losing 500 ms a second
+		// idle and 1000 in combat, with crystal (D) upkeep from its level
+		// tables (level 1: none; level 3: 1 at 4 steps; level 5: 1 at 14).
+		for _, tc := range []struct {
+			level, countOT, steps int
+		}{{1, 0, 0}, {3, 1, 4}, {5, 1, 14}} {
+			d, ok := table.Get(1111, tc.level)
+			if !ok || d.SummonTotalLifeTime != 1200000 || d.SummonTimeLostIdle != 500 || d.SummonTimeLostActive != 1000 ||
+				d.ItemConsumeIDOT != 1458 || d.ItemConsumeCountOT != tc.countOT || d.ItemConsumeSteps != tc.steps {
+				t.Fatalf("skill 1111 level %d = total %d idle %d active %d upkeep %d x%d steps %d (loaded %v), want 1200000 500 1000 1458 x%d steps %d",
+					tc.level, d.SummonTotalLifeTime, d.SummonTimeLostIdle, d.SummonTimeLostActive, d.ItemConsumeIDOT, d.ItemConsumeCountOT, d.ItemConsumeSteps, ok, tc.countOT, tc.steps)
+			}
+		}
+		// Power Strike sets none of them.
+		if d, ok := table.Get(3, 1); !ok || d.SummonTimeLostIdle != 0 || d.ItemConsumeIDOT != 0 || d.ItemConsumeSteps != 0 {
+			t.Fatalf("skill 3 level 1 lifetime fields = idle %d upkeep %d steps %d (loaded %v), want zero", d.SummonTimeLostIdle, d.ItemConsumeIDOT, d.ItemConsumeSteps, ok)
+		}
+	})
+
 	t.Run("regular level with table-substituted fields", func(t *testing.T) {
 		d, ok := table.Get(3, 1)
 		if !ok {

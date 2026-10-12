@@ -398,6 +398,12 @@ type GameClientLink struct {
 	// skillEnchantRoll supplies skill-enchant dice rolls in [0,99];
 	// overridden in tests for a deterministic outcome.
 	skillEnchantRoll func() int
+	// petRoll is the random source of every pet called out; nil uses the
+	// summon default.
+	petRoll func(n int) int
+	// petFeedPeriod is how often every pet called out eats; zero uses the
+	// summon default.
+	petFeedPeriod time.Duration
 
 	// fishing is the fish table and dice a cast line draws from; see
 	// fishing.go.
@@ -660,6 +666,13 @@ type GameClientLinkConfig struct {
 	// CraftRoll supplies craft success rolls in [0,n); nil falls back to
 	// the random source.
 	CraftRoll func(n int) int
+	// PetRoll supplies the dice of every pet called out in [0,n), its
+	// hunger included; nil falls back to the random source.
+	PetRoll func(n int) int
+	// PetFeedPeriod is how often every pet called out eats; zero is the
+	// standard ten seconds. Harnesses lengthen it so a meal cannot land
+	// inside a timed exchange.
+	PetFeedPeriod time.Duration
 	// Fish is the loaded fish table a cast line draws its fish from; nil
 	// draws none, so every line comes back empty.
 	Fish *fish.Table
@@ -846,6 +859,8 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		showNPCCrest:     cfg.ShowNPCCrest,
 		enchantRoll:      cfg.EnchantRoll,
 		skillEnchantRoll: cfg.SkillEnchantRoll,
+		petRoll:          cfg.PetRoll,
+		petFeedPeriod:    cfg.PetFeedPeriod,
 		fishing:          fishingDeps{table: cfg.Fish, roll: cfg.FishingRoll},
 		inventory:        invops.NewService(cfg.IDs),
 		petItems:         petitem.NewService(cfg.IDs),
@@ -974,6 +989,12 @@ func (l *GameClientLink) newPet(cfg summon.PetConfig) (*summon.Actor, error) {
 	cfg.Config = &l.petConfig
 	cfg.MaxBuffsAmount = l.playerConfig.MaxBuffsAmount
 	cfg.RespawnRestoreHP = l.playerConfig.RespawnRestoreHP
+	if cfg.Roll == nil {
+		cfg.Roll = l.petRoll
+	}
+	if cfg.FeedPeriod == 0 {
+		cfg.FeedPeriod = l.petFeedPeriod
+	}
 	if cfg.SkillDefs == nil {
 		cfg.SkillDefs = l.skills
 	}

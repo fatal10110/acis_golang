@@ -56,8 +56,9 @@ func defaultRoll(roll func(int) int) func(int) int {
 }
 
 // SpawnBesideOwner places actor in state at owner plus offset and registers
-// it as the owner's active summon. A living baby pet starts healing its
-// owner.
+// it as the owner's active summon. A living summon starts its lifetime task
+// (a servitor's countdown, a pet's feeding), and a living baby pet starts
+// healing its owner.
 func SpawnBesideOwner(state *world.State, actor *Actor, owner Owner, offset location.Location) {
 	if state == nil || actor == nil || owner == nil {
 		return
@@ -70,5 +71,6 @@ func SpawnBesideOwner(state *world.State, actor *Actor, owner Owner, offset loca
 	actor.EnterZones()
 	// Vitals restored short regenerate one period from the spawn.
 	actor.SettleRegen()
+	actor.startLifeTask()
 	actor.startBabyHeal()
 }

@@ -79,9 +79,10 @@ func (a *Actor) RelinkOwner(owner Owner, inv *itemcontainer.Inventory, q *sim.Qu
 	a.effects.SetQueue(q)
 	a.emit(event.OwnerRelinked{})
 	if !a.Dead() {
-		// The owner-heal ticked on the queue the pet leaves, which closes
-		// with the relink.
+		// The owner-heal and the feeding ticked on the queue the pet
+		// leaves, which closes with the relink.
 		a.moveBabyHeal()
+		a.moveLifeTask()
 		a.liftCollar(inv)
 	}
 	// Last, so nothing that waits for the owner to be back (a later
