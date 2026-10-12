@@ -73,12 +73,14 @@ func (p *livePlayer) castApproachTarget() int32 {
 }
 
 // intentionIdle reports whether p's current intention is IDLE: no swing,
-// cast, sit-down or stand-up in flight, and no attack, cast approach,
-// pickup, interact, follow, walk to a point or equip toggle current. An
-// intention queued as the next one never counts on its own: it waits behind
-// one of the actions in flight. A finished sit-down leaves p idle, seated.
+// cast, sit-down or stand-up in flight, and no attack, parked cast, pickup,
+// interact, follow, walk to a point or equip toggle current. A parked cast
+// is either the CAST intention walking to its target or signet point, or a
+// cast queued behind an action in flight; any other intention queued as the
+// next one never counts on its own, since it waits behind one of the
+// actions in flight. A finished sit-down leaves p idle, seated.
 func (p *livePlayer) intentionIdle() bool {
-	if p.CastingNow() || itemAICastBusy(p) || p.castApproachTarget() != 0 {
+	if p.CastingNow() || itemAICastBusy(p) || p.hasParkedCast() {
 		return false
 	}
 	if p.combat != nil && p.combat.Target() != nil {

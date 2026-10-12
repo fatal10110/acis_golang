@@ -164,3 +164,46 @@ func TestEmoteWhileFishingAnswersCannotDoWhileFishing(t *testing.T) {
 		}
 	}
 }
+
+const socialIdleGroundSkill = 5
+
+func encodeRequestExMagicSkillUseGround(x, y, z, skillID int32) []byte {
+	w := wire.NewPacketWriter(clientpackets.OpcodeExtended)
+	w.WriteUint16(clientpackets.OpcodeRequestExMagicSkillUseGround)
+	w.WriteInt32(x)
+	w.WriteInt32(y)
+	w.WriteInt32(z)
+	w.WriteInt32(skillID)
+	w.WriteInt32(0)
+	w.WriteUint8(0)
+	return w.Bytes()
+}
+
+// The walk to an out-of-range signet point is the CAST intention
+// (PlayerAI.thinkCast keeps it current through maybeMoveToLocation), so the
+// emote is dropped until the cast it walks for has ended.
+func TestEmoteDroppedWhileWalkingToGroundCastThenShownAfterCast(t *testing.T) {
+	t.Parallel()
+	seed := func(srv *gameservertest.Server, objID int32) { seedKnownSkill(t, srv, objID, socialIdleGroundSkill, 1) }
+	srv, c, objID := bootSocialIdle(t, seed, gameservertest.WithSkills(combatPersistence(t,
+		[]modelskill.Definition{{
+			ID: socialIdleGroundSkill, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetGround,
+			CastRange: 40, HitTime: 500, StaticHitTime: true, SkillType: "BUFF",
+			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true}},
+		}},
+	)))
+
+	c.Send(encodeRequestExMagicSkillUseGround(int32(playerOrigin.X)+800, int32(playerOrigin.Y), int32(playerOrigin.Z), socialIdleGroundSkill))
+	readUntil(t, c, serverpackets.OpcodeMoveToLocation, "ground-cast approach")
+	drainUntilQuiet(t, c)
+	if srv.PlayerCastingNow(t, objID) {
+		t.Fatal("ground cast started before the approach arrived")
+	}
+	assertEmoteDropped(t, c, "emote while walking to the signet point")
+
+	srv.AdvanceUntil(t, "ground cast after the approach", func() bool { return srv.PlayerCastingNow(t, objID) })
+	srv.AdvanceUntil(t, "ground cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
+	drainUntilQuiet(t, c)
+	c.Send(encodeRequestSocialAction(6))
+	assertEmoteShown(t, c, objID, 6, "emote after the ground cast")
+}
