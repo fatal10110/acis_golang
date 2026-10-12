@@ -36,6 +36,8 @@ type scriptOptions struct {
 	kinds map[int32]script.NPCKind
 	// skills are the skill definitions the scripts read.
 	skills []modelskill.Definition
+	// itemIDs wraps the object id allocator of the scripts' gives.
+	itemIDs func(next func() (int32, error)) func() (int32, error)
 }
 
 // WithScripts boots the script registry from list and catalog, as the
@@ -66,6 +68,14 @@ func WithScriptRand(rand func(n int) int) Option {
 // setting is on, as shipped.
 func WithScriptSingleItemDrop() Option {
 	return func(o *options) { o.scriptHelpers().singleItemDrop = true }
+}
+
+// WithScriptItemIDs makes wrap(next) the object id allocator of every
+// script give, where next is the server's own; a suite pauses a give there,
+// past its checks and before the item exists. Without it gives allocate
+// from next.
+func WithScriptItemIDs(wrap func(next func() (int32, error)) func() (int32, error)) Option {
+	return func(o *options) { o.scriptHelpers().itemIDs = wrap }
 }
 
 func (o *options) scriptHelpers() *scriptOptions {
@@ -165,6 +175,9 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *
 	}
 	if so.rand != nil {
 		env.Rand = so.rand
+	}
+	if so.itemIDs != nil {
+		env.NewItemID = so.itemIDs(ids.NextID)
 	}
 	kindOf := func(id int32) (script.NPCKind, bool) {
 		k, ok := so.kinds[id]
@@ -297,4 +310,12 @@ func (s *Server) QuestVars(tb testing.TB, objID int32, name string) map[string]s
 func (s *Server) PlayerItemCount(tb testing.TB, objID, templateID int32) int {
 	tb.Helper()
 	return s.onlineCharacter(tb, objID).ItemCount(int(templateID))
+}
+
+// PlayerDetaching resolves the online player objID now and returns a
+// report of whether it has started leaving the world. The report keeps
+// answering after the player is gone from the world, from any goroutine.
+func (s *Server) PlayerDetaching(tb testing.TB, objID int32) func() bool {
+	tb.Helper()
+	return s.onlineCharacter(tb, objID).Detaching
 }

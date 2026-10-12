@@ -147,6 +147,7 @@ func provideGameClientLink(
 	gmAudit gmAuditLogger,
 	reloads network.DataReloads,
 	chatLog chatLogger,
+	itemLog itemLogger,
 ) (*network.GameClientLink, error) {
 	enchantCfg := gameplay.Enchant
 	freightCfg := gameplay.Freight
@@ -258,6 +259,7 @@ func provideGameClientLink(
 		Levels:           data.Levels,
 		Admin:            data.Admin,
 		GMAudit:          gmAudit.enabled(gameplay.Admin.GMAudit),
+		ItemLog:          itemLog.enabled(bool(gameplay.LogItems)),
 		Chat: network.ChatConfig{
 			Log:              chatLog.enabled(gameplay.Chat.LogChat),
 			WalkerProtection: gameplay.Chat.WalkerProtection,

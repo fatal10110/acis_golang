@@ -31,8 +31,8 @@ func petWeaponTemplate() *item.Template {
 // bootArmedWolf boots the owner with a collar that calls out a wolf able to
 // wear wolf-slot equipment, and one wolf weapon already saved in its
 // inventory, unequipped. It returns the world, the spawned wolf and the
-// weapon's object id.
-func bootArmedWolf(t *testing.T) (*petWorld, *summon.Actor, int32) {
+// weapon's object id. extra adds boot options.
+func bootArmedWolf(t *testing.T, extra ...gameservertest.Option) (*petWorld, *summon.Actor, int32) {
 	t.Helper()
 	wolf := wolfTemplate()
 	wolf.ID = armedWolfNPCID
@@ -40,11 +40,11 @@ func bootArmedWolf(t *testing.T) (*petWorld, *summon.Actor, int32) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
+	h := bootOwnerWithCollarOpts(t, append([]gameservertest.Option{
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{wolf})),
 		gameservertest.WithSummonItems(summonItems),
 		gameservertest.WithItemTemplates(item.NewTable(append(gameservertest.ItemTemplates().All(), petWeaponTemplate()))),
-	})
+	}, extra...))
 	weapon := item.Instance{ObjectID: h.srv.NewObjectID(), TemplateID: fixturePetWeaponID, OwnerID: h.collarID, Count: 1, Location: item.LocationPet}
 	if err := h.srv.Items.Create(context.Background(), h.collarID, weapon); err != nil {
 		t.Fatalf("seed pet weapon: %v", err)

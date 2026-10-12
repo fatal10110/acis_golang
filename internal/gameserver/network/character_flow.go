@@ -665,7 +665,10 @@ func setWaterSurface(mover *move.CreatureMove, zones *zone.Index) {
 
 func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c *player.Character, tmpl *player.Template, items []*item.Instance, shortcuts []shortcut.Shortcut) (*livePlayer, error) {
 	delivery := &playerInventoryDelivery{updates: l.inventoryUpdates, character: c}
-	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventoryWithDelivery(c.ID, l.itemTemplates, items, delivery, l.itemPersister(c.ID)))
+	inv := itemcontainer.NewPlayerInventoryWithDelivery(c.ID, l.itemTemplates, delivery, l.itemPersister(c.ID))
+	inv.SetItemLog(l.itemLog, func() string { return c.Name })
+	inv.Restore(items)
+	c.AttachRuntime(tmpl, inv)
 	// The body stays the base class's while a subclass is played.
 	if base, ok := l.templates.Get(c.BaseClassID()); ok {
 		c.SetBaseTemplate(base)

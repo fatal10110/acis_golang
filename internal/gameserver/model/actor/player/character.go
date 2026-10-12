@@ -366,6 +366,9 @@ type Character struct {
 	// detaching is set once the character starts leaving the world; see
 	// MarkDetaching.
 	detaching atomic.Bool
+	// detachGate orders the script's give and take paths, which may run on
+	// any queue, against MarkDetaching: see whileAttached.
+	detachGate sync.RWMutex
 	// lastQuestNPC is the object id of the NPC c last talked to about
 	// quests; see SetLastQuestNPC.
 	lastQuestNPC atomic.Int32

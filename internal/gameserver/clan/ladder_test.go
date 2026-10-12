@@ -31,7 +31,7 @@ func TestRefreshLadderRanksCurrentReputation(t *testing.T) {
 	for id, rep := range map[int32]int{1: 5000, 50: 1000, 51: 1000} {
 		cl, _ := table.Get(id)
 		cl.mu.Lock()
-		cl.reputation = rep
+		cl.reputation, cl.storedReputation = rep, rep
 		cl.mu.Unlock()
 	}
 	table.RefreshLadder()
