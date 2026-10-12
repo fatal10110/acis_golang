@@ -22,5 +22,5 @@ func (l *GameClientLink) talkToHostile(live *livePlayer, h *npc.Hostile) {
 	if l.talkThroughScripts(live, h) {
 		return
 	}
-	l.openHostileChat(live, h)
+	l.openHostileChat(live, h, 0)
 }

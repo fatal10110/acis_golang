@@ -67,11 +67,12 @@ func (l *GameClientLink) npcOwnedCastleTaxRate(inst *npc.Instance) float64 {
 	return 0
 }
 
-// showTerritoryStatus answers f's TerritoryStatus command: the town and
-// kingdom of f's castle, with its lord, lord's clan and tax rate in force
-// when a clan owns it. An NPC of no castle answers nothing.
-func (l *GameClientLink) showTerritoryStatus(live *livePlayer, f *npc.Folk) {
-	c, ok := l.npcCastle(f.Instance)
+// showTerritoryStatus answers the TerritoryStatus command of the NPC
+// objectID, an instance of inst: the town and kingdom of its castle, with
+// its lord, lord's clan and tax rate in force when a clan owns it. An NPC
+// of no castle answers nothing.
+func (l *GameClientLink) showTerritoryStatus(live *livePlayer, objectID int32, inst *npc.Instance) {
+	c, ok := l.npcCastle(inst)
 	if !ok {
 		return
 	}
@@ -100,10 +101,10 @@ func (l *GameClientLink) showTerritoryStatus(live *livePlayer, f *npc.Folk) {
 	pairs = append(pairs,
 		"%territory%", territory,
 		"%townName%", town,
-		"%objectId%", strconv.Itoa(int(f.ObjectID())),
+		"%objectId%", strconv.Itoa(int(objectID)),
 	)
 	for i := 0; i < len(pairs); i += 2 {
 		page = strings.ReplaceAll(page, pairs[i], pairs[i+1])
 	}
-	sendFilledHTML(live, f.ObjectID(), page, 0)
+	sendFilledHTML(live, objectID, page, 0)
 }

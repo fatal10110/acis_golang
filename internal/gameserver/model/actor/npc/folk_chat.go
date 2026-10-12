@@ -18,6 +18,9 @@ type ChatRules struct {
 	KarmaCanUseGK        bool
 	KarmaCanUseWarehouse bool
 	AllowWear            bool
+	// AllowManor is server.properties AllowManor: while it is off, the
+	// castle blacksmiths and manor managers show the generic page.
+	AllowManor bool
 }
 
 // ChatOutcome is what an interact with a civilian NPC opens.
@@ -44,6 +47,12 @@ const (
 	// ChatCompetitionOnly refuses every talker while no cabal leads: it says
 	// the NPC serves only in the quest event period, and releases nothing.
 	ChatCompetitionOnly
+	// ChatPageOnly opens the returned page and releases nothing.
+	ChatPageOnly
+	// ChatReleasedOnly opens nothing and releases the client.
+	ChatReleasedOnly
+	// ChatSilent opens nothing and sends nothing.
+	ChatSilent
 )
 
 // folkChat is one type's chat window: the data/html folder its pages live
@@ -83,21 +92,29 @@ var folkChats = map[InstanceKind]folkChat{
 }
 
 // unportedFolkChats are the civilian types whose chat window depends on
-// castle, clan hall, Seven Signs, Olympiad or manor state.
+// castle or clan hall state not in place yet: a mass gatekeeper's on the
+// life towers and its teleport task, a wyvern manager's on the wyvern
+// settings (#3673), and a siegable hall messenger's on the hall's siege
+// (#244); a castle's messenger is answered before the chat window.
 var unportedFolkChats = map[InstanceKind]struct{}{
+	"CastleGatekeeper": {},
+	"SiegeNpc":         {},
+	"WyvernManagerNpc": {},
+}
+
+// unportedResidenceCommands are the castle and clan hall types whose chat
+// window opens but whose dialog commands need castle, door, manor or
+// wyvern behavior not in place yet (#3672).
+var unportedResidenceCommands = map[InstanceKind]struct{}{
 	"CastleBlacksmith":      {},
 	"CastleChamberlain":     {},
 	"CastleDoorman":         {},
-	"CastleGatekeeper":      {},
 	"CastleMagician":        {},
 	"CastleWarehouseKeeper": {},
 	"ClanHallDoorman":       {},
-	"ClanHallManagerNpc":    {},
 	"Doorman":               {},
 	"ManorManagerNpc":       {},
 	"MercenaryManagerNpc":   {},
-	"SiegeNpc":              {},
-	"WyvernManagerNpc":      {},
 }
 
 // unportedFolkCommands are the civilian types whose first chat page is in
@@ -111,7 +128,8 @@ var unportedFolkCommands = map[InstanceKind]struct{}{
 // karma, or names the wedding manager, whose own dialog greets: its page with %objectId% filled in, or, for a karma-gated type
 // whose gate refuses the talker and whose refusal page exists, that page
 // as is. A Seven Signs priest, festival guide or Olympiad manager reads
-// its page from state; see signsChat. A missing page reads as a "My html
+// its page from state, as does an NPC serving a castle or a clan hall; see
+// signsChat and residenceChat. A missing page reads as a "My html
 // is missing" notice naming it.
 func (f *Folk) ChatWindow(pages Pages, rules ChatRules, karma int, state ChatState) (string, ChatOutcome) {
 	kind := hostileKind(f.Instance)
@@ -123,6 +141,9 @@ func (f *Folk) ChatWindow(pages Pages, rules ChatRules, karma int, state ChatSta
 	}
 	if _, ok := unportedFolkChats[kind]; ok {
 		return "", ChatUnported
+	}
+	if page, outcome, ok := f.residenceChat(pages, kind, rules, state); ok {
+		return page, outcome
 	}
 	if page, outcome, ok := f.signsChat(pages, kind, state); ok {
 		return page, outcome

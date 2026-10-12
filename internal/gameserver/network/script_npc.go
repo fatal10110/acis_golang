@@ -27,14 +27,14 @@ func (l *GameClientLink) showNPCChat(live *livePlayer, objectID int32) {
 	case *npc.Folk:
 		l.openFolkChat(live, n)
 	case *npc.Hostile:
-		l.openHostileChat(live, n)
+		l.openHostileChat(live, n, 0)
 	}
 }
 
 // openFolkChat opens f's chat window on live, as its talk does when no
 // script answers and f shows no observer or siege window.
 func (l *GameClientLink) openFolkChat(live *livePlayer, f *npc.Folk) {
-	html, outcome := f.ChatWindow(setPages{l.html}, l.playerConfig.chatRules(), live.Karma(), folkChatState{l: l, live: live})
+	html, outcome := f.ChatWindow(setPages{l.html}, l.chatRules(), live.Karma(), folkChatState{l: l, live: live, f: f})
 	switch outcome {
 	case npc.ChatWedding:
 		l.weddingGreeting(live, f)
@@ -45,22 +45,29 @@ func (l *GameClientLink) openFolkChat(live *livePlayer, f *npc.Folk) {
 	}
 }
 
-// openHostileChat opens h's chat page on live, then ActionFailed.
-func (l *GameClientLink) openHostileChat(live *livePlayer, h *npc.Hostile) {
-	file := h.ChatPage(func(file string) bool {
+// openHostileChat opens h's chat page val on live, then ActionFailed.
+func (l *GameClientLink) openHostileChat(live *livePlayer, h *npc.Hostile, val int) {
+	file := h.ChatPage(val, func(file string) bool {
 		if l.html == nil {
 			return false
 		}
 		_, ok := l.html.Get(file)
 		return ok
 	})
+	l.sendNPCPage(live, h.ObjectID(), file)
+	live.SendFrame(serverpackets.FrameActionFailed())
+}
+
+// sendNPCPage opens the datapack page file as the window of the NPC
+// objectID, with %objectId% naming it; a missing page reads as a "My html
+// is missing" notice naming it.
+func (l *GameClientLink) sendNPCPage(live *livePlayer, objectID int32, file string) {
 	page := "<html><body>My html is missing:<br>" + file + "</body></html>"
 	if l.html != nil {
 		page = l.setPage(file)
 	}
-	page = strings.ReplaceAll(page, "%objectId%", strconv.Itoa(int(h.ObjectID())))
-	sendFilledHTML(live, h.ObjectID(), page, 0)
-	live.SendFrame(serverpackets.FrameActionFailed())
+	page = strings.ReplaceAll(page, "%objectId%", strconv.Itoa(int(objectID)))
+	sendFilledHTML(live, objectID, page, 0)
 }
 
 // callSkill makes live use the skill of e on its target at once, as a
