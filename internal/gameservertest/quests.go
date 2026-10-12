@@ -311,3 +311,11 @@ func (s *Server) PlayerItemCount(tb testing.TB, objID, templateID int32) int {
 	tb.Helper()
 	return s.onlineCharacter(tb, objID).ItemCount(int(templateID))
 }
+
+// PlayerDetaching resolves the online player objID now and returns a
+// report of whether it has started leaving the world. The report keeps
+// answering after the player is gone from the world, from any goroutine.
+func (s *Server) PlayerDetaching(tb testing.TB, objID int32) func() bool {
+	tb.Helper()
+	return s.onlineCharacter(tb, objID).Detaching
+}

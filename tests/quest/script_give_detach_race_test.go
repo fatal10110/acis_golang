@@ -58,12 +58,14 @@ func parkedDetach() (parked, inMark bool) {
 
 // TestScriptGiveFromAnotherQueueRacingDetachIsSaved raises a give and a
 // take for a player from outside its queue while the player goes back to
-// character select. The give is held past its checks until the detach
-// stops for it, which must be where it marks the player as leaving, then
-// let go: it lands before the final item save, so its row is written and
-// the reselected player holds it. The take, raised once the detach waits
-// at the mark, takes nothing: the stack it asked for is still saved in
-// full.
+// character select. The give is held past its checks until the detach,
+// having set the leaving mark, stops for it; that stop must be inside
+// MarkDetaching, and the goroutine dump is what tells a gated detach from
+// an ungated one. The pause sits inside the inventory's own lock, so an
+// ungated detach would stop later, at the inventory's release, and the
+// give would still be saved: the rows and the reselected counts only
+// guard the outcome, that the give lands before the final item save and
+// the take, raised once the detach has stopped, takes nothing.
 //
 // It runs alone, not in parallel: the detach it waits for is found among
 // the process's goroutines, and no other suite's may be there.
@@ -86,11 +88,19 @@ func TestScriptGiveFromAnotherQueueRacingDetachIsSaved(t *testing.T) {
 	}()
 	<-paused.entered
 
+	detaching := srv.PlayerDetaching(t, objID)
 	var restarted, pastMark atomic.Bool
 	taken := make(chan struct{})
 	go func() {
 		defer close(paused.release)
 		for !restarted.Load() {
+			// A stop before the mark is set is some other step of the
+			// detach waiting briefly: keep looking. The mark is read
+			// before the dump, so the dump is taken with it set.
+			if !detaching() {
+				runtime.Gosched()
+				continue
+			}
 			if parked, inMark := parkedDetach(); parked {
 				pastMark.Store(!inMark)
 				break
