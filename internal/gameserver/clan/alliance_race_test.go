@@ -83,7 +83,7 @@ func TestJoinAllyRaceFillsTheLastSlotOnce(t *testing.T) {
 		s, leaders := allianceRaceWorld(t, 2, true)
 		results := make([]AllyJoinRefusal, len(leaders))
 		raceAll(len(leaders), func(i int) {
-			results[i] = s.JoinAlly(raceLeadLeader, leaders[i], time.Now()).Refusal
+			results[i] = s.JoinAlly(raceLeadLeader, leaders[i], time.Now(), nil).Refusal
 		})
 		joined := 0
 		for i, r := range results {
@@ -111,7 +111,7 @@ func TestCreateAllyRaceTakesANameOnce(t *testing.T) {
 		s, leaders := allianceRaceWorld(t, 3, false)
 		results := make([]AllyCreateResult, len(leaders))
 		raceAll(len(leaders), func(i int) {
-			results[i] = s.CreateAlly(leaders[i], names[i%len(names)], time.Now())
+			results[i] = s.CreateAlly(leaders[i], names[i%len(names)], time.Now(), nil)
 		})
 		created, founders := 0, 0
 		for i, r := range results {
@@ -150,7 +150,7 @@ func TestJoinAllyRacingWarKeepsAlliesOutOfWar(t *testing.T) {
 		var declared WarResult
 		raceAll(2, func(i int) {
 			if i == 0 {
-				joined = s.JoinAlly(raceLeadLeader, leaders[0], time.Now()).Refusal
+				joined = s.JoinAlly(raceLeadLeader, leaders[0], time.Now(), nil).Refusal
 				return
 			}
 			for start := time.Now(); time.Since(start) < delay; {

@@ -41,5 +41,8 @@ const (
 	SystemMessageCreateAllyClanLevel5Needed       = 549 // no parameter
 	SystemMessageCannotCreateAllyWhileDissolving  = 550 // no parameter
 	SystemMessageS1ClanAlreadyMemberOfS2Alliance  = 691 // text: the clan's name, its alliance's name
+	SystemMessageNoAllyCreationInSiege            = 721 // no parameter
+	SystemMessageCannotDissolveAllyInSiege        = 722 // no parameter
+	SystemMessageOpposingClanInSiege              = 723 // no parameter
 	SystemMessageS1CantEnterAllianceWithin1Day    = 761 // text: the clan's name
 )

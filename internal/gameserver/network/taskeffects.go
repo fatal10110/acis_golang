@@ -132,6 +132,7 @@ func (a *liveZoneActor) GM() bool                    { return a.live.accessLevel
 func (a *liveZoneActor) Online() bool                { return !a.live.detached() }
 func (a *liveZoneActor) Race() player.Race           { return a.live.Character.Race }
 func (a *liveZoneActor) ClanID() int32               { return a.live.Character.ClanID() }
+func (a *liveZoneActor) SiegeState() int32           { return a.live.Character.SiegeState() }
 
 func (a *liveZoneActor) revalidate(ix *zone.Index) {
 	defer a.fireScriptZones()
