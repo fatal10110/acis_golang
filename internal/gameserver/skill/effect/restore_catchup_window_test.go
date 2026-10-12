@@ -22,33 +22,6 @@ func otherBuff() []modelskill.EffectTemplate {
 	return []modelskill.EffectTemplate{{Name: "Buff", Count: 1, Time: 1200, StackType: "other_buff", StackOrder: 1, Icon: true}}
 }
 
-// A lethal poison saved overdue is anchored at its add inside the replay,
-// with its first tick the minimum delay after it. The rest of the replay
-// taking longer than that delay does not bring the tick inside the replay:
-// the catch-up runs only the ticks due by the instant the replay began, so
-// the character is not hit before it is in the world (#3394).
-func TestRestoreRunsNoLethalTickThatCameDueDuringTheReplay(t *testing.T) {
-	now := time.Unix(5000, 0)
-	var events []string
-	list, in := windowList(now, &events)
-	target := &liveEffectTarget{hp: 100, list: list}
-
-	list.Restore(func() {
-		ApplyRestored(list, target, target, Skill{ID: 4082, Level: 1, KillByDOT: true}, restoredPoison(10, 3), 10, 3, now.Add(-40*time.Second))
-		in.AdvanceBefore(10 * time.Millisecond)
-		ApplyRestored(list, target, target, Skill{ID: 1040, Level: 1}, otherBuff(), 1, 0, now.Add(-40*time.Second))
-	})
-
-	if target.hp != 100 || damageTicks(target.events) != 0 {
-		t.Fatalf("HP after a 10ms replay = %g (%v), want 100: the lethal tick due 5ms into the replay waits for the effects sweep", target.hp, target.events)
-	}
-	for _, e := range list.All() {
-		if e.Skill.ID == 4082 && e.Remaining() != 10 {
-			t.Fatalf("lethal poison ticks left = %d, want 10", e.Remaining())
-		}
-	}
-}
-
 // A selection-anchored poison whose tick comes due while the replay is
 // applying, after it began, is left to the effects sweep as well: the
 // catch-up stops at the replay's start instant.

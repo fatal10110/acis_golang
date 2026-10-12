@@ -125,9 +125,9 @@ func TestLearnGeneralSkillPersistsAndRefreshesShortcut(t *testing.T) {
 		t.Fatalf("read SP-decreased message: %v", err)
 	}
 
+	assertShortCutRegister(t, c, 3, 3, 1)
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageLearnedSkill, 3, 1)
 	assertSkillList(t, c.Read(), skillListEntry{passive: 0, level: 1, id: 3})
-	assertShortCutRegister(t, c, 3, 3, 1)
 	assertEmptyListClose(t, c, serverpackets.SystemMessageNoMoreSkillsToLearn)
 	drainUntilQuiet(t, c)
 	assertKnownSkills(t, srv, objID, map[int]int{3: 1})
