@@ -136,24 +136,29 @@ func (l *GameClientLink) hallOfManager(npcID int) (*hallmodel.Hall, bool) {
 // for live at f. Only a member of the clan owning f's hall is answered.
 // functions opens the function services, manage the function rental,
 // support casts support magic, support_back and list_back go back to the
-// support list and the main page; a member lacking the privilege a command
-// needs is told so. teleport and instant_teleport take a member allowed
-// the functions to a destination. A malformed number answers nothing.
-func (l *GameClientLink) clanHallManagerBypass(live *livePlayer, f *npc.Folk, command string) {
+// support list and the main page; door opens or closes the hall's gates,
+// banish_foreigner throws strangers out of its grounds, manage_vault shows
+// its lease, and WithdrawC and DepositC open the clan warehouse; a member
+// lacking the privilege a command needs is told so. teleport and
+// instant_teleport take a member allowed the functions to a destination. A
+// malformed number answers nothing. It reports false when the command
+// aborted, so that nothing more is sent.
+func (l *GameClientLink) clanHallManagerBypass(live *livePlayer, f *npc.Folk, command string) bool {
 	hall, ok := l.hallOfManager(f.NpcID())
 	if !ok {
-		return
+		return true
 	}
 	cl, ok := l.clanService().ClanOf(live.Character)
 	if !ok {
-		return
+		return true
 	}
-	if v, ok := l.halls.View(int32(hall.ID)); !ok || v.OwnerID != cl.ID() {
-		return
+	v, ok := l.halls.View(int32(hall.ID))
+	if !ok || v.OwnerID != cl.ID() {
+		return true
 	}
 	tokens := strings.FieldsFunc(command, func(r rune) bool { return r == ' ' })
 	if len(tokens) == 0 {
-		return
+		return true
 	}
 	d := hallDialog{l: l, live: live, f: f, hall: hall, cl: cl}
 	val := ""
@@ -171,14 +176,102 @@ func (l *GameClientLink) clanHallManagerBypass(live *livePlayer, f *npc.Folk, co
 		d.send(fillPage(d.page("chamberlain.htm"), "%npcname%", f.CharacterName(), "%objectId%", objID(f)))
 	case strings.EqualFold(actual, "support_back"):
 		d.supportBack()
-	case strings.EqualFold(actual, "banish_foreigner"), strings.EqualFold(actual, "manage_vault"), strings.EqualFold(actual, "door"),
-		strings.EqualFold(actual, "WithdrawC"), strings.EqualFold(actual, "DepositC"):
-		// ponytail: the door, banishment, vault and clan warehouse commands
-		// are ported with the hall's doors and banishment (#3364) in #3429.
-		l.log.Debug().Int("npc_id", f.NpcID()).Str("command", command).Msg("bypass: clan hall manager command not modeled")
+	case strings.EqualFold(actual, "banish_foreigner"):
+		return d.banishForeigners(val)
+	case strings.EqualFold(actual, "manage_vault"):
+		d.manageVault(v)
+	case strings.EqualFold(actual, "door"):
+		d.door(val)
+	case strings.EqualFold(actual, "WithdrawC"):
+		d.clanWarehouse(true)
+	case strings.EqualFold(actual, "DepositC"):
+		d.clanWarehouse(false)
 	default:
 		d.npcCommand(command, tokens)
 	}
+	return true
+}
+
+// banishForeigners answers "banish_foreigner list", the banishment page,
+// and "banish_foreigner banish", which throws every player of another clan
+// out of the hall's grounds before its page; a member lacking the right to
+// dismiss is told so. Any other choice aborts, answering nothing.
+func (d hallDialog) banishForeigners(val string) bool {
+	if !d.allowed(clan.PrivHallDismiss) {
+		return true
+	}
+	switch {
+	case strings.EqualFold(val, "list"):
+		d.sendPage("banish-list.htm")
+	case strings.EqualFold(val, "banish"):
+		ClanHallGrounds(d.l).BanishForeigners(d.hallID(), d.cl.ID())
+		d.sendPage("banish.htm")
+	default:
+		return false
+	}
+	return true
+}
+
+// manageVault shows the hall's lease and the date v, the hall's view, says
+// it is paid until; a siegable hall has its own page. A member lacking the
+// warehouse privilege is told so.
+func (d hallDialog) manageVault(v clanhall.HallView) {
+	if !d.allowed(clan.PrivWarehouseSearch) {
+		return
+	}
+	file := "vault.htm"
+	if d.hall.IsSiegable() {
+		file = "vault-sch.htm"
+	}
+	d.send(fillPage(d.page(file),
+		"%rent%", strconv.Itoa(d.hall.Lease), "%date%", auctionTime(v.PaidUntil, hallFeeDateLayout), "%objectId%", objID(d.f)))
+}
+
+// door answers "door open" and "door close", which open or close the
+// hall's gates before their page, and any other "door", the doors page; a
+// member lacking the entry rights is told so.
+func (d hallDialog) door(val string) {
+	if !d.allowed(clan.PrivHallEntryExit) {
+		return
+	}
+	switch {
+	case strings.EqualFold(val, "open"):
+		d.l.setHallDoors(d.hall.Gates, true)
+		d.sendPage("door-open.htm")
+	case strings.EqualFold(val, "close"):
+		d.l.setHallDoors(d.hall.Gates, false)
+		d.sendPage("door-close.htm")
+	default:
+		d.sendPage("door.htm")
+	}
+}
+
+// clanWarehouse opens the clan warehouse at the manager: its withdrawal
+// list when withdraw is set, its deposit list otherwise, then ActionFailed.
+// A withdrawal needs the warehouse privilege, whose refusal page comes with
+// the warehouse refusal message; a clan below level 1 is told it cannot use
+// a warehouse. A withdrawal lists the warehouse even when it is empty, and
+// a deposit holds the item list while it is open.
+func (d hallDialog) clanWarehouse(withdraw bool) {
+	if withdraw && !d.allowed(clan.PrivWarehouseSearch) {
+		d.live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNoRightToUseClanWarehouse))
+		return
+	}
+	if d.cl.Level() == 0 {
+		d.live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyLevel1ClanOrHigherCanUseWarehouse))
+		return
+	}
+	wh, ok := d.l.activateClanWarehouse(d.live, d.cl)
+	if !ok {
+		return
+	}
+	if withdraw {
+		d.l.sendWithdrawList(d.live, serverpackets.WarehouseClan, wh.Items())
+	} else {
+		d.live.tempInventoryDisable()
+		d.l.sendDepositList(d.live, serverpackets.WarehouseClan, false)
+	}
+	d.live.SendFrame(serverpackets.FrameActionFailed())
 }
 
 // npcCommand runs the commands every NPC answers that a clan hall manager

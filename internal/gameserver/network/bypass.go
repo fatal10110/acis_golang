@@ -170,8 +170,8 @@ func (l *GameClientLink) bypassNpc(live *livePlayer, command string) {
 					return
 				}
 			case *npc.Hostile:
-				if l.playerCanDoInteract(live, target) {
-					l.hostileBypass(live, target, command[end+1:])
+				if l.playerCanDoInteract(live, target) && !l.hostileBypass(live, target, command[end+1:]) {
+					return
 				}
 			default:
 				l.log.Debug().Int32("object_id", obj.ObjectID()).Str("command", command).Msg("bypass: dialog of a non-civilian NPC not modeled")
@@ -184,7 +184,7 @@ func (l *GameClientLink) bypassNpc(live *livePlayer, command string) {
 // folkBypass runs command on f for live. It reports false when the command
 // aborted, so that nothing more is sent.
 func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command string) bool {
-	rules := l.playerConfig.chatRules()
+	rules := l.chatRules()
 	rules.AllowWear = l.merchant.Config().AllowWear
 	talker := npc.Talker{Karma: live.Karma(), Level: live.Level(), LowLevelNewbie: live.LowLevelNewbie()}
 	talker.InactiveHero = l.heroes != nil && l.heroes.IsInactive(live.ObjectID())
@@ -193,7 +193,7 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 	classLevel, _ := player.ClassLevel(live.ClassID())
 	talker.ThirdClass = classLevel >= 3
 	talker.CurrentFolk = live.currentFolk.Load() == f
-	talker.SevenSigns = folkChatState{l: l, live: live}.SevenSigns
+	talker.SevenSigns = folkChatState{l: l, live: live, f: f}.SevenSigns
 	reply := f.Bypass(setPages{l.html}, rules, talker, command)
 	if reply.LeadingActionFailed {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -276,7 +276,7 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 	case npc.BypassAuction:
 		l.auctioneerBypass(live, f, command)
 	case npc.BypassClanHallManager:
-		l.clanHallManagerBypass(live, f, command)
+		return l.clanHallManagerBypass(live, f, command)
 	case npc.BypassOlympiadNoble:
 		l.olympiadNobleBypass(live, f, reply.Index)
 	case npc.BypassClassRanking:
@@ -286,7 +286,7 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 	case npc.BypassSignsChat:
 		sendFolkChat(live, f, reply.HTML, reply.Chat)
 	case npc.BypassTerritoryStatus:
-		l.showTerritoryStatus(live, f)
+		l.showTerritoryStatus(live, f.ObjectID(), f.Instance)
 	case npc.BypassQuest:
 		l.questWindow(live, f, command)
 	case npc.BypassUnported:
@@ -296,15 +296,30 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 	return true
 }
 
-// hostileBypass runs command on the hostile NPC h for live: a "Quest"
-// command opens its quest windows; the rest of a hostile NPC's dialog is
-// not modeled yet and is logged.
-func (l *GameClientLink) hostileBypass(live *livePlayer, h *npc.Hostile, command string) {
-	if strings.HasPrefix(command, "Quest") {
+// hostileBypass runs command on the hostile NPC h for live, a town guard or
+// a friendly monster in the shipped pages: TerritoryStatus shows its
+// castle's territory, Quest opens its quest windows, Chat <n> its chat page
+// n and Link <path> a datapack page. The rest of a hostile NPC's dialog is
+// not modeled and is logged. It reports false when the command aborted, so
+// that nothing more is sent.
+func (l *GameClientLink) hostileBypass(live *livePlayer, h *npc.Hostile, command string) bool {
+	reply := npc.ParseHostileCommand(command)
+	switch reply.Command {
+	case npc.HostileTerritoryStatus:
+		l.showTerritoryStatus(live, h.ObjectID(), h.Instance)
+	case npc.HostileQuest:
 		l.questWindow(live, h, command)
-		return
+	case npc.HostileChat:
+		l.openHostileChat(live, h, reply.Val)
+	case npc.HostileLink:
+		l.sendNPCPage(live, h.ObjectID(), reply.Path)
+	case npc.HostileAborted:
+		return false
+	case npc.HostileRefused:
+	case npc.HostileUnported:
+		l.log.Debug().Int("npc_id", h.NpcID()).Str("command", command).Msg("bypass: dialog of a hostile NPC not modeled")
 	}
-	l.log.Debug().Int("npc_id", h.NpcID()).Str("command", command).Msg("bypass: dialog of a hostile NPC not modeled")
+	return true
 }
 
 // cpRecovery has arena manager f restore live's CP for its fee: the fee

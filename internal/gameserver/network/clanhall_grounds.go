@@ -30,13 +30,18 @@ func ClanHallGrounds(l *GameClientLink) clanhall.Grounds { return clanHallGround
 // CloseDoors closes each door named in gates (Residence.closeDoors), as
 // Door.closeMe does: a door that is unknown, broken or closed already
 // stays as it is.
-func (g clanHallGrounds) CloseDoors(gates []string) {
-	if g.l.doors == nil {
+func (g clanHallGrounds) CloseDoors(gates []string) { g.l.setHallDoors(gates, false) }
+
+// setHallDoors opens or closes each door named in gates, a hall's gates
+// list, as Door.openMe and Door.closeMe do: a door that is unknown, broken
+// or in that state already stays as it is.
+func (l *GameClientLink) setHallDoors(gates []string, open bool) {
+	if l.doors == nil {
 		return
 	}
 	for _, name := range gates {
-		if d, ok := g.l.doors.DoorByName(name); ok {
-			g.l.doors.SetDoorOpen(d.DoorID(), false)
+		if d, ok := l.doors.DoorByName(name); ok {
+			l.doors.SetDoorOpen(d.DoorID(), open)
 		}
 	}
 }
