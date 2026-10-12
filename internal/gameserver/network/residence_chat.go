@@ -9,12 +9,16 @@ import (
 )
 
 // npcResidence returns the residence inst serves: a castle, or else a clan
-// hall. A maker whose spawn time names a castle or a siegable hall gives its
-// NPCs that residence; otherwise the NPC serves the first castle whose npcs
+// hall. A holy artifact serves the castle that placed it. A maker whose
+// spawn time names a castle or a siegable hall gives its NPCs that
+// residence; otherwise the NPC serves the first castle whose npcs
 // list holds its template id, else the first clan hall's.
 func (l *GameClientLink) npcResidence(inst *npc.Instance) (*castle.Castle, *hallmodel.Hall) {
 	if inst == nil || inst.Template == nil {
 		return nil, nil
+	}
+	if c, ok := l.castles.ByArtifact(inst.ObjectID); ok {
+		return c, nil
 	}
 	if id, ok := inst.Maker.ResidenceParam(); ok {
 		if c, ok := l.castles.Get(id); ok {

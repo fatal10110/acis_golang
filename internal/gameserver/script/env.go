@@ -77,11 +77,12 @@ type Doors interface {
 
 // Castles finds the castle an NPC belongs to.
 type Castles interface {
-	// ForNPC returns the castle an NPC of template npcID placed by maker
-	// (nil for none) belongs to: the one the maker's spawn time names,
-	// none when that names a siegable clan hall, else the castle whose
+	// ForNPC returns the castle the NPC objectID, of template npcID and
+	// placed by maker (nil for none), belongs to: the castle that placed it
+	// as a holy artifact, else the one the maker's spawn time names, none
+	// when that names a siegable clan hall, else the castle whose
 	// residence NPCs include npcID.
-	ForNPC(npcID int, maker *spawn.Maker, siegableHall func(id int) bool) (*castle.Castle, bool)
+	ForNPC(objectID int32, npcID int, maker *spawn.Maker, siegableHall func(id int) bool) (*castle.Castle, bool)
 }
 
 // Sieges finds a castle's siege.
