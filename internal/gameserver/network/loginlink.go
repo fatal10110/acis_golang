@@ -347,13 +347,14 @@ func (l *LoginLink) Close() error {
 }
 
 // Maintain keeps this game server linked to the login server at address for
-// as long as ctx is not canceled: it dials and performs the handshake,
-// passes the established LoginLink to onLink, then blocks until the link
-// ends and dials again after retryDelay. A failed dial or handshake is
+// as long as ctx is not canceled: it dials and performs the handshake with
+// the registration auth returns at that moment, passes the established
+// LoginLink to onLink, then blocks until the link ends and dials again
+// after retryDelay. A failed dial or handshake is
 // logged and retried the same way. onLink may be nil.
-func Maintain(ctx context.Context, address string, auth LoginServerAuth, handlers LoginLinkHandlers, retryDelay time.Duration, onLink func(*LoginLink), log zerolog.Logger) {
+func Maintain(ctx context.Context, address string, auth func() LoginServerAuth, handlers LoginLinkHandlers, retryDelay time.Duration, onLink func(*LoginLink), log zerolog.Logger) {
 	for ctx.Err() == nil {
-		l, err := DialLoginLink(ctx, address, auth, handlers, log)
+		l, err := DialLoginLink(ctx, address, auth(), handlers, log)
 		if err != nil {
 			log.Error().Err(err).Msg("login link")
 		} else {

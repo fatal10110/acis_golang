@@ -1,6 +1,7 @@
 package summon
 
 import (
+	"cmp"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -129,9 +130,11 @@ type Actor struct {
 	// zero-value until InitMovement wires real geodata/speed, so Move().Moving()
 	// stays false (not an error) for a summon with no movement controller.
 	movement move.CreatureMove
-	// baseRunSpeed is the template run speed InitMovement recorded, read
-	// only once movementReady (stored after it) reports true.
-	baseRunSpeed  float64
+	// runSpeed and walkSpeed are the npc template's base speeds; immutable.
+	runSpeed, walkSpeed float64
+	// walking is set while the summon is in its walk stance; the zero value
+	// runs, as every summon does once called out.
+	walking       atomic.Bool
 	movementReady atomic.Bool
 	// speedMu serializes refreshMoveSpeed's read of the stats with its
 	// hand-off to the movement, so the last refresh to run always sets the
@@ -245,17 +248,12 @@ type Actor struct {
 	mealInBattle   int
 	food1          int32
 	food2          int32
-	// foodRestore1/foodRestore2 hold the meal gauge each food item
-	// restores on auto-feed: the feed skill for that item (its Feed value
-	// times the pet food rate), since food1 and food2 can map to
-	// different feed skills with different amounts (e.g. Strider's food
-	// vs Clan Hall Strider's food).
-	foodRestore1  int
-	foodRestore2  int
-	autoFeedLimit float64
-	hungryLimit   float64
-	unsummonLimit float64
-	roll          func(int) int
+	autoFeedLimit  float64
+	hungryLimit    float64
+	unsummonLimit  float64
+	roll           func(int) int
+	// feedPeriod is how often a pet eats; immutable after construction.
+	feedPeriod time.Duration
 	// respawnRestoreHP is the share of max HP a revive restores without a
 	// Phoenix Blessing; immutable after construction.
 	respawnRestoreHP float64
@@ -300,6 +298,11 @@ type Actor struct {
 
 	// babyHeal is a baby pet's owner-heal task.
 	babyHeal babyHealTask
+	// life is a servitor's lifetime countdown or a pet's feeding.
+	life lifeTask
+	// lifetimeShown is the remaining lifetime the owner's summon window was
+	// last shown, guarded by statusMu.
+	lifetimeShown int
 }
 
 // Intent is the live action this actor is currently trying to carry out.
@@ -362,24 +365,6 @@ type CommandResult struct {
 	Intent   Intent
 }
 
-// TickResult reports the side effects of one live summon tick.
-type TickResult struct {
-	TimeRemaining  int
-	Expired        bool
-	UpkeepDue      bool
-	UpkeepConsumed bool
-	Unsummoned     bool
-}
-
-// PetTickResult reports the side effects of one live pet feeding tick.
-type PetTickResult struct {
-	Fed        int
-	AutoFed    bool
-	Starvation petmodel.StarvationTier
-	LeftOwner  bool
-	Unsummoned bool
-}
-
 // PetConfig carries the minimum state needed to create a live pet.
 type PetConfig struct {
 	Effects         effect.Env
@@ -390,7 +375,9 @@ type PetConfig struct {
 	NPCID           int
 	CollisionRadius float64
 	CollisionHeight float64
-	Name            string
+	// RunSpeed and WalkSpeed are the npc template's base speeds.
+	RunSpeed, WalkSpeed float64
+	Name                string
 	// Named reports whether Name is a player-assigned custom name rather
 	// than a fallback to the npc template's name; it gates RequestChangePetName's
 	// "pet is already named" rejection.
@@ -404,19 +391,20 @@ type PetConfig struct {
 	Config  *petmodel.Config
 	Growth  *npc.PetData
 
-	Inventory      *itemcontainer.Inventory
-	Fed            int
-	MaxMeal        int
-	MealInNormal   int
-	MealInBattle   int
-	Food1          int32
-	Food2          int32
-	FoodRestore1   int
-	FoodRestore2   int
-	AutoFeedLimit  float64
-	HungryLimit    float64
-	UnsummonLimit  float64
-	Roll           func(int) int
+	Inventory     *itemcontainer.Inventory
+	Fed           int
+	MaxMeal       int
+	MealInNormal  int
+	MealInBattle  int
+	Food1         int32
+	Food2         int32
+	AutoFeedLimit float64
+	HungryLimit   float64
+	UnsummonLimit float64
+	Roll          func(int) int
+	// FeedPeriod is how often the pet eats; zero is the standard ten
+	// seconds.
+	FeedPeriod     time.Duration
 	Stats          CombatStats
 	MaxBuffsAmount int
 	// RespawnRestoreHP is the share of max HP a revive restores without a
@@ -441,9 +429,11 @@ type ServitorConfig struct {
 	NPCID           int
 	CollisionRadius float64
 	CollisionHeight float64
-	Name            string
-	Level           int
-	Passive         bool
+	// RunSpeed and WalkSpeed are the npc template's base speeds.
+	RunSpeed, WalkSpeed float64
+	Name                string
+	Level               int
+	Passive             bool
 	// Undead marks a servitor whose npc template is of the UNDEAD race.
 	Undead bool
 
@@ -484,13 +474,16 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 		npcID:            cfg.NPCID,
 		radius:           cfg.CollisionRadius,
 		height:           cfg.CollisionHeight,
+		runSpeed:         cfg.RunSpeed,
+		walkSpeed:        cfg.WalkSpeed,
 		name:             cfg.Name,
 		passive:          cfg.Passive,
 		undead:           cfg.Undead,
 		intent:           IntentFollowOwner,
 		lifetime:         cfg.Lifetime,
-		timeLostIdle:     defaultPositive(cfg.TimeLostIdle, 1000),
-		timeLostActive:   defaultPositive(cfg.TimeLostActive, 1000),
+		lifetimeShown:    cfg.Lifetime.TotalLifeTime,
+		timeLostIdle:     cfg.TimeLostIdle,
+		timeLostActive:   cfg.TimeLostActive,
 		itemConsumeID:    cfg.ItemConsumeID,
 		itemConsumeCount: cfg.ItemConsumeCount,
 		expPenalty:       cfg.ExpPenalty,
@@ -525,6 +518,8 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 		npcID:          cfg.NPCID,
 		radius:         cfg.CollisionRadius,
 		height:         cfg.CollisionHeight,
+		runSpeed:       cfg.RunSpeed,
+		walkSpeed:      cfg.WalkSpeed,
 		name:           cfg.Name,
 		named:          cfg.Named,
 		passive:        cfg.Passive,
@@ -542,12 +537,11 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 		mealInBattle:   cfg.MealInBattle,
 		food1:          cfg.Food1,
 		food2:          cfg.Food2,
-		foodRestore1:   cfg.FoodRestore1,
-		foodRestore2:   cfg.FoodRestore2,
 		autoFeedLimit:  cfg.AutoFeedLimit,
 		hungryLimit:    cfg.HungryLimit,
 		unsummonLimit:  cfg.UnsummonLimit,
 		roll:           defaultRoll(cfg.Roll),
+		feedPeriod:     cmp.Or(cfg.FeedPeriod, petFeedPeriod),
 		stats:          cfg.Stats,
 		skills:         cfg.Skills,
 		skillDefs:      cfg.SkillDefs,

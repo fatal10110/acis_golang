@@ -226,6 +226,8 @@ type options struct {
 	craftRoll              func(n int) int
 	fish                   *fish.Table
 	fishingRoll            func(n int) int
+	petRoll                func(n int) int
+	petFeedPeriod          time.Duration
 	multisells             *multisell.Table
 	multisellDelay         time.Duration
 	rollDiceDelay          time.Duration
@@ -789,6 +791,19 @@ func WithFish(table *fish.Table) Option {
 	return func(o *options) { o.fish = table }
 }
 
+// WithPetRoll supplies the dice of every pet called out, in [0,n) (default:
+// the random source), so a pet's hunger is deterministic.
+func WithPetRoll(roll func(n int) int) Option {
+	return func(o *options) { o.petRoll = roll }
+}
+
+// WithPetFeedPeriod makes every pet called out eat every period (default:
+// ten seconds), so a long exchange on the wall clock is not cut by a meal's
+// status refresh.
+func WithPetFeedPeriod(period time.Duration) Option {
+	return func(o *options) { o.petFeedPeriod = period }
+}
+
 // WithFishingRoll supplies the fishing dice in [0,n) (default: the random
 // source), so a fishing run is deterministic.
 func WithFishingRoll(roll func(n int) int) Option {
@@ -998,6 +1013,7 @@ type Server struct {
 	SevenSigns          *sevensigns.State
 	Festival            *festival.Manager
 	AnnounceFile        string // the announcements.xml the server reads and rewrites
+	shutdown            *shutdownHarness
 	account             string
 	templates           *player.TemplateTable
 	itemTable           *item.Table
@@ -1891,11 +1907,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 
 	loginAddr, servers, sessions := startLoginServerAcceptor(t, loginsql.NewAccountStore(db))
 	servers.Register(1, HexID)
+	shutdownState := newShutdownHarness(servers)
 
 	validator := network.NewSessionValidator()
 	loginLink, err := network.DialLoginLink(context.Background(), loginAddr,
 		network.LoginServerAuth{ServerID: 1, HexID: HexID, HostName: "*", Port: 7777, MaxPlayers: 300},
-		network.LoginLinkHandlers{PlayerAuthResponse: validator.Resolve}, zerolog.Nop())
+		network.LoginLinkHandlers{PlayerAuthResponse: shutdownState.authResponse(validator.Resolve)}, zerolog.Nop())
 	if err != nil {
 		t.Fatalf("DialLoginLink: %v", err)
 	}
@@ -2068,6 +2085,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		CraftRoll:        o.craftRoll,
 		Fish:             o.fish,
 		FishingRoll:      o.fishingRoll,
+		PetRoll:          o.petRoll,
+		PetFeedPeriod:    o.petFeedPeriod,
 		Templates:        templates,
 		ItemTemplates:    itemTemplates,
 		HTML:             HTMLCache(t, o.pages()),
@@ -2247,6 +2266,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Sieges = newSieges(db, o, gclConfig.Castles, gclConfig.Clans, persistWorker)
 	quests.bindResidences(worldObjects, gclConfig.Castles, gclConfig.Sieges)
 	gclConfig.CastleManor = newCastleManor(db, o, gclConfig.Castles, gclConfig.Clans, persistWorker, o.log)
+	gclConfig.LoginStatus, gclConfig.Shutdown = shutdownState.wire(loginLink, 300, queues, network.NewShutdownNotices(state), o.log)
 	gcl, err := network.NewGameClientLink(gclConfig)
 	if err != nil {
 		t.Fatalf("gameservertest: build game client link: %v", err)
@@ -2467,6 +2487,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	readCharSelectInfo(t, c, o.account, o.wantChars)
 
 	srv := &Server{
+		shutdown:            shutdownState,
 		Client:              c,
 		State:               state,
 		WorldObjects:        worldObjects,

@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -247,8 +248,33 @@ func (s *summonSink) Emit(ev event.Event) {
 		if l.decay != nil {
 			l.decay.Cancel(actor)
 		}
-	case event.PetCorpseDecayed:
+	case event.PetCorpseDecayed, event.PetDeserted:
 		l.destroyDecayedPet(actor)
+	case event.LifetimeShown:
+		if owner, ok := l.currentSummonOwner(actor); ok {
+			owner.SendFrame(serverpackets.FrameSetSummonRemainTime(int32(e.Total), int32(e.Remaining)))
+		}
+	case event.UpkeepPaid:
+		if owner, ok := l.currentSummonOwner(actor); ok {
+			sendDestroyedMessage(owner, e.ItemID, e.Count)
+		}
+	case event.UpkeepShort:
+		l.sendSummonOwnerMessage(actor, serverpackets.SystemMessageNotEnoughItems)
+	case event.PetFoodDue:
+		l.autoFeedPet(actor, e.ObjectID)
+	case event.PetHungry:
+		message := serverpackets.SystemMessageYourPetIsVeryHungryBeCareful
+		if e.Starving {
+			message = serverpackets.SystemMessageYourPetIsVeryHungry
+		}
+		l.sendSummonOwnerMessage(actor, message)
+	case event.PetLeavingHungry:
+		l.sendSummonOwnerMessage(actor, serverpackets.SystemMessageStarvingPetHasLeft)
+	case event.MoveTypeChanged:
+		swimming := actor.InsideZone(zone.FlagWater)
+		l.broadcastSummon(actor, func() wire.Frame {
+			return serverpackets.FrameChangeMoveType(actor.ObjectID(), e.Running, swimming)
+		})
 	case event.CorpseLeftBehind:
 		s.leaveCorpseBehind()
 	case event.OwnerRelinked:
@@ -524,8 +550,8 @@ type petRowDeleter interface {
 	DeleteByItemObjectID(ctx context.Context, itemObjectID int32) error
 }
 
-// destroyDecayedPet ends a pet whose corpse decayed: its owner loses the
-// collar and the pets row is deleted. The pet has already left the world
+// destroyDecayedPet ends a pet whose corpse decayed, or that left its owner
+// from hunger: its owner loses the collar and the pets row is deleted. The pet has already left the world
 // through the same settle as any other departure (releasePet), so its items
 // are already back with its owner and its row was saved; the delete is queued
 // on the collar's persistence lane, behind that save.

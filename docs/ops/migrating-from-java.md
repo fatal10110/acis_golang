@@ -70,7 +70,7 @@ against its working directory.
 | Reference | Go |
 | --- | --- |
 | `startLoginServer.sh`, `LoginServer_loop.sh` | Run `./loginserver` under a supervisor (systemd, Docker). |
-| `startGameServer.sh`, `GameServer_loop.sh` (restarts on exit code 2) | Run `./gameserver` under a supervisor with automatic restart. Admin-requested shutdown and restart (`//server_shutdown`, `//server_restart`) are not ported yet ([#3369](https://github.com/fatal10110/acis_golang/issues/3369)), so the Go server exits only on SIGTERM or SIGINT, or on a fatal error. |
+| `startGameServer.sh`, `GameServer_loop.sh` (restarts on exit code 2) | Run `./gameserver` under a supervisor that restarts it on a non-zero exit. `//server restart <seconds>` exits with code 2 after its countdown and `//server shutdown <seconds>` with code 0, both through the same stop as SIGTERM, so a supervisor restarting on failure only restarts the former, as the loop script did. |
 | `RegisterGameServer.sh` | `./gsregister` in `login/`: the same prompts and the same `hexid(server N).txt` output. |
 | `startSQLAccountManager.sh` | `./accountmgr` in `login/`. |
 | `java -Xmx2G` | No heap flag is needed. Set `GOMEMLIMIT` (for example `GOMEMLIMIT=1500MiB`) to keep the garbage collector under a memory budget. |
@@ -88,7 +88,9 @@ Wants=acis-loginserver.service
 User=acis
 WorkingDirectory=/opt/acis/gameserver
 ExecStart=/opt/acis/gameserver/gameserver
-Restart=always
+# Restarts after //server restart (exit code 2) and after a crash, but not
+# after //server shutdown (exit code 0) or systemctl stop.
+Restart=on-failure
 RestartSec=5
 # Above the server's own worst-case graceful shutdown; see ops/systemd/.
 TimeoutStopSec=240

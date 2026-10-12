@@ -38,6 +38,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/schemebuffer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
+	"github.com/fatal10110/acis_golang/internal/gameserver/shutdown"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 	"github.com/fatal10110/acis_golang/internal/gameserver/signspriest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -146,6 +147,8 @@ func provideGameClientLink(
 	log zerolog.Logger,
 	gmAudit gmAuditLogger,
 	reloads network.DataReloads,
+	loginStatus *network.LoginStatus,
+	countdown *shutdown.Countdown,
 	chatLog chatLogger,
 	itemLog itemLogger,
 ) (*network.GameClientLink, error) {
@@ -316,6 +319,9 @@ func provideGameClientLink(
 		ClanHalls:         halls,
 
 		Reloads: reloads,
+
+		Shutdown:    countdown,
+		LoginStatus: loginStatus,
 	})
 	if err != nil {
 		return nil, err
@@ -389,7 +395,7 @@ func startDebugHTTP(lc fx.Lifecycle, paths gameServerPaths, state *world.State, 
 	})
 }
 
-func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, clients *network.GameClientLink, state *world.State, log zerolog.Logger) {
+func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *manager.Roster, validator *network.SessionValidator, links *loginLinkState, status *network.LoginStatus, clients *network.GameClientLink, state *world.State, log zerolog.Logger) {
 	var cancel context.CancelFunc
 	var wg sync.WaitGroup
 	lc.Append(fx.Hook{
@@ -400,10 +406,12 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *mana
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				network.Maintain(runCtx, cfg.LoginAddr, cfg.Auth, network.LoginLinkHandlers{
+				auth := func() network.LoginServerAuth { return status.Auth(cfg.Auth) }
+				network.Maintain(runCtx, cfg.LoginAddr, auth, network.LoginLinkHandlers{
 					PlayerAuthResponse: playerAuthResponseHandler(links, validator, log),
 				}, network.DefaultReconnectDelay, func(link *network.LoginLink) {
 					links.set(link)
+					status.Registered(link.ServerName)
 					if accounts := onlineAccounts(state); len(accounts) > 0 {
 						if err := link.SendPlayerInGame(accounts); err != nil {
 							log.Error().Err(err).Int("accounts", len(accounts)).Msg("send online roster to loginserver")

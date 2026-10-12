@@ -108,9 +108,9 @@ On `stop`, `restart` and `down`, Docker sends SIGTERM. The game server then clos
 with `ServerClose`, saves players and world state, and exits. Its `stop_grace_period` (240s) is set
 above the server's own worst-case shutdown (`gameServerStopTimeout`, currently 3m35s).
 `TestComposeStopGraceCoversGameServerStop` fails if the two drift apart. The `servers` profile
-uses `restart: unless-stopped`, so a crashed server comes back up. The reference loop scripts
-also restarted on the admin restart exit code. The Go server has no admin shutdown or restart
-command yet ([#3369](https://github.com/fatal10110/acis_golang/issues/3369)).
+uses `restart: unless-stopped`, so a crashed server comes back up, and so does one stopped
+in game: `//server restart` (exit code 2) and `//server shutdown` (exit code 0) both end in a
+restart under this policy. To keep the server down, stop it with `docker compose stop`.
 
 CI runs `ops/docker/smoke-test.sh` on every change. It checks that `docker-compose.yml` parses,
 that the image builds and each of its binaries starts, and that the `db` service's first start

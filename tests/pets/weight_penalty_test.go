@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -235,6 +236,9 @@ func bootBallastWolfCarrying(t *testing.T, saved pet.State, carried int) *petWor
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{regenWolfTemplate(), treeTemplate()})),
 		gameservertest.WithItemTemplates(item.NewTable(catalog)),
 		gameservertest.WithWeightLimitMultiplier(4),
+		// Each meal republishes the wolf's status, which the weight steps
+		// would count; on the wall clock a ten-second meal lands inside them.
+		gameservertest.WithPetFeedPeriod(time.Hour),
 	}, seedItem{TemplateID: ballastID, Count: 2728})
 	if err := h.srv.Pets.Save(context.Background(), h.collarID, saved); err != nil {
 		t.Fatalf("seed pets row: %v", err)

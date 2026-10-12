@@ -305,15 +305,6 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		name = state.Name
 	}
 
-	// food1/food2 restore different amounts: each maps to its own feed
-	// skill (the fixed item->skill map), and those skills'
-	// Feed values differ (e.g. Strider's food vs Clan Hall Strider's food).
-	foodRestore1, _ := petFoodFeedAmount(link.skills, link.petConfig.FoodRate, int32(npcTmpl.Pet.Food1))
-	var foodRestore2 int
-	if npcTmpl.Pet.Food2 != 0 {
-		foodRestore2, _ = petFoodFeedAmount(link.skills, link.petConfig.FoodRate, int32(npcTmpl.Pet.Food2))
-	}
-
 	pet, err := link.newPet(summon.PetConfig{
 		ObjectID:        objID,
 		Owner:           live,
@@ -322,6 +313,8 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		NPCID:           int(summonItem.NPCID),
 		CollisionRadius: npcTmpl.CollisionRadius,
 		CollisionHeight: npcTmpl.CollisionHeight,
+		RunSpeed:        npcTmpl.RunSpeed,
+		WalkSpeed:       npcTmpl.WalkSpeed,
 		Name:            name,
 		Named:           named,
 		BabyPet:         npcTmpl.Type == "BabyPet",
@@ -339,8 +332,6 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		MealInBattle:    levelStats.MealInBattle,
 		Food1:           int32(npcTmpl.Pet.Food1),
 		Food2:           int32(npcTmpl.Pet.Food2),
-		FoodRestore1:    foodRestore1,
-		FoodRestore2:    foodRestore2,
 		AutoFeedLimit:   npcTmpl.Pet.AutoFeedLimit,
 		HungryLimit:     npcTmpl.Pet.HungryLimit,
 		UnsummonLimit:   npcTmpl.Pet.UnsummonLimit,
@@ -398,7 +389,7 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 	// connection goroutine looking the pet up to dispatch TryUseSkill).
 	// Setting brain first means that edge also covers the brain field,
 	// instead of leaving it as an unsynchronized write racing that read.
-	link.wireSummonAI(pet, npcTmpl.RunSpeed)
+	link.wireSummonAI(pet)
 	pet.SyncControlItemEnchant()
 
 	offset := location.Location{X: petSpawnOffset, Y: 0, Z: 0}
@@ -483,6 +474,8 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		NPCID:            def.NpcID,
 		CollisionRadius:  npcTmpl.CollisionRadius,
 		CollisionHeight:  npcTmpl.CollisionHeight,
+		RunSpeed:         npcTmpl.RunSpeed,
+		WalkSpeed:        npcTmpl.WalkSpeed,
 		Name:             npcTmpl.Name,
 		Level:            npcTmpl.Level,
 		Undead:           npcTmpl.Race == npc.RaceUndead,
@@ -492,10 +485,15 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		ExpPenalty:       def.ExpPenalty,
 		CorpseTime:       time.Duration(npcTmpl.CorpseTime) * time.Second,
 		Lifetime: summon.LifetimeState{
-			TimeRemaining:    def.SummonTotalLifeTime,
-			TotalLifeTime:    def.SummonTotalLifeTime,
-			ItemConsumeSteps: 0,
+			TimeRemaining:       def.SummonTotalLifeTime,
+			TotalLifeTime:       def.SummonTotalLifeTime,
+			NextItemConsumeTime: summon.InitialNextConsumeTime(def.SummonTotalLifeTime, def.ItemConsumeSteps, def.ItemConsumeIDOT),
+			ItemConsumeSteps:    def.ItemConsumeSteps,
 		},
+		TimeLostIdle:     def.SummonTimeLostIdle,
+		TimeLostActive:   def.SummonTimeLostActive,
+		ItemConsumeID:    int32(def.ItemConsumeIDOT),
+		ItemConsumeCount: def.ItemConsumeCountOT,
 		Stats: summon.CombatStats{
 			STR: npcTmpl.STR, CON: npcTmpl.CON, DEX: npcTmpl.DEX,
 			INT: npcTmpl.INT, WIT: npcTmpl.WIT, MEN: npcTmpl.MEN,
@@ -519,7 +517,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 	if err != nil {
 		return false
 	}
-	link.wireSummonAI(servitor, npcTmpl.RunSpeed)
+	link.wireSummonAI(servitor)
 	summon.SpawnBesideOwner(link.world, servitor, live, location.Location{X: petSpawnOffset})
 	servitor.TryToFollow(live)
 	link.broadcastSummonSpawnRelation(live, servitor)
@@ -532,11 +530,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 // notifiers, and returns the installed cast controller so a caller (or a
 // test) can drive it directly rather than reaching into the brain's
 // unexported state.
-func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *actorcast.AIController {
-	runSpeed := 0.0
-	if len(speed) != 0 {
-		runSpeed = speed[0]
-	}
+func (l *GameClientLink) wireSummonAI(actor *summon.Actor) *actorcast.AIController {
 	sink := &summonSink{link: l, actor: actor}
 	// A summon's work runs on its owner's queue.
 	owner, _ := liveSummonOwner(actor)
@@ -545,7 +539,7 @@ func (l *GameClientLink) wireSummonAI(actor *summon.Actor, speed ...float64) *ac
 	moveController := ai.SummonMoveController(inertSummonMoveController{})
 	if actor != nil && l.geo != nil {
 		x, y, z := actor.Position()
-		if err := actor.InitMovement(location.Location{X: x, Y: y, Z: z}, runSpeed, l.geo); err != nil {
+		if err := actor.InitMovement(location.Location{X: x, Y: y, Z: z}, l.geo); err != nil {
 			l.log.Warn().Err(err).Msg("summon: create movement controller")
 		} else {
 			setWaterSurface(actor.Move(), l.zones)

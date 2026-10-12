@@ -47,11 +47,12 @@ func (a *Actor) Kill(killer attackable.Combatant) bool {
 // resurrection, and last the owner is told (event.DeathSettled).
 //
 // A dead pet stops eating, a dead baby pet stops healing its owner, and a
-// dead servitor's lifetime stops (see TickPet and TickServitor). The owner's
+// dead servitor's lifetime stops for good. The owner's
 // side then schedules the corpse's decay (DecayDelay, Decay), and last a pet
 // pays its death penalty.
 func (a *Actor) die(killer attackable.Combatant) {
 	a.stopBabyHeal(false)
+	a.stopLifeTask(false)
 	if a.brain != nil {
 		a.brain.AbortAll()
 	}
