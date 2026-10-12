@@ -51,7 +51,7 @@ func TestIdleHostileWanderBroadcastsWalkThenMove(t *testing.T) {
 		t.Fatalf("CurrentIntention() = %v, want wander", got)
 	}
 
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
+	assertStanceShown(t, c, "ChangeMoveType", hostile.ObjectID(), false)
 	move := mustRead(t, c, "MoveToLocation")
 	dest := moveToLocationDest(t, move)
 	offset := 60 * 3
@@ -89,7 +89,7 @@ func TestMinionIdleWanderOffsetsFromCurrentPosition(t *testing.T) {
 		t.Fatalf("CurrentIntention() = %v, want wander", got)
 	}
 
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), minion.ObjectID(), false)
+	assertStanceShown(t, c, "ChangeMoveType", minion.ObjectID(), false)
 	dest := moveToLocationDest(t, mustRead(t, c, "MoveToLocation"))
 	offset := 60 * 3
 	if absInt(dest.X-current.X) > offset || absInt(dest.Y-current.Y) > offset || dest.Z != current.Z {
@@ -132,7 +132,7 @@ func TestMinionIdleWanderContinuesWhenMasterDiesOffTerritory(t *testing.T) {
 	if got := minion.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("CurrentIntention() = %v, want wander after master death", got)
 	}
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), minion.ObjectID(), false)
+	assertStanceShown(t, c, "ChangeMoveType", minion.ObjectID(), false)
 	dest := moveToLocationDest(t, mustRead(t, c, "MoveToLocation"))
 	offset := 60 * 3
 	if absInt(dest.X-current.X) > offset || absInt(dest.Y-current.Y) > offset || dest.Z != current.Z {
@@ -232,7 +232,7 @@ func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) 
 	if !hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
 		t.Fatal("wander desire missing after Think, want it queued before arrival")
 	}
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
+	assertStanceShown(t, c, "ChangeMoveType", hostile.ObjectID(), false)
 	_ = mustRead(t, c, "MoveToLocation")
 	if !hostile.IsMoving() {
 		t.Fatal("IsMoving() = false after wander Think, want an in-flight walk")
@@ -299,7 +299,7 @@ func TestMakerIdleWanderStaysInsideTerritory(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	tickThinkWander(t, hostile)
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
+	assertStanceShown(t, c, "ChangeMoveType", hostile.ObjectID(), false)
 	dest := moveToLocationDest(t, mustRead(t, c, "MoveToLocation"))
 	if !poly.Contains(dest.X, dest.Y, dest.Z) {
 		t.Fatalf("maker wander dest = %+v, want inside territory", dest)
@@ -341,7 +341,7 @@ func TestMakerIdleWanderFallsBackToShapeCenter(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	tickThinkWander(t, hostile)
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
+	assertStanceShown(t, c, "ChangeMoveType", hostile.ObjectID(), false)
 	dest := moveToLocationDest(t, mustRead(t, c, "MoveToLocation"))
 	want := geometry.Point{X: (55 + 65 + 60) / 3, Y: (15 + 15 + 28) / 3}
 	if dest.X != want.X || dest.Y != want.Y || dest.Z != home.Z {

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 )
@@ -34,21 +34,26 @@ type zoneStatElement struct {
 	Val  string `xml:"val,attr"`
 }
 
+// zoneBuilder builds one zone kind from its id, form and <stat> settings.
+// It reads the settings it uses through set and leaves any parse failure in
+// set's sticky error; a kind that takes no settings ignores them entirely.
+type zoneBuilder func(id int, form zone.Form, set *attrValues) zone.Kind
+
 // zoneBuilders maps a zone data file's base name onto the zone kind its
 // entries build. The names are the datapack contract.
-var zoneBuilders = map[string]func(id int, form zone.Form, set *commons.StatSet) (zone.Kind, error){
+var zoneBuilders = map[string]zoneBuilder{
 	"ArenaZone":           settingsFree(zone.NewArena),
-	"BossZone":            wrap(zone.NewBoss),
-	"CastleTeleportZone":  wrap(zone.NewCastleTeleport),
-	"CastleZone":          wrap(zone.NewCastle),
-	"ClanHallZone":        wrap(zone.NewClanHall),
-	"DamageZone":          wrap(zone.NewDamage),
+	"BossZone":            buildBossZone,
+	"CastleTeleportZone":  buildCastleTeleportZone,
+	"CastleZone":          buildCastleZone,
+	"ClanHallZone":        buildClanHallZone,
+	"DamageZone":          buildDamageZone,
 	"DerbyTrackZone":      settingsFree(zone.NewDerbyTrack),
-	"EffectZone":          wrap(zone.NewEffect),
+	"EffectZone":          buildEffectZone,
 	"FishingZone":         settingsFree(zone.NewFishing),
 	"HqZone":              settingsFree(zone.NewHQ),
 	"JailZone":            settingsFree(zone.NewJail),
-	"MotherTreeZone":      wrap(zone.NewMotherTree),
+	"MotherTreeZone":      buildMotherTreeZone,
 	"NoLandingZone":       settingsFree(zone.NewNoLanding),
 	"NoRestartZone":       settingsFree(zone.NewNoRestart),
 	"NoStoreZone":         settingsFree(zone.NewNoStore),
@@ -57,24 +62,126 @@ var zoneBuilders = map[string]func(id int, form zone.Form, set *commons.StatSet)
 	"PeaceZone":           settingsFree(zone.NewPeace),
 	"PrayerZone":          settingsFree(zone.NewPrayer),
 	"ScriptZone":          settingsFree(zone.NewScript),
-	"SiegeZone":           wrap(zone.NewSiege),
-	"SwampZone":           wrap(zone.NewSwamp),
-	"TownZone":            wrap(zone.NewTown),
+	"SiegeZone":           buildSiegeZone,
+	"SwampZone":           buildSwampZone,
+	"TownZone":            buildTownZone,
 	"WaterZone":           settingsFree(zone.NewWater),
 }
 
 // settingsFree adapts a constructor that ignores zone settings.
-func settingsFree[T zone.Kind](ctor func(id int, form zone.Form) T) func(int, zone.Form, *commons.StatSet) (zone.Kind, error) {
-	return func(id int, form zone.Form, _ *commons.StatSet) (zone.Kind, error) {
-		return ctor(id, form), nil
-	}
+func settingsFree[T zone.Kind](ctor func(id int, form zone.Form) T) zoneBuilder {
+	return func(id int, form zone.Form, _ *attrValues) zone.Kind { return ctor(id, form) }
 }
 
-// wrap adapts a settings-taking constructor to the builder shape.
-func wrap[T zone.Kind](ctor func(id int, form zone.Form, set *commons.StatSet) (T, error)) func(int, zone.Form, *commons.StatSet) (zone.Kind, error) {
-	return func(id int, form zone.Form, set *commons.StatSet) (zone.Kind, error) {
-		return ctor(id, form, set)
+// Each settings-taking builder starts from the constructor's defaults and
+// overrides every value the zone's <stat> children carry.
+
+func buildMotherTreeZone(id int, form zone.Form, set *attrValues) zone.Kind {
+	z := zone.NewMotherTree(id, form)
+	z.EnterMessage = set.intDefault("enterMsgId", z.EnterMessage)
+	z.LeaveMessage = set.intDefault("leaveMsgId", z.LeaveMessage)
+	z.MPBonus = set.intDefault("MpRegenBonus", z.MPBonus)
+	z.HPBonus = set.intDefault("HpRegenBonus", z.HPBonus)
+	z.AffectedRace = set.intDefault("affectedRace", z.AffectedRace)
+	return z
+}
+
+func buildTownZone(id int, form zone.Form, set *attrValues) zone.Kind {
+	z := zone.NewTown(id, form)
+	z.TownID = set.intDefault("townId", z.TownID)
+	z.CastleID = set.intDefault("castleId", z.CastleID)
+	z.Peaceful = set.boolDefault("isPeaceZone", z.Peaceful)
+	return z
+}
+
+// buildSiegeZone links the battlefield to its castle or, when both are
+// given, its clan hall.
+func buildSiegeZone(id int, form zone.Form, set *attrValues) zone.Kind {
+	z := zone.NewSiege(id, form)
+	for _, key := range []string{"castleId", "clanHallId"} {
+		if set.has(key) {
+			z.ResidenceID = set.int(key)
+		}
 	}
+	return z
+}
+
+func buildCastleZone(id int, form zone.Form, set *attrValues) zone.Kind {
+	z := zone.NewCastle(id, form)
+	z.ResidenceID = set.intDefault("castleId", z.ResidenceID)
+	return z
+}
+
+func buildClanHallZone(id int, form zone.Form, set *attrValues) zone.Kind {
+	z := zone.NewClanHall(id, form)
+	z.ResidenceID = set.intDefault("clanHallId", z.ResidenceID)
+	return z
+}
+
+func buildCastleTeleportZone(id int, form zone.Form, set *attrValues) zone.Kind {
+	z := zone.NewCastleTeleport(id, form)
+	z.CastleID = set.intDefault("castleId", z.CastleID)
+	z.ExitMinX = set.intDefault("spawnMinX", z.ExitMinX)
+	z.ExitMaxX = set.intDefault("spawnMaxX", z.ExitMaxX)
+	z.ExitMinY = set.intDefault("spawnMinY", z.ExitMinY)
+	z.ExitMaxY = set.intDefault("spawnMaxY", z.ExitMaxY)
+	z.ExitZ = set.intDefault("spawnZ", z.ExitZ)
+	return z
+}
+
+// readTrap overrides a trap's castle link and event trigger.
+func readTrap(t *zone.Trap, set *attrValues) {
+	t.CastleID = set.intDefault("castleId", t.CastleID)
+	t.EventID = set.intDefault("eventId", t.EventID)
+}
+
+func buildDamageZone(id int, form zone.Form, set *attrValues) zone.Kind {
+	z := zone.NewDamage(id, form)
+	readTrap(&z.Trap, set)
+	z.HPDamage = set.intDefault("hpDamage", z.HPDamage)
+	z.InitialDelay = millisDefault(set, "initialDelay", z.InitialDelay)
+	z.ReuseDelay = millisDefault(set, "reuseDelay", z.ReuseDelay)
+	return z
+}
+
+func buildSwampZone(id int, form zone.Form, set *attrValues) zone.Kind {
+	z := zone.NewSwamp(id, form)
+	readTrap(&z.Trap, set)
+	z.MoveBonus = set.intDefault("move_bonus", z.MoveBonus)
+	return z
+}
+
+// buildEffectZone reads the skill list and target scope; an empty
+// targetType keeps the default scope.
+func buildEffectZone(id int, form zone.Form, set *attrValues) zone.Kind {
+	z := zone.NewEffect(id, form)
+	z.Chance = set.intDefault("chance", z.Chance)
+	z.InitialDelay = millisDefault(set, "initialDelay", z.InitialDelay)
+	z.ReuseDelay = millisDefault(set, "reuseDelay", z.ReuseDelay)
+	z.SetEnabled(set.boolDefault("defaultStatus", z.Enabled()))
+	skills, err := zone.ParseSkillRefs(set.strDefault("skill", ""))
+	if err != nil {
+		set.fail(err)
+	}
+	z.Skills = skills
+	if raw := set.strDefault("targetType", ""); raw != "" {
+		z.Target = attrEnum(set, "targetType", zone.ParseTargetScope)
+	}
+	return z
+}
+
+func buildBossZone(id int, form zone.Form, set *attrValues) zone.Kind {
+	z := zone.NewBoss(id, form)
+	z.InvadeWindow = millisDefault(set, "InvadeTime", z.InvadeWindow)
+	z.OustLoc.X = set.intDefault("oustX", z.OustLoc.X)
+	z.OustLoc.Y = set.intDefault("oustY", z.OustLoc.Y)
+	z.OustLoc.Z = set.intDefault("oustZ", z.OustLoc.Z)
+	return z
+}
+
+// millisDefault reads a whole-millisecond delay at key, or def when absent.
+func millisDefault(set *attrValues, key string, def time.Duration) time.Duration {
+	return time.Duration(set.intDefault(key, int(def/time.Millisecond))) * time.Millisecond
 }
 
 // LoadZones parses every zone data file in dir into a region-attached zone
@@ -109,16 +216,15 @@ func LoadZones(dir string) (*zone.Index, error) {
 	return index, nil
 }
 
-func buildZone(build func(int, zone.Form, *commons.StatSet) (zone.Kind, error), el zoneElement, dynamicID *int) (zone.Kind, error) {
-	attrs := commons.StatSetFromXMLAttrs(el.Attrs)
+func buildZone(build zoneBuilder, el zoneElement, dynamicID *int) (zone.Kind, error) {
+	attrs := newAttrValues(foldAttrs(el.Attrs), "zone")
 
 	var id int
-	if attrs.Has("id") {
-		v, err := attrs.GetInt32("id")
-		if err != nil {
+	if attrs.has("id") {
+		id = int(attrs.int32("id"))
+		if err := attrs.Err(); err != nil {
 			return nil, err
 		}
-		id = int(v)
 	} else {
 		id = *dynamicID
 		*dynamicID++
@@ -129,13 +235,13 @@ func buildZone(build func(int, zone.Form, *commons.StatSet) (zone.Kind, error), 
 		return nil, fmt.Errorf("zone %d: %w", id, err)
 	}
 
-	set := commons.NewStatSetWithCapacity(len(el.Stats))
+	stats := make(map[string]string, len(el.Stats))
 	for _, stat := range el.Stats {
-		set.Set(stat.Name, stat.Val)
+		stats[stat.Name] = stat.Val
 	}
-
-	k, err := build(id, form, set)
-	if err != nil {
+	set := newAttrValues(stats, "settings")
+	k := build(id, form, set)
+	if err := set.Err(); err != nil {
 		return nil, fmt.Errorf("zone %d: %w", id, err)
 	}
 
@@ -151,15 +257,13 @@ func buildZone(build func(int, zone.Form, *commons.StatSet) (zone.Kind, error), 
 	return k, nil
 }
 
-func buildZoneForm(attrs *commons.StatSet, nodeEls []pointElement) (zone.Form, error) {
-	if err := decodeLiteralAttrs(attrs, "minZ", "maxZ"); err != nil {
-		return nil, err
-	}
-	f := commons.NewFields(attrs, "zone form")
-	shape := f.String("shape")
-	minZ := f.Int("minZ")
-	maxZ := f.Int("maxZ")
-	if err := f.Err(); err != nil {
+// buildZoneForm builds the zone's shape. minZ, maxZ and a cylinder's rad
+// are integer literals.
+func buildZoneForm(attrs *attrValues, nodeEls []pointElement) (zone.Form, error) {
+	shape := attrs.str("shape")
+	minZ := int(attrs.int32Literal("minZ"))
+	maxZ := int(attrs.int32Literal("maxZ"))
+	if err := attrs.Err(); err != nil {
 		return nil, err
 	}
 
@@ -190,11 +294,8 @@ func buildZoneForm(attrs *commons.StatSet, nodeEls []pointElement) (zone.Form, e
 		if len(nodes) != 1 {
 			return nil, fmt.Errorf("cylinder zone wants 1 node, has %d", len(nodes))
 		}
-		if err := decodeLiteralAttrs(attrs, "rad"); err != nil {
-			return nil, err
-		}
-		rad := f.Int("rad")
-		if err := f.Err(); err != nil {
+		rad := int(attrs.int32Literal("rad"))
+		if err := attrs.Err(); err != nil {
 			return nil, err
 		}
 		return zone.NewCylinder(nodes[0].X, nodes[0].Y, minZ, maxZ, rad)

@@ -125,7 +125,7 @@ func TestStunStopsWalkingNPC(t *testing.T) {
 	drainUntilQuiet(t, c)
 
 	tickThinkWander(t, hostile)
-	assertFrameOpcode(t, mustRead(t, c, "ChangeMoveType"), serverpackets.OpcodeChangeMoveType, "ChangeMoveType")
+	assertStanceShown(t, c, "ChangeMoveType", hostile.ObjectID(), false)
 	assertFrameOpcode(t, mustRead(t, c, "MoveToLocation"), serverpackets.OpcodeMoveToLocation, "MoveToLocation")
 	if !hostile.IsMoving() {
 		t.Fatal("IsMoving() = false after wander, want a live walk")

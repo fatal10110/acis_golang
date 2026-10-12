@@ -4,7 +4,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/block"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -294,29 +293,23 @@ func TestBlockConcurrentAddRemoveAndReads(t *testing.T) {
 }
 
 func TestDoorObjectFromTemplate(t *testing.T) {
-	tmpl, err := door.NewTemplate(func() *mapSet {
-		set := newMapSet()
-		set.Set("id", 1)
-		set.Set("name", "door")
-		set.Set("type", "DOOR")
-		set.Set("level", 1)
-		set.Set("x", 24)
-		set.Set("y", 40)
-		set.Set("z", 0)
-		set.Set("coords", []location.Point{
+	tmpl := &door.Template{
+		ID:       1,
+		Name:     "door",
+		Kind:     door.KindDoor,
+		Level:    1,
+		Position: location.Location{X: 24, Y: 40, Z: 0},
+		Coordinates: []location.Point{
 			{X: 16, Y: 32},
 			{X: 48, Y: 32},
 			{X: 48, Y: 64},
 			{X: 16, Y: 64},
-		})
-		set.Set("hp", 1)
-		set.Set("pDef", 1)
-		set.Set("mDef", 1)
-		set.Set("height", 80)
-		return set
-	}().StatSet)
-	if err != nil {
-		t.Fatalf("NewTemplate: %v", err)
+		},
+		HP:       1,
+		PDef:     1,
+		MDef:     1,
+		Height:   80,
+		OpenKind: door.OpenNPC,
 	}
 
 	obj, err := NewDoorObject(tmpl, stubSampler{
@@ -347,17 +340,4 @@ func TestDoorObjectFromTemplate(t *testing.T) {
 	if obj.GeoData()[2][0] != block.North|block.West|block.East {
 		t.Fatalf("edge cell = %v, want NWE", obj.GeoData()[2][0])
 	}
-}
-
-// ---- from testhelpers_test.go ----
-type mapSet struct {
-	StatSet *commons.StatSet
-}
-
-func newMapSet() *mapSet {
-	return &mapSet{StatSet: commons.NewStatSet()}
-}
-
-func (m *mapSet) Set(name string, value any) {
-	m.StatSet.Set(name, value)
 }

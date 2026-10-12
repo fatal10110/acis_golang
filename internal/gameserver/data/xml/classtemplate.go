@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 )
@@ -19,8 +18,7 @@ type classFile struct {
 
 // classElement is one <class> element. A shipped file spreads a
 // profession's attributes across several <set> children purely for
-// readability; buildTemplate merges them before handing the result to the
-// model constructor.
+// readability; buildTemplate merges them before reading the template.
 type classElement struct {
 	Sets   []attrsElement    `xml:"set"`
 	Items  []attrsElement    `xml:"items>item"`
@@ -29,7 +27,7 @@ type classElement struct {
 }
 
 // attrsElement captures every attribute of an element, whatever their
-// names, so they can be folded into a StatSet.
+// names, so they can be folded into a name-keyed value map.
 type attrsElement struct {
 	Attrs []xml.Attr `xml:",any,attr"`
 }
@@ -95,52 +93,125 @@ func loadClassFile(path string, doc classFile, templates map[int]*player.Templat
 	return nil
 }
 
-// buildTemplate packs one parsed <class> element into the StatSet shape
-// player.NewTemplate consumes: the merged <set> attributes plus the
-// items/skills/spawns lists.
+// buildTemplate reads one parsed <class> element: the merged <set>
+// attributes, later ones winning, plus the items/skills/spawns lists.
 func buildTemplate(c classElement) (*player.Template, error) {
-	set := commons.NewStatSetWithCapacity(32)
+	vals := make(map[string]string, 32)
 	for _, s := range c.Sets {
 		for _, a := range s.Attrs {
-			set.Set(a.Name.Local, a.Value)
+			vals[a.Name.Local] = a.Value
 		}
+	}
+	a := newAttrValues(vals, "player template")
+	id := a.int("id")
+	if err := a.Err(); err != nil {
+		return nil, err
+	}
+	a.prefix = fmt.Sprintf("player template %d", id)
+
+	t := &player.Template{
+		ID:          id,
+		BaseLevel:   a.int("baseLvl"),
+		FistsItemID: a.int("fists"),
+
+		STR: a.intDefault("str", 40),
+		CON: a.intDefault("con", 21),
+		DEX: a.intDefault("dex", 30),
+		INT: a.intDefault("int", 20),
+		WIT: a.intDefault("wit", 43),
+		MEN: a.intDefault("men", 20),
+
+		PAtk:      a.float64("pAtk"),
+		PDef:      a.float64("pDef"),
+		MAtk:      a.float64("mAtk"),
+		MDef:      a.float64("mDef"),
+		RunSpeed:  a.float64Default("runSpd", 1),
+		WalkSpeed: a.float64Default("walkSpd", 0),
+
+		SwimSpeed: a.intDefault("swimSpd", 1),
+
+		CollisionRadius:       a.float64("radius"),
+		CollisionHeight:       a.float64("height"),
+		CollisionRadiusFemale: a.float64("radiusFemale"),
+		CollisionHeightFemale: a.float64("heightFemale"),
+
+		HPTable:      a.float64Array("hpTable"),
+		MPTable:      a.float64Array("mpTable"),
+		CPTable:      a.float64Array("cpTable"),
+		HPRegenTable: a.float64Array("hpRegenTable"),
+		MPRegenTable: a.float64Array("mpRegenTable"),
+		CPRegenTable: a.float64Array("cpRegenTable"),
+	}
+	safeFall := a.intArray("safeFallHeight")
+	if len(safeFall) == 2 {
+		t.SafeFallHeightFemale, t.SafeFallHeightMale = safeFall[0], safeFall[1]
+	} else {
+		a.fail(fmt.Errorf("attribute %q: want 2 values, got %d", "safeFallHeight", len(safeFall)))
+	}
+	if err := a.Err(); err != nil {
+		return nil, err
 	}
 
 	if len(c.Items) > 0 {
-		items := make([]player.StarterItem, 0, len(c.Items))
+		t.Items = make([]player.StarterItem, 0, len(c.Items))
 		for _, node := range c.Items {
-			item, err := player.NewStarterItem(commons.StatSetFromXMLAttrs(node.Attrs))
+			item, err := buildStarterItem(newAttrValues(foldAttrs(node.Attrs), "player starter item"))
 			if err != nil {
 				return nil, fmt.Errorf("starter item: %w", err)
 			}
-			items = append(items, item)
+			t.Items = append(t.Items, item)
 		}
-		set.Set("items", items)
 	}
 
 	if len(c.Skills) > 0 {
-		skills := make([]player.SkillGrant, 0, len(c.Skills))
+		t.Skills = make([]player.SkillGrant, 0, len(c.Skills))
 		for _, node := range c.Skills {
-			skill, err := player.NewSkillGrant(commons.StatSetFromXMLAttrs(node.Attrs))
+			skill, err := buildSkillGrant(newAttrValues(foldAttrs(node.Attrs), "player skill grant"))
 			if err != nil {
 				return nil, fmt.Errorf("skill grant: %w", err)
 			}
-			skills = append(skills, skill)
+			t.Skills = append(t.Skills, skill)
 		}
-		set.Set("skills", skills)
 	}
 
 	if len(c.Spawns) > 0 {
-		spawns := make([]location.Location, 0, len(c.Spawns))
+		t.Spawns = make([]location.Location, 0, len(c.Spawns))
 		for _, node := range c.Spawns {
 			spawn, err := node.loc()
 			if err != nil {
 				return nil, fmt.Errorf("spawn point: %w", err)
 			}
-			spawns = append(spawns, spawn)
+			t.Spawns = append(t.Spawns, spawn)
 		}
-		set.Set("spawns", spawns)
 	}
+	return t, nil
+}
 
-	return player.NewTemplate(set)
+// buildStarterItem reads a starter item: id and count are required, and
+// isEquipped defaults to true.
+func buildStarterItem(a *attrValues) (player.StarterItem, error) {
+	item := player.StarterItem{
+		ItemID:   a.int("id"),
+		Count:    a.int("count"),
+		Equipped: a.boolDefault("isEquipped", true),
+	}
+	if err := a.Err(); err != nil {
+		return player.StarterItem{}, err
+	}
+	return item, nil
+}
+
+// buildSkillGrant reads a learnable skill grant; id, lvl, minLvl and cost
+// are all required.
+func buildSkillGrant(a *attrValues) (player.SkillGrant, error) {
+	grant := player.SkillGrant{
+		SkillID:  a.int("id"),
+		Level:    a.int("lvl"),
+		MinLevel: a.int("minLvl"),
+		Cost:     a.int("cost"),
+	}
+	if err := a.Err(); err != nil {
+		return player.SkillGrant{}, err
+	}
+	return grant, nil
 }

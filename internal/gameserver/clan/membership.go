@@ -312,6 +312,7 @@ func (s *Service) removeLocked(cl *Clan, objectID int32, joinExpiry int64, live 
 		return Member{}, false
 	}
 	delete(cl.members, objectID)
+	delete(cl.loginGrades, objectID)
 	s.unlinkLeaverLocked(cl, m)
 	row := RemovalRow{ObjectID: objectID, JoinExpiry: joinExpiry, Online: live != nil, KeepTitle: live != nil && live.IsNoble()}
 	switch {

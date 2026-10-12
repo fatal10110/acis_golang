@@ -177,7 +177,7 @@ func (s *folkSink) Emit(ev event.Event) {
 	case event.MoveTypeChanged:
 		s.broadcast(func() wire.Frame { return frames.ChangeMoveType(f.ObjectID(), e.Running) })
 	case event.AbnormalEffectChanged:
-		s.broadcast(func() wire.Frame { return frames.Info(f.NPCInfoSnapshot()) })
+		broadcastNPCView(&s.known, s.world, f, false)
 	case event.HallManagerBuffCheck:
 		if s.link != nil {
 			s.link.hallManagerSelfBuff(f)
@@ -187,11 +187,7 @@ func (s *folkSink) Emit(ev event.Event) {
 			s.link.hallSupportAnswer(f, e)
 		}
 	case event.NPCInfoChanged:
-		if e.ServerObject {
-			s.broadcast(func() wire.Frame { return frames.ObjectInfo(f.ServerObjectInfoSnapshot()) })
-			return
-		}
-		s.broadcast(func() wire.Frame { return frames.Info(f.NPCInfoSnapshot()) })
+		broadcastNPCView(&s.known, s.world, f, e.ServerObject)
 	}
 }
 

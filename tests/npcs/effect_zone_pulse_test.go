@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -25,15 +24,15 @@ var areaHaste = modelskill.Definition{
 // pulse, after a one second initial delay, on targetType.
 func effectZone(t *testing.T, id int, form zone.Form, targetType string) *zone.Effect {
 	t.Helper()
-	set := commons.NewStatSet()
-	set.Set("targetType", targetType)
-	set.Set("skill", "4644-2")
-	set.Set("initialDelay", "1000")
-	set.Set("reuseDelay", "6000")
-	z, err := zone.NewEffect(id, form, set)
+	target, err := zone.ParseTargetScope(targetType)
 	if err != nil {
 		t.Fatal(err)
 	}
+	z := zone.NewEffect(id, form)
+	z.Target = target
+	z.Skills = []zone.SkillRef{{ID: 4644, Level: 2}}
+	z.InitialDelay = time.Second
+	z.ReuseDelay = 6 * time.Second
 	return z
 }
 

@@ -14,16 +14,6 @@ import (
 // NPC.
 type NpcFrameBuilder struct{}
 
-// Info builds the current NPCInfo frame from snapshot.
-func (NpcFrameBuilder) Info(snapshot npcinfo.Snapshot) wire.Frame {
-	return FrameNPCInfo(snapshot)
-}
-
-// ObjectInfo builds the stationary-NPC info frame from snapshot.
-func (NpcFrameBuilder) ObjectInfo(snapshot npcinfo.Snapshot) wire.Frame {
-	return FrameServerObjectInfo(snapshot)
-}
-
 // Attack builds the attack packet for snapshot.
 func (NpcFrameBuilder) Attack(snapshot event.Attack) wire.Frame {
 	return FrameAttack(snapshot)

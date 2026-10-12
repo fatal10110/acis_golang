@@ -32,7 +32,7 @@ func TestBlockedArrivalBroadcastsSameCellMoveToLocation(t *testing.T) {
 	if !hostile.ReturnHome() {
 		t.Fatal("ReturnHome() = false, want true outside SiegeGuard drift range")
 	}
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), true)
+	assertStanceShown(t, c, "ChangeMoveType", hostile.ObjectID(), true)
 	if err := hostile.RunAI(); err != nil {
 		t.Fatalf("RunAI() error: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestBlockedMidRouteBroadcastsNextLegMoveToLocation(t *testing.T) {
 	if !hostile.ReturnHome() {
 		t.Fatal("ReturnHome() = false, want true outside home drift range")
 	}
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), hostile.ObjectID(), false)
+	assertStanceShown(t, c, "ChangeMoveType", hostile.ObjectID(), false)
 	startID, startDest, _ := moveToLocationCoords(t, mustRead(t, c, "start walk"))
 	if startID != hostile.ObjectID() {
 		t.Fatalf("start MoveToLocation object id = %d, want %d", startID, hostile.ObjectID())

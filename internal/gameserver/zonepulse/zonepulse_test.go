@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -115,14 +114,6 @@ func box(t *testing.T) zone.Form {
 	return f
 }
 
-func statSet(kv ...string) *commons.StatSet {
-	set := commons.NewStatSet()
-	for i := 0; i < len(kv); i += 2 {
-		set.Set(kv[i], kv[i+1])
-	}
-	return set
-}
-
 var (
 	inside  = location.Location{X: 500, Y: 500}
 	outside = location.Location{X: 1_500, Y: 500}
@@ -154,10 +145,8 @@ func assertHits(t *testing.T, when string, c *creature, want ...float64) {
 // finds the zone empty stops the task, and the next entry starts a fresh one
 // at initialDelay again.
 func TestDamagePulseHurtsOccupantsAtAFixedRate(t *testing.T) {
-	z, err := zone.NewDamage(1, box(t), statSet("hpDamage", "40", "initialDelay", "1000", "reuseDelay", "5000"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	z := zone.NewDamage(1, box(t))
+	z.HPDamage, z.InitialDelay, z.ReuseDelay = 40, time.Second, 5*time.Second
 	ix := zone.NewIndex()
 	ix.Add(z)
 	in := sim.NewInline(time.Unix(0, 0))
@@ -201,10 +190,8 @@ func TestDamagePulseHurtsOccupantsAtAFixedRate(t *testing.T) {
 // during its siege, the first entry tells the defenders it tripped
 // (DamageZone.java:86-88); and the trap going dormant stops the task.
 func TestDamagePulseStopsForADormantCastleTrap(t *testing.T) {
-	z, err := zone.NewDamage(1, box(t), statSet("castleId", "5", "hpDamage", "10", "initialDelay", "0", "reuseDelay", "1000"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	z := zone.NewDamage(1, box(t))
+	z.CastleID, z.HPDamage, z.InitialDelay, z.ReuseDelay = 5, 10, 0, time.Second
 	var siege bool
 	z.SiegeActive = func() bool { return siege }
 	z.Armed = true
@@ -288,10 +275,9 @@ func TestPulseRestartsForAnEntryRacingItsStop(t *testing.T) {
 // the zone; a disabled zone skips its pulses without stopping; and the pulse
 // that finds the zone empty stops the task.
 func TestEffectPulseLandsSkillsOnTheTargetScope(t *testing.T) {
-	z, err := zone.NewEffect(1, box(t), statSet("targetType", "Npc", "skill", "4644-2;4645-3", "chance", "70", "initialDelay", "1000", "reuseDelay", "6000"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	z := zone.NewEffect(1, box(t))
+	z.Target, z.Chance, z.InitialDelay, z.ReuseDelay = zone.ScopeNPC, 70, time.Second, 6*time.Second
+	z.Skills = []zone.SkillRef{{ID: 4644, Level: 2}, {ID: 4645, Level: 3}}
 	ix := zone.NewIndex()
 	ix.Add(z)
 	in := sim.NewInline(time.Unix(0, 0))
