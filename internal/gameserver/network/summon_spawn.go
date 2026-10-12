@@ -422,6 +422,9 @@ func (l *GameClientLink) newPetInventory(live *livePlayer, controlItemID int32, 
 		state:   l.world,
 		log:     l.log,
 	}, l.itemPersister(controlItemID))
+	// The pet built around inv does not exist yet, so its records name the
+	// player it is called out for.
+	inv.SetItemLog(l.itemLog, func() string { return live.Name })
 	inv.Restore(l.restoreRows(controlItemID, items, restoredPetItemLocation))
 	// Restored rows never queue an update, so the carried weight stays 0
 	// unless recomputed here; the pet built around inv takes its
