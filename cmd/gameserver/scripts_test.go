@@ -255,7 +255,7 @@ func TestManifestComparisonCatchesDifferences(t *testing.T) {
 	}
 	q001 := stand(script.Bindings{script.EventQuestStart: {30048}, script.EventTalked: {30006, 30033, 30048}})
 	folk := func(int32) (script.NPCKind, bool) { return script.KindFolk, true }
-	unraised := stand(script.Bindings{script.EventSeeItem: {30048}})
+	unraised := stand(script.Bindings{script.EventPartyAttacked: {30048}})
 	if got := manifestMismatches(t, list, unraised, script.Config{KindOf: folk, Log: zerolog.Nop()}); !slices.Equal(got, []string{"script quest.Q001_LettersOfLove refused"}) {
 		t.Fatalf("a refused script gave %q", got)
 	}
@@ -314,7 +314,7 @@ func TestScriptCatalogMatchesManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := script.Config{KindOf: npcKindOf(npcs), Log: zerolog.Nop()}
+	cfg := script.Config{KindOf: npcKindOf(npcs), Log: zerolog.Nop(), HandleOps: scriptHandleOps}
 	for _, m := range manifestMismatches(t, list, catalog, cfg) {
 		t.Error(m)
 	}

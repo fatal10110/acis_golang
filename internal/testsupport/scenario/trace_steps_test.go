@@ -7,7 +7,7 @@ import (
 )
 
 // stepsTrace is a scenario trace: two kills, a hit, an advance with a timer
-// firing, a pinned draw and a player memo statement between them.
+// firing, a pinned draw and a player memo write between them.
 const stepsTrace = `# test trace
 # player object 500; format: README.md in this directory.
 # kill 20120 (object 700)
@@ -29,10 +29,9 @@ S ActionFailed 25
 `
 
 // A kill step of N kills replays N kills of the trace, hits and advances
-// replay theirs, and a statement on another table than the quest journal is
-// not a Q line.
+// replay theirs, and a player memo write is an M line, not a Q line.
 func TestCheckTraceReplaysKillsHitsAndAdvances(t *testing.T) {
-	sc := traceScenario(t, "random always 0\nkill wolf x2\n  S ActionFailed\n  S ActionFailed\n  Q upsert Q001_LettersOfLove | <cond> | 2\nhit wolf 10\n  S ActionFailed\nadvance 1500ms\n  S ActionFailed\nrelog\n")
+	sc := traceScenario(t, "random always 0\nkill wolf x2\n  S ActionFailed\n  S ActionFailed\n  Q upsert Q001_LettersOfLove | <cond> | 2\n  M set Q260_OneTimeQuestFlag | true\nhit wolf 10\n  S ActionFailed\nadvance 1500ms\n  S ActionFailed\nrelog\n")
 	draws, err := checkTrace(sc, []byte(stepsTrace), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -44,10 +43,10 @@ func TestCheckTraceReplaysKillsHitsAndAdvances(t *testing.T) {
 
 func TestCheckTraceNamesADepartureOfAKillHitOrAdvance(t *testing.T) {
 	for _, tc := range []struct{ name, steps, want string }{
-		{"fewer kills", "kill wolf\n  S ActionFailed\n  Q upsert Q001_LettersOfLove | <cond> | 2\nhit wolf 10\n", `step 2 (line 7) "hit wolf 10" against trace "kill 20120": the step sends "hit 20120 10"`},
-		{"other damage", "kill wolf x2\n  S ActionFailed\n  S ActionFailed\n  Q upsert Q001_LettersOfLove | <cond> | 2\nhit wolf 11\n", `the step sends "hit 20120 11"`},
-		{"other time", "kill wolf x2\n  S ActionFailed\n  S ActionFailed\n  Q upsert Q001_LettersOfLove | <cond> | 2\nhit wolf 10\n  S ActionFailed\nadvance 1s\n", `the step sends "advance 1000"`},
-		{"missing timer packet", "kill wolf x2\n  S ActionFailed\n  S ActionFailed\n  Q upsert Q001_LettersOfLove | <cond> | 2\nhit wolf 10\n  S ActionFailed\nadvance 1500ms\n", "scenario packet 1 missing"},
+		{"fewer kills", "kill wolf\n  S ActionFailed\n  Q upsert Q001_LettersOfLove | <cond> | 2\n  M set Q260_OneTimeQuestFlag | true\nhit wolf 10\n", `step 2 (line 8) "hit wolf 10" against trace "kill 20120": the step sends "hit 20120 10"`},
+		{"other damage", "kill wolf x2\n  S ActionFailed\n  S ActionFailed\n  Q upsert Q001_LettersOfLove | <cond> | 2\n  M set Q260_OneTimeQuestFlag | true\nhit wolf 11\n", `the step sends "hit 20120 11"`},
+		{"other time", "kill wolf x2\n  S ActionFailed\n  S ActionFailed\n  Q upsert Q001_LettersOfLove | <cond> | 2\n  M set Q260_OneTimeQuestFlag | true\nhit wolf 10\n  S ActionFailed\nadvance 1s\n", `the step sends "advance 1000"`},
+		{"missing timer packet", "kill wolf x2\n  S ActionFailed\n  S ActionFailed\n  Q upsert Q001_LettersOfLove | <cond> | 2\n  M set Q260_OneTimeQuestFlag | true\nhit wolf 10\n  S ActionFailed\nadvance 1500ms\n", "scenario packet 1 missing"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := checkTrace(traceScenario(t, tc.steps), []byte(stepsTrace), nil)

@@ -2183,7 +2183,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Recommendations = gamesql.NewRecommendationStore(db)
 	quests := bootQuests(db, persistWorker, ids, queues.NewQueue("script-engine"), state, clock, itemTemplates, gclConfig.HTML, sevenSigns, o)
 	gclConfig.Quests, gclConfig.Scripts, gclConfig.Journals = quests.store, quests.registry, quests.journals
-	gclConfig.Memos = memoStore{MemoStore: gamesql.NewMemoStore(db), loadErr: o.memoLoadErr}
+	quests.memos = &memoStore{MemoStore: gamesql.NewMemoStore(db), loadErr: o.memoLoadErr}
+	gclConfig.Memos = quests.memos
 	gclConfig.AugmentationChances = augmentation.DefaultChances()
 	if o.augmentationChances != nil {
 		gclConfig.AugmentationChances = *o.augmentationChances

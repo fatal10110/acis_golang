@@ -32,9 +32,9 @@ const (
 )
 
 // walkerTestSpawnFixture writes a spawnlist with one fresh (non-db) entry
-// fixed at (100, 200, 0), heading 12345 — matching walkerTestRoutes' single
-// node, so the NPC's very first route move is a same-cell arrival back at
-// its own spawn point.
+// fixed at (100, 200, 0), heading 12345: walkerTestSpawnPoint, the first
+// node of the routes the walker tests give it, so the NPC's very first route
+// move is a same-cell arrival back at its own spawn point.
 func walkerTestSpawnFixture(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -70,20 +70,20 @@ func walkerTestTemplate() *npc.Table {
 	}})
 }
 
-func walkerTestRoutes(spawnPoint location.Location) route.WalkerRoutes {
+// walkerTestRoutes is the walker alias's route over nodes.
+func walkerTestRoutes(nodes ...route.WalkerLocation) route.WalkerRoutes {
 	return route.WalkerRoutes{
-		walkerTestAlias: {walkerTestAlias: []route.WalkerLocation{{Location: spawnPoint}}},
+		walkerTestAlias: {walkerTestAlias: nodes},
 	}
 }
 
-// TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading pins issue #1940:
-// a spawned NPC whose template alias resolves in walkerRoutes.xml is
-// registered with task.Walker at spawn (previously PR #418's Walker task
-// had no production caller at all — StartRoute/Arrived/MoveToNextPoint were
-// unreachable outside tests), and an arrival that lands exactly back at the
-// spawn point restores the spawn heading (aCis NpcAI.onEvtArrived,
-// NpcAI.java:295-296), even after the NPC's heading changed in between.
-func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
+// walkerTestSpawnPoint is where walkerTestSpawnFixture places its NPC.
+var walkerTestSpawnPoint = location.Location{X: 100, Y: 200, Z: 0}
+
+// spawnWalkerTestNPC spawns walkerTestSpawnFixture's NPC walking routes and
+// returns it with the clock its queue runs on.
+func spawnWalkerTestNPC(t *testing.T, routes route.WalkerRoutes) (*npc.Hostile, *sim.Inline) {
+	t.Helper()
 	dir := walkerTestSpawnFixture(t)
 	table, err := xml.LoadSpawnlist(dir, zerolog.Nop(), 1)
 	if err != nil {
@@ -92,7 +92,6 @@ func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
 	templates := walkerTestTemplate()
 	spawns := NewSpawns(table, nil)
 
-	spawnPoint := location.Location{X: 100, Y: 200, Z: 0}
 	state := world.New()
 	ids := &sequentialIDs{}
 	decay, err := task.NewDecay(nopDecayEffects{}, time.Now)
@@ -106,7 +105,7 @@ func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
 	ai := task.NewAI(state, zerolog.Nop())
 	positions := task.NewPositionUpdates(state)
 	items := item.NewTable(nil)
-	walker, err := task.NewWalker(walkerTestRoutes(spawnPoint), alwaysOpenPath{}, time.Now, state)
+	walker, err := task.NewWalker(routes, alwaysOpenPath{}, time.Now, state)
 	if err != nil {
 		t.Fatalf("NewWalker() error: %v", err)
 	}
@@ -129,6 +128,22 @@ func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
 	if !ok {
 		t.Fatalf("object id 1 is %T, want *npc.Hostile", obj)
 	}
+	return hostile, clock
+}
+
+// TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading pins issue #1940:
+// a spawned NPC whose template alias resolves in walkerRoutes.xml is
+// registered with task.Walker at spawn, and an arrival that lands exactly
+// back at the spawn point restores the spawn heading (NpcAI.onEvtArrived),
+// even after the NPC's heading changed in between. The spawn point is the
+// route's only node, which holds a pause, so no further leg turns it. The
+// first leg heads for that node although the NPC stands on it: the route
+// step moves with a zero offset, and a zero radius holds no distance.
+func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
+	hostile, clock := spawnWalkerTestNPC(t, walkerTestRoutes(route.WalkerLocation{Location: walkerTestSpawnPoint, DelayMillis: 60_000}))
+	if !hostile.Move().Moving() {
+		t.Fatal("walker standing on its nearest node started no leg, want a leg to that node")
+	}
 
 	// Prove the eventual match to walkerTestSpawnHeading below comes from
 	// the arrival's own reset, not coincidence: knock the heading away from
@@ -140,6 +155,30 @@ func TestNpcSpawnRegistersWalkerRouteAndRestoresSpawnHeading(t *testing.T) {
 	advanceUntil(clock, func() bool { return hostile.Heading() == walkerTestSpawnHeading })
 	if got := hostile.Heading(); got != walkerTestSpawnHeading {
 		t.Fatalf("Heading() after route arrival = %d, want spawn heading %d", got, walkerTestSpawnHeading)
+	}
+	if hostile.Move().Moving() {
+		t.Fatal("walker moving during its node pause")
+	}
+}
+
+// TestRouteArrivalOnSpawnPointTurnsTowardTheNextLeg pins the order of a
+// route arrival (NpcAI.onEvtArrived): the AI restores the spawn heading
+// first, then the route step starts the next leg, which turns the NPC
+// toward the next node. The spawn heading does not override the leg.
+func TestRouteArrivalOnSpawnPointTurnsTowardTheNextLeg(t *testing.T) {
+	next := location.Location{X: 100, Y: 500, Z: 0}
+	hostile, clock := spawnWalkerTestNPC(t, walkerTestRoutes(route.WalkerLocation{Location: walkerTestSpawnPoint}, route.WalkerLocation{Location: next}))
+
+	towardNext := func() bool {
+		to, moving := hostile.Move().MovingTo()
+		return moving && to == next
+	}
+	advanceUntil(clock, towardNext)
+	if !towardNext() {
+		t.Fatal("walker never started its leg to the next node")
+	}
+	if got, want := hostile.Heading(), walkerTestSpawnPoint.HeadingTo(next); got != want {
+		t.Fatalf("Heading() as the next leg starts = %d, want %d toward the next node (spawn heading %d)", got, want, walkerTestSpawnHeading)
 	}
 }
 
@@ -216,7 +255,7 @@ func TestNpcDespawnStopsWalkerRoute(t *testing.T) {
 	ai := task.NewAI(state, zerolog.Nop())
 	positions := task.NewPositionUpdates(state)
 	items := item.NewTable(nil)
-	walker, err := task.NewWalker(walkerTestRoutes(spawnPoint), alwaysOpenPath{}, time.Now, state)
+	walker, err := task.NewWalker(walkerTestRoutes(route.WalkerLocation{Location: spawnPoint}), alwaysOpenPath{}, time.Now, state)
 	if err != nil {
 		t.Fatalf("NewWalker() error: %v", err)
 	}

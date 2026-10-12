@@ -101,6 +101,6 @@ func (l *GameClientLink) callSkill(live *livePlayer, e event.SkillCalled) {
 	})
 	handlers := l.castEffects()
 	handlers.Sink = l.playerMessageSink(live, nil)
-	result := actorcast.CallSkill(handlers, live.Character, target, def)
+	result := actorcast.CallSkill(handlers, live, target, def)
 	l.syncCubicTargets(live, result, def)
 }

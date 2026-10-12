@@ -33,8 +33,11 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 			// A one-time private leaves its spawn master's minions, even
 			// when that master's death already unlinked it.
 			if master := m.SpawnMaster(); master != nil && slot.entry.RespawnDelay <= 0 {
-				master.RemoveMinion(actorID)
+				master.RemoveMinion(m)
 				m.SetMaster(nil)
+			}
+			if m.IsMaster() {
+				n.dropGoneScriptPrivates(m)
 			}
 		}
 	}
@@ -52,16 +55,16 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 		return func() { n.groupNPCDeleted(g, slot) }
 	}
 
+	if slot.scripted {
+		// The script that created the private brings it back, if ever.
+		n.dropOrphanScriptSlot(key, slot)
+		return nil
+	}
 	delay := spawn.CalculateRespawnDelay(slot.entry)
 	if delay <= 0 {
 		n.mu.Lock()
 		delete(n.slot, key)
 		n.mu.Unlock()
-		return nil
-	}
-	if slot.scripted {
-		// The script that created the private brings it back, if ever.
-		n.dropOrphanScriptSlot(key, slot)
 		return nil
 	}
 
@@ -172,17 +175,21 @@ func (n *Npcs) respawnSlot(key string) {
 	if tmpl == nil {
 		return
 	}
-	if slot.masterID != 0 {
-		obj, _ := n.state.Object(slot.masterID)
-		master, ok := obj.(npc.PartyMember)
-		if !ok || master.Dead() {
+	if slot.master != nil {
+		// A private comes back only while its master lives, in the
+		// master's current life: around it, or at the private's own point.
+		master := npc.Current(slot.master)
+		if master.Dead() {
 			n.mu.Lock()
 			delete(n.slot, key)
 			n.mu.Unlock()
 			return
 		}
-		master.RemoveMinion(slot.liveID)
-		n.instantiate(key, slot.entry, tmpl, n.privateSpawnLocation(master, tmpl), master.Heading(), fullHP, fullMP, master)
+		at, heading := n.privateSpawnLocation(master, tmpl), master.Heading()
+		if slot.placed {
+			at, heading = slot.at, slot.heading
+		}
+		n.instantiate(key, slot.entry, tmpl, at, heading, fullHP, fullMP, master)
 		return
 	}
 
@@ -203,6 +210,9 @@ func (n *Npcs) respawnSlot(key string) {
 	n.spawnFresh(key, slot.entry, tmpl, pos)
 }
 
+// despawnMinions takes master's minions out of the world with it, each
+// decayed on the calling goroutine without waiting for its own queue (the
+// npc package's off-queue delete contract), and drops their spawn slots.
 func (n *Npcs) despawnMinions(master npc.PartyMember) {
 	for _, minion := range master.Minions() {
 		id := minion.ObjectID()
@@ -216,7 +226,7 @@ func (n *Npcs) despawnMinions(master npc.PartyMember) {
 			o.Decay(n.state, nil)
 		}
 		minion.SetMaster(nil)
-		master.RemoveMinion(id)
+		master.RemoveMinion(minion)
 
 		n.mu.Lock()
 		if _, ok := n.live[id]; ok {
@@ -224,7 +234,7 @@ func (n *Npcs) despawnMinions(master npc.PartyMember) {
 			n.liveCount--
 		}
 		for key, slot := range n.slot {
-			if slot.masterID == master.ObjectID() {
+			if npc.SameNPC(slot.master, master) {
 				delete(n.slot, key)
 			}
 		}

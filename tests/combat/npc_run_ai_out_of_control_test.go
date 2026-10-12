@@ -263,8 +263,10 @@ func TestStunnedMonsterIdlesPastLatchAndSwingsItAfter(t *testing.T) {
 		t.Fatal("no ChangeMoveType on the stunned periodic idle, want the walk stance")
 	}
 	assertChangeMoveType(t, walk, hostile.ObjectID(), false)
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
-		t.Fatalf("CurrentIntention() after the stunned periodic idle = %v, want %v", got, ai.IntentionIdle)
+	// The cycle's own idle keeps the intention; only desire selection,
+	// which a stunned monster skips, switches to idle.
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
+		t.Fatalf("CurrentIntention() after the stunned periodic idle = %v, want %v kept", got, ai.IntentionAttack)
 	}
 
 	removeHeldEffect(t, hostile, stun)

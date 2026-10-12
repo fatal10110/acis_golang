@@ -764,14 +764,17 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	c.NotifyRestoredHP()
 	c.Attach(creatureLive, live)
 	c.SetWorldHandle(live)
-	moveCtl, err := move.NewController(c.Move(), c, live)
+	// The controllers act as live, the object the world registers: the
+	// creatures a swing or a follow reaches see the same player the world,
+	// the AI and every known list hold.
+	moveCtl, err := move.NewController(c.Move(), live, live)
 	if err != nil {
 		return nil, fmt.Errorf("attach live player: %w", err)
 	}
 	moveCtl.SetPositionUpdates(l.positions)
-	attackCtl := attack.NewPlayer(c, live)
+	attackCtl := attack.NewPlayer(live, live)
 	attackCtl.SetQueue(creatureLive.Queue())
-	combat := ai.NewPlayerAttack(c, moveCtl, attackCtl)
+	combat := ai.NewPlayerAttack(live, moveCtl, attackCtl)
 
 	c.SetCanGiveDamage(access.GiveDamage)
 	c.SetSeesInvisible(access.IsGM)

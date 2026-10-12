@@ -31,7 +31,7 @@ func TestNPCHandleSummonerAndDecayed(t *testing.T) {
 	}
 
 	h := NPCOf(f)
-	if h == nil || h.brain != brain(f) {
+	if h == nil || h.mind() != brain(f) {
 		t.Fatalf("folk handle = %+v, want one whose brain is the NPC's own AI", h)
 	}
 	p, ok := h.Summoner().(*Player)

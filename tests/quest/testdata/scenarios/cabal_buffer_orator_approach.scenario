@@ -1,0 +1,19 @@
+# An Orator of Revelations (CabalBuffer) far from a character of Dawn, which leads the Seven Signs:
+# out of its sight, its AI ticks see nobody. The character steps up to it and the AI tick of the
+# approach sees him: holding no blessing, he is blessed with the fighter blessing at level 1, with
+# no line, as the draw of 10000 is not 0 (onSeeCreature); the blessing lands, and the next AI
+# tick does nothing more. Expectations are derived from the reference source (CabalBuffer.java)
+# and replay the reference trace, which plays the approach.
+trace internal/gameserver/script/testdata/oracle/scenarios/cabal_buffer_orator_approach.golden
+character Seeker 20
+cabal dawn gnosis
+festival 100 0
+random 50 1
+script script.feature.CabalBuffer
+npc orator 31094 Folk 3000 0 0
+
+tick x2
+approach orator
+  S MagicSkillUse caster=orator target=player skill=4364-1 hit=0 reuse=0 success=0
+  S SystemMessage id=110 4:4364,1
+tick

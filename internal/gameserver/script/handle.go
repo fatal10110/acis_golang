@@ -10,12 +10,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 )
 
-// NPC is a script's handle on one NPC.
+// NPC is a script's handle on one NPC. The handle follows the NPC across
+// its spawn slot's respawns, as the reference's reused NPC object does: it
+// acts on the life the slot placed last (npc.Current), the decayed one
+// until the slot places another.
 type NPC struct {
-	// self is the NPC as the world tracks it.
+	// self is the NPC as the world tracked it when the handle was made.
 	self attackable.Combatant
-	// brain is the AI the NPC's desires are queued on.
-	brain brain
 }
 
 // Player is a script's handle on one player.
@@ -57,7 +58,7 @@ type creature struct{ self attackable.Combatant }
 
 // NewNPC returns a handle on the hostile NPC h.
 func NewNPC(h *npc.Hostile) *NPC {
-	return &NPC{self: h, brain: h.AI()}
+	return &NPC{self: h}
 }
 
 // NPCOf returns the handle on the live NPC n, a hostile or a civilian
@@ -67,7 +68,7 @@ func NPCOf(n attackable.Combatant) *NPC {
 	case *npc.Hostile:
 		return NewNPC(o)
 	case *npc.Folk:
-		return &NPC{self: o, brain: o}
+		return &NPC{self: o}
 	}
 	return nil
 }
@@ -216,7 +217,23 @@ func (n *NPC) combatant() attackable.Combatant {
 	if n == nil || n.self == nil {
 		return nil
 	}
+	if m, ok := n.self.(npc.PartyMember); ok {
+		return npc.Current(m)
+	}
 	return n.self
+}
+
+// mind returns the AI the NPC's desires are queued on, its current life's:
+// a hostile NPC's attackable AI, or the NPC itself when it queues its own
+// desires, as a civilian does.
+func (n *NPC) mind() brain {
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		return o.AI()
+	case brain:
+		return o
+	}
+	return nil
 }
 
 func (p *Player) combatant() attackable.Combatant {
@@ -272,6 +289,7 @@ type brain interface {
 	AddAttackDesireDamage(target attackable.Combatant, damage int, weight float64)
 	AddFollowDesire(target attackable.Combatant, weight float64)
 	AddFleeDesire(target attackable.Combatant, distance int, weight float64)
+	AddPickUpDesire(itemObjectID int32, weight float64)
 }
 
 var (
@@ -290,57 +308,57 @@ var (
 // weight to the NPC's hate of target. An NPC that hates no one yet runs its
 // desire selection at once, on the calling goroutine.
 func (n *NPC) AddAttackDesire(target Creature, weight float64) {
-	n.brain.AddAttackDesire(combatantOf(target), weight)
+	n.mind().AddAttackDesire(combatantOf(target), weight)
 }
 
 // AddAttackDesireHold is AddAttackDesire for an NPC that stays where it is:
 // it never walks toward target.
 func (n *NPC) AddAttackDesireHold(target Creature, weight float64) {
-	n.brain.AddAttackDesireHold(combatantOf(target), weight)
+	n.mind().AddAttackDesireHold(combatantOf(target), weight)
 }
 
 // AddAttackDesireDamage is AddAttackDesire that also counts damage as dealt
 // to the NPC by target.
 func (n *NPC) AddAttackDesireDamage(target Creature, damage int, weight float64) {
-	n.brain.AddAttackDesireDamage(combatantOf(target), damage, weight)
+	n.mind().AddAttackDesireDamage(combatantOf(target), damage, weight)
 }
 
 // AddCastDesire asks the NPC to cast ref at target, closing in on it. It is
 // refused when ref is still in reuse or its MP or HP cost cannot be paid.
 // The cast aims at the creature ref's target type picks from target.
 func (n *NPC) AddCastDesire(target Creature, ref skill.Ref, weight float64) {
-	n.brain.AddCastDesire(combatantOf(target), ref, weight, true, true)
+	n.mind().AddCastDesire(combatantOf(target), ref, weight, true, true)
 }
 
 // AddCastDesireUnchecked is AddCastDesire without the reuse and cost
 // checks.
 func (n *NPC) AddCastDesireUnchecked(target Creature, ref skill.Ref, weight float64) {
-	n.brain.AddCastDesire(combatantOf(target), ref, weight, false, true)
+	n.mind().AddCastDesire(combatantOf(target), ref, weight, false, true)
 }
 
 // AddCastDesireHold is AddCastDesire for an NPC that stays where it is: it
 // is also refused when target stands out of ref's reach from where the NPC
 // is.
 func (n *NPC) AddCastDesireHold(target Creature, ref skill.Ref, weight float64) {
-	n.brain.AddCastDesire(combatantOf(target), ref, weight, true, false)
+	n.mind().AddCastDesire(combatantOf(target), ref, weight, true, false)
 }
 
 // AddFollowDesire asks the NPC to follow target.
 func (n *NPC) AddFollowDesire(target Creature, weight float64) {
-	n.brain.AddFollowDesire(combatantOf(target), weight)
+	n.mind().AddFollowDesire(combatantOf(target), weight)
 }
 
 // AddWanderDesire asks the NPC to walk around its spawn territory, trying a
 // walk every timer seconds. A civilian NPC has no wander step: it stands
 // while the wander outweighs its other desires.
 func (n *NPC) AddWanderDesire(timer int, weight float64) {
-	n.brain.AddWanderDesire(timer, weight)
+	n.mind().AddWanderDesire(timer, weight)
 }
 
 // AddDoNothingDesire asks the NPC to keep still while the desire outweighs
 // the rest. Its weight decays as the NPC's AI runs; timer times nothing.
 func (n *NPC) AddDoNothingDesire(timer int, weight float64) {
-	n.brain.AddDoNothingDesire(timer, weight)
+	n.mind().AddDoNothingDesire(timer, weight)
 }
 
 // AddMoveToDesire asks the NPC to walk to at. It is refused for an NPC that
@@ -348,14 +366,14 @@ func (n *NPC) AddDoNothingDesire(timer int, weight float64) {
 // Once there, its move-finished hooks run, then the desire is dropped.
 func (n *NPC) AddMoveToDesire(at Place, weight float64) {
 	l := at.loc()
-	n.brain.AddMoveToDesire(location.Location{X: l.X, Y: l.Y, Z: l.Z}, weight)
+	n.mind().AddMoveToDesire(location.Location{X: l.X, Y: l.Y, Z: l.Z}, weight)
 }
 
 // AddFleeDesire asks the NPC to run distance away from target, counted from
 // where it stands now. While it flees it takes up no other desire; reaching
 // the end of the run drops the flee. Refused for an NPC that cannot move.
 func (n *NPC) AddFleeDesire(target Creature, distance int, weight float64) {
-	n.brain.AddFleeDesire(combatantOf(target), distance, weight)
+	n.mind().AddFleeDesire(combatantOf(target), distance, weight)
 }
 
 // AddMoveRouteDesire asks the NPC to walk the walker route named route,
@@ -364,12 +382,12 @@ func (n *NPC) AddFleeDesire(target Creature, distance int, weight float64) {
 // NPC lives, so the NPC walks the route whenever nothing outweighs it, and
 // goes back to the node nearest to it once nothing does again.
 func (n *NPC) AddMoveRouteDesire(route string, weight float64) {
-	n.brain.AddMoveRouteDesire(route, weight)
+	n.mind().AddMoveRouteDesire(route, weight)
 }
 
 // AddSocialDesire asks the NPC to play social animation id. Once it plays,
 // the NPC takes up no other desire for timer milliseconds. Refused while the
 // NPC's AI sleeps.
 func (n *NPC) AddSocialDesire(id, timer int, weight float64) {
-	n.brain.AddSocialDesire(id, timer, weight)
+	n.mind().AddSocialDesire(id, timer, weight)
 }

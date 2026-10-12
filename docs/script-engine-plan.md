@@ -319,7 +319,9 @@ where the reference asks an NPC to walk a route (A13).
   shot-recharge roll, the walker alias rule, `Party_Type` 2 privates, `despawnMinions`, and
   default treatment of the scripted maker type strings (predicate: no maker registered).
 - A script cannot register until every seam it subscribes to, and every handle operation it
-  calls, is implemented for the NPC kinds it is bound to (boot check and test).
+  calls, is implemented for the NPC kinds it is bound to (boot check and test). Handle
+  operations are checked per hook: a hook raised for NPC events against the NPCs bound to
+  those events, any other hook against every NPC the script is bound to.
 
 ## 9. Deliberate differences from the reference
 
@@ -387,6 +389,9 @@ uses.
      placeholders, hashes; no page text).
    - One unit test covers the four hand-kept `Hooks` lists (fields, invokers, `With`, bound
      set).
+   - The kind-specific handle operations each hook reaches, which the handle half of the
+     seam gate reads at boot (`cmd/gameserver/scripts_handleops.go`), equal a `go/types`
+     scan of the script sources.
 3. **Engine contracts, once.** About 45 reference-derived goldens: cond and flags bits; set
    cond and exit packet and SQL order; quest list contents; four drop types with roll counts
    and a fractional rate; range checks; the dialog rules of section 7; the fan-out rules of

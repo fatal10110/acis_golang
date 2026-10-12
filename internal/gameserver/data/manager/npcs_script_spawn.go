@@ -136,19 +136,21 @@ func (n *Npcs) createPrivate(master npc.PartyMember, tmpl *npc.Template, at *loc
 	}
 
 	entry := spawn.Entry{NPCID: int32(tmpl.ID), RespawnDelay: respawn}
-	slot := slotInfo{entry: entry, masterID: master.ObjectID(), tmpl: tmpl, scripted: true, memory: newSlotMemory(entry, nil)}
+	slot := slotInfo{entry: entry, master: master, tmpl: tmpl, scripted: true, memory: newSlotMemory(entry, nil)}
 	for i, p := range params {
 		slot.memory.scratch.SetInt(npc.IntParam1+npc.IntSlot(i), p)
+	}
+	loc, face := n.privateSpawnLocation(master, tmpl), master.Heading()
+	if at != nil {
+		// A private created at a point respawns there too.
+		loc, face = location.Location{X: at.X, Y: at.Y, Z: int(n.geo.Height(at.X, at.Y, at.Z))}, heading
+		slot.placed, slot.at, slot.heading = true, loc, face
 	}
 	slot.key = fmt.Sprintf("private#%d", n.fixedSeq.Add(1))
 	n.mu.Lock()
 	n.slot[slot.key] = slot
 	n.mu.Unlock()
 
-	loc, face := n.privateSpawnLocation(master, tmpl), master.Heading()
-	if at != nil {
-		loc, face = location.Location{X: at.X, Y: at.Y, Z: int(n.geo.Height(at.X, at.Y, at.Z))}, heading
-	}
 	private, _ := n.instantiate(slot.key, entry, tmpl, loc, face, fullHP, fullMP, master).(npc.PartyMember)
 	if private == nil {
 		n.mu.Lock()

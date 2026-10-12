@@ -4,7 +4,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	handlerskill "github.com/fatal10110/acis_golang/internal/gameserver/handler/skill"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
@@ -33,9 +32,6 @@ func (l *GameClientLink) deliverChanceCast(caster handlerskill.Creature, ownHit 
 	switch c := caster.(type) {
 	case *livePlayer:
 		live, actsFor = c, c
-	case *player.Character:
-		live, _ = l.livePlayerByID(c.ObjectID())
-		actsFor = live
 	case *summon.Actor:
 		summonCaster = c
 		actsFor, _ = liveSummonOwner(c)

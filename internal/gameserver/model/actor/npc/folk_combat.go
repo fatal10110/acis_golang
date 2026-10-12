@@ -42,6 +42,9 @@ type folkCombat struct {
 	// it out of the world for DeleteNow; nil decays it with no respawn.
 	scripts ScriptHooks
 	remover FolkRemover
+	// ground takes the items the NPC picks up out of the world; nil leaves
+	// them on the ground.
+	ground GroundTaker
 	// sight is what the NPC's tick scan has told its see-creature scripts
 	// about; seeDistance is its see range, zero for the shipped default.
 	sight       sight
@@ -114,6 +117,9 @@ type FolkRuntime struct {
 	// Remover takes the NPC out of the world for DeleteNow; nil decays it
 	// with no respawn.
 	Remover FolkRemover
+	// Ground takes the items the NPC picks up out of the world; nil leaves
+	// them on the ground.
+	Ground GroundTaker
 	// SeeRange is the configured see range (DefaultSeeRange); zero keeps
 	// the shipped default.
 	SeeRange int
@@ -150,11 +156,12 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 		return errors.New("npc: folk runtime needs a queue")
 	}
 	f.world, f.queue, f.sink, f.los, f.decay = rt.World, rt.Queue, rt.Sink, rt.LOS, rt.Decay
-	f.scripts, f.remover = rt.Scripts, rt.Remover
+	f.scripts, f.remover, f.ground = rt.Scripts, rt.Remover, rt.Ground
 	f.seeDistance = rt.SeeRange
 	f.zones.ix = rt.Zones
 	f.cast.ai = rt.AI
 	f.bindSpawn(rt.Slot)
+	f.Scratch().setLife(f)
 	f.heldMask = templateHeldMask(f.Instance.Template, rt.Items)
 	f.resolveWeapon(rt.Items)
 	if rt.MaxBuffsAmount > 0 {

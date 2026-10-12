@@ -162,7 +162,11 @@ func Run(t *testing.T, sc *Scenario, cfg Config) {
 	r := &run{sc: sc, pages: loadPages(t, sc.Pages), roles: map[int32]string{}, objs: map[string]int32{}, npcs: map[string]NPC{}, live: map[string]*npc.Hostile{}}
 	r.draws.random = sc.Random
 	r.texts = pageTexts(t, r.pages)
-	r.items = itemTemplates(t, sc.Items)
+	items := sc.Items
+	if sc.Creates() {
+		items = append(slices.Clone(items), starterItemIDs(t)...)
+	}
+	r.items = itemTemplates(t, items)
 	if sc.Trace != "" {
 		data, err := os.ReadFile(filepath.Join(moduleRoot(t), filepath.FromSlash(sc.Trace)))
 		if err != nil {
@@ -238,12 +242,11 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	}
 	switch {
 	case r.sc.Creates():
-		// The create step makes the character at the character select.
-		opts = append(opts, gameservertest.WithWantChars(0))
+		// The create step makes the character at the character select, with
+		// the shipped starter items.
+		opts = append(opts, gameservertest.WithWantChars(0), gameservertest.WithClassTemplate(createdTemplate(t)))
 	case r.sc.Class != 0:
-		tmpl := gameservertest.ClassTemplate()
-		tmpl.ID = r.sc.Class
-		opts = append(opts, gameservertest.WithClassTemplates(tmpl),
+		opts = append(opts, gameservertest.WithClassTemplates(classTemplates()...),
 			gameservertest.WithClassCharacter(r.sc.Character, r.sc.Level, 0, r.sc.Class))
 	default:
 		opts = append(opts, gameservertest.WithCharacter(r.sc.Character, r.sc.Level, 0))
@@ -276,6 +279,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	r.enterWorld(t)
 	r.srv.FlushPersistence(t)
 	r.srv.TakeJournalWrites()
+	r.srv.TakeMemoWrites()
 }
 
 // setPlayer names the account's one character the player.
@@ -318,22 +322,25 @@ func seedClan(t *testing.T, db *sql.DB, name string, level int) {
 	}
 }
 
-// levelExp is the experience each level adds in the scenario level table.
-const levelExp = 1_000_000
+// shippedLevels is the shipped player level table, loaded once per test
+// binary.
+var shippedLevels struct {
+	once  sync.Once
+	table *player.LevelTable
+	err   error
+}
 
-// scenarioLevels is the level table scenarios run with: level L is reached
-// at (L-1) x levelExp experience, up to level 85.
+// scenarioLevels is the level table scenarios run with: the shipped one, as
+// the reference trace's server runs with, so experience a script rewards
+// raises the level as it does there.
 func scenarioLevels(t *testing.T) *player.LevelTable {
 	t.Helper()
-	levels := make(map[int]player.Level, 85)
-	for lvl := 1; lvl <= 85; lvl++ {
-		levels[lvl] = player.Level{RequiredExpToLevelUp: int64(lvl-1) * levelExp}
+	path := datapack.Path(t, "data", "xml", "playerLevels.xml")
+	shippedLevels.once.Do(func() { shippedLevels.table, shippedLevels.err = gamexml.LoadPlayerLevels(path) })
+	if shippedLevels.err != nil {
+		t.Fatalf("load shipped levels: %v", shippedLevels.err)
 	}
-	table, err := player.NewLevelTable(levels)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return table
+	return shippedLevels.table
 }
 
 // seedExp gives the character obj the experience its level starts at, so
@@ -341,7 +348,8 @@ func scenarioLevels(t *testing.T) *player.LevelTable {
 // level the character line set.
 func seedExp(t *testing.T, db *sql.DB, obj int32, level int) {
 	t.Helper()
-	if _, err := db.ExecContext(context.Background(), "UPDATE characters SET exp = ? WHERE obj_Id = ?", int64(level-1)*levelExp, obj); err != nil {
+	exp := scenarioLevels(t).RequiredExpForLevel(level)
+	if _, err := db.ExecContext(context.Background(), "UPDATE characters SET exp = ? WHERE obj_Id = ?", exp, obj); err != nil {
 		t.Fatalf("seed experience: %v", err)
 	}
 }
@@ -571,6 +579,9 @@ func (r *run) step(t *testing.T, i int, st Step) {
 	if d := FirstDiff("statement", statements(r.srv.TakeJournalWrites()), st.Statements); d != "" {
 		fail("%s", d)
 	}
+	if d := FirstDiff("memo", memoLines(r.srv.TakeMemoWrites()), st.Memos); d != "" {
+		fail("%s", d)
+	}
 	for _, ck := range st.Checks {
 		if d := r.check(t, ck); d != "" {
 			fail("%s (line %d)", d, ck.Line)
@@ -779,6 +790,37 @@ func statements(writes []questlog.Write) []string {
 	return out
 }
 
+// memoLines renders player memo writes as M lines.
+func memoLines(writes []gameservertest.MemoWrite) []string {
+	var out []string
+	for _, w := range writes {
+		if w.Unset {
+			out = append(out, "unset "+w.Key)
+			continue
+		}
+		out = append(out, "set "+w.Key+" | "+w.Value)
+	}
+	return out
+}
+
+// classTemplates returns a template of every class, each with the
+// fixture's stats: the class line's class loads with its parents, and a
+// script's class change lands on whichever class it names.
+func classTemplates() []*player.Template {
+	var out []*player.Template
+	for id := 1; id <= maxClassID; id++ {
+		if _, ok := player.ClassParent(id); ok {
+			tmpl := gameservertest.ClassTemplate()
+			tmpl.ID = id
+			out = append(out, tmpl)
+		}
+	}
+	return out
+}
+
+// maxClassID bounds the class ids classTemplates looks up.
+const maxClassID = 255
+
 // loadPages reads the shipped pages the scenario serves, keyed by their
 // path below data/html.
 func loadPages(t *testing.T, paths []string) map[string]string {
@@ -870,12 +912,16 @@ func itemTemplates(t *testing.T, ids []int32) *item.Table {
 	if shipped.err != nil {
 		t.Fatalf("load shipped items: %v", shipped.err)
 	}
+	added := map[int32]bool{}
 	for _, id := range ids {
 		tmpl, ok := shipped.table.Get(id)
 		if !ok {
 			t.Fatalf("no shipped item %d", id)
 		}
-		templates = append(templates, tmpl)
+		if !added[id] {
+			added[id] = true
+			templates = append(templates, tmpl)
+		}
 	}
 	return item.NewTable(templates)
 }

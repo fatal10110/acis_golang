@@ -39,27 +39,28 @@ docker run --rm --user "$(id -u):$(id -g)" \
 	-v "$java_tree:/ref:ro" -v "$here:/probe:ro" -v "$work:/work" \
 	"$image" sh -euc '
 		cd /work
-		# The four shadowed classes replace their reference files.
-		find /ref/java -name "*.java" \
-			| grep -v -e "/commons/pool/ThreadPool.java$" -e "/commons/pool/ConnectionPool.java$" \
-			          -e "/commons/random/Rnd.java$" -e "/gameserver/network/GameClient.java$" \
-			          -e "/gameserver/scripting/ScheduledQuest.java$" > sources.txt
-		# The game client keeps its reference body; only the socket write in its packet
-		# send becomes the probe wire.
-		mkdir -p patched
-		sed "s/getConnection().sendPacket(gsp);/net.sf.l2j.commons.mmocore.ProbeWire.capture(this, gsp);/" \
-			/ref/java/net/sf/l2j/gameserver/network/GameClient.java > patched/GameClient.java
-		[ "$(grep -c "ProbeWire.capture(this, gsp)" patched/GameClient.java)" = 1 ] \
-			|| { echo "game client send path not found" >&2; exit 1; }
-		echo patched/GameClient.java >> sources.txt
+		# The reference tree, patched below; the four shadowed classes replace their reference files.
+		mkdir -p src
+		cp -r /ref/java/. src/
 		# The scheduled script keeps its reference body; its clock read and calendar come from
 		# the probe clock, which answers as the reference does until the schedule golden sets it.
-		sed -e "s/System.currentTimeMillis()/net.sf.l2j.commons.probe.ProbeClock.now()/" \
+		sed -i -e "s/System.currentTimeMillis()/net.sf.l2j.commons.probe.ProbeClock.now()/" \
 			-e "s/Calendar.getInstance()/net.sf.l2j.commons.probe.ProbeClock.calendar()/" \
-			/ref/java/net/sf/l2j/gameserver/scripting/ScheduledQuest.java > patched/ScheduledQuest.java
-		[ "$(grep -c "ProbeClock.now()" patched/ScheduledQuest.java)" = 1 ] && [ "$(grep -c "ProbeClock.calendar()" patched/ScheduledQuest.java)" = 1 ] \
+			src/net/sf/l2j/gameserver/scripting/ScheduledQuest.java
+		[ "$(grep -c "ProbeClock.now()" src/net/sf/l2j/gameserver/scripting/ScheduledQuest.java)" = 1 ] && [ "$(grep -c "ProbeClock.calendar()" src/net/sf/l2j/gameserver/scripting/ScheduledQuest.java)" = 1 ] \
 			|| { echo "scheduled script clock not found" >&2; exit 1; }
-		echo patched/ScheduledQuest.java >> sources.txt
+		# Every other wall clock read goes through the probe wall clock: the real one, except
+		# while a scenario trace plays (a virtual one, so its trace does not depend on when it ran).
+		find src -name "*.java" -exec sed -i "s/System\.currentTimeMillis()/net.sf.l2j.commons.probe.ProbeClock.wall()/g" {} +
+		# The game client keeps its reference body; only the socket write in its packet
+		# send becomes the probe wire.
+		sed -i "s/getConnection().sendPacket(gsp);/net.sf.l2j.commons.mmocore.ProbeWire.capture(this, gsp);/" \
+			src/net/sf/l2j/gameserver/network/GameClient.java
+		[ "$(grep -c "ProbeWire.capture(this, gsp)" src/net/sf/l2j/gameserver/network/GameClient.java)" = 1 ] \
+			|| { echo "game client send path not found" >&2; exit 1; }
+		find src -name "*.java" \
+			| grep -v -e "/commons/pool/ThreadPool.java$" -e "/commons/pool/ConnectionPool.java$" \
+			          -e "/commons/random/Rnd.java$" > sources.txt
 		find /probe/shadow /probe/probe -name "*.java" >> sources.txt
 		javac -J-Xmx1500m -nowarn -encoding UTF-8 -proc:none -cp "/ref/lib/*" -d classes @sources.txt > javac.log 2>&1 \
 			|| { cat javac.log >&2; echo "probe build failed" >&2; exit 1; }

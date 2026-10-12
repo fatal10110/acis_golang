@@ -179,6 +179,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	if deps.spawner != nil {
 		deps.spawner.Bind(npcs)
 	}
+	npcs.SetGroundTaker(link)
 	link.SetNpcSpawns(npcs)
 	npcs.SpawnOnStart()
 	if deps.sevenSigns != nil {

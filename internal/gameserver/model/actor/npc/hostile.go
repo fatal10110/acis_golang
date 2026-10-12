@@ -82,6 +82,9 @@ type Hostile struct {
 	// scripts raises this NPC's script hooks; nil raises none and leaves
 	// every built-in reaction on. Installed by Attach.
 	scripts ScriptHooks
+	// ground takes the items this NPC picks up out of the world; nil
+	// leaves them on the ground. Installed by Attach.
+	ground GroundTaker
 	// sight is what h's tick scan has told its see-creature scripts about.
 	sight sight
 	// interacted latches the first unlock attempt on a chest.
@@ -347,6 +350,9 @@ type Runtime struct {
 	Hits HitObserver
 	// Scripts raises the NPC's script hooks; nil raises none.
 	Scripts ScriptHooks
+	// Ground takes the items the NPC picks up out of the world; nil leaves
+	// them on the ground.
+	Ground GroundTaker
 	// Slot is the spawn slot that placed the NPC; nil leaves it with no
 	// spawn parameters and a script memory of its own.
 	Slot SpawnSlot
@@ -367,7 +373,9 @@ func (h *Hostile) Attach(rt Runtime) {
 	h.remover = rt.Remover
 	h.hits = rt.Hits
 	h.scripts = rt.Scripts
+	h.ground = rt.Ground
 	h.bindSpawn(rt.Slot)
+	h.Scratch().setLife(h)
 	if rt.Items == nil {
 		return
 	}
@@ -768,6 +776,13 @@ func (h *Hostile) Tick() {
 		return
 	}
 	h.brain.Tick()
+}
+
+// After runs fn on this NPC's queue once d has elapsed, for the AI's
+// wander chain and its out-of-territory stale-hate sweep. Closing the queue
+// at deletion cancels it.
+func (h *Hostile) After(d time.Duration, fn func()) ai.Timer {
+	return h.Queue().After(d, fn)
 }
 
 // Think continues the hostile AI's current intention after a bow's reuse

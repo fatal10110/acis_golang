@@ -83,6 +83,11 @@ type fakeActor struct {
 	immobile bool
 	sleeping bool
 	socials  []int
+	// ground is where each ground item the actor may pick up lies; picked
+	// records each pickup, and onPickUp runs inside one.
+	ground   map[int32]location.Location
+	picked   []int32
+	onPickUp func()
 }
 
 func actor(id int32) *fakeActor {
@@ -337,11 +342,6 @@ func (c *recordingCast) Stop() {
 	if c.onStop != nil {
 		c.onStop()
 	}
-}
-
-func tickOOTSweepDue(ai *Attackable, at time.Time) {
-	ai.now = func() time.Time { return at }
-	ai.Tick()
 }
 
 type summonMove struct {

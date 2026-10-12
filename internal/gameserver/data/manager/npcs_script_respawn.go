@@ -40,19 +40,28 @@ func (n *Npcs) RespawnDelay(h *npc.Hostile) time.Duration {
 }
 
 // ScheduleRespawn asks the spawn of h, a master's private, to bring it back
-// around its master once d has passed. It comes back only when its corpse
-// has left the world by then and its master is alive. Of two requests for
-// one private, the first to come due brings it back. A d that is not
-// positive asks nothing. A private whose spawn declares no respawn delay
-// is gone once its corpse decays, and never comes back (#3531). An NPC
-// that is no private reports ErrNotPrivate: an npcmaker's NPCs come back
-// through their maker.
+// once d has passed: around its master, or at its own point when it was
+// created at one. It comes back only when its corpse has left the world by
+// then and its master is alive. Of two requests for one private, the first
+// to come due brings it back. A d that is not positive asks nothing. A
+// private whose spawn declares no respawn delay comes back too, when the
+// request was made before its corpse decayed, but no longer as its master's
+// private: its decay let it go. A private whose spawn is gone (hidden, or
+// decayed with nothing left to bring it back) asks nothing. An NPC that is
+// no private reports ErrNotPrivate: an npcmaker's NPCs come back through
+// their maker.
 func (n *Npcs) ScheduleRespawn(h *npc.Hostile, d time.Duration) error {
 	if d <= 0 {
 		return nil
 	}
 	slot, ok := n.slotOf(h.ObjectID())
-	if !ok || slot.masterID == 0 {
+	if !ok {
+		if h.IsPrivate() {
+			return nil
+		}
+		return ErrNotPrivate
+	}
+	if slot.master == nil {
 		return ErrNotPrivate
 	}
 	n.respawn.AddEarliest(slot.key, n.now().Add(d))
@@ -60,17 +69,36 @@ func (n *Npcs) ScheduleRespawn(h *npc.Hostile, d time.Duration) error {
 }
 
 // dropOrphanScriptSlot drops the slot key of a private a script created,
-// whose NPC is decaying, once its master is dead or out of the world:
-// nothing asks a dead master's private back, and a request already pending
-// would find that master dead anyway, so the slot would stay for good.
+// whose NPC is decaying, unless the private can still come back: a request
+// for it is pending or under way, or its spawn declares a respawn delay and
+// its master lives, for the master's script to ask it back. A dead
+// master's private has nobody left to ask, and a request already pending
+// would find that master dead anyway, so a kept slot would stay for good.
 func (n *Npcs) dropOrphanScriptSlot(key string, slot slotInfo) {
-	obj, _ := n.state.Object(slot.masterID)
-	if master, ok := obj.(npc.PartyMember); ok && !master.Dead() {
+	master := npc.Current(slot.master)
+	alive := master != nil && !master.Dead()
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	cur, ok := n.slot[key]
+	if !ok || cur.spawning || n.respawn.Tracked(key) || (slot.entry.RespawnDelay > 0 && alive) {
 		return
 	}
-	n.mu.Lock()
 	delete(n.slot, key)
-	n.mu.Unlock()
+}
+
+// dropGoneScriptPrivates drops, as master decays, the slots of the privates
+// a script created for it whose NPC has left the world for good: none is
+// in the world and no request to bring it back is pending. Only master's
+// party-died hooks ask a private back, at its death, so nothing can ask
+// for them any more.
+func (n *Npcs) dropGoneScriptPrivates(master npc.PartyMember) {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	for key, slot := range n.slot {
+		if slot.scripted && npc.SameNPC(slot.master, master) && !slot.spawning && !n.liveLocked(key) && !n.respawn.Tracked(key) {
+			delete(n.slot, key)
+		}
+	}
 }
 
 // DecayMe hides h, as the reference's decayMe hides an NPC: it leaves the

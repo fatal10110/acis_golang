@@ -512,3 +512,10 @@ Quest.onPartyAttacked script.Script.RaisePartyAttacked
 Residence.getId script.Castle.ID
 Siege.checkSides script.Castle.OnSiegeSide
 Siege.isInProgress script.Castle.SiegeInProgress
+
+# Ground items (#3498). A look for ground items and a pick-up desire are
+# calls on the NPC handle; the items a look finds and the item picked up are
+# values on the hook's payload, whose ids are fields.
+ItemInstance.getItemId inline
+Npc.lookItem script.NPC.LookItem
+NpcAI.addPickUpDesire script.NPC.AddPickUpDesire

@@ -46,10 +46,11 @@ func TestHookPointNoDesireOnIdleContinue(t *testing.T) {
 	assertHookPoints(t, owner, "on an out-of-control idle swing end", HookNoDesire)
 }
 
-// TestHookPointNoDesireNotOnContinueDroppedToIdle pins that a continue pass
-// on an attack whose desire left the queue opens no no-desire point: the
-// actor was not idle when the pass started, so it takes no idle step.
-func TestHookPointNoDesireNotOnContinueDroppedToIdle(t *testing.T) {
+// TestHookPointContinueStepsAttackWithoutDesire pins that a continue pass
+// on an attack whose desire left the queue steps the attack, as the pass never
+// reads the queue, and opens no no-desire point: the actor was not idle when
+// the pass started.
+func TestHookPointContinueStepsAttackWithoutDesire(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	strike := &recordingAttack{canAttack: true}
@@ -60,17 +61,20 @@ func TestHookPointNoDesireNotOnContinueDroppedToIdle(t *testing.T) {
 	}
 	brain.Desires().Clear()
 	owner.hooks.points = nil
-	stops := strike.stopCalls
+	stops, swings := strike.stopCalls, strike.doAttackCalls
 
 	if err := brain.Think(); err != nil {
 		t.Fatalf("Think() error: %v", err)
 	}
-	assertHookPoints(t, owner, "on a continue pass dropping the attack")
-	if got := brain.CurrentIntention(); got != IntentionIdle {
-		t.Fatalf("CurrentIntention() after the continue pass = %v, want idle", got)
+	assertHookPoints(t, owner, "on a continue pass stepping the desire-less attack")
+	if got := brain.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() after the continue pass = %v, want %v", got, IntentionAttack)
+	}
+	if strike.doAttackCalls != swings+1 || strike.target != target {
+		t.Fatalf("DoAttack calls %d -> %d on %v, want one more swing at the target", swings, strike.doAttackCalls, strike.target)
 	}
 	if strike.stopCalls != stops || owner.walkStanceCalls != 0 {
-		t.Fatalf("idle step ran on the dropped attack: attack stops %d -> %d, walk stance %d",
+		t.Fatalf("idle step ran on the continued attack: attack stops %d -> %d, walk stance %d",
 			stops, strike.stopCalls, owner.walkStanceCalls)
 	}
 }
