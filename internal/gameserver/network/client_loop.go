@@ -80,7 +80,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 	})
 	defer stopOnShutdown()
 
-	cs := &connState{}
+	cs := &connState{client: client}
 	defer func() {
 		// A connection lost between selection and EnterWorld takes the
 		// selected player out of the world as a logout would.
@@ -188,6 +188,12 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 		// still handled one at a time in read order; decoding and the
 		// protection gates above stay on this goroutine.
 		cs.acted = clearsSpawnProtection(opcode)
+		if found, open := gameInbound.serve(l, ctx, cs, opcode, payload); found {
+			if !open {
+				return
+			}
+			continue
+		}
 		switch opcode {
 		case clientpackets.OpcodeProtocolVersion:
 			req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeProtocolVersion)
