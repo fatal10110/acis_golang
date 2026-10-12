@@ -150,10 +150,10 @@ func TestBypassPlayerHelpKeepsTheDialogLinks(t *testing.T) {
 
 // TestBypassNpcRejections pins the dispatcher's gates on whitelisted npc_
 // commands: an object id that does not parse is dropped silently; an
-// unknown object, a non-civilian NPC, an NPC out of interaction distance,
-// a command naming no dialog command, an unported command and a Link
-// climbing out of the page tree are each answered ActionFailed alone; a
-// bare Link aborts with nothing sent.
+// unknown object, a hostile NPC's command it does not answer, an NPC out
+// of interaction distance, a command naming no dialog command, an unported
+// command and a Link climbing out of the page tree are each answered
+// ActionFailed alone; a bare Link aborts with nothing sent.
 func TestBypassNpcRejections(t *testing.T) {
 	t.Parallel()
 	w := bootFolkWorld(t, dialogPages(), noBypassReuse)
@@ -169,7 +169,7 @@ func TestBypassNpcRejections(t *testing.T) {
 	}{
 		{"npc_x1_Chat 1", nil},
 		{"npc_999999_Chat 1", releaseOnly},
-		{"npc_" + strconv.Itoa(int(hostile.ObjectID())) + "_Chat 1", releaseOnly},
+		{"npc_" + strconv.Itoa(int(hostile.ObjectID())) + "_Buy 1", releaseOnly},
 		{npcCommand(far, "Chat 1"), releaseOnly},
 		{"npc_" + strconv.Itoa(int(near.ObjectID())), releaseOnly},
 		{npcCommand(near, "Buy 1"), releaseOnly},

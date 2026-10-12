@@ -251,6 +251,9 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	if _, ok := unportedFolkChats[kind]; ok {
 		return reply
 	}
+	if _, ok := unportedResidenceCommands[kind]; ok {
+		return reply
+	}
 	if kind == "OlympiadManagerNpc" {
 		switch {
 		case strings.HasPrefix(command, "OlympiadNoble"):

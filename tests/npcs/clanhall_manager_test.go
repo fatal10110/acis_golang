@@ -40,6 +40,7 @@ const (
 	hallManagerClan = 0x70000031
 	hallFounderID   = 0x70000032
 	hallRivalClan   = 0x70000033
+	hallRivalLeader = 0x70000034
 	hallMoonstone   = 22
 	hallDayMs       = int64(24 * time.Hour / time.Millisecond)
 )
@@ -51,6 +52,10 @@ type hallManagerSetup struct {
 	rank, privs int
 	// foreign has a rival clan own the hall instead of Talker's.
 	foreign bool
+	// levelZero makes Talker's clan level 0 instead of 4.
+	levelZero bool
+	// rivalLeader gives the rival clan an offline leader, Rook.
+	rivalLeader bool
 	// adena is Talker's inventory adena.
 	adena int32
 	// functions are seeded clanhall_functions rows of Moonstone Hall:
@@ -164,21 +169,30 @@ func seedHallManager(t *testing.T, db *sql.DB, s hallManagerSetup) {
 			t.Fatalf("seed clan hall manager: %s: %v", q, err)
 		}
 	}
+	level := 4
+	if s.levelZero {
+		level = 0
+	}
 	if s.rank == 0 {
 		exec("UPDATE characters SET clanid = ?, power_grade = 0 WHERE char_name = 'Talker'", hallManagerClan)
 		exec(`INSERT INTO clan_data (clan_id, clan_name, clan_level, leader_id)
-			SELECT ?, 'Hallkeepers', 4, obj_Id FROM characters WHERE char_name = 'Talker'`, hallManagerClan)
+			SELECT ?, 'Hallkeepers', ?, obj_Id FROM characters WHERE char_name = 'Talker'`, hallManagerClan, level)
 	} else {
 		exec("UPDATE characters SET clanid = ?, power_grade = ? WHERE char_name = 'Talker'", hallManagerClan, s.rank)
 		exec(`INSERT INTO characters (account_name, obj_Id, char_name, level, clanid, power_grade) VALUES ('founder', ?, 'Founder', 40, ?, 0)`,
 			hallFounderID, hallManagerClan)
-		exec("INSERT INTO clan_data (clan_id, clan_name, clan_level, leader_id) VALUES (?, 'Hallkeepers', 4, ?)", hallManagerClan, hallFounderID)
+		exec("INSERT INTO clan_data (clan_id, clan_name, clan_level, leader_id) VALUES (?, 'Hallkeepers', ?, ?)", hallManagerClan, level, hallFounderID)
 		exec("INSERT INTO clan_privs (clan_id, ranking, privs) VALUES (?, ?, ?)", hallManagerClan, s.rank, s.privs)
 	}
 	owner := hallManagerClan
 	if s.foreign {
 		owner = hallRivalClan
 		exec("INSERT INTO clan_data (clan_id, clan_name, clan_level) VALUES (?, 'Rivals', 4)", hallRivalClan)
+		if s.rivalLeader {
+			exec("INSERT INTO characters (account_name, obj_Id, char_name, level, clanid, power_grade) VALUES ('rook', ?, 'Rook', 40, ?, 0)",
+				hallRivalLeader, hallRivalClan)
+			exec("UPDATE clan_data SET leader_id = ? WHERE clan_id = ?", hallRivalLeader, hallRivalClan)
+		}
 	}
 	exec("INSERT INTO clanhall (id, ownerId, paid, paidUntil) VALUES (?, ?, 1, ?)", hallMoonstone, owner, time.Now().UnixMilli()+30*hallDayMs)
 	for _, f := range s.functions {
