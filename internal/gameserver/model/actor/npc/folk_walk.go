@@ -274,14 +274,15 @@ func (w *FolkWalker) MoveToLocation(target location.Location) (event.Move, error
 	return w.ctl.MoveToLocationEvent(target)
 }
 
-// SayNPCString shows observers a route node's chat line; an unmapped id
-// says nothing.
+// SayNPCString shows observers a route node's chat line, as Say does:
+// named by the npc id, not the client template id. An unmapped id says
+// nothing.
 func (w *FolkWalker) SayNPCString(id int) {
 	text, ok := npcstring.Text(int32(id))
 	if !ok {
 		return
 	}
-	w.emit(event.NpcSay{NpcID: w.Instance.Template.TemplateID, Text: text})
+	w.Folk.Say(text)
 }
 
 // SocialAction shows observers a route node's social animation.

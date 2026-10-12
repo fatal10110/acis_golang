@@ -1,0 +1,171 @@
+# Saga of the Phoenix Knight (Q070) from cond 4: Felix trades the reward item for the first
+# Resonance Amulet; the first Tablet of Vision takes it, with the resonance animation on the
+# player and on the tablet; ten Guardians of Forbidden Knowledge give the second amulet (the
+# kill count is a quest variable, dropped at the tenth); the second tablet takes it; the third
+# tablet wakes the corrupted knight as its private, far away at its spot, and answers the same
+# player that its fight is on. Expectations of the traced steps are the reference trace's; the rest are derived from the
+# reference source (ThirdClassQuest.java, Q070_SagaOfThePhoenixKnight.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q070_saga_of_the_phoenix_knight_tablets.golden
+character Paladin 76
+class 5
+quest Q070_SagaOfThePhoenixKnight <state>=STARTED <cond>=4
+script quest.Q070_SagaOfThePhoenixKnight
+item 7093 7534 7268 7299 7330
+page villagemaster/30849.htm
+page trainer/31277.htm
+page default/31624.htm
+page default/31646.htm
+page default/31647.htm
+page default/31650.htm
+page default/31654.htm
+page default/31655.htm
+page default/31657.htm
+page script/quest/Q070_SagaOfThePhoenixKnight/
+npc sedrick 30849 VillageMasterFighter 10 0 0
+npc felix 31277 Trainer -10 0 0
+npc donath 31624 Folk 0 10 0
+npc tablet1 31646 Folk 0 -10 0
+npc tablet2 31647 Folk 20 20 0
+npc tablet3 31650 Folk -20 20 0
+npc tablet4 31654 Folk 20 -20 0
+npc tablet5 31655 Folk -20 -20 0
+npc tablet6 31657 Folk 30 0 0
+npc guardian 27214 Monster 40 0 0
+npc corrupted 27286 Monster -40 0 0
+
+action felix
+action felix
+  S ActionFailed
+  S NpcHtmlMessage obj=felix item=0 page=trainer/31277.htm
+  S ActionFailed
+bypass npc_{felix}_Quest
+  S NpcHtmlMessage obj=felix item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/2-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q070_SagaOfThePhoenixKnight 2-2
+  S QuestList 70:0x8000001f
+  S ExShowQuestMark quest=70
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7268
+  S NpcHtmlMessage obj=felix item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/2-06.htm
+  S ActionFailed
+  Q upsert Q070_SagaOfThePhoenixKnight | <cond> | 5
+  items 7268=1
+action felix
+  S ActionFailed
+  S NpcHtmlMessage obj=felix item=0 page=trainer/31277.htm
+  S ActionFailed
+bypass npc_{felix}_Quest
+  S NpcHtmlMessage obj=felix item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/2-04.htm
+  S ActionFailed
+  S ActionFailed
+action tablet1
+action tablet1
+  S ActionFailed
+  S NpcHtmlMessage obj=tablet1 item=0 page=default/31646.htm
+  S ActionFailed
+bypass npc_{tablet1}_Quest
+  S NpcHtmlMessage obj=tablet1 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/5-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q070_SagaOfThePhoenixKnight 5-1
+  S QuestList 70:0x8000003f
+  S ExShowQuestMark quest=70
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7268
+  S MagicSkillUse caster=player target=player skill=4546-1 hit=6000 reuse=1 success=0
+  S MagicSkillUse caster=tablet1 target=tablet1 skill=4546-1 hit=6000 reuse=1 success=0
+  S NpcHtmlMessage obj=tablet1 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/5-02.htm
+  S ActionFailed
+  Q upsert Q070_SagaOfThePhoenixKnight | <cond> | 6
+  items 7268=0
+action tablet1
+  S ActionFailed
+  S NpcHtmlMessage obj=tablet1 item=0 page=default/31646.htm
+  S ActionFailed
+bypass npc_{tablet1}_Quest
+  S NpcHtmlMessage obj=tablet1 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/5-03.htm
+  S ActionFailed
+  S ActionFailed
+kill guardian x9
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  Q upsert Q070_SagaOfThePhoenixKnight | kills | 1
+  Q upsert Q070_SagaOfThePhoenixKnight | kills | 2
+  Q upsert Q070_SagaOfThePhoenixKnight | kills | 3
+  Q upsert Q070_SagaOfThePhoenixKnight | kills | 4
+  Q upsert Q070_SagaOfThePhoenixKnight | kills | 5
+  Q upsert Q070_SagaOfThePhoenixKnight | kills | 6
+  Q upsert Q070_SagaOfThePhoenixKnight | kills | 7
+  Q upsert Q070_SagaOfThePhoenixKnight | kills | 8
+  Q upsert Q070_SagaOfThePhoenixKnight | kills | 9
+  rows Q070_SagaOfThePhoenixKnight <cond>=6 <state>=STARTED kills=9
+kill guardian
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 70:0x8000007f
+  S ExShowQuestMark quest=70
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7299
+  Q delete-var Q070_SagaOfThePhoenixKnight | kills
+  Q upsert Q070_SagaOfThePhoenixKnight | <cond> | 7
+  items 7299=1
+  rows Q070_SagaOfThePhoenixKnight <cond>=7 <state>=STARTED
+action tablet2
+action tablet2
+  S ActionFailed
+  S NpcHtmlMessage obj=tablet2 item=0 page=default/31647.htm
+  S ActionFailed
+bypass npc_{tablet2}_Quest
+  S NpcHtmlMessage obj=tablet2 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/6-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q070_SagaOfThePhoenixKnight 6-1
+  S QuestList 70:0x800000ff
+  S ExShowQuestMark quest=70
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7299
+  S MagicSkillUse caster=player target=player skill=4546-1 hit=6000 reuse=1 success=0
+  S MagicSkillUse caster=tablet2 target=tablet2 skill=4546-1 hit=6000 reuse=1 success=0
+  S NpcHtmlMessage obj=tablet2 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/6-03.htm
+  S ActionFailed
+  Q upsert Q070_SagaOfThePhoenixKnight | <cond> | 8
+  items 7299=0
+action tablet2
+  S ActionFailed
+  S NpcHtmlMessage obj=tablet2 item=0 page=default/31647.htm
+  S ActionFailed
+bypass npc_{tablet2}_Quest
+  S NpcHtmlMessage obj=tablet2 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/6-04.htm
+  S ActionFailed
+  S ActionFailed
+action tablet3
+action tablet3
+  S ActionFailed
+  S NpcHtmlMessage obj=tablet3 item=0 page=default/31650.htm
+  S ActionFailed
+bypass npc_{tablet3}_Quest
+  S NpcHtmlMessage obj=tablet3 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/7-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q070_SagaOfThePhoenixKnight 7-1
+  S NpcHtmlMessage obj=tablet3 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/7-02.htm
+  S ActionFailed
+advance 1s
+action tablet3
+  S ActionFailed
+  S NpcHtmlMessage obj=tablet3 item=0 page=default/31650.htm
+  S ActionFailed
+bypass npc_{tablet3}_Quest
+  S NpcHtmlMessage obj=tablet3 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/7-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q070_SagaOfThePhoenixKnight 7-1
+  S NpcHtmlMessage obj=tablet3 item=0 page=script/quest/Q070_SagaOfThePhoenixKnight/7-03.htm
+  S ActionFailed
