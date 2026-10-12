@@ -27,9 +27,9 @@ func (n *Npcs) registerSlot(key string, g *makerGroup, i int, dbName string, tmp
 	n.mu.Unlock()
 }
 
-func (n *Npcs) registerPrivateSlot(key string, entry spawn.Entry, masterID int32, tmpl *npc.Template) {
+func (n *Npcs) registerPrivateSlot(key string, entry spawn.Entry, master npc.PartyMember, tmpl *npc.Template) {
 	n.mu.Lock()
-	n.slot[key] = slotInfo{key: key, entry: entry, masterID: masterID, tmpl: tmpl, memory: newSlotMemory(entry, nil)}
+	n.slot[key] = slotInfo{key: key, entry: entry, master: master, tmpl: tmpl, memory: newSlotMemory(entry, nil)}
 	n.mu.Unlock()
 }
 
@@ -216,8 +216,12 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	}
 	hostile.Attach(rt)
 	if master != nil {
-		hostile.SetMaster(master)
-		master.AddMinion(hostile)
+		// A respawned private is still the private it was: its slot kept
+		// its master link and its place among master's privates.
+		if hostile.SpawnMaster() == nil {
+			hostile.SetMaster(master)
+			master.AddMinion(hostile)
+		}
 		// A Monster-family private of a raid boss joins the raid (no
 		// lethal strikes, raid curse, see-through).
 		if boss, ok := master.(*npc.Hostile); ok && boss.RaidBoss() && hostile.MonsterKind() {
@@ -306,7 +310,7 @@ func (n *Npcs) spawnPrivates(key string, entry spawn.Entry, master *npc.Hostile)
 		}
 		privateEntry := spawn.Entry{NPCID: private.NPCID, RespawnDelay: private.RespawnDelay}
 		privateKey := fmt.Sprintf("%s/private/%d", key, i)
-		n.registerPrivateSlot(privateKey, privateEntry, master.ObjectID(), tmpl)
+		n.registerPrivateSlot(privateKey, privateEntry, master, tmpl)
 		n.instantiate(privateKey, privateEntry, tmpl, n.privateSpawnLocation(master, tmpl), master.Heading(), fullHP, fullMP, master)
 	}
 }

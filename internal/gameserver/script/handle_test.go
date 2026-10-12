@@ -76,6 +76,13 @@ type combatant struct {
 
 func (c *combatant) ObjectID() int32 { return c.objectID }
 
+// thinkingCombatant is a tracked creature that queues its own desires, as a
+// civilian NPC does.
+type thinkingCombatant struct {
+	*combatant
+	*recordingBrain
+}
+
 func id(c attackable.Combatant) any {
 	if c == nil {
 		return "nil"
@@ -88,7 +95,7 @@ func id(c attackable.Combatant) any {
 // and condition-check flags of each variant.
 func TestNPCDesireRequests(t *testing.T) {
 	b := &recordingBrain{}
-	n := &NPC{self: &combatant{objectID: 1}, brain: b}
+	n := &NPC{self: thinkingCombatant{&combatant{objectID: 1}, b}}
 	p := &Player{self: &combatant{objectID: 2}}
 	ref := skill.Ref{ID: 4107, Level: 1}
 

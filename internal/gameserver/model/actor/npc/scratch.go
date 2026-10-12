@@ -54,19 +54,25 @@ type ScratchCreature interface {
 	ObjectID() int32
 }
 
-// Scratch is the memory scripts keep on an NPC: integer and creature slots
-// and the script value. A spawn slot owns one and hands it to every NPC it
-// spawns, so the slots carry over from one life to the next; Respawned
-// clears the script value for each new life. A Scratch is safe for
-// concurrent use; each call is atomic on its own.
+// Scratch is what a spawn slot keeps of its NPC from one life to the next,
+// as the reference keeps it on the NPC object it respawns: the memory
+// scripts keep on the NPC (integer and creature slots and the script
+// value), the NPC's party membership, and its current life. A spawn slot
+// owns one and hands it to every NPC it spawns; Respawned clears the script
+// value for each new life. A Scratch is the NPC's identity across its
+// lives. It is safe for concurrent use; each call is atomic on its own.
 type Scratch struct {
 	mu          sync.Mutex
 	ints        [intSlotCount]int32
 	creatures   [creatureSlotCount]ScratchCreature
 	scriptValue int32
+	// life is the NPC the slot placed last, nil before the first.
+	life PartyMember
 	// lookNeighbor is when the slot's NPC last looked around; it carries
 	// over to the next life, as the reference keeps it on the reused NPC.
 	lookNeighbor lookNeighborClock
+	// party is the NPC's master and privates, in every life.
+	party party
 }
 
 // NewScratch returns the memory of an NPC that has never lived: every slot
@@ -135,4 +141,20 @@ func (s *Scratch) SetScriptValue(v int32) {
 // zero and every other slot keeps its value.
 func (s *Scratch) Respawned() {
 	s.SetScriptValue(0)
+}
+
+// Life returns the NPC the slot placed last, nil before the first: once
+// the slot respawns its NPC, the new life.
+func (s *Scratch) Life() PartyMember {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.life
+}
+
+// setLife records m as the slot's current life. An NPC records itself as
+// it attaches, before it is published.
+func (s *Scratch) setLife(m PartyMember) {
+	s.mu.Lock()
+	s.life = m
+	s.mu.Unlock()
 }

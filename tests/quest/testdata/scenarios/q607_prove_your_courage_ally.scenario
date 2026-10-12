@@ -5,6 +5,7 @@
 # no longer offered it. As in q607_prove_your_courage.scenario, Kadun's chat window is the default
 # page. The head going to every ally of the killer's party is in q607_flow_test.go. Expectations
 # are derived from the reference source (Q607_ProveYourCourage.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q607_prove_your_courage_ally.golden
 character Ally 75
 standing 3
 hold 7213 1

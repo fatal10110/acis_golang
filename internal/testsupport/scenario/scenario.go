@@ -68,13 +68,16 @@
 //	restart                a RequestRestart: back to character select
 //	enter                  the character is selected and enters the world (the EnterWorld burst)
 //	create                 the first step only: a RequestCharacterCreate of a human fighter named as the
-//	                       character line says, instead of a seeded character; the character line's level
-//	                       must be 1, and the class, clan, quest, hold, equip, standing, pk and cabal
-//	                       lines are left out (the creation writes its own rows)
+//	                       character line says, instead of a seeded character; it gets the shipped human
+//	                       fighter's starter items (data/xml/classes), whose templates join the catalog;
+//	                       the character line's level must be 1, and the class, clan, quest, hold, equip,
+//	                       standing, pk and cabal lines are left out (the creation writes its own rows)
 //
 //	  S <packet>           the packets of the step, in order, as scriptcontract.Packet renders them;
 //	                       "page=<path>" ends an NpcHtmlMessage whose text is that page, %objectId% filled in
 //	  Q <statement>        the character_quests statements of the step, in order: kind quest | params
+//	  M set <var> | <value>  a character_memo write of the step: the player memo var set to value;
+//	  M unset <var>          or deleted. The M lines are the step's memo writes, in order
 //	  items <id>=<n> ...   the character's count of each item after the step
 //	  rows <quest> <var>=<value> ... | -    the quest's character_quests rows after the step, all of them
 //	  state <quest> <status> | -            the quest's state in memory after the step
@@ -85,9 +88,10 @@
 // The items and state checks read the character in the world, so a create
 // or restart step takes rows checks only.
 //
-// The S and Q lists are exact: a step without S lines must send none of
+// The S, Q and M lists are exact: a step without S lines must send none of
 // the rendered packets (relog excepted: its enter burst is not compared),
-// and one without Q lines must write no statement. The rendered packets
+// one without Q lines must write no journal statement, and one without M
+// lines no memo. The rendered packets
 // are the dialog's, the quest's, the tutorial's and the item messages:
 // ActionFailed, NpcHtmlMessage, SystemMessage, PlaySound, QuestList,
 // ExShowQuestMark, TutorialShowHtml, TutorialShowQuestionMark,
@@ -98,14 +102,17 @@
 // [0, n), or past the listed ones, fails the step that drew it.
 //
 // A trace header ties the scenario to the reference server: before the run
-// the trace's client packets, kills, hits and advances must be the
-// scenario's first steps (a kill step of N kills is N kills of the trace),
-// and their rendered packets and journal statements must be those steps' S
-// and Q lines; a statement on another table than character_quests is not
-// compared, an unknown one on it fails. The script draws the trace pins
-// (needing a random line) must be those the run's same steps draw: the
-// same bounds, in order. A trace under the oracle's scenarios directory is the
-// reference probe's play of this scenario itself (the oracle README).
+// the trace's client packets, kills, hits, advances, approaches, ticks and
+// pickups must be the scenario's steps (a kill step of N kills is N kills of
+// the trace, a relog the trace's restart, character select and enter world),
+// and their rendered packets, journal statements and memo writes must be
+// those steps' S, Q and M lines (a relog's packets excepted, as in the run);
+// a read, and a statement on another table than character_quests and
+// character_memo, is not compared, an unknown write on one of them fails.
+// The script draws the trace pins (needing a random line) must be those the
+// run's same steps draw: the same bounds, in order. A trace under the
+// oracle's scenarios directory is the reference probe's play of this
+// scenario itself (the oracle README).
 package scenario
 
 import (
@@ -201,9 +208,11 @@ type Step struct {
 	Line int
 	Verb string
 	Args []string
-	// Packets and Statements are the S and Q lines without their prefix.
+	// Packets, Statements and Memos are the S, Q and M lines without their
+	// prefix.
 	Packets    []string
 	Statements []string
+	Memos      []string
 	Checks     []Check
 }
 
@@ -625,6 +634,11 @@ func (s *Step) expect(n int, line string) error {
 		s.Packets = append(s.Packets, rest)
 	case "Q":
 		s.Statements = append(s.Statements, rest)
+	case "M":
+		if err := checkMemo(rest); err != nil {
+			return err
+		}
+		s.Memos = append(s.Memos, rest)
 	case "items", "rows", "state":
 		args := strings.Fields(rest)
 		if err := checkCheck(kind, args); err != nil {
@@ -635,6 +649,22 @@ func (s *Step) expect(n int, line string) error {
 		return fmt.Errorf("unknown expectation %q", kind)
 	}
 	return nil
+}
+
+// checkMemo validates an M line: set <var> | <value> or unset <var>.
+func checkMemo(line string) error {
+	op, rest, _ := strings.Cut(line, " ")
+	switch op {
+	case "set":
+		if k, _, ok := strings.Cut(rest, " | "); ok && k != "" && !strings.Contains(k, " ") {
+			return nil
+		}
+	case "unset":
+		if rest != "" && !strings.Contains(rest, " ") {
+			return nil
+		}
+	}
+	return fmt.Errorf("memo %q is not set <var> | <value> or unset <var>", line)
 }
 
 func checkCheck(kind string, args []string) error {

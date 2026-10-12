@@ -44,8 +44,11 @@ type slotInfo struct {
 	first    bool
 	entry    spawn.Entry
 	dbName   string
-	masterID int32
-	liveID   int32
+	// master is the master a private's slot spawns its NPC for, as the
+	// life it had when the slot was declared (npc.Current reads it now);
+	// nil for any other slot.
+	master npc.PartyMember
+	liveID int32
 	// tmpl is the template resolved when the slot was declared. Every
 	// respawn of the slot builds from it, so a //reload npc swapping the
 	// template table leaves the slot's existing spawn unchanged: only slots
@@ -54,8 +57,10 @@ type slotInfo struct {
 	tmpl *npc.Template
 	// fixed marks a standalone spawn placed at a point of its own, not
 	// declared under a maker: at and heading are that point. It never
-	// respawns.
+	// respawns. placed marks a script private created at a point of its
+	// own: at and heading are that point, where it respawns too.
 	fixed   bool
+	placed  bool
 	at      location.Location
 	heading int
 	// scripted marks a private a script created: no respawn is armed when

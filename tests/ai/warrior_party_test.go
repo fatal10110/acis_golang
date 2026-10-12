@@ -56,12 +56,18 @@ func partyScripts() ([]script.Listing, script.Catalog) {
 // npcmakers of makers spawned at boot (none for nil).
 func bootParty(t *testing.T, makers *spawn.Table, templates ...*npc.Template) *warriorWorld {
 	t.Helper()
+	return bootPartyWith(t, makers, nil, templates...)
+}
+
+// bootPartyWith is bootParty with extra boot options, applied last.
+func bootPartyWith(t *testing.T, makers *spawn.Table, extra []gameservertest.Option, templates ...*npc.Template) *warriorWorld {
+	t.Helper()
 	list, catalog := partyScripts()
 	kinds := map[int32]script.NPCKind{}
 	for _, tmpl := range templates {
 		kinds[int32(tmpl.ID)] = script.KindHostile
 	}
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Hunter", 20, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithNPCs(npc.NewTable(templates)),
@@ -69,7 +75,7 @@ func bootParty(t *testing.T, makers *spawn.Table, templates ...*npc.Template) *w
 		gameservertest.WithAITask(),
 		gameservertest.WithScriptRand(func(int) int { return 0 }),
 		gameservertest.WithNPCScripts(kinds, list, catalog),
-	)
+	}, extra...)...)
 	c := srv.Client
 	c.Send(encodeGameStart())
 	for i := 0; ; i++ {

@@ -3,6 +3,7 @@
 # and no teleport list, so the Noblesse page and its hunting-ground windows are in
 # tests/npcs/proof_features_test.go. Expectations are derived from the reference source
 # (NoblesseTeleporter.onTalk).
+trace internal/gameserver/script/testdata/oracle/scenarios/noblesse_teleporter_refused.golden
 character Commoner 20
 script script.teleport.NoblesseTeleporter
 page gatekeeper/30080.htm

@@ -174,7 +174,8 @@ func TestScriptRespawnWaitsForCorpseAndLiveMaster(t *testing.T) {
 
 // TestDecayMeHidesWithoutRespawn pins decayMe: the private leaves the world
 // with nothing armed to bring it back, its script-created slot goes with it
-// and a later respawn request finds nothing to respawn.
+// and a later respawn request asks nothing, as the reference's doRespawn
+// leaves an NPC that is hidden, not decayed, alone.
 func TestDecayMeHidesWithoutRespawn(t *testing.T) {
 	w := newScriptRespawnWorld(t)
 	private := w.private(t)
@@ -189,8 +190,8 @@ func TestDecayMeHidesWithoutRespawn(t *testing.T) {
 	if got := w.npcs.LiveCount(); got != before-1 {
 		t.Fatalf("LiveCount() = %d, want %d", got, before-1)
 	}
-	if err := w.npcs.ScheduleRespawn(private, time.Second); !errors.Is(err, ErrNotPrivate) {
-		t.Fatalf("respawn request for a hidden private = %v, want ErrNotPrivate: its slot is gone", err)
+	if err := w.npcs.ScheduleRespawn(private, time.Second); err != nil {
+		t.Fatalf("respawn request for a hidden private = %v, want nil: a private whose slot is gone asks nothing", err)
 	}
 	w.pass(time.Hour)
 	if got := w.livePrivates(); got != 0 {

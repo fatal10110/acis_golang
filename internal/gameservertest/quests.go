@@ -122,22 +122,66 @@ func WithRespawnRestoreHP(share float64) Option {
 	return func(o *options) { o.respawnRestoreHP = share }
 }
 
-// memoStore is the real memo store, with the read fault a suite sets.
+// memoStore is the real memo store, with the read fault a suite sets and a
+// record of the writes it applied.
 type memoStore struct {
 	*gamesql.MemoStore
 	loadErr error
+
+	mu      sync.Mutex
+	applied []MemoWrite
 }
 
-func (s memoStore) ListMemos(ctx context.Context, ownerID int32) (map[string]string, error) {
+// MemoWrite is one player memo write applied to the database: Key set to
+// Value, or deleted when Unset.
+type MemoWrite struct {
+	Key, Value string
+	Unset      bool
+}
+
+func (s *memoStore) ListMemos(ctx context.Context, ownerID int32) (map[string]string, error) {
 	if s.loadErr != nil {
 		return nil, s.loadErr
 	}
 	return s.MemoStore.ListMemos(ctx, ownerID)
 }
 
+func (s *memoStore) SetMemo(ctx context.Context, ownerID int32, key, value string) error {
+	if err := s.MemoStore.SetMemo(ctx, ownerID, key, value); err != nil {
+		return err
+	}
+	s.record(MemoWrite{Key: key, Value: value})
+	return nil
+}
+
+func (s *memoStore) UnsetMemo(ctx context.Context, ownerID int32, key string) error {
+	if err := s.MemoStore.UnsetMemo(ctx, ownerID, key); err != nil {
+		return err
+	}
+	s.record(MemoWrite{Key: key, Unset: true})
+	return nil
+}
+
+func (s *memoStore) record(w MemoWrite) {
+	s.mu.Lock()
+	s.applied = append(s.applied, w)
+	s.mu.Unlock()
+}
+
+// TakeMemoWrites returns, in order, the player memo writes applied to the
+// database since the last call.
+func (s *Server) TakeMemoWrites() []MemoWrite {
+	s.quests.memos.mu.Lock()
+	defer s.quests.memos.mu.Unlock()
+	out := s.quests.memos.applied
+	s.quests.memos.applied = nil
+	return out
+}
+
 // questBoot is the quest journal wiring Boot hands the link.
 type questBoot struct {
 	store    *journalStore
+	memos    *memoStore
 	registry *script.Registry
 	journals *script.Quests
 	env      *script.Env
