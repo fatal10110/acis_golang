@@ -18,7 +18,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
@@ -137,7 +136,7 @@ func (s *Server) spawnHostileInstance(t *testing.T, inst *npc.Instance, at locat
 		Items:   s.itemTable,
 		Rewards: rewards,
 		Hits:    hits,
-		Sink:    network.HostileSinks(s.State, s.stance)(hostile),
+		Sink:    s.hostileSinks(hostile),
 		Scripts: s.quests.registry,
 	})
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
@@ -450,7 +449,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 		Items:   s.itemTable,
 		Rewards: rewards,
 		Hits:    hits,
-		Sink:    network.HostileSinks(s.State, s.stance)(hostile),
+		Sink:    s.hostileSinks(hostile),
 		Scripts: s.quests.registry,
 	}
 	// Production takes line of sight from the same geodata (npcs_spawn.go).

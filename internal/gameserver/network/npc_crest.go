@@ -1,0 +1,65 @@
+package network
+
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
+)
+
+// npcInstance is the NPC instance behind v, nil for an object that is no
+// NPC.
+func npcInstance(v world.Tracked) *npc.Instance {
+	switch o := v.(type) {
+	case *npc.Folk:
+		return o.Instance
+	case *npc.Hostile:
+		return o.Instance
+	case *npc.Decoration:
+		return o.Instance
+	case *npc.EffectPoint:
+		return o.Instance
+	}
+	return nil
+}
+
+// npcResidenceOwner is the clan owning the residence inst serves: its
+// castle's owner, else its clan hall's; 0 when it serves none or the
+// residence is free.
+func (l *GameClientLink) npcResidenceOwner(inst *npc.Instance) int32 {
+	c, h := l.npcResidence(inst)
+	switch {
+	case c != nil:
+		return c.OwnerID()
+	case h != nil:
+		if v, ok := l.halls.View(int32(h.ID)); ok {
+			return v.OwnerID
+		}
+	}
+	return 0
+}
+
+// addNPCCrest puts into s, v's NpcInfo, the clan and alliance of the clan
+// owning the residence v serves, when npcs.properties ShowNpcCrest is set.
+// The alliance crest is the clan's as stored, whether or not it is still in
+// an alliance. Without the switch, or for an NPC whose residence has no
+// owner, s keeps no clan.
+func (l *GameClientLink) addNPCCrest(v world.Tracked, s *npcinfo.Snapshot) {
+	if l == nil || !l.showNPCCrest {
+		return
+	}
+	inst := npcInstance(v)
+	if inst == nil {
+		return
+	}
+	owner := l.npcResidenceOwner(inst)
+	if owner == 0 {
+		return
+	}
+	cl, ok := l.clanService().Table().Get(owner)
+	if !ok {
+		return
+	}
+	info := cl.Info()
+	s.ClanID, s.ClanCrest = int(info.ID), int(info.CrestID)
+	s.AllyID, s.AllyCrest = int(info.AllyID), int(info.AllyCrestID)
+}
