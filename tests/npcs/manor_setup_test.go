@@ -363,6 +363,28 @@ func TestManorManagerWindows(t *testing.T) {
 	wantMessages(t, "window under maintenance", frames, serverpackets.SystemMessageManorUnderMaintenance)
 }
 
+// TestManorSetWithoutCurrentNPC pins a setting request from the privileged
+// lord of the castle who has talked to no NPC: it answers ActionFailed alone
+// and sets nothing; once the lord talks to the chamberlain, the same request
+// sets the list.
+func TestManorSetWithoutCurrentNPC(t *testing.T) {
+	t.Parallel()
+	w := bootManorSetup(t, residenceSetup{})
+	m := w.srv.CastleManor
+	before := productions(m.SeedProduction(1, true))
+
+	wantOnly(t, "set seeds with no NPC talked to", w.send(t, encodeSetSeed(1, [3]int{5016, 1, 5})), []byte{serverpackets.OpcodeActionFailed})
+	if got := productions(m.SeedProduction(1, true)); !equalRows(got, before) {
+		t.Fatalf("next seeds = %v, want unchanged %v", got, before)
+	}
+
+	spawnManorNPC(t, w, "CastleChamberlain", castleChamberlainID, 30)
+	wantOnly(t, "set seeds after talking to the chamberlain", w.send(t, encodeSetSeed(1, [3]int{5016, 1, 5})))
+	if got, want := productions(m.SeedProduction(1, true)), [][4]int32{{5016, 1, 1, 5}}; !equalRows(got, want) {
+		t.Fatalf("next seeds = %v, want %v", got, want)
+	}
+}
+
 // TestChamberlainManorRefusals pins who the chamberlain's manor windows and
 // the setting requests turn away: a member without the manor privilege and
 // a clan not owning the castle get the refusal page and ActionFailed, any

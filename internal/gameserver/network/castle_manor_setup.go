@@ -53,8 +53,10 @@ func parseManorMenu(s string) (manorMenu, bool) {
 
 // bypassManorMenu answers a manor_menu_select command on the player's
 // target, at any distance: a manor manager's or a castle chamberlain's
-// manor windows. Any other target answers nothing, as specified: no other
-// NPC reads the command, and a link click leaves no client action pending.
+// manor windows. Any other target answers nothing: a plain NPC ignores the
+// command and a link click leaves no client action pending. The NPC types
+// that answer any command before reading it (karma refusal page, a leading
+// ActionFailed, a disabled-manor page) are not routed here yet (#3672).
 func (l *GameClientLink) bypassManorMenu(live *livePlayer, command string) {
 	f, ok := live.Target().(*npc.Folk)
 	if !ok || f.Instance == nil {
