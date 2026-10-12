@@ -388,9 +388,9 @@ func Apply(effector, effected Actor, meta Skill, templates []modelskill.EffectTe
 // run no action and whose first tick came due in between has ended and is
 // not reinstated (see resumeRestored). One whose ticks run an action runs
 // the actions of the ticks due in between, in time order with those of the
-// other effects the same List.Restore reinstates (see List.Restore); only a
-// lethal damage-over-time tick still waits for the replay (see
-// restoreAnchor).
+// other effects the same List.Restore reinstates (see List.Restore). A
+// damage-over-time tick that may kill does too: a death it causes there
+// runs on a character not yet in the world, whose owner keeps it silent.
 func ApplyRestored(list *List, effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate, count, elapsedSeconds int32, restoredAt time.Time) {
 	if list == nil {
 		return
@@ -410,37 +410,16 @@ func applyRestored(list *List, effector, effected Actor, meta Skill, templates [
 		if err != nil {
 			continue
 		}
-		at := restoreAnchor(meta, tmpl, restoredAt)
-		if !at.IsZero() && e.OnAction == nil {
-			if _, _, ok := resumeRestored(tmpl, count, elapsedSeconds, at, now); !ok {
+		if !restoredAt.IsZero() && e.OnAction == nil {
+			if _, _, ok := resumeRestored(tmpl, count, elapsedSeconds, restoredAt, now); !ok {
 				continue
 			}
 		}
 		e.Effector = effector
 		e.Effected = effected
-		e.seedRestore(count, elapsedSeconds, at)
+		e.seedRestore(count, elapsedSeconds, restoredAt)
 		list.AddRestored(e)
 	}
-}
-
-// restoreAnchor is the instant from which an effect built from tmpl for the
-// skill meta and restored at restoredAt runs its schedule: restoredAt
-// itself, or zero (the replay) for a damage-over-time tick that may kill.
-// Such a tick due on the loading screen would put the character through
-// death before it is in the world, so that effect still starts its schedule
-// at the replay (#3394).
-func restoreAnchor(meta Skill, tmpl modelskill.EffectTemplate, restoredAt time.Time) time.Time {
-	if restoredAt.IsZero() || lethalTick(meta, tmpl) {
-		return time.Time{}
-	}
-	return restoredAt
-}
-
-// lethalTick reports whether an effect built from tmpl for the skill meta
-// has a damage-over-time tick that may kill.
-func lethalTick(meta Skill, tmpl modelskill.EffectTemplate) bool {
-	k, ok := coreKinds[tmpl.Name]
-	return ok && k.typ == TypeDamOverTime && meta.KillByDOT
 }
 
 // actsOnTick reports whether an effect built from tmpl has a tick action.

@@ -9,31 +9,6 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-// A lethal poison saved with its tick overdue (elapsed == period, a save
-// that lands between the tick's instant and the sweep that runs it) is not
-// due at the replay that anchors it: the reference resumes a task no sooner
-// than its 5 ms minimum delay, so the tick cannot run inside the replay,
-// before the character is in the world (#3394).
-func TestApplyRestoredLethalPoisonSavedOverdueDoesNotTickInTheReplay(t *testing.T) {
-	now := time.Unix(5000, 0)
-	var events []string
-	list := catchUpList(now, &events)
-	target := &liveEffectTarget{hp: 100, list: list}
-
-	ApplyRestored(list, target, target, Skill{ID: 4082, Level: 1, KillByDOT: true}, restoredPoison(10, 3), 10, 3, now.Add(-40*time.Second))
-
-	if target.hp != 100 || damageTicks(target.events) != 0 {
-		t.Fatalf("HP after the replay = %g (%v), want 100: the overdue lethal tick waits for the effects sweep", target.hp, target.events)
-	}
-	held := list.All()
-	if len(held) != 1 || held[0].Remaining() != 10 {
-		t.Fatalf("list after the replay = %d effects, want the lethal poison with all 10 ticks left", len(held))
-	}
-	if due := held[0].dueAt(); !due.Equal(now.Add(restoreMinDelay)) {
-		t.Fatalf("lethal poison first tick = %v, want %v (the minimum delay after the replay)", due, now.Add(restoreMinDelay))
-	}
-}
-
 // An effect restored at the replay instant itself (a duel's end puts the
 // pre-duel effects back that way) with its tick saved overdue runs nothing
 // in the replay: the tick is left to the effects sweep, so the replay of a

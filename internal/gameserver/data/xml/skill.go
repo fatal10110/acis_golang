@@ -13,33 +13,36 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// skillFile is the root <list> element of one skill definition XML file.
+// skillFile is one skill definition XML file: the <skill> elements of its
+// root <list>, or its root <skill>. It decodes itself (see
+// templatedecode.go).
 type skillFile struct {
-	Skills []skillElement `xml:"skill"`
+	Skills []skillElement
 }
 
 // skillElement is one <skill> element: its own id/name/level-count
 // attributes, a set of per-level substitution tables, and the <set>,
 // <enchant1> and <enchant2> children that carry the actual attribute values
 // (a level's value may reference a table by "#name" instead of a literal).
+// It decodes itself (see templatedecode.go).
 type skillElement struct {
-	ID             string  `xml:"id,attr"`
-	Name           *string `xml:"name,attr"`
-	Levels         string  `xml:"levels,attr"`
-	EnchantLevels1 *string `xml:"enchantLevels1,attr"`
-	EnchantLevels2 *string `xml:"enchantLevels2,attr"`
+	ID             string
+	Name           *string
+	Levels         string
+	EnchantLevels1 *string
+	EnchantLevels2 *string
 
-	Tables   []tableElement `xml:"table"`
-	Sets     []setElem      `xml:"set"`
-	Enchant1 []setElem      `xml:"enchant1"`
-	Enchant2 []setElem      `xml:"enchant2"`
+	Tables   []tableElement
+	Sets     []templateSet
+	Enchant1 []templateSet
+	Enchant2 []templateSet
 
-	Cond         []condElement `xml:"cond"`
-	For          []forElement  `xml:"for"`
-	Enchant1Cond []condElement `xml:"enchant1cond"`
-	Enchant1For  []forElement  `xml:"enchant1for"`
-	Enchant2Cond []condElement `xml:"enchant2cond"`
-	Enchant2For  []forElement  `xml:"enchant2for"`
+	Cond         []condElement
+	For          []forElement
+	Enchant1Cond []condElement
+	Enchant1For  []forElement
+	Enchant2Cond []condElement
+	Enchant2For  []forElement
 }
 
 // LoadSkillDefinitions parses every ".xml" skill definition file directly
@@ -52,9 +55,9 @@ type skillElement struct {
 // whose values do not build is logged and dropped with every later level of
 // its route (regular, enchant1 or enchant2); see buildLevels. Any other
 // failure while a <skill> element is read (its id, level counts or tables, a
-// condition, a <for> block, or a template that has no level left to attach
-// to) stops the file there: that skill and every later skill in the file
-// are logged and not loaded, while the earlier ones are kept.
+// <set> it reads, a condition, a <for> block, or a template that has no level
+// left to attach to) stops the file there: that skill and every later skill
+// in the file are logged and not loaded, while the earlier ones are kept.
 //
 // log receives skipped-skill diagnostics; the zero logger discards them.
 func LoadSkillDefinitions(dir string, log zerolog.Logger) (*skill.Table, error) {
@@ -128,7 +131,7 @@ func (sl *skillLoader) resolveAttrMap(attrs []xml.Attr, tableIndex int, asWritte
 // resolveLevel builds the raw attribute values for one level by applying
 // attrs in order, resolving any table-referencing value against row
 // tableIndex (the level within the referenced table, 1-based).
-func (sl *skillLoader) resolveLevel(attrs []setElem, tableIndex int) map[string]string {
+func (sl *skillLoader) resolveLevel(attrs []setValue, tableIndex int) map[string]string {
 	vals := make(map[string]string, len(attrs))
 	sl.applyAttrs(vals, attrs, tableIndex)
 	return vals
@@ -137,10 +140,9 @@ func (sl *skillLoader) resolveLevel(attrs []setElem, tableIndex int) map[string]
 // applyAttrs applies attrs to vals in order, resolving any table-referencing
 // value ("#name") against row tableIndex and overwriting whatever the same
 // attribute name already held.
-func (sl *skillLoader) applyAttrs(vals map[string]string, attrs []setElem, tableIndex int) {
+func (sl *skillLoader) applyAttrs(vals map[string]string, attrs []setValue, tableIndex int) {
 	for _, a := range attrs {
-		name, val := strings.TrimSpace(a.Name), strings.TrimSpace(a.Val)
-		vals[name] = sl.resolveTableValue(name, val, tableIndex)
+		vals[a.name] = sl.resolveTableValue(a.name, a.val, tableIndex)
 	}
 }
 
@@ -180,8 +182,13 @@ func buildSkillDefinitions(el skillElement, path string, log zerolog.Logger) ([]
 		return nil, fmt.Errorf("skill %d: %w", id, err)
 	}
 
+	sets, err := readLevelSets(el, levels, enchant1, enchant2)
+	if err != nil {
+		return nil, fmt.Errorf("skill %d: %w", id, err)
+	}
+
 	sl := &skillLoader{log: log, path: path, id: id, tables: tables}
-	built := sl.buildLevels(el, levels, enchant1, enchant2)
+	built := sl.buildLevels(*el.Name, sets, levels, enchant1, enchant2)
 
 	for i := 1; i <= levels; i++ {
 		if err := sl.applyTemplatesAt(built, i-1, el.Cond, el.For, i, i, condMsgModeRegular); err != nil {
@@ -229,7 +236,7 @@ func buildSkillDefinitions(el skillElement, path string, log zerolog.Logger) ([]
 // logged and dropped with every later level of its route: the reference
 // inserts each level at its position within its route, and once one is
 // missing, each later insert lands past the end of the list and fails too.
-func (sl *skillLoader) buildLevels(el skillElement, levels, enchant1, enchant2 int) []skill.Definition {
+func (sl *skillLoader) buildLevels(name string, sets levelSets, levels, enchant1, enchant2 int) []skill.Definition {
 	var built []skill.Definition
 	route := func(count, first int, vals func(i int) map[string]string) {
 		for i := 0; i < count; i++ {
@@ -240,21 +247,52 @@ func (sl *skillLoader) buildLevels(el skillElement, levels, enchant1, enchant2 i
 					Msg("data/xml: malformed skill level; it and every later level of its route are not loaded")
 				return
 			}
-			built = append(built, skill.NewDefinition(sl.id, level, *el.Name, attrs))
+			built = append(built, skill.NewDefinition(sl.id, level, name, attrs))
 		}
 	}
-	route(levels, 1, func(i int) map[string]string { return sl.resolveLevel(el.Sets, i+1) })
+	route(levels, 1, func(i int) map[string]string { return sl.resolveLevel(sets.regular, i+1) })
 	route(enchant1, 101, func(i int) map[string]string {
-		vals := sl.resolveLevel(el.Sets, levels)
-		sl.applyAttrs(vals, el.Enchant1, i+1)
+		vals := sl.resolveLevel(sets.regular, levels)
+		sl.applyAttrs(vals, sets.enchant1, i+1)
 		return vals
 	})
 	route(enchant2, 141, func(i int) map[string]string {
-		vals := sl.resolveLevel(el.Sets, levels)
-		sl.applyAttrs(vals, el.Enchant2, i+1)
+		vals := sl.resolveLevel(sets.regular, levels)
+		sl.applyAttrs(vals, sets.enchant2, i+1)
 		return vals
 	})
 	return built
+}
+
+// levelSets are the values a skill's levels are built from: its <set>
+// values, and its <enchant1> and <enchant2> ones.
+type levelSets struct {
+	regular, enchant1, enchant2 []setValue
+}
+
+// readLevelSets reads the <set>, <enchant1> and <enchant2> values of el that
+// building its levels reads: the <set> ones when it has any level, an
+// <enchantN> one when that route has levels. One that lacks its name or val
+// fails; the others are never read.
+func readLevelSets(el skillElement, levels, enchant1, enchant2 int) (levelSets, error) {
+	var sets levelSets
+	var err error
+	if levels > 0 || enchant1 > 0 || enchant2 > 0 {
+		if sets.regular, err = readTemplateSets(el.Sets); err != nil {
+			return levelSets{}, err
+		}
+	}
+	if enchant1 > 0 {
+		if sets.enchant1, err = readTemplateSets(el.Enchant1); err != nil {
+			return levelSets{}, fmt.Errorf("enchant1: %w", err)
+		}
+	}
+	if enchant2 > 0 {
+		if sets.enchant2, err = readTemplateSets(el.Enchant2); err != nil {
+			return levelSets{}, fmt.Errorf("enchant2: %w", err)
+		}
+	}
+	return sets, nil
 }
 
 // errNoLevelAtPosition marks templates read for a position the built levels
@@ -505,8 +543,8 @@ func buildSkillCondition(n condNode, role condRole, resolve tableResolver) (skil
 		return skill.Condition{}, fmt.Errorf("<%s>: %w", n.XMLName.Local, err)
 	}
 	var children []skill.Condition
-	for i, c := range n.Children {
-		child, err := buildSkillCondition(c, childConditionRole(n, role, i), resolve)
+	for _, c := range conditionChildren(n, role) {
+		child, err := buildSkillCondition(c.node, c.role, resolve)
 		if err != nil {
 			return skill.Condition{}, err
 		}

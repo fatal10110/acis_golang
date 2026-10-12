@@ -100,12 +100,45 @@ func childConditionRole(n condNode, role condRole, i int) condRole {
 		if i == 0 {
 			return condRolePredicate
 		}
-	case "player":
-		if i == 0 && hasAttrFold(n, "insidePoly") {
-			return condRolePolyZone
-		}
 	}
 	return condRoleUnread
+}
+
+// condChild is a child element of a condition element and the role it is
+// read in.
+type condChild struct {
+	node condNode
+	role condRole
+}
+
+// conditionChildren returns the child elements of n, read in role, that the
+// condition keeps, each with its role. A <player insidePoly> keeps only its
+// zone (see polyZone); any other element keeps every child.
+func conditionChildren(n condNode, role condRole) []condChild {
+	if role == condRolePredicate && strings.EqualFold(n.XMLName.Local, "player") && hasAttrFold(n, "insidePoly") {
+		if zone, ok := polyZone(n); ok {
+			return []condChild{{node: zone, role: condRolePolyZone}}
+		}
+		return nil
+	}
+	out := make([]condChild, len(n.Children))
+	for i, c := range n.Children {
+		out[i] = condChild{node: c, role: childConditionRole(n, role, i)}
+	}
+	return out
+}
+
+// polyZone returns the zone of a <player insidePoly>: the element that is
+// its second child node, whatever its tag. That is its first child element
+// only when character data or a processing instruction comes before it; with
+// none, or when the second node is not an element, there is no zone.
+func polyZone(n condNode) (condNode, bool) {
+	for _, c := range n.Children {
+		if c.Pos == 1 {
+			return c, true
+		}
+	}
+	return condNode{}, false
 }
 
 func hasAttrFold(n condNode, name string) bool {
@@ -239,7 +272,7 @@ func conditionRequiredAttrs(n condNode, role condRole) []string {
 // checkConditionValues fails a condition element whose values, as resolved
 // in vals, the condition reader cannot decode when it loads the condition,
 // or which lacks an attribute the reader requires. A <player insidePoly>
-// needs its <zone> child. Everything else the reader takes as written, or
+// needs its zone (see polyZone). Everything else the reader takes as written, or
 // only when the condition is tested.
 func checkConditionValues(n condNode, role condRole, vals map[string]string) error {
 	for _, name := range conditionRequiredAttrs(n, role) {
@@ -269,8 +302,10 @@ func checkConditionValues(n condNode, role condRole, vals map[string]string) err
 			return fmt.Errorf("attribute %q: %w", name, err)
 		}
 		if role == condRolePredicate && strings.EqualFold(n.XMLName.Local, "player") &&
-			strings.EqualFold(name, "insidePoly") && len(n.Children) == 0 {
-			return fmt.Errorf("attribute %q: no <zone> child", name)
+			strings.EqualFold(name, "insidePoly") {
+			if _, ok := polyZone(n); !ok {
+				return fmt.Errorf("attribute %q: the second child node is no <zone> element", name)
+			}
 		}
 	}
 	return nil
