@@ -3,6 +3,7 @@ package manager
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -16,30 +17,31 @@ var ErrNotPlaceable = errors.New("npcs: npc cannot be placed")
 
 // SpawnFixed places one NPC of tmpl as a standalone spawn of its own, not
 // declared under any maker: at (x, y) on the ground height below z, facing
-// heading. The spawn point is also where the NPC wanders around. Such a
-// spawn never respawns: once its NPC decays or is deleted, the spawn is
-// gone.
+// heading, with respawn as its declared respawn delay. The spawn point is
+// also where the NPC wanders around. Such a spawn never respawns, whatever
+// its delay: once its NPC decays or is deleted, the spawn is gone.
 //
 // Only a template a live hostile or civilian NPC models can be placed; any
 // other reports ErrNotPlaceable and places nothing.
-func (n *Npcs) SpawnFixed(tmpl *npc.Template, x, y, z, heading int) error {
-	_, err := n.spawnFixed(tmpl, x, y, z, heading)
+func (n *Npcs) SpawnFixed(tmpl *npc.Template, x, y, z, heading int, respawn time.Duration) error {
+	_, err := n.spawnStandalone(tmpl, x, y, z, heading, respawn, nil)
 	return err
 }
 
-// spawnFixed is SpawnFixed, also returning the placed NPC's object id.
+// spawnFixed is SpawnFixed with no respawn delay, also returning the placed
+// NPC's object id.
 func (n *Npcs) spawnFixed(tmpl *npc.Template, x, y, z, heading int) (int32, error) {
-	live, err := n.spawnStandalone(tmpl, x, y, z, heading, nil)
+	live, err := n.spawnStandalone(tmpl, x, y, z, heading, 0, nil)
 	if err != nil {
 		return 0, err
 	}
 	return live.ObjectID(), nil
 }
 
-// spawnStandalone is spawnFixed for an NPC spawned for summoner, nil for
+// spawnStandalone is SpawnFixed for an NPC spawned for summoner, nil for
 // none, returning the NPC placed. Its created hooks have run by then; one
 // may have deleted it again.
-func (n *Npcs) spawnStandalone(tmpl *npc.Template, x, y, z, heading int, summoner attackable.Combatant) (attackable.Combatant, error) {
+func (n *Npcs) spawnStandalone(tmpl *npc.Template, x, y, z, heading int, respawn time.Duration, summoner attackable.Combatant) (attackable.Combatant, error) {
 	if tmpl == nil {
 		return nil, ErrNotPlaceable
 	}
@@ -48,7 +50,7 @@ func (n *Npcs) spawnStandalone(tmpl *npc.Template, x, y, z, heading int, summone
 	}
 	at := location.Location{X: x, Y: y, Z: int(n.geo.Height(x, y, z))}
 	key := fmt.Sprintf("fixed#%d", n.fixedSeq.Add(1))
-	entry := spawn.Entry{NPCID: int32(tmpl.ID)}
+	entry := spawn.Entry{NPCID: int32(tmpl.ID), RespawnDelay: max(respawn, 0)}
 	n.mu.Lock()
 	n.slot[key] = slotInfo{key: key, entry: entry, tmpl: tmpl, fixed: true, at: at, heading: heading, summoner: summoner, memory: newSlotMemory(entry, nil)}
 	n.mu.Unlock()
@@ -96,35 +98,67 @@ type SpawnRecord struct {
 	// Maker names the maker that declares the NPC; empty for any other
 	// spawn.
 	Maker string
-	// MasterID is the object id of the master a private spawns around;
-	// zero for any other spawn.
-	MasterID int32
-	// Fixed reports a standalone spawn SpawnFixed placed, at At facing
-	// Heading.
-	Fixed   bool
+	// MasterID and MasterName are the object id and name of the master a
+	// private spawns around, as its current life; zero and empty for any
+	// other spawn.
+	MasterID   int32
+	MasterName string
+	// Fixed reports a standalone spawn SpawnFixed placed.
+	Fixed bool
+	// At and Heading are the point a standalone spawn, or a private a
+	// script created at a point, places its NPC at; unset for any other
+	// spawn (see SpawnPoint).
 	At      location.Location
 	Heading int
+	// Entry is the spawn's declaration: the maker entry, or the entry a
+	// private's or a standalone spawn was given. It holds the spawn's
+	// respawn delays, positions, privates and AI parameters.
+	Entry spawn.Entry
 }
 
 // SpawnOf returns the spawn of the live NPC id, false when id is no NPC
 // this population spawned.
 func (n *Npcs) SpawnOf(id int32) (SpawnRecord, bool) {
 	n.mu.Lock()
-	defer n.mu.Unlock()
 	key, live := n.live[id]
-	if !live {
-		return SpawnRecord{}, false
-	}
 	slot, ok := n.slot[key]
-	if !ok {
+	n.mu.Unlock()
+	if !live || !ok {
 		return SpawnRecord{}, false
 	}
-	rec := SpawnRecord{Fixed: slot.fixed, At: slot.at, Heading: slot.heading}
-	if master := npc.Current(slot.master); master != nil {
-		rec.MasterID = master.ObjectID()
+	rec := SpawnRecord{Fixed: slot.fixed, Entry: slot.entry}
+	if slot.fixed || slot.placed {
+		rec.At, rec.Heading = slot.at, slot.heading
+	}
+	if slot.master != nil {
+		master := npc.Current(slot.master)
+		rec.MasterID, rec.MasterName = master.ObjectID(), master.CharacterName()
 	}
 	if slot.maker != nil {
 		rec.Maker = slot.maker.Name
 	}
 	return rec, true
+}
+
+// SpawnPoint returns where the spawn of the live NPC id places its NPC: a
+// standalone spawn's own point, a private's own point when a script gave
+// it one, else a point drawn around the private's master, anew for each
+// call, facing the way the master faces. ok is false for a maker's spawn,
+// whose entry declares its points, and for an NPC this population did not
+// spawn.
+func (n *Npcs) SpawnPoint(id int32) (at location.Location, heading int, ok bool) {
+	n.mu.Lock()
+	key, live := n.live[id]
+	slot, found := n.slot[key]
+	n.mu.Unlock()
+	switch {
+	case !live || !found || slot.maker != nil:
+		return location.Location{}, 0, false
+	case slot.fixed || slot.placed:
+		return slot.at, slot.heading, true
+	case slot.master != nil:
+		master := npc.Current(slot.master)
+		return n.privateSpawnLocation(master, slot.tmpl), master.Heading(), true
+	}
+	return location.Location{}, 0, false
 }

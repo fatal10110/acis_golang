@@ -61,7 +61,7 @@ func (n *Npcs) placeStandalone(tmpl *npc.Template, x, y, z, heading int, summone
 	if heading < 0 {
 		heading = rnd.Get(65536)
 	}
-	return n.spawnStandalone(tmpl, x, y, z, heading, summoner)
+	return n.spawnStandalone(tmpl, x, y, z, heading, 0, summoner)
 }
 
 // CreatePrivate places one NPC of template npcID as a private of master

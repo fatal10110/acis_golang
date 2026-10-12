@@ -2,6 +2,7 @@ package network
 
 import (
 	"errors"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
@@ -244,16 +245,17 @@ func (l *GameClientLink) useDecorativeSummonItem(live *livePlayer, inv *itemcont
 	}
 	live.move.Stop()
 	x, y, z := live.Position()
-	if !l.placeDecoration(template, live.Character.Name, x, y, z, live.Heading()) {
+	if !l.placeDecoration(template, live.Character.Name, x, y, z, live.Heading(), 0) {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetNotFound))
 	}
 	return true
 }
 
 // placeDecoration places a decoration NPC of template, titled title, at
-// (x, y) on the ground height below z, facing heading. It reports false,
+// (x, y) on the ground height below z, facing heading, its spawn declaring
+// the respawn delay respawn. It reports false,
 // placing nothing, when the NPC cannot be built.
-func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x, y, z, heading int) bool {
+func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x, y, z, heading int, respawn time.Duration) bool {
 	if l.geo != nil {
 		z = int(l.geo.Height(x, y, z))
 	}
@@ -269,6 +271,7 @@ func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x
 	if err != nil {
 		return false
 	}
+	decoration.RespawnDelay = respawn
 	decoration.Attach(npc.DecorationRuntime{World: l.world, Zones: l.zones, Sink: &decorationSink{world: l.world, d: decoration, link: l}})
 	decoration.Spawn(x, y, z, heading)
 	return true

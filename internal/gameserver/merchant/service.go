@@ -64,6 +64,15 @@ func (s *Service) List(id int) (buylist.List, bool) {
 	return s.lists.Find(id)
 }
 
+// ListsForNPC returns the buylists npcID sells from, in load order, and
+// how many buylists there are in all.
+func (s *Service) ListsForNPC(npcID int) (lists []buylist.List, total int) {
+	if s == nil || s.lists == nil {
+		return nil, 0
+	}
+	return s.lists.ForNPC(npcID), s.lists.Len()
+}
+
 // Count returns p's current stock count, 0 for an unlimited product.
 func (s *Service) Count(p buylist.Product) int {
 	if s == nil || s.stock == nil {

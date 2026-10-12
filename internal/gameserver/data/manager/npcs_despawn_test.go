@@ -121,7 +121,7 @@ func TestDespawnAllRemovesEveryNpcForGood(t *testing.T) {
 		t.Fatalf("maker wolves = %d, want 2", len(makerWolves))
 	}
 	wolf, _ := f.templates.Get(1)
-	if err := f.npcs.SpawnFixed(wolf, 70, 70, 0, 0); err != nil {
+	if err := f.npcs.SpawnFixed(wolf, 70, 70, 0, 0, 0); err != nil {
 		t.Fatalf("SpawnFixed() error: %v", err)
 	}
 	tree, _ := f.templates.Get(3)

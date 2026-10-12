@@ -29,23 +29,10 @@ const (
 // Artifacts, control towers and mercenary guards are given their castle
 // as they spawn, by the siege systems that spawn them (#236, #238).
 func (l *GameClientLink) npcCastle(inst *npc.Instance) (*castle.Castle, bool) {
-	if inst == nil {
+	if inst == nil || inst.Template == nil {
 		return nil, false
 	}
-	if id, ok := inst.Maker.ResidenceParam(); ok {
-		if c, ok := l.castles.Get(id); ok {
-			return c, true
-		}
-		if l.clanHallData != nil {
-			if h, ok := l.clanHallData.Get(id); ok && h.IsSiegable() {
-				return nil, false
-			}
-		}
-	}
-	if inst.Template == nil {
-		return nil, false
-	}
-	return l.castles.ByNPC(inst.Template.ID)
+	return l.castles.ForNPC(inst.Template.ID, inst.Maker, l.clanHallData.Siegable)
 }
 
 // npcTaxRate is the tax rate of the castle inst belongs to, 0 when it

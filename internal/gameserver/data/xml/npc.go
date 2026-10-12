@@ -108,9 +108,13 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 	}
 
 	var aiParams npc.AIParams
+	var aiParamKeys []string
 	if len(el.AI) > 0 {
 		aiParams = make(npc.AIParams, len(el.AI))
 		for _, s := range el.AI {
+			if _, seen := aiParams[s.Name]; !seen {
+				aiParamKeys = append(aiParamKeys, s.Name)
+			}
 			aiParams[s.Name] = s.Val
 		}
 	}
@@ -317,11 +321,12 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 		Seedable:      a.boolDefault("seedable", false),
 		CanSeeThrough: a.boolDefault("canSeeThrough", false),
 
-		AIParams: aiParams,
-		Drops:    categories,
-		Privates: privates,
-		TeachTo:  teachTo,
-		Pet:      pet,
+		AIParams:    aiParams,
+		AIParamKeys: aiParamKeys,
+		Drops:       categories,
+		Privates:    privates,
+		TeachTo:     teachTo,
+		Pet:         pet,
 	}
 	if a.has("clan") {
 		t.Clans = a.strArray("clan")

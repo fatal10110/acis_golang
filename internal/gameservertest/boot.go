@@ -2265,7 +2265,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	fishChampState := o.fishChamp.newChampionship(db, persistWorker, queues, o.log)
 	gclConfig.FishingChampionship = fishChampState
 	gclConfig.Sieges = newSieges(db, o, gclConfig.Castles, gclConfig.Clans, persistWorker)
-	quests.bindResidences(worldObjects, gclConfig.Castles, gclConfig.Sieges)
+	quests.bindResidences(worldObjects, gclConfig.Castles, o.clanHallData, gclConfig.Sieges)
 	gclConfig.CastleManor = newCastleManor(db, o, gclConfig.Castles, gclConfig.Clans, persistWorker, o.log)
 	gclConfig.LoginStatus, gclConfig.Shutdown = shutdownState.wire(loginLink, 300, queues, network.NewShutdownNotices(state), o.log)
 	gcl, err := network.NewGameClientLink(gclConfig)

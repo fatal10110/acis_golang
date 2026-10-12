@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
@@ -31,21 +32,24 @@ func (l *GameClientLink) SetNpcSpawns(npcs *manager.Npcs) {
 // adminSpawn answers //spawn <id|name> [respawn]: one NPC of the template
 // with that id, or that name with underscores for spaces, placed at the
 // position of gm's selection (gm itself without one) as a standalone spawn
-// that never respawns. The respawn delay is read and checked, but such a
-// spawn has no respawn for it to set. Missing or unreadable arguments open
-// the spawn panel; a template that is unknown or cannot be placed answers
-// that the information is incorrect.
+// that never respawns. The respawn delay, in seconds, 60 by default and
+// none when negative, is only declared on the spawn. Missing or unreadable
+// arguments open the spawn panel; a template that is unknown or cannot be
+// placed answers that the information is incorrect.
 func (l *GameClientLink) adminSpawn(gm *livePlayer, line string) {
 	args := handleradmin.Args(line)
 	if len(args) == 0 {
 		l.sendAdminFile(gm, "spawns.htm")
 		return
 	}
+	respawn := time.Minute
 	if len(args) > 1 {
-		if _, ok := parseJavaInt(args[1]); !ok {
+		secs, ok := parseJavaInt(args[1])
+		if !ok {
 			l.sendAdminFile(gm, "spawns.htm")
 			return
 		}
+		respawn = time.Duration(max(secs, 0)) * time.Second
 	}
 	var tmpl *npc.Template
 	ok := false
@@ -61,7 +65,7 @@ func (l *GameClientLink) adminSpawn(gm *livePlayer, line string) {
 	} else if l.npcs != nil {
 		tmpl, ok = l.npcs.GetByName(strings.ReplaceAll(idOrName, "_", " "))
 	}
-	if !ok || !l.placeAdminSpawn(tmpl, adminSpawnPoint(gm)) {
+	if !ok || !l.placeAdminSpawn(tmpl, adminSpawnPoint(gm), respawn) {
 		gm.SendFrame(serverpackets.FrameSystemMessage(systemMessageApplicantInformationIncorrect))
 		return
 	}
@@ -85,19 +89,19 @@ func adminSpawnPoint(gm *livePlayer) positioned {
 
 // placeAdminSpawn places one NPC of tmpl at at's position on the ground
 // below it, facing at's heading. A decoration is placed on its own; every
-// other NPC joins the live population as a standalone spawn. It reports
-// false when the NPC cannot be placed.
-func (l *GameClientLink) placeAdminSpawn(tmpl *npc.Template, at positioned) bool {
+// other NPC joins the live population as a standalone spawn declaring
+// respawn. It reports false when the NPC cannot be placed.
+func (l *GameClientLink) placeAdminSpawn(tmpl *npc.Template, at positioned, respawn time.Duration) bool {
 	x, y, z := at.Position()
 	heading := at.Heading()
 	if npc.InstanceKind(tmpl.Type) == npc.InstanceKind("ChristmasTree") {
-		return l.ids != nil && l.placeDecoration(tmpl, tmpl.Title, x, y, z, heading)
+		return l.ids != nil && l.placeDecoration(tmpl, tmpl.Title, x, y, z, heading, respawn)
 	}
 	npcs := l.npcSpawns.Load()
 	if npcs == nil {
 		return false
 	}
-	if err := npcs.SpawnFixed(tmpl, x, y, z, heading); err != nil {
+	if err := npcs.SpawnFixed(tmpl, x, y, z, heading, respawn); err != nil {
 		l.log.Warn().Err(err).Int("npc_id", tmpl.ID).Msg("admin: //spawn placed nothing")
 		return false
 	}
@@ -213,32 +217,12 @@ func (l *GameClientLink) adminListSpawns(gm *livePlayer, line string) {
 // maker's by the maker, a private's by its master. ok is false for an NPC
 // no spawn placed.
 func (l *GameClientLink) describeSpawn(obj world.Tracked, npcID int32) (label, desc string, ok bool) {
-	standalone := fmt.Sprintf("Spawn [id=%d]", npcID)
-	if d, isDecoration := obj.(*npc.Decoration); isDecoration {
-		x, y, z := d.Position()
-		return standalone, fmt.Sprintf("Location: %d, %d, %d, %d", x, y, z, d.Heading()), true
-	}
-	npcs := l.npcSpawns.Load()
-	if npcs == nil {
+	rec, ok := l.npcSpawnOf(obj)
+	if !ok {
 		return "", "", false
 	}
-	rec, ok := npcs.SpawnOf(obj.ObjectID())
-	switch {
-	case !ok:
-		return "", "", false
-	case rec.Fixed:
-		return standalone, fmt.Sprintf("Location: %d, %d, %d, %d", rec.At.X, rec.At.Y, rec.At.Z, rec.Heading), true
-	case rec.MasterID != 0:
-		name := ""
-		if master, found := l.world.Object(rec.MasterID); found {
-			if inst := npcInstanceOf(master); inst != nil {
-				name = inst.Name()
-			}
-		}
-		return standalone, fmt.Sprintf("Master: %s [objId=%d]", trimAndDress(name, 20), rec.MasterID), true
-	default:
-		return fmt.Sprintf("MultiSpawn [id=%d]", npcID), "NpcMaker: " + rec.Maker, true
-	}
+	label, desc = spawnDescription(rec, int(npcID))
+	return label, desc, true
 }
 
 // npcInstanceOf returns the NPC instance obj is, nil when obj is no NPC.

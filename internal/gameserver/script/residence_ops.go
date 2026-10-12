@@ -54,14 +54,14 @@ type Castle struct {
 }
 
 // Castle returns the castle the NPC belongs to (Npc.getCastle), nil for
-// none: the castle whose residence NPCs list the NPC's template. A
-// residence given to the NPC at its spawn is not read yet (#3397). A
-// handle on nothing belongs to none.
+// none: the one its maker's spawn time names, none when that names a
+// siegable clan hall, else the castle whose residence NPCs list the NPC's
+// template. A handle on nothing belongs to none.
 func (s *Script) Castle(n *NPC) *Castle {
 	if s.env == nil || s.env.Castles == nil || n.combatant() == nil {
 		return nil
 	}
-	c, ok := s.env.Castles.ByNPC(int(n.NpcID()))
+	c, ok := s.env.Castles.ForNPC(int(n.NpcID()), n.instance().Maker, s.env.SiegableHall)
 	if !ok {
 		return nil
 	}

@@ -8,6 +8,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/rs/zerolog"
 )
 
@@ -165,6 +166,23 @@ func (m *Manager) ByNPC(npcID int) (*Castle, bool) {
 		}
 	}
 	return nil, false
+}
+
+// ForNPC returns the castle an NPC of template npcID belongs to when maker
+// (nil for none) placed it: the castle the residence id of the maker's
+// spawn time names, none when that id names a siegable clan hall instead
+// (as siegableHall, nil for none, reports), else the castle whose
+// residence NPCs include npcID.
+func (m *Manager) ForNPC(npcID int, maker *spawn.Maker, siegableHall func(id int) bool) (*Castle, bool) {
+	if id, ok := maker.ResidenceParam(); ok {
+		if c, ok := m.Get(id); ok {
+			return c, true
+		}
+		if siegableHall != nil && siegableHall(id) {
+			return nil, false
+		}
+	}
+	return m.ByNPC(npcID)
 }
 
 // SetOwner gives c to cl, unless cl already owns a castle, which it

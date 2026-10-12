@@ -61,7 +61,7 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 		return nil
 	}
 	delay := spawn.CalculateRespawnDelay(slot.entry)
-	if delay <= 0 {
+	if delay <= 0 || slot.fixed {
 		n.mu.Lock()
 		delete(n.slot, key)
 		n.mu.Unlock()

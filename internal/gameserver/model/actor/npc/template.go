@@ -68,6 +68,9 @@ type Template struct {
 	// when the template defines no <ai> block. A spawn's own values shadow
 	// them (see SpawnSlot).
 	AIParams AIParams
+	// AIParamKeys are the names of AIParams in the order the <ai> block
+	// first declares each.
+	AIParamKeys []string
 
 	Drops    []item.DropCategory
 	Privates []PrivateEntry

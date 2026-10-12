@@ -22,7 +22,6 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -66,15 +65,6 @@ func assertInfoPage(t *testing.T, gm *testsupport.ScriptedClient, cmd, want stri
 		at++
 	}
 	t.Fatalf("//%s page differs at byte %d:\n got  %q\n want %q", cmd, at, got[max(at-80, 0):min(at+80, len(got))], want[max(at-80, 0):min(at+80, len(want))])
-}
-
-// assertActionFailed requires //cmd to answer only ActionFailed.
-func assertActionFailed(t *testing.T, gm *testsupport.ScriptedClient, cmd string) {
-	t.Helper()
-	frames := exchange(t, gm, encodeBuildCmd(cmd))
-	if len(frames) != 1 || frames[0][0] != serverpackets.OpcodeActionFailed {
-		t.Fatalf("//%s frames = %x, want ActionFailed", cmd, testsupport.FrameOpcodes(frames))
-	}
 }
 
 // shippedPage is the datapack admin page name with each placeholder of
@@ -526,11 +516,6 @@ func TestAdminInfoNpcGeneralPages(t *testing.T) {
 		assertInfoPage(t, gm, cmd, defaultPage(t, "This NPC doesn't hold any drops."))
 	}
 	assertInfoPage(t, gm, "info spoil", defaultPage(t, "This NPC doesn't hold any spoils."))
-
-	// The pages that read state Go does not keep yet release the client.
-	for _, cmd := range []string{"info ai 1", "info desire", "info shop", "info skill", "info spawn"} {
-		assertActionFailed(t, gm, cmd)
-	}
 }
 
 // TestAdminInfoNpcDropPages pins //info drop|spoil [page [subpage]] on a

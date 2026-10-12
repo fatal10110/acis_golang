@@ -134,7 +134,7 @@ func buildMaker(el makerElement, territories map[string]*spawn.Territory, log ze
 	refs := resolveTerritories(logName, a.strDefault("territory", ""), territories, log)
 	banned := resolveTerritories(logName, a.strDefault("ban", ""), territories, log)
 
-	aiType, aiParams := flattenAI(el.AI, true)
+	aiType, aiParams, _ := flattenAI(el.AI, true)
 	if aiType == "" {
 		aiType = a.strDefault("maker", "")
 	}
@@ -188,7 +188,7 @@ func buildEntry(el spawnNPCElement, spawnMultiplier float64) (spawn.Entry, error
 		}
 	}
 
-	_, aiParams := flattenAI(el.AI, false)
+	_, aiParams, aiParamKeys := flattenAI(el.AI, false)
 	positions, err := spawn.ParsePositions(a.strDefault("pos", ""))
 	if err != nil {
 		return spawn.Entry{}, fmt.Errorf("npc %q: %w", npcID, err)
@@ -207,6 +207,7 @@ func buildEntry(el spawnNPCElement, spawnMultiplier float64) (spawn.Entry, error
 		Positions:     positions,
 		Privates:      privates,
 		AIParams:      aiParams,
+		AIParamKeys:   aiParamKeys,
 		DBName:        a.strDefault("dbName", ""),
 	}
 	if a.has("dbSaving") {
@@ -232,9 +233,11 @@ func buildSpawnPrivate(a *attrValues) (spawn.Private, error) {
 	return p, nil
 }
 
-func flattenAI(ai []aiElement, stripAt bool) (string, map[string]string) {
-	var kind string
-	params := make(map[string]string)
+// flattenAI merges the <ai> blocks ai into the last type they name and
+// their parameters, a later value replacing an earlier one, with the
+// parameter names in the order each first appears.
+func flattenAI(ai []aiElement, stripAt bool) (kind string, params map[string]string, keys []string) {
+	params = make(map[string]string)
 	for _, el := range ai {
 		if t, ok := foldAttrs(el.Attrs)["type"]; ok {
 			kind = t
@@ -244,13 +247,16 @@ func flattenAI(ai []aiElement, stripAt bool) (string, map[string]string) {
 			if stripAt {
 				value = strings.ReplaceAll(value, "@", "")
 			}
+			if _, seen := params[param.Name]; !seen {
+				keys = append(keys, param.Name)
+			}
 			params[param.Name] = value
 		}
 	}
 	if len(params) == 0 {
 		params = nil
 	}
-	return kind, params
+	return kind, params, keys
 }
 
 // resolveTerritories looks up each ";"-delimited name in raw: an unknown
