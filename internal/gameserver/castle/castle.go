@@ -36,6 +36,9 @@ type Castle struct {
 	// artifacts are the object ids of the holy artifacts placed for the
 	// castle at boot (SpawnArtifacts).
 	artifacts []int32
+	// droppedTickets are the mercenary tickets lying on the castle's
+	// grounds, by ground item object id.
+	droppedTickets map[int32]DroppedTicket
 }
 
 // Row is a castle table row.
