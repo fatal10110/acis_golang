@@ -22,7 +22,6 @@ import (
 // siegeKeysNotApplied are the siege.properties keys this server reads but
 // does not apply yet, each with the issue that applies it.
 var siegeKeysNotApplied = []struct{ key, issue string }{
-	{"AttackerRespawn", "#3346"},
 	{"ChSiegeClanMinLevel", "#244"},
 	{"ChAttackerMaxClans", "#244"},
 }
@@ -30,9 +29,8 @@ var siegeKeysNotApplied = []struct{ key, issue string }{
 // loadSiegeConfig reads the siege.properties castle siege settings,
 // defaulting as the reference does when a key is missing. It also returns
 // the keys set in the file that have no effect yet, so the boot can say
-// so: AttackerRespawn waits for the siege restart rules, and the siegable
-// clan hall keys (ChSiegeClanMinLevel, ChAttackerMaxClans) for the clan
-// hall sieges.
+// so: the siegable clan hall keys (ChSiegeClanMinLevel, ChAttackerMaxClans)
+// wait for the clan hall sieges.
 func loadSiegeConfig(paths gameServerPaths) (siege.Config, []string, error) {
 	props, err := config.LoadFile(paths.SiegeConfigPath)
 	if err != nil {

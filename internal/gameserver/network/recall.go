@@ -6,22 +6,28 @@ import (
 )
 
 // recallLivePlayer takes live where a recall skill sends it
-// (RestartPointData.getLocationToTeleport): a castle or clan hall recall
-// lands at a random OWNER spawn of the residence live's clan owns, and any
-// other recall, or one for a clan owning no such residence, at live's
-// nearest town restart point. An owned residence with no OWNER spawn moves
-// no one, as the reference's null destination does.
+// (RestartPointData.getLocationToTeleport): a castle recall lands at a
+// random OWNER spawn of the castle live's clan owns, or of the castle
+// besieged at live's position when its clan owns or defends it; a clan hall
+// recall at one of the hall live's clan owns; any other recall, or one
+// finding no such residence, goes to town (restartDestination). A residence
+// with no OWNER spawn moves no one, as the reference's null destination
+// does.
 //
-// The siege-side rules of that lookup (a castle defender's castle spawn,
-// the Seal of Strife and FlagWar town points) come with the sieges (#3346).
+// ponytail: the FlagWar clan restart point of the town branch waits for the
+// hall sieges (#244).
 func (l *GameClientLink) recallLivePlayer(live *livePlayer, dest modelskill.RecallType) {
 	var (
 		at location.Location
 		ok bool
 	)
-	castleID, hallID := live.ClanCastleID(), live.ClanHallID()
+	hallID := live.ClanHallID()
+	castleID := int32(0)
+	if dest == modelskill.RecallCastle {
+		castleID = l.restartCastleID(live)
+	}
 	switch {
-	case dest == modelskill.RecallCastle && castleID != 0:
+	case castleID != 0:
 		at, ok = l.castleOwnerSpawn(castleID)
 	case dest == modelskill.RecallClanHall && hallID != 0:
 		at, ok = l.clanHallOwnerSpawn(hallID)

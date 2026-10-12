@@ -131,3 +131,11 @@ func (a *Actor) location() location.Location {
 	x, y, z := a.Position()
 	return location.Location{X: x, Y: y, Z: z}
 }
+
+// ReloadZones moves the summon off the zones a reload swapped out and onto
+// the reloaded zones around it.
+func (a *Actor) ReloadZones() {
+	if m := a.membership; m != nil && m.ix != nil {
+		m.Reload(m.ix, m)
+	}
+}
