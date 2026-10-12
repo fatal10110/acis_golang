@@ -111,8 +111,9 @@ func (b *spawnBinding) party() *party { return &b.scratch.party }
 func (b *spawnBinding) Master() PartyMember {
 	p := b.party()
 	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return Current(p.master)
+	m := p.master
+	p.mu.RUnlock()
+	return Current(m)
 }
 
 // SetMaster links this NPC to its master, or unlinks it for nil. Linking
@@ -133,8 +134,9 @@ func (b *spawnBinding) SetMaster(master PartyMember) {
 func (b *spawnBinding) SpawnMaster() PartyMember {
 	p := b.party()
 	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return Current(p.spawnMaster)
+	m := p.spawnMaster
+	p.mu.RUnlock()
+	return Current(m)
 }
 
 // IsPrivate reports whether this NPC was spawned as a master's private.

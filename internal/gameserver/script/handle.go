@@ -17,9 +17,6 @@ import (
 type NPC struct {
 	// self is the NPC as the world tracked it when the handle was made.
 	self attackable.Combatant
-	// brain is the AI the desires of an NPC that is neither hostile nor
-	// civilian are queued on; nil for those two, whose own is used.
-	brain brain
 }
 
 // Player is a script's handle on one player.
@@ -226,15 +223,17 @@ func (n *NPC) combatant() attackable.Combatant {
 	return n.self
 }
 
-// mind returns the AI the NPC's desires are queued on, its current life's.
+// mind returns the AI the NPC's desires are queued on, its current life's:
+// a hostile NPC's attackable AI, or the NPC itself when it queues its own
+// desires, as a civilian does.
 func (n *NPC) mind() brain {
 	switch o := n.combatant().(type) {
 	case *npc.Hostile:
 		return o.AI()
-	case *npc.Folk:
+	case brain:
 		return o
 	}
-	return n.brain
+	return nil
 }
 
 func (p *Player) combatant() attackable.Combatant {
