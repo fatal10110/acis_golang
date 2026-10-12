@@ -26,24 +26,25 @@ jobs:
         # A shard runs either `pkgs` on the inline executor or `pool` on the
         # real pool, so the two passes over a suite run side by side. Each
         # shard saves its own cache, which also holds its test results; until
-        # it has one, it starts from its inline sibling's (`cache`).
+        # it has one, it starts from its inline sibling's (`cache`). A restore
+        # key matches by prefix, so no shard name may begin with another's.
         shard:
           - name: skills-pets
             cache: skills-pets
             pkgs: ./tests/skills ./tests/pets
-          - name: skills-pets-pool
+          - name: pool-skills-pets
             cache: skills-pets
             pool: ./tests/skills ./tests/pets
           - name: combat-items
             cache: combat-items
             pkgs: ./tests/combat ./tests/items
-          - name: combat-items-pool
+          - name: pool-combat-items
             cache: combat-items
             pool: ./tests/combat ./tests/items
           - name: rest
             cache: rest
             pkgs: all
-          - name: rest-pool
+          - name: pool-rest
             cache: rest
             pool: ./tests/character ./tests/lifecycle ./tests/trade ./tests/social
     services:
