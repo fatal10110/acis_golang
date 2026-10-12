@@ -10,6 +10,7 @@ type table struct {
 	base    int
 	pos     [2]int
 	masters []master
+	ids     []int32
 }
 
 // master is a plain value a table lists.
@@ -33,6 +34,8 @@ func Lookup(t *table) script.Script {
 			out = append(out, m.arcana)
 		}
 		out[0] = 0
+		ids := append([]int32(nil), t.ids...)
+		ids[0] = e.NPC.ObjectID()
 		name := names[e.NPC.ObjectID()]
 		name += "!"
 		return name + string(rune(p[0]))

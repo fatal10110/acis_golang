@@ -93,3 +93,59 @@ func Wrapped(f *family) script.Script {
 		return ""
 	}}}
 }
+
+// bag is a family whose plain fields hold a slice and an interface.
+type bag struct {
+	list []int32
+	any  any
+}
+
+// holder wraps a map a hook-local can be handed.
+type holder struct{ m map[int32]bool }
+
+// ResliceAppend appends into the family's backing array through a slice
+// of its field.
+func ResliceAppend(b *bag) script.Script {
+	return script.Script{Hooks: script.Hooks{OnTalk: func(_ *script.Script, e script.Talk) string {
+		o := append(b.list[:0], e.NPC.ObjectID())
+		return string(rune(len(o)))
+	}}}
+}
+
+// ResliceCopy copies into the family's backing array through a slice of
+// its field.
+func ResliceCopy(b *bag) script.Script {
+	return script.Script{Hooks: script.Hooks{OnTalk: func(_ *script.Script, e script.Talk) string {
+		copy(b.list[1:], []int32{e.NPC.ObjectID()})
+		return ""
+	}}}
+}
+
+// ResliceStore stores into an element of a slice of the family's field.
+func ResliceStore(b *bag) script.Script {
+	return script.Script{Hooks: script.Hooks{OnTalk: func(_ *script.Script, e script.Talk) string {
+		b.list[1:][0] = e.NPC.ObjectID()
+		return ""
+	}}}
+}
+
+// FieldAssign hands the family's map to a local's field and writes it there.
+func FieldAssign(f *family) script.Script {
+	return script.Script{Hooks: script.Hooks{OnTalk: func(_ *script.Script, e script.Talk) string {
+		var w holder
+		w.m = f.seen
+		w.m[e.NPC.ObjectID()] = true
+		return ""
+	}}}
+}
+
+// Switched writes the family's map through a type switch guard.
+func Switched(b *bag) script.Script {
+	return script.Script{Hooks: script.Hooks{OnTalk: func(_ *script.Script, e script.Talk) string {
+		switch m := b.any.(type) {
+		case map[int32]bool:
+			m[e.NPC.ObjectID()] = true
+		}
+		return ""
+	}}}
+}
