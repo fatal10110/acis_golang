@@ -606,6 +606,35 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 			case clientpackets.OpcodeRequestManorList:
 				session.SendFrame(serverpackets.FrameExSendManorList())
+			case clientpackets.OpcodeRequestSetSeed:
+				req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestSetSeed, error) {
+					return clientpackets.DecodeRequestSetSeed(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+				})
+				if err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					// A refused list answers nothing, as specified: the
+					// setting window's submit leaves no client action
+					// pending.
+					continue
+				}
+				if live != nil {
+					onLive(live, func() { l.requestSetSeed(live, req) })
+				}
+			case clientpackets.OpcodeRequestSetCrop:
+				req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestSetCrop, error) {
+					return clientpackets.DecodeRequestSetCrop(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+				})
+				if err != nil {
+					if errors.Is(err, errMalformedPacketDisconnect) {
+						return
+					}
+					continue
+				}
+				if live != nil {
+					onLive(live, func() { l.requestSetCrop(live, req) })
+				}
 			case clientpackets.OpcodeRequestExPledgeCrestLarge:
 				req, err := decodeClientPacket(l, client, payload, clientpackets.DecodeRequestExPledgeCrestLarge)
 				if err != nil {
