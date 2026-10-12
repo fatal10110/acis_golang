@@ -11,6 +11,7 @@
 # onAdvEvent, onTimer, onMyDying; Tutorial.java CE6353; ItemInstance.pickupMe) and restate
 # newbie_helper_test.go (TestNewbieHelperRecommendationShotsAndRadar), which stays the primary
 # check.
+trace internal/gameserver/script/testdata/oracle/scenarios/newbie_helper_talking_island.golden
 character Fighter 1
 random always 0
 quest Tutorial <state>=STARTED onlyone=1

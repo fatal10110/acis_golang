@@ -1,9 +1,11 @@
-# Tutorial relog: after its first two steps a new human fighter goes back to the character
-# select and enters again. The rows are kept; the enter world shows question mark 1 with the
-# tutorial sound and voice; clicking it marks the newbie guide on the radar, plays its voice
-# and opens its page. Expectations are derived from the reference source (Tutorial.java
-# onAdvEvent UC and QM1) and restate tutorial_script_test.go
-# (TestNewCharacterTutorialFirstSteps), which stays the primary check.
+# Tutorial relog: after its first two steps a new human fighter (holding the tutorial guide its
+# class template gives) goes back to the character select and enters again. The rows are kept;
+# the enter world shows question mark 1 with the tutorial sound and voice; clicking it marks the
+# newbie guide on the radar, plays its voice and opens its page. Expectations are derived from
+# the reference source (Tutorial.java onAdvEvent UC and QM1), replay the reference trace and
+# restate tutorial_script_test.go (TestNewCharacterTutorialFirstSteps), which stays the primary
+# check.
+trace internal/gameserver/script/testdata/oracle/scenarios/tutorial_relog.golden
 character Newbie 1
 script script.feature.Tutorial
 item 5588
@@ -22,7 +24,6 @@ enter
   Q upsert Tutorial | ucMemo | 1
 
 advance 10s
-  S SystemMessage id=54 3:5588
   S PlaySound type=2 file=tutorial_voice_001a bind=1 obj=player loc=10,20,30 delay=0
   S TutorialShowHtml page=script/feature/Tutorial/tutorial_human_fighter001.htm
   Q upsert Tutorial | Ex | -3

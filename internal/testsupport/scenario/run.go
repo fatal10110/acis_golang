@@ -162,7 +162,11 @@ func Run(t *testing.T, sc *Scenario, cfg Config) {
 	r := &run{sc: sc, pages: loadPages(t, sc.Pages), roles: map[int32]string{}, objs: map[string]int32{}, npcs: map[string]NPC{}, live: map[string]*npc.Hostile{}}
 	r.draws.random = sc.Random
 	r.texts = pageTexts(t, r.pages)
-	r.items = itemTemplates(t, sc.Items)
+	items := sc.Items
+	if sc.Creates() {
+		items = append(slices.Clone(items), starterItemIDs(t)...)
+	}
+	r.items = itemTemplates(t, items)
 	if sc.Trace != "" {
 		data, err := os.ReadFile(filepath.Join(moduleRoot(t), filepath.FromSlash(sc.Trace)))
 		if err != nil {
@@ -238,8 +242,9 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	}
 	switch {
 	case r.sc.Creates():
-		// The create step makes the character at the character select.
-		opts = append(opts, gameservertest.WithWantChars(0))
+		// The create step makes the character at the character select, with
+		// the shipped starter items.
+		opts = append(opts, gameservertest.WithWantChars(0), gameservertest.WithClassTemplate(createdTemplate(t)))
 	case r.sc.Class != 0:
 		opts = append(opts, gameservertest.WithClassTemplates(classTemplates()...),
 			gameservertest.WithClassCharacter(r.sc.Character, r.sc.Level, 0, r.sc.Class))
@@ -274,6 +279,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	r.enterWorld(t)
 	r.srv.FlushPersistence(t)
 	r.srv.TakeJournalWrites()
+	r.srv.TakeMemoWrites()
 }
 
 // setPlayer names the account's one character the player.
@@ -573,6 +579,9 @@ func (r *run) step(t *testing.T, i int, st Step) {
 	if d := FirstDiff("statement", statements(r.srv.TakeJournalWrites()), st.Statements); d != "" {
 		fail("%s", d)
 	}
+	if d := FirstDiff("memo", memoLines(r.srv.TakeMemoWrites()), st.Memos); d != "" {
+		fail("%s", d)
+	}
 	for _, ck := range st.Checks {
 		if d := r.check(t, ck); d != "" {
 			fail("%s (line %d)", d, ck.Line)
@@ -781,6 +790,19 @@ func statements(writes []questlog.Write) []string {
 	return out
 }
 
+// memoLines renders player memo writes as M lines.
+func memoLines(writes []gameservertest.MemoWrite) []string {
+	var out []string
+	for _, w := range writes {
+		if w.Unset {
+			out = append(out, "unset "+w.Key)
+			continue
+		}
+		out = append(out, "set "+w.Key+" | "+w.Value)
+	}
+	return out
+}
+
 // classTemplates returns a template of every class, each with the
 // fixture's stats: the class line's class loads with its parents, and a
 // script's class change lands on whichever class it names.
@@ -890,12 +912,16 @@ func itemTemplates(t *testing.T, ids []int32) *item.Table {
 	if shipped.err != nil {
 		t.Fatalf("load shipped items: %v", shipped.err)
 	}
+	added := map[int32]bool{}
 	for _, id := range ids {
 		tmpl, ok := shipped.table.Get(id)
 		if !ok {
 			t.Fatalf("no shipped item %d", id)
 		}
-		templates = append(templates, tmpl)
+		if !added[id] {
+			added[id] = true
+			templates = append(templates, tmpl)
+		}
 	}
 	return item.NewTable(templates)
 }
