@@ -425,7 +425,29 @@ func (l *GameClientLink) replayLoadingScreenEffects(live *livePlayer) {
 	if l.skills == nil || len(live.Character.ActiveSkillEffects()) == 0 {
 		return
 	}
+	l.replaySavedEffects(live, nil)
+	// No burst follows to show what a death there held back.
+	live.takeHeldForEnterWorld()
+}
+
+// replaySavedEffects replays the effects live's selection restored, then
+// runs settle, inside the silent replay window (see
+// livePlayer.replayingEffects). A player that enters the window alive may
+// die in it, to a damage-over-time tick due on the loading screen: that
+// death sends its client nothing (see livePlayer.deathOnLoadingScreen;
+// what it holds for the burst, livePlayer.holdForEnterWorld), and
+// replaySavedEffects reports it.
+func (l *GameClientLink) replaySavedEffects(live *livePlayer, settle func()) (died bool) {
+	alive := !live.Dead()
 	live.replayingEffects.Store(true)
-	l.skills.ReplayEffects(live.Character)
+	live.replayMayDie.Store(alive)
+	if l.skills != nil {
+		l.skills.ReplayEffects(live.Character)
+	}
+	if settle != nil {
+		settle()
+	}
+	live.replayMayDie.Store(false)
 	live.replayingEffects.Store(false)
+	return alive && live.Dead()
 }
