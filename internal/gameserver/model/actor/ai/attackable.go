@@ -70,7 +70,8 @@ type AttackableActor interface {
 	Now() time.Time
 	// After runs fn as a task on the actor's queue once d has elapsed on
 	// that clock, unless the returned timer is stopped first. The wander
-	// chain's firings use it.
+	// chain's firings and the out-of-territory stale-hate sweep use it; the
+	// queue closing when the actor leaves the world cancels both.
 	After(d time.Duration, fn func()) Timer
 	// AtHookPoint gives the behavior bound to the actor's template its turn
 	// at p, on the goroutine that reached p, with the AI loop unlocked (see
@@ -254,6 +255,10 @@ type Attackable struct {
 	// reports that no periodic pass has consumed it yet.
 	tickStep int
 	ticked   bool
+	// cycleDecayDue reports that the latest Tick reached every third step:
+	// that cycle's hate refresh and weight decay run once its periodic pass
+	// has selected, so they shape the next cycle's selection, not this one's.
+	cycleDecayDue bool
 	// onRoute reports that the actor walks its route: a route intention
 	// stepped since the AI last took up another desire.
 	onRoute bool
@@ -851,6 +856,10 @@ func (a *Attackable) think(mode thinkMode) error {
 	defer a.mu.Unlock()
 
 	updateTick := mode == thinkTick
+	if updateTick {
+		// Runs before mu is released, after the pass's selection and idle.
+		defer a.cycleDecayLocked()
+	}
 	// Only an actor idle when the pass starts repeats its idle step on a
 	// continue pass; one this pass drops to idle takes no step.
 	idleAtStart := a.current.kind == IntentionIdle
@@ -1232,23 +1241,36 @@ func (a *Attackable) nextToDo() (next intention, fromLatch, ok bool) {
 	return next, false, true
 }
 
-// Tick advances the AI clock and applies periodic attack, cast, and
-// nothing-desire weight decay.
+// Tick advances the AI clock. Every third step it marks the cycle's hate
+// refresh and attack, cast, and nothing-desire weight decay due; the cycle's
+// TickThink runs them after its selection. A decay a previous cycle left
+// due, because no TickThink followed its Tick, runs first.
 func (a *Attackable) Tick() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
+	a.cycleDecayLocked()
 	a.tickStep, a.ticked = a.step, true
 	a.step++
 	if a.step%3 != 0 {
 		return
 	}
+	a.cycleDecayDue = true
+	a.step = 0
+}
+
+// cycleDecayLocked runs the periodic hate refresh and weight decay if a Tick
+// marked them due.
+func (a *Attackable) cycleDecayLocked() {
+	if !a.cycleDecayDue {
+		return
+	}
+	a.cycleDecayDue = false
 	a.refreshCombatMemory()
 	a.reduceAllAggroHateLocked(attackHateDecay)
 	a.desires.DecreaseWeightByType(IntentionAttack, attackHateDecay)
 	a.desires.DecreaseWeightByType(IntentionCast, castDesireDecay)
 	a.desires.DecreaseWeightByType(IntentionNothing, nothingDesireDecay)
-	a.step = 0
 }
 
 // syncOOTSweepLocked settles the out-of-territory state on an arrival. One

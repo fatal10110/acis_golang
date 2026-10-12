@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"math"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -217,5 +218,55 @@ func TestBackToPeaceKeepsScriptDesires(t *testing.T) {
 	}
 	if move.stopCount != stops {
 		t.Fatalf("move stops = %d, want %d (the return to peace stops nothing)", move.stopCount, stops)
+	}
+}
+
+// tickDecay advances the AI clock one cycle and runs the hate refresh and
+// weight decay that cycle's periodic pass would run after its selection,
+// without the selection itself.
+func tickDecay(a *Attackable) {
+	a.Tick()
+	a.mu.Lock()
+	a.cycleDecayLocked()
+	a.mu.Unlock()
+}
+
+// TestCycleDecayRunsAfterTheCycleSelection pins the periodic cycle's order:
+// selection first, then every third cycle the hate refresh and weight decay.
+// The cycle whose decay drops the last attack desire still keeps the attack
+// it selected; the next cycle finds the queue empty and idles.
+func TestCycleDecayRunsAfterTheCycleSelection(t *testing.T) {
+	owner, target := actor(1), actor(2)
+	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	brain.AddDamageHate(target, 0, 100)
+	brain.Desires().AddOrUpdate(&Desire{Kind: IntentionAttack, FinalTarget: target, Weight: 5, MoveToTarget: true})
+	if err := brain.TickThink(); err != nil {
+		t.Fatalf("TickThink() error: %v", err)
+	}
+	if got := brain.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() = %v, want %v", got, IntentionAttack)
+	}
+	cycle := func(n int) {
+		t.Helper()
+		brain.Tick()
+		if err := brain.TickThink(); err != nil {
+			t.Fatalf("cycle %d TickThink() error: %v", n, err)
+		}
+	}
+	for n := 1; n <= 3; n++ {
+		cycle(n)
+		if got := brain.CurrentIntention(); got != IntentionAttack {
+			t.Fatalf("cycle %d CurrentIntention() = %v, want %v", n, got, IntentionAttack)
+		}
+	}
+	if n := brain.Desires().Len(); n != 0 {
+		t.Fatalf("desires after the third cycle's decay = %d, want 0", n)
+	}
+	if got, want := brain.Threats().Hate(target), 93.4; math.Abs(got-want) > 1e-9 {
+		t.Fatalf("hate after the third cycle's decay = %v, want %v", got, want)
+	}
+	cycle(4)
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("cycle 4 CurrentIntention() = %v, want %v", got, IntentionIdle)
 	}
 }

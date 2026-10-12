@@ -13,9 +13,10 @@ import (
 // TestHateRunningOutKeepsTheAttackDesire pins the return to peace
 // (NpcAI.setBackToPeace clears the aggro and hate lists only): a monster
 // whose hate on its target runs out while its attack desire still has
-// weight swings at it again, and drops the attack only once the periodic
-// refresh finds its aggro list empty (AggroList.refresh) and the next cycle
-// idles it.
+// weight swings at it again. Each AI cycle selects before its periodic
+// refresh (NpcAI.runAI), so the cycle whose refresh finds the aggro list
+// empty (AggroList.refresh) and drops the attack desire still keeps the
+// attack, and only the cycle after it idles the monster.
 func TestHateRunningOutKeepsTheAttackDesire(t *testing.T) {
 	t.Parallel()
 	srv, hostile, victim, attackTime := startHostileAttack(t, 300, 0)
@@ -35,17 +36,26 @@ func TestHateRunningOutKeepsTheAttackDesire(t *testing.T) {
 	srv.Advance(t, attackTime+10*time.Millisecond)
 	readUntil(t, srv.Client, serverpackets.OpcodeAttack, "the swing after the hate ran out")
 
-	for range 3 {
+	// One AI cycle as the AI task runs it: Tick, then TickThink.
+	cycle := func() {
+		t.Helper()
 		hostile.Tick()
+		if err := hostile.TickThink(); err != nil {
+			t.Fatalf("TickThink() error: %v", err)
+		}
 	}
-	if got := hostile.AI().Desires().Len(); got != 0 {
-		t.Fatalf("queued desires after the periodic refresh = %d, want the attack desire dropped", got)
+	for n := 1; hostile.AI().Desires().Len() != 0; n++ {
+		if n > 3 {
+			t.Fatal("attack desire still queued after three AI cycles, want the periodic refresh to drop it")
+		}
+		cycle()
+		if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
+			t.Fatalf("CurrentIntention() after AI cycle %d = %v, want %v until the cycle after the refresh", n, got, ai.IntentionAttack)
+		}
 	}
-	if err := hostile.TickThink(); err != nil {
-		t.Fatalf("TickThink() error: %v", err)
-	}
+	cycle()
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
-		t.Fatalf("CurrentIntention() after the next cycle = %v, want %v", got, ai.IntentionIdle)
+		t.Fatalf("CurrentIntention() in the AI cycle after the refresh = %v, want %v", got, ai.IntentionIdle)
 	}
 }
 

@@ -21,6 +21,9 @@ func TestBowReuseEndShootsAgainWithoutDesire(t *testing.T) {
 	reuse := 1500 * time.Millisecond * 345 / time.Duration(hostile.AttackSpeed())
 
 	srv.Advance(t, attackTime+hitAnimationTail+10*time.Millisecond)
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
+		t.Fatalf("CurrentIntention() after the shot's hit animation = %v, want %v", got, ai.IntentionAttack)
+	}
 	decayAttackDesire(t, hostile)
 	drainUntilQuiet(t, srv.Client)
 

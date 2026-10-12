@@ -15,13 +15,13 @@ func TestAttackableAITickDecaysThreatEveryThirdTick(t *testing.T) {
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 	addAttackHate(ai, target, 0, 20)
 
-	ai.Tick()
-	ai.Tick()
+	tickDecay(ai)
+	tickDecay(ai)
 	if got := ai.Threats().Hate(target); got != 20 {
 		t.Fatalf("hate after two ticks = %v, want 20", got)
 	}
 
-	ai.Tick()
+	tickDecay(ai)
 	if got, want := ai.Threats().Hate(target), 13.4; math.Abs(got-want) > 0.000001 {
 		t.Fatalf("hate after third tick = %v, want %v", got, want)
 	}
@@ -34,14 +34,14 @@ func TestAttackableAITickDecaysCastAndNothingDesireWeights(t *testing.T) {
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: skill.Ref{ID: 4, Level: 1}, Weight: 70000})
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionNothing, Weight: 1})
 
-	ai.Tick()
-	ai.Tick()
+	tickDecay(ai)
+	tickDecay(ai)
 	got, ok := ai.Desires().Peek()
 	if !ok || got.Kind != IntentionCast || got.Weight != 70000 {
 		t.Fatalf("Peek after two ticks = (%v, %v), want CAST 70000", got, ok)
 	}
 
-	ai.Tick()
+	tickDecay(ai)
 	got, ok = ai.Desires().Peek()
 	if !ok || got.Kind != IntentionCast {
 		t.Fatalf("Peek after third tick = (%v, %v), want CAST", got, ok)
@@ -65,9 +65,9 @@ func TestAttackableAITickDropsCastDesireBelowDecayAmount(t *testing.T) {
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: skill.Ref{ID: 4, Level: 1}, Weight: 50000})
 
-	ai.Tick()
-	ai.Tick()
-	ai.Tick()
+	tickDecay(ai)
+	tickDecay(ai)
+	tickDecay(ai)
 
 	if got := ai.Desires().Len(); got != 0 {
 		t.Fatalf("queued desires after CAST decay = %d, want 0", got)
@@ -289,9 +289,9 @@ func TestAttackableAITickRefreshesStaleThreatAndHate(t *testing.T) {
 	ai.AddHate(dead, 800)
 	ai.AddHate(kept, 900)
 
-	ai.Tick()
-	ai.Tick()
-	ai.Tick()
+	tickDecay(ai)
+	tickDecay(ai)
+	tickDecay(ai)
 
 	if _, ok := ai.Threats().Get(lost); ok {
 		t.Fatal("lost threat entry still present after refresh")
