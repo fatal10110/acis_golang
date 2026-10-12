@@ -178,6 +178,7 @@ const (
 	SystemMessageExchangeHasEnded                  = 1266
 	SystemMessagePetRefusingOrder                  = 1864
 	SystemMessagePetTooHighToControl               = 1918
+	SystemMessageSealOfStrifeForbidsSummoning      = 1925 // no parameter
 	SystemMessageS1                                = 1987
 	SystemMessageCreateLvlTooLowToRegister         = 404
 	SystemMessageItemMixingFailed                  = 719

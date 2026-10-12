@@ -722,6 +722,12 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	if l.zones != nil {
 		rt.Zones = l.zones
 	}
+	if l.sieges != nil {
+		rt.Sieges = l.sieges
+	}
+	if l.sevenSigns != nil {
+		rt.Seals = l.sevenSigns
+	}
 	if l.npcs != nil {
 		rt.Mounts = l.npcs
 		rt.MountData = mountDataTable{npcs: l.npcs}

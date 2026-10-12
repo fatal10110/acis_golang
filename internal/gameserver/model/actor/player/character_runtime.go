@@ -223,6 +223,10 @@ type Runtime struct {
 	// HallFunctions answers the functions a clan hall rents; nil rents
 	// none, so no clan hall bonus applies.
 	HallFunctions HallFunctions
+	// Sieges answers the castle sieges under way; nil runs none.
+	Sieges SiegeGround
+	// Seals answers the Seven Signs seal rules; nil applies none.
+	Seals SealRules
 	// PartyLoot shares the items a partied character auto-loots or sweeps
 	// by its party's loot rule; nil keeps every item with the character.
 	PartyLoot PartyLoot
@@ -251,6 +255,8 @@ func (c *Character) Configure(rt Runtime) {
 	c.zones = rt.Zones
 	c.social = rt.Social
 	c.hallFunctions = rt.HallFunctions
+	c.sieges = rt.Sieges
+	c.seals = rt.Seals
 	c.partyLoot = rt.PartyLoot
 	c.tutorial = rt.Tutorial
 	c.deaths = rt.Deaths

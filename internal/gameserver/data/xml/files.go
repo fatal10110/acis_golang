@@ -71,10 +71,10 @@ func (c *coord) UnmarshalXMLAttr(attr xml.Attr) error {
 }
 
 // coord32 is like coord but for an attribute that must fit int32 (an id, a z
-// bound, a heading), rejecting the same malformed, empty, padded, and
-// out-of-range input commons.StatSet.GetInt32 did. Declare a required
-// attribute as *coord32 so absence stays distinguishable; a plain coord32 is
-// an optional attribute whose default is 0.
+// bound, a heading), rejecting malformed, empty, padded, and out-of-range
+// input. Declare a required attribute as *coord32 so absence stays
+// distinguishable; a plain coord32 is an optional attribute whose default
+// is 0.
 type coord32 int32
 
 func (c *coord32) UnmarshalXMLAttr(attr xml.Attr) error {
@@ -122,8 +122,7 @@ func canonicalizeLiteralAttrs(vals map[string]string, keys ...string) error {
 	return nil
 }
 
-// floatAttr is a required float64 attribute, rejecting the same malformed
-// input commons.StatSet.GetFloat64 did.
+// floatAttr is a required float64 attribute, rejecting malformed input.
 type floatAttr float64
 
 func (f *floatAttr) UnmarshalXMLAttr(attr xml.Attr) error {
@@ -135,10 +134,9 @@ func (f *floatAttr) UnmarshalXMLAttr(attr xml.Attr) error {
 	return nil
 }
 
-// boolAttr coerces an attribute value the same permissive way
-// commons.StatSet.GetBoolDefault did: case-insensitively "true" is true,
-// anything else present is false. It never fails to parse, matching that
-// laxness exactly rather than encoding/xml's stricter native bool decode.
+// boolAttr coerces an attribute value permissively: case-insensitively
+// "true" is true, anything else present is false. It never fails to parse,
+// unlike encoding/xml's stricter native bool decode.
 type boolAttr bool
 
 func (b *boolAttr) UnmarshalXMLAttr(attr xml.Attr) error {

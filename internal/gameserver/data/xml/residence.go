@@ -334,9 +334,8 @@ func buildControlTower(t castleTowerElement) (castle.ControlTower, error) {
 	if len(t.Position) == 0 {
 		return castle.ControlTower{}, fmt.Errorf("castle: control tower %q: position is required", t.Alias)
 	}
-	// Last element wins: the StatSet this replaced was built by merging every
-	// <position>/<stats> child in document order, so a later child's attrs
-	// overwrote an earlier one's.
+	// Last element wins: each <position>/<stats> child carries the full value,
+	// so a later child replaces an earlier one.
 	loc, err := t.Position[len(t.Position)-1].loc()
 	if err != nil {
 		return castle.ControlTower{}, fmt.Errorf("castle: control tower %q: %w", t.Alias, err)
@@ -526,9 +525,8 @@ func joinVals(elems []valListElement) string {
 }
 
 // splitList splits raw on ";" without trimming or dropping empty elements,
-// or returns nil if raw is empty. It mirrors
-// commons.StatSet.GetStringArray/GetStringArrayDefault's raw split; callers
-// that need trimmed, non-empty elements apply cleanStrings.
+// or returns nil if raw is empty. Callers that need trimmed, non-empty
+// elements apply cleanStrings.
 func splitList(raw string) []string {
 	if raw == "" {
 		return nil
@@ -537,8 +535,8 @@ func splitList(raw string) []string {
 }
 
 // splitInts splits raw on ";" and parses each part as an int, or returns nil
-// if raw is empty. It mirrors commons.StatSet's coerceIntArray: no
-// trimming, and a malformed element is an error.
+// if raw is empty. Parts are not trimmed, and a malformed element is an
+// error.
 func splitInts(raw string) ([]int, error) {
 	if raw == "" {
 		return nil, nil

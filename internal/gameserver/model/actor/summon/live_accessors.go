@@ -433,21 +433,10 @@ func (a *Actor) AlikeDead() bool { return a.Dead() }
 // siege guards.
 func (a *Actor) SiegeGuard() bool { return false }
 
-// siegeSummonNPCIDs are the Siege Golem, Hog Cannon, and Swoop Cannon
-// servitor templates (the siege summons), the summons the ERASE skill
-// exempts.
-var siegeSummonNPCIDs = map[int]struct{}{
-	14737: {},
-	14768: {},
-	14839: {},
-}
-
-// SiegeSummon reports whether this servitor is a siege-assault summon,
-// exempt from the ERASE skill.
-func (a *Actor) SiegeSummon() bool {
-	_, ok := siegeSummonNPCIDs[a.npcID]
-	return ok
-}
+// SiegeSummon reports whether this servitor is a siege summon (a template
+// of type SiegeSummon): it lives only on a siege battlefield, and fear,
+// bluff and the ERASE skill leave it alone.
+func (a *Actor) SiegeSummon() bool { return a.siegeSummon }
 
 // SummonOwner returns this summon's owning player.
 func (a *Actor) SummonOwner() Owner { return a.currentOwner() }
