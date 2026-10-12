@@ -39,6 +39,13 @@ type routeWorld struct {
 // catalog, every fixture id with a template of its kind.
 func bootRouteWorld(t *testing.T, list []script.Listing, catalog script.Catalog, opts ...gameservertest.Option) *routeWorld {
 	t.Helper()
+	return bootTunedRouteWorld(t, list, catalog, nil, opts...)
+}
+
+// bootTunedRouteWorld is bootRouteWorld with tune, when non-nil, given the
+// patrol monster's template and the fixture routes to adjust before boot.
+func bootTunedRouteWorld(t *testing.T, list []script.Listing, catalog script.Catalog, tune func(patrol *npc.Template, routes route.WalkerRoutes), opts ...gameservertest.Option) *routeWorld {
+	t.Helper()
 	templates := []*npc.Template{}
 	for _, f := range []struct {
 		id    int
@@ -66,6 +73,9 @@ func bootRouteWorld(t *testing.T, list []script.Listing, catalog script.Catalog,
 		w.a[f.id] = location.Location{X: at.X + 100, Y: y, Z: z}
 		w.b[f.id] = location.Location{X: at.X + 400, Y: y, Z: z}
 		routes[f.alias] = map[string][]route.WalkerLocation{f.alias: {{Location: w.a[f.id]}, {Location: w.b[f.id]}}}
+	}
+	if tune != nil {
+		tune(patrol, routes)
 	}
 	kinds := map[int32]script.NPCKind{scribeID: script.KindFolk, porterID: script.KindFolk, strollerID: script.KindFolk, patrolID: script.KindHostile}
 	w.folkWorld = bootFolkWorld(t, nil, append([]gameservertest.Option{
