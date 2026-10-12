@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/route"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -26,6 +27,9 @@ type DataReloads struct {
 	// Admin reloads the access levels and admin commands
 	// (AdminData.reload).
 	Admin func() error
+	// BoatRoutes reads the boat itineraries anew, which then replace the
+	// fleet's.
+	BoatRoutes func() ([]route.BoatItinerary, error)
 	// BuyLists reads the buylists anew, which the merchant then sells
 	// from, its limited stock rebuilt from the saved rows
 	// (BuyListManager.reload).
@@ -74,8 +78,8 @@ type DataReloads struct {
 // hook yet.
 var errReloadNotPorted = errors.New("reload not ported yet")
 
-// reloadNotPorted answers a type no reload exists for yet, each tracked by
-// its issue: boat (#3404) and config (#3406).
+// reloadNotPorted answers a type no reload exists for yet, tracked by its
+// issue: config (#3406).
 func reloadNotPorted(*GameClientLink) error { return errReloadNotPorted }
 
 // reloadHook runs hook, errReloadNotPorted without one.
@@ -95,6 +99,9 @@ type reloadType struct {
 	// done is what the game master is told once the type has reloaded.
 	done string
 	run  func(l *GameClientLink) error
+	// runFor, when set, reloads in place of run for the game master gm,
+	// on whose queue the command runs.
+	runFor func(l *GameClientLink, gm *livePlayer) error
 }
 
 // reloadTypes are the types //reload takes, in the order AdminReload.java
@@ -102,7 +109,7 @@ type reloadType struct {
 var reloadTypes = []reloadType{
 	{word: "admin", done: "Admin data has been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Admin) }},
 	{word: "announcement", done: "The content of announcements.xml has been reloaded.", run: func(l *GameClientLink) error { return l.announcements.Load() }},
-	{word: "boat", done: "Boat have been reloaded.", run: reloadNotPorted},
+	{word: "boat", done: "Boat have been reloaded.", runFor: (*GameClientLink).reloadBoats},
 	{word: "buylist", done: "Buylists have been reloaded.", run: (*GameClientLink).reloadBuyLists},
 	{word: "config", done: "Configs files have been reloaded.", run: reloadNotPorted},
 	{word: "crest", done: "Crests have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Crests) }},
@@ -143,7 +150,12 @@ func (l *GameClientLink) adminReload(gm *livePlayer, line string) {
 			sendReloadUsage(gm)
 			continue
 		}
-		err := typ.run(l)
+		var err error
+		if typ.runFor != nil {
+			err = typ.runFor(l, gm)
+		} else {
+			err = typ.run(l)
+		}
 		switch {
 		case errors.Is(err, errReloadNotPorted):
 			l.log.Warn().Str("type", typ.word).Msg("admin: //reload type not implemented yet")

@@ -194,13 +194,20 @@ func (l *GameClientLink) requestGetOnVehicle(live *livePlayer, req clientpackets
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
+	// A boat a reload retired takes no one aboard: it is about to leave the
+	// world with the passengers it had when retired, put ashore.
+	added, ok := b.AddPassenger(live.ObjectID())
+	if !ok {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return
+	}
 	// No summon boards: it is dismissed.
 	if s := l.liveSummon(live); s != nil {
 		s.Unsummon()
 	}
 	live.Board(b)
 	l.updateLivePlayerPosition(live, boatLocation(b), live.CurrentHeading())
-	if b.AddPassenger(live.ObjectID()) {
+	if added {
 		live.zoneActor.holdBoatPeace(true)
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageEnterPeacefulZone))
 	}
