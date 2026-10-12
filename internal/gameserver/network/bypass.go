@@ -289,6 +289,12 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		l.showTerritoryStatus(live, f.ObjectID(), f.Instance)
 	case npc.BypassQuest:
 		l.questWindow(live, f, command)
+	case npc.BypassDungeonEnter:
+		l.dungeonGate(live, f, true)
+	case npc.BypassDungeonExit:
+		l.dungeonGate(live, f, false)
+	case npc.BypassDungeonRefused:
+		dungeonRefusal(live, f, reply)
 	case npc.BypassUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Str("command", command).Msg("bypass: npc dialog command not modeled")
 	case npc.BypassRefused:

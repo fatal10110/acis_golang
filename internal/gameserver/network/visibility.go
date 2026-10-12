@@ -82,16 +82,16 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 		}
 		p.describeState(o, o.CastControl())
 	case *npc.Hostile:
-		p.sendVisibilityFrame(npcViewFrame(o, p, false))
+		p.sendVisibilityFrame(npcViewFrame(p.link, o, p, false))
 		p.describeState(o, o.CastControl())
 	case *npc.Decoration:
-		p.sendVisibilityFrame(npcViewFrame(o, p, false))
+		p.sendVisibilityFrame(npcViewFrame(p.link, o, p, false))
 	case *npc.EffectPoint:
 		// A signet point never walks, and its casts are its own broadcasts,
 		// not a cast in flight: it is shown with its NpcInfo alone.
-		p.sendVisibilityFrame(npcViewFrame(o, p, false))
+		p.sendVisibilityFrame(npcViewFrame(p.link, o, p, false))
 	case *npc.Folk:
-		p.sendVisibilityFrame(npcViewFrame(o, p, false))
+		p.sendVisibilityFrame(npcViewFrame(p.link, o, p, false))
 		p.describeState(o, o.CastControl())
 	case *summon.Actor:
 		if o.ShownAsOwnedBy(p.ObjectID()) {

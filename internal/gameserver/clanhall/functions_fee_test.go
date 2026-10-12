@@ -69,9 +69,9 @@ type feeTreasury struct {
 	charged chan struct{}
 }
 
-func (t *feeTreasury) PayHallFee(clanID int32, adena int) bool {
+func (t *feeTreasury) TakeAdena(clanID int32, adena int) (Landing, bool) {
 	if clanID != feeClan {
-		return false
+		return nil, false
 	}
 	t.mu.Lock()
 	t.paid = append(t.paid, adena)
@@ -79,7 +79,7 @@ func (t *feeTreasury) PayHallFee(clanID int32, adena int) bool {
 	if t.charged != nil {
 		t.charged <- struct{}{}
 	}
-	return true
+	return nil, true
 }
 
 func (t *feeTreasury) charges() int {

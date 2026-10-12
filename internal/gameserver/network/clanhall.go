@@ -54,25 +54,20 @@ func (l *GameClientLink) showClanHallInterior(hallID int32, a zone.Actor) {
 	}))
 }
 
-// PayHallFee destroys adena from the warehouse of the clan clanID,
-// restoring it first when no member opened it, and reports false, with
-// nothing taken, when it holds less or cannot be read.
-func (l *GameClientLink) PayHallFee(clanID int32, adena int) bool {
-	_, ok := l.TakeAdena(clanID, adena)
-	return ok
-}
-
 var _ clanhall.Bank = (*GameClientLink)(nil)
 
-// TakeAdena is PayHallFee, also returning the write that lands the
-// warehouse's adena row as the fee left it. The fee's own row write is
-// queued as every item operation's is; the landing writes the same row
-// now, in its place in the row's write order, for a caller that has to
-// know it is in the database before it stores what the fee paid for.
+// TakeAdena destroys adena from the warehouse of the clan clanID,
+// restoring it first when no member opened it, and reports false, with
+// nothing taken, when it holds less or cannot be read. It also returns the
+// write that lands the warehouse's adena row as the fee left it. The fee's
+// own row write is queued as every item operation's is; the landing writes
+// the same row now, in its place in the row's write order, for a caller
+// that has to know it is in the database before it stores what the fee
+// paid for.
 func (l *GameClientLink) TakeAdena(clanID int32, adena int) (clanhall.Landing, bool) {
 	wh, err := l.clanWarehouse(clanID)
 	if err != nil {
-		l.log.Error().Err(err).Int32("clan_id", clanID).Msg("clan hall: restore clan warehouse for a function fee")
+		l.log.Error().Err(err).Int32("clan_id", clanID).Msg("clan hall: restore clan warehouse for a fee")
 		return nil, false
 	}
 	end := l.itemInstances.BeginOperation(clanID)

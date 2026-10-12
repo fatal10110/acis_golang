@@ -25,12 +25,15 @@ type npcAttackRules interface {
 }
 
 // npcSnapshot is v's stationary view when serverObject is set, its full
-// view otherwise, with the flag it shows no particular viewer.
-func npcSnapshot(v npcView, serverObject bool) npcinfo.Snapshot {
+// view otherwise, with the flag it shows no particular viewer. The full view
+// carries the crest l adds to it; a nil l adds none.
+func npcSnapshot(l *GameClientLink, v npcView, serverObject bool) npcinfo.Snapshot {
 	if serverObject {
 		return v.ServerObjectInfoSnapshot()
 	}
-	return v.NPCInfoSnapshot()
+	s := v.NPCInfoSnapshot()
+	l.addNPCCrest(v, &s)
+	return s
 }
 
 // npcShownAttackable reports the attackable flag viewer sees in v's view,
@@ -52,9 +55,9 @@ func npcShownAttackable(v npcView, viewer *livePlayer, serverObject, fallback bo
 }
 
 // npcViewFrame builds v's view as viewer sees it: the stationary one when
-// serverObject is set, the full one otherwise.
-func npcViewFrame(v npcView, viewer *livePlayer, serverObject bool) wire.Frame {
-	s := npcSnapshot(v, serverObject)
+// serverObject is set, the full one otherwise, with the crest l adds.
+func npcViewFrame(l *GameClientLink, v npcView, viewer *livePlayer, serverObject bool) wire.Frame {
+	s := npcSnapshot(l, v, serverObject)
 	s.Attackable = npcShownAttackable(v, viewer, serverObject, s.Attackable)
 	return npcSnapshotFrame(s, serverObject)
 }
@@ -70,15 +73,16 @@ func npcSnapshotFrame(s npcinfo.Snapshot, serverObject bool) wire.Frame {
 // snapshot of its known list taken through buf, v's view again: the
 // stationary one when serverObject is set, the full one otherwise. The view
 // tells each viewer whether it may attack v, so a viewer gets one of two
-// frames, each built once on first use from one snapshot of v.
-func broadcastNPCView(buf *world.KnownBuffer, state *world.State, v npcView, serverObject bool) {
+// frames, each built once on first use from one snapshot of v, which
+// carries the crest l adds; a nil l adds none.
+func broadcastNPCView(l *GameClientLink, buf *world.KnownBuffer, state *world.State, v npcView, serverObject bool) {
 	known := buf.SnapshotCopy(state, v)
 	defer known.Release()
 	var snapshot npcinfo.Snapshot
 	taken := false
 	view := func() npcinfo.Snapshot {
 		if !taken {
-			snapshot, taken = npcSnapshot(v, serverObject), true
+			snapshot, taken = npcSnapshot(l, v, serverObject), true
 		}
 		return snapshot
 	}

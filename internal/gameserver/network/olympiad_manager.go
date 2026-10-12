@@ -51,7 +51,17 @@ func (l *GameClientLink) olympiadNobleBypass(live *livePlayer, f *npc.Folk, choi
 	case 7:
 		l.openMultisell(live, f, passesMultisell, false)
 	case 10:
-		if passes := o.Passes(id, l.olympiadHero(live)); passes > 0 {
+		// The claim is stored before the passes exist (Passes), so their row
+		// can never land ahead of it. One that cannot be stored pays nothing
+		// and stays open; like a claim paying nothing, it answers nothing.
+		ctx, cancel := context.WithTimeout(context.Background(), olympiad.TaskTimeout)
+		passes, err := o.Passes(ctx, id, l.olympiadHero(live))
+		cancel()
+		if err != nil {
+			l.log.Error().Err(err).Int32("object_id", id).Msg("olympiad: store the noblesse pass claim")
+			return
+		}
+		if passes > 0 {
 			live.AddCreatedItem(olympiad.NoblesseGatePass, passes, l.nextObjectID)
 		}
 	}

@@ -359,6 +359,7 @@ type GameClientLink struct {
 	playerConfig     PlayerConfig
 	petConfig        petmodel.Config // passed into summon.PetConfig by newPet.
 	disableRaidCurse bool
+	showNPCCrest     bool
 	inventory        *invops.Service
 	petItems         *petitem.Service
 	trades           *tradebook.Book
@@ -610,6 +611,10 @@ type GameClientLinkConfig struct {
 	// DisableRaidCurse is npcs.properties DisableRaidCurse: when true, raid
 	// petrification and anti-strider curses never apply.
 	DisableRaidCurse bool
+	// ShowNPCCrest is npcs.properties ShowNpcCrest: when true, an NPC's
+	// NpcInfo shows the clan and alliance crests of the clan owning the
+	// residence it serves.
+	ShowNPCCrest bool
 	// Teleports and InstantTeleports are the destinations civilian NPCs
 	// offer; nil offers none. FreeTeleport is npcs.properties FreeTeleport:
 	// when true, no destination is charged for. TeleportClock is the local
@@ -833,6 +838,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		playerConfig:     cfg.PlayerConfig,
 		petConfig:        cfg.PetConfig,
 		disableRaidCurse: cfg.DisableRaidCurse,
+		showNPCCrest:     cfg.ShowNPCCrest,
 		enchantRoll:      cfg.EnchantRoll,
 		skillEnchantRoll: cfg.SkillEnchantRoll,
 		petRoll:          cfg.PetRoll,
