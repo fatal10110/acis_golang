@@ -112,9 +112,11 @@ func (l *GameClientLink) learnGeneralAcquireSkill(live *livePlayer, trainer *npc
 		return
 	}
 
+	// Adding the skill re-points the shortcuts bound to it, so their
+	// ShortCutRegister precedes the learned message.
+	l.refreshSkillShortcuts(live, req.SkillID, req.Level)
 	live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageLearnedSkill, req.SkillID, req.Level))
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
-	l.refreshSkillShortcuts(live, req.SkillID, req.Level)
 	l.showSkillList(live, trainer)
 }
 
@@ -144,12 +146,12 @@ func (l *GameClientLink) learnFishingAcquireSkill(live *livePlayer, req clientpa
 		return
 	}
 
+	l.refreshSkillShortcuts(live, req.SkillID, req.Level)
 	live.SendFrame(serverpackets.FrameSystemMessageSkillName(serverpackets.SystemMessageLearnedSkill, req.SkillID, req.Level))
 	if result.StorageSync {
 		live.SendFrame(serverpackets.FrameExStorageMaxCount(live.Character))
 	}
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
-	l.refreshSkillShortcuts(live, req.SkillID, req.Level)
 	l.showFishSkillList(live)
 }
 

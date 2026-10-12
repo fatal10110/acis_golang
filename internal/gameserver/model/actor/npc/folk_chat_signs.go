@@ -8,8 +8,8 @@ import (
 )
 
 // ChatState is what the chat windows of the Seven Signs priests, the
-// festival guides and the Olympiad managers read of the talker and the
-// world.
+// festival guides, the Olympiad managers and the castle and clan hall NPCs
+// read of the talker and the world.
 type ChatState interface {
 	// SevenSigns is the talker's Record of Seven Signs.
 	SevenSigns() sevensigns.Record
@@ -21,6 +21,9 @@ type ChatState interface {
 	// Hero reports whether the talker is a hero, and inactive whether it
 	// was elected hero and has not claimed the status yet.
 	Hero() (hero, inactive bool)
+	// Residence is the castle or clan hall the NPC serves, as the talker
+	// stands with it.
+	Residence() ResidenceTalk
 }
 
 const (

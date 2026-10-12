@@ -38,9 +38,9 @@ func (l *GameClientLink) talkToFolk(live *livePlayer, f *npc.Folk) {
 }
 
 // sendFolkChat opens html, f's chat window, the way outcome says: with
-// ActionFailed first for a Seven Signs priest, after the page for everyone
-// else. A Mammon NPC refusing the talker says why instead, releasing the
-// client after a cabal refusal.
+// ActionFailed first or alone, after the page, or not at all. A Mammon NPC
+// refusing the talker says why instead, releasing the client after a cabal
+// refusal.
 func sendFolkChat(live *livePlayer, f *npc.Folk, html string, outcome npc.ChatOutcome) {
 	switch outcome {
 	case npc.ChatShownReleased:
@@ -55,6 +55,11 @@ func sendFolkChat(live *livePlayer, f *npc.Folk, html string, outcome npc.ChatOu
 		live.SendFrame(serverpackets.FrameActionFailed())
 	case npc.ChatCompetitionOnly:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageQuestEventPeriod))
+	case npc.ChatPageOnly:
+		sendFilledHTML(live, f.ObjectID(), html, 0)
+	case npc.ChatReleasedOnly:
+		live.SendFrame(serverpackets.FrameActionFailed())
+	case npc.ChatSilent:
 	default:
 		sendFilledHTML(live, f.ObjectID(), html, 0)
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -62,10 +67,12 @@ func sendFolkChat(live *livePlayer, f *npc.Folk, html string, outcome npc.ChatOu
 }
 
 // folkChatState is what a civilian NPC's chat window reads of live and of
-// the Seven Signs, festival and noble state.
+// the Seven Signs, festival, noble and residence state. f is the NPC talked
+// to.
 type folkChatState struct {
 	l    *GameClientLink
 	live *livePlayer
+	f    *npc.Folk
 }
 
 func (s folkChatState) SevenSigns() sevensigns.Record {
@@ -83,6 +90,8 @@ func (s folkChatState) FestivalNotice() string {
 }
 
 func (s folkChatState) Noble() bool { return s.live.IsNoble() }
+
+func (s folkChatState) Residence() npc.ResidenceTalk { return s.l.residenceTalk(s.live, s.f) }
 
 func (s folkChatState) Hero() (isHero, inactive bool) {
 	return s.live.IsHero(), s.l.heroes != nil && s.l.heroes.IsInactive(s.live.ObjectID())
@@ -229,4 +238,12 @@ func (c PlayerConfig) chatRules() npc.ChatRules {
 		KarmaCanUseGK:        c.KarmaPlayerCanUseGK,
 		KarmaCanUseWarehouse: c.KarmaPlayerCanUseWareHouse,
 	}
+}
+
+// chatRules are the gates on service NPC dialogs: the karma gates and the
+// manor switch.
+func (l *GameClientLink) chatRules() npc.ChatRules {
+	rules := l.playerConfig.chatRules()
+	rules.AllowManor = l.manor.Allowed
+	return rules
 }

@@ -178,37 +178,15 @@ func ApplyResolvedEffectsResult(handlers EffectHandlers, caster skilltarget.Acto
 // that carries the item it was cast with (e.g. a seed's SOW cast), threading
 // item through to the skill handler as handlerskill.Cast.Item.
 //
-// When the launch resolved no target, no effect is dispatched, but a
-// player's skill, or its summon's, is still seen by the NPCs around its
-// caster (castWithoutTargets).
+// A launch that resolved no target still runs the skill's handler, with no
+// targets: the handler's caster-side work (self effects, the shot it
+// spends) happens whoever it hit, and a player's skill, or its summon's, is
+// still seen by the NPCs around its caster.
 func ApplyResolvedItemEffectsResult(handlers EffectHandlers, caster skilltarget.Actor, affected []skilltarget.Actor, def modelskill.Definition, item any) EffectResult {
 	if handlers.Skills == nil {
 		return EffectResult{}
 	}
-	if len(affected) == 0 {
-		castWithoutTargets(caster, def)
-		return EffectResult{}
-	}
 	return dispatchEffects(handlers, caster, affected, def, item)
-}
-
-// castWithoutTargets is the skill call of a cast whose launch resolved no
-// target: once the raid curses, which have no target to test, let it
-// through, a player's skill, or its summon's, reaches every NPC around the
-// caster that watches spells, with no targets.
-func castWithoutTargets(caster skilltarget.Actor, def modelskill.Definition) {
-	castCaster, ok := caster.(SkillCaster)
-	if !ok {
-		return
-	}
-	player, isPet, acting := actingPlayer(caster)
-	if !acting {
-		return
-	}
-	if def.Activation != modelskill.ActivationToggle && castCaster.TestCursesOnSkillSee(def, nil) {
-		return
-	}
-	seeSpell(castCaster, player, def, nil, isPet)
 }
 
 func dispatchEffects(handlers EffectHandlers, caster skilltarget.Actor, affected []skilltarget.Actor, def modelskill.Definition, item any) EffectResult {

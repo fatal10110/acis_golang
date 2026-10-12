@@ -465,6 +465,9 @@ type HallView struct {
 	Lease       int
 	AuctionMin  int
 	OwnerID     int32
+	// PaidUntil is when the owner's lease runs out, in milliseconds; 0 for
+	// a free hall.
+	PaidUntil int64
 	// Auction reports whether the hall holds an auction; the fields below
 	// are its.
 	Auction bool
@@ -521,6 +524,7 @@ func (h *hall) viewLocked() HallView {
 	v := HallView{
 		ID: h.id(), Name: h.data.Name, Town: h.data.Town, Description: h.data.Description,
 		Size: h.data.Size, Lease: h.data.Lease, AuctionMin: h.data.AuctionMin, OwnerID: h.ownerID,
+		PaidUntil: h.paidUntil,
 	}
 	a := h.auction
 	if a == nil {
