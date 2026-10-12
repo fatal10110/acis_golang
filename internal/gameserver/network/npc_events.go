@@ -21,12 +21,20 @@ func HostileSinks(state *world.State, stance AttackStanceTracker) func(*npc.Host
 	return func(h *npc.Hostile) event.Sink { return &hostileSink{world: state, stance: stance, h: h} }
 }
 
+// HostileSinks is the package HostileSinks whose sinks show the NPCs' views
+// with the crest l adds to them.
+func (l *GameClientLink) HostileSinks(state *world.State, stance AttackStanceTracker) func(*npc.Hostile) event.Sink {
+	return func(h *npc.Hostile) event.Sink { return &hostileSink{world: state, stance: stance, h: h, link: l} }
+}
+
 // hostileSink maps one hostile NPC's events to packets for its observers.
 type hostileSink struct {
 	world  *world.State
 	stance AttackStanceTracker
 	h      *npc.Hostile
 	known  world.KnownBuffer
+	// link adds the crest to the NPC's view; nil adds none.
+	link *GameClientLink
 }
 
 // Emit maps ev to the frame every known observer receives.
@@ -75,9 +83,9 @@ func (s *hostileSink) Emit(ev event.Event) {
 	case event.HPChanged:
 		s.broadcastHP()
 	case event.AbnormalEffectChanged:
-		broadcastNPCView(&s.known, s.world, h, false)
+		broadcastNPCView(s.link, &s.known, s.world, h, false)
 	case event.NPCInfoChanged:
-		broadcastNPCView(&s.known, s.world, h, e.ServerObject)
+		broadcastNPCView(s.link, &s.known, s.world, h, e.ServerObject)
 	case event.MoveTypeChanged:
 		s.broadcast(func() wire.Frame { return frames.ChangeMoveType(h.ObjectID(), e.Running) })
 	case event.Flight:
@@ -239,7 +247,9 @@ func (s *effectPointSink) Emit(ev event.Event) {
 	case event.SkillLaunched:
 		frame = frames.SkillLaunched(s.ep.ObjectID(), e.SkillID, e.Level, e.TargetIDs)
 	case event.NPCInfoChanged:
-		broadcastNPCView(&s.known, s.world, s.ep, e.ServerObject)
+		// A signet point's template serves no residence: its view carries
+		// no crest.
+		broadcastNPCView(nil, &s.known, s.world, s.ep, e.ServerObject)
 		return
 	default:
 		return
@@ -258,12 +268,13 @@ type decorationSink struct {
 	world *world.State
 	d     *npc.Decoration
 	known world.KnownBuffer
+	link  *GameClientLink
 }
 
 // Emit sends every known observer the decoration's view ev asks for.
 func (s *decorationSink) Emit(ev event.Event) {
 	if e, ok := ev.(event.NPCInfoChanged); ok {
-		broadcastNPCView(&s.known, s.world, s.d, e.ServerObject)
+		broadcastNPCView(s.link, &s.known, s.world, s.d, e.ServerObject)
 	}
 }
 

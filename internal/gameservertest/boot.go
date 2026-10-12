@@ -151,6 +151,7 @@ type options struct {
 	teleports              travel.TeleportTable
 	instantTeleports       travel.InstantTable
 	freeTeleport           bool
+	showNPCCrest           bool
 	teleportClock          func() time.Time
 	tradeClock             func() time.Time
 	zones                  *zone.Index
@@ -1032,6 +1033,9 @@ type Server struct {
 	// folkSinks builds the sinks fixture civilian NPCs report to, carrying
 	// out a clan hall manager's AI requests through the link.
 	folkSinks func(*npc.Folk) event.Sink
+	// hostileSinks builds the sinks fixture hostile NPCs report to, showing
+	// their views with the link's crests.
+	hostileSinks func(*npc.Hostile) event.Sink
 	// rewardParties resolves a kill's party for the hostiles the suite spawns.
 	rewardParties gamemanager.RewardParties
 	// raidKills credits the raid boss kills of the hostiles the suite
@@ -1040,9 +1044,6 @@ type Server struct {
 	// lootChannels resolves the command channel that wins a raid boss's
 	// loot rights for the hostiles the suite spawns.
 	lootChannels gamemanager.LootChannels
-	// stance is the stance tracker the link was wired with, nil when none
-	// was; fixture NPCs report their attack stances to it.
-	stance network.AttackStanceTracker
 	// maxGeoPathFail is each fixture hostile's MaxGeopathFailCount.
 	maxGeoPathFail int
 	// decay is the corpse-decay task WithDecay supplied; nil when none was.
@@ -2106,6 +2107,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Teleports:        o.teleports,
 		InstantTeleports: o.instantTeleports,
 		FreeTeleport:     o.freeTeleport,
+		ShowNPCCrest:     o.showNPCCrest,
 		TeleportClock:    o.teleportClock,
 		TradeClock:       o.tradeClock,
 		Zones:            o.zones,
@@ -2519,10 +2521,10 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		effectEnv:           effectEnv,
 		castEffects:         gcl.HostileCastEffects(),
 		folkSinks:           gcl.FolkSinks(state, gclConfig.AttackStance),
+		hostileSinks:        gcl.HostileSinks(state, gclConfig.AttackStance),
 		rewardParties:       o.rewardParties(gcl),
 		raidKills:           gcl,
 		lootChannels:        o.lootChannels(gcl),
-		stance:              gclConfig.AttackStance,
 		maxGeoPathFail:      o.maxGeoPathFailCount,
 		zones:               o.zones,
 		decay:               o.decay,

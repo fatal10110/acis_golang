@@ -85,6 +85,7 @@ type gameplayConfig struct {
 	MaxGeoPathFailCount      maxGeoPathFailCount
 	DisableRaidCurse         raidCursesDisabled
 	FreeTeleport             freeTeleport
+	ShowNPCCrest             npcCrestShown
 	RaidMultipliers          npc.RaidMultipliers
 	NpcAI                    npc.AIConfig
 	BossWaits                script.BossWaitTimes
@@ -217,6 +218,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.FreeTeleport, err = loadFreeTeleport(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.ShowNPCCrest, err = loadShowNPCCrest(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.RaidMultipliers, err = loadRaidMultipliers(paths); err != nil {
@@ -812,6 +816,18 @@ func loadFreeTeleport(paths gameServerPaths) (freeTeleport, error) {
 		return false, err
 	}
 	return freeTeleport(config.NewFields(props, "free teleport").Bool("FreeTeleport", false)), nil
+}
+
+// npcCrestShown is npcs.properties ShowNpcCrest: when true, an NPC's
+// NpcInfo shows the crests of the clan owning the residence it serves.
+type npcCrestShown bool
+
+func loadShowNPCCrest(paths gameServerPaths) (npcCrestShown, error) {
+	props, err := config.LoadFile(paths.NpcsConfigPath)
+	if err != nil {
+		return false, err
+	}
+	return npcCrestShown(config.NewFields(props, "show npc crest").Bool("ShowNpcCrest", false)), nil
 }
 
 // loadRaidMultipliers reads the npcs.properties RaidDefenceMultiplier,
