@@ -40,6 +40,7 @@ func assertCreatureSay(t *testing.T, frame []byte, objectID, typ int32, name, te
 // AnnouncementData.showAnnouncements). An automatic announcement is not
 // read at login.
 func TestEnterWorldBurstReadsLoginAnnouncements(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
@@ -92,6 +93,7 @@ func readAnnouncement(c *testsupport.ScriptedClient, d time.Duration) []byte {
 // seconds into the three-second initial delay, which pins the first fire to
 // boot rather than to login.
 func TestBootAutomaticAnnouncementRepeats(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),

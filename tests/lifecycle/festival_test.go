@@ -24,6 +24,7 @@ import (
 // Ann and Bob, dusk festival 4 scored 150 by Cid, and dusk festival 0
 // scored 99 in cycle 0.
 func TestRecordFestivalPageListsTheCycleBestScores(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
@@ -89,6 +90,7 @@ func changerOver(t *testing.T, srv *gameservertest.Server) (state *sevensigns.St
 // started during recruiting has counted one already: the seeded 1 becomes
 // 3.
 func TestRecruitingEndCountsAFestivalCycle(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
@@ -112,6 +114,7 @@ func TestRecruitingEndCountsAFestivalCycle(t *testing.T) {
 // row's festival cycle and accumulated bonuses go back to zero. The
 // earlier cycle's scores stay.
 func TestSealValidationEndResetsTheFestival(t *testing.T) {
+	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),

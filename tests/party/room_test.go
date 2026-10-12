@@ -37,6 +37,7 @@ func encodeSay(typ int32, text string) []byte {
 //   - Withdrawing tells the others S1_LEFT_PARTY_ROOM and drops the row
 //     (mode 2); the leaver's window closes, then PARTY_ROOM_EXITED.
 func TestPartyRoomOpenBrowseEnterLeave(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}, {"Third", 50}}, spawnRegions())
 	leader, member, third := g.players[0], g.players[1], g.players[2]
 
@@ -128,6 +129,7 @@ func TestPartyRoomOpenBrowseEnterLeave(t *testing.T) {
 // shown both rows again, mode 1, and PARTY_ROOM_LEADER_CHANGED), then the
 // old leader leaves as any member does.
 func TestPartyRoomLeaderLeavingHandsOver(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}, {"Third", 40}}, spawnRegions())
 	leader, member, third := g.players[0], g.players[1], g.players[2]
 	id := g.openRoom(t, leader, "Go")
@@ -158,6 +160,7 @@ func TestPartyRoomLeaderLeavingHandsOver(t *testing.T) {
 // window with PARTY_ROOM_DISBANDED. Neither works for anyone but the
 // leader (a deliberate refusal: the reference disbands any room by id).
 func TestPartyRoomOustAndDismiss(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}}, spawnRegions())
 	leader, member := g.players[0], g.players[1]
 	id := g.openRoom(t, leader, "Go")
@@ -202,6 +205,7 @@ func TestPartyRoomOustAndDismiss(t *testing.T) {
 // room as RequestJoinPartyRoom does, and an answer with nothing pending is
 // TARGET_IS_NOT_FOUND_IN_THE_GAME.
 func TestPartyRoomInvitation(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}, {"Third", 40}}, spawnRegions())
 	leader, member, third := g.players[0], g.players[1], g.players[2]
 	id := g.openRoom(t, leader, "Go")
@@ -251,6 +255,7 @@ func TestPartyRoomInvitation(t *testing.T) {
 //     (CANNOT_DISMISS_PARTY_MEMBER) nor withdraw; nor can the leader while
 //     in a party.
 func TestPartyRoomFollowsParty(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}, {"Third", 40}, {"Fourth", 50}}, spawnRegions())
 	leader, member, third, fourth := g.players[0], g.players[1], g.players[2], g.players[3]
 	g.invite(t, 0, 1, 0)
@@ -322,6 +327,7 @@ func TestPartyRoomFollowsParty(t *testing.T) {
 // TestPartyRoomLeavesWithPlayer pins a player leaving the world: out of
 // its room (the others told it left), and a lone leader's room is gone.
 func TestPartyRoomLeavesWithPlayer(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}, {"Third", 40}}, spawnRegions())
 	leader, member, third := g.players[0], g.players[1], g.players[2]
 	id := g.openRoom(t, leader, "Go")
@@ -358,6 +364,7 @@ func TestPartyRoomLeavesWithPlayer(t *testing.T) {
 // member revising, or a player off the waiting list opening a room,
 // changes nothing and hears nothing.
 func TestPartyRoomRevise(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}, {"Third", 40}}, spawnRegions())
 	leader, member, third := g.players[0], g.players[1], g.players[2]
 	id := g.openRoom(t, leader, "Go")

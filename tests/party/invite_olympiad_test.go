@@ -15,6 +15,7 @@ import (
 // match is over.
 
 func TestInviteSilentlyRefusedInOlympiad(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name       string
 		competitor int
@@ -42,6 +43,7 @@ func TestInviteSilentlyRefusedInOlympiad(t *testing.T) {
 }
 
 func TestInviteOlympiadRefusalOrder(t *testing.T) {
+	t.Parallel()
 	t.Run("party check first", func(t *testing.T) {
 		g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}, {"Third", 40}})
 		g.invite(t, 0, 1, 0)

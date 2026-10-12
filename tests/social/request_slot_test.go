@@ -13,6 +13,7 @@ import (
 // request of any kind refuses the invitation with WAITING_FOR_ANOTHER_REPLY
 // and a failed FriendAddRequestResult.
 func TestFriendInviteToTargetHoldingPartyInvitation(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.enterAll(t)
 	carol, _ := p.third(t, "player3", "Carol")
@@ -35,6 +36,7 @@ func TestFriendInviteToTargetHoldingPartyInvitation(t *testing.T) {
 // to it. Nobody becomes friends, nobody hears anything, and the trade
 // request still holds its target.
 func TestFriendAnswerLeavesTradeRequest(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.enterAll(t)
 	carol, _ := p.third(t, "player3", "Carol")
