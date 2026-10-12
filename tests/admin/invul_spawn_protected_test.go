@@ -18,8 +18,9 @@ const actedNotice = "As you acted, you are no longer under spawn protection."
 // protection (L2GameClientPacket.run: runImpl, then onActionRequest): after
 // its handler. A spawn-protected GM with its flag off reads invulnerable, so
 // //invul turns the flag off and says "invulnerable"; the protection then
-// ends, notice ahead of UserInfo, and the GM is left vulnerable. Chat and a
-// frame that fails to decode leave the protection on.
+// ends, notice ahead of UserInfo, and the GM is left vulnerable. Chat, an
+// acting frame that fails to decode, and an extended frame that names no
+// handler leave the protection on.
 func TestAdminInvulWhileSpawnProtected(t *testing.T) {
 	t.Parallel()
 	srv, gmID := bootAdmin(t, adminLevel, gameservertest.WithSpawnProtection(time.Minute))
@@ -29,18 +30,24 @@ func TestAdminInvulWhileSpawnProtected(t *testing.T) {
 		t.Fatal("GM entered the world without spawn protection")
 	}
 
-	// Neither a Say2 cut short, which never reaches a handler, nor a Say2
-	// counts as acting. The chat line is the barrier: exchange's own barrier
-	// packet would act.
+	// None of these reaches a handler that acts: a build command cut short
+	// fails to decode (the one underflow a minute tolerates), an extended
+	// frame without its sub-opcode or with an unknown one names no handler,
+	// and chat never counts as acting. The chat line is the barrier:
+	// exchange's own barrier packet would act.
+	unknownExtended := wire.NewPacketWriter(clientpackets.OpcodeExtended)
+	unknownExtended.WriteUint16(0xffff)
 	chat := testsupport.SyncBarrierFrames(t, srv.Client, func() {
-		srv.Client.Send(wire.NewPacketWriter(clientpackets.OpcodeSay2).Bytes())
+		srv.Client.Send(wire.NewPacketWriter(clientpackets.OpcodeSendBypassBuildCmd).Bytes())
+		srv.Client.Send([]byte{clientpackets.OpcodeExtended, 0x01})
+		srv.Client.Send(unknownExtended.Bytes())
 		srv.Client.Send(encodeSay("hello"))
 	}, serverpackets.OpcodeCreatureSay)
 	if len(chat) != 0 {
-		t.Fatalf("malformed chat and chat answered %x ahead of the chat line", testsupport.FrameOpcodes(chat))
+		t.Fatalf("frames that never acted answered %x ahead of the chat line", testsupport.FrameOpcodes(chat))
 	}
 	if !gm.SpawnProtected() {
-		t.Fatal("chat or a malformed frame ended spawn protection")
+		t.Fatal("chat, a malformed frame or an unknown extended frame ended spawn protection")
 	}
 
 	frames := exchange(t, srv.Client, encodeBuildCmd("invul"))

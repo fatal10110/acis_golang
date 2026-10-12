@@ -67,9 +67,9 @@ func TestReadFramePartialFrameLogLevels(t *testing.T) {
 	}
 
 	for name, partial := range map[string][]byte{
-		"one header byte":    {0x47},
-		"short payload":      []byte("GET / HTTP/1.0"),
-		"header, no payload": {0x10, 0x00},
+		"one header byte":  {0x47},
+		"short payload":    []byte("GET / HTTP/1.0"),
+		"one payload byte": {0x10, 0x00, 0x01},
 	} {
 		probe := testsupport.Dial(t, srv.Addr())
 		hangUpMidFrame(probe.Conn(), partial)
