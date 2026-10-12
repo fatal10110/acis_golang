@@ -40,8 +40,8 @@ func TestClanWarDeathDrop(t *testing.T) {
 			w := bootAllianceCast(t, nil, stmts, gameservertest.WithDeathDrop(rules))
 			founderChar := onlineCharacter(t, w.srv, w.leaderID)
 			onPlayerQueue(t, w.srv, w.leaderID, func() {
-				founderChar.AddRewardItem(potionID, 5, 0x7f200001)
-				founderChar.AddRewardItem(tunicID, 1, 0x7f200002)
+				founderChar.AddRewardItem(potionID, 5, true, func() (int32, error) { return 0x7f200001, nil })
+				founderChar.AddRewardItem(tunicID, 1, true, func() (int32, error) { return 0x7f200002, nil })
 			})
 			drainFrames(t, w.leader)
 

@@ -187,12 +187,7 @@ func (l *GameClientLink) redeemDerbyTicket(live *livePlayer, redeem *derby.Redem
 		live.SendFrame(serverpackets.FrameSystemMessageNumber(serverpackets.SystemMessageEarnedS1Adena, redeem.Payout))
 		return
 	}
-	id, err := l.nextObjectID()
-	if err != nil {
-		l.log.Error().Err(err).Msg("derby: allocate race payout")
-		return
-	}
-	live.AddRewardItem(item.AdenaID, int(redeem.Payout), id)
+	live.AddRewardItem(item.AdenaID, int(redeem.Payout), false, l.nextObjectID)
 }
 
 // derbyHolder reads a player's inventory for a race manager.

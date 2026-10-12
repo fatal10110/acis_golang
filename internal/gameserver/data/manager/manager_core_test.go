@@ -99,8 +99,8 @@ func (l *lootKiller) ConsumeHerb(itemID int32) bool {
 
 func (l *lootKiller) ObjectID() int32 { return l.id }
 
-func (l *lootKiller) AddRewardItem(itemID int32, count int, objectID int32) bool {
-	if objectID == 0 {
+func (l *lootKiller) AddRewardItem(itemID int32, count int, _ bool, nextID func() (int32, error)) bool {
+	if id, err := nextID(); err != nil || id == 0 {
 		return false
 	}
 	if l.items == nil {

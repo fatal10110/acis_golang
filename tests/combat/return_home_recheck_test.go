@@ -35,7 +35,7 @@ func TestReturnHomeRecoverySkipsWanderRecheck(t *testing.T) {
 			if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
 				t.Fatalf("CurrentIntention() = %v, want wander", got)
 			}
-			assertChangeMoveType(t, mustRead(t, c, "wander walk stance"), hostile.ObjectID(), false)
+			assertStanceShown(t, c, "wander walk stance", hostile.ObjectID(), false)
 			assertFrameOpcode(t, mustRead(t, c, "wander move"), serverpackets.OpcodeMoveToLocation, "wander move")
 			if !hostile.IsMoving() {
 				t.Fatal("IsMoving() = false before return home")
@@ -123,13 +123,14 @@ func TestReturnHomeRecoveryFromThinkLoop(t *testing.T) {
 		panic("think loop deadlocked on the recovery teleport")
 	}
 
-	// The wander step forces walk stance first; skip to the teleport.
+	// The wander step forces walk stance first, shown with ChangeMoveType
+	// and NpcInfo; skip to the teleport.
 	for {
 		frame := c.ReadWithTimeout(time.Second)
 		if frame == nil {
 			t.Fatal("TeleportToLocation never arrived")
 		}
-		if frame[0] != serverpackets.OpcodeChangeMoveType {
+		if frame[0] != serverpackets.OpcodeChangeMoveType && frame[0] != serverpackets.OpcodeNPCInfo {
 			assertNPCTeleportFrames(t, c, frame, hostile.ObjectID(), home)
 			break
 		}

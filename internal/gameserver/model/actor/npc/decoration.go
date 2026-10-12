@@ -121,10 +121,14 @@ func (d *Decoration) NPCInfoSnapshot() npcinfo.Snapshot {
 }
 
 // ServerObjectInfoSnapshot is NPCInfoSnapshot with the server-side name
-// always shown, the view an NPC that cannot move is announced with.
+// always shown, the view an NPC that cannot move is announced with. It
+// shows the decoration attackable, with its full HP: like any civilian NPC
+// it may be attacked by force, though it can never be targeted.
 func (d *Decoration) ServerObjectInfoSnapshot() npcinfo.Snapshot {
 	s := d.NPCInfoSnapshot()
 	s.Name = d.Instance.Name()
+	s.Attackable = true
+	s.CurrentHP, s.MaxHP = d.stats.maxHP, d.stats.maxHP
 	return s
 }
 

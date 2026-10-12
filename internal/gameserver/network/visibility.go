@@ -82,12 +82,12 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 		}
 		p.describeState(o, o.CastControl())
 	case *npc.Hostile:
-		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
+		p.sendVisibilityFrame(npcViewFrame(o, p, false))
 		p.describeState(o, o.CastControl())
 	case *npc.Decoration:
-		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
+		p.sendVisibilityFrame(npcViewFrame(o, p, false))
 	case *npc.Folk:
-		p.sendVisibilityFrame(serverpackets.FrameNPCInfo(o.NPCInfoSnapshot()))
+		p.sendVisibilityFrame(npcViewFrame(o, p, false))
 		p.describeState(o, o.CastControl())
 	case *summon.Actor:
 		if o.ShownAsOwnedBy(p.ObjectID()) {

@@ -326,15 +326,20 @@ func (c *Character) RewardItemFits(itemID int32, count int) bool {
 	return c.inventory != nil && c.inventory.ValidateCapacityByItemID(itemID, count)
 }
 
-// AddRewardItem creates and adds one kill-reward item stack to this live
-// character's inventory, then runs ItemAdded's side effects: adena names
-// its amount, anything else its template and count. objectID must be
-// allocated by the reward caller.
-func (c *Character) AddRewardItem(itemID int32, count int, objectID int32) bool {
-	if c.inventory == nil {
+// AddRewardItem creates count units of itemID in this live character's
+// inventory the way an auto-looted reward arrives, then runs ItemAdded's
+// side effects for the whole count: adena names its amount, anything else
+// its template and count. A stackable item joins the held stack or starts
+// one; a non-stackable one arrives as count single instances when multiple
+// (server.properties MultipleItemDrop), else as one. nextID allocates the
+// object id of each instance actually created, so units joining a held
+// stack take none. It reports whether anything was added.
+func (c *Character) AddRewardItem(itemID int32, count int, multiple bool, nextID func() (int32, error)) bool {
+	if c.inventory == nil || count < 1 || nextID == nil {
 		return false
 	}
-	if c.inventory.AddNew(itemID, count, objectID) == nil {
+	tmpl, ok := c.inventory.Templates().Get(itemID)
+	if !ok || c.addByTemplate(tmpl, count, multiple, nextID) == 0 {
 		return false
 	}
 	notice := event.ObtainCreated
@@ -393,7 +398,7 @@ func (c *Character) createItem(itemID int32, count int, nextID func() (int32, er
 	if tmpl.EtcItem != nil && tmpl.EtcItem.Type == item.EtcItemHerb {
 		return c.ConsumeHerb(itemID)
 	}
-	count = c.addByTemplate(tmpl, count, nextID)
+	count = c.addByTemplate(tmpl, count, true, nextID)
 	if count == 0 {
 		return false
 	}
@@ -413,21 +418,25 @@ func (c *Character) AddCraftedItem(itemID int32, count int, nextID func() (int32
 	if !ok {
 		return 0
 	}
-	return c.addByTemplate(tmpl, count, nextID)
+	return c.addByTemplate(tmpl, count, true, nextID)
 }
 
 // addByTemplate adds count units of tmpl: a stackable joins the held stack
-// or starts one, and a non-stackable arrives as one instance per unit. It
-// returns how many units were added.
-func (c *Character) addByTemplate(tmpl *item.Template, count int, nextID func() (int32, error)) int {
+// or starts one, and a non-stackable arrives as one instance per unit when
+// multiple, else as one instance. nextID is asked for an id only for an
+// instance actually created. It returns how many units were added.
+func (c *Character) addByTemplate(tmpl *item.Template, count int, multiple bool, nextID func() (int32, error)) int {
 	instances := 1
-	if !tmpl.Stackable {
+	if !tmpl.Stackable && multiple {
 		instances = count
 	}
 	added := 0
 	for range instances {
-		id, err := nextID()
-		if err != nil || c.inventory.AddNew(tmpl.ID, count, id) == nil {
+		inst, err := c.inventory.AddCreated(tmpl.ID, count, nextID)
+		if err != nil {
+			c.log.Error().Err(err).Int32("item_id", tmpl.ID).Msg("allocate item id")
+		}
+		if inst == nil {
 			break
 		}
 		added++
