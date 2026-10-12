@@ -6,7 +6,8 @@
 // in progress whose battlefield holds a point), At (the siege whose
 // battlefield holds a point), Get (a castle's siege),
 // Siege.InProgress, Siege.Side, Siege.CheckSides, Siege.OnOppositeSides,
-// Engine.Registered and the kill counters.
+// Engine.Registered, the clan rules' reads (Registration, Fighting,
+// Opposed, StateOf) and the kill counters; Forget drops a destroyed clan.
 package siege
 
 import (

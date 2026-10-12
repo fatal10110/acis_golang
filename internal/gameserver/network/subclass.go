@@ -519,8 +519,7 @@ func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChan
 		// which does not show them: a noble's skills, with its skill list
 		// and UserInfo; a hero's skills on the base class, which the
 		// status takes away on a subclass, with its skill list; then the
-		// clan's skills, and a clan leader's siege skills after them once
-		// sieges exist (#3150).
+		// clan's skills, and a clan leader's siege skills after them.
 		if c.IsNoble() {
 			l.giveNobleSkills(c)
 			live.SendFrame(serverpackets.FrameSkillList(skillListEntries(c, l.skills)))
@@ -531,6 +530,9 @@ func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChan
 		}
 		if cl, ok := l.clanService().ClanOf(c); ok {
 			l.giveClanSkills(live, cl, c.PledgeClass())
+			if l.leadsSiegeClan(live, cl) {
+				l.giveSiegeSkills(live)
+			}
 		}
 		// The death penalty's passive stats are not a learned skill's:
 		// they stay through the change, as the reference gives them back.

@@ -329,8 +329,8 @@ func (s *Service) removeLocked(cl *Clan, objectID int32, joinExpiry int64, live 
 }
 
 // ApplyLeft clears the clan state of m, removed at now, on its live
-// character; it runs on that character's queue. A noble keeps its title.
-// An academy member leaves without a join penalty. A personal surrender is
+// character; it runs on that character's queue. A noble keeps its title;
+// the siege state clears. An academy member leaves without a join penalty. A personal surrender is
 // forgotten, so it does not follow the character into its next clan.
 func (s *Service) ApplyLeft(c *player.Character, m Member, now time.Time) {
 	s.applyLeft(c, m, s.joinExpiry(now))
@@ -342,6 +342,7 @@ func (s *Service) applyLeft(c *player.Character, m Member, joinExpiry int64) {
 	clearLeaverTitle(c)
 	c.SetClanID(0)
 	c.SetWantsPeace(false)
+	c.SetSiegeState(player.SiegeStateNone)
 	if m.PledgeType != SubunitAcademy {
 		c.SetClanJoinExpiryTime(joinExpiry)
 	}

@@ -371,12 +371,22 @@ type Town struct {
 	// default; special event towns may disable it).
 	Peaceful bool
 	// CombatRule adjusts town combat handling: 0 applies peace normally,
-	// 1 keeps siege participants flagged (needs InSiege), 2 disables the
-	// peace flag townwide.
+	// 1 raises neither flag for a player taking part in a siege (a
+	// Besieger with a siege state), 2 disables the peace flag townwide.
 	CombatRule int
-	// InSiege reports whether the player currently takes part in a siege;
-	// consulted only under CombatRule 1. Nil means no siege participation.
-	InSiege func(a Actor) bool
+}
+
+// Besieger is implemented by the player actors that may take part in a
+// siege.
+type Besieger interface {
+	// SiegeState is the player's siege state, 0 outside any siege.
+	SiegeState() int32
+}
+
+// inSiege reports whether a is a player taking part in a siege.
+func inSiege(a Actor) bool {
+	b, ok := a.(Besieger)
+	return ok && a.Class() == ClassPlayer && b.SiegeState() != 0
 }
 
 // NewTown builds a peaceful town zone with no town or castle link; the
@@ -391,7 +401,7 @@ func (z *Town) Core() *Zone { return &z.Zone }
 func (z *Town) affects(Actor) bool { return true }
 
 func (z *Town) enter(a Actor) {
-	if z.CombatRule == 1 && a.Class() == ClassPlayer && z.InSiege != nil && z.InSiege(a) {
+	if z.CombatRule == 1 && inSiege(a) {
 		return
 	}
 	if z.raisesPeace() {

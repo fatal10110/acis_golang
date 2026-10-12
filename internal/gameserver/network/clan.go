@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 )
 
 // The clan window requests answer nothing when the player has no clan, or
@@ -17,10 +18,11 @@ import (
 
 // enterWorldClan sends the clan part of the login burst, on live's queue
 // before it spawns: the clan's skill list, then live is given the clan
-// skills its rank reaches (shown by the burst's SkillList), its fellow
-// members learn it logged in, and it gets its own roster row and the
-// rosters, the main clan's then each sub-unit's. The siege state (#3150)
-// joins here once it exists.
+// skills its rank reaches and, leading a clan of siege level, the siege
+// skills (shown by the burst's SkillList); its fellow members learn it
+// logged in; it is told when its clan's hall lease is unpaid; it takes the
+// siege state of a siege in progress its clan fights; and it gets its own
+// roster row and the rosters, the main clan's then each sub-unit's.
 func (l *GameClientLink) enterWorldClan(client *Client, live *livePlayer) {
 	c := live.Character
 	cl, ok := l.clanService().ClanOf(c)
@@ -30,6 +32,9 @@ func (l *GameClientLink) enterWorldClan(client *Client, live *livePlayer) {
 	client.Session.SendFrame(framePledgeSkillList(cl))
 	cl.SetOnline(c.ID, clan.LiveMember(c))
 	l.giveClanSkills(live, cl, c.PledgeClass())
+	if l.leadsSiegeClan(live, cl) {
+		l.giveSiegeSkills(live)
+	}
 	m, _ := cl.Member(c.ID)
 	row := liveMemberRow(c, m)
 	l.broadcastToClan(cl, c.ID,
@@ -37,6 +42,13 @@ func (l *GameClientLink) enterWorldClan(client *Client, live *livePlayer) {
 			return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageClanMemberS1LoggedIn, c.CharacterName())
 		},
 		func() wire.Frame { return serverpackets.FramePledgeShowMemberListUpdate(row) })
+	if l.halls.LeaseUnpaid(cl.ID()) {
+		// Sent with its lease left blank, as the reference sends it.
+		client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageClanHallPaymentDueTomorrowS1))
+	}
+	if state := l.sieges.StateOf(cl.ID()); state != siege.StateNone {
+		c.SetSiegeState(int32(state))
+	}
 	client.Session.SendFrame(serverpackets.FramePledgeShowMemberListUpdate(row))
 	for _, frame := range l.pledgeListFrames(cl, live) {
 		client.Session.SendFrame(frame)
@@ -177,6 +189,9 @@ func (l *GameClientLink) requestAnswerJoinPledge(live *livePlayer, req clientpac
 		sendJoinRefusal(requester, cl, c.CharacterName(), refusal)
 	} else {
 		l.giveClanSkills(live, cl, rank)
+		if state := l.sieges.StateOf(cl.ID()); state != siege.StateNone {
+			c.SetSiegeState(int32(state))
+		}
 		l.sendJoinedClan(live, cl)
 	}
 	l.clanService().Invites().Answered(c.ID)

@@ -327,6 +327,18 @@ func (hs *Halls) ByOwner(clanID int32) (int32, bool) {
 	return 0, false
 }
 
+// LeaseUnpaid reports whether clan clanID owns a hall whose lease is
+// unpaid: the day of grace before the hall is taken back.
+func (hs *Halls) LeaseUnpaid(clanID int32) bool {
+	if hs == nil || clanID == 0 {
+		return false
+	}
+	hs.mu.Lock()
+	defer hs.mu.Unlock()
+	h := hs.byOwnerLocked(clanID)
+	return h != nil && !h.paid
+}
+
 func (hs *Halls) byOwnerLocked(clanID int32) *hall {
 	for _, h := range hs.order {
 		if h.ownerID == clanID {

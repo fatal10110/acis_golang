@@ -15,7 +15,7 @@ import (
 // clan header, or, with no delay configured, destroyed at once; either way
 // the leader then loses a full death's experience.
 func (l *GameClientLink) dissolveClan(live *livePlayer) {
-	cl, result := l.clanService().RequestDissolve(live.Character, time.Now())
+	cl, result := l.clanService().RequestDissolve(live.Character, time.Now(), l.sieges)
 	var msg int
 	switch result {
 	case clan.DissolveNotLeader:
@@ -26,6 +26,10 @@ func (l *GameClientLink) dissolveClan(live *livePlayer) {
 		msg = serverpackets.SystemMessageCannotDissolveWhileInWar
 	case clan.DissolveOwnsResidence:
 		msg = serverpackets.SystemMessageCannotDissolveOwningResidence
+	case clan.DissolveSiegeRegistered:
+		msg = serverpackets.SystemMessageCannotDissolveSiegeRegistered
+	case clan.DissolveInSiege:
+		msg = serverpackets.SystemMessageCannotDissolveWhileInSiege
 	case clan.DissolveInProgress:
 		msg = serverpackets.SystemMessageDissolutionInProgress
 	case clan.DissolveScheduled:
@@ -60,10 +64,11 @@ func (l *GameClientLink) DissolveDue(cl *clan.Clan) {
 	l.destroyClan(cl, nil, true)
 }
 
-// destroyClan destroys cl (clan.Service.Destroy; due as there): every
-// member in the world is told the clan dispersed, then leaves it as a
-// member who withdrew does, its clan tab cleared; the clan warehouse's
-// items are destroyed. An offline member of a clan holding a castle has
+// destroyClan destroys cl (clan.Service.Destroy; due as there): the clan
+// leaves every siege it was registered on; every member in the world is
+// told the clan dispersed, then leaves it as a member who withdrew does,
+// its siege state cleared and its clan tab cleared, the leader losing its
+// siege skills; the clan warehouse's items are destroyed. An offline member of a clan holding a castle has
 // its circlets put back in its inventory (unequipLeaverCirclets). A member
 // in the world keeps them on: the reference checks its items while it
 // still holds the clan, where they pass, but here the clan has already
@@ -82,6 +87,7 @@ func (l *GameClientLink) destroyClan(cl *clan.Clan, actor *livePlayer, due bool)
 	if !ok {
 		return
 	}
+	l.sieges.Forget(cl.ID())
 	l.destroyClanWarehouse(cl.ID())
 	type leaver struct {
 		live *livePlayer
@@ -106,7 +112,11 @@ func (l *GameClientLink) destroyClan(cl *clan.Clan, actor *livePlayer, due bool)
 	})
 	for _, lv := range leavers {
 		onMemberQueue(actor, lv.live, func() {
-			l.clanService().ApplyDispersed(lv.live.Character, lv.m, lv.m.ObjectID == out.LeaderID, now)
+			leader := lv.m.ObjectID == out.LeaderID
+			l.clanService().ApplyDispersed(lv.live.Character, lv.m, leader, now)
+			if leader {
+				l.takeSiegeSkills(lv.live)
+			}
 			l.sendLeftClan(lv.live, cl)
 		})
 	}

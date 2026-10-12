@@ -18,14 +18,15 @@ import (
 // and the attacker stays where it was revived.
 func TestSiegeAttackerRevivedDuringWaitStays(t *testing.T) {
 	t.Parallel()
-	// The battlefield spans x -1000..1000; the attacker lies at its east edge
-	// and the healer stands in cast range outside it.
-	srv, objID, _ := bootSiegeRestart(t, siegeRestarter{side: "ATTACKER", x: 900},
+	// The battlefield spans x -1000..300; the attacker, sent at login to the
+	// town restart point on it, lies near its east edge and the healer
+	// stands in cast range outside it.
+	srv, objID, _ := bootSiegeRestart(t, siegeRestarter{side: "ATTACKER", fieldEast: 300},
 		gameservertest.WithSkills(combatPersistence(t, []modelskill.Definition{resurrectSkill()})))
 	victim := srv.Client
 	healer := srv.SeedCharacterFor(t, "healer", "Healer", 5, 0)
 	seedKnownSkill(t, srv, healer.ID, resurrectSkillID, 1)
-	if _, err := srv.DB.ExecContext(context.Background(), "UPDATE characters SET x = 1150 WHERE obj_Id = ?", healer.ID); err != nil {
+	if _, err := srv.DB.ExecContext(context.Background(), "UPDATE characters SET x = 550, y = 400, z = -300 WHERE obj_Id = ?", healer.ID); err != nil {
 		t.Fatalf("place healer: %v", err)
 	}
 	hc := srv.DialClient(t, "healer", 1)
@@ -48,8 +49,8 @@ func TestSiegeAttackerRevivedDuringWaitStays(t *testing.T) {
 		t.Fatal("accepted resurrection left the attacker dead")
 	}
 	revivedAt := siegeRestarterAt(t, srv, objID)
-	if revivedAt.X != 900 {
-		t.Fatalf("revived at %+v, want x 900", revivedAt)
+	if !nearAny(revivedAt, []location.Location{townRestartPoint}) {
+		t.Fatalf("revived at %+v, want where it lay, by %+v", revivedAt, townRestartPoint)
 	}
 	drainUntilQuiet(t, victim)
 
