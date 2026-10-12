@@ -58,8 +58,11 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 		// never selected, and the reference answers no packet either.
 		return
 	}
-	_, ground := target.(*grounditem.Item)
-	if ground {
+	ground, isGround := target.(*grounditem.Item)
+	if isGround {
+		if l.refuseTicketPickup(live, ground) {
+			return
+		}
 		if inPostureTransition(live) {
 			if live.DenyAIAction() {
 				live.SendFrame(serverpackets.FrameActionFailed())

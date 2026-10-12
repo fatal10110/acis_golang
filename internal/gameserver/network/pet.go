@@ -363,7 +363,11 @@ func (l *GameClientLink) petUseItem(ctx context.Context, live *livePlayer, req c
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePetPutOnS1, res.ItemID))
 }
 
+// broadcastGroundPickup shows every viewer of ground pickerID picking it
+// up. A mercenary ticket picked up off a castle's grounds no longer counts
+// there.
 func (l *GameClientLink) broadcastGroundPickup(ground *grounditem.Item, pickerID int32) {
+	l.forgetPickedTicket(ground)
 	if l.world == nil {
 		return
 	}

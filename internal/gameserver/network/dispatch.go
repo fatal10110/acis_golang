@@ -149,6 +149,8 @@ type idAllocator interface {
 type groundItemDropper interface {
 	Drop(*grounditem.Item, task.DropOptions)
 	Remove(*grounditem.Item)
+	SetKept(func(itemID int32, x, y, z int) bool)
+	Each(func(*grounditem.Item))
 }
 
 const (
@@ -992,6 +994,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.skillHandlers.Register(takeCastleHandler{l: link})
 	link.chance = &actorcast.ChanceProcs{Definitions: link.skills, Targets: link.targets, Skills: link.skillHandlers, Deliver: link.deliverChanceCast}
 	link.wireZones(link.zones)
+	link.wireCastleTickets()
 	return link, nil
 }
 

@@ -108,6 +108,9 @@ type GroundItems struct {
 
 	mu    sync.RWMutex
 	items map[int32]groundItemEntry
+	// kept reports whether an item dropped at a point is never destroyed
+	// for want of a special time; see SetKept.
+	kept func(itemID int32, x, y, z int) bool
 }
 
 // NewGroundItems returns an empty ground-item owner.
@@ -154,6 +157,28 @@ func (g *GroundItems) Drop(ground *grounditem.Item, opts DropOptions) {
 		return
 	}
 	g.track(ground, g.destroyDelay(ground, opts.PlayerDropped), lootExpiresAt)
+}
+
+// SetKept sets fn to report whether an item, neither a herb nor equipment
+// nor given its own destroy time, dropped at the point (x, y, z) stays on
+// the ground until picked up: a castle's mercenary ticket on its grounds.
+func (g *GroundItems) SetKept(fn func(itemID int32, x, y, z int) bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.kept = fn
+}
+
+// Each runs fn on every tracked item.
+func (g *GroundItems) Each(fn func(*grounditem.Item)) {
+	g.mu.RLock()
+	items := make([]*grounditem.Item, 0, len(g.items))
+	for _, entry := range g.items {
+		items = append(items, entry.item)
+	}
+	g.mu.RUnlock()
+	for _, it := range items {
+		fn(it)
+	}
 }
 
 // Load restores previously saved ground items and clears their persisted
@@ -264,6 +289,17 @@ func (g *GroundItems) track(ground *grounditem.Item, delay time.Duration, lootEx
 	g.mu.Unlock()
 }
 
+func (g *GroundItems) keptAt(ground *grounditem.Item) bool {
+	g.mu.RLock()
+	kept := g.kept
+	g.mu.RUnlock()
+	if kept == nil {
+		return false
+	}
+	x, y, z := ground.Position()
+	return kept(ground.ItemID(), x, y, z)
+}
+
 func (g *GroundItems) destroyDelay(ground *grounditem.Item, playerDropped bool) time.Duration {
 	delay, ok := g.opts.SpecialAutoDestroy[ground.ItemID()]
 	if !ok {
@@ -272,6 +308,8 @@ func (g *GroundItems) destroyDelay(ground *grounditem.Item, playerDropped bool) 
 			delay = g.opts.HerbAutoDestroy
 		case ground.Equipable():
 			delay = g.opts.EquipableAutoDestroy
+		case g.keptAt(ground):
+			delay = 0
 		default:
 			delay = g.opts.ItemAutoDestroy
 		}
