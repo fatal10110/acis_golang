@@ -6,8 +6,11 @@
 #      image's runtime user;
 #   3. the db service's first start loads the schema through
 #      initdb/10-acis-schema.sh: every table file in a stub datapack is
-#      loaded, and a datapack without tools/full_install.sql stops the
-#      container instead of leaving it serving an empty database.
+#      loaded, and a datapack without tools/full_install.sql makes that
+#      container start exit non-zero. This runs one start through compose
+#      run, which applies no restart policy; under compose up, restart:
+#      always still brings db back healthy with an empty acis database
+#      (#3696).
 #
 # The stub datapack keeps this independent of an aCis_datapack checkout, so
 # it checks the compose mounts and the init script, not the real 65-table

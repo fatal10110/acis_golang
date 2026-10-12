@@ -114,7 +114,10 @@ command yet ([#3369](https://github.com/fatal10110/acis_golang/issues/3369)).
 
 CI runs `ops/docker/smoke-test.sh` on every change. It checks that `docker-compose.yml` parses,
 that the image builds and each of its binaries starts, and that the `db` service's first start
-loads every table file of a stub datapack and stops when `tools/full_install.sql` is missing. It
+loads every table file of a stub datapack. It also checks that one first start without
+`tools/full_install.sql` exits non-zero; that start goes through `compose run`, which applies no
+restart policy, so it does not cover the `restart: always` restart that leaves `docker compose up`
+serving an empty database ([#3696](https://github.com/fatal10110/acis_golang/issues/3696)). It
 does not load the real datapack schema
 ([#3697](https://github.com/fatal10110/acis_golang/issues/3697)). To run it locally, stop any
 compose database first: the `db` container name is fixed.
