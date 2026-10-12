@@ -155,26 +155,29 @@ func (m *Manager) All() []*Castle {
 	return append([]*Castle(nil), m.order...)
 }
 
-// ByNPC returns the castle whose residence NPCs or holy artifacts include
-// npcID.
+// ByNPC returns the castle whose residence NPCs include npcID.
 func (m *Manager) ByNPC(npcID int) (*Castle, bool) {
 	if m == nil {
 		return nil, false
 	}
 	for _, c := range m.order {
-		if slices.Contains(c.NPCs, npcID) || c.ArtifactNPC(npcID) {
+		if slices.Contains(c.NPCs, npcID) {
 			return c, true
 		}
 	}
 	return nil, false
 }
 
-// ForNPC returns the castle an NPC of template npcID belongs to when maker
-// (nil for none) placed it: the castle the residence id of the maker's
+// ForNPC returns the castle the NPC objectID, of template npcID, belongs
+// to when maker (nil for none) placed it: the castle that placed it as one
+// of its holy artifacts, else the castle the residence id of the maker's
 // spawn time names, none when that id names a siegable clan hall instead
 // (as siegableHall, nil for none, reports), else the castle whose
 // residence NPCs include npcID.
-func (m *Manager) ForNPC(npcID int, maker *spawn.Maker, siegableHall func(id int) bool) (*Castle, bool) {
+func (m *Manager) ForNPC(objectID int32, npcID int, maker *spawn.Maker, siegableHall func(id int) bool) (*Castle, bool) {
+	if c, ok := m.ByArtifact(objectID); ok {
+		return c, true
+	}
 	if id, ok := maker.ResidenceParam(); ok {
 		if c, ok := m.Get(id); ok {
 			return c, true

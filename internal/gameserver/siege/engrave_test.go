@@ -104,20 +104,57 @@ func TestSiegeEndWipesEngravings(t *testing.T) {
 		t.Fatal("one artifact took the castle")
 	}
 	gludio.End()
-	if gludio.Engrave(w.clan(rivals), 502) {
-		t.Fatal("an engraving outlived the siege's end")
+	w.e.mu.Lock()
+	left := len(gludio.engraved)
+	w.e.mu.Unlock()
+	if left != 0 {
+		t.Fatalf("%d engravings outlived the siege's end", left)
 	}
 }
 
-// TestArtifactResidence pins ArtifactSpawnLocation.spawnMe's
-// Npc.setResidence: a holy artifact belongs to the castle it is placed
-// for, though its template is none of the castle's residence NPCs.
+// TestEngraveAfterEnd pins that an engraving landing once the siege is over
+// records and tells nothing and takes no castle, though the check its cast
+// ran passed while the siege was fought.
+func TestEngraveAfterEnd(t *testing.T) {
+	w := twoArtifactWorld(t)
+	gludio := w.siege(1)
+	gludio.End()
+	w.notes.take()
+	for _, id := range []int32{501, 502} {
+		if gludio.Engrave(w.clan(rivals), id) {
+			t.Fatalf("engraving %d after the end took the castle", id)
+		}
+	}
+	expectLines(t, "engrave after end", w.notes.take(), nil)
+	w.e.mu.Lock()
+	left := len(gludio.engraved)
+	w.e.mu.Unlock()
+	if left != 0 {
+		t.Fatalf("%d engravings recorded after the end", left)
+	}
+}
+
+// TestArtifactResidence pins the residence a placed holy artifact is given
+// as it spawns: it belongs to the castle that placed it, though its
+// template is none of the castle's residence NPCs, while another NPC of
+// the same template belongs to no castle.
 func TestArtifactResidence(t *testing.T) {
 	w := twoArtifactWorld(t)
-	if c, ok := w.castles.ByNPC(35322); !ok || c.ID != 1 {
-		t.Fatalf("ByNPC(artifact) = %v, %v; want Gludio", c, ok)
+	for _, id := range []int32{501, 502} {
+		if c, ok := w.castles.ByArtifact(id); !ok || c.ID != 1 {
+			t.Fatalf("ByArtifact(%d) = %v, %v; want Gludio", id, c, ok)
+		}
+		if c, ok := w.castles.ForNPC(id, 35322, nil, nil); !ok || c.ID != 1 {
+			t.Fatalf("ForNPC(placed artifact %d) = %v, %v; want Gludio", id, c, ok)
+		}
 	}
-	if c, ok := w.castles.ForNPC(35322, nil, nil); !ok || c.ID != 1 {
-		t.Fatalf("ForNPC(artifact) = %v, %v; want Gludio", c, ok)
+	if c, ok := w.castles.ByArtifact(503); ok {
+		t.Fatalf("ByArtifact(another copy) = %v; want none", c)
+	}
+	if c, ok := w.castles.ForNPC(503, 35322, nil, nil); ok {
+		t.Fatalf("ForNPC(another copy of the artifact) = %v; want none", c)
+	}
+	if c, ok := w.castles.ByNPC(35322); ok {
+		t.Fatalf("ByNPC(artifact template) = %v; want none", c)
 	}
 }

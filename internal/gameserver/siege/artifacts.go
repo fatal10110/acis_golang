@@ -19,6 +19,10 @@ func (s *Siege) Engrave(cl *clan.Clan, artifactID int32) bool {
 	}
 	var fx effects
 	s.e.mu.Lock()
+	if s.status != StatusInProgress {
+		s.e.mu.Unlock()
+		return false
+	}
 	if s.engraved == nil {
 		s.engraved = map[int32]int32{}
 	}

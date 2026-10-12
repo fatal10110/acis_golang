@@ -34,6 +34,24 @@ func (c *Castle) ArtifactIDs() []int32 {
 	return slices.Clone(c.artifacts)
 }
 
+// ByArtifact returns the castle that placed the NPC objectID as one of its
+// holy artifacts. Another NPC of an artifact's template belongs to no
+// castle by being one.
+func (m *Manager) ByArtifact(objectID int32) (*Castle, bool) {
+	if m == nil {
+		return nil, false
+	}
+	for _, c := range m.order {
+		c.mu.Lock()
+		placed := slices.Contains(c.artifacts, objectID)
+		c.mu.Unlock()
+		if placed {
+			return c, true
+		}
+	}
+	return nil, false
+}
+
 // ArtifactNPC reports whether npcID is the template of one of the castle's
 // artifacts.
 func (c *Castle) ArtifactNPC(npcID int) bool {
