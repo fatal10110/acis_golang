@@ -49,7 +49,7 @@ func TestPrivateStaysAPrivateWhenItsMasterDies(t *testing.T) {
 	if got := minion.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("CurrentIntention() = %v, want wander after the master died", got)
 	}
-	assertChangeMoveType(t, mustRead(t, c, "ChangeMoveType"), minion.ObjectID(), false)
+	assertStanceShown(t, c, "ChangeMoveType", minion.ObjectID(), false)
 	dest := moveToLocationDest(t, mustRead(t, c, "MoveToLocation"))
 	offset := 60 * 3
 	if absInt(dest.X-current.X) > offset || absInt(dest.Y-current.Y) > offset || dest.Z != current.Z {

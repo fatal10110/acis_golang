@@ -451,7 +451,7 @@ func TestReturnHomeForceWalkStanceBroadcast(t *testing.T) {
 	if hostile.Running() {
 		t.Fatal("Running() = true after ordinary ReturnHome, want walk stance")
 	}
-	if got, want := rec.Events(), []event.Event{event.MoveTypeChanged{Running: false}}; !reflect.DeepEqual(got, want) {
+	if got, want := rec.Events(), []event.Event{event.MoveTypeChanged{Running: false}, event.NPCInfoChanged{}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("events = %+v, want %+v", got, want)
 	}
 }
@@ -695,7 +695,7 @@ func TestSiegeGuardReturnHomeForceRunStanceBroadcast(t *testing.T) {
 	if !hostile.Running() {
 		t.Fatal("Running() = false after SiegeGuard ReturnHome, want run stance")
 	}
-	if got, want := rec.Events(), []event.Event{event.MoveTypeChanged{Running: true}}; !reflect.DeepEqual(got, want) {
+	if got, want := rec.Events(), []event.Event{event.MoveTypeChanged{Running: true}, event.NPCInfoChanged{}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("events = %+v, want %+v", got, want)
 	}
 }

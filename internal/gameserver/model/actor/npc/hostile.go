@@ -426,7 +426,10 @@ func (h *Hostile) AbnormalEffect() int {
 	return int(h.abnormalEffect.Load()) | h.EffectList().CrowdControlAbnormalEffect()
 }
 
-// NPCInfoSnapshot captures this NPC's current client-visible state.
+// NPCInfoSnapshot captures this NPC's current client-visible state. Its
+// attackable flag is the one shown to no particular viewer: a living
+// Monster-family NPC; a per-viewer view sets it from
+// AttackableWithoutForceBy instead.
 func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 	tmpl := h.Instance.Template
 	x, y, z := h.Position()
@@ -439,7 +442,7 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 	}
 	pAtkSpd := h.AttackSpeed()
 	return npcinfo.Snapshot{
-		ObjectID: h.ObjectID(), TemplateID: tmpl.TemplateID, Attackable: true,
+		ObjectID: h.ObjectID(), TemplateID: tmpl.TemplateID, Attackable: h.MonsterKind() && !h.AlikeDead(),
 		X: x, Y: y, Z: z, Heading: h.Heading(),
 		MAtkSpd: h.MagicAttackSpeed(), PAtkSpd: pAtkSpd,
 		RunSpd: int(tmpl.RunSpeed), WalkSpd: int(tmpl.WalkSpeed),

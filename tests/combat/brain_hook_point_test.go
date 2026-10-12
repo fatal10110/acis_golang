@@ -142,7 +142,7 @@ func TestBrainArrivalOutsideTerritoryWalksHome(t *testing.T) {
 		t.Fatalf("CurrentIntention() after the arrival = %v, want the finished walk kept", got)
 	}
 
-	step("the idle cycle", cycle, serverpackets.OpcodeChangeMoveType)
+	step("the idle cycle", cycle, serverpackets.OpcodeChangeMoveType, serverpackets.OpcodeNPCInfo)
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
 		t.Fatalf("CurrentIntention() after the idle cycle = %v, want %v", got, ai.IntentionIdle)
 	}

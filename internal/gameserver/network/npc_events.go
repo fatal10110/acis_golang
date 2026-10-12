@@ -75,13 +75,9 @@ func (s *hostileSink) Emit(ev event.Event) {
 	case event.HPChanged:
 		s.broadcastHP()
 	case event.AbnormalEffectChanged:
-		s.broadcast(func() wire.Frame { return frames.Info(h.NPCInfoSnapshot()) })
+		broadcastNPCView(&s.known, s.world, h, false)
 	case event.NPCInfoChanged:
-		if e.ServerObject {
-			s.broadcast(func() wire.Frame { return frames.ObjectInfo(h.ServerObjectInfoSnapshot()) })
-			return
-		}
-		s.broadcast(func() wire.Frame { return frames.Info(h.NPCInfoSnapshot()) })
+		broadcastNPCView(&s.known, s.world, h, e.ServerObject)
 	case event.MoveTypeChanged:
 		s.broadcast(func() wire.Frame { return frames.ChangeMoveType(h.ObjectID(), e.Running) })
 	case event.Flight:
@@ -243,7 +239,7 @@ func (s *effectPointSink) Emit(ev event.Event) {
 	case event.SkillLaunched:
 		frame = frames.SkillLaunched(s.ep.ObjectID(), e.SkillID, e.Level, e.TargetIDs)
 	case event.NPCInfoChanged:
-		broadcastKnown(&s.known, s.world, s.ep, func() wire.Frame { return npcViewFrame(s.ep, e.ServerObject) })
+		broadcastNPCView(&s.known, s.world, s.ep, e.ServerObject)
 		return
 	default:
 		return
@@ -257,22 +253,6 @@ func (s *effectPointSink) Emit(ev event.Event) {
 	})
 }
 
-// npcView is an NPC with both client views.
-type npcView interface {
-	NPCInfoSnapshot() npcinfo.Snapshot
-	ServerObjectInfoSnapshot() npcinfo.Snapshot
-}
-
-// npcViewFrame is v's stationary view when serverObject is set, its full
-// view otherwise.
-func npcViewFrame(v npcView, serverObject bool) wire.Frame {
-	frames := serverpackets.NpcFrameBuilder{}
-	if serverObject {
-		return frames.ObjectInfo(v.ServerObjectInfoSnapshot())
-	}
-	return frames.Info(v.NPCInfoSnapshot())
-}
-
 // decorationSink shows one placed decoration's observers its view again.
 type decorationSink struct {
 	world *world.State
@@ -283,7 +263,7 @@ type decorationSink struct {
 // Emit sends every known observer the decoration's view ev asks for.
 func (s *decorationSink) Emit(ev event.Event) {
 	if e, ok := ev.(event.NPCInfoChanged); ok {
-		broadcastKnown(&s.known, s.world, s.d, func() wire.Frame { return npcViewFrame(s.d, e.ServerObject) })
+		broadcastNPCView(&s.known, s.world, s.d, e.ServerObject)
 	}
 }
 
