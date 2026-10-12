@@ -125,7 +125,8 @@ func (g *makerGroup) Every(d time.Duration, fn func()) *sim.Ticker {
 // to uninitialized. Its slots are dropped first, so no maker hook runs for
 // the deleted NPCs and no respawn comes back; a master's privates leave
 // with it. Each NPC is out of the world, its decayed hooks run, when it
-// returns.
+// returns. The NPCs decay on the calling goroutine, without waiting for
+// their own queues (the npc package's off-queue delete contract).
 func (g *makerGroup) DeleteAll() {
 	n := g.n
 	var ids []int32
@@ -484,7 +485,8 @@ func (n *Npcs) MakerEvent(maker, name string, int1, int2 int) bool {
 }
 
 // deleteLive deletes the live NPC id at once, with no corpse, on the
-// calling goroutine: its spawn slot answers as for a decayed corpse.
+// calling goroutine, without waiting for the NPC's own queue: its spawn
+// slot answers as for a decayed corpse.
 func (n *Npcs) deleteLive(id int32) {
 	obj, ok := n.state.Object(id)
 	if !ok {
