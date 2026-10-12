@@ -79,12 +79,15 @@ func TestPartyTimersBringLeaderAndPrivateBackIntoTerritory(t *testing.T) {
 	w.srv.ReadQueued(t, w.srv.Client)
 	private := privatesOf(t, leader, 1)[0]
 	// The hit set both on the character. Drop their attack desires but not
-	// their hate, and let an AI turn pick something else: the checks below
-	// drop the hate.
+	// their hate, and let the AI cycles pick something else: the checks below
+	// drop the hate. The hit's attack was latched as the next intention, and
+	// clearing the queue leaves that latch set. The second cycle steps the
+	// latched attack once more, and that cycle's idle keeps the intention, so
+	// only the third cycle moves both off ATTACK.
 	for _, h := range []*npc.Hostile{leader, private} {
 		w.onQueue(t, h, func() { h.AI().Desires().Clear() })
 	}
-	w.ticks(t, 2)
+	w.ticks(t, 3)
 	w.srv.ReadQueued(t, w.srv.Client)
 	for _, h := range []*npc.Hostile{leader, private} {
 		if got := h.AI().CurrentIntention(); got == actorai.IntentionAttack {
