@@ -11,6 +11,7 @@ import (
 	featuretutorial "github.com/fatal10110/acis_golang/internal/gameserver/script/feature/tutorial"
 	quest001 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q001"
 	quest023 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q023"
+	quest070 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q070"
 	quest211 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q211"
 	quest234 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q234"
 	quest235 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q235"
@@ -23,10 +24,16 @@ import (
 	quest607 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q607"
 	quest646 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q646"
 	quest651 "github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q651"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/thirdclass"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/noblesseteleporter"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/primevalsummoner"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scenario"
 )
+
+// scenarioSagas is the saga family the scenario catalog's saga core and
+// sagas share, as the server's quest catalog builds one. Its cells key the
+// fights by NPC, so the scenarios' servers never share an entry.
+var scenarioSagas = thirdclass.NewFamily()
 
 // scenarioScripts are the ported scripts a quest scenario may list, by
 // scripts.xml path, as the server's catalogs map them; the newbie helper
@@ -40,6 +47,7 @@ var scenarioScripts = script.Catalog{
 	"script.teleport.PrimevalSummoner":   primevalsummoner.New,
 	"quest.Q001_LettersOfLove":           quest001.New,
 	"quest.Q023_LidiasHeart":             quest023.New,
+	"quest.Q070_SagaOfThePhoenixKnight":  func() script.Script { return quest070.New(scenarioSagas) },
 	"quest.Q211_TrialOfTheChallenger":    quest211.New,
 	"quest.Q234_FatesWhisper":            quest234.New,
 	"quest.Q235_MimirsElixir":            quest235.New,
@@ -52,6 +60,7 @@ var scenarioScripts = script.Catalog{
 	"quest.Q607_ProveYourCourage":        quest607.New,
 	"quest.Q646_SignsOfRevolt":           quest646.New,
 	"quest.Q651_RunawayYouth":            quest651.New,
+	"quest.ThirdClassQuest":              func() script.Script { return thirdclass.NewCore(scenarioSagas) },
 }
 
 // TestScenarios plays every quest scenario of testdata/scenarios through
