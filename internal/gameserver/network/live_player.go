@@ -88,8 +88,14 @@ type livePlayer struct {
 	// follow carry the result, so those refreshes stay silent. Written on
 	// the owner's queue; atomic for the Emit readers.
 	replayingEffects atomic.Bool
-	shortcuts        *shortcut.List
-	macros           *macro.List
+	// replayMayDie is set for the replay window of a player that entered
+	// it alive: a damage-over-time tick due on the loading screen may kill
+	// it there, before it is in the world. Every frame its own client would
+	// get from then on is dropped (see deathOnLoadingScreen). Written on the
+	// owner's queue; atomic for the send paths.
+	replayMayDie atomic.Bool
+	shortcuts    *shortcut.List
+	macros       *macro.List
 	// board is the player's community board session; owned by its queue.
 	board boardSession
 	// duelCondition is what the player's duel saved of it when it began;

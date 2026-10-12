@@ -348,18 +348,17 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// icon refresh's place in the enter-world sequence: the replay's one
 	// icon refresh (List.Restore) fires the AbnormalStatusUpdate frame (if
 	// any effect was restored) right where it belongs, ahead of
-	// EtcStatusUpdate.
-	live.replayingEffects.Store(true)
-	if l.skills != nil {
-		l.skills.ReplayEffects(c)
+	// EtcStatusUpdate. Decide the restored load's penalty band only once
+	// the replayed effects and the equipped items have set the weight
+	// limit, and inside the silent replay window: the EtcStatusUpdate below
+	// and every later login frame carry the band, and sendLoginWeight
+	// reports the change between UserInfo and ItemList.
+	if l.replaySavedEffects(live, c.RefreshWeightPenalty) {
+		// A tick due on the loading screen killed the player, silently: its
+		// icon refresh went with the death's frames, and the burst shows
+		// what the death left. The Die frame follows ShortCutInit.
+		l.updateEffectIcons(live)
 	}
-	// Decide the restored load's penalty band only now that the replayed
-	// effects and the equipped items have set the weight limit, and inside
-	// the silent replay window: the EtcStatusUpdate below and every later
-	// login frame carry the band, and sendLoginWeight reports the change
-	// between UserInfo and ItemList.
-	c.RefreshWeightPenalty()
-	live.replayingEffects.Store(false)
 	client.Session.SendFrame(serverpackets.FrameEtcStatusUpdate(etcStatus(c)))
 	l.enterWorldClan(client, live)
 	// The Seal of Strife skill follows the clan block, ahead of the spawn.

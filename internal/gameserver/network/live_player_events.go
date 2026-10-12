@@ -17,7 +17,7 @@ import (
 // detached it releases frame and reports false. While frames wait for the
 // player's PvP flag changes, frame waits behind them (sendBehindPvPChanges).
 func (p *livePlayer) SendFrame(frame wire.Frame) bool {
-	if p.session == nil || p.SessionDetached() {
+	if p.session == nil || p.SessionDetached() || p.deathOnLoadingScreen() {
 		frame.Release()
 		return false
 	}
@@ -34,11 +34,19 @@ func (p *livePlayer) sendFrameNow(frame wire.Frame, visibility bool) bool {
 	if visibility {
 		send = p.visibilitySend
 	}
-	if send == nil || (p.Character != nil && p.SessionDetached()) {
+	if send == nil || (p.Character != nil && (p.SessionDetached() || p.deathOnLoadingScreen())) {
 		frame.Release()
 		return false
 	}
 	return send(frame)
+}
+
+// deathOnLoadingScreen reports whether p died in the effect replay of a
+// player not yet in the world: a restored damage-over-time tick due on the
+// loading screen killed it. That death runs silently; the EnterWorld burst
+// shows it.
+func (p *livePlayer) deathOnLoadingScreen() bool {
+	return p.replayMayDie.Load() && p.Dead()
 }
 
 // sendHeldFrame sends a frame that waited behind the player's PvP flag
