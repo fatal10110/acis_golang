@@ -2,7 +2,9 @@ package script
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 // NewQuestState adds to p's journal a state of the script, created, and
@@ -15,19 +17,23 @@ func (s *Script) NewQuestState(p *Player) *QuestState {
 func (qs *QuestState) IsCompleted() bool { return qs.Status() == questlog.StatusCompleted }
 
 // WorldNPC returns an NPC of npcID in the world, the first one met; nil
-// when there is none.
+// when there is none. The scan copies nothing and wraps only the NPC it
+// returns.
 func (s *Script) WorldNPC(npcID int32) *NPC {
 	if s.env.World == nil {
 		return nil
 	}
-	for _, obj := range s.env.World.Objects() {
-		c, ok := obj.(attackable.Combatant)
-		if !ok {
-			continue
+	found := s.env.World.FindObject(func(obj world.Tracked) bool {
+		switch o := obj.(type) {
+		case *npc.Hostile:
+			return int32(o.NpcID()) == npcID
+		case *npc.Folk:
+			return int32(o.NpcID()) == npcID
 		}
-		if n := NPCOf(c); n != nil && n.NpcID() == npcID {
-			return n
-		}
+		return false
+	})
+	if found == nil {
+		return nil
 	}
-	return nil
+	return NPCOf(found.(attackable.Combatant))
 }
