@@ -29,12 +29,21 @@ type DataReloads struct {
 	CursedWeapons func() (*entity.CursedWeaponTable, error)
 	// HTML reloads the HTML pages (HtmCache.reload).
 	HTML func() error
+	// Items reloads the item templates. Tables that resolved or checked
+	// item ids against the templates when they were read (multisells,
+	// buylists, NPC drops) are not read again; each has its own reload.
+	Items func() error
 	// Multisells reloads the multisell lists (MultisellData.reload).
 	Multisells func() error
 	// NPCs reloads the NPC templates (NpcData.reload); NPCs already in the
 	// world keep theirs, and so do the respawns of spawns already in place
 	// (ASpawn's template is fixed when the spawn is built).
 	NPCs func() error
+	// Skills reloads the skill definitions. Tables that resolved or
+	// checked skills against them when they were read (NPC templates,
+	// cursed weapons, the scheme buffer) are not read again; NPC templates
+	// and cursed weapons have their own reload.
+	Skills func() error
 	// WalkerRoutes reloads the walker routes (WalkerRouteData.reload).
 	WalkerRoutes func() error
 	// Teleports reads the gatekeeper destinations, which the link's
@@ -52,8 +61,8 @@ type DataReloads struct {
 var errReloadNotPorted = errors.New("reload not ported yet")
 
 // reloadNotPorted answers a type no reload exists for yet, each tracked by
-// its issue: boat (#3404), buylist (#3405), config (#3406), door (#3407),
-// item (#3408), skill (#3409) and zone (#3410).
+// its issue: boat (#3404), buylist (#3405), config (#3406), door (#3407)
+// and zone (#3410).
 func reloadNotPorted(*GameClientLink) error { return errReloadNotPorted }
 
 // reloadHook runs hook, errReloadNotPorted without one.
@@ -87,12 +96,12 @@ var reloadTypes = []reloadType{
 	{word: "cw", done: "Cursed weapons have been reloaded.", run: (*GameClientLink).reloadCursedWeapons},
 	{word: "door", done: "Doors instance has been reloaded.", run: reloadNotPorted},
 	{word: "htm", done: "The HTM cache has been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.HTML) }},
-	{word: "item", done: "Items' templates have been reloaded.", run: reloadNotPorted},
+	{word: "item", done: "Items' templates have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Items) }},
 	{word: "multisell", exact: true, done: "The multisell instance has been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Multisells) }},
 	{word: "npc", exact: true, done: "NPCs templates have been reloaded; scripts were not reloaded.", run: (*GameClientLink).reloadNPCs},
 	{word: "npcwalker", done: "Walking routes have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.WalkerRoutes) }},
 	{word: "script", exact: true, done: "Script reload is not supported; scripts load once, at server start.", run: reloadNothing},
-	{word: "skill", done: "Skills' XMLs have been reloaded.", run: reloadNotPorted},
+	{word: "skill", done: "Skills' XMLs have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Skills) }},
 	{word: "teleport", done: "Teleport locations have been reloaded.", run: (*GameClientLink).reloadTeleports},
 	{word: "zone", done: "Zones have been reloaded.", run: reloadNotPorted},
 }
