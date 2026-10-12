@@ -344,12 +344,18 @@ where the reference asks an NPC to walk a route (A13).
      one state. The reference resolves the name case-insensitively but looks up the state by
      the exact name, so each such row adds another state of the same quest, holding only
      that row's variable, and the quest window can list the quest more than once.
-   - A `<state>` naming no status is neither started nor completed. A `<cond>` that is not an
-     int reads 0. A `<flags>` that is not an int reads as no flags; the quest window then shows
-     the flags `<cond>` gives. In the reference these reads throw. A bad `<state>` aborts the
-     QuestList build: nothing is sent on request, and EnterWorld skips the rest of its burst.
-     A bad `<cond>` or `<flags>` throws while the packet is written, which sends a truncated
+   - A `<state>` naming no status is neither started nor completed. In the quest window and in
+     a condition change, a `<cond>` that is not an int reads 0 (a script reading the condition
+     still panics, as the reference throws, and the help page that reads it is not shown). A
+     `<flags>` that is not an int reads as no flags; the quest window then shows the flags
+     `<cond>` gives. In the reference these reads throw. A bad `<state>` aborts the QuestList
+     build: nothing is sent on request, and EnterWorld skips the rest of its burst. A bad
+     `<cond>` or `<flags>` throws while the packet is written, which sends a truncated
      QuestList. A condition change on such a state aborts before it writes; Go goes ahead.
+   - A bad `<state>` on any real quest makes every QuestList build throw, so in the reference
+     a condition change or quest exit of any quest stops after its variable writes: no quest
+     window, no quest mark, no item take, no exit row update, and the rest of the hook does
+     not run. Go goes ahead.
 
 Everything else follows the reference, including its quirks (abort by id, the 25-quest check
 only at talk, the abnormal-status dispatch list).
