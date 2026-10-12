@@ -44,6 +44,8 @@ const (
 	halishaID   = 27219
 	scarabID    = 21646
 
+	sepulchersArchonID = 18212
+
 	amulet3rd   = 7330
 	amulet5th   = 7392
 	amulet6th   = 7423
@@ -101,6 +103,7 @@ func bootSaga(t *testing.T, cond int, items map[int32]int32, opts ...gameservert
 	kinds := map[int32]script.NPCKind{
 		tablet3ID: script.KindFolk, tablet6ID: script.KindFolk, sedrickID: script.KindFolk, defenderID: script.KindFolk,
 		corruptedID: script.KindHostile, attackerID: script.KindHostile, halishaID: script.KindHostile, scarabID: script.KindHostile,
+		sepulchersArchonID: script.KindHostile,
 	}
 	w := bootSeamQuest(t, 76, chatPages(shippedQuestPages(t, q070Name), tablet3ID, tablet6ID, sedrickID, defenderID),
 		func(srv *gameservertest.Server, objID int32) {
@@ -130,13 +133,17 @@ func bootSaga(t *testing.T, cond int, items map[int32]int32, opts ...gameservert
 }
 
 // sagaMate brings a second Paladin into the world beside the player, its
-// saga started at cond; with party, it joins the player's party. It
-// returns the mate's object id and client.
-func sagaMate(t *testing.T, w *dialogWorld, cond int, party bool) (int32, *testsupport.ScriptedClient) {
+// saga started at cond, after running before (seeds that must precede the
+// selection); with party, it joins the player's party. It returns the
+// mate's object id and client.
+func sagaMate(t *testing.T, w *dialogWorld, cond int, party bool, before ...func(objID int32)) (int32, *testsupport.ScriptedClient) {
 	t.Helper()
 	srv := w.srv
 	mate := srv.SeedCharacterFor(t, "mate", "Mate", 76, 0).ID
 	sagaPlayer(t, srv, mate, cond)
+	for _, fn := range before {
+		fn(mate)
+	}
 	c := srv.DialClient(t, "mate", 1)
 	c.Send(encodeRequestGameStart(0))
 	readUntil(t, c, serverpackets.OpcodeCharSelected)
