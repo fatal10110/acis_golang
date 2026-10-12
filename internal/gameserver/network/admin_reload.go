@@ -30,6 +30,20 @@ type DataReloads struct {
 	// BoatRoutes reads the boat itineraries anew, which then replace the
 	// fleet's.
 	BoatRoutes func() ([]route.BoatItinerary, error)
+	// Config reads the game server properties files anew into the player
+	// settings, which then replace the ones in force, all at once. Each read
+	// of a setting after the swap sees the reloaded value, but some take it
+	// later or not at all:
+	//   - the settings a player or summon is built with (PlayerConfig's
+	//     player.Rules fields and a summon's MaxBuffsAmount and
+	//     RespawnRestoreHP) reach the players entering the world, and the
+	//     summons called, after the reload;
+	//   - Enchant, MagicFailures, CraftingDisabled and
+	//     KeepMaintainedIngredients keep their boot value: the enchant,
+	//     skill, craft and multisell services are built with them;
+	//   - every setting outside PlayerConfig keeps its boot value; the
+	//     composition root that builds this hook lists them.
+	Config func() (PlayerConfig, error)
 	// BuyLists reads the buylists anew, which the merchant then sells
 	// from, its limited stock rebuilt from the saved rows
 	// (BuyListManager.reload).
@@ -78,10 +92,6 @@ type DataReloads struct {
 // hook yet.
 var errReloadNotPorted = errors.New("reload not ported yet")
 
-// reloadNotPorted answers a type no reload exists for yet, tracked by its
-// issue: config (#3406).
-func reloadNotPorted(*GameClientLink) error { return errReloadNotPorted }
-
 // reloadHook runs hook, errReloadNotPorted without one.
 func reloadHook(hook func() error) error {
 	if hook == nil {
@@ -111,7 +121,7 @@ var reloadTypes = []reloadType{
 	{word: "announcement", done: "The content of announcements.xml has been reloaded.", run: func(l *GameClientLink) error { return l.announcements.Load() }},
 	{word: "boat", done: "Boat have been reloaded.", runFor: (*GameClientLink).reloadBoats},
 	{word: "buylist", done: "Buylists have been reloaded.", run: (*GameClientLink).reloadBuyLists},
-	{word: "config", done: "Configs files have been reloaded.", run: reloadNotPorted},
+	{word: "config", done: "Configs files have been reloaded.", run: (*GameClientLink).reloadConfig},
 	{word: "crest", done: "Crests have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Crests) }},
 	{word: "cw", done: "Cursed weapons have been reloaded.", run: (*GameClientLink).reloadCursedWeapons},
 	{word: "door", done: "Doors instance has been reloaded.", run: (*GameClientLink).reloadDoors},
@@ -196,6 +206,21 @@ func reloadNothing(*GameClientLink) error { return nil }
 // templates keep them.
 func (l *GameClientLink) reloadNPCs() error {
 	return reloadHook(l.reloads.NPCs)
+}
+
+// reloadConfig reads the properties files anew and puts the player settings
+// read in force in place of the ones before; a file that cannot be read
+// leaves them as they were.
+func (l *GameClientLink) reloadConfig() error {
+	if l.reloads.Config == nil {
+		return errReloadNotPorted
+	}
+	settings, err := l.reloads.Config()
+	if err != nil {
+		return err
+	}
+	l.playerSettings.Store(&settings)
+	return nil
 }
 
 // reloadTeleports reads the gatekeeper destinations anew and hands them to

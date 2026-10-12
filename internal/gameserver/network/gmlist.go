@@ -9,7 +9,7 @@ func (l *GameClientLink) registerGM(live *livePlayer) {
 	if !live.accessLevel().IsGM {
 		return
 	}
-	listed := !l.playerConfig.GMStartupUnlisted && l.admin.HasAccess("admin_gmlist", live.accessLevel())
+	listed := !l.playerConfig().GMStartupUnlisted && l.admin.HasAccess("admin_gmlist", live.accessLevel())
 	l.gms.Add(live, !listed)
 }
 

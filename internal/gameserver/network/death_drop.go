@@ -25,7 +25,7 @@ const deathDropOffset = 25
 // inventory changes reach live as the usual batched InventoryUpdate, and
 // observers see the gear change on live's next appearance refresh.
 func (l *GameClientLink) dropItemsOnDeath(live *livePlayer, e event.DeathItemDrop) {
-	rules := l.playerConfig.DeathDrop
+	rules := l.playerConfig().DeathDrop
 	if live.accessLevel().IsGM && !rules.GMDrops {
 		return
 	}

@@ -509,7 +509,7 @@ func (a *liveZoneActor) SwimStateChanged(swimming bool) {
 		return
 	}
 	l.broadcastCharacterInfo(live)
-	if l.water == nil || !l.playerConfig.AllowWater || live.Teleporting() {
+	if l.water == nil || !l.playerConfig().AllowWater || live.Teleporting() {
 		// A teleport stops the breath countdown itself, once the old
 		// neighborhood has been forgotten.
 		return

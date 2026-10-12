@@ -199,7 +199,7 @@ func (l *GameClientLink) subclassMenuAllowed(live *livePlayer) bool {
 // actions: one per SubclassDelay. A refused action answers nothing of its
 // own.
 func (l *GameClientLink) subclassActionAllowed(live *livePlayer) bool {
-	delay := l.playerConfig.SubclassDelay
+	delay := l.playerConfig().SubclassDelay
 	if delay <= 0 {
 		return true
 	}
@@ -223,7 +223,7 @@ func (l *GameClientLink) mayAddSubclass(live *livePlayer, subs []player.SubClass
 			return false
 		}
 	}
-	if l.playerConfig.SubclassWithoutQuests || live.IsNoble() {
+	if l.playerConfig().SubclassWithoutQuests || live.IsNoble() {
 		return true
 	}
 	return questCompleted(live.Character, fatesWhisperQuest) && questCompleted(live.Character, mimirsElixirQuest)

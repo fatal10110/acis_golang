@@ -287,7 +287,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			// The character-select reuse gate answers a refused delete
 			// with the deletion-failed reply; nothing else runs.
-			if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig.CharacterSelectDelay, time.Now()) {
+			if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig().CharacterSelectDelay, time.Now()) {
 				session.SendFrame(serverpackets.FrameCharDeleteFail(serverpackets.CharDeleteFailReasonDeletionFailed))
 				continue
 			}
@@ -344,7 +344,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			// The character-select reuse gate refuses a restore silently,
 			// leaving the client's character list untouched.
-			if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig.CharacterSelectDelay, time.Now()) {
+			if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig().CharacterSelectDelay, time.Now()) {
 				continue
 			}
 			if c, ok := slotCharacter(cs.chars, req.Slot); ok {
@@ -476,7 +476,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				continue
 			}
 			// The character-select reuse gate refuses a selection silently.
-			if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig.CharacterSelectDelay, time.Now()) {
+			if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig().CharacterSelectDelay, time.Now()) {
 				continue
 			}
 			c, ok := slotCharacter(cs.chars, req.Slot)
@@ -600,7 +600,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				session.SendFrame(serverpackets.FrameExSendManorList())
 			case clientpackets.OpcodeRequestSetSeed:
 				req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestSetSeed, error) {
-					return clientpackets.DecodeRequestSetSeed(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+					return clientpackets.DecodeRequestSetSeed(p, l.playerConfig().InventorySlots.MaxItemInPacket())
 				})
 				if err != nil {
 					if errors.Is(err, errMalformedPacketDisconnect) {
@@ -616,7 +616,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 			case clientpackets.OpcodeRequestSetCrop:
 				req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestSetCrop, error) {
-					return clientpackets.DecodeRequestSetCrop(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+					return clientpackets.DecodeRequestSetCrop(p, l.playerConfig().InventorySlots.MaxItemInPacket())
 				})
 				if err != nil {
 					if errors.Is(err, errMalformedPacketDisconnect) {
@@ -629,7 +629,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 				}
 			case clientpackets.OpcodeRequestProcureCropList:
 				req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestProcureCropList, error) {
-					return clientpackets.DecodeRequestProcureCropList(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+					return clientpackets.DecodeRequestProcureCropList(p, l.playerConfig().InventorySlots.MaxItemInPacket())
 				})
 				if err != nil {
 					if errors.Is(err, errMalformedPacketDisconnect) {
@@ -1119,7 +1119,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			// The dice gate belongs to this read loop, which stays parked
 			// in onLive while useItem runs, so the throw consults it there.
 			rollDice := func() bool {
-				return client.performFloodProtected(floodProtectorRollDice, l.playerConfig.RollDiceDelay, time.Now())
+				return client.performFloodProtected(floodProtectorRollDice, l.playerConfig().RollDiceDelay, time.Now())
 			}
 			onLive(cs.live, func() { l.useItem(cs.live, req.ObjectID, req.CtrlPressed, rollDice) })
 
@@ -1221,7 +1221,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			}
 			// A craft inside the manufacture reuse window is dropped
 			// silently, before anything else is looked at.
-			if !client.performFloodProtected(floodProtectorManufacture, l.playerConfig.ManufactureDelay, time.Now()) {
+			if !client.performFloodProtected(floodProtectorManufacture, l.playerConfig().ManufactureDelay, time.Now()) {
 				continue
 			}
 			if cs.live != nil {
@@ -1329,7 +1329,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			if cs.live != nil {
 				// The reuse gate is consulted only with a player in the
 				// world; a refused exchange still drops the open list.
-				allowed := client.performFloodProtected(floodProtectorMultisell, l.playerConfig.MultisellDelay, time.Now())
+				allowed := client.performFloodProtected(floodProtectorMultisell, l.playerConfig().MultisellDelay, time.Now())
 				onLive(cs.live, func() { l.requestMultiSellChoose(cs.live, req, allowed) })
 			}
 
@@ -1507,7 +1507,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			// An empty command returns before the bypass reuse gate is
 			// consulted, so it never consumes the cooldown; a refused
 			// command is dropped silently.
-			if req.Command != "" && !client.performFloodProtected(floodProtectorServerBypass, l.playerConfig.ServerBypassDelay, time.Now()) {
+			if req.Command != "" && !client.performFloodProtected(floodProtectorServerBypass, l.playerConfig().ServerBypassDelay, time.Now()) {
 				continue
 			}
 			onLive(cs.live, func() { l.requestBypassToServer(cs.live, req) })
@@ -1893,7 +1893,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 
 		case clientpackets.OpcodeRequestBuyItem:
 			req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestBuyItem, error) {
-				return clientpackets.DecodeRequestBuyItem(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+				return clientpackets.DecodeRequestBuyItem(p, l.playerConfig().InventorySlots.MaxItemInPacket())
 			})
 			if err != nil {
 				if errors.Is(err, errMalformedPacketDisconnect) {
@@ -1907,7 +1907,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 
 		case clientpackets.OpcodeRequestBuySeed:
 			req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestBuySeed, error) {
-				return clientpackets.DecodeRequestBuySeed(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+				return clientpackets.DecodeRequestBuySeed(p, l.playerConfig().InventorySlots.MaxItemInPacket())
 			})
 			if err != nil {
 				if errors.Is(err, errMalformedPacketDisconnect) {
@@ -1919,7 +1919,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			// a player in the world. A gated purchase answers nothing, as
 			// specified: the seed window's submit leaves no client action
 			// pending.
-			if !client.performFloodProtected(floodProtectorManor, l.playerConfig.ManorDelay, time.Now()) {
+			if !client.performFloodProtected(floodProtectorManor, l.playerConfig().ManorDelay, time.Now()) {
 				continue
 			}
 			if cs.live != nil {
@@ -1931,7 +1931,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 			// the refusal answers nothing, as specified, and leaves no
 			// client action pending.
 			req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestBuyProcure, error) {
-				return clientpackets.DecodeRequestBuyProcure(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+				return clientpackets.DecodeRequestBuyProcure(p, l.playerConfig().InventorySlots.MaxItemInPacket())
 			})
 			if err != nil {
 				if errors.Is(err, errMalformedPacketDisconnect) {
@@ -1979,7 +1979,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 
 		case clientpackets.OpcodeRequestSellItem:
 			req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestSellItem, error) {
-				return clientpackets.DecodeRequestSellItem(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+				return clientpackets.DecodeRequestSellItem(p, l.playerConfig().InventorySlots.MaxItemInPacket())
 			})
 			if err != nil {
 				if errors.Is(err, errMalformedPacketDisconnect) {
@@ -1993,7 +1993,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 
 		case clientpackets.OpcodeSendWarehouseDeposit:
 			req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.SendWarehouseDepositList, error) {
-				return clientpackets.DecodeSendWarehouseDepositList(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+				return clientpackets.DecodeSendWarehouseDepositList(p, l.playerConfig().InventorySlots.MaxItemInPacket())
 			})
 			if err != nil {
 				if errors.Is(err, errMalformedPacketDisconnect) {
@@ -2007,7 +2007,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 
 		case clientpackets.OpcodeSendWarehouseWithdraw:
 			req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.SendWarehouseWithdrawList, error) {
-				return clientpackets.DecodeSendWarehouseWithdrawList(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+				return clientpackets.DecodeSendWarehouseWithdrawList(p, l.playerConfig().InventorySlots.MaxItemInPacket())
 			})
 			if err != nil {
 				if errors.Is(err, errMalformedPacketDisconnect) {
@@ -2021,7 +2021,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 
 		case clientpackets.OpcodeRequestPackageSend:
 			req, err := decodeClientPacket(l, client, payload, func(p []byte) (clientpackets.RequestPackageSend, error) {
-				return clientpackets.DecodeRequestPackageSend(p, l.playerConfig.InventorySlots.MaxItemInPacket())
+				return clientpackets.DecodeRequestPackageSend(p, l.playerConfig().InventorySlots.MaxItemInPacket())
 			})
 			if err != nil {
 				if errors.Is(err, errMalformedPacketDisconnect) {
