@@ -13,6 +13,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -104,14 +105,31 @@ func opcodeIndex(frames [][]byte, opcode byte) int {
 	return -1
 }
 
+// buffServitor lands a lasting buff with an icon on servitor from its own
+// queue, then drains the owner's frames it caused.
+func (o *servitorOwner) buffServitor(t *testing.T, servitor *summon.Actor) {
+	t.Helper()
+	buff, err := effect.New(effect.Skill{ID: 1040, Level: 1}, modelskill.EffectTemplate{Name: "Buff", Time: 600, Icon: true})
+	if err != nil {
+		t.Fatalf("effect.New(Buff): %v", err)
+	}
+	buff.Effector, buff.Effected = servitor, servitor
+	runOn(t, servitor.Queue(), func() { servitor.EffectList().Add(buff) })
+	if !servitor.EffectList().HasHeld() {
+		t.Fatal("buff did not land on the servitor")
+	}
+	drainFrames(t, o.client)
+}
+
 // TestServitorLifetimeTickShowsRemainingTimeThenIcons pins one lifetime
-// tick: the idle servitor loses 500 ms, and its owner is shown the remaining
-// lifetime (SetSummonRemainTime) and then the servitor's effect icons
-// (PartySpelled), in that order.
+// tick of a buffed servitor: the idle servitor loses 500 ms, and its owner
+// is shown the remaining lifetime (SetSummonRemainTime) and then the
+// servitor's effect icons (PartySpelled), in that order.
 func TestServitorLifetimeTickShowsRemainingTimeThenIcons(t *testing.T) {
 	t.Parallel()
 	o := bootLifetimeServitorOwner(t, lifetimeServitorSkill())
 	servitor := o.summonLifetimeServitor(t)
+	o.buffServitor(t, servitor)
 
 	frames := o.tickServitor(t, 1)
 	if got := servitor.Lifetime().TimeRemaining; got != 34_700 {
@@ -123,6 +141,23 @@ func TestServitorLifetimeTickShowsRemainingTimeThenIcons(t *testing.T) {
 	remain, icons := opcodeIndex(frames, serverpackets.OpcodeSetSummonRemainTime), opcodeIndex(frames, serverpackets.OpcodePartySpelled)
 	if icons < 0 || icons < remain {
 		t.Fatalf("tick frames = opcodes %x, want SetSummonRemainTime then PartySpelled", frameOpcodes(frames))
+	}
+}
+
+// TestUnbuffedServitorLifetimeTickShowsNoIcons: a servitor that never held
+// an effect has no icon list to refresh, so its owner is shown the remaining
+// lifetime alone.
+func TestUnbuffedServitorLifetimeTickShowsNoIcons(t *testing.T) {
+	t.Parallel()
+	o := bootLifetimeServitorOwner(t, lifetimeServitorSkill())
+	o.summonLifetimeServitor(t)
+
+	frames := o.tickServitor(t, 1)
+	if got := remainTimes(frames); len(got) != 1 || got[0] != [2]int32{35_200, 34_700} {
+		t.Fatalf("SetSummonRemainTime after one tick = %v, want one (35200, 34700); opcodes %x", got, frameOpcodes(frames))
+	}
+	if opcodeIndex(frames, serverpackets.OpcodePartySpelled) >= 0 {
+		t.Fatalf("unbuffed servitor tick = opcodes %x, want no PartySpelled", frameOpcodes(frames))
 	}
 }
 
@@ -161,11 +196,13 @@ func TestServitorUpkeepPaidAtItsCheckpoint(t *testing.T) {
 
 // TestServitorLeavesWhenItsUpkeepIsShort lets a servitor whose owner holds no
 // Gemstone D reach its checkpoint: the owner reads that it has not enough
-// items, and the servitor leaves with no remaining time shown.
+// items, and the servitor leaves; the owner is still shown the remaining
+// time after the PetDelete, with no icon refresh.
 func TestServitorLeavesWhenItsUpkeepIsShort(t *testing.T) {
 	t.Parallel()
 	o := bootLifetimeServitorOwner(t, lifetimeServitorSkill())
-	o.summonLifetimeServitor(t)
+	servitor := o.summonLifetimeServitor(t)
+	o.buffServitor(t, servitor)
 
 	o.tickServitor(t, 35)
 	frames := o.tickServitor(t, 1)
@@ -178,9 +215,7 @@ func TestServitorLeavesWhenItsUpkeepIsShort(t *testing.T) {
 	if gone := opcodeIndex(frames, serverpackets.OpcodePetDelete); short < 0 || gone < short {
 		t.Fatalf("short checkpoint tick = opcodes %x, want NOT_ENOUGH_ITEMS then PetDelete", frameOpcodes(frames))
 	}
-	if got := remainTimes(frames); len(got) != 0 {
-		t.Fatalf("short checkpoint tick showed remaining time %v, want none", got)
-	}
+	assertTrailingRemainTime(t, frames, [2]int32{35_200, 17_200})
 	if _, ok := o.srv.State.Summon(o.id); ok {
 		t.Fatal("servitor stayed though its upkeep was short")
 	}
@@ -188,7 +223,7 @@ func TestServitorLeavesWhenItsUpkeepIsShort(t *testing.T) {
 
 // TestServitorLeavesWhenItsLifetimeRunsOut runs a 2000 ms servitor out: a
 // lifetime at exactly 0 still holds, and the tick that takes it below 0
-// unsummons the servitor.
+// unsummons the servitor, then shows its owner the negative remaining time.
 func TestServitorLeavesWhenItsLifetimeRunsOut(t *testing.T) {
 	t.Parallel()
 	def := lifetimeServitorSkill()
@@ -204,11 +239,25 @@ func TestServitorLeavesWhenItsLifetimeRunsOut(t *testing.T) {
 		t.Fatal("servitor left with its lifetime at 0")
 	}
 	frames := o.tickServitor(t, 1)
-	if opcodeIndex(frames, serverpackets.OpcodePetDelete) < 0 {
-		t.Fatalf("expiring tick = opcodes %x, want PetDelete", frameOpcodes(frames))
-	}
+	assertTrailingRemainTime(t, frames, [2]int32{2000, -500})
 	if _, ok := o.srv.State.Summon(o.id); ok {
 		t.Fatal("servitor stayed past its lifetime")
+	}
+}
+
+// assertTrailingRemainTime checks the frames of a servitor's departing tick:
+// PetDelete, then one SetSummonRemainTime of want, and no icon refresh.
+func assertTrailingRemainTime(t *testing.T, frames [][]byte, want [2]int32) {
+	t.Helper()
+	gone, remain := opcodeIndex(frames, serverpackets.OpcodePetDelete), opcodeIndex(frames, serverpackets.OpcodeSetSummonRemainTime)
+	if gone < 0 || remain < gone {
+		t.Fatalf("departing tick = opcodes %x, want PetDelete then SetSummonRemainTime", frameOpcodes(frames))
+	}
+	if got := remainTimes(frames); len(got) != 1 || got[0] != want {
+		t.Fatalf("departing tick SetSummonRemainTime = %v, want one %v", got, want)
+	}
+	if opcodeIndex(frames[gone:], serverpackets.OpcodePartySpelled) >= 0 {
+		t.Fatalf("departing tick = opcodes %x, want no PartySpelled after PetDelete", frameOpcodes(frames))
 	}
 }
 
