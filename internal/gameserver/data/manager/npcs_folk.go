@@ -139,7 +139,9 @@ func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading in
 			control.ref = walker
 		}
 	}
-	if master != nil {
+	// A respawned private is still the private it was: its slot kept its
+	// master link and its place among master's privates.
+	if master != nil && f.SpawnMaster() == nil {
 		f.SetMaster(master)
 		master.AddMinion(f)
 	}

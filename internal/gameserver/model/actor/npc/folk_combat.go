@@ -155,6 +155,7 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 	f.zones.ix = rt.Zones
 	f.cast.ai = rt.AI
 	f.bindSpawn(rt.Slot)
+	f.Scratch().setLife(f)
 	f.heldMask = templateHeldMask(f.Instance.Template, rt.Items)
 	f.resolveWeapon(rt.Items)
 	if rt.MaxBuffsAmount > 0 {
