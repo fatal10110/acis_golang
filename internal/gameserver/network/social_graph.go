@@ -68,6 +68,11 @@ func (g socialGraph) AtWar(clanID, targetClanID int32) bool {
 	return ok && cl.AtWarWith(targetClanID)
 }
 
+func (g socialGraph) InAcademy(clanID, objectID int32) bool {
+	cl, ok := g.clan(clanID)
+	return ok && academyMember(cl, objectID)
+}
+
 func (g socialGraph) ClanCastleID(clanID int32) int32 {
 	if cl, ok := g.clan(clanID); ok {
 		return cl.CastleID()

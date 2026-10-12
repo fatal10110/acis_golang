@@ -135,6 +135,7 @@ type options struct {
 	cursedWeapons          []*entity.CursedWeaponTable
 	cursedWeaponClock      func() time.Time
 	karmaPlayerCanTeleport bool
+	awardPKKillPVPPoint    bool
 	karmaServiceGates      [3]bool
 	htmlPages              map[string]string
 	karmaPlayerCanTrade    bool
@@ -326,6 +327,13 @@ func WithCursedWeaponClock(now func() time.Time) Option {
 // (default true).
 func WithKarmaTeleport(allowed bool) Option {
 	return func(o *options) { o.karmaPlayerCanTeleport = allowed }
+}
+
+// WithAwardPKKillPVPPoint sets the players.properties AwardPKKillPVPPoint
+// option (default false): killing a karma-holding player then awards the
+// killer a PvP point.
+func WithAwardPKKillPVPPoint(award bool) Option {
+	return func(o *options) { o.awardPKKillPVPPoint = award }
 }
 
 // WithKarmaServiceGates sets the players.properties KarmaPlayerCanShop,
@@ -2171,6 +2179,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		gclConfig.Favorites = bbs.NewFavorites(favoriteStore, persistWorker, o.log)
 	}
 	gclConfig.PlayerConfig.AutoLearnSkills = o.autoLearnSkills
+	gclConfig.PlayerConfig.AwardPKKillPVPPoint = o.awardPKKillPVPPoint
 	if o.respawnRestoreHP != 0 {
 		gclConfig.PlayerConfig.RespawnRestoreHP = o.respawnRestoreHP
 	}

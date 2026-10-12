@@ -232,8 +232,8 @@ func TestEnterWorldOverloadedRestoreRefreshesPenaltyBeforeItemList(t *testing.T)
 // multiplier. spawnMe registers the character in its region before the
 // ItemList constructor runs (EnterWorld.java:191, WorldObject.java:112-121),
 // so the refresh's broadcastCharInfo reaches every player around it
-// (Player.java:1139, 2254-2266). The RelationChanged that broadcastCharInfo
-// also sends is not ported yet (#1165).
+// (Player.java:1139, 2254-2266). The RelationChanged that follows each
+// CharInfo is pinned by the clan relation scenarios.
 func TestEnterWorldOverloadedLoginRefreshesObservers(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
