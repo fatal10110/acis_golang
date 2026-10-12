@@ -120,25 +120,32 @@ func bootCrestWorld(t *testing.T, owned bool, extra ...gameservertest.Option) *f
 	opts := append([]gameservertest.Option{
 		gameservertest.WithCastles(crestCastles(t)),
 		gameservertest.WithCrests(crests),
-		gameservertest.WithClanSeed(func(db *sql.DB) {
-			for _, s := range []struct {
-				q    string
-				args []any
-			}{
-				{"UPDATE characters SET clanid = ? WHERE char_name = 'Talker'", []any{crestClanID}},
-				{
-					`INSERT INTO clan_data (clan_id, clan_name, clan_level, hasCastle, ally_id, ally_name, leader_id, crest_id, ally_crest_id)
-					SELECT ?, 'Lords', 5, ?, ?, 'Realm', obj_Id, ?, ? FROM characters WHERE char_name = 'Talker'`,
-					[]any{crestClanID, castleID, crestAllyID, crestID, crestAllyMark},
-				},
-			} {
-				if _, err := db.ExecContext(context.Background(), s.q, s.args...); err != nil {
-					t.Fatalf("seed crest clan: %v", err)
-				}
-			}
-		}),
+		gameservertest.WithClanSeed(crestClanSeed(t, castleID)),
 	}, extra...)
 	return bootFolkWorld(t, nil, opts...)
+}
+
+// crestClanSeed makes Talker the leader of a clan owning castleID (none
+// when 0) that bears a crest and leads an alliance bearing one.
+func crestClanSeed(t *testing.T, castleID int) func(db *sql.DB) {
+	t.Helper()
+	return func(db *sql.DB) {
+		for _, s := range []struct {
+			q    string
+			args []any
+		}{
+			{"UPDATE characters SET clanid = ? WHERE char_name = 'Talker'", []any{crestClanID}},
+			{
+				`INSERT INTO clan_data (clan_id, clan_name, clan_level, hasCastle, ally_id, ally_name, leader_id, crest_id, ally_crest_id)
+				SELECT ?, 'Lords', 5, ?, ?, 'Realm', obj_Id, ?, ? FROM characters WHERE char_name = 'Talker'`,
+				[]any{crestClanID, castleID, crestAllyID, crestID, crestAllyMark},
+			},
+		} {
+			if _, err := db.ExecContext(context.Background(), s.q, s.args...); err != nil {
+				t.Fatalf("seed crest clan: %v", err)
+			}
+		}
+	}
 }
 
 // spawnFolkFrames places tmpl dx units east of the player and returns what
