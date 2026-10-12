@@ -11,21 +11,22 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// itemFile is the root element of one item template XML file: a flat list
-// of <item> elements.
+// itemFile is the root element of one item template XML file: a <list> of
+// <item> elements. It decodes itself (see templatedecode.go).
 type itemFile struct {
-	Items []itemElement `xml:"item"`
+	Items []itemElement
 }
 
 // itemElement is one <item> element: its own attributes (id, type, name)
 // fold in directly; <set> children flatten alongside them; <table>, <for>
 // and <cond> are distinctly shaped child blocks handled by their own types.
+// It decodes itself (see templatedecode.go).
 type itemElement struct {
-	Attrs  []xml.Attr     `xml:",any,attr"`
-	Tables []tableElement `xml:"table"`
-	Sets   []setElem      `xml:"set"`
-	For    []forElement   `xml:"for"`
-	Cond   []condElement  `xml:"cond"`
+	Attrs  []xml.Attr
+	Tables []tableElement
+	Sets   []templateSet
+	For    []forElement
+	Cond   []condElement
 }
 
 // setElem is one <set name="..." val="..."/> attribute-style element.
@@ -65,11 +66,15 @@ type condElement struct {
 // condNode is one node of a <cond> block's predicate tree (a combinator
 // such as <and>, or a leaf predicate such as <player .../>), captured
 // generically and recursively since this loader doesn't interpret
-// condition semantics — see item.Condition.
+// condition semantics — see item.Condition. It decodes itself (see
+// templatedecode.go).
 type condNode struct {
 	XMLName  xml.Name
-	Attrs    []xml.Attr `xml:",any,attr"`
-	Children []condNode `xml:",any"`
+	Attrs    []xml.Attr
+	Children []condNode
+	// Pos is the element's index among its parent's child nodes, as
+	// decodeChildNodes counts them.
+	Pos int
 }
 
 // LoadItemTemplates parses every ".xml" item template file directly under
@@ -117,13 +122,17 @@ func buildItemTemplate(el itemElement) (*item.Template, error) {
 		return nil, err
 	}
 
+	sets, err := readTemplateSets(el.Sets)
+	if err != nil {
+		return nil, err
+	}
 	vals := foldAttrs(el.Attrs)
-	for _, s := range el.Sets {
-		val, err := resolveTableValue(tables, s.Name, s.Val, 1)
+	for _, s := range sets {
+		val, err := resolveTableValue(tables, s.name, s.val, 1)
 		if err != nil {
 			return nil, err
 		}
-		vals[s.Name] = val
+		vals[s.name] = val
 	}
 
 	a := newAttrValues(vals, "item template")
@@ -529,8 +538,8 @@ func buildCondition(n condNode, role condRole) (item.Condition, error) {
 		return item.Condition{}, fmt.Errorf("<%s>: %w", n.XMLName.Local, err)
 	}
 	var children []item.Condition
-	for i, c := range n.Children {
-		child, err := buildCondition(c, childConditionRole(n, role, i))
+	for _, c := range conditionChildren(n, role) {
+		child, err := buildCondition(c.node, c.role)
 		if err != nil {
 			return item.Condition{}, err
 		}
