@@ -1,8 +1,11 @@
 package merchant
 
 import (
+	"context"
 	"errors"
 	"math"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
@@ -37,15 +40,42 @@ type IDs interface {
 // Service answers the merchant windows from the buylists and their stock.
 // A nil *Service has no buylists.
 type Service struct {
-	lists *buylist.Table
+	lists atomic.Pointer[buylist.Table]
 	stock *Stock
 	ids   IDs
 	cfg   Config
+
+	// reloadMu keeps one reload's stock and lists swaps together (write
+	// lock) and holds a purchase's stock check and its sale on one side of
+	// any reload (read lock).
+	reloadMu sync.RWMutex
 }
 
 // NewService builds a Service over lists and their stock.
 func NewService(lists *buylist.Table, stock *Stock, ids IDs, cfg Config) *Service {
-	return &Service{lists: lists, stock: stock, ids: ids, cfg: cfg}
+	s := &Service{stock: stock, ids: ids, cfg: cfg}
+	s.lists.Store(lists)
+	return s
+}
+
+// Reload replaces the buylists with lists and rebuilds their stock from
+// the saved rows (Stock.Reload). The stock takes the new products before
+// the lists are handed out, so a list read from now on is never sold
+// against the old stock. A reload waits for the purchases in progress, so
+// one that passed its stock check also sells; a purchase starting after the
+// reload with a list read before it finds no stock left on a limited
+// product the reload changed, and is refused before it pays. When the rows
+// cannot be read, the buylists and their stock stay as they were.
+func (s *Service) Reload(ctx context.Context, lists *buylist.Table) error {
+	s.reloadMu.Lock()
+	defer s.reloadMu.Unlock()
+	if s.stock != nil {
+		if err := s.stock.Reload(ctx, lists); err != nil {
+			return err
+		}
+	}
+	s.lists.Store(lists)
+	return nil
 }
 
 // Config returns the shop settings.
@@ -58,10 +88,27 @@ func (s *Service) Config() Config {
 
 // List returns buylist id.
 func (s *Service) List(id int) (buylist.List, bool) {
-	if s == nil || s.lists == nil {
+	if s == nil {
 		return buylist.List{}, false
 	}
-	return s.lists.Find(id)
+	lists := s.lists.Load()
+	if lists == nil {
+		return buylist.List{}, false
+	}
+	return lists.Find(id)
+}
+
+// ListsForNPC returns the buylists npcID sells from, in load order, and
+// how many buylists there are in all.
+func (s *Service) ListsForNPC(npcID int) (lists []buylist.List, total int) {
+	if s == nil {
+		return nil, 0
+	}
+	all := s.lists.Load()
+	if all == nil {
+		return nil, 0
+	}
+	return all.ForNPC(npcID), all.Len()
 }
 
 // Count returns p's current stock count, 0 for an unlimited product.
@@ -112,8 +159,10 @@ type Purchase struct {
 // total within the adena range, the buyer's weight limit, free slots and
 // adena. Then the adena is taken and each item created; a limited item
 // whose count ran out in the meantime is not created, its price already
-// paid.
+// paid. A reload never lands between the checks and the sale.
 func (s *Service) Buy(inv *itemcontainer.Inventory, list buylist.List, rows []BuyRow, taxRate float64, gm bool) (Purchase, error) {
+	s.reloadMu.RLock()
+	defer s.reloadMu.RUnlock()
 	var subtotal, slots, weight int64
 	for _, row := range rows {
 		p, ok := list.FindProduct(row.ItemID)

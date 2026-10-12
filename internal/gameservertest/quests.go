@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
+	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
@@ -231,14 +232,18 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *
 	return &questBoot{store: store, registry: registry, journals: journals, env: env}
 }
 
-// bindResidences gives the scripts the doors they open and close and the
-// castles NPCs belong to, with their sieges; a nil one stays unset.
-func (q *questBoot) bindResidences(doors *gamemanager.WorldObjects, castles *castle.Manager, sieges *siege.Engine) {
+// bindResidences gives the scripts the doors they open and close, the
+// castles NPCs belong to with their sieges, and the clan halls telling
+// which residence ids name siegable halls; a nil one stays unset.
+func (q *questBoot) bindResidences(doors *gamemanager.WorldObjects, castles *castle.Manager, halls *hallmodel.Table, sieges *siege.Engine) {
 	if doors != nil {
 		q.env.Doors = doors
 	}
 	if castles != nil {
 		q.env.Castles = castles
+	}
+	if halls != nil {
+		q.env.SiegableHall = halls.Siegable
 	}
 	if sieges != nil {
 		q.env.Sieges = sieges

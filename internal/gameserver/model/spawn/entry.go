@@ -32,8 +32,11 @@ type Entry struct {
 	Positions     []Position
 	Privates      []Private
 	AIParams      map[string]string
-	DBName        string
-	DBSaving      []string
+	// AIParamKeys are the names of AIParams in the order the entry first
+	// declares each.
+	AIParamKeys []string
+	DBName      string
+	DBSaving    []string
 }
 
 // NewEntry returns e as the spawnlist loads it: Total is scaled and
@@ -49,6 +52,7 @@ func NewEntry(e Entry, multiplier float64) Entry {
 	e.Positions = append([]Position(nil), e.Positions...)
 	e.Privates = append([]Private(nil), e.Privates...)
 	e.AIParams = copyStringMap(e.AIParams)
+	e.AIParamKeys = append([]string(nil), e.AIParamKeys...)
 	e.DBSaving = cleanStrings(e.DBSaving)
 	return e
 }

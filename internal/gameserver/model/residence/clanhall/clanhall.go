@@ -165,6 +165,12 @@ func (t *Table) Get(id int) (*Hall, bool) {
 	return entry, ok
 }
 
+// Siegable reports whether id names a siegable hall.
+func (t *Table) Siegable(id int) bool {
+	h, ok := t.Get(id)
+	return ok && h.IsSiegable()
+}
+
 // ByAlias returns the hall with alias, case-insensitively.
 func (t *Table) ByAlias(alias string) (*Hall, bool) {
 	if t == nil {
