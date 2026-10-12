@@ -61,7 +61,18 @@ type hallManagerSetup struct {
 	// functions are seeded clanhall_functions rows of Moonstone Hall:
 	// type, level, lease, rate and end time.
 	functions [][5]int64
-	extra     []gameservertest.Option
+	// hall is the clan hall Talker's clan owns, Moonstone Hall unless set,
+	// and manager the npc id of its manager.
+	hall, manager int
+	extra         []gameservertest.Option
+}
+
+// hallID is the setup's clan hall.
+func (s hallManagerSetup) hallID() int {
+	if s.hall == 0 {
+		return hallMoonstone
+	}
+	return s.hall
 }
 
 type hallManagerWorld struct {
@@ -105,8 +116,8 @@ func managerPage(t *testing.T, name string) string {
 	return page
 }
 
-// hallGrounds is Moonstone Hall's zone, around the players' spawn point.
-func hallGrounds(t *testing.T) *zone.Index {
+// hallGrounds is clan hall id's zone, around the players' spawn point.
+func hallGrounds(t *testing.T, id int) *zone.Index {
 	t.Helper()
 	zones := zone.NewIndex()
 	form, err := zone.NewCuboid(-2000, 2000, -2000, 2000, -10_000, 10_000)
@@ -114,7 +125,7 @@ func hallGrounds(t *testing.T) *zone.Index {
 		t.Fatal(err)
 	}
 	set := commons.NewStatSet()
-	set.Set("clanHallId", strconv.Itoa(hallMoonstone))
+	set.Set("clanHallId", strconv.Itoa(id))
 	hz, err := zone.NewClanHall(1, form, set)
 	if err != nil {
 		t.Fatal(err)
@@ -140,7 +151,7 @@ func bootHallManager(t *testing.T, s hallManagerSetup) *hallManagerWorld {
 		gameservertest.WithHTMLPages(hallManagerPages(t)),
 		gameservertest.WithClanHalls(halls, decos),
 		gameservertest.WithResidences(halls, nil),
-		gameservertest.WithZones(hallGrounds(t)),
+		gameservertest.WithZones(hallGrounds(t, s.hallID())),
 		gameservertest.WithClanSeed(func(db *sql.DB) { seedHallManager(t, db, s) }),
 		noBypassReuse,
 	}, s.extra...)
@@ -155,7 +166,11 @@ func bootHallManager(t *testing.T, s hallManagerSetup) *hallManagerWorld {
 	startInWorld(t, srv, w.bystander)
 	x, y, z := srv.PlayerPosition(t, w.player)
 	w.at = location.Location{X: x, Y: y, Z: z}
-	tmpl := folkTemplate("ClanHallManagerNpc", hallManagerID)
+	managerID := hallManagerID
+	if s.manager != 0 {
+		managerID = s.manager
+	}
+	tmpl := folkTemplate("ClanHallManagerNpc", managerID)
 	tmpl.Name, tmpl.MPMax = "Black", 1493
 	w.manager = w.spawnFolk(t, tmpl, 60)
 	drainUntilQuiet(t, w.bystander)
@@ -194,10 +209,10 @@ func seedHallManager(t *testing.T, db *sql.DB, s hallManagerSetup) {
 			exec("UPDATE clan_data SET leader_id = ? WHERE clan_id = ?", hallRivalLeader, hallRivalClan)
 		}
 	}
-	exec("INSERT INTO clanhall (id, ownerId, paid, paidUntil) VALUES (?, ?, 1, ?)", hallMoonstone, owner, time.Now().UnixMilli()+30*hallDayMs)
+	exec("INSERT INTO clanhall (id, ownerId, paid, paidUntil) VALUES (?, ?, 1, ?)", s.hallID(), owner, time.Now().UnixMilli()+30*hallDayMs)
 	for _, f := range s.functions {
 		exec("INSERT INTO clanhall_functions (hall_id, type, lvl, lease, rate, endTime) VALUES (?, ?, ?, ?, ?, ?)",
-			hallMoonstone, f[0], f[1], f[2], f[3], f[4])
+			s.hallID(), f[0], f[1], f[2], f[3], f[4])
 	}
 }
 

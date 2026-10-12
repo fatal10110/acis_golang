@@ -388,3 +388,27 @@ func TestCastleNPCChatWindowsWithoutTheManor(t *testing.T) {
 	w.talkResidence(t, blacksmithNPC, "npcdefault.htm", 30)
 	w.talkResidence(t, manorNPC, "npcdefault.htm", 40)
 }
+
+// TestCastleNPCChatWindowsForAMercenaryHirer pins that a member allowed to
+// hire mercenaries, the Seal of Strife owned by the Dusk, is shown the
+// Dusk's mercenary page.
+func TestCastleNPCChatWindowsForAMercenaryHirer(t *testing.T) {
+	t.Parallel()
+	w := bootResidenceChat(t, residenceSetup{rank: 5, privs: 2097152, strife: sevensigns.Dusk})
+	w.talkResidence(t, mercenaryNPC, "mercmanager/mseller001_dusk.htm", 30)
+}
+
+// TestCastleBlacksmithOfNoCastle pins that a castle blacksmith listed by no
+// castle, the manor on, sends nothing after the interact.
+func TestCastleBlacksmithOfNoCastle(t *testing.T) {
+	t.Parallel()
+	w := bootResidenceChat(t, residenceSetup{})
+	tmpl := folkTemplate("CastleBlacksmith", unlistedResidentID)
+	tmpl.Name = "Keeper"
+	f := w.spawnFolk(t, tmpl, 30)
+	w.selectFolk(t, f)
+	want := []byte{serverpackets.OpcodeActionFailed, serverpackets.OpcodeMoveToPawn, serverpackets.OpcodeSocialAction}
+	if got := interactOrder(w.talk(t, f, false)); !bytes.Equal(got, want) {
+		t.Fatalf("talk = % x, want % x", got, want)
+	}
+}

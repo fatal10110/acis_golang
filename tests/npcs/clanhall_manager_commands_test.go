@@ -217,8 +217,8 @@ func abs(n int) int {
 }
 
 // TestClanHallManagerVault: manage_vault shows the hall's lease and the
-// date its lease is paid until; a member without the warehouse privilege
-// is refused.
+// date its lease is paid until, on vault-sch.htm at a siegable hall; a
+// member without the warehouse privilege is refused.
 func TestClanHallManagerVault(t *testing.T) {
 	t.Parallel()
 	t.Run("warehouse right", func(t *testing.T) {
@@ -232,6 +232,22 @@ func TestClanHallManagerVault(t *testing.T) {
 			"%date%", time.UnixMilli(v.PaidUntil).Format("02-01-2006 15:04"), "%objectId%", w.oid())
 		if got := w.page(t, "manage_vault"); got != want {
 			t.Fatalf("vault page =\n%s\nwant\n%s", got, want)
+		}
+	})
+	t.Run("siegable hall", func(t *testing.T) {
+		t.Parallel()
+		const vault = "<html><body>vault-sch %rent% %date% %objectId%</body></html>"
+		w := bootHallManager(t, hallManagerSetup{
+			hall: devastatedCastle, manager: devastatedManager,
+			extra: []gameservertest.Option{gameservertest.WithHTMLPages(map[string]string{"clanHallManager/vault-sch.htm": vault})},
+		})
+		v, ok := w.srv.Halls.View(devastatedCastle)
+		if !ok || v.PaidUntil == 0 {
+			t.Fatalf("Devastated Castle view = %+v", v)
+		}
+		want := fill(vault, "%rent%", "0", "%date%", time.UnixMilli(v.PaidUntil).Format("02-01-2006 15:04"), "%objectId%", w.oid()) + "\n"
+		if got := w.page(t, "manage_vault"); got != want {
+			t.Fatalf("siegable vault page =\n%s\nwant\n%s", got, want)
 		}
 	})
 	t.Run("no right", func(t *testing.T) {
