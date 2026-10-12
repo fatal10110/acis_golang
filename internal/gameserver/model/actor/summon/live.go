@@ -1,6 +1,7 @@
 package summon
 
 import (
+	"cmp"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -251,6 +252,8 @@ type Actor struct {
 	hungryLimit    float64
 	unsummonLimit  float64
 	roll           func(int) int
+	// feedPeriod is how often a pet eats; immutable after construction.
+	feedPeriod time.Duration
 	// respawnRestoreHP is the share of max HP a revive restores without a
 	// Phoenix Blessing; immutable after construction.
 	respawnRestoreHP float64
@@ -388,17 +391,20 @@ type PetConfig struct {
 	Config  *petmodel.Config
 	Growth  *npc.PetData
 
-	Inventory      *itemcontainer.Inventory
-	Fed            int
-	MaxMeal        int
-	MealInNormal   int
-	MealInBattle   int
-	Food1          int32
-	Food2          int32
-	AutoFeedLimit  float64
-	HungryLimit    float64
-	UnsummonLimit  float64
-	Roll           func(int) int
+	Inventory     *itemcontainer.Inventory
+	Fed           int
+	MaxMeal       int
+	MealInNormal  int
+	MealInBattle  int
+	Food1         int32
+	Food2         int32
+	AutoFeedLimit float64
+	HungryLimit   float64
+	UnsummonLimit float64
+	Roll          func(int) int
+	// FeedPeriod is how often the pet eats; zero is the standard ten
+	// seconds.
+	FeedPeriod     time.Duration
 	Stats          CombatStats
 	MaxBuffsAmount int
 	// RespawnRestoreHP is the share of max HP a revive restores without a
@@ -535,6 +541,7 @@ func NewPet(cfg PetConfig) (*Actor, error) {
 		hungryLimit:    cfg.HungryLimit,
 		unsummonLimit:  cfg.UnsummonLimit,
 		roll:           defaultRoll(cfg.Roll),
+		feedPeriod:     cmp.Or(cfg.FeedPeriod, petFeedPeriod),
 		stats:          cfg.Stats,
 		skills:         cfg.Skills,
 		skillDefs:      cfg.SkillDefs,

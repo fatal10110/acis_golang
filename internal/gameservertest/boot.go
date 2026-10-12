@@ -227,6 +227,7 @@ type options struct {
 	fish                   *fish.Table
 	fishingRoll            func(n int) int
 	petRoll                func(n int) int
+	petFeedPeriod          time.Duration
 	multisells             *multisell.Table
 	multisellDelay         time.Duration
 	rollDiceDelay          time.Duration
@@ -794,6 +795,13 @@ func WithFish(table *fish.Table) Option {
 // the random source), so a pet's hunger is deterministic.
 func WithPetRoll(roll func(n int) int) Option {
 	return func(o *options) { o.petRoll = roll }
+}
+
+// WithPetFeedPeriod makes every pet called out eat every period (default:
+// ten seconds), so a long exchange on the wall clock is not cut by a meal's
+// status refresh.
+func WithPetFeedPeriod(period time.Duration) Option {
+	return func(o *options) { o.petFeedPeriod = period }
 }
 
 // WithFishingRoll supplies the fishing dice in [0,n) (default: the random
@@ -2076,6 +2084,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Fish:             o.fish,
 		FishingRoll:      o.fishingRoll,
 		PetRoll:          o.petRoll,
+		PetFeedPeriod:    o.petFeedPeriod,
 		Templates:        templates,
 		ItemTemplates:    itemTemplates,
 		HTML:             HTMLCache(t, o.pages()),

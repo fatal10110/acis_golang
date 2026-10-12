@@ -8,7 +8,7 @@ import (
 )
 
 // A servitor's lifetime counts down once a second; a pet eats every ten
-// seconds. Both tasks run at a fixed rate, the first tick one period after
+// seconds unless its config sets another period. Both tasks run at a fixed rate, the first tick one period after
 // the start.
 const (
 	servitorLifePeriod = time.Second
@@ -50,7 +50,7 @@ func (a *Actor) startLifeTask() {
 	}
 	period := servitorLifePeriod
 	if a.isPet {
-		period = petFeedPeriod
+		period = a.feedPeriod
 	}
 	gen := t.gen
 	t.ticker = q.Every(period, func() { a.runLifeTick(gen) })
