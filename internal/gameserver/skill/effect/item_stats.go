@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -78,29 +79,19 @@ func ItemModifierFuncs(owner ItemOwner) ([]Mod, error) {
 func itemModifierCondition(mod item.StatModifier) (Condition, error) {
 	var direct *modelskill.Condition
 	if mod.Condition != nil {
-		c := ItemCondition(*mod.Condition)
+		c := conditions.ItemCondition(*mod.Condition)
 		direct = &c
 	}
 	var attach *modelskill.ConditionClause
 	if mod.AttachCondition != nil {
 		attach = &modelskill.ConditionClause{
-			Root:      ItemCondition(mod.AttachCondition.Root),
+			Root:      conditions.ItemCondition(mod.AttachCondition.Root),
 			Message:   mod.AttachCondition.Message,
 			MessageID: mod.AttachCondition.MessageID,
 			AddName:   mod.AttachCondition.AddName,
 		}
 	}
 	return funcCondition(direct, attach)
-}
-
-// ItemCondition is c in the skill condition shape the condition compiler
-// reads.
-func ItemCondition(c item.Condition) modelskill.Condition {
-	out := modelskill.Condition{Kind: c.Kind, Attrs: c.Attrs}
-	for _, ch := range c.Children {
-		out.Children = append(out.Children, ItemCondition(ch))
-	}
-	return out
 }
 
 func itemStatFunc(owner ItemOwner, s stat.Stat, mod item.StatModifier, cond Condition) (Mod, error) {

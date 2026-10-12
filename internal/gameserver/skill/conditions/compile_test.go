@@ -408,13 +408,15 @@ func TestCompileNamesMatchCaseInsensitively(t *testing.T) {
 	})
 }
 
-func TestCompileRejectsWhatItCannotEvaluate(t *testing.T) {
+func TestCompileRejectsUndecodableValues(t *testing.T) {
 	cases := []struct {
 		name string
 		node modelskill.Condition
 	}{
-		{"player race", leaf("player", map[string]string{"race": "Elf"})},
-		{"skill stat", leaf("skill", map[string]string{"stat": "pAtk"})},
+		{"player race in the wrong case", leaf("player", map[string]string{"race": "Elf"})},
+		{"unknown player race", leaf("player", map[string]string{"race": "GIANT"})},
+		{"skill without stat", leaf("skill", map[string]string{"Stat": "pAtk"})},
+		{"unknown skill stat", leaf("skill", map[string]string{"stat": "PATK"})},
 		{"bad number", leaf("player", map[string]string{"level": "forty"})},
 		{"bad number beside an unknown attribute", leaf("player", map[string]string{"level": "forty", "bogus": "1"})},
 		{"one-value hp_min_max", leaf("target", map[string]string{"hp_min_max": "25"})},

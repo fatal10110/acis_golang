@@ -11,7 +11,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 // TestSkillCondThatHoldsNoConditionReadsNoFeedback: the reference reads a
@@ -184,14 +183,14 @@ func TestShippedConditionsHoldNoNullNode(t *testing.T) {
 	for _, tpl := range items.All() {
 		where := fmt.Sprintf("item %d", tpl.ID)
 		for _, uc := range tpl.UseConditions {
-			check(where+" cond", effect.ItemCondition(uc.Root))
+			check(where+" cond", conditions.ItemCondition(uc.Root))
 		}
 		for _, mod := range tpl.Modifiers {
 			if mod.Condition != nil {
-				check(where+" func "+mod.Stat, effect.ItemCondition(*mod.Condition))
+				check(where+" func "+mod.Stat, conditions.ItemCondition(*mod.Condition))
 			}
 			if mod.AttachCondition != nil {
-				check(where+" func "+mod.Stat+" attach", effect.ItemCondition(mod.AttachCondition.Root))
+				check(where+" func "+mod.Stat+" attach", conditions.ItemCondition(mod.AttachCondition.Root))
 			}
 		}
 	}

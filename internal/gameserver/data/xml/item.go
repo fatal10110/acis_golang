@@ -8,7 +8,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/rs/zerolog"
 )
 
@@ -497,7 +496,7 @@ func buildUseCondition(id int32, attrs []xml.Attr, children []condNode) (uc item
 	if err != nil {
 		return item.UseCondition{}, false, fmt.Errorf("item template %d: cond: %w", id, err)
 	}
-	if conditions.IsNull(effect.ItemCondition(root)) {
+	if conditions.IsNull(conditions.ItemCondition(root)) {
 		return item.UseCondition{}, true, nil
 	}
 	a := newAttrValues(foldAttrs(attrs), fmt.Sprintf("item template %d: use condition", id))
