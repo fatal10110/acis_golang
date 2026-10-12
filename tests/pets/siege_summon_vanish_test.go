@@ -1,6 +1,8 @@
 package pets
 
 import (
+	"encoding/binary"
+	"slices"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -9,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // assertVanished requires frames to dismiss the summon (PetDelete) and then
@@ -102,8 +105,11 @@ func TestSiegeSummonCalledOffBattlefieldVanishes(t *testing.T) {
 // TestSiegeSummonVanishesOnTeleport pins the jump of a siege summon after its
 // owner's teleport (Creature.teleportTo, SiegeSummon.onTeleported): leaving
 // its zones for the jump takes it off its battlefield, so it is dismissed
-// and its owner told YOUR_SERVITOR_HAS_VANISHED wherever it lands, on the
-// same battlefield or off it. An ordinary servitor follows its owner.
+// before it lands and its owner told YOUR_SERVITOR_HAS_VANISHED, on the same
+// battlefield or off it. After its TeleportToLocation the owner is never
+// shown it again, and a watcher parked at the landing point never sees it
+// there. An ordinary servitor follows its owner and is shown at the landing
+// point.
 func TestSiegeSummonVanishesOnTeleport(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -123,24 +129,82 @@ func TestSiegeSummonVanishesOnTeleport(t *testing.T) {
 				tmpl, skillID = siegeGolemTemplate, summonGolemSkillID
 			}
 			h, _ := bootSiegeServitor(t, tmpl(), skillID)
-			obj, ok := h.srv.State.Player(h.ownerID)
+			servitor, ok := h.srv.State.Summon(h.ownerID)
 			if !ok {
-				t.Fatal("owner missing from world")
+				t.Fatal("servitor missing from world")
 			}
-			owner, ok := network.OnlineCharacter(obj)
-			if !ok {
-				t.Fatalf("owner = %T, want online character", obj)
-			}
+			summonID := servitor.ObjectID()
 			x, y, z := h.srv.PlayerPosition(t, h.ownerID)
-			owner.TeleportTo(x+tc.dx, y, z, 0)
-			readUntilOpcode(t, h.client, serverpackets.OpcodeTeleportToLocation, "owner teleport")
-			h.client.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+			watcher := h.joinSecondPlayer(t, "Watcher")
+			teleportAndAppear(t, h, watcher.id, watcher.client, x+tc.dx, y, z)
+			drainUntilQuiet(t, watcher.client)
+			drainUntilQuiet(t, h.client)
+
+			teleportAndAppear(t, h, h.ownerID, h.client, x+tc.dx, y, z)
 			frames := drainFrames(t, h.client)
-			if tc.vanishes {
-				assertVanished(t, h, frames)
+			watched := drainFrames(t, watcher.client)
+			if !tc.vanishes {
+				assertStillSummoned(t, h, frames)
+				if !showsObject(watched, summonID) {
+					t.Fatalf("watcher opcodes %x, want the servitor shown at the landing point", frameOpcodes(watched))
+				}
 				return
 			}
-			assertStillSummoned(t, h, frames)
+			assertVanished(t, h, frames)
+			// An owner landing within sight of the summon's old position
+			// sees it there, then its jump; one landing out of sight is told
+			// of neither. Either way it is not shown once it jumped.
+			after := frames
+			if jumped := slices.IndexFunc(frames, func(f []byte) bool {
+				return f[0] == serverpackets.OpcodeTeleportToLocation && frameObjectID(f, 1) == summonID
+			}); jumped >= 0 {
+				after = frames[jumped:]
+			}
+			if showsObject(after, summonID) {
+				t.Fatalf("owner opcodes %x after the summon's jump, want it never shown again", frameOpcodes(after))
+			}
+			if showsObject(watched, summonID) {
+				t.Fatalf("watcher at the landing point opcodes %x, want the summon never shown", frameOpcodes(watched))
+			}
 		})
 	}
+}
+
+// teleportAndAppear teleports player id to (x, y, z) and has its client c
+// report it appeared.
+func teleportAndAppear(t *testing.T, h *petWorld, id int32, c *testsupport.ScriptedClient, x, y, z int) {
+	t.Helper()
+	obj, ok := h.srv.State.Player(id)
+	if !ok {
+		t.Fatalf("player %d missing from world", id)
+	}
+	live, ok := network.OnlineCharacter(obj)
+	if !ok {
+		t.Fatalf("player %d = %T, want online character", id, obj)
+	}
+	live.TeleportTo(x, y, z, 0)
+	readUntilOpcode(t, c, serverpackets.OpcodeTeleportToLocation, "teleport")
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
+}
+
+// showsObject reports whether frames show objectID to their client: a
+// PetInfo to its owner or an NpcInfo to anyone else.
+func showsObject(frames [][]byte, objectID int32) bool {
+	return slices.ContainsFunc(frames, func(f []byte) bool {
+		switch f[0] {
+		case serverpackets.OpcodePetInfo:
+			return frameObjectID(f, 5) == objectID
+		case serverpackets.OpcodeNPCInfo:
+			return frameObjectID(f, 1) == objectID
+		}
+		return false
+	})
+}
+
+// frameObjectID reads the int32 object id at offset at of frame.
+func frameObjectID(frame []byte, at int) int32 {
+	if len(frame) < at+4 {
+		return 0
+	}
+	return int32(binary.LittleEndian.Uint32(frame[at:]))
 }

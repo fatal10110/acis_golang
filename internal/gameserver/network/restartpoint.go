@@ -294,17 +294,21 @@ func (l *GameClientLink) landTeleportedPlayer(live *livePlayer) (bool, *summon.A
 	// position forget it too.
 	npc.DropThreatAround(l.world, actor)
 	l.broadcastSummonFrame(actor, serverpackets.FrameTeleportToLocation(actor.ObjectID(), destination, false))
+	if vanishes {
+		// Dismissed before it lands: nobody at its landing point, its owner
+		// included, is ever shown it there. A corpse cannot be dismissed,
+		// so it only leaves the grid; its owner is told it vanished all
+		// the same. The dismissal its battlefield exit posted then finds it
+		// gone.
+		if actor.Dead() {
+			l.world.Leave(actor)
+		}
+		actor.Vanish()
+		return true, nil
+	}
 	actor.Move().SetPosition(destination)
 	_ = l.world.Teleport(actor, destination.X, destination.Y, destination.Z)
 	actor.EnterZones()
 	actor.OnTeleported()
-	if vanishes {
-		// Posted behind the dismissal its battlefield exit already posted.
-		// Leaving, it is seen by no NPC at its landing point.
-		if q := actor.Queue(); q != nil {
-			q.Post(actor.Vanish)
-		}
-		return true, nil
-	}
 	return true, actor
 }
