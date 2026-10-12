@@ -439,6 +439,9 @@ type GameClientLink struct {
 	// gmAudit records every admin command run; the zero logger records
 	// nothing.
 	gmAudit zerolog.Logger
+	// itemLog records every change to a non-stackable item a player or pet
+	// carries; the zero logger records nothing.
+	itemLog zerolog.Logger
 	// chat is the chat settings: log, bot filter and reuse delays.
 	chat ChatConfig
 	// announcements are the server announcements: read at login, repeated
@@ -689,6 +692,10 @@ type GameClientLinkConfig struct {
 	// GMAudit records every admin command run (server.properties GMAudit);
 	// the zero logger records nothing.
 	GMAudit zerolog.Logger
+	// ItemLog records every add, change and removal of a non-stackable item
+	// in a player's or pet's inventory (server.properties LogItems); the
+	// zero logger records nothing.
+	ItemLog zerolog.Logger
 	// Chat is the chat settings of server.properties; the zero value logs
 	// nothing and rate-limits nothing.
 	Chat ChatConfig
@@ -815,6 +822,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		levels:           cfg.Levels,
 		admin:            cfg.Admin,
 		gmAudit:          cfg.GMAudit,
+		itemLog:          cfg.ItemLog,
 		chat:             cfg.Chat,
 		playerConfig:     cfg.PlayerConfig,
 		petConfig:        cfg.PetConfig,

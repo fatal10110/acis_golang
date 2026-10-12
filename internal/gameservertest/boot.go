@@ -142,6 +142,7 @@ type options struct {
 	gmStartupModes         [3]bool
 	gmHeroAura             bool
 	gmAudit                zerolog.Logger
+	itemLog                zerolog.Logger
 	chat                   network.ChatConfig
 	restarts               *restart.Table
 	clanHallData           *hallmodel.Table
@@ -371,6 +372,11 @@ func WithGMHeroAura() Option { return func(o *options) { o.gmHeroAura = true } }
 // WithGMAudit records every admin command run to log (server.properties
 // GMAudit = True); by default nothing is recorded.
 func WithGMAudit(log zerolog.Logger) Option { return func(o *options) { o.gmAudit = log } }
+
+// WithItemLog records every change to a non-stackable item a player or pet
+// carries to log (server.properties LogItems = True); by default nothing is
+// recorded.
+func WithItemLog(log zerolog.Logger) Option { return func(o *options) { o.itemLog = log } }
 
 // WithChat sets the server.properties chat settings: the chat log, the bot
 // whisper filter and the chat reuse delays (default: nothing logged,
@@ -2109,6 +2115,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Levels:           levels,
 		Admin:            o.admin,
 		GMAudit:          o.gmAudit,
+		ItemLog:          o.itemLog,
 		Chat:             o.chat,
 		Log:              o.log,
 	}
