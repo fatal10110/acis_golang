@@ -1,7 +1,6 @@
 package clan
 
 import (
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -84,8 +83,8 @@ func NewTable() *Table { return &Table{clans: map[int32]*Clan{}} }
 // before any player connects. A clan below level 5 holds no reputation,
 // whatever its row says; a member penalty survives while it is less than
 // joinDays past its start; an alliance penalty survives until it ends. The
-// sub-units and wars follow (see restoreWars). The ladder then ranks the 99
-// clans with the most positive reputation.
+// sub-units and wars follow (see restoreWars). The ladder then ranks the
+// clans (see rankLadder).
 func (t *Table) Restore(s Snapshot, now time.Time, joinDays int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -103,8 +102,10 @@ func (t *Table) Restore(s Snapshot, now time.Time, joinDays int) {
 		if r.CharPenaltyExpiry+int64(joinDays)*dayMillis > nowMs {
 			cl.charPenaltyExpiry = r.CharPenaltyExpiry
 		}
+		cl.storedReputation = r.Reputation
 		if cl.level >= minReputationLevel {
 			cl.reputation = clampReputation(r.Reputation)
+			cl.storedReputation = cl.reputation
 		}
 		t.clans[r.ID] = cl
 	}
@@ -127,24 +128,11 @@ func (t *Table) Restore(s Snapshot, now time.Time, joinDays int) {
 	}
 	t.restoreSubunits(s.Subunits)
 	t.restoreWars(s.Wars, nowMs)
-	t.rankLadder(s.Clans)
-}
-
-// rankLadder gives ranks 1, 2, ... to the clans with positive reputation,
-// best stored score first, among the 99 best stored scores.
-func (t *Table) rankLadder(rows []Row) {
-	ordered := append([]Row(nil), rows...)
-	sort.SliceStable(ordered, func(i, j int) bool { return ordered[i].Reputation > ordered[j].Reputation })
-	if len(ordered) > ladderSize {
-		ordered = ordered[:ladderSize]
+	clans := make([]*Clan, 0, len(t.clans))
+	for _, cl := range t.clans {
+		clans = append(clans, cl)
 	}
-	rank := 1
-	for _, r := range ordered {
-		if cl := t.clans[r.ID]; cl != nil && cl.reputation > 0 {
-			cl.rank = rank
-			rank++
-		}
-	}
+	rankLadder(clans)
 }
 
 func clampReputation(v int) int {

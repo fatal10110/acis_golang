@@ -72,6 +72,11 @@ type Clan struct {
 	allyPenaltyType   int
 	charPenaltyExpiry int64
 	dissolvingExpiry  int64
+	// storedReputation is the score the clan's row holds once its queued
+	// writes land: the ladder orders the clans by it. It differs from
+	// reputation only for a clan restored below level 5 with a score in its
+	// row, until its row is next written.
+	storedReputation int
 	// destroyed marks a clan dissolved for good (Service.Destroy).
 	destroyed bool
 	board     board
