@@ -55,6 +55,12 @@ func reloadedItinerary() route.BoatItinerary {
 // as routes (failing while fail is set), and boats as the fleet's boats.
 func bootReload(t *testing.T, routes []route.BoatItinerary, fail *atomic.Bool, boats ...route.BoatItinerary) (*gameservertest.Server, *testsupport.ScriptedClient, int32) {
 	t.Helper()
+	return bootReloadWith(t, routes, fail, boats)
+}
+
+// bootReloadWith is bootReload with extra boot options.
+func bootReloadWith(t *testing.T, routes []route.BoatItinerary, fail *atomic.Bool, boats []route.BoatItinerary, opts ...gameservertest.Option) (*gameservertest.Server, *testsupport.ScriptedClient, int32) {
+	t.Helper()
 	adminData, err := gamexml.LoadAdminData(datapack.Path(t, "data", "xml"))
 	if err != nil {
 		t.Fatalf("load admin data: %v", err)
@@ -65,14 +71,14 @@ func bootReload(t *testing.T, routes []route.BoatItinerary, fail *atomic.Bool, b
 		}
 		return routes, nil
 	}}
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Sailor", 1, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithBoats(boats...),
 		gameservertest.WithAdmin(adminData),
 		gameservertest.WithRestartPoints(reloadTownTable()),
 		gameservertest.WithDataReloads(reloads),
-	)
+	}, opts...)...)
 	me := srv.SoleObjectID(t)
 	place(t, srv, me, runeBoarding)
 	if _, err := srv.DB.ExecContext(context.Background(), "UPDATE characters SET accesslevel = ? WHERE obj_Id = ?", gmLevel, me); err != nil {

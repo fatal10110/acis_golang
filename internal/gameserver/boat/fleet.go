@@ -97,8 +97,9 @@ func (f *Fleet) launch(itineraries []route.BoatItinerary) error {
 }
 
 // Retire takes every boat out of the fleet: its schedule and its ticket
-// collection due end, and it stops where it stands, showing its observers
-// so. The boats stay in the world for the caller to put their passengers
+// collection due end, it takes no one else aboard, and it stops where it
+// stands, showing its observers so. Its passengers read after Retire are
+// all it will ever carry. The boats stay in the world for the caller to put their passengers
 // ashore and Remove them. The returned launch is what Launch takes to put
 // a new fleet out once they are gone; a later Retire voids it.
 func (f *Fleet) Retire() (retired []*Boat, launch uint64) {
@@ -109,6 +110,7 @@ func (f *Fleet) Retire() (retired []*Boat, launch uint64) {
 		b.engine = nil
 		b.mu.Lock()
 		b.fare = fareDue{}
+		b.retired = true
 		b.mu.Unlock()
 		b.stop()
 		retired = append(retired, b)

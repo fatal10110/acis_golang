@@ -40,6 +40,8 @@ type Boat struct {
 	passengers []int32
 	// fare is the ticket collection due after a departure.
 	fare fareDue
+	// retired marks a boat taken out of its fleet: it takes no one aboard.
+	retired bool
 
 	// Owned by the tick goroutine.
 	xAccurate, yAccurate float64
