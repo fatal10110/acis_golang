@@ -217,8 +217,7 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	c.notifyDeath(c.combatant(), killer)
 	c.stopMountFeed()
 	if !c.creditCursedWeaponKill(killer) {
-		c.awardKillerPKKarma(killer)
-		c.awardKillerPvPKill(killer)
+		c.creditKill(killer, false)
 	}
 	c.ClearCharges()
 	if fakeDead {
