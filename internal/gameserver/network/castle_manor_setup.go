@@ -83,7 +83,8 @@ func (l *GameClientLink) refuseManorMaintenance(live *livePlayer) bool {
 
 // manorManagerMenu answers a manor manager's manor windows: the seeds or
 // crops of a castle for a period, or the manor's crops, with the purchase
-// buttons shown, and the harvester shop. A command that does not parse, or
+// buttons shown, the seed purchase, crop sale and crop sale detail windows,
+// and the harvester shop. A command that does not parse, or
 // an unknown ask, answers nothing, as specified; a link click leaves no
 // client action pending.
 func (l *GameClientLink) manorManagerMenu(live *livePlayer, f *npc.Folk, command string) {
@@ -103,11 +104,18 @@ func (l *GameClientLink) manorManagerMenu(live *livePlayer, f *npc.Folk, command
 		castleID = c.ID
 	}
 	switch menu.ask {
-	case 1, 2, 9:
-		// Seed purchase (#640), crop sale (#656) and the crop sale detail
-		// (#657) are not modeled yet.
-		l.log.Debug().Int("ask", menu.ask).Str("command", command).Msg("bypass: manor trade window not modeled")
-		live.SendFrame(serverpackets.FrameActionFailed())
+	case 1:
+		l.manorSeedWindow(live, f, castleID)
+	case 2:
+		// A castle the manor holds no lists of answers nothing.
+		if frame, ok := l.frameManorSellCropList(live, castleID); ok {
+			live.SendFrame(frame)
+		}
+	case 9:
+		// The state names the crop; a manor that is off answers nothing.
+		if l.castleManor.Enabled() {
+			live.SendFrame(l.frameManorProcureCropDetail(int32(menu.state)))
+		}
 	case 3:
 		live.SendFrame(l.frameManorSeedInfo(castleID, menu.next, false))
 	case 4:

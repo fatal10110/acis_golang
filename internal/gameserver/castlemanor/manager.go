@@ -498,6 +498,18 @@ func (m *Manager) NextModeChange() time.Time {
 	return m.nextChange
 }
 
+// Manages reports whether the manor holds castle castleID's lists: it runs
+// and castleID names a castle.
+func (m *Manager) Manages(castleID int) bool {
+	if !m.Enabled() {
+		return false
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, ok := m.byCastle[castleID]
+	return ok
+}
+
 // SeedProduction returns castle castleID's seed list for the next period,
 // or the running one.
 func (m *Manager) SeedProduction(castleID int, next bool) []*Production {

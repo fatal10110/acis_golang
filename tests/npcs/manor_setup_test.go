@@ -327,9 +327,9 @@ func equalRows[T comparable](got, want []T) bool {
 
 // TestManorManagerWindows pins the manor manager's windows for a member of
 // no clan, at any distance: the castle's seeds and crops and the manor's
-// crops with their buttons shown, the harvester shop; the trade windows
-// not yet in place are only released; under maintenance every window is
-// refused.
+// crops with their buttons shown, the harvester shop and the trade
+// windows (pinned in manor_trade_test.go); under maintenance every window
+// is refused.
 func TestManorManagerWindows(t *testing.T) {
 	t.Parallel()
 	w := bootManorSetup(t, residenceSetup{clanless: true})
@@ -348,7 +348,9 @@ func TestManorManagerWindows(t *testing.T) {
 		t.Fatalf("harvester shop = % x, want BuyList", opcodes(got))
 	}
 	for _, ask := range []string{"1", "2", "9"} {
-		wantOnly(t, "trade window "+ask, w.bypass(t, "manor_menu_select?ask="+ask+"&state=-1&time=0"), []byte{serverpackets.OpcodeActionFailed})
+		if got := w.bypass(t, "manor_menu_select?ask="+ask+"&state=-1&time=0"); len(got) != 1 || got[0][0] == serverpackets.OpcodeActionFailed {
+			t.Fatalf("trade window %s = % x, want its window", ask, opcodes(got))
+		}
 	}
 	for _, command := range []string{"manor_menu_select?ask=7&state=-1&time=0", "manor_menu_select?ask=x&state=-1&time=0", "manor_menu_select?ask=3&state=-1"} {
 		wantOnly(t, command, w.bypass(t, command))

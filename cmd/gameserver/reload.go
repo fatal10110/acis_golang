@@ -9,6 +9,7 @@ import (
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -47,6 +48,9 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 		},
 		CursedWeapons: func() (*entity.CursedWeaponTable, error) {
 			return gamexml.LoadCursedWeapons(filepath.Join(xmlRoot, "cursedWeapons.xml"), data.Skills)
+		},
+		Doors: func() (*door.Table, error) {
+			return gamexml.LoadDoors(filepath.Join(xmlRoot, "doors.xml"), log)
 		},
 		HTML: func() error {
 			fresh, err := loadHTMLCache(paths, log)

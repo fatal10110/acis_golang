@@ -230,6 +230,8 @@ func TestAllowedAcceptsWireSafeInGameOpcodes(t *testing.T) {
 		clientpackets.OpcodeRequestHennaUnequipList,
 		clientpackets.OpcodeRequestHennaUnequipInfo,
 		clientpackets.OpcodeRequestHennaUnequip,
+		clientpackets.OpcodeRequestBuyProcure,
+		clientpackets.OpcodeRequestBuySeed,
 		clientpackets.OpcodeDlgAnswer,
 		clientpackets.OpcodeGameGuardReply,
 		clientpackets.OpcodeRequestShowMiniMap,
