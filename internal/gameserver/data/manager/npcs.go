@@ -277,6 +277,16 @@ type Npcs struct {
 	// scripts raises each live hostile NPC's script hooks; nil raises
 	// none.
 	scripts npc.ScriptHooks
+	// pickUps takes the ground items live NPCs pick up out of the world;
+	// nil leaves them on the ground. Set once, before any spawn.
+	pickUps npc.GroundTaker
+}
+
+// SetGroundTaker makes t take the ground items the NPCs spawned from now on
+// pick up out of the world. Call it before SpawnOnStart.
+func (n *Npcs) SetGroundTaker(t npc.GroundTaker) {
+	n.pickUps = t
+	n.folk.Ground = t
 }
 
 // NewNpcs builds a population that raises no script hook and spawns it at

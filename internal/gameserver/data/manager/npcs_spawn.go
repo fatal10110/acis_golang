@@ -204,7 +204,7 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	}
 	hostile.SetCurrentHP(hp)
 	rewards := n.rewarderFor(hostile, tmpl)
-	rt := npc.Runtime{World: n.state, Log: n.log, Items: n.items, Rewards: rewards, Remover: n, Slot: slot, Scripts: n.scripts}
+	rt := npc.Runtime{World: n.state, Log: n.log, Items: n.items, Rewards: rewards, Remover: n, Slot: slot, Scripts: n.scripts, Ground: n.pickUps}
 	if rewards.rights != nil {
 		rt.Hits = rewards.rights
 	}

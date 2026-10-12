@@ -106,6 +106,7 @@ func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids
 	if err != nil {
 		return nil, err
 	}
+	npcs.SetGroundTaker(link)
 	decayHooks.SetRespawnHook(npcs.RespawnHook)
 	respawnHooks.SetHook(npcs.Respawn)
 	spawner.Bind(npcs)

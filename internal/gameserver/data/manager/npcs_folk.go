@@ -62,6 +62,9 @@ type FolkSpawner struct {
 	// Remover takes the NPC out of the world for a script delete; nil
 	// decays it with no respawn.
 	Remover npc.FolkRemover
+	// Ground takes the items the NPC picks up out of the world; nil leaves
+	// them on the ground.
+	Ground npc.GroundTaker
 	// SeeRange is the configured NPC see range; zero keeps the shipped
 	// default.
 	SeeRange int
@@ -92,6 +95,7 @@ func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading in
 		Slot:           slot,
 		Scripts:        s.Scripts,
 		Remover:        s.Remover,
+		Ground:         s.Ground,
 		SeeRange:       s.SeeRange,
 	}
 	if s.NewSink != nil {

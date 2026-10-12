@@ -272,6 +272,7 @@ type brain interface {
 	AddAttackDesireDamage(target attackable.Combatant, damage int, weight float64)
 	AddFollowDesire(target attackable.Combatant, weight float64)
 	AddFleeDesire(target attackable.Combatant, distance int, weight float64)
+	AddPickUpDesire(itemObjectID int32, weight float64)
 }
 
 var (

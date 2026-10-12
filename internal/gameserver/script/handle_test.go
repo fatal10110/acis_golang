@@ -63,6 +63,10 @@ func (b *recordingBrain) AddMoveRouteDesire(name string, weight float64) {
 	b.record("route %s %v", name, weight)
 }
 
+func (b *recordingBrain) AddPickUpDesire(itemObjectID int32, weight float64) {
+	b.record("pick-up %d %v", itemObjectID, weight)
+}
+
 // combatant is a creature the world tracks under objectID.
 type combatant struct {
 	attackabletest.Combatant
@@ -101,6 +105,7 @@ func TestNPCDesireRequests(t *testing.T) {
 	n.AddFleeDesire(p, 500, 10000)
 	n.AddSocialDesire(3, 7000, 1000)
 	n.AddMoveRouteDesire("walk", 1000000)
+	n.AddPickUpDesire(9001, 1000000)
 	n.AddAttackDesire(nil, 1)
 	n.AddFollowDesire((*Player)(nil), 1)
 	n.AddCastDesire(&Player{}, ref, 1)
@@ -119,6 +124,7 @@ func TestNPCDesireRequests(t *testing.T) {
 		"flee 2 500 10000",
 		"social 3 7000 1000",
 		"route walk 1e+06",
+		"pick-up 9001 1e+06",
 		"attack nil 1",
 		"follow nil 1",
 		"cast nil {4107 1} 1 check=true move=true",
