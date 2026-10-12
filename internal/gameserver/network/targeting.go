@@ -45,9 +45,9 @@ func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot event.At
 // attack: an AttackRequest on the object already selected.
 func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlayer, objectID int32, selected, ctrl, shift bool) {
 	target := l.resolveTarget(objectID)
-	// A fence answers every click, plain, forced or shifted, with
-	// ActionFailed: it is never selected.
-	if target == nil || target.Kind() == actor.KindFence {
+	// A fence or a signet effect point answers every click, plain, forced
+	// or shifted, with ActionFailed: it is never selected.
+	if _, point := target.(*npc.EffectPoint); target == nil || point || target.Kind() == actor.KindFence {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
