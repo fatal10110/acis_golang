@@ -105,8 +105,11 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 	}
 
 	var afterCanCast func() error
-	if known && def.Target == modelskill.TargetGround {
+	switch {
+	case known && def.Target == modelskill.TargetGround:
 		afterCanCast = l.groundCastAfterCanCast(live, def)
+	case known && def.SkillType == "TAKE_CASTLE":
+		afterCanCast = l.takeCastleAfterCanCast(live, def, l.magicSkillFinalTarget(live, def, selected))
 	}
 	started, err := actorcast.StartPlayerSkill(actorcast.PlayerSkillRequest{
 		Controller:  controller,
@@ -123,7 +126,7 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 		},
 	})
 	if err != nil {
-		if errors.Is(err, errGroundCastRejected) {
+		if errors.Is(err, errGroundCastRejected) || errors.Is(err, errTakeCastleRefused) {
 			return
 		}
 		// A nextActionAttack skill refused at its cost and condition checks

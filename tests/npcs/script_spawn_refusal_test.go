@@ -18,8 +18,8 @@ import (
 const (
 	spawnBrokenCaptainID = 20133
 	spawnMissingID       = 4242
-	// spawnArtifactID is a castle artifact, which spawns as no NPC kind.
-	spawnArtifactID = 35063
+	// spawnTowerID is a castle control tower, which spawns as no NPC kind.
+	spawnTowerID = 13002
 )
 
 // brokenCaptainTemplates is the script spawn table with the broken captain.
@@ -97,22 +97,22 @@ func TestScriptCreatePrivatesPanicsOnMissingTemplate(t *testing.T) {
 // is refused with no handle and logged, and its master keeps no private.
 func TestScriptPrivateKindRefusals(t *testing.T) {
 	t.Parallel()
-	artifact := gameservertest.FolkTemplate("HolyThing", spawnArtifactID)
+	tower := gameservertest.FolkTemplate("LifeTower", spawnTowerID)
 	w := bootScriptSpawns(t, gameservertest.WithNPCs(npc.NewTable([]*npc.Template{
 		spawnMonster(spawnWolfID, "Wolf"),
 		gameservertest.FolkTemplate("Merchant", spawnGrocerID),
-		artifact,
+		tower,
 	})))
 	var logged bytes.Buffer
 	spawner := script.NewSpawner(w.srv.NpcSpawns, zerolog.New(&logged))
 
 	for _, id := range []int32{spawnWolfID, spawnGrocerID} {
 		master := spawner.AddSpawn(id, script.Loc{X: w.at.X + 50, Y: w.at.Y, Z: w.at.Z}, false, 0)
-		if h := spawner.CreateOnePrivate(master, spawnArtifactID, 0); h != nil {
-			t.Fatalf("artifact private of %d returned %v, want no handle", id, h)
+		if h := spawner.CreateOnePrivate(master, spawnTowerID, 0); h != nil {
+			t.Fatalf("tower private of %d returned %v, want no handle", id, h)
 		}
-		if h := spawner.CreateOnePrivateEx(master, spawnArtifactID, script.Loc{X: w.at.X + 70, Y: w.at.Y, Z: w.at.Z}, 0, script.Params{}); h != nil {
-			t.Fatalf("artifact private of %d at a point returned %v, want no handle", id, h)
+		if h := spawner.CreateOnePrivateEx(master, spawnTowerID, script.Loc{X: w.at.X + 70, Y: w.at.Y, Z: w.at.Z}, 0, script.Params{}); h != nil {
+			t.Fatalf("tower private of %d at a point returned %v, want no handle", id, h)
 		}
 		if live := spawnedNPC(t, w, int(id)).(npc.PartyMember); len(live.Minions()) != 0 {
 			t.Fatalf("master %d privates = %d after refusals, want none", id, len(live.Minions()))

@@ -108,8 +108,11 @@ func (f *Folk) raiseAttacked(attacker attackable.Combatant, damage int32, sk mod
 // The HP left is never under folkMinHP for an undying template, nor under
 // zero otherwise, and an NPC left under folkDeathHP dies. It reports
 // whether this call killed the NPC. A hit has no sleep, hold or stun to
-// break: none lands on a civilian NPC.
+// break: none lands on a civilian NPC. A holy artifact takes no hit at all.
 func (f *Folk) reduceHP(amount float64, attacker attackable.Combatant, sk modelskill.Ref) bool {
+	if f.HolyThing() {
+		return false
+	}
 	return f.loseHP(amount, attacker, sk, true)
 }
 

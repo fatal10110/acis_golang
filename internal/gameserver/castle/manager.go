@@ -155,13 +155,14 @@ func (m *Manager) All() []*Castle {
 	return append([]*Castle(nil), m.order...)
 }
 
-// ByNPC returns the castle whose residence NPCs include npcID.
+// ByNPC returns the castle whose residence NPCs or holy artifacts include
+// npcID.
 func (m *Manager) ByNPC(npcID int) (*Castle, bool) {
 	if m == nil {
 		return nil, false
 	}
 	for _, c := range m.order {
-		if slices.Contains(c.NPCs, npcID) {
+		if slices.Contains(c.NPCs, npcID) || c.ArtifactNPC(npcID) {
 			return c, true
 		}
 	}

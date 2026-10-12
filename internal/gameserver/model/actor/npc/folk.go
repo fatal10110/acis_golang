@@ -17,11 +17,10 @@ import (
 )
 
 // folkInstanceKinds are the civilian service NPC types: shopkeepers,
-// trainers, gatekeepers, warehouse keepers, village masters and the like.
-// Two civilian types are left out and skipped at spawn: HolyThing, as the
-// castle artifact belongs to the siege runtime, and ChristmasTree, whose
-// click only releases the client (no selection, no talk) and which spawns
-// only from event makers or as a summoned Decoration.
+// trainers, gatekeepers, warehouse keepers, village masters, the castle
+// holy artifacts and the like. ChristmasTree is left out and skipped at
+// spawn: its click only releases the client (no selection, no talk), and
+// it spawns only from event makers or as a summoned Decoration.
 var folkInstanceKinds = map[InstanceKind]struct{}{
 	"Adventurer":            {},
 	"Auctioneer":            {},
@@ -43,6 +42,7 @@ var folkInstanceKinds = map[InstanceKind]struct{}{
 	"Fisherman":             {},
 	"Folk":                  {},
 	"Gatekeeper":            {},
+	"HolyThing":             {},
 	"ManorManagerNpc":       {},
 	"MercenaryManagerNpc":   {},
 	"Merchant":              {},
@@ -165,8 +165,24 @@ func (f *Folk) CollisionHeight() float64 { return f.Instance.Template.CollisionH
 // weddingManager is the wedding manager's type.
 const weddingManager InstanceKind = "WeddingManagerNpc"
 
-// Muted reports a civilian NPC a player's interact does nothing on.
-func (f *Folk) Muted() bool { return hostileKind(f.Instance) == "MutedFolk" }
+// holyThing is the castle holy artifact's type: a civilian NPC no creature
+// may attack or damage and a player's interact does nothing on, shown with
+// ServerObjectInfo, and the only target a HOLY skill accepts.
+const holyThing InstanceKind = "HolyThing"
+
+// HolyThing reports a castle holy artifact.
+func (f *Folk) HolyThing() bool { return hostileKind(f.Instance) == holyThing }
+
+// Muted reports a civilian NPC a player's interact does nothing on: a muted
+// civilian, or a holy artifact.
+func (f *Folk) Muted() bool {
+	kind := hostileKind(f.Instance)
+	return kind == "MutedFolk" || kind == holyThing
+}
+
+// ServerObjectView reports an NPC every player is shown with the stationary
+// ServerObjectInfo, whatever its speed: a holy artifact.
+func (f *Folk) ServerObjectView() bool { return f.HolyThing() }
 
 // QuestTalker reports whether a player's interact goes through the quest
 // dialog first: every civilian NPC but the wedding manager, whose own
