@@ -57,12 +57,14 @@ func (f Flag) String() string {
 // active until every zone that raised it has released it. The zero value
 // is ready to use.
 //
-// mu guards counts. Revalidation writes them from whichever queue moved the
-// actor (a summon-friend teleport runs on the caster's), while movement and
-// exit checks read them from the actor's own queue.
+// mu guards counts and synced. Revalidation writes them from whichever
+// queue moved the actor (a summon-friend teleport runs on the caster's),
+// while movement and exit checks read them from the actor's own queue.
+// synced is the zone set the holds were last raised against.
 type Flags struct {
 	mu     sync.RWMutex
 	counts [FlagCount]int32
+	synced *zoneSet
 }
 
 // Set raises (state true) or releases (state false) one hold on flag.
@@ -89,9 +91,17 @@ func (f *Flags) Has(flag Flag) bool {
 	return f.counts[flag] > 0
 }
 
-// Reset releases every hold on every flag.
-func (f *Flags) Reset() {
+// resync records set as the zone set the holds are raised against from now
+// on. When the holds were raised against another set, it releases every
+// one of them and returns that set; otherwise it returns nil.
+func (f *Flags) resync(set *zoneSet) *zoneSet {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	prev := f.synced
+	f.synced = set
+	if prev == nil || prev == set {
+		return nil
+	}
 	f.counts = [FlagCount]int32{}
+	return prev
 }

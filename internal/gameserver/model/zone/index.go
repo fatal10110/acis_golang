@@ -1,6 +1,7 @@
 package zone
 
 import (
+	"sync"
 	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -20,10 +21,15 @@ type Index struct {
 	zones atomic.Pointer[zoneSet]
 }
 
-// zoneSet is the zones an Index holds at one time.
+// zoneSet is the zones an Index holds at one time. Once swapped out, it
+// keeps which of its zones held each creature (holders), so a creature
+// still synced against it can leave them.
 type zoneSet struct {
 	all      []Kind
 	byRegion [world.RegionsX][world.RegionsY][]Kind
+
+	retire sync.Once
+	held   map[int32][]Kind
 }
 
 // NewIndex returns an empty Index.
@@ -99,19 +105,29 @@ func (ix *Index) ByID(id int) (Kind, bool) {
 
 // At returns the zones attached to the region containing (x, y); nil when
 // the point falls outside the world or no zone touches that region.
-func (ix *Index) At(x, y int) []Kind {
+func (ix *Index) At(x, y int) []Kind { return ix.set().at(x, y) }
+
+func (s *zoneSet) at(x, y int) []Kind {
 	if x < world.MinX || x > world.MaxX || y < world.MinY || y > world.MaxY {
 		return nil
 	}
-	return ix.set().byRegion[(x-world.MinX)/regionEdge][(y-world.MinY)/regionEdge]
+	return s.byRegion[(x-world.MinX)/regionEdge][(y-world.MinY)/regionEdge]
 }
 
 // Revalidate syncs a's zone occupancy against its current position: every
 // zone near a is entered or left as needed. Call it whenever an actor
-// moves or teleports.
+// moves or teleports. A creature last synced against zones a reload has
+// swapped out leaves them first (see Rebase).
 func (ix *Index) Revalidate(a Actor) {
+	set := ix.set()
+	dropped := set.sync(a)
+	set.revalidate(a)
+	settleDropped(a, dropped)
+}
+
+func (s *zoneSet) revalidate(a Actor) {
 	pos := a.Position()
-	for _, k := range ix.At(pos.X, pos.Y) {
+	for _, k := range s.at(pos.X, pos.Y) {
 		Revalidate(k, a)
 	}
 }
@@ -120,19 +136,25 @@ func (ix *Index) Revalidate(a Actor) {
 // positions, so crossing a world-region boundary evicts zones left behind
 // without restarting zones that span the boundary.
 func (ix *Index) RevalidateMove(a Actor, previous location.Location) {
-	for _, k := range ix.At(previous.X, previous.Y) {
+	set := ix.set()
+	dropped := set.sync(a)
+	for _, k := range set.at(previous.X, previous.Y) {
 		Revalidate(k, a)
 	}
-	ix.Revalidate(a)
+	set.revalidate(a)
+	settleDropped(a, dropped)
 }
 
 // RemoveFrom evicts a from every zone attached to the region containing
 // (x, y). Call it with the actor's previous position when it leaves a
 // region or the world entirely.
 func (ix *Index) RemoveFrom(a Actor, x, y int) {
-	for _, k := range ix.At(x, y) {
+	set := ix.set()
+	dropped := set.sync(a)
+	for _, k := range set.at(x, y) {
 		Remove(k, a)
 	}
+	settleDropped(a, dropped)
 }
 
 // FindAt returns the first zone of type T whose volume contains

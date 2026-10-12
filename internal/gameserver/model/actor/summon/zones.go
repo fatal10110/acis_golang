@@ -132,10 +132,10 @@ func (a *Actor) location() location.Location {
 	return location.Location{X: x, Y: y, Z: z}
 }
 
-// ReloadZones moves the summon off held, the zones of a reload's
-// swapped-out index that hold it, and onto the reloaded zones around it.
-func (a *Actor) ReloadZones(held []zone.Kind) {
+// ReloadZones moves the summon off the zones a reload swapped out and onto
+// the reloaded zones around it.
+func (a *Actor) ReloadZones() {
 	if m := a.membership; m != nil && m.ix != nil {
-		m.Reload(m.ix, m, held)
+		m.Reload(m.ix, m)
 	}
 }

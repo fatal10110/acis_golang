@@ -83,44 +83,43 @@ func (l *GameClientLink) carryBossPermissions(next *zone.Index) {
 
 // zoneReloader is a creature whose zone membership a reload moves.
 type zoneReloader interface {
-	ReloadZones(held []zone.Kind)
+	ReloadZones()
 }
 
 // rebaseCreatures moves every creature in the world off the zones of old,
 // the swapped-out index, and into the zones now around it. Each creature is
 // moved under its own zone lock, so a revalidation that read old before
-// the swap has finished by then; old is cleared last of whatever such a
-// revalidation entered meanwhile.
+// the swap has finished by then, and one that reads the new zones moves it
+// first; old is cleared last of whatever such a revalidation entered
+// meanwhile.
 func (l *GameClientLink) rebaseCreatures(old *zone.Index) {
-	held := old.Holders()
 	if l.world != nil {
 		for _, obj := range l.world.Objects() {
 			if r, ok := obj.(zoneReloader); ok {
-				r.ReloadZones(held[obj.ObjectID()])
+				r.ReloadZones()
 			}
 		}
 	}
 	old.Clear()
 }
 
-// ReloadZones moves the player off held, the zones of a reload's
-// swapped-out index that hold it, and into the reloaded zones around it,
-// sending its compass zone when it changed.
-func (p *livePlayer) ReloadZones(held []zone.Kind) {
+// ReloadZones moves the player off the zones a reload swapped out and into
+// the reloaded zones around it, sending its compass zone when it changed.
+func (p *livePlayer) ReloadZones() {
 	if p.zoneActor == nil || p.link == nil {
 		return
 	}
-	p.zoneActor.reload(p.link.zones, held)
+	p.zoneActor.reload(p.link.zones)
 }
 
-func (a *liveZoneActor) reload(ix *zone.Index, held []zone.Kind) {
+func (a *liveZoneActor) reload(ix *zone.Index) {
 	defer a.fireScriptZones()
 	a.deliveryMu.Lock()
 	defer a.deliveryMu.Unlock()
 	a.mu.Lock()
 	a.steps = 0
 	onGrid := !a.offGrid && !a.live.Teleporting()
-	zone.Rebase(ix, held, a, onGrid)
+	ix.Rebase(a, onGrid)
 	a.syncFlags()
 	if !onGrid {
 		a.mu.Unlock()

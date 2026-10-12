@@ -48,12 +48,8 @@ func TestReloadMovesMembersWithoutExitRules(t *testing.T) {
 	if got := ix.All(); len(got) != 1 || got[0] != peace {
 		t.Fatalf("after Swap the index holds %v, want the reloaded peace zone", got)
 	}
-	held := old.Holders()
-	if len(held[1]) != 2 {
-		t.Fatalf("Holders()[summon] = %v, want the battlefield and the water", held[1])
-	}
 
-	summon.Reload(ix, summon, held[1])
+	summon.Reload(ix, summon)
 	if exits != 0 {
 		t.Fatal("the reload ran the battlefield's exit rule")
 	}
@@ -69,7 +65,7 @@ func TestReloadMovesMembersWithoutExitRules(t *testing.T) {
 	}
 
 	jumper.teleporting = true
-	jumper.Reload(ix, jumper, held[2])
+	jumper.Reload(ix, jumper)
 	if jumper.ZoneFlags().Has(FlagPeace) || peace.Inside(jumper) || jumper.ZoneFlags().Has(FlagSiege) {
 		t.Fatal("a creature mid-teleport entered the reloaded zones or kept the old flags")
 	}
