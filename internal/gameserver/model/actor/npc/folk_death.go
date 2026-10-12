@@ -146,7 +146,9 @@ func (f *Folk) DecayWithRespawn(worldState *world.State, respawnFor func(id int3
 
 // DeleteNow takes the NPC out of the world at once, leaving no corpse, on
 // the calling goroutine, and answers its spawn as for a decayed corpse: it
-// is out of the world when it returns.
+// is out of the world when it returns. It does not wait for a task this
+// NPC's queue is running; see the package doc for what keeps that task from
+// acting.
 func (f *Folk) DeleteNow() {
 	if f.remover != nil {
 		f.remover.RemoveFolk(f)

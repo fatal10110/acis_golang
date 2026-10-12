@@ -770,6 +770,13 @@ func (h *Hostile) Tick() {
 	h.brain.Tick()
 }
 
+// After runs fn on this NPC's queue once d has elapsed, for the AI's
+// wander chain and its out-of-territory stale-hate sweep. Closing the queue
+// at deletion cancels it.
+func (h *Hostile) After(d time.Duration, fn func()) ai.Timer {
+	return h.Queue().After(d, fn)
+}
+
 // Think continues the hostile AI's current intention after a bow's reuse
 // ending or a control effect ending. It never idles on an empty desire
 // queue: RunAI and TickThink do.

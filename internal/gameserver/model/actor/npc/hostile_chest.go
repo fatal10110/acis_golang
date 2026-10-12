@@ -47,7 +47,8 @@ func (h *Hostile) DeleteMe() {
 }
 
 // DeleteNow is DeleteMe run on the calling goroutine: the NPC is out of
-// the world when it returns.
+// the world when it returns. It does not wait for a task this NPC's queue
+// is running; see the package doc for what keeps that task from acting.
 func (h *Hostile) DeleteNow() {
 	if h.remover != nil {
 		h.remover.Remove(h)

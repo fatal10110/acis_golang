@@ -1,10 +1,7 @@
 package npc
 
 import (
-	"time"
-
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 )
@@ -33,12 +30,6 @@ func (h *Hostile) ShouldIdleWander() bool {
 	default:
 		return true
 	}
-}
-
-// After runs fn on this NPC's queue once d has elapsed, for the AI's
-// wander chain. Closing the queue at deletion cancels it.
-func (h *Hostile) After(d time.Duration, fn func()) ai.Timer {
-	return h.Queue().After(d, fn)
 }
 
 // RealMoveSpeed is the stance-aware move speed used as the wander offset
