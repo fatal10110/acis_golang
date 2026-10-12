@@ -99,7 +99,7 @@ func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.Re
 		return
 	}
 	if blocked := l.blockRefusal(live, target); blocked != 0 {
-		live.SendFrame(serverpackets.FrameSystemMessageString(blocked, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(blocked, target.CharacterName()))
 		return
 	}
 	if target.ObjectID() == live.ObjectID() || target.CursedWeaponEquipped() || live.CursedWeaponEquipped() || target.Invisible() {
@@ -107,7 +107,7 @@ func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.Re
 		return
 	}
 	if l.parties.InParty(target.ObjectID()) {
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsAlreadyInParty, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsAlreadyInParty, target.CharacterName()))
 		return
 	}
 	if target.clientDetached() {
@@ -127,7 +127,7 @@ func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.Re
 		return
 	}
 	if book.ProcessingRequest(target.ObjectID()) {
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.CharacterName()))
 		return
 	}
 
@@ -158,11 +158,11 @@ func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.Re
 		return
 	case tradebook.RequestTargetBusy:
 		l.parties.CancelInvite(live.ObjectID())
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, target.CharacterName()))
 		return
 	}
-	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageYouInvitedS1ToParty, target.Name))
-	target.SendFrame(serverpackets.FrameAskJoinParty(live.Name, int32(loot)))
+	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageYouInvitedS1ToParty, target.CharacterName()))
+	target.SendFrame(serverpackets.FrameAskJoinParty(live.CharacterName(), int32(loot)))
 }
 
 // requestAnswerJoinParty answers live's pending party invitation. With no
@@ -242,7 +242,7 @@ func (l *GameClientLink) applyPartyNotices(notices []party.Notice) {
 			})
 		case party.WindowDelete[*livePlayer]:
 			l.broadcastToMembers(n.To, func() wire.Frame {
-				return serverpackets.FramePartySmallWindowDelete(n.Member.ObjectID(), n.Member.Name)
+				return serverpackets.FramePartySmallWindowDelete(n.Member.ObjectID(), n.Member.CharacterName())
 			})
 		case party.WindowDeleteAll[*livePlayer]:
 			n.To.SendFrame(serverpackets.FramePartySmallWindowDeleteAll())
@@ -272,7 +272,7 @@ func (l *GameClientLink) applyPartyNotices(notices []party.Notice) {
 			l.broadcastToMembers(n.To, serverpackets.FrameExCloseMPCC)
 		case party.ChannelPartyUpdate[*livePlayer]:
 			l.broadcastToMembers(n.To, func() wire.Frame {
-				return serverpackets.FrameExMPCCPartyInfoUpdate(n.Leader.Name, n.Leader.ObjectID(), int32(n.Count), n.Added)
+				return serverpackets.FrameExMPCCPartyInfoUpdate(n.Leader.CharacterName(), n.Leader.ObjectID(), int32(n.Count), n.Added)
 			})
 		case party.LeaderChanged[*livePlayer]:
 			if l.rooms != nil {
@@ -307,7 +307,7 @@ func partyMemberRow(live *livePlayer) serverpackets.PartyMember {
 	res := live.ResourceValues()
 	return serverpackets.PartyMember{
 		ObjectID: live.ObjectID(),
-		Name:     live.Name,
+		Name:     live.CharacterName(),
 		CP:       int32(res.CurrentCP),
 		MaxCP:    int32(res.MaxCP),
 		HP:       int32(res.CurrentHP),

@@ -123,6 +123,32 @@ func (s *State) RemovePlayer(id int32) {
 	s.players.remove(id)
 }
 
+// RenamePlayer runs rename, which changes the name of the online player
+// with the given id to name, and re-keys its PlayerByName entry, under the
+// same lock as AddPlayer and RemovePlayer, so neither sees the name and the
+// index disagree. It refuses, without running rename, a name another
+// online player is indexed under, matched case-insensitively.
+func (s *State) RenamePlayer(id int32, name string, rename func()) bool {
+	s.playersMu.Lock()
+	defer s.playersMu.Unlock()
+
+	to := strings.ToLower(name)
+	if owner, taken := s.playerNames[to]; taken && owner != id {
+		return false
+	}
+	obj, ok := s.players.get(id)
+	if !ok {
+		rename()
+		return true
+	}
+	if from := strings.ToLower(obj.CharacterName()); s.playerNames[from] == id {
+		delete(s.playerNames, from)
+	}
+	rename()
+	s.playerNames[to] = id
+	return true
+}
+
 // Player returns the online player with the given id, if any.
 func (s *State) Player(id int32) (Player, bool) { return s.players.get(id) }
 

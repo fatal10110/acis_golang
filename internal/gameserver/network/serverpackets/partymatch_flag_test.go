@@ -22,9 +22,12 @@ func TestPartyRoomFlag(t *testing.T) {
 	for name, encode := range encoders {
 		// The cubic count's offset is where an encoding with one cubic
 		// first differs from one with none.
-		withCubic := &player.Character{Name: "C"}
+		withCubic := &player.Character{}
+		withCubic.SetName("C")
 		withCubic.AddOrRefreshCubic(1, false)
-		base := encode(&player.Character{Name: "C"})
+		plain := &player.Character{}
+		plain.SetName("C")
+		base := encode(plain)
 		cubic := encode(withCubic)
 		countAt := 0
 		for base[countAt] == cubic[countAt] {
@@ -32,7 +35,8 @@ func TestPartyRoomFlag(t *testing.T) {
 		}
 		flagAt := countAt + 2
 
-		inRoom := &player.Character{Name: "C"}
+		inRoom := &player.Character{}
+		inRoom.SetName("C")
 		inRoom.SetPartyRoom(3)
 		got := encode(inRoom)
 		if len(got) != len(base) {

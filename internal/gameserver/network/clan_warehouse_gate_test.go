@@ -32,7 +32,7 @@ func TestWarehouseGateDropsClanWarehouseOfExpelledMember(t *testing.T) {
 
 	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, memberID, capture)
-	live.Character.Name = "Member"
+	live.Character.SetName("Member")
 	live.SetClanID(clanID)
 	activate := func() {
 		live.storage.active = activeStore{store: itemcontainer.NewClanWarehouse(clanID, testItemTemplates()), clanID: clanID}
@@ -45,7 +45,8 @@ func TestWarehouseGateDropsClanWarehouseOfExpelledMember(t *testing.T) {
 	}
 
 	activate()
-	leader := &player.Character{ID: leaderID, Name: "Leader"}
+	leader := &player.Character{ID: leaderID}
+	leader.SetName("Leader")
 	leader.SetClanID(clanID)
 	if _, _, res := svc.Oust(leader, "Member", func(int32) *player.Character { return live.Character }, time.Now()); res != clan.Ousted {
 		t.Fatalf("oust = %v, want Ousted", res)

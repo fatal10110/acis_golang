@@ -65,7 +65,7 @@ func (l *GameClientLink) shareAdena(members []*livePlayer, adena int, origin par
 // reads as swept up.
 func sendPartyLootNotice(members []*livePlayer, looter *livePlayer, spoil bool, itemID int32, count, enchant int) {
 	broadcastFrame(func() wire.Frame {
-		return partyLootNoticeFrame(looter.Name, spoil, itemID, count, enchant)
+		return partyLootNoticeFrame(looter.CharacterName(), spoil, itemID, count, enchant)
 	}, func(send func(frameReceiver)) {
 		for _, m := range members {
 			if m != looter {

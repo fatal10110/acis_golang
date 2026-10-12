@@ -44,7 +44,7 @@ func (l *GameClientLink) charInfoPage(target *livePlayer) string {
 	partyText := "N/A"
 	if l.parties != nil {
 		if view, ok := l.parties.View(target.ObjectID()); ok {
-			partyText = `<a action="bypass -h admin_party_info ` + target.Name + `">` + strconv.Itoa(len(view.Members)) + ` members</a>`
+			partyText = `<a action="bypass -h admin_party_info ` + target.CharacterName() + `">` + strconv.Itoa(len(view.Members)) + ` members</a>`
 		}
 	}
 	// A player lingering after its connection dropped shows as
@@ -57,7 +57,7 @@ func (l *GameClientLink) charInfoPage(target *livePlayer) string {
 	current, next := target.intentionNames()
 	page := l.adminHTML("charinfo.htm")
 	for _, r := range [...][2]string{
-		{"%name%", target.Name},
+		{"%name%", target.CharacterName()},
 		{"%objid%", strconv.Itoa(int(target.ObjectID()))},
 		{"%clan%", clanName},
 		{"%party%", partyText},
@@ -87,20 +87,20 @@ func (l *GameClientLink) adminPartyInfo(gm *livePlayer, line string) {
 		}
 	}
 	if members == nil {
-		sendText(gm, target.Name+" isn't in a party.")
+		sendText(gm, target.CharacterName()+" isn't in a party.")
 		return
 	}
 	var b strings.Builder
 	for _, m := range members {
-		label := m.Name + " (" + strconv.Itoa(m.Level()) + ")"
+		label := m.CharacterName() + " (" + strconv.Itoa(m.Level()) + ")"
 		if m.ObjectID() == leader {
 			label = `<font color="LEVEL">` + label + `</font>`
 		}
-		b.WriteString(`<tr><td width=150><a action="bypass -h admin_debug ` + m.Name + `">` + label +
+		b.WriteString(`<tr><td width=150><a action="bypass -h admin_debug ` + m.CharacterName() + `">` + label +
 			`</a></td><td width=120 align=right>` + player.ClassName(m.ClassID()) + `</td></tr>`)
 	}
 	page := l.adminHTML("partyinfo.htm")
-	page = strings.ReplaceAll(page, "%name%", target.Name)
+	page = strings.ReplaceAll(page, "%name%", target.CharacterName())
 	page = strings.ReplaceAll(page, "%party%", b.String())
 	sendFilledHTML(gm, 0, page, 0)
 }
@@ -134,13 +134,13 @@ func (l *GameClientLink) adminRemove(gm *livePlayer, line string) {
 				target.SetClanJoinExpiryTime(0)
 			}
 			l.storeClanPenalties(target)
-			sendText(gm, "Clan penalty is successfully removed for "+target.Name+".")
+			sendText(gm, "Clan penalty is successfully removed for "+target.CharacterName()+".")
 		})
 	case "death_penalty":
 		onPlayer(gm, target, func() {
 			target.LiftDeathPenalty()
 			if target != gm {
-				sendText(gm, target.Name+"'s Death Penalty has been lifted.")
+				sendText(gm, target.CharacterName()+"'s Death Penalty has been lifted.")
 			}
 		})
 	case "skill_reuse":
@@ -149,7 +149,7 @@ func (l *GameClientLink) adminRemove(gm *livePlayer, line string) {
 			target.ClearDisabledSkills()
 			now := target.Now()
 			target.SendFrame(serverpackets.FrameSkillCoolTime(skillCoolTimeEntries(target.SkillReuseTimers(now), now)))
-			sendText(gm, target.Name+"'s skills reuse timers are now cleaned.")
+			sendText(gm, target.CharacterName()+"'s skills reuse timers are now cleaned.")
 		})
 	default:
 		sendText(gm, usage)

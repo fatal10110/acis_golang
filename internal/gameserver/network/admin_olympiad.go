@@ -18,6 +18,6 @@ func (l *GameClientLink) adminSetHero(gm *livePlayer, _ string) {
 	onPlayer(gm, target, func() {
 		l.setHero(target, !target.IsHero())
 		l.broadcastCharacterInfo(target)
-		sendText(gm, "You have modified "+target.Name+"'s hero status.")
+		sendText(gm, "You have modified "+target.CharacterName()+"'s hero status.")
 	})
 }

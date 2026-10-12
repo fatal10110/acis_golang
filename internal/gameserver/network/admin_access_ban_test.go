@@ -51,9 +51,9 @@ func TestAdminBanAccountOfLeavingPlayerReachesLogin(t *testing.T) {
 	state := world.New()
 	gmCap := &testsupport.FrameCapture{}
 	gm := newTestLivePlayer(t, 1, gmCap)
-	gm.Name = "Admin"
+	gm.SetName("Admin")
 	target := newTestLivePlayer(t, 2, &testsupport.FrameCapture{})
-	target.Name = "Leaver"
+	target.SetName("Leaver")
 	target.Character.AccountName = "leaveracct"
 	state.Spawn(target, 100, 0, 0, 0)
 	state.AddPlayer(target)

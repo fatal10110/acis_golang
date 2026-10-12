@@ -221,6 +221,7 @@ const (
 	SystemMessageNamingAlreadyInUseByAnotherPet    = 584
 	SystemMessageNamingPetnameContainsInvalidChars = 591
 	SystemMessageNamingYouCannotSetNameOfThePet    = 695
+	SystemMessageIncorrectNameTryAgain             = 204
 	SystemMessageDistTooFarCastingStopped          = 748
 
 	// Experience, SP and level change feedback.

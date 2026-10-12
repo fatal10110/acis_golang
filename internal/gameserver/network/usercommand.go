@@ -160,7 +160,7 @@ func (l *GameClientLink) userCommandPartyInfo(live *livePlayer, _ int32) {
 	}
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessagePartyInformation))
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageLooting(int32(view.Loot))))
-	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessagePartyLeaderS1, view.Leader.Name))
+	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessagePartyLeaderS1, view.Leader.CharacterName()))
 	sendText(live, fmt.Sprintf("Members: %d/%d", len(view.Members), party.MaxMembers))
 	live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageFriendListFooter))
 }
@@ -186,7 +186,7 @@ func (l *GameClientLink) userCommandChannelListUpdate(live *livePlayer, _ int32)
 	}
 	parties := make([]serverpackets.ChannelParty, len(view.Parties))
 	for i, p := range view.Parties {
-		parties[i] = serverpackets.ChannelParty{LeaderName: p.Leader.Name, LeaderID: p.Leader.ObjectID(), Members: int32(p.Count)}
+		parties[i] = serverpackets.ChannelParty{LeaderName: p.Leader.CharacterName(), LeaderID: p.Leader.ObjectID(), Members: int32(p.Count)}
 	}
-	live.SendFrame(serverpackets.FrameExMultiPartyCommandChannelInfo(view.Leader.Name, int32(view.MembersCount), parties))
+	live.SendFrame(serverpackets.FrameExMultiPartyCommandChannelInfo(view.Leader.CharacterName(), int32(view.MembersCount), parties))
 }

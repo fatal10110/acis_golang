@@ -43,7 +43,8 @@ func TestFrameExHeroList(t *testing.T) {
 // TestFrameCharInfoHeroFlag pins CharInfo's hero byte, right after the
 // noble byte: 1 for a hero, 0 otherwise.
 func TestFrameCharInfoHeroFlag(t *testing.T) {
-	c := &player.Character{Name: "Observed"}
+	c := &player.Character{}
+	c.SetName("Observed")
 	hero := func() byte {
 		got := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: &player.Template{}}))
 		return got[len(got)-38]

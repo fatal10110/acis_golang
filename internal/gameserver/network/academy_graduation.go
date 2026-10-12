@@ -25,7 +25,7 @@ func (l *GameClientLink) graduateFromAcademy(live *livePlayer, classID int) {
 	if !ok {
 		return
 	}
-	cl, name, points := g.Clan, live.Name, g.Points
+	cl, name, points := g.Clan, live.CharacterName(), g.Points
 	if g.ReputationMoved {
 		// live was still a member as the score moved: it sees the change
 		// too, though it is off the roster by now.

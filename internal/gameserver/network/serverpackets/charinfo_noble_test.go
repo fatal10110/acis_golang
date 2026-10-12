@@ -9,7 +9,8 @@ import (
 // TestFrameCharInfoNobleFlag pins CharInfo's noble byte, which follows the
 // large crest id: 1 for a noble, 0 otherwise.
 func TestFrameCharInfoNobleFlag(t *testing.T) {
-	c := &player.Character{Name: "Observed"}
+	c := &player.Character{}
+	c.SetName("Observed")
 	noble := func() byte {
 		got := framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: &player.Template{}}))
 		// The tail after the noble byte: hero, fishing, fishing stance x/y/z,

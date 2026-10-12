@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -234,11 +233,11 @@ func npcNameTitle(t *testing.T, frame []byte) (int32, string, string) {
 // TestAdminSetNPCNameTitle pins //set name and //set title on an NPC
 // (AdminEditChar.java admin_set name|title, Npc case): the NPC takes the
 // word as given, every player around it is shown its NpcInfo again, and
-// the GM is told. Renaming a player is not ported yet (#3399) and releases
-// the client; a missing value answers the usage.
+// the GM is told; a missing value answers the usage. TestAdminSetPlayerName
+// covers a player.
 func TestAdminSetNPCNameTitle(t *testing.T) {
 	t.Parallel()
-	srv, gm, user, _, userID := bootSetAdmin(t)
+	srv, gm, user, _, _ := bootSetAdmin(t)
 	folk := srv.SpawnFolkNPCAt(t, &npc.Template{
 		ID: 31357, TemplateID: 31357, Type: "Folk", Name: "Leandro", Title: "Gatekeeper", Level: 1, HPMax: 100,
 		UsingServerSideName: true, UsingServerSideTitle: true,
@@ -275,15 +274,6 @@ func TestAdminSetNPCNameTitle(t *testing.T) {
 	settle(t, user)
 	if got := folk.CharacterName(); got != "Leandro_The_Very_Long_Name" {
 		t.Fatalf("NPC name = %q, want the new one", got)
-	}
-
-	// A player: not ported yet (#3399).
-	selectPlayer(t, gm, user, userID)
-	if got := testsupport.FrameOpcodes(exchange(t, gm, encodeBuildCmd("set name Renamed"))); !slices.Equal(got, []byte{serverpackets.OpcodeActionFailed}) {
-		t.Fatalf("//set name on a player frames = %x, want ActionFailed", got)
-	}
-	if strings.Contains(onlineCharacter(t, srv, userID).Name, "Renamed") {
-		t.Fatal("//set name renamed the player")
 	}
 }
 

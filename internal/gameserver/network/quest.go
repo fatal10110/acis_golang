@@ -101,7 +101,7 @@ func (l *GameClientLink) restoreQuests(ctx context.Context, c *player.Character)
 		resolve = l.scripts.JournalQuest
 	}
 	for _, name := range c.Quests().Restore(rows, resolve) {
-		l.log.Warn().Str("quest", name).Str("player", c.Name).Msg("select character: unknown quest in journal; skipped")
+		l.log.Warn().Str("quest", name).Str("player", c.CharacterName()).Msg("select character: unknown quest in journal; skipped")
 	}
 	return nil
 }

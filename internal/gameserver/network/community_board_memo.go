@@ -114,7 +114,7 @@ func (l *GameClientLink) boardTopicWrite(live *livePlayer, args [5]string) {
 			l.sendBoard(live, bbs.NamedForumMissing(args[1]))
 			return
 		}
-		l.board.forums.AddTopic(forumID, args[4], live.Name, live.ObjectID(), args[3], time.Now())
+		l.board.forums.AddTopic(forumID, args[4], live.CharacterName(), live.ObjectID(), args[3], time.Now())
 		l.showMemo(live)
 	case "del":
 		forumID, ok := parseJavaInt(args[1])

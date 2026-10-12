@@ -29,18 +29,18 @@ func (l *GameClientLink) requestAskJoinChannel(live *livePlayer, req clientpacke
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotInviteToCommandChannel))
 		return
 	case party.ChannelInviteTargetInChannel:
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1AlreadyMemberOfCommandChannel, target.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1AlreadyMemberOfCommandChannel, target.CharacterName()))
 		return
 	}
 	if !l.commandChannelAuthority(live, false) {
 		return
 	}
 	if l.tradeBook().Invite(tradebook.KindCommandChannel, live.ObjectID(), targetLeader.ObjectID(), false).Status != tradebook.RequestStarted {
-		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, targetLeader.Name))
+		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1IsBusyTryLater, targetLeader.CharacterName()))
 		return
 	}
-	targetLeader.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageCommandChannelConfirmFromS1, live.Name))
-	targetLeader.SendFrame(serverpackets.FrameExAskJoinMPCC(live.Name))
+	targetLeader.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageCommandChannelConfirmFromS1, live.CharacterName()))
+	targetLeader.SendFrame(serverpackets.FrameExAskJoinMPCC(live.CharacterName()))
 }
 
 // requestAcceptJoinChannel answers live's pending command channel
@@ -60,7 +60,7 @@ func (l *GameClientLink) requestAcceptJoinChannel(live *livePlayer, req clientpa
 		return
 	}
 	if req.Response != 1 {
-		requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeclinedChannelInvitation, live.Name))
+		requester.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1DeclinedChannelInvitation, live.CharacterName()))
 		return
 	}
 	if !forms {
@@ -113,7 +113,7 @@ func (l *GameClientLink) requestChannelPartyMembers(live *livePlayer, req client
 	}
 	rows := make([]serverpackets.PartyChannelMember, len(view.Members))
 	for i, m := range view.Members {
-		rows[i] = serverpackets.PartyChannelMember{Name: m.Name, ObjectID: m.ObjectID(), ClassID: int32(m.ClassID())}
+		rows[i] = serverpackets.PartyChannelMember{Name: m.CharacterName(), ObjectID: m.ObjectID(), ClassID: int32(m.ClassID())}
 	}
 	live.SendFrame(serverpackets.FrameExMPCCShowPartyMemberInfo(rows))
 }

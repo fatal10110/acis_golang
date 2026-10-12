@@ -49,7 +49,7 @@ func (s *fakeCharStore) Create(_ context.Context, c *player.Character) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.byID[c.ID] = c
-	s.names[c.Name] = true
+	s.names[c.CharacterName()] = true
 	return nil
 }
 

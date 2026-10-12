@@ -67,10 +67,10 @@ func (l *GameClientLink) handleSay2(client *Client, live *livePlayer, req client
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageChattingProhibited))
 		return
 	}
-	l.chat.Log.Info().Msg(chat.LogEntry(line, live.Name))
+	l.chat.Log.Info().Msg(chat.LogEntry(line, live.CharacterName()))
 	handle := chatHandlers[line.Type]
 	if handle == nil {
-		l.log.Warn().Str("player", live.Name).Stringer("type", line.Type).Msg("chat line on a channel with no handler")
+		l.log.Warn().Str("player", live.CharacterName()).Stringer("type", line.Type).Msg("chat line on a channel with no handler")
 		return
 	}
 	line.Text = chat.Clean(line.Text)
@@ -80,7 +80,7 @@ func (l *GameClientLink) handleSay2(client *Client, live *livePlayer, req client
 // frameCreatureSay builds live's line as its listeners see it.
 func frameCreatureSay(live *livePlayer, line chat.Line) func() wire.Frame {
 	return func() wire.Frame {
-		return serverpackets.FrameCreatureSay(live.ObjectID(), int32(line.Type), live.Name, line.Text)
+		return serverpackets.FrameCreatureSay(live.ObjectID(), int32(line.Type), live.CharacterName(), line.Text)
 	}
 }
 
@@ -156,7 +156,7 @@ func (l *GameClientLink) chatTell(_ *Client, live *livePlayer, line chat.Line) {
 	}
 	if !live.accessLevel().IsGM {
 		if target.BlockingAll() {
-			live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1BlockedEverything, target.Name))
+			live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1BlockedEverything, target.CharacterName()))
 			return
 		}
 		if l.relations.IsBlocked(target.ObjectID(), live.ObjectID()) {
@@ -164,8 +164,8 @@ func (l *GameClientLink) chatTell(_ *Client, live *livePlayer, line chat.Line) {
 			return
 		}
 	}
-	target.SendFrame(serverpackets.FrameCreatureSay(live.ObjectID(), int32(line.Type), live.Name, line.Text))
-	live.SendFrame(serverpackets.FrameCreatureSay(live.ObjectID(), int32(line.Type), "->"+target.Name, line.Text))
+	target.SendFrame(serverpackets.FrameCreatureSay(live.ObjectID(), int32(line.Type), live.CharacterName(), line.Text))
+	live.SendFrame(serverpackets.FrameCreatureSay(live.ObjectID(), int32(line.Type), "->"+target.CharacterName(), line.Text))
 }
 
 // chatParty is heard by every member of live's party, live included. With

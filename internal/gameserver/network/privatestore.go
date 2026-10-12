@@ -439,8 +439,8 @@ func (l *GameClientLink) buyFromStore(live *livePlayer, req clientpackets.Reques
 	}
 	if l.answerDeal(live, deal) {
 		for _, row := range deal.Rows {
-			owner.SendFrame(storeDealFrame(row, live.Name, false))
-			live.SendFrame(storeDealFrame(row, owner.Name, true))
+			owner.SendFrame(storeDealFrame(row, live.CharacterName(), false))
+			live.SendFrame(storeDealFrame(row, owner.CharacterName(), true))
 		}
 	}
 	l.closeSoldOutStore(owner, deal)
@@ -476,8 +476,8 @@ func (l *GameClientLink) sellToStore(live *livePlayer, req clientpackets.Request
 	}
 	if l.answerDeal(live, deal) {
 		for _, row := range deal.Rows {
-			owner.SendFrame(storeDealFrame(row, live.Name, true))
-			live.SendFrame(storeDealFrame(row, owner.Name, false))
+			owner.SendFrame(storeDealFrame(row, live.CharacterName(), true))
+			live.SendFrame(storeDealFrame(row, owner.CharacterName(), false))
 		}
 	}
 	l.closeSoldOutStore(owner, deal)

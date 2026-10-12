@@ -42,7 +42,7 @@ func (s *Service) GrantTitle(c *player.Character, name, title string) (*Clan, Me
 	}
 	// The name is matched exactly: a character name holds no pattern
 	// character, so the reference's pattern match is an equality.
-	if c.IsNoble() && name == c.Name {
+	if c.IsNoble() && name == c.CharacterName() {
 		return nil, Member{}, TitleSelf
 	}
 	cl, ok := s.ClanOf(c)
