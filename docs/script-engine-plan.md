@@ -247,12 +247,12 @@ of a type the family's package declares, holding engine cells only. The catalog 
 once and hands it to the constructor of every member, as it hands tables to other
 constructors; a member registers itself in it from its constructor, as the reference's
 constructor does. The same `go/types` test covers it: a family's plain fields can only be
-read. A map keyed by NPC is `NPCMapCell`, with the reference's removal of a value; its keys
-and values match by NPC identity, the spawn slot's, as the timers' do. A field holding one
-player is `PlayerCell`; a list is `ListCell`, ordered and keeping duplicates, whose creature
-handles match by the same identity (a player's is its character) and other values by `==`.
-A member reaches another member's helpers through
-`QuestState.Quest()`, the registered script of a state it found.
+read, directly or through a local copied from them. A map keyed by NPC is `NPCMapCell`,
+with the reference's removal of a value; its keys and values match by NPC identity, the
+spawn slot's, as the timers' do. A field holding one player is `PlayerCell`; a list is
+`ListCell`, ordered and keeping duplicates, whose creature handles match by the same
+identity (a player's is its character) and other values by `==`. A member reaches another
+member's helpers through `QuestState.Quest()`, the registered script of a state it found.
 
 ### Timers
 
@@ -325,7 +325,9 @@ where the reference asks an NPC to walk a route (A13).
 
 1. A detaching player gets no script give, take or journal write. Enforced by one new flag
    on `player.Character`, set where `markDetaching` runs, before inventory persistence is
-   released. This closes a relog duplication window.
+   released. This closes a relog duplication window. A give or take raised from another queue
+   checks the flag and changes the inventory under a read lock that `MarkDetaching` takes for
+   writing after it sets the flag, so it lands before the final saves or not at all.
 2. A failed quest or memo load refuses the character selection. The reference continues
    with an empty journal or an empty memo set, which lets one-time rewards be taken again
    (memos hold the `<quest>_OneTimeQuestFlag` and class-change flags).
