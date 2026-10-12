@@ -22,15 +22,28 @@ jobs:
         # The slowest behavior suites get their own runners. In a single
         # `go test ./...` they queue behind compiling every other package.
         # Keep the `rest` exclusion list in sync with these packages.
+        #
+        # A shard runs either `pkgs` on the inline executor or `pool` on the
+        # real pool, so the two passes over a suite run side by side. A pool
+        # shard reads the build cache its inline sibling (`cache`) saves.
         shard:
           - name: skills-pets
+            cache: skills-pets
             pkgs: ./tests/skills ./tests/pets
+          - name: skills-pets-pool
+            cache: skills-pets
             pool: ./tests/skills ./tests/pets
           - name: combat-items
+            cache: combat-items
             pkgs: ./tests/combat ./tests/items
+          - name: combat-items-pool
+            cache: combat-items
             pool: ./tests/combat ./tests/items
           - name: rest
-            pkgs: ""
+            cache: rest
+            pkgs: all
+          - name: rest-pool
+            cache: rest
             pool: ./tests/character ./tests/lifecycle ./tests/trade ./tests/social
     services:
       mariadb:
@@ -62,8 +75,8 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-${{ runner.os }}-${{ matrix.shard.name }}-${{ github.sha }}
-          restore-keys: go-${{ runner.os }}-${{ matrix.shard.name }}-
+          key: go-${{ runner.os }}-${{ matrix.shard.cache }}-${{ github.sha }}
+          restore-keys: go-${{ runner.os }}-${{ matrix.shard.cache }}-
 
       # main saves only the build cache entries its own run used, so the cache
       # does not carry every earlier build forward and grow without bound. Go
@@ -71,7 +84,7 @@ jobs:
       # backdating them all first marks every entry this run reads. Two hours
       # stays well inside Go's own 5-day trim.
       - name: Mark Go cache entries unused
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && matrix.shard.pkgs
         run: |
           mkdir -p ~/.cache/go-build
           find ~/.cache/go-build -type f -name '*-[ad]' -exec touch -d '2 hours ago' {} +
@@ -85,15 +98,18 @@ jobs:
         if: matrix.shard.name == 'rest'
         run: go vet ./...
 
+      # gotest.sh keeps the log to package results and failing tests' output,
+      # and ends it with the slowest packages and tests.
       - name: Test
+        if: matrix.shard.pkgs
         env:
           PKGS: ${{ matrix.shard.pkgs }}
         run: |
-          if [ -z "$PKGS" ]; then
+          if [ "$PKGS" = all ]; then
             PKGS="$(go list ./... | grep -vE '/tests/(skills|pets|combat|items)$')"
           fi
           # shellcheck disable=SC2086 # PKGS is a space-separated package list
-          go test -race $PKGS
+          .github/scripts/gotest.sh -race $PKGS
 
       # Behavior suites run on sim.Inline with a test-driven clock by
       # default; this keeps their run on the real pool, with real
@@ -101,38 +117,39 @@ jobs:
       # cast, swing and stand-up times, so far more tests than GOMAXPROCS
       # run at once.
       - name: Test (real pool)
-        if: matrix.shard.pool != ''
+        if: matrix.shard.pool
         env:
           ACIS_SIM_EXECUTOR: pool
           PKGS: ${{ matrix.shard.pool }}
         run: |
           # shellcheck disable=SC2086 # PKGS is a space-separated package list
-          go test -race -parallel 16 $PKGS
+          .github/scripts/gotest.sh -race -parallel 16 $PKGS
 
       - name: Test (simdebug)
         if: matrix.shard.name == 'rest'
-        run: go test -race -tags simdebug ./internal/gameserver/sim/...
+        run: .github/scripts/gotest.sh -race -tags simdebug ./internal/gameserver/sim/...
 
       # Go skips writing an output it already holds byte for byte, so an
       # action entry written this run can name an output file left backdated;
       # keep the output of every kept entry before dropping the rest.
       - name: Drop Go cache entries this run did not use
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && matrix.shard.pkgs
         run: |
           cd ~/.cache/go-build
           find . -type f -name '*-a' -newer "$RUNNER_TEMP/go-cache-start" \
             -exec awk '{print substr($3, 1, 2) "/" $3 "-d"}' {} + | xargs -r touch -c
           find . -type f -name '*-[ad]' ! -newer "$RUNNER_TEMP/go-cache-start" -delete
 
-      # Only main saves, so every branch can restore it.
+      # Only main's inline shards save, so every branch and both shards of a
+      # suite can restore it.
       - name: Save Go cache
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && matrix.shard.pkgs
         uses: actions/cache/save@v4
         with:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: go-${{ runner.os }}-${{ matrix.shard.name }}-${{ github.sha }}
+          key: go-${{ runner.os }}-${{ matrix.shard.cache }}-${{ github.sha }}
 
   # Runs the linters and the gofumpt formatter from .golangci.yml.
   lint:
