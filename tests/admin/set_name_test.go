@@ -127,9 +127,22 @@ func TestAdminSetPlayerName(t *testing.T) {
 		t.Fatal("the player is still found by its old name")
 	}
 
-	// The old name is free again once stored; the new one is taken.
+	// The new name is taken; the old one is free again.
 	if frames := exchange(t, gm, encodeBuildCmd("set name renamed7")); !incorrectName(frames) {
 		t.Fatalf("//set name to the new name frames = %x, want INCORRECT_NAME_TRY_AGAIN", testsupport.FrameOpcodes(frames))
+	}
+	gmFrames = append(exchange(t, gm, encodeBuildCmd("set name Player")), settle(t, gm)...)
+	charInfos, rest = split(gmFrames)
+	if len(charInfos) != 1 {
+		t.Fatalf("GM frames after //set name Player = %x, want one CharInfo", testsupport.FrameOpcodes(gmFrames))
+	}
+	assertTexts(t, rest, "You successfully set your target's name to Player.")
+	settle(t, user)
+	if p, ok := srv.State.PlayerByName("player"); !ok || p.ObjectID() != userID {
+		t.Fatal("the player is not found by its old name again")
+	}
+	if got := storedName(t, srv, userID); got != "Player" {
+		t.Fatalf("stored char_name = %q, want Player", got)
 	}
 }
 

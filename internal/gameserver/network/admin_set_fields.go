@@ -202,14 +202,12 @@ func (l *GameClientLink) adminRenamePlayer(gm, target *livePlayer, name string) 
 	}
 	onPlayer(gm, target, func() {
 		if !l.renamePlayer(target, name) {
-			// A player that took the name online since the check.
+			// A player that took the name online since the check, or a
+			// name the database did not take.
 			gm.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageIncorrectNameTryAgain))
 			return
 		}
 		l.broadcastCharacterInfo(target)
-		l.storeCharacterEdit(target.ObjectID(), "store name", func(ctx context.Context, s characterEditStore) error {
-			return s.SetName(ctx, target.ObjectID(), name)
-		})
 		l.storeLive(target)
 		sendText(gm, "You successfully set your target's name to "+target.CharacterName()+".")
 	})
@@ -242,17 +240,51 @@ func (l *GameClientLink) characterNamed(name string) bool {
 }
 
 // renamePlayer names live name, on its queue, together with its name
-// index entry and its clan roster row. It refuses a name another online
-// player holds.
+// index entry, its stored name and its clan roster row. It refuses a name
+// another online player holds, and one it cannot store, which it takes
+// back.
 func (l *GameClientLink) renamePlayer(live *livePlayer, name string) bool {
-	rename := func() { live.SetName(name) }
-	if l.world == nil {
-		rename()
-	} else if !l.world.RenamePlayer(live.ObjectID(), name, rename) {
+	old := live.CharacterName()
+	if !l.reindexPlayer(live, name) {
+		return false
+	}
+	if !l.storeName(live.ObjectID(), name) {
+		if !l.reindexPlayer(live, old) {
+			l.log.Error().Int32("object_id", live.ObjectID()).Str("name", old).Msg("admin: //set name: take back name")
+		}
 		return false
 	}
 	if cl, ok := l.clanService().ClanOf(live.Character); ok {
 		cl.RefreshName(live.ObjectID(), name)
+	}
+	return true
+}
+
+// reindexPlayer names live name together with its name index entry,
+// refusing a name another online player holds.
+func (l *GameClientLink) reindexPlayer(live *livePlayer, name string) bool {
+	rename := func() { live.SetName(name) }
+	if l.world == nil {
+		rename()
+		return true
+	}
+	return l.world.RenamePlayer(live.ObjectID(), name, rename)
+}
+
+// storeName writes objectID's stored name now rather than on its
+// persistence lane: character creation looks names up in the database, so
+// the name is taken there before the rename is reported. No save queued on
+// the lane writes the name, so none can undo it. A failed write is logged
+// and reported.
+func (l *GameClientLink) storeName(objectID int32, name string) bool {
+	if l.characterEdits == nil {
+		return true
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), accessLevelWriteTimeout)
+	defer cancel()
+	if err := l.characterEdits.SetName(ctx, objectID, name); err != nil {
+		l.log.Error().Err(err).Int32("object_id", objectID).Str("name", name).Msg("admin: //set name: store name")
+		return false
 	}
 	return true
 }
