@@ -82,6 +82,15 @@ func (s *State) AppendObjects(dst []Tracked) []Tracked {
 	return s.objects.appendAll(dst)
 }
 
+// FindObject returns the first tracked object match accepts, in no fixed
+// order, without copying the tracked set; nil when match accepts none.
+// match runs under the object registry's read lock, so it must not add or
+// remove tracked objects, and should only inspect the object.
+func (s *State) FindObject(match func(Tracked) bool) Tracked {
+	obj, _ := s.objects.find(match)
+	return obj
+}
+
 // AddPlayer marks obj online, unless a player with the same id is already
 // tracked, and indexes its name for PlayerByName lookups. The registry and
 // name-index updates happen under one lock so a concurrent RemovePlayer for

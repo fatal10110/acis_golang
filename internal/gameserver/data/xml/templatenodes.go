@@ -51,23 +51,50 @@ func (e *funcElement) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error
 // data or a processing instruction came before the first child element.
 func decodeChildElements(d *xml.Decoder, decode func(xml.StartElement) error) (leadingNode bool, err error) {
 	seenElement := false
+	err = decodeChildNodes(d, func(node int, tok xml.Token) error {
+		child, ok := tok.(xml.StartElement)
+		if !ok {
+			return nil
+		}
+		if !seenElement {
+			seenElement = true
+			leadingNode = node > 0
+		}
+		return decode(child)
+	})
+	return leadingNode, err
+}
+
+// decodeChildNodes consumes the current element's content up to its end tag,
+// handing visit each token with the index of the child node it belongs to. A
+// run of character data is one node, even when comments split it, since
+// comments are not nodes; a processing instruction and an element are one
+// node each. visit must consume a child element it is handed, by decoding or
+// skipping it.
+func decodeChildNodes(d *xml.Decoder, visit func(node int, tok xml.Token) error) error {
+	node := -1
+	inText := false
 	for {
 		tok, err := d.Token()
 		if err != nil {
-			return leadingNode, err
+			return err
 		}
-		switch t := tok.(type) {
-		case xml.StartElement:
-			seenElement = true
-			if err := decode(t); err != nil {
-				return leadingNode, err
+		switch tok.(type) {
+		case xml.CharData:
+			if !inText {
+				node++
+				inText = true
 			}
-		case xml.CharData, xml.ProcInst:
-			if !seenElement {
-				leadingNode = true
-			}
+		case xml.StartElement, xml.ProcInst:
+			node++
+			inText = false
 		case xml.EndElement:
-			return leadingNode, nil
+			return nil
+		default:
+			continue
+		}
+		if err := visit(node, tok); err != nil {
+			return err
 		}
 	}
 }

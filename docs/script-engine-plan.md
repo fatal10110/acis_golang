@@ -222,7 +222,8 @@ Each item is a leaf-locked container. Nothing new is queue-owned.
 - Load at character selection: `SELECT name,var,value … WHERE charId=?`. Go adds
   `ORDER BY name,var`, which pins the primary-key order `(charId, name, var)` the reference's
   rows arrive in. Names resolve case-insensitively, first match in list order; unknown names
-  are skipped with a warning.
+  are skipped with a warning. Every row of a resolved quest joins its one state, and
+  reserved values the server never writes read leniently (§9, item 5).
 - Sealed at detach. A dirty sealed journal is drained before the next selection loads; if
   that drain fails, the selection is refused. Nothing else writes a sealed journal.
 - Character purge deletes `character_quests` and `character_memo` rows.
@@ -246,12 +247,12 @@ of a type the family's package declares, holding engine cells only. The catalog 
 once and hands it to the constructor of every member, as it hands tables to other
 constructors; a member registers itself in it from its constructor, as the reference's
 constructor does. The same `go/types` test covers it: a family's plain fields can only be
-read. A map keyed by NPC is `NPCMapCell`, with the reference's removal of a value; its keys
-and values match by NPC identity, the spawn slot's, as the timers' do. A field holding one
-player is `PlayerCell`; a list is `ListCell`, ordered and keeping duplicates, whose creature
-handles match by the same identity (a player's is its character) and other values by `==`.
-A member reaches another member's helpers through
-`QuestState.Quest()`, the registered script of a state it found.
+read, directly or through a local copied from them. A map keyed by NPC is `NPCMapCell`,
+with the reference's removal of a value; its keys and values match by NPC identity, the
+spawn slot's, as the timers' do. A field holding one player is `PlayerCell`; a list is
+`ListCell`, ordered and keeping duplicates, whose creature handles match by the same
+identity (a player's is its character) and other values by `==`. A member reaches another
+member's helpers through `QuestState.Quest()`, the registered script of a state it found.
 
 ### Timers
 
@@ -339,6 +340,24 @@ where the reference asks an NPC to walk a route (A13).
    another player's position from the caller's queue while that player's own queue moves
    it, or wait on that queue, which deadlocks when two players' hooks swap each other
    (WarriorBase `SwapPosition`). An NPC's instant teleport, hostile or civilian, stays inline.
+5. Journal rows the server never writes load leniently. Only a hand-edited or migrated
+   `character_quests` row reaches either case.
+   - A row whose quest name differs from the script's name only in case joins that quest's
+     one state. The reference resolves the name case-insensitively but looks up the state by
+     the exact name, so each such row adds another state of the same quest, holding only
+     that row's variable, and the quest window can list the quest more than once.
+   - A `<state>` naming no status is neither started nor completed. In the quest window and in
+     a condition change, a `<cond>` that is not an int reads 0 (a script reading the condition
+     still panics, as the reference throws, and the help page that reads it is not shown). A
+     `<flags>` that is not an int reads as no flags; the quest window then shows the flags
+     `<cond>` gives. In the reference these reads throw. A bad `<state>` aborts the QuestList
+     build: nothing is sent on request, and EnterWorld skips the rest of its burst. A bad
+     `<cond>` or `<flags>` throws while the packet is written, which sends a truncated
+     QuestList. A condition change on such a state aborts before it writes; Go goes ahead.
+   - A bad `<state>` on any real quest makes every QuestList build throw, so in the reference
+     a condition change or quest exit of any quest stops after its variable writes: no quest
+     window, no quest mark, no item take, no exit row update, and the rest of the hook does
+     not run. Go goes ahead.
 
 Everything else follows the reference, including its quirks (abort by id, the 25-quest check
 only at talk, the abnormal-status dispatch list).
