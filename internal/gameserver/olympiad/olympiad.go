@@ -22,6 +22,7 @@ package olympiad
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"math"
 	"sync"
@@ -537,9 +538,44 @@ func (o *Olympiad) write(what string, fn func(context.Context, Store) error) {
 	o.queueJob(what, func(ctx context.Context) error { return fn(ctx, store) })
 }
 
+// writeLanded is write, returning a channel that receives fn's result once
+// it ran, or errWriteDropped when it never will.
+func (o *Olympiad) writeLanded(what string, fn func(context.Context, Store) error) <-chan error {
+	store := o.store
+	landed := make(chan error, 1)
+	if !o.queueJob(what, func(ctx context.Context) error {
+		err := fn(ctx, store)
+		landed <- err
+		return err
+	}) {
+		landed <- errWriteDropped
+	}
+	return landed
+}
+
+// errWriteDropped is the result of a write the writer refused.
+var errWriteDropped = errors.New("olympiad: write dropped")
+
+// awaitLanded waits until ctx ends for the result writeLanded sends on
+// landed; one already sent wins over an ended ctx.
+func awaitLanded(ctx context.Context, landed <-chan error) error {
+	select {
+	case err := <-landed:
+		return err
+	default:
+	}
+	select {
+	case err := <-landed:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 // queueJob queues fn on the Olympiad's persistence lane, or runs it at once
-// without a writer. Each job gets TaskTimeout.
-func (o *Olympiad) queueJob(what string, fn func(context.Context) error) {
+// without a writer, reporting false when the writer refused it. Each job
+// gets TaskTimeout.
+func (o *Olympiad) queueJob(what string, fn func(context.Context) error) bool {
 	log := o.log
 	job := func() {
 		ctx, cancel := context.WithTimeout(context.Background(), TaskTimeout)
@@ -550,9 +586,11 @@ func (o *Olympiad) queueJob(what string, fn func(context.Context) error) {
 	}
 	if o.writes == nil {
 		job()
-		return
+		return true
 	}
 	if !o.writes.Enqueue(writeLane, job) {
 		log.Error().Msg("olympiad: " + what + ": write dropped")
+		return false
 	}
+	return true
 }

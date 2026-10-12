@@ -8,7 +8,7 @@ import (
 	hallmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/clanhall"
 )
 
-// gateTreasury blocks inside PayHallFee until released, then answers pay;
+// gateTreasury blocks inside TakeAdena until released, then answers pay;
 // it records every fee asked.
 type gateTreasury struct {
 	entered chan struct{}
@@ -19,13 +19,13 @@ type gateTreasury struct {
 	asked []int
 }
 
-func (t *gateTreasury) PayHallFee(_ int32, adena int) bool {
+func (t *gateTreasury) TakeAdena(_ int32, adena int) (Landing, bool) {
 	t.mu.Lock()
 	t.asked = append(t.asked, adena)
 	t.mu.Unlock()
 	t.entered <- struct{}{}
 	<-t.release
-	return t.pay
+	return nil, t.pay
 }
 
 func (t *gateTreasury) fees() []int {

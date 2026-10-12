@@ -445,7 +445,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.SummonConfirmRequested:
 		live.SendFrame(serverpackets.FrameConfirmDlgSummonFriendRequest(e.CasterName, e.CasterID, int32(e.X), int32(e.Y), int32(e.Z), e.Timeout))
 	case event.TeleportRequested:
-		l.teleportLivePlayer(live, location.Location{X: e.X, Y: e.Y, Z: e.Z}, e.Radius)
+		// A script or a summon-friend cast asks it from any queue.
+		l.teleportLivePlayerFrom(live, location.Location{X: e.X, Y: e.Y, Z: e.Z}, e.Radius, false)
 	case event.InstantTeleportRequested:
 		// A script asks it from any queue (a swap moves two players from
 		// an NPC hook): the jump runs on live's own queue.

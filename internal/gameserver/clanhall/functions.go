@@ -7,6 +7,7 @@ package clanhall
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -69,11 +70,12 @@ type Owners interface {
 	HallOwner(hallID int32) int32
 }
 
-// Treasury takes a function's fee out of a clan's warehouse.
+// Treasury takes a fee out of a clan's warehouse.
 type Treasury interface {
-	// PayHallFee destroys adena from clan clanID's warehouse, reporting
-	// false, with nothing taken, when it holds less.
-	PayHallFee(clanID int32, adena int) bool
+	// TakeAdena destroys adena from clan clanID's warehouse, reporting
+	// false, with nothing taken, when it holds less, and returns the write
+	// that lands the change.
+	TakeAdena(clanID int32, adena int) (Landing, bool)
 }
 
 // Decoration is the decoration level of each function, as an owner's hall
@@ -294,6 +296,9 @@ func (f *Functions) RemoveAll(hallID int32) {
 // payFee charges fn's fee to the clan owning hall hallID when its term
 // ends. A free hall charges nothing and keeps the function as it is. Paid,
 // the function's next term starts now; unpaid, the function is removed.
+// The fee's adena is written ahead of the row recording the new term, in
+// the same lane job, and a failed write of it stores no row, so no crash
+// leaves the clan both the adena and the term (#3454).
 // gen is the generation the fee's timer was armed with; one replaced since
 // charges nothing.
 func (f *Functions) payFee(hallID int32, fn *rented, gen uint64) {
@@ -313,7 +318,11 @@ func (f *Functions) payFee(hallID int32, fn *rented, gen uint64) {
 	if clanID == 0 {
 		return
 	}
-	paid := lease <= 0 || (treasury != nil && treasury.PayHallFee(clanID, lease))
+	var landing Landing
+	paid := lease <= 0
+	if !paid && treasury != nil {
+		landing, paid = treasury.TakeAdena(clanID, lease)
+	}
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -332,6 +341,9 @@ func (f *Functions) payFee(hallID int32, fn *rented, gen uint64) {
 	fn.EndTime = f.queue.Now().UnixMilli() + fn.Rate
 	saved := fn.Function
 	f.write("store clan hall function", hallID, func(ctx context.Context, st Store) error {
+		if err := land(ctx, landing); err != nil {
+			return fmt.Errorf("write the fee paid: %w", err)
+		}
 		return st.SaveFunction(ctx, hallID, saved)
 	})
 	if fn.Rate <= 0 {
