@@ -50,6 +50,7 @@ func startLoggedBoot(t *testing.T, opts ...gameservertest.Option) *gameservertes
 // cleared so nothing double-restores), and be fully usable — the entering
 // client picks it up and the adena is back in one inventory stack.
 func TestGroundItemsRestartRoundTrip(t *testing.T) {
+	t.Parallel()
 	srv := startLoggedBoot(t, gameservertest.WithCharacter("Newbie", 1, 0), gameservertest.WithWantChars(1))
 	c := srv.Client
 	objID := srv.SoleObjectID(t)

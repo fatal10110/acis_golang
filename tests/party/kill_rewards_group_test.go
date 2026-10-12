@@ -17,6 +17,7 @@ import (
 // for the bonus. It gets no gain, and its own entry, left for a later pass
 // that finds no party damage, tells it nothing either.
 func TestPartyKillSkipsDeadMember(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 40}, {"Member", 30}, {"Dead", 51}})
 	g.invite(t, 0, 1, 0)
 	g.invite(t, 0, 2, 0)
@@ -58,6 +59,7 @@ func TestPartyKillSkipsDeadMember(t *testing.T) {
 // wrapped to answer for the two parties as one channel; the link's own
 // channel answer is pinned in the network package.
 func TestChannelKillSharesAcrossParties(t *testing.T) {
+	t.Parallel()
 	var leaders atomic.Pointer[[2]int32]
 	g := bootGroup(t, []seat{{"Leader", 40}, {"Member", 30}, {"Other", 35}, {"Far", 52}},
 		gameservertest.WithRewardParties(func(link gamemanager.RewardParties) gamemanager.RewardParties {

@@ -36,6 +36,7 @@ func (p *pair) dropInCombat(t *testing.T, objID int32, close func() error) {
 // answers TARGET_IS_NOT_FOUND_IN_THE_GAME for a detached client
 // (ChatTell.java:26) and delivers nothing.
 func TestTellToLingeringPlayerNotFound(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.enterAll(t)
 

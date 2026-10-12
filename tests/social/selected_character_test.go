@@ -40,6 +40,7 @@ func encodeAction(objectID int32) []byte {
 // /friendlist shows it online; it is not spawned yet, so the friend neither sees nor can click it,
 // and its friends hear of it only when it enters.
 func TestSelectedCharacterIsFoundBeforeEnterWorld(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.srv.Relations.AddFriend(p.aliceID, p.bobbyID)
 	startInWorld(t, p.alice)
@@ -95,6 +96,7 @@ func TestSelectedCharacterIsFoundBeforeEnterWorld(t *testing.T) {
 // is closed, its row is marked offline, and its friends get the offline
 // status a logout sends.
 func TestDisconnectBeforeEnterWorldLeavesNothingRegistered(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.srv.Relations.AddFriend(p.aliceID, p.bobbyID)
 	startInWorld(t, p.alice)

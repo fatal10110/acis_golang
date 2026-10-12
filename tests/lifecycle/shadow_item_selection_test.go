@@ -21,6 +21,7 @@ import (
 // the client with its last second, and the next tick destroys and unequips
 // it as any expiry does.
 func TestShadowItemTickDuringSelectionDoesNotLoseItsExpiry(t *testing.T) {
+	t.Parallel()
 	var armed atomic.Bool
 	var held atomic.Int32
 	var srv *gameservertest.Server
