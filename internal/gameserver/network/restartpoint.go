@@ -286,11 +286,26 @@ func (l *GameClientLink) landTeleportedPlayer(live *livePlayer) (bool, *summon.A
 	// The summon leaves the zones around its old position before the jump
 	// and enters those at the destination once it has landed.
 	actor.LeaveZones()
+	// Leaving its zones takes a siege summon off its battlefield, so its
+	// jump dismisses it wherever it lands, and its owner hears it vanished.
+	vanishes := actor.OffBattlefield()
 	actor.AbortForTeleport()
 	// The summon's jump is a teleport of its own: hostiles around its old
 	// position forget it too.
 	npc.DropThreatAround(l.world, actor)
 	l.broadcastSummonFrame(actor, serverpackets.FrameTeleportToLocation(actor.ObjectID(), destination, false))
+	if vanishes {
+		// Dismissed before it lands: nobody at its landing point, its owner
+		// included, is ever shown it there. A corpse cannot be dismissed,
+		// so it only leaves the grid; its owner is told it vanished all
+		// the same. The dismissal its battlefield exit posted then finds it
+		// gone.
+		if actor.Dead() {
+			l.world.Leave(actor)
+		}
+		actor.Vanish()
+		return true, nil
+	}
 	actor.Move().SetPosition(destination)
 	_ = l.world.Teleport(actor, destination.X, destination.Y, destination.Z)
 	actor.EnterZones()

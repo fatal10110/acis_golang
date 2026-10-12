@@ -216,6 +216,8 @@ type Character struct {
 	zones                    PeaceZoneQuery
 	social                   SocialGraph
 	hallFunctions            HallFunctions
+	sieges                   SiegeGround
+	seals                    SealRules
 	partyLoot                PartyLoot
 	tutorial                 TutorialEvents
 	deaths                   DeathEvents
@@ -229,6 +231,7 @@ type Character struct {
 	insideNoSummonFriendZone atomic.Bool
 	insideBossZone           atomic.Bool
 	insideClanHallZone       atomic.Bool
+	insideCastleZone         atomic.Bool
 	insideDangerArea         atomic.Bool
 	insideWater              atomic.Bool
 	swampMoveBonus           atomic.Int32

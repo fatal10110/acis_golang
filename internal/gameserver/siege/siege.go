@@ -331,6 +331,13 @@ func (e *Engine) ActiveAt(x, y, z int) (*Siege, bool) {
 	return nil, false
 }
 
+// AttackerAt reports whether clanID attacks the siege in progress whose
+// battlefield holds the point (x, y, z).
+func (e *Engine) AttackerAt(clanID int32, x, y, z int) bool {
+	s, ok := e.ActiveAt(x, y, z)
+	return ok && s.CheckSides(clanID, SideAttacker)
+}
+
 // Registered reports whether clanID is registered, on any side, on any
 // castle's siege.
 func (e *Engine) Registered(clanID int32) bool {
