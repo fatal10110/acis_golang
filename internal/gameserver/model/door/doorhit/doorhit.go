@@ -9,6 +9,7 @@ package doorhit
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
@@ -36,10 +37,15 @@ type Target struct{ *door.Object }
 var (
 	_ attackable.Combatant  = Target{}
 	_ creature.FormulaActor = Target{}
+	_ dynamic.StandIn       = Target{}
 )
 
 // Of returns d as a hit target.
 func Of(d *door.Object) Target { return Target{Object: d} }
+
+// StoredObject is the door itself, the object geodata holds while it is
+// closed: a sight query to the hit target leaves the door out.
+func (t Target) StoredObject() dynamic.Object { return t.Object }
 
 // CollisionRadius is the body radius every door has.
 func (Target) CollisionRadius() float64 { return door.CollisionRadius }
