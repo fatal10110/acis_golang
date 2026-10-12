@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/rs/zerolog"
 )
 
 // Paperdoll equip-array positions, matching the items table's loc_data
@@ -43,6 +44,21 @@ const (
 	UpdateRemoved
 )
 
+var updateStateNames = [...]string{
+	updateUnchanged: "UNCHANGED",
+	UpdateAdded:     "ADDED",
+	UpdateModified:  "MODIFIED",
+	UpdateRemoved:   "REMOVED",
+}
+
+// String returns the state's item log spelling.
+func (s UpdateState) String() string {
+	if int(s) >= len(updateStateNames) {
+		return "UNKNOWN"
+	}
+	return updateStateNames[s]
+}
+
 // Update is one pending inventory-change notification. Delivering it to
 // the client as an actual packet is the network layer's job; Inventory
 // only queues the fact that something changed.
@@ -73,7 +89,8 @@ type Update struct {
 // left. Every paperdoll mutation applies that rule, so each caller reports
 // the extra left-hand change among the instances it altered.
 //
-// mu guards paperdoll, wornMask, totalWeight, updates, removed and limiter.
+// mu guards paperdoll, wornMask, totalWeight, updates, removed, limiter,
+// itemLog and itemOwner.
 // Mutable item fields are guarded by item.Instance.
 type Inventory struct {
 	*Container
@@ -95,6 +112,22 @@ type Inventory struct {
 	// removed holds the object ids of instances that left the inventory
 	// since the last fireDelivery, which hands them to a RemovalDelivery.
 	removed []int32
+	// itemLog records each change to a non-stackable item, naming the
+	// holder itemOwner returns; the zero logger records nothing.
+	itemLog   zerolog.Logger
+	itemOwner func() string
+}
+
+// SetItemLog makes inv record every add, change and removal of one of its
+// non-stackable items on log (server.properties LogItems), owner naming who
+// holds the inventory at that moment. owner runs with inv's lock held, so it
+// must not call back into inv. The zero logger records nothing. Set it
+// before Restore so the items a restore puts back on the paperdoll are
+// recorded too.
+func (inv *Inventory) SetItemLog(log zerolog.Logger, owner func() string) {
+	inv.mu.Lock()
+	inv.itemLog, inv.itemOwner = log, owner
+	inv.mu.Unlock()
 }
 
 // Limiter reports how many item slots and how much carried weight an
@@ -400,6 +433,7 @@ func (inv *Inventory) Remove(inst *item.Instance, isDrop bool) bool {
 	inv.mu.Lock()
 	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
 	defer inv.mu.Unlock()
+	inv.logItemLocked(st, UpdateRemoved)
 	inv.queueRemovedLocked(st.ObjectID, st.TemplateID, st.Count)
 	return true
 }
@@ -471,6 +505,7 @@ func (inv *Inventory) DestroyAllItems() {
 		st := inst.Snapshot()
 		inst.DestroyState()
 		inv.mu.Lock()
+		inv.logItemLocked(st, UpdateRemoved)
 		inv.queueRemovedLocked(st.ObjectID, st.TemplateID, st.Count)
 		inv.mu.Unlock()
 	}
@@ -575,7 +610,8 @@ func (inv *Inventory) TransferItem(objectID int32, count int, target Receiver, n
 		movedCount = sourceCount
 	}
 
-	result, freedObjectID, freed = inv.Container.Transfer(objectID, count, target, newObjectID)
+	moving := &removalFirst{Receiver: target, inv: inv, source: source}
+	result, freedObjectID, freed = inv.Container.Transfer(objectID, count, moving, newObjectID)
 	if result == nil {
 		return nil, 0, false
 	}
@@ -583,11 +619,35 @@ func (inv *Inventory) TransferItem(objectID int32, count int, target Receiver, n
 		inv.queueUpdate(remaining, UpdateModified)
 	} else {
 		inv.mu.Lock()
+		if !moving.logged {
+			st.Count = movedCount
+			inv.logItemLocked(st, UpdateRemoved)
+		}
 		inv.queueRemovedLocked(objectID, templateID, movedCount)
 		inv.mu.Unlock()
 		inv.fireDelivery()
 	}
 	return result, freedObjectID, freed
+}
+
+// removalFirst is a transfer's target that writes the source inventory's
+// removal record of a whole moved instance just before target takes it in,
+// so the item log reads out of one inventory, then into the other.
+type removalFirst struct {
+	Receiver
+	inv    *Inventory
+	source *item.Instance
+	logged bool
+}
+
+func (r *removalFirst) Add(inst *item.Instance) (*item.Instance, bool) {
+	if inst == r.source {
+		r.inv.mu.Lock()
+		r.inv.logItemLocked(inst.Snapshot(), UpdateRemoved)
+		r.inv.mu.Unlock()
+		r.logged = true
+	}
+	return r.Receiver.Add(inst)
 }
 
 // ItemAt returns the instance equipped at paperdoll position slot, or nil.
@@ -1161,6 +1221,7 @@ func (inv *Inventory) queueUpdateLocked(inst *item.Instance, state UpdateState) 
 		return
 	}
 	st := inst.Snapshot()
+	inv.logItemLocked(st, state)
 	inv.queueUpdateRecordLocked(st.ObjectID, st.TemplateID, st.Count, state)
 }
 
@@ -1182,10 +1243,38 @@ func (inv *Inventory) queueUpdateRecordLocked(objectID, templateID int32, count 
 }
 
 // queueRemovedLocked queues the removed update of an instance that left the
-// inventory and records its object id for the next fireDelivery.
+// inventory and records its object id for the next fireDelivery. Callers
+// write the removal's item log record themselves.
 func (inv *Inventory) queueRemovedLocked(objectID, templateID int32, count int) {
 	inv.queueUpdateRecordLocked(objectID, templateID, count, UpdateRemoved)
 	inv.removed = append(inv.removed, objectID)
+}
+
+// logItemLocked writes the item log record of st changing by state, when st
+// is a non-stackable item and the log is on.
+func (inv *Inventory) logItemLocked(st item.InstanceState, state UpdateState) {
+	e := inv.itemLog.Info()
+	if e == nil {
+		return
+	}
+	tmpl, ok := inv.Templates().Get(st.TemplateID)
+	if !ok || tmpl.Stackable {
+		e.Discard()
+		return
+	}
+	var owner string
+	if inv.itemOwner != nil {
+		owner = inv.itemOwner()
+	}
+	e.Str("owner", owner).
+		Int32("owner_id", inv.OwnerID()).
+		Str("item", tmpl.Name).
+		Int32("object_id", st.ObjectID).
+		Int32("item_id", st.TemplateID).
+		Str("location", st.Location.String()).
+		Int("count", st.Count).
+		Int("enchant", st.EnchantLevel).
+		Msg(state.String())
 }
 
 // fireDelivery reports a queued update after a mutation, then the instances

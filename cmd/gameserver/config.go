@@ -78,6 +78,7 @@ type gameplayConfig struct {
 	SubclassWithoutQuests    subclassWithoutQuests
 	BlacksmithUseRecipes     blacksmithUseRecipes
 	AllowDiscardItem         allowDiscardItem
+	LogItems                 logItems
 	SpawnMultiplier          spawnMultiplier
 	SpawnEvents              []string
 	RandomWalkRate           randomWalkRate
@@ -192,6 +193,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.AllowDiscardItem, err = loadAllowDiscardItem(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.LogItems, err = loadLogItems(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.Manor, err = loadManorSettings(paths); err != nil {
@@ -702,6 +706,21 @@ func loadAllowDiscardItem(paths gameServerPaths) (allowDiscardItem, error) {
 		return false, err
 	}
 	return allowDiscardItem(config.NewFields(props, "allow discard item").Bool("AllowDiscardItem", true)), nil
+}
+
+// logItems turns the item log on: every add, change and removal of a
+// non-stackable item a player or pet carries is recorded, read from
+// server.properties.
+type logItems bool
+
+func loadLogItems(paths gameServerPaths) (logItems, error) {
+	props, err := config.LoadFile(paths.ConfigPath)
+	if err != nil {
+		return false, err
+	}
+	f := config.NewFields(props, "log items")
+	on := f.Bool("LogItems", false)
+	return logItems(on), f.Err()
 }
 
 // loadPetConfig takes the process logger for the same reason as
