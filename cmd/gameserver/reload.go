@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/travel"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
@@ -29,6 +30,9 @@ func provideDataReloads(paths gameServerPaths, data *gameData, html *datacache.H
 			}
 			data.Admin.Replace(fresh)
 			return nil
+		},
+		BuyLists: func() (*buylist.Table, error) {
+			return gamexml.LoadBuyLists(filepath.Join(xmlRoot, "buyLists.xml"), data.Items)
 		},
 		// CrestCache.reload never fails: what was read before a bad file
 		// stays loaded, as at boot.
