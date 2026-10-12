@@ -117,6 +117,7 @@ func raidAnnouncement(t *testing.T, name string, frames [][]byte) {
 // its own 15 to 25 points for the boss, stored and listed in its record;
 // the partyless player who watched earns nothing.
 func TestRaidBossPartyKillCreditsEveryMember(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 40}, {"Member", 30}, {"Far", 45}, {"Outsider", 40}})
 	g.invite(t, 0, 1, 0)
 	g.invite(t, 0, 2, 0)
@@ -171,6 +172,7 @@ func TestRaidBossPartyKillCreditsEveryMember(t *testing.T) {
 
 // TestRaidBossSoloKillCreditsKillerAlone credits a partyless killer only.
 func TestRaidBossSoloKillCreditsKillerAlone(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 40}, {"Watcher", 40}})
 	boss := g.spawnBesideLeader(t, raidBoss(raidBossID))
 	if !boss.TakeDamage(5000, g.combatant(t, 0)) {
@@ -190,6 +192,7 @@ func TestRaidBossSoloKillCreditsKillerAlone(t *testing.T) {
 // TestMonsterKillEarnsNoRaidPoints: an ordinary monster neither announces
 // a raid success nor pays raid points.
 func TestMonsterKillEarnsNoRaidPoints(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 40}})
 	monster := g.spawnBesideLeader(t, partyRewardMonster())
 	if !monster.TakeDamage(5000, g.combatant(t, 0)) {
@@ -245,6 +248,7 @@ func readRaidPointsGolden(t *testing.T) (live, restarted map[int][]byte) {
 // included, matches the reference byte for byte, before and after the
 // stored rows are read back.
 func TestBossRecordMatchesReference(t *testing.T) {
+	t.Parallel()
 	stored := [][2]int32{{25001, 10}, {25002, 20}, {25016, 5}, {25017, 7}, {25033, 1}, {29001, 30}}
 	g := bootGroup(t, []seat{{"First", 40}, {"Second", 40}, {"Third", 40}, {"Fourth", 40}},
 		gameservertest.WithBossSeed(func(db *sql.DB) {

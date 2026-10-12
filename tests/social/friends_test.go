@@ -24,6 +24,7 @@ import (
 // and an L2Friend add row for the other. The friendship is saved with the
 // relations, as one row flagged 1.
 func TestFriendInviteAccepted(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.enterAll(t)
 
@@ -63,6 +64,7 @@ func TestFriendInviteAccepted(t *testing.T) {
 // TestFriendInviteDeclined answers the requester alone, with
 // FriendAddRequestResult(0), and makes no friends.
 func TestFriendInviteDeclined(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.enterAll(t)
 
@@ -82,6 +84,7 @@ func TestFriendInviteDeclined(t *testing.T) {
 // message and FriendAddRequestResult(0), and the target hears nothing. The
 // messages naming the target name it as typed.
 func TestFriendInviteRefusals(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name   string
 		setup  func(t *testing.T, p *pair)
@@ -190,6 +193,7 @@ func TestFriendInviteRefusals(t *testing.T) {
 // TestFriendInviteToGMRefused refuses a non-GM's invitation to a GM with
 // THE_PLAYER_IS_REJECTING_FRIEND_INVITATIONS, while a GM may invite a GM.
 func TestFriendInviteToGMRefused(t *testing.T) {
+	t.Parallel()
 	levels, err := admin.NewData([]admin.AccessLevel{
 		{Level: 0, Name: "User", NameColor: "FFFFFF", TitleColor: "FFFF77", AllowTransaction: true},
 		{Level: 7, Name: "GM", NameColor: "FFFFFF", TitleColor: "FFFF77", IsGM: true, AllowTransaction: true},
@@ -214,6 +218,7 @@ func TestFriendInviteToGMRefused(t *testing.T) {
 // late answer finds none and nobody hears anything, and the target is free
 // for a new invitation.
 func TestFriendInviteExpires(t *testing.T) {
+	t.Parallel()
 	var clock atomic.Int64
 	clock.Store(time.Unix(1_000_000, 0).UnixNano())
 	now := func() time.Time { return time.Unix(0, clock.Load()) }
@@ -240,6 +245,7 @@ func TestFriendInviteExpires(t *testing.T) {
 // invitation clock: the first answer to any of one requester's invitations
 // ends the others, whose late answers then find nothing.
 func TestFriendInviteAnswerEndsRequesterOtherInvitations(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.enterAll(t)
 	carol, _ := p.third(t, "player3", "Carol")
@@ -263,6 +269,7 @@ func TestFriendInviteAnswerEndsRequesterOtherInvitations(t *testing.T) {
 // The new login hears nothing, and the target's add row shows the
 // requester offline.
 func TestFriendInviteRequesterRelogged(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.enterAll(t)
 
@@ -290,6 +297,7 @@ func TestFriendInviteRequesterRelogged(t *testing.T) {
 // FRIEND_S1_HAS_LOGGED_IN, and the entering friend's own FriendList shows
 // the first player online. Leaving sends L2FriendStatus(0) alone.
 func TestFriendListAndStatusNotices(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	p.srv.Relations.AddFriend(p.aliceID, p.bobbyID)
 
@@ -341,6 +349,7 @@ func TestFriendListAndStatusNotices(t *testing.T) {
 // is pinned against the reference by the relation package's
 // TestListOrderMatchesReferenceProbe.
 func TestFriendListOrder(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name    string
 		seeded  int
@@ -406,6 +415,7 @@ func TestFriendListOrder(t *testing.T) {
 // Against an offline friend the remove row carries the name as typed and no
 // object id. A name that is no friend answers THE_USER_NOT_IN_FRIENDS_LIST.
 func TestFriendDelete(t *testing.T) {
+	t.Parallel()
 	p := bootPair(t)
 	carolID := p.srv.SeedCharacterFor(t, "player3", "Carol", 1, 0).ID
 	p.srv.Relations.AddFriend(p.aliceID, p.bobbyID)

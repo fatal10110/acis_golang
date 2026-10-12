@@ -44,6 +44,7 @@ func (g *group) makeNoble(t *testing.T, i int) {
 // the partyless killer, gets a "raid boss defeated" entry (action 1)
 // naming the boss; anyone else none.
 func TestRaidBossKillGoesToNoblesHeroDiaries(t *testing.T) {
+	t.Parallel()
 	t.Run("party", func(t *testing.T) {
 		g := bootGroup(t, []seat{{"Leader", 40}, {"Noble", 40}})
 		g.invite(t, 0, 1, 0)

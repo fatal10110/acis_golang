@@ -21,6 +21,7 @@ import (
 // windows, then see it stand, jump away and vanish. Back from the
 // viewpoint, it is shown to them again.
 func TestObserverLeavesItsParty(t *testing.T) {
+	t.Parallel()
 	groups, err := gamexml.LoadObserverGroups(datapack.Path(t, "data", "xml", "observerGroups.xml"))
 	if err != nil {
 		t.Fatalf("load observer groups: %v", err)

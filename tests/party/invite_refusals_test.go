@@ -47,6 +47,7 @@ func (g *group) character(t *testing.T, i int) *playermodel.Character {
 }
 
 func TestInviteRefusedWhileTargetBlocksEverything(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}})
 	leader, member := g.players[0], g.players[1]
 	member.c.Send(encodeBlock(clientpackets.BlockAll, ""))
@@ -67,6 +68,7 @@ func TestInviteRefusedWhileTargetBlocksEverything(t *testing.T) {
 }
 
 func TestInviteRefusedByTargetBlockList(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}, {"Third", 40}})
 	leader, member := g.players[0], g.players[1]
 	member.c.Send(encodeBlock(clientpackets.BlockAdd, "Leader"))
@@ -91,6 +93,7 @@ func TestInviteRefusedByTargetBlockList(t *testing.T) {
 }
 
 func TestInviteRefusedWhileTargetConnectionIsGone(t *testing.T) {
+	t.Parallel()
 	g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}})
 	leader, member := g.players[0], g.players[1]
 	// In combat, a player whose connection dropped stays in the world a
@@ -118,6 +121,7 @@ func TestInviteRefusedWhileTargetConnectionIsGone(t *testing.T) {
 }
 
 func TestInviteRefusedWhileJailed(t *testing.T) {
+	t.Parallel()
 	t.Run("target", func(t *testing.T) {
 		g := bootGroup(t, []seat{{"Leader", 20}, {"Member", 30}})
 		g.character(t, 1).SetPunishment(playermodel.PunishJail, 0)
