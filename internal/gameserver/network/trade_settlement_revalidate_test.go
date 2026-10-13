@@ -131,7 +131,7 @@ func TestSettleConfirmedTradeCancelsWhenOfferedScrollBecameSelected(t *testing.T
 		t.Fatalf("first offer holds %d rows, want the scroll", n)
 	}
 
-	link.enchantStateStore().Select(first.ObjectID(), scrollID)
+	link.enchanting.scrolls.Select(first.ObjectID(), scrollID)
 	testsupport.ResetCapture(firstCap, secondCap)
 
 	link.settleConfirmedTrade(ready.Session, first.ObjectID())

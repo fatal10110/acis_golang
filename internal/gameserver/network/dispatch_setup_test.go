@@ -11,6 +11,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	datacache "github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -153,28 +155,28 @@ func assertSystemMessageStringSkillNameFrame(t *testing.T, frame []byte, message
 // deterministic flood-gate assertions.
 var testLinkNow func() time.Time
 
-func newTestGameClientLink(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+func newTestGameClientLink(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator) (addr string, chars *gamesql.CharacterStore, items *gamesql.ItemStore, state *world.State) {
 	t.Helper()
 	return newTestGameClientLinkWithLog(t, loginLink, validator, zerolog.Nop())
 }
 
-func newTestGameClientLinkWithLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, log zerolog.Logger) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+func newTestGameClientLinkWithLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, log zerolog.Logger) (addr string, chars *gamesql.CharacterStore, items *gamesql.ItemStore, state *world.State) {
 	t.Helper()
 	return newTestGameClientLinkWithSkillsAndLog(t, loginLink, validator, nil, log)
 }
 
-func newTestGameClientLinkWithSkillsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *skillstate.Persistence, log zerolog.Logger) (addr string, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+func newTestGameClientLinkWithSkillsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *skillstate.Persistence, log zerolog.Logger) (addr string, chars *gamesql.CharacterStore, items *gamesql.ItemStore, state *world.State) {
 	t.Helper()
 	addr, chars, items, _, state = newTestGameClientLinkWithSkillsShortcutsAndLog(t, loginLink, validator, skills, log)
 	return addr, chars, items, state
 }
 
-func newTestGameClientLinkWithSkillsShortcutsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *skillstate.Persistence, log zerolog.Logger) (addr string, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+func newTestGameClientLinkWithSkillsShortcutsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *skillstate.Persistence, log zerolog.Logger) (addr string, chars *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, state *world.State) {
 	t.Helper()
 	return newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t, loginLink, validator, skills, nil, modelskill.BookPolicy{}, nil, log)
 }
 
-func newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *skillstate.Persistence, crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, log zerolog.Logger, cursedWeapons ...*entity.CursedWeaponTable) (addr string, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+func newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *skillstate.Persistence, crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, log zerolog.Logger, cursedWeapons ...*entity.CursedWeaponTable) (addr string, chars *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, state *world.State) {
 	t.Helper()
 	return newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t, loginLink, validator, skills, crests, spellbooks, trees, true, log, cursedWeapons...)
 }
@@ -183,11 +185,12 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsAndLog(t *testing.T, loginLin
 // constructor; karmaPlayerCanTeleport plugs the players.properties
 // KarmaPlayerCanTeleport gate so karma-teleport-rejection tests can run it
 // false without disturbing every other caller's default-true setup.
-func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *skillstate.Persistence, crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, karmaPlayerCanTeleport bool, log zerolog.Logger, cursedWeapons ...*entity.CursedWeaponTable) (addr string, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, loginLink func() *LoginLink, validator *SessionValidator, skills *skillstate.Persistence, crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, karmaPlayerCanTeleport bool, log zerolog.Logger, cursedWeapons ...*entity.CursedWeaponTable) (addr string, chars *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, state *world.State) {
 	t.Helper()
-	chars = newFakeCharStore()
-	items = newFakeItemStore()
-	shortcuts = newFakeShortcutStore()
+	db := sqltest.SharedDB(t)
+	chars = gamesql.NewCharacterStore(db)
+	items = gamesql.NewItemStore(db)
+	shortcuts = gamesql.NewShortcutStore(db)
 	state = world.New()
 	templates := testTemplates(t)
 	itemTemplates := testItemTemplates()
@@ -278,28 +281,28 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 // GS-LS link (the same infrastructure loginlink_test.go uses), dials a fake
 // game client through VersionCheck and a successful AuthLogin, and returns
 // it positioned right after the initial (empty) CharSelectInfo.
-func newLinkedGameClient(t *testing.T) (c *testsupport.ScriptedClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+func newLinkedGameClient(t *testing.T) (c *testsupport.ScriptedClient, chars *gamesql.CharacterStore, items *gamesql.ItemStore, state *world.State) {
 	t.Helper()
 	return newLinkedGameClientWithSkills(t, nil)
 }
 
-func newLinkedGameClientWithSkills(t *testing.T, skills *skillstate.Persistence) (c *testsupport.ScriptedClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+func newLinkedGameClientWithSkills(t *testing.T, skills *skillstate.Persistence) (c *testsupport.ScriptedClient, chars *gamesql.CharacterStore, items *gamesql.ItemStore, state *world.State) {
 	t.Helper()
 	return newLinkedGameClientWithSkillsSeed(t, skills, nil, 0)
 }
 
-func newLinkedGameClientWithSkillsSeed(t *testing.T, skills *skillstate.Persistence, seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *testsupport.ScriptedClient, chars *fakeCharStore, items *fakeItemStore, state *world.State) {
+func newLinkedGameClientWithSkillsSeed(t *testing.T, skills *skillstate.Persistence, seed func(*gamesql.CharacterStore, *gamesql.ItemStore), wantChars int) (c *testsupport.ScriptedClient, chars *gamesql.CharacterStore, items *gamesql.ItemStore, state *world.State) {
 	t.Helper()
 	c, chars, items, _, state = newLinkedGameClientWithSkillsShortcutsSeed(t, skills, nil, seed, wantChars)
 	return c, chars, items, state
 }
 
-func newLinkedGameClientWithSkillsShortcutsSeed(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*fakeShortcutStore), seed func(*fakeCharStore, *fakeItemStore), wantChars int) (c *testsupport.ScriptedClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+func newLinkedGameClientWithSkillsShortcutsSeed(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*gamesql.ShortcutStore), seed func(*gamesql.CharacterStore, *gamesql.ItemStore), wantChars int) (c *testsupport.ScriptedClient, chars *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, state *world.State) {
 	t.Helper()
 	return newLinkedGameClientWithSkillsShortcutsCrestsSeed(t, skills, shortcutSeed, nil, modelskill.BookPolicy{}, nil, seed, wantChars)
 }
 
-func newLinkedGameClientWithSkillsShortcutsCrestsSeed(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*fakeShortcutStore), crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, seed func(*fakeCharStore, *fakeItemStore), wantChars int, cursedWeapons ...*entity.CursedWeaponTable) (c *testsupport.ScriptedClient, chars *fakeCharStore, items *fakeItemStore, shortcuts *fakeShortcutStore, state *world.State) {
+func newLinkedGameClientWithSkillsShortcutsCrestsSeed(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*gamesql.ShortcutStore), crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, seed func(*gamesql.CharacterStore, *gamesql.ItemStore), wantChars int, cursedWeapons ...*entity.CursedWeaponTable) (c *testsupport.ScriptedClient, chars *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, state *world.State) {
 	t.Helper()
 
 	loginAddr, servers, sessions := newTestLoginServer(t, false)
@@ -336,24 +339,6 @@ func newLinkedGameClientWithSkillsShortcutsCrestsSeed(t *testing.T, skills *skil
 		t.Fatalf("initial char count = %d, want %d", count, wantChars)
 	}
 	return c, chars, items, shortcuts, state
-}
-
-func seedSelectableCharacter(t *testing.T, chars *fakeCharStore, account, name string, level, sp int) int32 {
-	t.Helper()
-	tmpl, ok := testTemplates(t).Get(0)
-	if !ok {
-		t.Fatal("missing test class template")
-	}
-	ch, err := player.NewCharacter(100, tmpl, account, name, 1, 0, 0, player.SexMale)
-	if err != nil {
-		t.Fatalf("seed character: %v", err)
-	}
-	ch.CharLevel = level
-	ch.SP = sp
-	if err := chars.Create(context.Background(), ch); err != nil {
-		t.Fatalf("seed character store: %v", err)
-	}
-	return ch.ID
 }
 
 func newTestLivePlayer(t testing.TB, id int32, capture *testsupport.FrameCapture, delivery ...itemcontainer.Delivery) *livePlayer {

@@ -73,8 +73,9 @@ var adminCommands = map[string]adminCommand{
 	"admin_party_info": (*GameClientLink).adminPartyInfo,
 	"admin_remove":     (*GameClientLink).adminRemove,
 
-	// Castles; see admin_castle.go.
+	// Castles and sieges; see admin_castle.go and admin_siege.go.
 	"admin_castle": (*GameClientLink).adminCastle,
+	"admin_siege":  (*GameClientLink).adminSiege,
 
 	// Manor; see admin_manor.go.
 	"admin_manor": (*GameClientLink).adminManor,
