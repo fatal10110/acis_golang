@@ -153,6 +153,7 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	}
 	inst.Home = loc
 	inst.HasHome = true
+	inst.DriftRange = n.aiConfig.DriftRange
 	inst.SpawnHeading = heading
 	inst.WalkMode = walkerWalkModeIDs[entry.NPCID] && routeStandIn(n.scripts, entry.NPCID)
 	n.mu.Lock()

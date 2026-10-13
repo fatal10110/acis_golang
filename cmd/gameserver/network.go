@@ -233,6 +233,7 @@ func provideGameClientLink(
 		PetConfig:        petCfg,
 		DisableRaidCurse: bool(gameplay.DisableRaidCurse),
 		ShowNPCCrest:     bool(gameplay.ShowNPCCrest),
+		ShowNPCLevel:     bool(gameplay.ShowNPCLevel),
 		Macros:           macros,
 		Recommendations:  recommendations,
 		Quests:           quests,
