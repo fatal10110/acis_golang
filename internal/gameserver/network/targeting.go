@@ -150,7 +150,7 @@ func (l *GameClientLink) actOnSelectedTarget(live *livePlayer, target world.Trac
 // every click with ActionFailed alone.
 func christmasTree(target world.Tracked) bool {
 	d, ok := target.(*npc.Decoration)
-	return ok && d.Instance.Kind == npc.InstanceKind("ChristmasTree")
+	return ok && d.Instance.Kind == npc.ChristmasTree
 }
 
 // interactsWith reports whether a click on the selected hostile NPC h is an
@@ -395,11 +395,16 @@ func (l *GameClientLink) actOnSummon(live *livePlayer, target world.Tracked, ctr
 // actOnFolk answers a click on an already-selected civilian NPC and
 // reports whether target was one. A forced click attacks it while it may be
 // attacked by force; any other click, a forced one on its corpse or on a
-// holy artifact included, talks to it.
+// holy artifact included, talks to it. A forced click from a player out of
+// control is refused before either.
 func (l *GameClientLink) actOnFolk(live *livePlayer, target world.Tracked, ctrl, shift bool) bool {
 	f, ok := target.(*npc.Folk)
 	if !ok || live == nil {
 		return false
+	}
+	if ctrl && liveOutOfControl(live) {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return true
 	}
 	if attacksFolk(live, f, ctrl) {
 		l.attackLiveTarget(live, f, shift)
