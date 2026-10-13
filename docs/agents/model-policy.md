@@ -16,7 +16,8 @@ hypotheses to test, not facts about cost or quality.
 - Do not treat generated-token count as a proxy for subscription efficiency.
 
 Claude roles currently use Haiku for the narrow lookup, Sonnet at high effort for multi-file research,
-and Fable at high effort for selective high-risk review; see the 2026-10-13 benchmark below. The
+and Opus at high effort (120-turn cap) for selective high-risk review; see the 2026-10-13 benchmark
+below. The
 agent files use floating aliases, so each role follows the newest model of its family. Codex uses GPT-5.6 Luna at medium effort for narrow Java lookup and keeps
 GPT-5.5 at medium/high effort for multi-file research and high-risk review. Cursor uses Grok 4.5 at
 medium effort for the narrow lookup and keeps Grok 4.6 at medium/high effort for multi-file research
@@ -58,17 +59,20 @@ Sonnet used 118k, 39, and 171 s. Haiku's per-token price is 1/20 of Sonnet's, so
 as much. Decision: Haiku.
 
 **`port-reviewer`, Fable vs Opus at high effort** (PR #2344 and #2363 reviewed at their merge commits,
-scored against the four verified findings of each saved review).
+scored against the four verified findings of each saved review; two runs per arm).
 
-| PR | Opus | Fable |
-| --- | --- | --- |
-| #2344 (33 files) | 2/4, including the Medium item-loss/dupe (non-deferred round accounting); plus one valid new race, since fixed on `main`. 137k tokens, 9 min. | 2/4; missed the dupe and called that path safe. 118k tokens, 10 min. |
-| #2363 (178 files) | 0/4; hit the 40-turn limit before reaching the wander and cast-gate code. 188k tokens, 5 min. | 3/4, including the High wander regression on a newly live path. 337k tokens, 12 min. |
+| Run | PR | Opus | Fable |
+| --- | --- | --- | --- |
+| 1 (40-turn cap) | #2344 (33 files) | 2/4, including the item-loss/dupe (non-deferred round accounting), plus a valid new pet-row race since fixed on `main`. 137k tokens, 9 min. | 2/4; missed the dupe and called that path safe. 118k tokens, 10 min. |
+| 1 (40-turn cap) | #2363 (178 files) | 0/4; hit the turn cap before reaching the wander and cast-gate code. 188k tokens, 5 min. | 3/4, including the High wander regression on a newly live path. 337k tokens, 12 min. |
+| 2 (cap lifted) | #2344 | 2/4, and the same pet-row race again. 118k tokens, 8 min. | 2/4; called the pet-row path safe again. 125k tokens, 9 min. |
+| 2 (cap lifted) | #2363 | 2/4, including the High wander regression and the unowned timer, plus a likely new regression (party skills cast by a summon now target the owner instead). 370k tokens, 117 tool calls, 15 min. | 0/4. 345k tokens, 12 min. |
 
-Fable found 5/8 known defects and Opus 2/8. Fable cost about 3.5× as much per review (2.5× the
-per-token price, more tokens). The reviewer runs only on explicit request for high-risk changes,
-so recall matters more than cost there. Decision: Fable. Both still miss defects, so a clean report
-is not proof.
+Without the cap, Opus scored 2/4 on every run. It caught the High #2363 regression, and on #2344 it
+twice found a real race that Fable called safe. Fable swung from 3/4 to 0/4 on the same PR, and its
+per-token price is 2.5× Opus's at similar token use. Decision: Opus, with the turn cap raised to 120,
+because 40 turns cut off its first #2363 review. Both still miss defects, so a clean report is not
+proof.
 
 **`java-researcher`, Sonnet at medium vs high effort** (bow fire-time sequence and NPC `teleportTo`
 lifecycle, 10 checkpoints each from verified reports).
