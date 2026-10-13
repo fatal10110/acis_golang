@@ -42,3 +42,13 @@ type MusicPlayed struct {
 }
 
 func (MusicPlayed) event() {}
+
+// EarthquakeStarted reports the screens shaking around At with Intensity
+// for Duration seconds: for the players that know the NPC that emits it,
+// or for the character alone.
+type EarthquakeStarted struct {
+	At                  location.Location
+	Intensity, Duration int32
+}
+
+func (EarthquakeStarted) event() {}

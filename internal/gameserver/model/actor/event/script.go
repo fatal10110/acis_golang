@@ -48,3 +48,21 @@ func (HennaListShown) event() {}
 type NobleGranted struct{}
 
 func (NobleGranted) event() {}
+
+// ScreenMessageShown reports Text shown at the top center of the
+// character's screen for DurationMs milliseconds.
+type ScreenMessageShown struct {
+	Text       string
+	DurationMs int32
+}
+
+func (ScreenMessageShown) event() {}
+
+// MultisellRequested asks for the multisell list List to be shown to the
+// character as the civilian NPC ObjectID offers it.
+type MultisellRequested struct {
+	ObjectID int32
+	List     string
+}
+
+func (MultisellRequested) event() {}

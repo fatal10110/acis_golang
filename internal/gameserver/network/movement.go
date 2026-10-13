@@ -73,7 +73,7 @@ func (l *GameClientLink) tryLiveMoveTo(live *livePlayer, target location.Locatio
 			live.SendFrame(serverpackets.FrameActionFailed())
 			return
 		}
-		live.deferAction(func() { l.startLiveMove(live, target, boatID) })
+		live.deferAction("MOVE_TO", func() { l.startLiveMove(live, target, boatID) })
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}

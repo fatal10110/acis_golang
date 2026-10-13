@@ -685,3 +685,49 @@ Quest.addPartyDied inline
 Clan.getClanHallId script.Player.ClanHallID
 Clan.getLeader inline
 ClanMember.getPlayerInstance script.Player.ClanLeader
+
+# Script-facing API freeze, finishing lane (#3748). A script neither logs
+# nor holds a database connection: the domain operation it calls reads,
+# writes and logs its own failures. A maker template's base HP and MP are
+# read inside the spawn data's alive check (#3800). The game tick is the
+# server's uptime in seconds; a maker reads the time of day on its own
+# handle, and its fixed-rate timer is the group's Every. The map, page,
+# multisell, zone and seven signs singletons are the lookups the Script
+# handle stands for. Location.getClosestPositionList sorts by descending
+# distance, so its Go name says what it returns. A page a script fills
+# itself is shown with ShowHTML. An earthquake is felt by one player, or
+# by the players around a hostile NPC. A flee desire's location is a clone
+# of a location built fresh on each flee lookup, so the arrival hook's
+# removal by identity matches nothing; the desire goes when the arrival
+# clears the current desire after the hook returns.
+BossZone.allowPlayerEntry script.Zone.AllowPlayerEntry
+CLogger.error inline
+CLogger.info inline
+CLogger.warn inline
+ConnectionPool.getConnection inline
+CreatureTemplate.getBaseHpMax inline
+CreatureTemplate.getBaseMpMax inline
+Door.isOpened script.Door.Opened
+Earthquake.new Earthquake
+ExShowScreenMessage.new script.Player.ShowScreenMessage
+GameTimeTaskManager.getCurrentTick script.Script.CurrentTick
+GameTimeTaskManager.isNight script.Maker.IsNight
+HtmCache.getHtm script.Script.Page
+HtmCache.getInstance inline
+Intention.getLoc inline
+Location.getClosestPosition script.Closest
+Location.getClosestPositionList script.Farthest
+MathUtil.calculateAngleFrom script.AngleFrom
+MathUtil.checkIfInRange script.InRange
+MultisellData.getInstance inline
+MultisellData.separateAndSend script.Player.ShowMultisell
+NpcHtmlMessage.replace script.Player.ShowHTML
+Point2D.addRandomOffset script.Script.RandomOffset
+SevenSignsManager.getCurrentPeriod script.Script.SevenSignsPeriod
+SevenSignsManager.getSealOwner script.Script.SealOwner
+StringUtil.scrambleString script.Script.Scramble
+ThreadPool.scheduleAtFixedRate spawn.Group.Every
+ZoneManager.getInstance inline
+ZoneManager.getZone script.Script.BossZoneAt
+ZoneManager.getZoneById script.Script.Zone
+ZoneType.isInsideZone script.Zone.Contains
