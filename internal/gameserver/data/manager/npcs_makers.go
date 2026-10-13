@@ -140,11 +140,9 @@ func (g *makerGroup) DeleteAll() {
 				delete(n.live, slot.liveID)
 				n.liveCount--
 			}
-			delete(n.slot, key)
+			n.dropSlotLocked(key)
 			if slot.dbName != "" {
-				if state, ok := n.spawns.State(slot.dbName); ok {
-					state.Status = spawn.StatusUninitialized
-				}
+				n.spawns.Uninitialize(slot.dbName)
 			}
 		}
 		g.keys[i] = nil

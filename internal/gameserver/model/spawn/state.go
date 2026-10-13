@@ -19,8 +19,9 @@ const (
 	StatusAlive Status = 1
 )
 
-// State is one spawn_data row. Callers that mutate a live spawn concurrently
-// must guard the owning spawn aggregate; State itself is a plain value holder.
+// State is one spawn_data row and its update rules. State itself holds no
+// lock: the spawn list that keeps a row owns it, and every read and write of
+// a kept row goes through that list under its lock.
 type State struct {
 	Name        string
 	Status      Status
