@@ -12,6 +12,9 @@ type olympiadStanding struct {
 	started atomic.Bool
 	gameID  atomic.Int32
 	side    atomic.Int32
+	// falling is held while a lethal hit marks the competitor dead
+	// (fallInOlympiad).
+	falling atomic.Bool
 }
 
 // OlympiadMode reports whether the character is a competitor of an

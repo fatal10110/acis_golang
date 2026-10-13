@@ -106,3 +106,8 @@ func (f *Folk) rawPage(pages Pages, path string) string {
 	}
 	return "<html><body>My html is missing:<br>" + path + "</body></html>"
 }
+
+// OlympiadManager reports whether f is an Olympiad manager.
+func (f *Folk) OlympiadManager() bool {
+	return hostileKind(f.Instance) == "OlympiadManagerNpc"
+}
