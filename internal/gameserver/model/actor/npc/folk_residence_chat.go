@@ -14,10 +14,11 @@ import (
 type ResidenceTalk struct {
 	// CastleID is the castle the NPC serves and HallID the clan hall; both
 	// are 0 for an NPC serving neither. Siegable marks a siegable hall, and
-	// HallName names the hall.
+	// HallName names the hall, CastleName the castle.
 	CastleID, HallID int
 	Siegable         bool
 	HallName         string
+	CastleName       string
 	// OwnerID is the clan owning the residence, 0 for none. OwnerName names
 	// it, and OwnerLeader its leader, empty when the clan has none.
 	OwnerID     int32
@@ -28,13 +29,20 @@ type ResidenceTalk struct {
 	// battlefield is.
 	SiegeInProgress   bool
 	BattlefieldActive bool
+	// LifeTowers is the number of the castle's life control towers still
+	// standing.
+	LifeTowers int
 	// ClanID is the talker's clan, 0 for none; ClanLeader is set when the
 	// talker leads it, and Privileges are the clan privileges it holds.
 	ClanID     int32
 	ClanLeader bool
 	Privileges clan.Privilege
-	// StrifeOwner is the cabal owning the Seal of Strife.
-	StrifeOwner sevensigns.Cabal
+	// StrifeOwner is the cabal owning the Seal of Strife, and
+	// SealValidation is set during the seal validation period.
+	StrifeOwner    sevensigns.Cabal
+	SealValidation bool
+	// Flying is set while the talker flies a wyvern.
+	Flying bool
 }
 
 // owns reports whether the talker's clan owns the residence.
@@ -74,8 +82,8 @@ func (r ResidenceTalk) castleTalkCond(busy bool, need clan.Privilege) castleTalk
 // a clan hall; ok is false for any other type.
 func (f *Folk) residenceChat(pages Pages, kind InstanceKind, rules ChatRules, state ChatState) (page string, outcome ChatOutcome, ok bool) {
 	switch kind {
-	case "CastleBlacksmith", "CastleChamberlain", "CastleDoorman", "CastleMagician", "CastleWarehouseKeeper",
-		"ClanHallDoorman", "ClanHallManagerNpc", "Doorman", "ManorManagerNpc", "MercenaryManagerNpc":
+	case "CastleBlacksmith", "CastleChamberlain", "CastleDoorman", "CastleGatekeeper", "CastleMagician", "CastleWarehouseKeeper",
+		"ClanHallDoorman", "ClanHallManagerNpc", "Doorman", "ManorManagerNpc", "MercenaryManagerNpc", "WyvernManagerNpc":
 	default:
 		return "", ChatShown, false
 	}
@@ -90,6 +98,8 @@ func (f *Folk) residenceChat(pages Pages, kind InstanceKind, rules ChatRules, st
 		page, outcome = f.castlePage(pages, r.castleTalkCond(r.SiegeInProgress, clan.PrivNone), "data/html/chamberlain/", "no.htm", "busy.htm", "chamberlain.htm"), ChatShownReleased
 	case "CastleDoorman":
 		page, outcome = f.castleDoormanChat(pages, r), ChatShown
+	case "CastleGatekeeper":
+		page, outcome = f.massGatekeeperChat(pages, r)
 	case "CastleMagician":
 		page, outcome = f.castlePage(pages, r.castleTalkCond(r.BattlefieldActive, clan.PrivNone), "data/html/castlemagician/", "magician-no.htm", "magician-busy.htm", "magician.htm"), ChatShownReleased
 	case "CastleWarehouseKeeper":
@@ -107,6 +117,8 @@ func (f *Folk) residenceChat(pages Pages, kind InstanceKind, rules ChatRules, st
 		page, outcome = f.manorManagerChat(pages, rules, r), ChatShown
 	case "MercenaryManagerNpc":
 		page, outcome = f.mercenaryManagerChat(pages, r), ChatPageOnly
+	case "WyvernManagerNpc":
+		page, outcome = f.wyvernManagerChat(pages, rules, r), ChatShown
 	}
 	return page, outcome, true
 }
@@ -147,16 +159,8 @@ func (f *Folk) blacksmithChat(pages Pages, rules ChatRules, r ResidenceTalk) (st
 // doormen/<npcId>.htm for a member of the owning clan allowed to open its
 // gates, doormen/<npcId>-no.htm for anyone else.
 func (f *Folk) castleDoormanChat(pages Pages, r ResidenceTalk) string {
-	owner := false
-	switch {
-	case r.ClanID == 0:
-	case r.HallID != 0 && r.Siegable:
-		owner = r.owns() && r.holds(clan.PrivHallEntryExit)
-	case r.CastleID != 0:
-		owner = r.owns() && r.holds(clan.PrivCastleEntryExit)
-	}
 	file := strconv.Itoa(f.NpcID()) + "-no.htm"
-	if owner {
+	if doormanOwner("CastleDoorman", r) {
 		file = strconv.Itoa(f.NpcID()) + ".htm"
 	}
 	return f.page(pages, "data/html/doormen/"+file)
