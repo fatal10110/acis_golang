@@ -31,7 +31,8 @@ func (f *Folk) Decayed() bool {
 // death ends, observers see it die and leave its attack stance, and its
 // corpse is registered for decay after the template corpse time. A
 // civilian NPC pays no reward. Its dying script hooks are scheduled, then
-// its party is told, then its clan members in range.
+// its party is told, then its clan members in range. A siege headquarters
+// then leaves its clan, which takes it out of the world.
 func (f *Folk) die(killer attackable.Combatant) bool {
 	f.vitalsMu.Lock()
 	if f.dead {
@@ -57,6 +58,9 @@ func (f *Folk) die(killer attackable.Combatant) bool {
 	f.raiseDying(killer)
 	partyDied(f.scripts, f)
 	raiseClanDied(f.scripts, f.world, f, killer)
+	if f.SiegeFlag() {
+		f.headquartersDied()
+	}
 	return true
 }
 

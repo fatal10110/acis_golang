@@ -275,10 +275,10 @@ func (s *Siege) End() {
 // than the owner's are thrown off the battlefield, the siege states are
 // cleared, the next date is set and every registration dropped, the owner
 // registered again, and the battlefield turns off. Last, the rulers
-// engraved on the castle's artifacts are wiped.
+// engraved on the castle's artifacts are wiped. Every registered clan
+// loses its headquarters with its counters.
 //
-// ponytail: the reference also drops each registered clan's headquarters
-// flag with its counters (#3374), unpolymorphs the control towers (#465),
+// ponytail: the reference also unpolymorphs the control towers (#465),
 // despawns the siege guards and revives the doors (#3373) before the
 // battlefield turns off.
 func (s *Siege) endLocked(fx *effects) {
@@ -309,9 +309,12 @@ func (s *Siege) endLocked(fx *effects) {
 	} else {
 		s.announceLocked(fx, castleMsg(MsgSiegeDraw, castleID))
 	}
+	registered := make([]int32, 0, len(s.clans))
 	for _, r := range s.clans {
 		delete(e.counters, r.clanID)
+		registered = append(registered, r.clanID)
 	}
+	dropHeadquarters(fx, e.resolve(registered))
 	s.reputationLocked(fx, ownerID)
 	fx.add(func() { s.withBattlefield(func(f *zone.Siege) { f.BanishForeigners(ownerID) }) })
 	s.siegeStatesLocked(fx, true)
@@ -351,13 +354,14 @@ func (s *Siege) reputationLocked(fx *effects, ownerID int32) {
 // under way. With no owner left nothing else changes. Otherwise the
 // attackers are told their temporary alliance is over, every owner and
 // defender attacks, the new owner owns, the attackers of its alliance
-// defend, the players of other clans are thrown off the battlefield, and
-// every registered clan's members in the world take their new siege state.
+// defend, the players of other clans are thrown off the battlefield, the
+// former owner and defenders lose their headquarters, and every registered
+// clan's members in the world take their new siege state.
 //
 // ponytail: the reference first respawns the siege guards (#3373), and
-// before the new siege states drops the former defenders' headquarters
-// flags (#3374), removes the door and trap upgrades (#236), revives the
-// doors at half HP (#3373) and resets the control towers (#465).
+// before the new siege states removes the door and trap upgrades (#236),
+// revives the doors at half HP (#3373) and resets the control towers
+// (#465).
 func (s *Siege) MidVictory() {
 	var fx effects
 	e := s.e
@@ -380,6 +384,7 @@ func (s *Siege) midVictoryLocked(fx *effects) {
 		return
 	}
 	attackers := s.idsLocked(SideAttacker)
+	defenders := s.e.resolve(s.idsLocked(SideOwner, SideDefender))
 	s.tellLocked(fx, Message{ID: MsgTemporaryAllianceDissolved}, SideAttacker)
 	for i := range s.clans {
 		if s.clans[i].side == SideDefender || s.clans[i].side == SideOwner {
@@ -395,7 +400,18 @@ func (s *Siege) midVictoryLocked(fx *effects) {
 		}
 	}
 	fx.add(func() { s.withBattlefield(func(f *zone.Siege) { f.BanishForeigners(ownerID) }) })
+	dropHeadquarters(fx, defenders)
 	s.siegeStatesLocked(fx, false)
+}
+
+// dropHeadquarters takes each of clans' siege headquarters out of the
+// world.
+func dropHeadquarters(fx *effects, clans []*clan.Clan) {
+	fx.add(func() {
+		for _, cl := range clans {
+			cl.DropHeadquarters()
+		}
+	})
 }
 
 // siegeStatesLocked gives the members in the world of the attacking clans

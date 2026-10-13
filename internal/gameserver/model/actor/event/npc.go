@@ -106,3 +106,10 @@ type HallSupportCast struct {
 
 func (HallManagerBuffCheck) event() {}
 func (HallSupportCast) event()      {}
+
+// HeadquartersAttacked reports a hit on a siege headquarters whose clan
+// was not warned of an attack in the last 30 seconds: the clan's members
+// are to be warned their base is under attack.
+type HeadquartersAttacked struct{}
+
+func (HeadquartersAttacked) event() {}
