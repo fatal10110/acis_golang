@@ -251,8 +251,10 @@ read, directly or through a local copied from them. A map keyed by NPC is `NPCMa
 with the reference's removal of a value; its keys and values match by NPC identity, the
 spawn slot's, as the timers' do. A field holding one player is `PlayerCell`; a list is
 `ListCell`, ordered and keeping duplicates, whose creature handles match by the same
-identity (a player's is its character) and other values by `==`. A member reaches another
-member's helpers through `QuestState.Quest()`, the registered script of a state it found.
+identity (a player's is its character) and other values by `==`. A map of integer keys
+a script counts or walks (FlagWar's clans) is `IntMapCell`, which walks in the reference's
+hash-map order. A member reaches another member's helpers through `QuestState.Quest()`,
+the registered script of a state it found.
 
 ### Timers
 

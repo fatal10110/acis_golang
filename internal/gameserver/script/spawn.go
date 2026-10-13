@@ -21,6 +21,7 @@ type Population interface {
 	RespawnDelay(live *npc.Hostile) time.Duration
 	ScheduleRespawn(live *npc.Hostile, d time.Duration) error
 	DecayMe(live *npc.Hostile)
+	MakerEvent(maker, name string, int1, int2 int) bool
 }
 
 // Spawner spawns NPCs for scripts. Every NPC it spawns is in the world,
