@@ -45,11 +45,11 @@ func (r *Registry) useCubicOn(cast Cast, target Creature, mAtk float64, result *
 	case "PARALYZE", "STUN", "ROOT", "AGGDAMAGE":
 		cubicDisable(cast, target, mAtk)
 	case "MDAM":
-		cubicMdam(cast, target, mAtk, r.magicFailures, result)
+		cubicMdam(cast, target, mAtk, r.magicFailures.enabled(), result)
 	case "POISON", "DEBUFF", "DOT":
 		cubicContinuous(cast, target, mAtk, result)
 	case "DRAIN":
-		cubicDrain(cast, target, r.magicFailures, result)
+		cubicDrain(cast, target, r.magicFailures.enabled(), result)
 	}
 }
 

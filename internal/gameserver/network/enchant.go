@@ -28,12 +28,8 @@ type enchanting struct {
 // newEnchanting builds the enchant feature from cfg's rates, armor sets and
 // dice; a nil roll draws from the random source.
 func newEnchanting(cfg GameClientLinkConfig) enchanting {
-	rates := enchantflow.DefaultConfig()
-	if cfg.PlayerConfig.Enchant != nil {
-		rates = *cfg.PlayerConfig.Enchant
-	}
 	scrolls := enchantflow.NewState()
-	items := enchantflow.NewService(scrolls, cfg.IDs, cfg.EnchantRoll, rates)
+	items := enchantflow.NewService(scrolls, cfg.IDs, cfg.EnchantRoll, enchantRates(&cfg.PlayerConfig))
 	items.SetArmorSets(cfg.ArmorSets)
 	skillRoll := cfg.SkillEnchantRoll
 	if skillRoll == nil {

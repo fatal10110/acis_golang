@@ -366,7 +366,13 @@ type GameClientLink struct {
 	admin        *admin.Data
 	// playerSettings holds the PlayerConfig in force; //reload config
 	// swaps it whole, so each read sees one config or the other.
-	playerSettings   atomic.Pointer[PlayerConfig]
+	playerSettings atomic.Pointer[PlayerConfig]
+	// playerRules holds the rules every character and summon reads, from
+	// the PlayerConfig in force; //reload config sets them with it.
+	playerRules *player.RuleBook
+	// playerConfigMu serializes the //reload config puts, so the settings
+	// and the rules and switches built from them come from one reload.
+	playerConfigMu   sync.Mutex
 	petConfig        petmodel.Config // passed into summon.PetConfig by newPet.
 	disableRaidCurse bool
 	showNPCCrest     bool
@@ -921,6 +927,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	}
 	playerConfig := cfg.PlayerConfig
 	link.playerSettings.Store(&playerConfig)
+	link.playerRules = player.NewRuleBook(link.characterRules(&playerConfig))
 	link.macros = cfg.Macros
 	link.manor = cfg.Manor
 	link.classMaster = cfg.ClassMaster
@@ -1017,9 +1024,7 @@ func (l *GameClientLink) playerConfig() *PlayerConfig {
 func (l *GameClientLink) newPet(cfg summon.PetConfig) (*summon.Actor, error) {
 	cfg.Effects = l.effects
 	cfg.Config = &l.petConfig
-	settings := l.playerConfig()
-	cfg.MaxBuffsAmount = settings.MaxBuffsAmount
-	cfg.RespawnRestoreHP = settings.RespawnRestoreHP
+	cfg.Settings = l.playerRules
 	if cfg.Roll == nil {
 		cfg.Roll = l.petRoll
 	}

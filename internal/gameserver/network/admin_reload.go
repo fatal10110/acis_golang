@@ -29,16 +29,10 @@ type DataReloads struct {
 	// fleet's.
 	BoatRoutes func() ([]route.BoatItinerary, error)
 	// Config reads the game server properties files anew into the player
-	// settings, which then replace the ones in force, all at once. Each read
-	// of a setting after the swap sees the reloaded value, but some take it
-	// later or not at all:
-	//   - the settings a player or summon is built with (PlayerConfig's
-	//     player.Rules fields and a summon's MaxBuffsAmount and
-	//     RespawnRestoreHP) reach the players entering the world, and the
-	//     summons called, after the reload;
-	//   - Enchant, MagicFailures, CraftingDisabled and
-	//     KeepMaintainedIngredients keep their boot value: the enchant,
-	//     skill, craft and multisell services are built with them;
+	// settings, which then replace the ones in force. Each read of a
+	// setting after the swap sees the reloaded value, the rules of the
+	// characters and summons already in the world and the enchant, skill,
+	// craft and multisell switches included, except:
 	//   - PartyRange and MultipleItemDrop keep their boot value: the kill
 	//     rewards and the scripts read their own copies of both, so the
 	//     reload leaves the ones in force for party loot too;
@@ -107,9 +101,10 @@ type reloadType struct {
 	// done is what the game master is told once the type has reloaded.
 	done string
 	run  func(l *GameClientLink) error
-	// runFor, when set, reloads in place of run for the game master gm,
-	// on whose queue the command runs.
-	runFor func(l *GameClientLink, gm *livePlayer) error
+	// runThen, when set, reloads in place of run for the game master gm,
+	// on whose queue the command runs. Unless it fails, it runs then on
+	// gm's queue once the reload is over, which may be after it returns.
+	runThen func(l *GameClientLink, gm *livePlayer, then func()) error
 }
 
 // reloadTypes are the types //reload takes, in the order //reload
@@ -117,7 +112,7 @@ type reloadType struct {
 var reloadTypes = []reloadType{
 	{word: "admin", done: "Admin data has been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Admin) }},
 	{word: "announcement", done: "The content of announcements.xml has been reloaded.", run: func(l *GameClientLink) error { return l.announcements.Load() }},
-	{word: "boat", done: "Boat have been reloaded.", runFor: (*GameClientLink).reloadBoats},
+	{word: "boat", done: "Boat have been reloaded.", runThen: (*GameClientLink).reloadBoats},
 	{word: "buylist", done: "Buylists have been reloaded.", run: (*GameClientLink).reloadBuyLists},
 	{word: "config", done: "Configs files have been reloaded.", run: (*GameClientLink).reloadConfig},
 	{word: "crest", done: "Crests have been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Crests) }},
@@ -152,15 +147,30 @@ func (l *GameClientLink) adminReload(gm *livePlayer, line string) {
 		sendReloadUsage(gm)
 		return
 	}
-	for _, token := range args {
+	l.reloadTokens(gm, args)
+}
+
+// reloadTokens reloads the types tokens name, in turn. A type that finishes
+// later tells gm it reloaded, and goes on with the tokens after it, only
+// once it is over, so gm sees what each reload sends before its text and
+// the next reload.
+func (l *GameClientLink) reloadTokens(gm *livePlayer, tokens []string) {
+	for i, token := range tokens {
 		typ, ok := reloadTypeOf(token)
 		if !ok {
 			sendReloadUsage(gm)
 			continue
 		}
 		var err error
-		if typ.runFor != nil {
-			err = typ.runFor(l, gm)
+		if typ.runThen != nil {
+			rest := tokens[i+1:]
+			err = typ.runThen(l, gm, func() {
+				sendText(gm, typ.done)
+				l.reloadTokens(gm, rest)
+			})
+			if err == nil {
+				return
+			}
 		} else {
 			err = typ.run(l)
 		}
@@ -207,10 +217,12 @@ func (l *GameClientLink) reloadNPCs() error {
 }
 
 // reloadConfig reads the properties files anew and puts the player settings
-// read in force in place of the ones before; a file that cannot be read
-// leaves them as they were. PartyRange and MultipleItemDrop keep the value
-// in force: the kill rewards and the scripts hold their own boot copies of
-// both, and party loot must agree with them.
+// read in force in place of the ones before (see applyPlayerConfig); a file
+// that cannot be read leaves them as they were. PartyRange and
+// MultipleItemDrop keep the value in force: the kill rewards and the
+// scripts hold their own boot copies of both, and party loot must agree
+// with them. Two game masters reloading at once put their settings in force
+// one after the other, each whole.
 func (l *GameClientLink) reloadConfig() error {
 	if l.reloads.Config == nil {
 		return errReloadNotPorted
@@ -219,9 +231,11 @@ func (l *GameClientLink) reloadConfig() error {
 	if err != nil {
 		return err
 	}
+	l.playerConfigMu.Lock()
+	defer l.playerConfigMu.Unlock()
 	prev := l.playerConfig()
 	settings.PartyRange, settings.MultipleItemDrop = prev.PartyRange, prev.MultipleItemDrop
-	l.playerSettings.Store(&settings)
+	l.applyPlayerConfig(&settings)
 	return nil
 }
 

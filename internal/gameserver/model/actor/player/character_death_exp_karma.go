@@ -49,9 +49,7 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 	}
 	pk := actingCharacter(killer)
 
-	c.stateMu.RLock()
-	allow := c.allowDelevel
-	c.stateMu.RUnlock()
+	allow := c.rules().AllowDelevel
 	lucky := c.HasSkill(int(skill.LuckySkillID))
 	loss := c.deathLossTerms(pk != nil, c.clanWarDeath(pk))
 
@@ -99,7 +97,7 @@ type deathLoss struct {
 // between clans at war, which costs a quarter of the normal loss.
 func (c *Character) deathLossTerms(killedByPlayable, atWar bool) deathLoss {
 	c.stateMu.RLock()
-	loss := deathLoss{table: c.levelTable, rate: c.rateKarmaExpLost}
+	loss := deathLoss{table: c.levelTable, rate: c.rules().RateKarmaExpLost}
 	c.stateMu.RUnlock()
 	loss.reducedLoss = c.FestivalParticipant() || atWar || c.InSiegeZone()
 	loss.exempt, loss.useCharm = deathLossExemption(c.InPvPZone(), c.InSiegeZone(),

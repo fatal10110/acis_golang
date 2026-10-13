@@ -249,9 +249,7 @@ func (c *Character) ShieldDefense(caster creature.FormulaActor, def modelskill.D
 		return formulas.ShieldFailed
 	}
 
-	c.stateMu.RLock()
-	perfectRate := c.perfectShieldBlockRate
-	c.stateMu.RUnlock()
+	perfectRate := c.rules().PerfectShieldBlockRate
 
 	result := formulas.ShieldUse(baseRate, c.DEX(), attackerUsesBow(caster), isCrit, perfectRate, c.rollValue(100))
 	c.notifyShieldBlock(result)

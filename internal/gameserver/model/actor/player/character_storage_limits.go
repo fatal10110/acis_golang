@@ -52,9 +52,7 @@ func (s StorageSlots) BaseFreight() int {
 }
 
 func (c *Character) configuredStorageSlots() StorageSlots {
-	c.stateMu.RLock()
-	defer c.stateMu.RUnlock()
-	return c.storageSlots.withDefaults()
+	return c.rules().StorageSlots.withDefaults()
 }
 
 // byRace picks the dwarf or non-dwarf base for c.

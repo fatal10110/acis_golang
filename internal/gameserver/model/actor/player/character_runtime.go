@@ -247,7 +247,9 @@ type Runtime struct {
 	Skills    skillDefinitions
 	Levels    *LevelTable
 	Log       zerolog.Logger
-	Rules     Rules
+	// Rules holds the server rules the character reads, each time it needs
+	// one; nil configures the zero Rules.
+	Rules *RuleBook
 }
 
 // Configure installs rt. Call it before exposing c to the world.
@@ -270,18 +272,11 @@ func (c *Character) Configure(rt Runtime) {
 	c.skillDefs = rt.Skills
 	c.levelTable = rt.Levels
 	c.log = rt.Log
-	c.rateKarmaExpLost = rt.Rules.RateKarmaExpLost
-	c.respawnRestoreHP = rt.Rules.RespawnRestoreHP
-	c.weightLimitMultiplier = rt.Rules.WeightLimitMultiplier
-	c.inventorySlots = rt.Rules.InventorySlots
-	c.storageSlots = rt.Rules.StorageSlots
-	c.perfectShieldBlockRate = rt.Rules.PerfectShieldBlockRate
-	c.maxBuffsAmount = rt.Rules.MaxBuffsAmount
-	c.deathPenaltyChance = rt.Rules.DeathPenaltyChance
-	c.allowDelevel = rt.Rules.AllowDelevel
-	c.raidCursesDisabled = rt.Rules.RaidCursesDisabled
-	c.awardPKKillPVPPoint = rt.Rules.AwardPKKillPVPPoint
-	c.deathDrop = rt.Rules.DeathDrop
+	rules := rt.Rules
+	if rules == nil {
+		rules = NewRuleBook(Rules{})
+	}
+	c.ruleBook.Store(rules)
 }
 
 // Attach installs live as this character's crowd-control/movement runtime

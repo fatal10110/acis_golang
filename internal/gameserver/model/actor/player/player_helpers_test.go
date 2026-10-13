@@ -279,7 +279,7 @@ func liveCharacter(id int32, tmpl *Template, items *item.Table, equipped ...*ite
 	c.SetResourceValues(Resources{MaxHP: 100, CurrentHP: 100, MaxMP: 30, CurrentMP: 30})
 	c.AttachRuntime(tmpl, itemcontainer.RestorePlayerInventory(c.ID, items, equipped))
 	c.SetRollSource(zeroRoll)
-	c.perfectShieldBlockRate = 5
+	setRules(c, func(r *Rules) { r.PerfectShieldBlockRate = 5 })
 	return c
 }
 
@@ -385,4 +385,11 @@ func attachIdleLive(t *testing.T, c *Character) *Character {
 	live.SetQueue(idleQueue())
 	c.Live = live
 	return c
+}
+
+// setRules puts in force for c its rules as edit changes them.
+func setRules(c *Character, edit func(*Rules)) {
+	r := *c.rules()
+	edit(&r)
+	c.ruleBook.Store(NewRuleBook(r))
 }

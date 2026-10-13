@@ -261,7 +261,11 @@ func (a *Actor) MaxBuffCount() int {
 	if a == nil {
 		return baseBuffSlots
 	}
-	return a.maxBuffsAmount + a.skills[int(modelskill.DivineInspirationSkillID)]
+	base := baseBuffSlots
+	if a.settings != nil {
+		base = defaultPositive(a.settings.MaxBuffsAmount(), baseBuffSlots)
+	}
+	return base + a.skills[int(modelskill.DivineInspirationSkillID)]
 }
 
 // Playable reports whether a is player-controlled.

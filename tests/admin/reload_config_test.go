@@ -30,7 +30,7 @@ func (f *configFiles) reloads() network.DataReloads {
 		if f.broken.Load() {
 			return network.PlayerConfig{}, errors.New("broken server.properties")
 		}
-		return network.PlayerConfig{DiscardItemDisabled: f.discardDisabled.Load(), RespawnRestoreHP: 0.7, MaxBuffsAmount: 20}, nil
+		return network.PlayerConfig{DiscardItemDisabled: f.discardDisabled.Load(), RespawnRestoreHP: 0.7, MaxBuffsAmount: 20, WeightLimitMultiplier: 1}, nil
 	}}
 }
 

@@ -14,10 +14,11 @@ import (
 // Each passenger is put ashore on its own queue, the game master at once.
 // The old boats leave the world, and the new ones enter it, once the last
 // passenger is ashore: a passenger never sees its boat go before its own
-// teleport, and the docks see the old boats go before the new ones come. With
-// passengers aboard other than gm, gm is told the boats reloaded before
-// that.
-func (l *GameClientLink) reloadBoats(gm *livePlayer) error {
+// teleport, and the docks see the old boats go before the new ones come.
+// then runs on gm's queue once the new boats are out: at once when no
+// passenger but gm was aboard, else posted there by the last oust, and
+// dropped when gm left the world meanwhile.
+func (l *GameClientLink) reloadBoats(gm *livePlayer, then func()) error {
 	if l.reloads.BoatRoutes == nil || l.boats == nil || l.world == nil {
 		return errReloadNotPorted
 	}
@@ -28,12 +29,13 @@ func (l *GameClientLink) reloadBoats(gm *livePlayer) error {
 	retired, launch := l.boats.Retire()
 
 	// pending counts the ousts still to run, plus this call's own share,
-	// dropped last, so the swap waits for every oust posted.
+	// dropped last, so the swap waits for every oust posted. The share
+	// dropped last swaps the fleet and reports whether it did.
 	var pending atomic.Int32
 	pending.Store(1)
-	done := func() {
+	done := func() bool {
 		if pending.Add(-1) != 0 {
-			return
+			return false
 		}
 		for _, b := range retired {
 			b.Remove()
@@ -41,6 +43,7 @@ func (l *GameClientLink) reloadBoats(gm *livePlayer) error {
 		if err := l.boats.Launch(launch, itineraries); err != nil {
 			l.log.Error().Err(err).Msg("admin: //reload boat could not launch the boats read")
 		}
+		return true
 	}
 	for _, b := range retired {
 		boatID := b.ObjectID()
@@ -55,17 +58,24 @@ func (l *GameClientLink) reloadBoats(gm *livePlayer) error {
 			}
 			pending.Add(1)
 			posted := onPlayer(gm, live, func() {
-				defer done()
 				l.oustFromRetiredBoat(live, boatID)
+				// gm's own oust runs inline while this call holds its
+				// share, so the last share dropped here is another
+				// passenger's, on that passenger's queue.
+				if done() {
+					postLive(gm, then)
+				}
 			})
 			if !posted {
 				// The player's queue is closed: it left the world, and its
-				// boat with it.
+				// boat with it. This call's share is still held.
 				done()
 			}
 		}
 	}
-	done()
+	if done() {
+		then()
+	}
 	return nil
 }
 

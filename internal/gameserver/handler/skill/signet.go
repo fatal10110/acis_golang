@@ -76,7 +76,7 @@ type signetUnsummonable interface {
 
 type signetHandler struct {
 	defs          Definitions
-	magicFailures bool
+	magicFailures *magicFailureSwitch
 	templates     signetTemplates
 	ids           objectIDAllocator
 	world         *world.State
@@ -378,12 +378,13 @@ func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Defin
 		mp.ReduceMP(float64(def.MPConsume))
 
 		var ids []int32
+		failures := h.magicFailures.enabled()
 		h.forEachSignetTarget(point, def.Radius, func(target Actor) {
 			dmgTarget, ok := asCreature(target)
 			if !ok {
 				return
 			}
-			in, ok := dmgTarget.MagicDamageInput(caster, def, h.magicFailures)
+			in, ok := dmgTarget.MagicDamageInput(caster, def, failures)
 			if !ok {
 				return
 			}

@@ -3,6 +3,7 @@ package enchant
 import (
 	"fmt"
 	"math"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/inventory"
@@ -190,7 +191,8 @@ type Service struct {
 	state *State
 	ids   inventory.IDAllocator
 	roll  func() float64
-	cfg   Config
+	// cfg holds the rates and limits in force; SetConfig replaces them.
+	cfg atomic.Pointer[Config]
 	// armorSets resolves the worn armor set whose +6 skill an armor
 	// enchant grants or revokes; nil grants none.
 	armorSets *armorset.Table
@@ -205,7 +207,15 @@ func NewService(state *State, ids inventory.IDAllocator, roll func() float64, cf
 	if roll == nil {
 		roll = func() float64 { return rnd.GetFloat(1) }
 	}
-	return &Service{state: state, ids: ids, roll: roll, cfg: cfg}
+	s := &Service{state: state, ids: ids, roll: roll}
+	s.SetConfig(cfg)
+	return s
+}
+
+// SetConfig puts cfg's rates and limits in force for the enchants that
+// start after it.
+func (s *Service) SetConfig(cfg Config) {
+	s.cfg.Store(&cfg)
 }
 
 // SetArmorSets makes an armor enchant grant and revoke the worn armor
@@ -304,7 +314,9 @@ func (s *Service) EnchantItem(req Request) (Result, error) {
 		return Result{}, nil
 	}
 	targetTemplate, ok := inv.Templates().Get(target.TemplateID)
-	if !ok || !scrollDef.valid(target, targetTemplate, s.cfg) || !Enchantable(target, targetTemplate) {
+	// One enchant reads one set of rates and limits.
+	cfg := *s.cfg.Load()
+	if !ok || !scrollDef.valid(target, targetTemplate, cfg) || !Enchantable(target, targetTemplate) {
 		return s.failCondition(playerID), nil
 	}
 
@@ -328,7 +340,7 @@ func (s *Service) EnchantItem(req Request) (Result, error) {
 		return out, nil
 	}
 
-	chance := scrollDef.chance(target, targetTemplate, s.cfg)
+	chance := scrollDef.chance(target, targetTemplate, cfg)
 	if target.Snapshot().OwnerID != playerID || !Enchantable(target, targetTemplate) || chance < 0 {
 		failed := s.failCondition(playerID)
 		failed.Persist = append(out.Persist, failed.Persist...)

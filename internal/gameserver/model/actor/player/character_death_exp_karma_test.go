@@ -29,8 +29,8 @@ func deathExpKarmaTable(t *testing.T, karmaModifier, expLossAtDeath float64) *Le
 func newDeathExpKarmaCharacter(t *testing.T, karmaModifier, expLossAtDeath float64) *Character {
 	c := &Character{ID: 1, CharLevel: 10, Exp: 1500, KarmaPoints: 100}
 	c.levelTable = deathExpKarmaTable(t, karmaModifier, expLossAtDeath)
-	c.allowDelevel = true
-	c.rateKarmaExpLost = 2.0
+	setRules(c, func(r *Rules) { r.AllowDelevel = true })
+	setRules(c, func(r *Rules) { r.RateKarmaExpLost = 2.0 })
 	return c
 }
 
@@ -93,7 +93,7 @@ func TestApplyDeathExpKarmaLossDropsLossBelowZero(t *testing.T) {
 	}
 	c := &Character{ID: 1, CharLevel: 1, Exp: 100}
 	c.levelTable = table
-	c.allowDelevel = true
+	setRules(c, func(r *Rules) { r.AllowDelevel = true })
 	rec := recordEvents(c)
 
 	// lostExp = round(3000*10/100) = 300 > 100.
@@ -209,7 +209,7 @@ func TestApplyDeathExpKarmaLossNoKillerIsNoOp(t *testing.T) {
 // applyDeathPenalty's charm check.
 func TestApplyDeathExpKarmaLossDelevelDisabledIsNoOp(t *testing.T) {
 	c := newDeathExpKarmaCharacter(t, 2.0, 10.0)
-	c.allowDelevel = false
+	setRules(c, func(r *Rules) { r.AllowDelevel = false })
 	c.ExpBeforeDeath = 1800
 	c.SetInPvPZone(true)
 	c.SetInSiegeZone(true)

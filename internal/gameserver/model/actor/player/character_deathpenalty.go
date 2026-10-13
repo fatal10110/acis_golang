@@ -70,10 +70,11 @@ func (c *Character) RaiseDeathPenaltyLevel(killer attackable.Combatant, roll int
 	inExemptZone := c.InPvPZone() || c.InSiegeZone()
 	charmOfLuck := c.EffectList().IsAffected(effect.FlagCharmOfLuck) && (killer == nil || killer.RaidRelated())
 	phoenixBlessing := c.EffectList().IsAffected(effect.FlagPhoenixBlessing)
+	chance := c.rules().DeathPenaltyChance
 
 	c.stateMu.Lock()
 	if c.deathPenaltyLevel >= maxDeathPenaltyLevel || byPlayer || inExemptZone ||
-		(karma <= 0 && roll > c.deathPenaltyChance) || charmOfLuck || phoenixBlessing {
+		(karma <= 0 && roll > chance) || charmOfLuck || phoenixBlessing {
 		c.stateMu.Unlock()
 		return c.deathPenaltyLevel, false
 	}

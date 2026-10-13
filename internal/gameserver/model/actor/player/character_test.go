@@ -287,7 +287,7 @@ func TestRefreshWeightPenalty(t *testing.T) {
 			inv := itemcontainer.NewPlayerInventory(1, item.NewTable([]*item.Template{{ID: 1, Kind: item.KindEtcItem, Weight: 1, Stackable: true, EtcItem: &item.EtcItemDetail{}}}))
 			c := &Character{}
 			c.AttachRuntime(&Template{CON: 20}, inv)
-			c.weightLimitMultiplier = 1
+			setRules(c, func(r *Rules) { r.WeightLimitMultiplier = 1 })
 			inv.AddNew(1, int(math.Ceil(float64(c.WeightLimit())*tc.ratio)), 1)
 			inv.UpdateWeight()
 			c.RefreshWeightPenalty()
@@ -302,7 +302,7 @@ func TestRefreshWeightPenaltyChangesOnlyOnBandChange(t *testing.T) {
 	inv := itemcontainer.NewPlayerInventory(1, item.NewTable([]*item.Template{{ID: 1, Kind: item.KindEtcItem, Weight: 1, Stackable: true, EtcItem: &item.EtcItemDetail{}}}))
 	c := &Character{}
 	c.AttachRuntime(&Template{CON: 20}, inv)
-	c.weightLimitMultiplier = 1
+	setRules(c, func(r *Rules) { r.WeightLimitMultiplier = 1 })
 	inv.AddNew(1, c.WeightLimit()/2, 1)
 	inv.UpdateWeight()
 	rec := recordEvents(c)
@@ -355,7 +355,7 @@ func TestAddLevelRefreshesWeightPenalty(t *testing.T) {
 	inv := itemcontainer.NewPlayerInventory(1, item.NewTable([]*item.Template{{ID: 1, Kind: item.KindEtcItem, Weight: 1, Stackable: true, EtcItem: &item.EtcItemDetail{}}}))
 	c := &Character{CharLevel: 1}
 	c.AttachRuntime(&Template{CON: 20}, inv)
-	c.weightLimitMultiplier = 1
+	setRules(c, func(r *Rules) { r.WeightLimitMultiplier = 1 })
 	inv.AddNew(1, c.WeightLimit(), 1) // full overload -> band 4
 	inv.UpdateWeight()
 
@@ -378,11 +378,11 @@ func TestRefreshWeightPenaltyKeepsStateWhenLimitIsZero(t *testing.T) {
 	inv := itemcontainer.NewPlayerInventory(1, item.NewTable([]*item.Template{{ID: 1, Kind: item.KindEtcItem, Weight: 1, Stackable: true, EtcItem: &item.EtcItemDetail{}}}))
 	c := &Character{}
 	c.AttachRuntime(&Template{CON: 20}, inv)
-	c.weightLimitMultiplier = 1
+	setRules(c, func(r *Rules) { r.WeightLimitMultiplier = 1 })
 	inv.AddNew(1, c.WeightLimit(), 1)
 	inv.UpdateWeight()
 	c.RefreshWeightPenalty()
-	c.weightLimitMultiplier = 0
+	setRules(c, func(r *Rules) { r.WeightLimitMultiplier = 0 })
 	c.RefreshWeightPenalty()
 	if got, want := c.WeightPenalty(), 4; got != want {
 		t.Fatalf("WeightPenalty() after zero limit = %d, want %d", got, want)
