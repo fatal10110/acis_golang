@@ -91,3 +91,47 @@ func TestScriptPrivateOfPrivateOutlivesAskerDecay(t *testing.T) {
 		t.Fatalf("master's privates = %v, want only the new private", got)
 	}
 }
+
+// A private its master's death let go creates a private of its own, which
+// joins its own set. The dead master's corpse decaying takes the first
+// private with it but not the new one, which keeps its spawn: at its own
+// decay it leaves the private that asked for it.
+func TestScriptPrivateOfUnlinkedPrivateKeepsSpawnAtMasterDecay(t *testing.T) {
+	t.Parallel()
+	w := bootCivilianParty(t, &partyLog{})
+	master := w.spawner.AddSpawn(spawnWolfID, script.Loc{X: w.at.X + 50, Y: w.at.Y, Z: w.at.Z}, false, 0)
+	wolf := spawnedNPC(t, w, spawnWolfID).(*npc.Hostile)
+	asker := w.spawner.CreateOnePrivate(master, spawnTabletID, 0)
+	tablet := spawnedNPC(t, w, spawnTabletID).(*npc.Folk)
+
+	p := w.liveObject(t, w.player)
+	onPlayerQueue(t, w, func() { wolf.TakeDamage(1_000_000, p) })
+	w.srv.Settle(t)
+	if !wolf.Dead() || tablet.Master() != nil {
+		t.Fatalf("master dead %v, private still linked %v; want dead and let go", wolf.Dead(), tablet.Master() != nil)
+	}
+
+	knight := w.spawner.CreateOnePrivate(asker, spawnPupID, 0)
+	pup := spawnedNPC(t, w, spawnPupID).(*npc.Hostile)
+	if !tablet.IsMaster() || !slices.Contains(tablet.Minions(), npc.PartyMember(pup)) {
+		t.Fatalf("let-go private master %v with privates %v, want the new private in its own set", tablet.IsMaster(), tablet.Minions())
+	}
+
+	onQueueOf(t, wolf, func() { wolf.Decay(w.srv.State, w.srv.NpcSpawns.RespawnHook(wolf.ObjectID())) })
+	w.srv.Settle(t)
+	if !asker.Decayed() || knight.Decayed() {
+		t.Fatalf("first private gone %v, new private gone %v; want only the first", asker.Decayed(), knight.Decayed())
+	}
+	if rec, ok := w.srv.NpcSpawns.SpawnOf(pup.ObjectID()); !ok || rec.MasterID != tablet.ObjectID() {
+		t.Fatalf("new private's spawn = %+v (%v), want the first private's private", rec, ok)
+	}
+
+	if !pup.Die(nil, nil) {
+		t.Fatal("the new private did not die")
+	}
+	onQueueOf(t, pup, func() { pup.Decay(w.srv.State, w.srv.NpcSpawns.RespawnHook(pup.ObjectID())) })
+	w.srv.Settle(t)
+	if pup.Master() != nil || slices.Contains(tablet.Minions(), npc.PartyMember(pup)) {
+		t.Fatalf("decayed one-time private still linked %v, in its master's privates %v", pup.Master() != nil, tablet.Minions())
+	}
+}
