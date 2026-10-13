@@ -7,6 +7,7 @@ import (
 	"time"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -493,10 +494,11 @@ func (c *Controller) hitFlags(hit Hit) uint8 {
 
 // swingHitTimer returns the shot step the first hit group of a swing runs
 // once its main target is known to still be there: a swing with any hit
-// that connects, in any group, spends the soulshot charge, and a player or
-// summon then charges its shots again from its auto-use shots. It runs once
-// per swing, ahead of the first hit's own feedback; a dual weapon's second
-// hit spends and charges nothing.
+// that connects, in any group, spends the soulshot charge and may empty the
+// main target's CP (breakCursedCP), and a player or summon then charges its
+// shots again from its auto-use shots. It runs once per swing, ahead of the
+// first hit's own feedback; a dual weapon's second hit spends and charges
+// nothing.
 func (c *Controller) swingHitTimer(groups []scheduledHit) func() {
 	connects := false
 	for _, group := range groups {
@@ -504,13 +506,50 @@ func (c *Controller) swingHitTimer(groups []scheduledHit) func() {
 			connects = connects || !hit.Miss
 		}
 	}
+	main := groups[0].hits[0].Target
 	return func() {
 		if connects {
 			c.actor.SetChargedShot(item.ShotSoul, false)
+			c.breakCursedCP(main)
 		}
 		if c.playable != nil {
 			c.emit(event.ShotsRechargeRequested{Physical: true})
 		}
+	}
+}
+
+// cursedHitParty is a player as the cursed-weapon hit rule reads it.
+type cursedHitParty interface {
+	CursedWeaponEquipped() bool
+	IsHero() bool
+}
+
+// cpBreakTarget is a player whose CP a cursed-weapon hit empties.
+type cpBreakTarget interface {
+	cursedHitParty
+	Invul() bool
+	SetCP(value float64)
+	BroadcastStatus()
+}
+
+// breakCursedCP empties the CP of target, a player the player attacking
+// connected with, when the attacker holds a cursed weapon or is a hero
+// striking a holder, and reports the CP. An invulnerable target keeps it.
+func (c *Controller) breakCursedCP(target attackable.Combatant) {
+	if c.player == nil || target == nil || target.Kind() != actor.KindPlayer {
+		return
+	}
+	attacker, ok := c.actor.(cursedHitParty)
+	if !ok {
+		return
+	}
+	victim, ok := target.(cpBreakTarget)
+	if !ok || victim.Invul() {
+		return
+	}
+	if attacker.CursedWeaponEquipped() || (attacker.IsHero() && victim.CursedWeaponEquipped()) {
+		victim.SetCP(0)
+		victim.BroadcastStatus()
 	}
 }
 

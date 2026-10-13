@@ -831,9 +831,10 @@ func (c *Character) SetCP(value float64) {
 	c.curCP = value
 }
 
-// CanBeHealed reports whether c may receive HP/MP restoration.
+// CanBeHealed reports whether c may receive HP/MP restoration. A
+// cursed-weapon holder never may.
 func (c *Character) CanBeHealed() bool {
-	return !c.Dead() && !c.Invul()
+	return !c.Dead() && !c.Invul() && !c.CursedWeaponEquipped()
 }
 
 // Invulnerable reports whether c ignores direct resource effects.
