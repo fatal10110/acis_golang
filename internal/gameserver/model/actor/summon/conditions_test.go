@@ -16,7 +16,7 @@ import (
 // pass regardless of real movement state.
 type movingGate struct{}
 
-func (g movingGate) Test(effector stat.Actor) bool {
+func (g movingGate) Test(effector stat.Actor, _ conditions.Skill) bool {
 	actor, ok := effector.(conditions.Actor)
 	return ok && actor.IsMoving()
 }
@@ -65,7 +65,7 @@ func TestSummonConditionalStatFuncGatesOnRealMovement(t *testing.T) {
 // conditional stat func on a summon-owned skill silently never applied.
 type levelGate struct{ min int }
 
-func (g levelGate) Test(effector stat.Actor) bool {
+func (g levelGate) Test(effector stat.Actor, _ conditions.Skill) bool {
 	actor, ok := effector.(conditions.Actor)
 	return ok && actor.Level() >= g.min
 }

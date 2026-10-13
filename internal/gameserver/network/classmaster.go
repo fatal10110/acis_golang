@@ -5,7 +5,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/classmaster"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -100,10 +99,7 @@ func (l *GameClientLink) classMasterTransfer(live *livePlayer, classID int) (cha
 // disappeared: adena reads as adena spent, and a talker holding too little
 // is told so.
 func payClassMasterItem(live *livePlayer, it classmaster.Item) bool {
-	if it.ID == item.AdenaID {
-		return reduceAdena(live, it.Count)
-	}
-	return destroyHeldItems(live, it.ID, it.Count)
+	return destroyItemByItemID(live, it.ID, it.Count)
 }
 
 // makeNoble grants live noblesse status: the noble skills, the skill list

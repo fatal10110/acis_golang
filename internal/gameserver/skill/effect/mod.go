@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -65,9 +66,10 @@ func (op Op) order() int {
 }
 
 // Condition gates whether a Mod's calculation applies against effector, the
-// only side of a stat calculation a Mod ever reads.
+// only side of a stat calculation a Mod ever reads, for a calculation run
+// for skill (nil when it runs for no skill).
 type Condition interface {
-	Test(effector stat.Actor) bool
+	Test(effector stat.Actor, skill conditions.Skill) bool
 }
 
 // ModOwner identifies whatever attached a Mod, so a Calculator can later
@@ -125,8 +127,8 @@ type Mod struct {
 
 // apply runs m against the calculation chain's running value, gated by its
 // Cond.
-func apply(m Mod, actor stat.Actor, base, value float64) float64 {
-	if m.Cond != nil && !m.Cond.Test(actor) {
+func apply(m Mod, actor stat.Actor, skill conditions.Skill, base, value float64) float64 {
+	if m.Cond != nil && !m.Cond.Test(actor, skill) {
 		return value
 	}
 	switch m.Op {
@@ -311,13 +313,14 @@ func (c *Calculator) RemoveOwner(owner ModOwner) int {
 	return removed
 }
 
-// Calc runs the chain for actor, starting the running value from base:
+// Calc runs the chain for actor, starting the running value from base, for
+// a calculation run for skill (nil when it runs for no skill):
 // every Mod ordered below the builtin finalize step, then the builtin (if
 // any), then every Mod ordered above it. A Set overrides the base value
 // seen by everything that runs after it, including the builtin, mirroring
 // how a template override (e.g. a weapon's flat P.Atk) replaces rather
 // than augments the starting point for what follows.
-func (c *Calculator) Calc(actor stat.Actor, base float64) float64 {
+func (c *Calculator) Calc(actor stat.Actor, base float64, skill conditions.Skill) float64 {
 	c.mu.RLock()
 	mods := c.mods
 	builtin := c.builtin
@@ -326,7 +329,7 @@ func (c *Calculator) Calc(actor stat.Actor, base float64) float64 {
 	value := base
 	i := 0
 	for ; i < len(mods) && mods[i].Op.order() < orderFinalize; i++ {
-		value = apply(mods[i], actor, base, value)
+		value = apply(mods[i], actor, skill, base, value)
 		if mods[i].Op == OpSet {
 			base = value
 		}
@@ -335,7 +338,7 @@ func (c *Calculator) Calc(actor stat.Actor, base float64) float64 {
 		value = builtin(actor, base, value)
 	}
 	for ; i < len(mods); i++ {
-		value = apply(mods[i], actor, base, value)
+		value = apply(mods[i], actor, skill, base, value)
 	}
 	return value
 }

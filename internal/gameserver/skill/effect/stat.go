@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
@@ -13,19 +14,21 @@ import (
 // template passives have no item owner.
 var ErrEnchantNeedsItem = errors.New("enchant stat funcs need an item owner")
 
-func statFuncs(owner ModOwner, templates []modelskill.FuncTemplate, cond Condition) ([]Mod, error) {
+// statFuncs builds templates as Mods attributed to owner. ownerSkill is the
+// skill that owns them, which a <skill stat> in a template's attached <cond>
+// tests.
+func statFuncs(owner ModOwner, templates []modelskill.FuncTemplate, ownerSkill conditions.Skill) ([]Mod, error) {
 	mods := make([]Mod, 0, len(templates))
 	for _, tmpl := range templates {
-		gate, err := funcCondition(tmpl.Condition, tmpl.AttachCondition)
+		gate, err := funcCondition(tmpl.Condition, tmpl.AttachCondition, ownerSkill)
 		if err != nil {
 			return nil, err
 		}
-		modCond := andCond(cond, gate)
 		s, err := stat.ByName(tmpl.Stat)
 		if err != nil {
 			return nil, err
 		}
-		m, err := statFunc(owner, s, tmpl, modCond)
+		m, err := statFunc(owner, s, tmpl, gate)
 		if err != nil {
 			return nil, err
 		}

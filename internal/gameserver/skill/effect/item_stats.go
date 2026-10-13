@@ -75,7 +75,8 @@ func ItemModifierFuncs(owner ItemOwner) ([]Mod, error) {
 // funcCondition, converting item.StatModifier's own Condition/
 // AttachCondition (an XML-shape twin of modelskill.Condition/
 // ConditionClause, parsed independently for item templates) to the shared
-// tree first.
+// tree first. An item's func has no owning skill: its attached <cond> is
+// tested with none.
 func itemModifierCondition(mod item.StatModifier) (Condition, error) {
 	var direct *modelskill.Condition
 	if mod.Condition != nil {
@@ -91,7 +92,7 @@ func itemModifierCondition(mod item.StatModifier) (Condition, error) {
 			AddName:   mod.AttachCondition.AddName,
 		}
 	}
-	return funcCondition(direct, attach)
+	return funcCondition(direct, attach, nil)
 }
 
 func itemStatFunc(owner ItemOwner, s stat.Stat, mod item.StatModifier, cond Condition) (Mod, error) {

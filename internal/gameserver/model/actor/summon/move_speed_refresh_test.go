@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -18,7 +19,7 @@ type stallingGate struct {
 	release chan struct{}
 }
 
-func (g *stallingGate) Test(stat.Actor) bool {
+func (g *stallingGate) Test(stat.Actor, conditions.Skill) bool {
 	if g.armed.CompareAndSwap(true, false) {
 		close(g.entered)
 		<-g.release

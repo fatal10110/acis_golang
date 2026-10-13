@@ -78,6 +78,11 @@ func landEffects(effector effect.Actor, effected Actor, def modelskill.Definitio
 				continue
 			}
 		}
+		// An effect whose attached condition rejects the pair is never
+		// created; a resist is reported only for a failed landing roll.
+		if !effect.Admits(effector, target, meta, tmpl) {
+			continue
+		}
 		e, err := effect.New(meta, tmpl)
 		if err != nil {
 			continue

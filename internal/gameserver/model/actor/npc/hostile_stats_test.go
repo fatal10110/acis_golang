@@ -87,7 +87,7 @@ func TestHostileCollisionRadiusOverride(t *testing.T) {
 // conditional stat func on an NPC-owned skill silently never applied.
 type levelGate struct{ min int }
 
-func (g levelGate) Test(effector stat.Actor) bool {
+func (g levelGate) Test(effector stat.Actor, _ conditions.Skill) bool {
 	actor, ok := effector.(conditions.Actor)
 	return ok && actor.Level() >= g.min
 }
