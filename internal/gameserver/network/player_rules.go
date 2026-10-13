@@ -19,6 +19,7 @@ func (l *GameClientLink) characterRules(settings *PlayerConfig) player.Rules {
 		AllowDelevel:           settings.AllowDelevel,
 		RaidCursesDisabled:     l.disableRaidCurse,
 		AwardPKKillPVPPoint:    settings.AwardPKKillPVPPoint,
+		SingleItemDrop:         !settings.MultipleItemDrop,
 		DeathDrop:              settings.DeathDrop,
 	}
 }

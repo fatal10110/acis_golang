@@ -328,7 +328,9 @@ func (l *GameClientLink) transferPetInventory(actor *summon.Actor, owner *itemco
 			l.dropPetItem(actor, petInventory, state.ObjectID, state.Count)
 			continue
 		}
-		petInventory.TransferItem(state.ObjectID, state.Count, owner, 0)
+		if _, _, _, err := petInventory.TransferItem(state.ObjectID, state.Count, owner, l.nextObjectID); err != nil {
+			l.log.Error().Err(err).Int32("object_id", state.ObjectID).Msg("allocate pet inventory return")
+		}
 	}
 }
 

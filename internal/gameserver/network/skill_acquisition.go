@@ -91,7 +91,7 @@ func (l *GameClientLink) sendGeneralAcquireSkillInfo(live *livePlayer, req clien
 // not ask whether trainer trains live's profession; the list it reopens
 // does. A skill that is not the next learnable level answers nothing.
 func (l *GameClientLink) learnGeneralAcquireSkill(live *livePlayer, trainer *npc.Folk, req clientpackets.RequestAcquireSkill) {
-	_, status, err := skillstate.LearnGeneral(live.Character, live.Template(), l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
+	_, status, err := skillstate.LearnGeneral(live.Character, live.Template(), l.skills, l.spellbooks, payLearnItem(live), int(req.SkillID), int(req.Level))
 	if err != nil {
 		// The skill is learned and paid for; only its passive stats failed to
 		// build from a malformed definition, which a learn never rejects, so the
@@ -120,6 +120,12 @@ func (l *GameClientLink) learnGeneralAcquireSkill(live *livePlayer, trainer *npc
 	l.showSkillList(live, trainer)
 }
 
+// payLearnItem pays a trainer learn's item out of live's inventory, naming
+// what went or what live lacks ahead of the learn's own reply.
+func payLearnItem(live *livePlayer) skillstate.PayItem {
+	return func(itemID int32, count int) bool { return destroyItemByItemID(live, itemID, count) }
+}
+
 func (l *GameClientLink) sendFishingAcquireSkillInfo(live *livePlayer, req clientpackets.RequestAcquireSkillInfo) {
 	offer, ok := skillstate.FishingOfferFor(live.Character, l.skillTrees, l.skills, int(req.SkillID), int(req.Level))
 	if !ok {
@@ -131,7 +137,7 @@ func (l *GameClientLink) sendFishingAcquireSkillInfo(live *livePlayer, req clien
 }
 
 func (l *GameClientLink) learnFishingAcquireSkill(live *livePlayer, req clientpackets.RequestAcquireSkill) {
-	result, status, err := skillstate.LearnFishing(live.Character, l.skillTrees, l.skills, int(req.SkillID), int(req.Level))
+	result, status, err := skillstate.LearnFishing(live.Character, l.skillTrees, l.skills, payLearnItem(live), int(req.SkillID), int(req.Level))
 	if err != nil {
 		// As in learnGeneralAcquireSkill: the learn stands, the definition is bad.
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn fishing skill: bad passive definition")

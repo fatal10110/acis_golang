@@ -273,8 +273,8 @@ type PlayerConfig struct {
 	// body to body; -1 is unlimited. It is the kill reward's party range.
 	PartyRange int
 	// MultipleItemDrop is server.properties MultipleItemDrop: a
-	// non-stackable item auto-looted with a count above one reaches the
-	// party member who takes it as that many instances instead of one.
+	// non-stackable item auto-looted, swept, harvested, extracted or crafted
+	// with a count above one arrives as that many instances instead of one.
 	MultipleItemDrop bool
 }
 
@@ -377,6 +377,7 @@ type GameClientLink struct {
 	disableRaidCurse bool
 	showNPCCrest     bool
 	showNPCLevel     bool
+	wyvern           npc.WyvernRules
 	inventory        *invops.Service
 	petItems         *petitem.Service
 	trades           *tradebook.Book
@@ -646,6 +647,9 @@ type GameClientLinkConfig struct {
 	// NpcInfo title starts with its level and, when it is aggressive, a
 	// star.
 	ShowNPCLevel bool
+	// Wyvern is the npcs.properties wyvern ride settings; nil reads their
+	// defaults.
+	Wyvern *npc.WyvernRules
 	// Teleports and InstantTeleports are the destinations civilian NPCs
 	// offer; nil offers none. FreeTeleport is npcs.properties FreeTeleport:
 	// when true, no destination is charged for. TeleportClock is the local
@@ -892,6 +896,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		disableRaidCurse: cfg.DisableRaidCurse,
 		showNPCCrest:     cfg.ShowNPCCrest,
 		showNPCLevel:     cfg.ShowNPCLevel,
+		wyvern:           wyvernRules(cfg.Wyvern),
 		petRoll:          cfg.PetRoll,
 		petFeedPeriod:    cfg.PetFeedPeriod,
 		fishing:          fishingDeps{table: cfg.Fish, roll: cfg.FishingRoll},

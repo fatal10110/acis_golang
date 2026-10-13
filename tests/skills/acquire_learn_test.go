@@ -84,7 +84,9 @@ func TestAcquireSkillInfoIncludesSpellbookRequirement(t *testing.T) {
 		t.Fatalf("read AcquireSkillInfo: %v", err)
 	}
 
+	// The book is adena the learner lacks: the shortfall precedes the refusal.
 	c.Send(encodeRequestAcquireSkill(3, 1, 0))
+	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageYouNotEnoughAdena)
 	reply = c.Read()
 	assertStaticSystemMessage(t, reply, serverpackets.SystemMessageItemMissingToLearnSkill)
 
@@ -196,6 +198,8 @@ func TestFishingSkillTreeGating(t *testing.T) {
 	}
 
 	c.Send(encodeRequestAcquireSkill(1368, 1, 1))
+	assertSystemMessageParams(t, c.Read(), serverpackets.SystemMessageS1DisappearedAdena,
+		systemMessageParam{serverpackets.SystemMessageParamNumber, 2})
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageLearnedSkill, 1368, 1)
 
 	reply = c.Read()
@@ -234,6 +238,7 @@ func TestFishingSkillTreeRejectsMissingItem(t *testing.T) {
 	selectTrainer(t, srv, c, objID)
 
 	c.Send(encodeRequestAcquireSkill(1368, 1, 1))
+	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageYouNotEnoughAdena)
 	reply := c.Read()
 	assertStaticSystemMessage(t, reply, serverpackets.SystemMessageItemMissingToLearnSkill)
 

@@ -21,7 +21,22 @@ type ChatRules struct {
 	// AllowManor is server.properties AllowManor: while it is off, the
 	// castle blacksmiths and manor managers show the generic page.
 	AllowManor bool
+	// Wyvern is the npcs.properties wyvern ride settings the wyvern pages
+	// name.
+	Wyvern WyvernRules
 }
+
+// WyvernRules are the npcs.properties wyvern ride settings: the strider
+// level RequiredStriderLevel and the B-grade crystal count
+// RequiredCrystalsNumber a ride asks for.
+type WyvernRules struct {
+	StriderLevel int
+	Crystals     int
+}
+
+// DefaultWyvernRules are the wyvern ride settings npcs.properties reads
+// when it names none: a level 55 strider and 10 crystals.
+func DefaultWyvernRules() WyvernRules { return WyvernRules{StriderLevel: 55, Crystals: 10} }
 
 // ChatOutcome is what an interact with a civilian NPC opens.
 type ChatOutcome int
@@ -77,6 +92,7 @@ var folkChats = map[InstanceKind]folkChat{
 	"DungeonGatekeeper":    {dir: "gatekeeper"},
 	"Fisherman":            {dir: "fisherman", pk: canShop},
 	"Gatekeeper":           {dir: "gatekeeper", pk: canUseGK},
+	"ManorManagerNpc":      {dir: "merchant", fixed: "data/html/manormanager/manager.htm", pk: canShop},
 	"Merchant":             {dir: "merchant", pk: canShop},
 	"SchemeBuffer":         {dir: "mods/buffer"},
 	"SymbolMaker":          {fixed: "data/html/symbolmaker/SymbolMaker.htm"},
@@ -89,32 +105,23 @@ var folkChats = map[InstanceKind]folkChat{
 	"VillageMasterOrc":     {dir: "villagemaster"},
 	"VillageMasterPriest":  {dir: "villagemaster"},
 	"WarehouseKeeper":      {dir: "warehouse", pk: canUseWarehouse},
+	// A castle warehouse keeper keeps the warehouse keeper's karma gate;
+	// its chat pages are its castle's, see residenceChatPage.
+	"CastleWarehouseKeeper": {dir: "warehouse", pk: canUseWarehouse},
 }
 
 // unportedFolkChats are the civilian types whose chat window depends on
-// castle or clan hall state not in place yet: a mass gatekeeper's on the
-// life towers and its teleport task, a wyvern manager's on the wyvern
-// settings (#3673), and a siegable hall messenger's on the hall's siege
+// state not in place yet: a siegable hall messenger's on the hall's siege
 // (#244); a castle's messenger is answered before the chat window.
 var unportedFolkChats = map[InstanceKind]struct{}{
-	"CastleGatekeeper": {},
-	"SiegeNpc":         {},
-	"WyvernManagerNpc": {},
+	"SiegeNpc": {},
 }
 
-// unportedResidenceCommands are the castle and clan hall types whose chat
-// window opens but whose dialog commands need castle, door, manor or
-// wyvern behavior not in place yet (#3672).
+// unportedResidenceCommands are the castle types whose chat window opens
+// but whose dialog commands are not in place yet: the chamberlain's
+// (#3849).
 var unportedResidenceCommands = map[InstanceKind]struct{}{
-	"CastleBlacksmith":      {},
-	"CastleChamberlain":     {},
-	"CastleDoorman":         {},
-	"CastleMagician":        {},
-	"CastleWarehouseKeeper": {},
-	"ClanHallDoorman":       {},
-	"Doorman":               {},
-	"ManorManagerNpc":       {},
-	"MercenaryManagerNpc":   {},
+	"CastleChamberlain": {},
 }
 
 // unportedFolkCommands are the civilian types whose first chat page is in

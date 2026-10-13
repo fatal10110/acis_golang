@@ -70,18 +70,18 @@ func capsuleCatalog() *item.Table {
 }
 
 // openCapsule boots a player holding two capsules and one weapon with the
-// given slot limit, opens one capsule, and returns every frame from the
-// cast's launch until the client goes quiet, the InventoryUpdate tick
-// still pending.
-func openCapsule(t *testing.T, products string, slots int) (*gameservertest.Server, int32, [][]byte) {
+// given slot limit and any extra options, opens one capsule, and returns
+// every frame from the cast's launch until the client goes quiet, the
+// InventoryUpdate tick still pending.
+func openCapsule(t *testing.T, products string, slots int, extra ...gameservertest.Option) (*gameservertest.Server, int32, [][]byte) {
 	t.Helper()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithItemTemplates(capsuleCatalog()),
 		gameservertest.WithSkills(capsuleSkills(t, products)),
 		gameservertest.WithCharacter("Newbie", 5, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithInventorySlots(slots, slots),
-	)
+	}, extra...)...)
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	capsule := srv.GiveItem(t, objID, capsuleItemID, 2)
 	srv.GiveItem(t, objID, capsuleWeaponID, 1)

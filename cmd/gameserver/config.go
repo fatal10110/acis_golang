@@ -88,6 +88,7 @@ type gameplayConfig struct {
 	FreeTeleport             freeTeleport
 	ShowNPCCrest             npcCrestShown
 	ShowNPCLevel             npcLevelShown
+	Wyvern                   npc.WyvernRules
 	RaidMultipliers          npc.RaidMultipliers
 	NpcAI                    npc.AIConfig
 	BossWaits                script.BossWaitTimes
@@ -229,6 +230,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.ShowNPCLevel, err = loadShowNPCLevel(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.Wyvern, err = loadWyvernRules(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.RaidMultipliers, err = loadRaidMultipliers(paths); err != nil {

@@ -403,18 +403,15 @@ func (s *Service) TransferItem(source, receiver *itemcontainer.Inventory, object
 		targetStack = receiver.ItemByTemplateID(st.TemplateID)
 	}
 
-	newObjectID := int32(0)
-	if st.Count > count || targetStack != nil {
-		id, ok, err := s.nextID()
-		if err != nil || !ok {
-			return TransferResult{}, false, err
-		}
-		newObjectID = id
+	id, ok, err := s.reserveMove(st.Count > count && targetStack == nil)
+	if err != nil || !ok {
+		return TransferResult{}, false, err
 	}
+	defer id.release()
 
-	result, freedObjectID, freed := source.TransferItem(objectID, count, receiver, newObjectID)
+	result, freedObjectID, freed, err := source.TransferItem(objectID, count, receiver, id.next)
 	if result == nil {
-		return TransferResult{}, false, nil
+		return TransferResult{}, false, err
 	}
 
 	out := TransferResult{Item: result}
@@ -424,7 +421,7 @@ func (s *Service) TransferItem(source, receiver *itemcontainer.Inventory, object
 	if freed {
 		out.Persist = append(out.Persist, Delete(source.OwnerID(), freedObjectID))
 	}
-	if newObjectID != 0 && result.ObjectID == newObjectID {
+	if id.created(result) {
 		out.Persist = append(out.Persist, Save(result))
 	} else {
 		out.Persist = append(out.Persist, Update(result))
@@ -564,14 +561,16 @@ func (s *Service) CrystallizeItem(inv *itemcontainer.Inventory, objectID int32, 
 }
 
 // grantID is the object id of an item granted after its source is
-// destroyed. It is taken before the destroy, so that running out of ids
-// refuses the request instead of taking the source unpaid, unless the
-// inventory already holds a stack the grant joins: the allocator never hands
-// out an id behind its cursor again, so an id taken for nothing is spent for
-// the rest of the session.
+// destroyed, or of the instance a move creates in its target. It is taken
+// before anything changes, so that running out of ids refuses the request
+// instead of taking the source unpaid, unless the units join a stack the
+// receiver already holds: the allocator never hands out an id behind its
+// cursor again, so an id taken for nothing is spent for the rest of the
+// session.
 type grantID struct {
-	s  *Service
-	id int32 // 0 once handed out, or when none was taken
+	s      *Service
+	id     int32 // 0 once handed out, or when none was taken
+	issued int32 // the id next handed out, or 0
 }
 
 // reserveGrant takes the id a grant of templateID into inv may need. It
@@ -592,14 +591,46 @@ func (s *Service) reserveGrant(inv *itemcontainer.Inventory, templateID int32) (
 	return g, true, nil
 }
 
+// reserveMove takes the id a move needs when split, that is when it leaves
+// part of its source behind in a receiver holding no stack of it. A move
+// that takes its source whole, or lands on a held stack, takes none up
+// front. It reports false, taking nothing, when a split move finds s
+// without an allocator.
+func (s *Service) reserveMove(split bool) (*grantID, bool, error) {
+	g := &grantID{s: s}
+	if !split {
+		return g, true, nil
+	}
+	id, ok, err := s.nextID()
+	if err != nil || !ok {
+		return nil, false, err
+	}
+	g.id = id
+	return g, true, nil
+}
+
 // next is the nextID of the grant's AddCreated: the reserved id, or a late
 // one when the held stack the reservation counted on has gone since.
 func (g *grantID) next() (int32, error) {
-	if id := g.id; id != 0 {
-		g.id = 0
-		return id, nil
+	id := g.id
+	g.id = 0
+	if id == 0 {
+		late, ok, err := g.s.nextID()
+		if err != nil {
+			return 0, err
+		}
+		if !ok {
+			return 0, errNoIDAllocator
+		}
+		id = late
 	}
-	return g.s.ids.NextID()
+	g.issued = id
+	return id, nil
+}
+
+// created reports whether inst is the new instance next named.
+func (g *grantID) created(inst *item.Instance) bool {
+	return g.issued != 0 && inst != nil && inst.ObjectID == g.issued
 }
 
 // release gives back a reserved id the grant never used; an allocator that
