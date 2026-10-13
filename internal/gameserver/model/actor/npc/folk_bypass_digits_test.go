@@ -93,8 +93,8 @@ func TestBypassArgumentsReadUnicodeDigits(t *testing.T) {
 }
 
 // TestCommandCharsCountsUTF16Units pins the offsets: a supplementary
-// character takes two, and a range splitting one keeps its half as a
-// replacement character.
+// character takes two, and a range splitting one keeps its half as an
+// unpaired surrogate (U+1D7CF is D835 DFCF; DFCF alone is ED BF 8F).
 func TestCommandCharsCountsUTF16Units(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -107,9 +107,9 @@ func TestCommandCharsCountsUTF16Units(t *testing.T) {
 		{"Chat ", 5, -1, "", true},
 		{"Chat １", 5, -1, "１", true},
 		{"Chat　１", 5, -1, "１", true},
-		{"Chat\U0001D7CF1", 5, -1, "�1", true},
+		{"Chat\U0001D7CF1", 5, -1, "\xED\xBF\x8F1", true},
 		{"ab\U0001D7CF", 2, 4, "\U0001D7CF", true},
-		{"ab\U0001D7CF", 3, 4, "�", true},
+		{"ab\U0001D7CF", 3, 4, "\xED\xBF\x8F", true},
 		{"Augment１", 8, 9, "", false},
 	} {
 		got, ok := commandChars(tc.in, tc.begin, tc.end)

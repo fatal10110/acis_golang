@@ -49,9 +49,9 @@ func Open(cfg Config) (*sql.DB, error) {
 		return nil, err
 	}
 
-	pool, err := sql.Open("mysql", dsn)
+	pool, err := OpenDSN(dsn)
 	if err != nil {
-		return nil, fmt.Errorf("open database pool: %w", err)
+		return nil, err
 	}
 
 	maxOpen := cfg.MaxConnections
@@ -63,6 +63,20 @@ func Open(cfg Config) (*sql.DB, error) {
 	pool.SetConnMaxIdleTime(defaultMaxIdleTime)
 	pool.SetConnMaxLifetime(defaultConnMaxLifetime)
 	return pool, nil
+}
+
+// OpenDSN builds a connection pool on a go-sql-driver/mysql DSN. Every
+// string query argument is written as StoredText gives it.
+func OpenDSN(dsn string) (*sql.DB, error) {
+	driverCfg, err := mysql.ParseDSN(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("open database pool: %w", err)
+	}
+	connector, err := mysql.NewConnector(driverCfg)
+	if err != nil {
+		return nil, fmt.Errorf("open database pool: %w", err)
+	}
+	return sql.OpenDB(textConnector{connector}), nil
 }
 
 // dataSourceName converts a MariaDB or MySQL JDBC URL, as shipped in

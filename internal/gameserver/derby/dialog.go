@@ -3,7 +3,6 @@ package derby
 import (
 	"strconv"
 	"strings"
-	"unicode/utf16"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 )
@@ -377,11 +376,11 @@ func itoa32(n int32) string { return strconv.Itoa(int(n)) }
 // unit). ok is false when the command is too short or the rest is no
 // number.
 func commandInt(command string, begin int) (int, bool) {
-	units := utf16.Encode([]rune(command))
+	units := commons.UTF16Units(command)
 	if begin > len(units) {
 		return 0, false
 	}
-	n, err := commons.ParseInt(string(utf16.Decode(units[begin:])), 32)
+	n, err := commons.ParseInt(commons.UTF16String(units[begin:]), 32)
 	if err != nil {
 		return 0, false
 	}

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 	"unicode"
-	"unicode/utf16"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -190,7 +189,7 @@ func javaSplitComma(s string) []string {
 // equal when they match as is, upper-cased or lower-cased; a string that
 // is a prefix of the other sorts first.
 func compareIgnoreCase(a, b string) int {
-	ua, ub := utf16.Encode([]rune(a)), utf16.Encode([]rune(b))
+	ua, ub := commons.UTF16Units(a), commons.UTF16Units(b)
 	for i := 0; i < len(ua) && i < len(ub); i++ {
 		c1, c2 := rune(ua[i]), rune(ub[i])
 		if c1 == c2 {
@@ -222,13 +221,4 @@ func toLower16(r rune) rune {
 		return u
 	}
 	return r
-}
-
-// utf16Len is the length of s in UTF-16 code units.
-func utf16Len(s string) int {
-	n := 0
-	for _, r := range s {
-		n += utf16.RuneLen(r)
-	}
-	return n
 }
