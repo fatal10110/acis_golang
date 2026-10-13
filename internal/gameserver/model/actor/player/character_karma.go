@@ -31,53 +31,85 @@ func calculateKarmaGain(pkCount int, summon bool) int {
 	return result
 }
 
-// awardKillerPKKarma grants killer PK-kill karma when c (the victim who
-// just died) had zero karma and no PvP flag of its own: a player killing a
-// karma-free, non-flagged player is considered a PKer and gains karma and
-// a PK-kill count. An actively-flagged, karma-free victim instead takes
-// the PvP-point branch; see awardKillerPvPKill.
+// creditKill updates the standing of the player acting through killer
+// after it killed c, or c's summon when summonKill is set. A killer
+// wielding a cursed weapon never gets here for a player kill: Die has the
+// kill feed the weapon instead. Nothing changes when the two players are
+// both in a duel, or both in a PvP zone, where a player kill between
+// opposite siege sides counts a siege kill and a siege death instead (see
+// reportSiegeKill).
 //
-// A kill between two players who are both in a duel changes nothing, and
-// a killer wielding a cursed weapon never gets here: Die has the kill feed
-// the weapon instead. A kill also takes other karma-free outcomes when it
-// happens in a PvP/siege zone or when it is a clan-war kill. Those states
-// are not tracked on Character yet, so those gates stay dormant until
-// their owning subsystems land.
-func (c *Character) awardKillerPKKarma(killer attackable.Combatant) {
+// A PvP kill (see pvpKill) awards the killer a PvP point and resends its
+// UserInfo; a summon kill awards nothing. Any other kill of a karma-free,
+// unflagged victim makes the killer a PKer: a player kill adds a PK kill,
+// and the karma gain is keyed off the killer's PK count, at the summon
+// rate for a summon kill (see publishPKKarma).
+func (c *Character) creditKill(killer attackable.Combatant, summonKill bool) {
 	pk := actingCharacter(killer)
-	if pk == nil || pk == c || duelKillExempt(pk, c) || c.Karma() != 0 || c.PvPFlagState() != task.PvPFlagNone {
+	if pk == nil || pk == c || duelKillExempt(pk, c) {
+		return
+	}
+	if pk.InPvPZone() && c.InPvPZone() {
+		if !summonKill {
+			c.reportSiegeKill(pk)
+		}
+		return
+	}
+	if pk.pvpKill(c) {
+		if summonKill {
+			return
+		}
+		pk.progressionMu.Lock()
+		pk.PvPKills++
+		pk.progressionMu.Unlock()
+		pk.UpdateUserInfo()
+		return
+	}
+	if c.Karma() != 0 || c.PvPFlagState() != task.PvPFlagNone {
 		return
 	}
 	pk.progressionMu.Lock()
-	pk.PKKills++
-	pk.KarmaPoints += calculateKarmaGain(pk.PKKills, false)
+	if !summonKill {
+		pk.PKKills++
+	}
+	pk.KarmaPoints += calculateKarmaGain(pk.PKKills, summonKill)
 	karma := pk.KarmaPoints
 	pk.progressionMu.Unlock()
 	pk.publishPKKarma(karma)
 }
 
-// AwardSummonKillKarma grants killer PK karma for killing c's summon when c
-// has no karma and no PvP flag, and the kill is not inside a PvP zone for
-// both players. A summon kill never counts as a PK kill: the gain uses the
-// killer's current PK count at the summon rate, and a PvP point is never
-// awarded for it. Killing one's own summon awards nothing.
-//
-// Nothing is awarded when both players are in a duel. The clan-war
-// exemption is not applied: that state is not tracked yet, the same as for
-// a player kill (#1301).
+// pvpKill reports whether c killing victim, or victim's summon, is a PvP
+// kill: c holds no karma and victim is flagged without karma; the two
+// belong to clans at war with each other, neither in its academy; or
+// victim holds karma and c's AwardPKKillPVPPoint option is on.
+func (c *Character) pvpKill(victim *Character) bool {
+	victimKarma := victim.Karma()
+	if c.Karma() == 0 && victimKarma == 0 && victim.PvPFlagState() != task.PvPFlagNone {
+		return true
+	}
+	if c.atWarOutsideAcademy(victim) {
+		return true
+	}
+	c.stateMu.RLock()
+	awardPKKillPVPPoint := c.awardPKKillPVPPoint
+	c.stateMu.RUnlock()
+	return victimKarma > 0 && awardPKKillPVPPoint
+}
+
+// reportSiegeKill reports c's death to pk, both in a PvP zone, as a siege
+// kill when the two fight a siege on opposite sides.
+func (c *Character) reportSiegeKill(pk *Character) {
+	own, theirs := c.SiegeState(), pk.SiegeState()
+	if own == SiegeStateNone || theirs == SiegeStateNone || own == theirs {
+		return
+	}
+	c.emit(event.SiegeKill{KillerClanID: pk.ClanID(), VictimClanID: c.ClanID()})
+}
+
+// AwardSummonKillKarma credits killer for killing c's summon; see
+// creditKill. Killing one's own summon awards nothing.
 func (c *Character) AwardSummonKillKarma(killer attackable.Combatant) {
-	pk := actingCharacter(killer)
-	if pk == nil || pk == c || duelKillExempt(pk, c) || c.Karma() != 0 || c.PvPFlagState() != task.PvPFlagNone {
-		return
-	}
-	if pk.InPvPZone() && c.InPvPZone() {
-		return
-	}
-	pk.progressionMu.Lock()
-	pk.KarmaPoints += calculateKarmaGain(pk.PKKills, true)
-	karma := pk.KarmaPoints
-	pk.progressionMu.Unlock()
-	pk.publishPKKarma(karma)
+	c.creditKill(killer, true)
 }
 
 // publishPKKarma reports c's karma after a PK gain to its own client and its
@@ -88,41 +120,6 @@ func (c *Character) publishPKKarma(karma int) {
 	c.UpdateUserInfo()
 	c.BroadcastRelations()
 	c.emit(event.PKKarmaGained{})
-}
-
-// awardKillerPvPKill grants the killer a PvP-kill point for an actively
-// PvP-flagged, karma-free victim, or a karma-positive victim when the
-// configured AwardPKKillPVPPoint option is enabled: the PvP-kill condition
-// of a kill's PvP/karma update. Only the killer's own UserInfo is resent;
-// no karma or PvP flag changes.
-//
-// Nothing is awarded when both players are in a duel, nor to a killer
-// wielding a cursed weapon (see awardKillerPKKarma). The whole update is
-// also gated behind a PvP/siege-zone early return, and
-// this branch's own condition also allows a mutual clan-war kill between
-// non-academy members; the clan registry holds that state, not wired here
-// yet (#1301).
-func (c *Character) awardKillerPvPKill(killer attackable.Combatant) {
-	pk := actingCharacter(killer)
-	if pk == nil || pk == c || duelKillExempt(pk, c) {
-		return
-	}
-	pk.stateMu.RLock()
-	awardPKKillPVPPoint := pk.awardPKKillPVPPoint
-	pk.stateMu.RUnlock()
-	victimKarma := c.Karma()
-	if victimKarma < 0 || (victimKarma > 0 && !awardPKKillPVPPoint) {
-		return
-	}
-	victimUnflagged := c.PvPFlagState() == task.PvPFlagNone
-	pk.progressionMu.Lock()
-	if victimKarma == 0 && (pk.KarmaPoints != 0 || victimUnflagged) {
-		pk.progressionMu.Unlock()
-		return
-	}
-	pk.PvPKills++
-	pk.progressionMu.Unlock()
-	pk.UpdateUserInfo()
 }
 
 // actingCharacter resolves the player acting through c: c itself, or a

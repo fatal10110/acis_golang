@@ -60,7 +60,7 @@ func (l *GameClientLink) handleTradeRequest(live *livePlayer, req clientpackets.
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, tradeOlympiadRefusal))
 		return
 	}
-	if !l.playerConfig.KarmaPlayerCanTrade && (live.Karma() > 0 || target.Karma() > 0) {
+	if !l.playerConfig().KarmaPlayerCanTrade && (live.Karma() > 0 || target.Karma() > 0) {
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, tradeChaoticRefusal))
 		return
 	}

@@ -9,3 +9,14 @@ type ClanKill struct {
 }
 
 func (ClanKill) event() {}
+
+// SiegeKill reports that this player died to a player of the opposite
+// siege side, both in a PvP zone: the clan KillerClanID scores a siege
+// kill and the clan VictimClanID a siege death. A side without a clan
+// (0) scores nothing.
+type SiegeKill struct {
+	KillerClanID int32
+	VictimClanID int32
+}
+
+func (SiegeKill) event() {}

@@ -228,6 +228,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		l.dropItemsOnDeath(live, e)
 	case event.ClanKill:
 		l.creditClanKill(live, e)
+	case event.SiegeKill:
+		l.sieges.RecordKill(e.KillerClanID, e.VictimClanID)
 	case event.DeathSettled:
 		if l.water != nil {
 			l.water.Remove(live)

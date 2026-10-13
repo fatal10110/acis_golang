@@ -10,13 +10,15 @@ import (
 )
 
 // policyGraph is a fixed SocialGraph: party ids by player, command channel
-// ids by party, alliance and leader by clan, and declared wars.
+// ids by party, alliance and leader by clan, declared wars, and academy
+// members.
 type policyGraph struct {
 	party   map[int32]int
 	channel map[int]int
 	ally    map[int32]int32
 	leader  map[int32]int32
 	wars    map[[2]int32]bool
+	academy map[int32]bool
 }
 
 func (g policyGraph) InParty(id int32) bool { return g.party[id] != 0 }
@@ -38,6 +40,7 @@ func (g policyGraph) AtWar(clanID, targetID int32) bool { return g.wars[[2]int32
 func (policyGraph) ClanCastleID(int32) int32            { return 0 }
 func (policyGraph) ClanHallID(int32) int32              { return 0 }
 func (policyGraph) ClanLevel(int32) int                 { return 0 }
+func (g policyGraph) InAcademy(_, id int32) bool        { return g.academy[id] }
 
 // cursedPeer is a player holding a cursed weapon; Character itself never
 // does until cursed weapons are modeled (#225).

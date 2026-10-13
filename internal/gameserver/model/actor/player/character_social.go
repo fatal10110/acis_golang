@@ -26,6 +26,8 @@ type SocialGraph interface {
 	ClanLeaderID(clanID int32) int32
 	// AtWar reports whether clanID declared war on targetClanID.
 	AtWar(clanID, targetClanID int32) bool
+	// InAcademy reports whether objectID is a member of clanID's academy.
+	InAcademy(clanID, objectID int32) bool
 	// ClanCastleID and ClanHallID are the castle and clan hall the clan
 	// owns now, 0 when it owns none or there is no such clan.
 	ClanCastleID(clanID int32) int32
@@ -137,6 +139,18 @@ func (c *Character) AtWarWith(other target.Actor) bool {
 	}
 	own, theirs := c.ClanID(), p.ClanID()
 	return own != 0 && theirs != 0 && c.social.AtWar(own, theirs) && c.social.AtWar(theirs, own)
+}
+
+// atWarOutsideAcademy reports whether c and other belong to clans at war
+// with each other, neither of them in its clan's academy.
+func (c *Character) atWarOutsideAcademy(other *Character) bool {
+	return c.AtWarWith(other) && !c.inAcademy() && !other.inAcademy()
+}
+
+// inAcademy reports whether c is a member of its clan's academy.
+func (c *Character) inAcademy() bool {
+	clanID := c.ClanID()
+	return clanID != 0 && c.social != nil && c.social.InAcademy(clanID, c.ID)
 }
 
 // MageClass reports whether c plays a mystic class.

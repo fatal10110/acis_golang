@@ -108,7 +108,7 @@ func (l *GameClientLink) activateDeposit(live *livePlayer, id int32) (*itemconta
 	if f == nil {
 		return nil, false
 	}
-	limit := l.playerConfig.StorageSlots.BaseFreight()
+	limit := l.playerConfig().StorageSlots.BaseFreight()
 	live.storage.active = activeStore{store: f, fits: func(slots int) bool {
 		return fitsLimit(f.VisibleSize(), slots, limit)
 	}}
@@ -138,7 +138,7 @@ func (l *GameClientLink) itemHolder(live *livePlayer) invops.Holder {
 // It reports false when the command aborted, so that nothing more is
 // sent.
 func (l *GameClientLink) warehouseBypass(live *livePlayer, f *npc.Folk, reply npc.BypassReply) bool {
-	freight := l.playerConfig.freight()
+	freight := l.playerConfig().freight()
 	switch reply.Warehouse {
 	case npc.WithdrawPrivate:
 		wh := activatePrivateWarehouse(live)
@@ -294,7 +294,7 @@ func (l *GameClientLink) warehouseRequestGate(live *livePlayer) (activeStore, bo
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return activeStore{}, false
 	}
-	if !l.playerConfig.KarmaPlayerCanUseWareHouse && live.Karma() > 0 {
+	if !l.playerConfig().KarmaPlayerCanUseWareHouse && live.Karma() > 0 {
 		return activeStore{}, false
 	}
 	return active, true
@@ -352,7 +352,7 @@ func (l *GameClientLink) requestWarehouseWithdraw(live *livePlayer, req clientpa
 // the fee is silent; the client closes its window when it sends the
 // request.
 func (l *GameClientLink) requestPackageSend(live *livePlayer, req clientpackets.RequestPackageSend) {
-	freight := l.playerConfig.freight()
+	freight := l.playerConfig().freight()
 	if live == nil || len(req.Items) == 0 || !freight.Allow {
 		return
 	}
@@ -368,7 +368,7 @@ func (l *GameClientLink) requestPackageSend(live *livePlayer, req clientpackets.
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNotAuthorizedToDoThat))
 		return
 	}
-	if !l.playerConfig.KarmaPlayerCanUseWareHouse && live.Karma() > 0 {
+	if !l.playerConfig().KarmaPlayerCanUseWareHouse && live.Karma() > 0 {
 		return
 	}
 	inv := live.Inventory()

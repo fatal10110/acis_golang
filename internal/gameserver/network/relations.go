@@ -11,10 +11,11 @@ import (
 )
 
 // relationTo returns the RelationChanged bitmask subject shows observer:
-// its PvP flag and karma, its clan leadership, and the clan wars between
-// their two clans, which a clan academy member on either side neither
-// shows nor sees. The siege bits are not computed yet (#1165), so they
-// are always zero here.
+// its PvP flag and karma, its clan leadership, its siege standing, and the
+// clan wars between their two clans, which a clan academy member on either
+// side neither shows nor sees. A player in a siege shows the in-siege bit,
+// the attacker bit when it attacks, and the ally bit to an observer of the
+// same siege state or the enemy bit to any other.
 func (l *GameClientLink) relationTo(subject, observer *player.Character) int32 {
 	var bits int32
 	if subject.PvPFlagState() != task.PvPFlagNone {
@@ -25,6 +26,17 @@ func (l *GameClientLink) relationTo(subject, observer *player.Character) int32 {
 	}
 	if subject.IsClanLeader() {
 		bits |= serverpackets.RelationLeader
+	}
+	if state := subject.SiegeState(); state != player.SiegeStateNone {
+		bits |= serverpackets.RelationInSiege
+		if state == observer.SiegeState() {
+			bits |= serverpackets.RelationAlly
+		} else {
+			bits |= serverpackets.RelationEnemy
+		}
+		if state == player.SiegeStateAttacker {
+			bits |= serverpackets.RelationAttacker
+		}
 	}
 	if l.clans == nil {
 		return bits

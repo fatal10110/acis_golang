@@ -12,7 +12,7 @@ func (l *GameClientLink) applyGMLoginModes(live *livePlayer) {
 	if !level.IsGM {
 		return
 	}
-	cfg := l.playerConfig
+	cfg := l.playerConfig()
 	if cfg.GMStartupInvulnerable && l.admin.HasAccess("admin_invul", level) {
 		live.SetInvul(true)
 	}

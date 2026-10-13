@@ -98,7 +98,7 @@ func (l *GameClientLink) handleRequestCharacterDelete(ctx context.Context, cs *c
 	client, session := cs.client, cs.client.Session
 	// The character-select reuse gate answers a refused delete
 	// with the deletion-failed reply; nothing else runs.
-	if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig.CharacterSelectDelay, time.Now()) {
+	if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig().CharacterSelectDelay, time.Now()) {
 		session.SendFrame(serverpackets.FrameCharDeleteFail(serverpackets.CharDeleteFailReasonDeletionFailed))
 		return nil
 	}
@@ -153,7 +153,7 @@ func (l *GameClientLink) handleCharacterRestore(ctx context.Context, cs *connSta
 	client := cs.client
 	// The character-select reuse gate refuses a restore silently,
 	// leaving the client's character list untouched.
-	if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig.CharacterSelectDelay, time.Now()) {
+	if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig().CharacterSelectDelay, time.Now()) {
 		return nil
 	}
 	if c, ok := slotCharacter(cs.chars, req.Slot); ok {
@@ -204,7 +204,7 @@ func (l *GameClientLink) handleRequestNewCharacter(_ context.Context, cs *connSt
 func (l *GameClientLink) handleRequestGameStart(ctx context.Context, cs *connState, req clientpackets.RequestGameStart) error {
 	client := cs.client
 	// The character-select reuse gate refuses a selection silently.
-	if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig.CharacterSelectDelay, time.Now()) {
+	if !client.performFloodProtected(floodProtectorCharacterSelect, l.playerConfig().CharacterSelectDelay, time.Now()) {
 		return nil
 	}
 	c, ok := slotCharacter(cs.chars, req.Slot)

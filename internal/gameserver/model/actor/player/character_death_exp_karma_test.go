@@ -465,7 +465,7 @@ func TestReviveRestoringExpRacingRestartGivesOneRevive(t *testing.T) {
 
 // TestDieAwardsKillerKarmaBeforeApplyingVictimsOwnDeathPenalty matches the
 // reference's ordering: Playable.doDie (Playable.java:178-183) runs
-// onKillUpdatePvPKarma — the source of awardKillerPKKarma/awardKillerPvPKill
+// onKillUpdatePvPKarma — the source of creditKill
 // — while the victim's karma is still untouched, and only Player.doDie's
 // later applyDeathPenalty call (Player.java:2650) reduces it
 // (updateKarmaLoss, Player.java:2921-2925). Character.Die must therefore run

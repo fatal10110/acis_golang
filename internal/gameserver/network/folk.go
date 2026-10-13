@@ -247,7 +247,7 @@ func (c PlayerConfig) chatRules() npc.ChatRules {
 // chatRules are the gates on service NPC dialogs: the karma gates and the
 // manor switch.
 func (l *GameClientLink) chatRules() npc.ChatRules {
-	rules := l.playerConfig.chatRules()
+	rules := l.playerConfig().chatRules()
 	rules.AllowManor = l.manor.Allowed
 	return rules
 }

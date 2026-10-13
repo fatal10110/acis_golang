@@ -81,7 +81,7 @@ func (l *GameClientLink) giveItemToPet(ctx context.Context, live *livePlayer, re
 	if !ok {
 		return
 	}
-	if !l.playerConfig.KarmaPlayerCanTrade && live.Karma() > 0 {
+	if !l.playerConfig().KarmaPlayerCanTrade && live.Karma() > 0 {
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, tradeChaoticRefusal))
 		return
 	}
