@@ -321,8 +321,8 @@ func (n siegeNotices) TellClans(clans []*clan.Clan, m siege.Message) {
 
 // GuardDoors makes s the siege of each door named in gates (castles.xml
 // <gates>), resolved by name now and kept by door id, so a door reload
-// guards the new door too. A name naming no door is left out, as the
-// reference leaves it out of the castle's doors.
+// guards the new door too. A name naming no door is left out: it is not
+// one of the castle's doors.
 func (n siegeNotices) GuardDoors(gates []string, s door.Siege) {
 	l := n.l
 	if l.doors == nil {
@@ -335,12 +335,13 @@ func (n siegeNotices) GuardDoors(gates []string, s door.Siege) {
 	}
 }
 
-// CloseDoors closes each door named in gates, as Door.closeMe does.
+// CloseDoors closes each door named in gates that stands open; a door
+// that is unknown or broken stays as it is.
 func (n siegeNotices) CloseDoors(gates []string) { n.l.setHallDoors(gates, false) }
 
-// RespawnDoors stands each door named in gates again (Castle.spawnDoors):
-// a broken one revives with the configured RespawnRestoreHP, each closes,
-// then its HP is set to its maximum, or to half of it when weak.
+// RespawnDoors stands each door named in gates again: a broken one
+// revives with the configured RespawnRestoreHP, each closes, then its HP
+// is set to its maximum, or to half of it when weak.
 func (n siegeNotices) RespawnDoors(gates []string, weak bool) {
 	l := n.l
 	if l.doors == nil {

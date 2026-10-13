@@ -230,8 +230,15 @@ var (
 // registrations.
 func newWorld(t *testing.T, cfg Config, rows ...ClanRow) *world {
 	t.Helper()
+	return newWorldOf(t, cfg, testCastles(t), rows...)
+}
+
+// newWorldOf is newWorld over the castles of castles, which must hold
+// Gludio, Dion and Giran.
+func newWorldOf(t *testing.T, cfg Config, castles *castledata.Table, rows ...ClanRow) *world {
+	t.Helper()
 	w := &world{t: t, clans: testClans(), store: &recordingStore{rows: rows}, notes: &recordingNotifier{}}
-	w.castles = castle.NewManager(testCastles(t), w.clans, nil, nil, zerolog.Nop())
+	w.castles = castle.NewManager(castles, w.clans, nil, nil, zerolog.Nop())
 	w.castles.Restore([]castle.Row{
 		{ID: 1, SiegeDate: saturday.UnixMilli()},
 		{ID: 2, SiegeDate: saturday.UnixMilli()},

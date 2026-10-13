@@ -41,8 +41,8 @@ func ClanHallGrounds(l *GameClientLink) clanhall.Grounds { return clanHallGround
 func (g clanHallGrounds) CloseDoors(gates []string) { g.l.setHallDoors(gates, false) }
 
 // setHallDoors opens or closes each door named in gates, a clan hall's or
-// a castle's gates list, as Door.openMe and Door.closeMe do: a door that is unknown, broken
-// or in that state already stays as it is.
+// a castle's gates list: a door that is unknown, broken or in that state
+// already stays as it is.
 func (l *GameClientLink) setHallDoors(gates []string, open bool) {
 	if l.doors == nil {
 		return

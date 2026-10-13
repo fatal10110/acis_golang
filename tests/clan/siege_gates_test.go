@@ -72,8 +72,8 @@ func gludioGates() []*door.Template {
 // gateWorld boots the shipped castles with their sieges and Gludio's gate
 // and wall. The founder leads Knights, registered to attack Gludio; the
 // rival leads Rivals, Gludio's lord. Both stand in the world by the doors,
-// their entry frames drained.
-func gateWorld(t *testing.T) *clanWorld {
+// their entry frames drained. extra adds boot options.
+func gateWorld(t *testing.T, extra ...gameservertest.Option) *clanWorld {
 	t.Helper()
 	datapack.Require(t)
 	castles, err := gamexml.LoadCastles(datapack.Path(t, "data", "xml", "castles.xml"))
@@ -84,7 +84,7 @@ func gateWorld(t *testing.T) *clanWorld {
 		return `UPDATE characters SET x = ` + itoa(int32(gateWorldAt.X)) + `, y = ` + itoa(int32(gateWorldAt.Y)) +
 			`, z = ` + itoa(int32(gateWorldAt.Z)) + ` WHERE ` + who
 	}
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Founder", 40, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithCastles(castles),
@@ -97,7 +97,7 @@ func gateWorld(t *testing.T) *clanWorld {
 			at(`char_name = 'Founder'`),
 			at(`obj_Id = `+itoa(rivalLeaderID)),
 		),
-	)
+	}, extra...)...)
 	w := &clanWorld{srv: srv, leader: srv.Client, leaderID: srv.SoleObjectID(t), memberID: rivalLeaderID, at: gateWorldAt}
 	w.member = srv.DialClient(t, "player2", 1)
 	startInWorld(t, w.leader)
