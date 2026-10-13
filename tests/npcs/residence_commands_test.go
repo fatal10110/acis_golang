@@ -79,13 +79,24 @@ type commandSetup struct {
 	period sevensigns.Period
 	room   bool
 	gates  bool
-	extra  []gameservertest.Option
+	// lifeTower lists one life control tower on the castle.
+	lifeTower bool
+	extra     []gameservertest.Option
 }
 
 // commandCastles is Gludio listing the castle NPCs and the mass gatekeeper
-// and wyvern manager, with two gates.
-func commandCastles(t *testing.T) *castledata.Table {
+// and wyvern manager, with two gates, and one life control tower when
+// lifeTower is set.
+func commandCastles(t *testing.T, lifeTower bool) *castledata.Table {
 	t.Helper()
+	var towers []castledata.ControlTower
+	if lifeTower {
+		tower, err := castledata.NewControlTower("gludio_life_tower", "LIFE_CONTROL", 400, 400, gameservertest.SpawnZ, 1000, 100, 100, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		towers = append(towers, tower)
+	}
 	gludio, err := castledata.NewCastle(castledata.CastleAttrs{
 		ID: taxCastleID, Alias: "gludio_castle", Name: "Gludio Castle", CircletID: 6838,
 		Tax:   residence.Tax{Rate: taxCastleTax},
@@ -94,7 +105,7 @@ func commandCastles(t *testing.T) *castledata.Table {
 			castleChamberlainID, castleBlacksmithID, castleMagicianID, castleWarehouseID,
 			castleMercenaryID, castleManorID, castleDoormanID, massGatekeeperID, wyvernManagerID,
 		},
-	}, nil, nil, nil, nil, nil)
+	}, nil, towers, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +191,7 @@ func commandZones(t *testing.T, s commandSetup) *zone.Index {
 func bootResidenceCommands(t *testing.T, s commandSetup) *folkWorld {
 	t.Helper()
 	opts := []gameservertest.Option{
-		gameservertest.WithCastles(commandCastles(t)),
+		gameservertest.WithCastles(commandCastles(t, s.lifeTower)),
 		gameservertest.WithManor(network.ManorConfig{Allowed: !s.manorOff}),
 		gameservertest.WithClanSeed(func(db *sql.DB) { seedResidenceChat(t, db, s.residenceSetup) }),
 		gameservertest.WithSevenSignsSeed(func(store *gamesql.SevenSignsStore) {
@@ -570,6 +581,32 @@ func TestMassGatekeeperTeleportUnderSiege(t *testing.T) {
 	defer want.Release()
 	if !bytes.Equal(frames[say], want.Bytes()[2:]) {
 		t.Fatalf("shout = % x, want % x", frames[say], want.Bytes()[2:])
+	}
+}
+
+// TestMassGatekeeperTeleportUnderSiegeWithLifeTower pins the siege with a
+// life control tower standing: the chat window opens MassGK.htm, tele waits
+// 30 seconds, and the region hears the shout before the room is emptied.
+func TestMassGatekeeperTeleportUnderSiegeWithLifeTower(t *testing.T) {
+	t.Parallel()
+	w := bootResidenceCommands(t, commandSetup{residenceSetup: residenceSetup{siege: true}, room: true, lifeTower: true})
+	f := w.spawnFolk(t, folkTemplate("CastleGatekeeper", massGatekeeperID), 30)
+	w.assertMassGatekeeperChat(t, f, filled("castleteleporter/MassGK.htm", f))
+	assertAnswer(t, w.command(t, f, "tele"), pageThenFinal, f, asRead("castleteleporter/MassGK-1.htm", "%delay%", "30"))
+	w.assertMassGatekeeperChat(t, f, filled("castleteleporter/MassGK-1.htm", f, "%delay%", "30"))
+
+	// Each quiet read lets a little time pass on the driven clock; see
+	// TestMassGatekeeperTeleport.
+	w.srv.Advance(t, 20*time.Second)
+	if frames := w.srv.ReadQueued(t, w.c); len(frames) != 0 || !f.MassTeleportPending() {
+		t.Fatalf("before the delay: % x, pending %v", opcodes(frames), f.MassTeleportPending())
+	}
+	w.srv.Advance(t, 10*time.Second)
+	frames := w.srv.ReadQueued(t, w.c)
+	say := slices.IndexFunc(frames, func(fr []byte) bool { return fr[0] == serverpackets.OpcodeNpcSay })
+	tele := slices.IndexFunc(frames, func(fr []byte) bool { return fr[0] == serverpackets.OpcodeTeleportToLocation })
+	if say < 0 || tele < 0 || say > tele {
+		t.Fatalf("oust under siege = % x, want the shout, then the teleport", opcodes(frames))
 	}
 }
 

@@ -23,8 +23,8 @@ func wyvernRules(cfg *npc.WyvernRules) npc.WyvernRules {
 
 // aliveLifeTowers is the number of c's life control towers standing.
 //
-// ponytail: the control towers are not spawned yet (#465), so every life
-// control tower c lists counts as standing.
+// ponytail: the control towers are not spawned yet, so every life control
+// tower c lists counts as standing; #3857 switches this to the live count.
 func aliveLifeTowers(c *castle.Castle) int {
 	n := 0
 	for _, t := range c.ControlTowers {
