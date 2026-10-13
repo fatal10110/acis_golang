@@ -28,7 +28,7 @@ func TestBoatRequestsNeverGoSilent(t *testing.T) {
 	c.Send(encodeRequestCharacterCreate("Newbie", 0, 0, 0, 1, 0, 0))
 	c.Read() // CharCreateOk
 	c.Read() // CharSelectInfo
-	chars.soleObjectID(t)
+	sqlSoleObjectID(t, chars)
 	c.Send(encodeRequestGameStart(0))
 	c.Read() // SSQInfo
 	c.Read() // CharSelected

@@ -28,12 +28,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
-// newLinkedSQLGameClientFull is the SQL-store counterpart of the fake-store
-// newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog: it wires a
-// GameClientLink whose roster, item, and shortcut persistence are real
-// gamesql stores on a shared MariaDB container, dials a fake game client
-// through VersionCheck and a successful AuthLogin, and returns it positioned
-// right after the initial (empty) CharSelectInfo.
+// newLinkedSQLGameClientFull wires a GameClientLink whose roster, item, and
+// shortcut persistence are real gamesql stores on the test's pooled
+// database, with a running player clock and Seven Signs state, dials a fake
+// game client through VersionCheck and a successful AuthLogin, and returns
+// it positioned right after the initial (empty) CharSelectInfo.
 func newLinkedSQLGameClientFull(t *testing.T, skills *skillstate.Persistence, shortcutSeed func(*gamesql.ShortcutStore), crests *datacache.Crests, spellbooks modelskill.BookPolicy, trees *modelskill.Trees, karmaPlayerCanTeleport bool, seed func(*gamesql.CharacterStore, *gamesql.ItemStore), wantChars int, cursedWeapons ...*entity.CursedWeaponTable) (c *testsupport.ScriptedClient, chars *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, knownSkills *gamesql.CharacterSkillStore, state *world.State) {
 	t.Helper()
 

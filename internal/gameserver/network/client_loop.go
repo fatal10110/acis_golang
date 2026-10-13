@@ -110,7 +110,7 @@ func (l *GameClientLink) Handle(ctx context.Context, conn *Conn) {
 // openSession builds the connection's cipher and session, logging and
 // reporting false when either cannot be made.
 func (l *GameClientLink) openSession(conn *Conn) (key []byte, session *Session, ok bool) {
-	key, err := l.newCipherKey()
+	key, err := randomCipherKey()
 	if err != nil {
 		l.log.Error().Err(err).Msg("generate game cipher key")
 		return nil, nil, false

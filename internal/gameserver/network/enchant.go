@@ -15,25 +15,38 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
-func (l *GameClientLink) enchantStateStore() *enchantflow.State {
-	if l.enchantState == nil {
-		l.enchantState = enchantflow.NewState()
-	}
-	return l.enchantState
+// enchanting is the enchant feature: the scroll each player has chosen,
+// the service that enchants an item with it, and the skill-enchant dice.
+// NewGameClientLink builds it whole and nothing in it is replaced
+// afterwards, so every client goroutine reads it without a lock.
+type enchanting struct {
+	scrolls   *enchantflow.State
+	items     *enchantflow.Service
+	skillRoll func() int
 }
 
-func (l *GameClientLink) enchantService() *enchantflow.Service {
-	if l.enchant == nil {
-		l.enchant = enchantflow.NewService(l.enchantStateStore(), l.ids, l.rollEnchant, enchantflow.DefaultConfig())
+// newEnchanting builds the enchant feature from cfg's rates, armor sets and
+// dice; a nil roll draws from the random source.
+func newEnchanting(cfg GameClientLinkConfig) enchanting {
+	rates := enchantflow.DefaultConfig()
+	if cfg.PlayerConfig.Enchant != nil {
+		rates = *cfg.PlayerConfig.Enchant
 	}
-	return l.enchant
+	scrolls := enchantflow.NewState()
+	items := enchantflow.NewService(scrolls, cfg.IDs, cfg.EnchantRoll, rates)
+	items.SetArmorSets(cfg.ArmorSets)
+	skillRoll := cfg.SkillEnchantRoll
+	if skillRoll == nil {
+		skillRoll = func() int { return rnd.Get(100) }
+	}
+	return enchanting{scrolls: scrolls, items: items, skillRoll: skillRoll}
 }
 
 func (l *GameClientLink) useEnchantScroll(live *livePlayer, scroll *item.Instance) bool {
 	if live == nil || scroll == nil {
 		return false
 	}
-	result, ok := l.enchantService().UseScroll(live.ObjectID(), live.Inventory(), scroll)
+	result, ok := l.enchanting.items.UseScroll(live.ObjectID(), live.Inventory(), scroll)
 	if !ok {
 		return false
 	}
@@ -58,7 +71,7 @@ func (l *GameClientLink) enchantLiveItem(ctx context.Context, live *livePlayer, 
 	playerID := live.ObjectID()
 	end := l.itemInstances.BeginOperation(inv.OwnerID())
 	defer end()
-	result, err := l.enchantService().EnchantItem(enchantflow.Request{
+	result, err := l.enchanting.items.EnchantItem(enchantflow.Request{
 		PlayerID: playerID,
 		Inv:      inv,
 		ObjectID: req.ObjectID,
@@ -84,7 +97,7 @@ func (l *GameClientLink) cancelActiveEnchant(live *livePlayer) {
 	if live == nil {
 		return
 	}
-	result := l.enchantService().Cancel(live.ObjectID(), live.Inventory())
+	result := l.enchanting.items.Cancel(live.ObjectID(), live.Inventory())
 	l.applyEnchantSteps(live, result.Steps)
 }
 
@@ -470,11 +483,4 @@ func (l *GameClientLink) queueItemWrite(reserved *persist.Write, write func(keep
 		reserved.Cancel()
 		settleAll()
 	}
-}
-
-func (l *GameClientLink) rollEnchant() float64 {
-	if l.enchantRoll != nil {
-		return l.enchantRoll()
-	}
-	return rnd.GetFloat(1)
 }

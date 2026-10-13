@@ -51,6 +51,7 @@ func newDirectTradeFixture(t *testing.T) (*GameClientLink, *gamesql.ItemStore, *
 		ids:              ids,
 		inventory:        invops.NewService(ids),
 		trades:           tradebook.NewBook(time.Now),
+		enchanting:       newEnchanting(GameClientLinkConfig{}),
 		inventoryUpdates: updates,
 		log:              zerolog.Nop(),
 	}

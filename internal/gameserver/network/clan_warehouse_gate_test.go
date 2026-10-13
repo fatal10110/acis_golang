@@ -28,7 +28,7 @@ func TestWarehouseGateDropsClanWarehouseOfExpelledMember(t *testing.T) {
 		},
 	}, time.Now(), 1)
 	svc := clan.NewService(table, nil, nil, nil, clan.DefaultConfig(), nil, zerolog.Nop())
-	l := &GameClientLink{log: zerolog.Nop(), clans: svc}
+	l := &GameClientLink{log: zerolog.Nop(), clans: svc, enchanting: newEnchanting(GameClientLinkConfig{})}
 
 	capture := &testsupport.FrameCapture{}
 	live := newTestLivePlayer(t, memberID, capture)
