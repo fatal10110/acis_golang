@@ -17,7 +17,8 @@ type TutorialEvents interface {
 const (
 	// TutorialEnterWorld: the character entered the world.
 	TutorialEnterWorld = "UC"
-	// tutorialDied: HP damage killed the character outside the Olympiad.
+	// tutorialDied: HP damage killed the character outside an Olympiad
+	// match.
 	tutorialDied = "CE30"
 	// tutorialLeveledUp: the character's level went up.
 	tutorialLeveledUp = "CE40"
@@ -120,15 +121,17 @@ func (c *Character) Memos() *memo.Memos {
 	return &c.memos
 }
 
-// DieFromDamage runs Die for HP damage that emptied c's HP, then, outside
-// the Olympiad, hands c's tutorial quest the death event. It reports
-// whether this call killed c.
+// DieFromDamage runs Die for HP damage that emptied c's HP, then hands c's
+// tutorial quest the death event. A competitor of an Olympiad match only
+// falls (fallInOlympiad): no death sequence and no tutorial event. It
+// reports whether this call killed c.
 func (c *Character) DieFromDamage(killer attackable.Combatant) bool {
+	if c.OlympiadMode() {
+		return c.fallInOlympiad()
+	}
 	if !c.Die(killer) {
 		return false
 	}
-	if !c.OlympiadMode() {
-		c.NotifyTutorial(tutorialDied)
-	}
+	c.NotifyTutorial(tutorialDied)
 	return true
 }
