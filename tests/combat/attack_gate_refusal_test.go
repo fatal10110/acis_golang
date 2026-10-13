@@ -72,7 +72,7 @@ func refusedThinkMessages(t *testing.T, c *scriptedClient, targetID int32) []int
 // TARGET_IN_PEACEZONE (85) when the target does, each once and ahead of the
 // think's ActionFailed; the weapon gate runs only after them. No swing
 // starts and the victim keeps its HP. With no peace zone and sight, the same
-// request swings.
+// request swings and its hit lands.
 func TestForcedAttackOnPlayerRefusedByPeaceZoneOrSight(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -129,6 +129,11 @@ func TestForcedAttackOnPlayerRefusedByPeaceZoneOrSight(t *testing.T) {
 			full := srv.PlayerCurrentHP(t, victimID) + srv.PlayerCurrentCP(t, victimID)
 
 			if tc.wantMsg == 0 {
+				// A forced attack on a player without karma swings once and
+				// does not re-swing, so a random miss would leave the victim
+				// untouched: pin the attacker's rolls to land.
+				attacker := intakePlayerOf(t, srv, attackerID)
+				onQueue(t, srv.PlayerQueue(t, attackerID), func() { attacker.SetRollSource(landNoCrit()) })
 				pc.Send(encodeAttackRequest(victimID, int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
 				srv.AdvanceUntil(t, "the attacker's swing landing", func() bool {
 					return srv.PlayerCurrentHP(t, victimID)+srv.PlayerCurrentCP(t, victimID) < full
