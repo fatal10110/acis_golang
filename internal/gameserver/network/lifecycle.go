@@ -420,12 +420,14 @@ func (l *GameClientLink) notifyPlayerLogout(account string) {
 // live leaves without entering the world, so nothing is shown of what the
 // replay changes. The ticks due on the loading screen run their actions
 // there (see effect.ApplyRestored), so a drop never saves an effect whose
-// ticks were spent without them.
+// ticks were spent without them. The restored HP's tutorial step runs
+// once the replay is done (noteRestoredHP).
 func (l *GameClientLink) replayLoadingScreenEffects(live *livePlayer) {
 	if l.skills == nil || len(live.Character.ActiveSkillEffects()) == 0 {
+		live.noteRestoredHP()
 		return
 	}
-	l.replaySavedEffects(live, nil)
+	l.replaySavedEffects(live, live.noteRestoredHP)
 	// No burst follows to show what a death there held back.
 	live.takeHeldForEnterWorld()
 }

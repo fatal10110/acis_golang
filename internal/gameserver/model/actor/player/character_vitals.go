@@ -51,12 +51,11 @@ func (c *Character) ResourceValues() Resources {
 	return res
 }
 
-// noteMaxima settles the regeneration task when a read finds a maximum
-// changed since the last read, so a maximum raised under a full resource
-// starts regenerating from the change. A read runs under the regeneration
-// task's own lock (regenShort) and under other actors' locks, so the
-// settle is posted to c's queue. A character not in the world has no
-// queue; it settles as it enters (SettleEnteredRegen).
+// noteMaxima settles c's maxima (SettleMaxima) when a read finds one
+// changed since the last read. A read runs under the regeneration task's
+// own lock (regenShort) and under other actors' locks, so the settle is
+// posted to c's queue. A character not in the world has no queue; it
+// settles as it enters (AdoptMaxima, SettleEnteredRegen).
 func (c *Character) noteMaxima(res Resources) {
 	hp, mp, cp := int64(res.MaxHP), int64(res.MaxMP), int64(res.MaxCP)
 	if c.seenMaxHP.Load() == hp && c.seenMaxMP.Load() == mp && c.seenMaxCP.Load() == cp {
@@ -69,7 +68,7 @@ func (c *Character) noteMaxima(res Resources) {
 		return
 	}
 	if q := c.liveLocked().Queue(); q != nil {
-		q.Post(c.settleRegenTask)
+		q.Post(c.SettleMaxima)
 	}
 }
 

@@ -248,17 +248,23 @@ func TestSymbolMakerDrawAndDelete(t *testing.T) {
 		t.Fatalf("adena after refusals = %d, want symbolStartAdena", got)
 	}
 
-	drawn := func(symbol, dye int32) [][]byte {
-		return [][]byte{
+	// A symbol moving CON changes the maximum HP and CP: each reports the
+	// player's status after the answer.
+	drawn := func(symbol, dye int32, statuses int) [][]byte {
+		frames := [][]byte{
 			sysMsg(serverpackets.SystemMessageS1DisappearedAdena, numberParam(symbolPrice)),
 			sysMsg(serverpackets.SystemMessageS2S1Disappeared, itemNameParam(dye), itemNumberParam(henna.DrawAmount)),
 			{serverpackets.OpcodeHennaInfo},
 			{serverpackets.OpcodeUserInfo},
 			sysMsg(serverpackets.SystemMessageSymbolAdded),
 		}
+		for range statuses {
+			frames = append(frames, []byte{serverpackets.OpcodeStatusUpdate})
+		}
+		return frames
 	}
 	frames := w.send(t, encodeSymbolRequest(clientpackets.OpcodeRequestHennaEquip, 1))
-	assertFrames(t, "draw symbol 1", frames, drawn(1, dyeSTRCON)...)
+	assertFrames(t, "draw symbol 1", frames, drawn(1, dyeSTRCON, 2)...)
 	// STR +1, CON -3 with one of two slots taken.
 	wantInfo := append([]byte{serverpackets.OpcodeHennaInfo, 0, 1, 0xfd, 0, 0, 0}, le32(2, 1, 1, 1)...)
 	if string(frames[2]) != string(wantInfo) {
@@ -274,7 +280,7 @@ func TestSymbolMakerDrawAndDelete(t *testing.T) {
 		t.Fatalf("saved hennas = %+v, want symbol 1 in slot 1", rows)
 	}
 
-	assertFrames(t, "draw symbol 2", w.send(t, encodeSymbolRequest(clientpackets.OpcodeRequestHennaEquip, 2)), drawn(2, dyeSTRDEX)...)
+	assertFrames(t, "draw symbol 2", w.send(t, encodeSymbolRequest(clientpackets.OpcodeRequestHennaEquip, 2)), drawn(2, dyeSTRDEX, 0)...)
 	// Both slots taken: the full check comes before the dye check.
 	assertFrames(t, "draw with the slots full", w.send(t, encodeSymbolRequest(clientpackets.OpcodeRequestHennaEquip, 3)), sysMsg(serverpackets.SystemMessageSymbolsFull))
 	// The draw window no longer lists symbol 2, its last dyes used up.
@@ -301,7 +307,8 @@ func TestSymbolMakerDrawAndDelete(t *testing.T) {
 		[]byte{serverpackets.OpcodeHennaInfo},
 		[]byte{serverpackets.OpcodeUserInfo},
 		sysMsg(serverpackets.SystemMessageYouPickedUpS2S1, itemNameParam(dyeSTRCON), itemNumberParam(henna.RemoveAmount)),
-		sysMsg(serverpackets.SystemMessageSymbolDeleted))
+		sysMsg(serverpackets.SystemMessageSymbolDeleted),
+		[]byte{serverpackets.OpcodeStatusUpdate}, []byte{serverpackets.OpcodeStatusUpdate})
 	// STR +1, DEX -3 from symbol 2 alone, now in slot 2.
 	wantInfo = append([]byte{serverpackets.OpcodeHennaInfo, 0, 1, 0, 0, 0xfd, 0}, le32(2, 1, 2, 2)...)
 	if string(frames[0]) != string(wantInfo) {
@@ -316,7 +323,7 @@ func TestSymbolMakerDrawAndDelete(t *testing.T) {
 	assertFrames(t, "delete a symbol not worn", w.send(t, encodeSymbolRequest(clientpackets.OpcodeRequestHennaUnequip, 1)))
 
 	// The freed first slot takes the next draw.
-	assertFrames(t, "draw into the freed slot", w.send(t, encodeSymbolRequest(clientpackets.OpcodeRequestHennaEquip, 1)), drawn(1, dyeSTRCON)...)
+	assertFrames(t, "draw into the freed slot", w.send(t, encodeSymbolRequest(clientpackets.OpcodeRequestHennaEquip, 1)), drawn(1, dyeSTRCON, 2)...)
 	if rows := w.savedHennas(t); len(rows) != 2 || rows[0] != (henna.Row{Slot: 1, SymbolID: 1}) {
 		t.Fatalf("saved hennas = %+v, want symbol 1 back in slot 1", rows)
 	}
@@ -335,7 +342,8 @@ func TestSymbolMakerAdenaRefusals(t *testing.T) {
 		sysMsg(serverpackets.SystemMessageS2S1Disappeared, itemNameParam(dyeSTRCON), itemNumberParam(henna.DrawAmount)),
 		[]byte{serverpackets.OpcodeHennaInfo},
 		[]byte{serverpackets.OpcodeUserInfo},
-		sysMsg(serverpackets.SystemMessageSymbolAdded))
+		sysMsg(serverpackets.SystemMessageSymbolAdded),
+		[]byte{serverpackets.OpcodeStatusUpdate}, []byte{serverpackets.OpcodeStatusUpdate})
 
 	notEnough := sysMsg(serverpackets.SystemMessageYouNotEnoughAdena)
 	assertFrames(t, "draw without the adena", w.send(t, encodeSymbolRequest(clientpackets.OpcodeRequestHennaEquip, 2)), notEnough)

@@ -57,6 +57,9 @@ func (l *GameClientLink) adminSetClass(gm, target *livePlayer, value string, has
 			}
 		}, func() {
 			l.storeLive(target)
+			// The store reads the new class's maxima: their changes are
+			// settled and reported here, ahead of the refreshes below.
+			target.SettleMaxima()
 			target.RefreshWeightPenalty()
 			target.RefreshHennaStats()
 			target.SendFrame(serverpackets.FrameHennaInfo(target.HennaSnapshot()))

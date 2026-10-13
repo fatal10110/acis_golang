@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"time"
 
@@ -353,7 +354,10 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// limit, and inside the silent replay window: the EtcStatusUpdate below
 	// and every later login frame carry the band, and sendLoginWeight
 	// reports the change between UserInfo and ItemList.
-	if l.replaySavedEffects(live, c.RefreshWeightPenalty) {
+	if l.replaySavedEffects(live, func() {
+		live.noteRestoredHP()
+		c.RefreshWeightPenalty()
+	}) {
 		// A tick due on the loading screen killed the player, silently: its
 		// icon refresh went with the death's frames, and the burst shows
 		// what the death left. The Die frame follows ShortCutInit.
@@ -389,6 +393,9 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	client.Session.SendFrame(questListFrame(c))
 	client.Session.SendFrame(serverpackets.FrameSkillList(skillList))
 	client.Session.SendFrame(serverpackets.FrameFriendList(l.friendListEntries(c.ID)))
+	// From the UserInfo on, the client knows the maxima, and a change
+	// to one is reported.
+	c.AdoptMaxima()
 	client.Session.SendFrame(serverpackets.FrameUserInfo(l.userInfoSnapshot(live)))
 	l.sendLoginWeight(live)
 	client.Session.SendFrame(itemListFrame)
@@ -768,10 +775,10 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	live.access.Store(&access)
 	live.remoteIP = client.Session.remoteIP()
 	delivery.live = live
-	// The restored HP raises its low-HP tutorial event here, with the
-	// journal loaded and the tutorial seam installed, but no event sink
-	// yet: the tutorial's packets reach no client, its journal writes stay.
-	c.NotifyRestoredHP()
+	// The restored HP raises its low-HP tutorial event once the restored
+	// equipment and effects make its maximum (noteRestoredHP).
+	live.restoredHP.Store(math.Float64bits(c.ResourceValues().CurrentHP))
+	live.restoredHPPending.Store(true)
 	c.Attach(creatureLive, live)
 	c.SetWorldHandle(live)
 	// The controllers act as live, the object the world registers: the
