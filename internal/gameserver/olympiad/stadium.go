@@ -99,7 +99,12 @@ type Arena interface {
 	Heal(objectID int32)
 	// Fight lets objectID fight its opponent.
 	Fight(objectID int32)
-	// ShowCompetitors shows the stadium both competitors' gauges.
+	// Await runs then once what was done to and sent each online player of
+	// objectIDs before it has been carried out. then may run on any
+	// goroutine.
+	Await(objectIDs []int32, then func())
+	// ShowCompetitors shows the stadium both competitors' gauges as they
+	// stand now.
 	ShowCompetitors(stadium int, one, two int32)
 	// RefreshCombat sets everyone inside stadium in or out of combat as its
 	// fight runs or not.
@@ -283,7 +288,12 @@ func (s *Stadium) step() (delay time.Duration, ok bool) {
 		s.set(stageBattleInProgress, 0)
 		if !s.startBattle(g) {
 			s.set(stageGameStopped, 0)
+			break
 		}
+		// The stadium sees the gauges once both competitors were healed and
+		// set fighting; the next step follows a second after.
+		a.Await([]int32{g.players[0].ObjectID, g.players[1].ObjectID}, func() { s.queue.Post(s.showBattle) })
+		return 0, false
 	case stageBattleInProgress:
 		cd += 1000
 		if s.haveWinner(g) || int64(cd) > cfg.BattleMillis {
@@ -417,9 +427,7 @@ func (s *Stadium) fighting(g *Game) bool {
 	return true
 }
 
-// startBattle starts the fight: both competitors must still be there. The
-// stadium is shown both competitors, told the fight started, and set in
-// combat.
+// startBattle starts the fight: both competitors must still be there.
 func (s *Stadium) startBattle(g *Game) bool {
 	if !s.fighting(g) {
 		return false
@@ -428,10 +436,22 @@ func (s *Stadium) startBattle(g *Game) bool {
 	g.Start(s.queue.Now())
 	a.Fight(g.players[0].ObjectID)
 	a.Fight(g.players[1].ObjectID)
+	return true
+}
+
+// showBattle shows the stadium both competitors of the fight that just
+// started, tells it the fight started and sets it in combat, then runs the
+// match on a second later.
+func (s *Stadium) showBattle() {
+	g := s.Game()
+	if g == nil {
+		return
+	}
+	a := s.games.arena
 	a.ShowCompetitors(s.id, g.players[0].ObjectID, g.players[1].ObjectID)
 	a.Announce(s.id, Message{Kind: MessageGameStarted})
 	a.RefreshCombat(s.id)
-	return true
+	s.queue.After(time.Second, s.run)
 }
 
 // haveWinner reports whether the fight is decided: a competitor left, or

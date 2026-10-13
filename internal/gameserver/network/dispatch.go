@@ -511,6 +511,9 @@ type GameClientLink struct {
 	bossZones BossZoneStore
 	// zoneReloadMu runs one //reload zone at a time.
 	zoneReloadMu sync.Mutex
+	// stadiums are the stadium zones of the zone set the link holds, in
+	// stadium order; see stadiumZones.
+	stadiums atomic.Pointer[stadiumZoneSet]
 	// zonePulses runs the effect and damage zones' pulses, those of every
 	// zone set the link wired.
 	zonePulses *sim.Queue

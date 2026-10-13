@@ -63,6 +63,13 @@ type match struct {
 // two non-classed registrations.
 func bootMatch(t *testing.T, adjust func(*olympiad.Config), opts ...gameservertest.Option) *match {
 	t.Helper()
+	return bootMatchPrepared(t, adjust, nil, opts...)
+}
+
+// bootMatchPrepared is bootMatch running prepare once both characters are
+// stored, before either enters the world.
+func bootMatchPrepared(t *testing.T, adjust func(*olympiad.Config), prepare func(srv *gameservertest.Server), opts ...gameservertest.Option) *match {
+	t.Helper()
 	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Alpha", 40, 0),
 		gameservertest.WithWantChars(1),
@@ -82,6 +89,9 @@ func bootMatch(t *testing.T, adjust func(*olympiad.Config), opts ...gameserverte
 	}, opts...)...)
 	m := &match{srv: srv, ones: []*competitor{{c: srv.Client, id: srv.SoleObjectID(t), name: "Alpha"}}}
 	id := srv.SeedCharacterFor(t, "bravo", "Bravo", 40, 0).ID
+	if prepare != nil {
+		prepare(srv)
+	}
 	m.ones = append(m.ones, &competitor{c: srv.DialClient(t, "bravo", 1), id: id, name: "Bravo"})
 	for _, p := range m.ones {
 		startInWorld(t, p.c)

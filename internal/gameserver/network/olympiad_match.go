@@ -3,6 +3,7 @@ package network
 import (
 	"cmp"
 	"slices"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -39,14 +40,20 @@ func (l *GameClientLink) bindOlympiadStadiums(rnd func(n int) int) {
 	if l.olympiad == nil || l.queues == nil || l.zones == nil {
 		return
 	}
-	l.olympiad.BindStadiums(len(orderedStadiums(l.zones)), olympiadArena{l}, l.queues.NewQueue, rnd)
+	l.olympiad.BindStadiums(len(l.stadiumZones()), olympiadArena{l}, l.queues.NewQueue, rnd)
 }
 
-// orderedStadiums are ix's stadium zones in the order the stadiums are
-// numbered: by id modulo the size of a hash table holding them, a power of
-// two of at least 16 filled at most to three quarters, then in load order.
-func orderedStadiums(ix *zone.Index) []*zone.Olympiad {
-	zs := zone.OfKind[*zone.Olympiad](ix)
+// orderedStadiums are the stadium zones among all in the order the stadiums
+// are numbered: by id modulo the size of a hash table holding them, a power
+// of two of at least 16 filled at most to three quarters, then in load
+// order.
+func orderedStadiums(all []zone.Kind) []*zone.Olympiad {
+	var zs []*zone.Olympiad
+	for _, k := range all {
+		if z, ok := k.(*zone.Olympiad); ok {
+			zs = append(zs, z)
+		}
+	}
 	size := 16
 	for len(zs) > size*3/4 {
 		size *= 2
@@ -59,12 +66,36 @@ func orderedStadiums(ix *zone.Index) []*zone.Olympiad {
 	return zs
 }
 
+// stadiumZoneSet is the ordered stadium zones of one zone set, keyed by the
+// first zone slot of that set: a set's zones never change once it is held,
+// and every set has its own slots.
+type stadiumZoneSet struct {
+	key   *zone.Kind
+	zones []*zone.Olympiad
+}
+
+// stadiumZones are the stadium zones of the zone set the link holds now, in
+// stadium order, worked out once per set.
+func (l *GameClientLink) stadiumZones() []*zone.Olympiad {
+	if l.zones == nil {
+		return nil
+	}
+	all := l.zones.All()
+	if len(all) == 0 {
+		return nil
+	}
+	key := &all[0]
+	if c := l.stadiums.Load(); c != nil && c.key == key {
+		return c.zones
+	}
+	c := &stadiumZoneSet{key: key, zones: orderedStadiums(all)}
+	l.stadiums.Store(c)
+	return c.zones
+}
+
 // stadiumZone is the zone of stadium id.
 func (l *GameClientLink) stadiumZone(id int) (*zone.Olympiad, bool) {
-	if l.zones == nil {
-		return nil, false
-	}
-	zs := orderedStadiums(l.zones)
+	zs := l.stadiumZones()
 	if id < 0 || id >= len(zs) {
 		return nil, false
 	}
@@ -75,7 +106,7 @@ func (l *GameClientLink) stadiumZone(id int) (*zone.Olympiad, bool) {
 // fight runs, the combat notices, the match window of a player walking in
 // and the expulsion of anyone who has no business there.
 func (l *GameClientLink) wireStadiumZones(ix *zone.Index) {
-	for i, z := range orderedStadiums(ix) {
+	for i, z := range orderedStadiums(ix.All()) {
 		z.BattleStarted = func() bool {
 			if l.olympiad == nil {
 				return false
@@ -238,11 +269,30 @@ func (a olympiadArena) stadiumPlayers(id int) []*livePlayer {
 }
 
 // toStadium sends each player inside stadium id its own copy of one frame,
-// on its queue.
+// built once, on its queue.
 func (a olympiadArena) toStadium(id int, build func() wire.Frame) {
-	for _, p := range a.stadiumPlayers(id) {
-		postLive(p, func() { p.SendFrame(build()) })
+	players := a.stadiumPlayers(id)
+	if len(players) == 0 {
+		return
 	}
+	broadcastFrame(build, func(send func(frameReceiver)) {
+		for _, p := range players {
+			send(queuedReceiver{p})
+		}
+	})
+}
+
+// queuedReceiver takes a broadcast copy for a player and sends it on the
+// player's queue, behind what was posted there before.
+type queuedReceiver struct{ live *livePlayer }
+
+func (r queuedReceiver) BroadcastFrame(frame wire.Frame) bool {
+	live := r.live
+	if !postLive(live, func() { live.SendFrame(frame) }) {
+		frame.Release()
+		return false
+	}
+	return true
 }
 
 func (a olympiadArena) Competitor(objectID int32) (olympiad.Competitor, bool) {
@@ -414,6 +464,26 @@ func (a olympiadArena) Heal(objectID int32) {
 
 func (a olympiadArena) Fight(objectID int32) {
 	a.postOnline(objectID, func(live *livePlayer) { live.SetOlympiadStarted(true) })
+}
+
+// Await posts a mark behind everything already posted to each online
+// player of objectIDs and runs then on the queue of the last to reach its
+// mark, or at once when none is online.
+func (a olympiadArena) Await(objectIDs []int32, then func()) {
+	var pending atomic.Int32
+	pending.Store(int32(len(objectIDs)) + 1)
+	reached := func() {
+		if pending.Add(-1) == 0 {
+			then()
+		}
+	}
+	for _, id := range objectIDs {
+		live, ok := a.l.onlineLive(id)
+		if !ok || !postLive(live, reached) {
+			reached()
+		}
+	}
+	reached()
 }
 
 // ShowCompetitors shows everyone inside stadium each competitor's gauges,
