@@ -1,0 +1,27 @@
+# The look, walk and ground lines play an NPC's ground-item hooks: the probe behavior, told about
+# ground items, says which and asks its NPC to pick each one up, and says each item it picks up.
+# A look filtered on items lying nowhere tells it nothing; one filtered on the potion and Zariche
+# tells it about the potion only, not the soulshot lying beside it. The first AI tick lets the
+# civilian's life begin (its scan sees the character), the next takes up the pick-up and walks
+# it toward the potion; arrived,
+# the next tick picks it up: the picked-item hook runs once and the potion leaves the world.
+# A later tick tells nothing more. An unfiltered look then tells it about the soulshot left.
+character Hunter 20
+script ai.Probe
+item 20 1463
+npc picker 35600 Folk 200 0 0 walks
+ground potion 20 1 500 0 0
+ground shot 1463 1 450 0 0
+
+look picker 500 1 8190
+look picker 500 1 20 8190
+  S NpcSay obj=picker type=0 npc=1035600 text="Probe.see_item q=1 20"
+tick x2
+  S PlaySound type=0 file=Probe.see bind=0 obj=0 loc=0,0,0 delay=0
+walk picker
+tick
+  S NpcSay obj=picker type=0 npc=1035600 text="Probe.picked 20"
+  S DeleteObject obj=potion
+tick
+look picker 500 1
+  S NpcSay obj=picker type=0 npc=1035600 text="Probe.see_item q=1 1463"

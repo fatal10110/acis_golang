@@ -25,11 +25,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
+	"github.com/fatal10110/acis_golang/internal/testsupport"
 	"github.com/fatal10110/acis_golang/internal/testsupport/datapack"
 	"github.com/rs/zerolog"
 )
@@ -93,12 +95,24 @@ type run struct {
 	objs  map[string]int32
 	npcs  map[string]NPC
 	live  map[string]*npc.Hostile
+	// makers are the territory lines' npcmakers, built at the first world
+	// entry; grounds holds the ground lines' items' object ids.
+	makers  map[string]*spawn.Maker
+	grounds map[int32]bool
+	// members are the member lines' characters and their clients.
+	members []member
 	// items is the item catalog the server runs with.
 	items *item.Table
 	// draws is the random line's source; traceDraws the draws the
 	// reference pinned in each traced step.
 	draws      draws
 	traceDraws [][]string
+}
+
+// member is one member line's character in the world.
+type member struct {
+	obj    int32
+	client *testsupport.ScriptedClient
 }
 
 // draws hands the script draws the random line lists, recording each draw
@@ -159,7 +173,10 @@ func (d *draws) unused() int {
 // failing at the first expectation that does not hold.
 func Run(t *testing.T, sc *Scenario, cfg Config) {
 	t.Helper()
-	r := &run{sc: sc, pages: loadPages(t, sc.Pages), roles: map[int32]string{}, objs: map[string]int32{}, npcs: map[string]NPC{}, live: map[string]*npc.Hostile{}}
+	r := &run{
+		sc: sc, pages: loadPages(t, sc.Pages), roles: map[int32]string{}, objs: map[string]int32{}, npcs: map[string]NPC{},
+		live: map[string]*npc.Hostile{}, makers: map[string]*spawn.Maker{}, grounds: map[int32]bool{},
+	}
 	r.draws.random = sc.Random
 	r.texts = pageTexts(t, r.pages)
 	items := sc.Items
@@ -224,6 +241,9 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		default:
 			t.Fatalf("%s: NPC %s type %s is neither a civilian nor an attackable", r.sc.Name, n.Role, n.Type)
 		}
+		if n.Walks && kinds[n.ID] != script.KindFolk {
+			t.Fatalf("%s: NPC %s walks, but only a civilian walks: a monster stands parked", r.sc.Name, n.Role)
+		}
 		r.npcs[n.Role] = n
 	}
 	opts := []gameservertest.Option{
@@ -276,6 +296,12 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	seedQuests(t, r.srv.DB, r.player, r.sc.Quests)
 	seedExp(t, r.srv.DB, r.player, r.sc.Level)
 	r.seedHoldings(t)
+	for _, m := range r.sc.Members {
+		c := r.srv.SeedCharacterFor(t, memberAccount(m), m.Name, m.Level, 0)
+		seedExp(t, r.srv.DB, c.ID, m.Level)
+		r.roles[c.ID] = m.Name
+		r.members = append(r.members, member{obj: c.ID})
+	}
 	r.enterWorld(t)
 	r.srv.FlushPersistence(t)
 	r.srv.TakeJournalWrites()
@@ -299,10 +325,18 @@ func (r *run) spawnNPCs(t *testing.T) {
 	r.spawned = true
 	x, y, z := r.srv.PlayerPosition(t, r.player)
 	r.origin = location.Location{X: x, Y: y, Z: z}
+	r.enterMembers(t)
+	for _, tr := range r.sc.Territories {
+		r.makers[tr.Name] = r.maker(t, tr)
+	}
 	for _, n := range r.sc.NPCs {
 		r.spawn(t, n)
 	}
+	for _, g := range r.sc.Grounds {
+		r.lay(t, g)
+	}
 	r.srv.ReadQueued(t, r.srv.Client)
+	r.drainMembers(t)
 }
 
 // scenarioClan is the object id of the clan a clan line seeds.
@@ -435,14 +469,18 @@ func (r *run) spawn(t *testing.T, n NPC) {
 	at := location.Location{X: r.origin.X + n.DX, Y: r.origin.Y + n.DY, Z: r.origin.Z + n.DZ}
 	tmpl := template(n)
 	var live attackable.Combatant
+	maker := r.makers[n.Maker]
 	if npc.FolkKind(&npc.Instance{Template: tmpl}) {
-		live = r.srv.SpawnCastingFolkNPCAt(t, tmpl, at, shippedSkills(t))
+		live = r.srv.SpawnCastingFolkNPCOfMakerAt(t, tmpl, at, shippedSkills(t), maker)
 	} else {
-		h := r.srv.SpawnHostileNPCTemplateAt(t, tmpl, at)
+		h := r.srv.SpawnHostileNPCOfMakerAt(t, tmpl, at, maker)
 		r.srv.AI.Add(h)
 		r.live[n.Role], live = h, h
 	}
 	r.roles[live.ObjectID()], r.objs[n.Role] = n.Role, live.ObjectID()
+	if draw, ok := r.sc.Rolls[n.Role]; ok {
+		r.pinRoll(t, n.Role, draw)
+	}
 	r.srv.RunCreated(t, live)
 }
 
@@ -451,6 +489,7 @@ func (r *run) spawn(t *testing.T, n NPC) {
 func template(n NPC) *npc.Template {
 	tmpl := gameservertest.FolkTemplate(n.Type, int(n.ID))
 	if npc.FolkKind(&npc.Instance{Template: tmpl}) {
+		tmpl.CanMove = n.Walks
 		return tmpl
 	}
 	return &npc.Template{
@@ -528,6 +567,10 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		}
 	case "pickup":
 		r.pickup(t, st.Args[0])
+	case "look":
+		r.look(t, st.Args)
+	case "walk":
+		r.walk(t, st.Args[0])
 	case "mark":
 		id, _ := strconv.ParseInt(st.Args[0], 10, 32)
 		w := wire.NewPacketWriter(clientpackets.OpcodeRequestTutorialQuestionMark)
@@ -549,6 +592,7 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		r.setPlayer(t)
 	}
 	frames = append(frames, r.srv.ReadQueued(t, c)...)
+	r.drainMembers(t)
 	drawn, bad := r.draws.take()
 	if len(bad) > 0 {
 		fail("script random: %s", strings.Join(bad, "; "))
@@ -559,6 +603,10 @@ func (r *run) step(t *testing.T, i int, st Step) {
 	if st.Verb != "relog" {
 		var got []string
 		for _, f := range frames {
+			if line, ok := r.groundDeleted(f); ok {
+				got = append(got, line)
+				continue
+			}
 			line, ok, err := render(f, r.roles)
 			if err != nil {
 				fail("frame %x: %v", f, err)
@@ -727,13 +775,7 @@ func (r *run) rows(t *testing.T, quest string) []string {
 // it was sent; the first time, the NPC lines' NPCs are spawned after.
 func (r *run) enterWorld(t *testing.T) [][]byte {
 	t.Helper()
-	w := wire.NewPacketWriter(clientpackets.OpcodeRequestGameStart)
-	w.WriteInt32(0)
-	w.WriteUint16(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	w.WriteInt32(0)
-	r.srv.Client.Send(w.Bytes())
+	r.srv.Client.Send(gameStart())
 	frames := r.readThrough(t, serverpackets.OpcodeCharSelected)
 	r.srv.Client.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
 	frames = append(frames, r.srv.ReadQueued(t, r.srv.Client)...)

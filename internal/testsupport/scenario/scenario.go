@@ -42,12 +42,35 @@
 //	item <id> ...                             shipped item templates added to the fixture catalog
 //	page <path below data/html>               a shipped page the server serves; a path ending in / serves its directory
 //	npc <role> <npc id> <type> <dx> <dy> <dz> a fixture NPC template of that instance type, spawned at that offset from the character;
-//	                                          the templates a script may spawn more NPCs of
+//	    [walks] [maker <territory>]           the templates a script may spawn more NPCs of; walks, a civilian's template can
+//	                                          move; with maker, the NPC is an npcmaker's whose territory is that territory
+//	                                          line's (see below)
+//	roll <role> <draw>                        optional: every combat draw of the NPC is that draw (n-1 for a draw of
+//	                                          [0, n) it is not inside): its skill landing rolls, as its hit and
+//	                                          critical rolls; with 0 every skill it casts lands (a landing rate is at
+//	                                          least 1), with 99 none does (at most 99)
+//	territory <name> <dx1> <dy1> <dx2> <dy2> <dz1> <dz2>
+//	                                          optional: an npcmaker territory, the box between those offsets from where the
+//	                                          character first enters the world
+//	member <name> <level> [dead] [<dx> <dy> <dz>]
+//	                                          optional: a second character, of its own account, that enters the world where the
+//	                                          character first does, right after it, joins its party, then stands at that
+//	                                          offset from the character (default 0 0 0); dead, it is then marked dead where
+//	                                          it stands. Its object id renders as its name
+//	ground <role> <item id> <count> <dx> <dy> <dz>
+//	                                          optional: an item lying on the ground at that offset from the character, laid
+//	                                          as the character first enters the world, after the NPCs; the template must be
+//	                                          in the catalog. Its object id renders as its role
 //
 // Each NPC line's NPC runs the created hooks of the scripts bound to it as
 // it appears, as the spawn pass runs them, and a civilian casts the shipped
 // skills (data/xml/skills) a script or dialog asks of it on a later AI
-// tick.
+// tick. A monster stands parked: it never walks; a civilian walks when its
+// line says walks. An NPC line with maker reads its maker's territory as
+// its spawn territory (a script's InSpawnTerritory), as an NPC the
+// population's npcmaker placed does; the maker spawns nothing itself.
+// Without maker, an NPC's spawn territory is the sphere of its drift range
+// (200) around its spawn point.
 //
 // Then the steps, each a verb line followed by its indented expectations:
 //
@@ -63,6 +86,10 @@
 //	                       on its own, as casting what a script asked of them
 //	pickup <item id>       an Action packet on the one ground item of that template, then time passes
 //	                       until the item has left the ground
+//	look <role> <radius> <quantity> [<item id> ...]
+//	                       the NPC looks for ground items within radius (of those templates, any without),
+//	                       on its own queue: its behavior's see-item hook runs, told at most quantity
+//	walk <role>            position ticks run until the NPC's walk ends (a pick-up desire's walk to its item)
 //	mark <id>              a RequestTutorialQuestionMark: the character clicks that tutorial question mark
 //	relog                  back to character select and into the world again
 //	restart                a RequestRestart: back to character select
@@ -96,7 +123,9 @@
 // ActionFailed, NpcHtmlMessage, SystemMessage, PlaySound, QuestList,
 // ExShowQuestMark, TutorialShowHtml, TutorialShowQuestionMark,
 // TutorialEnableClientEvent, TutorialCloseHtml, RadarControl, DropItem,
-// MagicSkillUse and NpcSay. "page=<path>" also ends a TutorialShowHtml line.
+// MagicSkillUse and NpcSay, and the DeleteObject of a ground line's item
+// leaving the world ("DeleteObject obj=<role>"). "page=<path>" also ends a
+// TutorialShowHtml line.
 //
 // Without a random line the script draws are random. A draw outside
 // [0, n), or past the listed ones, fails the step that drew it.
@@ -112,7 +141,8 @@
 // The script draws the trace pins (needing a random line) must be those the
 // run's same steps draw: the same bounds, in order. A trace under the
 // oracle's scenarios directory is the reference probe's play of this
-// scenario itself (the oracle README).
+// scenario itself (the oracle README). The trace format has no member,
+// ground or look, so a traced scenario takes no member or ground line.
 package scenario
 
 import (
@@ -167,7 +197,14 @@ type Scenario struct {
 	Items   []int32
 	Pages   []string
 	NPCs    []NPC
-	Steps   []Step
+	// Rolls are the roll lines' draws by role.
+	Rolls map[string]int
+	// Territories are the territory lines, Members the member lines and
+	// Grounds the ground lines.
+	Territories []Territory
+	Members     []Member
+	Grounds     []Ground
+	Steps       []Step
 }
 
 // QuestRows is one quest line: a quest's rows as var=value.
@@ -200,6 +237,10 @@ type NPC struct {
 	ID         int32
 	Type       string
 	DX, DY, DZ int
+	// Walks gives a civilian's template canMove: it walks.
+	Walks bool
+	// Maker is the territory line of the NPC's npcmaker, empty for none.
+	Maker string
 }
 
 // Step is one client action and what it must leave.
@@ -242,6 +283,8 @@ var argCount = map[string][2]int{
 	"advance":  {1, 1},
 	"approach": {1, 1},
 	"pickup":   {1, 1},
+	"look":     {3, -1},
+	"walk":     {1, 1},
 	"mark":     {1, 1},
 	"tick":     {0, 1},
 	"relog":    {0, 0},
@@ -307,6 +350,9 @@ func Parse(name string, data []byte) (*Scenario, error) {
 	if len(sc.Steps) == 0 {
 		return nil, fmt.Errorf("%s: no step", name)
 	}
+	if sc.Trace != "" && (len(sc.Members) > 0 || len(sc.Grounds) > 0) {
+		return nil, fmt.Errorf("%s: a traced scenario takes no member or ground line", name)
+	}
 	if err := sc.checkFlow(); err != nil {
 		return nil, fmt.Errorf("%s:%w", name, err)
 	}
@@ -338,6 +384,8 @@ func (sc *Scenario) checkFlow() error {
 				return fail("a created character takes no class, clan or quest line")
 			case len(sc.Holds) > 0 || len(sc.Equips) > 0 || sc.Standing != 0 || sc.PK != 0 || sc.Cabal != sevensigns.NoCabal:
 				return fail("a created character takes no hold, equip, standing, pk or cabal line")
+			case len(sc.Members) > 0:
+				return fail("a created character takes no member line")
 			}
 			inWorld = false
 		case "enter":
@@ -348,6 +396,10 @@ func (sc *Scenario) checkFlow() error {
 		default:
 			if !inWorld {
 				return fail("%s needs the character in the world: enter first", st.Verb)
+			}
+			if (st.Verb == "restart" || st.Verb == "relog") && len(sc.Members) > 0 {
+				// The character leaving the world breaks its party up.
+				return fail("a scenario with member lines takes no %s", st.Verb)
 			}
 			if st.Verb == "restart" {
 				inWorld = false
@@ -471,15 +523,19 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 		}
 		sc.Pages = append(sc.Pages, args[0])
 	case "npc":
-		if len(args) != 6 {
-			return fmt.Errorf("npc <role> <npc id> <type> <dx> <dy> <dz>")
+		if len(args) < 6 {
+			return fmt.Errorf("npc <role> <npc id> <type> <dx> <dy> <dz> [walks] [maker <territory>]")
+		}
+		opts, err := npcOptions(args[6:], sc.Territories)
+		if err != nil {
+			return err
 		}
 		id, err := strconv.ParseInt(args[1], 10, 32)
 		if err != nil {
 			return fmt.Errorf("npc number %q: %w", args[1], err)
 		}
 		var offsets [3]int
-		for i, a := range args[3:] {
+		for i, a := range args[3:6] {
 			v, err := strconv.ParseInt(a, 10, 32)
 			if err != nil {
 				return fmt.Errorf("npc number %q: %w", a, err)
@@ -487,11 +543,15 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 			offsets[i] = int(v)
 		}
 		role := args[0]
-		if roles[role] || role == "player" {
+		if sc.named(role, roles) {
 			return fmt.Errorf("role %q named twice", role)
 		}
 		roles[role] = true
-		sc.NPCs = append(sc.NPCs, NPC{Role: role, ID: int32(id), Type: args[2], DX: offsets[0], DY: offsets[1], DZ: offsets[2]})
+		opts.Role, opts.ID, opts.Type = role, int32(id), args[2]
+		opts.DX, opts.DY, opts.DZ = offsets[0], offsets[1], offsets[2]
+		sc.NPCs = append(sc.NPCs, opts)
+	case "territory", "member", "ground", "roll":
+		return sc.world(key, args, roles)
 	default:
 		return fmt.Errorf("unknown header line %q", key)
 	}
@@ -583,7 +643,7 @@ func (sc *Scenario) holdings(key string, args []string) error {
 // checkStep validates a step's arguments against the declared roles.
 func checkStep(verb string, args []string, roles map[string]bool) error {
 	switch verb {
-	case "action", "hit", "kill", "approach":
+	case "action", "hit", "kill", "approach", "look", "walk":
 		if !roles[args[0]] {
 			return fmt.Errorf("unknown role %q", args[0])
 		}
@@ -612,6 +672,10 @@ func checkStep(verb string, args []string, roles map[string]bool) error {
 	case "pickup", "mark":
 		if _, err := strconv.ParseInt(args[0], 10, 32); err != nil {
 			return fmt.Errorf("%s number %q: %w", verb, args[0], err)
+		}
+	case "look":
+		if _, err := lookArgs(args); err != nil {
+			return err
 		}
 	}
 	return nil

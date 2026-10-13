@@ -2,20 +2,29 @@ package ai
 
 import (
 	"fmt"
+	"slices"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scenario"
 )
 
-// probeID is the NPC id the runner's probe behavior is bound to.
-const probeID = 20120
+// probeID and probeFolkID are the NPC ids the runner's probe behavior is
+// bound to: a monster, which stands parked, and a civilian, which walks.
+const (
+	probeID     = 20120
+	probeFolkID = 35600
+)
 
 // probe is a behavior that answers its NPC's attacked and dying hooks with
 // a sound to the attacker or killer, naming the hook and the damage, its
-// see-creature hook with a sound to the player seen, and its created hook
-// with a chat line, so a scenario sees through packets which hooks its
-// hit, kill and approach steps and its NPCs' spawns raised.
+// see-creature hook with a sound to the player seen, its created hook with
+// a chat line, and its see-item and picked-item hooks with a chat line
+// naming the items, a see-item hook asking it to pick each one up, so a
+// scenario sees through packets which hooks its hit, kill, approach and
+// look steps and its NPCs' spawns raised.
 // It stands in for the behavior scripts until the first one is ported.
 func probe() script.Script {
 	sound := func(s *script.Script, c script.Creature, name string) {
@@ -23,13 +32,27 @@ func probe() script.Script {
 			s.PlaySound(p, name)
 		}
 	}
-	return script.Script{Behavior: true, NPCs: []int32{probeID}, Hooks: script.Hooks{
+	return script.Script{Behavior: true, NPCs: []int32{probeID, probeFolkID}, Hooks: script.Hooks{
 		OnAttacked: func(s *script.Script, e script.Attacked) {
 			sound(s, e.Attacker, fmt.Sprintf("Probe.attacked_%d", e.Damage))
 		},
 		OnMyDying:     func(s *script.Script, e script.MyDying) { sound(s, e.Killer, "Probe.dying") },
 		OnSeeCreature: func(s *script.Script, e script.SeeCreature) { sound(s, e.Creature, "Probe.see") },
 		OnCreated:     func(_ *script.Script, e script.Created) { e.NPC.Say("Probe.created") },
+		OnSeeItem: func(_ *script.Script, e script.SeeItem) {
+			ids := make([]string, 0, len(e.Items))
+			for _, it := range e.Items {
+				ids = append(ids, strconv.Itoa(int(it.ItemID)))
+			}
+			slices.Sort(ids)
+			e.NPC.Say(fmt.Sprintf("Probe.see_item q=%d %s", e.Quantity, strings.Join(ids, ",")))
+			for _, it := range e.Items {
+				e.NPC.AddPickUpDesire(it.ObjectID, 1_000_000)
+			}
+		},
+		OnPickedItem: func(_ *script.Script, e script.PickedItem) {
+			e.NPC.Say(fmt.Sprintf("Probe.picked %d", e.Item.ItemID))
+		},
 	}}
 }
 
