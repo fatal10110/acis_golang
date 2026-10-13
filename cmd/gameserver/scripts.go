@@ -253,6 +253,7 @@ func provideScriptEnv(serverProps *config.Properties, rewards manager.KillReward
 		Castles:          castles,
 		SiegableHall:     data.ClanHalls.Siegable,
 		Sieges:           sieges,
+		Zones:            data.Zones,
 	}, nil
 }
 
@@ -287,9 +288,10 @@ func npcKindOf(templates *npc.Table) func(int32) (script.NPCKind, bool) {
 func buildScripts(*script.Registry) {}
 
 // provideMakers returns the maker registry: every npcmaker runs the maker
-// of its type, the default maker when its type has none.
-func provideMakers(log zerolog.Logger) *script.Makers {
-	return script.NewMakers(maker.Catalog(), maker.Default, log)
+// of its type, the default maker when its type has none, and reads the
+// time of day from the game clock.
+func provideMakers(clock *task.GameClock, log zerolog.Logger) *script.Makers {
+	return script.NewMakers(maker.Catalog(), maker.Default, clock.IsNight, log)
 }
 
 // startSchedule runs the scheduled tasks against link. It starts once
