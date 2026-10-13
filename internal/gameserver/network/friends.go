@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
-	"unicode/utf16"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/chat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -302,7 +302,7 @@ func (l *GameClientLink) sendBlockList(live *livePlayer) {
 //
 // A delivered message is recorded in the chat log.
 func (l *GameClientLink) handleRequestSendL2FriendSay(live *livePlayer, req clientpackets.RequestSendL2FriendSay) {
-	if req.Message == "" || len(utf16.Encode([]rune(req.Message))) > friendSayMaxLength {
+	if req.Message == "" || commons.UTF16Len(req.Message) > friendSayMaxLength {
 		return
 	}
 	recipient, online := l.livePlayerByName(req.Recipient)

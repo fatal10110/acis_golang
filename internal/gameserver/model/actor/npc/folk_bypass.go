@@ -3,7 +3,6 @@ package npc
 import (
 	"strconv"
 	"strings"
-	"unicode/utf16"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/classmaster"
@@ -613,17 +612,17 @@ func javaSpace(r rune) bool { return r <= ' ' }
 // its end when end is negative, counting characters as the client encodes
 // them: one per UTF-16 unit, so a character outside the Basic Multilingual
 // Plane counts two. ok is false when command is too short for the range. A
-// bound that splits such a character keeps its half as U+FFFD, which no
-// number reads.
+// bound that splits such a character keeps its half as an unpaired
+// surrogate, which no number reads.
 func commandChars(command string, begin, end int) (string, bool) {
-	units := utf16.Encode([]rune(command))
+	units := commons.UTF16Units(command)
 	if end < 0 {
 		end = len(units)
 	}
 	if begin > end || end > len(units) {
 		return "", false
 	}
-	return string(utf16.Decode(units[begin:end])), true
+	return commons.UTF16String(units[begin:end]), true
 }
 
 // olympiadCommand answers an Olympiad manager's "Olympiad <n>" command,

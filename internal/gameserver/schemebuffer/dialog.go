@@ -251,7 +251,7 @@ func (d dialog) create(args []string) Reply {
 		return Reply{Message: nameNotice}
 	}
 	name := args[0]
-	if utf16Len(name) > 14 {
+	if commons.UTF16Len(name) > 14 {
 		return Reply{Message: nameNotice}
 	}
 	if o := d.m.owners[d.talker.ObjectID]; o != nil {

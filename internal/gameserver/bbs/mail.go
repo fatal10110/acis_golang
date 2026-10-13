@@ -14,6 +14,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/fatal10110/acis_golang/internal/commons/db"
 	"github.com/rs/zerolog"
 )
 
@@ -358,9 +359,9 @@ type Sender struct {
 func (m *Mailbox) Send(sender Sender, recipients []Recipient, list, subject, message string, now time.Time) ([]Delivery, bool) {
 	subject = trimOr(subject, subjectLength, noSubject)
 	message = strings.ReplaceAll(message, "\n", "<br1>")
-	stored := utf8.RuneCountInString(list) <= recipientsColumnWidth &&
-		utf8.RuneCountInString(subject) <= subjectColumnWidth &&
-		utf8.RuneCountInString(message) <= messageColumnWidth
+	stored := columnLen(list) <= recipientsColumnWidth &&
+		columnLen(subject) <= subjectColumnWidth &&
+		columnLen(message) <= messageColumnWidth
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -420,4 +421,9 @@ func (m *Mailbox) fileLocked(mail Mail, stored bool) {
 		row := mail
 		m.write(row.ID, "insert mail", func(ctx context.Context, st MailStore) error { return st.InsertMail(ctx, row) })
 	}
+}
+
+// columnLen is how many characters s takes in its column once stored.
+func columnLen(s string) int {
+	return utf8.RuneCountInString(db.StoredText(s))
 }

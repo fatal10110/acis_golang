@@ -2,8 +2,8 @@ package serverpackets
 
 import (
 	"strings"
-	"unicode/utf16"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 )
 
@@ -74,14 +74,15 @@ const (
 // 102 and 103, each holding up to 4090 UTF-16 code units in order; a part
 // html does not reach carries ShowBoardNoPage. A page of 12270 units or
 // more is not shown: nil. A character whose two code units straddle a cut
-// reaches the client as two replacement characters.
+// reaches the client as its two halves, one ending a part and one starting
+// the next.
 func FramesShowBoardPage(html string) []wire.Frame {
-	units := utf16.Encode([]rune(html))
+	units := commons.UTF16Units(html)
 	n := len(units)
 	if n >= showBoardPageLength {
 		return nil
 	}
-	part := func(from, to int) string { return string(utf16.Decode(units[from:to])) }
+	part := func(from, to int) string { return commons.UTF16String(units[from:to]) }
 	switch {
 	case n < showBoardPartLength:
 		return []wire.Frame{
@@ -108,7 +109,7 @@ func FramesShowBoardPage(html string) []wire.Frame {
 // reports false, building nothing, for a page of 8180 UTF-16 code units or
 // more.
 func FrameShowBoardEdit(html string) (wire.Frame, bool) {
-	if len(utf16.Encode([]rune(html))) >= showBoardEditLength {
+	if commons.UTF16Len(html) >= showBoardEditLength {
 		return wire.Frame{}, false
 	}
 	return FrameShowBoard("1001", html), true

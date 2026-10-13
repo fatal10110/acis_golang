@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -69,7 +70,7 @@ func (l *GameClientLink) beginChangePetName(live *livePlayer, req clientpackets.
 	if !ok {
 		return nil
 	}
-	if len(req.Name) < 1 || len(req.Name) > 16 {
+	if n := commons.UTF16Len(req.Name); n < 1 || n > 16 {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNamingCharnameUpTo16Chars))
 		return nil
 	}

@@ -4,7 +4,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"unicode/utf16"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -70,7 +69,7 @@ type SubclassCommand struct {
 // every later part 0.
 func ParseSubclassCommand(command string) SubclassCommand {
 	var cmd SubclassCommand
-	units := utf16.Encode([]rune(command))
+	units := commons.UTF16Units(command)
 	if len(units) < 10 {
 		return cmd
 	}
@@ -100,9 +99,9 @@ func ParseSubclassCommand(command string) SubclassCommand {
 
 // parseTrimmedInt parses the characters in units, trimmed of every
 // character up to the space, as a 32-bit decimal. A surrogate left alone by
-// the range reads as U+FFFD, which no number reads.
+// the range is no digit, so no number reads.
 func parseTrimmedInt(units []uint16) (int, bool) {
-	n, err := commons.ParseInt(strings.TrimFunc(string(utf16.Decode(units)), javaSpace), 32)
+	n, err := commons.ParseInt(strings.TrimFunc(commons.UTF16String(units), javaSpace), 32)
 	return int(n), err == nil
 }
 
