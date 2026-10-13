@@ -390,6 +390,7 @@ func (h *Hostile) Attach(rt Runtime) {
 	h.guarded = rt.Guarded
 	h.bindSpawn(rt.Slot)
 	h.Scratch().setLife(h)
+	h.brain.KeepTerritory(h.Scratch().Territory())
 	if rt.Items == nil {
 		return
 	}

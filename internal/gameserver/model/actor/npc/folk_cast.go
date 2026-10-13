@@ -76,8 +76,8 @@ type folkCast struct {
 	// onRoute marks an NPC its AI put on its route, until the AI takes up
 	// another desire.
 	onRoute bool
-	// oot is the NPC's out-of-territory state: whether its last arrival was
-	// outside and the stale-aggro sweep that arrival armed.
+	// oot is this life's stale-aggro sweep firing; the rest of the NPC's
+	// out-of-territory state lives in its Scratch.
 	oot folkOutOfTerritory
 	// buffCheckAt is when a clan hall manager last checked its own support
 	// buff, in Unix milliseconds: read and set by the AI under brain, reset

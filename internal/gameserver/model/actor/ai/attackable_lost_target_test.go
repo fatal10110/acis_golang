@@ -261,3 +261,33 @@ func TestSelectionInsideHitAnimationKeepsAttackWhoseDesireLeft(t *testing.T) {
 		t.Fatalf("CurrentIntention() inside the hit animation = %v, want the attack kept", got)
 	}
 }
+
+// TestSelectionWithNothingPromotedTakesNoStep pins that desire selection
+// steps the current intention only through a promotion: before the first
+// periodic cycle, a cast whose desire its end dropped is neither idled nor
+// cast again by the selection that end runs.
+func TestSelectionWithNothingPromotedTakesNoStep(t *testing.T) {
+	owner, target := actor(1), actor(2)
+	ref := skill.Ref{ID: 4, Level: 1}
+	cast := &recordingCast{canAttempt: true, canCast: true}
+	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	brain.SetCastController(cast)
+	brain.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
+	if err := brain.RunAI(); err != nil {
+		t.Fatalf("RunAI() error: %v", err)
+	}
+	if cast.castCalls != 1 {
+		t.Fatalf("setup: casts = %d, want 1", cast.castCalls)
+	}
+
+	brain.ClearCurrentDesire()
+	if err := brain.RunAI(); err != nil {
+		t.Fatalf("RunAI() after the cast end error: %v", err)
+	}
+	if cast.castCalls != 1 {
+		t.Fatalf("casts after the cast end = %d, want no new cast", cast.castCalls)
+	}
+	if got := brain.CurrentIntention(); got != IntentionCast {
+		t.Fatalf("CurrentIntention() = %v, want the cast kept", got)
+	}
+}

@@ -253,18 +253,18 @@ type Attackable struct {
 	current intention
 	next    intention
 	step    int
-	// ootOutside marks an actor whose last arrival was outside its
-	// territory. ootSweep is the out-of-territory stale-hate sweep's pending
-	// firing (nil for none), armed only by the first such arrival and
-	// cancelled only by an arrival back in territory; ootDue is that
-	// firing's deadline on the sweep's fixed-rate grid, and ootSeq the
-	// generation a firing must match to run. The sweep runs on the actor's
-	// queue, apart from the AI task: a stationary actor out of territory
-	// never arms it, and an inactive region does not stall it.
-	ootOutside bool
-	ootSweep   Timer
-	ootDue     time.Time
-	ootSeq     uint64
+	// territory is the actor's out-of-territory state, kept across its
+	// lives: whether its last arrival was outside its territory, and the
+	// deadline of the out-of-territory stale-hate sweep's next firing on its
+	// fixed-rate grid. The first such arrival arms the sweep, and only an
+	// arrival back in territory ends it. ootSweep is this life's pending
+	// firing (nil for none), and ootSeq the generation a firing must match
+	// to run. The sweep runs on the actor's queue, apart from the AI task: a
+	// stationary actor out of territory never arms it, and an inactive
+	// region does not stall it.
+	territory *TerritoryMemory
+	ootSweep  Timer
+	ootSeq    uint64
 	// lastKind is the intention kind Think was running before the latest
 	// promote, used so escort follow can tell a fresh FOLLOW from a
 	// continuing one.
@@ -341,6 +341,7 @@ func NewAttackable(actor AttackableActor, move AttackableMoveController, attack 
 		hates:          attackable.NewHateTable(actor),
 		desires:        NewDesireQueue(),
 		current:        intention{kind: IntentionIdle},
+		territory:      &TerritoryMemory{},
 		now:            actor.Now,
 		randomWalkRate: defaultRandomWalkRate,
 		roll:           rnd.Get,
@@ -975,7 +976,7 @@ func (a *Attackable) think(mode thinkMode) error {
 	}
 	var err error
 	if canPromote && !held {
-		err = a.promoteAndStep()
+		err = a.promoteAndStep(mode)
 	}
 	if idleAfterLatch {
 		if _, ok := a.desires.Peek(); !ok && !a.castingNow() {
@@ -1078,9 +1079,15 @@ func (a *Attackable) continueCurrent(wasIdle bool) error {
 
 // promoteAndStep promotes the next desire and runs one step of the current
 // intention. A lost attack or cast target ends the step; the pass does not
-// re-select.
-func (a *Attackable) promoteAndStep() error {
+// re-select. With nothing promoted (the hit animation holds the selection,
+// or nothing is queued yet before the first periodic cycle), the current
+// intention takes no step, except on a finished swing, whose own think
+// steps it.
+func (a *Attackable) promoteAndStep(mode thinkMode) error {
 	promoted := a.promoteNext()
+	if !promoted && mode != thinkAttackFinished {
+		return nil
+	}
 	switch a.current.kind {
 	case IntentionAttack:
 		a.lastDesire = IntentionAttack
@@ -1284,24 +1291,42 @@ func (a *Attackable) cycleDecayLocked() {
 	a.desires.DecreaseWeightByType(IntentionNothing, nothingDesireDecay)
 }
 
+// KeepTerritory makes m the actor's out-of-territory state, the one its
+// earlier lives left: when the last of their arrivals was outside, the
+// stale-hate sweep goes on, on its grid, on this life's queue, and the next
+// arrival outside opens no out-of-territory point. Call it once, before the
+// actor is published.
+func (a *Attackable) KeepTerritory(m *TerritoryMemory) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.territory = m
+	outside, due := m.Load()
+	if !outside {
+		return
+	}
+	next, d := NextOnGrid(due, a.now(), ootSweepPeriod)
+	a.territory.Store(true, next)
+	a.armOOTSweepAt(d)
+}
+
 // syncOOTSweepLocked settles the out-of-territory state on an arrival. One
 // inside territory disarms the stale-hate sweep. The first one outside opens
 // the out-of-territory point, then arms the sweep: 100 ms later, then every
 // 10 s on a fixed grid. Nothing else disarms it; the actor's queue closing
-// when it leaves the world cancels it.
+// when it leaves the world cancels this life's firing, and the next life
+// resumes it on its grid (KeepTerritory).
 func (a *Attackable) syncOOTSweepLocked() {
 	if a.actor.InTerritory() {
-		a.ootOutside = false
+		a.territory.Store(false, time.Time{})
 		a.stopOOTSweep()
 		return
 	}
-	if a.ootOutside {
+	if outside, _ := a.territory.Load(); outside {
 		return
 	}
 	a.atHookPoint(HookOutOfTerritory)
 	a.stopOOTSweep()
 	a.armOOTSweep(ootSweepInitialDelay)
-	a.ootOutside = true
 }
 
 // stopOOTSweep cancels the stale-hate sweep's pending firing, if any.
@@ -1314,9 +1339,15 @@ func (a *Attackable) stopOOTSweep() {
 }
 
 // armOOTSweep schedules the next stale-hate sweep d from now on the actor's
-// queue.
+// queue and records the actor outside with that deadline.
 func (a *Attackable) armOOTSweep(d time.Duration) {
-	a.ootDue = a.now().Add(d)
+	a.territory.Store(true, a.now().Add(d))
+	a.armOOTSweepAt(d)
+}
+
+// armOOTSweepAt schedules this life's next stale-hate sweep firing d from
+// now on the actor's queue.
+func (a *Attackable) armOOTSweepAt(d time.Duration) {
 	seq := a.ootSeq
 	a.ootSweep = a.actor.After(d, func() { a.sweepStaleThreats(seq) })
 }
@@ -1333,11 +1364,9 @@ func (a *Attackable) sweepStaleThreats(seq uint64) {
 		return
 	}
 	now := a.now()
-	next := a.ootDue.Add(ootSweepPeriod)
-	for !next.After(now) {
-		next = next.Add(ootSweepPeriod)
-	}
-	a.armOOTSweep(next.Sub(now))
+	_, due := a.territory.Load()
+	_, d := NextOnGrid(due.Add(ootSweepPeriod), now, ootSweepPeriod)
+	a.armOOTSweep(d)
 	if a.actor.InTerritory() {
 		return
 	}
