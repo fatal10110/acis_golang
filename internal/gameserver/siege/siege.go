@@ -72,6 +72,19 @@ const (
 	StatusInProgress
 )
 
+// String names s as the admin castle list shows it.
+func (s Status) String() string {
+	switch s {
+	case StatusRegistrationOpened:
+		return "REGISTRATION_OPENED"
+	case StatusRegistrationOver:
+		return "REGISTRATION_OVER"
+	case StatusInProgress:
+		return "IN_PROGRESS"
+	}
+	return fmt.Sprintf("Status(%d)", uint8(s))
+}
+
 // State is a player's siege state: what UserInfo and the relations show
 // of the side its clan fights on.
 type State int32

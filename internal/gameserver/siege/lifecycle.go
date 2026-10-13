@@ -484,6 +484,14 @@ func (s *Siege) clearPendingLocked() {
 	s.clans = kept
 }
 
+// ClearAll drops every registration and stores it, then registers the
+// castle's owner again.
+func (s *Siege) ClearAll() {
+	s.e.mu.Lock()
+	defer s.e.mu.Unlock()
+	s.clearAllLocked()
+}
+
 // clearAllLocked drops every registration and stores it, then registers
 // the castle's owner again.
 func (s *Siege) clearAllLocked() {
