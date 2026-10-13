@@ -579,3 +579,109 @@ SpawnMaker.checkHasSpawnCondition spawn.Group.Held
 SpawnMaker.onMakerScriptEvent script.Spawner.SendMakerEvent
 SpawnManager.getInstance inline
 SpawnManager.getNpcMaker inline
+
+# Script-facing API freeze, player, creature and skill rows (#3748). A
+# binding is a field of the script (Bind, UsedItems, EnteredZones). The soul
+# crystal data is the table the catalog hands the quest, whose crystal and
+# leveling rows are fields. A quest state's variable reads (MemoSet.get,
+# its presence) go through Get; a creature's inventory is the player
+# handle's; a skill level is a field of
+# its skill.Ref. An NPC's summon animation flag shows in no NPC view, so
+# setting it is no call. Music an NPC plays is bound to it and heard by the
+# players around it. A creature's attack type, strider ride, pet control
+# item and 3D range are package functions over any creature; a party's
+# leader and size are read on a member's player handle.
+AbstractGroup.getLeader script.Player.PartyLeader
+AbstractGroup.getLeaderObjectId script.Player.PartyLeader
+AbstractGroup.isLeader script.Player.IsPartyLeader
+Creature.forceRunStance script.NPC.SetRunning
+Creature.getAttackType script.AttackType
+Creature.getInventory inline
+Creature.isPhysicalMuted script.NPC.PhysicalMuted
+Creature.isRiding script.Riding
+Creature.setRunning script.NPC.SetRunningQuietly
+Creature.setShowSummonAnimation inline
+CreatureAttack.isAttackingNow script.NPC.AttackingNow
+CreatureAttack.stop script.NPC.StopAttack
+CreatureCast.meetsHpMpConditions script.NPC.MeetsHPMPConditions
+CreatureCast.meetsHpMpDisabledConditions script.NPC.MeetsHPMPDisabledConditions
+CreatureStatus.getMaxMp script.NPC.MaxMP
+Inventory.getItemIdFrom script.Player.RightHandItemID
+Item.isStackable script.Script.ItemStackable
+ItemContainer.getItems script.Player.HeldItems
+ItemInstance.getCount script.Player.FirstItemCount
+L2Skill.getEffectId script.SkillInfo.EffectID
+L2Skill.getEffects script.Script.ApplyEffects
+L2Skill.getElement script.SkillInfo.Element
+L2Skill.getLevel inline
+L2Skill.isMagic script.SkillInfo.Magic
+LevelingInfo.absorbCrystalType inline
+LevelingInfo.chanceBreak inline
+LevelingInfo.chanceStage inline
+LevelingInfo.isSkillRequired inline
+LevelingInfo.levelList inline
+MemoSet.containsKey script.QuestState.Get
+MemoSet.get script.QuestState.Get
+MemoSet.getBool script.QuestState.GetBool
+Monster.getSpoilState inline
+Party.getMembersCount script.Player.PartyMembers
+Pet.getControlItemId script.PetControlItemID
+PlaySound.new script.NPC.PlayMusic
+Player.addItem script.Script.AddItems
+Player.destroyItemByItemId script.Script.DestroyItems
+Player.getActingPlayer script.ActingPlayer
+Player.getActiveWeaponInstance script.Player.RightHandItemID
+Player.getApprentice script.Player.Apprentice
+Player.getAttackType script.AttackType
+Player.getClanId script.Player.ClanID
+Player.getMountType script.Player.MountType
+Player.getSponsor script.Player.Sponsor
+Player.isFlying script.Player.Flying
+Player.isHero script.Player.IsHero
+Player.isOverweight script.Player.Overweight
+Player.refreshHennaList script.Player.RefreshHennaList
+Player.setAllianceWithVarkaKetra script.Player.SetVarkaKetraAlliance
+Player.setIsIn7sDungeon script.Player.SetIn7sDungeon
+Player.setNoble script.Player.MakeNoble
+Quest.addItemUse inline
+Quest.addSeeCreature inline
+Quest.addZoneEnter inline
+Quest.getApprentice script.Script.ApprenticeInRange
+Quest.getElapsedTicks script.Script.ElapsedTicks
+Quest.getMemoState script.Script.MemoState
+Quest.getMemoStateEx script.Script.MemoStateEx
+Quest.getSponsor script.Script.SponsorInRange
+Quest.setMemoState script.Script.SetMemoState
+Quest.setMemoStateEx script.Script.SetMemoStateEx
+QuestList.getAllQuests script.Player.StartedQuests
+QuestState.getBool script.QuestState.GetBool
+SoulCrystal.brokenItemId inline
+SoulCrystal.initialItemId inline
+SoulCrystal.level inline
+SoulCrystal.stagedItemId inline
+SoulCrystalData.getInstance inline
+SoulCrystalData.getLevelingInfos item.SoulCrystalTable.LevelingInfo
+SoulCrystalData.getSoulCrystals item.SoulCrystalTable.Crystal
+SpoilState.isActualSpoiler script.NPC.ActualSpoiler
+Summon.getControlItemId script.PetControlItemID
+WorldObject.distance3D script.NPC.Distance3D
+WorldObject.isIn3DRadius script.InRadius3D
+# The NPC chat line a teleport dungeon NPC shouts to the players within a
+# radius of it is one call on the NPC handle; that NpcSay shout is the only
+# form of Creature.broadcastPacketInRadius the handle covers. The
+# siegable-hall system messages broadcast in a radius (FlagWar,
+# RainbowSpringsChateau) have no call yet and are tracked on #3502. A
+# binding a siegable-hall script registers is a field of the script.
+Creature.broadcastPacketInRadius script.NPC.ShoutInRadius
+NpcSay.new script.NPC.ShoutInRadius
+Quest.addClanAttacked inline
+Quest.addNoDesire inline
+Quest.addPartyAttacked inline
+Quest.addPartyDied inline
+
+# Clan reads of the API freeze, residence lane (#3748). The clan and its
+# leader's member record fold into the Player handle calls; the leader is
+# the online player, nil while offline.
+Clan.getClanHallId script.Player.ClanHallID
+Clan.getLeader inline
+ClanMember.getPlayerInstance script.Player.ClanLeader

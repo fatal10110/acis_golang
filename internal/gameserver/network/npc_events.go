@@ -106,6 +106,10 @@ func (s *hostileSink) Emit(ev event.Event) {
 		s.broadcast(func() wire.Frame { return frames.NpcSay(h.ObjectID(), e.NpcID, e.Text, e.Shout) })
 	case event.CameraShotPlayed:
 		s.broadcast(func() wire.Frame { return serverpackets.FrameSpecialCamera(h.ObjectID(), e.Shot) })
+	case event.NpcShout:
+		broadcastInRadius(s.world, h, e.Radius, func() wire.Frame { return frames.NpcSay(h.ObjectID(), e.NpcID, e.Text, true) })
+	case event.MusicPlayed:
+		s.broadcast(func() wire.Frame { return serverpackets.FrameMusicAt(h.ObjectID(), e.File, e.At) })
 	case event.OnScreenMessage:
 		s.broadcast(func() wire.Frame { return serverpackets.FrameExShowScreenMessage(e.Text, e.DurationMs) })
 	case event.ShotRecharged:

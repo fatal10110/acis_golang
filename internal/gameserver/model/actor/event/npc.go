@@ -113,3 +113,13 @@ func (HallSupportCast) event()      {}
 type HeadquartersAttacked struct{}
 
 func (HeadquartersAttacked) event() {}
+
+// NpcShout reports the NPC's chat line Text shouted, named by its NpcID,
+// to the players within Radius of it.
+type NpcShout struct {
+	NpcID  int
+	Text   string
+	Radius int
+}
+
+func (NpcShout) event() {}

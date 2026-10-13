@@ -1,8 +1,10 @@
 package script
 
 import (
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
@@ -35,15 +37,20 @@ func (r *Registry) HostileAttackFinished(h *npc.Hostile, target attackable.Comba
 
 // SeeSpell runs the see-spell hook of every script bound to n's template,
 // in list order: caster, a player, cast sk on targets near n, through its
-// summon when isPet.
-func (r *Registry) SeeSpell(n, caster attackable.Combatant, sk skill.Ref, targets []attackable.Combatant, isPet bool) {
+// summon when isPet. A door among targets is a Door handle, in its place.
+func (r *Registry) SeeSpell(n, caster attackable.Combatant, sk skill.Ref, targets []skilltarget.Actor, isPet bool) {
 	list := r.scripts(npcIDOf(n), EventSeeSpell)
 	if len(list) == 0 {
 		return
 	}
-	seen := make([]Creature, len(targets))
-	for i, t := range targets {
-		seen[i] = creatureOf(t)
+	seen := make([]Creature, 0, len(targets))
+	for _, t := range targets {
+		switch o := t.(type) {
+		case attackable.Combatant:
+			seen = append(seen, creatureOf(o))
+		case *door.Object:
+			seen = append(seen, &Door{obj: o, doors: r.doors})
+		}
 	}
 	e := SeeSpell{NPC: NPCOf(n), Caster: PlayerOf(caster), Skill: sk, Targets: seen, IsPet: isPet}
 	for _, s := range list {

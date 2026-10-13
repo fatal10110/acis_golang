@@ -35,3 +35,16 @@ type SkillCalled struct {
 }
 
 func (SkillCalled) event() {}
+
+// HennaListShown asks for the character's dye list to be shown to it, its
+// dyes' stat bonuses just recomputed.
+type HennaListShown struct{}
+
+func (HennaListShown) event() {}
+
+// NobleGranted asks for the character to become a noblesse: the noble
+// skills, its skill list and UserInfo showing them, the status stored at
+// once.
+type NobleGranted struct{}
+
+func (NobleGranted) event() {}
