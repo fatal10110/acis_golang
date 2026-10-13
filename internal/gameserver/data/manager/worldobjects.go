@@ -33,12 +33,19 @@ type WorldObjects struct {
 	// strife is the Seven Signs state door defences read, installed on
 	// every door built, at boot and by ReloadDoors. Guarded by doorMu.
 	strife door.Strife
+	// sieges are the residence sieges SetDoorSiege installed, by door id,
+	// installed again on every door a reload builds under that id.
+	// Guarded by doorMu.
+	sieges map[int]door.Siege
 
 	// doorMu serializes door state changes, so a flag flip or an HP change
 	// and its geodata, broadcast and timer follow-up land as one step
 	// whichever goroutine (the door timer, the regeneration sweep, a
 	// player's unlock or hit, a reload) makes it. A change looks its door
-	// up under doorMu, so it never lands on a door a reload replaced.
+	// up under doorMu, so it never lands on a door a reload replaced. A
+	// status broadcast under doorMu reads the door's residence siege,
+	// which takes that siege's own lock; a door's death is told to the
+	// siege once doorMu is released.
 	doorMu sync.Mutex
 
 	// doors is replaced whole, under doorMu, by ReloadDoors; lookups read
@@ -165,6 +172,28 @@ func (w *WorldObjects) SetStrife(s door.Strife) {
 	}
 }
 
+// SetDoorSiege makes s the siege of the residence door id belongs to, on
+// the door standing and on every door a reload builds under that id; a
+// nil s removes it.
+func (w *WorldObjects) SetDoorSiege(id int, s door.Siege) {
+	if w == nil {
+		return
+	}
+	w.doorMu.Lock()
+	defer w.doorMu.Unlock()
+	if s == nil {
+		delete(w.sieges, id)
+	} else {
+		if w.sieges == nil {
+			w.sieges = make(map[int]door.Siege)
+		}
+		w.sieges[id] = s
+	}
+	if obj, ok := w.Door(id); ok {
+		obj.SetSiege(s)
+	}
+}
+
 // SetDoorOpen changes a door's open state, applies the matching geodata,
 // broadcasts the change to known observers, reschedules the door's next auto
 // open/close timer from its template's openTime/closeTime/randomTime, and
@@ -219,21 +248,31 @@ func (w *WorldObjects) ToggleDoor(id int) {
 
 // ReduceDoorHP implements door.StateOwner: it takes amount off id's door HP
 // once door.Object.ReduceHP let the hit through, broadcasting the new HP,
-// and breaks the door once less than half a point is left. A broken door
-// takes no more damage.
+// and breaks the door once less than half a point is left, telling its
+// residence once the death is applied. A broken door takes no more damage.
 func (w *WorldObjects) ReduceDoorHP(id int, amount float64) {
+	if broken := w.reduceDoorHP(id, amount); broken != nil {
+		broken.TellBroken()
+	}
+}
+
+// reduceDoorHP is ReduceDoorHP's state change, under doorMu; it returns
+// the door it broke, nil for none.
+func (w *WorldObjects) reduceDoorHP(id int, amount float64) *door.Object {
 	w.doorMu.Lock()
 	defer w.doorMu.Unlock()
 	obj, ok := w.Door(id)
 	if !ok || obj.Dead() {
-		return
+		return nil
 	}
 	if amount > 0 {
 		w.setDoorHP(obj, math.Max(obj.CurrentHP()-amount, 0), true)
 	}
-	if obj.CurrentHP() < 0.5 {
-		w.breakDoor(obj)
+	if obj.CurrentHP() >= 0.5 {
+		return nil
 	}
+	w.breakDoor(obj)
+	return obj
 }
 
 // ReviveDoor stands id's broken door again, as a siege's door respawn does:
@@ -244,7 +283,33 @@ func (w *WorldObjects) ReviveDoor(id int, restoreHP float64) bool {
 	w.doorMu.Lock()
 	defer w.doorMu.Unlock()
 	obj, ok := w.Door(id)
-	if !ok || !obj.Dead() {
+	return ok && w.reviveDoor(obj, restoreHP)
+}
+
+// RespawnDoor stands id's door again as a siege's door respawn does: a
+// broken door revives as ReviveDoor does, regaining restoreHP of its
+// maximum HP; the door closes; then its HP is set to its maximum, or to
+// half of it, rounded down, when weak. Observers see each change as it
+// lands, the HP always.
+func (w *WorldObjects) RespawnDoor(id int, restoreHP float64, weak bool) {
+	w.doorMu.Lock()
+	defer w.doorMu.Unlock()
+	obj, ok := w.Door(id)
+	if !ok {
+		return
+	}
+	w.reviveDoor(obj, restoreHP)
+	w.changeDoorState(obj, false, false)
+	hp := obj.MaxHP()
+	if weak {
+		hp /= 2
+	}
+	w.setDoorHP(obj, float64(hp), true)
+}
+
+// reviveDoor is ReviveDoor on obj; the caller holds doorMu.
+func (w *WorldObjects) reviveDoor(obj *door.Object, restoreHP float64) bool {
+	if !obj.Dead() {
 		return false
 	}
 	obj.SetOpened(obj.Template.Opened)
@@ -370,8 +435,8 @@ func (w *WorldObjects) newDoors(doors *door.Table) (*doorSet, error) {
 // doors that opened close again and stay.
 //
 // Doors are looked up by id when they act, so scripts, clan hall grounds,
-// keys, timers and regeneration reach the new doors. No siege gate is
-// carried over: a new door has none, as one built at boot. A door change
+// keys, timers and regeneration reach the new doors, and so does the
+// residence siege SetDoorSiege installed under a door's id. A door change
 // that comes in during the reload waits for it and lands on the new door.
 func (w *WorldObjects) ReloadDoors(doors *door.Table) error {
 	w.doorMu.Lock()
@@ -427,6 +492,9 @@ func (w *WorldObjects) newDoor(tmpl *door.Template) (*door.Object, error) {
 	obj.SetOwner(w)
 	obj.SetSight(doorSight{geo: w.geo})
 	obj.SetStrife(w.strife)
+	if s, ok := w.sieges[tmpl.ID]; ok {
+		obj.SetSiege(s)
+	}
 	return obj, nil
 }
 

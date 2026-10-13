@@ -19,6 +19,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/rs/zerolog"
@@ -156,6 +157,15 @@ type Notifier interface {
 	// siege: former's members lose the items c's owners wear, and each
 	// noble of owner in the world records the castle in its diary.
 	CastleTaken(c *castle.Castle, owner, former *clan.Clan)
+	// GuardDoors makes s the siege of each door named in gates, and of
+	// whatever door later stands under that door's id.
+	GuardDoors(gates []string, s door.Siege)
+	// CloseDoors closes each door named in gates that stands open.
+	CloseDoors(gates []string)
+	// RespawnDoors stands each door named in gates again: a broken one
+	// revives, each closes, and its HP is set to its maximum, or to half
+	// of it when weak.
+	RespawnDoors(gates []string, weak bool)
 }
 
 // writeTimeout bounds one siege write.
@@ -207,7 +217,9 @@ type counters struct {
 // mu guards every siege and the counters. It is taken before any castle
 // or clan lock and never while holding one; nothing the engine calls
 // while holding it calls back into the engine. The Notifier and the
-// battlefields are called once mu is released.
+// battlefields are called once mu is released. A castle gate's status
+// update takes mu under the world doors' lock (ShowsDoorHP); the engine
+// reaches the doors only through the Notifier, never holding mu.
 type Engine struct {
 	cfg     Config
 	castles *castle.Manager
@@ -290,12 +302,19 @@ func (e *Engine) Restore(ctx context.Context) error {
 }
 
 // Start runs the sieges' calendars on queue from now on, telling the world
-// through notify. A siege whose date has passed is given its next date,
-// stored, and waits for it; any other siege takes its next step a second
-// from now.
+// through notify. Each siege first guards its castle's gates. A siege
+// whose date has passed is given its next date, stored, and waits for it;
+// any other siege takes its next step a second from now.
 func (e *Engine) Start(queue *sim.Queue, notify Notifier) {
 	if e == nil {
 		return
+	}
+	if notify != nil {
+		for _, s := range e.order {
+			if gates := s.castle.Gates; len(gates) > 0 {
+				notify.GuardDoors(gates, s)
+			}
+		}
 	}
 	var fx effects
 	e.mu.Lock()

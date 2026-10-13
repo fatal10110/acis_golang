@@ -4,6 +4,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/boat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/fence"
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
@@ -135,8 +136,8 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 		}
 		p.sendVisibilityFrame(serverpackets.FrameSpawnItem(o))
 	case doorObject:
-		p.sendVisibilityFrame(serverpackets.FrameDoorInfo(o, false))
-		p.sendVisibilityFrame(serverpackets.FrameDoorStatusUpdate(o, false))
+		p.sendVisibilityFrame(serverpackets.FrameDoorInfo(o, o.AttackableBy(p.Character)))
+		p.sendVisibilityFrame(serverpackets.FrameDoorStatusUpdate(o, o.ShowsHP()))
 	case staticObject:
 		p.sendVisibilityFrame(serverpackets.FrameStaticObjectInfo(o))
 	case fenceObject:
@@ -311,6 +312,10 @@ type doorObject interface {
 	MaxHP() int
 	HP() int
 	Damage() int
+	// AttackableBy decides DoorInfo's HP flag for the viewer, ShowsHP
+	// DoorStatusUpdate's.
+	AttackableBy(attacker skilltarget.Actor) bool
+	ShowsHP() bool
 }
 
 type staticObject interface {

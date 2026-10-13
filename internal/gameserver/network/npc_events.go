@@ -296,7 +296,7 @@ func (s *doorSink) Emit(ev event.Event) {
 	var build func() wire.Frame
 	switch ev.(type) {
 	case event.StatusChanged:
-		build = func() wire.Frame { return serverpackets.DoorFrameBuilder{}.StatusUpdate(s.door, false) }
+		build = func() wire.Frame { return serverpackets.DoorFrameBuilder{}.StatusUpdate(s.door, s.door.ShowsHP()) }
 	case event.Revived:
 		build = func() wire.Frame { return serverpackets.FrameRevive(s.door.ObjectID()) }
 	default:
