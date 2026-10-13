@@ -602,16 +602,17 @@ func (inv *Inventory) DropItem(objectID int32, count int, newObjectID int32) *it
 	return inst
 }
 
-// TransferItem moves count units from inv to target and queues inventory
-// updates on inv for the source-side change. A target inventory's Add path
+// TransferItem moves count units from inv to target per Container.Transfer
+// and queues inventory updates on inv for the source-side change, also when
+// the units left inv but nextID failed them. A target inventory's Add path
 // queues its own update.
-func (inv *Inventory) TransferItem(objectID int32, count int, target Receiver, newObjectID int32) (result *item.Instance, freedObjectID int32, freed bool) {
+func (inv *Inventory) TransferItem(objectID int32, count int, target Receiver, nextID func() (int32, error)) (result *item.Instance, freedObjectID int32, freed bool, err error) {
 	if target == nil || count <= 0 {
-		return nil, 0, false
+		return nil, 0, false, nil
 	}
 	source := inv.ItemByObjectID(objectID)
 	if source == nil {
-		return nil, 0, false
+		return nil, 0, false, nil
 	}
 	st := source.Snapshot()
 	templateID := st.TemplateID
@@ -622,9 +623,9 @@ func (inv *Inventory) TransferItem(objectID int32, count int, target Receiver, n
 	}
 
 	moving := &removalFirst{Receiver: target, inv: inv, source: source}
-	result, freedObjectID, freed = inv.Container.Transfer(objectID, count, moving, newObjectID)
-	if result == nil {
-		return nil, 0, false
+	result, freedObjectID, freed, err = inv.Container.Transfer(objectID, count, moving, nextID)
+	if result == nil && err == nil {
+		return nil, 0, false, nil
 	}
 	if remaining := inv.ItemByObjectID(objectID); remaining != nil {
 		inv.queueUpdate(remaining, UpdateModified)
@@ -638,7 +639,7 @@ func (inv *Inventory) TransferItem(objectID int32, count int, target Receiver, n
 		inv.mu.Unlock()
 		inv.fireDelivery()
 	}
-	return result, freedObjectID, freed
+	return result, freedObjectID, freed, err
 }
 
 // removalFirst is a transfer's target that settles the source inventory's

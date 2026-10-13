@@ -213,7 +213,7 @@ func TestInventory_TransferItemPartialQueuesSourceAndTargetUpdates(t *testing.T)
 	source := playerInv.AddNew(1, 100, 0x30000001)
 	playerInv.DrainUpdates()
 
-	result, freedID, freed := playerInv.TransferItem(source.ObjectID, 30, petInv, 0x40000001)
+	result, freedID, freed, _ := playerInv.TransferItem(source.ObjectID, 30, petInv, (&idSource{ids: []int32{0x40000001}}).next)
 	if result == nil || result.ObjectID != 0x40000001 || result.Count != 30 {
 		t.Fatalf("TransferItem() result = %+v, want new pet stack with 30 units", result)
 	}
@@ -245,7 +245,7 @@ func TestInventory_TransferItemFullIntoExistingStackQueuesRemoveAndModify(t *tes
 	playerInv.DrainUpdates()
 	petInv.DrainUpdates()
 
-	result, freedID, freed := playerInv.TransferItem(source.ObjectID, 20, petInv, 0)
+	result, freedID, freed, _ := playerInv.TransferItem(source.ObjectID, 20, petInv, nil)
 	if result != existing {
 		t.Fatalf("TransferItem() result = %+v, want existing pet stack", result)
 	}
@@ -308,14 +308,14 @@ func TestInventory_RemovalDeliveryHearsEveryInstanceThatLeaves(t *testing.T) {
 
 	inv.DestroyItem(stack, 4)
 	inv.DropItem(stack.ObjectID, 2, 0x30000010)
-	inv.TransferItem(stack.ObjectID, 1, other, 0x30000011)
+	inv.TransferItem(stack.ObjectID, 1, other, (&idSource{ids: []int32{0x30000011}}).next)
 	expect("partial changes")
 
 	inv.DestroyItem(single, 1)
 	expect("whole destroy", single.ObjectID)
 	inv.DropItem(dropped.ObjectID, 1, 0)
 	expect("drop", dropped.ObjectID)
-	inv.TransferItem(moved.ObjectID, 1, other, 0)
+	inv.TransferItem(moved.ObjectID, 1, other, nil)
 	expect("transfer", moved.ObjectID)
 	Exchange(inv, other, func(a, b Held) {
 		if _, ok := a.Transfer(traded.ObjectID, 1, b, 0); !ok {

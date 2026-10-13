@@ -273,8 +273,8 @@ type PlayerConfig struct {
 	// body to body; -1 is unlimited. It is the kill reward's party range.
 	PartyRange int
 	// MultipleItemDrop is server.properties MultipleItemDrop: a
-	// non-stackable item auto-looted with a count above one reaches the
-	// party member who takes it as that many instances instead of one.
+	// non-stackable item auto-looted, swept, harvested, extracted or crafted
+	// with a count above one arrives as that many instances instead of one.
 	MultipleItemDrop bool
 }
 

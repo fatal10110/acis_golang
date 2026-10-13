@@ -527,41 +527,48 @@ func (c *Container) DestroyAllItems() {
 	}
 }
 
-// Receiver is a container a transfer moves items into: a stackable item
-// merges into the stack ItemByTemplateID names, anything else arrives
-// through Add or AddNew. A freight container answers both by its active
-// town.
+// Receiver is a container a transfer moves items into: a whole instance
+// arrives through Add, split-off units through AddCreated, and a stackable
+// item merges into the stack ItemByTemplateID names. A freight container
+// answers all three by its active town.
 type Receiver interface {
 	Add(inst *item.Instance) (result *item.Instance, absorbed bool)
-	AddNew(templateID int32, count int, objectID int32) *item.Instance
+	AddCreated(templateID int32, count int, nextID func() (int32, error)) (*item.Instance, error)
 	ItemByTemplateID(templateID int32) *item.Instance
 }
 
+// noObjectID is the nextID of a transfer given none: a move that needs a new
+// instance in its target fails instead of creating one under id 0.
+func noObjectID() (int32, error) { return 0, errNoObjectID }
+
 // Transfer moves count units of the instance identified by objectID from
 // c into target, merging into an existing stack in target when the item
-// is stackable and target already holds one. newObjectID supplies the
-// pre-allocated world id for a brand new instance in target, used only
-// when one must be created (a non-stackable item, or a partial-count
-// transfer of a stackable item into a target that holds none yet);
-// otherwise it's unused. It returns the resulting instance in target
-// (nil if objectID isn't held by c), and reports via freed/freedObjectID
-// an object id the caller must now release — either objectID itself
-// (fully absorbed into an existing target stack or fully destroyed here)
-// or none.
+// is stackable and target already holds one. nextID is asked for an object
+// id only when target must take a new instance (a partial-count transfer
+// of a stackable item into a target that holds none), so units joining a
+// held stack take none; a nil nextID refuses that case. It returns the
+// resulting instance in target (nil if objectID isn't held by c, or with
+// nextID's error when the units left c but no id could be taken for
+// them), and reports via freed/freedObjectID an object id the caller must
+// now release — either objectID itself (fully absorbed into an existing
+// target stack or fully destroyed here) or none.
 //
 // The caller remains responsible for undoing any life-stone augmentation
 // bonus a transferred instance was granting its previous owner — that's
 // stat-engine behavior this package doesn't own.
-func (c *Container) Transfer(objectID int32, count int, target Receiver, newObjectID int32) (result *item.Instance, freedObjectID int32, freed bool) {
+func (c *Container) Transfer(objectID int32, count int, target Receiver, nextID func() (int32, error)) (result *item.Instance, freedObjectID int32, freed bool, err error) {
 	if target == nil || count <= 0 {
-		return nil, 0, false
+		return nil, 0, false, nil
+	}
+	if nextID == nil {
+		nextID = noObjectID
 	}
 
 	c.mu.Lock()
 	src := c.items[objectID]
 	if src == nil {
 		c.mu.Unlock()
-		return nil, 0, false
+		return nil, 0, false, nil
 	}
 	st := src.Snapshot()
 	templateID := st.TemplateID
@@ -582,12 +589,12 @@ func (c *Container) Transfer(objectID int32, count int, target Receiver, newObje
 	src = c.items[objectID]
 	if src == nil {
 		c.mu.Unlock()
-		return nil, 0, false
+		return nil, 0, false, nil
 	}
 	st = src.Snapshot()
 	if st.TemplateID != templateID || st.Count != sourceCount {
 		c.mu.Unlock()
-		return nil, 0, false
+		return nil, 0, false, nil
 	}
 	if count > st.Count {
 		count = st.Count
@@ -595,14 +602,19 @@ func (c *Container) Transfer(objectID int32, count int, target Receiver, newObje
 	if st.Count == count && targetItem == nil {
 		delete(c.items, objectID)
 		c.mu.Unlock()
-		result, _ = target.Add(src)
-		return result, 0, false
+		// A stack target gained since the check absorbs src, whose id is
+		// then free.
+		result, absorbed := target.Add(src)
+		if absorbed {
+			return result, objectID, true, nil
+		}
+		return result, 0, false, nil
 	}
 
 	if st.Count > count {
 		if _, ok := src.ReduceCount(count); !ok {
 			c.mu.Unlock()
-			return nil, 0, false
+			return nil, 0, false, nil
 		}
 	} else {
 		delete(c.items, objectID)
@@ -611,12 +623,10 @@ func (c *Container) Transfer(objectID int32, count int, target Receiver, newObje
 	}
 	c.mu.Unlock()
 
-	if targetItem != nil {
-		result, _ = target.Add(&item.Instance{ObjectID: newObjectID, TemplateID: templateID, Count: count, ManaLeft: -1})
-		return result, freedObjectID, freed
-	}
-
-	return target.AddNew(templateID, count, newObjectID), freedObjectID, freed
+	// The units join target's stack when it still holds one, and only a new
+	// instance takes an id.
+	result, err = target.AddCreated(templateID, count, nextID)
+	return result, freedObjectID, freed, err
 }
 
 // Restore replaces c's contents with persisted item rows at c's location,
