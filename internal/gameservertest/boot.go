@@ -1070,6 +1070,8 @@ type Server struct {
 	// hostileSinks builds the sinks fixture hostile NPCs report to, showing
 	// their views with the link's crests.
 	hostileSinks func(*npc.Hostile) event.Sink
+	// guardedSiege resolves the siege a fixture siege guard defends.
+	guardedSiege func(*npc.Instance) npc.GuardedSiege
 	// rewardParties resolves a kill's party for the hostiles the suite spawns.
 	rewardParties gamemanager.RewardParties
 	// raidKills credits the raid boss kills of the hostiles the suite
@@ -2579,6 +2581,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		castEffects:         gcl.HostileCastEffects(),
 		folkSinks:           gcl.FolkSinks(state, gclConfig.AttackStance),
 		hostileSinks:        gcl.HostileSinks(state, gclConfig.AttackStance),
+		guardedSiege:        gcl.GuardedSiege,
 		rewardParties:       o.rewardParties(gcl),
 		raidKills:           gcl,
 		lootChannels:        o.lootChannels(gcl),

@@ -282,13 +282,14 @@ func (c *Character) AttackDisabled() bool {
 }
 
 // DenyAIAction reports whether this player cannot act on an intention now:
-// dead, teleporting, observing, running a store open for business (buy,
-// sell, package sell, manufacture; not the manage modes), or held by stun,
-// sleep, paralysis, fear, or an immobile-until-attacked effect. Unlike
-// AttackDisabled it ignores flying and fake death, which fail only the
-// attack itself, once in range.
+// dead, teleporting, running a store open for business (buy, sell, package
+// sell, manufacture; not the manage modes), or held by stun, sleep,
+// paralysis, fear, or an immobile-until-attacked effect. Observing is no
+// denial of its own: a viewpoint's observer is held by its paralysis, and a
+// stadium's spectator may walk. Unlike AttackDisabled it ignores flying and
+// fake death, which fail only the attack itself, once in range.
 func (c *Character) DenyAIAction() bool {
-	if c.Dead() || c.ObserverMode() || c.InStoreMode() {
+	if c.Dead() || c.InStoreMode() {
 		return true
 	}
 	live := c.liveLocked()
@@ -886,13 +887,22 @@ func (c *Character) Playable() bool { return true }
 
 // AttackableBy reports whether attacker may attack this player: any living
 // one, fake death included, unless the playable attackability rules refuse
-// a playable attacker (attackable.PlayableRefuses).
+// a playable attacker (attackable.PlayableRefuses). A siege guard may
+// attack it unless its clan owns or defends the siege in progress where it
+// stands.
 func (c *Character) AttackableBy(attacker target.Actor) bool {
 	if c.Dead() {
 		return false
 	}
 	other, ok := attacker.(attackable.Combatant)
-	return !ok || !attackable.PlayableRefuses(c, other)
+	if !ok {
+		return true
+	}
+	if other.SiegeGuard() {
+		x, y, z := c.Position()
+		return !c.DefendsSiegeAt(x, y, z)
+	}
+	return !attackable.PlayableRefuses(c, other)
 }
 
 // AttackableWithoutForceBy reports whether caster may attack c without force:
@@ -900,8 +910,6 @@ func (c *Character) AttackableBy(attacker target.Actor) bool {
 // command channel, clan and alliance rules decide (SocialWithoutForce);
 // otherwise when c and caster both stand inside a PvP zone (each its own
 // membership), or while c has karma or a PvP flag.
-//
-// The siege-side rule (#3375) is not applied yet.
 func (c *Character) AttackableWithoutForceBy(caster target.Actor) bool {
 	if caster == nil || actingPlayerID(caster) == c.ID {
 		return false

@@ -35,9 +35,11 @@ func (t *scrollTarget) IsPet() bool      { return t.isPet }
 type scrollPlayer struct {
 	scrollTarget
 	inSiege, festival, offer, offerForPet bool
+	siegeState                            int32
 }
 
 func (p *scrollPlayer) InSiegeZone() bool         { return p.inSiege }
+func (p *scrollPlayer) SiegeState() int32         { return p.siegeState }
 func (p *scrollPlayer) FestivalParticipant() bool { return p.festival }
 func (p *scrollPlayer) ReviveOffer() (bool, bool) { return p.offer, p.offerForPet }
 func newScrollPlayer(dead bool) *scrollPlayer {
@@ -100,6 +102,15 @@ func TestResurrectionScrollGate(t *testing.T) {
 				return p
 			}(),
 			want: ResurrectionScrollSiege,
+		},
+		{
+			name: "dead siege fighter in a siege zone goes on to the festival check",
+			selected: func() *scrollPlayer {
+				p := newScrollPlayer(true)
+				p.inSiege, p.siegeState, p.festival = true, player.SiegeStateDefender, true
+				return p
+			}(),
+			want: ResurrectionScrollFestival,
 		},
 		{
 			name: "dead festival participant wins over an open offer",

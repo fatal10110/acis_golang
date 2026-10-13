@@ -285,6 +285,9 @@ type Npcs struct {
 	// pickUps takes the ground items live NPCs pick up out of the world;
 	// nil leaves them on the ground. Set once, before any spawn.
 	pickUps npc.GroundTaker
+	// guarded resolves the siege a siege guard defends; nil gives none.
+	// Set once, before any spawn.
+	guarded func(*npc.Instance) npc.GuardedSiege
 }
 
 // SetGroundTaker makes t take the ground items the NPCs spawned from now on
@@ -292,6 +295,12 @@ type Npcs struct {
 func (n *Npcs) SetGroundTaker(t npc.GroundTaker) {
 	n.pickUps = t
 	n.folk.Ground = t
+}
+
+// SetGuardedSieges makes resolve give each siege guard spawned from now on
+// the siege it defends, nil for none. Call it before SpawnOnStart.
+func (n *Npcs) SetGuardedSieges(resolve func(*npc.Instance) npc.GuardedSiege) {
+	n.guarded = resolve
 }
 
 // NewNpcs builds a population that raises no script hook and spawns it at

@@ -123,7 +123,8 @@ func (l *GameClientLink) divorce(live *livePlayer) {
 }
 
 // goToLove teleports live next to its spouse, unless live is not married,
-// the spouse is offline or the spouse's state refuses it.
+// the spouse is offline, or the spouse's state or its clan's castle under
+// siege refuses it.
 func (l *GameClientLink) goToLove(live *livePlayer) {
 	partnerID := l.wedding.PartnerID(live.ObjectID())
 	if partnerID == 0 {
@@ -135,7 +136,7 @@ func (l *GameClientLink) goToLove(live *livePlayer) {
 		sendText(live, wedding.NoticePartnerOffline)
 		return
 	}
-	if notice := wedding.TeleportRefusal(partner.Character); notice != "" {
+	if notice := wedding.TeleportRefusal(partner.Character, l.ownCastleBesieged(partner.ClanID())); notice != "" {
 		sendText(live, notice)
 		return
 	}

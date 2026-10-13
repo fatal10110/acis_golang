@@ -209,6 +209,8 @@ func TestGameExInboundServesExtendedSubOpcodes(t *testing.T) {
 		clientpackets.OpcodeRequestListPartyMatchingWaitingRoom,
 		clientpackets.OpcodeRequestExitPartyMatchingWaitingRoom,
 		clientpackets.OpcodeRequestCursedWeaponLocation,
+		clientpackets.OpcodeRequestOlympiadObserverEnd,
+		clientpackets.OpcodeRequestOlympiadMatchList,
 	} {
 		if _, ok := gameExInbound[sub]; !ok {
 			t.Errorf("gameExInbound has no handler for sub-opcode %#x", sub)

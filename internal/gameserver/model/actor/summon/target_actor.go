@@ -122,12 +122,30 @@ func (a *Actor) CanCastOnPlayable(target skilltarget.Actor, skill *modelskill.De
 // AttackableBy reports whether attacker may attack a: a living summon is
 // attackable by anyone but itself, its owner included, unless the playable
 // attackability rules refuse a playable attacker (attackable.PlayableRefuses).
+// A siege guard may attack it unless its owner's clan owns or defends the
+// siege in progress where a stands.
 func (a *Actor) AttackableBy(attacker skilltarget.Actor) bool {
 	if a.Dead() || sameObject(attacker, a) {
 		return false
 	}
 	other, ok := attacker.(attackable.Combatant)
-	return !ok || !attackable.PlayableRefuses(a, other)
+	if !ok {
+		return true
+	}
+	if other.SiegeGuard() {
+		owner, ok := a.currentOwner().(siegeDefender)
+		if !ok {
+			return true
+		}
+		x, y, z := a.Position()
+		return !owner.DefendsSiegeAt(x, y, z)
+	}
+	return !attackable.PlayableRefuses(a, other)
+}
+
+// siegeDefender is an owner whose clan may own or defend a siege.
+type siegeDefender interface {
+	DefendsSiegeAt(x, y, z int) bool
 }
 
 // ProtectionBlessing reports whether a carries a Blessing of Protection of
@@ -142,9 +160,6 @@ func (a *Actor) ProtectionBlessing() bool {
 // with a's own arena membership; otherwise when a and caster both stand
 // inside a PvP zone (each its own membership), or while the owner has karma
 // or a PvP flag.
-//
-// The siege-side rule (#3375) is not applied yet, the same as for a player
-// target.
 func (a *Actor) AttackableWithoutForceBy(caster skilltarget.Actor) bool {
 	if owner := a.currentOwner(); caster == nil || owner == nil || actingPlayerID(caster) == owner.ObjectID() {
 		return false

@@ -107,7 +107,7 @@ var bypassRoutes = []bypassRoute{
 	{[]string{"Quest "}, (*GameClientLink).bypassQuest},
 	{[]string{"_match"}, (*GameClientLink).bypassHeroFights},
 	{[]string{"_diary"}, (*GameClientLink).bypassHeroDiary},
-	{[]string{"arenachange"}, unportedBypass("olympiad observation (#3356)")},
+	{[]string{"arenachange"}, (*GameClientLink).bypassArenaChange},
 }
 
 // requestBypassToServer routes a clicked HTML link to its command family.
@@ -123,15 +123,6 @@ func (l *GameClientLink) requestBypassToServer(live *livePlayer, req clientpacke
 				return
 			}
 		}
-	}
-}
-
-// unportedBypass answers a command family whose system is not in place
-// yet: the gap is logged and the client released.
-func unportedBypass(system string) func(*GameClientLink, *livePlayer, string) {
-	return func(l *GameClientLink, live *livePlayer, command string) {
-		l.log.Debug().Str("command", command).Str("system", system).Msg("bypass: command family not modeled")
-		live.SendFrame(serverpackets.FrameActionFailed())
 	}
 }
 
@@ -281,6 +272,8 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		l.olympiadNobleBypass(live, f, reply.Index)
 	case npc.BypassClassRanking:
 		l.showClassRanking(live, f, reply.Index)
+	case npc.BypassOlympiadStadiums:
+		l.showOlympiadStadiums(live, f)
 	case npc.BypassSevenSigns:
 		return l.sevenSignsBypass(live, f, command, reply.DawnPriest)
 	case npc.BypassSignsChat:
@@ -362,6 +355,8 @@ func (l *GameClientLink) showTeleports(live *livePlayer, objectID int32, npcID i
 func (l *GameClientLink) departFromNpc(live *livePlayer, trip gatekeeper.Trip) {
 	for _, n := range trip.Notices {
 		switch n := n.(type) {
+		case gatekeeper.CastleBesieged:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotPortVillageInSiege))
 		case gatekeeper.NotEnoughAdena:
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena))
 		case gatekeeper.AdenaSpent:

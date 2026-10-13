@@ -171,6 +171,14 @@ import (
 // player with no tutorial quest state. The tutorial window and its question
 // marks hold no pending action; tests/quest asserts that silence.
 //
+// An arenachange bypass is absent where the reference is silent: a player
+// who neither selected an Olympiad manager last nor watches a stadium, or a
+// stadium number that does not parse or names no stadium. The link click
+// holds no pending action. RequestOlympiadObserverEnd and
+// RequestOlympiadMatchList are absent too: from a player watching nothing
+// the reference sends nothing, the spectator window's buttons holding no
+// pending action. tests/olympiad asserts those silences.
+//
 // RequestSSQStatus for the seal prediction page is absent too: once the
 // competition is over (results, seal validation) the reference sends
 // nothing, and the record window holds no pending action. tests/lifecycle
@@ -208,7 +216,6 @@ func TestGameClientLinkNeverGoesSilentOnActionRequests(t *testing.T) {
 		{"RequestActionUse with an action id no handler claims", encodeRequestActionUse(9999, false, false), []byte{serverpackets.OpcodeActionFailed}},
 		{"RequestActionUse pet command with no active summon", encodeRequestActionUse(16, false, false), []byte{serverpackets.OpcodeActionFailed}},
 		{"Action on the selected player itself (a follow of oneself)", encodeActionOn(self, false), []byte{serverpackets.OpcodeActionFailed}},
-		{"RequestBypassToServer for a command family not modeled yet", encodeRequestBypassToServer("arenachange 0"), []byte{serverpackets.OpcodeActionFailed}},
 		{"RequestShowBoard while the community board is off", encodeRequestShowBoard(), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestBBSwrite while the community board is off", encodeRequestBBSWrite("Mail", "Send"), []byte{serverpackets.OpcodeSystemMessage}},
 		{"RequestGmList with no game master online", wire.NewPacketWriter(clientpackets.OpcodeRequestGmList).Bytes(), []byte{serverpackets.OpcodeSystemMessage, serverpackets.OpcodePlaySound}},

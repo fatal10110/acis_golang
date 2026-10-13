@@ -925,6 +925,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.memos = cfg.Memos
 	link.symbols = symbolmaker.NewService(cfg.HennaTable, link.nextObjectID)
 	link.gatekeeper = gatekeeper.NewService(cfg.Teleports, cfg.InstantTeleports, cfg.FreeTeleport, cfg.TeleportClock)
+	link.gatekeeper.SetCastleSieges(link.castleBesieged)
 	if cfg.SevenSigns != nil {
 		link.gatekeeper.SetGnosisFollower(cfg.SevenSigns.GnosisFollower)
 		signsCfg := signspriest.DefaultConfig()

@@ -131,14 +131,18 @@ func (s *Server) spawnHostileInstance(t *testing.T, inst *npc.Instance, at locat
 	s.installZones(hostile)
 	rewards, hits := gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
 		s.killRewards(), s.itemTable, s.ids, s.GroundItems)
-	hostile.Attach(npc.Runtime{
+	rt := npc.Runtime{
 		World:   s.State,
 		Items:   s.itemTable,
 		Rewards: rewards,
 		Hits:    hits,
 		Sink:    s.hostileSinks(hostile),
 		Scripts: s.quests.registry,
-	})
+	}
+	if hostile.SiegeGuard() {
+		rt.Guarded = s.guardedSiege(inst)
+	}
+	hostile.Attach(rt)
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
 	hostile.EnterZones()
 	return hostile
@@ -455,6 +459,9 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 	// Production takes line of sight from the same geodata (npcs_spawn.go).
 	if los, ok := geo.(npc.LineOfSight); ok {
 		rt.LOS = los
+	}
+	if hostile.SiegeGuard() {
+		rt.Guarded = s.guardedSiege(inst)
 	}
 	hostile.Attach(rt)
 	s.State.Spawn(hostile, at.X, at.Y, at.Z, 0)
