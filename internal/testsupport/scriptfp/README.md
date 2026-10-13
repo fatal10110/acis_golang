@@ -51,7 +51,10 @@ class <key> [extends <parent>]      key: path below scripting/, '.'-separated, a
 - **Calls**: a call whose declaration is in a reference class outside the script trees.
   Receivers are typed statically: parameters, locals, fields, casts, pattern variables,
   the return types of reference methods, and the elements of library collections and maps
-  (for-each variables and lambda parameters included). A row is `Owner.method`, with the
+  (for-each variables and lambda parameters included). A method type variable that a class
+  literal argument binds is that class, for the call's result and for the parameters of a
+  lambda passed as a library functional interface over it
+  (`getKnownTypeInside(Player.class, p -> ...)` walks players). A row is `Owner.method`, with the
   declaring class (`WorldObject.getObjectId` for a player's object id); `Owner.new` for a
   constructor. A method inherited from a library class is counted on the reference class
   that extends it (`MemoSet.get` for a quest state's variable). Calls to library (JDK)

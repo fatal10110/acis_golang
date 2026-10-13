@@ -618,3 +618,10 @@ Quest.addClanAttacked inline
 Quest.addNoDesire inline
 Quest.addPartyAttacked inline
 Quest.addPartyDied inline
+
+# Clan reads of the API freeze, residence lane (#3748). The clan and its
+# leader's member record fold into the Player handle calls; the leader is
+# the online player, nil while offline.
+Clan.getClanHallId script.Player.ClanHallID
+Clan.getLeader inline
+ClanMember.getPlayerInstance script.Player.ClanLeader
