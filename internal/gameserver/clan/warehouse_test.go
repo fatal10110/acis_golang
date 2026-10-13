@@ -41,7 +41,7 @@ func TestWarehouseRightsEndWithMembership(t *testing.T) {
 			}
 		}
 
-		if _, _, res := s.Oust(leader, "Member0", func(int32) *player.Character { return member }, time.Now()); res != Ousted {
+		if _, _, res := s.Oust(leader, "Member0", func(int32) *player.Character { return member }, func(int32) bool { return true }, time.Now()); res != Ousted {
 			t.Fatalf("members=%v: oust = %v, want Ousted", members, res)
 		}
 		writes.drain()

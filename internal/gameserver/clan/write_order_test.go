@@ -222,7 +222,7 @@ func TestOustRacingReputationLevelUpKeepsStoredReputation(t *testing.T) {
 		done = runCompeting(func() { raised = s.RaiseLevel(leader, nil, time.Now()) })
 	}
 
-	if _, _, res := s.Oust(leader, "Member0", func(int32) *player.Character { return nil }, time.Now()); res != Ousted {
+	if _, _, res := s.Oust(leader, "Member0", func(int32) *player.Character { return nil }, func(int32) bool { return true }, time.Now()); res != Ousted {
 		t.Fatalf("oust = %v, want Ousted", res)
 	}
 	<-done
@@ -254,7 +254,7 @@ func TestJoinRacingOustKeepsExpelledMemberOut(t *testing.T) {
 	writes.holdOwner = recruit.ID
 	writes.hook = func() {
 		done = runCompeting(func() {
-			_, _, oust = s.Oust(leader, "Recruit", func(int32) *player.Character { return nil }, time.Now())
+			_, _, oust = s.Oust(leader, "Recruit", func(int32) *player.Character { return nil }, func(int32) bool { return true }, time.Now())
 		})
 	}
 
@@ -288,7 +288,9 @@ func TestCancelNominationRacingOustKeepsPenalty(t *testing.T) {
 	var done chan struct{}
 	writes.holdOwner = orderClanID
 	writes.hook = func() {
-		done = runCompeting(func() { s.Oust(leader, "Member1", func(int32) *player.Character { return nil }, time.Now()) })
+		done = runCompeting(func() {
+			s.Oust(leader, "Member1", func(int32) *player.Character { return nil }, func(int32) bool { return true }, time.Now())
+		})
 	}
 
 	if res := s.CancelNomination(leader); res != NominationCancelled {

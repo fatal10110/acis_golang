@@ -48,7 +48,7 @@ func TestWarehouseGateDropsClanWarehouseOfExpelledMember(t *testing.T) {
 	leader := &player.Character{ID: leaderID}
 	leader.SetName("Leader")
 	leader.SetClanID(clanID)
-	if _, _, res := svc.Oust(leader, "Member", func(int32) *player.Character { return live.Character }, time.Now()); res != clan.Ousted {
+	if _, _, res := svc.Oust(leader, "Member", func(int32) *player.Character { return live.Character }, func(int32) bool { return true }, time.Now()); res != clan.Ousted {
 		t.Fatalf("oust = %v, want Ousted", res)
 	}
 	if live.ClanID() != clanID {

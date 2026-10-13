@@ -2432,7 +2432,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			return o.skills.HasDefinition(modelskill.Ref{ID: modelskill.ID(sk.ID), Level: sk.Level})
 		})
 	}
-	gclConfig.Clans.Table().Restore(clanRows, clanNow, clanConfig.JoinDays)
+	clampedClans := gclConfig.Clans.Table().Restore(clanRows, clanNow, clanConfig.JoinDays)
+	gclConfig.Clans.StoreRestoredReputations(clampedClans)
 	hallOwners, err := clanStore.LoadHallOwners(context.Background())
 	if err != nil {
 		t.Fatalf("load clan hall owners: %v", err)
