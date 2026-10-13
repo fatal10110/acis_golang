@@ -69,6 +69,10 @@ func bootCastleWorld(t *testing.T, castle int, seed func(*sql.DB), extra ...game
 	if err != nil {
 		t.Fatalf("read castle page: %v", err)
 	}
+	list, err := os.ReadFile(datapack.Path(t, "data", "html", "admin", "castles.htm"))
+	if err != nil {
+		t.Fatalf("read castle list: %v", err)
+	}
 	db := sqltest.SharedDB(t)
 	opts := []gameservertest.Option{
 		gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), skills, gamesql.NewCharacterSkillStore(db))),
@@ -77,7 +81,7 @@ func bootCastleWorld(t *testing.T, castle int, seed func(*sql.DB), extra ...game
 		gameservertest.WithWantChars(1),
 		gameservertest.WithCastles(castles),
 		gameservertest.WithAdmin(adminData),
-		gameservertest.WithHTMLPages(map[string]string{"admin/castle.htm": string(page)}),
+		gameservertest.WithHTMLPages(map[string]string{"admin/castle.htm": string(page), "admin/castles.htm": string(list)}),
 		gameservertest.WithReuseDelays(3*time.Second, 0),
 		gameservertest.WithClanSeed(func(db *sql.DB) {
 			for _, s := range []struct {
@@ -355,8 +359,9 @@ func TestAdminCastlePageRestoresStoredCastle(t *testing.T) {
 	if texts, page, _ := gmAnswer(t, gm); len(texts) != 1 || texts[0] != "Usage: //castle [set|remove|certificates|tax castleName]." || page == "" {
 		t.Fatalf("unknown action told %q, page %q", texts, page)
 	}
+	// An alias no castle has opens the castle list.
 	gm, _ = w.castleCommand(t, "set nowhere_castle")
-	if texts, page, failed := gmAnswer(t, gm); len(texts) != 0 || page != "" || !failed {
+	if texts, page, failed := gmAnswer(t, gm); len(texts) != 0 || failed || !strings.Contains(page, "Castles Menu") || !strings.Contains(page, `<a action="bypass -h admin_siege gludio_castle">Gludio Castle</a>`) {
 		t.Fatalf("unknown castle: texts %q, page %q, ActionFailed %v", texts, page, failed)
 	}
 }

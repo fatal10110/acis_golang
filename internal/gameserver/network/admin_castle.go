@@ -25,23 +25,11 @@ const castleCertificates = 300
 //
 // Each then opens the castle's page; an unknown action is answered with
 // the usage first. Without exactly one or two arguments, or with an alias
-// no castle has, the castle list would open instead.
+// no castle has, the castle list opens instead.
 func (l *GameClientLink) adminCastle(gm *livePlayer, line string) {
-	args := handleradmin.Args(line)
-	var param string
-	var c *castle.Castle
-	switch len(args) {
-	case 1:
-		c, _ = l.castles.ByAlias(args[0])
-	case 2:
-		param = args[0]
-		c, _ = l.castles.ByAlias(args[1])
-	}
+	param, c := l.adminCastleArgs(line)
 	if c == nil {
-		// ponytail: the castle list shows each castle's siege status
-		// (#3376).
-		l.log.Warn().Str("command", "admin_castle").Msg("admin: castle list not implemented yet")
-		gm.SendFrame(serverpackets.FrameActionFailed())
+		l.showAdminCastles(gm)
 		return
 	}
 	switch param {
@@ -64,6 +52,22 @@ func (l *GameClientLink) adminCastle(gm *livePlayer, line string) {
 		sendText(gm, "Usage: //castle [set|remove|certificates|tax castleName].")
 	}
 	l.showAdminCastle(gm, c)
+}
+
+// adminCastleArgs reads the [action] <alias> arguments //castle and
+// //siege take: the action ("" without one) and the castle the alias
+// names, nil unless there are exactly one or two arguments and the alias
+// names a castle.
+func (l *GameClientLink) adminCastleArgs(line string) (param string, c *castle.Castle) {
+	args := handleradmin.Args(line)
+	switch len(args) {
+	case 1:
+		c, _ = l.castles.ByAlias(args[0])
+	case 2:
+		param = args[0]
+		c, _ = l.castles.ByAlias(args[1])
+	}
+	return param, c
 }
 
 // adminCastleSet gives c to the clan of gm's selected player. A selection
