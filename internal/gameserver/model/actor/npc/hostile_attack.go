@@ -6,6 +6,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
@@ -400,15 +401,36 @@ func (h *Hostile) BroadcastStatus() {
 	h.SettleRegen()
 }
 
-// AttackableBy reports whether attacker may physically attack this NPC.
+// AttackableBy reports whether attacker may physically attack this NPC. A
+// siege guard may be attacked only by a player, or a player's summon, whose
+// clan attacks the siege in progress of the castle the guard belongs to.
+//
+// ponytail: a guard of a siegable clan hall is attacked the same way during
+// that hall's siege, which waits for the hall siege runtime (#244).
 func (h *Hostile) AttackableBy(attacker skilltarget.Actor) bool {
-	return attacker != nil && attacker.ObjectID() != h.ObjectID() && !h.AlikeDead()
+	if attacker == nil || attacker.ObjectID() == h.ObjectID() || h.AlikeDead() {
+		return false
+	}
+	if !h.SiegeGuard() {
+		return true
+	}
+	var acting any = attacker
+	if attacker.Kind() == actor.KindSummon {
+		owner, ok := attacker.Owner()
+		if !ok || owner == nil {
+			return false
+		}
+		acting = owner
+	} else if attacker.Kind() != actor.KindPlayer {
+		return false
+	}
+	member, ok := acting.(interface{ ClanID() int32 })
+	return ok && h.guarded != nil && h.guarded.Attacking(member.ClanID())
 }
 
 // AttackableWithoutForceBy reports whether a playable may attack this NPC
-// without Ctrl: only a Monster-family NPC that caster may attack. A town
-// Guard and a FriendlyMonster always need Ctrl, and so does a SiegeGuard,
-// which needs a siege in progress (none runs yet) to be attacked at all.
+// without Ctrl: a Monster-family NPC or a siege guard that caster may
+// attack. A town Guard and a FriendlyMonster always need Ctrl.
 func (h *Hostile) AttackableWithoutForceBy(caster skilltarget.Actor) bool {
-	return h.MonsterKind() && h.AttackableBy(caster)
+	return (h.MonsterKind() || h.SiegeGuard()) && h.AttackableBy(caster)
 }

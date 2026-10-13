@@ -3,9 +3,10 @@
 // the clans' siege kills and deaths.
 //
 // Other systems read a siege through a narrow surface: ActiveAt (the siege
-// in progress whose battlefield holds a point), At (the siege whose
-// battlefield holds a point), Get (a castle's siege),
-// Siege.InProgress, Siege.Side, Siege.CheckSides, Siege.OnOppositeSides,
+// in progress whose battlefield holds a point) and the side reads at a
+// point (AttackerAt, DefenderAt, SameSideAt), At (the siege whose
+// battlefield holds a point), Get (a castle's siege), Siege.InProgress,
+// Siege.Attacking, Siege.Side, Siege.CheckSides, Siege.OnOppositeSides,
 // Engine.Registered, the clan rules' reads (Registration, Fighting,
 // Opposed, StateOf) and the kill counters; Forget drops a destroyed clan.
 package siege
@@ -388,6 +389,22 @@ func (e *Engine) AttackerAt(clanID int32, x, y, z int) bool {
 	return ok && s.CheckSides(clanID, SideAttacker)
 }
 
+// DefenderAt reports whether clanID owns or defends the siege in progress
+// whose battlefield holds the point (x, y, z).
+func (e *Engine) DefenderAt(clanID int32, x, y, z int) bool {
+	s, ok := e.ActiveAt(x, y, z)
+	return ok && s.CheckSides(clanID, SideOwner, SideDefender)
+}
+
+// SameSideAt reports whether a siege is in progress whose battlefield holds
+// the point (x, y, z), and the clans a and b are not on opposite sides of
+// it. Two clans of which one is not registered, or no clan at all (0), are
+// never on opposite sides.
+func (e *Engine) SameSideAt(a, b int32, x, y, z int) bool {
+	s, ok := e.ActiveAt(x, y, z)
+	return ok && !s.OnOppositeSides(a, b)
+}
+
 // At returns the siege whose battlefield holds the point (x, y, z), being
 // fought or not.
 func (e *Engine) At(x, y, z int) (*Siege, bool) {
@@ -541,6 +558,14 @@ func (s *Siege) Status() Status {
 
 // InProgress reports whether the siege is being fought.
 func (s *Siege) InProgress() bool { return s.Status() == StatusInProgress }
+
+// Attacking reports whether the siege is being fought and clanID attacks
+// it.
+func (s *Siege) Attacking(clanID int32) bool {
+	s.e.mu.Lock()
+	defer s.e.mu.Unlock()
+	return s.status == StatusInProgress && s.sideLocked(clanID) == SideAttacker
+}
 
 // RegistrationOver reports whether the siege takes no more registrations.
 func (s *Siege) RegistrationOver() bool { return s.Status() != StatusRegistrationOpened }

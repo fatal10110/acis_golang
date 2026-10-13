@@ -886,13 +886,22 @@ func (c *Character) Playable() bool { return true }
 
 // AttackableBy reports whether attacker may attack this player: any living
 // one, fake death included, unless the playable attackability rules refuse
-// a playable attacker (attackable.PlayableRefuses).
+// a playable attacker (attackable.PlayableRefuses). A siege guard may
+// attack it unless its clan owns or defends the siege in progress where it
+// stands.
 func (c *Character) AttackableBy(attacker target.Actor) bool {
 	if c.Dead() {
 		return false
 	}
 	other, ok := attacker.(attackable.Combatant)
-	return !ok || !attackable.PlayableRefuses(c, other)
+	if !ok {
+		return true
+	}
+	if other.SiegeGuard() {
+		x, y, z := c.Position()
+		return !c.DefendsSiegeAt(x, y, z)
+	}
+	return !attackable.PlayableRefuses(c, other)
 }
 
 // AttackableWithoutForceBy reports whether caster may attack c without force:
@@ -900,8 +909,6 @@ func (c *Character) AttackableBy(attacker target.Actor) bool {
 // command channel, clan and alliance rules decide (SocialWithoutForce);
 // otherwise when c and caster both stand inside a PvP zone (each its own
 // membership), or while c has karma or a PvP flag.
-//
-// The siege-side rule (#3375) is not applied yet.
 func (c *Character) AttackableWithoutForceBy(caster target.Actor) bool {
 	if caster == nil || actingPlayerID(caster) == c.ID {
 		return false

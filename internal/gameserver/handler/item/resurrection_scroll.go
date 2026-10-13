@@ -26,7 +26,7 @@ const (
 	// selected.
 	ResurrectionScrollInvalidTarget
 	// ResurrectionScrollSiege means the dead player stands in an active
-	// siege zone without a siege side.
+	// siege zone with no siege state.
 	ResurrectionScrollSiege
 	// ResurrectionScrollFestival means the dead player takes part in a
 	// festival.
@@ -51,6 +51,7 @@ type reviveOfferHolder interface {
 type resurrectionPlayerTarget interface {
 	reviveOfferHolder
 	InSiegeZone() bool
+	SiegeState() int32
 	FestivalParticipant() bool
 }
 
@@ -87,11 +88,10 @@ func ResurrectionScrollGate(userID int32, selected any) ResurrectionScrollRefusa
 	return ResurrectionScrollAllowed
 }
 
-// deadPlayerRefusal checks a dead player target. Standing in an active
-// siege zone is enough to refuse; the reference also requires the target's
-// siege state to be 0, not checked yet (#3375).
+// deadPlayerRefusal checks a dead player target. One standing in an active
+// siege zone with no siege state of its own is refused.
 func deadPlayerRefusal(p resurrectionPlayerTarget) ResurrectionScrollRefusal {
-	if p.InSiegeZone() {
+	if p.InSiegeZone() && p.SiegeState() == 0 {
 		return ResurrectionScrollSiege
 	}
 	if p.FestivalParticipant() {
