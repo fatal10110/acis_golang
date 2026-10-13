@@ -92,7 +92,7 @@ func TestDispatchUnregisteredOpcodeLogsNotImplemented(t *testing.T) {
 // is answered or counted, so the next request's answer is the first frame
 // the client reads.
 func TestUnwiredOpcodesInGameAnswerNothing(t *testing.T) {
-	c, _, _, _, _ := newLinkedGameClientEnterWorld(t)
+	c, _, _, _ := newLinkedGameClientEnterWorld(t)
 
 	for _, op := range unwiredOpcodes {
 		for i := 0; i < maxUnknownPerMin+1; i++ {

@@ -220,7 +220,7 @@ func TestGameExInboundServesExtendedSubOpcodes(t *testing.T) {
 // too short to carry its sub-opcode is dropped without closing the
 // connection and without counting as an unknown packet.
 func TestExtendedFrameWithoutSubOpcodeIsDropped(t *testing.T) {
-	c, _, _, _, _ := newLinkedGameClientEnterWorld(t)
+	c, _, _, _ := newLinkedGameClientEnterWorld(t)
 
 	for i := 0; i < maxUnknownPerMin+5; i++ {
 		c.Send([]byte{clientpackets.OpcodeExtended, 0x01})

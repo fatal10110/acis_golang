@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"errors"
 	"net"
 	"testing"
 	"time"
@@ -10,6 +9,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -85,7 +86,7 @@ func (r *rawClient) read() []byte {
 // and the connection still completes the handshake afterwards.
 func TestAuthLoginAcceptedBeforeProtocolVersion(t *testing.T) {
 	addr, chars, _ := twoClientServer(t)
-	seedSelectableCharacter(t, chars, "player1", "Newbie", 1, 0)
+	seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 1, 0)
 
 	c := dialRaw(t, addr)
 	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
@@ -132,15 +133,13 @@ func TestRequestGameStartUnknownSlotKeepsConnectionOpen(t *testing.T) {
 // the selection without any reply, leaving the connection on the character
 // list.
 func TestRequestGameStartBannedCharacterRefusedSilently(t *testing.T) {
-	c, _, _, _ := newLinkedGameClientWithSkillsSeed(t, nil, func(chars *fakeCharStore, _ *fakeItemStore) {
-		seedSelectableCharacter(t, chars, "player1", "Banned", 1, 0)
-		list, err := chars.ListByAccount(context.Background(), "player1")
-		if err != nil || len(list) != 1 {
-			t.Fatalf("list seeded character: %v (%d)", err, len(list))
+	c, _, _, _ := newLinkedGameClientWithSkillsSeed(t, nil, func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
+		seedSelectableSQLCharacter(t, chars, "player1", "Banned", 1, 0)
+		// Banned before the client ever authenticates, so the character
+		// list it is shown already carries the access level.
+		if found, err := chars.SetAccessLevelByName(context.Background(), "Banned", -100); err != nil || !found {
+			t.Fatalf("ban seeded character: %v (found %v)", err, found)
 		}
-		// Banned before the client ever authenticates, so no server
-		// goroutine can race the mutation.
-		list[0].AccessLevel = -100
 	}, 1)
 
 	c.Send(encodeRequestGameStart(0))
@@ -247,7 +246,7 @@ func TestKnownExtendedOpcodeWhileEnteringCountsTowardDisconnect(t *testing.T) {
 // Go handler exists for it: sending it more than maxUnknownPerMin times
 // must not disconnect the client.
 func TestMappedButUnimplementedOpcodeDoesNotCountAsUnknown(t *testing.T) {
-	c, _, _, _, _ := newLinkedGameClientEnterWorld(t)
+	c, _, _, _ := newLinkedGameClientEnterWorld(t)
 
 	for i := 0; i < maxUnknownPerMin+5; i++ {
 		c.Send(encodeSingleOpcode(clientpackets.OpcodeGameGuardReply))
@@ -265,7 +264,7 @@ func TestMappedButUnimplementedOpcodeDoesNotCountAsUnknown(t *testing.T) {
 // unknown-packet disconnect threshold: the window tolerates maxUnknownPerMin
 // and the next one closes the connection.
 func TestUnknownTopLevelOpcodeCountsTowardDisconnect(t *testing.T) {
-	c, _, _, _, _ := newLinkedGameClientEnterWorld(t)
+	c, _, _, _ := newLinkedGameClientEnterWorld(t)
 
 	for i := 0; i < maxUnknownPerMin; i++ {
 		c.Send(encodeSingleOpcode(0xfe))
@@ -289,7 +288,7 @@ func TestUnknownTopLevelOpcodeCountsTowardDisconnect(t *testing.T) {
 // maxUnderflowsPerMin short packets, and the next one closes the connection
 // with ServerClose as its last frame, ahead of anything detach sends.
 func TestMalformedInGamePacketPastThresholdClosesWithServerClose(t *testing.T) {
-	c, _, _, _, _ := newLinkedGameClientEnterWorld(t)
+	c, _, _, _ := newLinkedGameClientEnterWorld(t)
 
 	for i := 0; i < maxUnderflowsPerMin; i++ {
 		c.Send(encodeSingleOpcode(clientpackets.OpcodeMoveBackwardToLocation))
@@ -312,7 +311,7 @@ func TestMalformedInGamePacketPastThresholdClosesWithServerClose(t *testing.T) {
 // window tolerates maxUnknownPerMin and the next one closes the connection
 // with ServerClose as its last frame.
 func TestUnknownExtendedOpcodeInGameClosesWithServerClose(t *testing.T) {
-	c, _, _, _, _ := newLinkedGameClientEnterWorld(t)
+	c, _, _, _ := newLinkedGameClientEnterWorld(t)
 
 	for i := 0; i < maxUnknownPerMin; i++ {
 		c.Send(encodeUnknownExtendedOpcode())
@@ -334,9 +333,19 @@ func TestUnknownExtendedOpcodeInGameClosesWithServerClose(t *testing.T) {
 // whose character restore fails (here: the item list cannot be read) closes
 // the connection with ServerClose, not a bare EOF, before CharSelected.
 func TestFailedSelectionRestoreClosesWithServerClose(t *testing.T) {
-	c, _, items, _ := newLinkedGameClientSeedOneChar(t)
+	c, _, _, _ := newLinkedGameClientSeedOneChar(t)
 
-	items.failListByOwner(errors.New("items unavailable"))
+	// Take the items table away so the restore's item read fails; put it
+	// back before the pooled database is reset for the next test.
+	db := sqltest.SharedDB(t)
+	if _, err := db.Exec("RENAME TABLE items TO items_unavailable"); err != nil {
+		t.Fatalf("hide items table: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := db.Exec("RENAME TABLE items_unavailable TO items"); err != nil {
+			t.Errorf("restore items table: %v", err)
+		}
+	})
 	c.Send(encodeRequestGameStart(0))
 	if frame := c.Read(); frame[0] != serverpackets.OpcodeServerClose {
 		t.Fatalf("close opcode = %#x, want ServerClose (%#x)", frame[0], serverpackets.OpcodeServerClose)
@@ -375,7 +384,7 @@ func TestRejectedAuthLoginClosesWithServerClose(t *testing.T) {
 // request stays unanswered — reuse timers reach the client unsolicited —
 // while the connection itself remains alive.
 func TestRequestSkillCoolTimeInGameGetsNoReply(t *testing.T) {
-	c, _, _, _, _ := newLinkedGameClientEnterWorld(t)
+	c, _, _, _ := newLinkedGameClientEnterWorld(t)
 
 	c.Send(encodeRequestSkillCoolTime())
 	c.ExpectNoFrame()
@@ -402,30 +411,29 @@ func TestRequestCharacterDeleteUnknownSlotRefreshesListWithoutFailPacket(t *test
 
 // --- helpers ---
 
-func newLinkedGameClientSeedOneChar(t *testing.T) (*testsupport.ScriptedClient, *fakeCharStore, *fakeItemStore, *world.State) {
+func newLinkedGameClientSeedOneChar(t *testing.T) (*testsupport.ScriptedClient, *gamesql.CharacterStore, *gamesql.ItemStore, *world.State) {
 	t.Helper()
-	c, chars, items, _, state := newLinkedGameClientWithSkillsShortcutsSeed(t, nil, nil, func(chars *fakeCharStore, _ *fakeItemStore) {
-		seedSelectableCharacter(t, chars, "player1", "Newbie", 1, 0)
+	c, chars, items, _, state := newLinkedGameClientWithSkillsShortcutsSeed(t, nil, nil, func(chars *gamesql.CharacterStore, _ *gamesql.ItemStore) {
+		seedSelectableSQLCharacter(t, chars, "player1", "Newbie", 1, 0)
 	}, 1)
 	return c, chars, items, state
 }
 
-func newLinkedGameClientEnterWorld(t *testing.T) (*testsupport.ScriptedClient, *fakeCharStore, *fakeItemStore, *fakeShortcutStore, *world.State) {
+func newLinkedGameClientEnterWorld(t *testing.T) (*testsupport.ScriptedClient, *gamesql.CharacterStore, *gamesql.ItemStore, *world.State) {
 	t.Helper()
 	c, chars, items, state := newLinkedGameClientSeedOneChar(t)
-	shortcuts := (*fakeShortcutStore)(nil)
 	c.Send(encodeRequestGameStart(0))
 	c.Read() // SSQInfo
 	c.Read() // CharSelected
 	c.Send(encodeEnterWorld())
 	readEnterWorldBurst(t, c, false)
-	return c, chars, items, shortcuts, state
+	return c, chars, items, state
 }
 
 // twoClientServer wires one game-client listener behind a fake login
 // server, returning its address so several independent clients can connect
 // to the same world state.
-func twoClientServer(t *testing.T) (addr string, chars *fakeCharStore, state *world.State) {
+func twoClientServer(t *testing.T) (addr string, chars *gamesql.CharacterStore, state *world.State) {
 	t.Helper()
 	loginAddr, servers, sessions := newTestLoginServer(t, false)
 	servers.Register(1, testHexID)

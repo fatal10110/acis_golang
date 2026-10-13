@@ -25,7 +25,7 @@ const (
 // while an initialized festival of darkness holds the player; neither system
 // is ported yet, so both conditions are unreachable here.
 func (l *GameClientLink) exitBlockReason(live *livePlayer) exitBlock {
-	if l.enchantService().Selected(live.ObjectID(), live.Inventory()) {
+	if l.enchanting.items.Selected(live.ObjectID(), live.Inventory()) {
 		return exitBlockEnchant
 	}
 	if live.ClassChangeLocked() {

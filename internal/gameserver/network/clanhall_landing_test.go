@@ -9,6 +9,8 @@ import (
 
 	"github.com/rs/zerolog"
 
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -50,7 +52,7 @@ const (
 // to the returned flusher and no tick.
 func newLandingLink(t *testing.T, adena int) (*GameClientLink, *landingFlusher) {
 	t.Helper()
-	store := newFakeItemStore()
+	store := gamesql.NewItemStore(sqltest.SharedDB(t))
 	if adena > 0 {
 		row := item.Instance{ObjectID: landingAdena, TemplateID: item.AdenaID, OwnerID: landingClan, Count: adena, Location: item.LocationClanWarehouse}
 		if err := store.Create(context.Background(), landingClan, row); err != nil {

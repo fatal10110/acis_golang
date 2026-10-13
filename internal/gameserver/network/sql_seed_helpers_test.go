@@ -13,11 +13,23 @@ import (
 // client dials.
 func seedSelectableSQLCharacter(t *testing.T, chars *gamesql.CharacterStore, account, name string, level, sp int) *player.Character {
 	t.Helper()
+	return seedSQLCharacter(t, chars, 100, account, name, level, sp)
+}
+
+// seedSelectableSQLCharacterWithID inserts a level 1 character with object
+// id id on the default test account.
+func seedSelectableSQLCharacterWithID(t *testing.T, chars *gamesql.CharacterStore, id int32, name string) *player.Character {
+	t.Helper()
+	return seedSQLCharacter(t, chars, id, "player1", name, 1, 0)
+}
+
+func seedSQLCharacter(t *testing.T, chars *gamesql.CharacterStore, id int32, account, name string, level, sp int) *player.Character {
+	t.Helper()
 	tmpl, ok := testTemplates(t).Get(0)
 	if !ok {
 		t.Fatal("missing test class template")
 	}
-	ch, err := player.NewCharacter(100, tmpl, account, name, 1, 0, 0, player.SexMale)
+	ch, err := player.NewCharacter(id, tmpl, account, name, 1, 0, 0, player.SexMale)
 	if err != nil {
 		t.Fatalf("seed character: %v", err)
 	}

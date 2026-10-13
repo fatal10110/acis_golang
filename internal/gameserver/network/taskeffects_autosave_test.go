@@ -2,6 +2,8 @@ package network
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -9,6 +11,8 @@ import (
 	"github.com/rs/zerolog"
 
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -25,7 +29,7 @@ import (
 // also sets online = 1), leaving online stuck at 1 for a character that
 // already logged out.
 func TestAutosaveSaveSkipsDetachingSession(t *testing.T) {
-	chars := newFakeCharStore()
+	db, chars := autosaveCharacters(t, 42)
 	state := world.New()
 	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
 
@@ -38,15 +42,15 @@ func TestAutosaveSaveSkipsDetachingSession(t *testing.T) {
 
 	sim.RunOwned(live.Queue(), func() { effects.Save(live) })
 
-	if got := chars.saves(42); got != 0 {
-		t.Fatalf("roster.Save calls for a detaching session = %d, want 0", got)
+	if got := readAutosaveRow(t, db, 42).online; got != 0 {
+		t.Fatalf("online after autosave of a detaching session = %d, want 0 (no save)", got)
 	}
 }
 
 // TestAutosaveSaveRunsForAttachedSession is the control case: a session
 // that has not started detaching still gets its periodic autosave write.
 func TestAutosaveSaveRunsForAttachedSession(t *testing.T) {
-	chars := newFakeCharStore()
+	db, chars := autosaveCharacters(t, 43)
 	state := world.New()
 	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
 
@@ -58,8 +62,8 @@ func TestAutosaveSaveRunsForAttachedSession(t *testing.T) {
 
 	sim.RunOwned(live.Queue(), func() { effects.Save(live) })
 
-	if got := chars.saves(43); got != 1 {
-		t.Fatalf("roster.Save calls for an attached session = %d, want 1", got)
+	if got := readAutosaveRow(t, db, 43).online; got != 1 {
+		t.Fatalf("online after autosave of an attached session = %d, want 1 (saved)", got)
 	}
 }
 
@@ -69,7 +73,7 @@ func TestAutosaveSaveRunsForAttachedSession(t *testing.T) {
 // reference's periodic autosave (GameClient.java store()) persists position
 // in the same write.
 func TestAutosaveSavePersistsPosition(t *testing.T) {
-	chars := newFakeCharStore()
+	db, chars := autosaveCharacters(t, 44)
 	state := world.New()
 	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
 
@@ -82,9 +86,9 @@ func TestAutosaveSavePersistsPosition(t *testing.T) {
 
 	sim.RunOwned(live.Queue(), func() { effects.Save(live) })
 
-	pos := chars.savedPosition(t, 44)
-	if pos.location != (location.Location{X: 100, Y: 200, Z: 300}) || pos.heading != 12345 {
-		t.Fatalf("autosave saved position = %+v heading %d, want (100,200,300) heading 12345", pos.location, pos.heading)
+	row := readAutosaveRow(t, db, 44)
+	if row.location != (location.Location{X: 100, Y: 200, Z: 300}) || row.heading != 12345 {
+		t.Fatalf("autosave saved position = %+v heading %d, want (100,200,300) heading 12345", row.location, row.heading)
 	}
 }
 
@@ -93,14 +97,26 @@ func TestAutosaveSavePersistsPosition(t *testing.T) {
 // after detach's own offline write and leave online stuck at 1 for a
 // character that fully logged out.
 //
-// A hook inside the fake char store's Save blocks the autosave write on its
-// persistence lane (a slow write), detachLivePlayer then runs to completion,
-// and only then is the autosave write released. Detach's saves share the
-// owner's lane, so they wait behind the blocked write and its offline write
-// is the last one recorded. A detach that wrote directly would record
-// "offline" while the autosave write was still blocked.
+// The store holds the autosave write on its persistence lane (a slow write),
+// detachLivePlayer then runs to completion, and only then is the autosave
+// write released. Detach's saves share the owner's lane, so they wait behind
+// the held write and its offline write lands last. A detach that wrote
+// directly would mark the row offline while the autosave write was still
+// held, and the released write would then leave it online.
 func TestAutosaveSaveDoesNotOutraceDetachOfflineWrite(t *testing.T) {
-	chars := newFakeCharStore()
+	db, store := autosaveCharacters(t, 45)
+	if err := store.SetOnline(context.Background(), 45, time.Now().UnixMilli()); err != nil {
+		t.Fatal(err)
+	}
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var held atomic.Bool
+	chars := heldCharacterStore{CharacterStore: store, hold: func(id int32) {
+		if id == 45 && held.CompareAndSwap(false, true) {
+			close(entered)
+			<-release
+		}
+	}}
 	state := world.New()
 	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
 	worker := persist.New(zerolog.Nop())
@@ -109,16 +125,6 @@ func TestAutosaveSaveDoesNotOutraceDetachOfflineWrite(t *testing.T) {
 	live := queuedTestLive(t, 45)
 	state.AddPlayer(live)
 
-	entered := make(chan struct{})
-	release := make(chan struct{})
-	var blocked atomic.Bool
-	chars.saveHook = func(id int32) {
-		if id == 45 && blocked.CompareAndSwap(false, true) {
-			close(entered)
-			<-release
-		}
-	}
-
 	effects := NewTaskEffects(state)
 	effects.SetAutosave(roster, nil, nil, worker, zerolog.Nop())
 	sim.RunOwned(live.Queue(), func() { effects.Save(live) })
@@ -126,18 +132,60 @@ func TestAutosaveSaveDoesNotOutraceDetachOfflineWrite(t *testing.T) {
 
 	link := &GameClientLink{roster: roster, log: zerolog.Nop(), persist: worker}
 	sim.RunOwned(live.Queue(), func() { link.detachLivePlayer(live) })
-	if seq := chars.onlineSequence(45); len(seq) != 0 {
-		t.Fatalf("online-status writes recorded while the autosave write was blocked = %v, want none", seq)
+	if got := readAutosaveRow(t, db, 45).online; got != 1 {
+		t.Fatalf("online while the autosave write was held = %d, want 1 (detach's writes queued behind it)", got)
 	}
 
 	close(release)
 	if err := worker.Flush(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	seq := chars.onlineSequence(45)
-	if len(seq) != 3 || seq[0] != "online" || seq[1] != "online" || seq[2] != "offline" {
-		t.Fatalf("online-status write sequence = %v, want [online online offline]", seq)
+	if got := readAutosaveRow(t, db, 45).online; got != 0 {
+		t.Fatalf("online after detach = %d, want 0 (detach's offline write landed last)", got)
 	}
+}
+
+// heldCharacterStore is the real character store whose Save first runs
+// hold, so a test can keep one write in flight as a slow database would.
+type heldCharacterStore struct {
+	*gamesql.CharacterStore
+	hold func(id int32)
+}
+
+func (s heldCharacterStore) Save(ctx context.Context, st player.SaveState) error {
+	s.hold(st.ID)
+	return s.CharacterStore.Save(ctx, st)
+}
+
+// autosaveCharacters is the character store of t's database with an
+// offline row for each of ids.
+func autosaveCharacters(t *testing.T, ids ...int32) (*sql.DB, *gamesql.CharacterStore) {
+	t.Helper()
+	db := sqltest.SharedDB(t)
+	chars := gamesql.NewCharacterStore(db)
+	for _, id := range ids {
+		seedSelectableSQLCharacterWithID(t, chars, id, fmt.Sprintf("Saved%d", id))
+	}
+	return db, chars
+}
+
+// autosaveRow is what an autosave writes to a characters row that these
+// tests read back.
+type autosaveRow struct {
+	online   int
+	location location.Location
+	heading  int
+}
+
+func readAutosaveRow(t *testing.T, db *sql.DB, id int32) autosaveRow {
+	t.Helper()
+	var row autosaveRow
+	err := db.QueryRowContext(context.Background(), "SELECT online, x, y, z, heading FROM characters WHERE obj_Id = ?", id).
+		Scan(&row.online, &row.location.X, &row.location.Y, &row.location.Z, &row.heading)
+	if err != nil {
+		t.Fatalf("read character %d: %v", id, err)
+	}
+	return row
 }
 
 // queuedTestLive builds an attached player on its own queue, where the
@@ -159,7 +207,7 @@ func queuedTestLive(t *testing.T, id int32) *livePlayer {
 // has entered the world again on a new queue. It must not save the newer
 // session from the old queue.
 func TestAutosaveSaveSkipsANewerSessionOfTheSameCharacter(t *testing.T) {
-	chars := newFakeCharStore()
+	db, chars := autosaveCharacters(t, 46)
 	state := world.New()
 	roster := gamemanager.NewRoster(chars, nil, nil, nil, nil, nil, nil, gamemanager.DefaultDeleteAfter, time.Now)
 
@@ -170,7 +218,7 @@ func TestAutosaveSaveSkipsANewerSessionOfTheSameCharacter(t *testing.T) {
 	effects.SetAutosave(roster, nil, nil, nil, zerolog.Nop())
 	sim.RunOwned(stale.Queue(), func() { effects.Save(stale) })
 
-	if got := chars.saves(46); got != 0 {
-		t.Fatalf("roster.Save calls from a stale session's queue = %d, want 0", got)
+	if got := readAutosaveRow(t, db, 46).online; got != 0 {
+		t.Fatalf("online after autosave from a stale session's queue = %d, want 0 (no save)", got)
 	}
 }
