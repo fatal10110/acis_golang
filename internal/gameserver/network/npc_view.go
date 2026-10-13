@@ -26,12 +26,13 @@ type npcAttackRules interface {
 
 // npcSnapshot is v's stationary view when serverObject is set, its full
 // view otherwise, with the flag it shows no particular viewer. The full view
-// carries the crest l adds to it; a nil l adds none.
+// carries the level and crest l adds to it; a nil l adds neither.
 func npcSnapshot(l *GameClientLink, v npcView, serverObject bool) npcinfo.Snapshot {
 	if serverObject {
 		return v.ServerObjectInfoSnapshot()
 	}
 	s := v.NPCInfoSnapshot()
+	l.addNPCLevel(v, &s)
 	l.addNPCCrest(v, &s)
 	return s
 }

@@ -69,12 +69,18 @@ func behaviorScripts() ([]script.Listing, script.Catalog) {
 // templates, the behavior chain registered and every script draw 0.
 func bootBehaviors(t *testing.T, templates ...*npc.Template) *warriorWorld {
 	t.Helper()
+	return bootBehaviorsWith(t, nil, templates...)
+}
+
+// bootBehaviorsWith is bootBehaviors with extra boot options, applied last.
+func bootBehaviorsWith(t *testing.T, extra []gameservertest.Option, templates ...*npc.Template) *warriorWorld {
+	t.Helper()
 	list, catalog := behaviorScripts()
 	kinds := map[int32]script.NPCKind{}
 	for _, tmpl := range templates {
 		kinds[int32(tmpl.ID)] = script.KindHostile
 	}
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Hunter", 20, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithNPCs(npc.NewTable(templates)),
@@ -82,7 +88,7 @@ func bootBehaviors(t *testing.T, templates ...*npc.Template) *warriorWorld {
 		gameservertest.WithAITask(),
 		gameservertest.WithScriptRand(func(int) int { return 0 }),
 		gameservertest.WithNPCScripts(kinds, list, catalog),
-	)
+	}, extra...)...)
 	c := srv.Client
 	c.Send(encodeGameStart())
 	for i := 0; ; i++ {
@@ -270,8 +276,8 @@ func TestMonsterBehaviorShortRangedMonsterRunsFromItsAttacker(t *testing.T) {
 			if ok != row.runs {
 				t.Fatalf("attacker %d away: flee desire = %+v (%v), want one: %v", row.away, d, ok, row.runs)
 			}
-			if ok && (d.Weight != 10000000 || d.Distance != script.MaxDriftRange || d.FinalTarget.ObjectID() != w.player.ObjectID()) {
-				t.Fatalf("flee desire = %+v, want from the character, %d far, weight 10000000", d, script.MaxDriftRange)
+			if ok && (d.Weight != 10000000 || d.Distance != 200 || d.FinalTarget.ObjectID() != w.player.ObjectID()) {
+				t.Fatalf("flee desire = %+v, want from the character, 200 (the shipped drift range) far, weight 10000000", d)
 			}
 		})
 	}

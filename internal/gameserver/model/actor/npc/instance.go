@@ -26,7 +26,9 @@ type Instance struct {
 	// SpawnHeading is the heading restored when a non-follow arrival lands
 	// exactly on Home.
 	SpawnHeading int
-	// DriftRange overrides the default home radius when positive.
+	// DriftRange is how far around Home the NPC's territory reaches and how
+	// far it strays from Home before it heads back: the configured drift
+	// range the spawn sets, the shipped 200 when not positive.
 	DriftRange int
 	// WalkMode forces walk stance (WalkSpeed, not RunSpeed) instead of the
 	// default run stance every other NPC spawns in (the walker ids that
@@ -124,4 +126,13 @@ func NewInstance(objectID int32, template *Template) (*Instance, error) {
 	}
 
 	return &Instance{ObjectID: objectID, Template: template, Kind: kind}, nil
+}
+
+// MaxDriftRange is the NPC's drift range: DriftRange when positive, else the
+// shipped 200.
+func (inst *Instance) MaxDriftRange() int {
+	if inst.DriftRange > 0 {
+		return inst.DriftRange
+	}
+	return defaultDriftRange
 }
