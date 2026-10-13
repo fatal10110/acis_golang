@@ -40,6 +40,7 @@ func (g policyGraph) AtWar(clanID, targetID int32) bool { return g.wars[[2]int32
 func (policyGraph) ClanCastleID(int32) int32            { return 0 }
 func (policyGraph) ClanHallID(int32) int32              { return 0 }
 func (policyGraph) ClanLevel(int32) int                 { return 0 }
+func (policyGraph) Mentors(int32, int32) (int32, int32) { return 0, 0 }
 func (g policyGraph) InAcademy(_, id int32) bool        { return g.academy[id] }
 
 // cursedPeer is a player holding a cursed weapon; Character itself never

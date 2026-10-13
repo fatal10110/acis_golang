@@ -432,10 +432,10 @@ func (c *Controller) CanCast(target Target, def modelskill.Definition) error {
 	return nil
 }
 
-// MeetsHPMPDisabled checks HP, MP, and mute gates for target and def. It
-// does not apply reuse, item, or line-of-sight checks; those belong to
-// CanCast at commit time.
-func (c *Controller) MeetsHPMPDisabled(target Target, def modelskill.Definition) error {
+// MeetsHPMP checks the MP and HP gates of def's cast at target: the MP
+// its cast and hit take together, then the HP it consumes. Only a missing
+// target is refused for the target's sake.
+func (c *Controller) MeetsHPMP(target Target, def modelskill.Definition) error {
 	if c.actor == nil || target == nil {
 		return ErrInvalidTarget
 	}
@@ -446,6 +446,16 @@ func (c *Controller) MeetsHPMPDisabled(target Target, def modelskill.Definition)
 	}
 	if def.HPConsume > 0 && c.actor.HP() <= def.HPConsume {
 		return ErrNotEnoughHP
+	}
+	return nil
+}
+
+// MeetsHPMPDisabled checks HP, MP, and mute gates for target and def. It
+// does not apply reuse, item, or line-of-sight checks; those belong to
+// CanCast at commit time.
+func (c *Controller) MeetsHPMPDisabled(target Target, def modelskill.Definition) error {
+	if err := c.MeetsHPMP(target, def); err != nil {
+		return err
 	}
 	if def.Magic {
 		if c.actor.MagicMuted() {

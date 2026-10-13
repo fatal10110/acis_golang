@@ -89,6 +89,9 @@ func (p *Player) loc() Loc { return locOf(p) }
 // locOf returns where c stands and the way it faces. A handle on nothing
 // panics.
 func locOf(c Creature) Loc {
+	if d, ok := c.(*Door); ok {
+		return d.loc()
+	}
 	at := combatantOf(c)
 	if at == nil {
 		panic("script: the place of a handle on nothing")

@@ -1,6 +1,8 @@
 package cast
 
 import (
+	"slices"
+
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -13,7 +15,7 @@ const spellSeenRadius = 1000
 // spellWatcher is an NPC whose scripts react to the skills players use: on
 // it, or around it.
 type spellWatcher interface {
-	SeeSpell(caster attackable.Combatant, sk modelskill.Ref, targets []attackable.Combatant, isPet bool)
+	SeeSpell(caster attackable.Combatant, sk modelskill.Ref, targets []skilltarget.Actor, isPet bool)
 	Spelled(caster attackable.Combatant, sk modelskill.Ref)
 }
 
@@ -56,7 +58,7 @@ func spelled(player skilltarget.Actor, def modelskill.Definition, targets []skil
 }
 
 // seeSpell reports player's skill def, cast by caster (the player itself
-// or, when isPet, its summon) on targets, to every NPC within
+// or, when isPet, its summon) on targets, doors included, to every NPC within
 // spellSeenRadius of caster that sees it (see spellUnseen). The hooks run
 // once the scan is done.
 func seeSpell(caster any, player skilltarget.Actor, def modelskill.Definition, targets []skilltarget.Actor, isPet bool) {
@@ -77,12 +79,7 @@ func seeSpell(caster any, player skilltarget.Actor, def modelskill.Definition, t
 	if len(watchers) == 0 {
 		return
 	}
-	seen := make([]attackable.Combatant, 0, len(targets))
-	for _, t := range targets {
-		if c, ok := t.(attackable.Combatant); ok {
-			seen = append(seen, c)
-		}
-	}
+	seen := slices.Clone(targets)
 	ref := modelskill.Ref{ID: def.ID, Level: def.Level}
 	for _, n := range watchers {
 		n.SeeSpell(who, ref, seen, isPet)
