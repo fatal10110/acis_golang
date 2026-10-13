@@ -126,6 +126,9 @@ const (
 	BypassOlympiadNoble
 	// BypassClassRanking shows the month's ranking of class Index.
 	BypassClassRanking
+	// BypassOlympiadStadiums lists the Olympiad stadiums, each a link to
+	// watch it.
+	BypassOlympiadStadiums
 	// BypassSevenSigns runs a Seven Signs priest's or Mammon NPC's
 	// "SevenSigns <n> ..." command for a talker who selected it; see
 	// signspriest.Service.Command. DawnPriest names a Priest of Dawn.
@@ -630,9 +633,8 @@ func commandChars(command string, begin, end int) (string, bool) {
 // other, and stops the handling when the class is missing or does not
 // parse; 4 shows the heroes; 5 asks an elected hero to confirm its claim
 // and 6 claims the status, answering nothing to anyone else; 7 opens the
-// Monument of Heroes' main page. The stadium list (3), whose links watch a
-// stadium, waits for stadium spectating (#3356); any other choice answers
-// nothing.
+// Monument of Heroes' main page; 3 lists the stadiums, whose links watch
+// one. Any other choice answers nothing.
 func (f *Folk) olympiadCommand(pages Pages, talker Talker, command string, reply BypassReply) BypassReply {
 	arg, ok := commandChars(command, 9, 10)
 	if !ok {
@@ -648,7 +650,7 @@ func (f *Folk) olympiadCommand(pages Pages, talker Talker, command string, reply
 	case 2:
 		return classRankingCommand(reply, command)
 	case 3:
-		reply.Outcome = BypassUnported
+		reply.Outcome = BypassOlympiadStadiums
 	case 4:
 		reply.Outcome = BypassHeroList
 	case 5:

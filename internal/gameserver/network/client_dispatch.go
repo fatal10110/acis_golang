@@ -306,6 +306,8 @@ func newGameExInbound() inboundRegistry[uint16] {
 	register(reg, clientpackets.OpcodeRequestListPartyMatchingWaitingRoom, clientpackets.DecodeRequestListPartyMatchingWaitingRoom, whenLive((*GameClientLink).requestListWaitingPlayers))
 	register(reg, clientpackets.OpcodeRequestExitPartyMatchingWaitingRoom, noPayload, (*GameClientLink).handleRequestExitPartyMatchingWaitingRoom)
 	register(reg, clientpackets.OpcodeRequestCursedWeaponLocation, noPayload, whenLiveNoBody((*GameClientLink).sendCursedWeaponLocations))
+	register(reg, clientpackets.OpcodeRequestOlympiadObserverEnd, noPayload, whenLiveNoBody((*GameClientLink).requestOlympiadObserverEnd))
+	register(reg, clientpackets.OpcodeRequestOlympiadMatchList, noPayload, whenLiveNoBody((*GameClientLink).requestOlympiadMatchList))
 	return reg
 }
 

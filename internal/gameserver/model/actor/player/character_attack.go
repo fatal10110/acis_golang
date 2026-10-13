@@ -282,13 +282,14 @@ func (c *Character) AttackDisabled() bool {
 }
 
 // DenyAIAction reports whether this player cannot act on an intention now:
-// dead, teleporting, observing, running a store open for business (buy,
-// sell, package sell, manufacture; not the manage modes), or held by stun,
-// sleep, paralysis, fear, or an immobile-until-attacked effect. Unlike
-// AttackDisabled it ignores flying and fake death, which fail only the
-// attack itself, once in range.
+// dead, teleporting, running a store open for business (buy, sell, package
+// sell, manufacture; not the manage modes), or held by stun, sleep,
+// paralysis, fear, or an immobile-until-attacked effect. Observing is no
+// denial of its own: a viewpoint's observer is held by its paralysis, and a
+// stadium's spectator may walk. Unlike AttackDisabled it ignores flying and
+// fake death, which fail only the attack itself, once in range.
 func (c *Character) DenyAIAction() bool {
-	if c.Dead() || c.ObserverMode() || c.InStoreMode() {
+	if c.Dead() || c.InStoreMode() {
 		return true
 	}
 	live := c.liveLocked()

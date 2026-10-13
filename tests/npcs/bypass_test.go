@@ -310,8 +310,8 @@ func TestBypassRefusedWhileTradeRequestPending(t *testing.T) {
 	}
 }
 
-// TestBypassCommandFamilies pins the families whose systems are not in
-// place: each is answered ActionFailed. A Quest command must be on the
+// TestBypassCommandFamilies pins the answers of the command families to a
+// player at no particular NPC. A Quest command must be on the
 // last page, like an npc_ one, and is dropped silently when it is not, or
 // when the player talked to no NPC about quests (tests/quest pins the
 // rest of it). An
@@ -329,7 +329,10 @@ func TestBypassCommandFamilies(t *testing.T) {
 	for _, command := range []string{"bbs_default", "_bbshome", "_friendlist_0_", "_maillist_0_1_0_", "_block"} {
 		assertAnswer(t, w.bypass(t, command), []byte{serverpackets.OpcodeSystemMessage}, nil, "")
 	}
-	assertAnswer(t, w.bypass(t, "arenachange 1"), releaseOnly, nil, "")
+	// A stadium is watched only from an Olympiad manager's list or while
+	// watching one (tests/olympiad); anyone else's arenachange answers
+	// nothing.
+	assertAnswer(t, w.bypass(t, "arenachange 1"), nil, nil, "")
 	// The manor windows answer only on a manor manager or a castle
 	// chamberlain targeted (tests/npcs/manor_setup_test.go).
 	assertAnswer(t, w.bypass(t, "manor_menu_select?ask=1"), nil, nil, "")
