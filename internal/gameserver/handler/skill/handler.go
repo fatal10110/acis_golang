@@ -637,6 +637,16 @@ func cursed(a Actor) bool {
 	return ok && p.CursedWeaponEquipped()
 }
 
+// actingCursed reports whether the player acting through a, a itself or
+// a summon's owner, wields a cursed weapon.
+func actingCursed(a Actor) bool {
+	if s, ok := a.(Summon); ok {
+		owner, ok := s.SummonOwner().(interface{ CursedWeaponEquipped() bool })
+		return ok && owner.CursedWeaponEquipped()
+	}
+	return cursed(a)
+}
+
 // formulaCasterOf returns a as a formula caster, or nil for a cast
 // participant that is not a creature (a door or a signet effect point).
 // Formula inputs treat a nil caster as one that cannot roll.
