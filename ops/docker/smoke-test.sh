@@ -7,10 +7,10 @@
 #   3. the db service's first start loads the schema through
 #      initdb/10-acis-schema.sh: every table file in a stub datapack is
 #      loaded, and a datapack without tools/full_install.sql makes that
-#      container start exit non-zero. This runs one start through compose
-#      run, which applies no restart policy; under compose up, restart:
-#      always still brings db back healthy with an empty acis database
-#      (#3696).
+#      container start exit non-zero;
+#   4. after such a failed first start under compose up, the restart policy
+#      brings db back serving an empty acis database, and it never reports
+#      healthy: the init script's marker fails the healthcheck.
 #
 # The stub datapack keeps this independent of an aCis_datapack checkout, so
 # it checks the compose mounts and the init script, not the real 65-table
@@ -110,5 +110,35 @@ esac
 echo "$out" | grep -q 'acis schema: .*full_install.sql not found' ||
 	{ echo "$out" >&2; fail "db first start did not name the missing full_install.sql"; }
 echo "smoke: first start without full_install.sql stops the db"
+clean_project
+
+# 4. The same failed first start through compose up, with the real restart
+# policy. restart: always starts db again, the entrypoint skips the schema
+# load over the existing data directory, and the server answers on an empty
+# acis database. It must not report healthy, so the servers that wait for a
+# healthy db never start. Wait until that restarted server answers and its
+# own healthcheck has rejected it on the marker (Docker clears the health
+# log on restart).
+rc=0
+ACIS_DATAPACK_DIR="$work/broken" compose up -d --wait --wait-timeout 120 db >/dev/null 2>&1 || rc=$?
+[ "$rc" -ne 0 ] || fail "compose up --wait reported db healthy after a failed first-start schema load"
+id=$(compose ps -a -q db)
+[ -n "$id" ] || fail "compose up left no db container"
+tries=0
+while :; do
+	state=$(docker inspect -f '{{.RestartCount}} {{.State.Status}} {{.State.Health.Status}}' "$id") ||
+		fail "db container $id is gone"
+	set -- $state
+	[ "$3" != healthy ] || { compose logs db >&2; fail "db reported healthy after a failed first-start schema load"; }
+	if [ "$1" -ge 1 ] && [ "$2" = running ] &&
+		compose exec -T db mariadb -uroot -p"$ACIS_DB_ROOT_PASSWORD" -N -B -e 'SELECT 1' >/dev/null 2>&1 &&
+		docker inspect -f '{{range .State.Health.Log}}{{.Output}}{{end}}' "$id" | grep -q 'acis schema load did not finish'; then
+		break
+	fi
+	tries=$((tries + 1))
+	[ "$tries" -lt 90 ] || { compose logs db >&2; fail "restarted db did not answer and fail its healthcheck on the schema marker (restarts=$1 state=$2 health=$3)"; }
+	sleep 2
+done
+echo "smoke: restarted db over a failed first start stays unhealthy"
 
 echo "smoke: ok"

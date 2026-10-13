@@ -9,16 +9,26 @@
 # and loads its rows. The files have no cross-table references, so their
 # order does not matter.
 #
-# Any failure aborts the image's first-start initialization, so the db
-# container exits instead of serving a database with a partial schema.
-# Recover with `docker compose down -v` (it deletes the volume), fix the
-# datapack mount, and start again.
+# Any failure aborts the image's first-start initialization, so that
+# container start exits. The data directory already exists by then, so the
+# next start (restart: always makes one on its own) skips this script and
+# serves an empty or partial acis database. To keep that database from
+# passing for a seeded one, the script first writes the marker file
+# /var/lib/mysql/.acis-schema-incomplete and removes it only after the last
+# table file loads; the db healthcheck in docker-compose.yml fails while the
+# marker exists, so services that wait for a healthy db never start. Recover
+# with `docker compose down -v` (it deletes the volume), fix the datapack
+# mount, and start again.
 #
 # The body runs in a subshell: the image sources a .sh file that has lost
 # its executable bit, and the subshell keeps this script's shell options and
 # positional parameters out of the entrypoint either way.
 (
 set -u
+
+# Keep in step with the db healthcheck in docker-compose.yml.
+marker=/var/lib/mysql/.acis-schema-incomplete
+: >"$marker" || exit 1
 
 tools=/acis/tools
 sqldir=/acis/sql
@@ -44,6 +54,7 @@ for f in "$@"; do
 	echo "acis schema: loading $f"
 	run_sql "$f" || exit 1
 done
+rm -f "$marker" || exit 1
 echo "acis schema: loaded $# table files into $db"
 )
 # A subshell tested by || would run with set -e disabled, so check its
