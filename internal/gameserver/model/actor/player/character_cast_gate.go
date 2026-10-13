@@ -25,6 +25,13 @@ type SiegeGround interface {
 	// AttackerAt reports whether clanID attacks the siege in progress whose
 	// battlefield holds the point (x, y, z).
 	AttackerAt(clanID int32, x, y, z int) bool
+	// DefenderAt reports whether clanID owns or defends the siege in
+	// progress whose battlefield holds the point (x, y, z).
+	DefenderAt(clanID int32, x, y, z int) bool
+	// SameSideAt reports whether a siege is in progress whose battlefield
+	// holds the point (x, y, z), and the clans a and b are not on opposite
+	// sides of it.
+	SameSideAt(a, b int32, x, y, z int) bool
 }
 
 // SealRules answers the Seven Signs seal rules a character's actions read.

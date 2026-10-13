@@ -21,7 +21,8 @@ func (*withoutForceCaster) Position() (int, int, int) { return 0, 0, 0 }
 
 // TestHostileAttackableWithoutForceOnlyMonsterFamily pins which hostile NPCs
 // a player attacks without Ctrl: every Monster-family kind, while it lives,
-// and never a town Guard, a FriendlyMonster or a SiegeGuard outside a siege.
+// and never a town Guard, a FriendlyMonster or a SiegeGuard outside a siege,
+// which nobody may attack at all.
 func TestHostileAttackableWithoutForceOnlyMonsterFamily(t *testing.T) {
 	t.Parallel()
 	caster := &withoutForceCaster{}
@@ -34,8 +35,8 @@ func TestHostileAttackableWithoutForceOnlyMonsterFamily(t *testing.T) {
 		if got := h.AttackableWithoutForceBy(caster); got != monster {
 			t.Errorf("%s AttackableWithoutForceBy = %v, want %v", kind, got, monster)
 		}
-		if !h.AttackableBy(caster) {
-			t.Errorf("%s AttackableBy = false, want true", kind)
+		if got, want := h.AttackableBy(caster), kind != "SiegeGuard"; got != want {
+			t.Errorf("%s AttackableBy = %v, want %v", kind, got, want)
 		}
 	}
 }

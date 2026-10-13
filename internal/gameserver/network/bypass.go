@@ -355,6 +355,8 @@ func (l *GameClientLink) showTeleports(live *livePlayer, objectID int32, npcID i
 func (l *GameClientLink) departFromNpc(live *livePlayer, trip gatekeeper.Trip) {
 	for _, n := range trip.Notices {
 		switch n := n.(type) {
+		case gatekeeper.CastleBesieged:
+			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageCannotPortVillageInSiege))
 		case gatekeeper.NotEnoughAdena:
 			live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouNotEnoughAdena))
 		case gatekeeper.AdenaSpent:

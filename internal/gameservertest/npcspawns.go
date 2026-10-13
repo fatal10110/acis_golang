@@ -180,6 +180,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 		deps.spawner.Bind(npcs)
 	}
 	npcs.SetGroundTaker(link)
+	npcs.SetGuardedSieges(link.GuardedSiege)
 	link.SetNpcSpawns(npcs)
 	npcs.SpawnOnStart()
 	if deps.sevenSigns != nil {

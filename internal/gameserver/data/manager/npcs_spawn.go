@@ -214,6 +214,9 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	if n.newSink != nil {
 		rt.Sink = n.newSink(hostile)
 	}
+	if n.guarded != nil && hostile.SiegeGuard() {
+		rt.Guarded = n.guarded(inst)
+	}
 	hostile.Attach(rt)
 	if master != nil {
 		// A respawned private is still the private it was: its slot kept

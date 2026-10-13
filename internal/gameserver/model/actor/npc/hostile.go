@@ -85,6 +85,9 @@ type Hostile struct {
 	// ground takes the items this NPC picks up out of the world; nil
 	// leaves them on the ground. Installed by Attach.
 	ground GroundTaker
+	// guarded is the siege a siege guard defends; nil for none. Installed
+	// by Attach.
+	guarded GuardedSiege
 	// sight is what h's tick scan has told its see-creature scripts about.
 	sight sight
 	// interacted latches the first unlock attempt on a chest.
@@ -356,6 +359,16 @@ type Runtime struct {
 	// Slot is the spawn slot that placed the NPC; nil leaves it with no
 	// spawn parameters and a script memory of its own.
 	Slot SpawnSlot
+	// Guarded is the siege of the castle a siege guard belongs to; nil
+	// leaves the guard unattackable.
+	Guarded GuardedSiege
+}
+
+// GuardedSiege is the siege of the castle a siege guard belongs to.
+type GuardedSiege interface {
+	// Attacking reports whether the siege is being fought and clanID
+	// attacks it.
+	Attacking(clanID int32) bool
 }
 
 // Attach installs rt. Call it once, before exposing this NPC to other
@@ -374,6 +387,7 @@ func (h *Hostile) Attach(rt Runtime) {
 	h.hits = rt.Hits
 	h.scripts = rt.Scripts
 	h.ground = rt.Ground
+	h.guarded = rt.Guarded
 	h.bindSpawn(rt.Slot)
 	h.Scratch().setLife(h)
 	if rt.Items == nil {

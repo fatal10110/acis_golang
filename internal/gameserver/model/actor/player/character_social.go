@@ -183,8 +183,8 @@ func (c *Character) CanCastOnPlayable(t target.Actor, skill *modelskill.Definiti
 //
 // Two competitors fighting each other in the same Olympiad match, or two
 // duellists fighting each other, need no force whatever else they share.
-//
-// The siege side rule (#3375) is not applied yet.
+// Two players on the same side of a siege in progress, both on its active
+// battlefield, need force like clan mates (inSameActiveSiegeSide).
 func (c *Character) SocialWithoutForce(self attackable.ArenaMember, attacker target.Actor) (allowed, decided bool) {
 	if c.inSameActiveOlympiadMatch(attacker) || c.inSameActiveDuel(attacker) {
 		return true, true
@@ -194,7 +194,7 @@ func (c *Character) SocialWithoutForce(self attackable.ArenaMember, attacker tar
 	if attackable.InArena(self) && attackable.InArena(attacker) && !sameParty && !sameChannel {
 		return true, true
 	}
-	if sameParty || sameChannel || c.IsInSameClan(attacker) || c.IsInSameAlly(attacker) {
+	if sameParty || sameChannel || c.IsInSameClan(attacker) || c.IsInSameAlly(attacker) || c.inSameActiveSiegeSide(self, attacker) {
 		return false, true
 	}
 	return false, false
@@ -207,9 +207,9 @@ func (c *Character) SocialWithoutForce(self attackable.ArenaMember, attacker tar
 // player not at war, only then.
 //
 // A competitor may cast anything offensive on the player it fights in the
-// same Olympiad match, and a duellist on the player it duels.
-//
-// The siege side rule (#3375) is not applied yet.
+// same Olympiad match, and a duellist on the player it duels. A player on
+// the same side of a siege in progress, both on its active battlefield, is
+// treated as a clan mate (inSameActiveSiegeSide).
 func (c *Character) OffensiveCastAllowed(caster attackable.ArenaMember, t target.Actor, skill *modelskill.Definition, ctrl, mainTarget bool) bool {
 	targetPlayer, ok := socialPeerOf(t)
 	if !ok || targetPlayer.ObjectID() == c.ID {
@@ -224,7 +224,7 @@ func (c *Character) OffensiveCastAllowed(caster attackable.ArenaMember, t target
 		return true
 	}
 	ctrlDamage := ctrl && skill != nil && skill.IsDamage() && mainTarget
-	if sameParty || sameChannel || c.IsInSameClan(t) || c.IsInSameAlly(t) {
+	if sameParty || sameChannel || c.IsInSameClan(t) || c.IsInSameAlly(t) || c.inSameActiveSiegeSide(caster, t) {
 		return ctrlDamage
 	}
 	if caster.InPvPZone() && inPvPZone(t) {

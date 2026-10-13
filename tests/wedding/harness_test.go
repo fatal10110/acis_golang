@@ -56,6 +56,8 @@ type chapelOptions struct {
 	bobbyAdena   int32
 	friends      bool
 	formalOnBoth bool
+	// extra adds boot options.
+	extra []gameservertest.Option
 }
 
 // defaultChapel is a man and a woman, friends, each holding twice the
@@ -81,13 +83,13 @@ func bootChapel(t *testing.T, opts chapelOptions) *chapel {
 		}
 		pages["mods/wedding/"+name] = string(data)
 	}
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Alice", 20, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithHTMLPages(pages),
 		gameservertest.WithWeddingConfig(opts.cfg),
 		gameservertest.WithReuseDelays(0, 0),
-	)
+	}, opts.extra...)...)
 	c := &chapel{srv: srv, alice: srv.Client, aliceID: srv.SoleObjectID(t)}
 	c.bobbyID = srv.SeedCharacterFor(t, "player2", "Bobby", 20, 0).ID
 	if _, err := srv.DB.ExecContext(context.Background(), "UPDATE characters SET sex = ? WHERE obj_Id = ?", int(opts.bobbySex), c.bobbyID); err != nil {
