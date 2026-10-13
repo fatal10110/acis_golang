@@ -101,13 +101,7 @@ func TestLingeringOwnerTeleportBringsSummon(t *testing.T) {
 	if !ok {
 		t.Fatalf("owner = %T, want an online character", obj)
 	}
-	h.srv.SetPlayerInCombat(t, h.ownerID, true)
-	if err := h.client.Close(); err != nil {
-		t.Fatal(err)
-	}
-	h.srv.AdvanceUntil(t, "the server noticing the connection drop", func() bool {
-		return network.ClientDetached(obj)
-	})
+	h.srv.DropInCombat(t, h.ownerID, h.client)
 	if _, ok := h.srv.State.Summon(h.ownerID); !ok {
 		t.Fatal("a lingering owner's pet left the world")
 	}
