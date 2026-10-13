@@ -1079,10 +1079,8 @@ func (a *Attackable) continueCurrent(wasIdle bool) error {
 
 // promoteAndStep promotes the next desire and runs one step of the current
 // intention. A lost attack or cast target ends the step; the pass does not
-// re-select. With nothing promoted (the hit animation holds the selection,
-// or nothing is queued yet before the first periodic cycle), the current
-// intention takes no step, except on a finished swing, whose own think
-// steps it.
+// re-select. With nothing promoted (see promoteNext), the current intention
+// takes no step, except on a finished swing, whose own think steps it.
 func (a *Attackable) promoteAndStep(mode thinkMode) error {
 	promoted := a.promoteNext()
 	if !promoted && mode != thinkAttackFinished {
@@ -1176,8 +1174,8 @@ func (a *Attackable) hasLatch() bool {
 
 // promoteNext picks the latched attack, else the heaviest queued desire,
 // and updates the latch from it. It reports whether anything was promoted:
-// nothing is during the hit animation, with no promotable desire, or when a wander is current
-// and the pick is a wander too.
+// nothing is during the hit animation, with no promotable desire, or when a
+// wander is current and the pick is a wander too.
 //
 // Desire selection always makes the pick current, whatever the current
 // intention is, so a heavier attack on another target, a cast or a walk
@@ -1691,6 +1689,8 @@ func (a *Attackable) doWanderMove() {
 // table drops every attack desire; otherwise a dead attacker's threat hate
 // stops, an attacker the actor no longer knows leaves the table, and either
 // loses its attack desire. The skill hate table drops both kinds of entry.
+// Not knowing an attacker covers one that is off the grid and one whose
+// acting player is invisible.
 func (a *Attackable) refreshCombatMemory() {
 	if a.threats.IsEmpty() {
 		a.desires.RemoveKind(IntentionAttack)
