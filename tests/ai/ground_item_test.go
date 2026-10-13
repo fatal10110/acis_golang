@@ -70,8 +70,8 @@ type groundWorld struct {
 }
 
 // bootGround boots one character in the world with the AI task, the picker
-// behavior and Zariche as a cursed weapon.
-func bootGround(t *testing.T) *groundWorld {
+// behavior and Zariche as a cursed weapon, plus opts.
+func bootGround(t *testing.T, opts ...gameservertest.Option) *groundWorld {
 	t.Helper()
 	log := &folkLog{}
 	catalog := picker(log)
@@ -82,7 +82,7 @@ func bootGround(t *testing.T) *groundWorld {
 	if err != nil {
 		t.Fatalf("NewCursedWeaponTable: %v", err)
 	}
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Hunter", 20, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{pickerTemplate(pickerHostileID, "Monster"), pickerTemplate(pickerFolkID, "Folk")})),
@@ -91,7 +91,7 @@ func bootGround(t *testing.T) *groundWorld {
 		gameservertest.WithCursedWeapons(zariche),
 		gameservertest.WithNPCScripts(map[int32]script.NPCKind{pickerHostileID: script.KindHostile, pickerFolkID: script.KindFolk},
 			[]script.Listing{{Path: "ai.GroundPicker"}}, catalog),
-	)
+	}, opts...)...)
 	c := srv.Client
 	c.Send(encodeGameStart())
 	for i := 0; ; i++ {

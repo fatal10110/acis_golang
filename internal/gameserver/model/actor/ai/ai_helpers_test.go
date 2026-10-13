@@ -369,6 +369,9 @@ func (m *summonMove) MaybeStartFriendlyFollow(target attackable.Combatant, offse
 }
 
 func (recordingMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
+func (recordingMove) MoveStraightToLocation(location.Location) (bool, error) {
+	return false, nil
+}
 
 func (*fakeActor) IdleFollowTarget() attackable.Combatant { return nil }
 

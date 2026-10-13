@@ -124,34 +124,39 @@ func (r *walkerActorRef) TeleportTo(target location.Location) {
 	r.Hostile.TeleportTo(target)
 }
 
-// routeAwareMoveController wraps a Hostile's ai.MoveController so that any
-// AI-initiated movement other than route walking (offensive-follow chase,
-// leash return-home, random walk and escort moves) clears routeMove before it starts — otherwise the
+// routeAwareMoveController wraps a Hostile's ai.AttackableMoveController so
+// that any AI-initiated movement other than route walking (offensive-follow
+// chase, leash return-home, random walk, escort and pick-up moves) clears routeMove before it starts — otherwise the
 // arrived hook would treat that move's completion as a route arrival too,
 // since it fires through the same move.Controller and task.Walker.Arrived
 // has no intention of its own to check.
 type routeAwareMoveController struct {
-	ai.MoveController
+	ai.AttackableMoveController
 	routeMove *atomic.Bool
 }
 
 func (r routeAwareMoveController) MaybeStartOffensiveFollow(target attackable.Combatant, attackRange int) (bool, error) {
 	r.routeMove.Store(false)
-	return r.MoveController.MaybeStartOffensiveFollow(target, attackRange)
+	return r.AttackableMoveController.MaybeStartOffensiveFollow(target, attackRange)
 }
 
 func (r routeAwareMoveController) MoveHome(home location.Location) error {
 	r.routeMove.Store(false)
-	return r.MoveController.MoveHome(home)
+	return r.AttackableMoveController.MoveHome(home)
 }
 
 func (r routeAwareMoveController) MoveToLocation(dest location.Location) (bool, error) {
 	r.routeMove.Store(false)
-	return r.MoveController.MoveToLocation(dest)
+	return r.AttackableMoveController.MoveToLocation(dest)
+}
+
+func (r routeAwareMoveController) MoveStraightToLocation(dest location.Location) (bool, error) {
+	r.routeMove.Store(false)
+	return r.AttackableMoveController.MoveStraightToLocation(dest)
 }
 
 func (r routeAwareMoveController) CanMoveTo(target location.Location) bool {
-	g, ok := r.MoveController.(*move.Controller)
+	g, ok := r.AttackableMoveController.(*move.Controller)
 	return !ok || g.CanMoveTo(target)
 }
 
@@ -186,7 +191,7 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	attackCtl.SetQueue(queue)
 
 	routeMove := &atomic.Bool{}
-	hostile, err := npc.NewHostile(inst, live, routeAwareMoveController{MoveController: moveCtl, routeMove: routeMove}, attackCtl, castDefs)
+	hostile, err := npc.NewHostile(inst, live, routeAwareMoveController{AttackableMoveController: moveCtl, routeMove: routeMove}, attackCtl, castDefs)
 	if err != nil {
 		return nil, nil, err
 	}

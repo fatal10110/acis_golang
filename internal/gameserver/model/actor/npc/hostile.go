@@ -61,7 +61,7 @@ type Hostile struct {
 	spawnBinding
 
 	brain *ai.Attackable
-	move  ai.MoveController
+	move  ai.AttackableMoveController
 	world *world.State
 	// sink receives this NPC's events. Attach installs it before the NPC is
 	// published into world.State; nil drops every event.
@@ -245,7 +245,7 @@ type skillDefinitions interface {
 // current HP/MP are seeded from the calculated maxima. Folk and other
 // non-attackable instance types never reach this constructor, so they never
 // gain stats from template passives.
-func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController, attack ai.AttackController, skills ...skillDefinitions) (*Hostile, error) {
+func NewHostile(inst *Instance, live *creature.Live, movement ai.AttackableMoveController, attack ai.AttackController, skills ...skillDefinitions) (*Hostile, error) {
 	if inst == nil {
 		return nil, errors.New("npc: nil hostile instance")
 	}

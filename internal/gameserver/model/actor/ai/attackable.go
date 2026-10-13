@@ -118,6 +118,16 @@ type MoveController interface {
 	Stop()
 }
 
+// AttackableMoveController is the MoveController of a hostile NPC's AI
+// loop, which also walks to ground items.
+type AttackableMoveController interface {
+	MoveController
+	// MoveStraightToLocation walks straight for a point with path-finding
+	// off: a closed line ends the walk blocked instead of being routed
+	// around.
+	MoveStraightToLocation(location.Location) (bool, error)
+}
+
 // AttackController controls attack requests emitted by the AI loop.
 type AttackController interface {
 	BowCoolingDown() bool
@@ -219,7 +229,7 @@ type intention struct {
 // whole pass there; the pass re-reads what mu guards after each point.
 type Attackable struct {
 	actor  AttackableActor
-	move   MoveController
+	move   AttackableMoveController
 	attack AttackController
 	// hitAnimation is attack's hit-animation report, nil when attack does
 	// not track one.
@@ -323,7 +333,7 @@ type Attackable struct {
 }
 
 // NewAttackable builds an idle hostile NPC AI loop.
-func NewAttackable(actor AttackableActor, move MoveController, attack AttackController) *Attackable {
+func NewAttackable(actor AttackableActor, move AttackableMoveController, attack AttackController) *Attackable {
 	a := &Attackable{
 		actor:          actor,
 		move:           move,

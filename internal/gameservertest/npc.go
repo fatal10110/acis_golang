@@ -606,11 +606,12 @@ type parkedMove struct{}
 func (parkedMove) MaybeStartOffensiveFollow(attackable.Combatant, int) (bool, error) {
 	return false, nil
 }
-func (parkedMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
-func (parkedMove) CanMoveTo(location.Location) bool               { return true }
-func (parkedMove) MoveHome(location.Location) error               { return nil }
-func (parkedMove) Stop()                                          {}
-func (parkedMove) CancelFollow()                                  {}
+func (parkedMove) MoveToLocation(location.Location) (bool, error)         { return false, nil }
+func (parkedMove) MoveStraightToLocation(location.Location) (bool, error) { return false, nil }
+func (parkedMove) CanMoveTo(location.Location) bool                       { return true }
+func (parkedMove) MoveHome(location.Location) error                       { return nil }
+func (parkedMove) Stop()                                                  {}
+func (parkedMove) CancelFollow()                                          {}
 
 // parkedAttack is an AttackController that never attacks.
 type parkedAttack struct{}
