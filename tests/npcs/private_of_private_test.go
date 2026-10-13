@@ -135,3 +135,47 @@ func TestScriptPrivateOfUnlinkedPrivateKeepsSpawnAtMasterDecay(t *testing.T) {
 		t.Fatalf("decayed one-time private still linked %v, in its master's privates %v", pup.Master() != nil, tablet.Minions())
 	}
 }
+
+// A private's private sits in the top master's set, linked to the private
+// that asked for it. When the asking private, let go by the master's death,
+// becomes a master of its own and decays before the master's corpse, it takes
+// only its own set: the private it created earlier stays in the world and
+// keeps its spawn, which still names it.
+func TestScriptPrivateInMasterSetKeepsSpawnAtAskerDecay(t *testing.T) {
+	t.Parallel()
+	w := bootCivilianParty(t, &partyLog{})
+	master := w.spawner.AddSpawn(spawnWolfID, script.Loc{X: w.at.X + 50, Y: w.at.Y, Z: w.at.Z}, false, 0)
+	wolf := spawnedNPC(t, w, spawnWolfID).(*npc.Hostile)
+	asker := w.spawner.CreateOnePrivate(master, spawnTabletID, 0)
+	tablet := spawnedNPC(t, w, spawnTabletID).(*npc.Folk)
+	knight := w.spawner.CreateOnePrivate(asker, spawnPupID, 0)
+	pup := spawnedNPC(t, w, spawnPupID).(*npc.Hostile)
+
+	p := w.liveObject(t, w.player)
+	onPlayerQueue(t, w, func() { wolf.TakeDamage(1_000_000, p) })
+	w.srv.Settle(t)
+	if !wolf.Dead() || tablet.Master() != nil || pup.Master() != nil {
+		t.Fatalf("master dead %v, privates still linked %v/%v; want dead and both let go", wolf.Dead(), tablet.Master() != nil, pup.Master() != nil)
+	}
+
+	clerkH := w.spawner.CreateOnePrivate(asker, spawnClerkID, 0)
+	clerk := spawnedNPC(t, w, spawnClerkID).(*npc.Folk)
+	if !tablet.IsMaster() || !slices.Equal(tablet.Minions(), []npc.PartyMember{clerk}) {
+		t.Fatalf("let-go private master %v with privates %v, want only the new one", tablet.IsMaster(), tablet.Minions())
+	}
+
+	onPlayerQueue(t, w, func() { tablet.TakeDamage(1_000_000, p) })
+	w.srv.Settle(t)
+	if !tablet.Dead() {
+		t.Fatal("the asking private did not die")
+	}
+	onQueueOf(t, tablet, func() { tablet.Decay(w.srv.State, w.srv.NpcSpawns.RespawnHook(tablet.ObjectID())) })
+	w.srv.Settle(t)
+	if !asker.Decayed() || !clerkH.Decayed() || knight.Decayed() {
+		t.Fatalf("asking private gone %v, its own private gone %v, earlier private gone %v; want only the earlier one left",
+			asker.Decayed(), clerkH.Decayed(), knight.Decayed())
+	}
+	if rec, ok := w.srv.NpcSpawns.SpawnOf(pup.ObjectID()); !ok || rec.MasterID != tablet.ObjectID() {
+		t.Fatalf("earlier private's spawn = %+v (%v), want the asking private's private", rec, ok)
+	}
+}

@@ -213,8 +213,9 @@ func (n *Npcs) respawnSlot(key string) {
 // despawnMinions takes master's minions out of the world with it, each
 // decayed on the calling goroutine without waiting for its own queue (the
 // npc package's off-queue delete contract), and drops their spawn slots,
-// those of the privates spawned for master, and those of the gone privates
-// spawned for one of them. An NPC that is no master takes nothing: a linked
+// those of the privates spawned for master that are not in the world, and
+// those of the gone privates spawned for one of them. A live private spawned
+// for any of them sits in another party's set and keeps its spawn. An NPC that is no master takes nothing: a linked
 // private's party privates are its master's.
 func (n *Npcs) despawnMinions(master npc.PartyMember) {
 	if !master.IsMaster() {
@@ -257,7 +258,12 @@ func (n *Npcs) despawnMinions(master npc.PartyMember) {
 			continue
 		}
 		if npc.SameNPC(slot.master, master) {
-			delete(n.slot, key)
+			// A live one was not taken: it sits in another party's set
+			// (master's own master's, joined before a death let master go)
+			// and stays in the world with its spawn.
+			if !n.liveLocked(key) {
+				delete(n.slot, key)
+			}
 			continue
 		}
 		// A taken member's private outside master's set (one it created
