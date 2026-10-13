@@ -20,11 +20,10 @@ type Maker struct {
 // scaleBySpawnMultiplier). Empty Territories, BannedTerritories, Entries and
 // AIParams read as nil.
 //
-// A territory name that resolves to nothing still builds the maker; a
-// maker with no resolvable territory just never
-// finds a spawn position (randomTerritoryPosition already treats a nil or
-// empty Territories the same way), matching that tolerance instead of
-// failing the whole spawnlist load.
+// A territory name that resolves to nothing still builds the maker; a maker
+// with no resolvable territory just never finds a spawn position
+// (randomTerritoryPosition already treats a nil or empty Territories the same
+// way), matching that tolerance instead of failing the whole spawnlist load.
 func NewMaker(m Maker, multiplier float64) *Maker {
 	m.Territories = append([]*Territory(nil), m.Territories...)
 	m.BannedTerritories = append([]*Territory(nil), m.BannedTerritories...)

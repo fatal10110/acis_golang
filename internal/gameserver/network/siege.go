@@ -255,14 +255,13 @@ func (l *GameClientLink) siegeFlagPvP(a zone.Actor) {
 	za.leftBattlefield = true
 }
 
-// siegeBanisher teleports a player thrown off field to its town restart
-// point, on the player's own queue, so after
-// the siege has taken its next step. Its outcome is that of a teleport
-// made in place: thrown off as the siege starts, before field
-// turns on, the player gets no combat notice or flag; thrown off while
-// field is on, at the end of the siege or as the castle changes hands, it
-// leaves a battlefield under siege and is flagged, even when field has
-// turned off by the time the teleport runs.
+// siegeBanisher teleports a player thrown off field to its town restart point,
+// on the player's own queue, so after the siege has taken its next step. Its
+// outcome is that of a teleport made in place: thrown off as the siege starts,
+// before field turns on, the player gets no combat notice or flag; thrown off
+// while field is on, at the end of the siege or as the castle changes hands, it
+// leaves a battlefield under siege and is flagged, even when field has turned
+// off by the time the teleport runs.
 func (l *GameClientLink) siegeBanisher(field *zone.Siege) func(zone.Actor) {
 	return func(a zone.Actor) {
 		za, ok := a.(*liveZoneActor)

@@ -312,14 +312,13 @@ func (c *Controller) MaybeStartFriendlyFollow(target attackable.Combatant, offse
 	return c.maybeStartFollow(target, offset, FollowFriendly, false, false, nil, false)
 }
 
-// MaybeStartEntranceFollow is MaybeStartFriendlyFollow for a follow that
-// never walks after target: a summon following anyone but its owner
-// heads for a boat entrance instead. The
-// follow is armed alike, but a target out of reach is not walked to: its
-// position is returned with true, for the caller to route the actor through
-// a boat entrance toward it. A target in reach, or one the actor cannot
-// follow, returns false; an actor that cannot move arms nothing, leaving a
-// follow already running toward target untouched.
+// MaybeStartEntranceFollow is MaybeStartFriendlyFollow for a follow that never
+// walks after target: a summon following anyone but its owner heads for a boat
+// entrance instead. The follow is armed alike, but a target out of reach is not
+// walked to: its position is returned with true, for the caller to route the
+// actor through a boat entrance toward it. A target in reach, or one the actor
+// cannot follow, returns false; an actor that cannot move arms nothing, leaving
+// a follow already running toward target untouched.
 func (c *Controller) MaybeStartEntranceFollow(target attackable.Combatant, offset int) (location.Location, bool) {
 	disabled := c.self.MovementDisabled()
 	c.mu.Lock()

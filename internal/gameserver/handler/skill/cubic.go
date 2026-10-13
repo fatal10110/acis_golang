@@ -15,7 +15,7 @@ type servitorSummoner interface {
 	SummonServitor(modelskill.Definition)
 }
 
-// cubicHandler applies either branch of a SkillType.SUMMON cast: a servitor
+// cubicHandler applies either branch of a SUMMON-type skill cast: a servitor
 // for non-cubic skills, or a cubic refresh for cubic skills.
 type cubicHandler struct{}
 

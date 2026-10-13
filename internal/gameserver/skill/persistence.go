@@ -353,16 +353,15 @@ func (p *Persistence) RemoveAllSkills(c *player.Character) {
 // ReplayEffects reinstates every effect Restore recorded into c's restore
 // registry (via RestoreSkillEffect) onto c's live effect list, at the tick
 // count and elapsed time it had at logout, run on from its restore instant.
-// Call once c.EffectList() is attached, after Restore itself: Restore
-// records restored effects into the registry only, so a character not yet
-// in the world sends nothing for them — this replay is what actually fires
-// their OnStart, schedules their ticks from the restored count and time,
-// and surfaces their icons, with one icon refresh for the whole replay, as
-// EnterWorld sends one. An effect whose ticks run an
-// action runs those of the ticks due between the restore and the replay, in
-// time order across all the effects, on c; one that ran out in between is
-// not reinstated. A session
-// that ends before EnterWorld replays them too, ahead of its saves.
+// Call once c.EffectList() is attached, after Restore itself: Restore records
+// restored effects into the registry only, so a character not yet in the world
+// sends nothing for them — this replay is what actually fires their OnStart,
+// schedules their ticks from the restored count and time, and surfaces their
+// icons, with one icon refresh for the whole replay, as EnterWorld sends one.
+// An effect whose ticks run an action runs those of the ticks due between the
+// restore and the replay, in time order across all the effects, on c; one that
+// ran out in between is not reinstated. A session that ends before EnterWorld
+// replays them too, ahead of its saves.
 func (p *Persistence) ReplayEffects(c *player.Character) {
 	if p == nil || c == nil {
 		return

@@ -126,13 +126,12 @@ func (l *GameClientLink) restartRestoreExp(live *livePlayer, requestType int32) 
 	return l.hallFunctions.Level(hallID, hallmodel.FuncRestoreExp)
 }
 
-// restartDestination is where a restart, recall or other teleport to town
-// sends live, jailed or not, past the residence branches: during a siege
-// in progress at live's position,
-// while Dawn holds the Seal of Strife in seal validation, a random spawn of
-// the besieged castle, a CHAOTIC one for a player with karma and an OTHER
-// one otherwise; else live's nearest town restart point. A castle listing
-// no such spawn falls back to the nearest town.
+// restartDestination is where a restart, recall or other teleport to town sends
+// live, jailed or not, past the residence branches: during a siege in progress
+// at live's position, while Dawn holds the Seal of Strife in seal validation, a
+// random spawn of the besieged castle, a CHAOTIC one for a player with karma
+// and an OTHER one otherwise; else live's nearest town restart point. A castle
+// listing no such spawn falls back to the nearest town.
 //
 // ponytail: the FlagWar clan restart point of a clan hall siege waits for
 // the hall sieges (#244).

@@ -17,12 +17,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-// DataReloads re-read the data tables //reload names
-// and the spawn list //respawnall reloads. A hook that returns only an error
-// reads its files and swaps the loaded table in place for every holder,
-// keeping the table as it was when the files cannot be read; a nil hook
-// leaves its table as booted, and //reload answers its type as not ported
-// yet.
+// DataReloads re-read the data tables //reload names and the spawn list
+// //respawnall reloads. A hook that returns only an error reads its files and
+// swaps the loaded table in place for every holder, keeping the table as it was
+// when the files cannot be read; a nil hook leaves its table as booted, and
+// //reload answers its type as not ported yet.
 type DataReloads struct {
 	// Admin reloads the access levels and admin commands.
 	Admin func() error
@@ -51,8 +50,8 @@ type DataReloads struct {
 	BuyLists func() (*buylist.Table, error)
 	// Crests reloads the crest images.
 	Crests func() error
-	// CursedWeapons reads the cursed weapons anew,
-	// which the link then takes in place of the ones it had.
+	// CursedWeapons reads the cursed weapons anew, which the link then takes in
+	// place of the ones it had.
 	CursedWeapons func() (*entity.CursedWeaponTable, error)
 	// Doors reads the doors anew, which then replace the doors in the
 	// world.

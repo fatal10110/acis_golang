@@ -31,12 +31,11 @@ const (
 	restartNoPoint
 )
 
-// effectiveRestartType is the restart type a request of requestType by
-// live resolves as: a jailed player always
-// restarts in the jail and a festival participant where they fell, whatever
-// type they asked for. Only this request forces the jail; every other town
-// teleport (//sendhome, a starved flying mount, a boss-zone ejection) still
-// sends a jailed player to the nearest town.
+// effectiveRestartType is the restart type a request of requestType by live
+// resolves as: a jailed player always restarts in the jail and a festival
+// participant where they fell, whatever type they asked for. Only this request
+// forces the jail; every other town teleport (//sendhome, a starved flying
+// mount, a boss-zone ejection) still sends a jailed player to the nearest town.
 func effectiveRestartType(live *livePlayer, requestType int32) int32 {
 	switch {
 	case live.Jailed():

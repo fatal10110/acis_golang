@@ -62,8 +62,8 @@ const (
 	FlagFakeDeath
 )
 
-// magicCircleAbnormalMask is AbnormalEffect.MAGIC_CIRCLE's client bitmask,
-// ClanGate's abnormal-effect icon.
+// magicCircleAbnormalMask is the client's magic-circle abnormal-effect
+// bitmask, ClanGate's abnormal-effect icon.
 const magicCircleAbnormalMask = 0x800000
 
 // clanGateOpener is a ClanGate target that tells the other online members
@@ -749,10 +749,9 @@ func (e *Effect) DecreaseForce(list *List, reapply func(level int)) {
 	}
 }
 
-// IncreasePower grows a live seed effect's charge level by one in place:
-// unlike a fusion effect's
-// IncreaseEffect, the same instance keeps running — only its Level (power)
-// changes, nothing is removed or reapplied.
+// IncreasePower grows a live seed effect's charge level by one in place: unlike
+// a fusion effect's IncreaseEffect, the same instance keeps running — only its
+// Level (power) changes, nothing is removed or reapplied.
 func (e *Effect) IncreasePower() {
 	if e == nil {
 		return

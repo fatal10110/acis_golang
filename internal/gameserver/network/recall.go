@@ -5,11 +5,10 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 )
 
-// recallLivePlayer takes live where a recall skill sends it: a castle
-// recall lands at a
-// random OWNER spawn of the castle live's clan owns, or of the castle
-// besieged at live's position when its clan owns or defends it; a clan hall
-// recall at one of the hall live's clan owns; any other recall, or one
+// recallLivePlayer takes live where a recall skill sends it: a castle recall
+// lands at a random OWNER spawn of the castle live's clan owns, or of the
+// castle besieged at live's position when its clan owns or defends it; a clan
+// hall recall at one of the hall live's clan owns; any other recall, or one
 // finding no such residence, goes to town (restartDestination). A residence
 // with no OWNER spawn moves no one.
 //

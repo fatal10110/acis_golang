@@ -30,7 +30,7 @@ const (
 
 // summonCreatureSkillRef is the fixed SUMMON_CREATURE skill id/level every
 // pet-collar item casts, independent of which collar was used — the collar
-// only selects the npc template via SummonItemData.
+// only selects the npc template through its summon-items entry.
 var summonCreatureSkillRef = skillref.Ref{ID: 2046, Level: 1}
 
 // useSummonItem triggers the SUMMON_CREATURE cast for a pet-collar item,

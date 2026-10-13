@@ -230,13 +230,12 @@ func cursedOverallTime(w cursedweapon.Info) string {
 	return strconv.Itoa(days) + "d. " + strconv.Itoa(hours) + "h. " + strconv.Itoa(mins) + "m."
 }
 
-// reloadCursedWeapons answers //reload cw:
-// every weapon ends, out or not, each told to every player as it would be
-// at the end of its life, and the weapons are read anew from
-// cursedWeapons.xml, none of them out. A holder has the end applied on its
-// own queue, the game master included. With cursed weapons disabled there
-// is nothing to reload. A file that cannot be read leaves every weapon as
-// it was.
+// reloadCursedWeapons answers //reload cw: every weapon ends, out or not, each
+// told to every player as it would be at the end of its life, and the weapons
+// are read anew from cursedWeapons.xml, none of them out. A holder has the end
+// applied on its own queue, the game master included. With cursed weapons
+// disabled there is nothing to reload. A file that cannot be read leaves every
+// weapon as it was.
 func (l *GameClientLink) reloadCursedWeapons() error {
 	if l.cursed == nil {
 		return nil

@@ -14,8 +14,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-// cubicCastDelay is Cubic.CAST_DELAY: the fixed delay between a cubic's
-// visible MagicSkillUse broadcast and its effect actually landing.
+// cubicCastDelay is the fixed delay between a cubic's visible MagicSkillUse
+// broadcast and its effect actually landing.
 const cubicCastDelay = 2 * time.Second
 
 func (l *GameClientLink) syncCubicTargets(caster *livePlayer, result actorcast.EffectResult, def modelskill.Definition) {
@@ -158,17 +158,16 @@ func (live *livePlayer) cubicStillActive(id cubic.ID, runtime *cubic.Runtime) bo
 	return live.cubics[id] == runtime
 }
 
-// fireCubic runs one action tick for live's cubic id: a dead owner stops
-// the cubic outright rather than
-// firing; for a non-Life cubic, going out of combat stance stops the action
-// tick outright (StopAction) rather than firing, otherwise the granting
-// skill's activation chance, a random skill among the cubic's fixed set,
-// and the target are resolved by cast.DecideCubicFire. The Life Cubic
-// instead always tries its single heal skill against cast.DecideLifeCubicTarget
-// and ignores the combat-stance gate entirely. Target selection, activation
-// rolls, and the heal formula are domain decisions (model/actor/cast); this
-// function only resolves session/world context, calls those decisions, and
-// translates the outcome into packets.
+// fireCubic runs one action tick for live's cubic id: a dead owner stops the
+// cubic outright rather than firing; for a non-Life cubic, going out of combat
+// stance stops the action tick outright (StopAction) rather than firing,
+// otherwise the granting skill's activation chance, a random skill among the
+// cubic's fixed set, and the target are resolved by cast.DecideCubicFire. The
+// Life Cubic instead always tries its single heal skill against
+// cast.DecideLifeCubicTarget and ignores the combat-stance gate entirely.
+// Target selection, activation rolls, and the heal formula are domain decisions
+// (model/actor/cast); this function only resolves session/world context, calls
+// those decisions, and translates the outcome into packets.
 func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic.Runtime) {
 	if live == nil || runtime == nil {
 		return
@@ -220,8 +219,8 @@ func (l *GameClientLink) fireCubic(live *livePlayer, id cubic.ID, runtime *cubic
 
 	broadcastLevel := def.Level
 	if id == cubic.Life && broadcastLevel == 8 {
-		// Life Cubic broadcast quirk: the granted
-		// level-8 heal skill displays as level 20 on the client.
+		// Life Cubic broadcast quirk: the granted level-8 heal skill displays
+		// as level 20 on the client.
 		broadcastLevel = 20
 	}
 

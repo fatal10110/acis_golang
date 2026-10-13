@@ -126,7 +126,8 @@ func exitDanger(a Actor) {
 }
 
 // Live reports whether the damage pulse keeps running: the zone deals
-// damage and is not a dormant castle trap (DamageZone's task stop rule).
+// damage and is not a dormant castle trap. The damage task stops once this
+// is false.
 func (z *Damage) Live() bool { return z.HPDamage > 0 && !z.dormant() }
 
 // PulseStopped resets the pulse latch; the damage task calls it when it

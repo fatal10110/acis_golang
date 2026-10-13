@@ -57,8 +57,9 @@ func LoadPlayerTemplates(dir string) (*player.TemplateTable, error) {
 	return table, nil
 }
 
-// loadClassDocuments mirrors PlayerData's recursive, per-file-tolerant load:
-// malformed files are ignored while well-formed siblings still contribute.
+// loadClassDocuments loads the class template directory recursively and
+// tolerates bad files: malformed files are ignored while well-formed
+// siblings still contribute.
 func loadClassDocuments(dir string) ([]xmlDocument[classFile], error) {
 	var docs []xmlDocument[classFile]
 	if err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {

@@ -1,12 +1,12 @@
 // Package signspriest runs the "SevenSigns <n> ..." dialog commands of the
-// Seven Signs priests and the Mammon NPCs:
-// buying the Record of Seven Signs, signing up for a cabal, turning seal
-// stones in or exchanging them for ancient adena, the Black Marketeer's
-// ancient adena exchange, collecting the stones' reward and the seal status
-// page. It decides and mutates the talker's inventory and the Seven Signs
-// state; the caller turns the returned notices into client packets, opens
-// the page and moves the talker. Every call runs on the talker's own queue,
-// so a check and the change it allows see the same inventory.
+// Seven Signs priests and the Mammon NPCs: buying the Record of Seven Signs,
+// signing up for a cabal, turning seal stones in or exchanging them for ancient
+// adena, the Black Marketeer's ancient adena exchange, collecting the stones'
+// reward and the seal status page. It decides and mutates the talker's
+// inventory and the Seven Signs state; the caller turns the returned notices
+// into client packets, opens the page and moves the talker. Every call runs on
+// the talker's own queue, so a check and the change it allows see the same
+// inventory.
 package signspriest
 
 import (
@@ -22,7 +22,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 )
 
-// Items and prices of the dialog (SevenSignsManager).
+// Items and prices of the Seven Signs priest dialog.
 const (
 	RecordID                int32 = 5707
 	CertificateOfApprovalID int32 = 6388
@@ -34,7 +34,7 @@ const (
 	RedStoneID   int32 = 6362
 )
 
-// Points one stone of each color is worth (SevenSignsManager.SEAL_STONE_*_VALUE).
+// Contribution points one seal stone of each color is worth.
 const (
 	blueValue  = 3
 	greenValue = 5
@@ -686,11 +686,10 @@ func (h *handler) reduceAncientAdena(count int) bool {
 	return true
 }
 
-// destroyItems takes count of itemID, saying so when say is set: adena
-// goes through reduceAdena, and holding
-// too few, or none, refuses. A count of 0 takes nothing from a held stack
-// and still names it. A negative count is refused like too few items,
-// rather than adding the units to the stack.
+// destroyItems takes count of itemID, saying so when say is set: adena goes
+// through reduceAdena, and holding too few, or none, refuses. A count of 0
+// takes nothing from a held stack and still names it. A negative count is
+// refused like too few items, rather than adding the units to the stack.
 func (h *handler) destroyItems(itemID int32, count int, say bool) bool {
 	if itemID == item.AdenaID {
 		return h.reduceAdena(count, say)

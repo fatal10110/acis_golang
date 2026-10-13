@@ -16,9 +16,9 @@ type dropMerger struct {
 	threshold int
 }
 
-// merge adds qty to itemID: the table resizes at
-// the start of the call once a previous call left it over its threshold,
-// and a new key goes to the head of its bucket.
+// merge adds qty to itemID: the table resizes at the start of the call once a
+// previous call left it over its threshold, and a new key goes to the head of
+// its bucket.
 func (m *dropMerger) merge(itemID, qty int32) {
 	if m.table == nil {
 		m.threshold = 1

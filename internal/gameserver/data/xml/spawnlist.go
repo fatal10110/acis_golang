@@ -76,12 +76,11 @@ func LoadSpawnlist(dir string, log zerolog.Logger, spawnMultiplier float64) (*sp
 				}
 				return nil, fmt.Errorf("data/xml: parse territory in %s: %w", doc.Path, err)
 			}
-			// SpawnManager stores every declared territory in a Set with no
-			// equals/hashCode override, so conflicting same-name
-			// declarations are retained rather than rejected; lookups
-			// resolve to an unspecified (here: first-declared) match. Keep
-			// every declaration for the table and let the first-declared
-			// name win the resolution map, matching that first-wins order.
+			// Conflicting same-name territory declarations are all
+			// retained rather than rejected, and a lookup by name resolves
+			// to one of them (here: the first declared). Keep every
+			// declaration for the table and let the first-declared name win
+			// the resolution map.
 			key := strings.ToLower(territory.Name)
 			if _, exists := territoryMap[key]; !exists {
 				territoryMap[key] = territory

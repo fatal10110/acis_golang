@@ -23,15 +23,14 @@ func ClassParent(classID int32) int32 {
 	return int32(parent)
 }
 
-// SetClassID moves the player to classID as every occupation change does,
-// all of it done when the call returns: the change's
-// visual shown around the player, the new class played (in an active
-// subclass's slot when one is active) with its template, the transfer
-// message, the player's row refreshed in its party's and its clan's
-// windows, the skills granted when the server grants them automatically,
-// and an academy member's graduation on its second occupation. The base
-// class does not move; SetBaseClass moves it. Nothing happens while
-// another class change of the player is in progress.
+// SetClassID moves the player to classID as every occupation change does, all
+// of it done when the call returns: the change's visual shown around the
+// player, the new class played (in an active subclass's slot when one is
+// active) with its template, the transfer message, the player's row refreshed
+// in its party's and its clan's windows, the skills granted when the server
+// grants them automatically, and an academy member's graduation on its second
+// occupation. The base class does not move; SetBaseClass moves it. Nothing
+// happens while another class change of the player is in progress.
 func (p *Player) SetClassID(classID int32) {
 	p.character().RequestClassChange(int(classID))
 }
@@ -39,27 +38,25 @@ func (p *Player) SetClassID(classID int32) {
 // SubClassActive reports whether the player plays one of its subclasses.
 func (p *Player) SubClassActive() bool { return p.character().SubclassActive() }
 
-// BaseClass returns the id of the player's base class: the class it was
-// created into, or the one it last
-// moved to on that line.
+// BaseClass returns the id of the player's base class: the class it was created
+// into, or the one it last moved to on that line.
 func (p *Player) BaseClass() int32 { return int32(p.character().BaseClassID()) }
 
-// SetBaseClass makes classID the player's base class.
-// The class it plays does not change.
+// SetBaseClass makes classID the player's base class. The class it plays does
+// not change.
 func (p *Player) SetBaseClass(classID int32) {
 	p.character().RequestBaseClass(int(classID))
 }
 
-// BroadcastUserInfo shows the player anew:
-// UserInfo to the player, CharInfo to every player around it.
+// BroadcastUserInfo shows the player anew: UserInfo to the player, CharInfo to
+// every player around it.
 func (p *Player) BroadcastUserInfo() { p.character().BroadcastUserInfo() }
 
-// BroadcastMagicSkillUse shows the player and every player around it the
-// cast animation of skillID at level from caster to target, with hitTime
-// and reuseDelay in milliseconds (a MagicSkillUse). It is only shown: no
-// skill is used, and caster and
-// target may be any creatures. Each stands where it is at the call; a
-// handle on nothing panics.
+// BroadcastMagicSkillUse shows the player and every player around it the cast
+// animation of skillID at level from caster to target, with hitTime and
+// reuseDelay in milliseconds (a MagicSkillUse). It is only shown: no skill is
+// used, and caster and target may be any creatures. Each stands where it is at
+// the call; a handle on nothing panics.
 func (p *Player) BroadcastMagicSkillUse(caster, target Creature, skillID, level int32, hitTime, reuseDelay int) {
 	from, to := locOf(caster), locOf(target)
 	p.character().BroadcastSkillAnimation(
@@ -106,10 +103,9 @@ func (s *Script) WorldPlayer(objectID int32) *Player {
 	return PlayerOf(self)
 }
 
-// Quest returns the registered script the state belongs to, so a script
-// may call another script's helpers on
-// a state of that script it found. nil when the state was not found
-// through a registered script.
+// Quest returns the registered script the state belongs to, so a script may
+// call another script's helpers on a state of that script it found. nil when
+// the state was not found through a registered script.
 func (qs *QuestState) Quest() *Script {
 	if qs.registry == nil {
 		return nil

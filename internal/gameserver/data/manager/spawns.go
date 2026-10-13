@@ -26,7 +26,7 @@ type Spawns struct {
 
 // LoadSpawns loads spawnlist XML from dir, restores dynamic rows from store,
 // and creates uninitialized rows for XML dbName entries missing in the DB.
-// spawnMultiplier is Config.SPAWN_MULTIPLIER (npcs.properties SpawnMultiplier).
+// spawnMultiplier is the npcs.properties SpawnMultiplier setting.
 func LoadSpawns(ctx context.Context, dir string, store spawnStateStore, log zerolog.Logger, spawnMultiplier float64) (*Spawns, error) {
 	table, err := xml.LoadSpawnlist(dir, log, spawnMultiplier)
 	if err != nil {

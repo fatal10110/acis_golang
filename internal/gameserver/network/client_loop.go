@@ -24,13 +24,12 @@ const (
 
 var errMalformedPacketDisconnect = errors.New("malformed packet requires disconnect")
 
-// decodeClientPacket disconnects buffer-underflow-equivalent pre-auth
-// packets (insufficient bytes, wire.ErrShortPacket) immediately. Once
-// authenticated, that same error class (char-select or in-game) is
-// tolerated up to maxUnderflowsPerMin within a 60s sliding window, then
-// disconnect. Other decode
-// validation errors (e.g. an out-of-range field) are logged and the packet
-// dropped without counting or disconnecting.
+// decodeClientPacket disconnects buffer-underflow-equivalent pre-auth packets
+// (insufficient bytes, wire.ErrShortPacket) immediately. Once authenticated,
+// that same error class (char-select or in-game) is tolerated up to
+// maxUnderflowsPerMin within a 60s sliding window, then disconnect. Other
+// decode validation errors (e.g. an out-of-range field) are logged and the
+// packet dropped without counting or disconnecting.
 func decodeClientPacket[T any](l *GameClientLink, client *Client, payload []byte, decode func([]byte) (T, error)) (T, error) {
 	req, err := decode(payload)
 	if err != nil {

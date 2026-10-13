@@ -316,9 +316,8 @@ func (l *GameClientLink) broadcastPetPickupAttention(owner *livePlayer, ground *
 }
 
 // petPickedFrame is the line a pet's owner reads when the pet keeps a ground
-// item it picked up: adena by amount, then
-// enchanted gear by enchant level, then a stack by count, else the item
-// alone.
+// item it picked up: adena by amount, then enchanted gear by enchant level,
+// then a stack by count, else the item alone.
 func petPickedFrame(st item.InstanceState) wire.Frame {
 	switch {
 	case st.TemplateID == item.AdenaID:

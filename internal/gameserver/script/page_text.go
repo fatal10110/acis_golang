@@ -18,9 +18,8 @@ func (s *Script) HTMLText(file string) string {
 	return "<html><body>My html is missing:<br>" + path + "</body></html>"
 }
 
-// ItemName returns the name of the item template itemID. An id with no
-// template panics,
-// so the invocation aborts there.
+// ItemName returns the name of the item template itemID. An id with no template
+// panics, so the invocation aborts there.
 func (s *Script) ItemName(itemID int32) string {
 	if s.env.Items != nil {
 		if tmpl, ok := s.env.Items.Get(itemID); ok && tmpl != nil {

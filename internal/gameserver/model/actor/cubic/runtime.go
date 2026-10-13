@@ -9,18 +9,17 @@ import (
 
 // Runtime is one live cubic's timers: the recurring action tick (started
 // immediately for the Life Cubic, or lazily via Action() the first time the
-// owner enters combat stance for every other kind; a restart while running
-// is a no-op) and the one-shot disappear
-// timer that fires when the granted lifetime elapses. Level is the level of
-// the SUMMON skill that granted this cubic — fixed at construction, not
-// re-read on a later refresh, which only resets the disappear timer of an
-// already-active cubic.
+// owner enters combat stance for every other kind; a restart while running is a
+// no-op) and the one-shot disappear timer that fires when the granted lifetime
+// elapses. Level is the level of the SUMMON skill that granted this cubic —
+// fixed at construction, not re-read on a later refresh, which only resets the
+// disappear timer of an already-active cubic.
 type Runtime struct {
 	id ID
 	// Level is the level of the SUMMON skill that granted this cubic.
-	// ActivationChance is that same granting skill's own percent gate on
-	// each non-Life action tick — both fixed at
-	// construction, distinct from any later-fired skill's own data.
+	// ActivationChance is that same granting skill's own percent gate on each
+	// non-Life action tick — both fixed at construction, distinct from any
+	// later-fired skill's own data.
 	Level            int
 	ActivationChance int
 	// MAtk is the cubic's own magic attack, the granting skill's power
@@ -109,9 +108,8 @@ func (r *Runtime) tick(gen int) {
 }
 
 // StopAction cancels the recurring action tick only — used when a non-Life
-// cubic finds its owner out of
-// combat stance on a fire attempt, so it goes idle until the owner's next
-// combat entry reactivates it via Action().
+// cubic finds its owner out of combat stance on a fire attempt, so it goes idle
+// until the owner's next combat entry reactivates it via Action().
 func (r *Runtime) StopAction() {
 	r.mu.Lock()
 	defer r.mu.Unlock()

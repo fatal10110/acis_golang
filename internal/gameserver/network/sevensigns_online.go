@@ -9,10 +9,9 @@ import (
 // changes.
 var _ sevensigns.Online = (*GameClientLink)(nil)
 
-// GiveStrifeSkills implements sevensigns.Online: every player online gets
-// the Seal of Strife skill its cabal earns, on its own queue, unstored and
-// without a skill list; its changed
-// maximum CP shows as any stat change does.
+// GiveStrifeSkills implements sevensigns.Online: every player online gets the
+// Seal of Strife skill its cabal earns, on its own queue, unstored and without
+// a skill list; its changed maximum CP shows as any stat change does.
 func (l *GameClientLink) GiveStrifeSkills() {
 	if l.sevenSigns == nil {
 		return
@@ -29,10 +28,9 @@ func (l *GameClientLink) RemoveStrifeSkills() {
 }
 
 // ExpelFromDungeons implements sevensigns.Online: every player in the world
-// standing in a Seven Signs dungeon, game masters aside, whom the period
-// change no longer allows there is sent to the nearest town and out of the
-// dungeon. A player still
-// logging in is left to its login check.
+// standing in a Seven Signs dungeon, game masters aside, whom the period change
+// no longer allows there is sent to the nearest town and out of the dungeon. A
+// player still logging in is left to its login check.
 func (l *GameClientLink) ExpelFromDungeons() {
 	if l.sevenSigns == nil {
 		return

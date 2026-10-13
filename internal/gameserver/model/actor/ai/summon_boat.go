@@ -34,13 +34,12 @@ func (s *Summon) SetBoatEntrance(boats BoatEntrance) {
 	s.boats = boats
 }
 
-// followThroughBoatEntranceLocked is one friendly follow run toward target
-// when target is not the summon's owner nor the owner's own: the follow
-// never walks after target. Out of reach,
-// the summon heads for the boat entrance its walk toward target crosses,
-// that walk replacing the follow; with no entrance
-// to head for, the owner is answered ActionFailed and the summon stays. It
-// reports whether it handled the run.
+// followThroughBoatEntranceLocked is one friendly follow run toward target when
+// target is not the summon's owner nor the owner's own: the follow never walks
+// after target. Out of reach, the summon heads for the boat entrance its walk
+// toward target crosses, that walk replacing the follow; with no entrance to
+// head for, the owner is answered ActionFailed and the summon stays. It reports
+// whether it handled the run.
 func (s *Summon) followThroughBoatEntranceLocked(target attackable.Combatant) (bool, error) {
 	if s.boats == nil {
 		return false, nil

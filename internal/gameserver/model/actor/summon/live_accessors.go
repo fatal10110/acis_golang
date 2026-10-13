@@ -86,10 +86,10 @@ func (a *Actor) OwnerID() int32 {
 }
 
 // OwnerStillLinked reports whether the owner still identifies this summon as
-// their active one. DecayTaskManager cancels a tracked summon corpse when this
-// returns false, before its deadline is checked. A servitor's corpse whose
-// owner left stays linked to the session that left it, which no longer
-// changes its summon.
+// their active one. The corpse-decay task cancels a tracked summon corpse when
+// this returns false, before its deadline is checked. A servitor's corpse whose
+// owner left stays linked to the session that left it, which no longer changes
+// its summon.
 func (a *Actor) OwnerStillLinked() bool {
 	if a == nil || a.world == nil {
 		return false

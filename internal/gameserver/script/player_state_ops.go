@@ -6,9 +6,9 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 )
 
-// HasItems reports whether the player's inventory holds an instance of
-// every one of itemIDs. An empty inventory holds
-// none of them; with no ids, the answer is whether it holds anything.
+// HasItems reports whether the player's inventory holds an instance of every
+// one of itemIDs. An empty inventory holds none of them; with no ids, the
+// answer is whether it holds anything.
 func (p *Player) HasItems(itemIDs ...int32) bool {
 	inv := p.character().Inventory()
 	if inv == nil || inv.Size() == 0 {
@@ -29,17 +29,16 @@ func (p *Player) ItemEnchantLevel(itemID int32) int32 {
 	panic(fmt.Sprintf("script: the enchant level of item %d the player does not hold", itemID))
 }
 
-// ActiveWeaponItemID returns the item id of the weapon the player attacks
-// with: the one in its right
-// hand, or its class's fists when that hand holds no weapon.
+// ActiveWeaponItemID returns the item id of the weapon the player attacks with:
+// the one in its right hand, or its class's fists when that hand holds no
+// weapon.
 func (p *Player) ActiveWeaponItemID() int32 { return p.character().ActiveWeaponItemID() }
 
 // PkKills returns the player's PK count.
 func (p *Player) PkKills() int32 { return int32(p.character().ProgressionValues().PKKills) }
 
-// SetPkKills sets the player's PK count to n. Nothing
-// is shown: SendUserInfo shows the player its new count. It is saved with
-// the character.
+// SetPkKills sets the player's PK count to n. Nothing is shown: SendUserInfo
+// shows the player its new count. It is saved with the character.
 func (p *Player) SetPkKills(n int32) { p.character().SetPKKills(int(n)) }
 
 // SendUserInfo sends the player its own full view, and no one else
@@ -65,9 +64,8 @@ type summonTemplate interface {
 	NPCID() int
 }
 
-// SummonNpcID returns the NPC template id of the summon c. A handle on
-// anything but a summon panics, so the
-// invocation aborts there.
+// SummonNpcID returns the NPC template id of the summon c. A handle on anything
+// but a summon panics, so the invocation aborts there.
 func SummonNpcID(c Creature) int32 {
 	if s, ok := combatantOf(c).(summonTemplate); ok && c.Summon() {
 		return int32(s.NPCID())

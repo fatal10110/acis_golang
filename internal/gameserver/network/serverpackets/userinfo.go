@@ -45,7 +45,7 @@ const (
 // an unmounted character reports 0.
 const mountNpcIdOffset = 1000000
 
-// teamBlue is TeamType.BLUE's wire id, the team byte shown while spawn
+// teamBlue is the blue team's wire id, the team byte shown while spawn
 // protection holds.
 const teamBlue = 1
 
@@ -61,8 +61,8 @@ type UserInfoSnapshot struct {
 	// not merely AccessLevel > 0.
 	IsGM bool
 	// SpawnProtectedTeam reports the team byte the client sees while spawn
-	// protection is active: TeamType.BLUE when spawn protection is enabled
-	// and currently held, the character's duel team otherwise.
+	// protection is active: the blue team (teamBlue) when spawn protection
+	// is enabled and currently held, the character's duel team otherwise.
 	SpawnProtectedTeam bool
 	// Clan is Character's clan as the status window shows it; zero when
 	// clanless.

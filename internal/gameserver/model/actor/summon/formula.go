@@ -384,9 +384,8 @@ func (a *Actor) baseMoveSpeed() int {
 	return int(a.walkSpeed)
 }
 
-// hungryHalved reports whether a pet's attack speed should be halved for
-// being under-fed. Servitors have no feeding
-// state and are never halved.
+// hungryHalved reports whether a pet's attack speed should be halved for being
+// under-fed. Servitors have no feeding state and are never halved.
 func (a *Actor) hungryHalved() bool {
 	a.statusMu.RLock()
 	fed, maxMeal := a.fed, a.maxMeal

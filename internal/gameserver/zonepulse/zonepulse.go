@@ -1,11 +1,10 @@
 // Package zonepulse runs the periodic tasks of the effect and damage zones.
 //
-// The first occupant to enter such a zone starts its pulse: after the
-// zone's initial delay, then every reuse delay at a fixed rate, a damage
-// zone hurts each living occupant and an effect
-// zone lands its skills on each living occupant that wins the chance roll.
-// A pulse that finds its zone empty, or a damage zone gone dormant, stops;
-// the next entry starts a fresh one.
+// The first occupant to enter such a zone starts its pulse: after the zone's
+// initial delay, then every reuse delay at a fixed rate, a damage zone hurts
+// each living occupant and an effect zone lands its skills on each living
+// occupant that wins the chance roll. A pulse that finds its zone empty, or a
+// damage zone gone dormant, stops; the next entry starts a fresh one.
 //
 // Each pulse runs on the queue Wire is given. What it does to one occupant
 // runs on that occupant's own queue, when it has one.

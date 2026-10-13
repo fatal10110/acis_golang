@@ -362,8 +362,7 @@ func (r *Roster) Restore(ctx context.Context, objectID int32) error {
 }
 
 // Save persists the live character's full in-memory stats (level, exp, sp,
-// cur/max HP/CP/MP), matching GameClient's periodic and disconnect
-// autosaves.
+// cur/max HP/CP/MP), as the periodic and disconnect autosaves write them.
 func (r *Roster) Save(ctx context.Context, st player.SaveState) error {
 	return r.characters.Save(ctx, st)
 }

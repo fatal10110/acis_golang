@@ -9,10 +9,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 )
 
-// adminInfo answers //info [args] on gm's selection, gm itself without one:
-// a player is shown its character page, a door, an NPC,
-// a summon or a static object its own page. Any other selection gets an
-// HTML window with no page, which still drops the links of the last one.
+// adminInfo answers //info [args] on gm's selection, gm itself without one: a
+// player is shown its character page, a door, an NPC, a summon or a static
+// object its own page. Any other selection gets an HTML window with no page,
+// which still drops the links of the last one.
 func (l *GameClientLink) adminInfo(gm *livePlayer, line string) {
 	switch target := gm.Target().(type) {
 	case nil:

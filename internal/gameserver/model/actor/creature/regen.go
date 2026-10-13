@@ -12,12 +12,12 @@ import (
 // door: 3s.
 const RegenPeriod = 3 * time.Second
 
-// Regen is one creature's regeneration phase: the
-// deadline of its next fixed-rate tick. Settle arms it when a resource first
-// falls short of its maximum, its first tick one full period later; later
-// changes while it is armed leave the phase alone. It is disarmed once
-// nothing is short or the creature is dead, so the next drop starts a fresh
-// phase. The regeneration sweep runs the ticks that come due (Claim).
+// Regen is one creature's regeneration phase: the deadline of its next
+// fixed-rate tick. Settle arms it when a resource first falls short of its
+// maximum, its first tick one full period later; later changes while it is
+// armed leave the phase alone. It is disarmed once nothing is short or the
+// creature is dead, so the next drop starts a fresh phase. The regeneration
+// sweep runs the ticks that come due (Claim).
 //
 // A phase bound to a RegenSet (Bind) reports each arm and disarm to it, so
 // the sweep walks only the armed phases rather than every creature.
