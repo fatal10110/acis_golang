@@ -61,7 +61,7 @@ type skillElement struct {
 //
 // log receives skipped-skill diagnostics; the zero logger discards them.
 func LoadSkillDefinitions(dir string, log zerolog.Logger) (*skill.Table, error) {
-	docs, err := loadXMLDocuments[skillFile](dir, "skill definition")
+	docs, err := loadTemplateDocuments[skillFile](dir, "skill definition")
 	if err != nil {
 		return nil, err
 	}

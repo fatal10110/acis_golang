@@ -1,6 +1,7 @@
 package xml
 
 import (
+	"bytes"
 	"encoding/xml"
 	"strings"
 )
@@ -12,6 +13,53 @@ import (
 // Comments are not nodes and do not count. The standard decoder drops that
 // character data, so these blocks decode their children by hand and record
 // whether anything came before the first child element.
+//
+// A CDATA section is a node of its own, even when empty: it never joins the
+// text before or after it, nor another CDATA section. The standard decoder
+// reports a CDATA section as plain character data, so skill and item files
+// are decoded through cdataMarker, which brackets each one with cdataBound
+// tokens.
+
+// cdataBound is the token cdataMarker emits right before and right after the
+// character data of a CDATA section. Decoders that do not look for it skip
+// it like any token they do not handle.
+type cdataBound struct{}
+
+// cdataMarker is the token stream of a document held in data, with every
+// CDATA section bracketed by cdataBound tokens.
+type cdataMarker struct {
+	data    []byte
+	raw     *xml.Decoder
+	pending []xml.Token
+}
+
+// newTemplateDecoder returns a decoder over data that reports CDATA section
+// bounds (see cdataMarker).
+func newTemplateDecoder(data []byte) *xml.Decoder {
+	return xml.NewTokenDecoder(&cdataMarker{data: data, raw: xml.NewDecoder(bytes.NewReader(data))})
+}
+
+// Token returns the next token of the document. The returned decoder checks
+// element nesting and resolves names, so the raw tokens are passed on as
+// read. Character data whose first input byte is '<' can only be a CDATA
+// section: text never starts with one.
+func (m *cdataMarker) Token() (xml.Token, error) {
+	if len(m.pending) > 0 {
+		tok := m.pending[0]
+		m.pending = m.pending[1:]
+		return tok, nil
+	}
+	start := m.raw.InputOffset()
+	tok, err := m.raw.RawToken()
+	if err != nil {
+		return tok, err
+	}
+	if text, ok := tok.(xml.CharData); ok && start < int64(len(m.data)) && m.data[start] == '<' {
+		m.pending = append(m.pending, text.Copy(), cdataBound{})
+		return cdataBound{}, nil
+	}
+	return tok, nil
+}
 
 // UnmarshalXML decodes a <for> block's child elements, noting whether a
 // non-element node precedes the first one.
@@ -68,9 +116,9 @@ func decodeChildElements(d *xml.Decoder, decode func(xml.StartElement) error) (l
 // decodeChildNodes consumes the current element's content up to its end tag,
 // handing visit each token with the index of the child node it belongs to. A
 // run of character data is one node, even when comments split it, since
-// comments are not nodes; a processing instruction and an element are one
-// node each. visit must consume a child element it is handed, by decoding or
-// skipping it.
+// comments are not nodes; a CDATA section, a processing instruction and an
+// element are one node each. visit must consume a child element it is
+// handed, by decoding or skipping it.
 func decodeChildNodes(d *xml.Decoder, visit func(node int, tok xml.Token) error) error {
 	node := -1
 	inText := false
@@ -88,6 +136,9 @@ func decodeChildNodes(d *xml.Decoder, visit func(node int, tok xml.Token) error)
 		case xml.StartElement, xml.ProcInst:
 			node++
 			inText = false
+		case cdataBound:
+			inText = false
+			continue
 		case xml.EndElement:
 			return nil
 		default:

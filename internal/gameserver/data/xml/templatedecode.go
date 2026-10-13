@@ -87,21 +87,34 @@ func (f *itemFile) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	return err
 }
 
-// UnmarshalXML decodes one <item> element.
+// UnmarshalXML decodes one <item> element, keeping the children the reader
+// acts on in document order.
 func (el *itemElement) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	el.Attrs = start.Attr
 	_, err := decodeChildElements(d, func(child xml.StartElement) error {
+		var c itemChild
+		var dst any
 		switch {
 		case tagIs(child, "table"):
-			return decodeAppend(d, child, &el.Tables)
+			c.Table = new(tableElement)
+			dst = c.Table
 		case tagIs(child, "set"):
-			return decodeAppend(d, child, &el.Sets)
+			c.Set = new(templateSet)
+			dst = c.Set
 		case tagIs(child, "for"):
-			return decodeAppend(d, child, &el.For)
+			c.For = new(forElement)
+			dst = c.For
 		case tagIs(child, "cond"):
-			return decodeAppend(d, child, &el.Cond)
+			c.Cond = new(condElement)
+			dst = c.Cond
+		default:
+			return d.Skip()
 		}
-		return d.Skip()
+		if err := d.DecodeElement(dst, &child); err != nil {
+			return err
+		}
+		el.Children = append(el.Children, c)
+		return nil
 	})
 	return err
 }
@@ -158,15 +171,24 @@ type setValue struct {
 func readTemplateSets(sets []templateSet) ([]setValue, error) {
 	out := make([]setValue, 0, len(sets))
 	for _, s := range sets {
-		if s.Name == nil {
-			return nil, errSetNoName
+		v, err := readTemplateSet(s)
+		if err != nil {
+			return nil, err
 		}
-		if s.Val == nil {
-			return nil, errSetNoVal
-		}
-		out = append(out, setValue{name: trimControlSpace(*s.Name), val: trimControlSpace(*s.Val)})
+		out = append(out, v)
 	}
 	return out, nil
+}
+
+// readTemplateSet reads one set (see readTemplateSets).
+func readTemplateSet(s templateSet) (setValue, error) {
+	if s.Name == nil {
+		return setValue{}, errSetNoName
+	}
+	if s.Val == nil {
+		return setValue{}, errSetNoVal
+	}
+	return setValue{name: trimControlSpace(*s.Name), val: trimControlSpace(*s.Val)}, nil
 }
 
 var (
