@@ -3,9 +3,11 @@ package npc
 import (
 	"math"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -39,7 +41,7 @@ func (f *Folk) statCalc(s stat.Stat) *effect.Calculator {
 // passives and the funcs of the effects it holds, flooring a non-positive
 // stat that can't go negative at one.
 func (f *Folk) CalcStat(s stat.Stat, base float64) float64 {
-	value := f.statCalc(s).Calc(templateStatActor{t: f.Instance.Template}, base)
+	value := f.statCalc(s).Calc(templateStatActor{t: f.Instance.Template}, base, nil)
 	if s.CantBeNegative() && value <= 0 {
 		return 1
 	}
@@ -278,3 +280,9 @@ func (f *Folk) refreshMoveSpeed() {
 	defer f.speedMu.Unlock()
 	f.motion.move.SetSpeed(f.MoveSpeed())
 }
+
+// ForSkill is f's stats read for a calculation run for skill. f's stat
+// funcs test their conditions against its template, which presents no
+// condition view, so no conditional func applies whatever skill a
+// calculation runs for: f's stats read the same for every skill.
+func (f *Folk) ForSkill(conditions.Skill) creature.SkillStats { return f }

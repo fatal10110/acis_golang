@@ -6,78 +6,87 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
-// funcCondition builds the Condition gate for one stat func from
-// its own direct predicate (a func element's child, e.g. <add ...><using
+// funcCondition builds the Condition gate for one stat func from its own
+// direct predicate (a func element's child, e.g. <add ...><using
 // .../></add>) and/or the <cond> block attached to its enclosing <for>/
-// <effect> group, ANDing both when both are present. A predicate that holds
-// no condition (see conditions.Compile) gates nothing. Returns (nil, nil)
-// when neither gates, matching every unconditional stat func today.
-func funcCondition(direct *modelskill.Condition, attach *modelskill.ConditionClause) (Condition, error) {
-	var conds []conditions.Condition
+// <effect> group, requiring both when both are present. The attached block
+// is tested against owner, the skill that owns the func (nil for an item's
+// func); the func's own predicate against the skill the stat calculation
+// runs for. A predicate that holds no condition (see conditions.Compile)
+// gates nothing. Returns (nil, nil) when neither gates, matching every
+// unconditional stat func today.
+func funcCondition(direct *modelskill.Condition, attach *modelskill.ConditionClause, owner conditions.Skill) (Condition, error) {
+	var g conditionGate
 	if attach != nil {
 		c, err := conditions.Compile(attach.Root)
 		if err != nil {
 			return nil, err
 		}
-		if c != nil {
-			conds = append(conds, c)
-		}
+		g.attach, g.owner = c, owner
 	}
 	if direct != nil {
 		c, err := conditions.Compile(*direct)
 		if err != nil {
 			return nil, err
 		}
-		if c != nil {
-			conds = append(conds, c)
-		}
+		g.own = c
 	}
-	switch len(conds) {
-	case 0:
+	if g.attach == nil && g.own == nil {
 		return nil, nil
-	case 1:
-		return conditionGate{conds[0]}, nil
-	default:
-		return conditionGate{&conditions.And{Conditions: conds}}, nil
 	}
+	return g, nil
 }
 
-// conditionGate adapts one built conditions.Condition into a
-// Condition: it resolves effector (as passed to Func.Calc) to a
-// conditions.Actor. In every Calc call site today, effector is the
-// calculation-only wrapper (characterStatActor/hostileStatActor/
-// summonStatActor) around a creature, which also implements
-// conditions.Actor (see model/actor/player/character_conditions.go,
+// conditionGate adapts built conditions into a Condition: it resolves
+// effector (as passed to Calculator.Calc) to a conditions.Actor. In every
+// Calc call site today, effector is the calculation-only wrapper
+// (characterStatActor/hostileStatActor/summonStatActor) around a creature,
+// which also implements conditions.Actor (see
+// model/actor/player/character_conditions.go,
 // model/actor/npc/hostile_conditions.go, model/actor/summon/conditions.go),
 // so this always resolves to that same owner, matching this package's doc:
 // a stat func is gated by its owner alone. A test that aborts (it reached a
 // <not> around no condition, see conditions.Evaluate) does not hold.
-type conditionGate struct{ cond conditions.Condition }
+type conditionGate struct {
+	// attach is the enclosing block's <cond>, tested with owner.
+	attach conditions.Condition
+	owner  conditions.Skill
+	// own is the func's own condition, tested with the calculation's skill.
+	own conditions.Condition
+}
 
-func (g conditionGate) Test(effector stat.Actor) bool {
+func (g conditionGate) Test(effector stat.Actor, skill conditions.Skill) bool {
 	actor, ok := effector.(conditions.Actor)
 	if !ok {
 		return false
 	}
-	return g.cond.Test(actor, actor, nil)
-}
-
-// andCond combines two optional Condition gates, either of which
-// may be nil, into one that requires both (when both are set) or whichever
-// one is set (when only one is).
-func andCond(a, b Condition) Condition {
-	switch {
-	case a == nil:
-		return b
-	case b == nil:
-		return a
-	default:
-		return bothCond{a, b}
+	if g.attach != nil && !g.attach.Test(actor, actor, g.owner) {
+		return false
 	}
+	return g.own == nil || g.own.Test(actor, actor, skill)
 }
 
-type bothCond struct{ a, b Condition }
-
-func (c bothCond) Test(effector stat.Actor) bool {
-	return c.a.Test(effector) && c.b.Test(effector)
+// Admits reports whether tmpl's attached <cond> (the <cond> sibling gating
+// the whole <effect> block) holds for effector applying meta's effect to
+// effected, tested with meta as the skill under test. An effect whose
+// attached condition fails is never created. A template with no attached
+// condition, or one that holds no condition, always admits. A condition
+// that does not compile, a nil effector, or a test that aborts does not.
+// effected may lack a condition view, failing every target-side test.
+func Admits(effector, effected Actor, meta Skill, tmpl modelskill.EffectTemplate) bool {
+	if tmpl.AttachCondition == nil {
+		return true
+	}
+	cond, err := conditions.Compile(tmpl.AttachCondition.Root)
+	if err != nil {
+		return false
+	}
+	if cond == nil {
+		return true
+	}
+	caster := conditions.ActorOf(effector)
+	if caster == nil {
+		return false
+	}
+	return cond.Test(caster, conditions.ActorOf(effected), conditions.SkillOf(meta.Stat))
 }

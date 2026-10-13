@@ -85,6 +85,11 @@ type Skill struct {
 	// FlyRadius is the owning skill's configured forced-flight distance,
 	// read by the knockback effect kind to size its landing offset.
 	FlyRadius int
+
+	// Stat is the owning skill's "stat" set value (see
+	// conditions.SkillOf): a <skill stat> condition attached to one of its
+	// effects or funcs tests it.
+	Stat string
 }
 
 func (s Skill) sevenSigns() bool {

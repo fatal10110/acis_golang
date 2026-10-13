@@ -67,7 +67,7 @@ func TestFuncConditionUsingItemType(t *testing.T) {
 	// <add stat="rEvas" val="3"><using kind="LIGHT" /></add>, matching
 	// skill 142 (Armor Mastery)'s rEvas func.
 	direct := modelskill.Condition{Kind: "using", Attrs: map[string]string{"kind": "LIGHT"}}
-	cond, err := funcCondition(&direct, nil)
+	cond, err := funcCondition(&direct, nil, nil)
 	if err != nil {
 		t.Fatalf("funcCondition: %v", err)
 	}
@@ -76,10 +76,10 @@ func TestFuncConditionUsingItemType(t *testing.T) {
 	wearingLight := fakeConditionActor{wearingMask: lightMask}
 	wearingHeavy := fakeConditionActor{wearingMask: 1 << 16}
 
-	if !cond.Test(wearingLight) {
+	if !cond.Test(wearingLight, nil) {
 		t.Error("using LIGHT should pass while wearing light armor")
 	}
-	if cond.Test(wearingHeavy) {
+	if cond.Test(wearingHeavy, nil) {
 		t.Error("using LIGHT should fail while wearing heavy armor")
 	}
 }
@@ -92,7 +92,7 @@ func TestFuncConditionPlayerAndComposition(t *testing.T) {
 			{Kind: "player", Attrs: map[string]string{"moving": "true"}},
 		},
 	}
-	cond, err := funcCondition(&direct, nil)
+	cond, err := funcCondition(&direct, nil, nil)
 	if err != nil {
 		t.Fatalf("funcCondition: %v", err)
 	}
@@ -100,10 +100,10 @@ func TestFuncConditionPlayerAndComposition(t *testing.T) {
 	moving := fakeConditionActor{moving: true}
 	still := fakeConditionActor{moving: false}
 
-	if !cond.Test(moving) {
+	if !cond.Test(moving, nil) {
 		t.Error("and{player moving=true} should pass while moving")
 	}
-	if cond.Test(still) {
+	if cond.Test(still, nil) {
 		t.Error("and{player moving=true} should fail while not moving")
 	}
 }
@@ -111,14 +111,14 @@ func TestFuncConditionPlayerAndComposition(t *testing.T) {
 // TestFuncConditionGameNightReadsEffectorServer pins that <game night=.../>
 // asks the effector for the time of day, not a process-wide clock.
 func TestFuncConditionGameNightReadsEffectorServer(t *testing.T) {
-	cond, err := funcCondition(&modelskill.Condition{Kind: "game", Attrs: map[string]string{"night": "true"}}, nil)
+	cond, err := funcCondition(&modelskill.Condition{Kind: "game", Attrs: map[string]string{"night": "true"}}, nil, nil)
 	if err != nil {
 		t.Fatalf("funcCondition: %v", err)
 	}
-	if !cond.Test(fakeConditionActor{night: true}) {
+	if !cond.Test(fakeConditionActor{night: true}, nil) {
 		t.Error("game night=true should pass at night")
 	}
-	if cond.Test(fakeConditionActor{night: false}) {
+	if cond.Test(fakeConditionActor{night: false}, nil) {
 		t.Error("game night=true should fail by day")
 	}
 }
@@ -128,7 +128,7 @@ func TestFuncConditionDirectAndAttachAreANDed(t *testing.T) {
 	attach := &modelskill.ConditionClause{
 		Root: modelskill.Condition{Kind: "using", Attrs: map[string]string{"kind": "LIGHT"}},
 	}
-	cond, err := funcCondition(&direct, attach)
+	cond, err := funcCondition(&direct, attach, nil)
 	if err != nil {
 		t.Fatalf("funcCondition: %v", err)
 	}
@@ -138,20 +138,20 @@ func TestFuncConditionDirectAndAttachAreANDed(t *testing.T) {
 	onlyMoving := fakeConditionActor{moving: true}
 	onlyWearing := fakeConditionActor{wearingMask: lightMask}
 
-	if !cond.Test(both) {
+	if !cond.Test(both, nil) {
 		t.Error("both direct and attach conditions satisfied should pass")
 	}
-	if cond.Test(onlyMoving) {
+	if cond.Test(onlyMoving, nil) {
 		t.Error("attach condition (wearing light) unmet should fail")
 	}
-	if cond.Test(onlyWearing) {
+	if cond.Test(onlyWearing, nil) {
 		t.Error("direct condition (moving) unmet should fail")
 	}
 }
 
 func TestFuncConditionUndecodableErrors(t *testing.T) {
 	direct := modelskill.Condition{Kind: "skill", Attrs: map[string]string{"stat": "PATK"}}
-	if _, err := funcCondition(&direct, nil); err == nil {
+	if _, err := funcCondition(&direct, nil, nil); err == nil {
 		t.Error("a condition that does not decode should error, not silently pass")
 	}
 }
@@ -174,12 +174,12 @@ var _ stat.Actor = notConditionActor{}
 
 func TestConditionGateFailsClosedWithoutActor(t *testing.T) {
 	direct := modelskill.Condition{Kind: "player", Attrs: map[string]string{"moving": "true"}}
-	cond, err := funcCondition(&direct, nil)
+	cond, err := funcCondition(&direct, nil, nil)
 	if err != nil {
 		t.Fatalf("funcCondition: %v", err)
 	}
 
-	if cond.Test(notConditionActor{}) {
+	if cond.Test(notConditionActor{}, nil) {
 		t.Error("conditionGate should fail closed when effector doesn't satisfy conditions.Actor")
 	}
 }
