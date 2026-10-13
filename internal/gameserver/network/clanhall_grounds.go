@@ -25,7 +25,7 @@ type WorldDoors interface {
 }
 
 // clanHallBanishOffset is the random offset of a player thrown out of a
-// clan hall's grounds (ClanHallZone.banishForeigners).
+// clan hall's grounds.
 const clanHallBanishOffset = 20
 
 // clanHallGrounds closes the clan halls' doors and clears their grounds
@@ -35,9 +35,8 @@ type clanHallGrounds struct{ l *GameClientLink }
 // ClanHallGrounds returns the grounds of the clan halls in l's world.
 func ClanHallGrounds(l *GameClientLink) clanhall.Grounds { return clanHallGrounds{l: l} }
 
-// CloseDoors closes each door named in gates (Residence.closeDoors), as
-// Door.closeMe does: a door that is unknown, broken or closed already
-// stays as it is.
+// CloseDoors closes each door named in gates as any door closing does: a
+// door that is unknown, broken or closed already stays as it is.
 func (g clanHallGrounds) CloseDoors(gates []string) { g.l.setHallDoors(gates, false) }
 
 // setHallDoors opens or closes each door named in gates, a clan hall's or
@@ -55,9 +54,8 @@ func (l *GameClientLink) setHallDoors(gates []string, open bool) {
 }
 
 // BanishForeigners throws every player who is not a member of clan clanID
-// out of hall hallID's grounds (ClanHall.banishForeigners). The hall's
-// grounds are the first clan hall zone naming it, as ClanHallManager links
-// one zone to each hall.
+// out of hall hallID's grounds. The hall's grounds are the first clan hall
+// zone naming it: each hall is linked to one zone.
 func (g clanHallGrounds) BanishForeigners(hallID, clanID int32) {
 	if g.l.zones == nil {
 		return

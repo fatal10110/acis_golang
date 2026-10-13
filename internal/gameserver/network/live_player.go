@@ -396,13 +396,13 @@ func (p *livePlayer) Stop() {
 // The attack stance and in-combat state are left alone: they end only on
 // their own expiry, on death or on logout.
 //
-// A teleport has already left p unable to act. Its attack stop is answered
-// with two ActionFailed, the refused idle's and the stop's own, and a cast
-// in flight is stopped with the intention queued behind it still in place:
-// the stopped cast's end thinks it once, refused, before the teleport drops
-// it with everything else. Last, a teleport's abort resets the selection
-// (Creature.abortAll(true)): ActionFailed always, then TargetUnselected to
-// p and its observers when something, p itself included, was selected.
+// A teleport has already left p unable to act. Its attack stop is answered with
+// two ActionFailed, the refused idle's and the stop's own, and a cast in flight
+// is stopped with the intention queued behind it still in place: the stopped
+// cast's end thinks it once, refused, before the teleport drops it with
+// everything else. Last, a teleport's abort resets the selection: ActionFailed
+// always, then TargetUnselected to p and its observers when something, p itself
+// included, was selected.
 func (p *livePlayer) abortAll(teleport bool) {
 	queuedForCast := teleport && p.cast != nil && p.cast.CastingNow()
 	if queuedForCast {
@@ -437,8 +437,8 @@ func (p *livePlayer) abortAll(teleport bool) {
 	// Detach stops them (stopCubics); death removes them (removeAllCubics).
 }
 
-// resetTarget clears p's selection the way Player.setTarget(null) answers
-// it, with no early return for an empty selection: ActionFailed, then
+// resetTarget clears p's selection as any deselection is answered, with no
+// early return for an empty selection: ActionFailed, then
 // TargetUnselected to p and its observers when one was held.
 func (p *livePlayer) resetTarget() {
 	old := p.TakeTarget()

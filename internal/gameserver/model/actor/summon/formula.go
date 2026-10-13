@@ -384,9 +384,8 @@ func (a *Actor) baseMoveSpeed() int {
 	return int(a.walkSpeed)
 }
 
-// hungryHalved reports whether a pet's attack speed should be halved for
-// being under-fed, matching Pet.checkHungryState. Servitors have no feeding
-// state and are never halved.
+// hungryHalved reports whether a pet's attack speed should be halved for being
+// under-fed. Servitors have no feeding state and are never halved.
 func (a *Actor) hungryHalved() bool {
 	a.statusMu.RLock()
 	fed, maxMeal := a.fed, a.maxMeal
@@ -398,8 +397,8 @@ func (a *Actor) hungryHalved() bool {
 }
 
 // PAtkSpd returns this summon's physical attack speed, given baseAtkSpd from
-// its npc template (Pet.getStatus().getPAtkSpd() / SummonStatus's shared
-// basis), halved while hungry.
+// its npc template (the basis pets and servitors share), halved while
+// hungry.
 func (a *Actor) PAtkSpd(baseAtkSpd float64) float64 {
 	if a.hungryHalved() {
 		baseAtkSpd /= 2
@@ -408,8 +407,7 @@ func (a *Actor) PAtkSpd(baseAtkSpd float64) float64 {
 }
 
 // magicAtkSpdBase is the fixed magic-attack-speed base every pet and
-// servitor uses (PetStatus.getMAtkSpd / base SummonStatus), independent of
-// npc template.
+// servitor uses, independent of npc template.
 const magicAtkSpdBase = 333
 
 // MAtkSpd returns this summon's magic attack speed, halved while hungry.

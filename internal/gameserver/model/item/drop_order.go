@@ -1,10 +1,9 @@
 package item
 
 // dropMerger sums a category roll's quantities per item id and keeps them in
-// the order the reference iterates its result: DropCategory.calculateDrop
-// collects into a new HashMap<>(1) through merge(id, qty, Integer::sum), and
-// Monster.doItemDrop walks its entrySet. That order is the bucket order of
-// the map's table, each bucket newest key first.
+// the order the kill hands them out: the bucket order of a chained hash
+// table that starts at capacity 1 and doubles past a 0.75 load factor, each
+// bucket newest key first.
 //
 // The zero value is an empty map of initial capacity 1.
 type dropMerger struct {
@@ -17,9 +16,9 @@ type dropMerger struct {
 	threshold int
 }
 
-// merge adds qty to itemID, as HashMap.merge does: the table resizes at
-// the start of the call once a previous call left it over its threshold,
-// and a new key goes to the head of its bucket.
+// merge adds qty to itemID: the table resizes at the start of the call once a
+// previous call left it over its threshold, and a new key goes to the head of
+// its bucket.
 func (m *dropMerger) merge(itemID, qty int32) {
 	if m.table == nil {
 		m.threshold = 1
@@ -40,7 +39,7 @@ func (m *dropMerger) merge(itemID, qty int32) {
 
 // resize doubles the table (or allocates it at the initial capacity) and
 // recomputes the threshold at load factor 0.75, keeping each bucket's
-// relative order as HashMap.resize's split does.
+// relative order through the split.
 func (m *dropMerger) resize() {
 	oldCap := len(m.table)
 	newCap, newThreshold := m.threshold, 0

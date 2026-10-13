@@ -62,8 +62,8 @@ const (
 	FlagFakeDeath
 )
 
-// magicCircleAbnormalMask is AbnormalEffect.MAGIC_CIRCLE's client bitmask,
-// ClanGate's abnormal-effect icon.
+// magicCircleAbnormalMask is the client's magic-circle abnormal-effect
+// bitmask, ClanGate's abnormal-effect icon.
 const magicCircleAbnormalMask = 0x800000
 
 // clanGateOpener is a ClanGate target that tells the other online members
@@ -478,7 +478,7 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 		Level:             level,
 		RejectsIfAffected: k.rejectsIfAffected,
 		SelfTarget:        k.selfTarget,
-		// Mirrors AbstractEffect._isHerbEffect = _skill.getName().contains("Herb"):
+		// A skill whose name contains "Herb" makes a herb effect:
 		// a herb buff is identified by its owning skill's name, not by how it
 		// was cast, so this applies uniformly to every application path.
 		Herb: strings.Contains(skill.Name, "Herb"),
@@ -749,10 +749,9 @@ func (e *Effect) DecreaseForce(list *List, reapply func(level int)) {
 	}
 }
 
-// IncreasePower grows a live seed effect's charge level by one in place,
-// matching EffectSeed.increasePower(): unlike a fusion effect's
-// IncreaseEffect, the same instance keeps running — only its Level (power)
-// changes, nothing is removed or reapplied.
+// IncreasePower grows a live seed effect's charge level by one in place: unlike
+// a fusion effect's IncreaseEffect, the same instance keeps running — only its
+// Level (power) changes, nothing is removed or reapplied.
 func (e *Effect) IncreasePower() {
 	if e == nil {
 		return

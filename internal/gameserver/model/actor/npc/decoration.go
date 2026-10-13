@@ -109,7 +109,7 @@ func (d *Decoration) zoneTeleporting() bool { return false }
 
 // swimStateChanged shows the decoration's observers its view again as it
 // enters or leaves water: the stationary one when it cannot move at its
-// speed, the full one otherwise (WaterZone.onEnter and onExit).
+// speed, the full one otherwise.
 func (d *Decoration) swimStateChanged(bool) {
 	if d.sink != nil {
 		d.sink.Emit(event.NPCInfoChanged{ServerObject: d.stats.moveSpeed == 0})

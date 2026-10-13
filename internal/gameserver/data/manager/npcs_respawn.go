@@ -150,7 +150,7 @@ func (n *Npcs) scheduleRespawn(slot slotInfo, delay time.Duration) {
 // resuming through the same persisted-state restore rule used at boot).
 // A slot DespawnAll dropped is not respawned. The NPC is built from the
 // template the slot was declared with, not the one the table holds now:
-// ASpawn keeps its template for life, so //reload npc does not reach the
+// A spawn keeps its template for life, so //reload npc does not reach the
 // respawns of spawns already in place.
 func (n *Npcs) Respawn(key string) {
 	n.respawnSlot(key)

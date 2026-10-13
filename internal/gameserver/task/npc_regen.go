@@ -11,8 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-// NPCRegenTick is the fixed HP/MP regeneration period (Formulas.
-// getRegeneratePeriod's HP_REGENERATE_PERIOD, 3s).
+// NPCRegenTick is the fixed HP/MP regeneration period, 3s.
 const NPCRegenTick = creature.RegenPeriod
 
 // RegenSweep is how often NPCRegen polls the regeneration phases: a tick

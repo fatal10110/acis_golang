@@ -128,8 +128,7 @@ func (w *WorldObjects) Door(id int) (*door.Object, bool) {
 	return obj, ok
 }
 
-// DoorByName returns the spawned door named name, ignoring case
-// (DoorData.getDoor(String)).
+// DoorByName returns the spawned door named name, ignoring case.
 func (w *WorldObjects) DoorByName(name string) (*door.Object, bool) {
 	if w == nil {
 		return nil, false
@@ -208,7 +207,7 @@ func (w *WorldObjects) SetDoorOpen(id int, open bool) bool {
 	return w.changeDoorState(obj, open, false)
 }
 
-// changeDoorState mirrors Door.changeState(open, triggered); the caller
+// changeDoorState opens or closes obj as open says; the caller
 // holds doorMu. A broken door keeps its state. triggered is true only for a
 // cascaded change propagated from another door's Template.TriggeredID, and
 // suppresses this door's own auto-timer reschedule so the linked door's
@@ -423,15 +422,14 @@ func (w *WorldObjects) newDoors(doors *door.Table) (*doorSet, error) {
 	return set, nil
 }
 
-// ReloadDoors replaces every spawned door with one built from doors
-// (DoorData.reload). Each door standing opens first, as an open does, so
-// no blocker of an old door is in the geodata the new doors are measured
-// against. The new doors are built, the old ones leave the world with
-// their timers and regeneration, and each new door enters the world in
-// the state opposite to its template's, so observers see it so first, and
-// then takes its template's state as any state change does (geodata,
-// broadcast, a linked new door, the auto timer); a linked door not in the
-// world yet takes the change too. When a new door cannot be built, the
+// ReloadDoors replaces every spawned door with one built from doors. Each door
+// standing opens first, as an open does, so no blocker of an old door is in the
+// geodata the new doors are measured against. The new doors are built, the old
+// ones leave the world with their timers and regeneration, and each new door
+// enters the world in the state opposite to its template's, so observers see it
+// so first, and then takes its template's state as any state change does
+// (geodata, broadcast, a linked new door, the auto timer); a linked door not in
+// the world yet takes the change too. When a new door cannot be built, the
 // doors that opened close again and stay.
 //
 // Doors are looked up by id when they act, so scripts, clan hall grounds,

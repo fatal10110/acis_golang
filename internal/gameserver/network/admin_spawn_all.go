@@ -67,8 +67,7 @@ func (l *GameClientLink) adminRespawnAll(_ *livePlayer, _ string) {
 	l.messageGMs("NPCs' respawn is now complete.")
 }
 
-// messageGMs tells every game master online, hidden ones too, text:
-// AdminData.broadcastMessageToGMs.
+// messageGMs tells every game master online, hidden ones too, text.
 func (l *GameClientLink) messageGMs(text string) {
 	broadcastFrame(func() wire.Frame {
 		return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, text)

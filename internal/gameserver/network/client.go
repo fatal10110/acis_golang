@@ -109,14 +109,14 @@ func (c *Client) Accept(opcode byte) bool {
 
 // countUnderflow records one malformed-packet (buffer underflow) occurrence
 // in the current 60s sliding window and reports whether the per-minute
-// threshold has now been exceeded, mirroring ClientStats.countUnderflowException.
+// threshold has now been exceeded.
 func (c *Client) countUnderflow() bool {
 	return countInWindow(&c.mu, &c.underflowCount, &c.underflowWindowStart, maxUnderflowsPerMin)
 }
 
 // countUnknownPacket records one unknown/rejected-opcode occurrence in the
 // current 60s sliding window and reports whether the per-minute threshold
-// has now been exceeded, mirroring ClientStats.countUnknownPacket.
+// has now been exceeded.
 func (c *Client) countUnknownPacket() bool {
 	return countInWindow(&c.mu, &c.unknownCount, &c.unknownWindowStart, maxUnknownPerMin)
 }

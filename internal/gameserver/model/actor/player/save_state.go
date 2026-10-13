@@ -37,9 +37,9 @@ type SaveState struct {
 	// VarkaKetraAlliance is the faction standing (see VarkaKetraAlliance).
 	VarkaKetraAlliance int
 	// ClientDetached marks a copy taken while the character lingers in the
-	// world after its connection dropped: the row's online column then
-	// records 2 instead of 1 (Player.isOnlineInt, Player.java:4504-4510).
-	// The character model does not know its session, so the caller sets it.
+	// world after its connection dropped: the row's online column then records
+	// 2 instead of 1. The character model does not know its session, so the
+	// caller sets it.
 	ClientDetached bool
 }
 

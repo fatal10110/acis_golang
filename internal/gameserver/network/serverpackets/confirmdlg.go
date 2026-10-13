@@ -15,11 +15,11 @@ const OpcodeConfirmDlg = 0xed
 // echoes back.
 const ConfirmDlgSummonFriendRequest int32 = 1842
 
-// ConfirmDlgResurrectionRequest is SystemMessageId's
-// RESSURECTION_REQUEST_BY_S1, the resurrection offer's messageId.
+// ConfirmDlgResurrectionRequest is system message RESSURECTION_REQUEST_BY_S1,
+// the resurrection offer's messageId.
 const ConfirmDlgResurrectionRequest int32 = 1510
 
-// ConfirmDlgRestoreRequest is SystemMessageId's DO_YOU_WANT_TO_BE_RESTORED,
+// ConfirmDlgRestoreRequest is system message DO_YOU_WANT_TO_BE_RESTORED,
 // whose answer is handled as a resurrection offer's.
 const ConfirmDlgRestoreRequest int32 = 332
 
@@ -54,8 +54,7 @@ func FrameConfirmDlgSummonFriendRequest(casterName string, casterID int32, x, y,
 
 // FrameConfirmDlgResurrectionRequest builds the resurrection offer: the
 // message id and the reviver's name as its single TYPE_TEXT parameter, with
-// no countdown or requester id (ConfirmDlg.writeImpl writes neither when
-// they are zero).
+// no countdown or requester id (both are left out when zero).
 func FrameConfirmDlgResurrectionRequest(reviverName string) wire.Frame {
 	w := newFrameWriter(OpcodeConfirmDlg)
 	w.WriteInt32(ConfirmDlgResurrectionRequest)

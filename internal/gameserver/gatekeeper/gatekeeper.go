@@ -54,9 +54,8 @@ func NewService(teleports travel.TeleportTable, instants travel.InstantTable, fr
 }
 
 // SetTables replaces the destinations with teleports and instants, at once
-// for every later request: TeleportData.reload and
-// InstantTeleportData.reload. A request already running keeps the tables
-// it started with.
+// for every later request, as a teleport reload does. A request already
+// running keeps the tables it started with.
 func (s *Service) SetTables(teleports travel.TeleportTable, instants travel.InstantTable) {
 	s.tables.Store(&destinations{teleports: teleports, instants: instants})
 }
@@ -179,8 +178,7 @@ func (s *Service) Instant(npcID, index int) Trip {
 	return Trip{Depart: true, Destination: list[index]}
 }
 
-// price is t's price at now for the talker talkerID
-// (TeleportLocation.getCalculatedPriceCount): an ancient adena price is
+// price is t's price at now for the talker talkerID: an ancient adena price is
 // its base count for a Gnosis follower and 1.6 times it, truncated, for
 // everyone else.
 func (s *Service) price(t travel.Teleport, now time.Time, talkerID int32) int {

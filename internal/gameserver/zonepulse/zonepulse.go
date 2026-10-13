@@ -1,11 +1,10 @@
 // Package zonepulse runs the periodic tasks of the effect and damage zones.
 //
-// The first occupant to enter such a zone starts its pulse: after the
-// zone's initial delay, then every reuse delay at a fixed rate, a damage
-// zone hurts each living occupant (DamageZone.onEnter's task) and an effect
-// zone lands its skills on each living occupant that wins the chance roll
-// (EffectZone.applyEffect). A pulse that finds its zone empty, or a damage
-// zone gone dormant, stops; the next entry starts a fresh one.
+// The first occupant to enter such a zone starts its pulse: after the zone's
+// initial delay, then every reuse delay at a fixed rate, a damage zone hurts
+// each living occupant and an effect zone lands its skills on each living
+// occupant that wins the chance roll. A pulse that finds its zone empty, or a
+// damage zone gone dormant, stops; the next entry starts a fresh one.
 //
 // Each pulse runs on the queue Wire is given. What it does to one occupant
 // runs on that occupant's own queue, when it has one.
@@ -53,11 +52,9 @@ type Damageable interface {
 // occupant being both the skill's caster and its target.
 type Effects interface {
 	// Conditions reports whether def's conditions hold for target using it
-	// on itself, telling target why not when they do not
-	// (L2Skill.checkCondition).
+	// on itself, telling target why not when they do not.
 	Conditions(target Target, def modelskill.Definition) bool
-	// Land lands def's effects on target (L2Skill.getEffects(target,
-	// target)).
+	// Land lands def's effects on target, as both effector and effected.
 	Land(target Target, def modelskill.Definition)
 }
 

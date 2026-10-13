@@ -44,8 +44,7 @@ func (s *State) SealOwners() [3]Cabal {
 
 // GnosisFollower reports whether objectID travels for the base ancient
 // adena price: during seal validation, signed up for the cabal owning the
-// Seal of Gnosis and having chosen that seal
-// (TeleportLocation.getCalculatedPriceCount).
+// Seal of Gnosis and having chosen that seal.
 func (s *State) GnosisFollower(objectID int32) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -331,8 +331,8 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	if l.playerClock != nil {
 		l.playerClock.Add(live)
 	}
-	// Reproduce GameClient's _autoSaveInDB: first full-stat save 5 minutes
-	// after entering the world, then every 15 minutes while still online.
+	// Periodic autosave: first full-stat save 5 minutes after entering the
+	// world, then every 15 minutes while still online.
 	if l.autosave != nil {
 		l.autosave.Add(live)
 	}

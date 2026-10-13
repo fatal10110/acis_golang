@@ -6,8 +6,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 )
 
-// minWanderOffset is Npc.moveFromSpawnPointUsingRandomOffset's "offset
-// isn't noticeable" cutoff: offsets below this do not start a walk.
+// minWanderOffset is the random wander's "offset isn't noticeable" cutoff:
+// offsets below this do not start a walk.
 const minWanderOffset = 10
 
 // randomWalkLoopLimit is how many offset samples a maker wander tries

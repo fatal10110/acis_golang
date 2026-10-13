@@ -68,11 +68,13 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 // Save persists a character's progress — the active and base classes, the base
 // class's level, exp and sp, expBeforeDeath, cur/max HP/CP/MP,
 // karma/pvpkills/pkkills, death_penalty_level, the accumulated session
-// playtime, the personal-surrender flag, the noblesse status, the Seven Signs dungeon membership, the Ketra/Varka faction standing and each subclass's progression — so a later reload reflects everything gained
-// since the last save instead of the row's creation-time values. Location and
-// appearance columns are not written here. The row is also marked online:
-// Save only runs for characters currently in game. Online is 1, or 2 for a
-// character lingering after its connection dropped (Player.isOnlineInt).
+// playtime, the personal-surrender flag, the noblesse status, the Seven Signs
+// dungeon membership, the Ketra/Varka faction standing and each subclass's
+// progression — so a later reload reflects everything gained since the last
+// save instead of the row's creation-time values. Location and appearance
+// columns are not written here. The row is also marked online: Save only runs
+// for characters currently in game. Online is 1, or 2 for a character lingering
+// after its connection dropped.
 func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
 	resources, progression := st.Resources, st.Progression
 	_, err := s.db.ExecContext(ctx,
@@ -91,7 +93,7 @@ func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
 }
 
 // onlineColumn is the characters.online value of a character in game: 1,
-// or 2 once its client detached (Player.isOnlineInt).
+// or 2 once its client detached.
 func onlineColumn(clientDetached bool) int {
 	if clientDetached {
 		return 2

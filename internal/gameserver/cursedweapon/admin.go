@@ -115,8 +115,8 @@ func (m *Manager) Unreserve(itemID int32) {
 
 // StartLife starts the full life of itemID's weapon, which a game master
 // just gave holderID: its hunger and its end time count from now, and its
-// life check runs every minute (CursedWeapon.reActivate(true)). It reports
-// false, changing nothing, when holderID does not hold it.
+// life check runs every minute. It reports false, changing nothing, when
+// holderID does not hold it.
 func (m *Manager) StartLife(itemID, holderID int32) bool {
 	if m == nil {
 		return false
@@ -134,10 +134,9 @@ func (m *Manager) StartLife(itemID, holderID int32) bool {
 	return true
 }
 
-// Reload ends every weapon, out or not, in the reference's order, then
-// takes table's weapons in place of the ones it had, none of them out
-// (CursedWeaponManager.reload). It returns the ends for the caller to
-// apply.
+// Reload ends every weapon, out or not, in the order Weapons lists them,
+// then takes table's weapons in place of the ones it had, none of them out.
+// It returns the ends for the caller to apply.
 func (m *Manager) Reload(table *entity.CursedWeaponTable) []EndOfLife {
 	if m == nil {
 		return nil

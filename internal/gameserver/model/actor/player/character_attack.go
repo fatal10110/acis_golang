@@ -105,9 +105,8 @@ func (w activeWeapon) grade() int {
 // alongside the world-grid presence and CreatureMove position it must
 // stay consistent with.
 
-// UpdateUserInfo reports that this character's UserInfo must be resent,
-// mirroring PlayerStatus.addExp() pushing a fresh UserInfo on
-// every experience change — without it the client keeps displaying the
+// UpdateUserInfo reports that this character's UserInfo must be resent, as
+// every experience change does — without it the client keeps displaying the
 // experience, SP and level it was last told about.
 func (c *Character) UpdateUserInfo() {
 	c.emit(event.UserInfoChanged{})
@@ -123,13 +122,13 @@ func (c *Character) UpdateAbnormalEffect() {
 
 // StartAbnormalEffect adds mask to this character's client-visible
 // abnormal-effect bitmask (the cosmetic/visual state carried in CharInfo and
-// UserInfo, e.g. BigHead), mirroring Creature.startAbnormalEffect(int).
+// UserInfo, e.g. BigHead).
 func (c *Character) StartAbnormalEffect(mask int) {
 	c.abnormalEffectMask.Or(int32(mask))
 }
 
 // StopAbnormalEffect removes mask from this character's client-visible
-// abnormal-effect bitmask, mirroring Creature.stopAbnormalEffect(int).
+// abnormal-effect bitmask.
 func (c *Character) StopAbnormalEffect(mask int) {
 	for {
 		current := c.abnormalEffectMask.Load()

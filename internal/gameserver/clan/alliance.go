@@ -485,8 +485,7 @@ type AllyClanInfo struct {
 // AllianceInfo returns the alliance allyID's information, its clans in
 // ascending id order; false when no clan leads it. connected reports
 // whether a member in the world still has its client: one lingering after
-// its connection dropped is not counted online (ClanInfo.java:13,
-// Clan.getOnlineMembersCount).
+// its connection dropped is not counted online.
 func (t *Table) AllianceInfo(allyID int32, connected func(objectID int32) bool) (AllyInfo, bool) {
 	leader, ok := t.Get(allyID)
 	if !ok {

@@ -43,7 +43,7 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 		BuyLists: func() (*buylist.Table, error) {
 			return gamexml.LoadBuyLists(filepath.Join(xmlRoot, "buyLists.xml"), data.Items)
 		},
-		// CrestCache.reload never fails: what was read before a bad file
+		// A crest reload never fails: what was read before a bad file
 		// stays loaded, as at boot.
 		Crests: func() error {
 			fresh, err := loadCrestCache(paths, log)
@@ -119,8 +119,7 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 			}
 			return teleports, instants, nil
 		},
-		// SpawnManager.reload: the save failing is logged and the load
-		// goes on, as in the reference.
+		// The save failing is logged and the load goes on.
 		SpawnList: func(ctx context.Context, current *manager.Spawns) (*manager.Spawns, error) {
 			if err := current.Save(ctx, spawnStore); err != nil {
 				log.Warn().Err(err).Msg("save spawn data before the spawn list reload")

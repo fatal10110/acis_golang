@@ -48,7 +48,7 @@ func (l *GameClientLink) charInfoPage(target *livePlayer) string {
 		}
 	}
 	// A player lingering after its connection dropped shows as
-	// disconnected already (AdminEditChar.java:586).
+	// disconnected already.
 	ip := target.remoteIP
 	if target.clientDetached() {
 		ip = "Disconnected"

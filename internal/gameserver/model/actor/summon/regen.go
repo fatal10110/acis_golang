@@ -44,7 +44,7 @@ func (a *Actor) Regen() *creature.Regen { return &a.regen }
 
 // SettleRegen arms a's regeneration task when it is spawned, alive and
 // short of HP or MP, its first tick one period from now, and disarms
-// it otherwise (CreatureStatus.setHp/setMp's start and stop).
+// it otherwise; every HP or MP change settles it so.
 func (a *Actor) SettleRegen() {
 	a.regen.Settle(a.Queue(), a.regenShort)
 }

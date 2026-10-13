@@ -17,15 +17,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-// DataReloads re-read the data tables //reload names (AdminReload.java)
-// and the spawn list //respawnall reloads. A hook that returns only an error
-// reads its files and swaps the loaded table in place for every holder,
-// keeping the table as it was when the files cannot be read; a nil hook
-// leaves its table as booted, and //reload answers its type as not ported
-// yet.
+// DataReloads re-read the data tables //reload names and the spawn list
+// //respawnall reloads. A hook that returns only an error reads its files and
+// swaps the loaded table in place for every holder, keeping the table as it was
+// when the files cannot be read; a nil hook leaves its table as booted, and
+// //reload answers its type as not ported yet.
 type DataReloads struct {
-	// Admin reloads the access levels and admin commands
-	// (AdminData.reload).
+	// Admin reloads the access levels and admin commands.
 	Admin func() error
 	// BoatRoutes reads the boat itineraries anew, which then replace the
 	// fleet's.
@@ -48,46 +46,43 @@ type DataReloads struct {
 	//     composition root that builds this hook lists them.
 	Config func() (PlayerConfig, error)
 	// BuyLists reads the buylists anew, which the merchant then sells
-	// from, its limited stock rebuilt from the saved rows
-	// (BuyListManager.reload).
+	// from, its limited stock rebuilt from the saved rows.
 	BuyLists func() (*buylist.Table, error)
-	// Crests reloads the crest images (CrestCache.reload).
+	// Crests reloads the crest images.
 	Crests func() error
-	// CursedWeapons reads the cursed weapons anew (CursedWeaponManager.load),
-	// which the link then takes in place of the ones it had.
+	// CursedWeapons reads the cursed weapons anew, which the link then takes in
+	// place of the ones it had.
 	CursedWeapons func() (*entity.CursedWeaponTable, error)
 	// Doors reads the doors anew, which then replace the doors in the
-	// world (DoorData.reload's load).
+	// world.
 	Doors func() (*door.Table, error)
-	// HTML reloads the HTML pages (HtmCache.reload).
+	// HTML reloads the HTML pages.
 	HTML func() error
 	// Items reloads the item templates. Tables that resolved or checked
 	// item ids against the templates when they were read (multisells,
 	// buylists, NPC drops) are not read again; each has its own reload.
 	Items func() error
-	// Multisells reloads the multisell lists (MultisellData.reload).
+	// Multisells reloads the multisell lists.
 	Multisells func() error
-	// NPCs reloads the NPC templates (NpcData.reload); NPCs already in the
+	// NPCs reloads the NPC templates; NPCs already in the
 	// world keep theirs, and so do the respawns of spawns already in place
-	// (ASpawn's template is fixed when the spawn is built).
+	// (a spawn's template is fixed when the spawn is built).
 	NPCs func() error
 	// Skills reloads the skill definitions. Tables that resolved or
 	// checked skills against them when they were read (NPC templates,
 	// cursed weapons, the scheme buffer) are not read again; NPC templates
 	// and cursed weapons have their own reload.
 	Skills func() error
-	// WalkerRoutes reloads the walker routes (WalkerRouteData.reload).
+	// WalkerRoutes reloads the walker routes.
 	WalkerRoutes func() error
 	// Teleports reads the gatekeeper destinations, which the link's
-	// gatekeeper then holds (TeleportData.reload and
-	// InstantTeleportData.reload).
+	// gatekeeper then holds.
 	Teleports func() (travel.TeleportTable, travel.InstantTable, error)
 	// SpawnList saves current's database-tracked spawn rows, then reads the
-	// spawn list and those rows anew, for //respawnall
-	// (SpawnManager.reload's save and load).
+	// spawn list and those rows anew, for //respawnall.
 	SpawnList func(ctx context.Context, current *manager.Spawns) (*manager.Spawns, error)
 	// Zones reads the zones anew, set up as at boot, which then replace the
-	// ones the server holds (ZoneManager.reload's load).
+	// ones the server holds.
 	Zones func() (*zone.Index, error)
 }
 
@@ -117,7 +112,7 @@ type reloadType struct {
 	runFor func(l *GameClientLink, gm *livePlayer) error
 }
 
-// reloadTypes are the types //reload takes, in the order AdminReload.java
+// reloadTypes are the types //reload takes, in the order //reload
 // tests a token against them: the first that matches reloads.
 var reloadTypes = []reloadType{
 	{word: "admin", done: "Admin data has been reloaded.", run: func(l *GameClientLink) error { return reloadHook(l.reloads.Admin) }},
@@ -204,7 +199,7 @@ func sendReloadUsage(live *livePlayer) {
 // once, at boot, and their registry never changes.
 func reloadNothing(*GameClientLink) error { return nil }
 
-// reloadNPCs reloads the NPC templates: NpcData.reload. Scripts are not
+// reloadNPCs reloads the NPC templates. Scripts are not
 // reloaded with them; their bindings are keyed by NPC id, so the new
 // templates keep them.
 func (l *GameClientLink) reloadNPCs() error {

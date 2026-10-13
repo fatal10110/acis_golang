@@ -8,8 +8,8 @@ import (
 )
 
 // pkKillKarmaPlateau is the karma gain once a killer's PK-kill count
-// reaches the formula's flat-rate ceiling, matching
-// Formulas.calculateKarmaGain's default branch.
+// reaches the formula's flat-rate ceiling (the karma formula's default
+// branch).
 const pkKillKarmaPlateau = 14400
 
 // calculateKarmaGain returns the karma a PK kill awards the killer, keyed

@@ -769,14 +769,14 @@ func (c *Character) reducePeriodicHP(amount float64, attacker effect.Actor, isDO
 	}
 }
 
-// applyNonConsumptionDamageEffects mirrors PlayerStatus.reduceHp's
-// !isHPConsumption block: every normal-hit or DOT damage source stops SLEEP
-// and IMMOBILE_UNTIL_ATTACKED, stands the character up when it has finished
-// sitting down (an ordinary sit or a fake-death lie-down) unless it is in
-// shop mode, and — for non-DOT damage only — has a 1-in-10 chance to break
-// STUN. A sit-down or lie-down still under way is left to finish. HP spent
-// as a skill's own resource cost, a toggle's upkeep tick among it
-// (ReduceHPByToggleUpkeep), never routes through here.
+// applyNonConsumptionDamageEffects runs what damage that is not an HP cost
+// does: every normal-hit or DOT damage source stops SLEEP and
+// IMMOBILE_UNTIL_ATTACKED, stands the character up when it has finished sitting
+// down (an ordinary sit or a fake-death lie-down) unless it is in shop mode,
+// and — for non-DOT damage only — has a 1-in-10 chance to break STUN. A
+// sit-down or lie-down still under way is left to finish. HP spent as a skill's
+// own resource cost, a toggle's upkeep tick among it (ReduceHPByToggleUpkeep),
+// never routes through here.
 func (c *Character) applyNonConsumptionDamageEffects(isDOT bool) {
 	live := c.liveLocked()
 	list := live.EffectList()

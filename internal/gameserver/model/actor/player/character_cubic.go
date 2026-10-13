@@ -24,9 +24,8 @@ func (c *Character) AddOrRefreshCubic(id cubic.ID, givenByOther bool) (touched, 
 	return true, !refreshed
 }
 
-// RemoveCubic deactivates the cubic of id, matching Cubic.stop() removing
-// itself from the owner's CubicList once its lifetime elapses or it is
-// otherwise stopped.
+// RemoveCubic deactivates the cubic of id, removing it from c's cubic list
+// once its lifetime elapses or it is otherwise stopped.
 func (c *Character) RemoveCubic(id cubic.ID) {
 	c.cubics.Remove(id)
 }

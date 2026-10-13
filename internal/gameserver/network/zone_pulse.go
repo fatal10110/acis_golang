@@ -17,8 +17,7 @@ const systemMessageTrapDeviceTripped = 714
 
 // wireZonePulses gives the effect and damage zones their periodic tasks,
 // run on a queue of their own, and the castle traps their siege: a castle
-// trap is live only while its castle's siege is in progress
-// (CastleZoneType.getCastle().getSiege().isInProgress()).
+// trap is live only while its castle's siege is in progress.
 func (l *GameClientLink) wireZonePulses(ix *zone.Index) {
 	if l.world == nil {
 		return
@@ -58,8 +57,8 @@ func (l *GameClientLink) castleSiegeInProgress(castleID int) func() bool {
 }
 
 // trapTripped tells the defenders of castleID's siege that one of its traps
-// started hurting (Siege.announce(A_TRAP_DEVICE_HAS_BEEN_TRIPPED,
-// SiegeSide.DEFENDER)): the online members of its owner and defender clans.
+// started hurting (A_TRAP_DEVICE_HAS_BEEN_TRIPPED): the online members of
+// its owner and defender clans.
 func (l *GameClientLink) trapTripped(castleID int) {
 	if l.sieges == nil {
 		return

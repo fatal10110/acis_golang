@@ -18,12 +18,11 @@ type fusionHandler struct {
 
 func (fusionHandler) Types() []string { return []string{"FUSION"} }
 
-// Use ports FusionSkill(caster, target, skill): each target already carrying
-// a live effect owned by the cast skill's TriggeredID grows it via
-// IncreaseEffect, capped at that triggered skill's max level. A target with
-// no such effect gets the triggered skill's effects applied fresh. The
-// channel-abort DecreaseForce path (FusionSkill.onCastAbort, gated on a
-// geo-range check) is wired via cast/schedule.go's ScheduleFusion, not this
+// Use starts a fusion channel: each target already carrying a live effect owned
+// by the cast skill's TriggeredID grows it via IncreaseEffect, capped at that
+// triggered skill's max level. A target with no such effect gets the triggered
+// skill's effects applied fresh. The channel-abort DecreaseForce path (gated on
+// a geo-range check) is wired via cast/schedule.go's ScheduleFusion, not this
 // Use handler — a Use handler does not run abort cleanup.
 func (h fusionHandler) Use(cast Cast) {
 	if h.defs == nil {

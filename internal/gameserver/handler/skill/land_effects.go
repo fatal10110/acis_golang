@@ -10,8 +10,7 @@ import (
 // cast, as a skill applied directly: no cast, no shot, no shield. A passive
 // skill or one without effects lands nothing; otherwise the landing gates
 // and rolls of a cast's own effects apply. It reports how many templates
-// with an icon effected resisted (L2Skill.getEffects tells a player
-// effector of each one).
+// with an icon effected resisted (a player effector is told of each one).
 func LandEffects(effector effect.Actor, effected Actor, def modelskill.Definition) (resisted int) {
 	if def.Activation == modelskill.ActivationPassive || len(def.Effects) == 0 {
 		return 0

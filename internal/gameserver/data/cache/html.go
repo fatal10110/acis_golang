@@ -71,9 +71,8 @@ func LoadHTML(dir string) (h *HTML, undecodable []string, err error) {
 	return h, undecodable, nil
 }
 
-// Replace swaps h's pages for from's, at once for every holder of h:
-// HtmCache.reload, which the reference runs by emptying its cache so every
-// page is read from disk again.
+// Replace swaps h's pages for from's, at once for every holder of h, as an
+// HTML reload does: every page is read from disk again.
 func (h *HTML) Replace(from *HTML) {
 	h.pages.Store(from.pages.Load())
 }

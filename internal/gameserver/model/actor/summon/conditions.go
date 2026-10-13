@@ -59,11 +59,11 @@ func (s summonStatActor) IsMoving() bool { return s.a.IsMoving() }
 func (s summonStatActor) IsRunning() bool { return s.a.Running() }
 
 // IsRiding satisfies conditions.Actor. Always false: summons are never
-// mounted, matching Creature.isRiding's un-overridden default.
+// mounted.
 func (s summonStatActor) IsRiding() bool { return false }
 
 // IsFlying satisfies conditions.Actor. Always false: no shipped summon
-// overrides Creature.isFlying's default.
+// flies.
 func (s summonStatActor) IsFlying() bool { return false }
 
 // headingActor is the extra capability IsBehind/IsInFrontOf need beyond

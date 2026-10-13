@@ -169,8 +169,7 @@ func (p *Persistence) Save(ctx context.Context, st SaveState) error {
 }
 
 // liveActiveEffects snapshots c's live effect list into the ActiveEffect view
-// BuildSaveRows needs, mirroring Player.storeEffect()'s use of
-// getAllEffects(): the effect list itself is the single source of truth for
+// BuildSaveRows needs: the effect list itself is the single source of truth for
 // what gets saved, not a separate write-only registry. A stacked-out effect
 // still held in the list is saved too, so it resumes behind the stronger one
 // after relog. An effect whose skill definition no longer resolves is
@@ -354,17 +353,15 @@ func (p *Persistence) RemoveAllSkills(c *player.Character) {
 // ReplayEffects reinstates every effect Restore recorded into c's restore
 // registry (via RestoreSkillEffect) onto c's live effect list, at the tick
 // count and elapsed time it had at logout, run on from its restore instant.
-// Call once c.EffectList() is attached, after Restore itself: Restore
-// records restored effects into the registry only, so a character not yet
-// in the world sends nothing for them — this replay is what actually fires
-// their OnStart, schedules their ticks, and surfaces their icons, mirroring
-// Player.restoreEffects()'s template.getEffect(this, this, skill) ->
-// setCount/setTime -> scheduleEffect() chain, with one icon refresh for
-// the whole replay, as EnterWorld sends one. An effect whose ticks run an
-// action runs those of the ticks due between the restore and the replay, in
-// time order across all the effects, on c; one that ran out in between is
-// not reinstated. A session
-// that ends before EnterWorld replays them too, ahead of its saves.
+// Call once c.EffectList() is attached, after Restore itself: Restore records
+// restored effects into the registry only, so a character not yet in the world
+// sends nothing for them — this replay is what actually fires their OnStart,
+// schedules their ticks from the restored count and time, and surfaces their
+// icons, with one icon refresh for the whole replay, as EnterWorld sends one.
+// An effect whose ticks run an action runs those of the ticks due between the
+// restore and the replay, in time order across all the effects, on c; one that
+// ran out in between is not reinstated. A session that ends before EnterWorld
+// replays them too, ahead of its saves.
 func (p *Persistence) ReplayEffects(c *player.Character) {
 	if p == nil || c == nil {
 		return
@@ -960,8 +957,7 @@ func (p *Persistence) itemSkillGrants(tmpl *item.Template) ([]itemSkillGrant, er
 // attach its passive stat functions once); at another level the known
 // level's stat functions are dropped before the granted level's attach. An
 // ACTIVE entry with a positive equip delay and no already-armed reuse timer
-// for its reuse key gets one armed, matching
-// ItemPassiveSkillsListener.onEquip:58-72.
+// for its reuse key gets one armed.
 func (p *Persistence) grantItemSkills(c *player.Character, grants []itemSkillGrant) (skillsChanged, timersChanged bool) {
 	for _, g := range grants {
 		def := g.def

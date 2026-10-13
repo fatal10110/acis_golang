@@ -13,12 +13,11 @@ type skillAnimator interface {
 	BroadcastSkillAnimation(casterID int32, casterAt location.Location, targetID int32, targetAt location.Location, skillID, level int32, hitTime, reuseDelay int)
 }
 
-// BroadcastMagicSkillUse shows every player around the NPC the cast
-// animation of skillID at level from caster to target, with hitTime and
-// reuseDelay in milliseconds (Creature.broadcastPacket of a MagicSkillUse).
-// It is only shown: no skill is used, and caster and target may be any
-// creatures. Each stands where it is at the call. A handle on nothing
-// panics.
+// BroadcastMagicSkillUse shows every player around the NPC the cast animation
+// of skillID at level from caster to target, with hitTime and reuseDelay in
+// milliseconds (a MagicSkillUse). It is only shown: no skill is used, and
+// caster and target may be any creatures. Each stands where it is at the call.
+// A handle on nothing panics.
 func (n *NPC) BroadcastMagicSkillUse(caster, target Creature, skillID, level int32, hitTime, reuseDelay int) {
 	a, ok := n.combatant().(skillAnimator)
 	if !ok {

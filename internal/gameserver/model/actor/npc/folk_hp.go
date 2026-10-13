@@ -286,7 +286,7 @@ func (f *Folk) Regen() *creature.Regen { return &f.regen }
 
 // SettleRegen arms the NPC's regeneration task when it is spawned, alive
 // and short of HP or MP, its first tick one period from now, and disarms
-// it otherwise (CreatureStatus.setHp/setMp's start and stop).
+// it otherwise; every HP or MP change settles it so.
 func (f *Folk) SettleRegen() {
 	f.regen.Settle(f.Queue(), f.regenShort)
 }

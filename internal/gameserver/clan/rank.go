@@ -93,8 +93,8 @@ const (
 // on its leader c's request. The handover itself is a scheduled task
 // (#3149); until it runs a second nomination is refused as pending.
 // connected reports whether a member in the world still has its client:
-// one lingering after its connection dropped is refused as offline
-// (ClanMember.isOnline). It is called with the clan lock released.
+// one lingering after its connection dropped is refused as offline. It is
+// called with the clan lock released.
 func (s *Service) NominateLeader(c *player.Character, name string, connected func(objectID int32) bool) NominationResult {
 	cl, ok := s.ClanOf(c)
 	switch {

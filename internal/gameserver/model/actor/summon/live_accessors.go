@@ -86,10 +86,10 @@ func (a *Actor) OwnerID() int32 {
 }
 
 // OwnerStillLinked reports whether the owner still identifies this summon as
-// their active one. DecayTaskManager cancels a tracked summon corpse when this
-// returns false, before its deadline is checked. A servitor's corpse whose
-// owner left stays linked to the session that left it, which no longer
-// changes its summon.
+// their active one. The corpse-decay task cancels a tracked summon corpse when
+// this returns false, before its deadline is checked. A servitor's corpse whose
+// owner left stays linked to the session that left it, which no longer changes
+// its summon.
 func (a *Actor) OwnerStillLinked() bool {
 	if a == nil || a.world == nil {
 		return false
@@ -829,15 +829,14 @@ func (a *Actor) Fed() int {
 }
 
 // CanEatFood reports whether itemID matches one of this pet's configured
-// food template ids, matching PetTemplate.canEatFood.
+// food template ids.
 func (a *Actor) CanEatFood(itemID int32) bool {
 	return itemID == a.food1 || itemID == a.food2
 }
 
 // AddFed increases a pet's meal gauge by amount, capped at maxMeal, and
 // reports the resulting fed value along with whether the pet is still below
-// the auto-feed threshold, matching Pet.checkAutoFeedState after
-// PetFoods.useFood's setCurrentFed update.
+// the auto-feed threshold after that update.
 func (a *Actor) AddFed(amount int) (fed int, stillHungry bool) {
 	a.statusMu.Lock()
 	a.fed += amount

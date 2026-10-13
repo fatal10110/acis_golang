@@ -23,7 +23,7 @@ const (
 // may run at now, extending its reuse deadline when allowed. A delay of 0
 // (or less) means the action is never rate-limited. While the deadline set
 // by a previous allowed call still holds, the action is refused without
-// touching it. Mirrors GameClient.performAction.
+// touching it.
 func (c *Client) performFloodProtected(protector int, delay time.Duration, now time.Time) bool {
 	if delay <= 0 {
 		return true

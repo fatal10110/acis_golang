@@ -62,10 +62,9 @@ type PlayerActor interface {
 	IsClanLeader() bool
 
 	// HasClan, ClanCastleID, ClanHasAnyCastle, ClanHallID and
-	// ClanHasAnyClanHall answer the clan-ownership checks
-	// ConditionPlayerHasCastle/HasClanHall need without requiring a full
-	// clan model here: ClanCastleID/ClanHallID are 0 when the clan owns
-	// none of that kind.
+	// ClanHasAnyClanHall answer the clan-ownership checks the HasCastle and
+	// HasClanHall conditions need without requiring a full clan model here:
+	// ClanCastleID/ClanHallID are 0 when the clan owns none of that kind.
 	HasClan() bool
 	ClanCastleID() int
 	ClanHasAnyCastle() bool

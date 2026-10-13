@@ -73,7 +73,7 @@ func (ep *EffectPoint) zoneTeleporting() bool { return false }
 
 // swimStateChanged shows the point's observers its view again as it enters
 // or leaves water: the stationary one when it cannot move at its speed,
-// the full one otherwise (WaterZone.onEnter and onExit).
+// the full one otherwise.
 func (ep *EffectPoint) swimStateChanged(bool) {
 	if ep.sink != nil {
 		ep.sink.Emit(event.NPCInfoChanged{ServerObject: ep.stats.moveSpeed == 0})

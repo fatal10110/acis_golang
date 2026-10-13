@@ -307,7 +307,7 @@ func (c *Character) addLevel(table *LevelTable, tmpl *Template, delta int, hooks
 	// UserInfo send below — the weight limit is CON-derived and therefore
 	// level-dependent.
 	hooks.add(c.RefreshWeightPenalty)
-	// The expertise penalty follows the weight penalty (PlayerStatus.addLevel):
+	// The expertise penalty follows the weight penalty on a level change:
 	// the level's skill grant above may have moved Expertise, and a flipped
 	// penalty's SkillList and EtcStatusUpdate trail the level's own SkillList
 	// and precede UserInfo.

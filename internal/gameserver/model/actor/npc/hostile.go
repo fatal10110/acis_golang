@@ -931,7 +931,7 @@ func (h *Hostile) RaidRelated() bool {
 
 // SetRaidRelated marks or clears this NPC's raid-encounter association.
 // Raid and grand bosses start marked; a Monster-family private spawned for a
-// raid boss master is marked by the spawner (MinionSpawn.doSpawn).
+// raid boss master is marked by the spawner.
 func (h *Hostile) SetRaidRelated(v bool) {
 	h.raidRelated.Store(v)
 }
