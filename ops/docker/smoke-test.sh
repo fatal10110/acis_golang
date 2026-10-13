@@ -117,13 +117,22 @@ clean_project
 # load over the existing data directory, and the server answers on an empty
 # acis database. It must not report healthy, so the servers that wait for a
 # healthy db never start. Wait until that restarted server answers with no
-# acis tables and one of its own healthchecks has rejected it on the marker.
+# acis tables and one of its own healthchecks has rejected it on the marker,
+# and fail as soon as the container reports healthy.
+#
+# This polls rather than trusting compose up --wait: some compose releases
+# (2.38 among them) exit 0 when --wait-timeout expires while the service is
+# still starting, so its status cannot tell a timeout from a healthy db.
+#
 # Docker keeps health log entries across a restart, and the first start's
 # entries carry the same marker message, so only entries that began after
 # the current start count.
-rc=0
-ACIS_DATAPACK_DIR="$work/broken" compose up -d --wait --wait-timeout 120 db >/dev/null 2>&1 || rc=$?
-[ "$rc" -ne 0 ] || fail "compose up --wait reported db healthy after a failed first-start schema load"
+db_state() {
+	compose logs db >&2 || true
+	[ -z "${id:-}" ] || docker inspect -f '{{json .State}}' "$id" >&2 || true
+}
+ACIS_DATAPACK_DIR="$work/broken" compose up -d db >&2 ||
+	{ db_state; fail "compose up did not start db over the broken datapack"; }
 id=$(compose ps -a -q db)
 [ -n "$id" ] || fail "compose up left no db container"
 # One inspect call, so the start time and the health log come from the same
@@ -135,7 +144,7 @@ tries=0
 while :; do
 	snap=$(docker inspect -f "$inspect_fmt" "$id") || fail "db container $id is gone"
 	set -- $(echo "$snap" | head -n 1)
-	[ "$3" != healthy ] || { compose logs db >&2; fail "db reported healthy after a failed first-start schema load"; }
+	[ "$3" != healthy ] || { db_state; fail "db reported healthy after a failed first-start schema load"; }
 	marked=no
 	if [ "$1" -ge 1 ] && [ "$2" = running ]; then
 		since=$(date -u -d "$4" +%s%N) || fail "cannot parse db start time $4"
@@ -151,11 +160,11 @@ while :; do
 	if [ "$marked" = yes ] &&
 		got=$(compose exec -T db mariadb -uroot -p"$ACIS_DB_ROOT_PASSWORD" -N -B -e \
 			"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'acis'" 2>/dev/null); then
-		[ "$got" = 0 ] || { compose logs db >&2; fail "restarted db has $got acis tables, want 0"; }
+		[ "$got" = 0 ] || { db_state; fail "restarted db has $got acis tables, want 0"; }
 		break
 	fi
 	tries=$((tries + 1))
-	[ "$tries" -lt 90 ] || { compose logs db >&2; fail "restarted db did not answer and fail its healthcheck on the schema marker (restarts=$1 state=$2 health=$3)"; }
+	[ "$tries" -lt 90 ] || { db_state; fail "restarted db did not answer and fail its healthcheck on the schema marker (restarts=$1 state=$2 health=$3)"; }
 	sleep 2
 done
 echo "smoke: restarted db over a failed first start stays unhealthy"
