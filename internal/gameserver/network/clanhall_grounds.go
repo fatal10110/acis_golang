@@ -17,6 +17,11 @@ type WorldDoors interface {
 	// ReloadDoors replaces the doors in the world with doors built from
 	// the given table.
 	ReloadDoors(doors *door.Table) error
+	// SetDoorSiege makes s the siege of the residence door id belongs to,
+	// on whatever door stands under that id.
+	SetDoorSiege(id int, s door.Siege)
+	// RespawnDoor stands door id again as a siege's door respawn does.
+	RespawnDoor(id int, restoreHP float64, weak bool)
 }
 
 // clanHallBanishOffset is the random offset of a player thrown out of a
@@ -35,8 +40,8 @@ func ClanHallGrounds(l *GameClientLink) clanhall.Grounds { return clanHallGround
 // stays as it is.
 func (g clanHallGrounds) CloseDoors(gates []string) { g.l.setHallDoors(gates, false) }
 
-// setHallDoors opens or closes each door named in gates, a hall's gates
-// list, as Door.openMe and Door.closeMe do: a door that is unknown, broken
+// setHallDoors opens or closes each door named in gates, a clan hall's or
+// a castle's gates list, as Door.openMe and Door.closeMe do: a door that is unknown, broken
 // or in that state already stays as it is.
 func (l *GameClientLink) setHallDoors(gates []string, open bool) {
 	if l.doors == nil {

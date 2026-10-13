@@ -152,6 +152,13 @@ type Siege interface {
 	// castle's siege in progress lets every attacker but the Swoop Cannon
 	// through, and a siegable clan hall's active siege zone any attacker.
 	AllowsDoorDamage(attacker attackable.Combatant) bool
+	// ShowsDoorHP reports whether the door's status updates show its HP:
+	// only while its castle's siege is in progress.
+	ShowsDoorHP() bool
+	// DoorBroken tells the residence one of its doors broke down: during
+	// a castle siege in progress the defenders hear that a wall was
+	// damaged or a gate broken down.
+	DoorBroken(wall bool)
 }
 
 type siegeRef struct{ siege Siege }
@@ -234,7 +241,25 @@ func (o *Object) AttackableBy(attacker skilltarget.Actor) bool {
 		return false
 	}
 	ref := o.siege.Load()
-	return ref != nil && ref.siege.AllowsDoorAttack(attacker, o.Template.Kind == KindWall)
+	return ref != nil && ref.siege.AllowsDoorAttack(attacker, o.Wall())
+}
+
+// Wall reports whether the door is a castle wall rather than a gate.
+func (o *Object) Wall() bool { return o.Template.Kind == KindWall }
+
+// ShowsHP reports whether the door's status updates show its HP: only
+// while its residence's siege lets them.
+func (o *Object) ShowsHP() bool {
+	ref := o.siege.Load()
+	return ref != nil && ref.siege.ShowsDoorHP()
+}
+
+// TellBroken tells the door's residence it broke down. The state owner
+// calls it once the door's death has been applied and broadcast.
+func (o *Object) TellBroken() {
+	if ref := o.siege.Load(); ref != nil {
+		ref.siege.DoorBroken(o.Wall())
+	}
 }
 
 // AttackableWithoutForceBy matches the door attackability rule.

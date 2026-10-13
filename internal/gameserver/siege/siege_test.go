@@ -11,6 +11,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -189,6 +190,16 @@ func (n *recordingNotifier) SetSiegeState(c []*clan.Clan, s State) {
 
 func (n *recordingNotifier) Reputation(cl *clan.Clan, points int, m Message) {
 	n.add("reputation %s %+d %s", cl.Name(), points, msg(m))
+}
+
+func (n *recordingNotifier) GuardDoors(gates []string, _ door.Siege) {
+	n.add("guard %s", strings.Join(gates, ","))
+}
+
+func (n *recordingNotifier) CloseDoors(gates []string) { n.add("close %s", strings.Join(gates, ",")) }
+
+func (n *recordingNotifier) RespawnDoors(gates []string, weak bool) {
+	n.add("respawn %s weak=%t", strings.Join(gates, ","), weak)
 }
 
 func (n *recordingNotifier) CastleTaken(c *castle.Castle, owner, former *clan.Clan) {

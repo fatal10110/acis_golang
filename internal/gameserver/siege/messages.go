@@ -17,6 +17,7 @@ const (
 	MsgLeftCombatZone               = 284
 	MsgClanEngravedRuler            = 285 // clan name
 	MsgOpponentStartedEngraving     = 287
+	MsgCastleGateBrokenDown         = 288
 	MsgClanVictoriousOverSiege      = 291 // clan name, castle name
 	MsgAnnouncedSiegeTime           = 292 // castle name
 	MsgRegistrationTermEnded        = 293 // castle name
@@ -40,6 +41,7 @@ const (
 	MsgDissolutionInProgress        = 1114
 	MsgTemporaryAlliance            = 1189
 	MsgTemporaryAllianceDissolved   = 1190
+	MsgCastleWallDamaged            = 1686
 	MsgClanDefeatedLostReputation   = 1772 // number
 	MsgClanVictoriousGainReputation = 1773 // number
 )

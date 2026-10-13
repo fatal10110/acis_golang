@@ -108,16 +108,21 @@ func (s *Server) DoorRegenerating(tb testing.TB, doorID int) bool {
 	return s.doors.regen.Tracked(doorID)
 }
 
-// siegeInProgress stands in for the siege of a door's residence while the
-// castle sieges install no door gate (#3373): it lets every playable attack
-// a door but no wall, as a castle siege in progress does for its attacker
-// side's players, and every hit through, as it does for any attacker but a
-// Swoop Cannon.
+// siegeInProgress stands in for the siege of a door outside any castle's
+// gates: it lets every playable attack a door but no wall, as a castle
+// siege in progress does for its attacker side's players, and every hit
+// through, as it does for any attacker but a Swoop Cannon. It shows no HP
+// in the door's status updates and tells no one of its death; a castle
+// gate's siege (WithSieges with the gate among WithDoors) does both.
 type siegeInProgress struct{}
 
 func (siegeInProgress) AllowsDoorAttack(_ skilltarget.Actor, wall bool) bool { return !wall }
 
 func (siegeInProgress) AllowsDoorDamage(attackable.Combatant) bool { return true }
+
+func (siegeInProgress) ShowsDoorHP() bool { return false }
+
+func (siegeInProgress) DoorBroken(bool) {}
 
 // BeginDoorSiege puts doorID's door under a siege that lets players attack
 // it and their hits lower its HP.
