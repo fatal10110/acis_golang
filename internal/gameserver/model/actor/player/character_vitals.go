@@ -35,7 +35,12 @@ func (c *Character) Vitals() Vitals {
 
 // ResourceValues returns a synchronized HP/MP/CP resource snapshot. The
 // maxima are whole points (see finalMax); the current values keep their
-// fractions.
+// fractions. Once the client has been shown c's maxima (AdoptMaxima), a
+// living character's current value never reads above its maximum: a
+// maximum that dropped bounds the value the read returns at once, while
+// the stored value drops, with its report, on c's queue (SettleMaxima).
+// Until then the restored equipment and effects that raise the maxima may
+// not apply yet, and the stored values read as they are.
 func (c *Character) ResourceValues() Resources {
 	c.vitalsMu.RLock()
 	res := Resources{
@@ -43,12 +48,30 @@ func (c *Character) ResourceValues() Resources {
 		MaxMP: c.maxMP, CurrentMP: c.curMP,
 		MaxCP: c.maxCP, CurrentCP: c.curCP,
 	}
+	bound := c.maximaShown && !c.dead.Load()
 	c.vitalsMu.RUnlock()
 	res.MaxHP = c.finalMax(stat.MaxHP, res.MaxHP)
 	res.MaxMP = c.finalMax(stat.MaxMP, res.MaxMP)
 	res.MaxCP = c.finalMax(stat.MaxCP, res.MaxCP)
 	c.noteMaxima(res)
+	if bound {
+		res.CurrentHP = min(res.CurrentHP, res.MaxHP)
+		res.CurrentMP = min(res.CurrentMP, res.MaxMP)
+		res.CurrentCP = min(res.CurrentCP, res.MaxCP)
+	}
 	return res
+}
+
+// boundedLocked returns cur, a current value whose maximum is maxValue, as
+// ResourceValues reads it: bounded by the maximum once the client has been
+// shown c's maxima, for a living character. A write that starts from the
+// current value starts from the bounded one, so a maximum that dropped
+// takes effect for it before SettleMaxima runs. The caller holds vitalsMu.
+func (c *Character) boundedLocked(cur, maxValue float64) float64 {
+	if c.maximaShown && !c.dead.Load() {
+		return min(cur, maxValue)
+	}
+	return cur
 }
 
 // noteMaxima settles c's maxima (SettleMaxima) when a read finds one
@@ -152,13 +175,14 @@ func (c *Character) ReduceCurrentHP(amount int) bool {
 	if amount < 0 {
 		amount = 0
 	}
+	maxHP := c.MaxHPValue()
 	defer c.settleRegenTask() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.Dead() {
 		return false
 	}
-	hp := c.curHP - float64(amount)
+	hp := c.boundedLocked(c.curHP, maxHP) - float64(amount)
 	if hp >= creature.DeathHP {
 		c.writeHPLocked(hp)
 		return false
@@ -173,13 +197,14 @@ func (c *Character) ReduceCurrentMP(amount int) {
 	if amount <= 0 {
 		return
 	}
+	maxMP := c.MaxMPValue()
 	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
 	if c.dead.Load() {
 		return
 	}
-	c.curMP -= float64(amount)
+	c.curMP = c.boundedLocked(c.curMP, maxMP) - float64(amount)
 	if c.curMP < 0 {
 		c.curMP = 0
 	}

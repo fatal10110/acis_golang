@@ -420,14 +420,14 @@ func (l *GameClientLink) notifyPlayerLogout(account string) {
 // live leaves without entering the world, so nothing is shown of what the
 // replay changes. The ticks due on the loading screen run their actions
 // there (see effect.ApplyRestored), so a drop never saves an effect whose
-// ticks were spent without them. The restored HP's tutorial step runs
-// once the replay is done (noteRestoredHP).
+// ticks were spent without them. The restored HP's tutorial step runs in
+// the replay (see replaySavedEffects).
 func (l *GameClientLink) replayLoadingScreenEffects(live *livePlayer) {
 	if l.skills == nil || len(live.Character.ActiveSkillEffects()) == 0 {
 		live.noteRestoredHP()
 		return
 	}
-	l.replaySavedEffects(live, live.noteRestoredHP)
+	l.replaySavedEffects(live, nil)
 	// No burst follows to show what a death there held back.
 	live.takeHeldForEnterWorld()
 }
@@ -438,14 +438,19 @@ func (l *GameClientLink) replayLoadingScreenEffects(live *livePlayer) {
 // die in it, to a damage-over-time tick due on the loading screen: that
 // death sends its client nothing (see livePlayer.deathOnLoadingScreen;
 // what it holds for the burst, livePlayer.holdForEnterWorld), and
-// replaySavedEffects reports it.
+// replaySavedEffects reports it. The restored HP's tutorial step
+// (noteRestoredHP) runs once the replayed effects apply their stats and
+// before the ticks due on the loading screen run, as restoring the saved
+// HP follows the restored effects but precedes their first tick; with no
+// effect to replay it runs right after the replay.
 func (l *GameClientLink) replaySavedEffects(live *livePlayer, settle func()) (died bool) {
 	alive := !live.Dead()
 	live.replayingEffects.Store(true)
 	live.replayMayDie.Store(alive)
 	if l.skills != nil {
-		l.skills.ReplayEffects(live.Character)
+		l.skills.ReplayEffects(live.Character, live.noteRestoredHP)
 	}
+	live.noteRestoredHP()
 	if settle != nil {
 		settle()
 	}

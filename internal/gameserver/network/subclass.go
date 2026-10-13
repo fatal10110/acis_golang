@@ -541,7 +541,7 @@ func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChan
 	c.ClearDisabledSkills()
 	if l.skills != nil {
 		l.skills.StageClassSkillState(c, rows.skills)
-		l.skills.ReplayEffects(c)
+		l.skills.ReplayEffects(c, nil)
 	}
 	if c.EffectList().HasHeld() {
 		l.updateEffectIcons(live)

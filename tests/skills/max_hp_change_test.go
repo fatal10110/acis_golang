@@ -32,12 +32,16 @@ func ownVitalsStatuses(frames [][]byte, objID int32) (at []int, attrs []map[serv
 	return at, attrs
 }
 
-// requireMaxChangeStatus requires frames to carry exactly one own vitals
-// StatusUpdate, after the last UserInfo, reporting current HP hp and the
-// player's own vitals set.
+// requireMaxChangeStatus requires the last UserInfo of frames to show
+// current HP hp, and frames to carry exactly one own vitals StatusUpdate,
+// after that UserInfo, reporting current HP hp and the player's own vitals
+// set.
 func requireMaxChangeStatus(t *testing.T, frames [][]byte, objID int32, hp int, when string) {
 	t.Helper()
 	_, userInfo := lastUserInfoCombat(t, frames, when)
+	if got := userInfoCurrentHP(t, frames[userInfo]); got != int32(hp) {
+		t.Fatalf("%s: UserInfo current HP = %d, want %d", when, got, hp)
+	}
 	at, attrs := ownVitalsStatuses(frames, objID)
 	if len(at) != 1 || at[0] < userInfo {
 		t.Fatalf("%s: own vitals StatusUpdates at %v, UserInfo at %d; want one after the UserInfo", when, at, userInfo)
@@ -56,8 +60,9 @@ func requireMaxChangeStatus(t *testing.T, frames [][]byte, objID int32, hp int, 
 // TestMaxHPBuffChangesReportStatusAndClampHP: a max-HP buff landing on a
 // player at full HP reports its status once, after the UserInfo of the stat
 // change, at the old HP below the raised maximum. Filled to the raised
-// maximum, the player drops to the old one when the buff ends, with the
-// same single report after that change's UserInfo.
+// maximum, the player drops to the old one when the buff ends: that
+// change's UserInfo already shows the old maximum as current HP, and the
+// same single report follows it.
 func TestMaxHPBuffChangesReportStatusAndClampHP(t *testing.T) {
 	t.Parallel()
 	const (

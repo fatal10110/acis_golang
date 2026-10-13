@@ -25,7 +25,8 @@ func (l *GameClientLink) tutorialRequest(live *livePlayer, name string) {
 
 // noteRestoredHP runs live's restored-HP tutorial step once (see
 // Character.NotifyRestoredHP), after the restored equipment and effects
-// apply. The selection that restored the HP had no client to show the
+// apply and before any tick of those effects runs (replaySavedEffects).
+// The selection that restored the HP had no client to show the
 // step's answer, so its frames are dropped; its journal writes stay.
 func (live *livePlayer) noteRestoredHP() {
 	if !live.restoredHPPending.CompareAndSwap(true, false) {

@@ -16,10 +16,10 @@ import (
 
 // TestTutorialLowHPAtRestoreCountsRestoredBuff: the restored HP is measured
 // against the maximum HP the restored effects make. A level-1 newbie saved
-// at half its plain maximum HP, but under a third of the maximum its saved
-// max-HP buff raises, runs the tutorial's low-HP step on the way into the
-// world. The step's journal writes stay, and none of its frames reach the
-// client.
+// at half the maximum HP its first entry computed, but under a third of the
+// maximum its saved max-HP buff raises, runs the tutorial's low-HP step on
+// the way into the world. The step's journal writes stay, and none of its
+// frames reach the client.
 func TestTutorialLowHPAtRestoreCountsRestoredBuff(t *testing.T) {
 	t.Parallel()
 	const (
@@ -38,11 +38,17 @@ func TestTutorialLowHPAtRestoreCountsRestoredBuff(t *testing.T) {
 	srv := bootNewbie(t, true, false, gameservertest.WithSkills(skillstate.NewPersistence(
 		gamesql.NewSkillSaveStore(db), modelskill.NewTable([]modelskill.Definition{buff}), gamesql.NewCharacterSkillStore(db))))
 	objID := createNewbie(t, srv)
-	srv.FlushPersistence(t)
-	var maxHP int
-	if err := srv.DB.QueryRow("SELECT maxHp FROM characters WHERE obj_Id=?", objID).Scan(&maxHP); err != nil {
-		t.Fatal(err)
+	c := srv.Client
+	// A first entry, at full HP and with no buff, computes the plain
+	// maximum HP.
+	enterBurst(t, srv)
+	maxHP := srv.PlayerMaxHP(t, objID)
+	if got := srv.QuestVars(t, objID, tutorial); got["HP"] != "" {
+		t.Fatalf("tutorial after the first entry = %v, want no HP step yet", got)
 	}
+	c.Send(encodeSingleOpcode(clientpackets.OpcodeRequestRestart))
+	readUntil(t, c, serverpackets.OpcodeCharSelectInfo)
+	srv.FlushPersistence(t)
 	saved := (maxHP + 1) / 2
 	if 10*saved < 3*maxHP || 10*saved >= 3*(maxHP+bonus) {
 		t.Fatalf("saved HP %d is not between 30%% of %d and 30%% of %d", saved, maxHP, maxHP+bonus)
@@ -56,7 +62,6 @@ func TestTutorialLowHPAtRestoreCountsRestoredBuff(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := srv.Client
 	c.Send(encodeRequestGameStart(0))
 	if got := tutorialFrames(srv.ReadQueued(t, c)); len(got) != 0 {
 		t.Fatalf("selection sent tutorial frames %x, want none", got)

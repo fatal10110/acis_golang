@@ -354,10 +354,7 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 	// limit, and inside the silent replay window: the EtcStatusUpdate below
 	// and every later login frame carry the band, and sendLoginWeight
 	// reports the change between UserInfo and ItemList.
-	if l.replaySavedEffects(live, func() {
-		live.noteRestoredHP()
-		c.RefreshWeightPenalty()
-	}) {
+	if l.replaySavedEffects(live, c.RefreshWeightPenalty) {
 		// A tick due on the loading screen killed the player, silently: its
 		// icon refresh went with the death's frames, and the burst shows
 		// what the death left. The Die frame follows ShortCutInit.
