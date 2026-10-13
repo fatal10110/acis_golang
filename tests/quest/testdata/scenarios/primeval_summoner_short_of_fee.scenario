@@ -1,0 +1,26 @@
+# Vervato (PrimevalSummoner): Payer's party member Fallen lies dead on the isle, the territory of
+# Vervato's npcmaker, but Payer is one adena short of the fee: he is told so, vervato003.htm, and
+# keeps his adena (onTalk).
+# Expectations are derived from the reference source (PrimevalSummoner.java); the reference
+# probe has no party member nor npcmaker territory to play this with.
+character Payer 20
+member Fallen 20 dead 300 0 0
+hold 57 199999
+script script.teleport.PrimevalSummoner
+item 57
+page default/32104.htm
+page script/teleport/PrimevalSummoner/
+territory isle -100 -100 400 400 -100 100
+npc vervato 32104 Folk 60 0 0 maker isle
+
+action vervato
+action vervato
+  S ActionFailed
+  S NpcHtmlMessage obj=vervato item=0 page=default/32104.htm
+  S ActionFailed
+bypass npc_{vervato}_Quest PrimevalSummoner
+  S SystemMessage id=279
+  S NpcHtmlMessage obj=vervato item=0 page=script/teleport/PrimevalSummoner/vervato003.htm
+  S ActionFailed
+  S ActionFailed
+  items 57=199999

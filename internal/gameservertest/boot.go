@@ -1072,6 +1072,9 @@ type Server struct {
 	hostileSinks func(*npc.Hostile) event.Sink
 	// guardedSiege resolves the siege a fixture siege guard defends.
 	guardedSiege func(*npc.Instance) npc.GuardedSiege
+	// groundTaker takes the items fixture NPCs pick up out of the world,
+	// as it does the population's.
+	groundTaker npc.GroundTaker
 	// rewardParties resolves a kill's party for the hostiles the suite spawns.
 	rewardParties gamemanager.RewardParties
 	// raidKills credits the raid boss kills of the hostiles the suite
@@ -2582,6 +2585,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		folkSinks:           gcl.FolkSinks(state, gclConfig.AttackStance),
 		hostileSinks:        gcl.HostileSinks(state, gclConfig.AttackStance),
 		guardedSiege:        gcl.GuardedSiege,
+		groundTaker:         gcl,
 		rewardParties:       o.rewardParties(gcl),
 		raidKills:           gcl,
 		lootChannels:        o.lootChannels(gcl),
