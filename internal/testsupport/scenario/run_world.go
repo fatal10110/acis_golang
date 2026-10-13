@@ -154,13 +154,17 @@ func (r *run) look(t *testing.T, args []string) {
 	r.srv.Settle(t)
 }
 
-// walk runs position ticks until role's NPC stops moving.
+// walk runs position ticks until role's NPC stops moving; the NPC must be
+// walking as the step starts.
 func (r *run) walk(t *testing.T, role string) {
 	t.Helper()
 	n, _ := r.npcQueue(t, role)
 	moving, ok := n.(interface{ IsMoving() bool })
 	if !ok {
 		t.Fatalf("%s: NPC %s (%T) does not walk", r.sc.Name, role, n)
+	}
+	if !moving.IsMoving() {
+		t.Fatalf("%s: NPC %s is not walking", r.sc.Name, role)
 	}
 	for i := 0; moving.IsMoving(); i++ {
 		if i >= int(walkLimit/move.PositionUpdateInterval) {

@@ -30,14 +30,15 @@ func (s *Server) SpawnCastingFolkNPCOfMakerAt(t *testing.T, tmpl *npc.Template, 
 }
 
 // SpawnHostileNPCOfMakerAt is SpawnHostileNPCTemplateAt for a hostile NPC
-// an npcmaker placed, reading maker's territories as its spawn territory as
-// SpawnCastingFolkNPCOfMakerAt does.
+// spawned at at as its spawn point, reading maker's territories as its spawn
+// territory as SpawnCastingFolkNPCOfMakerAt does. With a nil maker its spawn
+// territory is the drift sphere around at.
 func (s *Server) SpawnHostileNPCOfMakerAt(t *testing.T, tmpl *npc.Template, at location.Location, maker *spawn.Maker) *npc.Hostile {
 	t.Helper()
 	inst, err := npc.NewInstance(s.NewObjectID(), tmpl)
 	if err != nil {
 		t.Fatalf("new npc instance: %v", err)
 	}
-	inst.Maker = maker
+	inst.Home, inst.HasHome, inst.Maker = at, true, maker
 	return s.spawnHostileInstance(t, inst, at, parkedAttack{})
 }

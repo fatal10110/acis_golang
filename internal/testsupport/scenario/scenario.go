@@ -89,7 +89,8 @@
 //	look <role> <radius> <quantity> [<item id> ...]
 //	                       the NPC looks for ground items within radius (of those templates, any without),
 //	                       on its own queue: its behavior's see-item hook runs, told at most quantity
-//	walk <role>            position ticks run until the NPC's walk ends (a pick-up desire's walk to its item)
+//	walk <role>            position ticks run until the NPC's walk ends (a pick-up desire's walk to its item);
+//	                       the run fails if the NPC is not walking as the step starts
 //	mark <id>              a RequestTutorialQuestionMark: the character clicks that tutorial question mark
 //	relog                  back to character select and into the world again
 //	restart                a RequestRestart: back to character select
