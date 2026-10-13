@@ -19,6 +19,18 @@ client-visible packet surface of the behavior being changed.
   later system, document the dependency, reason, and future integration point.
 - Never leave an accepted opcode as an undocumented no-op or omit an expected send silently.
 
+## Adding an inbound opcode
+
+Inbound frames dispatch through the registries in `client_dispatch.go`: `newGameInbound` keys the
+opcode byte, `newGameExInbound` the Extended sub-opcode. A new packet is one `register(...)` line
+(`registerCapped` for an item-list request with the per-packet cap, `registerFrame` only for a
+handler that reads the raw frame) plus one handler method; wrap a handler that acts on the player
+in the world with `whenLive`. The adapter owns the decode policy (short frame disconnects pre-auth
+or past the underflow threshold, any other decode error drops the frame), so handlers never repeat
+it. Allow the opcode for its states in `allowedOpcodes` (`state.go`);
+`TestEveryAcceptedOpcodeHasAHandler` fails when the gate and the registry disagree. Do not dispatch
+on opcodes in `client_loop.go`: it only reads, gates, and hands the frame to the registry.
+
 ## Exact protocol behavior
 
 Verify opcode, field order and width, byte order, state gating, send/broadcast target, packet order,

@@ -233,6 +233,19 @@ func (l *GameClientLink) logNotWired(opcode byte) {
 	l.log.Warn().Str("opcode", fmt.Sprintf("%#x", opcode)).Msg("Opcode not wired")
 }
 
+// clearsSpawnProtection reports whether a frame of opcode ends the player's
+// spawn protection once its handler is done.
+func clearsSpawnProtection(opcode byte) bool {
+	switch opcode {
+	case clientpackets.OpcodeEnterWorld, clientpackets.OpcodeAction,
+		clientpackets.OpcodeRequestPledgeCrest, clientpackets.OpcodeAppearing,
+		clientpackets.OpcodeRequestPledgeInfo, clientpackets.OpcodeSay2:
+		return false
+	default:
+		return true
+	}
+}
+
 // dispatch serves an accepted frame through gameInbound and reports whether
 // the connection keeps reading. An accepted opcode with no handler is
 // logged and the frame dropped.

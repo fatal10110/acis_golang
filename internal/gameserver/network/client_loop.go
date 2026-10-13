@@ -12,7 +12,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamecipher "github.com/fatal10110/acis_golang/internal/gameserver/network/cipher"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -222,17 +221,6 @@ func (l *GameClientLink) gateFrame(client *Client, payload []byte) (serve, open 
 		return false, true
 	}
 	return true, true
-}
-
-func clearsSpawnProtection(opcode byte) bool {
-	switch opcode {
-	case clientpackets.OpcodeEnterWorld, clientpackets.OpcodeAction,
-		clientpackets.OpcodeRequestPledgeCrest, clientpackets.OpcodeAppearing,
-		clientpackets.OpcodeRequestPledgeInfo, clientpackets.OpcodeSay2:
-		return false
-	default:
-		return true
-	}
 }
 
 // hangUp reports a read ended by the peer closing its side, between frames
