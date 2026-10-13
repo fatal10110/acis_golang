@@ -244,6 +244,7 @@ func provideScriptEnv(serverProps *config.Properties, rewards manager.KillReward
 		World:            state,
 		Skills:           data.Skills,
 		GameHour:         clock.Hour,
+		Uptime:           clock.Uptime,
 		Items:            data.Items,
 		Page:             html.Get,
 		SevenSigns:       sevenSigns,

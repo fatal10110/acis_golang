@@ -21,6 +21,7 @@ type Population interface {
 	RespawnDelay(live *npc.Hostile) time.Duration
 	ScheduleRespawn(live *npc.Hostile, d time.Duration) error
 	DecayMe(live *npc.Hostile)
+	MakerEvent(maker, name string, int1, int2 int) bool
 }
 
 // Spawner spawns NPCs for scripts. Every NPC it spawns is in the world,
@@ -89,6 +90,9 @@ func (p *Player) loc() Loc { return locOf(p) }
 // locOf returns where c stands and the way it faces. A handle on nothing
 // panics.
 func locOf(c Creature) Loc {
+	if d, ok := c.(*Door); ok {
+		return d.loc()
+	}
 	at := combatantOf(c)
 	if at == nil {
 		panic("script: the place of a handle on nothing")

@@ -1,5 +1,7 @@
 package event
 
+import "github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+
 // CameraShot is one cutscene camera move the client plays around an
 // object, in the units the client takes them: a distance, angles in
 // degrees and times in milliseconds.
@@ -30,3 +32,13 @@ type ScenePlayed struct{}
 
 func (CameraShotPlayed) event() {}
 func (ScenePlayed) event()      {}
+
+// MusicPlayed reports music File played around the NPC that emits it, for
+// the players that know the NPC: the sound is bound to the NPC and starts
+// where the NPC stood when it was played, At.
+type MusicPlayed struct {
+	File string
+	At   location.Location
+}
+
+func (MusicPlayed) event() {}

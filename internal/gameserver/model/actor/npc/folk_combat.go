@@ -285,6 +285,17 @@ func (f *Folk) SetRunStance(run bool) {
 	f.forceWalkStance()
 }
 
+// SetRunning puts f in its run stance, or its walk stance, and reports
+// whether the stance changed. The movement takes the stance's speed; the
+// players around f are not told.
+func (f *Folk) SetRunning(running bool) bool {
+	if !f.running.CompareAndSwap(!running, running) {
+		return false
+	}
+	f.refreshMoveSpeed()
+	return true
+}
+
 // forceRunStance switches a walking NPC to its run stance, as any hit
 // does: the movement speeds up, and observers see the stance change and
 // the NPC's info again.

@@ -43,6 +43,8 @@ type Env struct {
 	Skills *skill.Table
 	// GameHour returns the in-game hour, 0 to 23.
 	GameHour func() int
+	// Uptime returns the real time elapsed since the server started.
+	Uptime func() time.Duration
 	// Items are the item templates a script reads an item's name from.
 	Items *item.Table
 	// Page returns the datapack page at path, relative to the server root

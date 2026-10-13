@@ -106,8 +106,8 @@ func (g *makerGroup) Spawns() []spawn.GroupSpawn {
 	return out
 }
 
-func (g *makerGroup) SendEvent(maker, name string, int1, int2 int) {
-	g.n.MakerEvent(maker, name, int1, int2)
+func (g *makerGroup) SendMakerEvent(maker, name string, int1, int2 int) bool {
+	return g.n.MakerEvent(maker, name, int1, int2)
 }
 
 // After runs fn on the makers' queue once d has passed. Each spawn fn

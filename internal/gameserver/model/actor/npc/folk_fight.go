@@ -228,6 +228,9 @@ func (f *Folk) ClearDesires() { f.cast.desires.Clear() }
 // use.
 func (f *Folk) Desires() *ai.DesireQueue { return f.cast.desires }
 
+// Aggro returns f's aggro list, for reads. It is safe for concurrent use.
+func (f *Folk) Aggro() *attackable.ThreatTable { return f.fight.aggro }
+
 // MostHated returns the creature f hates most, false when it hates none or
 // is dead.
 func (f *Folk) MostHated() (attackable.Combatant, bool) {

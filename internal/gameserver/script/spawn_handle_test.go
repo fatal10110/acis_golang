@@ -114,3 +114,5 @@ func (nopPopulation) RespawnDelay(*npc.Hostile) time.Duration { return 0 }
 func (nopPopulation) ScheduleRespawn(*npc.Hostile, time.Duration) error { return nil }
 
 func (nopPopulation) DecayMe(*npc.Hostile) {}
+
+func (nopPopulation) MakerEvent(string, string, int, int) bool { return false }
