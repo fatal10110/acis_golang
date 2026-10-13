@@ -21,7 +21,6 @@ const hostileOnly kindSet = 1 << KindHostile
 // a test checks the list against the source.
 var kindOps = map[string]kindSet{
 	"NPC.AbortAll":              hostileOnly,
-	"NPC.BroadcastOnScreen":     hostileOnly,
 	"NPC.CanAttack":             hostileOnly,
 	"NPC.CanAutoAttack":         hostileOnly,
 	"NPC.CastingNow":            hostileOnly,
@@ -41,7 +40,6 @@ var kindOps = map[string]kindSet{
 	"NPC.RechargeShots":         hostileOnly,
 	"NPC.RemoveAggro":           hostileOnly,
 	"NPC.RemoveAllAttackDesire": hostileOnly,
-	"NPC.RemoveAllDesire":       hostileOnly,
 	"NPC.RemoveAttackDesire":    hostileOnly,
 	"NPC.RemoveDesires":         hostileOnly,
 	"NPC.Rooted":                hostileOnly,

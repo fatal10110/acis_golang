@@ -124,15 +124,14 @@ func TestNPCHateAndDesireOps(t *testing.T) {
 		}
 	})
 
-	// Every one of these is a hostile NPC's: a civilian NPC panics.
+	// Every one of these is a hostile NPC's: a civilian NPC panics. Its
+	// RemoveAllDesire and BroadcastOnScreen are pinned in tests/npcs.
 	folk := script.NPCOf(srv.SpawnFolkNPCAt(t, gameservertest.FolkTemplate("Folk", 32109), location.Location{X: x, Y: y + 40, Z: z}))
 	for name, op := range map[string]func(){
-		"RemoveAllDesire":   folk.RemoveAllDesire,
-		"CleanAllHate":      folk.CleanAllHate,
-		"RemoveAggro":       func() { folk.RemoveAggro(nb) },
-		"RemoveDesires":     func() { folk.RemoveDesires(script.IntentionWander) },
-		"DisableCoreAI":     func() { folk.DisableCoreAI(true) },
-		"BroadcastOnScreen": func() { folk.BroadcastOnScreen(1000, "x") },
+		"CleanAllHate":  folk.CleanAllHate,
+		"RemoveAggro":   func() { folk.RemoveAggro(nb) },
+		"RemoveDesires": func() { folk.RemoveDesires(script.IntentionWander) },
+		"DisableCoreAI": func() { folk.DisableCoreAI(true) },
 	} {
 		if srv.RunScript(t, objID, q001, func(*script.Script, *script.Player) { op() }) {
 			t.Errorf("%s on a civilian NPC returned, want a panic", name)

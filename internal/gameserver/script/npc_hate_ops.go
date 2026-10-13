@@ -9,11 +9,20 @@ import (
 // The desire, hate and AI-state operations the boss, raid and faction
 // behaviors make on an NPC (#3748).
 
+// desireRemover is an NPC that can drop every desire and hate it holds.
+type desireRemover interface{ RemoveAllDesire() }
+
 // RemoveAllDesire drops every desire the NPC holds, zeroes its hate of
 // every creature on its attack hate and on its hate list, keeping them
-// listed, and stops its movement. The NPC is not sent back to peace. Only a
-// hostile NPC does it; any other NPC panics.
-func (n *NPC) RemoveAllDesire() { n.hostile("remove every desire").RemoveAllDesire() }
+// listed, and stops its movement. The NPC is not sent back to peace. A
+// handle on nothing panics.
+func (n *NPC) RemoveAllDesire() {
+	r, ok := n.combatant().(desireRemover)
+	if !ok {
+		panic("script: remove every desire of a handle on nothing")
+	}
+	r.RemoveAllDesire()
+}
 
 // RemoveDesires drops every desire of kind the NPC holds. Only a hostile
 // NPC does it; any other NPC panics.
@@ -69,11 +78,20 @@ func (n *NPC) AISleeping() bool {
 	return s.AISleeping()
 }
 
+// screenBroadcaster is an NPC that can show a text on its observers'
+// screens.
+type screenBroadcaster interface {
+	BroadcastOnScreen(durationMs int32, text string)
+}
+
 // BroadcastOnScreen shows text in the middle of the screens of the players
-// around the NPC for durationMs milliseconds. Only a hostile NPC does it;
-// any other NPC panics.
+// around the NPC for durationMs milliseconds. A handle on nothing panics.
 func (n *NPC) BroadcastOnScreen(durationMs int32, text string) {
-	n.hostile("show a screen message").BroadcastOnScreen(durationMs, text)
+	b, ok := n.combatant().(screenBroadcaster)
+	if !ok {
+		panic("script: a screen message of a handle on nothing")
+	}
+	b.BroadcastOnScreen(durationMs, text)
 }
 
 // NeighborHero returns a hero picked at random, through the script random
@@ -107,4 +125,10 @@ func mustCombatant(c Creature, what string) attackable.Combatant {
 	return t
 }
 
-var _ aiSleeper = (*npc.Folk)(nil)
+var (
+	_ aiSleeper         = (*npc.Folk)(nil)
+	_ desireRemover     = (*npc.Hostile)(nil)
+	_ desireRemover     = (*npc.Folk)(nil)
+	_ screenBroadcaster = (*npc.Hostile)(nil)
+	_ screenBroadcaster = (*npc.Folk)(nil)
+)

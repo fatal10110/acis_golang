@@ -27,9 +27,7 @@ func (a *Attackable) RemoveAllDesire() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.desires.Clear()
-	for _, t := range a.threats.Snapshot() {
-		a.threats.StopHate(t.Attacker)
-	}
+	a.threats.ZeroHate()
 	a.hates.ZeroHate()
 }
 
