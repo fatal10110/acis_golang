@@ -4,9 +4,10 @@ import "github.com/fatal10110/acis_golang/internal/commons/wire"
 
 // Olympiad match server packet sub-opcodes.
 const (
-	OpcodeExOlympiadUserInfo uint16 = 0x0029
-	OpcodeExOlympiadMode     uint16 = 0x002b
-	OpcodeExOlympiadMatchEnd uint16 = 0x002c
+	OpcodeExOlympiadUserInfo    uint16 = 0x0029
+	OpcodeExOlympiadSpelledInfo uint16 = 0x002a
+	OpcodeExOlympiadMode        uint16 = 0x002b
+	OpcodeExOlympiadMatchEnd    uint16 = 0x002c
 )
 
 // Olympiad modes ExOlympiadMode switches the receiver's client to.
@@ -14,6 +15,8 @@ const (
 	OlympiadModeNone  = 0
 	OlympiadModeSide1 = 1
 	OlympiadModeSide2 = 2
+	// OlympiadModeObserver is a stadium's spectator.
+	OlympiadModeObserver = 3
 )
 
 // Olympiad match system message ids.
@@ -29,6 +32,7 @@ const (
 	SystemMessageS1HasGainedS2OlympiadPoints     = 1657 // text then number
 	SystemMessageS1HasLostS2OlympiadPoints       = 1658 // text then number
 	SystemMessageSubJobCannotJoinOlympiad        = 1692 // no parameter
+	SystemMessageWaitingListCannotWatchGame      = 1693 // no parameter
 	SystemMessageCannotJoinOlympiadWhileDead     = 1858 // no parameter
 	SystemMessageEnteredCombatZone               = 283  // no parameter
 	SystemMessageLeftCombatZone                  = 284  // no parameter
@@ -73,5 +77,22 @@ func FrameExOlympiadUserInfo(u OlympiadUserInfo) wire.Frame {
 	w.WriteInt32(u.MaxHP)
 	w.WriteInt32(u.CP)
 	w.WriteInt32(u.MaxCP)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameExOlympiadSpelledInfo shows a stadium's spectators the icon list of
+// competitor objectID's effects. Every entry reports its whole seconds
+// left; a permanent one's -1 ms reads as 0, and toggles get no special
+// encoding.
+func FrameExOlympiadSpelledInfo(objectID int32, effects []AbnormalStatusEffect) wire.Frame {
+	w := newFrameWriter(OpcodeExtended)
+	w.WriteUint16(OpcodeExOlympiadSpelledInfo)
+	w.WriteInt32(objectID)
+	w.WriteInt32(int32(len(effects)))
+	for _, e := range effects {
+		w.WriteInt32(e.SkillID)
+		w.WriteUint16(uint16(e.Level))
+		w.WriteInt32(int32(e.DurationMillis / 1000))
+	}
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
