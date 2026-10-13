@@ -630,8 +630,9 @@ func commandChars(command string, begin, end int) (string, bool) {
 // other, and stops the handling when the class is missing or does not
 // parse; 4 shows the heroes; 5 asks an elected hero to confirm its claim
 // and 6 claims the status, answering nothing to anyone else; 7 opens the
-// Monument of Heroes' main page. The stadium list (3) needs the matches
-// (#3340); any other choice answers nothing.
+// Monument of Heroes' main page. The stadium list (3), whose links watch a
+// stadium, waits for stadium spectating (#3356); any other choice answers
+// nothing.
 func (f *Folk) olympiadCommand(pages Pages, talker Talker, command string, reply BypassReply) BypassReply {
 	arg, ok := commandChars(command, 9, 10)
 	if !ok {

@@ -83,12 +83,11 @@ func (l *GameClientLink) canOpenPrivateStore(live *livePlayer, cancelTrade bool)
 }
 
 // storeOpenState reads what the store set-up checks need from live. A duel
-// counts as fighting. No Olympiad (#216) is modeled yet, so it never
-// refuses.
+// counts as fighting; an Olympiad competitor stands where no store opens.
 func (l *GameClientLink) storeOpenState(live *livePlayer) privatestore.OpenState {
 	attacking := live.attack != nil && live.attack.AttackingNow()
 	requesting := l.trades != nil && l.trades.ProcessingRequest(live.ObjectID())
-	noStore := live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagNoStore)
+	noStore := (live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagNoStore)) || live.OlympiadMode()
 	return privatestore.OpenState{
 		Operate:     live.OperateType(),
 		AlikeDead:   live.AlikeDead(),

@@ -142,8 +142,8 @@ func TestRegisterWaitingLists(t *testing.T) {
 	if classed, nonClassed := o.WaitingList(); classed != 1 || nonClassed != 1 {
 		t.Fatalf("WaitingList = %d, %d; want 1, 1", classed, nonClassed)
 	}
-	o.RemoveDisconnectedCompetitor(1, 88)
-	o.RemoveDisconnectedCompetitor(2, 93)
+	o.RemoveDisconnectedCompetitor(1, 88, -1)
+	o.RemoveDisconnectedCompetitor(2, 93, -1)
 	if o.IsRegistered(1, 88) || o.IsRegistered(2, 93) {
 		t.Fatal("RemoveDisconnectedCompetitor left a registration")
 	}

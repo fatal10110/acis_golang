@@ -75,8 +75,9 @@ type ShotsRechargeRequested struct{ Physical, Magic bool }
 // against a target, for the attacking side's damage feedback. Only a player
 // or a summon reports it; a summon reports neither a miss nor a hit on its
 // own owner. Blocked marks an invulnerable target and Petrified one that is
-// also paralyzed.
+// also paralyzed. TargetID is the object id of the target hit.
 type HitDealt struct {
+	TargetID  int32
 	Damage    int
 	Crit      bool
 	Miss      bool

@@ -555,7 +555,7 @@ func recordDamage(result *Result, attacker, target Actor, amount int, mcrit, pcr
 	if result == nil || attacker == nil || target == nil {
 		return
 	}
-	m := Damage{Amount: int32(amount), MagicCrit: mcrit, PhysicalCrit: pcrit}
+	m := Damage{TargetID: target.ObjectID(), Amount: int32(amount), MagicCrit: mcrit, PhysicalCrit: pcrit}
 	switch attacker.Kind() {
 	case actor.KindPlayer:
 		m.RecipientID = attacker.ObjectID()
@@ -656,7 +656,7 @@ func deliverDamage(caster Creature, target Actor, amount int, mcrit bool) {
 	recordDamage(&result, caster, target, amount, mcrit, false)
 	for _, m := range result.Messages {
 		if d, ok := m.(Damage); ok {
-			n.NotifySkillDamage(int(d.Amount), d.MagicCrit, d.Blocked, d.Petrified)
+			n.NotifySkillDamage(d.TargetID, int(d.Amount), d.MagicCrit, d.Blocked, d.Petrified)
 		}
 	}
 }
