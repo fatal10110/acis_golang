@@ -31,6 +31,12 @@ func (c *Character) RemoveCubic(id cubic.ID) {
 	c.cubics.Remove(id)
 }
 
+// StopCubicsGivenByOthers deactivates every cubic another player gave c and
+// returns their ids.
+func (c *Character) StopCubicsGivenByOthers() []cubic.ID {
+	return c.cubics.StopGivenByOthers()
+}
+
 // CubicIDs returns the ids of c's currently active cubics, in grant order,
 // for packet serialization.
 func (c *Character) CubicIDs() []int {

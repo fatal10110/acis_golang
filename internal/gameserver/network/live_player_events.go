@@ -401,6 +401,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 			return
 		}
 		sendDamageMessage(live, hitDamage(e, skillhandler.DamageByPlayer))
+		l.notifyCompetitorDamage(live, e.TargetID, e.Damage)
 	case event.SkillResisted:
 		live.SendFrame(serverpackets.FrameSystemMessageStringSkillName(serverpackets.SystemMessageS1ResistedYourS2, e.TargetName, int32(e.SkillID), int32(e.Level)))
 	case event.MagicResisted:
@@ -414,6 +415,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 			Source: skillhandler.DamageByPlayer, Amount: int32(e.Amount),
 			MagicCrit: e.MagicCrit, Blocked: e.Blocked, Petrified: e.Petrified,
 		})
+		l.notifyCompetitorDamage(live, e.TargetID, e.Amount)
 	case event.AttackTargetRefused:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageTargetIncorrect))
 	case event.AttackRefused:

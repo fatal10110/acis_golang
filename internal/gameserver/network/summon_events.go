@@ -231,6 +231,7 @@ func (s *summonSink) Emit(ev event.Event) {
 			source = skillhandler.DamageByPet
 		}
 		sendDamageMessage(owner, hitDamage(e, source))
+		l.notifyCompetitorDamage(owner, e.TargetID, e.Damage)
 	case event.Died:
 		// Observers see the summon fall, then its own combat stance end. The
 		// stance is its owner's: the owner stays in combat and keeps its own

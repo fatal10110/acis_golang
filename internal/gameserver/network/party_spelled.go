@@ -11,8 +11,8 @@ import (
 
 // updateEffectIcons runs live's effect icon pass: live's own icon list,
 // then, in a party, the icon list every member sees of live. The
-// ExOlympiadSpelledInfo an Olympiad match's observers get from the same
-// pass waits for Olympiad matches and observers (#1268, #219).
+// ExOlympiadSpelledInfo a stadium's observers get from the same pass waits
+// for stadium spectating (#3356).
 func (l *GameClientLink) updateEffectIcons(live *livePlayer) {
 	l.updateLiveAbnormalEffect(live)
 	if l.parties == nil {

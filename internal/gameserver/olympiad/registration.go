@@ -136,11 +136,9 @@ func (o *Olympiad) registeredLocked(objectID int32, baseClass int) (RegisterResu
 	return 0, false
 }
 
-// inMatchLocked reports whether objectID competes in a running match.
-// No match runs yet: the game manager that starts them is #3340, which
-// answers this from its stadiums' games during the competition window.
-func (o *Olympiad) inMatchLocked(int32) bool {
-	return false
+// inMatchLocked reports whether objectID competes in a stadium's match.
+func (o *Olympiad) inMatchLocked(objectID int32) bool {
+	return o.games != nil && o.games.inMatch(objectID)
 }
 
 // Unregister takes the player objectID, of base class baseClass, off the
@@ -185,13 +183,18 @@ func (o *Olympiad) IsRegisteredInComp(objectID int32, baseClass int) bool {
 	return o.period == Competition && o.inMatchLocked(objectID)
 }
 
-// RemoveDisconnectedCompetitor takes the player objectID, of base class
-// baseClass, off the waiting list it is on, as it leaves the world or is
-// jailed. Recording the departure in its running match is the game
-// manager's (#3340).
-func (o *Olympiad) RemoveDisconnectedCompetitor(objectID int32, baseClass int) {
+// RemoveDisconnectedCompetitor records, as the player objectID of base
+// class baseClass leaves the world or is jailed, that it left the match of
+// stadium gameID once that match brought its competitors in, then takes it
+// off the waiting list it is on.
+func (o *Olympiad) RemoveDisconnectedCompetitor(objectID int32, baseClass, gameID int) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	if s, ok := o.Stadium(gameID); ok && s.GameStarted() {
+		if g := s.Game(); g != nil {
+			g.Disconnect(objectID)
+		}
+	}
 	o.removeLocked(objectID, baseClass)
 }
 

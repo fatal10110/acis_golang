@@ -212,6 +212,8 @@ type options struct {
 	seedBoard              func(db *sql.DB)
 	seedOlympiad           func(db *sql.DB)
 	olympiadWindow         *olympiadWindow
+	olympiadConfig         func(*olympiad.Config)
+	olympiadDraw           func(n int) int
 	seedBoss               func(db *sql.DB)
 	serverNews             bool
 	announcements          string
@@ -2103,6 +2105,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Fish:             o.fish,
 		FishingRoll:      o.fishingRoll,
 		PetRoll:          o.petRoll,
+		OlympiadDraw:     o.olympiadDraw,
 		PetFeedPeriod:    o.petFeedPeriod,
 		Templates:        templates,
 		ItemTemplates:    itemTemplates,
@@ -2273,7 +2276,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	heroes := hero.New(gamesql.NewHeroStore(db), gclConfig.Clans.Table(), hero.TableNames{NPCs: o.npcs, Castles: gclConfig.Castles}, persistWorker, HeroMinMatches, time.Now, o.log)
 	gclConfig.Heroes = heroes
 	olympiadQueue := queues.NewQueue("olympiad")
-	olympiadState := olympiad.New(o.olympiadWindow.config(olympiadQueue.Now()), gamesql.NewOlympiadStore(db), persistWorker, network.NewOlympiadAnnouncer(state), heroes, olympiadQueue, o.log)
+	olympiadCfg := o.olympiadWindow.config(olympiadQueue.Now())
+	if o.olympiadConfig != nil {
+		o.olympiadConfig(&olympiadCfg)
+	}
+	olympiadState := olympiad.New(olympiadCfg, gamesql.NewOlympiadStore(db), persistWorker, network.NewOlympiadAnnouncer(state), heroes, olympiadQueue, o.log)
 	gclConfig.Olympiad = olympiadState
 	raidPoints := raidpoint.New(gamesql.NewRaidPointStore(db), persistWorker, o.log)
 	gclConfig.RaidPoints = raidPoints

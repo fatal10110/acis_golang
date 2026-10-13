@@ -409,6 +409,9 @@ type GameClientLink struct {
 	// petRoll is the random source of every pet called out; nil uses the
 	// summon default.
 	petRoll func(n int) int
+	// olympiadDraw is the random source of the Olympiad's draws and of the
+	// spot its competitors return to; nil uses the random source.
+	olympiadDraw func(n int) int
 	// petFeedPeriod is how often every pet called out eats; zero uses the
 	// summon default.
 	petFeedPeriod time.Duration
@@ -510,6 +513,9 @@ type GameClientLink struct {
 	bossZones BossZoneStore
 	// zoneReloadMu runs one //reload zone at a time.
 	zoneReloadMu sync.Mutex
+	// stadiums are the stadium zones of the zone set the link holds, in
+	// stadium order; see stadiumZones.
+	stadiums atomic.Pointer[stadiumZoneSet]
 	// zonePulses runs the effect and damage zones' pulses, those of every
 	// zone set the link wired.
 	zonePulses *sim.Queue
@@ -688,6 +694,10 @@ type GameClientLinkConfig struct {
 	// PetRoll supplies the dice of every pet called out in [0,n), its
 	// hunger included; nil falls back to the random source.
 	PetRoll func(n int) int
+	// OlympiadDraw supplies the dice of the Olympiad's draws and of the
+	// spot its competitors return to in [0,n); nil falls back to the
+	// random source.
+	OlympiadDraw func(n int) int
 	// PetFeedPeriod is how often every pet called out eats; zero is the
 	// standard ten seconds. Harnesses lengthen it so a meal cannot land
 	// inside a timed exchange.
@@ -999,6 +1009,8 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	link.chance = &actorcast.ChanceProcs{Definitions: link.skills, Targets: link.targets, Skills: link.skillHandlers, Deliver: link.deliverChanceCast}
 	link.wireZones(link.zones)
 	link.wireCastleTickets()
+	link.olympiadDraw = cfg.OlympiadDraw
+	link.bindOlympiadStadiums(cfg.OlympiadDraw)
 	return link, nil
 }
 

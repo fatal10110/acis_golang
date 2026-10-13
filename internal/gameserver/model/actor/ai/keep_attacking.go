@@ -17,12 +17,9 @@ func actingPlayer(c attackable.Combatant) attackable.Combatant {
 // canKeepAttacking reports whether a playable attacker swings again at target
 // once a swing ends with nothing queued. Any non-playable target is kept. A
 // playable target is kept only while its acting player has karma, while it
-// fights the attacker's acting player in the same duel, while both sides
-// stand inside a PvP zone (each its own membership), or when the attacker is
-// a betrayed summon.
-//
-// A target in the same active Olympiad match is also kept; that system does
-// not exist yet (#216), so that branch never applies.
+// fights the attacker's acting player in the same started Olympiad match or
+// in the same duel, while both sides stand inside a PvP zone (each its own
+// membership), or when the attacker is a betrayed summon.
 func canKeepAttacking(attacker, target attackable.Combatant) bool {
 	if target == nil {
 		return false
@@ -32,6 +29,9 @@ func canKeepAttacking(attacker, target attackable.Combatant) bool {
 	}
 	acting := actingPlayer(target)
 	if acting.Karma() > 0 {
+		return true
+	}
+	if attackable.SameActiveOlympiadMatch(actingPlayer(attacker), acting) {
 		return true
 	}
 	if a, ok := actingPlayer(attacker).(duel.Standing); ok {

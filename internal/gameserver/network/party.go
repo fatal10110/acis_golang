@@ -152,8 +152,9 @@ func (l *GameClientLink) leaveParty(live *livePlayer) {
 }
 
 // sendPartyVitals answers a vitals change of live's: its party-window row
-// is refreshed on the other members' windows, and its row in its duel
-// opponents' window, when a gauge left its segment.
+// is refreshed on the other members' windows, and its gauges in its
+// Olympiad stadium's and its duel opponents' windows, when a gauge left its
+// segment.
 func (l *GameClientLink) sendPartyVitals(live *livePlayer) {
 	var view partyView
 	inParty := false
@@ -161,6 +162,7 @@ func (l *GameClientLink) sendPartyVitals(live *livePlayer) {
 		view, inParty = l.parties.View(live.ObjectID())
 	}
 	cpOrHP, partyRow := live.VitalsGaugesStale(inParty)
+	l.sendOlympiadVitals(live, cpOrHP)
 	l.sendDuelVitals(live, cpOrHP)
 	if !partyRow {
 		return

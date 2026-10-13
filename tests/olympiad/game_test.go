@@ -201,8 +201,7 @@ func TestOlympiadGameJudging(t *testing.T) {
 			queue := []int32{nobleOne, nobleTwo}
 			var g *olympiad.Game
 			if tc.kind == olympiad.Classed {
-				ready := []*[]int32{&queue}
-				g = o.ClassedGame(3, &ready, onlineRoster(), first)
+				g, _ = o.ClassedGame(3, []*[]int32{&queue}, onlineRoster(), first)
 			} else {
 				g = o.NonClassedGame(3, &queue, onlineRoster(), first)
 			}
@@ -253,10 +252,8 @@ func TestOlympiadGameJudging(t *testing.T) {
 // registrations: each draw takes the competitor off the queue; a first
 // draw found offline is dropped; a second one found offline is dropped and
 // the first goes back to the end of the queue. A queue left with fewer
-// than two gives no match. A classed match picks one class queue at random
-// and drops from the ready list each queue that cannot give a pair: one
-// holding a single registration, untouched, or one whose first draw is
-// offline, which leaves its last registration queued.
+// than two gives no match. A classed match picks one class queue at random;
+// one that cannot give a pair ends the round of draws.
 func TestOlympiadGameDraw(t *testing.T) {
 	t.Parallel()
 	db := sqltest.SharedDB(t)
@@ -284,15 +281,23 @@ func TestOlympiadGameDraw(t *testing.T) {
 	}
 
 	short, gone, full := []int32{10}, []int32{20, 21}, []int32{30, 31, 32}
-	ready := []*[]int32{&short, &gone, &full}
-	g = o.ClassedGame(5, &ready, onlineRoster(20, 21), first)
+	// A picked queue that no longer gives a pair ends the round: one
+	// holding a single registration is left untouched, one whose first draw
+	// is offline keeps its last registration.
+	if g, stop := o.ClassedGame(5, []*[]int32{&short, &full}, onlineRoster(), first); g != nil || !stop || !slices.Equal(short, []int32{10}) {
+		t.Fatalf("short queue: game %v, stop %v, short %v; want no game, stop, short untouched", g, stop, short)
+	}
+	if g, stop := o.ClassedGame(5, []*[]int32{&gone, &full}, onlineRoster(20, 21), first); g != nil || !stop || !slices.Equal(gone, []int32{21}) {
+		t.Fatalf("offline queue: game %v, stop %v, gone %v; want no game, stop, 21 left", g, stop, gone)
+	}
+	if g, stop := o.ClassedGame(5, nil, onlineRoster(), first); g != nil || stop {
+		t.Fatalf("no ready queue: game %v, stop %v; want neither", g, stop)
+	}
+	g, _ = o.ClassedGame(5, []*[]int32{&full}, onlineRoster(), first)
 	if g == nil || g.Type() != olympiad.Classed || g.Stadium() != 5 {
 		t.Fatalf("classed draw = %v, want a classed match in stadium 5", g)
 	}
-	if got := g.Participants(); got[0].ObjectID != 30 || got[1].ObjectID != 31 {
-		t.Fatalf("classed participants = %+v, want 30 and 31", got)
-	}
-	if len(ready) != 1 || ready[0] != &full || !slices.Equal(gone, []int32{21}) || !slices.Equal(full, []int32{32}) || !slices.Equal(short, []int32{10}) {
-		t.Fatalf("after the classed draw: ready %d queues, gone %v, full %v, short %v", len(ready), gone, full, short)
+	if got := g.Participants(); got[0].ObjectID != 30 || got[1].ObjectID != 31 || !slices.Equal(full, []int32{32}) {
+		t.Fatalf("classed participants = %+v, full %v; want 30 and 31, 32 left", got, full)
 	}
 }

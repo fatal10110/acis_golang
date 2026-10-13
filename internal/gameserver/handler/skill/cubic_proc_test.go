@@ -95,7 +95,7 @@ func TestCubicMdamDamageComesFromTheCubicFormula(t *testing.T) {
 	if !slices.Equal(target.hitLog, []string{"cast break", "hp -567 with 0 effects"}) {
 		t.Fatalf("hit log = %v, want the cast break before the HP", target.hitLog)
 	}
-	if !slices.Equal(result.Messages, []any{Damage{RecipientID: owner.objectID, Amount: want}}) {
+	if !slices.Equal(result.Messages, []any{Damage{RecipientID: owner.objectID, TargetID: target.objectID, Amount: want}}) {
 		t.Fatalf("messages = %+v, want the owner's damage report only", result.Messages)
 	}
 	if len(owner.shots) != 0 {
@@ -116,7 +116,7 @@ func TestCubicMdamCriticalQuadruples(t *testing.T) {
 	if got := target.maxHP - target.hp; got != want {
 		t.Fatalf("target lost %v HP, want %d", got, want)
 	}
-	if !slices.Equal(result.Messages, []any{Damage{RecipientID: owner.objectID, Amount: want, MagicCrit: true}}) {
+	if !slices.Equal(result.Messages, []any{Damage{RecipientID: owner.objectID, TargetID: target.objectID, Amount: want, MagicCrit: true}}) {
 		t.Fatalf("messages = %+v, want a critical damage report", result.Messages)
 	}
 }
@@ -274,7 +274,7 @@ func TestCubicDrainFeedsOwnerFromFullDamage(t *testing.T) {
 	if !slices.Equal(target.hitLog, []string{"hp -1234 with 0 effects", "cast break"}) {
 		t.Fatalf("hit log = %v, want the HP before the cast break", target.hitLog)
 	}
-	want := []any{CasterVitalsChanged{}, Damage{RecipientID: owner.objectID, Amount: damage}}
+	want := []any{CasterVitalsChanged{}, Damage{RecipientID: owner.objectID, TargetID: target.objectID, Amount: damage}}
 	if !slices.Equal(result.Messages, want) {
 		t.Fatalf("messages = %+v, want %+v", result.Messages, want)
 	}

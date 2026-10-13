@@ -121,7 +121,7 @@ type Player interface {
 	NotifyAttackFailed()
 	NotifyResistedSkill(targetName string, skillID modelskill.ID, level int)
 	NotifyResistedMagic(attackerName string)
-	NotifySkillDamage(amount int, magicCrit, blocked, petrified bool)
+	NotifySkillDamage(targetID int32, amount int, magicCrit, blocked, petrified bool)
 	NotifySpoilAlready()
 	NotifySpoilSuccess()
 	// Summon-friend eligibility state the caster and target share.
@@ -343,9 +343,11 @@ const (
 )
 
 // Damage reports a skill hit's damage to the attacking side. RecipientID is
-// the attacking player, or the owner of the attacking summon.
+// the attacking player, or the owner of the attacking summon; TargetID is
+// the object id of the target hit.
 type Damage struct {
 	RecipientID  int32
+	TargetID     int32
 	Source       DamageSource
 	Amount       int32
 	MagicCrit    bool

@@ -17,8 +17,8 @@ import (
 )
 
 // loadOlympiadConfig reads the events.properties Olympiad calendar, match,
-// record and noblesse pass settings, defaulting as the reference does when
-// a key is missing. A malformed reward list reads as no reward.
+// record, noblesse pass and stadium settings, defaulting as the reference
+// does when a key is missing. A malformed reward list reads as no reward.
 func loadOlympiadConfig(paths gameServerPaths) (olympiad.Config, error) {
 	props, err := config.LoadFile(paths.EventsConfigPath)
 	if err != nil {
@@ -40,6 +40,14 @@ func loadOlympiadConfig(paths gameServerPaths) (olympiad.Config, error) {
 		MinMatches:        f.Int("OlyMinMatchesToBeClassed", def.MinMatches),
 		GPPerPoint:        f.Int("OlyGPPerPoint", def.GPPerPoint),
 		HeroPoints:        f.Int("OlyHeroPoints", def.HeroPoints),
+
+		BattleMillis:           f.Int64("OlyBattle", def.BattleMillis),
+		WaitTime:               f.Int("OlyWaitTime", def.WaitTime),
+		WaitBattle:             f.Int("OlyWaitBattle", def.WaitBattle),
+		WaitEnd:                f.Int("OlyWaitEnd", def.WaitEnd),
+		ClassedParticipants:    f.Int("OlyClassedParticipants", def.ClassedParticipants),
+		NonClassedParticipants: f.Int("OlyNonClassedParticipants", def.NonClassedParticipants),
+		AnnounceGames:          f.Bool("OlyAnnounceGames", def.AnnounceGames),
 	}
 	return cfg, f.Err()
 }
