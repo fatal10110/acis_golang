@@ -143,8 +143,8 @@ func (a *Actor) ProtectionBlessing() bool {
 // inside a PvP zone (each its own membership), or while the owner has karma
 // or a PvP flag.
 //
-// The Olympiad (#216) and siege-side (#3375) rules are not applied yet,
-// the same as for a player target.
+// The siege-side rule (#3375) is not applied yet, the same as for a player
+// target.
 func (a *Actor) AttackableWithoutForceBy(caster skilltarget.Actor) bool {
 	if owner := a.currentOwner(); caster == nil || owner == nil || actingPlayerID(caster) == owner.ObjectID() {
 		return false

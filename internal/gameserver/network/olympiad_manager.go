@@ -148,11 +148,12 @@ func (l *GameClientLink) leaveOlympiadOnSubclass(live *livePlayer) {
 	}
 }
 
-// dropOlympiadCompetitor takes live off the Olympiad's waiting list as it
-// leaves the world or is jailed.
+// dropOlympiadCompetitor records, as live leaves the world or is jailed,
+// that it left the Olympiad match it competes in, and takes it off the
+// Olympiad's waiting list.
 func (l *GameClientLink) dropOlympiadCompetitor(live *livePlayer) {
 	if l.olympiad != nil {
-		l.olympiad.RemoveDisconnectedCompetitor(live.ObjectID(), live.BaseClassID())
+		l.olympiad.RemoveDisconnectedCompetitor(live.ObjectID(), live.BaseClassID(), live.OlympiadGameID())
 	}
 }
 

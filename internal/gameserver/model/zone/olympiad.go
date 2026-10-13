@@ -7,20 +7,18 @@ type Olympiad struct {
 	Zone
 	Spawns
 
-	// BattleStarted reports whether a match is currently running in this
-	// stadium; nil (until the tournament system wires it) reads as no
-	// match.
+	// BattleStarted reports whether a match is currently fighting in this
+	// stadium; nil reads as no match.
 	BattleStarted func() bool
 	// CombatNotice tells a player they entered or left the active ring
-	// (leaving also closes the match scoreboard); nil until the messaging
-	// layer wires it.
+	// (leaving also closes the match scoreboard); nil tells nothing.
 	CombatNotice func(a Actor, entering bool)
 	// SendMatchInfo shows an entering player the running match's state;
-	// nil until the tournament system wires it.
+	// nil shows nothing.
 	SendMatchInfo func(a Actor)
 	// ExpelUninvited unsummons and teleports out an entering player-side
 	// actor whose controlling player is neither participant, observer nor
-	// game master; nil until the tournament system wires it.
+	// game master; nil expels no one.
 	ExpelUninvited func(a Actor)
 }
 

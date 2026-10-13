@@ -697,7 +697,7 @@ func (c *Controller) reportHit(hit Hit) {
 			return
 		}
 	}
-	e := event.HitDealt{Damage: hit.Damage, Crit: hit.Crit, Miss: hit.Miss}
+	e := event.HitDealt{TargetID: hit.Target.ObjectID(), Damage: hit.Damage, Crit: hit.Crit, Miss: hit.Miss}
 	if t, ok := hit.Target.(invulTarget); ok && t.Invul() {
 		e.Blocked = true
 		e.Petrified = t.Paralyzed()

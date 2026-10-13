@@ -11,7 +11,7 @@ import (
 
 // shippedOlympiadEvents is lines copied verbatim from the head of the
 // reference's shipped config/events.properties: the four calendar keys,
-// OlyBattle, which the calendar does not read, and the match keys.
+// OlyBattle, and the match keys.
 const shippedOlympiadEvents = `#=============================================================
 #                          Olympiad
 #=============================================================
@@ -49,24 +49,30 @@ OlyDividerNonClassed = 5
 `
 
 // TestLoadOlympiadConfig pins the Olympiad settings to events.properties:
-// the shipped file, with its zero-padded OlyMin, and an empty one both give
-// the reference defaults (18, 0, 21600000, 3; 10 points at most, dividers 3
-// and 5, rewards 6651x50 and 6651x30; 18 starting points, 5 matches to be
-// ranked, 1000 passes a point, 300 hero points); set keys override them; a
+// an empty file gives the reference defaults (18, 0, 21600000, 3; 10 points
+// at most, dividers 3 and 5, rewards 6651x50 and 6651x30; 18 starting
+// points, 5 matches to be ranked, 1000 passes a point, 300 hero points;
+// fights of 180000 ms after 30 and 60 seconds, 40 back; draws from 5 and 9
+// registrations, matches announced), the shipped file, with its zero-padded
+// OlyMin, the same but its six-minute OlyBattle; set keys override them; a
 // malformed number fails the load instead of defaulting, while a malformed
 // reward list, an id or count outside int32 included, reads as no reward.
 func TestLoadOlympiadConfig(t *testing.T) {
 	dir := t.TempDir()
-	shipped := olympiad.Config{
+	defaults := olympiad.Config{
 		StartHour: 18, StartMinute: 0, CompetitionMillis: 21600000, WeeklyPoints: 3,
 		MaxPoints: 10, DividerClassed: 3, DividerNonClassed: 5,
 		ClassedReward:    []olympiad.Reward{{ItemID: 6651, Count: 50}},
 		NonClassedReward: []olympiad.Reward{{ItemID: 6651, Count: 30}},
 		StartPoints:      18, MinMatches: 5, GPPerPoint: 1000, HeroPoints: 300,
+		BattleMillis: 180000, WaitTime: 30, WaitBattle: 60, WaitEnd: 40,
+		ClassedParticipants: 5, NonClassedParticipants: 9, AnnounceGames: true,
 	}
-	if def := olympiad.DefaultConfig(); !reflect.DeepEqual(def, shipped) {
-		t.Fatalf("DefaultConfig() = %+v, want %+v", def, shipped)
+	if def := olympiad.DefaultConfig(); !reflect.DeepEqual(def, defaults) {
+		t.Fatalf("DefaultConfig() = %+v, want %+v", def, defaults)
 	}
+	shipped := defaults
+	shipped.BattleMillis = 360000
 	for _, tt := range []struct {
 		name, props string
 		want        olympiad.Config
@@ -79,13 +85,17 @@ func TestLoadOlympiadConfig(t *testing.T) {
 			props: "OlyStartTime = 20\nOlyMin = 05\nOlyCPeriod = 3600000\nOlyWeeklyPoints = 7\n" +
 				"OlyMaxPoints = 4\nOlyDividerClassed = 2\nOlyDividerNonClassed = 6\n" +
 				"OlyClassedReward = 57-1000;6651-5\nOlyNonClassedReward = 6651-1\n" +
-				"OlyStartPoints = 7\nOlyMinMatchesToBeClassed = 9\nOlyGPPerPoint = 20\nOlyHeroPoints = 40\n",
+				"OlyStartPoints = 7\nOlyMinMatchesToBeClassed = 9\nOlyGPPerPoint = 20\nOlyHeroPoints = 40\n" +
+				"OlyBattle = 1000\nOlyWaitTime = 2\nOlyWaitBattle = 3\nOlyWaitEnd = 4\n" +
+				"OlyClassedParticipants = 6\nOlyNonClassedParticipants = 7\nOlyAnnounceGames = False\n",
 			want: olympiad.Config{
 				StartHour: 20, StartMinute: 5, CompetitionMillis: 3600000, WeeklyPoints: 7,
 				MaxPoints: 4, DividerClassed: 2, DividerNonClassed: 6,
 				ClassedReward:    []olympiad.Reward{{ItemID: 57, Count: 1000}, {ItemID: 6651, Count: 5}},
 				NonClassedReward: []olympiad.Reward{{ItemID: 6651, Count: 1}},
 				StartPoints:      7, MinMatches: 9, GPPerPoint: 20, HeroPoints: 40,
+				BattleMillis: 1000, WaitTime: 2, WaitBattle: 3, WaitEnd: 4,
+				ClassedParticipants: 6, NonClassedParticipants: 7,
 			},
 		},
 		{

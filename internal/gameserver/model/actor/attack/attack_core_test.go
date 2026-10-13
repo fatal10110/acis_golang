@@ -743,46 +743,46 @@ func TestControllerReportsHitFeedbackPerActorKind(t *testing.T) {
 			name:  "player miss",
 			build: func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
 			hit:   Hit{Miss: true},
-			want:  []event.HitDealt{{Miss: true}},
+			want:  []event.HitDealt{{TargetID: 2, Miss: true}},
 		},
 		{
 			name:  "player critical",
 			build: func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
 			hit:   Hit{Damage: 120, Crit: true},
-			want:  []event.HitDealt{{Damage: 120, Crit: true}},
+			want:  []event.HitDealt{{TargetID: 2, Damage: 120, Crit: true}},
 		},
 		{
 			name:  "player normal hit",
 			build: func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
 			hit:   Hit{Damage: 45},
-			want:  []event.HitDealt{{Damage: 45}},
+			want:  []event.HitDealt{{TargetID: 2, Damage: 45}},
 		},
 		{
 			name:   "player against invulnerable target",
 			build:  func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
 			hit:    Hit{Damage: 45},
 			target: &timingTarget{id: 2, invul: true},
-			want:   []event.HitDealt{{Damage: 45, Blocked: true}},
+			want:   []event.HitDealt{{TargetID: 2, Damage: 45, Blocked: true}},
 		},
 		{
 			name:   "player against petrified target",
 			build:  func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
 			hit:    Hit{Damage: 45, Crit: true},
 			target: &timingTarget{id: 2, invul: true, paralyzed: true},
-			want:   []event.HitDealt{{Damage: 45, Crit: true, Blocked: true, Petrified: true}},
+			want:   []event.HitDealt{{TargetID: 2, Damage: 45, Crit: true, Blocked: true, Petrified: true}},
 		},
 		{
 			name:   "paralyzed but vulnerable target takes the plain message",
 			build:  func() *Controller { return NewPlayer(&timingPlayer{}, nil) },
 			hit:    Hit{Damage: 45},
 			target: &timingTarget{id: 2, paralyzed: true},
-			want:   []event.HitDealt{{Damage: 45}},
+			want:   []event.HitDealt{{TargetID: 2, Damage: 45}},
 		},
 		{
 			name:  "summon critical on another target",
 			build: func() *Controller { return NewPlayable(&timingSummon{owner: owner}, nil) },
 			hit:   Hit{Damage: 80, Crit: true},
-			want:  []event.HitDealt{{Damage: 80, Crit: true}},
+			want:  []event.HitDealt{{TargetID: 2, Damage: 80, Crit: true}},
 		},
 		{
 			name:  "summon miss is silent",
@@ -861,7 +861,7 @@ func TestControllerReportsEachPoleHit(t *testing.T) {
 	ctrl.DoAttack(primary)
 	clock.fire(500 * time.Millisecond)
 
-	want := []event.HitDealt{{Damage: 1}, {Damage: 1, Blocked: true}}
+	want := []event.HitDealt{{TargetID: 2, Damage: 1}, {TargetID: 3, Damage: 1, Blocked: true}}
 	if got := event.Of[event.HitDealt](rec); !slices.Equal(got, want) {
 		t.Fatalf("pole HitDealt = %+v, want %+v", got, want)
 	}
