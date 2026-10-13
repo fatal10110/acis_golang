@@ -73,7 +73,7 @@ func (n *Npcs) spawnStandalone(tmpl *npc.Template, x, y, z, heading int, respawn
 	live := n.instantiate(key, entry, tmpl, at, heading, fullHP, fullMP, nil)
 	if live == nil {
 		n.mu.Lock()
-		delete(n.slot, key)
+		n.dropSlotLocked(key)
 		n.mu.Unlock()
 		return nil, fmt.Errorf("%w: npc %d", ErrNotPlaceable, tmpl.ID)
 	}

@@ -83,7 +83,7 @@ func (n *Npcs) dropOrphanScriptSlot(key string, slot slotInfo) {
 	if !ok || cur.spawning || n.respawn.Tracked(key) || (slot.entry.RespawnDelay > 0 && alive) {
 		return
 	}
-	delete(n.slot, key)
+	n.dropSlotLocked(key)
 }
 
 // dropGoneScriptPrivates drops, as master decays, the slots of the privates
@@ -94,9 +94,9 @@ func (n *Npcs) dropOrphanScriptSlot(key string, slot slotInfo) {
 func (n *Npcs) dropGoneScriptPrivates(master npc.PartyMember) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	for key, slot := range n.slot {
-		if slot.scripted && npc.SameNPC(slot.master, master) && !slot.spawning && !n.liveLocked(key) && !n.respawn.Tracked(key) {
-			delete(n.slot, key)
+	for key := range n.privates[master.Scratch()] {
+		if slot := n.slot[key]; slot.scripted && !slot.spawning && !n.liveLocked(key) && !n.respawn.Tracked(key) {
+			n.dropSlotLocked(key)
 		}
 	}
 }
@@ -125,5 +125,5 @@ func (n *Npcs) DecayMe(h *npc.Hostile) {
 	}
 	delete(n.live, id)
 	n.liveCount--
-	delete(n.slot, key)
+	n.dropSlotLocked(key)
 }

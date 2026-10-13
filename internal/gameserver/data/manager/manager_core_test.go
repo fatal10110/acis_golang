@@ -710,8 +710,8 @@ func TestNewSpawnsCreatesMissingStateRows(t *testing.T) {
 	existing := &spawn.State{Name: "existing", Status: spawn.StatusAlive, CurrentHP: 10}
 	spawns := NewSpawns(table, map[string]*spawn.State{"existing": existing})
 
-	if got, ok := spawns.State("existing"); !ok || got != existing {
-		t.Fatalf("State(existing) = %p, %v; want original row", got, ok)
+	if got, ok := spawns.State("existing"); !ok || got != *existing {
+		t.Fatalf("State(existing) = %+v, %v; want the loaded row", got, ok)
 	}
 	missing, ok := spawns.State("missing")
 	if !ok {
@@ -720,8 +720,8 @@ func TestNewSpawnsCreatesMissingStateRows(t *testing.T) {
 	if missing.Status != spawn.StatusUninitialized {
 		t.Fatalf("missing status = %d, want %d", missing.Status, spawn.StatusUninitialized)
 	}
-	if got, ok := spawns.State(""); ok || got != nil {
-		t.Fatalf("State(empty) = %p, %v; want nil, false", got, ok)
+	if got, ok := spawns.State(""); ok || got != (spawn.State{}) {
+		t.Fatalf("State(empty) = %+v, %v; want none", got, ok)
 	}
 	if got, want := spawns.StateCount(), 2; got != want {
 		t.Fatalf("StateCount() = %d, want %d", got, want)
