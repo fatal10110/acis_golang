@@ -75,7 +75,7 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 				live.SendFrame(serverpackets.FrameActionFailed())
 				return
 			}
-			live.deferAction(func() {
+			live.deferAction("PICK_UP", func() {
 				if l.resolveTarget(objectID) != target {
 					live.SendFrame(serverpackets.FrameActionFailed())
 					return
@@ -113,8 +113,8 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 		} else if h, ok := target.(*npc.Hostile); ok && interactsWith(live, h, ctrl) {
 			live.deferInteract(h, shift)
 		} else {
-			run := l.queuedSelectedTargetAction(live, target, ctrl, shift)
-			live.deferAction(func() {
+			intention, run := l.queuedSelectedTargetAction(live, target, ctrl, shift)
+			live.deferAction(intention, func() {
 				if l.resolveTarget(objectID) != target {
 					live.SendFrame(serverpackets.FrameActionFailed())
 					return
@@ -181,31 +181,32 @@ func (l *GameClientLink) actOnStaticObject(live *livePlayer, obj *staticobject.O
 	l.tryToInteract(live, obj, shift)
 }
 
-// queuedSelectedTargetAction captures the click's resolved intention before a
-// posture transition ends. A later selection must not change what it runs.
-func (l *GameClientLink) queuedSelectedTargetAction(live *livePlayer, target world.Tracked, ctrl, shift bool) func() {
+// queuedSelectedTargetAction captures the click's resolved intention, and its
+// name, before a posture transition ends. A later selection must not change
+// what it runs.
+func (l *GameClientLink) queuedSelectedTargetAction(live *livePlayer, target world.Tracked, ctrl, shift bool) (string, func()) {
 	attack := func() { l.attackQueuedTarget(live, target, shift) }
 	switch v := target.(type) {
 	case *summon.Actor:
 		// The caller queues a click without ctrl on an owned summon as its
 		// interact intention, so only a ctrl-click reaches here.
 		if v.ShownAsOwnedBy(live.ObjectID()) {
-			return attack
+			return "ATTACK", attack
 		}
 		if v.AttackableWithoutForceBy(live.Character) || (ctrl && v.AttackableBy(live.Character)) {
-			return attack
+			return "ATTACK", attack
 		}
-		return func() { l.startLiveFollow(live, v, shift) }
+		return "FOLLOW", func() { l.startLiveFollow(live, v, shift) }
 	case *livePlayer:
 		if v.AttackableWithoutForceBy(live.Character) || (ctrl && v.AttackableBy(live.Character)) {
-			return attack
+			return "ATTACK", attack
 		}
 		if v.Operating() {
-			return func() { l.tryToInteract(live, v, shift) }
+			return "INTERACT", func() { l.tryToInteract(live, v, shift) }
 		}
-		return func() { l.startLiveFollow(live, v, shift) }
+		return "FOLLOW", func() { l.startLiveFollow(live, v, shift) }
 	}
-	return attack
+	return "ATTACK", attack
 }
 
 func (l *GameClientLink) startPickupLiveGroundItem(ctx context.Context, live *livePlayer, target world.Tracked, shift bool) bool {
@@ -722,11 +723,19 @@ func (l *GameClientLink) requestChangeWaitType(live *livePlayer, stand bool) {
 		return
 	}
 	if itemAICastBusy(live) {
-		live.deferAction(func() { l.runChangeWaitType(live, stand, target) })
+		live.deferAction(waitTypeIntention(stand), func() { l.runChangeWaitType(live, stand, target) })
 		return
 	}
 	live.takeDeferredAction()
 	l.runChangeWaitType(live, stand, target)
+}
+
+// waitTypeIntention names a sit or stand request on the character page.
+func waitTypeIntention(stand bool) string {
+	if stand {
+		return "STAND"
+	}
+	return "SIT"
 }
 
 func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target world.Tracked) {
