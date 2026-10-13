@@ -1,6 +1,9 @@
 package castle
 
 import (
+	"cmp"
+	"slices"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 )
@@ -10,11 +13,13 @@ import (
 const ticketSpacing = 25
 
 // DroppedTicket is a mercenary ticket lying on a castle's grounds: the
-// ground item's object id, its item id and where it lies.
+// ground item's object id, its item id, where it lies, and when the item
+// last entered a container (its entry time, in Unix milliseconds).
 type DroppedTicket struct {
 	ObjectID int32
 	ItemID   int
 	location.Location
+	Time int64
 }
 
 // Ticket returns the castle's mercenary ticket for itemID.
@@ -79,7 +84,7 @@ func (c *Castle) RemoveDroppedTicket(objectID int32) {
 }
 
 // TakeDroppedTickets forgets every ticket on the castle's grounds and
-// returns them.
+// returns them, the latest entry time first, then the highest object id.
 func (c *Castle) TakeDroppedTickets() []DroppedTicket {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -88,5 +93,26 @@ func (c *Castle) TakeDroppedTickets() []DroppedTicket {
 		out = append(out, t)
 	}
 	clear(c.droppedTickets)
+	slices.SortFunc(out, func(a, b DroppedTicket) int {
+		return cmp.Or(cmp.Compare(b.Time, a.Time), cmp.Compare(b.ObjectID, a.ObjectID))
+	})
+	return out
+}
+
+// AddMercenary records the NPC objectID as a mercenary the castle's siege
+// hired.
+func (c *Castle) AddMercenary(objectID int32) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.mercenaries = append(c.mercenaries, objectID)
+}
+
+// TakeMercenaries forgets the castle's hired mercenaries and returns their
+// object ids, in hiring order.
+func (c *Castle) TakeMercenaries() []int32 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := c.mercenaries
+	c.mercenaries = nil
 	return out
 }

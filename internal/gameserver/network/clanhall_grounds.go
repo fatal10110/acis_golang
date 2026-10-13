@@ -12,6 +12,8 @@ import (
 // their lookup by name, and their reload.
 type WorldDoors interface {
 	door.StateOwner
+	// Door returns the door of id.
+	Door(id int) (*door.Object, bool)
 	// DoorByName returns the door named name, ignoring case.
 	DoorByName(name string) (*door.Object, bool)
 	// ReloadDoors replaces the doors in the world with doors built from

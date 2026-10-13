@@ -24,7 +24,7 @@ var ErrNotPlaceable = errors.New("npcs: npc cannot be placed")
 // Only a template a live hostile or civilian NPC models can be placed; any
 // other reports ErrNotPlaceable and places nothing.
 func (n *Npcs) SpawnFixed(tmpl *npc.Template, x, y, z, heading int, respawn time.Duration) error {
-	_, err := n.spawnStandalone(tmpl, x, y, z, heading, respawn, nil)
+	_, err := n.spawnStandalone(tmpl, x, y, z, heading, respawn, nil, 0)
 	return err
 }
 
@@ -34,7 +34,7 @@ func (n *Npcs) SpawnFixedFolk(tmpl *npc.Template, x, y, z, heading int) (*npc.Fo
 	if tmpl == nil || !npc.FolkKind(&npc.Instance{Template: tmpl}) {
 		return nil, ErrNotPlaceable
 	}
-	live, err := n.spawnStandalone(tmpl, x, y, z, heading, 0, nil)
+	live, err := n.spawnStandalone(tmpl, x, y, z, heading, 0, nil, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (n *Npcs) SpawnFixedFolk(tmpl *npc.Template, x, y, z, heading int) (*npc.Fo
 // spawnFixed is SpawnFixed with no respawn delay, also returning the placed
 // NPC's object id.
 func (n *Npcs) spawnFixed(tmpl *npc.Template, x, y, z, heading int) (int32, error) {
-	live, err := n.spawnStandalone(tmpl, x, y, z, heading, 0, nil)
+	live, err := n.spawnStandalone(tmpl, x, y, z, heading, 0, nil, 0)
 	if err != nil {
 		return 0, err
 	}
@@ -53,9 +53,10 @@ func (n *Npcs) spawnFixed(tmpl *npc.Template, x, y, z, heading int) (int32, erro
 }
 
 // spawnStandalone is SpawnFixed for an NPC spawned for summoner, nil for
-// none, returning the NPC placed. Its created hooks have run by then; one
-// may have deleted it again.
-func (n *Npcs) spawnStandalone(tmpl *npc.Template, x, y, z, heading int, respawn time.Duration, summoner attackable.Combatant) (attackable.Combatant, error) {
+// none, and belonging to the castle castleID, 0 for none, returning the NPC
+// placed. Its created hooks have run by then; one may have deleted it
+// again.
+func (n *Npcs) spawnStandalone(tmpl *npc.Template, x, y, z, heading int, respawn time.Duration, summoner attackable.Combatant, castleID int) (attackable.Combatant, error) {
 	if tmpl == nil {
 		return nil, ErrNotPlaceable
 	}
@@ -66,7 +67,7 @@ func (n *Npcs) spawnStandalone(tmpl *npc.Template, x, y, z, heading int, respawn
 	key := fmt.Sprintf("fixed#%d", n.fixedSeq.Add(1))
 	entry := spawn.Entry{NPCID: int32(tmpl.ID), RespawnDelay: max(respawn, 0)}
 	n.mu.Lock()
-	n.slot[key] = slotInfo{key: key, entry: entry, tmpl: tmpl, fixed: true, at: at, heading: heading, summoner: summoner, memory: newSlotMemory(entry, nil)}
+	n.slot[key] = slotInfo{key: key, entry: entry, tmpl: tmpl, fixed: true, at: at, heading: heading, summoner: summoner, castleID: castleID, memory: newSlotMemory(entry, nil)}
 	n.mu.Unlock()
 
 	live := n.instantiate(key, entry, tmpl, at, heading, fullHP, fullMP, nil)

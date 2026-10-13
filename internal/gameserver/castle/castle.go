@@ -39,6 +39,9 @@ type Castle struct {
 	// droppedTickets are the mercenary tickets lying on the castle's
 	// grounds, by ground item object id.
 	droppedTickets map[int32]DroppedTicket
+	// mercenaries are the object ids of the NPCs the castle's siege hired
+	// from its dropped tickets, in hiring order.
+	mercenaries []int32
 }
 
 // Row is a castle table row.

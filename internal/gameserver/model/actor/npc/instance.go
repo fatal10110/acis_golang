@@ -39,6 +39,10 @@ type Instance struct {
 	// Summoner is the creature the NPC was spawned for, a caught monster's
 	// fisher; nil for none. Set before the NPC is placed, read-only after.
 	Summoner attackable.Combatant
+	// CastleID is the castle the NPC was given as it spawned, a mercenary
+	// a siege hired; 0 for none, leaving it to its maker and template. Set
+	// before the NPC is placed, read-only after.
+	CastleID int
 
 	// name and title, once set, replace the template's; see Name and Title.
 	name, title atomic.Pointer[string]
