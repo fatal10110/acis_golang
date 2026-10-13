@@ -77,7 +77,8 @@ func (slotLimit) WeightLimit() int      { return math.MaxInt32 }
 // party range of the origin. A dead member, a full one and a far one are
 // passed over.
 func TestPartyLootEligible(t *testing.T) {
-	l := &GameClientLink{playerConfig: PlayerConfig{PartyRange: 1500}}
+	l := &GameClientLink{}
+	l.playerSettings.Store(&PlayerConfig{PartyRange: 1500})
 	capture := &testsupport.FrameCapture{}
 	origin := newTestLivePlayer(t, 1, capture)
 	alive := newTestLivePlayer(t, 2, capture)
@@ -103,7 +104,7 @@ func TestPartyLootEligible(t *testing.T) {
 		}
 	}
 
-	l.playerConfig.PartyRange = -1
+	l.playerSettings.Store(&PlayerConfig{PartyRange: -1})
 	if !l.partyLootEligible(20, origin)(far) {
 		t.Error("a far member is passed over with an unlimited party range")
 	}
@@ -121,7 +122,8 @@ func TestShareAdenaSkipsMembersAtTheCap(t *testing.T) {
 	first, second := &testsupport.FrameCapture{}, &testsupport.FrameCapture{}
 	a := newEquipTestLivePlayer(t, 2, first, templates, nil)
 	b := newEquipTestLivePlayer(t, 3, second, templates, nil)
-	l := &GameClientLink{log: zerolog.Nop(), ids: &sequentialIDs{next: 9000}, playerConfig: PlayerConfig{PartyRange: 1500}}
+	l := &GameClientLink{log: zerolog.Nop(), ids: &sequentialIDs{next: 9000}}
+	l.playerSettings.Store(&PlayerConfig{PartyRange: 1500})
 	members := []*livePlayer{rich, a, b}
 
 	l.shareAdena(members, 1, rich)

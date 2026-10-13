@@ -34,6 +34,9 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 			data.Admin.Replace(fresh)
 			return nil
 		},
+		Config: func() (network.PlayerConfig, error) {
+			return reloadPlayerConfig(paths, data, log)
+		},
 		BoatRoutes: func() ([]route.BoatItinerary, error) {
 			return loadBoatRoutes(paths)
 		},
@@ -133,4 +136,56 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 			return fresh, nil
 		},
 	}
+}
+
+// reloadPlayerConfig reads the server, hexid, players, NPC and geoengine
+// properties files anew, failing as boot would on a file or value it cannot
+// read, and returns the player settings read from them.
+//
+// Only the player settings take the reloaded values. These keep their boot
+// value, read once into what the boot built from them:
+//   - the listener and login server addresses, the login registration
+//     (server id, hexid, status flags), the database and the client cipher;
+//   - the geodata and the town combat rule the zones were set up with,
+//     which //reload zone reapplies as booted;
+//   - AllowCursedWeapons, AllowBoat and DeleteCharAfterDays;
+//   - the kill rewards (drop and XP/SP rates, auto-loot, party XP, and
+//     PartyRange and MultipleItemDrop, which party loot keeps too), the PvP
+//     flag times, the ground item settings, the pet settings, the spellbook
+//     needs, StoreSkillCooltime and CancelLesserEffect;
+//   - the clan, siege, manor, Olympiad, hero, Seven Signs, festival,
+//     lottery, wedding, fishing championship, derby, scheme buffer,
+//     community board, petition and class master settings;
+//   - the NPC settings: AI, random walk rate, path fail count, raid
+//     multipliers, boss wait times, spawn multiplier and spawn events
+//     (//respawnall reads the spawn list with the boot multiplier), raid
+//     curse, NPC crest and free teleport;
+//   - the merchant and augmentation settings, the chat settings, and the GM
+//     audit and item logs.
+func reloadPlayerConfig(paths gameServerPaths, data *gameData, log zerolog.Logger) (network.PlayerConfig, error) {
+	serverProps, err := loadGameServerProperties(paths, log)
+	if err != nil {
+		return network.PlayerConfig{}, err
+	}
+	hexProps, err := loadHexIDProperties(paths)
+	if err != nil {
+		return network.PlayerConfig{}, err
+	}
+	cfg, err := gameServerConfigFromLoadedProperties(paths, serverProps, hexProps)
+	if err != nil {
+		return network.PlayerConfig{}, err
+	}
+	gameplay, err := loadGameplayConfig(paths, log)
+	if err != nil {
+		return network.PlayerConfig{}, err
+	}
+	pvpOptions, err := loadPvPFlagOptions(paths, log)
+	if err != nil {
+		return network.PlayerConfig{}, err
+	}
+	rewards, err := provideKillRewardConfig(paths, serverProps, data)
+	if err != nil {
+		return network.PlayerConfig{}, err
+	}
+	return newPlayerConfig(cfg, gameplay, rewards, pvpOptions), nil
 }

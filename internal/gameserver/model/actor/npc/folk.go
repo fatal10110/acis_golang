@@ -49,6 +49,7 @@ var folkInstanceKinds = map[InstanceKind]struct{}{
 	"MutedFolk":             {},
 	"OlympiadManagerNpc":    {},
 	"SchemeBuffer":          {},
+	"SiegeFlag":             {},
 	"SiegeNpc":              {},
 	"SignsPriest":           {},
 	"SymbolMaker":           {},
@@ -116,6 +117,10 @@ type Folk struct {
 	// observerGroups are the viewpoint groups a broadcasting tower offers;
 	// see folk_observer.go.
 	observerGroups atomic.Pointer[[]int]
+
+	// headquarters is a siege flag's clan and the end of its attack
+	// warning hold; see folk_siegeflag.go.
+	headquarters headquarters
 }
 
 // NewFolk builds a civilian NPC from inst. skills, when provided, resolves
@@ -174,10 +179,10 @@ const holyThing InstanceKind = "HolyThing"
 func (f *Folk) HolyThing() bool { return hostileKind(f.Instance) == holyThing }
 
 // Muted reports a civilian NPC a player's interact does nothing on: a muted
-// civilian, or a holy artifact.
+// civilian, a holy artifact or a siege headquarters.
 func (f *Folk) Muted() bool {
 	kind := hostileKind(f.Instance)
-	return kind == "MutedFolk" || kind == holyThing
+	return kind == "MutedFolk" || kind == holyThing || kind == siegeFlag
 }
 
 // ServerObjectView reports an NPC every player is shown with the stationary

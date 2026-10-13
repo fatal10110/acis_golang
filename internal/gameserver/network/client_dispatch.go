@@ -26,9 +26,8 @@ type inboundOpcode interface{ ~uint8 | ~uint16 }
 // every connection's read goroutine may share it.
 type inboundRegistry[K inboundOpcode] map[K]inboundFunc
 
-// gameInbound holds the handlers of the frame's opcode byte. The read loop
-// asks it first and falls back to its own opcode switch for an opcode with
-// no entry.
+// gameInbound holds the handlers of the frame's opcode byte; the read loop
+// dispatches every accepted frame through it.
 var gameInbound = newGameInbound()
 
 // gameExInbound holds the handlers of an extended frame's uint16
@@ -210,7 +209,54 @@ func newGameInbound() inboundRegistry[byte] {
 		register(reg, op, tutorialDecoder(op), (*GameClientLink).handleTutorialEvent)
 	}
 	register(reg, clientpackets.OpcodeRequestQuestAbort, clientpackets.DecodeRequestQuestAbort, (*GameClientLink).handleRequestQuestAbort)
+	for _, op := range unwiredOpcodes {
+		registerFrame(reg, op, func(l *GameClientLink, _ context.Context, _ *connState, _ []byte) error {
+			l.logNotWired(op)
+			return nil
+		})
+	}
 	return reg
+}
+
+// unwiredOpcodes are accepted in-game opcodes that do nothing a client can
+// observe: the client's filler packets and its game-guard reply, whose
+// recorded answer nothing reads. Each one is read and dropped without an
+// answer, and without counting as an unknown packet; the client waits on
+// nothing after sending any of them.
+var unwiredOpcodes = []byte{
+	clientpackets.OpcodeDummy1A, clientpackets.OpcodeDummy23, clientpackets.OpcodeDummy2E,
+	clientpackets.OpcodeDummy34, clientpackets.OpcodeDummy3E, clientpackets.OpcodeGameGuardReply,
+}
+
+// logNotWired logs a frame of one of the unwiredOpcodes.
+func (l *GameClientLink) logNotWired(opcode byte) {
+	l.log.Warn().Str("opcode", fmt.Sprintf("%#x", opcode)).Msg("Opcode not wired")
+}
+
+// clearsSpawnProtection reports whether a frame of opcode ends the player's
+// spawn protection once its handler is done.
+func clearsSpawnProtection(opcode byte) bool {
+	switch opcode {
+	case clientpackets.OpcodeEnterWorld, clientpackets.OpcodeAction,
+		clientpackets.OpcodeRequestPledgeCrest, clientpackets.OpcodeAppearing,
+		clientpackets.OpcodeRequestPledgeInfo, clientpackets.OpcodeSay2:
+		return false
+	default:
+		return true
+	}
+}
+
+// dispatch serves an accepted frame through gameInbound and reports whether
+// the connection keeps reading. An accepted opcode with no handler is
+// logged and the frame dropped.
+func (l *GameClientLink) dispatch(ctx context.Context, cs *connState, payload []byte) (open bool) {
+	opcode := payload[0]
+	found, open := gameInbound.serve(l, ctx, cs, opcode, payload)
+	if !found {
+		l.log.Info().Str("opcode", fmt.Sprintf("%#x", opcode)).Str("state", cs.client.State().String()).
+			Msg("game client: accepted opcode not implemented yet")
+	}
+	return open
 }
 
 // newGameExInbound lists every extended sub-opcode handler. Each decoder
@@ -286,7 +332,7 @@ func registerCapped[K inboundOpcode, T any](
 	handle func(*GameClientLink, context.Context, *connState, T) error,
 ) {
 	registerFrame(reg, op, func(l *GameClientLink, ctx context.Context, cs *connState, payload []byte) error {
-		maxItems := l.playerConfig.InventorySlots.MaxItemInPacket()
+		maxItems := l.playerConfig().InventorySlots.MaxItemInPacket()
 		return decodeAndHandle(l, ctx, cs, payload, func(p []byte) (T, error) { return decode(p, maxItems) }, handle)
 	})
 }

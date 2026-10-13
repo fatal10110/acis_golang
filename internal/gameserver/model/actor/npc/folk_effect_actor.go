@@ -181,9 +181,9 @@ func (f *Folk) ApplyLethalOutcome(outcome formulas.LethalOutcome, caster attacka
 	}
 }
 
-// Lethalable reports true: the lethal-strike exemptions are attackable
-// NPCs, doors and siege flags.
-func (f *Folk) Lethalable() bool { return true }
+// Lethalable reports whether a lethal strike can land on the NPC: on any
+// civilian NPC but a siege headquarters.
+func (f *Folk) Lethalable() bool { return !f.SiegeFlag() }
 
 // SpoilPool reports none: a civilian NPC has nothing to sweep.
 func (f *Folk) SpoilPool() *item.SpoilPool { return nil }

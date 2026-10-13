@@ -523,7 +523,7 @@ func sendKarmaChangeFrames(live *livePlayer, karma int) {
 // available skill automatically.
 func (l *GameClientLink) giveOrRewardSkills(c *player.Character, tmpl *player.Template) error {
 	refresh := l.skills.GiveSkills
-	if l.playerConfig.AutoLearnSkills {
+	if l.playerConfig().AutoLearnSkills {
 		refresh = l.skills.RewardSkills
 	}
 	return refresh(c, tmpl)
@@ -552,7 +552,7 @@ func (l *GameClientLink) refreshLiveLevelSkills(live *livePlayer) {
 	// an actual level increase refreshes shortcuts — ahead of the skill
 	// list, as the grant does — and a pull-back's level decrease must not.
 	var refresh func(old, level int) bool
-	if l.playerConfig.AutoLearnSkills {
+	if l.playerConfig().AutoLearnSkills {
 		refresh = raisedSkill
 	}
 	l.sendSkillChanges(live, before, refresh)
@@ -566,7 +566,7 @@ func (l *GameClientLink) userInfoSnapshot(live *livePlayer) serverpackets.UserIn
 		Template:           live.Template(),
 		Items:              live.inventoryItems(),
 		IsGM:               live.accessLevel().IsGM,
-		SpawnProtectedTeam: l.playerConfig.SpawnProtection > 0 && live.SpawnProtected(),
+		SpawnProtectedTeam: l.playerConfig().SpawnProtection > 0 && live.SpawnProtected(),
 		Clan:               l.clanFields(live.Character),
 		HeroAura:           l.heroAura(live),
 	}
@@ -688,6 +688,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	// logout) is dropped, and every surviving one gets SharedReuseGroup from
 	// its item's etc-item data.
 	shortcuts = l.restoreItemShortcuts(c, shortcuts)
+	settings := l.playerConfig()
 	rt := player.Runtime{
 		World:  l.world,
 		Social: socialGraph{parties: l.parties, clans: l.clans},
@@ -706,18 +707,18 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		Levels: l.levels,
 		Log:    l.log,
 		Rules: player.Rules{
-			RateKarmaExpLost:       l.playerConfig.RateKarmaExpLost,
-			RespawnRestoreHP:       l.playerConfig.RespawnRestoreHP,
-			WeightLimitMultiplier:  l.playerConfig.WeightLimitMultiplier,
-			InventorySlots:         l.playerConfig.InventorySlots,
-			StorageSlots:           l.playerConfig.StorageSlots,
-			PerfectShieldBlockRate: l.playerConfig.PerfectShieldBlockRate,
-			MaxBuffsAmount:         l.playerConfig.MaxBuffsAmount,
-			DeathPenaltyChance:     l.playerConfig.DeathPenaltyChance,
-			AllowDelevel:           l.playerConfig.AllowDelevel,
+			RateKarmaExpLost:       settings.RateKarmaExpLost,
+			RespawnRestoreHP:       settings.RespawnRestoreHP,
+			WeightLimitMultiplier:  settings.WeightLimitMultiplier,
+			InventorySlots:         settings.InventorySlots,
+			StorageSlots:           settings.StorageSlots,
+			PerfectShieldBlockRate: settings.PerfectShieldBlockRate,
+			MaxBuffsAmount:         settings.MaxBuffsAmount,
+			DeathPenaltyChance:     settings.DeathPenaltyChance,
+			AllowDelevel:           settings.AllowDelevel,
 			RaidCursesDisabled:     l.disableRaidCurse,
-			AwardPKKillPVPPoint:    l.playerConfig.AwardPKKillPVPPoint,
-			DeathDrop:              l.playerConfig.DeathDrop,
+			AwardPKKillPVPPoint:    settings.AwardPKKillPVPPoint,
+			DeathDrop:              settings.DeathDrop,
 		},
 	}
 	if los, ok := l.geo.(player.LineOfSight); ok {

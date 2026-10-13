@@ -8,8 +8,7 @@ import (
 )
 
 // TestGameInboundServesInGameOpcodes pins that every in-game opcode with a
-// handler is dispatched through the registry, while the opcodes accepted
-// but not wired yet still fall through to the read loop.
+// handler is dispatched through the registry.
 func TestGameInboundServesInGameOpcodes(t *testing.T) {
 	for _, op := range []byte{
 		clientpackets.OpcodeRequestSetPledgeCrest,
@@ -161,14 +160,6 @@ func TestGameInboundServesInGameOpcodes(t *testing.T) {
 	} {
 		if _, ok := gameInbound[op]; !ok {
 			t.Errorf("gameInbound has no handler for opcode %#x", op)
-		}
-	}
-	for _, op := range []byte{
-		clientpackets.OpcodeDummy1A, clientpackets.OpcodeDummy23, clientpackets.OpcodeDummy2E,
-		clientpackets.OpcodeDummy34, clientpackets.OpcodeDummy3E, clientpackets.OpcodeGameGuardReply,
-	} {
-		if _, ok := gameInbound[op]; ok {
-			t.Errorf("gameInbound has a handler for unwired opcode %#x", op)
 		}
 	}
 }

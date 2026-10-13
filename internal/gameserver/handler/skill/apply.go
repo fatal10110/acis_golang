@@ -50,6 +50,9 @@ func landEffects(effector effect.Actor, effected Actor, def modelskill.Definitio
 	if !ok {
 		return 0
 	}
+	if r, ok := effected.(effectRefuser); ok && r.RefusesEffects() {
+		return 0
+	}
 	if !effect.Lands(effector, target, def) || target.EffectList() == nil {
 		return 0
 	}
@@ -163,4 +166,10 @@ func applySelfEffects(cast Cast, def modelskill.Definition) {
 		}
 	}
 	applyCasterSelfEffects(cast, def)
+}
+
+// effectRefuser is an effect participant no effect lands on, whoever casts
+// it: a siege headquarters.
+type effectRefuser interface {
+	RefusesEffects() bool
 }

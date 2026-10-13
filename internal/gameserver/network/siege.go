@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/hero"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -315,6 +316,42 @@ func (n siegeNotices) PlaySound(file string) {
 func (n siegeNotices) TellClans(clans []*clan.Clan, m siege.Message) {
 	for _, cl := range clans {
 		n.l.broadcastToClanQueued(cl, nil, func() wire.Frame { return frameSiegeMessage(m) })
+	}
+}
+
+// GuardDoors makes s the siege of each door named in gates (castles.xml
+// <gates>), resolved by name now and kept by door id, so a door reload
+// guards the new door too. A name naming no door is left out: it is not
+// one of the castle's doors.
+func (n siegeNotices) GuardDoors(gates []string, s door.Siege) {
+	l := n.l
+	if l.doors == nil {
+		return
+	}
+	for _, name := range gates {
+		if d, ok := l.doors.DoorByName(name); ok {
+			l.doors.SetDoorSiege(d.DoorID(), s)
+		}
+	}
+}
+
+// CloseDoors closes each door named in gates that stands open; a door
+// that is unknown or broken stays as it is.
+func (n siegeNotices) CloseDoors(gates []string) { n.l.setHallDoors(gates, false) }
+
+// RespawnDoors stands each door named in gates again: a broken one
+// revives with the configured RespawnRestoreHP, each closes, then its HP
+// is set to its maximum, or to half of it when weak.
+func (n siegeNotices) RespawnDoors(gates []string, weak bool) {
+	l := n.l
+	if l.doors == nil {
+		return
+	}
+	restoreHP := l.playerConfig().RespawnRestoreHP
+	for _, name := range gates {
+		if d, ok := l.doors.DoorByName(name); ok {
+			l.doors.RespawnDoor(d.DoorID(), restoreHP, weak)
+		}
 	}
 }
 

@@ -354,18 +354,20 @@ type GameClientLink struct {
 	// itemWrites orders the writes of one items row against each other, which
 	// the lanes alone cannot: a row outlives its owner's lane (see
 	// applyPersistActions).
-	itemWrites       *persist.Order
-	persistWait      time.Duration
-	queues           Queues
-	queuedPets       queuedPets
-	selections       selectingOwners
-	restarts         *restart.Table
-	observers        *observer.Table
-	clanHallData     *hallmodel.Table
-	castleData       *castledata.Table
-	levels           *player.LevelTable
-	admin            *admin.Data
-	playerConfig     PlayerConfig
+	itemWrites   *persist.Order
+	persistWait  time.Duration
+	queues       Queues
+	queuedPets   queuedPets
+	selections   selectingOwners
+	restarts     *restart.Table
+	observers    *observer.Table
+	clanHallData *hallmodel.Table
+	castleData   *castledata.Table
+	levels       *player.LevelTable
+	admin        *admin.Data
+	// playerSettings holds the PlayerConfig in force; //reload config
+	// swaps it whole, so each read sees one config or the other.
+	playerSettings   atomic.Pointer[PlayerConfig]
 	petConfig        petmodel.Config // passed into summon.PetConfig by newPet.
 	disableRaidCurse bool
 	showNPCCrest     bool
@@ -886,7 +888,6 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		gmAudit:          cfg.GMAudit,
 		itemLog:          cfg.ItemLog,
 		chat:             cfg.Chat,
-		playerConfig:     cfg.PlayerConfig,
 		petConfig:        cfg.PetConfig,
 		disableRaidCurse: cfg.DisableRaidCurse,
 		showNPCCrest:     cfg.ShowNPCCrest,
@@ -926,6 +927,8 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		newCipherKey: randomCipherKey,
 		noCipher:     cfg.NoCipher,
 	}
+	playerConfig := cfg.PlayerConfig
+	link.playerSettings.Store(&playerConfig)
 	link.macros = cfg.Macros
 	link.manor = cfg.Manor
 	link.classMaster = cfg.ClassMaster
@@ -1002,12 +1005,23 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		link.roster.SetPurged(func(objectID int32) { clans.RemoveDeleted(objectID, time.Now()) })
 	}
 	link.skillHandlers.Register(takeCastleHandler{l: link})
+	link.skillHandlers.Register(siegeFlagHandler{l: link})
 	link.chance = &actorcast.ChanceProcs{Definitions: link.skills, Targets: link.targets, Skills: link.skillHandlers, Deliver: link.deliverChanceCast}
 	link.wireZones(link.zones)
 	link.wireCastleTickets()
 	link.olympiadDraw = cfg.OlympiadDraw
 	link.bindOlympiadStadiums(cfg.OlympiadDraw)
 	return link, nil
+}
+
+// playerConfig is the PlayerConfig in force. A caller reading several of
+// its settings for one action takes it once, so a reload between two reads
+// cannot mix the old settings with the new.
+func (l *GameClientLink) playerConfig() *PlayerConfig {
+	if settings := l.playerSettings.Load(); settings != nil {
+		return settings
+	}
+	return &PlayerConfig{}
 }
 
 // newPet builds a pet with the shared effect, config and skill wiring. A live
@@ -1017,8 +1031,9 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 func (l *GameClientLink) newPet(cfg summon.PetConfig) (*summon.Actor, error) {
 	cfg.Effects = l.effects
 	cfg.Config = &l.petConfig
-	cfg.MaxBuffsAmount = l.playerConfig.MaxBuffsAmount
-	cfg.RespawnRestoreHP = l.playerConfig.RespawnRestoreHP
+	settings := l.playerConfig()
+	cfg.MaxBuffsAmount = settings.MaxBuffsAmount
+	cfg.RespawnRestoreHP = settings.RespawnRestoreHP
 	if cfg.Roll == nil {
 		cfg.Roll = l.petRoll
 	}

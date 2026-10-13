@@ -195,6 +195,10 @@ func (s *folkSink) Emit(ev event.Event) {
 		if s.link != nil {
 			s.link.hallSupportAnswer(f, e)
 		}
+	case event.HeadquartersAttacked:
+		if s.link != nil {
+			s.link.warnHeadquartersAttacked(f)
+		}
 	case event.NPCInfoChanged:
 		broadcastNPCView(s.link, &s.known, s.world, f, e.ServerObject || f.ServerObjectView())
 	}
@@ -243,7 +247,7 @@ func (c PlayerConfig) chatRules() npc.ChatRules {
 // chatRules are the gates on service NPC dialogs: the karma gates and the
 // manor switch.
 func (l *GameClientLink) chatRules() npc.ChatRules {
-	rules := l.playerConfig.chatRules()
+	rules := l.playerConfig().chatRules()
 	rules.AllowManor = l.manor.Allowed
 	return rules
 }

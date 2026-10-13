@@ -31,7 +31,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	def, known := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: live.SkillLevel(int(req.SkillID))})
 	castable := known && (def.Activation == modelskill.ActivationActive || def.Activation == modelskill.ActivationToggle)
 	if known {
-		if itemhandler.RecallCastBlockedByKarma(def.SkillType, live.Karma(), l.playerConfig.KarmaPlayerCanTeleport) {
+		if itemhandler.RecallCastBlockedByKarma(def.SkillType, live.Karma(), l.playerConfig().KarmaPlayerCanTeleport) {
 			sendMagicActionFailed(live)
 			return
 		}
@@ -110,6 +110,8 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 		afterCanCast = l.groundCastAfterCanCast(live, def)
 	case known && def.SkillType == "TAKE_CASTLE":
 		afterCanCast = l.takeCastleAfterCanCast(live, def, l.magicSkillFinalTarget(live, def, selected))
+	case known && def.SkillType == "SIEGE_FLAG":
+		afterCanCast = l.siegeFlagAfterCanCast(live)
 	}
 	started, err := actorcast.StartPlayerSkill(actorcast.PlayerSkillRequest{
 		Controller:  controller,
@@ -126,7 +128,7 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 		},
 	})
 	if err != nil {
-		if errors.Is(err, errGroundCastRejected) || errors.Is(err, errTakeCastleRefused) {
+		if errors.Is(err, errGroundCastRejected) || errors.Is(err, errTakeCastleRefused) || errors.Is(err, errSiegeFlagRefused) {
 			return
 		}
 		// A nextActionAttack skill refused at its cost and condition checks

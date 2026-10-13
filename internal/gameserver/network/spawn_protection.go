@@ -11,7 +11,8 @@ const (
 )
 
 func (l *GameClientLink) activateSpawnProtection(live *livePlayer) {
-	if live == nil || l.playerConfig.SpawnProtection <= 0 {
+	protection := l.playerConfig().SpawnProtection
+	if live == nil || protection <= 0 {
 		return
 	}
 	sim.AssertOwner(live.Queue())
@@ -22,7 +23,7 @@ func (l *GameClientLink) activateSpawnProtection(live *livePlayer) {
 	gen := live.spawnProtectionGen
 	live.SetSpawnProtection(true)
 	live.UpdateUserInfo()
-	live.after(l.playerConfig.SpawnProtection, func() {
+	live.after(protection, func() {
 		sim.AssertOwner(live.Queue())
 		if gen != live.spawnProtectionGen || !live.SpawnProtected() {
 			return

@@ -84,7 +84,7 @@ func (l *GameClientLink) activateClanWarehouse(live *livePlayer, cl *clan.Clan) 
 		l.log.Error().Err(err).Int32("clan_id", cl.ID()).Msg("warehouse: restore clan warehouse")
 		return nil, false
 	}
-	limit := l.playerConfig.StorageSlots.ClanWarehouseSlots()
+	limit := l.playerConfig().StorageSlots.ClanWarehouseSlots()
 	live.storage.active = activeStore{store: wh, clanID: cl.ID(), fits: func(slots int) bool {
 		return fitsLimit(wh.Size(), slots, limit)
 	}}

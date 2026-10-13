@@ -25,7 +25,12 @@ func (f *Folk) statCalc(s stat.Stat) *effect.Calculator {
 	if calc := f.statCalcs[s]; calc != nil {
 		return calc
 	}
-	calc := effect.NewCalculator(defaultBuiltin(s))
+	builtin := defaultBuiltin(s)
+	if f.SiegeFlag() {
+		// A siege headquarters has none of a creature's built-in bonuses.
+		builtin = nil
+	}
+	calc := effect.NewCalculator(builtin)
 	f.statCalcs[s] = &calc
 	return &calc
 }

@@ -623,6 +623,8 @@ func buildSkillDefinitionAttrs(id skill.ID, level int, vals map[string]string) (
 		SuicideAttack:    a.boolDefault("isSuicideAttack", false),
 		SiegeSummonSkill: a.boolDefault("isSiegeSummonSkill", false),
 
+		Advanced: a.boolDefault("isAdvanced", false),
+
 		IsCubic: a.boolDefault("isCubic", false),
 		NpcID:   a.intDefault("npcId", 0),
 

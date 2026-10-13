@@ -98,6 +98,8 @@ type Clan struct {
 	wars         map[int32]struct{}
 	attackers    map[int32]struct{}
 	warPenalties map[int32]int64
+	// headquarters is the siege headquarters the clan put up; nil for none.
+	headquarters Headquarters
 }
 
 // newClan returns a clan with empty rosters and registries.
