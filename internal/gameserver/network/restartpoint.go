@@ -127,8 +127,8 @@ func (l *GameClientLink) restartRestoreExp(live *livePlayer, requestType int32) 
 }
 
 // restartDestination is where a restart, recall or other teleport to town
-// sends live, jailed or not (RestartPointData.getLocationToTeleport, past
-// the residence branches): during a siege in progress at live's position,
+// sends live, jailed or not, past the residence branches: during a siege
+// in progress at live's position,
 // while Dawn holds the Seal of Strife in seal validation, a random spawn of
 // the besieged castle, a CHAOTIC one for a player with karma and an OTHER
 // one otherwise; else live's nearest town restart point. A castle listing

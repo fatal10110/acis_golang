@@ -34,8 +34,8 @@ func (c *Character) Regen() *creature.Regen { return &c.regen }
 
 // SettleRegen arms c's regeneration task when it is in the world, alive and
 // short of HP, MP or CP, its first tick one period from now, and disarms
-// it otherwise (CreatureStatus.setHp/setMp and PlayerStatus.setCp's start and
-// stop). A character not yet attached has no queue and stays idle. A
+// it otherwise; every HP, MP or CP change settles it so. A character not
+// yet attached has no queue and stays idle. A
 // teleport keeps the task on its grid: off the grid until Appearing, c is
 // still in the world.
 //

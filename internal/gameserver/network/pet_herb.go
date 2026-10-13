@@ -22,7 +22,7 @@ func (l *GameClientLink) consumePetHerb(live *livePlayer, pet *summon.Actor, inv
 		Target:      pet.CurrentTarget(),
 	})
 	// However the herb's use ends, the pet's status is republished once it
-	// is spent (SummonAI.thinkPickUp → SummonStatus.broadcastStatusUpdate):
+	// is spent:
 	// HP to the players targeting the pet, PetStatusUpdate to its owner,
 	// SummonInfo to everyone else who knows it.
 	defer pet.BroadcastStatus()

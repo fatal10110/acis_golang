@@ -9,17 +9,17 @@ import (
 
 // Runtime is one live cubic's timers: the recurring action tick (started
 // immediately for the Life Cubic, or lazily via Action() the first time the
-// owner enters combat stance for every other kind, matching
-// Cubic.doAction()'s idempotent restart guard) and the one-shot disappear
+// owner enters combat stance for every other kind; a restart while running
+// is a no-op) and the one-shot disappear
 // timer that fires when the granted lifetime elapses. Level is the level of
 // the SUMMON skill that granted this cubic — fixed at construction, not
-// re-read on a later refresh, matching CubicList.addOrRefreshCubic only
-// resetting the disappear timer for an already-active cubic.
+// re-read on a later refresh, which only resets the disappear timer of an
+// already-active cubic.
 type Runtime struct {
 	id ID
 	// Level is the level of the SUMMON skill that granted this cubic.
 	// ActivationChance is that same granting skill's own percent gate on
-	// each non-Life action tick (Cubic._activationChance) — both fixed at
+	// each non-Life action tick — both fixed at
 	// construction, distinct from any later-fired skill's own data.
 	Level            int
 	ActivationChance int
@@ -60,8 +60,8 @@ func NewRuntime(id ID, level, activationChance int, interval time.Duration, fire
 // ID satisfies task.AttackStanceCubic.
 func (r *Runtime) ID() int { return int(r.id) }
 
-// Action starts the recurring action tick if it isn't already running,
-// matching Cubic.doAction()'s no-op-if-already-active guard.
+// Action starts the recurring action tick if it isn't already running; it
+// is a no-op while the tick runs.
 func (r *Runtime) Action() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -108,8 +108,8 @@ func (r *Runtime) tick(gen int) {
 	r.mu.Unlock()
 }
 
-// StopAction cancels the recurring action tick only, matching
-// Cubic.stopAction() — used when a non-Life cubic finds its owner out of
+// StopAction cancels the recurring action tick only — used when a non-Life
+// cubic finds its owner out of
 // combat stance on a fire attempt, so it goes idle until the owner's next
 // combat entry reactivates it via Action().
 func (r *Runtime) StopAction() {
@@ -122,8 +122,8 @@ func (r *Runtime) StopAction() {
 	}
 }
 
-// RefreshDisappear (re)starts the disappear timer for lifetime, matching
-// CubicList.addOrRefreshCubic's refreshDisappearTask.
+// RefreshDisappear (re)starts the disappear timer for lifetime, as a
+// refresh of an already-active cubic does.
 func (r *Runtime) RefreshDisappear(lifetime time.Duration) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -133,7 +133,7 @@ func (r *Runtime) RefreshDisappear(lifetime time.Duration) {
 	r.disappearTimer = r.queue.After(lifetime, r.disappear)
 }
 
-// Stop cancels both timers, matching Cubic.stop().
+// Stop cancels both timers.
 func (r *Runtime) Stop() {
 	r.mu.Lock()
 	defer r.mu.Unlock()

@@ -6,8 +6,8 @@ import (
 )
 
 // BoatEntrance routes a summon's friendly follow of anyone but its owner
-// through the entrance of a boat's dock, as SummonMove.friendlyFollowTask
-// does through Playable.tryToPassBoatEntrance.
+// through the entrance of a boat's dock, the same boat-entrance pass a
+// player's walk makes.
 type BoatEntrance interface {
 	// PassBoatEntrance returns the shore point where the summon's walk
 	// toward dest crosses the entrance of the dock a boat it knows serves,
@@ -35,10 +35,10 @@ func (s *Summon) SetBoatEntrance(boats BoatEntrance) {
 }
 
 // followThroughBoatEntranceLocked is one friendly follow run toward target
-// when target is not the summon's owner nor the owner's own
-// (SummonMove.java:94-99): the follow never walks after target. Out of reach,
+// when target is not the summon's owner nor the owner's own: the follow
+// never walks after target. Out of reach,
 // the summon heads for the boat entrance its walk toward target crosses,
-// that walk replacing the follow (PlayableAI.tryToMoveTo); with no entrance
+// that walk replacing the follow; with no entrance
 // to head for, the owner is answered ActionFailed and the summon stays. It
 // reports whether it handled the run.
 func (s *Summon) followThroughBoatEntranceLocked(target attackable.Combatant) (bool, error) {
@@ -58,7 +58,7 @@ func (s *Summon) followThroughBoatEntranceLocked(target attackable.Combatant) (b
 	}
 	s.setCurrentLocked(intention{kind: IntentionMoveTo, loc: entrance})
 	s.move.CancelFollow()
-	// PlayableAI.thinkMoveTo: a summon that cannot move goes idle, answered
+	// A summon that cannot move goes idle, answered
 	// ActionFailed.
 	if disabler, ok := s.actor.(movementDisabler); ok && disabler.MovementDisabled() {
 		s.idleLocked()

@@ -48,7 +48,8 @@ func (o *object) Height() int             { return o.height }
 func (o *object) GeoData() [][]block.NSWE { return o.data }
 
 // CalculateGeoObject converts an object's inside/outside cell mask into
-// geodata NSWE edits matching GeoEngine.calculateGeoObject.
+// geodata NSWE edits: an inside cell is fully blocked, and an outside cell
+// loses each direction that leads into an inside neighbour.
 func CalculateGeoObject(inside [][]bool) [][]block.NSWE {
 	width := len(inside)
 	if width == 0 {

@@ -672,7 +672,7 @@ func (a *Attackable) SetBackToPeace() {
 	a.setBackToPeaceLocked()
 }
 
-// StopAggroHate mirrors AggroList.stopHate: zeroes target's threat hate,
+// StopAggroHate zeroes target's threat hate,
 // drops its queued attack desire, and returns to peace when neither hate
 // table still has a most-hated entry.
 func (a *Attackable) StopAggroHate(target attackable.Combatant) {
@@ -681,7 +681,7 @@ func (a *Attackable) StopAggroHate(target attackable.Combatant) {
 	a.stopAggroHateLocked(target)
 }
 
-// ReduceAllAggroHate mirrors AggroList.reduceAllHate: subtracts amount from
+// ReduceAllAggroHate subtracts amount from
 // every threat entry and returns to peace when neither hate table still has
 // a most-hated entry.
 func (a *Attackable) ReduceAllAggroHate(amount float64) {

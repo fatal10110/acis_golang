@@ -14,7 +14,7 @@ type Door struct {
 	doors Doors
 }
 
-// Door returns the door named name, ignoring case (DoorData.getDoor), nil
+// Door returns the door named name, ignoring case, nil
 // when there is none.
 func (s *Script) Door(name string) *Door {
 	if s.env == nil || s.env.Doors == nil {
@@ -27,12 +27,12 @@ func (s *Script) Door(name string) *Door {
 	return &Door{obj: obj, doors: s.env.Doors}
 }
 
-// Open opens the door as every opening does (Door.openMe): its geodata is
+// Open opens the door as every opening does: its geodata is
 // lifted, the players around it see it open, and its next automatic close
 // or open is scheduled anew. A broken or open door is left as is.
 func (d *Door) Open() { d.doors.SetDoorOpen(d.obj.DoorID(), true) }
 
-// Close closes the door as every closing does (Door.closeMe). A broken or
+// Close closes the door as every closing does. A broken or
 // closed door is left as is.
 func (d *Door) Close() { d.doors.SetDoorOpen(d.obj.DoorID(), false) }
 
@@ -53,7 +53,7 @@ type Castle struct {
 	siege *siege.Siege
 }
 
-// Castle returns the castle the NPC belongs to (Npc.getCastle), nil for
+// Castle returns the castle the NPC belongs to, nil for
 // none: the castle that placed it as a holy artifact, else the one its
 // maker's spawn time names, none when that names a
 // siegable clan hall, else the castle whose residence NPCs list the NPC's
@@ -73,15 +73,14 @@ func (s *Script) Castle(n *NPC) *Castle {
 	return h
 }
 
-// ID returns the castle's id (Residence.getId).
+// ID returns the castle's id.
 func (c *Castle) ID() int32 { return int32(c.c.ID) }
 
-// SiegeInProgress reports whether the castle's siege is being fought
-// (Siege.isInProgress).
+// SiegeInProgress reports whether the castle's siege is being fought.
 func (c *Castle) SiegeInProgress() bool { return c.siege != nil && c.siege.InProgress() }
 
 // OnSiegeSide reports whether the player's clan is registered on one of
-// sides in the castle's siege (Siege.checkSides), on any side when sides is
+// sides in the castle's siege, on any side when sides is
 // empty. A player in no clan is on none.
 func (c *Castle) OnSiegeSide(p *Player, sides ...SiegeSide) bool {
 	clanID := p.character().ClanID()
@@ -92,5 +91,5 @@ func (c *Castle) OnSiegeSide(p *Player, sides ...SiegeSide) bool {
 func (p *Player) InClan() bool { return p.character().ClanID() != 0 }
 
 // ClanCastleID returns the id of the castle the player's clan owns, 0 for
-// none (Clan.getCastleId). A player in no clan panics.
+// none. A player in no clan panics.
 func (p *Player) ClanCastleID() int32 { return p.clanCharacter().ClanCastleID() }

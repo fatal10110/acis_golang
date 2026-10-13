@@ -194,8 +194,8 @@ func NewTable(templates []*Template) *Table {
 	return &Table{commons.NewLookup(templates, func(tpl *Template) int { return tpl.ID })}
 }
 
-// Replace swaps t's templates for from's, at once for every holder of t:
-// NpcData.reload. A live NPC keeps the template it was built from; NPCs
+// Replace swaps t's templates for from's, at once for every holder of t, as
+// an NPC reload does. A live NPC keeps the template it was built from; NPCs
 // built afterwards use the new ones.
 func (t *Table) Replace(from *Table) {
 	t.Swap(from.Lookup)

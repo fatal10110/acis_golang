@@ -94,8 +94,8 @@ func (l *GameClientLink) learnGeneralAcquireSkill(live *livePlayer, trainer *npc
 	_, status, err := skillstate.LearnGeneral(live.Character, live.Template(), l.skills, l.spellbooks, int(req.SkillID), int(req.Level))
 	if err != nil {
 		// The skill is learned and paid for; only its passive stats failed to
-		// build from a malformed definition. The reference cannot fail here
-		// (Player.addSkill), so the client gets the full learn reply.
+		// build from a malformed definition, which a learn never rejects, so the
+		// client gets the full learn reply.
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("learn skill: bad passive definition")
 	}
 	switch status {

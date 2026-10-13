@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// JavaDouble writes v the way the reference's String.valueOf(double) does:
+// JavaDouble writes v as a double's decimal string:
 // the shortest decimal that reads back as v, with at least one digit after
 // the point, in scientific form ("1.0E7") outside [0.001, 10000000).
 func JavaDouble(v float64) string {

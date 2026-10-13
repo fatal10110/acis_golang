@@ -9,8 +9,7 @@ import (
 )
 
 // signsPriestBypass answers the commands a Priest of Dawn, a Dusk Priestess
-// or a Mammon NPC handles itself (DawnPriest, DuskPriest and
-// SignsPriest.onBypassFeedback); ok is false for any other type, and for a
+// or a Mammon NPC handles itself; ok is false for any other type, and for a
 // command the generic dialog answers. A priest's Chat re-opens its cabal
 // page for anyone. Every other command needs the talker to have selected
 // the NPC, and answers nothing otherwise: SevenSignsDesc <n> opens the

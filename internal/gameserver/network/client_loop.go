@@ -28,10 +28,9 @@ var errMalformedPacketDisconnect = errors.New("malformed packet requires disconn
 // packets (insufficient bytes, wire.ErrShortPacket) immediately. Once
 // authenticated, that same error class (char-select or in-game) is
 // tolerated up to maxUnderflowsPerMin within a 60s sliding window, then
-// disconnect, mirroring GameClient.onBufferUnderflow. Other decode
+// disconnect. Other decode
 // validation errors (e.g. an out-of-range field) are logged and the packet
-// dropped without counting or disconnecting, matching
-// L2GameClientPacket.read()'s catch-all branch.
+// dropped without counting or disconnecting.
 func decodeClientPacket[T any](l *GameClientLink, client *Client, payload []byte, decode func([]byte) (T, error)) (T, error) {
 	req, err := decode(payload)
 	if err != nil {

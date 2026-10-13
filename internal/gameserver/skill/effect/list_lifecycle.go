@@ -331,7 +331,7 @@ func (l *List) notifyActivityTransition() {
 }
 
 // StopByType removes every active effect of the given type, running each
-// removed instance's exit hook, matching Creature.stopEffects(EffectType).
+// removed instance's exit hook.
 func (l *List) StopByType(t Type) {
 	if l == nil {
 		return
@@ -344,7 +344,7 @@ func (l *List) StopByType(t Type) {
 }
 
 // StopBySkillID removes every held effect the given skill applied, running
-// each removed instance's exit hook, matching Creature.stopSkillEffects(int).
+// each removed instance's exit hook.
 func (l *List) StopBySkillID(id modelskill.ID) {
 	if l == nil {
 		return
@@ -357,7 +357,7 @@ func (l *List) StopBySkillID(id modelskill.ID) {
 }
 
 // StopAllToggles removes every toggle held among the buffs, running each
-// exit hook, matching EffectList.stopAllToggles.
+// exit hook.
 func (l *List) StopAllToggles() {
 	if l == nil {
 		return
@@ -408,9 +408,8 @@ func (l *List) strip(e *Effect) {
 }
 
 // notifyAbnormalUpdate tells l's owner to refresh its abnormal-effect icon
-// state, mirroring Creature.addEffect()/removeEffect() unconditionally
-// queueing an EffectList icon update on every add or remove attempt,
-// regardless of whether the attempt actually changed anything.
+// state, queued unconditionally on every add or remove attempt, regardless
+// of whether the attempt actually changed anything.
 func (l *List) notifyAbnormalUpdate() {
 	if l.owner != nil && l.catchingUp.Load() == 0 {
 		l.owner.UpdateEffectIcons()

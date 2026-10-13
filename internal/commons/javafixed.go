@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// JavaFixed formats f with decimals digits after the point the way the
-// reference's String.format("%.<decimals>f") does: the shortest decimal
+// JavaFixed formats f with decimals digits after the point: the shortest
+// decimal
 // that reads back as f, rounded half up. A tie in that decimal rounds away
 // from zero even where the binary value sits just below it, so 1.25 reads
 // "1.3" with one digit where Go's %.1f reads "1.2".

@@ -20,8 +20,8 @@ type Maker struct {
 // scaleBySpawnMultiplier). Empty Territories, BannedTerritories, Entries and
 // AIParams read as nil.
 //
-// SpawnManager.findTerritory resolves an unknown name to null and still
-// builds the NpcMaker; a maker with no resolvable territory just never
+// A territory name that resolves to nothing still builds the maker; a
+// maker with no resolvable territory just never
 // finds a spawn position (randomTerritoryPosition already treats a nil or
 // empty Territories the same way), matching that tolerance instead of
 // failing the whole spawnlist load.

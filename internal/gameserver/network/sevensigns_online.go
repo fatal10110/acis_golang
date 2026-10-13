@@ -11,7 +11,7 @@ var _ sevensigns.Online = (*GameClientLink)(nil)
 
 // GiveStrifeSkills implements sevensigns.Online: every player online gets
 // the Seal of Strife skill its cabal earns, on its own queue, unstored and
-// without a skill list (SevenSignsManager.giveSosEffect); its changed
+// without a skill list; its changed
 // maximum CP shows as any stat change does.
 func (l *GameClientLink) GiveStrifeSkills() {
 	if l.sevenSigns == nil {
@@ -23,8 +23,7 @@ func (l *GameClientLink) GiveStrifeSkills() {
 }
 
 // RemoveStrifeSkills implements sevensigns.Online: every player online
-// loses both Seal of Strife skills, unstored and without a skill list
-// (SevenSignsManager.removeSosEffect).
+// loses both Seal of Strife skills, unstored and without a skill list.
 func (l *GameClientLink) RemoveStrifeSkills() {
 	l.onEachLivePlayer(l.removeStrifeSkills)
 }
@@ -32,7 +31,7 @@ func (l *GameClientLink) RemoveStrifeSkills() {
 // ExpelFromDungeons implements sevensigns.Online: every player in the world
 // standing in a Seven Signs dungeon, game masters aside, whom the period
 // change no longer allows there is sent to the nearest town and out of the
-// dungeon (SevenSignsManager.teleLosingCabalFromDungeons). A player still
+// dungeon. A player still
 // logging in is left to its login check.
 func (l *GameClientLink) ExpelFromDungeons() {
 	if l.sevenSigns == nil {
@@ -117,7 +116,7 @@ func (l *GameClientLink) enterWorldStrifeSkills(live *livePlayer) {
 
 // enterWorldSevenSignsDungeon sends live, entering the world in a Seven
 // Signs dungeon it is no longer allowed in, to the nearest town and out of
-// the dungeon; a game master stays (Player.onPlayerEnter).
+// the dungeon; a game master stays.
 func (l *GameClientLink) enterWorldSevenSignsDungeon(live *livePlayer) {
 	if l.sevenSigns == nil || !live.In7sDungeon() || live.accessLevel().IsGM {
 		return

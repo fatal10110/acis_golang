@@ -74,9 +74,9 @@ type Effect struct {
 }
 
 // restoreSeed carries the tick count and time-since-last-tick a persisted
-// effect had at logout, mirroring the effect_count/effect_cur_time columns
-// AbstractEffect.setCount/setTime seed before Player.restoreEffects() calls
-// scheduleEffect(), and the instant at which they were read back: the
+// effect had at logout, read from the effect_count/effect_cur_time columns
+// and seeded before the effect is scheduled, and the instant at which they
+// were read back: the
 // schedule runs from there, not from when the effect joins a list.
 type restoreSeed struct {
 	count   int32
@@ -413,8 +413,8 @@ func (e *Effect) stackType() string {
 }
 
 // iconDuration reports the remaining duration, in milliseconds, e should
-// report to an AbnormalStatusUpdate-style icon list, mirroring
-// AbstractEffect.addIcon(): a repeat-count effect reports its remaining tick
+// report to an AbnormalStatusUpdate-style icon list: a repeat-count effect
+// reports its remaining tick
 // countdown, a single scheduled effect reports the time left until that
 // schedule fires, and a permanent (no period) effect reports -1. ok is false
 // when none of those apply (an unscheduled, non-repeating, non-permanent
@@ -424,7 +424,7 @@ func (e *Effect) iconDuration(now time.Time) (millis int32, ok bool) {
 		e.scheduleMu.Lock()
 		next := e.nextAction
 		e.scheduleMu.Unlock()
-		// Mirrors AbstractEffect.addIcon's repeat-count branch: elapsed is
+		// Repeat-count branch: elapsed is
 		// the whole seconds since the current tick's period started, so the
 		// value decrements every second instead of holding flat for a whole
 		// tick.

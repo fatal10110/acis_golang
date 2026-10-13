@@ -32,7 +32,7 @@ const (
 )
 
 // effectiveRestartType is the restart type a request of requestType by
-// live resolves as (RequestRestartPoint.portPlayer): a jailed player always
+// live resolves as: a jailed player always
 // restarts in the jail and a festival participant where they fell, whatever
 // type they asked for. Only this request forces the jail; every other town
 // teleport (//sendhome, a starved flying mount, a boss-zone ejection) still
@@ -48,7 +48,7 @@ func effectiveRestartType(live *livePlayer, requestType int32) int32 {
 }
 
 // restartPointDestination resolves where a restart-point request of
-// requestType sends the dead live (RequestRestartPoint.portPlayer).
+// requestType sends the dead live.
 //
 // The castle restart during a siege at live's position follows its clan's
 // side: an owner or defender restarts at a castle, an attacker in town, and
@@ -162,8 +162,7 @@ func (l *GameClientLink) castleOwnerSpawn(castleID int32) (location.Location, bo
 	return randomSpawn(c.Spawns, residence.SpawnOwner)
 }
 
-// randomSpawn picks one of a residence's spawns of kind at random
-// (Residence.getRndSpawn).
+// randomSpawn picks one of a residence's spawns of kind at random.
 func randomSpawn(spawns map[residence.SpawnType][]location.Location, kind residence.SpawnType) (location.Location, bool) {
 	list := spawns[kind]
 	if len(list) == 0 {

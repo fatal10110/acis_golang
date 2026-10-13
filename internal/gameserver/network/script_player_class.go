@@ -9,14 +9,12 @@ import (
 // on the script's goroutine before the script's call returns:
 //
 //   - ClassChangeRequested: the occupation change every class change makes
-//     (changeOccupation), as Player.setClassId does;
-//   - BaseClassChangeRequested: the base class, and the base body with it,
-//     as Player.setBaseClass does;
-//   - UserInfoBroadcast: UserInfo to live and CharInfo around it, as
-//     Player.broadcastUserInfo does.
+//     (changeOccupation);
+//   - BaseClassChangeRequested: the base class, and the base body with it;
+//   - UserInfoBroadcast: UserInfo to live and CharInfo around it.
 //
-// A class with no template loaded changes nothing and is logged: the
-// reference loads every class's template.
+// A class with no template loaded changes nothing and is logged: every
+// class's template is expected to load.
 func (l *GameClientLink) applyScriptClassEvent(live *livePlayer, ev event.Event) {
 	switch e := ev.(type) {
 	case event.ClassChangeRequested:

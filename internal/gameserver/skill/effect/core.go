@@ -478,7 +478,7 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 		Level:             level,
 		RejectsIfAffected: k.rejectsIfAffected,
 		SelfTarget:        k.selfTarget,
-		// Mirrors AbstractEffect._isHerbEffect = _skill.getName().contains("Herb"):
+		// A skill whose name contains "Herb" makes a herb effect:
 		// a herb buff is identified by its owning skill's name, not by how it
 		// was cast, so this applies uniformly to every application path.
 		Herb: strings.Contains(skill.Name, "Herb"),
@@ -749,8 +749,8 @@ func (e *Effect) DecreaseForce(list *List, reapply func(level int)) {
 	}
 }
 
-// IncreasePower grows a live seed effect's charge level by one in place,
-// matching EffectSeed.increasePower(): unlike a fusion effect's
+// IncreasePower grows a live seed effect's charge level by one in place:
+// unlike a fusion effect's
 // IncreaseEffect, the same instance keeps running — only its Level (power)
 // changes, nothing is removed or reapplied.
 func (e *Effect) IncreasePower() {

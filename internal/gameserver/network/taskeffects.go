@@ -253,8 +253,8 @@ func (a *liveZoneActor) takeLeftBattlefield() bool {
 }
 
 // flagLeftBattlefield puts a player that left a battlefield under siege on
-// the normal pvp flag timer, flagging it when it is not
-// (SiegeZone.onExit). It runs with deliveryMu held and mu released,
+// the normal pvp flag timer, flagging it when it is not. It runs with
+// deliveryMu held and mu released,
 // before the compass update of the same revalidation.
 func (a *liveZoneActor) flagLeftBattlefield(left bool) {
 	if left {

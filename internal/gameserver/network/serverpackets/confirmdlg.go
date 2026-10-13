@@ -54,8 +54,7 @@ func FrameConfirmDlgSummonFriendRequest(casterName string, casterID int32, x, y,
 
 // FrameConfirmDlgResurrectionRequest builds the resurrection offer: the
 // message id and the reviver's name as its single TYPE_TEXT parameter, with
-// no countdown or requester id (ConfirmDlg.writeImpl writes neither when
-// they are zero).
+// no countdown or requester id (both are left out when zero).
 func FrameConfirmDlgResurrectionRequest(reviverName string) wire.Frame {
 	w := newFrameWriter(OpcodeConfirmDlg)
 	w.WriteInt32(ConfirmDlgResurrectionRequest)

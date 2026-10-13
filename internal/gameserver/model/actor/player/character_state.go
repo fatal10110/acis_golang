@@ -134,8 +134,8 @@ func (c *Character) StandingNow() bool {
 
 // beginPostureTransitionLocked starts a sit-down (standing false) or
 // stand-up transition that ends after delay with a PostureSettled event. A
-// transition still running is left alone, as Player.sitDown, standUp and
-// startFakeDeath each schedule their own uncancelled end: every one ends at
+// transition still running is left alone: sitting down, standing up and
+// faking death each schedule their own uncancelled end; every one ends at
 // its own time, and the flag it raised stays up until an end clears it. A
 // character without a live runtime has no queue to end it on and starts
 // none. c.stateMu must be held.

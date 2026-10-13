@@ -66,8 +66,8 @@ type SubclassCommand struct {
 // character and its numbers from the twelfth: the first up to the next
 // space, the second the rest. Characters are counted as the client encodes
 // them, one per UTF-16 unit, and a number reads any Basic Multilingual Plane
-// decimal digit, as the reference's Integer.parseInt over String.substring
-// does. Reading stops at the first part that does not parse, leaving it and
+// decimal digit. Reading stops at the first part that does not parse,
+// leaving it and
 // every later part 0.
 func ParseSubclassCommand(command string) SubclassCommand {
 	var cmd SubclassCommand

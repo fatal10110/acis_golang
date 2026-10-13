@@ -59,11 +59,11 @@ func (a hostileStatActor) IsMoving() bool { return a.h.Move().Moving() }
 func (a hostileStatActor) IsRunning() bool { return a.h.Running() }
 
 // IsRiding satisfies conditions.Actor. Always false: NPCs are never
-// mounted, matching Creature.isRiding's un-overridden default.
+// mounted.
 func (a hostileStatActor) IsRiding() bool { return false }
 
 // IsFlying satisfies conditions.Actor. Always false: no shipped NPC
-// overrides Creature.isFlying's default.
+// flies.
 func (a hostileStatActor) IsFlying() bool { return false }
 
 // headingActor is the extra capability IsBehind/IsInFrontOf need beyond

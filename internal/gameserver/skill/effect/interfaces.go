@@ -216,5 +216,5 @@ func asSummon(a Actor) (SummonActor, bool) {
 	return s, ok
 }
 
-// growRadiusScale is EffectGrow.onStart()'s collision-radius multiplier.
+// growRadiusScale is the Grow effect's collision-radius multiplier.
 const growRadiusScale = 1.19

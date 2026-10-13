@@ -70,7 +70,7 @@ func (l *GameClientLink) adminNpcInfo(gm *livePlayer, obj world.Tracked, inst *n
 		if isDigits(sub) {
 			n, ok := parseJavaInt(sub)
 			if !ok {
-				// Integer.valueOf throws past the int range: the command
+				// A page number past the int range aborts: the command
 				// ends with nothing sent.
 				l.log.Warn().Str("page", sub).Msg("admin: //info general page out of the int range")
 				return
@@ -163,7 +163,7 @@ func (l *GameClientLink) npcResidenceName(inst *npc.Instance) string {
 	return "none"
 }
 
-// javaIntArray formats v the way Arrays.toString(int[]) does: "[1, 2]",
+// javaIntArray formats v as a bracketed, comma-separated list: "[1, 2]",
 // "null" for no array.
 func javaIntArray(v []int) string {
 	if v == nil {

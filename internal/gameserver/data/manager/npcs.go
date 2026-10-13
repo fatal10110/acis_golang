@@ -458,7 +458,7 @@ func (n *Npcs) SpawnOnStart() {
 }
 
 // spawnOnStart builds the npcmakers of spawns, their slots keyed for
-// RespawnAll run gen, and starts them as SpawnManager.spawn does: every
+// RespawnAll run gen, and starts them: every
 // on-start maker in list order, then the makers of each listed spawn
 // event, then the Seven Signs groups once that state is known.
 func (n *Npcs) spawnOnStart(spawns *Spawns, gen int) {

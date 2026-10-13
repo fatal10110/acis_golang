@@ -314,7 +314,7 @@ func (c *Controller) MaybeStartFriendlyFollow(target attackable.Combatant, offse
 
 // MaybeStartEntranceFollow is MaybeStartFriendlyFollow for a follow that
 // never walks after target: a summon following anyone but its owner
-// (SummonMove.friendlyFollowTask) heads for a boat entrance instead. The
+// heads for a boat entrance instead. The
 // follow is armed alike, but a target out of reach is not walked to: its
 // position is returned with true, for the caller to route the actor through
 // a boat entrance toward it. A target in reach, or one the actor cannot
@@ -464,9 +464,8 @@ func (c *Controller) maybeStartFollow(target attackable.Combatant, offset int, m
 		return false, nil
 	}
 	if rider, ok := target.(boatRider); ok && mode == FollowFriendly && !c.selfPlayable() && rider.InBoat() {
-		// No NPC walks after a passenger (CreatureMove.friendlyFollowTask);
-		// the follow stays armed for when it steps ashore. A summon's follow
-		// (SummonMove) and a player's (PlayerMove) have no such check. No
+		// No NPC walks after a passenger; the follow stays armed for when it
+		// steps ashore. A summon's follow and a player's have no such check. No
 		// production NPC friendly-follows yet; the tests/boat coverage of
 		// this branch waits on that caller (#3425).
 		c.move.StartFriendlyFollow(target.ObjectID(), offset)

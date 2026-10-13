@@ -8,9 +8,8 @@ import "sync"
 // the owner's rows, its collar row is deleted. A selection of that owner reads
 // those rows before it registers its player, so a settle landing in between
 // would change rows the selection has already loaded, leaving the session with
-// a collar whose row is gone and without the corpse's items. The reference
-// relinks the pet on the same restore that loads the inventory
-// (Player.restore, Player.java:4144-4150), so no decay settles in between.
+// a collar whose row is gone and without the corpse's items: no decay may
+// settle between the restore that loads the inventory and the pet's relink.
 //
 // A selection is under way from before it waits for the character's queued
 // saves until it has registered its player and taken its pet over, or given

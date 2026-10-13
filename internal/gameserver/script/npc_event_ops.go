@@ -15,7 +15,7 @@ type skillAnimator interface {
 
 // BroadcastMagicSkillUse shows every player around the NPC the cast
 // animation of skillID at level from caster to target, with hitTime and
-// reuseDelay in milliseconds (Creature.broadcastPacket of a MagicSkillUse).
+// reuseDelay in milliseconds (a MagicSkillUse).
 // It is only shown: no skill is used, and caster and target may be any
 // creatures. Each stands where it is at the call. A handle on nothing
 // panics.

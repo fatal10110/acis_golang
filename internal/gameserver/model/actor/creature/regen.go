@@ -9,10 +9,10 @@ import (
 )
 
 // RegenPeriod is the HP/MP/CP regeneration period of every creature but a
-// door (Formulas.getRegeneratePeriod: HP_REGENERATE_PERIOD, 3s).
+// door: 3s.
 const RegenPeriod = 3 * time.Second
 
-// Regen is one creature's regeneration phase (CreatureStatus._regTask): the
+// Regen is one creature's regeneration phase: the
 // deadline of its next fixed-rate tick. Settle arms it when a resource first
 // falls short of its maximum, its first tick one full period later; later
 // changes while it is armed leave the phase alone. It is disarmed once

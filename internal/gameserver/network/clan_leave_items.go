@@ -18,8 +18,8 @@ func (l *GameClientLink) leaverCastle(cl *clan.Clan) (*castle.Castle, bool) {
 
 // checkLeaverItems has live, leaving cl, take off what it may no longer
 // wear when cl owns a castle; it runs on live's queue, before live's clan
-// state is cleared. The check therefore still sees live in cl, as the
-// reference's Castle.checkItemsForMember does, so the castle's circlet and
+// state is cleared. The check therefore still sees live in cl, so the
+// castle's circlet and
 // the rank items stay on and only an item already failing its conditions
 // comes off.
 func (l *GameClientLink) checkLeaverItems(live *livePlayer, cl *clan.Clan) {

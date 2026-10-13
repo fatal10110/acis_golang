@@ -181,7 +181,7 @@ func (c *Crests) Remove(typ CrestType, id int) error {
 	return nil
 }
 
-// Replace swaps c's crests for a copy of from's: CrestCache.reload. c keeps
+// Replace swaps c's crests for a copy of from's, as a crest reload does. c keeps
 // its own directory.
 func (c *Crests) Replace(from *Crests) {
 	from.mu.RLock()

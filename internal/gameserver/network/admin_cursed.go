@@ -12,7 +12,7 @@ import (
 // cursedUsage is what //cw answers a command it cannot read.
 const cursedUsage = "Usage: //cw [set|remove|teleportto itemid|name]"
 
-// adminCursedWeapons answers //cw (AdminCursedWeapon.java):
+// adminCursedWeapons answers //cw:
 //
 //	//cw                         the cursed weapons panel
 //	//cw set <id|name>           the weapon, not out yet, given to the selected player, gm without one
@@ -136,9 +136,8 @@ func (l *GameClientLink) adminRemoveCursedWeapon(gm *livePlayer, itemID int32) b
 
 // adminTeleportToCursedWeapon moves gm to itemID's holder, or to where the
 // weapon lies; a weapon not out is answered as not in the world. It
-// reports false for a held weapon whose holder is out of the world, which
-// the reference cannot reach either: CursedWeapon.teleportTo fails on the
-// holder it no longer has.
+// reports false for a held weapon whose holder is out of the world: there
+// is no holder to go to.
 func (l *GameClientLink) adminTeleportToCursedWeapon(gm *livePlayer, itemID int32) bool {
 	for _, w := range l.cursed.Weapons() {
 		if w.ItemID != itemID {
@@ -231,7 +230,7 @@ func cursedOverallTime(w cursedweapon.Info) string {
 	return strconv.Itoa(days) + "d. " + strconv.Itoa(hours) + "h. " + strconv.Itoa(mins) + "m."
 }
 
-// reloadCursedWeapons answers //reload cw (CursedWeaponManager.reload):
+// reloadCursedWeapons answers //reload cw:
 // every weapon ends, out or not, each told to every player as it would be
 // at the end of its life, and the weapons are read anew from
 // cursedWeapons.xml, none of them out. A holder has the end applied on its

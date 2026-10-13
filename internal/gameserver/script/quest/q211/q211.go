@@ -133,7 +133,7 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 			} else {
 				htmltext = "30647-02.htm"
 				s.TakeItems(p, brokenKey, 1)
-				// Rnd.get(1, 1000): 1 to 1000 inclusive.
+				// A roll from 1 to 1000 inclusive.
 				s.RewardItems(p, adena, 1+int32(s.Rnd(1000)))
 			}
 		}

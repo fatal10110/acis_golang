@@ -10,7 +10,7 @@ import (
 var _ task.PvPFlagActor = (*Character)(nil)
 
 // UpdatePvPFlag records the PvP flag state visible to this character's own
-// client, mirroring Player.updatePvPFlag(int): a no-op when the state is
+// client: a no-op when the state is
 // unchanged, otherwise it persists the new state, resends UserInfo so the
 // client redraws the name color/PvP icon, sends an owned summon a
 // self-view RelationChanged, and broadcasts the relation change to nearby

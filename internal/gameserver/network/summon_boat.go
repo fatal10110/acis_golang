@@ -8,8 +8,8 @@ import (
 )
 
 // summonBoatEntrance is the boat-entrance probe of a summon's friendly
-// follow of anyone but its owner (Playable.tryToPassBoatEntrance and
-// moveToBoatEntrance run for a summon). Its refusals reach the owner, as a
+// follow of anyone but its owner (the boat-entrance pass a player's walk
+// makes, run for a summon). Its refusals reach the owner, as a
 // summon's packets do.
 type summonBoatEntrance struct {
 	link  *GameClientLink

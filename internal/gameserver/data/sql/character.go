@@ -72,7 +72,7 @@ func (s *CharacterStore) Create(ctx context.Context, c *player.Character) error 
 // since the last save instead of the row's creation-time values. Location and
 // appearance columns are not written here. The row is also marked online:
 // Save only runs for characters currently in game. Online is 1, or 2 for a
-// character lingering after its connection dropped (Player.isOnlineInt).
+// character lingering after its connection dropped.
 func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
 	resources, progression := st.Resources, st.Progression
 	_, err := s.db.ExecContext(ctx,
@@ -91,7 +91,7 @@ func (s *CharacterStore) Save(ctx context.Context, st player.SaveState) error {
 }
 
 // onlineColumn is the characters.online value of a character in game: 1,
-// or 2 once its client detached (Player.isOnlineInt).
+// or 2 once its client detached.
 func onlineColumn(clientDetached bool) int {
 	if clientDetached {
 		return 2

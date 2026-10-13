@@ -769,8 +769,8 @@ func (c *Character) reducePeriodicHP(amount float64, attacker effect.Actor, isDO
 	}
 }
 
-// applyNonConsumptionDamageEffects mirrors PlayerStatus.reduceHp's
-// !isHPConsumption block: every normal-hit or DOT damage source stops SLEEP
+// applyNonConsumptionDamageEffects runs what damage that is not an HP cost
+// does: every normal-hit or DOT damage source stops SLEEP
 // and IMMOBILE_UNTIL_ATTACKED, stands the character up when it has finished
 // sitting down (an ordinary sit or a fake-death lie-down) unless it is in
 // shop mode, and — for non-DOT damage only — has a 1-in-10 chance to break

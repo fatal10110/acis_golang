@@ -1,5 +1,5 @@
 // Package signspriest runs the "SevenSigns <n> ..." dialog commands of the
-// Seven Signs priests and the Mammon NPCs (SignsPriest.onBypassFeedback):
+// Seven Signs priests and the Mammon NPCs:
 // buying the Record of Seven Signs, signing up for a cabal, turning seal
 // stones in or exchanging them for ancient adena, the Black Marketeer's
 // ancient adena exchange, collecting the stones' reward and the seal status
@@ -646,8 +646,7 @@ func (h *handler) sealStatus(npcObjectID int32) string {
 	return b.String()
 }
 
-// reduceAdena takes count adena, saying so when say is set
-// (Player.reduceAdena).
+// reduceAdena takes count adena, saying so when say is set.
 func (h *handler) reduceAdena(count int, say bool) bool {
 	inv := h.t.Inventory
 	if inv == nil || count > inv.Adena() {
@@ -670,8 +669,7 @@ func (h *handler) reduceAdena(count int, say bool) bool {
 	return true
 }
 
-// reduceAncientAdena takes count ancient adena, saying so
-// (Player.reduceAncientAdena).
+// reduceAncientAdena takes count ancient adena, saying so.
 func (h *handler) reduceAncientAdena(count int) bool {
 	inv := h.t.Inventory
 	if inv == nil || count > firstCount(inv, item.AncientAdenaID) {
@@ -688,11 +686,11 @@ func (h *handler) reduceAncientAdena(count int) bool {
 	return true
 }
 
-// destroyItems takes count of itemID, saying so when say is set
-// (Player.destroyItemByItemId): adena goes through reduceAdena, and holding
+// destroyItems takes count of itemID, saying so when say is set: adena
+// goes through reduceAdena, and holding
 // too few, or none, refuses. A count of 0 takes nothing from a held stack
-// and still names it. A negative count is refused like too few items: the
-// reference would add the units to the stack instead.
+// and still names it. A negative count is refused like too few items,
+// rather than adding the units to the stack.
 func (h *handler) destroyItems(itemID int32, count int, say bool) bool {
 	if itemID == item.AdenaID {
 		return h.reduceAdena(count, say)
@@ -717,7 +715,7 @@ func (h *handler) destroyItems(itemID int32, count int, say bool) bool {
 	return true
 }
 
-// pickUp hands count of itemID over as picked up (Player.addItem).
+// pickUp hands count of itemID over as picked up.
 func (h *handler) pickUp(itemID int32, count int) {
 	if h.t.Inventory == nil {
 		return
@@ -730,7 +728,7 @@ func (h *handler) pickUp(itemID int32, count int) {
 }
 
 // addAncientAdena hands count ancient adena over, naming it even when there
-// is none to hand (Player.addAncientAdena).
+// is none to hand.
 func (h *handler) addAncientAdena(count int) {
 	h.notice(AncientAdenaEarned{Count: count})
 	h.add(item.AncientAdenaID, count)
@@ -794,7 +792,7 @@ func commandChars(command string, begin int) (string, bool) {
 	return string(utf16.Decode(units[begin:])), true
 }
 
-// javaSpace is what String.trim strips: every character up to and including
+// javaSpace is what a trim strips: every character up to and including
 // the space.
 func javaSpace(r rune) bool { return r <= ' ' }
 
@@ -805,7 +803,7 @@ func tokenSpace(r rune) bool {
 
 func itoa(n int) string { return strconv.Itoa(n) }
 
-// cabalShortName is the page suffix naming c (CabalType.getShortName).
+// cabalShortName is the page suffix naming c.
 func cabalShortName(c sevensigns.Cabal) string {
 	switch c {
 	case sevensigns.Dusk:
@@ -827,7 +825,7 @@ func cabalFullName(c sevensigns.Cabal) string {
 	return "No Cabal"
 }
 
-// sealShortName is the page part naming s (SealType.getShortName).
+// sealShortName is the page part naming s.
 func sealShortName(s sevensigns.Seal) string {
 	switch s {
 	case sevensigns.Avarice:

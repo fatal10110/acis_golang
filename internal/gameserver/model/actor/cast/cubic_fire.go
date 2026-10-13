@@ -54,7 +54,7 @@ func CubicGrantedLevel(def modelskill.Definition) int {
 
 // DecideCubicFire resolves a non-Life cubic's action-tick activation-chance
 // roll, random skill pick among skillIDs, and enemy target selection,
-// matching Cubic.fireAction's non-Life branch. ok reports whether the cubic
+// for a non-Life cubic. ok reports whether the cubic
 // should fire at all this tick — a failed activation roll or no valid
 // target both report false with no other observable effect.
 func DecideCubicFire(owner CubicFireOwner, skillIDs []int, activationChance int) (skillID int, target Target, ok bool) {
@@ -159,7 +159,7 @@ func pickCubicEnemyTarget(owner CubicFireOwner) (Target, bool) {
 	return selected, true
 }
 
-// ApplyCubicHeal restores HP directly, matching Cubic.useHealSkill: a flat
+// ApplyCubicHeal restores HP directly: a flat
 // power * target's HEAL_EFFECTIVNESS / 100, with no caster stat or
 // proficiency contribution — distinct from the generic HEAL skill handler a
 // player's own heal cast goes through, which scales by the caster's own

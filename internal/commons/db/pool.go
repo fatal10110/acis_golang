@@ -115,8 +115,7 @@ func dataSourceName(cfg Config) (string, error) {
 // (as documented in driver.properties of the bundled connector) into the
 // equivalent go-sql-driver/mysql setting. Connector/J options with no safe
 // go-sql-driver equivalent are rejected rather than silently dropped or
-// forwarded as a MySQL session variable (see aCis_gameserver
-// ConnectionPool.setUrl and PR #278).
+// forwarded as a MySQL session variable (see PR #278).
 func applyConnectorOption(driverCfg *mysql.Config, key, value string) error {
 	switch key {
 	case "timezone":

@@ -62,9 +62,8 @@ func (e *Engine) ValidLocation(ox, oy, oz, tx, ty, tz int) location.Location {
 		}
 
 		// The next cell falls outside the geodata grid: the walk stops at
-		// this border, same as a blocked edge (GeoEngine.getValidLocation
-		// GEO_CELLS_X/GEO_CELLS_Y bounds check, checked before the NSWE
-		// obstacle test).
+		// this border, same as a blocked edge (the grid bounds are checked
+		// before the NSWE obstacle test).
 		if nx < 0 || nx > maxGeoX || ny < 0 || ny > maxGeoY {
 			return location.Location{X: checkX, Y: checkY, Z: goz}
 		}

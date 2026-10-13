@@ -11,9 +11,9 @@ type KillDrop struct {
 }
 
 // RollKillReward rolls every category in categories for one kill and
-// returns what the killer receives, in the order the reference hands it
-// out: categories in template order, each category's results in the
-// reference's per-category order (see dropMerger).
+// returns what the killer receives, in the order it is handed out:
+// categories in template order, each category's results in dropMerger's
+// order.
 //
 //   - A spoil category only rolls once the monster already carries a spoil
 //     marker (pool.IsSpoiled), and its results merge into pool rather than

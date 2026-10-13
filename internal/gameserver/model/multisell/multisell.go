@@ -250,8 +250,8 @@ func NewTable(lists []*List) (*Table, error) {
 	return &Table{commons.NewLookup(lists, func(l *List) int32 { return l.ID })}, nil
 }
 
-// Replace swaps t's lists for from's, at once for every holder of t:
-// MultisellData.reload. A list already prepared for a player stays as it
+// Replace swaps t's lists for from's, at once for every holder of t, as a
+// multisell reload does. A list already prepared for a player stays as it
 // was prepared.
 func (t *Table) Replace(from *Table) {
 	t.Swap(from.Lookup)

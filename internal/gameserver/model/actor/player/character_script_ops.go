@@ -3,8 +3,7 @@ package player
 import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 
 // IsNewbie reports whether c counts as a newbie: at most one class change
-// made and level 25 or lower, and, with checkLowLevel, level 6 or higher
-// (Player.isNewbie).
+// made and level 25 or lower, and, with checkLowLevel, level 6 or higher.
 func (c *Character) IsNewbie(checkLowLevel bool) bool {
 	tier, _ := ClassLevel(c.ClassID())
 	level := c.Level()

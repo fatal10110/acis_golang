@@ -74,7 +74,7 @@ func isDigits(s string) bool {
 	return true
 }
 
-// parseJavaInt parses s as Integer.parseInt does: an optional ASCII sign,
+// parseJavaInt parses s as a signed decimal int: an optional ASCII sign,
 // then decimal digits, any Basic Multilingual Plane decimal digit included
 // (fullwidth, Arabic-Indic and the like), in int32 range.
 func parseJavaInt(s string) (int32, bool) {
