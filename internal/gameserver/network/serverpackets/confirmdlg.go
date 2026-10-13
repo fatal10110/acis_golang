@@ -15,11 +15,11 @@ const OpcodeConfirmDlg = 0xed
 // echoes back.
 const ConfirmDlgSummonFriendRequest int32 = 1842
 
-// ConfirmDlgResurrectionRequest is SystemMessageId's
-// RESSURECTION_REQUEST_BY_S1, the resurrection offer's messageId.
+// ConfirmDlgResurrectionRequest is system message RESSURECTION_REQUEST_BY_S1,
+// the resurrection offer's messageId.
 const ConfirmDlgResurrectionRequest int32 = 1510
 
-// ConfirmDlgRestoreRequest is SystemMessageId's DO_YOU_WANT_TO_BE_RESTORED,
+// ConfirmDlgRestoreRequest is system message DO_YOU_WANT_TO_BE_RESTORED,
 // whose answer is handled as a resurrection offer's.
 const ConfirmDlgRestoreRequest int32 = 332
 

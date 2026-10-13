@@ -122,10 +122,10 @@ func (r *l2offReader) multilayer(region *block.Region, blockIndex int) error {
 		}
 
 		counts[cell] = uint8(count)
-		// The file stores each cell's layers highest first (matching
-		// BlockMultilayer's own on-disk convention); Region and the rest of
-		// this package expect them ordered lowest to highest, so reverse
-		// them into place as they're read.
+		// The file stores each cell's layers highest first, the geodata
+		// format's on-disk order; Region and the rest of this package expect
+		// them ordered lowest to highest, so reverse them into place as
+		// they're read.
 		start := len(cells)
 		for layer := 0; layer < int(count); layer++ {
 			code, ok := r.u16()
