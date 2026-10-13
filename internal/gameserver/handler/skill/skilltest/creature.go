@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -110,3 +111,8 @@ func (Creature) WeaponGradePenalty() bool                     { return false }
 func (Creature) Evasion() int                                 { return 0 }
 func (Creature) LethalRate() float64                          { return 0 }
 func (Creature) RaceMultiplier(creature.FormulaActor) float64 { return 1 }
+
+// ForSkill is the neutral creature itself. A fake embedding Creature that
+// overrides CalcStat, MAtk, MDef or MagicCriticalRate overrides ForSkill
+// too, or formulas read the neutral zeros.
+func (c Creature) ForSkill(conditions.Skill) creature.SkillStats { return c }

@@ -213,7 +213,7 @@ func (fs fixedStats) calc(s stat.Stat, base float64) float64 {
 			c.AddMod(m)
 		}
 	}
-	v := c.Calc(templateStatActor{t: fs.template}, base)
+	v := c.Calc(templateStatActor{t: fs.template}, base, nil)
 	if s.CantBeNegative() && v <= 0 {
 		return 1
 	}

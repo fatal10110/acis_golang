@@ -3,6 +3,7 @@ package npc
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -148,7 +149,12 @@ func (h *Hostile) statCalcOrCreate(s stat.Stat) *effect.Calculator {
 // plus any buff/debuff funcs an active effect has added) starting from
 // base, flooring a non-positive stat that can't go negative at one.
 func (h *Hostile) calcStat(s stat.Stat, base float64) float64 {
-	value := h.statCalc(s).Calc(hostileStatActor{h: h}, base)
+	return h.calcSkillStat(s, base, nil)
+}
+
+// calcSkillStat is calcStat for a calculation run for skill (nil for none).
+func (h *Hostile) calcSkillStat(s stat.Stat, base float64, skill conditions.Skill) float64 {
+	value := h.statCalc(s).Calc(hostileStatActor{h: h}, base, skill)
 	if s.CantBeNegative() && value <= 0 {
 		return 1
 	}

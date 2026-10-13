@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/rs/zerolog"
 )
 
@@ -557,6 +558,14 @@ func buildSkillCondition(n condNode, role condRole, resolve tableResolver) (skil
 	}, nil
 }
 
+// parseStatConstant checks that raw is a stat constant name, exactly.
+func parseStatConstant(raw string) (string, error) {
+	if _, err := stat.ByConstantName(raw); err != nil {
+		return "", err
+	}
+	return raw, nil
+}
+
 // buildSkillDefinitionAttrs resolves one level's raw <set> values into the
 // typed attributes skill.NewDefinition takes. Every attribute is parsed and
 // defaulted here: a level's values come from a per-level substitution of one
@@ -604,7 +613,7 @@ func buildSkillDefinitionAttrs(id skill.ID, level int, vals map[string]string) (
 		StaticReuse:       a.boolDefault("staticReuse", false),
 		StaticHitTime:     a.boolDefault("staticHitTime", false),
 
-		Stat:         a.strDefault("stat", ""),
+		Stat:         attrEnumDefault(a, "stat", parseStatConstant, ""),
 		IgnoreShield: a.boolDefault("ignoreShld", false),
 
 		SkillType:  attrSkillType(a),

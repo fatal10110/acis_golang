@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/statbonus"
@@ -40,6 +41,10 @@ type FormulaActor interface {
 	BlessedSpiritshotCharged() bool
 
 	CalcStat(stat.Stat, float64) float64
+	// ForSkill is this actor's stats read for a calculation run for skill:
+	// a stat func whose own condition tests the skill under calculation
+	// sees it.
+	ForSkill(skill conditions.Skill) SkillStats
 	RandomDamageSpread() int
 	Roll(int) int
 
@@ -63,6 +68,15 @@ type FormulaActor interface {
 	LethalRate() float64
 }
 
+// SkillStats is the part of an actor's stat surface a formula reads for a
+// calculation run for one skill (see FormulaActor.ForSkill).
+type SkillStats interface {
+	CalcStat(stat.Stat, float64) float64
+	MAtk() float64
+	MDef() float64
+	MagicCriticalRate() float64
+}
+
 // damageBlocked reports whether attacker lacks permission to deal damage.
 // A blocked attacker's physical-skill and magic-damage inputs still resolve
 // against the target, flagged NoDamage so the formula yields 0 and each
@@ -80,6 +94,9 @@ type FormulaActor interface {
 func damageBlocked(attacker attackable.Combatant) bool {
 	return !CanDealDamage(attacker)
 }
+
+// calcSkill is def as the skill a stat calculation runs for.
+func calcSkill(def modelskill.Definition) conditions.Skill { return conditions.SkillOf(def.Stat) }
 
 // casterSkillPower is the physical/magic/mana skill-power term: DEATHLINK
 // and FATAL scale with the caster's current/max HP ratio; every other type
@@ -105,7 +122,7 @@ func ResolvePhysicalSkillInput(attacker, target FormulaActor, def modelskill.Def
 		return formulas.PhysicalSkillInput{}, false
 	}
 	soulshot := attacker.SoulshotCharged()
-	if attacker.AttackType() != item.WeaponFist && attacker.AttackType() != item.WeaponBow && float64(target.Roll(100)) < target.CalcStat(stat.PSkillEvasion, 0) {
+	if attacker.AttackType() != item.WeaponFist && attacker.AttackType() != item.WeaponBow && float64(target.Roll(100)) < target.ForSkill(calcSkill(def)).CalcStat(stat.PSkillEvasion, 0) {
 		return formulas.PhysicalSkillInput{Evaded: true}, true
 	}
 	skillPower := casterSkillPower(attacker, def)
@@ -203,17 +220,18 @@ func ResolveMagicDamageInput(attacker, target FormulaActor, def modelskill.Defin
 	// MDAM/DEATHLINK and signet MDAM pass isCrit=false; magic crit must not
 	// triple the shield rate.
 	shield := target.ShieldDefense(attacker, def, false)
-	mDef := target.MDef()
+	sk := calcSkill(def)
+	mDef := target.ForSkill(sk).MDef()
 	if shield == formulas.ShieldSuccess {
 		mDef += target.CalcStat(stat.ShieldDefence, 0)
 	}
 	in := formulas.MagicDamageInput{
-		MAtk:            attacker.MAtk(),
+		MAtk:            attacker.ForSkill(sk).MAtk(),
 		MDef:            mDef,
 		SkillPower:      casterSkillPower(attacker, def),
 		PvPMul:          MagicPvPMul(attacker, def, pvp),
 		ElementalMul:    ElementalSkillModifier(target, def),
-		MagicCrit:       formulas.MCritSucceeds(int(attacker.MagicCriticalRate()), attacker.Roll(1000)),
+		MagicCrit:       formulas.MCritSucceeds(int(attacker.ForSkill(sk).MagicCriticalRate()), attacker.Roll(1000)),
 		SoulShot:        sps,
 		BlessedSoulShot: bsps,
 		Shield:          shield,
@@ -271,7 +289,8 @@ func ResolveBlowInput(attacker, target FormulaActor, def modelskill.Definition, 
 		Front:    front,
 		Backstab: def.ID == 30,
 	}, attacker.Roll(1000))
-	if landed && !def.Magic && float64(target.Roll(100)) < target.CalcStat(stat.PSkillEvasion, 0) {
+	sk := calcSkill(def)
+	if landed && !def.Magic && float64(target.Roll(100)) < target.ForSkill(sk).CalcStat(stat.PSkillEvasion, 0) {
 		return formulas.BlowInput{Landed: true, Evaded: true}, true
 	}
 	crit := landed && PhysicalSkillCrit(attacker, def)
@@ -293,11 +312,11 @@ func ResolveBlowInput(attacker, target FormulaActor, def modelskill.Definition, 
 		RandomMul:         float64(95+attacker.Roll(11)) / 100,
 		PosMul:            PositionMultiplierFrom(target, attacker, true),
 		PvPMul:            pvpMul,
-		CritDamageMul:     attacker.CalcStat(stat.CriticalDamage, 1),
-		CritDamagePosMul:  (attacker.CalcStat(stat.CriticalDamagePos, 1)-1)/2 + 1,
-		CritVulnMul:       target.CalcStat(stat.CritVuln, 1),
+		CritDamageMul:     attacker.ForSkill(sk).CalcStat(stat.CriticalDamage, 1),
+		CritDamagePosMul:  (attacker.ForSkill(sk).CalcStat(stat.CriticalDamagePos, 1)-1)/2 + 1,
+		CritVulnMul:       target.ForSkill(sk).CalcStat(stat.CritVuln, 1),
 		DaggerVulnMul:     target.CalcStat(stat.DaggerWpnVuln, 1),
-		CritDamageAddBase: attacker.CalcStat(stat.CriticalDamageAdd, 0),
+		CritDamageAddBase: attacker.ForSkill(sk).CalcStat(stat.CriticalDamageAdd, 0),
 		Landed:            landed,
 		Crit:              crit,
 	}, true
@@ -320,15 +339,16 @@ func ResolveManaDamageInput(attacker, target FormulaActor, maxMP float64, def mo
 		return formulas.ManaDamageInput{}, false
 	}
 	sps, bsps := SpiritshotFlags(attacker)
+	sk := calcSkill(def)
 	affected := formulas.MagicAffected(formulas.MagicAffectedInput{
-		MAtk:     attacker.MAtk(),
-		MDef:     target.MDef(),
+		MAtk:     attacker.ForSkill(sk).MAtk(),
+		MDef:     target.ForSkill(sk).MDef(),
 		VulnMul:  SkillVulnerability(target, def.SkillType, def),
 		Defended: def.Activation == modelskill.ActivationActive && def.Offensive,
 	}, rnd.NextGaussian())
 	return formulas.ManaDamageInput{
-		MAtk:            attacker.MAtk(),
-		MDef:            target.MDef(),
+		MAtk:            attacker.ForSkill(sk).MAtk(),
+		MDef:            target.ForSkill(sk).MDef(),
 		SkillPower:      casterSkillPower(attacker, def),
 		TargetMaxMp:     maxMP,
 		SoulShot:        sps,
@@ -525,8 +545,9 @@ func SkillMAtkModifier(target, attacker FormulaActor, def modelskill.Definition,
 	if !def.Magic || target == nil || attacker == nil {
 		return 1
 	}
-	mDef := target.MDef()
-	mAtk := attacker.MAtk()
+	sk := calcSkill(def)
+	mDef := target.ForSkill(sk).MDef()
+	mAtk := attacker.ForSkill(sk).MAtk()
 	if bss {
 		mAtk *= 4
 	}

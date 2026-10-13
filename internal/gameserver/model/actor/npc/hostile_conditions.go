@@ -68,8 +68,8 @@ func (a hostileStatActor) IsFlying() bool { return false }
 
 // headingActor is the extra capability IsBehind/IsInFrontOf need beyond
 // conditions.Actor's plain X/Y/Z: the reference position's own heading.
-// conditionGate always tests an owner against itself
-// (conditionGate.Test(actor, actor, nil)), so other is always this same
+// conditionGate always tests an owner against itself (the owner on both
+// sides of the test), so other is always this same
 // hostileStatActor, which implements it via CurrentHeading below.
 // CurrentHeading lets a hostileStatActor serve as the "other" side of its
 // own IsBehind/IsInFrontOf check.

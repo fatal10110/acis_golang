@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -45,9 +46,7 @@ func (h *Hostile) PAtk() float64 {
 }
 
 // MagicCriticalRate returns this NPC's magic critical rate.
-func (h *Hostile) MagicCriticalRate() float64 {
-	return h.calcStat(stat.MCriticalRate, 8)
-}
+func (h *Hostile) MagicCriticalRate() float64 { return hostileSkillStats{h: h}.MagicCriticalRate() }
 
 // SpiritshotCharged reports whether a spiritshot charge is currently active.
 func (h *Hostile) SpiritshotCharged() bool {
@@ -406,7 +405,7 @@ func (h *Hostile) SkillReflectInput(def modelskill.Definition) formulas.SkillRef
 		CanBeReflected: def.CanBeReflected,
 		Magic:          def.Magic,
 		CastRange:      def.CastRange,
-		ReflectChance:  h.CalcStat(reflectStat, 0),
+		ReflectChance:  h.calcSkillStat(reflectStat, 0, conditions.SkillOf(def.Stat)),
 	}
 }
 
