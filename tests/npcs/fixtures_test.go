@@ -132,16 +132,18 @@ func startInWorld(t *testing.T, srv *gameservertest.Server, c *testsupport.Scrip
 	enterWorld(t, srv, c)
 }
 
-// enterWorld sends EnterWorld and returns its burst once the server has
-// handled it. On the wall clock (the real pool) the character's rows are read
-// before the burst's first frame, and the player joins the world only after
-// them, so a quiet window alone could close before either: the drain starts
-// only once the request has been handled.
+// enterWorld sends EnterWorld and returns its burst, then whatever follows
+// it until the client goes quiet. The burst is every frame the server queued
+// while it handled the request, read by count rather than until a quiet
+// spell: on the wall clock (the real pool) a loaded machine can hold the
+// connection's writer, or the reading test, past a quiet window while the
+// burst is already queued, and the drain would stop before the NPCs the
+// player is shown.
 func enterWorld(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	c.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
-	srv.Settle(t)
-	return drainFrames(t, c)
+	burst := srv.ReadQueued(t, c)
+	return append(burst, drainFrames(t, c)...)
 }
 
 func drainUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) {

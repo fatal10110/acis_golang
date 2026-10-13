@@ -35,6 +35,10 @@ func TestPlayerHitRecordsRegisteredPlayerOnNPC(t *testing.T) {
 	targetHostile(t, c, hostile.ObjectID())
 	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
 	_, _ = firstHitFeedback(t, c, objID)
+	// The hit's feedback reaches the client from inside the player's hit
+	// task, before that task applies the damage and records the threat, so
+	// wait for the task to finish before reading the monster's table.
+	onQueue(t, srv.PlayerQueue(t, objID), func() {})
 
 	var threat attackable.Threat
 	onHostileQueue(t, hostile, func() {
