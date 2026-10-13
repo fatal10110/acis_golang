@@ -303,12 +303,14 @@ func TestAdminCastleSetAndRemoveOwner(t *testing.T) {
 // //castle certificates puts the certificates back to 300, both stored.
 func TestAdminCastlePageRestoresStoredCastle(t *testing.T) {
 	t.Parallel()
+	// The NPC spawns place the castles' control towers, which the page
+	// counts.
 	w := bootCastleWorld(t, 1, func(db *sql.DB) {
 		if _, err := db.ExecContext(context.Background(), `UPDATE castle SET currentTaxPercent=10, nextTaxPercent=20,
 			treasury=1234567, taxRevenue=1000, seedIncome=500, certificates=120 WHERE id=1`); err != nil {
 			t.Fatalf("seed castle row: %v", err)
 		}
-	})
+	}, gameservertest.WithNpcSpawns(nil))
 	w.enter(t)
 
 	gm, _ := w.castleCommand(t, "gludio_castle")

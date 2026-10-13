@@ -247,7 +247,7 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 // its route while it lives. A non-nil master makes it one of master's
 // privates. It returns the NPC, nil when none stays placed.
 func (n *Npcs) spawnFolk(key string, inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot, master npc.PartyMember) *npc.Folk {
-	f, err := n.folk.spawn(inst, loc, heading, slot, master)
+	f, err := n.folk.spawn(inst, loc, heading, slot, master, n.towerRuntime(inst))
 	if err != nil {
 		n.log.Warn().Err(err).Int("npc_id", inst.Template.ID).Msg("spawn: cannot build folk npc")
 		return nil

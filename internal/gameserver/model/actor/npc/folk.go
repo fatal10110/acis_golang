@@ -18,9 +18,10 @@ import (
 
 // folkInstanceKinds are the civilian service NPC types: shopkeepers,
 // trainers, gatekeepers, warehouse keepers, village masters, the castle
-// holy artifacts and the like. ChristmasTree is left out and skipped at
-// spawn: its click only releases the client (no selection, no talk), and
-// it spawns only from event makers or as a summoned Decoration.
+// holy artifacts and control towers, and the like. ChristmasTree is left
+// out and skipped at spawn: its click only releases the client (no
+// selection, no talk), and it spawns only from event makers or as a
+// summoned Decoration.
 var folkInstanceKinds = map[InstanceKind]struct{}{
 	"Adventurer":            {},
 	"Auctioneer":            {},
@@ -40,9 +41,11 @@ var folkInstanceKinds = map[InstanceKind]struct{}{
 	"DuskPriest":            {},
 	"FestivalGuide":         {},
 	"Fisherman":             {},
+	"FlameTower":            {},
 	"Folk":                  {},
 	"Gatekeeper":            {},
 	"HolyThing":             {},
+	"LifeTower":             {},
 	"ManorManagerNpc":       {},
 	"MercenaryManagerNpc":   {},
 	"Merchant":              {},
@@ -125,6 +128,9 @@ type Folk struct {
 	// massTeleport is set while a mass gatekeeper's teleport of its
 	// defenders is armed; see folk_residence_commands.go.
 	massTeleport atomic.Bool
+
+	// towerState is a control tower's siege and form; see folk_tower.go.
+	towerState tower
 }
 
 // NewFolk builds a civilian NPC from inst. skills, when provided, resolves
@@ -183,15 +189,16 @@ const holyThing InstanceKind = "HolyThing"
 func (f *Folk) HolyThing() bool { return hostileKind(f.Instance) == holyThing }
 
 // Muted reports a civilian NPC a player's interact does nothing on: a muted
-// civilian, a holy artifact or a siege headquarters.
+// civilian, a holy artifact, a siege headquarters or a control tower.
 func (f *Folk) Muted() bool {
 	kind := hostileKind(f.Instance)
-	return kind == "MutedFolk" || kind == holyThing || kind == siegeFlag
+	return kind == "MutedFolk" || kind == holyThing || kind == siegeFlag || f.Tower()
 }
 
 // ServerObjectView reports an NPC every player is shown with the stationary
-// ServerObjectInfo, whatever its speed: a holy artifact.
-func (f *Folk) ServerObjectView() bool { return f.HolyThing() }
+// ServerObjectInfo, whatever its speed: a holy artifact, or a control tower
+// standing dead.
+func (f *Folk) ServerObjectView() bool { return f.HolyThing() || (f.Tower() && !f.TowerWorking()) }
 
 // QuestTalker reports whether a player's interact goes through the quest
 // dialog first: every civilian NPC but the wedding manager, whose own
@@ -231,16 +238,22 @@ func (f *Folk) NPCInfoSnapshot() npcinfo.Snapshot {
 		title = f.Instance.Title()
 	}
 	pAtkSpd := f.AttackSpeed()
+	// A working control tower is shown as its working form: its template
+	// id, held items and body.
+	shown := t
+	if form := f.towerState.form.Load(); form != nil {
+		shown = form
+	}
 	return npcinfo.Snapshot{
-		ObjectID: f.ObjectID(), TemplateID: t.TemplateID,
+		ObjectID: f.ObjectID(), TemplateID: shown.TemplateID,
 		X: x, Y: y, Z: z, Heading: f.Heading(),
 		MAtkSpd: f.MagicAttackSpeed(), PAtkSpd: pAtkSpd,
 		RunSpd: int(t.RunSpeed), WalkSpd: int(t.WalkSpeed),
 		MoveMultiplier: float64(f.MovementSpeedMultiplier()), AtkSpdMultiplier: npcinfo.AttackSpeedMultiplier(pAtkSpd, t.AtkSpd),
 		MoveType:  f.zones.moveType(),
 		CurrentHP: f.CurrentHP(), MaxHP: f.MaxHP(),
-		CollisionRadius: t.CollisionRadius, CollisionHeight: t.CollisionHeight,
-		RightHand: t.RightHand, LeftHand: t.LeftHand,
+		CollisionRadius: shown.CollisionRadius, CollisionHeight: shown.CollisionHeight,
+		RightHand: shown.RightHand, LeftHand: shown.LeftHand,
 		Running: f.Running(), InCombat: f.InCombat(), AlikeDead: f.AlikeDead(), SummonAnimation: 2,
 		AbnormalEffect: f.AbnormalEffect(), Name: name, Title: title,
 	}

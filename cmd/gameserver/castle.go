@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/rs/zerolog"
 )
@@ -31,9 +32,13 @@ func provideCastles(ctx bootContext, pool *sql.DB, worker *persist.Worker, clans
 	return castles, nil
 }
 
-// startCastleArtifacts places every castle's holy artifacts once, after
-// the NPC spawns.
+// startCastleArtifacts places every castle's control towers, then its
+// holy artifacts, once, after the NPC spawns.
 func startCastleArtifacts(castles *castle.Manager, npcs *manager.Npcs, log zerolog.Logger) {
+	towers := castles.SpawnTowers(func(castleID int, t castledata.ControlTower) (castle.Tower, bool) {
+		return npcs.SpawnTower(castleID, t)
+	})
+	log.Info().Int("castle_towers", towers).Msg("castle control towers spawned")
 	placed := castles.SpawnArtifacts(npcs.SpawnArtifact)
 	log.Info().Int("castle_artifacts", placed).Msg("castle artifacts spawned")
 }
