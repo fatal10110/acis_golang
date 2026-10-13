@@ -47,9 +47,10 @@ func (l *GameClientLink) broadcastAttack(attacker *livePlayer, snapshot event.At
 // attack: an AttackRequest on the object already selected.
 func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlayer, objectID int32, selected, ctrl, shift bool) {
 	target := l.resolveTarget(objectID)
-	// A fence or a signet effect point answers every click, plain, forced
-	// or shifted, with ActionFailed: it is never selected.
-	if _, point := target.(*npc.EffectPoint); target == nil || point || target.Kind() == actor.KindFence {
+	// A fence, a signet effect point or a Christmas tree answers every
+	// click, plain, forced or shifted, with ActionFailed: it is never
+	// selected.
+	if _, point := target.(*npc.EffectPoint); target == nil || point || target.Kind() == actor.KindFence || christmasTree(target) {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
@@ -60,6 +61,12 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 	}
 	ground, isGround := target.(*grounditem.Item)
 	if isGround {
+		// A player in flight picks nothing up: the click is refused ahead of
+		// every pickup gate.
+		if live.Flying() {
+			live.SendFrame(serverpackets.FrameActionFailed())
+			return
+		}
 		if l.refuseTicketPickup(live, ground) {
 			return
 		}
@@ -101,7 +108,7 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 		}
 		if pet, ok := target.(*summon.Actor); ok && !ctrl && pet.ShownAsOwnedBy(live.ObjectID()) {
 			live.deferInteract(pet, shift)
-		} else if f, ok := target.(*npc.Folk); ok && !ctrl {
+		} else if f, ok := target.(*npc.Folk); ok && !attacksFolk(live, f, ctrl) {
 			live.deferInteract(f, shift)
 		} else if h, ok := target.(*npc.Hostile); ok && interactsWith(live, h, ctrl) {
 			live.deferInteract(h, shift)
@@ -137,6 +144,13 @@ func (l *GameClientLink) actOnSelectedTarget(live *livePlayer, target world.Trac
 		return
 	}
 	l.attackLiveTarget(live, target, shift)
+}
+
+// christmasTree reports whether target is a Christmas tree, which answers
+// every click with ActionFailed alone.
+func christmasTree(target world.Tracked) bool {
+	d, ok := target.(*npc.Decoration)
+	return ok && d.Instance.Kind == npc.ChristmasTree
 }
 
 // interactsWith reports whether a click on the selected hostile NPC h is an
@@ -379,19 +393,31 @@ func (l *GameClientLink) actOnSummon(live *livePlayer, target world.Tracked, ctr
 }
 
 // actOnFolk answers a click on an already-selected civilian NPC and
-// reports whether target was one. A forced click attacks it, since another
-// creature may always attack it by force; any other click talks to it.
+// reports whether target was one. A forced click attacks it while it may be
+// attacked by force; any other click, a forced one on its corpse or on a
+// holy artifact included, talks to it. A forced click from a player out of
+// control is refused before either.
 func (l *GameClientLink) actOnFolk(live *livePlayer, target world.Tracked, ctrl, shift bool) bool {
 	f, ok := target.(*npc.Folk)
 	if !ok || live == nil {
 		return false
 	}
-	if ctrl {
+	if ctrl && liveOutOfControl(live) {
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return true
+	}
+	if attacksFolk(live, f, ctrl) {
 		l.attackLiveTarget(live, f, shift)
 		return true
 	}
 	l.tryToInteract(live, f, shift)
 	return true
+}
+
+// attacksFolk reports whether a click on the selected civilian NPC f is an
+// attack rather than an interact.
+func attacksFolk(live *livePlayer, f *npc.Folk, ctrl bool) bool {
+	return f.AttackableWithoutForceBy(live.Character) || (ctrl && f.AttackableBy(live.Character))
 }
 
 // interactTarget is what a player's interact intention walks to and acts

@@ -25,6 +25,9 @@ type scriptRegistry interface {
 	player.DeathEvents
 	// PlayerDetached stops the script timers bound to c as it leaves.
 	PlayerDetached(c *player.Character)
+	// ScriptRuns counts the hook invocations in flight, which a player's
+	// departure waits out once they wrote it.
+	ScriptRuns() *player.ScriptRuns
 	// CharacterCreated gives a character just created its creation-time
 	// quest state.
 	CharacterCreated(c *player.Character)

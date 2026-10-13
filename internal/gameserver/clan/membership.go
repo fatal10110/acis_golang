@@ -257,11 +257,15 @@ const (
 )
 
 // Oust expels the member named targetName from c's clan. online resolves a
-// member's live character; nil when it is not in the world. The expelled
-// member may not join a clan, nor the clan recruit, for JoinDays. The
-// leader cannot be expelled: an expulsion naming it is refused as
-// unauthorized, as a clan without its leader would be left unusable.
-func (s *Service) Oust(c *player.Character, targetName string, online func(int32) *player.Character, now time.Time) (*Clan, Member, OustRefusal) {
+// member's live character; nil when it is not in the world. connected
+// reports whether a member in the world still has its client: the combat
+// of one lingering after its connection dropped refuses nothing, though it
+// leaves the clan as an online member does, so that the character it
+// stores on leaving the world is clanless. The expelled member may not join
+// a clan, nor the clan recruit, for JoinDays. The leader cannot be
+// expelled: an expulsion naming it is refused as unauthorized, as a clan
+// without its leader would be left unusable.
+func (s *Service) Oust(c *player.Character, targetName string, online func(int32) *player.Character, connected func(int32) bool, now time.Time) (*Clan, Member, OustRefusal) {
 	cl, ok := s.ClanOf(c)
 	if !ok {
 		return nil, Member{}, OustNotMember
@@ -281,7 +285,7 @@ func (s *Service) Oust(c *player.Character, targetName string, online func(int32
 	if target.Online {
 		live = online(target.ObjectID)
 	}
-	if live != nil && live.InCombat() {
+	if live != nil && live.InCombat() && connected(target.ObjectID) {
 		return nil, Member{}, OustInCombat
 	}
 	joinExpiry := s.joinExpiry(now)

@@ -94,7 +94,7 @@ func adminSpawnPoint(gm *livePlayer) positioned {
 func (l *GameClientLink) placeAdminSpawn(tmpl *npc.Template, at positioned, respawn time.Duration) bool {
 	x, y, z := at.Position()
 	heading := at.Heading()
-	if npc.InstanceKind(tmpl.Type) == npc.InstanceKind("ChristmasTree") {
+	if npc.InstanceKind(tmpl.Type) == npc.ChristmasTree {
 		return l.ids != nil && l.placeDecoration(tmpl, tmpl.Title, x, y, z, heading, respawn)
 	}
 	npcs := l.npcSpawns.Load()

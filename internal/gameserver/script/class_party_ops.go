@@ -30,9 +30,11 @@ func ClassParent(classID int32) int32 {
 // in its party's and its clan's windows, the skills granted when the server
 // grants them automatically, and an academy member's graduation on its second
 // occupation. The base class does not move; SetBaseClass moves it. Nothing
-// happens while another class change of the player is in progress.
+// happens while another class change of the player is in progress, nor to a
+// player leaving the world.
 func (p *Player) SetClassID(classID int32) {
-	p.character().RequestClassChange(int(classID))
+	c := p.character()
+	c.WhileAttached(func() { c.RequestClassChange(int(classID)) })
 }
 
 // SubClassActive reports whether the player plays one of its subclasses.
@@ -43,9 +45,10 @@ func (p *Player) SubClassActive() bool { return p.character().SubclassActive() }
 func (p *Player) BaseClass() int32 { return int32(p.character().BaseClassID()) }
 
 // SetBaseClass makes classID the player's base class. The class it plays does
-// not change.
+// not change. A player leaving the world is left as it is.
 func (p *Player) SetBaseClass(classID int32) {
-	p.character().RequestBaseClass(int(classID))
+	c := p.character()
+	c.WhileAttached(func() { c.RequestBaseClass(int(classID)) })
 }
 
 // BroadcastUserInfo shows the player anew: UserInfo to the player, CharInfo to

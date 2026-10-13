@@ -5,12 +5,14 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
-// TestSelectingDecorationSendsValidateLocationFirst clicks a spawned
-// Christmas Tree: like any creature target it answers ValidateLocation
-// before MyTargetSelected.
-func TestSelectingDecorationSendsValidateLocationFirst(t *testing.T) {
+// TestChristmasTreeClickAnswersActionFailed clicks a placed Christmas Tree:
+// whether plain, shifted or forced, every click is answered with
+// ActionFailed alone. The tree is never selected, and the player's current
+// target, itself, stays selected.
+func TestChristmasTreeClickAnswersActionFailed(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollar(t, seedItem{TemplateID: treeKitID, Count: 1})
 	h.client.Send(encodeUseItem(h.seededItem(t, treeKitID), false))
@@ -19,16 +21,41 @@ func TestSelectingDecorationSendsValidateLocationFirst(t *testing.T) {
 	treeID := wire.NewReader(frame[1:]).ReadInt32()
 	drainUntilQuiet(t, h.client)
 
-	h.client.Send(encodeAction(treeID, 0, 0, 0, false))
-	frame = mustRead(t, h.client, "tree ValidateLocation")
-	assertFrameOpcode(t, frame, serverpackets.OpcodeValidateLocation, "tree ValidateLocation")
-	if got := wire.NewReader(frame[1:]).ReadInt32(); got != treeID {
-		t.Fatalf("ValidateLocation object id = %d, want tree %d", got, treeID)
+	h.client.Send(encodeAction(h.ownerID, 0, 0, 0, false))
+	drainUntilQuiet(t, h.client)
+	obj, ok := h.srv.State.Player(h.ownerID)
+	if !ok {
+		t.Fatal("owner not in the world")
 	}
-	frame = mustRead(t, h.client, "tree MyTargetSelected")
-	assertFrameOpcode(t, frame, serverpackets.OpcodeMyTargetSelected, "tree MyTargetSelected")
-	if got := wire.NewReader(frame[1:]).ReadInt32(); got != treeID {
-		t.Fatalf("MyTargetSelected object id = %d, want tree %d", got, treeID)
+	owner, ok := obj.(interface{ Target() world.Tracked })
+	if !ok {
+		t.Fatalf("owner %T has no target", obj)
+	}
+	if cur := owner.Target(); cur == nil || cur.ObjectID() != h.ownerID {
+		t.Fatalf("owner target = %v, want itself before clicking the tree", cur)
+	}
+
+	for _, click := range []struct {
+		name    string
+		payload []byte
+	}{
+		{"plain click", encodeAction(treeID, 0, 0, 0, false)},
+		{"shift click", encodeAction(treeID, 0, 0, 0, true)},
+		{"forced click", encodeAttackRequest(treeID, 0, 0, 0, false)},
+		{"forced shift click", encodeAttackRequest(treeID, 0, 0, 0, true)},
+	} {
+		h.client.Send(click.payload)
+		frames := drainFrames(t, h.client)
+		if len(frames) != 1 || frames[0][0] != serverpackets.OpcodeActionFailed {
+			opcodes := make([]byte, 0, len(frames))
+			for _, f := range frames {
+				opcodes = append(opcodes, f[0])
+			}
+			t.Fatalf("%s on the tree answered %x, want ActionFailed alone", click.name, opcodes)
+		}
+		if cur := owner.Target(); cur == nil || cur.ObjectID() != h.ownerID {
+			t.Fatalf("%s on the tree changed the target to %v, want the owner kept", click.name, cur)
+		}
 	}
 }
 

@@ -38,8 +38,12 @@ func (p *Player) ActiveWeaponItemID() int32 { return p.character().ActiveWeaponI
 func (p *Player) PkKills() int32 { return int32(p.character().ProgressionValues().PKKills) }
 
 // SetPkKills sets the player's PK count to n. Nothing is shown: SendUserInfo
-// shows the player its new count. It is saved with the character.
-func (p *Player) SetPkKills(n int32) { p.character().SetPKKills(int(n)) }
+// shows the player its new count. It is saved with the character; a player
+// leaving the world keeps its count.
+func (p *Player) SetPkKills(n int32) {
+	c := p.character()
+	c.WhileAttached(func() { c.SetPKKills(int(n)) })
+}
 
 // SendUserInfo sends the player its own full view, and no one else
 // anything.

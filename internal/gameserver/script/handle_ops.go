@@ -104,7 +104,7 @@ func (s *Script) RewardNewbieShots(p *Player, ssCount, spsCount int32) {
 		s.RewardItems(p, soulshotNoGrade, ssCount)
 		p.PlayTutorialVoice(voiceSoulshots)
 	}
-	c.Memos().Set(flag, "true")
+	c.WhileAttached(func() { c.Memos().Set(flag, "true") })
 }
 
 // SocialAction plays the social animation id on the player, for the

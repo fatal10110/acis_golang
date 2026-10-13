@@ -509,7 +509,8 @@ func (p *livePlayer) Departed() bool {
 
 // markDetaching runs on p's queue, where autosave and shadow-item expiry
 // check detached, so neither enqueues after detach's own writes (#1948). It
-// also marks the character, whose quest journal then takes no change.
+// also marks the character: a script invocation that wrote it, on any queue,
+// has finished first, and no other writes it after.
 func (p *livePlayer) markDetaching() {
 	sim.AssertOwner(p.Queue())
 	p.deliveryStopped.Store(true)
