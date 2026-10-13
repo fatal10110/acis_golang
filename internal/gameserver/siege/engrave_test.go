@@ -144,14 +144,14 @@ func TestArtifactResidence(t *testing.T) {
 		if c, ok := w.castles.ByArtifact(id); !ok || c.ID != 1 {
 			t.Fatalf("ByArtifact(%d) = %v, %v; want Gludio", id, c, ok)
 		}
-		if c, ok := w.castles.ForNPC(id, 35322, nil, nil); !ok || c.ID != 1 {
+		if c, ok := w.castles.ForNPC(id, 35322, 0, nil, nil); !ok || c.ID != 1 {
 			t.Fatalf("ForNPC(placed artifact %d) = %v, %v; want Gludio", id, c, ok)
 		}
 	}
 	if c, ok := w.castles.ByArtifact(503); ok {
 		t.Fatalf("ByArtifact(another copy) = %v; want none", c)
 	}
-	if c, ok := w.castles.ForNPC(503, 35322, nil, nil); ok {
+	if c, ok := w.castles.ForNPC(503, 35322, 0, nil, nil); ok {
 		t.Fatalf("ForNPC(another copy of the artifact) = %v; want none", c)
 	}
 	if c, ok := w.castles.ByNPC(35322); ok {

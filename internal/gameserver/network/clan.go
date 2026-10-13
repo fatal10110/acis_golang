@@ -20,9 +20,10 @@ import (
 // before it spawns: the clan's skill list, then live is given the clan
 // skills its rank reaches and, leading a clan of siege level, the siege
 // skills (shown by the burst's SkillList); its fellow members learn it
-// logged in; it is told when its clan's hall lease is unpaid; it takes the
-// siege state of a siege in progress its clan fights; and it gets its own
-// roster row and the rosters, the main clan's then each sub-unit's.
+// logged in, and so does its sponsor, or else its apprentice; it is told
+// when its clan's hall lease is unpaid; it takes the siege state of a siege
+// in progress its clan fights; and it gets its own roster row and the
+// rosters, the main clan's then each sub-unit's.
 func (l *GameClientLink) enterWorldClan(client *Client, live *livePlayer) {
 	c := live.Character
 	cl, ok := l.clanService().ClanOf(c)
@@ -42,6 +43,7 @@ func (l *GameClientLink) enterWorldClan(client *Client, live *livePlayer) {
 			return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageClanMemberS1LoggedIn, c.CharacterName())
 		},
 		func() wire.Frame { return serverpackets.FramePledgeShowMemberListUpdate(row) })
+	l.tellMentorLoggedIn(c)
 	if l.halls.LeaseUnpaid(cl.ID()) {
 		// Sent with its lease left blank, as the reference sends it.
 		client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageClanHallPaymentDueTomorrowS1))
@@ -52,6 +54,22 @@ func (l *GameClientLink) enterWorldClan(client *Client, live *livePlayer) {
 	client.Session.SendFrame(serverpackets.FramePledgeShowMemberListUpdate(row))
 	for _, frame := range l.pledgeListFrames(cl, live) {
 		client.Session.SendFrame(frame)
+	}
+}
+
+// tellMentorLoggedIn tells c's sponsor in the world that its apprentice c
+// logged in; with no sponsor, it tells c's apprentice in the world that
+// its sponsor c logged in.
+func (l *GameClientLink) tellMentorLoggedIn(c *player.Character) {
+	notice, mentorID := serverpackets.SystemMessageYourApprenticeS1HasLoggedIn, c.Sponsor()
+	if mentorID == 0 {
+		notice, mentorID = serverpackets.SystemMessageYourSponsorS1HasLoggedIn, c.Apprentice()
+	}
+	if mentorID == 0 {
+		return
+	}
+	if mentor, ok := l.livePlayerByID(mentorID); ok {
+		mentor.SendFrame(serverpackets.FrameSystemMessageString(notice, c.CharacterName()))
 	}
 }
 
@@ -262,7 +280,8 @@ func (l *GameClientLink) requestWithdrawPledge(live *livePlayer) {
 // requestOustPledgeMember expels the member live names from live's clan.
 // An expelled member online learns it on its own queue, where a castle's
 // clan first checks what it wears (checkLeaverItems); an offline one's
-// circlets go back to its inventory.
+// circlets go back to its inventory. One lingering after its connection
+// dropped leaves as an online one does, its client told nothing.
 func (l *GameClientLink) requestOustPledgeMember(live *livePlayer, req clientpackets.RequestOustPledgeMember) {
 	online := func(id int32) *player.Character {
 		if target, ok := l.livePlayerByID(id); ok {
@@ -271,7 +290,7 @@ func (l *GameClientLink) requestOustPledgeMember(live *livePlayer, req clientpac
 		return nil
 	}
 	now := time.Now()
-	cl, m, refusal := l.clanService().Oust(live.Character, req.Name, online, now)
+	cl, m, refusal := l.clanService().Oust(live.Character, req.Name, online, l.clanMemberConnected, now)
 	switch refusal {
 	case clan.OustNotMember:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageYouAreNotAClanMember))

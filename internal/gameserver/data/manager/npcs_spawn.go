@@ -153,6 +153,7 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	}
 	inst.Home = loc
 	inst.HasHome = true
+	inst.DriftRange = n.aiConfig.DriftRange
 	inst.SpawnHeading = heading
 	inst.WalkMode = walkerWalkModeIDs[entry.NPCID] && routeStandIn(n.scripts, entry.NPCID)
 	n.mu.Lock()
@@ -160,6 +161,7 @@ func (n *Npcs) place(key string, entry spawn.Entry, tmpl *npc.Template, loc loca
 	n.mu.Unlock()
 	inst.Maker = info.maker
 	inst.Summoner = info.summoner
+	inst.CastleID = info.castleID
 	// Each life of the slot starts with the script value cleared; its
 	// other script memory carries over.
 	var slot npc.SpawnSlot

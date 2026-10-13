@@ -73,7 +73,7 @@ func provideClans(ctx bootContext, pool *sql.DB, ids *idfactory.Allocator, worke
 		return ok
 	})
 	table := clan.NewTable()
-	table.Restore(snap, now, cfg.JoinDays)
+	clamped := table.Restore(snap, now, cfg.JoinDays)
 	halls, err := store.LoadHallOwners(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("restore clans: %w", err)
@@ -84,6 +84,7 @@ func provideClans(ctx bootContext, pool *sql.DB, ids *idfactory.Allocator, worke
 	})
 	log.Info().Int("clans", table.Len()).Msg("clans loaded")
 	service := clan.NewService(table, store, worker, ids, cfg, time.Now, log)
+	service.StoreRestoredReputations(clamped)
 	service.DropMissingCrests(crests)
 	service.DropDanglingAlliances()
 	return service, nil

@@ -117,6 +117,9 @@ type npcSpawnDeps struct {
 	spawnStore *gamesql.SpawnStore
 	// makerCatalog are makers added to the server's own.
 	makerCatalog script.MakerCatalog
+	// driftRange is the WithMaxDriftRange drift range; 0 keeps the shipped
+	// one.
+	driftRange int
 }
 
 // WithDataReloads gives the link the //reload and //respawnall hooks; by
@@ -168,10 +171,14 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	}
 	makers := maker.Catalog()
 	maps.Copy(makers, deps.makerCatalog)
+	aiConfig := npc.DefaultAIConfig()
+	if deps.driftRange != 0 {
+		aiConfig.DriftRange = deps.driftRange
+	}
 	npcs, err := gamemanager.NewNpcsWithMaxBuffsAmount(gamemanager.NewSpawns(deps.makers, states), templates, deps.geo, deps.state, deps.ids,
 		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Rates: deps.dropRates, RateXP: 1, RateSP: 1}, time.Now, deps.log,
 		deps.skills, castEffects, walker, link.HostileSinks(deps.state, deps.stance), link.FolkSinks(deps.state, deps.stance),
-		20, 0, 0, npc.DefaultRaidMultipliers(), npc.DefaultAIConfig(), gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues,
+		20, 0, 0, npc.DefaultRaidMultipliers(), aiConfig, gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues,
 		script.NewMakers(makers, maker.Default, deps.log), deps.scripts, deps.zones)
 	if err != nil {
 		t.Fatalf("new npc spawns: %v", err)
@@ -181,6 +188,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	}
 	npcs.SetGroundTaker(link)
 	npcs.SetGuardedSieges(link.GuardedSiege)
+	npcs.SetSpawnTimes(network.SpawnTimes(link))
 	link.SetNpcSpawns(npcs)
 	npcs.SpawnOnStart()
 	if deps.sevenSigns != nil {

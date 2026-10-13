@@ -60,7 +60,7 @@ func (inst *Instance) spawnTerritoryContains(at location.Location) bool {
 	if !inst.HasHome {
 		return true
 	}
-	return at.In3DRadius(inst.Home, defaultDriftRange)
+	return at.In3DRadius(inst.Home, inst.MaxDriftRange())
 }
 
 // InstantTeleportTo moves the NPC in one step to where j lands, grounded

@@ -84,8 +84,10 @@ func NewTable() *Table { return &Table{clans: map[int32]*Clan{}} }
 // whatever its row says; a member penalty survives while it is less than
 // joinDays past its start; an alliance penalty survives until it ends. The
 // sub-units and wars follow (see restoreWars). The ladder then ranks the
-// clans (see rankLadder).
-func (t *Table) Restore(s Snapshot, now time.Time, joinDays int) {
+// clans (see rankLadder). It returns the clans of level 5 or more whose
+// stored score lies past the reputation bounds and now holds the bound,
+// for StoreRestoredReputations to write back.
+func (t *Table) Restore(s Snapshot, now time.Time, joinDays int) (clamped []int32) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	nowMs := now.UnixMilli()
@@ -106,6 +108,9 @@ func (t *Table) Restore(s Snapshot, now time.Time, joinDays int) {
 		if cl.level >= minReputationLevel {
 			cl.reputation = clampReputation(r.Reputation)
 			cl.storedReputation = cl.reputation
+			if cl.reputation != r.Reputation {
+				clamped = append(clamped, r.ID)
+			}
 		}
 		t.clans[r.ID] = cl
 	}
@@ -133,6 +138,7 @@ func (t *Table) Restore(s Snapshot, now time.Time, joinDays int) {
 		clans = append(clans, cl)
 	}
 	rankLadder(clans)
+	return clamped
 }
 
 func clampReputation(v int) int {

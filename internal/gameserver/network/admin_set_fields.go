@@ -313,6 +313,7 @@ func (l *GameClientLink) broadcastNPCInfo(obj world.Tracked, info func() serverp
 	}
 	broadcastFrame(func() wire.Frame {
 		s := info()
+		l.addNPCLevel(obj, &s)
 		l.addNPCCrest(obj, &s)
 		return serverpackets.FrameNPCInfo(s)
 	}, func(send func(frameReceiver)) {
