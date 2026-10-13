@@ -12,7 +12,7 @@ import (
 // degrees from the positive x axis, 0 up to but not including 360.
 func AngleFrom(a, b Place) float64 {
 	from, to := a.loc(), b.loc()
-	angle := math.Atan2(float64(to.Y-from.Y), float64(to.X-from.X)) * 180 / math.Pi
+	angle := math.Atan2(float64(to.Y-from.Y), float64(to.X-from.X)) * (180 / math.Pi)
 	if angle < 0 {
 		angle += 360
 	}

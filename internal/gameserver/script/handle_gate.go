@@ -49,7 +49,6 @@ var kindOps = map[string]kindSet{
 	"NPC.RemoveAllAttackDesire":       hostileOnly,
 	"NPC.RemoveAttackDesire":          hostileOnly,
 	"NPC.RemoveDesires":               hostileOnly,
-	"NPC.RemoveMoveToDesire":          hostileOnly,
 	"NPC.Rooted":                      hostileOnly,
 	"NPC.SetTopDesireTarget":          hostileOnly,
 	"NPC.StopAttack":                  hostileOnly,

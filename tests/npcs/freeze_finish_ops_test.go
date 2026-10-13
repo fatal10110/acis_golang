@@ -6,7 +6,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -117,34 +116,6 @@ func TestScriptInRangeMeasuresBodies(t *testing.T) {
 		}
 		if script.InRange(-1, p, nil, true) {
 			t.Error("InRange of nothing = true")
-		}
-	})
-}
-
-// TestScriptRemoveMoveToDesire pins WarriorRunAwayToClan's
-// getDesireQueue().removeIf(MOVE_TO at the flee point): the move desire to
-// that point goes, a move desire elsewhere stays.
-func TestScriptRemoveMoveToDesire(t *testing.T) {
-	t.Parallel()
-	w := bootCutscene(t)
-	mob := w.srv.SpawnHostileNPCTemplateAt(t, spawnMonster(cutsceneMonsterID, "Runner"), location.Location{X: w.at.X + 40, Y: w.at.Y, Z: w.at.Z})
-	flee := script.Loc{X: w.at.X + 9000, Y: w.at.Y, Z: w.at.Z}
-	other := script.Loc{X: w.at.X - 9000, Y: w.at.Y, Z: w.at.Z}
-	movesTo := func(l script.Loc) bool {
-		return mob.AI().Desires().AnyMatch(func(d *ai.Desire) bool {
-			return d.Kind == ai.IntentionMoveTo && d.Location == location.Location{X: l.X, Y: l.Y, Z: l.Z}
-		})
-	}
-	w.direct(t, func(_ *script.Player) {
-		n := script.NPCOf(mob)
-		n.AddMoveToDesire(flee, 50)
-		n.AddMoveToDesire(other, 10)
-		if !movesTo(flee) || !movesTo(other) {
-			t.Fatalf("fixture: move desires flee %v, other %v", movesTo(flee), movesTo(other))
-		}
-		n.RemoveMoveToDesire(flee)
-		if movesTo(flee) || !movesTo(other) {
-			t.Errorf("after the removal: flee desire %v, other %v; want only the other", movesTo(flee), movesTo(other))
 		}
 	})
 }

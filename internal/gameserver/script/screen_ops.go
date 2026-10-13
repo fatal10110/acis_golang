@@ -3,7 +3,6 @@ package script
 import (
 	"fmt"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 )
 
@@ -43,13 +42,4 @@ func (p *Player) ShowMultisell(n *NPC, name string) {
 		panic(fmt.Sprintf("script: a multisell of %T: only a civilian npc offers one", n.combatant()))
 	}
 	p.character().ShowMultisell(n.ObjectID(), name)
-}
-
-// RemoveMoveToDesire drops every desire the NPC holds to move to at. Only
-// a hostile NPC does it; any other NPC panics.
-func (n *NPC) RemoveMoveToDesire(at Place) {
-	l := at.loc()
-	n.hostile("remove a move desire").AI().Desires().RemoveIf(func(d *ai.Desire) bool {
-		return d.Kind == ai.IntentionMoveTo && d.Location.X == l.X && d.Location.Y == l.Y && d.Location.Z == l.Z
-	})
 }

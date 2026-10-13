@@ -19,6 +19,7 @@ func TestAngleFrom(t *testing.T) {
 		{Loc{X: 100, Y: 0}, 270},
 		{Loc{X: 200, Y: 0}, 315},
 		{Loc{X: 100, Y: 100, Z: 900}, 0},
+		{Loc{X: -200, Y: -191}, 224.12754287709797},
 	} {
 		if got := AngleFrom(from, tc.to); got != tc.want {
 			t.Errorf("AngleFrom(%v, %v) = %v, want %v", from, tc.to, got, tc.want)

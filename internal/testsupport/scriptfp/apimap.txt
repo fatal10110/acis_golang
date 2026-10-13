@@ -696,7 +696,10 @@ ClanMember.getPlayerInstance script.Player.ClanLeader
 # handle stands for. Location.getClosestPositionList sorts by descending
 # distance, so its Go name says what it returns. A page a script fills
 # itself is shown with ShowHTML. An earthquake is felt by one player, or
-# by the players around a hostile NPC.
+# by the players around a hostile NPC. A flee desire's location is a clone
+# of a location built fresh on each flee lookup, so the arrival hook's
+# removal by identity matches nothing; the desire goes when the arrival
+# clears the current desire after the hook returns.
 BossZone.allowPlayerEntry script.Zone.AllowPlayerEntry
 CLogger.error inline
 CLogger.info inline
@@ -711,7 +714,7 @@ GameTimeTaskManager.getCurrentTick script.Script.CurrentTick
 GameTimeTaskManager.isNight script.Maker.IsNight
 HtmCache.getHtm script.Script.Page
 HtmCache.getInstance inline
-Intention.getLoc script.NPC.RemoveMoveToDesire
+Intention.getLoc inline
 Location.getClosestPosition script.Closest
 Location.getClosestPositionList script.Farthest
 MathUtil.calculateAngleFrom script.AngleFrom
