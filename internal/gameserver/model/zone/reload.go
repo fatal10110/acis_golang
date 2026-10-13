@@ -1,5 +1,7 @@
 package zone
 
+import "github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+
 // holders maps the object id of each occupant of s's zones to the zones
 // holding it, in load order. It is taken once, the first time it is asked
 // for, which happens only after s was swapped out.
@@ -80,28 +82,35 @@ func (ix *Index) Clear() {
 // Rebase moves a onto the zones ix holds now, as a zone reload does. When a
 // was last synced against zones the reload swapped out, it is dropped from
 // those that held it without their exit rules and loses every flag they
-// raised; then, when it stands on the grid (onGrid), it enters the zones
-// of ix around it, their entry rules and watchers running as on any entry.
+// raised; then, when it stands on the grid (onGrid), it is revalidated
+// against the zones of ix attached to the region containing held, the
+// region holding it (see RevalidateIn), their entry rules and watchers
+// running as on any entry. A creature an instant teleport moved out of that
+// region so enters none of the zones at its landing point until its next
+// move.
 // A swimmer or wader that only the dropped zones kept in water or swamp is
 // told it left, and so is a player that only they kept in danger.
 //
 // Any index operation against the new zones moves a the same way first, so
 // a creature that moved before the reload reached it keeps the holds the
 // new zones raised. The caller holds a's membership, as for Revalidate.
-func (ix *Index) Rebase(a Actor, onGrid bool) {
+func (ix *Index) Rebase(a Actor, held location.Location, onGrid bool) {
 	set := ix.set()
 	dropped := set.sync(a)
 	if onGrid {
-		set.revalidate(a)
+		for _, k := range set.at(held.X, held.Y) {
+			Revalidate(k, a)
+		}
 	}
 	settleDropped(a, dropped)
 }
 
-// Reload moves a onto the zones ix holds now (Rebase). A creature off the
-// grid or mid-teleport enters none until it lands.
+// Reload moves a onto the zones ix holds now (Rebase), those of the region
+// holding it. A creature off the grid or mid-teleport enters none until it
+// lands.
 func (m *Member) Reload(ix *Index, a Actor) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.steps = 0
-	ix.Rebase(a, m.onGrid && !teleporting(a))
+	ix.Rebase(a, m.held, m.onGrid && !teleporting(a))
 }

@@ -2,6 +2,7 @@ package skill
 
 import (
 	"strings"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -425,9 +426,26 @@ type resultHandler interface {
 // Registry maps skill type names to their handlers.
 type Registry struct {
 	entries map[string]Handler
-	// magicFailures is the server's MagicFailures switch, read by the
-	// cubic damage path (UseCubic).
-	magicFailures bool
+	// magicFailures is the server's MagicFailures switch, shared with the
+	// magic damage handlers and read by the cubic damage path (UseCubic).
+	magicFailures *magicFailureSwitch
+}
+
+// magicFailureSwitch is the server's MagicFailures switch in force. A nil
+// switch is off.
+type magicFailureSwitch struct{ on atomic.Bool }
+
+func (s *magicFailureSwitch) enabled() bool {
+	return s != nil && s.on.Load()
+}
+
+// SetMagicFailures puts the MagicFailures switch on in force for the casts
+// that start after it. A registry built by NewRegistry has no switch, so
+// keeps magic failures off.
+func (r *Registry) SetMagicFailures(on bool) {
+	if r.magicFailures != nil {
+		r.magicFailures.on.Store(on)
+	}
 }
 
 // NewRegistry returns a registry populated with handlers.
@@ -453,11 +471,13 @@ func NewDefaultRegistryWithDefinitions(defs Definitions) *Registry {
 }
 
 func newDefaultRegistry(defs Definitions, magicFailures bool, healSps *modelskill.HealSpsTable) *Registry {
+	failures := &magicFailureSwitch{}
+	failures.on.Store(magicFailures)
 	r := NewRegistry(
 		pdamHandler{},
 		chargeDamHandler{},
-		mdamHandler{magicFailures: magicFailures},
-		drainHandler{magicFailures: magicFailures},
+		mdamHandler{magicFailures: failures},
+		drainHandler{magicFailures: failures},
 		blowHandler{},
 		manaDamageHandler{},
 		healHandler{buff: continuousHandler{defs: defs}, healSps: healSps},
@@ -492,7 +512,7 @@ func newDefaultRegistry(defs Definitions, magicFailures bool, healSps *modelskil
 		fishingHandler{},
 		fishingSkillHandler{},
 	)
-	r.magicFailures = magicFailures
+	r.magicFailures = failures
 	return r
 }
 
@@ -529,7 +549,7 @@ func NewDefaultRegistryWithSignet(defs Definitions, magicFailures bool, healSps 
 		r.Register(harvestHandler{ids: signet.IDs, cropRate: signet.ManorCropRate})
 		r.Register(sweepHandler{ids: signet.IDs})
 	}
-	r.Register(signetHandler{defs: defs, magicFailures: magicFailures, templates: signet.Templates, ids: signet.IDs, world: signet.World, newSink: signet.NewSink, zones: signet.Zones, effects: signet.Effects, queues: signet.Queues, log: signet.Log})
+	r.Register(signetHandler{defs: defs, magicFailures: r.magicFailures, templates: signet.Templates, ids: signet.IDs, world: signet.World, newSink: signet.NewSink, zones: signet.Zones, effects: signet.Effects, queues: signet.Queues, log: signet.Log})
 	return r
 }
 

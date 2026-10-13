@@ -72,9 +72,8 @@ func (f *Folk) ValidLocation(_, _, _, tx, ty, tz int) location.Location {
 // outside movement.
 func (f *Folk) SetXYZ(x, y, z int) {
 	if f.world != nil {
-		px, py, pz := f.Position()
 		_ = f.world.Move(f, x, y, z)
-		f.zones.place(location.Location{X: px, Y: py, Z: pz})
+		f.zones.place()
 	}
 }
 

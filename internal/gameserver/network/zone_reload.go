@@ -106,7 +106,8 @@ func (l *GameClientLink) rebaseCreatures(old *zone.Index) {
 }
 
 // ReloadZones moves the player off the zones a reload swapped out and into
-// the reloaded zones around it, sending its compass zone when it changed.
+// the reloaded zones of the region holding it, sending its compass zone
+// when it changed.
 func (p *livePlayer) ReloadZones() {
 	if p.zoneActor == nil || p.link == nil {
 		return
@@ -121,7 +122,7 @@ func (a *liveZoneActor) reload(ix *zone.Index) {
 	a.mu.Lock()
 	a.steps = 0
 	onGrid := !a.offGrid && !a.live.Teleporting()
-	ix.Rebase(a, onGrid)
+	ix.Rebase(a, a.held, onGrid)
 	a.syncFlags()
 	if !onGrid {
 		a.mu.Unlock()

@@ -31,7 +31,9 @@ func TestReportDeathDropPvPZone(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &Character{ID: 1, CharLevel: 5, KarmaPoints: tt.karma, PKKills: tt.pks}
-			c.deathDrop = DeathDropRules{Karma: karma, Monster: monster, KarmaPKLimit: 5, GMDrops: true, Kept: []int32{57}}
+			setRules(c, func(r *Rules) {
+				r.DeathDrop = DeathDropRules{Karma: karma, Monster: monster, KarmaPKLimit: 5, GMDrops: true, Kept: []int32{57}}
+			})
 			c.SetInPvPZone(tt.inPvP)
 			rec := recordEvents(c)
 

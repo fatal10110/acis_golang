@@ -90,10 +90,7 @@ func (c *Character) pvpKill(victim *Character) bool {
 	if c.atWarOutsideAcademy(victim) {
 		return true
 	}
-	c.stateMu.RLock()
-	awardPKKillPVPPoint := c.awardPKKillPVPPoint
-	c.stateMu.RUnlock()
-	return victimKarma > 0 && awardPKKillPVPPoint
+	return victimKarma > 0 && c.rules().AwardPKKillPVPPoint
 }
 
 // reportSiegeKill reports c's death to pk, both in a PvP zone, as a siege

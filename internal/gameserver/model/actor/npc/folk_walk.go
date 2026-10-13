@@ -152,9 +152,8 @@ func (m *folkMotion) emit(ev event.Event) {
 // SyncPosition moves the NPC's world presence to position, a movement step.
 func (m *folkMotion) SyncPosition(position location.Location) {
 	if m.cfg.World != nil {
-		x, y, z := m.Folk.Position()
 		_ = m.cfg.World.Move(m.Folk, position.X, position.Y, position.Z)
-		m.zones.step(location.Location{X: x, Y: y, Z: z})
+		m.zones.step()
 	}
 }
 
@@ -243,8 +242,7 @@ func (m *folkMotion) TeleportTo(target location.Location) {
 	m.emit(event.Teleported{To: target})
 	// The NPC leaves the zones around its old position while its observers
 	// there still know it, and enters those at target once it has landed.
-	x, y, z := m.Folk.Position()
-	m.zones.leave(location.Location{X: x, Y: y, Z: z})
+	m.zones.leave()
 	m.move.SetPosition(target)
 	if m.cfg.World != nil {
 		_ = m.cfg.World.Teleport(m.Folk, target.X, target.Y, target.Z)

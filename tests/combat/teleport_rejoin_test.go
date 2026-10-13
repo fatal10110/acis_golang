@@ -3,16 +3,11 @@ package combat
 import (
 	"encoding/binary"
 	"fmt"
-	"sync"
 	"testing"
-	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -182,12 +177,13 @@ func opcodes(frames [][]byte) []string {
 	return out
 }
 
-// TestAppearingWaitsForAnOffQueueTeleport parks a teleport driven off the
-// player's queue, as a summon-friend cast drives it from the caster's, right
-// after its TeleportToLocation. An Appearing answered at once must not finish
-// the teleport early: its UserInfo only goes out after the teleport is done,
-// and carries the destination.
-func TestAppearingWaitsForAnOffQueueTeleport(t *testing.T) {
+// TestAppearingAfterAnOffQueueTeleportLandsAtTheDestination asks a
+// teleport from another goroutine, as a party recall asks it from its
+// caster's queue: the teleport runs on the player's own queue, so an
+// Appearing answered as soon as TeleportToLocation arrives finds it done.
+// Its UserInfo carries the destination, and the player is no longer
+// teleporting.
+func TestAppearingAfterAnOffQueueTeleportLandsAtTheDestination(t *testing.T) {
 	t.Parallel()
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Newbie", 5, 0),
@@ -203,9 +199,6 @@ func TestAppearingWaitsForAnOffQueueTeleport(t *testing.T) {
 	if !ok {
 		t.Fatalf("player %T is not an online character", obj)
 	}
-	parker := &teleportParker{id: 1 << 30, subject: objID, parked: make(chan struct{}), release: make(chan struct{})}
-	srv.State.Spawn(parker, playerOrigin.X+10, playerOrigin.Y, playerOrigin.Z, 0)
-	t.Cleanup(func() { srv.State.Despawn(parker) })
 	drainUntilQuiet(t, c)
 
 	destX := playerOrigin.X + 300
@@ -214,56 +207,15 @@ func TestAppearingWaitsForAnOffQueueTeleport(t *testing.T) {
 		defer close(done)
 		player.TeleportTo(destX, playerOrigin.Y, playerOrigin.Z, 0)
 	}()
-	select {
-	case <-parker.parked:
-	case <-time.After(5 * time.Second):
-		close(parker.release)
-		t.Fatal("teleport never broadcast TeleportToLocation to the parker")
-	}
+	<-done
 	readUntil(t, c, serverpackets.OpcodeTeleportToLocation, "TeleportToLocation")
 	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
-	for f := c.ReadWithTimeout(readQuietWindow); f != nil; f = c.ReadWithTimeout(readQuietWindow) {
-		if f[0] == serverpackets.OpcodeUserInfo {
-			close(parker.release)
-			t.Fatalf("UserInfo at (%d, ...) before the parked teleport finished", int32(binary.LittleEndian.Uint32(f[1:5])))
-		}
-	}
-	close(parker.release)
-	<-done
-
 	user := readUntil(t, c, serverpackets.OpcodeUserInfo, "Appearing UserInfo")[0]
 	if x := int32(binary.LittleEndian.Uint32(user[1:5])); x != int32(destX) {
 		t.Fatalf("UserInfo x = %d, want the destination %d", x, destX)
 	}
+	srv.Settle(t)
 	if player.Teleporting() {
 		t.Fatal("player still teleporting after Appearing")
 	}
-}
-
-// teleportParker is a world object that sees the player and blocks the
-// player's own TeleportToLocation broadcast until released.
-type teleportParker struct {
-	world.Presence
-	id, subject int32
-	parked      chan struct{}
-	release     chan struct{}
-	once        sync.Once
-}
-
-func (p *teleportParker) ObjectID() int32  { return p.id }
-func (p *teleportParker) Kind() actor.Kind { return actor.KindStatic }
-
-func (p *teleportParker) BroadcastFrame(f wire.Frame) bool {
-	b := f.Bytes()
-	if len(b) > wire.FrameHeaderSize {
-		b = b[wire.FrameHeaderSize:]
-	}
-	if len(b) >= 5 && b[0] == serverpackets.OpcodeTeleportToLocation && int32(binary.LittleEndian.Uint32(b[1:5])) == p.subject {
-		p.once.Do(func() {
-			close(p.parked)
-			<-p.release
-		})
-	}
-	f.Release()
-	return true
 }

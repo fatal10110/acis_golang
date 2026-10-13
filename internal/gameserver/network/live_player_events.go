@@ -201,7 +201,7 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.Stopped:
 		// Stopping a move revalidates the zones at once, before observers
 		// see the stop.
-		l.revalidateZones(live, live.CurrentLocation(), revalidateForce)
+		l.revalidateZones(live, revalidateStop)
 		x, y, z := live.Position()
 		l.broadcastLiveStopMove(live, location.Location{X: x, Y: y, Z: z}, live.CurrentHeading())
 	case event.AutoAttackStopped:
@@ -469,21 +469,23 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.SummonConfirmRequested:
 		live.SendFrame(serverpackets.FrameConfirmDlgSummonFriendRequest(e.CasterName, e.CasterID, int32(e.X), int32(e.Y), int32(e.Z), e.Timeout))
 	case event.TeleportRequested:
-		// A script or a summon-friend cast asks it from any queue.
-		l.teleportLivePlayerFrom(live, location.Location{X: e.X, Y: e.Y, Z: e.Z}, e.Radius, false)
+		at := location.Location{X: e.X, Y: e.Y, Z: e.Z}
+		radius := e.Radius
+		onOwnQueue(live, e.OwnQueue, func() { l.teleportLivePlayer(live, at, radius) })
 	case event.InstantTeleportRequested:
 		// A script asks it from any queue (a swap moves two players from
 		// an NPC hook): the jump runs on live's own queue.
 		j := e.Jump
 		postLive(live, func() { l.instantTeleportLivePlayer(live, j) })
 	case event.RecallRequested:
-		l.recallLivePlayer(live, e.Destination)
+		dest := e.Destination
+		onOwnQueue(live, e.OwnQueue, func() { l.recallLivePlayer(live, dest) })
 	case event.Relocated:
 		reason := revalidateStep
 		if e.Placed {
 			reason = revalidatePlaced
 		}
-		l.revalidateZones(live, e.Previous, reason)
+		l.revalidateZones(live, reason)
 	case event.AttackStanceRequested:
 		l.startLiveAutoAttack(live)
 	case event.Attacked:

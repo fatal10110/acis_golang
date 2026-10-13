@@ -141,8 +141,9 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 // properties files anew, failing as boot would on a file or value it cannot
 // read, and returns the player settings read from them.
 //
-// Only the player settings take the reloaded values. These keep their boot
-// value, read once into what the boot built from them:
+// Only the player settings take the reloaded values, the rules of the
+// characters and summons already in the world included. These keep their
+// boot value, read once into what the boot built from them:
 //   - the listener and login server addresses, the login registration
 //     (server id, hexid, status flags), the database and the client cipher;
 //   - the geodata and the town combat rule the zones were set up with,
@@ -155,10 +156,11 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 //   - the clan, siege, manor, Olympiad, hero, Seven Signs, festival,
 //     lottery, wedding, fishing championship, derby, scheme buffer,
 //     community board, petition and class master settings;
-//   - the NPC settings: AI, random walk rate, path fail count, raid
-//     multipliers, boss wait times, spawn multiplier and spawn events
-//     (//respawnall reads the spawn list with the boot multiplier), raid
-//     curse, NPC crest and free teleport;
+//   - the NPC settings: the NPCs' own MaxBuffsAmount, AI, random walk
+//     rate, path fail count, raid multipliers, boss wait times, spawn
+//     multiplier and spawn events (//respawnall reads the spawn list with
+//     the boot multiplier), raid curse (characters included), NPC crest
+//     and free teleport;
 //   - the merchant and augmentation settings, the chat settings, and the GM
 //     audit and item logs.
 func reloadPlayerConfig(paths gameServerPaths, data *gameData, log zerolog.Logger) (network.PlayerConfig, error) {

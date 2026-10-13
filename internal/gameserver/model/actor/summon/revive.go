@@ -108,6 +108,10 @@ func petRestoredExp(before, current int64, percent float64) int64 {
 func (a *Actor) revive() bool {
 	blessed := a.EffectList().IsAffected(effect.FlagPhoenixBlessing)
 	maxHP, maxMP := math.Floor(a.MaxHPValue()), math.Floor(a.MaxMPValue())
+	var restoreHP float64
+	if a.settings != nil {
+		restoreHP = a.settings.RespawnRestoreHP()
+	}
 	a.vitals.mu.Lock()
 	if !a.dead || a.decayed {
 		a.vitals.mu.Unlock()
@@ -118,7 +122,7 @@ func (a *Actor) revive() bool {
 	if blessed {
 		a.vitals.hp, a.vitals.mp = maxHP, maxMP
 	} else {
-		a.vitals.hp = min(maxHP*a.respawnRestoreHP, maxHP)
+		a.vitals.hp = min(maxHP*restoreHP, maxHP)
 	}
 	a.vitals.mu.Unlock()
 

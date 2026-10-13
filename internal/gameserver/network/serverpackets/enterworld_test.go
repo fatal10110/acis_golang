@@ -55,10 +55,10 @@ func TestFrameExStorageMaxCountFollowsConfigAndLimitStats(t *testing.T) {
 	} {
 		c := &player.Character{Race: tc.race}
 		c.SetName("S")
-		c.Configure(player.Runtime{Rules: player.Rules{
+		c.Configure(player.Runtime{Rules: player.NewRuleBook(player.Rules{
 			InventorySlots: player.InventorySlots{NoDwarf: 90, Dwarf: 117, Configured: true},
 			StorageSlots:   slots,
-		}})
+		})})
 		c.AddStatFuncs(mods)
 		got := framePayload(t, FrameExStorageMaxCount(c))
 		want := appendH([]byte{OpcodeExtended}, OpcodeExStorageMaxCount)

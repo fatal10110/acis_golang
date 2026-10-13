@@ -241,7 +241,7 @@ func applyPdamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, resul
 
 // mdamHandler resolves MDAM/DEATHLINK; magicFailures is the server's
 // MagicFailures switch.
-type mdamHandler struct{ magicFailures bool }
+type mdamHandler struct{ magicFailures *magicFailureSwitch }
 
 func (mdamHandler) Types() []string { return []string{"MDAM", "DEATHLINK"} }
 
@@ -254,12 +254,13 @@ func (h mdamHandler) UseResult(cast Cast) Result {
 	if alikeDead(cast.Caster) {
 		return result
 	}
+	failures := h.magicFailures.enabled()
 	for _, obj := range cast.Targets {
 		target, ok := asDamageTarget(obj)
 		if !ok || target.Dead() {
 			continue
 		}
-		in, ok := target.MagicDamageInput(cast.Caster, cast.Skill, h.magicFailures)
+		in, ok := target.MagicDamageInput(cast.Caster, cast.Skill, failures)
 		if !ok {
 			continue
 		}
@@ -321,7 +322,7 @@ func applyMdamEffects(cast Cast, obj Actor, bss bool, shield formulas.ShieldDefe
 
 // drainHandler resolves DRAIN: magic damage whose caster regains part of
 // the HP it drains. magicFailures is the server's MagicFailures switch.
-type drainHandler struct{ magicFailures bool }
+type drainHandler struct{ magicFailures *magicFailureSwitch }
 
 func (drainHandler) Types() []string { return []string{"DRAIN"} }
 
@@ -344,6 +345,7 @@ func (h drainHandler) UseResult(cast Cast) Result {
 		return result
 	}
 	corpseMob := cast.Skill.Target == modelskill.TargetCorpseMob
+	failures := h.magicFailures.enabled()
 	for _, obj := range cast.Targets {
 		target, ok := asDamageTarget(obj)
 		if !ok || (alikeDead(target) && !corpseMob) {
@@ -353,7 +355,7 @@ func (h drainHandler) UseResult(cast Cast) Result {
 		if !sameObject(cast.Caster, target) && target.Invul() {
 			continue
 		}
-		in, ok := target.MagicDamageInput(cast.Caster, cast.Skill, h.magicFailures)
+		in, ok := target.MagicDamageInput(cast.Caster, cast.Skill, failures)
 		if !ok {
 			continue
 		}

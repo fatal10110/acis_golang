@@ -49,11 +49,9 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 	}
 	pk := actingCharacter(killer)
 
-	c.stateMu.RLock()
-	allow := c.allowDelevel
-	c.stateMu.RUnlock()
+	rules := c.rules()
 	lucky := c.HasSkill(int(skill.LuckySkillID))
-	loss := c.deathLossTerms(pk != nil, c.clanWarDeath(pk))
+	loss := c.deathLossTerms(rules, pk != nil, c.clanWarDeath(pk))
 
 	var hooks progressionHooks
 	defer func() { hooks.run() }()
@@ -63,7 +61,7 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 	if pk != nil && pk.CursedWeaponEquipped() {
 		return
 	}
-	if loss.table == nil || !allow || (lucky && c.CharLevel <= 9) {
+	if loss.table == nil || !rules.AllowDelevel || (lucky && c.CharLevel <= 9) {
 		return
 	}
 	c.applyDeathPenaltyLocked(loss, &hooks)
@@ -74,7 +72,7 @@ func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 // that, and a personal surrender the member. The delevel gate does not apply; the PvP-zone exemptions do, as
 // for a death no playable caused.
 func (c *Character) ApplyDeathPenalty() {
-	loss := c.deathLossTerms(false, false)
+	loss := c.deathLossTerms(c.rules(), false, false)
 	if loss.table == nil {
 		return
 	}
@@ -94,12 +92,12 @@ type deathLoss struct {
 	exempt, useCharm bool
 }
 
-// deathLossTerms reads the level table, the karma rate and the zone and
-// effect state a death's experience loss depends on; atWar reports a death
-// between clans at war, which costs a quarter of the normal loss.
-func (c *Character) deathLossTerms(killedByPlayable, atWar bool) deathLoss {
+// deathLossTerms reads the level table, the karma rate of rules and the
+// zone and effect state a death's experience loss depends on; atWar reports
+// a death between clans at war, which costs a quarter of the normal loss.
+func (c *Character) deathLossTerms(rules *Rules, killedByPlayable, atWar bool) deathLoss {
 	c.stateMu.RLock()
-	loss := deathLoss{table: c.levelTable, rate: c.rateKarmaExpLost}
+	loss := deathLoss{table: c.levelTable, rate: rules.RateKarmaExpLost}
 	c.stateMu.RUnlock()
 	loss.reducedLoss = c.FestivalParticipant() || atWar || c.InSiegeZone()
 	loss.exempt, loss.useCharm = deathLossExemption(c.InPvPZone(), c.InSiegeZone(),

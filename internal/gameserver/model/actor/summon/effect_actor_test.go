@@ -23,7 +23,7 @@ func TestSummonMaxBuffCountIncludesTemplateDivineInspiration(t *testing.T) {
 }
 
 func TestSummonMaxBuffCountUsesConfiguredBase(t *testing.T) {
-	servitor := mustServitor(t, ServitorConfig{ObjectID: 1, MaxBuffsAmount: 2})
+	servitor := mustServitor(t, ServitorConfig{ObjectID: 1, Settings: fixedSettings{maxBuffs: 2}})
 
 	if got := servitor.MaxBuffCount(); got != 2 {
 		t.Fatalf("MaxBuffCount() = %d, want 2", got)
@@ -326,3 +326,12 @@ func TestPetEffectListHoldsAppliedEffects(t *testing.T) {
 }
 
 func (*fakePlayerEffector) Kind() actor.Kind { return actor.KindPlayer }
+
+// fixedSettings answers fixed summon settings.
+type fixedSettings struct {
+	maxBuffs  int
+	restoreHP float64
+}
+
+func (s fixedSettings) MaxBuffsAmount() int       { return s.maxBuffs }
+func (s fixedSettings) RespawnRestoreHP() float64 { return s.restoreHP }

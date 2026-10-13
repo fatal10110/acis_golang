@@ -692,7 +692,6 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 	// logout) is dropped, and every surviving one gets SharedReuseGroup from
 	// its item's etc-item data.
 	shortcuts = l.restoreItemShortcuts(c, shortcuts)
-	settings := l.playerConfig()
 	rt := player.Runtime{
 		World:  l.world,
 		Social: socialGraph{parties: l.parties, clans: l.clans},
@@ -710,20 +709,7 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		Skills: l.skills,
 		Levels: l.levels,
 		Log:    l.log,
-		Rules: player.Rules{
-			RateKarmaExpLost:       settings.RateKarmaExpLost,
-			RespawnRestoreHP:       settings.RespawnRestoreHP,
-			WeightLimitMultiplier:  settings.WeightLimitMultiplier,
-			InventorySlots:         settings.InventorySlots,
-			StorageSlots:           settings.StorageSlots,
-			PerfectShieldBlockRate: settings.PerfectShieldBlockRate,
-			MaxBuffsAmount:         settings.MaxBuffsAmount,
-			DeathPenaltyChance:     settings.DeathPenaltyChance,
-			AllowDelevel:           settings.AllowDelevel,
-			RaidCursesDisabled:     l.disableRaidCurse,
-			AwardPKKillPVPPoint:    settings.AwardPKKillPVPPoint,
-			DeathDrop:              settings.DeathDrop,
-		},
+		Rules:  l.playerRules,
 	}
 	if l.scripts != nil {
 		// A script invocation that wrote the player holds its departure

@@ -5,7 +5,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -128,8 +127,7 @@ func (f *Folk) DecayWithRespawn(worldState *world.State, respawnFor func(id int3
 	f.raiseDecayed()
 
 	// The NPC leaves its zones while its observers still know it.
-	x, y, z := f.Position()
-	f.zones.leave(location.Location{X: x, Y: y, Z: z})
+	f.zones.leave()
 	if worldState != nil {
 		worldState.Despawn(f)
 	}

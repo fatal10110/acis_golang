@@ -375,6 +375,22 @@ func postLive(live *livePlayer, fn func()) bool {
 	return live.Queue().Post(fn)
 }
 
+// onOwnQueue runs fn for live at once when the caller already runs on live's
+// queue (owned), else posts it there: a party recall or a script hook asks
+// a teleport from another queue, and the teleport touches state only live's
+// queue owns. A posted fn is dropped once live has begun leaving the world.
+func onOwnQueue(live *livePlayer, owned bool, fn func()) {
+	if owned {
+		fn()
+		return
+	}
+	postLive(live, func() {
+		if !live.detached() {
+			fn()
+		}
+	})
+}
+
 // onLive runs fn on live's queue, or on the calling goroutine when live is
 // nil; see onQueue. It reports whether fn returned normally and records a
 // failure on live, so the dispatch loop drops the session even at the call
