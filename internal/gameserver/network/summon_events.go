@@ -483,9 +483,10 @@ func (l *GameClientLink) settleLeftCorpseItems(actor *summon.Actor) {
 		l.flushItemPersistence(petInv)
 	}, func() {
 		// The pet's container stops persisting first, so the items leave
-		// it carrying no writer; the owner's rows are written below. Its
-		// last write is queued only once they left, so it cannot read, and
-		// on failure abandon, items the carried write still has to land.
+		// it carrying no writer; the owner's rows are written below. The
+		// pet container's own last write is queued only after they left:
+		// one that read them would, on failure, abandon items the carried
+		// write still has to land.
 		petInv.ReleasePersistence()
 		carried := itemcontainer.NewPlayerInventory(ownerID, petInv.Templates())
 		for _, inst := range petInv.Items() {
