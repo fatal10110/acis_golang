@@ -240,6 +240,7 @@ func TestDamageOverTimeEffectTargetsHostile(t *testing.T) {
 func TestDamageOverTimeEffectRecordsFlatHateFromAttackDesire(t *testing.T) {
 	h := newCombatHostile(t, 1, &Template{HPMax: 100, MPMax: 50})
 	caster := newCombatHostile(t, 2, &Template{HPMax: 100, MPMax: 50})
+	spawnPartyWorld(t, h, caster)
 	e, err := effect.New(effect.Skill{ID: 1}, skill.EffectTemplate{Name: "DamOverTime", Value: 4})
 	if err != nil {
 		t.Fatalf("effect.New() error: %v", err)
@@ -356,6 +357,7 @@ func TestSubOneDOTTickContributesZeroHate(t *testing.T) {
 func TestDamageOverTimeEffectQueuesAttackDesire(t *testing.T) {
 	h := newCombatHostile(t, 1, &Template{HPMax: 100, MPMax: 50})
 	caster := newCombatHostile(t, 2, &Template{HPMax: 100, MPMax: 50})
+	spawnPartyWorld(t, h, caster)
 	e, err := effect.New(effect.Skill{ID: 1}, skill.EffectTemplate{Name: "DamOverTime", Value: 4})
 	if err != nil {
 		t.Fatalf("effect.New() error: %v", err)

@@ -24,13 +24,15 @@ func (a *fakeActor) PickUp(itemObjectID int32) bool {
 	return true
 }
 
-// walkingMove is a recordingMove that records each walk to a point.
+// walkingMove is a recordingMove that records each straight walk to a
+// point, the pick-up's walk with path-finding off; a routed walk is not
+// recorded.
 type walkingMove struct {
 	recordingMove
 	walks []location.Location
 }
 
-func (m *walkingMove) MoveToLocation(at location.Location) (bool, error) {
+func (m *walkingMove) MoveStraightToLocation(at location.Location) (bool, error) {
 	m.walks = append(m.walks, at)
 	return true, nil
 }

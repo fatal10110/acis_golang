@@ -171,6 +171,7 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 	}
 	f.effects = effect.NewList(f, effect.WithEnv(rt.Effects), effect.WithAdmission(folkAdmits))
 	f.effects.SetQueue(rt.Queue)
+	f.keepTerritory()
 	return nil
 }
 

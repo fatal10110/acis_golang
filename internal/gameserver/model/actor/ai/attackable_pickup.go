@@ -27,7 +27,9 @@ func (a *Attackable) AddPickUpDesire(itemObjectID int32, weight float64) {
 // it can no longer pick up, does nothing. One not yet within PickUpRange
 // walks to the item, unless it cannot move. Within range it picks the item
 // up (the picked-item turn runs with mu released), then drops the desire of
-// its current intention as it stands after that turn.
+// its current intention as it stands after that turn. The walk heads
+// straight for the item with path-finding off: a wall on the line stops it
+// blocked short of the item.
 func (a *Attackable) thinkPickUp() {
 	if a.actor.DenyAIAction() {
 		return
@@ -40,7 +42,7 @@ func (a *Attackable) thinkPickUp() {
 	x, y, z := a.actor.Position()
 	if (location.Location{X: x, Y: y, Z: z}).Distance3D(at) >= PickUpRange {
 		if !a.actor.MovementDisabled() {
-			_, _ = a.move.MoveToLocation(at)
+			_, _ = a.move.MoveStraightToLocation(at)
 		}
 		return
 	}

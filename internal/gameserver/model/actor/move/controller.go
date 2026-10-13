@@ -596,6 +596,22 @@ func (c *Controller) MoveToLocation(target location.Location) (bool, error) {
 	return true, nil
 }
 
+// MoveStraightToLocation starts a walk straight for target with
+// path-finding off and reports whether it was accepted: a closed line on
+// the way is not routed around, and ends the walk blocked where it meets
+// it. It counts no geo-path outcome, as no route is searched.
+func (c *Controller) MoveStraightToLocation(target location.Location) (bool, error) {
+	before := c.move.catchUpCount()
+	ev, err := c.move.MoveStraightToLocation(target)
+	c.syncRetarget(before)
+	if err != nil {
+		return false, nil
+	}
+	c.broadcastMoveStart(ev)
+	c.addPositionUpdate()
+	return true, nil
+}
+
 // MoveToPawn starts a pawn walk toward target and broadcasts it as an
 // approach that stops offset short of target, the same movement request a
 // player's attack approach sends. The walk itself tracks target: it re-aims

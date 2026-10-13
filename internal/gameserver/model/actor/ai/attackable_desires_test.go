@@ -124,7 +124,6 @@ func TestAddCastDesireNeedsTargetAndCaster(t *testing.T) {
 func TestAddAttackDesireDamageRecordsDamageAndHate(t *testing.T) {
 	owner := actor(1)
 	attacker := actor(2)
-	owner.known[attacker.ObjectID()] = false
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 
 	brain.AddAttackDesireDamage(attacker, 1, 200)

@@ -99,16 +99,6 @@ func (q *DesireQueue) Remove(kind Intention, target attackable.Combatant) {
 	})
 }
 
-// RemoveFinalTarget drops every queued Desire aimed at target.
-func (q *DesireQueue) RemoveFinalTarget(target attackable.Combatant) {
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
-	q.removeLocked(func(d *Desire) bool {
-		return sameCombatant(d.FinalTarget, target)
-	})
-}
-
 // RemoveKind drops every queued Desire of kind.
 func (q *DesireQueue) RemoveKind(kind Intention) {
 	q.mu.Lock()
