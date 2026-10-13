@@ -120,6 +120,16 @@ func TestCompletedNPCCastDropsItsCastDesire(t *testing.T) {
 	srv, hostile := bootNPCDesireCaster(t)
 	c := srv.Client
 
+	// One periodic cycle first: before it, the cast end's selection has no
+	// empty-queue idle and the finished cast stays the intention.
+	onNPCQueue(t, hostile, func() {
+		if err := hostile.TickThink(); err != nil {
+			t.Errorf("TickThink() error: %v", err)
+		}
+	})
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
+		t.Fatalf("CurrentIntention() after the first cycle = %v, want %v", got, ai.IntentionIdle)
+	}
 	thinkOnNPCQueue(t, hostile)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "NPC MagicSkillUse")
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionCast {
