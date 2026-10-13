@@ -36,12 +36,14 @@ type Participant struct {
 	BaseClass int
 }
 
-// Standing is a competitor's state when its match is judged. Dead, HP and
-// CP are the competitor's own, also while it is offline.
+// Standing is a competitor's state in its match. Dead, HP and CP are the
+// competitor's own, also while it is offline; GameID is the stadium it
+// competes in, -1 for none.
 type Standing struct {
 	Online bool
 	Dead   bool
 	HP, CP float64
+	GameID int
 }
 
 // ResultKind is one message the judging of a match sends.
@@ -115,22 +117,22 @@ func (o *Olympiad) NonClassedGame(stadium int, queue *[]int32, roster Roster, rn
 }
 
 // ClassedGame draws two online competitors from one of ready, the class
-// queues holding enough registrations, into a classed match in stadium, or
-// returns nil when none of them still holds two. It picks the queue at
-// random and drops it from ready when no pair can be drawn from it; drawing
-// takes the competitors off that queue as NonClassedGame does.
-func (o *Olympiad) ClassedGame(stadium int, ready *[]*[]int32, roster Roster, rnd func(n int) int) *Game {
-	for len(*ready) > 0 {
-		i := rnd(len(*ready))
-		queue := (*ready)[i]
-		if queue != nil && len(*queue) >= 2 {
-			if players, ok := drawPair(queue, roster, rnd); ok {
-				return o.newGame(stadium, Classed, players)
-			}
-		}
-		*ready = append((*ready)[:i], (*ready)[i+1:]...)
+// queues holding enough registrations when the round of draws began, into a
+// classed match in stadium. It picks the queue at random; drawing takes the
+// competitors off it as NonClassedGame does. It returns nil when ready is
+// empty, and nil with stop set when the queue it picked no longer gives a
+// pair: that ends the round of draws, with ready left as it was.
+func (o *Olympiad) ClassedGame(stadium int, ready []*[]int32, roster Roster, rnd func(n int) int) (g *Game, stop bool) {
+	if len(ready) == 0 {
+		return nil, false
 	}
-	return nil
+	queue := ready[rnd(len(ready))]
+	if queue != nil && len(*queue) >= 2 {
+		if players, ok := drawPair(queue, roster, rnd); ok {
+			return o.newGame(stadium, Classed, players), false
+		}
+	}
+	return nil, true
 }
 
 func (o *Olympiad) newGame(stadium int, kind GameType, players [2]Participant) *Game {
@@ -221,6 +223,20 @@ func (g *Game) Defect(objectID int32) {
 	if i := g.sideOf(objectID); i >= 0 {
 		g.defecting[i] = true
 	}
+}
+
+// flags returns whether side i left the match and whether it defected.
+func (g *Game) flags(i int) (disconnected, defecting bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.disconnected[i], g.defecting[i]
+}
+
+// defected reports whether either competitor defected.
+func (g *Game) defected() bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.defecting[0] || g.defecting[1]
 }
 
 // Start records the moment the fight begins.

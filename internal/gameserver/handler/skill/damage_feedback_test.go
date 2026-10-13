@@ -376,14 +376,14 @@ func TestMdamReportsDamageBeforeEachTargetsResist(t *testing.T) {
 		t.Fatalf("messages = %#v, want damage, resist, damage", result.Messages)
 	}
 	first, ok := result.Messages[0].(Damage)
-	if !ok || first != (Damage{RecipientID: 1, Source: DamageByPlayer, Amount: int32(5000 - resister.hp), MagicCrit: true}) {
+	if !ok || first != (Damage{RecipientID: 1, TargetID: 2, Source: DamageByPlayer, Amount: int32(5000 - resister.hp), MagicCrit: true}) {
 		t.Fatalf("first message = %#v, want A's critical damage", result.Messages[0])
 	}
 	if r, ok := result.Messages[1].(Resisted); !ok || r.TargetName != "A" {
 		t.Fatalf("second message = %#v, want A's resist", result.Messages[1])
 	}
 	second, ok := result.Messages[2].(Damage)
-	if !ok || second != (Damage{RecipientID: 1, Source: DamageByPlayer, Amount: int32(5000 - hit.hp)}) {
+	if !ok || second != (Damage{RecipientID: 1, TargetID: 3, Source: DamageByPlayer, Amount: int32(5000 - hit.hp)}) {
 		t.Fatalf("third message = %#v, want B's damage", result.Messages[2])
 	}
 }
@@ -411,7 +411,7 @@ func TestPhysicalSkillsReportDamageAfterTheHit(t *testing.T) {
 				Targets: []Actor{target},
 			})
 			got := damageMessages(t, result.Messages)
-			want := Damage{RecipientID: 1, Source: DamageByPlayer, Amount: int32(5000 - target.hp), PhysicalCrit: tc.pcrit}
+			want := Damage{RecipientID: 1, TargetID: 2, Source: DamageByPlayer, Amount: int32(5000 - target.hp), PhysicalCrit: tc.pcrit}
 			if len(got) != 1 || got[0] != want || want.Amount <= 0 {
 				t.Fatalf("damage messages = %#v, want %#v", got, want)
 			}
@@ -449,7 +449,7 @@ func TestCounteredSkillReportsCounterDamageToTheDefender(t *testing.T) {
 			if _, ok := result.Messages[0].(Counterattack); !ok {
 				t.Fatalf("first message = %T, want Counterattack", result.Messages[0])
 			}
-			want := Damage{RecipientID: 2, Source: DamageByPlayer, Amount: int32(5000 - caster.hp), PhysicalCrit: tc.pcrit}
+			want := Damage{RecipientID: 2, TargetID: 1, Source: DamageByPlayer, Amount: int32(5000 - caster.hp), PhysicalCrit: tc.pcrit}
 			if got, ok := result.Messages[1].(Damage); !ok || got != want || want.Amount <= 0 || defender.hp != 5000 {
 				t.Fatalf("second message = %#v, want %#v with the defender untouched", result.Messages[1], want)
 			}
@@ -498,6 +498,7 @@ func TestSkillDamageFeedbackRecipientAndBlockedTarget(t *testing.T) {
 			got := damageMessages(t, result.Messages)
 			for i := range tc.want {
 				tc.want[i].Amount = int32(5000 - target.hp)
+				tc.want[i].TargetID = tc.targetID
 			}
 			if len(got) != len(tc.want) {
 				t.Fatalf("damage messages = %#v, want %#v", got, tc.want)

@@ -24,6 +24,19 @@ func WithOlympiadSeed(seed func(db *sql.DB)) Option {
 	return func(o *options) { o.seedOlympiad = seed }
 }
 
+// WithOlympiadConfig adjusts the Olympiad configuration the server boots
+// with, after WithOlympiadCompetition or WithOlympiadValidation placed its
+// window.
+func WithOlympiadConfig(adjust func(*olympiad.Config)) Option {
+	return func(o *options) { o.olympiadConfig = adjust }
+}
+
+// WithOlympiadDraw supplies the dice, in [0,n), of the Olympiad's draws
+// and of the spot its competitors return to.
+func WithOlympiadDraw(roll func(n int) int) Option {
+	return func(o *options) { o.olympiadDraw = roll }
+}
+
 // SetPlayerOlympiadMode puts the online player objID into an Olympiad
 // match on side 1 of stadium 0, or takes it out, the precondition of the
 // Olympiad gates no packet reaches until the matches run.

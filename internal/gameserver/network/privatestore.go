@@ -83,12 +83,11 @@ func (l *GameClientLink) canOpenPrivateStore(live *livePlayer, cancelTrade bool)
 }
 
 // storeOpenState reads what the store set-up checks need from live. A duel
-// counts as fighting. No Olympiad (#216) is modeled yet, so it never
-// refuses.
+// counts as fighting; an Olympiad competitor stands where no store opens.
 func (l *GameClientLink) storeOpenState(live *livePlayer) privatestore.OpenState {
 	attacking := live.attack != nil && live.attack.AttackingNow()
 	requesting := l.trades != nil && l.trades.ProcessingRequest(live.ObjectID())
-	noStore := live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagNoStore)
+	noStore := (live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagNoStore)) || live.OlympiadMode()
 	return privatestore.OpenState{
 		Operate:     live.OperateType(),
 		AlikeDead:   live.AlikeDead(),
@@ -207,7 +206,7 @@ func (l *GameClientLink) sendRecipeShopManageList(live *livePlayer, dwarven bool
 // but a manage window only opens after the set-up checks refused a casting
 // player, so no cast is ever in flight here.
 func (l *GameClientLink) storeHidden(live *livePlayer) func(objectID int32) bool {
-	scroll := l.enchantStateStore().Active(live.ObjectID())
+	scroll := l.enchanting.scrolls.Active(live.ObjectID())
 	return func(objectID int32) bool {
 		return objectID == scroll || (objectID != live.MountObjectID() && live.ControlItemInUse(objectID))
 	}
@@ -215,7 +214,7 @@ func (l *GameClientLink) storeHidden(live *livePlayer) func(objectID int32) bool
 
 // storeTrader is live as one side of a store deal.
 func (l *GameClientLink) storeTrader(live *livePlayer) privatestore.Trader {
-	scroll := l.enchantStateStore().Active(live.ObjectID())
+	scroll := l.enchanting.scrolls.Active(live.ObjectID())
 	return privatestore.Trader{
 		Inv: live.Inventory(),
 		Bound: func(objectID int32) bool {

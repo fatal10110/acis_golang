@@ -1048,6 +1048,7 @@ func (l *GameClientLink) sendSkillHandlerResultVia(send frameSender, live *liveP
 		case skillhandler.Damage:
 			if recipient, online := l.livePlayerByID(m.RecipientID); online {
 				sendDamageMessageVia(send, recipient, m)
+				l.notifyCompetitorDamage(recipient, m.TargetID, int(m.Amount))
 			}
 		case skillhandler.DamageReceived:
 			if target, online := l.livePlayerByID(m.TargetID); online {

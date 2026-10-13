@@ -36,6 +36,13 @@ type SocialGraph interface {
 	ClanLevel(clanID int32) int
 }
 
+// olympiadMember is the Olympiad standing of the player acting through
+// another playable.
+type olympiadMember interface {
+	OlympiadMode() bool
+	OlympiadGameID() int
+}
+
 // socialPeer is the player state the social rules read from the player
 // acting through another playable.
 type socialPeer interface {
@@ -174,13 +181,12 @@ func (c *Character) CanCastOnPlayable(t target.Actor, skill *modelskill.Definiti
 // fight freely unless they share a party or command channel; otherwise a
 // shared party, command channel, clan or alliance needs force.
 //
-// Two duellists fighting each other need no force whatever else they
-// share.
+// Two competitors fighting each other in the same Olympiad match, or two
+// duellists fighting each other, need no force whatever else they share.
 //
-// The Olympiad match (#216) and siege side (#3375) rules are not applied
-// yet.
+// The siege side rule (#3375) is not applied yet.
 func (c *Character) SocialWithoutForce(self attackable.ArenaMember, attacker target.Actor) (allowed, decided bool) {
-	if c.inSameActiveDuel(attacker) {
+	if c.inSameActiveOlympiadMatch(attacker) || c.inSameActiveDuel(attacker) {
 		return true, true
 	}
 	sameParty := c.IsInSameParty(attacker)
@@ -200,16 +206,16 @@ func (c *Character) SocialWithoutForce(self attackable.ArenaMember, attacker tar
 // on a party, command channel, clan or alliance mate, or on an unflagged
 // player not at war, only then.
 //
-// A duellist may cast anything offensive on the player it fights.
+// A competitor may cast anything offensive on the player it fights in the
+// same Olympiad match, and a duellist on the player it duels.
 //
-// The Olympiad match (#216) and siege side (#3375) rules are not applied
-// yet.
+// The siege side rule (#3375) is not applied yet.
 func (c *Character) OffensiveCastAllowed(caster attackable.ArenaMember, t target.Actor, skill *modelskill.Definition, ctrl, mainTarget bool) bool {
 	targetPlayer, ok := socialPeerOf(t)
 	if !ok || targetPlayer.ObjectID() == c.ID {
 		return false
 	}
-	if c.inSameActiveDuel(t) {
+	if c.inSameActiveOlympiadMatch(t) || c.inSameActiveDuel(t) {
 		return true
 	}
 	sameParty := c.IsInSameParty(t)
@@ -252,10 +258,9 @@ func (c *Character) OffensiveCastAllowed(caster attackable.ArenaMember, t target
 // playable: c itself always; inside a PvP zone the target's player may be
 // helped from one, or from a peace zone with CTRL; a party, command
 // channel, clan or alliance mate always; any other flagged or karma player
-// only with CTRL. Outside a PvP zone, a player in the same duel as c is
-// helped like a party mate.
-//
-// Olympiad matches (#216) are not modeled, so their rule never applies.
+// only with CTRL. Outside a PvP zone, a competitor of c's Olympiad match,
+// started or not, and a player in the same duel as c are helped like a
+// party mate.
 func (c *Character) beneficialCastAllowed(t target.Actor, ctrl bool) bool {
 	if t.Kind() == actor.KindPlayer && t.ObjectID() == c.ID {
 		return true
@@ -271,6 +276,9 @@ func (c *Character) beneficialCastAllowed(t target.Actor, ctrl bool) bool {
 		if c.InPeaceZone() {
 			return ctrl
 		}
+	}
+	if other, ok := targetPlayer.(olympiadMember); ok && c.OlympiadMode() && other.OlympiadMode() && other.OlympiadGameID() == c.OlympiadGameID() {
+		return true
 	}
 	if other, ok := targetPlayer.(duel.Standing); ok && c.InDuel() && other.DuelID() == c.DuelID() {
 		return true

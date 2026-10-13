@@ -240,6 +240,7 @@ type ServitorDamageShared struct {
 // for hits delivered outside a cast's own handler result. Blocked marks an
 // invulnerable target and Petrified one that is also paralyzed.
 type SkillDamageDealt struct {
+	TargetID  int32
 	Amount    int
 	MagicCrit bool
 	Blocked   bool

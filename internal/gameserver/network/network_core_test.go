@@ -68,9 +68,6 @@ func TestGameClientLinkCipherDisabledKeepsAuthFailureCleartext(t *testing.T) {
 		log:       zerolog.Nop(),
 		noCipher:  true,
 		loginLink: func() *LoginLink { return nil },
-		newCipherKey: func() ([]byte, error) {
-			return bytes.Repeat([]byte{0xcc}, gamecipher.KeySize), nil
-		},
 	}
 	done := make(chan struct{})
 	go func() {

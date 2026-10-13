@@ -123,7 +123,7 @@ func (l *GameClientLink) itemHolder(live *livePlayer) invops.Holder {
 			return objectID != mount && live.ControlItemInUse(objectID)
 		},
 		MountCollar:   mount,
-		EnchantScroll: l.enchantStateStore().Active(live.ObjectID()),
+		EnchantScroll: l.enchanting.scrolls.Active(live.ObjectID()),
 		Casting:       live.Character.CastingNow(),
 	}
 	if live.cast != nil {

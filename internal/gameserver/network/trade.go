@@ -28,7 +28,7 @@ const tradeChaoticRefusal = "You cannot trade in a chaotic state."
 // Each call reads them as they stand then.
 func (l *GameClientLink) boundItems(live *livePlayer) tradebook.BoundItems {
 	return func(objectID int32) bool {
-		return live.ControlItemInUse(objectID) || objectID == l.enchantStateStore().Active(live.ObjectID()) ||
+		return live.ControlItemInUse(objectID) || objectID == l.enchanting.scrolls.Active(live.ObjectID()) ||
 			l.cursedItem(live.Inventory(), objectID)
 	}
 }

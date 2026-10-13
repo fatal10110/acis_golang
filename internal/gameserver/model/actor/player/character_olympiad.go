@@ -44,3 +44,11 @@ func (c *Character) OlympiadSide() int { return int(c.olympiad.side.Load()) - 1 
 // SetOlympiadSide records the side the character competes on; -1 clears
 // it.
 func (c *Character) SetOlympiadSide(side int) { c.olympiad.side.Store(int32(side + 1)) }
+
+// ClearOlympiadDeath lifts c's dead mark without a revive, as the end of an
+// Olympiad fight does for a competitor left dead in it.
+func (c *Character) ClearOlympiadDeath() {
+	c.vitalsMu.Lock()
+	c.dead.Store(false)
+	c.vitalsMu.Unlock()
+}

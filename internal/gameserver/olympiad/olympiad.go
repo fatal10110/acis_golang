@@ -13,11 +13,10 @@
 //
 // The waiting lists nobles register on during a competition window, and
 // the trade of a cycle's points for Noblesse Gate Passes, are in
-// registration.go. The rules of a match between two nobles are in game.go.
-// Nothing runs the matches yet: the competition window starts no game
-// manager (#3340). The
-// end of an Olympiad elects the heroes, behind the save of the records
-// they are elected from.
+// registration.go. The rules of a match between two nobles are in game.go;
+// the stadiums that run the matches, in stadium.go, are filled by the draws
+// of games.go while a competition window is open. The end of an Olympiad
+// elects the heroes, behind the save of the records they are elected from.
 package olympiad
 
 import (
@@ -76,6 +75,19 @@ type Config struct {
 	// GPPerPoint is how many Noblesse Gate Passes one point trades for, and
 	// HeroPoints the points a hero trades on top of its own.
 	GPPerPoint, HeroPoints int
+	// BattleMillis is how long a match's fight may last.
+	BattleMillis int64
+	// WaitTime, WaitBattle and WaitEnd are the seconds counted down before
+	// a match's competitors enter the stadium, before they may fight, and
+	// before they are sent back.
+	WaitTime, WaitBattle, WaitEnd int
+	// ClassedParticipants and NonClassedParticipants are how many
+	// registrations a class queue and the non-classed list need for a draw
+	// to take matches from them.
+	ClassedParticipants, NonClassedParticipants int
+	// AnnounceGames has the Grand Olympiad Managers shout each match as its
+	// competitors enter the stadium.
+	AnnounceGames bool
 }
 
 // Reward is a stack of items a match's winner is given.
@@ -89,7 +101,10 @@ type Reward struct {
 // moving at most 10 points, a third of the lower total in classed matches
 // and a fifth in non-classed ones, their winners given 50 and 30 Noblesse
 // Gate Passes; records starting with 18 points, rankings counting nobles
-// with 5 matches, and 1000 passes a point with 300 more points for a hero.
+// with 5 matches, and 1000 passes a point with 300 more points for a hero;
+// fights of three minutes, after 30 seconds to enter the stadium and 60 to
+// start, then 40 to be sent back; draws needing 5 registrations of a class
+// or 9 non-classed ones, and the managers shouting each match.
 func DefaultConfig() Config {
 	return Config{
 		StartHour: 18, CompetitionMillis: 21600000, WeeklyPoints: 3,
@@ -97,6 +112,8 @@ func DefaultConfig() Config {
 		ClassedReward:    []Reward{{ItemID: 6651, Count: 50}},
 		NonClassedReward: []Reward{{ItemID: 6651, Count: 30}},
 		StartPoints:      18, MinMatches: 5, GPPerPoint: 1000, HeroPoints: 300,
+		BattleMillis: 180000, WaitTime: 30, WaitBattle: 60, WaitEnd: 40,
+		ClassedParticipants: 5, NonClassedParticipants: 9, AnnounceGames: true,
 	}
 }
 
@@ -199,6 +216,10 @@ type Olympiad struct {
 	// stays open; negative when it is not counting down.
 	registrationEnd int64
 
+	// games is the game manager BindStadiums sets before Start; nil runs
+	// no match.
+	games *games
+
 	// order keeps the records' writes in the order the records changed: it
 	// is held from a change to the records, or the copy of them a write
 	// takes, until that write is queued.
@@ -277,6 +298,10 @@ func (o *Olympiad) Stop(ctx context.Context) {
 	if o.timer != nil {
 		o.timer.Stop()
 		o.timer = nil
+	}
+	o.stopGames()
+	if o.games != nil {
+		o.games.close()
 	}
 	o.saveStatus()
 	if o.writes == nil {
@@ -418,27 +443,29 @@ func (o *Olympiad) enterPeriod() {
 		return
 	}
 	o.registrationEnd = -1
+	o.stopGames()
 	if end <= o.queue.Now().UnixMilli() {
 		o.startCycle()
 		o.openCompetition()
 	}
 }
 
-// openCompetition announces the competition window and starts the
-// countdown to its registration's close, ten minutes before it ends. The
-// matches are not run yet (#3340).
+// openCompetition announces the competition window, starts its draws and
+// the countdown to its registration's close, ten minutes before it ends.
 func (o *Olympiad) openCompetition() {
 	o.out.Announce(NoticeCompetitionStarted, 0)
+	o.startGames()
 	o.mu.Lock()
 	end := o.periodEnd
 	o.mu.Unlock()
 	o.registrationEnd = end - o.queue.Now().UnixMilli() - registrationCloseMillis
 }
 
-// closeCompetition saves the status once the window's matches are over and
-// enters the next period. No match can still be running: matches are not
-// run yet (#3340).
+// closeCompetition stops the window's draws, saves the status and enters
+// the next period. A match still running goes on to its end in its stadium
+// (#3280 owns whether the window should wait for it).
 func (o *Olympiad) closeCompetition() {
+	o.stopGames()
 	o.saveStatus()
 	o.enterPeriod()
 }
@@ -469,6 +496,7 @@ func (o *Olympiad) SelectHeroes() {
 			o.timer.Stop()
 			o.timer = nil
 		}
+		o.stopGames()
 		o.olympiadEnd, o.nextPoints, o.registrationEnd = 0, 0, -1
 		o.mu.Lock()
 		o.periodEnd = 0

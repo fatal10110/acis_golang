@@ -63,7 +63,7 @@ func (l *GameClientLink) requestSellItem(live *livePlayer, req clientpackets.Req
 		rows[i] = invops.SaleRow{ObjectID: row.ObjectID, Count: int(row.Count)}
 	}
 	inv := live.Inventory()
-	enchantScroll := l.enchantStateStore().Active(live.ObjectID())
+	enchantScroll := l.enchanting.scrolls.Active(live.ObjectID())
 	res, sold, err := l.inventory.Sell(inv, rows, func(objectID int32) bool {
 		return objectID == enchantScroll || live.ControlItemInUse(objectID)
 	})

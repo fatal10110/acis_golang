@@ -31,6 +31,24 @@ func InArena(a any) bool {
 	return ok && m.InPvPZone() && !m.InSiegeZone()
 }
 
+// OlympiadCompetitor is a player's place in an Olympiad match.
+type OlympiadCompetitor interface {
+	OlympiadStarted() bool
+	OlympiadGameID() int
+}
+
+// SameActiveOlympiadMatch reports whether a and b, the players acting
+// through two playables, fight each other in the same started Olympiad
+// match.
+func SameActiveOlympiadMatch(a, b any) bool {
+	x, ok := a.(OlympiadCompetitor)
+	if !ok {
+		return false
+	}
+	y, ok := b.(OlympiadCompetitor)
+	return ok && x.OlympiadStarted() && y.OlympiadStarted() && x.OlympiadGameID() == y.OlympiadGameID()
+}
+
 // actingPlayer is the acting-player state the playable attackability rules
 // read through a playable: the player itself, or a summon's owner.
 type actingPlayer interface {
