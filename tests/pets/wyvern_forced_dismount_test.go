@@ -204,3 +204,32 @@ func TestWyvernDismountedAgainOnNextSiege(t *testing.T) {
 	h.srv.Advance(t, wyvernGraceDelay+100*time.Millisecond)
 	h.requireDismounted(t, "second siege", drainFrames(t, h.client))
 }
+
+// TestWyvernBanishedAsSiegeStartsKeepsFlying pins Siege.startSiege's order
+// (banishForeigners, then SiegeZone.setActive(true)): a foreign wyvern
+// rider on the battlefield as its siege starts is teleported out before the
+// battlefield turns on, so it hears neither the combat notice nor that the
+// area is closed to wyverns, and no countdown takes it off its mount.
+func TestWyvernBanishedAsSiegeStartsKeepsFlying(t *testing.T) {
+	t.Parallel()
+	h, field := bootWyvernOnBattlefield(t)
+	// The clanless rider is foreign to every owning clan. Its queue is
+	// parked so the siege turns on before the teleport out runs, as it does
+	// when the siege steps faster than the rider's queue drains.
+	const ownerClanID = 1
+	release := make(chan struct{})
+	if !h.srv.PlayerQueue(t, h.ownerID).Post(func() { <-release }) {
+		t.Fatal("rider queue closed")
+	}
+	field.BanishForeigners(ownerClanID)
+	field.SetActive(true)
+	close(release)
+	h.handled(t)
+	frames := readUntilOpcode(t, h.client, serverpackets.OpcodeTeleportToLocation, "banish teleport")
+	h.srv.Advance(t, 2*wyvernGraceDelay)
+	frames = append(frames, drainFrames(t, h.client)...)
+	if got := systemMessageIDs(t, frames); slices.Contains(got, msgEnteredCombatZone) || slices.Contains(got, msgNoWyvernArea) {
+		t.Fatalf("banished as the siege started: system messages %v, want neither %d nor %d", got, msgEnteredCombatZone, msgNoWyvernArea)
+	}
+	h.requireStillRiding(t, "banished as the siege started", frames)
+}
