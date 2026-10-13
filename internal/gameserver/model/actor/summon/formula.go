@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
@@ -153,7 +154,12 @@ func (a *Actor) statCalcOrCreate(s stat.Stat) *effect.Calculator {
 }
 
 func (a *Actor) calcStat(s stat.Stat, base float64) float64 {
-	value := a.statCalculator(s).Calc(summonStatActor{a: a}, base)
+	return a.calcSkillStat(s, base, nil)
+}
+
+// calcSkillStat is calcStat for a calculation run for skill (nil for none).
+func (a *Actor) calcSkillStat(s stat.Stat, base float64, skill conditions.Skill) float64 {
+	value := a.statCalculator(s).Calc(summonStatActor{a: a}, base, skill)
 	if s.CantBeNegative() && value <= 0 {
 		return 1
 	}
@@ -322,18 +328,38 @@ func (a *Actor) PDef() float64 {
 }
 
 // MAtk returns this summon's magic attack stat, truncated to a whole number.
-func (a *Actor) MAtk() float64 {
-	return math.Trunc(a.calcStat(stat.MagicAttack, positiveBase(a.combatStats().MAtk)))
-}
+func (a *Actor) MAtk() float64 { return skillStats{a: a}.MAtk() }
 
 // MDef returns this summon's magic defence stat, truncated to a whole number.
-func (a *Actor) MDef() float64 {
-	return math.Trunc(a.calcStat(stat.MagicDefence, positiveBase(a.combatStats().MDef)))
-}
+func (a *Actor) MDef() float64 { return skillStats{a: a}.MDef() }
 
 // MagicCriticalRate returns this summon's magic critical rate.
-func (a *Actor) MagicCriticalRate() float64 {
-	return a.calcStat(stat.MCriticalRate, 8)
+func (a *Actor) MagicCriticalRate() float64 { return skillStats{a: a}.MagicCriticalRate() }
+
+// ForSkill is a's stats read for a calculation run for skill.
+func (a *Actor) ForSkill(skill conditions.Skill) creature.SkillStats {
+	return skillStats{a: a, skill: skill}
+}
+
+type skillStats struct {
+	a     *Actor
+	skill conditions.Skill
+}
+
+func (s skillStats) CalcStat(st stat.Stat, base float64) float64 {
+	return s.a.calcSkillStat(st, base, s.skill)
+}
+
+func (s skillStats) MAtk() float64 {
+	return math.Trunc(s.a.calcSkillStat(stat.MagicAttack, positiveBase(s.a.combatStats().MAtk), s.skill))
+}
+
+func (s skillStats) MDef() float64 {
+	return math.Trunc(s.a.calcSkillStat(stat.MagicDefence, positiveBase(s.a.combatStats().MDef), s.skill))
+}
+
+func (s skillStats) MagicCriticalRate() float64 {
+	return s.a.calcSkillStat(stat.MCriticalRate, 8, s.skill)
 }
 
 // Accuracy returns this summon's physical accuracy stat.
@@ -819,7 +845,7 @@ func (a *Actor) SkillReflectInput(def modelskill.Definition) formulas.SkillRefle
 		CanBeReflected: def.CanBeReflected,
 		Magic:          def.Magic,
 		CastRange:      def.CastRange,
-		ReflectChance:  a.CalcStat(reflectStat, 0),
+		ReflectChance:  a.calcSkillStat(reflectStat, 0, conditions.SkillOf(def.Stat)),
 	}
 }
 

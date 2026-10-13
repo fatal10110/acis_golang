@@ -41,7 +41,7 @@ func EvaluateSkill(def modelskill.Definition, caster Source, target any) (models
 		if err != nil || effector == nil {
 			return clause, false
 		}
-		held, aborted := Evaluate(cond, effector, effected, definitionSkill{def.Stat})
+		held, aborted := Evaluate(cond, effector, effected, SkillOf(def.Stat))
 		if aborted {
 			return modelskill.ConditionClause{Root: clause.Root}, false
 		}
@@ -52,9 +52,11 @@ func EvaluateSkill(def modelskill.Definition, caster Source, target any) (models
 	return modelskill.ConditionClause{}, true
 }
 
-// definitionSkill is a skill definition under test: its "stat" set value,
-// an upper-case stat constant name, names its stat. An empty or unknown
-// value names none.
+// SkillOf is the skill under test whose "stat" set value is constant, an
+// upper-case stat constant name. An empty or unknown value names no stat.
+func SkillOf(constant string) Skill { return definitionSkill{constant} }
+
+// definitionSkill is a skill definition under test (see SkillOf).
 type definitionSkill struct{ stat string }
 
 func (s definitionSkill) Stat() (stat.Stat, bool) {

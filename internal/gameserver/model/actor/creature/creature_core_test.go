@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -58,6 +59,8 @@ func (a *randomDamageTestActor) RandomDamageSpread() int { return a.spread }
 func (a *randomDamageTestActor) Roll(int) int            { return a.roll }
 
 var _ FormulaActor = (*randomDamageTestActor)(nil)
+
+func (a *randomDamageTestActor) ForSkill(conditions.Skill) SkillStats { return a }
 
 func TestResolvePhysicalSkillInputSkipsEvasionForUnarmedAndBow(t *testing.T) {
 	target := &randomDamageTestActor{pSkillEvasion: 100}
@@ -510,6 +513,8 @@ func (a *physicalAttackActor) RaceMultiplier(FormulaActor) float64 {
 }
 
 var _ FormulaActor = (*physicalAttackActor)(nil)
+
+func (a *physicalAttackActor) ForSkill(conditions.Skill) SkillStats { return a }
 
 type shieldedPhysicalAttackActor struct {
 	physicalAttackActor

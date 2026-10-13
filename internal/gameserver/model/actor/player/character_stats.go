@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/funcs"
@@ -44,7 +45,12 @@ func (c *Character) statCalcOrCreate(s stat.Stat) *effect.Calculator {
 }
 
 func (c *Character) calcStat(s stat.Stat, base float64) float64 {
-	value := c.statCalc(s).Calc(characterStatActor{c: c}, base)
+	return c.calcSkillStat(s, base, nil)
+}
+
+// calcSkillStat is calcStat for a calculation run for skill (nil for none).
+func (c *Character) calcSkillStat(s stat.Stat, base float64, skill conditions.Skill) float64 {
+	value := c.statCalc(s).Calc(characterStatActor{c: c}, base, skill)
 	if s.CantBeNegative() && value <= 0 {
 		return 1
 	}
@@ -298,7 +304,11 @@ func attackerUsesBow(caster creature.FormulaActor) bool {
 // MAtk returns the current magic attack value, truncated to a whole
 // number. A rider casts from its mount's M.Atk. instead of its class and
 // weapon.
-func (c *Character) MAtk() float64 {
+func (c *Character) MAtk() float64 { return c.mAtk(nil) }
+
+// mAtk is MAtk for a calculation run for skill. A rider's M.Atk. is
+// calculated for no skill.
+func (c *Character) mAtk(skill conditions.Skill) float64 {
 	if m, ok := c.ridden(); ok {
 		return math.Trunc(c.calcStat(stat.MagicAttack, m.mAtk))
 	}
@@ -307,18 +317,21 @@ func (c *Character) MAtk() float64 {
 	if tmpl != nil && tmpl.MAtk > 0 {
 		base = tmpl.MAtk
 	}
-	return math.Trunc(c.calcStat(stat.MagicAttack, c.activeWeapon().stat("mAtk", base)))
+	return math.Trunc(c.calcSkillStat(stat.MagicAttack, c.activeWeapon().stat("mAtk", base), skill))
 }
 
 // MDef returns the current magic defence value, truncated to a whole
 // number.
-func (c *Character) MDef() float64 {
+func (c *Character) MDef() float64 { return c.mDef(nil) }
+
+// mDef is MDef for a calculation run for skill.
+func (c *Character) mDef(skill conditions.Skill) float64 {
 	tmpl := c.template()
 	base := 1.0
 	if tmpl != nil && tmpl.MDef > 0 {
 		base = tmpl.MDef
 	}
-	return math.Trunc(c.calcStat(stat.MagicDefence, base))
+	return math.Trunc(c.calcSkillStat(stat.MagicDefence, base, skill))
 }
 
 // HP returns current HP as a floating-point skill-resource value.
@@ -908,7 +921,7 @@ func (c *Character) SkillReflectInput(def modelskill.Definition) formulas.SkillR
 		CanBeReflected: def.CanBeReflected,
 		Magic:          def.Magic,
 		CastRange:      def.CastRange,
-		ReflectChance:  c.CalcStat(reflectStat, 0),
+		ReflectChance:  c.calcSkillStat(reflectStat, 0, conditions.SkillOf(def.Stat)),
 	}
 }
 

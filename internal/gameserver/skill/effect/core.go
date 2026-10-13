@@ -7,6 +7,7 @@ import (
 	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 )
 
 // ErrUnsupportedCoreEffect marks New's rejection of an effect template whose
@@ -356,16 +357,21 @@ func SkillFromDefinition(def modelskill.Definition) Skill {
 		NegateIDs:           def.NegateIDs,
 		NegateTypes:         def.NegateTypes,
 		FlyRadius:           def.FlyRadius,
+		Stat:                def.Stat,
 	}
 }
 
 // Apply instantiates each of templates as a fresh live effect of effector on
 // effected and hosts it where Attach places it. It rolls no landing chance
 // and checks no landing gate; callers decide that first (see Lands). A
-// template naming an effect core this port hasn't wired yet is skipped
-// rather than failing the whole batch.
+// template whose attached condition rejects the pair (see Admits), or one
+// naming an effect core this port hasn't wired yet, is skipped rather than
+// failing the whole batch.
 func Apply(effector, effected Actor, meta Skill, templates []modelskill.EffectTemplate) {
 	for _, tmpl := range templates {
+		if !Admits(effector, effected, meta, tmpl) {
+			continue
+		}
 		e, err := New(meta, tmpl)
 		if err != nil {
 			continue
@@ -380,7 +386,8 @@ func Apply(effector, effected Actor, meta Skill, templates []modelskill.EffectTe
 // template: each is built, given its saved count and time, then scheduled.
 // effector and effected are both the relogging character: the original
 // caster identity is not persisted, so every reinstated effect is treated as
-// self-applied. The replay is silent (see List.AddRestored): it activates and refreshes icons
+// self-applied, and a template whose attached condition rejects that pair
+// (see Admits) is not reinstated. The replay is silent (see List.AddRestored): it activates and refreshes icons
 // but sends no stack or expiry system messages.
 //
 // restoredAt, when set, is the instant the saved state was read back: each
@@ -406,6 +413,9 @@ func applyRestored(list *List, effector, effected Actor, meta Skill, templates [
 		now = list.now()
 	}
 	for _, tmpl := range templates {
+		if !Admits(effector, effected, meta, tmpl) {
+			continue
+		}
 		e, err := New(meta, tmpl)
 		if err != nil {
 			continue
@@ -484,15 +494,9 @@ func New(skill Skill, tmpl modelskill.EffectTemplate) (*Effect, error) {
 		Herb: strings.Contains(skill.Name, "Herb"),
 	}
 
-	// tmpl.AttachCondition is the <cond> sibling gating the whole <effect>
-	// block (not any one func's own predicate); AND it onto every func this
-	// effect contributes (a <cond> stays in scope for every stat element
-	// until the next <cond> resets it).
-	attachGate, err := funcCondition(nil, tmpl.AttachCondition)
-	if err != nil {
-		return nil, fmt.Errorf("effect %s: %w", tmpl.Name, err)
-	}
-	funcs, err := statFuncs(ModOwnerEffect(e), tmpl.Funcs, attachGate)
+	// tmpl.AttachCondition gates creating the effect itself (see Admits),
+	// not its funcs.
+	funcs, err := statFuncs(ModOwnerEffect(e), tmpl.Funcs, conditions.SkillOf(skill.Stat))
 	if err != nil {
 		return nil, fmt.Errorf("effect %s: %w", tmpl.Name, err)
 	}

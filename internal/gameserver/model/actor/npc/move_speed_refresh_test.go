@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -21,7 +22,7 @@ func newStallingGate() *stallingGate {
 	return &stallingGate{entered: make(chan struct{}), release: make(chan struct{})}
 }
 
-func (g *stallingGate) Test(stat.Actor) bool {
+func (g *stallingGate) Test(stat.Actor, conditions.Skill) bool {
 	if g.armed.CompareAndSwap(true, false) {
 		close(g.entered)
 		<-g.release

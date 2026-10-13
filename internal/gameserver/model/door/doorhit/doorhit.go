@@ -15,6 +15,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -99,6 +100,10 @@ func (Target) BlessedSpiritshotCharged() bool { return false }
 
 // CalcStat returns base: a door carries no stat modifier.
 func (Target) CalcStat(_ stat.Stat, base float64) float64 { return base }
+
+// ForSkill is t itself: with no stat modifier, a door's stats read the same
+// whatever skill a calculation runs for.
+func (t Target) ForSkill(conditions.Skill) creature.SkillStats { return t }
 
 func (Target) RandomDamageSpread() int  { return 0 }
 func (Target) Roll(n int) int           { return rnd.Get(n) }
