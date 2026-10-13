@@ -523,16 +523,14 @@ NpcAI.addPickUpDesire script.NPC.AddPickUpDesire
 # Script-facing API freeze, player, creature and skill rows (#3748). A
 # binding is a field of the script (Bind, UsedItems, EnteredZones). The soul
 # crystal data is the table the catalog hands the quest, whose crystal and
-# leveling rows are fields; a monster's absorber record is the NPC handle's.
-# A quest state's variable reads (MemoSet.get, its presence) go through Get;
-# a creature's inventory is the player handle's; a skill level is a field of
+# leveling rows are fields. A quest state's variable reads (MemoSet.get,
+# its presence) go through Get; a creature's inventory is the player
+# handle's; a skill level is a field of
 # its skill.Ref. An NPC's summon animation flag shows in no NPC view, so
 # setting it is no call. Music an NPC plays is bound to it and heard by the
 # players around it. A creature's attack type, strider ride, pet control
 # item and 3D range are package functions over any creature; a party's
 # leader and size are read on a member's player handle.
-AbsorbInfo.isRegistered inline
-AbsorbInfo.isValid script.AbsorbInfo.Valid
 AbstractGroup.getLeader script.Player.PartyLeader
 AbstractGroup.getLeaderObjectId script.Player.PartyLeader
 AbstractGroup.isLeader script.Player.IsPartyLeader
@@ -565,8 +563,6 @@ LevelingInfo.levelList inline
 MemoSet.containsKey script.QuestState.Get
 MemoSet.get script.QuestState.Get
 MemoSet.getBool script.QuestState.GetBool
-Monster.addAbsorber script.NPC.AddAbsorber
-Monster.getAbsorbInfo script.NPC.Absorber
 Monster.getSpoilState inline
 Party.getMembersCount script.Player.PartyMembers
 Pet.getControlItemId script.PetControlItemID
@@ -611,8 +607,11 @@ Summon.getControlItemId script.PetControlItemID
 WorldObject.distance3D script.NPC.Distance3D
 WorldObject.isIn3DRadius script.InRadius3D
 # The NPC chat line a teleport dungeon NPC shouts to the players within a
-# radius of it is one call on the NPC handle. A binding a siegable-hall
-# script registers is a field of the script.
+# radius of it is one call on the NPC handle; that NpcSay shout is the only
+# form of Creature.broadcastPacketInRadius the handle covers. The
+# siegable-hall system messages broadcast in a radius (FlagWar,
+# RainbowSpringsChateau) have no call yet and are tracked on #3502. A
+# binding a siegable-hall script registers is a field of the script.
 Creature.broadcastPacketInRadius script.NPC.ShoutInRadius
 NpcSay.new script.NPC.ShoutInRadius
 Quest.addClanAttacked inline

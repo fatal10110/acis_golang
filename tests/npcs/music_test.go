@@ -97,7 +97,8 @@ func TestNPCMusicReachesKnownPlayersInCallOrder(t *testing.T) {
 // TestNPCShoutInRadiusReachesPlayersByDistance: a line an NPC shouts in a
 // radius (npc.broadcastPacketInRadius(new NpcSay(npc, SHOUT, text), r))
 // reaches each player within that radius of it, however far, as a shout
-// naming the NPC, and no player beyond it.
+// naming the NPC, and no player beyond it. A monster and a folk NPC (the
+// Four Sepulchers managers that shout this way are folk) shout alike.
 func TestNPCShoutInRadiusReachesPlayersByDistance(t *testing.T) {
 	t.Parallel()
 	w := bootCutscene(t)
@@ -116,19 +117,22 @@ func TestNPCShoutInRadiusReachesPlayersByDistance(t *testing.T) {
 		x, _, _ := w.srv.PlayerPosition(t, secondID)
 		return x == far.X
 	})
+	const folkID = 31921
 	crier := w.srv.SpawnHostileNPCTemplateAt(t, spawnMonster(cutsceneMonsterID, "Crier"), location.Location{X: w.at.X + 40, Y: w.at.Y, Z: w.at.Z})
+	folk := w.srv.SpawnFolkNPCAt(t, gameservertest.FolkTemplate("Folk", folkID), location.Location{X: w.at.X, Y: w.at.Y + 40, Z: w.at.Z})
 	w.srv.ReadQueued(t, w.first)
 	w.srv.ReadQueued(t, w.second)
 
 	w.direct(t, func(_ *script.Player) {
-		n := script.NPCOf(crier)
-		n.ShoutInRadius("Far and wide", 11500)
-		n.ShoutInRadius("Close by", 600)
+		for _, n := range []*script.NPC{script.NPCOf(crier), script.NPCOf(folk)} {
+			n.ShoutInRadius("Far and wide", 11500)
+			n.ShoutInRadius("Close by", 600)
+		}
 	})
 
-	say := func(text string) []byte {
+	say := func(objectID int32, npcID int, text string) []byte {
 		out := []byte{serverpackets.OpcodeNpcSay}
-		for _, v := range []int32{crier.ObjectID(), 1, int32(cutsceneMonsterID) + 1_000_000} {
+		for _, v := range []int32{objectID, 1, int32(npcID) + 1_000_000} {
 			out = binary.LittleEndian.AppendUint32(out, uint32(v))
 		}
 		for _, r := range utf16.Encode([]rune(text)) {
@@ -136,13 +140,15 @@ func TestNPCShoutInRadiusReachesPlayersByDistance(t *testing.T) {
 		}
 		return append(out, 0, 0)
 	}
+	crierSay := func(text string) []byte { return say(crier.ObjectID(), cutsceneMonsterID, text) }
+	folkSay := func(text string) []byte { return say(folk.ObjectID(), folkID, text) }
 	for _, viewer := range []struct {
 		name string
 		c    *testsupport.ScriptedClient
 		want [][]byte
 	}{
-		{"first", w.first, [][]byte{say("Far and wide"), say("Close by")}},
-		{"second", w.second, [][]byte{say("Far and wide")}},
+		{"first", w.first, [][]byte{crierSay("Far and wide"), crierSay("Close by"), folkSay("Far and wide"), folkSay("Close by")}},
+		{"second", w.second, [][]byte{crierSay("Far and wide"), folkSay("Far and wide")}},
 	} {
 		got := pick(w.srv.ReadQueued(t, viewer.c), serverpackets.OpcodeNpcSay)
 		if len(got) != len(viewer.want) {
