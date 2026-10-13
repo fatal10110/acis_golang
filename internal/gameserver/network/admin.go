@@ -42,6 +42,7 @@ var adminCommands = map[string]adminCommand{
 	"admin_invul":        (*GameClientLink).adminInvul,
 	"admin_skill":        (*GameClientLink).adminSkill,
 	"admin_clan_skill":   (*GameClientLink).adminClanSkill,
+	"admin_pledge":       (*GameClientLink).adminPledge,
 	"admin_help":         (*GameClientLink).adminHelp,
 
 	// Spawns; see admin_spawn.go and admin_spawn_all.go.

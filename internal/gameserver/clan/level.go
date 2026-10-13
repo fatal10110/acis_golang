@@ -123,6 +123,15 @@ func (s *Service) setLevelLocked(cl *Clan, level int) int {
 	return level
 }
 
+// ChangeLevel sets cl's level to level, up or down, and stores it. Nothing
+// else about the clan changes: its leader's siege skills and what its
+// members are shown are the caller's.
+func (s *Service) ChangeLevel(cl *Clan, level int) {
+	cl.mu.Lock()
+	defer cl.mu.Unlock()
+	s.setLevelLocked(cl, level)
+}
+
 // TellsLeaderAboutReputation reports whether reaching level earns the
 // leader the reputation notice.
 func TellsLeaderAboutReputation(level int) bool { return level > reputationLevel }
@@ -153,7 +162,9 @@ func (s *Service) addReputationLocked(cl *Clan, delta int) (ReputationChanged, b
 		return ReputationChanged{}, false
 	}
 	before := cl.reputation
-	after := clampReputation(before + delta)
+	// The score and the change add as 32-bit integers, wrapping past the
+	// int range before the bounds apply.
+	after := clampReputation(int(int32(before) + int32(delta)))
 	cl.reputation, cl.storedReputation = after, after
 	change := ReputationChanged{Score: after}
 	switch {
