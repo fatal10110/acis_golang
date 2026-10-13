@@ -3,6 +3,8 @@ package script
 import (
 	"runtime/debug"
 	"strings"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 )
 
 // ResultKind is what a string hook's answer asks the engine to send.
@@ -47,8 +49,12 @@ func Classify(answer string) Result {
 
 // run calls fn, one invocation of s's hook h, and reports whether it
 // returned. A panic is recovered and logged with its stack; nothing is
-// disabled, so the next hook and the next invocation run as usual.
+// disabled, so the next hook and the next invocation run as usual. The
+// invocation is counted as running until it returns: a player it writes
+// leaves the world only after that.
 func (r *Registry) run(s *Script, h hook, fn func()) (ok bool) {
+	epoch := r.runs.Begin()
+	defer r.runs.End(epoch)
 	defer func() {
 		if p := recover(); p != nil {
 			r.log.Error().Str("script", s.path).Str("hook", h.String()).Interface("panic", p).Str("stack", string(debug.Stack())).Msg("script: hook panicked")
@@ -71,6 +77,15 @@ func (r *Registry) Invoke(name string, fn func(s *Script)) bool {
 		return false
 	}
 	return r.run(s, hookEvent, func() { fn(s) })
+}
+
+// ScriptRuns returns the count of the hook invocations in flight, nil for a
+// nil registry.
+func (r *Registry) ScriptRuns() *player.ScriptRuns {
+	if r == nil {
+		return nil
+	}
+	return &r.runs
 }
 
 // answer calls fn, one invocation of s's string hook h, and classifies its

@@ -94,9 +94,13 @@ func (s *Script) RewardItems(p *Player, itemID, count int32) {
 }
 
 // RewardExpAndSp gives p exp experience and sp skill points, each scaled
-// by its reward rate.
+// by its reward rate. A player leaving the world gets nothing, as no script
+// gives it anything.
 func (s *Script) RewardExpAndSp(p *Player, exp int64, sp int32) {
-	p.character().AddExpAndSp(commons.JavaLong(float64(exp)*s.env.Rates.XP), int(commons.JavaInt(float64(sp)*s.env.Rates.SP)))
+	c := p.character()
+	c.WhileAttached(func() {
+		c.AddExpAndSp(commons.JavaLong(float64(exp)*s.env.Rates.XP), int(commons.JavaInt(float64(sp)*s.env.Rates.SP)))
+	})
 }
 
 // PlaySound plays sound for p alone.

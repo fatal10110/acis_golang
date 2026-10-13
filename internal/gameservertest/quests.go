@@ -330,6 +330,31 @@ func (s *Server) RunScript(tb testing.TB, objID int32, name string, fn func(sc *
 	return s.runScript(tb, s.onlineCharacter(tb, objID), name, func(sc *script.Script) { fn(sc, script.PlayerOf(self)) })
 }
 
+// ScriptOffQueue resolves the online player objID and the script
+// WithScripts registered under name now, and returns a func that runs fn as
+// one invocation of that script on the calling goroutine, off the player's
+// queue, the way a hook raised on another queue (a killer's, the engine's)
+// runs. The func may be called from any goroutine, after the player has
+// left too; it reports whether fn returned.
+func (s *Server) ScriptOffQueue(tb testing.TB, objID int32, name string) func(fn func(sc *script.Script, p *script.Player)) bool {
+	tb.Helper()
+	if _, ok := s.quests.registry.JournalQuest(name); !ok {
+		tb.Fatalf("no script %q registered", name)
+	}
+	obj, ok := s.State.Player(objID)
+	if !ok {
+		tb.Fatalf("world.Player(%d) missing", objID)
+	}
+	self, ok := obj.(attackable.Combatant)
+	if !ok {
+		tb.Fatalf("world.Player(%d) = %T is not a combatant", objID, obj)
+	}
+	registry := s.quests.registry
+	return func(fn func(sc *script.Script, p *script.Player)) bool {
+		return registry.Invoke(name, func(sc *script.Script) { fn(sc, script.PlayerOf(self)) })
+	}
+}
+
 // runScript runs fn on c's queue as one invocation of the script name and
 // waits for it, reporting whether fn returned.
 func (s *Server) runScript(tb testing.TB, c *player.Character, name string, fn func(sc *script.Script)) bool {
