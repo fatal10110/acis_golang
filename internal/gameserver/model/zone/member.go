@@ -24,6 +24,10 @@ const StepsPerRevalidation = 5
 //     revalidates only when it changes region;
 //   - Leave when it leaves the grid: a despawn, or a teleport before the jump.
 //
+// An instant teleport reports nothing: the creature stays held in its
+// region, and its zones are those of that region, until its next Step or
+// Place moves it to the region of its position.
+//
 // Between Leave and the next Enter no position change enters a zone, and a
 // creature mid-teleport (one whose Actor reports Teleporting) counts its
 // steps but revalidates nothing.
@@ -37,6 +41,9 @@ type Member struct {
 	flags  Flags
 	onGrid bool
 	steps  int
+	// held is a point of the region holding the creature: its position at
+	// the last Enter, Step or Place.
+	held location.Location
 }
 
 // ZoneFlags is the creature's zone flag ledger.
@@ -56,29 +63,31 @@ func (m *Member) Enter(ix *Index, a Actor) {
 	defer m.mu.Unlock()
 	m.onGrid = true
 	m.steps = 0
+	m.held = a.Position()
 	if ix != nil && !teleporting(a) {
 		ix.Revalidate(a)
 	}
 }
 
-// Step records one movement step of a from previous.
-func (m *Member) Step(ix *Index, a Actor, previous location.Location) {
+// Step records one movement step of a.
+func (m *Member) Step(ix *Index, a Actor) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if !m.onGrid {
 		return
 	}
-	m.regionChangedLocked(ix, a, previous)
+	m.regionChangedLocked(ix, a)
 	m.steps++
 	if m.steps >= StepsPerRevalidation {
 		m.steps = 0
 		if ix != nil && !teleporting(a) {
-			ix.Revalidate(a)
+			ix.RevalidateIn(a, m.held)
 		}
 	}
 }
 
-// Settle revalidates a's zones at once: its move ended or stopped.
+// Settle revalidates a's zones at once, against those of the region
+// holding it: its move ended or stopped.
 func (m *Member) Settle(ix *Index, a Actor) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -87,42 +96,43 @@ func (m *Member) Settle(ix *Index, a Actor) {
 	}
 	m.steps = 0
 	if ix != nil && !teleporting(a) {
-		ix.Revalidate(a)
+		ix.RevalidateIn(a, m.held)
 	}
 }
 
-// Place records a position of a set from previous outside movement: only a
-// change of region revalidates its zones.
-func (m *Member) Place(ix *Index, a Actor, previous location.Location) {
+// Place records a position of a set outside movement: only a change of
+// region revalidates its zones.
+func (m *Member) Place(ix *Index, a Actor) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if !m.onGrid {
 		return
 	}
-	m.regionChangedLocked(ix, a, previous)
+	m.regionChangedLocked(ix, a)
 }
 
-// regionChangedLocked revalidates the zones of both regions and restarts
-// the step count when a left the region containing previous. Callers hold
-// mu.
-func (m *Member) regionChangedLocked(ix *Index, a Actor, previous location.Location) {
+// regionChangedLocked moves a to the region of its position: when that is
+// not the region holding it, it revalidates the zones of both regions and
+// restarts the step count. Callers hold mu.
+func (m *Member) regionChangedLocked(ix *Index, a Actor) {
 	pos := a.Position()
-	if world.RegionKey(previous.X, previous.Y) == world.RegionKey(pos.X, pos.Y) {
+	held := m.held
+	m.held = pos
+	if world.RegionKey(held.X, held.Y) == world.RegionKey(pos.X, pos.Y) {
 		return
 	}
 	m.steps = 0
 	if ix != nil && !teleporting(a) {
-		ix.RevalidateMove(a, previous)
+		ix.RevalidateMove(a, held)
 	}
 }
 
-// Leave takes a off the grid, exiting every zone of the region containing
-// (x, y), its position before it left.
-func (m *Member) Leave(ix *Index, a Actor, x, y int) {
+// Leave takes a off the grid, exiting every zone of the region holding it.
+func (m *Member) Leave(ix *Index, a Actor) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.onGrid = false
 	if ix != nil {
-		ix.RemoveFrom(a, x, y)
+		ix.RemoveFrom(a, m.held.X, m.held.Y)
 	}
 }

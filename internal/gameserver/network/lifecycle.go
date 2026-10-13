@@ -134,8 +134,7 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		l.pvpFlags.Remove(live.Character, false)
 	}
 	if l.zones != nil && live.zoneActor != nil {
-		position := live.CurrentLocation()
-		live.zoneActor.removeFrom(l.zones, position.X, position.Y)
+		live.zoneActor.removeFrom(l.zones)
 	}
 	if l.world != nil {
 		// A living summon leaves with its owner; a corpse stays until it
@@ -366,7 +365,10 @@ func (l *GameClientLink) dropPetItem(actor *summon.Actor, inv *itemcontainer.Inv
 // succeeded. UpdateItems writes the whole container as one atomic flush, so
 // a deadline expiring partway through leaves none of it written; keeping
 // the container pending hands all of it to the next tick, or to the
-// shutdown flush, instead of dropping it on the floor.
+// shutdown flush, instead of dropping it on the floor. Nothing writes these
+// instances after this job, so a failure also abandons the bound rows they
+// hold (task.ItemInstances.FlushReleased): every item must already be in inv,
+// and stay there, when the job runs.
 //
 // So a pending entry here means "this item's write has not landed yet", not
 // "this item left its container" — the entry carries the container's final
@@ -389,11 +391,9 @@ func (l *GameClientLink) flushItemPersistence(inv persistedContainer) {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), livePlayerDetachSaveTimeout)
 		defer cancel()
-		if err := itemInstances.UpdateItems(ctx, items); err != nil {
+		if err := itemInstances.FlushReleased(ctx, items); err != nil {
 			log.Error().Err(err).Int32("owner_id", inv.OwnerID()).Msg("save container items")
-			return
 		}
-		itemInstances.RemoveItems(items)
 	})
 }
 

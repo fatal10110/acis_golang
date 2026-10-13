@@ -60,13 +60,12 @@ func (a *Actor) relocate(position location.Location, placed bool) {
 	if a.world == nil {
 		return
 	}
-	previous := a.location()
 	_ = a.world.Move(a, position.X, position.Y, position.Z)
 	if placed {
-		a.membership.place(previous)
+		a.membership.place()
 		return
 	}
-	a.membership.step(previous)
+	a.membership.step()
 }
 
 // BroadcastStop shows observers a stop in place, once the stop has

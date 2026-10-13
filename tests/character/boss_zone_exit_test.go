@@ -56,8 +56,10 @@ func TestBossZoneTeleportOutRevokesPermission(t *testing.T) {
 	}
 	x, y, z := srv.PlayerPosition(t, objID)
 
-	// The teleport runs to completion on this goroutine, zone exit included.
+	// The teleport runs to completion on the player's queue, zone exit
+	// included.
 	player.TeleportTo(x+5000, y, z, 0)
+	srv.Settle(t)
 	if slices.Contains(boss.AllowedPlayers(), objID) {
 		t.Fatal("player teleported out of the boss zone kept its entry permission")
 	}

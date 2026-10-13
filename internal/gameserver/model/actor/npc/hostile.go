@@ -506,13 +506,12 @@ func (h *Hostile) relocate(position location.Location, placed bool) {
 	if h.world == nil {
 		return
 	}
-	previous := h.location()
 	_ = h.world.Move(h, position.X, position.Y, position.Z)
 	if placed {
-		h.zones.place(previous)
+		h.zones.place()
 		return
 	}
-	h.zones.step(previous)
+	h.zones.step()
 }
 
 // SetRollSource overrides the random source MakeAttackHit uses for its
@@ -1084,7 +1083,7 @@ func (h *Hostile) markDecayed() bool {
 // when it is not nil, and closes its queue.
 func (h *Hostile) leaveWorld(worldState *world.State, respawn func()) {
 	// The NPC leaves its zones while its observers still know it.
-	h.zones.leave(h.location())
+	h.zones.leave()
 	if worldState != nil {
 		worldState.Despawn(h)
 	}

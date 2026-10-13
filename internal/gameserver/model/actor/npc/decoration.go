@@ -9,7 +9,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npcinfo"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -101,8 +100,7 @@ func (d *Decoration) Despawn() {
 	}
 	d.placeMu.Lock()
 	defer d.placeMu.Unlock()
-	x, y, z := d.Position()
-	d.zones.leave(location.Location{X: x, Y: y, Z: z})
+	d.zones.leave()
 	d.world.Despawn(d)
 }
 

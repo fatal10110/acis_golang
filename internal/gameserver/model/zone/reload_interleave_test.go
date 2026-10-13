@@ -32,9 +32,8 @@ func TestReloadKeepsHoldsOfARevalidationBeforeTheRebase(t *testing.T) {
 		"settle": func(ix *Index, s *memberStub) { s.Settle(ix, s) },
 		"step": func(ix *Index, s *memberStub) {
 			for range StepsPerRevalidation {
-				previous := s.at
 				s.at.X++
-				s.Step(ix, s, previous)
+				s.Step(ix, s)
 			}
 		},
 	}
@@ -98,7 +97,7 @@ func TestReloadPlayerMoveBeforeTheRebase(t *testing.T) {
 	previous := p.at
 	p.at = location.Location{X: 600, Y: 500}
 	ix.RevalidateMove(p, previous)
-	ix.Rebase(p, true)
+	ix.Rebase(p, p.at, true)
 	if !arena.Inside(p) || !p.flags.Has(FlagPvP) || !p.flags.Has(FlagNoSummonFriend) {
 		t.Fatalf("after Rebase: inside the new arena = %v, pvp flag = %v; want both",
 			arena.Inside(p), p.flags.Has(FlagPvP))
@@ -143,7 +142,7 @@ func TestReloadCreatureTheRebaseMissed(t *testing.T) {
 		t.Fatalf("swim changes = %v, want entering then leaving the water", swimmer.swims)
 	}
 
-	leaver.Leave(ix, leaver, leaver.at.X, leaver.at.Y)
+	leaver.Leave(ix, leaver)
 	if leaver.ZoneFlags().Has(FlagNoStore) || peace.Inside(leaver) {
 		t.Fatal("leaving the grid after the swap kept the old zones' flags or entered the new zone")
 	}

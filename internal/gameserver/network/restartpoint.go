@@ -166,13 +166,6 @@ func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location
 // its connection dropped has no client to report it, so it lands at once,
 // before the enchant, trade and boat cancels. The caller runs on live's queue.
 func (l *GameClientLink) teleportLivePlayer(live *livePlayer, target location.Location, randomOffset int) {
-	l.teleportLivePlayerFrom(live, target, randomOffset, true)
-}
-
-// teleportLivePlayerFrom is teleportLivePlayer for a caller that may run off
-// live's queue (onQueue false): a lingering player then lands on its own
-// queue after the cancels instead (landLingeringPlayer).
-func (l *GameClientLink) teleportLivePlayerFrom(live *livePlayer, target location.Location, randomOffset int, onQueue bool) {
 	live.teleportMu.Lock()
 	locked := true
 	defer func() {
@@ -183,7 +176,7 @@ func (l *GameClientLink) teleportLivePlayerFrom(live *livePlayer, target locatio
 	if !l.relocateLivePlayer(live, target, randomOffset) {
 		return
 	}
-	if onQueue && live.clientDetached() && !live.detached() {
+	if live.clientDetached() && !live.detached() {
 		landed, followed := l.landTeleportedPlayer(live)
 		// The NPCs around the landing point notice the summon that followed
 		// and live itself with the teleport lock released: their
@@ -202,9 +195,6 @@ func (l *GameClientLink) teleportLivePlayerFrom(live *livePlayer, target locatio
 	l.cancelActiveEnchant(live)
 	l.cancelActiveTrade(live)
 	l.leaveBoat(live)
-	if !onQueue && live.clientDetached() {
-		postLive(live, func() { l.landLingeringPlayer(live) })
-	}
 }
 
 // relocateLivePlayer is teleportLivePlayer up to the position update, under
@@ -263,20 +253,6 @@ func (l *GameClientLink) relocateLivePlayer(live *livePlayer, target location.Lo
 	}
 	l.updateLivePlayerPosition(live, target, heading)
 	return true
-}
-
-// landLingeringPlayer lands live, teleported off its queue while it lingers
-// without a client, as an Appearing would, then has the NPCs around its
-// landing point notice the summon that followed it and live itself. A player
-// that has begun leaving the world stays off the grid, as its detach already
-// took it out of its zones. It runs on live's queue.
-func (l *GameClientLink) landLingeringPlayer(live *livePlayer) {
-	if live.detached() {
-		return
-	}
-	if landed, followed := l.landLivePlayer(live); landed {
-		l.tellLandingOnlookers(live, followed)
-	}
 }
 
 // tellLandingOnlookers has the NPCs around a lingering player's landing

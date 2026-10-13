@@ -10,7 +10,7 @@ import (
 // castle besieged at live's position when its clan owns or defends it; a clan
 // hall recall at one of the hall live's clan owns; any other recall, or one
 // finding no such residence, goes to town (restartDestination). A residence
-// with no OWNER spawn moves no one.
+// with no OWNER spawn moves no one. It runs on live's queue.
 //
 // ponytail: the FlagWar clan restart point of the town branch waits for the
 // hall sieges (#244).
@@ -37,6 +37,5 @@ func (l *GameClientLink) recallLivePlayer(live *livePlayer, dest modelskill.Reca
 			Msg("recall: no destination resolved")
 		return
 	}
-	// A party recall reaches live from its caster's queue.
-	l.teleportLivePlayerFrom(live, at, restartTeleportOffset, false)
+	l.teleportLivePlayer(live, at, restartTeleportOffset)
 }

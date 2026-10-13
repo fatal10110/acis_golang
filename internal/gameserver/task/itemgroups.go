@@ -15,6 +15,11 @@ type BoundRow struct {
 	// Inst is the instance whose state the row carries, or nil for a row the
 	// operation deleted with no instance left to read.
 	Inst *item.Instance
+	// abandoned marks a row whose instance nothing writes again: the
+	// container holding it was released and its last write failed
+	// (FlushReleased). Rebinding the row, or a restore taking it over
+	// (retargetGroups), builds a fresh row without it.
+	abandoned bool
 }
 
 // rowGroup is a set of rows no single write has landed together yet. Its
@@ -179,17 +184,21 @@ func (i *ItemInstances) pendingInstance(objectID int32) *item.Instance {
 	return nil
 }
 
-// markOrphans takes the rows the pending cap just dropped (finishOwner) and
-// records each of their groups whose every row is dead — deleted, or an
-// instance used up or destroyed — for the next Save to release
-// (releaseOrphans).
+// markOrphans takes rows nothing may write again — rows the pending cap just
+// dropped (finishOwner), or rows a released container's last write failed to
+// land (abandon) — and records each of their groups whose every row is dead
+// for the next Save to release (releaseOrphans). A row is dead once it is
+// deleted, its instance is used up or destroyed, or its instance was
+// abandoned.
 //
 // A dropped row's group otherwise stays until a write lands every one of its
 // rows (Landed), and the tick no longer writes a dropped row. A row whose
 // item still exists may yet be written by its owner — a handler's write, the
 // container's last flush at logout — and that write must carry the dropped
 // rows along (Widen), or one leg of the operation would land without the
-// other. So only a group with no such row left is released.
+// other. So only a group with no such row left is released. A released
+// container's item counts as such a row until its last flush has run: the
+// release comes before that flush, which must still carry the group.
 //
 // A dead row's last write can still be on its way into pending: an instance
 // changes first and reports the change after (item.Persister), so a row just
@@ -197,12 +206,12 @@ func (i *ItemInstances) pendingInstance(objectID int32) *item.Instance {
 // alone; marking here and releasing on the next Save, which first checks that
 // no row of the group is pending or in flight, leaves a whole Save for it to
 // arrive and keep the group.
-func (i *ItemInstances) markOrphans(dropped []int32) {
-	if len(dropped) == 0 {
+func (i *ItemInstances) markOrphans(ids []int32) {
+	if len(ids) == 0 {
 		return
 	}
 	var dead []*rowGroup
-	for g, rows := range i.groupsOf(dropped) {
+	for g, rows := range i.groupsOf(ids) {
 		if allDead(rows) {
 			dead = append(dead, g)
 		}
@@ -215,6 +224,35 @@ func (i *ItemInstances) markOrphans(dropped []int32) {
 	for _, g := range dead {
 		i.orphans[g] = struct{}{}
 	}
+}
+
+// abandon marks the bound rows of items, the contents of a released container
+// whose last write failed (FlushReleased), as rows nothing writes again, and
+// hands their groups to markOrphans. Only a row still holding one of these
+// instances is marked: a row a restore has since pointed at a newer instance
+// belongs to that instance's container.
+//
+// A write of one of these rows that is already pending still carries the
+// group: releaseOrphans keeps a group with a row pending or in flight, and the
+// cap dropping that write marks it again.
+func (i *ItemInstances) abandon(items []*item.Instance) {
+	i.groupsMu.Lock()
+	var bound []int32
+	for _, inst := range items {
+		g := i.groups[inst.ObjectID]
+		if g == nil {
+			continue
+		}
+		row := g.rows[inst.ObjectID]
+		if row.Inst != inst {
+			continue
+		}
+		row.abandoned = true
+		g.rows[inst.ObjectID] = row
+		bound = append(bound, inst.ObjectID)
+	}
+	i.groupsMu.Unlock()
+	i.markOrphans(bound)
 }
 
 // releaseOrphans ends every group markOrphans recorded whose rows are all
@@ -300,11 +338,11 @@ func (i *ItemInstances) groupsOf(ids []int32) map[*rowGroup][]BoundRow {
 	return out
 }
 
-// allDead reports whether every row is a delete or an instance whose count is
-// gone, which no later change brings back.
+// allDead reports whether every row is a delete, an instance whose count is
+// gone, or an abandoned instance: states no later write brings back.
 func allDead(rows []BoundRow) bool {
 	for _, row := range rows {
-		if row.Inst != nil && row.Inst.Snapshot().Count > 0 {
+		if row.Inst != nil && !row.abandoned && row.Inst.Snapshot().Count > 0 {
 			return false
 		}
 	}
