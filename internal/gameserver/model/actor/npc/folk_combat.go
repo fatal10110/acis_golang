@@ -51,6 +51,8 @@ type folkCombat struct {
 	seeDistance int
 	// heldMask is the item-type bits of the template's weapon and shield.
 	heldMask int32
+	// roll overrides the combat random source; nil draws at random.
+	roll func(n int) int
 
 	effects  *effect.List
 	maxBuffs atomic.Int32
@@ -323,12 +325,23 @@ func (f *Folk) forceWalkStance() {
 	f.emit(event.NPCInfoChanged{})
 }
 
-// Roll draws a uniform random integer in [0, n).
+// Roll draws a uniform random integer in [0, n) from f's combat random
+// source.
 func (f *Folk) Roll(n int) int {
 	if n <= 0 {
 		return 0
 	}
+	if f.roll != nil {
+		return f.roll(n)
+	}
 	return rand.Intn(n)
+}
+
+// SetRollSource overrides the combat random source Roll draws from (the
+// skill landing rolls, the hit and critical rolls), for deterministic
+// tests. Set it on the NPC's queue.
+func (f *Folk) SetRollSource(roll func(n int) int) {
+	f.roll = roll
 }
 
 // AbnormalEffect returns the NPC's client-visible abnormal-effect bits.
