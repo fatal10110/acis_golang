@@ -125,6 +125,9 @@ type FolkRuntime struct {
 	// SeeRange is the configured see range (DefaultSeeRange); zero keeps
 	// the shipped default.
 	SeeRange int
+	// Tower is a control tower's siege and working form; a control tower
+	// without them stands dead for good. Any other NPC ignores it.
+	Tower TowerRuntime
 }
 
 // FolkRemover takes a civilian NPC out of the world at once, with no
@@ -160,6 +163,9 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 	f.world, f.queue, f.sink, f.los, f.decay = rt.World, rt.Queue, rt.Sink, rt.LOS, rt.Decay
 	f.scripts, f.remover, f.ground = rt.Scripts, rt.Remover, rt.Ground
 	f.seeDistance = rt.SeeRange
+	if f.Tower() {
+		f.towerState.siege, f.towerState.working = rt.Tower.Siege, rt.Tower.Working
+	}
 	f.zones.ix = rt.Zones
 	f.cast.ai = rt.AI
 	f.bindSpawn(rt.Slot)

@@ -158,12 +158,9 @@ func (s *Siege) Start() {
 // is set. Otherwise the siege is under way: the castle owner's clan is
 // remembered, the players of other clans are thrown off the battlefield,
 // which turns on, every registered clan's members in the world take their
-// siege state, the castle's gates close, its siege guards spawn, everyone
-// is told and hears it start, the attackers are told they are in a
-// temporary alliance, and the siege clock runs.
-//
-// ponytail: after the siege states the reference also polymorphs the
-// control towers (#465).
+// siege state, the castle's control towers work, its gates close, its
+// siege guards spawn, everyone is told and hears it start, the attackers
+// are told they are in a temporary alliance, and the siege clock runs.
 func (s *Siege) startLocked(fx *effects) {
 	if s.status == StatusInProgress {
 		return
@@ -191,6 +188,7 @@ func (s *Siege) startLocked(fx *effects) {
 		})
 	})
 	s.siegeStatesLocked(fx, false)
+	s.towersLocked(fx, Tower.PolymorphTower)
 	s.closeGatesLocked(fx)
 	s.spawnGuardsLocked(fx)
 	s.announceLocked(fx, castleMsg(MsgSiegeStarted, castleID))
@@ -276,13 +274,11 @@ func (s *Siege) End() {
 // reputation moves (see reputationLocked), the players of other clans
 // than the owner's are thrown off the battlefield, the siege states are
 // cleared, the next date is set and every registration dropped, the owner
-// registered again, the siege guards leave, the castle's gates stand again
-// closed at full HP, and the battlefield turns off. Last, the rulers
-// engraved on the castle's artifacts are wiped. Every registered clan
-// loses its headquarters with its counters.
-//
-// ponytail: before the guards leave the reference also unpolymorphs the
-// control towers (#465).
+// registered again, the control towers stand dead at full HP, the siege
+// guards leave, the castle's gates stand again closed at full HP, and the
+// battlefield turns off. Last, the rulers engraved on the castle's
+// artifacts are wiped. Every registered clan loses its headquarters with
+// its counters.
 func (s *Siege) endLocked(fx *effects) {
 	if s.status != StatusInProgress {
 		return
@@ -322,6 +318,7 @@ func (s *Siege) endLocked(fx *effects) {
 	s.siegeStatesLocked(fx, true)
 	s.saveSiegeLocked(fx, true)
 	s.clearAllLocked()
+	s.towersLocked(fx, Tower.UnpolymorphTower)
 	s.despawnGuardsLocked(fx)
 	s.respawnGatesLocked(fx, false)
 	fx.add(func() { s.withBattlefield(func(f *zone.Siege) { f.SetActive(false) }) })
@@ -361,12 +358,12 @@ func (s *Siege) reputationLocked(fx *effects, ownerID int32) {
 // owner and defender attacks, the new owner owns, the attackers of its
 // alliance defend, the players of other clans are thrown off the
 // battlefield, the former owner and defenders lose their headquarters, the
-// castle's gates stand again closed at half HP, and every registered
+// castle's gates stand again closed at half HP, the working flame towers
+// fall dead and the dead life towers work again, and every registered
 // clan's members in the world take their new siege state.
 //
 // ponytail: the reference also removes the door and trap upgrades (#236)
-// before the gates stand again, and resets the control towers (#465)
-// after.
+// before the gates stand again.
 func (s *Siege) MidVictory() {
 	var fx effects
 	e := s.e
@@ -409,6 +406,7 @@ func (s *Siege) midVictoryLocked(fx *effects) {
 	fx.add(func() { s.withBattlefield(func(f *zone.Siege) { f.BanishForeigners(ownerID) }) })
 	dropHeadquarters(fx, defenders)
 	s.respawnGatesLocked(fx, true)
+	s.towersLocked(fx, Tower.TowerMidVictory)
 	s.siegeStatesLocked(fx, false)
 }
 

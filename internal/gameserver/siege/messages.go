@@ -35,6 +35,7 @@ const (
 	MsgCannotAttackAllianceCastle   = 690
 	MsgSiegeStarted                 = 711 // castle name
 	MsgSiegeEnded                   = 712 // castle name
+	MsgTowerDestroyedNoResurrection = 717
 	MsgDeadlinePassed               = 845 // castle name
 	MsgSiegeCanceledNoInterest      = 846 // castle name
 	MsgSiegeDraw                    = 856 // castle name

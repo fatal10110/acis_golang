@@ -6,7 +6,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
@@ -414,18 +413,8 @@ func (h *Hostile) AttackableBy(attacker skilltarget.Actor) bool {
 	if !h.SiegeGuard() {
 		return true
 	}
-	var acting any = attacker
-	if attacker.Kind() == actor.KindSummon {
-		owner, ok := attacker.Owner()
-		if !ok || owner == nil {
-			return false
-		}
-		acting = owner
-	} else if attacker.Kind() != actor.KindPlayer {
-		return false
-	}
-	member, ok := acting.(interface{ ClanID() int32 })
-	return ok && h.guarded != nil && h.guarded.Attacking(member.ClanID())
+	clanID, ok := actingClanID(attacker)
+	return ok && h.guarded != nil && h.guarded.Attacking(clanID)
 }
 
 // AttackableWithoutForceBy reports whether a playable may attack this NPC
