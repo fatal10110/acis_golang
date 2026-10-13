@@ -3,8 +3,8 @@ package network
 import (
 	"context"
 	"time"
-	"unicode/utf16"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 )
@@ -151,9 +151,5 @@ func (l *GameClientLink) sendAccountAccessLevel(account string, level int32) {
 
 // trimTitle cuts title to the longest title kept.
 func trimTitle(title string) string {
-	units := utf16.Encode([]rune(title))
-	if len(units) <= titleMaxLength {
-		return title
-	}
-	return string(utf16.Decode(units[:titleMaxLength]))
+	return commons.UTF16Cut(title, titleMaxLength)
 }

@@ -3,7 +3,6 @@ package network
 import (
 	"strconv"
 	"strings"
-	"unicode/utf16"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
@@ -50,11 +49,11 @@ func (l *GameClientLink) bypassArenaChange(live *livePlayer, command string) {
 // arenaChangeID reads the stadium of an "arenachange" command: what
 // follows its twelfth UTF-16 unit, trimmed, as a 32-bit number.
 func arenaChangeID(command string) (int, bool) {
-	units := utf16.Encode([]rune(command))
+	units := commons.UTF16Units(command)
 	if len(units) < 12 {
 		return 0, false
 	}
-	n, err := commons.ParseInt(strings.TrimFunc(string(utf16.Decode(units[12:])), javaSpace), 32)
+	n, err := commons.ParseInt(strings.TrimFunc(commons.UTF16String(units[12:]), javaSpace), 32)
 	if err != nil {
 		return 0, false
 	}

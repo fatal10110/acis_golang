@@ -6,8 +6,8 @@ import (
 	"slices"
 	"sync"
 	"time"
-	"unicode/utf16"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/chat"
 )
 
@@ -217,7 +217,7 @@ func (m *Manager) Submit(player Person, typ int32, content string) (Submission, 
 		s.Result = SubmitPlayerLimit
 		return s, nil
 	}
-	if len(utf16.Encode([]rune(content))) > maxContentLength {
+	if commons.UTF16Len(content) > maxContentLength {
 		s.Result = SubmitTooLong
 		return s, nil
 	}
