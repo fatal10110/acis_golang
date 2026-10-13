@@ -30,6 +30,7 @@ var kindOps = map[string]kindSet{
 	"NPC.DisableCoreAI":               hostileOnly,
 	"NPC.DoDie":                       hostileOnly,
 	"NPC.DropItem":                    hostileOnly,
+	"NPC.Earthquake":                  hostileOnly,
 	"NPC.GeoPathFailCount":            hostileOnly,
 	"NPC.HP":                          hostileOnly,
 	"NPC.HateList":                    hostileOnly,

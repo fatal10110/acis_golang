@@ -104,3 +104,19 @@ func (l *GameClientLink) callSkill(live *livePlayer, e event.SkillCalled) {
 	result := actorcast.CallSkill(handlers, live, target, def)
 	l.syncCubicTargets(live, result, def)
 }
+
+// showScriptMultisell shows live the multisell list name as the civilian
+// NPC objectID offers it, as a script opens it; an NPC no longer in the
+// world shows nothing.
+func (l *GameClientLink) showScriptMultisell(live *livePlayer, objectID int32, name string) {
+	if l.world == nil {
+		return
+	}
+	obj, ok := l.world.Object(objectID)
+	if !ok {
+		return
+	}
+	if f, ok := obj.(*npc.Folk); ok {
+		l.openMultisell(live, f, name, false)
+	}
+}

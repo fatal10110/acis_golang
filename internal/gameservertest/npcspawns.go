@@ -120,6 +120,9 @@ type npcSpawnDeps struct {
 	// driftRange is the WithMaxDriftRange drift range; 0 keeps the shipped
 	// one.
 	driftRange int
+	// night tells the makers whether it is night in the game world; nil
+	// says it is day.
+	night func() bool
 }
 
 // WithDataReloads gives the link the //reload and //respawnall hooks; by
@@ -171,6 +174,10 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	}
 	makers := maker.Catalog()
 	maps.Copy(makers, deps.makerCatalog)
+	night := deps.night
+	if night == nil {
+		night = func() bool { return false }
+	}
 	aiConfig := npc.DefaultAIConfig()
 	if deps.driftRange != 0 {
 		aiConfig.DriftRange = deps.driftRange
@@ -179,7 +186,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Rates: deps.dropRates, RateXP: 1, RateSP: 1}, time.Now, deps.log,
 		deps.skills, castEffects, walker, link.HostileSinks(deps.state, deps.stance), link.FolkSinks(deps.state, deps.stance),
 		20, 0, 0, npc.DefaultRaidMultipliers(), aiConfig, gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues,
-		script.NewMakers(makers, maker.Default, deps.log), deps.scripts, deps.zones)
+		script.NewMakers(makers, maker.Default, night, deps.log), deps.scripts, deps.zones)
 	if err != nil {
 		t.Fatalf("new npc spawns: %v", err)
 	}
