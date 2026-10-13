@@ -116,23 +116,42 @@ clean_project
 # policy. restart: always starts db again, the entrypoint skips the schema
 # load over the existing data directory, and the server answers on an empty
 # acis database. It must not report healthy, so the servers that wait for a
-# healthy db never start. Wait until that restarted server answers and its
-# own healthcheck has rejected it on the marker (Docker clears the health
-# log on restart).
+# healthy db never start. Wait until that restarted server answers with no
+# acis tables and one of its own healthchecks has rejected it on the marker.
+# Docker keeps health log entries across a restart, and the first start's
+# entries carry the same marker message, so only entries that began after
+# the current start count.
 rc=0
 ACIS_DATAPACK_DIR="$work/broken" compose up -d --wait --wait-timeout 120 db >/dev/null 2>&1 || rc=$?
 [ "$rc" -ne 0 ] || fail "compose up --wait reported db healthy after a failed first-start schema load"
 id=$(compose ps -a -q db)
 [ -n "$id" ] || fail "compose up left no db container"
+# One inspect call, so the start time and the health log come from the same
+# container start: a first line with the restart count, status, health and
+# start time, then one line per health log entry with its start in Unix
+# nanoseconds and its JSON-quoted output.
+inspect_fmt='{{.RestartCount}} {{.State.Status}} {{.State.Health.Status}} {{.State.StartedAt}}{{"\n"}}{{range .State.Health.Log}}{{.Start.UnixNano}} {{json .Output}}{{"\n"}}{{end}}'
 tries=0
 while :; do
-	state=$(docker inspect -f '{{.RestartCount}} {{.State.Status}} {{.State.Health.Status}}' "$id") ||
-		fail "db container $id is gone"
-	set -- $state
+	snap=$(docker inspect -f "$inspect_fmt" "$id") || fail "db container $id is gone"
+	set -- $(echo "$snap" | head -n 1)
 	[ "$3" != healthy ] || { compose logs db >&2; fail "db reported healthy after a failed first-start schema load"; }
-	if [ "$1" -ge 1 ] && [ "$2" = running ] &&
-		compose exec -T db mariadb -uroot -p"$ACIS_DB_ROOT_PASSWORD" -N -B -e 'SELECT 1' >/dev/null 2>&1 &&
-		docker inspect -f '{{range .State.Health.Log}}{{.Output}}{{end}}' "$id" | grep -q 'acis schema load did not finish'; then
+	marked=no
+	if [ "$1" -ge 1 ] && [ "$2" = running ]; then
+		since=$(date -u -d "$4" +%s%N) || fail "cannot parse db start time $4"
+		echo "$snap" | tail -n +2 | {
+			while read -r ns out; do
+				if [ "$ns" -gt "$since" ]; then
+					case $out in *'acis schema load did not finish'*) exit 0 ;; esac
+				fi
+			done
+			exit 1
+		} && marked=yes
+	fi
+	if [ "$marked" = yes ] &&
+		got=$(compose exec -T db mariadb -uroot -p"$ACIS_DB_ROOT_PASSWORD" -N -B -e \
+			"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'acis'" 2>/dev/null); then
+		[ "$got" = 0 ] || { compose logs db >&2; fail "restarted db has $got acis tables, want 0"; }
 		break
 	fi
 	tries=$((tries + 1))
