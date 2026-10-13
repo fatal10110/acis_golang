@@ -795,7 +795,9 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 		return errors.New("task: item persistence is nil")
 	}
 
-	items = slices.DeleteFunc(items, func(inst *item.Instance) bool { return inst == nil })
+	// A copy, so the caller's slice is neither compacted nor reordered by the
+	// widening below (FlushReleased reads it again after the write).
+	items = slices.DeleteFunc(slices.Clone(items), func(inst *item.Instance) bool { return inst == nil })
 	write, states, deletes, carried := i.placeRows(items)
 	var err error
 	var landed []int32
@@ -820,6 +822,28 @@ func (i *ItemInstances) UpdateItems(ctx context.Context, items []*item.Instance)
 		i.Landed(carried, landed)
 	}
 	return err
+}
+
+// FlushReleased writes the final state of items, the contents of a container
+// whose owner left and whose persistence was released
+// (itemcontainer.Container.ReleasePersistence), as one atomic flush
+// (UpdateItems), and takes them out of the pending set once it lands.
+//
+// A failed write leaves items to whatever pending already holds of them; the
+// rest keep their last saved rows, and nothing writes these instances again.
+// Their bound rows are abandoned, so a group they alone kept alive is released
+// rather than held for the life of the process (abandon). That waits for this
+// write: before it runs, the group still has to ride along with it.
+//
+// It runs on the owner's persistence lane, after every write already queued
+// there for the container.
+func (i *ItemInstances) FlushReleased(ctx context.Context, items []*item.Instance) error {
+	if err := i.UpdateItems(ctx, items); err != nil {
+		i.abandon(items)
+		return err
+	}
+	i.RemoveItems(items)
+	return nil
 }
 
 // placeRows reads the state of items and of every row bound to one of them
