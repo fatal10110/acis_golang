@@ -13,7 +13,6 @@ import (
 	"context"
 	"strconv"
 	"strings"
-	"unicode/utf16"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -784,11 +783,11 @@ func commandNumber(command string, begin int) (int, bool) {
 // as the client encodes them: one per UTF-16 unit. ok is false when command
 // is shorter than begin.
 func commandChars(command string, begin int) (string, bool) {
-	units := utf16.Encode([]rune(command))
+	units := commons.UTF16Units(command)
 	if begin > len(units) {
 		return "", false
 	}
-	return string(utf16.Decode(units[begin:])), true
+	return commons.UTF16String(units[begin:]), true
 }
 
 // javaSpace is what a trim strips: every character up to and including

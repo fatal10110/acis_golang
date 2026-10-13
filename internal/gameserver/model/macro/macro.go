@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
-	"unicode/utf16"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 )
@@ -168,7 +167,7 @@ func (l *List) Check(m Macro, commandText int) Refusal {
 		return NameMissing
 	case l.nameTaken(m):
 		return NameTaken
-	case UTF16Len(m.Description) > maxDescription:
+	case commons.UTF16Len(m.Description) > maxDescription:
 		return DescriptionTooLong
 	}
 	return Accepted
@@ -230,8 +229,8 @@ func (l *List) NextRevision() int32 {
 
 // EncodeCommands serializes cmds into the persisted command text: each line
 // as type,d1,d2 then ",text" when it has text, closed by ';', and the whole
-// cut to 255 UTF-16 code units. A cut through a surrogate pair drops its
-// leading half.
+// cut to 255 UTF-16 code units. A cut through a surrogate pair keeps its
+// leading half on its own.
 func EncodeCommands(cmds []Command) string {
 	var sb strings.Builder
 	for _, c := range cmds {
@@ -246,7 +245,7 @@ func EncodeCommands(cmds []Command) string {
 		}
 		sb.WriteByte(';')
 	}
-	return truncateUTF16(sb.String(), maxStoredCommands)
+	return commons.UTF16Cut(sb.String(), maxStoredCommands)
 }
 
 // DecodeCommands parses persisted command text. Lines are split on ';' and
@@ -297,36 +296,14 @@ func tokens(s string, sep byte) []string {
 	return out
 }
 
-// UTF16Len reports how many UTF-16 code units s encodes to: the length the
-// client counts in.
-func UTF16Len(s string) int {
-	n := 0
-	for _, r := range s {
-		n += utf16.RuneLen(r)
-	}
-	return n
-}
-
-func truncateUTF16(s string, limit int) string {
-	n := 0
-	for i, r := range s {
-		w := utf16.RuneLen(r)
-		if n+w > limit {
-			return s[:i]
-		}
-		n += w
-	}
-	return s
-}
-
 // equalFoldJava compares a and b ignoring case code point by code point,
 // matching on equal code points, equal upper cases, or equal lower cases
 // of the upper cases; strings of different UTF-16 length never match.
 func equalFoldJava(a, b string) bool {
-	if UTF16Len(a) != UTF16Len(b) {
+	if commons.UTF16Len(a) != commons.UTF16Len(b) {
 		return false
 	}
-	ra, rb := []rune(a), []rune(b)
+	ra, rb := commons.UTF16Runes(a), commons.UTF16Runes(b)
 	if len(ra) != len(rb) {
 		return false
 	}

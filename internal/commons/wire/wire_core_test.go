@@ -7,7 +7,6 @@ import (
 	"math"
 	"net"
 	"testing"
-	"unicode/utf16"
 )
 
 // ---- from frame_length_test.go ----
@@ -424,22 +423,26 @@ func TestMaxStringUnitsCoversLargestFramePayload(t *testing.T) {
 	}
 }
 
-func TestReaderReadStringDecodesLikeUTF16Decode(t *testing.T) {
-	cases := [][]uint16{
-		{},
-		{'a', 'b', 'c'},
-		{0x0439, 0x4E2D, 0xFFFF},         // 2- and 3-byte UTF-8 runes
-		{0xD83D, 0xDE00},                 // valid surrogate pair
-		{0xD83D},                         // lone high surrogate at end
-		{0xDE00, 'x'},                    // lone low surrogate
-		{0xD83D, 'x', 0xD83D, 0xDE00},    // high surrogate followed by non-low
-		{0xD83D, 0xD83D, 0xDE00, 0xDE00}, // high, pair, low
+func TestReaderReadStringDecodesUTF16(t *testing.T) {
+	cases := []struct {
+		units []uint16
+		want  string
+	}{
+		{nil, ""},
+		{[]uint16{'a', 'b', 'c'}, "abc"},
+		{[]uint16{0x0439, 0x4E2D, 0xFFFF}, "\u0439\u4E2D\uFFFF"}, // 2- and 3-byte UTF-8 runes
+		{[]uint16{0xD83D, 0xDE00}, "\U0001F600"},                 // valid surrogate pair
+		// An unpaired surrogate keeps its unit in the three-byte form.
+		{[]uint16{0xD83D}, "\xED\xA0\xBD"},                                               // lone high surrogate at end
+		{[]uint16{0xDE00, 'x'}, "\xED\xB8\x80x"},                                         // lone low surrogate
+		{[]uint16{0xD83D, 'x', 0xD83D, 0xDE00}, "\xED\xA0\xBDx\U0001F600"},               // high surrogate followed by non-low
+		{[]uint16{0xD83D, 0xD83D, 0xDE00, 0xDE00}, "\xED\xA0\xBD\U0001F600\xED\xB8\x80"}, // high, pair, low
+		{[]uint16{0xDE00, 0xD83D}, "\xED\xB8\x80\xED\xA0\xBD"},                           // reversed pair
 	}
-	for _, units := range cases {
-		want := string(utf16.Decode(units))
-		r := NewReader(append(utf16LE(units, true), 0x7F))
-		if got := r.ReadString(); got != want {
-			t.Fatalf("ReadString(%04X) = %q, want %q", units, got, want)
+	for _, tc := range cases {
+		r := NewReader(append(utf16LE(tc.units, true), 0x7F))
+		if got := r.ReadString(); got != tc.want {
+			t.Fatalf("ReadString(%04X) = %q, want %q", tc.units, got, tc.want)
 		}
 		if got := r.ReadUint8(); got != 0x7F || r.Err() != nil {
 			t.Fatalf("byte after string = %#x, Err() = %v; want 0x7F, nil", got, r.Err())

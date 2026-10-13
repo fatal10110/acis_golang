@@ -1,6 +1,10 @@
 package serverpackets
 
-import "github.com/fatal10110/acis_golang/internal/commons/wire"
+import (
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+
+	"github.com/fatal10110/acis_golang/internal/commons"
+)
 
 // OpcodeNpcHtmlMessage is the wire opcode for NpcHtmlMessage.
 const OpcodeNpcHtmlMessage = 0x0f
@@ -18,16 +22,8 @@ func NpcHtmlBody(html string) string {
 	if len(html) <= maxNpcHTML {
 		return html
 	}
-	units := 0
-	for _, r := range html {
-		// A rune past the Basic Multilingual Plane takes a surrogate pair.
-		units++
-		if r >= 0x10000 {
-			units++
-		}
-		if units > maxNpcHTML {
-			return "<html><body>Html was too long.</body></html>"
-		}
+	if commons.UTF16Len(html) > maxNpcHTML {
+		return "<html><body>Html was too long.</body></html>"
 	}
 	return html
 }

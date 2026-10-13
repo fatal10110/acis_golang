@@ -1,8 +1,7 @@
 package network
 
 import (
-	"unicode/utf16"
-
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -235,7 +234,7 @@ func (l *GameClientLink) quitPrivateStore(live *livePlayer) {
 // storeMessageFits reports whether text is short enough for a store title
 // or workshop name.
 func storeMessageFits(text string) bool {
-	return len(utf16.Encode([]rune(text))) <= privatestore.MaxMessageLength
+	return commons.UTF16Len(text) <= privatestore.MaxMessageLength
 }
 
 // setSellStoreTitle answers SetPrivateStoreMsgSell: the title is kept and
