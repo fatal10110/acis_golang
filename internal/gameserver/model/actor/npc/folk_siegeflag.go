@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 )
 
@@ -14,14 +15,21 @@ import (
 // lethal blow, and its stats are its template's own, with none of a
 // creature's built-in stat bonuses. A hit warns its clan the base is under
 // attack, at most once every headquartersWarnHold. Its clan holds it until
-// it dies, which takes it out of the world at once.
-//
-// ponytail: the Swoop Cannon siege summon cannot damage it; that waits for
-// the siege summons (#3296).
+// it dies, which takes it out of the world at once. The anti-infantry
+// Swoop Cannon siege summon neither hurts it nor sets off the warning.
 const siegeFlag InstanceKind = "SiegeFlag"
 
 // SiegeFlagNpcID is the template id a siege headquarters spawns as.
 const SiegeFlagNpcID = 35062
+
+// swoopCannonNpcID is the template id of the Swoop Cannon siege summon.
+const swoopCannonNpcID = 14839
+
+// siegeSummoner is an attacker that may be a siege summon.
+type siegeSummoner interface {
+	SiegeSummon() bool
+	NPCID() int
+}
 
 // headquartersWarnHold is how long a siege headquarters' clan is warned of
 // an attack at most once.
@@ -100,14 +108,19 @@ func (f *Folk) HeadquartersClan() (*clan.Clan, bool) {
 func (f *Folk) RefusesEffects() bool { return f.SiegeFlag() }
 
 // headquartersHit is a hit on a siege headquarters, before its HP is
-// touched: it warns the clan when no warning is on hold, and holds the next
-// for headquartersWarnHold.
-func (f *Folk) headquartersHit() {
+// touched. It reports false, the hit landing nothing, for a Swoop Cannon
+// attacker; otherwise it warns the clan when no warning is on hold, and
+// holds the next for headquartersWarnHold.
+func (f *Folk) headquartersHit(attacker attackable.Combatant) bool {
+	if s, ok := attacker.(siegeSummoner); ok && s.SiegeSummon() && s.NPCID() == swoopCannonNpcID {
+		return false
+	}
 	now := f.now().UnixMilli()
 	until := f.headquarters.warnUntil.Load()
 	if now >= until && f.headquarters.warnUntil.CompareAndSwap(until, now+headquartersWarnHold.Milliseconds()) {
 		f.emit(event.HeadquartersAttacked{})
 	}
+	return true
 }
 
 // headquartersDied drops a dead siege headquarters from its clan, which

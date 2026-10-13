@@ -65,6 +65,8 @@ type hqSetup struct {
 	// deputy makes the caster a member of its clan, led by an offline
 	// deputy.
 	deputy bool
+	// known are more skills the caster knows, at their definitions' level.
+	known []modelskill.Definition
 }
 
 // hqWorld is a booted server over the shipped castles with Gludio's siege
@@ -114,7 +116,7 @@ func bootHQ(t *testing.T, setup hqSetup) *hqWorld {
 	if setup.deputy {
 		leader = "?"
 	}
-	defs := hqSkills(t)
+	defs := append(hqSkills(t), setup.known...)
 	srv := gameservertest.Boot(t,
 		gameservertest.WithCharacter("Sieger", 40, 0),
 		gameservertest.WithWantChars(1),
@@ -151,7 +153,7 @@ func bootHQ(t *testing.T, setup hqSetup) *hqWorld {
 	}
 	objID := srv.SoleObjectID(t)
 	for _, def := range defs {
-		seedKnownSkill(t, srv, objID, int(def.ID), 1)
+		seedKnownSkill(t, srv, objID, int(def.ID), def.Level)
 	}
 	srv.GiveItem(t, objID, hqCostItemID, hqCostHeld)
 	gludio, ok := srv.Sieges.Get(gludioCastleID)

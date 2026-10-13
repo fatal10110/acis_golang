@@ -109,13 +109,14 @@ func (f *Folk) raiseAttacked(attacker attackable.Combatant, damage int32, sk mod
 // zero otherwise, and an NPC left under folkDeathHP dies. It reports
 // whether this call killed the NPC. A hit has no sleep, hold or stun to
 // break: none lands on a civilian NPC. A holy artifact takes no hit at all;
-// a siege headquarters runs its own hit first (headquartersHit).
+// a siege headquarters runs its own hit first (headquartersHit), and a
+// Swoop Cannon's hit on it stops there.
 func (f *Folk) reduceHP(amount float64, attacker attackable.Combatant, sk modelskill.Ref) bool {
 	if f.HolyThing() {
 		return false
 	}
-	if f.SiegeFlag() {
-		f.headquartersHit()
+	if f.SiegeFlag() && !f.headquartersHit(attacker) {
+		return false
 	}
 	return f.loseHP(amount, attacker, sk, true)
 }
