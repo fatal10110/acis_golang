@@ -66,11 +66,7 @@ type loadingDeathEvents struct {
 // memo stops it from ever being shown again. The burst carries neither, so
 // it emits them after its Die frame (releaseHeldForEnterWorld).
 func (p *livePlayer) holdForEnterWorld(ev event.Event) bool {
-	switch ev.(type) {
-	case event.ReviveRequested, event.SoundPlayed,
-		event.TutorialPageShown, event.TutorialPageClosed, event.TutorialQuestionMarkShown,
-		event.TutorialClientEventEnabled, event.TutorialVoicePlayed, event.RadarMarkerAdded, event.RadarMarkerRemoved:
-	default:
+	if _, revive := ev.(event.ReviveRequested); !revive && !tutorialAnswer(ev) {
 		return false
 	}
 	if !p.deathOnLoadingScreen() {
@@ -80,6 +76,17 @@ func (p *livePlayer) holdForEnterWorld(ev event.Event) bool {
 	p.loadingDeath.events = append(p.loadingDeath.events, ev)
 	p.loadingDeath.mu.Unlock()
 	return true
+}
+
+// tutorialAnswer reports whether ev is a frame a tutorial step sends.
+func tutorialAnswer(ev event.Event) bool {
+	switch ev.(type) {
+	case event.SoundPlayed,
+		event.TutorialPageShown, event.TutorialPageClosed, event.TutorialQuestionMarkShown,
+		event.TutorialClientEventEnabled, event.TutorialVoicePlayed, event.RadarMarkerAdded, event.RadarMarkerRemoved:
+		return true
+	}
+	return false
 }
 
 // takeHeldForEnterWorld returns and clears the events holdForEnterWorld
@@ -144,6 +151,9 @@ func (p *livePlayer) Emit(ev event.Event) {
 		p.removeAllCubics()
 	}
 	if p.SessionDetached() && sessionOnly(ev) {
+		return
+	}
+	if p.quietTutorial.Load() && tutorialAnswer(ev) {
 		return
 	}
 	if p.holdForEnterWorld(ev) {

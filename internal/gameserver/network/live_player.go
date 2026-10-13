@@ -95,6 +95,14 @@ type livePlayer struct {
 	// events loadingDeath holds for the burst. Written on the owner's
 	// queue; atomic for the send paths.
 	replayMayDie atomic.Bool
+	// restoredHP is the HP the selection restored, which noteRestoredHP
+	// measures once the restored equipment and effects apply; it is
+	// pending until then. quietTutorial keeps that measure's tutorial
+	// answer from the client. Atomic: the selection, the owner's queue and
+	// a detach touch them.
+	restoredHP        atomic.Uint64
+	restoredHPPending atomic.Bool
+	quietTutorial     atomic.Bool
 	// loadingDeath holds the events of that death whose state outlives it
 	// and that no EnterWorld frame carries (see holdForEnterWorld).
 	loadingDeath loadingDeathEvents

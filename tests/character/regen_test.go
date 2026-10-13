@@ -51,6 +51,9 @@ func TestPlayerRegenTickRestoresResourcesAndSendsStatus(t *testing.T) {
 	p.SetResourceValues(player.Resources{MaxHP: 100, CurrentHP: full.MaxHP, MaxMP: 100, CurrentMP: full.MaxMP, MaxCP: 100, CurrentCP: full.MaxCP})
 	dropped := player.Resources{MaxHP: 100, CurrentHP: 10, MaxMP: 100, CurrentMP: 10, MaxCP: 100, CurrentCP: 10}
 	p.SetResourceValues(dropped)
+	// The fixture's maxima replace the restored ones, and each changed
+	// maximum reports the player's status on its queue.
+	srv.ReadQueued(t, c)
 
 	regen := task.NewNPCRegen(srv.State)
 	sweepAfter := func(d time.Duration) player.Resources {

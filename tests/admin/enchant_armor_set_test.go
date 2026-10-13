@@ -103,10 +103,12 @@ func bootArmorSetAdmin(t *testing.T, enchant map[int32]int) (*gameservertest.Ser
 // statRefreshThenSkillList is what the GM sees when the +6 skill is granted
 // or revoked: the skill's maxHp func changing the stats refreshes UserInfo
 // first (Creature.broadcastModifiedStats), then the SkillList, the
-// command's own UserInfo and the report.
+// command's own UserInfo and the report; the changed maximum HP reports
+// the GM's status last.
 var statRefreshThenSkillList = []byte{
 	serverpackets.OpcodeUserInfo, serverpackets.OpcodeSkillList,
 	serverpackets.OpcodeUserInfo, serverpackets.OpcodeSystemMessage,
+	serverpackets.OpcodeStatusUpdate,
 }
 
 // TestAdminEnchantArmorSet pins the armor branch of //enchant
@@ -129,7 +131,7 @@ func TestAdminEnchantArmorSet(t *testing.T) {
 		if !skillListHas(frames[1], mithrilSetSkillID) {
 			t.Fatal("SkillList after //enchant chest 5 lost the set skill")
 		}
-		assertTexts(t, frames[3:], "Admin's Mithril Breastplate enchant was modified from 6 to 5.")
+		assertTexts(t, frames[3:4], "Admin's Mithril Breastplate enchant was modified from 6 to 5.")
 		if got, want := srv.PlayerMaxHP(t, gmID), before-mithrilEnchant6HP; got != want {
 			t.Fatalf("MaxHP after the +6 revoke = %d, want %d", got, want)
 		}
@@ -156,7 +158,7 @@ func TestAdminEnchantArmorSet(t *testing.T) {
 		if !skillListHas(frames[1], mithrilEnchant6ID) {
 			t.Fatal("SkillList after //enchant head 6 lacks the +6 skill")
 		}
-		assertTexts(t, frames[3:], "Admin's Helmet enchant was modified from 5 to 6.")
+		assertTexts(t, frames[3:4], "Admin's Helmet enchant was modified from 5 to 6.")
 		if got, want := srv.PlayerMaxHP(t, gmID), before+mithrilEnchant6HP; got != want {
 			t.Fatalf("MaxHP after the +6 grant = %d, want %d", got, want)
 		}

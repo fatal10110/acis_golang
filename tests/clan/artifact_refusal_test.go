@@ -99,7 +99,7 @@ func bootRefusalWorld(t *testing.T) *refusalWorld {
 		Level: 20, HPMax: 342, MPMax: 213, WalkSpeed: 49.5, CollisionRadius: 25, CollisionHeight: 98, Undying: true,
 	}
 	place := func(where string, at location.Location) string {
-		return `UPDATE characters SET x = ` + itoa(int32(at.X)) + `, y = ` + itoa(int32(at.Y)) + `, z = ` + itoa(int32(at.Z)) + `, curMp = 300 WHERE ` + where
+		return `UPDATE characters SET x = ` + itoa(int32(at.X)) + `, y = ` + itoa(int32(at.Y)) + `, z = ` + itoa(int32(at.Z)) + `, maxMp = 1000, curMp = 300 WHERE ` + where
 	}
 	member := func(id int32) string {
 		return `UPDATE characters SET clanid = ` + itoa(knightsClanID) + `, power_grade = 6 WHERE obj_Id = ` + itoa(id)

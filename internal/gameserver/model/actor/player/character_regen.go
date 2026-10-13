@@ -51,8 +51,8 @@ func (c *Character) SettleRegen() {
 
 // SettleEnteredRegen arms c's regeneration task as c enters the world short
 // of HP, MP or CP restored before it was in the world, its first tick one
-// period from the entry. It raises no tutorial event: the restore reported
-// its HP at the selection (NotifyRestoredHP).
+// period from the entry. It raises no tutorial event: the restored HP is
+// reported on its own (NotifyRestoredHP).
 func (c *Character) SettleEnteredRegen() {
 	c.settleRegenTask()
 }

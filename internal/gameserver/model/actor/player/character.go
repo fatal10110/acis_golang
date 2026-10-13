@@ -99,6 +99,11 @@ type Character struct {
 	// seenMaxHP, seenMaxMP and seenMaxCP are the whole-point maxima the
 	// last ResourceValues read finalized; see noteMaxima.
 	seenMaxHP, seenMaxMP, seenMaxCP atomic.Int64
+	// shownMaxHP, shownMaxMP and shownMaxCP are the whole-point maxima
+	// SettleMaxima last measured a change against; maximaShown is set once
+	// the client has been shown them (AdoptMaxima). Guarded by vitalsMu.
+	shownMaxHP, shownMaxMP, shownMaxCP float64
+	maximaShown                        bool
 	// reviveMu makes a revive one step from dead to alive, so exactly one
 	// of two revives wins a death. The player's own restart-point request
 	// and a resurrecting caster's hit run on different queues. Without the

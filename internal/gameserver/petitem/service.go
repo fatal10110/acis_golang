@@ -153,33 +153,18 @@ func withinGiveRange(owner positioned, pet *summon.Actor) bool {
 }
 
 // GetFromPet transfers one item from a pet inventory to its owner's
-// inventory, unequipping it from the pet first if it was worn. Container.
-// Transfer only touches the container's item map — it never clears a
-// paperdoll slot pointing at the transferred instance — so an equipped item
-// must be unequipped explicitly here; the reported WasWorn drives the
-// PET_TOOK_OFF_S1 notification.
-//
-// wasWorn is only captured as a boolean before the transfer is attempted;
-// the actual paperdoll-clearing mutation runs only once s.transfer reports
-// GiveOK — the confirmed-success path, after the item is reconfirmed still
-// present. A failed transfer (e.g. the item was concurrently removed from
-// petInv between this lookup and transfer's own re-check) must leave the
-// pet's equip state untouched. The clear uses ClearWornSlot rather than UnequipSlot: by
-// this point the transfer has already moved inst into playerInv and set
-// its Location there, and UnequipSlot's own SetLocation(petInv.Location(),
-// 0) would incorrectly move it back.
+// inventory. A worn item is taken off as it leaves the pet's inventory, inside
+// the transfer, so a failed transfer leaves the pet's equip state untouched.
+// The reported WasWorn, read before the transfer, drives the PET_TOOK_OFF_S1
+// notification.
 func (s *Service) GetFromPet(petInv, playerInv *itemcontainer.Inventory, objectID int32, count int) (TransferResult, bool, error) {
 	wasWorn := false
 	itemID := int32(0)
-	slot := 0
-	var inst *item.Instance
 	if petInv != nil {
-		if candidate := petInv.ItemByObjectID(objectID); candidate != nil {
-			if st := candidate.Snapshot(); st.Equipped() {
+		if inst := petInv.ItemByObjectID(objectID); inst != nil {
+			if st := inst.Snapshot(); st.Equipped() {
 				wasWorn = true
 				itemID = st.TemplateID
-				slot = st.LocationData
-				inst = candidate
 			}
 		}
 	}
@@ -187,10 +172,8 @@ func (s *Service) GetFromPet(petInv, playerInv *itemcontainer.Inventory, objectI
 	if failure != GiveOK {
 		return result, false, err
 	}
-	if wasWorn && petInv.ClearWornSlot(slot, inst) {
-		result.WasWorn = true
-		result.ItemID = itemID
-	}
+	result.WasWorn = wasWorn
+	result.ItemID = itemID
 	return result, true, err
 }
 

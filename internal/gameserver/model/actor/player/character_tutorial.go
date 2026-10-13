@@ -65,16 +65,16 @@ func (c *Character) lowHPNotice() {
 	}
 }
 
-// NotifyRestoredHP raises tutorialLowHP when c's restored HP is below
-// lowHPRatio of its maximum, as restoring the saved HP does, dead or not.
-// The selection runs it once, after c's journal is loaded and its tutorial
-// seam installed and before c has an event sink: what the tutorial answers
-// reaches no client, and its journal writes are kept.
-func (c *Character) NotifyRestoredHP() {
+// NotifyRestoredHP raises tutorialLowHP when hp, the HP c's selection
+// restored, is below lowHPRatio of c's maximum HP, dead or not. Restoring
+// the saved HP measures it against the maximum the restored equipment and
+// effects make, so it runs once both apply. Its caller keeps the tutorial's
+// answer from the client; the journal writes stay.
+func (c *Character) NotifyRestoredHP(hp float64) {
 	if c.tutorial == nil {
 		return
 	}
-	if res := c.ResourceValues(); res.CurrentHP/res.MaxHP < lowHPRatio {
+	if maxHP := c.ResourceValues().MaxHP; min(hp, maxHP)/maxHP < lowHPRatio {
 		c.NotifyTutorial(tutorialLowHP)
 	}
 }

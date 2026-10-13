@@ -48,11 +48,14 @@ func TestRelogMidFightRestoresSavedHP(t *testing.T) {
 	attacker := srv.SpawnAttackingHostileNPCAt(t, location.Location{X: spawnX + 50, Y: spawnY, Z: spawnZ})
 	drainUntilQuiet(t, srv.Client)
 
-	fullHP := srv.PlayerCurrentHP(t, objID)
+	// Low enough that the relogged maximum, which the restore recomputes
+	// from the stored row, still holds the post-hit HP unclamped.
+	srv.DamagePlayerHP(t, objID, srv.PlayerCurrentHP(t, objID)-10)
+	beforeHP := srv.PlayerCurrentHP(t, objID)
 	attacker.DoAttack(t, obj.(attackable.Combatant))
 	hitHP := srv.PlayerCurrentHP(t, objID)
-	if hitHP >= fullHP || hitHP <= 0 {
-		t.Fatalf("HP after the hit = %d, want a survived hit below %d", hitHP, fullHP)
+	if hitHP >= beforeHP || hitHP <= 0 {
+		t.Fatalf("HP after the hit = %d, want a survived hit below %d", hitHP, beforeHP)
 	}
 
 	release := srv.HoldPersistenceLane(t, objID)

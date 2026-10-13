@@ -249,9 +249,9 @@ func TestTutorialLowHPAheadOfUnreportedStatus(t *testing.T) {
 }
 
 // TestTutorialLowHPAtRestore: a newbie saved below 30% of its maximum HP
-// runs the tutorial's low-HP step when the character is restored at
-// selection. The step's packets reach no client, but its journal writes
-// stay, so no question mark 10 ever shows.
+// runs the tutorial's low-HP step for its restored HP on the way into the
+// world. The step's packets reach no client, but its journal writes stay,
+// so no question mark 10 ever shows.
 func TestTutorialLowHPAtRestore(t *testing.T) {
 	t.Parallel()
 	srv := bootNewbie(t, true, false)
@@ -266,11 +266,11 @@ func TestTutorialLowHPAtRestore(t *testing.T) {
 	if got := tutorialFrames(selection); len(got) != 0 {
 		t.Fatalf("selection sent tutorial frames %x, want none", got)
 	}
-	if got := srv.QuestVars(t, objID, tutorial); got["HP"] != "1" || got["sit"] != "8388608" {
-		t.Fatalf("tutorial after the selection = %v, want HP 1 and sit 8388608", got)
-	}
 	c.Send(encodeSingleOpcode(clientpackets.OpcodeEnterWorld))
 	burst := srv.ReadQueued(t, c)
+	if got := srv.QuestVars(t, objID, tutorial); got["HP"] != "1" || got["sit"] != "8388608" {
+		t.Fatalf("tutorial after entering = %v, want HP 1 and sit 8388608", got)
+	}
 	for _, f := range tutorialFrames(burst) {
 		if f[0] == serverpackets.OpcodeTutorialShowQuestionMark && wire.NewReader(f[1:]).ReadInt32() == 10 {
 			t.Fatalf("burst shows question mark 10: %x", burst)
