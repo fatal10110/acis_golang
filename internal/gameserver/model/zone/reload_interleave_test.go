@@ -97,7 +97,7 @@ func TestReloadPlayerMoveBeforeTheRebase(t *testing.T) {
 	previous := p.at
 	p.at = location.Location{X: 600, Y: 500}
 	ix.RevalidateMove(p, previous)
-	ix.Rebase(p, true)
+	ix.Rebase(p, p.at, true)
 	if !arena.Inside(p) || !p.flags.Has(FlagPvP) || !p.flags.Has(FlagNoSummonFriend) {
 		t.Fatalf("after Rebase: inside the new arena = %v, pvp flag = %v; want both",
 			arena.Inside(p), p.flags.Has(FlagPvP))
