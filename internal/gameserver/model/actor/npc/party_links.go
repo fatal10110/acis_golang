@@ -1,6 +1,8 @@
 package npc
 
 import (
+	"maps"
+	"slices"
 	"sync"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -31,27 +33,33 @@ type PartyMember interface {
 	SpawnMaster() PartyMember
 	// IsPrivate reports whether the NPC was spawned as a master's private.
 	IsPrivate() bool
-	// AddMinion records a private spawned for the NPC.
+	// AddMinion records a private spawned for the NPC in its party's
+	// privates: its master's when it has one, its own otherwise.
 	AddMinion(minion PartyMember)
-	// RemoveMinion forgets the private minion, in whichever life.
+	// RemoveMinion forgets the private minion, in whichever life, from the
+	// NPC's party's privates.
 	RemoveMinion(minion PartyMember)
-	// ClearMinions forgets every private, leaving them in the world; the
-	// NPC stays a master.
+	// ClearMinions forgets every private of the NPC's party, leaving them
+	// in the world.
 	ClearMinions()
-	// Minions returns a snapshot of the NPC's privates, each as its
-	// current life.
+	// Minions returns a snapshot of the privates of the NPC's party, each
+	// as its current life: its master's when it has one, its own
+	// otherwise.
 	Minions() []PartyMember
-	// PartyMinions returns a snapshot of the privates of the NPC's party:
-	// its master's when it has one. Otherwise they are its own, and the
-	// NPC is a master from then on, with no private at first.
+	// PartyMinions returns what Minions does. An NPC with no master keeps
+	// privates of its own from then on: it is a master, with no private at
+	// first.
 	PartyMinions() []PartyMember
-	// IsMaster reports whether the NPC has ever recorded a private, in
-	// this life or an earlier one.
+	// IsMaster reports whether the NPC has kept privates of its own, in
+	// this life or an earlier one. A linked private records the privates it
+	// spawns in its master's, so it is no master.
 	IsMaster() bool
+	// SpawnedPrivates reports whether a private was ever spawned for the
+	// NPC, in this life or an earlier one, whichever party recorded it.
+	SpawnedPrivates() bool
 
 	links() *partyLinks
 	inParty() bool
-	partyMinions() []PartyMember
 }
 
 var (
@@ -98,8 +106,11 @@ type party struct {
 	// for good.
 	spawnMaster PartyMember
 	// minions are the privates, keyed by their spawn slot's Scratch: each
-	// is read as the private's current life (Current).
+	// is read as the private's current life (Current). Only an NPC with no
+	// master keeps them; a linked private's party uses its master's.
 	minions map[*Scratch]PartyMember
+	// spawned reports that a private was spawned for this NPC.
+	spawned bool
 }
 
 // party returns the NPC's party membership, its spawn slot's.
@@ -142,72 +153,101 @@ func (b *spawnBinding) SpawnMaster() PartyMember {
 // IsPrivate reports whether this NPC was spawned as a master's private.
 func (b *spawnBinding) IsPrivate() bool { return b.SpawnMaster() != nil }
 
-// AddMinion records a private spawned for this NPC.
+// holder returns the party whose privates this NPC's party uses: its top
+// master's, following each master's own master, or its own when it has no
+// master. Master links form no cycle: an NPC is linked only to an NPC that
+// existed before it.
+func (b *spawnBinding) holder() *party {
+	m := b.Master()
+	if m == nil {
+		return b.party()
+	}
+	for next := m.Master(); next != nil; next = m.Master() {
+		m = next
+	}
+	return &m.Scratch().party
+}
+
+// keptMinions returns the privates map of p, making p a master when it had
+// none. The caller holds p.mu.
+func (p *party) keptMinions() map[*Scratch]PartyMember {
+	if p.minions == nil {
+		p.minions = make(map[*Scratch]PartyMember)
+	}
+	return p.minions
+}
+
+// AddMinion records a private spawned for this NPC in its party's
+// privates: its master's when it has one, its own otherwise.
 func (b *spawnBinding) AddMinion(minion PartyMember) {
 	if minion == nil {
 		return
 	}
-	p := b.party()
+	own := b.party()
+	own.mu.Lock()
+	own.spawned = true
+	own.mu.Unlock()
+	p := b.holder()
 	p.mu.Lock()
-	if p.minions == nil {
-		p.minions = make(map[*Scratch]PartyMember)
-	}
-	p.minions[minion.Scratch()] = minion
+	p.keptMinions()[minion.Scratch()] = minion
 	p.mu.Unlock()
 }
 
-// RemoveMinion forgets the private minion, in whichever life.
+// RemoveMinion forgets the private minion, in whichever life, from this
+// NPC's party's privates.
 func (b *spawnBinding) RemoveMinion(minion PartyMember) {
 	if minion == nil {
 		return
 	}
-	p := b.party()
+	p := b.holder()
 	p.mu.Lock()
-	delete(p.minions, minion.Scratch())
+	delete(p.keptMinions(), minion.Scratch())
 	p.mu.Unlock()
 }
 
-// ClearMinions forgets every private, leaving them in the world; the NPC
-// stays a master.
+// ClearMinions forgets every private of this NPC's party, leaving them in
+// the world.
 func (b *spawnBinding) ClearMinions() {
-	p := b.party()
+	p := b.holder()
 	p.mu.Lock()
 	p.minions = make(map[*Scratch]PartyMember)
 	p.mu.Unlock()
 }
 
-// Minions returns a stable snapshot of this NPC's privates, each as its
-// current life, dead and decayed ones included.
+// Minions returns a stable snapshot of the privates of this NPC's party,
+// each as its current life, dead and decayed ones included: its master's
+// when it has one, its own otherwise.
 func (b *spawnBinding) Minions() []PartyMember {
-	p := b.party()
-	p.mu.RLock()
-	minions := make([]PartyMember, 0, len(p.minions))
-	for _, minion := range p.minions {
-		minions = append(minions, minion)
+	return b.holder().snapshot(false)
+}
+
+// PartyMinions returns what Minions does. An NPC with no master keeps
+// privates of its own from then on: it is a master, with no private at
+// first.
+func (b *spawnBinding) PartyMinions() []PartyMember {
+	return b.holder().snapshot(true)
+}
+
+// snapshot returns p's privates, each as its current life; keep makes p a
+// master when it had none.
+func (p *party) snapshot(keep bool) []PartyMember {
+	var minions []PartyMember
+	if keep {
+		p.mu.Lock()
+		minions = slices.Collect(maps.Values(p.keptMinions()))
+		p.mu.Unlock()
+	} else {
+		p.mu.RLock()
+		minions = slices.Collect(maps.Values(p.minions))
+		p.mu.RUnlock()
 	}
-	p.mu.RUnlock()
 	for i, minion := range minions {
 		minions[i] = Current(minion)
 	}
 	return minions
 }
 
-// PartyMinions returns a snapshot of the privates of this NPC's party: its
-// master's when it has one. Otherwise they are its own, and the NPC is a
-// master from then on, with no private at first.
-func (b *spawnBinding) PartyMinions() []PartyMember {
-	if b.Master() == nil {
-		p := b.party()
-		p.mu.Lock()
-		if p.minions == nil {
-			p.minions = make(map[*Scratch]PartyMember)
-		}
-		p.mu.Unlock()
-	}
-	return b.partyMinions()
-}
-
-// IsMaster reports whether this NPC has ever recorded a private, in this
+// IsMaster reports whether this NPC has kept privates of its own, in this
 // life or an earlier one.
 func (b *spawnBinding) IsMaster() bool {
 	p := b.party()
@@ -216,18 +256,18 @@ func (b *spawnBinding) IsMaster() bool {
 	return p.minions != nil
 }
 
+// SpawnedPrivates reports whether a private was ever spawned for this NPC,
+// in this life or an earlier one.
+func (b *spawnBinding) SpawnedPrivates() bool {
+	p := b.party()
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.spawned
+}
+
 // inParty reports whether the NPC is a master or a linked private.
 func (b *spawnBinding) inParty() bool {
 	return b.IsMaster() || b.Master() != nil
-}
-
-// partyMinions returns the privates of the NPC's party: its master's when
-// it has one, its own otherwise.
-func (b *spawnBinding) partyMinions() []PartyMember {
-	if master := b.Master(); master != nil {
-		return master.Minions()
-	}
-	return b.Minions()
 }
 
 // privateInTerritory decides InTerritory for a private: a linked one uses
@@ -292,7 +332,7 @@ func propagatePartyAttacked(caller PartyMember, target attackable.Combatant, dam
 	if master := caller.Master(); master != nil && !master.AlikeDead() {
 		call(master)
 	}
-	for _, minion := range caller.partyMinions() {
+	for _, minion := range caller.Minions() {
 		if minion.AlikeDead() {
 			continue
 		}
@@ -322,7 +362,7 @@ func partyDied(hooks ScriptHooks, caller PartyMember) {
 		if master := caller.Master(); master != nil && !SameNPC(master, caller) {
 			call(master)
 		}
-		for _, minion := range caller.partyMinions() {
+		for _, minion := range caller.Minions() {
 			if !SameNPC(minion, caller) {
 				call(minion)
 			}
