@@ -54,9 +54,10 @@ func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
 // out. Crossing an upkeep checkpoint makes its owner pay the upkeep item, and
 // an owner who cannot pay loses the servitor. Once the remaining lifetime has
 // dropped far enough since it was last shown (1/352 of the total), the
-// owner's summon window is shown it again, even on the tick the servitor
-// leaves, and the effect icons of a servitor still here that ever held an
-// effect are refreshed. A dead servitor's lifetime stands still.
+// owner's summon window is shown it again, and the effect icons of a
+// servitor that ever held an effect are refreshed, even on the tick the
+// servitor leaves: after its PetDelete, with the icons its departure
+// cleared. A dead servitor's lifetime stands still.
 func (a *Actor) TickServitor(state *world.State) {
 	if a == nil || a.isPet || a.Dead() {
 		return
@@ -74,19 +75,14 @@ func (a *Actor) TickServitor(state *world.State) {
 	}
 	a.statusMu.Unlock()
 
-	left := false
 	if expired || (upkeep && a.itemConsumeID != 0 && a.itemConsumeCount > 0 && !a.payUpkeep()) {
 		a.despawn(state)
-		left = true
 	}
 	if !show {
 		return
 	}
-	// The owner still reads the remaining time after the servitor's
-	// PetDelete. Its icon refresh waits on the effects stopping at
-	// departure, which a leaving summon does not do yet (#3719).
 	a.emit(event.LifetimeShown{Total: next.TotalLifeTime, Remaining: next.TimeRemaining})
-	if !left && a.EffectList().HasHeld() {
+	if a.EffectList().HasHeld() {
 		a.UpdateEffectIcons()
 	}
 }

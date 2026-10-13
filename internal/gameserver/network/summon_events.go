@@ -322,16 +322,17 @@ func (s *summonSink) Emit(ev event.Event) {
 			// world (a signet's unsummon, a servitor's decay): it stops what
 			// it was doing, and a pet's row is saved again first, alive,
 			// with its owner's collar lifted to the level it regained.
-			if !actor.Dead() {
-				if s.brain != nil {
-					s.runCleanup(s.brain.AbortAll)
-				}
-				if actor.IsPet() {
-					s.runCleanup(func() {
-						l.savePet(actor, nil)
-						l.liftLeftPetCollar(actor)
-					})
-				}
+			// Either way its effects end, with no owner to show them to.
+			alive := !actor.Dead()
+			if alive && s.brain != nil {
+				s.runCleanup(s.brain.AbortAll)
+			}
+			s.runCleanup(actor.EffectList().StopAll)
+			if alive && actor.IsPet() {
+				s.runCleanup(func() {
+					l.savePet(actor, nil)
+					l.liftLeftPetCollar(actor)
+				})
 			}
 			s.runCleanup(func() { l.settleLeftCorpseItems(actor) })
 			return
@@ -340,11 +341,15 @@ func (s *summonSink) Emit(ev event.Event) {
 		// one-time despawn, so a panic escaping it would leave the summon in
 		// the world with no second despawn to take it out. The abort comes
 		// first, so a stop broadcast still reaches observers and a cast or
-		// attack in flight cannot land from a summon that is leaving.
+		// attack in flight cannot land from a summon that is leaving. A pet's
+		// items go back before its effects end, and its row is saved after
+		// they ended; the owner sees the icons cleared before PetDelete.
 		if s.brain != nil {
 			s.runCleanup(s.brain.AbortAll)
 		}
-		s.runCleanup(func() { l.releasePet(actor) })
+		s.runCleanup(func() { l.returnPetItems(actor) })
+		s.runCleanup(actor.StopAllEffects)
+		s.runCleanup(func() { l.storeDepartingPet(actor) })
 	case event.SummonRemoved:
 		if owner, ok := l.currentSummonOwner(actor); ok {
 			owner.SendFrame(serverpackets.FramePetDelete(actor.SummonType(), actor.ObjectID()))
@@ -465,7 +470,7 @@ func (l *GameClientLink) reclaimPetCorpse(live *livePlayer) {
 // settleLeftCorpseItems hands the items of a pet corpse its owner left
 // behind to that owner as the corpse decays. An owner back in the world
 // whose session has not taken the corpse over yet gets them in its
-// inventory, on its own queue, as for any other departure (releasePet).
+// inventory, on its own queue, as for any other departure (returnPetItems).
 // Otherwise the owner is offline: every item becomes a row of the owner's
 // carried inventory, without a capacity check or a stack merge, since the
 // inventory of a session that left holds nothing; the owner's next login
@@ -559,7 +564,7 @@ type petRowDeleter interface {
 
 // destroyDecayedPet ends a pet whose corpse decayed, or that left its owner
 // from hunger: its owner loses the collar and the pets row is deleted. The pet has already left the world
-// through the same settle as any other departure (releasePet), so its items
+// through the same settle as any other departure (returnPetItems), so its items
 // are already back with its owner and its row was saved; the delete is queued
 // on the collar's persistence lane, behind that save.
 //
@@ -634,11 +639,12 @@ func (l *GameClientLink) setOfflineItemEnchant(ownerID, objectID int32, enchant 
 	}, ownerID)
 }
 
-// releasePet settles a pet on its way out of the world, whatever took it out:
-// its items go back to its owner, its row and collar are saved, and its
-// container is then flushed and unregistered, since nothing else will ever
-// write it. It runs while the pet and its owner are both still in the world,
-// before PetDelete is sent.
+// returnPetItems and storeDepartingPet settle a pet on its way out of the
+// world, whatever took it out: its items go back to its owner, then its row
+// and collar are saved, and its container is flushed and unregistered, since
+// nothing else will ever write it. They run while the pet and its owner are
+// both still in the world, before PetDelete is sent; the pet's effects end
+// between the two.
 //
 // A dead pet is settled the same way. The routes that must leave a corpse
 // alone refuse before reaching here (Actor.Unsummon), so a dead pet only
@@ -646,19 +652,31 @@ func (l *GameClientLink) setOfflineItemEnchant(ownerID, objectID int32, enchant 
 // mid-despawn. Its items go to the owner now, since the collar goes with the
 // decay, and skipping the row would restore it alive from an older save. A
 // corpse its owner left behind is settled apart (settleLeftCorpseItems).
-func (l *GameClientLink) releasePet(actor *summon.Actor) {
+func (l *GameClientLink) returnPetItems(actor *summon.Actor) {
+	if actor.IsPet() {
+		l.transferPetInventory(actor, departingPetOwnerInventory(actor))
+	}
+}
+
+// storeDepartingPet saves a departing pet's row and collar, then flushes its
+// container (see returnPetItems).
+func (l *GameClientLink) storeDepartingPet(actor *summon.Actor) {
 	if !actor.IsPet() {
 		return
 	}
-	var ownerInv *itemcontainer.Inventory
-	if owner, ok := liveSummonOwner(actor); ok {
-		ownerInv = owner.Inventory()
-	}
-	l.transferPetInventory(actor, ownerInv)
-	l.savePet(actor, ownerInv)
+	l.savePet(actor, departingPetOwnerInventory(actor))
 	if inv := actor.PetInventory(); inv != nil {
 		l.flushItemPersistence(inv)
 	}
+}
+
+// departingPetOwnerInventory is the inventory of the live owner a departing
+// pet answers to, or nil.
+func departingPetOwnerInventory(actor *summon.Actor) *itemcontainer.Inventory {
+	if owner, ok := liveSummonOwner(actor); ok {
+		return owner.Inventory()
+	}
+	return nil
 }
 
 // broadcastSummon builds one frame lazily, only once a known observer capable
