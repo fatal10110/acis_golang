@@ -1,6 +1,7 @@
 package npc
 
 import (
+	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
@@ -93,9 +94,9 @@ type ScriptHooks interface {
 	// target ended.
 	HostileAttackFinished(h *Hostile, target attackable.Combatant)
 	// SeeSpell runs n's see-spell hooks: caster, a player, cast sk on
-	// targets near n, through its summon when isPet. n is a *Hostile or a
-	// *Folk.
-	SeeSpell(n, caster attackable.Combatant, sk skill.Ref, targets []attackable.Combatant, isPet bool)
+	// targets near n, doors included, through its summon when isPet. n is
+	// a *Hostile or a *Folk.
+	SeeSpell(n, caster attackable.Combatant, sk skill.Ref, targets []skilltarget.Actor, isPet bool)
 	// Spelled runs n's spelled hooks: sk, not offensive, landed on n from
 	// caster, a player. n is a *Hostile or a *Folk.
 	Spelled(n, caster attackable.Combatant, sk skill.Ref)
@@ -201,7 +202,7 @@ func (h *Hostile) AttackEnded(target attackable.Combatant) {
 
 // SeeSpell runs h's see-spell hooks: caster, a player, cast sk on targets
 // near h, through its summon when isPet.
-func (h *Hostile) SeeSpell(caster attackable.Combatant, sk skill.Ref, targets []attackable.Combatant, isPet bool) {
+func (h *Hostile) SeeSpell(caster attackable.Combatant, sk skill.Ref, targets []skilltarget.Actor, isPet bool) {
 	if h.scripts != nil {
 		h.scripts.SeeSpell(h, caster, sk, targets, isPet)
 	}
@@ -225,7 +226,7 @@ func (h *Hostile) AbnormalStatusChanged(caster attackable.Combatant, sk skill.Re
 
 // SeeSpell runs f's see-spell hooks: caster, a player, cast sk on targets
 // near f, through its summon when isPet.
-func (f *Folk) SeeSpell(caster attackable.Combatant, sk skill.Ref, targets []attackable.Combatant, isPet bool) {
+func (f *Folk) SeeSpell(caster attackable.Combatant, sk skill.Ref, targets []skilltarget.Actor, isPet bool) {
 	if f.scripts != nil {
 		f.scripts.SeeSpell(f, caster, sk, targets, isPet)
 	}

@@ -72,9 +72,14 @@ func (s *Script) AddItems(p *Player, itemID, count int32) {
 	p.character().AddScriptItems(itemID, int(count), s.env.MultipleItemDrop, s.env.NewItemID)
 }
 
-// DestroyItems destroys count units of itemID held by p, with no chat line,
-// and reports whether it did: p must hold that many in one instance.
-func (s *Script) DestroyItems(p *Player, itemID, count int32) bool {
+// DestroyItems destroys count units of itemID held by p and reports whether
+// it did: p must hold that many in one instance. With notify, p is told in
+// chat what disappeared, or that it holds too few; adena is then paid as
+// Player.ReduceAdena pays it.
+func (s *Script) DestroyItems(p *Player, itemID, count int32, notify bool) bool {
+	if notify {
+		return p.character().DestroyScriptItemsNotify(itemID, int(count))
+	}
 	return p.character().DestroyScriptItems(itemID, int(count))
 }
 

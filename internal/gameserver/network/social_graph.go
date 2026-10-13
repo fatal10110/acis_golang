@@ -93,3 +93,15 @@ func (g socialGraph) ClanLevel(clanID int32) int {
 	}
 	return 0
 }
+
+func (g socialGraph) Mentors(clanID, objectID int32) (sponsor, apprentice int32) {
+	cl, ok := g.clan(clanID)
+	if !ok {
+		return 0, 0
+	}
+	m, ok := cl.Member(objectID)
+	if !ok {
+		return 0, 0
+	}
+	return m.Sponsor, m.Apprentice
+}

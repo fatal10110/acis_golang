@@ -210,6 +210,7 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *
 		World:            state,
 		Skills:           modelskill.NewTable(so.skills),
 		GameHour:         clock.Hour,
+		Uptime:           clock.Uptime,
 		Items:            items,
 		Page:             html.Get,
 		SevenSigns:       sevenSigns,

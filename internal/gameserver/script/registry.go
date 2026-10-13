@@ -166,6 +166,9 @@ type Registry struct {
 	// memo is the scripts' global memo, a leaf-locked container of its
 	// own like the timers.
 	memo *GlobalMemo
+	// doors are the world's doors (Env.Doors), which a door handle in a
+	// hook's payload opens and closes; nil when the server has none.
+	doors Doors
 }
 
 type npcKey struct {
@@ -213,6 +216,7 @@ func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
 	var w *world.State
 	if cfg.Env != nil {
 		w = cfg.Env.World
+		r.doors = cfg.Env.Doors
 	}
 	r.memo = newGlobalMemo(w)
 	registered := 0

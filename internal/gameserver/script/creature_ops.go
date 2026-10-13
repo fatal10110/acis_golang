@@ -303,12 +303,15 @@ func (s *Script) GameHour() int { return s.env.GameHour() }
 // LocOf returns where c stands and the way it faces.
 func LocOf(c Creature) Loc { return locOf(c) }
 
-// Same reports whether a and b handle the same creature; a handle on
-// nothing is the same as no creature at all.
-func Same(a, b Creature) bool {
-	ta, tb := combatantOf(a), combatantOf(b)
-	if ta == nil || tb == nil {
-		return ta == nil && tb == nil
+// Same reports whether a and b handle the same creature, a door included;
+// a handle on nothing is the same as no creature at all.
+func Same(a, b Creature) bool { return identity(a) == identity(b) }
+
+// identity is c's world object id, 0 for no creature or a handle on
+// nothing.
+func identity(c Creature) int32 {
+	if c == nil {
+		return 0
 	}
-	return ta.ObjectID() == tb.ObjectID()
+	return c.ObjectID()
 }

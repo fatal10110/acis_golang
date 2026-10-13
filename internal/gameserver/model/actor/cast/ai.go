@@ -240,6 +240,18 @@ func (a *AIController) meetsCastConditions(target attackable.Combatant, def mode
 // MeetsHPMPDisabled reports whether the actor currently has the HP/MP and is
 // not muted for ref against target.
 func (a *AIController) MeetsHPMPDisabled(target attackable.Combatant, ref modelskill.Ref) bool {
+	return a.meets(target, ref, a.Controller.MeetsHPMPDisabled)
+}
+
+// MeetsHPMP reports whether the actor currently has the MP and HP ref's cast
+// at target takes, whatever mutes it.
+func (a *AIController) MeetsHPMP(target attackable.Combatant, ref modelskill.Ref) bool {
+	return a.meets(target, ref, a.Controller.MeetsHPMP)
+}
+
+// meets runs gate on ref's definition at target: false for no controller,
+// no target, a skill the actor's table lacks, or a refusal.
+func (a *AIController) meets(target attackable.Combatant, ref modelskill.Ref, gate func(Target, modelskill.Definition) error) bool {
 	if a.Controller == nil || target == nil {
 		return false
 	}
@@ -251,7 +263,7 @@ func (a *AIController) MeetsHPMPDisabled(target attackable.Combatant, ref models
 	if !ok {
 		return false
 	}
-	return a.Controller.MeetsHPMPDisabled(castTarget, def) == nil
+	return gate(castTarget, def) == nil
 }
 
 // AICaster is an AI-driven caster: the launch-revalidated creature plus the

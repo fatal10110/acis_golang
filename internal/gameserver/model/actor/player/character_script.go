@@ -161,6 +161,26 @@ func (c *Character) DestroyScriptItems(itemID int32, count int) bool {
 	return destroyed
 }
 
+// DestroyScriptItemsNotify is DestroyScriptItems naming the outcome in chat:
+// what disappeared, or that c holds too few. Adena is paid as
+// ReduceScriptAdena pays it.
+func (c *Character) DestroyScriptItemsNotify(itemID int32, count int) bool {
+	if c.inventory == nil {
+		return false
+	}
+	destroyed := false
+	c.whileAttached(func() {
+		if itemID == item.AdenaID {
+			destroyed = c.reduceScriptAdena(count)
+			return
+		}
+		inst := c.inventory.ItemByTemplateID(itemID)
+		destroyed = inst != nil && inst.CountValue() >= count && c.inventory.DestroyItem(inst, count) != nil
+		c.emit(event.ItemsTaken{ItemID: itemID, Count: count, Short: !destroyed})
+	})
+	return destroyed
+}
+
 // HoldsItem reports whether c's inventory holds the item instance
 // objectID.
 func (c *Character) HoldsItem(objectID int32) bool {

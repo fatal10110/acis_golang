@@ -385,6 +385,10 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FramePlaySound(e.File))
 	case event.ScenePlayed:
 		live.SendFrame(serverpackets.FrameExPlayScene())
+	case event.HennaListShown:
+		live.SendFrame(serverpackets.FrameHennaInfo(live.HennaSnapshot()))
+	case event.NobleGranted:
+		l.makeNoble(live)
 	case event.ServitorVanished:
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageServitorHasVanished))
 	case event.ShieldBlocked:

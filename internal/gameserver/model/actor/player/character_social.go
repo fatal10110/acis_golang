@@ -34,6 +34,9 @@ type SocialGraph interface {
 	ClanHallID(clanID int32) int32
 	// ClanLevel is the clan's level, 0 when there is no such clan.
 	ClanLevel(clanID int32) int
+	// Mentors are the object ids of the academy sponsor and apprentice of
+	// clanID's member objectID, 0 for none or no such member.
+	Mentors(clanID, objectID int32) (sponsor, apprentice int32)
 }
 
 // olympiadMember is the Olympiad standing of the player acting through
