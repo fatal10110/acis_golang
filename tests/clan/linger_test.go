@@ -3,13 +3,10 @@ package clan
 import (
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
-	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
 
 // A clan member whose connection dropped in combat lingers in the world 15
@@ -17,26 +14,6 @@ import (
 // its client already detached. ClanMember.isOnline is false for it
 // (ClanMember.java:174-177), so the roster, the online counts and
 // Clan.getOnlineMembers treat it as offline while it lingers.
-
-// dropInCombat closes c, objID's connection, while it is in combat, and
-// returns once the server noticed the drop, the player still in the world.
-func (w *clanWorld) dropInCombat(t *testing.T, c *testsupport.ScriptedClient, objID int32) {
-	t.Helper()
-	w.srv.SetPlayerInCombat(t, objID, true)
-	if err := c.Close(); err != nil {
-		t.Fatal(err)
-	}
-	obj, ok := w.srv.State.Player(objID)
-	if !ok {
-		t.Fatal("the dropped member left the world at once")
-	}
-	for deadline := time.Now().Add(5 * time.Second); !network.ClientDetached(obj); {
-		if time.Now().After(deadline) {
-			t.Fatal("the server never noticed the connection drop")
-		}
-		time.Sleep(time.Millisecond)
-	}
-}
 
 // stillLingers fails unless objID is still in the world.
 func (w *clanWorld) stillLingers(t *testing.T, objID int32) {
@@ -89,7 +66,7 @@ func TestLingeringMemberListedOffline(t *testing.T) {
 	w.found(t, "Knights")
 	w.recruit(t)
 
-	w.dropInCombat(t, w.member, w.memberID)
+	w.srv.DropInCombat(t, w.memberID, w.member)
 	w.leader.Send(wire.NewPacketWriter(clientpackets.OpcodeRequestPledgeMemberList).Bytes())
 	frame, ok := firstOpcode(drainFrames(t, w.leader), serverpackets.OpcodePledgeShowMemberListAll)
 	if !ok {
@@ -112,7 +89,7 @@ func TestLingeringMemberNotCountedInAllianceInfo(t *testing.T) {
 	w := bootAllianceWorld(t)
 	w.formAlliance(t)
 
-	w.dropInCombat(t, w.member, w.memberID)
+	w.srv.DropInCombat(t, w.memberID, w.member)
 	w.leader.Send(encodeAllyBare(clientpackets.OpcodeRequestAllyInfo))
 	info := drainFrames(t, w.leader)
 	if len(info) == 0 || info[0][0] != serverpackets.OpcodeAllianceInfo {
@@ -156,7 +133,7 @@ func TestLingeringMemberDoesNotHoldWarStop(t *testing.T) {
 		t.Fatalf("declaration answer = %x, want the war declared", opcodes(declared))
 	}
 
-	w.dropInCombat(t, squire, squireID)
+	w.srv.DropInCombat(t, squireID, squire)
 	w.leader.Send(encodeWarName(clientpackets.OpcodeRequestStopPledgeWar, "Rivals"))
 	stop := drainFrames(t, w.leader)
 	for _, id := range messages(t, stop) {
@@ -178,7 +155,7 @@ func TestLingeringMemberRefusedAsNominee(t *testing.T) {
 	clanID := w.found(t, "Knights")
 	w.recruit(t)
 
-	w.dropInCombat(t, w.member, w.memberID)
+	w.srv.DropInCombat(t, w.memberID, w.member)
 	drainFrames(t, w.leader)
 	if ids := messages(t, w.command(t, "change_clan_leader Recruit")); !slices.Equal(ids, []int{serverpackets.SystemMessageInvitedUserNotOnline}) {
 		t.Fatalf("lingering nominee = %v, want INVITED_USER_NOT_ONLINE", ids)
