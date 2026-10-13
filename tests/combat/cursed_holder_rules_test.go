@@ -176,6 +176,50 @@ func TestHeroHitEmptiesHolderCP(t *testing.T) {
 	}
 }
 
+// TestHeroHitSparesNonHolderCP: a hero's connecting swing at a player
+// holding no cursed weapon takes only its damage off the CP.
+func TestHeroHitSparesNonHolderCP(t *testing.T) {
+	t.Parallel()
+	p := bootHolderPair(t, true)
+	p.steady(t)
+
+	// One status, the hit's own: no emptied CP at full HP ahead of it.
+	statuses := p.firstHit(t)
+	if len(statuses) != 1 || bytes.Equal(statuses[0], p.emptiedCPStatus(t)) {
+		t.Fatalf("victim statuses = %x, want the hit's damage alone", statuses)
+	}
+}
+
+// TestCursedHolderHitSparesInvulnerableCP: a holder's connecting swing at
+// a spawn-protected player leaves its CP whole.
+func TestCursedHolderHitSparesInvulnerableCP(t *testing.T) {
+	t.Parallel()
+	p := bootHolderPair(t, false)
+	pickUpCursed(t, p.srv, p.c, p.attackerID)
+	drainUntilQuiet(t, p.vc)
+	sitDown(t, p.srv, p.vc, p.victimID)
+	victim := onlineVictim(t, p.srv, p.victimID)
+	onQueue(t, p.srv.PlayerQueue(t, p.victimID), func() { victim.SetSpawnProtection(true) })
+	p.steady(t)
+	maxHP, maxCP := p.srv.PlayerMaxHP(t, p.victimID), p.srv.PlayerMaxCP(t, p.victimID)
+
+	attackPlayer(t, p.c, p.victimID)
+	// The landed hit stands the seated victim up; its damage is dropped.
+	p.srv.AdvanceUntil(t, "hit on the spawn-protected victim", victim.Standing)
+	statuses, _ := statusFramesFor(t, p.vc, p.victimID)
+	for _, s := range statuses {
+		if bytes.Equal(s, p.emptiedCPStatus(t)) {
+			t.Fatalf("spawn-protected victim status = %x, want its CP kept", s)
+		}
+	}
+	if cp, hp := p.srv.PlayerCurrentCP(t, p.victimID), p.srv.PlayerCurrentHP(t, p.victimID); cp != maxCP || hp != maxHP {
+		t.Fatalf("spawn-protected victim CP %d/%d HP %d/%d after the hit, want both full", cp, maxCP, hp, maxHP)
+	}
+	if !victim.SpawnProtected() {
+		t.Fatal("victim lost its spawn protection to the hit")
+	}
+}
+
 // TestCursedHolderCannotBeHealed: a heal cast on a holder restores
 // nothing; the same heal on the victim before it holds the weapon does.
 func TestCursedHolderCannotBeHealed(t *testing.T) {
