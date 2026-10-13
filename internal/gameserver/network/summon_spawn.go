@@ -319,7 +319,7 @@ func (s *gameSummonSpawner) spawnRestoredPet(controlItem *item.Instance, summonI
 		Named:           named,
 		BabyPet:         npcTmpl.Type == "BabyPet",
 		Level:           level,
-		MaxBuffsAmount:  link.playerConfig.MaxBuffsAmount,
+		MaxBuffsAmount:  link.playerConfig().MaxBuffsAmount,
 		Exp:             exp,
 		SP:              state.SP,
 		ExpType:         levelStats.ExpType,
@@ -467,6 +467,7 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		return false
 	}
 
+	settings := link.playerConfig()
 	servitor, err := summon.NewServitor(summon.ServitorConfig{
 		Effects:          link.effects,
 		ObjectID:         objID,
@@ -480,8 +481,8 @@ func (s *gameSummonSpawner) SpawnServitor(owner *player.Character, def modelskil
 		Level:            npcTmpl.Level,
 		Undead:           npcTmpl.Race == npc.RaceUndead,
 		SiegeSummon:      npcTmpl.Type == "SiegeSummon",
-		MaxBuffsAmount:   link.playerConfig.MaxBuffsAmount,
-		RespawnRestoreHP: link.playerConfig.RespawnRestoreHP,
+		MaxBuffsAmount:   settings.MaxBuffsAmount,
+		RespawnRestoreHP: settings.RespawnRestoreHP,
 		OwnerInventory:   live.Inventory(),
 		ExpPenalty:       def.ExpPenalty,
 		CorpseTime:       time.Duration(npcTmpl.CorpseTime) * time.Second,

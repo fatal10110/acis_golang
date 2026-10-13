@@ -183,7 +183,7 @@ func (l *GameClientLink) handleUseItem(_ context.Context, cs *connState, req cli
 	// The dice gate belongs to this read loop, which stays parked
 	// in onLive while useItem runs, so the throw consults it there.
 	rollDice := func() bool {
-		return client.performFloodProtected(floodProtectorRollDice, l.playerConfig.RollDiceDelay, time.Now())
+		return client.performFloodProtected(floodProtectorRollDice, l.playerConfig().RollDiceDelay, time.Now())
 	}
 	onLive(cs.live, func() { l.useItem(cs.live, req.ObjectID, req.CtrlPressed, rollDice) })
 	return nil
@@ -212,7 +212,7 @@ func (l *GameClientLink) handleRequestRecipeItemMakeSelf(_ context.Context, cs *
 	client := cs.client
 	// A craft inside the manufacture reuse window is dropped
 	// silently, before anything else is looked at.
-	if !client.performFloodProtected(floodProtectorManufacture, l.playerConfig.ManufactureDelay, time.Now()) {
+	if !client.performFloodProtected(floodProtectorManufacture, l.playerConfig().ManufactureDelay, time.Now()) {
 		return nil
 	}
 	if cs.live != nil {
@@ -243,7 +243,7 @@ func (l *GameClientLink) handleMultiSellChoose(_ context.Context, cs *connState,
 	if cs.live != nil {
 		// The reuse gate is consulted only with a player in the
 		// world; a refused exchange still drops the open list.
-		allowed := client.performFloodProtected(floodProtectorMultisell, l.playerConfig.MultisellDelay, time.Now())
+		allowed := client.performFloodProtected(floodProtectorMultisell, l.playerConfig().MultisellDelay, time.Now())
 		onLive(cs.live, func() { l.requestMultiSellChoose(cs.live, req, allowed) })
 	}
 	return nil
@@ -363,7 +363,7 @@ func (l *GameClientLink) handleRequestBypassToServer(_ context.Context, cs *conn
 	// An empty command returns before the bypass reuse gate is
 	// consulted, so it never consumes the cooldown; a refused
 	// command is dropped silently.
-	if req.Command != "" && !client.performFloodProtected(floodProtectorServerBypass, l.playerConfig.ServerBypassDelay, time.Now()) {
+	if req.Command != "" && !client.performFloodProtected(floodProtectorServerBypass, l.playerConfig().ServerBypassDelay, time.Now()) {
 		return nil
 	}
 	onLive(cs.live, func() { l.requestBypassToServer(cs.live, req) })
@@ -526,7 +526,7 @@ func (l *GameClientLink) handleRequestBuySeed(_ context.Context, cs *connState, 
 	// a player in the world. A gated purchase answers nothing, as
 	// specified: the seed window's submit leaves no client action
 	// pending.
-	if !client.performFloodProtected(floodProtectorManor, l.playerConfig.ManorDelay, time.Now()) {
+	if !client.performFloodProtected(floodProtectorManor, l.playerConfig().ManorDelay, time.Now()) {
 		return nil
 	}
 	if cs.live != nil {

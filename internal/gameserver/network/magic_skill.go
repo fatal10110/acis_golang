@@ -31,7 +31,7 @@ func (l *GameClientLink) handleMagicSkillUse(live *livePlayer, req clientpackets
 	def, known := l.skills.Definition(modelskill.Ref{ID: modelskill.ID(req.SkillID), Level: live.SkillLevel(int(req.SkillID))})
 	castable := known && (def.Activation == modelskill.ActivationActive || def.Activation == modelskill.ActivationToggle)
 	if known {
-		if itemhandler.RecallCastBlockedByKarma(def.SkillType, live.Karma(), l.playerConfig.KarmaPlayerCanTeleport) {
+		if itemhandler.RecallCastBlockedByKarma(def.SkillType, live.Karma(), l.playerConfig().KarmaPlayerCanTeleport) {
 			sendMagicActionFailed(live)
 			return
 		}

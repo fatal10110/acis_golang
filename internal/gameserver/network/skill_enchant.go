@@ -33,7 +33,7 @@ func (l *GameClientLink) sendEnchantSkillInfo(live *livePlayer, req clientpacket
 		XPCost: int64(node.Exp),
 		Rate:   int32(offer.Rate),
 	}
-	if l.playerConfig.SkillEnchantSPBookNeeded && node.ItemID != 0 {
+	if l.playerConfig().SkillEnchantSPBookNeeded && node.ItemID != 0 {
 		info.Requirements = []serverpackets.EnchantSkillRequirement{
 			{Type: enchantSkillRequirementType, ItemID: node.ItemID, Count: int32(node.ItemCount)},
 		}
@@ -53,7 +53,7 @@ func (l *GameClientLink) applyEnchantSkill(live *livePlayer, req clientpackets.R
 	if !ok {
 		return
 	}
-	result, status, err := skillstate.Enchant(live.Character, l.levels, live.Template(), l.skillTrees, l.skills, l.playerConfig.SkillEnchantSPBookNeeded, l.rollEnchantSkill, int(req.SkillID), int(req.SkillLevel))
+	result, status, err := skillstate.Enchant(live.Character, l.levels, live.Template(), l.skillTrees, l.skills, l.playerConfig().SkillEnchantSPBookNeeded, l.rollEnchantSkill, int(req.SkillID), int(req.SkillLevel))
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("enchant skill")
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))

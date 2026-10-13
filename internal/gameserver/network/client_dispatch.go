@@ -286,7 +286,7 @@ func registerCapped[K inboundOpcode, T any](
 	handle func(*GameClientLink, context.Context, *connState, T) error,
 ) {
 	registerFrame(reg, op, func(l *GameClientLink, ctx context.Context, cs *connState, payload []byte) error {
-		maxItems := l.playerConfig.InventorySlots.MaxItemInPacket()
+		maxItems := l.playerConfig().InventorySlots.MaxItemInPacket()
 		return decodeAndHandle(l, ctx, cs, payload, func(p []byte) (T, error) { return decode(p, maxItems) }, handle)
 	})
 }

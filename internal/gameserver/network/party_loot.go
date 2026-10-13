@@ -13,7 +13,7 @@ import (
 // inPartyLootRange reports whether m is within party range of origin, body
 // to body in 3D.
 func (l *GameClientLink) inPartyLootRange(origin party.LootOrigin, m *livePlayer) bool {
-	return party.InRange(l.playerConfig.PartyRange, origin, m)
+	return party.InRange(l.playerConfig().PartyRange, origin, m)
 }
 
 // partyLootEligible accepts a member that may take one itemID from origin
@@ -114,7 +114,7 @@ func (l *GameClientLink) lootForParty(picker *livePlayer, itemID int32, count in
 	if spoil {
 		looter.AddEarnedItem(itemID, count, l.nextObjectID)
 	} else {
-		looter.AddRewardItem(itemID, count, l.playerConfig.MultipleItemDrop, l.nextObjectID)
+		looter.AddRewardItem(itemID, count, l.playerConfig().MultipleItemDrop, l.nextObjectID)
 	}
 	sendPartyLootNotice(members, looter, spoil, itemID, count, 0)
 	return true

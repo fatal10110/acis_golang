@@ -63,7 +63,7 @@ func (l *GameClientLink) useItem(live *livePlayer, objectID int32, ctrl bool, ro
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return
 	}
-	if itemhandler.ItemBlockedByKarmaTeleport(tmpl, l.skills, live.Karma(), l.playerConfig.KarmaPlayerCanTeleport) {
+	if itemhandler.ItemBlockedByKarmaTeleport(tmpl, l.skills, live.Karma(), l.playerConfig().KarmaPlayerCanTeleport) {
 		return
 	}
 	if live.Fishing() && tmpl.DefaultAction != item.ActionFishingShot {
@@ -603,7 +603,7 @@ func (l *GameClientLink) dropLiveItem(live *livePlayer, req clientpackets.Reques
 		return
 	}
 	count := int(req.Count)
-	refused := l.boundItems(live)(req.ObjectID) || (l.playerConfig.DiscardItemDisabled && !live.accessLevel().IsGM)
+	refused := l.boundItems(live)(req.ObjectID) || (l.playerConfig().DiscardItemDisabled && !live.accessLevel().IsGM)
 	switch l.inventory.DropItemFailure(inv, req.ObjectID, count, refused) {
 	case invops.DropOK:
 	case invops.DropCannotDiscard:

@@ -155,52 +155,7 @@ func provideGameClientLink(
 	chatLog chatLogger,
 	itemLog itemLogger,
 ) (*network.GameClientLink, error) {
-	enchantCfg := gameplay.Enchant
-	freightCfg := gameplay.Freight
-	playerConfig := network.PlayerConfig{
-		Enchant:                    &enchantCfg,
-		RespawnRestoreHP:           float64(gameplay.RespawnRestoreHP),
-		DeathPenaltyChance:         int(gameplay.DeathPenaltyChance),
-		MaxBuffsAmount:             int(gameplay.MaxBuffsAmount),
-		MagicFailures:              bool(gameplay.MagicFailures),
-		PerfectShieldBlockRate:     int(gameplay.PerfectShieldBlockRate),
-		SpawnProtection:            time.Duration(gameplay.SpawnProtection),
-		SkillEnchantSPBookNeeded:   bool(gameplay.SkillEnchantSPBookNeeded),
-		AutoLearnSkills:            bool(gameplay.AutoLearnSkills),
-		WeightLimitMultiplier:      float64(gameplay.WeightLimitMultiplier),
-		InventorySlots:             gameplay.InventorySlots,
-		StorageSlots:               gameplay.StorageSlots,
-		Freight:                    &freightCfg,
-		KarmaPlayerCanTeleport:     bool(gameplay.KarmaPlayerCanTeleport),
-		KarmaPlayerCanShop:         gameplay.KarmaServiceGates.CanShop,
-		KarmaPlayerCanUseGK:        gameplay.KarmaServiceGates.CanUseGK,
-		KarmaPlayerCanUseWareHouse: gameplay.KarmaServiceGates.CanUseWareHouse,
-		KarmaPlayerCanTrade:        bool(gameplay.KarmaPlayerCanTrade),
-		AwardPKKillPVPPoint:        pvpOptions.AwardPKKillPVPPoint,
-		AllowWater:                 cfg.AllowWater,
-		EnableFallingDamage:        cfg.EnableFallingDamage,
-		AllowDelevel:               bool(gameplay.AllowDelevel),
-		RateKarmaExpLost:           float64(gameplay.RateKarmaExpLost),
-		DeathDrop:                  gameplay.DeathDrop,
-		CharacterSelectDelay:       time.Duration(gameplay.CharacterSelectDelay),
-		ServerBypassDelay:          time.Duration(gameplay.ServerBypassDelay),
-		CraftingDisabled:           !bool(gameplay.CraftingEnabled),
-		ManufactureDelay:           time.Duration(gameplay.ManufactureDelay),
-		MultisellDelay:             time.Duration(gameplay.MultisellDelay),
-		ManorDelay:                 time.Duration(gameplay.ManorDelay),
-		RollDiceDelay:              time.Duration(gameplay.RollDiceDelay),
-		SubclassDelay:              time.Duration(gameplay.SubclassDelay),
-		SubclassWithoutQuests:      bool(gameplay.SubclassWithoutQuests),
-		KeepMaintainedIngredients:  !bool(gameplay.BlacksmithUseRecipes),
-		DiscardItemDisabled:        !bool(gameplay.AllowDiscardItem),
-		GMStartupUnlisted:          !gameplay.Admin.GMStartupAutoList,
-		GMStartupInvulnerable:      gameplay.Admin.GMStartupInvulnerable,
-		GMStartupInvisible:         gameplay.Admin.GMStartupInvisible,
-		GMStartupBlockAll:          gameplay.Admin.GMStartupBlockAll,
-		GMHeroAura:                 gameplay.Admin.GMHeroAura,
-		PartyRange:                 rewards.PartyRange,
-		MultipleItemDrop:           rewards.MultipleItemDrop,
-	}
+	playerConfig := newPlayerConfig(cfg, gameplay, rewards, pvpOptions)
 	network.SetOutboundRejectLog(log)
 	link, err := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,
@@ -465,4 +420,56 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *mana
 			}
 		},
 	})
+}
+
+// newPlayerConfig gathers the settings the game client link reads at each
+// use from the server and players properties, at boot and on
+// //reload config.
+func newPlayerConfig(cfg gameServerConfig, gameplay gameplayConfig, rewards manager.KillRewardConfig, pvpOptions task.PvPFlagOptions) network.PlayerConfig {
+	enchantCfg := gameplay.Enchant
+	freightCfg := gameplay.Freight
+	return network.PlayerConfig{
+		Enchant:                    &enchantCfg,
+		RespawnRestoreHP:           float64(gameplay.RespawnRestoreHP),
+		DeathPenaltyChance:         int(gameplay.DeathPenaltyChance),
+		MaxBuffsAmount:             int(gameplay.MaxBuffsAmount),
+		MagicFailures:              bool(gameplay.MagicFailures),
+		PerfectShieldBlockRate:     int(gameplay.PerfectShieldBlockRate),
+		SpawnProtection:            time.Duration(gameplay.SpawnProtection),
+		SkillEnchantSPBookNeeded:   bool(gameplay.SkillEnchantSPBookNeeded),
+		AutoLearnSkills:            bool(gameplay.AutoLearnSkills),
+		WeightLimitMultiplier:      float64(gameplay.WeightLimitMultiplier),
+		InventorySlots:             gameplay.InventorySlots,
+		StorageSlots:               gameplay.StorageSlots,
+		Freight:                    &freightCfg,
+		KarmaPlayerCanTeleport:     bool(gameplay.KarmaPlayerCanTeleport),
+		KarmaPlayerCanShop:         gameplay.KarmaServiceGates.CanShop,
+		KarmaPlayerCanUseGK:        gameplay.KarmaServiceGates.CanUseGK,
+		KarmaPlayerCanUseWareHouse: gameplay.KarmaServiceGates.CanUseWareHouse,
+		KarmaPlayerCanTrade:        bool(gameplay.KarmaPlayerCanTrade),
+		AwardPKKillPVPPoint:        pvpOptions.AwardPKKillPVPPoint,
+		AllowWater:                 cfg.AllowWater,
+		EnableFallingDamage:        cfg.EnableFallingDamage,
+		AllowDelevel:               bool(gameplay.AllowDelevel),
+		RateKarmaExpLost:           float64(gameplay.RateKarmaExpLost),
+		DeathDrop:                  gameplay.DeathDrop,
+		CharacterSelectDelay:       time.Duration(gameplay.CharacterSelectDelay),
+		ServerBypassDelay:          time.Duration(gameplay.ServerBypassDelay),
+		CraftingDisabled:           !bool(gameplay.CraftingEnabled),
+		ManufactureDelay:           time.Duration(gameplay.ManufactureDelay),
+		MultisellDelay:             time.Duration(gameplay.MultisellDelay),
+		ManorDelay:                 time.Duration(gameplay.ManorDelay),
+		RollDiceDelay:              time.Duration(gameplay.RollDiceDelay),
+		SubclassDelay:              time.Duration(gameplay.SubclassDelay),
+		SubclassWithoutQuests:      bool(gameplay.SubclassWithoutQuests),
+		KeepMaintainedIngredients:  !bool(gameplay.BlacksmithUseRecipes),
+		DiscardItemDisabled:        !bool(gameplay.AllowDiscardItem),
+		GMStartupUnlisted:          !gameplay.Admin.GMStartupAutoList,
+		GMStartupInvulnerable:      gameplay.Admin.GMStartupInvulnerable,
+		GMStartupInvisible:         gameplay.Admin.GMStartupInvisible,
+		GMStartupBlockAll:          gameplay.Admin.GMStartupBlockAll,
+		GMHeroAura:                 gameplay.Admin.GMHeroAura,
+		PartyRange:                 rewards.PartyRange,
+		MultipleItemDrop:           rewards.MultipleItemDrop,
+	}
 }

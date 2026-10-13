@@ -79,5 +79,7 @@ func (c *Character) reportDeathDrop(killer attackable.Combatant) {
 		WeaponChance: rates.EquipWeapon,
 		ItemChance:   rates.Item,
 		Limit:        rates.Limit,
+		GMDrops:      rules.GMDrops,
+		Kept:         rules.Kept,
 	})
 }
