@@ -10,7 +10,7 @@ import (
 // its nominee (clan.Service.HandOverLeadership) and shows each change.
 func (l *GameClientLink) TransferClanLeaders() {
 	for _, h := range l.clanService().HandOverLeadership() {
-		l.showHandover(h)
+		l.showHandover(h, nil)
 	}
 }
 
@@ -20,15 +20,19 @@ func (l *GameClientLink) TransferClanLeaders() {
 // that rank no longer allows; the new leader in the world takes its rank
 // and the siege skills of a clan of siege level, and shows it; then every
 // member in the world gets its clan window and status refreshed and is
-// told who leads now. Each leader's part runs on its own queue and the
-// next part follows it, so every member sees the parts in that order.
-func (l *GameClientLink) showHandover(h clan.Handover) {
+// told who leads now; then after runs, when not nil. Each leader's part
+// runs on its own queue and the next part follows it, so every member sees
+// the parts in that order.
+func (l *GameClientLink) showHandover(h clan.Handover, after func()) {
 	announce := func() {
 		l.broadcastClanStatus(h.Clan)
 		name := h.Leader.Name
 		l.broadcastToClan(h.Clan, 0, func() wire.Frame {
 			return serverpackets.FrameSystemMessageString(serverpackets.SystemMessageClanLeaderPrivilegesTransferredToS1, name)
 		})
+		if after != nil {
+			after()
+		}
 	}
 	siegeLevel := h.Clan.Level() >= l.sieges.MinClanLevel()
 	newLeader := func() {

@@ -77,8 +77,9 @@ func (l *GameClientLink) villageMasterClan(live *livePlayer, f *npc.Folk, comman
 	}
 }
 
-// createClan founds the clan name with live as its leader.
-func (l *GameClientLink) createClan(live *livePlayer, name string) {
+// createClan founds the clan name with live as its leader, telling live
+// the outcome, and reports whether it did.
+func (l *GameClientLink) createClan(live *livePlayer, name string) bool {
 	cl, result := l.clanService().Create(live.Character, name, time.Now())
 	switch result {
 	case clan.Created:
@@ -98,6 +99,7 @@ func (l *GameClientLink) createClan(live *livePlayer, name string) {
 	case clan.CreateNameTaken:
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1AlreadyExists, name))
 	}
+	return result == clan.Created
 }
 
 // clanLevelPayer pays a clan level's price out of live, reporting each

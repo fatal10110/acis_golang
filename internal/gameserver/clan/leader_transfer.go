@@ -51,6 +51,26 @@ func (s *Service) handOver(cl *Clan) (Handover, bool) {
 		s.updateClanLocked(cl)
 		return Handover{}, false
 	}
+	return s.setLeaderLocked(cl, leader), true
+}
+
+// SetLeader makes the member objectID cl's leader at once, as an applied
+// nomination does (HandOverLeadership), dropping any pending nomination.
+// It reports false, changing nothing, when cl is gone, objectID is not on
+// its roster or already leads it.
+func (s *Service) SetLeader(cl *Clan, objectID int32) (Handover, bool) {
+	cl.mu.Lock()
+	defer cl.mu.Unlock()
+	leader, ok := cl.members[objectID]
+	if cl.destroyed || !ok || cl.leaderID == objectID {
+		return Handover{}, false
+	}
+	return s.setLeaderLocked(cl, leader), true
+}
+
+// setLeaderLocked hands cl to leader, one of its members, and stores the
+// change; cl.mu is held.
+func (s *Service) setLeaderLocked(cl *Clan, leader *Member) Handover {
 	formerID := cl.leaderID
 	cl.leaderID = leader.ObjectID
 	cl.newLeaderID = 0
@@ -69,7 +89,7 @@ func (s *Service) handOver(cl *Clan) (Handover, bool) {
 	s.write(formerID, "set former leader power grade", func(ctx context.Context, st Store) error {
 		return st.SetPowerGrade(ctx, formerID, MemberPowerGrade)
 	})
-	return Handover{Clan: cl, Former: former, Leader: *leader}, true
+	return Handover{Clan: cl, Former: former, Leader: *leader}
 }
 
 // regradeLocked gives m power grade grade: at once when m is in the world,
