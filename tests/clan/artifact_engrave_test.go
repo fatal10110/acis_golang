@@ -98,7 +98,7 @@ func engraveWorld(t *testing.T) *clanWorld {
 		seedAllianceClans(t,
 			`UPDATE clan_data SET hasCastle = 1 WHERE clan_id = `+itoa(rivalsClanID),
 			`INSERT INTO siege_clans (castle_id, clan_id, type) VALUES (1, `+itoa(knightsClanID)+`, 'ATTACKER')`,
-			`UPDATE characters SET x = `+itoa(int32(at.X))+`, y = `+itoa(int32(at.Y))+`, z = `+itoa(int32(at.Z))+`, curMp = 300 WHERE char_name = 'Founder'`,
+			`UPDATE characters SET x = `+itoa(int32(at.X))+`, y = `+itoa(int32(at.Y))+`, z = `+itoa(int32(at.Z))+`, maxMp = 1000, curMp = 300 WHERE char_name = 'Founder'`,
 			`INSERT INTO character_skills (char_obj_id, skill_id, skill_level, class_index)
 				SELECT obj_Id, `+itoa(sealOfRulerID)+`, 1, 0 FROM characters WHERE char_name = 'Founder'`,
 		),

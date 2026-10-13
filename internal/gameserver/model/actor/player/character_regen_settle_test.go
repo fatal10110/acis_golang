@@ -57,9 +57,9 @@ func TestRefillResourcesStopsRegen(t *testing.T) {
 	}
 }
 
-// TestClampResourcesStopsRegenAtFull pins that a class change's clamp which
+// TestSettleMaximaStopsRegenAtFull pins that a class change's clamp which
 // leaves the character full stops its regeneration task.
-func TestClampResourcesStopsRegenAtFull(t *testing.T) {
+func TestSettleMaximaStopsRegenAtFull(t *testing.T) {
 	c, _ := spawnedRegenCharacter(t)
 	c.AttachStatFuncs([]effect.Mod{
 		{Stat: stat.MaxHP, Op: effect.OpSet, Value: 5},
@@ -69,7 +69,7 @@ func TestClampResourcesStopsRegenAtFull(t *testing.T) {
 	if !c.Regen().Active() {
 		t.Fatal("lowering the maxima settled the phase; the clamp is not exercised")
 	}
-	c.ClampResources()
+	c.SettleMaxima()
 	if res := c.ResourceValues(); res.CurrentHP != res.MaxHP || res.CurrentMP != res.MaxMP || res.CurrentCP != res.MaxCP {
 		t.Fatalf("resources after the clamp = %+v, want full", res)
 	}

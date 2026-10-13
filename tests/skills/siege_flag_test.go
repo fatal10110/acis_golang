@@ -134,7 +134,7 @@ func bootHQ(t *testing.T, setup hqSetup) *hqWorld {
 				q    string
 				args []any
 			}{
-				{"UPDATE characters SET clanid = ?, curMp = 500 WHERE char_name = 'Sieger'", []any{hqClanID}},
+				{"UPDATE characters SET clanid = ?, maxMp = 1000, curMp = 500 WHERE char_name = 'Sieger'", []any{hqClanID}},
 				{"INSERT INTO characters (account_name, obj_Id, char_name, level, clanid) VALUES ('deputy', ?, 'Deputy', 40, ?)", []any{hqDeputyID, hqClanID}},
 				{"INSERT INTO clan_data (clan_id, clan_name, clan_level, leader_id) VALUES (?, 'Siegers', 5, " + leader + ")", leaderArgs},
 				{"INSERT INTO characters (account_name, obj_Id, char_name, level, clanid) VALUES ('rival', ?, 'Red', 40, ?)", []any{hqRivalLeaderID, hqRivalClanID}},

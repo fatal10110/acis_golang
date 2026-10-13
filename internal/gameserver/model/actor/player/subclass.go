@@ -252,21 +252,6 @@ func (t *Template) StartingSubclassSkills() SkillLevels {
 	return out
 }
 
-// ClampResources lowers current HP, MP and CP to their maxima, as a class
-// change does once the new class's maxima apply. A clamp that leaves c full
-// stops the regeneration task.
-func (c *Character) ClampResources() {
-	res := c.ResourceValues()
-	defer c.SettleRegen() // after the unlock below
-	c.vitalsMu.Lock()
-	defer c.vitalsMu.Unlock()
-	if c.curHP > res.MaxHP {
-		c.writeHPLocked(res.MaxHP)
-	}
-	c.curMP = min(c.curMP, res.MaxMP)
-	c.curCP = min(c.curCP, res.MaxCP)
-}
-
 // Overweight reports whether c carries too much to change class: a load in
 // the third weight band or above, or an inventory at least 80% full.
 func (c *Character) Overweight() bool {

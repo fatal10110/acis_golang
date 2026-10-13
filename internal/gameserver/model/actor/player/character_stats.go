@@ -453,16 +453,18 @@ func (c *Character) ReduceMP(amount float64) float64 {
 	if amount <= 0 {
 		return 0
 	}
+	maxMP := c.MaxMPValue()
 	defer c.SettleRegen() // after the unlock below
 	c.vitalsMu.Lock()
 	defer c.vitalsMu.Unlock()
-	if c.dead.Load() || c.curMP <= 0 {
+	mp := c.boundedLocked(c.curMP, maxMP)
+	if c.dead.Load() || mp <= 0 {
 		return 0
 	}
-	if amount > c.curMP {
-		amount = c.curMP
+	if amount > mp {
+		amount = mp
 	}
-	c.curMP -= amount
+	c.curMP = mp - amount
 	return amount
 }
 
@@ -487,7 +489,7 @@ type hitOutcome struct {
 // share and under vitalsMu, and after applyNonConsumptionDamageEffects's
 // sleep/immobile-stop, stand-up, and stun-break side effects, which run
 // first. Already-dead is a no-op.
-func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Combatant, ignoreCP bool) hitOutcome {
+func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Combatant, ignoreCP bool, maxima Resources) hitOutcome {
 	if amount < 0 {
 		amount = 0
 	}
@@ -496,14 +498,15 @@ func (c *Character) absorbCPThenReduceHP(amount float64, attacker attackable.Com
 	}
 	hit := hitOutcome{applied: true}
 	if !ignoreCP && c.hitByOther(attacker) && attacker.Kind().Playable() {
-		hit.cpOnly = c.curCP >= amount
-		drained := math.Min(c.curCP, amount)
-		c.curCP -= drained
+		cp := c.boundedLocked(c.curCP, maxima.MaxCP)
+		hit.cpOnly = cp >= amount
+		drained := math.Min(cp, amount)
+		c.curCP = cp - drained
 		amount -= drained
 	}
 	// Only damage left over once CP has absorbed its share writes HP.
 	if amount > 0 {
-		hp := c.curHP - amount
+		hp := c.boundedLocked(c.curHP, maxima.MaxHP) - amount
 		if hp <= 0 && c.InDuel() {
 			// A duel never kills: the hit leaves 1 HP, and a character
 			// still fighting is defeated.
@@ -611,8 +614,9 @@ func (c *Character) NotifyServitorDamageShare(targetDamage, servitorDamage int) 
 func (c *Character) landHit(amount float64, attacker attackable.Combatant, ignoreCP, isDOT bool) bool {
 	shared := c.shareDamageWithServitor(amount, attacker)
 	amount -= float64(shared)
+	maxima := c.ResourceValues()
 	c.vitalsMu.Lock()
-	hit := c.absorbCPThenReduceHP(amount, attacker, ignoreCP)
+	hit := c.absorbCPThenReduceHP(amount, attacker, ignoreCP, maxima)
 	c.vitalsMu.Unlock()
 	if !hit.applied {
 		return false

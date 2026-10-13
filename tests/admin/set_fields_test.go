@@ -115,6 +115,12 @@ func TestAdminSetClass(t *testing.T) {
 	if last := frames[len(frames)-1][0]; last != serverpackets.OpcodeActionFailed {
 		t.Fatalf("player frames after the delay = %x, want ActionFailed last", testsupport.FrameOpcodes(frames))
 	}
+	// The store reads the new class's maxima, which report the player's
+	// status ahead of HennaInfo.
+	if !hasOpcodes(frames, serverpackets.OpcodeCharInfo, serverpackets.OpcodeStatusUpdate, serverpackets.OpcodeHennaInfo) ||
+		hasOpcodes(frames, serverpackets.OpcodeHennaInfo, serverpackets.OpcodeStatusUpdate) {
+		t.Fatalf("player frames after the delay = %x, want the max-change StatusUpdates between the GM's CharInfo and HennaInfo", testsupport.FrameOpcodes(frames))
+	}
 	gmFrames = settle(t, gm)
 	charInfos, rest := split(gmFrames)
 	if len(charInfos) != 3 {
