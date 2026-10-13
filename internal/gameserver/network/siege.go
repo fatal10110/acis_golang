@@ -208,14 +208,13 @@ func (l *GameClientLink) showSiegeMessenger(live *livePlayer, f *npc.Folk) bool 
 }
 
 // wireSiegeZones gives the castle battlefields their effects on players:
-// the combat zone notices, the pvp flag of a player leaving a battlefield
-// under siege, and the town teleport of a player thrown off one.
-//
-// ponytail: the forced dismount of a wyvern rider on a battlefield under
-// siege, as on no-landing ground, is not wired (#3377).
+// the combat zone notices, the forced dismount of a wyvern rider on a
+// battlefield under siege, the pvp flag of a player leaving one, and the
+// town teleport of a player thrown off one.
 func (l *GameClientLink) wireSiegeZones(ix *zone.Index) {
 	for _, field := range zone.OfKind[*zone.Siege](ix) {
 		field.CombatNotice = l.siegeCombatNotice
+		field.DismountTimer = l.siegeDismountTimer
 		field.FlagPvP = l.siegeFlagPvP
 		field.Banish = l.siegeBanisher(field)
 	}

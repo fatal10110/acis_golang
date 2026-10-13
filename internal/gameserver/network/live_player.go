@@ -124,6 +124,10 @@ type livePlayer struct {
 	// siegeRestart is the restart a dead siege attacker waits out, nil for
 	// none; owned by p's queue. See restartpoint.go.
 	siegeRestart *sim.Timer
+	// wyvernDismount is the countdown that takes a wyvern rider off its
+	// mount over ground closed to wyverns, nil for none; owned by p's
+	// queue. See wyvern_dismount.go.
+	wyvernDismount *sim.Timer
 	// handlerPanicked records that a task this player's connection waited on
 	// panicked. Written by onLive and read by the dispatch loop, both on the
 	// owning connection goroutine and nowhere else.
