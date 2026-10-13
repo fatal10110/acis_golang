@@ -19,6 +19,16 @@ type xmlDocument[T any] struct {
 }
 
 func loadXMLDocuments[T any](dir, kind string) ([]xmlDocument[T], error) {
+	return loadDocuments[T](dir, kind, readXML)
+}
+
+// loadTemplateDocuments is loadXMLDocuments for skill and item files, whose
+// readers tell a CDATA section from the text around it (see readTemplateXML).
+func loadTemplateDocuments[T any](dir, kind string) ([]xmlDocument[T], error) {
+	return loadDocuments[T](dir, kind, readTemplateXML)
+}
+
+func loadDocuments[T any](dir, kind string, read func(string, any) error) ([]xmlDocument[T], error) {
 	paths, err := filepath.Glob(filepath.Join(dir, "*.xml"))
 	if err != nil {
 		return nil, fmt.Errorf("xml: list %s files in %s: %w", kind, dir, err)
@@ -31,7 +41,7 @@ func loadXMLDocuments[T any](dir, kind string) ([]xmlDocument[T], error) {
 	docs := make([]xmlDocument[T], 0, len(paths))
 	for _, path := range paths {
 		var doc T
-		if err := readXML(path, &doc); err != nil {
+		if err := read(path, &doc); err != nil {
 			return nil, fmt.Errorf("%s: %w", kind, err)
 		}
 		docs = append(docs, xmlDocument[T]{Path: path, Data: doc})
@@ -247,6 +257,19 @@ func readXML(path string, dst any) error {
 		return fmt.Errorf("xml: read %s: %w", path, err)
 	}
 	if err := xml.Unmarshal(data, dst); err != nil {
+		return fmt.Errorf("xml: parse %s: %w", path, err)
+	}
+	return nil
+}
+
+// readTemplateXML is readXML for a skill or item file: the decoder it uses
+// brackets each CDATA section with cdataBound tokens (see cdataMarker).
+func readTemplateXML(path string, dst any) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("xml: read %s: %w", path, err)
+	}
+	if err := newTemplateDecoder(data).Decode(dst); err != nil {
 		return fmt.Errorf("xml: parse %s: %w", path, err)
 	}
 	return nil

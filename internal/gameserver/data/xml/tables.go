@@ -56,15 +56,24 @@ func (t *tableElement) UnmarshalXML(d *xml.Decoder, start xml.StartElement) erro
 func buildValueTables(elems []tableElement) (map[string][]string, error) {
 	tables := make(map[string][]string, len(elems))
 	for _, tbl := range elems {
-		if !strings.HasPrefix(tbl.Name, "#") {
-			return nil, fmt.Errorf("table name %q must start with '#'", tbl.Name)
+		row, err := readValueTable(tbl)
+		if err != nil {
+			return nil, err
 		}
-		if !tbl.HasText {
-			return nil, fmt.Errorf("table %q: %w", tbl.Name, errTableNoText)
-		}
-		tables[tbl.Name] = strings.FieldsFunc(tbl.Text, isTableSpace)
+		tables[tbl.Name] = row
 	}
 	return tables, nil
+}
+
+// readValueTable reads one <table> element's row.
+func readValueTable(tbl tableElement) ([]string, error) {
+	if !strings.HasPrefix(tbl.Name, "#") {
+		return nil, fmt.Errorf("table name %q must start with '#'", tbl.Name)
+	}
+	if !tbl.HasText {
+		return nil, fmt.Errorf("table %q: %w", tbl.Name, errTableNoText)
+	}
+	return strings.FieldsFunc(tbl.Text, isTableSpace), nil
 }
 
 // isTableSpace reports whether r separates two values of a table row: a
