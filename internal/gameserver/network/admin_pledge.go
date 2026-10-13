@@ -31,17 +31,8 @@ const adminPledgeUsage = "Usage: //pledge create|dismiss|info|level|rep|transfer
 // command runs on the player's queue, where its clan membership changes.
 func (l *GameClientLink) adminPledge(gm *livePlayer, line string) {
 	target := adminTargetPlayer(gm, true)
-	var args []string
-	if tokens := spaceTokens(line); len(tokens) > 1 {
-		args = tokens[1:]
-	}
+	args := javaTokens(line)[1:]
 	onPlayer(gm, target, func() { l.runAdminPledge(gm, target, args) })
-}
-
-// spaceTokens splits line at its spaces, leaving every other character,
-// tabs included, inside the tokens.
-func spaceTokens(line string) []string {
-	return strings.FieldsFunc(line, func(r rune) bool { return r == ' ' })
 }
 
 // runAdminPledge runs //pledge with args on target's queue.
