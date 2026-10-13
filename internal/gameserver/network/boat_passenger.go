@@ -386,7 +386,6 @@ func (l *GameClientLink) carryPassenger(live *livePlayer, boatID int32, at locat
 	if live.BoatObjectID() != boatID {
 		return
 	}
-	previous := live.CurrentLocation()
 	facing := live.CurrentHeading()
 	live.Character.SetLastKnownPosition(at, facing)
 	if live.move != nil {
@@ -397,7 +396,7 @@ func (l *GameClientLink) carryPassenger(live *livePlayer, boatID int32, at locat
 			l.log.Debug().Err(err).Int32("object_id", live.ObjectID()).Msg("carry passenger")
 		}
 	}
-	l.revalidateZones(live, previous, revalidateStep)
+	l.revalidateZones(live, revalidateStep)
 	live.SendFrame(serverpackets.FrameOnVehicleCheckLocation(boatID, at, heading))
 }
 

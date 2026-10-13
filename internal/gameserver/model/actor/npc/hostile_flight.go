@@ -35,7 +35,7 @@ func (h *Hostile) TeleportTo(target location.Location) {
 	h.emit(event.Teleported{To: target})
 	// The NPC leaves the zones around its old position while its observers
 	// there still know it, and enters those at target once it has landed.
-	h.zones.leave(h.location())
+	h.zones.leave()
 	// Leaving the grid forgets every creature around the old position, and
 	// its threat entry (damage and hate) goes with it even when the
 	// destination still sees it. Queued attack desires stay; the next

@@ -30,7 +30,7 @@ func (f *Folk) TeleportTo(target location.Location) {
 		return
 	}
 	f.emit(event.Teleported{To: target})
-	f.zones.leave(f.location())
+	f.zones.leave()
 	if f.world != nil {
 		_ = f.world.Teleport(f, target.X, target.Y, target.Z)
 	}

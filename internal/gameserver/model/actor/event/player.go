@@ -309,8 +309,13 @@ type SummonConfirmRequested struct {
 }
 
 // TeleportRequested reports a discontinuous relocation to (X, Y, Z) within
-// Radius.
-type TeleportRequested struct{ X, Y, Z, Radius int }
+// Radius. OwnQueue marks a request raised on the character's own queue,
+// which moves it inside the call; any other runs on that queue once the
+// raising task is done.
+type TeleportRequested struct {
+	X, Y, Z, Radius int
+	OwnQueue        bool
+}
 
 // InstantTeleportRequested reports a jump of a player or a summon to where
 // Jump lands, keeping it in its region, shown without the teleport fade.
@@ -318,15 +323,16 @@ type InstantTeleportRequested struct{ Jump location.Jump }
 
 // RecallRequested reports a recall skill sending the character to the
 // place Destination names, resolved for the character where it stands.
-type RecallRequested struct{ Destination modelskill.RecallType }
-
-// Relocated reports that the server-authoritative position moved away from
-// Previous. Placed marks a position set outside movement (a forced flight's
-// landing) rather than a movement step.
-type Relocated struct {
-	Previous location.Location
-	Placed   bool
+// OwnQueue is as for TeleportRequested.
+type RecallRequested struct {
+	Destination modelskill.RecallType
+	OwnQueue    bool
 }
+
+// Relocated reports that the server-authoritative position moved. Placed
+// marks a position set outside movement (a forced flight's landing) rather
+// than a movement step.
+type Relocated struct{ Placed bool }
 
 // PvPFlagged reports a hit that flags the character for PvP; UseFlaggedDuration
 // selects the PvP-versus-PvP duration. ByServitor marks a hit or skill of

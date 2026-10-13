@@ -157,8 +157,7 @@ func (ep *EffectPoint) Despawn() {
 		return
 	}
 	ep.placeMu.Lock()
-	x, y, z := ep.Position()
-	ep.zones.leave(location.Location{X: x, Y: y, Z: z})
+	ep.zones.leave()
 	ep.world.Despawn(ep)
 	ep.placeMu.Unlock()
 	// Stop the periodic effect sweep from reaching this signet point's

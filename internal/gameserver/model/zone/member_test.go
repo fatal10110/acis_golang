@@ -41,12 +41,11 @@ func TestMemberRevalidationCadence(t *testing.T) {
 	s := &memberStub{id: 1, class: ClassNPC, at: location.Location{X: 2000, Y: 500}}
 	in := func() bool { return s.ZoneFlags().Has(FlagPeace) }
 	step := func(x int) {
-		previous := s.at
 		s.at = location.Location{X: x, Y: 500}
-		s.Step(ix, s, previous)
+		s.Step(ix, s)
 	}
 
-	s.Step(ix, s, s.at)
+	s.Step(ix, s)
 	s.at = location.Location{X: 500, Y: 500}
 	s.Settle(ix, s)
 	if in() {
@@ -87,7 +86,7 @@ func TestMemberRevalidationCadence(t *testing.T) {
 		t.Fatal("four steps after a settle: entered")
 	}
 
-	s.Leave(ix, s, s.at.X, s.at.Y)
+	s.Leave(ix, s)
 	s.Settle(ix, s)
 	step(500)
 	if in() {
@@ -104,7 +103,7 @@ func TestMemberRevalidationCadence(t *testing.T) {
 	if !in() {
 		t.Fatal("teleport landed inside the zone: not entered")
 	}
-	s.Leave(ix, s, s.at.X, s.at.Y)
+	s.Leave(ix, s)
 	if in() {
 		t.Fatal("Leave kept the zone's flag")
 	}
@@ -128,12 +127,56 @@ func TestMemberRegionChangeRevalidatesAtOnce(t *testing.T) {
 	if world.RegionKey(previous.X, previous.Y) == world.RegionKey(s.at.X, s.at.Y) {
 		t.Fatal("test setup: the step does not change region")
 	}
-	s.Step(ix, s, previous)
+	s.Step(ix, s)
 	if !s.ZoneFlags().Has(FlagPeace) {
 		t.Fatal("a region-changing step did not enter the new region's zone")
 	}
 	if s.ZoneFlags().Has(FlagNoSummonFriend) {
 		t.Fatal("a region-changing step did not leave the old region's zone")
+	}
+}
+
+// TestMemberKeepsTheZonesOfItsRegionAfterAJump pins the zones of a
+// creature an instant teleport moved to another region, which reports
+// nothing to its Member: it stays in the zones of the region holding it. A
+// stop then revalidates only that region's zones, leaving those it jumped
+// out of without entering those at its landing point; its next step moves
+// it to the region of its position and enters them. Leave exits the zones
+// of the region holding it.
+func TestMemberKeepsTheZonesOfItsRegionAfterAJump(t *testing.T) {
+	edge := world.MinX + 100*regionEdge
+	ix := NewIndex()
+	ix.Add(NewArena(1, testCuboid(t, edge-1000, edge-1, 0, 1000)))
+	ix.Add(NewPeace(2, testCuboid(t, edge+3000, edge+4000, 0, 1000)))
+	s := &memberStub{id: 1, class: ClassNPC, at: location.Location{X: edge - 500, Y: 500}}
+	s.Enter(ix, s)
+	arena := func() bool { return s.ZoneFlags().Has(FlagNoSummonFriend) }
+	peace := func() bool { return s.ZoneFlags().Has(FlagPeace) }
+
+	s.at = location.Location{X: edge + 3500, Y: 500}
+	if !arena() || peace() {
+		t.Fatalf("after the jump: arena %v peace %v, want the arena kept and no peace", arena(), peace())
+	}
+	s.Settle(ix, s)
+	if arena() || peace() {
+		t.Fatalf("a stop after the jump: arena %v peace %v, want the arena left and no peace", arena(), peace())
+	}
+	s.at.X++
+	s.Step(ix, s)
+	if !peace() {
+		t.Fatal("the first step after the jump did not enter the landing point's zone")
+	}
+
+	s.at = location.Location{X: edge - 500, Y: 500}
+	s.Settle(ix, s)
+	s.Step(ix, s)
+	if !arena() || peace() {
+		t.Fatalf("stepping back: arena %v peace %v, want only the arena", arena(), peace())
+	}
+	s.at = location.Location{X: edge + 3500, Y: 500}
+	s.Leave(ix, s)
+	if arena() {
+		t.Fatal("Leave after a jump kept the zone of the region holding the creature")
 	}
 }
 

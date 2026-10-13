@@ -89,15 +89,15 @@ func (m *zoneMember) enter() {
 	}
 }
 
-func (m *zoneMember) step(previous location.Location) {
+func (m *zoneMember) step() {
 	if m != nil {
-		m.Step(m.ix, m, previous)
+		m.Step(m.ix, m)
 	}
 }
 
-func (m *zoneMember) place(previous location.Location) {
+func (m *zoneMember) place() {
 	if m != nil {
-		m.Place(m.ix, m, previous)
+		m.Place(m.ix, m)
 	}
 }
 
@@ -107,9 +107,9 @@ func (m *zoneMember) settle() {
 	}
 }
 
-func (m *zoneMember) leave(at location.Location) {
+func (m *zoneMember) leave() {
 	if m != nil {
-		m.Leave(m.ix, m, at.X, at.Y)
+		m.Leave(m.ix, m)
 	}
 }
 
@@ -119,18 +119,13 @@ func (a *Actor) EnterZones() { a.membership.enter() }
 
 // LeaveZones takes the summon out of the zones around its position before a
 // teleport moves it away; EnterZones puts it in those at the destination.
-func (a *Actor) LeaveZones() { a.membership.leave(a.location()) }
+func (a *Actor) LeaveZones() { a.membership.leave() }
 
 // SettleZones revalidates the summon's zones at once, as a move ends.
 func (a *Actor) SettleZones() { a.membership.settle() }
 
 // InsideZone reports whether the summon's zones hold flag.
 func (a *Actor) InsideZone(flag zone.Flag) bool { return a.membership.has(flag) }
-
-func (a *Actor) location() location.Location {
-	x, y, z := a.Position()
-	return location.Location{X: x, Y: y, Z: z}
-}
 
 // ReloadZones moves the summon off the zones a reload swapped out and onto
 // the reloaded zones around it.

@@ -131,6 +131,7 @@ func TestTeleportInsidePeaceZoneExitsUntilAppearing(t *testing.T) {
 
 	x, y, z := srv.PlayerPosition(t, objID)
 	character.TeleportTo(x+300, y, z, 0)
+	srv.Settle(t)
 	if character.InPeaceZone() {
 		t.Fatal("peace flag still set after the teleport, before Appearing")
 	}
