@@ -10,7 +10,7 @@ type Store interface {
 	itemcontainer.Receiver
 	OwnerID() int32
 	ItemByObjectID(objectID int32) *item.Instance
-	Transfer(objectID int32, count int, target itemcontainer.Receiver, newObjectID int32) (result *item.Instance, freedObjectID int32, freed bool)
+	Transfer(objectID int32, count int, target itemcontainer.Receiver, nextID func() (int32, error)) (result *item.Instance, freedObjectID int32, freed bool, err error)
 }
 
 // Holder is what the player holding an inventory is using its items for
@@ -275,8 +275,8 @@ func (s *Service) Withdraw(store Store, inv *itemcontainer.Inventory, rows []Mov
 		if tmpl.Stackable {
 			target = inv.ItemByTemplateID(inst.TemplateID)
 		}
-		if err := s.move(&res, store.OwnerID(), inst, row.Count, target, func(newID int32) (*item.Instance, int32, bool) {
-			return store.Transfer(row.ObjectID, row.Count, inv, newID)
+		if err := s.move(&res, store.OwnerID(), inst, row.Count, target, func(nextID func() (int32, error)) (*item.Instance, int32, bool, error) {
+			return store.Transfer(row.ObjectID, row.Count, inv, nextID)
 		}); err != nil {
 			return res, StoreDone, err
 		}
@@ -318,29 +318,27 @@ func (s *Service) storeMove(res *Result, inv *itemcontainer.Inventory, store Sto
 	if tmpl.Stackable {
 		target = store.ItemByTemplateID(inst.TemplateID)
 	}
-	return s.move(res, inv.OwnerID(), inst, count, target, func(newID int32) (*item.Instance, int32, bool) {
-		return inv.TransferItem(inst.ObjectID, count, store, newID)
+	return s.move(res, inv.OwnerID(), inst, count, target, func(nextID func() (int32, error)) (*item.Instance, int32, bool, error) {
+		return inv.TransferItem(inst.ObjectID, count, store, nextID)
 	})
 }
 
 // move runs transfer, which moves count units of inst out of the container
 // sourceOwnerID owns, and records the rows it changed. target is the stack
-// the units merge into, or nil. A move that splits inst or merges into
-// target gets a new object id first.
-func (s *Service) move(res *Result, sourceOwnerID int32, inst *item.Instance, count int, target *item.Instance, transfer func(newID int32) (*item.Instance, int32, bool)) error {
-	newID := int32(0)
-	if inst.CountValue() > count || target != nil {
-		id, ok, err := s.nextID()
-		if err != nil {
-			return err
-		}
-		if !ok {
-			return errNoIDAllocator
-		}
-		newID = id
+// the units merge into, or nil. Only a move that splits inst into a
+// receiver holding no stack of it takes a new object id up front; one that
+// lands on target takes none.
+func (s *Service) move(res *Result, sourceOwnerID int32, inst *item.Instance, count int, target *item.Instance, transfer func(nextID func() (int32, error)) (*item.Instance, int32, bool, error)) error {
+	id, ok, err := s.reserveMove(inst.CountValue() > count && target == nil)
+	if err != nil {
+		return err
 	}
-	moved, freedID, freed := transfer(newID)
-	if moved == nil {
+	if !ok {
+		return errNoIDAllocator
+	}
+	defer id.release()
+	moved, freedID, freed, err := transfer(id.next)
+	if moved == nil && err == nil {
 		return nil
 	}
 	if moved != inst && inst.CountValue() > 0 {
@@ -349,7 +347,11 @@ func (s *Service) move(res *Result, sourceOwnerID int32, inst *item.Instance, co
 	if freed {
 		res.Persist = append(res.Persist, Delete(sourceOwnerID, freedID))
 	}
-	if newID != 0 && moved.ObjectID == newID {
+	if moved == nil {
+		// The units left the source, but no id could be taken for them.
+		return err
+	}
+	if id.created(moved) {
 		res.Persist = append(res.Persist, Save(moved))
 	} else {
 		res.Persist = append(res.Persist, Update(moved))

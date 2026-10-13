@@ -121,6 +121,13 @@ func (f *Freight) Add(inst *item.Instance) (result *item.Instance, absorbed bool
 		}
 	}
 
+	f.enterLocked(inst)
+	return inst, false
+}
+
+// enterLocked makes inst one of f's items, tagged with the active town.
+// The caller holds f.mu.
+func (f *Freight) enterLocked(inst *item.Instance) {
 	locData := 0
 	if f.ActiveLocation > 0 {
 		locData = f.ActiveLocation
@@ -128,7 +135,34 @@ func (f *Freight) Add(inst *item.Instance) (result *item.Instance, absorbed bool
 	inst.BindPersister(f.persist)
 	inst.EnterContainer(f.ownerID, f.location, locData, nowMillis())
 	f.items[inst.ObjectID] = inst
-	return inst, false
+}
+
+// AddCreated creates count units of templateID per Container.AddCreated,
+// joining a stack visible at the active town or else starting one tagged
+// with it. nextID is asked for an id only for a new instance.
+func (f *Freight) AddCreated(templateID int32, count int, nextID func() (int32, error)) (*item.Instance, error) {
+	tmpl, ok := f.templates.Get(templateID)
+	if !ok || nextID == nil {
+		return nil, nil
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if tmpl.Stackable {
+		if held := f.itemByTemplateIDLocked(templateID); held != nil {
+			held.AddCount(max(count, 1))
+			return held, nil
+		}
+	}
+	id, err := nextID()
+	if err != nil {
+		return nil, err
+	}
+	if id == 0 {
+		return nil, errNoObjectID
+	}
+	inst := buildInstance(tmpl, count, id)
+	f.enterLocked(inst)
+	return inst, nil
 }
 
 // AddNew creates a new instance of templateID and adds it, tagging it with

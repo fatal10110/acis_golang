@@ -491,7 +491,9 @@ func (l *GameClientLink) settleLeftCorpseItems(actor *summon.Actor) {
 		carried := itemcontainer.NewPlayerInventory(ownerID, petInv.Templates())
 		for _, inst := range petInv.Items() {
 			st := inst.Snapshot()
-			petInv.TransferItem(st.ObjectID, st.Count, carried, 0)
+			if _, _, _, err := petInv.TransferItem(st.ObjectID, st.Count, carried, l.nextObjectID); err != nil {
+				l.log.Error().Err(err).Int32("object_id", st.ObjectID).Msg("allocate left pet corpse item")
+			}
 		}
 		l.flushItemPersistence(petInv)
 		l.flushItemPersistence(carried)
