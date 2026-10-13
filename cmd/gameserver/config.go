@@ -87,6 +87,7 @@ type gameplayConfig struct {
 	DisableRaidCurse         raidCursesDisabled
 	FreeTeleport             freeTeleport
 	ShowNPCCrest             npcCrestShown
+	ShowNPCLevel             npcLevelShown
 	RaidMultipliers          npc.RaidMultipliers
 	NpcAI                    npc.AIConfig
 	BossWaits                script.BossWaitTimes
@@ -225,6 +226,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.ShowNPCCrest, err = loadShowNPCCrest(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.ShowNPCLevel, err = loadShowNPCLevel(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.RaidMultipliers, err = loadRaidMultipliers(paths); err != nil {
@@ -846,6 +850,18 @@ func loadShowNPCCrest(paths gameServerPaths) (npcCrestShown, error) {
 	return npcCrestShown(config.NewFields(props, "show npc crest").Bool("ShowNpcCrest", false)), nil
 }
 
+// npcLevelShown is npcs.properties ShowNpcLevel: when true, a monster's
+// NpcInfo title starts with its level and, for an aggressive one, a star.
+type npcLevelShown bool
+
+func loadShowNPCLevel(paths gameServerPaths) (npcLevelShown, error) {
+	props, err := config.LoadFile(paths.NpcsConfigPath)
+	if err != nil {
+		return false, err
+	}
+	return npcLevelShown(config.NewFields(props, "show npc level").Bool("ShowNpcLevel", false)), nil
+}
+
 // loadRaidMultipliers reads the npcs.properties RaidDefenceMultiplier,
 // RaidHpRegenMultiplier and RaidMpRegenMultiplier keys, each defaulting to 1.
 // A malformed value fails boot.
@@ -868,8 +884,9 @@ func loadRaidMultipliers(paths gameServerPaths) (npc.RaidMultipliers, error) {
 }
 
 // loadNpcAIConfig reads the npcs.properties MobAggroInPeaceZone (default
-// true) and GuardAttackAggroMob (default false) target-selection switches
-// and the DefaultSeeRange (default 450) NPC see range.
+// true) and GuardAttackAggroMob (default false) target-selection switches,
+// the DefaultSeeRange (default 450) NPC see range and the MaxDriftRange
+// (default 200) drift range.
 func loadNpcAIConfig(paths gameServerPaths) (npc.AIConfig, error) {
 	props, err := config.LoadFile(paths.NpcsConfigPath)
 	if err != nil {
@@ -881,6 +898,7 @@ func loadNpcAIConfig(paths gameServerPaths) (npc.AIConfig, error) {
 		MobAggroInPeaceZone: f.Bool("MobAggroInPeaceZone", def.MobAggroInPeaceZone),
 		GuardAttackAggroMob: f.Bool("GuardAttackAggroMob", def.GuardAttackAggroMob),
 		SeeRange:            f.Int("DefaultSeeRange", def.SeeRange),
+		DriftRange:          f.Int("MaxDriftRange", def.DriftRange),
 	}
 	if err := f.Err(); err != nil {
 		return npc.AIConfig{}, err

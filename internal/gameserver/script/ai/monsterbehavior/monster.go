@@ -118,7 +118,7 @@ func MonsterHooks() script.Hooks {
 			}
 			if strings.EqualFold(e.Name, "5001") {
 				if fled := n.Slot(script.SlotCreature4); n.Int(script.SlotIntAI4) == 1 && fled != nil {
-					n.AddFleeDesire(fled, script.MaxDriftRange, 10000000)
+					n.AddFleeDesire(fled, n.MaxDriftRange(), 10000000)
 					n.SetInt(script.SlotIntAI4, 0)
 					n.SetSlot(script.SlotCreature4, nil)
 				}

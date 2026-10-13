@@ -361,8 +361,10 @@ func (p *Persistence) RemoveAllSkills(c *player.Character) {
 // An effect whose ticks run an action runs those of the ticks due between the
 // restore and the replay, in time order across all the effects, on c; one that
 // ran out in between is not reinstated. A session that ends before EnterWorld
-// replays them too, ahead of its saves.
-func (p *Persistence) ReplayEffects(c *player.Character) {
+// replays them too, ahead of its saves. applied, when set, runs once every
+// effect is back with its stats, before any tick due since the restore:
+// what the restore does with the full maxima, it does ahead of those ticks.
+func (p *Persistence) ReplayEffects(c *player.Character, applied func()) {
 	if p == nil || c == nil {
 		return
 	}
@@ -385,6 +387,9 @@ func (p *Persistence) ReplayEffects(c *player.Character) {
 				continue
 			}
 			effect.ApplyRestored(list, self, self, effect.SkillFromDefinition(def), def.Effects, eff.Count, eff.Time, eff.RestoredAt)
+		}
+		if applied != nil {
+			applied()
 		}
 	})
 	// The registry's only purpose is staging Restore's effects until the live
@@ -1230,7 +1235,7 @@ func (p *Persistence) RestoreDuelState(c *player.Character, st SaveState) {
 	// c is in the world: its effects run from the replay, which runs none
 	// of their ticks.
 	p.stageSkillState(c, st.rows, c.Now(), time.Time{})
-	p.ReplayEffects(c)
+	p.ReplayEffects(c, nil)
 }
 
 // ClearSaved deletes the rows st's character saved for st's class.

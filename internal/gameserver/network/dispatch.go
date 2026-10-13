@@ -370,6 +370,7 @@ type GameClientLink struct {
 	petConfig        petmodel.Config // passed into summon.PetConfig by newPet.
 	disableRaidCurse bool
 	showNPCCrest     bool
+	showNPCLevel     bool
 	inventory        *invops.Service
 	petItems         *petitem.Service
 	trades           *tradebook.Book
@@ -635,6 +636,10 @@ type GameClientLinkConfig struct {
 	// NpcInfo shows the clan and alliance crests of the clan owning the
 	// residence it serves.
 	ShowNPCCrest bool
+	// ShowNPCLevel is npcs.properties ShowNpcLevel: when true, a monster's
+	// NpcInfo title starts with its level and, when it is aggressive, a
+	// star.
+	ShowNPCLevel bool
 	// Teleports and InstantTeleports are the destinations civilian NPCs
 	// offer; nil offers none. FreeTeleport is npcs.properties FreeTeleport:
 	// when true, no destination is charged for. TeleportClock is the local
@@ -880,6 +885,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		petConfig:        cfg.PetConfig,
 		disableRaidCurse: cfg.DisableRaidCurse,
 		showNPCCrest:     cfg.ShowNPCCrest,
+		showNPCLevel:     cfg.ShowNPCLevel,
 		petRoll:          cfg.PetRoll,
 		petFeedPeriod:    cfg.PetFeedPeriod,
 		fishing:          fishingDeps{table: cfg.Fish, roll: cfg.FishingRoll},

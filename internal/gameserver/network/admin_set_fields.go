@@ -57,6 +57,9 @@ func (l *GameClientLink) adminSetClass(gm, target *livePlayer, value string, has
 			}
 		}, func() {
 			l.storeLive(target)
+			// The store reads the new class's maxima: their changes are
+			// settled and reported here, ahead of the refreshes below.
+			target.SettleMaxima()
 			target.RefreshWeightPenalty()
 			target.RefreshHennaStats()
 			target.SendFrame(serverpackets.FrameHennaInfo(target.HennaSnapshot()))
@@ -310,6 +313,7 @@ func (l *GameClientLink) broadcastNPCInfo(obj world.Tracked, info func() serverp
 	}
 	broadcastFrame(func() wire.Frame {
 		s := info()
+		l.addNPCLevel(obj, &s)
 		l.addNPCCrest(obj, &s)
 		return serverpackets.FrameNPCInfo(s)
 	}, func(send func(frameReceiver)) {

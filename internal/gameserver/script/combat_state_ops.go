@@ -1,15 +1,13 @@
 package script
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
-
 // The NPC operations a monster behavior reads its fight by: its attack
 // stance, its cast in flight and its root, whether it may attack a creature
 // on its own, and the drop of one attack desire. Each is a hostile NPC's;
 // any other NPC panics.
 
-// MaxDriftRange is how far an NPC spawned at a point may stray from it
-// before it is out of its territory.
-const MaxDriftRange = npc.MaxDriftRange
+// MaxDriftRange is how far the NPC, spawned at a point, may stray from it
+// before it is out of its territory: the configured drift range.
+func (n *NPC) MaxDriftRange() int { return n.instance().MaxDriftRange() }
 
 // InCombat reports whether the NPC holds an attack stance.
 func (n *NPC) InCombat() bool { return n.hostile("check its attack stance").InCombat() }

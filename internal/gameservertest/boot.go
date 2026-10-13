@@ -154,6 +154,8 @@ type options struct {
 	instantTeleports       travel.InstantTable
 	freeTeleport           bool
 	showNPCCrest           bool
+	showNPCLevel           bool
+	maxDriftRange          int
 	teleportClock          func() time.Time
 	tradeClock             func() time.Time
 	zones                  *zone.Index
@@ -2154,6 +2156,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		InstantTeleports: o.instantTeleports,
 		FreeTeleport:     o.freeTeleport,
 		ShowNPCCrest:     o.showNPCCrest,
+		ShowNPCLevel:     o.showNPCLevel,
 		TeleportClock:    o.teleportClock,
 		TradeClock:       o.tradeClock,
 		Zones:            o.zones,
@@ -2325,7 +2328,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			state: state, templates: o.npcs, geo: bootGeo(o.geo), ids: ids, decay: o.decay, ai: ai, positions: positions,
 			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.AttackStance, log: o.log, makers: o.npcSpawns,
 			dropRates: o.npcDropRates, sevenSigns: sevenSigns, scripts: quests.registry, spawner: quests.env.Spawner, routes: o.walkerRoutes,
-			skills: o.npcSpawnSkills, zones: o.zones,
+			skills: o.npcSpawnSkills, zones: o.zones, driftRange: o.maxDriftRange,
 		})
 		// As the game server does once the spawns are up, every castle's
 		// holy artifacts are placed, built from the WithNPCs templates.

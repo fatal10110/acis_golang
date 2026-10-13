@@ -541,7 +541,7 @@ func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChan
 	c.ClearDisabledSkills()
 	if l.skills != nil {
 		l.skills.StageClassSkillState(c, rows.skills)
-		l.skills.ReplayEffects(c)
+		l.skills.ReplayEffects(c, nil)
 	}
 	if c.EffectList().HasHeld() {
 		l.updateEffectIcons(live)
@@ -552,7 +552,9 @@ func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChan
 	if l.journals != nil {
 		l.journals.Exit(c, repentYourSinsQuest, true)
 	}
-	c.ClampResources()
+	// The new class's maxima bound the current values, and their changes
+	// are reported ahead of the refreshes below.
+	c.SettleMaxima()
 	c.RefreshWeightPenalty()
 	c.RefreshExpertisePenalty()
 	c.RefreshHennaStats()

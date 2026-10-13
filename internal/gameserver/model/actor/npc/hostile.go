@@ -25,6 +25,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// defaultDriftRange is the shipped npcs.properties MaxDriftRange.
 const defaultDriftRange = 200
 
 // siegeGuardHomeMoveWeight is the MOVE_TO desire weight SiegeGuard return-home
@@ -1173,7 +1174,7 @@ func (h *Hostile) ReturnHome() bool {
 // is always in its own territory.
 // Maker NPCs with a resolved territory use banned-then-allowed polygon
 // containment. A nil maker, or a maker with no territories, uses a strict
-// 200-unit 3D sphere around Home.
+// 3D sphere of the drift range around Home.
 func (h *Hostile) InTerritory() bool {
 	if in, decided := h.privateInTerritory(); decided {
 		return in
@@ -1214,10 +1215,7 @@ func (h *Hostile) driftRange() int {
 	if kind := hostileKind(h.Instance); kind == "Guard" || kind == "SiegeGuard" {
 		return 20
 	}
-	if h.Instance.DriftRange > 0 {
-		return h.Instance.DriftRange
-	}
-	return defaultDriftRange
+	return h.Instance.MaxDriftRange()
 }
 
 func (h *Hostile) returnHomeOutsideDriftRange() bool {
