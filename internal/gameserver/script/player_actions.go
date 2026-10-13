@@ -41,7 +41,10 @@ func (p *Player) HasAtLeastOneItem(itemIDs ...int32) bool {
 	return false
 }
 
-// TeleportTo moves the player to at, up to offset away on each axis.
+// TeleportTo moves the player to at, up to offset away on each axis. The
+// teleport runs on the player's own queue once the calling task is done,
+// whatever queue the hook runs on: the rest of the hook still reads the old
+// position.
 func (p *Player) TeleportTo(at Place, offset int) {
 	loc := at.loc()
 	p.character().TeleportTo(loc.X, loc.Y, loc.Z, offset)

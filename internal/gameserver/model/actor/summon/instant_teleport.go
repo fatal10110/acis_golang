@@ -12,15 +12,13 @@ func (a *Actor) InstantTeleportTo(j location.Jump) {
 }
 
 // LandInstantly puts the summon at target, once its observers have seen the
-// jump: it stays in its region until it next moves, so what knows it and
-// what it knows are unchanged, its zones are revalidated as for a position
-// set outside movement, and it follows its owner again.
+// jump: it stays in its region until it next moves, so what knows it, what
+// it knows and the zones it is in are unchanged, and it follows its owner
+// again.
 func (a *Actor) LandInstantly(target location.Location) {
-	previous := a.location()
 	a.Move().SetPosition(target)
 	if a.world != nil {
 		a.world.SetPosition(a, target.X, target.Y, target.Z)
-		a.membership.place(previous)
 	}
 	a.OnTeleported()
 }

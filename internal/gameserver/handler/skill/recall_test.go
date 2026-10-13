@@ -18,6 +18,9 @@ type recallPlayer struct {
 
 	teleports [][4]int
 	recalls   []modelskill.RecallType
+	// onQueue records, per move, whether it was asked as running on the
+	// player's own queue.
+	onQueue []bool
 	// in7sDungeon is the dungeon membership; leftDungeonFirst records
 	// whether it was cleared before the first move.
 	in7sDungeon, leftDungeonFirst bool
@@ -31,9 +34,21 @@ func (p *recallPlayer) Jailed() bool                      { return p.jailed }
 func (p *recallPlayer) InDuel() bool                      { return p.duel }
 func (p *recallPlayer) Riding() bool                      { return p.riding }
 func (p *recallPlayer) Flying() bool                      { return p.flying }
-func (p *recallPlayer) Recall(dest modelskill.RecallType) { p.recalls = append(p.recalls, dest) }
-func (p *recallPlayer) TeleportTo(x, y, z, radius int) {
+func (p *recallPlayer) Recall(dest modelskill.RecallType) { p.recall(dest, false) }
+func (p *recallPlayer) RecallOnQueue(dest modelskill.RecallType) {
+	p.recall(dest, true)
+}
+func (p *recallPlayer) TeleportTo(x, y, z, radius int)      { p.teleport(x, y, z, radius, false) }
+func (p *recallPlayer) TeleportOnQueue(x, y, z, radius int) { p.teleport(x, y, z, radius, true) }
+
+func (p *recallPlayer) recall(dest modelskill.RecallType, onQueue bool) {
+	p.recalls = append(p.recalls, dest)
+	p.onQueue = append(p.onQueue, onQueue)
+}
+
+func (p *recallPlayer) teleport(x, y, z, radius int, onQueue bool) {
 	p.teleports = append(p.teleports, [4]int{x, y, z, radius})
+	p.onQueue = append(p.onQueue, onQueue)
 }
 
 func (p *recallPlayer) SetIn7sDungeon(in bool) {
@@ -81,6 +96,24 @@ func TestRecallSendsTargetsByRecallType(t *testing.T) {
 			if !slices.Equal(p.recalls, []modelskill.RecallType{tc.recall}) || len(p.teleports) != 0 {
 				t.Fatalf("%s %v: player %d recalls %v teleports %v, want one recall", tc.skillType, tc.recall, p.objectID, p.recalls, p.teleports)
 			}
+		}
+	}
+}
+
+// TestRecallMovesOnlyTheCasterInsideTheCast pins where each move runs: the
+// cast runs on the caster's queue, so the caster moves inside it, while
+// every other target moves on its own queue once the cast's task is done.
+func TestRecallMovesOnlyTheCasterInsideTheCast(t *testing.T) {
+	at := location.Location{X: -84200, Y: 244544, Z: -3728}
+	for name, def := range map[string]modelskill.Definition{
+		"recall type": {RecallType: modelskill.RecallTown},
+		"teleCoords":  {TeleCoords: &at},
+	} {
+		caster := newRecallPlayer(1)
+		member := newRecallPlayer(2)
+		recall(caster, def, caster, member)
+		if !slices.Equal(caster.onQueue, []bool{true}) || !slices.Equal(member.onQueue, []bool{false}) {
+			t.Fatalf("%s: caster on its queue %v, member on its queue %v; want [true], [false]", name, caster.onQueue, member.onQueue)
 		}
 	}
 }

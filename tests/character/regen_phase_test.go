@@ -91,6 +91,7 @@ func TestPlayerRegenPhaseSurvivesTeleport(t *testing.T) {
 
 	x, y, z := p.srv.PlayerPosition(t, p.objID)
 	p.c.TeleportTo(x+300, y, z, 0)
+	p.srv.Settle(t)
 	if p.c.Visible() {
 		t.Fatal("player still on the grid before Appearing")
 	}

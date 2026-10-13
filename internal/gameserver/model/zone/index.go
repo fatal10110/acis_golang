@@ -132,6 +132,18 @@ func (s *zoneSet) revalidate(a Actor) {
 	}
 }
 
+// RevalidateIn syncs a's zone occupancy, at its current position, against
+// the zones attached to the region containing held: the region holding a,
+// which an instant teleport leaves a in until its next move.
+func (ix *Index) RevalidateIn(a Actor, held location.Location) {
+	set := ix.set()
+	dropped := set.sync(a)
+	for _, k := range set.at(held.X, held.Y) {
+		Revalidate(k, a)
+	}
+	settleDropped(a, dropped)
+}
+
 // RevalidateMove synchronizes zones near both the prior and current
 // positions, so crossing a world-region boundary evicts zones left behind
 // without restarting zones that span the boundary.

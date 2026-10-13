@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/wedding"
 )
@@ -141,7 +142,7 @@ func (l *GameClientLink) goToLove(live *livePlayer) {
 		return
 	}
 	x, y, z := partner.Position()
-	live.Character.TeleportTo(x, y, z, 20)
+	l.teleportLivePlayer(live, location.Location{X: x, Y: y, Z: z}, 20)
 }
 
 // engageAnswer is live's answer to a marriage request; answer 1 accepts.

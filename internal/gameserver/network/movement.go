@@ -435,10 +435,9 @@ func (l *GameClientLink) updateLivePlayerPosition(live *livePlayer, position loc
 }
 
 // placeLivePlayer is updateLivePlayerPosition; with keepRegion live stays
-// in the region holding it until its next position update, as an instant
-// teleport leaves it.
+// in the region holding it, and in that region's zones, until its next
+// position update, as an instant teleport leaves it.
 func (l *GameClientLink) placeLivePlayer(live *livePlayer, position location.Location, heading int, keepRegion bool) {
-	previous := live.CurrentLocation()
 	live.Character.SetLastKnownPosition(position, heading)
 	live.Character.SetHeading(heading)
 	if live.move != nil {
@@ -453,8 +452,10 @@ func (l *GameClientLink) placeLivePlayer(live *livePlayer, position location.Loc
 	}
 	if keepRegion {
 		l.world.SetPosition(live, position.X, position.Y, position.Z)
-	} else if err := l.world.Move(live, position.X, position.Y, position.Z); err != nil {
+		return
+	}
+	if err := l.world.Move(live, position.X, position.Y, position.Z); err != nil {
 		l.log.Debug().Err(err).Int32("object_id", live.ObjectID()).Msg("move player")
 	}
-	l.revalidateZones(live, previous, revalidateForce)
+	l.revalidateZones(live, revalidateForce)
 }

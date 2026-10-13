@@ -507,7 +507,6 @@ func (c *Character) SyncPosition(position location.Location) {
 // relocate moves this player's live world-grid presence to position; placed
 // marks a position set outside movement.
 func (c *Character) relocate(position location.Location, placed bool) {
-	previous := c.CurrentLocation()
 	c.locMu.Lock()
 	c.Location = position
 	c.locMu.Unlock()
@@ -515,7 +514,7 @@ func (c *Character) relocate(position location.Location, placed bool) {
 		return
 	}
 	_ = c.world.Move(c.tracked(), position.X, position.Y, position.Z)
-	c.emit(event.Relocated{Previous: previous, Placed: placed})
+	c.emit(event.Relocated{Placed: placed})
 }
 
 // SetWorldHandle names t, the object that embeds c, as the one the world

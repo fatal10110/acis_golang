@@ -32,9 +32,8 @@ func TestReloadKeepsHoldsOfARevalidationBeforeTheRebase(t *testing.T) {
 		"settle": func(ix *Index, s *memberStub) { s.Settle(ix, s) },
 		"step": func(ix *Index, s *memberStub) {
 			for range StepsPerRevalidation {
-				previous := s.at
 				s.at.X++
-				s.Step(ix, s, previous)
+				s.Step(ix, s)
 			}
 		},
 	}
@@ -143,7 +142,7 @@ func TestReloadCreatureTheRebaseMissed(t *testing.T) {
 		t.Fatalf("swim changes = %v, want entering then leaving the water", swimmer.swims)
 	}
 
-	leaver.Leave(ix, leaver, leaver.at.X, leaver.at.Y)
+	leaver.Leave(ix, leaver)
 	if leaver.ZoneFlags().Has(FlagNoStore) || peace.Inside(leaver) {
 		t.Fatal("leaving the grid after the swap kept the old zones' flags or entered the new zone")
 	}

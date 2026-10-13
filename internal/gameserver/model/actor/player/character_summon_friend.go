@@ -31,10 +31,17 @@ type SummonFriendRequester interface {
 // isn't ported yet.
 func (c *Character) FestivalParticipant() bool { return false }
 
-// TeleportTo is summonFriendTraveler's entry point
-// (handler/skill/summon.go).
+// TeleportTo moves the character to (x, y, z), scattered within radius. It
+// may be called from any queue: the teleport runs on the character's own
+// queue once the calling task is done.
 func (c *Character) TeleportTo(x, y, z, radius int) {
 	c.emit(event.TeleportRequested{X: x, Y: y, Z: z, Radius: radius})
+}
+
+// TeleportOnQueue is TeleportTo for a caller running on the character's own
+// queue: the teleport runs inside the call.
+func (c *Character) TeleportOnQueue(x, y, z, radius int) {
+	c.emit(event.TeleportRequested{X: x, Y: y, Z: z, Radius: radius, OwnQueue: true})
 }
 
 // ItemCount is summonFriendItemConsumer's entry point: the held count of
@@ -141,5 +148,5 @@ func (c *Character) TeleportAnswer(answer, requesterID int32) {
 		}
 	}
 	x, y, z := info.Position()
-	c.TeleportTo(x, y, z, 20)
+	c.TeleportOnQueue(x, y, z, 20)
 }
