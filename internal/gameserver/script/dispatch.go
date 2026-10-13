@@ -49,12 +49,20 @@ func Classify(answer string) Result {
 
 // run calls fn, one invocation of s's hook h, and reports whether it
 // returned. A panic is recovered and logged with its stack; nothing is
-// disabled, so the next hook and the next invocation run as usual. The
-// invocation is counted as running until it returns: a player it writes
-// leaves the world only after that.
+// disabled, so the next hook and the next invocation run as usual.
+//
+// Every invocation but a start is counted as running until it returns, so a
+// player it wrote leaves the world only after that (Character.WhileAttached).
+// A start is not counted: it is handed no player, and it may hold the
+// database for long (a daily refresh of every player's recommendations, the
+// Seven Signs saves), which would hold every player written meanwhile, from
+// any script, and the actor queue detaching it. Each write a start makes to
+// a player still counts itself while it runs.
 func (r *Registry) run(s *Script, h hook, fn func()) (ok bool) {
-	epoch := r.runs.Begin()
-	defer r.runs.End(epoch)
+	if h != hookStart {
+		epoch := r.runs.Begin()
+		defer r.runs.End(epoch)
+	}
 	defer func() {
 		if p := recover(); p != nil {
 			r.log.Error().Str("script", s.path).Str("hook", h.String()).Interface("panic", p).Str("stack", string(debug.Stack())).Msg("script: hook panicked")

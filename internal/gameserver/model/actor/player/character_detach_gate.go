@@ -6,6 +6,9 @@ import "sync"
 // write admitted stamps the gate (ScriptRuns.stamp), and the character is
 // held while an invocation counted at or below the stamp still runs: the
 // invocation that made the write, and any it was raised from, among them.
+// Once the character is leaving, a write is admitted only while it is so
+// held, and the stamp it takes extends the hold to the write's own
+// invocation and to every invocation begun before it.
 type detachGate struct {
 	mu sync.Mutex
 	// runs is the counter the stamp was taken from, nil before any write.
@@ -23,8 +26,12 @@ func (g *detachGate) heldLocked() bool {
 // invocation that wrote c, then seals its quest journal. A script invocation
 // that wrote c before the mark, from whichever queue, has made all its
 // writes to c when MarkDetaching returns, so they are in the final saves of
-// c's departure; one that had not is refused every write to c. See
-// WhileAttached.
+// c's departure. After the mark a write to c is admitted only while an
+// invocation counted at or below c's last stamp still runs; an admitted
+// write stamps c again, so the wait extends to its own invocation, and that
+// invocation's later writes are admitted too. Once nothing holds c, every
+// write is refused. So each invocation's writes to c land before the final
+// saves, or none does. See WhileAttached.
 func (c *Character) MarkDetaching() {
 	g := &c.detachGate
 	g.mu.Lock()
