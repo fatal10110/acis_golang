@@ -42,8 +42,9 @@ type Instance struct {
 	// fisher; nil for none. Set before the NPC is placed, read-only after.
 	Summoner attackable.Combatant
 	// CastleID is the castle the NPC was given as it spawned, a mercenary
-	// a siege hired; 0 for none, leaving it to its maker and template. Set
-	// before the NPC is placed, read-only after.
+	// a siege hired or a castle's control tower; 0 for none, leaving it to
+	// its maker and template. Set before the NPC is placed, read-only
+	// after.
 	CastleID int
 
 	// name and title, once set, replace the template's; see Name and Title.

@@ -74,12 +74,13 @@ type FolkSpawner struct {
 // on the AI task, and starts its route walk when it has one. slot is the
 // spawn slot placing it; nil for none.
 func (s FolkSpawner) Spawn(inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot) (*npc.Folk, error) {
-	return s.spawn(inst, loc, heading, slot, nil)
+	return s.spawn(inst, loc, heading, slot, nil, npc.TowerRuntime{})
 }
 
 // spawn is Spawn for a private of master, which a nil master spawns none
-// for: the NPC is linked to master before it enters the world.
-func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot, master npc.PartyMember) (*npc.Folk, error) {
+// for: the NPC is linked to master before it enters the world. tower is
+// what a control tower works with.
+func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading int, slot npc.SpawnSlot, master npc.PartyMember, tower npc.TowerRuntime) (*npc.Folk, error) {
 	f, err := npc.NewFolk(inst, s.Skills)
 	if err != nil {
 		return nil, err
@@ -97,6 +98,7 @@ func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading in
 		Remover:        s.Remover,
 		Ground:         s.Ground,
 		SeeRange:       s.SeeRange,
+		Tower:          tower,
 	}
 	if s.NewSink != nil {
 		rt.Sink = s.NewSink(f)

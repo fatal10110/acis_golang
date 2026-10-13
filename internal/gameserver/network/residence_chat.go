@@ -9,8 +9,9 @@ import (
 )
 
 // npcResidence returns the residence inst serves: a castle, or else a clan
-// hall. A mercenary serves the castle whose siege hired it, a holy artifact
-// the castle that placed it. A maker whose spawn time names a castle or a
+// hall. A mercenary serves the castle whose siege hired it, a control
+// tower the castle it was placed for, a holy artifact the castle that
+// placed it. A maker whose spawn time names a castle or a
 // siegable hall gives its NPCs that residence; otherwise the NPC serves the
 // first castle whose npcs list holds its template id, else the first clan
 // hall's.
@@ -56,7 +57,8 @@ func (l *GameClientLink) residenceTalk(live *livePlayer, f *npc.Folk) npc.Reside
 	c, h := l.npcResidence(f.Instance)
 	switch {
 	case c != nil:
-		r.CastleID, r.OwnerID = c.ID, c.OwnerID()
+		r.CastleID, r.OwnerID, r.CastleName = c.ID, c.OwnerID(), c.Name
+		r.LifeTowers = aliveLifeTowers(c)
 		if s, ok := l.castleSiege(int32(c.ID)); ok {
 			r.SiegeInProgress = s.InProgress()
 			if field := s.Battlefield(); field != nil {
@@ -81,6 +83,8 @@ func (l *GameClientLink) residenceTalk(live *livePlayer, f *npc.Folk) npc.Reside
 	}
 	if l.sevenSigns != nil {
 		r.StrifeOwner = l.sevenSigns.SealOwners()[sevensigns.Strife-sevensigns.Avarice]
+		r.SealValidation = l.sevenSigns.CurrentPeriod() == sevensigns.SealValidation
 	}
+	r.Flying = live.Flying()
 	return r
 }

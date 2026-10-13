@@ -3,6 +3,7 @@ package npc
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/classmaster"
@@ -152,6 +153,27 @@ const (
 	// BypassDungeonRefused turns the talker away from a Seven Signs dungeon:
 	// the message DungeonOnly names, when set, then HTML alone.
 	BypassDungeonRefused
+	// BypassChatAs opens HTML the way Chat says, as a chat window opens on
+	// an interact.
+	BypassChatAs
+	// BypassDoors opens the doors of DoorScope when OpenDoors is set, else
+	// closes them: each of DoorIDs in turn, or every gate of the clan hall.
+	// HTML, when set, follows alone. A malformed door list stops the
+	// handling once the doors before the fault are done.
+	BypassDoors
+	// BypassDoorsBusy refuses a doorman's gates during a siege: HTML, then
+	// ActionFailed, then the message saying so.
+	BypassDoorsBusy
+	// BypassClanGate sends the talker to its clan leader's portal: HTML, the
+	// page saying there is none, opens with ActionFailed when the leader is
+	// online without one.
+	BypassClanGate
+	// BypassMassTeleport arms the mass gatekeeper's teleport of its
+	// defenders Delay from now, unless one is pending, then opens HTML alone.
+	BypassMassTeleport
+	// BypassMercenaryHire opens the untaxed buy window of buylist ListID,
+	// then HTML alone; a list this NPC may not sell answers nothing.
+	BypassMercenaryHire
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -177,6 +199,9 @@ type Talker struct {
 	// SevenSigns reads the talker's Record of Seven Signs; nil reads an
 	// empty record.
 	SevenSigns func() sevensigns.Record
+	// Residence reads the talker's standing at the castle or clan hall the
+	// NPC serves; nil reads a residence of no one.
+	Residence func() ResidenceTalk
 }
 
 // BypassReply is a civilian NPC's answer to one dialog command.
@@ -217,6 +242,13 @@ type BypassReply struct {
 	// DungeonOnly is the cabal BypassDungeonRefused says alone may enter,
 	// NoCabal when the refusal gives no reason.
 	DungeonOnly sevensigns.Cabal
+	// DoorScope and OpenDoors are the door command BypassDoors runs, and
+	// doorCommand its text; see DoorIDs.
+	DoorScope   DoorScope
+	OpenDoors   bool
+	doorCommand string
+	// Delay is how long BypassMassTeleport's teleport waits.
+	Delay time.Duration
 }
 
 // Bypass answers command, the part of an npc_<objectId>_<command> dialog
@@ -247,8 +279,11 @@ type BypassReply struct {
 // commands to the race track, and every command on a wedding manager to
 // its dialog, as does every command on an auctioneer or a clan hall
 // manager. A Seven Signs priest's and a Mammon NPC's own commands go to
-// signsPriestBypass. Every other command belongs to a system not in place
-// yet.
+// signsPriestBypass. A castle or clan hall NPC answers its own commands
+// before the generic ones (see residenceCommand), a castle warehouse keeper
+// and a clan hall doorman their residence's chat pages, and a castle or
+// clan hall doorman lets only its owners teleport. Every other command
+// belongs to a system not in place yet.
 func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command string) BypassReply {
 	karma := talker.Karma
 	kind := hostileKind(f.Instance)
@@ -270,6 +305,9 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	}
 	if _, ok := unportedFolkChats[kind]; ok {
 		return reply
+	}
+	if out, ok := f.residenceCommand(pages, kind, rules, talker, command, reply); ok {
+		return out
 	}
 	if _, ok := unportedResidenceCommands[kind]; ok {
 		return reply
@@ -334,7 +372,7 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		}
 	}
 	// A merchant or fisherman keeps its sale's empty page in its own folder.
-	if (kind == "Merchant" || kind == "Fisherman") && strings.EqualFold(firstToken(command), "Sell") {
+	if merchantKind(kind) && strings.EqualFold(firstToken(command), "Sell") {
 		reply.Outcome = BypassSellList
 		if page, ok := pages.Get("data/html/" + chat.dir + "/" + strconv.Itoa(f.NpcID()) + "-empty.htm"); ok {
 			reply.HTML = strings.ReplaceAll(page, "%objectId%", strconv.Itoa(int(f.ObjectID())))
@@ -351,7 +389,7 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			return reply
 		}
 	}
-	reply.CancelEnchant = kind == "WarehouseKeeper"
+	reply.CancelEnchant = kind == "WarehouseKeeper" || kind == "CastleWarehouseKeeper"
 	if reply.CancelEnchant {
 		if cmd := warehouseCommand(command); cmd != WarehouseNoCommand {
 			reply.Outcome, reply.Warehouse = BypassWarehouse, cmd
@@ -359,7 +397,7 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			return reply
 		}
 	}
-	if kind == "Merchant" || kind == "Fisherman" {
+	if merchantKind(kind) {
 		if out, ok := f.merchantMultisell(pages, talker, command, reply); ok {
 			return out
 		}
@@ -391,6 +429,10 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			if n, err := commons.ParseInt(arg, 32); err == nil {
 				val = int(n)
 			}
+		}
+		if page, how, ok := f.residenceChatPage(pages, kind, talker.residence(), val); ok {
+			reply.Outcome, reply.HTML, reply.Chat = BypassChatAs, page, how
+			return reply
 		}
 		reply.Outcome = BypassChatWindow
 		if kind == "OlympiadManagerNpc" {
@@ -450,15 +492,30 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		reply.Outcome = BypassTeleportList
 		return reply
 	case strings.HasPrefix(command, "teleport"):
-		return teleportCommand(reply, BypassTeleport, command)
+		return gateTeleport(teleportCommand(reply, BypassTeleport, command), kind, talker)
 	case strings.HasPrefix(command, "instant_teleport"):
-		return teleportCommand(reply, BypassInstantTeleport, command)
+		return gateTeleport(teleportCommand(reply, BypassInstantTeleport, command), kind, talker)
 	}
 	if strings.HasPrefix(command, "CPRecovery") {
 		reply.Outcome = BypassRefused
 		if arenaManager(f.NpcID()) {
 			reply.Outcome = BypassCPRecovery
 		}
+	}
+	return reply
+}
+
+// merchantKind reports whether kind answers the merchant's shop commands: a
+// merchant, a fisherman or a manor manager.
+func merchantKind(kind InstanceKind) bool {
+	return kind == "Merchant" || kind == "Fisherman" || kind == "ManorManagerNpc"
+}
+
+// gateTeleport refuses a parsed teleport the NPC of kind does not let the
+// talker take; see teleportAllowed.
+func gateTeleport(reply BypassReply, kind InstanceKind, talker Talker) BypassReply {
+	if (reply.Outcome == BypassTeleport || reply.Outcome == BypassInstantTeleport) && !teleportAllowed(kind, talker) {
+		reply.Outcome = BypassRefused
 	}
 	return reply
 }

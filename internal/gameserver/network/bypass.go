@@ -185,6 +185,7 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 	talker.ThirdClass = classLevel >= 3
 	talker.CurrentFolk = live.currentFolk.Load() == f
 	talker.SevenSigns = folkChatState{l: l, live: live, f: f}.SevenSigns
+	talker.Residence = folkChatState{l: l, live: live, f: f}.Residence
 	reply := f.Bypass(setPages{l.html}, rules, talker, command)
 	if reply.LeadingActionFailed {
 		live.SendFrame(serverpackets.FrameActionFailed())
@@ -288,6 +289,18 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		l.dungeonGate(live, f, false)
 	case npc.BypassDungeonRefused:
 		dungeonRefusal(live, f, reply)
+	case npc.BypassChatAs:
+		sendFolkChat(live, f, reply.HTML, reply.Chat)
+	case npc.BypassDoors:
+		return l.doormanDoors(live, f, reply)
+	case npc.BypassDoorsBusy:
+		doormanBusy(live, f, reply.HTML)
+	case npc.BypassClanGate:
+		l.clanGate(live, f, reply.HTML)
+	case npc.BypassMassTeleport:
+		l.massTeleport(live, f, reply)
+	case npc.BypassMercenaryHire:
+		l.mercenaryHire(live, f, reply)
 	case npc.BypassUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Str("command", command).Msg("bypass: npc dialog command not modeled")
 	case npc.BypassRefused:

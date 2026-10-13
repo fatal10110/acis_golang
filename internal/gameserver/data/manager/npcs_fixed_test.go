@@ -24,7 +24,7 @@ type groundGeo struct{ fakeGeo }
 func (groundGeo) Height(_, _, z int) int16 { return int16(z - 7) }
 
 // fixedSpawnFixture boots a population with one maker spawn of npc 1 and
-// templates for a monster (1), a merchant (2) and a control tower (3).
+// templates for a monster (1), a merchant (2) and a Christmas tree (3).
 func fixedSpawnFixture(t *testing.T) (*Npcs, *world.State, *sim.Inline) {
 	t.Helper()
 	dir := t.TempDir()
@@ -47,7 +47,7 @@ func fixedSpawnFixture(t *testing.T) (*Npcs, *world.State, *sim.Inline) {
 	npcs, err := NewNpcs(NewSpawns(table, nil), npc.NewTable([]*npc.Template{
 		{ID: 1, TemplateID: 1, Type: "Monster", Name: "Wolf", HPMax: 100, RunSpeed: 100},
 		{ID: 2, TemplateID: 2, Type: "Merchant", Name: "Lector", HPMax: 100},
-		{ID: 3, TemplateID: 3, Type: "LifeTower", Name: "Life Control Tower", HPMax: 100},
+		{ID: 3, TemplateID: 3, Type: "ChristmasTree", Name: "Christmas Tree", HPMax: 100},
 	}), groundGeo{}, state, &sequentialIDs{}, decay, respawn, task.NewAI(state, zerolog.Nop()), task.NewPositionUpdates(state), item.NewTable(nil),
 		&recordingGround{}, KillRewardConfig{}, time.Now, zerolog.Nop(), nil, actorcast.EffectHandlers{}, walker, nil, effect.Env{Activity: task.NewEffects()}, queues, testMakers())
 	if err != nil {
@@ -112,7 +112,7 @@ func TestSpawnFixedPlacesStandaloneSpawns(t *testing.T) {
 	}
 
 	if err := npcs.SpawnFixed(tmpl(3), 0, 0, 0, 0, 0); !errors.Is(err, ErrNotPlaceable) {
-		t.Fatalf("SpawnFixed(tower) error = %v, want ErrNotPlaceable", err)
+		t.Fatalf("SpawnFixed(Christmas tree) error = %v, want ErrNotPlaceable", err)
 	}
 	if got := npcs.LiveCount(); got != 3 {
 		t.Fatalf("LiveCount() = %d, want the maker spawn and two fixed spawns", got)

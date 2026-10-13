@@ -22,13 +22,11 @@ const (
 )
 
 // npcCastle returns the castle inst belongs to. A mercenary belongs to the
-// castle whose siege hired it, a holy artifact to the castle that placed
-// it. A maker whose spawn time names a residence gives its NPCs that
-// castle, or none when it names a siegable clan hall instead; otherwise the
-// NPC belongs to the first castle whose npcs list holds its template id.
-//
-// Control towers are given their castle as they spawn, by the siege system
-// that spawns them (#465).
+// castle whose siege hired it, a control tower to the castle it was placed
+// for, a holy artifact to the castle that placed it. A maker whose spawn
+// time names a residence gives its NPCs that castle, or none when it names
+// a siegable clan hall instead; otherwise the NPC belongs to the first
+// castle whose npcs list holds its template id.
 func (l *GameClientLink) npcCastle(inst *npc.Instance) (*castle.Castle, bool) {
 	if inst == nil || inst.Template == nil {
 		return nil, false

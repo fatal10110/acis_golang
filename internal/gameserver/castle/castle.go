@@ -1,7 +1,8 @@
 // Package castle holds the castles' live state: the clan owning each, its
 // tax rates, treasury, tax revenue and seed income, its left certificates
 // and its stored siege date, restored from the castle table at boot and
-// written back as they change, and the holy artifacts placed for it.
+// written back as they change, and the holy artifacts and control towers
+// placed for it.
 package castle
 
 import (
@@ -36,6 +37,9 @@ type Castle struct {
 	// artifacts are the object ids of the holy artifacts placed for the
 	// castle at boot (SpawnArtifacts).
 	artifacts []int32
+	// towers are the control towers placed for the castle at boot
+	// (SpawnTowers), in castles.xml order.
+	towers []Tower
 	// droppedTickets are the mercenary tickets lying on the castle's
 	// grounds, by ground item object id.
 	droppedTickets map[int32]DroppedTicket

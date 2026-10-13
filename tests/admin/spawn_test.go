@@ -28,8 +28,8 @@ const (
 	treeID   = 13006
 )
 
-// spawnTemplates are a monster, a merchant, a control tower (no live
-// model yet) and a Christmas tree.
+// spawnTemplates are a monster, a merchant, a control tower and a
+// Christmas tree.
 func spawnTemplates() *npc.Table {
 	tmpl := func(id int, typ, name string) *npc.Template {
 		return &npc.Template{ID: id, TemplateID: id, Type: typ, Name: name, Level: 1, HPMax: 100, AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CanMove: true}
@@ -138,15 +138,12 @@ func TestAdminSpawn(t *testing.T) {
 			t.Fatalf("//%s frames = %x, want the spawns.htm page", cmd, testsupport.FrameOpcodes(frames))
 		}
 	}
-	for _, cmd := range []string{"spawn 4242", "spawn No_Such_Npc", "spawn 13002"} {
+	for _, cmd := range []string{"spawn 4242", "spawn No_Such_Npc"} {
 		frames := exchange(t, gm, encodeBuildCmd(cmd))
 		if len(frames) != 1 {
 			t.Fatalf("//%s frames = %x, want APPLICANT_INFORMATION_INCORRECT", cmd, testsupport.FrameOpcodes(frames))
 		}
 		assertStatic(t, frames[0], 12)
-	}
-	if got := npcsOf(srv, towerID); len(got) != 0 {
-		t.Fatalf("refused //spawn placed %d towers", len(got))
 	}
 
 	frames := exchange(t, gm, encodeBuildCmd("spawn 20120 30"))
@@ -189,6 +186,17 @@ func TestAdminSpawn(t *testing.T) {
 		t.Fatalf("trees in the world = %d, want 1", len(trees))
 	} else if _, ok := trees[0].(*npc.Decoration); !ok {
 		t.Fatalf("tree is %T, want a decoration", trees[0])
+	}
+
+	// A control tower is placed as any other NPC, belonging to no castle.
+	frames = exchange(t, gm, encodeBuildCmd("spawn 13002"))
+	if got := textsIn(t, frames); !slices.Equal(got, []string{"You spawned Life Control Tower. - Cmd: admin_spawn"}) {
+		t.Fatalf("//spawn 13002 messages = %q, want the spawn notice", got)
+	}
+	if towers := npcsOf(srv, towerID); len(towers) != 1 {
+		t.Fatalf("towers in the world = %d, want 1", len(towers))
+	} else if f, ok := towers[0].(*npc.Folk); !ok || !f.Tower() || f.TowerWorking() || f.Instance.CastleID != 0 {
+		t.Fatalf("tower is %T, want a dead control tower of no castle", towers[0])
 	}
 }
 
