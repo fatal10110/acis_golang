@@ -36,7 +36,7 @@ func (n *Npcs) RespawnHook(actorID int32) func() {
 				master.RemoveMinion(m)
 				m.SetMaster(nil)
 			}
-			if m.IsMaster() {
+			if m.SpawnedPrivates() {
 				n.dropGoneScriptPrivates(m)
 			}
 		}
@@ -212,9 +212,18 @@ func (n *Npcs) respawnSlot(key string) {
 
 // despawnMinions takes master's minions out of the world with it, each
 // decayed on the calling goroutine without waiting for its own queue (the
-// npc package's off-queue delete contract), and drops their spawn slots.
+// npc package's off-queue delete contract), and drops their spawn slots,
+// those of the privates spawned for master that are not in the world, and
+// those of the gone privates spawned for one of them. A live private spawned
+// for any of them sits in another party's set and keeps its spawn. An NPC that is no master takes nothing: a linked
+// private's party privates are its master's.
 func (n *Npcs) despawnMinions(master npc.PartyMember) {
-	for _, minion := range master.Minions() {
+	if !master.IsMaster() {
+		return
+	}
+	minions := master.Minions()
+	keys := make(map[string]bool, len(minions))
+	for _, minion := range minions {
 		id := minion.ObjectID()
 		n.walker.StopRouteByID(id)
 		switch o := minion.(type) {
@@ -229,17 +238,43 @@ func (n *Npcs) despawnMinions(master npc.PartyMember) {
 		master.RemoveMinion(minion)
 
 		n.mu.Lock()
-		if _, ok := n.live[id]; ok {
+		if key, ok := n.live[id]; ok {
+			keys[key] = true
 			delete(n.live, id)
 			n.liveCount--
 		}
-		for key, slot := range n.slot {
-			if npc.SameNPC(slot.master, master) {
-				delete(n.slot, key)
-			}
-		}
 		n.mu.Unlock()
 	}
+	if len(minions) == 0 {
+		return
+	}
+	n.mu.Lock()
+	for key, slot := range n.slot {
+		if keys[key] {
+			delete(n.slot, key)
+			continue
+		}
+		if slot.master == nil {
+			continue
+		}
+		if npc.SameNPC(slot.master, master) {
+			// A live one was not taken: it sits in another party's set
+			// (master's own master's, joined before a death let master go)
+			// and stays in the world with its spawn.
+			if !n.liveLocked(key) {
+				delete(n.slot, key)
+			}
+			continue
+		}
+		// A taken member's private outside master's set (one it created
+		// after master's death let it go) is in the world on its own: only
+		// a gone one's slot goes.
+		if slices.ContainsFunc(minions, func(m npc.PartyMember) bool { return npc.SameNPC(slot.master, m) }) &&
+			!slot.spawning && !n.liveLocked(key) && !n.respawn.Tracked(key) {
+			delete(n.slot, key)
+		}
+	}
+	n.mu.Unlock()
 }
 
 // SyncPersistedState writes every live database-tracked slot's current HP,
