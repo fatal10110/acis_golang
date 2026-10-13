@@ -82,6 +82,10 @@ type AttackableActor interface {
 	AISleeping() bool
 	// SocialAction shows observers the actor playing social animation id.
 	SocialAction(id int)
+	// InWorld reports whether target is still in the world: an object that
+	// left it (a logged-out player, a decayed NPC) is a lost target even for
+	// a cast that does not need the actor to know it.
+	InWorld(target attackable.Combatant) bool
 	// PickUpTarget returns where the ground item itemObjectID lies, ok
 	// false once the actor can no longer pick it up: it left the world or
 	// the ground, or the actor does not know it.
@@ -444,7 +448,7 @@ func (a *Attackable) AddCombatDamageHate(attacker attackable.Combatant, damage, 
 		return
 	}
 	a.addAttackDesire(attacker, weight)
-	a.thinkIfNoMostHated(hadMostHated, attacker)
+	a.thinkIfNoMostHated(hadMostHated)
 }
 
 // AddAttackDesire queues an attack intention that closes on the target.
@@ -473,7 +477,7 @@ func (a *Attackable) queueAttackDesire(attacker attackable.Combatant, damage, ha
 	_, hadMostHated := a.threats.MostHated()
 	a.queueAttackDesireOnly(attacker, hate, moveToTarget)
 	a.threats.AddDamage(attacker, damage, hate)
-	a.thinkIfNoMostHated(hadMostHated, attacker)
+	a.thinkIfNoMostHated(hadMostHated)
 }
 
 func (a *Attackable) addAttackDesire(attacker attackable.Combatant, hate float64) {
@@ -595,11 +599,10 @@ func (a *Attackable) thinkFollow() error {
 }
 
 // thinkIfNoMostHated re-runs desire selection (RunAI) immediately for a
-// first attack desire. An attacker the actor does not know is skipped
-// because the attack step drops unknown targets, so an unseen target keeps
-// its queued desire for a later tick instead of being wiped here.
-func (a *Attackable) thinkIfNoMostHated(hadMostHated bool, attacker attackable.Combatant) {
-	if hadMostHated || attacker == nil || !a.actor.Knows(attacker) {
+// first attack desire, whoever it is aimed at: the selection's prune drops
+// the desire of an attacker the actor does not know.
+func (a *Attackable) thinkIfNoMostHated(hadMostHated bool) {
+	if hadMostHated {
 		return
 	}
 	_ = a.RunAI()
@@ -895,11 +898,9 @@ func (a *Attackable) think(mode thinkMode) error {
 		return nil
 	}
 	// busy is whether the actor is doing something as desire selection
-	// starts; an intention dropped below for its lost desire still counts.
+	// starts. Selection never idles an intention whose desire left the
+	// queue: only the empty-queue idle and a promotion change it.
 	busy := a.current.kind != IntentionIdle
-	if !outOfControl {
-		a.dropCurrentIfUnqueued(mode)
-	}
 	canPromote := a.canPromote(updateTick, instantRun)
 	// idleAfterLatch is the periodic cycle's empty-queue idle deferred past
 	// a latched attack: the latched step runs first and the idle then
@@ -1002,8 +1003,7 @@ func (a *Attackable) selectionHeld() bool {
 // actor, after desire selection: an actor left idle runs the idle step
 // again, so the no-desire point opens, and queues no idle follow or wander.
 // wasIdle reports that the actor was idle when the pass started or that the
-// selection's empty-queue idle idled it; an attack or cast the pass silently
-// dropped to idle was neither and takes no idle step.
+// selection's empty-queue idle idled it.
 func (a *Attackable) idleAfterFinishedAttack(mode thinkMode, wasIdle bool) {
 	if mode == thinkAttackFinished && wasIdle && a.current.kind == IntentionIdle {
 		a.thinkIdle()
@@ -1051,11 +1051,9 @@ func (a *Attackable) continueCurrent(wasIdle bool) error {
 			a.thinkIdle()
 		}
 	case IntentionAttack:
-		_, err := a.thinkAttack()
-		return err
+		return a.thinkAttack()
 	case IntentionCast:
-		_, err := a.thinkCast()
-		return err
+		return a.thinkCast()
 	case IntentionFollow:
 		return a.thinkFollow()
 	case IntentionMoveTo:
@@ -1069,69 +1067,58 @@ func (a *Attackable) continueCurrent(wasIdle bool) error {
 }
 
 // promoteAndStep promotes the next desire and runs one step of the current
-// intention. A lost attack or cast target re-promotes at once, except for a
-// latched attack, which is the whole pass.
+// intention. A lost attack or cast target ends the step; the pass does not
+// re-select.
 func (a *Attackable) promoteAndStep() error {
-	for attempts := 0; attempts <= maxDesires; attempts++ {
-		latched, promoted := a.promoteNext()
-		switch a.current.kind {
-		case IntentionAttack:
-			again, err := a.thinkAttack()
-			if again && !latched {
-				continue
-			}
-			a.lastDesire = IntentionAttack
-			return err
-		case IntentionCast:
-			again, err := a.thinkCast()
-			if again {
-				continue
-			}
-			a.lastDesire = IntentionCast
-			return err
-		case IntentionFollow:
-			a.lastDesire = IntentionFollow
-			return a.thinkFollow()
-		case IntentionNothing:
-			// Doing nothing has no step: the actor keeps still while the
-			// desire outweighs the rest.
-			a.lastDesire = IntentionNothing
-		case IntentionFlee:
-			// A flee steps once, on the pass that promotes it; while its
-			// desire stays queued, the selection holds.
-			if !promoted {
-				return nil
-			}
-			a.thinkFlee()
-			a.lastDesire = IntentionFlee
-		case IntentionSocial:
-			if !promoted {
-				return nil
-			}
-			a.thinkSocial()
-			a.lastDesire = IntentionSocial
-		case IntentionWander:
-			// A wander steps only on the pass that promotes it; while it
-			// stays current, its chain fires on its own.
-			if !promoted || !a.currentQueued() {
-				return nil
-			}
-			a.thinkWander()
-			a.lastDesire = IntentionWander
-		case IntentionMoveTo:
-			if !a.currentQueued() {
-				return nil
-			}
-			a.thinkMoveTo()
-			a.lastDesire = IntentionMoveTo
-		case IntentionMoveRoute:
-			a.thinkMoveRoute()
-			a.lastDesire = IntentionMoveRoute
-		case IntentionPickUp:
-			a.thinkPickUp()
-			a.lastDesire = IntentionPickUp
+	promoted := a.promoteNext()
+	switch a.current.kind {
+	case IntentionAttack:
+		a.lastDesire = IntentionAttack
+		return a.thinkAttack()
+	case IntentionCast:
+		a.lastDesire = IntentionCast
+		return a.thinkCast()
+	case IntentionFollow:
+		a.lastDesire = IntentionFollow
+		return a.thinkFollow()
+	case IntentionNothing:
+		// Doing nothing has no step: the actor keeps still while the
+		// desire outweighs the rest.
+		a.lastDesire = IntentionNothing
+	case IntentionFlee:
+		// A flee steps once, on the pass that promotes it; while its
+		// desire stays queued, the selection holds.
+		if !promoted {
+			return nil
 		}
-		return nil
+		a.thinkFlee()
+		a.lastDesire = IntentionFlee
+	case IntentionSocial:
+		if !promoted {
+			return nil
+		}
+		a.thinkSocial()
+		a.lastDesire = IntentionSocial
+	case IntentionWander:
+		// A wander steps only on the pass that promotes it; while it
+		// stays current, its chain fires on its own.
+		if !promoted || !a.currentQueued() {
+			return nil
+		}
+		a.thinkWander()
+		a.lastDesire = IntentionWander
+	case IntentionMoveTo:
+		if !a.currentQueued() {
+			return nil
+		}
+		a.thinkMoveTo()
+		a.lastDesire = IntentionMoveTo
+	case IntentionMoveRoute:
+		a.thinkMoveRoute()
+		a.lastDesire = IntentionMoveRoute
+	case IntentionPickUp:
+		a.thinkPickUp()
+		a.lastDesire = IntentionPickUp
 	}
 	return nil
 }
@@ -1171,9 +1158,8 @@ func (a *Attackable) hasLatch() bool {
 }
 
 // promoteNext picks the latched attack, else the heaviest queued desire,
-// and updates the latch from it. It reports whether the pick was the
-// latched attack, and whether anything was promoted: nothing is during the
-// hit animation, with no promotable desire, or when a wander is current
+// and updates the latch from it. It reports whether anything was promoted:
+// nothing is during the hit animation, with no promotable desire, or when a wander is current
 // and the pick is a wander too.
 //
 // Desire selection always makes the pick current, whatever the current
@@ -1182,16 +1168,16 @@ func (a *Attackable) hasLatch() bool {
 // one drops any follow task and the queued next intention the old one left
 // behind. Taking up any desire but a route walk takes the actor off its
 // route.
-func (a *Attackable) promoteNext() (fromLatch, promoted bool) {
+func (a *Attackable) promoteNext() bool {
 	if a.inHitAnimation() {
-		return false, false
+		return false
 	}
-	next, fromLatch, ok := a.nextToDo()
+	next, ok := a.nextToDo()
 	if !ok {
-		return false, false
+		return false
 	}
 	if a.current.kind == IntentionWander && next.kind == IntentionWander {
-		return false, false
+		return false
 	}
 	if next.kind != IntentionMoveRoute {
 		a.leaveRoute()
@@ -1208,7 +1194,7 @@ func (a *Attackable) promoteNext() (fromLatch, promoted bool) {
 	a.lastKind = a.current.kind
 	a.setCurrent(next)
 	a.topDesireTarget = next.target
-	return fromLatch, true
+	return true
 }
 
 // same reports whether o is the same intention as i: same kind, aimed at
@@ -1221,13 +1207,13 @@ func (i intention) same(o intention) bool {
 // nextToDo returns the latched attack when one is set, else the heaviest
 // queued desire as an intention. ok is false when there is neither or the
 // heaviest desire's kind is not promotable.
-func (a *Attackable) nextToDo() (next intention, fromLatch, ok bool) {
+func (a *Attackable) nextToDo() (next intention, ok bool) {
 	if a.hasLatch() {
-		return a.latched, true, true
+		return a.latched, true
 	}
 	desire, ok := a.desires.Peek()
 	if !ok {
-		return intention{}, false, false
+		return intention{}, false
 	}
 	switch desire.Kind {
 	case IntentionAttack:
@@ -1251,9 +1237,9 @@ func (a *Attackable) nextToDo() (next intention, fromLatch, ok bool) {
 	case IntentionMoveRoute:
 		next = intention{kind: IntentionMoveRoute, route: desire.RouteName}
 	default:
-		return intention{}, false, false
+		return intention{}, false
 	}
-	return next, false, true
+	return next, true
 }
 
 // Tick advances the AI clock. Every third step it marks the cycle's hate
@@ -1389,99 +1375,70 @@ func (a *Attackable) pruneDesires(outOfControl bool) {
 	})
 }
 
-// dropCurrentIfUnqueued idles an attack, cast or walk whose desire is no
-// longer queued, unless an action is in flight. The caller skips it while
-// the actor is out of control. The continue pass never reads the queue: it
-// steps the current attack, cast or walk as it stands, so a bow whose attack
-// desire decayed during its reuse shoots again, and a walk an arrival left
-// short of its destination sets off again.
-func (a *Attackable) dropCurrentIfUnqueued(mode thinkMode) {
-	if mode == thinkContinue {
-		return
-	}
-	if a.attack.AttackingNow() {
-		return
-	}
-	if a.castingNow() {
-		return
-	}
-	switch a.current.kind {
-	case IntentionAttack, IntentionCast:
-		probe := &Desire{Kind: a.current.kind, FinalTarget: a.current.target, Skill: a.current.skill}
-		if !a.desires.Has(probe) {
-			a.setCurrent(intention{kind: IntentionIdle})
-		}
-	case IntentionMoveTo:
-		probe := &Desire{Kind: IntentionMoveTo, Location: a.current.loc}
-		if !a.desires.Has(probe) {
-			a.setCurrent(intention{kind: IntentionIdle})
-		}
-	}
-}
-
-// thinkAttack advances one IntentionAttack step. The first return reports
-// whether RunAI / TickThink desire selection (promoteAndStep) should
-// immediately re-promote and continue (true) or stop for this cycle (false);
-// continueCurrent (Think) ignores it and never re-selects. The second is any
-// broadcast error from a synchronous call this step made, only meaningful
-// when the first is false.
-func (a *Attackable) thinkAttack() (bool, error) {
+// thinkAttack advances one IntentionAttack step. A lost target (see
+// targetLost) ends the step with nothing changed: the intention, hate and
+// desires stay as they are, and the next desire selection decides. A dead
+// target the actor still knows is not lost: the follow and attack gates
+// refuse it. The return is any broadcast error from a synchronous call this
+// step made.
+func (a *Attackable) thinkAttack() error {
 	if a.actor.DenyAIAction() {
-		return false, nil
+		return nil
 	}
 
 	target := a.current.target
-	if a.dropLostTarget(target) {
-		return true, nil
+	if a.targetLost(target, "") {
+		return nil
 	}
 
 	following, err := a.move.MaybeStartOffensiveFollow(target, a.actor.PhysicalAttackRange())
 	if following {
-		return false, err
+		return err
 	}
 
 	if a.attack.BowCoolingDown() || a.attack.AttackingNow() {
 		a.next = a.current
-		return false, nil
+		return nil
 	}
 
 	if !a.attack.CanAttack(target) {
-		return false, nil
+		return nil
 	}
 
 	a.move.Stop()
 	a.attack.DoAttack(target)
-	return false, nil
+	return nil
 }
 
 // thinkCast advances an IntentionCast desire once it has been promoted to
 // the current intention: pre-movement validation, closing distance on the
 // target, planting and facing it once the cast animation is long enough to
 // warrant it, then the final cast attempt. It mirrors thinkAttack's shape
-// for skill casts instead of physical attacks.
-func (a *Attackable) thinkCast() (bool, error) {
+// for skill casts instead of physical attacks; a lost target ends the step
+// with nothing changed, as there.
+func (a *Attackable) thinkCast() error {
 	cast := a.CastController()
 	if a.actor.DenyAIAction() || cast == nil {
-		return false, nil
+		return nil
 	}
 	if cast.Disabled() {
-		return false, nil
+		return nil
 	}
 
 	target := a.current.target
 	ref := a.current.skill
-	if a.dropLostCastTarget(target, cast.SkillType(ref)) {
-		return true, nil
+	if a.targetLost(target, cast.SkillType(ref)) {
+		return nil
 	}
 
 	if !cast.CanAttempt(target, ref) {
-		return false, nil
+		return nil
 	}
 
 	following, err := a.move.MaybeStartOffensiveFollow(target, cast.Range(ref))
 	if following {
 		a.actor.ForceRunStance()
-		return false, err
+		return err
 	}
 
 	if cast.StopsMovement(ref) {
@@ -1495,11 +1452,11 @@ func (a *Attackable) thinkCast() (bool, error) {
 		if target.ObjectID() != a.actor.ObjectID() {
 			a.actor.BroadcastMoveToPawn(target)
 		}
-		return false, nil
+		return nil
 	}
 
 	cast.Cast(target, ref)
-	return false, nil
+	return nil
 }
 
 func (a *Attackable) thinkMoveTo() {
@@ -1706,43 +1663,16 @@ func (a *Attackable) refreshCombatMemory() {
 	a.hates.Refresh(a.actor.Knows)
 }
 
-func (a *Attackable) dropLostTarget(target attackable.Combatant) bool {
-	return a.dropLostCastTarget(target, "")
-}
-
-// dropLostCastTarget is dropLostTarget's cast-path variant: a SUMMON_FRIEND
-// cast's target is exempt from the "not known" drop (the rotation-target
-// bypass of the target-lost check).
-func (a *Attackable) dropLostCastTarget(target attackable.Combatant, skillType string) bool {
-	if target == nil {
-		a.setCurrent(intention{kind: IntentionIdle})
-		return true
-	}
-	if target.AlikeDead() {
-		a.threats.StopHate(target)
-		a.hates.StopHate(target)
-		a.desires.RemoveFinalTarget(target)
-		a.clearIntentionsFor(target)
+// targetLost reports whether an attack or cast step has lost target: there
+// is none, it is no longer in the world, or the actor does not know it. A
+// SUMMON_FRIEND cast (skillType) keeps a target the actor does not know. It
+// changes nothing.
+func (a *Attackable) targetLost(target attackable.Combatant, skillType string) bool {
+	if target == nil || !a.actor.InWorld(target) {
 		return true
 	}
 	if skillType == "SUMMON_FRIEND" {
 		return false
 	}
-	if !a.actor.Knows(target) {
-		a.threats.Remove(target)
-		a.hates.StopHate(target)
-		a.desires.RemoveFinalTarget(target)
-		a.clearIntentionsFor(target)
-		return true
-	}
-	return false
-}
-
-func (a *Attackable) clearIntentionsFor(target attackable.Combatant) {
-	if sameCombatant(a.current.target, target) {
-		a.setCurrent(intention{kind: IntentionIdle})
-	}
-	if sameCombatant(a.next.target, target) {
-		a.next = intention{}
-	}
+	return !a.actor.Knows(target)
 }

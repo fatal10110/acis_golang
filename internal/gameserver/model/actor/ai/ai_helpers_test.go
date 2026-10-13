@@ -52,13 +52,15 @@ func thinkWanderOnce(ai *Attackable) error {
 type fakeActor struct {
 	attackabletest.Combatant
 	world.Presence
-	id              int32
-	siegeGuard      bool
-	alikeDead       bool
-	denyAction      bool
-	confused        bool
-	attackRange     int
-	known           map[int32]bool
+	id          int32
+	siegeGuard  bool
+	alikeDead   bool
+	denyAction  bool
+	confused    bool
+	attackRange int
+	known       map[int32]bool
+	// gone lists the targets that left the world.
+	gone            map[int32]bool
 	inTerritory     bool
 	returnHome      bool
 	returnHomeCalls int
@@ -106,6 +108,11 @@ func (a *fakeActor) OutOfControl() bool { return a.denyAction || a.confused }
 func (a *fakeActor) Knows(target attackable.Combatant) bool {
 	known, ok := a.known[target.ObjectID()]
 	return !ok || known
+}
+
+// InWorld reports a target not listed in gone as still in the world.
+func (a *fakeActor) InWorld(target attackable.Combatant) bool {
+	return !a.gone[target.ObjectID()]
 }
 func (a *fakeActor) PhysicalAttackRange() int { return a.attackRange }
 func (a *fakeActor) ReturnHome() bool {

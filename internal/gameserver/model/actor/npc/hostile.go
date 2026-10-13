@@ -1122,6 +1122,16 @@ func (h *Hostile) Knows(target attackable.Combatant) bool {
 	return ok && world.Knows(h, tracked) && !attackable.HiddenActingPlayer(target)
 }
 
+// InWorld reports whether target is still registered in h's world. With no
+// world attached, nothing has left it.
+func (h *Hostile) InWorld(target attackable.Combatant) bool {
+	if h.world == nil {
+		return true
+	}
+	_, ok := h.world.Object(target.ObjectID())
+	return ok
+}
+
 // PhysicalAttackRange returns this NPC's melee attack range.
 func (h *Hostile) PhysicalAttackRange() int {
 	return h.Instance.Template.BaseAttackRange
