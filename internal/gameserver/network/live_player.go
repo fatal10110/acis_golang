@@ -177,8 +177,10 @@ type livePlayer struct {
 	// deferredUseItem is a weapon or shield toggle queued as the next
 	// intention; see tryToUseItem.
 	deferredUseItem *useItemIntention
-	// deferredAction runs a player request held until a swing, cast or posture settles.
-	deferredAction func()
+	// deferredAction runs a player request held until a swing, cast or
+	// posture settles; deferredActionIntention names it for the character page.
+	deferredAction          func()
+	deferredActionIntention string
 	// deferredInteract is an interact queued as the next intention; see
 	// tryToInteract.
 	deferredInteract *interactIntention
@@ -551,6 +553,7 @@ func (p *livePlayer) clearNextIntentionLocked() {
 	p.deferredFollow = nil
 	p.deferredUseItem = nil
 	p.deferredAction = nil
+	p.deferredActionIntention = ""
 	p.deferredInteract = nil
 }
 
@@ -751,13 +754,15 @@ func (p *livePlayer) hasDeferredUseItem() bool {
 	return p.deferredUseItem != nil
 }
 
-// deferAction replaces the next player intention. It is drained by the
-// player's queue when the swing, cast, or posture transition ends.
-func (p *livePlayer) deferAction(run func()) {
+// deferAction replaces the next player intention with run, named intention
+// on the character page. It is drained by the player's queue when the swing,
+// cast, or posture transition ends.
+func (p *livePlayer) deferAction(intention string, run func()) {
 	p.pickupMu.Lock()
 	defer p.pickupMu.Unlock()
 	p.clearNextIntentionLocked()
 	p.deferredAction = run
+	p.deferredActionIntention = intention
 }
 
 func (p *livePlayer) takeDeferredAction() func() {
@@ -765,6 +770,7 @@ func (p *livePlayer) takeDeferredAction() func() {
 	defer p.pickupMu.Unlock()
 	run := p.deferredAction
 	p.deferredAction = nil
+	p.deferredActionIntention = ""
 	return run
 }
 

@@ -5,8 +5,9 @@ package network
 // the slot that holds it: the cast in flight or its approach, the attack,
 // a pickup, an interact walk, a friendly follow, a walk to a point or an
 // equip toggle. The next one is whatever is queued behind it: a queued
-// pickup, cast, follow, equip toggle or interact runs ahead of a queued
-// attack when the swing or cast ends, so it is named first.
+// pickup, cast, follow, equip toggle, interact or other request held behind
+// a swing, cast or posture change runs ahead of a queued attack when the
+// swing or cast ends, so it is named first.
 func (p *livePlayer) intentionNames() (current, next string) {
 	current = "IDLE"
 	switch {
@@ -52,6 +53,8 @@ func (p *livePlayer) queuedIntentionName() string {
 		return "USE_ITEM"
 	case p.deferredInteract != nil:
 		return "INTERACT"
+	case p.deferredAction != nil:
+		return p.deferredActionIntention
 	}
 	return "IDLE"
 }
