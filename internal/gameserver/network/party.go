@@ -1,8 +1,6 @@
 package network
 
 import (
-	"errors"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -12,58 +10,6 @@ import (
 
 // partyRegistry is the registry of the parties live players form.
 type partyRegistry = party.Registry[*livePlayer]
-
-// dispatchParty decodes and runs one top-level party packet. It reports
-// false once the connection has been closed for a malformed packet.
-func (l *GameClientLink) dispatchParty(client *Client, live *livePlayer, opcode byte, payload []byte) bool {
-	switch opcode {
-	case clientpackets.OpcodeRequestJoinParty:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestJoinParty, l.requestJoinParty)
-	case clientpackets.OpcodeRequestAnswerJoinParty:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestAnswerJoinParty, l.requestAnswerJoinParty)
-	case clientpackets.OpcodeRequestWithdrawParty:
-		// The request carries no body. A player in no party leaves nothing
-		// and hears nothing: the menu action waits on no answer.
-		if live != nil {
-			onLive(live, func() { l.withdrawParty(live) })
-		}
-	case clientpackets.OpcodeRequestOustPartyMember:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestOustPartyMember, l.requestOustPartyMember)
-	}
-	return true
-}
-
-// dispatchPartyExtended decodes and runs one extended party or command
-// channel packet; see dispatchParty.
-func (l *GameClientLink) dispatchPartyExtended(client *Client, live *livePlayer, second uint16, payload []byte) bool {
-	switch second {
-	case clientpackets.OpcodeRequestChangePartyLeader:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestChangePartyLeader, l.requestChangePartyLeader)
-	case clientpackets.OpcodeRequestExAskJoinMPCC:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestExAskJoinMPCC, l.requestAskJoinChannel)
-	case clientpackets.OpcodeRequestExAcceptJoinMPCC:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestExAcceptJoinMPCC, l.requestAcceptJoinChannel)
-	case clientpackets.OpcodeRequestExOustFromMPCC:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestExOustFromMPCC, l.requestOustFromChannel)
-	case clientpackets.OpcodeRequestExMPCCShowPartyMembersInfo:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestExMPCCShowPartyMembersInfo, l.requestChannelPartyMembers)
-	}
-	return true
-}
-
-// dispatchLive decodes payload and runs handle on live's queue. A packet
-// with no player in the world is dropped once decoded. It reports false
-// once the connection has been closed for a malformed packet.
-func dispatchLive[T any](l *GameClientLink, client *Client, live *livePlayer, payload []byte, decode func([]byte) (T, error), handle func(*livePlayer, T)) bool {
-	req, err := decodeClientPacket(l, client, payload, decode)
-	if err != nil {
-		return !errors.Is(err, errMalformedPacketDisconnect)
-	}
-	if live != nil {
-		onLive(live, func() { handle(live, req) })
-	}
-	return true
-}
 
 func (l *GameClientLink) livePlayerByName(name string) (*livePlayer, bool) {
 	if l.world == nil {

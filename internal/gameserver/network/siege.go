@@ -12,22 +12,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 )
 
-// dispatchSiege decodes and runs one siege window packet; see
-// dispatchPartyMatch.
-func (l *GameClientLink) dispatchSiege(client *Client, live *livePlayer, opcode byte, payload []byte) bool {
-	switch opcode {
-	case clientpackets.OpcodeRequestSiegeAttackerList:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestSiegeList, l.requestSiegeAttackerList)
-	case clientpackets.OpcodeRequestSiegeDefenderList:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestSiegeList, l.requestSiegeDefenderList)
-	case clientpackets.OpcodeRequestJoinSiege:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestJoinSiege, l.requestJoinSiege)
-	case clientpackets.OpcodeRequestConfirmSiegeWaitingList:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestConfirmSiegeWaitingList, l.requestConfirmSiegeWaitingList)
-	}
-	return true
-}
-
 // castleSiege resolves castle id's siege.
 func (l *GameClientLink) castleSiege(id int32) (*siege.Siege, bool) {
 	return l.sieges.Get(int(id))

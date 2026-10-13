@@ -15,47 +15,6 @@ import (
 // open, and of the players waiting for one.
 type roomRegistry = partymatch.Registry[*livePlayer]
 
-// dispatchPartyMatch decodes and runs one top-level party-matching packet.
-// It reports false once the connection has been closed for a malformed
-// packet.
-func (l *GameClientLink) dispatchPartyMatch(client *Client, live *livePlayer, opcode byte, payload []byte) bool {
-	switch opcode {
-	case clientpackets.OpcodeRequestListPartyWaiting:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestListPartyWaiting, l.requestListPartyWaiting)
-	case clientpackets.OpcodeRequestManagePartyRoom:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestManagePartyRoom, l.requestManagePartyRoom)
-	case clientpackets.OpcodeRequestJoinPartyRoom:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestJoinPartyRoom, l.requestJoinPartyRoom)
-	}
-	return true
-}
-
-// dispatchPartyMatchExtended decodes and runs one extended party-matching
-// packet; see dispatchPartyMatch.
-func (l *GameClientLink) dispatchPartyMatchExtended(client *Client, live *livePlayer, second uint16, payload []byte) bool {
-	switch second {
-	case clientpackets.OpcodeRequestOustFromPartyRoom:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestOustFromPartyRoom, l.requestOustFromPartyRoom)
-	case clientpackets.OpcodeRequestDismissPartyRoom:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestDismissPartyRoom, l.requestDismissPartyRoom)
-	case clientpackets.OpcodeRequestWithdrawPartyRoom:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestWithdrawPartyRoom, l.requestWithdrawPartyRoom)
-	case clientpackets.OpcodeRequestAskJoinPartyRoom:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestAskJoinPartyRoom, l.requestAskJoinPartyRoom)
-	case clientpackets.OpcodeAnswerJoinPartyRoom:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeAnswerJoinPartyRoom, l.answerJoinPartyRoom)
-	case clientpackets.OpcodeRequestListPartyMatchingWaitingRoom:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestListPartyMatchingWaitingRoom, l.requestListWaitingPlayers)
-	case clientpackets.OpcodeRequestExitPartyMatchingWaitingRoom:
-		// The request carries no body; leaving the waiting list answers
-		// nothing, the client having closed its window already.
-		if live != nil {
-			onLive(live, func() { l.rooms.RemoveWaiting(live) })
-		}
-	}
-	return true
-}
-
 // requestListPartyWaiting opens live's party-matching window. In a room,
 // it shows that room again. Otherwise live joins the waiting list and is
 // shown the rooms it asked for, unless it is a party member that does not
