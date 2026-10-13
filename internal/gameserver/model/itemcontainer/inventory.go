@@ -525,6 +525,18 @@ func (inv *Inventory) SetEnchantLevel(inst *item.Instance, level int) bool {
 	return true
 }
 
+// SetCustomType2 sets inst's second custom type to value and queues a
+// modified inventory notification, even when the value was already set. It
+// returns false when inst is absent from this inventory.
+func (inv *Inventory) SetCustomType2(inst *item.Instance, value int) bool {
+	if inst == nil || inv.ItemByObjectID(inst.ObjectID) != inst {
+		return false
+	}
+	inst.SetCustomType2(value)
+	inv.queueUpdate(inst, UpdateModified)
+	return true
+}
+
 // SetAugmentation gives inst, held in this inventory, aug and queues a
 // modified inventory notification. It returns false when inst is absent from
 // this inventory or already augmented.
@@ -629,9 +641,11 @@ func (inv *Inventory) TransferItem(objectID int32, count int, target Receiver, n
 	return result, freedObjectID, freed
 }
 
-// removalFirst is a transfer's target that writes the source inventory's
-// removal record of a whole moved instance just before target takes it in,
-// so the item log reads out of one inventory, then into the other.
+// removalFirst is a transfer's target that settles the source inventory's
+// side of a whole moved instance just before target takes it in: a worn
+// instance is taken off first (its modified change queued at the source's
+// base location), then the removal is recorded, so the item log reads out of
+// one inventory, then into the other.
 type removalFirst struct {
 	Receiver
 	inv    *Inventory
@@ -642,6 +656,11 @@ type removalFirst struct {
 func (r *removalFirst) Add(inst *item.Instance) (*item.Instance, bool) {
 	if inst == r.source {
 		r.inv.mu.Lock()
+		for slot, occupant := range r.inv.paperdoll {
+			if occupant == inst {
+				r.inv.unequipSlotLocked(slot)
+			}
+		}
 		r.inv.logItemLocked(inst.Snapshot(), UpdateRemoved)
 		r.inv.mu.Unlock()
 		r.logged = true
@@ -1020,31 +1039,6 @@ func (inv *Inventory) pullOffHandLocked(slot int, inst *item.Instance, tmpl *ite
 		moved = append(moved, off)
 	}
 	return append(moved, arrows)
-}
-
-// ClearWornSlot drops paperdoll position slot's occupant and its wornMask
-// contribution when it still equals inst, without touching inst's own
-// Location/LocationData or queuing an inventory update for it. Use this
-// instead of UnequipSlot when inst has already been moved to a different
-// container (e.g. by a completed transfer) and only this inventory's own
-// equip bookkeeping needs to catch up — UnequipSlot's SetLocation(inv.
-// Location(), 0) would otherwise stomp the location the transfer already
-// assigned. Reports whether it actually cleared anything.
-func (inv *Inventory) ClearWornSlot(slot int, inst *item.Instance) bool {
-	if slot < 0 || slot >= item.PaperdollSlots || inst == nil {
-		return false
-	}
-	inv.mu.Lock()
-	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
-	defer inv.mu.Unlock()
-	if inv.paperdoll[slot] != inst {
-		return false
-	}
-	inv.paperdoll[slot] = nil
-	if tmpl, ok := inv.Templates().Get(inst.TemplateID); ok {
-		inv.wornMask &^= tmpl.Mask()
-	}
-	return true
 }
 
 // UpdateWeight recomputes the inventory's total carried weight and reports

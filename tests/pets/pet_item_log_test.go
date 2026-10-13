@@ -55,9 +55,8 @@ func (l *petItemLog) take(t *testing.T) []petItemRecord {
 
 // TestItemLogRecordsPetInventoryChanges pins LogItems on a pet's inventory:
 // the wolf putting on its weapon is a change recorded under the collar, and
-// taking the weapon back records it leaving the pet before it arrives in the
-// owner's inventory. The take-off change and the location the weapon leaves
-// from are #3693, so the take-back records are compared without location.
+// taking the worn weapon back records the take-off in the pet's inventory,
+// then the weapon leaving it, before it arrives in the owner's inventory.
 func TestItemLogRecordsPetInventoryChanges(t *testing.T) {
 	t.Parallel()
 	var log petItemLog
@@ -71,15 +70,12 @@ func TestItemLogRecordsPetInventoryChanges(t *testing.T) {
 	}
 
 	h.sendAndTick(t, encodeRequestGetItemFromPet(weaponID, 1))
-	got := log.take(t)
-	for i := range got {
-		got[i].Location = ""
-	}
 	want = []petItemRecord{
-		{"REMOVED", "Owner", h.collarID, weaponID, ""},
-		{"ADDED", "Owner", h.ownerID, weaponID, ""},
+		{"MODIFIED", "Owner", h.collarID, weaponID, "PET"},
+		{"REMOVED", "Owner", h.collarID, weaponID, "PET"},
+		{"ADDED", "Owner", h.ownerID, weaponID, "INVENTORY"},
 	}
-	if !slices.Equal(got, want) {
+	if got := log.take(t); !slices.Equal(got, want) {
 		t.Fatalf("item log after the take-back = %+v, want %+v", got, want)
 	}
 }

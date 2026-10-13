@@ -145,9 +145,7 @@ func (l *GameClientLink) finishChangePetName(live *livePlayer, name string, take
 		}
 	})
 	if inv := live.Inventory(); inv != nil {
-		if control := inv.ItemByObjectID(actor.ControlItemID()); control != nil {
-			control.SetCustomType2(1)
-		}
+		inv.SetCustomType2(inv.ItemByObjectID(actor.ControlItemID()), 1)
 	}
 	actor.UpdateStatus()
 	sendSummonInfosToOwner(actor)
