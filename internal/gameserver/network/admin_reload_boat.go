@@ -58,13 +58,16 @@ func (l *GameClientLink) reloadBoats(gm *livePlayer, then func()) error {
 			}
 			pending.Add(1)
 			posted := onPlayer(gm, live, func() {
-				l.oustFromRetiredBoat(live, boatID)
 				// gm's own oust runs inline while this call holds its
 				// share, so the last share dropped here is another
-				// passenger's, on that passenger's queue.
-				if done() {
-					postLive(gm, then)
-				}
+				// passenger's, on that passenger's queue. It is dropped
+				// even when the oust panics, so the fleet still swaps.
+				defer func() {
+					if done() {
+						postLive(gm, then)
+					}
+				}()
+				l.oustFromRetiredBoat(live, boatID)
 			})
 			if !posted {
 				// The player's queue is closed: it left the world, and its
