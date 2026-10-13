@@ -56,17 +56,7 @@ func TestRecalledLingeringTraderLandsBeforeTradeCancel(t *testing.T) {
 
 	// The first trader drops its connection in combat and lingers, its
 	// trade still open.
-	firstObj, ok := h.srv.State.Player(h.firstID)
-	if !ok {
-		t.Fatal("first trader missing from the world")
-	}
-	h.srv.SetPlayerInCombat(t, h.firstID, true)
-	if err := h.first.Close(); err != nil {
-		t.Fatal(err)
-	}
-	h.srv.AdvanceUntil(t, "the server noticing the connection drop", func() bool {
-		return network.ClientDetached(firstObj)
-	})
+	h.srv.DropInCombat(t, h.firstID, h.first)
 	drainAllTraders(t, h.second, gm)
 
 	gm.Send(encodeTraderBuildCmd("recall TraderOne"))

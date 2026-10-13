@@ -194,16 +194,7 @@ func bootLingerTeleport(t *testing.T, gm bool, opts ...gameservertest.Option) *l
 	if !ok {
 		t.Fatalf("player = %T, want an online character", obj)
 	}
-	srv.SetPlayerInCombat(t, objID, true)
-	if err := c.Close(); err != nil {
-		t.Fatal(err)
-	}
-	srv.AdvanceUntil(t, "the server noticing the connection drop", func() bool {
-		return network.ClientDetached(obj)
-	})
-	if _, ok := srv.State.Player(objID); !ok {
-		t.Fatal("a player dropped in combat left the world at once")
-	}
+	srv.DropInCombat(t, objID, c)
 	return &lingerTeleport{srv: srv, observer: observer, peace: peace, seen: seen, lingerer: lingerer, objID: objID, dest: dest}
 }
 
