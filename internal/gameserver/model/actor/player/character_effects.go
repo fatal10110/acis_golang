@@ -31,9 +31,7 @@ func (c *Character) MaxBuffCount() int {
 	if c == nil {
 		return defaultMaxBuffsAmount
 	}
-	c.stateMu.RLock()
-	base := c.maxBuffsAmount
-	c.stateMu.RUnlock()
+	base := c.rules().MaxBuffsAmount
 	return base + c.SkillLevel(int(modelskill.DivineInspirationSkillID))
 }
 

@@ -578,7 +578,7 @@ func TestFrameUserInfo_DwarfUsesDwarfInventoryLimit(t *testing.T) {
 func TestStorageLimitPacketsReportLiveInventoryLimit(t *testing.T) {
 	c := &player.Character{Race: player.RaceDwarf}
 	c.SetName("D")
-	c.Configure(player.Runtime{Rules: player.Rules{InventorySlots: player.InventorySlots{NoDwarf: 90, Dwarf: 117, Configured: true}}})
+	c.Configure(player.Runtime{Rules: player.NewRuleBook(player.Rules{InventorySlots: player.InventorySlots{NoDwarf: 90, Dwarf: 117, Configured: true}})})
 	c.AddStatFuncs([]effect.Mod{{Stat: stat.InvLim, Op: effect.OpAdd, Value: 1}})
 
 	storage := framePayload(t, FrameExStorageMaxCount(c))

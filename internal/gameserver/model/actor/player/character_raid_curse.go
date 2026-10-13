@@ -21,7 +21,7 @@ func (c *Character) TestCursesOnAttack(target attackable.Combatant) bool {
 		return false
 	}
 	c.stateMu.RLock()
-	disabled := c.raidCursesDisabled
+	disabled := c.rules().RaidCursesDisabled
 	skills := c.skillDefs
 	c.stateMu.RUnlock()
 	return creature.TestCursesOnAttack(creature.RaidCurseInput{
@@ -43,7 +43,7 @@ func (c *Character) TestCursesOnSkillSee(def modelskill.Definition, targets []ta
 		return false
 	}
 	c.stateMu.RLock()
-	disabled := c.raidCursesDisabled
+	disabled := c.rules().RaidCursesDisabled
 	skills := c.skillDefs
 	c.stateMu.RUnlock()
 

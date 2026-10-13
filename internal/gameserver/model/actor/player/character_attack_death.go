@@ -148,7 +148,7 @@ func (c *Character) revive() (revived, blessed bool) {
 		c.writeHPLocked(res.MaxHP)
 		c.curMP = res.MaxMP
 	} else {
-		c.writeHPLocked(min(res.MaxHP*c.respawnRestoreHP, res.MaxHP))
+		c.writeHPLocked(min(res.MaxHP*c.rules().RespawnRestoreHP, res.MaxHP))
 	}
 	c.vitalsMu.Unlock()
 	c.reviveRequested, c.revivePower = false, 0

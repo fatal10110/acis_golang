@@ -32,8 +32,6 @@ func (s InventorySlots) MaxItemInPacket() int {
 // InventoryLimit returns how many item slots c's inventory may hold: the
 // configured base for c's race plus the inventoryLimit stat, truncated.
 func (c *Character) InventoryLimit() int {
-	c.stateMu.RLock()
-	slots := c.inventorySlots.withDefaults()
-	c.stateMu.RUnlock()
+	slots := c.rules().InventorySlots.withDefaults()
 	return c.byRace(slots.NoDwarf, slots.Dwarf) + c.limitStat(stat.InvLim)
 }

@@ -55,7 +55,7 @@ func TestCharacterRaidCurseMountedAntiStriderContinues(t *testing.T) {
 func TestCharacterRaidCurseDisabledDoesNotBlock(t *testing.T) {
 	c := withEffectList(t, liveCharacter(1, combatTemplate(), combatItems()))
 	c.CharLevel = 80
-	c.raidCursesDisabled = true
+	setRules(c, func(r *Rules) { r.RaidCursesDisabled = true })
 	c.skillDefs = newRaidCurseSkillTable()
 	target := &raidCurseNPC{id: 2, npcID: 25035, level: 70, attackable: true}
 
@@ -88,7 +88,7 @@ func TestCharacterRaidCurseSkillSeePetrifiesAndAborts(t *testing.T) {
 func TestCharacterRaidCurseSkillSeeDisabledDoesNotAbort(t *testing.T) {
 	c := withEffectList(t, liveCharacter(1, combatTemplate(), combatItems()))
 	c.CharLevel = 80
-	c.raidCursesDisabled = true
+	setRules(c, func(r *Rules) { r.RaidCursesDisabled = true })
 	c.skillDefs = newRaidCurseSkillTable()
 	raid := &raidCurseNPC{id: 2, npcID: 25035, level: 70, attackable: true, raidRelated: true}
 

@@ -118,9 +118,6 @@ type Character struct {
 	reviveRequested bool
 	revivePower     float64
 	revivePet       bool
-	// respawnRestoreHP is the fraction of max HP a revive restores when no
-	// Phoenix Blessing does it in full.
-	respawnRestoreHP float64
 	// partyBars gates the party-window refreshes vitals changes send; see
 	// PartyWindowStale.
 	partyBars partyBars
@@ -207,16 +204,14 @@ type Character struct {
 	// runtimeTemplate is the active class's template and baseTemplate the
 	// base class's; a class switch replaces runtimeTemplate on the owner's
 	// queue while other actors read it.
-	runtimeTemplate    atomic.Pointer[Template]
-	baseTemplate       atomic.Pointer[Template]
-	levelTable         *LevelTable
-	allowDelevel       bool
-	deathDrop          DeathDropRules
-	raidCursesDisabled bool
-	skillDefs          skillDefinitions
-	rateKarmaExpLost   float64
-	inventory          *itemcontainer.Inventory
-	world              *world.State
+	runtimeTemplate atomic.Pointer[Template]
+	baseTemplate    atomic.Pointer[Template]
+	levelTable      *LevelTable
+	// ruleBook holds the server rules c reads; see rules.
+	ruleBook  atomic.Pointer[RuleBook]
+	skillDefs skillDefinitions
+	inventory *itemcontainer.Inventory
+	world     *world.State
 	// worldHandle is the object the world registers c under when c is
 	// embedded in one; nil means c itself. See SetWorldHandle.
 	worldHandle              world.Tracked
@@ -245,11 +240,6 @@ type Character struct {
 	swampMoveBonus           atomic.Int32
 	abnormalEffectMask       atomic.Int32
 	weightPenalty            int
-	weightLimitMultiplier    float64
-	inventorySlots           InventorySlots
-	storageSlots             StorageSlots
-	maxBuffsAmount           int
-	awardPKKillPVPPoint      bool
 	roll                     func(int) int
 	floatRoll                func(float64) float64
 
@@ -350,13 +340,7 @@ type Character struct {
 
 	// deathPenaltyLevel is the persisted death-penalty debuff level (skill
 	// 5076), capped at maxDeathPenaltyLevel.
-	deathPenaltyLevel  int
-	deathPenaltyChance int
-
-	// perfectShieldBlockRate is the players.properties-configured
-	// PerfectShieldBlockRate roll threshold for a shield block to upgrade
-	// to a perfect block.
-	perfectShieldBlockRate int
+	deathPenaltyLevel int
 
 	skills skillState
 	cubics cubic.List
@@ -435,10 +419,9 @@ func NewCharacter(objectID int32, tmpl *Template, accountName, name string, hair
 
 		AccessLevel: defaultAccessLevel,
 
-		stateInit:      true,
-		running:        true,
-		standing:       true,
-		maxBuffsAmount: defaultMaxBuffsAmount,
+		stateInit: true,
+		running:   true,
+		standing:  true,
 	}
 
 	c.SetName(name)

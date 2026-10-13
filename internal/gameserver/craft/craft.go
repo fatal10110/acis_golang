@@ -5,6 +5,8 @@
 package craft
 
 import (
+	"sync/atomic"
+
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -15,7 +17,7 @@ import (
 // Service applies the recipe book rules against the loaded recipe table.
 type Service struct {
 	recipes *recipe.Table
-	enabled bool
+	enabled atomic.Bool
 	roll    func(n int) int
 	nextID  func() (int32, error)
 }
@@ -27,7 +29,14 @@ func NewService(recipes *recipe.Table, enabled bool, nextID func() (int32, error
 	if roll == nil {
 		roll = rnd.Get
 	}
-	return &Service{recipes: recipes, enabled: enabled, roll: roll, nextID: nextID}
+	s := &Service{recipes: recipes, roll: roll, nextID: nextID}
+	s.SetEnabled(enabled)
+	return s
+}
+
+// SetEnabled puts the CraftingEnabled switch enabled in force.
+func (s *Service) SetEnabled(enabled bool) {
+	s.enabled.Store(enabled)
 }
 
 // Recipe returns the loaded recipe with id.
@@ -156,7 +165,7 @@ func (s *Service) MakeSelf(c *player.Character, recipeID int, busy bool) Attempt
 		a.Notices = append(a.Notices, NotEnoughMP{})
 		return a
 	}
-	if !s.enabled {
+	if !s.enabled.Load() {
 		a.Notices = append(a.Notices, CraftingDisabled{})
 		return a
 	}
@@ -235,7 +244,7 @@ func (s *Service) Register(c *player.Character, inst *item.Instance, tmpl *item.
 	if tmpl == nil || tmpl.EtcItem == nil || tmpl.EtcItem.Handler != RecipesHandler {
 		return Registration{}, false
 	}
-	if !s.enabled {
+	if !s.enabled.Load() {
 		return Registration{Notices: []any{RegisterDisabled{}}}, true
 	}
 	r, found := s.recipes.FindByItemID(tmpl.ID)
@@ -332,7 +341,7 @@ func (s *Service) MakeFor(crafter, customer *player.Character, r recipe.Recipe, 
 		a.ToCustomer = append(a.ToCustomer, NotEnoughMP{})
 		return a
 	}
-	if !s.enabled {
+	if !s.enabled.Load() {
 		a.ToCustomer = append(a.ToCustomer, CraftingDisabled{})
 		return a
 	}

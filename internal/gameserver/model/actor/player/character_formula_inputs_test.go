@@ -132,7 +132,7 @@ func TestCharacterShieldDefenseUsesConfiguredPerfectShieldBlockRate(t *testing.T
 
 	// Configuring PerfectShieldBlockRate to 15 pushes the same roll (10)
 	// under the threshold, upgrading the block to perfect.
-	target.perfectShieldBlockRate = 15
+	setRules(target, func(r *Rules) { r.PerfectShieldBlockRate = 15 })
 	if got := target.ShieldDefense(caster, modelskill.Definition{SkillType: "STUN"}, false); got != formulas.ShieldPerfect {
 		t.Fatalf("ShieldDefense() with configured rate 15 = %v, want ShieldPerfect", got)
 	}

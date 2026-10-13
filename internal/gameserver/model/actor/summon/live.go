@@ -25,6 +25,17 @@ import (
 // baseBuffSlots is the shipped players.properties MaxBuffsAmount default.
 const baseBuffSlots = 20
 
+// Settings answers the players.properties settings a summon reads each time
+// it needs one, so new values reach the summons already out.
+type Settings interface {
+	// MaxBuffsAmount is the base buff-slot count; zero or less keeps the
+	// shipped one.
+	MaxBuffsAmount() int
+	// RespawnRestoreHP is the share of max HP a revive without a Phoenix
+	// Blessing restores.
+	RespawnRestoreHP() float64
+}
+
 // AI is the summon intention loop controlled by owner commands and effects.
 type AI interface {
 	TryToAttack(attackable.Combatant) bool
@@ -156,18 +167,20 @@ type Actor struct {
 	// inventory. It is set once before the summon is published and replaced
 	// only when a pet corpse its owner left behind is handed to the owner's
 	// next session (RelinkOwner), so it is read from any goroutine.
-	binding        atomic.Pointer[ownerBinding]
-	world          *world.State
-	los            LineOfSight
-	isPet          bool
-	babyPet        bool // heals its owner (babyHeal); immutable
-	npcID          int
-	radius         float64
-	height         float64
-	passive        bool
-	undead         bool // a servitor of the UNDEAD race; immutable
-	siegeSummon    bool // a servitor of type SiegeSummon; immutable
-	maxBuffsAmount int
+	binding     atomic.Pointer[ownerBinding]
+	world       *world.State
+	los         LineOfSight
+	isPet       bool
+	babyPet     bool // heals its owner (babyHeal); immutable
+	npcID       int
+	radius      float64
+	height      float64
+	passive     bool
+	undead      bool // a servitor of the UNDEAD race; immutable
+	siegeSummon bool // a servitor of type SiegeSummon; immutable
+	// settings answers the base buff slots and the revive HP share in
+	// force; immutable after construction, nil for the shipped defaults.
+	settings Settings
 
 	// statusMu guards level, pet growth state, name, fed, belowUnsummonLimit,
 	// lifetime, combat stat bases, and invul:
@@ -255,9 +268,6 @@ type Actor struct {
 	roll           func(int) int
 	// feedPeriod is how often a pet eats; immutable after construction.
 	feedPeriod time.Duration
-	// respawnRestoreHP is the share of max HP a revive restores without a
-	// Phoenix Blessing; immutable after construction.
-	respawnRestoreHP float64
 
 	stats              CombatStats
 	statCalc           summonStatCalcs
@@ -405,12 +415,11 @@ type PetConfig struct {
 	Roll          func(int) int
 	// FeedPeriod is how often the pet eats; zero is the standard ten
 	// seconds.
-	FeedPeriod     time.Duration
-	Stats          CombatStats
-	MaxBuffsAmount int
-	// RespawnRestoreHP is the share of max HP a revive restores without a
-	// Phoenix Blessing.
-	RespawnRestoreHP float64
+	FeedPeriod time.Duration
+	Stats      CombatStats
+	// Settings answers the base buff slots and the revive HP share in
+	// force; nil keeps the shipped buff slots and revives with no HP.
+	Settings Settings
 	// Skills maps skill id to level, from this pet's npc template. See
 	// Actor.skills.
 	Skills map[int]int
@@ -452,13 +461,12 @@ type ServitorConfig struct {
 	ExpPenalty float32
 	// CorpseTime is how long this servitor's corpse lasts before it decays,
 	// from its npc template.
-	CorpseTime     time.Duration
-	Roll           func(int) int
-	Stats          CombatStats
-	MaxBuffsAmount int
-	// RespawnRestoreHP is the share of max HP a revive restores without a
-	// Phoenix Blessing.
-	RespawnRestoreHP float64
+	CorpseTime time.Duration
+	Roll       func(int) int
+	Stats      CombatStats
+	// Settings answers the base buff slots and the revive HP share in
+	// force; nil keeps the shipped buff slots and revives with no HP.
+	Settings Settings
 	// Skills maps skill id to level, from this servitor's npc template.
 	// See Actor.skills.
 	Skills map[int]int
@@ -497,7 +505,7 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 		stats:            cfg.Stats,
 		skills:           cfg.Skills,
 		skillDefs:        cfg.SkillDefs,
-		maxBuffsAmount:   defaultPositive(cfg.MaxBuffsAmount, baseBuffSlots),
+		settings:         cfg.Settings,
 		zones:            cfg.Zones,
 		los:              cfg.LOS,
 	}
@@ -506,7 +514,6 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {
 		return nil, err
 	}
-	a.respawnRestoreHP = cfg.RespawnRestoreHP
 	a.initVitals()
 	a.effects = effect.NewList(a, effect.WithEnv(cfg.Effects))
 	return a, nil
@@ -516,50 +523,49 @@ func NewServitor(cfg ServitorConfig) (*Actor, error) {
 func NewPet(cfg PetConfig) (*Actor, error) {
 	petCfg := copyPetConfig(cfg.Config)
 	a := &Actor{
-		id:             cfg.ObjectID,
-		level:          cfg.Level,
-		isPet:          true,
-		babyPet:        cfg.BabyPet,
-		npcID:          cfg.NPCID,
-		radius:         cfg.CollisionRadius,
-		height:         cfg.CollisionHeight,
-		runSpeed:       cfg.RunSpeed,
-		walkSpeed:      cfg.WalkSpeed,
-		name:           cfg.Name,
-		named:          cfg.Named,
-		passive:        cfg.Passive,
-		intent:         IntentFollowOwner,
-		petInventory:   cfg.Inventory,
-		petConfig:      petCfg,
-		growth:         cfg.Growth,
-		controlItemID:  cfg.ControlItemID,
-		exp:            cfg.Exp,
-		sp:             cfg.SP,
-		expType:        cfg.ExpType,
-		fed:            cfg.Fed,
-		maxMeal:        cfg.MaxMeal,
-		mealInNormal:   cfg.MealInNormal,
-		mealInBattle:   cfg.MealInBattle,
-		food1:          cfg.Food1,
-		food2:          cfg.Food2,
-		autoFeedLimit:  cfg.AutoFeedLimit,
-		hungryLimit:    cfg.HungryLimit,
-		unsummonLimit:  cfg.UnsummonLimit,
-		roll:           defaultRoll(cfg.Roll),
-		feedPeriod:     cmp.Or(cfg.FeedPeriod, petFeedPeriod),
-		stats:          cfg.Stats,
-		skills:         cfg.Skills,
-		skillDefs:      cfg.SkillDefs,
-		maxBuffsAmount: defaultPositive(cfg.MaxBuffsAmount, baseBuffSlots),
-		zones:          cfg.Zones,
-		los:            cfg.LOS,
+		id:            cfg.ObjectID,
+		level:         cfg.Level,
+		isPet:         true,
+		babyPet:       cfg.BabyPet,
+		npcID:         cfg.NPCID,
+		radius:        cfg.CollisionRadius,
+		height:        cfg.CollisionHeight,
+		runSpeed:      cfg.RunSpeed,
+		walkSpeed:     cfg.WalkSpeed,
+		name:          cfg.Name,
+		named:         cfg.Named,
+		passive:       cfg.Passive,
+		intent:        IntentFollowOwner,
+		petInventory:  cfg.Inventory,
+		petConfig:     petCfg,
+		growth:        cfg.Growth,
+		controlItemID: cfg.ControlItemID,
+		exp:           cfg.Exp,
+		sp:            cfg.SP,
+		expType:       cfg.ExpType,
+		fed:           cfg.Fed,
+		maxMeal:       cfg.MaxMeal,
+		mealInNormal:  cfg.MealInNormal,
+		mealInBattle:  cfg.MealInBattle,
+		food1:         cfg.Food1,
+		food2:         cfg.Food2,
+		autoFeedLimit: cfg.AutoFeedLimit,
+		hungryLimit:   cfg.HungryLimit,
+		unsummonLimit: cfg.UnsummonLimit,
+		roll:          defaultRoll(cfg.Roll),
+		feedPeriod:    cmp.Or(cfg.FeedPeriod, petFeedPeriod),
+		stats:         cfg.Stats,
+		skills:        cfg.Skills,
+		skillDefs:     cfg.SkillDefs,
+		settings:      cfg.Settings,
+		zones:         cfg.Zones,
+		los:           cfg.LOS,
 	}
 	a.membership = newZoneMember(a, cfg.Zones)
 	a.bindOwner(cfg.Owner, cfg.OwnerInventory)
 	if err := a.attachTemplatePassives(cfg.SkillDefs, cfg.Passives); err != nil {
 		return nil, err
 	}
-	a.respawnRestoreHP = cfg.RespawnRestoreHP
 	a.initVitals()
 	a.effects = effect.NewList(a, effect.WithEnv(cfg.Effects))
 	if petCfg != nil && cfg.Inventory != nil {

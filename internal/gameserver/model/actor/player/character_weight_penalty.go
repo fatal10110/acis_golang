@@ -10,9 +10,7 @@ const baseWeightLimit = 69000
 
 // WeightLimit returns the current stat-modified carrying limit.
 func (c *Character) WeightLimit() int {
-	c.stateMu.RLock()
-	multiplier := c.weightLimitMultiplier
-	c.stateMu.RUnlock()
+	multiplier := c.rules().WeightLimitMultiplier
 	return int(c.CalcStat(stat.WeightLimit, baseWeightLimit*statbonus.CONBonus[c.CON()]*multiplier))
 }
 

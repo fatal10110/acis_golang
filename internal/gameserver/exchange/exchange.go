@@ -6,6 +6,7 @@ package exchange
 
 import (
 	"math"
+	"sync/atomic"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
@@ -37,7 +38,7 @@ type Clans interface {
 // Service applies the multisell rules against the loaded lists.
 type Service struct {
 	lists          *multisell.Table
-	keepMaintained bool
+	keepMaintained atomic.Bool
 	nextID         func() (int32, error)
 	clans          Clans
 }
@@ -47,7 +48,15 @@ type Service struct {
 // maintainIngredient is only checked for, once, and never taken. nextID
 // allocates the products' object ids; clans settles clan reputation.
 func NewService(lists *multisell.Table, keepMaintained bool, nextID func() (int32, error), clans Clans) *Service {
-	return &Service{lists: lists, keepMaintained: keepMaintained, nextID: nextID, clans: clans}
+	s := &Service{lists: lists, nextID: nextID, clans: clans}
+	s.SetKeepMaintained(keepMaintained)
+	return s
+}
+
+// SetKeepMaintained puts the inverted BlacksmithUseRecipes switch
+// keepMaintained in force for the exchanges that start after it.
+func (s *Service) SetKeepMaintained(keepMaintained bool) {
+	s.keepMaintained.Store(keepMaintained)
 }
 
 // Open prepares list name for c talking to the NPC npcID. It returns nil
@@ -232,6 +241,8 @@ func (s *Service) Choose(c *player.Character, list *multisell.List, npcID int, r
 		return Outcome{Notices: []any{SlotsFull{}}}
 	}
 
+	// One exchange checks for and takes its ingredients under one switch.
+	keep := s.keepMaintained.Load()
 	needs, ok := mergeIngredients(entry.Ingredients)
 	if !ok {
 		return Outcome{Notices: []any{QuantityExceeded{}}}
@@ -258,13 +269,13 @@ func (s *Service) Choose(c *player.Character, list *multisell.List, npcID int, r
 		if list.MaintainEnchantment {
 			enchant = e.EnchantLevel
 		}
-		if inv.ItemCount(e.ItemID, enchant, false) < s.taken(e, amount) {
+		if inv.ItemCount(e.ItemID, enchant, false) < taken(e, amount, keep) {
 			return Outcome{Notices: []any{NotEnoughItems{}}}
 		}
 	}
 
 	var out Outcome
-	augmentations, ok := s.takeIngredients(inv, list, entry, amount, payer, &out)
+	augmentations, ok := s.takeIngredients(inv, list, entry, amount, payer, keep, &out)
 	if !ok {
 		out.Forget = true
 		return out
@@ -284,9 +295,10 @@ func (s *Service) clanOf(c *player.Character) (*clan.Clan, bool) {
 }
 
 // taken is how many units of e an exchange of amount units takes, or, for
-// an ingredient kept by the exchange, how many it must find.
-func (s *Service) taken(e multisell.Ingredient, amount int) int {
-	if s.keepMaintained && e.MaintainIngredient {
+// an ingredient kept by the exchange (keep set and e maintained), how many
+// it must find.
+func taken(e multisell.Ingredient, amount int, keep bool) int {
+	if keep && e.MaintainIngredient {
 		return e.Count
 	}
 	return e.Count * amount
@@ -327,7 +339,7 @@ func mergeIngredients(ingredients []multisell.Ingredient) ([]multisell.Ingredien
 // the clan the ingredient check found able to pay it. It reports false when
 // an ingredient could not be found or taken; what was taken before stays
 // taken.
-func (s *Service) takeIngredients(inv *itemcontainer.Inventory, list *multisell.List, entry multisell.Entry, amount int, payer *clan.Clan, out *Outcome) ([]item.Augmentation, bool) {
+func (s *Service) takeIngredients(inv *itemcontainer.Inventory, list *multisell.List, entry multisell.Entry, amount int, payer *clan.Clan, keep bool, out *Outcome) ([]item.Augmentation, bool) {
 	var augmentations []item.Augmentation
 	for _, e := range entry.Ingredients {
 		if e.ItemID == clanReputationID {
@@ -342,7 +354,7 @@ func (s *Service) takeIngredients(inv *itemcontainer.Inventory, list *multisell.
 		if first == nil {
 			return nil, false
 		}
-		if s.keepMaintained && e.MaintainIngredient {
+		if keep && e.MaintainIngredient {
 			continue
 		}
 		count := e.Count * amount

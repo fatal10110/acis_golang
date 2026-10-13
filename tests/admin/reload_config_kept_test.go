@@ -25,18 +25,20 @@ func fixedConfig(settings network.PlayerConfig) network.DataReloads {
 	return network.DataReloads{Config: func() (network.PlayerConfig, error) { return settings, nil }}
 }
 
-// TestAdminReloadConfigDeathDropKeepsEntryRules: a player in the world when
-// //reload config runs dies under the death-drop rules it entered with, all
-// of them. The game master here entered allowed to drop, with the potion
-// kept and every other droppable item lost; the reload turns game-master
-// drops off and keeps nothing, yet its karma death still drops the tunic
-// and keeps the potion.
-func TestAdminReloadConfigDeathDropKeepsEntryRules(t *testing.T) {
+// TestAdminReloadConfigDeathDropTakesReloadedRules: a player in the world
+// when //reload config runs dies under the reloaded death-drop rules, all of
+// them, as the reference reads them on each death. The game master here
+// entered with the potion kept; the reload keeps the tunic instead, so its
+// karma death drops the potion and keeps the tunic.
+func TestAdminReloadConfigDeathDropTakesReloadedRules(t *testing.T) {
 	t.Parallel()
 	every := player.DeathDropRates{Chance: 100, Equip: 100, EquipWeapon: 100, Item: 100, Limit: 10}
 	srv, gmID := bootAdmin(t, adminLevel,
 		gameservertest.WithDeathDrop(player.DeathDropRules{Karma: every, GMDrops: true, Kept: []int32{keptPotionID}}),
-		gameservertest.WithDataReloads(fixedConfig(network.PlayerConfig{RespawnRestoreHP: 0.7, MaxBuffsAmount: 20})))
+		gameservertest.WithDataReloads(fixedConfig(network.PlayerConfig{
+			RespawnRestoreHP: 0.7, MaxBuffsAmount: 20, WeightLimitMultiplier: 1,
+			DeathDrop: player.DeathDropRules{Karma: every, GMDrops: true, Kept: []int32{keptTunicID}},
+		})))
 	if _, err := srv.DB.ExecContext(context.Background(), "UPDATE characters SET karma = 100 WHERE obj_Id = ?", gmID); err != nil {
 		t.Fatalf("set karma: %v", err)
 	}
@@ -61,11 +63,11 @@ func TestAdminReloadConfigDeathDropKeepsEntryRules(t *testing.T) {
 	for _, g := range srv.GroundItems.Snapshots(nil) {
 		ground = append(ground, g.TemplateID)
 	}
-	if len(ground) != 1 || ground[0] != keptTunicID {
-		t.Fatalf("ground items = %v, want the tunic alone", ground)
+	if len(ground) != 1 || ground[0] != keptPotionID {
+		t.Fatalf("ground items = %v, want the potion alone", ground)
 	}
-	if got := srv.PlayerInventory(t, gmID).ItemCount(keptPotionID, -1, true); got != 5 {
-		t.Fatalf("potions kept = %d, want 5", got)
+	if got := srv.PlayerInventory(t, gmID).ItemCount(keptTunicID, -1, true); got != 1 {
+		t.Fatalf("tunics kept = %d, want 1", got)
 	}
 }
 
@@ -76,7 +78,7 @@ func TestAdminReloadConfigDeathDropKeepsEntryRules(t *testing.T) {
 func TestAdminReloadConfigKeepsPartyRange(t *testing.T) {
 	t.Parallel()
 	srv, gmID := bootAdmin(t, adminLevel,
-		gameservertest.WithDataReloads(fixedConfig(network.PlayerConfig{RespawnRestoreHP: 0.7, MaxBuffsAmount: 20, PartyRange: -1})))
+		gameservertest.WithDataReloads(fixedConfig(network.PlayerConfig{RespawnRestoreHP: 0.7, MaxBuffsAmount: 20, WeightLimitMultiplier: 1, PartyRange: -1})))
 	gm := srv.Client
 	enterWorld(t, gm)
 	member, memberID := addPlayer(t, srv, "member", "Member", userLevel)
