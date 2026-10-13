@@ -320,11 +320,21 @@ func (l *GameClientLink) handleRequestActionUse(ctx context.Context, cs *connSta
 	return nil
 }
 
-// handleRequestSocialAction plays a social animation.
+// handleRequestSocialAction plays a social animation. Every request first
+// spends the emote reuse gate; one it refuses answers nothing, like the
+// other silent emote rejections (see broadcastLiveSocialAction).
 func (l *GameClientLink) handleRequestSocialAction(_ context.Context, cs *connState, req clientpackets.RequestSocialAction) error {
-	if cs.live != nil {
-		onLive(cs.live, func() { l.broadcastLiveSocialAction(cs.live, req.ActionID) })
+	if cs.live == nil {
+		return nil
 	}
+	client, live := cs.client, cs.live
+	// The gate belongs to this read loop, which stays parked in onLive
+	// while this runs; it is timed on the player's queue clock.
+	onLive(live, func() {
+		if client.performFloodProtected(floodProtectorSocial, l.playerConfig().SocialDelay, live.Now()) {
+			l.broadcastLiveSocialAction(live, req.ActionID)
+		}
+	})
 	return nil
 }
 

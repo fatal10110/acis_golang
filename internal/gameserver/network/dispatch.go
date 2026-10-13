@@ -259,6 +259,9 @@ type PlayerConfig struct {
 	// RollDiceDelay is the reuse delay between two dice throws on one
 	// client session.
 	RollDiceDelay time.Duration
+	// SocialDelay is the reuse delay between two emote requests on one
+	// client session.
+	SocialDelay time.Duration
 	// SubclassDelay is the reuse delay between two subclass add, change or
 	// replace actions of one player.
 	SubclassDelay time.Duration
