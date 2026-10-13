@@ -143,56 +143,70 @@ func (qs *QuestState) Player() *Player {
 
 // Set sets the variable key to value and writes it.
 func (qs *QuestState) Set(key, value string) {
-	if qs.state.Set(key, value) {
-		qs.quests.commit(qs.player)
-	}
+	qs.write(func() {
+		if qs.state.Set(key, value) {
+			qs.quests.commit(qs.player)
+		}
+	})
 }
 
 // Unset removes the variable key and deletes its row.
 func (qs *QuestState) Unset(key string) {
-	if qs.state.Unset(key) {
-		qs.quests.commit(qs.player)
-	}
+	qs.write(func() {
+		if qs.state.Unset(key) {
+			qs.quests.commit(qs.player)
+		}
+	})
 }
 
 // SetStatus sets the state's status; an unchanged status writes nothing.
 func (qs *QuestState) SetStatus(s questlog.Status) {
-	if qs.state.SetStatus(s) {
-		qs.quests.commit(qs.player)
-	}
+	qs.write(func() {
+		if qs.state.SetStatus(s) {
+			qs.quests.commit(qs.player)
+		}
+	})
 }
 
 // SetCond sets the quest's condition, with its quest window flags. A real
 // quest then shows the player its quest window and marks the quest.
 func (qs *QuestState) SetCond(cond int32) {
-	list, ok := qs.state.SetCond(cond)
-	if !ok {
-		return
-	}
-	qs.quests.commit(qs.player)
-	if q := qs.state.Quest(); q.Real() {
-		qs.player.NotifyQuestList(list)
-		qs.player.NotifyQuestMarked(q.ID)
-	}
+	qs.write(func() {
+		list, ok := qs.state.SetCond(cond)
+		if !ok {
+			return
+		}
+		qs.quests.commit(qs.player)
+		if q := qs.state.Quest(); q.Real() {
+			qs.player.NotifyQuestList(list)
+			qs.player.NotifyQuestMarked(q.ID)
+		}
+	})
 }
 
 // Exit ends a started quest: a repeatable one is forgotten, any other is
 // kept completed. A real quest then shows the player its quest window, and
 // the player loses every unit of the quest's items.
 func (qs *QuestState) Exit(repeatable bool) {
-	list, ok := qs.state.Exit(repeatable)
-	if !ok {
-		return
-	}
-	qs.quests.commit(qs.player)
-	q := qs.state.Quest()
-	if q.Real() {
-		qs.player.NotifyQuestList(list)
-	}
-	for _, id := range q.Items {
-		qs.player.TakeScriptItems(id, -1)
-	}
+	qs.write(func() {
+		list, ok := qs.state.Exit(repeatable)
+		if !ok {
+			return
+		}
+		qs.quests.commit(qs.player)
+		q := qs.state.Quest()
+		if q.Real() {
+			qs.player.NotifyQuestList(list)
+		}
+		for _, id := range q.Items {
+			qs.player.TakeScriptItems(id, -1)
+		}
+	})
 }
+
+// write makes fn's change to the journal as one script write to the
+// player: a player leaving the world takes none it has not waited for.
+func (qs *QuestState) write(fn func()) { qs.player.WhileAttached(fn) }
 
 // commit starts a drain of c's journal unless one is already owed.
 func (q *Quests) commit(c *player.Character) {

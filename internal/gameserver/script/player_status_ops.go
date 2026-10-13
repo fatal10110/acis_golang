@@ -30,13 +30,20 @@ func (p *Player) Overweight() bool { return p.character().Overweight() }
 func (p *Player) RightHandItemID() int32 { return p.character().RightHandItemID() }
 
 // SetIn7sDungeon marks the player as inside a Seven Signs dungeon, or no
-// longer inside one.
-func (p *Player) SetIn7sDungeon(in bool) { p.character().SetIn7sDungeon(in) }
+// longer inside one. A player leaving the world is left as it is.
+func (p *Player) SetIn7sDungeon(in bool) {
+	c := p.character()
+	c.WhileAttached(func() { c.SetIn7sDungeon(in) })
+}
 
 // SetVarkaKetraAlliance sets the player's standing with the two factions:
 // 1 to 5 allied with the Ketra Orcs, -1 to -5 with the Varka Silenos, 0
-// neither. It is stored with the character's next save.
-func (p *Player) SetVarkaKetraAlliance(level int32) { p.character().SetVarkaKetraAlliance(int(level)) }
+// neither. It is stored with the character's next save; a player leaving
+// the world keeps its standing.
+func (p *Player) SetVarkaKetraAlliance(level int32) {
+	c := p.character()
+	c.WhileAttached(func() { c.SetVarkaKetraAlliance(int(level)) })
+}
 
 // RefreshHennaList recomputes what the player's dyes add to its stats and
 // shows the player its dye list.

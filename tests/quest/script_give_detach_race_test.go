@@ -65,7 +65,9 @@ func parkedDetach() (parked, inMark bool) {
 // ungated detach would stop later, at the inventory's release, and the
 // give would still be saved: the rows and the reselected counts only
 // guard the outcome, that the give lands before the final item save and
-// the take, raised once the detach has stopped, takes nothing.
+// the take, raised once the player has left, takes nothing. (A take raised
+// while the detach waits for the give is let through ahead of the saves, as
+// the give still holds the player, so it would tell nothing here.)
 //
 // It runs alone, not in parallel: the detach it waits for is found among
 // the process's goroutines, and no other suite's may be there.
@@ -90,7 +92,6 @@ func TestScriptGiveFromAnotherQueueRacingDetachIsSaved(t *testing.T) {
 
 	detaching := srv.PlayerDetaching(t, objID)
 	var restarted, pastMark atomic.Bool
-	taken := make(chan struct{})
 	go func() {
 		defer close(paused.release)
 		for !restarted.Load() {
@@ -107,15 +108,11 @@ func TestScriptGiveFromAnotherQueueRacingDetachIsSaved(t *testing.T) {
 			}
 			runtime.Gosched()
 		}
-		go func() {
-			defer close(taken)
-			s.TakeItems(p, dropItem+1, -1)
-		}()
 	}()
 	restart(t, srv)
 	restarted.Store(true)
 	<-given
-	<-taken
+	s.TakeItems(p, dropItem+1, -1)
 	if pastMark.Load() {
 		t.Error("the detach went past marking the player while a give was in flight")
 	}

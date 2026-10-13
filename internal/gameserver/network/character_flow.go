@@ -721,6 +721,11 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 			DeathDrop:              settings.DeathDrop,
 		},
 	}
+	if l.scripts != nil {
+		// A script invocation that wrote the player holds its departure
+		// until it ends.
+		rt.ScriptRuns = l.scripts.ScriptRuns()
+	}
 	if los, ok := l.geo.(player.LineOfSight); ok {
 		rt.LOS = los
 	}

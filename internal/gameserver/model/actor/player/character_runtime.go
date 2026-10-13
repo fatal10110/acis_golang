@@ -236,7 +236,11 @@ type Runtime struct {
 	// Deaths takes the deaths of the character and of its summon; nil
 	// drops them.
 	Deaths DeathEvents
-	Mounts MountBodies
+	// ScriptRuns counts the script invocations in flight, for the
+	// character's departure to wait out the ones that changed it; nil
+	// counts only the script writes made to the character itself.
+	ScriptRuns *ScriptRuns
+	Mounts     MountBodies
 	// MountData resolves a mount's pet data; nil leaves every mount unfed
 	// and riding at its rider's own speeds.
 	MountData MountDataSource
@@ -260,6 +264,7 @@ func (c *Character) Configure(rt Runtime) {
 	c.partyLoot = rt.PartyLoot
 	c.tutorial = rt.Tutorial
 	c.deaths = rt.Deaths
+	c.scriptRuns = rt.ScriptRuns
 	c.mounts = rt.Mounts
 	c.mountData = rt.MountData
 	c.skillDefs = rt.Skills

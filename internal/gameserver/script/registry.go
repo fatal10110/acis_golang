@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -169,6 +170,9 @@ type Registry struct {
 	// doors are the world's doors (Env.Doors), which a door handle in a
 	// hook's payload opens and closes; nil when the server has none.
 	doors Doors
+	// runs counts the hook invocations in flight, for a player leaving the
+	// world to wait out the ones that wrote it. It carries its own lock.
+	runs player.ScriptRuns
 }
 
 type npcKey struct {
