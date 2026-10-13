@@ -2,7 +2,6 @@ package manager
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -34,12 +33,11 @@ func (n *Npcs) DespawnAll() int {
 			if entry.DBName == "" {
 				continue
 			}
-			if state, ok := n.spawns.State(entry.DBName); ok {
-				state.Status = spawn.StatusUninitialized
-			}
+			n.spawns.Uninitialize(entry.DBName)
 		}
 	}
 	clear(n.slot)
+	clear(n.privates)
 	for _, g := range n.groups {
 		clear(g.keys)
 	}

@@ -51,7 +51,16 @@ services:
       - ${ACIS_DATAPACK_DIR:-../aCis_datapack}/sql:/acis/sql:ro
       - ${ACIS_DATAPACK_DIR:-../aCis_datapack}/tools:/acis/tools:ro
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      # ops/docker/initdb/10-acis-schema.sh leaves this marker behind when
+      # the first-start schema load fails. The restarted server skips the
+      # load, so it must not report healthy over an empty acis database.
+      test:
+        - CMD-SHELL
+        - >-
+          if [ -e /var/lib/mysql/.acis-schema-incomplete ]; then
+          echo 'acis schema load did not finish; see Failure modes in docs/ops/docker.md';
+          exit 1; fi;
+          healthcheck.sh --connect --innodb_initialized
       interval: 5s
       timeout: 5s
       retries: 30

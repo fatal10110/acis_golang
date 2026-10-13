@@ -201,7 +201,7 @@ func TestShippedConditionsHoldNoNullNode(t *testing.T) {
 	// The item loader drops a top-level or <for>-leading <cond> that holds no
 	// condition, so the walk above cannot see one: read the raw elements and
 	// require each of them to build a condition.
-	docs, err := loadXMLDocuments[itemFile](datapackPath(t, filepath.Join("data", "xml", "items")), "item template")
+	docs, err := loadTemplateDocuments[itemFile](datapackPath(t, filepath.Join("data", "xml", "items")), "item template")
 	if err != nil {
 		t.Fatalf("loadXMLDocuments: %v", err)
 	}
@@ -218,12 +218,15 @@ func TestShippedConditionsHoldNoNullNode(t *testing.T) {
 		for _, el := range doc.Data.Items {
 			id := newAttrValues(foldAttrs(el.Attrs), "item").int32("id")
 			where := fmt.Sprintf("%s item %d", filepath.Base(doc.Path), id)
-			for _, c := range el.Cond {
-				rawCond(where+" cond", id, c.Attrs, c.Children)
-			}
-			for _, forEl := range el.For {
-				for i, op := range forEl.Ops {
-					if tag := op.XMLName.Local; strings.EqualFold(tag, "cond") && leadsWithCond(tag, i, forEl.LeadingNode) {
+			for _, c := range el.Children {
+				if c.Cond != nil {
+					rawCond(where+" cond", id, c.Cond.Attrs, c.Cond.Children)
+				}
+				if c.For == nil {
+					continue
+				}
+				for i, op := range c.For.Ops {
+					if tag := op.XMLName.Local; strings.EqualFold(tag, "cond") && leadsWithCond(tag, i, c.For.LeadingNode) {
 						rawCond(where+" for cond", id, op.Attrs, op.Children)
 					}
 				}

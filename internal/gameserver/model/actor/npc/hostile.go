@@ -1041,9 +1041,9 @@ func (h *Hostile) Decayed() bool {
 //
 // worldState may be nil in tests that do not track live world placement.
 // respawn is called after the world removal when non-nil; a live spawn
-// runtime is expected to close over its own spawn.State/spawn.Entry
-// linkage and call spawn.CalculateRespawnDelay plus spawn.State.SetRespawn
-// there, since Hostile itself carries no spawn linkage yet.
+// runtime is expected to close over its own spawn row/spawn.Entry
+// linkage and record the row's respawn time there (spawn.CalculateRespawnDelay),
+// since Hostile itself carries no spawn linkage yet.
 func (h *Hostile) Decay(worldState *world.State, respawn func()) bool {
 	return h.DecayWithRespawn(worldState, func(int32) func() { return respawn })
 }
