@@ -255,9 +255,9 @@ func TestTutorialHearsEnterWorldLastInTheBurst(t *testing.T) {
 // the player's queue. An HP write that leaves the player below 30% of its
 // maximum raises CE45 once its status is reported, one that does not
 // raises nothing; a death from HP damage raises CE45 for the damage's
-// write, CE45 for the death's own HP clear, then CE30, but no CE30 in the
-// Olympiad; a level gain raises CE40 once, a loss nothing; sitting down
-// raises CE8388608, on request and through Sit.
+// write, CE45 for the death's own HP clear, then CE30, but only the first
+// CE45 in the Olympiad; a level gain raises CE40 once, a loss nothing;
+// sitting down raises CE8388608, on request and through Sit.
 func TestTutorialHearsTheGameTriggers(t *testing.T) {
 	t.Parallel()
 	levels := flatLevels(t)
@@ -292,12 +292,9 @@ func TestTutorialHearsTheGameTriggers(t *testing.T) {
 		c.SetHP(c.MaxHPValue())
 		c.SetOlympiadMode(true)
 	})
-	// Only the missing CE30 is pinned here: in the Olympiad a lethal hit
-	// raises CE45 once for the damage's write and runs no death sequence,
-	// which this server does not have yet (#3540).
-	if got := onPlayer(func(c *player.Character) { c.TakeDamage(1_000_000, c) }); slices.Contains(got, "CE30") || !slices.Contains(got, "CE45") {
-		t.Fatalf("lethal hit in the Olympiad: heard %q, want CE45 and no CE30", got)
-	}
+	// In the Olympiad a lethal hit only marks the player dead: CE45 once
+	// for the damage's write, no death HP clear and no CE30.
+	expect("lethal hit in the Olympiad", onPlayer(func(c *player.Character) { c.TakeDamage(1_000_000, c) }), "CE45")
 	onPlayer(func(c *player.Character) {
 		c.SetOlympiadMode(false)
 		c.Revive()
