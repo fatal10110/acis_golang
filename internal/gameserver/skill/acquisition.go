@@ -107,13 +107,18 @@ func FishingOfferFor(c *player.Character, trees *modelskill.Trees, skills *Persi
 	return FishingOffer{Node: node}, true
 }
 
-// LearnGeneral applies a general trainer skill-learning request.
+// PayItem takes count units of itemID from the learner, telling it what
+// went or what it lacks, and reports whether it took them.
+type PayItem func(itemID int32, count int) bool
+
+// LearnGeneral applies a general trainer skill-learning request, paying a
+// required spellbook through pay before the SP comes off.
 //
 // A non-nil error comes only with LearnDone and reports a malformed passive
 // definition whose stat functions could not be built: the skill is already
 // known and its costs are paid, so the learn stands and the error is the
 // caller's to log. LearnFishing follows the same contract.
-func LearnGeneral(c *player.Character, tmpl *player.Template, skills *Persistence, books modelskill.BookPolicy, skillID, level int) (LearnResult, LearnOutcome, error) {
+func LearnGeneral(c *player.Character, tmpl *player.Template, skills *Persistence, books modelskill.BookPolicy, pay PayItem, skillID, level int) (LearnResult, LearnOutcome, error) {
 	if c == nil {
 		return LearnResult{}, LearnUnavailable, nil
 	}
@@ -131,7 +136,7 @@ func LearnGeneral(c *player.Character, tmpl *player.Template, skills *Persistenc
 		return LearnResult{}, LearnUnavailable, nil
 	}
 	if bookID := books.BookForSkill(modelskill.ID(skillID), level); bookID > 0 {
-		if c.Inventory() == nil || c.Inventory().DestroyByTemplateID(bookID, 1) == nil {
+		if pay == nil || !pay(bookID, 1) {
 			return result, LearnMissingItem, nil
 		}
 	}
@@ -143,8 +148,9 @@ func LearnGeneral(c *player.Character, tmpl *player.Template, skills *Persistenc
 	return result, LearnDone, setKnownSkill(skills, c, grant.SkillID, grant.Level)
 }
 
-// LearnFishing applies a fishing trainer skill-learning request.
-func LearnFishing(c *player.Character, trees *modelskill.Trees, skills *Persistence, skillID, level int) (LearnResult, LearnOutcome, error) {
+// LearnFishing applies a fishing trainer skill-learning request, paying its
+// item through pay.
+func LearnFishing(c *player.Character, trees *modelskill.Trees, skills *Persistence, pay PayItem, skillID, level int) (LearnResult, LearnOutcome, error) {
 	offer, ok := FishingOfferFor(c, trees, skills, skillID, level)
 	if !ok {
 		return LearnResult{}, LearnUnavailable, nil
@@ -155,7 +161,7 @@ func LearnFishing(c *player.Character, trees *modelskill.Trees, skills *Persiste
 		Level:       node.Level,
 		StorageSync: NeedsStorageSync(int32(node.ID)),
 	}
-	if c.Inventory() == nil || c.Inventory().DestroyByTemplateID(node.ItemID, node.ItemCount) == nil {
+	if pay == nil || !pay(node.ItemID, node.ItemCount) {
 		return result, LearnMissingItem, nil
 	}
 	return result, LearnDone, setKnownSkill(skills, c, skillID, level)

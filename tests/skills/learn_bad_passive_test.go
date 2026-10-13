@@ -49,6 +49,8 @@ func TestLearnBadPassiveCompletesTheLearn(t *testing.T) {
 		selectTrainer(t, srv, c, objID)
 
 		c.Send(encodeRequestAcquireSkill(1368, 1, 1))
+		assertSystemMessageParams(t, c.Read(), serverpackets.SystemMessageS1DisappearedAdena,
+			systemMessageParam{serverpackets.SystemMessageParamNumber, 2})
 		assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageLearnedSkill, 1368, 1)
 		reply := c.Read()
 		assertFrameOpcode(t, reply, serverpackets.OpcodeExtended, "ExStorageMaxCount extended")

@@ -757,6 +757,16 @@ func destroyHeldItems(live *livePlayer, templateID int32, count int) bool {
 	return true
 }
 
+// destroyItemByItemID destroys count units of templateID out of live's
+// inventory with its notices: adena reads as adena spent or lacking,
+// anything else as destroyHeldItems names it.
+func destroyItemByItemID(live *livePlayer, templateID int32, count int) bool {
+	if templateID == item.AdenaID {
+		return reduceAdena(live, count)
+	}
+	return destroyHeldItems(live, templateID, count)
+}
+
 // sendDestroyedMessage names count units of templateID the player just
 // destroyed: a shadow item reads as its mana running out, several units
 // carry their count.
