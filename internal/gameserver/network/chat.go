@@ -5,6 +5,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/chat"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -232,10 +233,16 @@ func (l *GameClientLink) broadcastToChannel(speaker *livePlayer, members []*live
 // the world whose position falls in the same restart region as speaker's,
 // speaker included. Players outside every region share the empty one.
 func (l *GameClientLink) broadcastToRegion(speaker *livePlayer, build func() wire.Frame) {
+	l.broadcastToRegionAt(speaker.CurrentLocation(), build)
+}
+
+// broadcastToRegionAt sends one copy of the built frame to every player in
+// the world whose position falls in the same restart region as at.
+func (l *GameClientLink) broadcastToRegionAt(at location.Location, build func() wire.Frame) {
 	if l.world == nil {
 		return
 	}
-	region := l.restarts.PointIndexAt(speaker.CurrentLocation())
+	region := l.restarts.PointIndexAt(at)
 	broadcastFrame(build, func(send func(frameReceiver)) {
 		for _, p := range l.world.Players() {
 			if listener, ok := p.(*livePlayer); ok && l.restarts.PointIndexAt(listener.CurrentLocation()) == region {

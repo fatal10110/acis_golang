@@ -121,6 +121,10 @@ type Folk struct {
 	// headquarters is a siege flag's clan and the end of its attack
 	// warning hold; see folk_siegeflag.go.
 	headquarters headquarters
+
+	// massTeleport is set while a mass gatekeeper's teleport of its
+	// defenders is armed; see folk_residence_commands.go.
+	massTeleport atomic.Bool
 }
 
 // NewFolk builds a civilian NPC from inst. skills, when provided, resolves

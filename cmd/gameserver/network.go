@@ -234,6 +234,7 @@ func provideGameClientLink(
 		DisableRaidCurse: bool(gameplay.DisableRaidCurse),
 		ShowNPCCrest:     bool(gameplay.ShowNPCCrest),
 		ShowNPCLevel:     bool(gameplay.ShowNPCLevel),
+		Wyvern:           &gameplay.Wyvern,
 		Macros:           macros,
 		Recommendations:  recommendations,
 		Quests:           quests,

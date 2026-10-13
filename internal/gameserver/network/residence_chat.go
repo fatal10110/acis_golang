@@ -56,7 +56,8 @@ func (l *GameClientLink) residenceTalk(live *livePlayer, f *npc.Folk) npc.Reside
 	c, h := l.npcResidence(f.Instance)
 	switch {
 	case c != nil:
-		r.CastleID, r.OwnerID = c.ID, c.OwnerID()
+		r.CastleID, r.OwnerID, r.CastleName = c.ID, c.OwnerID(), c.Name
+		r.LifeTowers = aliveLifeTowers(c)
 		if s, ok := l.castleSiege(int32(c.ID)); ok {
 			r.SiegeInProgress = s.InProgress()
 			if field := s.Battlefield(); field != nil {
@@ -81,6 +82,8 @@ func (l *GameClientLink) residenceTalk(live *livePlayer, f *npc.Folk) npc.Reside
 	}
 	if l.sevenSigns != nil {
 		r.StrifeOwner = l.sevenSigns.SealOwners()[sevensigns.Strife-sevensigns.Avarice]
+		r.SealValidation = l.sevenSigns.CurrentPeriod() == sevensigns.SealValidation
 	}
+	r.Flying = live.Flying()
 	return r
 }

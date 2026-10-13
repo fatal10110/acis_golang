@@ -256,12 +256,12 @@ func TestFolkKarmaRefusalPage(t *testing.T) {
 }
 
 // TestMutedAndUnportedFolkOpenNothing pins the NPCs whose interact opens
-// no page: a muted NPC, and a type whose dialog reads state not in place.
-// Both still release the client and face the player toward the NPC.
+// no page: a muted NPC, and a mass gatekeeper serving no castle. Both
+// still release the client and face the player toward the NPC.
 func TestMutedAndUnportedFolkOpenNothing(t *testing.T) {
 	t.Parallel()
 	w := bootFolkWorld(t, map[string]string{"default/31000.htm": "<html><body>x</body></html>", "npcdefault.htm": "<html><body>y</body></html>"})
-	for _, kind := range []string{"MutedFolk", "CastleGatekeeper", "WyvernManagerNpc"} {
+	for _, kind := range []string{"MutedFolk", "CastleGatekeeper"} {
 		f := w.spawnFolk(t, folkTemplate(kind, 31000), 40)
 		w.selectFolk(t, f)
 		frames := w.talk(t, f, false)
