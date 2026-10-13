@@ -4,7 +4,6 @@ import (
 	"strconv"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
-	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/grounditem"
 )
 
@@ -76,17 +75,17 @@ func (l *GameClientLink) killMercenaries(c *castle.Castle) {
 	}
 }
 
-// spawnTimes answers the world state the npcmakers with a spawn time
-// follow through l.
-type spawnTimes struct{ l *GameClientLink }
+// SpawnTimeState answers the world state the npcmakers with a spawn time
+// follow through a link.
+type SpawnTimeState struct{ l *GameClientLink }
 
 // SpawnTimes returns the world state, read through l, the npcmakers with a
 // spawn time follow.
-func SpawnTimes(l *GameClientLink) manager.SpawnTimes { return spawnTimes{l: l} }
+func SpawnTimes(l *GameClientLink) SpawnTimeState { return SpawnTimeState{l: l} }
 
 // CastleSiege reports whether castle id's battlefield is active and
 // whether a clan owns the castle.
-func (s spawnTimes) CastleSiege(id int) (active, owned, ok bool) {
+func (s SpawnTimeState) CastleSiege(id int) (active, owned, ok bool) {
 	c, ok := s.l.castles.Get(id)
 	if !ok {
 		return false, false, false
@@ -104,10 +103,10 @@ func (s spawnTimes) CastleSiege(id int) (active, owned, ok bool) {
 //
 // ponytail: no clan hall siege runs yet (#244), so none is ever in
 // progress.
-func (spawnTimes) HallSiegeInProgress(int) bool { return false }
+func (SpawnTimeState) HallSiegeInProgress(int) bool { return false }
 
 // DoorOpen reports whether door id stands open.
-func (s spawnTimes) DoorOpen(id int) bool {
+func (s SpawnTimeState) DoorOpen(id int) bool {
 	if s.l.doors == nil {
 		return false
 	}
