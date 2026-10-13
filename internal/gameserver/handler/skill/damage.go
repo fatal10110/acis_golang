@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door/doorhit"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
@@ -164,8 +165,41 @@ func (pdamHandler) UseResult(cast Cast) Result {
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
+	chargeCaster(cast)
+	killSuicideCaster(cast)
 	dischargeSoulshot(cast)
 	return result
+}
+
+// chargeCaster rushes a CHARGE skill's caster FlyRadius units toward the
+// first target, or along its own heading when the skill reached nobody,
+// stopping short of geodata. Observers see the flight from the old
+// position, then the landing position.
+func chargeCaster(cast Cast) {
+	if cast.Skill.Flight == nil || *cast.Skill.Flight != modelskill.FlightCharge {
+		return
+	}
+	caster := cast.Caster
+	x, y, z := caster.Position()
+	from := location.Location{X: x, Y: y, Z: z}
+	heading := caster.Heading()
+	if len(cast.Targets) > 0 && cast.Targets[0] != nil {
+		tx, ty, _ := cast.Targets[0].Position()
+		heading = from.HeadingTo(location.Location{X: tx, Y: ty})
+	}
+	point := location.OrientedLocation{Location: from, Heading: heading}.Ahead(cast.Skill.FlyRadius)
+	landing := caster.ValidLocation(x, y, z, point.X, point.Y, z)
+	caster.FlyTo(landing, modelskill.FlightCharge)
+	caster.SetXYZ(landing.X, landing.Y, landing.Z)
+	caster.BroadcastPosition()
+}
+
+// killSuicideCaster kills a suicide attack's caster by its own hand, once
+// the attack has gone off, whether or not it reached anyone.
+func killSuicideCaster(cast Cast) {
+	if cast.Skill.SuicideAttack {
+		cast.Caster.Kill(cast.Caster)
+	}
 }
 
 type chargeDamHandler struct{}
@@ -283,6 +317,7 @@ func (h mdamHandler) UseResult(cast Cast) Result {
 		}
 	}
 	applySelfEffects(cast, cast.Skill)
+	killSuicideCaster(cast)
 	dischargeSpiritshot(cast)
 	return result
 }
