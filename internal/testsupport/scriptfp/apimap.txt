@@ -519,3 +519,10 @@ Siege.isInProgress script.Castle.SiegeInProgress
 ItemInstance.getItemId inline
 Npc.lookItem script.NPC.LookItem
 NpcAI.addPickUpDesire script.NPC.AddPickUpDesire
+
+# Clan reads of the API freeze, residence lane (#3748). The clan and its
+# leader's member record fold into the Player handle calls; the leader is
+# the online player, nil while offline.
+Clan.getClanHallId script.Player.ClanHallID
+Clan.getLeader inline
+ClanMember.getPlayerInstance script.Player.ClanLeader
