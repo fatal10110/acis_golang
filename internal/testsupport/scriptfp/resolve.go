@@ -265,6 +265,16 @@ func (x xtype) known() bool { return x.name != "" || x.super }
 // resolveRef turns a declared type into an xtype, resolving names in the
 // declaring type's file. Type variables are unknown.
 func (tr *tree) resolveRef(ref typeRef, decl *javaType, m *javaMethod) xtype {
+	return tr.resolveBound(ref, decl, m, nil)
+}
+
+// resolveBound is resolveRef with the method type variables a call binds
+// (classBindings) taken as their bound types.
+func (tr *tree) resolveBound(ref typeRef, decl *javaType, m *javaMethod, bind map[string]xtype) xtype {
+	if x, ok := bind[ref.name]; ok && ref.qual == "" {
+		x.dims += ref.dims
+		return x
+	}
 	if ref.name == "" || m != nil && slices.Contains(m.typeParams, ref.name) {
 		return xtype{}
 	}
@@ -275,7 +285,7 @@ func (tr *tree) resolveRef(ref typeRef, decl *javaType, m *javaMethod) xtype {
 	}
 	x := xtype{name: ref.name, dims: ref.dims, t: tr.lookupQualified(ref, decl)}
 	for _, arg := range ref.args {
-		x.args = append(x.args, tr.resolveRef(arg, decl, m))
+		x.args = append(x.args, tr.resolveBound(arg, decl, m, bind))
 	}
 	return x
 }
@@ -348,6 +358,15 @@ func libraryResult(recv xtype, name string) xtype {
 	return xtype{}
 }
 
+// functionalParams gives, for the library functional interfaces whose
+// leading type arguments are the types of the lambda's parameters in order,
+// how many parameters that covers: a lambda passed as a Consumer<A> has one
+// parameter of type A.
+var functionalParams = map[string]int{
+	"Consumer": 1, "Predicate": 1, "Function": 1, "ToIntFunction": 1, "ToLongFunction": 1,
+	"ToDoubleFunction": 1, "UnaryOperator": 1, "BiConsumer": 2, "BiPredicate": 2, "BiFunction": 2,
+}
+
 // lambdaParam returns the type of parameter index of a lambda passed to a
 // library call named name on recv.
 func lambdaParam(recv xtype, name string, index int) xtype {
@@ -378,6 +397,10 @@ type call struct {
 	owner *javaType
 	name  string // method name; "new" for a constructor
 	ret   xtype
+	// a call of a declared method: the method and the type variables the
+	// call binds (classBindings)
+	m    *javaMethod
+	bind map[string]xtype
 }
 
 // row is the census row name of an engine or unresolved call.
@@ -392,9 +415,10 @@ type localDecl struct {
 	pos  int
 	name string
 	typ  typeRef
-	// lambda parameters: the call taking the lambda and the parameter's
-	// position; typ is unused.
-	lambdaCall, lambdaIndex int
+	// lambda parameters: the name token of the call taking the lambda, the
+	// lambda's argument position and the parameter's position; typ is
+	// unused.
+	lambdaCall, lambdaArg, lambdaIndex int
 }
 
 // body analyses one method body of type t in file f.
@@ -441,7 +465,7 @@ func newBody(tr *tree, f *javaFile, t *javaType, m *javaMethod, open []int) *bod
 }
 
 // lambdaParams records the untyped parameters of the lambda whose arrow is
-// at i when the lambda is the first argument of a call: x -> or (x, y) ->.
+// at i when the lambda is an argument of a call: x -> or (x, y) ->.
 func (b *body) lambdaParams(arrow int) {
 	var names []int
 	start := arrow - 1
@@ -459,12 +483,54 @@ func (b *body) lambdaParams(arrow int) {
 	default:
 		return
 	}
-	if !b.tok(start-1).is("(") || b.tok(start-2).kind != tokIdent || !b.tok(start-3).is(".") {
+	open, arg := b.enclosingCall(start - 1)
+	if open < 0 || b.tok(open-1).kind != tokIdent || javaKeywords[b.tok(open-1).text] {
 		return
 	}
 	for index, k := range names {
-		b.decls = append(b.decls, localDecl{pos: k, name: b.tok(k).text, lambdaCall: start - 2, lambdaIndex: index})
+		b.decls = append(b.decls, localDecl{pos: k, name: b.tok(k).text, lambdaCall: open - 1, lambdaArg: arg, lambdaIndex: index})
 	}
+}
+
+// enclosingCall returns the '(' of the argument list that the token at j
+// ends an argument in or opens, with the position of the argument after j;
+// -1 when j is not inside parentheses.
+func (b *body) enclosingCall(j int) (open, arg int) {
+	for k := j; k >= 0; k-- {
+		t := b.tok(k)
+		switch {
+		case t.is(")") || t.is("]") || t.is("}"):
+			k = b.open[k]
+		case t.is("("):
+			return k, arg
+		case t.is(","):
+			arg++
+		case t.is(";") || t.is("{"):
+			return -1, 0
+		}
+	}
+	return -1, 0
+}
+
+// lambdaType returns the type of the lambda parameter d: an element of the
+// library container the lambda walks, else the matching type argument of
+// the functional interface the declared method takes there.
+func (b *body) lambdaType(d localDecl) xtype {
+	name := b.tok(d.lambdaCall).text
+	if b.tok(d.lambdaCall-1).is(".") && d.lambdaArg == 0 {
+		if x := lambdaParam(b.typeEnding(d.lambdaCall-2), name, d.lambdaIndex); x.known() {
+			return x
+		}
+	}
+	c := b.callAt(d.lambdaCall)
+	if c.m == nil || len(c.m.params) == 0 {
+		return xtype{}
+	}
+	p := c.m.params[min(d.lambdaArg, len(c.m.params)-1)].typ
+	if p.dims > 0 || d.lambdaIndex >= functionalParams[p.name] || d.lambdaIndex >= len(p.args) {
+		return xtype{}
+	}
+	return b.tr.resolveBound(p.args[d.lambdaIndex], c.owner, c.m, c.bind)
 }
 
 func (b *body) tok(i int) javaToken {
@@ -479,7 +545,7 @@ func (b *body) variable(name string, pos int) (xtype, bool) {
 	for k := len(b.decls) - 1; k >= 0; k-- {
 		if d := b.decls[k]; d.pos < pos && d.name == name {
 			if d.lambdaCall > 0 {
-				return lambdaParam(b.typeEnding(d.lambdaCall-2), b.tok(d.lambdaCall).text, d.lambdaIndex), true
+				return b.lambdaType(d), true
 			}
 			return b.tr.resolveRef(d.typ, b.t, b.m), true
 		}
@@ -681,7 +747,7 @@ func (b *body) classify(recv xtype, name string, argc int) call {
 }
 
 func (b *body) declared(owner *javaType, m *javaMethod, c call) call {
-	c.owner = owner
+	c.owner, c.m = owner, m
 	c.ret = b.tr.resolveRef(m.ret, owner, m)
 	if owner.file.key != "" {
 		c.kind = callOwn
@@ -718,8 +784,50 @@ func (b *body) callAt(i int) call {
 			}
 		}
 	}
+	if c.m != nil && argc > 0 {
+		if c.bind = b.classBindings(c.m, i+1); c.bind != nil {
+			c.ret = b.tr.resolveBound(c.m.ret, c.owner, c.m, c.bind)
+		}
+	}
 	b.calls[i] = c
 	return c
+}
+
+// classBindings returns the type variables of m that the call whose '(' is
+// at open binds with a class literal argument: A in
+// <A> List<A> getKnownType(Class<A> type) called as getKnownType(Player.class).
+func (b *body) classBindings(m *javaMethod, open int) map[string]xtype {
+	if len(m.typeParams) == 0 {
+		return nil
+	}
+	var bind map[string]xtype
+	end := b.f.match[open]
+	start, arg := open+1, 0
+	for k := open + 1; k <= end; k++ {
+		t := b.tok(k)
+		if k < end {
+			if t.is("(") || t.is("[") || t.is("{") {
+				k = b.f.match[k]
+			}
+			if !b.tok(k).is(",") {
+				continue
+			}
+		}
+		// The argument at position arg spans [start, k).
+		if arg < len(m.params) {
+			p := m.params[arg].typ
+			if p.name == "Class" && p.dims == 0 && len(p.args) == 1 && slices.Contains(m.typeParams, p.args[0].name) &&
+				k-start >= 3 && b.tok(k-1).ident("class") && b.tok(k-2).is(".") && b.tok(k-3).kind == tokIdent {
+				name := b.tok(k - 3).text
+				if bind == nil {
+					bind = map[string]xtype{}
+				}
+				bind[p.args[0].name] = xtype{name: name, t: b.tr.lookupType(name, b.f, b.t)}
+			}
+		}
+		start, arg = k+1, arg+1
+	}
+	return bind
 }
 
 // sites returns every call made in the body, constructors included and
