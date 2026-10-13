@@ -25,25 +25,6 @@ type duelRegistry = duel.Manager[*livePlayer]
 
 var _ duel.Player = (*livePlayer)(nil)
 
-// dispatchDuel decodes and runs one extended duel packet. It reports false
-// once the connection has been closed for a malformed packet.
-func (l *GameClientLink) dispatchDuel(client *Client, live *livePlayer, second uint16, payload []byte) bool {
-	switch second {
-	case clientpackets.OpcodeRequestDuelStart:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestDuelStart, l.requestDuelStart)
-	case clientpackets.OpcodeRequestDuelAnswerStart:
-		return dispatchLive(l, client, live, payload, clientpackets.DecodeRequestDuelAnswerStart, l.requestDuelAnswerStart)
-	case clientpackets.OpcodeRequestDuelSurrender:
-		// The request carries no body. A player in no duel surrenders
-		// nothing and hears nothing, as the menu action waits on no
-		// answer; the duel's end answers a surrender.
-		if live != nil && l.duels != nil {
-			onLive(live, func() { l.duels.Surrender(live) })
-		}
-	}
-	return true
-}
-
 // requestDuelStart challenges the named player to a duel, or its party to
 // a party duel; a party duel's challenge goes to the party's leader.
 func (l *GameClientLink) requestDuelStart(live *livePlayer, req clientpackets.RequestDuelStart) {
