@@ -107,6 +107,10 @@ func TestAttackableAIArrivedClearsMoveToWhenGeoSnapsZ(t *testing.T) {
 	move := &recordingMove{}
 	brain := NewAttackable(owner, move, &recordingAttack{})
 	home := location.Location{}
+	// Past the first cycle, so the empty-queue idle runs.
+	if err := brain.TickThink(); err != nil {
+		t.Fatalf("first TickThink() error: %v", err)
+	}
 
 	brain.AddMoveToDesire(home, 1_000_000)
 	if err := brain.RunAI(); err != nil {
@@ -142,6 +146,10 @@ func TestAttackableAIArrivedShortThinkResumesMoveTo(t *testing.T) {
 	move := &recordingMove{}
 	brain := NewAttackable(owner, move, &recordingAttack{})
 	home := location.Location{}
+	// Past the first cycle, so the empty-queue idle runs.
+	if err := brain.TickThink(); err != nil {
+		t.Fatalf("first TickThink() error: %v", err)
+	}
 
 	brain.AddMoveToDesire(home, 1_000_000)
 	if err := brain.RunAI(); err != nil {

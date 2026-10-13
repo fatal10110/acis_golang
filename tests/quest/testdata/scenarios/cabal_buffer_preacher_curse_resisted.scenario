@@ -1,0 +1,16 @@
+# A Preacher of Doom (CabalBuffer) curses a character of Dusk while Dawn leads the Seven Signs,
+# as in cabal_buffer_preacher_curse.scenario, but its landing rolls are pinned to 99: the curse
+# is resisted, and the character feels nothing.
+# Expectations are derived from the reference source (CabalBuffer.java); the reference probe
+# cannot pin the world's landing roll.
+character Seeker 20
+cabal dusk gnosis
+festival 100 0
+random 50 0
+script script.feature.CabalBuffer
+npc preacher 31093 Folk 100 0 0
+roll preacher 99
+
+tick x4
+  S NpcSay obj=preacher type=0 npc=1031093 text="You don't have any hope! Your end has come!"
+  S MagicSkillUse caster=preacher target=player skill=4361-1 hit=0 reuse=0 success=0

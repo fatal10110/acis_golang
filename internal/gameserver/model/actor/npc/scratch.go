@@ -1,6 +1,10 @@
 package npc
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
+)
 
 // IntSlot names one integer of an NPC's script memory.
 type IntSlot uint8
@@ -57,7 +61,8 @@ type ScratchCreature interface {
 // Scratch is what a spawn slot keeps of its NPC from one life to the next,
 // as the reference keeps it on the NPC object it respawns: the memory
 // scripts keep on the NPC (integer and creature slots and the script
-// value), the NPC's party membership, and its current life. A spawn slot
+// value), the NPC's party membership, its out-of-territory state, and its
+// current life. A spawn slot
 // owns one and hands it to every NPC it spawns; Respawned clears the script
 // value for each new life. A Scratch is the NPC's identity across its
 // lives. It is safe for concurrent use; each call is atomic on its own.
@@ -73,6 +78,8 @@ type Scratch struct {
 	lookNeighbor lookNeighborClock
 	// party is the NPC's master and privates, in every life.
 	party party
+	// territory is the NPC's out-of-territory state, in every life.
+	territory ai.TerritoryMemory
 }
 
 // NewScratch returns the memory of an NPC that has never lived: every slot
@@ -142,6 +149,10 @@ func (s *Scratch) SetScriptValue(v int32) {
 func (s *Scratch) Respawned() {
 	s.SetScriptValue(0)
 }
+
+// Territory returns the NPC's out-of-territory state, which every life of
+// the slot shares.
+func (s *Scratch) Territory() *ai.TerritoryMemory { return &s.territory }
 
 // Life returns the NPC the slot placed last, nil before the first: once
 // the slot respawns its NPC, the new life.

@@ -19,7 +19,7 @@ func partyAI(partyType, loyalty int) AIParams {
 	return params
 }
 
-func partyHostile(t *testing.T, id int32, partyType int, move ai.MoveController) *Hostile {
+func partyHostile(t *testing.T, id int32, partyType int, move ai.AttackableMoveController) *Hostile {
 	t.Helper()
 	tpl := &Template{
 		ID: int(id), Type: "Monster", HPMax: 1000, CanMove: true, RunSpeed: 120,
@@ -38,6 +38,9 @@ func TestMinionAssistsWhenMasterTakesDamage(t *testing.T) {
 	attacker := partyHostile(t, 3, 0, &hostileMove{})
 	master.AddMinion(minion)
 	minion.SetMaster(master)
+	// The minion knows the attacker, so the selection its first attack
+	// desire runs keeps the desire.
+	spawnPartyWorld(t, master, minion, attacker)
 
 	master.TakeDamage(40, attacker)
 
@@ -64,6 +67,7 @@ func TestMinionAssistsWhenMasterReduceHP(t *testing.T) {
 	attacker := partyHostile(t, 3, 0, &hostileMove{})
 	master.AddMinion(minion)
 	minion.SetMaster(master)
+	spawnPartyWorld(t, master, minion, attacker)
 
 	master.ReduceHP(40, attacker, skill.Definition{})
 
@@ -85,6 +89,7 @@ func TestMinionAssistsWhenMasterReduceHPByDOT(t *testing.T) {
 	attacker := partyHostile(t, 3, 0, &hostileMove{})
 	master.AddMinion(minion)
 	minion.SetMaster(master)
+	spawnPartyWorld(t, master, minion, attacker)
 
 	master.ReduceHPByDOT(40, attacker, true)
 
@@ -124,6 +129,7 @@ func TestSiblingMinionAssistsWhenPartyMemberTakesDamage(t *testing.T) {
 	master.AddMinion(two)
 	one.SetMaster(master)
 	two.SetMaster(master)
+	spawnPartyWorld(t, master, one, two, attacker)
 
 	one.TakeDamage(25, attacker)
 
@@ -143,6 +149,7 @@ func TestLoyaltyTwoMinionAssistsOnlyWhenMasterIsCaller(t *testing.T) {
 	master.AddMinion(sibling)
 	loyal.SetMaster(master)
 	sibling.SetMaster(master)
+	spawnPartyWorld(t, master, loyal, sibling, attacker)
 
 	sibling.TakeDamage(25, attacker)
 	if got := loyal.AI().Desires().Len(); got != 0 {
@@ -162,6 +169,7 @@ func TestNotifyAggressionFansOutToMinions(t *testing.T) {
 	attacker := partyHostile(t, 3, 0, &hostileMove{})
 	master.AddMinion(minion)
 	minion.SetMaster(master)
+	spawnPartyWorld(t, master, minion, attacker)
 
 	master.NotifyAggression(attacker, 80)
 

@@ -760,6 +760,9 @@ func (*disablerFake) Kind() actor.Kind { return actor.KindNPC }
 func (disablerHostileMove) CanMoveTo(location.Location) bool { return true }
 
 func (disablerHostileMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
+func (disablerHostileMove) MoveStraightToLocation(location.Location) (bool, error) {
+	return false, nil
+}
 
 // newTestList returns a list whose owner runs on its own inline queue, with
 // the clock reading the wall time at creation.

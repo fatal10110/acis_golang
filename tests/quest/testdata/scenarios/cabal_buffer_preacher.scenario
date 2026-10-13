@@ -1,8 +1,8 @@
 # A Preacher of Doom (CabalBuffer) beside a character of Dawn, which leads the Seven Signs: the
 # priest starts preaching as it appears, a minute later and then every minute, a line drawn from
 # its four (onCreated, onTimer). Seeing the character it draws 100 then 10000 and leaves him
-# alone: it curses only the losing cabal (onSeeCreature). The curse of a Dusk character is in
-# cabal_buffer_test.go: whether it lands is the world's roll, which a scenario cannot pin.
+# alone: it curses only the losing cabal (onSeeCreature). The curse of a Dusk character is
+# cabal_buffer_preacher_curse.scenario (landing) and cabal_buffer_preacher_curse_resisted.
 # Expectations are derived from the reference source (CabalBuffer.java).
 trace internal/gameserver/script/testdata/oracle/scenarios/cabal_buffer_preacher.golden
 character Seeker 20

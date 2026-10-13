@@ -153,6 +153,10 @@ func TestUnboundedHitQueuesAFiniteAttackDesire(t *testing.T) {
 	h := newCombatHostile(t, 1, &Template{HPMax: 10000, MPMax: 50, Level: 20})
 	h.SetInvul(true)
 	attacker := &hostileTarget{id: 2, playable: true}
+	// h knows the attacker, so the selection its first attack desire runs
+	// keeps the desire.
+	state := spawnPartyWorld(t, h)
+	state.Spawn(attacker, 100, 0, 0, 0)
 
 	h.ReduceHP(math.Inf(1), attacker, skill.Definition{})
 

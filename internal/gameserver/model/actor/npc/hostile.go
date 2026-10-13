@@ -61,7 +61,7 @@ type Hostile struct {
 	spawnBinding
 
 	brain *ai.Attackable
-	move  ai.MoveController
+	move  ai.AttackableMoveController
 	world *world.State
 	// sink receives this NPC's events. Attach installs it before the NPC is
 	// published into world.State; nil drops every event.
@@ -245,7 +245,7 @@ type skillDefinitions interface {
 // current HP/MP are seeded from the calculated maxima. Folk and other
 // non-attackable instance types never reach this constructor, so they never
 // gain stats from template passives.
-func NewHostile(inst *Instance, live *creature.Live, movement ai.MoveController, attack ai.AttackController, skills ...skillDefinitions) (*Hostile, error) {
+func NewHostile(inst *Instance, live *creature.Live, movement ai.AttackableMoveController, attack ai.AttackController, skills ...skillDefinitions) (*Hostile, error) {
 	if inst == nil {
 		return nil, errors.New("npc: nil hostile instance")
 	}
@@ -390,6 +390,7 @@ func (h *Hostile) Attach(rt Runtime) {
 	h.guarded = rt.Guarded
 	h.bindSpawn(rt.Slot)
 	h.Scratch().setLife(h)
+	h.brain.KeepTerritory(h.Scratch().Territory())
 	if rt.Items == nil {
 		return
 	}
@@ -1120,6 +1121,16 @@ func (h *Hostile) OutOfControl() bool {
 func (h *Hostile) Knows(target attackable.Combatant) bool {
 	tracked, ok := target.(world.Tracked)
 	return ok && world.Knows(h, tracked) && !attackable.HiddenActingPlayer(target)
+}
+
+// InWorld reports whether target is still registered in h's world. With no
+// world attached, nothing has left it.
+func (h *Hostile) InWorld(target attackable.Combatant) bool {
+	if h.world == nil {
+		return true
+	}
+	_, ok := h.world.Object(target.ObjectID())
+	return ok
 }
 
 // PhysicalAttackRange returns this NPC's melee attack range.

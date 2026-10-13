@@ -244,13 +244,18 @@ func TestAttackableAttackFinishedContinuesAttackWhenOutOfControl(t *testing.T) {
 }
 
 // TestAttackableRunAIDropsCurrentAttackWhenTargetMovesBeyond1500 pins the
-// distance prune of desire selection; the continue pass prunes nothing.
+// distance prune of desire selection, after which the empty-queue idle
+// idles the attack; the continue pass prunes nothing.
 func TestAttackableRunAIDropsCurrentAttackWhenTargetMovesBeyond1500(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	owner.known = map[int32]bool{target.ObjectID(): true}
 	strike := &recordingAttack{canAttack: true}
 	ai := NewAttackable(owner, &recordingMove{}, strike)
+	// Past the first cycle, so the empty-queue idle runs.
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("first TickThink() error: %v", err)
+	}
 	addAttackHate(ai, target, 0, 20)
 	// The second pass takes the one-pass attack latch the first set.
 	ai.RunAI()

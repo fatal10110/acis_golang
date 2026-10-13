@@ -9,7 +9,7 @@ import (
 )
 
 type recordingMoveController struct {
-	ai.MoveController
+	ai.AttackableMoveController
 	moved []location.Location
 }
 
@@ -24,7 +24,7 @@ func TestRouteAwareMoveControllerMoveToLocationClearsRouteMove(t *testing.T) {
 	var routeMove atomic.Bool
 	routeMove.Store(true)
 	inner := &recordingMoveController{}
-	controller := routeAwareMoveController{MoveController: inner, routeMove: &routeMove}
+	controller := routeAwareMoveController{AttackableMoveController: inner, routeMove: &routeMove}
 
 	dest := location.Location{X: 10, Y: 20, Z: 30}
 	if ok, err := controller.MoveToLocation(dest); !ok || err != nil {

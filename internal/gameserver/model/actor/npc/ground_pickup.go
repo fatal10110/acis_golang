@@ -130,7 +130,8 @@ func (f *Folk) AddPickUpDesire(itemObjectID int32, weight float64) {
 
 // thinkPickUp is the pick-up step, under brain: an f that cannot act, or
 // whose item it can no longer pick up, does nothing; one not yet within
-// ai.PickUpRange walks to the item unless it cannot move. Within range f
+// ai.PickUpRange walks straight to the item, path-finding off, unless it
+// cannot move. Within range f
 // picks the item up, with brain released, then drops the desire of its
 // current intention as it stands after the picked-item hooks.
 func (f *Folk) thinkPickUp(d *ai.Desire) {
@@ -143,7 +144,7 @@ func (f *Folk) thinkPickUp(d *ai.Desire) {
 	}
 	if f.location().Distance3D(groundAt(ground)) >= ai.PickUpRange {
 		if f.motion != nil && !f.MovementDisabled() {
-			_, _ = f.motion.ctl.MoveToLocation(groundAt(ground))
+			_, _ = f.motion.ctl.MoveStraightToLocation(groundAt(ground))
 		}
 		return
 	}

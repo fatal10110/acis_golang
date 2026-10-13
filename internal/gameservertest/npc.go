@@ -138,6 +138,7 @@ func (s *Server) spawnHostileInstance(t *testing.T, inst *npc.Instance, at locat
 		Hits:    hits,
 		Sink:    s.hostileSinks(hostile),
 		Scripts: s.quests.registry,
+		Ground:  s.groundTaker,
 	}
 	if hostile.SiegeGuard() {
 		rt.Guarded = s.guardedSiege(inst)
@@ -455,6 +456,7 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 		Hits:    hits,
 		Sink:    s.hostileSinks(hostile),
 		Scripts: s.quests.registry,
+		Ground:  s.groundTaker,
 	}
 	// Production takes line of sight from the same geodata (npcs_spawn.go).
 	if los, ok := geo.(npc.LineOfSight); ok {
@@ -606,11 +608,12 @@ type parkedMove struct{}
 func (parkedMove) MaybeStartOffensiveFollow(attackable.Combatant, int) (bool, error) {
 	return false, nil
 }
-func (parkedMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
-func (parkedMove) CanMoveTo(location.Location) bool               { return true }
-func (parkedMove) MoveHome(location.Location) error               { return nil }
-func (parkedMove) Stop()                                          {}
-func (parkedMove) CancelFollow()                                  {}
+func (parkedMove) MoveToLocation(location.Location) (bool, error)         { return false, nil }
+func (parkedMove) MoveStraightToLocation(location.Location) (bool, error) { return false, nil }
+func (parkedMove) CanMoveTo(location.Location) bool                       { return true }
+func (parkedMove) MoveHome(location.Location) error                       { return nil }
+func (parkedMove) Stop()                                                  {}
+func (parkedMove) CancelFollow()                                          {}
 
 // parkedAttack is an AttackController that never attacks.
 type parkedAttack struct{}
@@ -674,18 +677,7 @@ func (s *Server) SpawnFolkNPCAt(t *testing.T, tmpl *npc.Template, at location.Lo
 // effects dispatched through the link's NPC cast seam.
 func (s *Server) SpawnCastingFolkNPCAt(t *testing.T, tmpl *npc.Template, at location.Location, defs actorcast.Definitions) *npc.Folk {
 	t.Helper()
-	inst, err := npc.NewInstance(s.NewObjectID(), tmpl)
-	if err != nil {
-		t.Fatalf("new npc instance: %v", err)
-	}
-	inst.Home, inst.HasHome = at, true
-	spawner := s.folkSpawner(nil, Geo{})
-	spawner.Skills = defs
-	f, err := spawner.Spawn(inst, at, 0, nil)
-	if err != nil {
-		t.Fatalf("spawn folk npc: %v", err)
-	}
-	return f
+	return s.SpawnCastingFolkNPCOfMakerAt(t, tmpl, at, defs, nil)
 }
 
 // folkSpawner is the production civilian spawner over this server's world,
@@ -707,6 +699,7 @@ func (s *Server) folkSpawner(walker *task.Walker, geo move.Geo) gamemanager.Folk
 		MaxGeoPathFailCount: s.maxGeoPathFail,
 		Log:                 s.log,
 		Scripts:             s.quests.registry,
+		Ground:              s.groundTaker,
 	}
 }
 
