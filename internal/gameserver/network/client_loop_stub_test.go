@@ -12,14 +12,29 @@ import (
 )
 
 // TestEveryAcceptedOpcodeHasAHandler pins that the state gate and the
-// registry agree: an opcode a client may send in some state always reaches
-// a handler, so the read loop's not-implemented fallback stays a guard.
+// registry agree in both directions: an opcode a client may send in some
+// state always reaches a handler, so the read loop's not-implemented
+// fallback stays a guard, and a registered handler is always reachable in
+// some state, so a new register line without its gate entry cannot sit
+// behind a gate that rejects every frame.
 func TestEveryAcceptedOpcodeHasAHandler(t *testing.T) {
 	for state, ops := range allowedOpcodes {
 		for op := range ops {
 			if _, ok := gameInbound[op]; !ok {
 				t.Errorf("opcode %#x accepted in state %s has no gameInbound handler", op, state)
 			}
+		}
+	}
+	for op := range gameInbound {
+		allowed := false
+		for _, ops := range allowedOpcodes {
+			if ops[op] {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			t.Errorf("gameInbound handler for opcode %#x is not allowed in any state", op)
 		}
 	}
 }
