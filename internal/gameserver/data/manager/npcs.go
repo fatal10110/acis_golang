@@ -69,6 +69,9 @@ type slotInfo struct {
 	// summoner is the creature the slot's NPC was spawned for; nil for
 	// none.
 	summoner attackable.Combatant
+	// castleID is the castle the slot's NPC belongs to as it spawns; 0
+	// for none.
+	castleID int
 	// memory is what the slot hands every NPC it spawns: the entry's own
 	// AI parameters and the script memory carried from one life to the
 	// next.
@@ -264,6 +267,9 @@ type Npcs struct {
 	// sevenSigns is the Seven Signs state the ssq_* groups follow; nil
 	// until StartSevenSigns.
 	sevenSigns SevenSigns
+	// spawnTimes is the world state the makers with a spawn time follow;
+	// nil until SetSpawnTimes.
+	spawnTimes SpawnTimes
 
 	// liveCount is guarded by mu, not atomic: every update pairs it with a
 	// live map write/delete that must stay consistent with the count.

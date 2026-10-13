@@ -180,6 +180,14 @@ type Notifier interface {
 	// revives, each closes, and its HP is set to its maximum, or to half
 	// of it when weak.
 	RespawnDoors(gates []string, weak bool)
+	// SpawnGuards spawns c's siege guards: with an owner, the NPCs of its
+	// pc_siege_warfare_start makers, then a mercenary at each ticket on
+	// its grounds, the tickets leaving the world; with none, the NPCs of
+	// its siege_warfare_start makers.
+	SpawnGuards(c *castle.Castle)
+	// DespawnGuards deletes c's mercenaries, then the NPCs of its
+	// pc_siege_warfare_start and siege_warfare_start makers.
+	DespawnGuards(c *castle.Castle)
 }
 
 // writeTimeout bounds one siege write.

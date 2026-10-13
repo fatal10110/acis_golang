@@ -136,12 +136,22 @@ func (m *Maker) SpawnTimeOf() (SpawnTimeKind, []string) {
 	if len(parts) != 2 {
 		return SpawnTimeNone, nil
 	}
+	kind := SpawnTimeKindOf(parts[0])
+	if kind == SpawnTimeNone {
+		return SpawnTimeNone, nil
+	}
+	return kind, strings.Split(parts[1], ";")
+}
+
+// SpawnTimeKindOf returns the spawn-time kind named name, ignoring case;
+// SpawnTimeNone for an unknown name.
+func SpawnTimeKindOf(name string) SpawnTimeKind {
 	for _, k := range spawnTimeKinds {
-		if strings.EqualFold(k.name, parts[0]) {
-			return k.kind, strings.Split(parts[1], ";")
+		if strings.EqualFold(k.name, name) {
+			return k.kind
 		}
 	}
-	return SpawnTimeNone, nil
+	return SpawnTimeNone
 }
 
 // EventName is the maker's event: its event attribute, else the EventName

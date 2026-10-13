@@ -110,3 +110,19 @@ func (s *Siege) respawnGatesLocked(fx *effects, weak bool) {
 	}
 	fx.add(func() { n.RespawnDoors(gates, weak) })
 }
+
+// spawnGuardsLocked spawns the castle's siege guards.
+func (s *Siege) spawnGuardsLocked(fx *effects) {
+	if n := s.e.notify; n != nil {
+		c := s.castle
+		fx.add(func() { n.SpawnGuards(c) })
+	}
+}
+
+// despawnGuardsLocked deletes the castle's siege guards.
+func (s *Siege) despawnGuardsLocked(fx *effects) {
+	if n := s.e.notify; n != nil {
+		c := s.castle
+		fx.add(func() { n.DespawnGuards(c) })
+	}
+}
