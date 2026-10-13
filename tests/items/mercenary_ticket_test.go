@@ -87,10 +87,10 @@ func ticketWorldOptions(t *testing.T, s ticketSetup) []gameservertest.Option {
 	return opts
 }
 
-func bootTicketWorld(t *testing.T, s ticketSetup) *castleWorld {
+func bootTicketWorld(t *testing.T, s ticketSetup, extra ...gameservertest.Option) *castleWorld {
 	t.Helper()
 	datapack.Require(t)
-	opts := append(ticketWorldOptions(t, s),
+	opts := append(append(ticketWorldOptions(t, s), extra...),
 		gameservertest.WithSevenSignsSeed(func(store *gamesql.SevenSignsStore) {
 			ctx := context.Background()
 			row, found, err := store.LoadStatus(ctx)

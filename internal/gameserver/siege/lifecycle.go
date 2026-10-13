@@ -158,13 +158,12 @@ func (s *Siege) Start() {
 // is set. Otherwise the siege is under way: the castle owner's clan is
 // remembered, the players of other clans are thrown off the battlefield,
 // which turns on, every registered clan's members in the world take their
-// siege state, the castle's gates close, everyone is told and hears it
-// start, the attackers are told they are in a temporary alliance, and the
-// siege clock runs.
+// siege state, the castle's gates close, its siege guards spawn, everyone
+// is told and hears it start, the attackers are told they are in a
+// temporary alliance, and the siege clock runs.
 //
 // ponytail: after the siege states the reference also polymorphs the
-// control towers (#465), and after closing the gates spawns the siege
-// guards (#3373) and the mercenaries (#3772).
+// control towers (#465).
 func (s *Siege) startLocked(fx *effects) {
 	if s.status == StatusInProgress {
 		return
@@ -193,6 +192,7 @@ func (s *Siege) startLocked(fx *effects) {
 	})
 	s.siegeStatesLocked(fx, false)
 	s.closeGatesLocked(fx)
+	s.spawnGuardsLocked(fx)
 	s.announceLocked(fx, castleMsg(MsgSiegeStarted, castleID))
 	if n := s.e.notify; n != nil {
 		fx.add(func() { n.PlaySound(SoundSiegeStarted) })
@@ -276,14 +276,13 @@ func (s *Siege) End() {
 // reputation moves (see reputationLocked), the players of other clans
 // than the owner's are thrown off the battlefield, the siege states are
 // cleared, the next date is set and every registration dropped, the owner
-// registered again, the castle's gates stand again closed at full HP, and
-// the battlefield turns off. Last, the rulers engraved on the castle's
-// artifacts are wiped. Every registered clan loses its headquarters with
-// its counters.
+// registered again, the siege guards leave, the castle's gates stand again
+// closed at full HP, and the battlefield turns off. Last, the rulers
+// engraved on the castle's artifacts are wiped. Every registered clan
+// loses its headquarters with its counters.
 //
-// ponytail: before the gates the reference also unpolymorphs the control
-// towers (#465) and despawns the siege guards (#3373) and the mercenaries
-// (#3772).
+// ponytail: before the guards leave the reference also unpolymorphs the
+// control towers (#465).
 func (s *Siege) endLocked(fx *effects) {
 	if s.status != StatusInProgress {
 		return
@@ -323,6 +322,7 @@ func (s *Siege) endLocked(fx *effects) {
 	s.siegeStatesLocked(fx, true)
 	s.saveSiegeLocked(fx, true)
 	s.clearAllLocked()
+	s.despawnGuardsLocked(fx)
 	s.respawnGatesLocked(fx, false)
 	fx.add(func() { s.withBattlefield(func(f *zone.Siege) { f.SetActive(false) }) })
 	clear(s.engraved)
@@ -355,17 +355,18 @@ func (s *Siege) reputationLocked(fx *effects, ownerID int32) {
 }
 
 // MidVictory is the siege's turn when the castle changes hands while it is
-// under way. With no owner left nothing else changes. Otherwise the
-// attackers are told their temporary alliance is over, every owner and
-// defender attacks, the new owner owns, the attackers of its alliance
-// defend, the players of other clans are thrown off the battlefield, the
-// former owner and defenders lose their headquarters, the castle's gates
-// stand again closed at half HP, and every registered clan's members in
-// the world take their new siege state.
+// under way. The siege guards leave and the castle's new owner's, or the
+// ownerless castle's, spawn. With no owner left nothing else changes.
+// Otherwise the attackers are told their temporary alliance is over, every
+// owner and defender attacks, the new owner owns, the attackers of its
+// alliance defend, the players of other clans are thrown off the
+// battlefield, the former owner and defenders lose their headquarters, the
+// castle's gates stand again closed at half HP, and every registered
+// clan's members in the world take their new siege state.
 //
-// ponytail: the reference first respawns the siege guards (#3373) and the
-// mercenaries (#3772), removes the door and trap upgrades (#236) before
-// the gates stand again, and resets the control towers (#465) after.
+// ponytail: the reference also removes the door and trap upgrades (#236)
+// before the gates stand again, and resets the control towers (#465)
+// after.
 func (s *Siege) MidVictory() {
 	var fx effects
 	e := s.e
@@ -379,6 +380,8 @@ func (s *Siege) midVictoryLocked(fx *effects) {
 	if s.status != StatusInProgress {
 		return
 	}
+	s.despawnGuardsLocked(fx)
+	s.spawnGuardsLocked(fx)
 	ownerID := s.castle.OwnerID()
 	if ownerID <= 0 {
 		return

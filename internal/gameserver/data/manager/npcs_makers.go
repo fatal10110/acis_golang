@@ -341,7 +341,8 @@ func (n *Npcs) created(g *makerGroup, i int, key string) {
 // held reports whether the spawn condition of m holds, keeping its NPCs out
 // of the world: for a maker with an event, the Seven Signs state decides
 // the ssq_* groups and the SpawnEvents list any other one (listed, it does
-// not hold); a maker with a spawn time holds, and any other maker does not.
+// not hold); the world state decides a maker with a spawn time (see
+// spawnTimeHeld), and any other maker does not hold.
 func (n *Npcs) held(m *spawn.Maker) bool {
 	if event := m.EventName(); event != "" {
 		if held, ok := sevenSignsHeld(n.sevenSignsState(), event); ok {
@@ -349,8 +350,11 @@ func (n *Npcs) held(m *spawn.Maker) bool {
 		}
 		return !n.events.has(event)
 	}
-	kind, _ := m.SpawnTimeOf()
-	return kind != spawn.SpawnTimeNone
+	kind, params := m.SpawnTimeOf()
+	if kind == spawn.SpawnTimeNone {
+		return false
+	}
+	return n.spawnTimeHeld(kind, params)
 }
 
 // sevenSignsHeld reports whether the Seven Signs state ss keeps the NPCs of

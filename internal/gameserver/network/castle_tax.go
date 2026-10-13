@@ -21,19 +21,19 @@ const (
 	elmoreFirstCastleID      = 7
 )
 
-// npcCastle returns the castle inst belongs to. A holy artifact belongs to
-// the castle that placed it. A maker whose spawn time names a residence
-// gives its NPCs that castle, or none when it names a siegable clan hall
-// instead; otherwise the NPC belongs to the first castle whose npcs list
-// holds its template id.
+// npcCastle returns the castle inst belongs to. A mercenary belongs to the
+// castle whose siege hired it, a holy artifact to the castle that placed
+// it. A maker whose spawn time names a residence gives its NPCs that
+// castle, or none when it names a siegable clan hall instead; otherwise the
+// NPC belongs to the first castle whose npcs list holds its template id.
 //
-// Control towers and mercenary guards are given their castle as they
-// spawn, by the siege systems that spawn them (#465, #238).
+// Control towers are given their castle as they spawn, by the siege system
+// that spawns them (#465).
 func (l *GameClientLink) npcCastle(inst *npc.Instance) (*castle.Castle, bool) {
 	if inst == nil || inst.Template == nil {
 		return nil, false
 	}
-	return l.castles.ForNPC(inst.ObjectID, inst.Template.ID, inst.Maker, l.clanHallData.Siegable)
+	return l.castles.ForNPC(inst.ObjectID, inst.Template.ID, inst.CastleID, inst.Maker, l.clanHallData.Siegable)
 }
 
 // npcTaxRate is the tax rate of the castle inst belongs to, 0 when it

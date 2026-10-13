@@ -57,7 +57,7 @@ func (l *GameClientLink) wireCastleTickets() {
 			return
 		}
 		if _, ok := c.Ticket(int(ground.ItemID())); ok {
-			c.AddDroppedTicket(castle.DroppedTicket{ObjectID: ground.ObjectID(), ItemID: int(ground.ItemID()), Location: location.Location{X: x, Y: y, Z: z}})
+			c.AddDroppedTicket(castle.DroppedTicket{ObjectID: ground.ObjectID(), ItemID: int(ground.ItemID()), Location: location.Location{X: x, Y: y, Z: z}, Time: ground.Instance.TimeValue()})
 		}
 	})
 }
@@ -123,7 +123,7 @@ func (l *GameClientLink) useMercenaryTicket(live *livePlayer, inv *itemcontainer
 		return true
 	}
 	gx, gy, gz := ground.Position()
-	c.AddDroppedTicket(castle.DroppedTicket{ObjectID: ground.ObjectID(), ItemID: itemID, Location: location.Location{X: gx, Y: gy, Z: gz}})
+	c.AddDroppedTicket(castle.DroppedTicket{ObjectID: ground.ObjectID(), ItemID: itemID, Location: location.Location{X: gx, Y: gy, Z: gz}, Time: ground.Instance.TimeValue()})
 	live.SendFrame(serverpackets.FrameSystemMessageItemName(serverpackets.SystemMessagePlaceS1InCurrentLocationAndDirection, inst.TemplateID))
 	return true
 }

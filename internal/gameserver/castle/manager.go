@@ -169,12 +169,18 @@ func (m *Manager) ByNPC(npcID int) (*Castle, bool) {
 }
 
 // ForNPC returns the castle the NPC objectID, of template npcID, belongs
-// to when maker (nil for none) placed it: the castle that placed it as one
-// of its holy artifacts, else the castle the residence id of the maker's
-// spawn time names, none when that id names a siegable clan hall instead
-// (as siegableHall, nil for none, reports), else the castle whose
-// residence NPCs include npcID.
-func (m *Manager) ForNPC(objectID int32, npcID int, maker *spawn.Maker, siegableHall func(id int) bool) (*Castle, bool) {
+// to when maker (nil for none) placed it: the castle spawnCastle when a
+// siege gave the NPC one as it spawned (0 for none), else the castle that
+// placed it as one of its holy artifacts, else the castle the residence id
+// of the maker's spawn time names, none when that id names a siegable clan
+// hall instead (as siegableHall, nil for none, reports), else the castle
+// whose residence NPCs include npcID.
+func (m *Manager) ForNPC(objectID int32, npcID, spawnCastle int, maker *spawn.Maker, siegableHall func(id int) bool) (*Castle, bool) {
+	if spawnCastle > 0 {
+		if c, ok := m.Get(spawnCastle); ok {
+			return c, true
+		}
+	}
 	if c, ok := m.ByArtifact(objectID); ok {
 		return c, true
 	}
