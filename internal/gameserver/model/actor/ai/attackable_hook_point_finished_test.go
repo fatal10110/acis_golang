@@ -64,12 +64,12 @@ func TestHookPointNoDesireTwiceOnAttackFinishedEventIdle(t *testing.T) {
 	}
 }
 
-// TestHookPointNoDesireNotOnAttackFinishedDroppedToIdle pins that a swing
-// end before the first periodic cycle, which drops an attack whose desire
-// left the queue without the empty-queue idle, takes no idle step: the
-// actor was not idle and nothing idled it, as the reference's attack would
-// still be current there and its think would step the attack.
-func TestHookPointNoDesireNotOnAttackFinishedDroppedToIdle(t *testing.T) {
+// TestHookPointNoDesireNotOnAttackFinishedBeforeFirstCycle pins a swing end
+// before the first periodic cycle on an attack whose desire left the queue:
+// no empty-queue idle runs yet, and desire selection does not idle the
+// attack either, so it stays current, its think steps it again (another
+// swing) and no idle step or no-desire point runs.
+func TestHookPointNoDesireNotOnAttackFinishedBeforeFirstCycle(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	strike := &recordingAttack{canAttack: true}
@@ -77,17 +77,20 @@ func TestHookPointNoDesireNotOnAttackFinishedDroppedToIdle(t *testing.T) {
 	attackUnlatched(t, brain, target)
 	brain.Desires().Clear()
 	owner.hooks.points = nil
-	stops := strike.stopCalls
+	stops, swings := strike.stopCalls, strike.doAttackCalls
 
 	if err := brain.AttackFinished(); err != nil {
 		t.Fatalf("AttackFinished() error: %v", err)
 	}
-	assertHookPoints(t, owner, "on a swing end dropping the attack")
-	if got := brain.CurrentIntention(); got != IntentionIdle {
-		t.Fatalf("CurrentIntention() after the swing end = %v, want idle", got)
+	assertHookPoints(t, owner, "on a swing end keeping the attack")
+	if got := brain.CurrentIntention(); got != IntentionAttack {
+		t.Fatalf("CurrentIntention() after the swing end = %v, want the attack kept", got)
+	}
+	if strike.doAttackCalls != swings+1 {
+		t.Fatalf("swings after the swing end = %d, want %d: the kept attack steps again", strike.doAttackCalls, swings+1)
 	}
 	if strike.stopCalls != stops || owner.walkStanceCalls != 0 {
-		t.Fatalf("idle step ran on the dropped attack: attack stops %d -> %d, walk stance %d",
+		t.Fatalf("idle step ran on the kept attack: attack stops %d -> %d, walk stance %d",
 			stops, strike.stopCalls, owner.walkStanceCalls)
 	}
 }

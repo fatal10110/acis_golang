@@ -247,7 +247,10 @@ func TestFishingMonsterTurnsOnItsFisher(t *testing.T) {
 	}
 
 	w.onQueue(t, m, func() { script.NPCOf(m).RemoveAllAttackDesire() })
-	w.ticks(t, 1)
+	// The 50 s wait ran no AI cycle, so the reference sequence takes three:
+	// the first is held by the first-cycle gate, the second promotes the
+	// latched attack, and the third finds the queue empty and idles.
+	w.ticks(t, 3)
 	if got := m.AI().CurrentIntention(); got == actorai.IntentionAttack || got == actorai.IntentionCast {
 		t.Fatalf("caught monster intention after dropping its attack = %v, want neither attack nor cast", got)
 	}

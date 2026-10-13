@@ -405,7 +405,7 @@ func TestAdminInfoNpcSpawnPage(t *testing.T) {
 	)...))
 	assertInfoPage(t, gm, "info ai 2", defaultPage(t, aiTabs(2)+"This NPC Spawn doesn't hold any memos."))
 	tree := trees[0].(*npc.Decoration)
-	exchange(t, gm, encodeAction(tree.ObjectID()))
+	retarget(t, srv, gm, gmID, tree)
 	assertInfoPage(t, gm, "info spawn", dataSpawnPage(t, append(whereabouts(tree, admin),
 		"%corpse%", " 7s",
 		"%spawn%", "Spawn [id=13006]",
@@ -430,7 +430,7 @@ func TestAdminInfoNpcSpawnPage(t *testing.T) {
 // AI holds, a tree, which runs no AI, holds none and shows its stats.
 func TestAdminInfoNpcFolkDesiresAndTreePages(t *testing.T) {
 	t.Parallel()
-	srv, _ := bootDataAdmin(t)
+	srv, gmID := bootDataAdmin(t)
 	gm := srv.Client
 	refresh := `<button value="Refresh" action="bypass -h admin_info desire" width=65 height=19 back="L2UI_ch3.smallbutton2_over" fore="L2UI_ch3.smallbutton2">`
 
@@ -449,7 +449,7 @@ func TestAdminInfoNpcFolkDesiresAndTreePages(t *testing.T) {
 	srv.Settle(t)
 	drain(t, gm)
 	tree := npcsOf(srv, treeID)[0].(*npc.Decoration)
-	exchange(t, gm, encodeAction(tree.ObjectID()))
+	retarget(t, srv, gm, gmID, tree)
 	assertInfoPage(t, gm, "info desire", defaultPage(t, "This NPC's Desires are empty.<br>"+refresh))
 	s := tree.Status()
 	itoa := strconv.Itoa

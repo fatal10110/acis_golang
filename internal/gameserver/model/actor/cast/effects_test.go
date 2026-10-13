@@ -485,6 +485,9 @@ func TestTargetRejectionsDistinguishInvalidTargetsFromLockedDoors(t *testing.T) 
 func (castHostileMove) CanMoveTo(location.Location) bool { return true }
 
 func (castHostileMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
+func (castHostileMove) MoveStraightToLocation(location.Location) (bool, error) {
+	return false, nil
+}
 
 func (*effectsActor) NotePvPSkillTargets([]attackable.Combatant, bool, string) {}
 

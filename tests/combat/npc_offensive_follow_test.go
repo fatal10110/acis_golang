@@ -212,14 +212,16 @@ func TestIdleHoldDesireTargetFailsAggroScanWithoutChase(t *testing.T) {
 	startInWorld(t, c)
 	player := liveCombatant(t, srv)
 
-	// Far beyond the monster's knowledge, so queuing the desire runs no
-	// Think: the hold desire stays queued and the current intention idle.
+	// Far beyond the monster's knowledge. The hold desire goes straight into
+	// the queue, with no hate: a first attack desire would run the desire
+	// selection, whose prune drops a desire on a creature the monster does
+	// not know. It stays queued and the current intention idle.
 	px, py, pz := player.Position()
 	home := location.Location{X: px + 20000, Y: py, Z: pz}
 	monster := srv.SpawnMovingHostileNPCAt(t, "Monster", home, home)
 	drainUntilQuiet(t, c)
 
-	monster.AddAttackDesireHold(player, 50)
+	monster.AI().Desires().AddOrUpdate(&ai.Desire{Kind: ai.IntentionAttack, FinalTarget: player, Weight: 50})
 	if got := monster.AI().CurrentIntention(); got != ai.IntentionIdle {
 		t.Fatalf("CurrentIntention() = %v, want %v", got, ai.IntentionIdle)
 	}

@@ -18,16 +18,32 @@ const (
 	folkSweepPeriod = 10 * time.Second
 )
 
-// folkOutOfTerritory is a civilian NPC's out-of-territory state, guarded by
-// folkCast.brain: outside marks an NPC whose last arrival was outside its
-// territory, and timer, due and seq are the stale-aggro sweep that arrival
-// armed (nil timer for none), its next deadline on the fixed-rate grid and
-// the generation a firing must match to run.
+// folkOutOfTerritory is this life's part of a civilian NPC's
+// out-of-territory state, guarded by folkCast.brain: timer and seq are the
+// stale-aggro sweep's pending firing on this life's queue (nil timer for
+// none) and the generation a firing must match to run. Whether the last
+// arrival was outside, and the sweep's next deadline on its fixed-rate
+// grid, are kept across lives in the NPC's Scratch.
 type folkOutOfTerritory struct {
-	outside bool
-	timer   *sim.Timer
-	due     time.Time
-	seq     uint64
+	timer *sim.Timer
+	seq   uint64
+}
+
+// keepTerritory resumes, before f is published, the out-of-territory state
+// f's earlier lives left: when the last of their arrivals was outside, the
+// stale-aggro sweep goes on, on its grid, on f's queue, and f's next arrival
+// outside opens no out-of-territory point.
+func (f *Folk) keepTerritory() {
+	f.cast.brain.Lock()
+	defer f.cast.brain.Unlock()
+	memory := f.Scratch().Territory()
+	outside, due := memory.Load()
+	if !outside {
+		return
+	}
+	next, d := ai.NextOnGrid(due, f.now(), folkSweepPeriod)
+	memory.Store(true, next)
+	f.armSweepAt(d)
 }
 
 // atHookPoint hands f's behavior hook point p with brain released. The
@@ -47,21 +63,21 @@ func (f *Folk) atHookPoint(p ai.HookPoint) {
 // old or more loses its hate and f's attack desire on it. An arrival back
 // inside disarms the sweep. Nothing else disarms it: a sweep on an NPC that
 // hates no one finds nothing to do, and the NPC's queue closing at its decay
-// cancels it.
+// cancels this life's firing; the next life resumes it on its grid
+// (keepTerritory).
 func (f *Folk) syncOutOfTerritory() {
-	oot := &f.cast.oot
+	memory := f.Scratch().Territory()
 	if f.InTerritory() {
-		oot.outside = false
+		memory.Store(false, time.Time{})
 		f.stopSweep()
 		return
 	}
-	if oot.outside {
+	if outside, _ := memory.Load(); outside {
 		return
 	}
 	f.atHookPoint(ai.HookOutOfTerritory)
 	f.stopSweep()
 	f.armSweep(folkSweepDelay)
-	oot.outside = true
 }
 
 // stopSweep disarms f's stale-aggro sweep, under brain.
@@ -74,14 +90,20 @@ func (f *Folk) stopSweep() {
 	}
 }
 
-// armSweep schedules f's next stale-aggro sweep d from now on f's queue,
-// under brain.
+// armSweep schedules f's next stale-aggro sweep d from now on f's queue and
+// records f outside with that deadline, under brain.
 func (f *Folk) armSweep(d time.Duration) {
+	f.Scratch().Territory().Store(true, f.now().Add(d))
+	f.armSweepAt(d)
+}
+
+// armSweepAt schedules this life's next stale-aggro sweep firing d from now
+// on f's queue, under brain.
+func (f *Folk) armSweepAt(d time.Duration) {
 	if f.queue == nil {
 		return
 	}
 	oot := &f.cast.oot
-	oot.due = f.now().Add(d)
 	seq := oot.seq
 	oot.timer = f.queue.After(d, func() { f.sweepStaleAggro(seq) })
 }
@@ -99,11 +121,9 @@ func (f *Folk) sweepStaleAggro(seq uint64) {
 		return
 	}
 	now := f.now()
-	next := oot.due.Add(folkSweepPeriod)
-	for !next.After(now) {
-		next = next.Add(folkSweepPeriod)
-	}
-	f.armSweep(next.Sub(now))
+	_, due := f.Scratch().Territory().Load()
+	_, d := ai.NextOnGrid(due.Add(folkSweepPeriod), now, folkSweepPeriod)
+	f.armSweep(d)
 	if f.InTerritory() {
 		return
 	}

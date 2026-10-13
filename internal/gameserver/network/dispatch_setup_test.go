@@ -467,6 +467,9 @@ func (testHostileAttack) Stop()                               {}
 func (testHostileMove) CanMoveTo(location.Location) bool { return true }
 
 func (testHostileMove) MoveToLocation(location.Location) (bool, error) { return false, nil }
+func (testHostileMove) MoveStraightToLocation(location.Location) (bool, error) {
+	return false, nil
+}
 
 // testQueues runs each linked player's work on a real pool, stopped once the
 // test's connection handlers have returned.

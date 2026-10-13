@@ -195,10 +195,11 @@ func TestAdminSpawn(t *testing.T) {
 // TestAdminDelete pins AdminSpawn.java's //delete: only an NPC of a
 // standalone spawn — a //spawn, or an item's decoration — is removed, for
 // good, with "You deleted <name>."; no selection, or an NPC no such spawn
-// placed, is INVALID_TARGET (109) and stays.
+// placed, is INVALID_TARGET (109) and stays. A tree, which a click never
+// selects, is targeted without one.
 func TestAdminDelete(t *testing.T) {
 	t.Parallel()
-	srv, _ := bootSpawnAdmin(t, nil)
+	srv, gmID := bootSpawnAdmin(t, nil)
 	gm := srv.Client
 
 	assertInvalidTarget := func(cmd string) {
@@ -237,7 +238,11 @@ func TestAdminDelete(t *testing.T) {
 		if target == nil {
 			t.Fatalf("no spawned %s", tc.name)
 		}
-		exchange(t, gm, encodeAction(target.ObjectID()))
+		if tc.id == treeID {
+			retarget(t, srv, gm, gmID, target)
+		} else {
+			exchange(t, gm, encodeAction(target.ObjectID()))
+		}
 		frames := exchange(t, gm, encodeBuildCmd("delete"))
 		if got := textsIn(t, frames); !slices.Equal(got, []string{"You deleted " + tc.name + "."}) {
 			t.Fatalf("//delete %s messages = %q (frames %x), want the delete notice", tc.name, got, testsupport.FrameOpcodes(frames))
