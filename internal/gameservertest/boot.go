@@ -2331,8 +2331,12 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			skills: o.npcSpawnSkills, zones: o.zones, driftRange: o.maxDriftRange,
 		})
 		// As the game server does once the spawns are up, every castle's
-		// holy artifacts are placed, built from the WithNPCs templates.
+		// control towers, then its holy artifacts, are placed, the
+		// artifacts built from the WithNPCs templates.
 		if gclConfig.Castles != nil {
+			gclConfig.Castles.SpawnTowers(func(castleID int, t castledata.ControlTower) (castle.Tower, bool) {
+				return npcSpawns.SpawnTower(castleID, t)
+			})
 			gclConfig.Castles.SpawnArtifacts(npcSpawns.SpawnArtifact)
 		}
 	}

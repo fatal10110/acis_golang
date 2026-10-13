@@ -14,12 +14,12 @@ type Trap struct {
 	// EventID is the client effect trigger fired when the trap arms; 0
 	// means none. Broadcasting it belongs to the visibility layer.
 	EventID int
-	// Armed reports whether the castle owner armed the trap.
+	// Armed reports whether the castle owner armed the trap. Nothing arms
+	// a castle trap: a flame tower never arms its zones, whatever the
+	// castle's trap upgrades, so a castle-linked trap stays dormant.
 	// Unsynchronized: dormant() may run on any actor goroutine that
-	// crosses the zone, and on the damage pulse's queue. No production
-	// writer exists yet (FlameTower zone enabling, #465); the trap-arming
-	// port must switch this to atomic.Bool (or equivalent) before a
-	// concurrent writer lands.
+	// crosses the zone, and on the damage pulse's queue; a writer added
+	// later must switch this to atomic.Bool (or equivalent) first.
 	Armed bool
 	// SiegeActive reports whether the linked castle's siege is running;
 	// nil reads as not running. The game server wires it at boot.

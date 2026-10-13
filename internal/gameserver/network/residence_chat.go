@@ -9,8 +9,9 @@ import (
 )
 
 // npcResidence returns the residence inst serves: a castle, or else a clan
-// hall. A mercenary serves the castle whose siege hired it, a holy artifact
-// the castle that placed it. A maker whose spawn time names a castle or a
+// hall. A mercenary serves the castle whose siege hired it, a control
+// tower the castle it was placed for, a holy artifact the castle that
+// placed it. A maker whose spawn time names a castle or a
 // siegable hall gives its NPCs that residence; otherwise the NPC serves the
 // first castle whose npcs list holds its template id, else the first clan
 // hall's.

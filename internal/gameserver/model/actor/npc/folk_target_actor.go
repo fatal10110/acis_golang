@@ -10,17 +10,27 @@ var _ skilltarget.Actor = (*Folk)(nil)
 
 // Folk and FolkOrGuard mark the civilian NPC for target resolution: its
 // aura skills reach nearby playables, and as a single offensive target it
-// accepts only a CTRL-pressed damage skill.
+// accepts only a CTRL-pressed damage skill. A control tower takes any
+// offensive skill as a single target.
 func (f *Folk) Folk() bool        { return true }
-func (f *Folk) FolkOrGuard() bool { return true }
+func (f *Folk) FolkOrGuard() bool { return !f.Tower() }
 
 // AttackableBy reports whether caster may affect this NPC offensively: any
 // other creature may while the NPC lives, with a forced attack, unless the
-// NPC is a holy artifact. AttackableWithoutForceBy is always false.
+// NPC is a holy artifact; a control tower follows its own rule
+// (towerAttackableBy).
 func (f *Folk) AttackableBy(caster skilltarget.Actor) bool {
-	return caster != nil && caster.ObjectID() != f.ObjectID() && !f.AlikeDead() && !f.HolyThing()
+	if caster == nil || caster.ObjectID() == f.ObjectID() || f.AlikeDead() || f.HolyThing() {
+		return false
+	}
+	return !f.Tower() || f.towerAttackableBy(caster)
 }
-func (f *Folk) AttackableWithoutForceBy(skilltarget.Actor) bool { return false }
+
+// AttackableWithoutForceBy reports whether caster may attack this NPC with
+// no forced attack: a control tower it may attack at all; never any other.
+func (f *Folk) AttackableWithoutForceBy(caster skilltarget.Actor) bool {
+	return f.Tower() && f.AttackableBy(caster)
+}
 
 // InPeaceZone reports whether the NPC's zones hold it in peace.
 func (f *Folk) InPeaceZone() bool { return f.zones.has(zone.FlagPeace) }

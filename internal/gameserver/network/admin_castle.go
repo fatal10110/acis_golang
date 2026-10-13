@@ -6,7 +6,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	handleradmin "github.com/fatal10110/acis_golang/internal/gameserver/handler/admin"
-	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
@@ -88,23 +87,16 @@ func (l *GameClientLink) adminCastleSet(gm *livePlayer, c *castle.Castle) {
 	}
 }
 
-// showAdminCastle opens c's page for gm.
-//
-// The page counts the life control towers standing, which outside a siege
-// is every one the castle has. During a siege only those still alive
-// count; tracking them needs the control towers (#465).
+// showAdminCastle opens c's page for gm. The page counts the life control
+// towers standing: every one placed outside a siege, the working ones while
+// it is fought.
 func (l *GameClientLink) showAdminCastle(gm *livePlayer, c *castle.Castle) {
 	const file = "data/html/admin/castle.htm"
 	page, ok := l.html.Get(file)
 	if !ok {
 		page = "<html><body>My html is missing:<br>" + file + "</body></html>"
 	}
-	lifeTowers := 0
-	for _, t := range c.ControlTowers {
-		if t.Type == castledata.TowerLifeControl {
-			lifeTowers++
-		}
-	}
+	lifeTowers := c.AliveLifeTowers(l.castleBesieged(c.ID))
 	var artifacts, towers strings.Builder
 	for i, a := range c.Artifacts {
 		adminTeleportLink(&artifacts, i+1, a.Position.X, a.Position.Y, a.Position.Z, a.Heading)
