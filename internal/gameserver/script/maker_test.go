@@ -52,15 +52,15 @@ func TestMakerHooksListsAgree(t *testing.T) {
 // fakeGroup is a spawn.Group that only names its maker.
 type fakeGroup struct{ def *spawn.Maker }
 
-func (g fakeGroup) Maker() *spawn.Maker                   { return g.def }
-func (fakeGroup) Alive() int                              { return 0 }
-func (fakeGroup) Held() bool                              { return false }
-func (fakeGroup) Listed(string) bool                      { return false }
-func (fakeGroup) Spawns() []spawn.GroupSpawn              { return nil }
-func (fakeGroup) DeleteAll()                              {}
-func (fakeGroup) SendEvent(string, string, int, int)      {}
-func (fakeGroup) After(time.Duration, func())             {}
-func (fakeGroup) Every(time.Duration, func()) *sim.Ticker { return nil }
+func (g fakeGroup) Maker() *spawn.Maker                        { return g.def }
+func (fakeGroup) Alive() int                                   { return 0 }
+func (fakeGroup) Held() bool                                   { return false }
+func (fakeGroup) Listed(string) bool                           { return false }
+func (fakeGroup) Spawns() []spawn.GroupSpawn                   { return nil }
+func (fakeGroup) DeleteAll()                                   {}
+func (fakeGroup) SendMakerEvent(string, string, int, int) bool { return false }
+func (fakeGroup) After(time.Duration, func())                  {}
+func (fakeGroup) Every(time.Duration, func()) *sim.Ticker      { return nil }
 
 // New gives each npcmaker a maker of its own, the fallback's for a type the
 // catalog lacks; a panicking hook is recovered, and the next call runs.

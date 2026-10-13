@@ -29,6 +29,12 @@ func (f *Folk) Say(text string) {
 	f.emit(event.NpcSay{NpcID: f.Instance.Template.ID, Text: text})
 }
 
+// BroadcastOnScreen shows text in the middle of f's observers' screens
+// for durationMs milliseconds.
+func (f *Folk) BroadcastOnScreen(durationMs int32, text string) {
+	f.emit(event.OnScreenMessage{Text: text, DurationMs: durationMs})
+}
+
 // SocialAction plays the social animation id on f for the players around
 // it.
 func (f *Folk) SocialAction(id int) {

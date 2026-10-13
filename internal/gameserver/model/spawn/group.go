@@ -27,10 +27,10 @@ type Group interface {
 	// DeleteAll deletes every NPC of the group, dead ones included, and
 	// cancels their respawns. A deleted NPC's maker hook does not run.
 	DeleteAll()
-	// SendEvent runs the maker script event name of the npcmaker named
-	// maker (case-insensitive, the first one in list order); nothing when
-	// none has that name.
-	SendEvent(maker, name string, int1, int2 int)
+	// SendMakerEvent runs the maker script event name of the npcmaker
+	// named maker (case-insensitive, the first one in list order) and
+	// reports whether one has that name; nothing runs when none has.
+	SendMakerEvent(maker, name string, int1, int2 int) bool
 	// After runs fn on the makers' queue once d has elapsed. It is never
 	// cancelled.
 	After(d time.Duration, fn func())

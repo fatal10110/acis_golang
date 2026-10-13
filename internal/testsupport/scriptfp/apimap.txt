@@ -520,6 +520,66 @@ ItemInstance.getItemId inline
 Npc.lookItem script.NPC.LookItem
 NpcAI.addPickUpDesire script.NPC.AddPickUpDesire
 
+# NPC, spawn and maker rows of the API freeze (#3748). A maker reads its
+# npcmaker and spawns on the spawn.Group its hooks receive: the maker memo
+# and the maximum are fields of the declaration, the maker of an npcmaker is
+# the group itself, and a spawn's template is its entry's NPC id. A maker
+# script event goes to an npcmaker by name, from a maker through its group
+# and from a behavior or a quest through the script's spawner; the
+# npcmaker lookup and its maker fold into that call, and the npcmaker that
+# placed an NPC is read by name on the NPC handle. A script's own record of
+# values (EchoCrystal's scores) is a Go struct of the script's, and a
+# heading is a field of the script's Loc. The desire queue is cleared, or
+# cleared of one kind, on the NPC handle. The NPC's own teleport wakes no
+# AI task: an NPC out of its territory never sleeps. A monster's soul
+# crystal record and its registration flag are read on the NPC handle.
+ASpawn.calculateRespawnDelay spawn.CalculateRespawnDelay
+ASpawn.doSpawn spawn.GroupSpawn.Spawn
+ASpawn.getTemplate inline
+AbsorbInfo.isRegistered inline
+AbsorbInfo.isValid script.AbsorbInfo.Valid
+AggroList.cleanAllHate script.NPC.CleanAllHate
+AggroList.remove script.NPC.RemoveAggro
+Attackable.getStatus inline
+HateList.addDefaultHateInfo script.HateList.AddDefault
+HateList.cleanAllHate script.HateList.CleanAll
+HateList.stopHate script.HateList.StopHate
+Monster.addAbsorber script.NPC.AddAbsorber
+Monster.getAbsorbInfo script.NPC.Absorber
+MultiSpawn.doRespawn spawn.GroupSpawn.Respawn
+MultiSpawn.getDecayed spawn.GroupSpawn.Decayed
+MultiSpawn.getNpcMaker script.NPC.MakerName
+MultiSpawn.getNpcs spawn.GroupSpawn.NPCs
+MultiSpawn.getSpawned spawn.GroupSpawn.Spawned
+MultiSpawn.getTotal spawn.GroupSpawn.Total
+MultiSpawn.loadDBNpcInfo spawn.GroupSpawn.LoadDBInfo
+Npc.broadcastOnScreen script.NPC.BroadcastOnScreen
+Npc.disableCoreAi script.NPC.DisableCoreAI
+Npc.getNeighborHero script.Script.NeighborHero
+Npc.isAISleeping script.NPC.AISleeping
+Npc.removeAllDesire script.NPC.RemoveAllDesire
+Npc.sendScriptEvent script.Script.SendScriptEvent
+Npc.teleportTo TeleportTo
+NpcAI.addCastDesireHold AddCastDesireHold
+NpcAI.getDesireQueue inline
+NpcMaker.deleteAll spawn.Group.DeleteAll
+NpcMaker.getMaker inline
+NpcMaker.getMakerMemo inline
+NpcMaker.getMaximumNpc inline
+NpcMaker.getNpcsAlive spawn.Group.Alive
+NpcMaker.getSpawns spawn.Group.Spawns
+NpcMaker.isOnStart spawn.Maker.OnStart
+ScoreData.crystalId inline
+ScoreData.new inline
+ScoreData.noAdenaMsg inline
+ScoreData.noScoreMsg inline
+ScoreData.okMsg inline
+SpawnLocation.setHeading inline
+SpawnMaker.checkHasSpawnCondition spawn.Group.Held
+SpawnMaker.onMakerScriptEvent script.Spawner.SendMakerEvent
+SpawnManager.getInstance inline
+SpawnManager.getNpcMaker inline
+
 # Script-facing API freeze, player, creature and skill rows (#3748). A
 # binding is a field of the script (Bind, UsedItems, EnteredZones). The soul
 # crystal data is the table the catalog hands the quest, whose crystal and

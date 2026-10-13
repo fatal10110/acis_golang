@@ -84,3 +84,20 @@ func (h *Hostile) InstantTeleportTo(j location.Jump) {
 	}
 	h.ResetGeoPathFailCount()
 }
+
+// RemoveAllDesire drops every desire the NPC holds, zeroes its hate of every
+// attacker on both of its hate tables, keeping them listed, and stops its
+// movement. The NPC is not sent back to peace.
+func (h *Hostile) RemoveAllDesire() {
+	h.brain.RemoveAllDesire()
+	h.move.Stop()
+}
+
+// RemoveAllDesire drops every desire the civilian NPC holds, zeroes its
+// hate of every creature on its aggro list, keeping them listed, and stops
+// its movement. The NPC is not sent back to peace. Safe from any goroutine.
+func (f *Folk) RemoveAllDesire() {
+	f.cast.desires.Clear()
+	f.fight.aggro.ZeroHate()
+	f.stopMoving()
+}
