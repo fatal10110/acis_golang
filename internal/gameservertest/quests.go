@@ -215,6 +215,7 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *
 		Page:             html.Get,
 		SevenSigns:       sevenSigns,
 		BossWaits:        script.DefaultBossWaitTimes(),
+		Zones:            o.zones,
 	}
 	if so.rates != nil {
 		env.Rates = *so.rates

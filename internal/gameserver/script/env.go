@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/siege"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -66,6 +67,8 @@ type Env struct {
 	SiegableHall func(id int) bool
 	// Sieges are the castles' sieges; nil finds none.
 	Sieges Sieges
+	// Zones are the zones of the world a script looks up; nil finds none.
+	Zones *zone.Index
 }
 
 // Doors finds the doors of the world by name and opens and closes them.

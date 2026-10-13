@@ -13,7 +13,12 @@ import (
 // MakerHooks. Every npcmaker gets a value of its own.
 type Maker struct {
 	MakerHooks
+	night func() bool
 }
+
+// IsNight reports whether it is night in the game world (00:00 to 05:59
+// game time).
+func (m *Maker) IsNight() bool { return m.night() }
 
 // MakerHooks holds a maker's handlers, one func field per hook; a nil
 // field does not react. The field list, the invokers and With are kept by
@@ -132,13 +137,15 @@ type MakerCatalog map[string]func() Maker
 type Makers struct {
 	catalog  MakerCatalog
 	fallback func() Maker
+	night    func() bool
 	log      zerolog.Logger
 }
 
 // NewMakers returns the registry of catalog, giving every type the catalog
-// lacks the maker fallback builds.
-func NewMakers(catalog MakerCatalog, fallback func() Maker, log zerolog.Logger) *Makers {
-	return &Makers{catalog: catalog, fallback: fallback, log: log}
+// lacks the maker fallback builds. night tells the makers whether it is
+// night in the game world.
+func NewMakers(catalog MakerCatalog, fallback func() Maker, night func() bool, log zerolog.Logger) *Makers {
+	return &Makers{catalog: catalog, fallback: fallback, night: night, log: log}
 }
 
 // Registered reports whether aiType has a maker of its own; any other type
@@ -155,6 +162,7 @@ func (r *Makers) New(aiType string) spawn.Behavior {
 		ctor = r.fallback
 	}
 	m := ctor()
+	m.night = r.night
 	return &makerRun{m: &m, aiType: aiType, log: r.log}
 }
 

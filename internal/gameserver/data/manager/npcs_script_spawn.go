@@ -148,13 +148,13 @@ func (n *Npcs) createPrivate(master npc.PartyMember, tmpl *npc.Template, at *loc
 	}
 	slot.key = fmt.Sprintf("private#%d", n.fixedSeq.Add(1))
 	n.mu.Lock()
-	n.slot[slot.key] = slot
+	n.addSlotLocked(slot)
 	n.mu.Unlock()
 
 	private, _ := n.instantiate(slot.key, entry, tmpl, loc, face, fullHP, fullMP, master).(npc.PartyMember)
 	if private == nil {
 		n.mu.Lock()
-		delete(n.slot, slot.key)
+		n.dropSlotLocked(slot.key)
 		n.mu.Unlock()
 		return nil, fmt.Errorf("%w: private npc %d", ErrNotPlaceable, tmpl.ID)
 	}

@@ -35,6 +35,9 @@ func (d *Door) Open() { d.doors.SetDoorOpen(d.obj.DoorID(), true) }
 // closed door is left as is.
 func (d *Door) Close() { d.doors.SetDoorOpen(d.obj.DoorID(), false) }
 
+// Opened reports whether the door stands open.
+func (d *Door) Opened() bool { return d.obj.Opened() }
+
 // SiegeSide is the side a clan is registered on in a castle's siege.
 type SiegeSide = siege.Side
 

@@ -256,7 +256,13 @@ type Npcs struct {
 
 	mu   sync.Mutex
 	slot map[string]slotInfo
-	live map[int32]string
+	// privates indexes the keys of the private slots in slot by their
+	// master's script memory, which every life of the master shares, so a
+	// master's decay visits only its own privates' slots. Every slot
+	// change goes through addSlotLocked and dropSlotLocked to keep it in
+	// step.
+	privates map[*npc.Scratch]map[string]struct{}
+	live     map[int32]string
 	// gen counts the RespawnAll runs; it suffixes the slot keys after the
 	// first, so a respawn armed for a slot of an earlier run never fires
 	// on the slot of the same maker entry spawned anew.
@@ -430,6 +436,7 @@ func newNpcs(spawns *Spawns, templates *npc.Table, geo move.Geo, state *world.St
 		castDefs:            castDefs,
 		castEffects:         castEffects,
 		slot:                make(map[string]slotInfo),
+		privates:            make(map[*npc.Scratch]map[string]struct{}),
 		live:                make(map[int32]string),
 	}
 	n.folk = FolkSpawner{

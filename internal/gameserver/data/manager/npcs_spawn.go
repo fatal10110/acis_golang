@@ -2,7 +2,6 @@ package manager
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -29,7 +28,7 @@ func (n *Npcs) registerSlot(key string, g *makerGroup, i int, dbName string, tmp
 
 func (n *Npcs) registerPrivateSlot(key string, entry spawn.Entry, master npc.PartyMember, tmpl *npc.Template) {
 	n.mu.Lock()
-	n.slot[key] = slotInfo{key: key, entry: entry, master: master, tmpl: tmpl, memory: newSlotMemory(entry, nil)}
+	n.addSlotLocked(slotInfo{key: key, entry: entry, master: master, tmpl: tmpl, memory: newSlotMemory(entry, nil)})
 	n.mu.Unlock()
 }
 
@@ -42,24 +41,16 @@ func (n *Npcs) spawnPersistedSlot(g *makerGroup, i int, key string, tmpl *npc.Te
 	dbName := entry.DBName
 	n.registerSlot(key, g, i, dbName, tmpl)
 
-	state, ok := n.currentSpawns().State(dbName)
-	if !ok {
-		state = spawn.NewState(dbName)
-	}
-
+	rows := n.currentSpawns()
 	now := n.now()
-	if state.Dead(now) {
-		remaining := time.UnixMilli(state.RespawnTime).Sub(now)
-		if remaining < 0 {
-			remaining = 0
-		}
+	if deadline, dead := rows.RespawnDeadline(dbName, now); dead {
 		g.rows[i].loaded.Store(false)
-		n.respawn.Add(key, now.Add(remaining))
+		n.respawn.Add(key, deadline)
 		n.restoredDeadCount.Add(1)
 		return
 	}
 
-	n.spawnPersisted(key, g.def, entry, tmpl, state, g.rows[i])
+	n.spawnPersisted(key, g.def, entry, tmpl, rows, dbName, g.rows[i])
 }
 
 // spawnPersisted places one instance of a database-tracked entry, reusing
@@ -67,7 +58,7 @@ func (n *Npcs) spawnPersistedSlot(g *makerGroup, i int, key string, tmpl *npc.Te
 // rolled position at full HP otherwise (CheckAlive's own restore rule). A
 // live row restored marks row loaded before the NPC's created hooks run;
 // a fresh or expired one leaves the mark as it was.
-func (n *Npcs) spawnPersisted(key string, maker *spawn.Maker, entry spawn.Entry, tmpl *npc.Template, state *spawn.State, row *dbRow) {
+func (n *Npcs) spawnPersisted(key string, maker *spawn.Maker, entry spawn.Entry, tmpl *npc.Template, rows *Spawns, dbName string, row *dbRow) {
 	now := n.now()
 	pos, ok := n.pickSpawnPosition(maker, entry)
 	if !ok {
@@ -76,7 +67,7 @@ func (n *Npcs) spawnPersisted(key string, maker *spawn.Maker, entry spawn.Entry,
 	}
 
 	loc, heading, hp, mp := pos.Location, pos.Heading, fullHP, fullMP
-	if state.CheckAlive(pos.Location, pos.Heading, int(tmpl.HPMax), int(tmpl.MPMax), now) {
+	if state, alive := rows.Restore(dbName, pos.Location, pos.Heading, int(tmpl.HPMax), int(tmpl.MPMax), now); alive {
 		loc, heading, hp, mp = state.Location, state.Heading, state.CurrentHP, state.CurrentMP
 		if row != nil {
 			row.loaded.Store(true)
