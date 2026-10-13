@@ -5,7 +5,9 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -52,7 +54,10 @@ func encodeUseItem(objectID int32) []byte {
 // siege runs (ScrollsOfResurrection.java:33-37): a Stranger with no siege
 // state of its own, its clan on no side, is refused with
 // CANNOT_BE_RESURRECTED_DURING_SIEGE alone and the scroll kept; one whose
-// clan fights the siege is resurrected, the scroll's skill cast on it.
+// clan fights the siege is resurrected, the scroll's skill cast on it. The
+// Caster's Knights attack the siege, so their headquarters stands first: an
+// attacker on the battlefield without one may not cast a resurrection
+// (PlayerCast.java:293-319, NO_RESURRECTION_WITHOUT_BASE_CAMP).
 func TestResurrectionScrollOnBesiegedBattlefield(t *testing.T) {
 	t.Parallel()
 	damage := targetedSkill(socialSkillID, modelskill.TargetOne, true)
@@ -80,6 +85,11 @@ func TestResurrectionScrollOnBesiegedBattlefield(t *testing.T) {
 			stranger, ok := network.OnlineCharacter(obj)
 			if !ok {
 				t.Fatalf("Stranger is %T", obj)
+			}
+			x, y, z := s.srv.PlayerPosition(t, s.casterID)
+			flag := s.srv.SpawnFolkNPCAt(t, npc.SiegeFlagTemplate("Knights", false), location.Location{X: x - 200, Y: y, Z: z})
+			if !hqClan(t, s.srv, socialKnightsID).SetHeadquarters(flag) {
+				t.Fatal("Knights already hold a headquarters")
 			}
 			done := make(chan struct{})
 			s.srv.PlayerQueue(t, s.strangerID).Post(func() {

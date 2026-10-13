@@ -68,6 +68,13 @@ func shippedCastles(t *testing.T) gameservertest.Option {
 // Gludio's siege first when started is set so its start banishes nobody.
 func bootBesiegedWorld(t *testing.T, started bool, adena int32, extra ...gameservertest.Option) *besiegedWorld {
 	t.Helper()
+	return bootBesiegedWorldPrepared(t, started, adena, nil, extra...)
+}
+
+// bootBesiegedWorldPrepared is bootBesiegedWorld running prepare, when
+// set, on the booted server before anyone comes into the world.
+func bootBesiegedWorldPrepared(t *testing.T, started bool, adena int32, prepare func(srv *gameservertest.Server, talkerID int32), extra ...gameservertest.Option) *besiegedWorld {
+	t.Helper()
 	zones := zone.NewIndex()
 	field := zone.NewSiege(1, battlefieldBox(t))
 	field.ResidenceID = gludioCastleID
@@ -116,6 +123,9 @@ func bootBesiegedWorld(t *testing.T, started bool, adena int32, extra ...gameser
 	w.gludio = gludio
 	if adena > 0 {
 		srv.GiveItem(t, w.talkerID, item.AdenaID, adena)
+	}
+	if prepare != nil {
+		prepare(srv, w.talkerID)
 	}
 	if started {
 		w.startSiege(t)
