@@ -95,7 +95,8 @@ func TestLearnNextLevelRefreshesShortcutBeforeLearnedMessage(t *testing.T) {
 }
 
 // TestLearnNextFishingLevelRefreshesShortcutBeforeLearnedMessage pins #3462
-// on the fishing trainer: the shortcut refresh precedes LEARNED_SKILL_S1,
+// on the fishing trainer: after the paid item's disappeared message, the
+// shortcut refresh precedes LEARNED_SKILL_S1,
 // which precedes the storage-cap sync of the 1368-1372 skills, the
 // SkillList and the fishing list.
 func TestLearnNextFishingLevelRefreshesShortcutBeforeLearnedMessage(t *testing.T) {
@@ -118,6 +119,8 @@ func TestLearnNextFishingLevelRefreshesShortcutBeforeLearnedMessage(t *testing.T
 	selectTrainer(t, srv, c, objID)
 
 	c.Send(encodeRequestAcquireSkill(skillID, 2, 1))
+	assertSystemMessageParams(t, c.Read(), serverpackets.SystemMessageS1DisappearedAdena,
+		systemMessageParam{serverpackets.SystemMessageParamNumber, 2})
 	assertShortCutRegister(t, c, 3, skillID, 2)
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageLearnedSkill, skillID, 2)
 	reply := c.Read()
