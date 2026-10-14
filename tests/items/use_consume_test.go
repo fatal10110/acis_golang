@@ -336,10 +336,8 @@ func TestUseTwoSkillItemLaterSkillReuseStillLaunchesFirst(t *testing.T) {
 		t.Fatalf("reuse message id = %d, want S1PreparedForReuse (%d)", id, serverpackets.SystemMessageS1PreparedForReuse)
 	}
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "first MagicSkillLaunched")
+	srv.AdvanceUntil(t, "first cast still scheduled to completion", func() bool { return !srv.PlayerCastingNow(t, objID) })
 	drainUntilQuiet(t, c)
-	if srv.PlayerCastingNow(t, objID) {
-		t.Fatal("CastingNow() = true after first skill finished, want first cast still scheduled to completion")
-	}
 }
 
 // TestUseTwoSkillItemWhileAttackingCastsOnlyLast pins next-intention
