@@ -44,6 +44,10 @@ func (disablersHandler) Use(cast Cast) {
 	bsps := blessedSpiritshotCharged(cast.Caster)
 
 	for _, obj := range cast.Targets {
+		if d, ok := asDoor(obj); ok {
+			disableDoor(cast, d, skillType, bsps)
+			continue
+		}
 		target, ok := asCreature(obj)
 		if !ok {
 			continue

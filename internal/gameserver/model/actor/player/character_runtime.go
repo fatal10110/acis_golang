@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door/doorhit"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -499,6 +500,15 @@ func (c *Character) ForEachKnownCombatantInRadius(radius int, fn func(attackable
 			fn(combatant)
 		}
 	})
+}
+
+// ForEachKnownHitTargetInRadius calls fn for every creature this player
+// knows within radius, a door through its hit surface.
+func (c *Character) ForEachKnownHitTargetInRadius(radius int, fn func(attackable.Combatant)) {
+	if c.world == nil {
+		return
+	}
+	doorhit.ForEachKnownInRadius(c.world, c, radius, fn)
 }
 
 // SyncPosition moves this player's live world-grid presence to position, a

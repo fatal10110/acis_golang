@@ -384,3 +384,9 @@ func (f *Folk) ForEachKnownCombatantInRadius(radius int, fn func(attackable.Comb
 		}
 	})
 }
+
+// ForEachKnownHitTargetInRadius is ForEachKnownCombatantInRadius: an NPC
+// never hits a door.
+func (f *Folk) ForEachKnownHitTargetInRadius(radius int, fn func(attackable.Combatant)) {
+	f.ForEachKnownCombatantInRadius(radius, fn)
+}

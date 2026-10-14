@@ -6,8 +6,11 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door/doorhit"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
 func (l *GameClientLink) handleSummonActionUse(ctx context.Context, live *livePlayer, req clientpackets.RequestActionUse) bool {
@@ -58,13 +61,27 @@ const (
 type summonSkillEntry struct {
 	SkillID    int
 	TargetKind summonSkillTargetKind
-	// DoorOnly marks the two siege actions (Siege Golem's Siege Hammer,
-	// Wild Hog Cannon's Attack) restricted to a Door target. No Door
-	// world-object type is modeled in Go yet, so this always evaluates to
-	// "not a Door" and these two actions correctly stay unusable until
-	// siege doors are ported, matching what a target-less/non-door click
-	// already does.
-	DoorOnly bool
+	// Door is how the action treats a door selected as its target.
+	Door summonDoorRule
+}
+
+// summonDoorRule is how a commanded special skill treats a door target.
+type summonDoorRule uint8
+
+// The zero rule takes a door like any other target.
+const (
+	// doorOnly is the siege breakers' rule (Siege Golem's Siege Hammer,
+	// Wild Hog Cannon's Attack): only a door is a target.
+	doorOnly summonDoorRule = iota + 1
+	// doorRefused is the anti-infantry Swoop Cannon's rule: a door is no
+	// target.
+	doorRefused
+)
+
+// refuses reports whether the rule refuses target.
+func (r summonDoorRule) refuses(target world.Tracked) bool {
+	_, isDoor := target.(*door.Object)
+	return (r == doorOnly && !isDoor) || (r == doorRefused && isDoor)
 }
 
 const sinEaterNPCID = 12564
@@ -82,7 +99,7 @@ var sinEaterActionStrings = [...]string{
 var summonSkillActionTable = map[int32]summonSkillEntry{
 	36:   {SkillID: 4259, TargetKind: summonSkillTargetClicked},
 	39:   {SkillID: 4138, TargetKind: summonSkillTargetClicked},
-	41:   {SkillID: 4230, TargetKind: summonSkillTargetClicked, DoorOnly: true},
+	41:   {SkillID: 4230, TargetKind: summonSkillTargetClicked, Door: doorOnly},
 	42:   {SkillID: 4378, TargetKind: summonSkillTargetOwner},
 	43:   {SkillID: 4137, TargetKind: summonSkillTargetClicked},
 	44:   {SkillID: 4139, TargetKind: summonSkillTargetClicked},
@@ -90,7 +107,7 @@ var summonSkillActionTable = map[int32]summonSkillEntry{
 	46:   {SkillID: 4261, TargetKind: summonSkillTargetClicked},
 	47:   {SkillID: 4260, TargetKind: summonSkillTargetClicked},
 	48:   {SkillID: 4068, TargetKind: summonSkillTargetClicked},
-	1000: {SkillID: 4079, TargetKind: summonSkillTargetClicked, DoorOnly: true},
+	1000: {SkillID: 4079, TargetKind: summonSkillTargetClicked, Door: doorOnly},
 	// 1001 (Sin Eater's Ultimate Bombastic Buster) targets the summon itself.
 	1001: {SkillID: 4139, TargetKind: summonSkillTargetSelf},
 	1003: {SkillID: 4710, TargetKind: summonSkillTargetClicked},
@@ -116,37 +133,25 @@ var summonSkillActionTable = map[int32]summonSkillEntry{
 	1036: {SkillID: 5142, TargetKind: summonSkillTargetClicked},
 	1037: {SkillID: 5141, TargetKind: summonSkillTargetClicked},
 	1038: {SkillID: 5140, TargetKind: summonSkillTargetClicked},
-	// 1039/1040 (Swoop Cannon) reject a Door target. No Door type
-	// exists in Go yet, so no target can match one and this restriction is
-	// vacuously satisfied — safe to omit without behavior divergence.
-	1039: {SkillID: 5110, TargetKind: summonSkillTargetClicked},
-	1040: {SkillID: 5111, TargetKind: summonSkillTargetClicked},
-}
-
-// doorTarget is satisfied by a future siege-door world object. Nothing in
-// the codebase implements it yet, so doorOnlyBlocked always returns true
-// for a DoorOnly entry until siege doors are ported.
-type doorTarget interface {
-	IsSiegeDoor() bool
-}
-
-func doorOnlyBlocked(entry summonSkillEntry, target attackable.Combatant) bool {
-	if !entry.DoorOnly {
-		return false
-	}
-	door, ok := target.(doorTarget)
-	return !ok || !door.IsSiegeDoor()
+	1039: {SkillID: 5110, TargetKind: summonSkillTargetClicked, Door: doorRefused},
+	1040: {SkillID: 5111, TargetKind: summonSkillTargetClicked, Door: doorRefused},
 }
 
 // handleSummonSkillUse dispatches an owner-commanded pet/servitor special
 // skill (e.g. Wild Hog Cannon Attack). Unlike handleSummonActionUse's movement/status
 // commands, an unresolvable summon or skill still returns true so the
 // client's input is released, matching the existing action-bar contract;
-// only an unmapped action id returns false.
+// only an unmapped action id returns false. A selected target the action's
+// door rule refuses is answered INVALID_TARGET ahead of everything else.
 func (l *GameClientLink) handleSummonSkillUse(live *livePlayer, req clientpackets.RequestActionUse) bool {
 	entry, ok := summonSkillActionTable[req.ActionID]
 	if !ok || l.world == nil {
 		return false
+	}
+	if entry.Door.refuses(live.Target()) {
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageInvalidTarget))
+		live.SendFrame(serverpackets.FrameActionFailed())
+		return true
 	}
 	obj, ok := l.world.Summon(live.ObjectID())
 	if !ok {
@@ -160,10 +165,8 @@ func (l *GameClientLink) handleSummonSkillUse(live *livePlayer, req clientpacket
 	}
 
 	target := l.summonSkillTarget(live, actor, entry.TargetKind)
-	if !doorOnlyBlocked(entry, target) {
-		if actor.TryUseSkill(entry.SkillID, target, req.CtrlPressed) && req.ActionID == 1001 && actor.NPCID() == sinEaterNPCID && actor.Roll(100) < 10 {
-			l.broadcastSummonFrame(actor, serverpackets.FrameNpcSay(actor.ObjectID(), actor.NPCID(), serverpackets.SayTypeAll, sinEaterActionStrings[actor.Roll(len(sinEaterActionStrings))]))
-		}
+	if actor.TryUseSkill(entry.SkillID, target, req.CtrlPressed) && req.ActionID == 1001 && actor.NPCID() == sinEaterNPCID && actor.Roll(100) < 10 {
+		l.broadcastSummonFrame(actor, serverpackets.FrameNpcSay(actor.ObjectID(), actor.NPCID(), serverpackets.SayTypeAll, sinEaterActionStrings[actor.Roll(len(sinEaterActionStrings))]))
 	}
 	live.SendFrame(serverpackets.FrameActionFailed())
 	return true
@@ -176,7 +179,7 @@ func (l *GameClientLink) summonSkillTarget(live *livePlayer, actor *summon.Actor
 	case summonSkillTargetSelf:
 		return actor
 	default:
-		target, _ := live.Target().(attackable.Combatant)
+		target, _ := hitTarget(live.Target())
 		return target
 	}
 }
@@ -187,7 +190,16 @@ func (l *GameClientLink) summonCommandContext(live *livePlayer, command summon.C
 		return ctx
 	}
 	ctx.Target = live.Target()
-	target, ok := live.Target().(attackable.Combatant)
+	if d, ok := ctx.Target.(*door.Object); ok {
+		// A door may be attacked without forcing whenever it may be
+		// attacked at all.
+		ctx.TargetIsCreature = true
+		ctx.TargetIsDeadCreature = d.Dead()
+		ctx.TargetAttackable = d.AttackableBy(live.Character)
+		ctx.Creature = doorhit.Of(d)
+		return ctx
+	}
+	target, ok := ctx.Target.(attackable.Combatant)
 	if !ok {
 		return ctx
 	}

@@ -337,6 +337,12 @@ func (h *Hostile) ForEachKnownCombatantInRadius(radius int, fn func(attackable.C
 	})
 }
 
+// ForEachKnownHitTargetInRadius is ForEachKnownCombatantInRadius: a
+// monster never hits a door.
+func (h *Hostile) ForEachKnownHitTargetInRadius(radius int, fn func(attackable.Combatant)) {
+	h.ForEachKnownCombatantInRadius(radius, fn)
+}
+
 // Runtime is everything a Hostile needs to act in the live world beyond its
 // template and controllers. A nil dependency leaves the matching behavior
 // off: no world means no spatial queries, no LOS means CanSee is permissive,

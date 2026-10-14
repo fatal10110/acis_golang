@@ -27,6 +27,14 @@ const ConfirmDlgRestoreRequest int32 = 332
 // dialog, a message id the client shows its one text parameter for.
 const ConfirmDlgEngageRequest int32 = 1983
 
+// ConfirmDlgOpenGate and ConfirmDlgCloseGate are system messages
+// WOULD_YOU_LIKE_TO_OPEN_THE_GATE and WOULD_YOU_LIKE_TO_CLOSE_THE_GATE, the
+// questions a clan hall door asks its owners.
+const (
+	ConfirmDlgOpenGate  int32 = 1140
+	ConfirmDlgCloseGate int32 = 1141
+)
+
 const (
 	confirmDlgTypeText     = 0
 	confirmDlgTypeZoneName = 7
@@ -73,5 +81,21 @@ func FrameConfirmDlgEngageRequest(text string) wire.Frame {
 	w.WriteInt32(1)
 	w.WriteInt32(confirmDlgTypeText)
 	w.WriteString(text)
+	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
+}
+
+// FrameConfirmDlgGate builds a clan hall door's question, whether to open
+// it (open set) or close it: the message id with no parameter, countdown or
+// requester id.
+func FrameConfirmDlgGate(open bool) wire.Frame {
+	id := ConfirmDlgCloseGate
+	if open {
+		id = ConfirmDlgOpenGate
+	}
+	w := newFrameWriter(OpcodeConfirmDlg)
+	w.WriteInt32(id)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
+	w.WriteInt32(0)
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }

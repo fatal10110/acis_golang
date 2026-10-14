@@ -176,11 +176,23 @@ type damageTarget interface {
 	ReduceHP(amount float64, attacker attackable.Combatant, skill modelskill.Definition)
 }
 
+// asDoor returns a as a door: the door itself, or the hit surface a
+// summon's cast aims at it through.
+func asDoor(a Actor) (*door.Object, bool) {
+	switch d := a.(type) {
+	case *door.Object:
+		return d, true
+	case doorhit.Target:
+		return d.Object, d.Object != nil
+	}
+	return nil, false
+}
+
 // asDamageTarget returns a as the target of a damage skill: a creature as
 // itself, a door through its hit surface. Any other participant (a signet
 // effect point) takes no damage.
 func asDamageTarget(a Actor) (damageTarget, bool) {
-	if d, ok := a.(*door.Object); ok {
+	if d, ok := asDoor(a); ok {
 		return doorhit.Of(d), true
 	}
 	c, ok := a.(Creature)
