@@ -137,7 +137,7 @@ func watcherObjectID(t *testing.T, srv *gameservertest.Server, objID int32) int3
 
 func readQuiet(c *scriptedClient) [][]byte {
 	var frames [][]byte
-	for f := c.ReadWithTimeout(readQuietWindow); f != nil; f = c.ReadWithTimeout(readQuietWindow) {
+	for _, f := range c.ReadQueued() {
 		frames = append(frames, f)
 	}
 	return frames

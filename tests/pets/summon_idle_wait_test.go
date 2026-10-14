@@ -82,7 +82,8 @@ func TestPetStopMidSwingIsWaitedOut(t *testing.T) {
 		t.Fatalf("pet intent after the waited-out Stop = %v, want attack-target kept", got)
 	}
 
-	frames := advanceCollecting(t, h, 3*time.Second)
+	// Two of the pet's swings take longer than 3s.
+	frames := advanceCollecting(t, h, 4*time.Second)
 	if n := petAttacks(frames, petActor); n < 2 {
 		t.Fatalf("pet swings after the Stop = %d, want it to keep attacking the monster", n)
 	}

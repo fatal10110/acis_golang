@@ -17,7 +17,7 @@ import (
 // and the HP pair of every ServerObjectInfo of objID, in order.
 func readServerObjectInfos(c *testsupport.ScriptedClient, objID int32) [][3]int32 {
 	var out [][3]int32
-	for f := c.ReadWithTimeout(300 * time.Millisecond); f != nil; f = c.ReadWithTimeout(300 * time.Millisecond) {
+	for _, f := range c.ReadQueued() {
 		if len(f) < 5 || f[0] != serverpackets.OpcodeServerObjectInfo {
 			continue
 		}

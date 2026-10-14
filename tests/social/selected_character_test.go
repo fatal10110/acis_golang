@@ -5,6 +5,7 @@ import (
 	"slices"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -164,12 +165,11 @@ func TestSelectionSeesCharacterStillEntering(t *testing.T) {
 	// The takeover closes the entering session; its detach waits on the
 	// held queue, so the character stays registered.
 	c := p.srv.DialClient(t, "player2", 1)
-	if !p.bobby.AwaitClose(silenceWindow * 10) {
+	if !p.bobby.AwaitClose(3 * time.Second) {
 		t.Fatal("account takeover left the entering session open")
 	}
 	c.Send(encodeRequestGameStart(0))
-	p.srv.AwaitHandled(t)
-	if frames := drainFrames(t, c); len(frames) != 0 {
+	if frames := p.srv.ReadHandled(t, c); len(frames) != 0 {
 		t.Fatalf("selection with the character still entering answered %x, want nothing", opcodes(frames))
 	}
 

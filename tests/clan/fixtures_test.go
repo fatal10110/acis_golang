@@ -247,15 +247,10 @@ func startInWorld(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 func drainFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	frames := make([][]byte, 0, 8)
-	for range 400 {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return frames
-		}
+	for _, frame := range c.ReadQueued() {
 		frames = append(frames, frame)
 	}
-	t.Fatal("client kept receiving frames after 400 drains")
-	return nil
+	return frames
 }
 
 func opcodes(frames [][]byte) []byte {

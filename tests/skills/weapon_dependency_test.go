@@ -3,7 +3,6 @@ package skills
 import (
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -211,11 +210,7 @@ func TestNPCCastNeedsAllowedWeapon(t *testing.T) {
 				assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeMagicSkillUse, tc.name)
 				return
 			}
-			for {
-				frame := srv.Client.ReadWithTimeout(300 * time.Millisecond)
-				if frame == nil {
-					break
-				}
+			for _, frame := range srv.Client.ReadQueued() {
 				if frame[0] == serverpackets.OpcodeMagicSkillUse || frame[0] == serverpackets.OpcodeSystemMessage {
 					t.Fatalf("%s: refused monster cast sent opcode %#x", tc.name, frame[0])
 				}

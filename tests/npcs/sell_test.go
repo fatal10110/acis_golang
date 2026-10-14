@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -187,8 +186,8 @@ func (w *sellWorld) savedCounts(t *testing.T) map[int32]int {
 
 func (w *sellWorld) requireSilent(t *testing.T, what string) {
 	t.Helper()
-	if frame := w.c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("%s answered %#x, want nothing", what, frame[0])
+	if queued := w.c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("%s answered %#x, want nothing", what, queued[0][0])
 	}
 }
 

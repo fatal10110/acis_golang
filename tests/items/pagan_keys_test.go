@@ -6,7 +6,6 @@ import (
 	"slices"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 
@@ -125,13 +124,10 @@ func useKey(t *testing.T, c *testsupport.ScriptedClient, key int32) [][]byte {
 	t.Helper()
 	c.Send(encodeUseItem(key, false))
 	var frames [][]byte
-	for {
-		frame := c.ReadWithTimeout(500 * time.Millisecond)
-		if frame == nil {
-			return frames
-		}
+	for _, frame := range c.ReadQueued() {
 		frames = append(frames, frame)
 	}
+	return frames
 }
 
 func keysLeft(t *testing.T, srv *gameservertest.Server, key int32) int {

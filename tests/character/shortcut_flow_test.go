@@ -54,19 +54,10 @@ func encodeRequestShortCutDel(slot int32) []byte {
 	return w.Bytes()
 }
 
-// rejectSilenceWindow is how long a test waits to confirm a handler stayed
-// silent.
-const rejectSilenceWindow = 300 * time.Millisecond
-
 // drainQuiet reads until the stream stays quiet for one silence window.
 func drainQuiet(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
-	for range 100 {
-		if c.ReadWithTimeout(rejectSilenceWindow) == nil {
-			return
-		}
-	}
-	t.Fatal("client kept receiving frames after 100 drains")
+	c.ReadQueued()
 }
 
 // shortCutInitEntry is one parsed ShortCutInit row.
@@ -195,8 +186,8 @@ func TestShortcutFlowRegistersPersistsDeletesDropsStale(t *testing.T) {
 	if typ, slot, id := r.ReadInt32(), r.ReadInt32(), r.ReadInt32(); typ != int32(serverpackets.ShortcutItem) || slot != wireShortcutSlot(1, 5) || id != missingObjectID {
 		t.Fatalf("missing-object ShortCutRegister = type %d slot %d id %d, want item at slot %d for %d", typ, slot, id, wireShortcutSlot(1, 5), missingObjectID)
 	}
-	if frame := c.ReadWithTimeout(rejectSilenceWindow); frame != nil {
-		t.Fatalf("missing-object register sent a second frame %#x", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("missing-object register sent a second frame %#x", queued[0][0])
 	}
 
 	// Shortcut rows are written on the persistence worker.

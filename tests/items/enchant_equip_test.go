@@ -3,7 +3,6 @@ package items
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -265,7 +264,8 @@ func TestEnchantRequestGates(t *testing.T) {
 
 		srv.SetPlayerOperating(t, objID, false)
 		c.Send(encodeRequestEnchantItem(weapon))
-		if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
+		if queued := c.ReadQueued(); len(queued) != 0 {
+			reply := queued[0]
 			t.Fatalf("enchant after the store refusal replied %x, want no reply", reply)
 		}
 		if inst := mustFindItem(t, srv, objID, scroll); inst.Count != 1 {
@@ -277,7 +277,8 @@ func TestEnchantRequestGates(t *testing.T) {
 		srv, objID, weapon, blessed := bootDestroyedSelection(t)
 		c := srv.Client
 		c.Send(encodeRequestEnchantItem(weapon))
-		if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
+		if queued := c.ReadQueued(); len(queued) != 0 {
+			reply := queued[0]
 			t.Fatalf("enchant with the selected scroll destroyed replied %x, want no reply", reply)
 		}
 		openEnchantSelection(t, c, blessed, 6575)
@@ -374,7 +375,8 @@ func TestTeleportCancelsActiveEnchant(t *testing.T) {
 	assertEnchantResult(t, frames[result], serverpackets.EnchantResultCancelled)
 
 	c.Send(encodeRequestEnchantItem(weapon))
-	if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		reply := queued[0]
 		t.Fatalf("enchant after the teleport replied %x, want no reply", reply)
 	}
 }

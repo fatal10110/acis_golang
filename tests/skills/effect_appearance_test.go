@@ -139,15 +139,10 @@ func (p *appearancePair) expire(t *testing.T, e *effect.Effect, what string) {
 func readQuiet(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	var frames [][]byte
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return frames
-		}
+	for _, frame := range c.ReadQueued() {
 		frames = append(frames, frame)
 	}
-	t.Fatal("client kept receiving frames after 100 reads")
-	return nil
+	return frames
 }
 
 func framesWithOpcode(frames [][]byte, opcode byte) [][]byte {

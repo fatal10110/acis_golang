@@ -113,12 +113,7 @@ func enterWorld(t *testing.T, c *testsupport.ScriptedClient) {
 // drain reads until the client has received nothing for 300ms.
 func drain(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
-	for range 200 {
-		if c.ReadWithTimeout(300*time.Millisecond) == nil {
-			return
-		}
-	}
-	t.Fatal("client kept receiving frames after 200 drains")
+	c.ReadQueued()
 }
 
 func encodeBuildCmd(command string) []byte {

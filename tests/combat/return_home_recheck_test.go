@@ -161,8 +161,8 @@ func TestNPCTeleportDroppedWhileAnotherInProgress(t *testing.T) {
 		t.Fatal("SetTeleporting(true) on an idle NPC reported no change")
 	}
 	hostile.TeleportTo(location.Location{X: home.X, Y: home.Y + 300, Z: home.Z})
-	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("dropped teleport sent opcode %#x", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("dropped teleport sent opcode %#x", queued[0][0])
 	}
 	if x, y, z := hostile.Position(); (location.Location{X: x, Y: y, Z: z}) != home {
 		t.Fatalf("position after dropped teleport = (%d,%d,%d), want %+v", x, y, z, home)

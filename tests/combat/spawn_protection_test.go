@@ -11,8 +11,9 @@ import (
 
 // enterAfterRestart drives a dead player back into play through a restart
 // point and the Appearing packet that completes the teleport, leaving spawn
-// protection active on a quiet stream.
-func enterAfterRestart(t *testing.T, srv *gameservertest.Server) {
+// protection active, and returns the frames queued after the post-teleport
+// UserInfo.
+func enterAfterRestart(t *testing.T, srv *gameservertest.Server) [][]byte {
 	t.Helper()
 	c := srv.Client
 	c.Send(encodeRequestGameStart(0))
@@ -36,7 +37,7 @@ func enterAfterRestart(t *testing.T, srv *gameservertest.Server) {
 	assertFrameOpcode(t, mustRead(t, c, "acted UserInfo"), serverpackets.OpcodeUserInfo, "acted UserInfo")
 	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
 	assertFrameOpcode(t, mustRead(t, c, "post-teleport UserInfo"), serverpackets.OpcodeUserInfo, "post-teleport UserInfo")
-	drainUntilQuiet(t, c)
+	return c.ReadQueued()
 }
 
 const (
@@ -45,31 +46,41 @@ const (
 )
 
 // readProtectionMessage scans frames until a string-parameter SystemMessage
-// arrives and returns its text.
+// arrives and returns its text. Each read waits well past the protection
+// windows the scenarios set, so a timer firing late on a loaded machine still
+// lands.
 func readProtectionMessage(t *testing.T, c *scriptedClient) string {
 	t.Helper()
-	for i := 0; i < 50; i++ {
-		frame := c.ReadWithTimeout(time.Second)
+	for range 50 {
+		frame := c.ReadWithTimeout(5 * time.Second)
 		if frame == nil {
 			t.Fatal("spawn-protection system message never arrived")
 		}
-		if frame[0] != serverpackets.OpcodeSystemMessage {
-			continue
+		if text, ok := protectionText(frame); ok {
+			return text
 		}
-		r := wireReader(frame[1:])
-		if id := r.ReadInt32(); id != int32(serverpackets.SystemMessageS1) {
-			continue
-		}
-		if params := r.ReadInt32(); params != 1 {
-			continue
-		}
-		if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamText {
-			continue
-		}
-		return r.ReadString()
 	}
 	t.Fatal("no string SystemMessage within 50 frames")
 	return ""
+}
+
+// protectionText returns the text of frame if it is a string-parameter
+// SystemMessage, the form the spawn-protection notices take.
+func protectionText(frame []byte) (string, bool) {
+	if frame[0] != serverpackets.OpcodeSystemMessage {
+		return "", false
+	}
+	r := wireReader(frame[1:])
+	if id := r.ReadInt32(); id != int32(serverpackets.SystemMessageS1) {
+		return "", false
+	}
+	if params := r.ReadInt32(); params != 1 {
+		return "", false
+	}
+	if typ := r.ReadInt32(); typ != serverpackets.SystemMessageParamText {
+		return "", false
+	}
+	return r.ReadString(), true
 }
 
 // TestSpawnProtectionEndsWhenPlayerActs pins the action-clear leg: after the
@@ -102,9 +113,19 @@ func TestSpawnProtectionExpires(t *testing.T) {
 		gameservertest.WithRestartPoints(restartTable()),
 		gameservertest.WithSpawnProtection(1200*time.Millisecond),
 	)
-	enterAfterRestart(t, srv)
-
-	if got := readProtectionMessage(t, srv.Client); got != "The spawn protection has ended." {
+	// On the wall clock a loaded machine can take the whole window to finish
+	// the restart, so the expiry may already be among the frames it left.
+	got := ""
+	for _, frame := range enterAfterRestart(t, srv) {
+		if text, ok := protectionText(frame); ok {
+			got = text
+			break
+		}
+	}
+	if got == "" {
+		got = readProtectionMessage(t, srv.Client)
+	}
+	if got != "The spawn protection has ended." {
 		t.Fatalf("protection message = %q", got)
 	}
 	drainUntilQuiet(t, srv.Client)

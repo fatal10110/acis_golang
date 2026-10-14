@@ -220,7 +220,7 @@ func TestAttackOnDoorNobodyMayAttackIsRefused(t *testing.T) {
 			attackDoor(t, c, gate)
 
 			assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "ActionFailed")
-			for frame := c.ReadWithTimeout(500 * time.Millisecond); frame != nil; frame = c.ReadWithTimeout(500 * time.Millisecond) {
+			for _, frame := range c.ReadQueued() {
 				if frame[0] == serverpackets.OpcodeAttack && wireReader(frame[1:]).ReadInt32() == objID {
 					t.Fatal("the player swung at a door it may not attack")
 				}
@@ -270,7 +270,7 @@ func TestDamageSkillOnDoorOutsideSiegeIsInvalidTarget(t *testing.T) {
 
 	c.Send(encodeRequestMagicSkillUse(doorPdamSkillID, false, false))
 	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageInvalidTarget)
-	for frame := c.ReadWithTimeout(time.Second); frame != nil; frame = c.ReadWithTimeout(time.Second) {
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeMagicSkillUse || frame[0] == serverpackets.OpcodeDoorStatusUpdate {
 			t.Fatalf("refused cast sent opcode %#x", frame[0])
 		}
@@ -290,7 +290,7 @@ func TestHealLeavesDoorHP(t *testing.T) {
 	drainUntilQuiet(t, c)
 	selectTarget(t, c, gate.ObjectID())
 
-	frames := castUnlock(t, c, objID, def, gate.ObjectID())
+	frames := castUnlock(t, srv, c, objID, def, gate.ObjectID())
 
 	if got := framesWith(frames, serverpackets.OpcodeDoorStatusUpdate, gate.ObjectID()); len(got) != 0 {
 		t.Fatalf("heal sent %d DoorStatusUpdates, want none", len(got))

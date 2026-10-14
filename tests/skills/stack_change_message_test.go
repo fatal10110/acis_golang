@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -31,11 +30,7 @@ func castCollectingEffectFeedback(t *testing.T, c *testsupport.ScriptedClient, s
 func drainEffectFeedback(t *testing.T, c *testsupport.ScriptedClient) []string {
 	t.Helper()
 	var got []string
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return got
-		}
+	for _, frame := range c.ReadQueued() {
 		switch frame[0] {
 		case serverpackets.OpcodeSystemMessage:
 			r := wire.NewReader(frame[1:])
@@ -47,7 +42,6 @@ func drainEffectFeedback(t *testing.T, c *testsupport.ScriptedClient) []string {
 			got = append(got, fmt.Sprintf("icons:%v", buffSlotIDs(readAbnormalStatusUpdateEntriesFromFrame(t, frame))))
 		}
 	}
-	t.Fatal("client kept receiving frames after 100 drains")
 	return got
 }
 

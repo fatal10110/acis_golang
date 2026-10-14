@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
@@ -152,15 +151,10 @@ func (r *rig) restart(t *testing.T, c *testsupport.ScriptedClient, objID int32) 
 func drain(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	var frames [][]byte
-	for range 400 {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return frames
-		}
+	for _, frame := range c.ReadQueued() {
 		frames = append(frames, frame)
 	}
-	t.Fatal("client kept receiving frames after 400 reads")
-	return nil
+	return frames
 }
 
 // exchange sends payload and returns every frame it drew, read up to the

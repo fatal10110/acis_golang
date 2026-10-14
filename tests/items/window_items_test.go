@@ -86,8 +86,8 @@ func readNpcHtml(t *testing.T, frame []byte) (int32, string, int32) {
 // assertQuiet fails on any frame c receives before the server goes quiet.
 func assertQuiet(t *testing.T, c *testsupport.ScriptedClient, what string) {
 	t.Helper()
-	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("%s: unexpected opcode %#x", what, frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("%s: unexpected opcode %#x", what, queued[0][0])
 	}
 }
 

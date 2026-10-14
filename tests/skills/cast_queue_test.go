@@ -120,15 +120,10 @@ func magicSkillUseSkill(t *testing.T, frame []byte) int32 {
 func queueFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	var frames [][]byte
-	for range 100 {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return frames
-		}
+	for _, frame := range c.ReadQueued() {
 		frames = append(frames, frame)
 	}
-	t.Fatal("client kept receiving frames after 100 reads")
-	return nil
+	return frames
 }
 
 // castStartedFor reports whether frames carry a MagicSkillUse for skillID.

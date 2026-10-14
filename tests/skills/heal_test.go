@@ -505,15 +505,10 @@ func TestHealEffectOtherCastSendsHPRestoredByHealer(t *testing.T) {
 func collectUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	var frames [][]byte
-	for range 100 {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return frames
-		}
+	for _, frame := range c.ReadQueued() {
 		frames = append(frames, frame)
 	}
-	t.Fatal("client kept receiving frames after 100 reads")
-	return nil
+	return frames
 }
 
 // hpRestoredAmount returns the amount of the single S1_HP_RESTORED message

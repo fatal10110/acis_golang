@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/dbtest"
@@ -156,15 +155,10 @@ func drainUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) {
 func drainFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	frames := make([][]byte, 0, 8)
-	for i := 0; i < 200; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return frames
-		}
+	for _, frame := range c.ReadQueued() {
 		frames = append(frames, frame)
 	}
-	t.Fatal("client kept receiving frames after 200 drains")
-	return nil
+	return frames
 }
 
 func opcodes(frames [][]byte) []byte {

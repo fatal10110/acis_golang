@@ -14,13 +14,10 @@ import (
 // framesUntilQuiet reads every frame c receives until it goes quiet.
 func framesUntilQuiet(c *scriptedClient) [][]byte {
 	var frames [][]byte
-	for {
-		frame := c.ReadWithTimeout(readQuietWindow)
-		if frame == nil {
-			return frames
-		}
+	for _, frame := range c.ReadQueued() {
 		frames = append(frames, frame)
 	}
+	return frames
 }
 
 // punchOfDoomID is the skill whose StunSelf effect stuns its own caster.

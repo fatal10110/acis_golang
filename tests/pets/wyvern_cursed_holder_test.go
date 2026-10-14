@@ -77,7 +77,11 @@ func TestWyvernCollarRefusedToCursedHolder(t *testing.T) {
 		t.Fatal("no Zariche on the ground")
 	}
 	h.client.Send(encodeAction(ground.ObjectID(), int32(x), int32(y), int32(z), false))
-	srv.Settle(t)
+	srv.AdvanceUntil(t, "Zariche picked up", func() bool {
+		_, lying := srv.State.Object(ground.ObjectID())
+		return !lying
+	})
+	srv.SettlePickup(t, h.ownerID)
 	drainUntilQuiet(t, h.client)
 	rider := h.character(t)
 	if !rider.CursedWeaponEquipped() {

@@ -48,8 +48,8 @@ func TestAttackRequestSelectsThenSwingsInRange(t *testing.T) {
 	assertFrameOpcode(t, mustRead(t, c, "select ValidateLocation"), serverpackets.OpcodeValidateLocation, "select ValidateLocation")
 	assertFrameOpcode(t, mustRead(t, c, "MyTargetSelected"), serverpackets.OpcodeMyTargetSelected, "MyTargetSelected")
 	assertFrameOpcode(t, mustRead(t, c, "selection StatusUpdate"), serverpackets.OpcodeStatusUpdate, "selection StatusUpdate")
-	if reply := c.ReadWithTimeout(readQuietWindow); reply != nil {
-		t.Fatalf("first in-range AttackRequest produced opcode %#x, want selection only", reply[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("first in-range AttackRequest produced opcode %#x, want selection only", queued[0][0])
 	}
 
 	c.Send(encodeAttackRequest(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
@@ -127,8 +127,8 @@ func TestSittingPlayerCannotAttackSelectedTarget(t *testing.T) {
 	before := hostile.CurrentHP()
 	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
 	assertFrameOpcode(t, mustRead(t, c, "sitting attack ActionFailed"), serverpackets.OpcodeActionFailed, "sitting attack ActionFailed")
-	if reply := c.ReadWithTimeout(readQuietWindow); reply != nil {
-		t.Fatalf("sitting attack produced opcode %#x after ActionFailed, want silence", reply[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("sitting attack produced opcode %#x after ActionFailed, want silence", queued[0][0])
 	}
 	if got := hostile.CurrentHP(); got != before {
 		t.Fatalf("hostile HP = %d after sitting attack, want unchanged %d", got, before)
@@ -154,8 +154,8 @@ func TestSittingPlayerCannotApproachSelectedTarget(t *testing.T) {
 
 	c.Send(encodeAction(hostile.ObjectID(), int32(playerOrigin.X), int32(playerOrigin.Y), int32(playerOrigin.Z), false))
 	assertFrameOpcode(t, mustRead(t, c, "sitting approach ActionFailed"), serverpackets.OpcodeActionFailed, "sitting approach ActionFailed")
-	if reply := c.ReadWithTimeout(readQuietWindow); reply != nil {
-		t.Fatalf("sitting approach produced opcode %#x after ActionFailed, want silence", reply[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("sitting approach produced opcode %#x after ActionFailed, want silence", queued[0][0])
 	}
 }
 
@@ -178,8 +178,8 @@ func TestAttackRequestOnDistantTargetSelectsOnly(t *testing.T) {
 	assertFrameOpcode(t, mustRead(t, c, "MyTargetSelected"), serverpackets.OpcodeMyTargetSelected, "MyTargetSelected")
 	assertFrameOpcode(t, mustRead(t, c, "selection StatusUpdate"), serverpackets.OpcodeStatusUpdate, "selection StatusUpdate")
 
-	if reply := c.ReadWithTimeout(readQuietWindow); reply != nil {
-		t.Fatalf("distant AttackRequest produced opcode %#x before arriving in range, want selection only", reply[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("distant AttackRequest produced opcode %#x before arriving in range, want selection only", queued[0][0])
 	}
 }
 

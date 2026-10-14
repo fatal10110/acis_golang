@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/dbtest"
@@ -136,7 +135,7 @@ func assertLog(t *testing.T, when string, got []string, want ...string) {
 
 func readUntilQuiet(c *testsupport.ScriptedClient) [][]byte {
 	var frames [][]byte
-	for f := c.ReadWithTimeout(300 * time.Millisecond); f != nil; f = c.ReadWithTimeout(300 * time.Millisecond) {
+	for _, f := range c.ReadQueued() {
 		frames = append(frames, f)
 	}
 	return frames

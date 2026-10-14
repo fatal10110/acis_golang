@@ -243,11 +243,7 @@ func TestItemCastLethalHPConsumeHasNoStatusAfterDie(t *testing.T) {
 			t.Fatal("item-cast death sequence did not reach Die")
 		}
 	}
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeStatusUpdate && wire.NewReader(frame[1:]).ReadInt32() == objID {
 			t.Fatal("item cast sent self StatusUpdate after Die")
 		}
@@ -275,8 +271,8 @@ func TestUseUnlockableKeyRejectsMonsterWithoutConsumption(t *testing.T) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeStatusUpdate, "select StatusUpdate")
 	c.Send(encodeUseItem(key, false))
 	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageInvalidTarget)
-	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("unlockable key rejection extra opcode = %#x, want none", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("unlockable key rejection extra opcode = %#x, want none", queued[0][0])
 	}
 	srv.FlushItems(t)
 	if inst := mustFindItem(t, srv, objID, key); inst.Count != 1 {
@@ -523,7 +519,8 @@ func TestDisabledItemUseIsSilent(t *testing.T) {
 
 	srv.DisablePlayerItem(t, objID, potion, time.Minute)
 	c.Send(encodeUseItem(potion, false))
-	if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		reply := queued[0]
 		t.Fatalf("disabled item use replied %x, want no reply at all", reply)
 	}
 	if inst := mustFindItem(t, srv, objID, potion); inst.Count != 5 {
@@ -662,8 +659,8 @@ func TestEscapeScrollReuseIsRejected(t *testing.T) {
 	if id := systemMessageID(t, frame); id != serverpackets.SystemMessageS1PreparedForReuse {
 		t.Fatalf("reuse message id = %d, want S1PreparedForReuse (%d)", id, serverpackets.SystemMessageS1PreparedForReuse)
 	}
-	if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
-		t.Fatalf("rejected reuse follow-up frame %x, want none", reply[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("rejected reuse follow-up frame %x, want none", queued[0][0])
 	}
 	srv.FlushItems(t)
 	if inst := mustFindItem(t, srv, objID, scroll); inst.Count != 2 {

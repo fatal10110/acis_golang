@@ -117,11 +117,7 @@ func TestAttackRefusedByWeaponSendsSystemMessage(t *testing.T) {
 				t.Fatalf("SystemMessages before ActionFailed = %v, want exactly [%d]", messages, tc.wantMsg)
 			}
 
-			for range 10 {
-				frame := c.ReadWithTimeout(readQuietWindow)
-				if frame == nil {
-					break
-				}
+			for _, frame := range c.ReadQueued() {
 				if frame[0] == serverpackets.OpcodeAttack {
 					t.Fatal("refused attack swung after ActionFailed")
 				}

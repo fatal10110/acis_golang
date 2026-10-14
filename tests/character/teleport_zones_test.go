@@ -93,7 +93,7 @@ func appear(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 
 func readUntilQuiet(c *testsupport.ScriptedClient) [][]byte {
 	var frames [][]byte
-	for f := c.ReadWithTimeout(rejectSilenceWindow); f != nil; f = c.ReadWithTimeout(rejectSilenceWindow) {
+	for _, f := range c.ReadQueued() {
 		frames = append(frames, f)
 	}
 	return frames

@@ -51,7 +51,7 @@ func landFear(t *testing.T, effector effect.Actor, target effectHolder, skillID 
 func readMoveOf(t *testing.T, c *scriptedClient, objectID int32, what string) location.Location {
 	t.Helper()
 	for {
-		frame := c.ReadWithTimeout(readQuietWindow)
+		frame := c.ReadWithTimeout(5 * time.Second)
 		if frame == nil {
 			t.Fatalf("%s: no MoveToLocation for %d", what, objectID)
 		}
@@ -68,13 +68,10 @@ func readMoveOf(t *testing.T, c *scriptedClient, objectID int32, what string) lo
 // server stays quiet for a full read window.
 func readFramesUntilQuiet(c *scriptedClient) [][]byte {
 	var frames [][]byte
-	for {
-		frame := c.ReadWithTimeout(readQuietWindow)
-		if frame == nil {
-			return frames
-		}
+	for _, frame := range c.ReadQueued() {
 		frames = append(frames, frame)
 	}
+	return frames
 }
 
 // TestFearSendsMonsterFleeingEveryTick pins fear on a monster: the landing

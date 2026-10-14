@@ -370,11 +370,7 @@ func TestResistedSkillReportsResistanceToCaster(t *testing.T) {
 
 	// Mdam reports the damage before the effect resist.
 	found, damaged := false, false
-	for i := 0; i < 50 && !found; i++ {
-		frame = c.ReadWithTimeout(time.Second)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] != serverpackets.OpcodeSystemMessage {
 			continue
 		}
@@ -463,11 +459,7 @@ func TestMagicDamageHalfFailureSendsAttackFailed(t *testing.T) {
 	srv.AdvanceUntil(t, "MDAM half-fail drain", func() bool { return hostile.CurrentHP() < maxHP })
 
 	found := false
-	for i := 0; i < 50 && !found; i++ {
-		frame := c.ReadWithTimeout(time.Second)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] != serverpackets.OpcodeSystemMessage {
 			continue
 		}
@@ -611,11 +603,7 @@ func TestSignetMDamFullFailureSendsResistedSkill(t *testing.T) {
 	}
 
 	var found bool
-	for range 50 {
-		frame := c.ReadWithTimeout(time.Second)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] != serverpackets.OpcodeSystemMessage {
 			continue
 		}

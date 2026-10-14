@@ -156,6 +156,7 @@ func assertNoCubicSummoningFailed(t *testing.T, frames [][]byte) {
 func TestSelfCubicCastPastFullListEvictsOldest(t *testing.T) {
 	t.Parallel()
 	srv, c, objID := bootCubicSummoner(t, 900*time.Second, 900*time.Second)
+	skipOnWallClock(t, srv)
 	setPlayerRollSource(t, srv, objID, func(int) int { return 0 })
 	damageToHealHeadroom(t, srv, objID, int32(srv.PlayerMaxHP(t, objID)/2))
 	drainUntilQuiet(t, c)
@@ -202,6 +203,7 @@ func TestSelfCubicRecastOnFullListRefreshes(t *testing.T) {
 	t.Parallel()
 	const lifetime = 10 * time.Second
 	srv, c, objID := bootCubicSummoner(t, 900*time.Second, lifetime)
+	skipOnWallClock(t, srv)
 
 	c.Send(encodeRequestMagicSkillUse(summonStormCubicSkill, false, false))
 	srv.Advance(t, time.Second)
@@ -255,6 +257,17 @@ func teleportAndAppear(t *testing.T, srv *gameservertest.Server, c *testsupport.
 	drainUntilQuiet(t, c)
 }
 
+// sinceNow returns a call that lets time pass until d after now on the clock
+// c's reads wait on.
+func sinceNow(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient) func(d time.Duration) {
+	t.Helper()
+	start := c.Now()
+	return func(d time.Duration) {
+		t.Helper()
+		srv.Advance(t, max(start.Add(d).Sub(c.Now()), 0))
+	}
+}
+
 func cubicHeals(t *testing.T, frames [][]byte) int {
 	t.Helper()
 	n := 0
@@ -275,13 +288,13 @@ func cubicHeals(t *testing.T, frames [][]byte) int {
 // running: the cubic heals once per interval after the jump, never twice,
 // and stops at its original lifetime, broadcasting UserInfo (Cubic.stop).
 //
-// Times in the comments are the actor clock since the cast; each quiet read
-// below also lets 300ms pass on the driven clock. Every check sits at least
-// 0.5s away from a tick, a heal landing or an expiry.
+// Every check sits at its time since the cast, at least 0.5s away from a
+// tick, a heal landing or an expiry.
 func TestLifeCubicKeepsHealingAndExpiresAcrossTeleport(t *testing.T) {
 	t.Parallel()
 	const lifeLifetime = 19 * time.Second
 	srv, c, objID := bootCubicSummoner(t, lifeLifetime, 900*time.Second)
+	skipOnWallClock(t, srv)
 	setPlayerRollSource(t, srv, objID, func(int) int { return 0 })
 	// Down to 1 HP, so the three heals below never top the owner off
 	// (pickFriendlyTarget skips a full-HP owner).
@@ -293,22 +306,23 @@ func TestLifeCubicKeepsHealingAndExpiresAcrossTeleport(t *testing.T) {
 	// Granted at 0s: ticks at 5s, 10s, 15s, each heal landing 2s later;
 	// expiry at 19s. A lifetime restarted by the teleport would end at ~21s.
 	c.Send(encodeRequestMagicSkillUse(summonLifeCubicSkill, false, false))
-	srv.Advance(t, time.Second)
+	at := sinceNow(t, srv, c)
+	at(time.Second)
 	drainUntilQuiet(t, c)
-	teleportAndAppear(t, srv, c, objID) // ~1.3s, done by ~1.9s
+	teleportAndAppear(t, srv, c, objID)
 	if got := liveCubicIDs(t, srv, objID); !slices.Equal(got, []int{int(cubic.Life)}) {
 		t.Fatalf("cubics after the teleport = %v, want [%d]", got, cubic.Life)
 	}
 
 	hpBefore := srv.PlayerCurrentHP(t, objID)
-	srv.Advance(t, 6*time.Second) // ~7.9s: the 5s tick and its heal at 7s
+	at(7900 * time.Millisecond) // the 5s tick and its heal at 7s
 	if n := cubicHeals(t, queueFrames(t, c)); n != 1 {
 		t.Fatalf("Life Cubic heals in the first interval after the teleport = %d, want 1", n)
 	}
 	if hp := srv.PlayerCurrentHP(t, objID); hp != hpBefore+lifeCubicHealPower {
 		t.Fatalf("HP after the first post-teleport heal = %d, want %d", hp, hpBefore+lifeCubicHealPower)
 	}
-	srv.Advance(t, 9500*time.Millisecond) // ~17.7s: the 10s and 15s ticks
+	at(17700 * time.Millisecond) // the 10s and 15s ticks
 	if n := cubicHeals(t, queueFrames(t, c)); n != 2 {
 		t.Fatalf("Life Cubic heals over the next two intervals = %d, want 2 (one timer, not two)", n)
 	}
@@ -316,7 +330,7 @@ func TestLifeCubicKeepsHealingAndExpiresAcrossTeleport(t *testing.T) {
 		t.Fatalf("cubics before the original lifetime ends = %v, want [%d]", got, cubic.Life)
 	}
 
-	srv.Advance(t, 1500*time.Millisecond) // ~19.5s
+	at(19500 * time.Millisecond)
 	frames := queueFrames(t, c)
 	if got := liveCubicIDs(t, srv, objID); len(got) != 0 {
 		t.Fatalf("cubics after the original lifetime = %v, want none", got)
@@ -339,23 +353,23 @@ func TestCubicKeepsItsDisappearTimerAcrossTeleport(t *testing.T) {
 	t.Parallel()
 	const stormLifetime = 10 * time.Second
 	srv, c, objID := bootCubicSummoner(t, 900*time.Second, stormLifetime)
+	skipOnWallClock(t, srv)
 
 	// Granted at 0s, expiry at 10s; restarted by the teleport it would end
 	// at ~14s.
 	c.Send(encodeRequestMagicSkillUse(summonStormCubicSkill, false, false))
-	srv.Advance(t, time.Second)
+	at := sinceNow(t, srv, c)
+	at(3600 * time.Millisecond)
 	drainUntilQuiet(t, c)
-	srv.Advance(t, 2*time.Second)
-	drainUntilQuiet(t, c)
-	teleportAndAppear(t, srv, c, objID) // ~3.6s, done by ~4.2s
+	teleportAndAppear(t, srv, c, objID)
 
-	srv.Advance(t, 5*time.Second)
-	drainUntilQuiet(t, c) // ~9.5s
+	at(9500 * time.Millisecond)
+	drainUntilQuiet(t, c)
 	if got := liveCubicIDs(t, srv, objID); !slices.Equal(got, []int{int(cubic.Storm)}) {
 		t.Fatalf("cubics at ~9.5s = %v, want [%d] still held", got, cubic.Storm)
 	}
 
-	srv.Advance(t, time.Second) // ~10.5s
+	at(10500 * time.Millisecond)
 	frames := queueFrames(t, c)
 	if got := liveCubicIDs(t, srv, objID); len(got) != 0 {
 		t.Fatalf("cubics at ~10.5s = %v, want none: the teleport kept the 10s lifetime", got)

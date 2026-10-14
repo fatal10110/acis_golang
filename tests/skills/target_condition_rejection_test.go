@@ -17,16 +17,11 @@ import (
 // with its system message only, never with ActionFailed.
 func assertNoActionFailedUntilQuiet(t *testing.T, c *testsupport.ScriptedClient, what string) {
 	t.Helper()
-	for range 20 {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeActionFailed {
 			t.Fatalf("%s sent ActionFailed after the rejection message", what)
 		}
 	}
-	t.Fatalf("%s kept sending frames", what)
 }
 
 func bootTargetConditionCaster(t *testing.T, def modelskill.Definition) *gameservertest.Server {

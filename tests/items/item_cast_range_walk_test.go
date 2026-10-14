@@ -55,7 +55,7 @@ func readFramesFor(t *testing.T, srv *gameservertest.Server, c *testsupport.Scri
 	var frames [][]byte
 	for passed := time.Duration(0); passed < d; passed += 100 * time.Millisecond {
 		srv.Advance(t, 100*time.Millisecond)
-		for frame := c.ReadWithTimeout(20 * time.Millisecond); frame != nil; frame = c.ReadWithTimeout(20 * time.Millisecond) {
+		for _, frame := range c.ReadQueued() {
 			frames = append(frames, frame)
 		}
 	}
@@ -74,7 +74,7 @@ func TestUseItemSkillOutOfRangeWalksThenCasts(t *testing.T) {
 	var cast []byte
 	for passed := time.Duration(0); cast == nil && passed < 20*time.Second; passed += 100 * time.Millisecond {
 		srv.Advance(t, 100*time.Millisecond)
-		for frame := c.ReadWithTimeout(20 * time.Millisecond); frame != nil; frame = c.ReadWithTimeout(20 * time.Millisecond) {
+		for _, frame := range c.ReadQueued() {
 			if frame[0] == serverpackets.OpcodeMagicSkillUse {
 				cast = frame
 				break

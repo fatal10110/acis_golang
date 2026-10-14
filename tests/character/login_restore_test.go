@@ -83,8 +83,8 @@ func readLoginBurst(t *testing.T, c *testsupport.ScriptedClient, want []byte) []
 		}
 		frames = append(frames, frame)
 	}
-	if frame := c.ReadWithTimeout(rejectSilenceWindow); frame != nil {
-		t.Fatalf("EnterWorld sent opcode %#x after its ActionFailed", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("EnterWorld sent opcode %#x after its ActionFailed", queued[0][0])
 	}
 	return frames
 }
@@ -255,11 +255,7 @@ func TestEnterWorldOverloadedLoginRefreshesObservers(t *testing.T) {
 	drainQuiet(t, self)
 
 	var charInfos int
-	for {
-		frame := observer.ReadWithTimeout(rejectSilenceWindow)
-		if frame == nil {
-			break
-		}
+	for _, frame := range observer.ReadQueued() {
 		if frame[0] != serverpackets.OpcodeCharInfo {
 			continue
 		}

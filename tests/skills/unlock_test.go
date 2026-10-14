@@ -2,7 +2,6 @@ package skills
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
@@ -105,20 +104,14 @@ func selectTarget(t *testing.T, c *testsupport.ScriptedClient, objectID int32) {
 	t.Fatalf("object %d was never selected", objectID)
 }
 
-// castUnlock casts def on the selected target and returns every frame up to
-// the client going quiet after the hit.
-func castUnlock(t *testing.T, c *testsupport.ScriptedClient, objID int32, def modelskill.Definition, targetID int32) [][]byte {
+// castUnlock casts def on the selected target and returns every frame the
+// cast sent once it has ended.
+func castUnlock(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient, objID int32, def modelskill.Definition, targetID int32) [][]byte {
 	t.Helper()
 	c.Send(encodeRequestMagicSkillUse(int32(def.ID), false, false))
 	readCastStartFrames(t, c, objID, int32(def.ID), int32(def.Level), unlockHitTime, unlockReuse, targetID)
-	var frames [][]byte
-	for {
-		frame := c.ReadWithTimeout(time.Second)
-		if frame == nil {
-			return frames
-		}
-		frames = append(frames, frame)
-	}
+	srv.AdvanceUntil(t, "unlock cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
+	return c.ReadQueued()
 }
 
 func framesWith(frames [][]byte, opcode byte, objectID int32) [][]byte {
@@ -173,7 +166,7 @@ func TestUnlockSkillOpensDoorThroughWorldOwner(t *testing.T) {
 	}
 	selectTarget(t, srv.Client, gate.ObjectID())
 
-	frames := castUnlock(t, srv.Client, objID, def, gate.ObjectID())
+	frames := castUnlock(t, srv, srv.Client, objID, def, gate.ObjectID())
 
 	if !gate.Opened() {
 		t.Fatal("door still closed after a guaranteed unlock")
@@ -197,7 +190,7 @@ func TestUnlockSkillFailedRollKeepsDoorClosed(t *testing.T) {
 	gate, _ := srv.WorldObjects.Door(unlockDoorID)
 	selectTarget(t, srv.Client, gate.ObjectID())
 
-	frames := castUnlock(t, srv.Client, objID, def, gate.ObjectID())
+	frames := castUnlock(t, srv, srv.Client, objID, def, gate.ObjectID())
 
 	if gate.Opened() {
 		t.Fatal("door opened by a never-succeeding unlock")
@@ -215,7 +208,7 @@ func TestUnlockSkillOnOpenDoorReportsFailure(t *testing.T) {
 	gate, _ := srv.WorldObjects.Door(unlockDoorID)
 	selectTarget(t, srv.Client, gate.ObjectID())
 
-	frames := castUnlock(t, srv.Client, objID, def, gate.ObjectID())
+	frames := castUnlock(t, srv, srv.Client, objID, def, gate.ObjectID())
 
 	if !gate.Opened() {
 		t.Fatal("open door closed by an unlock")
@@ -242,7 +235,7 @@ func TestUnlockSkillOpensBoxChest(t *testing.T) {
 	drainUntilQuiet(t, srv.Client)
 	selectTarget(t, srv.Client, chest.ObjectID())
 
-	frames := castUnlock(t, srv.Client, objID, def, chest.ObjectID())
+	frames := castUnlock(t, srv, srv.Client, objID, def, chest.ObjectID())
 
 	if !chest.Dead() {
 		t.Fatal("box chest survived a guaranteed unlock")
@@ -266,7 +259,7 @@ func TestUnlockSkillFailureDeletesBoxChest(t *testing.T) {
 	drainUntilQuiet(t, srv.Client)
 	selectTarget(t, srv.Client, chest.ObjectID())
 
-	frames := castUnlock(t, srv.Client, objID, def, chest.ObjectID())
+	frames := castUnlock(t, srv, srv.Client, objID, def, chest.ObjectID())
 
 	if got := framesWith(frames, serverpackets.OpcodeDie, chest.ObjectID()); len(got) != 0 {
 		t.Fatalf("chest Die frames = %d, want none", len(got))
@@ -287,7 +280,7 @@ func TestUnlockSkillOnMimicChestLeavesItStanding(t *testing.T) {
 	drainUntilQuiet(t, srv.Client)
 	selectTarget(t, srv.Client, chest.ObjectID())
 
-	frames := castUnlock(t, srv.Client, objID, def, chest.ObjectID())
+	frames := castUnlock(t, srv, srv.Client, objID, def, chest.ObjectID())
 
 	if chest.Dead() || chest.Interacted() {
 		t.Fatalf("mimic chest dead=%v interacted=%v, want neither", chest.Dead(), chest.Interacted())
@@ -311,7 +304,7 @@ func TestUnlockSkillOnPlayerReportsInvalidTarget(t *testing.T) {
 	srv, objID := bootUnlock(t, def)
 	selectTarget(t, srv.Client, objID)
 
-	frames := castUnlock(t, srv.Client, objID, def, objID)
+	frames := castUnlock(t, srv, srv.Client, objID, def, objID)
 
 	assertOneSystemMessage(t, frames, serverpackets.SystemMessageInvalidTarget)
 }
@@ -329,7 +322,7 @@ func TestUnlockSkillOnClaimedChestDoesNothing(t *testing.T) {
 	}
 	selectTarget(t, srv.Client, chest.ObjectID())
 
-	frames := castUnlock(t, srv.Client, objID, def, chest.ObjectID())
+	frames := castUnlock(t, srv, srv.Client, objID, def, chest.ObjectID())
 
 	if chest.Dead() {
 		t.Fatal("claimed chest opened by a second unlock")

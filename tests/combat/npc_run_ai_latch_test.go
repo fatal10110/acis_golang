@@ -48,11 +48,7 @@ func readAttackWithout(t *testing.T, srv *gameservertest.Server, forbidden byte,
 func assertNoSwingFor(t *testing.T, srv *gameservertest.Server, d time.Duration) {
 	t.Helper()
 	srv.Advance(t, d)
-	for {
-		frame := srv.Client.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return
-		}
+	for _, frame := range srv.Client.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeAttack {
 			t.Fatal("Attack after the latched swing, want the monster idle")
 		}

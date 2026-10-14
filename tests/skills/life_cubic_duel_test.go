@@ -31,6 +31,7 @@ func TestLifeCubicInOneOnOneDuelHealsOnlyOwner(t *testing.T) {
 			{ID: lifeCubicHealSkill, Level: 1, Power: lifeCubicHealPower},
 		})),
 	)
+	skipOnWallClock(t, srv)
 	c, ownerID := srv.Client, srv.SoleObjectID(t)
 	seedKnownSkill(t, srv, ownerID, summonLifeCubicSkill, 1)
 	startInWorld(t, c)

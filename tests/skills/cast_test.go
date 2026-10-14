@@ -407,8 +407,8 @@ func TestCastItemConsumeShortageNamesSkill(t *testing.T) {
 	c.Send(encodeRequestMagicSkillUse(5, false, false))
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1CannotBeUsed, 5, 1)
 	// The refused cast destroys nothing, so no item message follows.
-	if extra := c.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-		t.Fatalf("refused cast sent extra opcode %#x, want the refusal alone", extra[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("refused cast sent extra opcode %#x, want the refusal alone", queued[0][0])
 	}
 }
 
@@ -700,13 +700,13 @@ func TestGroundCastIgnoresNonGroundAndUnknownSkill(t *testing.T) {
 	startInWorld(t, c)
 
 	c.Send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, 5, false, false))
-	if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
-		t.Fatalf("non-ground ground-cast reply = opcode %#x, want no reply", reply[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("non-ground ground-cast reply = opcode %#x, want no reply", queued[0][0])
 	}
 
 	c.Send(encodeRequestExMagicSkillUseGround(1000, 2000, 300, 9999, false, false))
-	if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
-		t.Fatalf("unlearned ground-cast reply = opcode %#x, want no reply", reply[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("unlearned ground-cast reply = opcode %#x, want no reply", queued[0][0])
 	}
 }
 
@@ -916,11 +916,7 @@ func TestNonlethalHPConsumeSendsOneStatus(t *testing.T) {
 	readCastStartFrames(t, c, objID, skillID, 1, 500, 0, objID)
 	srv.AdvanceUntil(t, "nonlethal HP cost", func() bool { return srv.PlayerCurrentHP(t, objID) == beforeHP-1 })
 	statuses := 0
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeDie {
 			t.Fatal("nonlethal HP cost sent Die")
 		}
@@ -953,11 +949,7 @@ func TestNonlethalToggleHPConsumeSendsOneStatus(t *testing.T) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "toggle ack")
 	srv.AdvanceUntil(t, "toggle HP cost", func() bool { return srv.PlayerCurrentHP(t, objID) == beforeHP-1 })
 	statuses := 0
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeDie {
 			t.Fatal("nonlethal toggle HP cost sent Die")
 		}
@@ -1103,11 +1095,7 @@ func castLethalHPConsume(t *testing.T, remainder float64) {
 	if held := holder.EffectList().All(); len(held) != 1 || !held[0].Template.Self {
 		t.Fatalf("dead caster holds %+v, want only the skill's self effect", held)
 	}
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeStatusUpdate && wireReader(frame[1:]).ReadInt32() == objID {
 			t.Fatal("self StatusUpdate sent after Die")
 		}

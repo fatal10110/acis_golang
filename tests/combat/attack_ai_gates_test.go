@@ -39,7 +39,7 @@ func attackFrameBy(frame []byte, id int32) bool {
 func advanceUntilActionFailed(t *testing.T, srv *gameservertest.Server, c *scriptedClient, attackerID int32, what string) {
 	t.Helper()
 	for range 60 {
-		for frame := c.ReadWithTimeout(20 * time.Millisecond); frame != nil; frame = c.ReadWithTimeout(20 * time.Millisecond) {
+		for _, frame := range c.ReadQueued() {
 			if attackFrameBy(frame, attackerID) {
 				t.Fatalf("%s: Attack by %d before ActionFailed", what, attackerID)
 			}
@@ -57,7 +57,7 @@ func assertNoAttackBy(t *testing.T, srv *gameservertest.Server, c *scriptedClien
 	t.Helper()
 	for passed := time.Duration(0); passed < d; passed += 100 * time.Millisecond {
 		srv.Advance(t, 100*time.Millisecond)
-		for frame := c.ReadWithTimeout(20 * time.Millisecond); frame != nil; frame = c.ReadWithTimeout(20 * time.Millisecond) {
+		for _, frame := range c.ReadQueued() {
 			if attackFrameBy(frame, attackerID) {
 				t.Fatalf("%s: Attack by %d", what, attackerID)
 			}
@@ -169,7 +169,7 @@ func TestBoxChestNeverSwingsBack(t *testing.T) {
 			}
 			for range 30 {
 				srv.Advance(t, 100*time.Millisecond)
-				for frame := c.ReadWithTimeout(20 * time.Millisecond); frame != nil; frame = c.ReadWithTimeout(20 * time.Millisecond) {
+				for _, frame := range c.ReadQueued() {
 					if attackFrameBy(frame, chest.ObjectID()) {
 						return
 					}

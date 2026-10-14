@@ -156,7 +156,7 @@ func TestRangedCastAtDoorIgnoresTheDoorItself(t *testing.T) {
 	}
 	selectTarget(t, c, gate.ObjectID())
 
-	frames := castUnlock(t, c, objID, def, gate.ObjectID())
+	frames := castUnlock(t, srv, c, objID, def, gate.ObjectID())
 
 	if !gate.Opened() {
 		t.Fatal("door still closed after a guaranteed unlock")

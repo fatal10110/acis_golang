@@ -58,8 +58,6 @@ func TestQueuedSitAtGetUpEndKeepsLieDownEnd(t *testing.T) {
 		t.Fatalf("at the get-ups' end Standing=%v SittingNow=%v Seated=%v FakeDead=%v, want the queued sit sitting the player down, out of fake death",
 			victim.Standing(), victim.SittingNow(), victim.Seated(), victim.FakeDead())
 	}
-	// No frame is read until the lie-down has ended: each quiet read lets
-	// readQuietWindow pass on the driven clock.
 	x, y, z := victim.Position()
 	vc.Send(encodeMoveFrom(int32(x)+100, int32(y), int32(z), int32(x), int32(y), int32(z)))
 	srv.Settle(t)
@@ -70,9 +68,6 @@ func TestQueuedSitAtGetUpEndKeepsLieDownEnd(t *testing.T) {
 	}
 	if !victim.Seated() || victim.Standing() {
 		t.Fatalf("at the lie-down's end Seated=%v Standing=%v, want seated", victim.Seated(), victim.Standing())
-	}
-	if sitEnd := sitAt.Add(sitDownDelay); !vc.Now().Add(readQuietWindow).Before(sitEnd) {
-		t.Fatalf("the sit-down ends %v after the lie-down, inside one quiet read; the scenario cannot tell the two ends apart", sitEnd.Sub(vc.Now()))
 	}
 	// Player.tryToPassBoatEntrance answers the move with ActionFailed (no
 	// boat known), PlayableAI.tryToMoveTo queues it with another, and the

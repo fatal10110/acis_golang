@@ -172,11 +172,7 @@ func denyCasterDamage(t *testing.T, srv *gameservertest.Server, objID int32) {
 
 func drainAssertingNoAttackFailed(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] != serverpackets.OpcodeSystemMessage {
 			continue
 		}
@@ -184,7 +180,6 @@ func drainAssertingNoAttackFailed(t *testing.T, c *testsupport.ScriptedClient) {
 			t.Fatal("got AttackFailed; invul/permission refuse is silent")
 		}
 	}
-	t.Fatal("client kept receiving frames after 100 drains")
 }
 
 // TestStunBlocksCastingAndMovement lands a stun through a self-cast skill
@@ -258,16 +253,11 @@ func castSlotBuff(t *testing.T, c *testsupport.ScriptedClient, objID, skillID in
 func drainCollectingAbnormal(t *testing.T, c *testsupport.ScriptedClient) []abnormalStatusEntry {
 	t.Helper()
 	var last []abnormalStatusEntry
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return last
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeAbnormalStatusUpdate {
 			last = readAbnormalStatusUpdateEntriesFromFrame(t, frame)
 		}
 	}
-	t.Fatal("client kept receiving frames after 100 drains")
 	return last
 }
 

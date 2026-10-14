@@ -183,7 +183,8 @@ func TestUseBeastSoulshotNotEnoughWithAutoDisablesAuto(t *testing.T) {
 	assertExAutoSoulShot(t, c.Read(), 6645, false)
 	assertSystemMessageItem(t, c.Read(), serverpackets.SystemMessageAutoUseOfItemCancelled, 6645)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "failed consume")
-	if reply := c.ReadWithTimeout(300 * time.Millisecond); reply != nil {
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		reply := queued[0]
 		t.Fatalf("unexpected extra reply %x, want none (not-enough suppressed while auto-enabled)", reply)
 	}
 	if inst := mustFindItem(t, srv, objID, shot); inst.Count != 4 {

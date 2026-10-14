@@ -140,11 +140,7 @@ func (w *castleWorld) castleCommand(t *testing.T, args string) (gm, leader [][]b
 // collectFrames reads until the client stays quiet for 300ms.
 func collectFrames(c *testsupport.ScriptedClient) [][]byte {
 	var out [][]byte
-	for range 100 {
-		f := c.ReadWithTimeout(300 * time.Millisecond)
-		if f == nil {
-			break
-		}
+	for _, f := range c.ReadQueued() {
 		out = append(out, f)
 	}
 	return out

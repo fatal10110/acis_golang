@@ -54,8 +54,9 @@ func TestSiegeFlagTakesNoEffect(t *testing.T) {
 		if !slices.Contains(opcodes(started), serverpackets.OpcodeMagicSkillUse) {
 			t.Fatalf("%s: Shield cast answered %x, want it started", tt.name, opcodes(started))
 		}
-		// The cast lands, and its reuse delay runs out before the next one.
-		w.srv.Advance(t, 15*time.Second)
+		// The cast lands, and its reuse delay runs out before the next one:
+		// at this caster's casting speed the two take longer than 15s.
+		w.srv.Advance(t, 20*time.Second)
 		drainUntilQuiet(t, w.c)
 		if _, landed := tt.npc.EffectList().ActiveBySkillID(shieldSkillID); landed != tt.lands {
 			t.Fatalf("%s: Shield landed = %v, want %v", tt.name, landed, tt.lands)

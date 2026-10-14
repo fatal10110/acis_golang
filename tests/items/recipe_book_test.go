@@ -709,15 +709,12 @@ func TestCommonCraftSkillOpensBook(t *testing.T) {
 	}
 	var book []byte
 	srv.AdvanceUntil(t, "common craft cast lands", func() bool {
-		for {
-			f := c.ReadWithTimeout(50 * time.Millisecond)
-			if f == nil {
-				return book != nil
-			}
+		for _, f := range c.ReadQueued() {
 			if f[0] == serverpackets.OpcodeRecipeBookItemList {
 				book = f
 			}
 		}
+		return book != nil
 	})
 	if typ, _, ids := recipeBookList(t, book); typ != 1 || !slices.Equal(ids, []int32{commonRecipeID}) {
 		t.Fatalf("craft skill page = type %d ids %v", typ, ids)
@@ -774,13 +771,10 @@ func TestCraftSkillBranches(t *testing.T) {
 				keep(f)
 			}
 			srv.AdvanceUntil(t, "craft cast lands", func() bool {
-				for {
-					f := c.ReadWithTimeout(50 * time.Millisecond)
-					if f == nil {
-						return !srv.PlayerCastingNow(t, objID)
-					}
+				for _, f := range c.ReadQueued() {
 					keep(f)
 				}
+				return !srv.PlayerCastingNow(t, objID)
 			})
 			for _, f := range collectUntilQuiet(t, c) {
 				keep(f)

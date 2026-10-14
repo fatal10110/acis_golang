@@ -393,7 +393,7 @@ func TestAdminClanSkillWaitsForLeaderQueue(t *testing.T) {
 		t.Fatal("post to the game master's queue: queue closed")
 	}
 	<-ran
-	if frames := drainFrames(t, w.gm); len(frames) != 0 {
+	if frames := w.srv.ReadHandled(t, w.gm); len(frames) != 0 {
 		t.Fatalf("game master answered %x while the leader is held, want nothing", opcodes(frames))
 	}
 	w.leader.Send(encodeRequestAcquireSkill(vitalityID, 1, acquireSkillReq))

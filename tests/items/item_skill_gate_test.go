@@ -417,7 +417,7 @@ func TestUseItemSkillDuringFakeDeathGetUpIsRefused(t *testing.T) {
 		fake.Effector, fake.Effected = pc, pc
 		pc.EffectList().Add(fake)
 	})
-	srv.Advance(t, 3*time.Second)
+	srv.SettlePosture(t, objID)
 	drainUntilQuiet(t, c)
 
 	// The stand's stopFakeDeath(true) exits the effect, whose own get-up

@@ -58,7 +58,7 @@ func castSignetPoint(t *testing.T, srv *gameservertest.Server, c *testsupport.Sc
 // whose first field is objID.
 func readObjectFrames(c *testsupport.ScriptedClient, opcode byte, objID int32) [][]byte {
 	var out [][]byte
-	for f := c.ReadWithTimeout(300 * time.Millisecond); f != nil; f = c.ReadWithTimeout(300 * time.Millisecond) {
+	for _, f := range c.ReadQueued() {
 		if len(f) >= 5 && f[0] == opcode && wire.NewReader(f[1:]).ReadInt32() == objID {
 			out = append(out, f)
 		}
@@ -183,7 +183,7 @@ func TestSignetPointClickAnswersActionFailed(t *testing.T) {
 	} {
 		c.Send(click.frame)
 		failed := 0
-		for f := c.ReadWithTimeout(300 * time.Millisecond); f != nil; f = c.ReadWithTimeout(300 * time.Millisecond) {
+		for _, f := range c.ReadQueued() {
 			switch f[0] {
 			case serverpackets.OpcodeActionFailed:
 				failed++

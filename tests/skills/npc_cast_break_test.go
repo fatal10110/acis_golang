@@ -2,7 +2,6 @@ package skills
 
 import (
 	"testing"
-	"time"
 
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -90,15 +89,12 @@ func startNPCCast(t *testing.T, c *testsupport.ScriptedClient, hostile *npc.Host
 func (w *castingNPC) npcCanceled(t *testing.T) bool {
 	t.Helper()
 	canceled := false
-	for {
-		frame := w.c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return canceled
-		}
+	for _, frame := range w.c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeMagicSkillCanceled && wireReader(frame[1:]).ReadInt32() == w.hostile.ObjectID() {
 			canceled = true
 		}
 	}
+	return canceled
 }
 
 // landOnNPC applies the named real effect to the monster on its own queue,

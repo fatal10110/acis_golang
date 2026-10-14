@@ -216,15 +216,10 @@ func placeWatcher(t *testing.T, srv *gameservertest.Server, account, name string
 func receivedTargetUnselected(t *testing.T, c *scriptedClient, objID int32) bool {
 	t.Helper()
 	got := false
-	for range 100 {
-		frame := c.ReadWithTimeout(readQuietWindow)
-		if frame == nil {
-			return got
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeTargetUnselected && wireReader(frame[1:]).ReadInt32() == objID {
 			got = true
 		}
 	}
-	t.Fatal("client kept receiving frames after 100 reads")
-	return false
+	return got
 }

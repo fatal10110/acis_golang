@@ -2,7 +2,6 @@ package skills
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -51,7 +50,7 @@ func TestEnteringPlayerSeesFolkCastInFlight(t *testing.T) {
 	}
 	observer.Send(encodeEnterWorld())
 	var frames [][]byte
-	for frame := observer.ReadWithTimeout(500 * time.Millisecond); frame != nil; frame = observer.ReadWithTimeout(500 * time.Millisecond) {
+	for _, frame := range observer.ReadQueued() {
 		frames = append(frames, frame)
 	}
 

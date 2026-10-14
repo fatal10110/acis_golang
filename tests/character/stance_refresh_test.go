@@ -90,11 +90,11 @@ func TestPlayerStanceChangeRefreshesSelfAndObserver(t *testing.T) {
 	self.Send(encodeRequestChangeMoveType(false))
 	assertStanceRefresh(t, self, observer, objectID, false)
 	self.Send(encodeRequestChangeMoveType(false))
-	if frame := self.ReadWithTimeout(rejectSilenceWindow); frame != nil {
-		t.Fatalf("unchanged walk stance sent self opcode %#x", frame[0])
+	if queued := self.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("unchanged walk stance sent self opcode %#x", queued[0][0])
 	}
-	if frame := observer.ReadWithTimeout(rejectSilenceWindow); frame != nil {
-		t.Fatalf("unchanged walk stance sent observer opcode %#x", frame[0])
+	if queued := observer.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("unchanged walk stance sent observer opcode %#x", queued[0][0])
 	}
 	self.Send(encodeRequestChangeMoveType(true))
 	assertStanceRefresh(t, self, observer, objectID, true)
@@ -146,11 +146,11 @@ func TestZeroSpeedStanceSkipsMoveTypeButRefreshesInfo(t *testing.T) {
 		t.Fatalf("zero-speed stance observer frame = %x, want CharInfo first", frame)
 	}
 	assertPlainRelation(t, observer.ReadWithTimeout(time.Second), objectID)
-	if frame := self.ReadWithTimeout(rejectSilenceWindow); frame != nil {
-		t.Fatalf("zero-speed stance sent extra self opcode %#x", frame[0])
+	if queued := self.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("zero-speed stance sent extra self opcode %#x", queued[0][0])
 	}
-	if frame := observer.ReadWithTimeout(rejectSilenceWindow); frame != nil {
-		t.Fatalf("zero-speed stance sent extra observer opcode %#x", frame[0])
+	if queued := observer.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("zero-speed stance sent extra observer opcode %#x", queued[0][0])
 	}
 	if loaded.Running() {
 		t.Fatal("zero-speed stance left the player running")

@@ -119,7 +119,7 @@ func TestWanderArrivalThenSleepExitTimesWanderFromPromotion(t *testing.T) {
 // goes quiet.
 func assertNoWanderWalk(t *testing.T, c *scriptedClient, after string) {
 	t.Helper()
-	for frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil; frame = c.ReadWithTimeout(300 * time.Millisecond) {
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeMoveToLocation {
 			t.Fatalf("MoveToLocation after %s", after)
 		}

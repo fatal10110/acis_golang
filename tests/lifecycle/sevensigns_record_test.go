@@ -40,8 +40,8 @@ func seedSevenSignsStatus(t *testing.T, edit func(*sevensigns.StatusRow)) gamese
 
 func assertQuietClient(t *testing.T, c *testsupport.ScriptedClient, what string) {
 	t.Helper()
-	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("%s: unexpected opcode %#x", what, frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("%s: unexpected opcode %#x", what, queued[0][0])
 	}
 }
 

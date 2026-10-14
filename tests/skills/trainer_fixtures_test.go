@@ -3,7 +3,6 @@ package skills
 import (
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -81,15 +80,10 @@ func trainerBypass(t *testing.T, c *testsupport.ScriptedClient, f *npc.Folk, com
 func readUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	var frames [][]byte
-	for range 100 {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return frames
-		}
+	for _, frame := range c.ReadQueued() {
 		frames = append(frames, frame)
 	}
-	t.Fatal("client kept receiving frames after 100 drains")
-	return nil
+	return frames
 }
 
 func frameOpcodes(frames [][]byte) []byte {
