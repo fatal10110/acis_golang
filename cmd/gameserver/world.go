@@ -24,9 +24,10 @@ import (
 	"go.uber.org/fx"
 )
 
-func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, subclasses *gamesql.SubclassStore, ids *idfactory.Allocator) *manager.Roster {
+func provideRoster(cfg gameServerConfig, data *gameData, characters *gamesql.CharacterStore, items *gamesql.ItemStore, shortcuts *gamesql.ShortcutStore, subclasses *gamesql.SubclassStore, ids *idfactory.Allocator, log zerolog.Logger) *manager.Roster {
 	roster := manager.NewRoster(characters, items, shortcuts, data.Players, data.Items, data.NPCs, ids, cfg.CharacterDeleteAfter, time.Now)
 	roster.SetSubclasses(subclasses)
+	roster.SetAccessLevels(data.Admin, log)
 	return roster
 }
 

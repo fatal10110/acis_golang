@@ -69,6 +69,7 @@ func (l *GameClientLink) handleRequestCharacterCreate(ctx context.Context, cs *c
 	created, outcome, err := l.roster.Create(ctx, client.AccountName(), manager.CreateRequest{
 		Name: req.Name, ClassID: int(req.ClassID), Race: int(req.Race), Sex: sex,
 		HairStyle: req.HairStyle, HairColor: req.HairColor, Face: req.Face,
+		AccessLevel: l.playerConfig().DefaultAccessLevel,
 	})
 	if err != nil {
 		l.log.Error().Err(err).Str("account", client.AccountName()).Msg("create character")
