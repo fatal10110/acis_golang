@@ -154,15 +154,18 @@ func TestSiegeSummonVanishesOnTeleport(t *testing.T) {
 			assertVanished(t, h, frames)
 			// An owner landing within sight of the summon's old position
 			// sees it there, then its jump; one landing out of sight is told
-			// of neither. Either way it is not shown once it jumped.
+			// of neither. Either way, once it jumped, the owner gets only
+			// the pet window its dismissal sends as its effects stop, just
+			// before PetDelete, and is never shown it again after that.
 			after := frames
 			if jumped := slices.IndexFunc(frames, func(f []byte) bool {
 				return f[0] == serverpackets.OpcodeTeleportToLocation && frameObjectID(f, 1) == summonID
 			}); jumped >= 0 {
 				after = frames[jumped:]
 			}
-			if showsObject(after, summonID) {
-				t.Fatalf("owner opcodes %x after the summon's jump, want it never shown again", frameOpcodes(after))
+			deleted := opcodeIndex(after, serverpackets.OpcodePetDelete)
+			if deleted < 1 || after[deleted-1][0] != serverpackets.OpcodePetInfo || showsObject(after[:deleted-1], summonID) || showsObject(after[deleted:], summonID) {
+				t.Fatalf("owner opcodes %x after the summon's jump, want only its departing PetInfo right before PetDelete", frameOpcodes(after))
 			}
 			if showsObject(watched, summonID) {
 				t.Fatalf("watcher at the landing point opcodes %x, want the summon never shown", frameOpcodes(watched))

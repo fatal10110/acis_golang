@@ -197,7 +197,7 @@ func TestServitorUpkeepPaidAtItsCheckpoint(t *testing.T) {
 // TestServitorLeavesWhenItsUpkeepIsShort lets a servitor whose owner holds no
 // Gemstone D reach its checkpoint: the owner reads that it has not enough
 // items, and the servitor leaves; the owner is still shown the remaining
-// time after the PetDelete, with no icon refresh.
+// time after the PetDelete, then the buffed servitor's emptied icon list.
 func TestServitorLeavesWhenItsUpkeepIsShort(t *testing.T) {
 	t.Parallel()
 	o := bootLifetimeServitorOwner(t, lifetimeServitorSkill())
@@ -215,7 +215,7 @@ func TestServitorLeavesWhenItsUpkeepIsShort(t *testing.T) {
 	if gone := opcodeIndex(frames, serverpackets.OpcodePetDelete); short < 0 || gone < short {
 		t.Fatalf("short checkpoint tick = opcodes %x, want NOT_ENOUGH_ITEMS then PetDelete", frameOpcodes(frames))
 	}
-	assertTrailingRemainTime(t, frames, [2]int32{35_200, 17_200})
+	assertTrailingRemainTime(t, frames, [2]int32{35_200, 17_200}, true)
 	if _, ok := o.srv.State.Summon(o.id); ok {
 		t.Fatal("servitor stayed though its upkeep was short")
 	}
@@ -224,6 +224,7 @@ func TestServitorLeavesWhenItsUpkeepIsShort(t *testing.T) {
 // TestServitorLeavesWhenItsLifetimeRunsOut runs a 2000 ms servitor out: a
 // lifetime at exactly 0 still holds, and the tick that takes it below 0
 // unsummons the servitor, then shows its owner the negative remaining time.
+// The servitor never held an effect, so no icon refresh follows.
 func TestServitorLeavesWhenItsLifetimeRunsOut(t *testing.T) {
 	t.Parallel()
 	def := lifetimeServitorSkill()
@@ -239,15 +240,16 @@ func TestServitorLeavesWhenItsLifetimeRunsOut(t *testing.T) {
 		t.Fatal("servitor left with its lifetime at 0")
 	}
 	frames := o.tickServitor(t, 1)
-	assertTrailingRemainTime(t, frames, [2]int32{2000, -500})
+	assertTrailingRemainTime(t, frames, [2]int32{2000, -500}, false)
 	if _, ok := o.srv.State.Summon(o.id); ok {
 		t.Fatal("servitor stayed past its lifetime")
 	}
 }
 
 // assertTrailingRemainTime checks the frames of a servitor's departing tick:
-// PetDelete, then one SetSummonRemainTime of want, and no icon refresh.
-func assertTrailingRemainTime(t *testing.T, frames [][]byte, want [2]int32) {
+// PetDelete, then one SetSummonRemainTime of want, then, when icons, one
+// PartySpelled listing no icon, else no PartySpelled after PetDelete.
+func assertTrailingRemainTime(t *testing.T, frames [][]byte, want [2]int32, icons bool) {
 	t.Helper()
 	gone, remain := opcodeIndex(frames, serverpackets.OpcodePetDelete), opcodeIndex(frames, serverpackets.OpcodeSetSummonRemainTime)
 	if gone < 0 || remain < gone {
@@ -256,8 +258,18 @@ func assertTrailingRemainTime(t *testing.T, frames [][]byte, want [2]int32) {
 	if got := remainTimes(frames); len(got) != 1 || got[0] != want {
 		t.Fatalf("departing tick SetSummonRemainTime = %v, want one %v", got, want)
 	}
-	if opcodeIndex(frames[gone:], serverpackets.OpcodePartySpelled) >= 0 {
-		t.Fatalf("departing tick = opcodes %x, want no PartySpelled after PetDelete", frameOpcodes(frames))
+	trailing := ofOpcodes(frames[gone:], serverpackets.OpcodePartySpelled)
+	if !icons {
+		if len(trailing) != 0 {
+			t.Fatalf("departing tick = opcodes %x, want no PartySpelled after PetDelete", frameOpcodes(frames))
+		}
+		return
+	}
+	if len(trailing) != 1 || opcodeIndex(frames[gone:], serverpackets.OpcodePartySpelled) < remain-gone {
+		t.Fatalf("departing tick = opcodes %x, want one PartySpelled after SetSummonRemainTime", frameOpcodes(frames))
+	}
+	if n := spelledCount(t, trailing[0]); n != 0 {
+		t.Fatalf("trailing PartySpelled lists %d icons, want 0: %x", n, trailing[0])
 	}
 }
 

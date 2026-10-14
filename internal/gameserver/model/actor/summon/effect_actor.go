@@ -192,6 +192,14 @@ func (a *Actor) BroadcastPosition() {
 // owner's party, or its owner alone, is shown them.
 func (a *Actor) UpdateEffectIcons() { a.emit(event.EffectIconsChanged{}) }
 
+// StopAllEffects ends every effect a holds, running each exit hook; each
+// one's end refreshes a's icons. Its owner is then shown the pet window and,
+// once a ever held an effect, the icon list the window clears.
+func (a *Actor) StopAllEffects() {
+	a.EffectList().StopAll()
+	a.emit(event.OwnerInfoChanged{})
+}
+
 // NotifyEffectWornOff does nothing: effect expiry messages go to players.
 func (a *Actor) NotifyEffectWornOff(modelskill.ID, int) {}
 
