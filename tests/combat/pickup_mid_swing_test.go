@@ -111,11 +111,8 @@ func TestMidSwingAttackReplacesQueuedPickup(t *testing.T) {
 	s.c.Send(encodeAction(s.hostileID, x, y, z, false))
 
 	swung := false
-	for end := s.c.Now().Add(3 * time.Second); s.c.Now().Before(end); {
-		frame := s.c.ReadWithTimeout(end.Sub(s.c.Now()))
-		if frame == nil {
-			break
-		}
+	s.srv.Advance(t, 3*time.Second)
+	for _, frame := range s.c.ReadQueued() {
 		switch {
 		case frame[0] == serverpackets.OpcodeGetItem:
 			t.Fatal("the pickup replaced by the attack still ran")
@@ -142,11 +139,8 @@ func TestMidSwingPickupOfVanishedItemEndsTheAttack(t *testing.T) {
 	s.srv.DespawnGroundItem(t, s.groundID)
 
 	deleted, released := false, false
-	for end := s.c.Now().Add(3 * time.Second); s.c.Now().Before(end); {
-		frame := s.c.ReadWithTimeout(end.Sub(s.c.Now()))
-		if frame == nil {
-			break
-		}
+	s.srv.Advance(t, 3*time.Second)
+	for _, frame := range s.c.ReadQueued() {
 		switch {
 		case frame[0] == serverpackets.OpcodeDeleteObject && wireReader(frame[1:]).ReadInt32() == s.groundID:
 			deleted = true

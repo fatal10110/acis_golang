@@ -40,31 +40,35 @@ func bootInStanceObserved(t *testing.T) (*gameservertest.Server, *testsupport.Sc
 	return srv, c, observer, objID
 }
 
-// watchLeave reads observer for d and reports whether it saw objID's
-// DeleteObject. It fails on an AutoAttackStop for objID when stance is set.
-// It reads in short steps: a step lets the clock run, and the detach a due
-// delay releases needs a moment of its own to reach the observer.
-func watchLeave(t *testing.T, observer *testsupport.ScriptedClient, objID int32, d time.Duration, stance bool) bool {
+// watchLeave lets up to d pass, in steps of watchStep, and reports whether
+// observer was sent objID's DeleteObject by then. It fails on an
+// AutoAttackStop for objID ahead of it when stance is set. The steps let the
+// detach a due delay releases reach the observer before the next one.
+func watchLeave(t *testing.T, srv *gameservertest.Server, observer *testsupport.ScriptedClient, objID int32, d time.Duration, stance bool) bool {
 	t.Helper()
-	for end := observer.Now().Add(d); observer.Now().Before(end); {
-		frame := observer.ReadWithTimeout(min(50*time.Millisecond, end.Sub(observer.Now())))
-		if frame == nil {
-			continue
-		}
-		if len(frame) < 5 || wire.NewReader(frame[1:]).ReadInt32() != objID {
-			continue
-		}
-		switch frame[0] {
-		case serverpackets.OpcodeDeleteObject:
-			return true
-		case serverpackets.OpcodeAutoAttackStop:
-			if stance {
-				t.Fatal("observer got an AutoAttackStop for the leaving player")
+	for passed := time.Duration(0); ; passed += watchStep {
+		for _, frame := range observer.ReadQueued() {
+			if len(frame) < 5 || wire.NewReader(frame[1:]).ReadInt32() != objID {
+				continue
+			}
+			switch frame[0] {
+			case serverpackets.OpcodeDeleteObject:
+				return true
+			case serverpackets.OpcodeAutoAttackStop:
+				if stance {
+					t.Fatal("observer got an AutoAttackStop for the leaving player")
+				}
 			}
 		}
+		if passed >= d {
+			return false
+		}
+		srv.Advance(t, watchStep)
 	}
-	return false
 }
+
+// watchStep is how far watchLeave lets time pass between reads.
+const watchStep = 50 * time.Millisecond
 
 func TestDroppedConnectionInStanceLingersUntilRelog(t *testing.T) {
 	t.Parallel()
@@ -73,7 +77,7 @@ func TestDroppedConnectionInStanceLingersUntilRelog(t *testing.T) {
 	if err := c.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if watchLeave(t, observer, objID, 8*time.Second, true) {
+	if watchLeave(t, srv, observer, objID, 8*time.Second, true) {
 		t.Fatal("a player dropped in attack stance left before the 15 s linger")
 	}
 	if _, ok := srv.State.Player(objID); !ok {
@@ -83,7 +87,7 @@ func TestDroppedConnectionInStanceLingersUntilRelog(t *testing.T) {
 	// Logging the account back in evicts the lingering session: the
 	// character leaves at once, its stance dropped silently.
 	srv.DialClient(t, srv.Account(), 1)
-	if !watchLeave(t, observer, objID, 2*time.Second, true) {
+	if !watchLeave(t, srv, observer, objID, 2*time.Second, true) {
 		t.Fatal("observer never saw the evicted player leave")
 	}
 }
@@ -110,7 +114,7 @@ func TestDroppedConnectionInStanceLeavesAfterLinger(t *testing.T) {
 	}
 	// The stance may run out on its own during the linger and send its own
 	// AutoAttackStop; only the DeleteObject matters here.
-	if !watchLeave(t, observer, objID, 2*time.Second, false) {
+	if !watchLeave(t, srv, observer, objID, 2*time.Second, false) {
 		t.Fatal("observer never saw the lingering player leave")
 	}
 }
@@ -126,7 +130,7 @@ func TestDroppedConnectionOutOfCombatLeavesAfterShortDelay(t *testing.T) {
 		_, ok := srv.State.Player(objID)
 		return !ok
 	})
-	if !watchLeave(t, observer, objID, time.Second, false) {
+	if !watchLeave(t, srv, observer, objID, time.Second, false) {
 		t.Fatal("observer never saw the dropped player leave")
 	}
 }

@@ -163,13 +163,8 @@ func TestFolkTalkMidSwingRunsAtSwingEnd(t *testing.T) {
 	w.clickFolkQueued(t, f, "mid-swing")
 
 	frames := readUntilOpcode(t, w.c, serverpackets.OpcodeNpcHtmlMessage, "chat window after the swing")
-	for end := w.c.Now().Add(3 * time.Second); w.c.Now().Before(end); {
-		frame := w.c.ReadWithTimeout(end.Sub(w.c.Now()))
-		if frame == nil {
-			break
-		}
-		frames = append(frames, frame)
-	}
+	w.srv.Advance(t, 3*time.Second)
+	frames = append(frames, w.srv.ReadQueued(t, w.c)...)
 	for _, frame := range frames {
 		if frame[0] == serverpackets.OpcodeAttack && wire.NewReader(frame[1:]).ReadInt32() == w.player {
 			t.Fatalf("the player swung again instead of talking: %x", opcodes(frames))
