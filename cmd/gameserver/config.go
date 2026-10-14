@@ -75,6 +75,7 @@ type gameplayConfig struct {
 	MultisellDelay           multisellDelay
 	ManorDelay               manorDelay
 	RollDiceDelay            rollDiceDelay
+	SocialDelay              socialDelay
 	SubclassDelay            subclassDelay
 	SubclassWithoutQuests    subclassWithoutQuests
 	BlacksmithUseRecipes     blacksmithUseRecipes
@@ -188,6 +189,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.RollDiceDelay, err = loadRollDiceDelay(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.SocialDelay, err = loadSocialDelay(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.SubclassDelay, err = loadSubclassDelay(paths); err != nil {
@@ -686,6 +690,18 @@ func loadRollDiceDelay(paths gameServerPaths) (rollDiceDelay, error) {
 		return 0, err
 	}
 	return rollDiceDelay(time.Duration(config.NewFields(props, "roll dice reuse delay").Int("RollDiceTime", 4200)) * time.Millisecond), nil
+}
+
+// socialDelay is the reuse delay between two emote requests on one client
+// session, read from server.properties.
+type socialDelay time.Duration
+
+func loadSocialDelay(paths gameServerPaths) (socialDelay, error) {
+	props, err := config.LoadFile(paths.ConfigPath)
+	if err != nil {
+		return 0, err
+	}
+	return socialDelay(time.Duration(config.NewFields(props, "social reuse delay").Int("SocialTime", 2000)) * time.Millisecond), nil
 }
 
 // subclassDelay is the reuse delay between two subclass add, change or
