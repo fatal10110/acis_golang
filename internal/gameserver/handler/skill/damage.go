@@ -6,7 +6,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
-	"github.com/fatal10110/acis_golang/internal/gameserver/model/door/doorhit"
 	modelitem "github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -331,7 +330,7 @@ func applyMdamEffects(cast Cast, obj Actor, bss bool, shield formulas.ShieldDefe
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
-	if d, ok := obj.(*door.Object); ok {
+	if d, ok := asDoor(obj); ok {
 		rollDoorEffects(cast, d, bss, shield, 1, result) // id-only addSkillName overload: level 1
 		return
 	}
@@ -462,7 +461,7 @@ func applyDrainEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, bss 
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
-	if d, ok := obj.(*door.Object); ok {
+	if d, ok := asDoor(obj); ok {
 		rollDoorEffects(cast, d, bss, shield, 1, result) // id-only addSkillName overload: level 1
 		return
 	}
@@ -744,7 +743,7 @@ func applyBlowEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, count
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
-	if d, ok := obj.(*door.Object); ok {
+	if d, ok := asDoor(obj); ok {
 		rollDoorEffects(cast, d, true, shield, cast.Skill.Level, result)
 		return
 	}
@@ -766,7 +765,7 @@ func applyChargeDamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, 
 	if len(cast.Skill.Effects) == 0 {
 		return
 	}
-	if d, ok := obj.(*door.Object); ok {
+	if d, ok := asDoor(obj); ok {
 		rollDoorEffects(cast, d, true, shield, cast.Skill.Level, result)
 		return
 	}
@@ -786,11 +785,7 @@ func applyChargeDamEffects(cast Cast, obj Actor, shield formulas.ShieldDefense, 
 // the resist at level, but a success lands nothing, since a door holds no
 // effects.
 func rollDoorEffects(cast Cast, d *door.Object, bss bool, shield formulas.ShieldDefense, level int, result *Result) {
-	in, ok := doorhit.Of(d).SkillSuccessInput(cast.Caster, cast.Skill, bss, shield)
-	if !ok {
-		return
-	}
-	if !formulas.SkillSucceeds(formulas.SkillSuccessRate(in), landingRoll(cast.Caster)) {
+	if succeeded, ok := doorLands(cast.Caster, d, cast.Skill, bss, shield); ok && !succeeded {
 		appendResisted(result, d, cast.Skill, level, true)
 	}
 }
@@ -826,6 +821,10 @@ func (manaDamageHandler) UseResult(cast Cast) Result {
 		return result
 	}
 	for _, obj := range cast.Targets {
+		if d, ok := asDoor(obj); ok {
+			manaDamageDoor(cast, d, &result)
+			continue
+		}
 		target, ok := asCreature(obj)
 		if !ok || target.Dead() {
 			continue

@@ -44,6 +44,19 @@ var (
 // Of returns d as a hit target.
 func Of(d *door.Object) Target { return Target{Object: d} }
 
+// ForEachKnownInRadius calls fn for every creature self knows in w within
+// radius, a door through its hit surface.
+func ForEachKnownInRadius(w *world.State, self world.Tracked, radius int, fn func(attackable.Combatant)) {
+	w.ForEachKnownInRadius(self, radius, func(candidate world.Tracked) {
+		switch c := candidate.(type) {
+		case *door.Object:
+			fn(Of(c))
+		case attackable.Combatant:
+			fn(c)
+		}
+	})
+}
+
 // StoredObject is the door itself, the object geodata holds while it is
 // closed: a sight query to the hit target leaves the door out.
 func (t Target) StoredObject() dynamic.Object { return t.Object }

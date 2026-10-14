@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door/doorhit"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -59,6 +60,15 @@ func (a *Actor) ForEachKnownCombatantInRadius(radius int, fn func(attackable.Com
 			fn(combatant)
 		}
 	})
+}
+
+// ForEachKnownHitTargetInRadius calls fn for every creature the summon
+// knows within radius, a door through its hit surface.
+func (a *Actor) ForEachKnownHitTargetInRadius(radius int, fn func(attackable.Combatant)) {
+	if a.world == nil {
+		return
+	}
+	doorhit.ForEachKnownInRadius(a.world, a, radius, fn)
 }
 
 func (a *Actor) PoleAttackAngle() int {

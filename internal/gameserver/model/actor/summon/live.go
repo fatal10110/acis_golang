@@ -367,6 +367,20 @@ type CommandContext struct {
 	TargetIsCreature     bool
 	TargetIsDeadCreature bool
 	TargetAttackable     bool
+	// Creature is Target as the creature an attack or follow acts on, when
+	// Target is not one itself: a door through its hit surface. Nil means
+	// Target is used as it is.
+	Creature attackable.Combatant
+}
+
+// creature returns the creature the command's attack or follow acts on,
+// nil when Target is no creature.
+func (ctx CommandContext) creature() attackable.Combatant {
+	if ctx.Creature != nil {
+		return ctx.Creature
+	}
+	c, _ := ctx.Target.(attackable.Combatant)
+	return c
 }
 
 // CommandResult reports what applying a command did.
