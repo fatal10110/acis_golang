@@ -4,6 +4,8 @@ import (
 	"maps"
 	"slices"
 	"sort"
+	"strconv"
+	"unicode/utf8"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 )
@@ -13,6 +15,7 @@ type ordered struct {
 	order []int32
 	seen  map[int32]bool
 	last  *int32
+	buf   []byte
 }
 
 // seenMap hands out the family's plain map; it writes nothing itself.
@@ -112,4 +115,59 @@ func Unpacked(o *ordered) script.Script {
 		x[e.NPC.ObjectID()] = true
 		return ""
 	}}}
+}
+
+// Closure writes the family's map through the result of a local function
+// value that returns it.
+func Closure(o *ordered) script.Script {
+	return script.Script{Hooks: script.Hooks{OnTalk: func(_ *script.Script, e script.Talk) string {
+		get := func() map[int32]bool { return o.seen }
+		get()[e.NPC.ObjectID()] = true
+		return ""
+	}}}
+}
+
+// getter returns a function value handing out the family's map.
+func (o *ordered) getter() func() map[int32]bool {
+	return func() map[int32]bool { return o.seen }
+}
+
+// Returned writes the family's map through the result of the function value
+// a method returns.
+func Returned(o *ordered) script.Script {
+	return script.Script{Hooks: script.Hooks{OnTalk: func(_ *script.Script, e script.Talk) string {
+		o.getter()()[e.NPC.ObjectID()] = true
+		return ""
+	}}}
+}
+
+// Appended overwrites the family's buffer with a library function that
+// writes its first argument's backing array.
+func Appended(o *ordered) script.Script {
+	return script.Script{Hooks: script.Hooks{OnTalk: func(*script.Script, script.Talk) string {
+		_ = strconv.AppendInt(o.buf[:0], 7, 10)
+		return ""
+	}}}
+}
+
+// encode writes its parameter's buffer with a library function that writes
+// its first argument.
+func encode(o *ordered) {
+	utf8.EncodeRune(o.buf, 'x')
+}
+
+// replaced writes through its parameter's map by way of a local pointer
+// whose whole pointee the map was stored in.
+func replaced(o *ordered) {
+	h := &holder{}
+	*h = holder{m: o.seen}
+	h.m[1] = true
+}
+
+// spelled writes through its parameter's map by way of a field the map was
+// stored in with the dereference spelled out.
+func spelled(o *ordered) {
+	h := &holder{}
+	(*h).m = o.seen
+	h.m[1] = true
 }

@@ -95,26 +95,35 @@ func TestScriptStateCheckCatchesFixture(t *testing.T) {
 		"bad.go:28: closure captures mutable constructor-local other",
 		"bad.go:29: go statement",
 		"bad.go:34: closure captures mutable constructor-local ptr",
-		"calls.go:24: Sorted writes through its parameter o",
-		"calls.go:24: closure captures mutable constructor-local o",
-		"calls.go:33: Copied writes through its parameter o",
-		"calls.go:33: closure captures mutable constructor-local o",
-		"calls.go:42: Resorted writes through its parameter o",
-		"calls.go:42: closure captures mutable constructor-local o",
-		"calls.go:50: closure captures mutable constructor-local o",
-		"calls.go:51: MethodResult writes through its parameter o",
-		"calls.go:59: DirectResult writes through its parameter o",
-		"calls.go:59: closure captures mutable constructor-local o",
-		"calls.go:68: Callback writes through its parameter o",
-		"calls.go:68: closure captures mutable constructor-local o",
-		"calls.go:77: Engine writes through its parameter o",
-		"calls.go:77: closure captures mutable constructor-local o",
-		"calls.go:86: closure captures mutable constructor-local o",
-		"calls.go:87: Nested writes through its parameter o",
-		"calls.go:94: sortAll writes through its parameter o",
-		"calls.go:102: stash writes through its parameter o",
-		"calls.go:110: closure captures mutable constructor-local o",
-		"calls.go:112: Unpacked writes through its parameter o",
+		"calls.go:27: Sorted writes through its parameter o",
+		"calls.go:27: closure captures mutable constructor-local o",
+		"calls.go:36: Copied writes through its parameter o",
+		"calls.go:36: closure captures mutable constructor-local o",
+		"calls.go:45: Resorted writes through its parameter o",
+		"calls.go:45: closure captures mutable constructor-local o",
+		"calls.go:53: closure captures mutable constructor-local o",
+		"calls.go:54: MethodResult writes through its parameter o",
+		"calls.go:62: DirectResult writes through its parameter o",
+		"calls.go:62: closure captures mutable constructor-local o",
+		"calls.go:71: Callback writes through its parameter o",
+		"calls.go:71: closure captures mutable constructor-local o",
+		"calls.go:80: Engine writes through its parameter o",
+		"calls.go:80: closure captures mutable constructor-local o",
+		"calls.go:89: closure captures mutable constructor-local o",
+		"calls.go:90: Nested writes through its parameter o",
+		"calls.go:97: sortAll writes through its parameter o",
+		"calls.go:105: stash writes through its parameter o",
+		"calls.go:113: closure captures mutable constructor-local o",
+		"calls.go:115: Unpacked writes through its parameter o",
+		"calls.go:124: closure captures mutable constructor-local o",
+		"calls.go:125: Closure writes through its parameter o",
+		"calls.go:139: Returned writes through its parameter o",
+		"calls.go:139: closure captures mutable constructor-local o",
+		"calls.go:148: Appended writes through its parameter o",
+		"calls.go:148: closure captures mutable constructor-local o",
+		"calls.go:156: encode writes through its parameter o",
+		"calls.go:164: replaced writes through its parameter o",
+		"calls.go:172: spelled writes through its parameter o",
 		"family.go:13: bump writes through its receiver f",
 		"family.go:18: Member writes through its parameter f",
 		"family.go:20: closure captures mutable constructor-local f",
@@ -464,7 +473,7 @@ const (
 
 // libraryCalls lists the functions of other packages the check knows by
 // "import/path.Name"; readOnlyPackages lists packages whose every function
-// only reads its arguments.
+// not listed in libraryCalls only reads its arguments.
 var (
 	libraryCalls = map[string]libraryCall{
 		"errors.Is":               readsAll,
@@ -523,6 +532,21 @@ var (
 		"sort.Slice":              writesFirst,
 		"sort.SliceStable":        writesFirst,
 		"sort.Strings":            writesFirst,
+		// strconv's Append functions and utf8's encoders write their
+		// first argument (the Append ones past its length, as append does);
+		// every other function of their packages only reads.
+		"strconv.AppendBool":               writesFirst,
+		"strconv.AppendFloat":              writesFirst,
+		"strconv.AppendInt":                writesFirst,
+		"strconv.AppendQuote":              writesFirst,
+		"strconv.AppendQuoteRune":          writesFirst,
+		"strconv.AppendQuoteRuneToASCII":   writesFirst,
+		"strconv.AppendQuoteRuneToGraphic": writesFirst,
+		"strconv.AppendQuoteToASCII":       writesFirst,
+		"strconv.AppendQuoteToGraphic":     writesFirst,
+		"strconv.AppendUint":               writesFirst,
+		"unicode/utf8.AppendRune":          writesFirst,
+		"unicode/utf8.EncodeRune":          writesFirst,
 	}
 	readOnlyPackages = []string{"math", "strconv", "strings", "unicode", "unicode/utf8"}
 )
@@ -548,11 +572,11 @@ func libraryFunc(call *ast.CallExpr, info *pkgInfo) (string, bool) {
 // libraryEffect returns what the library function name does with its
 // arguments.
 func libraryEffect(name string) libraryCall {
-	if slices.Contains(readOnlyPackages, name[:strings.LastIndex(name, ".")]) {
-		return readsAll
-	}
 	if effect, ok := libraryCalls[name]; ok {
 		return effect
+	}
+	if slices.Contains(readOnlyPackages, name[:strings.LastIndex(name, ".")]) {
+		return readsAll
 	}
 	return writesAll
 }
@@ -636,8 +660,9 @@ type pathStep struct {
 
 // placePath walks a written place down to the expression it starts from,
 // a variable or another value, and returns the steps from that expression
-// to the place, outermost last. A step through a value of unresolved type
-// counts as following a reference.
+// to the place, outermost last. A field selected through a pointer takes
+// the dereference step first, whether it is spelled out or not. A step
+// through a value of unresolved type counts as following a reference.
 func placePath(e ast.Expr, info *pkgInfo) (ast.Expr, []pathStep) {
 	viaRef := func(x ast.Expr) bool {
 		tv, ok := info.Types[x]
@@ -664,6 +689,15 @@ func placePath(e ast.Expr, info *pkgInfo) (ast.Expr, []pathStep) {
 		case *ast.SliceExpr:
 			step, e = pathStep{"[]", viaRef(x.X)}, x.X
 		case *ast.SelectorExpr:
+			if tv, ok := info.Types[x.X]; ok && tv.Type != nil {
+				if _, ptr := tv.Type.Underlying().(*types.Pointer); ptr {
+					// h.m dereferences h as (*h).m does, and takes the
+					// same steps.
+					steps = append(steps, pathStep{"." + x.Sel.Name, false}, pathStep{"*", true})
+					e = x.X
+					continue
+				}
+			}
 			step, e = pathStep{"." + x.Sel.Name, viaRef(x.X)}, x.X
 		case *ast.StarExpr:
 			step, e = pathStep{"*", true}, x.X
@@ -805,8 +839,8 @@ func aliasSources(n ast.Node, info *pkgInfo) aliases {
 
 // valueRoots returns the variables a value is read out of: the root of a
 // field, index, slice, dereference, address or type assertion chain, the
-// roots of every element of a composite literal, and the roots of a call's
-// result (see callRoots). A value whose type holds no reference (a number,
+// roots of every element of a composite literal, the variables a function
+// literal captures, and the roots of a call's result (see callRoots). A value whose type holds no reference (a number,
 // a string, a struct or array of them) is a copy and has none, as has any
 // other value.
 func valueRoots(e ast.Expr, info *pkgInfo) []types.Object {
@@ -838,6 +872,8 @@ func valueRoots(e ast.Expr, info *pkgInfo) []types.Object {
 			e = x.X
 		case *ast.CompositeLit:
 			return rootsOf(x.Elts, info)
+		case *ast.FuncLit:
+			return captures(x, info)
 		case *ast.CallExpr:
 			return callRoots(x, info)
 		case *ast.Ident:
@@ -861,8 +897,9 @@ func valueRoots(e ast.Expr, info *pkgInfo) []types.Object {
 // (see resultShares): the method seenMap returning its receiver's map is
 // that map. The engine (a function of another package of the module, or a
 // method of a type the stub importer left unresolved) returns engine
-// values. Any other call, a function value's among them, may return its
-// receiver or any argument.
+// values. Any other call may return its receiver or any argument, and a
+// call of a function value also what the value shares: a closure's
+// captures (see valueRoots).
 func callRoots(call *ast.CallExpr, info *pkgInfo) []types.Object {
 	if info.Types[call.Fun].IsType() {
 		return rootsOf(call.Args, info)
@@ -922,6 +959,10 @@ func callRoots(call *ast.CallExpr, info *pkgInfo) []types.Object {
 	if recv != nil {
 		out = append(out, valueRoots(recv, info)...)
 	}
+	if fn == nil {
+		// A function value may return what it captures.
+		out = append(out, valueRoots(call.Fun, info)...)
+	}
 	return out
 }
 
@@ -958,6 +999,24 @@ func elemsShare(e ast.Expr, info *pkgInfo) bool {
 		}
 	}
 	return true
+}
+
+// captures returns the variables declared outside the function literal lit
+// that it uses.
+func captures(lit *ast.FuncLit, info *pkgInfo) []types.Object {
+	var out []types.Object
+	ast.Inspect(lit.Body, func(n ast.Node) bool {
+		id, ok := n.(*ast.Ident)
+		if !ok {
+			return true
+		}
+		v, ok := info.Uses[id].(*types.Var)
+		if ok && !v.IsField() && (v.Pos() < lit.Pos() || v.Pos() >= lit.End()) && !slices.Contains(out, types.Object(v)) {
+			out = append(out, v)
+		}
+		return true
+	})
+	return out
 }
 
 func rootsOf(es []ast.Expr, info *pkgInfo) []types.Object {

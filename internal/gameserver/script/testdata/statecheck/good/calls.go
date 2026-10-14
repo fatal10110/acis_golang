@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 )
@@ -50,6 +52,10 @@ func Read(r *roster) script.Script {
 		f := r.fresh()
 		f[0] = id
 		slices.Sort(r.fresh())
+		first := func() int32 { return r.order[0] }
+		local[0] = first()
+		buf := strconv.AppendInt(nil, int64(id), 10)
+		utf8.EncodeRune(buf, 'x')
 		s.Say(e.NPC, strings.Join(r.names, ","), fmt.Sprint(r.count()))
 		return ""
 	}}}
