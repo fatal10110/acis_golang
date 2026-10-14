@@ -244,6 +244,9 @@ type PlayerConfig struct {
 	// GMHeroAura is players.properties GMHeroAura: a game master shows the
 	// hero aura.
 	GMHeroAura bool
+	// DefaultAccessLevel is players.properties DefaultAccessLevel: the access
+	// level every new character is granted.
+	DefaultAccessLevel int
 	// CraftingDisabled is players.properties CraftingEnabled inverted, so
 	// the zero value keeps crafting on as the shipped config does.
 	CraftingDisabled bool

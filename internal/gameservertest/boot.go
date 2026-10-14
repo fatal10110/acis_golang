@@ -141,6 +141,7 @@ type options struct {
 	karmaPlayerCanTrade    bool
 	admin                  *admin.Data
 	gmStartupUnlisted      bool
+	defaultAccessLevel     int
 	gmStartupModes         [3]bool
 	gmHeroAura             bool
 	gmAudit                zerolog.Logger
@@ -380,6 +381,13 @@ func WithGMStartupUnlisted() Option { return func(o *options) { o.gmStartupUnlis
 // with (default: none, as shipped).
 func WithGMStartupModes(invulnerable, invisible, blockAll bool) Option {
 	return func(o *options) { o.gmStartupModes = [3]bool{invulnerable, invisible, blockAll} }
+}
+
+// WithDefaultAccessLevel sets players.properties DefaultAccessLevel: the
+// access level every character created through the client is granted
+// (default 0).
+func WithDefaultAccessLevel(level int) Option {
+	return func(o *options) { o.defaultAccessLevel = level }
 }
 
 // WithGMHeroAura sets players.properties GMHeroAura = True: a game master
@@ -2075,6 +2083,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	roster := gamemanager.NewRoster(holdingCharacterStore{CharacterStore: chars, hold: o.selectionHold}, items, shortcuts, templates, itemTemplates, rosterNPCs, ids, o.characterDeleteAfter, time.Now)
 	roster.SetSubclasses(subclasses)
+	if o.admin != nil {
+		roster.SetAccessLevels(o.admin, o.log)
+	}
 	effects.SetAutosave(roster, o.skills, petStore, persistWorker, zerolog.Nop())
 	autosaveClock := &autosaveClock{now: time.Now()}
 	autosave, err := task.NewAutosave(effects, autosaveClock.Now)
@@ -2147,7 +2158,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, DeathDrop: o.deathDrop, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, ManorDelay: o.manorDelay, RollDiceDelay: o.rollDiceDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight, PartyRange: fixturePartyRange, MultipleItemDrop: !o.singleItemDrop},
+		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, DeathDrop: o.deathDrop, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, DefaultAccessLevel: o.defaultAccessLevel, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, ManorDelay: o.manorDelay, RollDiceDelay: o.rollDiceDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight, PartyRange: fixturePartyRange, MultipleItemDrop: !o.singleItemDrop},
 		Restarts:         o.restarts,
 		ClanHallData:     o.clanHallData,
 		CastleData:       o.castleData,
