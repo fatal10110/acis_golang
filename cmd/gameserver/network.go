@@ -472,6 +472,7 @@ func newPlayerConfig(cfg gameServerConfig, gameplay gameplayConfig, rewards mana
 		GMStartupInvisible:         gameplay.Admin.GMStartupInvisible,
 		GMStartupBlockAll:          gameplay.Admin.GMStartupBlockAll,
 		GMHeroAura:                 gameplay.Admin.GMHeroAura,
+		DefaultAccessLevel:         gameplay.Admin.DefaultAccessLevel,
 		PartyRange:                 rewards.PartyRange,
 		MultipleItemDrop:           rewards.MultipleItemDrop,
 	}

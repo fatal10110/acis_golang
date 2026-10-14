@@ -8,9 +8,11 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/shortcut"
+	"github.com/rs/zerolog"
 )
 
 // DefaultDeleteAfter is the grace period between scheduling a character for
@@ -40,9 +42,9 @@ const (
 	CreateInvalidName
 )
 
-// CreateRequest is the client-supplied choice for a new character.
-// Appearance fields are validated by Create; nothing here is trusted
-// as-is.
+// CreateRequest is the client-supplied choice for a new character, plus the
+// access level the server grants it. Appearance fields are validated by
+// Create; nothing the client supplies is trusted as-is.
 type CreateRequest struct {
 	Name    string
 	ClassID int
@@ -53,6 +55,10 @@ type CreateRequest struct {
 	Race                       int
 	Sex                        player.Sex
 	HairStyle, HairColor, Face byte
+	// AccessLevel is the level the server grants every new character
+	// (players.properties DefaultAccessLevel), never a client value. Create
+	// stores the level it resolves to; see SetAccessLevels.
+	AccessLevel int
 }
 
 // idAllocator hands out unique persistent-object ids. Roster needs only
@@ -118,6 +124,17 @@ type Roster struct {
 	now         func() time.Time
 	// purged learns of every character deleted for good; nil for none.
 	purged func(objectID int32)
+	// accessLevels resolves the level a new character is granted; nil
+	// resolves every level to the user level.
+	accessLevels *admin.Data
+	log          zerolog.Logger
+}
+
+// SetAccessLevels has Create resolve the level a new character is granted
+// against levels, logging to log an undefined level and the master level.
+// It is set once at boot, before any client connects.
+func (r *Roster) SetAccessLevels(levels *admin.Data, log zerolog.Logger) {
+	r.accessLevels, r.log = levels, log
 }
 
 // SetPurged has fn learn of every character deleted for good, after its
@@ -142,6 +159,7 @@ func NewRoster(characters characterStore, items itemStore, shortcuts shortcutSto
 		ids:         ids,
 		deleteAfter: deleteAfter,
 		now:         now,
+		log:         zerolog.Nop(),
 	}
 }
 
@@ -213,6 +231,10 @@ func (r *Roster) Create(ctx context.Context, accountName string, req CreateReque
 	if err != nil {
 		return nil, CreateRejected, fmt.Errorf("player roster: create %q: %w", req.Name, err)
 	}
+	// The row stores the level the granted one resolves to. The title stays
+	// empty: the access level's name is shown as title once the character
+	// enters the world, not stored at creation.
+	c.AccessLevel = r.accessLevels.Grant(req.AccessLevel, req.Name, r.log).Level
 
 	if err := r.characters.Create(ctx, c); err != nil {
 		return nil, CreateRejected, err
