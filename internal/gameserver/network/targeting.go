@@ -112,6 +112,8 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 			live.deferInteract(f, shift)
 		} else if h, ok := target.(*npc.Hostile); ok && interactsWith(live, h, ctrl) {
 			live.deferInteract(h, shift)
+		} else if d, ok := target.(*door.Object); ok && !d.AttackableBy(live.Character) {
+			live.deferInteract(d, shift)
 		} else {
 			intention, run := l.queuedSelectedTargetAction(live, target, ctrl, shift)
 			live.deferAction(intention, func() {
@@ -141,6 +143,9 @@ func (l *GameClientLink) actOnSelectedTarget(live *livePlayer, target world.Trac
 	}
 	if h, ok := target.(*npc.Hostile); ok && interactsWith(live, h, ctrl) {
 		l.tryToInteract(live, h, shift)
+		return
+	}
+	if l.actOnDoor(live, target, shift) {
 		return
 	}
 	l.attackLiveTarget(live, target, shift)
@@ -423,7 +428,8 @@ func attacksFolk(live *livePlayer, f *npc.Folk, ctrl bool) bool {
 
 // interactTarget is what a player's interact intention walks to and acts
 // on: the player's own summon, whose status window opens, a civilian NPC,
-// whose chat window opens, a player running a store, or a static object.
+// whose chat window opens, a player running a store, a static object, or a
+// door.
 type interactTarget interface {
 	world.Tracked
 	Position() (x, y, z int)
@@ -432,6 +438,9 @@ type interactTarget interface {
 // interactTargetRadius is target's collision radius, counted into the
 // approach range: a creature's own, none for a static object.
 func interactTargetRadius(target interactTarget) float64 {
+	if _, ok := target.(*door.Object); ok {
+		return door.CollisionRadius
+	}
 	if c, ok := target.(interface{ CollisionRadius() float64 }); ok {
 		return c.CollisionRadius()
 	}
@@ -593,7 +602,8 @@ func movingNPC(target interactTarget) bool {
 
 // onInteract acts on an interact target in reach: the player's own summon
 // shows its status window, a civilian NPC talks, a talking hostile NPC
-// too, a player running a store shows its store window.
+// too, a player running a store shows its store window, and a clan hall
+// door asks its owners whether to open or close it.
 func (l *GameClientLink) onInteract(live *livePlayer, target interactTarget) {
 	switch t := target.(type) {
 	case *livePlayer:
@@ -606,6 +616,8 @@ func (l *GameClientLink) onInteract(live *livePlayer, target interactTarget) {
 		l.talkToHostile(live, t)
 	case *staticobject.Object:
 		l.showStaticObject(live, t)
+	case *door.Object:
+		l.interactDoor(live, t)
 	}
 }
 

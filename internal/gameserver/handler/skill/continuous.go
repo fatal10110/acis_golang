@@ -46,6 +46,10 @@ func (h continuousHandler) UseResult(cast Cast) Result {
 		// A target that died after the cast resolved it still goes through
 		// the reflect, immunity and success rolls below; only the effects
 		// themselves are refused on landing.
+		if d, ok := asDoor(obj); ok {
+			continuousOnDoor(cast, d, def, bsps, &result)
+			continue
+		}
 		target, ok := asCreature(obj)
 		if !ok {
 			continue

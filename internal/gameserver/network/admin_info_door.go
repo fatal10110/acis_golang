@@ -53,10 +53,8 @@ var sealStrifeIndex = slices.Index(sevensigns.Seals[:], sevensigns.Strife)
 // name, "none" when no residence does. Clan halls are attached after
 // castles, so a hall listing the door wins.
 func (l *GameClientLink) doorResidenceName(name string) string {
-	for _, h := range l.clanHallData.All() {
-		if slices.Contains(h.Gates, name) {
-			return h.Name
-		}
+	if h, ok := l.hallOfDoor(name); ok {
+		return h.Name
 	}
 	for _, c := range l.castleData.All() {
 		if slices.Contains(c.Gates, name) {

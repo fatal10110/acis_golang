@@ -22,10 +22,10 @@ func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
 		a.SetTarget(ctx.Target)
 		if ctx.TargetIsCreature && ctx.TargetAttackable {
 			a.setIntent(IntentAttackTarget)
-			a.TryToAttack(ctx.Target)
+			a.tryToAttack(ctx.creature())
 		} else if ctx.TargetIsCreature {
 			a.setIntent(IntentFollowTarget)
-			a.TryToFollow(ctx.Target)
+			a.tryToFollow(ctx.creature())
 		} else {
 			a.setIntent(IntentInteractTarget)
 		}
@@ -39,7 +39,7 @@ func (a *Actor) ApplyCommand(ctx CommandContext) CommandResult {
 		a.SetTarget(ctx.Target)
 		if ctx.TargetIsCreature {
 			a.setIntent(IntentFollowTarget)
-			a.TryToFollow(ctx.Target)
+			a.tryToFollow(ctx.creature())
 		} else {
 			a.setIntent(IntentInteractTarget)
 		}

@@ -18,6 +18,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/macro"
@@ -195,6 +196,10 @@ type livePlayer struct {
 	// Trainer, shop and other service requests act on it while
 	// playerCanDoInteract(p, currentFolk) holds.
 	currentFolk atomic.Pointer[npc.Folk]
+
+	// requestedGate is the door whose open or close question the player
+	// was last asked; the dialog's answer takes it.
+	requestedGate atomic.Pointer[door.Object]
 
 	// bypasses are the links of the last validated HTML page p was sent.
 	bypasses bypassWhitelist

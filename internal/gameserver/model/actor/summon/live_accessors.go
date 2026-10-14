@@ -642,21 +642,33 @@ func (a *Actor) AttackTarget(target world.Tracked) { a.TryToAttack(target) }
 // TryToAttack forwards an attack request to the attached AI when target is
 // a live combatant.
 func (a *Actor) TryToAttack(target world.Tracked) {
-	combatant, ok := target.(attackable.Combatant)
-	if !ok || a.brain == nil {
+	combatant, _ := target.(attackable.Combatant)
+	a.tryToAttack(combatant)
+}
+
+// tryToAttack forwards an attack request on target, when there is one, to
+// the attached AI.
+func (a *Actor) tryToAttack(target attackable.Combatant) {
+	if target == nil || a.brain == nil {
 		return
 	}
-	a.brain.TryToAttack(combatant)
+	a.brain.TryToAttack(target)
 }
 
 // TryToFollow forwards a follow request to the attached AI when target is
 // a live combatant.
 func (a *Actor) TryToFollow(target world.Tracked) {
-	combatant, ok := target.(attackable.Combatant)
-	if !ok || a.brain == nil {
+	combatant, _ := target.(attackable.Combatant)
+	a.tryToFollow(combatant)
+}
+
+// tryToFollow forwards a follow request on target, when there is one, to
+// the attached AI.
+func (a *Actor) tryToFollow(target attackable.Combatant) {
+	if target == nil || a.brain == nil {
 		return
 	}
-	a.brain.TryToFollow(combatant)
+	a.brain.TryToFollow(target)
 }
 
 // TryToIdle sends the summon idle the way an effect, an interrupted action

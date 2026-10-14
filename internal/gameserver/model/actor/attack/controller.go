@@ -49,7 +49,10 @@ type CreatureActor interface {
 	PhysicalAttackRange() int
 	PoleAttackAngle() int
 	PoleAttackCountMax() int
-	ForEachKnownCombatantInRadius(int, func(attackable.Combatant))
+	// ForEachKnownHitTargetInRadius calls its func for every creature the
+	// actor knows within the radius that a pole swing may splash onto, a
+	// door among them through its hit surface.
+	ForEachKnownHitTargetInRadius(int, func(attackable.Combatant))
 	WeaponReuseDelay() time.Duration
 	WeaponGrade() int
 	SoulshotCharged() bool
@@ -334,7 +337,7 @@ func (c *Controller) DoAttack(target attackable.Combatant) {
 			}
 			angle := c.actor.PoleAttackAngle()
 			primaryIsPlayable := target.Kind().Playable()
-			c.actor.ForEachKnownCombatantInRadius(c.actor.PhysicalAttackRange(), func(candidate attackable.Combatant) {
+			c.actor.ForEachKnownHitTargetInRadius(c.actor.PhysicalAttackRange(), func(candidate attackable.Combatant) {
 				if len(hits) >= maxTargets || candidate.ObjectID() == c.actor.ObjectID() || candidate.ObjectID() == target.ObjectID() {
 					return
 				}

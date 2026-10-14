@@ -396,7 +396,7 @@ func (a *timingActor) SetHeadingTo(attackable.Combatant)       {}
 func (a *timingActor) PhysicalAttackRange() int { return 100 }
 func (a *timingActor) PoleAttackAngle() int     { return 120 }
 func (a *timingActor) PoleAttackCountMax() int  { return a.poleMax }
-func (a *timingActor) ForEachKnownCombatantInRadius(radius int, fn func(attackable.Combatant)) {
+func (a *timingActor) ForEachKnownHitTargetInRadius(radius int, fn func(attackable.Combatant)) {
 	a.queryRadius = radius
 	for _, candidate := range a.known {
 		positioned, ok := candidate.(interface{ Position() (int, int, int) })
