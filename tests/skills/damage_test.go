@@ -713,6 +713,8 @@ func TestDamageOverTimeOnInvulnerableNPCRegistersHateWithoutDamage(t *testing.T)
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(43, false, false))
+	srv.Settle(t)
+	srv.AdvanceUntil(t, "DOT cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 	drainUntilQuiet(t, c)
 
 	hostile.SetInvul(true)

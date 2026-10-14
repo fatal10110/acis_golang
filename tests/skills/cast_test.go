@@ -835,6 +835,7 @@ func TestSkillDisabledToggleRejectionDoesNotStopMovement(t *testing.T) {
 	startInWorld(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(blockerSkillID, false, false))
+	srv.Settle(t)
 	srv.AdvanceUntil(t, "blocker cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 	drainUntilQuiet(t, c)
 
