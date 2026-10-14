@@ -462,6 +462,7 @@ func newPlayerConfig(cfg gameServerConfig, gameplay gameplayConfig, rewards mana
 		MultisellDelay:             time.Duration(gameplay.MultisellDelay),
 		ManorDelay:                 time.Duration(gameplay.ManorDelay),
 		RollDiceDelay:              time.Duration(gameplay.RollDiceDelay),
+		SocialDelay:                time.Duration(gameplay.SocialDelay),
 		SubclassDelay:              time.Duration(gameplay.SubclassDelay),
 		SubclassWithoutQuests:      bool(gameplay.SubclassWithoutQuests),
 		KeepMaintainedIngredients:  !bool(gameplay.BlacksmithUseRecipes),
@@ -471,6 +472,7 @@ func newPlayerConfig(cfg gameServerConfig, gameplay gameplayConfig, rewards mana
 		GMStartupInvisible:         gameplay.Admin.GMStartupInvisible,
 		GMStartupBlockAll:          gameplay.Admin.GMStartupBlockAll,
 		GMHeroAura:                 gameplay.Admin.GMHeroAura,
+		DefaultAccessLevel:         gameplay.Admin.DefaultAccessLevel,
 		PartyRange:                 rewards.PartyRange,
 		MultipleItemDrop:           rewards.MultipleItemDrop,
 	}

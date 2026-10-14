@@ -244,6 +244,9 @@ type PlayerConfig struct {
 	// GMHeroAura is players.properties GMHeroAura: a game master shows the
 	// hero aura.
 	GMHeroAura bool
+	// DefaultAccessLevel is players.properties DefaultAccessLevel: the access
+	// level every new character is granted.
+	DefaultAccessLevel int
 	// CraftingDisabled is players.properties CraftingEnabled inverted, so
 	// the zero value keeps crafting on as the shipped config does.
 	CraftingDisabled bool
@@ -259,6 +262,9 @@ type PlayerConfig struct {
 	// RollDiceDelay is the reuse delay between two dice throws on one
 	// client session.
 	RollDiceDelay time.Duration
+	// SocialDelay is the reuse delay between two emote requests on one
+	// client session.
+	SocialDelay time.Duration
 	// SubclassDelay is the reuse delay between two subclass add, change or
 	// replace actions of one player.
 	SubclassDelay time.Duration
