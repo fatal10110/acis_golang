@@ -217,11 +217,8 @@ func TestQueuedAttackIdledAtCastEndAnswersActionFailed(t *testing.T) {
 
 			srv.AdvanceUntil(t, "cast end", func() bool { return !pc.CastingNow() })
 			failed := 0
-			for end := c.Now().Add(2 * time.Second); c.Now().Before(end); {
-				frame := c.ReadWithTimeout(300 * time.Millisecond)
-				if frame == nil {
-					continue
-				}
+			srv.Advance(t, 2*time.Second)
+			for _, frame := range c.ReadQueued() {
 				if attackFrameBy(frame, objID) {
 					t.Fatal("queued attack swung after the cast")
 				}

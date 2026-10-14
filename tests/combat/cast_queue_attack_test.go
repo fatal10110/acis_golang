@@ -124,12 +124,13 @@ func requestAttackMidCast(t *testing.T, c *scriptedClient, hostileID int32) {
 	assertFrameOpcode(t, mustRead(t, c, "mid-cast attack ActionFailed"), serverpackets.OpcodeActionFailed, "mid-cast attack ActionFailed")
 }
 
-// assertNoAttackFor reads frames while d passes and fails on any Attack.
-func assertNoAttackFor(t *testing.T, c *scriptedClient, d time.Duration, what string) {
+// assertNoAttackFor lets d pass and fails on any Attack the server queued
+// to c meanwhile.
+func assertNoAttackFor(t *testing.T, srv *gameservertest.Server, c *scriptedClient, d time.Duration, what string) {
 	t.Helper()
-	for end := c.Now().Add(d); c.Now().Before(end); {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame != nil && frame[0] == serverpackets.OpcodeAttack {
+	srv.Advance(t, d)
+	for _, frame := range c.ReadQueued() {
+		if frame[0] == serverpackets.OpcodeAttack {
 			t.Fatalf("%s: an attack started", what)
 		}
 	}
@@ -151,7 +152,7 @@ func TestMidCastSkillReplacesQueuedAttack(t *testing.T) {
 
 	srv.AdvanceUntil(t, "queued skill start", func() bool { return pc.SkillDisabled(key) })
 	srv.AdvanceUntil(t, "queued skill end", func() bool { return !pc.CastingNow() })
-	assertNoAttackFor(t, c, 2*time.Second, "after the queued skill")
+	assertNoAttackFor(t, srv, c, 2*time.Second, "after the queued skill")
 }
 
 // TestMidCastAttackReplacesQueuedSkill is the other order: a skill queued
@@ -199,11 +200,8 @@ func TestQueuedSkillWhoseTargetLeftSendsNothing(t *testing.T) {
 	}
 
 	srv.AdvanceUntil(t, "cast end", func() bool { return !pc.CastingNow() })
-	for end := c.Now().Add(2 * time.Second); c.Now().Before(end); {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			continue
-		}
+	srv.Advance(t, 2*time.Second)
+	for _, frame := range c.ReadQueued() {
 		switch frame[0] {
 		case serverpackets.OpcodeActionFailed, serverpackets.OpcodeSystemMessage, serverpackets.OpcodeMagicSkillUse:
 			t.Fatalf("resume with its target gone sent opcode %#x, want no packet", frame[0])

@@ -47,13 +47,10 @@ func bootMidSwingPickup(t *testing.T, back int) midSwingPickup {
 
 // assertNoSwingBy fails when attackerID starts a swing within d. The
 // monster's own swings back do not count.
-func assertNoSwingBy(t *testing.T, c *scriptedClient, attackerID int32, d time.Duration, what string) {
+func assertNoSwingBy(t *testing.T, srv *gameservertest.Server, c *scriptedClient, attackerID int32, d time.Duration, what string) {
 	t.Helper()
-	for end := c.Now().Add(d); c.Now().Before(end); {
-		frame := c.ReadWithTimeout(end.Sub(c.Now()))
-		if frame == nil {
-			return
-		}
+	srv.Advance(t, d)
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeAttack && wireReader(frame[1:]).ReadInt32() == attackerID {
 			t.Fatalf("player swung again %s", what)
 		}
@@ -95,7 +92,7 @@ func TestMidSwingPickupReplacesTheAttack(t *testing.T) {
 					break
 				}
 			}
-			assertNoSwingBy(t, s.c, s.objID, 3*time.Second, "after the queued pickup")
+			assertNoSwingBy(t, s.srv, s.c, s.objID, 3*time.Second, "after the queued pickup")
 		})
 	}
 }

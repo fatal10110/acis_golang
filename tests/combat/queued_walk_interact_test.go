@@ -116,7 +116,7 @@ func TestWalkRequestedMidSwingRunsAtSwingEnd(t *testing.T) {
 	if !landed {
 		t.Fatal("the queued walk started before the swing landed")
 	}
-	assertNoSwingBy(t, s.c, s.objID, 2*time.Second, "after the queued walk")
+	assertNoSwingBy(t, s.srv, s.c, s.objID, 2*time.Second, "after the queued walk")
 }
 
 // TestWalkRequestedMidCastRunsAtCastEnd is the same for a cast in flight:
@@ -242,7 +242,7 @@ func TestThroneClickMidSwingInteractsAtSwingEnd(t *testing.T) {
 			if throne.Busy() {
 				t.Fatal("a throne click claimed the throne")
 			}
-			assertNoSwingBy(t, s.c, s.objID, 2*time.Second, "after the queued throne interact")
+			assertNoSwingBy(t, s.srv, s.c, s.objID, 2*time.Second, "after the queued throne interact")
 			return
 		case frame[0] == serverpackets.OpcodeChangeWaitType, frame[0] == serverpackets.OpcodeChairSit:
 			t.Fatalf("queued throne interact sat the player: opcode %#x", frame[0])

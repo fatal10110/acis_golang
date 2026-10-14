@@ -143,8 +143,9 @@ func TestSkillBarCastDuringSitDownIsRefusedOnceSeated(t *testing.T) {
 		t.Fatalf("queued skill-bar cast answered %v after sit-down, want no earlier than %v", elapsed, sitStandDelay)
 	}
 	assertStaticSystemMessage(t, frame, serverpackets.SystemMessageCannotMoveWhileSitting)
-	if extra := c.ReadWithTimeout(time.Second); extra != nil {
-		t.Fatalf("refused queued cast extra opcode = %#x, want none", extra[0])
+	srv.Advance(t, time.Second)
+	if extra := c.ReadQueued(); len(extra) != 0 {
+		t.Fatalf("refused queued cast extra opcode = %#x, want none", extra[0][0])
 	}
 	if got := srv.PlayerCurrentMP(t, objID); got != mpBefore {
 		t.Fatalf("MP after refused cast = %d, want unchanged %d", got, mpBefore)

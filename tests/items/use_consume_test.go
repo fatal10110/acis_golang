@@ -368,7 +368,7 @@ func TestUseTwoSkillItemWhileAttackingCastsOnlyLast(t *testing.T) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeAttack, "Attack")
 
 	c.Send(encodeUseItem(scroll, false))
-	ids := collectMagicSkillUseIDs(t, c, 3*time.Second)
+	ids := collectMagicSkillUseIDs(t, srv, c, 3*time.Second)
 	if len(ids) != 1 || ids[0] != 2015 {
 		t.Fatalf("MagicSkillUse skill ids = %v, want only 2015", ids)
 	}
@@ -396,34 +396,16 @@ func disablePlayerSkill(t *testing.T, srv *gameservertest.Server, objID int32, d
 	disabler.DisableSkill(actorcast.ReuseKey(def), delay)
 }
 
-func collectMagicSkillUseIDs(t *testing.T, c *testsupport.ScriptedClient, window time.Duration) []int32 {
+// collectMagicSkillUseIDs lets window pass and returns the skill ids of the
+// MagicSkillUse frames the server queued to c meanwhile.
+func collectMagicSkillUseIDs(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient, window time.Duration) []int32 {
 	t.Helper()
-	deadline := c.Now().Add(window)
-	quiet := 500 * time.Millisecond
+	srv.Advance(t, window)
 	var ids []int32
-	for c.Now().Before(deadline) {
-		timeout := 200 * time.Millisecond
-		if len(ids) > 0 {
-			timeout = quiet
+	for _, frame := range c.ReadQueued() {
+		if frame[0] == serverpackets.OpcodeMagicSkillUse {
+			ids = append(ids, magicSkillUseSkillID(frame))
 		}
-		remaining := deadline.Sub(c.Now())
-		if remaining <= 0 {
-			break
-		}
-		if timeout > remaining {
-			timeout = remaining
-		}
-		frame := c.ReadWithTimeout(timeout)
-		if frame == nil {
-			if len(ids) > 0 {
-				return ids
-			}
-			continue
-		}
-		if frame[0] != serverpackets.OpcodeMagicSkillUse {
-			continue
-		}
-		ids = append(ids, magicSkillUseSkillID(frame))
 	}
 	return ids
 }

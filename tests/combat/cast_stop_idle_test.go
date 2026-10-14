@@ -57,7 +57,7 @@ func assertStaysIdle(t *testing.T, srv *gameservertest.Server, pc *player.Charac
 	t.Helper()
 	c := srv.Client
 	x, y, z := srv.PlayerPosition(t, pc.ObjectID())
-	assertNoAttackFor(t, c, 2*time.Second, "after the stop")
+	assertNoAttackFor(t, srv, c, 2*time.Second, "after the stop")
 	onPlayerQueue(t, srv, pc.ObjectID(), func(pc *player.Character) { pc.WakeAI() })
 	assertOpcodes(t, framesUntilQuiet(c), nil, "an AI wake-up after the stop")
 	if nx, ny, nz := srv.PlayerPosition(t, pc.ObjectID()); nx != x || ny != y || nz != z {
@@ -242,7 +242,7 @@ func TestTeleportMidCastActionFailedCounts(t *testing.T) {
 			}
 			c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
 			drainUntilQuiet(t, c)
-			assertNoAttackFor(t, c, 2*time.Second, "after the teleport")
+			assertNoAttackFor(t, srv, c, 2*time.Second, "after the teleport")
 			if pc.CastingNow() {
 				t.Fatal("a cast is in flight after the teleport")
 			}

@@ -346,8 +346,8 @@ func TestHealOverTimeTicksRestoreDamagedCaster(t *testing.T) {
 
 	srv.Advance(t, 1100*time.Millisecond)
 	srv.TickEffects()
-	if frame := c.ReadWithTimeout(time.Second); frame != nil {
-		t.Fatalf("full-health tick frame opcode %#x, want silence", frame[0])
+	if frames := c.ReadQueued(); len(frames) != 0 {
+		t.Fatalf("full-health tick frame opcode %#x, want silence", frames[0][0])
 	}
 	if got := srv.PlayerCurrentHP(t, objID); got != maxHP {
 		t.Fatalf("HP after full-health tick = %d, want unchanged %d", got, maxHP)
