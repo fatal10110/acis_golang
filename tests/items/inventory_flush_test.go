@@ -294,15 +294,11 @@ func readUntilOpcode(t *testing.T, c *testsupport.ScriptedClient, opcode byte) [
 	return nil
 }
 
-// readUntilQuiet collects every frame the client still receives until it
-// falls silent for one read timeout.
+// readUntilQuiet returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func readUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	var frames [][]byte
-	for _, frame := range c.ReadQueued() {
-		frames = append(frames, frame)
-	}
-	return frames
+	return c.ReadQueued()
 }
 
 // assertNoInventoryUpdateFor fails if any frame is an InventoryUpdate

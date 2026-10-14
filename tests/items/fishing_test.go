@@ -250,9 +250,8 @@ func fishingEvent(t *testing.T, f []byte) string {
 	return ""
 }
 
-// fishingEvents collects the fishing flow frames until the client is quiet,
-// leaving out the fight's per-second gauge: each quiet read lets time pass,
-// so how many seconds of the fight it spans is not fixed.
+// fishingEvents collects the fishing flow frames the server has queued to
+// the client, leaving out the fight's per-second gauge.
 func fishingEvents(t *testing.T, c *testsupport.ScriptedClient) []string {
 	t.Helper()
 	var out []string

@@ -136,11 +136,7 @@ func watcherObjectID(t *testing.T, srv *gameservertest.Server, objID int32) int3
 }
 
 func readQuiet(c *scriptedClient) [][]byte {
-	var frames [][]byte
-	for _, f := range c.ReadQueued() {
-		frames = append(frames, f)
-	}
-	return frames
+	return c.ReadQueued()
 }
 
 // indexOf finds the first frame at or after from with opcode op whose

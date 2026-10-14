@@ -691,15 +691,11 @@ func waitForInventoryUpdate(t *testing.T, c *testsupport.ScriptedClient, objectI
 	t.Fatalf("no InventoryUpdate for object %d within 5s", objectID)
 }
 
-// collectUntilQuiet gathers frames until the client goes quiet, returning
-// everything it received.
+// collectUntilQuiet returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func collectUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	var frames [][]byte
-	for _, frame := range c.ReadQueued() {
-		frames = append(frames, frame)
-	}
-	return frames
+	return c.ReadQueued()
 }
 
 // TestDropValidityAnswersBeforeDistance drops out of reach an item the

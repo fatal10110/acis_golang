@@ -243,14 +243,11 @@ func startInWorld(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	return drainFrames(t, c)
 }
 
-// drainFrames collects every frame c receives until the server goes quiet.
+// drainFrames returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func drainFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	frames := make([][]byte, 0, 8)
-	for _, frame := range c.ReadQueued() {
-		frames = append(frames, frame)
-	}
-	return frames
+	return c.ReadQueued()
 }
 
 func opcodes(frames [][]byte) []byte {

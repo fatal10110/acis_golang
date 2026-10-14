@@ -150,11 +150,7 @@ func (r *rig) restart(t *testing.T, c *testsupport.ScriptedClient, objID int32) 
 // caught up.
 func drain(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	var frames [][]byte
-	for _, frame := range c.ReadQueued() {
-		frames = append(frames, frame)
-	}
-	return frames
+	return c.ReadQueued()
 }
 
 // exchange sends payload and returns every frame it drew, read up to the

@@ -123,11 +123,7 @@ func selectDoor(t *testing.T, c *testsupport.ScriptedClient, gate *door.Object) 
 func useKey(t *testing.T, c *testsupport.ScriptedClient, key int32) [][]byte {
 	t.Helper()
 	c.Send(encodeUseItem(key, false))
-	var frames [][]byte
-	for _, frame := range c.ReadQueued() {
-		frames = append(frames, frame)
-	}
-	return frames
+	return c.ReadQueued()
 }
 
 func keysLeft(t *testing.T, srv *gameservertest.Server, key int32) int {

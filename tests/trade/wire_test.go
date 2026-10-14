@@ -239,15 +239,11 @@ func drainUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) {
 	c.ReadQueued()
 }
 
-// drainFrames collects every frame the client receives until the server goes
-// quiet, returning them in arrival order.
+// drainFrames returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func drainFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	frames := make([][]byte, 0, 8)
-	for _, frame := range c.ReadQueued() {
-		frames = append(frames, frame)
-	}
-	return frames
+	return c.ReadQueued()
 }
 
 func assertFrameOpcode(t *testing.T, frame []byte, want byte, what string) {

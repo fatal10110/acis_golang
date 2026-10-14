@@ -92,11 +92,7 @@ func appear(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 }
 
 func readUntilQuiet(c *testsupport.ScriptedClient) [][]byte {
-	var frames [][]byte
-	for _, f := range c.ReadQueued() {
-		frames = append(frames, f)
-	}
-	return frames
+	return c.ReadQueued()
 }
 
 func firstOpcode(frames [][]byte, op byte) int {

@@ -116,14 +116,11 @@ func magicSkillUseSkill(t *testing.T, frame []byte) int32 {
 	return r.ReadInt32()
 }
 
-// queueFrames reads every frame until the client goes quiet.
+// queueFrames returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func queueFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	var frames [][]byte
-	for _, frame := range c.ReadQueued() {
-		frames = append(frames, frame)
-	}
-	return frames
+	return c.ReadQueued()
 }
 
 // castStartedFor reports whether frames carry a MagicSkillUse for skillID.

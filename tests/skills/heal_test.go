@@ -500,15 +500,11 @@ func TestHealEffectOtherCastSendsHPRestoredByHealer(t *testing.T) {
 	drainUntilQuiet(t, patient)
 }
 
-// collectUntilQuiet returns every frame the server has queued to the client
-// once it has caught up.
+// collectUntilQuiet returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func collectUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	var frames [][]byte
-	for _, frame := range c.ReadQueued() {
-		frames = append(frames, frame)
-	}
-	return frames
+	return c.ReadQueued()
 }
 
 // hpRestoredAmount returns the amount of the single S1_HP_RESTORED message

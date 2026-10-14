@@ -134,11 +134,7 @@ func assertLog(t *testing.T, when string, got []string, want ...string) {
 }
 
 func readUntilQuiet(c *testsupport.ScriptedClient) [][]byte {
-	var frames [][]byte
-	for _, f := range c.ReadQueued() {
-		frames = append(frames, f)
-	}
-	return frames
+	return c.ReadQueued()
 }
 
 func encodeRequestGameStart(slot int32) []byte {

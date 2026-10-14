@@ -75,15 +75,11 @@ func trainerBypass(t *testing.T, c *testsupport.ScriptedClient, f *npc.Folk, com
 	return readUntilQuiet(t, c)
 }
 
-// readUntilQuiet collects every frame the server has queued to the client
-// once it has caught up, in arrival order.
+// readUntilQuiet returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func readUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	var frames [][]byte
-	for _, frame := range c.ReadQueued() {
-		frames = append(frames, frame)
-	}
-	return frames
+	return c.ReadQueued()
 }
 
 func frameOpcodes(frames [][]byte) []byte {

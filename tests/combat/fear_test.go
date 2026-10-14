@@ -64,14 +64,10 @@ func readMoveOf(t *testing.T, c *scriptedClient, objectID int32, what string) lo
 	}
 }
 
-// readFramesUntilQuiet returns every frame the client receives until the
-// server stays quiet for a full read window.
+// readFramesUntilQuiet returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func readFramesUntilQuiet(c *scriptedClient) [][]byte {
-	var frames [][]byte
-	for _, frame := range c.ReadQueued() {
-		frames = append(frames, frame)
-	}
-	return frames
+	return c.ReadQueued()
 }
 
 // TestFearSendsMonsterFleeingEveryTick pins fear on a monster: the landing

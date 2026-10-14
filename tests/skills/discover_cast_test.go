@@ -42,10 +42,7 @@ func TestEnteringPlayerSeesCastInFlight(t *testing.T) {
 	for frame := observer.Read(); frame[0] != serverpackets.OpcodeCharSelected; frame = observer.Read() {
 	}
 	observer.Send(encodeEnterWorld())
-	var frames [][]byte
-	for _, frame := range observer.ReadQueued() {
-		frames = append(frames, frame)
-	}
+	frames := observer.ReadQueued()
 
 	var next []byte
 	for i, frame := range frames {

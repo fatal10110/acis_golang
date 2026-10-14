@@ -11,13 +11,10 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
-// framesUntilQuiet reads every frame c receives until it goes quiet.
+// framesUntilQuiet returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func framesUntilQuiet(c *scriptedClient) [][]byte {
-	var frames [][]byte
-	for _, frame := range c.ReadQueued() {
-		frames = append(frames, frame)
-	}
-	return frames
+	return c.ReadQueued()
 }
 
 // punchOfDoomID is the skill whose StunSelf effect stuns its own caster.

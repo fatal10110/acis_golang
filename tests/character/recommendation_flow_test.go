@@ -19,14 +19,11 @@ func encodeRequestEvaluate(targetID int32) []byte {
 	return w.Bytes()
 }
 
-// quietFrames collects every frame c receives until the stream stays quiet.
+// quietFrames returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func quietFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	var out [][]byte
-	for _, frame := range c.ReadQueued() {
-		out = append(out, frame)
-	}
-	return out
+	return c.ReadQueued()
 }
 
 func enterWorldQuiet(t *testing.T, c *testsupport.ScriptedClient) {

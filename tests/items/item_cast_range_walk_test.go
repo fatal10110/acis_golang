@@ -55,9 +55,7 @@ func readFramesFor(t *testing.T, srv *gameservertest.Server, c *testsupport.Scri
 	var frames [][]byte
 	for passed := time.Duration(0); passed < d; passed += 100 * time.Millisecond {
 		srv.Advance(t, 100*time.Millisecond)
-		for _, frame := range c.ReadQueued() {
-			frames = append(frames, frame)
-		}
+		frames = append(frames, c.ReadQueued()...)
 	}
 	return frames
 }

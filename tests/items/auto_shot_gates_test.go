@@ -28,7 +28,8 @@ func addAutoShotServitor(t *testing.T, srv *gameservertest.Server, objID int32, 
 	return servitor
 }
 
-// assertNoReply fails when anything reaches the client within 300ms.
+// assertNoReply fails on any frame the server has queued to the client once
+// it has caught up.
 func assertNoReply(t *testing.T, srv *gameservertest.Server, what string) {
 	t.Helper()
 	if queued := srv.Client.ReadQueued(); len(queued) != 0 {
