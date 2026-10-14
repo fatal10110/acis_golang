@@ -188,7 +188,7 @@ func TestDisplacedCharmOfLuckLeavesWithLesserKept(t *testing.T) {
 			seedKnownSkill(t, srv, objID, strong, 1)
 			startInWorld(t, c)
 
-			castSlotBuff(t, c, objID, weak)
+			castSlotBuff(t, srv, objID, weak)
 			c.Send(encodeRequestMagicSkillUse(strong, false, false))
 			assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "MagicSkillUse")
 			assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, strong, 1)
