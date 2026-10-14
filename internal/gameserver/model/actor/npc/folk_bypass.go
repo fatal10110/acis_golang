@@ -417,42 +417,11 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	case strings.HasPrefix(command, "EnchantSkillList"):
 		reply.Outcome = BypassEnchantSkillList
 		return reply
-	case strings.EqualFold(command, "TerritoryStatus"):
-		reply.Outcome = BypassTerritoryStatus
-		return reply
-	case strings.HasPrefix(command, "Quest"):
-		reply.Outcome = BypassQuest
-		return reply
-	case strings.HasPrefix(command, "Chat"):
-		val := 0
-		if arg, ok := commandChars(command, 5, -1); ok {
-			if n, err := commons.ParseInt(arg, 32); err == nil {
-				val = int(n)
-			}
-		}
-		if page, how, ok := f.residenceChatPage(pages, kind, talker.residence(), val); ok {
-			reply.Outcome, reply.HTML, reply.Chat = BypassChatAs, page, how
-			return reply
-		}
-		reply.Outcome = BypassChatWindow
-		if kind == "OlympiadManagerNpc" {
-			reply.HTML = f.olympiadChat(pages, val, talker.Noble, talker.Hero, talker.InactiveHero)
-		} else {
-			reply.HTML = f.chatPage(pages, chat, val)
-		}
-		return reply
-	case strings.HasPrefix(command, "Link"):
-		if len(command) < 5 {
-			reply.Outcome = BypassAborted
-			return reply
-		}
-		path := strings.TrimFunc(command[5:], func(r rune) bool { return r <= ' ' })
-		if strings.Contains(path, "..") {
-			reply.Outcome = BypassRefused
-			return reply
-		}
-		reply.Outcome, reply.HTML = BypassPage, f.page(pages, "data/html/"+path)
-		return reply
+	}
+	if out, ok := f.dialogCommand(pages, kind, chat, talker, command, reply); ok {
+		return out
+	}
+	switch {
 	case strings.HasPrefix(command, "Loto"):
 		reply.Outcome = BypassLottery
 		return reply
@@ -503,6 +472,40 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 		}
 	}
 	return reply
+}
+
+// dialogCommand answers the generic dialog commands; see
+// ParseDialogCommand. A residence NPC's or an Olympiad manager's chat page
+// comes from its own pages, any other from chat. ok is false for every
+// other command.
+func (f *Folk) dialogCommand(pages Pages, kind InstanceKind, chat folkChat, talker Talker, command string, reply BypassReply) (BypassReply, bool) {
+	dialog := ParseDialogCommand(command)
+	switch dialog.Command {
+	case DialogTerritoryStatus:
+		reply.Outcome = BypassTerritoryStatus
+	case DialogQuest:
+		reply.Outcome = BypassQuest
+	case DialogChat:
+		if page, how, ok := f.residenceChatPage(pages, kind, talker.residence(), dialog.Val); ok {
+			reply.Outcome, reply.HTML, reply.Chat = BypassChatAs, page, how
+			return reply, true
+		}
+		reply.Outcome = BypassChatWindow
+		if kind == "OlympiadManagerNpc" {
+			reply.HTML = f.olympiadChat(pages, dialog.Val, talker.Noble, talker.Hero, talker.InactiveHero)
+		} else {
+			reply.HTML = f.chatPage(pages, chat, dialog.Val)
+		}
+	case DialogLink:
+		reply.Outcome, reply.HTML = BypassPage, f.page(pages, dialog.Path)
+	case DialogRefused:
+		reply.Outcome = BypassRefused
+	case DialogAborted:
+		reply.Outcome = BypassAborted
+	default:
+		return reply, false
+	}
+	return reply, true
 }
 
 // merchantKind reports whether kind answers the merchant's shop commands: a

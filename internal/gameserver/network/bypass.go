@@ -315,20 +315,20 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 // not modeled and is logged. It reports false when the command aborted, so
 // that nothing more is sent.
 func (l *GameClientLink) hostileBypass(live *livePlayer, h *npc.Hostile, command string) bool {
-	reply := npc.ParseHostileCommand(command)
+	reply := npc.ParseDialogCommand(command)
 	switch reply.Command {
-	case npc.HostileTerritoryStatus:
+	case npc.DialogTerritoryStatus:
 		l.showTerritoryStatus(live, h.ObjectID(), h.Instance)
-	case npc.HostileQuest:
+	case npc.DialogQuest:
 		l.questWindow(live, h, command)
-	case npc.HostileChat:
+	case npc.DialogChat:
 		l.openHostileChat(live, h, reply.Val)
-	case npc.HostileLink:
+	case npc.DialogLink:
 		l.sendNPCPage(live, h.ObjectID(), reply.Path)
-	case npc.HostileAborted:
+	case npc.DialogAborted:
 		return false
-	case npc.HostileRefused:
-	case npc.HostileUnported:
+	case npc.DialogRefused:
+	case npc.DialogOther:
 		l.log.Debug().Int("npc_id", h.NpcID()).Str("command", command).Msg("bypass: dialog of a hostile NPC not modeled")
 	}
 	return true
