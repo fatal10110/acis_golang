@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/dbtest"
@@ -149,6 +150,20 @@ func drainUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) {
 func drainFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	return c.ReadQueued()
+}
+
+// advanceUntilSwingLands lets time pass in short steps until cond holds,
+// for up to a minute: swings miss at random, so a landing hit can take more
+// swings than AdvanceUntil's limit leaves room for.
+func advanceUntilSwingLands(t *testing.T, srv *gameservertest.Server, what string, cond func() bool) {
+	t.Helper()
+	const step, limit = 10 * time.Millisecond, time.Minute
+	for passed := time.Duration(0); !cond(); passed += step {
+		if passed >= limit {
+			t.Fatalf("%s not observed within %v", what, limit)
+		}
+		srv.Advance(t, step)
+	}
 }
 
 func opcodes(frames [][]byte) []byte {

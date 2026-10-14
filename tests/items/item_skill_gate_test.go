@@ -64,7 +64,7 @@ func sitDown(t *testing.T, c *testsupport.ScriptedClient) time.Time {
 func sitAndSettle(t *testing.T, srv *gameservertest.Server) {
 	t.Helper()
 	changePosture(t, srv.Client, false)
-	srv.Advance(t, sitStandDelay)
+	srv.SettlePosture(t, srv.SoleObjectID(t))
 	drainUntilQuiet(t, srv.Client)
 }
 
@@ -439,7 +439,7 @@ func TestUseItemSkillDuringFakeDeathGetUpIsRefused(t *testing.T) {
 
 	c.Send(encodeUseItem(scroll, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "item use while getting up")
-	srv.Advance(t, sitStandDelay)
+	srv.SettlePosture(t, objID)
 	if seen := opcodesUntilQuiet(t, c); seen[serverpackets.OpcodeMagicSkillUse] != 0 {
 		t.Fatal("refused item cast started after the fake-death get-up")
 	}

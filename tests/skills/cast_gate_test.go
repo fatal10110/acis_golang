@@ -75,10 +75,10 @@ func TestPlayerPreAttemptGateRejectsBeforeAnyCost(t *testing.T) {
 	t.Parallel()
 	// sit seats the player and lets the sit-down end: a player still
 	// sitting down is not seated yet.
-	sit := func(t *testing.T, srv *gameservertest.Server, _ int32) {
+	sit := func(t *testing.T, srv *gameservertest.Server, objID int32) {
 		srv.Client.Send(encodeRequestActionUse(0, false, false))
 		assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeChangeWaitType, "sit ChangeWaitType")
-		srv.Advance(t, sitStandDelay)
+		srv.SettlePosture(t, objID)
 		drainUntilQuiet(t, srv.Client)
 	}
 	for _, tt := range []struct {

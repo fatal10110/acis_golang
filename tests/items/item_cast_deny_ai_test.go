@@ -176,7 +176,7 @@ func TestHeldItemSkillCastDroppedByTeleport(t *testing.T) {
 		t.Fatalf("teleport during the stand-up sent opcodes %x up to TeleportToLocation, want %x", got, want)
 	}
 	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
-	srv.Advance(t, sitStandDelay)
+	srv.SettlePosture(t, objID)
 	if seen := opcodesUntilQuiet(t, c); seen[serverpackets.OpcodeMagicSkillUse] != 0 {
 		t.Fatal("held item cast started after the teleport")
 	}

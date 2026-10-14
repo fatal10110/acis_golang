@@ -110,6 +110,15 @@ func startFakeDeath(t *testing.T, c *testsupport.ScriptedClient) time.Time {
 	return sent
 }
 
+// awaitPostureSettled waits until the player's lie-down or get-up has ended:
+// on the wall clock its timer can fire just after the delay advanced by.
+func awaitPostureSettled(t *testing.T, srv *gameservertest.Server, objID int32) {
+	t.Helper()
+	var pc *player.Character
+	onPlayerQueue(t, srv, objID, func(p *player.Character) { pc = p })
+	srv.AdvanceUntil(t, "posture transition end", func() bool { return !pc.SittingNow() && !pc.StandingNow() })
+}
+
 // assertSittingRefusal expects CANT_MOVE_SITTING then ActionFailed, and no
 // cast.
 func assertSittingRefusal(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient, objID int32, what string) {
@@ -157,10 +166,10 @@ func TestSkillBarCastDuringSitDownIsRefusedOnceSeated(t *testing.T) {
 // runs it (PlayerAI.onEvtStoodUp).
 func TestSkillBarCastDuringStandUpRunsWhenUp(t *testing.T) {
 	t.Parallel()
-	srv, c, _ := bootPostureCaster(t)
+	srv, c, objID := bootPostureCaster(t)
 	c.Send(encodeRequestChangeWaitType(false))
 	readMatching(t, c, time.Second, "sit ChangeWaitType", isWaitType(serverpackets.WaitSitting))
-	srv.Advance(t, sitStandDelay)
+	srv.SettlePosture(t, objID)
 	drainUntilQuiet(t, c)
 
 	// Measured from before the request: the server starts the stand-up no
@@ -216,6 +225,7 @@ func TestFakeDeathGetUpRefusesCastsUntilUp(t *testing.T) {
 	lieDown, getUp := fakeDeathDelays(t, srv, objID)
 	startFakeDeath(t, c)
 	srv.Advance(t, lieDown)
+	awaitPostureSettled(t, srv, objID)
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeRequestChangeWaitType(true))
@@ -236,6 +246,7 @@ func TestFakeDeathGetUpRefusesCastsUntilUp(t *testing.T) {
 	if rest := getUp - c.Now().Sub(standAt); rest > 0 {
 		srv.Advance(t, rest)
 	}
+	awaitPostureSettled(t, srv, objID)
 	drainUntilQuiet(t, c)
 	c.Send(encodeRequestMagicSkillUse(gateActiveSkillID, false, false))
 	readMatching(t, c, time.Second, "cast after get-up", isSkillUse(gateActiveSkillID))
@@ -252,6 +263,7 @@ func TestRestartRequestDuringFakeDeathGetUpKeepsGetUp(t *testing.T) {
 	lieDown, getUp := fakeDeathDelays(t, srv, objID)
 	startFakeDeath(t, c)
 	srv.Advance(t, lieDown)
+	awaitPostureSettled(t, srv, objID)
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeRequestChangeWaitType(true))
@@ -268,6 +280,7 @@ func TestRestartRequestDuringFakeDeathGetUpKeepsGetUp(t *testing.T) {
 	if rest := getUp - c.Now().Sub(standAt); rest > 0 {
 		srv.Advance(t, rest)
 	}
+	awaitPostureSettled(t, srv, objID)
 	drainUntilQuiet(t, c)
 	c.Send(encodeRequestMagicSkillUse(gateActiveSkillID, false, false))
 	readMatching(t, c, time.Second, "cast after the first get-up's end", isSkillUse(gateActiveSkillID))

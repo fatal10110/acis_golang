@@ -84,7 +84,7 @@ func TestStunSelfDuringStandUpWaitsOutTheTransition(t *testing.T) {
 		t.Fatalf("MagicSkillUse frames after StunSelf during the stand-up = %d, want 0", n)
 	}
 
-	srv.Advance(t, sitStandDelay)
+	srv.SettlePosture(t, objID)
 	if n := opcodesUntilQuiet(t, c)[serverpackets.OpcodeMagicSkillUse]; n != 0 {
 		t.Fatalf("MagicSkillUse frames at the stand-up's end = %d, want 0: the idle must replace the queued cast", n)
 	}
