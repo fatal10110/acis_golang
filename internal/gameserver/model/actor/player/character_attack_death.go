@@ -232,7 +232,7 @@ func (c *Character) Die(killer attackable.Combatant) bool {
 	c.RaiseDeathPenaltyLevel(killer, c.rollValue(100)+1)
 	c.emit(event.DeathSettled{})
 	if c.EffectList().IsAffected(effect.FlagPhoenixBlessing) {
-		c.ReviveRequest(c, 0, false)
+		c.ReviveRequest(c.selfReviver(), 0, false)
 	}
 	// The retained effects' icons are resent once the death has settled,
 	// unless no effect was ever held.

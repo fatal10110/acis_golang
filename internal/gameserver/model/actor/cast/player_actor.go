@@ -3,6 +3,7 @@ package cast
 import (
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
@@ -115,7 +116,12 @@ func (a PlayerActor) ReduceHP(amount int) {
 	dead := a.Character.ReduceCurrentHP(amount)
 	a.Character.BroadcastStatus()
 	if dead {
-		a.Character.DieFromDamage(a.Character)
+		// The killer is the caster as the world registers it.
+		killer, ok := a.Character.WorldHandle().(attackable.Combatant)
+		if !ok {
+			killer = a.Character
+		}
+		a.Character.DieFromDamage(killer)
 	}
 }
 
