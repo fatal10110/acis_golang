@@ -525,7 +525,8 @@ func opName(fn *types.Func) (string, bool) {
 // Catalog reads the script catalogs of the Go file at file: every
 // composite literal of the engine's Catalog type, keyed by a constant
 // scripts.xml path and valued with a constructor, a selector of a checked
-// package's function or a function literal calling one.
+// package's function or a function literal calling one. An entry valued
+// nil is a path not ported yet and is left out.
 func (p *Program) Catalog(file string) (map[string][]*types.Func, error) {
 	f, err := parser.ParseFile(p.fset, file, nil, parser.SkipObjectResolution)
 	if err != nil {
@@ -557,6 +558,9 @@ func (p *Program) Catalog(file string) (map[string][]*types.Func, error) {
 				continue
 			}
 			path, _ := strconv.Unquote(key.Value)
+			if id, ok := kv.Value.(*ast.Ident); ok && id.Name == "nil" {
+				continue
+			}
 			var ctors []*types.Func
 			ast.Inspect(kv.Value, func(n ast.Node) bool {
 				sel, ok := n.(*ast.SelectorExpr)

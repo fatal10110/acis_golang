@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"maps"
 	"path/filepath"
+	"slices"
 
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
@@ -28,6 +30,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/raid"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/warrior"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/wizard"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/catalog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/alliance"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/blackjudge"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/cabalbuffer"
@@ -66,17 +69,27 @@ import (
 	"go.uber.org/fx"
 )
 
-// scriptCatalogs are the literal script catalogs, one per range or family;
-// scriptCatalog joins them. crystals are the soul crystals a quest charges,
-// buffs the buffs the newbie guides cast.
+// scriptCatalogs are the literal script catalogs: the scripts ported with
+// the engine, then the content catalog files; scriptCatalog joins them.
+// crystals are the soul crystals a quest charges, buffs the buffs the
+// newbie guides cast. The saga core and the sagas share one family.
 func scriptCatalogs(crystals *item.SoulCrystalTable, buffs *skill.NewbieBuffTable) []script.Catalog {
-	return []script.Catalog{questCatalog(crystals), featureCatalog(buffs), teleportCatalog(), taskCatalog(), aiCatalog()}
+	sagas := thirdclass.NewFamily()
+	out := engineCatalogs(crystals, buffs, sagas)
+	files := catalog.Scripts(sagas)
+	for _, name := range slices.Sorted(maps.Keys(files)) {
+		out = append(out, files[name])
+	}
+	return out
 }
 
-// questCatalog lists the quests. The saga core and the sagas share one
-// family.
-func questCatalog(crystals *item.SoulCrystalTable) script.Catalog {
-	sagas := thirdclass.NewFamily()
+// engineCatalogs are the catalogs of the scripts ported with the engine.
+func engineCatalogs(crystals *item.SoulCrystalTable, buffs *skill.NewbieBuffTable, sagas *thirdclass.Family) []script.Catalog {
+	return []script.Catalog{questCatalog(crystals, sagas), featureCatalog(buffs), teleportCatalog(), taskCatalog(), aiCatalog()}
+}
+
+// questCatalog lists the quests ported with the engine.
+func questCatalog(crystals *item.SoulCrystalTable, sagas *thirdclass.Family) script.Catalog {
 	return script.Catalog{
 		"quest.Q001_LettersOfLove":          q001.New,
 		"quest.Q023_LidiasHeart":            q023.New,
@@ -159,16 +172,33 @@ func taskCatalog() script.Catalog {
 	}
 }
 
-// scriptCatalog joins catalogs into one. A path in two catalogs is an
-// error.
+// scriptCatalog joins catalogs into one, without the entries not ported
+// yet (a nil constructor). A path in two catalogs is an error, ported or
+// not.
 func scriptCatalog(catalogs []script.Catalog) (script.Catalog, error) {
-	out := script.Catalog{}
+	return joinCatalogs("script", catalogs)
+}
+
+// makerCatalog joins maker catalogs into one, as scriptCatalog joins
+// script catalogs.
+func makerCatalog(catalogs []script.MakerCatalog) (script.MakerCatalog, error) {
+	return joinCatalogs("maker type", catalogs)
+}
+
+// joinCatalogs joins catalogs into one and drops the nil constructors; a
+// key in two catalogs is an error.
+func joinCatalogs[C ~map[string]func() T, T any](what string, catalogs []C) (C, error) {
+	seen := map[string]bool{}
+	out := C{}
 	for _, c := range catalogs {
-		for path, ctor := range c {
-			if _, dup := out[path]; dup {
-				return nil, fmt.Errorf("script %s is in two catalogs", path)
+		for key, ctor := range c {
+			if seen[key] {
+				return nil, fmt.Errorf("%s %s is in two catalogs", what, key)
 			}
-			out[path] = ctor
+			seen[key] = true
+			if ctor != nil {
+				out[key] = ctor
+			}
 		}
 	}
 	return out, nil
@@ -189,7 +219,7 @@ func provideScripts(lc fx.Lifecycle, paths gameServerPaths, data *gameData, env 
 	if err != nil {
 		return nil, err
 	}
-	catalog, err := scriptCatalog(scriptCatalogs(data.SoulCrystals, data.NewbieBuffs))
+	joined, err := scriptCatalog(scriptCatalogs(data.SoulCrystals, data.NewbieBuffs))
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +228,16 @@ func provideScripts(lc fx.Lifecycle, paths gameServerPaths, data *gameData, env 
 		engine.Close()
 		return nil
 	}})
-	return script.Build(list, catalog, script.Config{KindOf: npcKindOf(data.NPCs), Log: log, Env: env, HandleOps: scriptHandleOps, Queue: engine}), nil
+	return script.Build(list, joined, script.Config{KindOf: npcKindOf(data.NPCs), Log: log, Env: env, HandleOps: handleOps(), Queue: engine}), nil
+}
+
+// handleOps returns the handle operations of every catalog script: those
+// generated for scripts.go and those generated beside each content catalog
+// file.
+func handleOps() map[string]script.HandleOps {
+	out := maps.Clone(scriptHandleOps)
+	maps.Copy(out, catalog.HandleOps())
+	return out
 }
 
 // provideScriptSpawner returns the spawner scripts place NPCs with. It is
@@ -290,8 +329,23 @@ func buildScripts(*script.Registry) {}
 // provideMakers returns the maker registry: every npcmaker runs the maker
 // of its type, the default maker when its type has none, and reads the
 // time of day from the game clock.
-func provideMakers(clock *task.GameClock, log zerolog.Logger) *script.Makers {
-	return script.NewMakers(maker.Catalog(), maker.Default, clock.IsNight, log)
+func provideMakers(clock *task.GameClock, log zerolog.Logger) (*script.Makers, error) {
+	makers, err := makerCatalog(makerCatalogs())
+	if err != nil {
+		return nil, err
+	}
+	return script.NewMakers(makers, maker.Default, clock.IsNight, log), nil
+}
+
+// makerCatalogs are the maker catalogs: the makers ported with the engine,
+// then the content catalog files.
+func makerCatalogs() []script.MakerCatalog {
+	out := []script.MakerCatalog{maker.Catalog()}
+	files := catalog.Makers()
+	for _, name := range slices.Sorted(maps.Keys(files)) {
+		out = append(out, files[name])
+	}
+	return out
 }
 
 // startSchedule runs the scheduled tasks against link. It starts once
