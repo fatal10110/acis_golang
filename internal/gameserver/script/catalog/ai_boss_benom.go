@@ -1,0 +1,11 @@
+package catalog
+
+import "github.com/fatal10110/acis_golang/internal/gameserver/script"
+
+// aiBossBenom is the catalog of the Benom behaviors (#204).
+func aiBossBenom() script.Catalog {
+	return script.Catalog{
+		"script.ai.boss.benom.Benom":             nil,
+		"script.ai.boss.benom.DungeonTeleporter": nil,
+	}
+}

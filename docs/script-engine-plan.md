@@ -150,8 +150,10 @@ model/actor/{npc,ai,cast}, model/zone and model/door import nothing from script.
   package-level code, and lanes cannot collide.
 - **Behaviors share family packages.** A child imports its parent's package, so parents-first
   is enforced by the compiler.
-- **Catalog files are pre-created per range or family** (`quests_3xx.go`, `ai_warrior.go`) in
-  one scaffold PR. A content lane edits one catalog file that no other open lane touches.
+- **Catalog files are pre-created, one per owner issue** (`script/catalog/quests_301_up.go`,
+  `ai_individual_1.go`, `makers_2.go`), in one scaffold PR. Each lists its owner's paths or
+  maker types with a nil constructor until ported. A content lane edits only its own catalog
+  file and the handle-operations file generated beside it.
 - **Quest journal:** new leaf package `model/questlog`, held by `player.Character`.
 
 ## 4. Seams
