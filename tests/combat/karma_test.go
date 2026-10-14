@@ -63,8 +63,8 @@ func TestKarmaBlocksRecallTeleportItemUse(t *testing.T) {
 	startInWorld(t, c)
 
 	c.Send(encodeUseItem(itemObjectID, false))
-	if reply := c.ReadWithTimeout(500 * time.Millisecond); reply != nil {
-		t.Fatalf("karma-blocked item use reply = opcode %#x, want no reply (silent reject)", reply[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("karma-blocked item use reply = opcode %#x, want no reply (silent reject)", queued[0][0])
 	}
 
 	srv.FlushItems(t)
@@ -96,8 +96,8 @@ func TestKarmaBlocksDirectRecallCast(t *testing.T) {
 	c.Send(encodeRequestMagicSkillUse(2031, false, false))
 	frame := mustRead(t, c, "blocked cast reply")
 	assertFrameOpcode(t, frame, serverpackets.OpcodeActionFailed, "blocked recall cast")
-	if reply := c.ReadWithTimeout(readQuietWindow); reply != nil {
-		t.Fatalf("unexpected extra reply after blocked recall cast = opcode %#x", reply[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("unexpected extra reply after blocked recall cast = opcode %#x", queued[0][0])
 	}
 }
 
@@ -163,7 +163,7 @@ func selectPlayerTarget(t *testing.T, c *scriptedClient, objectID int32) {
 func assertKarmaChangeFrames(t *testing.T, c *scriptedClient, objectID, wantKarma int32) {
 	t.Helper()
 	for i := 0; i < 50; i++ {
-		frame := c.ReadWithTimeout(time.Second)
+		frame := c.ReadWithTimeout(5 * time.Second)
 		if frame == nil {
 			t.Fatalf("karma change message for %d never arrived", wantKarma)
 		}

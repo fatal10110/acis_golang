@@ -3,7 +3,6 @@ package trade
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
@@ -113,17 +112,9 @@ func drainAllTraders(t *testing.T, clients ...*testsupport.ScriptedClient) {
 	}
 }
 
-// drainFramesUntilQuiet collects c's frames until the server goes quiet.
+// drainFramesUntilQuiet returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func drainFramesUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	var frames [][]byte
-	for range 200 {
-		f := c.ReadWithTimeout(300 * time.Millisecond)
-		if f == nil {
-			return frames
-		}
-		frames = append(frames, f)
-	}
-	t.Fatal("client kept receiving frames after 200 reads")
-	return nil
+	return c.ReadQueued()
 }

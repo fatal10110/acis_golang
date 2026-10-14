@@ -3,7 +3,6 @@ package trade
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -26,8 +25,8 @@ func TestTradeRequestRejectsIncorrectTargets(t *testing.T) {
 	drainUntilQuiet(t, h.second)
 
 	h.first.Send(encodeTradeRequest(999999))
-	if frame := h.first.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("unknown-target reply opcode = %#x, want silence", frame[0])
+	if queued := h.first.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("unknown-target reply opcode = %#x, want silence", queued[0][0])
 	}
 
 	h.startTrade(t)
@@ -81,8 +80,8 @@ func TestAddTradeItemRejectsUntradableItem(t *testing.T) {
 
 	h.first.Send(encodeAddTradeItem(0, shots, 1))
 	assertStaticSystemMessage(t, h.first.Read(), serverpackets.SystemMessageNothingHappened)
-	if frame := h.second.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("partner received opcode %#x for an untradable offer, want silence", frame[0])
+	if queued := h.second.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("partner received opcode %#x for an untradable offer, want silence", queued[0][0])
 	}
 
 	h.srv.FlushItems(t)

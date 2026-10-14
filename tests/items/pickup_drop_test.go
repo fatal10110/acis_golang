@@ -153,6 +153,7 @@ func TestDropGroundItemRoundTrip(t *testing.T) {
 	}
 
 	// Movement must still work after the pickup resolves.
+	srv.SettlePickup(t, objID)
 	c.Send(encodeMoveBackwardToLocation(80, 70, 30, spawnX, spawnY, spawnZ))
 	expectGroundClickAck(t, c)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMoveToLocation, "movement after pickup")
@@ -690,20 +691,11 @@ func waitForInventoryUpdate(t *testing.T, c *testsupport.ScriptedClient, objectI
 	t.Fatalf("no InventoryUpdate for object %d within 5s", objectID)
 }
 
-// collectUntilQuiet gathers frames until the client goes quiet, returning
-// everything it received.
+// collectUntilQuiet returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func collectUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	var frames [][]byte
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return frames
-		}
-		frames = append(frames, frame)
-	}
-	t.Fatal("client kept receiving frames after 100 drains")
-	return nil
+	return c.ReadQueued()
 }
 
 // TestDropValidityAnswersBeforeDistance drops out of reach an item the
@@ -728,8 +720,8 @@ func TestDropValidityAnswersBeforeDistance(t *testing.T) {
 	} {
 		c.Send(encodeRequestDropItem(req.objectID, req.count, spawnX+1000, spawnY, spawnZ))
 		assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageCannotDiscardThisItem)
-		if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-			t.Fatalf("drop of object %d x%d sent opcode %#x after its refusal, want nothing", req.objectID, req.count, frame[0])
+		if queued := c.ReadQueued(); len(queued) != 0 {
+			t.Fatalf("drop of object %d x%d sent opcode %#x after its refusal, want nothing", req.objectID, req.count, queued[0][0])
 		}
 	}
 	if inst := mustFindItem(t, srv, objID, adena); inst.Count != 100 {

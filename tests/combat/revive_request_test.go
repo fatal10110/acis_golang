@@ -167,6 +167,8 @@ func TestPhoenixBlessedDeathOffersFullRevive(t *testing.T) {
 			startInWorld(t, c)
 			for _, skillID := range []int32{phoenixSkillID, charmOfLuckSkill} {
 				c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+				srv.Settle(t)
+				srv.AdvanceUntil(t, "self-buff cast end", func() bool { return !srv.PlayerCastingNow(t, id) })
 				drainUntilQuiet(t, c)
 			}
 			victim := reviveVictimOf(t, srv, id)
@@ -336,8 +338,8 @@ func TestResurrectionAsksTheCorpse(t *testing.T) {
 
 	s.victim.Send(encodeDlgAnswer(resurrectionDlgID, 1, 0))
 	s.srv.Settle(t)
-	if extra := s.victim.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-		t.Fatalf("repeated answer sent opcode %#x, want nothing", extra[0])
+	if queued := s.victim.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("repeated answer sent opcode %#x, want nothing", queued[0][0])
 	}
 	if exp, before := persistedExp(t, s.srv, s.victim, s.victimID); exp != 1500 || before != 0 {
 		t.Fatalf("persisted exp/before-death = %d/%d, want 1500/0", exp, before)
@@ -361,8 +363,8 @@ func TestResurrectionAcceptedAfterRestartGivesNothing(t *testing.T) {
 
 	s.victim.Send(encodeDlgAnswer(resurrectionDlgID, 1, 0))
 	s.srv.Settle(t)
-	if extra := s.victim.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-		t.Fatalf("answer after restart sent opcode %#x, want nothing", extra[0])
+	if queued := s.victim.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("answer after restart sent opcode %#x, want nothing", queued[0][0])
 	}
 	if exp, before := persistedExp(t, s.srv, s.victim, s.victimID); exp != 1300 || before != 1500 {
 		t.Fatalf("persisted exp/before-death = %d/%d, want 1300/1500 (loss kept)", exp, before)

@@ -45,11 +45,7 @@ func TestHostileDieAppliesOnceUnderConcurrency(t *testing.T) {
 		t.Fatalf("Die results: winners=%d rewards=%d; repeat must be false", winners.Load(), rewards.calls.Load())
 	}
 	statuses, dies := 0, 0
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(readQuietWindow)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if len(frame) < 5 {
 			continue
 		}
@@ -121,8 +117,8 @@ func TestMovingHostileDeathStopsBeforeFinalStatusAndDie(t *testing.T) {
 		t.Fatal("dead NPC is still moving")
 	}
 	srv.Advance(t, time.Second)
-	if frame := c.ReadWithTimeout(readQuietWindow); frame != nil {
-		t.Fatalf("frame after movement stopped on death = %#x", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("frame after movement stopped on death = %#x", queued[0][0])
 	}
 }
 
@@ -150,11 +146,7 @@ func TestPlayerNonlethalSkillDamageSendsSelfStatus(t *testing.T) {
 		t.Fatalf("HP = %d, want %d", got, beforeHP-1)
 	}
 	statuses := 0
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(readQuietWindow)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if len(frame) < 5 {
 			continue
 		}
@@ -194,7 +186,7 @@ func TestLethalHitOrdersStatusRewardDie(t *testing.T) {
 
 	var order []string
 	for len(order) == 0 || order[len(order)-1] != "die" {
-		frame := c.ReadWithTimeout(readQuietWindow)
+		frame := c.ReadWithTimeout(5 * time.Second)
 		if frame == nil {
 			t.Fatalf("kill sequence stopped after %v", order)
 		}
@@ -253,7 +245,7 @@ func TestPlayerLethalSkillDamageSendsThreeStatusesBeforeDie(t *testing.T) {
 
 	var order []string
 	for len(order) == 0 || order[len(order)-1] != "die" {
-		frame := c.ReadWithTimeout(readQuietWindow)
+		frame := c.ReadWithTimeout(5 * time.Second)
 		if frame == nil {
 			t.Fatalf("player death sequence stopped after %v", order)
 		}

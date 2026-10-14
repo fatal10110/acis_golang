@@ -50,11 +50,7 @@ func TestBowReuseEndShootsAgainWithoutDesire(t *testing.T) {
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
 		t.Fatalf("CurrentIntention() after the second shot = %v, want %v", got, ai.IntentionAttack)
 	}
-	for {
-		frame := srv.Client.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			break
-		}
+	for _, frame := range srv.Client.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeChangeMoveType {
 			t.Fatal("ChangeMoveType after the second shot, want none before the next periodic cycle")
 		}

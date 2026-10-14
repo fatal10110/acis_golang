@@ -95,11 +95,8 @@ func TestOwnedPetInteractMidSwingRunsAtSwingEnd(t *testing.T) {
 			break
 		}
 	}
-	for end := h.client.Now().Add(3 * time.Second); h.client.Now().Before(end); {
-		frame := h.client.ReadWithTimeout(end.Sub(h.client.Now()))
-		if frame == nil {
-			break
-		}
+	h.srv.Advance(t, 3*time.Second)
+	for _, frame := range h.client.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeAttack && wire.NewReader(frame[1:]).ReadInt32() == h.ownerID {
 			t.Fatal("the owner swung again after the queued interact replaced the attack")
 		}
@@ -195,11 +192,8 @@ func TestOwnedPetInteractQueuedForReturnedPetEndsTheAttack(t *testing.T) {
 	}
 
 	released := false
-	for end := h.client.Now().Add(3 * time.Second); h.client.Now().Before(end); {
-		frame := h.client.ReadWithTimeout(end.Sub(h.client.Now()))
-		if frame == nil {
-			break
-		}
+	h.srv.Advance(t, 3*time.Second)
+	for _, frame := range h.client.ReadQueued() {
 		switch {
 		case isOwnerInteractFrame(frame, h.ownerID, pet):
 			t.Fatalf("the queued interact ran against the returned pet: opcode %#x", frame[0])

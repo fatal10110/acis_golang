@@ -129,6 +129,7 @@ func TestItemLogRecordsNonStackableChanges(t *testing.T) {
 		c.Send(encodeAction(groundID, spawnX, spawnY, spawnZ, false))
 		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, what+" pending-action release")
 		assertFrameOpcode(t, c.Read(), serverpackets.OpcodeGetItem, what+" GetItem")
+		srv.SettlePickup(t, objID)
 		drainUntilQuiet(t, c)
 	}
 

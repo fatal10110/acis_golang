@@ -77,7 +77,7 @@ func TestLifeCubicHealsWoundedPartyMember(t *testing.T) {
 	statuses, _ := selfStatusesThenMessage(t, member, memberID, serverpackets.SystemMessageRejuvenatingHP, 1)
 	assertCasterStatus(t, srv, statuses[0], memberID, want, srv.PlayerCurrentMP(t, memberID))
 
-	for _, frame := range collectQuiet(t, c) {
+	for _, frame := range c.ReadQueued() {
 		switch frame[0] {
 		case serverpackets.OpcodeSystemMessage:
 			if wire.NewReader(frame[1:]).ReadInt32() == serverpackets.SystemMessageRejuvenatingHP {
@@ -92,20 +92,6 @@ func TestLifeCubicHealsWoundedPartyMember(t *testing.T) {
 	if hp := srv.PlayerCurrentHP(t, ownerID); hp != ownerHP {
 		t.Fatalf("owner HP = %d, want untouched %d", hp, ownerHP)
 	}
-}
-
-func collectQuiet(t *testing.T, c interface{ ReadWithTimeout(time.Duration) []byte }) [][]byte {
-	t.Helper()
-	var frames [][]byte
-	for range 100 {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return frames
-		}
-		frames = append(frames, frame)
-	}
-	t.Fatal("client kept receiving frames after 100 reads")
-	return nil
 }
 
 func encodePartyInvite(name string) []byte {

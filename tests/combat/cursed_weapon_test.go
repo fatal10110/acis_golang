@@ -114,7 +114,7 @@ func pickUpCursed(t *testing.T, srv *gameservertest.Server, c *scriptedClient, i
 }
 
 // pickUpWeapon lays itemID at id's feet and has its client pick it up,
-// returning every frame the pickup sent it.
+// returning every frame the pickup sent it once the player is free to act.
 func pickUpWeapon(t *testing.T, srv *gameservertest.Server, c *scriptedClient, id, itemID int32) [][]byte {
 	t.Helper()
 	x, y, z := srv.PlayerPosition(t, id)
@@ -122,7 +122,11 @@ func pickUpWeapon(t *testing.T, srv *gameservertest.Server, c *scriptedClient, i
 	drainUntilQuiet(t, c)
 	ground := groundWeapon(t, srv, itemID)
 	c.Send(encodeAction(ground.ObjectID(), int32(x), int32(y), int32(z), false))
-	srv.Settle(t)
+	srv.AdvanceUntil(t, "weapon picked up", func() bool {
+		_, lying := srv.State.Object(ground.ObjectID())
+		return !lying
+	})
+	srv.SettlePickup(t, id)
 	return readQuiet(c)
 }
 
@@ -293,8 +297,8 @@ func TestCursedWeaponDropsFromMonsterKill(t *testing.T) {
 	drainUntilQuiet(t, bystander)
 
 	c.Send(encodeRequestCursedWeaponLocation())
-	if f := c.ReadWithTimeout(readQuietWindow); f != nil {
-		t.Fatalf("location request with no weapon out answered %#x, want silence", f[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("location request with no weapon out answered %#x, want silence", queued[0][0])
 	}
 
 	setVictimRoll(t, srv, objID, 0)

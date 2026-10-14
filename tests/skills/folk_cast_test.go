@@ -90,6 +90,8 @@ func TestFolkAuraCastLandsOnPlayersOnly(t *testing.T) {
 
 	addCastDesire(t, folk, modelskill.Ref{ID: folkAuraHealSkill, Level: 1})
 	frames := tickAI(t, srv)
+	srv.AdvanceUntil(t, "Folk cast end", func() bool { return !folk.CastingNow() })
+	frames = append(frames, readUntilQuiet(t, c)...)
 
 	if use := framesWith(frames, serverpackets.OpcodeMagicSkillUse, folk.ObjectID()); len(use) != 1 {
 		t.Fatalf("AI tick frames %x, want one MagicSkillUse", frameOpcodes(frames))

@@ -295,6 +295,10 @@ func TestHeavierRouteDesireKeepsTheMonsterOnItsRoute(t *testing.T) {
 			t.Fatalf("intention with a lighter attack desire queued = %v, want move_route", got)
 		}
 	}
+	w.srv.AdvanceUntil(t, "patrol reaches its first node", func() bool {
+		x, _, _ := h.Position()
+		return x <= w.a[patrolID].X
+	})
 	w.srv.AdvanceUntil(t, "patrol walks on past its first node", func() bool {
 		x, _, _ := h.Position()
 		return x > w.a[patrolID].X

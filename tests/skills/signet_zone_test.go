@@ -20,7 +20,7 @@ import (
 // effect and the flying flag.
 func readNPCInfoMoveTypes(c *testsupport.ScriptedClient, objID int32) []byte {
 	var out []byte
-	for f := c.ReadWithTimeout(300 * time.Millisecond); f != nil; f = c.ReadWithTimeout(300 * time.Millisecond) {
+	for _, f := range c.ReadQueued() {
 		if len(f) >= 5 && f[0] == serverpackets.OpcodeNPCInfo && wire.NewReader(f[1:]).ReadInt32() == objID {
 			out = append(out, f[len(f)-1-(1+8+8+4+4)])
 		}

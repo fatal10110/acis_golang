@@ -3,6 +3,7 @@ package combat
 import (
 	"context"
 	"testing"
+	"time"
 
 	playermodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -47,7 +48,7 @@ func levelTableFor(t *testing.T) *playermodel.LevelTable {
 func readExpSpGain(t *testing.T, c *scriptedClient, exp int64, sp int) {
 	t.Helper()
 	for i := 0; i < 50; i++ {
-		frame := c.ReadWithTimeout(readQuietWindow)
+		frame := c.ReadWithTimeout(5 * time.Second)
 		if frame == nil {
 			t.Fatalf("exp/SP gain message for %d/%d never arrived", exp, sp)
 		}
@@ -94,7 +95,7 @@ func assertRewardTail(t *testing.T, c *scriptedClient, selfID int32, wantSPTotal
 	t.Helper()
 	userInfo, spStatus := -1, -1
 	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(readQuietWindow)
+		frame := c.ReadWithTimeout(5 * time.Second)
 		if frame == nil {
 			t.Fatalf("reward message %d never arrived", wantMessage)
 		}
@@ -227,11 +228,7 @@ func TestKillNPCLevelUpRefreshesSkills(t *testing.T) {
 	srv.AdvanceUntil(t, "monster death", func() bool { return hostile.CurrentHP() <= 0 })
 
 	var sawSkillList bool
-	for i := 0; i < 50 && !sawSkillList; i++ {
-		frame := c.ReadWithTimeout(readQuietWindow)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeSkillList {
 			sawSkillList = true
 		}
@@ -288,7 +285,7 @@ func readOverHitThenExpSpGain(t *testing.T, c *scriptedClient, exp int64, sp int
 	t.Helper()
 	sawOverHit := false
 	for i := 0; i < 50; i++ {
-		frame := c.ReadWithTimeout(readQuietWindow)
+		frame := c.ReadWithTimeout(5 * time.Second)
 		if frame == nil {
 			t.Fatalf("exp/SP gain message for %d/%d never arrived", exp, sp)
 		}

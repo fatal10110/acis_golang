@@ -3,7 +3,6 @@ package trade
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -47,11 +46,11 @@ func TestCancelMidWayReturnsItemsUntouched(t *testing.T) {
 
 	// The cleared session swallows a late add-item without any reply.
 	h.first.Send(encodeAddTradeItem(0, adena, 40))
-	if frame := h.first.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("late add after cancel replied %#x, want silence", frame[0])
+	if queued := h.first.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("late add after cancel replied %#x, want silence", queued[0][0])
 	}
-	if frame := h.second.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("partner received %#x after cancel, want silence", frame[0])
+	if queued := h.second.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("partner received %#x after cancel, want silence", queued[0][0])
 	}
 
 	h.srv.FlushItems(t)

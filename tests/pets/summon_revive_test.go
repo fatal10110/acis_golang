@@ -68,7 +68,7 @@ func castResurrection(t *testing.T, srv *gameservertest.Server, c *testsupport.S
 	c.Send(encodeRequestMagicSkillUse(petResurrectSkillID))
 	srv.Settle(t)
 	srv.Advance(t, 600*time.Millisecond)
-	srv.Settle(t)
+	srv.AdvanceUntil(t, "resurrection cast end", func() bool { return !srv.PlayerCastingNow(t, casterID) })
 }
 
 // TestOwnPetResurrectionRevivesIt: an owner's resurrection on its own dead

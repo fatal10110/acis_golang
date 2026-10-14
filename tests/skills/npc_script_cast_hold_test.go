@@ -62,7 +62,7 @@ func TestScriptHoldCastDesireNeverChasesOutOfReach(t *testing.T) {
 			var moved, cast bool
 			for passed := time.Duration(0); passed < time.Second; passed += 100 * time.Millisecond {
 				srv.Advance(t, 100*time.Millisecond)
-				for frame := c.ReadWithTimeout(20 * time.Millisecond); frame != nil; frame = c.ReadWithTimeout(20 * time.Millisecond) {
+				for _, frame := range c.ReadQueued() {
 					if len(frame) < 5 || wireReader(frame[1:]).ReadInt32() != monster.ObjectID() {
 						continue
 					}

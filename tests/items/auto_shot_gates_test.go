@@ -2,7 +2,6 @@ package items
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -29,10 +28,12 @@ func addAutoShotServitor(t *testing.T, srv *gameservertest.Server, objID int32, 
 	return servitor
 }
 
-// assertNoReply fails when anything reaches the client within 300ms.
+// assertNoReply fails on any frame the server has queued to the client once
+// it has caught up.
 func assertNoReply(t *testing.T, srv *gameservertest.Server, what string) {
 	t.Helper()
-	if reply := srv.Client.ReadWithTimeout(300 * time.Millisecond); reply != nil {
+	if queued := srv.Client.ReadQueued(); len(queued) != 0 {
+		reply := queued[0]
 		t.Fatalf("%s: unexpected extra reply %x", what, reply)
 	}
 }

@@ -2,7 +2,6 @@ package items
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
@@ -82,7 +81,7 @@ func TestItemSkillCastWhileTeleportingAnswersActionFailed(t *testing.T) {
 
 	c.Send(encodeUseItem(scroll, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "item cast while teleporting")
-	assertNoFrameFor(t, c, 300*time.Millisecond, "after the refused item cast")
+	assertNoFrame(t, c, "after the refused item cast")
 	if srv.PlayerCastingNow(t, objID) {
 		t.Fatal("item cast started while teleporting")
 	}
@@ -102,7 +101,7 @@ func TestItemSkillCastWhileImmobileUntilAttackedAnswersActionFailed(t *testing.T
 
 	c.Send(encodeUseItem(scroll, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "item cast while immobile until attacked")
-	assertNoFrameFor(t, c, 300*time.Millisecond, "after the refused item cast")
+	assertNoFrame(t, c, "after the refused item cast")
 	if srv.PlayerCastingNow(t, objID) {
 		t.Fatal("item cast started while immobile until attacked")
 	}
@@ -135,14 +134,14 @@ func TestHeldItemSkillCastResumedWhileTeleportingGoesIdle(t *testing.T) {
 	}
 	srv.Advance(t, sitStandDelay)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "held item cast resumed while teleporting")
-	assertNoFrameFor(t, c, 300*time.Millisecond, "after the refused held item cast")
+	assertNoFrame(t, c, "after the refused held item cast")
 	if srv.PlayerCastingNow(t, objID) {
 		t.Fatal("held item cast started while teleporting")
 	}
 
 	// The held cast went idle: clearing the teleport does not revive it.
 	live.SetTeleporting(false)
-	assertNoFrameFor(t, c, 300*time.Millisecond, "after the teleport cleared")
+	assertNoFrame(t, c, "after the teleport cleared")
 	assertItemCount(t, srv, objID, scroll, 3)
 }
 
@@ -177,7 +176,7 @@ func TestHeldItemSkillCastDroppedByTeleport(t *testing.T) {
 		t.Fatalf("teleport during the stand-up sent opcodes %x up to TeleportToLocation, want %x", got, want)
 	}
 	c.Send(encodeSingleOpcode(clientpackets.OpcodeAppearing))
-	srv.Advance(t, sitStandDelay)
+	srv.SettlePosture(t, objID)
 	if seen := opcodesUntilQuiet(t, c); seen[serverpackets.OpcodeMagicSkillUse] != 0 {
 		t.Fatal("held item cast started after the teleport")
 	}

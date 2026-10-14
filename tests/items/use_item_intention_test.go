@@ -2,7 +2,6 @@ package items
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -154,6 +153,6 @@ func TestWeaponUseItemWhileTeleportingAnswersActionFailed(t *testing.T) {
 
 	c.Send(encodeUseItem(sword, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "denied UseItem")
-	assertNoFrameFor(t, c, 300*time.Millisecond, "after the denied UseItem")
+	assertNoFrame(t, c, "after the denied UseItem")
 	assertRightHandEmpty(t, srv, objID, "after the denied UseItem")
 }

@@ -165,7 +165,7 @@ func TestRangedCastAtDoorSeesItAtDoorEyeHeight(t *testing.T) {
 
 			selectTarget(t, c, gate.ObjectID())
 			if tc.opens {
-				castUnlock(t, c, objID, def, gate.ObjectID())
+				castUnlock(t, srv, c, objID, def, gate.ObjectID())
 				if !gate.Opened() {
 					t.Fatal("door still closed after a guaranteed unlock it can be seen for")
 				}

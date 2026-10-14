@@ -124,8 +124,8 @@ func TestThinkMidSwingLeavesQueuedCastWaiting(t *testing.T) {
 	if srv.PlayerCastingNow(t, objID) {
 		t.Fatal("THINK started the cast queued behind the swing")
 	}
-	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("frame %#x for the THINK mid-swing, want none", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("frame %#x for the THINK mid-swing, want none", queued[0][0])
 	}
 	srv.AdvanceUntil(t, "queued cast start", func() bool { return srv.PlayerCastingNow(t, objID) })
 }

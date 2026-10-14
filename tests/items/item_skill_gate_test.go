@@ -64,16 +64,25 @@ func sitDown(t *testing.T, c *testsupport.ScriptedClient) time.Time {
 func sitAndSettle(t *testing.T, srv *gameservertest.Server) {
 	t.Helper()
 	changePosture(t, srv.Client, false)
-	srv.Advance(t, sitStandDelay)
+	srv.SettlePosture(t, srv.SoleObjectID(t))
 	drainUntilQuiet(t, srv.Client)
 }
 
-// assertNoFrameFor fails on any frame the client receives within d.
-func assertNoFrameFor(t *testing.T, c *testsupport.ScriptedClient, d time.Duration, what string) {
+// assertNoFrame fails on any frame the server has queued to c once it has
+// caught up.
+func assertNoFrame(t *testing.T, c *testsupport.ScriptedClient, what string) {
 	t.Helper()
-	if frame := c.ReadWithTimeout(d); frame != nil {
-		t.Fatalf("%s: got opcode %#x, want none", what, frame[0])
+	if frames := c.ReadQueued(); len(frames) != 0 {
+		t.Fatalf("%s: got opcode %#x, want none", what, frames[0][0])
 	}
+}
+
+// assertNoFrameFor lets d pass and fails on any frame the server queued to
+// c meanwhile.
+func assertNoFrameFor(t *testing.T, srv *gameservertest.Server, c *testsupport.ScriptedClient, d time.Duration, what string) {
+	t.Helper()
+	srv.Advance(t, d)
+	assertNoFrame(t, c, what)
 }
 
 func assertItemCount(t *testing.T, srv *gameservertest.Server, ownerID, objectID int32, want int) {
@@ -225,7 +234,7 @@ func TestUseItemSkillWhileSeatedIsRefused(t *testing.T) {
 	c.Send(encodeUseItem(scroll, false))
 	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageCannotMoveWhileSitting)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "seated ActionFailed")
-	assertNoFrameFor(t, c, 3*time.Second, "seated item use")
+	assertNoFrameFor(t, srv, c, 3*time.Second, "seated item use")
 	assertItemCount(t, srv, objID, scroll, 3)
 }
 
@@ -253,7 +262,7 @@ func TestUseItemSkillDuringSitDownIsRefusedOnceSeated(t *testing.T) {
 		t.Fatalf("queued item cast answered %v after sit-down, want no earlier than %v", elapsed, sitStandDelay)
 	}
 	assertStaticSystemMessage(t, frame, serverpackets.SystemMessageCannotMoveWhileSitting)
-	assertNoFrameFor(t, c, time.Second, "refused queued item cast")
+	assertNoFrameFor(t, srv, c, time.Second, "refused queued item cast")
 	assertItemCount(t, srv, objID, scroll, 3)
 }
 
@@ -288,7 +297,7 @@ func TestUseItemSkillGateRefusesBeforeQueueing(t *testing.T) {
 	c.Send(encodeUseItem(scroll, false))
 	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageCannotUseSkillsWithFormalWear)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "gate ActionFailed")
-	assertNoFrameFor(t, c, 2*sitStandDelay, "refused item cast after stand-up")
+	assertNoFrameFor(t, srv, c, 2*sitStandDelay, "refused item cast after stand-up")
 	assertItemCount(t, srv, objID, scroll, 3)
 }
 
@@ -311,7 +320,7 @@ func TestSitRequestDropsQueuedItemSkill(t *testing.T) {
 	c.Send(encodeUseItem(scroll, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "queued item cast")
 	changePosture(t, c, false)
-	assertNoFrameFor(t, c, 2*sitStandDelay, "replaced item cast")
+	assertNoFrameFor(t, srv, c, 2*sitStandDelay, "replaced item cast")
 	assertItemCount(t, srv, objID, scroll, 3)
 }
 
@@ -353,7 +362,7 @@ func TestUseItemCtrlForcesItemSkillTarget(t *testing.T) {
 
 	c.Send(encodeUseItem(key, false))
 	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageInvalidTarget)
-	assertNoFrameFor(t, c, 300*time.Millisecond, "unforced key")
+	assertNoFrame(t, c, "unforced key")
 
 	assertKeyCastOnHostile := func(what string) {
 		t.Helper()
@@ -417,7 +426,7 @@ func TestUseItemSkillDuringFakeDeathGetUpIsRefused(t *testing.T) {
 		fake.Effector, fake.Effected = pc, pc
 		pc.EffectList().Add(fake)
 	})
-	srv.Advance(t, 3*time.Second)
+	srv.SettlePosture(t, objID)
 	drainUntilQuiet(t, c)
 
 	// The stand's stopFakeDeath(true) exits the effect, whose own get-up
@@ -430,7 +439,7 @@ func TestUseItemSkillDuringFakeDeathGetUpIsRefused(t *testing.T) {
 
 	c.Send(encodeUseItem(scroll, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "item use while getting up")
-	srv.Advance(t, sitStandDelay)
+	srv.SettlePosture(t, objID)
 	if seen := opcodesUntilQuiet(t, c); seen[serverpackets.OpcodeMagicSkillUse] != 0 {
 		t.Fatal("refused item cast started after the fake-death get-up")
 	}

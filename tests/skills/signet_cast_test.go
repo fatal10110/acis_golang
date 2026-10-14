@@ -224,8 +224,8 @@ func TestFusionTimelineCastsKeepTheirConsumeItem(t *testing.T) {
 			c.Send(encodeRequestMagicSkillUse(signetCastID, false, false))
 			if tc.held == 0 {
 				assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageS1CannotBeUsed, signetCastID, 1)
-				if extra := c.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-					t.Fatalf("refused cast sent extra opcode %#x, want the refusal alone", extra[0])
+				if queued := c.ReadQueued(); len(queued) != 0 {
+					t.Fatalf("refused cast sent extra opcode %#x, want the refusal alone", queued[0][0])
 				}
 				return
 			}

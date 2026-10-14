@@ -62,7 +62,7 @@ func TestKarmaPlayerCannotForceAttackBlessedPet(t *testing.T) {
 			}
 			for passed := time.Duration(0); passed < 3*time.Second; passed += 100 * time.Millisecond {
 				h.srv.Advance(t, 100*time.Millisecond)
-				for f := pk.ReadWithTimeout(20 * time.Millisecond); f != nil; f = pk.ReadWithTimeout(20 * time.Millisecond) {
+				for _, f := range pk.ReadQueued() {
 					if frameIndex([][]byte{f}, serverpackets.OpcodeAttack, pkID) >= 0 {
 						t.Fatal("karma player swung at the blessed pet")
 					}

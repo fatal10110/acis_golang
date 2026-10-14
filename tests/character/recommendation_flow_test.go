@@ -19,19 +19,11 @@ func encodeRequestEvaluate(targetID int32) []byte {
 	return w.Bytes()
 }
 
-// quietFrames collects every frame c receives until the stream stays quiet.
+// quietFrames returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func quietFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	var out [][]byte
-	for range 100 {
-		frame := c.ReadWithTimeout(rejectSilenceWindow)
-		if frame == nil {
-			return out
-		}
-		out = append(out, frame)
-	}
-	t.Fatal("client kept receiving frames after 100 drains")
-	return nil
+	return c.ReadQueued()
 }
 
 func enterWorldQuiet(t *testing.T, c *testsupport.ScriptedClient) {
@@ -126,8 +118,8 @@ func TestRecommendationFlow(t *testing.T) {
 
 	// Nothing selected yet: the request is ignored.
 	giver.Send(encodeRequestEvaluate(takerID))
-	if frame := giver.ReadWithTimeout(rejectSilenceWindow); frame != nil {
-		t.Fatalf("evaluate of an unselected player answered %#x", frame[0])
+	if queued := giver.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("evaluate of an unselected player answered %#x", queued[0][0])
 	}
 	// An id no online player has: Select target.
 	giver.Send(encodeRequestEvaluate(999999))

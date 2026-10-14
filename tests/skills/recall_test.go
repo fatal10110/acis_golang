@@ -50,6 +50,7 @@ func TestTeleportSkillGoesToTeleCoords(t *testing.T) {
 	t.Parallel()
 	def := shippedSkill(t, 2213, 1)
 	srv, c, objID := bootRecallCaster(t, def, gameservertest.WithRestartPoints(recallTown(location.Location{X: -5000, Y: 2000, Z: 30})))
+	skipOnWallClock(t, srv)
 	startInWorld(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(int32(def.ID), false, false))

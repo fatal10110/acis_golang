@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/dbtest"
@@ -229,20 +228,11 @@ func encodeUseItem(objectID int32) []byte {
 	return w.Bytes()
 }
 
-// drainFrames collects every frame c receives until the server goes
-// quiet, in arrival order.
+// drainFrames returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func drainFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	frames := make([][]byte, 0, 8)
-	for range 200 {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return frames
-		}
-		frames = append(frames, frame)
-	}
-	t.Fatal("client kept receiving frames after 200 drains")
-	return nil
+	return c.ReadQueued()
 }
 
 // only keeps the frames whose opcode is one of want, in order.

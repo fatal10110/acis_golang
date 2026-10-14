@@ -2,7 +2,6 @@ package skills
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
@@ -62,18 +61,15 @@ func bootDoorDebuffAt(t *testing.T, tmpl *door.Template, def modelskill.Definiti
 	return srv, objID, gate
 }
 
-// castOnDoor casts def at the selected door and returns every frame up to
-// the client going quiet.
+// castOnDoor casts def at the selected door, lets the cast run to its end,
+// and returns every frame the server sent the caster after the cast start.
 func castOnDoor(t *testing.T, srv *gameservertest.Server, objID int32, def modelskill.Definition, gate *door.Object) frameLog {
 	t.Helper()
 	c := srv.Client
 	c.Send(encodeRequestMagicSkillUse(int32(def.ID), false, false))
 	readCastStartFrames(t, c, objID, int32(def.ID), int32(def.Level), doorSkillHit, 0, gate.ObjectID())
-	var log frameLog
-	for frame := c.ReadWithTimeout(time.Second); frame != nil; frame = c.ReadWithTimeout(time.Second) {
-		log = append(log, frame)
-	}
-	return log
+	srv.AdvanceUntil(t, "cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
+	return c.ReadQueued()
 }
 
 func TestDisablerOnDoorIsResistedAsOnCreature(t *testing.T) {

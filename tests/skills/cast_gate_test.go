@@ -75,10 +75,10 @@ func TestPlayerPreAttemptGateRejectsBeforeAnyCost(t *testing.T) {
 	t.Parallel()
 	// sit seats the player and lets the sit-down end: a player still
 	// sitting down is not seated yet.
-	sit := func(t *testing.T, srv *gameservertest.Server, _ int32) {
+	sit := func(t *testing.T, srv *gameservertest.Server, objID int32) {
 		srv.Client.Send(encodeRequestActionUse(0, false, false))
 		assertFrameOpcode(t, srv.Client.Read(), serverpackets.OpcodeChangeWaitType, "sit ChangeWaitType")
-		srv.Advance(t, sitStandDelay)
+		srv.SettlePosture(t, objID)
 		drainUntilQuiet(t, srv.Client)
 	}
 	for _, tt := range []struct {
@@ -186,8 +186,8 @@ func TestPlayerPreAttemptGateRejectsBeforeAnyCost(t *testing.T) {
 			c.Send(encodeRequestMagicSkillUse(tt.skillID, false, false))
 			tt.assert(t, c.Read())
 			assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "gate ActionFailed")
-			if extra := c.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-				t.Fatalf("gate rejection extra opcode = %#x, want none", extra[0])
+			if queued := c.ReadQueued(); len(queued) != 0 {
+				t.Fatalf("gate rejection extra opcode = %#x, want none", queued[0][0])
 			}
 			if got := srv.PlayerCurrentMP(t, objID); got != mpBefore {
 				t.Fatalf("MP after rejected cast = %d, want unchanged %d", got, mpBefore)
@@ -240,14 +240,10 @@ func TestWalkingInsufficientMPTargetedCastLeavesHeading(t *testing.T) {
 	caster.Send(encodeRequestMagicSkillUse(skillID, false, false))
 	assertFrameOpcode(t, caster.Read(), serverpackets.OpcodeStopMove, "cast stop")
 	assertStaticSystemMessage(t, caster.Read(), serverpackets.SystemMessageNotEnoughMP)
-	if extra := caster.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-		t.Fatalf("insufficient-MP rejection extra caster opcode = %#x, want no MoveToPawn", extra[0])
+	if queued := caster.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("insufficient-MP rejection extra caster opcode = %#x, want no MoveToPawn", queued[0][0])
 	}
-	for {
-		frame := patient.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			break
-		}
+	for _, frame := range patient.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeMoveToPawn {
 			t.Fatal("observer received MoveToPawn for a player's rejected cast")
 		}

@@ -282,6 +282,7 @@ func TestMercenaryTicketPlacement(t *testing.T) {
 
 	// The lord picks it up: it no longer counts.
 	w.leader.Send(encodeAction(clericGround, 0, 0, 0, false))
+	w.srv.SettlePickup(t, w.leaderID)
 	drainUntilQuiet(t, w.leader)
 	drainUntilQuiet(t, w.gm)
 	if got := gludioDropped(t, w.srv); got != 0 {

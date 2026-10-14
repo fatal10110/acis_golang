@@ -220,8 +220,8 @@ func TestSiegeSummonSkillGate(t *testing.T) {
 			}
 			tt.refuse(t, c.Read())
 			assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "gate ActionFailed")
-			if extra := c.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-				t.Fatalf("gate rejection extra opcode = %#x, want none", extra[0])
+			if queued := c.ReadQueued(); len(queued) != 0 {
+				t.Fatalf("gate rejection extra opcode = %#x, want none", queued[0][0])
 			}
 			if got := srv.PlayerCurrentMP(t, objID); got != mpBefore {
 				t.Fatalf("MP after rejected cast = %d, want unchanged %d", got, mpBefore)

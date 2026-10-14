@@ -55,11 +55,7 @@ type doorStatusUpdate struct {
 func doorStatusUpdates(t *testing.T, c *testsupport.ScriptedClient, objectID int32) []doorStatusUpdate {
 	t.Helper()
 	var out []doorStatusUpdate
-	for {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return out
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] != serverpackets.OpcodeDoorStatusUpdate {
 			t.Fatalf("frame opcode %#x, want only DoorStatusUpdate", frame[0])
 		}
@@ -73,6 +69,7 @@ func doorStatusUpdates(t *testing.T, c *testsupport.ScriptedClient, objectID int
 		}
 		out = append(out, u)
 	}
+	return out
 }
 
 func wantDoorStatus(objectID int32, damage, hp int32) doorStatusUpdate {

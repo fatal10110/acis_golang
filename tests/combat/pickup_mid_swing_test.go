@@ -47,13 +47,10 @@ func bootMidSwingPickup(t *testing.T, back int) midSwingPickup {
 
 // assertNoSwingBy fails when attackerID starts a swing within d. The
 // monster's own swings back do not count.
-func assertNoSwingBy(t *testing.T, c *scriptedClient, attackerID int32, d time.Duration, what string) {
+func assertNoSwingBy(t *testing.T, srv *gameservertest.Server, c *scriptedClient, attackerID int32, d time.Duration, what string) {
 	t.Helper()
-	for end := c.Now().Add(d); c.Now().Before(end); {
-		frame := c.ReadWithTimeout(end.Sub(c.Now()))
-		if frame == nil {
-			return
-		}
+	srv.Advance(t, d)
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeAttack && wireReader(frame[1:]).ReadInt32() == attackerID {
 			t.Fatalf("player swung again %s", what)
 		}
@@ -95,7 +92,7 @@ func TestMidSwingPickupReplacesTheAttack(t *testing.T) {
 					break
 				}
 			}
-			assertNoSwingBy(t, s.c, s.objID, 3*time.Second, "after the queued pickup")
+			assertNoSwingBy(t, s.srv, s.c, s.objID, 3*time.Second, "after the queued pickup")
 		})
 	}
 }
@@ -114,11 +111,8 @@ func TestMidSwingAttackReplacesQueuedPickup(t *testing.T) {
 	s.c.Send(encodeAction(s.hostileID, x, y, z, false))
 
 	swung := false
-	for end := s.c.Now().Add(3 * time.Second); s.c.Now().Before(end); {
-		frame := s.c.ReadWithTimeout(end.Sub(s.c.Now()))
-		if frame == nil {
-			break
-		}
+	s.srv.Advance(t, 3*time.Second)
+	for _, frame := range s.c.ReadQueued() {
 		switch {
 		case frame[0] == serverpackets.OpcodeGetItem:
 			t.Fatal("the pickup replaced by the attack still ran")
@@ -145,11 +139,8 @@ func TestMidSwingPickupOfVanishedItemEndsTheAttack(t *testing.T) {
 	s.srv.DespawnGroundItem(t, s.groundID)
 
 	deleted, released := false, false
-	for end := s.c.Now().Add(3 * time.Second); s.c.Now().Before(end); {
-		frame := s.c.ReadWithTimeout(end.Sub(s.c.Now()))
-		if frame == nil {
-			break
-		}
+	s.srv.Advance(t, 3*time.Second)
+	for _, frame := range s.c.ReadQueued() {
 		switch {
 		case frame[0] == serverpackets.OpcodeDeleteObject && wireReader(frame[1:]).ReadInt32() == s.groundID:
 			deleted = true

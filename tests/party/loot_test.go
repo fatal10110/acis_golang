@@ -123,6 +123,7 @@ func (g *group) pickUp(t *testing.T, picker int, ownerID, templateID, count int3
 		t.Fatalf("ground items = %d, want 1", len(snaps))
 	}
 	g.players[picker].c.Send(encodeAction(snaps[0].ObjectID, x, y, z))
+	g.srv.SettlePickup(t, g.players[picker].id)
 	out := make([][][]byte, len(g.players))
 	for i, p := range g.players {
 		out[i] = drainFrames(t, p.c)

@@ -524,6 +524,7 @@ func TestUseItemWeaponEquipDropsStaleAutoShot(t *testing.T) {
 	c.Send(encodeAction(soleGroundObjectID(t, srv), spawnX, spawnY, spawnZ, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "pickup pending-action release")
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeGetItem, "GetItem")
+	srv.SettlePickup(t, objID)
 	drainUntilQuiet(t, c)
 	srv.InventoryUpdates.Tick()
 	drainUntilQuiet(t, c)

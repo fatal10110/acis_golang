@@ -52,8 +52,8 @@ func TestRestoredLethalPoisonKillsOnTheLoadingScreen(t *testing.T) {
 	c := srv.Client
 	selectOnly(t, c)
 	srv.Advance(t, lethalPoisonKill+2*time.Second)
-	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("frame %#x sent on the loading screen, want nothing before the EnterWorld burst", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("frame %#x sent on the loading screen, want nothing before the EnterWorld burst", queued[0][0])
 	}
 	c.Send(encodeEnterWorld())
 	frames := readFrameSequence(t, c, []byte{

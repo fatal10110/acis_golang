@@ -137,17 +137,10 @@ func (w *castleWorld) castleCommand(t *testing.T, args string) (gm, leader [][]b
 	return collectFrames(w.gm), collectFrames(w.leader)
 }
 
-// collectFrames reads until the client stays quiet for 300ms.
+// collectFrames returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func collectFrames(c *testsupport.ScriptedClient) [][]byte {
-	var out [][]byte
-	for range 100 {
-		f := c.ReadWithTimeout(300 * time.Millisecond)
-		if f == nil {
-			break
-		}
-		out = append(out, f)
-	}
-	return out
+	return c.ReadQueued()
 }
 
 // gmAnswer decodes the game master's frames: the texts it was told, the

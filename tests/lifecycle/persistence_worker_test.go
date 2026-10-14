@@ -132,8 +132,8 @@ func TestSelectRefusedWhenQueuedSavesTimeOut(t *testing.T) {
 	release()
 	srv.FlushPersistence(t)
 	// A selection that kept waiting instead of giving up answers now.
-	if frame := c.ReadWithTimeout(500 * time.Millisecond); frame != nil {
-		t.Fatalf("refused selection answered %#x once the lane drained: it waited past its budget", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("refused selection answered %#x once the lane drained: it waited past its budget", queued[0][0])
 	}
 	c.Send(encodeRequestGameStart(0))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")

@@ -5,7 +5,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/dbtest"
@@ -19,8 +18,6 @@ import (
 func TestMain(m *testing.M) {
 	os.Exit(dbtest.Main(m))
 }
-
-const silenceWindow = 300 * time.Millisecond
 
 // boardOn is the community board switched on, opening on its home page.
 var boardOn = gamebbs.Config{Enabled: true, Home: "_bbshome"}
@@ -167,19 +164,11 @@ func write(t *testing.T, c *testsupport.ScriptedClient, url string, args ...stri
 	return drainFrames(t, c)
 }
 
-// drainFrames collects every frame c receives until the server goes quiet.
+// drainFrames returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func drainFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	var frames [][]byte
-	for range 400 {
-		frame := c.ReadWithTimeout(silenceWindow)
-		if frame == nil {
-			return frames
-		}
-		frames = append(frames, frame)
-	}
-	t.Fatal("client kept receiving frames after 400 drains")
-	return nil
+	return c.ReadQueued()
 }
 
 func opcodes(frames [][]byte) []byte {
@@ -199,8 +188,8 @@ func assertOpcode(t *testing.T, frame []byte, want byte, what string) {
 
 func assertSilent(t *testing.T, c *testsupport.ScriptedClient, what string) {
 	t.Helper()
-	if frame := c.ReadWithTimeout(silenceWindow); frame != nil {
-		t.Fatalf("%s: received %#x, want silence", what, frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("%s: received %#x, want silence", what, queued[0][0])
 	}
 }
 

@@ -2,7 +2,6 @@ package combat
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/geometry"
@@ -259,8 +258,8 @@ func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) 
 	if !hostile.AI().Desires().Has(&ai.Desire{Kind: ai.IntentionWander}) {
 		t.Fatal("wander desire missing after arrival TickThink")
 	}
-	if f := c.ReadWithTimeout(300 * time.Millisecond); f != nil {
-		t.Fatalf("unexpected packet after arrival queue tick: %#x", f[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("unexpected packet after arrival queue tick: %#x", queued[0][0])
 	}
 
 	if err := hostile.TickThink(); err != nil {
@@ -269,8 +268,8 @@ func assertWanderArrivalClearsDesire(t *testing.T, arrive func(*hostileHandle)) 
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("CurrentIntention() after promote = %v, want wander", got)
 	}
-	if f := c.ReadWithTimeout(300 * time.Millisecond); f != nil {
-		t.Fatalf("unexpected packet after arrival Think: %#x, want the wander timer to gate the next step", f[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("unexpected packet after arrival Think: %#x, want the wander timer to gate the next step", queued[0][0])
 	}
 }
 

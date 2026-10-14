@@ -2,7 +2,6 @@ package skills
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
@@ -27,11 +26,7 @@ type frameLog [][]byte
 // readFrameLog reads c until the server stays quiet.
 func readFrameLog(c *testsupport.ScriptedClient) frameLog {
 	var log frameLog
-	for range 200 {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		log = append(log, frame)
 	}
 	return log

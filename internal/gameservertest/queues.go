@@ -53,19 +53,19 @@ var errUnsettled = errors.New("actor queues did not settle")
 // its own queue and keep running (a corpse's decay closes the corpse's queue
 // partway through its despawn cleanup); its queue then refuses the barrier
 // post, but the rest of that task's work still has to land before settle
-// returns.
+// returns. One goroutine waits on every closed queue: a long test closes
+// many, and suites settle before every read.
 func (q *queues) settle() error {
 	q.mu.Lock()
 	all := append([]*sim.Queue(nil), q.all...)
 	q.mu.Unlock()
 	deadline := time.After(shutdownDrainTimeout)
+	var closed []*sim.Queue
 	for _, queue := range all {
 		done := make(chan struct{})
 		if !queue.Post(func() { close(done) }) {
-			go func() {
-				sim.RunOwned(queue, func() {})
-				close(done)
-			}()
+			closed = append(closed, queue)
+			continue
 		}
 		select {
 		case <-done:
@@ -73,7 +73,22 @@ func (q *queues) settle() error {
 			return errUnsettled
 		}
 	}
-	return nil
+	if len(closed) == 0 {
+		return nil
+	}
+	done := make(chan struct{})
+	go func() {
+		for _, queue := range closed {
+			sim.RunOwned(queue, func() {})
+		}
+		close(done)
+	}()
+	select {
+	case <-done:
+		return nil
+	case <-deadline:
+		return errUnsettled
+	}
 }
 
 // startQueues starts the executor WithRealPool or SimExecutorEnv selects, in

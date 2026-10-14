@@ -56,6 +56,7 @@ func TestEffectAttachConditionGatesItsCreation(t *testing.T) {
 			c.Send(encodeRequestMagicSkillUse(skillID, false, false))
 			readCastStartFrames(t, c, objID, skillID, 1, 500, 60_000, objID)
 			srv.Advance(t, 700*time.Millisecond)
+			srv.AdvanceUntil(t, "buff cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 			frames := collectUntilQuiet(t, c)
 
 			icon := slices.Contains(lastBuffIcons(t, frames), skillID)

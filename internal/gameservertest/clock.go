@@ -2,6 +2,7 @@ package gameservertest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -49,6 +50,15 @@ func (s *Server) SettlePosture(tb testing.TB, objID int32) {
 	s.Advance(tb, postureDelay)
 	c := s.onlineCharacter(tb, objID)
 	s.AdvanceUntil(tb, "posture transition end", func() bool { return !c.SittingNow() && !c.StandingNow() })
+}
+
+// SettlePickup lets the brief paralysis a pickup by the player objID started
+// run out, so the player can act again.
+func (s *Server) SettlePickup(tb testing.TB, objID int32) {
+	tb.Helper()
+	s.Settle(tb)
+	c := s.onlineCharacter(tb, objID)
+	s.AdvanceUntil(tb, "pickup paralysis end", func() bool { return !c.Paralyzed() })
 }
 
 // advanceStep is how far AdvanceUntil moves the clock between checks, and
@@ -121,6 +131,7 @@ func (s *Server) addClient(c *testsupport.ScriptedClient) {
 	s.traffic.mu.Lock()
 	s.traffic.clients = append(s.traffic.clients, c)
 	s.traffic.mu.Unlock()
+	c.SetQueued(func() (int64, error) { return s.queuedTo(c, true) })
 	if s.queues.advance != nil {
 		c.SetAwait(func(d time.Duration) bool { return s.awaitFrame(c, d) }, s.queues.inline.Now)
 		return
@@ -289,17 +300,49 @@ func (s *Server) awaitFrame(c *testsupport.ScriptedClient, d time.Duration) bool
 // read yet, once the server has handled what c sent (see Settle). It lets no
 // time pass on a driven clock, so no timer comes due meanwhile, and on the
 // wall clock it does not stop at a quiet spell: a frame already queued is
-// read however long the machine takes to deliver it.
+// read however long the machine takes to deliver it. c.ReadQueued does the
+// same, failing c's test instead of tb.
 func (s *Server) ReadQueued(tb testing.TB, c *testsupport.ScriptedClient) [][]byte {
 	tb.Helper()
-	s.Settle(tb)
-	ct := s.traffic.conn(c.LocalAddr())
-	if ct == nil {
-		tb.Fatal("ReadQueued: client connection not tracked")
+	return s.readQueued(tb, c, true)
+}
+
+// ReadHandled is ReadQueued without the wait on the actor queues (see
+// AwaitHandled): a test holding an actor's queue uses it to read what the
+// requests it sent were answered.
+func (s *Server) ReadHandled(tb testing.TB, c *testsupport.ScriptedClient) [][]byte {
+	tb.Helper()
+	return s.readQueued(tb, c, false)
+}
+
+func (s *Server) readQueued(tb testing.TB, c *testsupport.ScriptedClient, settle bool) [][]byte {
+	tb.Helper()
+	queued, err := s.queuedTo(c, settle)
+	if err != nil {
+		tb.Fatalf("ReadQueued: %v", err)
 	}
 	var frames [][]byte
-	for c.Received() < ct.sent.Load() {
+	for c.Received() < queued {
 		frames = append(frames, c.Read())
 	}
 	return frames
+}
+
+// queuedTo waits until the server has handled every frame a client wrote
+// and, with settle, until the actor queues have run what was posted to them,
+// then returns how many frames the server has queued to c.
+func (s *Server) queuedTo(c *testsupport.ScriptedClient, settle bool) (int64, error) {
+	if err := s.awaitHandled(); err != nil {
+		return 0, err
+	}
+	if settle {
+		if err := s.queues.settle(); err != nil {
+			return 0, err
+		}
+	}
+	ct := s.traffic.conn(c.LocalAddr())
+	if ct == nil {
+		return 0, errors.New("client connection not tracked")
+	}
+	return ct.sent.Load(), nil
 }

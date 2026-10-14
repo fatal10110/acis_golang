@@ -338,8 +338,7 @@ func enterWorld(t *testing.T, c *testsupport.ScriptedClient) {
 		t.Fatalf("opcode = %#x, want CharSelected (%#x)", reply[0], serverpackets.OpcodeCharSelected)
 	}
 	c.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
-	for c.ReadWithTimeout(300*time.Millisecond) != nil {
-	}
+	c.ReadQueued()
 }
 
 func encodeAction(objectID int32, origin location.Location) []byte {

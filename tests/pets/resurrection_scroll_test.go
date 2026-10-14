@@ -79,8 +79,8 @@ func selectObject(t *testing.T, srv *gameservertest.Server, c *testsupport.Scrip
 func assertOnlyFrame(t *testing.T, c *testsupport.ScriptedClient, messageID int, what string) {
 	t.Helper()
 	assertStaticSystemMessage(t, mustRead(t, c, what), messageID)
-	if extra := c.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-		t.Fatalf("%s: extra opcode %#x, want none", what, extra[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("%s: extra opcode %#x, want none", what, queued[0][0])
 	}
 }
 
@@ -169,8 +169,8 @@ func TestPetScrollTargetRefusals(t *testing.T) {
 
 		o.client.Send(encodeUseItem(o.seeded[gameservertest.PetResurrectionScrollID][0], false))
 		assertSystemMessageSkill(t, mustRead(t, o.client, "dead-servitor scroll"), serverpackets.SystemMessageS1CannotBeUsed, petScrollSkillID, 1)
-		if extra := o.client.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-			t.Fatalf("dead-servitor scroll extra opcode = %#x, want none", extra[0])
+		if queued := o.client.ReadQueued(); len(queued) != 0 {
+			t.Fatalf("dead-servitor scroll extra opcode = %#x, want none", queued[0][0])
 		}
 		if got := liveItemCount(t, o.srv, o.id, gameservertest.PetResurrectionScrollID); got != 1 {
 			t.Fatalf("scrolls = %d, want 1 kept", got)
@@ -192,8 +192,8 @@ func TestPetScrollWithoutSkillAnswersNothing(t *testing.T) {
 	selectObject(t, h.srv, h.client, h.ownerID, h.ownerID)
 
 	h.client.Send(encodeUseItem(h.seeded[gameservertest.PetResurrectionScrollID][0], false))
-	if frame := h.client.ReadWithTimeout(500 * time.Millisecond); frame != nil {
-		t.Fatalf("scroll without skill answered opcode %#x, want nothing", frame[0])
+	if queued := h.client.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("scroll without skill answered opcode %#x, want nothing", queued[0][0])
 	}
 	if got := liveItemCount(t, h.srv, h.ownerID, gameservertest.PetResurrectionScrollID); got != 1 {
 		t.Fatalf("scrolls = %d, want 1 kept", got)

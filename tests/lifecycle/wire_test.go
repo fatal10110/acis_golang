@@ -2,7 +2,6 @@ package lifecycle
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -178,16 +177,11 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	return frames
 }
 
-// drainUntilQuiet consumes every frame the client receives until the server
-// stays quiet for a full read timeout.
+// drainUntilQuiet consumes every frame the server has queued to the client
+// once it has caught up.
 func drainUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
-	for i := 0; i < 100; i++ {
-		if c.ReadWithTimeout(300*time.Millisecond) == nil {
-			return
-		}
-	}
-	t.Fatal("client kept receiving frames after 100 drains")
+	c.ReadQueued()
 }
 
 // startInWorld selects slot 0 and enters the world, returning the EnterWorld

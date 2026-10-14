@@ -4,7 +4,6 @@ import (
 	"slices"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -129,11 +128,7 @@ func TestLingeringOwnerTeleportBringsSummon(t *testing.T) {
 func seenObjects(t *testing.T, c *testsupport.ScriptedClient) map[byte]map[int32]bool {
 	t.Helper()
 	seen := map[byte]map[int32]bool{serverpackets.OpcodeCharInfo: {}, serverpackets.OpcodeNPCInfo: {}}
-	for range 100 {
-		f := c.ReadWithTimeout(300 * time.Millisecond)
-		if f == nil {
-			return seen
-		}
+	for _, f := range c.ReadQueued() {
 		r := wire.NewReader(f[1:])
 		switch f[0] {
 		case serverpackets.OpcodeCharInfo:
@@ -146,6 +141,5 @@ func seenObjects(t *testing.T, c *testsupport.ScriptedClient) map[byte]map[int32
 			seen[f[0]][r.ReadInt32()] = true
 		}
 	}
-	t.Fatal("client kept receiving frames after 100 reads")
-	return nil
+	return seen
 }

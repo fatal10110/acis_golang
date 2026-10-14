@@ -2,7 +2,6 @@ package combat
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -95,8 +94,8 @@ func TestSiegeGuardReturnHomeBroadcastsRunThenMove(t *testing.T) {
 	// observers then see ChangeMoveType(walk), NpcInfo and nothing else.
 	assertFrameOpcode(t, mustRead(t, c, "idle StopMove"), serverpackets.OpcodeStopMove, "StopMove")
 	assertStanceShown(t, c, "idle walk stance", hostile.ObjectID(), false)
-	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("unexpected frame after idle Think: opcode %#x", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("unexpected frame after idle Think: opcode %#x", queued[0][0])
 	}
 }
 

@@ -43,6 +43,9 @@ type ScriptedClient struct {
 	// afterSend, when set, runs after Send has written a frame; see
 	// SetAfterSend.
 	afterSend func(payload []byte)
+	// queued, when set, lets the server catch up and counts the frames it has
+	// queued to this client; see SetQueued.
+	queued func() (int64, error)
 }
 
 // frameInFlight is how long a read waits for a frame await reported as
@@ -62,6 +65,14 @@ func (f *ScriptedClient) SetAwait(await func(d time.Duration) bool, now func() t
 // is used.
 func (f *ScriptedClient) SetAfterSend(fn func(payload []byte)) {
 	f.afterSend = fn
+}
+
+// SetQueued has ReadQueued and ExpectNoFrame ask queued instead of waiting
+// out a quiet spell: queued lets the server handle what this client sent and
+// run the work that follows, then reports how many frames it has queued to
+// this client in all. Set it before the client is used.
+func (f *ScriptedClient) SetQueued(queued func() (int64, error)) {
+	f.queued = queued
 }
 
 // Now reads the clock reads wait on: SetAwait's clock, else the wall clock.
@@ -278,9 +289,41 @@ func (f *ScriptedClient) Read() []byte {
 	return payload
 }
 
-// ExpectNoFrame fails the test if any frame arrives within 100ms.
+// ReadQueued returns, in wire order, every frame the server has queued to
+// this client that it has not read yet, once the server has caught up (see
+// SetQueued). It lets no time pass on a driven clock and does not stop at a
+// quiet spell on the wall clock, so what it returns does not depend on how
+// fast the machine is. A test that needs frames a timer sends lets that time
+// pass first. It fails the test on a client the harness does not count frames
+// for.
+func (f *ScriptedClient) ReadQueued() [][]byte {
+	f.t.Helper()
+	if f.queued == nil {
+		f.t.Fatal("ReadQueued: the server does not count this client's frames")
+	}
+	queued, err := f.queued()
+	if err != nil {
+		f.t.Fatalf("ReadQueued: %v", err)
+	}
+	var frames [][]byte
+	for f.Received() < queued {
+		frames = append(frames, f.Read())
+	}
+	return frames
+}
+
+// ExpectNoFrame fails the test if the server has queued a frame this client
+// has not read. On a client the harness counts frames for, it asks the server
+// once it has caught up (see ReadQueued); on any other it fails if a frame
+// arrives within 100ms.
 func (f *ScriptedClient) ExpectNoFrame() {
 	f.t.Helper()
+	if f.queued != nil {
+		if frames := f.ReadQueued(); len(frames) != 0 {
+			f.t.Fatalf("unexpected frames: %x", frames)
+		}
+		return
+	}
 	if payload, err := f.readFrame(100 * time.Millisecond); err == nil {
 		if f.cipher != nil {
 			f.cipher.Decrypt(payload)

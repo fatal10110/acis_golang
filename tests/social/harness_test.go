@@ -3,7 +3,6 @@ package social
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -11,8 +10,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 	"github.com/fatal10110/acis_golang/internal/testsupport"
 )
-
-const silenceWindow = 300 * time.Millisecond
 
 // pair is a booted server with two dialed clients, Alice (the primary
 // account) and Bobby, seeded but not yet in the world.
@@ -190,33 +187,20 @@ func encodeTradeRequest(objectID int32) []byte {
 
 func drainUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
-	for range 100 {
-		if c.ReadWithTimeout(silenceWindow) == nil {
-			return
-		}
-	}
-	t.Fatal("client kept receiving frames after 100 drains")
+	c.ReadQueued()
 }
 
-// drainFrames collects every frame c receives until the server goes quiet.
+// drainFrames returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func drainFrames(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	var frames [][]byte
-	for range 100 {
-		frame := c.ReadWithTimeout(silenceWindow)
-		if frame == nil {
-			return frames
-		}
-		frames = append(frames, frame)
-	}
-	t.Fatal("client kept receiving frames after 100 drains")
-	return nil
+	return c.ReadQueued()
 }
 
 func assertSilent(t *testing.T, c *testsupport.ScriptedClient, what string) {
 	t.Helper()
-	if frame := c.ReadWithTimeout(silenceWindow); frame != nil {
-		t.Fatalf("%s: received %#x, want silence", what, frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("%s: received %#x, want silence", what, queued[0][0])
 	}
 }
 

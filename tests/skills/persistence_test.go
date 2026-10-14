@@ -518,8 +518,8 @@ func TestStackedOutBuffPersistsAndRestoresBehindStronger(t *testing.T) {
 	seedKnownSkill(t, srv, objID, 202, 1)
 	startInWorld(t, c)
 
-	castSlotBuff(t, c, objID, 201)
-	if icons := buffSlotIDs(castSlotBuff(t, c, objID, 202)); !slices.Equal(icons, []int32{202}) {
+	castSlotBuff(t, srv, objID, 201)
+	if icons := buffSlotIDs(castSlotBuff(t, srv, objID, 202)); !slices.Equal(icons, []int32{202}) {
 		t.Fatalf("icons after stronger stacked buff = %v, want only active [202]", icons)
 	}
 

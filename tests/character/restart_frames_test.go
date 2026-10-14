@@ -28,7 +28,8 @@ func TestRestartDropsTeardownFramesForSelfButNotWatcher(t *testing.T) {
 	if frame := c.Read(); frame[0] != serverpackets.OpcodeCharSelectInfo {
 		t.Fatalf("second restart frame = %x, want CharSelectInfo", frame)
 	}
-	if frame := c.ReadWithTimeout(rejectSilenceWindow); frame != nil {
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		frame := queued[0]
 		t.Fatalf("frame after CharSelectInfo = %x, want silence", frame)
 	}
 

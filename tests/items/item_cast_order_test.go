@@ -2,7 +2,6 @@ package items
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -153,8 +152,8 @@ func TestItemCastWithItemGoneChargesNothing(t *testing.T) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "first MagicSkillLaunched")
 	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageNotEnoughItems)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "item-gone ActionFailed")
-	if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-		t.Fatalf("item-gone cast extra opcode = %#x, want none", frame[0])
+	if queued := c.ReadQueued(); len(queued) != 0 {
+		t.Fatalf("item-gone cast extra opcode = %#x, want none", queued[0][0])
 	}
 
 	if got := srv.PlayerCurrentMP(t, objID); got != mp {

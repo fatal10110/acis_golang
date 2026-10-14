@@ -2,7 +2,6 @@ package skills
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -69,11 +68,7 @@ func hasCastDesire(hostile *npc.Hostile) bool {
 func assertNoRecast(t *testing.T, srv *gameservertest.Server, hostile *npc.Hostile) {
 	t.Helper()
 	thinkOnNPCQueue(t, hostile)
-	for {
-		frame := srv.Client.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return
-		}
+	for _, frame := range srv.Client.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeMagicSkillUse {
 			t.Fatal("the monster cast its skill again from a desire its last cast should have dropped")
 		}

@@ -95,11 +95,7 @@ func TestStunAbortsPlayerCastInFlight(t *testing.T) {
 	}
 	assertFrameOpcode(t, mustRead(t, c, "cast-stop ActionFailed"), serverpackets.OpcodeActionFailed, "cast-stop ActionFailed")
 
-	for {
-		frame := c.ReadWithTimeout(readQuietWindow)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeMagicSkillLaunched || frame[0] == serverpackets.OpcodeMagicSkillCanceled {
 			t.Fatalf("post-stun frame opcode %#x: the aborted cast must neither launch nor cancel again", frame[0])
 		}
@@ -186,11 +182,7 @@ func TestRemoveTargetStopsWalkingPlayer(t *testing.T) {
 	}
 	assertFrameOpcode(t, mustRead(t, c, "attack-stop ActionFailed"), serverpackets.OpcodeActionFailed, "attack-stop ActionFailed")
 	assertFrameOpcode(t, mustRead(t, c, "cast-stop ActionFailed"), serverpackets.OpcodeActionFailed, "cast-stop ActionFailed")
-	for {
-		frame := c.ReadWithTimeout(readQuietWindow)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeMoveToLocation || frame[0] == serverpackets.OpcodeStopMove {
 			t.Fatalf("post-RemoveTarget frame opcode %#x: the walk must stay stopped", frame[0])
 		}

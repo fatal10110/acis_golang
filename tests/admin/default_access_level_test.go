@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/admin"
@@ -72,11 +71,7 @@ func enterWorldUserInfo(t *testing.T, c *testsupport.ScriptedClient) userInfoAcc
 	c.Send(w.Bytes())
 	c.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
 	var info *userInfoAccess
-	for range 200 {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			break
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeUserInfo && info == nil {
 			got := decodeUserInfoAccess(t, frame)
 			info = &got

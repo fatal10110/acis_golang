@@ -3,7 +3,6 @@ package skills
 import (
 	"slices"
 	"testing"
-	"time"
 
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -58,8 +57,8 @@ func TestOffensiveCastOnFolkRequiresCtrlDamage(t *testing.T) {
 			c.Send(encodeRequestMagicSkillUse(skillID, tt.ctrl, false))
 			if tt.wantReject {
 				assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageInvalidTarget)
-				if extra := c.ReadWithTimeout(300 * time.Millisecond); extra != nil {
-					t.Fatalf("Folk cast rejection extra opcode = %#x, want none", extra[0])
+				if queued := c.ReadQueued(); len(queued) != 0 {
+					t.Fatalf("Folk cast rejection extra opcode = %#x, want none", queued[0][0])
 				}
 				return
 			}

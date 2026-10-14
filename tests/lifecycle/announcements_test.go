@@ -120,7 +120,10 @@ func TestBootAutomaticAnnouncementRepeats(t *testing.T) {
 			t.Fatalf("automatic announcement %d came %v after boot, want %v", i, c.Now().Sub(boot), want)
 		}
 	}
-	if frame := readAnnouncement(c, 2*time.Second); frame != nil {
-		t.Fatalf("CreatureSay %x after the limit, want none", frame)
+	srv.Advance(t, 2*time.Second)
+	for _, frame := range c.ReadQueued() {
+		if frame[0] == serverpackets.OpcodeCreatureSay {
+			t.Fatalf("CreatureSay %x after the limit, want none", frame)
+		}
 	}
 }

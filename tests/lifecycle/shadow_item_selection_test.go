@@ -3,7 +3,6 @@ package lifecycle
 import (
 	"sync/atomic"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
@@ -89,15 +88,11 @@ func TestShadowItemTickDuringSelectionDoesNotLoseItsExpiry(t *testing.T) {
 	}
 }
 
-// sawManaRanOut reads c until it is quiet and reports whether a
+// sawManaRanOut reads what the server has queued to c and reports whether a
 // remaining-mana-is-0 system message came.
-func sawManaRanOut(c interface{ ReadWithTimeout(time.Duration) []byte }) bool {
+func sawManaRanOut(c interface{ ReadQueued() [][]byte }) bool {
 	seen := false
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return seen
-		}
+	for _, frame := range c.ReadQueued() {
 		if frame[0] == serverpackets.OpcodeSystemMessage && len(frame) >= 5 &&
 			wire.NewReader(frame[1:]).ReadInt32() == serverpackets.SystemMessageRemainingManaIsNow0 {
 			seen = true

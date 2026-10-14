@@ -135,19 +135,11 @@ func (p *appearancePair) expire(t *testing.T, e *effect.Effect, what string) {
 	}
 }
 
-// readQuiet returns every frame c receives until it stays quiet.
+// readQuiet returns, in arrival order, every frame the server has queued to
+// the client that it has not read yet, once the server has caught up.
 func readQuiet(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
-	var frames [][]byte
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return frames
-		}
-		frames = append(frames, frame)
-	}
-	t.Fatal("client kept receiving frames after 100 reads")
-	return nil
+	return c.ReadQueued()
 }
 
 func framesWithOpcode(frames [][]byte, opcode byte) [][]byte {

@@ -43,7 +43,7 @@ func TestMidSwingToggleEndsTheAttack(t *testing.T) {
 	c.Send(encodeRequestMagicSkillUse(midSwingToggleID, false, false))
 	assertFrameOpcode(t, mustRead(t, c, "queued toggle ActionFailed"), serverpackets.OpcodeActionFailed, "queued toggle ActionFailed")
 	srv.AdvanceUntil(t, "queued toggle on", func() bool { return toggleOn(pc) })
-	assertNoAttackFor(t, c, 3*time.Second, "after the toggle turned on")
+	assertNoAttackFor(t, srv, c, 3*time.Second, "after the toggle turned on")
 }
 
 // TestFailedQueuedSkillDoesNotReviveTheAttack pins the queued skill taking
@@ -66,7 +66,7 @@ func TestFailedQueuedSkillDoesNotReviveTheAttack(t *testing.T) {
 	assertSystemMessageSkillFrame(t, readUntil(t, c, serverpackets.OpcodeSystemMessage, "resume reuse rejection")[0], serverpackets.SystemMessageS1PreparedForReuse, queueNextSkillID, 1)
 
 	onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.WakeAI() })
-	assertNoAttackFor(t, c, 2*time.Second, "after the AI woke up")
+	assertNoAttackFor(t, srv, c, 2*time.Second, "after the AI woke up")
 	if pc.CastingNow() {
 		t.Fatal("queued skill on reuse started")
 	}
@@ -168,7 +168,7 @@ func TestQueuedItemCastDropsTheAttackClickedMidCast(t *testing.T) {
 
 	srv.AdvanceUntil(t, "queued item cast start", func() bool { return pc.SkillDisabled(key) })
 	srv.AdvanceUntil(t, "queued item cast end", func() bool { return !pc.CastingNow() })
-	assertNoAttackFor(t, c, 2*time.Second, "after the queued item cast")
+	assertNoAttackFor(t, srv, c, 2*time.Second, "after the queued item cast")
 }
 
 // TestFailedQueuedItemCastDoesNotFollowUpWithAttack pins the queued item
@@ -188,9 +188,9 @@ func TestFailedQueuedItemCastDoesNotFollowUpWithAttack(t *testing.T) {
 	pc.DisableSkill(cast.ReuseKey(queueScrollSkill()), 10*time.Minute)
 
 	srv.AdvanceUntil(t, "cast end", func() bool { return !pc.CastingNow() })
-	assertNoAttackFor(t, c, 2*time.Second, "after the cast ended")
+	assertNoAttackFor(t, srv, c, 2*time.Second, "after the cast ended")
 	onPlayerQueue(t, srv, objID, func(pc *player.Character) { pc.WakeAI() })
-	assertNoAttackFor(t, c, 2*time.Second, "after the AI woke up")
+	assertNoAttackFor(t, srv, c, 2*time.Second, "after the AI woke up")
 	if pc.CastingNow() {
 		t.Fatal("queued item cast on reuse started")
 	}

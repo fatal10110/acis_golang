@@ -2,7 +2,6 @@ package items
 
 import (
 	"testing"
-	"time"
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -51,15 +50,10 @@ func landStunSelfOn(t *testing.T, srv *gameservertest.Server, objID int32) {
 func opcodesUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) map[byte]int {
 	t.Helper()
 	seen := map[byte]int{}
-	for i := 0; i < 100; i++ {
-		frame := c.ReadWithTimeout(300 * time.Millisecond)
-		if frame == nil {
-			return seen
-		}
+	for _, frame := range c.ReadQueued() {
 		seen[frame[0]]++
 	}
-	t.Fatal("client kept receiving frames after 100 reads")
-	return nil
+	return seen
 }
 
 // TestStunSelfDuringStandUpWaitsOutTheTransition pins PlayableAI.tryToIdle's
@@ -90,7 +84,7 @@ func TestStunSelfDuringStandUpWaitsOutTheTransition(t *testing.T) {
 		t.Fatalf("MagicSkillUse frames after StunSelf during the stand-up = %d, want 0", n)
 	}
 
-	srv.Advance(t, sitStandDelay)
+	srv.SettlePosture(t, objID)
 	if n := opcodesUntilQuiet(t, c)[serverpackets.OpcodeMagicSkillUse]; n != 0 {
 		t.Fatalf("MagicSkillUse frames at the stand-up's end = %d, want 0: the idle must replace the queued cast", n)
 	}
