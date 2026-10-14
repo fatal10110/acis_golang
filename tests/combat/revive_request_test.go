@@ -167,6 +167,8 @@ func TestPhoenixBlessedDeathOffersFullRevive(t *testing.T) {
 			startInWorld(t, c)
 			for _, skillID := range []int32{phoenixSkillID, charmOfLuckSkill} {
 				c.Send(encodeRequestMagicSkillUse(skillID, false, false))
+				srv.Settle(t)
+				srv.AdvanceUntil(t, "self-buff cast end", func() bool { return !srv.PlayerCastingNow(t, id) })
 				drainUntilQuiet(t, c)
 			}
 			victim := reviveVictimOf(t, srv, id)

@@ -192,6 +192,7 @@ func TestDisplacedCharmOfLuckLeavesWithLesserKept(t *testing.T) {
 			c.Send(encodeRequestMagicSkillUse(strong, false, false))
 			assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "MagicSkillUse")
 			assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, strong, 1)
+			srv.AdvanceUntil(t, "stronger charm cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 			frames := collectUntilQuiet(t, c)
 			if got := skillMessages(t, frames); !slices.Equal(got, tc.afterCast) {
 				t.Fatalf("skill messages after the stronger charm = %+v, want %+v", got, tc.afterCast)

@@ -214,6 +214,7 @@ func TestStunBlocksCastingAndMovement(t *testing.T) {
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillUse, "stun cast ack")
 	assertSystemMessageSkillFrame(t, c.Read(), serverpackets.SystemMessageUseS1, 20, 1)
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeMagicSkillLaunched, "stun launch")
+	srv.AdvanceUntil(t, "stun cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeRequestMagicSkillUse(21, false, false))
@@ -646,6 +647,8 @@ func TestHeldStackedEffectAnswersSkillIDLookup(t *testing.T) {
 
 	castSlotBuff(t, srv, objID, 201)
 	c.Send(encodeRequestMagicSkillUse(202, false, false))
+	srv.Settle(t)
+	srv.AdvanceUntil(t, "stronger cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 	drainUntilQuiet(t, c)
 	if ids := liveHeldSkillIDs(t, srv, objID); !slices.Equal(ids, []int32{201, 202}) {
 		t.Fatalf("held effects with cancel-lesser off = %v, want queued lesser [201 202]", ids)

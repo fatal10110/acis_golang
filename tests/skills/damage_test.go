@@ -854,6 +854,8 @@ func TestManadamOnInvulnerableNPCDrainsNoMP(t *testing.T) {
 	}
 
 	c.Send(encodeRequestMagicSkillUse(46, false, false))
+	srv.Settle(t)
+	srv.AdvanceUntil(t, "MANADAM cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 	drainUntilQuiet(t, c)
 
 	if mp := hostile.CurrentMP(); mp != beforeMP {
