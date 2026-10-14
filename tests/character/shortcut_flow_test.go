@@ -54,7 +54,8 @@ func encodeRequestShortCutDel(slot int32) []byte {
 	return w.Bytes()
 }
 
-// drainQuiet reads until the stream stays quiet for one silence window.
+// drainQuiet reads every frame the server has queued to the client once it
+// has caught up.
 func drainQuiet(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
 	c.ReadQueued()

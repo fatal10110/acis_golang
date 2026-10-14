@@ -3,7 +3,6 @@ package items
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -255,7 +254,7 @@ func TestUseItemOnArrowsTogglesNothing(t *testing.T) {
 
 	c.Send(encodeUseItem(arrows, false))
 	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeActionFailed, "UseItem on arrows")
-	assertNoFrameFor(t, c, 300*time.Millisecond, "after UseItem on arrows")
+	assertNoFrame(t, c, "after UseItem on arrows")
 	if worn := srv.PlayerInventory(t, objID).ItemAt(itemcontainer.LHand); worn == nil || worn.ObjectID != arrows {
 		t.Fatalf("left hand after UseItem on arrows = %v, want the arrows", worn)
 	}
@@ -383,7 +382,7 @@ func TestCrystallizeInStoreModeIsRefused(t *testing.T) {
 
 	c.Send(encodeRequestCrystallizeItem(weapon, 1))
 	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageCannotTradeDiscardDropInShopMode)
-	assertNoFrameFor(t, c, 300*time.Millisecond, "after the store-mode refusal")
+	assertNoFrame(t, c, "after the store-mode refusal")
 	if inst := mustFindItem(t, srv, objID, weapon); inst.Count != 1 {
 		t.Fatalf("weapon count after refused crystallize = %d, want 1", inst.Count)
 	}

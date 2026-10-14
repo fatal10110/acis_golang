@@ -99,7 +99,7 @@ func assertRefusedAlone(t *testing.T, srv *gameservertest.Server, objID int32, m
 	if messageID != 0 {
 		assertStaticSystemMessage(t, srv.Client.Read(), messageID)
 	}
-	assertNoFrameFor(t, srv.Client, 300*time.Millisecond, what)
+	assertNoFrame(t, srv.Client, what)
 	if srv.PlayerCastingNow(t, objID) {
 		t.Fatalf("%s started a cast", what)
 	}

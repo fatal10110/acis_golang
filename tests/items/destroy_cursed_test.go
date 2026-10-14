@@ -2,7 +2,6 @@ package items
 
 import (
 	"testing"
-	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -80,7 +79,7 @@ func TestDestroyCursedWeaponIsRefused(t *testing.T) {
 
 			c.Send(encodeRequestDestroyItem(weapon, 1))
 			assertStaticSystemMessage(t, c.Read(), tc.wantID)
-			assertNoFrameFor(t, c, 300*time.Millisecond, "after the cursed-weapon refusal")
+			assertNoFrame(t, c, "after the cursed-weapon refusal")
 
 			assertItemCount(t, srv, objID, weapon, 1)
 			if tc.equip && !mustFindItem(t, srv, objID, weapon).Equipped() {
@@ -103,7 +102,7 @@ func TestDestroyCursedWeaponCountChecksComeFirst(t *testing.T) {
 
 	c.Send(encodeRequestDestroyItem(sword, 0))
 	assertStaticSystemMessage(t, c.Read(), serverpackets.SystemMessageCannotDestroyNumberIncorrect)
-	assertNoFrameFor(t, c, 300*time.Millisecond, "after the count refusal")
+	assertNoFrame(t, c, "after the count refusal")
 
 	assertItemCount(t, srv, objID, sword, 1)
 }

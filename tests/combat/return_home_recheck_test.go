@@ -75,8 +75,8 @@ func TestReturnHomeRecoverySkipsWanderRecheck(t *testing.T) {
 			srv.Advance(t, 5*time.Second)
 			if tc.wantRecheck {
 				assertFrameOpcode(t, mustRead(t, c, "wander recheck"), serverpackets.OpcodeMoveToLocation, "wander recheck")
-			} else if frame := c.ReadWithTimeout(300 * time.Millisecond); frame != nil {
-				t.Fatalf("unexpected frame after recovery teleport: opcode %#x", frame[0])
+			} else if frames := c.ReadQueued(); len(frames) != 0 {
+				t.Fatalf("unexpected frame after recovery teleport: opcode %#x", frames[0][0])
 			}
 		})
 	}

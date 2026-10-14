@@ -146,8 +146,8 @@ func (r *rig) restart(t *testing.T, c *testsupport.ScriptedClient, objID int32) 
 	drain(t, c)
 }
 
-// drain reads until the client has received nothing for 300ms and returns
-// what it read.
+// drain returns every frame the server has queued to the client once it has
+// caught up.
 func drain(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	t.Helper()
 	var frames [][]byte

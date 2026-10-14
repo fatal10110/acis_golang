@@ -110,7 +110,8 @@ func enterWorld(t *testing.T, c *testsupport.ScriptedClient) {
 	drain(t, c)
 }
 
-// drain reads until the client has received nothing for 300ms.
+// drain reads every frame the server has queued to the client once it has
+// caught up.
 func drain(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
 	c.ReadQueued()

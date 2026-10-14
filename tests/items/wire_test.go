@@ -249,8 +249,8 @@ func readEnterWorldBurst(t *testing.T, c *testsupport.ScriptedClient) [][]byte {
 	return frames
 }
 
-// drainUntilQuiet consumes every frame the client receives until the server
-// stays quiet for a full read timeout.
+// drainUntilQuiet consumes every frame the server has queued to the client
+// once it has caught up.
 func drainUntilQuiet(t *testing.T, c *testsupport.ScriptedClient) {
 	t.Helper()
 	c.ReadQueued()
