@@ -81,7 +81,8 @@ func (s *Service) SetIntroduction(cl *Clan, introduction string) {
 
 // MembersInTableOrder returns the roster in the order of the hash table it
 // is kept in, as Clans orders the registry: the order a clan mail
-// addresses the members in. Like Clans, it approximates that order.
+// addresses the members in and a roster packet lists them in. Like Clans,
+// it approximates that order.
 func (cl *Clan) MembersInTableOrder() []Member {
 	members := cl.Members()
 	buckets := registryBuckets(len(members))
