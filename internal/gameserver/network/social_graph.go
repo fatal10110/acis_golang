@@ -42,6 +42,26 @@ func (g socialGraph) SameChannel(a, b int32) bool {
 	return g.parties != nil && g.parties.SameChannel(a, b)
 }
 
+func (g socialGraph) Channel(objectID int32) (*player.Character, [][]*player.Character, bool) {
+	if g.parties == nil {
+		return nil, nil, false
+	}
+	view, ok := g.parties.Channel(objectID)
+	if !ok {
+		return nil, nil, false
+	}
+	parties := make([][]*player.Character, len(view.Parties))
+	members := view.Members
+	for i, p := range view.Parties {
+		parties[i] = make([]*player.Character, p.Count)
+		for j, m := range members[:p.Count] {
+			parties[i][j] = m.Character
+		}
+		members = members[p.Count:]
+	}
+	return view.Leader.Character, parties, true
+}
+
 func (g socialGraph) clan(id int32) (*clan.Clan, bool) {
 	if g.clans == nil {
 		return nil, false

@@ -761,3 +761,14 @@ Player.setActiveWarehouse script.Player.OpenWarehouseWithdraw
 WarehouseWithdrawList.new script.Player.OpenWarehouseWithdraw
 Shutdown.new inline
 Shutdown.start script.Server.Shutdown
+
+# Command channel reads and group screen messages (#3808). The Player handle
+# reads the channel its party is in, so the party's channel getter folds
+# into each read; the channel's own getLeader is Player.ChannelLeader. The
+# one packet a script hands a party is the screen message.
+CommandChannel.broadcastOnScreen script.Player.ShowChannelScreenMessage
+CommandChannel.getMembers script.Player.ChannelMembers
+CommandChannel.getParties script.Player.ChannelParties
+Party.broadcastOnScreen script.Player.ShowPartyScreenMessage
+Party.broadcastPacket script.Player.ShowPartyScreenMessage
+Party.getCommandChannel inline

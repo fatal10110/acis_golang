@@ -58,6 +58,18 @@ type ScreenMessageShown struct {
 
 func (ScreenMessageShown) event() {}
 
+// GroupScreenMessageShown reports Text shown at the top center of the
+// screen of every member of the character's party, or of the command
+// channel that party is in when Channel is set, for DurationMs
+// milliseconds. The members are the group's as the event is handled.
+type GroupScreenMessageShown struct {
+	Text       string
+	DurationMs int32
+	Channel    bool
+}
+
+func (GroupScreenMessageShown) event() {}
+
 // MultisellRequested asks for the multisell list List to be shown to the
 // character as the civilian NPC ObjectID offers it.
 type MultisellRequested struct {
