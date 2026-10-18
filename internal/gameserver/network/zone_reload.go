@@ -33,6 +33,7 @@ func (l *GameClientLink) wireZones(ix *zone.Index) {
 	l.wireZoneOccupantHooks(ix)
 	l.wireScriptZones(ix)
 	l.wireClanHallZones(ix)
+	l.wireCastleZones(ix)
 	l.wireCastleTeleportZones(ix)
 	l.wireSiegeZones(ix)
 	l.wireNoLandingZones(ix)

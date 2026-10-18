@@ -107,7 +107,9 @@ func (f *Folk) residenceCommand(pages Pages, kind InstanceKind, rules ChatRules,
 	case "CastleGatekeeper":
 		return f.massGatekeeperCommand(pages, talker.residence(), command, reply)
 	case "WyvernManagerNpc":
-		return f.wyvernManagerCommand(pages, rules, talker, command, reply), true
+		return f.wyvernManagerCommand(pages, rules, talker, command, reply)
+	case "CastleChamberlain":
+		return f.chamberlainBypass(pages, kind, talker.residence(), command, reply)
 	}
 	return reply, false
 }
@@ -574,15 +576,15 @@ func (f *Folk) wyvernPage(pages Pages, rules ChatRules, path string) string {
 	).Replace(f.page(pages, path))
 }
 
-// wyvernManagerCommand answers every command at a wyvern manager, which
-// heeds only the talker who last selected it. Chat <val> opens page val,
-// page 1 when the command has none, and a val climbing out of the wyvern
-// pages reads as a missing page; RideWyvern lets the leader of the clan
-// owning its residence ride, see wyvernRide, and opens page 2 for anyone
-// else. A talker of no clan owning its residence is refused every other
-// command with the chamberlain's refusal page, whose other commands are
-// #3849.
-func (f *Folk) wyvernManagerCommand(pages Pages, rules ChatRules, talker Talker, command string, reply BypassReply) BypassReply {
+// wyvernManagerCommand answers a wyvern manager's commands; it heeds only
+// the talker who last selected it. Chat <val> opens page val, page 1 when
+// the command has none, and a val climbing out of the wyvern pages reads as
+// a missing page; RideWyvern lets the leader of the clan owning its
+// residence ride, see wyvernRide, and opens page 2 for anyone else. Every
+// other command reaches the chamberlain's dialog, with the wyvern manager's
+// own standing; ok is false for a command that dialog leaves to the
+// merchant's.
+func (f *Folk) wyvernManagerCommand(pages Pages, rules ChatRules, talker Talker, command string, reply BypassReply) (BypassReply, bool) {
 	switch {
 	case !talker.CurrentFolk:
 		reply.Outcome = BypassRefused
@@ -605,11 +607,8 @@ func (f *Folk) wyvernManagerCommand(pages Pages, rules ChatRules, talker Talker,
 			// A page outside the wyvern pages is never read from a typed value.
 			reply.HTML = missingHTML(path)
 		}
-	case !talker.residence().owns():
-		reply.Outcome, reply.HTML = BypassPage, rawPage(pages, "data/html/chamberlain/noprivs.htm")
 	default:
-		// ponytail: the chamberlain commands are #3849.
-		reply.Outcome = BypassUnported
+		return f.chamberlainBypass(pages, "WyvernManagerNpc", talker.residence(), command, reply)
 	}
-	return reply
+	return reply, true
 }

@@ -178,6 +178,12 @@ const (
 	// wyvern only from one, then opens HTML and releases the client with
 	// ActionFailed.
 	BypassWyvernNoStrider
+	// BypassAlreadyTrading tells a talker tied up in a trade that it is,
+	// and does nothing else.
+	BypassAlreadyTrading
+	// BypassChamberlain runs one of the castle chamberlain dialog's own
+	// commands for a talker of Standing.
+	BypassChamberlain
 	// BypassWyvernRide takes Count B-grade crystals from the talker, which
 	// leaves its strider for a wyvern, then opens HTML and releases the
 	// client with ActionFailed; a talker holding too few gets ShortHTML
@@ -203,6 +209,8 @@ type Talker struct {
 	SubclassActive bool
 	// ThirdClass is set when the talker's class is a third occupation.
 	ThirdClass bool
+	// Trading is set while the talker is tied up in a trade.
+	Trading bool
 	// CurrentFolk is set when the NPC is the one the talker last selected.
 	CurrentFolk bool
 	// MountNPCID is the mount the talker rides, 0 on foot, and MountLevel
@@ -228,9 +236,7 @@ type BypassReply struct {
 	LeadingActionFailed bool
 	// CancelEnchant drops the talker's enchant scroll selection before the
 	// command runs: a warehouse keeper does so for every command its karma
-	// gate lets through. Its refusal of a talker tied up in a trade needs
-	// no field: the interact gate ahead of every dialog command already
-	// refuses one.
+	// gate lets through and that finds the talker in no trade.
 	CancelEnchant bool
 	// ListID is the buylist BypassBuyList and BypassWearList name.
 	ListID int
@@ -266,6 +272,9 @@ type BypassReply struct {
 	// page it opens when the talker holds fewer.
 	Count     int
 	ShortHTML string
+	// Standing is the talker's standing at the chamberlain dialog
+	// BypassChamberlain runs.
+	Standing ChamberlainStanding
 }
 
 // Bypass answers command, the part of an npc_<objectId>_<command> dialog
@@ -325,9 +334,6 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	}
 	if out, ok := f.residenceCommand(pages, kind, rules, talker, command, reply); ok {
 		return out
-	}
-	if _, ok := unportedResidenceCommands[kind]; ok {
-		return reply
 	}
 	if kind == "OlympiadManagerNpc" {
 		switch {
@@ -405,6 +411,10 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			reply.Outcome = BypassHennaRemoveList
 			return reply
 		}
+	}
+	if (kind == "WarehouseKeeper" || kind == "CastleWarehouseKeeper") && talker.Trading {
+		reply.Outcome = BypassAlreadyTrading
+		return reply
 	}
 	reply.CancelEnchant = kind == "WarehouseKeeper" || kind == "CastleWarehouseKeeper"
 	if reply.CancelEnchant {
@@ -526,9 +536,14 @@ func (f *Folk) dialogCommand(pages Pages, kind InstanceKind, chat folkChat, talk
 }
 
 // merchantKind reports whether kind answers the merchant's shop commands: a
-// merchant, a fisherman or a manor manager.
+// merchant, a fisherman, a manor manager, and a castle chamberlain or a
+// wyvern manager past their own dialogs.
 func merchantKind(kind InstanceKind) bool {
-	return kind == "Merchant" || kind == "Fisherman" || kind == "ManorManagerNpc"
+	switch kind {
+	case "Merchant", "Fisherman", "ManorManagerNpc", "CastleChamberlain", "WyvernManagerNpc":
+		return true
+	}
+	return false
 }
 
 // gateTeleport refuses a parsed teleport the NPC of kind does not let the
