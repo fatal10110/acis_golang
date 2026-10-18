@@ -84,6 +84,9 @@ var adminCommands = map[string]adminCommand{
 	"admin_castle": (*GameClientLink).adminCastle,
 	"admin_siege":  (*GameClientLink).adminSiege,
 
+	// Clan halls; see admin_clanhall.go.
+	"admin_ch": (*GameClientLink).adminClanHall,
+
 	// Manor; see admin_manor.go.
 	"admin_manor": (*GameClientLink).adminManor,
 
