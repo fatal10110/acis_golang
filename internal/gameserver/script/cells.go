@@ -6,11 +6,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 )
 
-// The cells are the only place a script keeps state shared by every player
-// and NPC it serves, never fields of the script value. Each cell is leaf-locked: no method calls out while holding the
-// lock, and none takes a closure. A script builds its cells in its
-// constructor and its hooks capture them; the zero value of each is ready
-// to use, and a cell is never copied once used.
+// The cells are the only place a script keeps state shared by every player and
+// NPC it serves, never fields of the script value. Each cell is leaf-locked: no
+// method calls out while holding the lock, and none takes a closure. A script
+// builds its cells in its constructor and its hooks capture them; the zero value
+// of each is ready to use, and a cell is never copied once used.
 
 // NPCCell holds one NPC, or none.
 type NPCCell struct {

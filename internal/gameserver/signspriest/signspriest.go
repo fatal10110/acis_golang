@@ -763,9 +763,9 @@ func signs(value int, suffix string) string {
 	return name + ".htm"
 }
 
-// commandNumber reads the number from character begin of command on: an
-// edit box's value, which may be padded with spaces. ok is false when command is too short or the text does not
-// parse.
+// commandNumber reads the number from character begin of command on: an edit
+// box's value, which may be padded with spaces. ok is false when command is too
+// short or the text does not parse.
 func commandNumber(command string, begin int) (int, bool) {
 	arg, ok := commandChars(command, begin)
 	if !ok {

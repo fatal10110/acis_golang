@@ -27,9 +27,9 @@ type Region struct {
 	X, Y int
 }
 
-// ListedRegions returns the region tiles geoengine.properties enables, in
-// tile order: every in-range tile whose exact "X_Y" key is present, whatever
-// its value: a key-presence check on "X_Y"; a commented-out "#X_Y" line is no key and leaves the tile unlisted.
+// ListedRegions returns the region tiles geoengine.properties enables, in tile
+// order: every in-range tile whose exact "X_Y" key is present, whatever its
+// value; a commented-out "#X_Y" line is no key and leaves the tile unlisted.
 func ListedRegions(props *config.Properties) []Region {
 	if props == nil {
 		return nil

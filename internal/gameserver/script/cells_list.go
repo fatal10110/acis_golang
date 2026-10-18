@@ -36,15 +36,14 @@ func (c *PlayerCell) Clear() {
 	c.mu.Unlock()
 }
 
-// ListCell is an ordered list, empty at first, that keeps duplicates. A creature handle (an *NPC, a *Player or a
-// Creature) matches by world identity: an NPC's is its spawn slot's, the
-// one the timers use; a player's is its character, whichever handle
-// reaches it; any other creature's is the creature itself. A nil handle or
-// a handle on nothing is never stored and matches nothing. Any other value
-// matches by ==: a script lists clans by clan id, and keeps a fixed row of
-// slots as a list it fills with zeroes at construction. Like the other
-// cells it is leaf-locked, takes no closure, and its zero value is ready to
-// use.
+// ListCell is an ordered list, empty at first, that keeps duplicates. A creature
+// handle (an *NPC, a *Player or a Creature) matches by world identity: an NPC's
+// is its spawn slot's, the one the timers use; a player's is its character,
+// whichever handle reaches it; any other creature's is the creature itself. A
+// nil handle or a handle on nothing is never stored and matches nothing. Any
+// other value matches by ==: a script lists clans by clan id, and keeps a fixed
+// row of slots as a list it fills with zeroes at construction. Like the other
+// cells it is leaf-locked, takes no closure, and its zero value is ready to use.
 type ListCell[T comparable] struct {
 	mu    sync.Mutex
 	items []listItem[T]

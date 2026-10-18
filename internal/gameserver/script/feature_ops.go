@@ -43,7 +43,8 @@ func (p *Player) ReduceAdena(count int32) bool {
 // root ("./data/html/..."), in a dialog window through the NPC objectID,
 // then releases its client. The page's links become the ones the player
 // may send back, and %objectId% reads objectID, as on every script page;
-// none of the pages scripts name this way holds another placeholder.
+// none of the pages sent this way holds %objectId%, so the fill changes
+// nothing.
 func (p *Player) ShowPage(objectID int32, file string) {
 	p.character().ShowDialogPage(objectID, file, "")
 }
