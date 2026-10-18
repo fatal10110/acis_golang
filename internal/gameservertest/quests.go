@@ -31,8 +31,6 @@ type scriptOptions struct {
 	catalog script.Catalog
 	rates   *script.Rates
 	rand    func(n int) int
-	// singleItemDrop turns MultipleItemDrop off.
-	singleItemDrop bool
 	// kinds are the NPC ids that have a template, with its kind.
 	kinds map[int32]script.NPCKind
 	// skills are the skill definitions the scripts read.
@@ -64,11 +62,11 @@ func WithScriptRand(rand func(n int) int) Option {
 	return func(o *options) { o.scriptHelpers().rand = rand }
 }
 
-// WithScriptSingleItemDrop turns MultipleItemDrop off, so a script give of
-// a non-stackable creates one instance whatever the count; without it the
-// setting is on, as shipped.
+// WithScriptSingleItemDrop is WithSingleItemDrop, named for the script
+// suites: a script give of a non-stackable creates one instance whatever
+// the count.
 func WithScriptSingleItemDrop() Option {
-	return func(o *options) { o.scriptHelpers().singleItemDrop = true }
+	return WithSingleItemDrop()
 }
 
 // WithScriptItemIDs makes wrap(next) the object id allocator of every
@@ -194,28 +192,27 @@ type questBoot struct {
 // item templates items and the link's page cache html, and the script
 // registry, whose own work (the dying hooks, and the timers bound to no NPC
 // or player queue) runs on engine. The scripts read the Seven Signs from
-// sevenSigns.
-func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, state *world.State, clock *task.GameClock, items *item.Table, html *cache.HTML, sevenSigns *sevensigns.State, o *options) *questBoot {
+// sevenSigns and the party range and multiple item drop rule from drops.
+func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *sim.Queue, state *world.State, clock *task.GameClock, items *item.Table, html *cache.HTML, sevenSigns *sevensigns.State, drops script.DropRules, o *options) *questBoot {
 	so := o.scriptHelpers()
 	store := &journalStore{QuestStore: gamesql.NewQuestStore(db), loadErr: o.questLoadErr}
 	journals := script.NewQuests(store, worker, o.log)
 	env := &script.Env{
-		Quests:           journals,
-		Rates:            script.Rates{Drop: 1, Reward: 1, RewardAdena: 1, XP: 1, SP: 1},
-		PartyRange:       fixturePartyRange,
-		MultipleItemDrop: !so.singleItemDrop,
-		NewItemID:        ids.NextID,
-		Spawner:          script.NewSpawner(nil, o.log),
-		Rand:             rnd.Get,
-		World:            state,
-		Skills:           modelskill.NewTable(so.skills),
-		GameHour:         clock.Hour,
-		Uptime:           clock.Uptime,
-		Items:            items,
-		Page:             html.Get,
-		SevenSigns:       sevenSigns,
-		BossWaits:        script.DefaultBossWaitTimes(),
-		Zones:            o.zones,
+		Quests:     journals,
+		Rates:      script.Rates{Drop: 1, Reward: 1, RewardAdena: 1, XP: 1, SP: 1},
+		Drops:      drops,
+		NewItemID:  ids.NextID,
+		Spawner:    script.NewSpawner(nil, o.log),
+		Rand:       rnd.Get,
+		World:      state,
+		Skills:     modelskill.NewTable(so.skills),
+		GameHour:   clock.Hour,
+		Uptime:     clock.Uptime,
+		Items:      items,
+		Page:       html.Get,
+		SevenSigns: sevenSigns,
+		BossWaits:  script.DefaultBossWaitTimes(),
+		Zones:      o.zones,
 	}
 	if so.rates != nil {
 		env.Rates = *so.rates

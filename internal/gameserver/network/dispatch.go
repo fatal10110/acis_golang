@@ -275,13 +275,11 @@ type PlayerConfig struct {
 	// inverted, so the zero value takes every ingredient as the shipped
 	// config does.
 	KeepMaintainedIngredients bool
-	// PartyRange is how near the loot a party member must be to share it,
-	// body to body; -1 is unlimited. It is the kill reward's party range.
-	PartyRange int
-	// MultipleItemDrop is server.properties MultipleItemDrop: a
-	// non-stackable item auto-looted, swept, harvested, extracted or crafted
-	// with a count above one arrives as that many instances instead of one.
-	MultipleItemDrop bool
+	// KillRewards, when set, are the kill reward settings to put in force
+	// whole with the rest: the rates, the auto-loot, the party range party
+	// loot reads too, and the multiple item drop rule every item creation
+	// reads. Nil leaves the ones in force as they are.
+	KillRewards *manager.KillRewardSettings
 }
 
 // GameClientLink accepts and drives connections from Interlude game
@@ -376,6 +374,9 @@ type GameClientLink struct {
 	// playerRules holds the rules every character and summon reads, from
 	// the PlayerConfig in force; //reload config sets them with it.
 	playerRules *player.RuleBook
+	// killRewards holds the kill reward settings in force, shared with the
+	// kill rewards and the scripts; //reload config sets them whole.
+	killRewards *manager.KillRewardBook
 	// playerConfigMu serializes the //reload config puts, so the settings
 	// and the rules and switches built from them come from one reload.
 	playerConfigMu   sync.Mutex
@@ -812,6 +813,10 @@ type GameClientLinkConfig struct {
 	// Reloads re-read the data tables //reload and //respawnall name; a
 	// nil hook leaves its table as booted.
 	Reloads DataReloads
+	// KillRewards holds the kill reward settings in force, the same book
+	// the kill rewards and the scripts read; nil gives the link its own,
+	// holding PlayerConfig.KillRewards or else the zero settings.
+	KillRewards *manager.KillRewardBook
 	// BossZones saves and restores who may enter the boss zones around a
 	// zone reload; nil keeps nobody's permission across one.
 	BossZones BossZoneStore
@@ -939,6 +944,13 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 	playerConfig := cfg.PlayerConfig
 	link.playerSettings.Store(&playerConfig)
 	link.playerRules = player.NewRuleBook(link.characterRules(&playerConfig))
+	link.killRewards = cfg.KillRewards
+	if link.killRewards == nil {
+		link.killRewards = manager.NewKillRewardBook(manager.KillRewardSettings{})
+	}
+	if playerConfig.KillRewards != nil {
+		link.killRewards.Set(*playerConfig.KillRewards)
+	}
 	link.macros = cfg.Macros
 	link.manor = cfg.Manor
 	link.classMaster = cfg.ClassMaster

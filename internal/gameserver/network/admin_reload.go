@@ -31,13 +31,12 @@ type DataReloads struct {
 	// Config reads the game server properties files anew into the player
 	// settings, which then replace the ones in force. Each read of a
 	// setting after the swap sees the reloaded value, the rules of the
-	// characters and summons already in the world and the enchant, skill,
-	// craft and multisell switches included, except:
-	//   - PartyRange and MultipleItemDrop keep their boot value: the kill
-	//     rewards and the scripts read their own copies of both, so the
-	//     reload leaves the ones in force for party loot too;
-	//   - every setting outside PlayerConfig keeps its boot value; the
-	//     composition root that builds this hook lists them.
+	// characters and summons already in the world, the kill reward settings
+	// (party loot, the scripts and item creation share their party range
+	// and multiple item drop rule) and the enchant, skill, craft and
+	// multisell switches included. Every setting outside PlayerConfig
+	// keeps its boot value; the composition root that builds this hook
+	// lists them.
 	Config func() (PlayerConfig, error)
 	// BuyLists reads the buylists anew, which the merchant then sells
 	// from, its limited stock rebuilt from the saved rows.
@@ -218,11 +217,8 @@ func (l *GameClientLink) reloadNPCs() error {
 
 // reloadConfig reads the properties files anew and puts the player settings
 // read in force in place of the ones before (see applyPlayerConfig); a file
-// that cannot be read leaves them as they were. PartyRange and
-// MultipleItemDrop keep the value in force: the kill rewards and the
-// scripts hold their own boot copies of both, and party loot must agree
-// with them. Two game masters reloading at once put their settings in force
-// one after the other, each whole.
+// that cannot be read leaves them as they were. Two game masters reloading
+// at once put their settings in force one after the other, each whole.
 func (l *GameClientLink) reloadConfig() error {
 	if l.reloads.Config == nil {
 		return errReloadNotPorted
@@ -233,8 +229,6 @@ func (l *GameClientLink) reloadConfig() error {
 	}
 	l.playerConfigMu.Lock()
 	defer l.playerConfigMu.Unlock()
-	prev := l.playerConfig()
-	settings.PartyRange, settings.MultipleItemDrop = prev.PartyRange, prev.MultipleItemDrop
 	l.applyPlayerConfig(&settings)
 	return nil
 }

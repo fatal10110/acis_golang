@@ -198,7 +198,7 @@ func (s *Script) inRange(c *player.Character, npc *NPC) bool {
 	}
 	nx, ny, nz := at.Position()
 	x, y, z := c.Position()
-	return location.In3DRadius(x, y, z, nx, ny, nz, s.env.PartyRange)
+	return location.In3DRadius(x, y, z, nx, ny, nz, s.env.partyRange())
 }
 
 // varIs reports whether the state's variable key is set and equals value,

@@ -142,16 +142,18 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 // read, and returns the player settings read from them.
 //
 // Only the player settings take the reloaded values, the rules of the
-// characters and summons already in the world included. These keep their
+// characters and summons already in the world and the kill reward settings
+// (drop and XP/SP rates, auto-loot, party XP, the party range and the
+// multiple item drop rule, shared by the kill rewards, party loot, the
+// scripts and item creation) included. The quest drop and reward rates
+// keep their boot value. These keep their
 // boot value, read once into what the boot built from them:
 //   - the listener and login server addresses, the login registration
 //     (server id, hexid, status flags), the database and the client cipher;
 //   - the geodata and the town combat rule the zones were set up with,
 //     which //reload zone reapplies as booted;
 //   - AllowCursedWeapons, AllowBoat and DeleteCharAfterDays;
-//   - the kill rewards (drop and XP/SP rates, auto-loot, party XP, and
-//     PartyRange and MultipleItemDrop, which party loot keeps too), the PvP
-//     flag times, the ground item settings, the pet settings, the spellbook
+//   - the PvP flag times, the ground item settings, the pet settings, the spellbook
 //     needs, StoreSkillCooltime and CancelLesserEffect;
 //   - the clan, siege, manor, Olympiad, hero, Seven Signs, festival,
 //     lottery, wedding, fishing championship, derby, scheme buffer,
@@ -184,9 +186,11 @@ func reloadPlayerConfig(paths gameServerPaths, data *gameData, log zerolog.Logge
 	if err != nil {
 		return network.PlayerConfig{}, err
 	}
-	rewards, err := provideKillRewardConfig(paths, serverProps, data)
+	rewards, err := loadKillRewardSettings(paths, serverProps)
 	if err != nil {
 		return network.PlayerConfig{}, err
 	}
-	return newPlayerConfig(cfg, gameplay, rewards, pvpOptions), nil
+	settings := newPlayerConfig(cfg, gameplay, pvpOptions)
+	settings.KillRewards = &rewards
+	return settings, nil
 }

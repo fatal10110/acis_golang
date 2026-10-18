@@ -1,8 +1,8 @@
 package gameservertest
 
 // WithSingleItemDrop turns server.properties MultipleItemDrop off for kill
-// rewards and party loot: a non-stackable item counted above one falls or
-// is auto-looted as a single instance. Without it the setting is on, as
+// rewards, party loot, the scripts and item creation: a non-stackable item
+// counted above one falls, is auto-looted or is given as a single instance. Without it the setting is on, as
 // shipped.
 func WithSingleItemDrop() Option {
 	return func(o *options) { o.singleItemDrop = true }

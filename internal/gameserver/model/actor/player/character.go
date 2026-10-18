@@ -208,7 +208,9 @@ type Character struct {
 	baseTemplate    atomic.Pointer[Template]
 	levelTable      *LevelTable
 	// ruleBook holds the server rules c reads; see rules.
-	ruleBook  atomic.Pointer[RuleBook]
+	ruleBook atomic.Pointer[RuleBook]
+	// itemDrops answers the multiple item drop rule; set by Configure.
+	itemDrops ItemDropRule
 	skillDefs skillDefinitions
 	inventory *itemcontainer.Inventory
 	world     *world.State
