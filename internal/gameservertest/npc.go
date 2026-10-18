@@ -2,6 +2,7 @@ package gameservertest
 
 import (
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -465,6 +466,7 @@ func (s *Server) spawnMovingHostileInstance(t *testing.T, inst *npc.Instance, at
 	actorRef.CreatureActor = hostile
 	statRef.StatOwner = hostile
 	control.hostile, control.move = hostile, moveCtl
+	s.hostileControls.Store(hostile, control)
 	rewards, hits := gamemanager.NewHostileRewarder(hostile, tmpl, s.State,
 		s.killRewards(), s.itemTable, s.ids, s.GroundItems)
 	rt := npc.Runtime{
@@ -497,6 +499,9 @@ type movingHostileControl struct {
 	server  *Server
 	hostile *npc.Hostile
 	move    *move.Controller
+	// rethinks counts the AttackRethink events handled, each once its
+	// desire selection has run.
+	rethinks atomic.Int64
 }
 
 func (c *movingHostileControl) Emit(ev event.Event) {
@@ -520,11 +525,26 @@ func (c *movingHostileControl) Emit(ev event.Event) {
 		}
 	case event.AttackRethink:
 		c.server.runAI(c.hostile)
+		c.rethinks.Add(1)
 	case event.AttackStanceRequested:
 		c.hostile.EnterAttackStance()
 	case event.HitLanded:
 		c.server.castEffects.Chance.AttackHit(c.hostile, e)
 	}
+}
+
+// HostileRethinks counts the desire selections the moving fixture hostile h
+// has re-run on its attack's phases: a bow shot landing and a hit animation
+// ending, each once it has run. On the wall clock those phases fire on timers
+// that can land after an Advance meant to pass them, so a test that changes
+// h's desires once they have run waits on this count.
+func (s *Server) HostileRethinks(tb testing.TB, h *npc.Hostile) int64 {
+	tb.Helper()
+	control, ok := s.hostileControls.Load(h)
+	if !ok {
+		tb.Fatalf("hostile %d is not a moving fixture hostile", h.ObjectID())
+	}
+	return control.(*movingHostileControl).rethinks.Load()
 }
 
 func (s *Server) think(hostile *npc.Hostile) {
