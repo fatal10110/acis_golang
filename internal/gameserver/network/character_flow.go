@@ -571,7 +571,7 @@ func (l *GameClientLink) userInfoSnapshot(live *livePlayer) serverpackets.UserIn
 		Template:           live.Template(),
 		Items:              live.inventoryItems(),
 		IsGM:               live.accessLevel().IsGM,
-		SpawnProtectedTeam: l.playerConfig().SpawnProtection > 0 && live.SpawnProtected(),
+		SpawnProtectedTeam: l.spawnProtectedTeam(live),
 		Clan:               l.clanFields(live.Character),
 		HeroAura:           l.heroAura(live),
 	}

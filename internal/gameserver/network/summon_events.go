@@ -17,6 +17,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -355,6 +356,9 @@ func (s *summonSink) Emit(ev event.Event) {
 			owner.SendFrame(serverpackets.FramePetDelete(actor.SummonType(), actor.ObjectID()))
 		}
 	case event.Despawned:
+		// The owner's tail of the departure follows the summon's
+		// DeleteObject, ahead of the runtime cleanups.
+		s.runCleanup(func() { l.releaseSummonOwner(actor) })
 		s.runDespawn()
 	}
 }
@@ -554,6 +558,26 @@ func (l *GameClientLink) notifyOwnerOfSummonDeath(actor *summon.Actor) {
 		message = serverpackets.SystemMessageResurrectPetWithin20Minutes
 	}
 	owner.SendFrame(serverpackets.FrameSystemMessage(message))
+}
+
+// releaseSummonOwner ends what a departed summon's owner held for it: the
+// owner's Contract Payment effects stop, then each of the owner's summon
+// auto-shots still enabled is turned off. A corpse its owner left behind
+// answers to nobody here, and an owner leaving the world reads nothing.
+func (l *GameClientLink) releaseSummonOwner(actor *summon.Actor) {
+	if actor.OwnerLeft() {
+		return
+	}
+	owner, ok := liveSummonOwner(actor)
+	if !ok || owner.detached() {
+		return
+	}
+	owner.StopSkillEffectsByID(modelskill.ContractPaymentSkillID)
+	for _, itemID := range item.SummonShotIDs() {
+		if owner.AutoSoulShotEnabled(itemID) {
+			l.disableAutoShot(owner, itemID)
+		}
+	}
 }
 
 // petRowDeleter deletes a pet's saved row. The production pet store has it;

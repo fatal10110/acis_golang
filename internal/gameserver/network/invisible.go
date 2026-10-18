@@ -28,7 +28,7 @@ func (l *GameClientLink) broadcastCharInfo(live *livePlayer, items []*item.Insta
 	if l.world == nil {
 		return
 	}
-	info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.Template(), Items: items, Clan: l.clanFields(live.Character), HeroAura: l.heroAura(live)}
+	info := serverpackets.CharInfoSnapshot{Character: live.Character, Template: live.Template(), Items: items, Clan: l.clanFields(live.Character), HeroAura: l.heroAura(live), SpawnProtectedTeam: l.spawnProtectedTeam(live)}
 	pet := l.summonOf(live)
 	frames := [2]fanout{
 		newFanout(func() wire.Frame { info.Hidden = false; return serverpackets.FrameCharInfo(info) }),
