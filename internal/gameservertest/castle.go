@@ -29,9 +29,10 @@ func newCastles(db *sql.DB, data *castledata.Table, clans *clan.Service, worker 
 	return castle.NewManager(data, clans.Table(), gamesql.NewCastleStore(db), worker, log)
 }
 
-// restoreCastles restores the stored castle rows and owners, as the boot
-// path does once the clans are restored.
-func restoreCastles(t *testing.T, db *sql.DB, castles *castle.Manager) {
+// restoreCastles restores the stored castle rows and owners, then the
+// stored trap and gate upgrades over doors, as the boot path does once the
+// clans are restored.
+func restoreCastles(t *testing.T, db *sql.DB, castles *castle.Manager, doors castle.Doors) {
 	t.Helper()
 	store := gamesql.NewCastleStore(db)
 	rows, err := store.Load(context.Background())
@@ -43,6 +44,16 @@ func restoreCastles(t *testing.T, db *sql.DB, castles *castle.Manager) {
 		t.Fatalf("load castle owners: %v", err)
 	}
 	castles.Restore(rows, owners)
+	traps, err := store.LoadTrapUpgrades(context.Background())
+	if err != nil {
+		t.Fatalf("load castle trap upgrades: %v", err)
+	}
+	doorUpgrades, err := store.LoadDoorUpgrades(context.Background())
+	if err != nil {
+		t.Fatalf("load castle door upgrades: %v", err)
+	}
+	castles.SetDoors(doors)
+	castles.RestoreUpgrades(doorUpgrades, traps)
 }
 
 // WithSieges runs the castle sieges with cfg over the WithCastles castles,

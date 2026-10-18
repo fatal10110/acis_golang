@@ -14,9 +14,11 @@ import (
 )
 
 // provideCastles restores every castle's stored state and owner, after the
-// clans: an owner row naming a clan that is not loaded is skipped. Each
-// change is then written through the persistence worker.
-func provideCastles(ctx bootContext, pool *sql.DB, worker *persist.Worker, clans *clan.Service, data *gameData, log zerolog.Logger) (*castle.Manager, error) {
+// clans: an owner row naming a clan that is not loaded is skipped. Then it
+// applies the stored control tower trap and gate upgrades, the gates' to
+// the doors standing in the world. Each change is then written through the
+// persistence worker.
+func provideCastles(ctx bootContext, pool *sql.DB, worker *persist.Worker, clans *clan.Service, data *gameData, doors *manager.WorldObjects, log zerolog.Logger) (*castle.Manager, error) {
 	store := gamesql.NewCastleStore(pool)
 	rows, err := store.Load(ctx)
 	if err != nil {
@@ -28,6 +30,16 @@ func provideCastles(ctx bootContext, pool *sql.DB, worker *persist.Worker, clans
 	}
 	castles := castle.NewManager(data.Castles, clans.Table(), store, worker, log)
 	castles.Restore(rows, owners)
+	traps, err := store.LoadTrapUpgrades(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("restore castles: %w", err)
+	}
+	doorUpgrades, err := store.LoadDoorUpgrades(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("restore castles: %w", err)
+	}
+	castles.SetDoors(doors)
+	castles.RestoreUpgrades(doorUpgrades, traps)
 	log.Info().Int("castles", len(castles.All())).Msg("castles loaded")
 	return castles, nil
 }

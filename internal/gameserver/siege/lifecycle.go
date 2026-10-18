@@ -339,12 +339,10 @@ func (s *Siege) reputationLocked(fx *effects, ownerID int32) {
 // owner and defender attacks, the new owner owns, the attackers of its
 // alliance defend, the players of other clans are thrown off the
 // battlefield, the former owner and defenders lose their headquarters, the
-// castle's gates stand again closed at half HP, the working flame towers
-// fall dead and the dead life towers work again, and every registered
-// clan's members in the world take their new siege state.
-//
-// ponytail: the reference also removes the door and trap upgrades (#236)
-// before the gates stand again.
+// castle loses its gate and trap upgrades, its gates stand again closed at
+// half HP, the working flame towers fall dead and the dead life towers work
+// again, and every registered clan's members in the world take their new
+// siege state.
 func (s *Siege) MidVictory() { s.runLifecycle(s.midVictoryLocked) }
 
 func (s *Siege) midVictoryLocked(fx *effects) {
@@ -379,6 +377,11 @@ func (s *Siege) midVictoryLocked(fx *effects) {
 	}
 	fx.add(func() { s.withBattlefield(func(f *zone.Siege) { f.BanishForeigners(ownerID) }) })
 	dropHeadquarters(fx, defenders)
+	c := s.castle
+	fx.add(func() {
+		c.RemoveDoorUpgrades()
+		c.RemoveTrapUpgrades()
+	})
 	s.respawnGatesLocked(fx, true)
 	s.towersLocked(fx, Tower.TowerMidVictory)
 	s.siegeStatesLocked(fx, false)

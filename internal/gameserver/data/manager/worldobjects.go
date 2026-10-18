@@ -37,6 +37,10 @@ type WorldObjects struct {
 	// installed again on every door a reload builds under that id.
 	// Guarded by doorMu.
 	sieges map[int]door.Siege
+	// hpUpgrades are the HP upgrade ratios UpgradeDoor set, by door id,
+	// set again on every door a reload builds under that id. Guarded by
+	// doorMu.
+	hpUpgrades map[int]int
 
 	// doorMu serializes door state changes, so a flag flip or an HP change
 	// and its geodata, broadcast and timer follow-up land as one step
@@ -193,6 +197,55 @@ func (w *WorldObjects) SetDoorSiege(id int, s door.Siege) {
 	}
 }
 
+// UpgradeDoor multiplies id's door's template HP by ratio into its maximum
+// HP, on the door standing and on every door a reload builds under that
+// id, then fills the standing door's HP to that maximum, observers seeing
+// it. A broken door keeps its HP. It reports whether the door stands in
+// the world.
+func (w *WorldObjects) UpgradeDoor(id, ratio int) bool {
+	if w == nil {
+		return false
+	}
+	w.doorMu.Lock()
+	defer w.doorMu.Unlock()
+	obj, ok := w.Door(id)
+	if !ok {
+		return false
+	}
+	w.setHPUpgrade(id, ratio)
+	obj.StoreHPUpgradeRatio(ratio)
+	w.setDoorHP(obj, float64(obj.MaxHP()), true)
+	return true
+}
+
+// ResetDoorUpgrade takes id's door's HP upgrade back to none, leaving its
+// HP as it is: the siege change of hands that resets it stands the door
+// again at once.
+func (w *WorldObjects) ResetDoorUpgrade(id int) {
+	if w == nil {
+		return
+	}
+	w.doorMu.Lock()
+	defer w.doorMu.Unlock()
+	w.setHPUpgrade(id, 1)
+	if obj, ok := w.Door(id); ok {
+		obj.StoreHPUpgradeRatio(1)
+	}
+}
+
+// setHPUpgrade records id's HP upgrade ratio for the doors a reload
+// builds; the caller holds doorMu.
+func (w *WorldObjects) setHPUpgrade(id, ratio int) {
+	if ratio == 1 {
+		delete(w.hpUpgrades, id)
+		return
+	}
+	if w.hpUpgrades == nil {
+		w.hpUpgrades = make(map[int]int)
+	}
+	w.hpUpgrades[id] = ratio
+}
+
 // SetDoorOpen changes a door's open state, applies the matching geodata,
 // broadcasts the change to known observers, reschedules the door's next auto
 // open/close timer from its template's openTime/closeTime/randomTime, and
@@ -268,6 +321,34 @@ func (w *WorldObjects) reduceDoorHP(id int, amount float64) *door.Object {
 		w.setDoorHP(obj, math.Max(obj.CurrentHP()-amount, 0), true)
 	}
 	if obj.CurrentHP() >= 0.5 {
+		return nil
+	}
+	w.breakDoor(obj)
+	return obj
+}
+
+// TakeDoorHP implements door.StateOwner: it takes amount straight off
+// id's standing door's HP, as a REAL_DAMAGE skill does, breaking the door
+// when that leaves zero HP or less and telling its residence once the
+// death is applied, else setting the HP left and broadcasting it.
+func (w *WorldObjects) TakeDoorHP(id int, amount float64) {
+	if broken := w.takeDoorHP(id, amount); broken != nil {
+		broken.TellBroken()
+	}
+}
+
+// takeDoorHP is TakeDoorHP's state change, under doorMu; it returns the
+// door it broke, nil for none.
+func (w *WorldObjects) takeDoorHP(id int, amount float64) *door.Object {
+	w.doorMu.Lock()
+	defer w.doorMu.Unlock()
+	obj, ok := w.Door(id)
+	if !ok || obj.Dead() {
+		return nil
+	}
+	left := obj.CurrentHP() - amount
+	if left > 0 {
+		w.setDoorHP(obj, left, true)
 		return nil
 	}
 	w.breakDoor(obj)
@@ -433,8 +514,9 @@ func (w *WorldObjects) newDoors(doors *door.Table) (*doorSet, error) {
 // doors that opened close again and stay.
 //
 // Doors are looked up by id when they act, so scripts, clan hall grounds,
-// keys, timers and regeneration reach the new doors, and so does the
-// residence siege SetDoorSiege installed under a door's id. A door change
+// keys, timers and regeneration reach the new doors, and so do the
+// residence siege SetDoorSiege installed and the HP upgrade UpgradeDoor set
+// under a door's id, the new door standing at its upgraded maximum HP. A door change
 // that comes in during the reload waits for it and lands on the new door.
 func (w *WorldObjects) ReloadDoors(doors *door.Table) error {
 	w.doorMu.Lock()
@@ -492,6 +574,10 @@ func (w *WorldObjects) newDoor(tmpl *door.Template) (*door.Object, error) {
 	obj.SetStrife(w.strife)
 	if s, ok := w.sieges[tmpl.ID]; ok {
 		obj.SetSiege(s)
+	}
+	if ratio, ok := w.hpUpgrades[tmpl.ID]; ok {
+		obj.StoreHPUpgradeRatio(ratio)
+		obj.StoreHP(float64(obj.MaxHP()))
 	}
 	return obj, nil
 }

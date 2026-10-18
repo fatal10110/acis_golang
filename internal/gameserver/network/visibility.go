@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
@@ -24,6 +25,24 @@ func (p *livePlayer) Discover(obj world.Tracked) {
 		p.showDerbyRace(f)
 	}
 	p.sendInfoFrom(obj, false)
+}
+
+// RegionCrossed shows p the map effects of the castle traps touching r as
+// r enters or leaves p's surroundings: leaving turns each trap's effect
+// off, and entering turns on an armed trap's. A trap touching several
+// crossing regions is told once per region.
+func (p *livePlayer) RegionCrossed(r *world.Region, entered bool) {
+	if p.link == nil || p.link.zones == nil {
+		return
+	}
+	x, y := r.Origin()
+	for _, k := range p.link.zones.At(x, y) {
+		t := zone.TrapOf(k)
+		if t == nil || t.EventID <= 0 || (entered && !t.Armed) {
+			continue
+		}
+		p.sendVisibilityFrame(serverpackets.FrameEventTrigger(int32(t.EventID), entered))
+	}
 }
 
 // requestRecordInfo answers the client's view resync: live's UserInfo, then

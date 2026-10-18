@@ -39,6 +39,18 @@ type Observer interface {
 	Forget(obj Tracked)
 }
 
+// RegionWatcher is implemented by tracked players that react when a region
+// enters or leaves their surroundings, the 3x3 block of regions around
+// their own: on every grid move, spawn, teleport, Leave, Rejoin and
+// Despawn. Each crossing region is told before the objects in it are
+// discovered or forgotten, on the same goroutine and under the same rules
+// as Observer's callbacks.
+type RegionWatcher interface {
+	// RegionCrossed tells the watcher r entered its surroundings, or left
+	// them when entered is false.
+	RegionCrossed(r *Region, entered bool)
+}
+
 // Player is a tracked player character. Only objects of KindPlayer keep a
 // Region active: entering or leaving a region's 3x3 neighborhood as a
 // player toggles Region.Active for the regions that lose or gain a nearby
@@ -277,7 +289,7 @@ func (s *State) DespawnAll(ts []Tracked) {
 				}
 				for _, t := range left {
 					if o.ObjectID() != t.ObjectID() {
-						notifications = append(notifications, visibilityNotification{w, t, false})
+						notifications = append(notifications, visibilityNotification{observer: w, object: t})
 					}
 				}
 			}
@@ -371,30 +383,31 @@ func (s *State) relocateAndUnlock(t Tracked, next *Region, rejoin bool, after fu
 		if owner, ok := t.(relocateScratchOwner); ok {
 			scratch = owner.relocateScratch()
 		}
-		// Same unshared-region skip as appendCrossing.
+		// Same unshared-region skip as appendCrossing: two notifications
+		// per object, and the region's own crossing.
 		for _, r := range oldAreas {
 			if !containsRegion(oldShared, r) {
-				n += len(r.objects)
+				n += 2*len(r.objects) + 1
 			}
 		}
 		for _, r := range newAreas {
 			if !containsRegion(newShared, r) {
-				n += len(r.objects)
+				n += 2*len(r.objects) + 1
 			}
 		}
 	}
 	// The scratch and stack-buffer paths keep separate slice variables so
 	// the stack buffer never flows into the heap-resident scratch.
 	if scratch != nil {
-		if cap(scratch.notifications) < n*2 {
-			scratch.notifications = make([]visibilityNotification, 0, n*2)
+		if cap(scratch.notifications) < n {
+			scratch.notifications = make([]visibilityNotification, 0, n)
 		}
 		scratch.notifications = appendCrossing(scratch.notifications[:0], t, oldAreas, oldShared, newAreas, newShared)
 		notifications = scratch.notifications
 	} else {
 		buf := notificationBuf[:0]
-		if cap(buf) < n*2 {
-			buf = make([]visibilityNotification, 0, n*2)
+		if cap(buf) < n {
+			buf = make([]visibilityNotification, 0, n)
 		}
 		notifications = appendCrossing(buf, t, oldAreas, oldShared, newAreas, newShared)
 	}
@@ -464,36 +477,52 @@ func appendCrossing(notes []visibilityNotification, t Tracked, oldAreas, oldShar
 	return appendRegionChange(notes, t, newAreas, newShared, true)
 }
 
-// appendRegionChange appends, for every object in areas outside shared, the
-// notification to that object about t and then t's own about that object.
+// appendRegionChange appends, for every region of areas outside shared,
+// the crossing of that region told to t when t is a RegionWatcher player,
+// then for every object in it the notification to that object about t and
+// then t's own about that object.
 func appendRegionChange(notes []visibilityNotification, t Tracked, areas, shared []*Region, discover bool) []visibilityNotification {
 	tObs, tObserves := t.(Observer)
+	watcher, watches := t.(RegionWatcher)
+	watches = watches && isPlayer(t)
 	for _, r := range areas {
 		if containsRegion(shared, r) {
 			continue
+		}
+		if watches {
+			notes = append(notes, visibilityNotification{watcher: watcher, region: r, discover: discover})
 		}
 		for _, o := range r.objects {
 			if o.ObjectID() == t.ObjectID() {
 				continue
 			}
 			if w, ok := o.(Observer); ok {
-				notes = append(notes, visibilityNotification{w, t, discover})
+				notes = append(notes, visibilityNotification{observer: w, object: t, discover: discover})
 			}
 			if tObserves {
-				notes = append(notes, visibilityNotification{tObs, o, discover})
+				notes = append(notes, visibilityNotification{observer: tObs, object: o, discover: discover})
 			}
 		}
 	}
 	return notes
 }
 
+// visibilityNotification is one callback a placement delivers: observer
+// told about object, or, when watcher is set, watcher told about region
+// crossing its surroundings.
 type visibilityNotification struct {
 	observer Observer
 	object   Tracked
+	watcher  RegionWatcher
+	region   *Region
 	discover bool
 }
 
 func (n visibilityNotification) notify() {
+	if n.watcher != nil {
+		n.watcher.RegionCrossed(n.region, n.discover)
+		return
+	}
 	if n.discover {
 		n.observer.Discover(n.object)
 		return
