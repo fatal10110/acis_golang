@@ -116,3 +116,11 @@ func (nopPopulation) ScheduleRespawn(*npc.Hostile, time.Duration) error { return
 func (nopPopulation) DecayMe(*npc.Hostile) {}
 
 func (nopPopulation) MakerEvent(string, string, int, int) bool { return false }
+
+func (nopPopulation) DoRespawn(npc.PartyMember) {}
+
+func (nopPopulation) DrawSpawnPoint(npc.PartyMember) (location.Location, int, bool) {
+	return location.Location{}, 0, false
+}
+
+func (nopPopulation) SetRespawnDelay(npc.PartyMember, time.Duration) error { return nil }

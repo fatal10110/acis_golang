@@ -17,16 +17,26 @@ var ErrNotPrivate = errors.New("npcs: not a private")
 func (n *Npcs) slotOf(id int32) (slotInfo, bool) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if key, ok := n.live[id]; ok {
-		slot, ok := n.slot[key]
-		return slot, ok
+	key, ok := n.slotKeyLocked(id)
+	if !ok {
+		return slotInfo{}, false
 	}
-	for _, slot := range n.slot {
+	slot, ok := n.slot[key]
+	return slot, ok
+}
+
+// slotKeyLocked returns the key of the spawn slot of the live or decayed
+// NPC with object id, as slotOf finds it. The caller holds n.mu.
+func (n *Npcs) slotKeyLocked(id int32) (string, bool) {
+	if key, ok := n.live[id]; ok {
+		return key, true
+	}
+	for key, slot := range n.slot {
 		if slot.liveID == id {
-			return slot, true
+			return key, true
 		}
 	}
-	return slotInfo{}, false
+	return "", false
 }
 
 // RespawnDelay returns the respawn delay the spawn that placed h declares,
