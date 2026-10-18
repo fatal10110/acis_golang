@@ -14,7 +14,8 @@ import (
 )
 
 // probeID and probeFolkID are the NPC ids the runner's probe behavior is
-// bound to: a monster, which stands parked, and a civilian, which walks.
+// bound to: a monster and a civilian, each walking when its npc line says
+// walks.
 const (
 	probeID     = 20120
 	probeFolkID = 35600

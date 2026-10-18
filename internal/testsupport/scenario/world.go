@@ -25,12 +25,14 @@ type Member struct {
 }
 
 // Ground is one ground line: Count of item template Item lying at an offset
-// from the character, named Role.
+// from the character, named Role. Cursed: the item is a cursed weapon whose
+// life starts as it is laid.
 type Ground struct {
 	Role       string
 	Item       int32
 	Count      int32
 	DX, DY, DZ int
+	Cursed     bool
 }
 
 // named reports whether name already names the player, an NPC role, a
@@ -106,8 +108,12 @@ func (sc *Scenario) world(key string, args []string, roles map[string]bool) erro
 		}
 		sc.Rolls[args[0]] = draw
 	case "ground":
+		cursed := len(args) == 7 && args[6] == "cursed"
+		if cursed {
+			args = args[:6]
+		}
 		if len(args) != 6 {
-			return fmt.Errorf("ground <role> <item id> <count> <dx> <dy> <dz>")
+			return fmt.Errorf("ground <role> <item id> <count> <dx> <dy> <dz> [cursed]")
 		}
 		if sc.named(args[0], roles) {
 			return fmt.Errorf("role %q named twice", args[0])
@@ -119,7 +125,10 @@ func (sc *Scenario) world(key string, args []string, roles map[string]bool) erro
 		if n[1] < 1 {
 			return fmt.Errorf("ground count %d is not 1 or more", n[1])
 		}
-		sc.Grounds = append(sc.Grounds, Ground{Role: args[0], Item: int32(n[0]), Count: int32(n[1]), DX: n[2], DY: n[3], DZ: n[4]})
+		if cursed && n[1] != 1 {
+			return fmt.Errorf("ground %s: a cursed weapon lies as one item, not %d", args[0], n[1])
+		}
+		sc.Grounds = append(sc.Grounds, Ground{Role: args[0], Item: int32(n[0]), Count: int32(n[1]), DX: n[2], DY: n[3], DZ: n[4], Cursed: cursed})
 	}
 	return nil
 }

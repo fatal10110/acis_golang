@@ -42,8 +42,9 @@
 //	item <id> ...                             shipped item templates added to the fixture catalog
 //	page <path below data/html>               a shipped page the server serves; a path ending in / serves its directory
 //	npc <role> <npc id> <type> <dx> <dy> <dz> a fixture NPC template of that instance type, spawned at that offset from the character;
-//	    [walks] [maker <territory>]           the templates a script may spawn more NPCs of; walks, a civilian's template can
-//	                                          move; with maker, the NPC is an npcmaker's whose territory is that territory
+//	    [walks] [maker <territory>]           the templates a script may spawn more NPCs of; walks, the template can move: a
+//	                                          civilian walks, a monster spawns moving and attacking (its spawn point its
+//	                                          home); with maker, the NPC is an npcmaker's whose territory is that territory
 //	                                          line's (see below)
 //	roll <role> <draw>                        optional: every combat draw of the NPC is that draw (n-1 for a draw of
 //	                                          [0, n) it is not inside): its skill landing rolls, as its hit and
@@ -57,18 +58,23 @@
 //	                                          character first does, right after it, joins its party, then stands at that
 //	                                          offset from the character (default 0 0 0); dead, it is then marked dead where
 //	                                          it stands. Its object id renders as its name
-//	ground <role> <item id> <count> <dx> <dy> <dz>
+//	ground <role> <item id> <count> <dx> <dy> <dz> [cursed]
 //	                                          optional: an item lying on the ground at that offset from the character, laid
 //	                                          as the character first enters the world, after the NPCs; the template must be
-//	                                          in the catalog. Its object id renders as its role
+//	                                          in the catalog. Its object id renders as its role. cursed: the item is a cursed
+//	                                          weapon of the shipped data (data/xml/cursedWeapons.xml), count 1, whose life
+//	                                          starts as a monster kill's drop starts it, then it is laid; the server runs
+//	                                          the shipped cursed weapons when a ground line says cursed
 //
 // Each NPC line's NPC runs the created hooks of the scripts bound to it as
 // it appears, as the spawn pass runs them, and a civilian casts the shipped
 // skills (data/xml/skills) a script or dialog asks of it on a later AI
-// tick. A monster stands parked: it never walks; a civilian walks when its
-// line says walks. An NPC line with maker reads its maker's territory as
-// its spawn territory (a script's InSpawnTerritory), as an NPC the
-// population's npcmaker placed does; the maker spawns nothing itself.
+// tick. An NPC walks when its line says walks: a walking monster also
+// attacks, as a live one does. Without walks a monster stands parked,
+// neither moving nor attacking, and a civilian's template cannot move. An
+// NPC line with maker reads its maker's territory as its spawn territory
+// (a script's InSpawnTerritory), as an NPC the population's npcmaker placed
+// does; the maker spawns nothing itself.
 // Without maker, an NPC's spawn territory is the sphere of its drift range
 // (200) around its spawn point.
 //
@@ -238,7 +244,8 @@ type NPC struct {
 	ID         int32
 	Type       string
 	DX, DY, DZ int
-	// Walks gives a civilian's template canMove: it walks.
+	// Walks gives the template canMove: a civilian walks, a monster
+	// spawns moving.
 	Walks bool
 	// Maker is the territory line of the NPC's npcmaker, empty for none.
 	Maker string
@@ -363,6 +370,11 @@ func Parse(name string, data []byte) (*Scenario, error) {
 // Creates reports whether the scenario creates its character through the
 // client: its first step is create.
 func (sc *Scenario) Creates() bool { return sc.Steps[0].Verb == "create" }
+
+// LaysCursed reports whether a ground line lays a cursed weapon.
+func (sc *Scenario) LaysCursed() bool {
+	return slices.ContainsFunc(sc.Grounds, func(g Ground) bool { return g.Cursed })
+}
 
 // checkFlow requires each step to find the character where it acts: create
 // first and only on a character no precondition line seeds, enter at the
