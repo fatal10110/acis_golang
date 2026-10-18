@@ -9,10 +9,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
-// contractPaymentID is the servitor upkeep debuff its owner carries, which
-// ends with the summon.
-const contractPaymentID = 4140
-
 // framesAfterPetDelete returns the frames the owner reads after the
 // PetDelete a return command sends, once the server is quiet.
 func framesAfterPetDelete(t *testing.T, h *petWorld) [][]byte {
@@ -80,13 +76,13 @@ func TestReturnedPetDisablesOwnerSummonAutoShots(t *testing.T) {
 }
 
 // TestReturnedPetStopsOwnerContractPayment returns a pet while its owner
-// carries Contract Payment and another buff: after PetDelete the owner's
-// icons refresh without Contract Payment, the other buff stays, and nothing
-// is sent for auto shots the owner never enabled.
+// carries Contract Payment and another buff: after PetDelete and the pet's
+// DeleteObject the owner's icons refresh without Contract Payment, the other
+// buff stays, and nothing is sent for auto shots the owner never enabled.
 func TestReturnedPetStopsOwnerContractPayment(t *testing.T) {
 	t.Parallel()
 	h := bootOwnerWithCollar(t)
-	h.spawnWolf(t)
+	petActor, _ := h.spawnWolf(t)
 	obj, ok := h.srv.State.Player(h.ownerID)
 	if !ok {
 		t.Fatal("owner not in world")
@@ -95,7 +91,7 @@ func TestReturnedPetStopsOwnerContractPayment(t *testing.T) {
 		effect.Actor
 		EffectList() *effect.List
 	})
-	payment, err := effect.New(effect.Skill{ID: contractPaymentID, Level: 1, Debuff: true}, modelskill.EffectTemplate{Name: "DamOverTime", Time: 3600, Icon: true})
+	payment, err := effect.New(effect.Skill{ID: modelskill.ContractPaymentSkillID, Level: 1, Debuff: true}, modelskill.EffectTemplate{Name: "DamOverTime", Time: 3600, Icon: true})
 	if err != nil {
 		t.Fatalf("effect.New(contract payment): %v", err)
 	}
@@ -114,9 +110,13 @@ func TestReturnedPetStopsOwnerContractPayment(t *testing.T) {
 
 	frames := framesAfterPetDelete(t, h)
 
-	icons := -1
+	deleted, icons := -1, -1
 	for i, frame := range frames {
 		switch frame[0] {
+		case serverpackets.OpcodeDeleteObject:
+			if wire.NewReader(frame[1:]).ReadInt32() == petActor.ObjectID() {
+				deleted = i
+			}
 		case serverpackets.OpcodeAbnormalStatusUpdate:
 			icons = i
 		case serverpackets.OpcodeExtended:
@@ -127,6 +127,9 @@ func TestReturnedPetStopsOwnerContractPayment(t *testing.T) {
 	}
 	if icons < 0 {
 		t.Fatalf("no AbnormalStatusUpdate after PetDelete; frames %x", frameOpcodes(frames))
+	}
+	if deleted < 0 || deleted > icons {
+		t.Fatalf("pet DeleteObject at %d, AbnormalStatusUpdate at %d: want the despawn first; frames %x", deleted, icons, frameOpcodes(frames))
 	}
 	r := wire.NewReader(frames[icons][1:])
 	count := int(r.ReadUint16())
@@ -144,7 +147,7 @@ func TestReturnedPetStopsOwnerContractPayment(t *testing.T) {
 		t.Fatalf("owner icons after the return = %v, want [1040]", ids)
 	}
 	for _, e := range owner.EffectList().All() {
-		if e.Skill.ID == contractPaymentID {
+		if e.Skill.ID == modelskill.ContractPaymentSkillID {
 			t.Fatal("owner still holds Contract Payment after the return")
 		}
 	}
