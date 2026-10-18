@@ -227,6 +227,12 @@ type Siege struct {
 	// engraved maps each of the castle's artifacts a clan engraved the
 	// ruler on this siege to that clan's id.
 	engraved map[int32]int32
+
+	// pending are the life-cycle steps' world effects decided and not yet
+	// run, in the order they were decided; draining is set while a
+	// goroutine runs them (see runLifecycle).
+	pending  effects
+	draining bool
 }
 
 // counters are a clan's siege kills and deaths.
@@ -338,14 +344,12 @@ func (e *Engine) Start(queue *sim.Queue, notify Notifier) {
 			}
 		}
 	}
-	var fx effects
 	e.mu.Lock()
 	e.queue, e.notify = queue, notify
-	for _, s := range e.order {
-		s.startAutoTaskLocked(&fx)
-	}
 	e.mu.Unlock()
-	fx.run()
+	for _, s := range e.order {
+		s.runLifecycle(s.startAutoTaskLocked)
+	}
 }
 
 // AttackerRespawn is how long a dead attacker of a siege in progress waits
@@ -746,5 +750,52 @@ func (fx *effects) add(fn func()) { *fx = append(*fx, fn) }
 func (fx effects) run() {
 	for _, fn := range fx {
 		fn()
+	}
+}
+
+// runLifecycle decides one of the siege's life-cycle steps with decide,
+// under the engine's lock, then runs the world effects it queued in the
+// order the steps were decided: a step decided while another step's
+// effects still run has its effects run after them, by the goroutine
+// already running them, so its own call may return before they ran. A
+// step's effects never run while the engine's lock is held.
+func (s *Siege) runLifecycle(decide func(fx *effects)) {
+	var fx effects
+	s.e.mu.Lock()
+	decide(&fx)
+	s.pending = append(s.pending, fx...)
+	if s.draining || len(s.pending) == 0 {
+		s.e.mu.Unlock()
+		return
+	}
+	s.draining = true
+	s.e.mu.Unlock()
+	s.drain()
+}
+
+// drain runs the pending life-cycle effects until none is left. A
+// panicking effect drops the rest of its batch but still frees the queue,
+// so the steps decided later run on the next step's call.
+func (s *Siege) drain() {
+	done := false
+	defer func() {
+		if !done {
+			s.e.mu.Lock()
+			s.draining = false
+			s.e.mu.Unlock()
+		}
+	}()
+	for {
+		s.e.mu.Lock()
+		batch := s.pending
+		s.pending = nil
+		if len(batch) == 0 {
+			s.draining = false
+			done = true
+			s.e.mu.Unlock()
+			return
+		}
+		s.e.mu.Unlock()
+		batch.run()
 	}
 }

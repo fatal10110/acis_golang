@@ -97,16 +97,13 @@ func (s *Siege) armStartLocked(d time.Duration) {
 // 13,600,000 ms, ten minutes, five minutes and ten seconds before the
 // siege, and starts it once its date is reached.
 func (s *Siege) step(gen uint64) {
-	var fx effects
-	s.e.mu.Lock()
-	if s.startGen != gen {
-		s.e.mu.Unlock()
-		return
-	}
-	s.start = nil
-	s.stepLocked(&fx)
-	s.e.mu.Unlock()
-	fx.run()
+	s.runLifecycle(func(fx *effects) {
+		if s.startGen != gen {
+			return
+		}
+		s.start = nil
+		s.stepLocked(fx)
+	})
 }
 
 func (s *Siege) stepLocked(fx *effects) {
@@ -145,13 +142,7 @@ func (s *Siege) stepLocked(fx *effects) {
 }
 
 // Start starts the siege now, as its date coming does.
-func (s *Siege) Start() {
-	var fx effects
-	s.e.mu.Lock()
-	s.startLocked(&fx)
-	s.e.mu.Unlock()
-	fx.run()
-}
+func (s *Siege) Start() { s.runLifecycle(s.startLocked) }
 
 // startLocked starts the siege, unless it is under way. With no clan
 // attacking, it is called off instead: everyone is told and the next date
@@ -249,22 +240,12 @@ func (s *Siege) armClockLocked(d time.Duration) {
 	}
 	gen := s.clockGen
 	s.clock = s.e.queue.After(max(d, 0), func() {
-		var fx effects
-		s.e.mu.Lock()
-		s.tickLocked(&fx, gen)
-		s.e.mu.Unlock()
-		fx.run()
+		s.runLifecycle(func(fx *effects) { s.tickLocked(fx, gen) })
 	})
 }
 
 // End ends the siege now, as its time running out does.
-func (s *Siege) End() {
-	var fx effects
-	s.e.mu.Lock()
-	s.endLocked(&fx)
-	s.e.mu.Unlock()
-	fx.run()
-}
+func (s *Siege) End() { s.runLifecycle(s.endLocked) }
 
 // endLocked ends the siege under way. Everyone is told and hears it end,
 // then who holds the castle: a clan that took it from another has the
@@ -364,14 +345,7 @@ func (s *Siege) reputationLocked(fx *effects, ownerID int32) {
 //
 // ponytail: the reference also removes the door and trap upgrades (#236)
 // before the gates stand again.
-func (s *Siege) MidVictory() {
-	var fx effects
-	e := s.e
-	e.mu.Lock()
-	s.midVictoryLocked(&fx)
-	e.mu.Unlock()
-	fx.run()
-}
+func (s *Siege) MidVictory() { s.runLifecycle(s.midVictoryLocked) }
 
 func (s *Siege) midVictoryLocked(fx *effects) {
 	if s.status != StatusInProgress {
