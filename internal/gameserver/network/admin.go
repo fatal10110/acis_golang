@@ -58,6 +58,12 @@ var adminCommands = map[string]adminCommand{
 	// Cursed weapons; see admin_cursed.go.
 	"admin_cw": (*GameClientLink).adminCursedWeapons,
 
+	// Mounts and summons; see admin_summon.go.
+	"admin_ride":     (*GameClientLink).adminRide,
+	"admin_unride":   (*GameClientLink).adminUnride,
+	"admin_unsummon": (*GameClientLink).adminUnsummon,
+	"admin_summon":   (*GameClientLink).adminSummon,
+
 	// Fences; see admin_fence.go.
 	"admin_spawnfence":  (*GameClientLink).adminSpawnFence,
 	"admin_deletefence": (*GameClientLink).adminDeleteFence,
