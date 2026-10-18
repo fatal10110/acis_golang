@@ -6,6 +6,7 @@ import (
 	skilltarget "github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
@@ -52,8 +53,9 @@ func (h *Hostile) Aggressive() bool {
 // non-NPC target still within its post-fake-death grace period is excluded
 // too (the recent-fake-death check), and so is an invisible player or the
 // summon of one, and a player — or the summon of one — allied with a
-// faction this NPC belongs to (see factionAllyTarget). Not modeled: the
-// rift-room memo sub-check. The follow gate's
+// faction this NPC belongs to (see factionAllyTarget), and one whose
+// acting player stands outside this rift-room NPC's spawn territory (see
+// outsideRiftRoom). The follow gate's
 // distance decision reuses move.Controller.MaybeStartOffensiveFollow, which
 // reads the current intention's move-to-target flag, not the queued hold
 // desire's.
@@ -95,6 +97,9 @@ func (h *Hostile) AutoAttackTargetValid(target attackable.Combatant, rangeVal in
 		return false
 	}
 	if !targetIsNPC && h.factionAllyTarget(target) {
+		return false
+	}
+	if !targetIsNPC && h.outsideRiftRoom(target) {
 		return false
 	}
 
@@ -154,6 +159,28 @@ func (h *Hostile) factionAllyTarget(target attackable.Combatant) bool {
 		return true
 	}
 	return ally.AlliedWithKetra() && slices.Contains(clans, ketraOrcClan)
+}
+
+// riftRoomParam is the spawn AI parameter that marks an NPC of a
+// Dimensional Rift room; its key is spelled as the spawnlist data spells it.
+const riftRoomParam = "CreviceOfDiminsion"
+
+// outsideRiftRoom reports whether h belongs to a Dimensional Rift room —
+// its own spawn entry, not its template, sets riftRoomParam above 0 — and
+// target's acting player (target itself, or a summon's owner) stands
+// outside the territory of the spawn that placed h. Such a player is left to
+// the party inside the room. A value that does not read as an int marks no
+// room.
+func (h *Hostile) outsideRiftRoom(target attackable.Combatant) bool {
+	if v, err := h.spawn.Int(riftRoomParam, 0); err != nil || v <= 0 {
+		return false
+	}
+	acting := target
+	if owner, ok := target.Owner(); ok && owner != nil {
+		acting = owner
+	}
+	x, y, z := acting.Position()
+	return !h.SpawnTerritoryContains(location.Location{X: x, Y: y, Z: z})
 }
 
 // inRangeAndUnconcealed applies the range and silent-move gates the
