@@ -98,25 +98,35 @@ func UTF16Cut(s string, n int) string {
 // matching of client text: comparing or searching two keys byte-wise
 // compares their UTF-16 unit sequences. Code points are lower-cased with a
 // surrogate pair taken as its supplementary character and an unpaired
-// surrogate left as it is; every unit, each half of a pair included, is
-// then written on its own, so a lone surrogate matches inside a pair that
-// starts or ends with it. The key is not text to show a client.
+// surrogate left as it is; a capital sigma that ends a word takes the final
+// form. Every unit, each half of a pair included, is then written on its
+// own, so a lone surrogate matches inside a pair that starts or ends with
+// it. The key is not text to show a client.
 func UTF16LowerKey(s string) string {
 	units := UTF16Units(s)
 	b := make([]byte, 0, len(s)+len(s)/2)
+	var words *wordText
 	for i := 0; i < len(units); i++ {
 		r := rune(units[i])
-		if utf16.IsSurrogate(r) && i+1 < len(units) {
+		switch {
+		case utf16.IsSurrogate(r) && i+1 < len(units):
 			if pair := utf16.DecodeRune(r, rune(units[i+1])); pair != utf8.RuneError {
-				r = pair
+				r = unicode.ToLower(pair)
 				i++
 			}
-		}
-		if r == 'İ' {
+		case r == 'İ':
 			// Its full lower case is two code points: i and a combining dot above.
 			b = append(b, 'i')
 			r = '\u0307'
-		} else {
+		case r == 'Σ':
+			if words == nil {
+				words = newWordText(units)
+			}
+			r = 'σ'
+			if words.endsWord(i) {
+				r = 'ς'
+			}
+		default:
 			r = unicode.ToLower(r)
 		}
 		if r >= 0x10000 {
