@@ -398,10 +398,14 @@ func (f *Folk) thinkCast(d *ai.Desire) {
 // skill's range, or in range but out of its sight, in its run stance, and
 // waits for it where it cannot walk; in reach it stops and faces its target
 // for a cast long enough to show, and when the final gates refuse turns
-// toward its target instead.
+// toward its target instead. A target no longer in f's world is given up,
+// and so is one f does not know, unless the skill is SUMMON_FRIEND.
 func (f *Folk) castOn(d *ai.Desire) {
 	castAI := f.cast.castAI
 	target, ref := d.FinalTarget, d.Skill
+	if !f.inWorld(target) {
+		return
+	}
 	if !f.Knows(target) && castAI.SkillType(ref) != "SUMMON_FRIEND" && target.ObjectID() != f.ObjectID() {
 		return
 	}

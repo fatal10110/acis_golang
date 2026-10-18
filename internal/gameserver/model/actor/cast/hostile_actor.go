@@ -126,3 +126,6 @@ func (a HostileActor) HeldItemTypeMask() int32 {
 	}
 	return a.Hostile.HeldItemTypeMask()
 }
+
+// npcCaster gives a hostile NPC's casts the NPC finish timing.
+func (HostileActor) npcCaster() {}

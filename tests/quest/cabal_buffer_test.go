@@ -250,6 +250,7 @@ func TestCabalBufferOratorBlessesTheWinningCabal(t *testing.T) {
 		t.Fatalf("draws = %v, want 100 then 10000", got)
 	}
 	w.srv.AdvanceUntil(t, "the blessing landing", func() bool { return w.heldEffect(t, blessFighter) })
+	w.srv.AdvanceUntil(t, "the orator's cast ending", func() bool { return !orator.CastingNow() })
 
 	w.draws.queue(4, 499)
 	act = w.leaveAndReturn(t, orator)
