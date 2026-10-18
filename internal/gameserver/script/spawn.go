@@ -22,6 +22,9 @@ type Population interface {
 	ScheduleRespawn(live *npc.Hostile, d time.Duration) error
 	DecayMe(live *npc.Hostile)
 	MakerEvent(maker, name string, int1, int2 int) bool
+	DoRespawn(live npc.PartyMember)
+	DrawSpawnPoint(live npc.PartyMember) (at location.Location, heading int, ok bool)
+	SetRespawnDelay(live npc.PartyMember, d time.Duration) error
 }
 
 // Spawner spawns NPCs for scripts. Every NPC it spawns is in the world,
