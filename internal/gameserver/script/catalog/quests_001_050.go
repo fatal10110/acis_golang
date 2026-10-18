@@ -1,18 +1,28 @@
 package catalog
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/script"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q002"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q003"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q004"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q005"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q006"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q007"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q008"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q009"
+)
 
 // quests001To050 is the catalog of quests 001 to 050 (#178), except the two the engine slices ported.
 func quests001To050() script.Catalog {
 	return script.Catalog{
-		"quest.Q002_WhatWomenWant":                    nil,
-		"quest.Q003_WillTheSealBeBroken":              nil,
-		"quest.Q004_LongliveThePaagrioLord":           nil,
-		"quest.Q005_MinersFavor":                      nil,
-		"quest.Q006_StepIntoTheFuture":                nil,
-		"quest.Q007_ATripBegins":                      nil,
-		"quest.Q008_AnAdventureBegins":                nil,
-		"quest.Q009_IntoTheCityOfHumans":              nil,
+		"quest.Q002_WhatWomenWant":                    q002.New,
+		"quest.Q003_WillTheSealBeBroken":              q003.New,
+		"quest.Q004_LongliveThePaagrioLord":           q004.New,
+		"quest.Q005_MinersFavor":                      q005.New,
+		"quest.Q006_StepIntoTheFuture":                q006.New,
+		"quest.Q007_ATripBegins":                      q007.New,
+		"quest.Q008_AnAdventureBegins":                q008.New,
+		"quest.Q009_IntoTheCityOfHumans":              q009.New,
 		"quest.Q010_IntoTheWorld":                     nil,
 		"quest.Q011_SecretMeetingWithKetraOrcs":       nil,
 		"quest.Q012_SecretMeetingWithVarkaSilenos":    nil,

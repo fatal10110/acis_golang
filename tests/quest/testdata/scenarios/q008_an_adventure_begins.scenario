@@ -1,0 +1,141 @@
+# An Adventure Begins (Q008): a dark elf of level 3 accepts at Jasmine, takes Roselyn's note to
+# Harne, and Jasmine rewards the trip with a mark of traveler and a scroll of escape to Giran;
+# then relog. Harne's page after the note names a page the datapack does not ship. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q008_an_adventure_begins.golden
+character Shade 3
+class 31
+script quest.Q008_AnAdventureBegins
+item 7573 7559 7570
+page gatekeeper/30134.htm
+page guard/30355.htm
+page trainer/30144.htm
+page script/quest/Q008_AnAdventureBegins/
+npc jasmine 30134 Gatekeeper 10 0 0
+npc roselyn 30355 Guard 20 0 0
+npc harne 30144 Trainer 30 0 0
+
+# Jasmine: accept.
+action jasmine
+action jasmine
+  S ActionFailed
+  S NpcHtmlMessage obj=jasmine item=0 page=gatekeeper/30134.htm
+  S ActionFailed
+bypass npc_{jasmine}_Quest
+  S NpcHtmlMessage obj=jasmine item=0 page=script/quest/Q008_AnAdventureBegins/30134-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q008_AnAdventureBegins CREATED
+bypass Quest Q008_AnAdventureBegins 30134-03.htm
+  S QuestList 8:0x80000001
+  S ExShowQuestMark quest=8
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=jasmine item=0 page=script/quest/Q008_AnAdventureBegins/30134-03.htm
+  S ActionFailed
+  Q upsert Q008_AnAdventureBegins | <state> | STARTED
+  Q upsert Q008_AnAdventureBegins | <cond> | 1
+  state Q008_AnAdventureBegins STARTED
+  rows Q008_AnAdventureBegins <cond>=1 <state>=STARTED
+action jasmine
+  S ActionFailed
+  S NpcHtmlMessage obj=jasmine item=0 page=gatekeeper/30134.htm
+  S ActionFailed
+bypass npc_{jasmine}_Quest
+  S NpcHtmlMessage obj=jasmine item=0 page=script/quest/Q008_AnAdventureBegins/30134-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Roselyn: her note for Harne.
+action roselyn
+action roselyn
+  S ActionFailed
+  S NpcHtmlMessage obj=roselyn item=0 page=guard/30355.htm
+  S ActionFailed
+bypass npc_{roselyn}_Quest
+  S NpcHtmlMessage obj=roselyn item=0 page=script/quest/Q008_AnAdventureBegins/30355-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q008_AnAdventureBegins 30355-02.htm
+  S QuestList 8:0x80000003
+  S ExShowQuestMark quest=8
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7573
+  S NpcHtmlMessage obj=roselyn item=0 page=script/quest/Q008_AnAdventureBegins/30355-02.htm
+  S ActionFailed
+  Q upsert Q008_AnAdventureBegins | <cond> | 2
+  items 7573=1
+action roselyn
+  S ActionFailed
+  S NpcHtmlMessage obj=roselyn item=0 page=guard/30355.htm
+  S ActionFailed
+bypass npc_{roselyn}_Quest
+  S NpcHtmlMessage obj=roselyn item=0 page=script/quest/Q008_AnAdventureBegins/30355-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Harne takes the note; asked again, he names a page the datapack lacks.
+action harne
+action harne
+  S ActionFailed
+  S NpcHtmlMessage obj=harne item=0 page=trainer/30144.htm
+  S ActionFailed
+bypass npc_{harne}_Quest
+  S NpcHtmlMessage obj=harne item=0 page=script/quest/Q008_AnAdventureBegins/30144-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q008_AnAdventureBegins 30144-02.htm
+  S QuestList 8:0x80000007
+  S ExShowQuestMark quest=8
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7573
+  S NpcHtmlMessage obj=harne item=0 page=script/quest/Q008_AnAdventureBegins/30144-02.htm
+  S ActionFailed
+  Q upsert Q008_AnAdventureBegins | <cond> | 3
+  rows Q008_AnAdventureBegins <cond>=3 <state>=STARTED
+  items 7573=0
+action harne
+  S ActionFailed
+  S NpcHtmlMessage obj=harne item=0 page=trainer/30144.htm
+  S ActionFailed
+bypass npc_{harne}_Quest
+  S NpcHtmlMessage obj=harne item=0 html="<html><body>My html is missing:<br>./data/html/script/quest/Q008_AnAdventureBegins/30144-03.htm</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+# Jasmine: the reward; the quest completes.
+action jasmine
+action jasmine
+  S ActionFailed
+  S NpcHtmlMessage obj=jasmine item=0 page=gatekeeper/30134.htm
+  S ActionFailed
+bypass npc_{jasmine}_Quest
+  S NpcHtmlMessage obj=jasmine item=0 page=script/quest/Q008_AnAdventureBegins/30134-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q008_AnAdventureBegins 30134-06.htm
+  S SystemMessage id=54 3:7570
+  S SystemMessage id=54 3:7559
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 8:0x00000000
+  S NpcHtmlMessage obj=jasmine item=0 page=script/quest/Q008_AnAdventureBegins/30134-06.htm
+  S ActionFailed
+  Q upsert Q008_AnAdventureBegins | <state> | COMPLETED
+  Q delete-except-state Q008_AnAdventureBegins
+  state Q008_AnAdventureBegins COMPLETED
+  rows Q008_AnAdventureBegins <state>=COMPLETED
+  items 7573=0 7570=1 7559=1
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q008_AnAdventureBegins COMPLETED
+  rows Q008_AnAdventureBegins <state>=COMPLETED
+  items 7570=1 7559=1
+action jasmine
+action jasmine
+  S ActionFailed
+  S NpcHtmlMessage obj=jasmine item=0 page=gatekeeper/30134.htm
+  S ActionFailed
+bypass npc_{jasmine}_Quest
+  S NpcHtmlMessage obj=jasmine item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

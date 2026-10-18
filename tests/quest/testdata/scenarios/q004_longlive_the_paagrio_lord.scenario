@@ -1,0 +1,185 @@
+# Long live the Pa'agrio Lord! (Q004): an orc of level 2 accepts at Nakusin, collects a gift
+# from each of the six chiefs (asking one of them twice), and Nakusin takes the six gifts
+# for a club; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q004_longlive_the_paagrio_lord.golden
+character Orcling 2
+class 44
+script quest.Q004_LongliveThePaagrioLord
+item 1541 1542 1543 1544 1545 1546 4
+page guard/30578.htm
+page default/30585.htm
+page default/30566.htm
+page warehouse/30562.htm
+page merchant/30560.htm
+page merchant/30559.htm
+page default/30587.htm
+page script/quest/Q004_LongliveThePaagrioLord/
+npc nakusin 30578 Guard 10 0 0
+npc hestui 30585 Folk 20 10 0
+npc varkees 30566 Folk 30 10 0
+npc grookin 30562 WarehouseKeeper 40 10 0
+npc uska 30560 Merchant 50 10 0
+npc kunai 30559 Merchant 60 10 0
+npc urutu 30587 Folk 70 10 0
+
+# Nakusin: accept.
+action nakusin
+action nakusin
+  S ActionFailed
+  S NpcHtmlMessage obj=nakusin item=0 page=guard/30578.htm
+  S ActionFailed
+bypass npc_{nakusin}_Quest
+  S NpcHtmlMessage obj=nakusin item=0 page=script/quest/Q004_LongliveThePaagrioLord/30578-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q004_LongliveThePaagrioLord CREATED
+bypass Quest Q004_LongliveThePaagrioLord 30578-03.htm
+  S QuestList 4:0x80000001
+  S ExShowQuestMark quest=4
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=nakusin item=0 page=script/quest/Q004_LongliveThePaagrioLord/30578-03.htm
+  S ActionFailed
+  Q upsert Q004_LongliveThePaagrioLord | <state> | STARTED
+  Q upsert Q004_LongliveThePaagrioLord | <cond> | 1
+  state Q004_LongliveThePaagrioLord STARTED
+  rows Q004_LongliveThePaagrioLord <cond>=1 <state>=STARTED
+action nakusin
+  S ActionFailed
+  S NpcHtmlMessage obj=nakusin item=0 page=guard/30578.htm
+  S ActionFailed
+bypass npc_{nakusin}_Quest
+  S NpcHtmlMessage obj=nakusin item=0 page=script/quest/Q004_LongliveThePaagrioLord/30578-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q004_LongliveThePaagrioLord 30578-05.htm
+  S NpcHtmlMessage obj=nakusin item=0 page=script/quest/Q004_LongliveThePaagrioLord/30578-05.htm
+  S ActionFailed
+
+# The chiefs: a gift each; the sixth completes the collection.
+action hestui
+action hestui
+  S ActionFailed
+  S NpcHtmlMessage obj=hestui item=0 page=default/30585.htm
+  S ActionFailed
+bypass npc_{hestui}_Quest
+  S SystemMessage id=54 3:1542
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=hestui item=0 page=script/quest/Q004_LongliveThePaagrioLord/30585-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1542=1
+
+# Asked again, Hestui has given his gift already.
+action hestui
+  S ActionFailed
+  S NpcHtmlMessage obj=hestui item=0 page=default/30585.htm
+  S ActionFailed
+bypass npc_{hestui}_Quest
+  S NpcHtmlMessage obj=hestui item=0 page=script/quest/Q004_LongliveThePaagrioLord/30585-02.htm
+  S ActionFailed
+  S ActionFailed
+  items 1542=1
+action varkees
+action varkees
+  S ActionFailed
+  S NpcHtmlMessage obj=varkees item=0 page=default/30566.htm
+  S ActionFailed
+bypass npc_{varkees}_Quest
+  S SystemMessage id=54 3:1541
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=varkees item=0 page=script/quest/Q004_LongliveThePaagrioLord/30566-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1541=1
+action grookin
+action grookin
+  S ActionFailed
+  S NpcHtmlMessage obj=grookin item=0 page=warehouse/30562.htm
+  S ActionFailed
+bypass npc_{grookin}_Quest
+  S SystemMessage id=54 3:1543
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=grookin item=0 page=script/quest/Q004_LongliveThePaagrioLord/30562-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1543=1
+action uska
+action uska
+  S ActionFailed
+  S NpcHtmlMessage obj=uska item=0 page=merchant/30560.htm
+  S ActionFailed
+bypass npc_{uska}_Quest
+  S SystemMessage id=54 3:1544
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=uska item=0 page=script/quest/Q004_LongliveThePaagrioLord/30560-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1544=1
+action kunai
+action kunai
+  S ActionFailed
+  S NpcHtmlMessage obj=kunai item=0 page=merchant/30559.htm
+  S ActionFailed
+bypass npc_{kunai}_Quest
+  S SystemMessage id=54 3:1545
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kunai item=0 page=script/quest/Q004_LongliveThePaagrioLord/30559-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1545=1
+action urutu
+action urutu
+  S ActionFailed
+  S NpcHtmlMessage obj=urutu item=0 page=default/30587.htm
+  S ActionFailed
+bypass npc_{urutu}_Quest
+  S SystemMessage id=54 3:1546
+  S QuestList 4:0x80000003
+  S ExShowQuestMark quest=4
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=urutu item=0 page=script/quest/Q004_LongliveThePaagrioLord/30587-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q004_LongliveThePaagrioLord | <cond> | 2
+  rows Q004_LongliveThePaagrioLord <cond>=2 <state>=STARTED
+  items 1546=1
+
+# Nakusin: the six gifts for the club; the quest completes.
+action nakusin
+action nakusin
+  S ActionFailed
+  S NpcHtmlMessage obj=nakusin item=0 page=guard/30578.htm
+  S ActionFailed
+bypass npc_{nakusin}_Quest
+  S SystemMessage id=54 3:4
+  S SystemMessage id=302 3:1544
+  S SystemMessage id=302 3:1542
+  S SystemMessage id=302 3:1543
+  S SystemMessage id=302 3:1546
+  S SystemMessage id=302 3:1541
+  S SystemMessage id=302 3:1545
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 4:0x00000000
+  S NpcHtmlMessage obj=nakusin item=0 page=script/quest/Q004_LongliveThePaagrioLord/30578-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q004_LongliveThePaagrioLord | <state> | COMPLETED
+  Q delete-except-state Q004_LongliveThePaagrioLord
+  state Q004_LongliveThePaagrioLord COMPLETED
+  rows Q004_LongliveThePaagrioLord <state>=COMPLETED
+  items 1541=0 1542=0 1543=0 1544=0 1545=0 1546=0 4=1
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q004_LongliveThePaagrioLord COMPLETED
+  rows Q004_LongliveThePaagrioLord <state>=COMPLETED
+  items 4=1
+action nakusin
+action nakusin
+  S ActionFailed
+  S NpcHtmlMessage obj=nakusin item=0 page=guard/30578.htm
+  S ActionFailed
+bypass npc_{nakusin}_Quest
+  S NpcHtmlMessage obj=nakusin item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
