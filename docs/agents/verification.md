@@ -59,17 +59,23 @@ queue that a running task drains, and cover it with a domain test that counts ru
 
 ## Complete implementation gates
 
-Before claiming completion of a source-code change, require no output from the formatting check and
-successful completion of every repository gate:
+Before claiming completion of a source-code change, the formatting check must print nothing, and
+the build, vet and scoped tests must pass:
 
 ```bash
-(cd acis_golang && golangci-lint fmt --diff)
-rtk go -C acis_golang vet ./...
-rtk go -C acis_golang build ./...
-rtk go -C acis_golang test -race ./...
+(cd <go-root> && golangci-lint fmt --diff)
+rtk go -C <go-root> vet ./...
+rtk go -C <go-root> build ./...
+ACIS_REQUIRE_DATAPACK=1 rtk go -C <go-root> test -race -count=1 <changed packages> -run '<tests that exercise the change>'
 ```
 
-There is no separate integration tier: `go test ./...` is the only run and needs Docker (the
+Run only the tests the change can affect: the unit tests of the changed packages and the behavior
+suites in `tests/<domain>/` that exercise the change, selected with `-run`. Do not run the full suite
+(`go test ./...`, `./tests/...`, `./internal/...`, `make test`) locally: PR CI runs it on every push
+and is the gate for everything except the datapack suites (next section). The PR body lists the scoped
+tests run and says "full suite: CI".
+
+There is no separate integration tier: `go test ./...` is CI's only run and needs Docker (the
 persistence suites boot MariaDB via testcontainers). The integration build tag was removed
 tree-wide in #1682; never reintroduce it.
 
@@ -132,16 +138,32 @@ checkout and any `acis_golang-worktrees/<task>/` resolve the same `aCis_datapack
 `t.Skip` when none is found. **All datapack oracle tests therefore skip in CI, and a green CI run
 proves nothing about them.** Setting `ACIS_REQUIRE_DATAPACK=1` turns that skip into a failure.
 
-This makes the local run the only gate for them. Before every push:
+This makes the local run the only gate for them. CI runs everything else, so locally you run only
+the datapack suites related to the change, before every push:
 
-- run the full suite from the outer `acis_public/` root, with `aCis_datapack/` present and
-  `ACIS_REQUIRE_DATAPACK=1` set, so a missing datapack fails the run instead of skipping the oracle
-  tests;
+- find the candidates:
+
+  ```bash
+  rg -l 'datapack\.(Require|Path|Find)\(|scriptfp\.|scriptcontract\.|scriptpages\.' \
+    <go-root>/tests <go-root>/internal <go-root>/cmd --glob '*_test.go'
+  ```
+
+- run the ones that cover the change:
+  - datapack tests in the changed packages;
+  - datapack tests that exercise the changed code path or the content the issue names (data
+    readers, templates, skill/item/NPC/zone/door data, geodata, HTML pages, multisells, spawns);
+  - the `scriptfp`, `scriptcontract` and `scriptpages` tests whenever `census.golden`,
+    `apimap.txt`, the script-facing API or script content changes;
+- run them from the outer `acis_public/` root, with `aCis_datapack/` present and
+  `ACIS_REQUIRE_DATAPACK=1` set, scoped with `-run`, and confirm in `-v` output that they ran (a SKIP
+  verifies nothing);
+- report them in the PR body as "Datapack suites (local only; CI skips them)" with each result,
+  or "none related";
 - never treat a green CI check as covering a datapack-backed acceptance criterion.
 
 ```bash
 # from acis_public/, with aCis_datapack/ checked out; <go-root> may be a linked worktree
-ACIS_REQUIRE_DATAPACK=1 rtk go -C <go-root> test -race ./...
+ACIS_REQUIRE_DATAPACK=1 rtk go -C <go-root> test -race -count=1 -v <packages> -run '<datapack tests>'
 ```
 
 An issue whose acceptance criteria name real datapack content is not verified until its oracle test
@@ -150,7 +172,7 @@ is observed passing locally.
 The installed `rtk` version exposes compact `go test`, `go build`, and `go vet` wrappers.
 Formatting is gofumpt, configured in `.golangci.yml`; `golangci-lint fmt` applies it. CI runs
 `golangci-lint run` over the whole tree, which must stay at 0 issues: run
-`(cd acis_golang && rtk err golangci-lint run)` before completion. If the binary is unavailable,
+`(cd <go-root> && rtk err golangci-lint run <touched package dirs>)` before completion. If the binary is unavailable,
 report it as unavailable, never as passed.
 
 If an external integration service is unavailable, run all independent gates and report the exact
