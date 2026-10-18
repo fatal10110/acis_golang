@@ -55,6 +55,23 @@ func (p Period) String() string {
 	}
 }
 
+// Name is the period's display name, as a castle chamberlain's report
+// shows it.
+func (p Period) Name() string {
+	switch p {
+	case Recruiting:
+		return "Quest Event Initialization"
+	case Competition:
+		return "Competition (Quest Event)"
+	case Results:
+		return "Quest Event Results"
+	case SealValidation:
+		return "Seal Validation"
+	default:
+		return p.String()
+	}
+}
+
 // ParsePeriod parses a persisted enum name into p.
 func ParsePeriod(name string) (Period, error) {
 	for p := Period(0); p < periodCount; p++ {
@@ -412,7 +429,7 @@ func (s *State) settleCastles(ended Period, castles Castles, strifeOwner Cabal) 
 	case Recruiting:
 		castles.ResetCertificates()
 	case Competition:
-		castles.ValidateTaxes(castleTaxCap(strifeOwner))
+		castles.ValidateTaxes(CastleTaxCap(strifeOwner))
 	}
 }
 

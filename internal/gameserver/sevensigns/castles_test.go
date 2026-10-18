@@ -25,8 +25,8 @@ func (j castlesJournal) ValidateTaxes(maxPercent int) {
 // Strife's owner: DAWN 25, DUSK 5, NORMAL 15.
 func TestCastleTaxCap(t *testing.T) {
 	for owner, want := range map[Cabal]int{Dawn: 25, Dusk: 5, NoCabal: 15} {
-		if got := castleTaxCap(owner); got != want {
-			t.Errorf("castleTaxCap(%v) = %d, want %d", owner, got, want)
+		if got := CastleTaxCap(owner); got != want {
+			t.Errorf("CastleTaxCap(%v) = %d, want %d", owner, got, want)
 		}
 	}
 }

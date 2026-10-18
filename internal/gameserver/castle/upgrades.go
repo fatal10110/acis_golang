@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
+	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 )
 
 // Doors is the world's doors as a castle's gate upgrades reach them.
@@ -68,6 +69,16 @@ func (c *Castle) gate(doorID int) (*door.Object, bool) {
 	return nil, false
 }
 
+// GateUpgradeRatio returns the HP upgrade ratio of the castle's gate
+// doorID, 1 for none; ok is false for a door that is not one of its gates.
+func (c *Castle) GateUpgradeRatio(doorID int) (ratio int, ok bool) {
+	d, ok := c.gate(doorID)
+	if !ok {
+		return 0, false
+	}
+	return d.HPUpgradeRatio(), true
+}
+
 // UpgradeDoor multiplies the template HP of the castle's gate doorID by
 // ratio into its maximum HP and fills the gate's HP to it, storing the
 // upgrade when save is set. A door that is not one of the castle's gates
@@ -115,6 +126,17 @@ func (c *Castle) TrapUpgradeLevel(towerIndex int) int {
 	return c.trapLevels[towerIndex]
 }
 
+// TrapUpgrade returns the level the trap of the castle's control tower at
+// towerIndex is upgraded to; ok is false for an index naming no tower.
+func (c *Castle) TrapUpgrade(towerIndex int) (level int, ok bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if towerIndex < 0 || towerIndex >= len(c.trapLevels) {
+		return 0, false
+	}
+	return c.trapLevels[towerIndex], true
+}
+
 // SetTrapUpgrade upgrades the trap of the castle's control tower at
 // towerIndex to level, storing it when save is set. An index naming no
 // control tower changes and stores nothing, and it reports false.
@@ -144,4 +166,63 @@ func (c *Castle) RemoveTrapUpgrades() {
 	c.write("delete trap upgrades", func(ctx context.Context, st Store) error {
 		return st.DeleteTrapUpgrades(ctx, id)
 	})
+}
+
+// Purchase runs fn alone among the castle's purchases: its gate and trap
+// upgrades, its certificate sales and its vault moves, each a check of the
+// castle's state, a payment and the change it buys. fn must not start
+// another purchase.
+func (c *Castle) Purchase(fn func()) {
+	c.purchase.Lock()
+	defer c.purchase.Unlock()
+	fn()
+}
+
+// DoorUpgradeCost is the adena a castle pays to raise a gate's HP ratio to
+// ratio: gateType 1 is a plain gate, 2 a metal gate, 3 a wall, each priced
+// for ratios 2, 3 and 5. The price is tripled while the dusk owns the Seal
+// of Strife and cut by a fifth while the dawn does. An unpriced type or
+// ratio costs 0.
+func DoorUpgradeCost(gateType, ratio int, strifeOwner sevensigns.Cabal) int {
+	prices := map[int][3]int{
+		1: {300_000, 400_000, 500_000},
+		2: {750_000, 900_000, 1_000_000},
+		3: {1_600_000, 1_800_000, 2_000_000},
+	}
+	price := 0
+	if row, ok := prices[gateType]; ok {
+		switch ratio {
+		case 2:
+			price = row[0]
+		case 3:
+			price = row[1]
+		case 5:
+			price = row[2]
+		}
+	}
+	return strifePrice(price, strifeOwner)
+}
+
+// TrapUpgradeCost is the adena a castle pays to raise a control tower's
+// trap to level 1 to 4, priced as DoorUpgradeCost prices under the Seal of
+// Strife. Any other level costs 0.
+func TrapUpgradeCost(level int, strifeOwner sevensigns.Cabal) int {
+	price := 0
+	if level >= 1 && level <= 4 {
+		price = 2_000_000 + level*1_000_000
+	}
+	return strifePrice(price, strifeOwner)
+}
+
+// strifePrice is price tripled under a dusk Seal of Strife and cut by a
+// fifth, truncated, under a dawn one.
+func strifePrice(price int, strifeOwner sevensigns.Cabal) int {
+	switch strifeOwner {
+	case sevensigns.Dusk:
+		return price * 3
+	case sevensigns.Dawn:
+		return int(float64(price) * 0.8)
+	case sevensigns.NoCabal:
+	}
+	return price
 }

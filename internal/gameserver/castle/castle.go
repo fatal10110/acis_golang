@@ -9,6 +9,7 @@ import (
 	"context"
 	"math"
 	"sync"
+	"time"
 
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 )
@@ -22,6 +23,9 @@ type Castle struct {
 	*castledata.Castle
 	parent *Castle
 	m      *Manager
+
+	// purchase serializes the castle's purchases; see Purchase.
+	purchase sync.Mutex
 
 	mu                sync.Mutex
 	ownerID           int32
@@ -156,6 +160,21 @@ func (c *Castle) SetTimeRegistrationOver(over bool) {
 	c.regTimeOver = over
 }
 
+// SetSiegeHour moves the siege to hour on its day, in the server's time
+// zone, an hour past 23 rolling into the next day, closes the date to
+// change and stores both.
+func (c *Castle) SetSiegeHour(hour int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	t := time.UnixMilli(c.siegeDate)
+	t = time.Date(t.Year(), t.Month(), t.Day(), hour, t.Minute(), t.Second(), t.Nanosecond(), t.Location())
+	c.siegeDate, c.regTimeOver = t.UnixMilli(), true
+	date := c.siegeDate
+	c.write("update siege info", func(ctx context.Context, st Store) error {
+		return st.UpdateSiegeInfo(ctx, c.id(), date, true)
+	})
+}
+
 // SaveSiegeInfo stores the siege date and whether it is still open to
 // change, as they stand.
 func (c *Castle) SaveSiegeInfo() {
@@ -229,6 +248,19 @@ func (c *Castle) SetLeftCertificates(n int, save bool) {
 			return st.UpdateCertificates(ctx, c.id(), n)
 		})
 	}
+}
+
+// TakeCertificates takes n of the certificates the castle has left, stores
+// what is left and returns it.
+func (c *Castle) TakeCertificates(n int) int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.leftCertificates -= n
+	left := c.leftCertificates
+	c.write("update certificates", func(ctx context.Context, st Store) error {
+		return st.UpdateCertificates(ctx, c.id(), left)
+	})
+	return left
 }
 
 // EditTreasury adds amount, negative to take some out, to the treasury of

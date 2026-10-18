@@ -18,10 +18,10 @@ func (s *State) SetCastles(castles Castles) {
 	s.castles = castles
 }
 
-// castleTaxCap is the highest castle tax rate, in percent, the Seal of
+// CastleTaxCap is the highest castle tax rate, in percent, the Seal of
 // Strife's owner allows: 25 under the dawn, 5 under the dusk, 15 when no
 // cabal owns it.
-func castleTaxCap(strifeOwner Cabal) int {
+func CastleTaxCap(strifeOwner Cabal) int {
 	switch strifeOwner {
 	case Dawn:
 		return 25

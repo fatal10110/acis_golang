@@ -52,21 +52,33 @@ func parseManorMenu(s string) (manorMenu, bool) {
 }
 
 // bypassManorMenu answers a manor_menu_select command on the player's
-// target, at any distance: a manor manager's or a castle chamberlain's
-// manor windows. Any other target answers nothing: a plain NPC ignores the
-// command and a link click leaves no client action pending. The NPC types
-// that answer any command before reading it (karma refusal page, a leading
-// ActionFailed, a disabled-manor page) are not routed here yet (#3672).
+// target, at any distance and from any page: a manor manager's manor
+// windows, and a castle chamberlain's or a wyvern manager's. A merchant,
+// fisherman, gatekeeper, warehouse keeper, dungeon gatekeeper, castle
+// blacksmith or auctioneer answers it as it answers any command it does
+// not know: with whatever it says to every command first (a karma refusal
+// page, a leading ActionFailed, a disabled-manor page, a trade or auction
+// refusal), else nothing. Any other target answers nothing: its dialog
+// knows no such command, and a link click leaves no client action pending.
 func (l *GameClientLink) bypassManorMenu(live *livePlayer, command string) {
 	f, ok := live.Target().(*npc.Folk)
 	if !ok || f.Instance == nil {
 		return
 	}
-	switch f.Instance.Kind {
+	switch kind := f.Instance.Kind; kind {
 	case "ManorManagerNpc":
 		l.manorManagerMenu(live, f, command)
-	case "CastleChamberlain":
-		l.chamberlainManorMenu(live, f, command)
+	case "CastleChamberlain", "WyvernManagerNpc":
+		l.chamberlainManorMenu(live, f, kind, command)
+	case "Auctioneer":
+		l.auctioneerBypass(live, f, command)
+	case "Merchant", "Fisherman", "Gatekeeper", "WarehouseKeeper", "CastleWarehouseKeeper", "DungeonGatekeeper", "CastleBlacksmith":
+		reply := l.folkReply(live, f, command)
+		if reply.Outcome == npc.BypassUnported {
+			// No command of these dialogs reads a manor window.
+			reply.Outcome = npc.BypassRefused
+		}
+		l.runFolkReply(live, f, command, reply)
 	}
 }
 
@@ -127,20 +139,33 @@ func (l *GameClientLink) manorManagerMenu(live *livePlayer, f *npc.Folk, command
 	}
 }
 
-// chamberlainManorMenu answers a castle chamberlain's manor windows for a
-// member of the clan owning its castle allowed to run the manor: the seeds
-// or crops of a castle for a period, or the manor's crops, with the
-// purchase buttons hidden, and the seed and crop setting windows outside
-// the approved period. A talker of another clan, or of none, gets the
-// refusal page; any talker while the siege runs, the busy page. A command
-// that does not parse, or an unknown ask, answers nothing, as specified; a
-// link click leaves no client action pending.
-func (l *GameClientLink) chamberlainManorMenu(live *livePlayer, f *npc.Folk, command string) {
+// chamberlainManorMenu answers the manor windows of a castle chamberlain,
+// or of a wyvern manager, which heeds only the talker who last selected it.
+// A talker who may not run its castle's manor gets the refusal page, any
+// talker at a chamberlain while the siege runs the busy page; see
+// chamberlainManorWindows for the rest.
+func (l *GameClientLink) chamberlainManorMenu(live *livePlayer, f *npc.Folk, kind npc.InstanceKind, command string) {
+	if kind == "WyvernManagerNpc" && live.currentFolk.Load() != f {
+		// Kept with the wyvern manager's own gate: a civilian NPC becomes
+		// the current one as it is selected, so its target always passes.
+		return
+	}
 	r := l.residenceTalk(live, f)
-	if page := r.ChamberlainRefusal(clan.PrivCastleManor); page != "" {
+	if page := r.ChamberlainRefusal(kind, clan.PrivCastleManor); page != "" {
 		sendFilledHTML(live, f.ObjectID(), l.setPage(page), 0)
 		return
 	}
+	l.chamberlainManorWindows(live, r, command)
+}
+
+// chamberlainManorWindows answers a chamberlain dialog's manor windows for
+// a talker allowed to run the manor of the castle r names: the seeds or
+// crops of a castle for a period, or the manor's crops, with the purchase
+// buttons hidden, and the seed and crop setting windows outside the
+// approved period. A command that does not parse, or an unknown ask,
+// answers nothing, as specified; a link click leaves no client action
+// pending.
+func (l *GameClientLink) chamberlainManorWindows(live *livePlayer, r npc.ResidenceTalk, command string) {
 	if l.refuseManorMaintenance(live) {
 		return
 	}

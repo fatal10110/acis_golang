@@ -175,6 +175,11 @@ func (l *GameClientLink) bypassNpc(live *livePlayer, command string) {
 // folkBypass runs command on f for live. It reports false when the command
 // aborted, so that nothing more is sent.
 func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command string) bool {
+	return l.runFolkReply(live, f, command, l.folkReply(live, f, command))
+}
+
+// folkReply is f's answer to command, sent by live.
+func (l *GameClientLink) folkReply(live *livePlayer, f *npc.Folk, command string) npc.BypassReply {
 	rules := l.chatRules()
 	rules.AllowWear = l.merchant.Config().AllowWear
 	talker := npc.Talker{Karma: live.Karma(), Level: live.Level(), LowLevelNewbie: live.LowLevelNewbie()}
@@ -184,10 +189,16 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 	classLevel, _ := player.ClassLevel(live.ClassID())
 	talker.ThirdClass = classLevel >= 3
 	talker.CurrentFolk = live.currentFolk.Load() == f
+	talker.Trading = l.trades != nil && l.trades.ProcessingTransaction(live.ObjectID())
 	talker.MountNPCID, talker.MountLevel = live.MountNPCID(), live.MountLevel()
 	talker.SevenSigns = folkChatState{l: l, live: live, f: f}.SevenSigns
 	talker.Residence = folkChatState{l: l, live: live, f: f}.Residence
-	reply := f.Bypass(setPages{l.html}, rules, talker, command)
+	return f.Bypass(setPages{l.html}, rules, talker, command)
+}
+
+// runFolkReply carries out reply, f's answer to command, for live. It
+// reports false when the command aborted, so that nothing more is sent.
+func (l *GameClientLink) runFolkReply(live *livePlayer, f *npc.Folk, command string, reply npc.BypassReply) bool {
 	if reply.LeadingActionFailed {
 		live.SendFrame(serverpackets.FrameActionFailed())
 	}
@@ -308,6 +319,10 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		live.SendFrame(serverpackets.FrameActionFailed())
 	case npc.BypassWyvernRide:
 		l.rideWyvernAtNpc(live, f, reply)
+	case npc.BypassAlreadyTrading:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAlreadyTrading))
+	case npc.BypassChamberlain:
+		return l.chamberlainBypass(live, f, command, reply.Standing)
 	case npc.BypassUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Str("command", command).Msg("bypass: npc dialog command not modeled")
 	case npc.BypassRefused:

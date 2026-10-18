@@ -108,6 +108,11 @@ var folkChats = map[InstanceKind]folkChat{
 	// A castle warehouse keeper keeps the warehouse keeper's karma gate;
 	// its chat pages are its castle's, see residenceChatPage.
 	"CastleWarehouseKeeper": {dir: "warehouse", pk: canUseWarehouse},
+	// A chamberlain and a wyvern manager answer the commands their own
+	// dialogs leave as a merchant does; their first chat page is their
+	// residence's, see residenceChat.
+	"CastleChamberlain": {dir: "merchant", pk: canShop},
+	"WyvernManagerNpc":  {dir: "merchant", pk: canShop},
 }
 
 // unportedFolkChats are the civilian types whose chat window depends on
@@ -115,13 +120,6 @@ var folkChats = map[InstanceKind]folkChat{
 // (#244); a castle's messenger is answered before the chat window.
 var unportedFolkChats = map[InstanceKind]struct{}{
 	"SiegeNpc": {},
-}
-
-// unportedResidenceCommands are the castle types whose chat window opens
-// but whose dialog commands are not in place yet: the chamberlain's
-// (#3849).
-var unportedResidenceCommands = map[InstanceKind]struct{}{
-	"CastleChamberlain": {},
 }
 
 // unportedFolkCommands are the civilian types whose first chat page is in
