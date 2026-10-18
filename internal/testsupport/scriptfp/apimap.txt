@@ -804,3 +804,15 @@ SpawnData.checkDead spawn.GroupSpawn.CheckDead
 SpawnManager.getSpawn script.Spawner.FindSpawn
 SpawnManager.startSpawnTime script.Spawner.StartSpawnTime
 SpawnManager.stopSpawnTime script.Spawner.StopSpawnTime
+
+# The castle siege rows of the siege maker (#3805). A maker finds a castle
+# by id and registers its npcmaker on the castle's siege; each later status
+# change of the siege runs the maker's siege event hook with the castle
+# handle and the new status. The siege's castle is that handle, on which
+# the maker reads the siege's status and the castle's standing life
+# control towers.
+Castle.getAliveLifeTowerCount script.Castle.AliveLifeTowers
+CastleManager.getCastleById script.Maker.Castle
+Siege.addMakerEvent script.Castle.AddMakerEvent
+Siege.getCastle inline
+Siege.getStatus script.Castle.SiegeStatus

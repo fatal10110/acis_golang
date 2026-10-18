@@ -13,14 +13,19 @@ import (
 // game server does once its spawns are up, with the life tower's working
 // form as the datapack defines it.
 func placedLifeTowers() []gameservertest.Option {
-	working := &npc.Template{
+	return []gameservertest.Option{
+		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{lifeTowerWorking()})),
+		gameservertest.WithNpcSpawns(nil),
+	}
+}
+
+// lifeTowerWorking is the life control tower's working form as the
+// datapack defines it.
+func lifeTowerWorking() *npc.Template {
+	return &npc.Template{
 		ID: npc.LifeTowerWorkingNpcID, TemplateID: npc.LifeTowerWorkingNpcID, Type: "LifeTower", Name: "Life Control Tower",
 		Level: 20, HPMax: 342, MPMax: 213, WalkSpeed: 49.5, CollisionRadius: 13, CollisionHeight: 54,
 		CanBeAttacked: true, CanMove: true,
-	}
-	return []gameservertest.Option{
-		gameservertest.WithNPCs(npc.NewTable([]*npc.Template{working})),
-		gameservertest.WithNpcSpawns(nil),
 	}
 }
 
