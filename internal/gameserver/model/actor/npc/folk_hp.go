@@ -331,5 +331,5 @@ func (f *Folk) RechargeMP(amount float64) float64 { return f.CalcStat(stat.Recha
 
 // HealInput resolves the NPC's side of an outgoing heal.
 func (f *Folk) HealInput(def modelskill.Definition) (formulas.HealInput, bool) {
-	return creature.ResolveHealInput(def, f.HealProficiency(), f.MAtk(), formulas.HealShotScalingNPC), true
+	return creature.ResolveHealInput(def, f.HealProficiency(), f.Against(f.ConditionActor(), nil).MAtk(), formulas.HealShotScalingNPC), true
 }
