@@ -155,16 +155,20 @@ func TestFrameInventoryUpdate(t *testing.T) {
 		{ID: 2368, Kind: item.KindWeapon, Slot: item.SlotLRHand, Duration: -1},
 		{ID: 1146, Kind: item.KindArmor, Slot: item.SlotChest, Duration: -1},
 	})
-	items := []*item.Instance{
-		{ObjectID: 100, TemplateID: 2368, Count: 1, Location: item.LocationPaperdoll, LocationData: 7, EnchantLevel: 5, CustomType1: 3, CustomType2: 4, ManaLeft: -1, Augmentation: &item.Augmentation{Attributes: 777}},
-		{ObjectID: 101, TemplateID: 1146, Count: 1, Location: item.LocationInventory, ManaLeft: -1},
-	}
 	updates := []itemcontainer.Update{
-		{ObjectID: 100, TemplateID: 2368, Count: 1, State: itemcontainer.UpdateModified},
-		{ObjectID: 101, TemplateID: 1146, Count: 1, State: itemcontainer.UpdateRemoved},
+		{
+			ObjectID: 100, TemplateID: 2368, Count: 1, State: itemcontainer.UpdateModified,
+			EnchantLevel: 5, CustomType1: 3, CustomType2: 4, Equipped: true, Augmentation: 777, ManaLeft: -1,
+		},
+		// A removed entry keeps the state it was queued with: the
+		// instance is gone by the time the packet is written.
+		{
+			ObjectID: 101, TemplateID: 1146, Count: 1, State: itemcontainer.UpdateRemoved,
+			EnchantLevel: 3, CustomType1: 1, CustomType2: 2, Augmentation: 555, ManaLeft: 237,
+		},
 	}
 
-	frame, err := FrameInventoryUpdate(updates, items, templates)
+	frame, err := FrameInventoryUpdate(updates, templates)
 	if err != nil {
 		t.Fatalf("FrameInventoryUpdate: %v", err)
 	}
@@ -185,7 +189,7 @@ func TestFrameInventoryUpdate(t *testing.T) {
 	want = binary.LittleEndian.AppendUint16(want, 5)
 	want = binary.LittleEndian.AppendUint16(want, 4)
 	want = binary.LittleEndian.AppendUint32(want, 777)
-	want = binary.LittleEndian.AppendUint32(want, uint32(noManaLeft))
+	want = binary.LittleEndian.AppendUint32(want, 0) // regular item: -1 / 60
 
 	want = binary.LittleEndian.AppendUint16(want, uint16(itemcontainer.UpdateRemoved))
 	want = binary.LittleEndian.AppendUint16(want, uint16(item.CategoryArmor))
@@ -193,13 +197,13 @@ func TestFrameInventoryUpdate(t *testing.T) {
 	want = binary.LittleEndian.AppendUint32(want, 1146)
 	want = binary.LittleEndian.AppendUint32(want, 1)
 	want = binary.LittleEndian.AppendUint16(want, uint16(item.SubCategoryArmor))
-	want = binary.LittleEndian.AppendUint16(want, 0)
+	want = binary.LittleEndian.AppendUint16(want, 1)
 	want = binary.LittleEndian.AppendUint16(want, 0)
 	want = binary.LittleEndian.AppendUint32(want, uint32(item.SlotChest))
-	want = binary.LittleEndian.AppendUint16(want, 0)
-	want = binary.LittleEndian.AppendUint16(want, 0)
-	want = binary.LittleEndian.AppendUint32(want, 0)
-	want = binary.LittleEndian.AppendUint32(want, uint32(noManaLeft))
+	want = binary.LittleEndian.AppendUint16(want, 3)
+	want = binary.LittleEndian.AppendUint16(want, 2)
+	want = binary.LittleEndian.AppendUint32(want, 555)
+	want = binary.LittleEndian.AppendUint32(want, 3) // 237 seconds in whole minutes
 
 	if !bytes.Equal(got, want) {
 		t.Errorf("FrameInventoryUpdate mismatch:\n got  %x\n want %x", got, want)
@@ -207,7 +211,7 @@ func TestFrameInventoryUpdate(t *testing.T) {
 }
 
 func TestFrameInventoryUpdateMissingTemplate(t *testing.T) {
-	_, err := FrameInventoryUpdate([]itemcontainer.Update{{ObjectID: 1, TemplateID: 999, Count: 1}}, nil, item.NewTable(nil))
+	_, err := FrameInventoryUpdate([]itemcontainer.Update{{ObjectID: 1, TemplateID: 999, Count: 1}}, item.NewTable(nil))
 	if err == nil {
 		t.Fatal("FrameInventoryUpdate: want error for missing template")
 	}

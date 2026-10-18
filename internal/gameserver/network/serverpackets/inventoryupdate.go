@@ -12,75 +12,53 @@ import (
 const OpcodeInventoryUpdate = 0x27
 
 // FrameInventoryUpdate builds the player InventoryUpdate packet for item
-// changes already queued by the inventory.
-func FrameInventoryUpdate(updates []itemcontainer.Update, items []*item.Instance, templates *item.Table) (wire.Frame, error) {
+// changes already queued by the inventory. Each entry is written from the
+// instance state its update carries, not from the instance as it is now.
+func FrameInventoryUpdate(updates []itemcontainer.Update, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(OpcodeInventoryUpdate)
-	if err := writeInventoryUpdate(w, updates, items, templates); err != nil {
+	if err := writeInventoryUpdate(w, updates, templates); err != nil {
 		releaseFrameWriter(w)
 		return wire.Frame{}, err
 	}
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
 }
 
-func writeInventoryUpdate(w *wire.Writer, updates []itemcontainer.Update, items []*item.Instance, templates *item.Table) error {
-	byObjectID := make(map[int32]*item.Instance, len(items))
-	for _, inst := range items {
-		if inst != nil {
-			byObjectID[inst.ObjectID] = inst
-		}
-	}
-
+func writeInventoryUpdate(w *wire.Writer, updates []itemcontainer.Update, templates *item.Table) error {
 	count, err := wire.Uint16Count(len(updates))
 	if err != nil {
 		return err
 	}
 	w.WriteUint16(count)
 	for _, update := range updates {
-		inst := byObjectID[update.ObjectID]
-		templateID := update.TemplateID
-		count := update.Count
-		var st item.InstanceState
-		if inst != nil {
-			st = inst.Snapshot()
-			templateID = st.TemplateID
-			if count == 0 {
-				count = st.Count
-			}
-		}
-
-		tmpl, ok := templates.Get(templateID)
-		if !ok {
-			return fmt.Errorf("serverpackets: InventoryUpdate: no template loaded for item template %d", templateID)
-		}
-		category, subCategory := tmpl.Category()
-
 		w.WriteUint16(uint16(update.State))
-		w.WriteUint16(uint16(category))
-		w.WriteInt32(update.ObjectID)
-		w.WriteInt32(templateID)
-		w.WriteInt32(int32(count))
-		w.WriteUint16(uint16(subCategory))
-		if inst == nil {
-			w.WriteUint16(0)
-			w.WriteUint16(0)
-			w.WriteInt32(int32(tmpl.Slot))
-			w.WriteUint16(0)
-			w.WriteUint16(0)
-			w.WriteInt32(0)
-			w.WriteInt32(-1)
-			continue
+		if err := writeUpdatedItem(w, update, templates); err != nil {
+			return fmt.Errorf("serverpackets: InventoryUpdate: %w", err)
 		}
-		w.WriteUint16(uint16(st.CustomType1))
-		w.WriteUint16(uint16(boolInt32(st.Location == item.LocationPaperdoll)))
-		w.WriteInt32(int32(tmpl.Slot))
-		w.WriteUint16(uint16(st.EnchantLevel))
-		w.WriteUint16(uint16(st.CustomType2))
-		if st.Augmentation != nil {
-			w.WriteInt32(st.Augmentation.Attributes)
-		} else {
-			w.WriteInt32(0)
-		}
-		w.WriteInt32(int32(inst.DisplayedManaLeft(tmpl)))
+		w.WriteInt32(update.Augmentation)
+		// The displayed mana is the queued mana in minutes, also for a
+		// regular item, whose -1 shows as 0.
+		w.WriteInt32(int32(update.ManaLeft / 60))
 	}
+	return nil
+}
+
+// writeUpdatedItem writes the item fields an inventory update entry shares
+// between the player and the pet packet, from update alone.
+func writeUpdatedItem(w *wire.Writer, update itemcontainer.Update, templates *item.Table) error {
+	tmpl, ok := templates.Get(update.TemplateID)
+	if !ok {
+		return fmt.Errorf("no template loaded for item template %d", update.TemplateID)
+	}
+	category, subCategory := tmpl.Category()
+	w.WriteUint16(uint16(category))
+	w.WriteInt32(update.ObjectID)
+	w.WriteInt32(update.TemplateID)
+	w.WriteInt32(int32(update.Count))
+	w.WriteUint16(uint16(subCategory))
+	w.WriteUint16(uint16(update.CustomType1))
+	w.WriteUint16(uint16(boolInt32(update.Equipped)))
+	w.WriteInt32(int32(tmpl.Slot))
+	w.WriteUint16(uint16(update.EnchantLevel))
+	w.WriteUint16(uint16(update.CustomType2))
 	return nil
 }

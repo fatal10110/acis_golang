@@ -65,7 +65,7 @@ func (o *petInventoryOwner) SendInventoryUpdate(updates []itemcontainer.Update) 
 	if inv == nil {
 		return
 	}
-	frame, err := serverpackets.FramePetInventoryUpdate(updates, inv.ItemsUnordered(), inv.Templates())
+	frame, err := serverpackets.FramePetInventoryUpdate(updates, inv.Templates())
 	if err != nil {
 		o.log.Error().Err(err).Msg("build PetInventoryUpdate")
 		return
