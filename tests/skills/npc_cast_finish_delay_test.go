@@ -10,9 +10,10 @@ import (
 const npcFinishDelaySkill = modelskill.ID(9105)
 
 // npcFinishDelayCases are the two timelines an NPC cast's finish is pinned
-// on: a cast with no hit time and no cool time still ends 250 ms after its
-// hit, and one with both ends its cool time plus 250 ms after its hit,
-// which lands at its hit time.
+// on, measured from the cast's start: a cast with no hit time and no cool
+// time still ends 250 ms after its immediate hit, and one with a 1000 ms
+// hit time and a 500 ms cool time ends 500 + 250 ms after its hit, 1750 ms
+// in.
 var npcFinishDelayCases = []struct {
 	name              string
 	hitTime, coolTime int
@@ -59,6 +60,9 @@ func TestHostileNPCCastFinishesCoolTimePlus250AfterHit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			srv, hostile, cast := bootRealDamageCaster(t, npcFinishDelaySkills(tt.hitTime, tt.coolTime)...)
+			if !srv.DrivesClock() {
+				t.Skip("exact cast phase timing needs the driven clock")
+			}
 			cast(hostile, npcFinishDelaySkill)
 			srv.Settle(t)
 			assertCastEndsAt(t, func(d time.Duration) { srv.Advance(t, d) }, hostile.CastingNow, tt.finish)
@@ -74,6 +78,9 @@ func TestFolkCastFinishesCoolTimePlus250AfterHit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			srv, _, folk := bootFolkCaster(t, npcFinishDelaySkills(tt.hitTime, tt.coolTime))
+			if !srv.DrivesClock() {
+				t.Skip("exact cast phase timing needs the driven clock")
+			}
 			addCastDesire(t, folk, modelskill.Ref{ID: npcFinishDelaySkill, Level: 1})
 			tickAI(t, srv)
 			assertCastEndsAt(t, func(d time.Duration) { srv.Advance(t, d) }, folk.CastingNow, tt.finish)
