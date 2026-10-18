@@ -189,6 +189,10 @@ const (
 	// client with ActionFailed; a talker holding too few gets ShortHTML
 	// instead, keeping its strider.
 	BypassWyvernRide
+	// BypassFestival runs a festival guide's or witch's "Festival <Index>"
+	// command, or its "FestivalDesc <Index>" one when FestivalDesc is set;
+	// see festival.Manager.Command and Description.
+	BypassFestival
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -223,6 +227,9 @@ type Talker struct {
 	// Residence reads the talker's standing at the castle or clan hall the
 	// NPC serves; nil reads a residence of no one.
 	Residence func() ResidenceTalk
+	// FestivalNotice reads the festival guides' line on when the next
+	// festival begins; nil reads an empty line.
+	FestivalNotice func() string
 }
 
 // BypassReply is a civilian NPC's answer to one dialog command.
@@ -275,6 +282,8 @@ type BypassReply struct {
 	// Standing is the talker's standing at the chamberlain dialog
 	// BypassChamberlain runs.
 	Standing ChamberlainStanding
+	// FestivalDesc is set when BypassFestival runs a description command.
+	FestivalDesc bool
 }
 
 // Bypass answers command, the part of an npc_<objectId>_<command> dialog
@@ -305,7 +314,8 @@ type BypassReply struct {
 // commands to the race track, and every command on a wedding manager to
 // its dialog, as does every command on an auctioneer or a clan hall
 // manager. A Seven Signs priest's and a Mammon NPC's own commands go to
-// signsPriestBypass. A castle or clan hall NPC answers its own commands
+// signsPriestBypass, and a festival guide's or witch's to
+// festivalGuideBypass. A castle or clan hall NPC answers its own commands
 // before the generic ones (see residenceCommand), a castle warehouse keeper
 // and a clan hall doorman their residence's chat pages, and a castle or
 // clan hall doorman lets only its owners teleport. Every other command
@@ -346,8 +356,8 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	if out, ok := f.signsPriestBypass(pages, kind, talker, command, reply); ok {
 		return out
 	}
-	if _, ok := unportedFolkCommands[kind]; ok {
-		return reply
+	if out, ok := f.festivalGuideBypass(pages, kind, talker, command, reply); ok {
+		return out
 	}
 	if _, ok := classmaster.ParseCommand(command); kind == "ClassMaster" && ok {
 		reply.Outcome = BypassClassMaster

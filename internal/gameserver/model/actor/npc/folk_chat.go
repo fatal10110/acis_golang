@@ -122,13 +122,6 @@ var unportedFolkChats = map[InstanceKind]struct{}{
 	"SiegeNpc": {},
 }
 
-// unportedFolkCommands are the civilian types whose first chat page is in
-// place but whose dialog commands still need festival behavior that is not
-// (#223).
-var unportedFolkCommands = map[InstanceKind]struct{}{
-	"FestivalGuide": {},
-}
-
 // ChatWindow resolves the first chat page this NPC shows a talker carrying
 // karma, or names the wedding manager, whose own dialog greets: its page with %objectId% filled in, or, for a karma-gated type
 // whose gate refuses the talker and whose refusal page exists, that page
