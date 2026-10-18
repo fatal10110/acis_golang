@@ -1,0 +1,18 @@
+# The castle defend teleporter (CastleDefendTeleporter): Gludio Castle's first inner gatekeeper,
+# talked to by a character in no clan, answers its refusal (onFirstTalk: no clan is on the owner
+# or defender side), which carries no link: the "0" link of the defenders' page, sent anyway, is
+# dropped before the script sees it. A scenario seeds no castle siege registration and no
+# teleport destination check, so the defenders' page, the owner's, the drawn point of a link and
+# the move are in tests/npcs/castle_defend_teleporter_test.go.
+trace internal/gameserver/script/testdata/oracle/scenarios/castle_defend_teleporter_refused.golden
+character Outsider 20
+script script.teleport.CastleDefendTeleporter
+page script/teleport/CastleDefendTeleporter/
+npc gatekeeper 35092 Folk 10 0 0
+
+action gatekeeper
+action gatekeeper
+  S ActionFailed
+  S NpcHtmlMessage obj=gatekeeper item=0 page=script/teleport/CastleDefendTeleporter/first_group_1_no.htm
+  S ActionFailed
+bypass Quest CastleDefendTeleporter 0
