@@ -110,6 +110,9 @@ type ScriptHooks interface {
 	// PickedItem runs n's picked-item hooks: n picked up ground, which is
 	// still in the world. n is a *Hostile or a *Folk.
 	PickedItem(n attackable.Combatant, ground *grounditem.Item)
+	// ScriptEvent runs n's script-event hooks: n received eventID with
+	// arg1 and arg2. n is a *Hostile or a *Folk, in the world or not.
+	ScriptEvent(n attackable.Combatant, eventID, arg1, arg2 int32)
 }
 
 // behaves reports whether a behavior is bound to h's template id.

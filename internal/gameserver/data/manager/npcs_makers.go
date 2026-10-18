@@ -121,32 +121,39 @@ func (g *makerGroup) Every(d time.Duration, fn func()) *sim.Ticker {
 	return g.n.makerQueue.Every(d, fn)
 }
 
-// DeleteAll deletes every NPC of g, and its database-tracked rows go back
-// to uninitialized. Its slots are dropped first, so no maker hook runs for
-// the deleted NPCs and no respawn comes back; a master's privates leave
-// with it. Each NPC is out of the world, its decayed hooks run, when it
-// returns. The NPCs decay on the calling goroutine, without waiting for
-// their own queues (the npc package's off-queue delete contract).
+// DeleteAll deletes every NPC of g, one spawn after another, as each
+// spawn's DeleteNPCs does.
 func (g *makerGroup) DeleteAll() {
+	for i := range g.def.Entries {
+		g.deleteEntry(i)
+	}
+}
+
+// deleteEntry deletes every NPC entry i of g keeps, and its
+// database-tracked row goes back to uninitialized. Its slots are dropped
+// first, so no maker hook runs for the deleted NPCs and no respawn comes
+// back; a master's privates leave with it. Each NPC is out of the world,
+// its decayed hooks run, when it returns. The NPCs decay on the calling
+// goroutine, without waiting for their own queues (the npc package's
+// off-queue delete contract).
+func (g *makerGroup) deleteEntry(i int) {
 	n := g.n
 	var ids []int32
 	n.mu.Lock()
-	for i, keys := range g.keys {
-		for _, key := range keys {
-			slot := n.slot[key]
-			n.respawn.Cancel(key)
-			if n.liveLocked(key) {
-				ids = append(ids, slot.liveID)
-				delete(n.live, slot.liveID)
-				n.liveCount--
-			}
-			n.dropSlotLocked(key)
-			if slot.dbName != "" {
-				n.spawns.Uninitialize(slot.dbName)
-			}
+	for _, key := range g.keys[i] {
+		slot := n.slot[key]
+		n.respawn.Cancel(key)
+		if n.liveLocked(key) {
+			ids = append(ids, slot.liveID)
+			delete(n.live, slot.liveID)
+			n.liveCount--
 		}
-		g.keys[i] = nil
+		n.dropSlotLocked(key)
+		if slot.dbName != "" {
+			n.spawns.Uninitialize(slot.dbName)
+		}
 	}
+	g.keys[i] = nil
 	n.mu.Unlock()
 	for _, id := range ids {
 		obj, ok := n.state.Object(id)

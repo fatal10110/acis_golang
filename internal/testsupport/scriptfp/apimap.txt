@@ -787,3 +787,20 @@ RoomInfo.isPartyChanged script.RoomCell.PartyChanged
 RoomInfo.new script.Script.NewRoom
 RoomInfo.setLock script.RoomCell.SetLock
 RoomInfo.setParty script.RoomCell.SetParty
+
+# Maker spawn operations and population spawn lookups (#3800). A maker acts
+# on its spawns through the spawn.GroupSpawn its group gives: the spawn's
+# database row is read through the spawn, which reads the template's base
+# HP and MP for the alive check itself. A maker finds a spawn of any
+# npcmaker by its template alias through its group; any other script finds
+# one by NPC id through its spawner, and draws its point on the Spawn it
+# gets. The spawn-time starts go through the spawner.
+MultiSpawn.doDelete spawn.GroupSpawn.DeleteNPCs
+MultiSpawn.getNpc spawn.GroupSpawn.FirstNPC
+MultiSpawn.getSpawnLocation spawn.GroupSpawn.DrawSpawnLocation
+MultiSpawn.sendScriptEvent spawn.GroupSpawn.SendScriptEvent
+SpawnData.checkAlive spawn.GroupSpawn.CheckAlive
+SpawnData.checkDead spawn.GroupSpawn.CheckDead
+SpawnManager.getSpawn script.Spawner.FindSpawn
+SpawnManager.startSpawnTime script.Spawner.StartSpawnTime
+SpawnManager.stopSpawnTime script.Spawner.StopSpawnTime
