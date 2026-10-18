@@ -70,7 +70,7 @@ func (l *GameClientLink) sendNPCPage(live *livePlayer, objectID int32, file stri
 	sendFilledHTML(live, objectID, page, 0)
 }
 
-// callSkill makes live use the skill of e on its target at once, as a
+// callSkill makes live use the skill of e on its target, on live's queue, as a
 // script asked: the cast animation for everyone watching live, then the
 // skill's effects through its handler. A skill with no definition, or a
 // target no longer in the world, does nothing.

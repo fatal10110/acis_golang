@@ -351,7 +351,11 @@ where the reference asks an NPC to walk a route (A13).
    A script's ordinary teleport of a player (`Player.TeleportTo`) runs on the player's queue
    the same way, for the same reason: a hook cannot tell whether it runs on that player's
    queue, and a teleport touches state only that queue owns (#3710). Packets the rest of the
-   hook sends go out before the teleport's.
+   hook sends go out before the teleport's. A script's skill call with a player caster
+   (`Script.CallSkill`) runs on the caster's queue the same way: the skill's handlers own the
+   caster's state, and a self-target recall or teleport moves the caster inside the cast
+   (#3843). The cast's packets are the same; they go out after those the rest of the hook
+   sends.
 5. Journal rows the server never writes load leniently. Only a hand-edited or migrated
    `character_quests` row reaches either case.
    - A row whose quest name differs from the script's name only in case joins that quest's
