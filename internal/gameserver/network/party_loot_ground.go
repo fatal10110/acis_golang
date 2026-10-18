@@ -109,7 +109,7 @@ func (l *GameClientLink) petPickupForParty(owner *livePlayer, pet *summon.Actor,
 // pet) picked up: alive, with room, and within party range of picker. A
 // picker that has left its party meanwhile keeps the item.
 func (l *GameClientLink) groundLooter(picker *livePlayer, itemID int32) (*livePlayer, []*livePlayer) {
-	looter, members, ok := l.parties.Looter(picker.ObjectID(), false, l.partyLootEligible(itemID, picker))
+	looter, members, ok := l.parties.Looter(picker.ObjectID(), false, partyLootEligible(l.killRewards.PartyRange(), itemID, picker))
 	if !ok || looter == nil || looter.Inventory() == nil {
 		return picker, nil
 	}

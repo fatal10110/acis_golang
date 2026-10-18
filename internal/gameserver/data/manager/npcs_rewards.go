@@ -51,8 +51,11 @@ func (d *deathRewards) CalculateRewards(killer attackable.Combatant) {
 	if d.hostile.AI().Threats().IsEmpty() {
 		return
 	}
+	// The death reads the settings in force once, so a reload under way
+	// never splits one kill between two of them.
+	s := d.config.Settings.Settings()
 	threats := d.hostile.AI().Threats().Snapshot()
-	entries, summonDamage, totalDamage, maxDealer := d.rewardEntries(threats)
+	entries, summonDamage, totalDamage, maxDealer := d.rewardEntries(s, threats)
 	// A command channel holding the loot rights takes the drops through its
 	// leader, whatever damage anyone dealt.
 	if leader, ok := d.rights.holderLeader(); ok {
@@ -64,9 +67,9 @@ func (d *deathRewards) CalculateRewards(killer attackable.Combatant) {
 	}
 	if receiver := dropReceiver(killer, maxDealer); receiver != nil {
 		d.rollCursedWeapon(receiver)
-		d.rollDrops(receiver, d.hostile.HighestAttackerLevel(receiver.Level()))
+		d.rollDrops(s, receiver, d.hostile.HighestAttackerLevel(receiver.Level()))
 	}
-	d.grantExpAndSp(entries, summonDamage, totalDamage)
+	d.grantExpAndSp(s, entries, summonDamage, totalDamage)
 }
 
 // creditRaidKill credits a raid or grand boss kill to the player its
@@ -133,7 +136,7 @@ func (d *deathRewards) scheduleDecay() {
 // player; a summon's damage is also kept under the summon's id for its
 // owner's pet share. The top dealer is the first player whose combined
 // damage exceeds every earlier total.
-func (d *deathRewards) rewardEntries(threats []attackable.Threat) ([]playerRewardEntry, map[int32]float64, float64, *player.Character) {
+func (d *deathRewards) rewardEntries(s *KillRewardSettings, threats []attackable.Threat) ([]playerRewardEntry, map[int32]float64, float64, *player.Character) {
 	var entries []playerRewardEntry
 	summonDamage := map[int32]float64{}
 	var totalDamage, maxDamage float64
@@ -143,7 +146,7 @@ func (d *deathRewards) rewardEntries(threats []attackable.Threat) ([]playerRewar
 		// An attacker the victim no longer knows (logged out, unsummoned,
 		// gone out of sight) has left the fight; its entry only lingers
 		// until the next AI refresh.
-		if threat.Damage <= 1 || !d.hostile.Knows(threat.Attacker) || !d.inPartyRange(threat.Attacker) {
+		if threat.Damage <= 1 || !d.hostile.Knows(threat.Attacker) || !d.inPartyRange(s, threat.Attacker) {
 			continue
 		}
 		attacker, ok := actingCharacter(threat.Attacker)
@@ -192,27 +195,27 @@ func actingCharacter(c attackable.Combatant) (*player.Character, bool) {
 }
 
 // inPartyRange reports whether c is within the party range of the victim,
-// body to body in 3D. A range of -1 is unlimited.
-func (d *deathRewards) inPartyRange(c attackable.Combatant) bool {
-	return party.InRange(d.config.PartyRange, d.hostile, c)
+// body to body in 3D, under s. A range of -1 is unlimited.
+func (d *deathRewards) inPartyRange(s *KillRewardSettings, c attackable.Combatant) bool {
+	return party.InRange(s.PartyRange, d.hostile, c)
 }
 
-func (d *deathRewards) rollDrops(receiver attackable.Combatant, attackerLevel int) {
+func (d *deathRewards) rollDrops(s *KillRewardSettings, receiver attackable.Combatant, attackerLevel int) {
 	if len(d.categories) == 0 {
 		return
 	}
 	x, y, z := d.hostile.Position()
 	heading := d.hostile.Heading()
 
-	levelMultiplier := item.LevelPenaltyMultiplier(int32(attackerLevel), int32(d.tmpl.Level), d.raid, d.config.DeepBlueDropRules)
-	autoLootItems := d.config.AutoLoot
+	levelMultiplier := item.LevelPenaltyMultiplier(int32(attackerLevel), int32(d.tmpl.Level), d.raid, s.DeepBlueDropRules)
+	autoLootItems := s.AutoLoot
 	if d.raid {
-		autoLootItems = d.config.AutoLootRaid
+		autoLootItems = s.AutoLootRaid
 	}
 
-	NewKillReward(d.droppingCategories(), d.hostile.SpoilPool(), levelMultiplier, d.raid, d.config.Rates, autoLootItems, d.config.AutoLootHerbs, d.ids, d.items, d.ground, d.geo, x, y, z, heading, d.hostile.ObjectID()).
+	NewKillReward(d.droppingCategories(), d.hostile.SpoilPool(), levelMultiplier, d.raid, s.Rates, autoLootItems, s.AutoLootHerbs, d.ids, d.items, d.ground, d.geo, x, y, z, heading, d.hostile.ObjectID()).
 		From(d.hostile).
-		MultipleItemDrop(d.config.MultipleItemDrop).
+		MultipleItemDrop(s.MultipleItemDrop).
 		AnnounceTo(d.hostile).
 		CalculateRewards(receiver)
 }
@@ -233,7 +236,7 @@ func (d *deathRewards) droppingCategories() []item.DropCategory {
 	return kept
 }
 
-func (d *deathRewards) grantExpAndSp(entries []playerRewardEntry, summonDamage map[int32]float64, totalDamage float64) {
+func (d *deathRewards) grantExpAndSp(s *KillRewardSettings, entries []playerRewardEntry, summonDamage map[int32]float64, totalDamage float64) {
 	if d.config.PlayerLevels == nil || totalDamage <= 0 {
 		return
 	}
@@ -245,27 +248,27 @@ func (d *deathRewards) grantExpAndSp(entries []playerRewardEntry, summonDamage m
 			continue
 		}
 		if group, ok := d.rewardGroup(entry.actor); ok {
-			d.grantParty(entry.actor, group, entries, spent, summonDamage, totalDamage)
+			d.grantParty(s, entry.actor, group, entries, spent, summonDamage, totalDamage)
 			continue
 		}
-		d.grantSolo(entry, summonDamage, totalDamage)
+		d.grantSolo(s, entry, summonDamage, totalDamage)
 	}
 }
 
 // ratedReward is the victim's full exp and sp reward at the server rates,
 // each narrowed to the 32-bit reward the kill is split from.
-func (d *deathRewards) ratedReward() (exp, sp float64) {
-	return float64(commons.JavaInt(d.tmpl.RewardExp * d.config.RateXP)), float64(commons.JavaInt(d.tmpl.RewardSp * d.config.RateSP))
+func (d *deathRewards) ratedReward(s *KillRewardSettings) (exp, sp float64) {
+	return float64(commons.JavaInt(d.tmpl.RewardExp * s.RateXP)), float64(commons.JavaInt(d.tmpl.RewardSp * s.RateSP))
 }
 
 // grantSolo pays a partyless attacker its own damage share.
-func (d *deathRewards) grantSolo(entry playerRewardEntry, summonDamage map[int32]float64, totalDamage float64) {
+func (d *deathRewards) grantSolo(s *KillRewardSettings, entry playerRewardEntry, summonDamage map[int32]float64, totalDamage float64) {
 	// Only real death forfeits the exp; Fake Death keeps it.
 	if entry.actor.Dead() || !entry.actor.Knows(d.hostile) {
 		return
 	}
 	own := d.summonOf(entry.actor)
-	rewardExp, rewardSp := d.ratedReward()
+	rewardExp, rewardSp := d.ratedReward(s)
 	exp, sp := player.KillRewardExpAndSp(rewardExp, rewardSp, entry.damage, totalDamage, entry.actor.Level()-d.tmpl.Level)
 	var penalty float32
 	if own != nil && !own.IsPet() {
@@ -280,7 +283,7 @@ func (d *deathRewards) grantSolo(entry playerRewardEntry, summonDamage map[int32
 	}
 	// Karma drops by the whole kill exp, before any pet takes its share.
 	entry.actor.UpdateKarmaLoss(d.config.PlayerLevels, exp)
-	d.pay(entry.actor, own, exp, sp, entry.damage, summonDamage)
+	d.pay(s, entry.actor, own, exp, sp, entry.damage, summonDamage)
 }
 
 // summonOf returns p's live summon, or nil.
@@ -299,8 +302,8 @@ func (d *deathRewards) summonOf(p *player.Character) *summon.Actor {
 // pay gives p its exp and sp, less the part its pet takes when the pet may
 // share the kill: a fixed part by the pet's exp type, or the pet's damage
 // over ownerDamage, p's own combined damage.
-func (d *deathRewards) pay(p *player.Character, own *summon.Actor, exp int64, sp int, ownerDamage float64, summonDamage map[int32]float64) {
-	if own != nil && own.CanReceiveKillReward(d.config.PartyRange) {
+func (d *deathRewards) pay(s *KillRewardSettings, p *player.Character, own *summon.Actor, exp int64, sp int, ownerDamage float64, summonDamage map[int32]float64) {
+	if own != nil && own.CanReceiveKillReward(s.PartyRange) {
 		petExp, petSp := petReward(own.ExpType(), summonDamage[own.ObjectID()], ownerDamage, exp, sp)
 		exp -= petExp
 		sp -= petSp
@@ -329,9 +332,10 @@ func petReward(expType int, petDamage, totalDamage float64, exp int64, sp int) (
 // MultipleItemDrop, else one. The drop is reserved for to when to acts
 // for a player, for as long as a drop of this NPC's death is.
 func (d *deathRewards) DropItem(to attackable.Combatant, itemID int32, count int) {
+	s := d.config.Settings.Settings()
 	x, y, z := d.hostile.Position()
-	k := NewKillReward(nil, nil, 1, d.raid, d.config.Rates, false, false, d.ids, d.items, d.ground, d.geo, x, y, z, d.hostile.Heading(), d.hostile.ObjectID()).
-		MultipleItemDrop(d.config.MultipleItemDrop)
+	k := NewKillReward(nil, nil, 1, d.raid, s.Rates, false, false, d.ids, d.items, d.ground, d.geo, x, y, z, d.hostile.Heading(), d.hostile.ObjectID()).
+		MultipleItemDrop(s.MultipleItemDrop)
 	if to != nil {
 		if _, acting := actingCharacter(to); acting {
 			k.protectOwnerID = to.ObjectID()

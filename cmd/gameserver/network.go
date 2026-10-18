@@ -155,7 +155,7 @@ func provideGameClientLink(
 	chatLog chatLogger,
 	itemLog itemLogger,
 ) (*network.GameClientLink, error) {
-	playerConfig := newPlayerConfig(cfg, gameplay, rewards, pvpOptions)
+	playerConfig := newPlayerConfig(cfg, gameplay, pvpOptions)
 	network.SetOutboundRejectLog(log)
 	link, err := network.NewGameClientLink(network.GameClientLinkConfig{
 		Validator:     validator,
@@ -280,8 +280,9 @@ func provideGameClientLink(
 		ClanHallFunctions: hallFunctions,
 		ClanHalls:         halls,
 
-		Reloads:   reloads,
-		BossZones: bossZones,
+		Reloads:     reloads,
+		KillRewards: rewards.Settings,
+		BossZones:   bossZones,
 
 		Shutdown:    countdown,
 		LoginStatus: loginStatus,
@@ -427,7 +428,7 @@ func startGameServer(lc fx.Lifecycle, cfg gameServerConfig, _ *gameData, _ *mana
 // newPlayerConfig gathers the settings the game client link reads at each
 // use from the server and players properties, at boot and on
 // //reload config.
-func newPlayerConfig(cfg gameServerConfig, gameplay gameplayConfig, rewards manager.KillRewardConfig, pvpOptions task.PvPFlagOptions) network.PlayerConfig {
+func newPlayerConfig(cfg gameServerConfig, gameplay gameplayConfig, pvpOptions task.PvPFlagOptions) network.PlayerConfig {
 	enchantCfg := gameplay.Enchant
 	freightCfg := gameplay.Freight
 	return network.PlayerConfig{
@@ -473,7 +474,5 @@ func newPlayerConfig(cfg gameServerConfig, gameplay gameplayConfig, rewards mana
 		GMStartupBlockAll:          gameplay.Admin.GMStartupBlockAll,
 		GMHeroAura:                 gameplay.Admin.GMHeroAura,
 		DefaultAccessLevel:         gameplay.Admin.DefaultAccessLevel,
-		PartyRange:                 rewards.PartyRange,
-		MultipleItemDrop:           rewards.MultipleItemDrop,
 	}
 }

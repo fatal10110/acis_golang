@@ -131,23 +131,14 @@ func (m *slotMemory) AIParams() npc.AIParams { return m.params }
 // Scratch returns the slot's script memory.
 func (m *slotMemory) Scratch() *npc.Scratch { return m.scratch }
 
-// KillRewardConfig carries live reward settings loaded at game-server boot.
+// KillRewardConfig is what a kill's rewards read besides the NPC: the
+// settings in force and the services the rewards go through.
 type KillRewardConfig struct {
-	Rates         item.Rates
-	AutoLoot      bool
-	AutoLootRaid  bool
-	AutoLootHerbs bool
-	// MultipleItemDrop drops a non-stackable item rolled with a count
-	// above one as that many ground items; false drops just one.
-	MultipleItemDrop  bool
-	DeepBlueDropRules bool
-	PlayerLevels      *player.LevelTable
-	PartyRange        int
-	// RateXP and RateSP scale every kill's exp and sp reward before it is
-	// split between the attackers.
-	RateXP, RateSP float64
-	// PartyXP are the rules a party shares a kill's exp and sp by.
-	PartyXP player.PartyXPRules
+	// Settings holds the reward settings in force; nil rewards under the
+	// zero settings.
+	Settings *KillRewardBook
+	// PlayerLevels is the exp table a reward levels a player up by.
+	PlayerLevels *player.LevelTable
 	// Parties resolves a rewarded player's party; nil rewards every
 	// attacker alone.
 	Parties RewardParties

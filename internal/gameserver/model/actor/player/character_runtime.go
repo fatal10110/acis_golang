@@ -207,11 +207,7 @@ type Rules struct {
 	AllowDelevel           bool
 	RaidCursesDisabled     bool
 	AwardPKKillPVPPoint    bool
-	// SingleItemDrop is server.properties MultipleItemDrop turned off: a
-	// non-stackable item created with a count above one arrives as one
-	// instance instead of one per unit.
-	SingleItemDrop bool
-	DeathDrop      DeathDropRules
+	DeathDrop              DeathDropRules
 }
 
 // Runtime is everything a persisted Character needs to act in the live
@@ -255,6 +251,16 @@ type Runtime struct {
 	// Rules holds the server rules the character reads, each time it needs
 	// one; nil configures the zero Rules.
 	Rules *RuleBook
+	// ItemDrops answers, each time the character creates items, whether a
+	// non-stackable counted above one arrives as that many instances; nil
+	// always splits it.
+	ItemDrops ItemDropRule
+}
+
+// ItemDropRule answers the multiple item drop rule in force, which the
+// party loot, the kill rewards and the scripts read too.
+type ItemDropRule interface {
+	MultipleItemDrop() bool
 }
 
 // Configure installs rt. Call it before exposing c to the world.
@@ -282,6 +288,12 @@ func (c *Character) Configure(rt Runtime) {
 		rules = NewRuleBook(Rules{})
 	}
 	c.ruleBook.Store(rules)
+	c.itemDrops = rt.ItemDrops
+}
+
+// multipleItemDrop reports whether the multiple item drop rule is in force.
+func (c *Character) multipleItemDrop() bool {
+	return c.itemDrops == nil || c.itemDrops.MultipleItemDrop()
 }
 
 // Attach installs live as this character's crowd-control/movement runtime
@@ -380,16 +392,16 @@ func (c *Character) ItemSlotsFit(slots int) bool {
 // AddCreatedItem creates count units of itemID in this live character's
 // inventory, named in chat as picked up, the way an opened capsule hands
 // over its product. A non-stackable arrives as count instances, or as one
-// under the SingleItemDrop rule. nextID allocates each new instance's
-// object id. It reports whether anything was added or, for a herb, applied.
+// when the multiple item drop rule is off. nextID allocates each new
+// instance's object id. It reports whether anything was added or, for a herb, applied.
 func (c *Character) AddCreatedItem(itemID int32, count int, nextID func() (int32, error)) bool {
 	return c.createItem(itemID, count, nextID, event.ObtainCreated)
 }
 
 // AddEarnedItem creates count units of itemID in this live character's
 // inventory, named in chat as earned, the way a sweep or a harvest pays
-// out. A non-stackable arrives as count instances, or as one under the
-// SingleItemDrop rule. nextID allocates each new instance's object id. It
+// out. A non-stackable arrives as count instances, or as one when the
+// multiple item drop rule is off. nextID allocates each new instance's object id. It
 // reports whether anything was added or, for a herb, applied.
 func (c *Character) AddEarnedItem(itemID int32, count int, nextID func() (int32, error)) bool {
 	return c.createItem(itemID, count, nextID, event.ObtainEarned)
@@ -398,7 +410,7 @@ func (c *Character) AddEarnedItem(itemID int32, count int, nextID func() (int32,
 // createItem creates count units of itemID by template id: a herb is
 // applied at once instead of carried, a stackable joins the held stack or
 // starts one, and a non-stackable arrives as one instance per unit unless
-// the SingleItemDrop rule makes it one. The whole count is then named in
+// the multiple item drop rule is off. The whole count is then named in
 // chat as notice says. Slot and weight limits are the caller's to check
 // first.
 func (c *Character) createItem(itemID int32, count int, nextID func() (int32, error), notice event.ObtainNotice) bool {
@@ -412,7 +424,7 @@ func (c *Character) createItem(itemID int32, count int, nextID func() (int32, er
 	if tmpl.EtcItem != nil && tmpl.EtcItem.Type == item.EtcItemHerb {
 		return c.ConsumeHerb(itemID)
 	}
-	if c.addByTemplate(tmpl, count, !c.rules().SingleItemDrop, nextID) == 0 {
+	if c.addByTemplate(tmpl, count, c.multipleItemDrop(), nextID) == 0 {
 		return false
 	}
 	c.ItemAdded(event.ItemObtained{ItemID: itemID, Count: count, Notice: notice})
@@ -422,8 +434,8 @@ func (c *Character) createItem(itemID int32, count int, nextID func() (int32, er
 // AddCraftedItem puts count units of itemID into this character's
 // inventory the way a finished craft hands over its product: straight into
 // the inventory, with no chat line and no arrow auto-equip. A non-stackable
-// arrives as count instances, or as one under the SingleItemDrop rule.
-// nextID allocates each new instance's object id. It reports how many units
+// arrives as count instances, or as one when the multiple item drop rule
+// is off. nextID allocates each new instance's object id. It reports how many units
 // were added.
 func (c *Character) AddCraftedItem(itemID int32, count int, nextID func() (int32, error)) int {
 	if c.inventory == nil || count < 1 || nextID == nil {
@@ -433,7 +445,7 @@ func (c *Character) AddCraftedItem(itemID int32, count int, nextID func() (int32
 	if !ok {
 		return 0
 	}
-	return c.addByTemplate(tmpl, count, !c.rules().SingleItemDrop, nextID)
+	return c.addByTemplate(tmpl, count, c.multipleItemDrop(), nextID)
 }
 
 // addByTemplate adds count units of tmpl: a stackable joins the held stack

@@ -711,6 +711,9 @@ func (l *GameClientLink) attachLivePlayer(ctx context.Context, client *Client, c
 		Levels: l.levels,
 		Log:    l.log,
 		Rules:  l.playerRules,
+		// ItemDrops answers the multiple item drop rule party loot, the
+		// kill rewards and the scripts read too.
+		ItemDrops: l.killRewards,
 	}
 	if l.scripts != nil {
 		// A script invocation that wrote the player holds its departure

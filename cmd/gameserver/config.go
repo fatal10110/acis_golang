@@ -1101,10 +1101,23 @@ func provideGroundItemOptions(props *config.Properties) (task.GroundItemOptions,
 	return task.GroundItemOptionsFromProperties(props)
 }
 
+// provideKillRewardConfig returns the kill reward config: the settings read
+// from the server and players properties, in a book //reload config sets
+// whole, and the exp table.
 func provideKillRewardConfig(paths gameServerPaths, serverProps *config.Properties, data *gameData) (manager.KillRewardConfig, error) {
-	playersProps, err := config.LoadFile(paths.PlayersConfigPath)
+	settings, err := loadKillRewardSettings(paths, serverProps)
 	if err != nil {
 		return manager.KillRewardConfig{}, err
+	}
+	return manager.KillRewardConfig{Settings: manager.NewKillRewardBook(settings), PlayerLevels: data.Levels}, nil
+}
+
+// loadKillRewardSettings reads the kill reward settings from the server
+// properties and the players properties file.
+func loadKillRewardSettings(paths gameServerPaths, serverProps *config.Properties) (manager.KillRewardSettings, error) {
+	playersProps, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return manager.KillRewardSettings{}, err
 	}
 
 	currencyKey := "RateDropCurrency"
@@ -1113,42 +1126,42 @@ func provideKillRewardConfig(paths gameServerPaths, serverProps *config.Properti
 	}
 	currency, err := serverProps.Float64(currencyKey, 1)
 	if err != nil {
-		return manager.KillRewardConfig{}, err
+		return manager.KillRewardSettings{}, err
 	}
 	spoil, err := serverProps.Float64("RateDropSpoil", 1)
 	if err != nil {
-		return manager.KillRewardConfig{}, err
+		return manager.KillRewardSettings{}, err
 	}
 	items, err := serverProps.Float64("RateDropItems", 1)
 	if err != nil {
-		return manager.KillRewardConfig{}, err
+		return manager.KillRewardSettings{}, err
 	}
 	raidItems, err := serverProps.Float64("RateRaidDropItems", 1)
 	if err != nil {
-		return manager.KillRewardConfig{}, err
+		return manager.KillRewardSettings{}, err
 	}
 	herbs, err := serverProps.Float64("RateDropHerbs", 1)
 	if err != nil {
-		return manager.KillRewardConfig{}, err
+		return manager.KillRewardSettings{}, err
 	}
 	partyRange, err := playersProps.Int("PartyRange", 1500)
 	if err != nil {
-		return manager.KillRewardConfig{}, err
+		return manager.KillRewardSettings{}, err
 	}
 	rateXP, err := serverProps.Float64("RateXp", 1)
 	if err != nil {
-		return manager.KillRewardConfig{}, err
+		return manager.KillRewardSettings{}, err
 	}
 	rateSP, err := serverProps.Float64("RateSp", 1)
 	if err != nil {
-		return manager.KillRewardConfig{}, err
+		return manager.KillRewardSettings{}, err
 	}
 	partyXP, err := partyXPRules(playersProps, serverProps)
 	if err != nil {
-		return manager.KillRewardConfig{}, err
+		return manager.KillRewardSettings{}, err
 	}
 
-	return manager.KillRewardConfig{
+	return manager.KillRewardSettings{
 		Rates: item.Rates{
 			Spoil:    spoil,
 			Currency: currency,
@@ -1161,7 +1174,6 @@ func provideKillRewardConfig(paths gameServerPaths, serverProps *config.Properti
 		AutoLootHerbs:     serverProps.Bool("AutoLootHerbs", false),
 		MultipleItemDrop:  serverProps.Bool("MultipleItemDrop", true),
 		DeepBlueDropRules: playersProps.Bool("UseDeepBlueDropRules", true),
-		PlayerLevels:      data.Levels,
 		PartyRange:        partyRange,
 		RateXP:            rateXP,
 		RateSP:            rateSP,

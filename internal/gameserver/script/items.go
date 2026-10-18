@@ -57,7 +57,7 @@ func (s *Script) give(c *player.Character, itemID, count, enchant int32) {
 	if count <= 0 {
 		return
 	}
-	c.GiveScriptItems(itemID, int(count), int(enchant), s.env.MultipleItemDrop, s.env.NewItemID)
+	c.GiveScriptItems(itemID, int(count), int(enchant), s.env.multipleItemDrop(), s.env.NewItemID)
 }
 
 // TakeItems takes count units of itemID from p; a negative count takes
@@ -69,7 +69,7 @@ func (s *Script) TakeItems(p *Player, itemID, count int32) {
 // AddItems gives p count units of itemID as GiveItems does, with the chat
 // line of items picked up.
 func (s *Script) AddItems(p *Player, itemID, count int32) {
-	p.character().AddScriptItems(itemID, int(count), s.env.MultipleItemDrop, s.env.NewItemID)
+	p.character().AddScriptItems(itemID, int(count), s.env.multipleItemDrop(), s.env.NewItemID)
 }
 
 // DestroyItems destroys count units of itemID held by p and reports whether
