@@ -87,12 +87,13 @@ func (m *Manager) CompetitionEnded() {
 			names = append(names, best.MemberNames()...)
 		}
 	}
+	world := m.world
 	m.mu.Unlock()
-	if m.world == nil {
+	if world == nil {
 		return
 	}
 	for _, name := range names {
-		m.world.RewardClanOf(name, highestRankedReward)
+		world.RewardClanOf(name, highestRankedReward)
 	}
 }
 

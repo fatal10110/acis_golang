@@ -77,10 +77,11 @@ type World interface {
 	// RewardClanOf adds points to the reputation of the clan of the
 	// character named name, online or not, and tells the clan's members
 	// online that name earned them for the clan in the festival. A
-	// character in no clan earns nothing.
+	// character in no clan earns nothing. It returns once the members
+	// have been sent all of it, so what the caller sends next follows.
 	RewardClanOf(name string, points int)
 	// RemoveBloodOfferings destroys every blood offering the players
-	// online carry, without a word.
+	// online carry, without a word, and returns once it is done.
 	RemoveBloodOfferings()
 }
 
@@ -140,12 +141,11 @@ type Manager struct {
 	// holding it.
 	saveMu sync.Mutex
 
-	// world is set once by SetWorld, before the festival starts.
-	world World
-
 	// mu guards the fields below. The calendar may be read while holding
 	// it; it is never held across a store call.
-	mu         sync.Mutex
+	mu sync.Mutex
+	// world is what the period changes reach; nil until SetWorld.
+	world      World
 	signsCycle int
 	status     Status
 	// scores holds each Seven Signs cycle's scores keyed by festival id,
@@ -168,8 +168,10 @@ func New(cfg Config, store Store, calendar Calendar, log zerolog.Logger, now fun
 }
 
 // SetWorld hands the festival the players and clans its period changes
-// reach. It must be called before Start; without it they reach no one.
+// reach; until then they reach no one.
 func (m *Manager) SetWorld(w World) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.world = w
 }
 
@@ -255,6 +257,7 @@ func (m *Manager) CycleBegun(cycle int) {
 		}
 	}
 	m.scores[cycle] = blank
+	world := m.world
 	m.mu.Unlock()
 
 	ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
@@ -262,8 +265,8 @@ func (m *Manager) CycleBegun(cycle int) {
 	if err := m.SaveScores(ctx); err != nil {
 		m.log.Error().Err(err).Int("cycle", cycle).Msg("festival: save the new cycle's scores")
 	}
-	if m.world != nil {
-		m.world.RemoveBloodOfferings()
+	if world != nil {
+		world.RemoveBloodOfferings()
 	}
 	m.log.Info().Int("cycle", cycle).Msg("festival: reinitialized for the next competition period")
 }

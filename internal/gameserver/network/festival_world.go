@@ -18,7 +18,10 @@ var _ festival.World = (*GameClientLink)(nil)
 // reputation change is, then each is told that name earned them in the
 // festival. A character online answers for its own clan; any other name is
 // looked up, in any case, in the clans' rosters. The message goes out even
-// to a clan too low in level to earn reputation.
+// to a clan too low in level to earn reputation. Each member gets it on its
+// own queue, and the call returns once every member's queue has sent it, so
+// the period change's announcements that follow come after it. It must not
+// run on a player's queue.
 func (l *GameClientLink) RewardClanOf(name string, points int) {
 	cl, ok := l.clanNamed(name)
 	if !ok {
@@ -30,6 +33,19 @@ func (l *GameClientLink) RewardClanOf(name string, points int) {
 	l.broadcastToClanQueued(cl, nil, func() wire.Frame {
 		return serverpackets.FrameSystemMessageStringNumber(serverpackets.SystemMessageFestivalHighestRankedParty, name, int32(points))
 	})
+	for _, member := range l.onlineClanMembers(cl, 0) {
+		awaitLiveQueue(member)
+	}
+}
+
+// awaitLiveQueue returns once live's queue has run everything posted to it
+// so far; at once when the queue has closed. It must not run on a player's
+// queue.
+func awaitLiveQueue(live *livePlayer) {
+	done := make(chan struct{})
+	if postLive(live, func() { close(done) }) {
+		<-done
+	}
 }
 
 // clanNamed returns the clan of the character named name: an online

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"testing"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -157,5 +158,76 @@ func TestCompetitionEndRewardsBestPartyClans(t *testing.T) {
 		if score != wantScore {
 			t.Errorf("%s reputation = %d, want %d", name, score, wantScore)
 		}
+	}
+}
+
+// withLordsClan seeds the level-5 clan Lords, 50 points, led by Newbie.
+func withLordsClan(t *testing.T) gameservertest.Option {
+	return gameservertest.WithClanSeed(func(db *sql.DB) {
+		if _, err := db.Exec(`INSERT INTO clan_data (clan_id, clan_name, clan_level, reputation_score, leader_id)
+			SELECT 0x7f000081, 'Lords', 5, 50, obj_Id FROM characters WHERE char_name = 'Newbie'`); err != nil {
+			t.Fatalf("seed clan: %v", err)
+		}
+		if _, err := db.Exec(`UPDATE characters SET clanid = 0x7f000081 WHERE char_name = 'Newbie'`); err != nil {
+			t.Fatalf("seed clan: %v", err)
+		}
+	})
+}
+
+// As the competition ends, the clans of the festivals' best parties are
+// rewarded once the end is announced and before the winning cabal is:
+// a member online sees the end, its clan's new score and who earned it,
+// then the winner.
+func TestCompetitionEndRewardPrecedesTheWinner(t *testing.T) {
+	t.Parallel()
+	var change func()
+	srv := gameservertest.Boot(t,
+		gameservertest.WithCharacter("Newbie", 20, 0),
+		gameservertest.WithWantChars(1),
+		withLordsClan(t),
+		seedSevenSignsStatus(t, func(row *sevensigns.StatusRow) {
+			row.Period = sevensigns.Competition
+			row.DawnStoneScore = 10
+		}),
+		gameservertest.WithSevenSignsTimer(func(_ time.Duration, fn func()) *time.Timer { change = fn; return nil }),
+		gameservertest.WithFestivalSeed(func(store *gamesql.FestivalStore) {
+			if err := store.SaveScores(context.Background(), []festival.Score{
+				{FestivalID: 0, Cabal: sevensigns.Dusk, Cycle: 1, Date: 1, Score: 10, Members: "Newbie"},
+			}); err != nil {
+				t.Fatalf("seed festival scores: %v", err)
+			}
+		}),
+	)
+	c := srv.Client
+	c.Send(encodeRequestGameStart(0))
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeSSQInfo, "game start SSQInfo")
+	assertFrameOpcode(t, c.Read(), serverpackets.OpcodeCharSelected, "game start CharSelected")
+	c.Send(encodeEnterWorld())
+	srv.ReadQueued(t, c)
+
+	change()
+	frames := srv.ReadQueued(t, c)
+	message := func(f []byte) int32 {
+		if f[0] != serverpackets.OpcodeSystemMessage {
+			return -1
+		}
+		return wire.NewReader(f[1:]).ReadInt32()
+	}
+	if len(frames) < 5 || frames[0][0] != serverpackets.OpcodePlaySound || message(frames[1]) != serverpackets.SystemMessageQuestEventPeriodEnded ||
+		frames[2][0] != serverpackets.OpcodePledgeShowInfoUpdate || message(frames[3]) != serverpackets.SystemMessageFestivalHighestRankedParty {
+		got := make([]byte, len(frames))
+		for i, f := range frames {
+			got[i] = f[0]
+		}
+		t.Fatalf("period change answer = % x, want PlaySound, the end, the clan's score, the reward message, then the rest", got)
+	}
+	won := -1
+	for i, f := range frames {
+		if message(f) == serverpackets.SystemMessageDawnWon {
+			won = i
+		}
+	}
+	if won < 4 {
+		t.Fatalf("dawn won message at %d, want it after the reward", won)
 	}
 }
