@@ -6,11 +6,11 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 )
 
-// NPCMapCell maps NPCs to NPCs, empty at first: the reference's map keyed
-// by an NPC object (the third-class sagas' busy tablets and their fights).
+// NPCMapCell maps NPCs to NPCs, empty at first: a map keyed by an NPC
+// (the third-class sagas' busy tablets and their fights).
 // Keys and values match by NPC identity, the one the timers use: the spawn
-// slot's, shared by every life the slot spawns, as the reference reuses
-// one NPC object across respawns; an NPC with no slot is its own identity.
+// slot's, shared by every life the slot spawns, since a respawn is the
+// same NPC in a new life; an NPC with no slot is its own identity.
 // Neither the template nor the object id is the identity: another NPC of
 // the same template is another key. Like the other cells it is
 // leaf-locked, takes no closure, and its zero value is ready to use.
@@ -98,8 +98,8 @@ func (c *NPCMapCell) Delete(key *NPC) bool {
 }
 
 // DeleteValue removes the first entry, in the order the keys were first
-// set, that maps to value, and reports whether there was one: the
-// reference's removal of a value from the map's values. Other entries
+// set, that maps to value, and reports whether there was one: a removal
+// of a value from the map's values. Other entries
 // mapping to value stay.
 func (c *NPCMapCell) DeleteValue(value *NPC) bool {
 	v := npcIdentity(value)

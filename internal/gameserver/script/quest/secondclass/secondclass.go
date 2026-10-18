@@ -60,7 +60,7 @@ func GiveDimensionalDiamonds39(s *script.Script, p *script.Player) bool {
 
 // give pays p the diamonds rewards lists for key and sets memo, once per
 // memo. A key the table does not list panics before anything is given or
-// set, as the reference throws there.
+// set.
 func give(s *script.Script, p *script.Player, memo string, rewards map[int32]int32, key int32) bool {
 	if _, done := p.Memo(memo); done {
 		return false

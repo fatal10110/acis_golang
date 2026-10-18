@@ -2,8 +2,7 @@ package relation
 
 import "slices"
 
-// pairTable keeps every pair in the order the reference relation store
-// walks them, the order a friend or block list is gathered in before
+// pairTable keeps every pair in the order the relation store walks them, the order a friend or block list is gathered in before
 // clientOrder. The store is a concurrent hash table of all pairs held since
 // boot, a pair cleared of every flag included, keyed by the pair's hash
 // (31*low + high folded onto its own high half): 16 bins to start, doubled
@@ -16,8 +15,8 @@ import "slices"
 //
 // Every update of a pair counts, not only adding one: an update that finds
 // its pair in eighth place or later of a listed bin treeifies it as above.
-// Updates are modelled one at a time; two racing updates of the reference
-// store can leave it in an order no sequence of them would.
+// Updates are modelled one at a time; two racing updates of a concurrent
+// store could leave it in an order no sequence of them would.
 type pairTable struct {
 	bins []pairBin
 	held int

@@ -61,8 +61,7 @@ func NewCrestsIn(dir string) *Crests {
 // deleted and skipped, and its name is returned in deleted.
 //
 // The load stops at the first file it cannot handle (an id that is not a
-// number, an unreadable file, an undeletable invalid file), as the
-// reference does. It then returns the cache holding the crests read before
+// number, an unreadable file, an undeletable invalid file). It then returns the cache holding the crests read before
 // that file together with a non-nil error saying why it stopped, so the
 // caller can keep the partial cache and report the failure. A nil cache
 // with an error means the directory itself could not be read.

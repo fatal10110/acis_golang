@@ -11,7 +11,7 @@ import (
 // the timers: the per-event lists of a template, the class chain of its
 // first script that is not a real quest, and the timers bound to one NPC.
 
-// Classes returns the reference class chain of the script: its own class
+// Classes returns the class chain //info AI prints for the script: its own class
 // (its Name) first, then each named class its hooks derive from, root
 // last.
 func (s *Script) Classes() []string {
@@ -73,10 +73,8 @@ type ScriptTimers struct {
 
 // NPCTimers returns, per registered script in list order, the pending
 // timers bound to the live NPC n, that is to its spawn slot, whatever
-// player they are also bound to; none for a nil registry or NPC. The
-// reference keeps a script's timers in a hash set,
-// so their order is unspecified there; here they are sorted by name, then
-// player name.
+// player they are also bound to; none for a nil registry or NPC. Timers
+// have no natural order, so they are sorted by name, then player name.
 func (r *Registry) NPCTimers(n attackable.Combatant) []ScriptTimers {
 	if r == nil {
 		return nil

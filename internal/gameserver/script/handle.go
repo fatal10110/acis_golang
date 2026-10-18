@@ -11,7 +11,8 @@ import (
 )
 
 // NPC is a script's handle on one NPC. The handle follows the NPC across
-// its spawn slot's respawns, as the reference's reused NPC object does: it
+// its spawn slot's respawns, since a respawn is the same NPC in a new
+// life: it
 // acts on the life the slot placed last (npc.Current), the decayed one
 // until the slot places another.
 type NPC struct {

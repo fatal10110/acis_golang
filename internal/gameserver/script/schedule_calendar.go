@@ -18,7 +18,7 @@ const (
 	scheduleMonthlyWeek
 )
 
-// unbuiltKinds are the schedule attributes the reference also accepts but no
+// unbuiltKinds are the schedule attributes that are valid kinds but no
 // listed task uses; they are refused like any unknown attribute, with their
 // own message.
 var unbuiltKinds = map[string]bool{"MONTHLY_DAY": true, "YEARLY_DAY": true, "YEARLY_WEEK": true}
@@ -48,7 +48,7 @@ type weekRules struct {
 var usWeek = weekRules{first: time.Sunday, minDays: 1}
 
 // parseSchedule parses an entry's schedule attribute kind and start stamp.
-// Day names other than MON-SUN read as Monday, as the reference reads them;
+// Day names other than MON-SUN read as Monday;
 // unknownDay reports such a name. Fields past the ones a kind reads are
 // ignored.
 func parseSchedule(kind, start string) (sc schedule, unknownDay string, err error) {

@@ -479,8 +479,7 @@ func loadStorageSlots(paths gameServerPaths) (player.StorageSlots, error) {
 		PrivateStoreDwarf:   fields.Int("MaxPvtStoreSlotsDwarf", def.PrivateStoreDwarf),
 		DwarfRecipe:         fields.Int("DwarfRecipeLimit", def.DwarfRecipe),
 		CommonRecipe:        fields.Int("CommonRecipeLimit", def.CommonRecipe),
-		// The shipped file sets 200; a file without the key gets the
-		// reference's own 150.
+		// The shipped file sets 200; a file without the key gets 150.
 		ClanWarehouse: fields.Int("MaximumWarehouseSlotsForClan", 150),
 		Configured:    true,
 	}
@@ -1085,7 +1084,8 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 		EnableFallingDamage: serverProps.Bool("EnableFallingDamage", true),
 		UseBlowfishCipher:   serverProps.Bool("UseBlowfishCipher", true),
 		TownCombatRule:      townCombatRule,
-		// The reference adds DELETE_DAYS * 86400000L milliseconds to now.
+		// A deletion falls due exactly DeleteCharAfterDays times 24 hours
+		// after the request, not at a calendar-day boundary.
 		CharacterDeleteAfter: time.Duration(deleteCharAfterDays) * 24 * time.Hour,
 	}, nil
 }

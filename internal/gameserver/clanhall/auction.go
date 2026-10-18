@@ -77,8 +77,7 @@ func (a *auction) remove(clanID int32) *Bidder {
 	return nil
 }
 
-// listed returns the bids in the order the reference's bid map iterates
-// them: by the bucket each clan id falls in, a table of 16 doubled each
+// listed returns the bids in listing order: by the bucket each clan id falls in, a table of 16 doubled each
 // time the bids reached three quarters of it, then by when each bid was
 // first made. Past the first table the order within a bucket is an
 // approximation: a grown table splits its buckets in an order of its own.

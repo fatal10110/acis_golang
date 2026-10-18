@@ -547,8 +547,8 @@ func (d hallDialog) recoveryCommand(args []string) {
 	case strings.EqualFold(cmd, "mp"):
 		d.change(mpChange, args)
 	case strings.EqualFold(cmd, "exp"):
-		// The reference takes 10 off an experience recovery level above 20
-		// here, where its offer page does so above 10.
+		// An experience recovery level above 20 loses 10 here, where the
+		// offer page takes 10 off above 10.
 		c := expChange
 		c.over = 20
 		d.change(c, args)
@@ -660,9 +660,9 @@ func (d hallDialog) change(c hallChange, args []string) {
 	if level == 0 {
 		file, fee = "functions-cancel_confirmed.htm", 0
 	} else if _, priced := decos.Get(c.funcType, link); !priced {
-		// The reference rents a level clanHallDeco.xml does not price (the
-		// grade 2 hall's "260%" fireplace link) for free, with a term of no
-		// length; it is refused here.
+		// A level clanHallDeco.xml does not price (the grade 2 hall's "260%"
+		// fireplace link) would rent for free, with a term of no length; it
+		// is refused.
 		d.l.log.Warn().Int32("hall_id", d.hallID()).Int("type", c.funcType).Int("level", link).Msg("clan hall: function level without a fee refused")
 		return
 	}

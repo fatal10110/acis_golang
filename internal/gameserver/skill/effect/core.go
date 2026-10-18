@@ -444,9 +444,8 @@ func actsOnTick(tmpl modelskill.EffectTemplate) bool {
 }
 
 // Known reports whether New can build an effect named name. The match is
-// exact. The reference resolves an <effect name> to its implementation when
-// it loads the effect, and a name with none rejects the skill or item that
-// carries it.
+// exact. An <effect name> resolves to its implementation when the effect
+// loads, and a name with none rejects the skill or item that carries it.
 func Known(name string) bool {
 	_, ok := coreKinds[name]
 	return ok

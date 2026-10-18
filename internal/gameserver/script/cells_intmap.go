@@ -3,7 +3,7 @@ package script
 import "sync"
 
 // IntMapCell maps int32 keys to values, empty at first, and walks them in
-// the order the reference's hash map of integer keys does: bucket by bucket,
+// the order of a hash map of integer keys: bucket by bucket,
 // the bucket of a key being its hash (the key with its upper 16 bits folded
 // into the lower ones) modulo the table size, and in insertion order within
 // a bucket. The table starts at 16 buckets, or at the size
@@ -12,14 +12,13 @@ import "sync"
 // buckets gets a ninth key; a doubling keeps each bucket's order. Removing
 // a key or clearing the cell never shrinks the table.
 //
-// The order is the reference's while no bucket of a table of 64 or more
-// buckets gets a ninth key; the reference then keeps that bucket as a
-// tree, whose walk order this cell does not follow. A script's map of clans
+// The order holds while no bucket of a table of 64 or more buckets gets a
+// ninth key; such a bucket would turn into a tree, whose walk order this
+// cell does not follow. A script's map of clans
 // stays far below that.
 //
 // The walks return snapshots, so a script may set or delete keys while it
-// goes through one, as the reference does through a copy of its keys or an
-// iterator's remove.
+// goes through one, as through a copy of its keys or an iterator's remove.
 type IntMapCell[V any] struct {
 	mu sync.Mutex
 	// buckets is the table, nil until the first Set; initial is the size
@@ -44,7 +43,7 @@ const (
 
 // NewIntMapCell returns an empty cell whose table is sized for expected
 // keys: the smallest power of two that holds them below three quarters,
-// at least 1, as the reference sizes a map made for that many mappings.
+// at least 1, as a map made for that many mappings is sized.
 func NewIntMapCell[V any](expected int) *IntMapCell[V] {
 	n := 1
 	want := (expected*4 + 2) / 3 // ceil(expected / 0.75)
@@ -54,7 +53,7 @@ func NewIntMapCell[V any](expected int) *IntMapCell[V] {
 	return &IntMapCell[V]{initial: n}
 }
 
-// intMapHash is the reference's hash of an integer key.
+// intMapHash is the bucket hash of an integer key.
 func intMapHash(k int32) uint32 {
 	h := uint32(k)
 	return h ^ h>>16

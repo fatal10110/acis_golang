@@ -14,7 +14,7 @@ type CastAborted struct{}
 // window-gated interrupt path. Target is the cast's final target when it is
 // a creature, nil otherwise. LaunchTarget is the first creature the
 // caster's latest AI-driven launch resolved, nil when it resolved none or
-// no AI cast launched yet: like the reference's target list, it outlives
+// no AI cast launched yet: like a launch's target list, it outlives
 // its cast, so a cast that ends before its launch reports the previous
 // launch's.
 type CastFinished struct {

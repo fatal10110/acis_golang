@@ -135,7 +135,7 @@ func PrivateStandardHooks() script.Hooks {
 			if top == nil {
 				return
 			}
-			// Whole numbers, as the reference divides them: any aggro
+			// Integer division: any aggro
 			// short of the NPC's maximum HP gives 0.
 			if aggro := int32(s.Skill(e.Skill).AggroPoints()); aggro > 0 && n.Intention() == script.IntentionAttack && !script.Same(top, caster) {
 				n.AddAttackDesire(caster, float64(((aggro/n.MaxHP())*4000)*150))

@@ -200,8 +200,8 @@ func UseItem(pet *summon.Actor, petInv *itemcontainer.Inventory, objectID int32,
 	// not-yet-equipped item. A failed condition sends PET_CANNOT_USE_ITEM
 	// to the pet's owner rather than staying silent, so this reuses
 	// UsePetCannotUseItem rather than a bare no-op. A test that aborts is
-	// the one silent refusal: the reference's check throws before it sends
-	// anything, and a pet item use leaves the client waiting on nothing.
+	// the one silent refusal: the check fails hard before anything is
+	// sent, and a pet item use leaves the client waiting on nothing.
 	if !st.Equipped() {
 		held, aborted := checkUseConditions(pet, tmpl.UseConditions)
 		if aborted {

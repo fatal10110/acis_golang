@@ -45,7 +45,7 @@ func (l *GameClientLink) enterWorldClan(client *Client, live *livePlayer) {
 		func() wire.Frame { return serverpackets.FramePledgeShowMemberListUpdate(row) })
 	l.tellMentorLoggedIn(c)
 	if l.halls.LeaseUnpaid(cl.ID()) {
-		// Sent with its lease left blank, as the reference sends it.
+		// Sent without its S1 parameter, so the lease shows blank.
 		client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageClanHallPaymentDueTomorrowS1))
 	}
 	if state := l.sieges.StateOf(cl.ID()); state != siege.StateNone {
@@ -199,7 +199,7 @@ func (l *GameClientLink) requestAnswerJoinPledge(live *livePlayer, req clientpac
 		return
 	}
 	// The clan's skills are given against the rank live held before it
-	// joined, as the reference grants them before it recomputes the rank;
+	// joined: they are granted before the rank is recomputed;
 	// no SkillList follows.
 	rank := c.PledgeClass()
 	blocksInviter := l.relations.IsBlocked(c.ID, invite.RequesterID)

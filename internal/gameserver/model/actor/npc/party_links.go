@@ -95,7 +95,7 @@ func (p *partyLinks) links() *partyLinks { return p }
 
 // party is an NPC's party membership: its master and its privates. The
 // spawn slot keeps it in its Scratch, so a respawned NPC is still the
-// master or the private it was, as the reference's reused NPC object is:
+// master or the private it was, as if the same NPC came back:
 // a master that recorded privates once stays a master in every later life,
 // and keeps the privates it had not forgotten.
 type party struct {
@@ -288,8 +288,8 @@ func (b *spawnBinding) privateInTerritory() (in, decided bool) {
 }
 
 // Current returns the NPC m's spawn slot placed last: m itself, unless the
-// slot has respawned it since, as a new life. The reference respawns the
-// same NPC object, so whatever holds an NPC acts on its current life. Nil
+// slot has respawned it since, as a new life. A respawn is the same NPC
+// in a new life, so whatever holds an NPC acts on its current life. Nil
 // stays nil.
 func Current(m PartyMember) PartyMember {
 	if m == nil {

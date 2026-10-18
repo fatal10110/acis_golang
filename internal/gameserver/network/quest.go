@@ -58,7 +58,7 @@ type questJournals interface {
 
 // abortQuest answers RequestQuestAbort: the first quest of live's journal
 // with the quest id is exited as repeatable. An id live has no quest of
-// answers nothing, as in the reference; the client sends the request once
+// answers nothing on purpose; the client sends the request once
 // the player confirmed the abort, and waits on no answer.
 func (l *GameClientLink) abortQuest(live *livePlayer, questID int32) {
 	if l.journals == nil {

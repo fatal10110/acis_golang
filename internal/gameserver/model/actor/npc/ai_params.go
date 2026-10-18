@@ -61,8 +61,8 @@ func resolveAIString(spawn, tmpl AIParams, name, def string) string {
 // resolveAISkill reads name, resolved as resolveAIString does, as an
 // "id-level" skill reference. ok is false when neither set holds name. A
 // value with fewer than two '-'-separated fields, or a field that is not
-// an int, is an error. Fields past the second are ignored. The reference
-// is not checked against the skill table.
+// an int, is an error. Fields past the second are ignored. The parsed
+// skill reference is not checked against the skill table.
 func resolveAISkill(spawn, tmpl AIParams, name string) (ref skill.Ref, ok bool, err error) {
 	v, found := spawn[name]
 	if !found {

@@ -29,8 +29,8 @@ func sendOlympiadBar(live *livePlayer, tmpl *item.Template) {
 // not barred in live's Olympiad match and live meets every use condition.
 // The Olympiad bar still tells the client why, as it does on every path;
 // a failed use condition stays silent. aborted reports a use condition test
-// that reached a <not> around no condition: the reference's check throws
-// there, which ends the whole worn-item sweep.
+// that reached a <not> around no condition: the check fails hard there,
+// which ends the whole worn-item sweep.
 func itemRestrictionHolds(live *livePlayer, tmpl *item.Template) (holds, aborted bool) {
 	if olympiadBarred(live, tmpl) {
 		sendOlympiadBar(live, tmpl)

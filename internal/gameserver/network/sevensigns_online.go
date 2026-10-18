@@ -125,7 +125,7 @@ func (l *GameClientLink) enterWorldSevenSignsDungeon(live *livePlayer) {
 }
 
 // expelFromDungeon sends live to the nearest town, then clears its Seven
-// Signs dungeon membership, in the reference's order.
+// Signs dungeon membership, in that order.
 func (l *GameClientLink) expelFromDungeon(live *livePlayer) {
 	if dest, ok := l.restartDestination(live); ok {
 		l.teleportLivePlayer(live, dest, restartTeleportOffset)

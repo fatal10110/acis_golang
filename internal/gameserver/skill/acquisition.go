@@ -140,8 +140,7 @@ func LearnGeneral(c *player.Character, tmpl *player.Template, skills *Persistenc
 			return result, LearnMissingItem, nil
 		}
 	}
-	// The SP comes off before the skill is added, as the reference charges it
-	// (RequestAcquireSkill: removeExpAndSp, then addSkill).
+	// The SP comes off before the skill is added.
 	if result.Cost > 0 {
 		c.RemoveExpAndSp(nil, tmpl, 0, result.Cost)
 	}

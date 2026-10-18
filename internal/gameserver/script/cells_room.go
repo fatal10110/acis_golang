@@ -16,7 +16,7 @@ import (
 // The room's party is named by identity and followed as it changes: its
 // leader and members are read live, and a party since disbanded keeps the
 // leader it last had and has no members. Asking a room that holds no party
-// for its party's members or ids panics, as the reference throws there.
+// for its party's members or ids panics.
 type RoomCell struct {
 	index int
 	tick  func() int32
@@ -62,7 +62,7 @@ func (r *RoomCell) SetLock(locked bool) {
 }
 
 // TryLock locks an unlocked room, stamping the game tick, and reports
-// whether it did: the reference's lock check followed by its lock, in one
+// whether it did: a lock check followed by the lock, in one
 // step, so two parties never take one room. A locked room is left as it
 // is.
 func (r *RoomCell) TryLock() bool {
@@ -121,8 +121,8 @@ func (r *RoomCell) mustParty() player.Party {
 }
 
 // HoldsPartyOf reports whether the room's party is the one p is in. A
-// player in no party matches a room holding none, as the reference's
-// identity compare of two absent parties does.
+// player in no party matches a room holding none, as an identity compare
+// of two absent parties does.
 func (r *RoomCell) HoldsPartyOf(p *Player) bool {
 	ref, _ := p.character().Party()
 	return r.heldParty() == ref

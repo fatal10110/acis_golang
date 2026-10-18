@@ -29,8 +29,7 @@ type Region struct {
 
 // ListedRegions returns the region tiles geoengine.properties enables, in
 // tile order: every in-range tile whose exact "X_Y" key is present, whatever
-// its value. This is the reference GeoEngine's props.containsKey(rx + "_" + ry)
-// check; a commented-out "#X_Y" line is no key and leaves the tile unlisted.
+// its value: a key-presence check on "X_Y"; a commented-out "#X_Y" line is no key and leaves the tile unlisted.
 func ListedRegions(props *config.Properties) []Region {
 	if props == nil {
 		return nil
@@ -46,13 +45,13 @@ func ListedRegions(props *config.Properties) []Region {
 	return regions
 }
 
-// LoadRegions builds a geo Engine from exactly the listed region files, as
-// the reference GeoEngine constructor does at boot: every listed region is
+// LoadRegions builds a geo Engine from exactly the listed region files at
+// boot: every listed region is
 // loaded from dir, every other tile keeps the engine's Null-block fallback
 // even when its file is on disk. It logs the loaded count, then fails when
 // any listed region could not be read or decoded (missing, unreadable, or
-// malformed), naming each failed file plus dir and geoType, where the
-// reference logs the failed count and exits the process.
+// malformed), naming each failed file plus dir and geoType, so the
+// caller stops the boot.
 func LoadRegions(dir string, geoType GeoType, regions []Region, log zerolog.Logger, options ...engine.Options) (*engine.Engine, error) {
 	if !validGeoType(geoType) {
 		return nil, fmt.Errorf("probe: unknown geodata type %q", geoType)
@@ -110,7 +109,7 @@ func validGeoType(geoType GeoType) bool {
 }
 
 // loadRegion reads one region file into e. A file with unread trailing bytes
-// still loads, with a warning, as in the reference.
+// still loads, with a warning.
 func loadRegion(e *engine.Engine, path string, geoType GeoType, x, y int, log zerolog.Logger) error {
 	blocks, trailing, err := readRegion(path, geoType)
 	if err != nil {

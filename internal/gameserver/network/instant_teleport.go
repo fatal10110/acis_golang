@@ -9,8 +9,8 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 )
 
-// instantTeleportLivePlayer moves live in one step to where j lands, as the
-// reference's instant teleport does: the landing is grounded unless live
+// instantTeleportLivePlayer moves live in one step to where j lands, as an
+// instant teleport does: the landing is grounded unless live
 // flies or it lies in water; live and its observers get the jump without
 // its fade; live stays in its region until its next position update, so
 // what knows it and what it knows are unchanged. live then goes idle, and,

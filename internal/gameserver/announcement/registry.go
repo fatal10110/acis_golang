@@ -278,7 +278,7 @@ func (e *entry) stop() {
 	}
 }
 
-// javaInt narrows n to the reference's 32-bit count. Both sources of a limit,
+// javaInt narrows n to a 32-bit count. Both sources of a limit,
 // the file loader and //announce add_auto, refuse a value out of that range,
 // so the bounds, clamping, only guard against a new caller.
 func javaInt(n int) int32 {

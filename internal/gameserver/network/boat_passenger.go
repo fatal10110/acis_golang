@@ -138,7 +138,7 @@ func (l *GameClientLink) moveToBoatEntrance(live *livePlayer, point boat.Point, 
 // toward target crosses the entrance of the dock a boat it knows serves,
 // and reports whether it did. Otherwise, with no boat known or no entrance
 // crossed, live is answered ActionFailed: a ground click's own walk then
-// follows that answer, as the reference's MoveBackwardToLocation does.
+// follows that answer, as a plain ground move does.
 func (l *GameClientLink) probeBoatEntrance(live *livePlayer, target location.Location) bool {
 	b := l.knownBoat(live)
 	if b == nil {
@@ -178,9 +178,8 @@ func (l *GameClientLink) requestGetOnVehicle(live *livePlayer, req clientpackets
 	b := riddenBoat(live)
 	if b == nil {
 		b = l.boatByID(req.BoatID)
-		// Only a boat in sight can be boarded: the reference takes any boat
-		// in the world, which a forged request would turn into a jump
-		// across it.
+		// Only a boat in sight can be boarded: taking any boat in the world
+		// would let a forged request jump across it.
 		// Nor one under way: a real client is only walked to the entrance
 		// of a boat tied up, and boarding at sea after the fare is taken
 		// would ride for free.
@@ -232,8 +231,8 @@ func (l *GameClientLink) requestGetOffVehicle(live *livePlayer, req clientpacket
 	point := b.Dock().AdjustedBoardingPoint(origin, boat.Point{X: int(req.X), Y: int(req.Y)}, true)
 	// The step-off point stays beside the boat: past the entrance it lies
 	// at most about 420 away, and a real client asks for a point over the
-	// side. The reference takes any point, which a forged request would
-	// turn into a jump across the world.
+	// side. Taking any point would let a forged request jump across the
+	// world.
 	if origin.Distance(point) > maxStepOffReach {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return

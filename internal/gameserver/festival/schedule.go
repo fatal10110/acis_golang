@@ -67,10 +67,9 @@ func (m *Manager) CompetitionBegun() {
 // stays where the last signup period put it until CompetitionBegun starts
 // a new schedule, so NextFestivalNotice counts down past zero through the
 // results period and, in the recruiting period that follows seal
-// validation, shows about a week's worth of minutes below zero. The
-// reference's no-party wait loop outlives the cancel and keeps moving the
-// start, so its guides show 1 to 20 minutes in both periods; that loop is
-// not reproduced.
+// validation, shows about a week's worth of minutes below zero. Nothing
+// keeps moving the start after the stop, so the guides never show a fresh
+// 1 to 20 minute countdown in those periods.
 func (m *Manager) CompetitionEnded() {
 	m.mu.Lock()
 	defer m.mu.Unlock()

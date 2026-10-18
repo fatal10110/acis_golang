@@ -73,8 +73,8 @@ type Config struct {
 }
 
 // Wire gives every effect and damage zone of ix its pulse. A zone whose
-// reuse delay is not positive never pulses: the reference fails to
-// schedule such a task. Call it once at boot, before any actor enters a
+// reuse delay is not positive never pulses: it schedules no pulse task.
+// Call it once at boot, before any actor enters a
 // zone.
 func Wire(ix *zone.Index, cfg Config) {
 	if ix == nil || cfg.Queue == nil || cfg.Objects == nil {

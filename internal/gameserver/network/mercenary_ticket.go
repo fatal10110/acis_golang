@@ -71,7 +71,7 @@ func (l *GameClientLink) wireCastleTickets() {
 // live's feet and the castle counts it.
 //
 // Outside any castle, and when the drop fails, nothing answers: the use
-// leaves the client waiting on nothing, and the reference is silent too.
+// leaves the client waiting on nothing, so silence is the expected answer.
 func (l *GameClientLink) useMercenaryTicket(live *livePlayer, inv *itemcontainer.Inventory, inst *item.Instance, tmpl *item.Template) bool {
 	if tmpl.EtcItem == nil || tmpl.EtcItem.Handler != mercenaryTicketsHandler {
 		return false

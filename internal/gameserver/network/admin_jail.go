@@ -67,8 +67,8 @@ func (l *GameClientLink) adminUnbanChat(gm, target *livePlayer, name string) {
 // selected one, is jailed for minutes, without end by default; an offline
 // character named name is stored jailed, in the jail.
 //
-// Minutes that do not parse answer nothing, as the reference does; a chat
-// command leaves no client action pending.
+// Minutes that do not parse answer nothing on purpose; a chat command
+// leaves no client action pending.
 func (l *GameClientLink) adminJail(gm *livePlayer, line string) {
 	args := handleradmin.Args(line)
 	var (

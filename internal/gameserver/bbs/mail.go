@@ -355,7 +355,7 @@ type Sender struct {
 // every check but the invalid target. Only a mail whose fields fit their
 // columns is stored; one that does not reaches its recipients for the run
 // but files no sent-box copy. It still counts against the sender's daily
-// limit, which the reference reaches only by storing a truncated row.
+// limit, as a stored mail does.
 func (m *Mailbox) Send(sender Sender, recipients []Recipient, list, subject, message string, now time.Time) ([]Delivery, bool) {
 	subject = trimOr(subject, subjectLength, noSubject)
 	message = strings.ReplaceAll(message, "\n", "<br1>")

@@ -45,7 +45,7 @@ func (l *GameClientLink) requestGiveNickName(live *livePlayer, req clientpackets
 		return
 	}
 	// The giver's message goes first, so it precedes the TitleUpdate the
-	// giver sees when the member is around it, as in the reference.
+	// giver sees when the member is around it.
 	live.SendFrame(serverpackets.FrameSystemMessageParams(serverpackets.SystemMessageClanMemberS1TitleChangedToS2,
 		serverpackets.TextParam(m.Name), serverpackets.TextParam(req.Title)))
 	clanID := cl.ID()

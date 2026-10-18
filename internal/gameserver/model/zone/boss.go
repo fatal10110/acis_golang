@@ -188,7 +188,7 @@ func (z *Boss) isAllowed(id int32) bool {
 
 // AllowEntry permits the player to enter (or re-enter) for the given
 // window from now. A permission restored at boot gets a zero window: the
-// reference reads the stored players before the zone's InvadeTime, so the
+// stored players are read before the zone's InvadeTime is known, so the
 // entry lapses at once and only the permission itself (summons, the next
 // save) survives the restart.
 func (z *Boss) AllowEntry(id int32, window time.Duration) {

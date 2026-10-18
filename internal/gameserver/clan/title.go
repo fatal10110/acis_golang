@@ -41,7 +41,7 @@ func (s *Service) GrantTitle(c *player.Character, name, title string) (*Clan, Me
 		return nil, Member{}, TitleInvalid
 	}
 	// The name is matched exactly: a character name holds no pattern
-	// character, so the reference's pattern match is an equality.
+	// character, so a pattern match on it is an equality.
 	if c.IsNoble() && name == c.CharacterName() {
 		return nil, Member{}, TitleSelf
 	}
@@ -61,9 +61,8 @@ func (s *Service) GrantTitle(c *player.Character, name, title string) (*Clan, Me
 
 // ValidTitle reports whether title holds only the characters a given
 // title may: ASCII letters and digits, the space and !@#$&()-`.+,/". The
-// reference's pattern bounds the length with a quantifier that never
-// applies, so a title of any length passes; it is cut to 16 characters as
-// it is set.
+// length is not bounded here, so a title of any length passes; it is cut
+// to 16 characters as it is set.
 func ValidTitle(title string) bool {
 	const punctuation = " !@#$&()-`.+,/\""
 	for _, r := range title {

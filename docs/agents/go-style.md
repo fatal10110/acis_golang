@@ -159,6 +159,8 @@ retry, or pooling frameworks when the adopted library or standard library alread
   they do not narrate syntax.
 - Production names, comments, and commit messages describe this Go system only. Reference evidence
   belongs in tests, docs, issues, pull requests, or `.agent-cache` reports.
+  `internal/provenance` fails the build on a production comment that says "the reference",
+  "the reference's", "Java" or names a `.java` file; state the behavior or invariant instead.
 
 ## Anti-patterns
 

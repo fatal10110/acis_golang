@@ -420,7 +420,7 @@ func (l *GameClientLink) leaveActiveTrade(live *livePlayer) {
 }
 
 // holdsActiveRequester reports whether live holds a request of any kind it
-// has not answered yet (the reference's active requester). A request that
+// has not answered yet (its active requester). A request that
 // timed out still counts while live has a trade window open.
 func (l *GameClientLink) holdsActiveRequester(live *livePlayer) bool {
 	return l.trades != nil && l.trades.HoldsRequest(live.ObjectID())

@@ -7,8 +7,7 @@ import (
 )
 
 // The cells are the only place a script keeps state shared by every player
-// and NPC it serves (the reference keeps it in fields of the script
-// object). Each cell is leaf-locked: no method calls out while holding the
+// and NPC it serves, never fields of the script value. Each cell is leaf-locked: no method calls out while holding the
 // lock, and none takes a closure. A script builds its cells in its
 // constructor and its hooks capture them; the zero value of each is ready
 // to use, and a cell is never copied once used.

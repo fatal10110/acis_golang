@@ -213,7 +213,7 @@ func restoredSchedule(tmpl modelskill.EffectTemplate, count, elapsedSeconds int3
 }
 
 // restoreMinDelay is the least delay before a restored effect's first tick,
-// the reference's minimum initial delay for a resumed effect task.
+// the minimum initial delay of a resumed effect task.
 const restoreMinDelay = 5 * time.Millisecond
 
 // resumeRestored is the schedule, at now, of an effect built from tmpl whose
@@ -221,8 +221,8 @@ const restoreMinDelay = 5 * time.Millisecond
 // Such an effect ends on its first tick whatever count it has left, as
 // List.tickAt ends an in-use effect whose action reports false: a tick due
 // before now has ended it, and ok is false. (A restored effect stacked out
-// by another restored one would keep counting in the reference instead;
-// both are restored debuffs of one stack group, rare enough to leave
+// by another restored one should keep counting instead; both are restored
+// debuffs of one stack group, rare enough to leave
 // unmodelled.)
 func resumeRestored(tmpl modelskill.EffectTemplate, count, elapsedSeconds int32, at, now time.Time) (remaining int, next time.Time, ok bool) {
 	remaining, next = restoredSchedule(tmpl, count, elapsedSeconds, at)

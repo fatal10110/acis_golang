@@ -290,8 +290,8 @@ const petItemsOf = "SELECT pet.object_id FROM items AS pet JOIN items AS collar 
 // cancellation partway through leaves all of them in place instead of
 // orphaning owned rows behind a deleted character.
 //
-// A pet's items are saved under its collar rather than under the character
-// (the reference keys them on the player), so they are found through the
+// A pet's items are saved under its collar rather than under the character,
+// so they are found through the
 // character's collars: their augmentations and pets rows, then the items
 // themselves, go first, while the collar rows still stand. Pets and
 // augmentations of the character's own items are deleted before those items

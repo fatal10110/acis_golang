@@ -52,7 +52,7 @@ type skillElement struct {
 // not well-formed fails the whole load: the caller gets an error rather
 // than a partially populated table.
 //
-// Within a file, skills load in order, as the reference loads them. A level
+// Within a file, skills load in document order. A level
 // whose values do not build is logged and dropped with every later level of
 // its route (regular, enchant1 or enchant2); see buildLevels. Any other
 // failure while a <skill> element is read (its id, level counts or tables, a
@@ -149,7 +149,7 @@ func (sl *skillLoader) applyAttrs(vals map[string]string, attrs []setValue, tabl
 
 // buildSkillDefinitions expands one <skill> element into one Definition per
 // regular level (1..levels) and per enchant level (101.. and 141.. when the
-// element declares enchantLevels1/2). It follows the reference's order: every
+// element declares enchantLevels1/2). It works in this order: every
 // level is built from its values first (buildLevels), then each level's
 // conditions and <for> blocks attach to the definition at that level's
 // position among the built ones. A dropped level therefore shifts the later
@@ -234,9 +234,9 @@ func buildSkillDefinitions(el skillElement, path string, log zerolog.Logger) ([]
 // regular levels, then the enchant1 levels, then the enchant2 levels. An
 // enchant level's <set> values read the last regular level's table row; only
 // its <enchantN> values read its own row. A level that does not build is
-// logged and dropped with every later level of its route: the reference
-// inserts each level at its position within its route, and once one is
-// missing, each later insert lands past the end of the list and fails too.
+// logged and dropped with every later level of its route: each level is
+// inserted at its position within its route, and once one is missing,
+// each later insert lands past the end of the list and fails too.
 func (sl *skillLoader) buildLevels(name string, sets levelSets, levels, enchant1, enchant2 int) []skill.Definition {
 	var built []skill.Definition
 	route := func(count, first int, vals func(i int) map[string]string) {

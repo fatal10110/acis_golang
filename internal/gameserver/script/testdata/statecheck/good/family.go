@@ -21,8 +21,7 @@ type member struct {
 // newFamily builds the family; it is no constructor.
 func newFamily() *family { return &family{} }
 
-// Member registers itself at construction, as the reference's constructor
-// does, and its hooks read and write the family's cells.
+// Member registers itself at construction, and its hooks read and write the family's cells.
 func Member(f *family, classID int32) script.Script {
 	f.members.Set(classID, member{name: "good", item: 1})
 	return script.Script{Hooks: script.Hooks{OnTalk: func(_ *script.Script, e script.Talk) string {

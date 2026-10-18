@@ -26,7 +26,7 @@ func measureCatch(live *livePlayer, champ *fishchamp.Championship, lure int32) {
 // requestFishRanking answers the fishing window's ranking button with the
 // running week's ranking, or, when it is due to be taken anew, with the
 // notice that it is being taken. A disabled championship answers nothing,
-// as the reference does: the fishing window then shows no ranking button,
+// on purpose: the fishing window then shows no ranking button,
 // so no client action waits on an answer.
 func (l *GameClientLink) requestFishRanking(live *livePlayer) {
 	champ := l.fishChamp

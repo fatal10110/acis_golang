@@ -47,7 +47,7 @@ func (l *GameClientLink) restoreRecommended(ctx context.Context, c *player.Chara
 
 // evaluate answers RequestEvaluate: live recommends the online player it
 // has selected. A target that is not live's current selection is ignored
-// without an answer, as the reference does: the request comes from a chat
+// without an answer on purpose: the request comes from a chat
 // command or the target window's button, which registers no pending client
 // action, and nothing about the selection changed.
 func (l *GameClientLink) evaluate(live *livePlayer, req clientpackets.RequestEvaluate) {

@@ -20,8 +20,8 @@ const cursedUsage = "Usage: //cw [set|remove|teleportto itemid|name]"
 //	//cw teleportto <id|name>    gm to the weapon's holder, or to where it lies
 //
 // A name is matched against the weapons' names, underscores read as
-// spaces, ignoring case, the first weapon in the reference's order whose
-// name contains it winning. A weapon no id or name finds is answered as
+// spaces, ignoring case, the first weapon in panel order whose name
+// contains it winning. A weapon no id or name finds is answered as
 // unknown; a command without a weapon, or naming an id that is no int, is
 // answered with the usage. Any other command word only reopens the panel,
 // which every command but those ends on.
@@ -170,7 +170,7 @@ const (
 )
 
 // sendCursedWeaponsPage sends gm the cursed weapons panel, cwinfo.htm, with
-// every weapon in the reference's order: a held one with its holder (named
+// every weapon in panel order (cursedweapon.Manager.Weapons): a held one with its holder (named
 // while in the world, "null" otherwise), the karma and PK kills the holder
 // gets back, its stage, its time and hunger left and its kills toward the
 // next stage; one on the ground with its time left; one not out with the
@@ -183,8 +183,8 @@ func (l *GameClientLink) sendCursedWeaponsPage(gm *livePlayer) {
 		switch {
 		case !w.Activated && !w.Dropped:
 			// Not out, or reserved by a //cw set whose grant has not reached
-			// the target's queue yet: the reference's set is synchronous and
-			// has no such state, so it keeps the not-out row; its Set button
+			// the target's queue yet: a set is shown as one step with no
+			// in-between state, so it keeps the not-out row; its Set button
 			// answers that the weapon is already active.
 			sb.WriteString("<tr><td>Position:</td><td>Doesn't exist.</td></tr><tr><td>" + cursedButton("Set CW", "set "+id) + "</td><td></td></tr>")
 		case w.Activated:
@@ -216,7 +216,7 @@ func cursedButton(value, command string) string {
 }
 
 // cursedOverallTime is a weapon's time left as the panel shows it, in
-// days, hours and minutes, worked out as the reference does: the seconds
+// days, hours and minutes, worked out so: the seconds
 // past the last whole minute are taken off, then the minutes, hours and
 // days are each the floor of what is left, in floating point.
 func cursedOverallTime(w cursedweapon.Info) string {

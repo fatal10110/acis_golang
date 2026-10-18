@@ -68,8 +68,7 @@ func (l *GameClientLink) requestAcceptJoinChannel(live *livePlayer, req clientpa
 		return
 	}
 	// Forming a channel is authorized, and its Strategy Guide paid, on the
-	// requester; the answer runs on live's queue as the reference runs it
-	// on the answering client's thread.
+	// requester; the answer runs on live's queue, the answering client's.
 	if !l.commandChannelAuthority(requester, true) {
 		return
 	}

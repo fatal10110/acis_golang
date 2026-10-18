@@ -13,7 +13,7 @@ const topicsPerPage = 12
 
 // topicPagerStep is the topic count the topic list's page links divide
 // by. The page count then rounds up unless it times 8 equals the number of
-// clans, as the reference compares it with the clan count.
+// clans: the comparison is with the clan count, not the topic count.
 const topicPagerStep = 8
 
 // The date layouts of the memo board: the topic list and the post edit

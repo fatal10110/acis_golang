@@ -71,9 +71,8 @@ func Closest(from Place, positions []Loc) (Loc, bool) {
 
 // Farthest returns up to count of positions ordered from the farthest from
 // from in 3D to the nearest, positions at the same distance in the order
-// listed. A Valakas private group's spots are picked this way: the
-// reference names the read a closest-position list, but it sorts by
-// descending distance.
+// listed. A Valakas private group's spots are picked this way: though
+// named a closest-position list, the read sorts by descending distance.
 func Farthest(from Place, positions []Loc, count int) []Loc {
 	at := from.loc()
 	out := slices.Clone(positions)

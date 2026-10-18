@@ -7,8 +7,8 @@ package item
 //
 // The zero value is an empty map of initial capacity 1.
 type dropMerger struct {
-	// table holds the buckets; a nil table is the reference's lazily
-	// allocated one.
+	// table holds the buckets; a nil table is one not allocated yet,
+	// allocated lazily on the first insert.
 	table [][]rolledDrop
 	size  int
 	// threshold is the size past which the next merge first resizes; for an

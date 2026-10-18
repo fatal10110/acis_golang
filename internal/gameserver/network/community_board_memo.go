@@ -10,9 +10,9 @@ import (
 
 // The memo board is a forum of topics, each with its text as post 0. A
 // topic or post command or form answers only for the player's own memo
-// forum: any other forum it names shows as missing, the page the reference
-// shows for a forum that is not a memo forum. The reference serves any
-// forum by its id, whoever owns it (#3262).
+// forum: any other forum it names shows as missing, the page a forum that
+// is not a memo forum gets. Serving any forum by its id, whoever owns it,
+// would expose other players' memos (#3262).
 
 // boardTopics runs a memo or topic command: _bbsmemo shows the player's
 // memo forum, created on first use; _bbstopics;read;<forum>[;<page>]
