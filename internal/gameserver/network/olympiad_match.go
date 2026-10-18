@@ -129,7 +129,7 @@ func stadiumCombatNotice(a zone.Actor, entering bool) {
 		return
 	}
 	live := za.live
-	postLive(live, func() {
+	zoneRule(live, func() {
 		if entering {
 			live.SendFrame(serverpackets.FrameSystemMessage(siege.MsgEnteredCombatZone))
 			return
@@ -162,7 +162,7 @@ func (l *GameClientLink) sendStadiumMatchInfo(id int, a zone.Actor) {
 			continue
 		}
 		info := olympiadUserInfo(c)
-		postLive(live, func() { live.SendFrame(serverpackets.FrameExOlympiadUserInfo(info)) })
+		zoneRule(live, func() { live.SendFrame(serverpackets.FrameExOlympiadUserInfo(info)) })
 		postLive(c, func() { l.updateEffectIcons(c) })
 	}
 }
@@ -180,7 +180,7 @@ func (l *GameClientLink) expelFromStadium(a zone.Actor) {
 	if owner == nil || owner.accessLevel().IsGM || owner.OlympiadMode() || owner.ObserverMode() {
 		return
 	}
-	postLive(owner, func() {
+	zoneRule(owner, func() {
 		if s := l.liveSummon(owner); s != nil {
 			s.Unsummon()
 		}
