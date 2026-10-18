@@ -175,6 +175,7 @@ func (s *Server) SpawnCastingHostileNPC(t *testing.T, tmpl *npc.Template, defs a
 func (s *Server) installCastSeam(hostile *npc.Hostile, defs actorcast.Definitions) *actorcast.AIController {
 	ctl := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, castCanceledBroadcast{hostile})
 	ctl.SetQueue(hostile.Queue())
+	ctl.OutliveQueueClose()
 	aiCtl := &actorcast.AIController{Controller: ctl, Definitions: defs, Effects: s.castEffects, Caster: hostile, OnHitResult: s.castEffects.OnHitResult}
 	hostile.AI().SetCastController(aiCtl)
 	hostile.SetCastController(ctl)

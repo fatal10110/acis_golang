@@ -59,23 +59,35 @@ func (q *Queue) Post(fn func()) bool {
 // must be taken from it.
 func (q *Queue) Now() time.Time { return q.exec.Now() }
 
-// Close cancels every armed timer and ticker and refuses later posts. Tasks
-// already accepted still run. Safe to call more than once.
+// Close cancels every armed timer and ticker, except those AfterPastClose
+// armed, and refuses later posts. Tasks already accepted still run. Safe to
+// call more than once.
 func (q *Queue) Close() {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.closed = true
 	for t := range q.timers {
+		if t.pastClose {
+			continue
+		}
 		t.done = true
 		t.ct.Stop()
+		delete(q.timers, t)
 	}
-	q.timers = nil
 }
 
 // After posts fn to q once d has elapsed, unless the timer is stopped or q
 // is closed before fn starts.
 func (q *Queue) After(d time.Duration, fn func()) *Timer {
-	return q.arm(d, 0, fn)
+	return q.arm(d, 0, fn, false)
+}
+
+// AfterPastClose is After for a step that must still run when q closes
+// before it comes due: Close leaves it armed, and it arms on a closed queue
+// too. Its expiry runs as one of q's tasks, behind the ones q accepted
+// before it, unless the timer is stopped or q's pool is stopping.
+func (q *Queue) AfterPastClose(d time.Duration, fn func()) *Timer {
+	return q.arm(d, 0, fn, true)
 }
 
 // Every posts fn to q every d until the ticker is stopped or q is closed.
@@ -87,14 +99,14 @@ func (q *Queue) Every(d time.Duration, fn func()) *Ticker {
 	if d <= 0 {
 		panic("sim: non-positive interval for Queue.Every")
 	}
-	return (*Ticker)(q.arm(d, d, fn))
+	return (*Ticker)(q.arm(d, d, fn, false))
 }
 
-func (q *Queue) arm(d, period time.Duration, fn func()) *Timer {
-	t := &Timer{q: q, fn: fn, period: period}
+func (q *Queue) arm(d, period time.Duration, fn func(), pastClose bool) *Timer {
+	t := &Timer{q: q, fn: fn, period: period, pastClose: pastClose}
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	if q.closed {
+	if q.closed && !pastClose {
 		t.done = true
 		return t
 	}
@@ -116,7 +128,9 @@ type Timer struct {
 	next   time.Time     // deadline of the armed expiry
 	ct     clockTimer
 	done   bool // stopped, cancelled by Close, or a one-shot that ran
-	queued bool // an expiry is posted and has not run yet
+	// pastClose marks a timer AfterPastClose armed, which Close leaves.
+	pastClose bool
+	queued    bool // an expiry is posted and has not run yet
 }
 
 // Stop cancels the timer and reports whether this call kept fn from running.

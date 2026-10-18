@@ -195,7 +195,10 @@ type Controller struct {
 	finishHolds int
 	finishArm   func()
 	queue       *sim.Queue
-	sink        event.Sink
+	// pastClose arms the cast's steps so that they still run once the
+	// queue closes (OutliveQueueClose).
+	pastClose bool
+	sink      event.Sink
 }
 
 // NewController returns a cast controller for actor. sink receives, each
@@ -239,6 +242,17 @@ func (c *Controller) SetQueue(q *sim.Queue) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.queue = q
+}
+
+// OutliveQueueClose lets a cast in flight run its remaining steps to their
+// end after the controller's queue closes, as they would on an open one. It
+// is for a caster whose removal from the world closes its queue without
+// stopping its cast: a deleted NPC's launched skill still lands, and a cast
+// not launched yet stops on its lost target.
+func (c *Controller) OutliveQueueClose() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.pastClose = true
 }
 
 // Now reads the clock the controller's queue runs on, the one its cast
@@ -511,14 +525,7 @@ func (c *Controller) StartCarried(now time.Time, target Target, def modelskill.D
 		c.mu.Unlock()
 		return Plan{}, ErrAlreadyCasting
 	}
-	plan := c.buildPlan(def)
-	c.casting = true
-	c.current = def
-	c.target = target
-	c.plan = plan
-	c.startedAt = now
-	c.interruptUntil = now.Add(plan.InterruptAfter)
-	seq := c.castSeq
+	plan, seq := c.claimLocked(now, target, def)
 	c.mu.Unlock()
 
 	if consumeCarrier != nil {
@@ -570,6 +577,43 @@ func (c *Controller) StartCarried(now time.Time, target Target, def modelskill.D
 		}
 	}
 
+	return c.chargeStart(seq, def, plan)
+}
+
+// StartUnchecked starts def's cast at target past every gate CanCast runs
+// (reuse, MP, HP, mutes, weapon, conditions, items), and takes no consume
+// item. A cast already in flight is replaced: its pending steps never run
+// and nothing reports its end. The cast is charged its reuse and initial MP
+// as any cast is, and its hit still checks the final MP and HP it takes.
+func (c *Controller) StartUnchecked(now time.Time, target Target, def modelskill.Definition) (Plan, error) {
+	if c.actor == nil || target == nil {
+		return Plan{}, ErrInvalidTarget
+	}
+	c.mu.Lock()
+	if c.casting {
+		c.clearLocked()
+	}
+	plan, seq := c.claimLocked(now, target, def)
+	c.mu.Unlock()
+	return c.chargeStart(seq, def, plan)
+}
+
+// claimLocked marks def's cast at target in flight from now and returns its
+// plan and the sequence that identifies it.
+func (c *Controller) claimLocked(now time.Time, target Target, def modelskill.Definition) (Plan, uint64) {
+	plan := c.buildPlan(def)
+	c.casting = true
+	c.current = def
+	c.target = target
+	c.plan = plan
+	c.startedAt = now
+	c.interruptUntil = now.Add(plan.InterruptAfter)
+	return plan, c.castSeq
+}
+
+// chargeStart charges the claimed cast seq its mastery proc or reuse, then
+// its initial MP, and reports ErrNotCasting when a cost ended it.
+func (c *Controller) chargeStart(seq uint64, def modelskill.Definition, plan Plan) (Plan, error) {
 	if plan.SkillMastery {
 		// A mastery proc tells the caster before the initial MP charge
 		// and before the caller announces the cast.
@@ -1002,6 +1046,10 @@ func (c *Controller) stopTimersLocked() {
 }
 
 func (c *Controller) scheduleLocked(delay time.Duration, f func()) {
+	if c.pastClose {
+		c.timers = append(c.timers, c.queue.AfterPastClose(delay, f))
+		return
+	}
 	c.timers = append(c.timers, c.queue.After(delay, f))
 }
 

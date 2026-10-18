@@ -742,3 +742,7 @@ ASpawn.getSpawnLocation script.Spawner.DrawSpawnLocation
 ASpawn.instantTeleportInMyTerritory script.Script.TeleportPlayersInTerritory
 ASpawn.setRespawnDelay script.Spawner.SetRespawnDelay
 WorldObject.setXYZ script.NPC.SetXYZ
+
+# The unchecked cast start (#3809): WizardCorpseNecroSummon's doCast starts
+# a cast past every gate of the cast's start, replacing a cast in flight.
+CreatureCast.doCast script.NPC.CastUnchecked
