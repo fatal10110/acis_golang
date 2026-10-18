@@ -10,11 +10,16 @@
 #      container start exit non-zero;
 #   4. after such a failed first start under compose up, the restart policy
 #      brings db back serving an empty acis database, and it never reports
-#      healthy: the init script's marker fails the healthcheck.
+#      healthy: the init script's marker fails the healthcheck;
+#   5. a data directory left by a first start killed before the init script
+#      ran (no marker, no tables) never reports healthy either;
+#   6. with ACIS_SMOKE_DATAPACK set to an aCis_datapack checkout, the first
+#      start loads its real schema: acis then holds one table per sql/*.sql
+#      file.
 #
-# The stub datapack keeps this independent of an aCis_datapack checkout, so
-# it checks the compose mounts and the init script, not the real 65-table
-# schema.
+# Steps 1-5 use a generated stub datapack, so they check the compose mounts,
+# the init script and the healthcheck without an aCis_datapack checkout.
+# Step 6 is skipped when ACIS_SMOKE_DATAPACK is unset.
 #
 # Run from anywhere: ops/docker/smoke-test.sh. It tags the image
 # acis-golang:smoke, uses the compose project acis-smoke (its own volume,
@@ -64,6 +69,18 @@ fail() {
 	exit 1
 }
 
+if [ -n "${ACIS_SMOKE_DATAPACK:-}" ]; then
+	[ -f "$ACIS_SMOKE_DATAPACK/tools/full_install.sql" ] ||
+		fail "ACIS_SMOKE_DATAPACK=$ACIS_SMOKE_DATAPACK has no tools/full_install.sql"
+	ACIS_SMOKE_DATAPACK=$(cd "$ACIS_SMOKE_DATAPACK" && pwd)
+fi
+
+# acis_tables prints the number of tables in acis.
+acis_tables() {
+	compose exec -T db mariadb -uroot -p"$ACIS_DB_ROOT_PASSWORD" -N -B -e \
+		"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'acis'"
+}
+
 # 1. Compose file.
 ACIS_DATAPACK_DIR="$work" compose config -q
 ACIS_DATAPACK_DIR="$work" compose --profile servers config -q
@@ -90,8 +107,7 @@ want=$(echo "$tables" | wc -w)
 
 ACIS_DATAPACK_DIR="$work/ok" compose up -d --wait --wait-timeout 180 db ||
 	{ compose logs db >&2; fail "db did not become healthy with a complete datapack"; }
-got=$(compose exec -T db mariadb -uroot -p"$ACIS_DB_ROOT_PASSWORD" -N -B -e \
-	"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'acis'")
+got=$(acis_tables)
 [ "$got" = "$want" ] || { compose logs db >&2; fail "acis has $got tables, want $want"; }
 rows=$(compose exec -T db mariadb -uroot -p"$ACIS_DB_ROOT_PASSWORD" -N -B acis -e \
 	"SELECT COUNT(*) FROM smoke_items")
@@ -112,61 +128,113 @@ echo "$out" | grep -q 'acis schema: .*full_install.sql not found' ||
 echo "smoke: first start without full_install.sql stops the db"
 clean_project
 
-# 4. The same failed first start through compose up, with the real restart
-# policy. restart: always starts db again, the entrypoint skips the schema
-# load over the existing data directory, and the server answers on an empty
-# acis database. It must not report healthy, so the servers that wait for a
-# healthy db never start. Wait until that restarted server answers with no
-# acis tables and one of its own healthchecks has rejected it on the marker,
-# and fail as soon as the container reports healthy.
+# wait_rejected waits until db, started by compose up, is running after at
+# least $1 restarts, one of its healthchecks that began during the current
+# start has rejected it with a message containing $2, and the command $3
+# succeeds. It fails as soon as the container reports healthy.
 #
 # This polls rather than trusting compose up --wait: some compose releases
 # (2.38 among them) exit 0 when --wait-timeout expires while the service is
 # still starting, so its status cannot tell a timeout from a healthy db.
 #
-# Docker keeps health log entries across a restart, and the first start's
-# entries carry the same marker message, so only entries that began after
-# the current start count.
+# Docker keeps health log entries across a restart, and an earlier start's
+# entries can carry the same message, so only entries that began after the
+# current start count.
 db_state() {
 	compose logs db >&2 || true
 	[ -z "${id:-}" ] || docker inspect -f '{{json .State}}' "$id" >&2 || true
 }
-ACIS_DATAPACK_DIR="$work/broken" compose up -d db >&2 ||
-	{ db_state; fail "compose up did not start db over the broken datapack"; }
-id=$(compose ps -a -q db)
-[ -n "$id" ] || fail "compose up left no db container"
 # One inspect call, so the start time and the health log come from the same
 # container start: a first line with the restart count, status, health and
 # start time, then one line per health log entry with its start in Unix
 # nanoseconds and its JSON-quoted output.
 inspect_fmt='{{.RestartCount}} {{.State.Status}} {{.State.Health.Status}} {{.State.StartedAt}}{{"\n"}}{{range .State.Health.Log}}{{.Start.UnixNano}} {{json .Output}}{{"\n"}}{{end}}'
-tries=0
-while :; do
-	snap=$(docker inspect -f "$inspect_fmt" "$id") || fail "db container $id is gone"
-	set -- $(echo "$snap" | head -n 1)
-	[ "$3" != healthy ] || { db_state; fail "db reported healthy after a failed first-start schema load"; }
-	marked=no
-	if [ "$1" -ge 1 ] && [ "$2" = running ]; then
-		since=$(date -u -d "$4" +%s%N) || fail "cannot parse db start time $4"
-		echo "$snap" | tail -n +2 | {
-			while read -r ns out; do
-				if [ "$ns" -gt "$since" ]; then
-					case $out in *'acis schema load did not finish'*) exit 0 ;; esac
-				fi
-			done
-			exit 1
-		} && marked=yes
-	fi
-	if [ "$marked" = yes ] &&
-		got=$(compose exec -T db mariadb -uroot -p"$ACIS_DB_ROOT_PASSWORD" -N -B -e \
-			"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'acis'" 2>/dev/null); then
-		[ "$got" = 0 ] || { db_state; fail "restarted db has $got acis tables, want 0"; }
-		break
-	fi
-	tries=$((tries + 1))
-	[ "$tries" -lt 90 ] || { db_state; fail "restarted db did not answer and fail its healthcheck on the schema marker (restarts=$1 state=$2 health=$3)"; }
-	sleep 2
-done
+wait_rejected() {
+	min_restarts=$1
+	want_msg=$2
+	ready_check=$3
+	id=$(compose ps -a -q db)
+	[ -n "$id" ] || fail "compose up left no db container"
+	tries=0
+	while :; do
+		snap=$(docker inspect -f "$inspect_fmt" "$id") || fail "db container $id is gone"
+		set -- $(echo "$snap" | head -n 1)
+		[ "$3" != healthy ] || { db_state; fail "db reported healthy ($want_msg expected)"; }
+		marked=no
+		if [ "$1" -ge "$min_restarts" ] && [ "$2" = running ]; then
+			since=$(date -u -d "$4" +%s%N) || fail "cannot parse db start time $4"
+			echo "$snap" | tail -n +2 | {
+				while read -r ns out; do
+					if [ "$ns" -gt "$since" ]; then
+						case $out in *"$want_msg"*) exit 0 ;; esac
+					fi
+				done
+				exit 1
+			} && marked=yes
+		fi
+		if [ "$marked" = yes ] && $ready_check; then
+			break
+		fi
+		tries=$((tries + 1))
+		[ "$tries" -lt 90 ] || { db_state; fail "db did not answer and fail its healthcheck with \"$want_msg\" (restarts=$1 state=$2 health=$3)"; }
+		sleep 2
+	done
+}
+
+# 4. The same failed first start through compose up, with the real restart
+# policy. restart: always starts db again, the entrypoint skips the schema
+# load over the existing data directory, and the server answers on an empty
+# acis database. It must not report healthy, so the servers that wait for a
+# healthy db never start. Wait until that restarted server answers with no
+# acis tables and one of its own healthchecks has rejected it on the marker.
+restarted_empty() {
+	got=$(acis_tables 2>/dev/null) || return 1
+	[ "$got" = 0 ] || { db_state; fail "restarted db has $got acis tables, want 0"; }
+}
+ACIS_DATAPACK_DIR="$work/broken" compose up -d db >&2 ||
+	{ db_state; fail "compose up did not start db over the broken datapack"; }
+wait_rejected 1 'acis schema load did not finish' restarted_empty
 echo "smoke: restarted db over a failed first start stays unhealthy"
+clean_project
+
+# 5. A first start killed after the image initialized the data directory
+# (mariadb-install-db) but before the init script wrote its marker. Build
+# that data directory with the image's own install step, then start db
+# through compose up: the entrypoint sees an initialized data directory and
+# skips the schema load, so acis has no tables (it is not even created) and
+# root has no password yet. Wait until the server answers and one of its
+# healthchecks has rejected it for having no tables.
+rc=0
+out=$(ACIS_DATAPACK_DIR="$work/ok" compose_timeout 120 run --rm -T --no-deps --name "$broken" \
+	--entrypoint mariadb-install-db db \
+	--user=mysql --datadir=/var/lib/mysql --auth-root-authentication-method=normal --skip-test-db 2>&1) || rc=$?
+[ "$rc" = 0 ] || { echo "$out" >&2; fail "mariadb-install-db exited $rc"; }
+killed_ready() {
+	compose exec -T db healthcheck.sh --connect >/dev/null 2>&1 || return 1
+	if compose logs db 2>&1 | grep -q 'acis schema: loading'; then
+		db_state
+		fail "db ran the schema load over an initialized data directory"
+	fi
+}
+ACIS_DATAPACK_DIR="$work/ok" compose up -d db >&2 ||
+	{ db_state; fail "compose up did not start db over the initialized data directory"; }
+wait_rejected 0 'acis database has no tables' killed_ready
+echo "smoke: db over a first start killed before the schema load stays unhealthy"
+clean_project
+
+# 6. The real datapack schema. Every table file must load under this
+# MariaDB image, and acis must then hold one table per sql/*.sql file.
+if [ -n "${ACIS_SMOKE_DATAPACK:-}" ]; then
+	want=$(find "$ACIS_SMOKE_DATAPACK/sql" -maxdepth 1 -type f -name '*.sql' | wc -l)
+	[ "$want" -gt 0 ] || fail "$ACIS_SMOKE_DATAPACK/sql has no .sql files"
+	ACIS_DATAPACK_DIR="$ACIS_SMOKE_DATAPACK" compose up -d --wait --wait-timeout 300 db ||
+		{ compose logs db >&2; fail "db did not become healthy with $ACIS_SMOKE_DATAPACK"; }
+	got=$(acis_tables) || { compose logs db >&2; fail "cannot count acis tables"; }
+	[ "$got" = "$want" ] || { compose logs db >&2; fail "acis has $got tables, want $want (one per sql/*.sql)"; }
+	echo "smoke: real datapack schema loaded $got tables"
+	clean_project
+else
+	echo "smoke: ACIS_SMOKE_DATAPACK unset; real datapack schema not checked"
+fi
 
 echo "smoke: ok"

@@ -116,10 +116,16 @@ CI runs `ops/docker/smoke-test.sh` on every change. It checks that `docker-compo
 that the image builds and each of its binaries starts, and that the `db` service's first start
 loads every table file of a stub datapack. It also checks that a first start without
 `tools/full_install.sql` exits non-zero, and that under `docker compose up` the `restart: always`
-restart that follows serves an empty database but never reports healthy. It does not load the real
-datapack schema
-([#3697](https://github.com/fatal10110/acis_golang/issues/3697)). To run it locally, stop any
-compose database first: the `db` container name is fixed.
+restart that follows serves an empty database but never reports healthy, and that a data directory
+left by a first start killed before the schema load never reports healthy either. With
+`ACIS_SMOKE_DATAPACK` set to an `aCis_datapack` checkout it also loads the real schema and checks
+that `acis` holds one table per `sql/*.sql` file; CI does this when the `ACIS_DATAPACK_TOKEN`
+secret (read access to the repository holding `aCis_datapack`) is set, and warns otherwise. To run
+it locally, stop any compose database first: the `db` container name is fixed:
+
+```sh
+ACIS_SMOKE_DATAPACK=../aCis_datapack ops/docker/smoke-test.sh
+```
 
 Backups: [backup-restore.md](backup-restore.md). Moving an existing Java server:
 [migrating-from-java.md](migrating-from-java.md).
@@ -129,6 +135,7 @@ Backups: [backup-restore.md](backup-restore.md). Moving an existing Java server:
 | Symptom | Cause and fix |
 | --- | --- |
 | `db` stays unhealthy, `loginserver` and `gameserver` never start, and `docker inspect --format '{{json .State.Health}}' mariadb-server` shows `acis schema load did not finish`. The first `db` log shows `acis schema: ... not found` or a failed load. | The first-start schema load failed, usually because `ACIS_DATAPACK_DIR` does not point at an `aCis_datapack` checkout. That start exits; `restart: always` starts `db` again, and since the data directory already exists, that start skips the schema load and serves an empty or partial `acis` database. The load leaves the marker `/var/lib/mysql/.acis-schema-incomplete` behind, and the healthcheck fails while it exists. Run `docker compose down -v` (it **deletes** the database volume), fix the path, and start again. |
+| `db` stays unhealthy, `loginserver` and `gameserver` never start, and `docker inspect --format '{{json .State.Health}}' mariadb-server` shows `acis database has no tables`. The `db` log has no `acis schema:` lines. | The first `db` start was killed (out of memory, host reboot, `docker kill`) after MariaDB initialized the data directory but before the schema load ran. Every later start sees an initialized data directory and skips the load, so the `acis` database has no tables. Run `docker compose down -v` (it **deletes** the database volume) and start again. |
 | The game server exits with `open config/hexid.txt: no such file or directory`. | Step 4 was skipped, or the file was not renamed to `hexid.txt`. |
 | The game server log shows `wrong hexid`, or it keeps retrying the login link. | `config/hexid.txt` does not match the `gameservers` table, for example after the database was recreated. Register again (step 4), then restart **both** services: the login server reads the registered servers only at startup. |
 | Clients see the server list, but entering the game times out. | `Hostname` in `config/server.properties` is not reachable from the client. Set it to the public IP or DNS name and restart `gameserver`. |
