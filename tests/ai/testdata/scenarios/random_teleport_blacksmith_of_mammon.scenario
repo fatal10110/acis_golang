@@ -1,0 +1,16 @@
+# The Blacksmith of Mammon (RandomTeleport): he shouts one of his three lines as he appears
+# (draw 1, sent as the NPC lines' NPCs spawn, before the first step), and half an hour
+# later, then every half hour, moves to one of his six catacombs, drawing again while the
+# draw is where he last moved to (the first catacomb before any move), then shouts a line
+# where he arrives, out of the character's hearing (onCreated, onTimer). His first move
+# draws the first catacomb twice, then the fourth, then his line; his second draws the
+# fourth again, then the sixth, then his line. Every draw must be drawn, in order.
+# Expectations are derived from the reference source (RandomTeleport.java).
+character Seeker 20
+random 1 0 0 3 2 3 5 0
+script script.ai.group.RandomTeleport
+npc bom 31126 SignsPriest 100 0 0
+
+advance 29m59s
+advance 1s
+advance 30m
