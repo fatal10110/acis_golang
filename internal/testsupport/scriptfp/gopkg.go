@@ -72,8 +72,8 @@ func readGoPackage(dir string) (*goPackage, error) {
 				return false
 			}
 		case *ast.CompositeLit:
-			if isHooksType(n.Type) {
-				pkg.hookFields(n, funcs)
+			if renamed, ok := hooksType(n.Type); ok {
+				pkg.hookFields(n, funcs, renamed)
 			}
 		}
 		return true
@@ -132,20 +132,31 @@ func calledName(call *ast.CallExpr) string {
 	}
 }
 
-func isHooksType(expr ast.Expr) bool {
+// hooksType reports whether expr is the type of a hooks literal, a script's
+// Hooks or a maker's MakerHooks, and returns the reference hook names of
+// that type's renamed fields.
+func hooksType(expr ast.Expr) (renamed map[string]string, ok bool) {
+	var name string
 	switch t := expr.(type) {
 	case *ast.Ident:
-		return t.Name == "Hooks"
+		name = t.Name
 	case *ast.SelectorExpr:
-		return t.Sel.Name == "Hooks"
+		name = t.Sel.Name
 	}
-	return false
+	switch name {
+	case "Hooks":
+		return renamedHooks, true
+	case "MakerHooks":
+		return renamedMakerHooks, true
+	}
+	return nil, false
 }
 
-// hookFields records each OnX field of a Hooks literal with the shape of
+// hookFields records each OnX field of a hooks literal with the shape of
 // its parent calls: calls to X on any receiver other than the hook's first
-// parameter, which is the script itself (a re-entry, not a parent call).
-func (pkg *goPackage) hookFields(lit *ast.CompositeLit, funcs map[string]*ast.FuncDecl) {
+// parameter, which is the script or maker itself (a re-entry, not a parent
+// call). renamed names the fields whose reference hook is not on plus X.
+func (pkg *goPackage) hookFields(lit *ast.CompositeLit, funcs map[string]*ast.FuncDecl, renamed map[string]string) {
 	for _, elt := range lit.Elts {
 		kv, ok := elt.(*ast.KeyValueExpr)
 		if !ok {
@@ -166,7 +177,7 @@ func (pkg *goPackage) hookFields(lit *ast.CompositeLit, funcs map[string]*ast.Fu
 				ftype, body = fn.Type, fn.Body
 			}
 		}
-		name := referenceHookName(invoker)
+		name := hookName(invoker, renamed)
 		if body == nil {
 			pkg.hooks = append(pkg.hooks, Hook{Name: name, Shape: "none"})
 			continue
@@ -195,10 +206,25 @@ func (pkg *goPackage) hookFields(lit *ast.CompositeLit, funcs map[string]*ast.Fu
 // reference name: the bypass-event hook is OnEvent, invoked as Event.
 var renamedHooks = map[string]string{"Event": "onAdvEvent"}
 
+// renamedMakerHooks names the reference maker hooks whose MakerHooks field
+// is not On plus the reference name.
+var renamedMakerHooks = map[string]string{
+	"NPCCreated":  "onNpcCreated",
+	"NPCDeleted":  "onNpcDeleted",
+	"NPCDBInfo":   "onNpcDBInfo",
+	"ScriptEvent": "onMakerScriptEvent",
+}
+
 // referenceHookName returns the reference hook name of the Hooks field OnX,
 // given X.
 func referenceHookName(invoker string) string {
-	if name, ok := renamedHooks[invoker]; ok {
+	return hookName(invoker, renamedHooks)
+}
+
+// hookName returns the reference hook name of the field OnX of a hooks
+// type whose renamed fields are renamed, given X.
+func hookName(invoker string, renamed map[string]string) string {
+	if name, ok := renamed[invoker]; ok {
 		return name
 	}
 	return "on" + invoker
