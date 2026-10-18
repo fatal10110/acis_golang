@@ -19,8 +19,8 @@ const helperOwner = "Quest"
 // difference, sorted:
 //
 //   - a distinctive literal (number, string, char) on one side only;
-//   - an engine call of the classes with no Go name in apimap.txt, or whose
-//     Go name the package never calls; a Go call mapped from a Quest helper
+//   - an engine call of the classes with no Go name in apimap.txt, exempt
+//     from the API freeze, or whose Go name the package never calls; a Go call mapped from a Quest helper
 //     that none of the classes makes;
 //   - a hook (on* override) whose name or parent-call shape differs: the
 //     Go hook is the OnX field of a Hooks literal, its parent call a call
@@ -109,6 +109,8 @@ func check(ref map[string]Fingerprint, amap map[string]string, dir string, class
 		case !ok:
 			add("call "+row, "has no Go name in apimap.txt")
 		case goName == Inline:
+		case goName == Exempt:
+			add("call "+row, "is exempt from the API freeze and has no Go name yet")
 		case pkg.calls[lastSegment(goName)] == 0:
 			add("call "+row, fmt.Sprintf("is in the reference but the Go package never calls %s", goName))
 		}
@@ -116,7 +118,7 @@ func check(ref map[string]Fingerprint, amap map[string]string, dir string, class
 	for _, row := range slices.Sorted(maps.Keys(amap)) {
 		goName := amap[row]
 		owner, _, _ := strings.Cut(row, ".")
-		if owner != helperOwner || goName == Inline || calls[row] || pkg.calls[lastSegment(goName)] == 0 {
+		if owner != helperOwner || goName == Inline || goName == Exempt || calls[row] || pkg.calls[lastSegment(goName)] == 0 {
 			continue
 		}
 		mappedHere := false

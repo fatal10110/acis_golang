@@ -4,10 +4,13 @@
 #                      name after its last '.' against the package's calls
 #   <row> inline       the row has no Go call of its own (a getter the Go
 #                      handle folds into the next call)
+#   <row> exempt       the API freeze leaves the row out: only siegable-hall
+#                      classes make it (scriptfp.ExemptCaller), and the hall
+#                      port gives it its Go name
 #
 # A row is a census row: Owner.method, Owner.new for a constructor. Rows are
 # added by the slices that build the matching Go call; the script-facing API
-# is frozen when census.golden has no unmapped row. A row that is no longer
+# is frozen when census.golden has no unmapped row; exempt rows do not count. A row that is no longer
 # in the census fails TestCommittedGoldensAreConsistent.
 Npc.deleteMe DeleteMe
 Npc.getPrivateData CreatePrivates
@@ -826,3 +829,71 @@ Siege.getStatus script.Castle.SiegeStatus
 # after the scripts' hooks.
 Door.addMakerEvent script.Door.AddMakerEvent
 Quest.addDoorChange inline
+
+# Siegable-hall rows, exempt from the freeze. Their only callers are the
+# siegable-hall scripts and behaviors, the AgitWarrior subtree and the two quests
+# that read hall siege state; the hall siege runtime does not exist yet.
+Clan.getClanId exempt
+Clan.getDissolvingExpiryTime exempt
+Clan.getLeaderId exempt
+Clan.getLeaderName exempt
+Clan.getMembersCount exempt
+Clan.getName exempt
+Clan.getOnlineMembers exempt
+Clan.hasClanHall exempt
+Clan.setClanHallId exempt
+Clan.setFlag exempt
+ClanHall.banishForeigners exempt
+ClanHall.free exempt
+ClanHall.getZone exempt
+ClanHall.setOwner exempt
+ClanHallManager.getInstance exempt
+ClanHallManager.getSiegableHall exempt
+ClanHallSiege.cancelSiegeTask exempt
+ClanHallSiege.endSiege exempt
+ClanHallSiege.getAttackerClans exempt
+ClanHallSiege.unspawnNpcs exempt
+ClanTable.getClan exempt
+Creature.doDie exempt
+Creature.getActiveWeaponInstance exempt
+Creature.setInvul exempt
+CreatureCast.canAttemptCast exempt
+CreatureStatus.setHp exempt
+GameTimeTaskManager.getGameTime exempt
+Npc.getClanId exempt
+Npc.getSiegableHall exempt
+Player.destroyItem exempt
+Player.setSiegeState exempt
+Player.stopAllEffects exempt
+Player.teleToLocation exempt
+Player.updatePvPStatus exempt
+Residence.closeDoor exempt
+Residence.getName exempt
+Residence.getOwnerId exempt
+Residence.getRndSpawn exempt
+Residence.isFree exempt
+Residence.openDoor exempt
+SiegableHall.addAttacker exempt
+SiegableHall.getNextSiegeTime exempt
+SiegableHall.getSiege exempt
+SiegableHall.getSiegeDate exempt
+SiegableHall.getSiegeLength exempt
+SiegableHall.getSiegeZone exempt
+SiegableHall.isInSiege exempt
+SiegableHall.isRegistering exempt
+SiegableHall.isWaitingBattle exempt
+SiegableHall.setSiege exempt
+SiegableHall.spawnDoor exempt
+SiegableHall.updateNextSiege exempt
+SiegableHall.updateSiegeStatus exempt
+SiegeZone.setActive exempt
+Spawn.new exempt
+Spawn.setLoc exempt
+Summon.unSummon exempt
+SystemMessage.addFortId exempt
+SystemMessage.addString exempt
+ThreadPool.execute exempt
+World.toAllOnlinePlayers exempt
+WorldObject.forEachKnownTypeInRadius exempt
+ZoneType.getCreatures exempt
+ZoneType.getKnownTypeInside exempt

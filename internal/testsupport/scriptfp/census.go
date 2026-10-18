@@ -14,6 +14,41 @@ import (
 // its own, such as a getter the Go handle folds into the next call.
 const Inline = "inline"
 
+// Exempt is the apimap.txt value of a reference call that the API freeze
+// leaves out: every class that makes it is a siegable-hall script or behavior
+// (see ExemptCaller), ported after the hall siege runtime exists, and the row
+// gets its Go name in that port.
+const Exempt = "exempt"
+
+// exemptCallerPrefixes and exemptCallers name the classes an exempt row may
+// have: the siegable-hall scripts and behaviors, the clan-hall siege NPC
+// subtree under AgitWarrior, and the two quests that read hall siege state.
+var (
+	exemptCallerPrefixes = []string{
+		"script.siegablehall.",
+		"script.ai.siegablehall.",
+		"script.ai.individual.AgitWarrior.",
+	}
+	exemptCallers = map[string]bool{
+		"quest.Q504_CompetitionForTheBanditStronghold": true,
+		"quest.Q655_AGrandPlanForTamingWildBeasts":     true,
+	}
+)
+
+// ExemptCaller reports whether the class with script key class may make a
+// call whose row is exempt from the API freeze.
+func ExemptCaller(class string) bool {
+	if exemptCallers[class] {
+		return true
+	}
+	for _, prefix := range exemptCallerPrefixes {
+		if strings.HasPrefix(class, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 //go:embed apimap.txt
 var committedAPIMap []byte
 
@@ -36,7 +71,7 @@ func parseAPIMap(data []byte) (map[string]string, error) {
 		}
 		fields := strings.Fields(line)
 		if len(fields) != 2 || !strings.Contains(fields[0], ".") {
-			return nil, fmt.Errorf("scriptfp: apimap.txt line %d: want \"<Owner>.<method> <Go name>|%s\"", n, Inline)
+			return nil, fmt.Errorf("scriptfp: apimap.txt line %d: want \"<Owner>.<method> <Go name>|%s|%s\"", n, Inline, Exempt)
 		}
 		if _, dup := out[fields[0]]; dup {
 			return nil, fmt.Errorf("scriptfp: apimap.txt line %d: %s mapped twice", n, fields[0])
@@ -67,7 +102,7 @@ func Census(fps []Fingerprint, apimap map[string]string) []byte {
 			total += sites
 		}
 	}
-	var mapped, inline, unmapped, unresolved int
+	var mapped, inline, exempt, unmapped, unresolved int
 	var body bytes.Buffer
 	for _, row := range slices.Sorted(maps.Keys(rows)) {
 		goName, ok := apimap[row]
@@ -77,6 +112,8 @@ func Census(fps []Fingerprint, apimap map[string]string) []byte {
 			unmapped++
 		case goName == Inline:
 			inline++
+		case goName == Exempt:
+			exempt++
 		default:
 			mapped++
 		}
@@ -87,8 +124,8 @@ func Census(fps []Fingerprint, apimap map[string]string) []byte {
 	}
 	var b bytes.Buffer
 	b.WriteString(censusHeader)
-	fmt.Fprintf(&b, "classes %d sites %d rows %d mapped %d inline %d unmapped %d unresolved %d\n\n",
-		len(fps), total, len(rows), mapped, inline, unmapped, unresolved)
+	fmt.Fprintf(&b, "classes %d sites %d rows %d mapped %d inline %d exempt %d unmapped %d unresolved %d\n\n",
+		len(fps), total, len(rows), mapped, inline, exempt, unmapped, unresolved)
 	b.Write(body.Bytes())
 	return b.Bytes()
 }
