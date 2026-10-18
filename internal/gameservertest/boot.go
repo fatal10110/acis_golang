@@ -1592,17 +1592,17 @@ func (s *Server) skipCursedGroundItem(itemID int32) bool {
 // production stop hooks giving their last-chance writes their own budget.
 const shutdownDrainTimeout = 10 * time.Second
 
-// Shutdown drains every pending persistence batch exactly the way the
-// production stop hooks do — pending item mutations through one final
-// ItemInstances save, tracked ground items back into items_on_ground — and
-// then tears the stack down. Restart tests call it on the first Boot cycle
-// so the second Boot restores what the first died holding.
+// Drain runs the production stop hooks' final saves without stopping the
+// server — pending item mutations through one final ItemInstances save,
+// sealed quest journals and every persistence lane, tracked ground items
+// back into items_on_ground, spawn data — while connected players stay in
+// game, so none of their logout saves has written anything yet.
 //
 // It first settles, as the production stop order closes the listener and
 // stops the actor pool before those saves: a request still being handled —
 // a drop whose DropItem frame is already out but whose ground item is not
 // yet tracked — finishes before anything is snapshotted.
-func (s *Server) Shutdown(tb testing.TB) {
+func (s *Server) Drain(tb testing.TB) {
 	tb.Helper()
 	s.Settle(tb)
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownDrainTimeout)
@@ -1623,7 +1623,23 @@ func (s *Server) Shutdown(tb testing.TB) {
 			tb.Fatalf("shutdown spawn data save: %v", err)
 		}
 	}
-	s.Close()
+}
+
+// Shutdown drains every pending persistence batch the way the production
+// stop hooks do (Drain), then stops serving and tears the stack down.
+// Restart tests call it on the first Boot cycle so the second Boot restores
+// what the first died holding.
+//
+// It returns only once every connection handler has returned (Stop), so each
+// connected player's detach save has landed: a detach still running after
+// Shutdown would write this stack's state over whatever a second Boot on the
+// same database writes next. That detach save also writes the player's final
+// inventory, so a test proving the drain alone lands state checks the rows
+// after Drain, before Shutdown.
+func (s *Server) Shutdown(tb testing.TB) {
+	tb.Helper()
+	s.Drain(tb)
+	s.Stop()
 	// Boot's own t.Cleanup(taskEffects.Reset) only fires at the end of the
 	// whole test function, not between two Boot calls a restart test makes
 	// within one function — reset explicitly here too, so the second

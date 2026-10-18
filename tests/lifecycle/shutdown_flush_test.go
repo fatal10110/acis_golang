@@ -26,7 +26,9 @@ func TestShutdownFlushMatchesFinalInventoryState(t *testing.T) {
 	c.Send(encodeRequestDropItem(adena, 40, spawnX, spawnY, spawnZ))
 	groundID := readDropItemGroundID(t, c.Read(), objID, item.AdenaID, 40)
 
-	srv.Shutdown(t)
+	// The rows are checked before Shutdown: stopping detaches the
+	// still-connected player, whose logout save would write them too.
+	srv.Drain(t)
 
 	if counts := persistedAdena(t, srv, objID); len(counts) != 1 || counts[0] != 60 {
 		t.Fatalf("persisted adena stacks after shutdown = %v, want one stack of 60", counts)
@@ -35,6 +37,7 @@ func TestShutdownFlushMatchesFinalInventoryState(t *testing.T) {
 	if len(rows) != 1 || rows[0].ObjectID != groundID || rows[0].Count != 40 {
 		t.Fatalf("items_on_ground rows after shutdown = %+v, want one adena row object %d count 40", rows, groundID)
 	}
+	srv.Shutdown(t)
 
 	srv2 := gameservertest.Boot(t, gameservertest.WithWantChars(1))
 	if got := srv2.SoleObjectID(t); got != objID {
@@ -63,7 +66,9 @@ func TestShutdownFlushPersistsDestruction(t *testing.T) {
 
 	destroyStack(t, c, potions, 5)
 
-	srv.Shutdown(t)
+	// Checked before Shutdown, whose logout save of the still-connected
+	// player would delete the row too.
+	srv.Drain(t)
 
 	for _, inst := range persistedItems(t, srv, objID) {
 		if inst.ObjectID == potions {
