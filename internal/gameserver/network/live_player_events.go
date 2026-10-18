@@ -398,6 +398,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FramePlaySound(e.File))
 	case event.ScreenMessageShown:
 		live.SendFrame(serverpackets.FrameExShowScreenMessage(e.Text, e.DurationMs))
+	case event.GroupScreenMessageShown:
+		l.showGroupScreenMessage(live, e)
 	case event.EarthquakeStarted:
 		live.SendFrame(serverpackets.FrameEarthquake(e.At.X, e.At.Y, e.At.Z, e.Intensity, e.Duration, false))
 	case event.MultisellRequested:

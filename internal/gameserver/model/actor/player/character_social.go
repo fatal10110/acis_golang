@@ -20,6 +20,10 @@ type SocialGraph interface {
 	// SameChannel reports whether b is in the command channel a's party
 	// belongs to.
 	SameChannel(a, b int32) bool
+	// Channel returns the command channel objectID's party is in: its
+	// leader and its parties in the order they joined, each party's
+	// characters in party order. ok is false when it is in none.
+	Channel(objectID int32) (leader *Character, parties [][]*Character, ok bool)
 	// AllyID is the alliance of the clan, 0 when it is in none.
 	AllyID(clanID int32) int32
 	// ClanLeaderID is the object id of the clan's leader, 0 for no clan.

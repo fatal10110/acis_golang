@@ -80,13 +80,7 @@ func (p *Player) PartyMembers() []*Player {
 	if members == nil {
 		return nil
 	}
-	out := make([]*Player, 0, len(members))
-	for _, m := range members {
-		if self, ok := m.WorldHandle().(attackable.Combatant); ok {
-			out = append(out, PlayerOf(self))
-		}
-	}
-	return out
+	return playersOf(members)
 }
 
 // WorldPlayer returns the player in the world whose object id is objectID,

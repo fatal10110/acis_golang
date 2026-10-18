@@ -11,6 +11,20 @@ func (c *Character) ShowScreenMessage(text string, durationMs int32) {
 	c.emit(event.ScreenMessageShown{Text: text, DurationMs: durationMs})
 }
 
+// ShowPartyScreenMessage shows text at the top center of the screen of
+// every member of c's party, c included, for durationMs milliseconds; no
+// one sees it when c is in no party.
+func (c *Character) ShowPartyScreenMessage(text string, durationMs int32) {
+	c.emit(event.GroupScreenMessageShown{Text: text, DurationMs: durationMs})
+}
+
+// ShowChannelScreenMessage shows text at the top center of the screen of
+// every member of the command channel c's party is in, party by party, for
+// durationMs milliseconds; no one sees it when c is in no channel.
+func (c *Character) ShowChannelScreenMessage(text string, durationMs int32) {
+	c.emit(event.GroupScreenMessageShown{Text: text, DurationMs: durationMs, Channel: true})
+}
+
 // ShakeScreen shakes c's screen around where c stands now, with intensity,
 // for duration seconds; no one else feels it.
 func (c *Character) ShakeScreen(intensity, duration int32) {

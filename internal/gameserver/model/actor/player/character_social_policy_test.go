@@ -34,6 +34,8 @@ func (g policyGraph) SameChannel(a, b int32) bool {
 	return ca != 0 && ca == cb
 }
 
+func (policyGraph) Channel(int32) (*Character, [][]*Character, bool) { return nil, nil, false }
+
 func (g policyGraph) AllyID(clanID int32) int32                  { return g.ally[clanID] }
 func (g policyGraph) ClanLeaderID(clanID int32) int32            { return g.leader[clanID] }
 func (g policyGraph) AtWar(clanID, targetID int32) bool          { return g.wars[[2]int32{clanID, targetID}] }
