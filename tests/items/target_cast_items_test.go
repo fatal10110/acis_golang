@@ -77,18 +77,19 @@ func selectAt(t *testing.T, c *testsupport.ScriptedClient, objectID int32, at lo
 	drainUntilQuiet(t, c)
 }
 
-// assertTargetCast reads the cast start of skillID by objID on targetID.
-// The skills' reuse is not static, so the reuse field is the caster's
-// speed-scaled value and is not pinned here.
-func assertTargetCast(t *testing.T, c *testsupport.ScriptedClient, objID, targetID, skillID, hitTime int32) {
+// assertTargetCast reads the cast start of skillID by objID on targetID and
+// returns the reuse it announced. The skills' reuse is not static, so the
+// reuse field is the caster's speed-scaled value and is not pinned here.
+func assertTargetCast(t *testing.T, c *testsupport.ScriptedClient, objID, targetID, skillID, hitTime int32) time.Duration {
 	t.Helper()
 	frame := c.Read()
 	assertFrameOpcode(t, frame, serverpackets.OpcodeMagicSkillUse, "item skill MagicSkillUse")
-	caster, target, sid, level, gotHit, _ := decodeMagicSkillUse(frame)
+	caster, target, sid, level, gotHit, reuse := decodeMagicSkillUse(frame)
 	if caster != objID || target != targetID || sid != skillID || level != 1 || gotHit != hitTime {
 		t.Fatalf("MagicSkillUse = caster %d target %d skill %d-%d hit %d, want %d/%d/%d-1/%d",
 			caster, target, sid, level, gotHit, objID, targetID, skillID, hitTime)
 	}
+	return time.Duration(reuse) * time.Millisecond
 }
 
 // assertRefusedAlone reads messageID, or nothing at all when messageID is

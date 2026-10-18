@@ -157,9 +157,6 @@ func systemMessageAmong(t *testing.T, frames [][]byte, ids ...int) int {
 // so all tries fail in about 0.35^16 < 1e-7 of runs.
 const maxSowTries = 16
 
-// sowReuse clears Sowing's 10 s reuse between tries.
-const sowReuse = 11 * time.Second
-
 // TestSeedSowsTargetedMonster uses Seed: Dark Coda on targeted Lesser
 // Succubi that spawned in a Gludio manor area and have since walked out of
 // it: each use starts Sowing (2097) at once on the target and spends the
@@ -176,16 +173,20 @@ func TestSeedSowsTargetedMonster(t *testing.T) {
 
 	var sown *npc.Hostile
 	tries := 0
+	// reuse is the last Sowing's announced reuse. Sowing's reuse is not
+	// static: the 10 s template value scales with the sower's casting speed
+	// (about 13 s at level 20), so each retry waits out the announced value.
+	var reuse time.Duration
 	for sown == nil && tries < maxSowTries {
 		if tries > 0 {
-			srv.Advance(t, sowReuse)
+			srv.Advance(t, reuse)
 		}
 		tries++
 		mob := spawnGludioSuccubus(t, srv, succubus)
 		selectAt(t, c, mob.ObjectID(), targetCastSpot)
 
 		c.Send(encodeUseItem(seed, false))
-		assertTargetCast(t, c, objID, mob.ObjectID(), 2097, 1800)
+		reuse = assertTargetCast(t, c, objID, mob.ObjectID(), 2097, 1800)
 		srv.AdvanceUntil(t, "Sowing cast ends", func() bool { return !srv.PlayerCastingNow(t, objID) })
 		frames := collectUntilQuiet(t, c)
 		switch systemMessageAmong(t, frames, serverpackets.SystemMessageSeedSuccessfullySown, serverpackets.SystemMessageSeedNotSown) {
