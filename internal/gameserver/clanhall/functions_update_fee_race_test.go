@@ -49,7 +49,7 @@ func TestUpdateDuringFeeKeepsChangedFunction(t *testing.T) {
 		f.treasury = treasury
 		f.mu.Unlock()
 
-		f.Update(feeHall, hallmodel.FuncRestoreHP, 80, 1000, day.Milliseconds())
+		f.Update(feeHall, hallmodel.FuncRestoreHP, 80, 1000, day.Milliseconds(), nil)
 		f.mu.Lock()
 		fn := f.byHall[feeHall][hallmodel.FuncRestoreHP]
 		gen := fn.gen
@@ -70,7 +70,7 @@ func TestUpdateDuringFeeKeepsChangedFunction(t *testing.T) {
 		}
 
 		// The leader pays for a change meanwhile.
-		f.Update(feeHall, hallmodel.FuncRestoreHP, 140, 1750, day.Milliseconds())
+		f.Update(feeHall, hallmodel.FuncRestoreHP, 140, 1750, day.Milliseconds(), nil)
 		changedEnd := clock.Now().Add(day).UnixMilli()
 		savesBefore := store.saved()
 		close(treasury.release)

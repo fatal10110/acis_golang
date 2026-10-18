@@ -632,7 +632,8 @@ func (d hallDialog) offer(c hallChange, apply string, args []string) {
 // change rents, changes or, at level 0, cancels c at the level args names,
 // the fee and term of that level per clanHallDeco.xml. A function already
 // at that level is left as is. The first fee comes out of the talker's
-// adena; short of it, the low adena page opens. A change shows the hall's
+// adena, whose row lands ahead of the function's; short of it, the low
+// adena page opens. A change shows the hall's
 // new decorations to everyone inside it; one to support magic has the
 // manager check its own buff on its next idle tick.
 func (d hallDialog) change(c hallChange, args []string) {
@@ -665,15 +666,22 @@ func (d hallDialog) change(c hallChange, args []string) {
 		d.l.log.Warn().Int32("hall_id", d.hallID()).Int("type", c.funcType).Int("level", link).Msg("clan hall: function level without a fee refused")
 		return
 	}
-	if fee > 0 && !reduceAdena(d.live, fee) {
-		file = "low_adena.htm"
-	} else {
-		d.l.hallFunctions.Update(d.hallID(), c.funcType, level, fee, int64(days)*hallFunctionDayMs)
-		if c.funcType == hallmodel.FuncSupportMagic {
-			d.f.ResetSupportBuffCheck()
+	var paid clanhall.Landing
+	if fee > 0 {
+		stack, ok := spendAdena(d.live, fee)
+		if !ok {
+			d.sendPage("low_adena.htm")
+			return
 		}
-		d.l.broadcastHallDecoration(d.hallID())
+		if stack != nil {
+			paid = d.l.landItems(stack)
+		}
 	}
+	d.l.hallFunctions.Update(d.hallID(), c.funcType, level, fee, int64(days)*hallFunctionDayMs, paid)
+	if c.funcType == hallmodel.FuncSupportMagic {
+		d.f.ResetSupportBuffCheck()
+	}
+	d.l.broadcastHallDecoration(d.hallID())
 	d.sendPage(file)
 }
 

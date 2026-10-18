@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 )
 
@@ -100,7 +101,7 @@ func (f *Folk) residenceCommand(pages Pages, kind InstanceKind, rules ChatRules,
 	case "CastleMagician":
 		return f.magicianCommand(pages, talker.residence(), command, reply)
 	case "CastleDoorman", "ClanHallDoorman", "Doorman":
-		return f.doormanCommand(pages, kind, rules, talker.residence(), command, reply)
+		return f.doormanCommand(pages, kind, rules, talker, command, reply)
 	case "MercenaryManagerNpc":
 		return f.mercenaryCommand(pages, talker.residence(), command, reply)
 	case "CastleGatekeeper":
@@ -224,9 +225,10 @@ func doormanOwner(kind InstanceKind, r ResidenceTalk) bool {
 //
 // ponytail: a siegable hall's siege is not run yet (#244), so its doorman
 // never reads as busy.
-func (f *Folk) doormanCommand(pages Pages, kind InstanceKind, rules ChatRules, r ResidenceTalk, command string, reply BypassReply) (BypassReply, bool) {
+func (f *Folk) doormanCommand(pages Pages, kind InstanceKind, rules ChatRules, talker Talker, command string, reply BypassReply) (BypassReply, bool) {
+	r := talker.residence()
 	if kind == "ClanHallDoorman" {
-		if out, ok := f.hallWyvernCommand(pages, rules, r, command, reply); ok {
+		if out, ok := f.hallWyvernCommand(pages, rules, talker, r, command, reply); ok {
 			return out, true
 		}
 	}
@@ -359,8 +361,8 @@ func parseDoorIDs(tokens []string) (ids []int, malformed bool) {
 // matched by prefix, for a member of the clan owning its hall; anyone else,
 // and any other hall's doorman, is answered nothing. wyvern_info and
 // wyvern_help open the wyvern pages 1 and 7, and wyvern_ride lets the clan
-// leader ride (#3850). ok is false for every other command.
-func (f *Folk) hallWyvernCommand(pages Pages, rules ChatRules, r ResidenceTalk, command string, reply BypassReply) (BypassReply, bool) {
+// leader ride; see wyvernRide. ok is false for every other command.
+func (f *Folk) hallWyvernCommand(pages Pages, rules ChatRules, talker Talker, r ResidenceTalk, command string, reply BypassReply) (BypassReply, bool) {
 	var val string
 	switch {
 	case strings.HasPrefix(command, "wyvern_info"):
@@ -376,15 +378,44 @@ func (f *Folk) hallWyvernCommand(pages Pages, rules ChatRules, r ResidenceTalk, 
 		return reply, true
 	}
 	if val == "" {
-		// ponytail: the ride itself is #3850.
 		if r.ClanLeader {
-			reply.Outcome = BypassUnported
+			reply = f.wyvernRide(pages, rules, talker, r, "clanHallDoormen", true, reply)
 		}
 		return reply, true
 	}
 	reply.Outcome, reply.Chat = BypassChatAs, ChatShown
 	reply.HTML = f.wyvernPage(pages, rules, "data/html/clanHallDoormen/wyvernmanager-"+val+".htm")
 	return reply, true
+}
+
+// wyvernRide answers a clan leader's request to ride a wyvern, whose pages
+// are those of dir: page 3 while Dusk owns the Seal of Strife; on no
+// strider, the message saying a wyvern is ridden only from one with page 1,
+// except that a hall doorman answers page 8 alone while the talker's mount
+// level is short of the ride's strider level; page 6 for a strider of too
+// low a level; else the ride itself, page 4, or page 5 for a talker short of
+// the crystals. Each page then releases the client.
+func (f *Folk) wyvernRide(pages Pages, rules ChatRules, talker Talker, r ResidenceTalk, dir string, doorman bool, reply BypassReply) BypassReply {
+	page := func(val string) string {
+		return f.wyvernPage(pages, rules, "data/html/"+dir+"/wyvernmanager-"+val+".htm")
+	}
+	strider := player.MountTypeOf(talker.MountNPCID) == player.MountTypeStrider
+	short := talker.MountLevel < rules.Wyvern.StriderLevel
+	reply.Outcome = BypassChatWindow
+	switch {
+	case r.StrifeOwner == sevensigns.Dusk:
+		reply.HTML = page("3")
+	case !strider && doorman && short:
+		reply.HTML = page("8")
+	case !strider:
+		reply.Outcome, reply.HTML = BypassWyvernNoStrider, page("1")
+	case short:
+		reply.HTML = page("6")
+	default:
+		reply.Outcome, reply.HTML, reply.ShortHTML = BypassWyvernRide, page("4"), page("5")
+		reply.Count = rules.Wyvern.Crystals
+	}
+	return reply
 }
 
 // teleportAllowed reports whether an NPC of kind lets the talker use its
@@ -546,8 +577,9 @@ func (f *Folk) wyvernPage(pages Pages, rules ChatRules, path string) string {
 // wyvernManagerCommand answers every command at a wyvern manager, which
 // heeds only the talker who last selected it. Chat <val> opens page val,
 // page 1 when the command has none, and a val climbing out of the wyvern
-// pages reads as a missing page; RideWyvern lets the clan leader ride
-// (#3850). A talker of no clan owning its residence is refused every other
+// pages reads as a missing page; RideWyvern lets the leader of the clan
+// owning its residence ride, see wyvernRide, and opens page 2 for anyone
+// else. A talker of no clan owning its residence is refused every other
 // command with the chamberlain's refusal page, whose other commands are
 // #3849.
 func (f *Folk) wyvernManagerCommand(pages Pages, rules ChatRules, talker Talker, command string, reply BypassReply) BypassReply {
@@ -555,8 +587,12 @@ func (f *Folk) wyvernManagerCommand(pages Pages, rules ChatRules, talker Talker,
 	case !talker.CurrentFolk:
 		reply.Outcome = BypassRefused
 	case strings.HasPrefix(command, "RideWyvern"):
-		// ponytail: the ride is #3850.
-		reply.Outcome = BypassUnported
+		r := talker.residence()
+		if !r.owns() || !r.ClanLeader {
+			reply.Outcome, reply.HTML = BypassChatWindow, f.wyvernPage(pages, rules, "data/html/wyvernmanager/wyvernmanager-2.htm")
+			break
+		}
+		reply = f.wyvernRide(pages, rules, talker, r, "wyvernmanager", false, reply)
 	case strings.HasPrefix(command, "Chat"):
 		val, ok := commandChars(command, 5, -1)
 		if !ok {
