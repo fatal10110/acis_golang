@@ -185,7 +185,9 @@ func settleFixedStats(inst *Instance, lookup skillDefinitions) (fixedStats, erro
 		return fixedStats{}, fmt.Errorf("npc %d template passives: %w", inst.Template.ID, err)
 	}
 	t := inst.Template
-	fs := fixedStats{template: t, mods: mods}
+	// A decoration has no condition view: a func with an attached condition
+	// never attaches.
+	fs := fixedStats{template: t, mods: effect.Attachable(mods, nil)}
 	fs.maxHP = int(fs.calc(stat.MaxHP, t.HPMax))
 	fs.pAtkSpd = int(fs.calc(stat.PowerAttackSpeed, t.AtkSpd))
 	fs.mAtkSpd = int(fs.calc(stat.MagicAttackSpeed, magicAttackSpeedBase))
@@ -213,7 +215,7 @@ func (fs fixedStats) calc(s stat.Stat, base float64) float64 {
 			c.AddMod(m)
 		}
 	}
-	v := c.Calc(templateStatActor{t: fs.template}, base, nil)
+	v := c.Calc(templateStatActor{t: fs.template}, base, nil, nil)
 	if s.CantBeNegative() && v <= 0 {
 		return 1
 	}

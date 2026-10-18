@@ -9,14 +9,15 @@ import (
 
 // TestFuncConditionSkillContext covers #3669: a func's own <skill stat> is
 // tested with the skill the stat calculation runs for (Func.calc), its
-// block's attached one with the skill owning the func (FuncTemplate.getFunc).
+// block's attached one with the skill owning the func when the func is
+// attached (FuncTemplate.getFunc).
 func TestFuncConditionSkillContext(t *testing.T) {
 	t.Parallel()
 	pAtk := modelskill.Condition{Kind: "skill", Attrs: map[string]string{"stat": "pAtk"}}
 	actor := fakeConditionActor{level: 80}
 	powerAttack, maxHP := conditions.SkillOf("POWER_ATTACK"), conditions.SkillOf("MAX_HP")
 
-	own, err := funcCondition(&pAtk, nil, maxHP)
+	own, err := funcCondition(&pAtk)
 	if err != nil || own == nil {
 		t.Fatalf("own gate: (%v, %v)", own, err)
 	}
@@ -28,12 +29,12 @@ func TestFuncConditionSkillContext(t *testing.T) {
 		"calculation for a MAX_HP skill":       {maxHP, false},
 		"calculation for no skill":             {nil, false},
 	} {
-		if got := own.Test(actor, tc.skill); got != tc.want {
+		if got := own.Test(actor, nil, tc.skill); got != tc.want {
 			t.Errorf("own <skill stat=pAtk>, %s: %v, want %v", name, got, tc.want)
 		}
 	}
 
-	attach := &modelskill.ConditionClause{Root: pAtk}
+	attached := []modelskill.FuncTemplate{{Op: modelskill.FuncAdd, Stat: "pAtk", Value: 1, AttachCondition: &modelskill.ConditionClause{Root: pAtk}}}
 	for name, tc := range map[string]struct {
 		owner conditions.Skill
 		want  bool
@@ -42,14 +43,12 @@ func TestFuncConditionSkillContext(t *testing.T) {
 		"owned by a MAX_HP skill":       {maxHP, false},
 		"owned by no skill (an item)":   {nil, false},
 	} {
-		gate, err := funcCondition(nil, attach, tc.owner)
-		if err != nil || gate == nil {
-			t.Fatalf("attached gate %s: (%v, %v)", name, gate, err)
+		mods, err := statFuncs(ModOwnerSkill(modelskill.Ref{ID: 1, Level: 1}), attached, tc.owner)
+		if err != nil || len(mods) != 1 || mods[0].Cond != nil {
+			t.Fatalf("attached func %s: (%v, %v), want one ungated mod", name, mods, err)
 		}
-		for _, calc := range []conditions.Skill{nil, powerAttack, maxHP} {
-			if got := gate.Test(actor, calc); got != tc.want {
-				t.Errorf("attached <skill stat=pAtk> %s, calculation skill %v: %v, want %v", name, calc, got, tc.want)
-			}
+		if got := len(Attachable(mods, actor)) == 1; got != tc.want {
+			t.Errorf("attached <skill stat=pAtk> %s: attaches %v, want %v", name, got, tc.want)
 		}
 	}
 }

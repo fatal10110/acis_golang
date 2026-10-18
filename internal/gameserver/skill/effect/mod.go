@@ -65,11 +65,11 @@ func (op Op) order() int {
 	}
 }
 
-// Condition gates whether a Mod's calculation applies against effector, the
-// only side of a stat calculation a Mod ever reads, for a calculation run
-// for skill (nil when it runs for no skill).
+// Condition gates whether a Mod's calculation applies: effector is the stat
+// owner, effected the calculation's target (nil when it runs against no
+// target) and skill the skill it runs for (nil when it runs for no skill).
 type Condition interface {
-	Test(effector stat.Actor, skill conditions.Skill) bool
+	Test(effector stat.Actor, effected conditions.Actor, skill conditions.Skill) bool
 }
 
 // ModOwner identifies whatever attached a Mod, so a Calculator can later
@@ -123,12 +123,18 @@ type Mod struct {
 	Value float64
 	Cond  Condition // nil always applies
 	Owner ModOwner
+
+	// attach is the <cond> attached to the func's enclosing <for>/<effect>
+	// group (nil when none), tested with attachSkill, the skill owning the
+	// func, once, when the func is attached (see Attachable).
+	attach      conditions.Condition
+	attachSkill conditions.Skill
 }
 
 // apply runs m against the calculation chain's running value, gated by its
 // Cond.
-func apply(m Mod, actor stat.Actor, skill conditions.Skill, base, value float64) float64 {
-	if m.Cond != nil && !m.Cond.Test(actor, skill) {
+func apply(m Mod, actor stat.Actor, target conditions.Actor, skill conditions.Skill, base, value float64) float64 {
+	if m.Cond != nil && !m.Cond.Test(actor, target, skill) {
 		return value
 	}
 	switch m.Op {
@@ -314,13 +320,14 @@ func (c *Calculator) RemoveOwner(owner ModOwner) int {
 }
 
 // Calc runs the chain for actor, starting the running value from base, for
-// a calculation run for skill (nil when it runs for no skill):
+// a calculation against target (nil for none) run for skill (nil when it
+// runs for no skill):
 // every Mod ordered below the builtin finalize step, then the builtin (if
 // any), then every Mod ordered above it. A Set overrides the base value
 // seen by everything that runs after it, including the builtin, mirroring
 // how a template override (e.g. a weapon's flat P.Atk) replaces rather
 // than augments the starting point for what follows.
-func (c *Calculator) Calc(actor stat.Actor, base float64, skill conditions.Skill) float64 {
+func (c *Calculator) Calc(actor stat.Actor, base float64, target conditions.Actor, skill conditions.Skill) float64 {
 	c.mu.RLock()
 	mods := c.mods
 	builtin := c.builtin
@@ -329,7 +336,7 @@ func (c *Calculator) Calc(actor stat.Actor, base float64, skill conditions.Skill
 	value := base
 	i := 0
 	for ; i < len(mods) && mods[i].Op.order() < orderFinalize; i++ {
-		value = apply(mods[i], actor, skill, base, value)
+		value = apply(mods[i], actor, target, skill, base, value)
 		if mods[i].Op == OpSet {
 			base = value
 		}
@@ -338,7 +345,7 @@ func (c *Calculator) Calc(actor stat.Actor, base float64, skill conditions.Skill
 		value = builtin(actor, base, value)
 	}
 	for ; i < len(mods); i++ {
-		value = apply(mods[i], actor, skill, base, value)
+		value = apply(mods[i], actor, target, skill, base, value)
 	}
 	return value
 }

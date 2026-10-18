@@ -143,10 +143,10 @@ func TestConditionalStatFuncsBuildForEveryShippedSkill(t *testing.T) {
 			}
 			rEvasFunc = true
 			const lightMask = 1 << 15 // item.ArmorLight.Mask()
-			if !fn.Cond.Test(fakeWearingActor{mask: lightMask}, nil) {
+			if !fn.Cond.Test(fakeWearingActor{mask: lightMask}, nil, nil) {
 				t.Error("rEvas bonus should apply while wearing light armor")
 			}
-			if fn.Cond.Test(fakeWearingActor{mask: 0}, nil) {
+			if fn.Cond.Test(fakeWearingActor{mask: 0}, nil, nil) {
 				t.Error("rEvas bonus should not apply while not wearing light armor")
 			}
 		}

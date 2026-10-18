@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -383,8 +384,11 @@ func (c *Character) Accuracy() int {
 
 // CriticalRate returns this player's physical critical rate, truncated to
 // an int and capped at 500: min(int(stat), 500).
-func (c *Character) CriticalRate() float64 {
-	return float64(min(int(c.calcStat(stat.CriticalRate, c.activeWeapon().stat("rCrit", 4))), 500))
+func (c *Character) CriticalRate() float64 { return c.criticalRate(nil) }
+
+// criticalRate is CriticalRate for a calculation against target.
+func (c *Character) criticalRate(target conditions.Actor) float64 {
+	return float64(min(int(c.calcFor(stat.CriticalRate, c.activeWeapon().stat("rCrit", 4), target, nil)), 500))
 }
 
 // MagicCriticalRate returns this player's magic critical rate.
@@ -784,40 +788,46 @@ func (c *Character) ClientActionFailed() {}
 // PAtk returns the physical attack value, truncated to a whole number
 // before any formula reads it. A rider attacks from its mount's P.Atk.
 // instead of its class and weapon.
-func (c *Character) PAtk() float64 {
+func (c *Character) PAtk() float64 { return c.pAtk(nil) }
+
+// pAtk is PAtk for a calculation against target. A rider's P.Atk. is
+// calculated against no target.
+func (c *Character) pAtk(target conditions.Actor) float64 {
 	if m, ok := c.ridden(); ok {
 		return math.Trunc(c.calcStat(stat.PowerAttack, m.pAtk))
 	}
-	return c.pAtk(c.activeWeapon())
-}
-
-func (c *Character) pAtk(weapon activeWeapon) float64 {
 	tmpl := c.template()
 	base := 1.0
 	if tmpl != nil && tmpl.PAtk > 0 {
 		base = tmpl.PAtk
 	}
-	return math.Trunc(c.calcStat(stat.PowerAttack, weapon.stat("pAtk", base)))
+	return math.Trunc(c.calcFor(stat.PowerAttack, c.activeWeapon().stat("pAtk", base), target, nil))
 }
 
 // PDef returns the current physical defence value, truncated to a whole
 // number.
-func (c *Character) PDef() float64 {
+func (c *Character) PDef() float64 { return c.pDef(nil) }
+
+// pDef is PDef for a calculation against target.
+func (c *Character) pDef(target conditions.Actor) float64 {
 	tmpl := c.template()
 	base := 1.0
 	if tmpl != nil && tmpl.PDef > 0 {
 		base = tmpl.PDef
 	}
-	return math.Trunc(c.calcStat(stat.PowerDefence, base))
+	return math.Trunc(c.calcFor(stat.PowerDefence, base, target, nil))
 }
 
 // Evasion returns this player's physical evasion rating.
-func (c *Character) Evasion() int {
+func (c *Character) Evasion() int { return c.evasion(nil) }
+
+// evasion is Evasion for a calculation against target.
+func (c *Character) evasion(target conditions.Actor) int {
 	tmpl := c.template()
 	if tmpl == nil {
 		return c.Level()
 	}
-	val := c.calcStat(stat.EvasionRate, 0)
+	val := c.calcFor(stat.EvasionRate, 0, target, nil)
 	if agp := c.ArmorGradePenalty(); agp > 0 {
 		val -= 2 * float64(agp)
 	}

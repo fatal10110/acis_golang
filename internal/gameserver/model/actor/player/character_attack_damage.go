@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attack"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 )
 
@@ -38,7 +39,7 @@ func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attac
 	}
 
 	accuracy := c.Accuracy()
-	evasion := other.Evasion()
+	evasion := other.Against(c.ConditionActor(), nil).Evasion()
 
 	_, _, sz := c.Position()
 	_, _, tz := other.Position()
@@ -49,7 +50,7 @@ func (c *Character) MakeAttackHit(target attackable.Combatant, split bool) attac
 		return hit
 	}
 
-	crit := formulas.CritSucceeds(c.CriticalRate(), c.rollValue(1000))
+	crit := formulas.CritSucceeds(c.criticalRate(conditions.ActorOf(other)), c.rollValue(1000))
 	in, shield := creature.ResolvePhysicalAttackInput(c, other, crit)
 	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
 	hit.Crit = crit

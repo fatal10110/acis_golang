@@ -535,7 +535,7 @@ func (a *liveZoneActor) SwimStateChanged(swimming bool) {
 		return
 	}
 	if swimming {
-		breath := time.Duration(live.CalcStat(stat.Breath, float64(time.Minute)*live.Race.BreathMultiplier()))
+		breath := time.Duration(live.Against(live.ConditionActor(), nil).CalcStat(stat.Breath, float64(time.Minute)*live.Race.BreathMultiplier()))
 		l.water.Add(live, breath)
 		return
 	}

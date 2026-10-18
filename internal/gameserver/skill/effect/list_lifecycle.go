@@ -483,13 +483,19 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect), announce bool) f
 		if e.OnStart != nil {
 			ok = e.OnStart(e)
 		}
+		// Each activation tests the funcs' attached conditions afresh, before
+		// l.mu: a condition may read this same list.
+		var fns []Mod
+		if ok {
+			fns = e.attachableFuncs()
+		}
 
 		attached := false
 		l.mu.Lock()
 		if ok {
 			e.inUse = true
 			if !e.startRefused {
-				l.attachStatFuncs(e)
+				l.attachStatFuncs(fns)
 				attached = true
 			}
 		} else {
@@ -500,7 +506,7 @@ func (l *List) beginActivate(e *Effect, onReject func(*Effect), announce bool) f
 		// The stat refresh runs outside l.mu: a RUN_SPEED change rebuilds the
 		// owner's appearance for its observers, which reads this list's flags.
 		if attached && l.owner != nil {
-			l.owner.StatFuncsAttached(e.Funcs)
+			l.owner.StatFuncsAttached(fns)
 		}
 		if ok && announce && !e.startRefused && e.Template.Icon && l.owner != nil {
 			l.owner.NotifyEffectFelt(e.Skill.ID, e.Skill.Level)

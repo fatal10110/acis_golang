@@ -44,7 +44,7 @@ func ResolveCubicMagicDamageInput(owner, target FormulaActor, def modelskill.Def
 	if owner == nil || target == nil {
 		return formulas.CubicMagicDamageInput{}, false
 	}
-	mDef := target.ForSkill(calcSkill(def)).MDef()
+	mDef := target.Against(view(owner), calcSkill(def)).MDef()
 	if shield == formulas.ShieldSuccess {
 		mDef += target.CalcStat(stat.ShieldDefence, 0)
 	}

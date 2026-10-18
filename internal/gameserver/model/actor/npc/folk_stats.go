@@ -41,7 +41,7 @@ func (f *Folk) statCalc(s stat.Stat) *effect.Calculator {
 // passives and the funcs of the effects it holds, flooring a non-positive
 // stat that can't go negative at one.
 func (f *Folk) CalcStat(s stat.Stat, base float64) float64 {
-	value := f.statCalc(s).Calc(templateStatActor{t: f.Instance.Template}, base, nil)
+	value := f.statCalc(s).Calc(templateStatActor{t: f.Instance.Template}, base, nil, nil)
 	if s.CantBeNegative() && value <= 0 {
 		return 1
 	}
@@ -174,14 +174,16 @@ func (f *Folk) MDef() float64 {
 	return math.Trunc(f.CalcStat(stat.MagicDefence, positiveStat(f.Instance.Template.MDef)))
 }
 
+// CriticalRate returns the physical critical rate, capped at 500.
+func (f *Folk) CriticalRate() float64 {
+	return float64(min(int(f.CalcStat(stat.CriticalRate, f.Instance.Template.CritRate)), 500))
+}
+
 // MagicCriticalRate returns the magic critical rate.
 func (f *Folk) MagicCriticalRate() float64 { return f.CalcStat(stat.MCriticalRate, 8) }
 
 // Evasion returns the physical evasion.
 func (f *Folk) Evasion() int { return int(f.CalcStat(stat.EvasionRate, 0)) }
-
-// LethalRate returns the lethal-strike rate multiplier.
-func (f *Folk) LethalRate() float64 { return f.CalcStat(stat.LethalRate, 1) }
 
 // AttackType returns the kind of the template's right-hand weapon, a fist
 // when it holds none.
@@ -281,8 +283,8 @@ func (f *Folk) refreshMoveSpeed() {
 	f.motion.move.SetSpeed(f.MoveSpeed())
 }
 
-// ForSkill is f's stats read for a calculation run for skill. f's stat
-// funcs test their conditions against its template, which presents no
-// condition view, so no conditional func applies whatever skill a
-// calculation runs for: f's stats read the same for every skill.
-func (f *Folk) ForSkill(conditions.Skill) creature.SkillStats { return f }
+// Against is f's stats read for a calculation against target run for
+// skill. f's stat funcs test their conditions against its template, which
+// presents no condition view, so no conditional func applies whatever the
+// calculation runs against: f's stats read the same for every one.
+func (f *Folk) Against(conditions.Actor, conditions.Skill) creature.SkillStats { return f }

@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
@@ -129,7 +130,7 @@ func (f *Folk) RaceMultiplier(attacker creature.FormulaActor) float64 {
 	if !ok {
 		return 1
 	}
-	return 1 + ((attacker.CalcStat(atk, 1) - f.CalcStat(res, 1)) / 100)
+	return 1 + ((attacker.Against(conditions.ActorOf(f), nil).CalcStat(atk, 1) - f.CalcStat(res, 1)) / 100)
 }
 
 // PhysicalSkillInput resolves a physical skill's damage against the NPC.
@@ -166,7 +167,7 @@ func (f *Folk) LethalInput(caster creature.FormulaActor, def modelskill.Definiti
 		MagicLevel:    def.MagicLevel,
 		AttackerLevel: caster.Level(),
 		TargetLevel:   f.Level(),
-		LethalMul:     caster.LethalRate(),
+		LethalMul:     caster.Against(conditions.ActorOf(f), nil).CalcStat(stat.LethalRate, 1),
 	}, true
 }
 
