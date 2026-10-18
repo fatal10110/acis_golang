@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/follower"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/randomteleport"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scenario"
 )
 
@@ -60,6 +62,8 @@ func probe() script.Script {
 // scripts.xml path.
 var scenarioScripts = script.Catalog{
 	"ai.Probe": probe,
+	"script.ai.group.FollowerMovingAroundMaster": follower.New,
+	"script.ai.group.RandomTeleport":             randomteleport.New,
 }
 
 // TestScenarios plays every NPC behavior scenario of testdata/scenarios
