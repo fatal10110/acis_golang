@@ -1,0 +1,106 @@
+# Will the Seal be Broken? (Q003): a dark elf of level 16 accepts at Talloth, kills an
+# omen beast, a tainted zombie and a lesser succubus (each drop always lands; the third
+# item completes the set and the quest's second step), and Talloth trades the three for a
+# scroll of enchant armor (D grade); then relog. Expectations replay the reference trace
+# of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q003_will_the_seal_be_broken.golden
+character Darkling 16
+class 31
+script quest.Q003_WillTheSealBeBroken
+item 1081 1082 1083 956
+page default/30141.htm
+page script/quest/Q003_WillTheSealBeBroken/
+npc talloth 30141 Folk 10 0 0
+npc beast 20031 Monster 40 0 0
+npc zombie 20041 Monster 0 40 0
+npc succubus 20048 Monster -40 0 0
+
+# Talloth: accept.
+action talloth
+action talloth
+  S ActionFailed
+  S NpcHtmlMessage obj=talloth item=0 page=default/30141.htm
+  S ActionFailed
+bypass npc_{talloth}_Quest
+  S NpcHtmlMessage obj=talloth item=0 page=script/quest/Q003_WillTheSealBeBroken/30141-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q003_WillTheSealBeBroken CREATED
+bypass Quest Q003_WillTheSealBeBroken 30141-03.htm
+  S QuestList 3:0x80000001
+  S ExShowQuestMark quest=3
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=talloth item=0 page=script/quest/Q003_WillTheSealBeBroken/30141-03.htm
+  S ActionFailed
+  Q upsert Q003_WillTheSealBeBroken | <state> | STARTED
+  Q upsert Q003_WillTheSealBeBroken | <cond> | 1
+  state Q003_WillTheSealBeBroken STARTED
+  rows Q003_WillTheSealBeBroken <cond>=1 <state>=STARTED
+action talloth
+  S ActionFailed
+  S NpcHtmlMessage obj=talloth item=0 page=default/30141.htm
+  S ActionFailed
+bypass npc_{talloth}_Quest
+  S NpcHtmlMessage obj=talloth item=0 page=script/quest/Q003_WillTheSealBeBroken/30141-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q003_WillTheSealBeBroken 30141-05.htm
+  S NpcHtmlMessage obj=talloth item=0 page=script/quest/Q003_WillTheSealBeBroken/30141-05.htm
+  S ActionFailed
+
+# The three monsters: an item each; the third completes the set.
+kill beast
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1081
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1081=1
+kill zombie
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1082
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1082=1
+kill succubus
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1083
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 3:0x80000003
+  S ExShowQuestMark quest=3
+  Q upsert Q003_WillTheSealBeBroken | <cond> | 2
+  rows Q003_WillTheSealBeBroken <cond>=2 <state>=STARTED
+  items 1083=1
+
+# Talloth: the three items for the scroll; the quest completes.
+action talloth
+  S ActionFailed
+  S NpcHtmlMessage obj=talloth item=0 page=default/30141.htm
+  S ActionFailed
+bypass npc_{talloth}_Quest
+  S SystemMessage id=302 3:1081
+  S SystemMessage id=302 3:1083
+  S SystemMessage id=302 3:1082
+  S SystemMessage id=54 3:956
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 3:0x00000000
+  S NpcHtmlMessage obj=talloth item=0 page=script/quest/Q003_WillTheSealBeBroken/30141-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q003_WillTheSealBeBroken | <state> | COMPLETED
+  Q delete-except-state Q003_WillTheSealBeBroken
+  state Q003_WillTheSealBeBroken COMPLETED
+  rows Q003_WillTheSealBeBroken <state>=COMPLETED
+  items 1081=0 1082=0 1083=0 956=1
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q003_WillTheSealBeBroken COMPLETED
+  rows Q003_WillTheSealBeBroken <state>=COMPLETED
+  items 956=1
+action talloth
+action talloth
+  S ActionFailed
+  S NpcHtmlMessage obj=talloth item=0 page=default/30141.htm
+  S ActionFailed
+bypass npc_{talloth}_Quest
+  S NpcHtmlMessage obj=talloth item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

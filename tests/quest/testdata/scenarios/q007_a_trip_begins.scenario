@@ -1,0 +1,140 @@
+# A Trip Begins (Q007): an elf of level 3 accepts at Mirabel, takes Ariel's recommendation to
+# Asterios, and Mirabel rewards the trip with a mark of traveler and a scroll of escape to Giran;
+# then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q007_a_trip_begins.golden
+character Wanderer 3
+class 18
+script quest.Q007_ATripBegins
+item 7572 7559 7570
+page gatekeeper/30146.htm
+page merchant/30148.htm
+page villagemaster/30154.htm
+page script/quest/Q007_ATripBegins/
+npc mirabel 30146 Gatekeeper 10 0 0
+npc ariel 30148 Merchant 20 0 0
+npc asterios 30154 VillageMasterPriest 30 0 0
+
+# Mirabel: accept.
+action mirabel
+action mirabel
+  S ActionFailed
+  S NpcHtmlMessage obj=mirabel item=0 page=gatekeeper/30146.htm
+  S ActionFailed
+bypass npc_{mirabel}_Quest
+  S NpcHtmlMessage obj=mirabel item=0 page=script/quest/Q007_ATripBegins/30146-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q007_ATripBegins CREATED
+bypass Quest Q007_ATripBegins 30146-03.htm
+  S QuestList 7:0x80000001
+  S ExShowQuestMark quest=7
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=mirabel item=0 page=script/quest/Q007_ATripBegins/30146-03.htm
+  S ActionFailed
+  Q upsert Q007_ATripBegins | <state> | STARTED
+  Q upsert Q007_ATripBegins | <cond> | 1
+  state Q007_ATripBegins STARTED
+  rows Q007_ATripBegins <cond>=1 <state>=STARTED
+action mirabel
+  S ActionFailed
+  S NpcHtmlMessage obj=mirabel item=0 page=gatekeeper/30146.htm
+  S ActionFailed
+bypass npc_{mirabel}_Quest
+  S NpcHtmlMessage obj=mirabel item=0 page=script/quest/Q007_ATripBegins/30146-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ariel: her recommendation for Asterios.
+action ariel
+action ariel
+  S ActionFailed
+  S NpcHtmlMessage obj=ariel item=0 page=merchant/30148.htm
+  S ActionFailed
+bypass npc_{ariel}_Quest
+  S NpcHtmlMessage obj=ariel item=0 page=script/quest/Q007_ATripBegins/30148-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q007_ATripBegins 30148-02.htm
+  S QuestList 7:0x80000003
+  S ExShowQuestMark quest=7
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7572
+  S NpcHtmlMessage obj=ariel item=0 page=script/quest/Q007_ATripBegins/30148-02.htm
+  S ActionFailed
+  Q upsert Q007_ATripBegins | <cond> | 2
+  items 7572=1
+action ariel
+  S ActionFailed
+  S NpcHtmlMessage obj=ariel item=0 page=merchant/30148.htm
+  S ActionFailed
+bypass npc_{ariel}_Quest
+  S NpcHtmlMessage obj=ariel item=0 page=script/quest/Q007_ATripBegins/30148-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Asterios takes the recommendation.
+action asterios
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+bypass npc_{asterios}_Quest
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q007_ATripBegins/30154-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q007_ATripBegins 30154-02.htm
+  S QuestList 7:0x80000007
+  S ExShowQuestMark quest=7
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7572
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q007_ATripBegins/30154-02.htm
+  S ActionFailed
+  Q upsert Q007_ATripBegins | <cond> | 3
+  rows Q007_ATripBegins <cond>=3 <state>=STARTED
+  items 7572=0
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+bypass npc_{asterios}_Quest
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q007_ATripBegins/30154-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Mirabel: the reward; the quest completes.
+action mirabel
+action mirabel
+  S ActionFailed
+  S NpcHtmlMessage obj=mirabel item=0 page=gatekeeper/30146.htm
+  S ActionFailed
+bypass npc_{mirabel}_Quest
+  S NpcHtmlMessage obj=mirabel item=0 page=script/quest/Q007_ATripBegins/30146-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q007_ATripBegins 30146-06.htm
+  S SystemMessage id=54 3:7570
+  S SystemMessage id=54 3:7559
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 7:0x00000000
+  S NpcHtmlMessage obj=mirabel item=0 page=script/quest/Q007_ATripBegins/30146-06.htm
+  S ActionFailed
+  Q upsert Q007_ATripBegins | <state> | COMPLETED
+  Q delete-except-state Q007_ATripBegins
+  state Q007_ATripBegins COMPLETED
+  rows Q007_ATripBegins <state>=COMPLETED
+  items 7572=0 7570=1 7559=1
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q007_ATripBegins COMPLETED
+  rows Q007_ATripBegins <state>=COMPLETED
+  items 7570=1 7559=1
+action mirabel
+action mirabel
+  S ActionFailed
+  S NpcHtmlMessage obj=mirabel item=0 page=gatekeeper/30146.htm
+  S ActionFailed
+bypass npc_{mirabel}_Quest
+  S NpcHtmlMessage obj=mirabel item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

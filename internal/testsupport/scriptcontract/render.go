@@ -1,11 +1,9 @@
 package scriptcontract
 
 import (
-	"cmp"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf16"
@@ -39,9 +37,7 @@ func Packet(payload []byte, roles map[int32]string) (string, error) {
 	case 0x0f:
 		obj := role(d.int32(), roles)
 		html := d.str()
-		for _, id := range sortedIDs(roles) {
-			html = strings.ReplaceAll(html, strconv.Itoa(int(id)), "{"+roles[id]+"}")
-		}
+		html = roleIDs(html, roles)
 		out = fmt.Sprintf("S NpcHtmlMessage obj=%s item=%d html=%s", obj, d.int32(), Quote(html))
 	case 0x64:
 		var sb strings.Builder
@@ -79,9 +75,7 @@ func Packet(payload []byte, roles map[int32]string) (string, error) {
 		out = sb.String()
 	case 0xa0:
 		html := d.str()
-		for _, id := range sortedIDs(roles) {
-			html = strings.ReplaceAll(html, strconv.Itoa(int(id)), "{"+roles[id]+"}")
-		}
+		html = roleIDs(html, roles)
 		out = "S TutorialShowHtml html=" + Quote(html)
 	case 0xa1:
 		out = fmt.Sprintf("S TutorialShowQuestionMark id=%d", d.int32())
@@ -235,20 +229,31 @@ func role(id int32, roles map[int32]string) string {
 	return strconv.Itoa(int(id))
 }
 
-// sortedIDs orders role ids longest decimal first, so no id is replaced inside
-// a longer one.
-func sortedIDs(roles map[int32]string) []int32 {
-	ids := make([]int32, 0, len(roles))
-	for id := range roles {
-		ids = append(ids, id)
-	}
-	slices.SortFunc(ids, func(a, b int32) int {
-		if c := cmp.Compare(len(strconv.Itoa(int(b))), len(strconv.Itoa(int(a)))); c != 0 {
-			return c
+// roleIDs replaces, in text, every run of digits that is a role's object id
+// with the role name in braces. A longer number holding an id's digits, such
+// as a system message id in a link, is left whole.
+func roleIDs(text string, roles map[int32]string) string {
+	var b strings.Builder
+	for i := 0; i < len(text); {
+		if text[i] < '0' || text[i] > '9' {
+			b.WriteByte(text[i])
+			i++
+			continue
 		}
-		return cmp.Compare(a, b)
-	})
-	return ids
+		j := i
+		for j < len(text) && text[j] >= '0' && text[j] <= '9' {
+			j++
+		}
+		run := text[i:j]
+		if id, err := strconv.ParseInt(run, 10, 32); err == nil && strconv.FormatInt(id, 10) == run {
+			if name, ok := roles[int32(id)]; ok {
+				run = "{" + name + "}"
+			}
+		}
+		b.WriteString(run)
+		i = j
+	}
+	return b.String()
 }
 
 type decoder struct {

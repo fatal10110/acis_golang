@@ -5,6 +5,7 @@ import (
 
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/catalog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/blackjudge"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/cabalbuffer"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/newbiehelper"
@@ -36,9 +37,10 @@ import (
 var scenarioSagas = thirdclass.NewFamily()
 
 // scenarioScripts are the ported scripts a quest scenario may list, by
-// scripts.xml path, as the server's catalogs map them; the newbie helper
-// casts from an empty newbie buff table.
-var scenarioScripts = script.Catalog{
+// scripts.xml path, as the server's catalogs map them: the scripts ported
+// with the engine, then every ported entry of the content catalog files.
+// The newbie helper casts from an empty newbie buff table.
+var scenarioScripts = withContentScripts(script.Catalog{
 	"script.feature.NewbieHelper":        func() script.Script { return newbiehelper.New(modelskill.NewNewbieBuffTable(nil)) },
 	"script.feature.Tutorial":            featuretutorial.New,
 	"script.feature.BlackJudge":          blackjudge.New,
@@ -61,6 +63,24 @@ var scenarioScripts = script.Catalog{
 	"quest.Q646_SignsOfRevolt":           quest646.New,
 	"quest.Q651_RunawayYouth":            quest651.New,
 	"quest.ThirdClassQuest":              func() script.Script { return thirdclass.NewCore(scenarioSagas) },
+})
+
+// withContentScripts adds to engine the ported entries of the content
+// catalog files, whose sagas share scenarioSagas. A path in both is a
+// mistake the server's catalog join refuses too.
+func withContentScripts(engine script.Catalog) script.Catalog {
+	for _, file := range catalog.Scripts(scenarioSagas) {
+		for path, ctor := range file {
+			if ctor == nil {
+				continue
+			}
+			if _, dup := engine[path]; dup {
+				panic("scenario catalog: " + path + " is in two catalogs")
+			}
+			engine[path] = ctor
+		}
+	}
+	return engine
 }
 
 // TestScenarios plays every quest scenario of testdata/scenarios through
