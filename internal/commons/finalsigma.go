@@ -1,6 +1,7 @@
 package commons
 
 import (
+	"math/bits"
 	"sort"
 	"unicode"
 	"unicode/utf16"
@@ -71,13 +72,20 @@ func wordCategory(r rune) int {
 
 // wordText is a text under boundary scans, as UTF-16 units. Forward and
 // backward scan results depend only on the text and the start position,
-// so they are kept for every scan of the text to share: each sigma's test
-// then costs time in proportion to the span it inspects, not the text.
+// so they are kept for every scan of the text to share, and runs of
+// forward scans are taken in jumps of a power of two: each boundary test
+// then costs time logarithmic in the text, so a key stays near linear.
 type wordText struct {
 	units []uint16
 	next  map[int]int     // forward scan result by start position
 	back  map[backKey]int // backward scan result by loop state
+	// jumps[k-1][p] is the break 2^k forward scans after p, scanDone past
+	// the end, or jumpUnknown; levels are made as first needed.
+	jumps [][]int32
+	steps int // scan steps taken, for complexity tests
 }
+
+const jumpUnknown = -2
 
 // backKey is the state of a backward scan between two steps: the position
 // and code point it stands on (a surrogate pair or a single unit), its
@@ -90,7 +98,10 @@ type backKey struct {
 }
 
 func newWordText(units []uint16) *wordText {
-	return &wordText{units: units, next: map[int]int{}, back: map[backKey]int{}}
+	return &wordText{
+		units: units, next: map[int]int{}, back: map[backKey]int{},
+		jumps: make([][]int32, bits.Len(uint(len(units)))),
+	}
 }
 
 // wordScan is one sigma's sequence of boundary tests over a text. last is
@@ -117,11 +128,49 @@ func (s *wordScan) following(offset int) int {
 	if result >= offset || result <= scanDone {
 		result = s.w.scanBack(offset)
 	}
-	for result != scanDone && result <= offset {
-		result = s.w.scanForward(result)
-	}
+	result = s.w.firstBreakAfter(result, offset)
 	s.last = result
 	return result
+}
+
+// firstBreakAfter returns the first break past offset in the run of
+// forward scans from start: start itself when it lies past offset.
+func (w *wordText) firstBreakAfter(start, offset int) int {
+	if start == scanDone || start > offset {
+		return start
+	}
+	for k := len(w.jumps); k >= 0; k-- {
+		w.steps++
+		if j := w.jump(k, start); j != scanDone && j <= offset {
+			start = j
+		}
+	}
+	return w.scanForward(start)
+}
+
+// jump returns the break 2^k forward scans after p, or scanDone.
+func (w *wordText) jump(k, p int) int {
+	if p == scanDone {
+		return scanDone
+	}
+	if k == 0 {
+		return w.scanForward(p)
+	}
+	level := w.jumps[k-1]
+	if level == nil {
+		level = make([]int32, len(w.units)+1)
+		for i := range level {
+			level[i] = jumpUnknown
+		}
+		w.jumps[k-1] = level
+	}
+	if r := level[p]; r != jumpUnknown {
+		return int(r)
+	}
+	w.steps++
+	r := w.jump(k-1, w.jump(k-1, p))
+	level[p] = int32(r)
+	return r
 }
 
 // scanForward returns the next break after start, or scanDone at the end.
@@ -136,6 +185,7 @@ func (w *wordText) scanForward(start int) int {
 	result := w.nextIndex(pos)
 	state := 1
 	for c := w.current(pos); c != wordDone && state != 0; {
+		w.steps++
 		if cat := wordCategory(c); cat != wordSkip {
 			state = int(wordBreakForward[state*wordBreakColumns+cat])
 		}
@@ -156,6 +206,7 @@ func (w *wordText) scanBack(start int) int {
 	var path []backKey
 	result := -1
 	for c != wordDone && state != 0 {
+		w.steps++
 		lastCat, cat = cat, wordCategory(c)
 		if cat != wordSkip {
 			state = int(wordBreakBackward[state*wordBreakColumns+cat])

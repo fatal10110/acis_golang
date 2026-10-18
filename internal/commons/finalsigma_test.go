@@ -94,13 +94,36 @@ func TestIsCasedMatchesOracle(t *testing.T) {
 
 // TestUTF16LowerKeyLongSigmaRun lowers a run of 16,000 capital sigmas, the
 // first with nothing cased before it and the last with nothing after it.
-// Testing each sigma's boundaries afresh would rescan the run per sigma;
-// shared scan results keep the whole key linear.
 func TestUTF16LowerKeyLongSigmaRun(t *testing.T) {
 	const n = 16000
 	want := strings.Repeat("σ", n-1) + "ς"
 	if got := UTF16LowerKey(strings.Repeat("Σ", n)); got != want {
 		t.Fatalf("UTF16LowerKey of %d sigmas differs from %d σ then ς", n, n-1)
+	}
+}
+
+// TestFinalSigmaWorkGrowsNearLinearly counts the scan steps that testing
+// every sigma of a text takes, at about 16,000 and 32,000 units, for
+// shapes where each test rescanning from a far safe position would make the
+// work quadratic (4x per doubling): letter runs, number-led segments the
+// backward scan finds no safe position in, and U+FFFF stops.
+func TestFinalSigmaWorkGrowsNearLinearly(t *testing.T) {
+	steps := func(s string) int {
+		w := newWordText(UTF16Units(s))
+		for i, u := range w.units {
+			if u == 'Σ' {
+				w.endsWord(i)
+			}
+		}
+		return w.steps
+	}
+	for _, pattern := range []string{"Σ", ".1Σ", "1.Σ", "a.1Σ", "1.1.Σ", "#\uFFFFΣ"} {
+		half := strings.Repeat(pattern, 16000/UTF16Len(pattern))
+		small, large := steps(half), steps(half+half)
+		if ratio := float64(large) / float64(small); ratio > 2.5 {
+			t.Errorf("%+q: %d steps at %d units, %d at %d (x%.2f), want at most x2.5",
+				pattern, small, UTF16Len(half), large, 2*UTF16Len(half), ratio)
+		}
 	}
 }
 
