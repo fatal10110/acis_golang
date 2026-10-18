@@ -86,7 +86,8 @@ func (l *GameClientLink) framePledgeMemberList(cl *clan.Clan, self ...*livePlaye
 }
 
 // framePledgeUnitList builds the roster of cl's sub-unit pledgeType (the
-// main clan for 0) with the clan's header; see memberRow for self.
+// main clan for 0) with the clan's header, its members in roster table
+// order; see memberRow for self.
 func (l *GameClientLink) framePledgeUnitList(cl *clan.Clan, pledgeType int, self ...*livePlayer) wire.Frame {
 	info := cl.Info()
 	name := info.Name
@@ -94,7 +95,7 @@ func (l *GameClientLink) framePledgeUnitList(cl *clan.Clan, pledgeType int, self
 		unit, _ := cl.Subunit(pledgeType)
 		name = unit.Name
 	}
-	members := cl.Members()
+	members := cl.MembersInTableOrder()
 	rows := make([]serverpackets.PledgeMemberListMember, 0, len(members))
 	for _, m := range members {
 		if m.PledgeType == pledgeType {
