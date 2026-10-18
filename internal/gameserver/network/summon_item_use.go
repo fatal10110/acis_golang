@@ -279,11 +279,12 @@ func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x
 
 // mountWyvern puts live on the mount npcID called by its collar
 // controlItemID, 0 for a mount no collar called, and reports whether it
-// did: a wyvern, or the strider a game master's //ride calls. Both hands are emptied first; a weapon that cannot be taken
-// off refuses the mount with no packet, as specified, and a
-// use-item request leaves no client action pending. The rider is then
-// forced to run and loses its toggles before the wyvern's skill list, the
-// Ride, the speed refresh and the feed gauge go out.
+// did: a wyvern, or the strider a game master's //ride calls. Both hands
+// are emptied first; a weapon that cannot be taken off refuses the mount
+// with no packet, as specified, and a use-item request leaves no client
+// action pending. The rider is then forced to run and loses its toggles
+// before the mount's skill list, the Ride, the speed refresh and the feed
+// gauge go out.
 func (l *GameClientLink) mountWyvern(live *livePlayer, npcID, controlItemID int32) bool {
 	if !l.disarm(live, true) {
 		return false
