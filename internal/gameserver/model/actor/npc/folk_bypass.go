@@ -174,6 +174,15 @@ const (
 	// BypassMercenaryHire opens the untaxed buy window of buylist ListID,
 	// then HTML alone; a list this NPC may not sell answers nothing.
 	BypassMercenaryHire
+	// BypassWyvernNoStrider tells a talker on no strider it may ride a
+	// wyvern only from one, then opens HTML and releases the client with
+	// ActionFailed.
+	BypassWyvernNoStrider
+	// BypassWyvernRide takes Count B-grade crystals from the talker, which
+	// leaves its strider for a wyvern, then opens HTML and releases the
+	// client with ActionFailed; a talker holding too few gets ShortHTML
+	// instead, keeping its strider.
+	BypassWyvernRide
 )
 
 // Talker is what a dialog command reads of the player sending it.
@@ -196,6 +205,10 @@ type Talker struct {
 	ThirdClass bool
 	// CurrentFolk is set when the NPC is the one the talker last selected.
 	CurrentFolk bool
+	// MountNPCID is the mount the talker rides, 0 on foot, and MountLevel
+	// its level.
+	MountNPCID int32
+	MountLevel int
 	// SevenSigns reads the talker's Record of Seven Signs; nil reads an
 	// empty record.
 	SevenSigns func() sevensigns.Record
@@ -249,6 +262,10 @@ type BypassReply struct {
 	doorCommand string
 	// Delay is how long BypassMassTeleport's teleport waits.
 	Delay time.Duration
+	// Count is the crystal count BypassWyvernRide takes, and ShortHTML the
+	// page it opens when the talker holds fewer.
+	Count     int
+	ShortHTML string
 }
 
 // Bypass answers command, the part of an npc_<objectId>_<command> dialog

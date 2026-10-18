@@ -184,6 +184,7 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 	classLevel, _ := player.ClassLevel(live.ClassID())
 	talker.ThirdClass = classLevel >= 3
 	talker.CurrentFolk = live.currentFolk.Load() == f
+	talker.MountNPCID, talker.MountLevel = live.MountNPCID(), live.MountLevel()
 	talker.SevenSigns = folkChatState{l: l, live: live, f: f}.SevenSigns
 	talker.Residence = folkChatState{l: l, live: live, f: f}.Residence
 	reply := f.Bypass(setPages{l.html}, rules, talker, command)
@@ -301,6 +302,12 @@ func (l *GameClientLink) folkBypass(live *livePlayer, f *npc.Folk, command strin
 		l.massTeleport(live, f, reply)
 	case npc.BypassMercenaryHire:
 		l.mercenaryHire(live, f, reply)
+	case npc.BypassWyvernNoStrider:
+		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageOnlyRideWyvernFromStrider))
+		sendFilledHTML(live, f.ObjectID(), reply.HTML, 0)
+		live.SendFrame(serverpackets.FrameActionFailed())
+	case npc.BypassWyvernRide:
+		l.rideWyvernAtNpc(live, f, reply)
 	case npc.BypassUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Str("command", command).Msg("bypass: npc dialog command not modeled")
 	case npc.BypassRefused:

@@ -71,7 +71,8 @@ func TestClanHallDoormanDoors(t *testing.T) {
 // TestClanHallDoormanWyvernPages pins the wyvern pages at an Aden hall for a
 // member of the owning clan, each naming the ride's settings, then
 // ActionFailed; a stranger, and an owner at a hall offering no wyverns, are
-// answered nothing, as is the ride, not in place yet, at any of them.
+// answered nothing, the ride included. TestClanHallDoormanWyvernRide covers
+// the ride.
 func TestClanHallDoormanWyvernPages(t *testing.T) {
 	t.Parallel()
 	release := []byte{serverpackets.OpcodeActionFailed}
@@ -81,7 +82,6 @@ func TestClanHallDoormanWyvernPages(t *testing.T) {
 		f := w.spawnKeeper(t, "ClanHallDoorman", goldenDoormanID, 40)
 		assertAnswer(t, w.command(t, f, "wyvern_info"), chatThenFinal, f, filled("clanHallDoormen/wyvernmanager-1.htm", f, wyvernPairs...))
 		assertAnswer(t, w.command(t, f, "wyvern_help"), chatThenFinal, f, filled("clanHallDoormen/wyvernmanager-7.htm", f, wyvernPairs...))
-		assertAnswer(t, w.command(t, f, "wyvern_ride"), release, f, "")
 		assertAnswer(t, w.command(t, f, "Chat 3"), releasedChat, f, filled("clanHallDoormen/doormen_wyvern.htm", f))
 	})
 	t.Run("aden stranger", func(t *testing.T) {
@@ -89,11 +89,13 @@ func TestClanHallDoormanWyvernPages(t *testing.T) {
 		w := bootHallManager(t, hallManagerSetup{hall: goldenChamber, manager: goldenManagerID, foreign: true, extra: []gameservertest.Option{hallDoormanCommandPages()}})
 		f := w.spawnKeeper(t, "ClanHallDoorman", goldenDoormanID, 40)
 		assertAnswer(t, w.command(t, f, "wyvern_info"), release, f, "")
+		assertAnswer(t, w.command(t, f, "wyvern_ride"), release, f, "")
 	})
 	t.Run("owner elsewhere", func(t *testing.T) {
 		t.Parallel()
 		w := bootHallManager(t, hallManagerSetup{extra: []gameservertest.Option{hallDoormanCommandPages()}})
 		f := w.spawnKeeper(t, "ClanHallDoorman", hallDoormanID, 40)
 		assertAnswer(t, w.command(t, f, "wyvern_info"), release, f, "")
+		assertAnswer(t, w.command(t, f, "wyvern_ride"), release, f, "")
 	})
 }

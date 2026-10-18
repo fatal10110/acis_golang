@@ -135,6 +135,7 @@ const (
 	SystemMessageYourPetAteALittleButIsStillHungry = 596
 	SystemMessageYourPetIsVeryHungryBeCareful      = 597
 	SystemMessageOutOfFeedMountCanceled            = 1248
+	SystemMessageOnlyRideWyvernFromStrider         = 1249
 	SystemMessagePetTookS1BecauseHeWasHungry       = 1527
 	SystemMessageItemNotForPets                    = 544
 	SystemMessagePetCannotCarryMoreItems           = 545
