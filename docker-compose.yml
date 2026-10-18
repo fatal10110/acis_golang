@@ -51,14 +51,20 @@ services:
       - ${ACIS_DATAPACK_DIR:-../aCis_datapack}/sql:/acis/sql:ro
       - ${ACIS_DATAPACK_DIR:-../aCis_datapack}/tools:/acis/tools:ro
     healthcheck:
-      # ops/docker/initdb/10-acis-schema.sh leaves this marker behind when
-      # the first-start schema load fails. The restarted server skips the
-      # load, so it must not report healthy over an empty acis database.
+      # A restarted server skips the first-start schema load, so it must not
+      # report healthy over an empty or partial acis database.
+      # ops/docker/initdb/10-acis-schema.sh leaves the marker behind when
+      # that load fails. A first start killed before the script ran leaves
+      # no marker, and no tables: MariaDB keeps one .frm file per table in
+      # the database's directory.
       test:
         - CMD-SHELL
         - >-
           if [ -e /var/lib/mysql/.acis-schema-incomplete ]; then
           echo 'acis schema load did not finish; see Failure modes in docs/ops/docker.md';
+          exit 1; fi;
+          if ! ls /var/lib/mysql/acis/*.frm >/dev/null 2>&1; then
+          echo 'acis database has no tables; see Failure modes in docs/ops/docker.md';
           exit 1; fi;
           healthcheck.sh --connect --innodb_initialized
       interval: 5s
