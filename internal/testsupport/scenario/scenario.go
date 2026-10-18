@@ -43,8 +43,9 @@
 //	page <path below data/html>               a shipped page the server serves; a path ending in / serves its directory
 //	npc <role> <npc id> <type> <dx> <dy> <dz> a fixture NPC template of that instance type, spawned at that offset from the character;
 //	    [walks] [maker <territory>]           the templates a script may spawn more NPCs of; walks, the template can move: a
-//	                                          civilian walks, a monster spawns moving (its spawn point its home); with maker,
-//	                                          the NPC is an npcmaker's whose territory is that territory line's (see below)
+//	                                          civilian walks, a monster spawns moving and attacking (its spawn point its
+//	                                          home); with maker, the NPC is an npcmaker's whose territory is that territory
+//	                                          line's (see below)
 //	roll <role> <draw>                        optional: every combat draw of the NPC is that draw (n-1 for a draw of
 //	                                          [0, n) it is not inside): its skill landing rolls, as its hit and
 //	                                          critical rolls; with 0 every skill it casts lands (a landing rate is at
@@ -68,10 +69,12 @@
 // Each NPC line's NPC runs the created hooks of the scripts bound to it as
 // it appears, as the spawn pass runs them, and a civilian casts the shipped
 // skills (data/xml/skills) a script or dialog asks of it on a later AI
-// tick. An NPC walks when its line says walks; without, a monster stands
-// parked and a civilian's template cannot move. An NPC line with maker reads its maker's territory as
-// its spawn territory (a script's InSpawnTerritory), as an NPC the
-// population's npcmaker placed does; the maker spawns nothing itself.
+// tick. An NPC walks when its line says walks: a walking monster also
+// attacks, as a live one does. Without walks a monster stands parked,
+// neither moving nor attacking, and a civilian's template cannot move. An
+// NPC line with maker reads its maker's territory as its spawn territory
+// (a script's InSpawnTerritory), as an NPC the population's npcmaker placed
+// does; the maker spawns nothing itself.
 // Without maker, an NPC's spawn territory is the sphere of its drift range
 // (200) around its spawn point.
 //
