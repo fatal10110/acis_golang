@@ -5,7 +5,6 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/handler/target"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
-	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
@@ -30,9 +29,7 @@ func (g policyGraph) SameParty(a, b int32) bool {
 
 func (policyGraph) PartyMembers(int32) []*Character { return nil }
 
-func (policyGraph) PartyOf(int32) (party.ID, bool) { return 0, false }
-
-func (policyGraph) PartyByID(party.ID) (*Character, []*Character, bool) { return nil, nil, false }
+func (policyGraph) Party(int32) (Party, bool) { return nil, false }
 
 func (g policyGraph) SameChannel(a, b int32) bool {
 	ca, cb := g.channel[g.party[a]], g.channel[g.party[b]]

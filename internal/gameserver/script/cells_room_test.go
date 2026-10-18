@@ -75,14 +75,16 @@ func TestRoomCellTryLockHasOneWinner(t *testing.T) {
 	}
 }
 
-// Reading the party, its leader, its members or its ids of a room holding
-// none panics, and so does copying it into another room.
+// Reading the members or the ids of the party of a room holding none
+// panics, and so does copying it into another room; its leader reads nil.
 func TestRoomCellWithoutPartyPanics(t *testing.T) {
 	var now atomic.Int64
 	r := newTestRoom(0, &now)
 	other := newTestRoom(1, &now)
+	if r.PartyLeader() != nil {
+		t.Error("a room holding no party has a party leader")
+	}
 	for name, fn := range map[string]func(){
-		"PartyLeader":  func() { r.PartyLeader() },
 		"PartyMembers": func() { r.PartyMembers() },
 		"MemberIDs":    func() { r.MemberIDs() },
 		"SetPartyFrom": func() { other.SetPartyFrom(r) },

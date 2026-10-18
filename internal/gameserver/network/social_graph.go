@@ -39,27 +39,31 @@ func (g socialGraph) PartyMembers(objectID int32) []*player.Character {
 	return out
 }
 
-func (g socialGraph) PartyOf(objectID int32) (party.ID, bool) {
+func (g socialGraph) Party(objectID int32) (player.Party, bool) {
 	if g.parties == nil {
-		return 0, false
+		return nil, false
 	}
-	view, ok := g.parties.View(objectID)
-	return view.ID, ok
+	ref, ok := g.parties.PartyRef(objectID)
+	if !ok {
+		return nil, false
+	}
+	return socialParty{ref: ref}, true
 }
 
-func (g socialGraph) PartyByID(id party.ID) (*player.Character, []*player.Character, bool) {
-	if g.parties == nil {
-		return nil, nil, false
-	}
-	view, ok := g.parties.ViewByID(id)
-	if !ok {
-		return nil, nil, false
-	}
-	out := make([]*player.Character, len(view.Members))
-	for i, m := range view.Members {
+// socialParty answers one party's leader and members as characters.
+type socialParty struct {
+	ref party.PartyRef[*livePlayer]
+}
+
+func (p socialParty) Leader() *player.Character { return p.ref.Leader().Character }
+
+func (p socialParty) Members() []*player.Character {
+	members := p.ref.Members()
+	out := make([]*player.Character, len(members))
+	for i, m := range members {
 		out[i] = m.Character
 	}
-	return view.Leader.Character, out, true
+	return out
 }
 
 func (g socialGraph) SameChannel(a, b int32) bool {

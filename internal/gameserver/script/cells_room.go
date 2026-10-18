@@ -14,9 +14,9 @@ import (
 // Script.NewRoom, which gives it the game tick to stamp.
 //
 // The room's party is named by identity and followed as it changes: its
-// leader and members are read live, and a party since disbanded reads as
-// having no leader and no members. Asking a room that holds no party for
-// its party's leader, members or ids panics, as the reference throws there.
+// leader and members are read live, and a party since disbanded keeps the
+// leader it last had and has no members. Asking a room that holds no party
+// for its party's members or ids panics, as the reference throws there.
 type RoomCell struct {
 	index int
 	tick  func() int32
@@ -24,8 +24,7 @@ type RoomCell struct {
 	mu        sync.Mutex
 	locked    bool
 	time      int32
-	party     player.PartyRef
-	hasParty  bool
+	party     player.Party
 	memberIDs []int32
 }
 
@@ -91,26 +90,31 @@ func (r *RoomCell) SetParty(p *Player) {
 // its members as they are now, not as other took them. other holding no
 // party panics.
 func (r *RoomCell) SetPartyFrom(other *RoomCell) {
-	r.setParty(other.heldParty())
+	r.setParty(other.mustParty())
 }
 
-func (r *RoomCell) setParty(ref player.PartyRef) {
+func (r *RoomCell) setParty(ref player.Party) {
 	members := ref.Members()
 	ids := make([]int32, len(members))
 	for i, m := range members {
 		ids[i] = m.ObjectID()
 	}
 	r.mu.Lock()
-	r.party, r.hasParty, r.memberIDs = ref, true, ids
+	r.party, r.memberIDs = ref, ids
 	r.mu.Unlock()
 }
 
-// heldParty returns the room's party; a room holding none panics.
-func (r *RoomCell) heldParty() player.PartyRef {
+// heldParty returns the room's party, nil when it holds none.
+func (r *RoomCell) heldParty() player.Party {
 	r.mu.Lock()
-	ref, ok := r.party, r.hasParty
-	r.mu.Unlock()
-	if !ok {
+	defer r.mu.Unlock()
+	return r.party
+}
+
+// mustParty returns the room's party; a room holding none panics.
+func (r *RoomCell) mustParty() player.Party {
+	ref := r.heldParty()
+	if ref == nil {
 		panic("script: the party of a room holding none")
 	}
 	return ref
@@ -120,28 +124,27 @@ func (r *RoomCell) heldParty() player.PartyRef {
 // player in no party matches a room holding none, as the reference's
 // identity compare of two absent parties does.
 func (r *RoomCell) HoldsPartyOf(p *Player) bool {
-	ref, inParty := p.character().Party()
-	r.mu.Lock()
-	held, hasParty := r.party, r.hasParty
-	r.mu.Unlock()
-	if !inParty || !hasParty {
-		return inParty == hasParty
-	}
-	return held.Same(ref)
+	ref, _ := p.character().Party()
+	return r.heldParty() == ref
 }
 
-// PartyLeader returns the leader of the room's party; nil once that party
-// is gone or while its leader is not in the world. A room holding no party
-// panics.
+// PartyLeader returns the leader of the room's party, the last one it had
+// once it disbanded; nil while that leader is not in the world, and for a
+// room holding no party, which a script checks before asking whether a
+// player leads the room's party.
 func (r *RoomCell) PartyLeader() *Player {
-	return leaderOf(r.heldParty())
+	ref := r.heldParty()
+	if ref == nil {
+		return nil
+	}
+	return leaderOf(ref)
 }
 
 // PartyMembers returns the players of the room's party in the world, in
-// the order they joined; empty once that party is gone. A room holding no
-// party panics.
+// the order they joined; empty once that party disbanded. A room holding
+// no party panics.
 func (r *RoomCell) PartyMembers() []*Player {
-	return playersOf(r.heldParty().Members())
+	return playersOf(r.mustParty().Members())
 }
 
 // MemberIDs returns the object ids of the members of the room's party as
@@ -150,7 +153,7 @@ func (r *RoomCell) PartyMembers() []*Player {
 func (r *RoomCell) MemberIDs() []int32 {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if !r.hasParty {
+	if r.party == nil {
 		panic("script: the member ids of a room holding no party")
 	}
 	return slices.Clone(r.memberIDs)
@@ -162,9 +165,9 @@ func (r *RoomCell) MemberIDs() []int32 {
 // among them. A party since disbanded has no members, so it changed.
 func (r *RoomCell) PartyChanged() bool {
 	r.mu.Lock()
-	ref, hasParty, ids := r.party, r.hasParty, r.memberIDs
+	ref, ids := r.party, r.memberIDs
 	r.mu.Unlock()
-	if !hasParty {
+	if ref == nil {
 		return true
 	}
 	members := ref.Members()
@@ -184,16 +187,13 @@ func (r *RoomCell) PartyChanged() bool {
 func (r *RoomCell) Clear() {
 	now := r.tick()
 	r.mu.Lock()
-	r.party, r.hasParty, r.memberIDs = player.PartyRef{}, false, nil
+	r.party, r.memberIDs = nil, nil
 	r.locked, r.time = false, now
 	r.mu.Unlock()
 }
 
-// leaderOf returns the handle of ref's leader; nil once the party is gone
-// or while the leader is not in the world.
-func leaderOf(ref player.PartyRef) *Player {
-	if leader := ref.Leader(); leader != nil {
-		return playerOfCharacter(leader)
-	}
-	return nil
+// leaderOf returns the handle of ref's leader; nil while the leader is not
+// in the world.
+func leaderOf(ref player.Party) *Player {
+	return playerOfCharacter(ref.Leader())
 }

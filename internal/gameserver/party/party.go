@@ -133,17 +133,6 @@ func (r *Registry[M]) View(memberID int32) (View[M], bool) {
 	return g.view(), true
 }
 
-// ViewByID returns a copy of the party id; false once it is gone.
-func (r *Registry[M]) ViewByID(id ID) (View[M], bool) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	g := r.byID[id]
-	if g == nil {
-		return View[M]{}, false
-	}
-	return g.view(), true
-}
-
 // Members returns the members of the party id, in join order.
 func (r *Registry[M]) Members(id ID) ([]M, bool) {
 	r.mu.Lock()

@@ -36,8 +36,8 @@ func objectIDs(players []*script.Player) []int32 {
 // member leaving again restores it. A leader change keeps the party and
 // moves its leader, which the player handle reads too. A room given another
 // room's party holds it as well; clearing a room drops the party and
-// unlocks it. Once the party disbands the room reads it as changed, with no
-// leader and no members, while the taken ids stay.
+// unlocks it. Once the party disbands the room reads it as changed, with
+// its last leader and no members, while the taken ids stay.
 func TestScriptRoomFollowsItsParty(t *testing.T) {
 	t.Parallel()
 	g := bootScriptChannel(t, false)
@@ -51,6 +51,9 @@ func TestScriptRoomFollowsItsParty(t *testing.T) {
 		}
 		if !room.HoldsPartyOf(p) {
 			t.Error("an empty room does not match a player in no party")
+		}
+		if room.PartyLeader() != nil {
+			t.Error("an empty room has a party leader")
 		}
 	})
 
@@ -139,8 +142,8 @@ func TestScriptRoomFollowsItsParty(t *testing.T) {
 		if !room.PartyChanged() {
 			t.Error("a disbanded party reads unchanged")
 		}
-		if leader := room.PartyLeader(); leader != nil {
-			t.Errorf("PartyLeader() of a disbanded party = %v, want nil", leader)
+		if leader := room.PartyLeader(); leader == nil || leader.ObjectID() != memberID {
+			t.Errorf("PartyLeader() of a disbanded party = %v, want its last leader, Member", leader)
 		}
 		if got := room.PartyMembers(); len(got) != 0 {
 			t.Errorf("PartyMembers() of a disbanded party = %v, want none", objectIDs(got))
