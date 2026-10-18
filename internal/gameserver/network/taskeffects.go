@@ -330,6 +330,7 @@ func (a *liveZoneActor) syncFlags() {
 	a.live.SetInNoSummonFriendZone(a.flags.Has(zone.FlagNoSummonFriend))
 	a.live.SetInBossZone(a.flags.Has(zone.FlagBoss))
 	a.live.SetInClanHallZone(a.flags.Has(zone.FlagClanHall))
+	a.live.SetInMotherTreeZone(a.flags.Has(zone.FlagMotherTree))
 	a.live.SetInCastleZone(a.flags.Has(zone.FlagCastle))
 	a.live.SetInWater(a.flags.Has(zone.FlagWater))
 	a.live.SetInDangerArea(a.flags.Has(zone.FlagDanger))
