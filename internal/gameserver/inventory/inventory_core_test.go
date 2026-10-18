@@ -332,8 +332,9 @@ func TestCrystallizeItemReportsGradeTooHighWithoutMutation(t *testing.T) {
 }
 
 // TestExchangeWithoutAllocatorMovesNothing pins the fail-closed exchange: a
-// service that cannot hand out object ids refuses before locking, instead of
-// moving a whole row and then failing on a later row that has to split.
+// service that cannot hand out the object id a splitting row needs refuses
+// before the first move, instead of moving a whole row and then failing on
+// the later row that has to split.
 func TestExchangeWithoutAllocatorMovesNothing(t *testing.T) {
 	templates := testTemplates()
 	a := itemcontainer.NewPlayerInventory(1, templates)
@@ -341,16 +342,12 @@ func TestExchangeWithoutAllocatorMovesNothing(t *testing.T) {
 	sword := a.AddNew(30, 1, 500)
 	adena := b.AddNew(item.AdenaID, 100, 600)
 
-	checked := false
-	_, ok, err := NewService(nil).Exchange(a, b,
+	res, ok, err := NewService(nil).Exchange(a, b,
 		[]Move{{ObjectID: sword.ObjectID, Count: 1}},
 		[]Move{{ObjectID: adena.ObjectID, Count: 40}},
-		func(itemcontainer.Held, itemcontainer.Held) bool { checked = true; return true })
-	if err == nil || ok {
-		t.Fatalf("Exchange() = ok %v, err %v; want a refusal", ok, err)
-	}
-	if checked {
-		t.Fatal("Exchange locked and checked without ids for its rows")
+		func(itemcontainer.Held, itemcontainer.Held) bool { return true })
+	if err == nil || ok || len(res.Persist) != 0 {
+		t.Fatalf("Exchange() = ok %v, err %v, persist %v; want a refusal", ok, err, res.Persist)
 	}
 	if a.ItemByObjectID(sword.ObjectID) == nil || b.ItemCount(item.AdenaID, -1, true) != 100 {
 		t.Fatal("a refused exchange moved items")
@@ -410,5 +407,28 @@ func TestDropItemFailureClassifiesInReferenceOrder(t *testing.T) {
 	}
 	if got := inv.ItemByObjectID(adena.ObjectID).Snapshot().Count; got != 10 {
 		t.Fatalf("classification mutated the stack: count = %d, want 10", got)
+	}
+}
+
+// TestExchangeWithoutSplitsNeedsNoAllocator pins that an exchange whose rows
+// all move whole or land on held stacks takes no object id, so it settles
+// even on a service with no allocator.
+func TestExchangeWithoutSplitsNeedsNoAllocator(t *testing.T) {
+	templates := testTemplates()
+	a := itemcontainer.NewPlayerInventory(1, templates)
+	b := itemcontainer.NewPlayerInventory(2, templates)
+	sword := a.AddNew(30, 1, 500)
+	a.AddNew(item.AdenaID, 5, 501)
+	adena := b.AddNew(item.AdenaID, 100, 600)
+
+	_, ok, err := NewService(nil).Exchange(a, b,
+		[]Move{{ObjectID: sword.ObjectID, Count: 1}},
+		[]Move{{ObjectID: adena.ObjectID, Count: 40}},
+		func(itemcontainer.Held, itemcontainer.Held) bool { return true })
+	if err != nil || !ok {
+		t.Fatalf("Exchange() = ok %v, err %v; want it settled", ok, err)
+	}
+	if b.ItemByObjectID(sword.ObjectID) == nil || a.ItemCount(item.AdenaID, -1, true) != 45 || b.ItemCount(item.AdenaID, -1, true) != 60 {
+		t.Fatal("the exchange did not move both rows")
 	}
 }

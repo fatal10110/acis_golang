@@ -443,46 +443,171 @@ type Move struct {
 // does can land between the check and the last move. It reports false,
 // having changed nothing, when check vetoes. A move failing after the check
 // approved is a broken check; it reports false with the persistence of the
-// moves already made, so the caller still writes what did happen.
+// moves already made, so the caller still writes what did happen. Only a row
+// that splits an instance into a receiver holding no stack of it takes an
+// object id; when those ids cannot be had, it reports the error having
+// changed nothing.
 func (s *Service) Exchange(a, b *itemcontainer.Inventory, aOut, bOut []Move, check func(a, b itemcontainer.Held) bool) (Result, bool, error) {
 	if a == nil || b == nil || a == b {
 		return Result{}, false, nil
 	}
-	// Ids come from outside the inventory locks, and whether a row splits is
-	// only known under them, so every row gets one up front. A move that
-	// could not get its id would fail after earlier rows had landed, so no
-	// allocator means no exchange at all.
-	// ponytail: a row that needs no id burns its id; the allocator never
-	// reuses an id behind its cursor, so handing it back would buy nothing.
-	ids := make([]int32, len(aOut)+len(bOut))
-	for i := range ids {
-		id, ok, err := s.nextID()
-		if err != nil {
-			return Result{}, false, err
-		}
-		if !ok {
-			return Result{}, false, errNoIDAllocator
-		}
-		ids[i] = id
-	}
-
-	var res Result
-	ok := false
+	var (
+		res Result
+		ok  bool
+		err error
+	)
 	itemcontainer.Exchange(a, b, func(heldA, heldB itemcontainer.Held) {
 		if check != nil && !check(heldA, heldB) {
 			return
 		}
-		ok = moveAll(&res, heldA, heldB, a.OwnerID(), aOut, ids) &&
-			moveAll(&res, heldB, heldA, b.OwnerID(), bOut, ids[len(aOut):])
+		// Whether a row splits is only known under the locks, so the ids are
+		// taken here, all of them before the first move: an allocator failing
+		// halfway would leave earlier rows landed. The allocator's lock is a
+		// leaf, so taking it under the inventory locks is safe.
+		var ids exchangeIDs
+		ids, err = s.takeExchangeIDs(splitsAhead(heldA, heldB, aOut, bOut))
+		if err != nil {
+			return
+		}
+		defer ids.release()
+		ok = moveAll(&res, heldA, heldB, a.OwnerID(), aOut, &ids) &&
+			moveAll(&res, heldB, heldA, b.OwnerID(), bOut, &ids)
 	})
-	return res, ok, nil
+	return res, ok, err
 }
 
-// moveAll transfers every row from source to receiver, row i splitting off
-// under ids[i] when it has to.
-func moveAll(res *Result, source, receiver itemcontainer.Held, sourceOwnerID int32, rows []Move, ids []int32) bool {
-	for i, row := range rows {
-		m, ok := source.Transfer(row.ObjectID, row.Count, receiver, ids[i])
+// exchangeIDs holds the ids an exchange took for the rows that split.
+type exchangeIDs struct {
+	s    *Service
+	pool []int32
+}
+
+// takeExchangeIDs takes n ids, or none and an error.
+func (s *Service) takeExchangeIDs(n int) (exchangeIDs, error) {
+	ids := exchangeIDs{s: s}
+	for range n {
+		id, ok, err := s.nextID()
+		if err == nil && !ok {
+			err = errNoIDAllocator
+		}
+		if err != nil {
+			ids.release()
+			return exchangeIDs{}, err
+		}
+		ids.pool = append(ids.pool, id)
+	}
+	return ids, nil
+}
+
+// peek is the id the next splitting row takes, or 0 when none is left; a
+// row given 0 that has to split fails without changing anything.
+func (ids *exchangeIDs) peek() int32 {
+	if len(ids.pool) == 0 {
+		return 0
+	}
+	return ids.pool[0]
+}
+
+// use marks the id peek returned as spent.
+func (ids *exchangeIDs) use() {
+	ids.pool = ids.pool[1:]
+}
+
+// release gives back the ids no row spent; an allocator that cannot take
+// ids back keeps them.
+func (ids *exchangeIDs) release() {
+	if ids.s == nil {
+		return
+	}
+	r, ok := ids.s.ids.(interface{ ReleaseID(int32) })
+	for _, id := range ids.pool {
+		if ok {
+			r.ReleaseID(id)
+		}
+	}
+	ids.pool = nil
+}
+
+// splitsAhead counts the rows that will split an instance into a receiver
+// holding no stack of it when aOut moves from a to b and then bOut from b to
+// a, playing the rows in that order on what a and b hold now: a row that
+// starts the receiver's stack lets later rows of that item land on it, and a
+// row that takes the sender's whole stack away makes a later row into the
+// sender start a new one. A row the moves will refuse counts nothing.
+func splitsAhead(a, b itemcontainer.Held, aOut, bOut []Move) int {
+	type stackKey struct {
+		side       int
+		templateID int32
+	}
+	// played is an object a row has moved: where it is now (-1 once it
+	// merged into a stack and is gone) and the units it holds.
+	type played struct {
+		side  int
+		count int
+	}
+	held := [2]itemcontainer.Held{a, b}
+	objects := make(map[int32]played)
+	templates := make(map[int32]int32) // object id to template id, for played objects
+	stacks := make(map[stackKey]bool)  // whether a side holds a stack, once a row changed it
+	hasStack := func(side int, templateID int32) bool {
+		if has, ok := stacks[stackKey{side, templateID}]; ok {
+			return has
+		}
+		return held[side].ItemByTemplateID(templateID) != nil
+	}
+	splits := 0
+	play := func(from int, rows []Move) {
+		to := 1 - from
+		for _, row := range rows {
+			if row.Count <= 0 {
+				continue
+			}
+			obj, ok := objects[row.ObjectID]
+			templateID := templates[row.ObjectID]
+			if !ok {
+				src := held[from].ItemByObjectID(row.ObjectID)
+				if src == nil {
+					continue
+				}
+				st := src.Snapshot()
+				obj, templateID = played{side: from, count: st.Count}, st.TemplateID
+				templates[row.ObjectID] = templateID
+			}
+			tmpl, ok := held[from].Templates().Get(templateID)
+			if obj.side != from || obj.count <= 0 || !ok {
+				continue
+			}
+			stack := tmpl.Stackable && hasStack(to, templateID)
+			switch {
+			case row.Count < obj.count:
+				obj.count -= row.Count
+				if !stack {
+					splits++
+				}
+			case stack:
+				obj.side = -1
+			default:
+				obj.side = to
+			}
+			objects[row.ObjectID] = obj
+			if tmpl.Stackable {
+				stacks[stackKey{to, templateID}] = true
+				if obj.side != from {
+					stacks[stackKey{from, templateID}] = false
+				}
+			}
+		}
+	}
+	play(0, aOut)
+	play(1, bOut)
+	return splits
+}
+
+// moveAll transfers every row from source to receiver, a row that splits
+// into a receiver holding none of it spending the next of ids.
+func moveAll(res *Result, source, receiver itemcontainer.Held, sourceOwnerID int32, rows []Move, ids *exchangeIDs) bool {
+	for _, row := range rows {
+		m, ok := source.Transfer(row.ObjectID, row.Count, receiver, ids.peek())
 		if !ok {
 			return false
 		}
@@ -493,6 +618,7 @@ func moveAll(res *Result, source, receiver itemcontainer.Held, sourceOwnerID int
 			res.Persist = append(res.Persist, Delete(sourceOwnerID, m.FreedObjectID))
 		}
 		if m.Created {
+			ids.use()
 			res.Persist = append(res.Persist, Save(m.Item))
 		} else {
 			res.Persist = append(res.Persist, Update(m.Item))
