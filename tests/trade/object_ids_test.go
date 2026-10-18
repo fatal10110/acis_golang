@@ -15,9 +15,10 @@ import (
 
 // TestTradeTakesObjectIDsOnlyForSplitRows settles trades whose rows split,
 // land on a held stack, or move whole, and counts the object ids each took.
-// The last case gives the first trader's whole adena stack away and takes
+// The last cases give the first trader's whole adena stack away and take
 // some back on the same trade: the stack is gone by the time the returning
-// row moves, so that row starts a new one.
+// row moves, so that row starts a new one, even when it offered its whole
+// stack, which the first stack has just grown.
 func TestTradeTakesObjectIDsOnlyForSplitRows(t *testing.T) {
 	t.Parallel()
 	for _, tc := range []struct {
@@ -54,6 +55,15 @@ func TestTradeTakesObjectIDsOnlyForSplitRows(t *testing.T) {
 			secondHolds: [2]int32{item.AdenaID, 50}, secondOffers: 10,
 			wantIDs:   1,
 			firstRows: "57x10", secondRows: "57x140",
+		},
+		{
+			// The first stack grows the second, so the second's whole
+			// offer is now part of it.
+			name:       "both whole adena stacks",
+			firstHolds: [2]int32{item.AdenaID, 100}, firstOffers: 100,
+			secondHolds: [2]int32{item.AdenaID, 50}, secondOffers: 50,
+			wantIDs:   1,
+			firstRows: "57x50", secondRows: "57x100",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

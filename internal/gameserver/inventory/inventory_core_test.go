@@ -432,3 +432,33 @@ func TestExchangeWithoutSplitsNeedsNoAllocator(t *testing.T) {
 		t.Fatal("the exchange did not move both rows")
 	}
 }
+
+// TestExchangeCountsUnitsMergedIntoAStack pins a row moving a stack an
+// earlier row grew: both owners offer their whole adena, so a's lands on
+// b's stack, and b's row, offering only its own 50 of the 150 it now holds,
+// splits into an a holding none and takes the one id the exchange spends.
+func TestExchangeCountsUnitsMergedIntoAStack(t *testing.T) {
+	templates := testTemplates()
+	a := itemcontainer.NewPlayerInventory(1, templates)
+	b := itemcontainer.NewPlayerInventory(2, templates)
+	aAdena := a.AddNew(item.AdenaID, 100, 500)
+	bAdena := b.AddNew(item.AdenaID, 50, 600)
+	ids := &testIDs{next: 900}
+
+	_, ok, err := NewService(ids).Exchange(a, b,
+		[]Move{{ObjectID: aAdena.ObjectID, Count: 100}},
+		[]Move{{ObjectID: bAdena.ObjectID, Count: 50}},
+		func(itemcontainer.Held, itemcontainer.Held) bool { return true })
+	if err != nil || !ok {
+		t.Fatalf("Exchange() = ok %v, err %v; want it settled", ok, err)
+	}
+	if got, want := a.ItemCount(item.AdenaID, -1, true), 50; got != want {
+		t.Fatalf("a adena = %d, want %d", got, want)
+	}
+	if got, want := b.ItemCount(item.AdenaID, -1, true), 100; got != want {
+		t.Fatalf("b adena = %d, want %d", got, want)
+	}
+	if ids.next != 901 {
+		t.Fatalf("ids taken = %d, want 1", ids.next-900)
+	}
+}

@@ -531,29 +531,50 @@ func (ids *exchangeIDs) release() {
 // splitsAhead counts the rows that will split an instance into a receiver
 // holding no stack of it when aOut moves from a to b and then bOut from b to
 // a, playing the rows in that order on what a and b hold now: a row that
-// starts the receiver's stack lets later rows of that item land on it, and a
-// row that takes the sender's whole stack away makes a later row into the
-// sender start a new one. A row the moves will refuse counts nothing.
+// starts or grows the receiver's stack lets later rows of that item land on
+// it, or move it out whole, and a row that takes the sender's whole stack
+// away makes a later row into the sender start a new one. A row the moves
+// will refuse counts nothing.
 func splitsAhead(a, b itemcontainer.Held, aOut, bOut []Move) int {
 	type stackKey struct {
 		side       int
 		templateID int32
 	}
-	// played is an object a row has moved: where it is now (-1 once it
-	// merged into a stack and is gone) and the units it holds.
+	// played is an object as the rows have left it: which side holds it (-1
+	// once it merged into a stack and is gone), its item and its units.
 	type played struct {
-		side  int
-		count int
+		side       int
+		templateID int32
+		count      int
 	}
 	held := [2]itemcontainer.Held{a, b}
-	objects := make(map[int32]played)
-	templates := make(map[int32]int32) // object id to template id, for played objects
-	stacks := make(map[stackKey]bool)  // whether a side holds a stack, once a row changed it
-	hasStack := func(side int, templateID int32) bool {
-		if has, ok := stacks[stackKey{side, templateID}]; ok {
-			return has
+	objects := make(map[int32]*played)
+	lookup := func(side int, inst *item.Instance) *played {
+		if p, ok := objects[inst.ObjectID]; ok {
+			return p
 		}
-		return held[side].ItemByTemplateID(templateID) != nil
+		st := inst.Snapshot()
+		p := &played{side: side, templateID: st.TemplateID, count: st.Count}
+		objects[inst.ObjectID] = p
+		return p
+	}
+	// stacks names the object holding a side's stack of an item, once a row
+	// changed it; 0 is none. A created instance has no id yet, so it goes
+	// by a negative stand-in no row can name.
+	stacks := make(map[stackKey]int32)
+	stackOf := func(side int, templateID int32) *played {
+		id, ok := stacks[stackKey{side, templateID}]
+		if !ok {
+			inst := held[side].ItemByTemplateID(templateID)
+			if inst == nil {
+				return nil
+			}
+			return lookup(side, inst)
+		}
+		if id == 0 {
+			return nil
+		}
+		return objects[id]
 	}
 	splits := 0
 	play := func(from int, rows []Move) {
@@ -563,38 +584,45 @@ func splitsAhead(a, b itemcontainer.Held, aOut, bOut []Move) int {
 				continue
 			}
 			obj, ok := objects[row.ObjectID]
-			templateID := templates[row.ObjectID]
 			if !ok {
 				src := held[from].ItemByObjectID(row.ObjectID)
 				if src == nil {
 					continue
 				}
-				st := src.Snapshot()
-				obj, templateID = played{side: from, count: st.Count}, st.TemplateID
-				templates[row.ObjectID] = templateID
+				obj = lookup(from, src)
 			}
-			tmpl, ok := held[from].Templates().Get(templateID)
+			tmpl, ok := held[from].Templates().Get(obj.templateID)
 			if obj.side != from || obj.count <= 0 || !ok {
 				continue
 			}
-			stack := tmpl.Stackable && hasStack(to, templateID)
-			switch {
-			case row.Count < obj.count:
-				obj.count -= row.Count
-				if !stack {
-					splits++
-				}
-			case stack:
-				obj.side = -1
-			default:
-				obj.side = to
-			}
-			objects[row.ObjectID] = obj
+			var stack *played
 			if tmpl.Stackable {
-				stacks[stackKey{to, templateID}] = true
-				if obj.side != from {
-					stacks[stackKey{from, templateID}] = false
+				stack = stackOf(to, obj.templateID)
+			}
+			moved := min(row.Count, obj.count)
+			whole := moved == obj.count
+			obj.count -= moved
+			switch {
+			case stack != nil:
+				stack.count += moved
+				if whole {
+					obj.side = -1
 				}
+			case whole:
+				obj.count, obj.side = moved, to
+				if tmpl.Stackable {
+					stacks[stackKey{to, obj.templateID}] = row.ObjectID
+				}
+			default:
+				splits++
+				if tmpl.Stackable {
+					created := -int32(splits)
+					objects[created] = &played{side: to, templateID: obj.templateID, count: moved}
+					stacks[stackKey{to, obj.templateID}] = created
+				}
+			}
+			if whole && tmpl.Stackable {
+				stacks[stackKey{from, obj.templateID}] = 0
 			}
 		}
 	}
