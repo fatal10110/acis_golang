@@ -124,16 +124,19 @@ type lastPlaces struct {
 func New() script.Script {
 	last := lastPlaces{mom: &script.IntCell{}, bom: &script.IntCell{}}
 	return script.Script{
-		Dir:   "ai/group",
-		Bind:  script.Bindings{script.EventCreated: {masterToma, merchantOfMammon, blacksmithOfMammon, blacksmithOfWindRooney}},
-		Hooks: script.Hooks{OnTimer: last.onTimer, OnCreated: onCreated},
+		Dir:  "ai/group",
+		Bind: script.Bindings{script.EventCreated: {masterToma, merchantOfMammon, blacksmithOfMammon, blacksmithOfWindRooney}},
+		Hooks: script.Hooks{
+			OnTimer:   func(s *script.Script, e script.Timer) string { return onTimer(s, e, last) },
+			OnCreated: onCreated,
+		},
 	}
 }
 
 // onTimer moves the NPC to a random place of its list. The two of Mammon
 // draw again until the place differs from where they last moved to, and
 // the Blacksmith of Mammon then shouts one of his lines.
-func (last lastPlaces) onTimer(s *script.Script, e script.Timer) string {
+func onTimer(s *script.Script, e script.Timer, last lastPlaces) string {
 	switch {
 	case strings.EqualFold(e.Name, tomaTimer):
 		locs := tomaLocs()

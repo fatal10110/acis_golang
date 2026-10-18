@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	actorai "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -16,16 +17,19 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/follower"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/randomteleport"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
 // The NPCs of the group script tests, typed as in the datapack: a golem
-// crafter and his golem, and the two of Mammon.
+// crafter and his golem, and the four NPCs that move every half hour.
 const (
 	telsonID             = int32(31592)
 	dorothyID            = int32(31593)
+	masterTomaID         = int32(30556)
 	merchantOfMammonID   = int32(31113)
 	blacksmithOfMammonID = int32(31126)
+	rooneyID             = int32(32049)
 )
 
 // listedDraws is a script random source that serves listed draws in order
@@ -154,6 +158,9 @@ func TestFollowerComesWithItsMasterAndWalksBesideIt(t *testing.T) {
 	if want := (location.Location{X: masterAt.X, Y: masterAt.Y, Z: masterAt.Z + 20}); golemAt != want {
 		t.Fatalf("the golem appeared at %+v, want where its master stands, %+v", golemAt, want)
 	}
+	if !folkOf(t, srv, dorothyID).Running() {
+		t.Fatal("the golem walks; it is set running as it appears")
+	}
 	if got := draws.take(); len(got) != 0 {
 		t.Fatalf("draws as the master appeared = %q, want none", got)
 	}
@@ -201,6 +208,55 @@ func walkFor(t *testing.T, srv *gameservertest.Server, d time.Duration) time.Dur
 	}
 	srv.ReadQueued(t, srv.Client)
 	return time.Duration(n) * move.PositionUpdateInterval
+}
+
+// folkOf returns the one civilian NPC of the template npcID in the world.
+func folkOf(t *testing.T, srv *gameservertest.Server, npcID int32) *npc.Folk {
+	t.Helper()
+	var found []*npc.Folk
+	srv.State.FindObject(func(o world.Tracked) bool {
+		if f, ok := o.(*npc.Folk); ok && f.NpcID() == int(npcID) {
+			found = append(found, f)
+		}
+		return false
+	})
+	if len(found) != 1 {
+		t.Fatalf("civilian NPCs of template %d in the world = %d, want 1", npcID, len(found))
+	}
+	return found[0]
+}
+
+// TestFollowerOfASleepingRegionStaysPut plays FollowerMovingAroundMaster for
+// a golem crafter far from any player: his golem appears beside him, its
+// AI asleep; at five seconds the offsets are still drawn, but the golem is
+// asked to walk nowhere.
+func TestFollowerOfASleepingRegionStaysPut(t *testing.T) {
+	t.Parallel()
+	draws := &listedDraws{draws: []int{100, 0}}
+	golem := gameservertest.FolkTemplate("MutedFolk", int(dorothyID))
+	golem.CanMove = true
+	srv, at := bootGroupScript(t, "script.ai.group.FollowerMovingAroundMaster", follower.New,
+		map[int32]script.NPCKind{telsonID: script.KindFolk, dorothyID: script.KindFolk},
+		[]*npc.Template{golem}, draws)
+
+	master := srv.SpawnFolkNPCAt(t, gameservertest.FolkTemplate("Folk", int(telsonID)),
+		location.Location{X: at.X + 40000, Y: at.Y, Z: at.Z})
+	srv.RunCreated(t, master)
+	follower := folkOf(t, srv, dorothyID)
+	if !follower.AISleeping() {
+		t.Fatal("test setup: the golem's AI is awake far from any player")
+	}
+
+	srv.Advance(t, 5*time.Second)
+	if got, want := draws.take(), []string{"101:100", "101:0"}; !slices.Equal(got, want) {
+		t.Fatalf("draws at five seconds = %q, want the offsets drawn %q", got, want)
+	}
+	if follower.Desires().HasKind(actorai.IntentionMoveTo) {
+		t.Fatal("the sleeping golem was asked to walk")
+	}
+	if frames := srv.ReadQueued(t, srv.Client); len(frames) != 0 {
+		t.Fatalf("the character got %d frames from a region it is far from", len(frames))
+	}
 }
 
 // teleportTo reads a TeleportToLocation frame's object and destination.
@@ -254,37 +310,9 @@ func TestMammonMovesElsewhereEveryHalfHour(t *testing.T) {
 		t.Fatalf("draws as the Merchant appeared = %q, want none", got)
 	}
 
-	// moves checks that the half hour from appearing has drawn wantDraws
-	// and moved obj to dest. Next to the character, the character sees it
-	// go, in one TeleportToLocation to dest, and hears nothing it says
-	// where it arrives; far away, the character gets nothing at all.
 	moves := func(step string, obj int32, wantDraws []string, dest location.Location, near bool, pos func() (int, int, int)) {
 		t.Helper()
-		if got := draws.take(); !slices.Equal(got, wantDraws) {
-			t.Fatalf("%s: draws = %q, want %q", step, got, wantDraws)
-		}
-		var jumps []location.Location
-		for _, f := range srv.ReadQueued(t, srv.Client) {
-			switch f[0] {
-			case serverpackets.OpcodeTeleportToLocation:
-				id, to := teleportTo(f)
-				if id != obj {
-					t.Fatalf("%s: TeleportToLocation of object %d, want only the NPC's", step, id)
-				}
-				jumps = append(jumps, to)
-			case serverpackets.OpcodeNpcSay:
-				t.Fatalf("%s: the character heard the NPC where it arrived", step)
-			}
-		}
-		switch {
-		case near && (len(jumps) != 1 || jumps[0].X != dest.X || jumps[0].Y != dest.Y):
-			t.Fatalf("%s: TeleportToLocation = %v, want one to %+v", step, jumps, dest)
-		case !near && len(jumps) != 0:
-			t.Fatalf("%s: TeleportToLocation = %v, want none from far away", step, jumps)
-		}
-		if x, y, _ := pos(); x != dest.X || y != dest.Y {
-			t.Fatalf("%s: the NPC stands at %d,%d, want %d,%d", step, x, y, dest.X, dest.Y)
-		}
+		checkMove(t, srv, draws, step, obj, wantDraws, dest, near, pos)
 	}
 
 	srv.Advance(t, 29*time.Minute-time.Millisecond)
@@ -306,6 +334,84 @@ func TestMammonMovesElsewhereEveryHalfHour(t *testing.T) {
 	srv.Advance(t, time.Minute)
 	moves("the Merchant's second move", mom.ObjectID(), []string{"8:7", "8:2"},
 		location.Location{X: 83136, Y: 208992}, false, mom.Position)
+	if n := draws.left(); n != 0 {
+		t.Fatalf("%d listed draws never drawn", n)
+	}
+}
+
+// checkMove checks that the half hour just past has drawn wantDraws and
+// moved obj to dest. Next to the character, the character sees it go, in
+// one TeleportToLocation to dest, and hears nothing it says where it
+// arrives; far away, the character gets nothing at all.
+func checkMove(t *testing.T, srv *gameservertest.Server, draws *listedDraws, step string, obj int32,
+	wantDraws []string, dest location.Location, near bool, pos func() (int, int, int),
+) {
+	t.Helper()
+	if got := draws.take(); !slices.Equal(got, wantDraws) {
+		t.Fatalf("%s: draws = %q, want %q", step, got, wantDraws)
+	}
+	var jumps []location.Location
+	for _, f := range srv.ReadQueued(t, srv.Client) {
+		switch f[0] {
+		case serverpackets.OpcodeTeleportToLocation:
+			id, to := teleportTo(f)
+			if id != obj {
+				t.Fatalf("%s: TeleportToLocation of object %d, want only the NPC's", step, id)
+			}
+			jumps = append(jumps, to)
+		case serverpackets.OpcodeNpcSay:
+			t.Fatalf("%s: the character heard the NPC where it arrived", step)
+		}
+	}
+	switch {
+	case near && (len(jumps) != 1 || jumps[0].X != dest.X || jumps[0].Y != dest.Y):
+		t.Fatalf("%s: TeleportToLocation = %v, want one to %+v", step, jumps, dest)
+	case !near && len(jumps) != 0:
+		t.Fatalf("%s: TeleportToLocation = %v, want none from far away", step, jumps)
+	}
+	if x, y, _ := pos(); x != dest.X || y != dest.Y {
+		t.Fatalf("%s: the NPC stands at %d,%d, want %d,%d", step, x, y, dest.X, dest.Y)
+	}
+}
+
+// TestTomaAndRooneyMoveEveryHalfHour plays RandomTeleport for Master Toma
+// and Rooney: neither draws as it appears; each moves half an hour after
+// appearing, then every half hour, to one drawn place of its own list (3
+// for Toma, 39 for Rooney), drawn once even when it is where it stands.
+func TestTomaAndRooneyMoveEveryHalfHour(t *testing.T) {
+	t.Parallel()
+	draws := &listedDraws{draws: []int{
+		2,  // Toma's first move: his third place
+		38, // Rooney's first move: his last place
+		2,  // Toma's second move: his third place again
+		38, // Rooney's second move: his last place again
+	}}
+	srv, at := bootGroupScript(t, "script.ai.group.RandomTeleport", randomteleport.New,
+		map[int32]script.NPCKind{masterTomaID: script.KindFolk, rooneyID: script.KindFolk},
+		nil, draws)
+
+	toma := srv.SpawnFolkNPCAt(t, gameservertest.FolkTemplate("Folk", int(masterTomaID)),
+		location.Location{X: at.X + 100, Y: at.Y, Z: at.Z})
+	srv.RunCreated(t, toma)
+	srv.Advance(t, time.Minute)
+	rooney := srv.SpawnFolkNPCAt(t, gameservertest.FolkTemplate("Folk", int(rooneyID)),
+		location.Location{X: at.X - 100, Y: at.Y, Z: at.Z})
+	srv.RunCreated(t, rooney)
+	srv.ReadQueued(t, srv.Client)
+	if got := draws.take(); len(got) != 0 {
+		t.Fatalf("draws as Toma and Rooney appeared = %q, want none", got)
+	}
+
+	tomaAt := location.Location{X: 178849, Y: -184342}
+	rooneyAt := location.Location{X: 186074, Y: -118154}
+	srv.Advance(t, 29*time.Minute)
+	checkMove(t, srv, draws, "Toma's first move", toma.ObjectID(), []string{"3:2"}, tomaAt, true, toma.Position)
+	srv.Advance(t, time.Minute)
+	checkMove(t, srv, draws, "Rooney's first move", rooney.ObjectID(), []string{"39:38"}, rooneyAt, true, rooney.Position)
+	srv.Advance(t, 29*time.Minute)
+	checkMove(t, srv, draws, "Toma's second move", toma.ObjectID(), []string{"3:2"}, tomaAt, false, toma.Position)
+	srv.Advance(t, time.Minute)
+	checkMove(t, srv, draws, "Rooney's second move", rooney.ObjectID(), []string{"39:38"}, rooneyAt, false, rooney.Position)
 	if n := draws.left(); n != 0 {
 		t.Fatalf("%d listed draws never drawn", n)
 	}
