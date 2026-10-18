@@ -82,6 +82,12 @@ func (l *doorChangeLog) take() []doorChangeSeen {
 // list order, and enters the world beside the doors.
 func bootDoorChange(t *testing.T, list []string, catalog script.Catalog) *gameservertest.Server {
 	t.Helper()
+	return bootDoorChangeWith(t, changeDoors(), list, catalog)
+}
+
+// bootDoorChangeWith is bootDoorChange with the doors of tmpls.
+func bootDoorChangeWith(t *testing.T, tmpls []*door.Template, list []string, catalog script.Catalog) *gameservertest.Server {
+	t.Helper()
 	var listing []script.Listing
 	for _, p := range list {
 		listing = append(listing, script.Listing{Path: p})
@@ -90,7 +96,7 @@ func bootDoorChange(t *testing.T, list []string, catalog script.Catalog) *gamese
 		gameservertest.WithCharacter("Newbie", 1, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithScripts(listing, catalog),
-		gameservertest.WithDoors(changeDoors()...),
+		gameservertest.WithDoors(tmpls...),
 	)
 	enterWorld(t, srv)
 	return srv

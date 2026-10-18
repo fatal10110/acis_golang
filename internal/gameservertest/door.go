@@ -58,7 +58,7 @@ func bootDoors(t *testing.T, tmpls []*door.Template, ids *sequentialIDs, state *
 	if err != nil {
 		t.Fatalf("door timers: %v", err)
 	}
-	h := &doorHarness{geo: geo, clock: &autosaveClock{now: time.Now()}}
+	h := &doorHarness{geo: geo, clock: &autosaveClock{now: time.Now()}, timers: timers}
 	h.regen = task.NewDoorRegen(h.clock.Now)
 	objs, err := gamemanager.NewWorldObjects(doors, statics, ids, geo, state, timers, h.regen, network.DoorSinks(state), zerolog.Nop())
 	if err != nil {
@@ -75,6 +75,8 @@ type doorHarness struct {
 	geo   *engine.Engine
 	clock *autosaveClock
 	regen *task.DoorRegen
+	// timers are the doors' auto open/close timers, never started.
+	timers *task.Door
 }
 
 // DoorGeo returns the geodata engine WithDoors' doors stand on.
@@ -106,6 +108,16 @@ func (s *Server) DoorRegenerating(tb testing.TB, doorID int) bool {
 		tb.Fatal("DoorRegenerating needs WithDoors")
 	}
 	return s.doors.regen.Tracked(doorID)
+}
+
+// DoorTimerPending reports whether doorID's door has an auto open/close
+// timer scheduled.
+func (s *Server) DoorTimerPending(tb testing.TB, doorID int) bool {
+	tb.Helper()
+	if s.doors == nil {
+		tb.Fatal("DoorTimerPending needs WithDoors")
+	}
+	return s.doors.timers.Tracked(doorID)
 }
 
 // siegeInProgress stands in for the siege of a door outside any castle's
