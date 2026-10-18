@@ -109,7 +109,7 @@ func TestEnchantSucceeds(t *testing.T) {
 	skills := enchantTestPersistence()
 	roll := func() int { return 0 }
 
-	result, status, err := Enchant(ch, table, nil, trees, skills, false, roll, enchantTestSkillID, 101)
+	result, status, err := Enchant(ch, table, nil, trees, skills, false, nil, roll, enchantTestSkillID, 101)
 	if err != nil {
 		t.Fatalf("Enchant() error: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestEnchantFailsResetsToMaxNormalLevel(t *testing.T) {
 	skills := enchantTestPersistence()
 	roll := func() int { return 99 }
 
-	result, status, err := Enchant(ch, table, nil, trees, skills, false, roll, enchantTestSkillID, 101)
+	result, status, err := Enchant(ch, table, nil, trees, skills, false, nil, roll, enchantTestSkillID, 101)
 	if err != nil {
 		t.Fatalf("Enchant() error: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestEnchantNeedsSP(t *testing.T) {
 	trees := enchantTestTree()
 	skills := enchantTestPersistence()
 
-	result, status, err := Enchant(ch, table, nil, trees, skills, false, func() int { return 0 }, enchantTestSkillID, 101)
+	result, status, err := Enchant(ch, table, nil, trees, skills, false, nil, func() int { return 0 }, enchantTestSkillID, 101)
 	if err != nil {
 		t.Fatalf("Enchant() error: %v", err)
 	}
@@ -187,7 +187,7 @@ func TestEnchantNeedsExp(t *testing.T) {
 	trees := enchantTestTree()
 	skills := enchantTestPersistence()
 
-	_, status, err := Enchant(ch, table, nil, trees, skills, false, func() int { return 0 }, enchantTestSkillID, 101)
+	_, status, err := Enchant(ch, table, nil, trees, skills, false, nil, func() int { return 0 }, enchantTestSkillID, 101)
 	if err != nil {
 		t.Fatalf("Enchant() error: %v", err)
 	}
@@ -207,7 +207,7 @@ func TestEnchantMissingItemWhenSPBookNeeded(t *testing.T) {
 	}}
 	skills := enchantTestPersistence()
 
-	result, status, err := Enchant(ch, table, nil, trees, skills, true, func() int { return 0 }, enchantTestSkillID, 101)
+	result, status, err := Enchant(ch, table, nil, trees, skills, true, nil, func() int { return 0 }, enchantTestSkillID, 101)
 	if err != nil {
 		t.Fatalf("Enchant() error: %v", err)
 	}
@@ -231,7 +231,7 @@ func TestEnchantSkipsItemCheckWhenConfigDisabled(t *testing.T) {
 	}}
 	skills := enchantTestPersistence()
 
-	_, status, err := Enchant(ch, table, nil, trees, skills, false, func() int { return 0 }, enchantTestSkillID, 101)
+	_, status, err := Enchant(ch, table, nil, trees, skills, false, nil, func() int { return 0 }, enchantTestSkillID, 101)
 	if err != nil {
 		t.Fatalf("Enchant() error: %v", err)
 	}
