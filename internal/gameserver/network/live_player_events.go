@@ -377,7 +377,10 @@ func (p *livePlayer) Emit(ev event.Event) {
 	case event.NPCChatShown:
 		l.showNPCChat(live, e.ObjectID)
 	case event.SkillCalled:
-		l.callSkill(live, e)
+		// A script calls it from any queue (an NPC hook, a dying hook):
+		// the skill's handlers own the caster's state, so the cast runs on
+		// live's own queue once the calling task is done.
+		onOwnQueue(live, false, func() { l.callSkill(live, e) })
 	case event.ScriptMessage:
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1, e.Text))
 	case event.QuestOverweight:
