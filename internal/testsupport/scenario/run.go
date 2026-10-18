@@ -21,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
@@ -241,9 +242,6 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		default:
 			t.Fatalf("%s: NPC %s type %s is neither a civilian nor an attackable", r.sc.Name, n.Role, n.Type)
 		}
-		if n.Walks && kinds[n.ID] != script.KindFolk {
-			t.Fatalf("%s: NPC %s walks, but only a civilian walks: a monster stands parked", r.sc.Name, n.Role)
-		}
 		r.npcs[n.Role] = n
 	}
 	opts := []gameservertest.Option{
@@ -276,6 +274,9 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	}
 	if r.sc.Random != nil {
 		opts = append(opts, gameservertest.WithScriptRand(r.draws.draw))
+	}
+	if r.sc.LaysCursed() {
+		opts = append(opts, gameservertest.WithCursedWeapons(shippedCursedWeapons(t)))
 	}
 	if f := r.sc.Festival; f != nil {
 		opts = append(opts, gameservertest.WithSevenSignsSeed(func(store *gamesql.SevenSignsStore) { seedFestival(t, store, f) }))
@@ -473,7 +474,12 @@ func (r *run) spawn(t *testing.T, n NPC) {
 	if npc.FolkKind(&npc.Instance{Template: tmpl}) {
 		live = r.srv.SpawnCastingFolkNPCOfMakerAt(t, tmpl, at, shippedSkills(t), maker)
 	} else {
-		h := r.srv.SpawnHostileNPCOfMakerAt(t, tmpl, at, maker)
+		var h *npc.Hostile
+		if n.Walks {
+			h = r.srv.SpawnMovingHostileNPCOfMakerAt(t, tmpl, at, maker)
+		} else {
+			h = r.srv.SpawnHostileNPCOfMakerAt(t, tmpl, at, maker)
+		}
 		r.srv.AI.Add(h)
 		r.live[n.Role], live = h, h
 	}
@@ -485,7 +491,8 @@ func (r *run) spawn(t *testing.T, n NPC) {
 }
 
 // template is the fixture template of n: a civilian one, undying like the
-// shipped service NPCs, or a level 1 monster of 1000 HP.
+// shipped service NPCs, or a level 1 monster of 1000 HP; it can move when
+// n walks.
 func template(n NPC) *npc.Template {
 	tmpl := gameservertest.FolkTemplate(n.Type, int(n.ID))
 	if npc.FolkKind(&npc.Instance{Template: tmpl}) {
@@ -495,6 +502,7 @@ func template(n NPC) *npc.Template {
 	return &npc.Template{
 		ID: int(n.ID), TemplateID: int(n.ID), Type: n.Type, Level: 1, HPMax: 1000,
 		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 8, CollisionHeight: 20,
+		CanMove: n.Walks,
 	}
 }
 
@@ -917,6 +925,27 @@ var shipped struct {
 	once  sync.Once
 	table *item.Table
 	err   error
+}
+
+// shippedCursed is the shipped cursed weapon table, loaded once per test
+// binary.
+var shippedCursed struct {
+	once  sync.Once
+	table *entity.CursedWeaponTable
+	err   error
+}
+
+// shippedCursedWeapons is the shipped cursed weapon table, its skills read
+// from the shipped skill table.
+func shippedCursedWeapons(t *testing.T) *entity.CursedWeaponTable {
+	t.Helper()
+	path := datapack.Path(t, "data", "xml", "cursedWeapons.xml")
+	skills := shippedSkills(t)
+	shippedCursed.once.Do(func() { shippedCursed.table, shippedCursed.err = gamexml.LoadCursedWeapons(path, skills) })
+	if shippedCursed.err != nil {
+		t.Fatalf("load shipped cursed weapons: %v", shippedCursed.err)
+	}
+	return shippedCursed.table
 }
 
 // shippedSkillTable is the shipped skill table, loaded once per test

@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -115,14 +116,53 @@ func (r *run) lay(t *testing.T, g Ground) {
 	for _, s := range r.srv.GroundItems.Snapshots(nil) {
 		before[s.ObjectID] = true
 	}
-	r.srv.SeedGroundItem(t, 0, g.Item, g.Count, r.origin.X+g.DX, r.origin.Y+g.DY, r.origin.Z+g.DZ)
+	if g.Cursed {
+		r.startCursedLife(t, g)
+	}
+	at := location.Location{X: r.origin.X + g.DX, Y: r.origin.Y + g.DY, Z: r.origin.Z + g.DZ}
+	r.srv.SeedGroundItem(t, 0, g.Item, g.Count, at.X, at.Y, at.Z)
 	for _, s := range r.srv.GroundItems.Snapshots(nil) {
 		if !before[s.ObjectID] && s.TemplateID == g.Item {
 			r.roles[s.ObjectID], r.objs[g.Role], r.grounds[s.ObjectID] = g.Role, s.ObjectID, true
+			if g.Cursed {
+				r.srv.CursedWeapons.PlaceOnGround(g.Item, s.ObjectID, at)
+			}
 			return
 		}
 	}
 	t.Fatalf("%s: ground %s: item %d not on the ground", r.sc.Name, g.Role, g.Item)
+}
+
+// startCursedLife starts the life of ground line g's cursed weapon as a
+// monster kill's drop roll does: of the weapons not out, in the order the
+// roll visits them, only g's rolls under its drop rate.
+func (r *run) startCursedLife(t *testing.T, g Ground) {
+	t.Helper()
+	turn, found := 0, false
+	for _, w := range r.srv.CursedWeapons.Weapons() {
+		if w.Out {
+			continue
+		}
+		if w.ItemID == g.Item {
+			found = true
+			break
+		}
+		turn++
+	}
+	if !found {
+		t.Fatalf("%s: ground %s: item %d is no cursed weapon of the shipped data, or it is out already", r.sc.Name, g.Role, g.Item)
+	}
+	call := 0
+	id, ok := r.srv.CursedWeapons.RollDrop(func(n int) int {
+		defer func() { call++ }()
+		if call == turn {
+			return 0
+		}
+		return n - 1
+	})
+	if !ok || id != g.Item {
+		t.Fatalf("%s: ground %s: the drop roll brought out %d (%v), want %d", r.sc.Name, g.Role, id, ok, g.Item)
+	}
 }
 
 // groundDeleted renders a DeleteObject of a ground line's item; false for

@@ -428,9 +428,17 @@ func (s *Server) spawnMovingHostile(t *testing.T, tmpl *npc.Template, home, at l
 	if err != nil {
 		t.Fatalf("new npc instance: %v", err)
 	}
-	inst.Kind = npc.InstanceKind(tmpl.Type)
 	inst.HasHome = true
 	inst.Home = home
+	return s.spawnMovingHostileInstance(t, inst, at, geo)
+}
+
+// spawnMovingHostileInstance is spawnMovingHostile for an instance the
+// caller built, its home set.
+func (s *Server) spawnMovingHostileInstance(t *testing.T, inst *npc.Instance, at location.Location, geo move.Geo) *npc.Hostile {
+	t.Helper()
+	tmpl := inst.Template
+	inst.Kind = npc.InstanceKind(tmpl.Type)
 	statRef := &movingHostileStatRef{}
 	live, err := creature.NewLive(at, tmpl.RunSpeed, geo, statRef, effect.WithEnv(s.effectEnv))
 	if err != nil {

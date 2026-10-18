@@ -13,8 +13,10 @@ territory isle -100 -100 400 400 -100 100
 npc vervato 32104 Folk 60 0 0 maker isle
 npc picker 35600 Folk 200 0 0 walks
 npc both 35601 Folk 0 10 0 maker isle walks
+npc wolf 20120 Monster 0 -10 0 walks maker isle
 roll vervato 0
 ground potion 20 1 500 0 0
+ground zariche 8190 1 450 0 0 cursed
 
 look picker 500 1 20 8190
 look picker 500 1
@@ -22,8 +24,9 @@ walk picker
   S DeleteObject obj=potion
 `
 
-// TestParseReadsWorldLines: the member, territory, roll and ground lines,
-// an npc line's walks and maker options, and the look and walk steps.
+// TestParseReadsWorldLines: the member, territory, roll and ground lines
+// (cursed among them), an npc line's walks and maker options, on a civilian
+// as on a monster, and the look and walk steps.
 func TestParseReadsWorldLines(t *testing.T) {
 	sc, err := Parse("world.scenario", []byte(worldSample))
 	if err != nil {
@@ -41,6 +44,7 @@ func TestParseReadsWorldLines(t *testing.T) {
 		{Role: "vervato", ID: 32104, Type: "Folk", DX: 60, Maker: "isle"},
 		{Role: "picker", ID: 35600, Type: "Folk", DX: 200, Walks: true},
 		{Role: "both", ID: 35601, Type: "Folk", DY: 10, Walks: true, Maker: "isle"},
+		{Role: "wolf", ID: 20120, Type: "Monster", DY: -10, Walks: true, Maker: "isle"},
 	}
 	if !slices.Equal(sc.NPCs, wantNPCs) {
 		t.Fatalf("npcs = %+v", sc.NPCs)
@@ -48,8 +52,12 @@ func TestParseReadsWorldLines(t *testing.T) {
 	if len(sc.Rolls) != 1 || sc.Rolls["vervato"] != 0 {
 		t.Fatalf("rolls = %v", sc.Rolls)
 	}
-	if want := []Ground{{Role: "potion", Item: 20, Count: 1, DX: 500}}; !slices.Equal(sc.Grounds, want) {
+	want := []Ground{{Role: "potion", Item: 20, Count: 1, DX: 500}, {Role: "zariche", Item: 8190, Count: 1, DX: 450, Cursed: true}}
+	if !slices.Equal(sc.Grounds, want) {
 		t.Fatalf("grounds = %+v", sc.Grounds)
+	}
+	if !sc.LaysCursed() {
+		t.Fatal("LaysCursed = false with a cursed ground line")
 	}
 	var steps []string
 	for _, st := range sc.Steps {
@@ -91,6 +99,8 @@ func TestParseRejectsMalformedWorldLines(t *testing.T) {
 		{"ground count", "character A 1\nground g 20 0 0 0 0\nadvance 1s\n", "not 1 or more"},
 		{"ground names a role", "character A 1\nnpc g 1 Folk 0 0 0\nground g 20 1 0 0 0\nadvance 1s\n", `role "g" named twice`},
 		{"npc names a ground", "character A 1\nground g 20 1 0 0 0\nnpc g 1 Folk 0 0 0\nadvance 1s\n", `role "g" named twice`},
+		{"ground cursed count", "character A 1\nground g 8190 2 0 0 0 cursed\nadvance 1s\n", "lies as one item"},
+		{"ground option", "character A 1\nground g 8190 1 0 0 0 blessed\nadvance 1s\n", "ground <role>"},
 		{"ground trace", "trace x.golden\ncharacter A 1\nground g 20 1 0 0 0\nadvance 1s\n", "no member or ground line"},
 		{"look usage", "character A 1\nnpc a 1 Folk 0 0 0\nlook a 500\n", "look takes 3"},
 		{"look radius", "character A 1\nnpc a 1 Folk 0 0 0\nlook a 0 1\n", "must be 1 or more"},

@@ -42,3 +42,16 @@ func (s *Server) SpawnHostileNPCOfMakerAt(t *testing.T, tmpl *npc.Template, at l
 	inst.Home, inst.HasHome, inst.Maker = at, true, maker
 	return s.spawnHostileInstance(t, inst, at, parkedAttack{})
 }
+
+// SpawnMovingHostileNPCOfMakerAt is SpawnHostileNPCOfMakerAt for a hostile
+// NPC that moves, as SpawnMovingHostileNPCTemplate spawns it: its spawn
+// point at is its home, and maker's territories its spawn territory.
+func (s *Server) SpawnMovingHostileNPCOfMakerAt(t *testing.T, tmpl *npc.Template, at location.Location, maker *spawn.Maker) *npc.Hostile {
+	t.Helper()
+	inst, err := npc.NewInstance(s.NewObjectID(), tmpl)
+	if err != nil {
+		t.Fatalf("new npc instance: %v", err)
+	}
+	inst.Home, inst.HasHome, inst.Maker = at, true, maker
+	return s.spawnMovingHostileInstance(t, inst, at, Geo{})
+}
