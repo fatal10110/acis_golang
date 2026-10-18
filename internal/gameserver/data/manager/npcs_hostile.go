@@ -217,6 +217,8 @@ func newLiveHostile(inst *npc.Instance, speed float64, geo move.Geo, positions *
 	if castDefs != nil {
 		castController := actorcast.NewController(actorcast.HostileActor{Hostile: hostile}, control)
 		castController.SetQueue(queue)
+		// A delete closes the NPC's queue without stopping its cast.
+		castController.OutliveQueueClose()
 		aiController := &actorcast.AIController{
 			Controller:  castController,
 			Definitions: castDefs,

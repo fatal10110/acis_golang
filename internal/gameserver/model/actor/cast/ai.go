@@ -284,6 +284,26 @@ type AICaster interface {
 // Finish phases, applying def's effects through Effects once the Hit phase
 // consumes its final resource cost.
 func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
+	a.cast(target, ref, a.startChecked)
+}
+
+// CastUnchecked is Cast past every gate the cast's start runs (see
+// Controller.StartUnchecked): a cast already in flight is replaced by it.
+// A skill the actor's table lacks starts nothing.
+func (a *AIController) CastUnchecked(target attackable.Combatant, ref modelskill.Ref) {
+	a.cast(target, ref, a.startUnchecked)
+}
+
+func (a *AIController) startChecked(target Target, def modelskill.Definition) (Plan, error) {
+	return a.Controller.Start(a.Controller.Now(), target, def)
+}
+
+func (a *AIController) startUnchecked(target Target, def modelskill.Definition) (Plan, error) {
+	return a.Controller.StartUnchecked(a.Controller.Now(), target, def)
+}
+
+// cast starts ref's cast at target through start and schedules its phases.
+func (a *AIController) cast(target attackable.Combatant, ref modelskill.Ref, start func(Target, modelskill.Definition) (Plan, error)) {
 	if a.Controller == nil || target == nil {
 		return
 	}
@@ -293,7 +313,7 @@ func (a *AIController) Cast(target attackable.Combatant, ref modelskill.Ref) {
 	}
 	castTarget := Target(target)
 
-	plan, err := a.Controller.Start(a.Controller.Now(), castTarget, def)
+	plan, err := start(castTarget, def)
 	if err != nil {
 		return
 	}
