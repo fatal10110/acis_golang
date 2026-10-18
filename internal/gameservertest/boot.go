@@ -1604,6 +1604,12 @@ const shutdownDrainTimeout = 10 * time.Second
 // stops the actor pool before those saves: a request still being handled —
 // a drop whose DropItem frame is already out but whose ground item is not
 // yet tracked — finishes before anything is snapshotted.
+//
+// It returns only once every connection handler has returned (Stop), so each
+// connected player's detach save has landed: a detach still running after
+// Shutdown would write this stack's state over whatever a second Boot on the
+// same database writes next. The saves above run first, so a restart test
+// still proves the shutdown drain lands state no logout flush wrote.
 func (s *Server) Shutdown(tb testing.TB) {
 	tb.Helper()
 	s.Settle(tb)
@@ -1625,7 +1631,7 @@ func (s *Server) Shutdown(tb testing.TB) {
 			tb.Fatalf("shutdown spawn data save: %v", err)
 		}
 	}
-	s.Close()
+	s.Stop()
 	// Boot's own t.Cleanup(taskEffects.Reset) only fires at the end of the
 	// whole test function, not between two Boot calls a restart test makes
 	// within one function — reset explicitly here too, so the second
