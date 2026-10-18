@@ -58,13 +58,13 @@ func (l *GameClientLink) residenceTalk(live *livePlayer, f *npc.Folk) npc.Reside
 	switch {
 	case c != nil:
 		r.CastleID, r.OwnerID, r.CastleName = c.ID, c.OwnerID(), c.Name
-		r.LifeTowers = aliveLifeTowers(c)
 		if s, ok := l.castleSiege(int32(c.ID)); ok {
 			r.SiegeInProgress = s.InProgress()
 			if field := s.Battlefield(); field != nil {
 				r.BattlefieldActive = field.Active()
 			}
 		}
+		r.LifeTowers = c.AliveLifeTowers(r.SiegeInProgress)
 	case h != nil:
 		r.HallID, r.Siegable, r.HallName = h.ID, h.IsSiegable(), h.Name
 		if v, ok := l.halls.View(int32(h.ID)); ok {
