@@ -2352,6 +2352,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	// armed; here the link exists only now, so a change firing earlier
 	// reaches no player, as none is online yet.
 	sevenSigns.SetOnline(gcl)
+	fest.SetWorld(gcl)
 	sevenSigns.SetCastles(gclConfig.Castles)
 	var npcSpawns *gamemanager.Npcs
 	var npcRespawns *task.Respawn

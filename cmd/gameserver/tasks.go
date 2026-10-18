@@ -173,6 +173,7 @@ func startSevenSigns(lc fx.Lifecycle, state *sevensigns.State, fest *festival.Ma
 				return err
 			}
 			state.SetFestival(fest)
+			fest.SetWorld(link)
 			state.SetCastles(castles)
 			state.SetOnline(link)
 			state.SetSpawns(npcs)

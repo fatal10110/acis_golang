@@ -232,8 +232,9 @@ func TestMammonPagesAndRefusals(t *testing.T) {
 // witches' page, each counting down to the next festival: the schedule
 // started at boot awaits it 2 + 19 minutes later, read on a clock that
 // stands still so the count is exactly 21 minutes, plus one. During seal
-// validation the page says festivals resume next week. A guide's dialog
-// commands are not in place yet: they log and release the client.
+// validation the page says festivals resume next week. Signing up, part of
+// the festival run, is not in place yet: it logs and releases the client
+// (see TestFestivalGuideScorePages for the commands in place).
 func TestFestivalGuidePages(t *testing.T) {
 	t.Parallel()
 	boot := time.Date(2026, time.August, 26, 12, 0, 0, 0, time.UTC)

@@ -193,6 +193,7 @@ func (l *GameClientLink) folkReply(live *livePlayer, f *npc.Folk, command string
 	talker.MountNPCID, talker.MountLevel = live.MountNPCID(), live.MountLevel()
 	talker.SevenSigns = folkChatState{l: l, live: live, f: f}.SevenSigns
 	talker.Residence = folkChatState{l: l, live: live, f: f}.Residence
+	talker.FestivalNotice = folkChatState{l: l, live: live, f: f}.FestivalNotice
 	return f.Bypass(setPages{l.html}, rules, talker, command)
 }
 
@@ -323,6 +324,8 @@ func (l *GameClientLink) runFolkReply(live *livePlayer, f *npc.Folk, command str
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageAlreadyTrading))
 	case npc.BypassChamberlain:
 		return l.chamberlainBypass(live, f, command, reply.Standing)
+	case npc.BypassFestival:
+		return l.festivalGuideBypass(live, f, command, reply.Index, reply.FestivalDesc)
 	case npc.BypassUnported:
 		l.log.Debug().Int("npc_id", f.NpcID()).Str("type", f.Instance.Template.Type).Str("command", command).Msg("bypass: npc dialog command not modeled")
 	case npc.BypassRefused:
