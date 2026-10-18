@@ -376,7 +376,8 @@ func (l *GameClientLink) finishEnterWorld(client *Client, c *player.Character, l
 		// Vitals restored short regenerate one period from the entry.
 		c.SettleEnteredRegen()
 		if live.zoneActor != nil {
-			live.zoneActor.revalidate(l.zones)
+			// A zone that refuses live moves it out here, mid-burst.
+			live.zoneActor.revalidateSpawn(l.zones)
 		}
 	}
 	client.Session.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageWelcomeToLineage))

@@ -3,18 +3,19 @@ package olympiad
 import (
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/restart"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
-	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
 // TestStadiumExpelsUninvitedPlayer pins the stadium's entry rule
 // (OlympiadStadiumZone.onEnter): a player who is neither competitor,
 // observer nor game master, here one entering the world inside a stadium,
-// is sent to the town of its region, scattered by up to 20.
+// is sent to the town of its region, scattered by up to 20. The rule runs
+// as the player spawns, so its TeleportToLocation lands in the enter burst
+// between EtcStatusUpdate and WELCOME_TO_LINEAGE, and the burst's UserInfo
+// already carries the town position.
 func TestStadiumExpelsUninvitedPlayer(t *testing.T) {
 	t.Parallel()
 	form, err := zone.NewCuboid(-500, 500, -500, 500, -1000, 1000)
@@ -38,22 +39,8 @@ func TestStadiumExpelsUninvitedPlayer(t *testing.T) {
 	)
 	burst := startInWorld(t, srv.Client)
 	id := srv.SoleObjectID(t)
-	var landed *location.Location
-	for _, f := range append(burst, srv.ReadQueued(t, srv.Client)...) {
-		if f[0] != serverpackets.OpcodeTeleportToLocation {
-			continue
-		}
-		r := wire.NewReader(f[1:])
-		if r.ReadInt32() != id {
-			continue
-		}
-		at := location.Location{X: int(r.ReadInt32()), Y: int(r.ReadInt32()), Z: int(r.ReadInt32())}
-		landed = &at
-	}
-	if landed == nil {
-		t.Fatal("the stray player was not teleported out of the stadium")
-	}
+	landed := gameservertest.AssertSpawnTeleport(t, burst, id)
 	if dx, dy := landed.X-town.X, landed.Y-town.Y; dx < -20 || dx > 20 || dy < -20 || dy > 20 {
-		t.Fatalf("stray player teleported to %+v, want within 20 of %+v", *landed, town)
+		t.Fatalf("stray player teleported to %+v, want within 20 of %+v", landed, town)
 	}
 }

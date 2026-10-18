@@ -74,9 +74,13 @@ func TestBossZoneLoginEjectsAfterExpiredPermission(t *testing.T) {
 	c.Read() // SSQInfo
 	c.Read() // CharSelected
 	c.Send(encodeEnterWorld())
-	frames := append(readEnterWorldBurst(t, c), readUntilQuiet(c)...)
+	// The ejection runs as the player spawns (BossZone.onEnter from
+	// spawnMe), so its teleport sits inside the enter burst.
+	frames := readUntilQuiet(c)
+	if to := gameservertest.AssertSpawnTeleport(t, frames, objID); to != oust {
+		t.Fatalf("ejected to %+v, want %+v", to, oust)
+	}
 	waitForWorldPosition(t, srv, objID, oust)
-	assertEjectFrame(t, frames, objID, oust.X, oust.X)
 }
 
 func TestBossZoneTeleportRejoinEjectsToTown(t *testing.T) {
