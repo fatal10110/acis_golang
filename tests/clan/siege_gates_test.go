@@ -75,6 +75,13 @@ func gludioGates() []*door.Template {
 // their entry frames drained. extra adds boot options.
 func gateWorld(t *testing.T, extra ...gameservertest.Option) *clanWorld {
 	t.Helper()
+	return gateWorldSeeded(t, nil, extra...)
+}
+
+// gateWorldSeeded is gateWorld with the statements seed run once the clans
+// are seeded.
+func gateWorldSeeded(t *testing.T, seed []string, extra ...gameservertest.Option) *clanWorld {
+	t.Helper()
 	datapack.Require(t)
 	castles, err := gamexml.LoadCastles(datapack.Path(t, "data", "xml", "castles.xml"))
 	if err != nil {
@@ -91,12 +98,12 @@ func gateWorld(t *testing.T, extra ...gameservertest.Option) *clanWorld {
 		gameservertest.WithSieges(siege.DefaultConfig()),
 		gameservertest.WithDoors(gludioGates()...),
 		seedRival(t),
-		seedAllianceClans(t,
-			`UPDATE clan_data SET hasCastle = 1 WHERE clan_id = `+itoa(rivalsClanID),
-			`INSERT INTO siege_clans (castle_id, clan_id, type) VALUES (1, `+itoa(knightsClanID)+`, 'ATTACKER')`,
+		seedAllianceClans(t, append([]string{
+			`UPDATE clan_data SET hasCastle = 1 WHERE clan_id = ` + itoa(rivalsClanID),
+			`INSERT INTO siege_clans (castle_id, clan_id, type) VALUES (1, ` + itoa(knightsClanID) + `, 'ATTACKER')`,
 			at(`char_name = 'Founder'`),
-			at(`obj_Id = `+itoa(rivalLeaderID)),
-		),
+			at(`obj_Id = ` + itoa(rivalLeaderID)),
+		}, seed...)...),
 	}, extra...)...)
 	w := &clanWorld{srv: srv, leader: srv.Client, leaderID: srv.SoleObjectID(t), memberID: rivalLeaderID, at: gateWorldAt}
 	w.member = srv.DialClient(t, "player2", 1)

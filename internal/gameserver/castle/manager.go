@@ -36,6 +36,14 @@ type Store interface {
 	// UpdateOwner clears the castle from every clan_data row holding it,
 	// then gives it to clanID's row; 0 gives it to none.
 	UpdateOwner(ctx context.Context, castleID, clanID int32) error
+	// SaveDoorUpgrade replaces the stored upgrade of u's gate.
+	SaveDoorUpgrade(ctx context.Context, u DoorUpgrade) error
+	// DeleteDoorUpgrades deletes every stored gate upgrade of castleID.
+	DeleteDoorUpgrades(ctx context.Context, castleID int32) error
+	// SaveTrapUpgrade replaces the stored upgrade of u's tower trap.
+	SaveTrapUpgrade(ctx context.Context, u TrapUpgrade) error
+	// DeleteTrapUpgrades deletes every stored trap upgrade of castleID.
+	DeleteTrapUpgrades(ctx context.Context, castleID int32) error
 	// UnequipCirclets moves an offline character's equipped circlet
 	// circletID and Lord's Crown back to its inventory.
 	UnequipCirclets(ctx context.Context, circletID, ownerID int32) error
@@ -69,6 +77,9 @@ type Manager struct {
 	store  Store
 	writes Writer
 	log    zerolog.Logger
+	// doors are the world's doors the gate upgrades reach, set once at
+	// boot (SetDoors); nil reaches none.
+	doors Doors
 
 	owners sync.Mutex
 }
@@ -79,7 +90,7 @@ type Manager struct {
 func NewManager(data *castledata.Table, clans Clans, store Store, writes Writer, log zerolog.Logger) *Manager {
 	m := &Manager{byID: map[int]*Castle{}, data: data, clans: clans, store: store, writes: writes, log: log}
 	for _, d := range data.All() {
-		c := &Castle{Castle: d, m: m}
+		c := &Castle{Castle: d, m: m, trapLevels: make([]int, len(d.ControlTowers))}
 		m.byID[d.ID] = c
 		m.order = append(m.order, c)
 	}

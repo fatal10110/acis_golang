@@ -37,6 +37,9 @@ type Castle struct {
 	// artifacts are the object ids of the holy artifacts placed for the
 	// castle at boot (SpawnArtifacts).
 	artifacts []int32
+	// trapLevels are the upgrade levels of the traps of the castle's
+	// control towers, in castles.xml order.
+	trapLevels []int
 	// towers are the control towers placed for the castle at boot
 	// (SpawnTowers), in castles.xml order.
 	towers []Tower

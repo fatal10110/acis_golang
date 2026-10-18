@@ -297,13 +297,17 @@ type realDamageHandler struct{}
 
 func (realDamageHandler) Types() []string { return []string{"REAL_DAMAGE"} }
 
-// Use takes the skill's power straight off each live creature target's HP.
-// It is not a hit: CP, invulnerability, damage permission, hate and the
-// wake-up side effects of damage play no part. A target the loss leaves at
-// or below zero HP dies to the caster; any other target has its HP set and
-// its status reported.
+// Use takes the skill's power straight off each live creature target's HP,
+// a door's included. It is not a hit: CP, invulnerability, damage
+// permission, hate and the wake-up side effects of damage play no part. A
+// target the loss leaves at or below zero HP dies to the caster; any other
+// target has its HP set and its status reported.
 func (realDamageHandler) Use(cast Cast) {
 	for _, obj := range cast.Targets {
+		if d, ok := asDoor(obj); ok {
+			d.TakeHP(float64(cast.Skill.Power))
+			continue
+		}
 		target, ok := asCreature(obj)
 		if !ok || target.Dead() {
 			continue

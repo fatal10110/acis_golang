@@ -133,6 +133,10 @@ type Object struct {
 	dead   atomic.Bool
 	siege  atomic.Pointer[siegeRef]
 	strife atomic.Pointer[strifeRef]
+	// hpUpgrade multiplies the template HP into the maximum HP: 1 until
+	// the castle owning the door upgrades it. It changes only through the
+	// state owner, like hp.
+	hpUpgrade atomic.Int32
 
 	sink  event.Sink
 	owner StateOwner
@@ -190,6 +194,7 @@ type Sight interface {
 type StateOwner interface {
 	SetDoorOpen(id int, open bool) bool
 	ReduceDoorHP(id int, amount float64)
+	TakeDoorHP(id int, amount float64)
 }
 
 // NewObject creates a live door object from a static template and geodata shape.
@@ -215,6 +220,7 @@ func NewObject(objectID int32, tmpl *Template, shape GeoShape) (*Object, error) 
 		geoData:  cloneGeoData(data),
 	}
 	o.opened.Store(tmpl.Opened)
+	o.hpUpgrade.Store(1)
 	o.StoreHP(float64(tmpl.HP))
 	return o, nil
 }
@@ -311,8 +317,17 @@ func (o *Object) underStrife(base int) int {
 	return int(float64(base) * factor)
 }
 
-// MaxHP returns the door's maximum HP.
-func (o *Object) MaxHP() int { return o.Template.HP }
+// MaxHP returns the door's maximum HP: its template HP times its HP
+// upgrade ratio.
+func (o *Object) MaxHP() int { return o.Template.HP * o.HPUpgradeRatio() }
+
+// HPUpgradeRatio returns the ratio the door's castle upgraded its maximum
+// HP by, 1 for none.
+func (o *Object) HPUpgradeRatio() int { return int(o.hpUpgrade.Load()) }
+
+// StoreHPUpgradeRatio updates only the door's HP upgrade ratio. It is the
+// state owner's primitive, like StoreHP.
+func (o *Object) StoreHPUpgradeRatio(ratio int) { o.hpUpgrade.Store(int32(ratio)) }
 
 // CurrentHP returns the door's current HP.
 func (o *Object) CurrentHP() float64 { return math.Float64frombits(o.hp.Load()) }
@@ -365,6 +380,16 @@ func (o *Object) ReduceHP(amount float64, attacker attackable.Combatant, _ model
 	}
 	if o.owner != nil {
 		o.owner.ReduceDoorHP(o.DoorID(), amount)
+	}
+}
+
+// TakeHP takes amount straight off the door's HP, as a REAL_DAMAGE skill
+// does: no siege permission and no attacker check apply. A loss leaving
+// zero HP or less breaks the door; any other sets its HP. The state owner
+// applies the change and what follows it.
+func (o *Object) TakeHP(amount float64) {
+	if o.owner != nil {
+		o.owner.TakeDoorHP(o.DoorID(), amount)
 	}
 }
 
