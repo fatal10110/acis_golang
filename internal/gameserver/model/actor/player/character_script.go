@@ -207,6 +207,16 @@ func (c *Character) PartyMembers() []*Character {
 	return c.social.PartyMembers(c.ObjectID())
 }
 
+// Channel returns the command channel c's party is in: its leader and its
+// parties in the order they joined, each party's characters in party
+// order. ok is false when c is in none.
+func (c *Character) Channel() (leader *Character, parties [][]*Character, ok bool) {
+	if c.social == nil {
+		return nil, nil, false
+	}
+	return c.social.Channel(c.ObjectID())
+}
+
 // OnlineClanLeader returns the leader of c's clan when that leader is in
 // the world.
 func (c *Character) OnlineClanLeader() (*Character, bool) {
