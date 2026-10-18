@@ -180,10 +180,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      # Read-only token for the private repository that holds aCis_datapack.
-      # Workflows triggered from forks get no secrets; those runs check only
-      # the stub datapack.
-      DATAPACK_TOKEN: ${{ secrets.ACIS_DATAPACK_TOKEN }}
+      # Whether the read-only token for the private repository that holds
+      # aCis_datapack is set. Only the checkout step sees the token itself,
+      # not the steps that run this branch's code. Workflows triggered from
+      # forks get no secrets; those runs check only the stub datapack.
+      HAS_DATAPACK_TOKEN: ${{ secrets.ACIS_DATAPACK_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -192,7 +193,7 @@ jobs:
       # Only the schema: sql/ holds one file per table, tools/ the
       # full_install.sql that drops them first.
       - name: Check out the aCis_datapack schema
-        if: env.DATAPACK_TOKEN != ''
+        if: env.HAS_DATAPACK_TOKEN == 'true'
         uses: actions/checkout@v4
         with:
           repository: fatal10110/acis_public
@@ -205,7 +206,7 @@ jobs:
 
       - name: Docker smoke test
         run: |
-          if [ -n "$DATAPACK_TOKEN" ]; then
+          if [ "$HAS_DATAPACK_TOKEN" = true ]; then
             # Out of the image's build context.
             mv acis-datapack "$RUNNER_TEMP/"
             export ACIS_SMOKE_DATAPACK="$RUNNER_TEMP/acis-datapack/aCis_datapack"
