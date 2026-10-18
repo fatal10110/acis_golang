@@ -34,11 +34,11 @@ func TestScriptEnvReadsQuestRates(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		env, err := provideScriptEnv(props, manager.KillRewardConfig{PartyRange: 1500, MultipleItemDrop: true}, nil, nil, nil, nil, &gameData{}, task.NewGameClock(nil), nil, nil, gameplayConfig{}, nil, nil, nil)
+		env, err := provideScriptEnv(props, manager.KillRewardConfig{Settings: manager.NewKillRewardBook(manager.KillRewardSettings{PartyRange: 1500, MultipleItemDrop: true})}, nil, nil, nil, nil, &gameData{}, task.NewGameClock(nil), nil, nil, gameplayConfig{}, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("provideScriptEnv(%q) error = %v", tc.body, err)
 		}
-		if env.Rates != tc.want || env.PartyRange != 1500 || !env.MultipleItemDrop {
+		if env.Rates != tc.want || env.Drops.PartyRange() != 1500 || !env.Drops.MultipleItemDrop() {
 			t.Fatalf("provideScriptEnv(%q) = %+v, want rates %+v", tc.body, env, tc.want)
 		}
 	}

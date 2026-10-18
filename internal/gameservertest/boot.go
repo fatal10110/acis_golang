@@ -1053,24 +1053,22 @@ type Server struct {
 	templates           *player.TemplateTable
 	itemTable           *item.Table
 	levelTable          *player.LevelTable
-	deepBlueDrops       bool
-	autoLoot            bool
-	autoLootRaid        bool
-	singleItemDrop      bool
-	rateXP, rateSP      float64
-	ids                 *sequentialIDs
-	positions           *task.PositionUpdates
-	addr                net.Addr
-	sessions            *manager.SessionStore
-	groundStore         *gamesql.GroundItemStore
-	spawnStore          *gamesql.SpawnStore
-	cursedWeapons       *entity.CursedWeaponTable
-	autosave            *task.Autosave
-	gameClock           *task.GameClock
-	autosaveClock       *autosaveClock
-	persist             *persist.Worker
-	quests              *questBoot
-	logs                *lockedBuffer
+	// rewardBook holds the kill reward settings the hostiles, the link
+	// and the scripts share, which //reload config sets.
+	rewardBook    *gamemanager.KillRewardBook
+	ids           *sequentialIDs
+	positions     *task.PositionUpdates
+	addr          net.Addr
+	sessions      *manager.SessionStore
+	groundStore   *gamesql.GroundItemStore
+	spawnStore    *gamesql.SpawnStore
+	cursedWeapons *entity.CursedWeaponTable
+	autosave      *task.Autosave
+	gameClock     *task.GameClock
+	autosaveClock *autosaveClock
+	persist       *persist.Worker
+	quests        *questBoot
+	logs          *lockedBuffer
 	// positionTicks is when TickPositions last posted a tick on the real
 	// pool, guarded by its mutex.
 	positionTicks struct {
@@ -2128,7 +2126,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	buyListStore := gamesql.NewBuyListStore(db)
 	shops, stock := bootMerchant(t, o.merchant, buyListStore, persistWorker, ids, o.log)
+	killRewards := gamemanager.NewKillRewardBook(fixtureKillRewards(o))
 	gclConfig := network.GameClientLinkConfig{
+		KillRewards:      killRewards,
 		Merchant:         shops,
 		Validator:        validator,
 		Effects:          effectEnv,
@@ -2181,7 +2181,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, DeathDrop: o.deathDrop, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, DefaultAccessLevel: o.defaultAccessLevel, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, ManorDelay: o.manorDelay, RollDiceDelay: o.rollDiceDelay, SocialDelay: o.socialDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight, PartyRange: fixturePartyRange, MultipleItemDrop: !o.singleItemDrop},
+		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, DeathDrop: o.deathDrop, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, DefaultAccessLevel: o.defaultAccessLevel, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, ManorDelay: o.manorDelay, RollDiceDelay: o.rollDiceDelay, SocialDelay: o.socialDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight},
 		Restarts:         o.restarts,
 		ClanHallData:     o.clanHallData,
 		CastleData:       o.castleData,
@@ -2249,7 +2249,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.Wedding = couples
 	gclConfig.Macros = gamesql.NewMacroStore(db)
 	gclConfig.Recommendations = gamesql.NewRecommendationStore(db)
-	quests := bootQuests(db, persistWorker, ids, queues.NewQueue("script-engine"), state, clock, itemTemplates, gclConfig.HTML, sevenSigns, o)
+	quests := bootQuests(db, persistWorker, ids, queues.NewQueue("script-engine"), state, clock, itemTemplates, gclConfig.HTML, sevenSigns, killRewards, o)
 	gclConfig.Quests, gclConfig.Scripts, gclConfig.Journals = quests.store, quests.registry, quests.journals
 	quests.memos = &memoStore{MemoStore: gamesql.NewMemoStore(db), loadErr: o.memoLoadErr}
 	gclConfig.Memos = quests.memos
@@ -2589,12 +2589,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Festival:            fest,
 		itemTable:           itemTemplates,
 		levelTable:          levels,
-		deepBlueDrops:       o.deepBlueDropRules,
-		autoLoot:            o.autoLoot,
-		autoLootRaid:        o.autoLootRaid,
-		singleItemDrop:      o.singleItemDrop,
-		rateXP:              o.rateXP,
-		rateSP:              o.rateSP,
+		rewardBook:          killRewards,
 		DB:                  db,
 		RaidPoints:          raidPoints,
 		CursedWeapons:       cursedState,

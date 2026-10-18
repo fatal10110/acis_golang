@@ -183,7 +183,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 		aiConfig.DriftRange = deps.driftRange
 	}
 	npcs, err := gamemanager.NewNpcsWithMaxBuffsAmount(gamemanager.NewSpawns(deps.makers, states), templates, deps.geo, deps.state, deps.ids,
-		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Rates: deps.dropRates, RateXP: 1, RateSP: 1}, time.Now, deps.log,
+		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Settings: gamemanager.NewKillRewardBook(gamemanager.KillRewardSettings{Rates: deps.dropRates, RateXP: 1, RateSP: 1})}, time.Now, deps.log,
 		deps.skills, castEffects, walker, link.HostileSinks(deps.state, deps.stance), link.FolkSinks(deps.state, deps.stance),
 		20, 0, 0, npc.DefaultRaidMultipliers(), aiConfig, gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues,
 		script.NewMakers(makers, maker.Default, night, deps.log), deps.scripts, deps.zones)

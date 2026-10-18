@@ -10,9 +10,8 @@ import (
 )
 
 // TestDataReloadsReadConfig requires the config reload hook to read the
-// server and players properties anew into the player settings, and to fail
-// on a value boot would refuse, PartyRange among them: the reload keeps the
-// party range in force, but a malformed one still fails the whole read.
+// server and players properties anew into the player settings, the kill
+// reward settings among them, and to fail on a value boot would refuse.
 func TestDataReloadsReadConfig(t *testing.T) {
 	dir := t.TempDir()
 	write := func(name, body string) string {
@@ -41,8 +40,8 @@ func TestDataReloadsReadConfig(t *testing.T) {
 			settings.DiscardItemDisabled, settings.KarmaPlayerCanTrade)
 	}
 
-	write("server.properties", "AllowDiscardItem = False\nServerBypassTime = 2500\n")
-	write("players.properties", "KarmaPlayerCanTrade = False\n")
+	write("server.properties", "AllowDiscardItem = False\nServerBypassTime = 2500\nMultipleItemDrop = False\nRateXp = 3\n")
+	write("players.properties", "KarmaPlayerCanTrade = False\nPartyRange = 900\n")
 	settings, err = reloads.Config()
 	if err != nil {
 		t.Fatalf("second config reload: %v", err)
@@ -50,6 +49,9 @@ func TestDataReloadsReadConfig(t *testing.T) {
 	if !settings.DiscardItemDisabled || settings.KarmaPlayerCanTrade || settings.ServerBypassDelay != 2500*time.Millisecond {
 		t.Fatalf("reloaded settings = discard disabled %v, karma trade %v, bypass delay %s; want the edited files' values",
 			settings.DiscardItemDisabled, settings.KarmaPlayerCanTrade, settings.ServerBypassDelay)
+	}
+	if r := settings.KillRewards; r == nil || r.PartyRange != 900 || r.MultipleItemDrop || r.RateXP != 3 {
+		t.Fatalf("reloaded kill rewards = %+v; want party range 900, single item drop, exp rate 3", r)
 	}
 
 	write("players.properties", "PartyRange = far\n")

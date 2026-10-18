@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -71,14 +72,17 @@ func TestAdminReloadConfigDeathDropTakesReloadedRules(t *testing.T) {
 	}
 }
 
-// TestAdminReloadConfigKeepsPartyRange: //reload config leaves the party
-// range in force, the one the kill rewards and the scripts keep too. A
-// reload reading an unlimited range still leaves a member 3000 away out of
-// an adena split.
-func TestAdminReloadConfigKeepsPartyRange(t *testing.T) {
+// TestAdminReloadConfigTakesPartyRange: party loot after //reload config
+// reads the reloaded party range, the one the kill rewards and the scripts
+// read too, as the reference reads PARTY_RANGE on each use. A reload
+// reading an unlimited range lets a member 3000 away share an adena pickup.
+func TestAdminReloadConfigTakesPartyRange(t *testing.T) {
 	t.Parallel()
 	srv, gmID := bootAdmin(t, adminLevel,
-		gameservertest.WithDataReloads(fixedConfig(network.PlayerConfig{RespawnRestoreHP: 0.7, MaxBuffsAmount: 20, WeightLimitMultiplier: 1, PartyRange: -1})))
+		gameservertest.WithDataReloads(fixedConfig(network.PlayerConfig{
+			RespawnRestoreHP: 0.7, MaxBuffsAmount: 20, WeightLimitMultiplier: 1,
+			KillRewards: &manager.KillRewardSettings{PartyRange: -1, MultipleItemDrop: true},
+		})))
 	gm := srv.Client
 	enterWorld(t, gm)
 	member, memberID := addPlayer(t, srv, "member", "Member", userLevel)
@@ -111,11 +115,11 @@ func TestAdminReloadConfigKeepsPartyRange(t *testing.T) {
 	drain(t, gm)
 	drain(t, member)
 
-	if got := srv.PlayerInventory(t, gmID).ItemCount(item.AdenaID, -1, true); got != 100 {
-		t.Fatalf("picker carries %d adena, want all 100", got)
+	if got := srv.PlayerInventory(t, gmID).ItemCount(item.AdenaID, -1, true); got != 50 {
+		t.Fatalf("picker carries %d adena, want half of 100", got)
 	}
-	if got := srv.PlayerInventory(t, memberID).ItemCount(item.AdenaID, -1, true); got != before {
-		t.Fatalf("far member carries %d adena, want %d: the reloaded unlimited range shared the pickup", got, before)
+	if got := srv.PlayerInventory(t, memberID).ItemCount(item.AdenaID, -1, true); got != before+50 {
+		t.Fatalf("far member carries %d adena, want %d: the reloaded unlimited range shares the pickup", got, before+50)
 	}
 }
 

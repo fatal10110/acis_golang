@@ -16,6 +16,30 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 )
 
+// DropRules answers the drop settings in force, which //reload config may
+// change between two reads.
+type DropRules interface {
+	// PartyRange is the distance a player must stand strictly within, from
+	// the NPC, to pass a quest-state check.
+	PartyRange() int
+	// MultipleItemDrop reports whether a non-stackable item counted above
+	// one is given as that many instances rather than as one.
+	MultipleItemDrop() bool
+}
+
+// partyRange is the party range in force.
+func (e *Env) partyRange() int {
+	if e.Drops == nil {
+		return 0
+	}
+	return e.Drops.PartyRange()
+}
+
+// multipleItemDrop reports whether the multiple item drop rule is in force.
+func (e *Env) multipleItemDrop() bool {
+	return e.Drops != nil && e.Drops.MultipleItemDrop()
+}
+
 // Env is the server state the script helpers act through. Build hands the
 // same Env to every registered script; nothing changes it afterwards.
 type Env struct {
@@ -23,12 +47,10 @@ type Env struct {
 	Quests *Quests
 	// Rates scale quest drops and rewards.
 	Rates Rates
-	// PartyRange is the distance a player must stand strictly within, from
-	// the NPC, to pass a quest-state check.
-	PartyRange int
-	// MultipleItemDrop gives a non-stackable item counted above one as that
-	// many instances; unset, as one.
-	MultipleItemDrop bool
+	// Drops answers the party range and the multiple item drop rule in
+	// force, read at each use; nil reads a zero range and gives a
+	// non-stackable counted above one as one instance.
+	Drops DropRules
 	// NewItemID allocates an item instance's object id.
 	NewItemID func() (int32, error)
 	// Spawner spawns the NPCs scripts place in the world.
