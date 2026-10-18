@@ -73,8 +73,8 @@ func (p *Player) BroadcastMagicSkillUse(caster, target Creature, skillID, level 
 func (p *Player) InParty() bool { return p.character().IsInParty() }
 
 // PartyMembers returns the players of the player's party, the player
-// included, in party order, the leader first; nil when it is in none. No
-// range or state is checked.
+// included, in the order they joined; nil when it is in none. No range or
+// state is checked.
 func (p *Player) PartyMembers() []*Player {
 	members := p.character().PartyMembers()
 	if members == nil {

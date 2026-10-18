@@ -6,6 +6,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
 )
 
@@ -17,6 +18,12 @@ type SocialGraph interface {
 	// PartyMembers returns the characters of objectID's party, in party
 	// order, nil when it is in none.
 	PartyMembers(objectID int32) []*Character
+	// PartyOf returns the id of objectID's party; ok is false when it is in
+	// none.
+	PartyOf(objectID int32) (id party.ID, ok bool)
+	// PartyByID returns the leader and the characters, in party order, of
+	// the party id; ok is false once that party is gone.
+	PartyByID(id party.ID) (leader *Character, members []*Character, ok bool)
 	// SameChannel reports whether b is in the command channel a's party
 	// belongs to.
 	SameChannel(a, b int32) bool

@@ -93,10 +93,11 @@ func (p *Player) FirstItemCount(itemID int32) int32 {
 // PartyLeader returns the leader of the player's party, nil when it is in
 // none.
 func (p *Player) PartyLeader() *Player {
-	if members := p.PartyMembers(); len(members) > 0 {
-		return members[0]
+	ref, ok := p.character().Party()
+	if !ok {
+		return nil
 	}
-	return nil
+	return leaderOf(ref)
 }
 
 // IsPartyLeader reports whether the player leads its party. A player in no
