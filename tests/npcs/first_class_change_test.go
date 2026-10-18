@@ -1,6 +1,7 @@
 package npcs
 
 import (
+	"context"
 	"os"
 	"slices"
 	"strconv"
@@ -93,8 +94,10 @@ func TestFirstClassChangeInASubclass(t *testing.T) {
 // TestFirstClassChangeTransferFrames: a level 20 human fighter holding the
 // medallion of the Warrior changes to a Warrior at Ramos. The answer is, in
 // order: the medallion taken and the coupons given, the fanfare, the class
-// change's animation and message, the henna list, the status and the
-// character shown anew, then the congratulation page and its release.
+// change's animation and message, the henna list and the character shown
+// anew (a StatusUpdate regen tick may interleave), then the congratulation
+// page and its release. The Warrior is the character's class and base
+// class, in the UserInfo and in its saved row.
 func TestFirstClassChangeTransferFrames(t *testing.T) {
 	t.Parallel()
 	const medallion, coupon = 1145, 8869
@@ -152,5 +155,17 @@ func TestFirstClassChangeTransferFrames(t *testing.T) {
 	}
 	if n, c := srv.PlayerItemCount(t, w.player, medallion), srv.PlayerItemCount(t, w.player, coupon); n != 0 || c != 15 {
 		t.Fatalf("medallion %d coupons %d, want 0 and 15", n, c)
+	}
+	if info := decodeUserInfoHead(t, frames[lastIndex(frames, serverpackets.OpcodeUserInfo)]); int(info.visibleClass) != warrior.ID {
+		t.Fatalf("UserInfo class = %d, want the Warrior %d", info.visibleClass, warrior.ID)
+	}
+	srv.TickAutosave(t)
+	srv.FlushPersistence(t)
+	var classID, baseClass int
+	if err := srv.DB.QueryRowContext(context.Background(), `SELECT classid, base_class FROM characters WHERE obj_Id = ?`, w.player).Scan(&classID, &baseClass); err != nil {
+		t.Fatal(err)
+	}
+	if classID != warrior.ID || baseClass != warrior.ID {
+		t.Fatalf("saved class/base class = %d/%d, want the Warrior %d for both", classID, baseClass, warrior.ID)
 	}
 }
