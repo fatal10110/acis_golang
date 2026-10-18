@@ -18,7 +18,11 @@ type schedule struct {
 	// nextFestivalStart is in Unix milliseconds; zero until a schedule
 	// first sets it.
 	nextFestivalStart int64
-	timer             *time.Timer
+	// nextCycleStart is when the next festival cycle is due, in Unix
+	// milliseconds: a cycle length after the schedule started or the last
+	// signup period opened; zero until a schedule first sets it.
+	nextCycleStart int64
+	timer          *time.Timer
 	// generation tells a timer of a cancelled schedule from the running
 	// one's: each start and cancel moves it on.
 	generation uint64
@@ -58,12 +62,16 @@ func (m *Manager) CompetitionBegun() {
 	now := m.nowMillis()
 	start := m.cfg.ManagerStart.Milliseconds()
 	m.nextFestivalStart = now + start + m.cfg.signup().Milliseconds()
+	m.nextCycleStart = now + m.cfg.CycleLength.Milliseconds()
 	generation, due := m.generation, now+start
 	m.armLocked(start, func() { m.runCycle(generation, due) })
 	m.log.Info().Int64("minutes", start/60000).Msg("festival: the first festival cycle begins")
 }
 
-// CompetitionEnded stops the festival schedule. The awaited festival start
+// CompetitionEnded stops the festival schedule, then rewards the clans of
+// the party that set each festival's best score ever: for each festival in
+// turn, each member named, online or not, earns its clan 100 reputation
+// points, once per festival it holds the record of. The awaited festival start
 // stays where the last signup period put it until CompetitionBegun starts
 // a new schedule, so NextFestivalNotice counts down past zero through the
 // results period and, in the recruiting period that follows seal
@@ -72,10 +80,21 @@ func (m *Manager) CompetitionBegun() {
 // 1 to 20 minute countdown in those periods.
 func (m *Manager) CompetitionEnded() {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.cancelLocked()
-	// ponytail: the end of the competition also rewards the clans of the
-	// best-ever party of each festival (#223); no score can be set yet.
+	var names []string
+	for id := range Count {
+		if best, ok := m.overallHighestLocked(id); ok {
+			names = append(names, best.MemberNames()...)
+		}
+	}
+	world := m.world
+	m.mu.Unlock()
+	if world == nil {
+		return
+	}
+	for _, name := range names {
+		world.RewardClanOf(name, highestRankedReward)
+	}
 }
 
 // runCycle runs the festival cycle that was due at due. During seal
@@ -110,6 +129,7 @@ func (m *Manager) signupEnded(generation uint64) {
 	now := m.nowMillis()
 	wait := (m.cfg.CycleLength - m.cfg.signup()).Milliseconds()
 	m.nextFestivalStart = now + wait
+	m.nextCycleStart = now + m.cfg.CycleLength.Milliseconds()
 	m.armLocked(wait, func() { m.signupEnded(generation) })
 }
 
@@ -145,4 +165,18 @@ func (m *Manager) NextFestivalNotice() string {
 	minutes := int(float32((m.nextFestivalStart-m.nowMillis())/60000)) + 1
 	m.mu.Unlock()
 	return `<font color="FF0000">The next festival will begin in ` + strconv.Itoa(minutes) + ` minute(s).</font>`
+}
+
+// minutesToNextCycle counts the minutes left until the next festival cycle
+// is due: the milliseconds left divided by a minute, truncated toward zero
+// and narrowed through single precision; -1 during seal validation. It
+// goes negative once the cycle is overdue, and counts from the epoch before
+// any schedule has started.
+func (m *Manager) minutesToNextCycle() int {
+	if m.calendar.CurrentPeriod() == sevensigns.SealValidation {
+		return -1
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return int(float32((m.nextCycleStart - m.nowMillis()) / 60000))
 }

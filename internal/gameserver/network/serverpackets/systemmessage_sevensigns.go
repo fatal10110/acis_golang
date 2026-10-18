@@ -16,3 +16,8 @@ const (
 	SystemMessageFightForStrife          = 1277
 	SystemMessageContribScoreExceeded    = 1279
 )
+
+// SystemMessageFestivalHighestRankedParty tells a clan which member was in
+// a festival's best-ever party (text) and the reputation it earned the clan
+// (number).
+const SystemMessageFestivalHighestRankedParty = 1775

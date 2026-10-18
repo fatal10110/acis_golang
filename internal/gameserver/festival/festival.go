@@ -8,7 +8,9 @@
 // persists them; and it runs the festival schedule during the competition
 // period, which the Seven Signs period changes start, stop and reset.
 //
-// The festival itself is not in place yet (#223): parties cannot sign up,
+// The festival guides and witches answer the pages that read the scores
+// and bonuses, and pay out the bonuses during seal validation. The
+// festival run itself is not in place yet (#3957): parties cannot sign up,
 // so no festival ever runs, no score is ever set and no bonus ever
 // accumulates; the schedule still counts down to each next festival.
 package festival
@@ -68,6 +70,29 @@ type Store interface {
 	SaveStatus(ctx context.Context, status Status) error
 }
 
+// World is how the festival reaches the players and clans as the Seven
+// Signs periods change. Its methods are called without the festival's lock
+// held.
+type World interface {
+	// RewardClanOf adds points to the reputation of the clan of the
+	// character named name, online or not, and tells the clan's members
+	// online that name earned them for the clan in the festival. A
+	// character in no clan earns nothing. It returns once the members
+	// have been sent all of it, so what the caller sends next follows.
+	RewardClanOf(name string, points int)
+	// RemoveBloodOfferings destroys every blood offering the players
+	// online carry, without a word, and returns once it is done.
+	RemoveBloodOfferings()
+}
+
+// BloodOfferingID is the blood offering, the item the festival's monsters
+// leave and its scores are counted in.
+const BloodOfferingID = 5901
+
+// highestRankedReward is the clan reputation each member of a festival's
+// best-ever party earns for the clan as the competition ends.
+const highestRankedReward = 100
+
 // Calendar is the Seven Signs calendar the festival follows.
 type Calendar interface {
 	CurrentPeriod() sevensigns.Period
@@ -118,7 +143,9 @@ type Manager struct {
 
 	// mu guards the fields below. The calendar may be read while holding
 	// it; it is never held across a store call.
-	mu         sync.Mutex
+	mu sync.Mutex
+	// world is what the period changes reach; nil until SetWorld.
+	world      World
 	signsCycle int
 	status     Status
 	// scores holds each Seven Signs cycle's scores keyed by festival id,
@@ -138,6 +165,14 @@ func New(cfg Config, store Store, calendar Calendar, log zerolog.Logger, now fun
 		afterFunc = time.AfterFunc
 	}
 	return &Manager{cfg: cfg, store: store, calendar: calendar, now: now, afterFunc: afterFunc, log: log, scores: map[int]map[int]Score{}}
+}
+
+// SetWorld hands the festival the players and clans its period changes
+// reach; until then they reach no one.
+func (m *Manager) SetWorld(w World) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.world = w
 }
 
 // Restore loads the stored scores and status columns; signsCycle is the
@@ -181,13 +216,36 @@ func scoreKey(cabal sevensigns.Cabal, festivalID int) int {
 func (m *Manager) HighestScore(cabal sevensigns.Cabal, festivalID int) (Score, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.highestScoreLocked(cabal, festivalID)
+}
+
+func (m *Manager) highestScoreLocked(cabal sevensigns.Cabal, festivalID int) (Score, bool) {
 	s, ok := m.scores[m.signsCycle][scoreKey(cabal, festivalID)]
 	return s, ok
 }
 
+// overallHighestLocked returns festivalID's best result of any cabal in any
+// cycle, ok=false when no score of it is above 0. Of equal results the
+// first found wins, searching the cycles in ascending order and each
+// cycle's Dusk score before its Dawn one.
+func (m *Manager) overallHighestLocked(festivalID int) (Score, bool) {
+	var best Score
+	found := false
+	for _, cycle := range slices.Sorted(maps.Keys(m.scores)) {
+		for _, cabal := range [...]sevensigns.Cabal{sevensigns.Dusk, sevensigns.Dawn} {
+			s, ok := m.scores[cycle][scoreKey(cabal, festivalID)]
+			if ok && s.Score > best.Score {
+				best, found = s, true
+			}
+		}
+	}
+	return best, found
+}
+
 // CycleBegun resets the festival for the Seven Signs cycle that began: no
 // festival cycle run, no bonus accumulated, and a blank score for each
-// festival and cabal, saved with every stored score.
+// festival and cabal, saved with every stored score. Then every blood
+// offering left on the players online is destroyed.
 func (m *Manager) CycleBegun(cycle int) {
 	m.mu.Lock()
 	m.status = Status{}
@@ -199,14 +257,16 @@ func (m *Manager) CycleBegun(cycle int) {
 		}
 	}
 	m.scores[cycle] = blank
+	world := m.world
 	m.mu.Unlock()
 
-	// ponytail: the reset also takes every unused blood offering from the
-	// players online, which only the festival hands out (#223).
 	ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
 	defer cancel()
 	if err := m.SaveScores(ctx); err != nil {
 		m.log.Error().Err(err).Int("cycle", cycle).Msg("festival: save the new cycle's scores")
+	}
+	if world != nil {
+		world.RemoveBloodOfferings()
 	}
 	m.log.Info().Int("cycle", cycle).Msg("festival: reinitialized for the next competition period")
 }
