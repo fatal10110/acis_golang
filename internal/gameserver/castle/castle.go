@@ -404,7 +404,7 @@ func (c *Castle) resetFinancesLocked() {
 	})
 }
 
-// javaInt narrows v to an int32 as a Java (int) cast does: toward zero,
+// javaInt narrows v to an int32 as an int cast does: toward zero,
 // saturating at the int32 range.
 func javaInt(v float64) int64 {
 	switch {

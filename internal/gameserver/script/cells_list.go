@@ -36,16 +36,14 @@ func (c *PlayerCell) Clear() {
 	c.mu.Unlock()
 }
 
-// ListCell is an ordered list, empty at first, that keeps duplicates as
-// the reference's lists do. A creature handle (an *NPC, a *Player or a
-// Creature) matches by world identity: an NPC's is its spawn slot's, the
-// one the timers use; a player's is its character, whichever handle
-// reaches it; any other creature's is the creature itself. A nil handle or
-// a handle on nothing is never stored and matches nothing. Any other value
-// matches by ==: a script lists clans by clan id, and keeps a fixed row of
-// slots as a list it fills with zeroes at construction. Like the other
-// cells it is leaf-locked, takes no closure, and its zero value is ready to
-// use.
+// ListCell is an ordered list, empty at first, that keeps duplicates. A creature
+// handle (an *NPC, a *Player or a Creature) matches by world identity: an NPC's
+// is its spawn slot's, the one the timers use; a player's is its character,
+// whichever handle reaches it; any other creature's is the creature itself. A
+// nil handle or a handle on nothing is never stored and matches nothing. Any
+// other value matches by ==: a script lists clans by clan id, and keeps a fixed
+// row of slots as a list it fills with zeroes at construction. Like the other
+// cells it is leaf-locked, takes no closure, and its zero value is ready to use.
 type ListCell[T comparable] struct {
 	mu    sync.Mutex
 	items []listItem[T]
@@ -108,7 +106,7 @@ func (c *ListCell[T]) Add(vs ...T) {
 }
 
 // AddIfAbsent appends v when no element matches it, and reports whether it
-// did: the reference's contains-then-add, in one step.
+// did: a contains-then-add, in one step.
 func (c *ListCell[T]) AddIfAbsent(v T) bool {
 	key, ok := listKey(v)
 	if !ok {
@@ -189,7 +187,7 @@ func (c *ListCell[T]) Items() []T {
 }
 
 // Take returns the elements, in order, and empties the list in one step,
-// for the reference's walk of a list followed by its clear: an element
+// for a walk of a list followed by its clear: an element
 // added meanwhile is neither walked nor dropped unseen.
 func (c *ListCell[T]) Take() []T {
 	c.mu.Lock()

@@ -250,7 +250,7 @@ func questCompleted(c *player.Character, name string) bool {
 // new class's reads on live's persistence lane. The connection then waits
 // for them (finishPendingClassChange) before the switch runs on live's
 // queue again. A lock already held, or a class with no template, ends the
-// request as the reference's refused change does.
+// request as a refused change does.
 func (l *GameClientLink) beginClassChange(live *livePlayer, ch *classChange) bool {
 	classID := ch.sub.ClassID
 	if ch.kind == classChangeSwitch {
@@ -305,8 +305,8 @@ func (l *GameClientLink) beginClassChange(live *livePlayer, ch *classChange) boo
 	return false
 }
 
-// refusedClassChange answers a change whose lock is already held, as the
-// reference answers its refused add, switch and replace.
+// refusedClassChange answers a change whose lock is already held, as a
+// refused add, switch and replace are answered.
 func (l *GameClientLink) refusedClassChange(live *livePlayer, ch *classChange) {
 	switch ch.kind {
 	case classChangeSwitch:
@@ -468,7 +468,7 @@ func (l *GameClientLink) completeClassChange(live *livePlayer, ch *classChange, 
 // and the new class's skills, hennas, shortcuts, effects and reuse timers
 // come in its place, the recipe book with the base class alone; the party's
 // level follows the new class's level and the clan's skills come back. The
-// client is shown the result in the order the reference sends it.
+// client is shown the result in a fixed packet order.
 func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChangeRows) {
 	c := live.Character
 	classID := c.BaseClassID()
@@ -535,7 +535,7 @@ func (l *GameClientLink) switchClass(live *livePlayer, index int, rows classChan
 			}
 		}
 		// The death penalty's passive stats are not a learned skill's:
-		// they stay through the change, as the reference gives them back.
+		// they stay through the change, given back after it.
 		l.equipItemStats(live, inv)
 	}
 	c.ClearDisabledSkills()

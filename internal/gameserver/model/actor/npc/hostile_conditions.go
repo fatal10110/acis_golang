@@ -67,7 +67,7 @@ func (a hostileStatActor) IsRiding() bool { return false }
 func (a hostileStatActor) IsFlying() bool { return false }
 
 // headingActor is the extra capability IsBehind/IsInFrontOf need beyond
-// conditions.Actor's plain X/Y/Z: the reference position's own heading.
+// conditions.Actor's plain X/Y/Z: the compared position's own heading.
 // conditionGate always tests an owner against itself (the owner on both
 // sides of the test), so other is always this same
 // hostileStatActor, which implements it via CurrentHeading below.

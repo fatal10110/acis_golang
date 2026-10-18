@@ -118,7 +118,7 @@ func macroRefusalMessage(r macro.Refusal) (int, bool) {
 
 // deleteMacro answers RequestDeleteMacro: the macro's row and every
 // shortcut bound to it go, then the refreshed macro list is sent. Deleting
-// an id the list does not hold answers nothing, as the reference does: the
+// an id the list does not hold answers nothing on purpose: the
 // macro window registers no pending action and the list it shows is
 // unchanged.
 func (l *GameClientLink) deleteMacro(live *livePlayer, req clientpackets.RequestDeleteMacro) {

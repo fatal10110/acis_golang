@@ -8,8 +8,8 @@ import (
 
 // checkUseConditions tests an item template's use conditions with pet
 // using the item on itself. aborted reports a test that reached a <not>
-// around no condition: the reference's check throws there, before the
-// pet's owner is told anything.
+// around no condition: the check fails hard there, before the pet's owner
+// is told anything.
 func checkUseConditions(pet *summon.Actor, uses []item.UseCondition) (held, aborted bool) {
 	actor := pet.ConditionActor()
 	_, held, aborted = conditions.EvaluateItem(uses, actor, actor)

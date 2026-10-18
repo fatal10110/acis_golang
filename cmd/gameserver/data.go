@@ -324,7 +324,7 @@ func loadHTMLCache(paths gameServerPaths, log zerolog.Logger) (*datacache.HTML, 
 	return html, err
 }
 
-// loadCrestCache loads the datapack crest images. As in the reference, a
+// loadCrestCache loads the datapack crest images. A
 // crest load that stops early keeps the crests read so far and the server
 // boots on: the failure is logged at error level, each deleted invalid
 // crest file is warned about, and the loaded count is reported. A missing
@@ -350,7 +350,7 @@ func loadCrestCache(paths gameServerPaths, log zerolog.Logger) (*datacache.Crest
 
 // loadGeodata loads exactly the region files geoengine.properties lists by
 // their "X_Y" keys; unlisted tiles stay null-block. A listed region that
-// fails to load fails boot, as the reference GeoEngine exits the server.
+// fails to load fails boot: the server does not run on partial geodata.
 func loadGeodata(paths gameServerPaths, log zerolog.Logger) (*geodata, error) {
 	props, err := config.LoadFile(paths.GeoConfigPath)
 	if err != nil {

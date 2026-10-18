@@ -56,7 +56,7 @@ func (l *GameClientLink) adminNpcDrops(gm *livePlayer, inst *npc.Instance, isDro
 // npcDropContent lists page of inst's drop categories (its spoil ones when
 // isDrop is false), each with subPage of its drops, most likely first, and
 // the rate rates gives its kind (the raid item rate for a raid or grand
-// boss). ok is false where the reference list throws: a page or subpage
+// boss). ok is false where the page fails to build: a page or subpage
 // below 1 with entries to show, or a drop of an item no template defines.
 func (l *GameClientLink) npcDropContent(inst *npc.Instance, rates item.Rates, page, subPage int, isDrop bool) (content string, ok bool) {
 	var categories []item.DropCategory

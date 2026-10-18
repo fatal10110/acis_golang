@@ -52,8 +52,7 @@ func New() script.Script {
 }
 
 // onAdvEvent starts the quest, or pays the reward the event numbers. A
-// number off the list panics once the dolls are taken, as the reference
-// throws there.
+// number off the list panics once the dolls are taken.
 func onAdvEvent(s *script.Script, e script.Event) string {
 	htmltext := e.Name
 	st := s.QuestState(e.Player, questName)

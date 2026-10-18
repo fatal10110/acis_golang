@@ -56,7 +56,7 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 }
 
 // onTalk pays 50 reputation points a claw. A payer who left the clan
-// panics once the claws are taken, as the reference throws there.
+// panics once the claws are taken.
 func onTalk(s *script.Script, e script.Talk) string {
 	st := s.QuestState(e.Player, questName)
 	htmltext := script.NoQuestMsg()

@@ -40,7 +40,7 @@ type Hooks struct {
 	// they set.
 	own     hookSet
 	derived bool
-	// class is the reference class these hooks are the hooks of, as Named
+	// class is the class name these hooks are the hooks of, as Named
 	// set it; "" until named. With does not carry it over.
 	class string
 	// ancestors are the named classes With derived these hooks from,
@@ -48,9 +48,9 @@ type Hooks struct {
 	ancestors []string
 }
 
-// Named returns h as the hooks of the reference class name. Hooks a child
-// derives from them with With list name among their ancestors, which the
-// //info AI page prints as the reference prints the class chain, so every
+// Named returns h as the hooks of the class name. Hooks a child derives
+// from them with With list name among their ancestors, which the //info AI
+// page prints as the class chain, so every
 // class a child derives from names its hooks. A script's own class is its
 // Name and needs no naming.
 func (h Hooks) Named(name string) Hooks {

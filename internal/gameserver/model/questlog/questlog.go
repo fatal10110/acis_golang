@@ -107,7 +107,7 @@ type Journal struct {
 
 // State is one quest's variables in a journal. Its journal's lock guards
 // them. A state an exit took out of its journal keeps working on its own:
-// its changes are still written, as the reference writes them.
+// its changes are still written.
 type State struct {
 	j     *Journal
 	quest Quest

@@ -57,8 +57,8 @@ var chatHandlers = map[chat.Type]chatHandler{
 }
 
 // handleSay2 delivers a chat line live says. A line the chat rules drop,
-// or one on a channel with no handler, goes unanswered as in the
-// reference: the client prints nothing of its own and waits on no reply.
+// or one on a channel with no handler, goes unanswered on purpose: the
+// client prints nothing of its own and waits on no reply.
 func (l *GameClientLink) handleSay2(client *Client, live *livePlayer, req clientpackets.Say2) {
 	line, ok := chat.Admit(req.Type, req.Text, req.Target, live.accessLevel().IsGM, l.chat.WalkerProtection)
 	if !ok {

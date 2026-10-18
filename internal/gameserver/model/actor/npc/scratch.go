@@ -59,7 +59,7 @@ type ScratchCreature interface {
 }
 
 // Scratch is what a spawn slot keeps of its NPC from one life to the next,
-// as the reference keeps it on the NPC object it respawns: the memory
+// since a respawn is the same NPC in a new life: the memory
 // scripts keep on the NPC (integer and creature slots and the script
 // value), the NPC's party membership, its out-of-territory state, and its
 // current life. A spawn slot
@@ -74,7 +74,7 @@ type Scratch struct {
 	// life is the NPC the slot placed last, nil before the first.
 	life PartyMember
 	// lookNeighbor is when the slot's NPC last looked around; it carries
-	// over to the next life, as the reference keeps it on the reused NPC.
+	// over to the next life with the rest of the NPC's identity.
 	lookNeighbor lookNeighborClock
 	// party is the NPC's master and privates, in every life.
 	party party

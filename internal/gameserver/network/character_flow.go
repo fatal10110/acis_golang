@@ -631,9 +631,9 @@ func skillListEntriesGreyed(c *player.Character, skills *skillstate.Persistence,
 	}
 	sort.Ints(ids)
 
-	// Worn formal wear greys out every skill. The reference also greys a
-	// clan skill while the clan's reputation is negative, but no member
-	// holds its clan's skills at 0 reputation or below, so that never shows.
+	// Worn formal wear greys out every skill. A clan skill would also grey
+	// out while the clan's reputation is negative, but no member holds its
+	// clan's skills at 0 reputation or below, so that never shows.
 	disabled := formalWear
 	entries := make([]serverpackets.SkillListEntry, 0, len(ids))
 	for _, id := range ids {

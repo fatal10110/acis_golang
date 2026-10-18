@@ -363,8 +363,7 @@ func (r *Roster) purge(ctx context.Context, objectID int32) error {
 
 // PurgesOnDelete reports whether MarkForDeletion purges a character at once
 // (DeleteCharAfterDays = 0) instead of scheduling it. A negative period,
-// which the reference stores as a deletion time already past and purges on
-// the character list that follows, purges at once here too.
+// which would put the deletion time in the past, purges at once too.
 func (r *Roster) PurgesOnDelete() bool { return r.deleteAfter <= 0 }
 
 // MarkForDeletion schedules objectID for deletion after the Roster's grace

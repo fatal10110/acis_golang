@@ -142,8 +142,8 @@ func (l *GameClientLink) npcGeneralPage(obj world.Tracked, inst *npc.Instance, i
 	}
 }
 
-// npcClassName names the reference class an NPC of inst is an instance of:
-// the one its template type names.
+// npcClassName is the instance class name admin pages print for an NPC of
+// inst: the one its template type names.
 func npcClassName(inst *npc.Instance) string {
 	if inst.Kind != "" {
 		return string(inst.Kind)
@@ -277,7 +277,7 @@ func npcAggroContent(obj world.Tracked) string {
 }
 
 // attackerName is the name an admin page prints for c: an unnamed summon
-// has none, which the reference prints as "null".
+// has none, which the page prints as "null".
 func attackerName(c attackable.Combatant) string {
 	if s, ok := c.(*summon.Actor); ok && !s.IsNamed() {
 		return "null"

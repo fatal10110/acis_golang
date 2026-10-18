@@ -163,9 +163,9 @@ type AllyDissolution struct {
 // DissolveAlly dissolves the alliance c's clan leads: every other clan
 // leaves it without a penalty; the leading clan may not found another for
 // CreateAllyDaysWhenDissolved. The alliance crest is removed from files
-// and cleared on every clan in no alliance, as the reference clears it by
-// the now-zero alliance id; with consistent rows that is only the
-// dissolved alliance's clans.
+// and cleared on every clan in no alliance, selected by the now-zero
+// alliance id; with consistent rows that is only the dissolved alliance's
+// clans.
 func (s *Service) DissolveAlly(c *player.Character, files *datacache.Crests, now time.Time, sieges Sieges) (AllyDissolution, AllyDissolveResult) {
 	cl, ok := s.ClanOf(c)
 	if !ok {

@@ -103,7 +103,7 @@ func (l *GameClientLink) createClan(live *livePlayer, name string) bool {
 }
 
 // clanLevelPayer pays a clan level's price out of live, reporting each
-// payment as the reference's own adena, item and SP removals do.
+// payment as plain adena, item and SP removals do.
 type clanLevelPayer struct {
 	l    *GameClientLink
 	live *livePlayer

@@ -89,7 +89,7 @@ func (s *State) playerCabalLocked(objectID int32) Cabal {
 // never signed up always leaves. During results and seal validation, one
 // outside the winning cabal leaves; in the other periods one signed up for
 // a cabal leaves, while a sign-up left without one stays — the reverse of
-// the login rule, as the reference has it.
+// the login rule.
 func (s *State) ExpelledAtPeriodChange(objectID int32) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()

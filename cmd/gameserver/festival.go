@@ -12,8 +12,8 @@ import (
 )
 
 // loadFestivalConfig reads the events.properties Festival of Darkness
-// schedule settings, in milliseconds, defaulting as the reference does
-// when a key is missing.
+// schedule settings, in milliseconds, with the shipped defaults for
+// a missing key.
 func loadFestivalConfig(paths gameServerPaths) (festival.Config, error) {
 	props, err := config.LoadFile(paths.EventsConfigPath)
 	if err != nil {

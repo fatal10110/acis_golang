@@ -26,8 +26,8 @@ const (
 // character, online or not. A character set below 0 is banned and
 // disconnected.
 //
-// Any other number of arguments answers nothing, as the reference does; a
-// chat command leaves no client action pending.
+// Any other number of arguments answers nothing on purpose; a chat
+// command leaves no client action pending.
 func (l *GameClientLink) adminSetAccess(gm *livePlayer, args []string) {
 	const usage = "Usage: //set access <level> | <name> <level>"
 	switch len(args) {
@@ -129,8 +129,8 @@ func (l *GameClientLink) adminGMOff(gm *livePlayer, line string) {
 // else the offline account or character. A chat ban lasts the minutes
 // given, without end by default; see adminBanChat.
 //
-// An unknown kind answers nothing, as the reference does; a chat command
-// leaves no client action pending.
+// An unknown kind answers nothing on purpose; a chat command leaves no
+// client action pending.
 func (l *GameClientLink) adminBan(gm *livePlayer, line string) {
 	const usage = "Usage : //ban account|chat|player [name [time]]"
 	args := handleradmin.Args(line)
@@ -188,8 +188,8 @@ func (l *GameClientLink) adminBan(gm *livePlayer, line string) {
 // or character gets its access back; an online one is not banned. A chat
 // unban lifts the named player's chat ban; see adminUnbanChat.
 //
-// An unknown kind answers nothing, as the reference does; a chat command
-// leaves no client action pending.
+// An unknown kind answers nothing on purpose; a chat command leaves no
+// client action pending.
 func (l *GameClientLink) adminUnban(gm *livePlayer, line string) {
 	args := handleradmin.Args(line)
 	if len(args) == 0 {
@@ -260,8 +260,8 @@ func (l *GameClientLink) changeCharAccessLevel(gm, target *livePlayer, name stri
 	}
 }
 
-// javaString is s as string concatenation prints it in the reference, where
-// a missing argument is null.
+// javaString is s as an admin message prints it, where a missing argument
+// is null.
 func javaString(s string) string {
 	if s == "" {
 		return "null"

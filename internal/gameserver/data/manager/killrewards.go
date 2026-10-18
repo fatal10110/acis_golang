@@ -153,8 +153,8 @@ func (k *KillReward) AnnounceTo(announcer raidDropAnnouncer) *KillReward {
 
 // CalculateRewards rolls this death's item/spoil/herb drops and either
 // places them on the ground or, when configured and supported, adds them
-// directly to the killer's inventory, one category roll at a time in the
-// reference's order. An auto-looted herb is consumed instantly instead:
+// directly to the killer's inventory, one category roll at a time in
+// category order. An auto-looted herb is consumed instantly instead:
 // herbs never occupy an inventory slot.
 func (k *KillReward) CalculateRewards(killer attackable.Combatant) {
 	receiver, isPlayer := killer.(rewardItemReceiver)

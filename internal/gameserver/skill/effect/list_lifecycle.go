@@ -66,9 +66,10 @@ type restoreBatch struct {
 // catchUp), and then refreshes the icons once. A tick that comes due while
 // apply runs is left to the effects sweep: an effect anchored at the replay
 // itself has its first tick at least restoreMinDelay after its add, so
-// however long apply takes, the replay never runs it. The reference schedules every restored effect
-// at the restore instant on its own fixed-rate task, so the ticks due since
-// then interleave by time, not by the order the effects were saved in. A
+// however long apply takes, the replay never runs it. Every restored effect
+// is anchored at the restore instant on its own fixed-rate clock, so the
+// ticks due since then interleave by time, not by the order the effects
+// were saved in. A
 // Restore inside another one just runs apply: the outermost one catches up
 // and refreshes for all of them. Call it on the owner's queue.
 func (l *List) Restore(apply func()) {

@@ -27,7 +27,7 @@ type characterEditStore interface {
 // adminSet answers //set <field> [value] for gm's selection, gm itself
 // without one. //set access is adminSetAccess; the other fields change a
 // selected player and tell gm, and a selection that is no player answers
-// nothing, as the reference does: a chat command leaves no client action
+// nothing on purpose: a chat command leaves no client action
 // pending. A missing or malformed value answers the field's usage.
 // //set name and //set title also name a selected NPC; see
 // admin_set_fields.go.
@@ -79,7 +79,7 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 		edit(func() {
 			// The color is read from the 17th character of the command on,
 			// the space before the value included, which no hexadecimal
-			// number parses: the reference answers the usage every time.
+			// number parses: the usage answers every time.
 			color, ok := int32(0), false
 			if len(line) >= len("admin_set tcolor") {
 				var err error

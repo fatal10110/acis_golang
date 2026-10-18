@@ -27,7 +27,7 @@ var siegeKeysNotApplied = []struct{ key, issue string }{
 }
 
 // loadSiegeConfig reads the siege.properties castle siege settings,
-// defaulting as the reference does when a key is missing. It also returns
+// with the shipped defaults for a missing key. It also returns
 // the keys set in the file that have no effect yet, so the boot can say
 // so: the siegable clan hall keys (ChSiegeClanMinLevel, ChAttackerMaxClans)
 // wait for the clan hall sieges.

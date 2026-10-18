@@ -114,7 +114,7 @@ func (l *GameClientLink) portDeadPlayer(live *livePlayer, requestType int32) {
 // restartRestoreExp is the percentage of the experience its last death took
 // that a restart of requestType gives back to live: the level of the
 // restore-exp function its clan's hall rents, for a clan hall restart only,
-// 0 for none. The reference restores it before the revive.
+// 0 for none. It is restored before the revive.
 func (l *GameClientLink) restartRestoreExp(live *livePlayer, requestType int32) int {
 	if requestType != restartToClanHall {
 		return 0
@@ -281,8 +281,8 @@ func (l *GameClientLink) inWater(at location.Location) bool {
 // A summon that followed live tells the NPCs around its landing point about
 // itself (npc.ForceSeeCreature) once the teleport lock is released, as its
 // see-creature hooks may teleport live again. live's own landing tells
-// nobody: the reference's re-fire runs before an Appearing gives a player
-// its region back.
+// nobody: the see-creature re-fire runs before an Appearing gives a
+// player its region back.
 func (l *GameClientLink) completeLivePlayerTeleport(live *livePlayer) {
 	if live == nil {
 		return

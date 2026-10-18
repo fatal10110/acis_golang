@@ -59,9 +59,9 @@ func (m *Manager) Fences() []*Fence {
 // Add places a fence of type typ, sizeX by sizeY world units and height
 // layers high (one, two or three), centered at (x, y, z) aligned to the
 // geodata grid: it is shown to the players around, then blocks movement.
-// The far edges x+sizeX and y+sizeY are summed in 32 bits, wrapping as the
-// reference's int arithmetic does, so a sum that overflows is refused the
-// same way.
+// The far edges x+sizeX and y+sizeY are summed in 32 bits, wrapping as
+// int32 arithmetic does, so a sum that overflows is refused by the same
+// bounds checks.
 func (m *Manager) Add(x, y, z, typ, sizeX, sizeY, height int) (*Fence, error) {
 	maxX, maxY := int(int32(x)+int32(sizeX)), int(int32(y)+int32(sizeY))
 	if x < geo.WorldXMin || maxX > geo.WorldXMax || y < geo.WorldYMin || maxY > geo.WorldYMax {
@@ -141,10 +141,9 @@ func sizeOf(n int) (size, bool) {
 	return size{}, false
 }
 
-// align snaps coordinate v to the geodata grid for placement s. The
-// reference writes this as v & 0xFFFFFFF0 + offset, which Java's operator
-// precedence evaluates as v & (0xFFFFFFF0 + offset): a mask clearing the
-// low four bits, or only the low three when the offset is 8.
+// align snaps coordinate v to the geodata grid for placement s as
+// v & (0xFFFFFFF0 + offset), the offset folded into the mask: a mask
+// clearing the low four bits, or only the low three when the offset is 8.
 func align(v int, s size) int {
 	return v & (s.offset - 16)
 }

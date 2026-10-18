@@ -195,7 +195,7 @@ func (l *GameClientLink) claimLotteryTicket(live *livePlayer, objectID int32) {
 		return
 	}
 	// A past round's drawing never changes, so checking before the destroy
-	// reads what the reference reads after it. A payout that needs a new
+	// reads what a check after it would. A payout that needs a new
 	// adena stack takes its id before the destroy, so an exhausted id
 	// factory keeps the ticket; one joining held adena takes none, since an
 	// id taken and given back is still spent.

@@ -66,8 +66,7 @@ func (j *Journal) StateByID(id int32) *State {
 }
 
 // Create adds a state of q, created, at the end of the journal and returns
-// it. It writes nothing and, as in the reference, does not look for a state
-// q already has.
+// it. It writes nothing and does not look for a state q already has.
 func (j *Journal) Create(q Quest) *State {
 	j.mu.Lock()
 	defer j.mu.Unlock()
@@ -206,8 +205,8 @@ func (st *State) SetCond(cond int32) ([]Entry, bool) {
 	if st.j.sealed || cond == previous {
 		return nil, false
 	}
-	// A <flags> of 0 is no flags. Shifts take the count mod 32, as int
-	// shifts do in the reference.
+	// A <flags> of 0 is no flags. Shifts take the count mod 32, as 32-bit
+	// int shifts do.
 	flags, _ := st.int(KeyFlags)
 	switch {
 	case flags == 0:
@@ -235,8 +234,8 @@ func (st *State) SetCond(cond int32) ([]Entry, bool) {
 // changing nothing, when st is not started or the journal is sealed.
 //
 // A repeatable exit takes out the first state of st's quest id, and only
-// for a real quest: the reference matches states by quest id and never
-// matches a script that is not a real quest, whose state stays in the
+// for a real quest: states match by quest id, and a script that is not a
+// real quest never matches, whose state stays in the
 // journal with no variables while its rows are deleted.
 func (st *State) Exit(repeatable bool) ([]Entry, bool) {
 	st.j.mu.Lock()

@@ -36,7 +36,7 @@ const (
 // even an invitation of oneself; an invisible target is refused as the
 // wrong target; a target whose connection is gone, or either side in jail,
 // is refused once the party check passed. Either side competing in an
-// Olympiad match is then turned away without a word, as the reference does:
+// Olympiad match is then turned away without a word on purpose:
 // neither the inviter nor the target hears of it.
 func (l *GameClientLink) requestJoinParty(live *livePlayer, req clientpackets.RequestJoinParty) {
 	target, ok := l.livePlayerByName(req.Target)

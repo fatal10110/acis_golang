@@ -328,10 +328,9 @@ func (h *handler) signUp() Reply {
 		return Reply{Aborted: true}
 	}
 	seal, ok := h.seal()
-	// The reference counts the choice toward the seal's votes, which no
-	// seal of NoSeal has, and stops with an error once the sign-up is
-	// made; no page links it, and it is refused here before anything is
-	// taken.
+	// A NoSeal choice has no seal votes to count toward and would fail
+	// only after the sign-up is made; no page links it, and it is refused
+	// here before anything is taken.
 	if !ok || seal == sevensigns.NoSeal {
 		return Reply{Aborted: true}
 	}
@@ -345,8 +344,8 @@ func (h *handler) signUp() Reply {
 	}
 	h.reply.SignUpErr = h.s.state.SetPlayerInfo(h.ctx, h.t.ObjectID, cabal, seal)
 	// A new sign-up's row is inserted at once, but a changed one lives in
-	// memory until the next save, which the reference's periodic save
-	// (#172) would bring within minutes.
+	// memory until the next save, which a periodic save (#172) would bring
+	// within minutes.
 	h.reply.Save = true
 	h.notice(Joined{Cabal: cabal})
 	h.notice(SealChosen{Seal: seal})
@@ -383,9 +382,8 @@ func (h *handler) contributeStones() Reply {
 	case 3:
 		color, id, count = "Red", RedStoneID, red
 	case 4:
-		// The reference adds the stones to a sign-up it then fails to
-		// find, losing them; no page offers the command to a talker who
-		// never signed up.
+		// Without a sign-up the stones would be taken and lost; no page
+		// offers the command to a talker who never signed up.
 		if !signed {
 			return Reply{Aborted: true}
 		}
@@ -432,7 +430,7 @@ func (h *handler) contributeAmount(command string) Reply {
 	}
 	score, signed := h.s.state.PlayerContribScore(h.t.ObjectID)
 	if !signed && isStone(int32(itemID)) {
-		// As for contributeStones' 4: the reference loses the stones.
+		// As for contributeStones' 4: the stones would be lost.
 		return Reply{Aborted: true}
 	}
 	count := min(amount, inv.ItemCount(int32(itemID), -1, true))
@@ -466,7 +464,7 @@ func (h *handler) contributeAmount(command string) Reply {
 }
 
 // addContrib turns the stones in, returning the points they were worth, or
-// -1 when they would pass the cap, as the reference does.
+// -1 when they would pass the cap.
 func (h *handler) addContrib(blue, green, red int) int {
 	points, ok := h.s.state.AddPlayerStoneContrib(h.t.ObjectID, blue, green, red, h.s.cfg.MaxPlayerContrib)
 	if !ok {
@@ -504,8 +502,7 @@ func (h *handler) collectReward() Reply {
 		return Reply{}
 	}
 	if _, signed := st.PlayerContribScore(h.t.ObjectID); !signed {
-		// The reference fails on the missing sign-up of a talker of no
-		// cabal while no cabal won.
+		// A talker of no cabal has no sign-up to read while no cabal won.
 		return Reply{Aborted: true}
 	}
 	reward := st.TakeAncientAdenaReward(h.t.ObjectID)
@@ -519,7 +516,7 @@ func (h *handler) collectReward() Reply {
 
 // huntingGroundTeleport takes the talker to x, y, z for its price in
 // ancient adena ("SevenSigns 11 <x> <y> <z> <price>"). A malformed command
-// is only logged by the reference; here it does nothing.
+// does nothing.
 func (h *handler) huntingGroundTeleport() Reply {
 	x, okX := h.int()
 	y, okY := h.int()
@@ -766,10 +763,9 @@ func signs(value int, suffix string) string {
 	return name + ".htm"
 }
 
-// commandNumber reads the number from character begin of command on, as
-// the reference does for an edit box's value, which may be padded with
-// spaces. ok is false when command is too short or the text does not
-// parse.
+// commandNumber reads the number from character begin of command on: an edit
+// box's value, which may be padded with spaces. ok is false when command is too
+// short or the text does not parse.
 func commandNumber(command string, begin int) (int, bool) {
 	arg, ok := commandChars(command, begin)
 	if !ok {

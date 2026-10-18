@@ -111,7 +111,7 @@ func (n *Npcs) dropGoneScriptPrivates(master npc.PartyMember) {
 	}
 }
 
-// DecayMe hides h, as the reference's decayMe hides an NPC: it leaves the
+// DecayMe hides h without a decay: it leaves the
 // world with no decayed hook, and its spawn is not told, so it never
 // respawns and an npcmaker keeps counting it. It takes no more AI turns
 // and walks no route. The slot of a private a script created goes with it,

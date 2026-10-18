@@ -93,8 +93,7 @@ func New() script.Script {
 }
 
 // onAdvEvent starts the quest on the raid the event numbers. A number off
-// the list panics once the quest has started, as the reference throws
-// there.
+// the list panics once the quest has started.
 func onAdvEvent(s *script.Script, e script.Event) string {
 	htmltext := e.Name
 	st := s.QuestState(e.Player, questName)

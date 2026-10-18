@@ -108,7 +108,7 @@ func parseAdminSex(value string) (player.Sex, bool) {
 }
 
 // adminRespawn takes live, on its queue, off the grid in place drawn held,
-// as the reference's decay: it stops what it does, forgets itself as its
+// as a decay does: it stops what it does, forgets itself as its
 // selection and is told it is gone. After adminRespawnDelay, on its queue
 // again, change runs, live comes back on the grid, settle runs, live and
 // the players around it see it no longer held, its client is released, and

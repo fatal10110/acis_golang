@@ -21,8 +21,8 @@ func (l *GameClientLink) castleSiege(id int32) (*siege.Siege, bool) {
 // requestSiegeAttackerList shows the attacking clans of castle req.ID.
 //
 // ponytail: a siegable clan hall's attackers wait on the clan hall sieges
-// (#244); for such an id, as for an id naming nothing, the reference sends
-// nothing, the window simply staying empty, and so does this.
+// (#244); for such an id, as for an id naming nothing, nothing is sent,
+// the window simply staying empty.
 func (l *GameClientLink) requestSiegeAttackerList(live *livePlayer, req clientpackets.RequestSiegeList) {
 	s, ok := l.castleSiege(req.ID)
 	if !ok {
@@ -32,7 +32,7 @@ func (l *GameClientLink) requestSiegeAttackerList(live *livePlayer, req clientpa
 }
 
 // requestSiegeDefenderList shows the defending clans of castle req.ID; an
-// id naming no castle answers nothing, as the reference does.
+// id naming no castle answers nothing, the window staying empty.
 func (l *GameClientLink) requestSiegeDefenderList(live *livePlayer, req clientpackets.RequestSiegeList) {
 	s, ok := l.castleSiege(req.ID)
 	if !ok {
@@ -47,8 +47,8 @@ func (l *GameClientLink) requestSiegeDefenderList(live *livePlayer, req clientpa
 // refused or not, live then sees the siege window again.
 //
 // ponytail: a siegable clan hall's registration waits on the clan hall
-// sieges (#244); for such an id, as for an id naming nothing, the
-// reference answers nothing, and so does this.
+// sieges (#244); for such an id, as for an id naming nothing, nothing
+// answers.
 func (l *GameClientLink) requestJoinSiege(live *livePlayer, req clientpackets.RequestJoinSiege) {
 	cl, member := l.clanService().ClanOf(live.Character)
 	if !member || !cl.HasPrivilege(live.ObjectID(), clan.PrivCastleSiege) {
@@ -83,7 +83,7 @@ func (l *GameClientLink) requestJoinSiege(live *livePlayer, req clientpackets.Re
 // requestConfirmSiegeWaitingList is the castle lord's answer to a clan's
 // request to defend castle req.CastleID, then the defender list again.
 // Only the leader of the clan owning the castle answers; anyone else, a
-// castle or clan id naming nothing, gets nothing, as in the reference.
+// castle or clan id naming nothing, gets nothing.
 func (l *GameClientLink) requestConfirmSiegeWaitingList(live *livePlayer, req clientpackets.RequestConfirmSiegeWaitingList) {
 	own, ok := l.clanService().ClanOf(live.Character)
 	if !ok {
@@ -228,8 +228,8 @@ func (l *GameClientLink) siegeBanished(live *livePlayer) bool {
 }
 
 // siegeCombatNotice tells a player it entered or left a combat zone. A
-// player thrown off the battlefield as its siege starts hears neither: the
-// reference teleports it out before the battlefield turns on.
+// player thrown off the battlefield as its siege starts hears neither: it
+// is teleported out before the battlefield turns on.
 func (l *GameClientLink) siegeCombatNotice(a zone.Actor, entering bool) {
 	za, ok := a.(*liveZoneActor)
 	if !ok || l.siegeBanished(za.live) {
@@ -297,7 +297,7 @@ func SiegeNotifier(l *GameClientLink) siege.Notifier { return siegeNotices{l: l}
 
 // The notices reach each player on its own queue, behind the siege states
 // and teleports the siege posted there before them, so a player sees them
-// in the reference's order.
+// in the order they were posted.
 
 // Announce sends m to every player in the world.
 func (n siegeNotices) Announce(m siege.Message) {

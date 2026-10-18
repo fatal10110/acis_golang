@@ -176,8 +176,8 @@ type Controller struct {
 	// caster in attack stance.
 	hasTargets bool
 	// launchFirst is the first creature the latest AI launch resolved, nil
-	// when it resolved none. The cast's clear leaves it, as the reference
-	// keeps its target list past its cast: CastFinished reports it.
+	// when it resolved none. The cast's clear leaves it, so the launch's
+	// targets outlive the cast: CastFinished reports it.
 	launchFirst attackable.Combatant
 
 	// castSeq increments every time the active cast is cleared (Stop,

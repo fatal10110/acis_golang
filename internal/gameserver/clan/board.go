@@ -96,8 +96,9 @@ func (cl *Clan) MembersInTableOrder() []Member {
 // the registry is kept in (an id folded onto its own high half, masked to
 // the table size), lowest bucket first, and by ascending id within a
 // bucket. The order is approximate: the table size is recomputed from the
-// current count, where the reference's table never shrinks after a clan
-// leaves it, and a reference resize can reverse the order within a bucket.
+// current count, where the client-facing order comes from a table that
+// never shrinks after a clan leaves it, and whose resize can reverse the
+// order within a bucket.
 func (t *Table) Clans() []*Clan {
 	clans := t.allClans()
 	buckets := registryBuckets(len(clans))

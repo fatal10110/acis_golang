@@ -53,8 +53,8 @@ func kinds(ks ...NPCKind) kindSet {
 // hook that never fires.
 var raisedHooks = map[hook]kindSet{
 	// The attacks and deaths (attacked.go, clan.go). A civilian NPC can
-	// be in a party, but no reference script binds a party hook to one, so
-	// none is raised on it.
+	// be in a party, but no script binds a party hook to one, so none is
+	// raised on it.
 	hookAttacked:      kinds(KindFolk, KindHostile),
 	hookPartyAttacked: kinds(KindHostile),
 	hookClanAttacked:  kinds(KindFolk, KindHostile),

@@ -149,8 +149,8 @@ func friendInviteRefusalMessage(refusal relation.InviteRefusal, name string) wir
 
 // handleRequestAnswerFriendInvite answers the friend invitation live holds.
 //
-// With no answerable invitation the answer goes unanswered, as in the
-// reference: the invitation dialog closed when the client answered, so no
+// With no answerable invitation the answer goes unanswered on purpose:
+// the invitation dialog closed when the client answered, so no
 // click waits on a reply. A request of another kind in live's slot is no
 // friend invitation: it stays pending for its own answer.
 func (l *GameClientLink) handleRequestAnswerFriendInvite(live *livePlayer, req clientpackets.RequestAnswerFriendInvite) {
@@ -230,8 +230,8 @@ func (l *GameClientLink) handleRequestFriendDel(live *livePlayer, req clientpack
 
 // handleRequestBlock runs one block-list command.
 //
-// Two branches answer nothing, as in the reference: an unblock of a name not
-// on the block list, and a command type no command sends. Neither registers
+// Two branches answer nothing on purpose: an unblock of a name not on the
+// block list, and a command type no command sends. Neither registers
 // a pending client action; the chat-line commands expect no reply.
 func (l *GameClientLink) handleRequestBlock(live *livePlayer, req clientpackets.RequestBlock) {
 	switch req.Type {
@@ -299,8 +299,8 @@ func (l *GameClientLink) sendBlockList(live *livePlayer) {
 // friend. A friend that ignores live sends the message back to live as
 // undelivered.
 //
-// An empty message, or one over friendSayMaxLength, goes unanswered, as in
-// the reference; the client shows what it typed itself and waits on no
+// An empty message, or one over friendSayMaxLength, goes unanswered on
+// purpose; the client shows what it typed itself and waits on no
 // reply.
 //
 // A delivered message is recorded in the chat log.

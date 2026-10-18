@@ -35,7 +35,7 @@ type Info struct {
 	TimeLeft time.Duration
 }
 
-// Weapons lists every weapon, out or not, in the reference's order.
+// Weapons lists every weapon, out or not, in hash order (see hashOrder).
 func (m *Manager) Weapons() []Info {
 	if m == nil {
 		return nil

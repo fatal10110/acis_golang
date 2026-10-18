@@ -56,7 +56,7 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 	}
 	if _, ok := target.(*boat.Boat); ok {
 		// A click on a boat, plain or forced, does nothing at all: a boat is
-		// never selected, and the reference answers no packet either.
+		// never selected, and silence is the expected answer.
 		return
 	}
 	ground, isGround := target.(*grounditem.Item)

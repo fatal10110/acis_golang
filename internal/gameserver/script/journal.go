@@ -97,8 +97,7 @@ func (q *Quests) NewState(c *player.Character, s *Script) *QuestState {
 }
 
 // Abort exits, as repeatable, the first quest of c's journal whose quest id
-// is questID. A quest id c has no state of does nothing; the reference
-// aborts by id in the same way.
+// is questID. A quest id c has no state of does nothing.
 func (q *Quests) Abort(c *player.Character, questID int32) {
 	st := c.Quests().StateByID(questID)
 	if st == nil {

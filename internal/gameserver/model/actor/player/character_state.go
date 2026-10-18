@@ -154,8 +154,8 @@ func (c *Character) beginPostureTransitionLocked(standing bool, delay time.Durat
 // settlePosture ends a sit-down (standing false) or stand-up transition,
 // whatever began after it. A sit-down's end leaves the character seated,
 // even when a stand-up or a get-up out of fake death took the standing
-// posture meanwhile: the reference's end sets isSitting whatever happened
-// in between. A stand-up's end only clears StandingNow and leaves the
+// posture meanwhile: a sit-down's end sets the seated flag whatever
+// happened in between. A stand-up's end only clears StandingNow and leaves the
 // posture a later sit-down took.
 func (c *Character) settlePosture(standing bool) {
 	c.stateMu.Lock()

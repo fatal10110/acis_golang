@@ -42,8 +42,7 @@ func New() script.Script {
 }
 
 // onAdvEvent starts the quest, or trades the head for the totem. Without
-// the head the quest goes back to cond 1. The start link checks nothing,
-// as in the reference.
+// the head the quest goes back to cond 1. The start link checks nothing.
 func onAdvEvent(s *script.Script, e script.Event) string {
 	htmltext := e.Name
 	st := s.QuestState(e.Player, questName)
