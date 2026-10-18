@@ -5,7 +5,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
-	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
@@ -19,20 +18,6 @@ func wyvernRules(cfg *npc.WyvernRules) npc.WyvernRules {
 		return npc.DefaultWyvernRules()
 	}
 	return *cfg
-}
-
-// aliveLifeTowers is the number of c's life control towers standing.
-//
-// ponytail: the control towers are not spawned yet, so every life control
-// tower c lists counts as standing; #3857 switches this to the live count.
-func aliveLifeTowers(c *castle.Castle) int {
-	n := 0
-	for _, t := range c.ControlTowers {
-		if t.Type == castledata.TowerLifeControl {
-			n++
-		}
-	}
-	return n
 }
 
 // doormanDoors carries out a doorman's door command for live: it opens or

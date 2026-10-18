@@ -79,7 +79,7 @@ type commandSetup struct {
 	period sevensigns.Period
 	room   bool
 	gates  bool
-	// lifeTower lists one life control tower on the castle.
+	// lifeTower lists one life control tower on the castle and places it.
 	lifeTower bool
 	extra     []gameservertest.Option
 }
@@ -214,6 +214,9 @@ func bootResidenceCommands(t *testing.T, s commandSetup) *folkWorld {
 	}
 	if s.gates {
 		opts = append(opts, gludioGates())
+	}
+	if s.lifeTower {
+		opts = append(opts, placedLifeTowers()...)
 	}
 	w := bootFolkWorld(t, commandPages(), append(opts, s.extra...)...)
 	if s.siege {
