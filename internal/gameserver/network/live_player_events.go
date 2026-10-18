@@ -130,7 +130,7 @@ func sessionOnly(ev event.Event) bool {
 		event.SkillResisted, event.MagicResisted, event.DamageReceived, event.ServitorDamageShared, event.SkillDamageDealt, event.UserInfoChanged,
 		event.PvPFlagged, event.RelationChanged, event.LevelChanged,
 		event.WeightPenaltyChanged, event.VitalsChanged, event.Evaded, event.MountFeedGauge,
-		event.ItemsTaken, event.SoundPlayed, event.ScenePlayed, event.ScreenMessageShown, event.EarthquakeStarted, event.MultisellRequested,
+		event.ItemsTaken, event.SoundPlayed, event.ScenePlayed, event.ScreenMessageShown, event.EarthquakeStarted, event.MultisellRequested, event.WarehouseWithdrawOpened,
 		event.DialogPageShown, event.DialogReleased, event.ScriptMessage, event.QuestOverweight,
 		event.SystemMessageShown, event.TeleportWindowShown, event.NPCChatShown:
 		return true
@@ -402,6 +402,8 @@ func (p *livePlayer) Emit(ev event.Event) {
 		live.SendFrame(serverpackets.FrameEarthquake(e.At.X, e.At.Y, e.At.Z, e.Intensity, e.Duration, false))
 	case event.MultisellRequested:
 		l.showScriptMultisell(live, e.ObjectID, e.List)
+	case event.WarehouseWithdrawOpened:
+		l.openScriptWithdraw(live)
 	case event.ScenePlayed:
 		live.SendFrame(serverpackets.FrameExPlayScene())
 	case event.HennaListShown:

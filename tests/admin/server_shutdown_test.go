@@ -19,10 +19,11 @@ import (
 const serverUsage = "Usage: //server <shutdown|restart|abort|gmonly|all|max>."
 
 // bootMaintenance boots the game master with the maintenance page, entered
-// in the world, and a second player beside it.
-func bootMaintenance(t *testing.T) (srv *gameservertest.Server, gm, user *testsupport.ScriptedClient) {
+// in the world, and a second player beside it. extra joins the boot
+// options.
+func bootMaintenance(t *testing.T, extra ...gameservertest.Option) (srv *gameservertest.Server, gm, user *testsupport.ScriptedClient) {
 	t.Helper()
-	srv, _ = bootAdmin(t, adminLevel, gameservertest.WithHTMLPages(shippedAdminPages(t, "maintenance.htm")))
+	srv, _ = bootAdmin(t, adminLevel, append([]gameservertest.Option{gameservertest.WithHTMLPages(shippedAdminPages(t, "maintenance.htm"))}, extra...)...)
 	if !srv.DrivesClock() {
 		t.Skip("counting the countdown's seconds needs the driven clock")
 	}

@@ -213,6 +213,9 @@ type Character struct {
 	itemDrops ItemDropRule
 	skillDefs skillDefinitions
 	inventory *itemcontainer.Inventory
+	// warehouse is c's private warehouse, set by AttachWarehouse before c
+	// is shared; nil before.
+	warehouse *itemcontainer.Container
 	world     *world.State
 	// worldHandle is the object the world registers c under when c is
 	// embedded in one; nil means c itself. See SetWorldHandle.
