@@ -392,8 +392,8 @@ func (c *Character) ItemSlotsFit(slots int) bool {
 // AddCreatedItem creates count units of itemID in this live character's
 // inventory, named in chat as picked up, the way an opened capsule hands
 // over its product. A non-stackable arrives as count instances, or as one
-// unless the multiple item drop rule is off. nextID allocates each new instance's
-// object id. It reports whether anything was added or, for a herb, applied.
+// when the multiple item drop rule is off. nextID allocates each new
+// instance's object id. It reports whether anything was added or, for a herb, applied.
 func (c *Character) AddCreatedItem(itemID int32, count int, nextID func() (int32, error)) bool {
 	return c.createItem(itemID, count, nextID, event.ObtainCreated)
 }
@@ -434,8 +434,8 @@ func (c *Character) createItem(itemID int32, count int, nextID func() (int32, er
 // AddCraftedItem puts count units of itemID into this character's
 // inventory the way a finished craft hands over its product: straight into
 // the inventory, with no chat line and no arrow auto-equip. A non-stackable
-// arrives as count instances, or as one unless the multiple item drop rule is off.
-// nextID allocates each new instance's object id. It reports how many units
+// arrives as count instances, or as one when the multiple item drop rule
+// is off. nextID allocates each new instance's object id. It reports how many units
 // were added.
 func (c *Character) AddCraftedItem(itemID int32, count int, nextID func() (int32, error)) int {
 	if c.inventory == nil || count < 1 || nextID == nil {

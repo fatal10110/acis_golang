@@ -145,16 +145,16 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 // characters and summons already in the world and the kill reward settings
 // (drop and XP/SP rates, auto-loot, party XP, the party range and the
 // multiple item drop rule, shared by the kill rewards, party loot, the
-// scripts and item creation) included. The quest drop and reward rates
-// keep their boot value. These keep their
-// boot value, read once into what the boot built from them:
+// scripts and item creation) included. These keep their boot value, read
+// once into what the boot built from them:
 //   - the listener and login server addresses, the login registration
 //     (server id, hexid, status flags), the database and the client cipher;
 //   - the geodata and the town combat rule the zones were set up with,
 //     which //reload zone reapplies as booted;
 //   - AllowCursedWeapons, AllowBoat and DeleteCharAfterDays;
-//   - the PvP flag times, the ground item settings, the pet settings, the spellbook
-//     needs, StoreSkillCooltime and CancelLesserEffect;
+//   - the quest drop and reward rates, the PvP flag times, the ground item
+//     settings, the pet settings, the spellbook needs, StoreSkillCooltime
+//     and CancelLesserEffect;
 //   - the clan, siege, manor, Olympiad, hero, Seven Signs, festival,
 //     lottery, wedding, fishing championship, derby, scheme buffer,
 //     community board, petition and class master settings;
