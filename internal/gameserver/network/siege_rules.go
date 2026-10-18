@@ -25,11 +25,16 @@ func (l *GameClientLink) ownCastleBesieged(clanID int32) bool {
 var _ npc.TowerSiege = (*siege.Siege)(nil)
 
 // GuardedSiege returns the siege of the castle inst belongs to (npcCastle),
-// the one a siege guard defends or a control tower stands for; nil for
-// none.
+// the one a siege guard defends or a control tower stands for, else the
+// siege of the siegable hall it serves (npcResidence); nil for none.
 func (l *GameClientLink) GuardedSiege(inst *npc.Instance) npc.GuardedSiege {
 	c, ok := l.npcCastle(inst)
 	if !ok {
+		if _, h := l.npcResidence(inst); h != nil {
+			if s, ok := l.halls.Siege(int32(h.ID)); ok {
+				return s
+			}
+		}
 		return nil
 	}
 	s, ok := l.sieges.Get(c.ID)

@@ -63,6 +63,7 @@ func (l *GameClientLink) reloadZones() error {
 	l.carryBossPermissions(next)
 	l.wireZones(next)
 	l.sieges.Rebind(zone.OfKind[*zone.Siege](next))
+	l.halls.RebindBattlefields(zone.OfKind[*zone.Siege](next))
 	old := l.zones.Swap(next)
 	l.rebaseCreatures(old)
 	return nil

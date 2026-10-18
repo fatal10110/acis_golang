@@ -22,7 +22,8 @@ import (
 // skills (shown by the burst's SkillList); its fellow members learn it
 // logged in, and so does its sponsor, or else its apprentice; it is told
 // when its clan's hall lease is unpaid; it takes the siege state of a siege
-// in progress its clan fights; and it gets its own roster row and the
+// in progress its clan fights, the attacker state when its clan attacks a
+// clan hall siege being fought; and it gets its own roster row and the
 // rosters, the main clan's then each sub-unit's.
 func (l *GameClientLink) enterWorldClan(client *Client, live *livePlayer) {
 	c := live.Character
@@ -50,6 +51,9 @@ func (l *GameClientLink) enterWorldClan(client *Client, live *livePlayer) {
 	}
 	if state := l.sieges.StateOf(cl.ID()); state != siege.StateNone {
 		c.SetSiegeState(int32(state))
+	}
+	if l.halls.Besieging(cl.ID()) {
+		c.SetSiegeState(int32(siege.StateAttacker))
 	}
 	client.Session.SendFrame(serverpackets.FramePledgeShowMemberListUpdate(row))
 	for _, frame := range l.pledgeListFrames(cl, live) {

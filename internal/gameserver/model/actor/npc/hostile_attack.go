@@ -399,10 +399,8 @@ func (h *Hostile) BroadcastStatus() {
 
 // AttackableBy reports whether attacker may physically attack this NPC. A
 // siege guard may be attacked only by a player, or a player's summon, whose
-// clan attacks the siege in progress of the castle the guard belongs to.
-//
-// ponytail: a guard of a siegable clan hall is attacked the same way during
-// that hall's siege, which waits for the hall siege runtime (#244).
+// clan attacks the siege in progress of the castle, or the siegable hall,
+// the guard belongs to.
 func (h *Hostile) AttackableBy(attacker skilltarget.Actor) bool {
 	if attacker == nil || attacker.ObjectID() == h.ObjectID() || h.AlikeDead() {
 		return false

@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
 	"github.com/fatal10110/acis_golang/internal/gameserver/persist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
@@ -44,23 +45,38 @@ func startClanHallFunctions(lc fx.Lifecycle, fns *clanhall.Functions, link *netw
 }
 
 // provideClanHalls restores the clan halls' owners, leases and auctions,
-// once the clans own their halls, writing through the persistence worker.
+// and the hall sieges' attackers and Rainbow Springs decrees, once the
+// clans own their halls, writing through the persistence worker.
 func provideClanHalls(ctx bootContext, pool *sql.DB, worker *persist.Worker, data *gameData, clans *clan.Service, fns *clanhall.Functions, log zerolog.Logger) (*clanhall.Halls, error) {
-	halls := clanhall.NewHalls(data.ClanHalls, clans.Table(), fns, gamesql.NewClanHallStore(pool), worker, log)
+	store := gamesql.NewClanHallStore(pool)
+	halls := clanhall.NewHalls(data.ClanHalls, clans.Table(), fns, store, worker, log)
 	if err := halls.Restore(ctx); err != nil {
 		return nil, fmt.Errorf("restore clan halls: %w", err)
+	}
+	if err := halls.RestoreSieges(ctx, store); err != nil {
+		return nil, fmt.Errorf("restore clan hall sieges: %w", err)
 	}
 	return halls, nil
 }
 
 // startClanHalls runs the clan hall leases and auctions, paid and refunded
-// through the clan warehouses of link, before any character can log in; on
-// shutdown it stops them.
-func startClanHalls(lc fx.Lifecycle, halls *clanhall.Halls, link *network.GameClientLink, pool *sim.Pool) {
+// through the clan warehouses of link, and the hall sieges with the
+// siege.properties hall settings, each over its hall's siege zone, before
+// any character can log in; on shutdown it stops them.
+func startClanHalls(lc fx.Lifecycle, paths gameServerPaths, data *gameData, halls *clanhall.Halls, link *network.GameClientLink, pool *sim.Pool) error {
+	cfg, err := loadHallSiegeConfig(paths)
+	if err != nil {
+		return err
+	}
+	var fields []*zone.Siege
+	if data.Zones != nil {
+		fields = zone.OfKind[*zone.Siege](data.Zones)
+	}
 	queue := pool.NewQueue("clanhalls")
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
 			halls.Start(queue, link, network.ClanHallNotifier(link), network.ClanHallGrounds(link))
+			halls.RunSieges(cfg, network.ClanHallSiegeNotifier(link), fields)
 			return nil
 		},
 		OnStop: func(context.Context) error {
@@ -68,4 +84,5 @@ func startClanHalls(lc fx.Lifecycle, halls *clanhall.Halls, link *network.GameCl
 			return nil
 		},
 	})
+	return nil
 }

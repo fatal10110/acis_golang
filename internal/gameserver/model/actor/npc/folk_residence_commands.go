@@ -222,11 +222,9 @@ func doormanOwner(kind InstanceKind, r ResidenceTalk) bool {
 // member of the owning clan, and answer nothing to anyone else. open_doors
 // and close_doors work the gates they name for a talker doormanOwner lets
 // through, and answer nothing to anyone else; while a castle doorman's
-// battlefield is active they open its busy page instead. Any other command
-// is left to the generic ones.
-//
-// ponytail: a siegable hall's siege is not run yet (#244), so its doorman
-// never reads as busy.
+// battlefield is active, or a siegable hall doorman's siege is under way,
+// they open its busy page instead. Any other command is left to the
+// generic ones.
 func (f *Folk) doormanCommand(pages Pages, kind InstanceKind, rules ChatRules, talker Talker, command string, reply BypassReply) (BypassReply, bool) {
 	r := talker.residence()
 	if kind == "ClanHallDoorman" {
@@ -242,7 +240,7 @@ func (f *Folk) doormanCommand(pages Pages, kind InstanceKind, rules ChatRules, t
 	if !doormanOwner(kind, r) {
 		return reply, true
 	}
-	if kind == "CastleDoorman" && r.HallID == 0 && r.BattlefieldActive {
+	if kind == "CastleDoorman" && (r.HallID == 0 && r.BattlefieldActive || r.HallID != 0 && r.SiegeInProgress) {
 		reply.Outcome, reply.HTML = BypassDoorsBusy, f.doormanBusyPage(pages)
 		return reply, true
 	}

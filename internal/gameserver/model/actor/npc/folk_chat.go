@@ -115,9 +115,9 @@ var folkChats = map[InstanceKind]folkChat{
 	"WyvernManagerNpc":  {dir: "merchant", pk: canShop},
 }
 
-// unportedFolkChats are the civilian types whose chat window depends on
-// state not in place yet: a siegable hall messenger's on the hall's siege
-// (#244); a castle's messenger is answered before the chat window.
+// unportedFolkChats are the civilian types whose chat window is answered
+// before it: a castle's or a siegable hall's messenger. One serving
+// neither residence opens no page.
 var unportedFolkChats = map[InstanceKind]struct{}{
 	"SiegeNpc": {},
 }

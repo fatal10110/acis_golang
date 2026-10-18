@@ -68,6 +68,9 @@ type HallStore interface {
 	LoadClanBids(ctx context.Context) ([]ClanBid, error)
 	// UpdateHall writes every column of row.
 	UpdateHall(ctx context.Context, row HallRow) error
+	// UpdateSiegableHall writes a siegable hall's owner and next siege
+	// date, the only columns its row keeps.
+	UpdateSiegableHall(ctx context.Context, hallID, ownerID int32, nextSiege int64) error
 	// UpdateEndDate writes hall hallID's auction end.
 	UpdateEndDate(ctx context.Context, hallID int32, endDate int64) error
 	// UpdateSale writes hall hallID's registered sale and auction end.
@@ -186,6 +189,22 @@ type Halls struct {
 	bank    Bank
 	notify  Notifier
 	grounds Grounds
+
+	// The hall sieges (siege.go). siegeCfg and siegeNotify are guarded by
+	// mu, storedAttackers and decrees by siegeMu; siegeStore is set once at
+	// boot (RestoreSieges), before the halls start.
+	siegeCfg        SiegeConfig
+	siegeNotify     SiegeNotifier
+	siegeStore      SiegeStore
+	storedAttackers map[int32][]int32
+	decrees         map[int32]int
+	// stepMu serializes the siege steps. siegeMu guards the sieges' state
+	// with mu (see hallSiege) and the decrees; it is a leaf lock, held
+	// while calling nothing outside the halls. fieldMu guards the sieges'
+	// battlefields and is held while one is switched or swept.
+	stepMu  sync.Mutex
+	siegeMu sync.Mutex
+	fieldMu sync.Mutex
 }
 
 // hall is one clan hall's live state.
@@ -201,6 +220,8 @@ type hall struct {
 	// auction is nil for a hall without a stored row or without a minimum
 	// bid: a siegable hall.
 	auction *auction
+	// siege is a siegable hall's siege, nil for any other hall.
+	siege *hallSiege
 }
 
 func (h *hall) id() int32 { return int32(h.data.ID) }
@@ -216,6 +237,9 @@ func NewHalls(data *hallmodel.Table, clans Clans, fns *Functions, store HallStor
 	}
 	for _, d := range data.All() {
 		h := &hall{data: d}
+		if d.IsSiegable() {
+			h.siege = &hallSiege{}
+		}
 		hs.byID[h.id()] = h
 		hs.order = append(hs.order, h)
 	}
@@ -228,8 +252,10 @@ func NewHalls(data *hallmodel.Table, clans Clans, fns *Functions, store HallStor
 // clans made, once at boot after the clans are restored and before Start.
 // A hall with a row and a minimum bid holds an auction: its stored sale
 // when the row names both the selling clan and its leader, and its bids,
-// the first one read standing highest. An owner that is not a clan leaves
-// the hall free; the id factory already freed such rows.
+// the first one read standing highest. A siegable hall's row holds its next
+// siege date; one already passed is set anew from now and stored. An owner
+// that is not a clan leaves the hall free; the id factory already freed
+// such rows.
 func (hs *Halls) Restore(ctx context.Context) error {
 	if hs == nil || hs.store == nil {
 		return nil
@@ -260,14 +286,16 @@ func (hs *Halls) Restore(ctx context.Context) error {
 			}
 			h.auction = a
 		}
-		if row.OwnerID <= 0 {
-			continue
+		if row.OwnerID > 0 {
+			if _, ok := hs.clans.Get(row.OwnerID); ok {
+				h.ownerID, h.paidUntil, h.paid = row.OwnerID, row.PaidUntil, row.Paid
+			} else {
+				hs.log.Warn().Int32("hall_id", row.ID).Int32("clan_id", row.OwnerID).Msg("clanhall: owner is no clan; the hall stays free")
+			}
 		}
-		if _, ok := hs.clans.Get(row.OwnerID); !ok {
-			hs.log.Warn().Int32("hall_id", row.ID).Int32("clan_id", row.OwnerID).Msg("clanhall: owner is no clan; the hall stays free")
-			continue
+		if h.siege != nil && h.auction == nil {
+			hs.restoreSiegeDateLocked(h, row.EndDate)
 		}
-		h.ownerID, h.paidUntil, h.paid = row.OwnerID, row.PaidUntil, row.Paid
 	}
 	for _, b := range bids {
 		h, ok := hs.byID[b.HallID]
@@ -488,12 +516,12 @@ func (hs *Halls) payFee(h *hall, gen uint64) {
 		hs.scheduleFeeLocked(h, weekMs)
 		h.paidUntil += weekMs
 		h.paid = true
-		row := hs.rowLocked(h)
-		hs.write("store clan hall", row.ID, func(ctx context.Context, st HallStore) error {
+		store := hs.rowWriteLocked(h)
+		hs.write("store clan hall", h.id(), func(ctx context.Context, st HallStore) error {
 			if err := land(ctx, paid); err != nil {
 				return fmt.Errorf("write the lease paid: %w", err)
 			}
-			return st.UpdateHall(ctx, row)
+			return store(ctx, st)
 		})
 	case h.paid:
 		hs.scheduleFeeLocked(h, dayMs)
@@ -584,13 +612,25 @@ func TaxedRefund(adena int) int {
 	return int(float64(adena) * 0.9)
 }
 
-// updateLocked stores every column of h's row, then pays credits once it
-// has landed (writeThenCredit).
+// updateLocked stores h's row, then pays credits once it has landed
+// (writeThenCredit).
 func (hs *Halls) updateLocked(h *hall, credits ...credit) {
+	hs.writeThenCredit("store clan hall", h.id(), hs.rowWriteLocked(h), credits)
+}
+
+// rowWriteLocked is the write storing h's row as it stands now: every
+// column, or a siegable hall's owner and next siege date alone.
+func (hs *Halls) rowWriteLocked(h *hall) func(context.Context, HallStore) error {
+	if h.siege != nil && h.auction == nil {
+		id, owner, next := h.id(), h.ownerID, h.siege.next
+		return func(ctx context.Context, st HallStore) error {
+			return st.UpdateSiegableHall(ctx, id, owner, next)
+		}
+	}
 	row := hs.rowLocked(h)
-	hs.writeThenCredit("store clan hall", row.ID, func(ctx context.Context, st HallStore) error {
+	return func(ctx context.Context, st HallStore) error {
 		return st.UpdateHall(ctx, row)
-	}, credits)
+	}
 }
 
 // rowLocked is h's clanhall row as it stands now.

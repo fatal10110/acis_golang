@@ -65,7 +65,8 @@ func (l *GameClientLink) DissolveDue(cl *clan.Clan) {
 }
 
 // destroyClan destroys cl (clan.Service.Destroy; due as there): the clan
-// leaves every siege it was registered on; every member in the world is
+// leaves every siege it was registered on, a siegable hall it owned freed
+// (clanhall.Halls.ForgetClan); every member in the world is
 // told the clan dispersed, then leaves it as a member who withdrew does,
 // its siege state cleared and its clan tab cleared, the leader losing its
 // siege skills; the clan warehouse's items are destroyed. An offline
@@ -89,6 +90,7 @@ func (l *GameClientLink) destroyClan(cl *clan.Clan, actor *livePlayer, due bool)
 		return
 	}
 	l.sieges.Forget(cl.ID())
+	l.halls.ForgetClan(cl)
 	l.destroyClanWarehouse(cl.ID())
 	type leaver struct {
 		live *livePlayer

@@ -100,10 +100,9 @@ func (s SpawnTimeState) CastleSiege(id int) (active, owned, ok bool) {
 
 // HallSiegeInProgress reports whether the siege of the siegable clan hall
 // id is being fought.
-//
-// ponytail: no clan hall siege runs yet (#244), so none is ever in
-// progress.
-func (SpawnTimeState) HallSiegeInProgress(int) bool { return false }
+func (s SpawnTimeState) HallSiegeInProgress(id int) bool {
+	return s.l.halls.SiegeInProgress(int32(id))
+}
 
 // DoorOpen reports whether door id stands open.
 func (s SpawnTimeState) DoorOpen(id int) bool {

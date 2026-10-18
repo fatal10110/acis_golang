@@ -31,6 +31,10 @@ func (l *GameClientLink) headquartersCheck(live *livePlayer) siege.HeadquartersR
 		Leader:               live.IsClanLeader(),
 		OnHeadquartersGround: live.zoneActor != nil && live.zoneActor.ZoneFlags().Has(zone.FlagHQ),
 		NearHeadquarters:     func() bool { return l.headquartersNear(live) },
+		HallAttacker: func() bool {
+			s, ok := l.halls.ActiveSiegeAt(x, y, z)
+			return ok && s.Registered(live.ClanID())
+		},
 	}
 	if cl, ok := l.clanService().ClanOf(live.Character); ok {
 		_, site.HasHeadquarters = cl.Headquarters()
