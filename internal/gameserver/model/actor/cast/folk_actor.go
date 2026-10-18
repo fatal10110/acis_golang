@@ -84,3 +84,6 @@ var (
 	_ SkillCaster    = (*npc.Folk)(nil)
 	_ Actor          = FolkActor{}
 )
+
+// npcCaster gives a civilian NPC's casts the NPC finish timing.
+func (FolkActor) npcCaster() {}

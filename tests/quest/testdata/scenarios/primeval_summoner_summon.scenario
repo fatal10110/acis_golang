@@ -35,7 +35,7 @@ bypass npc_{vervato}_Quest PrimevalSummoner
   S ActionFailed
   S ActionFailed
   items 57=0
-advance 1400ms
+advance 1600ms
 advance 3s
   S NpcHtmlMessage obj=vervato item=0 page=script/teleport/PrimevalSummoner/vervato004.htm
   S ActionFailed

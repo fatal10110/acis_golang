@@ -992,8 +992,19 @@ func (c *Controller) buildPlan(def modelskill.Definition) Plan {
 			plan.FinalDelay = plan.CoolTime
 		}
 	}
+	if _, ok := c.actor.(npcCaster); ok {
+		plan.FinalDelay = plan.CoolTime + npcFinishPad
+	}
 	return plan
 }
+
+// npcFinishPad is how much longer than its cool time an NPC's cast stays in
+// flight after its hit, whatever its hit and cool times.
+const npcFinishPad = 250 * time.Millisecond
+
+// npcCaster marks the NPC casters, whose cast finishes npcFinishPad past
+// its cool time after the hit.
+type npcCaster interface{ npcCaster() }
 
 // claimToggle marks an instantaneous toggle cast as in flight so the abort
 // funnel has a cast to report, and returns the sequence the release must

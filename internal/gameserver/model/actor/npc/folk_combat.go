@@ -239,6 +239,16 @@ func (f *Folk) Knows(other attackable.Combatant) bool {
 	return ok && world.Knows(f, tracked) && !attackable.HiddenActingPlayer(other)
 }
 
+// inWorld reports whether target is still registered in f's world. With no
+// world attached, nothing has left it.
+func (f *Folk) inWorld(target attackable.Combatant) bool {
+	if f.world == nil {
+		return true
+	}
+	_, ok := f.world.Object(target.ObjectID())
+	return ok
+}
+
 // SpawnProtected reports false: spawn protection is a player state.
 func (f *Folk) SpawnProtected() bool { return false }
 
