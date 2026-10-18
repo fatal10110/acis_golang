@@ -17,6 +17,8 @@ type SocialGraph interface {
 	// PartyMembers returns the characters of objectID's party, in party
 	// order, nil when it is in none.
 	PartyMembers(objectID int32) []*Character
+	// Party returns objectID's party; ok is false when it is in none.
+	Party(objectID int32) (p Party, ok bool)
 	// SameChannel reports whether b is in the command channel a's party
 	// belongs to.
 	SameChannel(a, b int32) bool
