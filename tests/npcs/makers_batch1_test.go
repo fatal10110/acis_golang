@@ -145,8 +145,8 @@ func TestCloseDoorMakerFollowsItsDoor(t *testing.T) {
 	w.srv.Advance(t, time.Millisecond)
 	world("1001 while the door is open", 0)
 	frames := drainFrames(t, w.c)
-	if got, gone := shown(frames), deleted(frames); len(got) != len(gone) {
-		t.Fatalf("1001 while the door is open: shown %v but deleted %v", got, gone)
+	if got, gone := shown(frames), deleted(frames); !slices.Equal(got, repeatID(closeDoorGuardID, 2)) || len(gone) != 2 {
+		t.Fatalf("1001 while the door is open: shown %v and deleted %v, want two guards shown and both deleted", got, gone)
 	}
 }
 

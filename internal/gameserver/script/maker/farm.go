@@ -42,30 +42,30 @@ func Farm() script.Maker {
 			spawns := e.Group.Spawns()
 			switch {
 			case strings.EqualFold(e.Name, "onSiegeStart"):
-				for i0 := 1; i0 < len(spawns)-1; i0++ {
-					fillFarmSpawn(spawns[i0])
+				for i := 1; i < len(spawns)-1; i++ {
+					fillFarmSpawn(spawns[i])
 				}
 			case strings.EqualFold(e.Name, "onFlagWarFinalEvent"):
-				for i0 := 1; i0 < len(spawns); i0++ {
-					fillFarmSpawn(spawns[i0])
+				for i := 1; i < len(spawns); i++ {
+					fillFarmSpawn(spawns[i])
 				}
 			case strings.EqualFold(e.Name, "onSiegeEnd"):
-				for i0 := 1; i0 < len(spawns); i0++ {
-					spawns[i0].DeleteNPCs()
+				for i := 1; i < len(spawns); i++ {
+					spawns[i].DeleteNPCs()
 				}
 			}
 		},
 	})}
 }
 
-// fillFarmSpawn brings def0 up to its total, an NPC out of the world back
+// fillFarmSpawn brings ms up to its total, an NPC out of the world back
 // before a new one.
-func fillFarmSpawn(def0 spawn.GroupSpawn) {
-	for range def0.Total() - def0.Spawned() {
-		if def0.Decayed() > 0 {
-			def0.Respawn()
+func fillFarmSpawn(ms spawn.GroupSpawn) {
+	for range ms.Total() - ms.Spawned() {
+		if ms.Decayed() > 0 {
+			ms.Respawn()
 		} else {
-			def0.Spawn()
+			ms.Spawn()
 		}
 	}
 }
