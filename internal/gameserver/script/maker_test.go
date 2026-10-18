@@ -58,6 +58,7 @@ func (fakeGroup) Held() bool                                   { return false }
 func (fakeGroup) Listed(string) bool                           { return false }
 func (fakeGroup) Spawns() []spawn.GroupSpawn                   { return nil }
 func (fakeGroup) DeleteAll()                                   {}
+func (fakeGroup) FindSpawn(string) spawn.GroupSpawn            { return nil }
 func (fakeGroup) SendMakerEvent(string, string, int, int) bool { return false }
 func (fakeGroup) After(time.Duration, func())                  {}
 func (fakeGroup) Every(time.Duration, func()) *sim.Ticker      { return nil }

@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/rs/zerolog"
 )
 
@@ -25,6 +26,9 @@ type Population interface {
 	DoRespawn(live npc.PartyMember)
 	DrawSpawnPoint(live npc.PartyMember) (at location.Location, heading int, ok bool)
 	SetRespawnDelay(live npc.PartyMember, d time.Duration) error
+	FindSpawn(npcID int32) spawn.Locator
+	StartSpawnTime(name string, args ...string) int
+	StopSpawnTime(name string, args ...string) int
 }
 
 // Spawner spawns NPCs for scripts. Every NPC it spawns is in the world,

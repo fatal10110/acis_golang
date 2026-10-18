@@ -8,6 +8,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/rs/zerolog"
 )
 
@@ -124,3 +125,9 @@ func (nopPopulation) DrawSpawnPoint(npc.PartyMember) (location.Location, int, bo
 }
 
 func (nopPopulation) SetRespawnDelay(npc.PartyMember, time.Duration) error { return nil }
+
+func (nopPopulation) FindSpawn(int32) spawn.Locator { return nil }
+
+func (nopPopulation) StartSpawnTime(string, ...string) int { return 0 }
+
+func (nopPopulation) StopSpawnTime(string, ...string) int { return 0 }
