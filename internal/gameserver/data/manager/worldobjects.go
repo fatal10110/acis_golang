@@ -41,6 +41,9 @@ type WorldObjects struct {
 	// set again on every door a reload builds under that id. Guarded by
 	// doorMu.
 	hpUpgrades map[int]int
+	// watchers are the watchers WatchDoor registered, by standing door.
+	// Guarded by doorMu.
+	watchers map[*door.Object]*doorWatchers
 
 	// doorMu serializes door state changes, so a flag flip or an HP change
 	// and its geodata, broadcast and timer follow-up land as one step
@@ -247,9 +250,10 @@ func (w *WorldObjects) setHPUpgrade(id, ratio int) {
 }
 
 // SetDoorOpen changes a door's open state, applies the matching geodata,
-// broadcasts the change to known observers, reschedules the door's next auto
-// open/close timer from its template's openTime/closeTime/randomTime, and
-// propagates the same state to a linked controller door (Template.TriggeredID).
+// broadcasts the change to known observers, runs the door's watchers
+// (WatchDoor), propagates the same state to a linked controller door
+// (Template.TriggeredID), and reschedules the door's next auto open/close
+// timer from its template's openTime/closeTime/randomTime.
 func (w *WorldObjects) SetDoorOpen(id int, open bool) bool {
 	w.doorMu.Lock()
 	defer w.doorMu.Unlock()
@@ -257,15 +261,18 @@ func (w *WorldObjects) SetDoorOpen(id int, open bool) bool {
 	if !ok {
 		return false
 	}
-	return w.changeDoorState(obj, open, false)
+	return w.changeDoorState(obj, open, false, inlineDoorRun())
 }
 
 // changeDoorState opens or closes obj as open says; the caller
 // holds doorMu. A broken door keeps its state. triggered is true only for a
 // cascaded change propagated from another door's Template.TriggeredID, and
 // suppresses this door's own auto-timer reschedule so the linked door's
-// cascade doesn't double-schedule it.
-func (w *WorldObjects) changeDoorState(obj *door.Object, open, triggered bool) bool {
+// cascade doesn't double-schedule it. The door's watchers run as run says,
+// after its broadcast and before the linked door changes; run inline
+// releases doorMu around them, so another change may land meanwhile, and a
+// door a reload replaced meanwhile gets no timer.
+func (w *WorldObjects) changeDoorState(obj *door.Object, open, triggered bool, run *doorRun) bool {
 	if obj.Dead() || !obj.SetOpened(open) {
 		return false
 	}
@@ -275,13 +282,16 @@ func (w *WorldObjects) changeDoorState(obj *door.Object, open, triggered bool) b
 		w.geo.AddObject(obj)
 	}
 	obj.BroadcastStatus()
+	w.watchDoorChange(obj, run)
 	if obj.Template.TriggeredID > 0 {
 		if linked, ok := w.Door(obj.Template.TriggeredID); ok {
-			w.changeDoorState(linked, open, true)
+			w.changeDoorState(linked, open, true, run)
 		}
 	}
 	if !triggered {
-		w.scheduleDoorTimer(obj)
+		if current, ok := w.Door(obj.DoorID()); ok && current == obj {
+			w.scheduleDoorTimer(obj)
+		}
 	}
 	return true
 }
@@ -295,7 +305,7 @@ func (w *WorldObjects) ToggleDoor(id int) {
 	if !ok {
 		return
 	}
-	w.changeDoorState(obj, !obj.Opened(), false)
+	w.changeDoorState(obj, !obj.Opened(), false, inlineDoorRun())
 }
 
 // ReduceDoorHP implements door.StateOwner: it takes amount off id's door HP
@@ -371,7 +381,11 @@ func (w *WorldObjects) ReviveDoor(id int, restoreHP float64) bool {
 // maximum HP; the door closes; then its HP is set to its maximum, or to
 // half of it, rounded down, when weak. Observers see each change as it
 // lands, the HP always.
+//
+// The door's watchers run once the respawn is done.
 func (w *WorldObjects) RespawnDoor(id int, restoreHP float64, weak bool) {
+	run := &doorRun{}
+	defer run.fire()
 	w.doorMu.Lock()
 	defer w.doorMu.Unlock()
 	obj, ok := w.Door(id)
@@ -379,7 +393,7 @@ func (w *WorldObjects) RespawnDoor(id int, restoreHP float64, weak bool) {
 		return
 	}
 	w.reviveDoor(obj, restoreHP)
-	w.changeDoorState(obj, false, false)
+	w.changeDoorState(obj, false, false, run)
 	hp := obj.MaxHP()
 	if weak {
 		hp /= 2
@@ -518,20 +532,25 @@ func (w *WorldObjects) newDoors(doors *door.Table) (*doorSet, error) {
 // residence siege SetDoorSiege installed and the HP upgrade UpgradeDoor set
 // under a door's id, the new door standing at its upgraded maximum HP. A door change
 // that comes in during the reload waits for it and lands on the new door.
+//
+// The watchers of an old door (WatchDoor) see it open, once the reload is
+// done; the new doors have none.
 func (w *WorldObjects) ReloadDoors(doors *door.Table) error {
+	run := &doorRun{}
+	defer run.fire()
 	w.doorMu.Lock()
 	defer w.doorMu.Unlock()
 	old := w.doors.Load().order
 	var opened []*door.Object
 	for _, obj := range old {
-		if w.changeDoorState(obj, true, false) {
+		if w.changeDoorState(obj, true, false, run) {
 			opened = append(opened, obj)
 		}
 	}
 	fresh, err := w.newDoors(doors)
 	if err != nil {
 		for _, obj := range opened {
-			w.changeDoorState(obj, false, false)
+			w.changeDoorState(obj, false, false, run)
 		}
 		return err
 	}
@@ -542,12 +561,13 @@ func (w *WorldObjects) ReloadDoors(doors *door.Table) error {
 		w.doorTimers.Cancel(obj.DoorID())
 		w.doorRegen.Cancel(obj.DoorID())
 		w.state.Despawn(obj)
+		delete(w.watchers, obj)
 	}
 	w.doors.Store(fresh)
 	for _, obj := range fresh.order {
 		pos := obj.Template.Position
 		w.state.Spawn(obj, pos.X, pos.Y, pos.Z, 0)
-		w.changeDoorState(obj, obj.Template.Opened, false)
+		w.changeDoorState(obj, obj.Template.Opened, false, run)
 	}
 	return nil
 }
