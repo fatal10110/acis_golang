@@ -15,6 +15,7 @@ func TestAttackableAIPromotesQueuedCastDesireAndCasts(t *testing.T) {
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{canAttempt: true, canCast: true, castRange: 400}
 	ai := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, ai)
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
@@ -39,6 +40,7 @@ func TestAttackableAICastStopsMovementAndFacesTargetForLongCast(t *testing.T) {
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{canAttempt: true, canCast: true, stopsMove: true}
 	ai := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, ai)
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
@@ -65,6 +67,7 @@ func TestAttackableAICastDoesNotFaceSelfTarget(t *testing.T) {
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{canAttempt: true, canCast: true, stopsMove: true}
 	ai := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, ai)
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: owner, Skill: ref, Weight: 10})
@@ -86,6 +89,7 @@ func TestAttackableAICastStartsOffensiveFollowBeforeCasting(t *testing.T) {
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{canAttempt: true, canCast: true, castRange: 400}
 	ai := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, ai)
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
@@ -131,6 +135,7 @@ func TestAttackableAICastRespectsFinalCastGate(t *testing.T) {
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{canAttempt: true, canCast: false}
 	ai := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, ai)
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
@@ -156,6 +161,7 @@ func TestAttackableRunAICastStopsMovementAndStillFacesTarget(t *testing.T) {
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{canAttempt: true, canCast: false, stopsMove: true}
 	ai := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, ai)
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
@@ -200,6 +206,7 @@ func TestAttackableAICastSummonFriendBypassesTargetLostCheck(t *testing.T) {
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{disabled: true, canAttempt: true, canCast: true, skillType: "SUMMON_FRIEND"}
 	ai := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, ai)
 	ai.SetCastController(cast)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
@@ -245,6 +252,7 @@ func TestAttackableAICastNoOpsWithoutCastController(t *testing.T) {
 	move := &recordingMove{}
 	ref := skill.Ref{ID: 4, Level: 1}
 	ai := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, ai)
 
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
 

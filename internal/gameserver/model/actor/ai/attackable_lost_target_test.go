@@ -133,6 +133,7 @@ func TestCastStepOnLostTargetChangesNothing(t *testing.T) {
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{canAttempt: true, canCast: true}
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	pastFirstCycle(t, brain)
 	brain.SetCastController(cast)
 	brain.AddHate(target, 50)
 	brain.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
@@ -265,13 +266,15 @@ func TestSelectionInsideHitAnimationKeepsAttackWhoseDesireLeft(t *testing.T) {
 // TestSelectionWithNothingPromotedTakesNoStep pins that desire selection
 // steps the current intention only through a promotion: before the first
 // periodic cycle, a cast whose desire its end dropped is neither idled nor
-// cast again by the selection that end runs.
+// cast again by the selection that end runs. The cast is taken up before
+// that cycle through a queued attack desire, which is gone by the cast end.
 func TestSelectionWithNothingPromotedTakesNoStep(t *testing.T) {
-	owner, target := actor(1), actor(2)
+	owner, target, attacker := actor(1), actor(2), actor(3)
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{canAttempt: true, canCast: true}
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
 	brain.SetCastController(cast)
+	brain.Desires().AddOrUpdate(&Desire{Kind: IntentionAttack, FinalTarget: attacker, Weight: 1})
 	brain.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
 	if err := brain.RunAI(); err != nil {
 		t.Fatalf("RunAI() error: %v", err)
@@ -280,6 +283,7 @@ func TestSelectionWithNothingPromotedTakesNoStep(t *testing.T) {
 		t.Fatalf("setup: casts = %d, want 1", cast.castCalls)
 	}
 
+	brain.Desires().Remove(IntentionAttack, attacker)
 	brain.ClearCurrentDesire()
 	if err := brain.RunAI(); err != nil {
 		t.Fatalf("RunAI() after the cast end error: %v", err)

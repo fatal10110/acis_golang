@@ -45,6 +45,7 @@ func TestScriptHoldCastDesireNeverChasesOutOfReach(t *testing.T) {
 			defs.table.Store(modelskill.NewTable([]modelskill.Definition{probeDefinition(longProbe, 200, 0)}))
 			monster, _ := srv.SpawnMovingCastingHostileNPC(t, gameservertest.MovingHostileTemplate("Monster"), home, home, defs)
 			drainUntilQuiet(t, c)
+			firstCycleOnNPCQueue(t, monster)
 
 			monster.AI().AddCastDesire(player, modelskill.Ref{ID: longProbe, Level: 1}, 1000, true, !hold)
 			if len(monster.AI().Desires().Snapshot()) != 1 {

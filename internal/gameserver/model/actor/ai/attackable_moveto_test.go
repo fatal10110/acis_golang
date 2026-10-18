@@ -16,6 +16,7 @@ func TestAttackableAIPromotesMoveToDesireAndKeepsItAtDestination(t *testing.T) {
 	owner.x, owner.y, owner.z = 100, 0, 0
 	move := &recordingMove{}
 	brain := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, brain)
 	home := location.Location{}
 
 	brain.AddMoveToDesire(home, 1_000_000)
@@ -70,6 +71,7 @@ func TestAttackableAIHoldsPromotionInsideHitAnimation(t *testing.T) {
 	move := &recordingMove{}
 	strike := &hitAnimationAttack{inHitAnimation: true}
 	brain := NewAttackable(owner, move, strike)
+	pastFirstCycle(t, brain)
 	dest := location.Location{X: 300}
 	unmoved := location.Location{X: -1, Y: -1, Z: -1}
 	move.home = unmoved
@@ -191,6 +193,7 @@ func TestAttackableAIArrivedBlockedThinkResumesMoveTo(t *testing.T) {
 	owner.x, owner.y, owner.z = 100, 0, 0
 	move := &recordingMove{}
 	brain := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, brain)
 	home := location.Location{}
 
 	brain.AddMoveToDesire(home, 1_000_000)
@@ -215,16 +218,17 @@ func TestAttackableAIArrivedBlockedThinkResumesMoveTo(t *testing.T) {
 }
 
 // TestAttackableAIArrivedKeepsMoveToWhileAttackingNow pins NpcAI.onEvtArrived:
-// an arrival short of the MOVE_TO destination drops only the desire. Desire
-// selection does not restart the finished walk, even while a swing keeps
-// dropCurrentIfUnqueued from idling it, but a THINK runs thinkMoveTo and
-// sets off for the destination again.
+// an arrival short of the MOVE_TO destination drops only the desire, while
+// a swing is in flight. A THINK runs thinkMoveTo and sets off for the
+// destination again; desire selection does not restart the finished walk:
+// on the empty queue it idles the actor.
 func TestAttackableAIArrivedKeepsMoveToWhileAttackingNow(t *testing.T) {
 	owner := actor(1)
 	owner.x, owner.y, owner.z = 100, 0, 0
 	mv := &recordingMove{}
 	atk := &recordingAttack{attackingNow: true}
 	brain := NewAttackable(owner, mv, atk)
+	pastFirstCycle(t, brain)
 	home := location.Location{}
 
 	brain.AddMoveToDesire(home, 1_000_000)
@@ -244,17 +248,21 @@ func TestAttackableAIArrivedKeepsMoveToWhileAttackingNow(t *testing.T) {
 		t.Fatalf("desires after Arrived = %d, want the MOVE_TO desire dropped", brain.Desires().Len())
 	}
 	mv.home = location.Location{X: -1, Y: -1, Z: -1}
+	if err := brain.Think(); err != nil {
+		t.Fatalf("Think() after Arrived error: %v", err)
+	}
+	if mv.home != home {
+		t.Fatalf("MoveHome after arrival Think = %#v, want %#v", mv.home, home)
+	}
+	mv.home = location.Location{X: -1, Y: -1, Z: -1}
 	if err := brain.RunAI(); err != nil {
 		t.Fatalf("RunAI() after Arrived error: %v", err)
 	}
 	if mv.home == home {
 		t.Fatal("RunAI after Arrived restarted MoveHome while attacking")
 	}
-	if err := brain.Think(); err != nil {
-		t.Fatalf("Think() after Arrived error: %v", err)
-	}
-	if mv.home != home {
-		t.Fatalf("MoveHome after arrival Think = %#v, want %#v", mv.home, home)
+	if got := brain.CurrentIntention(); got != IntentionIdle {
+		t.Fatalf("CurrentIntention() after RunAI on the empty queue = %v, want idle", got)
 	}
 }
 
@@ -273,6 +281,7 @@ func TestAttackableAIFollowArrivedSkipsSpawnHeadingAndOOTSweep(t *testing.T) {
 	owner := actor(1)
 	target := actor(2)
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	pastFirstCycle(t, ai)
 	ai.Desires().AddOrUpdate(&Desire{Kind: IntentionFollow, FinalTarget: target, Weight: 5})
 	if err := ai.RunAI(); err != nil {
 		t.Fatalf("RunAI() error: %v", err)

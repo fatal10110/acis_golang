@@ -32,6 +32,19 @@ func addAttackHate(ai *Attackable, attacker attackable.Combatant, damage, hate f
 	})
 }
 
+// pastFirstCycle runs a fresh brain's first periodic cycle on an empty
+// queue, so later event passes may take up any desire: before that cycle
+// they take up nothing unless an attack desire is queued.
+func pastFirstCycle(t *testing.T, ai *Attackable) {
+	t.Helper()
+	if n := ai.Desires().Len(); n != 0 {
+		t.Fatalf("pastFirstCycle: %d desires queued, want an empty queue", n)
+	}
+	if err := ai.TickThink(); err != nil {
+		t.Fatalf("first TickThink() error: %v", err)
+	}
+}
+
 func tickThinkIdle(ai *Attackable) error {
 	if err := ai.TickThink(); err != nil {
 		return err

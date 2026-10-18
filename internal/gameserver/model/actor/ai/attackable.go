@@ -821,9 +821,10 @@ func (a *Attackable) Think() error {
 // RunAI re-runs desire selection on an event. After the first periodic
 // cycle, an actor that is not casting, has an empty desire queue and is
 // not idle aborts everything and goes idle; otherwise it makes the
-// heaviest queued desire current and steps it. An out-of-control actor
-// does neither, and neither runs while a social's hold or a flee holds the
-// selection (selectionHeld).
+// heaviest queued desire current and steps it. Before the first periodic
+// cycle it takes up nothing unless an ATTACK desire is queued. An
+// out-of-control actor does neither, and neither runs while a social's hold
+// or a flee holds the selection (selectionHeld).
 func (a *Attackable) RunAI() error {
 	return a.think(thinkEvent)
 }
@@ -842,6 +843,8 @@ func (a *Attackable) TickThink() error {
 // stepped a busy intention; one left idle, whether it was idle already or
 // the selection's empty-queue idle idled it, runs the idle step again, so
 // the no-desire point opens once more, and queues no idle follow or wander.
+// Before the first periodic cycle the selection takes up nothing unless an
+// ATTACK desire is queued, and the think steps the current intention.
 // An out-of-control actor selects nothing and takes that think as a
 // continue pass: a confused actor keeps swinging at its current target
 // while a stunned one does nothing.
@@ -861,16 +864,6 @@ func (a *Attackable) ClearCurrentDesire() {
 func (a *Attackable) castingNow() bool {
 	cast := a.CastController()
 	return cast != nil && cast.CastingNow()
-}
-
-func (a *Attackable) canPromote(updateTick bool, instantRun bool) bool {
-	if a.castingNow() {
-		return false
-	}
-	if !updateTick {
-		return true
-	}
-	return a.lifeTime.Load() > 0 || instantRun
 }
 
 func (a *Attackable) think(mode thinkMode) error {
@@ -912,7 +905,12 @@ func (a *Attackable) think(mode thinkMode) error {
 	// starts. Selection never idles an intention whose desire left the
 	// queue: only the empty-queue idle and a promotion change it.
 	busy := a.current.kind != IntentionIdle
-	canPromote := a.canPromote(updateTick, instantRun)
+	notCasting := !a.castingNow()
+	// canSelect is the first-cycle gate on every selection pass, on an event
+	// as on the periodic cycle: nothing is taken up before the first cycle
+	// has run unless an ATTACK desire was queued as the pass started. It is
+	// read before the cycle counts itself.
+	canSelect := a.lifeTime.Load() > 0 || instantRun
 	// idleAfterLatch is the periodic cycle's empty-queue idle deferred past
 	// a latched attack: the latched step runs first and the idle then
 	// aborts it, as the cycle's idle does not wait for the latch.
@@ -963,20 +961,22 @@ func (a *Attackable) think(mode thinkMode) error {
 			a.cycleIdle()
 			a.topDesireTarget = nil
 		}
-		if mode == thinkAttackFinished && canPromote {
+		if mode == thinkAttackFinished && notCasting {
 			return a.continueCurrent(idleAtStart)
 		}
 		return nil
 	}
 	if mode == thinkContinue {
-		if !canPromote {
+		if !notCasting {
 			return nil
 		}
 		return a.continueCurrent(idleAtStart)
 	}
 	var err error
-	if canPromote && !held {
-		err = a.promoteAndStep(mode)
+	if notCasting && !held {
+		// Before the first cycle the selection takes up nothing; a finished
+		// swing's own think still steps the current intention.
+		err = a.promoteAndStep(mode, canSelect)
 	}
 	if idleAfterLatch {
 		if _, ok := a.desires.Peek(); !ok && !a.castingNow() {
@@ -1079,10 +1079,12 @@ func (a *Attackable) continueCurrent(wasIdle bool) error {
 
 // promoteAndStep promotes the next desire and runs one step of the current
 // intention. A lost attack or cast target ends the step; the pass does not
-// re-select. With nothing promoted (see promoteNext), the current intention
-// takes no step, except on a finished swing, whose own think steps it.
-func (a *Attackable) promoteAndStep(mode thinkMode) error {
-	promoted := a.promoteNext()
+// re-select. With nothing promoted (see promoteNext), or selection closed
+// (canSelect false) before the first periodic cycle, the current intention
+// takes no step, except on a finished swing, whose own think steps it; that
+// think has no route-walk step.
+func (a *Attackable) promoteAndStep(mode thinkMode, canSelect bool) error {
+	promoted := canSelect && a.promoteNext()
 	if !promoted && mode != thinkAttackFinished {
 		return nil
 	}
@@ -1129,6 +1131,9 @@ func (a *Attackable) promoteAndStep(mode thinkMode) error {
 		a.thinkMoveTo()
 		a.lastDesire = IntentionMoveTo
 	case IntentionMoveRoute:
+		if !promoted {
+			return nil
+		}
 		a.thinkMoveRoute()
 		a.lastDesire = IntentionMoveRoute
 	case IntentionPickUp:

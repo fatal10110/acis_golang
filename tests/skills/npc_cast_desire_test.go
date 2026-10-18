@@ -43,11 +43,24 @@ func bootNPCDesireCasterWith(t *testing.T, magic bool) (*gameservertest.Server, 
 		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 8, CollisionHeight: 20,
 	}, defs)
 	drainUntilQuiet(t, srv.Client)
+	firstCycleOnNPCQueue(t, hostile)
 	hostile.AI().Desires().AddOrUpdate(&ai.Desire{
 		Kind: ai.IntentionCast, FinalTarget: hostile, Skill: npcDesiredRef,
 		Weight: 1_000_000, QueuedAt: hostile.Now(),
 	})
 	return srv, hostile
+}
+
+// firstCycleOnNPCQueue runs the monster's first periodic AI cycle on its
+// queue: before it, an event's desire selection takes up nothing but an
+// attack.
+func firstCycleOnNPCQueue(t *testing.T, hostile *npc.Hostile) {
+	t.Helper()
+	onNPCQueue(t, hostile, func() {
+		if err := hostile.TickThink(); err != nil {
+			t.Errorf("first TickThink() error: %v", err)
+		}
+	})
 }
 
 // thinkOnNPCQueue runs one event-driven AI step on the monster's queue.
@@ -115,13 +128,8 @@ func TestCompletedNPCCastDropsItsCastDesire(t *testing.T) {
 	srv, hostile := bootNPCDesireCaster(t)
 	c := srv.Client
 
-	// One periodic cycle first: before it, the cast end's selection has no
-	// empty-queue idle and the finished cast stays the intention.
-	onNPCQueue(t, hostile, func() {
-		if err := hostile.TickThink(); err != nil {
-			t.Errorf("TickThink() error: %v", err)
-		}
-	})
+	// The boot ran one periodic cycle: before it, the cast end's selection
+	// has no empty-queue idle and the finished cast stays the intention.
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
 		t.Fatalf("CurrentIntention() after the first cycle = %v, want %v", got, ai.IntentionIdle)
 	}

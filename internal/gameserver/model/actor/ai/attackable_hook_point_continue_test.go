@@ -85,6 +85,7 @@ func TestHookPointContinueOnBusyIntentionOpensNoPoint(t *testing.T) {
 	owner := actor(1)
 	owner.x = 100
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	pastFirstCycle(t, brain)
 	brain.AddMoveToDesire(location.Location{X: 300}, 1_000)
 	if err := brain.RunAI(); err != nil {
 		t.Fatalf("RunAI() error: %v", err)
