@@ -462,3 +462,27 @@ func TestExchangeCountsUnitsMergedIntoAStack(t *testing.T) {
 		t.Fatalf("ids taken = %d, want 1", ids.next-900)
 	}
 }
+
+// TestExchangeMoveTakesALateIDWhenTheCountFellShort pins the backstop for a
+// miscounted split: a splitting row finding no id left takes one late
+// instead of failing after earlier rows landed.
+func TestExchangeMoveTakesALateIDWhenTheCountFellShort(t *testing.T) {
+	templates := testTemplates()
+	a := itemcontainer.NewPlayerInventory(1, templates)
+	b := itemcontainer.NewPlayerInventory(2, templates)
+	adena := a.AddNew(item.AdenaID, 100, 500)
+	svc := NewService(&testIDs{next: 900})
+
+	var res Result
+	moved := false
+	itemcontainer.Exchange(a, b, func(heldA, heldB itemcontainer.Held) {
+		ids := exchangeIDs{s: svc}
+		moved = moveAll(&res, heldA, heldB, a.OwnerID(), []Move{{ObjectID: adena.ObjectID, Count: 40}}, &ids)
+	})
+	if !moved {
+		t.Fatal("the splitting row failed without its id")
+	}
+	if got := b.ItemByTemplateID(item.AdenaID); got == nil || got.ObjectID != 901 || got.CountValue() != 40 {
+		t.Fatalf("b adena = %+v, want 40 under the late id 901", got)
+	}
+}

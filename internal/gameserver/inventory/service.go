@@ -500,12 +500,25 @@ func (s *Service) takeExchangeIDs(n int) (exchangeIDs, error) {
 }
 
 // peek is the id the next splitting row takes, or 0 when none is left; a
-// row given 0 that has to split fails without changing anything.
+// row given 0 that has to split fails without changing anything, and is
+// retried with a late id.
 func (ids *exchangeIDs) peek() int32 {
 	if len(ids.pool) == 0 {
 		return 0
 	}
 	return ids.pool[0]
+}
+
+// late takes one more id after the count fell short, reporting whether it
+// got one, so a miscount costs a late allocation instead of an exchange
+// stranded halfway.
+func (ids *exchangeIDs) late() bool {
+	id, ok, err := ids.s.nextID()
+	if err != nil || !ok {
+		return false
+	}
+	ids.pool = append(ids.pool, id)
+	return true
 }
 
 // use marks the id peek returned as spent.
@@ -636,6 +649,9 @@ func splitsAhead(a, b itemcontainer.Held, aOut, bOut []Move) int {
 func moveAll(res *Result, source, receiver itemcontainer.Held, sourceOwnerID int32, rows []Move, ids *exchangeIDs) bool {
 	for _, row := range rows {
 		m, ok := source.Transfer(row.ObjectID, row.Count, receiver, ids.peek())
+		if !ok && ids.peek() == 0 && ids.late() {
+			m, ok = source.Transfer(row.ObjectID, row.Count, receiver, ids.peek())
+		}
 		if !ok {
 			return false
 		}
