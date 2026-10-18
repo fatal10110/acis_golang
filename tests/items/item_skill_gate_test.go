@@ -372,6 +372,10 @@ func TestUseItemCtrlForcesItemSkillTarget(t *testing.T) {
 		if caster != objID || target != hostile.ObjectID() || skillID != 2236 {
 			t.Fatalf("%s MagicSkillUse = caster %d target %d skill %d, want %d/%d/2236", what, caster, target, skillID, objID, hostile.ObjectID())
 		}
+		// The cast's later phases run on timers even with no hit time;
+		// on the wall clock they can still be pending here, and the
+		// frames they send would land after the drain.
+		srv.AdvanceUntil(t, what+" cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 		drainUntilQuiet(t, c)
 	}
 	c.Send(encodeUseItem(key, true))

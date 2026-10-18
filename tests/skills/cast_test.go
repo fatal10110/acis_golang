@@ -197,6 +197,9 @@ func TestWalkingReuseRejectionDoesNotStopMovement(t *testing.T) {
 	assertCasterMPStatus(t, srv, c.Read(), objID, 28)
 	readCastStartFrames(t, c, objID, 3, 1, 500, 60_000, objID)
 	assertCasterMPStatus(t, srv, c.Read(), objID, 25)
+	// The cast ends after its MP charge; a walk sent before then waits
+	// for the cast's end instead of starting.
+	srv.AdvanceUntil(t, "first cast end", func() bool { return !srv.PlayerCastingNow(t, objID) })
 	drainUntilQuiet(t, c)
 
 	c.Send(encodeMoveBackwardToLocation(80, 70, 30))
