@@ -326,14 +326,14 @@ func npcKindOf(templates *npc.Table) func(int32) (script.NPCKind, bool) {
 func buildScripts(*script.Registry) {}
 
 // provideMakers returns the maker registry: every npcmaker runs the maker
-// of its type, the default maker when its type has none, and reads the
-// time of day from the game clock.
-func provideMakers(clock *task.GameClock, log zerolog.Logger) (*script.Makers, error) {
+// of its type, the default maker when its type has none, reads the time of
+// day from the game clock, and finds the castles and their sieges.
+func provideMakers(clock *task.GameClock, castles *castle.Manager, sieges *siege.Engine, log zerolog.Logger) (*script.Makers, error) {
 	makers, err := makerCatalog(makerCatalogs())
 	if err != nil {
 		return nil, err
 	}
-	return script.NewMakers(makers, maker.Default, clock.IsNight, log), nil
+	return script.NewMakers(makers, maker.Default, script.MakerWorld{Night: clock.IsNight, Castles: castles, Sieges: sieges}, log), nil
 }
 
 // makerCatalogs are the maker catalogs: the makers ported with the engine,

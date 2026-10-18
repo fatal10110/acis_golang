@@ -79,7 +79,7 @@ func TestMakersNewPerNpcmakerWithFallback(t *testing.T) {
 			}}}
 		}
 	}
-	r := NewMakers(MakerCatalog{"event_maker": ctor("event")}, ctor("default"), func() bool { return false }, zerolog.Nop())
+	r := NewMakers(MakerCatalog{"event_maker": ctor("event")}, ctor("default"), MakerWorld{Night: func() bool { return false }}, zerolog.Nop())
 	if !r.Registered("event_maker") || r.Registered("random_spawn") {
 		t.Fatal("Registered disagrees with the catalog")
 	}

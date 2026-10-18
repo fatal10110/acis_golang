@@ -8,5 +8,5 @@ import (
 
 // testMakers is the production maker registry.
 func testMakers() MakerBehaviors {
-	return script.NewMakers(maker.Catalog(), maker.Default, func() bool { return false }, zerolog.Nop())
+	return script.NewMakers(maker.Catalog(), maker.Default, script.MakerWorld{Night: func() bool { return false }}, zerolog.Nop())
 }
