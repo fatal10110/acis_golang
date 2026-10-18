@@ -487,6 +487,16 @@ class-change quest of X1), the tutorial and newbie helper, four features, two te
 six tasks, three makers and the behavior spine. The API freezes when the census of every
 engine call made by the 857 scripts has no unmapped row.
 
+Owner decision (2026-10-19): rows whose only callers are siegable-hall classes are exempt
+from the freeze and marked `exempt` in `apimap.txt`. They are the siegable-hall scripts and
+behaviors of #3502, the AgitWarrior subtree (#193) and the quests Q504 and Q655 (#184).
+These classes cannot run before the hall siege runtime (#244, M12), so the 64 rows left at
+the decision (siegable hall, clan hall, hall siege, clan, residence and siege-zone calls)
+get their Go names in the hall port. That port is the one place after the freeze that may
+add to the script-facing API, and only for those rows. Every other class must not make an
+exempt call: `TestCommittedGoldensAreConsistent` checks it. The AgitWarrior subtree
+(`Npc.getClanId`) therefore waits for the hall port, like Q504 and Q655.
+
 ### M10: content (about 165–175 PRs)
 
 - Quests are independent and never on the critical path: about 8 plain quests per PR; the 30

@@ -10,7 +10,11 @@ V1 and the proof batch). It holds:
   the Go name `apimap.txt` gives it.
 - `apimap.txt`: the hand-kept Go name of each census row. It starts empty; a slice that
   builds the Go call for a row adds the row. The script-facing API is frozen when the
-  census has no unmapped row.
+  census has no unmapped row. A row marked `exempt` does not count: the freeze leaves it
+  out because only siegable-hall classes make it (`ExemptCaller`: the siegable-hall
+  scripts and behaviors, the AgitWarrior subtree, Q504 and Q655). The hall port (#3502,
+  with the hall siege runtime of #244) gives those rows their Go names.
+  `TestCommittedGoldensAreConsistent` fails when any other class makes an exempt call.
 - `Check`: compares a Go script package with the fingerprints of the classes it ports.
 
 Fingerprints are read from source text. Nothing is compiled or run.
@@ -74,11 +78,12 @@ shapes.
 ## census.golden
 
 ```
-classes <n> sites <n> rows <n> mapped <n> inline <n> unmapped <n> unresolved <n>
-call <row> classes <n> sites <n> go <Go name>|inline|-
+classes <n> sites <n> rows <n> mapped <n> inline <n> exempt <n> unmapped <n> unresolved <n>
+call <row> classes <n> sites <n> go <Go name>|inline|exempt|-
 ```
 
-`-` marks an unmapped row; `?.` rows are the calls the extractor could not resolve.
+`-` marks an unmapped row; `exempt` a row the freeze leaves out (`Check` reports it as a
+problem for a package that ports a class making it); `?.` rows are the calls the extractor could not resolve.
 
 ## Check
 
