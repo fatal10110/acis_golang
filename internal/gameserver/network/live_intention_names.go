@@ -3,8 +3,8 @@ package network
 // intentionNames names p's current and next intentions as a game master's
 // character page shows them, IDLE for none. The current one is read from
 // the slot that holds it: the cast in flight or its approach, the attack,
-// a pickup, an interact walk, a friendly follow, a walk to a point or an
-// equip toggle. The next one is whatever is queued behind it: a queued
+// a pickup, an interact walk, a friendly follow, a walk to a point, an
+// equip toggle, or a sit or stand request under way. The next one is whatever is queued behind it: a queued
 // pickup, cast, follow, equip toggle, interact or other request held behind
 // a swing, cast or posture change runs ahead of a queued attack when the
 // swing or cast ends, so it is named first.
@@ -27,6 +27,10 @@ func (p *livePlayer) intentionNames() (current, next string) {
 			current = "MOVE_TO"
 		case heldUseItem:
 			current = "USE_ITEM"
+		case heldSit:
+			current = "SIT"
+		case heldStand:
+			current = "STAND"
 		}
 	}
 
