@@ -46,12 +46,6 @@ func conditionOf(c Creature) conditions.Actor {
 // hpRatio returns c's current HP over its max HP; a creature with no HP
 // reports 0.
 func hpRatio(c Creature) float64 {
-	if f, ok := tracked(c).(*npc.Folk); ok {
-		if maxHP := f.MaxHPValue(); maxHP > 0 {
-			return f.HP() / maxHP
-		}
-		return 0
-	}
 	if a := conditionOf(c); a != nil {
 		return a.HPRatio()
 	}

@@ -38,10 +38,17 @@ func (f *Folk) statCalc(s stat.Stat) *effect.Calculator {
 }
 
 // CalcStat finalizes base for s through the NPC's builtin funcs, template
-// passives and the funcs of the effects it holds, flooring a non-positive
-// stat that can't go negative at one.
+// passives and the funcs of the effects it holds, against no target and no
+// skill.
 func (f *Folk) CalcStat(s stat.Stat, base float64) float64 {
-	value := f.statCalc(s).Calc(templateStatActor{t: f.Instance.Template}, base, nil, nil)
+	return f.calcFor(s, base, nil, nil)
+}
+
+// calcFor is CalcStat for a calculation against target run for skill: a
+// conditional func tests f against them. A non-positive stat that can't go
+// negative is floored at one.
+func (f *Folk) calcFor(s stat.Stat, base float64, target conditions.Actor, skill conditions.Skill) float64 {
+	value := f.statCalc(s).Calc(f.statActor(), base, target, skill)
 	if s.CantBeNegative() && value <= 0 {
 		return 1
 	}
@@ -155,35 +162,25 @@ func (f *Folk) WIT() int { return f.Instance.Template.WIT }
 func (f *Folk) MEN() int { return f.Instance.Template.MEN }
 
 // PAtk returns the physical attack, truncated to a whole number.
-func (f *Folk) PAtk() float64 {
-	return math.Trunc(f.CalcStat(stat.PowerAttack, f.Instance.Template.PAtk))
-}
+func (f *Folk) PAtk() float64 { return folkSkillStats{f: f}.PAtk() }
 
 // PDef returns the physical defence, truncated to a whole number.
-func (f *Folk) PDef() float64 {
-	return math.Trunc(f.CalcStat(stat.PowerDefence, f.Instance.Template.PDef))
-}
+func (f *Folk) PDef() float64 { return folkSkillStats{f: f}.PDef() }
 
 // MAtk returns the magic attack, truncated to a whole number.
-func (f *Folk) MAtk() float64 {
-	return math.Trunc(f.CalcStat(stat.MagicAttack, positiveStat(f.Instance.Template.MAtk)))
-}
+func (f *Folk) MAtk() float64 { return folkSkillStats{f: f}.MAtk() }
 
 // MDef returns the magic defence, truncated to a whole number.
-func (f *Folk) MDef() float64 {
-	return math.Trunc(f.CalcStat(stat.MagicDefence, positiveStat(f.Instance.Template.MDef)))
-}
+func (f *Folk) MDef() float64 { return folkSkillStats{f: f}.MDef() }
 
 // CriticalRate returns the physical critical rate, capped at 500.
-func (f *Folk) CriticalRate() float64 {
-	return float64(min(int(f.CalcStat(stat.CriticalRate, f.Instance.Template.CritRate)), 500))
-}
+func (f *Folk) CriticalRate() float64 { return folkSkillStats{f: f}.CriticalRate() }
 
 // MagicCriticalRate returns the magic critical rate.
-func (f *Folk) MagicCriticalRate() float64 { return f.CalcStat(stat.MCriticalRate, 8) }
+func (f *Folk) MagicCriticalRate() float64 { return folkSkillStats{f: f}.MagicCriticalRate() }
 
 // Evasion returns the physical evasion.
-func (f *Folk) Evasion() int { return int(f.CalcStat(stat.EvasionRate, 0)) }
+func (f *Folk) Evasion() int { return folkSkillStats{f: f}.Evasion() }
 
 // AttackType returns the kind of the template's right-hand weapon, a fist
 // when it holds none.
@@ -284,7 +281,48 @@ func (f *Folk) refreshMoveSpeed() {
 }
 
 // Against is f's stats read for a calculation against target run for
-// skill. f's stat funcs test their conditions against its template, which
-// presents no condition view, so no conditional func applies whatever the
-// calculation runs against: f's stats read the same for every one.
-func (f *Folk) Against(conditions.Actor, conditions.Skill) creature.SkillStats { return f }
+// skill: a conditional func of f's tests them.
+func (f *Folk) Against(target conditions.Actor, skill conditions.Skill) creature.SkillStats {
+	return folkSkillStats{f: f, target: target, skill: skill}
+}
+
+// folkSkillStats is a civilian NPC's stats read against one target and
+// skill (none for its plain stats).
+type folkSkillStats struct {
+	f      *Folk
+	target conditions.Actor
+	skill  conditions.Skill
+}
+
+func (s folkSkillStats) CalcStat(st stat.Stat, base float64) float64 {
+	return s.f.calcFor(st, base, s.target, s.skill)
+}
+
+func (s folkSkillStats) PAtk() float64 {
+	return math.Trunc(s.f.calcFor(stat.PowerAttack, s.f.Instance.Template.PAtk, s.target, nil))
+}
+
+func (s folkSkillStats) PDef() float64 {
+	return math.Trunc(s.f.calcFor(stat.PowerDefence, s.f.Instance.Template.PDef, s.target, nil))
+}
+
+func (s folkSkillStats) MAtk() float64 {
+	return math.Trunc(s.f.calcFor(stat.MagicAttack, positiveStat(s.f.Instance.Template.MAtk), s.target, s.skill))
+}
+
+func (s folkSkillStats) MDef() float64 {
+	return math.Trunc(s.f.calcFor(stat.MagicDefence, positiveStat(s.f.Instance.Template.MDef), s.target, s.skill))
+}
+
+func (s folkSkillStats) Evasion() int {
+	return int(s.f.calcFor(stat.EvasionRate, 0, s.target, nil))
+}
+
+// CriticalRate is the physical critical rate, capped at 500.
+func (s folkSkillStats) CriticalRate() float64 {
+	return float64(min(int(s.f.calcFor(stat.CriticalRate, s.f.Instance.Template.CritRate, s.target, nil)), 500))
+}
+
+func (s folkSkillStats) MagicCriticalRate() float64 {
+	return s.f.calcFor(stat.MCriticalRate, 8, s.target, s.skill)
+}

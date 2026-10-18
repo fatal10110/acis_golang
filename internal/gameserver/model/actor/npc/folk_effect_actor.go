@@ -111,7 +111,7 @@ func (f *Folk) SkillReflectInput(def modelskill.Definition) formulas.SkillReflec
 		CanBeReflected: def.CanBeReflected,
 		Magic:          def.Magic,
 		CastRange:      def.CastRange,
-		ReflectChance:  f.CalcStat(reflectStat, 0),
+		ReflectChance:  f.calcFor(reflectStat, 0, nil, conditions.SkillOf(def.Stat)),
 	}
 }
 
@@ -130,7 +130,8 @@ func (f *Folk) RaceMultiplier(attacker creature.FormulaActor) float64 {
 	if !ok {
 		return 1
 	}
-	return 1 + ((attacker.Against(conditions.ActorOf(f), nil).CalcStat(atk, 1) - f.CalcStat(res, 1)) / 100)
+	self := f.ConditionActor()
+	return 1 + ((attacker.Against(self, nil).CalcStat(atk, 1) - f.calcFor(res, 1, self, nil)) / 100)
 }
 
 // PhysicalSkillInput resolves a physical skill's damage against the NPC.
@@ -154,7 +155,9 @@ func (f *Folk) ManaDamageInput(caster creature.FormulaActor, def modelskill.Defi
 }
 
 // CounterSkillPhysical returns the NPC's physical skill counter rate.
-func (f *Folk) CounterSkillPhysical() float64 { return f.CalcStat(stat.CounterSkillPhysical, 0) }
+func (f *Folk) CounterSkillPhysical() float64 {
+	return f.calcFor(stat.CounterSkillPhysical, 0, f.ConditionActor(), nil)
+}
 
 // LethalInput resolves a lethal-strike roll against the NPC.
 func (f *Folk) LethalInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.LethalInput, bool) {
@@ -167,7 +170,7 @@ func (f *Folk) LethalInput(caster creature.FormulaActor, def modelskill.Definiti
 		MagicLevel:    def.MagicLevel,
 		AttackerLevel: caster.Level(),
 		TargetLevel:   f.Level(),
-		LethalMul:     caster.Against(conditions.ActorOf(f), nil).CalcStat(stat.LethalRate, 1),
+		LethalMul:     caster.Against(f.ConditionActor(), nil).CalcStat(stat.LethalRate, 1),
 	}, true
 }
 
