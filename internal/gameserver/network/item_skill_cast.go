@@ -181,12 +181,16 @@ func (l *GameClientLink) beginItemAICast(live *livePlayer, inv *itemcontainer.In
 			ResolveTarget:  l.resolveMagicSkillTarget,
 			StopMovement:   l.stopMovementForCast(live),
 			ConsumeCarrier: consumeCarrier,
+			AfterCanCast:   l.siegeCastAfterCanCast(live, def, func() skilltarget.Actor { return l.skillFinalTarget(live, selected, def) }),
 		},
 	})
 	if err != nil {
 		if carrierLost {
 			sendItemConsumeFailure(live)
 			return nil, false, true
+		}
+		if errors.Is(err, errSiegeCastRefused) {
+			return nil, true, false
 		}
 		// A nextActionAttack skill refused at its cost and condition checks
 		// still hands on to the attack, after the refusal's own packets.

@@ -19,6 +19,8 @@ const (
 	SystemMessageCannotResMaster                   = 1514
 	SystemMessageCannotResPet2                     = 1515
 	SystemMessageCannotBeResurrectedDuringSiege    = 1053
+	SystemMessageNoResurrectionWithoutBaseCamp     = 716
+	SystemMessageTowerDestroyedNoResurrection      = 717
 	SystemMessageDeathPenaltyLifted                = 1917
 	SystemMessageUseS1                             = 46
 	SystemMessageS1PreparedForReuse                = 48
