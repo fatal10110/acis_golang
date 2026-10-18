@@ -41,10 +41,10 @@ type FormulaActor interface {
 	BlessedSpiritshotCharged() bool
 
 	CalcStat(stat.Stat, float64) float64
-	// ForSkill is this actor's stats read for a calculation run for skill:
-	// a stat func whose own condition tests the skill under calculation
-	// sees it.
-	ForSkill(skill conditions.Skill) SkillStats
+	// Against is this actor's stats read for a calculation against target
+	// run for skill (either nil for none): a stat func whose own condition
+	// tests the calculation's target or skill sees them.
+	Against(target conditions.Actor, skill conditions.Skill) SkillStats
 	RandomDamageSpread() int
 	Roll(int) int
 
@@ -63,19 +63,25 @@ type FormulaActor interface {
 	RaceMultiplier(attacker FormulaActor) float64
 	// Evasion is the physical evasion stat.
 	Evasion() int
-
-	// LethalRate multiplies the lethal-strike chances of this actor's skills.
-	LethalRate() float64
 }
 
 // SkillStats is the part of an actor's stat surface a formula reads for a
-// calculation run for one skill (see FormulaActor.ForSkill).
+// calculation against one target run for one skill (see
+// FormulaActor.Against). PAtk, PDef, Evasion and CriticalRate are always
+// calculated for no skill.
 type SkillStats interface {
 	CalcStat(stat.Stat, float64) float64
+	PAtk() float64
+	PDef() float64
 	MAtk() float64
 	MDef() float64
+	Evasion() int
+	CriticalRate() float64
 	MagicCriticalRate() float64
 }
+
+// view is a's condition view, nil for a nil a or one without one.
+func view(a any) conditions.Actor { return conditions.ActorOf(a) }
 
 // damageBlocked reports whether attacker lacks permission to deal damage.
 // A blocked attacker's physical-skill and magic-damage inputs still resolve
@@ -122,7 +128,7 @@ func ResolvePhysicalSkillInput(attacker, target FormulaActor, def modelskill.Def
 		return formulas.PhysicalSkillInput{}, false
 	}
 	soulshot := attacker.SoulshotCharged()
-	if attacker.AttackType() != item.WeaponFist && attacker.AttackType() != item.WeaponBow && float64(target.Roll(100)) < target.ForSkill(calcSkill(def)).CalcStat(stat.PSkillEvasion, 0) {
+	if attacker.AttackType() != item.WeaponFist && attacker.AttackType() != item.WeaponBow && float64(target.Roll(100)) < target.Against(nil, calcSkill(def)).CalcStat(stat.PSkillEvasion, 0) {
 		return formulas.PhysicalSkillInput{Evaded: true}, true
 	}
 	skillPower := casterSkillPower(attacker, def)
@@ -135,12 +141,12 @@ func ResolvePhysicalSkillInput(attacker, target FormulaActor, def modelskill.Def
 	}
 	crit := PhysicalSkillCrit(attacker, def)
 	shield := target.ShieldDefense(attacker, def, crit)
-	defence := target.PDef()
+	defence := target.Against(view(attacker), nil).PDef()
 	if shield == formulas.ShieldSuccess {
 		defence += target.CalcStat(stat.ShieldDefence, 0)
 	}
 	return formulas.PhysicalSkillInput{
-		AttackPower:   attacker.PAtk(),
+		AttackPower:   attacker.Against(view(target), nil).PAtk(),
 		SkillPower:    skillPower,
 		Defence:       defence,
 		Shield:        shield,
@@ -163,7 +169,7 @@ func ResolvePhysicalAttackInput(attacker, target FormulaActor, crit bool) (formu
 		return formulas.PhysicalAttackInput{}, formulas.ShieldFailed
 	}
 	shield := target.ShieldDefense(attacker, modelskill.Definition{}, crit)
-	defence := target.PDef()
+	defence := target.Against(view(attacker), nil).PDef()
 	if shield == formulas.ShieldSuccess {
 		defence += target.CalcStat(stat.ShieldDefence, 0)
 	}
@@ -171,8 +177,9 @@ func ResolvePhysicalAttackInput(attacker, target FormulaActor, crit bool) (formu
 	if Playable(attacker) && Playable(target) {
 		pvpMul = attacker.CalcStat(stat.PvPPhysicalDmg, 1)
 	}
+	versus := attacker.Against(view(target), nil)
 	in := formulas.PhysicalAttackInput{
-		AttackPower:   attacker.PAtk(),
+		AttackPower:   versus.PAtk(),
 		Defence:       defence,
 		Crit:          crit,
 		SoulShot:      attacker.SoulshotCharged(),
@@ -184,10 +191,10 @@ func ResolvePhysicalAttackInput(attacker, target FormulaActor, crit bool) (formu
 		PvPMul:        pvpMul,
 	}
 	if crit {
-		in.CritDamageMul = attacker.CalcStat(stat.CriticalDamage, 1)
-		in.CritDamagePosMul = attacker.CalcStat(stat.CriticalDamagePos, 1)
-		in.CritVulnMul = target.CalcStat(stat.CritVuln, 1)
-		in.CritDamageAddBase = attacker.CalcStat(stat.CriticalDamageAdd, 0)
+		in.CritDamageMul = versus.CalcStat(stat.CriticalDamage, 1)
+		in.CritDamagePosMul = versus.CalcStat(stat.CriticalDamagePos, 1)
+		in.CritVulnMul = target.Against(view(target), nil).CalcStat(stat.CritVuln, 1)
+		in.CritDamageAddBase = versus.CalcStat(stat.CriticalDamageAdd, 0)
 	}
 	return in, shield
 }
@@ -221,17 +228,18 @@ func ResolveMagicDamageInput(attacker, target FormulaActor, def modelskill.Defin
 	// triple the shield rate.
 	shield := target.ShieldDefense(attacker, def, false)
 	sk := calcSkill(def)
-	mDef := target.ForSkill(sk).MDef()
+	mDef := target.Against(view(attacker), sk).MDef()
 	if shield == formulas.ShieldSuccess {
 		mDef += target.CalcStat(stat.ShieldDefence, 0)
 	}
+	versus := attacker.Against(view(target), sk)
 	in := formulas.MagicDamageInput{
-		MAtk:            attacker.ForSkill(sk).MAtk(),
+		MAtk:            versus.MAtk(),
 		MDef:            mDef,
 		SkillPower:      casterSkillPower(attacker, def),
 		PvPMul:          MagicPvPMul(attacker, def, pvp),
 		ElementalMul:    ElementalSkillModifier(target, def),
-		MagicCrit:       formulas.MCritSucceeds(int(attacker.ForSkill(sk).MagicCriticalRate()), attacker.Roll(1000)),
+		MagicCrit:       formulas.MCritSucceeds(int(versus.MagicCriticalRate()), attacker.Roll(1000)),
 		SoulShot:        sps,
 		BlessedSoulShot: bsps,
 		Shield:          shield,
@@ -284,13 +292,13 @@ func ResolveBlowInput(attacker, target FormulaActor, def modelskill.Definition, 
 	landed := formulas.BlowSucceeds(formulas.BlowRateInput{
 		BaseRate: float64(def.BaseLandRate),
 		DexMul:   statbonus.DEXBonus[attacker.DEX()],
-		BlowMul:  attacker.CalcStat(stat.BlowRate, 1),
+		BlowMul:  attacker.Against(view(target), nil).CalcStat(stat.BlowRate, 1),
 		Behind:   behind,
 		Front:    front,
 		Backstab: def.ID == 30,
 	}, attacker.Roll(1000))
 	sk := calcSkill(def)
-	if landed && !def.Magic && float64(target.Roll(100)) < target.ForSkill(sk).CalcStat(stat.PSkillEvasion, 0) {
+	if landed && !def.Magic && float64(target.Roll(100)) < target.Against(nil, sk).CalcStat(stat.PSkillEvasion, 0) {
 		return formulas.BlowInput{Landed: true, Evaded: true}, true
 	}
 	crit := landed && PhysicalSkillCrit(attacker, def)
@@ -298,12 +306,13 @@ func ResolveBlowInput(attacker, target FormulaActor, def modelskill.Definition, 
 	if landed && !def.IgnoreShield {
 		shield = target.ShieldDefense(attacker, def, crit)
 	}
-	defence := target.PDef()
+	defence := target.Against(view(attacker), nil).PDef()
 	if shield == formulas.ShieldSuccess {
 		defence += target.CalcStat(stat.ShieldDefence, 0)
 	}
+	versus := attacker.Against(view(target), sk)
 	return formulas.BlowInput{
-		AttackPower:       attacker.PAtk(),
+		AttackPower:       attacker.Against(view(target), nil).PAtk(),
 		SkillPower:        skillPower,
 		Defence:           defence,
 		Shield:            shield,
@@ -312,11 +321,11 @@ func ResolveBlowInput(attacker, target FormulaActor, def modelskill.Definition, 
 		RandomMul:         float64(95+attacker.Roll(11)) / 100,
 		PosMul:            PositionMultiplierFrom(target, attacker, true),
 		PvPMul:            pvpMul,
-		CritDamageMul:     attacker.ForSkill(sk).CalcStat(stat.CriticalDamage, 1),
-		CritDamagePosMul:  (attacker.ForSkill(sk).CalcStat(stat.CriticalDamagePos, 1)-1)/2 + 1,
-		CritVulnMul:       target.ForSkill(sk).CalcStat(stat.CritVuln, 1),
-		DaggerVulnMul:     target.CalcStat(stat.DaggerWpnVuln, 1),
-		CritDamageAddBase: attacker.ForSkill(sk).CalcStat(stat.CriticalDamageAdd, 0),
+		CritDamageMul:     versus.CalcStat(stat.CriticalDamage, 1),
+		CritDamagePosMul:  (versus.CalcStat(stat.CriticalDamagePos, 1)-1)/2 + 1,
+		CritVulnMul:       target.Against(view(target), sk).CalcStat(stat.CritVuln, 1),
+		DaggerVulnMul:     target.Against(view(target), nil).CalcStat(stat.DaggerWpnVuln, 1),
+		CritDamageAddBase: versus.CalcStat(stat.CriticalDamageAdd, 0),
 		Landed:            landed,
 		Crit:              crit,
 	}, true
@@ -340,15 +349,16 @@ func ResolveManaDamageInput(attacker, target FormulaActor, maxMP float64, def mo
 	}
 	sps, bsps := SpiritshotFlags(attacker)
 	sk := calcSkill(def)
+	versus, defending := attacker.Against(view(target), sk), target.Against(view(attacker), sk)
 	affected := formulas.MagicAffected(formulas.MagicAffectedInput{
-		MAtk:     attacker.ForSkill(sk).MAtk(),
-		MDef:     target.ForSkill(sk).MDef(),
+		MAtk:     versus.MAtk(),
+		MDef:     defending.MDef(),
 		VulnMul:  SkillVulnerability(target, def.SkillType, def),
 		Defended: def.Activation == modelskill.ActivationActive && def.Offensive,
 	}, rnd.NextGaussian())
 	return formulas.ManaDamageInput{
-		MAtk:            attacker.ForSkill(sk).MAtk(),
-		MDef:            target.ForSkill(sk).MDef(),
+		MAtk:            versus.MAtk(),
+		MDef:            defending.MDef(),
 		SkillPower:      casterSkillPower(attacker, def),
 		TargetMaxMp:     maxMP,
 		SoulShot:        sps,
@@ -509,31 +519,33 @@ func SkillStatModifier(target FormulaActor, typ string, magic bool) float64 {
 }
 
 // SkillVulnerability returns the target's skill-type vulnerability multiplier,
-// including elemental resistance as the base.
+// including elemental resistance as the base, calculated against target
+// itself.
 func SkillVulnerability(target FormulaActor, typ string, def modelskill.Definition) float64 {
 	if target == nil {
 		return 1
 	}
 	base := math.Sqrt(ElementalSkillModifier(target, def))
+	self := target.Against(view(target), nil)
 	switch SkillTypeKey(typ) {
 	case "BLEED":
-		return target.CalcStat(stat.BleedVuln, base)
+		return self.CalcStat(stat.BleedVuln, base)
 	case "POISON":
-		return target.CalcStat(stat.PoisonVuln, base)
+		return self.CalcStat(stat.PoisonVuln, base)
 	case "STUN":
-		return target.CalcStat(stat.StunVuln, base)
+		return self.CalcStat(stat.StunVuln, base)
 	case "PARALYZE":
-		return target.CalcStat(stat.ParalyzeVuln, base)
+		return self.CalcStat(stat.ParalyzeVuln, base)
 	case "ROOT":
-		return target.CalcStat(stat.RootVuln, base)
+		return self.CalcStat(stat.RootVuln, base)
 	case "SLEEP":
-		return target.CalcStat(stat.SleepVuln, base)
+		return self.CalcStat(stat.SleepVuln, base)
 	case "MUTE", "FEAR", "BETRAY", "AGGDEBUFF", "AGGREDUCE_CHAR", "ERASE", "CONFUSION":
-		return target.CalcStat(stat.DerangementVuln, base)
+		return self.CalcStat(stat.DerangementVuln, base)
 	case "DEBUFF", "WEAKNESS":
-		return target.CalcStat(stat.DebuffVuln, base)
+		return self.CalcStat(stat.DebuffVuln, base)
 	case "CANCEL":
-		return target.CalcStat(stat.CancelVuln, base)
+		return self.CalcStat(stat.CancelVuln, base)
 	default:
 		return base
 	}
@@ -546,8 +558,8 @@ func SkillMAtkModifier(target, attacker FormulaActor, def modelskill.Definition,
 		return 1
 	}
 	sk := calcSkill(def)
-	mDef := target.ForSkill(sk).MDef()
-	mAtk := attacker.ForSkill(sk).MAtk()
+	mDef := target.Against(view(attacker), sk).MDef()
+	mAtk := attacker.Against(view(target), sk).MAtk()
 	if bss {
 		mAtk *= 4
 	}
@@ -636,30 +648,31 @@ func ElementResistanceStat(element modelskill.Element) (stat.Stat, bool) {
 }
 
 // WeaponVulnerability returns target's vulnerability multiplier for an
-// attacker's weapon type.
+// attacker's weapon type, calculated against target itself.
 func WeaponVulnerability(target FormulaActor, weapon item.WeaponType) float64 {
 	if target == nil {
 		return 1
 	}
+	self := target.Against(view(target), nil)
 	switch weapon {
 	case item.WeaponSword:
-		return target.CalcStat(stat.SwordWpnVuln, 1)
+		return self.CalcStat(stat.SwordWpnVuln, 1)
 	case item.WeaponBlunt:
-		return target.CalcStat(stat.BluntWpnVuln, 1)
+		return self.CalcStat(stat.BluntWpnVuln, 1)
 	case item.WeaponDagger:
-		return target.CalcStat(stat.DaggerWpnVuln, 1)
+		return self.CalcStat(stat.DaggerWpnVuln, 1)
 	case item.WeaponBow:
-		return target.CalcStat(stat.BowWpnVuln, 1)
+		return self.CalcStat(stat.BowWpnVuln, 1)
 	case item.WeaponPole:
-		return target.CalcStat(stat.PoleWpnVuln, 1)
+		return self.CalcStat(stat.PoleWpnVuln, 1)
 	case item.WeaponDual:
-		return target.CalcStat(stat.DualWpnVuln, 1)
+		return self.CalcStat(stat.DualWpnVuln, 1)
 	case item.WeaponDualFist:
-		return target.CalcStat(stat.DualFistWpnVuln, 1)
+		return self.CalcStat(stat.DualFistWpnVuln, 1)
 	case item.WeaponBigSword:
-		return target.CalcStat(stat.BigSwordWpnVuln, 1)
+		return self.CalcStat(stat.BigSwordWpnVuln, 1)
 	case item.WeaponBigBlunt:
-		return target.CalcStat(stat.BigBluntWpnVuln, 1)
+		return self.CalcStat(stat.BigBluntWpnVuln, 1)
 	default:
 		return 1
 	}

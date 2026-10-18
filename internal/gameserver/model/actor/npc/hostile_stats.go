@@ -19,7 +19,10 @@ const maxBuffCount = 20
 // all-or-nothing to readers must serialize at a higher level (see
 // effect.List, which does this for effect-driven adds through
 // AttachStatFuncs and StatFuncsAttached).
+//
+// A func whose attached condition fails for h is left out.
 func (h *Hostile) AddStatFuncs(fns []effect.Mod) {
+	fns = effect.Attachable(fns, h.ConditionActor())
 	h.AttachStatFuncs(fns)
 	h.StatFuncsAttached(fns)
 }
@@ -149,12 +152,13 @@ func (h *Hostile) statCalcOrCreate(s stat.Stat) *effect.Calculator {
 // plus any buff/debuff funcs an active effect has added) starting from
 // base, flooring a non-positive stat that can't go negative at one.
 func (h *Hostile) calcStat(s stat.Stat, base float64) float64 {
-	return h.calcSkillStat(s, base, nil)
+	return h.calcFor(s, base, nil, nil)
 }
 
-// calcSkillStat is calcStat for a calculation run for skill (nil for none).
-func (h *Hostile) calcSkillStat(s stat.Stat, base float64, skill conditions.Skill) float64 {
-	value := h.statCalc(s).Calc(hostileStatActor{h: h}, base, skill)
+// calcFor is calcStat for a calculation against target run for skill (nil
+// for none).
+func (h *Hostile) calcFor(s stat.Stat, base float64, target conditions.Actor, skill conditions.Skill) float64 {
+	value := h.statCalc(s).Calc(hostileStatActor{h: h}, base, target, skill)
 	if s.CantBeNegative() && value <= 0 {
 		return 1
 	}

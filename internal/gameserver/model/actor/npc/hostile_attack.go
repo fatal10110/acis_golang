@@ -1,7 +1,6 @@
 package npc
 
 import (
-	"math"
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
@@ -13,6 +12,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -283,15 +283,11 @@ func (h *Hostile) SetHeadingTo(target attackable.Combatant) {
 // calculator (level scaling plus any active buff/debuff) from the template
 // base, scaled by the raid defence multiplier while raid related, and
 // truncated to a whole number.
-func (h *Hostile) PDef() float64 {
-	return math.Trunc(h.calcStat(stat.PowerDefence, h.Instance.Template.PDef*h.raidBaseMultipliers().Defence))
-}
+func (h *Hostile) PDef() float64 { return hostileSkillStats{h: h}.PDef() }
 
 // Evasion returns this NPC's physical evasion rating (per-mille), finalized
 // through its stat calculator (base DEX/level plus any active buff/debuff).
-func (h *Hostile) Evasion() int {
-	return int(h.calcStat(stat.EvasionRate, 0))
-}
+func (h *Hostile) Evasion() int { return hostileSkillStats{h: h}.Evasion() }
 
 // MakeAttackHit resolves one physical attack against target: a hit/miss
 // roll, a critical roll, and a damage roll through the shared
@@ -313,9 +309,8 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 		return hit
 	}
 
-	tpl := h.Instance.Template
 	accuracy := int(h.calcStat(stat.AccuracyCombat, 0))
-	evasion := other.Evasion()
+	evasion := other.Against(h.ConditionActor(), nil).Evasion()
 
 	_, _, sz := h.Position()
 	_, _, tz := other.Position()
@@ -326,8 +321,7 @@ func (h *Hostile) MakeAttackHit(target attackable.Combatant, split bool) attack.
 		return hit
 	}
 
-	critRate := float64(min(int(h.calcStat(stat.CriticalRate, tpl.CritRate)), 500))
-	crit := formulas.CritSucceeds(critRate, h.roll(1000))
+	crit := formulas.CritSucceeds(h.Against(conditions.ActorOf(other), nil).CriticalRate(), h.roll(1000))
 	in, shield := creature.ResolvePhysicalAttackInput(h, other, crit)
 	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
 	hit.Crit = crit

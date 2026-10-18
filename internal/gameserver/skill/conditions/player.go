@@ -171,9 +171,11 @@ func (c PlayerState) Test(effector, effected Actor, skill Skill) bool {
 	case StateFlying:
 		return a.IsFlying() == c.Required
 	case StateBehind:
-		return effected != nil && a.IsBehind(effected) == c.Required
+		// No effected is neither behind nor in front of anything, so a
+		// required False holds.
+		return (effected != nil && a.IsBehind(effected)) == c.Required
 	case StateFront:
-		return effected != nil && a.IsInFrontOf(effected) == c.Required
+		return (effected != nil && a.IsInFrontOf(effected)) == c.Required
 	case StateOlympiad:
 		if p, ok := asPlayer(effector); ok {
 			return p.IsInOlympiadMode() == c.Required

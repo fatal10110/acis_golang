@@ -113,7 +113,7 @@ func cubicContinuous(cast Cast, target Creature, mAtk float64, result *Result) {
 // cubicStrike rolls the owner's magic critical and the target's shield,
 // then the cubic strike damage, reporting any magic failure first.
 func cubicStrike(cast Cast, target Creature, magicFailures bool, result *Result) (damage int, crit bool, shield formulas.ShieldDefense) {
-	crit = formulas.MCritSucceeds(int(cast.Caster.ForSkill(conditions.SkillOf(cast.Skill.Stat)).MagicCriticalRate()), cast.Caster.Roll(1000))
+	crit = formulas.MCritSucceeds(int(cast.Caster.Against(conditions.ActorOf(target), conditions.SkillOf(cast.Skill.Stat)).MagicCriticalRate()), cast.Caster.Roll(1000))
 	shield = resolveShieldDefense(cast.Caster, target, cast.Skill)
 	in, ok := creature.ResolveCubicMagicDamageInput(cast.Caster, target, cast.Skill, crit, shield, magicFailures)
 	if !ok {

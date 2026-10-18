@@ -26,9 +26,12 @@ func newCubicProcOwner() *cubicProcOwner {
 	return &cubicProcOwner{skillTarget: skillTarget{fakeActor: fakeActor{objectID: 1}, isPlayer: true, name: "Owner", hp: 100, maxHP: 1000}, level: 80, mAtk: 5000}
 }
 
-func (o *cubicProcOwner) Level() int                                    { return o.level }
-func (o *cubicProcOwner) MAtk() float64                                 { return o.mAtk }
-func (o *cubicProcOwner) ForSkill(conditions.Skill) creature.SkillStats { return o }
+func (o *cubicProcOwner) Level() int { return o.level }
+
+func (o *cubicProcOwner) MAtk() float64 { return o.mAtk }
+
+func (o *cubicProcOwner) Against(conditions.Actor, conditions.Skill) creature.SkillStats { return o }
+
 func (o *cubicProcOwner) Roll(n int) int {
 	if len(o.rolls) == 0 {
 		return n - 1
@@ -52,9 +55,12 @@ func newCubicProcTarget() *cubicProcTarget {
 	return &cubicProcTarget{skillTarget: skillTarget{fakeActor: fakeActor{objectID: 2}, name: "Target", hp: 100000, maxHP: 100000, effects: newTestList(nil)}, level: 40, mDef: 385}
 }
 
-func (t *cubicProcTarget) Level() int                                    { return t.level }
-func (t *cubicProcTarget) MDef() float64                                 { return t.mDef }
-func (t *cubicProcTarget) ForSkill(conditions.Skill) creature.SkillStats { return t }
+func (t *cubicProcTarget) Level() int { return t.level }
+
+func (t *cubicProcTarget) MDef() float64 { return t.mDef }
+
+func (t *cubicProcTarget) Against(conditions.Actor, conditions.Skill) creature.SkillStats { return t }
+
 func (t *cubicProcTarget) Attackable() bool {
 	return t.attackable
 }
@@ -126,8 +132,8 @@ func TestCubicMdamCriticalQuadruples(t *testing.T) {
 
 type critCubicOwner struct{ *cubicProcOwner }
 
-func (critCubicOwner) MagicCriticalRate() float64                      { return 1 }
-func (o critCubicOwner) ForSkill(conditions.Skill) creature.SkillStats { return o }
+func (critCubicOwner) MagicCriticalRate() float64                                       { return 1 }
+func (o critCubicOwner) Against(conditions.Actor, conditions.Skill) creature.SkillStats { return o }
 
 // TestCubicMdamReflectDealsNothing: a reflected strike deals no damage and
 // reports nothing.

@@ -105,6 +105,8 @@ func (Target) MAtk() float64 { return 0 }
 func (t Target) PDef() float64 { return float64(t.PhysicalDefence()) }
 func (t Target) MDef() float64 { return float64(t.MagicDefence()) }
 
+// CriticalRate and MagicCriticalRate are zero: a door never attacks.
+func (Target) CriticalRate() float64          { return 0 }
 func (Target) MagicCriticalRate() float64     { return 0 }
 func (Target) AttackType() item.WeaponType    { return item.WeaponNone }
 func (Target) SoulshotCharged() bool          { return false }
@@ -114,9 +116,9 @@ func (Target) BlessedSpiritshotCharged() bool { return false }
 // CalcStat returns base: a door carries no stat modifier.
 func (Target) CalcStat(_ stat.Stat, base float64) float64 { return base }
 
-// ForSkill is t itself: with no stat modifier, a door's stats read the same
-// whatever skill a calculation runs for.
-func (t Target) ForSkill(conditions.Skill) creature.SkillStats { return t }
+// Against is t itself: with no stat modifier, a door's stats read the same
+// whatever target and skill a calculation runs against.
+func (t Target) Against(conditions.Actor, conditions.Skill) creature.SkillStats { return t }
 
 func (Target) RandomDamageSpread() int  { return 0 }
 func (Target) Roll(n int) int           { return rnd.Get(n) }
@@ -139,8 +141,7 @@ func (Target) ShieldDefense(creature.FormulaActor, modelskill.Definition, bool) 
 func (Target) RaceMultiplier(creature.FormulaActor) float64 { return 1 }
 
 // Evasion is 0: a door has no evasion.
-func (Target) Evasion() int        { return 0 }
-func (Target) LethalRate() float64 { return 1 }
+func (Target) Evasion() int { return 0 }
 
 // PhysicalSkillInput resolves a physical skill's damage input against the
 // door.

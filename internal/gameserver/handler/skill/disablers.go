@@ -4,9 +4,12 @@ import (
 	"strings"
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/formulas"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
 // blessedSpiritshotCharged reports whether caster holds a blessed spiritshot
@@ -256,11 +259,17 @@ func disableConfusion(cast Cast, target Creature, land landing) {
 	land.apply(cast, target)
 }
 
-// disableAggReduce applies the skill's effects and, for a positive skill
-// power, subtracts it from every hate entry the target's threat table
-// holds. A zero-or-negative power should instead subtract a generic
-// AGGRESSION stat delta; that needs a stat
-// resolution this port has no generic model for yet, so it's skipped.
+// aggroHolder is a target whose threat table reports its hate against an
+// attacker.
+type aggroHolder interface {
+	AggroHate(attacker attackable.Combatant) float64
+}
+
+// disableAggReduce applies the skill's effects and subtracts from every
+// hate entry the target's threat table holds: a positive skill power
+// itself, otherwise how far the target's AGGRESSION stat, calculated for
+// the skill from its hate against the caster, lowers that hate (truncated,
+// and only when it does lower it).
 func disableAggReduce(cast Cast, target Creature, land landing) {
 	// Only an NPC holds the aggro tables this skill reduces.
 	if !target.Attackable() {
@@ -268,7 +277,16 @@ func disableAggReduce(cast Cast, target Creature, land landing) {
 	}
 	land.apply(cast, target)
 	if cast.Skill.Power > 0 {
-		target.ReduceAllAggroHate(float64(cast.Skill.Power))
+		target.ReduceAllAggroHate(float64(javaInt(float64(cast.Skill.Power))))
+		return
+	}
+	var hate float64
+	if holder, ok := target.(aggroHolder); ok {
+		hate = holder.AggroHate(cast.Caster)
+	}
+	reduced := target.Against(conditions.ActorOf(target), conditions.SkillOf(cast.Skill.Stat)).CalcStat(stat.Aggression, hate)
+	if diff := hate - reduced; diff > 0 {
+		target.ReduceAllAggroHate(float64(javaInt(diff)))
 	}
 }
 

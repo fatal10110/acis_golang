@@ -15,12 +15,16 @@ import (
 var ErrEnchantNeedsItem = errors.New("enchant stat funcs need an item owner")
 
 // statFuncs builds templates as Mods attributed to owner. ownerSkill is the
-// skill that owns them, which a <skill stat> in a template's attached <cond>
-// tests.
+// skill that owns them, which a template's attached <cond> is tested with
+// when the Mod is attached.
 func statFuncs(owner ModOwner, templates []modelskill.FuncTemplate, ownerSkill conditions.Skill) ([]Mod, error) {
 	mods := make([]Mod, 0, len(templates))
 	for _, tmpl := range templates {
-		gate, err := funcCondition(tmpl.Condition, tmpl.AttachCondition, ownerSkill)
+		gate, err := funcCondition(tmpl.Condition)
+		if err != nil {
+			return nil, err
+		}
+		attach, err := attachCondition(tmpl.AttachCondition)
 		if err != nil {
 			return nil, err
 		}
@@ -32,6 +36,7 @@ func statFuncs(owner ModOwner, templates []modelskill.FuncTemplate, ownerSkill c
 		if err != nil {
 			return nil, err
 		}
+		m.attach, m.attachSkill = attach, ownerSkill
 		mods = append(mods, m)
 	}
 	return mods, nil

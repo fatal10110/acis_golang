@@ -42,7 +42,10 @@ func (c *Character) MaxBuffCount() int {
 // all-or-nothing to readers must serialize at a higher level (see
 // effect.List, which does this for effect-driven adds through
 // AttachStatFuncs and StatFuncsAttached).
+//
+// A func whose attached condition fails for c is left out.
 func (c *Character) AddStatFuncs(fns []effect.Mod) {
+	fns = effect.Attachable(fns, c.ConditionActor())
 	c.AttachStatFuncs(fns)
 	c.StatFuncsAttached(fns)
 }

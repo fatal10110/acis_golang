@@ -22,7 +22,7 @@ func newStallingGate() *stallingGate {
 	return &stallingGate{entered: make(chan struct{}), release: make(chan struct{})}
 }
 
-func (g *stallingGate) Test(stat.Actor, conditions.Skill) bool {
+func (g *stallingGate) Test(stat.Actor, conditions.Actor, conditions.Skill) bool {
 	if g.armed.CompareAndSwap(true, false) {
 		close(g.entered)
 		<-g.release

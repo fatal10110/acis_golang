@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
-	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
@@ -54,7 +53,7 @@ func ItemModifierFuncs(owner ItemOwner) ([]Mod, error) {
 	}
 	mods := make([]Mod, 0, len(owner.Tmpl.Modifiers))
 	for _, mod := range owner.Tmpl.Modifiers {
-		gate, err := itemModifierCondition(mod)
+		gate, attach, err := itemModifierCondition(mod)
 		if err != nil {
 			return nil, fmt.Errorf("item %d: %w", owner.Tmpl.ID, err)
 		}
@@ -66,33 +65,33 @@ func ItemModifierFuncs(owner ItemOwner) ([]Mod, error) {
 		if err != nil {
 			return nil, fmt.Errorf("item %d: %w", owner.Tmpl.ID, err)
 		}
+		m.attach = attach
 		mods = append(mods, m)
 	}
 	return mods, nil
 }
 
-// itemModifierCondition builds the same effector-side gate as
-// funcCondition, converting item.StatModifier's own Condition/
-// AttachCondition (an XML-shape twin of modelskill.Condition/
+// itemModifierCondition builds the same gate and attached condition as
+// funcCondition and attachCondition, converting item.StatModifier's own
+// Condition/AttachCondition (an XML-shape twin of modelskill.Condition/
 // ConditionClause, parsed independently for item templates) to the shared
 // tree first. An item's func has no owning skill: its attached <cond> is
 // tested with none.
-func itemModifierCondition(mod item.StatModifier) (Condition, error) {
-	var direct *modelskill.Condition
+func itemModifierCondition(mod item.StatModifier) (Condition, conditions.Condition, error) {
+	var gate Condition
 	if mod.Condition != nil {
 		c := conditions.ItemCondition(*mod.Condition)
-		direct = &c
-	}
-	var attach *modelskill.ConditionClause
-	if mod.AttachCondition != nil {
-		attach = &modelskill.ConditionClause{
-			Root:      conditions.ItemCondition(mod.AttachCondition.Root),
-			Message:   mod.AttachCondition.Message,
-			MessageID: mod.AttachCondition.MessageID,
-			AddName:   mod.AttachCondition.AddName,
+		g, err := funcCondition(&c)
+		if err != nil {
+			return nil, nil, err
 		}
+		gate = g
 	}
-	return funcCondition(direct, attach, nil)
+	if mod.AttachCondition == nil {
+		return gate, nil, nil
+	}
+	attach, err := conditions.Compile(conditions.ItemCondition(mod.AttachCondition.Root))
+	return gate, attach, err
 }
 
 func itemStatFunc(owner ItemOwner, s stat.Stat, mod item.StatModifier, cond Condition) (Mod, error) {
