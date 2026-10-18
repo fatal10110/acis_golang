@@ -99,8 +99,11 @@ func (l *GameClientLink) pickupLiveGroundItem(ctx context.Context, live *livePla
 		l.broadcastGroundPickup(ground, live.ObjectID())
 		l.groundItems.Remove(ground)
 		l.world.Despawn(ground)
-		l.lockPickupParalysis(live)
+		// The herb is used before the pickup lock paralyzes the picker: a
+		// paralyzed character has every skill disabled, which would reject
+		// the herb's skill as still being prepared for reuse.
 		l.consumeHerb(live, ground.ItemID())
+		l.lockPickupParalysis(live)
 		return true
 	}
 
