@@ -55,6 +55,7 @@ func TestPruneDropsEveryDesireOnALostCreature(t *testing.T) {
 					owner := actor(1)
 					target, other := actor(2), actor(3)
 					brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+					pastFirstCycle(t, brain)
 					brain.SetCastController(&recordingCast{disabled: true})
 					tc.queue(brain, target)
 					brain.AddFollowDesire(other, 1)
@@ -155,6 +156,7 @@ func TestContinueStepsCastWithoutDesire(t *testing.T) {
 	ref := skill.Ref{ID: 4, Level: 1}
 	cast := &recordingCast{canAttempt: true, canCast: true}
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	pastFirstCycle(t, brain)
 	brain.SetCastController(cast)
 	brain.Desires().AddOrUpdate(&Desire{Kind: IntentionCast, FinalTarget: target, Skill: ref, Weight: 10})
 	if err := brain.RunAI(); err != nil {

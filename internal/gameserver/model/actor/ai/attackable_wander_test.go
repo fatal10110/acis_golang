@@ -12,6 +12,7 @@ func TestAttackableAIWanderReturnHome(t *testing.T) {
 	owner.inTerritory = false
 	owner.returnHome = true
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	pastFirstCycle(t, ai)
 
 	if err := thinkWanderOnce(ai); err != nil {
 		t.Fatalf("Think() error: %v", err)
@@ -45,6 +46,7 @@ func TestAttackableAIWanderClearsWhenOutsideTerritoryAndNotReturning(t *testing.
 	owner := actor(1)
 	owner.inTerritory = false
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	pastFirstCycle(t, ai)
 
 	if err := thinkWanderOnce(ai); err != nil {
 		t.Fatalf("Think() error: %v", err)
@@ -65,6 +67,7 @@ func TestAttackableAIWanderWalksFromSpawnOnFirstStep(t *testing.T) {
 	owner := actor(1)
 	owner.moveSpeed = 50
 	ai := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	pastFirstCycle(t, ai)
 
 	if err := thinkWanderOnce(ai); err != nil {
 		t.Fatalf("Think() error: %v", err)
@@ -192,14 +195,16 @@ func TestAttackableAIAttackInterruptsWander(t *testing.T) {
 
 // wanderArrivedThenPromoted walks one wander step at clock start, arrives,
 // and has a THINK (a control effect ending), which takes no wander step.
-// The next cycles run at start+1s (lifetime), start+2s (empty-queue idle)
-// and start+3s (WANDER re-promoted, arming the wander chain). It returns
+// The brain's first cycle ran before the walk; the next cycles run at
+// start+2s (empty-queue idle) and start+3s (WANDER re-promoted, arming the
+// wander chain). It returns
 // the brain, its actor, the promotion time and a setter for the AI clock.
 func wanderArrivedThenPromoted(t *testing.T, start time.Time) (*Attackable, *fakeActor, time.Time, func(time.Time)) {
 	t.Helper()
 	owner := actor(1)
 	owner.idleWander = true
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	pastFirstCycle(t, brain)
 	brain.SetRandomWalkRate(100)
 	brain.roll = func(int) int { return 0 }
 	now := start
@@ -228,7 +233,7 @@ func wanderArrivedThenPromoted(t *testing.T, start time.Time) (*Attackable, *fak
 		t.Fatalf("walk stances/timers after arrival Think = %d/%d, want %d/0 (no wander step)", owner.walkStanceCalls, len(owner.timers), stances)
 	}
 
-	for i, at := range []int{1, 2, 3} {
+	for i, at := range []int{2, 3} {
 		now = start.Add(time.Duration(at) * time.Second)
 		if err := brain.TickThink(); err != nil {
 			t.Fatalf("TickThink() %d error: %v", i, err)
@@ -391,6 +396,7 @@ func TestAttackableThinkDuringWanderTakesNoStep(t *testing.T) {
 	owner.known = map[int32]bool{target.ObjectID(): true}
 	strike := &recordingAttack{canAttack: true}
 	ai := NewAttackable(owner, &recordingMove{}, strike)
+	pastFirstCycle(t, ai)
 	ai.SetRandomWalkRate(100)
 	ai.roll = func(int) int { return 0 }
 	if err := thinkWanderOnce(ai); err != nil {

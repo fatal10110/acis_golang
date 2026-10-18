@@ -39,11 +39,14 @@ func (m *walkingMove) MoveStraightToLocation(at location.Location) (bool, error)
 
 // pickUpWorld is an actor at the origin with one ground item, 9001, 100 away
 // on the x axis.
-func pickUpWorld() (*fakeActor, *walkingMove, *Attackable) {
+func pickUpWorld(t *testing.T) (*fakeActor, *walkingMove, *Attackable) {
+	t.Helper()
 	owner := actor(1)
 	owner.ground = map[int32]location.Location{9001: {X: 100}}
 	move := &walkingMove{}
-	return owner, move, NewAttackable(owner, move, &recordingAttack{})
+	brain := NewAttackable(owner, move, &recordingAttack{})
+	pastFirstCycle(t, brain)
+	return owner, move, brain
 }
 
 // TestAttackablePickUpWalksThenPicks pins the pick-up step: out of range the
@@ -51,7 +54,7 @@ func pickUpWorld() (*fakeActor, *walkingMove, *Attackable) {
 // AI loop unlocked, and the desire leaves the queue while the intention
 // stays current.
 func TestAttackablePickUpWalksThenPicks(t *testing.T) {
-	owner, move, brain := pickUpWorld()
+	owner, move, brain := pickUpWorld(t)
 	brain.AddPickUpDesire(9001, 1_000_000)
 	if err := brain.RunAI(); err != nil {
 		t.Fatalf("RunAI() error: %v", err)
@@ -102,7 +105,7 @@ func TestAttackablePickUpWalksThenPicks(t *testing.T) {
 // can no longer pick up does nothing and stays queued, outweighing lighter
 // desires.
 func TestAttackablePickUpOfGoneItemStaysQueued(t *testing.T) {
-	owner, move, brain := pickUpWorld()
+	owner, move, brain := pickUpWorld(t)
 	delete(owner.ground, 9001)
 	brain.AddPickUpDesire(9001, 1_000_000)
 	brain.AddWanderDesire(5, 5)
@@ -125,13 +128,13 @@ func TestAttackablePickUpOfGoneItemStaysQueued(t *testing.T) {
 // TestAttackablePickUpGates: object id 0 queues nothing, an actor that
 // cannot act takes no step, and one that cannot move does not walk.
 func TestAttackablePickUpGates(t *testing.T) {
-	_, _, brain := pickUpWorld()
+	_, _, brain := pickUpWorld(t)
 	brain.AddPickUpDesire(0, 1_000_000)
 	if brain.Desires().Len() != 0 {
 		t.Fatal("a pick-up of object 0 was queued")
 	}
 
-	owner, move, brain := pickUpWorld()
+	owner, move, brain := pickUpWorld(t)
 	owner.denyAction = true
 	brain.AddPickUpDesire(9001, 1)
 	if err := brain.Think(); err != nil {
@@ -150,7 +153,7 @@ func TestAttackablePickUpGates(t *testing.T) {
 // TestAttackablePickUpRanksByWeight: a pick-up desire is taken up against
 // the other kinds by weight, and an equal one adds its weight.
 func TestAttackablePickUpRanksByWeight(t *testing.T) {
-	_, move, brain := pickUpWorld()
+	_, move, brain := pickUpWorld(t)
 	brain.AddMoveToDesire(location.Location{X: -500}, 100)
 	brain.AddPickUpDesire(9001, 60)
 	if err := brain.RunAI(); err != nil {

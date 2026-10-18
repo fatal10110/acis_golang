@@ -85,6 +85,7 @@ func TestNPCSkillFinishedHook(t *testing.T) {
 
 	// Two cast desires: the heavier one is cast first; when it ends, its
 	// desire is gone, the lighter one still waits and no cast has started.
+	firstCycleOnNPCQueue(t, h)
 	h.AI().AddCastDesire(player, modelskill.Ref{ID: finishedFirst, Level: 1}, 1000, false, true)
 	h.AI().AddCastDesire(player, modelskill.Ref{ID: finishedNext, Level: 1}, 10, false, true)
 	thinkOnNPCQueue(t, h)

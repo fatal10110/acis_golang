@@ -214,6 +214,8 @@ func TestHookPointMoveFinishedPrecedesDesireDrop(t *testing.T) {
 	owner := actor(1)
 	owner.x = 100
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	pastFirstCycle(t, brain)
+	owner.hooks.points = nil // the first cycle's see-creature point
 	dest := location.Location{X: 300}
 	walk := &Desire{Kind: IntentionMoveTo, Location: dest}
 	brain.AddMoveToDesire(dest, 1_000)
@@ -251,6 +253,8 @@ func TestHookPointMoveFinishedAtDestination(t *testing.T) {
 	owner := actor(1)
 	owner.x = 100
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	pastFirstCycle(t, brain)
+	owner.hooks.points = nil // the first cycle's see-creature point
 	here := location.Location{X: 100}
 	owner.hooks.at = func(p HookPoint) {
 		assertBrainUnlocked(t, brain, p)
@@ -278,6 +282,8 @@ func TestHookPointOutOfTerritoryOnFirstOutsideArrival(t *testing.T) {
 	owner.x = 100
 	owner.inTerritory = false
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	pastFirstCycle(t, brain)
+	owner.hooks.points = nil // the first cycle's see-creature point
 	owner.hooks.at = func(p HookPoint) {
 		assertBrainUnlocked(t, brain, p)
 		if p != HookOutOfTerritory {

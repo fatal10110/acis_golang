@@ -225,6 +225,7 @@ func TestAttackableAIArrivedThinkDoesNotAbortInFlightAttack(t *testing.T) {
 	move := &recordingMove{}
 	strike := &recordingAttack{attackingNow: true}
 	ai := NewAttackable(owner, move, strike)
+	pastFirstCycle(t, ai)
 	if err := thinkWanderOnce(ai); err != nil {
 		t.Fatalf("Think() error: %v", err)
 	}
@@ -242,7 +243,7 @@ func TestAttackableAIArrivedThinkDoesNotAbortInFlightAttack(t *testing.T) {
 		t.Fatalf("walk stance calls = %d on arrival Think, want %d", owner.walkStanceCalls, walk)
 	}
 
-	if err := tickThinkIdle(ai); err != nil {
+	if err := ai.TickThink(); err != nil {
 		t.Fatalf("TickThink() error: %v", err)
 	}
 	// The finished wander is busy with an empty queue: desire selection
