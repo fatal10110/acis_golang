@@ -278,19 +278,20 @@ func (l *GameClientLink) placeDecoration(template *npc.Template, title string, x
 }
 
 // mountWyvern puts live on the wyvern npcID called by its collar
-// controlItemID. Both hands are emptied first; a weapon that cannot be taken
+// controlItemID, 0 for a wyvern no collar called, and reports whether it
+// did. Both hands are emptied first; a weapon that cannot be taken
 // off refuses the mount with no packet, as specified, and a
 // use-item request leaves no client action pending. The rider is then
 // forced to run and loses its toggles before the wyvern's skill list, the
 // Ride, the speed refresh and the feed gauge go out.
-func (l *GameClientLink) mountWyvern(live *livePlayer, npcID, controlItemID int32) {
+func (l *GameClientLink) mountWyvern(live *livePlayer, npcID, controlItemID int32) bool {
 	if !l.disarm(live, true) {
-		return
+		return false
 	}
 	l.changeLiveMoveType(live, true)
 	live.Character.EffectList().StopAllToggles()
 	if !live.Character.Mount(npcID, controlItemID) {
-		return
+		return false
 	}
 	live.SendFrame(serverpackets.FrameSkillList(skillListEntries(live.Character, l.skills)))
 	l.broadcastLiveFrame(live, func() wire.Frame {
@@ -298,6 +299,7 @@ func (l *GameClientLink) mountWyvern(live *livePlayer, npcID, controlItemID int3
 	})
 	l.broadcastCharacterInfo(live)
 	live.Character.StartMountFeed()
+	return true
 }
 
 // disarm takes live's weapon off, and its shield too when leftHandIncluded,

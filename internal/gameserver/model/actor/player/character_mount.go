@@ -2,7 +2,10 @@ package player
 
 import modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 
-const wyvernNPCID int32 = 12621
+// WyvernNPCID is the wyvern a rider flies.
+const WyvernNPCID int32 = 12621
+
+const wyvernNPCID = WyvernNPCID
 
 // Mount types: a strider is ridden, a wyvern flown.
 const (
@@ -23,7 +26,8 @@ func MountTypeOf(npcID int32) int32 {
 }
 
 // Mount records the active mount, at the character's level, and the pet
-// data of the mount at that level. StartMountFeed starts feeding it. A
+// data of the mount at that level; controlItemID is the collar calling it,
+// 0 for a mount no collar called. StartMountFeed starts feeding it. A
 // wyvern flies and gives its rider Wyvern Breath for as long as it is
 // ridden; the skill is not stored.
 func (c *Character) Mount(npcID, controlItemID int32) bool {
@@ -39,7 +43,7 @@ func (c *Character) MountPet(npcID, controlItemID int32, petLevel int) bool {
 }
 
 func (c *Character) mount(npcID, controlItemID int32, level int) bool {
-	if npcID <= 0 || controlItemID <= 0 {
+	if npcID <= 0 || controlItemID < 0 {
 		return false
 	}
 	c.stateMu.Lock()
@@ -73,6 +77,13 @@ func (c *Character) MountNPCID() int32 {
 	c.stateMu.RLock()
 	defer c.stateMu.RUnlock()
 	return c.mountNPCID
+}
+
+// MountLevel is the level of the ridden mount, 0 on foot.
+func (c *Character) MountLevel() int {
+	c.stateMu.RLock()
+	defer c.stateMu.RUnlock()
+	return c.mountLevel
 }
 
 func (c *Character) MountObjectID() int32 {
