@@ -210,24 +210,105 @@ func (c *Character) ReduceCurrentMP(amount int) {
 	}
 }
 
-// refillResources installs new base maxima and fills current HP/MP/CP to
-// the calculated maxima. A dead character takes the new maxima but keeps its
-// current values: a level gained while dead must not raise the corpse. The
-// check shares vitalsMu with MarkDead. A refill to full stops the
-// regeneration task, so the next drop starts a fresh phase.
-func (c *Character) refillResources(maxHP, maxMP, maxCP float64) {
-	currentHP := c.finalMax(stat.MaxHP, maxHP)
-	currentMP := c.finalMax(stat.MaxMP, maxMP)
-	currentCP := c.finalMax(stat.MaxCP, maxCP)
-	defer c.SettleRegen() // after the unlock below
+// refillForLevel installs a gained level's base maxima and fills HP and MP
+// to the maxima they make, telling the client as a level gain does. CP fills
+// later (refillCPForLevel), after the tutorial hears of the gain.
+//
+// Each maximum that changed from the one the client was shown, while its
+// current value differs from the new maximum, first owes a status report of
+// the values before the refill: those reports go out ahead of the MP fill
+// when MP's is among them, otherwise after it and ahead of the HP fill, or,
+// when only CP's is owed, after the HP fill. HP's report raises the low-HP
+// tutorial event right after it, measured against the new maximum; it is
+// the second report when every maximum owes one and the last otherwise. The
+// HP fill then sends its own report.
+//
+// A dead character takes the new maxima but keeps its current values and
+// sends no report: a level gained while dead must not raise the corpse. Its
+// HP fill still owes the low-HP event. A fill to full stops the regeneration
+// task, so the next drop starts a fresh phase.
+func (c *Character) refillForLevel(maxHP, maxMP, maxCP float64) {
+	hpMax := c.finalMax(stat.MaxHP, maxHP)
+	mpMax := c.finalMax(stat.MaxMP, maxMP)
+	cpMax := c.finalMax(stat.MaxCP, maxCP)
 	c.vitalsMu.Lock()
-	defer c.vitalsMu.Unlock()
 	c.maxHP, c.maxMP, c.maxCP = maxHP, maxMP, maxCP
+	shown := c.maximaShown
+	owes := func(shownMax *float64, cur, newMax float64) bool {
+		changed := *shownMax != newMax
+		*shownMax = newMax
+		return shown && changed && cur != newMax
+	}
+	hpOwed := owes(&c.shownMaxHP, c.curHP, hpMax)
+	mpOwed := owes(&c.shownMaxMP, c.curMP, mpMax)
+	cpOwed := owes(&c.shownMaxCP, c.curCP, cpMax)
 	if c.dead.Load() {
+		c.hpWritten.Store(true)
+		c.vitalsMu.Unlock()
+		c.SettleRegen()
 		return
 	}
-	c.writeHPLocked(currentHP)
-	c.curMP, c.curCP = currentMP, currentCP
+	if !mpOwed {
+		c.curMP = mpMax
+	}
+	c.vitalsMu.Unlock()
+
+	switch {
+	case mpOwed:
+		c.BroadcastStatus()
+		if hpOwed {
+			c.reportUnfilledHP()
+		}
+		if cpOwed {
+			c.BroadcastStatus()
+		}
+	case hpOwed:
+		if cpOwed {
+			c.BroadcastStatus()
+		}
+		c.reportUnfilledHP()
+	}
+
+	c.vitalsMu.Lock()
+	if c.dead.Load() {
+		c.vitalsMu.Unlock()
+		return
+	}
+	c.curMP = mpMax
+	c.writeHPLocked(hpMax)
+	c.vitalsMu.Unlock()
+	if cpOwed && !mpOwed && !hpOwed {
+		c.BroadcastStatus()
+	}
+	c.BroadcastStatus()
+}
+
+// reportUnfilledHP reports c's status as an HP write that keeps the current
+// value does, so the low-HP tutorial event follows the report.
+func (c *Character) reportUnfilledHP() {
+	c.vitalsMu.Lock()
+	if c.dead.Load() {
+		c.vitalsMu.Unlock()
+		return
+	}
+	c.writeHPLocked(c.curHP)
+	c.vitalsMu.Unlock()
+	c.BroadcastStatus()
+}
+
+// refillCPForLevel fills a gained level's CP to its maximum and reports the
+// status, even when CP was already full. A dead character keeps its CP and
+// sends nothing.
+func (c *Character) refillCPForLevel() {
+	cpMax := c.MaxCPValue()
+	c.vitalsMu.Lock()
+	if c.dead.Load() {
+		c.vitalsMu.Unlock()
+		return
+	}
+	c.curCP = cpMax
+	c.vitalsMu.Unlock()
+	c.BroadcastStatus()
 }
 
 // ChangesTo reports which resources differ in next.
