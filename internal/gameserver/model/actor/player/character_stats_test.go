@@ -134,7 +134,8 @@ func TestCharacterStatFuncsAffectCombatStatsAndCanBeRemoved(t *testing.T) {
 	if got, want := c.RunSpeed(), baseRunSpeed+5; !closeFloat(got, want) {
 		t.Fatalf("RunSpeed() with stat func = %v, want %v", got, want)
 	}
-	if got, want := c.HPRegenRate(), baseHPRegen+1; !closeFloat(got, want) {
+	// The added rate is multiplied by the standing-still posture bonus.
+	if got, want := c.HPRegenRate(), baseHPRegen+1.1; !closeFloat(got, want) {
 		t.Fatalf("HPRegenRate() with stat func = %v, want %v", got, want)
 	}
 

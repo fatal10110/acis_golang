@@ -221,7 +221,7 @@ type Character struct {
 	// embedded in one; nil means c itself. See SetWorldHandle.
 	worldHandle              world.Tracked
 	los                      LineOfSight
-	zones                    PeaceZoneQuery
+	zones                    ZoneQuery
 	social                   SocialGraph
 	hallFunctions            HallFunctions
 	sieges                   SiegeGround
@@ -239,6 +239,7 @@ type Character struct {
 	insideNoSummonFriendZone atomic.Bool
 	insideBossZone           atomic.Bool
 	insideClanHallZone       atomic.Bool
+	insideMotherTreeZone     atomic.Bool
 	insideCastleZone         atomic.Bool
 	insideDangerArea         atomic.Bool
 	insideWater              atomic.Bool
