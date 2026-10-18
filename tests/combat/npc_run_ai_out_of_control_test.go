@@ -128,14 +128,7 @@ func TestStunnedMonsterTakesLatchOnFirstPassAfterStun(t *testing.T) {
 	attackTime := time.Duration(formulas.TimeBetweenAttacks(hostile.AttackSpeed())) * time.Millisecond
 	decayAttackDesire(t, hostile)
 
-	srv.Advance(t, attackTime+10*time.Millisecond)
-	readAttackWithout(t, srv, serverpackets.OpcodeChangeMoveType, "latched second swing")
-	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
-		t.Fatalf("CurrentIntention() after the latched runAI = %v, want %v", got, ai.IntentionAttack)
-	}
-
-	intentionAfter(t, srv, hostile, attackTime, "once the latched swing finished, want idle", intentionIs(ai.IntentionIdle))
-	assertNoSwingFor(t, srv, attackTime)
+	assertLatchedSwingThenIdle(t, srv, hostile, attackTime)
 }
 
 // TestConfusedMonsterSelectsNoHeavierDesire pins confusion as part of
