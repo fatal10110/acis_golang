@@ -33,22 +33,25 @@ type MailQuery struct {
 
 func (q MailQuery) searching() bool { return q.SearchType != "" && q.Search != "" }
 
-// matches reports whether mail answers q's search, matched in any case
-// unit by unit; writer names a sender.
-func (q MailQuery) matches(mail Mail, writer func(int32) string) bool {
+// matcher returns a test of whether a mail answers q's search, matched in
+// any case unit by unit, or passes every mail without a search; writer
+// names a sender. The search key is built once for every mail it tests.
+func (q MailQuery) matcher(writer func(int32) string) func(Mail) bool {
+	if !q.searching() {
+		return func(Mail) bool { return true }
+	}
 	search := commons.UTF16LowerKey(q.Search)
 	if strings.EqualFold(q.SearchType, "title") {
-		return strings.Contains(commons.UTF16LowerKey(mail.Subject), search)
+		return func(mail Mail) bool { return strings.Contains(commons.UTF16LowerKey(mail.Subject), search) }
 	}
-	return strings.Contains(commons.UTF16LowerKey(writer(mail.SenderID)), search)
+	return func(mail Mail) bool { return strings.Contains(commons.UTF16LowerKey(writer(mail.SenderID)), search) }
 }
 
-// count is how many of box's mails in folder answer q's search, or all of
-// them without one.
-func (q MailQuery) count(box []Mail, folder Folder, writer func(int32) string) int {
+// count is how many of box's mails in folder answer matches.
+func count(box []Mail, folder Folder, matches func(Mail) bool) int {
 	n := 0
 	for _, mail := range box {
-		if mail.Folder == folder && (!q.searching() || q.matches(mail, writer)) {
+		if mail.Folder == folder && matches(mail) {
 			n++
 		}
 	}
@@ -68,15 +71,16 @@ func mailPages(count int) int {
 // asks for, and returns it with the page number shown: q's page held to
 // the folder's pages. writer names a mail's sender.
 func RenderMailList(page string, box []Mail, q MailQuery, writer func(int32) string) (string, int) {
-	empty := MailQuery{}
-	pages := mailPages(q.count(box, q.Folder, writer))
+	matches := q.matcher(writer)
+	all := func(Mail) bool { return true }
+	pages := mailPages(count(box, q.Folder, matches))
 	shown := min(q.Page, pages)
 	shown = max(shown, 1)
 
-	page = strings.ReplaceAll(page, "%inbox%", strconv.Itoa(empty.count(box, Inbox, writer)))
-	page = strings.ReplaceAll(page, "%sentbox%", strconv.Itoa(empty.count(box, SentBox, writer)))
-	page = strings.ReplaceAll(page, "%archive%", strconv.Itoa(empty.count(box, Archive, writer)))
-	page = strings.ReplaceAll(page, "%temparchive%", strconv.Itoa(empty.count(box, TempArchive, writer)))
+	page = strings.ReplaceAll(page, "%inbox%", strconv.Itoa(count(box, Inbox, all)))
+	page = strings.ReplaceAll(page, "%sentbox%", strconv.Itoa(count(box, SentBox, all)))
+	page = strings.ReplaceAll(page, "%archive%", strconv.Itoa(count(box, Archive, all)))
+	page = strings.ReplaceAll(page, "%temparchive%", strconv.Itoa(count(box, TempArchive, all)))
 	page = strings.ReplaceAll(page, "%type%", folders[q.Folder].description)
 	page = strings.ReplaceAll(page, "%htype%", q.Folder.Column())
 
@@ -89,7 +93,7 @@ func RenderMailList(page string, box []Mail, q MailQuery, writer func(int32) str
 	var rows strings.Builder
 	index := 0
 	for _, mail := range box {
-		if mail.Folder != q.Folder || (q.searching() && !q.matches(mail, writer)) {
+		if mail.Folder != q.Folder || !matches(mail) {
 			continue
 		}
 		if index < first {
