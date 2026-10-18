@@ -313,24 +313,13 @@ func (f *ScriptedClient) ReadQueued() [][]byte {
 }
 
 // ExpectNoFrame fails the test if the server has queued a frame this client
-// has not read. On a client the harness counts frames for, it asks the server
-// once it has caught up (see ReadQueued); on any other it fails if a frame
-// arrives within 100ms.
+// has not read, once the server has caught up (see ReadQueued). It waits out
+// no quiet spell, so a frame that comes late is not missed; it fails the test
+// on a client the harness does not count frames for.
 func (f *ScriptedClient) ExpectNoFrame() {
 	f.t.Helper()
-	if f.queued != nil {
-		if frames := f.ReadQueued(); len(frames) != 0 {
-			f.t.Fatalf("unexpected frames: %x", frames)
-		}
-		return
-	}
-	if payload, err := f.readFrame(100 * time.Millisecond); err == nil {
-		if f.cipher != nil {
-			f.cipher.Decrypt(payload)
-		}
-		f.t.Fatalf("unexpected frame: %x", payload)
-	} else if ne, ok := err.(net.Error); !ok || !ne.Timeout() {
-		f.t.Fatalf("ReadFrame: %v", err)
+	if frames := f.ReadQueued(); len(frames) != 0 {
+		f.t.Fatalf("unexpected frames: %x", frames)
 	}
 }
 

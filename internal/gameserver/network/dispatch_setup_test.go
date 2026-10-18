@@ -211,6 +211,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 	if err := sevenSigns.Restore(context.Background()); err != nil {
 		t.Fatalf("restore seven signs status: %v", err)
 	}
+	queues := testQueues(t)
 	gcl, err := NewGameClientLink(GameClientLinkConfig{
 		Validator:        validator,
 		LoginLink:        loginLink,
@@ -234,7 +235,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 		SevenSigns:       sevenSigns,
 		PlayerConfig:     playerConfig,
 		PetConfig:        petmodel.DefaultConfig(),
-		Queues:           testQueues(t),
+		Queues:           queues,
 		Effects:          effect.Env{Activity: task.NewEffects()},
 		Log:              log,
 		Now:              testLinkNow,
@@ -246,6 +247,7 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
+	counts := serveFrames(t, ln.Addr().String(), queues)
 	ctx, cancel := context.WithCancel(context.Background())
 	var handlers struct {
 		sync.Mutex
@@ -271,6 +273,8 @@ func newTestGameClientLinkWithSkillsShortcutsCrestsKarmaAndLog(t *testing.T, log
 			handlersDone.Broadcast()
 			handlers.Unlock()
 		}()
+		closed := counts.track(conn)
+		defer closed()
 		gcl.Handle(ctx, conn)
 	}, zerolog.Nop())
 
@@ -324,7 +328,7 @@ func newLinkedGameClientWithSkillsShortcutsCrestsSeed(t *testing.T, skills *skil
 		shortcutSeed(shortcuts)
 	}
 
-	c = testsupport.Dial(t, addr)
+	c = dialCounted(t, addr)
 	c.SendProtocolVersion(746)
 
 	key := link.SessionKey{LoginKey1: 11, LoginKey2: 22, PlayKey1: 33, PlayKey2: 44}
@@ -473,7 +477,7 @@ func (testHostileMove) MoveStraightToLocation(location.Location) (bool, error) {
 
 // testQueues runs each linked player's work on a real pool, stopped once the
 // test's connection handlers have returned.
-func testQueues(t *testing.T) *sim.Pool {
+func testQueues(t *testing.T) *countedQueues {
 	t.Helper()
 	pool := sim.NewPool(2, zerolog.Nop())
 	pool.Start(context.Background())
@@ -484,7 +488,7 @@ func testQueues(t *testing.T) *sim.Pool {
 			t.Errorf("stop pool: %v", err)
 		}
 	})
-	return pool
+	return &countedQueues{Pool: pool}
 }
 
 func idleQueue() *sim.Queue { return sim.NewInline(time.Unix(0, 0)).NewQueue("test") }
