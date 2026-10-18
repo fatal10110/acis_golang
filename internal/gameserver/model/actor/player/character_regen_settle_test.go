@@ -44,11 +44,12 @@ func TestRegenPhaseKeptOffGridMidTeleport(t *testing.T) {
 	}
 }
 
-// TestRefillResourcesStopsRegen pins the level-up refill's stop of the
+// TestLevelRefillStopsRegen pins the level-up refill's stop of the
 // regeneration task: back at full, the next drop starts a fresh phase.
-func TestRefillResourcesStopsRegen(t *testing.T) {
+func TestLevelRefillStopsRegen(t *testing.T) {
 	c, _ := spawnedRegenCharacter(t)
-	c.refillResources(100, 30, 50)
+	c.refillForLevel(100, 30, 50)
+	c.refillCPForLevel()
 	if res := c.ResourceValues(); res.CurrentHP != res.MaxHP {
 		t.Fatalf("HP after the refill = %v, want max %v", res.CurrentHP, res.MaxHP)
 	}
