@@ -68,7 +68,10 @@ func (a *Actor) initVitals() {
 // applied. Callers that need a batch to appear all-or-nothing to readers
 // must serialize at a higher level (see effect.List, which does this for
 // effect-driven adds through AttachStatFuncs).
+//
+// A func whose attached condition fails for a is left out.
 func (a *Actor) AddStatFuncs(fns []effect.Mod) {
+	fns = effect.Attachable(fns, a.ConditionActor())
 	a.AttachStatFuncs(fns)
 	a.StatFuncsAttached(fns)
 }
@@ -154,12 +157,13 @@ func (a *Actor) statCalcOrCreate(s stat.Stat) *effect.Calculator {
 }
 
 func (a *Actor) calcStat(s stat.Stat, base float64) float64 {
-	return a.calcSkillStat(s, base, nil)
+	return a.calcFor(s, base, nil, nil)
 }
 
-// calcSkillStat is calcStat for a calculation run for skill (nil for none).
-func (a *Actor) calcSkillStat(s stat.Stat, base float64, skill conditions.Skill) float64 {
-	value := a.statCalculator(s).Calc(summonStatActor{a: a}, base, skill)
+// calcFor is calcStat for a calculation against target run for skill (nil
+// for none).
+func (a *Actor) calcFor(s stat.Stat, base float64, target conditions.Actor, skill conditions.Skill) float64 {
+	value := a.statCalculator(s).Calc(summonStatActor{a: a}, base, target, skill)
 	if s.CantBeNegative() && value <= 0 {
 		return 1
 	}
@@ -318,14 +322,10 @@ func (a *Actor) CanGiveDamage() bool {
 func (a *Actor) Invulnerable() bool { return a.Invul() }
 
 // PAtk returns this summon's physical attack stat, truncated to a whole number.
-func (a *Actor) PAtk() float64 {
-	return math.Trunc(a.calcStat(stat.PowerAttack, positiveBase(a.combatStats().PAtk)))
-}
+func (a *Actor) PAtk() float64 { return skillStats{a: a}.PAtk() }
 
 // PDef returns this summon's physical defence stat, truncated to a whole number.
-func (a *Actor) PDef() float64 {
-	return math.Trunc(a.calcStat(stat.PowerDefence, positiveBase(a.combatStats().PDef)))
-}
+func (a *Actor) PDef() float64 { return skillStats{a: a}.PDef() }
 
 // MAtk returns this summon's magic attack stat, truncated to a whole number.
 func (a *Actor) MAtk() float64 { return skillStats{a: a}.MAtk() }
@@ -336,30 +336,46 @@ func (a *Actor) MDef() float64 { return skillStats{a: a}.MDef() }
 // MagicCriticalRate returns this summon's magic critical rate.
 func (a *Actor) MagicCriticalRate() float64 { return skillStats{a: a}.MagicCriticalRate() }
 
-// ForSkill is a's stats read for a calculation run for skill.
-func (a *Actor) ForSkill(skill conditions.Skill) creature.SkillStats {
-	return skillStats{a: a, skill: skill}
+// Against is a's stats read for a calculation against target run for
+// skill (either nil for none).
+func (a *Actor) Against(target conditions.Actor, skill conditions.Skill) creature.SkillStats {
+	return skillStats{a: a, target: target, skill: skill}
 }
 
 type skillStats struct {
-	a     *Actor
-	skill conditions.Skill
+	a      *Actor
+	target conditions.Actor
+	skill  conditions.Skill
 }
 
 func (s skillStats) CalcStat(st stat.Stat, base float64) float64 {
-	return s.a.calcSkillStat(st, base, s.skill)
+	return s.a.calcFor(st, base, s.target, s.skill)
+}
+
+func (s skillStats) PAtk() float64 {
+	return math.Trunc(s.a.calcFor(stat.PowerAttack, positiveBase(s.a.combatStats().PAtk), s.target, nil))
+}
+
+func (s skillStats) PDef() float64 {
+	return math.Trunc(s.a.calcFor(stat.PowerDefence, positiveBase(s.a.combatStats().PDef), s.target, nil))
 }
 
 func (s skillStats) MAtk() float64 {
-	return math.Trunc(s.a.calcSkillStat(stat.MagicAttack, positiveBase(s.a.combatStats().MAtk), s.skill))
+	return math.Trunc(s.a.calcFor(stat.MagicAttack, positiveBase(s.a.combatStats().MAtk), s.target, s.skill))
 }
 
 func (s skillStats) MDef() float64 {
-	return math.Trunc(s.a.calcSkillStat(stat.MagicDefence, positiveBase(s.a.combatStats().MDef), s.skill))
+	return math.Trunc(s.a.calcFor(stat.MagicDefence, positiveBase(s.a.combatStats().MDef), s.target, s.skill))
+}
+
+func (s skillStats) Evasion() int { return int(s.a.calcFor(stat.EvasionRate, 0, s.target, nil)) }
+
+func (s skillStats) CriticalRate() float64 {
+	return float64(min(int(s.a.calcFor(stat.CriticalRate, s.a.combatStats().CritRate, s.target, nil)), 500))
 }
 
 func (s skillStats) MagicCriticalRate() float64 {
-	return s.a.calcSkillStat(stat.MCriticalRate, 8, s.skill)
+	return s.a.calcFor(stat.MCriticalRate, 8, s.target, s.skill)
 }
 
 // Accuracy returns this summon's physical accuracy stat.
@@ -801,7 +817,7 @@ func (a *Actor) RechargeMP(amount float64) float64 {
 // HealInput resolves a's side of an outgoing HEAL. A summon's charged
 // spiritshot scales its M.Atk term the way a mage-class player's does.
 func (a *Actor) HealInput(def modelskill.Definition) (formulas.HealInput, bool) {
-	return creature.ResolveHealInput(def, a.HealProficiency(), a.MAtk(), formulas.HealShotScalingMage), true
+	return creature.ResolveHealInput(def, a.HealProficiency(), a.Against(a.ConditionActor(), nil).MAtk(), formulas.HealShotScalingMage), true
 }
 
 // PhysicalSkillInput resolves the damage formula input for a physical skill
@@ -823,7 +839,7 @@ func (a *Actor) BlowInput(caster creature.FormulaActor, def modelskill.Definitio
 }
 
 func (a *Actor) CounterSkillPhysical() float64 {
-	return a.CalcStat(stat.CounterSkillPhysical, 0)
+	return a.calcFor(stat.CounterSkillPhysical, 0, a.ConditionActor(), nil)
 }
 
 // CancelVulnerability returns a's CANCEL_VULN multiplier for the cancel and
@@ -845,7 +861,7 @@ func (a *Actor) SkillReflectInput(def modelskill.Definition) formulas.SkillRefle
 		CanBeReflected: def.CanBeReflected,
 		Magic:          def.Magic,
 		CastRange:      def.CastRange,
-		ReflectChance:  a.calcSkillStat(reflectStat, 0, conditions.SkillOf(def.Stat)),
+		ReflectChance:  a.calcFor(reflectStat, 0, nil, conditions.SkillOf(def.Stat)),
 	}
 }
 
@@ -853,11 +869,6 @@ func (a *Actor) SkillReflectInput(def modelskill.Definition) formulas.SkillRefle
 // by caster against a.
 func (a *Actor) ManaDamageInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return creature.ResolveManaDamageInput(caster, a, a.MaxMPValue(), def)
-}
-
-// LethalRate returns a's lethal-strike rate multiplier.
-func (a *Actor) LethalRate() float64 {
-	return a.calcStat(stat.LethalRate, 1)
 }
 
 // LethalInput resolves a lethal-strike roll against a.
@@ -875,7 +886,7 @@ func (a *Actor) LethalInput(caster creature.FormulaActor, def modelskill.Definit
 		MagicLevel:    def.MagicLevel,
 		AttackerLevel: attacker.Level(),
 		TargetLevel:   a.Level(),
-		LethalMul:     attacker.LethalRate(),
+		LethalMul:     attacker.Against(a.ConditionActor(), nil).CalcStat(stat.LethalRate, 1),
 	}, true
 }
 

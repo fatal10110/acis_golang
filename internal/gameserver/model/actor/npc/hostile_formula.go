@@ -41,9 +41,7 @@ func (h *Hostile) Lethalable() bool {
 }
 
 // PAtk returns this NPC's physical attack stat, truncated to a whole number.
-func (h *Hostile) PAtk() float64 {
-	return math.Trunc(h.calcStat(stat.PowerAttack, h.Instance.Template.PAtk))
-}
+func (h *Hostile) PAtk() float64 { return hostileSkillStats{h: h}.PAtk() }
 
 // MagicCriticalRate returns this NPC's magic critical rate.
 func (h *Hostile) MagicCriticalRate() float64 { return hostileSkillStats{h: h}.MagicCriticalRate() }
@@ -360,7 +358,7 @@ func (h *Hostile) RechargeMP(amount float64) float64 {
 // HealInput resolves h's side of an outgoing HEAL. Any charged spiritshot
 // quadruples an NPC's M.Atk term.
 func (h *Hostile) HealInput(def modelskill.Definition) (formulas.HealInput, bool) {
-	return creature.ResolveHealInput(def, h.HealProficiency(), h.MAtk(), formulas.HealShotScalingNPC), true
+	return creature.ResolveHealInput(def, h.HealProficiency(), h.Against(h.ConditionActor(), nil).MAtk(), formulas.HealShotScalingNPC), true
 }
 
 // PhysicalSkillInput resolves the damage formula input for a physical skill
@@ -383,7 +381,7 @@ func (h *Hostile) BlowInput(caster creature.FormulaActor, def modelskill.Definit
 }
 
 func (h *Hostile) CounterSkillPhysical() float64 {
-	return h.CalcStat(stat.CounterSkillPhysical, 0)
+	return h.calcFor(stat.CounterSkillPhysical, 0, h.ConditionActor(), nil)
 }
 
 // CancelVulnerability returns h's CANCEL_VULN multiplier for the cancel and
@@ -405,7 +403,7 @@ func (h *Hostile) SkillReflectInput(def modelskill.Definition) formulas.SkillRef
 		CanBeReflected: def.CanBeReflected,
 		Magic:          def.Magic,
 		CastRange:      def.CastRange,
-		ReflectChance:  h.calcSkillStat(reflectStat, 0, conditions.SkillOf(def.Stat)),
+		ReflectChance:  h.calcFor(reflectStat, 0, nil, conditions.SkillOf(def.Stat)),
 	}
 }
 
@@ -413,11 +411,6 @@ func (h *Hostile) SkillReflectInput(def modelskill.Definition) formulas.SkillRef
 // by caster against h.
 func (h *Hostile) ManaDamageInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return creature.ResolveManaDamageInput(caster, h, h.MaxMPValue(), def)
-}
-
-// LethalRate returns h's lethal-strike rate multiplier.
-func (h *Hostile) LethalRate() float64 {
-	return h.calcStat(stat.LethalRate, 1)
 }
 
 // LethalInput resolves a lethal-strike roll against h.
@@ -435,7 +428,7 @@ func (h *Hostile) LethalInput(caster creature.FormulaActor, def modelskill.Defin
 		MagicLevel:    def.MagicLevel,
 		AttackerLevel: attacker.Level(),
 		TargetLevel:   h.Level(),
-		LethalMul:     attacker.LethalRate(),
+		LethalMul:     attacker.Against(h.ConditionActor(), nil).CalcStat(stat.LethalRate, 1),
 	}, true
 }
 
@@ -460,7 +453,8 @@ func (h *Hostile) RaceMultiplier(attacker creature.FormulaActor) float64 {
 	if !ok {
 		return 1
 	}
-	return 1 + ((attacker.CalcStat(atk, 1) - h.calcStat(res, 1)) / 100)
+	self := h.ConditionActor()
+	return 1 + ((attacker.Against(self, nil).CalcStat(atk, 1) - h.calcFor(res, 1, self, nil)) / 100)
 }
 
 func raceStats(r Race) (atk, res stat.Stat, ok bool) {

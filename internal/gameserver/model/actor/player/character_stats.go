@@ -45,12 +45,13 @@ func (c *Character) statCalcOrCreate(s stat.Stat) *effect.Calculator {
 }
 
 func (c *Character) calcStat(s stat.Stat, base float64) float64 {
-	return c.calcSkillStat(s, base, nil)
+	return c.calcFor(s, base, nil, nil)
 }
 
-// calcSkillStat is calcStat for a calculation run for skill (nil for none).
-func (c *Character) calcSkillStat(s stat.Stat, base float64, skill conditions.Skill) float64 {
-	value := c.statCalc(s).Calc(characterStatActor{c: c}, base, skill)
+// calcFor is calcStat for a calculation against target run for skill (nil
+// for none).
+func (c *Character) calcFor(s stat.Stat, base float64, target conditions.Actor, skill conditions.Skill) float64 {
+	value := c.statCalc(s).Calc(characterStatActor{c: c}, base, target, skill)
 	if s.CantBeNegative() && value <= 0 {
 		return 1
 	}
@@ -245,7 +246,7 @@ func (c *Character) ShieldDefense(caster creature.FormulaActor, def modelskill.D
 		return formulas.ShieldFailed
 	}
 
-	baseRate := c.calcStat(stat.ShieldRate, 0)
+	baseRate := c.calcFor(stat.ShieldRate, 0, conditions.ActorOf(caster), nil)
 	if baseRate == 0 {
 		return formulas.ShieldFailed
 	}
@@ -304,11 +305,11 @@ func attackerUsesBow(caster creature.FormulaActor) bool {
 // MAtk returns the current magic attack value, truncated to a whole
 // number. A rider casts from its mount's M.Atk. instead of its class and
 // weapon.
-func (c *Character) MAtk() float64 { return c.mAtk(nil) }
+func (c *Character) MAtk() float64 { return c.mAtk(nil, nil) }
 
-// mAtk is MAtk for a calculation run for skill. A rider's M.Atk. is
-// calculated for no skill.
-func (c *Character) mAtk(skill conditions.Skill) float64 {
+// mAtk is MAtk for a calculation against target run for skill. A rider's
+// M.Atk. is calculated against no target for no skill.
+func (c *Character) mAtk(target conditions.Actor, skill conditions.Skill) float64 {
 	if m, ok := c.ridden(); ok {
 		return math.Trunc(c.calcStat(stat.MagicAttack, m.mAtk))
 	}
@@ -317,21 +318,21 @@ func (c *Character) mAtk(skill conditions.Skill) float64 {
 	if tmpl != nil && tmpl.MAtk > 0 {
 		base = tmpl.MAtk
 	}
-	return math.Trunc(c.calcSkillStat(stat.MagicAttack, c.activeWeapon().stat("mAtk", base), skill))
+	return math.Trunc(c.calcFor(stat.MagicAttack, c.activeWeapon().stat("mAtk", base), target, skill))
 }
 
 // MDef returns the current magic defence value, truncated to a whole
 // number.
-func (c *Character) MDef() float64 { return c.mDef(nil) }
+func (c *Character) MDef() float64 { return c.mDef(nil, nil) }
 
-// mDef is MDef for a calculation run for skill.
-func (c *Character) mDef(skill conditions.Skill) float64 {
+// mDef is MDef for a calculation against target run for skill.
+func (c *Character) mDef(target conditions.Actor, skill conditions.Skill) float64 {
 	tmpl := c.template()
 	base := 1.0
 	if tmpl != nil && tmpl.MDef > 0 {
 		base = tmpl.MDef
 	}
-	return math.Trunc(c.calcSkillStat(stat.MagicDefence, base, skill))
+	return math.Trunc(c.calcFor(stat.MagicDefence, base, target, skill))
 }
 
 // HP returns current HP as a floating-point skill-resource value.
@@ -877,7 +878,7 @@ func (c *Character) HealInput(def modelskill.Definition) (formulas.HealInput, bo
 	if ClassMage(c.ClassID()) {
 		scaling = formulas.HealShotScalingMage
 	}
-	return creature.ResolveHealInput(def, c.HealProficiency(), c.MAtk(), scaling), true
+	return creature.ResolveHealInput(def, c.HealProficiency(), c.mAtk(c.ConditionActor(), nil), scaling), true
 }
 
 // PhysicalSkillInput resolves the damage formula input for a physical skill
@@ -899,7 +900,7 @@ func (c *Character) BlowInput(caster creature.FormulaActor, def modelskill.Defin
 }
 
 func (c *Character) CounterSkillPhysical() float64 {
-	return c.CalcStat(stat.CounterSkillPhysical, 0)
+	return c.calcFor(stat.CounterSkillPhysical, 0, c.ConditionActor(), nil)
 }
 
 // CancelVulnerability returns c's CANCEL_VULN multiplier for the cancel and
@@ -921,7 +922,7 @@ func (c *Character) SkillReflectInput(def modelskill.Definition) formulas.SkillR
 		CanBeReflected: def.CanBeReflected,
 		Magic:          def.Magic,
 		CastRange:      def.CastRange,
-		ReflectChance:  c.calcSkillStat(reflectStat, 0, conditions.SkillOf(def.Stat)),
+		ReflectChance:  c.calcFor(reflectStat, 0, nil, conditions.SkillOf(def.Stat)),
 	}
 }
 
@@ -929,11 +930,6 @@ func (c *Character) SkillReflectInput(def modelskill.Definition) formulas.SkillR
 // cast by caster against c.
 func (c *Character) ManaDamageInput(caster creature.FormulaActor, def modelskill.Definition) (formulas.ManaDamageInput, bool) {
 	return creature.ResolveManaDamageInput(caster, c, c.MaxMPValue(), def)
-}
-
-// LethalRate returns c's lethal-strike rate multiplier.
-func (c *Character) LethalRate() float64 {
-	return c.calcStat(stat.LethalRate, 1)
 }
 
 // LethalInput resolves a lethal-strike roll against c.
@@ -951,7 +947,7 @@ func (c *Character) LethalInput(caster creature.FormulaActor, def modelskill.Def
 		MagicLevel:    def.MagicLevel,
 		AttackerLevel: attacker.Level(),
 		TargetLevel:   c.Level(),
-		LethalMul:     attacker.LethalRate(),
+		LethalMul:     attacker.Against(c.ConditionActor(), nil).CalcStat(stat.LethalRate, 1),
 	}, true
 }
 
