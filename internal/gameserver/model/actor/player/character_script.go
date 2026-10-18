@@ -225,9 +225,10 @@ func (c *Character) OnlineClanLeader() (*Character, bool) {
 	return h.PlayerCharacter(), true
 }
 
-// CallSkill makes c use ref on the creature targetID at once, as a script
-// does: the cast animation shows and the skill's effects land, with no cast
-// time, cost, reuse or target check.
+// CallSkill makes c use ref on the creature targetID, as a script does: the
+// cast animation shows and the skill's effects land, with no cast time,
+// cost, reuse or target check. The cast runs on c's own queue once the
+// calling task is done, whatever queue the caller runs on.
 func (c *Character) CallSkill(targetID int32, ref modelskill.Ref) {
 	c.emit(event.SkillCalled{TargetID: targetID, Skill: ref})
 }

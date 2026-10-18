@@ -60,9 +60,11 @@ func (p *Player) After(d time.Duration, fn func()) {
 	pl.Queue().After(max(d, 0), fn)
 }
 
-// CallSkill makes caster use ref on target at once: everyone watching
-// caster sees the cast, and the skill's effects land on target with no
-// cast time, cost, reuse or target check.
+// CallSkill makes caster use ref on target: everyone watching caster sees
+// the cast, and the skill's effects land on target with no cast time, cost,
+// reuse or target check. The cast runs on caster's own queue once the
+// calling task is done, whatever queue the hook runs on: the rest of the
+// hook still reads the state from before the cast.
 func (s *Script) CallSkill(caster, target *Player, ref skill.Ref) {
 	caster.character().CallSkill(target.ObjectID(), ref)
 }

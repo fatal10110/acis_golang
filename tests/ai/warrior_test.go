@@ -78,12 +78,18 @@ type warriorWorld struct {
 
 func bootWarriors(t *testing.T, templates ...*npc.Template) *warriorWorld {
 	t.Helper()
+	return bootWarriorsWith(t, nil, templates...)
+}
+
+// bootWarriorsWith is bootWarriors with opts added to the boot.
+func bootWarriorsWith(t *testing.T, opts []gameservertest.Option, templates ...*npc.Template) *warriorWorld {
+	t.Helper()
 	list, catalog := warriorScripts()
 	kinds := map[int32]script.NPCKind{}
 	for _, tmpl := range templates {
 		kinds[int32(tmpl.ID)] = script.KindHostile
 	}
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Hunter", 20, 0),
 		gameservertest.WithWantChars(1),
 		gameservertest.WithNPCs(npc.NewTable(templates)),
@@ -91,7 +97,7 @@ func bootWarriors(t *testing.T, templates ...*npc.Template) *warriorWorld {
 		gameservertest.WithAITask(),
 		gameservertest.WithScriptRand(func(int) int { return 0 }),
 		gameservertest.WithNPCScripts(kinds, list, catalog),
-	)
+	}, opts...)...)
 	c := srv.Client
 	c.Send(encodeGameStart())
 	for i := 0; ; i++ {
