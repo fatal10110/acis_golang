@@ -146,6 +146,8 @@ func (l *GameClientLink) manorManagerMenu(live *livePlayer, f *npc.Folk, command
 // chamberlainManorWindows for the rest.
 func (l *GameClientLink) chamberlainManorMenu(live *livePlayer, f *npc.Folk, kind npc.InstanceKind, command string) {
 	if kind == "WyvernManagerNpc" && live.currentFolk.Load() != f {
+		// Kept with the wyvern manager's own gate: a civilian NPC becomes
+		// the current one as it is selected, so its target always passes.
 		return
 	}
 	r := l.residenceTalk(live, f)
