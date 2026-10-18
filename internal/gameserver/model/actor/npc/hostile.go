@@ -171,18 +171,17 @@ type Hostile struct {
 	mpMu sync.RWMutex
 	mp   float64
 
-	// weapon is this NPC's resolved right-hand weapon kind, recorded by
-	// Attach. Nil means unarmed — the common case, since the
-	// overwhelming majority of monster templates carry no weapon item id.
-	weapon *item.WeaponDetail
-
-	// weaponCrystal is the resolved right-hand weapon's crystal grade,
-	// resolved by Attach alongside weapon. CrystalNone when unarmed.
-	weaponCrystal item.CrystalType
-
-	// offHandMask is the armor-type bit of the shield the template holds
-	// in its left hand, resolved by Attach; zero when it holds none.
-	offHandMask int32
+	// held is what this NPC holds in its hands, nil until Attach. A script
+	// swaps it from whichever queue runs its hook, and a death puts the
+	// template's back.
+	held atomic.Pointer[heldItems]
+	// items resolves a held item id into its weapon or shield; nil leaves
+	// every hand empty of either. Set by Attach.
+	items *item.Table
+	// enchantEffect is the enchant glow observers see on its weapon.
+	enchantEffect atomic.Int32
+	// lastAttacker is the last creature that damaged this NPC in this life.
+	lastAttacker atomic.Pointer[attackerRef]
 
 	// roll draws a uniform integer in [0, n) for MakeAttackHit's hit/crit/
 	// damage-spread rolls. It defaults to math/rand's global source; tests
@@ -398,32 +397,18 @@ func (h *Hostile) Attach(rt Runtime) {
 	h.bindSpawn(rt.Slot)
 	h.Scratch().setLife(h)
 	h.brain.KeepTerritory(h.Scratch().Territory())
-	if rt.Items == nil {
-		return
-	}
-	if id := h.Instance.Template.LeftHand; id != 0 {
-		if tmpl, ok := rt.Items.Get(int32(id)); ok && tmpl.Kind == item.KindArmor && tmpl.Armor != nil {
-			h.offHandMask = tmpl.Armor.Type.Mask()
-		}
-	}
-	if h.Instance.Template.RightHand == 0 {
-		return
-	}
-	tmpl, ok := rt.Items.Get(int32(h.Instance.Template.RightHand))
-	if !ok || tmpl.Weapon == nil {
-		return
-	}
-	h.weapon = tmpl.Weapon
-	h.weaponCrystal = tmpl.Crystal
+	h.items = rt.Items
+	h.holdTemplateItems()
 }
 
 // HeldItemTypeMask returns the item-type bits of this NPC's right-hand
 // weapon and of the armor, a shield, in its left hand. An unarmed NPC holds
 // no weapon bit at all, not a fist's.
 func (h *Hostile) HeldItemTypeMask() int32 {
-	mask := h.offHandMask
-	if h.weapon != nil {
-		mask |= h.weapon.Type.Mask()
+	held := h.hands()
+	mask := held.offHandMask
+	if held.weapon != nil {
+		mask |= held.weapon.Type.Mask()
 	}
 	return mask
 }
@@ -471,6 +456,7 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 		title = h.Instance.Title()
 	}
 	pAtkSpd := h.AttackSpeed()
+	held := h.hands()
 	return npcinfo.Snapshot{
 		ObjectID: h.ObjectID(), TemplateID: tmpl.TemplateID, Attackable: h.MonsterKind() && !h.AlikeDead(),
 		X: x, Y: y, Z: z, Heading: h.Heading(),
@@ -480,7 +466,7 @@ func (h *Hostile) NPCInfoSnapshot() npcinfo.Snapshot {
 		MoveType:  h.zones.moveType(),
 		CurrentHP: h.CurrentHP(), MaxHP: int(h.MaxHPValue()),
 		CollisionRadius: h.CollisionRadius(), CollisionHeight: tmpl.CollisionHeight,
-		RightHand: tmpl.RightHand, LeftHand: tmpl.LeftHand,
+		RightHand: held.rightHand, LeftHand: held.leftHand, EnchantEffect: int(h.enchantEffect.Load()),
 		Running: h.Running(), InCombat: h.InCombat(), AlikeDead: h.AlikeDead(), SummonAnimation: 2,
 		AbnormalEffect: h.AbnormalEffect(), Name: name, Title: title,
 	}
@@ -1008,6 +994,10 @@ func (h *Hostile) Die(killer attackable.Combatant, rewards creature.Rewarder) bo
 	if h.RaidBoss() && killedByPlayer(killer) {
 		h.emit(event.RaidBossKilled{})
 	}
+	// The corpse holds the template's items again and loses its glow; no
+	// observer is told until it next sees the NPC.
+	h.holdTemplateItems()
+	h.enchantEffect.Store(0)
 	h.raiseDying(killer)
 	partyDied(h.scripts, h)
 	raiseClanDied(h.scripts, h.world, h, killer)

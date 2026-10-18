@@ -20,6 +20,7 @@ func TestTasksMatchReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check(".", []string{
 		"task.CastleTaxRefresh", "task.ClanLadderRefresh", "task.ClanLeaderTransfer",
 		"task.RaidPointReset", "task.RecommendationUpdate", "task.SevenSignsUpdate",
+		"task.ServerRestart", "task.ServerShutdown",
 	},
 		`string "task"`, "hook onEnd none",
 		// The recommendation refresh's body (its level bands, SQL, log
@@ -73,6 +74,9 @@ func (s *server) AddClanReputation(clanID int32, points int) {
 	s.calls = append(s.calls, fmt.Sprintf("AddClanReputation %d %d", clanID, points))
 }
 func (s *server) CleanUpRaidPoints() { s.calls = append(s.calls, "CleanUpRaidPoints") }
+func (s *server) Shutdown(seconds int32, restart bool) {
+	s.calls = append(s.calls, fmt.Sprintf("Shutdown %d %t", seconds, restart))
+}
 
 // TestTaskStarts pins what each task's start does, in order.
 func TestTaskStarts(t *testing.T) {
@@ -89,6 +93,8 @@ func TestTaskStarts(t *testing.T) {
 		{"ClanLadderRefresh", ClanLadderRefresh, false, []string{"RefreshClanLadder"}},
 		{"RecommendationUpdate", RecommendationUpdate, false, []string{"RefreshRecommendations"}},
 		{"RaidPointReset with no winners", RaidPointReset, false, []string{"CleanUpRaidPoints"}},
+		{"ServerShutdown", ServerShutdown, false, []string{"Shutdown 600 false"}},
+		{"ServerRestart", ServerRestart, false, []string{"Shutdown 600 true"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			srv := &server{sealValidation: tc.sealValidation}

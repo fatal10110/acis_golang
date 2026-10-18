@@ -746,3 +746,18 @@ WorldObject.setXYZ script.NPC.SetXYZ
 # The unchecked cast start (#3809): WizardCorpseNecroSummon's doCast starts
 # a cast past every gate of the cast's start, replacing a cast in flight.
 CreatureCast.doCast script.NPC.CastUnchecked
+
+# Small freeze handles (#3801, #3807, #3836). A hostile NPC's weapon swap,
+# enchant glow and last attacker. The private warehouse is a getter the
+# Player handle folds into its size read and its withdrawal window, which
+# also makes it the active warehouse. The shutdown and restart tasks start
+# their countdown through Server.Shutdown.
+Npc.equipItem script.NPC.EquipItem
+Npc.getLastAttacker script.NPC.LastAttacker
+Npc.setEnchantEffect script.NPC.SetEnchantEffect
+ItemContainer.getSize script.Player.WarehouseSize
+Player.getWarehouse inline
+Player.setActiveWarehouse script.Player.OpenWarehouseWithdraw
+WarehouseWithdrawList.new script.Player.OpenWarehouseWithdraw
+Shutdown.new inline
+Shutdown.start script.Server.Shutdown

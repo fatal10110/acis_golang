@@ -108,3 +108,12 @@ func (l *GameClientLink) CleanUpRaidPoints() {
 		l.raidPoints.CleanUp()
 	}
 }
+
+// Shutdown starts a countdown of seconds that restarts the server when
+// restart is set and shuts it down otherwise; //server abort does not stop
+// it.
+func (l *GameClientLink) Shutdown(seconds int32, restart bool) {
+	if l.shutdown != nil {
+		l.shutdown.StartUnabortable(seconds, restart)
+	}
+}

@@ -6,6 +6,10 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 // ServerObject selects the static-object view an immobile NPC uses.
 type NPCInfoChanged struct{ ServerObject bool }
 
+// NPCInfoShown asks for an NPC's NpcInfo to be shown again, as no
+// particular viewer sees it, to every player that knows the NPC.
+type NPCInfoShown struct{}
+
 // StatusKind names one value a status update carries.
 type StatusKind uint8
 
@@ -79,6 +83,7 @@ type NpcSay struct {
 }
 
 func (NPCInfoChanged) event()    {}
+func (NPCInfoShown) event()      {}
 func (OnScreenMessage) event()   {}
 func (Status) event()            {}
 func (HPChanged) event()         {}
