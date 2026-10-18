@@ -21,6 +21,13 @@ func TestBowReuseEndShootsAgainWithoutDesire(t *testing.T) {
 	reuse := 1500 * time.Millisecond * 345 / time.Duration(hostile.AttackSpeed())
 
 	srv.Advance(t, attackTime+hitAnimationTail+10*time.Millisecond)
+	// The shot's landing and its hit animation's end each re-run desire
+	// selection. On the wall clock either can land after the advance, and
+	// one that runs after the decay below idles the monster on its empty
+	// queue before the reuse ends.
+	srv.AdvanceUntil(t, "the shot's landing and hit animation end", func() bool {
+		return srv.HostileRethinks(t, hostile) >= 2
+	})
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionAttack {
 		t.Fatalf("CurrentIntention() after the shot's hit animation = %v, want %v", got, ai.IntentionAttack)
 	}

@@ -1085,6 +1085,9 @@ type Server struct {
 	// hostileSinks builds the sinks fixture hostile NPCs report to, showing
 	// their views with the link's crests.
 	hostileSinks func(*npc.Hostile) event.Sink
+	// hostileControls maps each moving fixture hostile to the controller
+	// event handler it reports to (see HostileRethinks).
+	hostileControls sync.Map // *npc.Hostile -> *movingHostileControl
 	// guardedSiege resolves the siege a fixture siege guard defends.
 	guardedSiege func(*npc.Instance) npc.GuardedSiege
 	// groundTaker takes the items fixture NPCs pick up out of the world,

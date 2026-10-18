@@ -264,6 +264,10 @@ func TestSummonStrikeOnReuseTellsOwner(t *testing.T) {
 	h, petActor, hostile := bootWolfStriker(t)
 	startWolfStrike(t, h)
 	h.srv.AdvanceUntil(t, "strike landing on the monster", func() bool { return hostile.HP() < float64(hostile.MaxHP()) })
+	// The strike's end puts the owner and the pet in the combat stance. On
+	// the wall clock it can still be pending once the hit has landed, and
+	// its AutoAttackStart frames would then reach the owner after the drain.
+	h.srv.AdvanceUntil(t, "strike cast end", func() bool { return !petActor.CastingNow() })
 	drainUntilQuiet(t, h.client)
 
 	h.client.Send(encodeRequestActionUse(wolfStrikeAction, false))
