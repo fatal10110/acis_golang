@@ -51,6 +51,12 @@ func newRegion(tileX, tileY int) *Region {
 	}
 }
 
+// Origin returns the game coordinates of r's lowest corner; every point of
+// r lies within one region edge of it on each axis.
+func (r *Region) Origin() (x, y int) {
+	return MinX + r.tileX*regionSize, MinY + r.tileY*regionSize
+}
+
 // Active reports whether r currently has a Player somewhere in its 3x3
 // neighborhood. Scheduled per-object work (AI, follow, route walking) is
 // expected to skip objects sitting in an inactive region.

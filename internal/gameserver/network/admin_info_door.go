@@ -9,11 +9,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 )
 
-// doorUpgradeHPRatio is the HP upgrade ratio every door shows and multiplies
-// its maximum HP by: castle door upgrades, which raise it, are not ported
-// yet (#236).
-const doorUpgradeHPRatio = 1
-
 // doorInfoPage is d's door page: its names and ids, residence, opening
 // rules, combat stats and where it stands.
 func (l *GameClientLink) doorInfoPage(d *door.Object) string {
@@ -37,8 +32,8 @@ func (l *GameClientLink) doorInfoPage(d *door.Object) string {
 		"%rt%", strconv.Itoa(t.RandomTime),
 		"%controlid%", strconv.Itoa(t.TriggeredID),
 		"%hp%", strconv.Itoa(d.HP()),
-		"%hpmax%", strconv.Itoa(d.MaxHP()*doorUpgradeHPRatio),
-		"%hpratio%", strconv.Itoa(doorUpgradeHPRatio),
+		"%hpmax%", strconv.Itoa(d.MaxHP()),
+		"%hpratio%", strconv.Itoa(d.HPUpgradeRatio()),
 		"%pdef%", strconv.Itoa(d.PhysicalDefence()),
 		"%mdef%", strconv.Itoa(d.MagicDefence()),
 		"%spawn%", strconv.Itoa(x)+", "+strconv.Itoa(y)+", "+strconv.Itoa(z)+", "+strconv.Itoa(d.Heading()),

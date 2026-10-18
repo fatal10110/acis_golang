@@ -11,8 +11,10 @@ import (
 type Trap struct {
 	// CastleID links the trap to a castle; 0 means unlinked (always live).
 	CastleID int
-	// EventID is the client effect trigger fired when the trap arms; 0
-	// means none. Broadcasting it belongs to the visibility layer.
+	// EventID is the client map effect the trap shows while armed; 0
+	// means none. A player whose surroundings stop including a region the
+	// trap touches has the effect turned off, armed or not; one whose
+	// surroundings come to include it has it turned on only while armed.
 	EventID int
 	// Armed reports whether the castle owner armed the trap. Nothing arms
 	// a castle trap: a flame tower never arms its zones, whatever the
@@ -24,6 +26,17 @@ type Trap struct {
 	// SiegeActive reports whether the linked castle's siege is running;
 	// nil reads as not running. The game server wires it at boot.
 	SiegeActive func() bool
+}
+
+// TrapOf returns k's castle trap, nil when k is no trap zone.
+func TrapOf(k Kind) *Trap {
+	switch z := k.(type) {
+	case *Damage:
+		return &z.Trap
+	case *Swamp:
+		return &z.Trap
+	}
+	return nil
 }
 
 // dormant reports whether the trap's effect is currently suppressed.
