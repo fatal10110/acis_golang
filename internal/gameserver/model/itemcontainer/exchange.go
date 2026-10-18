@@ -151,7 +151,7 @@ func (h Held) Transfer(objectID int32, count int, to Held, newObjectID int32) (M
 		h.inv.queueUpdateLocked(m.Remaining, UpdateModified)
 	} else {
 		h.inv.logItemLocked(st, UpdateRemoved)
-		h.inv.queueRemovedLocked(objectID, st.TemplateID, count)
+		h.inv.queueRemovedLocked(st)
 	}
 	if stack != nil {
 		to.inv.queueUpdateLocked(m.Item, UpdateModified)

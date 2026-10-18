@@ -87,12 +87,12 @@ type EnchantResult struct {
 }
 
 // Enchant applies a skill-enchant attempt against a loaded offer: SP and
-// exp checks, optional item consumption (skipped entirely when
+// exp checks, the offer's item paid through pay (skipped entirely when
 // spBookNeeded is false), exp/sp deduction, and a rate roll. roll must
 // return a value in [0,99]; the attempt succeeds when roll <= the offer's
 // rate, raising the skill to the requested level, and otherwise resets it
 // to its current max normal (non-enchanted) level.
-func Enchant(c *player.Character, table *player.LevelTable, tmpl *player.Template, trees *modelskill.Trees, skills *Persistence, spBookNeeded bool, roll func() int, skillID, level int) (EnchantResult, EnchantOutcome, error) {
+func Enchant(c *player.Character, table *player.LevelTable, tmpl *player.Template, trees *modelskill.Trees, skills *Persistence, spBookNeeded bool, pay PayItem, roll func() int, skillID, level int) (EnchantResult, EnchantOutcome, error) {
 	if c == nil {
 		return EnchantResult{}, EnchantUnavailable, nil
 	}
@@ -111,7 +111,7 @@ func Enchant(c *player.Character, table *player.LevelTable, tmpl *player.Templat
 		return result, EnchantNeedsExp, nil
 	}
 	if spBookNeeded && node.ItemID != 0 {
-		if c.Inventory() == nil || c.Inventory().DestroyByTemplateID(node.ItemID, node.ItemCount) == nil {
+		if pay == nil || !pay(node.ItemID, node.ItemCount) {
 			return result, EnchantMissingItem, nil
 		}
 	}

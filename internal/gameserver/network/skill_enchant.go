@@ -53,7 +53,7 @@ func (l *GameClientLink) applyEnchantSkill(live *livePlayer, req clientpackets.R
 	if !ok {
 		return
 	}
-	result, status, err := skillstate.Enchant(live.Character, l.levels, live.Template(), l.skillTrees, l.skills, l.playerConfig().SkillEnchantSPBookNeeded, l.enchanting.skillRoll, int(req.SkillID), int(req.SkillLevel))
+	result, status, err := skillstate.Enchant(live.Character, l.levels, live.Template(), l.skillTrees, l.skills, l.playerConfig().SkillEnchantSPBookNeeded, payTrainerItem(live), l.enchanting.skillRoll, int(req.SkillID), int(req.SkillLevel))
 	if err != nil {
 		l.log.Error().Err(err).Int32("object_id", live.ObjectID()).Msg("enchant skill")
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageNothingHappened))
