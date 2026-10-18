@@ -1,11 +1,14 @@
 package catalog
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/script"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/teleport/castledefendteleporter"
+)
 
 // teleporters is the catalog of the scripted teleporters (#210), except the two the engine slices ported.
 func teleporters() script.Catalog {
 	return script.Catalog{
-		"script.teleport.CastleDefendTeleporter":      nil,
+		"script.teleport.CastleDefendTeleporter":      castledefendteleporter.New,
 		"script.teleport.CharmTeleporter":             nil,
 		"script.teleport.DimensionalVortex":           nil,
 		"script.teleport.ElmoredenCemeteryTeleporter": nil,
