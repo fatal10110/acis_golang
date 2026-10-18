@@ -118,6 +118,8 @@ func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading in
 	if s.Skills != nil {
 		ctl := actorcast.NewController(actorcast.FolkActor{Folk: f}, f.CastEvents())
 		ctl.SetQueue(rt.Queue)
+		// A delete closes the NPC's queue without stopping its cast.
+		ctl.OutliveQueueClose()
 		f.SetCaster(ctl, &actorcast.AIController{
 			Controller:  ctl,
 			Definitions: s.Skills,

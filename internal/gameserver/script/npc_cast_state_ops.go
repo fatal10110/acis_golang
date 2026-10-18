@@ -73,3 +73,15 @@ func distance3D(a, b Loc) float64 {
 	dx, dy, dz := float64(a.X)-float64(b.X), float64(a.Y)-float64(b.Y), float64(a.Z)-float64(b.Z)
 	return math.Sqrt(dx*dx + dy*dy + dz*dz)
 }
+
+// CastUnchecked starts the NPC's cast of ref at target at once, outside its
+// desires and past every check a cast's start makes: the skill's reuse, its
+// MP and HP, mutes, weapon and conditions. A cast the NPC already has in
+// flight is replaced, its pending steps dropped and its end reported to no
+// one. The cast then runs as any cast of the NPC: it is shown to the
+// players around, charges its reuse and MP, and lands at its hit unless the
+// MP or HP it takes there is short. No target, or a skill the NPC's table
+// lacks, starts nothing.
+func (n *NPC) CastUnchecked(target Creature, ref skill.Ref) {
+	n.hostile("start a cast").CastUnchecked(combatantOf(target), ref)
+}

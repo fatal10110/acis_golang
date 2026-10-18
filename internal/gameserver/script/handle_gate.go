@@ -25,6 +25,7 @@ var kindOps = map[string]kindSet{
 	"NPC.AttackingNow":                hostileOnly,
 	"NPC.CanAttack":                   hostileOnly,
 	"NPC.CanAutoAttack":               hostileOnly,
+	"NPC.CastUnchecked":               hostileOnly,
 	"NPC.CastingNow":                  hostileOnly,
 	"NPC.CleanAllHate":                hostileOnly,
 	"NPC.DisableCoreAI":               hostileOnly,

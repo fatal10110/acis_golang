@@ -18,8 +18,15 @@
 //   - The decay marks the NPC dead and decayed first, under its death lock,
 //     before any hook runs or the world removal starts.
 //   - Its queue is closed before the delete returns. No armed timer (a hit,
-//     a cast step, a movement arrival) runs after that, the script timers
-//     bound to the NPC are cancelled, and later posts are refused.
+//     a movement arrival) runs after that, the script timers bound to the
+//     NPC are cancelled, and later posts are refused.
+//   - The one exception is a cast in flight: the delete does not stop it,
+//     and its steps run to their end on the closed queue. A cast not
+//     launched yet stops at its launch, its target lost to an NPC that
+//     knows no one any more. A launched one lands at its hit as a dead
+//     caster's skill: no damage, while its effects and the hit's notice to
+//     its targets still apply. Then it finishes and raises its
+//     skill-finished hooks.
 //   - Every task the queue has already taken checks, before it acts, that
 //     the NPC is alive, on the grid, or both: an AI tick or think, a hit, a
 //     regeneration step, a region reset. One that runs after the delete

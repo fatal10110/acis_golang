@@ -30,3 +30,18 @@ func (h *Hostile) MeetsHPMPDisabled(target attackable.Combatant, ref skill.Ref) 
 
 // AttackingNow reports whether h's attack is in flight.
 func (h *Hostile) AttackingNow() bool { return h.brain.AttackingNow() }
+
+// uncheckedCaster is the cast controller start a script's direct cast takes.
+type uncheckedCaster interface {
+	CastUnchecked(target attackable.Combatant, ref skill.Ref)
+}
+
+// CastUnchecked starts h's cast of ref at target at once, past every gate a
+// cast's start runs: reuse, MP, HP, mutes, weapon, conditions. A cast h
+// already has in flight is replaced. No target, or a skill h's table lacks,
+// starts nothing.
+func (h *Hostile) CastUnchecked(target attackable.Combatant, ref skill.Ref) {
+	if c, ok := h.brain.CastController().(uncheckedCaster); ok && target != nil {
+		c.CastUnchecked(target, ref)
+	}
+}
