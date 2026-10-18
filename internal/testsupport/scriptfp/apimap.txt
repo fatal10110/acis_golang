@@ -272,7 +272,6 @@ Npc.lookNeighbor script.NPC.LookNeighbor
 # script reads with Script.Skill; an effect's level is Script.AbnormalLevel.
 ASpawn.getMemo inline
 ASpawn.isInMyTerritory script.NPC.InSpawnTerritory
-ASpawn.setRespawnDelay inline
 AbstractAI.getCurrentIntention script.NPC.Intention
 AbstractEffect.getSkill inline
 AbstractEffect.getTemplate inline
@@ -731,3 +730,15 @@ ZoneManager.getInstance inline
 ZoneManager.getZone script.Script.BossZoneAt
 ZoneManager.getZoneById script.Script.Zone
 ZoneType.isInsideZone script.Zone.Contains
+
+# Spawn operations on the spawn that placed an NPC (#3800, #3739, #3809).
+# DefaultNpc's setRespawnDelay folds into Spawner.CreatePrivates, which
+# gives each private its declared delay; a script that changes a private's
+# delay afterwards calls Spawner.SetRespawnDelay. Zaken's setXYZ moves the
+# private before its respawn, which places it at its spawn's own point.
+ASpawn.doRespawn script.Spawner.DoRespawn
+ASpawn.getFleeLocation script.NPC.FleeLocation
+ASpawn.getSpawnLocation script.Spawner.DrawSpawnLocation
+ASpawn.instantTeleportInMyTerritory script.Script.TeleportPlayersInTerritory
+ASpawn.setRespawnDelay script.Spawner.SetRespawnDelay
+WorldObject.setXYZ script.NPC.SetXYZ

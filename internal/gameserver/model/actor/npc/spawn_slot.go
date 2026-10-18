@@ -58,6 +58,13 @@ func (b *spawnBinding) bindSpawn(slot SpawnSlot) {
 	}
 }
 
+// SpawnParam returns the AI parameter name its spawn sets, ignoring the
+// template's; ok is false when the spawn does not set it.
+func (b *spawnBinding) SpawnParam(name string) (v string, ok bool) {
+	v, ok = b.spawn[name]
+	return v, ok
+}
+
 func (b *spawnBinding) templateParams() AIParams {
 	if b.template == nil {
 		return nil
