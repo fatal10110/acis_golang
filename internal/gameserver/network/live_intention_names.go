@@ -4,10 +4,11 @@ package network
 // character page shows them, IDLE for none. The current one is read from
 // the slot that holds it: the cast in flight or its approach, the attack,
 // a pickup, an interact walk, a friendly follow, a walk to a point, an
-// equip toggle, or a sit or stand request under way. The next one is whatever is queued behind it: a queued
-// pickup, cast, follow, equip toggle, interact or other request held behind
-// a swing, cast or posture change runs ahead of a queued attack when the
-// swing or cast ends, so it is named first.
+// equip toggle, or a sit or stand request under way. The next one is
+// whatever is queued behind it: a queued pickup, cast, follow, equip
+// toggle, interact or other request held behind a swing, cast or posture
+// change runs ahead of a queued attack when the swing or cast ends, so it
+// is named first.
 func (p *livePlayer) intentionNames() (current, next string) {
 	current = "IDLE"
 	switch {
