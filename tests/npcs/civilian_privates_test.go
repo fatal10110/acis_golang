@@ -129,8 +129,8 @@ func TestScriptCivilianMasterKeepsPrivates(t *testing.T) {
 	}
 	tx, ty, _ := tablet.Position()
 	cx, cy, _, _ := npcInfoAt(t, frames, folk.ObjectID())
-	if d := math.Hypot(float64(cx)-float64(tx), float64(cy)-float64(ty)); d < 37 || d > 117 {
-		t.Fatalf("clerk %.0f from its master; want 38 to 116", d)
+	if d := math.Hypot(float64(cx)-float64(tx), float64(cy)-float64(ty)); !inPrivateRing(d, 38, 116) {
+		t.Fatalf("clerk %.2f from its master; want 38 to 116", d)
 	}
 	if !folk.InTerritory() || !pup.InTerritory() {
 		t.Fatal("a private of a civilian master is out of its territory")
