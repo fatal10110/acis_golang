@@ -112,6 +112,15 @@ func (s *Script) BroadcastScriptEventEx(caller *NPC, eventID, arg1, arg2 int32, 
 	s.registry.broadcastScriptEvent(caller, eventID, arg1, arg2, radius)
 }
 
+// ScriptEvent runs the script-event hooks of n, a hostile or a civilian
+// NPC, in the world or not, as SendScriptEvent does.
+func (r *Registry) ScriptEvent(n attackable.Combatant, eventID, arg1, arg2 int32) {
+	if r == nil {
+		return
+	}
+	r.scriptEvent(NPCOf(n), eventID, arg1, arg2)
+}
+
 func (r *Registry) scriptEvent(n *NPC, eventID, arg1, arg2 int32) {
 	if n.combatant() == nil {
 		return
