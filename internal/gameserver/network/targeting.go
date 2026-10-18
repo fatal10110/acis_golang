@@ -102,7 +102,10 @@ func (l *GameClientLink) handleTargetAction(ctx context.Context, live *livePlaye
 		return
 	}
 	if busy {
-		if live.DenyAIAction() || (ctrl && liveOutOfControl(live)) || target.ObjectID() == live.ObjectID() {
+		// A click on a player across the boat boundary is refused ahead
+		// of the intention it would queue, as it is when nothing is busy:
+		// whatever was queued stays.
+		if live.DenyAIAction() || target.ObjectID() == live.ObjectID() || acrossBoatBoundary(live, target) {
 			live.SendFrame(serverpackets.FrameActionFailed())
 			return
 		}
@@ -394,23 +397,18 @@ func (l *GameClientLink) actOnSummon(live *livePlayer, target world.Tracked, ctr
 		l.attackLiveTarget(live, s, shift)
 		return true
 	}
-	l.followLiveTarget(live, s, ctrl, shift)
+	l.followLiveTarget(live, s, shift)
 	return true
 }
 
 // actOnFolk answers a click on an already-selected civilian NPC and
 // reports whether target was one. A forced click attacks it while it may be
 // attacked by force; any other click, a forced one on its corpse or on a
-// holy artifact included, talks to it. A forced click from a player out of
-// control is refused before either.
+// holy artifact included, talks to it.
 func (l *GameClientLink) actOnFolk(live *livePlayer, target world.Tracked, ctrl, shift bool) bool {
 	f, ok := target.(*npc.Folk)
 	if !ok || live == nil {
 		return false
-	}
-	if ctrl && liveOutOfControl(live) {
-		live.SendFrame(serverpackets.FrameActionFailed())
-		return true
 	}
 	if attacksFolk(live, f, ctrl) {
 		l.attackLiveTarget(live, f, shift)
@@ -761,16 +759,21 @@ func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target 
 	// not seated, and the request is refused below as a stand while not
 	// seated.
 	if stand && live.StandFromFakeDeath() {
+		live.holdPosture(true)
 		return
 	}
 	if !stand {
 		if target != nil && l.sitLiveOnChair(live, target) {
+			live.holdPosture(false)
 			return
 		}
 	}
 	if !l.changeLiveWaitType(live, stand) {
 		live.SendFrame(serverpackets.FrameActionFailed())
+		return
 	}
+	// The request stays the current intention until the transition ends.
+	live.holdPosture(stand)
 }
 
 // sitLiveOnChair claims target as a throne and sits live on it, for a sit

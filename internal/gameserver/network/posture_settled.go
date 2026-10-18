@@ -7,9 +7,11 @@ package network
 // get-up that ends after the player sat down again still releases the
 // throne that later sit claimed.
 //
-// The intention queued behind the transition then runs at once, even while
-// another transition is still under way: a fake-death get-up running beside
-// a lie-down, or a lie-down or sit begun after a get-up that has yet to end.
+// A sit or stand request the transition carried out stops being the
+// current intention. The intention queued behind the transition then runs
+// at once, even while another transition is still under way: a fake-death
+// get-up running beside a lie-down, or a lie-down or sit begun after a
+// get-up that has yet to end.
 // The queued intention runs as it would on a fresh request, its own gates
 // deciding the outcome, so a stand queued during a lie-down that ends while
 // a get-up still runs finds the player seated and still playing dead and
@@ -19,6 +21,7 @@ func (l *GameClientLink) settleLivePosture(live *livePlayer, stoodUp bool) {
 	if stoodUp {
 		live.releaseChair()
 	}
+	live.dropHeldPosture()
 	if l.runDeferredAction(live, swingOrCastBusy) {
 		return
 	}

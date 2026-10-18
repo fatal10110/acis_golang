@@ -49,6 +49,14 @@ func (l *GameClientLink) handleAttackRequest(ctx context.Context, cs *connState,
 		return nil
 	}
 	onLive(cs.live, func() {
+		// A player out of control may send no attack request at all: the
+		// whole packet is refused before the object is resolved, ahead of
+		// the observer refusal, so it neither selects, picks up nor
+		// interacts.
+		if liveOutOfControl(cs.live) {
+			cs.live.SendFrame(serverpackets.FrameActionFailed())
+			return
+		}
 		if refuseObserverAttack(cs.live) {
 			return
 		}

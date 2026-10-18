@@ -323,8 +323,10 @@ func (l *GameClientLink) broadcastLiveWaitType(live *livePlayer, stand bool) {
 // mounted is answered with a single ActionFailed and goes idle; one seated
 // while it plays dead gets up out of fake death, its Fake Death effect, if
 // still on, ending with its own get-up first; anyone else stands up as a
-// stand request does. Either way the intentions the player held or queued,
-// a click held behind a posture transition among them, are dropped, on live's own queue, the only one that touches them; the
+// stand request does, the stand becoming its current intention while the
+// stand-up lasts. Either way the intentions the player held or queued,
+// a click held behind a posture transition among them, are dropped, on
+// live's own queue, the only one that touches them; the
 // idle answers nothing more even when the damage has meanwhile started a
 // stand-up. A chair is released when a stand-up ends.
 func (l *GameClientLink) standAttackedLivePlayer(live *livePlayer) {
@@ -350,6 +352,9 @@ func (l *GameClientLink) standAttackedLivePlayer(live *livePlayer) {
 		if !live.detached() {
 			live.takeDeferredAction()
 			dropPostureQueuedIntentions(live)
+			if live.StandingNow() {
+				live.holdPosture(true)
+			}
 		}
 	})
 }
