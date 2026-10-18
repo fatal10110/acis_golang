@@ -82,7 +82,7 @@ type wordText struct {
 	// jumps[k-1][p] is the break 2^k forward scans after p, scanDone past
 	// the end, or jumpUnknown; levels are made as first needed.
 	jumps [][]int32
-	steps int // scan steps taken, for complexity tests
+	steps int // scan calls and steps, memo hits included, for complexity tests
 }
 
 const jumpUnknown = -2
@@ -140,7 +140,6 @@ func (w *wordText) firstBreakAfter(start, offset int) int {
 		return start
 	}
 	for k := len(w.jumps); k >= 0; k-- {
-		w.steps++
 		if j := w.jump(k, start); j != scanDone && j <= offset {
 			start = j
 		}
@@ -164,10 +163,10 @@ func (w *wordText) jump(k, p int) int {
 		}
 		w.jumps[k-1] = level
 	}
+	w.steps++
 	if r := level[p]; r != jumpUnknown {
 		return int(r)
 	}
-	w.steps++
 	r := w.jump(k-1, w.jump(k-1, p))
 	level[p] = int32(r)
 	return r
@@ -175,6 +174,7 @@ func (w *wordText) jump(k, p int) int {
 
 // scanForward returns the next break after start, or scanDone at the end.
 func (w *wordText) scanForward(start int) int {
+	w.steps++
 	if start == len(w.units) {
 		return scanDone
 	}
@@ -201,6 +201,7 @@ func (w *wordText) scanForward(start int) int {
 // scanBack returns the position a backward scan from start settles on: a
 // break whatever precedes it.
 func (w *wordText) scanBack(start int) int {
+	w.steps++
 	pos, c := start, w.current(start)
 	state, cat, lastCat := 1, 0, 0
 	var path []backKey
