@@ -62,7 +62,12 @@ func (s *Siege) saveSiegeLocked(fx *effects, launch bool) {
 	next := NextDate(s.castle.ID, time.UnixMilli(s.castle.SiegeDate()), now)
 	s.castle.SetSiegeDate(next.UnixMilli())
 	s.announceLocked(fx, castleMsg(MsgAnnouncedSiegeTime, s.castle.ID))
-	s.status = StatusRegistrationOpened
+	if launch {
+		s.changeStatusLocked(fx, StatusRegistrationOpened)
+	} else {
+		// The boot's own date change: nothing watches the siege yet.
+		s.status = StatusRegistrationOpened
+	}
 	s.castle.SetTimeRegistrationOver(false)
 	if s.start != nil {
 		s.armStartLocked(time.Second)
@@ -125,7 +130,7 @@ func (s *Siege) stepLocked(fx *effects) {
 		s.armStartLocked(ms(remaining - dayMs))
 	case remaining > registrationEndMs:
 		s.announceLocked(fx, castleMsg(MsgRegistrationTermEnded, s.castle.ID))
-		s.status = StatusRegistrationOver
+		s.changeStatusLocked(fx, StatusRegistrationOver)
 		s.clearPendingLocked()
 		s.armStartLocked(ms(remaining - registrationEndMs))
 	case remaining > tenMinutesMs:
@@ -171,7 +176,7 @@ func (s *Siege) startLocked(fx *effects) {
 	if _, ok := s.e.clans.Get(owner); ok {
 		s.formerOwner = owner
 	}
-	s.status = StatusInProgress
+	s.changeStatusLocked(fx, StatusInProgress)
 	fx.add(func() {
 		s.withBattlefield(func(f *zone.Siege) {
 			f.BanishForeigners(owner)

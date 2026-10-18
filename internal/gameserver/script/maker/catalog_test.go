@@ -20,7 +20,7 @@ func TestCatalogAgainstShippedSpawnlist(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadSpawnlist() error: %v", err)
 	}
-	makers := script.NewMakers(Catalog(), Default, func() bool { return false }, zerolog.Nop())
+	makers := script.NewMakers(Catalog(), Default, script.MakerWorld{Night: func() bool { return false }}, zerolog.Nop())
 	byType := map[string]int{}
 	for _, m := range table.Makers() {
 		byType[m.AIType]++

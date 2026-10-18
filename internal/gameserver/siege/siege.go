@@ -233,6 +233,10 @@ type Siege struct {
 	// goroutine runs them (see runLifecycle).
 	pending  effects
 	draining bool
+
+	// watchers are called with each status the siege changes to, in the
+	// order they were added (see OnStatusChange).
+	watchers []func(Status)
 }
 
 // counters are a clan's siege kills and deaths.

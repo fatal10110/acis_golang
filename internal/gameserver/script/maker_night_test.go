@@ -19,7 +19,7 @@ func TestMakerReadsTheTimeOfDay(t *testing.T) {
 			seen = append(seen, m.IsNight())
 		}}}
 	}
-	r := NewMakers(MakerCatalog{"on_day_night_spawn": ctor}, ctor, func() bool { return night }, zerolog.Nop())
+	r := NewMakers(MakerCatalog{"on_day_night_spawn": ctor}, ctor, MakerWorld{Night: func() bool { return night }}, zerolog.Nop())
 	g := fakeGroup{def: &spawn.Maker{Name: "m"}}
 	run := r.New("on_day_night_spawn")
 	run.Start(g)
