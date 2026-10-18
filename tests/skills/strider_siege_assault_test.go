@@ -8,7 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	castledata "github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -52,6 +54,8 @@ type assaultSetup struct {
 	defends bool
 	noSiege bool
 	riding  bool
+	// armed equips the fixture sword before mounting.
+	armed bool
 }
 
 // bootAssault boots Gludio with one gate by the Caster, who leads Knights
@@ -117,7 +121,16 @@ func bootAssault(t *testing.T, setup assaultSetup) (*gameservertest.Server, int3
 			t.Fatal("Gludio siege not under way")
 		}
 	}
+	var sword int32
+	if setup.armed {
+		sword = srv.GiveItem(t, objID, fixtureSwordID, 1)
+	}
 	enterBesieged(t, srv.Client)
+	if setup.armed {
+		srv.Client.Send(encodeUseItem(sword))
+		srv.InventoryUpdates.Tick()
+		drainUntilQuiet(t, srv.Client)
+	}
 	if setup.riding {
 		mountStrider(t, srv, objID)
 	}
@@ -289,5 +302,36 @@ func TestShippedSiegeAssaultSkill(t *testing.T) {
 	if def.SkillType != "STRIDER_SIEGE_ASSAULT" || def.Target != modelskill.TargetOne || def.Offensive || def.BaseCritRate != 15 {
 		t.Fatalf("Siege Assault loads as %s %v offensive=%v crit=%d, want STRIDER_SIEGE_ASSAULT ONE, not offensive, crit 15",
 			def.SkillType, def.Target, def.Offensive, def.BaseCritRate)
+	}
+}
+
+// TestStriderSiegeAssaultSpendsSoulshot lands the assault of a riding
+// attacker holding a charged soulshot: the hit spends it.
+func TestStriderSiegeAssaultSpendsSoulshot(t *testing.T) {
+	t.Parallel()
+	srv, objID, gate := bootAssault(t, assaultSetup{riding: true, armed: true})
+	c := srv.Client
+	charged := false
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) {
+		pc.SetChargedShot(item.ShotSoul, true)
+		charged = pc.ChargedShot(item.ShotSoul)
+	})
+	if !charged {
+		t.Fatal("soulshot not charged on the sword")
+	}
+	selectTarget(t, c, gate.ObjectID())
+
+	c.Send(encodeRequestMagicSkillUse(assaultSkillID, false, false))
+	frames := collectUntilQuiet(t, c)
+	if !slices.Contains(opcodes(frames), serverpackets.OpcodeMagicSkillUse) {
+		t.Fatalf("assault answered %x, want it cast", opcodes(frames))
+	}
+	srv.Advance(t, assaultHit*time.Millisecond)
+	if hit := readDoorHit(t, c, objID, gate); hit.reported <= 0 {
+		t.Fatalf("assault reported %d damage, want positive", hit.reported)
+	}
+	onPlayerQueue(t, srv, objID, func(pc *player.Character) { charged = pc.ChargedShot(item.ShotSoul) })
+	if charged {
+		t.Fatal("soulshot still charged after the assault landed")
 	}
 }
