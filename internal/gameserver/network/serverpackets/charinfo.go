@@ -25,6 +25,10 @@ type CharInfoSnapshot struct {
 	// HeroAura shows the hero aura on a Character that is no hero: a game
 	// master while GMHeroAura is set.
 	HeroAura bool
+	// SpawnProtectedTeam shows Character in the blue team (teamBlue) in
+	// place of its duel team: spawn protection is active and a protection
+	// window is configured.
+	SpawnProtectedTeam bool
 }
 
 // FrameCharInfo builds a CharInfo packet for a visible player.
@@ -136,7 +140,11 @@ func writeCharInfo(w *wire.Writer, s CharInfoSnapshot) error {
 	w.WriteInt32(int32(resources.MaxCP))
 	w.WriteInt32(int32(resources.CurrentCP))
 	w.WriteUint8(0) // enchant effect
-	w.WriteUint8(uint8(c.DuelTeam()))
+	if s.SpawnProtectedTeam {
+		w.WriteUint8(teamBlue)
+	} else {
+		w.WriteUint8(uint8(c.DuelTeam()))
+	}
 	w.WriteInt32(s.Clan.CrestLargeID)
 	w.WriteUint8(boolUint8(c.IsNoble()))
 	w.WriteUint8(boolUint8(c.IsHero() || s.HeroAura))

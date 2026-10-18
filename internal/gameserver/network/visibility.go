@@ -76,12 +76,13 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 	switch o := obj.(type) {
 	case *livePlayer:
 		p.sendVisibilityFrame(serverpackets.FrameCharInfo(serverpackets.CharInfoSnapshot{
-			Character: o.Character,
-			Template:  o.Template(),
-			Items:     o.inventoryItems(),
-			Clan:      p.link.clanFields(o.Character),
-			Hidden:    hiddenFrom(o, p),
-			HeroAura:  p.link.heroAura(o),
+			Character:          o.Character,
+			Template:           o.Template(),
+			Items:              o.inventoryItems(),
+			Clan:               p.link.clanFields(o.Character),
+			Hidden:             hiddenFrom(o, p),
+			HeroAura:           p.link.heroAura(o),
+			SpawnProtectedTeam: p.link.spawnProtectedTeam(o),
 		}))
 		if o.throne != nil {
 			p.sendVisibilityFrame(serverpackets.FrameChairSit(o.ObjectID(), o.throne.StaticObjectID()))
