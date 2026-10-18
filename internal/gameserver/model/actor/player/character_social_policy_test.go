@@ -29,6 +29,8 @@ func (g policyGraph) SameParty(a, b int32) bool {
 
 func (policyGraph) PartyMembers(int32) []*Character { return nil }
 
+func (policyGraph) Party(int32) (Party, bool) { return nil, false }
+
 func (g policyGraph) SameChannel(a, b int32) bool {
 	ca, cb := g.channel[g.party[a]], g.channel[g.party[b]]
 	return ca != 0 && ca == cb

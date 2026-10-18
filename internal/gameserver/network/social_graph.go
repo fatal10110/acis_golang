@@ -3,6 +3,7 @@ package network
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/party"
 )
 
 // socialGraph answers a character's party and clan standing from the
@@ -33,6 +34,33 @@ func (g socialGraph) PartyMembers(objectID int32) []*player.Character {
 	}
 	out := make([]*player.Character, len(view.Members))
 	for i, m := range view.Members {
+		out[i] = m.Character
+	}
+	return out
+}
+
+func (g socialGraph) Party(objectID int32) (player.Party, bool) {
+	if g.parties == nil {
+		return nil, false
+	}
+	ref, ok := g.parties.PartyRef(objectID)
+	if !ok {
+		return nil, false
+	}
+	return socialParty{ref: ref}, true
+}
+
+// socialParty answers one party's leader and members as characters.
+type socialParty struct {
+	ref party.PartyRef[*livePlayer]
+}
+
+func (p socialParty) Leader() *player.Character { return p.ref.Leader().Character }
+
+func (p socialParty) Members() []*player.Character {
+	members := p.ref.Members()
+	out := make([]*player.Character, len(members))
+	for i, m := range members {
 		out[i] = m.Character
 	}
 	return out
