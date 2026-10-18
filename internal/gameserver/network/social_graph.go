@@ -105,3 +105,16 @@ func (g socialGraph) Mentors(clanID, objectID int32) (sponsor, apprentice int32)
 	}
 	return m.Sponsor, m.Apprentice
 }
+
+func (g socialGraph) ClanHeadquarters(clanID int32) (x, y, z int, ok bool) {
+	cl, found := g.clan(clanID)
+	if !found {
+		return 0, 0, 0, false
+	}
+	hq, held := cl.Headquarters()
+	if !held {
+		return 0, 0, 0, false
+	}
+	x, y, z = hq.Position()
+	return x, y, z, true
+}

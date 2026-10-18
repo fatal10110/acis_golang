@@ -34,14 +34,15 @@ func (g policyGraph) SameChannel(a, b int32) bool {
 	return ca != 0 && ca == cb
 }
 
-func (g policyGraph) AllyID(clanID int32) int32         { return g.ally[clanID] }
-func (g policyGraph) ClanLeaderID(clanID int32) int32   { return g.leader[clanID] }
-func (g policyGraph) AtWar(clanID, targetID int32) bool { return g.wars[[2]int32{clanID, targetID}] }
-func (policyGraph) ClanCastleID(int32) int32            { return 0 }
-func (policyGraph) ClanHallID(int32) int32              { return 0 }
-func (policyGraph) ClanLevel(int32) int                 { return 0 }
-func (policyGraph) Mentors(int32, int32) (int32, int32) { return 0, 0 }
-func (g policyGraph) InAcademy(_, id int32) bool        { return g.academy[id] }
+func (g policyGraph) AllyID(clanID int32) int32                  { return g.ally[clanID] }
+func (g policyGraph) ClanLeaderID(clanID int32) int32            { return g.leader[clanID] }
+func (g policyGraph) AtWar(clanID, targetID int32) bool          { return g.wars[[2]int32{clanID, targetID}] }
+func (policyGraph) ClanCastleID(int32) int32                     { return 0 }
+func (policyGraph) ClanHallID(int32) int32                       { return 0 }
+func (policyGraph) ClanLevel(int32) int                          { return 0 }
+func (policyGraph) Mentors(int32, int32) (int32, int32)          { return 0, 0 }
+func (policyGraph) ClanHeadquarters(int32) (int, int, int, bool) { return 0, 0, 0, false }
+func (g policyGraph) InAcademy(_, id int32) bool                 { return g.academy[id] }
 
 // cursedPeer is a player holding a cursed weapon; Character itself never
 // does until cursed weapons are modeled (#225).

@@ -37,6 +37,9 @@ type SocialGraph interface {
 	// Mentors are the object ids of the academy sponsor and apprentice of
 	// clanID's member objectID, 0 for none or no such member.
 	Mentors(clanID, objectID int32) (sponsor, apprentice int32)
+	// ClanHeadquarters is where the clan's siege headquarters stands; ok
+	// is false when the clan holds none.
+	ClanHeadquarters(clanID int32) (x, y, z int, ok bool)
 }
 
 // olympiadMember is the Olympiad standing of the player acting through

@@ -112,6 +112,8 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 		afterCanCast = l.takeCastleAfterCanCast(live, def, l.magicSkillFinalTarget(live, def, selected))
 	case known && def.SkillType == "SIEGE_FLAG":
 		afterCanCast = l.siegeFlagAfterCanCast(live)
+	case known:
+		afterCanCast = l.siegeCastAfterCanCast(live, def, func() skilltarget.Actor { return l.magicSkillFinalTarget(live, def, selected) })
 	}
 	started, err := actorcast.StartPlayerSkill(actorcast.PlayerSkillRequest{
 		Controller:  controller,
@@ -128,7 +130,7 @@ func (l *GameClientLink) castMagicSkill(live *livePlayer, req clientpackets.Requ
 		},
 	})
 	if err != nil {
-		if errors.Is(err, errGroundCastRejected) || errors.Is(err, errTakeCastleRefused) || errors.Is(err, errSiegeFlagRefused) {
+		if errors.Is(err, errGroundCastRejected) || errors.Is(err, errTakeCastleRefused) || errors.Is(err, errSiegeFlagRefused) || errors.Is(err, errSiegeCastRefused) {
 			return
 		}
 		// A nextActionAttack skill refused at its cost and condition checks
