@@ -66,3 +66,10 @@ type MultisellRequested struct {
 }
 
 func (MultisellRequested) event() {}
+
+// WarehouseWithdrawOpened asks for the character's private warehouse to
+// become its active one and for its withdrawal window to open, after its
+// client is released.
+type WarehouseWithdrawOpened struct{}
+
+func (WarehouseWithdrawOpened) event() {}

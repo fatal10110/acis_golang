@@ -90,6 +90,14 @@ func activatePrivateWarehouse(live *livePlayer) *itemcontainer.Container {
 	return wh
 }
 
+// openScriptWithdraw releases live's client, makes its private warehouse
+// the active store and opens its withdrawal window, as a script asks.
+func (l *GameClientLink) openScriptWithdraw(live *livePlayer) {
+	live.SendFrame(serverpackets.FrameActionFailed())
+	wh := activatePrivateWarehouse(live)
+	l.sendWithdrawList(live, serverpackets.WarehousePrivate, wh.Items())
+}
+
 // activateOwnFreight makes live's own freight the active store, limited to
 // live's freight size.
 func activateOwnFreight(live *livePlayer) *itemcontainer.Freight {
@@ -427,6 +435,7 @@ func (l *GameClientLink) restoreStorage(ctx context.Context, account string, c *
 	}
 	st.warehouse.Restore(rows)
 	st.freight.Restore(rows)
+	c.AttachWarehouse(st.warehouse)
 	if l.roster == nil || account == "" {
 		return st
 	}

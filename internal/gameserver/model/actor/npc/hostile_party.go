@@ -118,6 +118,7 @@ func (h *Hostile) registerHit(combatant attackable.Combatant, amount float64, is
 		h.AddCombatDamageHate(combatant, amount)
 		h.RollAttackedShotRecharge()
 	}
+	h.lastAttacker.Store(&attackerRef{c: combatant})
 	damage := int(commons.JavaInt(amount))
 	h.raiseAttacked(combatant, int32(damage), sk)
 	propagatePartyAttacked(h, combatant, damage, false, true)

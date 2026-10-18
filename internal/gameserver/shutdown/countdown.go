@@ -104,6 +104,19 @@ func (c *Countdown) Start(issuer string, seconds int32, restart bool) {
 	n.ticker = c.q.Every(time.Second, func() { c.tick(n) })
 }
 
+// StartUnabortable begins a countdown of seconds that restarts the server
+// when restart is set and shuts it down otherwise, beside the one Start
+// runs: it aborts no countdown, Abort does not stop it, and a later Start
+// leaves it running. Players are first warned at its first warning time,
+// never at once; a count of zero or less stops at the first tick.
+func (c *Countdown) StartUnabortable(seconds int32, restart bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	n := &counter{seconds: max(0, seconds), restart: restart}
+	c.q.Post(func() { c.tick(n) })
+	n.ticker = c.q.Every(time.Second, func() { c.tick(n) })
+}
+
 // Abort stops the running countdown, by issuer, and tells every player the
 // server carries on. Once any countdown was started the notice is said
 // even when none is running any more; before that Abort does nothing.

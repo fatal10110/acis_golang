@@ -26,15 +26,15 @@ type cutsceneWorld struct {
 }
 
 // bootCutscene boots a quest script for the first player to run handle
-// calls through, then logs both players in.
-func bootCutscene(t *testing.T) *cutsceneWorld {
+// calls through, then logs both players in. extra joins the boot options.
+func bootCutscene(t *testing.T, extra ...gameservertest.Option) *cutsceneWorld {
 	t.Helper()
-	srv := gameservertest.Boot(t,
+	srv := gameservertest.Boot(t, append([]gameservertest.Option{
 		gameservertest.WithCharacter("Director", playerLevel, 0), gameservertest.WithWantChars(1),
 		gameservertest.WithScripts([]script.Listing{{Path: "quest.Director"}}, script.Catalog{
 			"quest.Director": func() script.Script { return script.Script{} },
 		}),
-	)
+	}, extra...)...)
 	startInWorld(t, srv, srv.Client)
 	srv.SeedCharacterFor(t, "player2", "Viewer", playerLevel, 0)
 	second := srv.DialClient(t, "player2", 1)

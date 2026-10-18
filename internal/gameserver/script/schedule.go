@@ -38,6 +38,10 @@ type Server interface {
 	AddClanReputation(clanID int32, points int)
 	// CleanUpRaidPoints forgets and clears every player's raid points.
 	CleanUpRaidPoints()
+	// Shutdown starts a countdown of seconds that restarts the server
+	// when restart is set and shuts it down otherwise. Nothing aborts it,
+	// and it warns no one before its first warning time.
+	Shutdown(seconds int32, restart bool)
 }
 
 // rescanPeriod is how often the runner looks for the tasks whose next

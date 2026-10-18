@@ -86,6 +86,8 @@ func (s *hostileSink) Emit(ev event.Event) {
 		broadcastNPCView(s.link, &s.known, s.world, h, false)
 	case event.NPCInfoChanged:
 		broadcastNPCView(s.link, &s.known, s.world, h, e.ServerObject)
+	case event.NPCInfoShown:
+		s.broadcast(func() wire.Frame { return serverpackets.FrameNPCInfo(npcSnapshot(s.link, h, false)) })
 	case event.MoveTypeChanged:
 		s.broadcast(func() wire.Frame { return frames.ChangeMoveType(h.ObjectID(), e.Running) })
 	case event.Flight:

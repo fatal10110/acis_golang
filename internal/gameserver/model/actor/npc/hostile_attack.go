@@ -135,15 +135,16 @@ func (h *Hostile) CollisionHeight() float64 {
 	return h.Instance.Template.CollisionHeight
 }
 
-// AttackType returns this NPC's attack style, resolved from the weapon
-// Attach resolved. Unarmed (WeaponFist) when Attach found no
-// right-hand weapon — the common case, since the overwhelming majority of
-// monster templates carry no weapon item id in the shipped data.
+// AttackType returns this NPC's attack style, resolved from the weapon in
+// its right hand. Unarmed (WeaponFist) when it holds no weapon — the
+// common case, since the overwhelming majority of monster templates carry
+// no weapon item id in the shipped data.
 func (h *Hostile) AttackType() item.WeaponType {
-	if h.weapon == nil {
+	weapon := h.hands().weapon
+	if weapon == nil {
 		return item.WeaponFist
 	}
-	return h.weapon.Type
+	return weapon.Type
 }
 
 // AttackSpeed returns this NPC's physical attack speed stat.
@@ -161,31 +162,33 @@ func (h *Hostile) MagicAttackSpeed() int {
 // ActiveWeaponItem returns this NPC's resolved right-hand weapon, nil when
 // it is unarmed.
 func (h *Hostile) ActiveWeaponItem() *item.WeaponDetail {
-	return h.weapon
+	return h.hands().weapon
 }
 
 // WeaponReuseDelay returns this NPC's weapon reuse delay; only read for a
 // bow attacker. Zero when unarmed or not wielding a template-defined
 // weapon.
 func (h *Hostile) WeaponReuseDelay() time.Duration {
-	if h.weapon == nil {
+	weapon := h.hands().weapon
+	if weapon == nil {
 		return 0
 	}
-	return time.Duration(h.weapon.ReuseDelay) * time.Millisecond
+	return time.Duration(weapon.ReuseDelay) * time.Millisecond
 }
 
 // ConsumeBowMP spends the right-hand weapon's MP cost at bow fire time.
 func (h *Hostile) ConsumeBowMP() {
-	if h.weapon == nil || h.weapon.MPConsume <= 0 {
+	weapon := h.hands().weapon
+	if weapon == nil || weapon.MPConsume <= 0 {
 		return
 	}
-	h.ReduceMP(float64(h.weapon.MPConsume))
+	h.ReduceMP(float64(weapon.MPConsume))
 }
 
-// WeaponGrade returns this NPC's resolved right-hand weapon's crystal
-// grade, resolved by Attach. Zero (CrystalNone) when unarmed.
+// WeaponGrade returns the crystal grade of this NPC's right-hand weapon.
+// Zero (CrystalNone) when unarmed.
 func (h *Hostile) WeaponGrade() int {
-	return int(h.weaponCrystal)
+	return int(h.hands().weaponCrystal)
 }
 
 func (h *Hostile) SoulshotCharged() bool {
