@@ -896,9 +896,11 @@ func (l *GameClientLink) attackLiveTargetWithGate(live *livePlayer, target world
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
-	// An attack request is rejected while out of control, before it is
-	// dispatched to the target's action.
-	if request && liveOutOfControl(live) {
+	// An attack request from a player that cannot act is answered
+	// ActionFailed alone, before any intention changes. A confused player
+	// can act: a plain click or an effect-driven attack still swings. Only
+	// the forced click refuses it, up front in handleAttackRequest.
+	if request && live.DenyAIAction() {
 		live.SendFrame(serverpackets.FrameActionFailed())
 		return false
 	}
@@ -944,7 +946,8 @@ func hitTarget(target any) (attackable.Combatant, bool) {
 
 // liveOutOfControl reports whether live is out of control: stunned,
 // immobile until attacked, sleeping, paralyzed, afraid, confused,
-// teleporting or dead. Such a player may not send an attack request or walk.
+// teleporting or dead. Such a player may not send a forced attack request
+// or walk.
 func liveOutOfControl(live *livePlayer) bool {
 	return live.Stunned() || live.ImmobileUntilAttacked() || live.Sleeping() || live.Paralyzed() ||
 		live.Afraid() || live.Confused() || live.Teleporting() || live.Dead()
