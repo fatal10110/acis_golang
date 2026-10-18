@@ -33,6 +33,9 @@ type Script struct {
 	// EnteredZones are the zone ids whose entry reaches the zone-enter
 	// hook.
 	EnteredZones []int32
+	// ChangedDoors are the door ids whose opening or closing reaches the
+	// door-change hook.
+	ChangedDoors []int32
 	Hooks
 
 	// path is the scripts.xml path the script was registered under.

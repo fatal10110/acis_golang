@@ -63,6 +63,9 @@ type Death struct {
 // Decayed: NPC's corpse decayed.
 type Decayed struct{ NPC *NPC }
 
+// DoorChange: Door opened or closed.
+type DoorChange struct{ Door *Door }
+
 // Event: Player sent the script event Name, through NPC when NPC is set.
 type Event struct {
 	Name   string

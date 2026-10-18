@@ -2358,7 +2358,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	}
 	if o.npcSpawns != nil {
 		npcSpawns, npcRespawns = bootNpcSpawns(t, gcl, npcSpawnDeps{
-			spawnStore: spawnStore, makerCatalog: o.makerCatalog, night: clock.IsNight, castles: gclConfig.Castles, sieges: gclConfig.Sieges,
+			spawnStore: spawnStore, makerCatalog: o.makerCatalog, night: clock.IsNight, castles: gclConfig.Castles, sieges: gclConfig.Sieges, doors: worldObjects,
 			state: state, templates: o.npcs, geo: bootGeo(o.geo), ids: ids, decay: o.decay, ai: ai, positions: positions,
 			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.AttackStance, log: o.log, makers: o.npcSpawns,
 			dropRates: o.npcDropRates, sevenSigns: sevenSigns, scripts: quests.registry, spawner: quests.env.Spawner, routes: o.walkerRoutes,

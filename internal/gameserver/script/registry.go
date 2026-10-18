@@ -87,6 +87,8 @@ var raisedHooks = map[hook]kindSet{
 	hookItemUse:   kinds(KindOther),
 	hookZoneEnter: kinds(KindOther),
 	hookDeath:     kinds(KindOther),
+	// The opening or closing of a door (WatchDoors).
+	hookDoorChange: kinds(KindOther),
 	// The script-event sends (SendScriptEvent, BroadcastScriptEvent), to an
 	// NPC of either kind.
 	hookScriptEvent: kinds(KindFolk, KindHostile),
@@ -275,6 +277,9 @@ func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
 			}
 		}
 	}
+	if cfg.Env != nil && cfg.Env.Doors != nil {
+		r.WatchDoors(cfg.Env.Doors)
+	}
 	r.log.Info().Int("listed", len(list)).Int("registered", registered).Msg("script: registry built")
 	return r
 }
@@ -344,7 +349,7 @@ func gate(s *Script, bound Bindings, cfg *Config) error {
 			}
 		}
 	}
-	for _, h := range []hook{hookEvent, hookStart, hookTimer, hookItemUse, hookZoneEnter, hookDeath} {
+	for _, h := range []hook{hookEvent, hookStart, hookTimer, hookItemUse, hookZoneEnter, hookDeath, hookDoorChange} {
 		if set.has(h) && !cfg.raised(h, KindOther) && !cfg.raised(h, KindFolk) && !cfg.raised(h, KindHostile) {
 			return fmt.Errorf("hook %s is not raised", h)
 		}

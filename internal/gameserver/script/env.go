@@ -100,6 +100,11 @@ type Doors interface {
 	// SetDoorOpen opens or closes the door id, as every state change of a
 	// door does.
 	SetDoorOpen(id int, open bool) bool
+	// WatchDoor has fn called with the standing door id after each later
+	// change of its open state: the script watchers, then the maker
+	// watchers, each in registration order; a key registered again under
+	// kind moves last. It reports whether the door stands in the world.
+	WatchDoor(id int, kind door.WatchKind, key any, fn func(*door.Object)) bool
 }
 
 // Castles finds the castle an NPC belongs to.
