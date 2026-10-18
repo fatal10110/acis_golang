@@ -81,6 +81,14 @@ type liveZoneActor struct {
 	scriptZones []int32
 	// scripts are the scripts zone entries reach; nil reaches none.
 	scripts zoneScripts
+	// spawnMu guards spawning and spawnRules. While spawning, the zone
+	// rules the spawn's revalidation runs (a move out, its notices) are
+	// held in spawnRules instead of posted, and that revalidation runs them
+	// inline once it has released its locks, so their frames land at the
+	// spawn's place in the enter-world burst.
+	spawnMu    sync.Mutex
+	spawning   bool
+	spawnRules []func()
 }
 
 // zoneScripts is what a player's zone entries ask of the script registry.
@@ -142,6 +150,39 @@ func (a *liveZoneActor) Online() bool                { return !a.live.detached()
 func (a *liveZoneActor) Race() player.Race           { return a.live.Character.Race }
 func (a *liveZoneActor) ClanID() int32               { return a.live.Character.ClanID() }
 func (a *liveZoneActor) SiegeState() int32           { return a.live.Character.SiegeState() }
+
+// revalidateSpawn enters the player into the zones it spawns in, on its
+// own queue, then runs the zone rules that entry asked of it (zoneRule)
+// with no zone lock held.
+func (a *liveZoneActor) revalidateSpawn(ix *zone.Index) {
+	a.spawnMu.Lock()
+	a.spawning = true
+	a.spawnMu.Unlock()
+	a.revalidate(ix)
+	a.spawnMu.Lock()
+	rules := a.spawnRules
+	a.spawning, a.spawnRules = false, nil
+	a.spawnMu.Unlock()
+	for _, fn := range rules {
+		fn()
+	}
+}
+
+// zoneRule runs fn, a zone rule's action on live, on live's queue with no
+// zone lock held: at the end of live's spawn revalidation while it runs,
+// else posted to the queue. It reports false when live's queue is closed.
+func zoneRule(live *livePlayer, fn func()) bool {
+	if a := live.zoneActor; a != nil {
+		a.spawnMu.Lock()
+		if a.spawning {
+			a.spawnRules = append(a.spawnRules, fn)
+			a.spawnMu.Unlock()
+			return true
+		}
+		a.spawnMu.Unlock()
+	}
+	return postLive(live, fn)
+}
 
 func (a *liveZoneActor) revalidate(ix *zone.Index) {
 	defer a.fireScriptZones()
@@ -588,9 +629,9 @@ func (l *GameClientLink) ejectBossPlayer(boss *zone.Boss, actor zone.Actor) {
 		}
 		radius = restartTeleportOffset
 	}
-	// Zone entry may hold both the zone and teleport locks. Post to the
-	// player's queue so the teleport starts after the callback returns.
-	postLive(live, func() {
+	// Zone entry may hold both the zone and teleport locks, so the
+	// teleport starts on the player's queue after the callback returns.
+	zoneRule(live, func() {
 		if !live.detached() {
 			l.teleportLivePlayer(live, dest, radius)
 		}
