@@ -332,8 +332,9 @@ func TestCrystallizeItemReportsGradeTooHighWithoutMutation(t *testing.T) {
 }
 
 // TestExchangeWithoutAllocatorMovesNothing pins the fail-closed exchange: a
-// service that cannot hand out object ids refuses before locking, instead of
-// moving a whole row and then failing on a later row that has to split.
+// service that cannot hand out the object id a splitting row needs refuses
+// before the first move, instead of moving a whole row and then failing on
+// the later row that has to split.
 func TestExchangeWithoutAllocatorMovesNothing(t *testing.T) {
 	templates := testTemplates()
 	a := itemcontainer.NewPlayerInventory(1, templates)
@@ -341,16 +342,12 @@ func TestExchangeWithoutAllocatorMovesNothing(t *testing.T) {
 	sword := a.AddNew(30, 1, 500)
 	adena := b.AddNew(item.AdenaID, 100, 600)
 
-	checked := false
-	_, ok, err := NewService(nil).Exchange(a, b,
+	res, ok, err := NewService(nil).Exchange(a, b,
 		[]Move{{ObjectID: sword.ObjectID, Count: 1}},
 		[]Move{{ObjectID: adena.ObjectID, Count: 40}},
-		func(itemcontainer.Held, itemcontainer.Held) bool { checked = true; return true })
-	if err == nil || ok {
-		t.Fatalf("Exchange() = ok %v, err %v; want a refusal", ok, err)
-	}
-	if checked {
-		t.Fatal("Exchange locked and checked without ids for its rows")
+		func(itemcontainer.Held, itemcontainer.Held) bool { return true })
+	if err == nil || ok || len(res.Persist) != 0 {
+		t.Fatalf("Exchange() = ok %v, err %v, persist %v; want a refusal", ok, err, res.Persist)
 	}
 	if a.ItemByObjectID(sword.ObjectID) == nil || b.ItemCount(item.AdenaID, -1, true) != 100 {
 		t.Fatal("a refused exchange moved items")
@@ -410,5 +407,82 @@ func TestDropItemFailureClassifiesInReferenceOrder(t *testing.T) {
 	}
 	if got := inv.ItemByObjectID(adena.ObjectID).Snapshot().Count; got != 10 {
 		t.Fatalf("classification mutated the stack: count = %d, want 10", got)
+	}
+}
+
+// TestExchangeWithoutSplitsNeedsNoAllocator pins that an exchange whose rows
+// all move whole or land on held stacks takes no object id, so it settles
+// even on a service with no allocator.
+func TestExchangeWithoutSplitsNeedsNoAllocator(t *testing.T) {
+	templates := testTemplates()
+	a := itemcontainer.NewPlayerInventory(1, templates)
+	b := itemcontainer.NewPlayerInventory(2, templates)
+	sword := a.AddNew(30, 1, 500)
+	a.AddNew(item.AdenaID, 5, 501)
+	adena := b.AddNew(item.AdenaID, 100, 600)
+
+	_, ok, err := NewService(nil).Exchange(a, b,
+		[]Move{{ObjectID: sword.ObjectID, Count: 1}},
+		[]Move{{ObjectID: adena.ObjectID, Count: 40}},
+		func(itemcontainer.Held, itemcontainer.Held) bool { return true })
+	if err != nil || !ok {
+		t.Fatalf("Exchange() = ok %v, err %v; want it settled", ok, err)
+	}
+	if b.ItemByObjectID(sword.ObjectID) == nil || a.ItemCount(item.AdenaID, -1, true) != 45 || b.ItemCount(item.AdenaID, -1, true) != 60 {
+		t.Fatal("the exchange did not move both rows")
+	}
+}
+
+// TestExchangeCountsUnitsMergedIntoAStack pins a row moving a stack an
+// earlier row grew: both owners offer their whole adena, so a's lands on
+// b's stack, and b's row, offering only its own 50 of the 150 it now holds,
+// splits into an a holding none and takes the one id the exchange spends.
+func TestExchangeCountsUnitsMergedIntoAStack(t *testing.T) {
+	templates := testTemplates()
+	a := itemcontainer.NewPlayerInventory(1, templates)
+	b := itemcontainer.NewPlayerInventory(2, templates)
+	aAdena := a.AddNew(item.AdenaID, 100, 500)
+	bAdena := b.AddNew(item.AdenaID, 50, 600)
+	ids := &testIDs{next: 900}
+
+	_, ok, err := NewService(ids).Exchange(a, b,
+		[]Move{{ObjectID: aAdena.ObjectID, Count: 100}},
+		[]Move{{ObjectID: bAdena.ObjectID, Count: 50}},
+		func(itemcontainer.Held, itemcontainer.Held) bool { return true })
+	if err != nil || !ok {
+		t.Fatalf("Exchange() = ok %v, err %v; want it settled", ok, err)
+	}
+	if got, want := a.ItemCount(item.AdenaID, -1, true), 50; got != want {
+		t.Fatalf("a adena = %d, want %d", got, want)
+	}
+	if got, want := b.ItemCount(item.AdenaID, -1, true), 100; got != want {
+		t.Fatalf("b adena = %d, want %d", got, want)
+	}
+	if ids.next != 901 {
+		t.Fatalf("ids taken = %d, want 1", ids.next-900)
+	}
+}
+
+// TestExchangeMoveTakesALateIDWhenTheCountFellShort pins the backstop for a
+// miscounted split: a splitting row finding no id left takes one late
+// instead of failing after earlier rows landed.
+func TestExchangeMoveTakesALateIDWhenTheCountFellShort(t *testing.T) {
+	templates := testTemplates()
+	a := itemcontainer.NewPlayerInventory(1, templates)
+	b := itemcontainer.NewPlayerInventory(2, templates)
+	adena := a.AddNew(item.AdenaID, 100, 500)
+	svc := NewService(&testIDs{next: 900})
+
+	var res Result
+	moved := false
+	itemcontainer.Exchange(a, b, func(heldA, heldB itemcontainer.Held) {
+		ids := exchangeIDs{s: svc}
+		moved = moveAll(&res, heldA, heldB, a.OwnerID(), []Move{{ObjectID: adena.ObjectID, Count: 40}}, &ids)
+	})
+	if !moved {
+		t.Fatal("the splitting row failed without its id")
+	}
+	if got := b.ItemByTemplateID(item.AdenaID); got == nil || got.ObjectID != 901 || got.CountValue() != 40 {
+		t.Fatalf("b adena = %+v, want 40 under the late id 901", got)
 	}
 }
