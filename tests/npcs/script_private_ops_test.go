@@ -59,8 +59,8 @@ func TestScriptDoRespawnOfAPrivate(t *testing.T) {
 	}
 	bx, by, _ := boss.Position()
 	px, py, _ := live.Position()
-	if d := math.Hypot(float64(px-bx), float64(py-by)); d < 39 || d > 131 {
-		t.Fatalf("respawned private %.0f from its master; want 40 to 130", d)
+	if d := math.Hypot(float64(px-bx), float64(py-by)); !inPrivateRing(d, 40, 120) {
+		t.Fatalf("respawned private %.2f from its master; want 40 to 120", d)
 	}
 
 	corpse := livePrivate(t, boss)
@@ -106,8 +106,8 @@ func TestScriptDrawSpawnLocationOfPrivates(t *testing.T) {
 	bx, by, _ := boss.Position()
 	for range 10 {
 		got := w.spawner.DrawSpawnLocation(around)
-		if d := math.Hypot(float64(got.X-bx), float64(got.Y-by)); d < 39 || d > 131 || got.Heading != boss.Heading() {
-			t.Fatalf("private spawn location %+v: %.0f from its master, heading %d; want 40 to 130, heading %d", got, d, got.Heading, boss.Heading())
+		if d := math.Hypot(float64(got.X-bx), float64(got.Y-by)); !inPrivateRing(d, 40, 120) || got.Heading != boss.Heading() {
+			t.Fatalf("private spawn location %+v: %.2f from its master, heading %d; want 40 to 120, heading %d", got, d, got.Heading, boss.Heading())
 		}
 	}
 }

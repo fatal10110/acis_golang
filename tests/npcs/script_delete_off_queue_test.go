@@ -172,14 +172,14 @@ func TestScriptDeleteDoesNotWaitForTheNPCQueueTaskInFlight(t *testing.T) {
 }
 
 // Deleting a fighting monster from another goroutine, while its queue keeps
-// running its AI ticks and hits, ends its fight when the delete returns: it
+// running its AI ticks and swings, ends its fight when the delete returns: it
 // is out of the world, decayed once, and lands no more hits however long the
 // fight would have gone on. Raced many times under -race on both executors.
 func TestScriptDeleteOffQueueEndsTheFightInFlight(t *testing.T) {
 	t.Parallel()
 	executors(t, func(t *testing.T, opts ...gameservertest.Option) {
 		w := bootLife(t, append(opts, gameservertest.WithAITask())...)
-		// A round on the wall clock lasts until the wolf's first hit lands.
+		// A round on the wall clock lasts until the wolf's first swing.
 		rounds := 10
 		if !w.srv.DrivesClock() {
 			rounds = 4
@@ -193,39 +193,14 @@ func TestScriptDeleteOffQueueEndsTheFightInFlight(t *testing.T) {
 			wolf := w.live(t, lifeWolfID).(*npc.Hostile)
 			onQueueOf(t, wolf, func() { script.NPCOf(wolf).AddAttackDesire(pl, 1000) })
 			w.log.take()
+			drainFrames(t, w.srv.Client)
 
-			// The fight goes on, on the wolf's queue, until the delete is
-			// done; the delete starts once the wolf has landed a hit.
-			stop := make(chan struct{})
-			going := make(chan struct{})
-			fought := make(chan struct{})
-			go func() {
-				defer close(fought)
-				hit := false
-				for {
-					select {
-					case <-stop:
-						return
-					default:
-					}
-					_ = w.srv.AI.Tick()
-					if w.srv.DrivesClock() {
-						w.srv.Advance(t, 100*time.Millisecond)
-					} else {
-						w.srv.TickPositions()
-					}
-					if !hit && w.srv.PlayerCurrentHP(t, w.player) < w.srv.PlayerMaxHP(t, w.player) {
-						hit = true
-						close(going)
-					}
-				}
-			}()
-			select {
-			case <-going:
-			case <-time.After(30 * time.Second):
-				t.Fatalf("round %d: the wolf never hit the character", round)
-			}
-
+			// The fight starts on the test goroutine: the delete waits for
+			// the wolf's first swing, hit or miss, as a hit can take many
+			// swings.
+			fightUntilSwing(t, w, wolf, round)
+			// The fight goes on, on the wolf's queue, while the delete runs.
+			endFight := fightOn(t, w)
 			script.NPCOf(wolf).DeleteMe()
 			if w.inWorld(lifeWolfID) {
 				t.Fatalf("round %d: the wolf is still in the world when the delete returns", round)
@@ -233,8 +208,9 @@ func TestScriptDeleteOffQueueEndsTheFightInFlight(t *testing.T) {
 			if !wolf.Decayed() {
 				t.Fatalf("round %d: the wolf is not decayed when the delete returns", round)
 			}
-			close(stop)
-			<-fought
+			if err := endFight(); err != nil {
+				t.Fatalf("round %d: fight step: %v", round, err)
+			}
 			w.srv.Settle(t)
 
 			hp := w.srv.PlayerCurrentHP(t, w.player)
@@ -262,4 +238,61 @@ func TestScriptDeleteOffQueueEndsTheFightInFlight(t *testing.T) {
 			w.srv.NpcSpawns.Respawn(lifeWolfKey)
 		}
 	})
+}
+
+// fightSteps bounds the AI and position ticks a round waits for the wolf's
+// first swing by fight steps rather than wall time: one position interval
+// each, 30s of fight time against a first swing within the first second.
+const fightSteps = 300
+
+// fightUntilSwing ticks the AI and the positions until the client sees the
+// wolf's Attack, failing the round after fightSteps steps.
+func fightUntilSwing(t *testing.T, w *lifeWorld, wolf *npc.Hostile, round int) {
+	t.Helper()
+	swung := func(f []byte) bool { return f[0] == serverpackets.OpcodeAttack }
+	for step := 0; ; step++ {
+		if step == fightSteps {
+			t.Fatalf("round %d: the wolf did not swing at the character in %d fight steps", round, fightSteps)
+		}
+		_ = w.srv.AI.Tick()
+		w.srv.TickPositions()
+		if slices.ContainsFunc(naming(drainFrames(t, w.srv.Client), wolf.ObjectID()), swung) {
+			return
+		}
+	}
+}
+
+// fightOn keeps ticking the AI and the positions on a goroutine of its own
+// until the returned func stops it. That func waits for the goroutine and
+// reports the step failure that ended it early, if any. The goroutine never
+// touches t; the test's cleanup stops it should the test fail first.
+func fightOn(t *testing.T, w *lifeWorld) func() error {
+	stop := make(chan struct{})
+	fought := make(chan error, 1)
+	go func() {
+		for {
+			select {
+			case <-stop:
+				fought <- nil
+				return
+			default:
+			}
+			_ = w.srv.AI.Tick()
+			if err := w.srv.TryTickPositions(); err != nil {
+				fought <- err
+				return
+			}
+		}
+	}()
+	var once sync.Once
+	var err error
+	end := func() error {
+		once.Do(func() {
+			close(stop)
+			err = <-fought
+		})
+		return err
+	}
+	t.Cleanup(func() { _ = end() })
+	return end
 }
