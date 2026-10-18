@@ -816,3 +816,13 @@ CastleManager.getCastleById script.Maker.Castle
 Siege.addMakerEvent script.Castle.AddMakerEvent
 Siege.getCastle inline
 Siege.getStatus script.Castle.SiegeStatus
+
+# The door rows of the door change (#3809). A script lists the door ids
+# whose opening or closing reaches its door-change hook in
+# Script.ChangedDoors; the door owner runs the hook after the door's status
+# broadcast and before the door it triggers changes. A maker finds a door
+# by name on its own handle (Maker.Door) and registers its npcmaker on the
+# door; each later opening or closing runs the maker's door event hook,
+# after the scripts' hooks.
+Door.addMakerEvent script.Door.AddMakerEvent
+Quest.addDoorChange inline

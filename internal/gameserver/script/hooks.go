@@ -12,6 +12,7 @@ type Hooks struct {
 	OnCreated                  func(*Script, Created)
 	OnDeath                    func(*Script, Death)
 	OnDecayed                  func(*Script, Decayed)
+	OnDoorChange               func(*Script, DoorChange)
 	OnEvent                    func(*Script, Event) string
 	OnFirstTalk                func(*Script, FirstTalk) string
 	OnItemUse                  func(*Script, ItemUse)
@@ -69,6 +70,7 @@ const (
 	hookCreated
 	hookDeath
 	hookDecayed
+	hookDoorChange
 	hookEvent
 	hookFirstTalk
 	hookItemUse
@@ -104,6 +106,7 @@ var hookMethods = [hookCount]string{
 	hookCreated:                  "onCreated",
 	hookDeath:                    "onDeath",
 	hookDecayed:                  "onDecayed",
+	hookDoorChange:               "onDoorChange",
 	hookEvent:                    "onAdvEvent",
 	hookFirstTalk:                "onFirstTalk",
 	hookItemUse:                  "onItemUse",
@@ -150,6 +153,7 @@ func (h *Hooks) set() hookSet {
 	add(h.OnCreated != nil, hookCreated)
 	add(h.OnDeath != nil, hookDeath)
 	add(h.OnDecayed != nil, hookDecayed)
+	add(h.OnDoorChange != nil, hookDoorChange)
 	add(h.OnEvent != nil, hookEvent)
 	add(h.OnFirstTalk != nil, hookFirstTalk)
 	add(h.OnItemUse != nil, hookItemUse)
@@ -211,6 +215,9 @@ func (h Hooks) With(o Hooks) Hooks {
 		}
 		if o.OnDecayed != nil {
 			dst.OnDecayed = o.OnDecayed
+		}
+		if o.OnDoorChange != nil {
+			dst.OnDoorChange = o.OnDoorChange
 		}
 		if o.OnEvent != nil {
 			dst.OnEvent = o.OnEvent
@@ -336,6 +343,12 @@ func (h *Hooks) Death(s *Script, e Death) {
 func (h *Hooks) Decayed(s *Script, e Decayed) {
 	if h.OnDecayed != nil {
 		h.OnDecayed(s, e)
+	}
+}
+
+func (h *Hooks) DoorChange(s *Script, e DoorChange) {
+	if h.OnDoorChange != nil {
+		h.OnDoorChange(s, e)
 	}
 }
 

@@ -327,13 +327,14 @@ func buildScripts(*script.Registry) {}
 
 // provideMakers returns the maker registry: every npcmaker runs the maker
 // of its type, the default maker when its type has none, reads the time of
-// day from the game clock, and finds the castles and their sieges.
-func provideMakers(clock *task.GameClock, castles *castle.Manager, sieges *siege.Engine, log zerolog.Logger) (*script.Makers, error) {
+// day from the game clock, and finds the castles and their sieges and the
+// doors.
+func provideMakers(clock *task.GameClock, castles *castle.Manager, sieges *siege.Engine, doors *manager.WorldObjects, log zerolog.Logger) (*script.Makers, error) {
 	makers, err := makerCatalog(makerCatalogs())
 	if err != nil {
 		return nil, err
 	}
-	return script.NewMakers(makers, maker.Default, script.MakerWorld{Night: clock.IsNight, Castles: castles, Sieges: sieges}, log), nil
+	return script.NewMakers(makers, maker.Default, script.MakerWorld{Night: clock.IsNight, Castles: castles, Sieges: sieges, Doors: doors}, log), nil
 }
 
 // makerCatalogs are the maker catalogs: the makers ported with the engine,

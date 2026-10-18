@@ -237,6 +237,7 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *
 func (q *questBoot) bindResidences(doors *gamemanager.WorldObjects, castles *castle.Manager, halls *hallmodel.Table, sieges *siege.Engine) {
 	if doors != nil {
 		q.env.Doors = doors
+		q.registry.WatchDoors(doors)
 	}
 	if castles != nil {
 		q.env.Castles = castles

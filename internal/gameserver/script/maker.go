@@ -32,6 +32,9 @@ type MakerHooks struct {
 	OnNPCDeleted  func(*Maker, MakerNPC)
 	OnNPCDBInfo   func(*Maker, MakerSpawn)
 	OnScriptEvent func(*Maker, MakerEvent)
+	// OnDoorEvent runs for each opening or closing of a door the maker
+	// registered on with Door.AddMakerEvent.
+	OnDoorEvent func(*Maker, MakerDoor)
 	// OnSiegeEvent runs for each status change of a siege the maker
 	// registered on with Castle.AddMakerEvent.
 	OnSiegeEvent func(*Maker, MakerSiege)
@@ -73,6 +76,12 @@ type MakerSiege struct {
 	Status SiegeStatus
 }
 
+// MakerDoor: Door, which Group's maker registered on, opened or closed.
+type MakerDoor struct {
+	Group spawn.Group
+	Door  *Door
+}
+
 // MakerTimer: the maker's timer Name came due.
 type MakerTimer struct {
 	Group spawn.Group
@@ -99,6 +108,9 @@ func (h MakerHooks) With(o MakerHooks) MakerHooks {
 	}
 	if o.OnSiegeEvent != nil {
 		h.OnSiegeEvent = o.OnSiegeEvent
+	}
+	if o.OnDoorEvent != nil {
+		h.OnDoorEvent = o.OnDoorEvent
 	}
 	if o.OnTimer != nil {
 		h.OnTimer = o.OnTimer
@@ -145,6 +157,12 @@ func (h *MakerHooks) SiegeEvent(m *Maker, e MakerSiege) {
 	}
 }
 
+func (h *MakerHooks) DoorEvent(m *Maker, e MakerDoor) {
+	if h.OnDoorEvent != nil {
+		h.OnDoorEvent(m, e)
+	}
+}
+
 func (h *MakerHooks) Timer(m *Maker, e MakerTimer) {
 	if h.OnTimer != nil {
 		h.OnTimer(m, e)
@@ -172,6 +190,8 @@ type MakerWorld struct {
 	Castles CastlesByID
 	// Sieges are the castles' sieges; nil finds none.
 	Sieges Sieges
+	// Doors are the doors of the world; nil finds none.
+	Doors Doors
 }
 
 // CastlesByID finds a castle by its id.
@@ -238,6 +258,12 @@ func (r *makerRun) ScriptEvent(g spawn.Group, name string, int1, int2 int) {
 func (r *makerRun) SiegeEvent(g spawn.Group, c *Castle, st SiegeStatus) {
 	r.run(g, "onSiegeEvent", func() {
 		r.m.MakerHooks.SiegeEvent(r.m, MakerSiege{Group: g, Castle: c, Status: st})
+	})
+}
+
+func (r *makerRun) DoorEvent(g spawn.Group, d *Door) {
+	r.run(g, "onDoorEvent", func() {
+		r.m.MakerHooks.DoorEvent(r.m, MakerDoor{Group: g, Door: d})
 	})
 }
 
