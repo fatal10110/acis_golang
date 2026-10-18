@@ -57,7 +57,7 @@ func TestDuelPacketBytes(t *testing.T) {
 
 // TestFrameUserAndCharInfoCarryDuelTeam pins the team byte UserInfo and
 // CharInfo write: a duellist's side colour (BLUE 1, RED 2), alone in the
-// payload changing with it. Spawn protection still shows BLUE in UserInfo.
+// payload changing with it. Spawn protection still shows BLUE in both.
 func TestFrameUserAndCharInfoCarryDuelTeam(t *testing.T) {
 	tmpl := &player.Template{}
 	c := &player.Character{}
@@ -96,5 +96,12 @@ func TestFrameUserAndCharInfoCarryDuelTeam(t *testing.T) {
 	blue := framePayload(t, FrameUserInfo(UserInfoSnapshot{Character: c, Template: tmpl}))
 	if !bytes.Equal(protected, blue) {
 		t.Fatal("a spawn-protected duellist's UserInfo differs from a blue one's, want BLUE shown")
+	}
+	c.SetDuelTeam(duel.TeamRed)
+	protected = framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: tmpl, SpawnProtectedTeam: true}))
+	c.SetDuelTeam(duel.TeamBlue)
+	blue = framePayload(t, FrameCharInfo(CharInfoSnapshot{Character: c, Template: tmpl}))
+	if !bytes.Equal(protected, blue) {
+		t.Fatal("a spawn-protected duellist's CharInfo differs from a blue one's, want BLUE shown")
 	}
 }
