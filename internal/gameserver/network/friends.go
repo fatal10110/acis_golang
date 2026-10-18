@@ -251,11 +251,14 @@ func (l *GameClientLink) handleRequestBlock(live *livePlayer, req clientpackets.
 			}
 			return
 		}
+		// The block is recorded before either notice goes out: the blocked
+		// player's connection runs on its own goroutine, so a request it
+		// sends after reading the notice must already find the block.
+		l.relations.Block(live.ObjectID(), ref.ID)
 		live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1AddedToYourIgnoreList, ref.Name))
 		if target, online := l.livePlayerByID(ref.ID); online {
 			target.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageS1HasAddedYouToIgnoreList, live.CharacterName()))
 		}
-		l.relations.Block(live.ObjectID(), ref.ID)
 
 	case clientpackets.BlockList:
 		l.sendBlockList(live)
