@@ -473,12 +473,12 @@ func (f *Folk) MakeAttackHit(target attackable.Combatant, split bool) attack.Hit
 	_, _, sz := f.Position()
 	_, _, tz := other.Position()
 	behind, inFront := creature.AttackFacing(other, f)
-	rate := formulas.HitRate(accuracy, other.Against(conditions.ActorOf(f), nil).Evasion(), sz-tz, f.effects.IsNight(), behind, inFront)
+	rate := formulas.HitRate(accuracy, other.Against(f.ConditionActor(), nil).Evasion(), sz-tz, f.effects.IsNight(), behind, inFront)
 	if formulas.Missed(rate, f.Roll(1000)) {
 		hit.Miss = true
 		return hit
 	}
-	crit := formulas.CritSucceeds(f.CriticalRate(), f.Roll(1000))
+	crit := formulas.CritSucceeds(f.Against(conditions.ActorOf(other), nil).CriticalRate(), f.Roll(1000))
 	in, shield := creature.ResolvePhysicalAttackInput(f, other, crit)
 	hit.Damage = creature.ApplyPhysicalAttackDamage(in, shield, split)
 	hit.Crit = crit

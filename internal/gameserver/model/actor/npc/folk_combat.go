@@ -15,7 +15,6 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sim"
-	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -149,7 +148,7 @@ func (f *Folk) initCombat(mods []effect.Mod) {
 	f.effects = effect.NewList(f, effect.WithAdmission(folkAdmits))
 	f.maxBuffs.Store(maxBuffCount)
 	f.running.Store(!f.Instance.WalkMode)
-	f.AttachStatFuncs(effect.Attachable(mods, conditions.ActorOf(f)))
+	f.AttachStatFuncs(effect.Attachable(mods, f.ConditionActor()))
 	f.hp = float64(f.MaxHP())
 	f.mp = math.Trunc(f.MaxMPValue())
 	f.hpBar.Calibrate(float64(f.MaxHP()))
