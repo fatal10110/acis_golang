@@ -228,6 +228,17 @@ func (ix *Index) EffectRangeInPeaceZone(regionX, regionY, x, y, z, effectRange i
 	return false
 }
 
+// MotherTreeBonus reports the flat HP and MP regeneration bonuses of the
+// first Mother Tree zone whose volume contains (x, y, z), whatever race it
+// admits.
+func (ix *Index) MotherTreeBonus(x, y, z int) (hp, mp int, ok bool) {
+	t, ok := FindAt[*MotherTree](ix, x, y, z)
+	if !ok {
+		return 0, 0, false
+	}
+	return t.HPBonus, t.MPBonus, true
+}
+
 // peaceCapable reports whether k is one of the zone kinds that can suspend
 // hostilities: an explicit Peace zone, a monster-race derby track, or a
 // town whose data marks it peaceful.

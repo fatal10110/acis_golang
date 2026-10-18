@@ -45,6 +45,14 @@ type PeaceZoneQuery interface {
 	EffectRangeInPeaceZone(regionX, regionY, x, y, z, effectRange int) bool
 }
 
+// ZoneQuery answers the zone questions a character asks of its position.
+type ZoneQuery interface {
+	PeaceZoneQuery
+	// MotherTreeBonus reports the flat HP and MP regeneration bonuses of
+	// the first Mother Tree zone whose volume contains (x, y, z).
+	MotherTreeBonus(x, y, z int) (hp, mp int, ok bool)
+}
+
 // SetInPvPZone records the live zone engine's current PvP membership.
 func (c *Character) SetInPvPZone(inside bool) {
 	c.insidePvPZone.Store(inside)
@@ -216,7 +224,7 @@ type Rules struct {
 type Runtime struct {
 	World *world.State
 	LOS   LineOfSight
-	Zones PeaceZoneQuery
+	Zones ZoneQuery
 	// Social answers the party and clan standing the social rules read;
 	// nil leaves the character in no party and its clan in no alliance,
 	// war or leadership.
