@@ -467,7 +467,7 @@ func (s *Service) giveProducts(c *player.Character, inv *itemcontainer.Inventory
 					continue
 				}
 				if i < len(augmentations) {
-					inst.SetAugmentation(&augmentations[i])
+					inv.SetAugmentation(inst, augmentations[i])
 				}
 				inv.SetEnchantLevel(inst, p.EnchantLevel)
 			}

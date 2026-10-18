@@ -43,6 +43,10 @@ func TestPetDeathPenalty(t *testing.T) {
 			t.Parallel()
 			h := bootOwnerWithCollarOpts(t, []gameservertest.Option{
 				gameservertest.WithNPCs(npc.NewTable([]*npc.Template{penaltyWolfTemplate(), treeTemplate()})),
+				// A shipped collar is not stackable, so each of its
+				// changes queues its own update entry instead of folding
+				// into an earlier one's count.
+				gameservertest.WithItemTemplates(unstackedCollarTemplates()),
 			})
 			if err := h.srv.Pets.Save(petCtx(), h.collarID, pet.State{
 				Level: wolfLevel, Exp: tt.exp, CurHP: wolfMaxHP, CurMP: wolfMaxMP, Fed: wolfMaxMeal,
