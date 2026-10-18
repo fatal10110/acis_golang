@@ -1,0 +1,28 @@
+# First class change (FirstClassChange): a level 19 human fighter holding the medallion of the
+# Warrior is told by Ramos to come back at level 20, and keeps the medallion. Expectations are
+# the reference trace's (FirstClassChange.onAdvEvent).
+trace internal/gameserver/script/testdata/oracle/scenarios/first_class_change_low_level.golden
+character Fighter 19
+hold 1145 1
+script script.feature.FirstClassChange
+item 1145
+page villagemaster/30373.htm
+page script/feature/FirstClassChange/
+npc ramos 30373 VillageMasterFighter 10 0 0
+
+action ramos
+action ramos
+  S ActionFailed
+  S NpcHtmlMessage obj=ramos item=0 page=villagemaster/30373.htm
+  S ActionFailed
+bypass npc_{ramos}_Quest FirstClassChange
+  S NpcHtmlMessage obj=ramos item=0 page=script/feature/FirstClassChange/30373-08.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest FirstClassChange 30373-09.htm
+  S NpcHtmlMessage obj=ramos item=0 page=script/feature/FirstClassChange/30373-09.htm
+  S ActionFailed
+bypass Quest FirstClassChange HW
+  S NpcHtmlMessage obj=ramos item=0 page=script/feature/FirstClassChange/30373-27.htm
+  S ActionFailed
+  items 1145=1
