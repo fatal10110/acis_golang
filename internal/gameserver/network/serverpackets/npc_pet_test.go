@@ -202,10 +202,9 @@ func TestFramePetItemListRejectsOversizedCount(t *testing.T) {
 
 func TestFramePetInventoryUpdate(t *testing.T) {
 	templates := petPacketTemplates()
-	items := []*item.Instance{{ObjectID: 0x01020304, TemplateID: 57, Count: 10, Location: item.LocationPet}}
 	updates := []itemcontainer.Update{{ObjectID: 0x01020304, TemplateID: 57, Count: 10, State: itemcontainer.UpdateModified}}
 
-	frame, err := FramePetInventoryUpdate(updates, items, templates)
+	frame, err := FramePetInventoryUpdate(updates, templates)
 	if err != nil {
 		t.Fatalf("FramePetInventoryUpdate: %v", err)
 	}

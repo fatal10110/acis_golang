@@ -1074,7 +1074,7 @@ func (p *livePlayer) SendInventoryUpdate(updates []itemcontainer.Update) {
 	if inv == nil {
 		return
 	}
-	frame, err := serverpackets.FrameInventoryUpdate(updates, inv.ItemsUnordered(), inv.Templates())
+	frame, err := serverpackets.FrameInventoryUpdate(updates, inv.Templates())
 	if err != nil {
 		p.log.Error().Err(err).Msg("build InventoryUpdate")
 		return

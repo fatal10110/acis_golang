@@ -61,12 +61,41 @@ func (s UpdateState) String() string {
 
 // Update is one pending inventory-change notification. Delivering it to
 // the client as an actual packet is the network layer's job; Inventory
-// only queues the fact that something changed.
+// only queues the fact that something changed, along with the instance
+// state the client is shown for it, copied when the change is queued: by the
+// time the update is sent the instance may have changed again or left the
+// inventory.
 type Update struct {
 	ObjectID   int32
 	TemplateID int32
 	Count      int
 	State      UpdateState
+
+	EnchantLevel             int
+	CustomType1, CustomType2 int
+	Equipped                 bool
+	// Augmentation is the augmentation id, 0 when the item has none.
+	Augmentation int32
+	ManaLeft     int
+}
+
+// NewUpdate returns the update reporting st as changed by state.
+func NewUpdate(st item.InstanceState, state UpdateState) Update {
+	u := Update{
+		ObjectID:     st.ObjectID,
+		TemplateID:   st.TemplateID,
+		Count:        st.Count,
+		State:        state,
+		EnchantLevel: st.EnchantLevel,
+		CustomType1:  st.CustomType1,
+		CustomType2:  st.CustomType2,
+		Equipped:     st.Equipped(),
+		ManaLeft:     st.ManaLeft,
+	}
+	if st.Augmentation != nil {
+		u.Augmentation = st.Augmentation.Attributes
+	}
+	return u
 }
 
 // Inventory is an equip-capable item container: a player or pet's own
@@ -433,7 +462,7 @@ func (inv *Inventory) Remove(inst *item.Instance, isDrop bool) bool {
 	defer inv.fireDelivery() // registered first, so it runs last, after the unlock
 	defer inv.mu.Unlock()
 	inv.logItemLocked(st, UpdateRemoved)
-	inv.queueRemovedLocked(st.ObjectID, st.TemplateID, st.Count)
+	inv.queueRemovedLocked(st)
 	return true
 }
 
@@ -505,7 +534,7 @@ func (inv *Inventory) DestroyAllItems() {
 		inst.DestroyState()
 		inv.mu.Lock()
 		inv.logItemLocked(st, UpdateRemoved)
-		inv.queueRemovedLocked(st.ObjectID, st.TemplateID, st.Count)
+		inv.queueRemovedLocked(st)
 		inv.mu.Unlock()
 	}
 	inv.fireDelivery()
@@ -615,12 +644,7 @@ func (inv *Inventory) TransferItem(objectID int32, count int, target Receiver, n
 		return nil, 0, false, nil
 	}
 	st := source.Snapshot()
-	templateID := st.TemplateID
-	sourceCount := st.Count
-	movedCount := count
-	if movedCount > sourceCount {
-		movedCount = sourceCount
-	}
+	movedCount := min(count, st.Count)
 
 	moving := &removalFirst{Receiver: target, inv: inv, source: source}
 	result, freedObjectID, freed, err = inv.Container.Transfer(objectID, count, moving, nextID)
@@ -631,11 +655,11 @@ func (inv *Inventory) TransferItem(objectID int32, count int, target Receiver, n
 		inv.queueUpdate(remaining, UpdateModified)
 	} else {
 		inv.mu.Lock()
+		st.Count = movedCount
 		if !moving.logged {
-			st.Count = movedCount
 			inv.logItemLocked(st, UpdateRemoved)
 		}
-		inv.queueRemovedLocked(objectID, templateID, movedCount)
+		inv.queueRemovedLocked(st)
 		inv.mu.Unlock()
 		inv.fireDelivery()
 	}
@@ -1192,7 +1216,7 @@ func (inv *Inventory) requeueUpdates(drained []Update) {
 	newer := inv.updates
 	inv.updates = drained
 	for _, u := range newer {
-		inv.queueUpdateRecordLocked(u.ObjectID, u.TemplateID, u.Count, u.State)
+		inv.queueUpdateRecordLocked(u)
 	}
 }
 
@@ -1216,32 +1240,35 @@ func (inv *Inventory) queueUpdateLocked(inst *item.Instance, state UpdateState) 
 	}
 	st := inst.Snapshot()
 	inv.logItemLocked(st, state)
-	inv.queueUpdateRecordLocked(st.ObjectID, st.TemplateID, st.Count, state)
+	inv.queueUpdateRecordLocked(NewUpdate(st, state))
 }
 
-func (inv *Inventory) queueUpdateRecordLocked(objectID, templateID int32, count int, state UpdateState) {
+func (inv *Inventory) queueUpdateRecordLocked(update Update) {
 	// Coalesce a repeated update for the same stackable instance and state
 	// (e.g. several count changes in a row) into the latest count instead of
 	// letting the queue grow unbounded; any other update is appended as its
 	// own entry.
-	tmpl, _ := inv.Templates().Get(templateID)
+	tmpl, _ := inv.Templates().Get(update.TemplateID)
 	if tmpl != nil && tmpl.Stackable {
 		for i, u := range inv.updates {
-			if u.ObjectID == objectID && u.State == state {
-				inv.updates[i].Count = count
+			if u.ObjectID == update.ObjectID && u.State == update.State {
+				inv.updates[i].Count = update.Count
 				return
 			}
 		}
 	}
-	inv.updates = append(inv.updates, Update{ObjectID: objectID, TemplateID: templateID, Count: count, State: state})
+	inv.updates = append(inv.updates, update)
 }
 
-// queueRemovedLocked queues the removed update of an instance that left the
-// inventory and records its object id for the next fireDelivery. Callers
-// write the removal's item log record themselves.
-func (inv *Inventory) queueRemovedLocked(objectID, templateID int32, count int) {
-	inv.queueUpdateRecordLocked(objectID, templateID, count, UpdateRemoved)
-	inv.removed = append(inv.removed, objectID)
+// queueRemovedLocked queues the removed update of st, an instance that left
+// the inventory with st.Count units, and records its object id for the next
+// fireDelivery. A removed item is never reported worn: it is taken off before
+// it leaves. Callers write the removal's item log record themselves.
+func (inv *Inventory) queueRemovedLocked(st item.InstanceState) {
+	update := NewUpdate(st, UpdateRemoved)
+	update.Equipped = false
+	inv.queueUpdateRecordLocked(update)
+	inv.removed = append(inv.removed, st.ObjectID)
 }
 
 // logItemLocked writes the item log record of st changing by state, when st
