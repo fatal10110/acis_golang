@@ -46,7 +46,7 @@ func byContainerOrder(a, b orderedItem) int {
 // slices.SortFunc does not fault on a key that moves mid-sort, it just
 // returns a wrong order, which leaves as a silently wrong ItemList. Copying
 // the key also keeps Items() to one instance RLock per item rather than one
-// per comparison, on a path FrameInventoryUpdate walks per item mutation.
+// per comparison.
 func sortContainerOrder(items []*item.Instance) {
 	order := make([]orderedItem, len(items))
 	for i, inst := range items {
@@ -163,21 +163,6 @@ func (c *Container) Items() []*item.Instance {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.itemsLocked()
-}
-
-// ItemsUnordered returns the container's contents in no particular order,
-// for callers that index them rather than list them. InventoryUpdate builds
-// a lookup map from the result and never reads the sequence, so paying for
-// byContainerOrder there would sort a slice purely to iterate it once — on a
-// path that runs per item mutation.
-func (c *Container) ItemsUnordered() []*item.Instance {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	out := make([]*item.Instance, 0, len(c.items))
-	for _, inst := range c.items {
-		out = append(out, inst)
-	}
-	return out
 }
 
 func (c *Container) itemsLocked() []*item.Instance {
