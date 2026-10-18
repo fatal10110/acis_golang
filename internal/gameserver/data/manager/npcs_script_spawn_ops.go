@@ -73,10 +73,7 @@ func (n *Npcs) DrawSpawnPoint(m npc.PartyMember) (at location.Location, heading 
 func (n *Npcs) SetRespawnDelay(m npc.PartyMember, d time.Duration) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	key, ok := n.live[m.ObjectID()]
-	if !ok {
-		key, ok = n.decayedSlotKeyLocked(m.ObjectID())
-	}
+	key, ok := n.slotKeyLocked(m.ObjectID())
 	slot, found := n.slot[key]
 	if !ok || !found {
 		if m.IsPrivate() {
@@ -90,15 +87,4 @@ func (n *Npcs) SetRespawnDelay(m npc.PartyMember, d time.Duration) error {
 	slot.entry.RespawnDelay = max(d, 0)
 	n.slot[key] = slot
 	return nil
-}
-
-// decayedSlotKeyLocked returns the key of the slot whose last placed NPC is
-// id. The caller holds n.mu.
-func (n *Npcs) decayedSlotKeyLocked(id int32) (string, bool) {
-	for key, slot := range n.slot {
-		if slot.liveID == id {
-			return key, true
-		}
-	}
-	return "", false
 }

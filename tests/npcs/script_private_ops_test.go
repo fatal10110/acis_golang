@@ -98,13 +98,14 @@ func TestScriptDrawSpawnLocationOfPrivates(t *testing.T) {
 	t.Parallel()
 	w := bootScriptSpawns(t)
 	master, boss := w.captainWithPrivates(t)
+	around := script.NPCOf(livePrivate(t, boss))
 	placed := w.spawner.CreateOnePrivateEx(master, spawnWolfID, script.Loc{X: w.at.X + 80, Y: w.at.Y + 10, Z: w.at.Z, Heading: 500}, 0, script.Params{})
 	if got := w.spawner.DrawSpawnLocation(placed); got.X != w.at.X+80 || got.Y != w.at.Y+10 || got.Heading != 500 {
 		t.Fatalf("placed private spawn location = %+v, want its point, heading 500", got)
 	}
 	bx, by, _ := boss.Position()
 	for range 10 {
-		got := w.spawner.DrawSpawnLocation(script.NPCOf(livePrivate(t, boss)))
+		got := w.spawner.DrawSpawnLocation(around)
 		if d := math.Hypot(float64(got.X-bx), float64(got.Y-by)); d < 39 || d > 131 || got.Heading != boss.Heading() {
 			t.Fatalf("private spawn location %+v: %.0f from its master, heading %d; want 40 to 130, heading %d", got, d, got.Heading, boss.Heading())
 		}
