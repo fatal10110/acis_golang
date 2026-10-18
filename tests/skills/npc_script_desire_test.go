@@ -37,6 +37,7 @@ func TestScriptCastDesireLandsOnPlayer(t *testing.T) {
 	player := worldCombatant(t, srv, objID)
 	before := srv.PlayerCurrentHP(t, objID)
 
+	firstCycleOnNPCQueue(t, caster)
 	caster.AI().AddCastDesire(player, modelskill.Ref{ID: realDamageProbe, Level: 1}, 1000, true, true)
 	thinkOnNPCQueue(t, caster)
 

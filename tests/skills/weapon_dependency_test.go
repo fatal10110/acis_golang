@@ -200,6 +200,7 @@ func TestNPCCastNeedsAllowedWeapon(t *testing.T) {
 				RightHand: tc.rHand, LeftHand: tc.lHand,
 			}, modelskill.NewTable([]modelskill.Definition{def}))
 			drainUntilQuiet(t, srv.Client)
+			firstCycleOnNPCQueue(t, hostile)
 			hostile.AI().Desires().AddOrUpdate(&ai.Desire{
 				Kind: ai.IntentionCast, FinalTarget: hostile, Skill: modelskill.Ref{ID: weaponSkillID, Level: 1},
 				Weight: 1_000_000, QueuedAt: hostile.Now(),

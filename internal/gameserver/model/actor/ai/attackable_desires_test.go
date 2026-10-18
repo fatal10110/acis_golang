@@ -152,6 +152,7 @@ func TestDesirePromotionOrderMixedKinds(t *testing.T) {
 	attack := &recordingAttack{canAttack: true}
 	cast := &recordingCast{canAttempt: true, canCast: true, castRange: 400}
 	brain := NewAttackable(owner, move, attack)
+	pastFirstCycle(t, brain)
 	brain.SetCastController(cast)
 
 	brain.AddDoNothingDesire(40, 500)
@@ -237,6 +238,7 @@ func TestScriptDesiresQueueConcurrently(t *testing.T) {
 	owner := actor(1)
 	leader := actor(3)
 	brain := NewAttackable(owner, &recordingMove{}, &recordingAttack{})
+	pastFirstCycle(t, brain)
 	brain.SetCastController(&recordingCast{canAttempt: true, canCast: true})
 
 	const workers = 16

@@ -25,6 +25,9 @@ func TestBlockedArrivalBroadcastsSameCellMoveToLocation(t *testing.T) {
 	geo := &gameservertest.GateGeo{}
 	hostile := srv.SpawnMovingHostileNPCAtGeo(t, "SiegeGuard", home, home, geo)
 	drainUntilQuiet(t, c)
+	if err := hostile.TickThink(); err != nil {
+		t.Fatalf("spawn-cycle TickThink() error: %v", err)
+	}
 
 	stranded := location.Location{X: hostileX, Y: hostileY + 50, Z: hostileZ}
 	hostile.SetRunning(false)
