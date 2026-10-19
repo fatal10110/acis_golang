@@ -273,8 +273,8 @@ func TestScriptPrivateFollowsMaster(t *testing.T) {
 	}
 	bx, by, _ := boss.Position()
 	sx, sy, _ := scout.Position()
-	if d := math.Hypot(float64(sx-bx), float64(sy-by)); d < 39 || d > 121 {
-		t.Fatalf("scout %.0f from its master; want 40 to 120", d)
+	if d := math.Hypot(float64(sx-bx), float64(sy-by)); !inPrivateRing(d, 40, 120) {
+		t.Fatalf("scout %.2f from its master; want 40 to 120", d)
 	}
 
 	// The scout's despawn passes: it is no longer the master's private.

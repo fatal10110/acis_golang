@@ -122,8 +122,8 @@ func TestScriptOneTimePrivateRespawnRules(t *testing.T) {
 	}
 	bx, by, _ := boss.Position()
 	px, py, _ := back.Position()
-	if d := math.Hypot(float64(px-bx), float64(py-by)); d < 39 || d > 121 {
-		t.Fatalf("respawned pup %.0f from its master; want 40 to 120", d)
+	if d := math.Hypot(float64(px-bx), float64(py-by)); !inPrivateRing(d, 40, 120) {
+		t.Fatalf("respawned pup %.2f from its master; want 40 to 120", d)
 	}
 
 	w.diePrivate(t, back, 0)

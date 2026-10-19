@@ -591,11 +591,17 @@ func (s *Server) TickEffects() {
 // wall clock, and the updates since a move started at least as many
 // intervals.
 func (s *Server) TickPositions() {
+	if err := s.TryTickPositions(); err != nil {
+		panic(err)
+	}
+}
+
+// TryTickPositions is TickPositions reporting a failure instead of
+// panicking, for a goroutine other than the test's: there a panic takes the
+// whole test binary down, and failing the test is not allowed.
+func (s *Server) TryTickPositions() error {
 	if s.queues.advanceThen != nil {
-		if err := s.tickPositionsDriven(move.PositionUpdateInterval); err != nil {
-			panic(err)
-		}
-		return
+		return s.tickPositionsDriven(move.PositionUpdateInterval)
 	}
 	s.positionTicks.Lock()
 	next := s.positionTicks.last.Add(move.PositionUpdateInterval)
@@ -604,14 +610,13 @@ func (s *Server) TickPositions() {
 	}
 	time.Sleep(time.Until(next))
 	if err := s.awaitHandled(); err != nil {
-		panic(err)
+		s.positionTicks.Unlock()
+		return err
 	}
 	s.positionTicks.last = time.Now()
 	s.positions.Tick()
 	s.positionTicks.Unlock()
-	if err := s.queues.settle(); err != nil {
-		panic(err)
-	}
+	return s.queues.settle()
 }
 
 // TickPositionsAfter is TickPositions on the driven clock with d, rather

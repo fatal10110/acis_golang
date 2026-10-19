@@ -1,12 +1,15 @@
 package catalog
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/script"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/firstclasschange"
+)
 
 // features is the catalog of the scripted features (#209), except the six the engine slices ported.
 func features() script.Catalog {
 	return script.Catalog{
 		"script.feature.EchoCrystal":         nil,
-		"script.feature.FirstClassChange":    nil,
+		"script.feature.FirstClassChange":    firstclasschange.New,
 		"script.feature.HeroCirclet":         nil,
 		"script.feature.HeroWeapon":          nil,
 		"script.feature.KetraOrcSupport":     nil,
