@@ -152,6 +152,63 @@ func ind2bWantHold(t *testing.T, when string, h *npc.Hostile, kind actorai.Inten
 	}
 }
 
+// ind2bAttackMoves reports whether h's attack desire, queued or taken up,
+// closes in on its target, and whether h has one at all.
+func ind2bAttackMoves(h *npc.Hostile) (moves, ok bool) {
+	if d, queued := desire(h, actorai.IntentionAttack); queued {
+		return d.MoveToTarget, true
+	}
+	if h.AI().CurrentIntention() == actorai.IntentionAttack {
+		return h.AI().CurrentIntentionMovesToTarget(), true
+	}
+	return false, false
+}
+
+// ind2bWantAttack fails unless h wants to attack, closing in when moves is
+// set and held in place otherwise.
+func ind2bWantAttack(t *testing.T, when string, h *npc.Hostile, moves bool) {
+	t.Helper()
+	got, ok := ind2bAttackMoves(h)
+	if !ok || got != moves {
+		t.Fatalf("%s: attack desire closes in = %v (%v), want %v", when, got, ok, moves)
+	}
+}
+
+// ind2bHeldDebuff is the fixture debuff, reaching 2000 and holding an
+// effect of its own stack for a minute.
+func ind2bHeldDebuff() modelskill.Definition {
+	d := ind1Skill(ind2DebuffSkill, 2000, false)
+	d.Effects = []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, StackType: "ind2b_debuff", StackOrder: 1}}
+	return d
+}
+
+// ind2bLandDebuff lands the fixture debuff's effect, cast by caster, on
+// the character when on is nil and on the NPC on otherwise, and waits for
+// it.
+func ind2bLandDebuff(t *testing.T, w *ind1World, caster, on *npc.Hostile) {
+	t.Helper()
+	ref := modelskill.Ref{ID: ind2DebuffSkill, Level: 1}
+	me := w.player.ObjectID()
+	target := func(p *script.Player) script.Creature {
+		if on == nil {
+			return p
+		}
+		return script.NPCOf(on)
+	}
+	if !w.srv.RunScript(t, me, "Ind1Director", func(s *script.Script, p *script.Player) {
+		s.ApplyEffects(ref, script.NPCOf(caster), target(p))
+	}) {
+		t.Fatal("the debuff landing panicked")
+	}
+	w.srv.AdvanceUntil(t, "the debuff landed", func() bool {
+		var level int32
+		w.srv.RunScript(t, me, "Ind1Director", func(s *script.Script, p *script.Player) {
+			level = s.AbnormalLevel(target(p), ref)
+		})
+		return level > 0
+	})
+}
+
 // TestAgit02DoomGuardAgitHoldsItsGround ports Agit02DoomGuardAgit's
 // created, no-desire, see-creature and attacked hooks, every draw 0. It
 // spawns with flag 0 and, with no desire left, does nothing. It wants to
@@ -250,6 +307,7 @@ func TestAgit02DoomGuardAgitHatesAnAggroSpell(t *testing.T) {
 	if got := n.AggroHate(w.player); got != want {
 		t.Fatalf("hate of the caster = %v, want %v", got, want)
 	}
+	ind2bWantAttack(t, "after the spell", n, false)
 }
 
 // TestAgit02DoomKnightAgitPartyJumpsToItsMaster ports
@@ -296,39 +354,94 @@ func TestAgit02DoomKnightAgitPartyJumpsToItsMaster(t *testing.T) {
 // TestAgit02DoomKnightAgitPartyAnswersItsParty ports
 // Agit02DoomKnightAgitParty's party-attacked hook, every draw 0, which
 // never calls its parent. A hit on its master makes the settled private
-// want its debuff on the attacker (weight 1000000), the effect looked up
-// on the master, and, sharing its master's flag, want to attack the
-// attacker by the damage. With another flag it only casts.
+// want its debuff on the attacker (weight 1000000) and, sharing its
+// master's flag, want to attack the attacker by the damage; with another
+// flag it only casts. The debuff's effect is looked up on the master, not
+// on the attacker: the character holding it still draws the debuff, the
+// master holding it does not.
 func TestAgit02DoomKnightAgitPartyAnswersItsParty(t *testing.T) {
 	t.Parallel()
 	for _, row := range []struct {
 		name string
 		flag int32
-	}{{"same flag", 0}, {"other flag", 1}} {
+		held string
+		cast bool
+		hate bool
+	}{
+		{"same flag", 0, "", true, true},
+		{"other flag", 1, "", true, false},
+		{"debuff on the character", 0, "character", true, true},
+		{"debuff on the master", 0, "master", false, true},
+	} {
 		t.Run(row.name, func(t *testing.T) {
 			t.Parallel()
-			w := bootIndividual2b(t, raidBoot{}, ind4Leader(ind2bPartyKnightID, 1), ind2bTemplate(ind2bPartyKnightID))
+			w := bootIndividual2b(t, raidBoot{opts: []gameservertest.Option{gameservertest.WithScriptSkills(ind2bHeldDebuff())}},
+				ind4Leader(ind2bPartyKnightID, 1), ind2bTemplate(ind2bPartyKnightID))
 			leader := w.spawn(t, leaderID, 400, 0)
 			n := privatesOf(t, leader, 1)[0]
 			w.srv.InstallNPCCastSeam(t, n, ind2bSkills())
 			w.onQueue(t, n, func() { script.NPCOf(n).SetInt(script.SlotFlag, row.flag) })
+			switch row.held {
+			case "character":
+				ind2bLandDebuff(t, w, n, nil)
+			case "master":
+				ind2bLandDebuff(t, w, n, leader)
+			}
 			w.ticks(t, 9)
 			w.onQueue(t, n, func() { script.NPCOf(n).RemoveAllAttackDesire(); n.AI().Desires().Clear() })
 			w.hit(t, leader, 10)
-			me := w.player.ObjectID()
-			w.wantCasts(t, "after the hit on its master", n, map[modelskill.ID]ind1Cast{ind2DebuffSkill: {me, 1000000}})
-			hate := n.AggroHate(w.player)
-			if row.flag != 0 {
-				if hate != 0 {
-					t.Fatalf("other flag private hate = %v, want none", hate)
-				}
-				return
+			want := map[modelskill.ID]ind1Cast{}
+			if row.cast {
+				want[ind2DebuffSkill] = ind1Cast{w.player.ObjectID(), 1000000}
 			}
-			if want := ind2bDamageHate(10, float64(n.MaxHP())); hate != want {
-				t.Fatalf("private hate = %v, want %v", hate, want)
+			w.wantCasts(t, "after the hit on its master", n, want)
+			wantHate := 0.0
+			if row.hate {
+				wantHate = ind2bDamageHate(10, float64(n.MaxHP()))
+			}
+			if got := n.AggroHate(w.player); got != wantHate {
+				t.Fatalf("private hate = %v, want %v", got, wantHate)
 			}
 		})
 	}
+}
+
+// TestAgit02DoomKnightAgitPartyHatesAnAggroSpellNotItsClan ports
+// Agit02DoomKnightAgitParty's see-spell and clan-attacked hooks. The
+// character's self buff of 50 aggro points makes it want to attack the
+// character, closing in, by 150 for each twentieth of its maximum hit
+// points the aggro makes. A hit on a member of its clan, which would draw
+// its parent's debuff, adds nothing.
+func TestAgit02DoomKnightAgitPartyHatesAnAggroSpellNotItsClan(t *testing.T) {
+	t.Parallel()
+	t.Run("spell", func(t *testing.T) {
+		t.Parallel()
+		tmpl := ind2bTemplate(ind2bPartyKnightID)
+		tmpl.CanMove = false
+		w := bootIndividual2b(t, ind2bSpellBoot(t), tmpl)
+		n := w.spawn(t, ind2bPartyKnightID, 400, 0)
+		want := float64(ind2bAggro) / float64(n.MaxHP()) / 0.05 * 150
+		w.castSelfBuff()
+		w.srv.AdvanceUntil(t, "the knight hates the caster", func() bool { return n.AggroHate(w.player) > 0 })
+		if got := n.AggroHate(w.player); got != want {
+			t.Fatalf("hate of the caster = %v, want %v", got, want)
+		}
+		ind2bWantAttack(t, "after the spell", n, true)
+	})
+	t.Run("clan", func(t *testing.T) {
+		t.Parallel()
+		member := warriorTemplate(unboundID, nil)
+		member.Clans, member.ClanRange = []string{"doom"}, 500
+		w := bootIndividual2b(t, raidBoot{}, ind2bTemplate(ind2bPartyKnightID), member)
+		n := w.spawn(t, ind2bPartyKnightID, 1500, 0)
+		w.srv.InstallNPCCastSeam(t, n, ind2bSkills())
+		clan := w.spawn(t, unboundID, 1500, 100)
+		w.ticks(t, 9)
+		w.hit(t, clan, 10)
+		if hate, casts := n.AggroHate(w.player), ind1Casts(n); hate != 0 || len(casts) != 0 {
+			t.Fatalf("after a hit on its clan: hate %v, casts %+v, want neither", hate, casts)
+		}
+	})
 }
 
 // TestAgit02VampireAgitPartyAnswersItsClanNotItsParty ports
@@ -336,28 +449,50 @@ func TestAgit02DoomKnightAgitPartyAnswersItsParty(t *testing.T) {
 // draw 0. A hit on its master adds nothing. A hit on a member of its clan
 // makes the settled vampire want its debuff on the attacker (weight
 // 1000000) and, sharing the member's flag, want to attack the attacker by
-// the damage.
+// the damage. The debuff's effect is looked up on the hit member, not on
+// the attacker: the character holding it still draws the debuff, the
+// member holding it does not.
 func TestAgit02VampireAgitPartyAnswersItsClanNotItsParty(t *testing.T) {
 	t.Parallel()
-	member := warriorTemplate(unboundID, nil)
-	member.Clans, member.ClanRange = []string{"doom"}, 500
-	w := bootIndividual2b(t, raidBoot{}, ind4Leader(ind2bVampireID, 1), ind2bTemplate(ind2bVampireID), member)
-	leader := w.spawn(t, leaderID, 400, 0)
-	n := privatesOf(t, leader, 1)[0]
-	w.srv.InstallNPCCastSeam(t, n, ind2bSkills())
-	clan := w.spawn(t, unboundID, 400, 100)
-	w.ticks(t, 9)
-	w.onQueue(t, n, func() { script.NPCOf(n).RemoveAllAttackDesire(); n.AI().Desires().Clear() })
+	for _, row := range []struct {
+		name string
+		held string
+		cast bool
+	}{{"no debuff held", "", true}, {"debuff on the character", "character", true}, {"debuff on the member", "member", false}} {
+		t.Run(row.name, func(t *testing.T) {
+			t.Parallel()
+			member := warriorTemplate(unboundID, nil)
+			member.Clans, member.ClanRange = []string{"doom"}, 500
+			w := bootIndividual2b(t, raidBoot{opts: []gameservertest.Option{gameservertest.WithScriptSkills(ind2bHeldDebuff())}},
+				ind4Leader(ind2bVampireID, 1), ind2bTemplate(ind2bVampireID), member)
+			leader := w.spawn(t, leaderID, 400, 0)
+			n := privatesOf(t, leader, 1)[0]
+			w.srv.InstallNPCCastSeam(t, n, ind2bSkills())
+			clan := w.spawn(t, unboundID, 400, 100)
+			switch row.held {
+			case "character":
+				ind2bLandDebuff(t, w, n, nil)
+			case "member":
+				ind2bLandDebuff(t, w, n, clan)
+			}
+			w.ticks(t, 9)
+			w.onQueue(t, n, func() { script.NPCOf(n).RemoveAllAttackDesire(); n.AI().Desires().Clear() })
 
-	w.hit(t, leader, 10)
-	if hate, casts := n.AggroHate(w.player), ind1Casts(n); hate != 0 || len(casts) != 0 {
-		t.Fatalf("after a hit on its master: hate %v, casts %+v, want neither", hate, casts)
-	}
+			w.hit(t, leader, 10)
+			if hate, casts := n.AggroHate(w.player), ind1Casts(n); hate != 0 || len(casts) != 0 {
+				t.Fatalf("after a hit on its master: hate %v, casts %+v, want neither", hate, casts)
+			}
 
-	w.hit(t, clan, 10)
-	w.wantCasts(t, "after a hit on its clan", n, map[modelskill.ID]ind1Cast{ind2DebuffSkill: {w.player.ObjectID(), 1000000}})
-	if want := ind2bDamageHate(10, float64(n.MaxHP())); n.AggroHate(w.player) != want {
-		t.Fatalf("hate after a hit on its clan = %v, want %v", n.AggroHate(w.player), want)
+			w.hit(t, clan, 10)
+			want := map[modelskill.ID]ind1Cast{}
+			if row.cast {
+				want[ind2DebuffSkill] = ind1Cast{w.player.ObjectID(), 1000000}
+			}
+			w.wantCasts(t, "after a hit on its clan", n, want)
+			if want := ind2bDamageHate(10, float64(n.MaxHP())); n.AggroHate(w.player) != want {
+				t.Fatalf("hate after a hit on its clan = %v, want %v", n.AggroHate(w.player), want)
+			}
+		})
 	}
 }
 
@@ -420,6 +555,39 @@ func TestWarriorHereticSelfRangePhysicalFollowsScriptEvents(t *testing.T) {
 	if got := ind1Slot(n, script.SlotIntAI4); got != 1 {
 		t.Fatalf("i_ai4 after event 10033 = %d, want 1", got)
 	}
+}
+
+// TestWarriorHereticSelfRangePhysicalAnswersItsClan ports
+// WarriorHereticSelfRangePhysical's clan-attacked hook, every draw 0. A
+// hit on a member of its clan while the heretic neither attacks nor casts
+// sets i_ai4. Settled, with the character its top desire target, a hit on
+// the member wants its self range physical skill on the character (weight
+// 1000000), beside its parent's debuff.
+func TestWarriorHereticSelfRangePhysicalAnswersItsClan(t *testing.T) {
+	t.Parallel()
+	member := warriorTemplate(unboundID, nil)
+	member.Clans, member.ClanRange = []string{"doom"}, 500
+	w := bootIndividual2b(t, raidBoot{}, ind2bTemplate(ind2bHereticID), member)
+	n := w.spawn(t, ind2bHereticID, 1500, 0)
+	w.srv.InstallNPCCastSeam(t, n, ind2bSkills())
+	clan := w.spawn(t, unboundID, 1500, 100)
+	me := w.player.ObjectID()
+	if fightingIntention(n) {
+		t.Fatalf("setup: intention %v, want neither attack nor cast", n.AI().CurrentIntention())
+	}
+	w.hit(t, clan, 10)
+	if got := ind1Slot(n, script.SlotIntAI4); got != 1 {
+		t.Fatalf("i_ai4 after a hit on its clan while idle = %d, want 1", got)
+	}
+	w.wantCasts(t, "after a hit on its clan while young", n, nil)
+
+	w.ticks(t, 8)
+	w.setTop(t, n, script.PlayerOf(w.player))
+	w.hit(t, clan, 10)
+	w.wantCasts(t, "after a hit on its clan by its top desire target", n, map[modelskill.ID]ind1Cast{
+		ind2bSelfRangeSkil: {me, 1000000},
+		ind2DebuffSkill:    {me, 1000000},
+	})
 }
 
 // ind2bHereticDen is an npcmaker spawning one heretic in a 400 by 400
