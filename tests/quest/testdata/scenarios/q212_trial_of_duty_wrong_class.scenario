@@ -1,0 +1,23 @@
+# Trial of Duty (Q212), refused: a level 35 Warrior is turned away by Hannavalt, who
+# takes knights only, and the quest is not started. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q212_trial_of_duty_wrong_class.golden
+character Warrior 35
+class 1
+script quest.Q212_TrialOfDuty
+item 2633
+page villagemaster/30109.htm
+page script/quest/Q212_TrialOfDuty/
+npc hannavalt 30109 VillageMasterFighter 10 0 0
+
+action hannavalt
+action hannavalt
+  S ActionFailed
+  S NpcHtmlMessage obj=hannavalt item=0 page=villagemaster/30109.htm
+  S ActionFailed
+bypass npc_{hannavalt}_Quest
+  S NpcHtmlMessage obj=hannavalt item=0 page=script/quest/Q212_TrialOfDuty/30109-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q212_TrialOfDuty CREATED
+  rows Q212_TrialOfDuty -
