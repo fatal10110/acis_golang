@@ -1,0 +1,22 @@
+# Cure for Fever Disease (Q151), refused: a level 14 character is too young for Elias, and the
+# quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q151_cure_for_fever_disease_low_level.golden
+character Healer 14
+script quest.Q151_CureForFeverDisease
+item 703 704 102
+page default/30050.htm
+page script/quest/Q151_CureForFeverDisease/
+npc elias 30050 Folk 10 0 0
+
+# Elias: too young.
+action elias
+action elias
+  S ActionFailed
+  S NpcHtmlMessage obj=elias item=0 page=default/30050.htm
+  S ActionFailed
+bypass npc_{elias}_Quest
+  S NpcHtmlMessage obj=elias item=0 page=script/quest/Q151_CureForFeverDisease/30050-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q151_CureForFeverDisease CREATED
+  rows Q151_CureForFeverDisease -

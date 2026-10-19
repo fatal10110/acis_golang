@@ -1,0 +1,82 @@
+# Find Sir Windawood (Q155): a level 3 character accepts at Abellos with his official letter, and
+# Sir Windawood takes it for a haste potion, then tells more on his page's first link; then
+# relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q155_find_sir_windawood.golden
+character Herald 3
+script quest.Q155_FindSirWindawood
+item 1019 734
+page guard/30042.htm
+page default/30311.htm
+page script/quest/Q155_FindSirWindawood/
+npc abellos 30042 Guard 10 0 0
+npc windawood 30311 Folk 20 0 0
+
+# Abellos: accept with the letter.
+action abellos
+action abellos
+  S ActionFailed
+  S NpcHtmlMessage obj=abellos item=0 page=guard/30042.htm
+  S ActionFailed
+bypass npc_{abellos}_Quest
+  S NpcHtmlMessage obj=abellos item=0 page=script/quest/Q155_FindSirWindawood/30042-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q155_FindSirWindawood CREATED
+bypass Quest Q155_FindSirWindawood 30042-02.htm
+  S QuestList 155:0x80000001
+  S ExShowQuestMark quest=155
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1019
+  S NpcHtmlMessage obj=abellos item=0 page=script/quest/Q155_FindSirWindawood/30042-02.htm
+  S ActionFailed
+  Q upsert Q155_FindSirWindawood | <state> | STARTED
+  Q upsert Q155_FindSirWindawood | <cond> | 1
+  state Q155_FindSirWindawood STARTED
+  rows Q155_FindSirWindawood <cond>=1 <state>=STARTED
+  items 1019=1
+action abellos
+  S ActionFailed
+  S NpcHtmlMessage obj=abellos item=0 page=guard/30042.htm
+  S ActionFailed
+bypass npc_{abellos}_Quest
+  S NpcHtmlMessage obj=abellos item=0 page=script/quest/Q155_FindSirWindawood/30042-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Sir Windawood: the letter for the potion; the quest completes.
+action windawood
+action windawood
+  S ActionFailed
+  S NpcHtmlMessage obj=windawood item=0 page=default/30311.htm
+  S ActionFailed
+bypass npc_{windawood}_Quest
+  S SystemMessage id=302 3:1019
+  S SystemMessage id=54 3:734
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 155:0x00000000
+  S NpcHtmlMessage obj=windawood item=0 page=script/quest/Q155_FindSirWindawood/30311-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q155_FindSirWindawood | <state> | COMPLETED
+  Q delete-except-state Q155_FindSirWindawood
+  items 1019=0 734=1
+  state Q155_FindSirWindawood COMPLETED
+  rows Q155_FindSirWindawood <state>=COMPLETED
+bypass Quest Q155_FindSirWindawood 30311-02.htm
+  S NpcHtmlMessage obj=windawood item=0 page=script/quest/Q155_FindSirWindawood/30311-02.htm
+  S ActionFailed
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q155_FindSirWindawood COMPLETED
+  rows Q155_FindSirWindawood <state>=COMPLETED
+  items 734=1
+action windawood
+action windawood
+  S ActionFailed
+  S NpcHtmlMessage obj=windawood item=0 page=default/30311.htm
+  S ActionFailed
+bypass npc_{windawood}_Quest
+  S NpcHtmlMessage obj=windawood item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

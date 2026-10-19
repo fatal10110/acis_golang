@@ -1,0 +1,150 @@
+# Recover Smuggled Goods (Q157): a level 5 character accepts at Wilford; twenty giant toads give
+# twenty adamantite ores (every roll pinned to succeed), and Wilford takes them for a buckler;
+# then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q157_recover_smuggled_goods.golden
+character Smuggler 5
+random always 0
+script quest.Q157_RecoverSmuggledGoods
+item 1024 20
+page warehouse/30005.htm
+page script/quest/Q157_RecoverSmuggledGoods/
+npc wilford 30005 WarehouseKeeper 10 0 0
+npc toad 20121 Monster 40 0 0
+
+# Wilford: two pages, then accept.
+action wilford
+action wilford
+  S ActionFailed
+  S NpcHtmlMessage obj=wilford item=0 page=warehouse/30005.htm
+  S ActionFailed
+bypass npc_{wilford}_Quest
+  S NpcHtmlMessage obj=wilford item=0 page=script/quest/Q157_RecoverSmuggledGoods/30005-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q157_RecoverSmuggledGoods CREATED
+bypass Quest Q157_RecoverSmuggledGoods 30005-04.htm
+  S NpcHtmlMessage obj=wilford item=0 page=script/quest/Q157_RecoverSmuggledGoods/30005-04.htm
+  S ActionFailed
+bypass Quest Q157_RecoverSmuggledGoods 30005-05.htm
+  S QuestList 157:0x80000001
+  S ExShowQuestMark quest=157
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=wilford item=0 page=script/quest/Q157_RecoverSmuggledGoods/30005-05.htm
+  S ActionFailed
+  Q upsert Q157_RecoverSmuggledGoods | <state> | STARTED
+  Q upsert Q157_RecoverSmuggledGoods | <cond> | 1
+  state Q157_RecoverSmuggledGoods STARTED
+  rows Q157_RecoverSmuggledGoods <cond>=1 <state>=STARTED
+action wilford
+  S ActionFailed
+  S NpcHtmlMessage obj=wilford item=0 page=warehouse/30005.htm
+  S ActionFailed
+bypass npc_{wilford}_Quest
+  S NpcHtmlMessage obj=wilford item=0 page=script/quest/Q157_RecoverSmuggledGoods/30005-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Twenty giant toads: an ore each; the twentieth completes the set.
+kill toad x19
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1024=19
+  rows Q157_RecoverSmuggledGoods <cond>=1 <state>=STARTED
+kill toad
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1024
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 157:0x80000003
+  S ExShowQuestMark quest=157
+  Q upsert Q157_RecoverSmuggledGoods | <cond> | 2
+  items 1024=20
+  rows Q157_RecoverSmuggledGoods <cond>=2 <state>=STARTED
+
+# Wilford: the ores for the buckler; the quest completes.
+action wilford
+  S ActionFailed
+  S NpcHtmlMessage obj=wilford item=0 page=warehouse/30005.htm
+  S ActionFailed
+bypass npc_{wilford}_Quest
+  S SystemMessage id=301 3:1024 6:20
+  S SystemMessage id=54 3:20
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 157:0x00000000
+  S NpcHtmlMessage obj=wilford item=0 page=script/quest/Q157_RecoverSmuggledGoods/30005-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q157_RecoverSmuggledGoods | <state> | COMPLETED
+  Q delete-except-state Q157_RecoverSmuggledGoods
+  items 1024=0 20=1
+  state Q157_RecoverSmuggledGoods COMPLETED
+  rows Q157_RecoverSmuggledGoods <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q157_RecoverSmuggledGoods COMPLETED
+  rows Q157_RecoverSmuggledGoods <state>=COMPLETED
+  items 20=1
+action wilford
+action wilford
+  S ActionFailed
+  S NpcHtmlMessage obj=wilford item=0 page=warehouse/30005.htm
+  S ActionFailed
+bypass npc_{wilford}_Quest
+  S NpcHtmlMessage obj=wilford item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
