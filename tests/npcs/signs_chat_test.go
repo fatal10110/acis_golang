@@ -232,9 +232,9 @@ func TestMammonPagesAndRefusals(t *testing.T) {
 // witches' page, each counting down to the next festival: the schedule
 // started at boot awaits it 2 + 19 minutes later, read on a clock that
 // stands still so the count is exactly 21 minutes, plus one. During seal
-// validation the page says festivals resume next week. Signing up, part of
-// the festival run, is not in place yet: it logs and releases the client
-// (see TestFestivalGuideScorePages for the commands in place).
+// validation the page says festivals resume next week. Signing up with no
+// party opens page 2b, missing here (see TestFestivalGuideScorePages for
+// the other commands, and the festival run's tests in tests/party).
 func TestFestivalGuidePages(t *testing.T) {
 	t.Parallel()
 	boot := time.Date(2026, time.August, 26, 12, 0, 0, 0, time.UTC)
@@ -258,9 +258,8 @@ func TestFestivalGuidePages(t *testing.T) {
 			continue
 		}
 		w.c.Send(encodeBypass(fmt.Sprintf("npc_%d_Festival 1", dawnGuide.ObjectID())))
-		if got := opcodes(drainFrames(t, w.c)); string(got) != string([]byte{serverpackets.OpcodeActionFailed}) {
-			t.Fatalf("Festival 1 answer = %x, want ActionFailed only", got)
-		}
+		assertAnswer(t, drainFrames(t, w.c), chatWindowAnswer, dawnGuide,
+			"<html><body>My html is missing:<br>data/html/seven_signs/festival/festival_2b.htm</body></html>")
 	}
 
 	setSevenSigns(t, w, sevensigns.SealValidation, sevensigns.NoCabal, sevensigns.NoCabal, sevensigns.NoCabal, sevensigns.NoCabal)

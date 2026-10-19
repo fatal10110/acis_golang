@@ -21,8 +21,6 @@ import (
 // open issue that ports its consumer; the boot reports them as unsupported.
 var pendingKeys = map[string][]string{
 	"events.properties": {
-		// Festival of Darkness: #223.
-		"FestivalChestSpawn", "FestivalFirstSpawn", "FestivalFirstSwarm", "FestivalMinPlayer", "FestivalSecondSpawn", "FestivalSecondSwarm",
 		// Dimensional Rift (Q635) and Q620: #184.
 		"AnakazelPortChance", "AutoJumpsDelayMin", "AutoJumpsDelayRnd", "CaptainCost", "CommanderCost", "HeroCost", "NeededPartyMembers",
 		"OfficerCost", "RecruitCost", "RiftMinPartySize", "SoldierCost",

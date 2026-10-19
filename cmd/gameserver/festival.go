@@ -12,8 +12,8 @@ import (
 )
 
 // loadFestivalConfig reads the events.properties Festival of Darkness
-// schedule settings, in milliseconds, with the shipped defaults for
-// a missing key.
+// settings, the times in milliseconds, with the shipped defaults for a
+// missing key; the party minimum is held to 2 to 9.
 func loadFestivalConfig(paths gameServerPaths) (festival.Config, error) {
 	props, err := config.LoadFile(paths.EventsConfigPath)
 	if err != nil {
@@ -28,6 +28,12 @@ func loadFestivalConfig(paths gameServerPaths) (festival.Config, error) {
 		ManagerStart: millis("FestivalManagerStart", def.ManagerStart),
 		Length:       millis("FestivalLength", def.Length),
 		CycleLength:  millis("FestivalCycleLength", def.CycleLength),
+		MinPlayers:   min(max(f.Int("FestivalMinPlayer", def.MinPlayers), 2), 9),
+		FirstSpawn:   millis("FestivalFirstSpawn", def.FirstSpawn),
+		FirstSwarm:   millis("FestivalFirstSwarm", def.FirstSwarm),
+		SecondSpawn:  millis("FestivalSecondSpawn", def.SecondSpawn),
+		SecondSwarm:  millis("FestivalSecondSwarm", def.SecondSwarm),
+		ChestSpawn:   millis("FestivalChestSpawn", def.ChestSpawn),
 	}
 	return cfg, f.Err()
 }

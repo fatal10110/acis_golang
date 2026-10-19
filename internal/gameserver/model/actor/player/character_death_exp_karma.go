@@ -39,10 +39,8 @@ func deathLossExemption(inPvP, inSiege, charmOfCourage, killedByPlayable bool) (
 // as does one killed by a player (or its summon) when either of their clans
 // has declared war on the other.
 //
-// The siege-zone and festival-participant reductions are wired: InSiegeZone
-// and FestivalParticipant are live accessors (FestivalParticipant is a
-// permanent false stub pending #223, so its branch stays dormant, not
-// approximated).
+// The siege-zone and festival-participant reductions read the live
+// InSiegeZone and FestivalParticipant accessors.
 func (c *Character) applyDeathExpKarmaLoss(killer attackable.Combatant) {
 	if killer == nil {
 		return

@@ -65,7 +65,7 @@ func (d *deathRewards) CalculateRewards(killer attackable.Combatant) {
 	if maxDealer != nil && maxDealer.SessionDetached() {
 		maxDealer = nil
 	}
-	if receiver := dropReceiver(killer, maxDealer); receiver != nil {
+	if receiver := dropReceiver(killer, maxDealer); receiver != nil && d.payOfferings(receiver) {
 		d.rollCursedWeapon(receiver)
 		d.rollDrops(s, receiver, d.hostile.HighestAttackerLevel(receiver.Level()))
 	}
@@ -81,6 +81,32 @@ func (d *deathRewards) creditRaidKill(killer attackable.Combatant) {
 	if p, ok := actingCharacter(killer); ok {
 		d.config.RaidKills.RecordRaidKill(p, int32(d.tmpl.ID), d.tmpl.Level)
 	}
+}
+
+// bloodOfferingID is the blood offering a festival monster's kill pays.
+const bloodOfferingID = 5901
+
+// payOfferings pays a festival monster's kill, credited to receiver: the
+// leader of the party of the player receiver acts for gets the blood
+// offerings the kill is worth, told so. A festival monster's kill pays
+// nothing else, not even its drops, unless it pays that; any other NPC's
+// kill goes on to its drops.
+func (d *deathRewards) payOfferings(receiver attackable.Combatant) bool {
+	if !d.hostile.FestivalMonster() {
+		return true
+	}
+	p, ok := actingCharacter(receiver)
+	if !ok {
+		return false
+	}
+	pt, ok := p.Party()
+	if !ok {
+		return false
+	}
+	if leader := pt.Leader(); leader != nil {
+		leader.AddRewardItem(bloodOfferingID, d.hostile.OfferingBonus(), false, d.ids.NextID)
+	}
+	return true
 }
 
 // rollCursedWeapon rolls, ahead of the drops, whether a Monster-family

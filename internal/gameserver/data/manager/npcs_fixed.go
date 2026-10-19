@@ -42,6 +42,23 @@ func (n *Npcs) SpawnFixedFolk(tmpl *npc.Template, x, y, z, heading int) (*npc.Fo
 	return f, nil
 }
 
+// SpawnFixedHostile is SpawnFixed with no respawn delay for a hostile NPC,
+// returning it. A template of any other kind reports ErrNotPlaceable.
+func (n *Npcs) SpawnFixedHostile(tmpl *npc.Template, x, y, z, heading int) (*npc.Hostile, error) {
+	if tmpl == nil || !npc.Attackable(&npc.Instance{Template: tmpl}) {
+		return nil, ErrNotPlaceable
+	}
+	live, err := n.spawnStandalone(tmpl, x, y, z, heading, 0, nil, 0)
+	if err != nil {
+		return nil, err
+	}
+	h, ok := live.(*npc.Hostile)
+	if !ok {
+		return nil, ErrNotPlaceable
+	}
+	return h, nil
+}
+
 // spawnFixed is SpawnFixed with no respawn delay, also returning the placed
 // NPC's object id.
 func (n *Npcs) spawnFixed(tmpl *npc.Template, x, y, z, heading int) (int32, error) {
