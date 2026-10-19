@@ -62,6 +62,13 @@ type chWorld struct {
 
 func bootClanHallAdmin(t *testing.T, inClan bool) *chWorld {
 	t.Helper()
+	return bootClanHallAdminWith(t, inClan, nil)
+}
+
+// bootClanHallAdminWith boots the //ch scenario with seed, more statements
+// run after its rows, and extra, more boot options.
+func bootClanHallAdminWith(t *testing.T, inClan bool, seed []string, extra ...gameservertest.Option) *chWorld {
+	t.Helper()
 	datapack.Require(t)
 	halls, err := gamexml.LoadClanHalls(datapack.Path(t, "data", "xml", "clanHalls.xml"))
 	if err != nil {
@@ -73,7 +80,7 @@ func bootClanHallAdmin(t *testing.T, inClan bool) *chWorld {
 	}
 	w := &chWorld{halls: halls, end: time.Now().Add(48 * time.Hour).UnixMilli()}
 	w.paidUntil = time.Now().UnixMilli() + chPaidAheadMs
-	srv, objID := bootAdmin(t, adminLevel,
+	srv, objID := bootAdmin(t, adminLevel, append([]gameservertest.Option{
 		gameservertest.WithHTMLPages(shippedAdminPages(t, "clanhall.htm", "clanhalls.htm")),
 		gameservertest.WithClanHalls(halls, decos),
 		gameservertest.WithResidences(halls, nil),
@@ -81,8 +88,8 @@ func bootClanHallAdmin(t *testing.T, inClan bool) *chWorld {
 			chGate(chGateA, "gludio_castle_agit_001_001", -60),
 			chGate(chGateB, "gludio_castle_agit_001_002", 80),
 		),
-		gameservertest.WithClanSeed(func(db *sql.DB) { w.seed(t, db, inClan) }),
-	)
+		gameservertest.WithClanSeed(func(db *sql.DB) { w.seed(t, db, inClan, seed) }),
+	}, extra...)...)
 	w.srv, w.objID, w.gm = srv, objID, srv.Client
 	enterWorld(t, w.gm)
 	return w
@@ -106,7 +113,7 @@ func chGate(id int, name string, x int) *door.Template {
 	}
 }
 
-func (w *chWorld) seed(t *testing.T, db *sql.DB, inClan bool) {
+func (w *chWorld) seed(t *testing.T, db *sql.DB, inClan bool, more []string) {
 	t.Helper()
 	exec := func(q string, args ...any) {
 		if _, err := db.ExecContext(context.Background(), q, args...); err != nil {
@@ -124,6 +131,9 @@ func (w *chWorld) seed(t *testing.T, db *sql.DB, inClan bool) {
 	exec("INSERT INTO clanhall (id, endDate) VALUES (?, ?), (?, ?)", chOnyx, w.end, chTopaz, w.end)
 	exec("INSERT INTO auctions (clanhall_id, bidder_name, clan_oid, clan_name, max_bid, time_bid) VALUES (?, ?, ?, 'Bidders', ?, 1)",
 		chOnyx, chBidderName, chBiddersID, chWinningBid)
+	for _, q := range more {
+		exec(q)
+	}
 }
 
 // ch sends //ch args as a clicked link and returns the frames it drew.
@@ -366,9 +376,11 @@ func TestAdminClanHallRefusals(t *testing.T) {
 	wantTextThenPage(t, w.ch(t, "siege 22"), "Usage: //ch siege start|end chId.")
 	wantTextThenPage(t, w.ch(t, "siege 5 22"), "Usage: //ch siege start|end chId.")
 	wantTextThenPage(t, w.ch(t, "siege start 22"), "This ClanHall isn't siegable.")
-	// A siegable hall: the page alone until hall sieges run.
-	if frames := w.ch(t, "siege start 21"); len(frames) != 1 || !strings.Contains(htmlBody(t, frames[0]), "Fortress of Resistance") {
-		t.Fatalf("siege start 21 frames = %x, want the hall page", testsupport.FrameOpcodes(frames))
+	// A siegable hall no script runs the siege of: start has no siege to
+	// start and gets the usage alone, end finds none being fought.
+	assertTexts(t, w.ch(t, "siege start 21"), chUsage)
+	if page := wantTextThenPage(t, w.ch(t, "siege end 21"), "This ClanHall isn't currently besieged."); !strings.Contains(page, "Fortress of Resistance") {
+		t.Fatalf("siege end 21 page =\n%s", page)
 	}
 	// An unknown action shows the page.
 	if frames := w.ch(t, "bogus 22"); len(frames) != 1 || !strings.Contains(htmlBody(t, frames[0]), "Moonstone Hall") {
