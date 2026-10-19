@@ -186,8 +186,9 @@ func TestMakerHookReadsWallClock(t *testing.T) {
 	// target is the first minute 54 second 0 of the local clock after the
 	// first timer run; run n of the timer, due n seconds after the start
 	// hook, is the first to read it.
-	target := started.Add(time.Second).Truncate(time.Hour).Add(54 * time.Minute)
-	for target.Before(started.Add(time.Second)) {
+	first := started.Add(time.Second)
+	target := time.Date(first.Year(), first.Month(), first.Day(), first.Hour(), 54, 0, 0, first.Location())
+	for target.Before(first) {
 		target = target.Add(time.Hour)
 	}
 	n := int((target.Sub(started) + time.Second - 1) / time.Second)
