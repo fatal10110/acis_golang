@@ -1,0 +1,31 @@
+# The hunting grounds teleporters (HuntingGroundsTeleporter): a priest of dawn and a priestess of
+# dusk, asked by a character in no cabal, answer their own side's refusal (onTalk). A scenario
+# seeds no teleport list, so a cabal member's teleport window is in
+# tests/npcs/teleporters_210_test.go.
+trace internal/gameserver/script/testdata/oracle/scenarios/hunting_grounds_teleporter_refused.golden
+character Wanderer 20
+script script.teleport.HuntingGroundsTeleporter
+page seven_signs/dawn_priest_1.htm
+page seven_signs/dusk_priest_1.htm
+page script/teleport/HuntingGroundsTeleporter/
+npc dawn 31078 DawnPriest 10 0 0
+npc dusk 31085 DuskPriest -10 0 0
+
+action dawn
+action dawn
+  S ActionFailed
+  S ActionFailed
+  S NpcHtmlMessage obj=dawn item=0 page=seven_signs/dawn_priest_1.htm
+bypass npc_{dawn}_Quest HuntingGroundsTeleporter
+  S NpcHtmlMessage obj=dawn item=0 page=script/teleport/HuntingGroundsTeleporter/dawn_tele-no.htm
+  S ActionFailed
+  S ActionFailed
+action dusk
+action dusk
+  S ActionFailed
+  S ActionFailed
+  S NpcHtmlMessage obj=dusk item=0 page=seven_signs/dusk_priest_1.htm
+bypass npc_{dusk}_Quest HuntingGroundsTeleporter
+  S NpcHtmlMessage obj=dusk item=0 page=script/teleport/HuntingGroundsTeleporter/dusk_tele-no.htm
+  S ActionFailed
+  S ActionFailed

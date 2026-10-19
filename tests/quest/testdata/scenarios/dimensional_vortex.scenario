@@ -1,0 +1,35 @@
+# The Dimensional Vortex (DimensionalVortex): the first vortex's red link, followed by a character
+# holding no red dimensional stone, answers the refusal; its blue link takes the character's one
+# blue dimensional stone and sends it up the tower, answering no page (onAdvEvent). A scenario
+# asserts no teleport landing (#3946), so the destinations of the three links are in
+# tests/npcs/teleporters_210_test.go.
+trace internal/gameserver/script/testdata/oracle/scenarios/dimensional_vortex.golden
+character Climber 20
+hold 4402 1
+item 4401 4402 4403
+script script.teleport.DimensionalVortex
+page default/30952.htm
+page script/teleport/DimensionalVortex/
+npc vortex 30952 Folk 10 0 0
+
+action vortex
+action vortex
+  S ActionFailed
+  S NpcHtmlMessage obj=vortex item=0 page=default/30952.htm
+  S ActionFailed
+bypass Quest DimensionalVortex red
+  S NpcHtmlMessage obj=vortex item=0 page=script/teleport/DimensionalVortex/no-items.htm
+  S ActionFailed
+  items 4402=1
+action vortex
+  S ActionFailed
+  S NpcHtmlMessage obj=vortex item=0 page=default/30952.htm
+  S ActionFailed
+bypass Quest DimensionalVortex blue
+  S SystemMessage id=302 3:4402
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  items 4402=0

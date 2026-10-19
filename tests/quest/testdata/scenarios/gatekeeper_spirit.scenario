@@ -1,0 +1,26 @@
+# The gatekeeper spirits (GatekeeperSpirit): the entrance spirit, talked to by a character in no
+# cabal while no cabal owns the Seal of Avarice or wins, shows its own chat window
+# (onFirstTalk). Lilith's death starts the exit timer, bound to no NPC and no player, and ten
+# seconds later the exit spirit appears, which sends nothing a scenario renders (onMyDying,
+# onTimer). A scenario seeds no seal owner and asserts no spawned NPC, so the cabal pages, the
+# exit spirit's place and its fifteen-minute despawn are in tests/npcs/teleporters_210_test.go.
+trace internal/gameserver/script/testdata/oracle/scenarios/gatekeeper_spirit.golden
+character Pilgrim 40
+script script.teleport.GatekeeperSpirit
+page gatekeeper/31111.htm
+page script/teleport/GatekeeperSpirit/
+npc spirit 31111 DungeonGatekeeper 10 0 0
+npc lilith 25283 RaidBoss 40 0 0
+npc exit 31112 DungeonGatekeeper -40 0 0
+
+action spirit
+action spirit
+  S ActionFailed
+  S NpcHtmlMessage obj=spirit item=0 page=gatekeeper/31111.htm
+  S ActionFailed
+  S ActionFailed
+kill lilith
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=1209
+  S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
+advance 10s
