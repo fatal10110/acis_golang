@@ -113,9 +113,9 @@ func (w *individual5World) skillHit(t *testing.T, h *npc.Hostile, def modelskill
 	w.srv.Settle(t)
 }
 
-// castDesire returns h's queued cast desire of skill id, and whether it has
+// castDesireOf returns h's queued cast desire of skill id, and whether it has
 // one.
-func castDesire(h *npc.Hostile, id modelskill.ID) (actorai.Desire, bool) {
+func castDesireOf(h *npc.Hostile, id modelskill.ID) (actorai.Desire, bool) {
 	for _, d := range h.AI().Desires().Snapshot() {
 		if d.Kind == actorai.IntentionCast && d.Skill.ID == id {
 			return d, true
@@ -187,7 +187,7 @@ func TestTreasureChestKeysAndBomb(t *testing.T) {
 	w.srv.InstallNPCCastSeam(t, bomb, modelskill.NewTable([]modelskill.Definition{npcSkill(treasureBombID, 3, true)}))
 	w.ticks(t, 2)
 	w.hit(t, bomb, 10)
-	d, ok := castDesire(bomb, treasureBombID)
+	d, ok := castDesireOf(bomb, treasureBombID)
 	if !ok || d.Skill.Level != 3 || d.Weight != 1000000 || d.FinalTarget == nil || d.FinalTarget.ObjectID() != w.player.ObjectID() {
 		t.Fatalf("chest cast desire after a plain hit = %+v (%v), want the level 3 treasure bomb on the character, weight 1000000", d, ok)
 	}
@@ -234,16 +234,16 @@ func TestTreasureChestMimicAnswersKeys(t *testing.T) {
 	if got, want := mimic.AggroHate(w.player), 10.0/37*100; got < want-0.01 || got > want+0.01 {
 		t.Fatalf("mimic hate after a hit of 10 = %v, want %v", got, want)
 	}
-	if d, ok := castDesire(mimic, mimicStrikeID); ok {
+	if d, ok := castDesireOf(mimic, mimicStrikeID); ok {
 		t.Fatalf("mimic wants %+v after a plain hit, want no cast", d)
 	}
 
 	before := mimic.AggroHate(w.player)
 	w.skillHit(t, mimic, modelskill.Definition{ID: unlockID, Level: 1})
-	if d, ok := castDesire(mimic, mimicWrathID); !ok || d.Weight != 1000000 || d.FinalTarget == nil || d.FinalTarget.ObjectID() != mimic.ObjectID() {
+	if d, ok := castDesireOf(mimic, mimicWrathID); !ok || d.Weight != 1000000 || d.FinalTarget == nil || d.FinalTarget.ObjectID() != mimic.ObjectID() {
 		t.Fatalf("mimic wrath desire = %+v (%v), want on itself, weight 1000000", d, ok)
 	}
-	if d, ok := castDesire(mimic, mimicStrikeID); !ok || d.Skill.Level != 25 || d.Weight != 1000000 || d.FinalTarget == nil || d.FinalTarget.ObjectID() != w.player.ObjectID() {
+	if d, ok := castDesireOf(mimic, mimicStrikeID); !ok || d.Skill.Level != 25 || d.Weight != 1000000 || d.FinalTarget == nil || d.FinalTarget.ObjectID() != w.player.ObjectID() {
 		t.Fatalf("mimic strong attack desire = %+v (%v), want level 25 on the character, weight 1000000", d, ok)
 	}
 	if got, want := mimic.AggroHate(w.player)-before, 1.0/37*100; got < want-0.01 || got > want+0.01 {
@@ -423,11 +423,11 @@ func TestBerserkerPhysicalSpecialStrikesAndRoars(t *testing.T) {
 	}
 
 	on := func(h *npc.Hostile, id modelskill.ID, target int32) bool {
-		d, ok := castDesire(h, id)
+		d, ok := castDesireOf(h, id)
 		return ok && d.Weight == 1000000 && d.FinalTarget != nil && d.FinalTarget.ObjectID() == target
 	}
 	w.hit(t, victim, 10)
-	if _, ok := castDesire(victim, berserkerPSProbe); ok {
+	if _, ok := castDesireOf(victim, berserkerPSProbe); ok {
 		t.Fatal("the victim wants its physical special after the hit that made the character its top target")
 	}
 	for _, id := range []modelskill.ID{berserkerPSProbe, berserkerDebuff} {
@@ -483,7 +483,7 @@ func TestStoneBerserkerPetrifiesAlliedPlayers(t *testing.T) {
 		t.Fatalf("Ketra berserker hate of a Ketra ally it sees = %v, want none", got)
 	}
 	w.hit(t, allied, 10)
-	if d, ok := castDesire(allied, petrifyID); !ok || d.Weight != 2000000 || d.FinalTarget == nil || d.FinalTarget.ObjectID() != w.player.ObjectID() {
+	if d, ok := castDesireOf(allied, petrifyID); !ok || d.Weight != 2000000 || d.FinalTarget == nil || d.FinalTarget.ObjectID() != w.player.ObjectID() {
 		t.Fatalf("petrify desire = %+v (%v), want on the character, weight 2000000", d, ok)
 	}
 	if got := allied.AggroHate(w.player); got != 0 {
@@ -569,17 +569,17 @@ func TestStoneBerserkerPetrifiesAlliedCaster(t *testing.T) {
 		castOwnSkill(w, row.skill)
 		w.srv.Advance(t, 2*time.Second)
 		w.srv.ReadQueued(t, w.srv.Client)
-		if d, ok := castDesire(stone, petrifyID); ok {
+		if d, ok := castDesireOf(stone, petrifyID); ok {
 			t.Fatalf("standing %d, buff %d: the berserker wants %+v, want no petrify", row.standing, row.skill, d)
 		}
 	}
 
 	castOwnSkill(w, aggroBuffID)
 	w.srv.AdvanceUntil(t, "the petrify desire", func() bool {
-		_, ok := castDesire(stone, petrifyID)
+		_, ok := castDesireOf(stone, petrifyID)
 		return ok
 	})
-	if d, _ := castDesire(stone, petrifyID); d.Weight != 1000000 || d.FinalTarget == nil || d.FinalTarget.ObjectID() != w.player.ObjectID() {
+	if d, _ := castDesireOf(stone, petrifyID); d.Weight != 1000000 || d.FinalTarget == nil || d.FinalTarget.ObjectID() != w.player.ObjectID() {
 		t.Fatalf("petrify desire = %+v, want on the caster, weight 1000000", d)
 	}
 	if got := stone.AggroHate(w.player); got != 0 {
