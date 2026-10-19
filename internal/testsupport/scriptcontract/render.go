@@ -18,7 +18,8 @@ import (
 // NpcHtmlMessage, SystemMessage, PlaySound, ExShowQuestMark, QuestList,
 // ActionFailed, the tutorial window's packets (TutorialShowHtml,
 // TutorialShowQuestionMark, TutorialEnableClientEvent, TutorialCloseHtml),
-// RadarControl, DropItem, MagicSkillUse and NpcSay are decoded; any other
+// RadarControl, DropItem, MagicSkillUse, NpcSay and TeleportToLocation are
+// decoded; any other
 // packet is an error, because the goldens write those with the reference
 // class name and raw bytes.
 //
@@ -114,6 +115,10 @@ func Packet(payload []byte, roles map[int32]string) (string, error) {
 		// the template id.
 		speaker, typ, npcID := role(d.int32(), roles), d.int32(), d.int32()
 		out = fmt.Sprintf("S NpcSay obj=%s type=%d npc=%d text=%s", speaker, typ, npcID, Quote(d.str()))
+	case 0x28:
+		obj := role(d.int32(), roles)
+		x, y, z := d.int32(), d.int32(), d.int32()
+		out = fmt.Sprintf("S TeleportToLocation obj=%s loc=%d,%d,%d fast=%d", obj, x, y, z, d.int32())
 	case 0xfe:
 		if sub := d.uint16(); sub != 0x1a {
 			return "", fmt.Errorf("extended packet 0x%04x is not rendered", sub)

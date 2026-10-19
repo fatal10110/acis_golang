@@ -3,6 +3,7 @@ package scenario
 import (
 	"bufio"
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"regexp"
@@ -16,22 +17,29 @@ import (
 )
 
 // renders are the opcodes a step compares: the dialog's, the quest's, the
-// tutorial's and the item messages, the radar marks, the drops, the casts
-// and the NPC chat lines a script makes. The rest (selection, approach, movement, NPC info, the
-// deferred inventory and status updates) is not the script's.
+// tutorial's and the item messages, the radar marks, the drops, the casts,
+// the NPC chat lines a script makes and the player's own teleports. The rest
+// (selection, approach, movement, NPC info, the deferred inventory and status
+// updates) is not the script's.
 var renders = []byte{
 	serverpackets.OpcodeActionFailed, serverpackets.OpcodeNpcHtmlMessage, serverpackets.OpcodeSystemMessage,
 	serverpackets.OpcodePlaySound, serverpackets.OpcodeQuestList, 0xfe,
 	serverpackets.OpcodeTutorialShowHTML, serverpackets.OpcodeTutorialShowQuestionMark,
 	serverpackets.OpcodeTutorialEnableClientEvent, serverpackets.OpcodeTutorialCloseHTML,
 	serverpackets.OpcodeRadarControl, serverpackets.OpcodeDropItem, serverpackets.OpcodeMagicSkillUse,
-	serverpackets.OpcodeNpcSay,
+	serverpackets.OpcodeNpcSay, serverpackets.OpcodeTeleportToLocation,
 }
 
 // render renders a server packet payload as an S line, with roles naming
-// object ids; false for a packet a step does not compare.
+// object ids; false for a packet a step does not compare. A
+// TeleportToLocation is compared only when it moves the player: where it
+// lands. Another creature's teleport is the world's.
 func render(payload []byte, roles map[int32]string) (string, bool, error) {
 	if len(payload) == 0 || !slices.Contains(renders, payload[0]) {
+		return "", false, nil
+	}
+	if payload[0] == serverpackets.OpcodeTeleportToLocation &&
+		(len(payload) < 5 || roles[int32(binary.LittleEndian.Uint32(payload[1:5]))] != "player") {
 		return "", false, nil
 	}
 	line, err := scriptcontract.Packet(payload, roles)
@@ -203,7 +211,9 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 			raw = append(raw, rawStep{client: "hit " + m[1] + " " + m[3]})
 		case traceAdvance.MatchString(line):
 			raw = append(raw, rawStep{client: "advance " + traceAdvance.FindStringSubmatch(line)[1]})
-		case (strings.HasPrefix(line, "S ") || strings.HasPrefix(line, "Q ")) && len(raw) > 0:
+		case (strings.HasPrefix(line, "S ") || strings.HasPrefix(line, "Q ") || strings.HasPrefix(line, "T ")) && len(raw) > 0:
+			// A T line ends the packets one task sent: the client
+			// packet's own run, then each tick's.
 			raw[len(raw)-1].lines = append(raw[len(raw)-1].lines, line)
 		case strings.HasPrefix(line, "# draw "):
 			if !traceDraw.MatchString(line) {
@@ -245,7 +255,14 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 	}
 	for _, r := range raw {
 		step := traceStep{client: r.client}
+		// task holds the rendered packets of the task running now.
+		var task []string
 		for _, line := range r.lines {
+			if strings.HasPrefix(line, "T ") {
+				step.sent = append(step.sent, deferTeleports(task)...)
+				task = nil
+				continue
+			}
 			if m := traceDraw.FindStringSubmatch(line); m != nil {
 				step.draws = append(step.draws, m[1])
 				continue
@@ -272,12 +289,37 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 				return nil, nil, fmt.Errorf("trace line %q: %w", line, err)
 			}
 			if ok {
-				step.sent = append(step.sent, rendered)
+				task = append(task, rendered)
 			}
 		}
+		step.sent = append(step.sent, deferTeleports(task)...)
 		steps = append(steps, step)
 	}
 	return steps, npcObjs, nil
+}
+
+// deferTeleports moves each teleport of the player among task, the
+// rendered packets one task of the trace sent, to the end of task, with the
+// ActionFailed lines right before it (its aborts'): a script's teleport of
+// a player runs on the player's queue once the hook's task is done, so the
+// packets the rest of the hook sends go out before the teleport's (script
+// engine plan, section 9, item 4).
+func deferTeleports(task []string) []string {
+	var rest, teleports []string
+	for _, line := range task {
+		if !strings.HasPrefix(line, "TeleportToLocation obj=player ") {
+			rest = append(rest, line)
+			continue
+		}
+		start := len(rest)
+		for start > 0 && rest[start-1] == "ActionFailed" {
+			start--
+		}
+		teleports = append(teleports, rest[start:]...)
+		teleports = append(teleports, line)
+		rest = rest[:start]
+	}
+	return append(rest, teleports...)
 }
 
 // checkTrace requires the scenario's steps to replay the trace: the same

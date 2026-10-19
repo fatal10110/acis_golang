@@ -21,6 +21,11 @@
 //	                                          character that logged out on it: a relog keeps playing it. The
 //	                                          character line's level and the class line's class stay the base class's
 //	clan <level>                              optional: the character leads a clan of that level
+//	siege <castle id> <owner|defender|attacker>
+//	                                          optional, with a clan line: the server runs the shipped castles
+//	                                          (data/xml/castles.xml) and their sieges, and the clan is registered
+//	                                          on that side of the castle's siege before the character enters the
+//	                                          world; owner makes it the castle's owner, on its siege's owner side
 //	quest <quest> <var>=<value> ...           character_quests rows of the character before it enters the world,
 //	                                          one line per quest, as a rows check lists them
 //	hold <item id> <count>                    optional: the character holds that many of the item before it enters
@@ -135,9 +140,11 @@
 // ActionFailed, NpcHtmlMessage, SystemMessage, PlaySound, QuestList,
 // ExShowQuestMark, TutorialShowHtml, TutorialShowQuestionMark,
 // TutorialEnableClientEvent, TutorialCloseHtml, RadarControl, DropItem,
-// MagicSkillUse and NpcSay, and the DeleteObject of a ground line's item
-// leaving the world ("DeleteObject obj=<role>"). "page=<path>" also ends a
-// TutorialShowHtml line.
+// MagicSkillUse and NpcSay, the TeleportToLocation of the character's own
+// teleport ("TeleportToLocation obj=player loc=<x>,<y>,<z> fast=<0|1>": where
+// it lands), and the DeleteObject of a ground line's item leaving the world
+// ("DeleteObject obj=<role>"). "page=<path>" also ends a TutorialShowHtml
+// line.
 //
 // Without a random line the script draws are random. A draw outside
 // [0, n), or past the listed ones, fails the step that drew it.
@@ -150,6 +157,12 @@
 // those steps' S, Q and M lines (a relog's packets excepted, as in the run);
 // a read, and a statement on another table than character_quests and
 // character_memo, is not compared, an unknown write on one of them fails.
+// A script's teleport of the character goes out once the hook's task is
+// done, after the packets the rest of the hook sends (script engine plan,
+// section 9, item 4), where the reference sends it inside the call: the
+// comparison moves each of the trace's TeleportToLocation lines of the
+// character, with the ActionFailed lines right before it (its aborts'), to
+// the end of the packets its task sent.
 // The script draws the trace pins (needing a random line) must be those the
 // run's same steps draw: the same bounds, in order. A trace under the
 // oracle's scenarios directory is the reference probe's play of this
@@ -187,6 +200,8 @@ type Scenario struct {
 	SubclassLevel int
 	// Clan is the level of the clan the character leads, -1 for none.
 	Clan int
+	// Siege is the siege line, nil for none.
+	Siege *Siege
 	// Quests are the character_quests rows seeded before the character
 	// enters the world.
 	Quests []QuestRows
@@ -222,6 +237,16 @@ type Scenario struct {
 	Grounds     []Ground
 	Steps       []Step
 }
+
+// Siege is the siege line: the clan's side of a castle's siege.
+type Siege struct {
+	Castle int
+	Side   string
+}
+
+// siegeSides are the sides a siege line names, as the siege_clans rows
+// write them; owner is the castle's owner instead.
+var siegeSides = []string{"owner", "defender", "attacker"}
 
 // QuestRows is one quest line: a quest's rows as var=value.
 type QuestRows struct {
@@ -370,6 +395,9 @@ func Parse(name string, data []byte) (*Scenario, error) {
 	if len(sc.Steps) == 0 {
 		return nil, fmt.Errorf("%s: no step", name)
 	}
+	if sc.Siege != nil && sc.Clan < 0 {
+		return nil, fmt.Errorf("%s: a siege line needs a clan line", name)
+	}
 	if sc.Subclass != 0 && sc.Subclass == sc.Class {
 		return nil, fmt.Errorf("%s: the subclass is the base class %d", name, sc.Class)
 	}
@@ -500,6 +528,18 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 			return fmt.Errorf("clan level %q is not 0 to %d", args[0], maxClanLevel)
 		}
 		sc.Clan = level
+	case "siege":
+		if len(args) != 2 || sc.Siege != nil {
+			return fmt.Errorf("one siege line: siege <castle id> <owner|defender|attacker>")
+		}
+		id, err := strconv.Atoi(args[0])
+		if err != nil || id < 1 {
+			return fmt.Errorf("castle id %q is not a number of 1 or more", args[0])
+		}
+		if !slices.Contains(siegeSides, args[1]) {
+			return fmt.Errorf("siege side %q is not owner, defender or attacker", args[1])
+		}
+		sc.Siege = &Siege{Castle: id, Side: args[1]}
 	case "quest":
 		if len(args) < 2 {
 			return fmt.Errorf("quest <quest> <var>=<value>, one or more")

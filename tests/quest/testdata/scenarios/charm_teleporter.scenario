@@ -1,8 +1,7 @@
 # The charm teleporters (CharmTeleporter): Tamil, asked by a character holding no orc gatekeeper
 # charm, answers her refusal; Whirpy takes the character's one dwarf gatekeeper token and sends
-# it to the Village of Gludin, answering no page (onTalk). A scenario asserts no teleport landing
-# (#3946), so the destinations and the persisted counts are in
-# tests/npcs/teleporters_210_test.go.
+# it to the Village of Gludin, answering no page (onTalk). Tamil's destination and the persisted
+# counts are in tests/npcs/teleporters_210_test.go.
 trace internal/gameserver/script/testdata/oracle/scenarios/charm_teleporter.golden
 character Traveler 20
 hold 1659 1
@@ -37,4 +36,5 @@ bypass npc_{whirpy}_Quest CharmTeleporter
   S ActionFailed
   S ActionFailed
   S ActionFailed
+  S TeleportToLocation obj=player loc=-80826,149775,-3043 fast=0
   items 1659=0
