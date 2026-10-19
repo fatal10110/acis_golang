@@ -1,0 +1,109 @@
+# Saga of the Hell Knight (Q095) on the saga core, played by a level 76 Dark Avenger from
+# the start: Mordred offers it and gives the main item; Bayard sends the player to Bavarin,
+# who asks for what the player does not hold; Mordred has nothing more to say until the
+# tablets are done, and a relog keeps the journal. Expectations are the reference trace's
+# (the relog's rows and state derived from ThirdClassQuest.java and Q095_SagaOfTheHellKnight.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q095_saga_of_the_hell_knight.golden
+character DarkAvenger 76
+class 6
+script quest.Q095_SagaOfTheHellKnight
+item 7086
+page trainer/31582.htm
+page guard/31297.htm
+page default/31623.htm
+page script/quest/Q095_SagaOfTheHellKnight/
+npc mordred 31582 Trainer 10 0 0
+npc bayard 31297 Guard -10 0 0
+npc bavarin 31623 Folk 0 10 0
+
+action mordred
+action mordred
+  S ActionFailed
+  S NpcHtmlMessage obj=mordred item=0 page=trainer/31582.htm
+  S ActionFailed
+bypass npc_{mordred}_Quest
+  S NpcHtmlMessage obj=mordred item=0 page=script/quest/Q095_SagaOfTheHellKnight/0-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q095_SagaOfTheHellKnight 0-1
+  S NpcHtmlMessage obj=mordred item=0 page=script/quest/Q095_SagaOfTheHellKnight/0-05.htm
+  S ActionFailed
+bypass Quest Q095_SagaOfTheHellKnight accept
+  S QuestList 95:0x80000001
+  S ExShowQuestMark quest=95
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7086
+  S NpcHtmlMessage obj=mordred item=0 page=script/quest/Q095_SagaOfTheHellKnight/0-03.htm
+  S ActionFailed
+  Q upsert Q095_SagaOfTheHellKnight | <state> | STARTED
+  Q upsert Q095_SagaOfTheHellKnight | <cond> | 1
+  items 7086=1
+  state Q095_SagaOfTheHellKnight STARTED
+action mordred
+  S ActionFailed
+  S NpcHtmlMessage obj=mordred item=0 page=trainer/31582.htm
+  S ActionFailed
+bypass npc_{mordred}_Quest
+  S NpcHtmlMessage obj=mordred item=0 page=script/quest/Q095_SagaOfTheHellKnight/0-04.htm
+  S ActionFailed
+  S ActionFailed
+action bayard
+action bayard
+  S ActionFailed
+  S NpcHtmlMessage obj=bayard item=0 page=guard/31297.htm
+  S ActionFailed
+bypass npc_{bayard}_Quest
+  S NpcHtmlMessage obj=bayard item=0 page=script/quest/Q095_SagaOfTheHellKnight/2-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q095_SagaOfTheHellKnight 2-1
+  S QuestList 95:0x80000003
+  S ExShowQuestMark quest=95
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=bayard item=0 page=script/quest/Q095_SagaOfTheHellKnight/2-05.htm
+  S ActionFailed
+  Q upsert Q095_SagaOfTheHellKnight | <cond> | 2
+action bayard
+  S ActionFailed
+  S NpcHtmlMessage obj=bayard item=0 page=guard/31297.htm
+  S ActionFailed
+bypass npc_{bayard}_Quest
+  S NpcHtmlMessage obj=bayard item=0 page=script/quest/Q095_SagaOfTheHellKnight/2-02.htm
+  S ActionFailed
+  S ActionFailed
+action bavarin
+action bavarin
+  S ActionFailed
+  S NpcHtmlMessage obj=bavarin item=0 page=default/31623.htm
+  S ActionFailed
+bypass npc_{bavarin}_Quest
+  S NpcHtmlMessage obj=bavarin item=0 page=script/quest/Q095_SagaOfTheHellKnight/1-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q095_SagaOfTheHellKnight 1-3
+  S QuestList 95:0x80000007
+  S ExShowQuestMark quest=95
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=bavarin item=0 page=script/quest/Q095_SagaOfTheHellKnight/1-05.htm
+  S ActionFailed
+  Q upsert Q095_SagaOfTheHellKnight | <cond> | 3
+action bavarin
+  S ActionFailed
+  S NpcHtmlMessage obj=bavarin item=0 page=default/31623.htm
+  S ActionFailed
+bypass npc_{bavarin}_Quest
+  S NpcHtmlMessage obj=bavarin item=0 page=script/quest/Q095_SagaOfTheHellKnight/1-02.htm
+  S ActionFailed
+  S ActionFailed
+action mordred
+action mordred
+  S ActionFailed
+  S NpcHtmlMessage obj=mordred item=0 page=trainer/31582.htm
+  S ActionFailed
+bypass npc_{mordred}_Quest
+  S NpcHtmlMessage obj=mordred item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
+  state Q095_SagaOfTheHellKnight STARTED
+  rows Q095_SagaOfTheHellKnight <cond>=3 <state>=STARTED

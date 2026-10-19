@@ -1,0 +1,109 @@
+# Saga of the Ghost Hunter (Q081) on the saga core, played by a level 76 Abyss Walker from
+# the start: Black Cat offers it and gives the main item; Drakon sends the player to Donath,
+# who asks for what the player does not hold; Black Cat has nothing more to say until the
+# tablets are done, and a relog keeps the journal. Expectations are the reference trace's
+# (the relog's rows and state derived from ThirdClassQuest.java and Q081_SagaOfTheGhostHunter.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q081_saga_of_the_ghost_hunter.golden
+character AbyssWalker 76
+class 36
+script quest.Q081_SagaOfTheGhostHunter
+item 7104
+page default/31603.htm
+page trainer/31286.htm
+page default/31624.htm
+page script/quest/Q081_SagaOfTheGhostHunter/
+npc blackcat 31603 Folk 10 0 0
+npc drakon 31286 Trainer -10 0 0
+npc donath 31624 Folk 0 10 0
+
+action blackcat
+action blackcat
+  S ActionFailed
+  S NpcHtmlMessage obj=blackcat item=0 page=default/31603.htm
+  S ActionFailed
+bypass npc_{blackcat}_Quest
+  S NpcHtmlMessage obj=blackcat item=0 page=script/quest/Q081_SagaOfTheGhostHunter/0-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q081_SagaOfTheGhostHunter 0-1
+  S NpcHtmlMessage obj=blackcat item=0 page=script/quest/Q081_SagaOfTheGhostHunter/0-05.htm
+  S ActionFailed
+bypass Quest Q081_SagaOfTheGhostHunter accept
+  S QuestList 81:0x80000001
+  S ExShowQuestMark quest=81
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7104
+  S NpcHtmlMessage obj=blackcat item=0 page=script/quest/Q081_SagaOfTheGhostHunter/0-03.htm
+  S ActionFailed
+  Q upsert Q081_SagaOfTheGhostHunter | <state> | STARTED
+  Q upsert Q081_SagaOfTheGhostHunter | <cond> | 1
+  items 7104=1
+  state Q081_SagaOfTheGhostHunter STARTED
+action blackcat
+  S ActionFailed
+  S NpcHtmlMessage obj=blackcat item=0 page=default/31603.htm
+  S ActionFailed
+bypass npc_{blackcat}_Quest
+  S NpcHtmlMessage obj=blackcat item=0 page=script/quest/Q081_SagaOfTheGhostHunter/0-04.htm
+  S ActionFailed
+  S ActionFailed
+action drakon
+action drakon
+  S ActionFailed
+  S NpcHtmlMessage obj=drakon item=0 page=trainer/31286.htm
+  S ActionFailed
+bypass npc_{drakon}_Quest
+  S NpcHtmlMessage obj=drakon item=0 page=script/quest/Q081_SagaOfTheGhostHunter/2-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q081_SagaOfTheGhostHunter 2-1
+  S QuestList 81:0x80000003
+  S ExShowQuestMark quest=81
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=drakon item=0 page=script/quest/Q081_SagaOfTheGhostHunter/2-05.htm
+  S ActionFailed
+  Q upsert Q081_SagaOfTheGhostHunter | <cond> | 2
+action drakon
+  S ActionFailed
+  S NpcHtmlMessage obj=drakon item=0 page=trainer/31286.htm
+  S ActionFailed
+bypass npc_{drakon}_Quest
+  S NpcHtmlMessage obj=drakon item=0 page=script/quest/Q081_SagaOfTheGhostHunter/2-02.htm
+  S ActionFailed
+  S ActionFailed
+action donath
+action donath
+  S ActionFailed
+  S NpcHtmlMessage obj=donath item=0 page=default/31624.htm
+  S ActionFailed
+bypass npc_{donath}_Quest
+  S NpcHtmlMessage obj=donath item=0 page=script/quest/Q081_SagaOfTheGhostHunter/1-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q081_SagaOfTheGhostHunter 1-3
+  S QuestList 81:0x80000007
+  S ExShowQuestMark quest=81
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=donath item=0 page=script/quest/Q081_SagaOfTheGhostHunter/1-05.htm
+  S ActionFailed
+  Q upsert Q081_SagaOfTheGhostHunter | <cond> | 3
+action donath
+  S ActionFailed
+  S NpcHtmlMessage obj=donath item=0 page=default/31624.htm
+  S ActionFailed
+bypass npc_{donath}_Quest
+  S NpcHtmlMessage obj=donath item=0 page=script/quest/Q081_SagaOfTheGhostHunter/1-02.htm
+  S ActionFailed
+  S ActionFailed
+action blackcat
+action blackcat
+  S ActionFailed
+  S NpcHtmlMessage obj=blackcat item=0 page=default/31603.htm
+  S ActionFailed
+bypass npc_{blackcat}_Quest
+  S NpcHtmlMessage obj=blackcat item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
+  state Q081_SagaOfTheGhostHunter STARTED
+  rows Q081_SagaOfTheGhostHunter <cond>=3 <state>=STARTED

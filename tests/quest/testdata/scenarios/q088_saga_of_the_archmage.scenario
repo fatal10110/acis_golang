@@ -1,0 +1,109 @@
+# Saga of the Archmage (Q088) on the saga core, played by a level 76 Sorcerer from
+# the start: Valleria offers it and gives the main item; Justin sends the player to Mist,
+# who asks for what the player does not hold; Valleria has nothing more to say until the
+# tablets are done, and a relog keeps the journal. Expectations are the reference trace's
+# (the relog's rows and state derived from ThirdClassQuest.java and Q088_SagaOfTheArchmage.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q088_saga_of_the_archmage.golden
+character Sorcerer 76
+class 12
+script quest.Q088_SagaOfTheArchmage
+item 7082
+page villagemaster/30176.htm
+page trainer/31282.htm
+page default/31627.htm
+page script/quest/Q088_SagaOfTheArchmage/
+npc valleria 30176 VillageMasterMystic 10 0 0
+npc justin 31282 Trainer -10 0 0
+npc mist 31627 Folk 0 10 0
+
+action valleria
+action valleria
+  S ActionFailed
+  S NpcHtmlMessage obj=valleria item=0 page=villagemaster/30176.htm
+  S ActionFailed
+bypass npc_{valleria}_Quest
+  S NpcHtmlMessage obj=valleria item=0 page=script/quest/Q088_SagaOfTheArchmage/0-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q088_SagaOfTheArchmage 0-1
+  S NpcHtmlMessage obj=valleria item=0 page=script/quest/Q088_SagaOfTheArchmage/0-05.htm
+  S ActionFailed
+bypass Quest Q088_SagaOfTheArchmage accept
+  S QuestList 88:0x80000001
+  S ExShowQuestMark quest=88
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7082
+  S NpcHtmlMessage obj=valleria item=0 page=script/quest/Q088_SagaOfTheArchmage/0-03.htm
+  S ActionFailed
+  Q upsert Q088_SagaOfTheArchmage | <state> | STARTED
+  Q upsert Q088_SagaOfTheArchmage | <cond> | 1
+  items 7082=1
+  state Q088_SagaOfTheArchmage STARTED
+action valleria
+  S ActionFailed
+  S NpcHtmlMessage obj=valleria item=0 page=villagemaster/30176.htm
+  S ActionFailed
+bypass npc_{valleria}_Quest
+  S NpcHtmlMessage obj=valleria item=0 page=script/quest/Q088_SagaOfTheArchmage/0-04.htm
+  S ActionFailed
+  S ActionFailed
+action justin
+action justin
+  S ActionFailed
+  S NpcHtmlMessage obj=justin item=0 page=trainer/31282.htm
+  S ActionFailed
+bypass npc_{justin}_Quest
+  S NpcHtmlMessage obj=justin item=0 page=script/quest/Q088_SagaOfTheArchmage/2-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q088_SagaOfTheArchmage 2-1
+  S QuestList 88:0x80000003
+  S ExShowQuestMark quest=88
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=justin item=0 page=script/quest/Q088_SagaOfTheArchmage/2-05.htm
+  S ActionFailed
+  Q upsert Q088_SagaOfTheArchmage | <cond> | 2
+action justin
+  S ActionFailed
+  S NpcHtmlMessage obj=justin item=0 page=trainer/31282.htm
+  S ActionFailed
+bypass npc_{justin}_Quest
+  S NpcHtmlMessage obj=justin item=0 page=script/quest/Q088_SagaOfTheArchmage/2-02.htm
+  S ActionFailed
+  S ActionFailed
+action mist
+action mist
+  S ActionFailed
+  S NpcHtmlMessage obj=mist item=0 page=default/31627.htm
+  S ActionFailed
+bypass npc_{mist}_Quest
+  S NpcHtmlMessage obj=mist item=0 page=script/quest/Q088_SagaOfTheArchmage/1-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q088_SagaOfTheArchmage 1-3
+  S QuestList 88:0x80000007
+  S ExShowQuestMark quest=88
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=mist item=0 page=script/quest/Q088_SagaOfTheArchmage/1-05.htm
+  S ActionFailed
+  Q upsert Q088_SagaOfTheArchmage | <cond> | 3
+action mist
+  S ActionFailed
+  S NpcHtmlMessage obj=mist item=0 page=default/31627.htm
+  S ActionFailed
+bypass npc_{mist}_Quest
+  S NpcHtmlMessage obj=mist item=0 page=script/quest/Q088_SagaOfTheArchmage/1-02.htm
+  S ActionFailed
+  S ActionFailed
+action valleria
+action valleria
+  S ActionFailed
+  S NpcHtmlMessage obj=valleria item=0 page=villagemaster/30176.htm
+  S ActionFailed
+bypass npc_{valleria}_Quest
+  S NpcHtmlMessage obj=valleria item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
+  state Q088_SagaOfTheArchmage STARTED
+  rows Q088_SagaOfTheArchmage <cond>=3 <state>=STARTED
