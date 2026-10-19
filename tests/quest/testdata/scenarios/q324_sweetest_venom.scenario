@@ -1,0 +1,111 @@
+# Sweetest Venom (Q324): a level 18 character accepts at Astaron; four, three and three of the
+# three bound monsters give ten venom sacs (every roll pinned to succeed, at the three chances),
+# the tenth moving the quest on; Astaron takes them for 5810 adena, and the repeatable quest ends;
+# then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q324_sweetest_venom.golden
+character Venomous 18
+random always 0
+script quest.Q324_SweetestVenom
+item 1077
+page default/30351.htm
+page script/quest/Q324_SweetestVenom/
+npc astaron 30351 Folk 10 0 0
+npc dryad 20034 Monster 40 0 0
+npc elder 20038 Monster 0 40 0
+npc third 20043 Monster -40 0 0
+
+# Astaron: accept.
+action astaron
+action astaron
+  S ActionFailed
+  S NpcHtmlMessage obj=astaron item=0 page=default/30351.htm
+  S ActionFailed
+bypass npc_{astaron}_Quest
+  S NpcHtmlMessage obj=astaron item=0 page=script/quest/Q324_SweetestVenom/30351-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q324_SweetestVenom CREATED
+bypass Quest Q324_SweetestVenom 30351-04.htm
+  S QuestList 324:0x80000001
+  S ExShowQuestMark quest=324
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=astaron item=0 page=script/quest/Q324_SweetestVenom/30351-04.htm
+  S ActionFailed
+  Q upsert Q324_SweetestVenom | <state> | STARTED
+  Q upsert Q324_SweetestVenom | <cond> | 1
+  state Q324_SweetestVenom STARTED
+  rows Q324_SweetestVenom <cond>=1 <state>=STARTED
+
+# Four, three and three: a sac each; the tenth completes the set.
+kill dryad x4
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1077
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1077
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1077
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1077
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1077=4
+kill elder x3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1077
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1077
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1077
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1077=7
+action astaron
+  S ActionFailed
+  S NpcHtmlMessage obj=astaron item=0 page=default/30351.htm
+  S ActionFailed
+bypass npc_{astaron}_Quest
+  S NpcHtmlMessage obj=astaron item=0 page=script/quest/Q324_SweetestVenom/30351-05.htm
+  S ActionFailed
+  S ActionFailed
+kill third x3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1077
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1077
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1077
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 324:0x80000003
+  S ExShowQuestMark quest=324
+  Q upsert Q324_SweetestVenom | <cond> | 2
+  items 1077=10
+  rows Q324_SweetestVenom <cond>=2 <state>=STARTED
+
+# Astaron: the sacs for adena; the quest ends.
+action astaron
+  S ActionFailed
+  S NpcHtmlMessage obj=astaron item=0 page=default/30351.htm
+  S ActionFailed
+bypass npc_{astaron}_Quest
+  S SystemMessage id=301 3:1077 6:10
+  S SystemMessage id=52 6:5810
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=astaron item=0 page=script/quest/Q324_SweetestVenom/30351-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q324_SweetestVenom
+  items 1077=0 57=5810
+  state Q324_SweetestVenom -
+  rows Q324_SweetestVenom -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q324_SweetestVenom -
+  rows Q324_SweetestVenom -
+  items 57=5810

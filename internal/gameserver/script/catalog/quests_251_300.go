@@ -1,18 +1,28 @@
 package catalog
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/script"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q257"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q258"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q259"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q261"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q262"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q263"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q264"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q265"
+)
 
 // quests251To300 is the catalog of quests 251 to 300 (#183), except the one the engine slices ported.
 func quests251To300() script.Catalog {
 	return script.Catalog{
-		"quest.Q257_TheGuardIsBusy":            nil,
-		"quest.Q258_BringWolfPelts":            nil,
-		"quest.Q259_RanchersPlea":              nil,
-		"quest.Q261_CollectorsDream":           nil,
-		"quest.Q262_TradeWithTheIvoryTower":    nil,
-		"quest.Q263_OrcSubjugation":            nil,
-		"quest.Q264_KeenClaws":                 nil,
-		"quest.Q265_ChainsOfSlavery":           nil,
+		"quest.Q257_TheGuardIsBusy":            q257.New,
+		"quest.Q258_BringWolfPelts":            q258.New,
+		"quest.Q259_RanchersPlea":              q259.New,
+		"quest.Q261_CollectorsDream":           q261.New,
+		"quest.Q262_TradeWithTheIvoryTower":    q262.New,
+		"quest.Q263_OrcSubjugation":            q263.New,
+		"quest.Q264_KeenClaws":                 q264.New,
+		"quest.Q265_ChainsOfSlavery":           q265.New,
 		"quest.Q266_PleasOfPixies":             nil,
 		"quest.Q267_WrathOfVerdure":            nil,
 		"quest.Q271_ProofOfValor":              nil,
