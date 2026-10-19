@@ -103,10 +103,11 @@ func StartSchedule(r *Registry, queue *sim.Queue, srv Server) *Schedule {
 }
 
 // startScript returns the script a task's start hooks are handed: a copy
-// of s whose helpers act through a copy of its env without the world. A
-// departure does not wait for a running start hook, so a start must never
-// reach a player: two writes to one could fall on both sides of its final
-// saves.
+// of s whose helpers act through a copy of its env without the world, so
+// its player and object lookups find nothing. A departure does not wait for
+// a running start hook, so a start must never reach a player: two writes to
+// one could fall on both sides of its final saves. See Start for what the
+// copy does not guard.
 func startScript(s *Script) *Script {
 	c := *s
 	if s.env != nil {
