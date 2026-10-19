@@ -97,8 +97,9 @@ const (
 // NPC of the group stays in and, leaving, respawns after its delay; the
 // unique NPC back deletes the other maker's NPC again and an NPC of the
 // group entering. A script event sets the flag to int1 before the default
-// handling: 1000 with int1 0 deletes the group, and the next NPC entering
-// stays.
+// handling: after 1001 with int1 0, which brings nothing, an NPC of the
+// group entering with the unique NPC in stays; 1000 with int1 0 then
+// deletes the whole group, wakes nobody and arms no respawn.
 func TestExclusiveSpawnNormalMakerKeepsItsGroupOut(t *testing.T) {
 	t.Parallel()
 	w := bootFolkWorld(t, map[string]string{},
@@ -184,6 +185,26 @@ func TestExclusiveSpawnNormalMakerKeepsItsGroupOut(t *testing.T) {
 	w.srv.NpcSpawns.Respawn("excl_m#1#1")
 	w.srv.Settle(t)
 	count("a minion after 1001 with int1 0", 1, 1, 0)
+	drainFrames(t, w.c)
+
+	group := objectIDs(append(mw.inWorld(exclLeaderID), mw.inWorld(exclMinionID)...))
+	if !w.srv.NpcSpawns.MakerEvent("excl_m", "1000", 0, 0) {
+		t.Fatal("npcmaker excl_m not found by name")
+	}
+	w.srv.Advance(t, time.Millisecond)
+	count("1000 with int1 0", 0, 0, 0)
+	frames = drainFrames(t, w.c)
+	if got := deleted(frames); !slices.Equal(got, group) {
+		t.Fatalf("1000 with int1 0: deleted objects = %v, want the group %v", got, group)
+	}
+	if got := shown(frames); len(got) != 0 {
+		t.Fatalf("1000 with int1 0: NPCs shown = %v, want none", got)
+	}
+	for _, slot := range []string{"excl_m#0#0", "excl_m#1#0", "excl_m#1#1"} {
+		if w.srv.NpcRespawns.Tracked(slot) {
+			t.Fatalf("1000 with int1 0: slot %s armed a respawn", slot)
+		}
+	}
 }
 
 const (
