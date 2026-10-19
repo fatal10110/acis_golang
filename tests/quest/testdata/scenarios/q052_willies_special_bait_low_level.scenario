@@ -1,0 +1,22 @@
+# Willie's Special Bait (Q052), refused: a level 47 character, one short of the quest's level,
+# is turned away by Willie and the quest is not started. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q052_willies_special_bait_low_level.golden
+character Baiter 47
+script quest.Q052_WilliesSpecialBait
+item 7623 7612
+page fisherman/31574.htm
+page script/quest/Q052_WilliesSpecialBait/
+npc willie 31574 Fisherman 10 0 0
+
+action willie
+action willie
+  S ActionFailed
+  S NpcHtmlMessage obj=willie item=0 page=fisherman/31574.htm
+  S ActionFailed
+bypass npc_{willie}_Quest
+  S NpcHtmlMessage obj=willie item=0 page=script/quest/Q052_WilliesSpecialBait/31574-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q052_WilliesSpecialBait CREATED
+  rows Q052_WilliesSpecialBait -

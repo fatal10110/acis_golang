@@ -1,0 +1,22 @@
+# Linnaues' Special Bait (Q053), refused: a level 59 character, one short of the quest's
+# level, is turned away by Linnaeus and the quest is not started. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q053_linnaeus_special_bait_low_level.golden
+character Lurer 59
+script quest.Q053_LinnaeusSpecialBait
+item 7624 7613
+page fisherman/31577.htm
+page script/quest/Q053_LinnaeusSpecialBait/
+npc linnaeus 31577 Fisherman 10 0 0
+
+action linnaeus
+action linnaeus
+  S ActionFailed
+  S NpcHtmlMessage obj=linnaeus item=0 page=fisherman/31577.htm
+  S ActionFailed
+bypass npc_{linnaeus}_Quest
+  S NpcHtmlMessage obj=linnaeus item=0 page=script/quest/Q053_LinnaeusSpecialBait/31577-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q053_LinnaeusSpecialBait CREATED
+  rows Q053_LinnaeusSpecialBait -
