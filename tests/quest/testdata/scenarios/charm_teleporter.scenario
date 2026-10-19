@@ -1,6 +1,6 @@
 # The charm teleporters (CharmTeleporter): Tamil, asked by a character holding no orc gatekeeper
 # charm, answers her refusal; Whirpy takes the character's one dwarf gatekeeper token and sends
-# it to the Dwarven Village, answering no page (onTalk). A scenario asserts no teleport landing
+# it to the Village of Gludin, answering no page (onTalk). A scenario asserts no teleport landing
 # (#3946), so the destinations and the persisted counts are in
 # tests/npcs/teleporters_210_test.go.
 trace internal/gameserver/script/testdata/oracle/scenarios/charm_teleporter.golden

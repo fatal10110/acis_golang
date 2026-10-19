@@ -2,6 +2,8 @@ package npcs
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"maps"
 	"os"
 	"slices"
@@ -67,7 +69,7 @@ const (
 )
 
 var (
-	tpDwarvenVillage = location.Location{X: -80826, Y: 149775, Z: -3043}
+	tpGludinVillage  = location.Location{X: -80826, Y: 149775, Z: -3043}
 	tpFourSepulchers = location.Location{X: 178127, Y: -84435, Z: -7215}
 	tpImperialTomb   = location.Location{X: 186699, Y: -75915, Z: -2826}
 	tpRaceTrack      = location.Location{X: 12661, Y: 181687, Z: -3560}
@@ -258,16 +260,19 @@ func (w *folkWorld) memoRow(t *testing.T) string {
 	var val string
 	err := w.srv.DB.QueryRowContext(context.Background(),
 		"SELECT val FROM character_memo WHERE charId=? AND var=?", w.player, tpRaceMemo).Scan(&val)
-	if err != nil {
+	if errors.Is(err, sql.ErrNoRows) {
 		return ""
+	}
+	if err != nil {
+		t.Fatal(err)
 	}
 	return val
 }
 
 // TestCharmTeleporterTakesItsTokenAndMoves: Whirpy takes one dwarf
 // gatekeeper token and Tamil one orc gatekeeper charm, each leaving the
-// other gatekeeper's item alone, and both send the player to the Dwarven
-// Village at no offset, answering no page.
+// other gatekeeper's item alone, and both send the player to the Village
+// of Gludin at no offset, answering no page.
 func TestCharmTeleporterTakesItsTokenAndMoves(t *testing.T) {
 	t.Parallel()
 	for _, tt := range []struct {
@@ -287,7 +292,7 @@ func TestCharmTeleporterTakesItsTokenAndMoves(t *testing.T) {
 			if _, ok := firstOpcode(frames, serverpackets.OpcodeNpcHtmlMessage); ok {
 				t.Fatalf("the trip answered a page: %x", opcodes(frames))
 			}
-			w.requireTrip(t, frames, tpDwarvenVillage)
+			w.requireTrip(t, frames, tpGludinVillage)
 			w.requireSaved(t, tt.saved)
 		})
 	}

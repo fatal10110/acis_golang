@@ -1,5 +1,5 @@
 // Package charmteleporter is the two gatekeepers that send a player to the
-// Dwarven Village for a token or charm: Whirpy takes a dwarf gatekeeper
+// Village of Gludin for a token or charm: Whirpy takes a dwarf gatekeeper
 // token, Tamil an orc gatekeeper charm. A player without one gets the
 // gatekeeper's refusal.
 package charmteleporter
