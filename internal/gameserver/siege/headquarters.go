@@ -38,20 +38,27 @@ type HeadquartersSite struct {
 	// NearHeadquarters reports another headquarters within
 	// HeadquartersRange of the player.
 	NearHeadquarters func() bool
+	// HallAttacker reports whether the player's clan attacks the clan hall
+	// siege whose battlefield is on where it stands; asked only when no
+	// castle siege is fought there.
+	HallAttacker func() bool
 }
 
 // CheckHeadquarters returns why the player at site may not put up a siege
 // headquarters, checked in this order: its clan must attack the siege in
-// progress whose battlefield holds it, it must lead the clan, the clan must
-// hold no headquarters, it must stand on headquarters ground, and no other
+// progress whose battlefield holds it, or with none the clan hall siege
+// whose battlefield is on there, it must lead the clan, the clan must hold
+// no headquarters, it must stand on headquarters ground, and no other
 // headquarters may stand within HeadquartersRange.
-//
-// ponytail: a clan hall siege's attackers may put one up too; that branch
-// reads the hall siege runtime (#244).
 func (e *Engine) CheckHeadquarters(site HeadquartersSite) HeadquartersRefusal {
-	s, ok := e.ActiveAt(site.X, site.Y, site.Z)
+	var attacker bool
+	if s, ok := e.ActiveAt(site.X, site.Y, site.Z); ok {
+		attacker = s.CheckSides(site.ClanID, SideAttacker)
+	} else if site.HallAttacker != nil {
+		attacker = site.HallAttacker()
+	}
 	switch {
-	case !ok || !s.CheckSides(site.ClanID, SideAttacker):
+	case !attacker:
 		return HeadquartersNotAttacker
 	case !site.Leader:
 		return HeadquartersNotLeader

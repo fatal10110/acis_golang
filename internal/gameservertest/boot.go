@@ -110,6 +110,9 @@ type options struct {
 	// sieges is the castle siege configuration (WithSieges); nil runs no
 	// siege.
 	sieges *siege.Config
+	// hallSieges are the hall siege settings (WithHallSiegeScript,
+	// WithHallSiegeConfig).
+	hallSieges hallSiegeOptions
 	// castleManor is the manor (WithCastleManor); nil runs none.
 	castleManor *castleManorOptions
 	// slowStores delays every handler-issued persistence write (WithSlowStores).
@@ -2502,9 +2505,11 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err := halls.Restore(context.Background()); err != nil {
 		t.Fatalf("restore clan halls: %v", err)
 	}
+	restoreHallSieges(t, db, halls)
 	hallQueue := queues.NewQueue("clanhalls")
 	t.Cleanup(hallQueue.Close)
 	halls.Start(hallQueue, gcl, network.ClanHallNotifier(gcl), network.ClanHallGrounds(gcl))
+	startHallSieges(t, o, halls, gcl)
 	restoreCastles(t, db, gclConfig.Castles, worldObjects)
 	castleManorClock := startCastleManor(t, gclConfig.CastleManor, o, gcl)
 	startSieges(t, gclConfig.Sieges, queues.NewQueue("sieges"), gcl)

@@ -33,9 +33,9 @@ func swoopCannon(a any) bool {
 	return ok && s.SiegeSummon() && s.NPCID() == swoopCannonID
 }
 
-// actingClanID is the clan of the player acting through a: a summon's
+// ActingClanID is the clan of the player acting through a: a summon's
 // owner's, or a's own; 0 for none.
-func actingClanID(a any) int32 {
+func ActingClanID(a any) int32 {
 	if s, ok := a.(interface {
 		Owner() (attackable.Combatant, bool)
 	}); ok {
@@ -54,7 +54,7 @@ func actingClanID(a any) int32 {
 // progress, only for a player of an attacking clan or its summon, and a
 // wall only through a siege summon other than the Swoop Cannon.
 func (s *Siege) AllowsDoorAttack(attacker skilltarget.Actor, wall bool) bool {
-	clanID := actingClanID(attacker)
+	clanID := ActingClanID(attacker)
 	s.e.mu.Lock()
 	attacking := s.status == StatusInProgress && clanID != 0 && s.sideLocked(clanID) == SideAttacker
 	s.e.mu.Unlock()

@@ -126,10 +126,10 @@ func (l *GameClientLink) adminClanHallSiege(gm *livePlayer, hallID int32, action
 	case !l.clanHallData.Siegable(int(hallID)):
 		sendText(gm, "This ClanHall isn't siegable.")
 	case action == "start" || action == "end":
-		// ponytail: #244 owns the hall siege runtime; until it lands a
-		// siegable hall's siege cannot be started or ended, and the GM
-		// gets the hall's page alone.
-		l.log.Warn().Int32("hall_id", hallID).Str("action", action).Msg("admin: //ch siege needs the hall siege runtime")
+		// ponytail: starting and ending a siegable hall's siege through
+		// clanhall.HallSiege (Instant, End) waits for #3365; until then
+		// the GM gets the hall's page alone.
+		l.log.Warn().Int32("hall_id", hallID).Str("action", action).Msg("admin: //ch siege start and end are not wired yet")
 	}
 }
 

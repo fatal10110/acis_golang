@@ -134,7 +134,7 @@ func (l *GameClientLink) restartRestoreExp(live *livePlayer, requestType int32) 
 // listing no such spawn falls back to the nearest town.
 //
 // ponytail: the FlagWar clan restart point of a clan hall siege waits for
-// the hall sieges (#244).
+// #3346.
 func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location, bool) {
 	if s, ok := l.siegeAt(live); ok && l.dawnHoldsStrife() {
 		kind := residence.SpawnOther

@@ -55,8 +55,8 @@ func effectiveRestartType(live *livePlayer, requestType int32) int32 {
 // castle.
 //
 // ponytail: the siege HQ restart to the clan's headquarters waits for
-// #3346, so it always resolves to town; the clan hall siege branches wait
-// for the hall sieges (#244).
+// #3346, so it always resolves to town, as do the clan hall siege
+// branches.
 //
 // requestType is the type effectiveRestartType already enforced.
 func (l *GameClientLink) restartPointDestination(live *livePlayer, requestType int32) (location.Location, restartOutcome) {
@@ -175,8 +175,8 @@ func randomSpawn(spawns map[residence.SpawnType][]location.Location, kind reside
 // restart also while it owns or defends the siege in progress at live's
 // position, and the fixed restart for an access level allowed it.
 //
-// ponytail: the siege HQ restart waits for #3346, and the clan hall siege
-// branch for the hall sieges (#244).
+// ponytail: the siege HQ restart, castle and clan hall siege branches,
+// waits for #3346.
 func (l *GameClientLink) dieOptions(live *livePlayer) serverpackets.DieOptions {
 	return serverpackets.DieOptions{
 		ClanHall: live.ClanHallID() != 0,

@@ -18,14 +18,13 @@ func (l *GameClientLink) castleSiege(id int32) (*siege.Siege, bool) {
 	return l.sieges.Get(int(id))
 }
 
-// requestSiegeAttackerList shows the attacking clans of castle req.ID.
-//
-// ponytail: a siegable clan hall's attackers wait on the clan hall sieges
-// (#244); for such an id, as for an id naming nothing, nothing is sent,
-// the window simply staying empty.
+// requestSiegeAttackerList shows the attacking clans of castle req.ID, or
+// of siegable hall req.ID; an id naming neither answers nothing, the window
+// staying empty.
 func (l *GameClientLink) requestSiegeAttackerList(live *livePlayer, req clientpackets.RequestSiegeList) {
 	s, ok := l.castleSiege(req.ID)
 	if !ok {
+		l.requestHallSiegeAttackerList(live, req.ID)
 		return
 	}
 	live.SendFrame(frameSiegeAttackerList(s))
@@ -44,11 +43,9 @@ func (l *GameClientLink) requestSiegeDefenderList(live *livePlayer, req clientpa
 // requestJoinSiege registers live's clan on castle req.ID's siege, or drops
 // its registration. live needs the siege management privilege. A clan
 // whose dissolution is pending may not register. Registering or dropping,
-// refused or not, live then sees the siege window again.
-//
-// ponytail: a siegable clan hall's registration waits on the clan hall
-// sieges (#244); for such an id, as for an id naming nothing, nothing
-// answers.
+// refused or not, live then sees the siege window again. An id naming a
+// siegable hall registers on its siege (requestJoinHallSiege); one naming
+// neither answers nothing.
 func (l *GameClientLink) requestJoinSiege(live *livePlayer, req clientpackets.RequestJoinSiege) {
 	cl, member := l.clanService().ClanOf(live.Character)
 	if !member || !cl.HasPrivilege(live.ObjectID(), clan.PrivCastleSiege) {
@@ -57,6 +54,7 @@ func (l *GameClientLink) requestJoinSiege(live *livePlayer, req clientpackets.Re
 	}
 	s, ok := l.castleSiege(req.ID)
 	if !ok {
+		l.requestJoinHallSiege(live, cl, req)
 		return
 	}
 	if req.IsJoining == 1 {
@@ -174,15 +172,16 @@ const siegeNpcKind = "SiegeNpc"
 // reports whether f is one: the leader of the clan owning the castle reads
 // siege/01.htm, or siege/03.htm while its siege is under way; anyone else
 // reads siege/02.htm while it is under way and otherwise sees the siege
-// window. A page comes with ActionFailed. A messenger of no castle is left
-// to the chat window (the siegable clan halls' messengers, #244).
+// window. A page comes with ActionFailed. A messenger of no castle is a
+// siegable hall's (showHallSiegeMessenger); one of neither is left to the
+// chat window.
 func (l *GameClientLink) showSiegeMessenger(live *livePlayer, f *npc.Folk) bool {
 	if f.Instance.Template.Type != siegeNpcKind {
 		return false
 	}
 	c, ok := l.castles.ByNPC(f.NpcID())
 	if !ok {
-		return false
+		return l.showHallSiegeMessenger(live, f)
 	}
 	s, ok := l.castleSiege(int32(c.ID))
 	if !ok {
@@ -269,23 +268,38 @@ func (l *GameClientLink) siegeBanisher(field *zone.Siege) func(zone.Actor) {
 			return
 		}
 		live := za.live
-		active := field.Active()
-		if !active {
-			l.siegeBanishing.Store(live, struct{}{})
-		}
-		posted := postLive(live, func() {
-			defer l.siegeBanishing.Delete(live)
+		l.banishOffBattlefield(live, field, func() {
 			if dest, ok := l.restartDestination(live); ok {
 				l.teleportLivePlayer(live, dest, restartTeleportOffset)
 			}
-			if active && !field.Active() {
-				l.startPvPFlag(live, false)
-			}
 		})
-		if !posted {
-			// The player's queue is closed, so the job never runs.
-			l.siegeBanishing.Delete(live)
+	}
+}
+
+// banishOffBattlefield runs teleport, live's banishment, on live's queue.
+// Banished while field is off, as its siege starts, live hears no combat
+// notice and takes no flag until the teleport has run; banished while field
+// is on, it is flagged once teleported should field have turned off by
+// then. A nil field leaves the teleport alone.
+func (l *GameClientLink) banishOffBattlefield(live *livePlayer, field *zone.Siege, teleport func()) {
+	if field == nil {
+		postLive(live, teleport)
+		return
+	}
+	active := field.Active()
+	if !active {
+		l.siegeBanishing.Store(live, struct{}{})
+	}
+	posted := postLive(live, func() {
+		defer l.siegeBanishing.Delete(live)
+		teleport()
+		if active && !field.Active() {
+			l.startPvPFlag(live, false)
 		}
+	})
+	if !posted {
+		// The player's queue is closed, so the job never runs.
+		l.siegeBanishing.Delete(live)
 	}
 }
 

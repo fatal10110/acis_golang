@@ -9,6 +9,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
@@ -19,22 +20,12 @@ import (
 	"go.uber.org/fx"
 )
 
-// siegeKeysNotApplied are the siege.properties keys this server reads but
-// does not apply yet, each with the issue that applies it.
-var siegeKeysNotApplied = []struct{ key, issue string }{
-	{"ChSiegeClanMinLevel", "#244"},
-	{"ChAttackerMaxClans", "#244"},
-}
-
-// loadSiegeConfig reads the siege.properties castle siege settings,
-// with the shipped defaults for a missing key. It also returns
-// the keys set in the file that have no effect yet, so the boot can say
-// so: the siegable clan hall keys (ChSiegeClanMinLevel, ChAttackerMaxClans)
-// wait for the clan hall sieges.
-func loadSiegeConfig(paths gameServerPaths) (siege.Config, []string, error) {
+// loadSiegeConfig reads the siege.properties castle siege settings, with
+// the shipped defaults for a missing key.
+func loadSiegeConfig(paths gameServerPaths) (siege.Config, error) {
 	props, err := config.LoadFile(paths.SiegeConfigPath)
 	if err != nil {
-		return siege.Config{}, nil, err
+		return siege.Config{}, err
 	}
 	f := config.NewFields(props, "siege")
 	def := siege.DefaultConfig()
@@ -45,26 +36,32 @@ func loadSiegeConfig(paths gameServerPaths) (siege.Config, []string, error) {
 		MaxDefenders:    f.Int("DefenderMaxClans", def.MaxDefenders),
 		AttackerRespawn: time.Duration(f.Int("AttackerRespawn", int(def.AttackerRespawn/time.Millisecond))) * time.Millisecond,
 	}
-	var notApplied []string
-	for _, k := range siegeKeysNotApplied {
-		if _, ok := props.Lookup(k.key); ok {
-			notApplied = append(notApplied, k.key+" ("+k.issue+")")
-		}
+	return cfg, f.Err()
+}
+
+// loadHallSiegeConfig reads the siege.properties siegable clan hall
+// settings, with the shipped defaults for a missing key.
+func loadHallSiegeConfig(paths gameServerPaths) (clanhall.SiegeConfig, error) {
+	props, err := config.LoadFile(paths.SiegeConfigPath)
+	if err != nil {
+		return clanhall.SiegeConfig{}, err
 	}
-	return cfg, notApplied, f.Err()
+	f := config.NewFields(props, "siege")
+	def := clanhall.DefaultSiegeConfig()
+	cfg := clanhall.SiegeConfig{
+		MinClanLevel: f.Int("ChSiegeClanMinLevel", def.MinClanLevel),
+		MaxAttackers: f.Int("ChAttackerMaxClans", def.MaxAttackers),
+	}
+	return cfg, f.Err()
 }
 
 // provideSieges restores the castle sieges' registrations, once the
 // castles have their owners, writing through the persistence worker. Each
 // siege turns on the siege zone of its castle.
 func provideSieges(ctx bootContext, paths gameServerPaths, pool *sql.DB, worker *persist.Worker, data *gameData, clans *clan.Service, castles *castle.Manager, log zerolog.Logger) (*siege.Engine, error) {
-	cfg, notApplied, err := loadSiegeConfig(paths)
+	cfg, err := loadSiegeConfig(paths)
 	if err != nil {
 		return nil, err
-	}
-	if len(notApplied) > 0 {
-		log.Warn().Strs("keys", notApplied).Str("file", paths.SiegeConfigPath).
-			Msg("siege.properties keys are read but not applied yet")
 	}
 	var fields []*zone.Siege
 	if data.Zones != nil {

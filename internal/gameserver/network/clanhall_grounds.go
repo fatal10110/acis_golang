@@ -73,8 +73,9 @@ func (g clanHallGrounds) BanishForeigners(hallID, clanID int32) {
 // banishFromClanHall teleports a, a player thrown out of hall hallID's
 // grounds, to a random banish point of the hall, within
 // clanHallBanishOffset. The teleport runs on the player's own queue, so
-// after the zone and hall locks the banishment ran under are released. A
-// hall without a banish point leaves the player where it is.
+// after the zone and hall locks the banishment ran under are released; off
+// a siegable hall's battlefield as banishOffBattlefield takes it. A hall
+// without a banish point leaves the player where it is.
 func (l *GameClientLink) banishFromClanHall(hallID int32, a zone.Actor) {
 	za, ok := a.(*liveZoneActor)
 	if !ok {
@@ -91,5 +92,9 @@ func (l *GameClientLink) banishFromClanHall(hallID int32, a zone.Actor) {
 	}
 	dest := spawns[rnd.Get(len(spawns))]
 	live := za.live
-	postLive(live, func() { l.teleportLivePlayer(live, dest, clanHallBanishOffset) })
+	var field *zone.Siege
+	if s, ok := l.halls.Siege(hallID); ok {
+		field = s.Battlefield()
+	}
+	l.banishOffBattlefield(live, field, func() { l.teleportLivePlayer(live, dest, clanHallBanishOffset) })
 }

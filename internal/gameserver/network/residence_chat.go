@@ -49,9 +49,6 @@ func (l *GameClientLink) npcResidence(inst *npc.Instance) (*castle.Castle, *hall
 
 // residenceTalk is what live sees of the residence f serves, as its chat
 // window reads it.
-//
-// ponytail: a siegable hall's siege is not run yet (#244), so such a hall
-// never reads as under siege.
 func (l *GameClientLink) residenceTalk(live *livePlayer, f *npc.Folk) npc.ResidenceTalk {
 	var r npc.ResidenceTalk
 	c, h := l.npcResidence(f.Instance)
@@ -67,6 +64,7 @@ func (l *GameClientLink) residenceTalk(live *livePlayer, f *npc.Folk) npc.Reside
 		r.LifeTowers = c.AliveLifeTowers(r.SiegeInProgress)
 	case h != nil:
 		r.HallID, r.Siegable, r.HallName = h.ID, h.IsSiegable(), h.Name
+		r.SiegeInProgress = l.halls.SiegeInProgress(int32(h.ID))
 		if v, ok := l.halls.View(int32(h.ID)); ok {
 			r.OwnerID = v.OwnerID
 		}

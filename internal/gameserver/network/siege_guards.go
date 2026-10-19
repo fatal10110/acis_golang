@@ -1,6 +1,7 @@
 package network
 
 import (
+	"math"
 	"strconv"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
@@ -100,10 +101,12 @@ func (s SpawnTimeState) CastleSiege(id int) (active, owned, ok bool) {
 
 // HallSiegeInProgress reports whether the siege of the siegable clan hall
 // id is being fought.
-//
-// ponytail: no clan hall siege runs yet (#244), so none is ever in
-// progress.
-func (SpawnTimeState) HallSiegeInProgress(int) bool { return false }
+func (s SpawnTimeState) HallSiegeInProgress(id int) bool {
+	if id < 0 || id > math.MaxInt32 {
+		return false
+	}
+	return s.l.halls.SiegeInProgress(int32(id))
+}
 
 // DoorOpen reports whether door id stands open.
 func (s SpawnTimeState) DoorOpen(id int) bool {
