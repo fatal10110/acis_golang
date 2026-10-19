@@ -20,6 +20,7 @@ func (l *GameClientLink) characterRules(settings *PlayerConfig) player.Rules {
 		RaidCursesDisabled:     l.disableRaidCurse,
 		AwardPKKillPVPPoint:    settings.AwardPKKillPVPPoint,
 		DeathDrop:              settings.DeathDrop,
+		FakeDeathUpProtection:  settings.FakeDeathUpProtection,
 	}
 }
 

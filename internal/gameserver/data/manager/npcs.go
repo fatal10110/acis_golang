@@ -281,6 +281,8 @@ type Npcs struct {
 	folkCount             atomic.Int64
 	// fixedSeq numbers the standalone spawns SpawnFixed places.
 	fixedSeq atomic.Int64
+	// noSpawns is SetNoSpawns' switch.
+	noSpawns atomic.Bool
 
 	// scripts raises each live hostile NPC's script hooks; nil raises
 	// none.
@@ -465,9 +467,12 @@ func (n *Npcs) SpawnOnStart() {
 // spawnOnStart builds the npcmakers of spawns, their slots keyed for RespawnAll
 // run gen, and starts them: every on-start maker in list order, then the makers
 // of each listed spawn event, then the Seven Signs groups once that state is
-// known.
+// known. With SetNoSpawns it only builds them.
 func (n *Npcs) spawnOnStart(spawns *Spawns, gen int) {
 	groups := n.newGroups(spawns, gen)
+	if n.noSpawns.Load() {
+		return
+	}
 	for _, g := range groups {
 		if g.def.OnStart() {
 			g.behavior.Start(g)

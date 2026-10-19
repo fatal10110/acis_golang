@@ -1,6 +1,9 @@
 package player
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+	"time"
+)
 
 // RuleBook holds the Rules in force for every character configured with it.
 // Set puts new Rules in force at once for all of them: each later read sees
@@ -33,7 +36,10 @@ func (b *RuleBook) RespawnRestoreHP() float64 {
 }
 
 // unconfiguredRules are the rules of a character not configured yet.
-var unconfiguredRules = Rules{MaxBuffsAmount: defaultMaxBuffsAmount}
+var unconfiguredRules = Rules{MaxBuffsAmount: defaultMaxBuffsAmount, FakeDeathUpProtection: DefaultFakeDeathUpProtection}
+
+// DefaultFakeDeathUpProtection is the shipped post-Fake-Death aggro grace.
+const DefaultFakeDeathUpProtection = 5 * time.Second
 
 // rules returns the Rules in force for c. A caller reading several rules
 // for one decision takes them from one call.

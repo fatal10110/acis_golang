@@ -216,6 +216,9 @@ type Rules struct {
 	RaidCursesDisabled     bool
 	AwardPKKillPVPPoint    bool
 	DeathDrop              DeathDropRules
+	// FakeDeathUpProtection is how long, after a Fake Death ends, hostile
+	// NPCs do not aggro the character; 0 or less gives no grace.
+	FakeDeathUpProtection time.Duration
 }
 
 // Runtime is everything a persisted Character needs to act in the live
