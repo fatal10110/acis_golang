@@ -8,10 +8,12 @@ import (
 	"time"
 
 	actorai "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
+	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 )
 
 // The Devastated Castle scenarios play amid Gustav's privates: the
@@ -391,5 +393,43 @@ func TestDefendersAttackWhoSpellsWhatTheyFight(t *testing.T) {
 		if got := h.AggroHate(w.player) - before[h]; got < 150 || got > 151 {
 			t.Fatalf("%s hate gained from the spell = %v, want 150 and the bolt's party share", name, got)
 		}
+	}
+}
+
+// TestDietrichStaysPutWhileLockedOutOfHisSkills ports the skill lock
+// Dietrich's reuse check of 4238 reads: with 4238's reuse expired but still
+// tracked, a feared Dietrich that remembers a Bishop walks nowhere on his
+// party's hit, as crowd control locks every skill while any reuse is
+// tracked (fear, unlike a stun, leaves him free to move); not feared, the
+// expired wait lets him walk to the Bishop.
+func TestDietrichStaysPutWhileLockedOutOfHisSkills(t *testing.T) {
+	t.Parallel()
+	for _, feared := range []bool{true, false} {
+		t.Run(fmt.Sprintf("feared %v", feared), func(t *testing.T) {
+			t.Parallel()
+			w, _, dietrich, mikhail, _ := bootDevastatedCastle(t, classBishop, 0, siegeSkillBoot(t))
+			w.selectTarget(t, mikhail)
+			w.cast(t, siegeBlessID)
+			key := actorcast.ReuseKey(modelskill.Definition{ID: hallReuseCurse, Level: 1})
+			w.onQueue(t, dietrich, func() { dietrich.DisableSkill(key, time.Millisecond) })
+			w.srv.Advance(t, hallTimerStep)
+			w.srv.Settle(t)
+			if feared {
+				e, err := effect.New(effect.Skill{ID: 9615, Level: 1, Debuff: true}, modelskill.EffectTemplate{Name: "Fear", Count: 1, Time: 300})
+				if err != nil {
+					t.Fatalf("effect.New(Fear): %v", err)
+				}
+				e.Effector, e.Effected = w.player.(effect.Actor), dietrich
+				w.onQueue(t, dietrich, func() { dietrich.EffectList().Add(e) })
+				if !dietrich.Afraid() || dietrich.MovementDisabled() {
+					t.Fatalf("setup: Dietrich afraid %v, movement disabled %v, want afraid and free to move", dietrich.Afraid(), dietrich.MovementDisabled())
+				}
+			}
+
+			w.hit(t, dietrich, 1)
+			if d, ok := desire(dietrich, actorai.IntentionMoveTo); ok == feared {
+				t.Fatalf("feared %v: Dietrich move desire = %+v, %v", feared, d, ok)
+			}
+		})
 	}
 }
