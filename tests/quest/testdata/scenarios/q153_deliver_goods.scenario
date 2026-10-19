@@ -1,0 +1,154 @@
+# Deliver Goods (Q153): a level 2 character accepts at Arnold with the delivery list and the
+# three parcels; Jackson takes the wood box, Silvia the cloth bundle (adding three soulshots),
+# and Rant the clay pot, whose receipt is the third; asked again, Jackson has nothing more; and
+# Arnold takes the list and the receipts for two rings of knowledge and experience; then
+# relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q153_deliver_goods.golden
+character Courier 2
+script quest.Q153_DeliverGoods
+item 1012 1013 1014 1015 1016 1017 1018 1835 875
+page guard/30041.htm
+page merchant/30002.htm
+page merchant/30003.htm
+page warehouse/30054.htm
+page script/quest/Q153_DeliverGoods/
+npc arnold 30041 Guard 10 0 0
+npc jackson 30002 Merchant 20 0 0
+npc silvia 30003 Merchant 30 0 0
+npc rant 30054 WarehouseKeeper 40 0 0
+
+# Arnold: accept with the list and the three parcels.
+action arnold
+action arnold
+  S ActionFailed
+  S NpcHtmlMessage obj=arnold item=0 page=guard/30041.htm
+  S ActionFailed
+bypass npc_{arnold}_Quest
+  S NpcHtmlMessage obj=arnold item=0 page=script/quest/Q153_DeliverGoods/30041-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q153_DeliverGoods CREATED
+bypass Quest Q153_DeliverGoods 30041-02.htm
+  S QuestList 153:0x80000001
+  S ExShowQuestMark quest=153
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1012
+  S SystemMessage id=54 3:1015
+  S SystemMessage id=54 3:1014
+  S SystemMessage id=54 3:1013
+  S NpcHtmlMessage obj=arnold item=0 page=script/quest/Q153_DeliverGoods/30041-02.htm
+  S ActionFailed
+  Q upsert Q153_DeliverGoods | <state> | STARTED
+  Q upsert Q153_DeliverGoods | <cond> | 1
+  state Q153_DeliverGoods STARTED
+  rows Q153_DeliverGoods <cond>=1 <state>=STARTED
+  items 1012=1 1013=1 1014=1 1015=1
+action arnold
+  S ActionFailed
+  S NpcHtmlMessage obj=arnold item=0 page=guard/30041.htm
+  S ActionFailed
+bypass npc_{arnold}_Quest
+  S NpcHtmlMessage obj=arnold item=0 page=script/quest/Q153_DeliverGoods/30041-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Jackson, Silvia and Rant: a receipt each; the third moves the quest on.
+action jackson
+action jackson
+  S ActionFailed
+  S NpcHtmlMessage obj=jackson item=0 page=merchant/30002.htm
+  S ActionFailed
+bypass npc_{jackson}_Quest
+  S SystemMessage id=302 3:1013
+  S SystemMessage id=54 3:1016
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=jackson item=0 page=script/quest/Q153_DeliverGoods/30002-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1013=0 1016=1
+  rows Q153_DeliverGoods <cond>=1 <state>=STARTED
+action silvia
+action silvia
+  S ActionFailed
+  S NpcHtmlMessage obj=silvia item=0 page=merchant/30003.htm
+  S ActionFailed
+bypass npc_{silvia}_Quest
+  S SystemMessage id=302 3:1014
+  S SystemMessage id=54 3:1017
+  S SystemMessage id=53 3:1835 6:3
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=silvia item=0 page=script/quest/Q153_DeliverGoods/30003-01.htm
+  S ActionFailed
+  S ActionFailed
+  items 1014=0 1017=1 1835=3
+  rows Q153_DeliverGoods <cond>=1 <state>=STARTED
+action rant
+action rant
+  S ActionFailed
+  S NpcHtmlMessage obj=rant item=0 page=warehouse/30054.htm
+  S ActionFailed
+bypass npc_{rant}_Quest
+  S SystemMessage id=302 3:1015
+  S SystemMessage id=54 3:1018
+  S QuestList 153:0x80000003
+  S ExShowQuestMark quest=153
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rant item=0 page=script/quest/Q153_DeliverGoods/30054-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q153_DeliverGoods | <cond> | 2
+  items 1015=0 1018=1
+  rows Q153_DeliverGoods <cond>=2 <state>=STARTED
+
+# Asked again, Jackson has no box to take.
+action jackson
+action jackson
+  S ActionFailed
+  S NpcHtmlMessage obj=jackson item=0 page=merchant/30002.htm
+  S ActionFailed
+bypass npc_{jackson}_Quest
+  S NpcHtmlMessage obj=jackson item=0 page=script/quest/Q153_DeliverGoods/30002-02.htm
+  S ActionFailed
+  S ActionFailed
+  items 1016=1
+
+# Arnold: the list and the receipts for the rings; the quest completes.
+action arnold
+action arnold
+  S ActionFailed
+  S NpcHtmlMessage obj=arnold item=0 page=guard/30041.htm
+  S ActionFailed
+bypass npc_{arnold}_Quest
+  S SystemMessage id=302 3:1012
+  S SystemMessage id=302 3:1016
+  S SystemMessage id=302 3:1017
+  S SystemMessage id=302 3:1018
+  S SystemMessage id=54 3:875
+  S SystemMessage id=54 3:875
+  S SystemMessage id=96
+  S SystemMessage id=45 1:600
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 153:0x00000000
+  S NpcHtmlMessage obj=arnold item=0 page=script/quest/Q153_DeliverGoods/30041-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q153_DeliverGoods | <state> | COMPLETED
+  Q delete-except-state Q153_DeliverGoods
+  items 1012=0 1016=0 1017=0 1018=0 875=2
+  state Q153_DeliverGoods COMPLETED
+  rows Q153_DeliverGoods <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q153_DeliverGoods COMPLETED
+  rows Q153_DeliverGoods <state>=COMPLETED
+  items 875=2 1835=3
+action arnold
+action arnold
+  S ActionFailed
+  S NpcHtmlMessage obj=arnold item=0 page=guard/30041.htm
+  S ActionFailed
+bypass npc_{arnold}_Quest
+  S NpcHtmlMessage obj=arnold item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

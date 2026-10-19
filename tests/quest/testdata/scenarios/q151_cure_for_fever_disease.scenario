@@ -1,0 +1,138 @@
+# Cure for Fever Disease (Q151): a level 15 character accepts at Elias; Yohanes has nothing to
+# say before the poison sac; a giant spider gives the sac (every roll pinned to succeed),
+# Yohanes turns it into the fever medicine, and Elias takes the medicine for a sword; then
+# relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q151_cure_for_fever_disease.golden
+character Healer 15
+random always 0
+script quest.Q151_CureForFeverDisease
+item 703 704 102
+page default/30050.htm
+page trainer/30032.htm
+page script/quest/Q151_CureForFeverDisease/
+npc elias 30050 Folk 10 0 0
+npc yohanes 30032 Trainer 20 0 0
+npc spider 20103 Monster 40 0 0
+
+# Elias: accept.
+action elias
+action elias
+  S ActionFailed
+  S NpcHtmlMessage obj=elias item=0 page=default/30050.htm
+  S ActionFailed
+bypass npc_{elias}_Quest
+  S NpcHtmlMessage obj=elias item=0 page=script/quest/Q151_CureForFeverDisease/30050-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q151_CureForFeverDisease CREATED
+bypass Quest Q151_CureForFeverDisease 30050-03.htm
+  S QuestList 151:0x80000001
+  S ExShowQuestMark quest=151
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=elias item=0 page=script/quest/Q151_CureForFeverDisease/30050-03.htm
+  S ActionFailed
+  Q upsert Q151_CureForFeverDisease | <state> | STARTED
+  Q upsert Q151_CureForFeverDisease | <cond> | 1
+  state Q151_CureForFeverDisease STARTED
+  rows Q151_CureForFeverDisease <cond>=1 <state>=STARTED
+action elias
+  S ActionFailed
+  S NpcHtmlMessage obj=elias item=0 page=default/30050.htm
+  S ActionFailed
+bypass npc_{elias}_Quest
+  S NpcHtmlMessage obj=elias item=0 page=script/quest/Q151_CureForFeverDisease/30050-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Yohanes has nothing for the player before the sac.
+action yohanes
+action yohanes
+  S ActionFailed
+  S NpcHtmlMessage obj=yohanes item=0 page=trainer/30032.htm
+  S ActionFailed
+bypass npc_{yohanes}_Quest
+  S NpcHtmlMessage obj=yohanes item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+# A giant spider: the poison sac.
+kill spider
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:703
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 151:0x80000003
+  S ExShowQuestMark quest=151
+  Q upsert Q151_CureForFeverDisease | <cond> | 2
+  items 703=1
+  rows Q151_CureForFeverDisease <cond>=2 <state>=STARTED
+action elias
+action elias
+  S ActionFailed
+  S NpcHtmlMessage obj=elias item=0 page=default/30050.htm
+  S ActionFailed
+bypass npc_{elias}_Quest
+  S NpcHtmlMessage obj=elias item=0 page=script/quest/Q151_CureForFeverDisease/30050-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Yohanes: the sac for the medicine.
+action yohanes
+action yohanes
+  S ActionFailed
+  S NpcHtmlMessage obj=yohanes item=0 page=trainer/30032.htm
+  S ActionFailed
+bypass npc_{yohanes}_Quest
+  S QuestList 151:0x80000007
+  S ExShowQuestMark quest=151
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:703
+  S SystemMessage id=54 3:704
+  S NpcHtmlMessage obj=yohanes item=0 page=script/quest/Q151_CureForFeverDisease/30032-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q151_CureForFeverDisease | <cond> | 3
+  items 703=0 704=1
+  rows Q151_CureForFeverDisease <cond>=3 <state>=STARTED
+action yohanes
+  S ActionFailed
+  S NpcHtmlMessage obj=yohanes item=0 page=trainer/30032.htm
+  S ActionFailed
+bypass npc_{yohanes}_Quest
+  S NpcHtmlMessage obj=yohanes item=0 page=script/quest/Q151_CureForFeverDisease/30032-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Elias: the medicine for the sword; the quest completes.
+action elias
+action elias
+  S ActionFailed
+  S NpcHtmlMessage obj=elias item=0 page=default/30050.htm
+  S ActionFailed
+bypass npc_{elias}_Quest
+  S SystemMessage id=302 3:704
+  S SystemMessage id=54 3:102
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 151:0x00000000
+  S NpcHtmlMessage obj=elias item=0 page=script/quest/Q151_CureForFeverDisease/30050-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q151_CureForFeverDisease | <state> | COMPLETED
+  Q delete-except-state Q151_CureForFeverDisease
+  items 704=0 102=1
+  state Q151_CureForFeverDisease COMPLETED
+  rows Q151_CureForFeverDisease <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q151_CureForFeverDisease COMPLETED
+  rows Q151_CureForFeverDisease <state>=COMPLETED
+  items 102=1
+action elias
+action elias
+  S ActionFailed
+  S NpcHtmlMessage obj=elias item=0 page=default/30050.htm
+  S ActionFailed
+bypass npc_{elias}_Quest
+  S NpcHtmlMessage obj=elias item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
