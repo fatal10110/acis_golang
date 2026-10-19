@@ -2,6 +2,7 @@ package network
 
 import (
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
@@ -52,11 +53,8 @@ func effectiveRestartType(live *livePlayer, requestType int32) int32 {
 // The castle restart during a siege at live's position follows its clan's
 // side: an owner or defender restarts at a castle, an attacker in town, and
 // any other clan may not use it. Without a siege it needs the clan to own a
-// castle.
-//
-// ponytail: the siege HQ restart to the clan's headquarters waits for
-// #3346, so it always resolves to town, as do the clan hall siege
-// branches.
+// castle. The siege HQ restart lands at the clan's headquarters
+// (siegeHeadquarters), else in town.
 //
 // requestType is the type effectiveRestartType already enforced.
 func (l *GameClientLink) restartPointDestination(live *livePlayer, requestType int32) (location.Location, restartOutcome) {
@@ -87,8 +85,9 @@ func (l *GameClientLink) restartPointDestination(live *livePlayer, requestType i
 			}
 		}
 	case restartToSiegeHQ:
-		// The restart to the clan's headquarters waits for #3346; the
-		// request falls back to town.
+		if at, ok := l.siegeHeadquarters(live); ok {
+			return at, restartResolved
+		}
 	case restartFixed:
 		if !live.accessLevel().IsGM && !live.FestivalParticipant() {
 			return location.Location{}, restartRefused
@@ -110,6 +109,43 @@ func (l *GameClientLink) townRestart(live *livePlayer) (location.Location, resta
 		return location.Location{}, restartNoPoint
 	}
 	return at, restartResolved
+}
+
+// siegeHeadquarters is where a siege HQ restart of live lands: the
+// headquarters of its clan when the clan attacks the castle siege in
+// progress at live's position, else when a clan hall siege is fought there,
+// whichever side the clan is on. False sends the restart to town.
+func (l *GameClientLink) siegeHeadquarters(live *livePlayer) (location.Location, bool) {
+	hq, ok := l.clanHeadquarters(live)
+	if !ok {
+		return location.Location{}, false
+	}
+	at := live.CurrentLocation()
+	if s, ok := l.siegeAt(live); ok && s.Side(live.ClanID()) == siege.SideAttacker {
+		return headquartersLocation(hq), true
+	}
+	if _, ok := l.halls.ActiveSiegeAt(at.X, at.Y, at.Z); ok {
+		return headquartersLocation(hq), true
+	}
+	return location.Location{}, false
+}
+
+// clanHeadquarters returns the siege headquarters live's clan holds.
+func (l *GameClientLink) clanHeadquarters(live *livePlayer) (clan.Headquarters, bool) {
+	if live.ClanID() == 0 {
+		return nil, false
+	}
+	cl, ok := l.clanService().ClanOf(live.Character)
+	if !ok {
+		return nil, false
+	}
+	return cl.Headquarters()
+}
+
+// headquartersLocation is where headquarters hq stands.
+func headquartersLocation(hq clan.Headquarters) location.Location {
+	x, y, z := hq.Position()
+	return location.Location{X: x, Y: y, Z: z}
 }
 
 // siegeAt returns the siege in progress at live's position.
@@ -173,14 +209,33 @@ func randomSpawn(spawns map[residence.SpawnType][]location.Location, kind reside
 // dieOptions are the restart choices the death window of live offers: the
 // clan hall and castle restarts while live's clan owns one, the castle
 // restart also while it owns or defends the siege in progress at live's
-// position, and the fixed restart for an access level allowed it.
-//
-// ponytail: the siege HQ restart, castle and clan hall siege branches,
-// waits for #3346.
+// position, the siege HQ restart while its clan holds a headquarters and
+// attacks the siege fought there (dieSiegeHQ), and the fixed restart for an
+// access level allowed it.
 func (l *GameClientLink) dieOptions(live *livePlayer) serverpackets.DieOptions {
 	return serverpackets.DieOptions{
 		ClanHall: live.ClanHallID() != 0,
 		Castle:   l.restartCastleID(live) != 0,
+		SiegeHQ:  l.dieSiegeHQ(live),
 		FixedRes: live.accessLevel().AllowFixedRes,
 	}
+}
+
+// dieSiegeHQ reports whether the death window of live offers the siege HQ
+// restart: its clan holds a headquarters and attacks the castle siege in
+// progress at live's position or, with none there, the clan hall siege
+// fought there.
+func (l *GameClientLink) dieSiegeHQ(live *livePlayer) bool {
+	if _, ok := l.clanHeadquarters(live); !ok {
+		return false
+	}
+	clanID := live.ClanID()
+	if s, ok := l.siegeAt(live); ok {
+		return s.Side(clanID) == siege.SideAttacker
+	}
+	at := live.CurrentLocation()
+	if hs, ok := l.halls.ActiveSiegeAt(at.X, at.Y, at.Z); ok {
+		return hs.Registered(clanID)
+	}
+	return false
 }

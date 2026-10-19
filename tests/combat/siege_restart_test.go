@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -48,6 +49,11 @@ type siegeRestarter struct {
 	x int
 	// fieldEast, when set, is the battlefield's east edge instead of 1000.
 	fieldEast int
+	// hall fights Devastated Castle's hall siege over the battlefield
+	// instead of the castle's; side "ATTACKER" registers the clan on it.
+	hall bool
+	// hq gives the player's clan a siege headquarters at siegeHQPoint.
+	hq bool
 }
 
 // bootSiegeRestart boots r stored dead inside castle restartCastleID's
@@ -78,6 +84,12 @@ func bootSiegeRestart(t *testing.T, r siegeRestarter, opts ...gameservertest.Opt
 	zones := zone.NewIndex()
 	field := zone.NewSiege(1, form)
 	field.ResidenceID = restartCastleID
+	if r.hall {
+		field.ResidenceID = int(siegeHallID)
+		opts = append(opts,
+			gameservertest.WithClanHalls(halls, nil),
+			gameservertest.WithHallSiegeScript(siegeHallID, clanhall.SiegeScript{}))
+	}
 	zones.Add(field)
 	cfg := siege.DefaultConfig()
 	cfg.AttackerRespawn = siegeRespawn
@@ -108,15 +120,22 @@ func bootSiegeRestart(t *testing.T, r siegeRestarter, opts ...gameservertest.Opt
 		// No period change fires during the test.
 		gameservertest.WithSevenSignsTimer(func(time.Duration, func()) *time.Timer { return nil }),
 	}, opts...)...)
-	s, ok := srv.Sieges.Get(restartCastleID)
-	if !ok {
-		t.Fatalf("no siege of castle %d", restartCastleID)
-	}
 	// The siege starts before the player comes in, so its start does not
 	// throw the player off the battlefield.
-	s.Start()
-	if !s.InProgress() {
-		t.Fatal("siege did not start")
+	if r.hall {
+		startRestartHallSiege(t, srv)
+	} else {
+		s, ok := srv.Sieges.Get(restartCastleID)
+		if !ok {
+			t.Fatalf("no siege of castle %d", restartCastleID)
+		}
+		s.Start()
+		if !s.InProgress() {
+			t.Fatal("siege did not start")
+		}
+	}
+	if r.hq {
+		putUpRestartHQ(t, srv)
 	}
 	c, objID := srv.Client, srv.SoleObjectID(t)
 	c.Send(encodeRequestGameStart(0))
@@ -163,6 +182,9 @@ func seedSiegeRestarter(t *testing.T, db *sql.DB, r siegeRestarter) {
 	exec("INSERT INTO characters (account_name, obj_Id, char_name, level, clanid) VALUES ('rival', ?, 'Red', 40, ?)", siegeRivalLeaderID, siegeRivalClanID)
 	exec("INSERT INTO clan_data (clan_id, clan_name, clan_level, leader_id) VALUES (?, 'Rivals', 5, ?)", siegeRivalClanID, siegeRivalLeaderID)
 	exec("INSERT INTO siege_clans (castle_id, clan_id, type) VALUES (?, ?, 'ATTACKER')", restartCastleID, siegeRivalClanID)
+	if r.hall {
+		seedRestartHallSiege(t, db, r)
+	}
 	if r.noClan {
 		return
 	}
@@ -173,7 +195,7 @@ func seedSiegeRestarter(t *testing.T, db *sql.DB, r siegeRestarter) {
 	exec("UPDATE characters SET clanid = ? WHERE char_name = 'Newbie'", restartClanID)
 	exec(`INSERT INTO clan_data (clan_id, clan_name, clan_level, hasCastle, leader_id)
 		SELECT ?, 'Lords', 5, ?, obj_Id FROM characters WHERE char_name = 'Newbie'`, restartClanID, castleID)
-	if r.side != "" && r.side != "OWNER" {
+	if r.side != "" && r.side != "OWNER" && !r.hall {
 		exec("INSERT INTO siege_clans (castle_id, clan_id, type) VALUES (?, ?, ?)", restartCastleID, restartClanID, r.side)
 	}
 }
