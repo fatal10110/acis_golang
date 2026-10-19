@@ -15,10 +15,10 @@ const lv3Dir = "ai/individual/Monster/LV3Monster"
 // LV3Monster is a monster a quest raises for one player, the one its
 // second spawn parameter names. As it spawns it attacks the creature its
 // first parameter names and remembers its master when its third parameter
-// names an NPC. A hit or a spell from any other player, or 12 minutes
-// passing, makes it leave the world, first telling its master (event
-// 1000) and clearing the quest slot of the NPC its third parameter names.
-// It binds no NPC of its own.
+// names an NPC. A hit or a spell from any other player makes it tell its
+// master (event 1000), clear the quest slot of the NPC its third parameter
+// names and leave the world; after 12 minutes it clears that slot and
+// leaves without telling its master. It binds no NPC of its own.
 func LV3Monster() script.Script {
 	return script.Script{Dir: lv3Dir, Behavior: true, Hooks: lv3MonsterHooks()}
 }
