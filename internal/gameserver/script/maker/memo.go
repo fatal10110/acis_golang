@@ -19,6 +19,14 @@ func memoInt(g spawn.Group, key string) int {
 	return n
 }
 
+// memoIntOr is memoInt with def for a key the memo does not declare.
+func memoIntOr(g spawn.Group, key string, def int) int {
+	if _, ok := g.Maker().AIParams[key]; !ok {
+		return def
+	}
+	return memoInt(g, key)
+}
+
 // intMemo is an integer a maker writes in its memo under key: reading it
 // before the first write panics.
 type intMemo struct {

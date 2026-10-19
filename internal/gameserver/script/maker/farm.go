@@ -27,16 +27,7 @@ func Farm() script.Maker {
 		},
 		OnNPCDeleted: func(*script.Maker, script.MakerNPC) {},
 		OnNPCDBInfo: func(_ *script.Maker, e script.MakerSpawn) {
-			ms := e.Spawn
-			if ms.Total()-ms.Spawned() <= 0 || !ms.Persisted() || ms.CheckDead() {
-				return
-			}
-			// A territory with no point to draw leaves the zero position: the
-			// row then comes alive there instead of failing the hook.
-			at, _ := ms.DrawSpawnLocation()
-			if ms.CheckAlive(at) {
-				ms.Spawn()
-			}
+			spawnLiveRow(e.Spawn)
 		},
 		OnScriptEvent: func(_ *script.Maker, e script.MakerEvent) {
 			spawns := e.Group.Spawns()
@@ -67,5 +58,22 @@ func fillFarmSpawn(ms spawn.GroupSpawn) {
 		} else {
 			ms.Spawn()
 		}
+	}
+}
+
+// spawnLiveRow places the NPC of the database-tracked spawn ms when ms is
+// short of its total and its row is saved alive. A row saved dead with its
+// respawn still ahead stays away; a dead row whose respawn has passed, or
+// one never saved, comes alive without an NPC. Any other spawn places
+// nothing.
+func spawnLiveRow(ms spawn.GroupSpawn) {
+	if ms.Total()-ms.Spawned() <= 0 || !ms.Persisted() || ms.CheckDead() {
+		return
+	}
+	// A territory with no point to draw leaves the zero position: the row
+	// then comes alive there instead of failing the hook.
+	at, _ := ms.DrawSpawnLocation()
+	if ms.CheckAlive(at) {
+		ms.Spawn()
 	}
 }
