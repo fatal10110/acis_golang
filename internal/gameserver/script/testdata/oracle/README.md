@@ -77,7 +77,10 @@ up the way the Go runner (`internal/testsupport/scenario`) sets it up, so the tr
 what the reference does in the scenario's own world:
 
 - unless its first step creates it, the player is created at the character line's level and
-  the class line's class (default 0), standing where the Go fixture character enters the world (10, 20, 30); a clan line creates a
+  the class line's class (default 0), standing where the Go fixture character enters the world (10, 20, 30); a subclass
+  line gives it that subclass in slot 1 at its level, its row written as the Go runner writes it, and
+  makes it the played class, as the reference's restore leaves a character that logged out on it
+  (the base class keeping the character line's level); a clan line creates a
   clan the player leads and sets its level; each quest line puts its rows in the player's quest
   state before anything is recorded;
 - each NPC line's NPC is spawned at its offset from the player. Every NPC template is bound to
@@ -99,8 +102,8 @@ what the reference does in the scenario's own world:
   sign-up, the festival scores, given back after the scenario); a traced scenario with a header
   line the probe does not read fails the run;
 - every scenario's character has the same account (`scenario`) and a clan line's clan the same
-  name (`Scenario`), since nothing of an earlier scenario is kept; its character, item, quest and
-  memo rows are kept from its creation on (the quest lines' rows written as the Go runner writes them), so
+  name (`Scenario`), since nothing of an earlier scenario is kept; its character, item, quest,
+  memo and subclass rows are kept from its creation on (the quest lines' rows written as the Go runner writes them), so
   a relog stores the character at its logout and restores it from the rows the run wrote, read
   back by the reference's own restore queries; a statement on a kept table the store cannot run
   fails the run;

@@ -50,6 +50,7 @@ import net.sf.l2j.gameserver.model.World;
 import net.sf.l2j.gameserver.model.WorldObject;
 import net.sf.l2j.gameserver.model.actor.Npc;
 import net.sf.l2j.gameserver.model.actor.Player;
+import net.sf.l2j.gameserver.model.actor.container.player.SubClass;
 import net.sf.l2j.gameserver.model.actor.template.CreatureTemplate;
 import net.sf.l2j.gameserver.model.actor.template.NpcTemplate;
 import net.sf.l2j.gameserver.model.item.instance.ItemInstance;
@@ -76,14 +77,14 @@ import net.sf.l2j.gameserver.taskmanager.GameTimeTaskManager;
  * Quest scenario traces: each scenario file of the Go quest suite whose {@code trace} line names
  * a file under {@code oracle/scenarios/} is played here, from the scenario itself, and its trace
  * is written to that file. The header sets the player up as the Go runner does (name, level,
- * class, a led clan of the given level, quest rows, the script draws of the random line) and
+ * class, the subclass it plays, a led clan of the given level, quest rows, the script draws of the random line) and
  * spawns each NPC line's NPC at its offset from the player, who stands where the Go fixture
  * character enters the world. The hold, equip, standing, pk, cabal and festival lines are seeded
  * as the Go runner seeds them. The NPCs keep only the bindings of the scenario's script and stub
  * lines, as the Go runner registers no other script. A monster the scenario kills or hits is made the Go runner's
  * fixture monster: level 1, 1000 HP, no experience, SP, drops, skills, minions or aggression.
  * <p>
- * The character, item, quest and memo rows the scenario writes are kept (see the probe's
+ * The character, item, quest, memo and subclass rows the scenario writes are kept (see the probe's
  * connection pool), so a relog stores the character at its logout and restores it from them.
  * Every step is played: action, bypass, link, mark, relog, restart, enter and create through the
  * client packets, kill (each of N kills alone, on a fresh monster once the last one died), hit,
@@ -118,7 +119,8 @@ final class ScenarioTrace
 		"characters",
 		"items",
 		"character_quests",
-		"character_memo"
+		"character_memo",
+		"character_subclasses"
 	};
 
 	/** The wall clock each scenario starts at: 2026-01-01 00:00 UTC. */
@@ -148,6 +150,9 @@ final class ScenarioTrace
 	private String _character;
 	private int _level;
 	private int _class;
+	/** The subclass line's class and level; 0 for none. */
+	private int _subclass;
+	private int _subclassLevel;
 	private int _clan = -1;
 	private int[] _draws;
 	private boolean _always;
@@ -343,6 +348,11 @@ final class ScenarioTrace
 					_level = Integer.parseInt(f[2]);
 				}
 				case "class" -> _class = Integer.parseInt(f[1]);
+				case "subclass" ->
+				{
+					_subclass = Integer.parseInt(f[1]);
+					_subclassLevel = Integer.parseInt(f[2]);
+				}
 				case "clan" -> _clan = Integer.parseInt(f[1]);
 				case "quest" -> _quests.add(f);
 				case "random" ->
@@ -440,15 +450,18 @@ final class ScenarioTrace
 
 	/**
 	 * The seeded character of a scenario that does not create its own: made at the character
-	 * line's level and the class line's class, with the clan, quest and holding lines, in the
-	 * world at the Go fixture's entry point with the NPC lines' NPCs around it. Its character,
-	 * quest and item rows are kept as written, so a relog restores it.
+	 * line's level and the class line's class, playing the subclass line's subclass, with the clan,
+	 * quest and holding lines, in the world at the Go fixture's entry point with the NPC lines' NPCs
+	 * around it. Its character, subclass, quest and item rows are kept as written, so a relog
+	 * restores it.
 	 */
 	private void seed() throws Exception
 	{
 		final Player player = Player.create(IdFactory.getInstance().getNextId(), PlayerData.getInstance().getTemplate(ClassId.VALUES[_class]), _client.getAccountName(), _character, (byte) 0, (byte) 0, (byte) 0, Sex.MALE);
 		player.getStatus().setLevel(_level);
 		player.getStatus().setExp(PlayerLevelData.getInstance().getPlayerLevel(_level).requiredExpToLevelUp());
+		if (_subclass != 0)
+			subclass(player);
 		player.getStatus().setMaxHpMp();
 		World.getInstance().addObject(player);
 
@@ -481,6 +494,24 @@ final class ScenarioTrace
 		}
 		holdings(player);
 		spawnNpcs();
+	}
+
+	/**
+	 * The subclass line's subclass, in slot 1 at its level, and played: the state the reference's
+	 * restore leaves of a character that logged out on it (its row kept, so a relog restores it),
+	 * with the base class's level and experience left as the character line set them.
+	 */
+	private void subclass(Player player) throws Exception
+	{
+		final long exp = PlayerLevelData.getInstance().getPlayerLevel(_subclassLevel).requiredExpToLevelUp();
+		final SubClass sub = new SubClass(_subclass, 1, exp, 0, (byte) _subclassLevel);
+		player.getSubClasses().put(sub.getClassIndex(), sub);
+		ConnectionPool.apply("INSERT INTO character_subclasses (char_obj_id,class_id,exp,sp,level,class_index) VALUES (?,?,?,?,?,?)", player.getObjectId(), sub.getClassId(), sub.getExp(), sub.getSp(), sub.getLevel(), sub.getClassIndex());
+		set(Player.class, player, "_classIndex", sub.getClassIndex());
+		set(Player.class, player, "_activeClass", sub.getClassId());
+		player.setTemplate(sub.getClassDefinition());
+		if (!player.isSubClassActive() || player.getStatus().getLevel() != _subclassLevel)
+			throw new IllegalStateException(_name + ": the subclass line's subclass is not played");
 	}
 
 	/** The hold, equip, standing, pk, cabal and festival lines, as the Go runner seeds them. */

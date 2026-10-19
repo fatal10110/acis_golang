@@ -1,0 +1,34 @@
+# Second class change on a subclass (SecondClassChange): a level 76 human Gladiator plays its
+# level 50 Sorcerer subclass and asks Grand Master Hannavalt about its class: the master offers
+# nothing while a subclass is played, so the dialog is the no-quest page, where the base class
+# would hear it has already made its second change. After a relog the character still plays the
+# subclass, so Hannavalt still answers the no-quest page. Expectations are the reference trace's
+# (SecondClassChange.onTalk).
+trace internal/gameserver/script/testdata/oracle/scenarios/second_class_change_subclass.golden
+character Fighter 76
+class 2
+subclass 12 50
+script script.feature.SecondClassChange
+page villagemaster/30109.htm
+page script/feature/SecondClassChange/
+npc hannavalt 30109 VillageMasterFighter 10 0 0
+
+action hannavalt
+action hannavalt
+  S ActionFailed
+  S NpcHtmlMessage obj=hannavalt item=0 page=villagemaster/30109.htm
+  S ActionFailed
+bypass npc_{hannavalt}_Quest SecondClassChange
+  S NpcHtmlMessage obj=hannavalt item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
+action hannavalt
+action hannavalt
+  S ActionFailed
+  S NpcHtmlMessage obj=hannavalt item=0 page=villagemaster/30109.htm
+  S ActionFailed
+bypass npc_{hannavalt}_Quest SecondClassChange
+  S NpcHtmlMessage obj=hannavalt item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
