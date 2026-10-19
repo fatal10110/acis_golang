@@ -13,21 +13,9 @@ func (l *GameClientLink) addSummonCrest(a *summon.Actor, s *serverpackets.NPCInf
 	if l == nil || !l.showSummonCrest {
 		return
 	}
-	owner, ok := liveSummonOwner(a)
-	if !ok {
-		return
+	if owner, ok := liveSummonOwner(a); ok {
+		l.putClanCrest(s, owner.ClanID())
 	}
-	clanID := owner.ClanID()
-	if clanID == 0 {
-		return
-	}
-	cl, ok := l.clanService().Table().Get(clanID)
-	if !ok {
-		return
-	}
-	info := cl.Info()
-	s.ClanID, s.ClanCrest = int(info.ID), int(info.CrestID)
-	s.AllyID, s.AllyCrest = int(info.AllyID), int(info.AllyCrestID)
 }
 
 // showSummonCrestToOwner sends a's owner the NpcInfo others see of a, as
