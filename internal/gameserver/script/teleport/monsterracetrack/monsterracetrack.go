@@ -54,9 +54,9 @@ func onTalk(_ *script.Script, e script.Talk) string {
 	if e.NPC.NpcID() == raceManager {
 		npcID := memoInteger(player, memo, -1)
 		if npcID >= 0 {
-			loc, ok := returnLocations()[int32(npcID)]
+			loc, ok := returnLocations()[npcID]
 			if !ok {
-				panic("monsterracetrack: no return point for gatekeeper " + strconv.Itoa(npcID))
+				panic("monsterracetrack: no return point for gatekeeper " + strconv.Itoa(int(npcID)))
 			}
 			player.TeleportTo(loc, 0)
 			player.UnsetMemo(memo)
@@ -69,16 +69,16 @@ func onTalk(_ *script.Script, e script.Talk) string {
 	return ""
 }
 
-// memoInteger reads the player's memo key as a number, def when it is not
-// set; a value that is not a number panics.
-func memoInteger(p *script.Player, key string, def int) int {
+// memoInteger reads the player's memo key as a 32-bit number, def when it
+// is not set; a value that is not one panics.
+func memoInteger(p *script.Player, key string, def int32) int32 {
 	v, ok := p.Memo(key)
 	if !ok {
 		return def
 	}
-	n, err := strconv.Atoi(v)
+	n, err := strconv.ParseInt(v, 10, 32)
 	if err != nil {
 		panic(err)
 	}
-	return n
+	return int32(n)
 }

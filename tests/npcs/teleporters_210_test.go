@@ -523,10 +523,26 @@ func TestMonsterRaceTrackRoundTrip(t *testing.T) {
 }
 
 // TestMonsterRaceTrackManagerReadsSavedMemo: a memo saved before the
-// character entered the world sends it back to that gatekeeper's town;
-// with no memo the race manager moves no one and keeps no memo.
+// character entered the world sends it back to that gatekeeper's town; a
+// saved value past int32 fails the parse as the reference's parseInt
+// does, so the talk aborts before the trip and the memo stays; with no
+// memo the race manager moves no one and keeps no memo.
 func TestMonsterRaceTrackManagerReadsSavedMemo(t *testing.T) {
 	t.Parallel()
+	t.Run("past int32", func(t *testing.T) {
+		t.Parallel()
+		const past = "4294997355" // 1<<32 + Trisha's id
+		w := bootTeleporters(t, teleporterSetup{memo: past})
+		manager := w.spawnFolk(t, folkTemplate("Folk", tpRaceManager), 50)
+		w.openThrough(t, manager)
+		frames := w.bypass(t, npcCommand(manager, "Quest MonsterRaceTrack"))
+		if _, ok := firstOpcode(frames, serverpackets.OpcodeTeleportToLocation); ok {
+			t.Fatalf("a memo past int32 moved the player: %x", opcodes(frames))
+		}
+		if got := w.memoRow(t); got != past {
+			t.Fatalf("saved memo = %q, want %q kept", got, past)
+		}
+	})
 	t.Run("saved", func(t *testing.T) {
 		t.Parallel()
 		w := bootTeleporters(t, teleporterSetup{memo: strconv.Itoa(tpBilia)})
