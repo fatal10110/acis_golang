@@ -8,11 +8,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	gamexml "github.com/fatal10110/acis_golang/internal/gameserver/data/xml"
 	actorai "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/warrior"
@@ -162,6 +165,46 @@ func (w *ind1World) setHPShare(t *testing.T, h *npc.Hostile, share float64) {
 	w.onQueue(t, h, func() { h.SetHP(share * float64(script.NPCOf(h).MaxHP())) })
 }
 
+// joinCharacter logs a second client in as account with a character of
+// name beside the first one, and returns that character in the world.
+func (w *ind1World) joinCharacter(t *testing.T, account, name string) attackable.Combatant {
+	t.Helper()
+	id := w.srv.SeedCharacterFor(t, account, name, 20, 0).ID
+	c := w.srv.DialClient(t, account, 1)
+	c.Send(encodeGameStart())
+	for i := 0; ; i++ {
+		if i == 100 {
+			t.Fatalf("%s: no CharSelected within 100 frames", name)
+		}
+		if c.Read()[0] == serverpackets.OpcodeCharSelected {
+			break
+		}
+	}
+	c.Send(wire.NewPacketWriter(clientpackets.OpcodeEnterWorld).Bytes())
+	w.srv.ReadQueued(t, c)
+	w.srv.ReadQueued(t, w.srv.Client)
+	obj, ok := w.srv.State.Object(id)
+	if !ok {
+		t.Fatalf("%s is not in the world", name)
+	}
+	return obj.(attackable.Combatant)
+}
+
+// hitBy lands a hit of damage on h from attacker, a character, on its
+// queue.
+func (w *ind1World) hitBy(t *testing.T, h *npc.Hostile, attacker attackable.Combatant, damage int) {
+	t.Helper()
+	done := make(chan struct{})
+	if !w.srv.PlayerQueue(t, attacker.ObjectID()).Post(func() {
+		defer close(done)
+		h.TakeDamage(damage, attacker)
+	}) {
+		t.Fatal("the attacker's queue is closed")
+	}
+	<-done
+	w.srv.Settle(t)
+}
+
 // TestPartyLeaderPhysicalSpecialSummonCallsItsSilhouette ports
 // PartyLeaderPhysicalSpecialSummon's created, attacked and timer hooks.
 // Its created hook calls no parent: it clears i_ai0 and i_ai1, and spawns
@@ -258,7 +301,9 @@ func gardenerTemplate() *npc.Template {
 // and attacked hooks. The first hit by the character, free of the debuff,
 // stores it in c_ai0 and wants the debuff on it, weight 1000000. The next
 // two hits by the same character count on (i_ai1) but want nothing: it is
-// already in c_ai0. Past three, a draw under 20 wants the hold on itself;
+// already in c_ai0. A second character's hit at i_ai1 1 stores it in c_ai1
+// and wants the debuff on it; at i_ai1 2 only a character in neither slot
+// gets it. Past three, a draw under 20 wants the hold on itself;
 // a draw of 20 wants nothing. While the character holds the debuff, even
 // the first hit goes to the hold.
 func TestFreyaGardenerDebuffsItsFirstAttackers(t *testing.T) {
@@ -292,6 +337,47 @@ func TestFreyaGardenerDebuffsItsFirstAttackers(t *testing.T) {
 		w.wantCasts(t, "past three on a draw of 0", n, map[modelskill.ID]ind1Cast{ind3bHoldSkill: {n.ObjectID(), 1000000}})
 		if got := ind1Slot(n, script.SlotIntAI1); got != 3 {
 			t.Fatalf("i_ai1 past three = %d, want 3", got)
+		}
+	})
+	t.Run("three attackers", func(t *testing.T) {
+		t.Parallel()
+		w := bootIndividual3b(t, raidBoot{}, gardenerTemplate())
+		n := w.spawn(t, ind3bGardenerID, 300, 0)
+		w.srv.InstallNPCCastSeam(t, n, ind3bSkills())
+		mate := w.joinCharacter(t, "mate", "Mate")
+		third := w.joinCharacter(t, "third", "Third")
+		h := script.NPCOf(n)
+		slot := func(s script.CreatureSlot) int32 {
+			if c := h.Slot(s); c != nil {
+				return c.ObjectID()
+			}
+			return 0
+		}
+
+		w.hit(t, n, 1)
+		w.wantCasts(t, "after the first attacker's hit", n, map[modelskill.ID]ind1Cast{ind3bDebuffSkill: {w.player.ObjectID(), 1000000}})
+		w.clearDesires(t, n)
+		w.hitBy(t, n, mate, 1)
+		w.wantCasts(t, "after the second attacker's hit", n, map[modelskill.ID]ind1Cast{ind3bDebuffSkill: {mate.ObjectID(), 1000000}})
+		if c0, c1, a1 := slot(script.SlotCreature0), slot(script.SlotCreature1), ind1Slot(n, script.SlotIntAI1); c0 != w.player.ObjectID() || c1 != mate.ObjectID() || a1 != 2 {
+			t.Fatalf("c_ai0, c_ai1, i_ai1 after two attackers = %d, %d, %d, want %d, %d, 2", c0, c1, a1, w.player.ObjectID(), mate.ObjectID())
+		}
+
+		// The second attacker again at i_ai1 2: it is in c_ai1.
+		w.clearDesires(t, n)
+		w.hitBy(t, n, mate, 1)
+		w.wantCasts(t, "after the second attacker's second hit", n, nil)
+		if got := ind1Slot(n, script.SlotIntAI1); got != 3 {
+			t.Fatalf("i_ai1 after the second attacker's second hit = %d, want 3", got)
+		}
+
+		// A third attacker at i_ai1 2 is in neither slot.
+		w.onQueue(t, n, func() { h.SetInt(script.SlotIntAI1, 2) })
+		w.clearDesires(t, n)
+		w.hitBy(t, n, third, 1)
+		w.wantCasts(t, "after the third attacker's hit", n, map[modelskill.ID]ind1Cast{ind3bDebuffSkill: {third.ObjectID(), 1000000}})
+		if c0, c1, a1 := slot(script.SlotCreature0), slot(script.SlotCreature1), ind1Slot(n, script.SlotIntAI1); c0 != w.player.ObjectID() || c1 != mate.ObjectID() || a1 != 3 {
+			t.Fatalf("c_ai0, c_ai1, i_ai1 after the third attacker = %d, %d, %d, want %d, %d, 3", c0, c1, a1, w.player.ObjectID(), mate.ObjectID())
 		}
 	})
 	t.Run("held", func(t *testing.T) {

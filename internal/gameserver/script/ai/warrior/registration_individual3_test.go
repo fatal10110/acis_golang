@@ -91,7 +91,7 @@ func TestIndividual3RegistrationMatchesReferenceManifest(t *testing.T) {
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ: %d entries, reference %d", len(got.folds), len(want.folds))
 	}
-	for _, id := range []int32{21517, 21512, 20963, 22028, 21345, 21371, 21432, 27041, 20947, 22096, 20983, 22135, 22029, 22032, 22039, 20376, 20522, 22100, 22113, 20773, 21081} {
+	for _, id := range []int32{21517, 21512, 20963, 22028, 21345, 21371, 21432, 27041, 20947, 22096, 20983, 22135, 22029, 22032, 22038, 22039, 20376, 20520, 20522, 22100, 22113, 20773, 21081} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}
