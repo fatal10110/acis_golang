@@ -1,8 +1,9 @@
 // Package siegeguard contains the castle siege guard behaviors: the
-// clerics that heal a hurt clan mate, the wizard that stands its post
-// casting at whoever it sees, and GludioHold, the guard that holds the
-// castle grounds against anyone but its castle's defenders and goes back
-// to its post when nothing is left to do, with the guards derived from it.
+// clerics that heal a hurt clan mate, the wizards that cast at whoever they
+// see, GludioHold, the guard that holds the castle grounds against anyone
+// but its castle's defenders and goes back to its post when nothing is left
+// to do, GludioStand, the guard that fights from its post, and the guards
+// derived from them.
 package siegeguard
 
 import (
@@ -13,8 +14,10 @@ import (
 
 // The page directories of the siege guard behaviors.
 const (
-	dir     = "ai/siegeguards"
-	holdDir = "ai/siegeguards/GludioHold"
+	dir       = "ai/siegeguards"
+	holdDir   = "ai/siegeguards/GludioHold"
+	standDir  = "ai/siegeguards/GludioStand"
+	wizardDir = "ai/siegeguards/GludioWizard"
 )
 
 // defender is where a player stands towards the guard's castle when its

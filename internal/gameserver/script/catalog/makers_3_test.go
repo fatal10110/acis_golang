@@ -14,7 +14,8 @@ import (
 
 // TestMakers3Bindings pins the maker each ported batch 3 type binds, by
 // constructor, and how many shipped npcmakers run it: two
-// frintessa_evilate_maker npcmakers and one of each other type.
+// frintessa_evilate_maker npcmakers and one of each other type. Only
+// sailren_maker is not ported yet.
 func TestMakers3Bindings(t *testing.T) {
 	dp := datapack.Require(t)
 	table, err := gamexml.LoadSpawnlist(filepath.Join(dp, "data", "xml", "spawnlist"), zerolog.Nop(), 1)
@@ -38,6 +39,10 @@ func TestMakers3Bindings(t *testing.T) {
 		count int
 	}{
 		{"benom_maker", maker.Benom, 1},
+		{"default_use_db_maker_for_frintessa", maker.DefaultUseDBForFrintezza, 1},
+		{"ice_fairy_sirr_maker", maker.IceFairySirr, 1},
+		{"rhamphorhynchus_maker", maker.Rhamphorhynchus, 1},
+		{"tyrannosaurus_maker", maker.Tyrannosaurus, 1},
 		{"freya_deacon_keeper_maker", maker.FreyaDeaconKeeper, 1},
 		{"frintessa_evilate_maker", maker.FrintezzaEvilate, 2},
 		{"sailren_dummy_maker", maker.SailrenDummy, 1},
@@ -54,7 +59,7 @@ func TestMakers3Bindings(t *testing.T) {
 			t.Errorf("shipped npcmakers of %s = %d, want %d", tc.typ, n, tc.count)
 		}
 	}
-	if ported != 8 {
-		t.Errorf("ported batch 3 types = %d, want 8", ported)
+	if ported != 12 {
+		t.Errorf("ported batch 3 types = %d, want 12", ported)
 	}
 }

@@ -53,19 +53,27 @@ const (
 	siegeBoltID    = modelskill.ID(4102)
 )
 
-// siegeGuardScripts are the behaviors this batch ports and the class they
+// siegeGuardScripts are the siege guard behaviors and the class they
 // derive from, in scripts.xml order.
 func siegeGuardScripts() ([]script.Listing, script.Catalog) {
 	catalog := script.Catalog{
-		"script.ai.individual.DefaultNpc":                         defaultnpc.New,
-		"script.ai.siegeguards.GludioCleric":                      siegeguard.Cleric,
-		"script.ai.siegeguards.GludioClericStand":                 siegeguard.ClericStand,
-		"script.ai.siegeguards.GludioWizardStand":                 siegeguard.WizardStand,
-		"script.ai.siegeguards.GludioHold.GludioBowGuard":         siegeguard.BowGuard,
-		"script.ai.siegeguards.GludioHold.GludioCourtGuard":       siegeguard.CourtGuard,
-		"script.ai.siegeguards.GludioHold.GludioDukeLewinWaldner": siegeguard.DukeLewinWaldner,
-		"script.ai.siegeguards.GludioHold.GludioHold":             siegeguard.Hold,
-		"script.ai.siegeguards.GludioHold.GludioKnight":           siegeguard.Knight,
+		"script.ai.individual.DefaultNpc":                           defaultnpc.New,
+		"script.ai.siegeguards.GludioCleric":                        siegeguard.Cleric,
+		"script.ai.siegeguards.GludioClericStand":                   siegeguard.ClericStand,
+		"script.ai.siegeguards.GludioWizardStand":                   siegeguard.WizardStand,
+		"script.ai.siegeguards.GludioHold.GludioBowGuard":           siegeguard.BowGuard,
+		"script.ai.siegeguards.GludioHold.GludioCourtGuard":         siegeguard.CourtGuard,
+		"script.ai.siegeguards.GludioHold.GludioDukeLewinWaldner":   siegeguard.DukeLewinWaldner,
+		"script.ai.siegeguards.GludioHold.GludioHold":               siegeguard.Hold,
+		"script.ai.siegeguards.GludioHold.GludioKnight":             siegeguard.Knight,
+		"script.ai.siegeguards.GludioHold.GludioSirCronenberg":      siegeguard.SirCronenberg,
+		"script.ai.siegeguards.GludioHold.GludioSpearGuard":         siegeguard.SpearGuard,
+		"script.ai.siegeguards.GludioHold.GludioSwordGuard":         siegeguard.SwordGuard,
+		"script.ai.siegeguards.GludioHold.GludioSwordGuardUseSkill": siegeguard.SwordGuardUseSkill,
+		"script.ai.siegeguards.GludioStand.GludioBowGuardStand":     siegeguard.BowGuardStand,
+		"script.ai.siegeguards.GludioStand.GludioStand":             siegeguard.Stand,
+		"script.ai.siegeguards.GludioWizard.GludioWizard":           siegeguard.Wizard,
+		"script.ai.siegeguards.GludioWizard.GludioWizardUseSkill":   siegeguard.WizardUseSkill,
 	}
 	var list []script.Listing
 	for _, path := range []string{
@@ -78,6 +86,14 @@ func siegeGuardScripts() ([]script.Listing, script.Catalog) {
 		"script.ai.siegeguards.GludioHold.GludioDukeLewinWaldner",
 		"script.ai.siegeguards.GludioHold.GludioHold",
 		"script.ai.siegeguards.GludioHold.GludioKnight",
+		"script.ai.siegeguards.GludioHold.GludioSirCronenberg",
+		"script.ai.siegeguards.GludioHold.GludioSpearGuard",
+		"script.ai.siegeguards.GludioHold.GludioSwordGuard",
+		"script.ai.siegeguards.GludioHold.GludioSwordGuardUseSkill",
+		"script.ai.siegeguards.GludioStand.GludioBowGuardStand",
+		"script.ai.siegeguards.GludioStand.GludioStand",
+		"script.ai.siegeguards.GludioWizard.GludioWizard",
+		"script.ai.siegeguards.GludioWizard.GludioWizardUseSkill",
 	} {
 		list = append(list, script.Listing{Path: path})
 	}
@@ -125,11 +141,13 @@ func siegeNPCSkills() *modelskill.Table {
 }
 
 // siegeCharacterSkills are the skills the character casts at the guards.
+// They reach 1200: past the 1000 within which a standing bow guard answers
+// Seal of Ruler, and from out of a guard's sight onto what it fights.
 func siegeCharacterSkills() []modelskill.Definition {
 	good := func(id modelskill.ID) modelskill.Definition {
 		return modelskill.Definition{
 			ID: id, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-			SkillType: "BUFF", CastRange: 900, HitTime: 500, StaticHitTime: true, StaticReuse: true,
+			SkillType: "BUFF", CastRange: 1200, HitTime: 500, StaticHitTime: true, StaticReuse: true,
 			Effects: []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, StackType: fmt.Sprintf("siege_good_%d", id), StackOrder: 1}},
 		}
 	}
@@ -138,7 +156,7 @@ func siegeCharacterSkills() []modelskill.Definition {
 		good(siegeBlessID),
 		{
 			ID: siegeBoltID, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetOne,
-			Offensive: true, Magic: true, SkillType: "MDAM", CastRange: 900, HitTime: 500, StaticHitTime: true, StaticReuse: true,
+			Offensive: true, Magic: true, SkillType: "MDAM", CastRange: 1200, HitTime: 500, StaticHitTime: true, StaticReuse: true,
 			Power: 1, AggroPoints: siegeTwentieth,
 		},
 	}

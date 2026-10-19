@@ -43,5 +43,51 @@ func aiSiegeGuardHandleOps() map[string]script.HandleOps {
 			"OnSeeSpell":                 {"NPC.GeoPathFailCount", "NPC.InCombat", "NPC.MaxHP", "NPC.TopDesireTarget"},
 			"OnStaticObjectClanAttacked": {"NPC.MaxHP"},
 		},
+		"script.ai.siegeguards.GludioHold.GludioSirCronenberg": {
+			"OnAttacked":                 {"NPC.InsideZone", "NPC.MaxHP", "NPC.RemoveAllAttackDesire"},
+			"OnClanAttacked":             {"NPC.MaxHP"},
+			"OnSeeCreature":              {"NPC.InsideZone", "NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":                 {"NPC.GeoPathFailCount", "NPC.InCombat", "NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnStaticObjectClanAttacked": {"NPC.MaxHP"},
+		},
+		"script.ai.siegeguards.GludioHold.GludioSpearGuard": {
+			"OnAttacked":                 {"NPC.InsideZone", "NPC.MaxHP", "NPC.RemoveAllAttackDesire"},
+			"OnClanAttacked":             {"NPC.MaxHP"},
+			"OnSeeCreature":              {"NPC.InsideZone", "NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":                 {"NPC.GeoPathFailCount", "NPC.InCombat", "NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnStaticObjectClanAttacked": {"NPC.MaxHP"},
+		},
+		"script.ai.siegeguards.GludioHold.GludioSwordGuard": {
+			"OnAttacked":                 {"NPC.InsideZone", "NPC.MaxHP", "NPC.RemoveAllAttackDesire"},
+			"OnClanAttacked":             {"NPC.MaxHP"},
+			"OnSeeCreature":              {"NPC.InsideZone", "NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":                 {"NPC.GeoPathFailCount", "NPC.InCombat", "NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnStaticObjectClanAttacked": {"NPC.MaxHP"},
+		},
+		"script.ai.siegeguards.GludioHold.GludioSwordGuardUseSkill": {
+			"OnAttacked":                 {"NPC.InsideZone", "NPC.MaxHP", "NPC.RemoveAllAttackDesire", "NPC.TopDesireTarget"},
+			"OnClanAttacked":             {"NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnSeeCreature":              {"NPC.InsideZone", "NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":                 {"NPC.GeoPathFailCount", "NPC.InCombat", "NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnStaticObjectClanAttacked": {"NPC.MaxHP"},
+		},
+		"script.ai.siegeguards.GludioStand.GludioBowGuardStand": {
+			"OnAttacked":                 {"NPC.MaxHP"},
+			"OnClanAttacked":             {"NPC.MaxHP"},
+			"OnSeeSpell":                 {"NPC.InCombat", "NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnStaticObjectClanAttacked": {"NPC.MaxHP"},
+		},
+		"script.ai.siegeguards.GludioStand.GludioStand": {
+			"OnAttacked":                 {"NPC.MaxHP"},
+			"OnClanAttacked":             {"NPC.MaxHP"},
+			"OnSeeSpell":                 {"NPC.InCombat", "NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnStaticObjectClanAttacked": {"NPC.MaxHP"},
+		},
+		"script.ai.siegeguards.GludioWizard.GludioWizard": {
+			"OnSeeCreature": {"NPC.InsideZone", "NPC.RemoveAllAttackDesire"},
+		},
+		"script.ai.siegeguards.GludioWizard.GludioWizardUseSkill": {
+			"OnSeeCreature": {"NPC.InsideZone", "NPC.RemoveAllAttackDesire"},
+		},
 	}
 }
