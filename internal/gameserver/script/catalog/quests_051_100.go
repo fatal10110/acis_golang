@@ -2,15 +2,18 @@ package catalog
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q051"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q052"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q053"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/thirdclass"
 )
 
 // quests051To100 is the catalog of quests 051 to 100 with the sagas (#179), except the one the engine slices ported. sagas is the family the saga core and every saga share.
 func quests051To100(sagas *thirdclass.Family) script.Catalog {
 	return script.Catalog{
-		"quest.Q051_OFullesSpecialBait":         nil,
-		"quest.Q052_WilliesSpecialBait":         nil,
-		"quest.Q053_LinnaeusSpecialBait":        nil,
+		"quest.Q051_OFullesSpecialBait":         q051.New,
+		"quest.Q052_WilliesSpecialBait":         q052.New,
+		"quest.Q053_LinnaeusSpecialBait":        q053.New,
 		"quest.Q071_SagaOfEvasTemplar":          nil,
 		"quest.Q072_SagaOfTheSwordMuse":         nil,
 		"quest.Q073_SagaOfTheDuelist":           nil,

@@ -1,0 +1,98 @@
+# O'Fulle's Special Bait (Q051): a level 36 character holding 98 lost baits accepts at O'Fulle,
+# kills two fettered souls (each drop always lands; the second makes a hundred lost baits and
+# completes the quest's first step); O'Fulle takes the hundred for four lures, and the quest
+# completes; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q051_ofulles_special_bait.golden
+character Angler 36
+hold 7622 98
+script quest.Q051_OFullesSpecialBait
+item 7622 7611
+page fisherman/31572.htm
+page script/quest/Q051_OFullesSpecialBait/
+npc ofulle 31572 Fisherman 10 0 0
+npc soul 20552 Monster 40 0 0
+
+# O'Fulle: accept.
+action ofulle
+action ofulle
+  S ActionFailed
+  S NpcHtmlMessage obj=ofulle item=0 page=fisherman/31572.htm
+  S ActionFailed
+bypass npc_{ofulle}_Quest
+  S NpcHtmlMessage obj=ofulle item=0 page=script/quest/Q051_OFullesSpecialBait/31572-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q051_OFullesSpecialBait CREATED
+bypass Quest Q051_OFullesSpecialBait 31572-03.htm
+  S QuestList 51:0x80000001
+  S ExShowQuestMark quest=51
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=ofulle item=0 page=script/quest/Q051_OFullesSpecialBait/31572-03.htm
+  S ActionFailed
+  Q upsert Q051_OFullesSpecialBait | <state> | STARTED
+  Q upsert Q051_OFullesSpecialBait | <cond> | 1
+  state Q051_OFullesSpecialBait STARTED
+  rows Q051_OFullesSpecialBait <cond>=1 <state>=STARTED
+
+# Short of a hundred: O'Fulle sends the player back out.
+action ofulle
+  S ActionFailed
+  S NpcHtmlMessage obj=ofulle item=0 page=fisherman/31572.htm
+  S ActionFailed
+bypass npc_{ofulle}_Quest
+  S NpcHtmlMessage obj=ofulle item=0 page=script/quest/Q051_OFullesSpecialBait/31572-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# The kills.
+kill soul
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7622
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 7622=99
+kill soul
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7622
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 51:0x80000003
+  S ExShowQuestMark quest=51
+  Q upsert Q051_OFullesSpecialBait | <cond> | 2
+  rows Q051_OFullesSpecialBait <cond>=2 <state>=STARTED
+  items 7622=100
+
+# A hundred: O'Fulle trades them for four lures; the quest completes.
+action ofulle
+  S ActionFailed
+  S NpcHtmlMessage obj=ofulle item=0 page=fisherman/31572.htm
+  S ActionFailed
+bypass npc_{ofulle}_Quest
+  S NpcHtmlMessage obj=ofulle item=0 page=script/quest/Q051_OFullesSpecialBait/31572-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q051_OFullesSpecialBait 31572-07.htm
+  S SystemMessage id=301 3:7622 6:100
+  S SystemMessage id=53 3:7611 6:4
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 51:0x00000000
+  S NpcHtmlMessage obj=ofulle item=0 page=script/quest/Q051_OFullesSpecialBait/31572-06.htm
+  S ActionFailed
+  Q upsert Q051_OFullesSpecialBait | <state> | COMPLETED
+  Q delete-except-state Q051_OFullesSpecialBait
+  state Q051_OFullesSpecialBait COMPLETED
+  rows Q051_OFullesSpecialBait <state>=COMPLETED
+  items 7622=0 7611=4
+
+# Relog: the completed quest loads from its one row, and the lures stay.
+relog
+  state Q051_OFullesSpecialBait COMPLETED
+  rows Q051_OFullesSpecialBait <state>=COMPLETED
+  items 7611=4
+action ofulle
+action ofulle
+  S ActionFailed
+  S NpcHtmlMessage obj=ofulle item=0 page=fisherman/31572.htm
+  S ActionFailed
+bypass npc_{ofulle}_Quest
+  S NpcHtmlMessage obj=ofulle item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

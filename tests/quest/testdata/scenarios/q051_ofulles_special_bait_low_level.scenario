@@ -1,0 +1,22 @@
+# O'Fulle's Special Bait (Q051), refused: a level 35 character, one short of the quest's
+# level, is turned away by O'Fulle and the quest is not started. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q051_ofulles_special_bait_low_level.golden
+character Angler 35
+script quest.Q051_OFullesSpecialBait
+item 7622 7611
+page fisherman/31572.htm
+page script/quest/Q051_OFullesSpecialBait/
+npc ofulle 31572 Fisherman 10 0 0
+
+action ofulle
+action ofulle
+  S ActionFailed
+  S NpcHtmlMessage obj=ofulle item=0 page=fisherman/31572.htm
+  S ActionFailed
+bypass npc_{ofulle}_Quest
+  S NpcHtmlMessage obj=ofulle item=0 page=script/quest/Q051_OFullesSpecialBait/31572-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q051_OFullesSpecialBait CREATED
+  rows Q051_OFullesSpecialBait -
