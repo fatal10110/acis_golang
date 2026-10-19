@@ -7,5 +7,15 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // aiIndividual8HandleOps holds, per script of ai_individual_8.go, the kind-specific NPC
 // handle operations each of its hooks reaches.
 func aiIndividual8HandleOps() map[string]script.HandleOps {
-	return map[string]script.HandleOps{}
+	return map[string]script.HandleOps{
+		"script.ai.individual.Corpse": {
+			"OnCreated": {"NPC.DoDie"},
+		},
+		"script.ai.individual.ImperialGravekeeper": {
+			"OnAttacked":       {"NPC.InsideZone", "NPC.MaxHP"},
+			"OnClanAttacked":   {"NPC.MaxHP"},
+			"OnOutOfTerritory": {"NPC.RemoveAllAttackDesire"},
+			"OnPartyAttacked":  {"NPC.MaxHP"},
+		},
+	}
 }

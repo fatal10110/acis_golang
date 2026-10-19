@@ -1,0 +1,18 @@
+# DaimonTheWhiteEyed (31705, a plain script) talked to by a fighter. The first talk, on an even
+# draw (0), curses him: one of its three curse lines (draw 1: 1000459) and its fighter curse,
+# 1206 level 19, asked with weight 1000000. A talk shows no page: the action's ActionFailed, and
+# the empty first talk's after the line. A second talk inside 30 s, on an odd draw (1), blesses
+# him (1086 level 2) with no line. (tests/ai/individual8_test.go checks the cast desires.)
+character Hunter 20
+random 0 1 1
+script script.ai.individual.DaimonTheWhiteEyed
+npc daimon 31705 Folk 40 0 0
+
+action daimon
+action daimon
+  S ActionFailed
+  S NpcSay obj=daimon type=0 npc=1031705 text="If you want to be the opponent of me, Daimon the White-Eyed, you should at least have the basic skills~!"
+  S ActionFailed
+action daimon
+  S ActionFailed
+  S ActionFailed
