@@ -9,17 +9,17 @@ import (
 func makers3() script.MakerCatalog {
 	return script.MakerCatalog{
 		"benom_maker":                        maker.Benom,
-		"default_use_db_maker_for_frintessa": nil,
+		"default_use_db_maker_for_frintessa": maker.DefaultUseDBForFrintezza,
 		"freya_deacon_keeper_maker":          maker.FreyaDeaconKeeper,
 		"frintessa_evilate_maker":            maker.FrintezzaEvilate,
-		"ice_fairy_sirr_maker":               nil,
-		"rhamphorhynchus_maker":              nil,
+		"ice_fairy_sirr_maker":               maker.IceFairySirr,
+		"rhamphorhynchus_maker":              maker.Rhamphorhynchus,
 		"sailren_dummy_maker":                maker.SailrenDummy,
 		"sailren_maker":                      nil,
 		"sculpture_garden_maker":             maker.SculptureGarden,
 		"sculpture_ice_fairy_maker":          maker.SculptureIceFairy,
 		"statue_of_shilen_maker":             maker.StatueOfShilen,
-		"tyrannosaurus_maker":                nil,
+		"tyrannosaurus_maker":                maker.Tyrannosaurus,
 		"velociraptor_maker":                 maker.Velociraptor,
 	}
 }
