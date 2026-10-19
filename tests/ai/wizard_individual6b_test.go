@@ -569,7 +569,8 @@ func TestPartyLeaderWizardDD2CurseCursesAttackers(t *testing.T) {
 // skill-finished hooks, every draw 0. As it spawns it wants to walk to its
 // spawn point, weight 30. A hit while it neither attacks nor casts
 // broadcasts event 10033 with the attacker's id. Its self heal landing sets
-// int slot 3.
+// int slot 3. Moved 200 away with nothing left to do, its no-desire hook
+// wants it back at its spawn point, weight 30.
 func TestPartyLeaderWizardHereticKeepsHomeAndCallsForHelp(t *testing.T) {
 	t.Parallel()
 	w := bootIndividual6b(t, raidBoot{}, i6bCurseTemplate(i6bHereticID), warriorTemplate(plwListenerID, nil))
@@ -595,6 +596,19 @@ func TestPartyLeaderWizardHereticKeepsHomeAndCallsForHelp(t *testing.T) {
 		}
 		w.ticks(t, 1)
 		w.srv.Advance(t, time.Second)
+	}
+
+	w.teleport(t, h, 200, 0)
+	w.onQueue(t, h, func() {
+		script.NPCOf(h).RemoveAllAttackDesire()
+		h.AI().Desires().Clear()
+	})
+	if d, ok := desire(h, actorai.IntentionMoveTo); ok {
+		t.Fatalf("setup: move desire after the desires were dropped = %+v", d)
+	}
+	w.ticks(t, 2)
+	if d, ok := desire(h, actorai.IntentionMoveTo); !ok || d.Weight != 30 || d.Location.X != home.X || d.Location.Y != home.Y {
+		t.Fatalf("heretic move desire with nothing to do = %+v (%v), want weight 30 to %d,%d", d, ok, home.X, home.Y)
 	}
 }
 
@@ -833,9 +847,9 @@ func TestPartyLeaderWizardRangeCurseCursesItsTarget(t *testing.T) {
 // TestPartyLeaderWizardRangeCurseStrikesAndCancelsOnDeath runs the eye's
 // see-creature, attacked and dying hooks, every draw 0. It attacks the
 // character it sees, weight 200. With another top desire target, a hit
-// wants its range DD magic on the attacker, weight 1000000. Dying with the
-// character remembered as cursed, its debuff cancel lands on the
-// character.
+// wants its range DD magic on the attacker, weight 1000000. An eye that
+// dies remembering only itself lands nothing; dying with the character
+// remembered as cursed, its debuff cancel lands on the character.
 func TestPartyLeaderWizardRangeCurseStrikesAndCancelsOnDeath(t *testing.T) {
 	t.Parallel()
 	w := bootIndividual6b(t, raidBoot{opts: []gameservertest.Option{gameservertest.WithScriptSkills(i6bEyeCancel())}}, i6bEyeTemplate(), warriorTemplate(i6bFoeID, nil))
@@ -846,6 +860,22 @@ func TestPartyLeaderWizardRangeCurseStrikesAndCancelsOnDeath(t *testing.T) {
 	w.ticks(t, 2)
 	if got := h.AggroHate(w.player); got != 200 {
 		t.Fatalf("hate of the character it sees = %v, want 200", got)
+	}
+
+	// Its dying hooks run 3 s after its death.
+	ref := modelskill.Ref{ID: i6bDebuffCancelID, Level: 1}
+	cancelLevel := func() int32 {
+		var level int32
+		w.srv.RunScript(t, me, "I6bDirector", func(s *script.Script, p *script.Player) {
+			level = s.AbnormalLevel(p, ref)
+		})
+		return level
+	}
+	uncursed := w.spawn(t, i6bEyeID, 0, 150)
+	w.onQueue(t, uncursed, func() { script.NPCOf(uncursed).DoDie(nil) })
+	w.srv.Advance(t, 4*time.Second)
+	if got := cancelLevel(); got > 0 {
+		t.Fatalf("debuff cancel level after the death of an eye that cursed no one = %d, want none", got)
 	}
 
 	w.onQueue(t, h, func() {
@@ -860,12 +890,5 @@ func TestPartyLeaderWizardRangeCurseStrikesAndCancelsOnDeath(t *testing.T) {
 
 	w.onQueue(t, h, func() { script.NPCOf(h).SetSlot(script.SlotCreature2, script.PlayerOf(w.player)) })
 	w.onQueue(t, h, func() { script.NPCOf(h).DoDie(nil) })
-	ref := modelskill.Ref{ID: i6bDebuffCancelID, Level: 1}
-	w.srv.AdvanceUntil(t, "the debuff cancel landed", func() bool {
-		var level int32
-		w.srv.RunScript(t, me, "I6bDirector", func(s *script.Script, p *script.Player) {
-			level = s.AbnormalLevel(p, ref)
-		})
-		return level > 0
-	})
+	w.srv.AdvanceUntil(t, "the debuff cancel landed", func() bool { return cancelLevel() > 0 })
 }
