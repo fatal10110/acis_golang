@@ -32,10 +32,8 @@ const defaultDriftRange = 200
 // queues so it outranks wander and ordinary combat desires.
 const siegeGuardHomeMoveWeight = 1_000_000
 
-// partyRangeDefault mirrors players.properties' PartyRange default (1500),
-// used by RandomizeHate's canAutoAttack gate. The Party subsystem isn't
-// ported yet, so this stays a local default instead of a wired Config
-// value; move it there once Party configuration exists.
+// partyRangeDefault is the shipped players.properties PartyRange, which a
+// hostile attached without party settings gates RandomizeHate by.
 const partyRangeDefault = 1500
 
 var hostileInstanceKinds = map[InstanceKind]struct{}{
@@ -89,6 +87,9 @@ type Hostile struct {
 	// guarded is the siege a siege guard defends; nil for none. Installed
 	// by Attach.
 	guarded GuardedSiege
+	// regenSettings and party are Runtime.Regen and Runtime.Party.
+	regenSettings RegenSettings
+	party         PartySettings
 	// sight is what h's tick scan has told its see-creature scripts about.
 	sight sight
 	// interacted latches the first unlock attempt on a chest.
@@ -368,6 +369,12 @@ type Runtime struct {
 	// Guarded is the siege of the castle a siege guard belongs to; nil
 	// leaves the guard unattackable.
 	Guarded GuardedSiege
+	// Regen answers the base regeneration multipliers the NPC takes while
+	// it is not raid related; nil takes the shipped ones.
+	Regen RegenSettings
+	// Party answers the party range RandomizeHate gates its candidates by;
+	// nil reads the shipped one.
+	Party PartySettings
 }
 
 // GuardedSiege is the siege of the castle a siege guard belongs to.
@@ -394,6 +401,8 @@ func (h *Hostile) Attach(rt Runtime) {
 	h.scripts = rt.Scripts
 	h.ground = rt.Ground
 	h.guarded = rt.Guarded
+	h.regenSettings = rt.Regen
+	h.party = rt.Party
 	h.bindSpawn(rt.Slot)
 	h.Scratch().setLife(h)
 	h.brain.KeepTerritory(h.Scratch().Territory())
@@ -764,13 +773,22 @@ func (h *Hostile) ClearAggroTables() {
 // RandomizeHate is attack randomization, the behavior behind the
 // randomize-hate effect: swaps a random valid attacker into the most-hated
 // slot ahead of the current target, gated by the same AutoAttackTargetValid
-// rule ReconsiderTarget uses, here at party range with peaceful targets
-// allowed.
+// rule ReconsiderTarget uses, here at the party range in force with
+// peaceful targets allowed.
 // Reports whether a swap happened.
 func (h *Hostile) RandomizeHate() bool {
+	partyRange := h.partyRange()
 	return h.brain.RandomizeHate(func(target attackable.Combatant) bool {
-		return h.AutoAttackTargetValid(target, partyRangeDefault, true)
+		return h.AutoAttackTargetValid(target, partyRange, true)
 	}, h.roll)
+}
+
+// partyRange is the party range in force for h.
+func (h *Hostile) partyRange() int {
+	if h.party == nil {
+		return partyRangeDefault
+	}
+	return h.party.PartyRange()
 }
 
 // LifeTime returns the number of AI cycles h has completed since it

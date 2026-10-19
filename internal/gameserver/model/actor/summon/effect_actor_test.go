@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/effect/effecttest"
@@ -335,3 +336,7 @@ type fixedSettings struct {
 
 func (s fixedSettings) MaxBuffsAmount() int       { return s.maxBuffs }
 func (s fixedSettings) RespawnRestoreHP() float64 { return s.restoreHP }
+
+func (fixedSettings) RegenMultipliers() creature.RegenMultipliers {
+	return creature.DefaultRegenMultipliers
+}

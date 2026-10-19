@@ -294,6 +294,7 @@ func provideGameClientLink(
 	if effects != nil {
 		effects.SetShadowItemExpiry(link.ExpireShadowItem)
 	}
+	worldObjects.SetRegenSettings(link.PlayerRules())
 	return link, nil
 }
 
@@ -444,6 +445,7 @@ func newPlayerConfig(cfg gameServerConfig, gameplay gameplayConfig, pvpOptions t
 		AutoLearnSkills:            bool(gameplay.AutoLearnSkills),
 		WeightLimitMultiplier:      float64(gameplay.WeightLimitMultiplier),
 		InventorySlots:             gameplay.InventorySlots,
+		Regen:                      gameplay.RegenMultipliers,
 		StorageSlots:               gameplay.StorageSlots,
 		Freight:                    &freightCfg,
 		KarmaPlayerCanTeleport:     bool(gameplay.KarmaPlayerCanTeleport),
