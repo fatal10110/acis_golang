@@ -1,6 +1,9 @@
 package catalog
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/script"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/individual"
+)
 
 // aiIndividual8 is the catalog of batch 8 of 8 of the individual NPC behaviors (#193).
 func aiIndividual8() script.Catalog {
@@ -10,13 +13,13 @@ func aiIndividual8() script.Catalog {
 		"script.ai.individual.AgitWarrior.AgitWarriorFlee.AgitWarriorFlee":                         nil,
 		"script.ai.individual.AgitWarrior.AgitWarriorFlee.AgitWizardFlee":                          nil,
 		"script.ai.individual.AgitWarrior.AgitWizard":                                              nil,
-		"script.ai.individual.AltarDoorController":                                                 nil,
-		"script.ai.individual.AreadataSwitch":                                                      nil,
-		"script.ai.individual.Corpse":                                                              nil,
-		"script.ai.individual.DaimonTheWhiteEyed":                                                  nil,
+		"script.ai.individual.AltarDoorController":                                                 individual.AltarDoorController,
+		"script.ai.individual.AreadataSwitch":                                                      individual.AreadataSwitch,
+		"script.ai.individual.Corpse":                                                              individual.Corpse,
+		"script.ai.individual.DaimonTheWhiteEyed":                                                  individual.DaimonTheWhiteEyed,
 		"script.ai.individual.Guard.GuardFixed":                                                    nil,
 		"script.ai.individual.Guard.GuardMoveAroundFixed":                                          nil,
-		"script.ai.individual.ImperialGravekeeper":                                                 nil,
+		"script.ai.individual.ImperialGravekeeper":                                                 individual.ImperialGravekeeper,
 		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushAfflict":                                nil,
 		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushAreaController":                         nil,
 		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushDefaultNpc":                             nil,
@@ -28,7 +31,7 @@ func aiIndividual8() script.Catalog {
 		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBox4":    nil,
 		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBox5":    nil,
 		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBoxBase": nil,
-		"script.ai.individual.RoyalRushMissionNpc":                                                 nil,
+		"script.ai.individual.RoyalRushMissionNpc":                                                 individual.RoyalRushMissionNpc,
 		"script.ai.individual.RoyalRushNpc":                                                        nil,
 		"script.ai.individual.SacrificialVictim":                                                   nil,
 		"script.ai.individual.TriolCamera":                                                         nil,
