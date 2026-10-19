@@ -7,11 +7,13 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 )
 
+const castingCurseDir = "ai/individual/Monster/WarriorBase/Warrior/WarriorCastingCurse"
+
 // CastingCurse is WarriorCastingCurse: a Warrior that may lay its debuff
 // on its most hated attacker and on a clan member's attacker, and once
 // hit, every 5 s while it fights, on the creature it hates most.
 func CastingCurse() script.Script {
-	return script.Script{Dir: "ai/individual/Monster/WarriorBase/Warrior/WarriorCastingCurse", Behavior: true, NPCs: castingCurseIDs(), Hooks: CastingCurseHooks()}
+	return script.Script{Dir: castingCurseDir, Behavior: true, NPCs: castingCurseIDs(), Hooks: CastingCurseHooks()}
 }
 
 // castingCurseIDs are WarriorCastingCurse's own NPCs.
