@@ -53,4 +53,12 @@ func (c *intMemo) get() int {
 	return v
 }
 
+// getOr is get with def before the first write.
+func (c *intMemo) getOr(def int) int {
+	if v, ok := c.cell.Get(c.key); ok {
+		return v
+	}
+	return def
+}
+
 func (c *intMemo) set(v int) { c.cell.Set(c.key, v) }
