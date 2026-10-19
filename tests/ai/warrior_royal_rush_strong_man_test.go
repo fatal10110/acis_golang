@@ -142,7 +142,7 @@ func TestRoyalRushStrongManLeavesAtMinute55(t *testing.T) {
 		t.Fatal("setup: the test does not drive the clock")
 	}
 	now := w.now(t)
-	at := now.Truncate(time.Hour).Add(53*time.Minute + 30*time.Second)
+	at := time.Date(now.Year(), now.Month(), now.Day(), now.Hour(), 53, 30, 0, now.Location())
 	if !at.After(now) {
 		at = at.Add(time.Hour)
 	}
