@@ -437,7 +437,7 @@ func TestRoyalRushMissionNpcFleesAndLeavesItsStrongNPC(t *testing.T) {
 		t.Fatalf("private %d at %+v, want the strong NPC where the victim fell %+v", strong.NpcID(), positionOf(strong), fell)
 	}
 
-	late := w.spawn(t, ind8VictimID, -200, 0)
+	late := w.spawn(t, ind8VictimID, -2000, 0)
 	w.srv.Advance(t, 300*time.Second)
 	privatesOf(t, late, 1) // its key box
 	w.onQueue(t, late, func() { script.NPCOf(late).DoDie(nil) })
@@ -727,4 +727,79 @@ func TestDaimonTheWhiteEyedCursesOrBlessesWhoTalks(t *testing.T) {
 	w.srv.Advance(t, 30*time.Second)
 	w.draws.set(0, 1, 2)
 	talk("talk after 30 s, odd draw", []string{script.NpcString(1000463)}, modelskill.Ref{ID: 1086, Level: 2}, 2000000)
+}
+
+// TestDaimonTheWhiteEyedCursesOrBlessesAMystic runs DaimonTheWhiteEyed's
+// first-talk hook for a player of a mystic class: an even draw curses him
+// with 1083 level 17, an odd one blesses him with 1059 level 3, each with
+// weight 1000000.
+func TestDaimonTheWhiteEyedCursesOrBlessesAMystic(t *testing.T) {
+	t.Parallel()
+	const humanMystic = 10
+	mystic := gameservertest.ClassTemplate()
+	mystic.ID = humanMystic
+	w := bootIndividual8(t, raidBoot{opts: []gameservertest.Option{gameservertest.WithClassTemplates(mystic)}}, ind8Folk(ind8DaimonID, nil))
+	if !w.srv.RunScript(t, w.player.ObjectID(), ind8DirectorName, func(_ *script.Script, p *script.Player) { p.SetClassID(humanMystic) }) {
+		t.Fatal("the class change panicked")
+	}
+	w.srv.Settle(t)
+	w.srv.ReadQueued(t, w.srv.Client)
+	c, _ := w.place(t, ind8DaimonID, 40, 0)
+	daimon := c.(*npc.Folk)
+	w.selectNPC(t, daimon)
+
+	for _, tc := range []struct {
+		draw int
+		cast modelskill.Ref
+	}{{0, modelskill.Ref{ID: 1083, Level: 17}}, {1, modelskill.Ref{ID: 1059, Level: 3}}} {
+		w.draws.set(tc.draw)
+		w.talk(t, daimon)
+		casts := daimonCasts(daimon)
+		if !slices.ContainsFunc(casts, func(d actorai.Desire) bool {
+			return d.Skill == tc.cast && d.Weight == 1000000 && d.FinalTarget.ObjectID() == w.player.ObjectID()
+		}) {
+			t.Fatalf("draw %d: cast desires = %+v, want %+v on the mystic with weight 1000000", tc.draw, casts, tc.cast)
+		}
+	}
+	if got := len(daimonCasts(daimon)); got != 2 {
+		t.Fatalf("cast desires after both talks = %d, want 2", got)
+	}
+}
+
+// TestRoyalRushMissionNpcCastsAtWhatItSeesOnceItsBoxDropped runs
+// RoyalRushMissionNpc's see-creature hook once its key box has dropped: a
+// victim out of the character's sight drops its box after 5 minutes, then
+// is moved beside the character; its first 5 s look 30 s after its last one
+// sees him, and it
+// follows him with weight 100 and wants to cast the skill of its draw of 4
+// (2: 4386) at him with weight 1000000, with no line.
+func TestRoyalRushMissionNpcCastsAtWhatItSeesOnceItsBoxDropped(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual8(t, raidBoot{}, victimTemplates()...)
+	victim := w.spawn(t, ind8VictimID, 2000, 0)
+	w.srv.Advance(t, 300*time.Second)
+	if got := ind8Slot(victim, script.SlotIntAI0); got != 1 {
+		t.Fatalf("victim ai0 after 5 minutes = %d, want 1", got)
+	}
+	if got := ind8Desires(victim, actorai.IntentionFollow); len(got) != 0 {
+		t.Fatalf("follow desires out of sight = %+v, want none", got)
+	}
+	w.srv.ReadQueued(t, w.srv.Client)
+
+	// A look comes at most once per 30 s: the 5 s look 30 s after the box's
+	// sees the character.
+	w.draws.set(2)
+	w.teleport(t, victim, -1800, 0)
+	w.srv.Advance(t, 30*time.Second)
+	if got := says(w.srv.ReadQueued(t, w.srv.Client), victim.ObjectID()); len(got) != 0 {
+		t.Fatalf("victim lines on seeing the character = %q, want none", got)
+	}
+	follow := ind8Desires(victim, actorai.IntentionFollow)
+	if len(follow) != 1 || follow[0].Weight != 100 || follow[0].FinalTarget.ObjectID() != w.player.ObjectID() {
+		t.Fatalf("follow desires = %+v, want the character with weight 100", follow)
+	}
+	casts := ind8Desires(victim, actorai.IntentionCast)
+	if len(casts) != 1 || casts[0].Skill != (modelskill.Ref{ID: 4386, Level: 1}) || casts[0].Weight != 1000000 || casts[0].FinalTarget.ObjectID() != w.player.ObjectID() {
+		t.Fatalf("cast desires = %+v, want 4386 on the character with weight 1000000", casts)
+	}
 }
