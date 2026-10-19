@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  * insert (with or without an on-duplicate-key update), a replace, an update and a delete change
  * them, and a select reads them back. Only the statement shapes the reference's own SQL uses on
  * these tables are understood (single table, a where clause of column comparisons joined by AND
- * and OR, an order by); any other statement on a kept table is a failure the scenario reports.
+ * (or &&) and OR, an order by); any other statement on a kept table is a failure the scenario reports.
  * Values are kept as the database would print them: integer columns rounded, a boolean as 1 or
  * 0, strings compared without case.
  */
@@ -157,7 +157,7 @@ final class ProbeStore
 		}
 	}
 
-	private static final Pattern TOKEN = Pattern.compile("\\s*(`[^`]*`|'(?:[^']|'')*'|<>|!=|<=|>=|[(),=<>*?;+]|-?\\d+(?:\\.\\d+)?|[A-Za-z_][\\w.]*)");
+	private static final Pattern TOKEN = Pattern.compile("\\s*(`[^`]*`|'(?:[^']|'')*'|<>|!=|<=|>=|&&|[(),=<>*?;+]|-?\\d+(?:\\.\\d+)?|[A-Za-z_][\\w.]*)");
 
 	/** One statement's tokens, read in order; each ? takes the next bound value. */
 	private static final class Parser
@@ -485,7 +485,8 @@ final class ProbeStore
 		private Predicate<Map<String, String>> and(Schema s)
 		{
 			Predicate<Map<String, String>> p = atom(s);
-			while (accept("AND"))
+			// MySQL reads && as AND.
+			while (accept("AND") || accept("&&"))
 				p = p.and(atom(s));
 			return p;
 		}

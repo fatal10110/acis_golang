@@ -263,7 +263,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		// The create step makes the character at the character select, with
 		// the shipped starter items.
 		opts = append(opts, gameservertest.WithWantChars(0), gameservertest.WithClassTemplate(createdTemplate(t)))
-	case r.sc.Class != 0:
+	case r.sc.Class != 0 || r.sc.Subclass != 0:
 		opts = append(opts, gameservertest.WithClassTemplates(classTemplates()...),
 			gameservertest.WithClassCharacter(r.sc.Character, r.sc.Level, 0, r.sc.Class))
 	default:
@@ -296,6 +296,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	// selected.
 	seedQuests(t, r.srv.DB, r.player, r.sc.Quests)
 	seedExp(t, r.srv.DB, r.player, r.sc.Level)
+	r.seedSubclass(t)
 	r.seedHoldings(t)
 	for _, m := range r.sc.Members {
 		c := r.srv.SeedCharacterFor(t, memberAccount(m), m.Name, m.Level, 0)
@@ -386,6 +387,29 @@ func seedExp(t *testing.T, db *sql.DB, obj int32, level int) {
 	exp := scenarioLevels(t).RequiredExpForLevel(level)
 	if _, err := db.ExecContext(context.Background(), "UPDATE characters SET exp = ? WHERE obj_Id = ?", exp, obj); err != nil {
 		t.Fatalf("seed experience: %v", err)
+	}
+}
+
+// seedSubclass stores the subclass line's subclass in slot 1 and makes it the
+// character's active class, as a character that logged out playing it: the
+// characters row keeps the base class's level and experience.
+func (r *run) seedSubclass(t *testing.T) {
+	t.Helper()
+	if r.sc.Subclass == 0 {
+		return
+	}
+	levels := scenarioLevels(t)
+	if r.sc.SubclassLevel > levels.RealMaxLevel() {
+		t.Fatalf("%s: subclass level %d is past the highest level %d", r.sc.Name, r.sc.SubclassLevel, levels.RealMaxLevel())
+	}
+	ctx := context.Background()
+	if _, err := r.srv.DB.ExecContext(ctx,
+		"INSERT INTO character_subclasses (char_obj_id, class_id, exp, sp, level, class_index) VALUES (?, ?, ?, 0, ?, 1)",
+		r.player, r.sc.Subclass, levels.RequiredExpForLevel(r.sc.SubclassLevel), r.sc.SubclassLevel); err != nil {
+		t.Fatalf("seed subclass: %v", err)
+	}
+	if _, err := r.srv.DB.ExecContext(ctx, "UPDATE characters SET classid = ? WHERE obj_Id = ?", r.sc.Subclass, r.player); err != nil {
+		t.Fatalf("seed active subclass: %v", err)
 	}
 }
 

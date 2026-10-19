@@ -15,6 +15,11 @@
 //	class <class id>                          optional: the character's class, and so its race (default 0, a human
 //	                                          fighter); every class then has a template with the fixture's
 //	                                          stats, so the class's parents load and a script may change it
+//	subclass <class id> <level>               optional: the character holds that class, a second or third occupation
+//	                                          other than the base class, as its subclass of slot 1, at that level (40
+//	                                          up to the highest level), and plays it as it enters the world, as a
+//	                                          character that logged out on it: a relog keeps playing it. The
+//	                                          character line's level and the class line's class stay the base class's
 //	clan <level>                              optional: the character leads a clan of that level
 //	quest <quest> <var>=<value> ...           character_quests rows of the character before it enters the world,
 //	                                          one line per quest, as a rows check lists them
@@ -174,8 +179,12 @@ type Scenario struct {
 	Trace     string
 	Character string
 	Level     int
-	// Class is the character's class id.
+	// Class is the character's class id: its base class.
 	Class int
+	// Subclass is the subclass line's class, played from the start; 0 for
+	// none. SubclassLevel is its level.
+	Subclass      int
+	SubclassLevel int
 	// Clan is the level of the clan the character leads, -1 for none.
 	Clan int
 	// Quests are the character_quests rows seeded before the character
@@ -278,6 +287,9 @@ type Check struct {
 // maxClanLevel is the highest clan level.
 const maxClanLevel = 8
 
+// minSubclassLevel is the lowest level a subclass has.
+const minSubclassLevel = 40
+
 // maxStanding is the highest Ketra/Varka alliance level.
 const maxStanding = 5
 
@@ -358,6 +370,9 @@ func Parse(name string, data []byte) (*Scenario, error) {
 	if len(sc.Steps) == 0 {
 		return nil, fmt.Errorf("%s: no step", name)
 	}
+	if sc.Subclass != 0 && sc.Subclass == sc.Class {
+		return nil, fmt.Errorf("%s: the subclass is the base class %d", name, sc.Class)
+	}
 	if sc.Trace != "" && (len(sc.Members) > 0 || len(sc.Grounds) > 0) {
 		return nil, fmt.Errorf("%s: a traced scenario takes no member or ground line", name)
 	}
@@ -393,8 +408,8 @@ func (sc *Scenario) checkFlow() error {
 			switch {
 			case sc.Level != 1:
 				return fail("a created character starts at level 1, not %d", sc.Level)
-			case sc.Class != 0 || sc.Clan >= 0 || len(sc.Quests) > 0:
-				return fail("a created character takes no class, clan or quest line")
+			case sc.Class != 0 || sc.Subclass != 0 || sc.Clan >= 0 || len(sc.Quests) > 0:
+				return fail("a created character takes no class, subclass, clan or quest line")
 			case len(sc.Holds) > 0 || len(sc.Equips) > 0 || sc.Standing != 0 || sc.PK != 0 || sc.Cabal != sevensigns.NoCabal:
 				return fail("a created character takes no hold, equip, standing, pk or cabal line")
 			case len(sc.Members) > 0:
@@ -458,6 +473,24 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 			return fmt.Errorf("class %d has no race", id)
 		}
 		sc.Class = id
+	case "subclass":
+		if len(args) != 2 || sc.Subclass != 0 {
+			return fmt.Errorf("one subclass line: subclass <class id> <level>")
+		}
+		id, err := strconv.Atoi(args[0])
+		if err != nil {
+			return fmt.Errorf("subclass %q: %w", args[0], err)
+		}
+		if lv, ok := player.ClassLevel(id); !ok || lv < 2 {
+			// A subclass is taken as a second occupation, and the
+			// third class quests move it on.
+			return fmt.Errorf("subclass %d is not a second or third occupation", id)
+		}
+		level, err := strconv.Atoi(args[1])
+		if err != nil || level < minSubclassLevel {
+			return fmt.Errorf("subclass level %q is not %d or more", args[1], minSubclassLevel)
+		}
+		sc.Subclass, sc.SubclassLevel = id, level
 	case "clan":
 		if len(args) != 1 || sc.Clan >= 0 {
 			return fmt.Errorf("one clan line: clan <level>")

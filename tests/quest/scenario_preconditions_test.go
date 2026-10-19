@@ -33,8 +33,9 @@ func preconditionProbe() script.Script {
 }
 
 // TestScenarioPreconditions plays the scenarios of testdata/preconditions,
-// whose headers set the class, the led clan, seeded quest rows, the script
-// random draws, and what the character holds and stands for (format:
+// whose headers set the class, the played subclass, the led clan, seeded
+// quest rows, the script random draws, and what the character holds and
+// stands for (format:
 // package scenario).
 func TestScenarioPreconditions(t *testing.T) {
 	t.Parallel()
@@ -42,5 +43,6 @@ func TestScenarioPreconditions(t *testing.T) {
 		"quest.Q001_LettersOfLove": quest001.New,
 		"test.PreconditionProbe":   preconditionProbe,
 		"test.HoldingsProbe":       holdingsProbe,
+		"test.SubclassProbe":       subclassProbe,
 	}})
 }
