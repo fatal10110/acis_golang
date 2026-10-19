@@ -44,6 +44,9 @@ type WorldObjects struct {
 	// watchers are the watchers WatchDoor registered, by standing door.
 	// Guarded by doorMu.
 	watchers map[*door.Object]*doorWatchers
+	// clanCall is the call SetClanCall installed, installed again on every
+	// door a reload builds. Guarded by doorMu.
+	clanCall door.ClanCall
 
 	// doorMu serializes door state changes, so a flag flip or an HP change
 	// and its geodata, broadcast and timer follow-up land as one step
@@ -175,6 +178,20 @@ func (w *WorldObjects) SetStrife(s door.Strife) {
 	w.strife = s
 	for _, obj := range w.doors.Load().order {
 		obj.SetStrife(s)
+	}
+}
+
+// SetClanCall installs c as the call a hit on any door makes to the NPCs
+// around it, on the doors standing and on every door a reload builds later.
+func (w *WorldObjects) SetClanCall(c door.ClanCall) {
+	if w == nil {
+		return
+	}
+	w.doorMu.Lock()
+	defer w.doorMu.Unlock()
+	w.clanCall = c
+	for _, obj := range w.doors.Load().order {
+		obj.SetClanCall(c)
 	}
 }
 
@@ -530,7 +547,8 @@ func (w *WorldObjects) newDoors(doors *door.Table) (*doorSet, error) {
 // Doors are looked up by id when they act, so scripts, clan hall grounds,
 // keys, timers and regeneration reach the new doors, and so do the
 // residence siege SetDoorSiege installed and the HP upgrade UpgradeDoor set
-// under a door's id, the new door standing at its upgraded maximum HP. A door change
+// under a door's id, the new door standing at its upgraded maximum HP, and
+// the clan call SetClanCall installed. A door change
 // that comes in during the reload waits for it and lands on the new door.
 //
 // The watchers of an old door (WatchDoor) see it open, once the reload is
@@ -592,6 +610,7 @@ func (w *WorldObjects) newDoor(tmpl *door.Template) (*door.Object, error) {
 	obj.SetOwner(w)
 	obj.SetSight(doorSight{geo: w.geo})
 	obj.SetStrife(w.strife)
+	obj.SetClanCall(w.clanCall)
 	if s, ok := w.sieges[tmpl.ID]; ok {
 		obj.SetSiege(s)
 	}

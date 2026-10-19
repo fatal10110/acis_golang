@@ -323,11 +323,14 @@ func (s *HallSiege) AllowsDoorAttack(attacker skilltarget.Actor, _ bool) bool {
 	return s.Attacking(siege.ActingClanID(attacker))
 }
 
-// AllowsDoorDamage reports whether a hit lowers one of the hall's doors'
-// HP: while its battlefield is on.
-func (s *HallSiege) AllowsDoorDamage(attackable.Combatant) bool {
-	f := s.Battlefield()
-	return f != nil && f.Active()
+// DoorHit is what the hall's siege makes of a hit on one of its doors: it
+// lowers the door's HP while the battlefield is on, and is harmless
+// otherwise.
+func (s *HallSiege) DoorHit(attackable.Combatant) door.HitOutcome {
+	if f := s.Battlefield(); f != nil && f.Active() {
+		return door.HitDamages
+	}
+	return door.HitHarmless
 }
 
 // ShowsDoorHP reports false: a hall's doors never show their HP.

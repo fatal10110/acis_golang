@@ -105,6 +105,9 @@ type Doors interface {
 	// watchers, each in registration order; a key registered again under
 	// kind moves last. It reports whether the door stands in the world.
 	WatchDoor(id int, kind door.WatchKind, key any, fn func(*door.Object)) bool
+	// SetClanCall installs c as the call a hit on any door, standing now
+	// or built by a later reload, makes to the NPCs around it.
+	SetClanCall(c door.ClanCall)
 }
 
 // Castles finds the castle an NPC belongs to.

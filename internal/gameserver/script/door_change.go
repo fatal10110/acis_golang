@@ -7,13 +7,15 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 // closing of such a door runs the script's door-change hook, on the
 // goroutine that changed the door, after the door's status broadcast and
 // before the door it triggers changes. A door id the world has no door for
-// registers nothing; a door a reload builds has no registration. Build
-// calls it when its Env has doors; a server binding its doors later calls
-// it once, then.
+// registers nothing; a door a reload builds has no registration. It also
+// makes every hit on any of d's doors, a reloaded one too, call the door
+// clan through r (DoorAttacked). Build calls it when its Env has doors; a
+// server binding its doors later calls it once, then.
 func (r *Registry) WatchDoors(d Doors) {
 	if r == nil || d == nil {
 		return
 	}
+	d.SetClanCall(r)
 	for _, e := range r.entries {
 		s := e.script
 		if s == nil {

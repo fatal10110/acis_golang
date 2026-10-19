@@ -89,6 +89,9 @@ var raisedHooks = map[hook]kindSet{
 	hookDeath:     kinds(KindOther),
 	// The opening or closing of a door (WatchDoors).
 	hookDoorChange: kinds(KindOther),
+	// A hit on a door, calling the NPCs of the door clan around it
+	// (DoorAttacked).
+	hookStaticObjectClanAttacked: kinds(KindFolk, KindHostile),
 	// The script-event sends (SendScriptEvent, BroadcastScriptEvent), to an
 	// NPC of either kind.
 	hookScriptEvent: kinds(KindFolk, KindHostile),
@@ -172,6 +175,9 @@ type Registry struct {
 	// doors are the world's doors (Env.Doors), which a door handle in a
 	// hook's payload opens and closes; nil when the server has none.
 	doors Doors
+	// world is the world a hit door calls the NPCs around it in
+	// (Env.World); nil finds none.
+	world *world.State
 	// runs counts the hook invocations in flight, for a player leaving the
 	// world to wait out the ones that wrote it. It carries its own lock.
 	runs player.ScriptRuns
@@ -224,6 +230,7 @@ func Build(list []Listing, catalog Catalog, cfg Config) *Registry {
 		w = cfg.Env.World
 		r.doors = cfg.Env.Doors
 	}
+	r.world = w
 	r.memo = newGlobalMemo(w)
 	registered := 0
 	for _, l := range list {
