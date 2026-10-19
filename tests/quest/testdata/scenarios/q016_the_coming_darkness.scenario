@@ -1,0 +1,245 @@
+# The Coming Darkness (Q016): a level 62 character accepts at the hierarch with five crystals of
+# seal, finds the second altar silent while the first is due, seals the five evil altars in order
+# (each one, visited again, says it is sealed), and the hierarch rewards the work with experience;
+# then relog. The quest given up for want of a crystal is q016_the_coming_darkness_no_crystal.scenario.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q016_the_coming_darkness.golden
+character Sealer 62
+script quest.Q016_TheComingDarkness
+item 7167
+page default/31517.htm
+page default/31512.htm
+page default/31513.htm
+page default/31514.htm
+page default/31515.htm
+page default/31516.htm
+page script/quest/Q016_TheComingDarkness/
+npc hierarch 31517 Folk 10 0 0
+npc altar1 31512 Folk 20 0 0
+npc altar2 31513 Folk 30 0 0
+npc altar3 31514 Folk 40 0 0
+npc altar4 31515 Folk 50 0 0
+npc altar5 31516 Folk 60 0 0
+
+# The hierarch: accept with five crystals.
+action hierarch
+action hierarch
+  S ActionFailed
+  S NpcHtmlMessage obj=hierarch item=0 page=default/31517.htm
+  S ActionFailed
+bypass npc_{hierarch}_Quest
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q016_TheComingDarkness/31517-0.htm
+  S ActionFailed
+  S ActionFailed
+  state Q016_TheComingDarkness CREATED
+bypass Quest Q016_TheComingDarkness 31517-1.htm
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q016_TheComingDarkness/31517-1.htm
+  S ActionFailed
+bypass Quest Q016_TheComingDarkness 31517-2.htm
+  S QuestList 16:0x80000001
+  S ExShowQuestMark quest=16
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:7167 6:5
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q016_TheComingDarkness/31517-2.htm
+  S ActionFailed
+  Q upsert Q016_TheComingDarkness | <state> | STARTED
+  Q upsert Q016_TheComingDarkness | <cond> | 1
+  state Q016_TheComingDarkness STARTED
+  rows Q016_TheComingDarkness <cond>=1 <state>=STARTED
+  items 7167=5
+action hierarch
+  S ActionFailed
+  S NpcHtmlMessage obj=hierarch item=0 page=default/31517.htm
+  S ActionFailed
+bypass npc_{hierarch}_Quest
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q016_TheComingDarkness/31517-3.htm
+  S ActionFailed
+  S ActionFailed
+
+# The second altar is silent while the first is due.
+action altar2
+action altar2
+  S ActionFailed
+  S NpcHtmlMessage obj=altar2 item=0 page=default/31513.htm
+  S ActionFailed
+bypass npc_{altar2}_Quest
+  S NpcHtmlMessage obj=altar2 item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+# Evil altar 1: a crystal seals it.
+action altar1
+action altar1
+  S ActionFailed
+  S NpcHtmlMessage obj=altar1 item=0 page=default/31512.htm
+  S ActionFailed
+bypass npc_{altar1}_Quest
+  S NpcHtmlMessage obj=altar1 item=0 page=script/quest/Q016_TheComingDarkness/31512-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q016_TheComingDarkness 31512-1.htm
+  S QuestList 16:0x80000003
+  S ExShowQuestMark quest=16
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7167
+  S NpcHtmlMessage obj=altar1 item=0 page=script/quest/Q016_TheComingDarkness/31512-1.htm
+  S ActionFailed
+  Q upsert Q016_TheComingDarkness | <cond> | 2
+  rows Q016_TheComingDarkness <cond>=2 <state>=STARTED
+  items 7167=4
+action altar1
+  S ActionFailed
+  S NpcHtmlMessage obj=altar1 item=0 page=default/31512.htm
+  S ActionFailed
+bypass npc_{altar1}_Quest
+  S NpcHtmlMessage obj=altar1 item=0 page=script/quest/Q016_TheComingDarkness/31512-2.htm
+  S ActionFailed
+  S ActionFailed
+
+# Evil altar 2: a crystal seals it.
+action altar2
+action altar2
+  S ActionFailed
+  S NpcHtmlMessage obj=altar2 item=0 page=default/31513.htm
+  S ActionFailed
+bypass npc_{altar2}_Quest
+  S NpcHtmlMessage obj=altar2 item=0 page=script/quest/Q016_TheComingDarkness/31513-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q016_TheComingDarkness 31513-1.htm
+  S QuestList 16:0x80000007
+  S ExShowQuestMark quest=16
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7167
+  S NpcHtmlMessage obj=altar2 item=0 page=script/quest/Q016_TheComingDarkness/31513-1.htm
+  S ActionFailed
+  Q upsert Q016_TheComingDarkness | <cond> | 3
+  rows Q016_TheComingDarkness <cond>=3 <state>=STARTED
+  items 7167=3
+action altar2
+  S ActionFailed
+  S NpcHtmlMessage obj=altar2 item=0 page=default/31513.htm
+  S ActionFailed
+bypass npc_{altar2}_Quest
+  S NpcHtmlMessage obj=altar2 item=0 page=script/quest/Q016_TheComingDarkness/31513-2.htm
+  S ActionFailed
+  S ActionFailed
+
+# Evil altar 3: a crystal seals it.
+action altar3
+action altar3
+  S ActionFailed
+  S NpcHtmlMessage obj=altar3 item=0 page=default/31514.htm
+  S ActionFailed
+bypass npc_{altar3}_Quest
+  S NpcHtmlMessage obj=altar3 item=0 page=script/quest/Q016_TheComingDarkness/31514-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q016_TheComingDarkness 31514-1.htm
+  S QuestList 16:0x8000000f
+  S ExShowQuestMark quest=16
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7167
+  S NpcHtmlMessage obj=altar3 item=0 page=script/quest/Q016_TheComingDarkness/31514-1.htm
+  S ActionFailed
+  Q upsert Q016_TheComingDarkness | <cond> | 4
+  rows Q016_TheComingDarkness <cond>=4 <state>=STARTED
+  items 7167=2
+action altar3
+  S ActionFailed
+  S NpcHtmlMessage obj=altar3 item=0 page=default/31514.htm
+  S ActionFailed
+bypass npc_{altar3}_Quest
+  S NpcHtmlMessage obj=altar3 item=0 page=script/quest/Q016_TheComingDarkness/31514-2.htm
+  S ActionFailed
+  S ActionFailed
+
+# Evil altar 4: a crystal seals it.
+action altar4
+action altar4
+  S ActionFailed
+  S NpcHtmlMessage obj=altar4 item=0 page=default/31515.htm
+  S ActionFailed
+bypass npc_{altar4}_Quest
+  S NpcHtmlMessage obj=altar4 item=0 page=script/quest/Q016_TheComingDarkness/31515-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q016_TheComingDarkness 31515-1.htm
+  S QuestList 16:0x8000001f
+  S ExShowQuestMark quest=16
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7167
+  S NpcHtmlMessage obj=altar4 item=0 page=script/quest/Q016_TheComingDarkness/31515-1.htm
+  S ActionFailed
+  Q upsert Q016_TheComingDarkness | <cond> | 5
+  rows Q016_TheComingDarkness <cond>=5 <state>=STARTED
+  items 7167=1
+action altar4
+  S ActionFailed
+  S NpcHtmlMessage obj=altar4 item=0 page=default/31515.htm
+  S ActionFailed
+bypass npc_{altar4}_Quest
+  S NpcHtmlMessage obj=altar4 item=0 page=script/quest/Q016_TheComingDarkness/31515-2.htm
+  S ActionFailed
+  S ActionFailed
+
+# Evil altar 5: a crystal seals it.
+action altar5
+action altar5
+  S ActionFailed
+  S NpcHtmlMessage obj=altar5 item=0 page=default/31516.htm
+  S ActionFailed
+bypass npc_{altar5}_Quest
+  S NpcHtmlMessage obj=altar5 item=0 page=script/quest/Q016_TheComingDarkness/31516-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q016_TheComingDarkness 31516-1.htm
+  S QuestList 16:0x8000003f
+  S ExShowQuestMark quest=16
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7167
+  S NpcHtmlMessage obj=altar5 item=0 page=script/quest/Q016_TheComingDarkness/31516-1.htm
+  S ActionFailed
+  Q upsert Q016_TheComingDarkness | <cond> | 6
+  rows Q016_TheComingDarkness <cond>=6 <state>=STARTED
+  items 7167=0
+action altar5
+  S ActionFailed
+  S NpcHtmlMessage obj=altar5 item=0 page=default/31516.htm
+  S ActionFailed
+bypass npc_{altar5}_Quest
+  S NpcHtmlMessage obj=altar5 item=0 page=script/quest/Q016_TheComingDarkness/31516-2.htm
+  S ActionFailed
+  S ActionFailed
+
+# The hierarch: experience; the quest completes.
+action hierarch
+action hierarch
+  S ActionFailed
+  S NpcHtmlMessage obj=hierarch item=0 page=default/31517.htm
+  S ActionFailed
+bypass npc_{hierarch}_Quest
+  S SystemMessage id=45 1:221958
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 16:0x00000000
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q016_TheComingDarkness/31517-4.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q016_TheComingDarkness | <state> | COMPLETED
+  Q delete-except-state Q016_TheComingDarkness
+  state Q016_TheComingDarkness COMPLETED
+  rows Q016_TheComingDarkness <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row.
+relog
+  state Q016_TheComingDarkness COMPLETED
+  rows Q016_TheComingDarkness <state>=COMPLETED
+action hierarch
+action hierarch
+  S ActionFailed
+  S NpcHtmlMessage obj=hierarch item=0 page=default/31517.htm
+  S ActionFailed
+bypass npc_{hierarch}_Quest
+  S NpcHtmlMessage obj=hierarch item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
