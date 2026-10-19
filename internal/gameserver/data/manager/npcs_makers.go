@@ -182,6 +182,13 @@ type groupSpawn struct {
 
 func (s groupSpawn) Entry() spawn.Entry { return s.g.def.Entries[s.i] }
 
+func (s groupSpawn) Alias() string {
+	if tmpl, ok := s.g.n.templates.Get(int(s.Entry().NPCID)); ok {
+		return tmpl.Alias
+	}
+	return ""
+}
+
 func (s groupSpawn) Total() int {
 	if s.Persisted() {
 		return 1

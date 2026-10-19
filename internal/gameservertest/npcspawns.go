@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -117,6 +118,9 @@ type npcSpawnDeps struct {
 	// spawnStore restores and saves the database-tracked spawns' rows; nil
 	// keeps them in memory only.
 	spawnStore *gamesql.SpawnStore
+	// rand is the scripts' random source the makers draw from; nil draws
+	// at random.
+	rand func(n int) int
 	// makerCatalog are makers added to the server's own.
 	makerCatalog script.MakerCatalog
 	// driftRange is the WithMaxDriftRange drift range; 0 keeps the shipped
@@ -186,7 +190,11 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	if night == nil {
 		night = func() bool { return false }
 	}
-	makerWorld := script.MakerWorld{Night: night, Castles: deps.castles, Sieges: deps.sieges}
+	rand := deps.rand
+	if rand == nil {
+		rand = rnd.Get
+	}
+	makerWorld := script.MakerWorld{Night: night, Castles: deps.castles, Sieges: deps.sieges, Rand: rand, Now: now}
 	if deps.doors != nil {
 		makerWorld.Doors = deps.doors
 	}
