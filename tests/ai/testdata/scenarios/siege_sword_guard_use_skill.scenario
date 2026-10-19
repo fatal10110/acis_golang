@@ -1,0 +1,16 @@
+# GludioSwordGuardUseSkill (35060, a sword guard mercenary) sees the character, who neither
+# defends nor owns its castle: on a draw of 0 of 10000 it shouts NpcString 1800012, and it
+# wants to attack the character with weight 200 (a desire, not rendered). Its own
+# see-creature hook replaces GludioHold's, so no life-time gate holds it back. Its other
+# hooks only queue desires and hate, which the format cannot check (#3983):
+# tests/ai/siege_guard_sword_test.go covers them.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioHold.GludioHold
+script script.ai.siegeguards.GludioHold.GludioSwordGuard
+script script.ai.siegeguards.GludioHold.GludioSwordGuardUseSkill
+npc guard 35060 SiegeGuard 600 0 0
+
+approach guard
+  S NpcSay obj=guard type=1 npc=1035060 text="Death to those who challenge the Lords of Dawn!"

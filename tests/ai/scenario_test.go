@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/randomteleport"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/individual"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monster"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/siegeguard"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/warrior"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scenario"
 )
@@ -82,6 +83,11 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WarriorHero":                                              monster.WarriorHero,
 	"script.ai.individual.RoyalRushMissionNpc":                                              individual.RoyalRushMissionNpc,
 	"script.ai.individual.WarriorPetForPC":                                                  individual.WarriorPetForPC,
+	"script.ai.siegeguards.GludioHold.GludioHold":                                           siegeguard.Hold,
+	"script.ai.siegeguards.GludioHold.GludioSwordGuard":                                     siegeguard.SwordGuard,
+	"script.ai.siegeguards.GludioHold.GludioSwordGuardUseSkill":                             siegeguard.SwordGuardUseSkill,
+	"script.ai.siegeguards.GludioWizard.GludioWizard":                                       siegeguard.Wizard,
+	"script.ai.siegeguards.GludioWizard.GludioWizardUseSkill":                               siegeguard.WizardUseSkill,
 }
 
 // TestScenarios plays every NPC behavior scenario of testdata/scenarios

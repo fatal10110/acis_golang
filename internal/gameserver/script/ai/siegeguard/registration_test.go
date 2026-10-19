@@ -29,6 +29,14 @@ var chain = []struct {
 	{"script.ai.siegeguards.GludioHold.GludioDukeLewinWaldner", DukeLewinWaldner},
 	{"script.ai.siegeguards.GludioHold.GludioHold", Hold},
 	{"script.ai.siegeguards.GludioHold.GludioKnight", Knight},
+	{"script.ai.siegeguards.GludioHold.GludioSirCronenberg", SirCronenberg},
+	{"script.ai.siegeguards.GludioHold.GludioSpearGuard", SpearGuard},
+	{"script.ai.siegeguards.GludioHold.GludioSwordGuard", SwordGuard},
+	{"script.ai.siegeguards.GludioHold.GludioSwordGuardUseSkill", SwordGuardUseSkill},
+	{"script.ai.siegeguards.GludioStand.GludioBowGuardStand", BowGuardStand},
+	{"script.ai.siegeguards.GludioStand.GludioStand", Stand},
+	{"script.ai.siegeguards.GludioWizard.GludioWizard", Wizard},
+	{"script.ai.siegeguards.GludioWizard.GludioWizardUseSkill", WizardUseSkill},
 }
 
 // manifestView is what the reference manifest records of the chain: per
@@ -116,8 +124,10 @@ func readView(t *testing.T, path string, text *bufio.Scanner) manifestView {
 // guards). None is refused, and the registry dump equals the reference
 // manifest for the chain: each script's kind and bind lines, and every
 // folded per-(npc, event) list restricted to the chain's scripts: the two
-// clerics' 14 ids on one event each, GludioWizardStand's 14 on 2, and the
-// 33 + 9 + 9 + 9 ids of the four GludioHold guards on 8 each.
+// clerics' 14 ids on one event each, GludioWizardStand's 14 on 2, the
+// 33 + 9 + 9 + 9 + 7 + 32 + 33 + 1 ids of the eight GludioHold guards on 8
+// each, GludioStand's 82 on 5, GludioBowGuardStand's 32 on 6,
+// GludioWizard's 14 on 2 and GludioWizardUseSkill's one on 3.
 func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, len(chain))
 	catalog := script.Catalog{}
@@ -154,13 +164,13 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 			t.Errorf("%s binds:\n got %q\nwant %q", c.path, got.binds[c.path], want.binds[c.path])
 		}
 	}
-	if wantFolds, got := 14+14+14*2+(33+9+9+9)*8, len(want.folds); got != wantFolds {
+	if wantFolds, got := 14+14+14*2+(33+9+9+9+7+32+33+1)*8+82*5+32*6+14*2+1*3, len(want.folds); got != wantFolds {
 		t.Fatalf("reference folds = %d entries, want %d", got, wantFolds)
 	}
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ: %d entries, reference %d", len(got.folds), len(want.folds))
 	}
-	for _, id := range []int32{35018, 35013, 35014, 31401, 35069, 35064, 35066} {
+	for _, id := range []int32{35018, 35013, 35014, 31401, 35069, 35064, 35066, 35065, 35016, 31400, 35060, 35010, 35012, 35019, 35061} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}
