@@ -1,0 +1,132 @@
+# Shilen's Hunt (Q165): a dark elven fighter of level 10 accepts at Nelsya; twelve young brown
+# keltirs (every roll pinned to succeed) and an ashen wolf give the thirteen dark bezoars, and
+# Nelsya takes them for lesser healing potions and experience; then relog. Expectations replay
+# the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q165_shilens_hunt.golden
+character Huntress 10
+class 31
+random always 0
+script quest.Q165_ShilensHunt
+item 1160 1060
+page guard/30348.htm
+page script/quest/Q165_ShilensHunt/
+npc nelsya 30348 Guard 10 0 0
+npc keltir 20529 Monster 40 0 0
+npc wolf 20456 Monster 0 40 0
+
+# Nelsya: accept.
+action nelsya
+action nelsya
+  S ActionFailed
+  S NpcHtmlMessage obj=nelsya item=0 page=guard/30348.htm
+  S ActionFailed
+bypass npc_{nelsya}_Quest
+  S NpcHtmlMessage obj=nelsya item=0 page=script/quest/Q165_ShilensHunt/30348-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q165_ShilensHunt CREATED
+bypass Quest Q165_ShilensHunt 30348-03.htm
+  S QuestList 165:0x80000001
+  S ExShowQuestMark quest=165
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=nelsya item=0 page=script/quest/Q165_ShilensHunt/30348-03.htm
+  S ActionFailed
+  Q upsert Q165_ShilensHunt | <state> | STARTED
+  Q upsert Q165_ShilensHunt | <cond> | 1
+  state Q165_ShilensHunt STARTED
+  rows Q165_ShilensHunt <cond>=1 <state>=STARTED
+action nelsya
+  S ActionFailed
+  S NpcHtmlMessage obj=nelsya item=0 page=guard/30348.htm
+  S ActionFailed
+bypass npc_{nelsya}_Quest
+  S NpcHtmlMessage obj=nelsya item=0 page=script/quest/Q165_ShilensHunt/30348-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Twelve young brown keltirs: twelve dark bezoars.
+kill keltir x12
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1160
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1160
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1160
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1160
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1160
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1160
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1160
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1160
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1160
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1160
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1160
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1160
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1160=12
+  rows Q165_ShilensHunt <cond>=1 <state>=STARTED
+
+# An ashen wolf, whose drop is certain: the thirteenth bezoar moves the cond.
+kill wolf
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1160
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 165:0x80000003
+  S ExShowQuestMark quest=165
+  Q upsert Q165_ShilensHunt | <cond> | 2
+  items 1160=13
+  rows Q165_ShilensHunt <cond>=2 <state>=STARTED
+
+# Nelsya: the bezoars for the potions and experience; the quest completes.
+action nelsya
+  S ActionFailed
+  S NpcHtmlMessage obj=nelsya item=0 page=guard/30348.htm
+  S ActionFailed
+bypass npc_{nelsya}_Quest
+  S SystemMessage id=301 3:1160 6:13
+  S SystemMessage id=53 3:1060 6:5
+  S SystemMessage id=45 1:1000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 165:0x00000000
+  S NpcHtmlMessage obj=nelsya item=0 page=script/quest/Q165_ShilensHunt/30348-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q165_ShilensHunt | <state> | COMPLETED
+  Q delete-except-state Q165_ShilensHunt
+  items 1160=0 1060=5
+  state Q165_ShilensHunt COMPLETED
+  rows Q165_ShilensHunt <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q165_ShilensHunt COMPLETED
+  rows Q165_ShilensHunt <state>=COMPLETED
+  items 1060=5
+action nelsya
+action nelsya
+  S ActionFailed
+  S NpcHtmlMessage obj=nelsya item=0 page=guard/30348.htm
+  S ActionFailed
+bypass npc_{nelsya}_Quest
+  S NpcHtmlMessage obj=nelsya item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

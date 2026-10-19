@@ -1,0 +1,99 @@
+# Legacy of the Poet (Q163): a level 11 character accepts at Starden; a Baraq orc fighter gives
+# all four of Rumiel's poems (every roll pinned to succeed), and Starden takes them for adena;
+# then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q163_legacy_of_the_poet.golden
+character Bard 11
+random always 0
+script quest.Q163_LegacyOfThePoet
+item 1038 1039 1040 1041 57
+page guard/30220.htm
+page script/quest/Q163_LegacyOfThePoet/
+npc starden 30220 Guard 10 0 0
+npc orc 20372 Monster 40 0 0
+
+# Starden: accept.
+action starden
+action starden
+  S ActionFailed
+  S NpcHtmlMessage obj=starden item=0 page=guard/30220.htm
+  S ActionFailed
+bypass npc_{starden}_Quest
+  S NpcHtmlMessage obj=starden item=0 page=script/quest/Q163_LegacyOfThePoet/30220-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q163_LegacyOfThePoet CREATED
+bypass Quest Q163_LegacyOfThePoet 30220-04.htm
+  S NpcHtmlMessage obj=starden item=0 page=script/quest/Q163_LegacyOfThePoet/30220-04.htm
+  S ActionFailed
+bypass Quest Q163_LegacyOfThePoet 30220-06.htm
+  S NpcHtmlMessage obj=starden item=0 page=script/quest/Q163_LegacyOfThePoet/30220-06.htm
+  S ActionFailed
+bypass Quest Q163_LegacyOfThePoet 30220-07.htm
+  S QuestList 163:0x80000001
+  S ExShowQuestMark quest=163
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=starden item=0 page=script/quest/Q163_LegacyOfThePoet/30220-07.htm
+  S ActionFailed
+  Q upsert Q163_LegacyOfThePoet | <state> | STARTED
+  Q upsert Q163_LegacyOfThePoet | <cond> | 1
+  state Q163_LegacyOfThePoet STARTED
+  rows Q163_LegacyOfThePoet <cond>=1 <state>=STARTED
+action starden
+  S ActionFailed
+  S NpcHtmlMessage obj=starden item=0 page=guard/30220.htm
+  S ActionFailed
+bypass npc_{starden}_Quest
+  S NpcHtmlMessage obj=starden item=0 page=script/quest/Q163_LegacyOfThePoet/30220-08.htm
+  S ActionFailed
+  S ActionFailed
+
+# A Baraq orc fighter: all four poems at once, and the cond moves.
+kill orc
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1038
+  S SystemMessage id=54 3:1039
+  S SystemMessage id=54 3:1040
+  S SystemMessage id=54 3:1041
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 163:0x80000003
+  S ExShowQuestMark quest=163
+  Q upsert Q163_LegacyOfThePoet | <cond> | 2
+  items 1038=1 1039=1 1040=1 1041=1
+  rows Q163_LegacyOfThePoet <cond>=2 <state>=STARTED
+
+# Starden: the poems for adena; the quest completes.
+action starden
+  S ActionFailed
+  S NpcHtmlMessage obj=starden item=0 page=guard/30220.htm
+  S ActionFailed
+bypass npc_{starden}_Quest
+  S SystemMessage id=302 3:1038
+  S SystemMessage id=302 3:1039
+  S SystemMessage id=302 3:1040
+  S SystemMessage id=302 3:1041
+  S SystemMessage id=52 6:13890
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 163:0x00000000
+  S NpcHtmlMessage obj=starden item=0 page=script/quest/Q163_LegacyOfThePoet/30220-09.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q163_LegacyOfThePoet | <state> | COMPLETED
+  Q delete-except-state Q163_LegacyOfThePoet
+  items 1038=0 1039=0 1040=0 1041=0 57=13890
+  state Q163_LegacyOfThePoet COMPLETED
+  rows Q163_LegacyOfThePoet <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q163_LegacyOfThePoet COMPLETED
+  rows Q163_LegacyOfThePoet <state>=COMPLETED
+  items 57=13890
+action starden
+action starden
+  S ActionFailed
+  S NpcHtmlMessage obj=starden item=0 page=guard/30220.htm
+  S ActionFailed
+bypass npc_{starden}_Quest
+  S NpcHtmlMessage obj=starden item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

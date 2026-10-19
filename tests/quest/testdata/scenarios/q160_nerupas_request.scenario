@@ -1,0 +1,187 @@
+# Nerupa's Request (Q160): an elven fighter of level 10 accepts at Nerupa with the silvery
+# spidersilk, which Unoren, Creamees and Julia trade along for the nightshade leaf; Unoren and
+# Creamees have their own lines once it is carried, and Nerupa takes the leaf for lesser healing
+# potions and experience; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q160_nerupas_request.golden
+character Courier 10
+class 18
+script quest.Q160_NerupasRequest
+item 1026 1027 1028 1029 1060
+page default/30370.htm
+page merchant/30147.htm
+page merchant/30149.htm
+page warehouse/30152.htm
+page script/quest/Q160_NerupasRequest/
+npc nerupa 30370 Folk 10 0 0
+npc unoren 30147 Merchant 20 0 0
+npc creamees 30149 Merchant 0 20 0
+npc julia 30152 WarehouseKeeper -10 0 0
+
+# Nerupa: accept with the silvery spidersilk.
+action nerupa
+action nerupa
+  S ActionFailed
+  S NpcHtmlMessage obj=nerupa item=0 page=default/30370.htm
+  S ActionFailed
+bypass npc_{nerupa}_Quest
+  S NpcHtmlMessage obj=nerupa item=0 page=script/quest/Q160_NerupasRequest/30370-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q160_NerupasRequest CREATED
+bypass Quest Q160_NerupasRequest 30370-04.htm
+  S QuestList 160:0x80000001
+  S ExShowQuestMark quest=160
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1026
+  S NpcHtmlMessage obj=nerupa item=0 page=script/quest/Q160_NerupasRequest/30370-04.htm
+  S ActionFailed
+  Q upsert Q160_NerupasRequest | <state> | STARTED
+  Q upsert Q160_NerupasRequest | <cond> | 1
+  state Q160_NerupasRequest STARTED
+  rows Q160_NerupasRequest <cond>=1 <state>=STARTED
+  items 1026=1
+action nerupa
+  S ActionFailed
+  S NpcHtmlMessage obj=nerupa item=0 page=default/30370.htm
+  S ActionFailed
+bypass npc_{nerupa}_Quest
+  S NpcHtmlMessage obj=nerupa item=0 page=script/quest/Q160_NerupasRequest/30370-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Unoren: the spidersilk for his receipt.
+action unoren
+action unoren
+  S ActionFailed
+  S NpcHtmlMessage obj=unoren item=0 page=merchant/30147.htm
+  S ActionFailed
+bypass npc_{unoren}_Quest
+  S QuestList 160:0x80000003
+  S ExShowQuestMark quest=160
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1026
+  S SystemMessage id=54 3:1027
+  S NpcHtmlMessage obj=unoren item=0 page=script/quest/Q160_NerupasRequest/30147-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q160_NerupasRequest | <cond> | 2
+  items 1026=0 1027=1
+  rows Q160_NerupasRequest <cond>=2 <state>=STARTED
+action unoren
+  S ActionFailed
+  S NpcHtmlMessage obj=unoren item=0 page=merchant/30147.htm
+  S ActionFailed
+bypass npc_{unoren}_Quest
+  S NpcHtmlMessage obj=unoren item=0 page=script/quest/Q160_NerupasRequest/30147-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Creamees: the receipt for her ticket.
+action creamees
+action creamees
+  S ActionFailed
+  S NpcHtmlMessage obj=creamees item=0 page=merchant/30149.htm
+  S ActionFailed
+bypass npc_{creamees}_Quest
+  S QuestList 160:0x80000007
+  S ExShowQuestMark quest=160
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1027
+  S SystemMessage id=54 3:1028
+  S NpcHtmlMessage obj=creamees item=0 page=script/quest/Q160_NerupasRequest/30149-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q160_NerupasRequest | <cond> | 3
+  items 1027=0 1028=1
+  rows Q160_NerupasRequest <cond>=3 <state>=STARTED
+action creamees
+  S ActionFailed
+  S NpcHtmlMessage obj=creamees item=0 page=merchant/30149.htm
+  S ActionFailed
+bypass npc_{creamees}_Quest
+  S NpcHtmlMessage obj=creamees item=0 page=script/quest/Q160_NerupasRequest/30149-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Julia: the ticket for the nightshade leaf.
+action julia
+action julia
+  S ActionFailed
+  S NpcHtmlMessage obj=julia item=0 page=warehouse/30152.htm
+  S ActionFailed
+bypass npc_{julia}_Quest
+  S QuestList 160:0x8000000f
+  S ExShowQuestMark quest=160
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1028
+  S SystemMessage id=54 3:1029
+  S NpcHtmlMessage obj=julia item=0 page=script/quest/Q160_NerupasRequest/30152-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q160_NerupasRequest | <cond> | 4
+  items 1028=0 1029=1
+  rows Q160_NerupasRequest <cond>=4 <state>=STARTED
+action julia
+  S ActionFailed
+  S NpcHtmlMessage obj=julia item=0 page=warehouse/30152.htm
+  S ActionFailed
+bypass npc_{julia}_Quest
+  S NpcHtmlMessage obj=julia item=0 page=script/quest/Q160_NerupasRequest/30152-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Unoren and Creamees once the leaf is carried.
+action unoren
+action unoren
+  S ActionFailed
+  S NpcHtmlMessage obj=unoren item=0 page=merchant/30147.htm
+  S ActionFailed
+bypass npc_{unoren}_Quest
+  S NpcHtmlMessage obj=unoren item=0 page=script/quest/Q160_NerupasRequest/30147-03.htm
+  S ActionFailed
+  S ActionFailed
+action creamees
+action creamees
+  S ActionFailed
+  S NpcHtmlMessage obj=creamees item=0 page=merchant/30149.htm
+  S ActionFailed
+bypass npc_{creamees}_Quest
+  S NpcHtmlMessage obj=creamees item=0 page=script/quest/Q160_NerupasRequest/30149-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Nerupa: the leaf for the potions and experience; the quest completes.
+action nerupa
+action nerupa
+  S ActionFailed
+  S NpcHtmlMessage obj=nerupa item=0 page=default/30370.htm
+  S ActionFailed
+bypass npc_{nerupa}_Quest
+  S SystemMessage id=302 3:1029
+  S SystemMessage id=53 3:1060 6:5
+  S SystemMessage id=45 1:1000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 160:0x00000000
+  S NpcHtmlMessage obj=nerupa item=0 page=script/quest/Q160_NerupasRequest/30370-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q160_NerupasRequest | <state> | COMPLETED
+  Q delete-except-state Q160_NerupasRequest
+  items 1029=0 1060=5
+  state Q160_NerupasRequest COMPLETED
+  rows Q160_NerupasRequest <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q160_NerupasRequest COMPLETED
+  rows Q160_NerupasRequest <state>=COMPLETED
+  items 1060=5
+action nerupa
+action nerupa
+  S ActionFailed
+  S NpcHtmlMessage obj=nerupa item=0 page=default/30370.htm
+  S ActionFailed
+bypass npc_{nerupa}_Quest
+  S NpcHtmlMessage obj=nerupa item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

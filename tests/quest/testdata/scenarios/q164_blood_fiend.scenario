@@ -1,0 +1,90 @@
+# Blood Fiend (Q164): a level 21 character accepts at Creamees; Kirunak cries out at the first
+# hit only, and dying gives his skull with his last words; Creamees takes the skull for adena;
+# then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q164_blood_fiend.golden
+character Slayer 21
+script quest.Q164_BloodFiend
+item 1044 57
+page merchant/30149.htm
+page script/quest/Q164_BloodFiend/
+npc creamees 30149 Merchant 10 0 0
+npc kirunak 27021 Monster 40 0 0
+
+# Creamees: accept.
+action creamees
+action creamees
+  S ActionFailed
+  S NpcHtmlMessage obj=creamees item=0 page=merchant/30149.htm
+  S ActionFailed
+bypass npc_{creamees}_Quest
+  S NpcHtmlMessage obj=creamees item=0 page=script/quest/Q164_BloodFiend/30149-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q164_BloodFiend CREATED
+bypass Quest Q164_BloodFiend 30149-04.htm
+  S QuestList 164:0x80000001
+  S ExShowQuestMark quest=164
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=creamees item=0 page=script/quest/Q164_BloodFiend/30149-04.htm
+  S ActionFailed
+  Q upsert Q164_BloodFiend | <state> | STARTED
+  Q upsert Q164_BloodFiend | <cond> | 1
+  state Q164_BloodFiend STARTED
+  rows Q164_BloodFiend <cond>=1 <state>=STARTED
+action creamees
+  S ActionFailed
+  S NpcHtmlMessage obj=creamees item=0 page=merchant/30149.htm
+  S ActionFailed
+bypass npc_{creamees}_Quest
+  S NpcHtmlMessage obj=creamees item=0 page=script/quest/Q164_BloodFiend/30149-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Kirunak: a cry at the first hit only; the skull as he dies.
+hit kirunak 10
+  S NpcSay obj=kirunak type=0 npc=1027021 text="I will taste your blood!"
+hit kirunak 10
+kill kirunak
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 164:0x80000003
+  S ExShowQuestMark quest=164
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1044
+  S NpcSay obj=kirunak type=0 npc=1027021 text="I have fulfilled my contract with Trader Creamees."
+  Q upsert Q164_BloodFiend | <cond> | 2
+  items 1044=1
+  rows Q164_BloodFiend <cond>=2 <state>=STARTED
+
+# Creamees: the skull for adena; the quest completes.
+action creamees
+  S ActionFailed
+  S NpcHtmlMessage obj=creamees item=0 page=merchant/30149.htm
+  S ActionFailed
+bypass npc_{creamees}_Quest
+  S SystemMessage id=302 3:1044
+  S SystemMessage id=52 6:42130
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 164:0x00000000
+  S NpcHtmlMessage obj=creamees item=0 page=script/quest/Q164_BloodFiend/30149-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q164_BloodFiend | <state> | COMPLETED
+  Q delete-except-state Q164_BloodFiend
+  items 1044=0 57=42130
+  state Q164_BloodFiend COMPLETED
+  rows Q164_BloodFiend <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q164_BloodFiend COMPLETED
+  rows Q164_BloodFiend <state>=COMPLETED
+  items 57=42130
+action creamees
+action creamees
+  S ActionFailed
+  S NpcHtmlMessage obj=creamees item=0 page=merchant/30149.htm
+  S ActionFailed
+bypass npc_{creamees}_Quest
+  S NpcHtmlMessage obj=creamees item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

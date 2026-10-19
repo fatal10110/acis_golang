@@ -1,0 +1,143 @@
+# Protect the Water Source (Q159): an elven fighter of level 12 accepts at Asterios with the
+# first hyacinth charm; a plague zombie gives the plague dust (every roll pinned to succeed),
+# Asterios takes it and the charm for the second charm; five more dusts, and Asterios takes the
+# charm and the dust for adena; then relog. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q159_protect_the_water_source.golden
+character Warden 12
+class 18
+random always 0
+script quest.Q159_ProtectTheWaterSource
+item 1035 1071 1072 57
+page villagemaster/30154.htm
+page script/quest/Q159_ProtectTheWaterSource/
+npc asterios 30154 VillageMasterPriest 10 0 0
+npc zombie 27017 Monster 40 0 0
+
+# Asterios: accept with the first charm.
+action asterios
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+bypass npc_{asterios}_Quest
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q159_ProtectTheWaterSource/30154-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q159_ProtectTheWaterSource CREATED
+bypass Quest Q159_ProtectTheWaterSource 30154-04.htm
+  S QuestList 159:0x80000001
+  S ExShowQuestMark quest=159
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1071
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q159_ProtectTheWaterSource/30154-04.htm
+  S ActionFailed
+  Q upsert Q159_ProtectTheWaterSource | <state> | STARTED
+  Q upsert Q159_ProtectTheWaterSource | <cond> | 1
+  state Q159_ProtectTheWaterSource STARTED
+  rows Q159_ProtectTheWaterSource <cond>=1 <state>=STARTED
+  items 1071=1
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+bypass npc_{asterios}_Quest
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q159_ProtectTheWaterSource/30154-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# A plague zombie: the first dust.
+kill zombie
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1035
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 159:0x80000003
+  S ExShowQuestMark quest=159
+  Q upsert Q159_ProtectTheWaterSource | <cond> | 2
+  items 1035=1
+  rows Q159_ProtectTheWaterSource <cond>=2 <state>=STARTED
+
+# Asterios: the dust and the first charm for the second charm.
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+bypass npc_{asterios}_Quest
+  S QuestList 159:0x80000007
+  S ExShowQuestMark quest=159
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1035
+  S SystemMessage id=302 3:1071
+  S SystemMessage id=54 3:1072
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q159_ProtectTheWaterSource/30154-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q159_ProtectTheWaterSource | <cond> | 3
+  items 1035=0 1071=0 1072=1
+  rows Q159_ProtectTheWaterSource <cond>=3 <state>=STARTED
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+bypass npc_{asterios}_Quest
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q159_ProtectTheWaterSource/30154-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Five plague zombies: five dusts.
+kill zombie x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1035
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1035
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1035
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1035
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1035
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 159:0x8000000f
+  S ExShowQuestMark quest=159
+  Q upsert Q159_ProtectTheWaterSource | <cond> | 4
+  items 1035=5
+  rows Q159_ProtectTheWaterSource <cond>=4 <state>=STARTED
+
+# Asterios: the second charm and the dust for adena; the quest completes.
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+bypass npc_{asterios}_Quest
+  S SystemMessage id=302 3:1072
+  S SystemMessage id=301 3:1035 6:5
+  S SystemMessage id=52 6:18250
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 159:0x00000000
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q159_ProtectTheWaterSource/30154-08.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q159_ProtectTheWaterSource | <state> | COMPLETED
+  Q delete-except-state Q159_ProtectTheWaterSource
+  items 1035=0 1072=0 57=18250
+  state Q159_ProtectTheWaterSource COMPLETED
+  rows Q159_ProtectTheWaterSource <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q159_ProtectTheWaterSource COMPLETED
+  rows Q159_ProtectTheWaterSource <state>=COMPLETED
+  items 57=18250
+action asterios
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+bypass npc_{asterios}_Quest
+  S NpcHtmlMessage obj=asterios item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
