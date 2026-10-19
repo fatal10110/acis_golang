@@ -138,9 +138,10 @@ type Object struct {
 	// state owner, like hp.
 	hpUpgrade atomic.Int32
 
-	sink  event.Sink
-	owner StateOwner
-	sight Sight
+	sink     event.Sink
+	owner    StateOwner
+	sight    Sight
+	clanCall atomic.Pointer[clanCallRef]
 }
 
 // Siege is the siege state of the residence a door belongs to. A door with
@@ -152,10 +153,12 @@ type Siege interface {
 	// Swoop Cannon; during a siegable clan hall's siege only the attacker
 	// side may, once the siege lets its doors be attacked.
 	AllowsDoorAttack(attacker skilltarget.Actor, wall bool) bool
-	// AllowsDoorDamage reports whether a hit lowers the door's HP: a
-	// castle's siege in progress lets every attacker but the Swoop Cannon
-	// through, and a siegable clan hall's active siege zone any attacker.
-	AllowsDoorDamage(attacker attackable.Combatant) bool
+	// DoorHit is what the siege makes of attacker's hit on the door: a
+	// castle's siege in progress ignores the Swoop Cannon's hits and lets
+	// every other attacker's lower the door's HP, a siegable clan hall's
+	// active siege zone lets any attacker's, and anything else leaves the
+	// hit harmless.
+	DoorHit(attacker attackable.Combatant) HitOutcome
 	// ShowsDoorHP reports whether the door's status updates show its HP:
 	// only while its castle's siege is in progress.
 	ShowsDoorHP() bool
@@ -166,6 +169,28 @@ type Siege interface {
 }
 
 type siegeRef struct{ siege Siege }
+
+// HitOutcome is what a door's residence siege makes of a hit on the door.
+type HitOutcome uint8
+
+const (
+	// HitHarmless lowers no HP; the door still calls its clan.
+	HitHarmless HitOutcome = iota
+	// HitDamages lowers the door's HP, then the door calls its clan.
+	HitDamages
+	// HitIgnored drops the hit whole: no HP change and no clan call.
+	HitIgnored
+)
+
+// ClanCall is what a hit on a door tells the NPCs around it.
+type ClanCall interface {
+	// DoorAttacked tells the NPCs of the door clan around d that attacker
+	// hit d for damage. It runs on the hitting goroutine, with no door
+	// lock held.
+	DoorAttacked(d *Object, attacker attackable.Combatant, damage float64)
+}
+
+type clanCallRef struct{ call ClanCall }
 
 // Strife is the Seven Signs state a door's defences read: the owner of each
 // seal, in Avarice, Gnosis, Strife order.
@@ -366,20 +391,24 @@ func (o *Object) SetSiege(s Siege) {
 
 // ReduceHP applies a hit's damage to the door: an auto-attack's, with no
 // skill, or a damage skill's. Every hit routed onto a door ends here. Only a
-// hit its residence's siege allows lowers HP, and an attacker whose access
-// level deals no damage lowers nothing; the state owner applies the loss,
-// its status broadcast, the regeneration schedule and, once HP runs out,
-// the door's death.
+// hit its residence's siege lets damage lowers HP, and an attacker whose
+// access level deals no damage lowers nothing; the state owner applies the
+// loss, its status broadcast, the regeneration schedule and, once HP runs
+// out, the door's death. Then, whatever the HP did, the door calls its clan
+// (SetClanCall), unless the siege ignores the hit.
 func (o *Object) ReduceHP(amount float64, attacker attackable.Combatant, _ modelskill.Definition) {
-	ref := o.siege.Load()
-	if ref == nil || !ref.siege.AllowsDoorDamage(attacker) {
+	outcome := HitHarmless
+	if ref := o.siege.Load(); ref != nil {
+		outcome = ref.siege.DoorHit(attacker)
+	}
+	if outcome == HitIgnored {
 		return
 	}
-	if attacker != nil && !attacker.CanGiveDamage() {
-		return
-	}
-	if o.owner != nil {
+	if outcome == HitDamages && (attacker == nil || attacker.CanGiveDamage()) && o.owner != nil {
 		o.owner.ReduceDoorHP(o.DoorID(), amount)
+	}
+	if ref := o.clanCall.Load(); ref != nil && attacker != nil {
+		ref.call.DoorAttacked(o, attacker, amount)
 	}
 }
 
@@ -425,6 +454,16 @@ func (o *Object) SetOwner(owner StateOwner) { o.owner = owner }
 // SetSight installs the geodata query CanSeeTarget runs. Call it once,
 // before the door is spawned.
 func (o *Object) SetSight(sight Sight) { o.sight = sight }
+
+// SetClanCall installs the call a hit on the door makes to the NPCs
+// around it; nil removes it. It may be installed once the door stands.
+func (o *Object) SetClanCall(c ClanCall) {
+	if c == nil {
+		o.clanCall.Store(nil)
+		return
+	}
+	o.clanCall.Store(&clanCallRef{call: c})
+}
 
 // BroadcastStatus reports this door's current open/close state, HP and
 // damage stage to observers.

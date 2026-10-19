@@ -32,6 +32,9 @@ func (d *Door) Playable() bool { return false }
 // Summon reports false: a door is no summon.
 func (d *Door) Summon() bool { return false }
 
+// SiegeSummon reports false: a door is no summon.
+func (d *Door) SiegeSummon() bool { return false }
+
 // InstantTeleportTo panics: no instant teleport moves a door.
 func (d *Door) InstantTeleportTo(Place) { panic("script: an instant teleport of a door") }
 

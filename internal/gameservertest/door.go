@@ -130,7 +130,7 @@ type siegeInProgress struct{}
 
 func (siegeInProgress) AllowsDoorAttack(_ skilltarget.Actor, wall bool) bool { return !wall }
 
-func (siegeInProgress) AllowsDoorDamage(attackable.Combatant) bool { return true }
+func (siegeInProgress) DoorHit(attackable.Combatant) door.HitOutcome { return door.HitDamages }
 
 func (siegeInProgress) ShowsDoorHP() bool { return false }
 

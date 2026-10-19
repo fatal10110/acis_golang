@@ -64,11 +64,17 @@ func (s *Siege) AllowsDoorAttack(attacker skilltarget.Actor, wall bool) bool {
 	return !wall || siegeWeapon(attacker)
 }
 
-// AllowsDoorDamage reports whether a hit lowers one of the castle's doors'
-// HP: while the siege is in progress, from any attacker but the Swoop
-// Cannon.
-func (s *Siege) AllowsDoorDamage(attacker attackable.Combatant) bool {
-	return s.InProgress() && !swoopCannon(attacker)
+// DoorHit is what the castle's siege makes of a hit on one of its doors:
+// while the siege is in progress the Swoop Cannon's is ignored and any
+// other attacker's lowers the door's HP; otherwise the hit is harmless.
+func (s *Siege) DoorHit(attacker attackable.Combatant) door.HitOutcome {
+	switch {
+	case !s.InProgress():
+		return door.HitHarmless
+	case swoopCannon(attacker):
+		return door.HitIgnored
+	}
+	return door.HitDamages
 }
 
 // ShowsDoorHP reports whether the castle's doors show their HP: while the

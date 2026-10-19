@@ -187,6 +187,7 @@ Hooks run synchronously on the goroutine that raises them, with no lock held.
 | Decayed | right after the decayed flag flips, before world removal | then behavior timers are cancelled, then removal. The script-facing delete is synchronous |
 | Dying | one 3 s timer on an engine-owned queue; all hooks in list order; no state re-check | corpse queues close at decay; 103 templates decay within 3 s |
 | Party died, clan died | killer's queue, inline with the death | |
+| Door clan attacked (static-object clan attacked) | hitter's goroutine, inside the door's hit, after its HP change and any death | every hit routed onto a door except a Swoop Cannon's during its castle's siege in progress, harmless ones included; living NPCs of `door_clan` within 600 (3D, inclusive, both collision radii), dispatched through `door.ClanCall` |
 | Zone enter | mover's goroutine, collected under the zone lock and fired after unlock | one quest uses it |
 | Player and summon death | the goroutine running the death, after the death broadcast and before the killer's karma | every quest of the journal with a death hook, in journal order and any status; no killer passes the one that died |
 | Script event | the sender's goroutine, inline: every receiver's hook runs before the send returns | a radius broadcast passes 0 as the second argument; the extended broadcast and the send to one NPC pass their own |

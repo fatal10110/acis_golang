@@ -39,9 +39,12 @@ type Creature interface {
 	Dead() bool
 	HPRatio() float64
 	// Playable reports whether a player controls the creature: a player or
-	// its summon. Summon reports whether it is a pet or a servitor.
+	// its summon. Summon reports whether it is a pet or a servitor, and
+	// SiegeSummon whether it is a siege summon, a servitor that fights on
+	// a siege battlefield.
 	Playable() bool
 	Summon() bool
+	SiegeSummon() bool
 	// combatant is the creature as the world tracks it, nil for a handle on
 	// nothing.
 	combatant() attackable.Combatant

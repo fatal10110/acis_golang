@@ -94,6 +94,18 @@ func (p *Player) Summon() bool { return false }
 // Summon reports whether the creature is a pet or a servitor.
 func (c *creature) Summon() bool { return tracked(c).Kind() == actor.KindSummon }
 
+// SiegeSummon reports false: an NPC is no summon.
+func (n *NPC) SiegeSummon() bool { return false }
+
+// SiegeSummon reports false: a player is no summon.
+func (p *Player) SiegeSummon() bool { return false }
+
+// SiegeSummon reports whether the creature is a siege summon.
+func (c *creature) SiegeSummon() bool {
+	s, ok := tracked(c).(interface{ SiegeSummon() bool })
+	return ok && s.SiegeSummon()
+}
+
 func (c *creature) loc() Loc { return locOf(c) }
 
 // Distance2D returns the NPC's distance to at, a creature or a point, on the
