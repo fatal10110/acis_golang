@@ -1,0 +1,146 @@
+# Spirit of Mirrors (Q104): a human mystic of level 10, wearing an oak wand of its own, accepts
+# at Gallint for three more, and the guards Kenyos and Arnold show it the way. Each of the three
+# spirits of mirrors, slain with an oak wand in hand, binds its spirit into a wand (an unworn
+# wand is the one taken). Gallint takes the three spiritbound wands for the Wand of Adept, a
+# mystic's spiritshots, the newbie spiritshots and the echo crystals, and the quest's end takes
+# the worn wand; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q104_spirit_of_mirrors.golden
+character Seeker 10
+class 10
+equip 748
+script quest.Q104_SpiritOfMirrors
+item 748 1135 1136 1137 747 1060 1835 2509 4412 4413 4414 4415 4416 5790
+page default/30017.htm
+page guard/30045.htm
+page guard/30041.htm
+page script/quest/Q104_SpiritOfMirrors/
+npc gallint 30017 Folk 10 0 0
+npc kenyos 30045 Guard 20 0 0
+npc arnold 30041 Guard 30 0 0
+npc spirit1 27003 Monster -40 0 0
+npc spirit2 27004 Monster 40 0 0
+npc spirit3 27005 Monster 0 40 0
+
+# Gallint: accept, three oak wands.
+action gallint
+action gallint
+  S ActionFailed
+  S NpcHtmlMessage obj=gallint item=0 page=default/30017.htm
+  S ActionFailed
+bypass npc_{gallint}_Quest
+  S NpcHtmlMessage obj=gallint item=0 page=script/quest/Q104_SpiritOfMirrors/30017-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q104_SpiritOfMirrors 30017-03.htm
+  S QuestList 104:0x80000001
+  S ExShowQuestMark quest=104
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:748
+  S SystemMessage id=54 3:748
+  S SystemMessage id=54 3:748
+  S NpcHtmlMessage obj=gallint item=0 page=script/quest/Q104_SpiritOfMirrors/30017-03.htm
+  S ActionFailed
+  Q upsert Q104_SpiritOfMirrors | <state> | STARTED
+  Q upsert Q104_SpiritOfMirrors | <cond> | 1
+  items 748=4
+  rows Q104_SpiritOfMirrors <cond>=1 <state>=STARTED
+
+# Kenyos moves the quest on; Arnold only talks.
+action kenyos
+action kenyos
+  S ActionFailed
+  S NpcHtmlMessage obj=kenyos item=0 page=guard/30045.htm
+  S ActionFailed
+bypass npc_{kenyos}_Quest
+  S QuestList 104:0x80000003
+  S ExShowQuestMark quest=104
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kenyos item=0 page=script/quest/Q104_SpiritOfMirrors/30045-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q104_SpiritOfMirrors | <cond> | 2
+  rows Q104_SpiritOfMirrors <cond>=2 <state>=STARTED
+action arnold
+action arnold
+  S ActionFailed
+  S NpcHtmlMessage obj=arnold item=0 page=guard/30041.htm
+  S ActionFailed
+bypass npc_{arnold}_Quest
+  S NpcHtmlMessage obj=arnold item=0 page=script/quest/Q104_SpiritOfMirrors/30041-01.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q104_SpiritOfMirrors <cond>=2 <state>=STARTED
+action gallint
+action gallint
+  S ActionFailed
+  S NpcHtmlMessage obj=gallint item=0 page=default/30017.htm
+  S ActionFailed
+bypass npc_{gallint}_Quest
+  S NpcHtmlMessage obj=gallint item=0 page=script/quest/Q104_SpiritOfMirrors/30017-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Each spirit binds a wand; the last one moves the quest on.
+kill spirit2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=302 3:748
+  S SystemMessage id=54 3:1136
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 748=3 1136=1
+kill spirit3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=302 3:748
+  S SystemMessage id=54 3:1137
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 748=2 1137=1
+  rows Q104_SpiritOfMirrors <cond>=2 <state>=STARTED
+kill spirit1
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=302 3:748
+  S SystemMessage id=54 3:1135
+  S QuestList 104:0x80000007
+  S ExShowQuestMark quest=104
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q104_SpiritOfMirrors | <cond> | 3
+  items 748=1 1135=1
+  rows Q104_SpiritOfMirrors <cond>=3 <state>=STARTED
+
+# Gallint rewards a mystic.
+action gallint
+  S ActionFailed
+  S NpcHtmlMessage obj=gallint item=0 page=default/30017.htm
+  S ActionFailed
+action gallint
+  S ActionFailed
+  S NpcHtmlMessage obj=gallint item=0 page=default/30017.htm
+  S ActionFailed
+bypass npc_{gallint}_Quest
+  S SystemMessage id=302 3:1135
+  S SystemMessage id=302 3:1136
+  S SystemMessage id=302 3:1137
+  S SystemMessage id=54 3:747
+  S SystemMessage id=53 3:2509 6:500
+  S TutorialShowQuestionMark id=26
+  S SystemMessage id=53 3:5790 6:3000
+  S PlaySound type=2 file=tutorial_voice_027 bind=1 obj=player loc=10,20,30 delay=0
+  S SystemMessage id=53 3:1060 6:100
+  S SystemMessage id=53 3:4412 6:10
+  S SystemMessage id=53 3:4413 6:10
+  S SystemMessage id=53 3:4414 6:10
+  S SystemMessage id=53 3:4415 6:10
+  S SystemMessage id=53 3:4416 6:10
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 104:0x00000000
+  S SystemMessage id=302 3:748
+  S NpcHtmlMessage obj=gallint item=0 page=script/quest/Q104_SpiritOfMirrors/30017-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q104_SpiritOfMirrors | <state> | COMPLETED
+  Q delete-except-state Q104_SpiritOfMirrors
+  M set Q104_SpiritOfMirrors_OneTimeQuestFlag | true
+  items 1135=0 1136=0 1137=0 748=0 747=1 2509=500 5790=3000 1835=0 1060=100 4412=10 4413=10 4414=10 4415=10 4416=10
+  state Q104_SpiritOfMirrors COMPLETED
+
+relog
+  items 747=1 748=0 2509=500
+  state Q104_SpiritOfMirrors COMPLETED

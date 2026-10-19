@@ -1,0 +1,272 @@
+# Sea of Spores Fever (Q102): an elven mystic of level 12 accepts at Alberius, takes his letter
+# to Cobendell, kills ten dryads for their tears (every roll pinned to succeed), brings
+# Cobendell's medicines back, hands one to each of the four sick guards and returns to
+# Alberius, who gives a mystic the Staff of Sentinel, spiritshots and the echo crystals; then
+# relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q102_sea_of_spores_fever.golden
+character Healer 12
+class 25
+random always 0
+script quest.Q102_SeaOfSporesFever
+item 964 965 966 746 1130 1131 1132 1133 1134 743 744 1060 1835 2509 4412 4413 4414 4415 4416
+page guard/30284.htm
+page trainer/30156.htm
+page guard/30217.htm
+page guard/30219.htm
+page guard/30221.htm
+page guard/30285.htm
+page script/quest/Q102_SeaOfSporesFever/
+npc alberius 30284 Guard 10 0 0
+npc cobendell 30156 Trainer 20 0 0
+npc berros 30217 Guard 30 0 0
+npc veltress 30219 Guard 0 10 0
+npc rayen 30221 Guard 0 20 0
+npc gartrandell 30285 Guard 0 30 0
+npc dryad 20013 Monster 40 0 0
+
+# Alberius: accept.
+action alberius
+action alberius
+  S ActionFailed
+  S NpcHtmlMessage obj=alberius item=0 page=guard/30284.htm
+  S ActionFailed
+bypass npc_{alberius}_Quest
+  S NpcHtmlMessage obj=alberius item=0 page=script/quest/Q102_SeaOfSporesFever/30284-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q102_SeaOfSporesFever 30284-02.htm
+  S QuestList 102:0x80000001
+  S ExShowQuestMark quest=102
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:964
+  S NpcHtmlMessage obj=alberius item=0 page=script/quest/Q102_SeaOfSporesFever/30284-02.htm
+  S ActionFailed
+  Q upsert Q102_SeaOfSporesFever | <state> | STARTED
+  Q upsert Q102_SeaOfSporesFever | <cond> | 1
+  items 964=1
+  rows Q102_SeaOfSporesFever <cond>=1 <state>=STARTED
+action alberius
+  S ActionFailed
+  S NpcHtmlMessage obj=alberius item=0 page=guard/30284.htm
+  S ActionFailed
+bypass npc_{alberius}_Quest
+  S NpcHtmlMessage obj=alberius item=0 page=script/quest/Q102_SeaOfSporesFever/30284-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Cobendell takes the letter and gives the evergreen amulet.
+action cobendell
+action cobendell
+  S ActionFailed
+  S NpcHtmlMessage obj=cobendell item=0 page=trainer/30156.htm
+  S ActionFailed
+bypass npc_{cobendell}_Quest
+  S QuestList 102:0x80000003
+  S ExShowQuestMark quest=102
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:964
+  S SystemMessage id=54 3:965
+  S NpcHtmlMessage obj=cobendell item=0 page=script/quest/Q102_SeaOfSporesFever/30156-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q102_SeaOfSporesFever | <cond> | 2
+  items 964=0 965=1
+  rows Q102_SeaOfSporesFever <cond>=2 <state>=STARTED
+action cobendell
+  S ActionFailed
+  S NpcHtmlMessage obj=cobendell item=0 page=trainer/30156.htm
+  S ActionFailed
+bypass npc_{cobendell}_Quest
+  S NpcHtmlMessage obj=cobendell item=0 page=script/quest/Q102_SeaOfSporesFever/30156-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ten dryads, ten tears.
+kill dryad x9
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:966
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:966
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:966
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:966
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:966
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:966
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:966
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:966
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:966
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 966=9
+  rows Q102_SeaOfSporesFever <cond>=2 <state>=STARTED
+kill dryad
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:966
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 102:0x80000007
+  S ExShowQuestMark quest=102
+  Q upsert Q102_SeaOfSporesFever | <cond> | 3
+  items 966=10
+  rows Q102_SeaOfSporesFever <cond>=3 <state>=STARTED
+
+# Cobendell's five medicines; Alberius keeps the first and lists the guards.
+action cobendell
+  S ActionFailed
+  S NpcHtmlMessage obj=cobendell item=0 page=trainer/30156.htm
+  S ActionFailed
+action cobendell
+  S ActionFailed
+  S NpcHtmlMessage obj=cobendell item=0 page=trainer/30156.htm
+  S ActionFailed
+bypass npc_{cobendell}_Quest
+  S QuestList 102:0x8000000f
+  S ExShowQuestMark quest=102
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:966 6:10
+  S SystemMessage id=302 3:965
+  S SystemMessage id=54 3:1130
+  S SystemMessage id=54 3:1131
+  S SystemMessage id=54 3:1132
+  S SystemMessage id=54 3:1133
+  S SystemMessage id=54 3:1134
+  S NpcHtmlMessage obj=cobendell item=0 page=script/quest/Q102_SeaOfSporesFever/30156-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q102_SeaOfSporesFever | <cond> | 4
+  items 966=0 965=0 1130=1 1131=1 1132=1 1133=1 1134=1
+  rows Q102_SeaOfSporesFever <cond>=4 <state>=STARTED
+action alberius
+action alberius
+  S ActionFailed
+  S NpcHtmlMessage obj=alberius item=0 page=guard/30284.htm
+  S ActionFailed
+bypass npc_{alberius}_Quest
+  S QuestList 102:0x8000001f
+  S ExShowQuestMark quest=102
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1130
+  S SystemMessage id=54 3:746
+  S NpcHtmlMessage obj=alberius item=0 page=script/quest/Q102_SeaOfSporesFever/30284-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q102_SeaOfSporesFever | <cond> | 5
+  Q upsert Q102_SeaOfSporesFever | medicines | 4
+  items 1130=0 746=1
+  rows Q102_SeaOfSporesFever <cond>=5 <state>=STARTED medicines=4
+action alberius
+  S ActionFailed
+  S NpcHtmlMessage obj=alberius item=0 page=guard/30284.htm
+  S ActionFailed
+bypass npc_{alberius}_Quest
+  S NpcHtmlMessage obj=alberius item=0 page=script/quest/Q102_SeaOfSporesFever/30284-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# The four guards, one medicine each.
+action berros
+action berros
+  S ActionFailed
+  S NpcHtmlMessage obj=berros item=0 page=guard/30217.htm
+  S ActionFailed
+bypass npc_{berros}_Quest
+  S SystemMessage id=302 3:1131
+  S NpcHtmlMessage obj=berros item=0 page=script/quest/Q102_SeaOfSporesFever/30217-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q102_SeaOfSporesFever | medicines | 3
+  items 1131=0
+  rows Q102_SeaOfSporesFever <cond>=5 <state>=STARTED medicines=3
+action berros
+  S ActionFailed
+  S NpcHtmlMessage obj=berros item=0 page=guard/30217.htm
+  S ActionFailed
+bypass npc_{berros}_Quest
+  S NpcHtmlMessage obj=berros item=0 page=script/quest/Q102_SeaOfSporesFever/30217-01.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q102_SeaOfSporesFever <cond>=5 <state>=STARTED medicines=3
+action veltress
+action veltress
+  S ActionFailed
+  S NpcHtmlMessage obj=veltress item=0 page=guard/30219.htm
+  S ActionFailed
+bypass npc_{veltress}_Quest
+  S SystemMessage id=302 3:1132
+  S NpcHtmlMessage obj=veltress item=0 page=script/quest/Q102_SeaOfSporesFever/30219-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q102_SeaOfSporesFever | medicines | 2
+  items 1132=0
+action rayen
+action rayen
+  S ActionFailed
+  S NpcHtmlMessage obj=rayen item=0 page=guard/30221.htm
+  S ActionFailed
+bypass npc_{rayen}_Quest
+  S SystemMessage id=302 3:1133
+  S NpcHtmlMessage obj=rayen item=0 page=script/quest/Q102_SeaOfSporesFever/30221-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q102_SeaOfSporesFever | medicines | 1
+  items 1133=0
+  rows Q102_SeaOfSporesFever <cond>=5 <state>=STARTED medicines=1
+action gartrandell
+action gartrandell
+  S ActionFailed
+  S NpcHtmlMessage obj=gartrandell item=0 page=guard/30285.htm
+  S ActionFailed
+bypass npc_{gartrandell}_Quest
+  S SystemMessage id=302 3:1134
+  S QuestList 102:0x8000003f
+  S ExShowQuestMark quest=102
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gartrandell item=0 page=script/quest/Q102_SeaOfSporesFever/30285-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q102_SeaOfSporesFever | <cond> | 6
+  items 1134=0
+  rows Q102_SeaOfSporesFever <cond>=6 <state>=STARTED medicines=1
+
+# Alberius rewards a mystic.
+action alberius
+action alberius
+  S ActionFailed
+  S NpcHtmlMessage obj=alberius item=0 page=guard/30284.htm
+  S ActionFailed
+bypass npc_{alberius}_Quest
+  S SystemMessage id=302 3:746
+  S SystemMessage id=54 3:744
+  S SystemMessage id=53 3:2509 6:500
+  S SystemMessage id=53 3:1060 6:100
+  S SystemMessage id=53 3:4412 6:10
+  S SystemMessage id=53 3:4413 6:10
+  S SystemMessage id=53 3:4414 6:10
+  S SystemMessage id=53 3:4415 6:10
+  S SystemMessage id=53 3:4416 6:10
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 102:0x00000000
+  S NpcHtmlMessage obj=alberius item=0 page=script/quest/Q102_SeaOfSporesFever/30284-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q102_SeaOfSporesFever | <state> | COMPLETED
+  Q delete-except-state Q102_SeaOfSporesFever
+  items 746=0 744=1 743=0 2509=500 1835=0 1060=100 4412=10 4413=10 4414=10 4415=10 4416=10
+  state Q102_SeaOfSporesFever COMPLETED
+  rows Q102_SeaOfSporesFever <state>=COMPLETED
+
+relog
+  items 744=1 2509=500
+  state Q102_SeaOfSporesFever COMPLETED

@@ -1,0 +1,193 @@
+# Sword of Solidarity (Q101): a human fighter of level 9 accepts at Roien, carries his letter to
+# Altran, kills two Tunath orc marksmen for the top and bottom of a broken blade (every roll
+# pinned to succeed), brings Altran's note back to Roien and the sword handle to Altran, who
+# gives the Sword of Solidarity, the newbie soulshots and the echo crystals; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q101_sword_of_solidarity.golden
+character Squire 9
+random always 0
+script quest.Q101_SwordOfSolidarity
+item 739 740 741 796 937 742 738 1060 4412 4413 4414 4415 4416 5789
+page default/30008.htm
+page default/30283.htm
+page script/quest/Q101_SwordOfSolidarity/
+npc roien 30008 Folk 10 0 0
+npc altran 30283 Folk 20 0 0
+npc marksman 20361 Monster 40 0 0
+
+# Roien: three pages, then accept.
+action roien
+action roien
+  S ActionFailed
+  S NpcHtmlMessage obj=roien item=0 page=default/30008.htm
+  S ActionFailed
+bypass npc_{roien}_Quest
+  S NpcHtmlMessage obj=roien item=0 page=script/quest/Q101_SwordOfSolidarity/30008-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q101_SwordOfSolidarity CREATED
+bypass Quest Q101_SwordOfSolidarity 30008-02a.htm
+  S NpcHtmlMessage obj=roien item=0 page=script/quest/Q101_SwordOfSolidarity/30008-02a.htm
+  S ActionFailed
+bypass Quest Q101_SwordOfSolidarity 30008-02b.htm
+  S NpcHtmlMessage obj=roien item=0 page=script/quest/Q101_SwordOfSolidarity/30008-02b.htm
+  S ActionFailed
+bypass Quest Q101_SwordOfSolidarity 30008-03.htm
+  S QuestList 101:0x80000001
+  S ExShowQuestMark quest=101
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:796
+  S NpcHtmlMessage obj=roien item=0 page=script/quest/Q101_SwordOfSolidarity/30008-03.htm
+  S ActionFailed
+  Q upsert Q101_SwordOfSolidarity | <state> | STARTED
+  Q upsert Q101_SwordOfSolidarity | <cond> | 1
+  items 796=1
+  state Q101_SwordOfSolidarity STARTED
+  rows Q101_SwordOfSolidarity <cond>=1 <state>=STARTED
+action roien
+  S ActionFailed
+  S NpcHtmlMessage obj=roien item=0 page=default/30008.htm
+  S ActionFailed
+bypass npc_{roien}_Quest
+  S NpcHtmlMessage obj=roien item=0 page=script/quest/Q101_SwordOfSolidarity/30008-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Altran takes the letter and gives the directions to the ruins.
+action altran
+action altran
+  S ActionFailed
+  S NpcHtmlMessage obj=altran item=0 page=default/30283.htm
+  S ActionFailed
+bypass npc_{altran}_Quest
+  S NpcHtmlMessage obj=altran item=0 page=script/quest/Q101_SwordOfSolidarity/30283-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q101_SwordOfSolidarity 30283-02.htm
+  S QuestList 101:0x80000003
+  S ExShowQuestMark quest=101
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:796
+  S SystemMessage id=54 3:937
+  S NpcHtmlMessage obj=altran item=0 page=script/quest/Q101_SwordOfSolidarity/30283-02.htm
+  S ActionFailed
+  Q upsert Q101_SwordOfSolidarity | <cond> | 2
+  items 796=0 937=1
+  rows Q101_SwordOfSolidarity <cond>=2 <state>=STARTED
+action altran
+  S ActionFailed
+  S NpcHtmlMessage obj=altran item=0 page=default/30283.htm
+  S ActionFailed
+bypass npc_{altran}_Quest
+  S NpcHtmlMessage obj=altran item=0 page=script/quest/Q101_SwordOfSolidarity/30283-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Two marksmen: the blade top, then the blade bottom.
+kill marksman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:741
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 741=1 740=0
+kill marksman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:740
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 101:0x80000007
+  S ExShowQuestMark quest=101
+  Q upsert Q101_SwordOfSolidarity | <cond> | 3
+  items 741=1 740=1
+  rows Q101_SwordOfSolidarity <cond>=3 <state>=STARTED
+
+# Altran's note, then Roien's sword handle.
+action altran
+  S ActionFailed
+  S NpcHtmlMessage obj=altran item=0 page=default/30283.htm
+  S ActionFailed
+action altran
+  S ActionFailed
+  S NpcHtmlMessage obj=altran item=0 page=default/30283.htm
+  S ActionFailed
+bypass npc_{altran}_Quest
+  S QuestList 101:0x8000000f
+  S ExShowQuestMark quest=101
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:937
+  S SystemMessage id=302 3:741
+  S SystemMessage id=302 3:740
+  S SystemMessage id=54 3:742
+  S NpcHtmlMessage obj=altran item=0 page=script/quest/Q101_SwordOfSolidarity/30283-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q101_SwordOfSolidarity | <cond> | 4
+  items 937=0 741=0 740=0 742=1
+  rows Q101_SwordOfSolidarity <cond>=4 <state>=STARTED
+action roien
+action roien
+  S ActionFailed
+  S NpcHtmlMessage obj=roien item=0 page=default/30008.htm
+  S ActionFailed
+bypass npc_{roien}_Quest
+  S QuestList 101:0x8000001f
+  S ExShowQuestMark quest=101
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:742
+  S SystemMessage id=54 3:739
+  S NpcHtmlMessage obj=roien item=0 page=script/quest/Q101_SwordOfSolidarity/30008-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q101_SwordOfSolidarity | <cond> | 5
+  items 742=0 739=1
+  rows Q101_SwordOfSolidarity <cond>=5 <state>=STARTED
+action roien
+  S ActionFailed
+  S NpcHtmlMessage obj=roien item=0 page=default/30008.htm
+  S ActionFailed
+bypass npc_{roien}_Quest
+  S NpcHtmlMessage obj=roien item=0 page=script/quest/Q101_SwordOfSolidarity/30008-05a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Altran reforges the sword.
+action altran
+action altran
+  S ActionFailed
+  S NpcHtmlMessage obj=altran item=0 page=default/30283.htm
+  S ActionFailed
+bypass npc_{altran}_Quest
+  S NpcHtmlMessage obj=altran item=0 page=script/quest/Q101_SwordOfSolidarity/30283-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q101_SwordOfSolidarity 30283-06.htm
+  S SystemMessage id=302 3:739
+  S SystemMessage id=54 3:738
+  S TutorialShowQuestionMark id=26
+  S SystemMessage id=53 3:5789 6:7000
+  S PlaySound type=2 file=tutorial_voice_026 bind=1 obj=player loc=10,20,30 delay=0
+  S SystemMessage id=53 3:1060 6:100
+  S SystemMessage id=53 3:4412 6:10
+  S SystemMessage id=53 3:4413 6:10
+  S SystemMessage id=53 3:4414 6:10
+  S SystemMessage id=53 3:4415 6:10
+  S SystemMessage id=53 3:4416 6:10
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 101:0x00000000
+  S NpcHtmlMessage obj=altran item=0 page=script/quest/Q101_SwordOfSolidarity/30283-06.htm
+  S ActionFailed
+  Q upsert Q101_SwordOfSolidarity | <state> | COMPLETED
+  Q delete-except-state Q101_SwordOfSolidarity
+  M set Q101_SwordOfSolidarity_OneTimeQuestFlag | true
+  items 739=0 738=1 1060=100 4412=10 4413=10 4414=10 4415=10 4416=10
+  state Q101_SwordOfSolidarity COMPLETED
+action altran
+  S ActionFailed
+  S NpcHtmlMessage obj=altran item=0 page=default/30283.htm
+  S ActionFailed
+bypass npc_{altran}_Quest
+  S NpcHtmlMessage obj=altran item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+relog
+  items 738=1 1060=100 4416=10
+  state Q101_SwordOfSolidarity COMPLETED

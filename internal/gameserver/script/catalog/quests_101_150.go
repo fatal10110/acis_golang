@@ -1,15 +1,22 @@
 package catalog
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/script"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q101"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q102"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q103"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q104"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q105"
+)
 
 // quests101To150 is the catalog of quests 101 to 150 (#180).
 func quests101To150() script.Catalog {
 	return script.Catalog{
-		"quest.Q101_SwordOfSolidarity":          nil,
-		"quest.Q102_SeaOfSporesFever":           nil,
-		"quest.Q103_SpiritOfCraftsman":          nil,
-		"quest.Q104_SpiritOfMirrors":            nil,
-		"quest.Q105_SkirmishWithTheOrcs":        nil,
+		"quest.Q101_SwordOfSolidarity":          q101.New,
+		"quest.Q102_SeaOfSporesFever":           q102.New,
+		"quest.Q103_SpiritOfCraftsman":          q103.New,
+		"quest.Q104_SpiritOfMirrors":            q104.New,
+		"quest.Q105_SkirmishWithTheOrcs":        q105.New,
 		"quest.Q106_ForgottenTruth":             nil,
 		"quest.Q107_MercilessPunishment":        nil,
 		"quest.Q108_JumbleTumbleDiamondFuss":    nil,
