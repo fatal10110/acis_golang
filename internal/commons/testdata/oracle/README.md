@@ -37,11 +37,12 @@ lengths up to 30), matched `UTF16LowerKey` row for row when the port was made.
 
 `LowerCaseProbe.java` captures `Character.toLowerCase(int)` on JDK 21
 (Unicode 15.0), the mapping `String.toLowerCase()` applies to every code
-point but a capital sigma and U+0130. Regenerate from this directory:
+point but a capital sigma and U+0130. Regenerate from this directory (the
+host shell writes the output into `testdata/`):
 
 ```sh
 docker run --rm --user "$(id -u):$(id -g)" -v "$PWD":/w -w /w eclipse-temurin:21-jdk-alpine sh -c '
-  javac -d /tmp LowerCaseProbe.java && java -cp /tmp LowerCaseProbe > lower_case.golden'
+  javac -d /tmp LowerCaseProbe.java && java -cp /tmp LowerCaseProbe' > ../lower_case.golden
 ```
 
 - `lower_case.golden`: one row per code point the mapping changes,
