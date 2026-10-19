@@ -44,7 +44,8 @@ const (
 )
 
 // quest holds the pure white unicorn the fallen unicorn's timer spawned,
-// one for every player.
+// shared by every player: one at a time. A unicorn that left on its own
+// 30 second despawn stays held, so no fallen unicorn spawns another.
 type quest struct{ pureUnicorn *script.NPCCell }
 
 // New returns the quest.
