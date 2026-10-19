@@ -28,6 +28,12 @@ var individual7 = []struct {
 	{"script.ai.individual.Monster.LV3Monster.LV3Monster", LV3Monster},
 	{"script.ai.individual.Monster.LV3Monster.LV3Orc", LV3Orc},
 	{"script.ai.individual.Monster.LV3Monster.LV3PartyLeaderMonster", LV3PartyLeader},
+	{"script.ai.individual.Monster.LV3Monster.LV3PartyPrivateMonster", LV3PartyPrivate},
+	{"script.ai.individual.Monster.LV3Monster.LV3Ranger", LV3Ranger},
+	{"script.ai.individual.Monster.LV3Monster.LV3SongDance", LV3SongDance},
+	{"script.ai.individual.Monster.LV3Monster.LV3Summoner", LV3Summoner},
+	{"script.ai.individual.Monster.LV3Monster.LV3Wizard", LV3Wizard},
+	{"script.ai.individual.Monster.LV3Monster.LV3WizardPrivate", LV3WizardPrivate},
 }
 
 // individual7View is what a manifest-layout text records of the batch:
@@ -109,8 +115,8 @@ func readIndividual7View(t *testing.T, path string, ours map[string]bool, text *
 // Monster). None is refused, and the registry dump equals the reference
 // manifest for the batch: each class's kind and bind lines (LV3Monster and
 // LV3PartyLeaderMonster bind none), and the folded per-(npc, event) lists
-// restricted to the batch: 68 entries, the attacked and see-spell lists of
-// the 14 LV3 ids among them, where a quest's hooks precede the behavior's.
+// restricted to the batch: 183 entries, the attacked and see-spell lists of
+// the 35 LV3 ids among them, where a quest's hooks precede the behavior's.
 func TestIndividual7RegistrationMatchesReferenceManifest(t *testing.T) {
 	list := []script.Listing{{Path: "script.ai.individual.DefaultNpc"}, {Path: "script.ai.individual.Monster.MonsterAI"}}
 	catalog := script.Catalog{"script.ai.individual.DefaultNpc": defaultnpc.New, "script.ai.individual.Monster.MonsterAI": New}
@@ -137,8 +143,8 @@ func TestIndividual7RegistrationMatchesReferenceManifest(t *testing.T) {
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	want := readIndividual7View(t, path, ours, sc)
-	if got := len(want.folds); got != 68 {
-		t.Fatalf("reference folds = %d entries, want 68", got)
+	if got := len(want.folds); got != 183 {
+		t.Fatalf("reference folds = %d entries, want 183", got)
 	}
 
 	for _, c := range individual7 {
@@ -155,7 +161,7 @@ func TestIndividual7RegistrationMatchesReferenceManifest(t *testing.T) {
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ:\n got %q\nwant %q", got.folds, want.folds)
 	}
-	for _, id := range []int32{21260, 27299, 27259, 27266, 27258, 27294} {
+	for _, id := range []int32{21260, 27299, 27259, 27266, 27258, 27294, 27261, 27253, 27289, 27269, 27313, 27250} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a batch class bound", id)
 		}

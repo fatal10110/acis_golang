@@ -28,5 +28,22 @@ func aiIndividual7HandleOps() map[string]script.HandleOps {
 		"script.ai.individual.Monster.LV3Monster.LV3PartyLeaderMonster": {
 			"OnPartyAttacked": {"NPC.MaxHP"},
 		},
+		"script.ai.individual.Monster.LV3Monster.LV3PartyPrivateMonster": {
+			"OnPartyAttacked": {"NPC.MaxHP"},
+			"OnSeeSpell":      {"NPC.AttackingNow", "NPC.TopDesireTarget"},
+			"OnTimer":         {"NPC.InCombat", "NPC.RemoveAllAttackDesire"},
+		},
+		"script.ai.individual.Monster.LV3Monster.LV3Ranger": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.LV3Monster.LV3Summoner": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.LV3Monster.LV3WizardPrivate": {
+			"OnPartyAttacked":    {"NPC.MaxHP"},
+			"OnSeeSpell":         {"NPC.AttackingNow", "NPC.TopDesireTarget"},
+			"OnTimer":            {"NPC.InCombat", "NPC.RemoveAllAttackDesire"},
+			"OnUseSkillFinished": {"NPC.DoDie", "NPC.RemoveAllAttackDesire"},
+		},
 	}
 }
