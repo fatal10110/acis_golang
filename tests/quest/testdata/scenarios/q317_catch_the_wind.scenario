@@ -1,0 +1,128 @@
+# Catch the Wind (Q317): a level 18 character accepts at Rizraell; ten lirein give ten wind
+# shards (every roll pinned to succeed); Rizraell pays 40 per shard and 2988 more for ten or more;
+# the player keeps going, a lirein elder's shard is paid 40 with no bonus, then the player quits
+# the repeatable quest; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q317_catch_the_wind.golden
+character Windy 18
+random always 0
+script quest.Q317_CatchTheWind
+item 1078
+page default/30361.htm
+page script/quest/Q317_CatchTheWind/
+npc rizraell 30361 Folk 10 0 0
+npc lirein 20036 Monster 40 0 0
+npc elder 20044 Monster 0 40 0
+
+# Rizraell: accept.
+action rizraell
+action rizraell
+  S ActionFailed
+  S NpcHtmlMessage obj=rizraell item=0 page=default/30361.htm
+  S ActionFailed
+bypass npc_{rizraell}_Quest
+  S NpcHtmlMessage obj=rizraell item=0 page=script/quest/Q317_CatchTheWind/30361-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q317_CatchTheWind CREATED
+bypass Quest Q317_CatchTheWind 30361-04.htm
+  S QuestList 317:0x80000001
+  S ExShowQuestMark quest=317
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rizraell item=0 page=script/quest/Q317_CatchTheWind/30361-04.htm
+  S ActionFailed
+  Q upsert Q317_CatchTheWind | <state> | STARTED
+  Q upsert Q317_CatchTheWind | <cond> | 1
+  state Q317_CatchTheWind STARTED
+  rows Q317_CatchTheWind <cond>=1 <state>=STARTED
+
+# No shards yet; keep going.
+action rizraell
+  S ActionFailed
+  S NpcHtmlMessage obj=rizraell item=0 page=default/30361.htm
+  S ActionFailed
+bypass npc_{rizraell}_Quest
+  S NpcHtmlMessage obj=rizraell item=0 page=script/quest/Q317_CatchTheWind/30361-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q317_CatchTheWind 30361-09.htm
+  S NpcHtmlMessage obj=rizraell item=0 page=script/quest/Q317_CatchTheWind/30361-09.htm
+  S ActionFailed
+
+# Ten lirein: a shard each.
+kill lirein x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1078
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1078
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1078
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1078
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1078
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1078
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1078
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1078
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1078
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1078
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1078=10
+
+# Rizraell: 10 x 40 + 2988.
+action rizraell
+  S ActionFailed
+  S NpcHtmlMessage obj=rizraell item=0 page=default/30361.htm
+  S ActionFailed
+bypass npc_{rizraell}_Quest
+  S SystemMessage id=301 3:1078 6:10
+  S SystemMessage id=52 6:3388
+  S NpcHtmlMessage obj=rizraell item=0 page=script/quest/Q317_CatchTheWind/30361-07.htm
+  S ActionFailed
+  S ActionFailed
+  items 1078=0 57=3388
+
+# A lirein elder: one shard, 40 with no bonus; then quit.
+kill elder
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1078
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1078=1
+action rizraell
+  S ActionFailed
+  S NpcHtmlMessage obj=rizraell item=0 page=default/30361.htm
+  S ActionFailed
+bypass npc_{rizraell}_Quest
+  S SystemMessage id=302 3:1078
+  S SystemMessage id=52 6:40
+  S NpcHtmlMessage obj=rizraell item=0 page=script/quest/Q317_CatchTheWind/30361-07.htm
+  S ActionFailed
+  S ActionFailed
+  items 1078=0 57=3428
+bypass Quest Q317_CatchTheWind 30361-08.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=rizraell item=0 page=script/quest/Q317_CatchTheWind/30361-08.htm
+  S ActionFailed
+  Q delete-quest Q317_CatchTheWind
+  state Q317_CatchTheWind -
+  rows Q317_CatchTheWind -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q317_CatchTheWind -
+  rows Q317_CatchTheWind -
+  items 57=3428

@@ -1,0 +1,107 @@
+# Collect Spores (Q313): a level 8 character accepts at Herbiel (a merchant) after his second page;
+# ten spore fungi give ten spore sacs (every roll pinned to succeed), the tenth moving the quest on;
+# Herbiel takes them for 3500 adena, and the repeatable quest ends; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q313_collect_spores.golden
+character Sporer 8
+random always 0
+script quest.Q313_CollectSpores
+item 1118
+page merchant/30150.htm
+page script/quest/Q313_CollectSpores/
+npc herbiel 30150 Merchant 10 0 0
+npc fungus 20509 Monster 40 0 0
+
+# Herbiel: his second page, then accept.
+action herbiel
+action herbiel
+  S ActionFailed
+  S NpcHtmlMessage obj=herbiel item=0 page=merchant/30150.htm
+  S ActionFailed
+bypass npc_{herbiel}_Quest
+  S NpcHtmlMessage obj=herbiel item=0 page=script/quest/Q313_CollectSpores/30150-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q313_CollectSpores CREATED
+bypass Quest Q313_CollectSpores 30150-04.htm
+  S NpcHtmlMessage obj=herbiel item=0 page=script/quest/Q313_CollectSpores/30150-04.htm
+  S ActionFailed
+bypass Quest Q313_CollectSpores 30150-05.htm
+  S QuestList 313:0x80000001
+  S ExShowQuestMark quest=313
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=herbiel item=0 page=script/quest/Q313_CollectSpores/30150-05.htm
+  S ActionFailed
+  Q upsert Q313_CollectSpores | <state> | STARTED
+  Q upsert Q313_CollectSpores | <cond> | 1
+  state Q313_CollectSpores STARTED
+  rows Q313_CollectSpores <cond>=1 <state>=STARTED
+action herbiel
+  S ActionFailed
+  S NpcHtmlMessage obj=herbiel item=0 page=merchant/30150.htm
+  S ActionFailed
+bypass npc_{herbiel}_Quest
+  S NpcHtmlMessage obj=herbiel item=0 page=script/quest/Q313_CollectSpores/30150-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ten spore fungi: a sac each; the tenth completes the set.
+kill fungus x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1118
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1118
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1118
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1118
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1118
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1118
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1118
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1118
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1118
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1118
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 313:0x80000003
+  S ExShowQuestMark quest=313
+  Q upsert Q313_CollectSpores | <cond> | 2
+  items 1118=10
+  rows Q313_CollectSpores <cond>=2 <state>=STARTED
+
+# Herbiel: the sacs for adena; the quest ends.
+action herbiel
+  S ActionFailed
+  S NpcHtmlMessage obj=herbiel item=0 page=merchant/30150.htm
+  S ActionFailed
+bypass npc_{herbiel}_Quest
+  S SystemMessage id=301 3:1118 6:10
+  S SystemMessage id=52 6:3500
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=herbiel item=0 page=script/quest/Q313_CollectSpores/30150-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q313_CollectSpores
+  items 1118=0 57=3500
+  state Q313_CollectSpores -
+  rows Q313_CollectSpores -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q313_CollectSpores -
+  rows Q313_CollectSpores -
+  items 57=3500

@@ -1,0 +1,112 @@
+# Bones Tell the Future (Q320): a dark elven fighter of level 10 accepts at Kaitar; five of each
+# skeleton kind give ten bone fragments (every roll pinned to succeed, at the two chances), the
+# tenth moving the quest on; Kaitar takes them for 8470 adena, and the repeatable quest ends; then
+# relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q320_bones_tell_the_future.golden
+character Bonereader 10
+class 31
+random always 0
+script quest.Q320_BonesTellTheFuture
+item 809
+page default/30359.htm
+page script/quest/Q320_BonesTellTheFuture/
+npc kaitar 30359 Folk 10 0 0
+npc skeleton 20517 Monster 40 0 0
+npc bones 20518 Monster 0 40 0
+
+# Kaitar: accept.
+action kaitar
+action kaitar
+  S ActionFailed
+  S NpcHtmlMessage obj=kaitar item=0 page=default/30359.htm
+  S ActionFailed
+bypass npc_{kaitar}_Quest
+  S NpcHtmlMessage obj=kaitar item=0 page=script/quest/Q320_BonesTellTheFuture/30359-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q320_BonesTellTheFuture CREATED
+bypass Quest Q320_BonesTellTheFuture 30359-04.htm
+  S QuestList 320:0x80000001
+  S ExShowQuestMark quest=320
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kaitar item=0 page=script/quest/Q320_BonesTellTheFuture/30359-04.htm
+  S ActionFailed
+  Q upsert Q320_BonesTellTheFuture | <state> | STARTED
+  Q upsert Q320_BonesTellTheFuture | <cond> | 1
+  state Q320_BonesTellTheFuture STARTED
+  rows Q320_BonesTellTheFuture <cond>=1 <state>=STARTED
+
+# Five of the first kind: a fragment each.
+kill skeleton x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:809
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:809
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:809
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:809
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:809
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 809=5
+  rows Q320_BonesTellTheFuture <cond>=1 <state>=STARTED
+action kaitar
+  S ActionFailed
+  S NpcHtmlMessage obj=kaitar item=0 page=default/30359.htm
+  S ActionFailed
+bypass npc_{kaitar}_Quest
+  S NpcHtmlMessage obj=kaitar item=0 page=script/quest/Q320_BonesTellTheFuture/30359-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Five of the other kind; the tenth completes the set.
+kill bones x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:809
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:809
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:809
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:809
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:809
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 320:0x80000003
+  S ExShowQuestMark quest=320
+  Q upsert Q320_BonesTellTheFuture | <cond> | 2
+  items 809=10
+  rows Q320_BonesTellTheFuture <cond>=2 <state>=STARTED
+
+# Kaitar: the fragments for adena; the quest ends.
+action kaitar
+  S ActionFailed
+  S NpcHtmlMessage obj=kaitar item=0 page=default/30359.htm
+  S ActionFailed
+bypass npc_{kaitar}_Quest
+  S SystemMessage id=301 3:809 6:10
+  S SystemMessage id=52 6:8470
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=kaitar item=0 page=script/quest/Q320_BonesTellTheFuture/30359-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q320_BonesTellTheFuture
+  items 809=0 57=8470
+  state Q320_BonesTellTheFuture -
+  rows Q320_BonesTellTheFuture -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q320_BonesTellTheFuture -
+  rows Q320_BonesTellTheFuture -
+  items 57=8470
