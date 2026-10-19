@@ -109,8 +109,11 @@ what the reference does in the scenario's own world:
   found it, after the boot, the quest traces and the contract scenes. Once a scenario is over,
   every world object of an id it drew is removed, wherever it stands, and so are the registry
   entries keyed by one (the clan table, the Seven Signs sign-ups, the raid points); an object
-  still in the world fails the run. The couples, which the reference loads at boot after the
-  scripts, are loaded before the first scenario, so no scenario's trace holds their query.
+  still in the world fails the run. What loads from the database on first use is loaded before
+  the first scenario, so no scenario's trace holds its query: the events the reference loads at
+  boot after the scripts (the derby track, whose runners also draw ids, the lottery, the couples,
+  the fishing championship when enabled) and the friend lists, which the reference loads when a
+  first character enters or leaves the world.
 
 A scenario's trace therefore depends on that scenario alone: adding, removing or renaming
 another scenario leaves it byte-identical. A content lane that adds scenarios runs `run.sh` and

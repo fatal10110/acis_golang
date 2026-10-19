@@ -24,8 +24,13 @@ import net.sf.l2j.commons.pool.ConnectionPool;
 import net.sf.l2j.commons.pool.ThreadPool;
 import net.sf.l2j.commons.random.Rnd;
 
+import net.sf.l2j.Config;
 import net.sf.l2j.gameserver.data.manager.CoupleManager;
+import net.sf.l2j.gameserver.data.manager.DerbyTrackManager;
+import net.sf.l2j.gameserver.data.manager.FishingChampionshipManager;
+import net.sf.l2j.gameserver.data.manager.LotteryManager;
 import net.sf.l2j.gameserver.data.manager.RaidPointManager;
+import net.sf.l2j.gameserver.data.manager.RelationManager;
 import net.sf.l2j.gameserver.data.manager.SevenSignsManager;
 import net.sf.l2j.gameserver.data.sql.ClanTable;
 import net.sf.l2j.gameserver.data.sql.PlayerInfoTable;
@@ -194,9 +199,16 @@ final class ScenarioTrace
 		if (files == null)
 			throw new IllegalStateException("no scenario directory " + scenarios);
 		Arrays.sort(files);
-		// The reference loads the couples at boot, after the scripts; loaded on the first
-		// EnterWorld instead, their query would be in the trace of whichever scenario enters first.
+		// What loads from the database on first use is loaded before the first scenario, else its
+		// query (and the runners' ids) would be in whichever scenario came first: the events the
+		// reference loads at boot after the scripts, and the friend lists, which the reference loads
+		// when a first character enters or leaves the world.
+		DerbyTrackManager.getInstance();
+		LotteryManager.getInstance();
 		CoupleManager.getInstance();
+		if (Config.ALLOW_FISH_CHAMPIONSHIP)
+			FishingChampionshipManager.getInstance();
+		RelationManager.getInstance();
 		final Ids ids = Ids.take();
 		for (File f : files)
 		{
