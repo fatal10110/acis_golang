@@ -1,0 +1,27 @@
+# Chest caught with a bait of icy air (Q028), refused: a level 36 character who has not completed
+# the fisherman's special bait quest is turned away and the quest is not started. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q028_chest_caught_with_a_bait_of_icy_air_unready.golden
+character Angler 36
+script quest.Q028_ChestCaughtWithABaitOfIcyAir
+script quest.Q051_OFullesSpecialBait
+item 6503 7626 881
+page fisherman/31572.htm
+page script/quest/Q028_ChestCaughtWithABaitOfIcyAir/
+npc ofulle 31572 Fisherman 10 0 0
+
+action ofulle
+action ofulle
+  S ActionFailed
+  S NpcHtmlMessage obj=ofulle item=0 page=fisherman/31572.htm
+  S ActionFailed
+bypass npc_{ofulle}_Quest
+  S NpcHtmlMessage obj=ofulle item=0 html="<html><body><a action=\"bypass -h npc_{ofulle}_Quest Q028_ChestCaughtWithABaitOfIcyAir\">[Chest caught with a bait of icy air]</a><br><a action=\"bypass -h npc_{ofulle}_Quest Q051_OFullesSpecialBait\">[O'Fulle's Special Bait]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{ofulle}_Quest Q028_ChestCaughtWithABaitOfIcyAir
+  S NpcHtmlMessage obj=ofulle item=0 page=script/quest/Q028_ChestCaughtWithABaitOfIcyAir/31572-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q028_ChestCaughtWithABaitOfIcyAir CREATED
+  rows Q028_ChestCaughtWithABaitOfIcyAir -

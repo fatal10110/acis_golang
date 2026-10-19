@@ -1,0 +1,22 @@
+# Bring Up With Love (Q020), refused: a level 64 character, one short of the quest's level, is
+# turned away by Tunatun and the quest is not started. Expectations replay the reference trace of
+# this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q020_bring_up_with_love_low_level.golden
+character Tamer 64
+script quest.Q020_BringUpWithLove
+item 7185 57
+page default/31537.htm
+page script/quest/Q020_BringUpWithLove/
+npc tunatun 31537 Folk 10 0 0
+
+action tunatun
+action tunatun
+  S ActionFailed
+  S NpcHtmlMessage obj=tunatun item=0 page=default/31537.htm
+  S ActionFailed
+bypass npc_{tunatun}_Quest
+  S NpcHtmlMessage obj=tunatun item=0 page=script/quest/Q020_BringUpWithLove/31537-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q020_BringUpWithLove CREATED
+  rows Q020_BringUpWithLove -
