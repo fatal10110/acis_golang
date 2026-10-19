@@ -1,0 +1,23 @@
+# The Monster Race Track trip (MonsterRaceTrack): Trisha sends the character to the track and
+# remembers herself in its player memo, answering no page (onTalk). A scenario asserts no
+# teleport landing and seeds no memo, so the landing and the race manager's trip back are in
+# tests/npcs/teleporters_210_test.go.
+trace internal/gameserver/script/testdata/oracle/scenarios/monster_race_track.golden
+character Gambler 20
+script script.teleport.MonsterRaceTrack
+page gatekeeper/30059.htm
+npc trisha 30059 Gatekeeper 10 0 0
+
+action trisha
+action trisha
+  S ActionFailed
+  S NpcHtmlMessage obj=trisha item=0 page=gatekeeper/30059.htm
+  S ActionFailed
+bypass npc_{trisha}_Quest MonsterRaceTrack
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  M set MonsterRaceTrack_Npc | 30059

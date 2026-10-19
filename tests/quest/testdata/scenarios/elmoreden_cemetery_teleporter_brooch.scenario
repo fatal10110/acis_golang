@@ -1,0 +1,25 @@
+# The Elmoreden cemetery teleporters (ElmoredenCemeteryTeleporter): a character holding an
+# antique brooch goes to the Four Sepulchers for free: the brooch and its used grave pass are
+# both kept (onAdvEvent). The landing is in tests/npcs/teleporters_210_test.go (#3946).
+trace internal/gameserver/script/testdata/oracle/scenarios/elmoreden_cemetery_teleporter_brooch.golden
+character Mourner 20
+hold 7261 1
+hold 7262 1
+item 7261 7262
+script script.teleport.ElmoredenCemeteryTeleporter
+page default/31920.htm
+page script/teleport/ElmoredenCemeteryTeleporter/
+npc chamberlain 31920 Folk 10 0 0
+
+action chamberlain
+action chamberlain
+  S ActionFailed
+  S NpcHtmlMessage obj=chamberlain item=0 page=default/31920.htm
+  S ActionFailed
+bypass Quest ElmoredenCemeteryTeleporter 4S
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  items 7261=1 7262=1
