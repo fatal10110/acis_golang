@@ -75,6 +75,9 @@ func (l *GameClientLink) detachLivePlayer(live *livePlayer) []int32 {
 		roster, skills, log := l.roster, l.skills, l.log
 		character := live.Character
 		charState := character.SaveState()
+		if at, ok := l.festivalDeparture(live); ok {
+			charState.Location = at
+		}
 		skillState := skills.SaveState(character)
 		l.persist.Enqueue(live.ObjectID(), func() {
 			// One budget for the whole character save, not one per store,

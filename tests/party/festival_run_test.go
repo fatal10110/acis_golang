@@ -2,6 +2,7 @@ package party
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -31,6 +32,8 @@ const (
 // festivalLinks are every festival command the fixture pages link.
 const festivalLinks = `<a action="bypass -h npc_%objectId%_Festival 1">join</a>` +
 	`<a action="bypass -h npc_%objectId%_Festival 2 6360">pay</a>` +
+	`<a action="bypass -h npc_%objectId%_Festival 2 6361">pay green</a>` +
+	`<a action="bypass -h npc_%objectId%_Festival 2 57">pay adena</a>` +
 	`<a action="bypass -h npc_%objectId%_Festival 3">score</a>` +
 	`<a action="bypass -h npc_%objectId%_Festival 8">harder</a>` +
 	`<a action="bypass -h npc_%objectId%_Festival 9">leave</a>`
@@ -115,16 +118,19 @@ func (c *festivalTimers) fire(t *testing.T, want time.Duration) {
 	fn()
 }
 
-// blankFestivalScores seeds a blank score for each festival and cabal of
-// cycle 1, the cycle the fixture's Seven Signs status is in.
-func blankFestivalScores(t *testing.T) func(*gamesql.FestivalStore) {
+// festivalScores seeds a blank score for each festival and cabal of cycle
+// 1, the cycle the fixture's Seven Signs status is in, under the scores
+// given.
+func festivalScores(t *testing.T, scores []festival.Score) func(*gamesql.FestivalStore) {
 	return func(store *gamesql.FestivalStore) {
-		var rows []festival.Score
+		rows := append([]festival.Score(nil), scores...)
 		for id := range festival.Count {
 			for _, cabal := range []sevensigns.Cabal{sevensigns.Dusk, sevensigns.Dawn} {
 				rows = append(rows, festival.Score{FestivalID: id, Cabal: cabal, Cycle: 1})
 			}
 		}
+		// A score given replaces the blank one saved after it.
+		slices.Reverse(rows)
 		if err := store.SaveScores(context.Background(), rows); err != nil {
 			t.Fatalf("seed festival scores: %v", err)
 		}
@@ -145,15 +151,36 @@ type festivalRun struct {
 // hand.
 func bootFestival(t *testing.T, seats []seat, blueStones int32, minPlayers int) *festivalRun {
 	t.Helper()
+	return bootFestivalWith(t, festivalSetup{seats: seats, blueStones: blueStones, minPlayers: minPlayers})
+}
+
+// festivalSetup is a festival fixture: its seats, the blue stones its
+// first seat holds, the party minimum, the pages (festivalPages when nil)
+// and the scores seeded over cycle 1's blank ones.
+type festivalSetup struct {
+	seats      []seat
+	blueStones int32
+	minPlayers int
+	pages      map[string]string
+	scores     []festival.Score
+}
+
+func bootFestivalWith(t *testing.T, s festivalSetup) *festivalRun {
+	t.Helper()
 	timers := &festivalTimers{now: time.Now()}
 	cfg := festival.DefaultConfig()
-	cfg.MinPlayers = minPlayers
+	cfg.MinPlayers = s.minPlayers
 	oracle, err := zone.NewCuboid(-2000, 2000, -2000, 2000, -1000, 1000)
 	if err != nil {
 		t.Fatal(err)
 	}
 	zones := zone.NewIndex()
 	zones.Add(zone.NewPeace(1, oracle))
+	pages := s.pages
+	if pages == nil {
+		pages = festivalPages()
+	}
+	seats := s.seats
 	srv := gameservertest.Boot(t, []gameservertest.Option{
 		gameservertest.WithCharacter(seats[0].name, seats[0].level, 0),
 		gameservertest.WithWantChars(1),
@@ -163,14 +190,14 @@ func bootFestival(t *testing.T, seats []seat, blueStones int32, minPlayers int) 
 		gameservertest.WithNPCs(festivalTemplates()),
 		gameservertest.WithNpcSpawns(nil),
 		gameservertest.WithItemTemplates(festivalItems()),
-		gameservertest.WithHTMLPages(festivalPages()),
+		gameservertest.WithHTMLPages(pages),
 		gameservertest.WithZones(zones),
 		gameservertest.WithReuseDelays(3*time.Second, 0),
-		gameservertest.WithFestivalSeed(blankFestivalScores(t)),
+		gameservertest.WithFestivalSeed(festivalScores(t, s.scores)),
 	}...)
 	leader := srv.SoleObjectID(t)
-	if blueStones > 0 {
-		srv.GiveItem(t, leader, blueStoneID, blueStones)
+	if s.blueStones > 0 {
+		srv.GiveItem(t, leader, blueStoneID, s.blueStones)
 	}
 	g := &group{srv: srv, players: []player{{c: srv.Client, id: leader, name: seats[0].name}}}
 	for i, s := range seats[1:] {
@@ -191,12 +218,18 @@ func bootFestival(t *testing.T, seats []seat, blueStones int32, minPlayers int) 
 // returns the answer.
 func (f *festivalRun) command(t *testing.T, i int, n string) [][]byte {
 	t.Helper()
+	return f.commandAt(t, i, f.guide, n)
+}
+
+// commandAt is command at guide.
+func (f *festivalRun) commandAt(t *testing.T, i int, guide *npc.Folk, n string) [][]byte {
+	t.Helper()
 	p := f.players[i]
 	x, y, z := f.srv.PlayerPosition(t, p.id)
 	// A first click only selects the guide; the next one talks.
 	opened := false
 	for range 2 {
-		p.c.Send(encodeAction(f.guide.ObjectID(), x, y, z))
+		p.c.Send(encodeAction(guide.ObjectID(), x, y, z))
 		if _, opened = firstFrame(drainFrames(t, p.c), serverpackets.OpcodeNpcHtmlMessage); opened {
 			break
 		}
@@ -204,7 +237,7 @@ func (f *festivalRun) command(t *testing.T, i int, n string) [][]byte {
 	if !opened {
 		t.Fatalf("%s: talking to the guide opened no page", p.name)
 	}
-	p.c.Send(encodeBypass(f.guide, "Festival "+n))
+	p.c.Send(encodeBypass(guide, "Festival "+n))
 	return drainFrames(t, p.c)
 }
 
@@ -264,8 +297,8 @@ func sayings(frames [][]byte) []string {
 // runs it and registers its score:
 //   - signing up is refused outside a party (2b, naming the two-member
 //     minimum) and to a member who does not lead it (2c); the leader sees
-//     the fee (page 1), cannot pay without stones, then pays 900 blue
-//     stones (2e), the festival's bonus gaining 3 a stone;
+//     the fee (page 1), then pays 900 blue stones (2e), the festival's
+//     bonus gaining 3 a stone;
 //   - after the signup period the guides call the main event over the
 //     oracle; the party is no longer there to hear it, taken into the
 //     arena around its start, where neither may restart nor log out;

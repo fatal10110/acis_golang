@@ -142,7 +142,8 @@ func (m *Manager) tellParty(world World, a *arena, text string) {
 }
 
 // spawnMonsters places a's monsters of spawns, each worth bonus blood
-// offerings; without archers drops the archers.
+// offerings; without archers drops the archers. A monster placed once a has
+// closed is deleted again.
 func (m *Manager) spawnMonsters(world World, a *arena, spawns []monsterSpawn, bonus int, withoutArchers bool) {
 	for _, s := range spawns {
 		if withoutArchers && archer(s.npcID) {
@@ -154,8 +155,16 @@ func (m *Manager) spawnMonsters(world World, a *arena, spawns []monsterSpawn, bo
 			continue
 		}
 		m.mu.Lock()
-		a.monsters = append(a.monsters, n)
+		open := m.initialized && m.arenas[side(a.cabal)][a.id] == a
+		if open {
+			a.monsters = append(a.monsters, n)
+		}
 		m.mu.Unlock()
+		if !open {
+			// The festival ended while the wave was coming: the arena
+			// that would clear it is gone.
+			world.Unspawn(n)
+		}
 	}
 }
 

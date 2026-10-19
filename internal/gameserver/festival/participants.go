@@ -133,6 +133,34 @@ func (m *Manager) updateParticipantsLocked(objectID int32, party []Member, moves
 	return false
 }
 
+// Departure is where the participant objectID, leaving the world while
+// in a party, is taken back to as its party lets it go: its arena's record
+// of where it came from, forgotten as it is read, or nil for the nearest
+// town when the arena never took it in. ok is false when the leave takes
+// it out of no arena: it is no participant, its festival is never found
+// (see festivalOfLocked), or no festival has begun.
+func (m *Manager) Departure(objectID int32) (at *Spot, ok bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if !m.isParticipantLocked(objectID) || !m.initialized {
+		return nil, false
+	}
+	cabal, id, found := m.festivalOfLocked(objectID)
+	if !found {
+		return nil, false
+	}
+	a := m.arenas[side(cabal)][id]
+	if a == nil {
+		return nil, false
+	}
+	origin, known := a.origins[objectID]
+	if !known {
+		return nil, true
+	}
+	delete(a.origins, objectID)
+	return &origin, true
+}
+
 // resetParticipantsLocked forgets every party signed up and every party
 // waiting to register its score.
 func (m *Manager) resetParticipantsLocked() {

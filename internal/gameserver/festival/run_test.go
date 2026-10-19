@@ -101,3 +101,77 @@ func TestUpdateParticipants(t *testing.T) {
 		t.Fatalf("after the dispersal: %v (taken %v), want the festival taken by no one", got, taken)
 	}
 }
+
+// fakeNPC is an NPC a fakeWorld placed.
+type fakeNPC int32
+
+func (n fakeNPC) ObjectID() int32 { return int32(n) }
+
+// fakeWorld places NPCs and records which it deleted; onSpawn, when set,
+// runs as the next monster is placed.
+type fakeWorld struct {
+	next     int32
+	spawned  []NPC
+	unspawns map[NPC]int
+	onSpawn  func()
+}
+
+func (w *fakeWorld) place() NPC {
+	w.next++
+	return fakeNPC(w.next)
+}
+
+func (w *fakeWorld) RewardClanOf(string, int)         {}
+func (w *fakeWorld) RemoveBloodOfferings()            {}
+func (w *fakeWorld) Shout(string, string)             {}
+func (w *fakeWorld) Locate(int32) (Spot, bool)        { return Spot{}, false }
+func (w *fakeWorld) Admit(int32, int, int, int)       {}
+func (w *fakeWorld) Relocate(int32, *Spot)            {}
+func (w *fakeWorld) Tell(int32, string)               {}
+func (w *fakeWorld) Settle([]int32)                   {}
+func (w *fakeWorld) SpawnWitch(int, Spot) (NPC, bool) { return w.place(), true }
+func (w *fakeWorld) Say(NPC, string)                  {}
+func (w *fakeWorld) Swarm(NPC, int, int, int)         {}
+func (w *fakeWorld) Unspawn(n NPC)                    { w.unspawns[n]++ }
+func (w *fakeWorld) SpawnMonster(int, int, int, int, int) (NPC, bool) {
+	if fn := w.onSpawn; fn != nil {
+		w.onSpawn = nil
+		fn()
+	}
+	n := w.place()
+	w.spawned = append(w.spawned, n)
+	return n, true
+}
+
+// A challenge whose wave is still being placed when the festival ends
+// leaves none of it behind: each monster placed after the end is deleted
+// as soon as it is placed.
+func TestChallengeWaveAfterTheEndIsDeleted(t *testing.T) {
+	h := newScheduleHarness(t)
+	w := &fakeWorld{unspawns: map[NPC]int{}}
+	h.m.SetWorld(w)
+	h.m.Start()
+	h.signUp(sevensigns.Dawn, 0, party)
+	for range 7 { // the cycle, the signup, the waves and the chests
+		h.fire(t)
+	}
+	before := len(w.spawned)
+	w.onSpawn = func() { h.fire(t) } // the end comes as the wave starts
+	if increased, ok := h.m.IncreaseChallenge(sevensigns.Dawn, 0); !increased || !ok {
+		t.Fatalf("IncreaseChallenge = %v, %v; want the arena's challenge raised", increased, ok)
+	}
+	wave := w.spawned[before:]
+	if len(wave) == 0 {
+		t.Fatal("the challenge placed nothing")
+	}
+	for _, n := range wave {
+		if w.unspawns[n] != 1 {
+			t.Fatalf("challenge monster %d deleted %d times, want once", n.ObjectID(), w.unspawns[n])
+		}
+	}
+	for _, n := range w.spawned[:before] {
+		if w.unspawns[n] != 1 {
+			t.Fatalf("festival monster %d deleted %d times at the end, want once", n.ObjectID(), w.unspawns[n])
+		}
+	}
+}

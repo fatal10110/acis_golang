@@ -5,6 +5,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/festival"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -143,6 +144,29 @@ func (w festivalWorld) Settle(objectIDs []int32) {
 			awaitLiveQueue(live)
 		}
 	}
+}
+
+// festivalDeparture is where live, a participant leaving the world during
+// a festival, is saved: the party leave its detach makes takes it out of
+// its arena, within 20 of where it came from or of the nearest town, before
+// its position is stored. ok is false when it stays where it stands.
+func (l *GameClientLink) festivalDeparture(live *livePlayer) (location.Location, bool) {
+	if l.festival == nil || l.parties == nil || !l.parties.InParty(live.ObjectID()) {
+		return location.Location{}, false
+	}
+	at, ok := l.festival.Departure(live.ObjectID())
+	if !ok {
+		return location.Location{}, false
+	}
+	var dest location.Location
+	if at != nil {
+		dest = location.Location{X: at.X, Y: at.Y, Z: at.Z}
+	} else if dest, ok = l.restartDestination(live); !ok {
+		return location.Location{}, false
+	}
+	return move.RandomNearbyLocation(l.geo, dest, restartTeleportOffset, func(at location.Location) bool {
+		return live.Flying() || l.inWater(at)
+	}), true
 }
 
 // postOnline runs fn on the queue of the player objectID while it is in the
