@@ -23,8 +23,7 @@ func berserkerIDs() []int32 {
 
 // roar counts one more roar of called and returns its fury at that count,
 // when called has roared fewer times than its MaxRoarCount. A template
-// that lists no fury skill aborts the hook after the count, as the
-// reference throws there.
+// that lists no fury skill aborts the hook after the count.
 func roar(called *script.NPC) (skill.Ref, bool) {
 	if called.Int(script.SlotIntAI1) >= called.IntParam("MaxRoarCount") {
 		return skill.Ref{}, false
