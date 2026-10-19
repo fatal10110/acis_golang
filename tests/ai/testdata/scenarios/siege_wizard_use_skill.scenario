@@ -1,0 +1,14 @@
+# GludioWizardUseSkill (35061, a wizard mercenary) sees the character, who neither defends
+# nor owns its castle: on a draw of 1 of 10000 it shouts NpcString 1800013, and it wants to
+# attack the character with weight 200 (a desire, not rendered). Its template lists no DD
+# magic, so it wants no cast. Its other hooks only queue cast desires, which the format
+# cannot check (#3983): tests/ai/siege_guard_wizard_test.go covers them.
+character Hunter 20
+random always 1
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioWizard.GludioWizard
+script script.ai.siegeguards.GludioWizard.GludioWizardUseSkill
+npc wizard 35061 SiegeGuard 600 0 0
+
+approach wizard
+  S NpcSay obj=wizard type=1 npc=1035061 text="Death to those who challenge the Lord!"

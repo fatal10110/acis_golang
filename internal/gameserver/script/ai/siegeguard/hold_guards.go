@@ -98,3 +98,44 @@ func Knight() script.Script {
 func knightIDs() []int32 {
 	return []int32{35066, 35108, 35150, 35192, 35235, 35282, 35326, 35471, 35518}
 }
+
+// SirCronenberg is GludioSirCronenberg: a GludioHold guard that attacks a
+// clan leader whose Seal of Ruler lands on it, unless the leader defends or
+// owns its castle.
+func SirCronenberg() script.Script {
+	base := holdHooks()
+	return script.Script{Dir: holdDir, Behavior: true, NPCs: sirCronenbergIDs(), Hooks: base.With(script.Hooks{
+		OnSpelled: func(s *script.Script, e script.Spelled) {
+			if e.Skill == sealOfRuler() && !spared(s, e.NPC, e.Caster) {
+				e.NPC.AddAttackDesire(e.Caster, 50000)
+			}
+		},
+	})}
+}
+
+// sirCronenbergIDs are GludioSirCronenberg's own NPCs.
+func sirCronenbergIDs() []int32 {
+	return []int32{35065, 35107, 35149, 35191, 35281, 35324, 35516}
+}
+
+// SpearGuard is GludioSpearGuard: a GludioHold guard that attacks a clan
+// leader whose Seal of Ruler lands on it, its castle's own included.
+func SpearGuard() script.Script {
+	base := holdHooks()
+	return script.Script{Dir: holdDir, Behavior: true, NPCs: spearGuardIDs(), Hooks: base.With(script.Hooks{
+		OnSpelled: func(_ *script.Script, e script.Spelled) {
+			if e.Skill == sealOfRuler() {
+				e.NPC.AddAttackDesire(e.Caster, 50000)
+			}
+		},
+	})}
+}
+
+// spearGuardIDs are GludioSpearGuard's own NPCs.
+func spearGuardIDs() []int32 {
+	return []int32{
+		35016, 35026, 35036, 35046, 35056, 35070, 35073, 35076, 35112, 35115, 35118, 35154, 35157, 35160,
+		35196, 35199, 35202, 35239, 35242, 35245, 35286, 35289, 35292, 35330, 35333, 35336, 35475, 35478,
+		35481, 35522, 35525, 35528,
+	}
+}

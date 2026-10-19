@@ -8,7 +8,8 @@ import (
 
 // TestMatchesReferenceFingerprints compares the package with the reference
 // classes: literals, engine calls and hook shapes. The reference names
-// Seal of Ruler by its frequent-skill entry; the port writes its id.
+// Seal of Ruler by its frequent-skill entry and the shouts by their
+// NpcString constants; the port writes their ids.
 func TestMatchesReferenceFingerprints(t *testing.T) {
 	problems, err := scriptfp.Check(".", []string{
 		"script.ai.siegeguards.GludioCleric",
@@ -19,7 +20,15 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.siegeguards.GludioHold.GludioCourtGuard",
 		"script.ai.siegeguards.GludioHold.GludioDukeLewinWaldner",
 		"script.ai.siegeguards.GludioHold.GludioKnight",
-	}, "number 246")
+		"script.ai.siegeguards.GludioHold.GludioSirCronenberg",
+		"script.ai.siegeguards.GludioHold.GludioSpearGuard",
+		"script.ai.siegeguards.GludioHold.GludioSwordGuard",
+		"script.ai.siegeguards.GludioHold.GludioSwordGuardUseSkill",
+		"script.ai.siegeguards.GludioStand.GludioStand",
+		"script.ai.siegeguards.GludioStand.GludioBowGuardStand",
+		"script.ai.siegeguards.GludioWizard.GludioWizard",
+		"script.ai.siegeguards.GludioWizard.GludioWizardUseSkill",
+	}, "number 246", "number 1800012", "number 1800013")
 	if err != nil {
 		t.Fatal(err)
 	}
