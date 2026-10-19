@@ -68,11 +68,17 @@ var ind7Batch = []struct {
 	{"script.ai.individual.Monster.LV3Monster.LV3Monster", monster.LV3Monster},
 	{"script.ai.individual.Monster.LV3Monster.LV3Orc", monster.LV3Orc},
 	{"script.ai.individual.Monster.LV3Monster.LV3PartyLeaderMonster", monster.LV3PartyLeader},
+	{"script.ai.individual.Monster.LV3Monster.LV3PartyPrivateMonster", monster.LV3PartyPrivate},
+	{"script.ai.individual.Monster.LV3Monster.LV3Ranger", monster.LV3Ranger},
+	{"script.ai.individual.Monster.LV3Monster.LV3SongDance", monster.LV3SongDance},
+	{"script.ai.individual.Monster.LV3Monster.LV3Summoner", monster.LV3Summoner},
+	{"script.ai.individual.Monster.LV3Monster.LV3Wizard", monster.LV3Wizard},
+	{"script.ai.individual.Monster.LV3Monster.LV3WizardPrivate", monster.LV3WizardPrivate},
 }
 
 // ind7World is ind1World with the batch registered after DefaultNpc and
-// MonsterAI, a listener on ind7MasterID and a spawner for privates that
-// start with spawn parameters.
+// MonsterAI, a listener on ind7MasterID, the director script and a spawner
+// for privates that start with spawn parameters.
 type ind7World struct {
 	*ind1World
 	spawner *script.Spawner
@@ -100,7 +106,9 @@ func bootIndividual7(t *testing.T, extra raidBoot, templates ...*npc.Template) *
 			},
 		}}
 	}
-	list = append(list, script.Listing{Path: listener})
+	const director = "test.Ind1Director"
+	catalog[director] = func() script.Script { return script.Script{} }
+	list = append(list, script.Listing{Path: listener}, script.Listing{Path: director})
 	kinds := map[int32]script.NPCKind{}
 	for _, tmpl := range templates {
 		kinds[int32(tmpl.ID)] = script.KindHostile
@@ -126,7 +134,7 @@ func ind7Skills() *modelskill.Table {
 	for _, id := range []modelskill.ID{ind7WeakFalse, ind7WeakTrue, ind7DefenceMode, ind7CrazyMode, ind7BigBody, ind7NormalBody, ind7Debuff1, ind7Debuff2, ind7Debuff3} {
 		defs = append(defs, ind1Skill(id, 0, true))
 	}
-	return modelskill.NewTable(defs)
+	return modelskill.NewTable(append(defs, ind7bSkills()...))
 }
 
 // ind7Template is a level 1 fixture monster of id listing
