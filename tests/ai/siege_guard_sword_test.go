@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -207,6 +208,44 @@ func TestGludioSwordGuardUseSkillAnswersAClanCall(t *testing.T) {
 		siegeDispelID:  near.ObjectID(),
 	})
 	w.hates(t, "after the second call", map[*npc.Hostile]float64{far: 100, near: 100}, names)
+}
+
+// TestGludioSwordGuardUseSkillAimsItsSpecialAtWhatItFights pins the
+// attacker test of GludioSwordGuardUseSkill's special attack roll: a sword
+// guard 100 from the character that wants a monster most (weight 10000),
+// hit by the character or called by a knight the character hits, on a
+// winning draw, wants only its dispel on itself, the character within 150:
+// no special attack, the character not being the one it fights.
+func TestGludioSwordGuardUseSkillAimsItsSpecialAtWhatItFights(t *testing.T) {
+	t.Parallel()
+	for _, called := range []bool{false, true} {
+		name := "hit"
+		if called {
+			name = "clan call"
+		}
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			tmpl := siegeSkillfulTemplate(swordGuardUseSkillID)
+			if !called {
+				tmpl.Clans = nil
+			}
+			w := bootSiegeGuards(t, raidBoot{}, tmpl, siegeGuardTemplate(adenKnightID), warriorTemplate(siegeDummyID, nil))
+			guard := w.spawn(t, swordGuardUseSkillID, 100, 0)
+			monster := w.spawn(t, siegeDummyID, 120, 0)
+			w.srv.InstallNPCCastSeam(t, guard, siegeSkillfulNPCSkills())
+			w.onQueue(t, guard, func() { script.NPCOf(guard).AddAttackDesire(script.NPCOf(monster), 10000) })
+			if top := guard.AI().TopDesireTarget(); top == nil || top.ObjectID() != monster.ObjectID() {
+				t.Fatalf("setup: sword guard top desire target = %v, want the monster", top)
+			}
+
+			if called {
+				w.hit(t, w.spawn(t, adenKnightID, 100, 100), siegeTwentieth)
+			} else {
+				w.hit(t, guard, siegeTwentieth)
+			}
+			wantCasts(t, "after the "+name, "sword guard", guard, map[modelskill.ID]int32{siegeDispelID: guard.ObjectID()})
+		})
+	}
 }
 
 // TestGludioSwordGuardUseSkillShoutsAtWhatItSees ports
