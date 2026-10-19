@@ -1,8 +1,6 @@
 package serverpackets
 
 import (
-	"fmt"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/buylist"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -18,13 +16,14 @@ const (
 
 // FrameShopPreviewList builds the try-on window of list: every equipable
 // product of a grade within expertise (the Expertise skill level), each
-// priced wearPrice (WearPrice).
+// priced wearPrice (WearPrice). A product whose template templates no longer
+// holds (one a reload removed) is left out.
 func FrameShopPreviewList(list buylist.List, currentMoney, expertise, wearPrice int, templates *item.Table) (wire.Frame, error) {
 	shown := make([]*item.Template, 0, len(list.Products))
 	for _, p := range list.Products {
 		tmpl, ok := templates.Get(p.ItemID)
 		if !ok {
-			return wire.Frame{}, fmt.Errorf("serverpackets: ShopPreviewList: no template loaded for item template %d", p.ItemID)
+			continue
 		}
 		if int(tmpl.Crystal) <= expertise && tmpl.Equipable() {
 			shown = append(shown, tmpl)

@@ -2098,7 +2098,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err != nil {
 		t.Fatalf("load ground items: %v", err)
 	}
-	if err := groundItems.Load(rows, itemTemplates); err != nil {
+	if err := groundItems.Load(rows, itemTemplates, o.log); err != nil {
 		t.Fatalf("restore ground items: %v", err)
 	}
 	if err := groundStore.Clear(context.Background()); err != nil {

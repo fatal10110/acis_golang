@@ -1,8 +1,6 @@
 package serverpackets
 
 import (
-	"fmt"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 )
@@ -13,9 +11,9 @@ const OpcodeGMViewItemList = 0x94
 
 // FrameGMViewItemList builds a game master's view of the inventory owner
 // carries: owner's name and slot limit, then every item in items, worn ones
-// marked equipped, in ItemList's item layout. templates must hold every
-// item's template; on error no frame is returned and nothing needs
-// releasing.
+// marked equipped, in ItemList's item layout. An item whose template
+// templates no longer holds (one a reload removed) is left out. On error no
+// frame is returned and nothing needs releasing.
 func FrameGMViewItemList(owner string, limit int, items []*item.Instance, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(OpcodeGMViewItemList)
 	if err := writeGMViewItemList(w, owner, limit, items, templates); err != nil {
@@ -26,20 +24,21 @@ func FrameGMViewItemList(owner string, limit int, items []*item.Instance, templa
 }
 
 func writeGMViewItemList(w *wire.Writer, owner string, limit int, items []*item.Instance, templates *item.Table) error {
-	count, err := wire.Uint16Count(len(items))
-	if err != nil {
-		return err
-	}
 	w.WriteString(owner)
 	w.WriteInt32(int32(limit))
 	w.WriteUint16(1) // show the window
-	w.WriteUint16(count)
+	countOffset, err := reserveUint16Count(w, len(items))
+	if err != nil {
+		return err
+	}
+	var listed int
 	for _, raw := range items {
 		it := raw.Snapshot()
 		tmpl, ok := templates.Get(it.TemplateID)
 		if !ok {
-			return fmt.Errorf("serverpackets: GMViewItemList: no template loaded for item template %d", it.TemplateID)
+			continue
 		}
+		listed++
 		category, subCategory := tmpl.Category()
 		worn := it.Location == item.LocationPaperdoll || it.Location == item.LocationPetEquip
 		w.WriteUint16(uint16(category))
@@ -59,5 +58,6 @@ func writeGMViewItemList(w *wire.Writer, owner string, limit int, items []*item.
 		}
 		w.WriteInt32(int32(raw.DisplayedManaLeft(tmpl)))
 	}
+	w.PatchUint16(countOffset, uint16(listed))
 	return nil
 }

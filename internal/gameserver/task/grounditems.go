@@ -182,13 +182,17 @@ func (g *GroundItems) Each(fn func(*grounditem.Item)) {
 }
 
 // Load restores previously saved ground items and clears their persisted
-// countdowns into live cleanup deadlines.
-func (g *GroundItems) Load(rows []item.GroundSnapshot, templates *item.Table) error {
+// countdowns into live cleanup deadlines. A row whose item template is not
+// loaded (one a reload removed before the shutdown saved it) is skipped and
+// logged; the rest still restore.
+func (g *GroundItems) Load(rows []item.GroundSnapshot, templates *item.Table, log zerolog.Logger) error {
 	now := g.now()
 	for _, row := range rows {
 		tmpl, ok := templates.Get(row.TemplateID)
 		if !ok {
-			return fmt.Errorf("ground items: item template %d not loaded", row.TemplateID)
+			log.Error().Int32("object_id", row.ObjectID).Int32("item_id", row.TemplateID).
+				Msg("ground items: skipped a saved item with no loaded template")
+			continue
 		}
 		row.Instance.ManaLeft = tmpl.InitialManaLeft()
 		// A loot-protection owner has no persisted deadline (only

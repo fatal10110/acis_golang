@@ -62,17 +62,3 @@ func TestFrameGMViewItemList(t *testing.T) {
 		t.Errorf("FrameGMViewItemList mismatch:\n got  %x\n want %x", got, want)
 	}
 }
-
-// TestFrameGMViewItemListErrorReturnsNoFrame pins a missing template as an
-// error with no frame to release.
-func TestFrameGMViewItemListErrorReturnsNoFrame(t *testing.T) {
-	items := []*item.Instance{{ObjectID: 1, TemplateID: 999, Count: 1, Location: item.LocationPet}}
-	frame, err := FrameGMViewItemList("", 12, items, item.NewTable(nil))
-	if err == nil {
-		t.Fatal("err = nil, want an error for a missing template")
-	}
-	frame.Release()
-	if frame.Bytes() != nil {
-		t.Errorf("frame.Bytes() = % X, want nil", frame.Bytes())
-	}
-}
