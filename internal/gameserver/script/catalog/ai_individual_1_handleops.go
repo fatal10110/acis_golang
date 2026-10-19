@@ -25,6 +25,22 @@ func aiIndividual1HandleOps() map[string]script.HandleOps {
 			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
 			"OnUseSkillFinished": {"NPC.DoDie"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushStrongMan1": {
+			"OnAttacked":         {"NPC.AbortAll", "NPC.CanAttack", "NPC.GeoPathFailCount", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned", "NPC.TopDesireTarget"},
+			"OnClanAttacked":     {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnScriptEvent":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire", "NPC.TopDesireTarget"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushStrongMan2": {
+			"OnAttacked":         {"NPC.AbortAll", "NPC.CanAttack", "NPC.GeoPathFailCount", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned", "NPC.TopDesireTarget"},
+			"OnClanAttacked":     {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnScriptEvent":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire", "NPC.TopDesireTarget"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushWarriorPhysicalSpecial2": {
 			"OnAttacked":         {"NPC.AbortAll", "NPC.CanAttack", "NPC.EquipItem", "NPC.GeoPathFailCount", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.SetEnchantEffect", "NPC.Stunned", "NPC.TopDesireTarget"},
 			"OnClanAttacked":     {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire"},

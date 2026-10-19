@@ -10,8 +10,8 @@ func aiIndividual1() script.Catalog {
 	return script.Catalog{
 		"script.ai.individual.Monster.WarriorBase.Warrior.CorePrivatePremo":                                                       warrior.CorePrivatePremo,
 		"script.ai.individual.Monster.WarriorBase.Warrior.RamphoPrimeval":                                                         warrior.RamphoPrimeval,
-		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushStrongMan1":                                                    nil,
-		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushStrongMan2":                                                    nil,
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushStrongMan1":                                                    warrior.RoyalRushStrongMan1,
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushStrongMan2":                                                    warrior.RoyalRushStrongMan2,
 		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushWarriorPhysicalSpecial2":                                       warrior.RoyalRushWarriorPhysicalSpecial2,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.CorePrivateWarriorAggressive":                         nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.Medusa":                                               nil,

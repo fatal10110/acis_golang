@@ -22,6 +22,8 @@ var individual1 = []struct {
 }{
 	{"script.ai.individual.Monster.WarriorBase.Warrior.CorePrivatePremo", CorePrivatePremo},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.RamphoPrimeval", RamphoPrimeval},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushStrongMan1", RoyalRushStrongMan1},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushStrongMan2", RoyalRushStrongMan2},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushWarriorPhysicalSpecial2", RoyalRushWarriorPhysicalSpecial2},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressiveImmediate", AggressiveImmediate},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast2DebuffsAggressive", Cast2DebuffsAggressive},
@@ -71,10 +73,10 @@ func readIndividual1View(t *testing.T, path string, ours map[string]bool, text *
 // TestIndividual1RegistrationMatchesReferenceManifest registers the batch
 // after the behavior chain it derives from, through the engine registry
 // with its own seam gate and every id a hostile NPC (the datapack types all
-// 56 ids Monster). None is refused, and the registry dump equals the
+// 64 ids Monster). None is refused, and the registry dump equals the
 // reference manifest for the batch: each class's kind and bind lines, and
 // every folded per-(npc, event) list restricted to the batch, each of the
-// 56 ids on the 10 events of the Warrior chain.
+// 64 ids on the 10 events of the Warrior chain.
 func TestIndividual1RegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, 0, len(chain)+len(individual1))
 	catalog := script.Catalog{}
@@ -105,7 +107,7 @@ func TestIndividual1RegistrationMatchesReferenceManifest(t *testing.T) {
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	want := readIndividual1View(t, path, ours, sc)
-	if wantFolds, got := (1+1+6+47+1)*10, len(want.folds); got != wantFolds {
+	if wantFolds, got := (1+1+4+4+6+47+1)*10, len(want.folds); got != wantFolds {
 		t.Fatalf("reference folds = %d entries, want %d", got, wantFolds)
 	}
 
@@ -123,7 +125,7 @@ func TestIndividual1RegistrationMatchesReferenceManifest(t *testing.T) {
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ: %d entries, reference %d", len(got.folds), len(want.folds))
 	}
-	for _, id := range []int32{29013, 22199, 18135, 21419, 27178, 27194, 21379} {
+	for _, id := range []int32{29013, 22199, 18158, 18164, 18159, 18165, 18135, 21419, 27178, 27194, 21379} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}
