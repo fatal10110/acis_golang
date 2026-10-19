@@ -47,6 +47,8 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushBomb",
 		"script.ai.individual.Monster.WarriorBase.Warrior.CorePrivatePremo",
 		"script.ai.individual.Monster.WarriorBase.Warrior.RamphoPrimeval",
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushStrongMan1",
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushStrongMan2",
 		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushWarriorPhysicalSpecial2",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressiveImmediate",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast2DebuffsAggressive",
