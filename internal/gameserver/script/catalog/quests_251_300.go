@@ -10,6 +10,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q263"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q264"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q265"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q266"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q267"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q271"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q272"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q273"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q274"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q277"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q291"
 )
 
 // quests251To300 is the catalog of quests 251 to 300 (#183), except the one the engine slices ported.
@@ -23,16 +31,16 @@ func quests251To300() script.Catalog {
 		"quest.Q263_OrcSubjugation":            q263.New,
 		"quest.Q264_KeenClaws":                 q264.New,
 		"quest.Q265_ChainsOfSlavery":           q265.New,
-		"quest.Q266_PleasOfPixies":             nil,
-		"quest.Q267_WrathOfVerdure":            nil,
-		"quest.Q271_ProofOfValor":              nil,
-		"quest.Q272_WrathOfAncestors":          nil,
-		"quest.Q273_InvadersOfTheHolyLand":     nil,
-		"quest.Q274_SkirmishWithTheWerewolves": nil,
+		"quest.Q266_PleasOfPixies":             q266.New,
+		"quest.Q267_WrathOfVerdure":            q267.New,
+		"quest.Q271_ProofOfValor":              q271.New,
+		"quest.Q272_WrathOfAncestors":          q272.New,
+		"quest.Q273_InvadersOfTheHolyLand":     q273.New,
+		"quest.Q274_SkirmishWithTheWerewolves": q274.New,
 		"quest.Q275_DarkWingedSpies":           nil,
 		"quest.Q276_TotemOfTheHestui":          nil,
-		"quest.Q277_GatekeepersOffering":       nil,
-		"quest.Q291_RevengeOfTheRedbonnet":     nil,
+		"quest.Q277_GatekeepersOffering":       q277.New,
+		"quest.Q291_RevengeOfTheRedbonnet":     q291.New,
 		"quest.Q292_BrigandsSweep":             nil,
 		"quest.Q293_TheHiddenVeins":            nil,
 		"quest.Q294_CovertBusiness":            nil,
