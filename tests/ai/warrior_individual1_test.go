@@ -285,6 +285,24 @@ func TestWarriorAggressiveImmediateAttacksOnFirstSight(t *testing.T) {
 	}
 }
 
+// TestWarriorAggressiveImmediateSparesWhatItSeesOutOfItsTerritory ports
+// the territory gate of WarriorAggressiveImmediate's see-creature hook: an
+// NPC standing out of its territory (its drift range around its spawn
+// point) does not turn on the character it sees.
+func TestWarriorAggressiveImmediateSparesWhatItSeesOutOfItsTerritory(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual1(t, raidBoot{}, warriorTemplate(immediateID, nil))
+	immediate := w.spawn(t, immediateID, 1500, 0)
+	w.teleport(t, immediate, -1350, 0)
+	if script.NPCOf(immediate).InMyTerritory() {
+		t.Fatal("setup: the NPC is still in its territory")
+	}
+	w.ticks(t, 2)
+	if got := immediate.AggroHate(w.player); got != 0 {
+		t.Fatalf("hate of the character seen out of its territory = %v, want none", got)
+	}
+}
+
 // debufferTemplate is the fixture WarriorCast2DebuffsAggressive NPC: two
 // debuffs by type, in the clan the scenario's NPCs share.
 func debufferTemplate() *npc.Template {
@@ -368,8 +386,9 @@ func TestWarriorCast2DebuffsAggressiveDebuffsWhatItFights(t *testing.T) {
 // TestWarriorCast2DebuffsAggressiveDebuffsOnSightAndForItsClan ports
 // WarriorCast2DebuffsAggressive's see-creature and clan-attacked hooks,
 // every draw 0. Settled (life time past 7) and wandering, it wants both
-// debuffs on the character it sees, then attacks it. A settled clan member
-// wants both debuffs on the attacker of another member.
+// debuffs on the character it sees, then attacks it; young, it only
+// attacks. A settled clan member wants both debuffs on the attacker of
+// another member.
 func TestWarriorCast2DebuffsAggressiveDebuffsOnSightAndForItsClan(t *testing.T) {
 	t.Parallel()
 	t.Run("see", func(t *testing.T) {
@@ -399,6 +418,20 @@ func TestWarriorCast2DebuffsAggressiveDebuffsOnSightAndForItsClan(t *testing.T) 
 			t.Fatalf("hate of the character it sees = %v, want 200", got)
 		}
 	})
+	t.Run("young", func(t *testing.T) {
+		t.Parallel()
+		w := bootIndividual1(t, raidBoot{}, debufferTemplate())
+		n := w.spawn(t, debufferID, 150, 0)
+		w.srv.InstallNPCCastSeam(t, n, debufferSkills())
+		w.ticks(t, 1)
+		if n.LifeTime() > 7 {
+			t.Fatalf("setup: life time %d, want at most 7", n.LifeTime())
+		}
+		if got := n.AggroHate(w.player); got != 200 {
+			t.Fatalf("hate of the character it sees = %v, want 200", got)
+		}
+		w.wantCasts(t, "after a young debuffer saw the character", n, nil)
+	})
 	t.Run("clan", func(t *testing.T) {
 		t.Parallel()
 		w := bootIndividual1(t, raidBoot{}, debufferTemplate())
@@ -413,6 +446,35 @@ func TestWarriorCast2DebuffsAggressiveDebuffsOnSightAndForItsClan(t *testing.T) 
 		me := w.player.ObjectID()
 		w.wantCasts(t, "member after the hit", member, map[modelskill.ID]ind1Cast{ind1Debuff1ID: {me, 1000000}, ind1Debuff2ID: {me, 1000000}})
 	})
+}
+
+// TestWarriorCast2DebuffsAggressiveSkipsAHeldDebuff ports the abnormal
+// level gate of WarriorCast2DebuffsAggressive's debuffs, every draw 0: hit
+// by its most hated while the character holds an effect of debuff 1's
+// stack, it wants debuff 2 alone.
+func TestWarriorCast2DebuffsAggressiveSkipsAHeldDebuff(t *testing.T) {
+	t.Parallel()
+	held := ind1Skill(ind1Debuff1ID, 600, false)
+	held.Effects = []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, StackType: "ind1_debuff1", StackOrder: 1}}
+	w := bootIndividual1(t, raidBoot{opts: []gameservertest.Option{gameservertest.WithScriptSkills(held)}}, debufferTemplate())
+	n := w.spawn(t, debufferID, 700, 0)
+	w.srv.InstallNPCCastSeam(t, n, debufferSkills())
+	me := w.player.ObjectID()
+	if !w.srv.RunScript(t, me, "Ind1Director", func(s *script.Script, p *script.Player) {
+		s.ApplyEffects(modelskill.Ref{ID: ind1Debuff1ID, Level: 1}, script.NPCOf(n), p)
+	}) {
+		t.Fatal("the effect landing panicked")
+	}
+	w.srv.AdvanceUntil(t, "debuff 1 landed on the character", func() bool {
+		var level int32
+		w.srv.RunScript(t, me, "Ind1Director", func(s *script.Script, p *script.Player) {
+			level = s.AbnormalLevel(p, modelskill.Ref{ID: ind1Debuff1ID, Level: 1})
+		})
+		return level > 0
+	})
+	w.hit(t, n, 10)
+	w.hit(t, n, 10)
+	w.wantCasts(t, "after a hit by the most hated", n, map[modelskill.ID]ind1Cast{ind1Debuff2ID: {me, 1000000}})
 }
 
 // ramphoTemplate is the fixture RamphoPrimeval NPC of AI parameters ai,
@@ -700,26 +762,68 @@ func TestRoyalRushWarriorDrawsItsWeapon(t *testing.T) {
 // TestRoyalRushWarriorAssistsItsClan ports RoyalRushWarriorPhysicalSpecial2's
 // clan-attacked hook, every draw 0: a settled clan member that is not
 // attacking wants its first physical special on an attacker farther than
-// 100 from it, and its second on one closer than 100, weight 1000000.
+// 100 from it, and its second on one closer than 100, weight 1000000. A
+// member that drew its weapon charges a soulshot (MagicSkillUse 2154)
+// instead of the close strike, and a member already attacking does
+// nothing.
 func TestRoyalRushWarriorAssistsItsClan(t *testing.T) {
 	t.Parallel()
 	w := bootIndividual1(t, raidBoot{}, royalTemplate(royalGuardID, nil), royalTemplate(royalGuardTwoID, nil))
 	victim := w.spawn(t, royalGuardID, 0, 400)
 	far := w.spawn(t, royalGuardTwoID, 300, 0)
 	near := w.spawn(t, royalGuardTwoID, 50, 0)
-	for _, h := range []*npc.Hostile{far, near} {
+	drawn := w.spawn(t, royalGuardTwoID, 0, -60)
+	attacking := w.spawn(t, royalGuardTwoID, -60, 0)
+	members := []*npc.Hostile{far, near, drawn, attacking}
+	for _, h := range members {
 		w.srv.InstallNPCCastSeam(t, h, royalSkills())
 	}
+	// The hit lands before any member has settled, so none calls for help.
+	w.hit(t, attacking, 10)
+	w.onQueue(t, drawn, func() { script.NPCOf(drawn).SetInt(script.SlotIntAI0, 1) })
 	w.ticks(t, 8)
-	for _, h := range []*npc.Hostile{far, near} {
+	for _, h := range members {
 		if h.LifeTime() <= 7 {
 			t.Fatalf("member life time = %d, want past 7", h.LifeTime())
 		}
+		if casts := ind1Casts(h); len(casts) != 0 {
+			t.Fatalf("setup: member %d wants %+v before the hit", h.ObjectID(), casts)
+		}
 	}
+	if got := attacking.AI().CurrentIntention(); got != actorai.IntentionAttack {
+		t.Fatalf("setup: the hit member's intention = %v, want attack", got)
+	}
+	w.srv.ReadQueued(t, w.srv.Client)
 	w.hit(t, victim, 10)
+	frames := w.srv.ReadQueued(t, w.srv.Client)
 	me := w.player.ObjectID()
 	w.wantCasts(t, "far member", far, map[modelskill.ID]ind1Cast{royalSpecial1ID: {me, 1000000}})
 	w.wantCasts(t, "near member", near, map[modelskill.ID]ind1Cast{royalSpecial2ID: {me, 1000000}})
+	w.wantCasts(t, "member with its weapon drawn", drawn, nil)
+	w.wantCasts(t, "attacking member", attacking, nil)
+	if got := castsOf(frames, drawn, 2154); len(got) != 1 {
+		t.Fatalf("soulshot MagicSkillUse frames of the member with its weapon drawn = %d, want 1", len(got))
+	}
+	for _, h := range []*npc.Hostile{far, near, attacking} {
+		if got := castsOf(frames, h, 2154); len(got) != 0 {
+			t.Fatalf("member %d charged a soulshot", h.ObjectID())
+		}
+	}
+}
+
+// TestRoyalRushWarriorStrikesFromRange ports the ranged branch of
+// RoyalRushWarriorPhysicalSpecial2's attacked hook, every draw 0: hit by
+// its top desire target from farther than 100, it wants its second
+// physical special on the attacker, weight 1000000.
+func TestRoyalRushWarriorStrikesFromRange(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual1(t, raidBoot{}, royalTemplate(royalGuardID, nil))
+	n := w.spawn(t, royalGuardID, 300, 0)
+	w.srv.InstallNPCCastSeam(t, n, royalSkills())
+	w.hit(t, n, 10)
+	w.wantCasts(t, "after the first hit", n, nil)
+	w.hit(t, n, 10)
+	w.wantCasts(t, "after a hit by its top desire target", n, map[modelskill.ID]ind1Cast{royalSpecial2ID: {w.player.ObjectID(), 1000000}})
 }
 
 // TestRoyalRushWarriorAttacksTheNamedCreature ports
