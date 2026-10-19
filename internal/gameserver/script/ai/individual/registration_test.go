@@ -15,7 +15,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// listed are the scripts.xml entries from Walkers to RoyalRushMissionNpc,
+// listed are the scripts.xml entries from Walkers to WarriorPetForPC,
 // in file order, with the Go constructor of each; ported marks the ones
 // this package ports.
 var listed = []struct {
@@ -31,11 +31,15 @@ var listed = []struct {
 	{"script.ai.individual.DefaultNpc", defaultnpc.New, false},
 	{"script.ai.individual.ImperialGravekeeper", ImperialGravekeeper, true},
 	{"script.ai.individual.RoyalRushMissionNpc", RoyalRushMissionNpc, true},
+	{"script.ai.individual.RoyalRushNpc", RoyalRushNpc, true},
+	{"script.ai.individual.SacrificialVictim", SacrificialVictim, true},
+	{"script.ai.individual.TriolCamera", TriolCamera, true},
+	{"script.ai.individual.WarriorPetForPC", WarriorPetForPC, true},
 }
 
 // folkIDs are the bound ids the datapack types Folk; the rest are Monster.
 func folkIDs() []int32 {
-	return []int32{31705, 32051, 32058, 32059, 32060, 32061, 32062, 32063, 32064, 32065, 32066, 32067, 32068}
+	return []int32{13015, 31705, 31921, 31922, 31923, 31924, 32038, 32051, 32058, 32059, 32060, 32061, 32062, 32063, 32064, 32065, 32066, 32067, 32068}
 }
 
 // registrationView is what a manifest-layout text records of the ported
@@ -110,7 +114,7 @@ func readRegistrationView(t *testing.T, path string, ours, kept map[string]bool,
 // refused, and the registry dump equals the reference manifest: each
 // class's kind and bind lines (DaimonTheWhiteEyed a plain script binding
 // created and first talk), and the folded per-(npc, event) lists naming
-// one of them: 75 entries, Daimon's created list after Walkers'.
+// one of them: 122 entries, Daimon's created list after Walkers'.
 func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	var list []script.Listing
 	catalog := script.Catalog{}
@@ -143,8 +147,8 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	want := readRegistrationView(t, path, ours, kept, sc)
-	if n := len(want.folds); n != 75 {
-		t.Fatalf("reference folds = %d entries, want 75", n)
+	if n := len(want.folds); n != 122 {
+		t.Fatalf("reference folds = %d entries, want 122", n)
 	}
 
 	for _, c := range listed {
@@ -164,7 +168,7 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ:\n got %q\nwant %q", got.folds, want.folds)
 	}
-	for _, id := range []int32{32051, 32058, 18119, 27181, 18150} {
+	for _, id := range []int32{32051, 32058, 18119, 27181, 18150, 31921, 32038, 13015, 16013} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a ported behavior bound", id)
 		}

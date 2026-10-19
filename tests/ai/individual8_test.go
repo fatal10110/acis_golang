@@ -47,7 +47,8 @@ const (
 )
 
 // ind8Batch are the batch's classes, in scripts.xml order around
-// DefaultNpc.
+// DefaultNpc, then two quests the tamed beasts read, each a stub with no
+// hook.
 var ind8Batch = []struct {
 	path string
 	ctor func() script.Script
@@ -59,6 +60,12 @@ var ind8Batch = []struct {
 	{"script.ai.individual.DefaultNpc", defaultnpc.New},
 	{"script.ai.individual.ImperialGravekeeper", individual.ImperialGravekeeper},
 	{"script.ai.individual.RoyalRushMissionNpc", individual.RoyalRushMissionNpc},
+	{"script.ai.individual.RoyalRushNpc", individual.RoyalRushNpc},
+	{"script.ai.individual.SacrificialVictim", individual.SacrificialVictim},
+	{"script.ai.individual.TriolCamera", individual.TriolCamera},
+	{"script.ai.individual.WarriorPetForPC", individual.WarriorPetForPC},
+	{"quest." + ind8Q020, ind8QuestStub(ind8Q020, 20)},
+	{"quest." + ind8Q655, ind8QuestStub(ind8Q655, 655)},
 }
 
 // ind8World is ind1World with the batch registered, a director script to
@@ -109,8 +116,8 @@ func bootIndividual8(t *testing.T, extra raidBoot, templates ...*npc.Template) *
 }
 
 // ind8Skills are the skills the batch's NPCs cast, at the levels they cast
-// them: Daimon's curses and blessings, the Gravekeeper's self skill and
-// the victim's four.
+// them: Daimon's curses and blessings, the Gravekeeper's self skill, the
+// victim's four and the tamed beasts'.
 func ind8Skills() *modelskill.Table {
 	at := func(id modelskill.ID, level int) modelskill.Definition {
 		d := ind1Skill(id, 600, false)
@@ -123,10 +130,10 @@ func ind8Skills() *modelskill.Table {
 		return d
 	}
 	self := ind1Skill(4080, 0, true)
-	return modelskill.NewTable([]modelskill.Definition{
+	return modelskill.NewTable(append([]modelskill.Definition{
 		at(1206, 19), at(1083, 17), blessing(1086, 2), blessing(1059, 3),
 		self, at(4384, 1), at(4385, 1), at(4386, 1), at(4387, 1),
-	})
+	}, ind8PetSkills()...))
 }
 
 // ind8Folk is a civilian fixture template of id with ai as its AI
