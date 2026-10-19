@@ -1,0 +1,116 @@
+# Sweet Whispers (Q015): a level 60 character accepts at Vladimir, finds the hierarch with nothing
+# to say yet, visits the mysterious necromancer, then the hierarch, who rewards the trip with
+# experience; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q015_sweet_whispers.golden
+character Listener 60
+script quest.Q015_SweetWhispers
+page merchant/31302.htm
+page default/31517.htm
+page default/31518.htm
+page script/quest/Q015_SweetWhispers/
+npc vladimir 31302 Merchant 10 0 0
+npc hierarch 31517 Folk 20 0 0
+npc necro 31518 Folk 30 0 0
+
+# Vladimir: accept.
+action vladimir
+action vladimir
+  S ActionFailed
+  S NpcHtmlMessage obj=vladimir item=0 page=merchant/31302.htm
+  S ActionFailed
+bypass npc_{vladimir}_Quest
+  S NpcHtmlMessage obj=vladimir item=0 page=script/quest/Q015_SweetWhispers/31302-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q015_SweetWhispers CREATED
+bypass Quest Q015_SweetWhispers 31302-01.htm
+  S QuestList 15:0x80000001
+  S ExShowQuestMark quest=15
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=vladimir item=0 page=script/quest/Q015_SweetWhispers/31302-01.htm
+  S ActionFailed
+  Q upsert Q015_SweetWhispers | <state> | STARTED
+  Q upsert Q015_SweetWhispers | <cond> | 1
+  state Q015_SweetWhispers STARTED
+  rows Q015_SweetWhispers <cond>=1 <state>=STARTED
+action vladimir
+  S ActionFailed
+  S NpcHtmlMessage obj=vladimir item=0 page=merchant/31302.htm
+  S ActionFailed
+bypass npc_{vladimir}_Quest
+  S NpcHtmlMessage obj=vladimir item=0 page=script/quest/Q015_SweetWhispers/31302-01a.htm
+  S ActionFailed
+  S ActionFailed
+
+# The hierarch has nothing to say before the necromancer.
+action hierarch
+action hierarch
+  S ActionFailed
+  S NpcHtmlMessage obj=hierarch item=0 page=default/31517.htm
+  S ActionFailed
+bypass npc_{hierarch}_Quest
+  S NpcHtmlMessage obj=hierarch item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+# The mysterious necromancer.
+action necro
+action necro
+  S ActionFailed
+  S NpcHtmlMessage obj=necro item=0 page=default/31518.htm
+  S ActionFailed
+bypass npc_{necro}_Quest
+  S NpcHtmlMessage obj=necro item=0 page=script/quest/Q015_SweetWhispers/31518-00.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q015_SweetWhispers 31518-01.htm
+  S QuestList 15:0x80000003
+  S ExShowQuestMark quest=15
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=necro item=0 page=script/quest/Q015_SweetWhispers/31518-01.htm
+  S ActionFailed
+  Q upsert Q015_SweetWhispers | <cond> | 2
+  rows Q015_SweetWhispers <cond>=2 <state>=STARTED
+action necro
+  S ActionFailed
+  S NpcHtmlMessage obj=necro item=0 page=default/31518.htm
+  S ActionFailed
+bypass npc_{necro}_Quest
+  S NpcHtmlMessage obj=necro item=0 page=script/quest/Q015_SweetWhispers/31518-01a.htm
+  S ActionFailed
+  S ActionFailed
+
+# The hierarch: experience; the quest completes.
+action hierarch
+action hierarch
+  S ActionFailed
+  S NpcHtmlMessage obj=hierarch item=0 page=default/31517.htm
+  S ActionFailed
+bypass npc_{hierarch}_Quest
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q015_SweetWhispers/31517-00.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q015_SweetWhispers 31517-01.htm
+  S SystemMessage id=45 1:60217
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 15:0x00000000
+  S NpcHtmlMessage obj=hierarch item=0 page=script/quest/Q015_SweetWhispers/31517-01.htm
+  S ActionFailed
+  Q upsert Q015_SweetWhispers | <state> | COMPLETED
+  Q delete-except-state Q015_SweetWhispers
+  state Q015_SweetWhispers COMPLETED
+  rows Q015_SweetWhispers <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row.
+relog
+  state Q015_SweetWhispers COMPLETED
+  rows Q015_SweetWhispers <state>=COMPLETED
+action vladimir
+action vladimir
+  S ActionFailed
+  S NpcHtmlMessage obj=vladimir item=0 page=merchant/31302.htm
+  S ActionFailed
+bypass npc_{vladimir}_Quest
+  S NpcHtmlMessage obj=vladimir item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
