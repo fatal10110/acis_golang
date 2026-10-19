@@ -92,8 +92,9 @@ func clearQuestSlot(s *script.Script, n *script.NPC) {
 // lv3Strike adds the LV3 attacked formula of a playable attacker to the
 // NPC's attack desire, a damage of 0 counting as 1, and, when attacker is
 // its top desire target, a 33% chance to want to strike it with one of its
-// three physical specials. It returns the damage the parent call passes on.
-func lv3Strike(s *script.Script, n *script.NPC, attacker script.Creature, damage int32) int32 {
+// three physical specials, at weight. It returns the damage the parent
+// call passes on.
+func lv3Strike(s *script.Script, n *script.NPC, attacker script.Creature, damage int32, weight float64) int32 {
 	if attacker.Playable() {
 		if damage == 0 {
 			damage = 1
@@ -102,11 +103,11 @@ func lv3Strike(s *script.Script, n *script.NPC, attacker script.Creature, damage
 		if script.Same(n.TopDesireTarget(), attacker) && s.Rnd(100) < 33 {
 			switch s.Rnd(3) {
 			case 0:
-				castByType(n, attacker, npc.SkillTypePhysicalSpecial1, 1000)
+				castByType(n, attacker, npc.SkillTypePhysicalSpecial1, weight)
 			case 1:
-				castByType(n, attacker, npc.SkillTypePhysicalSpecial2, 1000)
+				castByType(n, attacker, npc.SkillTypePhysicalSpecial2, weight)
 			case 2:
-				castByType(n, attacker, npc.SkillTypePhysicalSpecial3, 1000)
+				castByType(n, attacker, npc.SkillTypePhysicalSpecial3, weight)
 			}
 		}
 	}
@@ -139,7 +140,7 @@ func LV3Dagger() script.Script {
 			base.Created(s, e)
 		},
 		OnAttacked: func(s *script.Script, e script.Attacked) {
-			e.Damage = lv3Strike(s, e.NPC, e.Attacker, e.Damage)
+			e.Damage = lv3Strike(s, e.NPC, e.Attacker, e.Damage, 1000)
 			base.Attacked(s, e)
 		},
 		OnTimer: func(s *script.Script, e script.Timer) string {
@@ -179,7 +180,7 @@ func LV3Knight() script.Script {
 				castByType(n, n, npc.SkillTypeDefenceMode, 1000000)
 				s.StartTimer("4000", n, nil, time.Duration(5000+(1000*s.Rnd(6)))*time.Millisecond)
 			}
-			e.Damage = lv3Strike(s, n, e.Attacker, e.Damage)
+			e.Damage = lv3Strike(s, n, e.Attacker, e.Damage, 1000)
 			if n.Int(script.SlotIntAI0) == 1 && n.Int(script.SlotIntAI1) == 0 && n.HPRatio() < 0.5 && s.Rnd(100) < 80 {
 				n.SetInt(script.SlotIntAI0, 2)
 				n.SetInt(script.SlotIntAI1, 1)
@@ -261,7 +262,7 @@ func LV3Orc() script.Script {
 					n.SetInt(script.SlotIntAI0, n.Int(script.SlotIntAI0)+1)
 				}
 			}
-			e.Damage = lv3Strike(s, n, e.Attacker, e.Damage)
+			e.Damage = lv3Strike(s, n, e.Attacker, e.Damage, 1000)
 			base.Attacked(s, e)
 		},
 	})}
