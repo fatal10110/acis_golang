@@ -1,0 +1,23 @@
+# Sword of Solidarity (Q101), refused: an elven fighter of level 9 is turned away by Roien, who
+# takes humans only, and the quest is not started. Expectations replay the reference trace of
+# this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q101_sword_of_solidarity_wrong_race.golden
+character Stranger 9
+class 18
+script quest.Q101_SwordOfSolidarity
+item 796
+page default/30008.htm
+page script/quest/Q101_SwordOfSolidarity/
+npc roien 30008 Folk 10 0 0
+
+action roien
+action roien
+  S ActionFailed
+  S NpcHtmlMessage obj=roien item=0 page=default/30008.htm
+  S ActionFailed
+bypass npc_{roien}_Quest
+  S NpcHtmlMessage obj=roien item=0 page=script/quest/Q101_SwordOfSolidarity/30008-01a.htm
+  S ActionFailed
+  S ActionFailed
+  state Q101_SwordOfSolidarity CREATED
+  rows Q101_SwordOfSolidarity -

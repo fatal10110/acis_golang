@@ -11,12 +11,12 @@ import (
 // message id 1039 of a warehouse link holds the fixture id 103, stays whole.
 func TestPacketRendersRoleIDsAsWholeNumbers(t *testing.T) {
 	roles := map[int32]string{103: "hestui", 104: "grookin"}
-	html := `<a action="bypass -h npc_104_DepositC" msg="1039">Deposit</a><a action="bypass -h npc_104_Quest">103 10310 0103</a>`
+	html := `<a action="bypass -h npc_104_DepositC" msg="1039">Deposit</a><a action="bypass -h npc_104_Quest">103 10310 0103</a><a action="bypass -h Quest Q103_X 104-01.htm">`
 	got, err := Packet(payload(t, serverpackets.FrameNpcHtmlMessage(104, html, 0)), roles)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `S NpcHtmlMessage obj=grookin item=0 html="<a action=\"bypass -h npc_{grookin}_DepositC\" msg=\"1039\">Deposit</a><a action=\"bypass -h npc_{grookin}_Quest\">{hestui} 10310 0103</a>"`
+	want := `S NpcHtmlMessage obj=grookin item=0 html="<a action=\"bypass -h npc_{grookin}_DepositC\" msg=\"1039\">Deposit</a><a action=\"bypass -h npc_{grookin}_Quest\">{hestui} 10310 0103</a><a action=\"bypass -h Quest Q103_X {grookin}-01.htm\">"`
 	if got != want {
 		t.Fatalf("got  %s\nwant %s", got, want)
 	}
