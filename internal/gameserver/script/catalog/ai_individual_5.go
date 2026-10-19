@@ -1,14 +1,17 @@
 package catalog
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/script"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/warrior"
+)
 
 // aiIndividual5 is the catalog of batch 5 of 8 of the individual NPC behaviors (#190).
 func aiIndividual5() script.Catalog {
 	return script.Catalog{
-		"script.ai.individual.Monster.WarriorBase.Chests.TreasureChest":                                                                                       nil,
-		"script.ai.individual.Monster.WarriorBase.Chests.TreasureChestMimic":                                                                                  nil,
-		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderSplit":                                                                                   nil,
-		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderSplitAggressive":                                                                         nil,
+		"script.ai.individual.Monster.WarriorBase.Chests.TreasureChest":                                                                                       warrior.TreasureChest,
+		"script.ai.individual.Monster.WarriorBase.Chests.TreasureChestMimic":                                                                                  warrior.TreasureChestMimic,
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderSplit":                                                                                   warrior.PartyLeaderSplit,
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderSplitAggressive":                                                                         warrior.PartyLeaderSplitAggressive,
 		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushBomb":                                                                        nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb":                                                                 nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb2":                                                                nil,
@@ -19,10 +22,10 @@ func aiIndividual5() script.Catalog {
 		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBossBasic":                                                      nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.TyrannoPrimeval.TyrannoPrimeval":                                                                    nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.TyrannoPrimeval.TyrannoPrimevalWalker":                                                              nil,
-		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserker":                                                                                   nil,
-		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecial":                                                                    nil,
-		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecialAggressive":                                                          nil,
-		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecialStoneAggressive":                                                     nil,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserker":                                                                                   warrior.Berserker,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecial":                                                                    warrior.BerserkerPhysicalSpecial,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecialAggressive":                                                          warrior.BerserkerPhysicalSpecialAggressive,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecialStoneAggressive":                                                     warrior.BerserkerPhysicalSpecialStoneAggressive,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBomb":                                                                                        nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBombAggressive":                                                                              nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagicPhysicalSpecial.WarriorCastDDMagicPhysicalSpecial":                                nil,
