@@ -10,6 +10,7 @@ import (
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/warrior"
+	"github.com/fatal10110/acis_golang/internal/gameserver/world"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -118,6 +119,18 @@ func ind3Skills() *modelskill.Table {
 		ind1Skill(ind3DDMagicSkill, 2000, false), ind1Skill(ind3SpecialSkill, 2000, false),
 		ind1Skill(ind3HealSkill, 0, true), ind1Skill(ind3SelfBuffSkill, 0, true),
 	})
+}
+
+// ind3Live counts the hostile NPCs of the template npcID in the world.
+func ind3Live(w *ind1World, npcID int32) int {
+	n := 0
+	w.srv.State.FindObject(func(o world.Tracked) bool {
+		if h, ok := o.(*npc.Hostile); ok && h.NpcID() == int(npcID) {
+			n++
+		}
+		return false
+	})
+	return n
 }
 
 // clearDesires drops h's queued desires and settles.
@@ -304,7 +317,8 @@ func TestPartyLeaderCastDDAggressiveAttacksOnSight(t *testing.T) {
 // created and see-creature hooks. It spawns with i_ai0 0, weight point 10
 // and none of its two declared privates, its created hook calling no
 // parent. The first character it sees sets i_ai0 and gets hate 200; it
-// creates the privates then only with no SummonPrivateRate.
+// creates the privates then only with no SummonPrivateRate, and seeing
+// the character again creates no more.
 func TestPartyLeaderBombSpawnCallsPrivatesOnSight(t *testing.T) {
 	t.Parallel()
 	for _, row := range []struct {
@@ -329,6 +343,17 @@ func TestPartyLeaderBombSpawnCallsPrivatesOnSight(t *testing.T) {
 			privatesOf(t, n, row.privates)
 			if got := n.AggroHate(w.player); got != 200 {
 				t.Fatalf("hate of the character it sees = %v, want 200", got)
+			}
+
+			// It sees the character again once the character leaves its
+			// sight and comes back; the privates come only once.
+			w.moveCharacter(t, n, 800, 0)
+			w.ticks(t, 1)
+			w.moveCharacter(t, n, -150, 0)
+			w.ticks(t, 1)
+			privatesOf(t, n, row.privates)
+			if got := ind3Live(w, partyPrivateID); got != row.privates {
+				t.Fatalf("privates in the world after the second sighting = %d, want %d", got, row.privates)
 			}
 		})
 	}
@@ -506,23 +531,42 @@ func TestPartyLeaderPhysicalSpecialAnswersItsClanOnce(t *testing.T) {
 // PartyLeaderPhysicalSpecialAggressive's see-creature hook, every draw 0.
 // Settled, wandering in its territory, it spends its strike on the
 // character it sees more than 100 away, then attacks it (hate 200); seen
-// at 50 it only attacks.
+// at 50 it only attacks. So does a young one, and one already attacking
+// another NPC: the sight only adds hate 200.
 func TestPartyLeaderPhysicalSpecialAggressiveStrikesOnSight(t *testing.T) {
 	t.Parallel()
 	for _, row := range []struct {
-		name   string
-		dx     int
-		strike bool
-	}{{"far", -150, true}, {"near", -50, false}} {
+		name      string
+		settle    int
+		attacking bool
+		dx        int
+		strike    bool
+	}{{"far", 9, false, -150, true}, {"near", 9, false, -50, false}, {"young", 1, false, -150, false}, {"attacking", 9, true, -150, false}} {
 		t.Run(row.name, func(t *testing.T) {
 			t.Parallel()
-			w := bootIndividual3(t, ind3Template(ind3SpecialAggrID, nil, false))
+			w := bootIndividual3(t, ind3Template(ind3SpecialAggrID, nil, false), warriorTemplate(unboundID, nil))
 			n := w.spawn(t, ind3SpecialAggrID, 1500, 0)
 			w.srv.InstallNPCCastSeam(t, n, ind3Skills())
-			w.ticks(t, 9)
-			if n.LifeTime() <= 7 || n.AI().CurrentIntention() != actorai.IntentionWander {
-				t.Fatalf("setup: life time %d, intention %v, want past 7 and wander", n.LifeTime(), n.AI().CurrentIntention())
+			w.ticks(t, row.settle)
+			switch {
+			case row.settle <= 7:
+				if n.LifeTime() > 7 {
+					t.Fatalf("setup: life time %d, want at most 7", n.LifeTime())
+				}
+			case row.attacking:
+				x, y, _ := n.Position()
+				prey := w.spawn(t, unboundID, x-w.at.X+100, y-w.at.Y)
+				w.onQueue(t, n, func() { script.NPCOf(n).AddAttackDesire(script.NPCOf(prey), 100) })
+				w.ticks(t, 1)
+				if got := n.AI().CurrentIntention(); got != actorai.IntentionAttack {
+					t.Fatalf("setup: intention after it went for the other NPC = %v, want attack", got)
+				}
+			default:
+				if n.LifeTime() <= 7 || n.AI().CurrentIntention() != actorai.IntentionWander {
+					t.Fatalf("setup: life time %d, intention %v, want past 7 and wander", n.LifeTime(), n.AI().CurrentIntention())
+				}
 			}
+			hateBefore := n.AggroHate(w.player)
 			w.moveCharacter(t, n, row.dx, 0)
 			w.ticks(t, 1)
 			want := map[modelskill.ID]ind1Cast{}
@@ -535,8 +579,8 @@ func TestPartyLeaderPhysicalSpecialAggressiveStrikesOnSight(t *testing.T) {
 			if got := ind1Slot(n, script.SlotIntAI0); got != wantAI0 {
 				t.Fatalf("i_ai0 after it saw the character = %d, want %d", got, wantAI0)
 			}
-			if got := n.AggroHate(w.player); got != 200 {
-				t.Fatalf("hate of the character it sees = %v, want 200", got)
+			if got := n.AggroHate(w.player) - hateBefore; got != 200 {
+				t.Fatalf("hate the sight added = %v, want 200", got)
 			}
 		})
 	}
