@@ -763,6 +763,12 @@ func (l *GameClientLink) runChangeWaitType(live *livePlayer, stand bool, target 
 		return
 	}
 	if !stand {
+		// An accepted sit stops a walk or follow first, so observers see
+		// the stop ahead of the sit and the throne range is measured
+		// where the player stopped. A refused sit stops nothing.
+		if live.move != nil && !live.AlikeDead() && live.Standing() {
+			live.move.Stop()
+		}
 		if target != nil && l.sitLiveOnChair(live, target) {
 			live.holdPosture(false)
 			return
