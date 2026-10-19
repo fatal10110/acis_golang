@@ -1,0 +1,184 @@
+# Proof of Valor (Q271): an orc fighter of level 4 accepts at Rukain (a guard); Kasha wolves give
+# two fangs each (the one-in-four roll pinned to two), the fiftieth fang moving the quest on; Rukain
+# takes them for a necklace, here pinned to the necklace of valor, and the repeatable quest ends.
+# Holding the necklace, Rukain offers the quest with his "already proven" page, and accepting it
+# again answers that page too; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q271_proof_of_valor.golden
+character Valiant 4
+class 44
+random always 0
+script quest.Q271_ProofOfValor
+item 1473 1507 1506
+page guard/30577.htm
+page script/quest/Q271_ProofOfValor/
+npc rukain 30577 Guard 10 0 0
+npc wolf 20475 Monster 40 0 0
+
+# Rukain: accept.
+action rukain
+action rukain
+  S ActionFailed
+  S NpcHtmlMessage obj=rukain item=0 page=guard/30577.htm
+  S ActionFailed
+bypass npc_{rukain}_Quest
+  S NpcHtmlMessage obj=rukain item=0 page=script/quest/Q271_ProofOfValor/30577-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q271_ProofOfValor CREATED
+bypass Quest Q271_ProofOfValor 30577-03.htm
+  S QuestList 271:0x80000001
+  S ExShowQuestMark quest=271
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rukain item=0 page=script/quest/Q271_ProofOfValor/30577-03.htm
+  S ActionFailed
+  Q upsert Q271_ProofOfValor | <state> | STARTED
+  Q upsert Q271_ProofOfValor | <cond> | 1
+  state Q271_ProofOfValor STARTED
+  rows Q271_ProofOfValor <cond>=1 <state>=STARTED
+action rukain
+  S ActionFailed
+  S NpcHtmlMessage obj=rukain item=0 page=guard/30577.htm
+  S ActionFailed
+bypass npc_{rukain}_Quest
+  S NpcHtmlMessage obj=rukain item=0 page=script/quest/Q271_ProofOfValor/30577-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Twenty-five Kasha wolves, two fangs each: the fiftieth completes the set.
+kill wolf x24
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1473=48
+  rows Q271_ProofOfValor <cond>=1 <state>=STARTED
+kill wolf
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1473 6:2
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 271:0x80000003
+  S ExShowQuestMark quest=271
+  Q upsert Q271_ProofOfValor | <cond> | 2
+  items 1473=50
+  rows Q271_ProofOfValor <cond>=2 <state>=STARTED
+
+# Rukain: the fangs for the necklace of valor (a roll of 0); the quest ends.
+action rukain
+  S ActionFailed
+  S NpcHtmlMessage obj=rukain item=0 page=guard/30577.htm
+  S ActionFailed
+bypass npc_{rukain}_Quest
+  S SystemMessage id=301 3:1473 6:50
+  S SystemMessage id=54 3:1507
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=rukain item=0 page=script/quest/Q271_ProofOfValor/30577-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q271_ProofOfValor
+  items 1473=0 1507=1
+  state Q271_ProofOfValor -
+  rows Q271_ProofOfValor -
+
+# With the necklace: the "already proven" page, and the same page on accepting.
+action rukain
+  S ActionFailed
+  S NpcHtmlMessage obj=rukain item=0 page=guard/30577.htm
+  S ActionFailed
+bypass npc_{rukain}_Quest
+  S NpcHtmlMessage obj=rukain item=0 page=script/quest/Q271_ProofOfValor/30577-06.htm
+  S ActionFailed
+  S ActionFailed
+  state Q271_ProofOfValor CREATED
+bypass Quest Q271_ProofOfValor 30577-03.htm
+  S QuestList 271:0x80000001
+  S ExShowQuestMark quest=271
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rukain item=0 page=script/quest/Q271_ProofOfValor/30577-07.htm
+  S ActionFailed
+  Q upsert Q271_ProofOfValor | <state> | STARTED
+  Q upsert Q271_ProofOfValor | <cond> | 1
+  state Q271_ProofOfValor STARTED
+  rows Q271_ProofOfValor <cond>=1 <state>=STARTED
+action rukain
+  S ActionFailed
+  S NpcHtmlMessage obj=rukain item=0 page=guard/30577.htm
+  S ActionFailed
+bypass npc_{rukain}_Quest
+  S NpcHtmlMessage obj=rukain item=0 page=script/quest/Q271_ProofOfValor/30577-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Relog: the started quest loads from its rows.
+relog
+  state Q271_ProofOfValor STARTED
+  rows Q271_ProofOfValor <cond>=1 <state>=STARTED
+  items 1507=1
