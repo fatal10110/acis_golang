@@ -154,7 +154,7 @@ func (s *Service) Command(ctx context.Context, t Talker, npcObjectID int32, dawn
 	if dawn {
 		h.side = "dawn"
 	}
-	h.tokens = strings.FieldsFunc(strings.TrimFunc(command, javaSpace), tokenSpace)
+	h.tokens = strings.FieldsFunc(strings.TrimFunc(command, isCtrlOrSpace), tokenSpace)
 	h.next = 1
 	value, ok := h.int()
 	if !ok {
@@ -771,7 +771,7 @@ func commandNumber(command string, begin int) (int, bool) {
 	if !ok {
 		return 0, false
 	}
-	n, err := commons.ParseInt(strings.TrimFunc(arg, javaSpace), 32)
+	n, err := commons.ParseInt(strings.TrimFunc(arg, isCtrlOrSpace), 32)
 	return int(n), err == nil
 }
 
@@ -786,11 +786,12 @@ func commandChars(command string, begin int) (string, bool) {
 	return commons.UTF16String(units[begin:]), true
 }
 
-// javaSpace is what a trim strips: every character up to and including
+// isCtrlOrSpace is what a trim strips: every character up to and including
 // the space.
-func javaSpace(r rune) bool { return r <= ' ' }
+func isCtrlOrSpace(r rune) bool { return r <= ' ' }
 
-// tokenSpace is what StringTokenizer splits on by default.
+// tokenSpace is the whitespace a page argument splits on: space, tab, line
+// feed, carriage return and form feed.
 func tokenSpace(r rune) bool {
 	return r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\f'
 }

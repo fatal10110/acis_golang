@@ -37,7 +37,7 @@ func (l *GameClientLink) doorInfoPage(d *door.Object) string {
 		"%pdef%", strconv.Itoa(d.PhysicalDefence()),
 		"%mdef%", strconv.Itoa(d.MagicDefence()),
 		"%spawn%", strconv.Itoa(x)+", "+strconv.Itoa(y)+", "+strconv.Itoa(z)+", "+strconv.Itoa(d.Heading()),
-		"%height%", commons.JavaDouble(float64(d.Height())),
+		"%height%", commons.FormatDouble(float64(d.Height())),
 	)
 }
 

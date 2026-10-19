@@ -46,7 +46,7 @@ func (l *GameClientLink) adminSkill(gm *livePlayer, line string) {
 		if !ok || !isDigits(tok) {
 			return true
 		}
-		n, ok := parseJavaInt(tok)
+		n, ok := parseInt32(tok)
 		page = int(n)
 		return ok
 	}
@@ -68,7 +68,7 @@ func (l *GameClientLink) adminSkill(gm *livePlayer, line string) {
 			}
 		default:
 			if isDigits(param) {
-				n, ok := parseJavaInt(param)
+				n, ok := parseInt32(param)
 				if !ok {
 					return
 				}
@@ -95,13 +95,13 @@ func (l *GameClientLink) adminSkillSet(gm, target *livePlayer, next func() (stri
 	if param == "all" {
 		return onPlayer(gm, target, func() { l.rewardAdminSkills(gm, target) })
 	}
-	id, ok := parseJavaInt(param)
+	id, ok := parseInt32(param)
 	if !ok {
 		sendText(gm, usage)
 		return true
 	}
 	levelParam, _ := next()
-	level, ok := parseJavaInt(levelParam)
+	level, ok := parseInt32(levelParam)
 	if !ok {
 		sendText(gm, usage)
 		return true
@@ -127,7 +127,7 @@ func (l *GameClientLink) adminSkillRemove(gm, target *livePlayer, next func() (s
 	if param == "all" {
 		return onPlayer(gm, target, func() { l.removeAdminSkills(gm, target) })
 	}
-	id, ok := parseJavaInt(param)
+	id, ok := parseInt32(param)
 	if !ok {
 		sendText(gm, usage)
 		return true

@@ -83,7 +83,7 @@ func writeBuyList(w *wire.Writer, list buylist.List, count func(buylist.Product)
 		if product.SiegeGuardTicket() {
 			price = float64(product.Price) * siegeGuardsPriceRate * (1 + taxRate)
 		}
-		writeShopItem(w, tmpl, product.ItemID, product.ItemID, max(stock, 0), 0, 0, 0, commons.JavaInt(price))
+		writeShopItem(w, tmpl, product.ItemID, product.ItemID, max(stock, 0), 0, 0, 0, commons.TruncInt32Sat(price))
 	}
 	return nil
 }

@@ -27,7 +27,7 @@ func (l *GameClientLink) adminInfo(gm *livePlayer, line string) {
 		sendFilledHTML(gm, 0, l.staticInfoPage(target), 0)
 	default:
 		if inst := npcInstanceOf(target); inst != nil {
-			l.adminNpcInfo(gm, target, inst, javaTokens(line)[1:])
+			l.adminNpcInfo(gm, target, inst, spaceTokens(line)[1:])
 			return
 		}
 		sendFilledHTML(gm, 0, "", 0)
@@ -48,11 +48,10 @@ func (l *GameClientLink) staticInfoPage(obj *staticobject.Object) string {
 	)
 }
 
-// javaTokens splits line on spaces the way a StringTokenizer with a space
-// delimiter does: runs of spaces separate tokens, and any other whitespace
-// stays inside one. The first token is the command word, so the result
-// always holds at least one entry.
-func javaTokens(line string) []string {
+// spaceTokens splits line on spaces: runs of spaces separate tokens, and
+// any other whitespace stays inside one. The first token is the command
+// word, so the result always holds at least one entry.
+func spaceTokens(line string) []string {
 	tokens := strings.FieldsFunc(line, func(r rune) bool { return r == ' ' })
 	if len(tokens) == 0 {
 		return []string{""}
@@ -60,10 +59,10 @@ func javaTokens(line string) []string {
 	return tokens
 }
 
-// formatPercent formats v the way DecimalFormat("#.###") does: at most three
-// fraction digits rounded half-even on v's exact value, no trailing zeros,
-// no integer digit before the point of a value below one, and a lone "0"
-// (signed when v is negative) for a value that rounds to zero.
+// formatPercent formats v with at most three fraction digits, rounded
+// half-even on v's exact value, no trailing zeros, no integer digit before
+// the point of a value below one, and a lone "0" (signed when v is
+// negative) for a value that rounds to zero.
 func formatPercent(v float64) string {
 	s := strconv.FormatFloat(v, 'f', 3, 64)
 	s = strings.TrimRight(strings.TrimRight(s, "0"), ".")

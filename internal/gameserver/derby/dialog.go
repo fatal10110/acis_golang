@@ -218,7 +218,7 @@ func (d dialog) showOdds() Reply {
 		page = replace(page, "Mob"+n, name)
 		odd := "&$804;"
 		if t.odds[i] > 0 {
-			odd = commons.JavaFixed(t.odds[i], 1)
+			odd = commons.FormatFixed(t.odds[i], 1)
 		}
 		page = replace(page, "Odd"+n, odd)
 	}
@@ -254,7 +254,7 @@ func (d dialog) showTicket(holder Holder, command string) Reply {
 	}
 	odd := "0.01"
 	if ticket.Lane == h.First+1 {
-		odd = commons.JavaFixed(h.OddRate, 2)
+		odd = commons.FormatFixed(h.OddRate, 2)
 	}
 	page := d.load(8)
 	page = replace(page, "%raceId%", strconv.Itoa(ticket.Race))
@@ -283,7 +283,7 @@ func (d dialog) calculateWin(holder Holder, command string) Reply {
 	if ticket.Lane == h.First+1 {
 		rate = h.OddRate
 	}
-	payout := commons.JavaInt(float64(ticket.Hundreds*100) * rate)
+	payout := commons.TruncInt32Sat(float64(ticket.Hundreds*100) * rate)
 	return Reply{Redeem: &Redemption{ObjectID: ticket.ObjectID, Payout: payout}, Chat: true}
 }
 
@@ -316,7 +316,7 @@ func (d dialog) viewHistory() Reply {
 		}
 		rows.WriteString(`<tr><td><font color="LEVEL">` + strconv.Itoa(h.RaceID) + `</font> th</td><td><font color="LEVEL">` + strconv.Itoa(first) +
 			`</font> Lane </td><td><font color="LEVEL">` + strconv.Itoa(second) + `</font> Lane</td><td align=right><font color=00ffff>` +
-			commons.JavaFixed(h.OddRate, 2) + `</font> Times</td></tr>`)
+			commons.FormatFixed(h.OddRate, 2) + `</font> Times</td></tr>`)
 	}
 	page := replace(d.load(9), "%infos%", rows.String())
 	return Reply{Page: d.fill(page)}

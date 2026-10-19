@@ -90,7 +90,7 @@ func (s *Script) RewardItems(p *Player, itemID, count int32) {
 	if itemID == item.AdenaID {
 		rate = s.env.Rates.RewardAdena
 	}
-	s.GiveItems(p, itemID, commons.JavaInt(float64(count)*rate))
+	s.GiveItems(p, itemID, commons.TruncInt32Sat(float64(count)*rate))
 }
 
 // RewardExpAndSp gives p exp experience and sp skill points, each scaled
@@ -99,7 +99,7 @@ func (s *Script) RewardItems(p *Player, itemID, count int32) {
 func (s *Script) RewardExpAndSp(p *Player, exp int64, sp int32) {
 	c := p.character()
 	c.WhileAttached(func() {
-		c.AddExpAndSp(commons.JavaLong(float64(exp)*s.env.Rates.XP), int(commons.JavaInt(float64(sp)*s.env.Rates.SP)))
+		c.AddExpAndSp(commons.TruncInt64Sat(float64(exp)*s.env.Rates.XP), int(commons.TruncInt32Sat(float64(sp)*s.env.Rates.SP)))
 	})
 }
 
@@ -205,7 +205,7 @@ func (s *Script) dropAmount(count, chance int32, typ DropType) int32 {
 	rate := s.env.Rates.Drop
 	switch typ {
 	case DropDivmod:
-		chance = commons.JavaInt(float64(chance) * rate)
+		chance = commons.TruncInt32Sat(float64(chance) * rate)
 		amount := count * (chance / MaxChance)
 		if int32(s.env.Rand(MaxChance)) < chance%MaxChance {
 			amount += count
@@ -213,7 +213,7 @@ func (s *Script) dropAmount(count, chance int32, typ DropType) int32 {
 		return amount
 	case DropFixedRate:
 		if int32(s.env.Rand(MaxChance)) < chance {
-			return commons.JavaInt(float64(count) * rate)
+			return commons.TruncInt32Sat(float64(count) * rate)
 		}
 	case DropFixedCount:
 		if float64(s.env.Rand(MaxChance)) < float64(chance)*rate {

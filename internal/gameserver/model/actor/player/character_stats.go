@@ -606,7 +606,7 @@ func (c *Character) shareDamageWithServitor(amount float64, attacker attackable.
 	if !location.In3DRadius(x, y, z, sx, sy, sz, servitorDamageShareRadius) {
 		return 0
 	}
-	share := int(commons.JavaInt(amount * c.calcStat(stat.TransferDamagePercent, 0) / 100))
+	share := int(commons.TruncInt32Sat(amount * c.calcStat(stat.TransferDamagePercent, 0) / 100))
 	share = min(int(servitor.HP())-1, share)
 	if share <= 0 {
 		return 0
@@ -663,7 +663,7 @@ func (c *Character) sendHitFeedback(amount float64, attacker attackable.Combatan
 	if hit.cpOnly {
 		c.BroadcastStatus()
 	}
-	if full := int(commons.JavaInt(amount)); full > 0 && !isDOT && c.hitByOther(attacker) {
+	if full := int(commons.TruncInt32Sat(amount)); full > 0 && !isDOT && c.hitByOther(attacker) {
 		c.emit(event.DamageReceived{AttackerName: attacker.CharacterName(), Amount: full})
 		if shared > 0 {
 			if recipient, ok := actingPlayer(attacker).(servitorShareRecipient); ok {

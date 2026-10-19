@@ -44,7 +44,7 @@ func (l *GameClientLink) adminSpawn(gm *livePlayer, line string) {
 	}
 	respawn := time.Minute
 	if len(args) > 1 {
-		secs, ok := parseJavaInt(args[1])
+		secs, ok := parseInt32(args[1])
 		if !ok {
 			l.sendAdminFile(gm, "spawns.htm")
 			return
@@ -54,7 +54,7 @@ func (l *GameClientLink) adminSpawn(gm *livePlayer, line string) {
 	var tmpl *npc.Template
 	ok := false
 	if idOrName := args[0]; isDigits(idOrName) {
-		id, valid := parseJavaInt(idOrName)
+		id, valid := parseInt32(idOrName)
 		if !valid {
 			l.sendAdminFile(gm, "spawns.htm")
 			return
@@ -141,7 +141,7 @@ func (l *GameClientLink) adminListSpawns(gm *livePlayer, line string) {
 	args := handleradmin.Args(line)
 	page := int32(1)
 	if len(args) > 1 {
-		p, ok := parseJavaInt(args[1])
+		p, ok := parseInt32(args[1])
 		if !ok {
 			return
 		}
@@ -157,7 +157,7 @@ func (l *GameClientLink) adminListSpawns(gm *livePlayer, line string) {
 		}
 		npcID = int32(inst.Template.ID)
 	case isDigits(args[0]):
-		id, ok := parseJavaInt(args[0])
+		id, ok := parseInt32(args[0])
 		if !ok {
 			return
 		}

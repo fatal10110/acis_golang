@@ -24,7 +24,7 @@ func (l *GameClientLink) adminSpawnFence(gm *livePlayer, line string) {
 	}
 	values := [4]int32{3: 1}
 	for i := range min(len(args), len(values)) {
-		v, ok := parseJavaInt(args[i])
+		v, ok := parseInt32(args[i])
 		if !ok {
 			sendText(gm, usage)
 			return
@@ -50,7 +50,7 @@ func (l *GameClientLink) adminDeleteFence(gm *livePlayer, line string) {
 	var id int32
 	ok := len(args) > 0
 	if ok {
-		id, ok = parseJavaInt(args[0])
+		id, ok = parseInt32(args[0])
 	}
 	if !ok {
 		sendText(gm, "Usage: //deletefence <objectId>")

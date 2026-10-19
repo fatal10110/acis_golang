@@ -29,13 +29,13 @@ func (l *GameClientLink) boardTopics(live *livePlayer, command string) {
 		if len(tokens) < 3 {
 			return
 		}
-		forumID, ok := parseJavaInt(tokens[2])
+		forumID, ok := parseInt32(tokens[2])
 		if !ok {
 			return
 		}
 		index := int32(1)
 		if len(tokens) > 3 {
-			if index, ok = parseJavaInt(tokens[3]); !ok {
+			if index, ok = parseInt32(tokens[3]); !ok {
 				return
 			}
 		}
@@ -45,7 +45,7 @@ func (l *GameClientLink) boardTopics(live *livePlayer, command string) {
 		if len(tokens) < 3 {
 			return
 		}
-		forumID, ok := parseJavaInt(tokens[2])
+		forumID, ok := parseInt32(tokens[2])
 		if !ok {
 			return
 		}
@@ -59,11 +59,11 @@ func (l *GameClientLink) boardTopics(live *livePlayer, command string) {
 		if len(tokens) < 4 {
 			return
 		}
-		forumID, ok := parseJavaInt(tokens[2])
+		forumID, ok := parseInt32(tokens[2])
 		if !ok {
 			return
 		}
-		topicID, ok := parseJavaInt(tokens[3])
+		topicID, ok := parseInt32(tokens[3])
 		if !ok {
 			return
 		}
@@ -106,7 +106,7 @@ func (l *GameClientLink) showTopics(live *livePlayer, forumID, index int32) {
 func (l *GameClientLink) boardTopicWrite(live *livePlayer, args [5]string) {
 	switch args[0] {
 	case "crea":
-		forumID, ok := parseJavaInt(args[1])
+		forumID, ok := parseInt32(args[1])
 		if !ok {
 			return
 		}
@@ -117,7 +117,7 @@ func (l *GameClientLink) boardTopicWrite(live *livePlayer, args [5]string) {
 		l.board.forums.AddTopic(forumID, args[4], live.CharacterName(), live.ObjectID(), args[3], time.Now())
 		l.showMemo(live)
 	case "del":
-		forumID, ok := parseJavaInt(args[1])
+		forumID, ok := parseInt32(args[1])
 		if !ok {
 			return
 		}
@@ -127,7 +127,7 @@ func (l *GameClientLink) boardTopicWrite(live *livePlayer, args [5]string) {
 			l.sendBoard(live, bbs.NamedForumMissing(args[1]))
 			return
 		}
-		topicID, ok := parseJavaInt(args[2])
+		topicID, ok := parseInt32(args[2])
 		if !ok {
 			return
 		}
@@ -155,11 +155,11 @@ func (l *GameClientLink) boardPosts(live *livePlayer, command string) {
 	if len(tokens) < 4 {
 		return
 	}
-	forumID, ok := parseJavaInt(tokens[2])
+	forumID, ok := parseInt32(tokens[2])
 	if !ok {
 		return
 	}
-	topicID, ok := parseJavaInt(tokens[3])
+	topicID, ok := parseInt32(tokens[3])
 	if !ok {
 		return
 	}
@@ -211,7 +211,7 @@ func (l *GameClientLink) boardPostWrite(live *livePlayer, args [5]string) {
 	}
 	var ids [3]int32
 	for i := range ids {
-		n, ok := parseJavaInt(tokens[i])
+		n, ok := parseInt32(tokens[i])
 		if !ok {
 			return
 		}

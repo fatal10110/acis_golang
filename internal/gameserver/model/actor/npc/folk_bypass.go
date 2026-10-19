@@ -467,10 +467,10 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 	case strings.HasPrefix(command, "observe"):
 		return observeCommand(reply, BypassObserve, command)
 	case strings.HasPrefix(command, "multisell"):
-		reply.Outcome, reply.Multisell = BypassMultisell, strings.TrimFunc(command[len("multisell"):], javaSpace)
+		reply.Outcome, reply.Multisell = BypassMultisell, strings.TrimFunc(command[len("multisell"):], isCtrlOrSpace)
 		return reply
 	case strings.HasPrefix(command, "exc_multisell"):
-		reply.Outcome, reply.Multisell, reply.InventoryOnly = BypassMultisell, strings.TrimFunc(command[len("exc_multisell"):], javaSpace), true
+		reply.Outcome, reply.Multisell, reply.InventoryOnly = BypassMultisell, strings.TrimFunc(command[len("exc_multisell"):], isCtrlOrSpace), true
 		return reply
 	case strings.HasPrefix(command, "Augment"):
 		// The choice is the one character after "Augment ": a command too
@@ -480,7 +480,7 @@ func (f *Folk) Bypass(pages Pages, rules ChatRules, talker Talker, command strin
 			reply.Outcome = BypassAborted
 			return reply
 		}
-		choice, err := commons.Atoi(strings.TrimFunc(arg, javaSpace))
+		choice, err := commons.Atoi(strings.TrimFunc(arg, isCtrlOrSpace))
 		if err != nil {
 			reply.Outcome = BypassAborted
 			return reply
@@ -617,7 +617,7 @@ func (f *Folk) adventurerCommand(pages Pages, command string, reply BypassReply)
 			reply.Outcome = BypassAborted
 			return reply, true
 		}
-		level, err := commons.ParseInt(strings.TrimFunc(arg, javaSpace), 32)
+		level, err := commons.ParseInt(strings.TrimFunc(arg, isCtrlOrSpace), 32)
 		if err != nil {
 			reply.Outcome = BypassAborted
 			return reply, true
@@ -706,9 +706,9 @@ func (f *Folk) merchantMultisell(pages Pages, talker Talker, command string, rep
 	return reply, false
 }
 
-// javaSpace is the set trimmed around a command argument: every character
+// isCtrlOrSpace is the set trimmed around a command argument: every character
 // up to and including the space.
-func javaSpace(r rune) bool { return r <= ' ' }
+func isCtrlOrSpace(r rune) bool { return r <= ' ' }
 
 // commandChars returns command's characters from begin up to end, or to
 // its end when end is negative, counting characters as the client encodes

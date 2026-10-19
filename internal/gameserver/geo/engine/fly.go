@@ -52,7 +52,7 @@ func (e *Engine) flyLine(ox, oy, oz int, oheight float64, tx, ty, tz int, bounde
 	dir := moveDirectionFor(gtx-gox, gty-goy)
 	gridX := alignCell(ox)
 	gridY := alignCell(oy)
-	height := int32(commons.JavaInt(oheight))
+	height := int32(commons.TruncInt32Sat(oheight))
 	maxGeoX := GeoX(WorldXMax)
 	maxGeoY := GeoY(WorldYMax)
 
@@ -79,7 +79,7 @@ func (e *Engine) flyLine(ox, oy, oz int, oheight float64, tx, ty, tz int, bounde
 		next := e.blockAtGeo(gox, goy)
 		stepDX := int32(checkX - ox)
 		stepDY := int32(checkY - oy)
-		bottomZ := int32(oz) + commons.JavaInt(mz*math.Sqrt(float64(stepDX*stepDX+stepDY*stepDY)))
+		bottomZ := int32(oz) + commons.TruncInt32Sat(mz*math.Sqrt(float64(stepDX*stepDX+stepDY*stepDY)))
 
 		// Some geodata always lies below a flier: the highest layer under
 		// the corridor top must stay at or under its bottom.

@@ -30,9 +30,9 @@ const (
 	// castleBanishOffset is the random offset of a player thrown out of a
 	// castle's grounds.
 	castleBanishOffset = 20
-	// javaDateLayout is how the siege date reads on the chamberlain's
+	// chamberlainDateLayout is how the siege date reads on the chamberlain's
 	// pages.
-	javaDateLayout = "Mon Jan 02 15:04:05 MST 2006"
+	chamberlainDateLayout = "Mon Jan 02 15:04:05 MST 2006"
 )
 
 // chamberlainDialog is one command of the castle chamberlain dialog: the
@@ -145,7 +145,7 @@ func (d chamberlainDialog) fileIfAllowed(p clan.Privilege, file string) {
 // sendFile opens the chamberlain page file naming the NPC, its template
 // and the castle's siege date.
 func (d chamberlainDialog) sendFile(file string) {
-	d.send(file, "%npcId%", strconv.Itoa(d.f.NpcID()), "%time%", time.UnixMilli(d.c.SiegeDate()).Format(javaDateLayout))
+	d.send(file, "%npcId%", strconv.Itoa(d.f.NpcID()), "%time%", time.UnixMilli(d.c.SiegeDate()).Format(chamberlainDateLayout))
 }
 
 // send opens the chamberlain page file, %objectId% naming the NPC, then

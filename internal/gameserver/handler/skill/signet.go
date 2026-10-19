@@ -389,7 +389,7 @@ func (h signetHandler) newSignetMDamEffect(caster Creature, def modelskill.Defin
 				return
 			}
 			deliverMagicFailure(caster, target, def, in.Failure)
-			damage := javaInt(formulas.MagicDamage(in))
+			damage := truncDamage(formulas.MagicDamage(in))
 			// A summon in the signet republishes its status on every tick,
 			// whether or not the tick then hurts it.
 			if target.Kind() == actor.KindSummon {

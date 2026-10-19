@@ -27,7 +27,7 @@ func (l *GameClientLink) adminEnchant(gm *livePlayer, line string) {
 		sendText(gm, "Unknown paperdoll slot.")
 		return
 	}
-	level, ok := parseJavaInt(args[1])
+	level, ok := parseInt32(args[1])
 	if !ok {
 		sendText(gm, "Please specify a new enchant value.")
 		return

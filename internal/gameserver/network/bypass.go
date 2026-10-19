@@ -52,12 +52,12 @@ func (w *bypassWhitelist) record(html string) {
 			continue
 		}
 		if dollar := strings.IndexByte(html[start:end], '$'); dollar >= 0 {
-			if p := strings.TrimFunc(html[start:start+dollar], javaSpace); p != "" {
+			if p := strings.TrimFunc(html[start:start+dollar], isCtrlOrSpace); p != "" {
 				w.prefix = append(w.prefix, p)
 			}
 			continue
 		}
-		w.exact = append(w.exact, strings.TrimFunc(html[start:end], javaSpace))
+		w.exact = append(w.exact, strings.TrimFunc(html[start:end], isCtrlOrSpace))
 	}
 }
 
@@ -78,9 +78,9 @@ func (w *bypassWhitelist) allows(command string) bool {
 	return false
 }
 
-// javaSpace is the set trimmed around a bypass command: every character up
+// isCtrlOrSpace is the set trimmed around a bypass command: every character up
 // to and including the space.
-func javaSpace(r rune) bool { return r <= ' ' }
+func isCtrlOrSpace(r rune) bool { return r <= ' ' }
 
 // sendValidatedHTML opens an HTML window on live showing html, a page sent
 // as loaded or built, with the page limit applied to it, and makes its

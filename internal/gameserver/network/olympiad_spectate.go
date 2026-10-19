@@ -53,7 +53,7 @@ func arenaChangeID(command string) (int, bool) {
 	if len(units) < 12 {
 		return 0, false
 	}
-	n, err := commons.ParseInt(strings.TrimFunc(commons.UTF16String(units[12:]), javaSpace), 32)
+	n, err := commons.ParseInt(strings.TrimFunc(commons.UTF16String(units[12:]), isCtrlOrSpace), 32)
 	if err != nil {
 		return 0, false
 	}

@@ -116,7 +116,7 @@ func (e Entry) prepare(enchant *int, taxRate float64) Entry {
 		if in.ItemID == item.AdenaID {
 			adenaTemplate = in.template
 			if in.TaxIngredient {
-				out.taxAmount += int(commons.JavaRound(float64(in.Count) * taxRate))
+				out.taxAmount += int(commons.RoundHalfUp(float64(in.Count) * taxRate))
 			} else {
 				adena += in.Count
 			}
