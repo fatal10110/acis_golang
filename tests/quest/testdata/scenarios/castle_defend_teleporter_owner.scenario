@@ -1,0 +1,25 @@
+# The castle defend teleporter (CastleDefendTeleporter): the leader of the clan owning Gludio
+# Castle is on its siege's owner side, so Gludio Castle's first inner gatekeeper answers its page
+# of links too (onFirstTalk); its "0" link draws one of the three points of index 0 and moves the
+# character there (onAdvEvent).
+trace internal/gameserver/script/testdata/oracle/scenarios/castle_defend_teleporter_owner.golden
+character Lord 20
+clan 5
+siege 1 owner
+random 0
+script script.teleport.CastleDefendTeleporter
+page script/teleport/CastleDefendTeleporter/
+npc gatekeeper 35092 Folk 10 0 0
+
+action gatekeeper
+action gatekeeper
+  S ActionFailed
+  S NpcHtmlMessage obj=gatekeeper item=0 page=script/teleport/CastleDefendTeleporter/first_group_1.htm
+  S ActionFailed
+bypass Quest CastleDefendTeleporter 0
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S TeleportToLocation obj=player loc=-18123,109927,-2492 fast=0

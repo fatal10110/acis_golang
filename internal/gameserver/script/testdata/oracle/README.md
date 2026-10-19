@@ -81,8 +81,10 @@ what the reference does in the scenario's own world:
   line gives it that subclass in slot 1 at its level, its row written as the Go runner writes it, and
   makes it the played class, as the reference's restore leaves a character that logged out on it
   (the base class keeping the character line's level); a clan line creates a
-  clan the player leads and sets its level; each quest line puts its rows in the player's quest
-  state before anything is recorded;
+  clan the player leads and sets its level; a siege line registers that clan on its side of the
+  castle's siege (the castles load at boot), or, for owner, makes it the castle's owner on its
+  siege's owner side, as the reference's restores leave a stored registration or ownership; each
+  quest line puts its rows in the player's quest state before anything is recorded;
 - each NPC line's NPC is spawned at its offset from the player. Every NPC template is bound to
   the scenario's script and stub lines only, from the bindings the script loader left (copied
   before the contract scenes change some), since the Go runner registers no other script:
@@ -111,7 +113,8 @@ what the reference does in the scenario's own world:
 - every scenario draws its object ids from the same point: the id factory as the first scenario
   found it, after the boot, the quest traces and the contract scenes. Once a scenario is over,
   every world object of an id it drew is removed, wherever it stands, and so are the registry
-  entries keyed by one (the clan table, the Seven Signs sign-ups, the raid points); an object
+  entries keyed by one (the clan table, the castle sieges' registrations and the castle owners, the
+  Seven Signs sign-ups, the raid points); an object
   still in the world fails the run. What loads from the database on first use is loaded before
   the first scenario, so no scenario's trace holds its query: the events the reference loads at
   boot after the scripts (the derby track, whose runners also draw ids, the lottery, the couples,
