@@ -1,0 +1,44 @@
+# Merciless Punishment (Q107), given up: an orc of level 12 holding the first order and the letter
+# to the humans (cond 3) gives up at Hatos; the quest and its items are removed and it can be
+# taken again. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q107_merciless_punishment_give_up.golden
+character Avenger 12
+class 44
+quest Q107_MercilessPunishment <cond>=3 <state>=STARTED
+hold 1553 1
+hold 1557 1
+script quest.Q107_MercilessPunishment
+item 1553 1557
+page default/30568.htm
+page script/quest/Q107_MercilessPunishment/
+npc hatos 30568 Folk 10 0 0
+
+action hatos
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+bypass npc_{hatos}_Quest
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q107_MercilessPunishment/30568-05.htm
+  S ActionFailed
+  S ActionFailed
+  state Q107_MercilessPunishment STARTED
+bypass Quest Q107_MercilessPunishment 30568-06.htm
+  S PlaySound type=0 file=ItemSound.quest_giveup bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S SystemMessage id=302 3:1553
+  S SystemMessage id=302 3:1557
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q107_MercilessPunishment/30568-06.htm
+  S ActionFailed
+  Q delete-quest Q107_MercilessPunishment
+  rows Q107_MercilessPunishment -
+  items 1553=0 1557=0
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+bypass npc_{hatos}_Quest
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q107_MercilessPunishment/30568-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q107_MercilessPunishment CREATED

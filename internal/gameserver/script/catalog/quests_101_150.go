@@ -7,6 +7,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q103"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q104"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q105"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q106"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q107"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q108"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q109"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q110"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q111"
 )
 
 // quests101To150 is the catalog of quests 101 to 150 (#180).
@@ -17,12 +23,12 @@ func quests101To150() script.Catalog {
 		"quest.Q103_SpiritOfCraftsman":          q103.New,
 		"quest.Q104_SpiritOfMirrors":            q104.New,
 		"quest.Q105_SkirmishWithTheOrcs":        q105.New,
-		"quest.Q106_ForgottenTruth":             nil,
-		"quest.Q107_MercilessPunishment":        nil,
-		"quest.Q108_JumbleTumbleDiamondFuss":    nil,
-		"quest.Q109_InSearchOfTheNest":          nil,
-		"quest.Q110_ToThePrimevalIsle":          nil,
-		"quest.Q111_ElrokianHuntersProof":       nil,
+		"quest.Q106_ForgottenTruth":             q106.New,
+		"quest.Q107_MercilessPunishment":        q107.New,
+		"quest.Q108_JumbleTumbleDiamondFuss":    q108.New,
+		"quest.Q109_InSearchOfTheNest":          q109.New,
+		"quest.Q110_ToThePrimevalIsle":          q110.New,
+		"quest.Q111_ElrokianHuntersProof":       q111.New,
 		"quest.Q112_WalkOfFate":                 nil,
 		"quest.Q113_StatusOfTheBeaconTower":     nil,
 		"quest.Q114_ResurrectionOfAnOldManager": nil,

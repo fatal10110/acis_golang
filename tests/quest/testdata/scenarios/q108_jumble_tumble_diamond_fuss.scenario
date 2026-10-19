@@ -1,0 +1,464 @@
+# Jumble, Tumble, Diamond Fuss (Q108): a dwarven fighter of level 10 accepts at Gouph and runs his
+# contract through Reep, Torocco, Maron and Brunon; nine goblin brigand leaders and a lieutenant
+# give the ten aquamarines and chrysoberyls (every roll pinned to succeed); the gem box goes to
+# Gouph, the coal to Brunon, the letter to Murdoc, the tart to Airy, a blade bat gives the star
+# diamond, and Gouph gives the Silversmith Hammer, the newbie soulshots and the echo crystals;
+# then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q108_jumble_tumble_diamond_fuss.golden
+character Jeweler 10
+class 53
+random always 0
+script quest.Q108_JumbleTumbleDiamondFuss
+item 1559 1560 1561 1562 1563 1564 1565 1566 1567 1568 1569 1570 1571 1511 1060 4412 4413 4414 4415 4416 5789
+page default/30523.htm
+page merchant/30516.htm
+page default/30555.htm
+page default/30529.htm
+page trainer/30526.htm
+page warehouse/30521.htm
+page warehouse/30522.htm
+page script/quest/Q108_JumbleTumbleDiamondFuss/
+npc gouph 30523 Folk 10 0 0
+npc reep 30516 Merchant 20 0 0
+npc torocco 30555 Folk 30 0 0
+npc maron 30529 Folk 0 10 0
+npc brunon 30526 Trainer 0 20 0
+npc murdoc 30521 WarehouseKeeper 0 30 0
+npc airy 30522 WarehouseKeeper -10 0 0
+npc leader 20323 Monster 40 0 0
+npc lieutenant 20324 Monster 0 40 0
+npc bat 20480 Monster -40 0 0
+
+# Gouph: accept.
+action gouph
+action gouph
+  S ActionFailed
+  S NpcHtmlMessage obj=gouph item=0 page=default/30523.htm
+  S ActionFailed
+bypass npc_{gouph}_Quest
+  S NpcHtmlMessage obj=gouph item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30523-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q108_JumbleTumbleDiamondFuss CREATED
+bypass Quest Q108_JumbleTumbleDiamondFuss 30523-03.htm
+  S QuestList 108:0x80000001
+  S ExShowQuestMark quest=108
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1559
+  S NpcHtmlMessage obj=gouph item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30523-03.htm
+  S ActionFailed
+  Q upsert Q108_JumbleTumbleDiamondFuss | <state> | STARTED
+  Q upsert Q108_JumbleTumbleDiamondFuss | <cond> | 1
+  state Q108_JumbleTumbleDiamondFuss STARTED
+  rows Q108_JumbleTumbleDiamondFuss <cond>=1 <state>=STARTED
+  items 1559=1
+action gouph
+  S ActionFailed
+  S NpcHtmlMessage obj=gouph item=0 page=default/30523.htm
+  S ActionFailed
+bypass npc_{gouph}_Quest
+  S NpcHtmlMessage obj=gouph item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30523-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Reep.
+action reep
+action reep
+  S ActionFailed
+  S NpcHtmlMessage obj=reep item=0 page=merchant/30516.htm
+  S ActionFailed
+bypass npc_{reep}_Quest
+  S QuestList 108:0x80000003
+  S ExShowQuestMark quest=108
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1559
+  S SystemMessage id=54 3:1560
+  S NpcHtmlMessage obj=reep item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30516-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q108_JumbleTumbleDiamondFuss | <cond> | 2
+  rows Q108_JumbleTumbleDiamondFuss <cond>=2 <state>=STARTED
+  items 1559=0 1560=1
+action reep
+  S ActionFailed
+  S NpcHtmlMessage obj=reep item=0 page=merchant/30516.htm
+  S ActionFailed
+bypass npc_{reep}_Quest
+  S NpcHtmlMessage obj=reep item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30516-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Torocco.
+action torocco
+action torocco
+  S ActionFailed
+  S NpcHtmlMessage obj=torocco item=0 page=default/30555.htm
+  S ActionFailed
+bypass npc_{torocco}_Quest
+  S NpcHtmlMessage obj=torocco item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30555-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q108_JumbleTumbleDiamondFuss 30555-02.htm
+  S QuestList 108:0x80000007
+  S ExShowQuestMark quest=108
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1560
+  S SystemMessage id=54 3:1561
+  S NpcHtmlMessage obj=torocco item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30555-02.htm
+  S ActionFailed
+  Q upsert Q108_JumbleTumbleDiamondFuss | <cond> | 3
+  rows Q108_JumbleTumbleDiamondFuss <cond>=3 <state>=STARTED
+  items 1560=0 1561=1
+action torocco
+  S ActionFailed
+  S NpcHtmlMessage obj=torocco item=0 page=default/30555.htm
+  S ActionFailed
+bypass npc_{torocco}_Quest
+  S NpcHtmlMessage obj=torocco item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30555-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Maron.
+action maron
+action maron
+  S ActionFailed
+  S NpcHtmlMessage obj=maron item=0 page=default/30529.htm
+  S ActionFailed
+bypass npc_{maron}_Quest
+  S QuestList 108:0x8000000f
+  S ExShowQuestMark quest=108
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1561
+  S SystemMessage id=54 3:1562
+  S NpcHtmlMessage obj=maron item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30529-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q108_JumbleTumbleDiamondFuss | <cond> | 4
+  rows Q108_JumbleTumbleDiamondFuss <cond>=4 <state>=STARTED
+  items 1561=0 1562=1
+action maron
+  S ActionFailed
+  S NpcHtmlMessage obj=maron item=0 page=default/30529.htm
+  S ActionFailed
+bypass npc_{maron}_Quest
+  S NpcHtmlMessage obj=maron item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30529-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Brunon.
+action brunon
+action brunon
+  S ActionFailed
+  S NpcHtmlMessage obj=brunon item=0 page=trainer/30526.htm
+  S ActionFailed
+bypass npc_{brunon}_Quest
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30526-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q108_JumbleTumbleDiamondFuss 30526-02.htm
+  S QuestList 108:0x8000001f
+  S ExShowQuestMark quest=108
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1562
+  S SystemMessage id=54 3:1563
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30526-02.htm
+  S ActionFailed
+  Q upsert Q108_JumbleTumbleDiamondFuss | <cond> | 5
+  rows Q108_JumbleTumbleDiamondFuss <cond>=5 <state>=STARTED
+  items 1562=0 1563=1
+action brunon
+  S ActionFailed
+  S NpcHtmlMessage obj=brunon item=0 page=trainer/30526.htm
+  S ActionFailed
+bypass npc_{brunon}_Quest
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30526-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Gouph waits.
+action gouph
+action gouph
+  S ActionFailed
+  S NpcHtmlMessage obj=gouph item=0 page=default/30523.htm
+  S ActionFailed
+bypass npc_{gouph}_Quest
+  S NpcHtmlMessage obj=gouph item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30523-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# The gems.
+kill leader x9
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1564
+  S SystemMessage id=54 3:1565
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1564
+  S SystemMessage id=54 3:1565
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1564
+  S SystemMessage id=54 3:1565
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1564
+  S SystemMessage id=54 3:1565
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1564
+  S SystemMessage id=54 3:1565
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1564
+  S SystemMessage id=54 3:1565
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1564
+  S SystemMessage id=54 3:1565
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1564
+  S SystemMessage id=54 3:1565
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1564
+  S SystemMessage id=54 3:1565
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1564=9 1565=9
+  rows Q108_JumbleTumbleDiamondFuss <cond>=5 <state>=STARTED
+kill lieutenant
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1564
+  S SystemMessage id=54 3:1565
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 108:0x8000003f
+  S ExShowQuestMark quest=108
+  Q upsert Q108_JumbleTumbleDiamondFuss | <cond> | 6
+  items 1564=10 1565=10
+  rows Q108_JumbleTumbleDiamondFuss <cond>=6 <state>=STARTED
+
+# Brunon's gem box.
+action brunon
+action brunon
+  S ActionFailed
+  S NpcHtmlMessage obj=brunon item=0 page=trainer/30526.htm
+  S ActionFailed
+bypass npc_{brunon}_Quest
+  S QuestList 108:0x8000007f
+  S ExShowQuestMark quest=108
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1563
+  S SystemMessage id=301 3:1564 6:10
+  S SystemMessage id=301 3:1565 6:10
+  S SystemMessage id=54 3:1566
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30526-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q108_JumbleTumbleDiamondFuss | <cond> | 7
+  rows Q108_JumbleTumbleDiamondFuss <cond>=7 <state>=STARTED
+  items 1563=0 1564=0 1565=0 1566=1
+action brunon
+  S ActionFailed
+  S NpcHtmlMessage obj=brunon item=0 page=trainer/30526.htm
+  S ActionFailed
+bypass npc_{brunon}_Quest
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30526-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Torocco has nothing more.
+action torocco
+action torocco
+  S ActionFailed
+  S NpcHtmlMessage obj=torocco item=0 page=default/30555.htm
+  S ActionFailed
+bypass npc_{torocco}_Quest
+  S NpcHtmlMessage obj=torocco item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30555-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Gouph's coal.
+action gouph
+action gouph
+  S ActionFailed
+  S NpcHtmlMessage obj=gouph item=0 page=default/30523.htm
+  S ActionFailed
+bypass npc_{gouph}_Quest
+  S QuestList 108:0x800000ff
+  S ExShowQuestMark quest=108
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1566
+  S SystemMessage id=54 3:1567
+  S NpcHtmlMessage obj=gouph item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30523-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q108_JumbleTumbleDiamondFuss | <cond> | 8
+  rows Q108_JumbleTumbleDiamondFuss <cond>=8 <state>=STARTED
+  items 1566=0 1567=1
+action gouph
+  S ActionFailed
+  S NpcHtmlMessage obj=gouph item=0 page=default/30523.htm
+  S ActionFailed
+bypass npc_{gouph}_Quest
+  S NpcHtmlMessage obj=gouph item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30523-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Brunon's letter.
+action brunon
+action brunon
+  S ActionFailed
+  S NpcHtmlMessage obj=brunon item=0 page=trainer/30526.htm
+  S ActionFailed
+bypass npc_{brunon}_Quest
+  S QuestList 108:0x800001ff
+  S ExShowQuestMark quest=108
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1567
+  S SystemMessage id=54 3:1568
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30526-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q108_JumbleTumbleDiamondFuss | <cond> | 9
+  rows Q108_JumbleTumbleDiamondFuss <cond>=9 <state>=STARTED
+  items 1567=0 1568=1
+action brunon
+  S ActionFailed
+  S NpcHtmlMessage obj=brunon item=0 page=trainer/30526.htm
+  S ActionFailed
+bypass npc_{brunon}_Quest
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30526-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Maron has nothing more.
+action maron
+action maron
+  S ActionFailed
+  S NpcHtmlMessage obj=maron item=0 page=default/30529.htm
+  S ActionFailed
+bypass npc_{maron}_Quest
+  S NpcHtmlMessage obj=maron item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30529-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Murdoc's berry tart.
+action murdoc
+action murdoc
+  S ActionFailed
+  S NpcHtmlMessage obj=murdoc item=0 page=warehouse/30521.htm
+  S ActionFailed
+bypass npc_{murdoc}_Quest
+  S QuestList 108:0x800003ff
+  S ExShowQuestMark quest=108
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1568
+  S SystemMessage id=54 3:1569
+  S NpcHtmlMessage obj=murdoc item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30521-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q108_JumbleTumbleDiamondFuss | <cond> | 10
+  rows Q108_JumbleTumbleDiamondFuss <cond>=10 <state>=STARTED
+  items 1568=0 1569=1
+action murdoc
+  S ActionFailed
+  S NpcHtmlMessage obj=murdoc item=0 page=warehouse/30521.htm
+  S ActionFailed
+bypass npc_{murdoc}_Quest
+  S NpcHtmlMessage obj=murdoc item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30521-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Airy's bat diagram.
+action airy
+action airy
+  S ActionFailed
+  S NpcHtmlMessage obj=airy item=0 page=warehouse/30522.htm
+  S ActionFailed
+bypass npc_{airy}_Quest
+  S QuestList 108:0x800007ff
+  S ExShowQuestMark quest=108
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1569
+  S SystemMessage id=54 3:1570
+  S NpcHtmlMessage obj=airy item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30522-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q108_JumbleTumbleDiamondFuss | <cond> | 11
+  rows Q108_JumbleTumbleDiamondFuss <cond>=11 <state>=STARTED
+  items 1569=0 1570=1
+action airy
+  S ActionFailed
+  S NpcHtmlMessage obj=airy item=0 page=warehouse/30522.htm
+  S ActionFailed
+bypass npc_{airy}_Quest
+  S NpcHtmlMessage obj=airy item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30522-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# A blade bat: the star diamond.
+kill bat
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1571
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1570
+  S QuestList 108:0x80000fff
+  S ExShowQuestMark quest=108
+  Q upsert Q108_JumbleTumbleDiamondFuss | <cond> | 12
+  rows Q108_JumbleTumbleDiamondFuss <cond>=12 <state>=STARTED
+  items 1570=0 1571=1
+action airy
+  S ActionFailed
+  S NpcHtmlMessage obj=airy item=0 page=warehouse/30522.htm
+  S ActionFailed
+action airy
+  S ActionFailed
+  S NpcHtmlMessage obj=airy item=0 page=warehouse/30522.htm
+  S ActionFailed
+bypass npc_{airy}_Quest
+  S NpcHtmlMessage obj=airy item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30522-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Gouph rewards.
+action gouph
+action gouph
+  S ActionFailed
+  S NpcHtmlMessage obj=gouph item=0 page=default/30523.htm
+  S ActionFailed
+bypass npc_{gouph}_Quest
+  S SystemMessage id=302 3:1571
+  S SystemMessage id=54 3:1511
+  S TutorialShowQuestionMark id=26
+  S SystemMessage id=53 3:5789 6:7000
+  S PlaySound type=2 file=tutorial_voice_026 bind=1 obj=player loc=10,20,30 delay=0
+  S SystemMessage id=53 3:1060 6:100
+  S SystemMessage id=53 3:4412 6:10
+  S SystemMessage id=53 3:4413 6:10
+  S SystemMessage id=53 3:4414 6:10
+  S SystemMessage id=53 3:4415 6:10
+  S SystemMessage id=53 3:4416 6:10
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 108:0x00000000
+  S NpcHtmlMessage obj=gouph item=0 page=script/quest/Q108_JumbleTumbleDiamondFuss/30523-08.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q108_JumbleTumbleDiamondFuss | <state> | COMPLETED
+  Q delete-except-state Q108_JumbleTumbleDiamondFuss
+  M set Q108_JumbleTumbleDiamondFuss_OneTimeQuestFlag | true
+  state Q108_JumbleTumbleDiamondFuss COMPLETED
+  rows Q108_JumbleTumbleDiamondFuss <state>=COMPLETED
+  items 1571=0 1511=1 5789=7000 1060=100 4412=10 4413=10 4414=10 4415=10 4416=10
+action gouph
+  S ActionFailed
+  S NpcHtmlMessage obj=gouph item=0 page=default/30523.htm
+  S ActionFailed
+bypass npc_{gouph}_Quest
+  S NpcHtmlMessage obj=gouph item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+relog
+  items 1511=1 5789=7000
+  state Q108_JumbleTumbleDiamondFuss COMPLETED
+  rows Q108_JumbleTumbleDiamondFuss <state>=COMPLETED

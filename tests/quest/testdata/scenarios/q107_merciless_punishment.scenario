@@ -1,0 +1,217 @@
+# Merciless Punishment (Q107): an orc fighter of level 12 accepts at Hatos, reports to Parugon,
+# and kills Baranka's messenger three times, once for each of Hatos's orders, for the letters to
+# the humans, the dark elves and the elves; Hatos takes them and gives the Butcher's Sword, the
+# newbie soulshots and the echo crystals; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q107_merciless_punishment.golden
+character Avenger 12
+class 44
+script quest.Q107_MercilessPunishment
+item 1553 1554 1555 1556 1557 1558 1510 1060 4412 4413 4414 4415 4416 5789
+page default/30568.htm
+page guard/30580.htm
+page script/quest/Q107_MercilessPunishment/
+npc hatos 30568 Folk 10 0 0
+npc parugon 30580 Guard 20 0 0
+npc messenger 27041 Monster 40 0 0
+
+# Hatos: accept.
+action hatos
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+bypass npc_{hatos}_Quest
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q107_MercilessPunishment/30568-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q107_MercilessPunishment CREATED
+bypass Quest Q107_MercilessPunishment 30568-03.htm
+  S QuestList 107:0x80000001
+  S ExShowQuestMark quest=107
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1553
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q107_MercilessPunishment/30568-03.htm
+  S ActionFailed
+  Q upsert Q107_MercilessPunishment | <state> | STARTED
+  Q upsert Q107_MercilessPunishment | <cond> | 1
+  state Q107_MercilessPunishment STARTED
+  rows Q107_MercilessPunishment <cond>=1 <state>=STARTED
+  items 1553=1
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+bypass npc_{hatos}_Quest
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q107_MercilessPunishment/30568-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Parugon.
+action parugon
+action parugon
+  S ActionFailed
+  S NpcHtmlMessage obj=parugon item=0 page=guard/30580.htm
+  S ActionFailed
+bypass npc_{parugon}_Quest
+  S QuestList 107:0x80000003
+  S ExShowQuestMark quest=107
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=parugon item=0 page=script/quest/Q107_MercilessPunishment/30580-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q107_MercilessPunishment | <cond> | 2
+  rows Q107_MercilessPunishment <cond>=2 <state>=STARTED
+action parugon
+  S ActionFailed
+  S NpcHtmlMessage obj=parugon item=0 page=guard/30580.htm
+  S ActionFailed
+bypass npc_{parugon}_Quest
+  S NpcHtmlMessage obj=parugon item=0 page=script/quest/Q107_MercilessPunishment/30580-01.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q107_MercilessPunishment <cond>=2 <state>=STARTED
+
+# The first messenger: the letter to the humans.
+kill messenger
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 107:0x80000007
+  S ExShowQuestMark quest=107
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1557
+  Q upsert Q107_MercilessPunishment | <cond> | 3
+  rows Q107_MercilessPunishment <cond>=3 <state>=STARTED
+  items 1557=1
+
+# Hatos's second order.
+action hatos
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+bypass npc_{hatos}_Quest
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q107_MercilessPunishment/30568-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q107_MercilessPunishment 30568-07.htm
+  S QuestList 107:0x8000000f
+  S ExShowQuestMark quest=107
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1553
+  S SystemMessage id=54 3:1554
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q107_MercilessPunishment/30568-07.htm
+  S ActionFailed
+  Q upsert Q107_MercilessPunishment | <cond> | 4
+  rows Q107_MercilessPunishment <cond>=4 <state>=STARTED
+  items 1553=0 1554=1
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+bypass npc_{hatos}_Quest
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q107_MercilessPunishment/30568-09.htm
+  S ActionFailed
+  S ActionFailed
+
+# The second messenger: the letter to the dark elves.
+kill messenger
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 107:0x8000001f
+  S ExShowQuestMark quest=107
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1556
+  Q upsert Q107_MercilessPunishment | <cond> | 5
+  rows Q107_MercilessPunishment <cond>=5 <state>=STARTED
+  items 1556=1
+
+# Hatos's third order.
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+bypass npc_{hatos}_Quest
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q107_MercilessPunishment/30568-08.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q107_MercilessPunishment 30568-09.htm
+  S QuestList 107:0x8000003f
+  S ExShowQuestMark quest=107
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1554
+  S SystemMessage id=54 3:1555
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q107_MercilessPunishment/30568-09.htm
+  S ActionFailed
+  Q upsert Q107_MercilessPunishment | <cond> | 6
+  rows Q107_MercilessPunishment <cond>=6 <state>=STARTED
+  items 1554=0 1555=1
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+bypass npc_{hatos}_Quest
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q107_MercilessPunishment/30568-09.htm
+  S ActionFailed
+  S ActionFailed
+
+# The third messenger: the letter to the elves.
+kill messenger
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 107:0x8000007f
+  S ExShowQuestMark quest=107
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1558
+  Q upsert Q107_MercilessPunishment | <cond> | 7
+  rows Q107_MercilessPunishment <cond>=7 <state>=STARTED
+  items 1558=1
+
+# Hatos rewards.
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+bypass npc_{hatos}_Quest
+  S SystemMessage id=302 3:1555
+  S SystemMessage id=302 3:1556
+  S SystemMessage id=302 3:1557
+  S SystemMessage id=302 3:1558
+  S SystemMessage id=54 3:1510
+  S TutorialShowQuestionMark id=26
+  S SystemMessage id=53 3:5789 6:7000
+  S PlaySound type=2 file=tutorial_voice_026 bind=1 obj=player loc=10,20,30 delay=0
+  S SystemMessage id=53 3:1060 6:100
+  S SystemMessage id=53 3:4412 6:10
+  S SystemMessage id=53 3:4413 6:10
+  S SystemMessage id=53 3:4414 6:10
+  S SystemMessage id=53 3:4415 6:10
+  S SystemMessage id=53 3:4416 6:10
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 107:0x00000000
+  S NpcHtmlMessage obj=hatos item=0 page=script/quest/Q107_MercilessPunishment/30568-10.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q107_MercilessPunishment | <state> | COMPLETED
+  Q delete-except-state Q107_MercilessPunishment
+  M set Q107_MercilessPunishment_OneTimeQuestFlag | true
+  state Q107_MercilessPunishment COMPLETED
+  rows Q107_MercilessPunishment <state>=COMPLETED
+  items 1555=0 1556=0 1557=0 1558=0 1510=1 5789=7000 1060=100 4412=10 4413=10 4414=10 4415=10 4416=10
+action hatos
+  S ActionFailed
+  S NpcHtmlMessage obj=hatos item=0 page=default/30568.htm
+  S ActionFailed
+bypass npc_{hatos}_Quest
+  S NpcHtmlMessage obj=hatos item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+relog
+  items 1510=1 5789=7000
+  state Q107_MercilessPunishment COMPLETED
+  rows Q107_MercilessPunishment <state>=COMPLETED
