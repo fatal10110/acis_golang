@@ -142,11 +142,13 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 // read, and returns the player settings read from them.
 //
 // Only the player settings take the reloaded values, the rules of the
-// characters and summons already in the world and the kill reward settings
-// (drop and XP/SP rates, auto-loot, party XP, the party range and the
-// multiple item drop rule, shared by the kill rewards, party loot, the
-// scripts and item creation) included. These keep their boot value, read
-// once into what the boot built from them:
+// characters and summons already in the world, the regeneration
+// multipliers the characters, summons, NPCs and doors read, and the kill
+// reward settings (drop and XP/SP rates, auto-loot, party XP, the party
+// range and the multiple item drop rule, shared by the kill rewards, party
+// loot, NPC hate randomization, the scripts and item creation) included.
+// These keep their boot value, read once into what the boot built from
+// them:
 //   - the listener and login server addresses, the login registration
 //     (server id, hexid, status flags), the database and the client cipher;
 //   - the geodata and the town combat rule the zones were set up with,

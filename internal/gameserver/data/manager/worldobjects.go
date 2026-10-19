@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/dynamic"
 	"github.com/fatal10110/acis_golang/internal/gameserver/geo/engine"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/staticobject"
 	"github.com/fatal10110/acis_golang/internal/gameserver/task"
@@ -33,6 +34,9 @@ type WorldObjects struct {
 	// strife is the Seven Signs state door defences read, installed on
 	// every door built, at boot and by ReloadDoors. Guarded by doorMu.
 	strife door.Strife
+	// regen answers the base regeneration multipliers a damaged door's
+	// ticks take; nil gives the shipped ones. Guarded by doorMu.
+	regen npc.RegenSettings
 	// sieges are the residence sieges SetDoorSiege installed, by door id,
 	// installed again on every door a reload builds under that id.
 	// Guarded by doorMu.
@@ -179,6 +183,17 @@ func (w *WorldObjects) SetStrife(s door.Strife) {
 	for _, obj := range w.doors.Load().order {
 		obj.SetStrife(s)
 	}
+}
+
+// SetRegenSettings makes every door's regeneration ticks read the base
+// regeneration multipliers from s.
+func (w *WorldObjects) SetRegenSettings(s npc.RegenSettings) {
+	if w == nil {
+		return
+	}
+	w.doorMu.Lock()
+	defer w.doorMu.Unlock()
+	w.regen = s
 }
 
 // SetClanCall installs c as the call a hit on any door makes to the NPCs
@@ -454,7 +469,13 @@ func (w *WorldObjects) RegenDoor(id int, due time.Time) {
 		return
 	}
 	w.doorRegen.Next(id, due)
-	w.setDoorHP(obj, obj.CurrentHP()+math.Max(1, door.HPRegen), false)
+	// A door is never raid related: its base takes the configured HP
+	// multiplier.
+	multiplier := 1.0
+	if w.regen != nil {
+		multiplier = w.regen.RegenMultipliers().HP
+	}
+	w.setDoorHP(obj, obj.CurrentHP()+math.Max(1, door.HPRegen*multiplier), false)
 	obj.BroadcastStatus()
 }
 

@@ -219,6 +219,9 @@ type Rules struct {
 	// FakeDeathUpProtection is how long, after a Fake Death ends, hostile
 	// NPCs do not aggro the character; 0 or less gives no grace.
 	FakeDeathUpProtection time.Duration
+	// Regen scales the base HP, MP and CP regeneration of the characters,
+	// their summons, the NPCs that are not raid related and the doors.
+	Regen creature.RegenMultipliers
 }
 
 // Runtime is everything a persisted Character needs to act in the live

@@ -1,6 +1,7 @@
 package gameservertest
 
 import (
+	"cmp"
 	"fmt"
 	"sync/atomic"
 	"testing"
@@ -84,7 +85,7 @@ const fixturePartyRange = 1500
 func fixtureKillRewards(o *options) gamemanager.KillRewardSettings {
 	return gamemanager.KillRewardSettings{
 		Rates:             item.Rates{Spoil: 1, Currency: 1, Item: 1, ItemRaid: 1, Herb: 1},
-		PartyRange:        fixturePartyRange,
+		PartyRange:        cmp.Or(o.partyRange, fixturePartyRange),
 		RateXP:            o.rateXP,
 		RateSP:            o.rateSP,
 		PartyXP:           player.PartyXPRules{Cutoff: player.PartyXPCutoffLevel, CutoffLevel: 20, CutoffPercent: 3, RateXP: 1, RateSP: 1},
@@ -149,6 +150,8 @@ func (s *Server) spawnHostileInstance(t *testing.T, inst *npc.Instance, at locat
 		Sink:    s.hostileSinks(hostile),
 		Scripts: s.quests.registry,
 		Ground:  s.groundTaker,
+		Regen:   s.playerRules,
+		Party:   s.rewardBook,
 	}
 	if hostile.SiegeGuard() {
 		rt.Guarded = s.guardedSiege(inst)
@@ -477,6 +480,8 @@ func (s *Server) spawnMovingHostileInstance(t *testing.T, inst *npc.Instance, at
 		Sink:    s.hostileSinks(hostile),
 		Scripts: s.quests.registry,
 		Ground:  s.groundTaker,
+		Regen:   s.playerRules,
+		Party:   s.rewardBook,
 	}
 	// Production takes line of sight from the same geodata (npcs_spawn.go).
 	if los, ok := geo.(npc.LineOfSight); ok {
@@ -743,6 +748,7 @@ func (s *Server) folkSpawner(walker *task.Walker, geo move.Geo) gamemanager.Folk
 		Log:                 s.log,
 		Scripts:             s.quests.registry,
 		Ground:              s.groundTaker,
+		Regen:               s.playerRules,
 	}
 }
 

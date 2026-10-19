@@ -7,16 +7,27 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/stat"
 )
 
-// HPRegenRate returns a's HP regeneration per tick: its npc template's base
-// through its live stat calculator, scaled by a pet's weight-penalty band.
+// HPRegenRate returns a's HP regeneration per tick: the configured multiple
+// of its npc template's base through its live stat calculator, scaled by a
+// pet's weight-penalty band.
 func (a *Actor) HPRegenRate() float64 {
-	return a.calcStat(stat.RegenerateHPRate, a.combatStats().HPRegen) * weightPenaltyRegen[a.weightPenalty.Load()]
+	return a.calcStat(stat.RegenerateHPRate, a.combatStats().HPRegen*a.regenMultipliers().HP) * weightPenaltyRegen[a.weightPenalty.Load()]
 }
 
-// MPRegenRate returns a's MP regeneration per tick: its npc template's base
-// through its live stat calculator, scaled by a pet's weight-penalty band.
+// MPRegenRate returns a's MP regeneration per tick: the configured multiple
+// of its npc template's base through its live stat calculator, scaled by a
+// pet's weight-penalty band.
 func (a *Actor) MPRegenRate() float64 {
-	return a.calcStat(stat.RegenerateMPRate, a.combatStats().MPRegen) * weightPenaltyRegen[a.weightPenalty.Load()]
+	return a.calcStat(stat.RegenerateMPRate, a.combatStats().MPRegen*a.regenMultipliers().MP) * weightPenaltyRegen[a.weightPenalty.Load()]
+}
+
+// regenMultipliers are the base regeneration multipliers in force for a,
+// the shipped ones without settings.
+func (a *Actor) regenMultipliers() creature.RegenMultipliers {
+	if a.settings == nil {
+		return creature.DefaultRegenMultipliers
+	}
+	return a.settings.RegenMultipliers()
 }
 
 // TickRegen applies one HP/MP regeneration step: each resource short of its

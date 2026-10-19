@@ -39,6 +39,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -171,6 +172,10 @@ type PlayerConfig struct {
 	// StorageSlots is the base warehouse, freight, private store and recipe
 	// book size.
 	StorageSlots player.StorageSlots
+	// Regen scales the base HP, MP and CP regeneration of every creature
+	// that is not raid related: the characters, their summons, the NPCs
+	// and the doors.
+	Regen creature.RegenMultipliers
 	// Freight holds the freight service settings; nil uses the shipped
 	// defaults.
 	Freight *FreightConfig
