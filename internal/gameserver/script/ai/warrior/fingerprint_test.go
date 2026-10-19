@@ -18,7 +18,10 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 	for _, id := range npcStrings {
 		exempt = append(exempt, fmt.Sprintf("number %d", id))
 	}
-	problems, err := scriptfp.Check(".", []string{"script.ai.individual.Monster.WarriorBase.WarriorBase", "script.ai.individual.Monster.WarriorBase.Warrior.Warrior", "script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive", "script.ai.individual.Monster.WarriorBase.Warrior.WarriorHold.WarriorHold", "script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorPhysicalSpecial", "script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorFishingBlock", "script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarrior", "script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateWarrior"}, exempt...)
+	problems, err := scriptfp.Check(".", []string{
+		"script.ai.individual.Monster.WarriorBase.WarriorBase", "script.ai.individual.Monster.WarriorBase.Warrior.Warrior", "script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorAggressive", "script.ai.individual.Monster.WarriorBase.Warrior.WarriorHold.WarriorHold", "script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorPhysicalSpecial", "script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.WarriorFishingBlock", "script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderWarrior.PartyLeaderWarrior", "script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateWarrior",
+		"script.ai.individual.Monster.WarriorBase.Warrior.CorePrivatePremo", "script.ai.individual.Monster.WarriorBase.Warrior.RamphoPrimeval", "script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushWarriorPhysicalSpecial2", "script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressiveImmediate", "script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast2DebuffsAggressive",
+	}, exempt...)
 	if err != nil {
 		t.Fatal(err)
 	}

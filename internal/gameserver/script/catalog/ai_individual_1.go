@@ -1,15 +1,18 @@
 package catalog
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/script"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/warrior"
+)
 
 // aiIndividual1 is the catalog of batch 1 of 8 of the individual NPC behaviors (#186).
 func aiIndividual1() script.Catalog {
 	return script.Catalog{
-		"script.ai.individual.Monster.WarriorBase.Warrior.CorePrivatePremo":                                                       nil,
-		"script.ai.individual.Monster.WarriorBase.Warrior.RamphoPrimeval":                                                         nil,
+		"script.ai.individual.Monster.WarriorBase.Warrior.CorePrivatePremo":                                                       warrior.CorePrivatePremo,
+		"script.ai.individual.Monster.WarriorBase.Warrior.RamphoPrimeval":                                                         warrior.RamphoPrimeval,
 		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushStrongMan1":                                                    nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushStrongMan2":                                                    nil,
-		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushWarriorPhysicalSpecial2":                                       nil,
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushWarriorPhysicalSpecial2":                                       warrior.RoyalRushWarriorPhysicalSpecial2,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.CorePrivateWarriorAggressive":                         nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.Medusa":                                               nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.QueenAntPrivateGuardAnt":                              nil,
@@ -18,8 +21,8 @@ func aiIndividual1() script.Catalog {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorHoldAggressive":                                nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorSeeSpellAggressive":                            nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorSummonPrivateAtDyingAggressive":                nil,
-		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressiveImmediate":                                             nil,
-		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast2DebuffsAggressive":                                          nil,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressiveImmediate":                                             warrior.AggressiveImmediate,
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast2DebuffsAggressive":                                          warrior.Cast2DebuffsAggressive,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast2SkillsApproachAggressive":                                   nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsApproach.WarriorCast3SkillsApproach":                  nil,
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsApproach.WarriorCast3SkillsApproachAggressive":        nil,
