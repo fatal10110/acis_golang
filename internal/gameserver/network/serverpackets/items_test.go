@@ -57,19 +57,6 @@ func TestFrameExUseSharedGroupItem(t *testing.T) {
 	}
 }
 
-func TestFrameItemListErrorReturnsNoFrame(t *testing.T) {
-	items := []*item.Instance{{ObjectID: 1, TemplateID: 999, Count: 1, Location: item.LocationInventory}}
-
-	frame, err := FrameItemList(items, item.NewTable(nil), true)
-	if err == nil {
-		t.Fatal("FrameItemList err = nil, want an error for a missing template")
-	}
-	frame.Release() // must be a no-op on the zero frame
-	if frame.Bytes() != nil {
-		t.Errorf("frame.Bytes() = % X, want nil", frame.Bytes())
-	}
-}
-
 // ---- from grounditems_test.go ----
 func TestFrameSpawnItem(t *testing.T) {
 	ground := packetGroundItem{id: 100, itemID: 57, count: 500, stackable: true, x: 10, y: 20, z: -30}
@@ -207,13 +194,6 @@ func TestFrameInventoryUpdate(t *testing.T) {
 
 	if !bytes.Equal(got, want) {
 		t.Errorf("FrameInventoryUpdate mismatch:\n got  %x\n want %x", got, want)
-	}
-}
-
-func TestFrameInventoryUpdateMissingTemplate(t *testing.T) {
-	_, err := FrameInventoryUpdate([]itemcontainer.Update{{ObjectID: 1, TemplateID: 999, Count: 1}}, item.NewTable(nil))
-	if err == nil {
-		t.Fatal("FrameInventoryUpdate: want error for missing template")
 	}
 }
 
@@ -544,13 +524,6 @@ func TestFrameWarehouseWithdrawList(t *testing.T) {
 
 	if !bytes.Equal(got, want) {
 		t.Fatalf("FrameWarehouseWithdrawList = %x, want %x", got, want)
-	}
-}
-
-func TestFramePackageSendableListMissingTemplate(t *testing.T) {
-	_, err := FramePackageSendableList(200, 777, []*item.Instance{{ObjectID: 500, TemplateID: 999, Count: 1}}, item.NewTable(nil))
-	if err == nil {
-		t.Fatal("FramePackageSendableList: want error for missing template")
 	}
 }
 

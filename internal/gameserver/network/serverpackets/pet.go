@@ -1,8 +1,6 @@
 package serverpackets
 
 import (
-	"fmt"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/itemcontainer"
@@ -48,7 +46,8 @@ func FrameSetSummonRemainTime(total, remaining int32) wire.Frame {
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter)
 }
 
-// FramePetItemList builds a full pet inventory snapshot.
+// FramePetItemList builds a full pet inventory snapshot. An item whose
+// template templates no longer holds (one a reload removed) is left out.
 func FramePetItemList(items []*item.Instance, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(OpcodePetItemList)
 	if err := writePetItemList(w, items, templates); err != nil {
@@ -59,22 +58,29 @@ func FramePetItemList(items []*item.Instance, templates *item.Table) (wire.Frame
 }
 
 func writePetItemList(w *wire.Writer, items []*item.Instance, templates *item.Table) error {
-	count, err := wire.Uint16Count(len(items))
+	countOffset, err := reserveUint16Count(w, len(items))
 	if err != nil {
 		return err
 	}
-	w.WriteUint16(count)
+	var written int
 	for _, inst := range items {
-		if err := writeUpdatedItem(w, itemcontainer.NewUpdate(inst.Snapshot(), 0), templates); err != nil {
-			return fmt.Errorf("serverpackets: pet item: %w", err)
+		if inst == nil {
+			continue
 		}
+		tmpl, ok := templates.Get(inst.TemplateID)
+		if !ok {
+			continue
+		}
+		writeUpdatedItem(w, itemcontainer.NewUpdate(inst.Snapshot(), 0), tmpl)
+		written++
 	}
+	w.PatchUint16(countOffset, uint16(written))
 	return nil
 }
 
 // FramePetInventoryUpdate builds a PetInventoryUpdate packet for queued pet
 // inventory changes, each entry written from the instance state its update
-// carries.
+// carries. An entry whose template templates no longer holds is left out.
 func FramePetInventoryUpdate(updates []itemcontainer.Update, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(OpcodePetInventoryUpdate)
 	if err := writePetInventoryUpdate(w, updates, templates); err != nil {
@@ -85,16 +91,20 @@ func FramePetInventoryUpdate(updates []itemcontainer.Update, templates *item.Tab
 }
 
 func writePetInventoryUpdate(w *wire.Writer, updates []itemcontainer.Update, templates *item.Table) error {
-	count, err := wire.Uint16Count(len(updates))
+	countOffset, err := reserveUint16Count(w, len(updates))
 	if err != nil {
 		return err
 	}
-	w.WriteUint16(count)
+	var written int
 	for _, update := range updates {
-		w.WriteUint16(uint16(update.State))
-		if err := writeUpdatedItem(w, update, templates); err != nil {
-			return fmt.Errorf("serverpackets: PetInventoryUpdate: %w", err)
+		tmpl, ok := templates.Get(update.TemplateID)
+		if !ok {
+			continue
 		}
+		w.WriteUint16(uint16(update.State))
+		writeUpdatedItem(w, update, tmpl)
+		written++
 	}
+	w.PatchUint16(countOffset, uint16(written))
 	return nil
 }

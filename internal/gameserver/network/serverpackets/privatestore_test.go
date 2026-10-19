@@ -122,10 +122,6 @@ func TestFramePrivateStoreSellPackets(t *testing.T) {
 	if got := framePayload(t, frame); !bytes.Equal(got, want) {
 		t.Fatalf("FramePrivateStoreListSell() = %x, want %x", got, want)
 	}
-
-	if _, err := FramePrivateStoreListSell(100, false, 0, []privatestore.SellItem{{TemplateID: 999}}, templates); err == nil {
-		t.Fatal("FramePrivateStoreListSell with an unknown template built a frame")
-	}
 }
 
 // TestFramePrivateStoreBuyPackets pins PrivateStoreManageListBuy (0xb7:

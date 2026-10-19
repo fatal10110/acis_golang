@@ -278,20 +278,23 @@ func (l *GameClientLink) applyEquipItemStats(live *livePlayer, inv *itemcontaine
 	for i, inst := range res.Changed {
 		tmpl, ok := inv.Templates().Get(inst.TemplateID)
 		if !ok {
+			// A worn item whose template a reload removed can still come
+			// off: the stat functions it was attached with go with it.
+			if l.skills != nil && !inst.Equipped() {
+				l.skills.UnequipItemStatsReporting(live.Character, steps[i].worn, inst, nil, nil)
+			}
 			continue
 		}
 		l.applyEquipStep(live, inst, tmpl, steps[i])
 	}
 	if l.shadowItems != nil {
 		for _, inst := range res.Changed {
-			tmpl, ok := inv.Templates().Get(inst.TemplateID)
-			if !ok {
+			if !inst.Equipped() {
+				l.shadowItems.Untrack(inst)
 				continue
 			}
-			if inst.Equipped() {
+			if tmpl, ok := inv.Templates().Get(inst.TemplateID); ok {
 				l.shadowItems.Track(live.ObjectID(), inst, tmpl)
-			} else {
-				l.shadowItems.Untrack(inst)
 			}
 		}
 	}

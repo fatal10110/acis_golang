@@ -246,24 +246,15 @@ func TestFrameTradeUpdatePackets(t *testing.T) {
 	}
 }
 
+// TestFrameShopTradeMissingTemplate pins the one-item trade rows: with no
+// template for their item there is no row to write, so they fail. The list
+// packets skip such an item instead (TestListPacketsSkipItemsWithNoTemplate).
 func TestFrameShopTradeMissingTemplate(t *testing.T) {
-	if _, err := FrameBuyList(buylist.List{ID: 1, Products: []buylist.Product{{ItemID: 9, MaxCount: -1}}}, noStock, 0, 0, 1.0, item.NewTable(nil)); err == nil {
-		t.Fatal("FrameBuyList: want missing-template error")
-	}
-	if _, err := FrameSellList(0, []*item.Instance{{TemplateID: 9}}, item.NewTable(nil)); err == nil {
-		t.Fatal("FrameSellList: want missing-template error")
-	}
-	if _, err := FrameTradeStart(1, []*item.Instance{{TemplateID: 9, Location: item.LocationInventory}}, item.NewTable(nil)); err == nil {
-		t.Fatal("FrameTradeStart: want missing-template error")
-	}
 	if _, err := FrameTradeOwnAdd(TradeItemSnapshot{TemplateID: 9}, 1, item.NewTable(nil)); err == nil {
 		t.Fatal("FrameTradeOwnAdd: want missing-template error")
 	}
 	if _, err := FrameTradeUpdate(TradeItemSnapshot{TemplateID: 9}, 1, item.NewTable(nil)); err == nil {
 		t.Fatal("FrameTradeUpdate: want missing-template error")
-	}
-	if _, err := FrameTradeItemUpdate([]TradeItemUpdateEntry{{Item: TradeItemSnapshot{TemplateID: 9}}}, item.NewTable(nil)); err == nil {
-		t.Fatal("FrameTradeItemUpdate: want missing-template error")
 	}
 }
 
