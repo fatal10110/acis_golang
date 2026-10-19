@@ -270,6 +270,50 @@ func TestLV3PartyPrivateWithNoMaster(t *testing.T) {
 	}
 }
 
+// TestLV3PartyPrivateHatesASpellOnItsFight ports the masterless branch of
+// LV3PartyPrivateMonster's see-spell hook. A private spawned on its own,
+// whose template hates the human race at 20%, sees the character cast its
+// hate-adding buff (10 aggro points, the character itself its target):
+// while it is not swinging, nothing changes; while it swings at the
+// character, its top desire target, it adds the formula 10 / 8 + 20 / 100 *
+// 10 / 8 = 1.5, times 150.
+func TestLV3PartyPrivateHatesASpellOnItsFight(t *testing.T) {
+	t.Parallel()
+	tmpl := ind7bTemplate(ind7bPartyPrivateID)
+	tmpl.AIParams = npc.AIParams{"SetHateRace": "@race_human", "SetHateRaceRatio": "20"}
+	w := bootIndividual7(t, ind1AggroSpellBoot(t), tmpl)
+	private := w.spawn(t, ind7bPartyPrivateID, 60, 0)
+	me := w.charOf(t)
+	w.onQueue(t, private, func() { script.NPCOf(private).AddAttackDesire(me, 100) })
+	attacking := func() bool {
+		var now bool
+		w.onQueue(t, private, func() { now = private.AttackingNow() })
+		return now
+	}
+
+	if attacking() {
+		t.Fatal("setup: the private swings before any think")
+	}
+	w.castAggroBuff()
+	w.srv.Advance(t, time.Second)
+	if got := w.attackWeight(private); got != 100 {
+		t.Fatalf("private attack desire after a spell while not swinging = %v, want 100", got)
+	}
+
+	w.srv.AdvanceUntil(t, "the private's swing", func() bool {
+		w.ticks(t, 1)
+		return attacking()
+	})
+	before := w.attackWeight(private)
+	w.castAggroBuff()
+	w.srv.Advance(t, 500*time.Millisecond)
+	f0 := 20.0
+	f0 = ((1.000000 * 10) / 8) + ((f0 / 100) * ((1.000000 * 10) / 8))
+	if got := w.attackWeight(private) - before; got != f0*150 {
+		t.Fatalf("private attack desire gain from the spell during its swing = %v, want %v", got, f0*150)
+	}
+}
+
 // TestLV3WizardRaisesAndHealsItsPrivates ports LV3Wizard's created, party
 // died and script event hooks with LV3WizardPrivate's created and
 // LV3PartyPrivateMonster's party died hooks, every draw 0. Raised for the
