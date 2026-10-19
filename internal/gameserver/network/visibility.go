@@ -145,7 +145,7 @@ func (p *livePlayer) sendInfoFrom(obj world.Tracked, onQueue bool) {
 			}
 			return
 		}
-		if snap, ok := summonInfoSnapshot(o, p, p.npcs, p.link.summonInCombat(o)); ok {
+		if snap, ok := p.link.summonInfoSnapshot(o, p, p.npcs, p.link.summonInCombat(o)); ok {
 			p.sendVisibilityFrame(serverpackets.FrameNPCInfo(snap))
 			p.describeState(o, o.CastControl())
 		}
@@ -280,7 +280,7 @@ func (l *GameClientLink) refreshSummonAbnormalEffect(a *summon.Actor) {
 		if !ok || a.ShownAsOwnedBy(p.ObjectID()) {
 			return
 		}
-		if snap, ok := summonInfoSnapshot(a, p, p.npcs, l.summonInCombat(a)); ok {
+		if snap, ok := l.summonInfoSnapshot(a, p, p.npcs, l.summonInCombat(a)); ok {
 			p.sendVisibilityFrame(serverpackets.FrameNPCInfo(snap))
 		}
 	})
@@ -391,8 +391,9 @@ func (l *GameClientLink) summonInCombat(a *summon.Actor) bool {
 // does not own. Attackable is per viewer: whether viewer may attack a without
 // forcing, which follows a's owner's karma and PvP flag. A nil viewer sees it
 // as not attackable. inCombat is summonInCombat's answer for a. The summon
-// of an invisible player is not shown: it reports false.
-func summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table, inCombat bool) (serverpackets.NPCInfoSnapshot, bool) {
+// of an invisible player is not shown: it reports false. With
+// ShowSummonCrest it carries its owner's clan and alliance (addSummonCrest).
+func (l *GameClientLink) summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table, inCombat bool) (serverpackets.NPCInfoSnapshot, bool) {
 	if npcs == nil {
 		return serverpackets.NPCInfoSnapshot{}, false
 	}
@@ -413,7 +414,7 @@ func summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table, in
 		team = owner.DuelTeam()
 	}
 	pAtkSpd := int(a.PAtkSpd(tmpl.AtkSpd))
-	return serverpackets.NPCInfoSnapshot{
+	snap := serverpackets.NPCInfoSnapshot{
 		ObjectID: a.ObjectID(), TemplateID: tmpl.TemplateID,
 		X: x, Y: y, Z: z, Heading: a.Heading(),
 		MAtkSpd: int(a.MAtkSpd()), PAtkSpd: pAtkSpd,
@@ -427,7 +428,9 @@ func summonInfoSnapshot(a *summon.Actor, viewer *livePlayer, npcs *npc.Table, in
 		Name: a.Name(), Title: title, Summon: true, PvpFlag: pvpFlag, Karma: karma,
 		AbnormalEffect: a.AbnormalEffect(), Team: team,
 		Attackable: viewer != nil && a.AttackableWithoutForceBy(viewer.Character),
-	}, true
+	}
+	l.addSummonCrest(a, &snap)
+	return snap, true
 }
 
 // petInfoSnapshot resolves a's owner-visible PetInfo fields, given owner

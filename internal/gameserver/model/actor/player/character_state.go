@@ -457,14 +457,11 @@ func (c *Character) liveLocked() *creature.Live {
 	return c.Live
 }
 
-// recentFakeDeathGrace is how long a player is exempt from hostile NPC
-// auto-targeting after standing up from Fake Death, matching the shipped
-// PlayerFakeDeathUpProtection default (players.properties).
-const recentFakeDeathGrace = 5 * time.Second
-
-// MarkRecentFakeDeath starts this player's post-fake-death grace period.
+// MarkRecentFakeDeath starts this player's post-fake-death grace period,
+// as long as the rules' FakeDeathUpProtection, during which hostile NPC
+// auto-targeting skips it.
 func (c *Character) MarkRecentFakeDeath() {
-	until := c.Now().Add(recentFakeDeathGrace)
+	until := c.Now().Add(c.rules().FakeDeathUpProtection)
 	c.stateMu.Lock()
 	defer c.stateMu.Unlock()
 	c.recentFakeDeathUntil = until

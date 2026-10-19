@@ -4,8 +4,8 @@ import "time"
 
 // Reuse-gate identifiers, one per client action that carries a per-client
 // reuse delay. Only the gates the current milestone wires exist (character selection
-// family, server bypass, crafting, multisell, dice, chat, seed purchase and
-// emotes), so the set grows as later
+// family, server bypass, crafting, multisell, dice, chat, seed purchase,
+// emotes and item drops), so the set grows as later
 // systems port their own gated actions.
 const (
 	floodProtectorCharacterSelect = iota
@@ -18,6 +18,7 @@ const (
 	floodProtectorHeroVoice
 	floodProtectorManor
 	floodProtectorSocial
+	floodProtectorDropItem
 	numFloodProtectors
 )
 

@@ -243,6 +243,7 @@ type options struct {
 	manorDelay             time.Duration
 	rollDiceDelay          time.Duration
 	socialDelay            time.Duration
+	configKeys             configKeyOptions
 	keepMaintained         bool
 	augmentations          *augmentation.Table
 	armorSets              *armorset.Table
@@ -2237,6 +2238,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.ClassMaster = o.classMaster
 	gclConfig.PlayerConfig.GMStartupInvulnerable, gclConfig.PlayerConfig.GMStartupInvisible, gclConfig.PlayerConfig.GMStartupBlockAll = o.gmStartupModes[0], o.gmStartupModes[1], o.gmStartupModes[2]
 	gclConfig.PlayerConfig.GMHeroAura = o.gmHeroAura
+	o.configKeys.apply(&gclConfig)
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
 	gclConfig.ArmorSets = o.armorSets
 	gclConfig.Manor = o.manor
@@ -2369,7 +2371,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			state: state, templates: o.npcs, geo: bootGeo(o.geo), ids: ids, decay: o.decay, ai: ai, positions: positions,
 			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.AttackStance, log: o.log, makers: o.npcSpawns,
 			dropRates: o.npcDropRates, sevenSigns: sevenSigns, scripts: quests.registry, spawner: quests.env.Spawner, rand: quests.env.Rand, routes: o.walkerRoutes,
-			skills: o.npcSpawnSkills, zones: o.zones, driftRange: o.maxDriftRange,
+			skills: o.npcSpawnSkills, zones: o.zones, driftRange: o.maxDriftRange, noSpawns: o.configKeys.noSpawns,
 		})
 		// As the game server does once the spawns are up, every castle's
 		// control towers, then its holy artifacts, are placed, the

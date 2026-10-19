@@ -135,6 +135,8 @@ type npcSpawnDeps struct {
 	sieges  *siege.Engine
 	// doors are the doors the makers find by name; nil finds none.
 	doors *gamemanager.WorldObjects
+	// noSpawns is WithNoSpawns.
+	noSpawns bool
 }
 
 // WithDataReloads gives the link the //reload and //respawnall hooks; by
@@ -217,6 +219,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	npcs.SetGuardedSieges(link.GuardedSiege)
 	npcs.SetSpawnTimes(network.SpawnTimes(link))
 	link.SetNpcSpawns(npcs)
+	npcs.SetNoSpawns(deps.noSpawns)
 	npcs.SpawnOnStart()
 	if deps.sevenSigns != nil {
 		deps.sevenSigns.SetSpawns(npcs)

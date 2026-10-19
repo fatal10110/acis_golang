@@ -122,6 +122,7 @@ func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids
 	respawnHooks.SetHook(npcs.Respawn)
 	spawner.Bind(npcs)
 	link.SetNpcSpawns(npcs)
+	npcs.SetNoSpawns(bool(gameplay.NoSpawns))
 	npcs.SpawnOnStart()
 	return npcs, nil
 }
