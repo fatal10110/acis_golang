@@ -32,9 +32,9 @@ func aiIndividual8() script.Catalog {
 		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBox5":    nil,
 		"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTriggerBoxBase.RoyalRushTriggerBoxBase": nil,
 		"script.ai.individual.RoyalRushMissionNpc":                                                 individual.RoyalRushMissionNpc,
-		"script.ai.individual.RoyalRushNpc":                                                        nil,
-		"script.ai.individual.SacrificialVictim":                                                   nil,
-		"script.ai.individual.TriolCamera":                                                         nil,
-		"script.ai.individual.WarriorPetForPC":                                                     nil,
+		"script.ai.individual.RoyalRushNpc":                                                        individual.RoyalRushNpc,
+		"script.ai.individual.SacrificialVictim":                                                   individual.SacrificialVictim,
+		"script.ai.individual.TriolCamera":                                                         individual.TriolCamera,
+		"script.ai.individual.WarriorPetForPC":                                                     individual.WarriorPetForPC,
 	}
 }

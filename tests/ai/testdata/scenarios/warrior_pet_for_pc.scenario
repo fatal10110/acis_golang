@@ -1,0 +1,10 @@
+# WarriorPetForPC (16013), a tamed beast: one placed with no owner, its first spawn parameter
+# naming no player, neither greets, claims, buffs nor eats; a hit on it changes nothing, and
+# a minute and more passes with nothing sent.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.individual.WarriorPetForPC
+npc beast 16013 Monster 40 0 0
+
+hit beast 10
+advance 61s
