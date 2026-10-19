@@ -18,6 +18,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q015"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q016"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q017"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q018"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q019"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q020"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q027"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q028"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q029"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q030"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q031"
 )
 
 // quests001To050 is the catalog of quests 001 to 050 (#178), except the two the engine slices ported.
@@ -39,18 +47,18 @@ func quests001To050() script.Catalog {
 		"quest.Q015_SweetWhispers":                    q015.New,
 		"quest.Q016_TheComingDarkness":                q016.New,
 		"quest.Q017_LightAndDarkness":                 q017.New,
-		"quest.Q018_MeetingWithTheGoldenRam":          nil,
-		"quest.Q019_GoToThePastureland":               nil,
-		"quest.Q020_BringUpWithLove":                  nil,
+		"quest.Q018_MeetingWithTheGoldenRam":          q018.New,
+		"quest.Q019_GoToThePastureland":               q019.New,
+		"quest.Q020_BringUpWithLove":                  q020.New,
 		"quest.Q021_HiddenTruth":                      nil,
 		"quest.Q022_TragedyInVonHellmannForest":       nil,
 		"quest.Q024_InhabitantsOfTheForestOfTheDead":  nil,
 		"quest.Q025_HidingBehindTheTruth":             nil,
-		"quest.Q027_ChestCaughtWithABaitOfWind":       nil,
-		"quest.Q028_ChestCaughtWithABaitOfIcyAir":     nil,
-		"quest.Q029_ChestCaughtWithABaitOfEarth":      nil,
-		"quest.Q030_ChestCaughtWithABaitOfFire":       nil,
-		"quest.Q031_SecretBuriedInTheSwamp":           nil,
+		"quest.Q027_ChestCaughtWithABaitOfWind":       q027.New,
+		"quest.Q028_ChestCaughtWithABaitOfIcyAir":     q028.New,
+		"quest.Q029_ChestCaughtWithABaitOfEarth":      q029.New,
+		"quest.Q030_ChestCaughtWithABaitOfFire":       q030.New,
+		"quest.Q031_SecretBuriedInTheSwamp":           q031.New,
 		"quest.Q032_AnObviousLie":                     nil,
 		"quest.Q033_MakeAPairOfDressShoes":            nil,
 		"quest.Q034_InSearchOfCloth":                  nil,
