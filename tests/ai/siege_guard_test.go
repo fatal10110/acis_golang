@@ -506,12 +506,17 @@ func TestGludioHoldAttacksWhoSpellsWhatItFights(t *testing.T) {
 	monster := w.spawn(t, siegeDummyID, 180, 30)
 
 	// The monster hurts the knight (its attacked hook ignores an attacker
-	// no player controls), then hits the court guard, whose call makes the
-	// knight attack it.
+	// no player controls, its clan call to itself does not), then hits the
+	// court guard, whose call makes the knight attack it.
 	w.onQueue(t, monster, func() {
 		knight.TakeDamage(10, monster)
 		court.TakeDamage(50, monster)
 	})
+	// Each call adds damage / max HP / 0.05 * 50, in float arithmetic.
+	weight := func(damage int) float64 { return float64(damage) / float64(siegeGuardMaxHP) / 0.05 * 50 }
+	if got, want := knight.AggroHate(monster), weight(10)+weight(50); got != want {
+		t.Fatalf("knight hate of the monster = %v, want the two clan calls' %v alone", got, want)
+	}
 	if top := knight.AI().TopDesireTarget(); top == nil || top.ObjectID() != monster.ObjectID() {
 		t.Fatalf("knight top desire target = %v, want the monster", top)
 	}
@@ -669,5 +674,33 @@ func TestGludioWizardStandAnswersAClanCall(t *testing.T) {
 				t.Fatalf("wizard DD magic desire = %+v, want one on the character from where it stands, weight 1000000", d)
 			}
 		})
+	}
+}
+
+// TestGludioWizardStandIgnoresWhatNoPlayerControls ports the playable
+// tests of GludioWizardStand's hooks: out of the character's sight, the
+// standing wizard that sees a monster casts nothing at it, and the
+// monster's hit on a clan mate, on a winning draw, calls it for nothing.
+// Its AI tick and the teleport re-fire tell it about playables only; a
+// look around (Npc.lookNeighbor, which another script may make it run)
+// tells it about every creature near it.
+func TestGludioWizardStandIgnoresWhatNoPlayerControls(t *testing.T) {
+	t.Parallel()
+	dummy := warriorTemplate(siegeDummyID, nil)
+	w := bootSiegeGuards(t, raidBoot{},
+		siegeGuardTemplate(adenKnightID), siegeCasterTemplate(adenWizardStandID, npc.SkillTypeDDMagic, siegeDDMagicID), dummy)
+	wizard := w.spawn(t, adenWizardStandID, 1500, 0)
+	knight := w.spawn(t, adenKnightID, 1500, 150)
+	monster := w.spawn(t, siegeDummyID, 1600, 0)
+	w.srv.InstallNPCCastSeam(t, wizard, siegeNPCSkills())
+
+	w.ticks(t, 2)
+	w.onQueue(t, wizard, wizard.LookNeighbor)
+	if d, ok := desire(wizard, actorai.IntentionCast); ok {
+		t.Fatalf("standing wizard wants %+v on the monster it sees", d)
+	}
+	w.onQueue(t, monster, func() { knight.TakeDamage(siegeTwentieth, monster) })
+	if d, ok := desire(wizard, actorai.IntentionCast); ok {
+		t.Fatalf("standing wizard wants %+v on the monster that hit its clan mate", d)
 	}
 }
