@@ -77,11 +77,10 @@ func attackingAfterLatchedRunAI(t *testing.T, srv *gameservertest.Server, hostil
 // assertLatchedSwingThenIdle checks a monster whose attack desire was lost
 // with its first swing latched: the next runAI swings once more without
 // idling first, and the runAI after that idles with no swing in between.
-// The idle shows no frame and lasts only until the next hit animation end
-// takes up the idle wander it queued, so the wall clock, which cannot stop
-// inside that window, checks the idle by that wander's MoveToLocation, the
-// first frame only an idle leads to; the driven clock also reads the idle
-// intention itself. No swing follows.
+// No swing follows. The driven clock pins the exact timeline: the idle at
+// the first swing's hit animation end, then the idle wander it queued taken
+// up at the latched swing's hit animation end (see idleThenWanderOnDrivenClock).
+// The wall clock checks the idle alone (see idleOnWallClock).
 func assertLatchedSwingThenIdle(t *testing.T, srv *gameservertest.Server, hostile *npc.Hostile, attackTime time.Duration) {
 	t.Helper()
 	srv.Advance(t, attackTime+10*time.Millisecond)
@@ -90,15 +89,48 @@ func assertLatchedSwingThenIdle(t *testing.T, srv *gameservertest.Server, hostil
 
 	srv.Advance(t, attackTime)
 	if srv.DrivesClock() {
-		if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
-			t.Fatalf("CurrentIntention() once the latched swing finished = %v, want %v", got, ai.IntentionIdle)
-		}
+		idleThenWanderOnDrivenClock(t, srv, hostile)
+	} else {
+		idleOnWallClock(t, srv, hostile)
+	}
+	assertNoSwingFor(t, srv, attackTime)
+}
+
+// idleThenWanderOnDrivenClock checks the idle intention at the step the
+// first swing's hit animation ends, then reads the idle wander's
+// MoveToLocation, which the latched swing's own hit animation end starts,
+// with no Attack before it.
+func idleThenWanderOnDrivenClock(t *testing.T, srv *gameservertest.Server, hostile *npc.Hostile) {
+	t.Helper()
+	if got := hostile.AI().CurrentIntention(); got != ai.IntentionIdle {
+		t.Fatalf("CurrentIntention() once the latched swing finished = %v, want %v", got, ai.IntentionIdle)
 	}
 	readUntilWithout(t, srv, hostile.ObjectID(), serverpackets.OpcodeMoveToLocation, serverpackets.OpcodeAttack, "idle wander after the latched swing")
 	if got := hostile.AI().CurrentIntention(); got != ai.IntentionWander {
 		t.Fatalf("CurrentIntention() after the idle wander set off = %v, want %v", got, ai.IntentionWander)
 	}
-	assertNoSwingFor(t, srv, attackTime)
+}
+
+// idleOnWallClock waits until the monster has left the attack for the idle
+// or for the idle wander only an idle queues, then fails on any Attack sent
+// before that. The wall clock decides neither which of the two the check
+// sees nor whether the wander is taken up: the idle comes from the first
+// swing's hit animation end, timed from that swing's hit, and the latched
+// swing's hit is timed from the first swing's finish. A late finish puts
+// that hit behind the idle, whose stop cancels it, and with it the hit
+// animation end that would take up the wander; the next periodic AI pass,
+// which this suite does not run, takes it up instead.
+func idleOnWallClock(t *testing.T, srv *gameservertest.Server, hostile *npc.Hostile) {
+	t.Helper()
+	srv.AdvanceUntil(t, "idle after the latched swing", func() bool {
+		got := hostile.AI().CurrentIntention()
+		return got == ai.IntentionIdle || got == ai.IntentionWander
+	})
+	for _, frame := range srv.ReadQueued(t, srv.Client) {
+		if frame[0] == serverpackets.OpcodeAttack {
+			t.Fatal("Attack before the idle after the latched swing, want none")
+		}
+	}
 }
 
 // assertNoSwingFor lets d pass and fails on any Attack broadcast in it.
