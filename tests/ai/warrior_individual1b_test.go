@@ -499,7 +499,8 @@ func TestSelfRangeCasterStrikesWhatItSeesFromAfar(t *testing.T) {
 // adds the hate once more; with a top desire target it cannot attack within
 // 600 (it cannot move and the monster is out of its reach), it wants its
 // long range magic on that one, and its self range magic on the character
-// within 200.
+// within 200; with one 600 or farther away, it stops hating that one and
+// adds the hate of the hit to the attacker.
 func TestSelfRangeCasterAnswersHits(t *testing.T) {
 	t.Parallel()
 	boot := func(t *testing.T) (*ind1World, *npc.Hostile, *npc.Hostile) {
@@ -574,6 +575,31 @@ func TestSelfRangeCasterAnswersHits(t *testing.T) {
 		w.wantCasts(t, "after the hit", n, map[modelskill.ID]ind1Cast{
 			ind1bLongDDID: {other.ObjectID(), 1000000}, ind1bSelfRangeDDID: {w.player.ObjectID(), 1000000},
 		})
+	})
+	t.Run("rooted, unattackable top desire target from 600 on", func(t *testing.T) {
+		t.Parallel()
+		tmpl := selfRangeTemplate(selfRangeID)
+		tmpl.CanMove = false
+		w := bootIndividual1b(t, raidBoot{opts: []gameservertest.Option{gameservertest.WithScriptSkills(dryadRoot())}}, tmpl, warriorTemplate(unboundID, nil))
+		n := w.spawn(t, selfRangeID, 1500, 0)
+		other := w.spawn(t, unboundID, 1500, 700)
+		w.srv.InstallNPCCastSeam(t, n, ind1bSkills())
+		w.land(t, dryadRootID, n)
+		w.moveCharacter(t, n, 30, 0)
+		w.setTop(t, n, script.NPCOf(other))
+		w.onQueue(t, n, func() { n.AddDamageHate(other, 0, 500) })
+		if got := n.AggroHate(other); got != 500 {
+			t.Fatalf("setup: hate of the monster = %v, want 500", got)
+		}
+		w.draws.set(99)
+		w.hit(t, n, 10)
+		if got := n.AggroHate(other); got != 0 {
+			t.Fatalf("hate of the monster 700 away after the hit = %v, want it stopped", got)
+		}
+		if got := n.AggroHate(w.player); got != 250 {
+			t.Fatalf("hate of the character after the hit = %v, want 125 from this branch and 125 from the Warrior", got)
+		}
+		w.wantCasts(t, "after the hit", n, nil)
 	})
 }
 
@@ -857,5 +883,49 @@ func TestFleeRunsFromItsAttacker(t *testing.T) {
 	w.ticks(t, 1)
 	if got := n.AI().CurrentIntention(); got != actorai.IntentionFlee {
 		t.Fatalf("intention after the hit = %v, want flee", got)
+	}
+}
+
+// TestCorpseNecroCastsOnACorpse ports the corpse branch of
+// WarriorCorpseNecroLongAggressive's see-creature hook, every draw 0:
+// attacking no one while it hates someone (here a monster, by threat
+// alone), it wants its second magic on a dead player it sees within 100,
+// weight 1000000; hating no one it does not.
+func TestCorpseNecroCastsOnACorpse(t *testing.T) {
+	t.Parallel()
+	for _, row := range []struct {
+		name  string
+		hates bool
+	}{{"hating", true}, {"hating no one", false}} {
+		t.Run(row.name, func(t *testing.T) {
+			t.Parallel()
+			w := bootIndividual1b(t, raidBoot{}, necroTemplate(necroID), warriorTemplate(unboundID, nil))
+			n := w.spawn(t, necroID, 1500, 0)
+			other := w.spawn(t, unboundID, 1500, 300)
+			w.srv.InstallNPCCastSeam(t, n, ind1bSkills())
+			w.moveCharacter(t, n, 50, 0)
+			w.srv.Settle(t)
+			w.onCharacter(t, func(c *player.Character) { c.Die(nil) })
+			w.clear(t, n)
+			w.ticks(t, 1)
+			w.clear(t, n)
+			w.onQueue(t, n, func() {
+				if row.hates {
+					n.AddDamageHate(other, 0, 1)
+				}
+				script.NPCOf(n).LookNeighbor()
+			})
+			if got := n.AI().CurrentIntention(); got == actorai.IntentionAttack {
+				t.Fatalf("setup: intention %v, want no attack", got)
+			}
+			if got := script.NPCOf(n).MostHated() != nil; got != row.hates {
+				t.Fatalf("setup: hates someone = %v, want %v", got, row.hates)
+			}
+			want := map[modelskill.ID]ind1Cast{}
+			if row.hates {
+				want[ind1bDD2ID] = ind1Cast{w.player.ObjectID(), 1000000}
+			}
+			w.wantCasts(t, "after it saw the corpse", n, want)
+		})
 	}
 }
