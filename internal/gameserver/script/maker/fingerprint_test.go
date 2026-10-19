@@ -21,6 +21,12 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.maker.InstantSpawnSerialMaker",
 		"script.maker.OnDayNightSpawnMaker",
 		"script.maker.OpenDoorMaker",
+		"script.maker.AlarmDeviceMaker1",
+		"script.maker.AlarmDeviceMaker2",
+		"script.maker.AlarmDeviceMaker3",
+		"script.maker.AlarmDeviceMaker4",
+		"script.maker.HallKeeperDefaultMaker",
+		"script.maker.RainbowMaker",
 	},
 		// Delays are durations: the reference's seconds-to-milliseconds
 		// factor and its one-minute period in milliseconds have no Go
