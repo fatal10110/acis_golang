@@ -1,0 +1,23 @@
+# The Guard Is Busy (Q257), refused: Gilbert sends an elven fighter away, and the quest is not
+# started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q257_the_guard_is_busy_wrong_race.golden
+character Guardsman 6
+class 18
+script quest.Q257_TheGuardIsBusy
+item 1084
+page guard/30039.htm
+page script/quest/Q257_TheGuardIsBusy/
+npc gilbert 30039 Guard 10 0 0
+
+# Gilbert: humans only.
+action gilbert
+action gilbert
+  S ActionFailed
+  S NpcHtmlMessage obj=gilbert item=0 page=guard/30039.htm
+  S ActionFailed
+bypass npc_{gilbert}_Quest
+  S NpcHtmlMessage obj=gilbert item=0 page=script/quest/Q257_TheGuardIsBusy/30039-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q257_TheGuardIsBusy CREATED
+  rows Q257_TheGuardIsBusy -

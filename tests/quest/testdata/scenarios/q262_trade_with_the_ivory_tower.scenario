@@ -1,0 +1,108 @@
+# Trade with the Ivory Tower (Q262): a level 8 character accepts at Vollodos (a merchant); a
+# green fungus and nine blood fungi give ten fungus sacs (every roll pinned to succeed), the tenth
+# moving the quest on; Vollodos takes them for 3000 adena, and the repeatable quest ends; then
+# relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q262_trade_with_the_ivory_tower.golden
+character Trader 8
+random always 0
+script quest.Q262_TradeWithTheIvoryTower
+item 707
+page merchant/30137.htm
+page script/quest/Q262_TradeWithTheIvoryTower/
+npc vollodos 30137 Merchant 10 0 0
+npc green 20007 Monster 40 0 0
+npc blood 20400 Monster 0 40 0
+
+# Vollodos: accept.
+action vollodos
+action vollodos
+  S ActionFailed
+  S NpcHtmlMessage obj=vollodos item=0 page=merchant/30137.htm
+  S ActionFailed
+bypass npc_{vollodos}_Quest
+  S NpcHtmlMessage obj=vollodos item=0 page=script/quest/Q262_TradeWithTheIvoryTower/30137-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q262_TradeWithTheIvoryTower CREATED
+bypass Quest Q262_TradeWithTheIvoryTower 30137-03.htm
+  S QuestList 262:0x80000001
+  S ExShowQuestMark quest=262
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=vollodos item=0 page=script/quest/Q262_TradeWithTheIvoryTower/30137-03.htm
+  S ActionFailed
+  Q upsert Q262_TradeWithTheIvoryTower | <state> | STARTED
+  Q upsert Q262_TradeWithTheIvoryTower | <cond> | 1
+  state Q262_TradeWithTheIvoryTower STARTED
+  rows Q262_TradeWithTheIvoryTower <cond>=1 <state>=STARTED
+
+# A green fungus, then nine blood fungi: a sac each; the tenth completes the set.
+kill green
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:707
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 707=1
+action vollodos
+  S ActionFailed
+  S NpcHtmlMessage obj=vollodos item=0 page=merchant/30137.htm
+  S ActionFailed
+bypass npc_{vollodos}_Quest
+  S NpcHtmlMessage obj=vollodos item=0 page=script/quest/Q262_TradeWithTheIvoryTower/30137-04.htm
+  S ActionFailed
+  S ActionFailed
+kill blood x9
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:707
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:707
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:707
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:707
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:707
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:707
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:707
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:707
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:707
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 262:0x80000003
+  S ExShowQuestMark quest=262
+  Q upsert Q262_TradeWithTheIvoryTower | <cond> | 2
+  items 707=10
+  rows Q262_TradeWithTheIvoryTower <cond>=2 <state>=STARTED
+
+# Vollodos: the sacs for adena; the quest ends.
+action vollodos
+  S ActionFailed
+  S NpcHtmlMessage obj=vollodos item=0 page=merchant/30137.htm
+  S ActionFailed
+bypass npc_{vollodos}_Quest
+  S SystemMessage id=301 3:707 6:10
+  S SystemMessage id=52 6:3000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=vollodos item=0 page=script/quest/Q262_TradeWithTheIvoryTower/30137-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q262_TradeWithTheIvoryTower
+  items 707=0 57=3000
+  state Q262_TradeWithTheIvoryTower -
+  rows Q262_TradeWithTheIvoryTower -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q262_TradeWithTheIvoryTower -
+  rows Q262_TradeWithTheIvoryTower -
+  items 57=3000
