@@ -13,7 +13,7 @@ import (
 // with no OWNER spawn moves no one. It runs on live's queue.
 //
 // ponytail: the FlagWar clan restart point of the town branch waits for the
-// FlagWar hall sieges (#3346).
+// FlagWar hall sieges (#3502).
 func (l *GameClientLink) recallLivePlayer(live *livePlayer, dest modelskill.RecallType) {
 	var (
 		at location.Location
