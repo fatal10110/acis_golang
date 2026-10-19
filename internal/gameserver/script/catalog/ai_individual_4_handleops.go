@@ -7,5 +7,79 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // aiIndividual4HandleOps holds, per script of ai_individual_4.go, the kind-specific NPC
 // handle operations each of its hooks reaches.
 func aiIndividual4HandleOps() map[string]script.HandleOps {
-	return map[string]script.HandleOps{}
+	return map[string]script.HandleOps{
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.FreyaBear": {
+			"OnAttacked":         {"NPC.AbortAll", "NPC.CanAttack", "NPC.GeoPathFailCount", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned"},
+			"OnClanAttacked":     {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnScriptEvent":      {"NPC.CleanAllHate", "NPC.RemoveAllAttackDesire", "NPC.TopDesireTarget"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnTimer":            {"NPC.AbortAll", "NPC.RemoveAllAttackDesire", "Spawner.DecayMe"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.OrfenPrivateRaikelLeos": {
+			"OnAttacked":         {"NPC.AbortAll", "NPC.CanAttack", "NPC.GeoPathFailCount", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned"},
+			"OnClanAttacked":     {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnScriptEvent":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnTimer":            {"NPC.AbortAll", "NPC.RemoveAllAttackDesire", "Spawner.DecayMe"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCannibaliAggressive": {
+			"OnAttacked":         {"NPC.AbortAll", "NPC.CanAttack", "NPC.GeoPathFailCount", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned"},
+			"OnClanAttacked":     {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnScriptEvent":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnTimer":            {"NPC.AbortAll", "NPC.RemoveAllAttackDesire", "Spawner.DecayMe"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCast3SkillsMagical": {
+			"OnAttacked":         {"NPC.AbortAll", "NPC.CanAttack", "NPC.GeoPathFailCount", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned"},
+			"OnClanAttacked":     {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnScriptEvent":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnTimer":            {"NPC.AbortAll", "NPC.RemoveAllAttackDesire", "Spawner.DecayMe"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCastCurse": {
+			"OnAttacked":         {"NPC.AbortAll", "NPC.CanAttack", "NPC.GeoPathFailCount", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned"},
+			"OnClanAttacked":     {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnScriptEvent":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnTimer":            {"NPC.AbortAll", "NPC.RemoveAllAttackDesire", "Spawner.DecayMe"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCastDDHeal": {
+			"OnAttacked":         {"NPC.AbortAll", "NPC.CanAttack", "NPC.GeoPathFailCount", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned", "NPC.TopDesireTarget"},
+			"OnClanAttacked":     {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnScriptEvent":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnTimer":            {"NPC.AbortAll", "NPC.RemoveAllAttackDesire", "Spawner.DecayMe"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCastDDMagicCurseStone": {
+			"OnAttacked":         {"NPC.AbortAll", "NPC.CanAttack", "NPC.GeoPathFailCount", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned"},
+			"OnClanAttacked":     {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnScriptEvent":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnTimer":            {"NPC.AbortAll", "NPC.RemoveAllAttackDesire", "Spawner.DecayMe"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateHereticCastCurse": {
+			"OnAttacked":         {"NPC.AbortAll", "NPC.CanAttack", "NPC.GeoPathFailCount", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned"},
+			"OnClanAttacked":     {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnOutOfTerritory":   {"NPC.RemoveAllAttackDesire"},
+			"OnScriptEvent":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnTimer":            {"NPC.AbortAll", "NPC.RemoveAllAttackDesire", "Spawner.DecayMe"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+	}
 }
