@@ -1,0 +1,471 @@
+# Trial of the Seeker (Q213), a second class-change trial, played by a level 36 Rogue, every
+# script roll pinned to 0: Dufner starts it with his letter and pays the level 35 set's
+# Dimensional Diamonds (128 for a Rogue, once per character); Terry sends the rogue after the
+# Neer Ghoul Berserker's runestone, then the four captains' runestones; Viktor, Terry and
+# Viktor again trade letters for the request of ten Medusa scales; Marina, Brunon and Marina
+# analyse the Shilen runestone; Terry, the level 36 rogue needing no third order, lists the
+# hosts of the four abyss runestones and writes his report; Dufner hands over the Mark of
+# Seeker and completes the quest; then relog. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q213_trial_of_the_seeker.golden
+character Seeker 36
+class 7
+random always 0
+script quest.Q213_TrialOfTheSeeker
+item 2647 2648 2649 2650 2651 2652 2653 2654 2655 2656 2657 2658 2659 2660 2661 2662 2663 2664 2665 2666 2667 2668 2669 2670 2671 2672 2673 7562
+page trainer/30106.htm
+page trainer/30064.htm
+page trainer/30526.htm
+page merchant/30684.htm
+page trainer/30715.htm
+page script/quest/Q213_TrialOfTheSeeker/
+npc dufner 30106 Trainer 10 0 0
+npc terry 30064 Trainer -10 0 0
+npc brunon 30526 Trainer 0 10 0
+npc viktor 30684 Merchant 0 -10 0
+npc marina 30715 Trainer 20 20 0
+npc ghoul 20198 Monster 40 0 0
+npc antcaptain 20080 Monster -40 0 0
+npc olmahum 20211 Monster 0 40 0
+npc bugbear 20249 Monster 0 -40 0
+npc turek 20495 Monster 40 40 0
+npc medusa 20158 Monster -40 -40 0
+npc stakato 20234 Monster 40 -40 0
+npc breka 20270 Monster -40 40 0
+npc antwarrior 20088 Monster 60 0 0
+npc leto 20580 Monster -60 0 0
+
+# Dufner: a Rogue of level 36 may start; his letter, and the first trial of the set pays the
+# diamonds, which turns the accept page into 30106-05a.htm.
+action dufner
+action dufner
+  S ActionFailed
+  S NpcHtmlMessage obj=dufner item=0 page=trainer/30106.htm
+  S ActionFailed
+bypass npc_{dufner}_Quest
+  S NpcHtmlMessage obj=dufner item=0 page=script/quest/Q213_TrialOfTheSeeker/30106-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q213_TrialOfTheSeeker CREATED
+bypass Quest Q213_TrialOfTheSeeker 30106-04.htm
+  S NpcHtmlMessage obj=dufner item=0 page=script/quest/Q213_TrialOfTheSeeker/30106-04.htm
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30106-05.htm
+  S QuestList 213:0x80000001
+  S ExShowQuestMark quest=213
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2647
+  S SystemMessage id=53 3:7562 6:128
+  S NpcHtmlMessage obj=dufner item=0 page=script/quest/Q213_TrialOfTheSeeker/30106-05a.htm
+  S ActionFailed
+  Q upsert Q213_TrialOfTheSeeker | <state> | STARTED
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 1
+  M set secondClassChange35 | true
+  items 2647=1 7562=128
+
+# Dufner waits for Terry's report.
+action dufner
+  S ActionFailed
+  S NpcHtmlMessage obj=dufner item=0 page=trainer/30106.htm
+  S ActionFailed
+bypass npc_{dufner}_Quest
+  S NpcHtmlMessage obj=dufner item=0 page=script/quest/Q213_TrialOfTheSeeker/30106-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Terry takes Dufner's letter for his first order.
+action terry
+action terry
+  S ActionFailed
+  S NpcHtmlMessage obj=terry item=0 page=trainer/30064.htm
+  S ActionFailed
+bypass npc_{terry}_Quest
+  S NpcHtmlMessage obj=terry item=0 page=script/quest/Q213_TrialOfTheSeeker/30064-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30064-02.htm
+  S NpcHtmlMessage obj=terry item=0 page=script/quest/Q213_TrialOfTheSeeker/30064-02.htm
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30064-03.htm
+  S QuestList 213:0x80000003
+  S ExShowQuestMark quest=213
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2647
+  S SystemMessage id=54 3:2648
+  S NpcHtmlMessage obj=terry item=0 page=script/quest/Q213_TrialOfTheSeeker/30064-03.htm
+  S ActionFailed
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 2
+
+# The Neer Ghoul Berserker's runestone (draw 0, under the 10% chance).
+kill ghoul
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2653
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 213:0x80000007
+  S ExShowQuestMark quest=213
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 3
+  items 2653=1
+
+# Terry takes the runestone and the first order for the second.
+action terry
+  S ActionFailed
+  S NpcHtmlMessage obj=terry item=0 page=trainer/30064.htm
+  S ActionFailed
+bypass npc_{terry}_Quest
+  S NpcHtmlMessage obj=terry item=0 page=script/quest/Q213_TrialOfTheSeeker/30064-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30064-06.htm
+  S QuestList 213:0x8000000f
+  S ExShowQuestMark quest=213
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2653
+  S SystemMessage id=302 3:2648
+  S SystemMessage id=54 3:2649
+  S NpcHtmlMessage obj=terry item=0 page=script/quest/Q213_TrialOfTheSeeker/30064-06.htm
+  S ActionFailed
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 4
+
+# The four captains' runestones; the last one found moves the quest on.
+kill antcaptain
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2656
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill olmahum
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2654
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill bugbear
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2657
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill turek
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2655
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 213:0x8000001f
+  S ExShowQuestMark quest=213
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 5
+  items 2654=1 2655=1 2656=1 2657=1
+
+# Terry takes the runestones for his box and his letter.
+action terry
+  S ActionFailed
+  S NpcHtmlMessage obj=terry item=0 page=trainer/30064.htm
+  S ActionFailed
+bypass npc_{terry}_Quest
+  S NpcHtmlMessage obj=terry item=0 page=script/quest/Q213_TrialOfTheSeeker/30064-09.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30064-10.htm
+  S QuestList 213:0x8000003f
+  S ExShowQuestMark quest=213
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2656
+  S SystemMessage id=302 3:2654
+  S SystemMessage id=302 3:2657
+  S SystemMessage id=302 3:2655
+  S SystemMessage id=302 3:2649
+  S SystemMessage id=54 3:2658
+  S SystemMessage id=54 3:2650
+  S NpcHtmlMessage obj=terry item=0 page=script/quest/Q213_TrialOfTheSeeker/30064-10.htm
+  S ActionFailed
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 6
+
+# Viktor takes Terry's letter for his own.
+action viktor
+action viktor
+  S ActionFailed
+  S NpcHtmlMessage obj=viktor item=0 page=merchant/30684.htm
+  S ActionFailed
+bypass npc_{viktor}_Quest
+  S NpcHtmlMessage obj=viktor item=0 page=script/quest/Q213_TrialOfTheSeeker/30684-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30684-02.htm
+  S NpcHtmlMessage obj=viktor item=0 page=script/quest/Q213_TrialOfTheSeeker/30684-02.htm
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30684-03.htm
+  S NpcHtmlMessage obj=viktor item=0 page=script/quest/Q213_TrialOfTheSeeker/30684-03.htm
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30684-04.htm
+  S NpcHtmlMessage obj=viktor item=0 page=script/quest/Q213_TrialOfTheSeeker/30684-04.htm
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30684-05.htm
+  S QuestList 213:0x8000007f
+  S ExShowQuestMark quest=213
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2650
+  S SystemMessage id=54 3:2651
+  S NpcHtmlMessage obj=viktor item=0 page=script/quest/Q213_TrialOfTheSeeker/30684-05.htm
+  S ActionFailed
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 7
+
+# Terry takes Viktor's letter for Hawkeye's.
+action terry
+action terry
+  S ActionFailed
+  S NpcHtmlMessage obj=terry item=0 page=trainer/30064.htm
+  S ActionFailed
+bypass npc_{terry}_Quest
+  S QuestList 213:0x800000ff
+  S ExShowQuestMark quest=213
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2651
+  S SystemMessage id=54 3:2652
+  S NpcHtmlMessage obj=terry item=0 page=script/quest/Q213_TrialOfTheSeeker/30064-12.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 8
+
+# Viktor takes the box and Hawkeye's letter for his request; Terry's and his own letters
+# are gone already, so taking them takes nothing.
+action viktor
+action viktor
+  S ActionFailed
+  S NpcHtmlMessage obj=viktor item=0 page=merchant/30684.htm
+  S ActionFailed
+bypass npc_{viktor}_Quest
+  S NpcHtmlMessage obj=viktor item=0 page=script/quest/Q213_TrialOfTheSeeker/30684-12.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30684-06.htm
+  S NpcHtmlMessage obj=viktor item=0 page=script/quest/Q213_TrialOfTheSeeker/30684-06.htm
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30684-07.htm
+  S NpcHtmlMessage obj=viktor item=0 page=script/quest/Q213_TrialOfTheSeeker/30684-07.htm
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30684-08.htm
+  S NpcHtmlMessage obj=viktor item=0 page=script/quest/Q213_TrialOfTheSeeker/30684-08.htm
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30684-10.htm
+  S NpcHtmlMessage obj=viktor item=0 page=script/quest/Q213_TrialOfTheSeeker/30684-10.htm
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30684-11.htm
+  S QuestList 213:0x800001ff
+  S ExShowQuestMark quest=213
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2658
+  S SystemMessage id=302 3:2652
+  S SystemMessage id=54 3:2659
+  S NpcHtmlMessage obj=viktor item=0 page=script/quest/Q213_TrialOfTheSeeker/30684-11.htm
+  S ActionFailed
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 9
+
+# Ten Medusas: the scales.
+kill medusa x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2660
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2660
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2660
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2660
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2660
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2660
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2660
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2660
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2660
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2660
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 213:0x800003ff
+  S ExShowQuestMark quest=213
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 10
+  items 2660=10
+
+# Viktor takes the request and the scales for the analysis request and the Shilen runestone.
+action viktor
+  S ActionFailed
+  S NpcHtmlMessage obj=viktor item=0 page=merchant/30684.htm
+  S ActionFailed
+bypass npc_{viktor}_Quest
+  S NpcHtmlMessage obj=viktor item=0 page=script/quest/Q213_TrialOfTheSeeker/30684-14.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30684-15.htm
+  S QuestList 213:0x800007ff
+  S ExShowQuestMark quest=213
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2659
+  S SystemMessage id=301 3:2660 6:10
+  S SystemMessage id=54 3:2662
+  S SystemMessage id=54 3:2661
+  S NpcHtmlMessage obj=viktor item=0 page=script/quest/Q213_TrialOfTheSeeker/30684-15.htm
+  S ActionFailed
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 11
+
+# Marina takes the runestone and the analysis request for her letter.
+action marina
+action marina
+  S ActionFailed
+  S NpcHtmlMessage obj=marina item=0 page=trainer/30715.htm
+  S ActionFailed
+bypass npc_{marina}_Quest
+  S NpcHtmlMessage obj=marina item=0 page=script/quest/Q213_TrialOfTheSeeker/30715-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30715-02.htm
+  S QuestList 213:0x80000fff
+  S ExShowQuestMark quest=213
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2661
+  S SystemMessage id=302 3:2662
+  S SystemMessage id=54 3:2663
+  S NpcHtmlMessage obj=marina item=0 page=script/quest/Q213_TrialOfTheSeeker/30715-02.htm
+  S ActionFailed
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 12
+
+# Brunon takes Marina's letter for the experiment tools.
+action brunon
+action brunon
+  S ActionFailed
+  S NpcHtmlMessage obj=brunon item=0 page=trainer/30526.htm
+  S ActionFailed
+bypass npc_{brunon}_Quest
+  S QuestList 213:0x80001fff
+  S ExShowQuestMark quest=213
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2663
+  S SystemMessage id=54 3:2664
+  S NpcHtmlMessage obj=brunon item=0 page=script/quest/Q213_TrialOfTheSeeker/30526-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 13
+
+# Marina takes the tools for the analysis result.
+action marina
+action marina
+  S ActionFailed
+  S NpcHtmlMessage obj=marina item=0 page=trainer/30715.htm
+  S ActionFailed
+bypass npc_{marina}_Quest
+  S NpcHtmlMessage obj=marina item=0 page=script/quest/Q213_TrialOfTheSeeker/30715-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30715-05.htm
+  S QuestList 213:0x80003fff
+  S ExShowQuestMark quest=213
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2664
+  S SystemMessage id=54 3:2665
+  S NpcHtmlMessage obj=marina item=0 page=script/quest/Q213_TrialOfTheSeeker/30715-05.htm
+  S ActionFailed
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 14
+
+# Terry: no third order, and level 36 is enough for the list of hosts; the quest skips cond 15,
+# which the journal leaves unmarked.
+action terry
+action terry
+  S ActionFailed
+  S NpcHtmlMessage obj=terry item=0 page=trainer/30064.htm
+  S ActionFailed
+bypass npc_{terry}_Quest
+  S NpcHtmlMessage obj=terry item=0 page=script/quest/Q213_TrialOfTheSeeker/30064-15.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30064-16.htm
+  S NpcHtmlMessage obj=terry item=0 page=script/quest/Q213_TrialOfTheSeeker/30064-16.htm
+  S ActionFailed
+bypass Quest Q213_TrialOfTheSeeker 30064-18.htm
+  S QuestList 213:0x8000bfff
+  S ExShowQuestMark quest=213
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2665
+  S SystemMessage id=54 3:2667
+  S NpcHtmlMessage obj=terry item=0 page=script/quest/Q213_TrialOfTheSeeker/30064-18.htm
+  S ActionFailed
+  Q upsert Q213_TrialOfTheSeeker | <flags> | -2147434497
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 16
+
+# The four abyss runestones; the last one found moves the quest on.
+kill stakato
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2668
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill breka
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2669
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill antwarrior
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2670
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+kill leto
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2671
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 213:0x8001bfff
+  S ExShowQuestMark quest=213
+  Q upsert Q213_TrialOfTheSeeker | <flags> | -2147368961
+  Q upsert Q213_TrialOfTheSeeker | <cond> | 17
+  items 2668=1 2669=1 2670=1 2671=1
+
+# Terry takes the list and the runestones for his report; the cond stays.
+action terry
+  S ActionFailed
+  S NpcHtmlMessage obj=terry item=0 page=trainer/30064.htm
+  S ActionFailed
+bypass npc_{terry}_Quest
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2667
+  S SystemMessage id=302 3:2668
+  S SystemMessage id=302 3:2669
+  S SystemMessage id=302 3:2670
+  S SystemMessage id=302 3:2671
+  S SystemMessage id=54 3:2672
+  S NpcHtmlMessage obj=terry item=0 page=script/quest/Q213_TrialOfTheSeeker/30064-23.htm
+  S ActionFailed
+  S ActionFailed
+  items 2667=0 2668=0 2669=0 2670=0 2671=0 2672=1
+  rows Q213_TrialOfTheSeeker <cond>=17 <flags>=-2147368961 <state>=STARTED
+
+# Dufner: the Mark of Seeker, experience and the finish.
+action dufner
+action dufner
+  S ActionFailed
+  S NpcHtmlMessage obj=dufner item=0 page=trainer/30106.htm
+  S ActionFailed
+bypass npc_{dufner}_Quest
+  S SystemMessage id=302 3:2672
+  S SystemMessage id=54 3:2673
+  S SystemMessage id=95 1:72126 1:11000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 213:0x00000000
+  S NpcHtmlMessage obj=dufner item=0 page=script/quest/Q213_TrialOfTheSeeker/30106-08.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q213_TrialOfTheSeeker | <state> | COMPLETED
+  Q delete-except-state Q213_TrialOfTheSeeker
+  state Q213_TrialOfTheSeeker COMPLETED
+  rows Q213_TrialOfTheSeeker <state>=COMPLETED
+  items 2672=0 2673=1
+
+relog
+  state Q213_TrialOfTheSeeker COMPLETED
+  rows Q213_TrialOfTheSeeker <state>=COMPLETED
+  items 2673=1 7562=128
+action dufner
+action dufner
+  S ActionFailed
+  S NpcHtmlMessage obj=dufner item=0 page=trainer/30106.htm
+  S ActionFailed
+bypass npc_{dufner}_Quest
+  S NpcHtmlMessage obj=dufner item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,16 @@
+# WarriorHero (21260) raised with no target: its created hook arms its two timers and wants
+# nothing. After 8 s it says one of its seven lines, 1000434 plus its draw of 7 (draw 3:
+# 1000437), once: nothing more answers. (After 15 s it leaves the world; the format does not
+# render the DeleteObject, which tests/ai/monster_individual7_test.go checks.)
+character Hunter 20
+random always 3
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorHero
+npc hero 21260 Monster 40 0 0
+
+advance 7s
+advance 1s
+  S NpcSay obj=hero type=0 npc=1021260 text="On to immortal glory!"
+advance 7s
+advance 30s

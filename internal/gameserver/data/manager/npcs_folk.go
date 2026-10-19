@@ -68,6 +68,9 @@ type FolkSpawner struct {
 	// SeeRange is the configured NPC see range; zero keeps the shipped
 	// default.
 	SeeRange int
+	// Regen answers the NPC's base regeneration multipliers; nil gives the
+	// shipped ones.
+	Regen npc.RegenSettings
 }
 
 // Spawn builds a civilian NPC from inst, places it at (loc, heading) and
@@ -99,6 +102,7 @@ func (s FolkSpawner) spawn(inst *npc.Instance, loc location.Location, heading in
 		Ground:         s.Ground,
 		SeeRange:       s.SeeRange,
 		Tower:          tower,
+		Regen:          s.Regen,
 	}
 	if s.NewSink != nil {
 		rt.Sink = s.NewSink(f)

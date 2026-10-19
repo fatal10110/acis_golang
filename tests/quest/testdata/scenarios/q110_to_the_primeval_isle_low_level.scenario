@@ -1,0 +1,21 @@
+# To the Primeval Isle (Q110), refused: a level 74 character, one short of the quest's level, is
+# turned away by Anton and the quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q110_to_the_primeval_isle_low_level.golden
+character Courier 74
+script quest.Q110_ToThePrimevalIsle
+item 8777
+page merchant/31338.htm
+page script/quest/Q110_ToThePrimevalIsle/
+npc anton 31338 Merchant 10 0 0
+
+action anton
+action anton
+  S ActionFailed
+  S NpcHtmlMessage obj=anton item=0 page=merchant/31338.htm
+  S ActionFailed
+bypass npc_{anton}_Quest
+  S NpcHtmlMessage obj=anton item=0 page=script/quest/Q110_ToThePrimevalIsle/31338-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q110_ToThePrimevalIsle CREATED
+  rows Q110_ToThePrimevalIsle -

@@ -14,7 +14,7 @@ func (l *GameClientLink) adminMainPage(gm *livePlayer, line string) {
 	if args := handleradmin.Args(line); len(args) > 0 {
 		param := args[0]
 		if isDigits(param) {
-			mode, ok := parseJavaInt(param)
+			mode, ok := parseInt32(param)
 			if !ok {
 				// A panel number past the int range opens nothing.
 				return
@@ -53,7 +53,7 @@ func (l *GameClientLink) adminSystemMessage(gm *livePlayer, line string) {
 		sendText(gm, "Usage: //msg sysMsgId")
 		return
 	}
-	id, ok := parseJavaInt(args[0])
+	id, ok := parseInt32(args[0])
 	if !ok {
 		sendText(gm, "Usage: //msg sysMsgId")
 		return
@@ -74,10 +74,10 @@ func isDigits(s string) bool {
 	return true
 }
 
-// parseJavaInt parses s as a signed decimal int: an optional ASCII sign,
+// parseInt32 parses s as a signed decimal int: an optional ASCII sign,
 // then decimal digits, any Basic Multilingual Plane decimal digit included
 // (fullwidth, Arabic-Indic and the like), in int32 range.
-func parseJavaInt(s string) (int32, bool) {
+func parseInt32(s string) (int32, bool) {
 	if s == "" || s == "+" || s == "-" {
 		return 0, false
 	}

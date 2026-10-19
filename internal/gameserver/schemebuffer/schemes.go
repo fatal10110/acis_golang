@@ -75,7 +75,7 @@ func (m *Manager) Restore(rows []Row, log zerolog.Logger) {
 	defer m.mu.Unlock()
 	for _, row := range rows {
 		var ids []int32
-		for _, text := range javaSplitComma(row.Skills) {
+		for _, text := range splitSkillList(row.Skills) {
 			if text == "" {
 				break
 			}
@@ -172,9 +172,9 @@ func (m *Manager) lookup(ownerID int32, name string) (*scheme, bool) {
 	return o.schemes[i], true
 }
 
-// javaSplitComma splits s on commas as the stored skill list is read:
+// splitSkillList splits s on commas as the stored skill list is read:
 // trailing empty fields are dropped, and an empty s is one empty field.
-func javaSplitComma(s string) []string {
+func splitSkillList(s string) []string {
 	parts := strings.Split(s, ",")
 	if s == "" {
 		return parts

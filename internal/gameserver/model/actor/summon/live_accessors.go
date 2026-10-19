@@ -149,7 +149,7 @@ func (a *Actor) SyncControlItemEnchant() bool {
 }
 
 func (a *Actor) notifyDamage(attacker attackable.Combatant, amount float64) {
-	a.emit(event.Damaged{AttackerName: attacker.CharacterName(), Damage: commons.JavaInt(amount)})
+	a.emit(event.Damaged{AttackerName: attacker.CharacterName(), Damage: commons.TruncInt32Sat(amount)})
 }
 
 // IsPet reports whether this live summon is a pet rather than a servitor.

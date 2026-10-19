@@ -7,5 +7,43 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // aiIndividual7HandleOps holds, per script of ai_individual_7.go, the kind-specific NPC
 // handle operations each of its hooks reaches.
 func aiIndividual7HandleOps() map[string]script.HandleOps {
-	return map[string]script.HandleOps{}
+	return map[string]script.HandleOps{
+		"script.ai.individual.Monster.LV3Monster.LV3Dagger": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.LV3Monster.LV3Dwarf": {
+			"OnPartyAttacked": {"NPC.MaxHP"},
+		},
+		"script.ai.individual.Monster.LV3Monster.LV3Healer": {
+			"OnPartyAttacked": {"NPC.MaxHP"},
+		},
+		"script.ai.individual.Monster.LV3Monster.LV3Knight": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.LV3Monster.LV3Orc": {
+			"OnAttacked": {"NPC.SetEnchantEffect", "NPC.Stunned", "NPC.TopDesireTarget"},
+			"OnCreated":  {"NPC.SetEnchantEffect"},
+			"OnTimer":    {"NPC.Stunned"},
+		},
+		"script.ai.individual.Monster.LV3Monster.LV3PartyLeaderMonster": {
+			"OnPartyAttacked": {"NPC.MaxHP"},
+		},
+		"script.ai.individual.Monster.LV3Monster.LV3PartyPrivateMonster": {
+			"OnPartyAttacked": {"NPC.MaxHP"},
+			"OnSeeSpell":      {"NPC.AttackingNow", "NPC.TopDesireTarget"},
+			"OnTimer":         {"NPC.InCombat", "NPC.RemoveAllAttackDesire"},
+		},
+		"script.ai.individual.Monster.LV3Monster.LV3Ranger": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.LV3Monster.LV3Summoner": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.LV3Monster.LV3WizardPrivate": {
+			"OnPartyAttacked":    {"NPC.MaxHP"},
+			"OnSeeSpell":         {"NPC.AttackingNow", "NPC.TopDesireTarget"},
+			"OnTimer":            {"NPC.InCombat", "NPC.RemoveAllAttackDesire"},
+			"OnUseSkillFinished": {"NPC.DoDie", "NPC.RemoveAllAttackDesire"},
+		},
+	}
 }

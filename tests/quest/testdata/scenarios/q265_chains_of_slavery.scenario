@@ -1,0 +1,128 @@
+# Chains of Slavery (Q265): a dark elven mystic of level 6 accepts at Kristin (a guard); ten imps
+# give ten shackles (every roll pinned to succeed); Kristin pays 12 per shackle with 500 more for
+# ten, and, the first time only, 3000 beginner spiritshots with the tutorial voice; an imp elder's
+# shackle is paid without shots; then the player quits the repeatable quest; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q265_chains_of_slavery.golden
+character Liberator 6
+class 38
+random always 0
+script quest.Q265_ChainsOfSlavery
+item 1368 5790
+page guard/30357.htm
+page script/quest/Q265_ChainsOfSlavery/
+npc kristin 30357 Guard 10 0 0
+npc imp 20004 Monster 40 0 0
+npc elder 20005 Monster 0 40 0
+
+# Kristin: accept.
+action kristin
+action kristin
+  S ActionFailed
+  S NpcHtmlMessage obj=kristin item=0 page=guard/30357.htm
+  S ActionFailed
+bypass npc_{kristin}_Quest
+  S NpcHtmlMessage obj=kristin item=0 page=script/quest/Q265_ChainsOfSlavery/30357-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q265_ChainsOfSlavery CREATED
+bypass Quest Q265_ChainsOfSlavery 30357-03.htm
+  S QuestList 265:0x80000001
+  S ExShowQuestMark quest=265
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kristin item=0 page=script/quest/Q265_ChainsOfSlavery/30357-03.htm
+  S ActionFailed
+  Q upsert Q265_ChainsOfSlavery | <state> | STARTED
+  Q upsert Q265_ChainsOfSlavery | <cond> | 1
+  state Q265_ChainsOfSlavery STARTED
+  rows Q265_ChainsOfSlavery <cond>=1 <state>=STARTED
+action kristin
+  S ActionFailed
+  S NpcHtmlMessage obj=kristin item=0 page=guard/30357.htm
+  S ActionFailed
+bypass npc_{kristin}_Quest
+  S NpcHtmlMessage obj=kristin item=0 page=script/quest/Q265_ChainsOfSlavery/30357-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ten imps: a shackle each.
+kill imp x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1368
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1368
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1368
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1368
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1368
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1368
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1368
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1368
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1368
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1368
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1368=10
+
+# First payment: 10 x 12 + 500, then the beginner spiritshots of a mystic.
+action kristin
+  S ActionFailed
+  S NpcHtmlMessage obj=kristin item=0 page=guard/30357.htm
+  S ActionFailed
+bypass npc_{kristin}_Quest
+  S SystemMessage id=301 3:1368 6:10
+  S SystemMessage id=52 6:620
+  S TutorialShowQuestionMark id=26
+  S SystemMessage id=53 3:5790 6:3000
+  S PlaySound type=2 file=tutorial_voice_027 bind=1 obj=player loc=10,20,30 delay=0
+  S NpcHtmlMessage obj=kristin item=0 page=script/quest/Q265_ChainsOfSlavery/30357-05.htm
+  S ActionFailed
+  S ActionFailed
+  M set Q265_ChainsOfSlavery_OneTimeQuestFlag | true
+  items 1368=0 57=620 5790=3000
+
+# An imp elder: one shackle, paid without shots.
+kill elder
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1368
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1368=1
+action kristin
+  S ActionFailed
+  S NpcHtmlMessage obj=kristin item=0 page=guard/30357.htm
+  S ActionFailed
+bypass npc_{kristin}_Quest
+  S SystemMessage id=302 3:1368
+  S SystemMessage id=52 6:12
+  S NpcHtmlMessage obj=kristin item=0 page=script/quest/Q265_ChainsOfSlavery/30357-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 1368=0 57=632 5790=3000
+bypass Quest Q265_ChainsOfSlavery 30357-06.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=kristin item=0 page=script/quest/Q265_ChainsOfSlavery/30357-06.htm
+  S ActionFailed
+  Q delete-quest Q265_ChainsOfSlavery
+  state Q265_ChainsOfSlavery -
+  rows Q265_ChainsOfSlavery -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q265_ChainsOfSlavery -
+  rows Q265_ChainsOfSlavery -
+  items 57=632 5790=3000

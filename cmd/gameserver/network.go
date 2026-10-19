@@ -233,6 +233,7 @@ func provideGameClientLink(
 		PetConfig:        petCfg,
 		DisableRaidCurse: bool(gameplay.DisableRaidCurse),
 		ShowNPCCrest:     bool(gameplay.ShowNPCCrest),
+		ShowSummonCrest:  bool(gameplay.ShowSummonCrest),
 		ShowNPCLevel:     bool(gameplay.ShowNPCLevel),
 		Wyvern:           &gameplay.Wyvern,
 		Macros:           macros,
@@ -293,6 +294,7 @@ func provideGameClientLink(
 	if effects != nil {
 		effects.SetShadowItemExpiry(link.ExpireShadowItem)
 	}
+	worldObjects.SetRegenSettings(link.PlayerRules())
 	return link, nil
 }
 
@@ -443,6 +445,7 @@ func newPlayerConfig(cfg gameServerConfig, gameplay gameplayConfig, pvpOptions t
 		AutoLearnSkills:            bool(gameplay.AutoLearnSkills),
 		WeightLimitMultiplier:      float64(gameplay.WeightLimitMultiplier),
 		InventorySlots:             gameplay.InventorySlots,
+		Regen:                      gameplay.RegenMultipliers,
 		StorageSlots:               gameplay.StorageSlots,
 		Freight:                    &freightCfg,
 		KarmaPlayerCanTeleport:     bool(gameplay.KarmaPlayerCanTeleport),
@@ -464,6 +467,9 @@ func newPlayerConfig(cfg gameServerConfig, gameplay gameplayConfig, pvpOptions t
 		ManorDelay:                 time.Duration(gameplay.ManorDelay),
 		RollDiceDelay:              time.Duration(gameplay.RollDiceDelay),
 		SocialDelay:                time.Duration(gameplay.SocialDelay),
+		DropItemDelay:              time.Duration(gameplay.DropItemDelay),
+		WarehouseDisabled:          !bool(gameplay.WarehouseAllowed),
+		FakeDeathUpProtection:      time.Duration(gameplay.FakeDeathUpProtection),
 		SubclassDelay:              time.Duration(gameplay.SubclassDelay),
 		SubclassWithoutQuests:      bool(gameplay.SubclassWithoutQuests),
 		KeepMaintainedIngredients:  !bool(gameplay.BlacksmithUseRecipes),

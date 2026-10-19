@@ -1,0 +1,109 @@
+# Saga of the Maestro (Q100) on the saga core, played by a level 76 Warsmith from
+# the start: Telson offers it and gives the main item; Tobald sends the player to Borodin,
+# who asks for what the player does not hold; Telson has nothing more to say until the
+# tablets are done, and a relog keeps the journal. Expectations are the reference trace's
+# (the relog's rows and state derived from ThirdClassQuest.java and Q100_SagaOfTheMaestro.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q100_saga_of_the_maestro.golden
+character Warsmith 76
+class 57
+script quest.Q100_SagaOfTheMaestro
+item 7108
+page default/31592.htm
+page default/31597.htm
+page merchant/31273.htm
+page script/quest/Q100_SagaOfTheMaestro/
+npc telson 31592 Folk 10 0 0
+npc tobald 31597 Folk -10 0 0
+npc borodin 31273 Merchant 0 10 0
+
+action telson
+action telson
+  S ActionFailed
+  S NpcHtmlMessage obj=telson item=0 page=default/31592.htm
+  S ActionFailed
+bypass npc_{telson}_Quest
+  S NpcHtmlMessage obj=telson item=0 page=script/quest/Q100_SagaOfTheMaestro/0-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q100_SagaOfTheMaestro 0-1
+  S NpcHtmlMessage obj=telson item=0 page=script/quest/Q100_SagaOfTheMaestro/0-05.htm
+  S ActionFailed
+bypass Quest Q100_SagaOfTheMaestro accept
+  S QuestList 100:0x80000001
+  S ExShowQuestMark quest=100
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7108
+  S NpcHtmlMessage obj=telson item=0 page=script/quest/Q100_SagaOfTheMaestro/0-03.htm
+  S ActionFailed
+  Q upsert Q100_SagaOfTheMaestro | <state> | STARTED
+  Q upsert Q100_SagaOfTheMaestro | <cond> | 1
+  items 7108=1
+  state Q100_SagaOfTheMaestro STARTED
+action telson
+  S ActionFailed
+  S NpcHtmlMessage obj=telson item=0 page=default/31592.htm
+  S ActionFailed
+bypass npc_{telson}_Quest
+  S NpcHtmlMessage obj=telson item=0 page=script/quest/Q100_SagaOfTheMaestro/0-04.htm
+  S ActionFailed
+  S ActionFailed
+action tobald
+action tobald
+  S ActionFailed
+  S NpcHtmlMessage obj=tobald item=0 page=default/31597.htm
+  S ActionFailed
+bypass npc_{tobald}_Quest
+  S NpcHtmlMessage obj=tobald item=0 page=script/quest/Q100_SagaOfTheMaestro/2-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q100_SagaOfTheMaestro 2-1
+  S QuestList 100:0x80000003
+  S ExShowQuestMark quest=100
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tobald item=0 page=script/quest/Q100_SagaOfTheMaestro/2-05.htm
+  S ActionFailed
+  Q upsert Q100_SagaOfTheMaestro | <cond> | 2
+action tobald
+  S ActionFailed
+  S NpcHtmlMessage obj=tobald item=0 page=default/31597.htm
+  S ActionFailed
+bypass npc_{tobald}_Quest
+  S NpcHtmlMessage obj=tobald item=0 page=script/quest/Q100_SagaOfTheMaestro/2-02.htm
+  S ActionFailed
+  S ActionFailed
+action borodin
+action borodin
+  S ActionFailed
+  S NpcHtmlMessage obj=borodin item=0 page=merchant/31273.htm
+  S ActionFailed
+bypass npc_{borodin}_Quest
+  S NpcHtmlMessage obj=borodin item=0 page=script/quest/Q100_SagaOfTheMaestro/1-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q100_SagaOfTheMaestro 1-3
+  S QuestList 100:0x80000007
+  S ExShowQuestMark quest=100
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=borodin item=0 page=script/quest/Q100_SagaOfTheMaestro/1-05.htm
+  S ActionFailed
+  Q upsert Q100_SagaOfTheMaestro | <cond> | 3
+action borodin
+  S ActionFailed
+  S NpcHtmlMessage obj=borodin item=0 page=merchant/31273.htm
+  S ActionFailed
+bypass npc_{borodin}_Quest
+  S NpcHtmlMessage obj=borodin item=0 page=script/quest/Q100_SagaOfTheMaestro/1-02.htm
+  S ActionFailed
+  S ActionFailed
+action telson
+action telson
+  S ActionFailed
+  S NpcHtmlMessage obj=telson item=0 page=default/31592.htm
+  S ActionFailed
+bypass npc_{telson}_Quest
+  S NpcHtmlMessage obj=telson item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
+  state Q100_SagaOfTheMaestro STARTED
+  rows Q100_SagaOfTheMaestro <cond>=3 <state>=STARTED

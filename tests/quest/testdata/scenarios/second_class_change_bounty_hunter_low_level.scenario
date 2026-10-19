@@ -1,0 +1,28 @@
+# Second class change (SecondClassChange): a level 39 dwarf Scavenger without the marks of the
+# Bounty Hunter asks Warehouse Chief Gesto about the occupation and gets the page the reference
+# numbers 109. Expectations are the reference trace's (SecondClassChange.onTalk, onAdvEvent).
+trace internal/gameserver/script/testdata/oracle/scenarios/second_class_change_bounty_hunter_low_level.golden
+character Fighter 39
+class 54
+script script.feature.SecondClassChange
+item 3119 3238 2809 8870
+page villagemaster/30511.htm
+page script/feature/SecondClassChange/
+npc gesto 30511 VillageMasterDwarf 10 0 0
+
+action gesto
+action gesto
+  S ActionFailed
+  S NpcHtmlMessage obj=gesto item=0 page=villagemaster/30511.htm
+  S ActionFailed
+bypass npc_{gesto}_Quest SecondClassChange
+  S NpcHtmlMessage obj=gesto item=0 page=script/feature/SecondClassChange/master_dwarf-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest SecondClassChange master_dwarf-02.htm
+  S NpcHtmlMessage obj=gesto item=0 page=script/feature/SecondClassChange/master_dwarf-02.htm
+  S ActionFailed
+bypass Quest SecondClassChange BH
+  S NpcHtmlMessage obj=gesto item=0 page=script/feature/SecondClassChange/master_dwarf-109.htm
+  S ActionFailed
+  items 3119=0 3238=0 2809=0 8870=0

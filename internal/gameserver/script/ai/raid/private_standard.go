@@ -45,7 +45,7 @@ func partyHate(called *script.NPC, damage int32) float64 {
 	if damage == 0 {
 		damage = 1
 	}
-	return float64(commons.JavaInt(((1.0 * float64(damage)) / float64(called.Level()+7)) * 20000))
+	return float64(commons.TruncInt32Sat(((1.0 * float64(damage)) / float64(called.Level()+7)) * 20000))
 }
 
 // PrivateStandardHooks are RaidPrivateStandard's hooks, which the other

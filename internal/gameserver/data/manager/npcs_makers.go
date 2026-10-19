@@ -182,6 +182,13 @@ type groupSpawn struct {
 
 func (s groupSpawn) Entry() spawn.Entry { return s.g.def.Entries[s.i] }
 
+func (s groupSpawn) Alias() string {
+	if tmpl, ok := s.g.n.templates.Get(int(s.Entry().NPCID)); ok {
+		return tmpl.Alias
+	}
+	return ""
+}
+
 func (s groupSpawn) Total() int {
 	if s.Persisted() {
 		return 1
@@ -408,12 +415,15 @@ func (n *Npcs) sevenSignsState() SevenSigns {
 }
 
 // StartSevenSigns hands the population the Seven Signs state its ssq_*
-// groups follow and spawns them as the state says.
+// groups follow and spawns them as the state says; with SetNoSpawns they
+// wait for the next period change.
 func (n *Npcs) StartSevenSigns(ss SevenSigns) {
 	n.mu.Lock()
 	n.sevenSigns = ss
 	n.mu.Unlock()
-	n.SevenSignsChanged()
+	if !n.noSpawns.Load() {
+		n.SevenSignsChanged()
+	}
 }
 
 // SevenSignsChanged deletes every Seven Signs group and starts the ones

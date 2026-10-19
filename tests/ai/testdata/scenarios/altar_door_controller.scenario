@@ -1,0 +1,11 @@
+# AltarDoorController (32051): talking to the altar door keeper shows nothing, its first talk
+# returning no page: the action's ActionFailed, then the empty first talk's.
+character Hunter 20
+script script.ai.individual.AltarDoorController
+script script.ai.individual.DefaultNpc
+npc altar 32051 Folk 40 0 0
+
+action altar
+action altar
+  S ActionFailed
+  S ActionFailed

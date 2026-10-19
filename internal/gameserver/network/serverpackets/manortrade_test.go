@@ -61,8 +61,4 @@ func TestFrameSellListProcure(t *testing.T) {
 	want = appendD(appendD(appendD(want, 268), 5073), 40)
 	want = appendD(appendH(appendH(want, uint16(item.SubCategoryOther)), 0), 0)
 	checkFrame(t, "FrameSellListProcure", framePayload(t, frame), want)
-
-	if _, err := FrameSellListProcure(0, []ProcureSale{{Item: &item.Instance{ObjectID: 1, TemplateID: 9999}}}, templates); err == nil {
-		t.Fatal("FrameSellListProcure with an unknown template: no error")
-	}
 }

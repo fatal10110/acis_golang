@@ -34,6 +34,12 @@ func (l *GameClientLink) handleAction(ctx context.Context, cs *connState, req cl
 		if refuseObserverAction(cs.live) {
 			return
 		}
+		// A player holding a request it has not answered may click
+		// nothing: ActionFailed alone, before the object is resolved.
+		if l.holdsActiveRequester(cs.live) {
+			cs.live.SendFrame(serverpackets.FrameActionFailed())
+			return
+		}
 		if l.refuseFrozenDuellist(cs.live, req.ObjectID) {
 			return
 		}

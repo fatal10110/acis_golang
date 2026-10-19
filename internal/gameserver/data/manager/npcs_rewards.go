@@ -258,7 +258,7 @@ func (d *deathRewards) grantExpAndSp(s *KillRewardSettings, entries []playerRewa
 // ratedReward is the victim's full exp and sp reward at the server rates,
 // each narrowed to the 32-bit reward the kill is split from.
 func (d *deathRewards) ratedReward(s *KillRewardSettings) (exp, sp float64) {
-	return float64(commons.JavaInt(d.tmpl.RewardExp * s.RateXP)), float64(commons.JavaInt(d.tmpl.RewardSp * s.RateSP))
+	return float64(commons.TruncInt32Sat(d.tmpl.RewardExp * s.RateXP)), float64(commons.TruncInt32Sat(d.tmpl.RewardSp * s.RateSP))
 }
 
 // grantSolo pays a partyless attacker its own damage share.

@@ -42,7 +42,7 @@ func (h striderSiegeAssaultHandler) UseResult(cast Cast) Result {
 	if !ok {
 		return result
 	}
-	if damage := javaInt(formulas.PhysicalSkillDamage(in)); damage > 0 {
+	if damage := truncDamage(formulas.PhysicalSkillDamage(in)); damage > 0 {
 		recordDamage(&result, cast.Caster, target, damage, false, false)
 		target.ReduceHP(float64(damage), cast.Caster, cast.Skill)
 	} else {

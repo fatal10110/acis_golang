@@ -14,6 +14,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	"github.com/fatal10110/acis_golang/internal/gameserver/enchant"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -60,6 +61,7 @@ type gameplayConfig struct {
 	SkillEnchantSPBookNeeded skillEnchantSPBookNeeded
 	AutoLearnSkills          autoLearnSkills
 	WeightLimitMultiplier    weightLimitMultiplier
+	RegenMultipliers         creature.RegenMultipliers
 	InventorySlots           player.InventorySlots
 	StorageSlots             player.StorageSlots
 	KarmaPlayerCanTeleport   karmaPlayerCanTeleport
@@ -76,6 +78,11 @@ type gameplayConfig struct {
 	ManorDelay               manorDelay
 	RollDiceDelay            rollDiceDelay
 	SocialDelay              socialDelay
+	DropItemDelay            dropItemDelay
+	WarehouseAllowed         warehouseAllowed
+	NoSpawns                 noSpawns
+	FakeDeathUpProtection    fakeDeathUpProtection
+	ShowSummonCrest          summonCrestShown
 	SubclassDelay            subclassDelay
 	SubclassWithoutQuests    subclassWithoutQuests
 	BlacksmithUseRecipes     blacksmithUseRecipes
@@ -146,6 +153,9 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 	if cfg.WeightLimitMultiplier, err = loadWeightLimitMultiplier(paths); err != nil {
 		return gameplayConfig{}, err
 	}
+	if cfg.RegenMultipliers, err = loadRegenMultipliers(paths); err != nil {
+		return gameplayConfig{}, err
+	}
 	if cfg.InventorySlots, err = loadInventorySlots(paths); err != nil {
 		return gameplayConfig{}, err
 	}
@@ -192,6 +202,21 @@ func loadGameplayConfig(paths gameServerPaths, _ zerolog.Logger) (gameplayConfig
 		return gameplayConfig{}, err
 	}
 	if cfg.SocialDelay, err = loadSocialDelay(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.DropItemDelay, err = loadDropItemDelay(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.WarehouseAllowed, err = loadWarehouseAllowed(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.NoSpawns, err = loadNoSpawns(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.FakeDeathUpProtection, err = loadFakeDeathUpProtection(paths); err != nil {
+		return gameplayConfig{}, err
+	}
+	if cfg.ShowSummonCrest, err = loadShowSummonCrest(paths); err != nil {
 		return gameplayConfig{}, err
 	}
 	if cfg.SubclassDelay, err = loadSubclassDelay(paths); err != nil {
@@ -397,6 +422,28 @@ func loadWeightLimitMultiplier(paths gameServerPaths) (weightLimitMultiplier, er
 	return weightLimitMultiplier(config.NewFields(props, "weight limit").Float64("WeightLimit", 1)), nil
 }
 
+// loadRegenMultipliers reads the players.properties HpRegenMultiplier,
+// MpRegenMultiplier and CpRegenMultiplier keys, each defaulting to 1. A
+// malformed value fails boot.
+func loadRegenMultipliers(paths gameServerPaths) (creature.RegenMultipliers, error) {
+	props, err := config.LoadFile(paths.PlayersConfigPath)
+	if err != nil {
+		return creature.RegenMultipliers{}, err
+	}
+	def := creature.DefaultRegenMultipliers
+	f := config.NewFields(props, "regen multipliers")
+	m := creature.RegenMultipliers{
+		HP:         f.Float64("HpRegenMultiplier", def.HP),
+		MP:         f.Float64("MpRegenMultiplier", def.MP),
+		CP:         f.Float64("CpRegenMultiplier", def.CP),
+		Configured: true,
+	}
+	if err := f.Err(); err != nil {
+		return creature.RegenMultipliers{}, err
+	}
+	return m, nil
+}
+
 // loadEnchantConfig reads the scroll-of-enchant rates and limits from
 // players.properties.
 func loadEnchantConfig(paths gameServerPaths) (enchant.Config, error) {
@@ -433,9 +480,14 @@ func loadAugmentationChances(paths gameServerPaths) (augmentation.Chances, error
 	def := augmentation.DefaultChances()
 	fields := config.NewFields(props, "augmentation")
 	var out augmentation.Chances
-	for grade, name := range [...]string{"NG", "Mid", "High", "Top"} {
-		out.Skill[grade] = fields.Int("Augmentation"+name+"SkillChance", def.Skill[grade])
-		out.Glow[grade] = fields.Int("Augmentation"+name+"GlowChance", def.Glow[grade])
+	for grade, keys := range [...][2]string{
+		{"AugmentationNGSkillChance", "AugmentationNGGlowChance"},
+		{"AugmentationMidSkillChance", "AugmentationMidGlowChance"},
+		{"AugmentationHighSkillChance", "AugmentationHighGlowChance"},
+		{"AugmentationTopSkillChance", "AugmentationTopGlowChance"},
+	} {
+		out.Skill[grade] = fields.Int(keys[0], def.Skill[grade])
+		out.Glow[grade] = fields.Int(keys[1], def.Glow[grade])
 	}
 	out.BaseStat = fields.Int("AugmentationBaseStatChance", def.BaseStat)
 	if err := fields.Err(); err != nil {

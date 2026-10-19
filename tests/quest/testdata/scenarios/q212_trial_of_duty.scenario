@@ -1,0 +1,468 @@
+# Trial of Duty (Q212), a second class-change trial, played by a level 35 Knight wearing an
+# Old Knight's Sword of its own (a knight must hold one to slay Sir Herod's spirit), every
+# script roll pinned to 0: Hannavalt starts it and pays the level 35 set's Dimensional
+# Diamonds (45 for a Knight, once per character); Sir Aron gives his sword, a Skeleton
+# Marauder calls Sir Herod's spirit and the spirit's death gives the Knight's Tear; Sir Kiel
+# asks for the ten report pieces of the strains, then hands over the Mirror of Orpic; a
+# Hangman Tree calls Sir Talianus' spirit, which confesses and leaves; Silvershadow wants
+# twenty Militas articles of the Leto Lizardmen; Dustin sends the knight after Athebaldt's
+# bones on the Breka Orc Overlords, Sir Collin takes the saint's ashes; Hannavalt hands over
+# the Mark of Duty and completes the quest; then relog. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q212_trial_of_duty.golden
+character Paladin 35
+class 4
+equip 3027
+random always 0
+script quest.Q212_TrialOfDuty
+item 2633 2634 2635 2636 2637 2638 2639 2640 2641 2642 2643 2644 2645 2646 3027 7562
+page villagemaster/30109.htm
+page trainer/30116.htm
+page default/30311.htm
+page default/30653.htm
+page default/30654.htm
+page default/30655.htm
+page default/30656.htm
+page script/quest/Q212_TrialOfDuty/
+npc hannavalt 30109 VillageMasterFighter 10 0 0
+npc dustin 30116 Trainer -10 0 0
+npc collin 30311 Folk 0 10 0
+npc aron 30653 Folk 0 -10 0
+npc kiel 30654 Folk 20 20 0
+npc silvershadow 30655 Folk -20 20 0
+npc talianus 30656 Folk 20 -20 0
+npc marauder 20190 Monster 40 0 0
+npc herod 27119 Monster -40 0 0
+npc strain 20200 Monster 0 40 0
+npc hangman 20144 Monster 0 -40 0
+npc lizardman 20577 Monster 40 40 0
+npc breka 20270 Monster -40 -40 0
+
+# Hannavalt: a Knight of level 35 may start; the first trial of the set pays the diamonds,
+# which turns the accept page into 30109-04a.htm.
+action hannavalt
+action hannavalt
+  S ActionFailed
+  S NpcHtmlMessage obj=hannavalt item=0 page=villagemaster/30109.htm
+  S ActionFailed
+bypass npc_{hannavalt}_Quest
+  S NpcHtmlMessage obj=hannavalt item=0 page=script/quest/Q212_TrialOfDuty/30109-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q212_TrialOfDuty CREATED
+bypass Quest Q212_TrialOfDuty 30109-04.htm
+  S QuestList 212:0x80000001
+  S ExShowQuestMark quest=212
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=53 3:7562 6:45
+  S NpcHtmlMessage obj=hannavalt item=0 page=script/quest/Q212_TrialOfDuty/30109-04a.htm
+  S ActionFailed
+  Q upsert Q212_TrialOfDuty | <state> | STARTED
+  Q upsert Q212_TrialOfDuty | <cond> | 1
+  M set secondClassChange35 | true
+  items 7562=45
+
+# Hannavalt has nothing more until the trial is over.
+action hannavalt
+  S ActionFailed
+  S NpcHtmlMessage obj=hannavalt item=0 page=villagemaster/30109.htm
+  S ActionFailed
+bypass npc_{hannavalt}_Quest
+  S NpcHtmlMessage obj=hannavalt item=0 page=script/quest/Q212_TrialOfDuty/30109-04a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Sir Aron gives his sword.
+action aron
+action aron
+  S ActionFailed
+  S NpcHtmlMessage obj=aron item=0 page=default/30653.htm
+  S ActionFailed
+bypass npc_{aron}_Quest
+  S QuestList 212:0x80000003
+  S ExShowQuestMark quest=212
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3027
+  S NpcHtmlMessage obj=aron item=0 page=script/quest/Q212_TrialOfDuty/30653-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q212_TrialOfDuty | <cond> | 2
+  items 3027=2
+
+# A Skeleton Marauder calls Sir Herod's spirit (draw 0, under 1 of 10).
+kill marauder
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=Itemsound.quest_before_battle bind=0 obj=0 loc=0,0,0 delay=0
+
+# Sir Herod's spirit, slain sword in hand: the Knight's Tear.
+kill herod
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 212:0x80000007
+  S ExShowQuestMark quest=212
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2635
+  Q upsert Q212_TrialOfDuty | <cond> | 3
+  items 2635=1
+
+# Sir Aron takes the tear and a sword.
+action aron
+  S ActionFailed
+  S NpcHtmlMessage obj=aron item=0 page=default/30653.htm
+  S ActionFailed
+bypass npc_{aron}_Quest
+  S QuestList 212:0x8000000f
+  S ExShowQuestMark quest=212
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2635
+  S SystemMessage id=302 3:3027
+  S NpcHtmlMessage obj=aron item=0 page=script/quest/Q212_TrialOfDuty/30653-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q212_TrialOfDuty | <cond> | 4
+  items 2635=0 3027=1
+
+# Sir Kiel asks for the report pieces.
+action kiel
+action kiel
+  S ActionFailed
+  S NpcHtmlMessage obj=kiel item=0 page=default/30654.htm
+  S ActionFailed
+bypass npc_{kiel}_Quest
+  S QuestList 212:0x8000001f
+  S ExShowQuestMark quest=212
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kiel item=0 page=script/quest/Q212_TrialOfDuty/30654-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q212_TrialOfDuty | <cond> | 5
+
+# Ten strains: the tenth report piece turns the pieces into the report.
+kill strain x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2638
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2638
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2638
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2638
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2638
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2638
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2638
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2638
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2638
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2638
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 212:0x8000003f
+  S ExShowQuestMark quest=212
+  S SystemMessage id=301 3:2638 6:10
+  S SystemMessage id=54 3:2639
+  Q upsert Q212_TrialOfDuty | <cond> | 6
+  items 2638=0 2639=1
+
+# Sir Kiel hands over the Mirror of Orpic.
+action kiel
+  S ActionFailed
+  S NpcHtmlMessage obj=kiel item=0 page=default/30654.htm
+  S ActionFailed
+bypass npc_{kiel}_Quest
+  S QuestList 212:0x8000007f
+  S ExShowQuestMark quest=212
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2636
+  S NpcHtmlMessage obj=kiel item=0 page=script/quest/Q212_TrialOfDuty/30654-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q212_TrialOfDuty | <cond> | 7
+
+# A Hangman Tree calls Sir Talianus' spirit (draw 0, under 33 of 100).
+kill hangman
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 212:0x800000ff
+  S ExShowQuestMark quest=212
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q212_TrialOfDuty | <cond> | 8
+
+# The spirit takes the mirror and the report, confesses and leaves; its leaving drops the
+# player's target, before the page.
+action talianus
+action talianus
+  S ActionFailed
+  S NpcHtmlMessage obj=talianus item=0 page=default/30656.htm
+  S ActionFailed
+bypass npc_{talianus}_Quest
+  S QuestList 212:0x800001ff
+  S ExShowQuestMark quest=212
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2636
+  S SystemMessage id=302 3:2639
+  S SystemMessage id=54 3:2637
+  S ActionFailed
+  S NpcHtmlMessage obj=talianus item=0 page=script/quest/Q212_TrialOfDuty/30656-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q212_TrialOfDuty | <cond> | 9
+  items 2636=0 2639=0 2637=1
+
+# Sir Kiel takes the confession.
+action kiel
+action kiel
+  S ActionFailed
+  S NpcHtmlMessage obj=kiel item=0 page=default/30654.htm
+  S ActionFailed
+bypass npc_{kiel}_Quest
+  S QuestList 212:0x800003ff
+  S ExShowQuestMark quest=212
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2637
+  S NpcHtmlMessage obj=kiel item=0 page=script/quest/Q212_TrialOfDuty/30654-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q212_TrialOfDuty | <cond> | 10
+
+# Silvershadow: level 35 is enough.
+action silvershadow
+action silvershadow
+  S ActionFailed
+  S NpcHtmlMessage obj=silvershadow item=0 page=default/30655.htm
+  S ActionFailed
+bypass npc_{silvershadow}_Quest
+  S QuestList 212:0x800007ff
+  S ExShowQuestMark quest=212
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=silvershadow item=0 page=script/quest/Q212_TrialOfDuty/30655-02.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q212_TrialOfDuty | <cond> | 11
+
+# Twenty Leto Lizardmen: the Militas articles.
+kill lizardman x20
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2641
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 212:0x80000fff
+  S ExShowQuestMark quest=212
+  Q upsert Q212_TrialOfDuty | <cond> | 12
+  items 2641=20
+
+# Silvershadow takes the articles for the Tear of Loyalty.
+action silvershadow
+  S ActionFailed
+  S NpcHtmlMessage obj=silvershadow item=0 page=default/30655.htm
+  S ActionFailed
+bypass npc_{silvershadow}_Quest
+  S QuestList 212:0x80001fff
+  S ExShowQuestMark quest=212
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:2641 6:20
+  S SystemMessage id=54 3:2640
+  S NpcHtmlMessage obj=silvershadow item=0 page=script/quest/Q212_TrialOfDuty/30655-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q212_TrialOfDuty | <cond> | 13
+  items 2641=0 2640=1
+
+# Dustin takes the tear.
+action dustin
+action dustin
+  S ActionFailed
+  S NpcHtmlMessage obj=dustin item=0 page=trainer/30116.htm
+  S ActionFailed
+bypass npc_{dustin}_Quest
+  S NpcHtmlMessage obj=dustin item=0 page=script/quest/Q212_TrialOfDuty/30116-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q212_TrialOfDuty 30116-02.htm
+  S NpcHtmlMessage obj=dustin item=0 page=script/quest/Q212_TrialOfDuty/30116-02.htm
+  S ActionFailed
+bypass Quest Q212_TrialOfDuty 30116-03.htm
+  S NpcHtmlMessage obj=dustin item=0 page=script/quest/Q212_TrialOfDuty/30116-03.htm
+  S ActionFailed
+bypass Quest Q212_TrialOfDuty 30116-04.htm
+  S NpcHtmlMessage obj=dustin item=0 page=script/quest/Q212_TrialOfDuty/30116-04.htm
+  S ActionFailed
+bypass Quest Q212_TrialOfDuty 30116-05.htm
+  S QuestList 212:0x80003fff
+  S ExShowQuestMark quest=212
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2640
+  S NpcHtmlMessage obj=dustin item=0 page=script/quest/Q212_TrialOfDuty/30116-05.htm
+  S ActionFailed
+  Q upsert Q212_TrialOfDuty | <cond> | 14
+
+# Three Breka Orc Overlords (each coin toss pinned to heads): the skull, the ribs and the shin.
+kill breka x3
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2643
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2644
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 212:0x80007fff
+  S ExShowQuestMark quest=212
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2645
+  Q upsert Q212_TrialOfDuty | <cond> | 15
+  items 2643=1 2644=1 2645=1
+
+# Dustin takes the bones for the saint's ashes.
+action dustin
+  S ActionFailed
+  S NpcHtmlMessage obj=dustin item=0 page=trainer/30116.htm
+  S ActionFailed
+bypass npc_{dustin}_Quest
+  S QuestList 212:0x8000ffff
+  S ExShowQuestMark quest=212
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2643
+  S SystemMessage id=302 3:2644
+  S SystemMessage id=302 3:2645
+  S SystemMessage id=54 3:2642
+  S NpcHtmlMessage obj=dustin item=0 page=script/quest/Q212_TrialOfDuty/30116-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q212_TrialOfDuty | <cond> | 16
+
+# Sir Collin takes the ashes for his letter.
+action collin
+action collin
+  S ActionFailed
+  S NpcHtmlMessage obj=collin item=0 page=default/30311.htm
+  S ActionFailed
+bypass npc_{collin}_Quest
+  S QuestList 212:0x8001ffff
+  S ExShowQuestMark quest=212
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2642
+  S SystemMessage id=54 3:2646
+  S NpcHtmlMessage obj=collin item=0 page=script/quest/Q212_TrialOfDuty/30311-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q212_TrialOfDuty | <cond> | 17
+
+# Dustin takes Sir Collin's letter for his own.
+action dustin
+action dustin
+  S ActionFailed
+  S NpcHtmlMessage obj=dustin item=0 page=trainer/30116.htm
+  S ActionFailed
+bypass npc_{dustin}_Quest
+  S QuestList 212:0x8003ffff
+  S ExShowQuestMark quest=212
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2646
+  S SystemMessage id=54 3:2634
+  S NpcHtmlMessage obj=dustin item=0 page=script/quest/Q212_TrialOfDuty/30116-08.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q212_TrialOfDuty | <cond> | 18
+
+# Hannavalt: the Mark of Duty, experience and the finish; the quest's end takes the
+# remaining sword.
+action hannavalt
+action hannavalt
+  S ActionFailed
+  S NpcHtmlMessage obj=hannavalt item=0 page=villagemaster/30109.htm
+  S ActionFailed
+bypass npc_{hannavalt}_Quest
+  S SystemMessage id=302 3:2634
+  S SystemMessage id=54 3:2633
+  S SystemMessage id=95 1:79832 1:3750
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 212:0x00000000
+  S SystemMessage id=302 3:3027
+  S NpcHtmlMessage obj=hannavalt item=0 page=script/quest/Q212_TrialOfDuty/30109-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q212_TrialOfDuty | <state> | COMPLETED
+  Q delete-except-state Q212_TrialOfDuty
+  state Q212_TrialOfDuty COMPLETED
+  rows Q212_TrialOfDuty <state>=COMPLETED
+  items 2633=1 2634=0 3027=0
+
+relog
+  state Q212_TrialOfDuty COMPLETED
+  rows Q212_TrialOfDuty <state>=COMPLETED
+  items 2633=1 3027=0 7562=45
+action hannavalt
+action hannavalt
+  S ActionFailed
+  S NpcHtmlMessage obj=hannavalt item=0 page=villagemaster/30109.htm
+  S ActionFailed
+bypass npc_{hannavalt}_Quest
+  S NpcHtmlMessage obj=hannavalt item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

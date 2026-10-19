@@ -7,20 +7,16 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // the group up to the maker's maximum, the door closing deletes it. Its
 // NPCs never respawn on their own.
 func OpenDoor() script.Maker {
-	// memo holds the maker memo's "enabled", which start writes: whether
-	// the door last seen open brought the group in.
-	var memo script.MapCell[string, bool]
-	enabled := func() bool {
-		v, ok := memo.Get("enabled")
-		if !ok {
-			panic("maker: memo enabled read before the maker started")
-		}
-		return v
-	}
+	return script.Maker{MakerHooks: openDoorHooks(&enabledMemo{})}
+}
+
+// openDoorHooks are OpenDoor's hooks over its enabled memo: whether the
+// door last seen open brought the group in.
+func openDoorHooks(enabled *enabledMemo) script.MakerHooks {
 	base := defaultHooks()
-	return script.Maker{MakerHooks: base.With(script.MakerHooks{
+	return base.With(script.MakerHooks{
 		OnStart: func(m *script.Maker, e script.MakerStart) {
-			memo.Set("enabled", false)
+			enabled.set(false)
 			doorName, ok := e.Group.Maker().AIParams["DoorName"]
 			if !ok {
 				return
@@ -32,30 +28,24 @@ func OpenDoor() script.Maker {
 		OnDoorEvent: func(_ *script.Maker, e script.MakerDoor) {
 			g := e.Group
 			if e.Door.Opened() {
-				if enabled() {
+				if enabled.get() {
 					return
 				}
-				memo.Set("enabled", true)
-				for _, ms := range g.Spawns() {
-					for range ms.Total() - ms.Spawned() {
-						if g.Maker().MaximumNPCs-g.Alive() > 0 {
-							ms.Spawn()
-						}
-					}
-				}
+				enabled.set(true)
+				fillToMaximum(g)
 				return
 			}
-			if !enabled() {
+			if !enabled.get() {
 				return
 			}
-			memo.Set("enabled", false)
+			enabled.set(false)
 			g.DeleteAll()
 		},
 		OnNPCCreated: func(_ *script.Maker, e script.MakerNPC) {
-			if !enabled() {
+			if !enabled.get() {
 				e.NPC.Delete()
 			}
 		},
 		OnNPCDeleted: func(*script.Maker, script.MakerNPC) {},
-	})}
+	})
 }

@@ -60,7 +60,7 @@ func (r *Registry) DoorAttacked(d *door.Object, attacker attackable.Combatant, d
 		if len(list) == 0 {
 			continue
 		}
-		e := StaticObjectClanAttacked{Called: NPCOf(called), Attacker: attackerHandle, Damage: commons.JavaInt(damage)}
+		e := StaticObjectClanAttacked{Called: NPCOf(called), Attacker: attackerHandle, Damage: commons.TruncInt32Sat(damage)}
 		for _, s := range list {
 			r.run(s, hookStaticObjectClanAttacked, func() { s.Hooks.StaticObjectClanAttacked(s, e) })
 		}

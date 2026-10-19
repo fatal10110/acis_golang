@@ -1,11 +1,13 @@
 package gameservertest
 
 import (
+	"cmp"
 	"context"
 	"maps"
 	"testing"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -96,7 +98,10 @@ type npcSpawnDeps struct {
 	stance    network.AttackStanceTracker
 	makers    *spawn.Table
 	dropRates item.Rates
-	log       zerolog.Logger
+	// partyRange is the WithPartyRange party range; 0 keeps the shipped
+	// one.
+	partyRange int
+	log        zerolog.Logger
 	// sevenSigns is the state the Seven Signs groups follow, and whose
 	// period changes swap them.
 	sevenSigns *sevensigns.State
@@ -117,6 +122,9 @@ type npcSpawnDeps struct {
 	// spawnStore restores and saves the database-tracked spawns' rows; nil
 	// keeps them in memory only.
 	spawnStore *gamesql.SpawnStore
+	// rand is the scripts' random source the makers draw from; nil draws
+	// at random.
+	rand func(n int) int
 	// makerCatalog are makers added to the server's own.
 	makerCatalog script.MakerCatalog
 	// driftRange is the WithMaxDriftRange drift range; 0 keeps the shipped
@@ -131,6 +139,8 @@ type npcSpawnDeps struct {
 	sieges  *siege.Engine
 	// doors are the doors the makers find by name; nil finds none.
 	doors *gamemanager.WorldObjects
+	// noSpawns is WithNoSpawns.
+	noSpawns bool
 }
 
 // WithDataReloads gives the link the //reload and //respawnall hooks; by
@@ -186,7 +196,11 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	if night == nil {
 		night = func() bool { return false }
 	}
-	makerWorld := script.MakerWorld{Night: night, Castles: deps.castles, Sieges: deps.sieges}
+	rand := deps.rand
+	if rand == nil {
+		rand = rnd.Get
+	}
+	makerWorld := script.MakerWorld{Night: night, Castles: deps.castles, Sieges: deps.sieges, Rand: rand, Now: now}
 	if deps.doors != nil {
 		makerWorld.Doors = deps.doors
 	}
@@ -195,7 +209,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 		aiConfig.DriftRange = deps.driftRange
 	}
 	npcs, err := gamemanager.NewNpcsWithMaxBuffsAmount(gamemanager.NewSpawns(deps.makers, states), templates, deps.geo, deps.state, deps.ids,
-		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Settings: gamemanager.NewKillRewardBook(gamemanager.KillRewardSettings{Rates: deps.dropRates, RateXP: 1, RateSP: 1})}, time.Now, deps.log,
+		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Settings: gamemanager.NewKillRewardBook(gamemanager.KillRewardSettings{Rates: deps.dropRates, PartyRange: cmp.Or(deps.partyRange, fixturePartyRange), RateXP: 1, RateSP: 1})}, time.Now, deps.log,
 		deps.skills, castEffects, walker, link.HostileSinks(deps.state, deps.stance), link.FolkSinks(deps.state, deps.stance),
 		20, 0, 0, npc.DefaultRaidMultipliers(), aiConfig, gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues,
 		script.NewMakers(makers, maker.Default, makerWorld, deps.log), deps.scripts, deps.zones)
@@ -208,7 +222,9 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	npcs.SetGroundTaker(link)
 	npcs.SetGuardedSieges(link.GuardedSiege)
 	npcs.SetSpawnTimes(network.SpawnTimes(link))
+	npcs.SetRegenSettings(link.PlayerRules())
 	link.SetNpcSpawns(npcs)
+	npcs.SetNoSpawns(deps.noSpawns)
 	npcs.SpawnOnStart()
 	if deps.sevenSigns != nil {
 		deps.sevenSigns.SetSpawns(npcs)

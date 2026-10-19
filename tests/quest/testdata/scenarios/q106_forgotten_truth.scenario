@@ -1,0 +1,171 @@
+# Forgotten Truth (Q106): a dark elven mystic of level 10 accepts at Thifiell and takes her onyx
+# talisman to Kartia, kills two Tumran orc brigands for the ancient scroll and clay tablet (every
+# roll pinned to succeed) and brings Kartia's translation back to Thifiell, who gives the Eldritch
+# Dagger, a mystic's spiritshots, the newbie spiritshots and the echo crystals; then relog.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q106_forgotten_truth.golden
+character Seeker 10
+class 38
+random always 0
+script quest.Q106_ForgottenTruth
+item 984 985 986 987 988 989 1060 1835 2509 4412 4413 4414 4415 4416 5790
+page villagemaster/30358.htm
+page default/30133.htm
+page script/quest/Q106_ForgottenTruth/
+npc thifiell 30358 VillageMasterDElf 10 0 0
+npc kartia 30133 Folk 20 0 0
+npc brigand 27070 Monster 40 0 0
+
+# Thifiell: two pages, then accept.
+action thifiell
+action thifiell
+  S ActionFailed
+  S NpcHtmlMessage obj=thifiell item=0 page=villagemaster/30358.htm
+  S ActionFailed
+bypass npc_{thifiell}_Quest
+  S NpcHtmlMessage obj=thifiell item=0 page=script/quest/Q106_ForgottenTruth/30358-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q106_ForgottenTruth CREATED
+bypass Quest Q106_ForgottenTruth 30358-04.htm
+  S NpcHtmlMessage obj=thifiell item=0 page=script/quest/Q106_ForgottenTruth/30358-04.htm
+  S ActionFailed
+bypass Quest Q106_ForgottenTruth 30358-05.htm
+  S QuestList 106:0x80000001
+  S ExShowQuestMark quest=106
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:984
+  S NpcHtmlMessage obj=thifiell item=0 page=script/quest/Q106_ForgottenTruth/30358-05.htm
+  S ActionFailed
+  Q upsert Q106_ForgottenTruth | <state> | STARTED
+  Q upsert Q106_ForgottenTruth | <cond> | 1
+  state Q106_ForgottenTruth STARTED
+  rows Q106_ForgottenTruth <cond>=1 <state>=STARTED
+  items 984=1
+action thifiell
+  S ActionFailed
+  S NpcHtmlMessage obj=thifiell item=0 page=villagemaster/30358.htm
+  S ActionFailed
+bypass npc_{thifiell}_Quest
+  S NpcHtmlMessage obj=thifiell item=0 page=script/quest/Q106_ForgottenTruth/30358-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Kartia swaps the talisman.
+action kartia
+action kartia
+  S ActionFailed
+  S NpcHtmlMessage obj=kartia item=0 page=default/30133.htm
+  S ActionFailed
+bypass npc_{kartia}_Quest
+  S QuestList 106:0x80000003
+  S ExShowQuestMark quest=106
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:984
+  S SystemMessage id=54 3:985
+  S NpcHtmlMessage obj=kartia item=0 page=script/quest/Q106_ForgottenTruth/30133-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q106_ForgottenTruth | <cond> | 2
+  rows Q106_ForgottenTruth <cond>=2 <state>=STARTED
+  items 984=0 985=1
+action kartia
+  S ActionFailed
+  S NpcHtmlMessage obj=kartia item=0 page=default/30133.htm
+  S ActionFailed
+bypass npc_{kartia}_Quest
+  S NpcHtmlMessage obj=kartia item=0 page=script/quest/Q106_ForgottenTruth/30133-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Two brigands: the scroll, then the tablet.
+kill brigand
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:986
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 986=1 987=0
+kill brigand
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:987
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 106:0x80000007
+  S ExShowQuestMark quest=106
+  Q upsert Q106_ForgottenTruth | <cond> | 3
+  items 986=1 987=1
+  rows Q106_ForgottenTruth <cond>=3 <state>=STARTED
+
+# Kartia translates.
+action kartia
+  S ActionFailed
+  S NpcHtmlMessage obj=kartia item=0 page=default/30133.htm
+  S ActionFailed
+action kartia
+  S ActionFailed
+  S NpcHtmlMessage obj=kartia item=0 page=default/30133.htm
+  S ActionFailed
+bypass npc_{kartia}_Quest
+  S QuestList 106:0x8000000f
+  S ExShowQuestMark quest=106
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:985
+  S SystemMessage id=302 3:986
+  S SystemMessage id=302 3:987
+  S SystemMessage id=54 3:988
+  S NpcHtmlMessage obj=kartia item=0 page=script/quest/Q106_ForgottenTruth/30133-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q106_ForgottenTruth | <cond> | 4
+  rows Q106_ForgottenTruth <cond>=4 <state>=STARTED
+  items 985=0 986=0 987=0 988=1
+action kartia
+  S ActionFailed
+  S NpcHtmlMessage obj=kartia item=0 page=default/30133.htm
+  S ActionFailed
+bypass npc_{kartia}_Quest
+  S NpcHtmlMessage obj=kartia item=0 page=script/quest/Q106_ForgottenTruth/30133-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Thifiell rewards.
+action thifiell
+action thifiell
+  S ActionFailed
+  S NpcHtmlMessage obj=thifiell item=0 page=villagemaster/30358.htm
+  S ActionFailed
+bypass npc_{thifiell}_Quest
+  S SystemMessage id=302 3:988
+  S SystemMessage id=54 3:989
+  S SystemMessage id=53 3:2509 6:500
+  S TutorialShowQuestionMark id=26
+  S SystemMessage id=53 3:5790 6:3000
+  S PlaySound type=2 file=tutorial_voice_027 bind=1 obj=player loc=10,20,30 delay=0
+  S SystemMessage id=53 3:1060 6:100
+  S SystemMessage id=53 3:4412 6:10
+  S SystemMessage id=53 3:4413 6:10
+  S SystemMessage id=53 3:4414 6:10
+  S SystemMessage id=53 3:4415 6:10
+  S SystemMessage id=53 3:4416 6:10
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 106:0x00000000
+  S NpcHtmlMessage obj=thifiell item=0 page=script/quest/Q106_ForgottenTruth/30358-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q106_ForgottenTruth | <state> | COMPLETED
+  Q delete-except-state Q106_ForgottenTruth
+  M set Q106_ForgottenTruth_OneTimeQuestFlag | true
+  state Q106_ForgottenTruth COMPLETED
+  rows Q106_ForgottenTruth <state>=COMPLETED
+  items 988=0 989=1 2509=500 1835=0 5790=3000 1060=100 4412=10 4413=10 4414=10 4415=10 4416=10
+action thifiell
+  S ActionFailed
+  S NpcHtmlMessage obj=thifiell item=0 page=villagemaster/30358.htm
+  S ActionFailed
+bypass npc_{thifiell}_Quest
+  S NpcHtmlMessage obj=thifiell item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+relog
+  items 989=1 2509=500 5790=3000
+  state Q106_ForgottenTruth COMPLETED
+  rows Q106_ForgottenTruth <state>=COMPLETED

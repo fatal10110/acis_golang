@@ -359,40 +359,42 @@ func (c *Character) MaxMPValue() float64 { return c.ResourceValues().MaxMP }
 // MaxCPValue returns maximum CP as a floating-point skill-resource value.
 func (c *Character) MaxCPValue() float64 { return c.ResourceValues().MaxCP }
 
-// HPRegenRate returns c's current HP regeneration rate: the stat, times
-// the siege headquarters, clan hall, posture and weight penalty
-// multipliers, plus the Mother Tree bonus.
+// HPRegenRate returns c's current HP regeneration rate: the configured
+// multiple of its base through the stat, times the siege headquarters,
+// clan hall, posture and weight penalty multipliers, plus the Mother Tree
+// bonus.
 func (c *Character) HPRegenRate() float64 {
 	tmpl := c.template()
 	if tmpl == nil {
 		return c.calcStat(stat.RegenerateHPRate, 0)
 	}
-	rate := c.calcStat(stat.RegenerateHPRate, c.levelTableValue(tmpl.HPRegenTable, 0)) * c.hpRegenHeadquartersMultiplier() * c.hpRegenHallMultiplier() * c.postureRegenMultiplier() * c.weightPenaltyRegenMultiplier()
+	rate := c.calcStat(stat.RegenerateHPRate, c.levelTableValue(tmpl.HPRegenTable, 0)*c.rules().Regen.InForce().HP) * c.hpRegenHeadquartersMultiplier() * c.hpRegenHallMultiplier() * c.postureRegenMultiplier() * c.weightPenaltyRegenMultiplier()
 	hp, _ := c.motherTreeRegenBonus()
 	return rate + hp
 }
 
-// MPRegenRate returns c's current MP regeneration rate: the stat, times
-// the clan hall, posture and weight penalty multipliers, plus the Mother
-// Tree bonus.
+// MPRegenRate returns c's current MP regeneration rate: the configured
+// multiple of its base through the stat, times the clan hall, posture and
+// weight penalty multipliers, plus the Mother Tree bonus.
 func (c *Character) MPRegenRate() float64 {
 	tmpl := c.template()
 	if tmpl == nil {
 		return c.calcStat(stat.RegenerateMPRate, 0)
 	}
-	rate := c.calcStat(stat.RegenerateMPRate, c.levelTableValue(tmpl.MPRegenTable, 0)) * c.mpRegenHallMultiplier() * c.postureRegenMultiplier() * c.weightPenaltyRegenMultiplier()
+	rate := c.calcStat(stat.RegenerateMPRate, c.levelTableValue(tmpl.MPRegenTable, 0)*c.rules().Regen.InForce().MP) * c.mpRegenHallMultiplier() * c.postureRegenMultiplier() * c.weightPenaltyRegenMultiplier()
 	_, mp := c.motherTreeRegenBonus()
 	return rate + mp
 }
 
-// CPRegenRate returns c's current CP regeneration rate: the stat, times
-// the posture and weight penalty multipliers.
+// CPRegenRate returns c's current CP regeneration rate: the configured
+// multiple of its base through the stat, times the posture and weight
+// penalty multipliers.
 func (c *Character) CPRegenRate() float64 {
 	tmpl := c.template()
 	if tmpl == nil {
 		return c.calcStat(stat.RegenerateCPRate, 0)
 	}
-	return c.calcStat(stat.RegenerateCPRate, c.levelTableValue(tmpl.CPRegenTable, 0)) * c.postureRegenMultiplier() * c.weightPenaltyRegenMultiplier()
+	return c.calcStat(stat.RegenerateCPRate, c.levelTableValue(tmpl.CPRegenTable, 0)*c.rules().Regen.InForce().CP) * c.postureRegenMultiplier() * c.weightPenaltyRegenMultiplier()
 }
 
 func (c *Character) levelTableValue(values []float64, fallback float64) float64 {
@@ -606,7 +608,7 @@ func (c *Character) shareDamageWithServitor(amount float64, attacker attackable.
 	if !location.In3DRadius(x, y, z, sx, sy, sz, servitorDamageShareRadius) {
 		return 0
 	}
-	share := int(commons.JavaInt(amount * c.calcStat(stat.TransferDamagePercent, 0) / 100))
+	share := int(commons.TruncInt32Sat(amount * c.calcStat(stat.TransferDamagePercent, 0) / 100))
 	share = min(int(servitor.HP())-1, share)
 	if share <= 0 {
 		return 0
@@ -663,7 +665,7 @@ func (c *Character) sendHitFeedback(amount float64, attacker attackable.Combatan
 	if hit.cpOnly {
 		c.BroadcastStatus()
 	}
-	if full := int(commons.JavaInt(amount)); full > 0 && !isDOT && c.hitByOther(attacker) {
+	if full := int(commons.TruncInt32Sat(amount)); full > 0 && !isDOT && c.hitByOther(attacker) {
 		c.emit(event.DamageReceived{AttackerName: attacker.CharacterName(), Amount: full})
 		if shared > 0 {
 			if recipient, ok := actingPlayer(attacker).(servitorShareRecipient); ok {

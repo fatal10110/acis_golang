@@ -142,16 +142,18 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 // read, and returns the player settings read from them.
 //
 // Only the player settings take the reloaded values, the rules of the
-// characters and summons already in the world and the kill reward settings
-// (drop and XP/SP rates, auto-loot, party XP, the party range and the
-// multiple item drop rule, shared by the kill rewards, party loot, the
-// scripts and item creation) included. These keep their boot value, read
-// once into what the boot built from them:
+// characters and summons already in the world, the regeneration
+// multipliers the characters, summons, NPCs and doors read, and the kill
+// reward settings (drop and XP/SP rates, auto-loot, party XP, the party
+// range and the multiple item drop rule, shared by the kill rewards, party
+// loot, NPC hate randomization, the scripts and item creation) included.
+// These keep their boot value, read once into what the boot built from
+// them:
 //   - the listener and login server addresses, the login registration
 //     (server id, hexid, status flags), the database and the client cipher;
 //   - the geodata and the town combat rule the zones were set up with,
 //     which //reload zone reapplies as booted;
-//   - AllowCursedWeapons, AllowBoat and DeleteCharAfterDays;
+//   - AllowCursedWeapons, AllowBoat, DeleteCharAfterDays and NoSpawns;
 //   - the quest drop and reward rates, the PvP flag times, the ground item
 //     settings, the pet settings, the spellbook needs, StoreSkillCooltime
 //     and CancelLesserEffect;
@@ -161,8 +163,8 @@ func provideDataReloads(paths gameServerPaths, cfg gameServerConfig, data *gameD
 //   - the NPC settings: the NPCs' own MaxBuffsAmount, AI, random walk
 //     rate, path fail count, raid multipliers, boss wait times, spawn
 //     multiplier and spawn events (//respawnall reads the spawn list with
-//     the boot multiplier), raid curse (characters included), NPC crest
-//     and free teleport;
+//     the boot multiplier), raid curse (characters included), NPC and
+//     summon crests and free teleport;
 //   - the merchant and augmentation settings, the chat settings, and the GM
 //     audit and item logs.
 func reloadPlayerConfig(paths gameServerPaths, data *gameData, log zerolog.Logger) (network.PlayerConfig, error) {

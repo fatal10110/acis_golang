@@ -1,0 +1,27 @@
+# Chest caught with a bait of fire (Q030), refused: a level 60 character who has not completed the
+# fisherman's special bait quest is turned away and the quest is not started. Expectations replay
+# the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q030_chest_caught_with_a_bait_of_fire_unready.golden
+character Angler 60
+script quest.Q030_ChestCaughtWithABaitOfFire
+script quest.Q053_LinnaeusSpecialBait
+item 6511 7628 916
+page fisherman/31577.htm
+page script/quest/Q030_ChestCaughtWithABaitOfFire/
+npc linnaeus 31577 Fisherman 10 0 0
+
+action linnaeus
+action linnaeus
+  S ActionFailed
+  S NpcHtmlMessage obj=linnaeus item=0 page=fisherman/31577.htm
+  S ActionFailed
+bypass npc_{linnaeus}_Quest
+  S NpcHtmlMessage obj=linnaeus item=0 html="<html><body><a action=\"bypass -h npc_{linnaeus}_Quest Q030_ChestCaughtWithABaitOfFire\">[Chest caught with a bait of fire]</a><br><a action=\"bypass -h npc_{linnaeus}_Quest Q053_LinnaeusSpecialBait\">[Linnaues' Special Bait]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{linnaeus}_Quest Q030_ChestCaughtWithABaitOfFire
+  S NpcHtmlMessage obj=linnaeus item=0 page=script/quest/Q030_ChestCaughtWithABaitOfFire/31577-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q030_ChestCaughtWithABaitOfFire CREATED
+  rows Q030_ChestCaughtWithABaitOfFire -

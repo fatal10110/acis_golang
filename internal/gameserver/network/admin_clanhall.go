@@ -52,7 +52,7 @@ func (l *GameClientLink) adminClanHall(gm *livePlayer, line string) {
 		ok   bool
 	)
 	if n := len(args); n >= 1 && n <= 3 {
-		id, valid := parseJavaInt(args[n-1])
+		id, valid := parseInt32(args[n-1])
 		if !valid {
 			sendText(gm, adminClanHallUsage)
 			return

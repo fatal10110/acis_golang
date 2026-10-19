@@ -2,6 +2,8 @@ package catalog
 
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q212"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q213"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q241"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q246"
 )
@@ -9,8 +11,8 @@ import (
 // quests201To250 is the catalog of quests 201 to 250 (#182), except the four the engine slices ported.
 func quests201To250() script.Catalog {
 	return script.Catalog{
-		"quest.Q212_TrialOfDuty":              nil,
-		"quest.Q213_TrialOfTheSeeker":         nil,
+		"quest.Q212_TrialOfDuty":              q212.New,
+		"quest.Q213_TrialOfTheSeeker":         q213.New,
 		"quest.Q214_TrialOfTheScholar":        nil,
 		"quest.Q215_TrialOfThePilgrim":        nil,
 		"quest.Q216_TrialOfTheGuildsman":      nil,

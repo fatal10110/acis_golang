@@ -39,6 +39,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	petmodel "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/pet"
@@ -171,6 +172,10 @@ type PlayerConfig struct {
 	// StorageSlots is the base warehouse, freight, private store and recipe
 	// book size.
 	StorageSlots player.StorageSlots
+	// Regen scales the base HP, MP and CP regeneration of every creature
+	// that is not raid related: the characters, their summons, the NPCs
+	// and the doors.
+	Regen creature.RegenMultipliers
 	// Freight holds the freight service settings; nil uses the shipped
 	// defaults.
 	Freight *FreightConfig
@@ -265,6 +270,15 @@ type PlayerConfig struct {
 	// SocialDelay is the reuse delay between two emote requests on one
 	// client session.
 	SocialDelay time.Duration
+	// DropItemDelay is the reuse delay between two item drops on one
+	// client session.
+	DropItemDelay time.Duration
+	// WarehouseDisabled is server.properties AllowWarehouse inverted: when
+	// set, a warehouse deposit request is ignored without being read.
+	WarehouseDisabled bool
+	// FakeDeathUpProtection is how long, after a Fake Death ends, hostile
+	// NPCs do not aggro the player.
+	FakeDeathUpProtection time.Duration
 	// SubclassDelay is the reuse delay between two subclass add, change or
 	// replace actions of one player.
 	SubclassDelay time.Duration
@@ -383,6 +397,7 @@ type GameClientLink struct {
 	petConfig        petmodel.Config // passed into summon.PetConfig by newPet.
 	disableRaidCurse bool
 	showNPCCrest     bool
+	showSummonCrest  bool
 	showNPCLevel     bool
 	wyvern           npc.WyvernRules
 	inventory        *invops.Service
@@ -650,6 +665,11 @@ type GameClientLinkConfig struct {
 	// NpcInfo shows the clan and alliance crests of the clan owning the
 	// residence it serves.
 	ShowNPCCrest bool
+	// ShowSummonCrest is npcs.properties ShowSummonCrest: when true, a
+	// summon's NpcInfo shows its owner's clan and alliance crests, and its
+	// owner is sent that NpcInfo too when the summon spawns or lands from a
+	// teleport.
+	ShowSummonCrest bool
 	// ShowNPCLevel is npcs.properties ShowNpcLevel: when true, a monster's
 	// NpcInfo title starts with its level and, when it is aggressive, a
 	// star.
@@ -906,6 +926,7 @@ func NewGameClientLink(cfg GameClientLinkConfig) (*GameClientLink, error) {
 		petConfig:        cfg.PetConfig,
 		disableRaidCurse: cfg.DisableRaidCurse,
 		showNPCCrest:     cfg.ShowNPCCrest,
+		showSummonCrest:  cfg.ShowSummonCrest,
 		showNPCLevel:     cfg.ShowNPCLevel,
 		wyvern:           wyvernRules(cfg.Wyvern),
 		petRoll:          cfg.PetRoll,

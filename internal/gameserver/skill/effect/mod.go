@@ -300,15 +300,24 @@ func (c *Calculator) AddMod(m Mod) {
 	c.mods = next
 }
 
-// RemoveOwner removes every Mod whose Owner equals owner and returns how
-// many it removed.
+// is reports whether o is owner. An item owner is its instance alone (see
+// ItemOwner).
+func (o ModOwner) is(owner ModOwner) bool {
+	if o.item.Inst != nil || owner.item.Inst != nil {
+		return o.item.Inst == owner.item.Inst
+	}
+	return o == owner
+}
+
+// RemoveOwner removes every Mod whose Owner is owner and returns how many it
+// removed.
 func (c *Calculator) RemoveOwner(owner ModOwner) int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	kept := make([]Mod, 0, len(c.mods))
 	for _, m := range c.mods {
-		if m.Owner != owner {
+		if !m.Owner.is(owner) {
 			kept = append(kept, m)
 		}
 	}

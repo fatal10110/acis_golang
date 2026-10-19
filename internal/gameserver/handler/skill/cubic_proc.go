@@ -120,7 +120,7 @@ func cubicStrike(cast Cast, target Creature, magicFailures bool, result *Result)
 		return 0, crit, shield
 	}
 	reportMagicFailure(cast, target, in.Failure, result)
-	return javaInt(formulas.CubicMagicDamage(in)), crit, shield
+	return truncDamage(formulas.CubicMagicDamage(in)), crit, shield
 }
 
 // cubicMdam is a cubic's MDAM proc. A reflected strike deals nothing. A hit

@@ -2,7 +2,9 @@ package combat
 
 import (
 	"context"
+	"slices"
 	"testing"
+	"time"
 
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -92,6 +94,28 @@ func etcStatusCharm(t *testing.T, frames [][]byte) []int32 {
 	return out
 }
 
+// readCharmShown reads c until an EtcStatusUpdate shows the charm, then
+// fails if a later one already queued clears it. The cast lands its effect
+// on a timer even with no hit time, so on the wall clock the update can
+// still be on its way once the request was handled.
+func readCharmShown(t *testing.T, srv *gameservertest.Server, c *scriptedClient) {
+	t.Helper()
+	for range 100 {
+		frame := c.ReadWithTimeout(time.Second)
+		if frame == nil {
+			t.Fatal("EtcStatusUpdate showing the charm never arrived")
+		}
+		if got := etcStatusCharm(t, [][]byte{frame}); len(got) == 0 || got[0] != 1 {
+			continue
+		}
+		if got := etcStatusCharm(t, srv.ReadQueued(t, c)); slices.Contains(got, 0) {
+			t.Fatalf("EtcStatusUpdate charm fields after the one showing the charm = %v, want no 0", got)
+		}
+		return
+	}
+	t.Fatal("EtcStatusUpdate showing the charm not found within 100 frames")
+}
+
 // pvpZoneDeathScene boots the victim (exp 1500 at level 5, so a full loss
 // is 200) and a killer knowing the one-shot PDAM, both inside zones.
 func pvpZoneDeathScene(t *testing.T, zones *zone.Index, seed func(*gamesql.CharacterStore, *gamesql.ItemStore)) (srv *gameservertest.Server, killer *scriptedClient, killerID, victimID int32) {
@@ -141,10 +165,7 @@ func TestSiegeCharmOfCourageSparesDeathExp(t *testing.T) {
 			victim := reviveVictimOf(t, srv, victimID)
 			if tc.charm {
 				c.Send(encodeRequestMagicSkillUse(charmOfCourageSkillID, false, false))
-				srv.Settle(t)
-				if got := etcStatusCharm(t, readQuiet(c)); len(got) == 0 || got[len(got)-1] != 1 {
-					t.Fatalf("EtcStatusUpdate charm fields after the charm = %v, want the last one 1", got)
-				}
+				readCharmShown(t, srv, c)
 				if !hasEffectID(victim.EffectList().All(), charmOfCourageSkillID) {
 					t.Fatal("Charm of Courage did not land")
 				}

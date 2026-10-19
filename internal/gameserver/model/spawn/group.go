@@ -59,6 +59,10 @@ type GroupSpawn interface {
 	Locator
 	// Entry is the spawn's declaration.
 	Entry() Entry
+	// Alias is the alias of the NPC template the entry names, which every
+	// NPC of the spawn has; empty when the template has none or is
+	// unknown.
+	Alias() string
 	// Total is how many NPCs the spawn keeps: one for a database-tracked
 	// spawn, the entry's total otherwise.
 	Total() int

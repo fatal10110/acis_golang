@@ -1,0 +1,109 @@
+# Saga of the Storm Screamer (Q090) on the saga core, played by a level 76 Spellhowler from
+# the start: Fairen offers it and gives the main item; Kamilen sends the player to Mist,
+# who asks for what the player does not hold; Fairen has nothing more to say until the
+# tablets are done, and a relog keeps the journal. Expectations are the reference trace's
+# (the relog's rows and state derived from ThirdClassQuest.java and Q090_SagaOfTheStormScreamer.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q090_saga_of_the_storm_screamer.golden
+character Spellhowler 76
+class 40
+script quest.Q090_SagaOfTheStormScreamer
+item 7084
+page villagemaster/30175.htm
+page trainer/31287.htm
+page default/31627.htm
+page script/quest/Q090_SagaOfTheStormScreamer/
+npc fairen 30175 VillageMasterMystic 10 0 0
+npc kamilen 31287 Trainer -10 0 0
+npc mist 31627 Folk 0 10 0
+
+action fairen
+action fairen
+  S ActionFailed
+  S NpcHtmlMessage obj=fairen item=0 page=villagemaster/30175.htm
+  S ActionFailed
+bypass npc_{fairen}_Quest
+  S NpcHtmlMessage obj=fairen item=0 page=script/quest/Q090_SagaOfTheStormScreamer/0-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q090_SagaOfTheStormScreamer 0-1
+  S NpcHtmlMessage obj=fairen item=0 page=script/quest/Q090_SagaOfTheStormScreamer/0-05.htm
+  S ActionFailed
+bypass Quest Q090_SagaOfTheStormScreamer accept
+  S QuestList 90:0x80000001
+  S ExShowQuestMark quest=90
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7084
+  S NpcHtmlMessage obj=fairen item=0 page=script/quest/Q090_SagaOfTheStormScreamer/0-03.htm
+  S ActionFailed
+  Q upsert Q090_SagaOfTheStormScreamer | <state> | STARTED
+  Q upsert Q090_SagaOfTheStormScreamer | <cond> | 1
+  items 7084=1
+  state Q090_SagaOfTheStormScreamer STARTED
+action fairen
+  S ActionFailed
+  S NpcHtmlMessage obj=fairen item=0 page=villagemaster/30175.htm
+  S ActionFailed
+bypass npc_{fairen}_Quest
+  S NpcHtmlMessage obj=fairen item=0 page=script/quest/Q090_SagaOfTheStormScreamer/0-04.htm
+  S ActionFailed
+  S ActionFailed
+action kamilen
+action kamilen
+  S ActionFailed
+  S NpcHtmlMessage obj=kamilen item=0 page=trainer/31287.htm
+  S ActionFailed
+bypass npc_{kamilen}_Quest
+  S NpcHtmlMessage obj=kamilen item=0 page=script/quest/Q090_SagaOfTheStormScreamer/2-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q090_SagaOfTheStormScreamer 2-1
+  S QuestList 90:0x80000003
+  S ExShowQuestMark quest=90
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kamilen item=0 page=script/quest/Q090_SagaOfTheStormScreamer/2-05.htm
+  S ActionFailed
+  Q upsert Q090_SagaOfTheStormScreamer | <cond> | 2
+action kamilen
+  S ActionFailed
+  S NpcHtmlMessage obj=kamilen item=0 page=trainer/31287.htm
+  S ActionFailed
+bypass npc_{kamilen}_Quest
+  S NpcHtmlMessage obj=kamilen item=0 page=script/quest/Q090_SagaOfTheStormScreamer/2-02.htm
+  S ActionFailed
+  S ActionFailed
+action mist
+action mist
+  S ActionFailed
+  S NpcHtmlMessage obj=mist item=0 page=default/31627.htm
+  S ActionFailed
+bypass npc_{mist}_Quest
+  S NpcHtmlMessage obj=mist item=0 page=script/quest/Q090_SagaOfTheStormScreamer/1-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q090_SagaOfTheStormScreamer 1-3
+  S QuestList 90:0x80000007
+  S ExShowQuestMark quest=90
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=mist item=0 page=script/quest/Q090_SagaOfTheStormScreamer/1-05.htm
+  S ActionFailed
+  Q upsert Q090_SagaOfTheStormScreamer | <cond> | 3
+action mist
+  S ActionFailed
+  S NpcHtmlMessage obj=mist item=0 page=default/31627.htm
+  S ActionFailed
+bypass npc_{mist}_Quest
+  S NpcHtmlMessage obj=mist item=0 page=script/quest/Q090_SagaOfTheStormScreamer/1-02.htm
+  S ActionFailed
+  S ActionFailed
+action fairen
+action fairen
+  S ActionFailed
+  S NpcHtmlMessage obj=fairen item=0 page=villagemaster/30175.htm
+  S ActionFailed
+bypass npc_{fairen}_Quest
+  S NpcHtmlMessage obj=fairen item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
+  state Q090_SagaOfTheStormScreamer STARTED
+  rows Q090_SagaOfTheStormScreamer <cond>=3 <state>=STARTED

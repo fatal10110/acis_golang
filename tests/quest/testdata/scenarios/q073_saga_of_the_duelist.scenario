@@ -1,0 +1,109 @@
+# Saga of the Duelist (Q073) on the saga core, played by a level 76 Gladiator from
+# the start: Sedrick offers it and gives the main item; Arena Director sends the player to Donath,
+# who asks for what the player does not hold; Sedrick has nothing more to say until the
+# tablets are done, and a relog keeps the journal. Expectations are the reference trace's
+# (the relog's rows and state derived from ThirdClassQuest.java and Q073_SagaOfTheDuelist.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q073_saga_of_the_duelist.golden
+character Gladiator 76
+class 2
+script quest.Q073_SagaOfTheDuelist
+item 7096
+page villagemaster/30849.htm
+page default/31226.htm
+page default/31624.htm
+page script/quest/Q073_SagaOfTheDuelist/
+npc sedrick 30849 VillageMasterFighter 10 0 0
+npc arenadirector 31226 Folk -10 0 0
+npc donath 31624 Folk 0 10 0
+
+action sedrick
+action sedrick
+  S ActionFailed
+  S NpcHtmlMessage obj=sedrick item=0 page=villagemaster/30849.htm
+  S ActionFailed
+bypass npc_{sedrick}_Quest
+  S NpcHtmlMessage obj=sedrick item=0 page=script/quest/Q073_SagaOfTheDuelist/0-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q073_SagaOfTheDuelist 0-1
+  S NpcHtmlMessage obj=sedrick item=0 page=script/quest/Q073_SagaOfTheDuelist/0-05.htm
+  S ActionFailed
+bypass Quest Q073_SagaOfTheDuelist accept
+  S QuestList 73:0x80000001
+  S ExShowQuestMark quest=73
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7096
+  S NpcHtmlMessage obj=sedrick item=0 page=script/quest/Q073_SagaOfTheDuelist/0-03.htm
+  S ActionFailed
+  Q upsert Q073_SagaOfTheDuelist | <state> | STARTED
+  Q upsert Q073_SagaOfTheDuelist | <cond> | 1
+  items 7096=1
+  state Q073_SagaOfTheDuelist STARTED
+action sedrick
+  S ActionFailed
+  S NpcHtmlMessage obj=sedrick item=0 page=villagemaster/30849.htm
+  S ActionFailed
+bypass npc_{sedrick}_Quest
+  S NpcHtmlMessage obj=sedrick item=0 page=script/quest/Q073_SagaOfTheDuelist/0-04.htm
+  S ActionFailed
+  S ActionFailed
+action arenadirector
+action arenadirector
+  S ActionFailed
+  S NpcHtmlMessage obj=arenadirector item=0 page=default/31226.htm
+  S ActionFailed
+bypass npc_{arenadirector}_Quest
+  S NpcHtmlMessage obj=arenadirector item=0 page=script/quest/Q073_SagaOfTheDuelist/2-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q073_SagaOfTheDuelist 2-1
+  S QuestList 73:0x80000003
+  S ExShowQuestMark quest=73
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=arenadirector item=0 page=script/quest/Q073_SagaOfTheDuelist/2-05.htm
+  S ActionFailed
+  Q upsert Q073_SagaOfTheDuelist | <cond> | 2
+action arenadirector
+  S ActionFailed
+  S NpcHtmlMessage obj=arenadirector item=0 page=default/31226.htm
+  S ActionFailed
+bypass npc_{arenadirector}_Quest
+  S NpcHtmlMessage obj=arenadirector item=0 page=script/quest/Q073_SagaOfTheDuelist/2-02.htm
+  S ActionFailed
+  S ActionFailed
+action donath
+action donath
+  S ActionFailed
+  S NpcHtmlMessage obj=donath item=0 page=default/31624.htm
+  S ActionFailed
+bypass npc_{donath}_Quest
+  S NpcHtmlMessage obj=donath item=0 page=script/quest/Q073_SagaOfTheDuelist/1-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q073_SagaOfTheDuelist 1-3
+  S QuestList 73:0x80000007
+  S ExShowQuestMark quest=73
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=donath item=0 page=script/quest/Q073_SagaOfTheDuelist/1-05.htm
+  S ActionFailed
+  Q upsert Q073_SagaOfTheDuelist | <cond> | 3
+action donath
+  S ActionFailed
+  S NpcHtmlMessage obj=donath item=0 page=default/31624.htm
+  S ActionFailed
+bypass npc_{donath}_Quest
+  S NpcHtmlMessage obj=donath item=0 page=script/quest/Q073_SagaOfTheDuelist/1-02.htm
+  S ActionFailed
+  S ActionFailed
+action sedrick
+action sedrick
+  S ActionFailed
+  S NpcHtmlMessage obj=sedrick item=0 page=villagemaster/30849.htm
+  S ActionFailed
+bypass npc_{sedrick}_Quest
+  S NpcHtmlMessage obj=sedrick item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
+  state Q073_SagaOfTheDuelist STARTED
+  rows Q073_SagaOfTheDuelist <cond>=3 <state>=STARTED

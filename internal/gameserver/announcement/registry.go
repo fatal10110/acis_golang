@@ -235,7 +235,7 @@ func (r *Registry) startLocked(e *entry) {
 		}
 		e.next = r.queue.Now().Add(initial)
 	} else {
-		e.left = javaInt(e.Limit)
+		e.left = clampInt32(e.Limit)
 	}
 	run := e.run
 	e.timer = r.queue.After(initial, func() { r.fire(e, run) })
@@ -278,10 +278,10 @@ func (e *entry) stop() {
 	}
 }
 
-// javaInt narrows n to a 32-bit count. Both sources of a limit,
+// clampInt32 narrows n to a 32-bit count. Both sources of a limit,
 // the file loader and //announce add_auto, refuse a value out of that range,
 // so the bounds, clamping, only guard against a new caller.
-func javaInt(n int) int32 {
+func clampInt32(n int) int32 {
 	switch {
 	case n > math.MaxInt32:
 		return math.MaxInt32

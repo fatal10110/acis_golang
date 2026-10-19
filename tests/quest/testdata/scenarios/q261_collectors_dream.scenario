@@ -1,0 +1,98 @@
+# Collector's Dream (Q261): a level 15 character accepts at Alshupes; eight hook spiders give
+# eight legs (a drop that cannot miss), the eighth moving the quest on; Alshupes takes them for
+# 1000 adena and experience, and the repeatable quest ends; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q261_collectors_dream.golden
+character Collector 15
+script quest.Q261_CollectorsDream
+item 1087
+page default/30222.htm
+page script/quest/Q261_CollectorsDream/
+npc alshupes 30222 Folk 10 0 0
+npc spider 20308 Monster 40 0 0
+
+# Alshupes: accept.
+action alshupes
+action alshupes
+  S ActionFailed
+  S NpcHtmlMessage obj=alshupes item=0 page=default/30222.htm
+  S ActionFailed
+bypass npc_{alshupes}_Quest
+  S NpcHtmlMessage obj=alshupes item=0 page=script/quest/Q261_CollectorsDream/30222-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q261_CollectorsDream CREATED
+bypass Quest Q261_CollectorsDream 30222-03.htm
+  S QuestList 261:0x80000001
+  S ExShowQuestMark quest=261
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=alshupes item=0 page=script/quest/Q261_CollectorsDream/30222-03.htm
+  S ActionFailed
+  Q upsert Q261_CollectorsDream | <state> | STARTED
+  Q upsert Q261_CollectorsDream | <cond> | 1
+  state Q261_CollectorsDream STARTED
+  rows Q261_CollectorsDream <cond>=1 <state>=STARTED
+action alshupes
+  S ActionFailed
+  S NpcHtmlMessage obj=alshupes item=0 page=default/30222.htm
+  S ActionFailed
+bypass npc_{alshupes}_Quest
+  S NpcHtmlMessage obj=alshupes item=0 page=script/quest/Q261_CollectorsDream/30222-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Eight hook spiders: a leg each; the eighth completes the set.
+kill spider x8
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1087
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1087
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1087
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1087
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1087
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1087
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1087
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1087
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 261:0x80000003
+  S ExShowQuestMark quest=261
+  Q upsert Q261_CollectorsDream | <cond> | 2
+  items 1087=8
+  rows Q261_CollectorsDream <cond>=2 <state>=STARTED
+
+# Alshupes: the legs for adena and experience; the quest ends.
+action alshupes
+  S ActionFailed
+  S NpcHtmlMessage obj=alshupes item=0 page=default/30222.htm
+  S ActionFailed
+bypass npc_{alshupes}_Quest
+  S SystemMessage id=301 3:1087 6:8
+  S SystemMessage id=52 6:1000
+  S SystemMessage id=45 1:2000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=alshupes item=0 page=script/quest/Q261_CollectorsDream/30222-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q261_CollectorsDream
+  items 1087=0 57=1000
+  state Q261_CollectorsDream -
+  rows Q261_CollectorsDream -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q261_CollectorsDream -
+  rows Q261_CollectorsDream -
+  items 57=1000

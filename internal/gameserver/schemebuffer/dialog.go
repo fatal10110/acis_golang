@@ -262,7 +262,7 @@ func (d dialog) create(args []string) Reply {
 			return Reply{Message: "The scheme name already exists."}
 		}
 	}
-	d.m.setLocked(d.talker.ObjectID, strings.TrimFunc(name, javaSpace), nil)
+	d.m.setLocked(d.talker.ObjectID, strings.TrimFunc(name, isCtrlOrSpace), nil)
 	return Reply{Page: d.schemesPage()}
 }
 
@@ -505,6 +505,6 @@ func fields(command string) []string {
 // UTF-16 unit.
 func equalIgnoreCase(a, b string) bool { return compareIgnoreCase(a, b) == 0 }
 
-// javaSpace is the set trimmed around a scheme name: every character up to
+// isCtrlOrSpace is the set trimmed around a scheme name: every character up to
 // and including the space.
-func javaSpace(r rune) bool { return r <= ' ' }
+func isCtrlOrSpace(r rune) bool { return r <= ' ' }

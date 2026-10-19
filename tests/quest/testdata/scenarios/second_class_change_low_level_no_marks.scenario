@@ -1,0 +1,28 @@
+# Second class change (SecondClassChange): a level 39 human Warrior without the marks of the
+# Gladiator is told by Hannavalt what the occupation asks for.
+# Expectations are the reference trace's (SecondClassChange.onAdvEvent).
+trace internal/gameserver/script/testdata/oracle/scenarios/second_class_change_low_level_no_marks.golden
+character Fighter 39
+class 1
+script script.feature.SecondClassChange
+item 2627 2734 2762 8870
+page villagemaster/30109.htm
+page script/feature/SecondClassChange/
+npc hannavalt 30109 VillageMasterFighter 10 0 0
+
+action hannavalt
+action hannavalt
+  S ActionFailed
+  S NpcHtmlMessage obj=hannavalt item=0 page=villagemaster/30109.htm
+  S ActionFailed
+bypass npc_{hannavalt}_Quest SecondClassChange
+  S NpcHtmlMessage obj=hannavalt item=0 page=script/feature/SecondClassChange/master_human_elf_fighter-29.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest SecondClassChange master_human_elf_fighter-30.htm
+  S NpcHtmlMessage obj=hannavalt item=0 page=script/feature/SecondClassChange/master_human_elf_fighter-30.htm
+  S ActionFailed
+bypass Quest SecondClassChange GL
+  S NpcHtmlMessage obj=hannavalt item=0 page=script/feature/SecondClassChange/master_human_elf_fighter-68.htm
+  S ActionFailed
+  items 2627=0 2734=0 2762=0 8870=0

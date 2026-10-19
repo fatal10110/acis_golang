@@ -351,5 +351,6 @@ func (l *GameClientLink) landTeleportedPlayer(live *livePlayer) (bool, *summon.A
 	_ = l.world.Teleport(actor, destination.X, destination.Y, destination.Z)
 	actor.EnterZones()
 	actor.OnTeleported()
+	l.showSummonCrestToOwner(live, actor)
 	return true, actor
 }

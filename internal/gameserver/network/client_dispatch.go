@@ -73,7 +73,7 @@ func newGameInbound() inboundRegistry[byte] {
 	register(reg, clientpackets.OpcodeRequestItemList, noPayload, (*GameClientLink).handleRequestItemList)
 	register(reg, clientpackets.OpcodeUseItem, clientpackets.DecodeUseItem, (*GameClientLink).handleUseItem)
 	register(reg, clientpackets.OpcodeRequestUnEquipItem, clientpackets.DecodeUnequipItem, (*GameClientLink).handleRequestUnEquipItem)
-	register(reg, clientpackets.OpcodeRequestDropItem, clientpackets.DecodeRequestDropItem, whenLive((*GameClientLink).dropLiveItem))
+	register(reg, clientpackets.OpcodeRequestDropItem, clientpackets.DecodeRequestDropItem, (*GameClientLink).handleRequestDropItem)
 	register(reg, clientpackets.OpcodeRequestDestroyItem, clientpackets.DecodeRequestDestroyItem, (*GameClientLink).handleRequestDestroyItem)
 	register(reg, clientpackets.OpcodeRequestCrystallizeItem, clientpackets.DecodeRequestCrystallizeItem, whenLive((*GameClientLink).crystallizeLiveItem))
 	register(reg, clientpackets.OpcodeRequestRecipeBookOpen, clientpackets.DecodeRequestRecipeBookOpen, whenLive((*GameClientLink).openRecipeBook))
@@ -165,7 +165,7 @@ func newGameInbound() inboundRegistry[byte] {
 	register(reg, clientpackets.OpcodeRequestSSQStatus, clientpackets.DecodeRequestSSQStatus, whenLive((*GameClientLink).requestSSQStatus))
 	register(reg, clientpackets.OpcodeDlgAnswer, clientpackets.DecodeDlgAnswer, whenLive((*GameClientLink).handleDlgAnswer))
 	registerCapped(reg, clientpackets.OpcodeRequestSellItem, clientpackets.DecodeRequestSellItem, whenLive((*GameClientLink).requestSellItem))
-	registerCapped(reg, clientpackets.OpcodeSendWarehouseDeposit, clientpackets.DecodeSendWarehouseDepositList, whenLive((*GameClientLink).requestWarehouseDeposit))
+	registerFrame(reg, clientpackets.OpcodeSendWarehouseDeposit, unlessWarehouseDisabled(cappedFrame(clientpackets.DecodeSendWarehouseDepositList, whenLive((*GameClientLink).requestWarehouseDeposit))))
 	registerCapped(reg, clientpackets.OpcodeSendWarehouseWithdraw, clientpackets.DecodeSendWarehouseWithdrawList, whenLive((*GameClientLink).requestWarehouseWithdraw))
 	registerCapped(reg, clientpackets.OpcodeRequestPackageSend, clientpackets.DecodeRequestPackageSend, whenLive((*GameClientLink).requestPackageSend))
 	register(reg, clientpackets.OpcodeRequestFriendInvite, clientpackets.DecodeRequestFriendInvite, whenLive((*GameClientLink).handleRequestFriendInvite))
@@ -333,10 +333,18 @@ func registerCapped[K inboundOpcode, T any](
 	decode func(payload []byte, maxItems int) (T, error),
 	handle func(*GameClientLink, context.Context, *connState, T) error,
 ) {
-	registerFrame(reg, op, func(l *GameClientLink, ctx context.Context, cs *connState, payload []byte) error {
+	registerFrame(reg, op, cappedFrame(decode, handle))
+}
+
+// cappedFrame is the frame handler registerCapped binds.
+func cappedFrame[T any](
+	decode func(payload []byte, maxItems int) (T, error),
+	handle func(*GameClientLink, context.Context, *connState, T) error,
+) inboundFunc {
+	return func(l *GameClientLink, ctx context.Context, cs *connState, payload []byte) error {
 		maxItems := l.playerConfig().InventorySlots.MaxItemInPacket()
 		return decodeAndHandle(l, ctx, cs, payload, func(p []byte) (T, error) { return decode(p, maxItems) }, handle)
-	})
+	}
 }
 
 // registerFrame binds op to a handler that reads the raw frame itself.

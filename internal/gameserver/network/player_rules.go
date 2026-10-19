@@ -20,8 +20,15 @@ func (l *GameClientLink) characterRules(settings *PlayerConfig) player.Rules {
 		RaidCursesDisabled:     l.disableRaidCurse,
 		AwardPKKillPVPPoint:    settings.AwardPKKillPVPPoint,
 		DeathDrop:              settings.DeathDrop,
+		FakeDeathUpProtection:  settings.FakeDeathUpProtection,
+		Regen:                  settings.Regen,
 	}
 }
+
+// PlayerRules is the rule book every character and summon reads, which
+// //reload config puts the reloaded rules in. The NPCs and doors read their
+// base regeneration multipliers from it too.
+func (l *GameClientLink) PlayerRules() *player.RuleBook { return l.playerRules }
 
 // enchantRates are the scroll enchant rates and limits settings give, the
 // shipped ones when it names none.

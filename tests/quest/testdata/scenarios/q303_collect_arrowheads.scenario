@@ -1,0 +1,110 @@
+# Collect Arrowheads (Q303): a level 10 character accepts at Minia (a trainer); ten Tumran orcs
+# give ten orcish arrowheads (every roll pinned to succeed), the tenth moving the quest on; Minia
+# takes them for 1000 adena and experience, and the repeatable quest ends; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q303_collect_arrowheads.golden
+character Archer 10
+random always 0
+script quest.Q303_CollectArrowheads
+item 963
+page trainer/30029.htm
+page script/quest/Q303_CollectArrowheads/
+npc minia 30029 Trainer 10 0 0
+npc orc 20361 Monster 40 0 0
+
+# Minia: accept.
+action minia
+action minia
+  S ActionFailed
+  S NpcHtmlMessage obj=minia item=0 page=trainer/30029.htm
+  S ActionFailed
+bypass npc_{minia}_Quest
+  S NpcHtmlMessage obj=minia item=0 page=script/quest/Q303_CollectArrowheads/30029-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q303_CollectArrowheads CREATED
+bypass Quest Q303_CollectArrowheads 30029-03.htm
+  S QuestList 303:0x80000001
+  S ExShowQuestMark quest=303
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=minia item=0 page=script/quest/Q303_CollectArrowheads/30029-03.htm
+  S ActionFailed
+  Q upsert Q303_CollectArrowheads | <state> | STARTED
+  Q upsert Q303_CollectArrowheads | <cond> | 1
+  state Q303_CollectArrowheads STARTED
+  rows Q303_CollectArrowheads <cond>=1 <state>=STARTED
+
+# Nine orcs: an arrowhead each; not enough yet.
+kill orc x9
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:963
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:963
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:963
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:963
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:963
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:963
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:963
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:963
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:963
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 963=9
+  rows Q303_CollectArrowheads <cond>=1 <state>=STARTED
+action minia
+  S ActionFailed
+  S NpcHtmlMessage obj=minia item=0 page=trainer/30029.htm
+  S ActionFailed
+bypass npc_{minia}_Quest
+  S NpcHtmlMessage obj=minia item=0 page=script/quest/Q303_CollectArrowheads/30029-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# The tenth arrowhead completes the set.
+kill orc
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:963
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 303:0x80000003
+  S ExShowQuestMark quest=303
+  Q upsert Q303_CollectArrowheads | <cond> | 2
+  items 963=10
+  rows Q303_CollectArrowheads <cond>=2 <state>=STARTED
+
+# Minia: the arrowheads for adena and experience; the quest ends.
+action minia
+  S ActionFailed
+  S NpcHtmlMessage obj=minia item=0 page=trainer/30029.htm
+  S ActionFailed
+bypass npc_{minia}_Quest
+  S SystemMessage id=301 3:963 6:10
+  S SystemMessage id=52 6:1000
+  S SystemMessage id=45 1:2000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=minia item=0 page=script/quest/Q303_CollectArrowheads/30029-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q303_CollectArrowheads
+  items 963=0 57=1000
+  state Q303_CollectArrowheads -
+  rows Q303_CollectArrowheads -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q303_CollectArrowheads -
+  rows Q303_CollectArrowheads -
+  items 57=1000

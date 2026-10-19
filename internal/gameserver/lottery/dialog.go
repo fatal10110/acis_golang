@@ -57,9 +57,9 @@ func (l *Lottery) Fill(page string, objectID int32) string {
 // places' share of the jackpot as a percentage, and the fourth place's
 // fixed prize.
 func (l *Lottery) Instructions(page string) string {
-	page = strings.ReplaceAll(page, "%prize5%", commons.JavaDouble(l.cfg.FiveNumberRate*100))
-	page = strings.ReplaceAll(page, "%prize4%", commons.JavaDouble(l.cfg.FourNumberRate*100))
-	page = strings.ReplaceAll(page, "%prize3%", commons.JavaDouble(l.cfg.ThreeNumberRate*100))
+	page = strings.ReplaceAll(page, "%prize5%", commons.FormatDouble(l.cfg.FiveNumberRate*100))
+	page = strings.ReplaceAll(page, "%prize4%", commons.FormatDouble(l.cfg.FourNumberRate*100))
+	page = strings.ReplaceAll(page, "%prize3%", commons.FormatDouble(l.cfg.ThreeNumberRate*100))
 	return strings.ReplaceAll(page, "%prize2%", strconv.Itoa(int(l.cfg.TwoAndOneNumberPrize)))
 }
 

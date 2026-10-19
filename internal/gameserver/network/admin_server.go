@@ -56,7 +56,7 @@ func (n ShutdownNotices) Announce(text string, critical bool) {
 // A missing or malformed number is answered with the usage line; an
 // unknown argument with the page alone.
 func (l *GameClientLink) adminServer(gm *livePlayer, line string) {
-	tokens := javaTokens(line)
+	tokens := spaceTokens(line)
 	if len(tokens) < 2 {
 		l.sendMaintenancePage(gm)
 		return
@@ -65,7 +65,7 @@ func (l *GameClientLink) adminServer(gm *livePlayer, line string) {
 		if len(tokens) < 3 {
 			return 0, false
 		}
-		return parseJavaInt(tokens[2])
+		return parseInt32(tokens[2])
 	}
 	usage := false
 	switch tokens[1] {

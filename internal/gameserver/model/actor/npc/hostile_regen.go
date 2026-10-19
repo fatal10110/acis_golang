@@ -8,17 +8,31 @@ import (
 )
 
 // HPRegenRate returns this NPC's HP regeneration per tick: the template
-// base, scaled by the raid HP regen multiplier while raid related, finalized
-// through the stat calculator.
+// base, scaled by the raid HP regen multiplier while raid related and by
+// the configured one otherwise, finalized through the stat calculator.
 func (h *Hostile) HPRegenRate() float64 {
-	return h.calcStat(stat.RegenerateHPRate, h.Instance.Template.HPRegen*h.raidBaseMultipliers().HPRegen)
+	hp, _ := h.regenBase()
+	return h.calcStat(stat.RegenerateHPRate, h.Instance.Template.HPRegen*hp)
 }
 
 // MPRegenRate returns this NPC's MP regeneration per tick: the template
-// base, scaled by the raid MP regen multiplier while raid related, finalized
-// through the stat calculator.
+// base, scaled by the raid MP regen multiplier while raid related and by
+// the configured one otherwise, finalized through the stat calculator.
 func (h *Hostile) MPRegenRate() float64 {
-	return h.calcStat(stat.RegenerateMPRate, h.Instance.Template.MPRegen*h.raidBaseMultipliers().MPRegen)
+	_, mp := h.regenBase()
+	return h.calcStat(stat.RegenerateMPRate, h.Instance.Template.MPRegen*mp)
+}
+
+// regenBase returns the multipliers h's base HP and MP regeneration take:
+// the raid ones while h is raid related, in place of the configured ones
+// it takes otherwise.
+func (h *Hostile) regenBase() (hp, mp float64) {
+	if h.RaidRelated() {
+		m := h.raidBaseMultipliers()
+		return m.HPRegen, m.MPRegen
+	}
+	m := regenInForce(h.regenSettings)
+	return m.HP, m.MP
 }
 
 // TickRegen applies one HP/MP regeneration step (each resource short of its

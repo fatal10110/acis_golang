@@ -1,0 +1,109 @@
+# Saga of the Adventurer (Q079) on the saga core, played by a level 76 Treasure Hunter from
+# the start: Black Cat offers it and gives the main item; Klaus sends the player to Valentine,
+# who asks for what the player does not hold; Black Cat has nothing more to say until the
+# tablets are done, and a relog keeps the journal. Expectations are the reference trace's
+# (the relog's rows and state derived from ThirdClassQuest.java and Q079_SagaOfTheAdventurer.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q079_saga_of_the_adventurer.golden
+character TreasureHunter 76
+class 8
+script quest.Q079_SagaOfTheAdventurer
+item 7102
+page default/31603.htm
+page fisherman/31579.htm
+page default/31584.htm
+page script/quest/Q079_SagaOfTheAdventurer/
+npc blackcat 31603 Folk 10 0 0
+npc klaus 31579 Fisherman -10 0 0
+npc valentine 31584 Folk 0 10 0
+
+action blackcat
+action blackcat
+  S ActionFailed
+  S NpcHtmlMessage obj=blackcat item=0 page=default/31603.htm
+  S ActionFailed
+bypass npc_{blackcat}_Quest
+  S NpcHtmlMessage obj=blackcat item=0 page=script/quest/Q079_SagaOfTheAdventurer/0-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q079_SagaOfTheAdventurer 0-1
+  S NpcHtmlMessage obj=blackcat item=0 page=script/quest/Q079_SagaOfTheAdventurer/0-05.htm
+  S ActionFailed
+bypass Quest Q079_SagaOfTheAdventurer accept
+  S QuestList 79:0x80000001
+  S ExShowQuestMark quest=79
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7102
+  S NpcHtmlMessage obj=blackcat item=0 page=script/quest/Q079_SagaOfTheAdventurer/0-03.htm
+  S ActionFailed
+  Q upsert Q079_SagaOfTheAdventurer | <state> | STARTED
+  Q upsert Q079_SagaOfTheAdventurer | <cond> | 1
+  items 7102=1
+  state Q079_SagaOfTheAdventurer STARTED
+action blackcat
+  S ActionFailed
+  S NpcHtmlMessage obj=blackcat item=0 page=default/31603.htm
+  S ActionFailed
+bypass npc_{blackcat}_Quest
+  S NpcHtmlMessage obj=blackcat item=0 page=script/quest/Q079_SagaOfTheAdventurer/0-04.htm
+  S ActionFailed
+  S ActionFailed
+action klaus
+action klaus
+  S ActionFailed
+  S NpcHtmlMessage obj=klaus item=0 page=fisherman/31579.htm
+  S ActionFailed
+bypass npc_{klaus}_Quest
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q079_SagaOfTheAdventurer/2-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q079_SagaOfTheAdventurer 2-1
+  S QuestList 79:0x80000003
+  S ExShowQuestMark quest=79
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q079_SagaOfTheAdventurer/2-05.htm
+  S ActionFailed
+  Q upsert Q079_SagaOfTheAdventurer | <cond> | 2
+action klaus
+  S ActionFailed
+  S NpcHtmlMessage obj=klaus item=0 page=fisherman/31579.htm
+  S ActionFailed
+bypass npc_{klaus}_Quest
+  S NpcHtmlMessage obj=klaus item=0 page=script/quest/Q079_SagaOfTheAdventurer/2-02.htm
+  S ActionFailed
+  S ActionFailed
+action valentine
+action valentine
+  S ActionFailed
+  S NpcHtmlMessage obj=valentine item=0 page=default/31584.htm
+  S ActionFailed
+bypass npc_{valentine}_Quest
+  S NpcHtmlMessage obj=valentine item=0 page=script/quest/Q079_SagaOfTheAdventurer/1-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q079_SagaOfTheAdventurer 1-3
+  S QuestList 79:0x80000007
+  S ExShowQuestMark quest=79
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=valentine item=0 page=script/quest/Q079_SagaOfTheAdventurer/1-05.htm
+  S ActionFailed
+  Q upsert Q079_SagaOfTheAdventurer | <cond> | 3
+action valentine
+  S ActionFailed
+  S NpcHtmlMessage obj=valentine item=0 page=default/31584.htm
+  S ActionFailed
+bypass npc_{valentine}_Quest
+  S NpcHtmlMessage obj=valentine item=0 page=script/quest/Q079_SagaOfTheAdventurer/1-02.htm
+  S ActionFailed
+  S ActionFailed
+action blackcat
+action blackcat
+  S ActionFailed
+  S NpcHtmlMessage obj=blackcat item=0 page=default/31603.htm
+  S ActionFailed
+bypass npc_{blackcat}_Quest
+  S NpcHtmlMessage obj=blackcat item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
+  state Q079_SagaOfTheAdventurer STARTED
+  rows Q079_SagaOfTheAdventurer <cond>=3 <state>=STARTED

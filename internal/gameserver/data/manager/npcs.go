@@ -281,6 +281,8 @@ type Npcs struct {
 	folkCount             atomic.Int64
 	// fixedSeq numbers the standalone spawns SpawnFixed places.
 	fixedSeq atomic.Int64
+	// noSpawns is SetNoSpawns' switch.
+	noSpawns atomic.Bool
 
 	// scripts raises each live hostile NPC's script hooks; nil raises
 	// none.
@@ -291,6 +293,9 @@ type Npcs struct {
 	// guarded resolves the siege a siege guard defends, and the one a
 	// control tower stands for; nil gives none. Set once, before any spawn.
 	guarded func(*npc.Instance) npc.GuardedSiege
+	// regen answers the base regeneration multipliers of every NPC; nil
+	// gives the shipped ones. Set once, before any spawn.
+	regen npc.RegenSettings
 }
 
 // SetGroundTaker makes t take the ground items the NPCs spawned from now on
@@ -298,6 +303,13 @@ type Npcs struct {
 func (n *Npcs) SetGroundTaker(t npc.GroundTaker) {
 	n.pickUps = t
 	n.folk.Ground = t
+}
+
+// SetRegenSettings makes every NPC spawned from now on read its base
+// regeneration multipliers from s. Call it before SpawnOnStart.
+func (n *Npcs) SetRegenSettings(s npc.RegenSettings) {
+	n.regen = s
+	n.folk.Regen = s
 }
 
 // SetGuardedSieges makes resolve give each siege guard spawned from now on
@@ -465,9 +477,12 @@ func (n *Npcs) SpawnOnStart() {
 // spawnOnStart builds the npcmakers of spawns, their slots keyed for RespawnAll
 // run gen, and starts them: every on-start maker in list order, then the makers
 // of each listed spawn event, then the Seven Signs groups once that state is
-// known.
+// known. With SetNoSpawns it only builds them.
 func (n *Npcs) spawnOnStart(spawns *Spawns, gen int) {
 	groups := n.newGroups(spawns, gen)
+	if n.noSpawns.Load() {
+		return
+	}
 	for _, g := range groups {
 		if g.def.OnStart() {
 			g.behavior.Start(g)

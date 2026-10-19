@@ -808,6 +808,16 @@ SpawnManager.getSpawn script.Spawner.FindSpawn
 SpawnManager.startSpawnTime script.Spawner.StartSpawnTime
 SpawnManager.stopSpawnTime script.Spawner.StopSpawnTime
 
+# What a maker hook reads besides its group (#3961, #3962, #3975). The rows
+# are mapped above by their script-side names, which Check matches on the
+# last segment: a maker reads the alias of a hook NPC's template, or of a
+# spawn's, as spawn.GroupSpawn.Alias (NpcTemplate.getAlias, every NPC of a
+# spawn has the spawn's template), and draws Rnd.get as script.Maker.Rnd,
+# from the scripts' random source. The local wall clock (Calendar, a JDK
+# type with no census row) is script.Maker.Now for a maker and
+# script.Script.Now for a behavior, each read from the clock its timers run
+# on.
+
 # The castle siege rows of the siege maker (#3805). A maker finds a castle
 # by id and registers its npcmaker on the castle's siege; each later status
 # change of the siege runs the maker's siege event hook with the castle
@@ -829,6 +839,10 @@ Siege.getStatus script.Castle.SiegeStatus
 # after the scripts' hooks.
 Door.addMakerEvent script.Door.AddMakerEvent
 Quest.addDoorChange inline
+
+# Siegable-hall rows the hall port has named (#3502). An NPC's cast check
+# of a skill's reuse is CanAttemptCast on its handle.
+CreatureCast.canAttemptCast script.NPC.CanAttemptCast
 
 # Siegable-hall rows, exempt from the freeze. Their only callers are the
 # siegable-hall scripts and behaviors, the AgitWarrior subtree and the two quests
@@ -857,7 +871,6 @@ ClanTable.getClan exempt
 Creature.doDie exempt
 Creature.getActiveWeaponInstance exempt
 Creature.setInvul exempt
-CreatureCast.canAttemptCast exempt
 CreatureStatus.setHp exempt
 GameTimeTaskManager.getGameTime exempt
 Npc.getClanId exempt

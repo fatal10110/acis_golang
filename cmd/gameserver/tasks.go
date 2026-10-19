@@ -94,7 +94,7 @@ func provideGroundItems(ctx bootContext, state *world.State, opts task.GroundIte
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := items.Load(rows, data.Items); err != nil {
+	if err := items.Load(rows, data.Items, log); err != nil {
 		return nil, nil, err
 	}
 

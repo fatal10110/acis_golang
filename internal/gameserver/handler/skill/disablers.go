@@ -277,7 +277,7 @@ func disableAggReduce(cast Cast, target Creature, land landing) {
 	}
 	land.apply(cast, target)
 	if cast.Skill.Power > 0 {
-		target.ReduceAllAggroHate(float64(javaInt(float64(cast.Skill.Power))))
+		target.ReduceAllAggroHate(float64(truncDamage(float64(cast.Skill.Power))))
 		return
 	}
 	var hate float64
@@ -286,7 +286,7 @@ func disableAggReduce(cast Cast, target Creature, land landing) {
 	}
 	reduced := target.Against(conditions.ActorOf(target), conditions.SkillOf(cast.Skill.Stat)).CalcStat(stat.Aggression, hate)
 	if diff := hate - reduced; diff > 0 {
-		target.ReduceAllAggroHate(float64(javaInt(diff)))
+		target.ReduceAllAggroHate(float64(truncDamage(diff)))
 	}
 }
 

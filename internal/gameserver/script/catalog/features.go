@@ -3,6 +3,7 @@ package catalog
 import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/firstclasschange"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/feature/secondclasschange"
 )
 
 // features is the catalog of the scripted features (#209), except the six the engine slices ported.
@@ -15,7 +16,7 @@ func features() script.Catalog {
 		"script.feature.KetraOrcSupport":     nil,
 		"script.feature.MissQueen":           nil,
 		"script.feature.RaidbossInfo":        nil,
-		"script.feature.SecondClassChange":   nil,
+		"script.feature.SecondClassChange":   secondclasschange.New,
 		"script.feature.ShadowWeapon":        nil,
 		"script.feature.VarkaSilenosSupport": nil,
 	}

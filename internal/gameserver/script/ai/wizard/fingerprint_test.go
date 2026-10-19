@@ -9,7 +9,7 @@ import (
 
 // npcStrings are the NpcString ids the classes say: a named constant in the
 // reference, a number in Go.
-var npcStrings = []int{1000290, 1000395, 1000396, 1000397, 1000406, 1000407, 1000408, 1000409, 1000410, 1000411, 1000412, 1000413, 1000414}
+var npcStrings = []int{1000290, 1000291, 1000294, 1000395, 1000396, 1000397, 1000398, 1000399, 1000403, 1000404, 1000405, 1000406, 1000407, 1000408, 1000409, 1000410, 1000411, 1000412, 1000413, 1000414}
 
 // TestMatchesReferenceFingerprints compares the package with the reference
 // classes: literals, engine calls and hook shapes.
@@ -18,7 +18,19 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 	for _, id := range npcStrings {
 		exempt = append(exempt, fmt.Sprintf("number %d", id))
 	}
-	problems, err := scriptfp.Check(".", []string{"script.ai.individual.Monster.WizardBase.WizardBase", "script.ai.individual.Monster.WizardBase.Wizard.Wizard"}, exempt...)
+	problems, err := scriptfp.Check(".", []string{
+		"script.ai.individual.Monster.WizardBase.WizardBase",
+		"script.ai.individual.Monster.WizardBase.Wizard.Wizard",
+		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizard",
+		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.Elcroki",
+		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardDD2",
+		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardCastRangeCurseStoneAggressive",
+		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardCorpseNecroAggressive",
+		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardDD2CurseAggressive",
+		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardHereticAggressive",
+		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardDD2Summon",
+		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardRangeCurseAggressive",
+	}, exempt...)
 	if err != nil {
 		t.Fatal(err)
 	}

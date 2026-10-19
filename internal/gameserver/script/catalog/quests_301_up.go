@@ -1,23 +1,34 @@
 package catalog
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/script"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q303"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q306"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q313"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q317"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q319"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q320"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q324"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q325"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q330"
+)
 
 // quests301Up is the catalog of quests 301 and up (#184), except the ten the engine slices ported.
 func quests301Up() script.Catalog {
 	return script.Catalog{
-		"quest.Q303_CollectArrowheads":                 nil,
-		"quest.Q306_CrystalsOfFireAndIce":              nil,
-		"quest.Q313_CollectSpores":                     nil,
-		"quest.Q317_CatchTheWind":                      nil,
-		"quest.Q319_ScentOfDeath":                      nil,
-		"quest.Q320_BonesTellTheFuture":                nil,
-		"quest.Q324_SweetestVenom":                     nil,
-		"quest.Q325_GrimCollector":                     nil,
+		"quest.Q303_CollectArrowheads":                 q303.New,
+		"quest.Q306_CrystalsOfFireAndIce":              q306.New,
+		"quest.Q313_CollectSpores":                     q313.New,
+		"quest.Q317_CatchTheWind":                      q317.New,
+		"quest.Q319_ScentOfDeath":                      q319.New,
+		"quest.Q320_BonesTellTheFuture":                q320.New,
+		"quest.Q324_SweetestVenom":                     q324.New,
+		"quest.Q325_GrimCollector":                     q325.New,
 		"quest.Q326_VanquishRemnants":                  nil,
 		"quest.Q327_RecoverTheFarmland":                nil,
 		"quest.Q328_SenseForBusiness":                  nil,
 		"quest.Q329_CuriosityOfADwarf":                 nil,
-		"quest.Q330_AdeptOfTaste":                      nil,
+		"quest.Q330_AdeptOfTaste":                      q330.New,
 		"quest.Q331_ArrowOfVengeance":                  nil,
 		"quest.Q333_HuntOfTheBlackLion":                nil,
 		"quest.Q334_TheWishingPotion":                  nil,

@@ -31,7 +31,7 @@ func (l *GameClientLink) adminPetition(gm *livePlayer, line string) {
 	if len(args) > 0 {
 		if isDigits(args[0]) {
 			var ok bool
-			if page, ok = parseJavaInt(args[0]); !ok {
+			if page, ok = parseInt32(args[0]); !ok {
 				// A page number past the int range opens nothing.
 				return
 			}
@@ -49,7 +49,7 @@ func (l *GameClientLink) adminPetitionAction(gm *livePlayer, action string, args
 		if len(args) == 0 {
 			return 0, false
 		}
-		return parseJavaInt(args[0])
+		return parseInt32(args[0])
 	}
 	pres := petitionPresence{l}
 	switch action {

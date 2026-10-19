@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -15,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import net.sf.l2j.commons.mmocore.ProbeWire;
 import net.sf.l2j.commons.probe.ProbeClock;
@@ -22,6 +24,13 @@ import net.sf.l2j.commons.pool.ConnectionPool;
 import net.sf.l2j.commons.pool.ThreadPool;
 import net.sf.l2j.commons.random.Rnd;
 
+import net.sf.l2j.Config;
+import net.sf.l2j.gameserver.data.manager.CoupleManager;
+import net.sf.l2j.gameserver.data.manager.DerbyTrackManager;
+import net.sf.l2j.gameserver.data.manager.FishingChampionshipManager;
+import net.sf.l2j.gameserver.data.manager.LotteryManager;
+import net.sf.l2j.gameserver.data.manager.RaidPointManager;
+import net.sf.l2j.gameserver.data.manager.RelationManager;
 import net.sf.l2j.gameserver.data.manager.SevenSignsManager;
 import net.sf.l2j.gameserver.data.sql.ClanTable;
 import net.sf.l2j.gameserver.data.sql.PlayerInfoTable;
@@ -41,6 +50,7 @@ import net.sf.l2j.gameserver.model.World;
 import net.sf.l2j.gameserver.model.WorldObject;
 import net.sf.l2j.gameserver.model.actor.Npc;
 import net.sf.l2j.gameserver.model.actor.Player;
+import net.sf.l2j.gameserver.model.actor.container.player.SubClass;
 import net.sf.l2j.gameserver.model.actor.template.CreatureTemplate;
 import net.sf.l2j.gameserver.model.actor.template.NpcTemplate;
 import net.sf.l2j.gameserver.model.item.instance.ItemInstance;
@@ -67,14 +77,14 @@ import net.sf.l2j.gameserver.taskmanager.GameTimeTaskManager;
  * Quest scenario traces: each scenario file of the Go quest suite whose {@code trace} line names
  * a file under {@code oracle/scenarios/} is played here, from the scenario itself, and its trace
  * is written to that file. The header sets the player up as the Go runner does (name, level,
- * class, a led clan of the given level, quest rows, the script draws of the random line) and
+ * class, the subclass it plays, a led clan of the given level, quest rows, the script draws of the random line) and
  * spawns each NPC line's NPC at its offset from the player, who stands where the Go fixture
  * character enters the world. The hold, equip, standing, pk, cabal and festival lines are seeded
  * as the Go runner seeds them. The NPCs keep only the bindings of the scenario's script and stub
  * lines, as the Go runner registers no other script. A monster the scenario kills or hits is made the Go runner's
  * fixture monster: level 1, 1000 HP, no experience, SP, drops, skills, minions or aggression.
  * <p>
- * The character, item, quest and memo rows the scenario writes are kept (see the probe's
+ * The character, item, quest, memo and subclass rows the scenario writes are kept (see the probe's
  * connection pool), so a relog stores the character at its logout and restores it from them.
  * Every step is played: action, bypass, link, mark, relog, restart, enter and create through the
  * client packets, kill (each of N kills alone, on a fresh monster once the last one died), hit,
@@ -97,10 +107,11 @@ final class ScenarioTrace
 	/** The kill wait of the Go runner: the dying hooks run 3 s after the death. */
 	private static final int KILL_TICKS = 7;
 
-	private static int _clans;
+	/** The account of every scenario's character: no row of an earlier scenario is kept. */
+	private static final String ACCOUNT = "scenario";
 
-	/** Scenarios played so far: each one's character has an account of its own. */
-	private static int _accounts;
+	/** The name of the clan a clan line creates: an earlier scenario's clan is gone. */
+	private static final String CLAN = "Scenario";
 
 	/** The tables whose rows a scenario keeps. */
 	private static final String[] KEPT =
@@ -108,7 +119,8 @@ final class ScenarioTrace
 		"characters",
 		"items",
 		"character_quests",
-		"character_memo"
+		"character_memo",
+		"character_subclasses"
 	};
 
 	/** The wall clock each scenario starts at: 2026-01-01 00:00 UTC. */
@@ -138,6 +150,9 @@ final class ScenarioTrace
 	private String _character;
 	private int _level;
 	private int _class;
+	/** The subclass line's class and level; 0 for none. */
+	private int _subclass;
+	private int _subclassLevel;
 	private int _clan = -1;
 	private int[] _draws;
 	private boolean _always;
@@ -189,6 +204,17 @@ final class ScenarioTrace
 		if (files == null)
 			throw new IllegalStateException("no scenario directory " + scenarios);
 		Arrays.sort(files);
+		// What loads from the database on first use is loaded before the first scenario, else its
+		// query (and the runners' ids) would be in whichever scenario came first: the events the
+		// reference loads at boot after the scripts, and the friend lists, which the reference loads
+		// when a first character enters or leaves the world.
+		DerbyTrackManager.getInstance();
+		LotteryManager.getInstance();
+		CoupleManager.getInstance();
+		if (Config.ALLOW_FISH_CHAMPIONSHIP)
+			FishingChampionshipManager.getInstance();
+		RelationManager.getInstance();
+		final Ids ids = Ids.take();
 		for (File f : files)
 		{
 			final ScenarioTrace t = new ScenarioTrace(f.getName());
@@ -200,6 +226,9 @@ final class ScenarioTrace
 
 			// Drop what an earlier scenario left queued, so no task of it runs here.
 			ThreadPool.cancelAll();
+			// Every scenario draws its object ids from where the first one did, so its trace does
+			// not depend on which other scenarios exist.
+			ids.restore();
 			Rnd.reseed(1);
 			if (t._draws != null)
 				Rnd.scriptCallers(t._draws, t._always, d -> t._lines.add("# draw " + d));
@@ -229,6 +258,67 @@ final class ScenarioTrace
 			target.getParentFile().mkdirs();
 			t.write(target);
 			t.clear();
+			ids.forget(t._name);
+		}
+	}
+
+	/**
+	 * The object id factory as the first scenario found it. Each scenario starts from it, so the
+	 * next one reuses the ids this one drew: once a scenario is over, {@link #forget} drops every
+	 * object and registry entry that still holds one of them.
+	 */
+	private record Ids(BitSet used, int free, int next)
+	{
+		static Ids take() throws Exception
+		{
+			final IdFactory f = IdFactory.getInstance();
+			return new Ids((BitSet) ((BitSet) field(IdFactory.class, f, "_freeIds")).clone(), ((AtomicInteger) field(IdFactory.class, f, "_freeIdCount")).get(), ((AtomicInteger) field(IdFactory.class, f, "_nextFreeId")).get());
+		}
+
+		void restore() throws Exception
+		{
+			final IdFactory f = IdFactory.getInstance();
+			set(IdFactory.class, f, "_freeIds", used.clone());
+			set(IdFactory.class, f, "_freeIdCount", new AtomicInteger(free));
+			set(IdFactory.class, f, "_nextFreeId", new AtomicInteger(next));
+		}
+
+		/** Whether id is one a scenario drew. */
+		boolean drawn(int id)
+		{
+			return id >= IdFactory.FIRST_OID && !used.get(id - IdFactory.FIRST_OID);
+		}
+
+		/**
+		 * Removes from the world every object of an id the scenario drew, wherever it stands (an NPC
+		 * a script spawned away from the player), and drops the registry entries keyed by one (the
+		 * clan, the character's Seven Signs sign-up and raid points). Fails on an object still in the
+		 * world: the next scenario's object of that id would not enter it.
+		 */
+		@SuppressWarnings("unchecked")
+		void forget(String scenario) throws Exception
+		{
+			for (WorldObject o : new ArrayList<>(World.getInstance().getObjects()))
+			{
+				if (!drawn(o.getObjectId()))
+					continue;
+				if (o instanceof Npc npc)
+					npc.deleteMe();
+				else if (o instanceof Player player)
+					player.deleteMe();
+				else
+					o.decayMe();
+			}
+			ThreadPool.cancelAll();
+			((Map<Integer, ?>) field(ClanTable.class, ClanTable.getInstance(), "_clans")).keySet().removeIf(this::drawn);
+			((Map<Integer, ?>) field(SevenSignsManager.class, SevenSignsManager.getInstance(), "_playersData")).keySet().removeIf(this::drawn);
+			((Map<Integer, ?>) field(RaidPointManager.class, RaidPointManager.getInstance(), "_entries")).keySet().removeIf(this::drawn);
+			final List<String> kept = new ArrayList<>();
+			for (WorldObject o : World.getInstance().getObjects())
+				if (drawn(o.getObjectId()))
+					kept.add(o + " (object " + o.getObjectId() + ")");
+			if (!kept.isEmpty())
+				throw new IllegalStateException(scenario + ": world objects outlive the scenario: " + kept);
 		}
 	}
 
@@ -258,6 +348,11 @@ final class ScenarioTrace
 					_level = Integer.parseInt(f[2]);
 				}
 				case "class" -> _class = Integer.parseInt(f[1]);
+				case "subclass" ->
+				{
+					_subclass = Integer.parseInt(f[1]);
+					_subclassLevel = Integer.parseInt(f[2]);
+				}
 				case "clan" -> _clan = Integer.parseInt(f[1]);
 				case "quest" -> _quests.add(f);
 				case "random" ->
@@ -306,7 +401,7 @@ final class ScenarioTrace
 	private void play() throws Exception
 	{
 		final GameClient client = new GameClient(null);
-		client.setAccountName("scenario" + _accounts++);
+		client.setAccountName(ACCOUNT);
 		client.setSessionId(new SessionKey(1, 2, 3, 4));
 		_client = client;
 
@@ -355,15 +450,18 @@ final class ScenarioTrace
 
 	/**
 	 * The seeded character of a scenario that does not create its own: made at the character
-	 * line's level and the class line's class, with the clan, quest and holding lines, in the
-	 * world at the Go fixture's entry point with the NPC lines' NPCs around it. Its character,
-	 * quest and item rows are kept as written, so a relog restores it.
+	 * line's level and the class line's class, playing the subclass line's subclass, with the clan,
+	 * quest and holding lines, in the world at the Go fixture's entry point with the NPC lines' NPCs
+	 * around it. Its character, subclass, quest and item rows are kept as written, so a relog
+	 * restores it.
 	 */
 	private void seed() throws Exception
 	{
 		final Player player = Player.create(IdFactory.getInstance().getNextId(), PlayerData.getInstance().getTemplate(ClassId.VALUES[_class]), _client.getAccountName(), _character, (byte) 0, (byte) 0, (byte) 0, Sex.MALE);
 		player.getStatus().setLevel(_level);
 		player.getStatus().setExp(PlayerLevelData.getInstance().getPlayerLevel(_level).requiredExpToLevelUp());
+		if (_subclass != 0)
+			subclass(player);
 		player.getStatus().setMaxHpMp();
 		World.getInstance().addObject(player);
 
@@ -376,7 +474,7 @@ final class ScenarioTrace
 
 		if (_clan >= 0)
 		{
-			final Clan clan = ClanTable.getInstance().createClan(player, "Scenario" + (char) ('a' + _clans++));
+			final Clan clan = ClanTable.getInstance().createClan(player, CLAN);
 			if (clan == null)
 				throw new IllegalStateException(_name + ": the clan line's clan was not created");
 			clan.changeLevel(_clan);
@@ -396,6 +494,24 @@ final class ScenarioTrace
 		}
 		holdings(player);
 		spawnNpcs();
+	}
+
+	/**
+	 * The subclass line's subclass, in slot 1 at its level, and played: the state the reference's
+	 * restore leaves of a character that logged out on it (its row kept, so a relog restores it),
+	 * with the base class's level and experience left as the character line set them.
+	 */
+	private void subclass(Player player) throws Exception
+	{
+		final long exp = PlayerLevelData.getInstance().getPlayerLevel(_subclassLevel).requiredExpToLevelUp();
+		final SubClass sub = new SubClass(_subclass, 1, exp, 0, (byte) _subclassLevel);
+		player.getSubClasses().put(sub.getClassIndex(), sub);
+		ConnectionPool.apply("INSERT INTO character_subclasses (char_obj_id,class_id,exp,sp,level,class_index) VALUES (?,?,?,?,?,?)", player.getObjectId(), sub.getClassId(), sub.getExp(), sub.getSp(), sub.getLevel(), sub.getClassIndex());
+		set(Player.class, player, "_classIndex", sub.getClassIndex());
+		set(Player.class, player, "_activeClass", sub.getClassId());
+		player.setTemplate(sub.getClassDefinition());
+		if (!player.isSubClassActive() || player.getStatus().getLevel() != _subclassLevel)
+			throw new IllegalStateException(_name + ": the subclass line's subclass is not played");
 	}
 
 	/** The hold, equip, standing, pk, cabal and festival lines, as the Go runner seeds them. */

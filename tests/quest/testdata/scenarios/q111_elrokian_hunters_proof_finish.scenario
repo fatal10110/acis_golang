@@ -1,0 +1,236 @@
+# Elrokian Hunter's Proof (Q111), second part: a level 75 character on cond 4 with 49 journal
+# fragments and nine claws, bones and skins kills a velociraptor for the last fragment, takes the
+# expedition letter from Marquez to Kirikashin, learns the song, makes Asamah's trap from an
+# ornithomimus claw, a pachycephalosaurus skin and a deinonychus bone (every roll pinned to
+# succeed), and Kirikashin gives the Elrokian trap, its stones and adena; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q111_elrokian_hunters_proof_finish.golden
+character Hunter 75
+quest Q111_ElrokianHuntersProof <cond>=4 <state>=STARTED
+hold 8768 49
+hold 8770 9
+hold 8771 9
+hold 8772 9
+random always 0
+script quest.Q111_ElrokianHuntersProof
+item 8768 8769 8770 8771 8772 8773 8763 8764 57
+page default/32113.htm
+page default/32115.htm
+page default/32116.htm
+page script/quest/Q111_ElrokianHuntersProof/
+npc marquez 32113 Folk 10 0 0
+npc asamah 32115 Folk 30 0 0
+npc kirikashin 32116 Folk 0 10 0
+npc raptor 22196 Monster 40 0 0
+npc ornitho 22200 Monster 0 40 0
+npc pachy 22208 Monster -40 0 0
+npc deino 22203 Monster 0 -40 0
+
+# The fiftieth fragment.
+kill raptor
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8768
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 111:0x8000001f
+  S ExShowQuestMark quest=111
+  Q upsert Q111_ElrokianHuntersProof | <cond> | 5
+  items 8768=50
+  rows Q111_ElrokianHuntersProof <cond>=5 <state>=STARTED
+
+# Marquez's letter.
+action marquez
+action marquez
+  S ActionFailed
+  S NpcHtmlMessage obj=marquez item=0 page=default/32113.htm
+  S ActionFailed
+bypass npc_{marquez}_Quest
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-010.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32113-011.htm
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-011.htm
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32113-012.htm
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-012.htm
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32113-013.htm
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-013.htm
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32113-014.htm
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-014.htm
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32113-015.htm
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-015.htm
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32113-016.htm
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-016.htm
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32113-017.htm
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-017.htm
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32113-018.htm
+  S QuestList 111:0x8000003f
+  S ExShowQuestMark quest=111
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:8768 6:50
+  S SystemMessage id=54 3:8769
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-018.htm
+  S ActionFailed
+  Q upsert Q111_ElrokianHuntersProof | <cond> | 6
+  rows Q111_ElrokianHuntersProof <cond>=6 <state>=STARTED
+  items 8768=0 8769=1
+
+# Kirikashin takes the letter and sings.
+action kirikashin
+action kirikashin
+  S ActionFailed
+  S NpcHtmlMessage obj=kirikashin item=0 page=default/32116.htm
+  S ActionFailed
+bypass npc_{kirikashin}_Quest
+  S SystemMessage id=302 3:8769
+  S NpcHtmlMessage obj=kirikashin item=0 page=script/quest/Q111_ElrokianHuntersProof/32116-001.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q111_ElrokianHuntersProof <cond>=6 <state>=STARTED
+  items 8769=0
+bypass Quest Q111_ElrokianHuntersProof 32116-002.htm
+  S NpcHtmlMessage obj=kirikashin item=0 page=script/quest/Q111_ElrokianHuntersProof/32116-002.htm
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32116-003.htm
+  S QuestList 111:0x8000007f
+  S ExShowQuestMark quest=111
+  S PlaySound type=0 file=EtcSound.elcroki_song_full bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kirikashin item=0 page=script/quest/Q111_ElrokianHuntersProof/32116-003.htm
+  S ActionFailed
+  Q upsert Q111_ElrokianHuntersProof | <cond> | 7
+  rows Q111_ElrokianHuntersProof <cond>=7 <state>=STARTED
+action kirikashin
+  S ActionFailed
+  S NpcHtmlMessage obj=kirikashin item=0 page=default/32116.htm
+  S ActionFailed
+bypass npc_{kirikashin}_Quest
+  S NpcHtmlMessage obj=kirikashin item=0 page=script/quest/Q111_ElrokianHuntersProof/32116-004.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32116-005.htm
+  S QuestList 111:0x800000ff
+  S ExShowQuestMark quest=111
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kirikashin item=0 page=script/quest/Q111_ElrokianHuntersProof/32116-005.htm
+  S ActionFailed
+  Q upsert Q111_ElrokianHuntersProof | <cond> | 8
+  rows Q111_ElrokianHuntersProof <cond>=8 <state>=STARTED
+
+# Asamah's trap order.
+action asamah
+action asamah
+  S ActionFailed
+  S NpcHtmlMessage obj=asamah item=0 page=default/32115.htm
+  S ActionFailed
+bypass npc_{asamah}_Quest
+  S NpcHtmlMessage obj=asamah item=0 page=script/quest/Q111_ElrokianHuntersProof/32115-003.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32115-004.htm
+  S QuestList 111:0x800001ff
+  S ExShowQuestMark quest=111
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=asamah item=0 page=script/quest/Q111_ElrokianHuntersProof/32115-004.htm
+  S ActionFailed
+  Q upsert Q111_ElrokianHuntersProof | <cond> | 9
+  rows Q111_ElrokianHuntersProof <cond>=9 <state>=STARTED
+bypass Quest Q111_ElrokianHuntersProof 32115-005.htm
+  S NpcHtmlMessage obj=asamah item=0 page=script/quest/Q111_ElrokianHuntersProof/32115-005.htm
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32115-006.htm
+  S QuestList 111:0x800003ff
+  S ExShowQuestMark quest=111
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=asamah item=0 page=script/quest/Q111_ElrokianHuntersProof/32115-006.htm
+  S ActionFailed
+  Q upsert Q111_ElrokianHuntersProof | <cond> | 10
+  rows Q111_ElrokianHuntersProof <cond>=10 <state>=STARTED
+
+# A claw, a skin and a bone.
+kill ornitho
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8770
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 8770=10
+  rows Q111_ElrokianHuntersProof <cond>=10 <state>=STARTED
+kill pachy
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8772
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 8772=10
+  rows Q111_ElrokianHuntersProof <cond>=10 <state>=STARTED
+kill deino
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8771
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 111:0x800007ff
+  S ExShowQuestMark quest=111
+  Q upsert Q111_ElrokianHuntersProof | <cond> | 11
+  items 8771=10
+  rows Q111_ElrokianHuntersProof <cond>=11 <state>=STARTED
+
+# Asamah makes the trap.
+action asamah
+  S ActionFailed
+  S NpcHtmlMessage obj=asamah item=0 page=default/32115.htm
+  S ActionFailed
+action asamah
+  S ActionFailed
+  S NpcHtmlMessage obj=asamah item=0 page=default/32115.htm
+  S ActionFailed
+bypass npc_{asamah}_Quest
+  S QuestList 111:0x80000fff
+  S ExShowQuestMark quest=111
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:8771 6:10
+  S SystemMessage id=301 3:8770 6:10
+  S SystemMessage id=301 3:8772 6:10
+  S SystemMessage id=54 3:8773
+  S NpcHtmlMessage obj=asamah item=0 page=script/quest/Q111_ElrokianHuntersProof/32115-007.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q111_ElrokianHuntersProof | <cond> | 12
+  rows Q111_ElrokianHuntersProof <cond>=12 <state>=STARTED
+  items 8770=0 8771=0 8772=0 8773=1
+
+# Kirikashin rewards.
+action kirikashin
+action kirikashin
+  S ActionFailed
+  S NpcHtmlMessage obj=kirikashin item=0 page=default/32116.htm
+  S ActionFailed
+bypass npc_{kirikashin}_Quest
+  S NpcHtmlMessage obj=kirikashin item=0 page=script/quest/Q111_ElrokianHuntersProof/32116-006.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32116-007.htm
+  S SystemMessage id=302 3:8773
+  S SystemMessage id=54 3:8763
+  S SystemMessage id=53 3:8764 6:100
+  S SystemMessage id=52 6:1022636
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 111:0x00000000
+  S NpcHtmlMessage obj=kirikashin item=0 page=script/quest/Q111_ElrokianHuntersProof/32116-007.htm
+  S ActionFailed
+  Q upsert Q111_ElrokianHuntersProof | <state> | COMPLETED
+  Q delete-except-state Q111_ElrokianHuntersProof
+  state Q111_ElrokianHuntersProof COMPLETED
+  rows Q111_ElrokianHuntersProof <state>=COMPLETED
+  items 8773=0 8763=1 8764=100 57=1022636
+action kirikashin
+  S ActionFailed
+  S NpcHtmlMessage obj=kirikashin item=0 page=default/32116.htm
+  S ActionFailed
+bypass npc_{kirikashin}_Quest
+  S NpcHtmlMessage obj=kirikashin item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+relog
+  items 8763=1 8764=100 57=1022636
+  state Q111_ElrokianHuntersProof COMPLETED
+  rows Q111_ElrokianHuntersProof <state>=COMPLETED

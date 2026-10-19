@@ -42,6 +42,15 @@ func (n *NPC) MeetsHPMPDisabledConditions(target Creature, ref skill.Ref) bool {
 	return n.hostile("check a cast's cost").MeetsHPMPDisabled(combatantOf(target), ref)
 }
 
+// CanAttemptCast reports whether the NPC may try its cast of ref at target
+// as far as its skill reuse goes: with any skill of its waiting for its
+// reuse, a stun, meditation, sleep, paralysis or fear locks every skill;
+// otherwise ref's own reuse wait decides. No target, or a skill the NPC's
+// table lacks, may not.
+func (n *NPC) CanAttemptCast(target Creature, ref skill.Ref) bool {
+	return n.hostile("check a skill's reuse").CanAttemptCast(combatantOf(target), ref)
+}
+
 // ActualSpoiler reports whether p is the player who spoiled the NPC.
 func (n *NPC) ActualSpoiler(p *Player) bool {
 	h := n.hostile("check its spoiler")

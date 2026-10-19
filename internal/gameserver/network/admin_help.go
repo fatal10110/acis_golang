@@ -20,7 +20,7 @@ func (l *GameClientLink) adminHelp(gm *livePlayer, line string) {
 	args := handleradmin.Args(line)
 	page, search := 1, ""
 	if len(args) > 0 {
-		n, ok := parseJavaInt(args[0])
+		n, ok := parseInt32(args[0])
 		if !ok {
 			l.sendAdminHelp(gm, 1, "")
 			return

@@ -77,7 +77,10 @@ up the way the Go runner (`internal/testsupport/scenario`) sets it up, so the tr
 what the reference does in the scenario's own world:
 
 - unless its first step creates it, the player is created at the character line's level and
-  the class line's class (default 0), standing where the Go fixture character enters the world (10, 20, 30); a clan line creates a
+  the class line's class (default 0), standing where the Go fixture character enters the world (10, 20, 30); a subclass
+  line gives it that subclass in slot 1 at its level, its row written as the Go runner writes it, and
+  makes it the played class, as the reference's restore leaves a character that logged out on it
+  (the base class keeping the character line's level); a clan line creates a
   clan the player leads and sets its level; each quest line puts its rows in the player's quest
   state before anything is recorded;
 - each NPC line's NPC is spawned at its offset from the player. Every NPC template is bound to
@@ -98,12 +101,29 @@ what the reference does in the scenario's own world:
   them (inventory items, a worn item, the Ketra/Varka standing, the PK count, the Seven Signs
   sign-up, the festival scores, given back after the scenario); a traced scenario with a header
   line the probe does not read fails the run;
-- each scenario's character has an account of its own; its character, item, quest and memo rows
-  are kept from its creation on (the quest lines' rows written as the Go runner writes them), so
+- every scenario's character has the same account (`scenario`) and a clan line's clan the same
+  name (`Scenario`), since nothing of an earlier scenario is kept; its character, item, quest,
+  memo and subclass rows are kept from its creation on (the quest lines' rows written as the Go runner writes them), so
   a relog stores the character at its logout and restores it from the rows the run wrote, read
   back by the reference's own restore queries; a statement on a kept table the store cannot run
   fails the run;
-- the game time is noon of the first game day at each scenario's start.
+- the game time is noon of the first game day at each scenario's start;
+- every scenario draws its object ids from the same point: the id factory as the first scenario
+  found it, after the boot, the quest traces and the contract scenes. Once a scenario is over,
+  every world object of an id it drew is removed, wherever it stands, and so are the registry
+  entries keyed by one (the clan table, the Seven Signs sign-ups, the raid points); an object
+  still in the world fails the run. What loads from the database on first use is loaded before
+  the first scenario, so no scenario's trace holds its query: the events the reference loads at
+  boot after the scripts (the derby track, whose runners also draw ids, the lottery, the couples,
+  the fishing championship when enabled) and the friend lists, which the reference loads when a
+  first character enters or leaves the world.
+
+A scenario's trace therefore depends on that scenario alone: adding, removing or renaming
+another scenario leaves it byte-identical. A content lane that adds scenarios runs `run.sh` and
+commits the whole result, which is its own new goldens only; a change to any other golden means
+the lane changed what that scenario plays (a script, a data reader, the probe) and is part of
+the review. When a new scenario writes another registry keyed by an object id, the probe clears
+that registry too (`ScenarioTrace.Ids.forget`).
 
 Every step is played, in order, and the trace records them all: action, bypass, link and mark
 (`RequestTutorialQuestionMark`) are fed as client packets, followed by 500 ms; a relog is a

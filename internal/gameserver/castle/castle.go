@@ -360,7 +360,7 @@ func (c *Castle) tax(amount int64) int64 {
 		amount = int64(float64(amount) - float64(sysget)/100.0*float64(amount))
 	}
 	if tribute := c.Tax.TributeRate; c.ParentID > 0 && tribute > 0 && c.parent != nil {
-		if share := javaInt(float64(tribute) / 100.0 * float64(amount)); share > 0 {
+		if share := truncInt32(float64(tribute) / 100.0 * float64(amount)); share > 0 {
 			c.parent.riseTaxRevenue(share, true)
 			amount -= share
 		}
@@ -404,9 +404,9 @@ func (c *Castle) resetFinancesLocked() {
 	})
 }
 
-// javaInt narrows v to an int32 as an int cast does: toward zero,
+// truncInt32 narrows v to an int32 as an int cast does: toward zero,
 // saturating at the int32 range.
-func javaInt(v float64) int64 {
+func truncInt32(v float64) int64 {
 	switch {
 	case math.IsNaN(v):
 		return 0

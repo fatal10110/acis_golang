@@ -80,7 +80,7 @@ func PartyPrivateHooks() script.Hooks {
 			called, target := e.Called, e.Target
 			if !called.IsMaster() && target.Playable() {
 				hateRatio := damageHate(called, float64(e.Damage), defaultnpc.HateRatio(called, target))
-				called.AddAttackDesire(target, float64(commons.JavaInt(hateRatio*float64(e.Damage)*float64(called.Int(script.SlotWeightPoint))*10)))
+				called.AddAttackDesire(target, float64(commons.TruncInt32Sat(hateRatio*float64(e.Damage)*float64(called.Int(script.SlotWeightPoint))*10)))
 			}
 		},
 		OnAttacked: func(s *script.Script, e script.Attacked) {
@@ -99,7 +99,7 @@ func PartyPrivateHooks() script.Hooks {
 			called, attacker := e.Called, e.Attacker
 			if attacker.Playable() && called.LifeTime() > 7 && deadMaster(called) {
 				hateRatio := damageHate(called, float64(e.Damage), defaultnpc.HateRatio(called, attacker))
-				called.AddAttackDesire(attacker, float64(commons.JavaInt(hateRatio*30)))
+				called.AddAttackDesire(attacker, float64(commons.TruncInt32Sat(hateRatio*30)))
 			}
 		},
 		OnSeeSpell: func(s *script.Script, e script.SeeSpell) {

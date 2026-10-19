@@ -1,0 +1,133 @@
+# Chest caught with a bait of icy air (Q028): a level 36 character who completed O'Fulle's Special
+# Bait (Q051) and holds a big yellow treasure chest accepts at the fisherman, who opens the chest
+# and finds a Kiki's letter; Kiki trades it for a elven ring and the quest completes; then relog.
+# The fisherman's quest link lists both his quests. Expectations replay the reference trace of
+# this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q028_chest_caught_with_a_bait_of_icy_air.golden
+character Angler 36
+quest Q051_OFullesSpecialBait <state>=COMPLETED
+hold 6503 1
+script quest.Q028_ChestCaughtWithABaitOfIcyAir
+script quest.Q051_OFullesSpecialBait
+item 6503 7626 881
+page fisherman/31572.htm
+page merchant/31442.htm
+page script/quest/Q028_ChestCaughtWithABaitOfIcyAir/
+npc ofulle 31572 Fisherman 10 0 0
+npc kiki 31442 Merchant 20 0 0
+
+# The fisherman: accept.
+action ofulle
+action ofulle
+  S ActionFailed
+  S NpcHtmlMessage obj=ofulle item=0 page=fisherman/31572.htm
+  S ActionFailed
+bypass npc_{ofulle}_Quest
+  S NpcHtmlMessage obj=ofulle item=0 html="<html><body><a action=\"bypass -h npc_{ofulle}_Quest Q051_OFullesSpecialBait\">[O'Fulle's Special Bait (Done)]</a><br><a action=\"bypass -h npc_{ofulle}_Quest Q028_ChestCaughtWithABaitOfIcyAir\">[Chest caught with a bait of icy air]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{ofulle}_Quest Q028_ChestCaughtWithABaitOfIcyAir
+  S NpcHtmlMessage obj=ofulle item=0 page=script/quest/Q028_ChestCaughtWithABaitOfIcyAir/31572-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q028_ChestCaughtWithABaitOfIcyAir CREATED
+bypass Quest Q028_ChestCaughtWithABaitOfIcyAir 31572-04.htm
+  S QuestList 51:0x00000000 28:0x80000001
+  S ExShowQuestMark quest=28
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=ofulle item=0 page=script/quest/Q028_ChestCaughtWithABaitOfIcyAir/31572-04.htm
+  S ActionFailed
+  Q upsert Q028_ChestCaughtWithABaitOfIcyAir | <state> | STARTED
+  Q upsert Q028_ChestCaughtWithABaitOfIcyAir | <cond> | 1
+  state Q028_ChestCaughtWithABaitOfIcyAir STARTED
+  rows Q028_ChestCaughtWithABaitOfIcyAir <cond>=1 <state>=STARTED
+
+# Kiki has nothing for the quest before the Kiki's letter.
+action kiki
+action kiki
+  S ActionFailed
+  S NpcHtmlMessage obj=kiki item=0 page=merchant/31442.htm
+  S ActionFailed
+bypass npc_{kiki}_Quest
+  S NpcHtmlMessage obj=kiki item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+# The fisherman opens the chest.
+action ofulle
+action ofulle
+  S ActionFailed
+  S NpcHtmlMessage obj=ofulle item=0 page=fisherman/31572.htm
+  S ActionFailed
+bypass npc_{ofulle}_Quest
+  S NpcHtmlMessage obj=ofulle item=0 html="<html><body><a action=\"bypass -h npc_{ofulle}_Quest Q028_ChestCaughtWithABaitOfIcyAir\">[Chest caught with a bait of icy air (In Progress)]</a><br><a action=\"bypass -h npc_{ofulle}_Quest Q051_OFullesSpecialBait\">[O'Fulle's Special Bait (Done)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{ofulle}_Quest Q028_ChestCaughtWithABaitOfIcyAir
+  S NpcHtmlMessage obj=ofulle item=0 page=script/quest/Q028_ChestCaughtWithABaitOfIcyAir/31572-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q028_ChestCaughtWithABaitOfIcyAir 31572-07.htm
+  S QuestList 51:0x00000000 28:0x80000003
+  S ExShowQuestMark quest=28
+  S SystemMessage id=302 3:6503
+  S SystemMessage id=54 3:7626
+  S NpcHtmlMessage obj=ofulle item=0 page=script/quest/Q028_ChestCaughtWithABaitOfIcyAir/31572-07.htm
+  S ActionFailed
+  Q upsert Q028_ChestCaughtWithABaitOfIcyAir | <cond> | 2
+  rows Q028_ChestCaughtWithABaitOfIcyAir <cond>=2 <state>=STARTED
+  items 6503=0 7626=1
+action ofulle
+  S ActionFailed
+  S NpcHtmlMessage obj=ofulle item=0 page=fisherman/31572.htm
+  S ActionFailed
+bypass npc_{ofulle}_Quest
+  S NpcHtmlMessage obj=ofulle item=0 html="<html><body><a action=\"bypass -h npc_{ofulle}_Quest Q028_ChestCaughtWithABaitOfIcyAir\">[Chest caught with a bait of icy air (In Progress)]</a><br><a action=\"bypass -h npc_{ofulle}_Quest Q051_OFullesSpecialBait\">[O'Fulle's Special Bait (Done)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{ofulle}_Quest Q028_ChestCaughtWithABaitOfIcyAir
+  S NpcHtmlMessage obj=ofulle item=0 page=script/quest/Q028_ChestCaughtWithABaitOfIcyAir/31572-09.htm
+  S ActionFailed
+  S ActionFailed
+
+# Kiki trades the Kiki's letter; the quest completes.
+action kiki
+action kiki
+  S ActionFailed
+  S NpcHtmlMessage obj=kiki item=0 page=merchant/31442.htm
+  S ActionFailed
+bypass npc_{kiki}_Quest
+  S NpcHtmlMessage obj=kiki item=0 page=script/quest/Q028_ChestCaughtWithABaitOfIcyAir/31442-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q028_ChestCaughtWithABaitOfIcyAir 31442-02.htm
+  S SystemMessage id=302 3:7626
+  S SystemMessage id=54 3:881
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 51:0x00000000 28:0x00000000
+  S NpcHtmlMessage obj=kiki item=0 page=script/quest/Q028_ChestCaughtWithABaitOfIcyAir/31442-02.htm
+  S ActionFailed
+  Q upsert Q028_ChestCaughtWithABaitOfIcyAir | <state> | COMPLETED
+  Q delete-except-state Q028_ChestCaughtWithABaitOfIcyAir
+  state Q028_ChestCaughtWithABaitOfIcyAir COMPLETED
+  rows Q028_ChestCaughtWithABaitOfIcyAir <state>=COMPLETED
+  items 7626=0 881=1
+
+# Relog: the completed quest loads from its one row.
+relog
+  state Q028_ChestCaughtWithABaitOfIcyAir COMPLETED
+  rows Q028_ChestCaughtWithABaitOfIcyAir <state>=COMPLETED
+  items 881=1
+action ofulle
+action ofulle
+  S ActionFailed
+  S NpcHtmlMessage obj=ofulle item=0 page=fisherman/31572.htm
+  S ActionFailed
+bypass npc_{ofulle}_Quest
+  S NpcHtmlMessage obj=ofulle item=0 html="<html><body><a action=\"bypass -h npc_{ofulle}_Quest Q028_ChestCaughtWithABaitOfIcyAir\">[Chest caught with a bait of icy air (Done)]</a><br><a action=\"bypass -h npc_{ofulle}_Quest Q051_OFullesSpecialBait\">[O'Fulle's Special Bait (Done)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{ofulle}_Quest Q028_ChestCaughtWithABaitOfIcyAir
+  S NpcHtmlMessage obj=ofulle item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

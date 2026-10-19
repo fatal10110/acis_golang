@@ -1,0 +1,135 @@
+# Curse of the Underground Fortress (Q162): a level 12 character accepts at Unoren; ten dungeon
+# skeletons give the bone fragments and three shade horrors the elf skulls (every roll pinned to
+# succeed), the last skull moving the cond, and Unoren takes them for a bone shield and adena;
+# then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q162_curse_of_the_underground_fortress.golden
+character Exorcist 12
+random always 0
+script quest.Q162_CurseOfTheUndergroundFortress
+item 1158 1159 625 57
+page merchant/30147.htm
+page script/quest/Q162_CurseOfTheUndergroundFortress/
+npc unoren 30147 Merchant 10 0 0
+npc skeleton 20464 Monster 40 0 0
+npc horror 20033 Monster 0 40 0
+
+# Unoren: accept.
+action unoren
+action unoren
+  S ActionFailed
+  S NpcHtmlMessage obj=unoren item=0 page=merchant/30147.htm
+  S ActionFailed
+bypass npc_{unoren}_Quest
+  S NpcHtmlMessage obj=unoren item=0 page=script/quest/Q162_CurseOfTheUndergroundFortress/30147-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q162_CurseOfTheUndergroundFortress CREATED
+bypass Quest Q162_CurseOfTheUndergroundFortress 30147-03.htm
+  S NpcHtmlMessage obj=unoren item=0 page=script/quest/Q162_CurseOfTheUndergroundFortress/30147-03.htm
+  S ActionFailed
+bypass Quest Q162_CurseOfTheUndergroundFortress 30147-04.htm
+  S QuestList 162:0x80000001
+  S ExShowQuestMark quest=162
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=unoren item=0 page=script/quest/Q162_CurseOfTheUndergroundFortress/30147-04.htm
+  S ActionFailed
+  Q upsert Q162_CurseOfTheUndergroundFortress | <state> | STARTED
+  Q upsert Q162_CurseOfTheUndergroundFortress | <cond> | 1
+  state Q162_CurseOfTheUndergroundFortress STARTED
+  rows Q162_CurseOfTheUndergroundFortress <cond>=1 <state>=STARTED
+action unoren
+  S ActionFailed
+  S NpcHtmlMessage obj=unoren item=0 page=merchant/30147.htm
+  S ActionFailed
+bypass npc_{unoren}_Quest
+  S NpcHtmlMessage obj=unoren item=0 page=script/quest/Q162_CurseOfTheUndergroundFortress/30147-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ten dungeon skeletons: ten bone fragments, and no cond before the skulls.
+kill skeleton x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1158
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1158
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1158
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1158
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1158
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1158
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1158
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1158
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1158
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1158
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 1158=10
+  rows Q162_CurseOfTheUndergroundFortress <cond>=1 <state>=STARTED
+
+# Three shade horrors: three elf skulls, and the third moves the cond.
+kill horror x3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1159
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1159
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1159
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 162:0x80000003
+  S ExShowQuestMark quest=162
+  Q upsert Q162_CurseOfTheUndergroundFortress | <cond> | 2
+  items 1158=10 1159=3
+  rows Q162_CurseOfTheUndergroundFortress <cond>=2 <state>=STARTED
+
+# Unoren: the skulls and fragments for the bone shield and adena; the quest completes.
+action unoren
+  S ActionFailed
+  S NpcHtmlMessage obj=unoren item=0 page=merchant/30147.htm
+  S ActionFailed
+bypass npc_{unoren}_Quest
+  S SystemMessage id=301 3:1159 6:3
+  S SystemMessage id=301 3:1158 6:10
+  S SystemMessage id=54 3:625
+  S SystemMessage id=52 6:24000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 162:0x00000000
+  S NpcHtmlMessage obj=unoren item=0 page=script/quest/Q162_CurseOfTheUndergroundFortress/30147-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q162_CurseOfTheUndergroundFortress | <state> | COMPLETED
+  Q delete-except-state Q162_CurseOfTheUndergroundFortress
+  items 1158=0 1159=0 625=1 57=24000
+  state Q162_CurseOfTheUndergroundFortress COMPLETED
+  rows Q162_CurseOfTheUndergroundFortress <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q162_CurseOfTheUndergroundFortress COMPLETED
+  rows Q162_CurseOfTheUndergroundFortress <state>=COMPLETED
+  items 625=1 57=24000
+action unoren
+action unoren
+  S ActionFailed
+  S NpcHtmlMessage obj=unoren item=0 page=merchant/30147.htm
+  S ActionFailed
+bypass npc_{unoren}_Quest
+  S NpcHtmlMessage obj=unoren item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

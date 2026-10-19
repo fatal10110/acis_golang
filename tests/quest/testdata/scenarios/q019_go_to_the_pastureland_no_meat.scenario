@@ -1,0 +1,27 @@
+# Go to the Pastureland! (Q019), without the meat: a level 63 character on cond 1 that no longer
+# holds the young wild beast meat asks Tunatun to finish; he refuses and nothing changes.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q019_go_to_the_pastureland_no_meat.golden
+character Herder 63
+quest Q019_GoToThePastureland <cond>=1 <state>=STARTED
+script quest.Q019_GoToThePastureland
+item 7547 57
+page default/31537.htm
+page script/quest/Q019_GoToThePastureland/
+npc tunatun 31537 Folk 20 0 0
+
+action tunatun
+action tunatun
+  S ActionFailed
+  S NpcHtmlMessage obj=tunatun item=0 page=default/31537.htm
+  S ActionFailed
+bypass npc_{tunatun}_Quest
+  S NpcHtmlMessage obj=tunatun item=0 page=script/quest/Q019_GoToThePastureland/31537-00.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q019_GoToThePastureland 019_finish
+  S NpcHtmlMessage obj=tunatun item=0 page=script/quest/Q019_GoToThePastureland/31537-02.htm
+  S ActionFailed
+  state Q019_GoToThePastureland STARTED
+  rows Q019_GoToThePastureland <cond>=1 <state>=STARTED
+  items 7547=0 57=0

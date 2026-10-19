@@ -1,0 +1,22 @@
+# Protect the Water Source (Q159), refused: a human fighter of level 12 is turned away by
+# Asterios, who takes elves only, and the quest is not started. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q159_protect_the_water_source_wrong_race.golden
+character Stranger 12
+script quest.Q159_ProtectTheWaterSource
+item 1035 1071 1072
+page villagemaster/30154.htm
+page script/quest/Q159_ProtectTheWaterSource/
+npc asterios 30154 VillageMasterPriest 10 0 0
+
+action asterios
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+bypass npc_{asterios}_Quest
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q159_ProtectTheWaterSource/30154-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q159_ProtectTheWaterSource CREATED
+  rows Q159_ProtectTheWaterSource -

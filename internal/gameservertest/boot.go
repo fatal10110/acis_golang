@@ -44,6 +44,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/lottery"
 	"github.com/fatal10110/acis_golang/internal/gameserver/merchant"
 	actorcast "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/cast"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/event"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/move"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
@@ -195,6 +196,8 @@ type options struct {
 	serverBypassDelay      time.Duration
 	maxBuffsAmount         int
 	weightLimitMultiplier  float64
+	regenMultipliers       creature.RegenMultipliers
+	partyRange             int
 	inventorySlots         player.InventorySlots
 	storageSlots           player.StorageSlots
 	freight                *network.FreightConfig
@@ -243,6 +246,7 @@ type options struct {
 	manorDelay             time.Duration
 	rollDiceDelay          time.Duration
 	socialDelay            time.Duration
+	configKeys             configKeyOptions
 	keepMaintained         bool
 	augmentations          *augmentation.Table
 	armorSets              *armorset.Table
@@ -1096,6 +1100,9 @@ type Server struct {
 	// groundTaker takes the items fixture NPCs pick up out of the world,
 	// as it does the population's.
 	groundTaker npc.GroundTaker
+	// playerRules is the link's rule book, whose regeneration multipliers
+	// the fixture NPCs read as the spawned ones do.
+	playerRules *player.RuleBook
 	// rewardParties resolves a kill's party for the hostiles the suite spawns.
 	rewardParties gamemanager.RewardParties
 	// raidKills credits the raid boss kills of the hostiles the suite
@@ -2097,7 +2104,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	if err != nil {
 		t.Fatalf("load ground items: %v", err)
 	}
-	if err := groundItems.Load(rows, itemTemplates); err != nil {
+	if err := groundItems.Load(rows, itemTemplates, o.log); err != nil {
 		t.Fatalf("restore ground items: %v", err)
 	}
 	if err := groundStore.Clear(context.Background()); err != nil {
@@ -2187,7 +2194,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		Queues:           queues,
 		ShadowItems:      shadowItems,
 		Autosave:         autosave,
-		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, DeathDrop: o.deathDrop, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, DefaultAccessLevel: o.defaultAccessLevel, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, ManorDelay: o.manorDelay, RollDiceDelay: o.rollDiceDelay, SocialDelay: o.socialDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight},
+		PlayerConfig:     network.PlayerConfig{Enchant: o.enchantConfig, RespawnRestoreHP: 0.7, SkillEnchantSPBookNeeded: true, KarmaPlayerCanTeleport: o.karmaPlayerCanTeleport, KarmaPlayerCanShop: o.karmaServiceGates[0], KarmaPlayerCanUseGK: o.karmaServiceGates[1], KarmaPlayerCanUseWareHouse: o.karmaServiceGates[2], KarmaPlayerCanTrade: o.karmaPlayerCanTrade, AllowWater: !o.disallowWater, EnableFallingDamage: !o.disableFallingDamage, PerfectShieldBlockRate: 5, SpawnProtection: o.spawnProtection, AllowDelevel: o.allowDelevel, RateKarmaExpLost: o.rateKarmaExpLost, DeathDrop: o.deathDrop, CharacterSelectDelay: o.characterSelectDelay, ServerBypassDelay: o.serverBypassDelay, CraftingDisabled: o.craftingDisabled, DiscardItemDisabled: o.discardItemDisabled, GMStartupUnlisted: o.gmStartupUnlisted, DefaultAccessLevel: o.defaultAccessLevel, ManufactureDelay: o.manufactureDelay, MultisellDelay: o.multisellDelay, ManorDelay: o.manorDelay, RollDiceDelay: o.rollDiceDelay, SocialDelay: o.socialDelay, SubclassDelay: o.subclassDelay, SubclassWithoutQuests: o.subclassWithoutQuests, KeepMaintainedIngredients: o.keepMaintained, MaxBuffsAmount: o.maxBuffsAmount, MagicFailures: o.magicFailures, WeightLimitMultiplier: o.weightLimitMultiplier, Regen: o.regenMultipliers, InventorySlots: o.inventorySlots, StorageSlots: o.storageSlots, Freight: o.freight},
 		Restarts:         o.restarts,
 		ClanHallData:     o.clanHallData,
 		CastleData:       o.castleData,
@@ -2237,6 +2244,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 	gclConfig.ClassMaster = o.classMaster
 	gclConfig.PlayerConfig.GMStartupInvulnerable, gclConfig.PlayerConfig.GMStartupInvisible, gclConfig.PlayerConfig.GMStartupBlockAll = o.gmStartupModes[0], o.gmStartupModes[1], o.gmStartupModes[2]
 	gclConfig.PlayerConfig.GMHeroAura = o.gmHeroAura
+	o.configKeys.apply(&gclConfig)
 	gclConfig.Augmentations, gclConfig.AugmentRoll = o.augmentations, o.augmentRoll
 	gclConfig.ArmorSets = o.armorSets
 	gclConfig.Manor = o.manor
@@ -2351,6 +2359,9 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		t.Fatalf("gameservertest: build game client link: %v", err)
 	}
 	effects.SetShadowItemExpiry(gcl.ExpireShadowItem)
+	if worldObjects != nil {
+		worldObjects.SetRegenSettings(gcl.PlayerRules())
+	}
 	// Production hands the link over before the period-change timer is
 	// armed; here the link exists only now, so a change firing earlier
 	// reaches no player, as none is online yet.
@@ -2368,8 +2379,8 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			spawnStore: spawnStore, makerCatalog: o.makerCatalog, night: clock.IsNight, castles: gclConfig.Castles, sieges: gclConfig.Sieges, doors: worldObjects,
 			state: state, templates: o.npcs, geo: bootGeo(o.geo), ids: ids, decay: o.decay, ai: ai, positions: positions,
 			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.AttackStance, log: o.log, makers: o.npcSpawns,
-			dropRates: o.npcDropRates, sevenSigns: sevenSigns, scripts: quests.registry, spawner: quests.env.Spawner, routes: o.walkerRoutes,
-			skills: o.npcSpawnSkills, zones: o.zones, driftRange: o.maxDriftRange,
+			dropRates: o.npcDropRates, partyRange: o.partyRange, sevenSigns: sevenSigns, scripts: quests.registry, spawner: quests.env.Spawner, rand: quests.env.Rand, routes: o.walkerRoutes,
+			skills: o.npcSpawnSkills, zones: o.zones, driftRange: o.maxDriftRange, noSpawns: o.configKeys.noSpawns,
 		})
 		// As the game server does once the spawns are up, every castle's
 		// control towers, then its holy artifacts, are placed, the
@@ -2632,6 +2643,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 		hostileSinks:        gcl.HostileSinks(state, gclConfig.AttackStance),
 		guardedSiege:        gcl.GuardedSiege,
 		groundTaker:         gcl,
+		playerRules:         gcl.PlayerRules(),
 		rewardParties:       o.rewardParties(gcl),
 		raidKills:           gcl,
 		lootChannels:        o.lootChannels(gcl),

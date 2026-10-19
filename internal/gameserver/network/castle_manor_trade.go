@@ -305,7 +305,7 @@ func (l *GameClientLink) sellCrop(live *livePlayer, s cropSale, ownCastleID int)
 	}
 	var fee int32
 	if int(s.row.ManorID) != ownCastleID {
-		fee = commons.JavaInt(float64(price) * otherManorFee)
+		fee = commons.TruncInt32Sat(float64(price) * otherManorFee)
 	}
 	if inv := live.Inventory(); fee != 0 && (inv == nil || inv.Adena() < int(fee)) {
 		live.SendFrame(serverpackets.FrameSystemMessageItemNameItemNumber(serverpackets.SystemMessageFailedInTradingS2OfCropS1, s.row.CropID, s.row.Count))
