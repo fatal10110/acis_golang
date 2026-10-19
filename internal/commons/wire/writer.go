@@ -157,6 +157,14 @@ func (w *Writer) PatchUint16(offset int, v uint16) {
 	binary.LittleEndian.PutUint16(w.buf[offset:offset+2], v)
 }
 
+// PatchInt32 overwrites the little-endian 32-bit integer at offset (an index
+// previously obtained from Len, immediately before the field it now patches
+// was written) with v. Used to backfill a count field written before its
+// element count was known.
+func (w *Writer) PatchInt32(offset int, v int32) {
+	binary.LittleEndian.PutUint32(w.buf[offset:offset+4], uint32(v))
+}
+
 // Bytes returns the assembled payload.
 func (w *Writer) Bytes() []byte {
 	return w.buf[w.payloadOffset:]

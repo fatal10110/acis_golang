@@ -1,8 +1,6 @@
 package serverpackets
 
 import (
-	"fmt"
-
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/manor"
@@ -111,25 +109,26 @@ type ProcureSale struct {
 }
 
 // FrameSellListProcure is the procure window: each held crop a castle
-// still buys, with how many it wants, for a player holding money adena.
-// No window the server opens sends it.
+// still buys, with how many it wants, for a player holding money adena. A
+// crop whose template templates no longer holds (one a reload removed) is
+// left out. No window the server opens sends it.
 func FrameSellListProcure(money int32, rows []ProcureSale, templates *item.Table) (wire.Frame, error) {
 	w := newFrameWriter(OpcodeSellListProcure)
 	w.WriteInt32(money)
 	w.WriteInt32(0)
-	n, err := wire.Uint16Count(len(rows))
+	countOffset, err := reserveUint16Count(w, len(rows))
 	if err != nil {
 		releaseFrameWriter(w)
 		return wire.Frame{}, err
 	}
-	w.WriteUint16(n)
+	var written int
 	for _, r := range rows {
 		st := r.Item.Snapshot()
 		tmpl, ok := templates.Get(st.TemplateID)
 		if !ok {
-			releaseFrameWriter(w)
-			return wire.Frame{}, fmt.Errorf("serverpackets: SellListProcure: no template loaded for item template %d", st.TemplateID)
+			continue
 		}
+		written++
 		category, subCategory := tmpl.Category()
 		w.WriteUint16(uint16(category))
 		w.WriteInt32(st.ObjectID)
@@ -139,5 +138,6 @@ func FrameSellListProcure(money int32, rows []ProcureSale, templates *item.Table
 		w.WriteUint16(0)
 		w.WriteInt32(0)
 	}
+	w.PatchUint16(countOffset, uint16(written))
 	return wire.OwnedFrame(w.Frame(), w, releaseFrameWriter), nil
 }
