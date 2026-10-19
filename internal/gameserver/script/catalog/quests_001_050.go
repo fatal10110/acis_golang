@@ -10,6 +10,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q007"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q008"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q009"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q010"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q011"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q012"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q013"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q014"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q015"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q016"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q017"
 )
 
 // quests001To050 is the catalog of quests 001 to 050 (#178), except the two the engine slices ported.
@@ -23,14 +31,14 @@ func quests001To050() script.Catalog {
 		"quest.Q007_ATripBegins":                      q007.New,
 		"quest.Q008_AnAdventureBegins":                q008.New,
 		"quest.Q009_IntoTheCityOfHumans":              q009.New,
-		"quest.Q010_IntoTheWorld":                     nil,
-		"quest.Q011_SecretMeetingWithKetraOrcs":       nil,
-		"quest.Q012_SecretMeetingWithVarkaSilenos":    nil,
-		"quest.Q013_ParcelDelivery":                   nil,
-		"quest.Q014_WhereaboutsOfTheArchaeologist":    nil,
-		"quest.Q015_SweetWhispers":                    nil,
-		"quest.Q016_TheComingDarkness":                nil,
-		"quest.Q017_LightAndDarkness":                 nil,
+		"quest.Q010_IntoTheWorld":                     q010.New,
+		"quest.Q011_SecretMeetingWithKetraOrcs":       q011.New,
+		"quest.Q012_SecretMeetingWithVarkaSilenos":    q012.New,
+		"quest.Q013_ParcelDelivery":                   q013.New,
+		"quest.Q014_WhereaboutsOfTheArchaeologist":    q014.New,
+		"quest.Q015_SweetWhispers":                    q015.New,
+		"quest.Q016_TheComingDarkness":                q016.New,
+		"quest.Q017_LightAndDarkness":                 q017.New,
 		"quest.Q018_MeetingWithTheGoldenRam":          nil,
 		"quest.Q019_GoToThePastureland":               nil,
 		"quest.Q020_BringUpWithLove":                  nil,

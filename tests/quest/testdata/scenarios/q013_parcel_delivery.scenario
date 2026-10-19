@@ -1,0 +1,81 @@
+# Parcel Delivery (Q013): a level 74 character accepts at Fundin with his package, which Vulcan
+# takes for adena; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q013_parcel_delivery.golden
+character Courier 74
+script quest.Q013_ParcelDelivery
+item 7263
+page merchant/31274.htm
+page default/31539.htm
+page script/quest/Q013_ParcelDelivery/
+npc fundin 31274 Merchant 10 0 0
+npc vulcan 31539 Folk 20 0 0
+
+# Fundin: accept with the package.
+action fundin
+action fundin
+  S ActionFailed
+  S NpcHtmlMessage obj=fundin item=0 page=merchant/31274.htm
+  S ActionFailed
+bypass npc_{fundin}_Quest
+  S NpcHtmlMessage obj=fundin item=0 page=script/quest/Q013_ParcelDelivery/31274-0.htm
+  S ActionFailed
+  S ActionFailed
+  state Q013_ParcelDelivery CREATED
+bypass Quest Q013_ParcelDelivery 31274-2.htm
+  S QuestList 13:0x80000001
+  S ExShowQuestMark quest=13
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7263
+  S NpcHtmlMessage obj=fundin item=0 page=script/quest/Q013_ParcelDelivery/31274-2.htm
+  S ActionFailed
+  Q upsert Q013_ParcelDelivery | <state> | STARTED
+  Q upsert Q013_ParcelDelivery | <cond> | 1
+  state Q013_ParcelDelivery STARTED
+  rows Q013_ParcelDelivery <cond>=1 <state>=STARTED
+  items 7263=1
+action fundin
+  S ActionFailed
+  S NpcHtmlMessage obj=fundin item=0 page=merchant/31274.htm
+  S ActionFailed
+bypass npc_{fundin}_Quest
+  S NpcHtmlMessage obj=fundin item=0 page=script/quest/Q013_ParcelDelivery/31274-2.htm
+  S ActionFailed
+  S ActionFailed
+
+# Vulcan takes the package: adena; the quest completes.
+action vulcan
+action vulcan
+  S ActionFailed
+  S NpcHtmlMessage obj=vulcan item=0 page=default/31539.htm
+  S ActionFailed
+bypass npc_{vulcan}_Quest
+  S NpcHtmlMessage obj=vulcan item=0 page=script/quest/Q013_ParcelDelivery/31539-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q013_ParcelDelivery 31539-1.htm
+  S SystemMessage id=302 3:7263
+  S SystemMessage id=52 6:82656
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 13:0x00000000
+  S NpcHtmlMessage obj=vulcan item=0 page=script/quest/Q013_ParcelDelivery/31539-1.htm
+  S ActionFailed
+  Q upsert Q013_ParcelDelivery | <state> | COMPLETED
+  Q delete-except-state Q013_ParcelDelivery
+  state Q013_ParcelDelivery COMPLETED
+  rows Q013_ParcelDelivery <state>=COMPLETED
+  items 7263=0 57=82656
+
+# Relog: the completed quest loads from its one row, and the adena stays.
+relog
+  state Q013_ParcelDelivery COMPLETED
+  rows Q013_ParcelDelivery <state>=COMPLETED
+  items 57=82656
+action vulcan
+action vulcan
+  S ActionFailed
+  S NpcHtmlMessage obj=vulcan item=0 page=default/31539.htm
+  S ActionFailed
+bypass npc_{vulcan}_Quest
+  S NpcHtmlMessage obj=vulcan item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
