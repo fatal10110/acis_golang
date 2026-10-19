@@ -98,12 +98,26 @@ what the reference does in the scenario's own world:
   them (inventory items, a worn item, the Ketra/Varka standing, the PK count, the Seven Signs
   sign-up, the festival scores, given back after the scenario); a traced scenario with a header
   line the probe does not read fails the run;
-- each scenario's character has an account of its own; its character, item, quest and memo rows
-  are kept from its creation on (the quest lines' rows written as the Go runner writes them), so
+- every scenario's character has the same account (`scenario`) and a clan line's clan the same
+  name (`Scenario`), since nothing of an earlier scenario is kept; its character, item, quest and
+  memo rows are kept from its creation on (the quest lines' rows written as the Go runner writes them), so
   a relog stores the character at its logout and restores it from the rows the run wrote, read
   back by the reference's own restore queries; a statement on a kept table the store cannot run
   fails the run;
-- the game time is noon of the first game day at each scenario's start.
+- the game time is noon of the first game day at each scenario's start;
+- every scenario draws its object ids from the same point: the id factory as the first scenario
+  found it, after the boot, the quest traces and the contract scenes. Once a scenario is over,
+  every world object of an id it drew is removed, wherever it stands, and so are the registry
+  entries keyed by one (the clan table, the Seven Signs sign-ups, the raid points); an object
+  still in the world fails the run. The couples, which the reference loads at boot after the
+  scripts, are loaded before the first scenario, so no scenario's trace holds their query.
+
+A scenario's trace therefore depends on that scenario alone: adding, removing or renaming
+another scenario leaves it byte-identical. A content lane that adds scenarios runs `run.sh` and
+commits the whole result, which is its own new goldens only; a change to any other golden means
+the lane changed what that scenario plays (a script, a data reader, the probe) and is part of
+the review. When a new scenario writes another registry keyed by an object id, the probe clears
+that registry too (`ScenarioTrace.Ids.forget`).
 
 Every step is played, in order, and the trace records them all: action, bypass, link and mark
 (`RequestTutorialQuestionMark`) are fed as client packets, followed by 500 ms; a relog is a
