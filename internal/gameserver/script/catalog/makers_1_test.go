@@ -14,7 +14,10 @@ import (
 
 // TestMakers1Bindings pins the maker each ported batch 1 type binds, by
 // constructor, and how many shipped npcmakers run it: 4 Close_Door_maker,
-// 28 default_use_db_maker, 2 farm_maker and 53 maker_instant_spawn.
+// 28 default_use_db_maker, 2 farm_maker, 53 maker_instant_spawn, 3
+// maker_instant_spawn_serial, 3 maker_instant_spawn_serial_last, 98
+// on_day_night_spawn and the 7 undead_band door makers (1 lance, 4 leader,
+// 2 archer_wazird).
 func TestMakers1Bindings(t *testing.T) {
 	dp := datapack.Require(t)
 	table, err := gamexml.LoadSpawnlist(filepath.Join(dp, "data", "xml", "spawnlist"), zerolog.Nop(), 1)
@@ -41,6 +44,12 @@ func TestMakers1Bindings(t *testing.T) {
 		{"default_use_db_maker", maker.DefaultUseDB, 28},
 		{"farm_maker", maker.Farm, 2},
 		{"maker_instant_spawn", maker.InstantSpawn, 53},
+		{"maker_instant_spawn_serial", maker.InstantSpawnSerial, 3},
+		{"maker_instant_spawn_serial_last", maker.InstantSpawnSerialLast, 3},
+		{"on_day_night_spawn", maker.OnDayNightSpawn, 98},
+		{"undead_band_lance_maker", maker.OpenDoor, 1},
+		{"undead_band_leader_maker", maker.OpenDoor, 4},
+		{"undead_band_archer_wazird_maker", maker.OpenDoor, 2},
 	} {
 		got := makers[tc.typ]
 		if got == nil || reflect.ValueOf(got).Pointer() != reflect.ValueOf(tc.ctor).Pointer() {
@@ -50,7 +59,7 @@ func TestMakers1Bindings(t *testing.T) {
 			t.Errorf("shipped npcmakers of %s = %d, want %d", tc.typ, n, tc.count)
 		}
 	}
-	if ported != 4 {
-		t.Errorf("ported batch 1 types = %d, want 4", ported)
+	if ported != 10 {
+		t.Errorf("ported batch 1 types = %d, want 10", ported)
 	}
 }
