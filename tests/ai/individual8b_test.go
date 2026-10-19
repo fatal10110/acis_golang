@@ -395,11 +395,6 @@ func TestRoyalRushNpcRunsTheSepulcherHour(t *testing.T) {
 	if start2.Sub(start)%time.Second != 0 {
 		t.Fatalf("the managers' timers are out of step: %v, %v", start, start2)
 	}
-	room := w.roomNPC(-3900)
-	if room == 0 {
-		t.Fatal("the first room's npcmaker placed no NPC at boot")
-	}
-
 	w.toTick(t, start, 49, 59)
 	for _, m := range []*npc.Folk{first, second} {
 		script.NPCOf(m).SetInt(npc.IntAVQuest0, 7)
@@ -438,6 +433,12 @@ func TestRoyalRushNpcRunsTheSepulcherHour(t *testing.T) {
 		}
 	}
 
+	// The run may have started late in an hour, so the first room's NPC
+	// is read after the climb to minute 55, past any earlier reset.
+	room := w.roomNPC(-3900)
+	if room == 0 {
+		t.Fatal("the first room's npcmaker holds no NPC")
+	}
 	w.toTick(t, start, 59, 59)
 	if got := w.roomNPC(-3900); got != room {
 		t.Fatalf("first room NPC before the hour = %d, want %d", got, room)
@@ -534,16 +535,21 @@ func ind8QuestStub(name string, id int32) func() script.Script {
 }
 
 // ind8PetSkills are the tamed beasts' five buffs, two debuffs and heal.
+// Each buff and debuff lands an effect of a stack type of its own.
 func ind8PetSkills() []modelskill.Definition {
+	held := func(d modelskill.Definition) modelskill.Definition {
+		d.Effects = []modelskill.EffectTemplate{{Name: "Buff", Time: 60, Icon: true, StackType: fmt.Sprint("ind8_pet_", d.ID), StackOrder: 1}}
+		return d
+	}
 	var out []modelskill.Definition
 	for i := range modelskill.ID(5) {
 		d := ind1Skill(ind8PetBuff1+i, 600, false)
 		d.Offensive, d.Magic, d.SkillType, d.Power = false, false, "BUFF", 0
-		out = append(out, d)
+		out = append(out, held(d))
 	}
 	heal := ind1Skill(ind8PetHeal, 600, false)
 	heal.Offensive, heal.SkillType = false, "HEAL"
-	return append(out, ind1Skill(ind8PetDebuff1, 600, false), ind1Skill(ind8PetDebuff2, 600, false), heal)
+	return append(out, held(ind1Skill(ind8PetDebuff1, 600, false)), held(ind1Skill(ind8PetDebuff2, 600, false)), heal)
 }
 
 // ind8PetTemplate is a fixture tamed beast of id of the beast clan, with
@@ -580,7 +586,8 @@ func bootTamer(t *testing.T, ready func(srv *gameservertest.Server, objID int32)
 	t.Helper()
 	mate := warriorTemplate(ind8HerdMateID, nil)
 	mate.Clans, mate.ClanRange = []string{"beast"}, 500
-	w := bootIndividual8(t, raidBoot{opts: append([]gameservertest.Option{gameservertest.WithItemTemplates(ind8PetItems())}, opts...), ready: ready},
+	base := []gameservertest.Option{gameservertest.WithItemTemplates(ind8PetItems()), gameservertest.WithScriptSkills(ind8PetSkills()...)}
+	w := bootIndividual8(t, raidBoot{opts: append(base, opts...), ready: ready},
 		ind8PetTemplate(ind8BuffaloID, npc.AIParams{"TakeSocial": fmt.Sprint(ind8PetTakeSocial)}), ind8PetTemplate(ind8CougarID, nil),
 		warriorTemplate(ind8TamerID, nil), mate, warriorTemplate(ind8ListenerID, nil))
 	master := w.spawn(t, ind8TamerID, 600, 600)
@@ -705,20 +712,18 @@ func TestWarriorPetForPCClaimsItsOwner(t *testing.T) {
 	if got := ind8Slot(second, script.SlotIntAI3); got != ind8CrystalSpice {
 		t.Fatalf("spice of another beast = %d, want %d", got, ind8CrystalSpice)
 	}
-	if got := ind8Slot(second, script.SlotIntAI1); got < came || first.Decayed() != (got > came) {
+	got := ind8Slot(second, script.SlotIntAI1)
+	if got < came || first.Decayed() != (got > came) {
 		t.Fatalf("a newer beast came at tick %d after %d: older decayed %v; want it gone only for a later tick", got, came, first.Decayed())
 	}
-	if first.Decayed() {
-		return
+	w.send(t, second, 10022, owner+1, got+1)
+	w.send(t, second, 10022, owner, got)
+	if second.Decayed() {
+		t.Fatal("the beast left on a claim of another player, or of its own tick; want it to stay")
 	}
-	w.send(t, first, 10022, owner+1, came+1)
-	w.send(t, first, 10022, owner, came)
-	if first.Decayed() {
-		t.Fatal("the beast left on a claim of another player, or of the same tick; want it to stay")
-	}
-	w.send(t, first, 10022, owner, came+1)
-	if !first.Decayed() || second.Decayed() {
-		t.Fatalf("after a later claim of its owner: older decayed %v, newer decayed %v; want the older gone", first.Decayed(), second.Decayed())
+	w.send(t, second, 10022, owner, got+1)
+	if !second.Decayed() {
+		t.Fatal("the beast stayed on its owner's claim of a later tick; want it gone")
 	}
 }
 
@@ -889,5 +894,135 @@ func TestWarriorPetForPCGuardsItsClan(t *testing.T) {
 	casts = ind8Desires(pet, actorai.IntentionCast)
 	if len(casts) != 2 || casts[1].Skill.ID != ind8PetHeal || casts[1].FinalTarget.ObjectID() != owner {
 		t.Fatalf("cast desires with the owner below half = %+v, want the heal at the owner added", casts)
+	}
+}
+
+// hold lands the effect of the pet skill id on the character, cast by
+// himself, and checks he holds it.
+func (w *ind8World) hold(t *testing.T, id modelskill.ID) {
+	t.Helper()
+	ref := modelskill.Ref{ID: id, Level: 1}
+	var level int32
+	if !w.srv.RunScript(t, w.player.ObjectID(), ind8DirectorName, func(s *script.Script, p *script.Player) {
+		s.ApplyEffects(ref, p, p)
+		level = s.AbnormalLevel(p, ref)
+	}) || level <= 0 {
+		t.Fatalf("the character holds no effect of skill %d (level %d)", id, level)
+	}
+}
+
+// ind8Casts renders h's queued cast desires as "skill>target" pairs.
+func ind8Casts(h *npc.Hostile) []string {
+	var out []string
+	for _, d := range ind8Desires(h, actorai.IntentionCast) {
+		out = append(out, fmt.Sprintf("%d>%d", d.Skill.ID, d.FinalTarget.ObjectID()))
+	}
+	slices.Sort(out)
+	return out
+}
+
+// TestWarriorPetForPCBuffsOnlyALackingOwner runs the buff gates of
+// WarriorPetForPC's 5 s timer. With two of its five buffs on its owner it
+// still lacks three, so every 5 s it draws which buff to give, and gives
+// it only if he lacks that one: the draws of 0 and 20 pick buffs he holds,
+// 40 the third, which it wants to cast. With three on him it draws
+// nothing and gives nothing.
+func TestWarriorPetForPCBuffsOnlyALackingOwner(t *testing.T) {
+	t.Parallel()
+	w, master := bootTamer(t, nil)
+	owner := w.player.ObjectID()
+	w.hold(t, ind8PetBuff1)
+	w.hold(t, ind8PetBuff1+1)
+	w.draws.set(99, 99, 0, 20, 40)
+	pet, _ := w.tame(t, master, ind8BuffaloID, 0, 100)
+
+	for i, want := range [][]string{nil, nil, {fmt.Sprintf("%d>%d", ind8PetBuff1+2, owner)}} {
+		w.srv.Advance(t, 5*time.Second)
+		if got := ind8Casts(pet); !slices.Equal(got, want) {
+			t.Fatalf("cast desires at %d s = %q, want %q", 5*(i+1), got, want)
+		}
+	}
+	w.hold(t, ind8PetBuff1+2)
+	w.draws.set(99, 80)
+	w.srv.Advance(t, 5*time.Second)
+	if got := ind8Casts(pet); !slices.Equal(got, []string{fmt.Sprintf("%d>%d", ind8PetBuff1+2, owner)}) {
+		t.Fatalf("cast desires with three buffs held = %q, want no new one", got)
+	}
+}
+
+// TestWarriorPetForPCGuardsItsClanWithinItsGates runs the gates of
+// WarriorPetForPC's clan-attacked hook. A member hit at 80 % HP or more
+// draws for each debuff; one hit below 80 % (the HP the hit finds) draws
+// for none. An owner below a
+// quarter of his HP is healed on a draw below 40, not on 40.
+func TestWarriorPetForPCGuardsItsClanWithinItsGates(t *testing.T) {
+	t.Parallel()
+	w, master := bootTamer(t, nil)
+	owner := w.player.ObjectID()
+	w.draws.set(99)
+	pet, _ := w.tame(t, master, ind8BuffaloID, 0, 100)
+	mate := w.spawn(t, ind8HerdMateID, 200, 0)
+	debuff2 := fmt.Sprintf("%d>%d", ind8PetDebuff2, mate.ObjectID())
+
+	w.draws.set(99, 99, 0)
+	w.hit(t, mate, 10)
+	if got := ind8Casts(pet); !slices.Equal(got, []string{debuff2}) {
+		t.Fatalf("cast desires after a hit at full HP = %q, want the second debuff at the mate", got)
+	}
+	// The hook reads the HP the hit finds, so the 250 lands first.
+	w.draws.set(99)
+	w.hit(t, mate, 250)
+	w.draws.set(99, 0, 0)
+	w.hit(t, mate, 10)
+	if got := ind8Casts(pet); !slices.Equal(got, []string{debuff2}) {
+		t.Fatalf("cast desires after a hit below 80 %% = %q, want no new one", got)
+	}
+
+	hp := w.srv.PlayerMaxHP(t, owner)
+	w.srv.DamagePlayerHP(t, owner, hp*3/4+1)
+	w.draws.set(99, 40)
+	w.hit(t, mate, 10)
+	if got := ind8Casts(pet); !slices.Equal(got, []string{debuff2}) {
+		t.Fatalf("cast desires on a heal draw of 40 = %q, want no new one", got)
+	}
+	w.draws.set(99, 39)
+	w.hit(t, mate, 10)
+	if got, want := ind8Casts(pet), []string{debuff2, fmt.Sprintf("%d>%d", ind8PetHeal, owner)}; !slices.Equal(got, want) {
+		t.Fatalf("cast desires on a heal draw of 39 = %q, want %q", got, want)
+	}
+}
+
+// TestWarriorPetForPCSparesTheClanWhileItsOwnerHoldsADebuff runs the owner
+// gate of WarriorPetForPC's clan-attacked hook: while its owner holds one
+// of its debuffs, a member hit at full HP gets neither debuff.
+func TestWarriorPetForPCSparesTheClanWhileItsOwnerHoldsADebuff(t *testing.T) {
+	t.Parallel()
+	w, master := bootTamer(t, nil)
+	w.hold(t, ind8PetDebuff1)
+	w.draws.set(99)
+	pet, _ := w.tame(t, master, ind8BuffaloID, 0, 100)
+	mate := w.spawn(t, ind8HerdMateID, 200, 0)
+	w.draws.set(99, 0, 0)
+	w.hit(t, mate, 10)
+	if got := ind8Casts(pet); len(got) != 0 {
+		t.Fatalf("cast desires while the owner holds a debuff = %q, want none", got)
+	}
+}
+
+// TestWarriorPetForPCLeavesADeadOwner runs the owner gate of
+// WarriorPetForPC's minute timer: a beast whose owner is dead leaves,
+// however much spice he holds, and eats none of it.
+func TestWarriorPetForPCLeavesADeadOwner(t *testing.T) {
+	t.Parallel()
+	w, master := bootTamer(t, func(srv *gameservertest.Server, objID int32) {
+		srv.GiveItem(t, objID, ind8GoldenSpice, 5)
+	})
+	owner := w.player.ObjectID()
+	w.draws.set(99)
+	pet, _ := w.tame(t, master, ind8BuffaloID, 2188, 100)
+	w.srv.MarkPlayerDead(t, owner)
+	w.srv.Advance(t, time.Minute)
+	if !pet.Decayed() || w.srv.PlayerItemCount(t, owner, ind8GoldenSpice) != 5 {
+		t.Fatalf("a minute after its owner died: beast gone %v, spice %d; want gone, 5 left", pet.Decayed(), w.srv.PlayerItemCount(t, owner, ind8GoldenSpice))
 	}
 }
