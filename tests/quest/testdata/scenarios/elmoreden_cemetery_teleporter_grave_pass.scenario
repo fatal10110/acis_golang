@@ -1,6 +1,6 @@
 # The Elmoreden cemetery teleporters (ElmoredenCemeteryTeleporter): with no antique brooch, the
 # Imperial Tomb link takes one of the character's two used grave passes and sends it there,
-# answering no page (onAdvEvent). The landing is in tests/npcs/teleporters_210_test.go (#3946).
+# answering no page (onAdvEvent).
 trace internal/gameserver/script/testdata/oracle/scenarios/elmoreden_cemetery_teleporter_grave_pass.golden
 character Mourner 20
 hold 7261 2
@@ -22,4 +22,5 @@ bypass Quest ElmoredenCemeteryTeleporter IT
   S ActionFailed
   S ActionFailed
   S ActionFailed
+  S TeleportToLocation obj=player loc=186699,-75915,-2826 fast=0
   items 7261=1

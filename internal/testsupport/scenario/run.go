@@ -270,7 +270,15 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		opts = append(opts, gameservertest.WithCharacter(r.sc.Character, r.sc.Level, 0))
 	}
 	if r.sc.Clan >= 0 {
-		opts = append(opts, gameservertest.WithClanSeed(func(db *sql.DB) { seedClan(t, db, r.sc.Character, r.sc.Clan) }))
+		opts = append(opts, gameservertest.WithClanSeed(func(db *sql.DB) {
+			seedClan(t, db, r.sc.Character, r.sc.Clan)
+			if r.sc.Siege != nil {
+				seedSiege(t, db, r.sc.Siege)
+			}
+		}))
+	}
+	if r.sc.Siege != nil {
+		opts = append(opts, siegeOptions(t)...)
 	}
 	if r.sc.Random != nil {
 		opts = append(opts, gameservertest.WithScriptRand(r.draws.draw))
@@ -292,6 +300,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 			t.Fatalf("%s: the clan line's clan is not restored at level %d", r.sc.Name, r.sc.Clan)
 		}
 	}
+	r.checkSiege(t)
 	// The journal and the experience are read when the character is
 	// selected.
 	seedQuests(t, r.srv.DB, r.player, r.sc.Quests)
