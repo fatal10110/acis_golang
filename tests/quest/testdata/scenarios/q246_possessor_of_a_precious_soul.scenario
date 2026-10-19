@@ -1,0 +1,213 @@
+# Possessor of a Precious Soul - 3 (Q246), played by a level 76 human Gladiator on its level 65
+# Sorcerer subclass holding Caradine's first letter, every script roll pinned to 0: Caradine
+# starts it and takes the letter; Ossian asks for the Waterbinder and the Evergreen, which a
+# Pilgrim and a Judge of Splendor leave (a hand-in bypass before that is refused); Barakiel's
+# death gives the Rain Song (a hand-in bypass before that is refused too), which Ossian
+# trades for the relic box; after a relog the subclass is still played; Ladd takes the box and
+# closes the quest with Caradine's second letter; then relog. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q246_possessor_of_a_precious_soul.golden
+character Fighter 76
+class 2
+subclass 12 65
+hold 7678 1
+random always 0
+script quest.Q246_PossessorOfAPreciousSoul
+item 7591 7592 7593 7594 7678 7679
+page default/31740.htm
+page default/31741.htm
+page trainer/30721.htm
+page script/quest/Q246_PossessorOfAPreciousSoul/
+npc caradine 31740 Folk 10 0 0
+npc ossian 31741 Folk -10 0 0
+npc ladd 30721 Trainer 0 10 0
+npc pilgrim 21541 Monster 40 0 0
+npc judge 21544 Monster -40 0 0
+npc barakiel 25325 RaidBoss 0 40 0
+
+# Caradine: a level 65 subclass holding her first letter may start; she takes the letter.
+action caradine
+action caradine
+  S ActionFailed
+  S NpcHtmlMessage obj=caradine item=0 page=default/31740.htm
+  S ActionFailed
+bypass npc_{caradine}_Quest
+  S NpcHtmlMessage obj=caradine item=0 page=script/quest/Q246_PossessorOfAPreciousSoul/31740-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q246_PossessorOfAPreciousSoul CREATED
+bypass Quest Q246_PossessorOfAPreciousSoul 31740-04.htm
+  S QuestList 246:0x80000001
+  S ExShowQuestMark quest=246
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7678
+  S NpcHtmlMessage obj=caradine item=0 page=script/quest/Q246_PossessorOfAPreciousSoul/31740-04.htm
+  S ActionFailed
+  Q upsert Q246_PossessorOfAPreciousSoul | <state> | STARTED
+  Q upsert Q246_PossessorOfAPreciousSoul | <cond> | 1
+  items 7678=0
+  rows Q246_PossessorOfAPreciousSoul <state>=STARTED <cond>=1
+action caradine
+  S ActionFailed
+  S NpcHtmlMessage obj=caradine item=0 page=default/31740.htm
+  S ActionFailed
+bypass npc_{caradine}_Quest
+  S NpcHtmlMessage obj=caradine item=0 page=script/quest/Q246_PossessorOfAPreciousSoul/31740-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ossian asks for the Waterbinder and the Evergreen.
+action ossian
+action ossian
+  S ActionFailed
+  S NpcHtmlMessage obj=ossian item=0 page=default/31741.htm
+  S ActionFailed
+bypass npc_{ossian}_Quest
+  S NpcHtmlMessage obj=ossian item=0 page=script/quest/Q246_PossessorOfAPreciousSoul/31741-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q246_PossessorOfAPreciousSoul 31741-02.htm
+  S QuestList 246:0x80000003
+  S ExShowQuestMark quest=246
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=ossian item=0 page=script/quest/Q246_PossessorOfAPreciousSoul/31741-02.htm
+  S ActionFailed
+  Q upsert Q246_PossessorOfAPreciousSoul | <cond> | 2
+action ossian
+  S ActionFailed
+  S NpcHtmlMessage obj=ossian item=0 page=default/31741.htm
+  S ActionFailed
+bypass npc_{ossian}_Quest
+  S NpcHtmlMessage obj=ossian item=0 page=script/quest/Q246_PossessorOfAPreciousSoul/31741-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# A hand-in bypass the last page does not offer is refused, and the quest stays where it is.
+bypass Quest Q246_PossessorOfAPreciousSoul 31741-05.htm
+  rows Q246_PossessorOfAPreciousSoul <state>=STARTED <cond>=2
+
+# A Pilgrim of Splendor leaves the Waterbinder (draw 0, under 2 of 10); a second one, nothing more;
+
+# a Judge of Splendor leaves the Evergreen, which completes the pair.
+kill pilgrim
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7591
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  # draw 10:0
+  items 7591=1
+kill pilgrim
+  S SystemMessage id=95 1:0 1:0
+  # draw 10:0
+  items 7591=1
+kill judge
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7592
+  S QuestList 246:0x80000007
+  S ExShowQuestMark quest=246
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q246_PossessorOfAPreciousSoul | <cond> | 3
+  # draw 10:0
+  items 7591=1 7592=1
+  rows Q246_PossessorOfAPreciousSoul <state>=STARTED <cond>=3
+action ossian
+  S ActionFailed
+  S NpcHtmlMessage obj=ossian item=0 page=default/31741.htm
+  S ActionFailed
+bypass npc_{ossian}_Quest
+  S NpcHtmlMessage obj=ossian item=0 page=script/quest/Q246_PossessorOfAPreciousSoul/31741-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q246_PossessorOfAPreciousSoul 31741-05.htm
+  S QuestList 246:0x8000000f
+  S ExShowQuestMark quest=246
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7591
+  S SystemMessage id=302 3:7592
+  S NpcHtmlMessage obj=ossian item=0 page=script/quest/Q246_PossessorOfAPreciousSoul/31741-05.htm
+  S ActionFailed
+  Q upsert Q246_PossessorOfAPreciousSoul | <cond> | 4
+  items 7591=0 7592=0
+
+# A Rain Song hand-in bypass before Barakiel is refused too.
+bypass Quest Q246_PossessorOfAPreciousSoul 31741-08.htm
+  rows Q246_PossessorOfAPreciousSoul <state>=STARTED <cond>=4
+
+# Barakiel's death gives the Rain Song to the killer, alone and on cond 4.
+kill barakiel
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=1209
+  S PlaySound type=0 file=systemmsg_e.1209 bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 246:0x8000001f
+  S ExShowQuestMark quest=246
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7593
+  Q upsert Q246_PossessorOfAPreciousSoul | <cond> | 5
+  items 7593=1
+action ossian
+  S ActionFailed
+  S NpcHtmlMessage obj=ossian item=0 page=default/31741.htm
+  S ActionFailed
+bypass npc_{ossian}_Quest
+  S NpcHtmlMessage obj=ossian item=0 page=script/quest/Q246_PossessorOfAPreciousSoul/31741-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q246_PossessorOfAPreciousSoul 31741-08.htm
+  S QuestList 246:0x8000003f
+  S ExShowQuestMark quest=246
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7593
+  S SystemMessage id=54 3:7594
+  S NpcHtmlMessage obj=ossian item=0 page=script/quest/Q246_PossessorOfAPreciousSoul/31741-08.htm
+  S ActionFailed
+  Q upsert Q246_PossessorOfAPreciousSoul | <cond> | 6
+  items 7593=0 7594=1
+
+# A relog keeps the subclass played.
+relog
+  state Q246_PossessorOfAPreciousSoul STARTED
+  rows Q246_PossessorOfAPreciousSoul <state>=STARTED <cond>=6
+action ossian
+action ossian
+  S ActionFailed
+  S NpcHtmlMessage obj=ossian item=0 page=default/31741.htm
+  S ActionFailed
+bypass npc_{ossian}_Quest
+  S NpcHtmlMessage obj=ossian item=0 page=script/quest/Q246_PossessorOfAPreciousSoul/31741-09.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ladd takes the relic box and closes the quest with Caradine's second letter.
+action ladd
+action ladd
+  S ActionFailed
+  S NpcHtmlMessage obj=ladd item=0 page=trainer/30721.htm
+  S ActionFailed
+bypass npc_{ladd}_Quest
+  S NpcHtmlMessage obj=ladd item=0 page=script/quest/Q246_PossessorOfAPreciousSoul/30721-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q246_PossessorOfAPreciousSoul 30721-02.htm
+  S SystemMessage id=302 3:7594
+  S SystemMessage id=54 3:7679
+  S SystemMessage id=45 1:719843
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 246:0x00000000
+  S NpcHtmlMessage obj=ladd item=0 page=script/quest/Q246_PossessorOfAPreciousSoul/30721-02.htm
+  S ActionFailed
+  Q upsert Q246_PossessorOfAPreciousSoul | <state> | COMPLETED
+  Q delete-except-state Q246_PossessorOfAPreciousSoul
+  items 7594=0 7679=1
+  state Q246_PossessorOfAPreciousSoul COMPLETED
+relog
+  state Q246_PossessorOfAPreciousSoul COMPLETED
+  rows Q246_PossessorOfAPreciousSoul <state>=COMPLETED
+  items 7679=1
+action caradine
+action caradine
+  S ActionFailed
+  S NpcHtmlMessage obj=caradine item=0 page=default/31740.htm
+  S ActionFailed
+bypass npc_{caradine}_Quest
+  S NpcHtmlMessage obj=caradine item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

@@ -5,6 +5,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q212"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q213"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q241"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q242"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q246"
 )
 
@@ -33,7 +34,7 @@ func quests201To250() script.Catalog {
 		"quest.Q232_TestOfTheLord":            nil,
 		"quest.Q233_TestOfTheWarSpirit":       nil,
 		"quest.Q241_PossessorOfAPreciousSoul": q241.New,
-		"quest.Q242_PossessorOfAPreciousSoul": nil,
+		"quest.Q242_PossessorOfAPreciousSoul": q242.New,
 		"quest.Q246_PossessorOfAPreciousSoul": q246.New,
 		"quest.Q247_PossessorOfAPreciousSoul": nil,
 	}

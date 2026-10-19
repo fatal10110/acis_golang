@@ -1,0 +1,25 @@
+# Possessor of a Precious Soul - 3 (Q246), refused: a level 76 human Gladiator playing its base
+# class, holding Caradine's first letter, is turned away by Caradine, who takes subclasses only,
+# and the quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q246_possessor_of_a_precious_soul_base_class.golden
+character Fighter 76
+class 2
+hold 7678 1
+script quest.Q246_PossessorOfAPreciousSoul
+item 7678
+page default/31740.htm
+page script/quest/Q246_PossessorOfAPreciousSoul/
+npc caradine 31740 Folk 10 0 0
+
+# Caradine turns away a character playing its base class, letter in hand.
+action caradine
+action caradine
+  S ActionFailed
+  S NpcHtmlMessage obj=caradine item=0 page=default/31740.htm
+  S ActionFailed
+bypass npc_{caradine}_Quest
+  S NpcHtmlMessage obj=caradine item=0 page=script/quest/Q246_PossessorOfAPreciousSoul/31740-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q246_PossessorOfAPreciousSoul CREATED
+  rows Q246_PossessorOfAPreciousSoul -

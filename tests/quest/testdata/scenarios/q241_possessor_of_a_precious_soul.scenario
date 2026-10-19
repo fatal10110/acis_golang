@@ -1,0 +1,570 @@
+# Possessor of a Precious Soul - 1 (Q241), played by a level 76 human Gladiator on its level 50
+# Sorcerer subclass, every script roll pinned to 0: Talien starts it; Gabrielle and Gilmore send
+# the player after Baraham, whose death leaves the Legend of the Seventeen; Kantabilon trades ten
+# Malruk Succubus claws for the Echo Crystal; Stedmiel gives the Poetry Book; after a relog the
+# subclass is still played; Virgil, Ogmar and Rahorakti send the player after the Splinter
+# Stakato's Crimson Moss, which Rahorakti makes into a medicine for Kassandra; Caradine sends the
+# player to Noel, who takes the lunargent and hellfire oil, and Caradine closes the quest with
+# Virgil's letter; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q241_possessor_of_a_precious_soul.golden
+character Fighter 76
+class 2
+subclass 12 50
+hold 6029 5
+hold 6033 1
+random always 0
+script quest.Q241_PossessorOfAPreciousSoul
+item 6029 6033 7587 7588 7589 7597 7598 7599 7677
+page default/31739.htm
+page default/30753.htm
+page default/30754.htm
+page default/31042.htm
+page trainer/30692.htm
+page default/31742.htm
+page default/31744.htm
+page villagemaster/31336.htm
+page default/31743.htm
+page default/31740.htm
+page villagemaster/31272.htm
+page script/quest/Q241_PossessorOfAPreciousSoul/
+npc talien 31739 Folk 10 0 0
+npc gabrielle 30753 Folk -10 0 0
+npc gilmore 30754 Folk 0 10 0
+npc kantabilon 31042 Folk 0 -10 0
+npc stedmiel 30692 Trainer 20 20 0
+npc virgil 31742 Folk -20 20 0
+npc ogmar 31744 Folk 20 -20 0
+npc rahorakti 31336 VillageMasterOrc -20 -20 0
+npc kassandra 31743 Folk 30 0 0
+npc caradine 31740 Folk -30 0 0
+npc noel 31272 VillageMasterDwarf 0 30 0
+npc baraham 27113 Monster 40 0 0
+npc succubus 20244 Monster -40 0 0
+npc turen 20245 Monster 0 40 0
+npc stakato 21508 Monster 0 -40 0
+
+# Talien: a level 50 subclass may start.
+action talien
+action talien
+  S ActionFailed
+  S NpcHtmlMessage obj=talien item=0 page=default/31739.htm
+  S ActionFailed
+bypass npc_{talien}_Quest
+  S NpcHtmlMessage obj=talien item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31739-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q241_PossessorOfAPreciousSoul CREATED
+bypass Quest Q241_PossessorOfAPreciousSoul 31739-03.htm
+  S QuestList 241:0x80000001
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=talien item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31739-03.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <state> | STARTED
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 1
+  rows Q241_PossessorOfAPreciousSoul <state>=STARTED <cond>=1
+action talien
+  S ActionFailed
+  S NpcHtmlMessage obj=talien item=0 page=default/31739.htm
+  S ActionFailed
+bypass npc_{talien}_Quest
+  S NpcHtmlMessage obj=talien item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31739-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Gabrielle, then Gilmore, send the player after Baraham.
+action gabrielle
+action gabrielle
+  S ActionFailed
+  S NpcHtmlMessage obj=gabrielle item=0 page=default/30753.htm
+  S ActionFailed
+bypass npc_{gabrielle}_Quest
+  S NpcHtmlMessage obj=gabrielle item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/30753-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 30753-02.htm
+  S QuestList 241:0x80000003
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gabrielle item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/30753-02.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 2
+action gilmore
+action gilmore
+  S ActionFailed
+  S NpcHtmlMessage obj=gilmore item=0 page=default/30754.htm
+  S ActionFailed
+bypass npc_{gilmore}_Quest
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/30754-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 30754-02.htm
+  S QuestList 241:0x80000007
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=gilmore item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/30754-02.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 3
+
+# Baraham's death leaves the Legend of the Seventeen.
+kill baraham
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 241:0x8000000f
+  S ExShowQuestMark quest=241
+  S SystemMessage id=54 3:7587
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 4
+  items 7587=1
+action talien
+action talien
+  S ActionFailed
+  S NpcHtmlMessage obj=talien item=0 page=default/31739.htm
+  S ActionFailed
+bypass npc_{talien}_Quest
+  S NpcHtmlMessage obj=talien item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31739-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 31739-07.htm
+  S QuestList 241:0x8000001f
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7587
+  S NpcHtmlMessage obj=talien item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31739-07.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 5
+  items 7587=0
+
+# Kantabilon wants ten Malruk Succubus claws: five of each kind, every drop roll 0.
+action kantabilon
+action kantabilon
+  S ActionFailed
+  S NpcHtmlMessage obj=kantabilon item=0 page=default/31042.htm
+  S ActionFailed
+bypass npc_{kantabilon}_Quest
+  S NpcHtmlMessage obj=kantabilon item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31042-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 31042-02.htm
+  S QuestList 241:0x8000003f
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kantabilon item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31042-02.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 6
+action kantabilon
+  S ActionFailed
+  S NpcHtmlMessage obj=kantabilon item=0 page=default/31042.htm
+  S ActionFailed
+bypass npc_{kantabilon}_Quest
+  S NpcHtmlMessage obj=kantabilon item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31042-03.htm
+  S ActionFailed
+  S ActionFailed
+kill succubus x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7597
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  # draw 1000000:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7597
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  # draw 1000000:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7597
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  # draw 1000000:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7597
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  # draw 1000000:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7597
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  # draw 1000000:0
+  items 7597=5
+kill turen x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7597
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  # draw 1000000:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7597
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  # draw 1000000:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7597
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  # draw 1000000:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7597
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  # draw 1000000:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7597
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 241:0x8000007f
+  S ExShowQuestMark quest=241
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 7
+  # draw 1000000:0
+  items 7597=10
+  rows Q241_PossessorOfAPreciousSoul <state>=STARTED <cond>=7
+action kantabilon
+  S ActionFailed
+  S NpcHtmlMessage obj=kantabilon item=0 page=default/31042.htm
+  S ActionFailed
+bypass npc_{kantabilon}_Quest
+  S NpcHtmlMessage obj=kantabilon item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31042-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 31042-05.htm
+  S QuestList 241:0x800000ff
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7597 6:10
+  S SystemMessage id=54 3:7589
+  S NpcHtmlMessage obj=kantabilon item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31042-05.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 8
+  items 7597=0 7589=1
+action talien
+action talien
+  S ActionFailed
+  S NpcHtmlMessage obj=talien item=0 page=default/31739.htm
+  S ActionFailed
+bypass npc_{talien}_Quest
+  S NpcHtmlMessage obj=talien item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31739-09.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 31739-10.htm
+  S QuestList 241:0x800001ff
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7589
+  S NpcHtmlMessage obj=talien item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31739-10.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 9
+  items 7589=0
+action talien
+  S ActionFailed
+  S NpcHtmlMessage obj=talien item=0 page=default/31739.htm
+  S ActionFailed
+bypass npc_{talien}_Quest
+  S NpcHtmlMessage obj=talien item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31739-11.htm
+  S ActionFailed
+  S ActionFailed
+
+# Stedmiel gives the Poetry Book, which Talien takes.
+action stedmiel
+action stedmiel
+  S ActionFailed
+  S NpcHtmlMessage obj=stedmiel item=0 page=trainer/30692.htm
+  S ActionFailed
+bypass npc_{stedmiel}_Quest
+  S NpcHtmlMessage obj=stedmiel item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/30692-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 30692-02.htm
+  S QuestList 241:0x800003ff
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7588
+  S NpcHtmlMessage obj=stedmiel item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/30692-02.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 10
+  items 7588=1
+action stedmiel
+  S ActionFailed
+  S NpcHtmlMessage obj=stedmiel item=0 page=trainer/30692.htm
+  S ActionFailed
+bypass npc_{stedmiel}_Quest
+  S NpcHtmlMessage obj=stedmiel item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/30692-03.htm
+  S ActionFailed
+  S ActionFailed
+action talien
+action talien
+  S ActionFailed
+  S NpcHtmlMessage obj=talien item=0 page=default/31739.htm
+  S ActionFailed
+bypass npc_{talien}_Quest
+  S NpcHtmlMessage obj=talien item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31739-12.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 31739-13.htm
+  S QuestList 241:0x800007ff
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7588
+  S NpcHtmlMessage obj=talien item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31739-13.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 11
+  items 7588=0
+action talien
+  S ActionFailed
+  S NpcHtmlMessage obj=talien item=0 page=default/31739.htm
+  S ActionFailed
+bypass npc_{talien}_Quest
+  S NpcHtmlMessage obj=talien item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31739-14.htm
+  S ActionFailed
+  S ActionFailed
+
+# A relog keeps the subclass played, so Talien still answers the quest.
+relog
+  state Q241_PossessorOfAPreciousSoul STARTED
+  rows Q241_PossessorOfAPreciousSoul <state>=STARTED <cond>=11
+action talien
+action talien
+  S ActionFailed
+  S NpcHtmlMessage obj=talien item=0 page=default/31739.htm
+  S ActionFailed
+bypass npc_{talien}_Quest
+  S NpcHtmlMessage obj=talien item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31739-14.htm
+  S ActionFailed
+  S ActionFailed
+
+# Virgil, Ogmar and Rahorakti; five Splinter Stakato leave the Crimson Moss.
+action virgil
+action virgil
+  S ActionFailed
+  S NpcHtmlMessage obj=virgil item=0 page=default/31742.htm
+  S ActionFailed
+bypass npc_{virgil}_Quest
+  S NpcHtmlMessage obj=virgil item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31742-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 31742-02.htm
+  S QuestList 241:0x80000fff
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=virgil item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31742-02.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 12
+action virgil
+  S ActionFailed
+  S NpcHtmlMessage obj=virgil item=0 page=default/31742.htm
+  S ActionFailed
+bypass npc_{virgil}_Quest
+  S NpcHtmlMessage obj=virgil item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31742-03.htm
+  S ActionFailed
+  S ActionFailed
+action ogmar
+action ogmar
+  S ActionFailed
+  S NpcHtmlMessage obj=ogmar item=0 page=default/31744.htm
+  S ActionFailed
+bypass npc_{ogmar}_Quest
+  S NpcHtmlMessage obj=ogmar item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31744-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 31744-02.htm
+  S QuestList 241:0x80001fff
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=ogmar item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31744-02.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 13
+action rahorakti
+action rahorakti
+  S ActionFailed
+  S NpcHtmlMessage obj=rahorakti item=0 page=villagemaster/31336.htm
+  S ActionFailed
+bypass npc_{rahorakti}_Quest
+  S NpcHtmlMessage obj=rahorakti item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31336-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 31336-02.htm
+  S QuestList 241:0x80003fff
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rahorakti item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31336-02.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 14
+action rahorakti
+  S ActionFailed
+  S NpcHtmlMessage obj=rahorakti item=0 page=villagemaster/31336.htm
+  S ActionFailed
+bypass npc_{rahorakti}_Quest
+  S NpcHtmlMessage obj=rahorakti item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31336-03.htm
+  S ActionFailed
+  S ActionFailed
+kill stakato x5
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7598
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  # draw 1000000:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7598
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  # draw 1000000:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7598
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  # draw 1000000:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7598
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  # draw 1000000:0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7598
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 241:0x80007fff
+  S ExShowQuestMark quest=241
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 15
+  # draw 1000000:0
+  items 7598=5
+action rahorakti
+  S ActionFailed
+  S NpcHtmlMessage obj=rahorakti item=0 page=villagemaster/31336.htm
+  S ActionFailed
+bypass npc_{rahorakti}_Quest
+  S NpcHtmlMessage obj=rahorakti item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31336-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 31336-05.htm
+  S QuestList 241:0x8000ffff
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7598 6:5
+  S SystemMessage id=54 3:7599
+  S NpcHtmlMessage obj=rahorakti item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31336-05.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 16
+  items 7598=0 7599=1
+
+# Kassandra takes Rahorakti's medicine; Virgil sends the player to Caradine.
+action kassandra
+action kassandra
+  S ActionFailed
+  S NpcHtmlMessage obj=kassandra item=0 page=default/31743.htm
+  S ActionFailed
+bypass npc_{kassandra}_Quest
+  S NpcHtmlMessage obj=kassandra item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31743-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 31743-02.htm
+  S QuestList 241:0x8001ffff
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7599
+  S NpcHtmlMessage obj=kassandra item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31743-02.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 17
+  items 7599=0
+action virgil
+action virgil
+  S ActionFailed
+  S NpcHtmlMessage obj=virgil item=0 page=default/31742.htm
+  S ActionFailed
+bypass npc_{virgil}_Quest
+  S NpcHtmlMessage obj=virgil item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31742-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 31742-05.htm
+  S QuestList 241:0x8003ffff
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=virgil item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31742-05.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 18
+action caradine
+action caradine
+  S ActionFailed
+  S NpcHtmlMessage obj=caradine item=0 page=default/31740.htm
+  S ActionFailed
+bypass npc_{caradine}_Quest
+  S NpcHtmlMessage obj=caradine item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31740-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 31740-02.htm
+  S QuestList 241:0x8007ffff
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=caradine item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31740-02.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 19
+action caradine
+  S ActionFailed
+  S NpcHtmlMessage obj=caradine item=0 page=default/31740.htm
+  S ActionFailed
+bypass npc_{caradine}_Quest
+  S NpcHtmlMessage obj=caradine item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31740-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Noel: the player holds the hellfire oil and five lunargent.
+action noel
+action noel
+  S ActionFailed
+  S NpcHtmlMessage obj=noel item=0 page=villagemaster/31272.htm
+  S ActionFailed
+bypass npc_{noel}_Quest
+  S NpcHtmlMessage obj=noel item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31272-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 31272-02.htm
+  S QuestList 241:0x800fffff
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=noel item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31272-02.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 20
+action noel
+  S ActionFailed
+  S NpcHtmlMessage obj=noel item=0 page=villagemaster/31272.htm
+  S ActionFailed
+bypass npc_{noel}_Quest
+  S NpcHtmlMessage obj=noel item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31272-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 31272-05.htm
+  S QuestList 241:0x801fffff
+  S ExShowQuestMark quest=241
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:6029 6:5
+  S SystemMessage id=302 3:6033
+  S NpcHtmlMessage obj=noel item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31272-05.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <cond> | 21
+  items 6029=0 6033=0
+action noel
+  S ActionFailed
+  S NpcHtmlMessage obj=noel item=0 page=villagemaster/31272.htm
+  S ActionFailed
+bypass npc_{noel}_Quest
+  S NpcHtmlMessage obj=noel item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31272-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Caradine closes the quest with Virgil's letter.
+action caradine
+action caradine
+  S ActionFailed
+  S NpcHtmlMessage obj=caradine item=0 page=default/31740.htm
+  S ActionFailed
+bypass npc_{caradine}_Quest
+  S NpcHtmlMessage obj=caradine item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31740-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 31740-05.htm
+  S SystemMessage id=54 3:7677
+  S SystemMessage id=45 1:263043
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 241:0x00000000
+  S NpcHtmlMessage obj=caradine item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31740-05.htm
+  S ActionFailed
+  Q upsert Q241_PossessorOfAPreciousSoul | <state> | COMPLETED
+  Q delete-except-state Q241_PossessorOfAPreciousSoul
+  items 7677=1
+  state Q241_PossessorOfAPreciousSoul COMPLETED
+  rows Q241_PossessorOfAPreciousSoul <state>=COMPLETED
+relog
+  state Q241_PossessorOfAPreciousSoul COMPLETED
+  rows Q241_PossessorOfAPreciousSoul <state>=COMPLETED
+  items 7677=1
+action talien
+action talien
+  S ActionFailed
+  S NpcHtmlMessage obj=talien item=0 page=default/31739.htm
+  S ActionFailed
+bypass npc_{talien}_Quest
+  S NpcHtmlMessage obj=talien item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
