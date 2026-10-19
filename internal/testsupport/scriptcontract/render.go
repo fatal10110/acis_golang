@@ -231,7 +231,8 @@ func role(id int32, roles map[int32]string) string {
 
 // roleIDs replaces, in text, every run of digits that is a role's object id
 // with the role name in braces. A longer number holding an id's digits, such
-// as a system message id in a link, is left whole.
+// as a system message id in a link, is left whole, and so is a number that
+// ends a word, such as the quest id in a quest name (Q101_...).
 func roleIDs(text string, roles map[int32]string) string {
 	var b strings.Builder
 	for i := 0; i < len(text); {
@@ -245,8 +246,9 @@ func roleIDs(text string, roles map[int32]string) string {
 			j++
 		}
 		run := text[i:j]
+		inWord := i > 0 && isLetter(text[i-1])
 		if id, err := strconv.ParseInt(run, 10, 32); err == nil && strconv.FormatInt(id, 10) == run {
-			if name, ok := roles[int32(id)]; ok {
+			if name, ok := roles[int32(id)]; ok && !inWord {
 				run = "{" + name + "}"
 			}
 		}
@@ -255,6 +257,8 @@ func roleIDs(text string, roles map[int32]string) string {
 	}
 	return b.String()
 }
+
+func isLetter(c byte) bool { return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' }
 
 type decoder struct {
 	b   []byte

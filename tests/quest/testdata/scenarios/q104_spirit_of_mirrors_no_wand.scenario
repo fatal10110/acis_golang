@@ -1,0 +1,17 @@
+# Spirit of Mirrors (Q104), no wand in hand: a human mystic of level 10 on the quest's second
+# step holds an oak wand without wearing it. A spirit of mirrors slain empty-handed binds no
+# spirit, and the quest stays where it was. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q104_spirit_of_mirrors_no_wand.golden
+character Seeker 10
+class 10
+quest Q104_SpiritOfMirrors <cond>=2 <state>=STARTED
+hold 748 1
+script quest.Q104_SpiritOfMirrors
+item 748 1135
+npc spirit1 27003 Monster 40 0 0
+
+kill spirit1
+  S SystemMessage id=95 1:0 1:0
+  items 748=1 1135=0
+  rows Q104_SpiritOfMirrors <cond>=2 <state>=STARTED

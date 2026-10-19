@@ -1,0 +1,147 @@
+# Skirmish with the Orcs (Q105): an elven fighter of level 10 accepts at Kendell, whose order
+# (drawn: the third, Batoh) names the chief to slay; slaying another chief first gives nothing.
+# Batoh's torque earns the second order (drawn: the fourth, Murtika); Roko gives nothing,
+# Murtika the second torque, and Kendell gives the Red Sunset Sword, soulshots, the newbie
+# soulshots and the echo crystals; then relog. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q105_skirmish_with_the_orcs.golden
+character Ranger 10
+class 18
+random 2 3
+script quest.Q105_SkirmishWithTheOrcs
+item 1836 1837 1838 1839 1840 1841 1842 1843 1844 1845 754 981 1060 1835 2509 4412 4413 4414 4415 4416 5789
+page guard/30218.htm
+page script/quest/Q105_SkirmishWithTheOrcs/
+npc kendell 30218 Guard 10 0 0
+npc uoph 27059 Monster 40 0 0
+npc batoh 27061 Monster 0 40 0
+npc roko 27065 Monster -40 0 0
+npc murtika 27068 Monster 0 -40 0
+
+# Kendell: accept, the third order.
+action kendell
+action kendell
+  S ActionFailed
+  S NpcHtmlMessage obj=kendell item=0 page=guard/30218.htm
+  S ActionFailed
+bypass npc_{kendell}_Quest
+  S NpcHtmlMessage obj=kendell item=0 page=script/quest/Q105_SkirmishWithTheOrcs/30218-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q105_SkirmishWithTheOrcs 30218-03.htm
+  S QuestList 105:0x80000001
+  S ExShowQuestMark quest=105
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1838
+  S NpcHtmlMessage obj=kendell item=0 page=script/quest/Q105_SkirmishWithTheOrcs/30218-03.htm
+  S ActionFailed
+  Q upsert Q105_SkirmishWithTheOrcs | <state> | STARTED
+  Q upsert Q105_SkirmishWithTheOrcs | <cond> | 1
+  items 1838=1
+  rows Q105_SkirmishWithTheOrcs <cond>=1 <state>=STARTED
+action kendell
+  S ActionFailed
+  S NpcHtmlMessage obj=kendell item=0 page=guard/30218.htm
+  S ActionFailed
+bypass npc_{kendell}_Quest
+  S NpcHtmlMessage obj=kendell item=0 page=script/quest/Q105_SkirmishWithTheOrcs/30218-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Uoph is not the ordered chief; Batoh is.
+kill uoph
+  S SystemMessage id=95 1:0 1:0
+  items 1844=0
+  rows Q105_SkirmishWithTheOrcs <cond>=1 <state>=STARTED
+kill batoh
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 105:0x80000003
+  S ExShowQuestMark quest=105
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1844
+  Q upsert Q105_SkirmishWithTheOrcs | <cond> | 2
+  items 1844=1
+  rows Q105_SkirmishWithTheOrcs <cond>=2 <state>=STARTED
+
+# Kendell: the fourth of the second orders.
+action kendell
+  S ActionFailed
+  S NpcHtmlMessage obj=kendell item=0 page=guard/30218.htm
+  S ActionFailed
+action kendell
+  S ActionFailed
+  S NpcHtmlMessage obj=kendell item=0 page=guard/30218.htm
+  S ActionFailed
+bypass npc_{kendell}_Quest
+  S QuestList 105:0x80000007
+  S ExShowQuestMark quest=105
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1844
+  S SystemMessage id=302 3:1838
+  S SystemMessage id=54 3:1843
+  S NpcHtmlMessage obj=kendell item=0 page=script/quest/Q105_SkirmishWithTheOrcs/30218-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q105_SkirmishWithTheOrcs | <cond> | 3
+  items 1844=0 1838=0 1843=1
+  rows Q105_SkirmishWithTheOrcs <cond>=3 <state>=STARTED
+action kendell
+  S ActionFailed
+  S NpcHtmlMessage obj=kendell item=0 page=guard/30218.htm
+  S ActionFailed
+bypass npc_{kendell}_Quest
+  S NpcHtmlMessage obj=kendell item=0 page=script/quest/Q105_SkirmishWithTheOrcs/30218-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Roko is not the ordered chief; Murtika is.
+kill roko
+  S SystemMessage id=95 1:0 1:0
+  items 1845=0
+kill murtika
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 105:0x8000000f
+  S ExShowQuestMark quest=105
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:1845
+  Q upsert Q105_SkirmishWithTheOrcs | <cond> | 4
+  items 1845=1
+  rows Q105_SkirmishWithTheOrcs <cond>=4 <state>=STARTED
+
+# Kendell rewards a fighter.
+action kendell
+  S ActionFailed
+  S NpcHtmlMessage obj=kendell item=0 page=guard/30218.htm
+  S ActionFailed
+action kendell
+  S ActionFailed
+  S NpcHtmlMessage obj=kendell item=0 page=guard/30218.htm
+  S ActionFailed
+bypass npc_{kendell}_Quest
+  S SystemMessage id=302 3:1845
+  S SystemMessage id=302 3:1843
+  S SystemMessage id=54 3:981
+  S SystemMessage id=53 3:1835 6:1000
+  S TutorialShowQuestionMark id=26
+  S SystemMessage id=53 3:5789 6:7000
+  S PlaySound type=2 file=tutorial_voice_026 bind=1 obj=player loc=10,20,30 delay=0
+  S SystemMessage id=53 3:1060 6:100
+  S SystemMessage id=53 3:4412 6:10
+  S SystemMessage id=53 3:4413 6:10
+  S SystemMessage id=53 3:4414 6:10
+  S SystemMessage id=53 3:4415 6:10
+  S SystemMessage id=53 3:4416 6:10
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 105:0x00000000
+  S NpcHtmlMessage obj=kendell item=0 page=script/quest/Q105_SkirmishWithTheOrcs/30218-08.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q105_SkirmishWithTheOrcs | <state> | COMPLETED
+  Q delete-except-state Q105_SkirmishWithTheOrcs
+  M set Q105_SkirmishWithTheOrcs_OneTimeQuestFlag | true
+  items 1845=0 1843=0 981=1 754=0 1835=1000 1060=100 4412=10 4413=10 4414=10 4415=10 4416=10
+  state Q105_SkirmishWithTheOrcs COMPLETED
+
+relog
+  items 981=1 1835=1000
+  state Q105_SkirmishWithTheOrcs COMPLETED

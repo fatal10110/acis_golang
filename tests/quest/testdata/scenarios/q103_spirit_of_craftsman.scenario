@@ -1,0 +1,235 @@
+# Spirit of Craftsman (Q103): a dark elven mystic of level 11 accepts at Karrod, takes his
+# letter to Cecktinon and Cecktinon's voucher to Harne, kills ten skeleton hunters for bone
+# fragments, trades Harne's soul catcher for Cecktinon's preserving oil, kills a marsh zombie
+# for its head (every roll pinned to succeed) and brings the steelbender's head to Karrod, who
+# gives the Blood Saber, a mystic's spiritshots and the echo crystals; then relog. Expectations
+# replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q103_spirit_of_craftsman.golden
+character Smith 11
+class 38
+random always 0
+script quest.Q103_SpiritOfCraftsman
+item 968 969 970 971 972 973 974 1107 975 1060 1835 2509 4412 4413 4414 4415 4416 5790
+page default/30307.htm
+page default/30132.htm
+page trainer/30144.htm
+page script/quest/Q103_SpiritOfCraftsman/
+npc karrod 30307 Folk 10 0 0
+npc cecktinon 30132 Folk 20 0 0
+npc harne 30144 Trainer 30 0 0
+npc skeleton 20517 Monster 40 0 0
+npc zombie 20015 Monster 0 40 0
+
+# Karrod: two pages, then accept.
+action karrod
+action karrod
+  S ActionFailed
+  S NpcHtmlMessage obj=karrod item=0 page=default/30307.htm
+  S ActionFailed
+bypass npc_{karrod}_Quest
+  S NpcHtmlMessage obj=karrod item=0 page=script/quest/Q103_SpiritOfCraftsman/30307-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q103_SpiritOfCraftsman 30307-04.htm
+  S NpcHtmlMessage obj=karrod item=0 page=script/quest/Q103_SpiritOfCraftsman/30307-04.htm
+  S ActionFailed
+bypass Quest Q103_SpiritOfCraftsman 30307-05.htm
+  S QuestList 103:0x80000001
+  S ExShowQuestMark quest=103
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:968
+  S NpcHtmlMessage obj=karrod item=0 page=script/quest/Q103_SpiritOfCraftsman/30307-05.htm
+  S ActionFailed
+  Q upsert Q103_SpiritOfCraftsman | <state> | STARTED
+  Q upsert Q103_SpiritOfCraftsman | <cond> | 1
+  items 968=1
+  rows Q103_SpiritOfCraftsman <cond>=1 <state>=STARTED
+action karrod
+  S ActionFailed
+  S NpcHtmlMessage obj=karrod item=0 page=default/30307.htm
+  S ActionFailed
+bypass npc_{karrod}_Quest
+  S NpcHtmlMessage obj=karrod item=0 page=script/quest/Q103_SpiritOfCraftsman/30307-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Cecktinon's voucher, then Harne's.
+action cecktinon
+action cecktinon
+  S ActionFailed
+  S NpcHtmlMessage obj=cecktinon item=0 page=default/30132.htm
+  S ActionFailed
+bypass npc_{cecktinon}_Quest
+  S QuestList 103:0x80000003
+  S ExShowQuestMark quest=103
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:968
+  S SystemMessage id=54 3:969
+  S NpcHtmlMessage obj=cecktinon item=0 page=script/quest/Q103_SpiritOfCraftsman/30132-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q103_SpiritOfCraftsman | <cond> | 2
+  items 968=0 969=1
+  rows Q103_SpiritOfCraftsman <cond>=2 <state>=STARTED
+action harne
+action harne
+  S ActionFailed
+  S NpcHtmlMessage obj=harne item=0 page=trainer/30144.htm
+  S ActionFailed
+bypass npc_{harne}_Quest
+  S QuestList 103:0x80000007
+  S ExShowQuestMark quest=103
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:969
+  S SystemMessage id=54 3:970
+  S NpcHtmlMessage obj=harne item=0 page=script/quest/Q103_SpiritOfCraftsman/30144-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q103_SpiritOfCraftsman | <cond> | 3
+  items 969=0 970=1
+  rows Q103_SpiritOfCraftsman <cond>=3 <state>=STARTED
+action harne
+  S ActionFailed
+  S NpcHtmlMessage obj=harne item=0 page=trainer/30144.htm
+  S ActionFailed
+bypass npc_{harne}_Quest
+  S NpcHtmlMessage obj=harne item=0 page=script/quest/Q103_SpiritOfCraftsman/30144-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ten skeleton hunters, ten bone fragments.
+kill skeleton x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1107
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1107
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1107
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1107
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1107
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1107
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1107
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1107
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1107
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1107
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 103:0x8000000f
+  S ExShowQuestMark quest=103
+  Q upsert Q103_SpiritOfCraftsman | <cond> | 4
+  items 1107=10
+  rows Q103_SpiritOfCraftsman <cond>=4 <state>=STARTED
+
+# Harne's soul catcher, then Cecktinon's preserving oil.
+action harne
+  S ActionFailed
+  S NpcHtmlMessage obj=harne item=0 page=trainer/30144.htm
+  S ActionFailed
+bypass npc_{harne}_Quest
+  S QuestList 103:0x8000001f
+  S ExShowQuestMark quest=103
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:970
+  S SystemMessage id=301 3:1107 6:10
+  S SystemMessage id=54 3:971
+  S NpcHtmlMessage obj=harne item=0 page=script/quest/Q103_SpiritOfCraftsman/30144-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q103_SpiritOfCraftsman | <cond> | 5
+  items 970=0 1107=0 971=1
+  rows Q103_SpiritOfCraftsman <cond>=5 <state>=STARTED
+action cecktinon
+action cecktinon
+  S ActionFailed
+  S NpcHtmlMessage obj=cecktinon item=0 page=default/30132.htm
+  S ActionFailed
+bypass npc_{cecktinon}_Quest
+  S QuestList 103:0x8000003f
+  S ExShowQuestMark quest=103
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:971
+  S SystemMessage id=54 3:972
+  S NpcHtmlMessage obj=cecktinon item=0 page=script/quest/Q103_SpiritOfCraftsman/30132-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q103_SpiritOfCraftsman | <cond> | 6
+  items 971=0 972=1
+  rows Q103_SpiritOfCraftsman <cond>=6 <state>=STARTED
+
+# A marsh zombie's head uses up the oil.
+kill zombie
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:973
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 103:0x8000007f
+  S ExShowQuestMark quest=103
+  S SystemMessage id=302 3:972
+  Q upsert Q103_SpiritOfCraftsman | <cond> | 7
+  items 973=1 972=0
+  rows Q103_SpiritOfCraftsman <cond>=7 <state>=STARTED
+
+# Cecktinon's steelbender's head, then Karrod's reward.
+action cecktinon
+  S ActionFailed
+  S NpcHtmlMessage obj=cecktinon item=0 page=default/30132.htm
+  S ActionFailed
+action cecktinon
+  S ActionFailed
+  S NpcHtmlMessage obj=cecktinon item=0 page=default/30132.htm
+  S ActionFailed
+bypass npc_{cecktinon}_Quest
+  S QuestList 103:0x800000ff
+  S ExShowQuestMark quest=103
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:973
+  S SystemMessage id=54 3:974
+  S NpcHtmlMessage obj=cecktinon item=0 page=script/quest/Q103_SpiritOfCraftsman/30132-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q103_SpiritOfCraftsman | <cond> | 8
+  items 973=0 974=1
+  rows Q103_SpiritOfCraftsman <cond>=8 <state>=STARTED
+action karrod
+action karrod
+  S ActionFailed
+  S NpcHtmlMessage obj=karrod item=0 page=default/30307.htm
+  S ActionFailed
+bypass npc_{karrod}_Quest
+  S SystemMessage id=302 3:974
+  S SystemMessage id=54 3:975
+  S SystemMessage id=53 3:2509 6:500
+  S SystemMessage id=53 3:1060 6:100
+  S SystemMessage id=53 3:4412 6:10
+  S SystemMessage id=53 3:4413 6:10
+  S SystemMessage id=53 3:4414 6:10
+  S SystemMessage id=53 3:4415 6:10
+  S SystemMessage id=53 3:4416 6:10
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 103:0x00000000
+  S NpcHtmlMessage obj=karrod item=0 page=script/quest/Q103_SpiritOfCraftsman/30307-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q103_SpiritOfCraftsman | <state> | COMPLETED
+  Q delete-except-state Q103_SpiritOfCraftsman
+  M set Q103_SpiritOfCraftsman_OneTimeQuestFlag | true
+  items 974=0 975=1 2509=500 1835=0 1060=100 4412=10 4413=10 4414=10 4415=10 4416=10
+  state Q103_SpiritOfCraftsman COMPLETED
+
+relog
+  items 975=1 2509=500
+  state Q103_SpiritOfCraftsman COMPLETED
