@@ -28,7 +28,7 @@ type Hooks struct {
 	OnSeeItem                  func(*Script, SeeItem)
 	OnSeeSpell                 func(*Script, SeeSpell)
 	OnSpelled                  func(*Script, Spelled)
-	OnStart                    func(*Script, Start)
+	OnStart                    func(*Script, Start) // handed a script that finds no world; see Start
 	OnStaticObjectClanAttacked func(*Script, StaticObjectClanAttacked)
 	OnTalk                     func(*Script, Talk) string
 	OnTimer                    func(*Script, Timer) string

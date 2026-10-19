@@ -160,7 +160,8 @@ func aiCatalog() script.Catalog {
 	}
 }
 
-// taskCatalog lists the scheduled tasks.
+// taskCatalog lists the scheduled tasks. The shutdown and restart tasks
+// run only once an operator uncomments their scripts.xml entries.
 func taskCatalog() script.Catalog {
 	return script.Catalog{
 		"task.CastleTaxRefresh":     scripttask.CastleTaxRefresh,
@@ -168,6 +169,8 @@ func taskCatalog() script.Catalog {
 		"task.ClanLeaderTransfer":   scripttask.ClanLeaderTransfer,
 		"task.RaidPointReset":       scripttask.RaidPointReset,
 		"task.RecommendationUpdate": scripttask.RecommendationUpdate,
+		"task.ServerRestart":        scripttask.ServerRestart,
+		"task.ServerShutdown":       scripttask.ServerShutdown,
 		"task.SevenSignsUpdate":     scripttask.SevenSignsUpdate,
 	}
 }
