@@ -3,6 +3,7 @@ package script
 import (
 	"slices"
 
+	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
@@ -25,6 +26,12 @@ type doorBody struct{ *door.Object }
 
 func (doorBody) CollisionRadius() float64 { return door.CollisionRadius }
 
+// clanNPC is an NPC a door's call reaches: a hostile or a civilian NPC.
+type clanNPC interface {
+	attackable.Combatant
+	ClanGroups() []string
+}
+
 // DoorAttacked runs, for every NPC within the door clan's range of d (3D,
 // inclusive, widened by both collision radii), alive and of the door clan,
 // the static-object clan-attacked hook of every script bound to its
@@ -35,7 +42,7 @@ func (r *Registry) DoorAttacked(d *door.Object, attacker attackable.Combatant, d
 	if r == nil || r.world == nil {
 		return
 	}
-	var near []attackable.Combatant
+	var near []clanNPC
 	r.world.ForEachKnownInRadius(doorBody{d}, doorClanRange, func(o world.Tracked) {
 		switch n := o.(type) {
 		case *npc.Hostile:
@@ -46,27 +53,16 @@ func (r *Registry) DoorAttacked(d *door.Object, attacker attackable.Combatant, d
 	})
 	attackerHandle := creatureOf(attacker)
 	for _, called := range near {
-		if called.Dead() || !slices.Contains(clansOf(called), doorClan) {
+		if called.Dead() || !slices.Contains(called.ClanGroups(), doorClan) {
 			continue
 		}
 		list := r.scripts(npcIDOf(called), EventStaticObjectClanAttacked)
 		if len(list) == 0 {
 			continue
 		}
-		e := StaticObjectClanAttacked{Called: NPCOf(called), Attacker: attackerHandle, Damage: int32(damage)}
+		e := StaticObjectClanAttacked{Called: NPCOf(called), Attacker: attackerHandle, Damage: commons.JavaInt(damage)}
 		for _, s := range list {
 			r.run(s, hookStaticObjectClanAttacked, func() { s.Hooks.StaticObjectClanAttacked(s, e) })
 		}
 	}
-}
-
-// clansOf returns the clans of the NPC n's template.
-func clansOf(n attackable.Combatant) []string {
-	switch o := n.(type) {
-	case *npc.Hostile:
-		return o.Instance.Template.Clans
-	case *npc.Folk:
-		return o.Instance.Template.Clans
-	}
-	return nil
 }
