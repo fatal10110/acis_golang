@@ -134,6 +134,7 @@ func (l *GameClientLink) broadcastSummonSpawnRelation(live *livePlayer, pet *sum
 	if l.world == nil || pet == nil {
 		return
 	}
+	l.showSummonCrestToOwner(live, pet)
 	karma := int32(live.Karma())
 	pvpFlag := int32(live.PvPFlagState())
 	live.BroadcastFrame(serverpackets.FrameRelationChanged(serverpackets.RelationChangedInfo{

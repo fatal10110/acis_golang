@@ -51,11 +51,16 @@ func (l *GameClientLink) addNPCCrest(v world.Tracked, s *npcinfo.Snapshot) {
 	if inst == nil {
 		return
 	}
-	owner := l.npcResidenceOwner(inst)
-	if owner == 0 {
+	l.putClanCrest(s, l.npcResidenceOwner(inst))
+}
+
+// putClanCrest puts into s the clan clanID and its alliance, as stored:
+// their ids and crests. A clanID of 0, or of no clan, leaves s alone.
+func (l *GameClientLink) putClanCrest(s *npcinfo.Snapshot, clanID int32) {
+	if clanID == 0 {
 		return
 	}
-	cl, ok := l.clanService().Table().Get(owner)
+	cl, ok := l.clanService().Table().Get(clanID)
 	if !ok {
 		return
 	}
