@@ -23,7 +23,7 @@ func makers2() script.MakerCatalog {
 		"royal_req_next_maker":               nil,
 		"royal_rush_maker":                   nil,
 		"royal_spawn_treasurebox":            nil,
-		"undead_bandmaster_maker":            nil,
-		"warrior_passive_weakness_maker":     nil,
+		"undead_bandmaster_maker":            maker.UndeadBandmaster,
+		"warrior_passive_weakness_maker":     maker.WarriorPassiveWeakness,
 	}
 }
