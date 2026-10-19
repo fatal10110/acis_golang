@@ -11,6 +11,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/follower"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/randomteleport"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/hall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/individual"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monster"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/siegeguard"
@@ -83,6 +84,12 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WarriorHero":                                              monster.WarriorHero,
 	"script.ai.individual.RoyalRushMissionNpc":                                              individual.RoyalRushMissionNpc,
 	"script.ai.individual.WarriorPetForPC":                                                  individual.WarriorPetForPC,
+	"script.ai.siegablehall.Agit02Dietrich":                                                 hall.Dietrich,
+	"script.ai.siegablehall.Agit02Gustav":                                                   hall.Gustav,
+	"script.ai.siegablehall.Agit02Mikhail":                                                  hall.Mikhail,
+	"script.ai.siegablehall.Agit03Alfred":                                                   hall.Alfred,
+	"script.ai.siegablehall.Agit03Giselle":                                                  hall.Giselle,
+	"script.ai.siegablehall.Agit03Lidia":                                                    hall.Lidia,
 	"script.ai.siegeguards.GludioHold.GludioHold":                                           siegeguard.Hold,
 	"script.ai.siegeguards.GludioHold.GludioSwordGuard":                                     siegeguard.SwordGuard,
 	"script.ai.siegeguards.GludioHold.GludioSwordGuardUseSkill":                             siegeguard.SwordGuardUseSkill,

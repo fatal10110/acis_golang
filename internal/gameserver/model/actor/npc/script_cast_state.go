@@ -28,6 +28,14 @@ func (h *Hostile) MeetsHPMPDisabled(target attackable.Combatant, ref skill.Ref) 
 	return cast != nil && cast.MeetsHPMPDisabled(target, ref)
 }
 
+// CanAttemptCast reports whether h's skill ref is off its reuse wait, so h
+// may try its cast at target; false for no target or a skill h's table
+// lacks.
+func (h *Hostile) CanAttemptCast(target attackable.Combatant, ref skill.Ref) bool {
+	cast := h.brain.CastController()
+	return cast != nil && cast.CanAttempt(target, ref)
+}
+
 // AttackingNow reports whether h's attack is in flight.
 func (h *Hostile) AttackingNow() bool { return h.brain.AttackingNow() }
 

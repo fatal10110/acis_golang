@@ -7,5 +7,35 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // siegableHallHandleOps holds, per script of siegablehall.go, the kind-specific NPC
 // handle operations each of its hooks reaches.
 func siegableHallHandleOps() map[string]script.HandleOps {
-	return map[string]script.HandleOps{}
+	return map[string]script.HandleOps{
+		"script.ai.siegablehall.Agit02Dietrich": {
+			"OnPartyAttacked":    {"NPC.CanAttemptCast", "NPC.MaxHP"},
+			"OnSeeSpell":         {"NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnTimer":            {"NPC.RandomizeAttack", "NPC.RemoveAllAttackDesire"},
+			"OnUseSkillFinished": {"NPC.RemoveAllAttackDesire"},
+		},
+		"script.ai.siegablehall.Agit02Gustav": {
+			"OnPartyAttacked":    {"NPC.MaxHP"},
+			"OnPartyDied":        {"Spawner.ScheduleRespawn"},
+			"OnSeeSpell":         {"NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnTimer":            {"NPC.DoDie", "NPC.RandomizeAttack", "NPC.RemoveAllAttackDesire"},
+			"OnUseSkillFinished": {"NPC.RemoveAllAttackDesire"},
+		},
+		"script.ai.siegablehall.Agit02Mikhail": {
+			"OnPartyAttacked":    {"NPC.MaxHP"},
+			"OnSeeSpell":         {"NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnTimer":            {"NPC.RandomizeAttack", "NPC.RemoveAllAttackDesire"},
+			"OnUseSkillFinished": {"NPC.RemoveAllAttackDesire"},
+		},
+		"script.ai.siegablehall.Agit03Alfred": {
+			"OnAttacked": {"NPC.MaxHP"},
+		},
+		"script.ai.siegablehall.Agit03Giselle": {
+			"OnAttacked": {"NPC.MaxHP"},
+		},
+		"script.ai.siegablehall.Agit03Lidia": {
+			"OnAttacked":     {"NPC.MaxHP", "NPC.RemoveAllAttackDesire"},
+			"OnClanAttacked": {"NPC.MaxHP"},
+		},
+	}
 }
