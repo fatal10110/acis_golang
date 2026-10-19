@@ -2,21 +2,32 @@ package maker
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 )
 
-// memoInt reads the integer the npcmaker's memo declares under key. A
-// missing or non-numeric value panics: the hook stops there.
+// memoInt reads the 32-bit integer the npcmaker's memo declares under
+// key. A missing, non-numeric or out-of-range value panics: the hook stops
+// there.
 func memoInt(g spawn.Group, key string) int {
 	v := g.Maker().AIParams[key]
-	n, err := strconv.Atoi(v)
-	if err != nil {
+	n, ok := parseInt32(v)
+	if !ok {
 		panic(fmt.Sprintf("maker: memo %s = %q is not an integer", key, v))
 	}
-	return n
+	return int(n)
+}
+
+// parseInt32 parses s as a decimal 32-bit integer.
+func parseInt32(s string) (int32, bool) {
+	n, err := strconv.Atoi(s)
+	if err != nil || n < math.MinInt32 || n > math.MaxInt32 {
+		return 0, false
+	}
+	return int32(n), true
 }
 
 // memoIntOr is memoInt with def for a key the memo does not declare.

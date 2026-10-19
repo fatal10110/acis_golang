@@ -1,10 +1,6 @@
 package maker
 
-import (
-	"strconv"
-
-	"github.com/fatal10110/acis_golang/internal/gameserver/script"
-)
+import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 
 // SailrenDummy is the maker of Sailren's lair dummy: maker script events
 // 11046, 11047 and 11048, matched exactly, send its first spawn's NPCs the
@@ -48,6 +44,6 @@ func passOnByNumber(e script.MakerEvent) {
 		return
 	}
 	// Only the makers' number cases reach here.
-	id, _ := strconv.Atoi(e.Name)
-	def0.SendScriptEvent(int32(id), 1, 0)
+	id, _ := parseInt32(e.Name)
+	def0.SendScriptEvent(id, 1, 0)
 }
