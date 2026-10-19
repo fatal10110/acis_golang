@@ -1,0 +1,22 @@
+# Gatekeeper's Offering (Q277), refused: a level 14 character is too young for Tamil, and the quest
+# is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q277_gatekeepers_offering_low_level.golden
+character Offerer 14
+script quest.Q277_GatekeepersOffering
+item 1572
+page gatekeeper/30576.htm
+page script/quest/Q277_GatekeepersOffering/
+npc tamil 30576 Gatekeeper 10 0 0
+
+# Tamil: too young.
+action tamil
+action tamil
+  S ActionFailed
+  S NpcHtmlMessage obj=tamil item=0 page=gatekeeper/30576.htm
+  S ActionFailed
+bypass npc_{tamil}_Quest
+  S NpcHtmlMessage obj=tamil item=0 page=script/quest/Q277_GatekeepersOffering/30576-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q277_GatekeepersOffering CREATED
+  rows Q277_GatekeepersOffering -
