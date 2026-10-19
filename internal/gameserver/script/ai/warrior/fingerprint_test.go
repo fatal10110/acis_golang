@@ -37,6 +37,11 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecial",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecialAggressive",
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecialStoneAggressive",
+		"script.ai.individual.Monster.WarriorBase.Warrior.CorePrivatePremo",
+		"script.ai.individual.Monster.WarriorBase.Warrior.RamphoPrimeval",
+		"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushWarriorPhysicalSpecial2",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressiveImmediate",
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast2DebuffsAggressive",
 	}, exempt...)
 	if err != nil {
 		t.Fatal(err)
