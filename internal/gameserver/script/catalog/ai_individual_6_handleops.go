@@ -7,5 +7,43 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // aiIndividual6HandleOps holds, per script of ai_individual_6.go, the kind-specific NPC
 // handle operations each of its hooks reaches.
 func aiIndividual6HandleOps() map[string]script.HandleOps {
-	return map[string]script.HandleOps{}
+	return map[string]script.HandleOps{
+		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.Elcroki": {
+			"OnAttacked":         {"NPC.HateList", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.Stunned"},
+			"OnClanAttacked":     {"NPC.HateList", "NPC.MeetsHPMPConditions"},
+			"OnCreated":          {"NPC.HateList"},
+			"OnNoDesire":         {"NPC.InCombat"},
+			"OnPartyAttacked":    {"NPC.HateList", "NPC.MeetsHPMPConditions"},
+			"OnPartyDied":        {"NPC.InCombat", "NPC.TopDesireTarget", "Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+			"OnScriptEvent":      {"NPC.HateList"},
+			"OnSeeCreature":      {"NPC.HateList", "NPC.MeetsHPMPConditions"},
+			"OnSeeSpell":         {"NPC.HateList"},
+			"OnTimer":            {"NPC.HateList", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned"},
+			"OnUseSkillFinished": {"NPC.DoDie", "NPC.HateList", "NPC.MeetsHPMPConditions"},
+		},
+		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizard": {
+			"OnAttacked":         {"NPC.HateList", "NPC.Muted", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.Stunned"},
+			"OnClanAttacked":     {"NPC.HateList"},
+			"OnCreated":          {"NPC.HateList"},
+			"OnPartyAttacked":    {"NPC.HateList"},
+			"OnPartyDied":        {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+			"OnScriptEvent":      {"NPC.HateList"},
+			"OnSeeCreature":      {"NPC.HateList"},
+			"OnSeeSpell":         {"NPC.HateList"},
+			"OnTimer":            {"NPC.HateList", "NPC.Muted", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardDD2": {
+			"OnAttacked":         {"NPC.HateList", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.Stunned"},
+			"OnClanAttacked":     {"NPC.HateList", "NPC.MeetsHPMPConditions"},
+			"OnCreated":          {"NPC.HateList"},
+			"OnPartyAttacked":    {"NPC.HateList", "NPC.MeetsHPMPConditions"},
+			"OnPartyDied":        {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+			"OnScriptEvent":      {"NPC.HateList"},
+			"OnSeeCreature":      {"NPC.HateList"},
+			"OnSeeSpell":         {"NPC.HateList"},
+			"OnTimer":            {"NPC.HateList", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned"},
+			"OnUseSkillFinished": {"NPC.DoDie", "NPC.HateList", "NPC.MeetsHPMPConditions"},
+		},
+	}
 }
