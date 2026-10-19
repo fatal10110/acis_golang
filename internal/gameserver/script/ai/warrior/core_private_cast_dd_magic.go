@@ -45,7 +45,7 @@ func CorePrivatePerum() script.Script {
 	base := CorePrivateCastDDMagicAggressiveHooks()
 	return script.Script{Dir: corePrivateCastDDMagicDir, Behavior: true, NPCs: []int32{29012}, Hooks: base.With(script.Hooks{
 		OnCreated: func(s *script.Script, e script.Created) {
-			s.StartTimer("4001", e.NPC, nil, perumShuffleDelay(s))
+			s.StartTimer("4001", e.NPC, nil, coreShuffleDelay(s))
 			base.Created(s, e)
 		},
 		OnTimer: func(s *script.Script, e script.Timer) string {
@@ -53,15 +53,15 @@ func CorePrivatePerum() script.Script {
 				if s.Rnd(100) < 66 {
 					e.NPC.RandomizeAttack()
 				}
-				s.StartTimer("4001", e.NPC, nil, perumShuffleDelay(s))
+				s.StartTimer("4001", e.NPC, nil, coreShuffleDelay(s))
 			}
 			return base.Timer(s, e)
 		},
 	})}
 }
 
-// perumShuffleDelay draws the time to Perum's next hate shuffle: 90 s and
-// up to 240 s more.
-func perumShuffleDelay(s *script.Script) time.Duration {
+// coreShuffleDelay draws the time to a Core private's next hate shuffle:
+// 90 s and up to 240 s more.
+func coreShuffleDelay(s *script.Script) time.Duration {
 	return time.Duration(90000+s.Rnd(240000)) * time.Millisecond
 }
