@@ -17,10 +17,16 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.maker.DefaultUseDBMaker",
 		"script.maker.FarmMaker",
 		"script.maker.InstantSpawnMaker",
+		"script.maker.InstantSpawnSerialLastMaker",
+		"script.maker.InstantSpawnSerialMaker",
+		"script.maker.OnDayNightSpawnMaker",
+		"script.maker.OpenDoorMaker",
 	},
 		// Delays are durations: the reference's seconds-to-milliseconds
-		// factor has no Go literal.
+		// factor and its one-minute period in milliseconds have no Go
+		// literal.
 		"number 1000",
+		"number 60000",
 		// The catalog keys of the makers ported with the engine; the
 		// reference binds its types in the npcmaker, not in a script class.
 		`string "event_maker"`,
@@ -31,9 +37,11 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"call ASpawn.getRespawnDelay",
 		"call Npc.deleteMe",
 		"call MemoSet.getBool",
-		// The panic of a memo read before its write, where the reference
-		// throws.
+		// The panics of a memo read before its write and of a memo value
+		// that is no integer, where the reference throws.
 		`string "maker: memo enabled read before the maker started"`,
+		`string "maker: memo %s read before the maker wrote it"`,
+		`string "maker: memo %s = %q is not an integer"`,
 	)
 	if err != nil {
 		t.Fatal(err)
