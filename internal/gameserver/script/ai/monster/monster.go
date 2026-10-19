@@ -1,5 +1,6 @@
 // Package monster holds MonsterAI, the behavior every monster behavior
-// derives from.
+// derives from, and the behaviors of its family that live beside it:
+// WarriorHero and the LV3 quest monsters.
 package monster
 
 import (

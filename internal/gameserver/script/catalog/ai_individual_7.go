@@ -1,17 +1,20 @@
 package catalog
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/script"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monster"
+)
 
 // aiIndividual7 is the catalog of batch 7 of 8 of the individual NPC behaviors (#192).
 func aiIndividual7() script.Catalog {
 	return script.Catalog{
-		"script.ai.individual.Monster.LV3Monster.LV3Dagger":                                                                 nil,
-		"script.ai.individual.Monster.LV3Monster.LV3Dwarf":                                                                  nil,
-		"script.ai.individual.Monster.LV3Monster.LV3Healer":                                                                 nil,
-		"script.ai.individual.Monster.LV3Monster.LV3Knight":                                                                 nil,
-		"script.ai.individual.Monster.LV3Monster.LV3Monster":                                                                nil,
-		"script.ai.individual.Monster.LV3Monster.LV3Orc":                                                                    nil,
-		"script.ai.individual.Monster.LV3Monster.LV3PartyLeaderMonster":                                                     nil,
+		"script.ai.individual.Monster.LV3Monster.LV3Dagger":                                                                 monster.LV3Dagger,
+		"script.ai.individual.Monster.LV3Monster.LV3Dwarf":                                                                  monster.LV3Dwarf,
+		"script.ai.individual.Monster.LV3Monster.LV3Healer":                                                                 monster.LV3Healer,
+		"script.ai.individual.Monster.LV3Monster.LV3Knight":                                                                 monster.LV3Knight,
+		"script.ai.individual.Monster.LV3Monster.LV3Monster":                                                                monster.LV3Monster,
+		"script.ai.individual.Monster.LV3Monster.LV3Orc":                                                                    monster.LV3Orc,
+		"script.ai.individual.Monster.LV3Monster.LV3PartyLeaderMonster":                                                     monster.LV3PartyLeader,
 		"script.ai.individual.Monster.LV3Monster.LV3PartyPrivateMonster":                                                    nil,
 		"script.ai.individual.Monster.LV3Monster.LV3Ranger":                                                                 nil,
 		"script.ai.individual.Monster.LV3Monster.LV3SongDance":                                                              nil,
@@ -44,6 +47,6 @@ func aiIndividual7() script.Catalog {
 		"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHold":                                                nil,
 		"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.ValakasPrivateLavasaurus":             nil,
 		"script.ai.individual.Monster.WarriorDDMagicHold.WarriorDDMagicHoldAggressive.WarriorDDMagicHoldAggressive":         nil,
-		"script.ai.individual.Monster.WarriorHero":                                                                          nil,
+		"script.ai.individual.Monster.WarriorHero":                                                                          monster.WarriorHero,
 	}
 }
