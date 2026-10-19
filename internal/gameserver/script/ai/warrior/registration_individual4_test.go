@@ -26,18 +26,27 @@ var individual4 = []struct {
 	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCastCurse", PartyPrivateCastCurse},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCastDDHeal", PartyPrivateCastDDHeal},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCastDDMagicCurseStone", PartyPrivateCastDDMagicCurseStone},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCastEnchant", PartyPrivateCastEnchant},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCastHeal", PartyPrivateCastHeal},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCastHealCurse", PartyPrivateCastHealCurse},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCouplePhysicalSpecial", PartyPrivateCouplePhysicalSpecial},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCoward", PartyPrivateCoward},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateHereticCastCurse", PartyPrivateHereticCastCurse},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePabelgolem", PartyPrivatePabelgolem},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalStone", PartyPrivatePhysicalStone},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePriest", PartyPrivatePriest},
 }
 
 // TestIndividual4RegistrationMatchesReferenceManifest registers the batch
 // after the behavior chain it derives from, through the engine registry
 // with its own seam gate and every id a hostile NPC (the datapack types all
-// 16 ids Monster). None is refused, and the registry dump equals the
+// 53 ids Monster). None is refused, and the registry dump equals the
 // reference manifest for the batch: each class's kind and bind lines (none
 // for PartyPrivateCast3SkillsMagical, which has no NPC of its own), and
 // every folded per-(npc, event) list restricted to the batch: the 11
 // events of the PartyPrivateWarrior chain for most ids, plus PARTY_DIED
-// for OrfenPrivateRaikelLeos and OUT_OF_TERRITORY for
+// for OrfenPrivateRaikelLeos, PartyPrivateCouplePhysicalSpecial and
+// PartyPrivateCoward, and OUT_OF_TERRITORY for
 // PartyPrivateHereticCastCurse.
 func TestIndividual4RegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, 0, len(chain)+len(individual4))
@@ -70,10 +79,13 @@ func TestIndividual4RegistrationMatchesReferenceManifest(t *testing.T) {
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	want := readIndividual1View(t, path, ours, sc)
 	// FreyaBear, PartyPrivateCannibaliAggressive, PartyPrivateCastCurse,
-	// PartyPrivateCastDDHeal (9) and PartyPrivateCastDDMagicCurseStone (2)
-	// on 11 events; OrfenPrivateRaikelLeos and PartyPrivateHereticCastCurse
-	// on 12.
-	if wantFolds, got := (1+1+1+9+2)*11+2*12, len(want.folds); got != wantFolds {
+	// PartyPrivateCastDDHeal (9), PartyPrivateCastDDMagicCurseStone (2),
+	// PartyPrivateCastEnchant (4), PartyPrivateCastHeal (3),
+	// PartyPrivateCastHealCurse (11), PartyPrivatePabelgolem (2),
+	// PartyPrivatePhysicalStone (6) and PartyPrivatePriest (9) on 11
+	// events; OrfenPrivateRaikelLeos, PartyPrivateHereticCastCurse,
+	// PartyPrivateCouplePhysicalSpecial and PartyPrivateCoward on 12.
+	if wantFolds, got := (1+1+1+9+2+4+3+11+2+6+9)*11+4*12, len(want.folds); got != wantFolds {
 		t.Fatalf("reference folds = %d entries, want %d", got, wantFolds)
 	}
 
@@ -91,7 +103,11 @@ func TestIndividual4RegistrationMatchesReferenceManifest(t *testing.T) {
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ: %d entries, reference %d", len(got.folds), len(want.folds))
 	}
-	for _, id := range []int32{22103, 29016, 22112, 20982, 22157, 20948, 20943, 20987, 20975, 20764, 20981, 21059, 21074, 21080, 21349, 21375} {
+	for _, id := range []int32{
+		22103, 29016, 22112, 20982, 22157, 20948, 20943, 20987, 20975, 20764, 20981, 21059, 21074, 21080, 21349, 21375,
+		20976, 20769, 20765, 22099, 20774, 20990, 20762, 21060, 20962, 20968, 20988, 20940, 20768, 20748, 21077, 21083, 21092, 22130,
+		21433, 21313, 22061, 22075, 21344, 21346, 21374, 21348, 21370, 21372, 20970, 20958, 20960, 20945, 20979, 20942, 20936, 20757, 20951,
+	} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}

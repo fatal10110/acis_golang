@@ -56,7 +56,15 @@ var ind4Batch = []struct {
 	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCastCurse", warrior.PartyPrivateCastCurse},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCastDDHeal", warrior.PartyPrivateCastDDHeal},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCastDDMagicCurseStone", warrior.PartyPrivateCastDDMagicCurseStone},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCastEnchant", warrior.PartyPrivateCastEnchant},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCastHeal", warrior.PartyPrivateCastHeal},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCastHealCurse", warrior.PartyPrivateCastHealCurse},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCouplePhysicalSpecial", warrior.PartyPrivateCouplePhysicalSpecial},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateCoward", warrior.PartyPrivateCoward},
 	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivateHereticCastCurse", warrior.PartyPrivateHereticCastCurse},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePabelgolem", warrior.PartyPrivatePabelgolem},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePhysicalStone", warrior.PartyPrivatePhysicalStone},
+	{"script.ai.individual.Monster.WarriorBase.Warrior.PartyPrivateWarrior.PartyPrivatePriest", warrior.PartyPrivatePriest},
 	// PartyPrivateCast3SkillsMagical binds no NPC of its own; the
 	// scenarios bind its hooks to fixture ids to drive them.
 	{ind4Cast3Path, func() script.Script {
