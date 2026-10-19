@@ -81,6 +81,7 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WarriorBase.WarriorBase":                                  warrior.Base,
 	"script.ai.individual.Monster.WarriorHero":                                              monster.WarriorHero,
 	"script.ai.individual.RoyalRushMissionNpc":                                              individual.RoyalRushMissionNpc,
+	"script.ai.individual.WarriorPetForPC":                                                  individual.WarriorPetForPC,
 }
 
 // TestScenarios plays every NPC behavior scenario of testdata/scenarios
