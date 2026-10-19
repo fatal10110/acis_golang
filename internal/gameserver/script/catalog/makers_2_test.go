@@ -15,7 +15,8 @@ import (
 // TestMakers2Bindings pins the maker each ported batch 2 type binds, by
 // constructor, and how many shipped npcmakers run it: one npcmaker of each
 // alarm device type, the 10 hall keeper and hall timer bomb npcmakers (5
-// wizard, 1 each of the others) and the one rainbow_maker.
+// wizard, 1 each of the others), the one rainbow_maker and the one
+// npcmaker of each Imperial Tomb hall maker.
 func TestMakers2Bindings(t *testing.T) {
 	dp := datapack.Require(t)
 	table, err := gamexml.LoadSpawnlist(filepath.Join(dp, "data", "xml", "spawnlist"), zerolog.Nop(), 1)
@@ -49,6 +50,8 @@ func TestMakers2Bindings(t *testing.T) {
 		{"hall_keeper_self_destruction_maker", maker.HallKeeperDefault, 1},
 		{"hall_timer_bomb_maker", maker.HallKeeperDefault, 1},
 		{"rainbow_maker", maker.Rainbow, 1},
+		{"undead_bandmaster_maker", maker.UndeadBandmaster, 1},
+		{"warrior_passive_weakness_maker", maker.WarriorPassiveWeakness, 1},
 	} {
 		got := makers[tc.typ]
 		if got == nil || reflect.ValueOf(got).Pointer() != reflect.ValueOf(tc.ctor).Pointer() {
@@ -58,7 +61,7 @@ func TestMakers2Bindings(t *testing.T) {
 			t.Errorf("shipped npcmakers of %s = %d, want %d", tc.typ, n, tc.count)
 		}
 	}
-	if ported != 11 {
-		t.Errorf("ported batch 2 types = %d, want 11", ported)
+	if ported != 13 {
+		t.Errorf("ported batch 2 types = %d, want 13", ported)
 	}
 }

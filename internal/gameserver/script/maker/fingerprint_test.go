@@ -27,6 +27,8 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		"script.maker.AlarmDeviceMaker4",
 		"script.maker.HallKeeperDefaultMaker",
 		"script.maker.RainbowMaker",
+		"script.maker.UndeadBandmasterMaker",
+		"script.maker.WarriorPassiveWeaknessMaker",
 		"script.maker.BenomMaker",
 		"script.maker.FreyaDeaconKeeperMaker",
 		"script.maker.FrintezzaEvilateMaker",
@@ -60,6 +62,9 @@ func TestMatchesReferenceFingerprints(t *testing.T) {
 		`string "maker: memo enabled read before the maker started"`,
 		`string "maker: memo %s read before the maker wrote it"`,
 		`string "maker: memo %s = %q is not an integer"`,
+		// The panic of a door looked up by name that does not exist, where
+		// the reference throws.
+		`string "maker: no door %q"`,
 	)
 	if err != nil {
 		t.Fatal(err)
