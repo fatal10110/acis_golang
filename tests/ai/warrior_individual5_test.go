@@ -1,16 +1,24 @@
 package ai
 
 import (
+	"context"
 	"sync/atomic"
 	"testing"
+	"time"
+
+	"github.com/fatal10110/acis_golang/internal/commons/wire"
+	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
+	"github.com/fatal10110/acis_golang/internal/gameserver/data/sql/sqltest"
 
 	actorai "github.com/fatal10110/acis_golang/internal/gameserver/model/actor/ai"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network"
+	"github.com/fatal10110/acis_golang/internal/gameserver/network/clientpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/network/serverpackets"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/warrior"
+	skillstate "github.com/fatal10110/acis_golang/internal/gameserver/skill"
 	"github.com/fatal10110/acis_golang/internal/gameservertest"
 )
 
@@ -30,6 +38,7 @@ const (
 // The skills the batch's tests cast or hit with.
 const (
 	unlockID         = modelskill.ID(27)
+	keyID            = modelskill.ID(2065)
 	deluxeKeyID      = modelskill.ID(2229)
 	treasureBombID   = modelskill.ID(4143)
 	mimicWrathID     = modelskill.ID(4245)
@@ -136,38 +145,42 @@ func chestTemplate() *npc.Template {
 }
 
 // TestTreasureChestKeysAndBomb ports TreasureChest's attacked and
-// skill-finished hooks on a level 21 chest. A level 1 Unlock (98 % base,
-// less 6 per level of the chest above 16 + 4) opens it on a draw under 92:
-// the chest dies to the character. A level 1 deluxe key gives
-// (0.0002*2*2 - 0.0264*2 + 0.7695) * 100 = 71.75, truncated to 71: a draw of
-// 71 fails, deleting the chest and playing the broken key sound to the
-// character. A plain hit makes a fresh chest want to cast its treasure bomb
-// of level min(10, 21/10 + 1) = 3 on the character; the bomb's cast ends
-// with the chest deleted.
+// skill-finished hooks on a level 21 chest. Each level 1 key opens it on a
+// draw under its chance, the chest dying to the character, and breaks
+// otherwise, the chest deleted with no death and the broken key sound
+// played to the character: Unlock 98 less 6 per level of the chest above
+// 16 + 4 = 92; key 2065, 60 - 21*1.5 = 28.5 truncated to 28; deluxe key
+// (0.0002*2*2 - 0.0264*2 + 0.7695) * 100 = 71.75 truncated to 71. A plain
+// hit makes a fresh chest want to cast its treasure bomb of level
+// min(10, 21/10 + 1) = 3 on the character; the bomb's cast ends with the
+// chest deleted.
 func TestTreasureChestKeysAndBomb(t *testing.T) {
 	t.Parallel()
 	w := bootIndividual5(t, nil, chestTemplate())
 
-	opened := w.spawn(t, chestID, 100, 0)
-	w.draw.Store(91)
-	w.skillHit(t, opened, modelskill.Definition{ID: unlockID, Level: 1})
-	frames := w.srv.ReadQueued(t, w.srv.Client)
-	if len(framesOf(frames, serverpackets.OpcodeDie, opened.ObjectID())) != 1 {
-		t.Fatal("a level 1 Unlock with a draw of 91 did not kill the level 21 chest")
-	}
-	if hasSound(frames, "ItemSound2.broken_key") {
-		t.Fatal("an opened chest played the broken key sound")
-	}
-
-	broken := w.spawn(t, chestID, 100, 100)
-	w.draw.Store(71)
-	w.skillHit(t, broken, modelskill.Definition{ID: deluxeKeyID, Level: 1})
-	frames = w.srv.ReadQueued(t, w.srv.Client)
-	if w.inWorld(broken) || len(framesOf(frames, serverpackets.OpcodeDie, broken.ObjectID())) != 0 || len(framesOf(frames, serverpackets.OpcodeDeleteObject, broken.ObjectID())) != 1 {
-		t.Fatal("a level 1 deluxe key with a draw of 71 did not delete the chest without a death")
-	}
-	if !hasSound(frames, "ItemSound2.broken_key") {
-		t.Fatal("a failed key played no broken key sound to the character")
+	for i, row := range []struct {
+		key   modelskill.ID
+		draw  int32
+		opens bool
+	}{
+		{unlockID, 91, true},
+		{unlockID, 92, false},
+		{keyID, 27, true},
+		{keyID, 28, false},
+		{deluxeKeyID, 70, true},
+		{deluxeKeyID, 71, false},
+	} {
+		chest := w.spawn(t, chestID, 100+50*i, 100)
+		w.draw.Store(row.draw)
+		w.skillHit(t, chest, modelskill.Definition{ID: row.key, Level: 1})
+		frames := w.srv.ReadQueued(t, w.srv.Client)
+		died := len(framesOf(frames, serverpackets.OpcodeDie, chest.ObjectID())) == 1
+		deleted := !died && len(framesOf(frames, serverpackets.OpcodeDeleteObject, chest.ObjectID())) == 1
+		broke := hasSound(frames, "ItemSound2.broken_key")
+		// An opened chest stays as a corpse; a broken one leaves the world.
+		if w.inWorld(chest) == !row.opens || died != row.opens || deleted == row.opens || broke == row.opens {
+			t.Fatalf("level 1 key %d with a draw of %d: died %v, deleted %v, broken key sound %v; want opened %v", row.key, row.draw, died, deleted, broke, row.opens)
+		}
 	}
 
 	bomb := w.spawn(t, chestID, 100, -100)
@@ -181,7 +194,7 @@ func TestTreasureChestKeysAndBomb(t *testing.T) {
 	if bomb.Dead() || !w.inWorld(bomb) {
 		t.Fatal("a plain hit took the chest out of the world before its bomb")
 	}
-	frames = w.ticks(t, 1)
+	frames := w.ticks(t, 1)
 	w.srv.AdvanceUntil(t, "the chest leaving after its bomb", func() bool { return !w.inWorld(bomb) })
 	frames = append(frames, w.srv.ReadQueued(t, w.srv.Client)...)
 	if len(framesOf(frames, serverpackets.OpcodeMagicSkillUse, bomb.ObjectID())) != 1 || len(framesOf(frames, serverpackets.OpcodeDie, bomb.ObjectID())) != 0 {
@@ -482,5 +495,94 @@ func TestStoneBerserkerPetrifiesAlliedPlayers(t *testing.T) {
 	w.ticks(t, 2)
 	if got := open.AggroHate(w.player); got != 200 {
 		t.Fatalf("Ketra berserker hate of a character with no alliance it sees = %v, want 200", got)
+	}
+}
+
+// The character's self buffs the stone berserker sees cast: one carrying
+// aggro points, one carrying none. Neither is offensive.
+const (
+	aggroBuffID = modelskill.ID(9330)
+	plainBuffID = modelskill.ID(9331)
+)
+
+// castOwnSkill has the character cast its skill id.
+func castOwnSkill(w *warriorWorld, id modelskill.ID) {
+	p := wire.NewPacketWriter(clientpackets.OpcodeRequestMagicSkillUse)
+	p.WriteInt32(int32(id))
+	p.WriteInt32(0)
+	p.WriteUint8(0)
+	w.srv.Client.Send(p.Bytes())
+}
+
+// TestStoneBerserkerPetrifiesAlliedCaster ports
+// WarriorBerserkerPhysicalSpecialStoneAggressive's see-spell hook for a
+// Ketra berserker that sees the character cast a self buff. A buff with
+// aggro points cast by a character with no alliance, or a buff without
+// aggro points cast by a Ketra ally, goes on to the parent hooks, which
+// want nothing here. A buff with aggro points cast by a Ketra ally makes
+// the berserker want to petrify the caster (4515, weight 1000000) and
+// leaves it no hate.
+func TestStoneBerserkerPetrifiesAlliedCaster(t *testing.T) {
+	t.Parallel()
+	db := sqltest.SharedDB(t)
+	buff := func(id modelskill.ID, aggro int) modelskill.Definition {
+		return modelskill.Definition{
+			ID: id, Level: 1, Activation: modelskill.ActivationActive, Target: modelskill.TargetSelf,
+			SkillType: "BUFF", HitTime: 500, StaticHitTime: true, StaticReuse: true, AggroPoints: aggro,
+		}
+	}
+	defs := []modelskill.Definition{buff(aggroBuffID, 100), buff(plainBuffID, 0)}
+	table := modelskill.NewTable(append([]modelskill.Definition{{ID: 248, Level: 3}, {ID: 294, Level: 1}}, defs...))
+	tmpl := berserkerTemplate(berserkerStoneID)
+	tmpl.Clans = []string{"ketra_orc_clan"}
+	list, catalog := individual5Scripts()
+	w := bootRaid(t, raidBoot{
+		opts: []gameservertest.Option{
+			gameservertest.WithSkills(skillstate.NewPersistence(gamesql.NewSkillSaveStore(db), table, gamesql.NewCharacterSkillStore(db))),
+			gameservertest.WithScriptSkills(defs...),
+			gameservertest.WithNPCScripts(map[int32]script.NPCKind{berserkerStoneID: script.KindHostile}, list, catalog),
+		},
+		ready: func(srv *gameservertest.Server, objID int32) {
+			for _, d := range defs {
+				if err := srv.KnownSkills.SetKnownSkill(context.Background(), objID, 0, int(d.ID), 1); err != nil {
+					t.Fatalf("seed skill %d: %v", d.ID, err)
+				}
+			}
+		},
+	}, tmpl)
+	obj, ok := w.srv.State.Player(w.player.ObjectID())
+	if !ok {
+		t.Fatal("the character is not in the world")
+	}
+	ch, ok := network.OnlineCharacter(obj)
+	if !ok {
+		t.Fatalf("the character is %T, not an online character", obj)
+	}
+	stone := w.spawn(t, berserkerStoneID, 150, 0)
+	w.srv.InstallNPCCastSeam(t, stone, modelskill.NewTable([]modelskill.Definition{npcSkill(petrifyID, 1, true)}))
+
+	for _, row := range []struct {
+		standing int
+		skill    modelskill.ID
+	}{{0, aggroBuffID}, {1, plainBuffID}} {
+		ch.SetVarkaKetraAlliance(row.standing)
+		castOwnSkill(w, row.skill)
+		w.srv.Advance(t, 2*time.Second)
+		w.srv.ReadQueued(t, w.srv.Client)
+		if d, ok := castDesire(stone, petrifyID); ok {
+			t.Fatalf("standing %d, buff %d: the berserker wants %+v, want no petrify", row.standing, row.skill, d)
+		}
+	}
+
+	castOwnSkill(w, aggroBuffID)
+	w.srv.AdvanceUntil(t, "the petrify desire", func() bool {
+		_, ok := castDesire(stone, petrifyID)
+		return ok
+	})
+	if d, _ := castDesire(stone, petrifyID); d.Weight != 1000000 || d.FinalTarget == nil || d.FinalTarget.ObjectID() != w.player.ObjectID() {
+		t.Fatalf("petrify desire = %+v, want on the caster, weight 1000000", d)
+	}
+	if got := stone.AggroHate(w.player); got != 0 {
+		t.Fatalf("berserker hate of the allied caster = %v, want none", got)
 	}
 }
