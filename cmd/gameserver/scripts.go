@@ -6,6 +6,7 @@ import (
 	"maps"
 	"path/filepath"
 	"slices"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/commons/idfactory"
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
@@ -254,9 +255,9 @@ func provideScriptSpawner(log zerolog.Logger) *script.Spawner {
 // rates of server.properties, the party range and multiple item drop the
 // kill rewards read, the item id allocator, the NPC spawner, the shared
 // random source, the world the scripts look NPCs up in, the skill and item
-// definitions, the in-game clock, the datapack pages a script reads, the
-// Seven Signs state, the grand boss wait times, the doors scripts open and
-// close, and the castles NPCs belong to with their sieges.
+// definitions, the in-game clock and the wall clock, the datapack pages a
+// script reads, the Seven Signs state, the grand boss wait times, the doors
+// scripts open and close, and the castles NPCs belong to with their sieges.
 func provideScriptEnv(serverProps *config.Properties, rewards manager.KillRewardConfig, journals *script.Quests, ids *idfactory.Allocator, spawner *script.Spawner, state *world.State, data *gameData, clock *task.GameClock, html *datacache.HTML, sevenSigns *sevensigns.State, gameplay gameplayConfig, doors *manager.WorldObjects, castles *castle.Manager, sieges *siege.Engine) (*script.Env, error) {
 	var rates script.Rates
 	for _, r := range []struct {
@@ -286,6 +287,7 @@ func provideScriptEnv(serverProps *config.Properties, rewards manager.KillReward
 		Skills:       data.Skills,
 		GameHour:     clock.Hour,
 		Uptime:       clock.Uptime,
+		Now:          time.Now,
 		Items:        data.Items,
 		Page:         html.Get,
 		SevenSigns:   sevenSigns,
@@ -330,14 +332,16 @@ func buildScripts(*script.Registry) {}
 
 // provideMakers returns the maker registry: every npcmaker runs the maker
 // of its type, the default maker when its type has none, reads the time of
-// day from the game clock, and finds the castles and their sieges and the
-// doors.
+// day from the game clock, finds the castles and their sieges and the
+// doors, draws from the scripts' random source and reads the wall clock
+// the NPC population runs on.
 func provideMakers(clock *task.GameClock, castles *castle.Manager, sieges *siege.Engine, doors *manager.WorldObjects, log zerolog.Logger) (*script.Makers, error) {
 	makers, err := makerCatalog(makerCatalogs())
 	if err != nil {
 		return nil, err
 	}
-	return script.NewMakers(makers, maker.Default, script.MakerWorld{Night: clock.IsNight, Castles: castles, Sieges: sieges, Doors: doors}, log), nil
+	world := script.MakerWorld{Night: clock.IsNight, Castles: castles, Sieges: sieges, Doors: doors, Rand: rnd.Get, Now: time.Now}
+	return script.NewMakers(makers, maker.Default, world, log), nil
 }
 
 // makerCatalogs are the maker catalogs: the makers ported with the engine,

@@ -2,6 +2,7 @@ package script
 
 import (
 	"runtime/debug"
+	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
@@ -22,6 +23,14 @@ type Maker struct {
 // IsNight reports whether it is night in the game world (00:00 to 05:59
 // game time).
 func (m *Maker) IsNight() bool { return m.world.Night() }
+
+// Rnd returns a uniform random int in [0, n), drawn from the scripts'
+// random source; it panics when n is not positive.
+func (m *Maker) Rnd(n int) int { return m.world.Rand(n) }
+
+// Now returns the local wall-clock time, read from the clock the maker's
+// timers run on.
+func (m *Maker) Now() time.Time { return m.world.Now() }
 
 // MakerHooks holds a maker's handlers, one func field per hook; a nil
 // field does not react. The field list, the invokers and With are kept by
@@ -192,6 +201,12 @@ type MakerWorld struct {
 	Sieges Sieges
 	// Doors are the doors of the world; nil finds none.
 	Doors Doors
+	// Rand returns a uniform random int in [0, n), from the source the
+	// scripts draw from (Env.Rand).
+	Rand func(n int) int
+	// Now returns the local wall-clock time, from the clock the maker
+	// timers run on.
+	Now func() time.Time
 }
 
 // CastlesByID finds a castle by its id.

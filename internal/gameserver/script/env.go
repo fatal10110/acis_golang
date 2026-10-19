@@ -68,6 +68,9 @@ type Env struct {
 	GameHour func() int
 	// Uptime returns the real time elapsed since the server started.
 	Uptime func() time.Duration
+	// Now returns the local wall-clock time, from the clock the scripts'
+	// timers run on.
+	Now func() time.Time
 	// Items are the item templates a script reads an item's name from.
 	Items *item.Table
 	// Page returns the datapack page at path, relative to the server root
@@ -162,6 +165,10 @@ func (s *Script) Rnd(n int) int { return s.env.Rand(n) }
 
 // RndBool returns true or false with even odds.
 func (s *Script) RndBool() bool { return s.env.Rand(2) == 0 }
+
+// Now returns the local wall-clock time, read from the clock the script's
+// timers run on.
+func (s *Script) Now() time.Time { return s.env.Now() }
 
 // Spawner returns the spawner the script places NPCs in the world with.
 func (s *Script) Spawner() *Spawner { return s.env.Spawner }

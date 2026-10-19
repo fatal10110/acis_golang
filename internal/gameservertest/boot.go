@@ -2368,7 +2368,7 @@ func Boot(t *testing.T, opts ...Option) *Server {
 			spawnStore: spawnStore, makerCatalog: o.makerCatalog, night: clock.IsNight, castles: gclConfig.Castles, sieges: gclConfig.Sieges, doors: worldObjects,
 			state: state, templates: o.npcs, geo: bootGeo(o.geo), ids: ids, decay: o.decay, ai: ai, positions: positions,
 			items: itemTemplates, ground: groundItems, effects: effectEnv, queues: queues, stance: gclConfig.AttackStance, log: o.log, makers: o.npcSpawns,
-			dropRates: o.npcDropRates, sevenSigns: sevenSigns, scripts: quests.registry, spawner: quests.env.Spawner, routes: o.walkerRoutes,
+			dropRates: o.npcDropRates, sevenSigns: sevenSigns, scripts: quests.registry, spawner: quests.env.Spawner, rand: quests.env.Rand, routes: o.walkerRoutes,
 			skills: o.npcSpawnSkills, zones: o.zones, driftRange: o.maxDriftRange,
 		})
 		// As the game server does once the spawns are up, every castle's

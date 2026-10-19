@@ -56,8 +56,8 @@ func WithScriptRates(r script.Rates) Option {
 	return func(o *options) { o.scriptHelpers().rates = &r }
 }
 
-// WithScriptRand makes rand the random source of every script draw;
-// without it the draws are random.
+// WithScriptRand makes rand the random source of every script and maker
+// draw; without it the draws are random.
 func WithScriptRand(rand func(n int) int) Option {
 	return func(o *options) { o.scriptHelpers().rand = rand }
 }
@@ -208,6 +208,7 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *
 		Skills:     modelskill.NewTable(so.skills),
 		GameHour:   clock.Hour,
 		Uptime:     clock.Uptime,
+		Now:        engine.Now,
 		Items:      items,
 		Page:       html.Get,
 		SevenSigns: sevenSigns,
