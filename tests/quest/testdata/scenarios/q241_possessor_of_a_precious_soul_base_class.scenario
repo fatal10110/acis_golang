@@ -1,0 +1,29 @@
+# Possessor of a Precious Soul - 1 (Q241), refused: a level 76 human Gladiator playing its base
+# class is turned away by Talien, who takes subclasses only; an accept bypass the refusal page
+# does not offer is refused, and the quest is not started.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q241_possessor_of_a_precious_soul_base_class.golden
+character Fighter 76
+class 2
+script quest.Q241_PossessorOfAPreciousSoul
+page default/31739.htm
+page script/quest/Q241_PossessorOfAPreciousSoul/
+npc talien 31739 Folk 10 0 0
+
+# Talien turns away a character playing its base class.
+action talien
+action talien
+  S ActionFailed
+  S NpcHtmlMessage obj=talien item=0 page=default/31739.htm
+  S ActionFailed
+bypass npc_{talien}_Quest
+  S NpcHtmlMessage obj=talien item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31739-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q241_PossessorOfAPreciousSoul CREATED
+  rows Q241_PossessorOfAPreciousSoul -
+
+# An accept bypass the refusal page does not offer is refused, and the quest is not started.
+bypass Quest Q241_PossessorOfAPreciousSoul 31739-03.htm
+  state Q241_PossessorOfAPreciousSoul CREATED
+  rows Q241_PossessorOfAPreciousSoul -

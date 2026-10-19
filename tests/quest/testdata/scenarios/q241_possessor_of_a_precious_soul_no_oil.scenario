@@ -1,0 +1,26 @@
+# Possessor of a Precious Soul - 1 (Q241), at Noel's step (cond 20) on a level 50 Sorcerer
+# subclass without the hellfire oil and the lunargent: Noel asks for them, and a trade bypass his
+# page does not offer is refused, leaving the quest where it is. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q241_possessor_of_a_precious_soul_no_oil.golden
+character Fighter 76
+class 2
+subclass 12 50
+quest Q241_PossessorOfAPreciousSoul <state>=STARTED <cond>=20
+script quest.Q241_PossessorOfAPreciousSoul
+item 6029 6033
+page villagemaster/31272.htm
+page script/quest/Q241_PossessorOfAPreciousSoul/
+npc noel 31272 VillageMasterDwarf 0 30 0
+
+# Noel asks for the lunargent and hellfire oil the player does not hold; a trade bypass his page does not offer is refused.
+action noel
+action noel
+  S ActionFailed
+  S NpcHtmlMessage obj=noel item=0 page=villagemaster/31272.htm
+  S ActionFailed
+bypass npc_{noel}_Quest
+  S NpcHtmlMessage obj=noel item=0 page=script/quest/Q241_PossessorOfAPreciousSoul/31272-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q241_PossessorOfAPreciousSoul 31272-05.htm
+  rows Q241_PossessorOfAPreciousSoul <state>=STARTED <cond>=20

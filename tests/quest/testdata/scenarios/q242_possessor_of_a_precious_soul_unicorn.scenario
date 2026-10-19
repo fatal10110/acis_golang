@@ -1,0 +1,151 @@
+# Possessor of a Precious Soul - 2 (Q242), last part, on a level 60 Sorcerer subclass that has
+# bound three cornerstones with three orbs (cond 9): a Restrainer of Glory leaves the fourth orb
+# and another leaves none; the fourth cornerstone is bound; the Fallen Unicorn is replaced by the
+# Pure White Unicorn three seconds after it is talked to; the Pure White Unicorn's talk moves the
+# quest on, and three seconds later the unicorn the script spawned leaves; Kassandra closes the
+# quest with Caradine's letter; then relog. Expectations replay the reference trace of this
+# scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q242_possessor_of_a_precious_soul_unicorn.golden
+character Fighter 76
+class 2
+subclass 12 60
+quest Q242_PossessorOfAPreciousSoul <state>=STARTED <cond>=9 cornerstone=3 orb=3
+script quest.Q242_PossessorOfAPreciousSoul
+item 7590 7595 7596 7677 7678
+page default/31742.htm
+page default/31743.htm
+page default/31744.htm
+page default/31751.htm
+page default/31752.htm
+page default/30759.htm
+page default/30738.htm
+page default/31748.htm
+page default/31746.htm
+page default/31747.htm
+page script/quest/Q242_PossessorOfAPreciousSoul/
+npc virgil 31742 Folk 10 0 0
+npc kassandra 31743 Folk -10 0 0
+npc ogmar 31744 Folk 0 10 0
+npc knight 31751 Folk 0 -10 0
+npc angel 31752 Folk 20 20 0
+npc kalis 30759 Folk -20 20 0
+npc matild 30738 Folk 20 -20 0
+npc cornerstone 31748 Folk -20 -20 0
+npc fallen 31746 Folk 30 0 0
+npc pure 31747 Folk -30 0 0
+npc restrainer 27317 Monster 40 0 0
+
+# The fourth orb; a fifth restrainer leaves none, as four were given.
+kill restrainer
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7595
+  Q upsert Q242_PossessorOfAPreciousSoul | orb | 4
+  items 7595=1
+  rows Q242_PossessorOfAPreciousSoul <state>=STARTED <cond>=9 cornerstone=3 orb=4
+kill restrainer
+  S SystemMessage id=95 1:0 1:0
+  items 7595=1
+
+# The fourth cornerstone is bound.
+action cornerstone
+action cornerstone
+  S ActionFailed
+  S NpcHtmlMessage obj=cornerstone item=0 page=default/31748.htm
+  S ActionFailed
+bypass npc_{cornerstone}_Quest
+  S NpcHtmlMessage obj=cornerstone item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31748-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q242_PossessorOfAPreciousSoul 31748-03.htm
+  S ActionFailed
+  S SystemMessage id=302 3:7595
+  S QuestList 242:0x800003ff
+  S ExShowQuestMark quest=242
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=cornerstone item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31748-03.htm
+  S ActionFailed
+  Q delete-var Q242_PossessorOfAPreciousSoul | orb
+  Q delete-var Q242_PossessorOfAPreciousSoul | cornerstone
+  Q upsert Q242_PossessorOfAPreciousSoul | <cond> | 10
+  items 7595=0
+  rows Q242_PossessorOfAPreciousSoul <state>=STARTED <cond>=10
+
+# The Fallen Unicorn: three seconds later it is replaced by the Pure White Unicorn.
+action fallen
+action fallen
+  S ActionFailed
+  S NpcHtmlMessage obj=fallen item=0 page=default/31746.htm
+  S ActionFailed
+bypass npc_{fallen}_Quest
+  S NpcHtmlMessage obj=fallen item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31746-02.htm
+  S ActionFailed
+  S ActionFailed
+action fallen
+  S ActionFailed
+  S NpcHtmlMessage obj=fallen item=0 page=default/31746.htm
+  S ActionFailed
+bypass npc_{fallen}_Quest
+  S NpcHtmlMessage obj=fallen item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31746-02.htm
+  S ActionFailed
+  S ActionFailed
+advance 3s
+  S ActionFailed
+
+# The Pure White Unicorn; three seconds later the one the script spawned leaves.
+action pure
+action pure
+  S ActionFailed
+  S NpcHtmlMessage obj=pure item=0 page=default/31747.htm
+  S ActionFailed
+bypass npc_{pure}_Quest
+  S QuestList 242:0x800007ff
+  S ExShowQuestMark quest=242
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=pure item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31747-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q242_PossessorOfAPreciousSoul | <cond> | 11
+  rows Q242_PossessorOfAPreciousSoul <state>=STARTED <cond>=11
+action pure
+  S ActionFailed
+  S NpcHtmlMessage obj=pure item=0 page=default/31747.htm
+  S ActionFailed
+bypass npc_{pure}_Quest
+  S NpcHtmlMessage obj=pure item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31747-02.htm
+  S ActionFailed
+  S ActionFailed
+advance 3s
+
+# Kassandra closes the quest with Caradine's letter.
+action kassandra
+action kassandra
+  S ActionFailed
+  S NpcHtmlMessage obj=kassandra item=0 page=default/31743.htm
+  S ActionFailed
+bypass npc_{kassandra}_Quest
+  S SystemMessage id=54 3:7678
+  S SystemMessage id=45 1:455764
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 242:0x00000000
+  S NpcHtmlMessage obj=kassandra item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31743-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q242_PossessorOfAPreciousSoul | <state> | COMPLETED
+  Q delete-except-state Q242_PossessorOfAPreciousSoul
+  items 7678=1
+  state Q242_PossessorOfAPreciousSoul COMPLETED
+  rows Q242_PossessorOfAPreciousSoul <state>=COMPLETED
+relog
+  state Q242_PossessorOfAPreciousSoul COMPLETED
+  rows Q242_PossessorOfAPreciousSoul <state>=COMPLETED
+  items 7678=1
+action virgil
+action virgil
+  S ActionFailed
+  S NpcHtmlMessage obj=virgil item=0 page=default/31742.htm
+  S ActionFailed
+bypass npc_{virgil}_Quest
+  S NpcHtmlMessage obj=virgil item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

@@ -1,0 +1,197 @@
+# Possessor of a Precious Soul - 2 (Q242), middle part, on a level 60 Sorcerer subclass that has
+# searched three angel corpses (cond 4): the fourth gives the Golden Hair for the Mysterious Dark
+# Knight; Kalis wants Matild's sorcery ingredient (a hand-in bypass her last page does not offer
+# is refused); a Restrainer of Glory leaves an Orb of Binding, which binds the first cornerstone
+# (a use bypass before that is refused), and the cornerstone leaves the world; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q242_possessor_of_a_precious_soul_cornerstones.golden
+character Fighter 76
+class 2
+subclass 12 60
+quest Q242_PossessorOfAPreciousSoul <state>=STARTED <cond>=4 angel=3
+script quest.Q242_PossessorOfAPreciousSoul
+item 7590 7595 7596 7677 7678
+page default/31742.htm
+page default/31743.htm
+page default/31744.htm
+page default/31751.htm
+page default/31752.htm
+page default/30759.htm
+page default/30738.htm
+page default/31748.htm
+page default/31746.htm
+page default/31747.htm
+page script/quest/Q242_PossessorOfAPreciousSoul/
+npc virgil 31742 Folk 10 0 0
+npc kassandra 31743 Folk -10 0 0
+npc ogmar 31744 Folk 0 10 0
+npc knight 31751 Folk 0 -10 0
+npc angel 31752 Folk 20 20 0
+npc kalis 30759 Folk -20 20 0
+npc matild 30738 Folk 20 -20 0
+npc cornerstone 31748 Folk -20 -20 0
+npc fallen 31746 Folk 30 0 0
+npc pure 31747 Folk -30 0 0
+npc restrainer 27317 Monster 40 0 0
+
+# The fourth angel corpse gives the Golden Hair.
+action angel
+action angel
+  S ActionFailed
+  S NpcHtmlMessage obj=angel item=0 page=default/31752.htm
+  S ActionFailed
+bypass npc_{angel}_Quest
+  S ActionFailed
+  S QuestList 242:0x8000001f
+  S ExShowQuestMark quest=242
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7590
+  S NpcHtmlMessage obj=angel item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31752-02.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-var Q242_PossessorOfAPreciousSoul | angel
+  Q upsert Q242_PossessorOfAPreciousSoul | <cond> | 5
+  items 7590=1
+  rows Q242_PossessorOfAPreciousSoul <state>=STARTED <cond>=5
+action knight
+action knight
+  S ActionFailed
+  S NpcHtmlMessage obj=knight item=0 page=default/31751.htm
+  S ActionFailed
+bypass npc_{knight}_Quest
+  S QuestList 242:0x8000003f
+  S ExShowQuestMark quest=242
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=knight item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31751-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q242_PossessorOfAPreciousSoul | <cond> | 6
+action knight
+  S ActionFailed
+  S NpcHtmlMessage obj=knight item=0 page=default/31751.htm
+  S ActionFailed
+bypass npc_{knight}_Quest
+  S NpcHtmlMessage obj=knight item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31751-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Kalis, then Matild's sorcery ingredient; a hand-in bypass the last page does not offer is refused.
+action kalis
+action kalis
+  S ActionFailed
+  S NpcHtmlMessage obj=kalis item=0 page=default/30759.htm
+  S ActionFailed
+bypass npc_{kalis}_Quest
+  S NpcHtmlMessage obj=kalis item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/30759-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q242_PossessorOfAPreciousSoul 30759-02.htm
+  S QuestList 242:0x8000007f
+  S ExShowQuestMark quest=242
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kalis item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/30759-02.htm
+  S ActionFailed
+  Q upsert Q242_PossessorOfAPreciousSoul | <cond> | 7
+bypass Quest Q242_PossessorOfAPreciousSoul 30759-05.htm
+  rows Q242_PossessorOfAPreciousSoul <state>=STARTED <cond>=7
+action kalis
+  S ActionFailed
+  S NpcHtmlMessage obj=kalis item=0 page=default/30759.htm
+  S ActionFailed
+bypass npc_{kalis}_Quest
+  S NpcHtmlMessage obj=kalis item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/30759-03.htm
+  S ActionFailed
+  S ActionFailed
+action matild
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/30738-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q242_PossessorOfAPreciousSoul 30738-02.htm
+  S QuestList 242:0x800000ff
+  S ExShowQuestMark quest=242
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7596
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/30738-02.htm
+  S ActionFailed
+  Q upsert Q242_PossessorOfAPreciousSoul | <cond> | 8
+  items 7596=1
+action matild
+  S ActionFailed
+  S NpcHtmlMessage obj=matild item=0 page=default/30738.htm
+  S ActionFailed
+bypass npc_{matild}_Quest
+  S NpcHtmlMessage obj=matild item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/30738-03.htm
+  S ActionFailed
+  S ActionFailed
+action kalis
+action kalis
+  S ActionFailed
+  S NpcHtmlMessage obj=kalis item=0 page=default/30759.htm
+  S ActionFailed
+bypass npc_{kalis}_Quest
+  S NpcHtmlMessage obj=kalis item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/30759-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q242_PossessorOfAPreciousSoul 30759-05.htm
+  S QuestList 242:0x800001ff
+  S ExShowQuestMark quest=242
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7590
+  S SystemMessage id=302 3:7596
+  S NpcHtmlMessage obj=kalis item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/30759-05.htm
+  S ActionFailed
+  Q upsert Q242_PossessorOfAPreciousSoul | <cond> | 9
+  items 7590=0 7596=0
+  rows Q242_PossessorOfAPreciousSoul <state>=STARTED <cond>=9
+action kalis
+  S ActionFailed
+  S NpcHtmlMessage obj=kalis item=0 page=default/30759.htm
+  S ActionFailed
+bypass npc_{kalis}_Quest
+  S NpcHtmlMessage obj=kalis item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/30759-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# The cornerstone wants an Orb of Binding; a bypass its page does not offer is refused.
+action cornerstone
+action cornerstone
+  S ActionFailed
+  S NpcHtmlMessage obj=cornerstone item=0 page=default/31748.htm
+  S ActionFailed
+bypass npc_{cornerstone}_Quest
+  S NpcHtmlMessage obj=cornerstone item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31748-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q242_PossessorOfAPreciousSoul 31748-03.htm
+  rows Q242_PossessorOfAPreciousSoul <state>=STARTED <cond>=9
+
+# A Restrainer of Glory leaves an orb, which binds the first cornerstone; the cornerstone leaves the world.
+kill restrainer
+  S SystemMessage id=95 1:0 1:0
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7595
+  Q upsert Q242_PossessorOfAPreciousSoul | orb | 1
+  items 7595=1
+  rows Q242_PossessorOfAPreciousSoul <state>=STARTED <cond>=9 orb=1
+action cornerstone
+  S ActionFailed
+  S NpcHtmlMessage obj=cornerstone item=0 page=default/31748.htm
+  S ActionFailed
+bypass npc_{cornerstone}_Quest
+  S NpcHtmlMessage obj=cornerstone item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31748-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q242_PossessorOfAPreciousSoul 31748-03.htm
+  S ActionFailed
+  S SystemMessage id=302 3:7595
+  S NpcHtmlMessage obj=cornerstone item=0 page=script/quest/Q242_PossessorOfAPreciousSoul/31748-03.htm
+  S ActionFailed
+  Q upsert Q242_PossessorOfAPreciousSoul | cornerstone | 1
+  items 7595=0
+  rows Q242_PossessorOfAPreciousSoul <state>=STARTED <cond>=9 orb=1 cornerstone=1
+relog
+  rows Q242_PossessorOfAPreciousSoul <state>=STARTED <cond>=9 orb=1 cornerstone=1
