@@ -28,6 +28,34 @@ func (h *Hostile) MeetsHPMPDisabled(target attackable.Combatant, ref skill.Ref) 
 	return cast != nil && cast.MeetsHPMPDisabled(target, ref)
 }
 
+// CanAttemptCast reports whether h may try its cast of ref at target as far
+// as its skill reuse goes. With no skill waiting for its reuse, it may.
+// Otherwise a stun, meditation, sleep, paralysis or fear locks every
+// skill, and failing that ref's own reuse wait decides. False for no
+// target or a skill h's table lacks.
+func (h *Hostile) CanAttemptCast(target attackable.Combatant, ref skill.Ref) bool {
+	cast := h.brain.CastController()
+	if cast == nil {
+		return false
+	}
+	// The lock is read before ref's own wait, whose check forgets an
+	// expired wait: an expired wait still tracked leaves the lock in force.
+	if h.skillsLocked() {
+		return false
+	}
+	return cast.CanAttempt(target, ref)
+}
+
+// skillsLocked reports whether crowd control keeps h from every skill: it
+// holds a stun, meditation, sleep, paralysis or fear while some skill of
+// its is tracked as waiting for its reuse, expired or not.
+func (h *Hostile) skillsLocked() bool {
+	h.skillMu.Lock()
+	tracked := len(h.disabledSkills) > 0
+	h.skillMu.Unlock()
+	return tracked && (h.Stunned() || h.ImmobileUntilAttacked() || h.Sleeping() || h.Paralyzed() || h.Afraid())
+}
+
 // AttackingNow reports whether h's attack is in flight.
 func (h *Hostile) AttackingNow() bool { return h.brain.AttackingNow() }
 

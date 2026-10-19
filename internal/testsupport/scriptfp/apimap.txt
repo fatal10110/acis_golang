@@ -840,6 +840,10 @@ Siege.getStatus script.Castle.SiegeStatus
 Door.addMakerEvent script.Door.AddMakerEvent
 Quest.addDoorChange inline
 
+# Siegable-hall rows the hall port has named (#3502). An NPC's cast check
+# of a skill's reuse is CanAttemptCast on its handle.
+CreatureCast.canAttemptCast script.NPC.CanAttemptCast
+
 # Siegable-hall rows, exempt from the freeze. Their only callers are the
 # siegable-hall scripts and behaviors, the AgitWarrior subtree and the two quests
 # that read hall siege state; the hall siege runtime does not exist yet.
@@ -867,7 +871,6 @@ ClanTable.getClan exempt
 Creature.doDie exempt
 Creature.getActiveWeaponInstance exempt
 Creature.setInvul exempt
-CreatureCast.canAttemptCast exempt
 CreatureStatus.setHp exempt
 GameTimeTaskManager.getGameTime exempt
 Npc.getClanId exempt
