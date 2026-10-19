@@ -1,15 +1,18 @@
 package catalog
 
-import "github.com/fatal10110/acis_golang/internal/gameserver/script"
+import (
+	"github.com/fatal10110/acis_golang/internal/gameserver/script"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/wizard"
+)
 
 // aiIndividual6 is the catalog of batch 6 of 8 of the individual NPC behaviors (#191).
 func aiIndividual6() script.Catalog {
 	return script.Catalog{
-		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.Elcroki":                                                                 nil,
-		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizard":                                                       nil,
+		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.Elcroki":                                                                 wizard.Elcroki,
+		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizard":                                                       wizard.PartyLeader,
 		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardCastRangeCurseStoneAggressive":                          nil,
 		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardCorpseNecroAggressive":                                  nil,
-		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardDD2":                                                    nil,
+		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardDD2":                                                    wizard.PartyLeaderDD2,
 		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardDD2CurseAggressive":                                     nil,
 		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardDD2Summon":                                              nil,
 		"script.ai.individual.Monster.WizardBase.PartyLeaderWizard.PartyLeaderWizardHereticAggressive":                                      nil,
