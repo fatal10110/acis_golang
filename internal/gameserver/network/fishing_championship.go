@@ -17,7 +17,7 @@ func measureCatch(live *livePlayer, champ *fishchamp.Championship, lure int32) {
 	if !ok {
 		return
 	}
-	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageCaughtFishS1Length, commons.JavaDouble(catch.Length)))
+	live.SendFrame(serverpackets.FrameSystemMessageString(serverpackets.SystemMessageCaughtFishS1Length, commons.FormatDouble(catch.Length)))
 	if catch.Registered {
 		live.SendFrame(serverpackets.FrameSystemMessage(serverpackets.SystemMessageRegisteredInFishSizeRanking))
 	}

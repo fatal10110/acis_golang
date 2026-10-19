@@ -152,7 +152,7 @@ func (l *GameClientLink) requestPetitionCancel(live *livePlayer) {
 // is dropped without an answer on purpose: the client closes its
 // feedback window when it sends the vote and waits on nothing.
 func (l *GameClientLink) petitionVote(live *livePlayer, req clientpackets.PetitionVote) {
-	l.petitions.Vote(live.ObjectID(), req.Rate, strings.TrimFunc(req.Feedback, javaSpace))
+	l.petitions.Vote(live.ObjectID(), req.Rate, strings.TrimFunc(req.Feedback, isCtrlOrSpace))
 }
 
 // chatPetition says live's line in the chat of the petition it sent or

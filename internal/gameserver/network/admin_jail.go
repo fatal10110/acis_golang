@@ -81,7 +81,7 @@ func (l *GameClientLink) adminJail(gm *livePlayer, line string) {
 		target, _ = l.livePlayerByName(name)
 		if len(args) > 1 {
 			var ok bool
-			if minutes, ok = parseJavaInt(args[1]); !ok {
+			if minutes, ok = parseInt32(args[1]); !ok {
 				l.log.Warn().Str("minutes", args[1]).Msg("admin: //jail minutes not a number")
 				return
 			}

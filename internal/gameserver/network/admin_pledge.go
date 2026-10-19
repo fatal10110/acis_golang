@@ -31,7 +31,7 @@ const adminPledgeUsage = "Usage: //pledge create|dismiss|info|level|rep|transfer
 // command runs on the player's queue, where its clan membership changes.
 func (l *GameClientLink) adminPledge(gm *livePlayer, line string) {
 	target := adminTargetPlayer(gm, true)
-	args := javaTokens(line)[1:]
+	args := spaceTokens(line)[1:]
 	onPlayer(gm, target, func() { l.runAdminPledge(gm, target, args) })
 }
 
@@ -99,7 +99,7 @@ func (l *GameClientLink) adminPledgeLevel(gm *livePlayer, cl *clan.Clan, args []
 	var level int32
 	ok := len(args) > 0
 	if ok {
-		level, ok = parseJavaInt(args[0])
+		level, ok = parseInt32(args[0])
 	}
 	switch {
 	case !ok:
@@ -154,7 +154,7 @@ func (l *GameClientLink) adminPledgeReputation(gm, target *livePlayer, cl *clan.
 	var points int32
 	ok := len(args) > 0
 	if ok {
-		points, ok = parseJavaInt(args[0])
+		points, ok = parseInt32(args[0])
 	}
 	if !ok {
 		sendText(gm, "Invalid number parameter for //pledge rep.")

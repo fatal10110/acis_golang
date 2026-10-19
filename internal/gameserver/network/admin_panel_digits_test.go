@@ -2,13 +2,13 @@ package network
 
 import "testing"
 
-// TestParseJavaIntReadsUnicodeDigits pins parseJavaInt to the reference's
+// TestParseInt32ReadsUnicodeDigits pins parseInt32 to the reference's
 // Integer.parseInt: any Basic Multilingual Plane decimal digit reads as its
 // value (a Java probe on OpenJDK 21.0.11, recorded in #3091, prints
 // Integer.parseInt("１２") and Integer.parseInt("١٢") as 12), the sign
 // stays ASCII, the range stays int32, and a fullwidth letter, a digit
 // outside the plane, an empty string and a lone sign read nothing.
-func TestParseJavaIntReadsUnicodeDigits(t *testing.T) {
+func TestParseInt32ReadsUnicodeDigits(t *testing.T) {
 	t.Parallel()
 	for in, want := range map[string]int32{
 		"１２":          12,
@@ -19,13 +19,13 @@ func TestParseJavaIntReadsUnicodeDigits(t *testing.T) {
 		"２１４７４８３６４７":  2147483647,
 		"-２１４７４８３６４８": -2147483648,
 	} {
-		if got, ok := parseJavaInt(in); !ok || got != want {
-			t.Errorf("parseJavaInt(%q) = (%d, %t), want %d", in, got, ok, want)
+		if got, ok := parseInt32(in); !ok || got != want {
+			t.Errorf("parseInt32(%q) = (%d, %t), want %d", in, got, ok, want)
 		}
 	}
 	for _, in := range []string{"", "-", "+", "ａ", "\U0001D7CF", "２１４７４８３６４８", "－１", "1 2"} {
-		if got, ok := parseJavaInt(in); ok {
-			t.Errorf("parseJavaInt(%q) = %d, want no number", in, got)
+		if got, ok := parseInt32(in); ok {
+			t.Errorf("parseInt32(%q) = %d, want no number", in, got)
 		}
 	}
 }

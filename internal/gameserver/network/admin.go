@@ -138,7 +138,7 @@ func (l *GameClientLink) sendBypassBuildCmd(live *livePlayer, req clientpackets.
 	if live == nil {
 		return
 	}
-	text := strings.TrimFunc(req.Command, javaSpace)
+	text := strings.TrimFunc(req.Command, isCtrlOrSpace)
 	word, _, _ := strings.Cut(text, " ")
 	l.runAdminCommand(live, adminChatEntry, "admin_"+word, "admin_"+text, text)
 }

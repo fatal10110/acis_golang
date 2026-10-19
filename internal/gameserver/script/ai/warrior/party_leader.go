@@ -80,7 +80,7 @@ func PartyLeaderHooks() script.Hooks {
 			called, target := e.Called, e.Target
 			if called.IsMaster() && target.Playable() {
 				hateRatio := damageHate(called, float64(e.Damage), defaultnpc.HateRatio(called, target))
-				called.AddAttackDesire(target, float64(commons.JavaInt(hateRatio*float64(e.Damage)*float64(e.Caller.Int(script.SlotWeightPoint))*10)))
+				called.AddAttackDesire(target, float64(commons.TruncInt32Sat(hateRatio*float64(e.Damage)*float64(e.Caller.Int(script.SlotWeightPoint))*10)))
 			}
 		},
 		OnPartyDied: func(s *script.Script, e script.PartyDied) {

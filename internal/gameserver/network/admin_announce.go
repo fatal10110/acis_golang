@@ -54,7 +54,7 @@ func (l *GameClientLink) announceCommand(gm *livePlayer, line string) bool {
 		if len(args) < 2 {
 			return false
 		}
-		l.addAnnouncement(gm, admin.Announcement{Message: args[1], Critical: javaBool(args[0])})
+		l.addAnnouncement(gm, admin.Announcement{Message: args[1], Critical: parseFlag(args[0])})
 		return l.listAnnouncements(gm)
 	case "add_auto":
 		if len(tokens) < 3 {
@@ -66,7 +66,7 @@ func (l *GameClientLink) announceCommand(gm *livePlayer, line string) bool {
 		}
 		var numbers [3]int
 		for i, arg := range args[2:5] {
-			n, ok := parseJavaInt(arg)
+			n, ok := parseInt32(arg)
 			if !ok {
 				return false
 			}
@@ -74,8 +74,8 @@ func (l *GameClientLink) announceCommand(gm *livePlayer, line string) bool {
 		}
 		l.addAnnouncement(gm, admin.Announcement{
 			Message:      args[5],
-			Critical:     javaBool(args[0]),
-			Auto:         javaBool(args[1]),
+			Critical:     parseFlag(args[0]),
+			Auto:         parseFlag(args[1]),
 			InitialDelay: numbers[0],
 			Delay:        numbers[1],
 			Limit:        numbers[2],
@@ -85,7 +85,7 @@ func (l *GameClientLink) announceCommand(gm *livePlayer, line string) bool {
 		if len(tokens) < 3 {
 			return false
 		}
-		index, ok := parseJavaInt(tokens[2])
+		index, ok := parseInt32(tokens[2])
 		if !ok || !l.announcements.Delete(int(index)) {
 			return false
 		}
@@ -193,8 +193,8 @@ func (l *GameClientLink) adminGMChat(gm *livePlayer, line string) {
 	})
 }
 
-// javaBool reads s as a flag: "true" in any case is true, anything else
+// parseFlag reads s as a flag: "true" in any case is true, anything else
 // false.
-func javaBool(s string) bool {
+func parseFlag(s string) bool {
 	return strings.EqualFold(s, "true")
 }

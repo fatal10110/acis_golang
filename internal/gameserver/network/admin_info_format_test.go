@@ -38,9 +38,9 @@ func TestFormatPercentMatchesDecimalFormat(t *testing.T) {
 	}
 }
 
-// TestJavaTokensSplitsOnSpacesOnly pins javaTokens to a StringTokenizer
+// TestSpaceTokensSplitsOnSpacesOnly pins spaceTokens to a StringTokenizer
 // with a space delimiter: other whitespace stays inside a token.
-func TestJavaTokensSplitsOnSpacesOnly(t *testing.T) {
+func TestSpaceTokensSplitsOnSpacesOnly(t *testing.T) {
 	for _, tc := range []struct {
 		in   string
 		want []string
@@ -50,15 +50,15 @@ func TestJavaTokensSplitsOnSpacesOnly(t *testing.T) {
 		{"admin_info  drop 2 ", []string{"admin_info", "drop", "2"}},
 		{"admin_info\tdrop", []string{"admin_info\tdrop"}},
 	} {
-		if got := javaTokens(tc.in); !slices.Equal(got, tc.want) {
-			t.Errorf("javaTokens(%q) = %q, want %q", tc.in, got, tc.want)
+		if got := spaceTokens(tc.in); !slices.Equal(got, tc.want) {
+			t.Errorf("spaceTokens(%q) = %q, want %q", tc.in, got, tc.want)
 		}
 	}
 }
 
-// TestJavaIntArrayMatchesArraysToString pins javaIntArray to
+// TestFormatIntArrayMatchesArraysToString pins formatIntArray to
 // Arrays.toString(int[]).
-func TestJavaIntArrayMatchesArraysToString(t *testing.T) {
+func TestFormatIntArrayMatchesArraysToString(t *testing.T) {
 	for _, tc := range []struct {
 		in   []int
 		want string
@@ -68,8 +68,8 @@ func TestJavaIntArrayMatchesArraysToString(t *testing.T) {
 		{[]int{0, 0, 80, 120}, "[0, 0, 80, 120]"},
 		{[]int{-1}, "[-1]"},
 	} {
-		if got := javaIntArray(tc.in); got != tc.want {
-			t.Errorf("javaIntArray(%v) = %q, want %q", tc.in, got, tc.want)
+		if got := formatIntArray(tc.in); got != tc.want {
+			t.Errorf("formatIntArray(%v) = %q, want %q", tc.in, got, tc.want)
 		}
 	}
 }

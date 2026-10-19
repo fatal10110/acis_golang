@@ -20,7 +20,7 @@ func PartyKillPool(expReward, spReward, partyDamage, totalDamage float64, levelD
 	if partyDamage < totalDamage {
 		share = partyDamage / totalDamage
 	}
-	return commons.JavaLong(float64(exp) * share), int(commons.JavaInt(float64(sp) * share))
+	return commons.TruncInt64Sat(float64(exp) * share), int(commons.TruncInt32Sat(float64(sp) * share))
 }
 
 // PartyXPCutoff is how a party decides which of its rewarded members are
@@ -118,8 +118,8 @@ func (r PartyXPRules) Shares(xpReward int64, spReward int, topLevel int, members
 	// A command channel can reward more than nine members; the bonus stops
 	// at a full party's.
 	bonus := partyBonus[min(valid, 9)]
-	xpReward = commons.JavaLong(float64(xpReward) * (bonus * r.RateXP))
-	spReward = int(commons.JavaInt(float64(spReward) * (bonus * r.RateSP)))
+	xpReward = commons.TruncInt64Sat(float64(xpReward) * (bonus * r.RateXP))
+	spReward = int(commons.TruncInt32Sat(float64(spReward) * (bonus * r.RateSP)))
 
 	validSqLevelSum := 0
 	for i, m := range members {
@@ -134,8 +134,8 @@ func (r PartyXPRules) Shares(xpReward int64, spReward int, topLevel int, members
 		// The penalty is taken from one in single precision, as the
 		// servitor stores it.
 		part := float64(m.Level*m.Level) / float64(validSqLevelSum) * float64(1-m.ServitorPenalty)
-		shares[i].Exp = commons.JavaRound(float64(xpReward) * part)
-		shares[i].Sp = int(commons.JavaInt(float64(spReward) * part))
+		shares[i].Exp = commons.RoundHalfUp(float64(xpReward) * part)
+		shares[i].Sp = int(commons.TruncInt32Sat(float64(spReward) * part))
 	}
 	return shares
 }

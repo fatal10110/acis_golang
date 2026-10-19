@@ -64,7 +64,7 @@ func ParseDialogCommand(command string) DialogReply {
 		if !ok {
 			return DialogReply{Command: DialogAborted}
 		}
-		path := strings.TrimFunc(arg, javaSpace)
+		path := strings.TrimFunc(arg, isCtrlOrSpace)
 		if strings.Contains(path, "..") {
 			return DialogReply{Command: DialogRefused}
 		}

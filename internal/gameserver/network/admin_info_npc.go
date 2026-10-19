@@ -68,7 +68,7 @@ func (l *GameClientLink) adminNpcInfo(gm *livePlayer, obj world.Tracked, inst *n
 	default:
 		page := 0
 		if isDigits(sub) {
-			n, ok := parseJavaInt(sub)
+			n, ok := parseInt32(sub)
 			if !ok {
 				// A page number past the int range aborts: the command
 				// ends with nothing sent.
@@ -98,13 +98,13 @@ func (l *GameClientLink) npcGeneralPage(obj world.Tracked, inst *npc.Instance, i
 			clans = "[" + strings.Join(t.Clans, ", ") + "]"
 		}
 		if t.IgnoredIDs != nil {
-			ignored = javaIntArray(t.IgnoredIDs)
+			ignored = formatIntArray(t.IgnoredIDs)
 		}
 		return fillPage(l.adminHTML("npcinfo/general-1.htm"),
-			"%exp%", commons.JavaDouble(t.RewardExp),
-			"%sp%", commons.JavaDouble(t.RewardSp),
+			"%exp%", commons.FormatDouble(t.RewardExp),
+			"%sp%", commons.FormatDouble(t.RewardSp),
 			"%baseAttackRange%", strconv.Itoa(t.BaseAttackRange),
-			"%baseDamageRange%", javaIntArray(t.BaseDamageRange),
+			"%baseDamageRange%", formatIntArray(t.BaseDamageRange),
 			"%baseRandomDamage%", strconv.Itoa(t.BaseRandomDamage),
 			"%race%", t.Race.EnumName(),
 			"%clan%", clans,
@@ -133,9 +133,9 @@ func (l *GameClientLink) npcGeneralPage(obj world.Tracked, inst *npc.Instance, i
 			"%usingServerSideTitle%", strconv.FormatBool(t.UsingServerSideTitle),
 			"%type%", npcClassName(inst),
 			"%level%", strconv.Itoa(t.Level),
-			"%radius%", commons.JavaDouble(t.CollisionRadius),
-			"%height%", commons.JavaDouble(t.CollisionHeight),
-			"%hitTimeFactor%", commons.JavaDouble(t.HitTimeFactor),
+			"%radius%", commons.FormatDouble(t.CollisionRadius),
+			"%height%", commons.FormatDouble(t.CollisionHeight),
+			"%hitTimeFactor%", commons.FormatDouble(t.HitTimeFactor),
 			"%rHand%", strconv.Itoa(t.RightHand),
 			"%lHand%", strconv.Itoa(t.LeftHand),
 		)
@@ -163,9 +163,9 @@ func (l *GameClientLink) npcResidenceName(inst *npc.Instance) string {
 	return "none"
 }
 
-// javaIntArray formats v as a bracketed, comma-separated list: "[1, 2]",
+// formatIntArray formats v as a bracketed, comma-separated list: "[1, 2]",
 // "null" for no array.
-func javaIntArray(v []int) string {
+func formatIntArray(v []int) string {
 	if v == nil {
 		return "null"
 	}
@@ -217,7 +217,7 @@ func npcStatusOf(obj world.Tracked) npcStatus {
 // combat stats, base stats and element defences.
 func (l *GameClientLink) npcStatPage(s npcStatus, t *npc.Template) string {
 	itoa := strconv.Itoa
-	element := func(res stat.Stat) string { return commons.JavaDouble(s.CalcStat(res, 1)) }
+	element := func(res stat.Stat) string { return commons.FormatDouble(s.CalcStat(res, 1)) }
 	return fillPage(l.adminHTML("npcinfo/stat.htm"),
 		"%hp%", itoa(int(s.HP())),
 		"%hpmax%", itoa(int(s.MaxHPValue())),
@@ -270,7 +270,7 @@ func npcAggroContent(obj world.Tracked) string {
 	b.WriteString(npcInfoRefresh("aggro"))
 	b.WriteString(`<br><table width="280"><tr><td><font color="LEVEL">Attacker</font></td><td><font color="LEVEL">Damage</font></td><td><font color="LEVEL">Hate</font></td></tr>`)
 	for _, th := range threats[:min(len(threats), 15)] {
-		b.WriteString("<tr><td>" + attackerName(th.Attacker) + "</td><td>" + commons.JavaDouble(th.Damage) + "</td><td>" + commons.JavaDouble(th.Hate) + "</td></tr>")
+		b.WriteString("<tr><td>" + attackerName(th.Attacker) + "</td><td>" + commons.FormatDouble(th.Damage) + "</td><td>" + commons.FormatDouble(th.Hate) + "</td></tr>")
 	}
 	b.WriteString(`</table><img src="L2UI.SquareGray" width=280 height=1>`)
 	return b.String()
@@ -307,7 +307,7 @@ func npcDesireContent(obj world.Tracked) string {
 	b.WriteString(npcInfoRefresh("desire"))
 	b.WriteString(`<br><table width="280"><tr><td><font color="LEVEL">Type</font></td><td><font color="LEVEL">Weight</font></td></tr>`)
 	for _, d := range desires {
-		b.WriteString("<tr><td>" + d.Kind.EnumName() + "</td><td>" + commons.JavaDouble(d.Weight) + "</td></tr>")
+		b.WriteString("<tr><td>" + d.Kind.EnumName() + "</td><td>" + commons.FormatDouble(d.Weight) + "</td></tr>")
 	}
 	b.WriteString(`</table><img src="L2UI.SquareGray" width=280 height=1>`)
 	return b.String()

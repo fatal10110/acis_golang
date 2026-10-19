@@ -75,8 +75,8 @@ func (m *dropMerger) ordered() []rolledDrop {
 	return out
 }
 
-// bucketOf is HashMap's bucket index for an Integer key: its hash spread
-// with the high half, masked to the table capacity.
+// bucketOf is the bucket index of itemID in a power-of-two table: the key
+// spread with its high half, masked to the table capacity.
 func bucketOf(itemID int32, capacity int) int {
 	h := uint32(itemID)
 	return int((h ^ h>>16) & uint32(capacity-1))

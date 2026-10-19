@@ -68,7 +68,7 @@ func (l *GameClientLink) adminCursedWeapons(gm *livePlayer, line string) {
 // weapon is.
 func (l *GameClientLink) cursedWeaponNamed(param string) (int32, bool) {
 	if isDigits(param) {
-		return parseJavaInt(param)
+		return parseInt32(param)
 	}
 	name := strings.ToLower(strings.ReplaceAll(param, "_", " "))
 	for _, w := range l.cursed.Weapons() {

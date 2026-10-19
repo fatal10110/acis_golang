@@ -186,7 +186,7 @@ func (s *Service) price(t travel.Teleport, now time.Time, talkerID int32) int {
 		if s.gnosis != nil && s.gnosis(talkerID) {
 			return t.PriceCount
 		}
-		return int(commons.JavaInt(float64(t.PriceCount) * 1.6))
+		return int(commons.TruncInt32Sat(float64(t.PriceCount) * 1.6))
 	}
 	return t.CalculatedPrice(now)
 }

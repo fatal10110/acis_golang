@@ -96,7 +96,7 @@ func manaDamageDoor(cast Cast, d *door.Object, result *Result) {
 		mp = 0
 	}
 	if _, player := asPlayer(cast.Caster); player {
-		result.OpponentMPReduced = append(result.OpponentMPReduced, commons.JavaInt(mp))
-		result.record(OpponentMPReducedMessage{MP: commons.JavaInt(mp)})
+		result.OpponentMPReduced = append(result.OpponentMPReduced, commons.TruncInt32Sat(mp))
+		result.record(OpponentMPReducedMessage{MP: commons.TruncInt32Sat(mp)})
 	}
 }

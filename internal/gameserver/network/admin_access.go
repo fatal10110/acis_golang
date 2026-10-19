@@ -32,7 +32,7 @@ func (l *GameClientLink) adminSetAccess(gm *livePlayer, args []string) {
 	const usage = "Usage: //set access <level> | <name> <level>"
 	switch len(args) {
 	case 1:
-		level, ok := parseJavaInt(args[0])
+		level, ok := parseInt32(args[0])
 		if !ok {
 			sendText(gm, usage)
 			return
@@ -47,7 +47,7 @@ func (l *GameClientLink) adminSetAccess(gm *livePlayer, args []string) {
 		})
 	case 2:
 		name := args[0]
-		level, ok := parseJavaInt(args[1])
+		level, ok := parseInt32(args[1])
 		if !ok {
 			sendText(gm, usage)
 			return
@@ -104,7 +104,7 @@ func (l *GameClientLink) changeAccessLevel(gm, target *livePlayer, level int, re
 func (l *GameClientLink) adminGMOff(gm *livePlayer, line string) {
 	minutes := int32(1)
 	if args := handleradmin.Args(line); len(args) > 0 {
-		if v, ok := parseJavaInt(args[0]); ok {
+		if v, ok := parseInt32(args[0]); ok {
 			minutes = v
 		} else {
 			sendText(gm, "Invalid timer set for //gm ; default time is used.")
@@ -149,7 +149,7 @@ func (l *GameClientLink) adminBan(gm *livePlayer, line string) {
 		target, _ = l.livePlayerByName(name)
 		if len(args) > 2 {
 			var ok bool
-			if minutes, ok = parseJavaInt(args[2]); !ok {
+			if minutes, ok = parseInt32(args[2]); !ok {
 				sendText(gm, usage)
 				return
 			}
@@ -216,7 +216,7 @@ func (l *GameClientLink) adminUnban(gm *livePlayer, line string) {
 			return
 		}
 		l.sendAccountAccessLevel(name, accountUnbannedLevel)
-		sendText(gm, "Unban request sent for account "+javaString(name)+".")
+		sendText(gm, "Unban request sent for account "+orNull(name)+".")
 	case "chat":
 		l.adminUnbanChat(gm, target, name)
 	case "player":
@@ -260,9 +260,9 @@ func (l *GameClientLink) changeCharAccessLevel(gm, target *livePlayer, name stri
 	}
 }
 
-// javaString is s as an admin message prints it, where a missing argument
+// orNull is s as an admin message prints it, where a missing argument
 // is null.
-func javaString(s string) string {
+func orNull(s string) string {
 	if s == "" {
 		return "null"
 	}

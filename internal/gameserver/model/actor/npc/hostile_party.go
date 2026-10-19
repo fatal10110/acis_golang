@@ -42,7 +42,7 @@ func (h *Hostile) attackedHateWeight(attacker attackable.Combatant, damage float
 	if !creature.Playable(attacker) {
 		return flatAttackedHateWeight
 	}
-	return float64(commons.JavaInt(damage)) / (float64(h.Level()) + 7) * 100
+	return float64(commons.TruncInt32Sat(damage)) / (float64(h.Level()) + 7) * 100
 }
 
 // NotifyAggression is an aggression effect source landed on this NPC with
@@ -119,7 +119,7 @@ func (h *Hostile) registerHit(combatant attackable.Combatant, amount float64, is
 		h.RollAttackedShotRecharge()
 	}
 	h.lastAttacker.Store(&attackerRef{c: combatant})
-	damage := int(commons.JavaInt(amount))
+	damage := int(commons.TruncInt32Sat(amount))
 	h.raiseAttacked(combatant, int32(damage), sk)
 	propagatePartyAttacked(h, combatant, damage, false, true)
 	raiseClanAttacked(h.scripts, h.world, h, combatant, int32(damage), sk, clanAttackedByHit)

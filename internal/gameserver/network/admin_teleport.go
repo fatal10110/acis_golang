@@ -81,7 +81,7 @@ func (l *GameClientLink) adminInstantMove(gm *livePlayer, args []string) {
 		gm.teleportMode = teleportModeOnce
 		return
 	}
-	mode, ok := parseJavaInt(args[0])
+	mode, ok := parseInt32(args[0])
 	if !ok || mode < int32(teleportModeNone) || mode > int32(teleportModeAlways) {
 		sendText(gm, "Usage: //instant_move [0|1|2]")
 		return
@@ -194,7 +194,7 @@ func (l *GameClientLink) adminTeleportTo(gm *livePlayer, args []string) {
 	var coords [3]int32
 	n := min(len(args), 3)
 	for i := range n {
-		v, ok := parseJavaInt(args[i])
+		v, ok := parseInt32(args[i])
 		if !ok {
 			l.sendAdminFile(gm, "teleports.htm")
 			return

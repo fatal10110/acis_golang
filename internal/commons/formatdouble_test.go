@@ -7,7 +7,7 @@ import (
 
 // The expected strings are what the reference's String.valueOf(double)
 // prints for each value.
-func TestJavaDouble(t *testing.T) {
+func TestFormatDouble(t *testing.T) {
 	// A sum taken at run time, unlike a constant one, rounds as the
 	// reference's double arithmetic does.
 	base, bonus := 77.3, 1.1
@@ -29,8 +29,8 @@ func TestJavaDouble(t *testing.T) {
 		{math.Inf(1), "Infinity"},
 		{math.Inf(-1), "-Infinity"},
 	} {
-		if got := JavaDouble(tc.v); got != tc.want {
-			t.Errorf("JavaDouble(%v) = %q, want %q", tc.v, got, tc.want)
+		if got := FormatDouble(tc.v); got != tc.want {
+			t.Errorf("FormatDouble(%v) = %q, want %q", tc.v, got, tc.want)
 		}
 	}
 }

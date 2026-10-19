@@ -176,7 +176,7 @@ func (l *List) Check(m Macro, commandText int) Refusal {
 func (l *List) nameTaken(m Macro) bool {
 	for _, id := range l.order {
 		other := l.byID[id]
-		if other.ID != m.ID && equalFoldJava(other.Name, m.Name) {
+		if other.ID != m.ID && equalFoldUTF16(other.Name, m.Name) {
 			return true
 		}
 	}
@@ -296,10 +296,10 @@ func tokens(s string, sep byte) []string {
 	return out
 }
 
-// equalFoldJava compares a and b ignoring case code point by code point,
+// equalFoldUTF16 compares a and b ignoring case code point by code point,
 // matching on equal code points, equal upper cases, or equal lower cases
 // of the upper cases; strings of different UTF-16 length never match.
-func equalFoldJava(a, b string) bool {
+func equalFoldUTF16(a, b string) bool {
 	if commons.UTF16Len(a) != commons.UTF16Len(b) {
 		return false
 	}

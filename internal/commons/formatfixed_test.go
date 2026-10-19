@@ -7,7 +7,7 @@ import (
 
 // The expected strings are what the reference's String.format with
 // Locale.ENGLISH prints for each value.
-func TestJavaFixed(t *testing.T) {
+func TestFormatFixed(t *testing.T) {
 	cases := []struct {
 		f        float64
 		decimals int
@@ -31,8 +31,8 @@ func TestJavaFixed(t *testing.T) {
 		{math.Inf(1), 2, "Infinity"},
 	}
 	for _, c := range cases {
-		if got := JavaFixed(c.f, c.decimals); got != c.want {
-			t.Errorf("JavaFixed(%v, %d) = %q, want %q", c.f, c.decimals, got, c.want)
+		if got := FormatFixed(c.f, c.decimals); got != c.want {
+			t.Errorf("FormatFixed(%v, %d) = %q, want %q", c.f, c.decimals, got, c.want)
 		}
 	}
 }

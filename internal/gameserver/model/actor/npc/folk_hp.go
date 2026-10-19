@@ -138,7 +138,7 @@ func (f *Folk) loseHP(amount float64, attacker attackable.Combatant, sk modelski
 	}
 	if attacker != nil && hit {
 		f.fight.aggro.AddDamage(attacker, amount, 0)
-		damage := commons.JavaInt(amount)
+		damage := commons.TruncInt32Sat(amount)
 		f.raiseAttacked(attacker, damage, sk)
 		propagatePartyAttacked(f, attacker, int(damage), false, true)
 		raiseClanAttacked(f.scripts, f.world, f, attacker, damage, sk, clanAttackedByHit)

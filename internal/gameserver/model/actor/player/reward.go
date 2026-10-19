@@ -50,5 +50,5 @@ func KillRewardExpAndSp(expReward, spReward float64, damage, totalDamage float64
 	if spF <= 0 {
 		spF = 0
 	}
-	return int64(commons.JavaInt(xp)), int(commons.JavaInt(spF))
+	return int64(commons.TruncInt32Sat(xp)), int(commons.TruncInt32Sat(spF))
 }

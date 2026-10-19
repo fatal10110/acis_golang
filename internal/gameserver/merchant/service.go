@@ -178,7 +178,7 @@ func (s *Service) Buy(inv *itemcontainer.Inventory, list buylist.List, rows []Bu
 		}
 		price := int32(p.Price)
 		if p.SiegeGuardTicket() {
-			price = commons.JavaInt(float64(price) * s.cfg.SiegeGuardsPriceRate)
+			price = commons.TruncInt32Sat(float64(price) * s.cfg.SiegeGuardsPriceRate)
 		}
 		if price < 0 || (price == 0 && !gm) {
 			return Purchase{}, nil
@@ -191,7 +191,7 @@ func (s *Service) Buy(inv *itemcontainer.Inventory, list buylist.List, rows []Bu
 		}
 		// The tax applies to the unit price, before the count; the 32-bit
 		// products wrap as int32 arithmetic does.
-		price = commons.JavaInt(float64(price) * (1 + taxRate))
+		price = commons.TruncInt32Sat(float64(price) * (1 + taxRate))
 		subtotal += int64(row.Count * price)
 		if subtotal > math.MaxInt32 {
 			return Purchase{}, nil

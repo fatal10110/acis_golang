@@ -209,7 +209,7 @@ func ApplyPhysicalAttackDamage(in formulas.PhysicalAttackInput, shield formulas.
 	if shield != formulas.ShieldPerfect {
 		damage = formulas.PhysicalAttackDamage(in)
 	}
-	hit := int(commons.JavaInt(damage))
+	hit := int(commons.TruncInt32Sat(damage))
 	if split {
 		hit /= 2
 	}
