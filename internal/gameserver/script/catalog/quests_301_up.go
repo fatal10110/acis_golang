@@ -10,6 +10,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q320"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q324"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q325"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q330"
 )
 
 // quests301Up is the catalog of quests 301 and up (#184), except the ten the engine slices ported.
@@ -27,7 +28,7 @@ func quests301Up() script.Catalog {
 		"quest.Q327_RecoverTheFarmland":                nil,
 		"quest.Q328_SenseForBusiness":                  nil,
 		"quest.Q329_CuriosityOfADwarf":                 nil,
-		"quest.Q330_AdeptOfTaste":                      nil,
+		"quest.Q330_AdeptOfTaste":                      q330.New,
 		"quest.Q331_ArrowOfVengeance":                  nil,
 		"quest.Q333_HuntOfTheBlackLion":                nil,
 		"quest.Q334_TheWishingPotion":                  nil,
