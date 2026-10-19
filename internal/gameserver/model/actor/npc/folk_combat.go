@@ -51,6 +51,8 @@ type folkCombat struct {
 	seeDistance int
 	// heldMask is the item-type bits of the template's weapon and shield.
 	heldMask int32
+	// regenSettings is FolkRuntime.Regen, set by Attach.
+	regenSettings RegenSettings
 	// roll overrides the combat random source; nil draws at random.
 	roll func(n int) int
 
@@ -128,6 +130,9 @@ type FolkRuntime struct {
 	// Tower is a control tower's siege and working form; a control tower
 	// without them stands dead for good. Any other NPC ignores it.
 	Tower TowerRuntime
+	// Regen answers the base regeneration multipliers in force; nil takes
+	// the shipped ones.
+	Regen RegenSettings
 }
 
 // FolkRemover takes a civilian NPC out of the world at once, with no
@@ -163,6 +168,7 @@ func (f *Folk) Attach(rt FolkRuntime) error {
 	f.world, f.queue, f.sink, f.los, f.decay = rt.World, rt.Queue, rt.Sink, rt.LOS, rt.Decay
 	f.scripts, f.remover, f.ground = rt.Scripts, rt.Remover, rt.Ground
 	f.seeDistance = rt.SeeRange
+	f.regenSettings = rt.Regen
 	if f.Tower() {
 		f.towerState.siege, f.towerState.working = rt.Tower.Siege, rt.Tower.Working
 	}

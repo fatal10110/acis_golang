@@ -34,6 +34,8 @@ type Settings interface {
 	// RespawnRestoreHP is the share of max HP a revive without a Phoenix
 	// Blessing restores.
 	RespawnRestoreHP() float64
+	// RegenMultipliers scale the base HP and MP regeneration.
+	RegenMultipliers() creature.RegenMultipliers
 }
 
 // AI is the summon intention loop controlled by owner commands and effects.

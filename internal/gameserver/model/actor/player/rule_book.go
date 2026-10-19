@@ -3,6 +3,8 @@ package player
 import (
 	"sync/atomic"
 	"time"
+
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/creature"
 )
 
 // RuleBook holds the Rules in force for every character configured with it.
@@ -33,6 +35,11 @@ func (b *RuleBook) MaxBuffsAmount() int {
 // Blessing restores, in force.
 func (b *RuleBook) RespawnRestoreHP() float64 {
 	return b.rules.Load().RespawnRestoreHP
+}
+
+// RegenMultipliers are the base regeneration multipliers in force.
+func (b *RuleBook) RegenMultipliers() creature.RegenMultipliers {
+	return b.rules.Load().Regen.InForce()
 }
 
 // unconfiguredRules are the rules of a character not configured yet.

@@ -235,14 +235,16 @@ func (f *Folk) MaxMPValue() float64 {
 	return math.Trunc(f.CalcStat(stat.MaxMP, f.Instance.Template.MPMax))
 }
 
-// HPRegenRate returns the HP regenerated per tick.
+// HPRegenRate returns the HP regenerated per tick: the configured multiple
+// of the template base, through the stat calculator.
 func (f *Folk) HPRegenRate() float64 {
-	return f.CalcStat(stat.RegenerateHPRate, f.Instance.Template.HPRegen)
+	return f.CalcStat(stat.RegenerateHPRate, f.Instance.Template.HPRegen*regenInForce(f.regenSettings).HP)
 }
 
-// MPRegenRate returns the MP regenerated per tick.
+// MPRegenRate returns the MP regenerated per tick: the configured multiple
+// of the template base, through the stat calculator.
 func (f *Folk) MPRegenRate() float64 {
-	return f.CalcStat(stat.RegenerateMPRate, f.Instance.Template.MPRegen)
+	return f.CalcStat(stat.RegenerateMPRate, f.Instance.Template.MPRegen*regenInForce(f.regenSettings).MP)
 }
 
 // MoveSpeed is the current move speed: the template run or walk speed the

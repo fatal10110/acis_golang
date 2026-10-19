@@ -27,8 +27,6 @@ var pendingKeys = map[string][]string{
 		"AnakazelPortChance", "AutoJumpsDelayMin", "AutoJumpsDelayRnd", "CaptainCost", "CommanderCost", "HeroCost", "NeededPartyMembers",
 		"OfficerCost", "RecruitCost", "RiftMinPartySize", "SoldierCost",
 	},
-	// Regeneration multipliers: #3938.
-	"players.properties": {"CpRegenMultiplier", "HpRegenMultiplier", "MpRegenMultiplier"},
 }
 
 // referenceKeys reads testdata/reference_keys.golden: the keys the

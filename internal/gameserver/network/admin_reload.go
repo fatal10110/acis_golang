@@ -31,10 +31,12 @@ type DataReloads struct {
 	// Config reads the game server properties files anew into the player
 	// settings, which then replace the ones in force. Each read of a
 	// setting after the swap sees the reloaded value, the rules of the
-	// characters and summons already in the world, the kill reward settings
-	// (party loot, the scripts and item creation share their party range
-	// and multiple item drop rule) and the enchant, skill, craft and
-	// multisell switches included. Every setting outside PlayerConfig
+	// characters and summons already in the world, the regeneration
+	// multipliers every creature's base regeneration takes, the kill reward
+	// settings (party loot, the scripts and item creation share their
+	// party range and multiple item drop rule, NPC hate randomization
+	// their party range) and the enchant, skill, craft and multisell
+	// switches included. Every setting outside PlayerConfig
 	// keeps its boot value; the composition root that builds this hook
 	// lists them.
 	Config func() (PlayerConfig, error)

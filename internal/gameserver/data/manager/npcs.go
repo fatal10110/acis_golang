@@ -293,6 +293,9 @@ type Npcs struct {
 	// guarded resolves the siege a siege guard defends, and the one a
 	// control tower stands for; nil gives none. Set once, before any spawn.
 	guarded func(*npc.Instance) npc.GuardedSiege
+	// regen answers the base regeneration multipliers of every NPC; nil
+	// gives the shipped ones. Set once, before any spawn.
+	regen npc.RegenSettings
 }
 
 // SetGroundTaker makes t take the ground items the NPCs spawned from now on
@@ -300,6 +303,13 @@ type Npcs struct {
 func (n *Npcs) SetGroundTaker(t npc.GroundTaker) {
 	n.pickUps = t
 	n.folk.Ground = t
+}
+
+// SetRegenSettings makes every NPC spawned from now on read its base
+// regeneration multipliers from s. Call it before SpawnOnStart.
+func (n *Npcs) SetRegenSettings(s npc.RegenSettings) {
+	n.regen = s
+	n.folk.Regen = s
 }
 
 // SetGuardedSieges makes resolve give each siege guard spawned from now on

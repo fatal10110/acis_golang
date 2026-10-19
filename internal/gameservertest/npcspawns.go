@@ -1,6 +1,7 @@
 package gameservertest
 
 import (
+	"cmp"
 	"context"
 	"maps"
 	"testing"
@@ -97,7 +98,10 @@ type npcSpawnDeps struct {
 	stance    network.AttackStanceTracker
 	makers    *spawn.Table
 	dropRates item.Rates
-	log       zerolog.Logger
+	// partyRange is the WithPartyRange party range; 0 keeps the shipped
+	// one.
+	partyRange int
+	log        zerolog.Logger
 	// sevenSigns is the state the Seven Signs groups follow, and whose
 	// period changes swap them.
 	sevenSigns *sevensigns.State
@@ -205,7 +209,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 		aiConfig.DriftRange = deps.driftRange
 	}
 	npcs, err := gamemanager.NewNpcsWithMaxBuffsAmount(gamemanager.NewSpawns(deps.makers, states), templates, deps.geo, deps.state, deps.ids,
-		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Settings: gamemanager.NewKillRewardBook(gamemanager.KillRewardSettings{Rates: deps.dropRates, RateXP: 1, RateSP: 1})}, time.Now, deps.log,
+		decay, respawn, ai, deps.positions, deps.items, deps.ground, gamemanager.KillRewardConfig{Settings: gamemanager.NewKillRewardBook(gamemanager.KillRewardSettings{Rates: deps.dropRates, PartyRange: cmp.Or(deps.partyRange, fixturePartyRange), RateXP: 1, RateSP: 1})}, time.Now, deps.log,
 		deps.skills, castEffects, walker, link.HostileSinks(deps.state, deps.stance), link.FolkSinks(deps.state, deps.stance),
 		20, 0, 0, npc.DefaultRaidMultipliers(), aiConfig, gamemanager.DefaultSpawnEvents(), deps.effects, deps.queues,
 		script.NewMakers(makers, maker.Default, makerWorld, deps.log), deps.scripts, deps.zones)
@@ -218,6 +222,7 @@ func bootNpcSpawns(t *testing.T, link *network.GameClientLink, deps npcSpawnDeps
 	npcs.SetGroundTaker(link)
 	npcs.SetGuardedSieges(link.GuardedSiege)
 	npcs.SetSpawnTimes(network.SpawnTimes(link))
+	npcs.SetRegenSettings(link.PlayerRules())
 	link.SetNpcSpawns(npcs)
 	npcs.SetNoSpawns(deps.noSpawns)
 	npcs.SpawnOnStart()
