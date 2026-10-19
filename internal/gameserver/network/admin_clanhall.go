@@ -28,12 +28,13 @@ var adminClanHallTowns = []string{"Aden", "Dion", "Giran", "Gludin", "Gludio", "
 //   - open and close open and close its gates;
 //   - teleportto moves the GM to one of its owner restart points;
 //   - end ends its auction now;
-//   - siege start|end checks its arguments and that the hall is siegable.
+//   - siege start closes a siegable hall's registrations and starts its
+//     siege at once; siege end ends the siege being fought.
 //
 // Each then opens the hall's page; an unknown action does nothing more.
 // Without one to three arguments, or with an id no hall has, the hall list
-// opens instead. An id that does not parse is answered with the usage
-// alone.
+// opens instead. An id that does not parse, or a siege start on a hall no
+// script runs the siege of, is answered with the usage alone.
 func (l *GameClientLink) adminClanHall(gm *livePlayer, line string) {
 	args := strings.FieldsFunc(line, func(r rune) bool { return r == ' ' })
 	if len(args) > 0 {
@@ -88,7 +89,10 @@ func (l *GameClientLink) adminClanHall(gm *livePlayer, line string) {
 			sendText(gm, "This ClanHall doesn't hold an auction.")
 		}
 	case "siege":
-		l.adminClanHallSiege(gm, hall.ID, param2)
+		if !l.adminClanHallSiege(gm, hall.ID, param2) {
+			sendText(gm, adminClanHallUsage)
+			return
+		}
 	}
 	hall, _ = l.halls.View(hall.ID)
 	l.showAdminClanHall(gm, hall)
@@ -118,19 +122,35 @@ func (l *GameClientLink) adminClanHallSet(gm *livePlayer, hallID int32) {
 
 // adminClanHallSiege answers //ch siege <action> <hallId>: an action
 // missing or all digits gets the usage, a hall that is not siegable says
-// so.
-func (l *GameClientLink) adminClanHallSiege(gm *livePlayer, hallID int32, action string) {
+// so, start refuses a siege being fought and otherwise closes the
+// registrations to start the siege at once, end refuses a siege not being
+// fought and otherwise ends it. It reports false when the hall has no
+// siege to start or end: no script runs it.
+func (l *GameClientLink) adminClanHallSiege(gm *livePlayer, hallID int32, action string) bool {
 	switch {
 	case action == "" || isDigits(action):
 		sendText(gm, "Usage: //ch siege start|end chId.")
+		return true
 	case !l.clanHallData.Siegable(int(hallID)):
 		sendText(gm, "This ClanHall isn't siegable.")
-	case action == "start" || action == "end":
-		// ponytail: starting and ending a siegable hall's siege through
-		// clanhall.HallSiege (Instant, End) waits for #3365; until then
-		// the GM gets the hall's page alone.
-		l.log.Warn().Int32("hall_id", hallID).Str("action", action).Msg("admin: //ch siege start and end are not wired yet")
+		return true
 	}
+	s, ok := l.halls.Siege(hallID)
+	switch action {
+	case "start":
+		if ok && s.InProgress() {
+			sendText(gm, "This ClanHall is already besieged.")
+			return true
+		}
+		return ok && s.Instant()
+	case "end":
+		if !ok || !s.InProgress() {
+			sendText(gm, "This ClanHall isn't currently besieged.")
+			return true
+		}
+		return s.End()
+	}
+	return true
 }
 
 // showAdminClanHall opens hall v's page for gm.
