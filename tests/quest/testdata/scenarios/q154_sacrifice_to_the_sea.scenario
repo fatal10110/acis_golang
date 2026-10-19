@@ -1,0 +1,234 @@
+# Sacrifice to the Sea (Q154): a level 2 character accepts at Rockswell; Rolfe and Cristel have
+# nothing yet; ten bearded keltirs give ten fox furs (every roll pinned to succeed); Cristel
+# spins them into yarn, Rolfe makes the yarn a maiden doll, and Rockswell takes the doll for an
+# earring and experience; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q154_sacrifice_to_the_sea.golden
+character Sailor 2
+random always 0
+script quest.Q154_SacrificeToTheSea
+item 1032 1033 1034 113
+page default/30312.htm
+page default/30051.htm
+page warehouse/30055.htm
+page script/quest/Q154_SacrificeToTheSea/
+npc rockswell 30312 Folk 10 0 0
+npc cristel 30051 Folk 20 0 0
+npc rolfe 30055 WarehouseKeeper 30 0 0
+npc keltir 20481 Monster 40 0 0
+
+# Rockswell: accept.
+action rockswell
+action rockswell
+  S ActionFailed
+  S NpcHtmlMessage obj=rockswell item=0 page=default/30312.htm
+  S ActionFailed
+bypass npc_{rockswell}_Quest
+  S NpcHtmlMessage obj=rockswell item=0 page=script/quest/Q154_SacrificeToTheSea/30312-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q154_SacrificeToTheSea CREATED
+bypass Quest Q154_SacrificeToTheSea 30312-04.htm
+  S QuestList 154:0x80000001
+  S ExShowQuestMark quest=154
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=rockswell item=0 page=script/quest/Q154_SacrificeToTheSea/30312-04.htm
+  S ActionFailed
+  Q upsert Q154_SacrificeToTheSea | <state> | STARTED
+  Q upsert Q154_SacrificeToTheSea | <cond> | 1
+  state Q154_SacrificeToTheSea STARTED
+  rows Q154_SacrificeToTheSea <cond>=1 <state>=STARTED
+action rockswell
+  S ActionFailed
+  S NpcHtmlMessage obj=rockswell item=0 page=default/30312.htm
+  S ActionFailed
+bypass npc_{rockswell}_Quest
+  S NpcHtmlMessage obj=rockswell item=0 page=script/quest/Q154_SacrificeToTheSea/30312-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Cristel wants furs, Rolfe has nothing yet.
+action cristel
+action cristel
+  S ActionFailed
+  S NpcHtmlMessage obj=cristel item=0 page=default/30051.htm
+  S ActionFailed
+bypass npc_{cristel}_Quest
+  S NpcHtmlMessage obj=cristel item=0 page=script/quest/Q154_SacrificeToTheSea/30051-01a.htm
+  S ActionFailed
+  S ActionFailed
+action rolfe
+action rolfe
+  S ActionFailed
+  S NpcHtmlMessage obj=rolfe item=0 page=warehouse/30055.htm
+  S ActionFailed
+bypass npc_{rolfe}_Quest
+  S NpcHtmlMessage obj=rolfe item=0 page=script/quest/Q154_SacrificeToTheSea/30055-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ten bearded keltirs: a fur each; the tenth completes the set.
+kill keltir
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1032
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1032=1
+  rows Q154_SacrificeToTheSea <cond>=1 <state>=STARTED
+action cristel
+action cristel
+  S ActionFailed
+  S NpcHtmlMessage obj=cristel item=0 page=default/30051.htm
+  S ActionFailed
+bypass npc_{cristel}_Quest
+  S NpcHtmlMessage obj=cristel item=0 page=script/quest/Q154_SacrificeToTheSea/30051-01.htm
+  S ActionFailed
+  S ActionFailed
+kill keltir x9
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1032
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1032
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1032
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1032
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1032
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1032
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1032
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1032
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1032
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 154:0x80000003
+  S ExShowQuestMark quest=154
+  Q upsert Q154_SacrificeToTheSea | <cond> | 2
+  items 1032=10
+  rows Q154_SacrificeToTheSea <cond>=2 <state>=STARTED
+action rockswell
+action rockswell
+  S ActionFailed
+  S NpcHtmlMessage obj=rockswell item=0 page=default/30312.htm
+  S ActionFailed
+bypass npc_{rockswell}_Quest
+  S NpcHtmlMessage obj=rockswell item=0 page=script/quest/Q154_SacrificeToTheSea/30312-08.htm
+  S ActionFailed
+  S ActionFailed
+
+# Cristel: the furs for the yarn.
+action cristel
+action cristel
+  S ActionFailed
+  S NpcHtmlMessage obj=cristel item=0 page=default/30051.htm
+  S ActionFailed
+bypass npc_{cristel}_Quest
+  S QuestList 154:0x80000007
+  S ExShowQuestMark quest=154
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:1032 6:10
+  S SystemMessage id=54 3:1033
+  S NpcHtmlMessage obj=cristel item=0 page=script/quest/Q154_SacrificeToTheSea/30051-02.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q154_SacrificeToTheSea | <cond> | 3
+  items 1032=0 1033=1
+  rows Q154_SacrificeToTheSea <cond>=3 <state>=STARTED
+action cristel
+  S ActionFailed
+  S NpcHtmlMessage obj=cristel item=0 page=default/30051.htm
+  S ActionFailed
+bypass npc_{cristel}_Quest
+  S NpcHtmlMessage obj=cristel item=0 page=script/quest/Q154_SacrificeToTheSea/30051-03.htm
+  S ActionFailed
+  S ActionFailed
+action rockswell
+action rockswell
+  S ActionFailed
+  S NpcHtmlMessage obj=rockswell item=0 page=default/30312.htm
+  S ActionFailed
+bypass npc_{rockswell}_Quest
+  S NpcHtmlMessage obj=rockswell item=0 page=script/quest/Q154_SacrificeToTheSea/30312-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Rolfe: the yarn for the maiden doll.
+action rolfe
+action rolfe
+  S ActionFailed
+  S NpcHtmlMessage obj=rolfe item=0 page=warehouse/30055.htm
+  S ActionFailed
+bypass npc_{rolfe}_Quest
+  S QuestList 154:0x8000000f
+  S ExShowQuestMark quest=154
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:1033
+  S SystemMessage id=54 3:1034
+  S NpcHtmlMessage obj=rolfe item=0 page=script/quest/Q154_SacrificeToTheSea/30055-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q154_SacrificeToTheSea | <cond> | 4
+  items 1033=0 1034=1
+  rows Q154_SacrificeToTheSea <cond>=4 <state>=STARTED
+action rolfe
+  S ActionFailed
+  S NpcHtmlMessage obj=rolfe item=0 page=warehouse/30055.htm
+  S ActionFailed
+bypass npc_{rolfe}_Quest
+  S NpcHtmlMessage obj=rolfe item=0 page=script/quest/Q154_SacrificeToTheSea/30055-02.htm
+  S ActionFailed
+  S ActionFailed
+action cristel
+action cristel
+  S ActionFailed
+  S NpcHtmlMessage obj=cristel item=0 page=default/30051.htm
+  S ActionFailed
+bypass npc_{cristel}_Quest
+  S NpcHtmlMessage obj=cristel item=0 page=script/quest/Q154_SacrificeToTheSea/30051-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Rockswell: the doll for the earring; the quest completes.
+action rockswell
+action rockswell
+  S ActionFailed
+  S NpcHtmlMessage obj=rockswell item=0 page=default/30312.htm
+  S ActionFailed
+bypass npc_{rockswell}_Quest
+  S SystemMessage id=302 3:1034
+  S SystemMessage id=54 3:113
+  S SystemMessage id=45 1:100
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 154:0x00000000
+  S NpcHtmlMessage obj=rockswell item=0 page=script/quest/Q154_SacrificeToTheSea/30312-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q154_SacrificeToTheSea | <state> | COMPLETED
+  Q delete-except-state Q154_SacrificeToTheSea
+  items 1034=0 113=1
+  state Q154_SacrificeToTheSea COMPLETED
+  rows Q154_SacrificeToTheSea <state>=COMPLETED
+
+# Relog: the completed quest loads from its one row, and the reward stays.
+relog
+  state Q154_SacrificeToTheSea COMPLETED
+  rows Q154_SacrificeToTheSea <state>=COMPLETED
+  items 113=1
+action rockswell
+action rockswell
+  S ActionFailed
+  S NpcHtmlMessage obj=rockswell item=0 page=default/30312.htm
+  S ActionFailed
+bypass npc_{rockswell}_Quest
+  S NpcHtmlMessage obj=rockswell item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
