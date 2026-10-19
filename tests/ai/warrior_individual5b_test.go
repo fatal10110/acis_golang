@@ -312,6 +312,31 @@ func TestTeleportBombJumpsBackWhenIdle(t *testing.T) {
 	}
 }
 
+// TestTeleportBombStaysAfterItsJump ports the jump guard of
+// WarriorTeleportBombAggressive's no-desire hook: once it jumped onto the
+// character, an idle AI cycle 10 s after its creation leaves it on the
+// character with no teleport effect wanted.
+func TestTeleportBombStaysAfterItsJump(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual5b(t, ind5bTemplate(ind5bTeleportBombID, nil))
+	h := w.spawn(t, ind5bTeleportBombID, 300, 0)
+	w.ticks(t, 1)
+	if got := ind1Slot(h, script.SlotIntAI1); got != 1 {
+		t.Fatalf("IntAI1 after seeing the character = %d, want 1", got)
+	}
+	x, y, _ := h.Position()
+	created := ind1Slot(h, script.SlotIntAI0)
+	w.onQueue(t, h, func() {
+		h.AI().Desires().Clear()
+		script.NPCOf(h).SetInt(script.SlotIntAI0, created-10)
+	})
+	w.ticks(t, 1)
+	if nx, ny, _ := h.Position(); nx != x || ny != y {
+		t.Fatalf("bomb at %d,%d after an idle cycle, want still on the character at %d,%d", nx, ny, x, y)
+	}
+	ind5bNoCast(t, "an idle cycle after its jump", h, ind5bTeleportFx)
+}
+
 // TestCastEnchant1Of4BuffsOnTheFirstHit ports WarriorCastEnchant1Of4's
 // created and attacked hooks. Its creation draws which of its four self
 // buffs it keeps: 2, its third. The first hit by the character, on a draw
@@ -440,6 +465,27 @@ func TestCorpseGhostBuffsItselfOnItsTimer(t *testing.T) {
 	w.onQueue(t, n, func() { n.AI().Desires().Clear() })
 	w.srv.Advance(t, 10*time.Second)
 	ind5bNoCast(t, "at a timer while it holds the buff", n, ind5bGhostBuff)
+}
+
+// TestCorpseGhostSkipsItsTimerBuffWhileAttacking ports the attack gate of
+// WarriorCorpseGhostPhysicalSpecial's timer "2001": a ghost attacking the
+// character, holding no effect of its self buff, wants no buff when the
+// timer runs.
+func TestCorpseGhostSkipsItsTimerBuffWhileAttacking(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual5b(t, ind5bTemplate(ind5bGhostID, nil))
+	n := w.spawn(t, ind5bGhostID, 150, 0)
+	w.onQueue(t, n, func() { n.AI().Desires().Clear() })
+	w.hit(t, n, 10)
+	w.ticks(t, 1)
+	if got := n.AI().CurrentIntention(); got != actorai.IntentionAttack {
+		t.Fatalf("setup: intention %v after the hit, want attack", got)
+	}
+	w.srv.Advance(t, 10*time.Second)
+	if got := n.AI().CurrentIntention(); got != actorai.IntentionAttack {
+		t.Fatalf("setup: intention %v at the timer, want attack", got)
+	}
+	ind5bNoCast(t, "the timer while it attacks", n, ind5bGhostBuff)
 }
 
 // TestCorpseGhostStrikesItsMostHatedAndItsClansAttacker ports
