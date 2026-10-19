@@ -13,6 +13,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/randomteleport"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/individual"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monster"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/warrior"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scenario"
 )
 
@@ -66,17 +67,20 @@ func probe() script.Script {
 // scripts.xml path.
 var scenarioScripts = script.Catalog{
 	"ai.Probe": probe,
-	"script.ai.group.FollowerMovingAroundMaster": follower.New,
-	"script.ai.group.RandomTeleport":             randomteleport.New,
-	"script.ai.individual.AltarDoorController":   individual.AltarDoorController,
-	"script.ai.individual.AreadataSwitch":        individual.AreadataSwitch,
-	"script.ai.individual.Corpse":                individual.Corpse,
-	"script.ai.individual.DaimonTheWhiteEyed":    individual.DaimonTheWhiteEyed,
-	"script.ai.individual.DefaultNpc":            defaultnpc.New,
-	"script.ai.individual.ImperialGravekeeper":   individual.ImperialGravekeeper,
-	"script.ai.individual.Monster.MonsterAI":     monster.New,
-	"script.ai.individual.Monster.WarriorHero":   monster.WarriorHero,
-	"script.ai.individual.RoyalRushMissionNpc":   individual.RoyalRushMissionNpc,
+	"script.ai.group.FollowerMovingAroundMaster":                                            follower.New,
+	"script.ai.group.RandomTeleport":                                                        randomteleport.New,
+	"script.ai.individual.AltarDoorController":                                              individual.AltarDoorController,
+	"script.ai.individual.AreadataSwitch":                                                   individual.AreadataSwitch,
+	"script.ai.individual.Corpse":                                                           individual.Corpse,
+	"script.ai.individual.DaimonTheWhiteEyed":                                               individual.DaimonTheWhiteEyed,
+	"script.ai.individual.DefaultNpc":                                                       defaultnpc.New,
+	"script.ai.individual.ImperialGravekeeper":                                              individual.ImperialGravekeeper,
+	"script.ai.individual.Monster.MonsterAI":                                                monster.New,
+	"script.ai.individual.Monster.WarriorBase.Warrior.Warrior":                              warrior.Warrior,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast2SkillsApproachAggressive": warrior.Cast2SkillsApproachAggressive,
+	"script.ai.individual.Monster.WarriorBase.WarriorBase":                                  warrior.Base,
+	"script.ai.individual.Monster.WarriorHero":                                              monster.WarriorHero,
+	"script.ai.individual.RoyalRushMissionNpc":                                              individual.RoyalRushMissionNpc,
 }
 
 // TestScenarios plays every NPC behavior scenario of testdata/scenarios
