@@ -76,7 +76,9 @@ type hallSiegeSetup struct {
 	seed []string
 	// unbound leaves Devastated Castle with no script running its siege.
 	unbound bool
-	extra   []gameservertest.Option
+	// enterLate leaves the Attacker out of the world; enter brings it in.
+	enterLate bool
+	extra     []gameservertest.Option
 }
 
 // hallSiegeWorld is the Attacker, leading Besiegers, in the world on
@@ -146,11 +148,19 @@ func bootHallSiege(t *testing.T, s hallSiegeSetup) *hallSiegeWorld {
 		t.Fatal("Devastated Castle has no siege")
 	}
 	w.siege = hs
+	if !s.enterLate {
+		w.enter(t)
+	}
+	return w
+}
+
+// enter brings the Attacker into the world.
+func (w *hallSiegeWorld) enter(t *testing.T) {
+	t.Helper()
 	startInWorld(t, w.c)
 	drainFrames(t, w.c)
 	x, y, z := w.srv.PlayerPosition(t, w.objID)
 	w.at = location.Location{X: x, Y: y, Z: z}
-	return w
 }
 
 // devastatedGate is an open door named Devastated_castle_001 beside the
@@ -497,4 +507,88 @@ func TestHallSiegeMessenger(t *testing.T) {
 			t.Fatalf("page during the siege = %q", got)
 		}
 	})
+}
+
+// TestHallSiegeStateShownToObservers has the Recruit watch the Attacker as
+// the siege starts and ends: the Attacker gets its UserInfo, and the
+// Recruit its CharInfo and relation, each time its siege state changes.
+func TestHallSiegeStateShownToObservers(t *testing.T) {
+	t.Parallel()
+	w := bootHallSiege(t, hallSiegeSetup{})
+	w.srv.SeedCharacterFor(t, "player2", "Recruit", 1, 0)
+	recruit := w.srv.DialClient(t, "player2", 1)
+	startInWorld(t, recruit)
+	w.register(t, 1)
+	drainFrames(t, recruit)
+	charInfoOfAttacker := func(frames [][]byte) bool {
+		for _, f := range frames {
+			if f[0] != serverpackets.OpcodeCharInfo {
+				continue
+			}
+			r := wire.NewReader(f[1:])
+			for range 4 { // position, boat
+				r.ReadInt32()
+			}
+			if r.ReadInt32() == w.objID {
+				return true
+			}
+		}
+		return false
+	}
+	for _, step := range []struct {
+		name string
+		run  func()
+	}{
+		{"start", func() { w.siege.Instant(); w.srv.Advance(t, 0) }},
+		{"end", func() { w.siege.End() }},
+	} {
+		step.run()
+		if _, ok := firstOpcode(drainFrames(t, w.c), serverpackets.OpcodeUserInfo); !ok {
+			t.Fatalf("%s: the Attacker got no UserInfo", step.name)
+		}
+		frames := drainFrames(t, recruit)
+		if !charInfoOfAttacker(frames) {
+			t.Fatalf("%s: the Recruit got no CharInfo of the Attacker: %x", step.name, opcodes(frames))
+		}
+		if _, ok := firstOpcode(frames, serverpackets.OpcodeRelationChanged); !ok {
+			t.Fatalf("%s: the Recruit got no RelationChanged: %x", step.name, opcodes(frames))
+		}
+	}
+}
+
+// TestHallSiegeEndFlagsThePlayersOnTheBattlefield has the Attacker, of
+// Besiegers, and the clanless Recruit come into the free hall's grounds on
+// its battlefield once its siege is under way. The draw's end banishes the
+// Attacker, of another clan than the hall's (no) owner, and flags the
+// Recruit, left on the battlefield (ClanHallSiege.endSiege). The Attacker
+// is flagged too, as it arrives at the banish point: its compass goes from
+// the siege zone to a general zone (Player.revalidateZone).
+func TestHallSiegeEndFlagsThePlayersOnTheBattlefield(t *testing.T) {
+	t.Parallel()
+	w := bootHallSiege(t, hallSiegeSetup{
+		groundsOverSpawn: true,
+		enterLate:        true,
+		seed:             []string{"INSERT INTO clanhall_siege_attackers VALUES (34, " + itoa(besiegersClanID) + ")"},
+	})
+	w.siege.Instant()
+	w.srv.Advance(t, 0)
+	if !w.siege.InProgress() {
+		t.Fatal("the siege did not start")
+	}
+	w.enter(t)
+	recruitID := w.srv.SeedCharacterFor(t, "player2", "Recruit", 1, 0).ID
+	recruit := w.srv.DialClient(t, "player2", 1)
+	startInWorld(t, recruit)
+	w.siege.End()
+	w.srv.Settle(t)
+	x, y, _ := w.srv.PlayerPosition(t, w.objID)
+	if max(x-devastatedBanish.X, devastatedBanish.X-x) > 20 || max(y-devastatedBanish.Y, devastatedBanish.Y-y) > 20 {
+		t.Fatalf("the Attacker stands at %d,%d, not banished", x, y)
+	}
+	if !w.srv.PlayerPvPFlagged(t, w.objID) {
+		t.Fatal("the banished Attacker is not flagged at the banish point")
+	}
+	if !w.srv.PlayerPvPFlagged(t, recruitID) {
+		t.Fatal("the Recruit, left on the battlefield, is not flagged")
+	}
 }

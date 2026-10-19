@@ -104,8 +104,10 @@ type SiegeNotifier interface {
 	// it when weak.
 	RespawnDoors(gates []string, weak bool)
 	// FlagPvP puts every player standing in field on the pvp flag, as
-	// fighting outside a combat zone does.
-	FlagPvP(field *zone.Siege)
+	// fighting outside a combat zone does, but for those standing in hall
+	// hallID's grounds of another clan than ownerID: the step banished
+	// them just before.
+	FlagPvP(field *zone.Siege, hallID, ownerID int32)
 }
 
 // hallSiege is a siegable hall's siege state. Every field but field is
@@ -318,7 +320,7 @@ func (s *HallSiege) withBattlefield(fn func(f *zone.Siege)) {
 // doors: while the siege is fought, a player of an attacking clan or its
 // summon.
 func (s *HallSiege) AllowsDoorAttack(attacker skilltarget.Actor, _ bool) bool {
-	return s.Attacking(actingClanID(attacker))
+	return s.Attacking(siege.ActingClanID(attacker))
 }
 
 // AllowsDoorDamage reports whether a hit lowers one of the hall's doors'
@@ -333,22 +335,6 @@ func (s *HallSiege) ShowsDoorHP() bool { return false }
 
 // DoorBroken tells nobody: a hall's broken door goes unannounced.
 func (s *HallSiege) DoorBroken(bool) {}
-
-// actingClanID is the clan of the player acting through a: a summon's
-// owner's, or a's own; 0 for none.
-func actingClanID(a any) int32 {
-	if s, ok := a.(interface {
-		Owner() (attackable.Combatant, bool)
-	}); ok {
-		if owner, ok := s.Owner(); ok && owner != nil {
-			a = owner
-		}
-	}
-	if c, ok := a.(interface{ ClanID() int32 }); ok {
-		return c.ClanID()
-	}
-	return 0
-}
 
 // RegisterResult is how a registration ended.
 type RegisterResult uint8

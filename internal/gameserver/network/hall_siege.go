@@ -29,13 +29,44 @@ func (n hallSiegeNotices) Announce(m siege.Message) {
 	n.l.toAllPlayers(func() wire.Frame { return frameSiegeMessage(m) })
 }
 
-// FlagPvP puts every player standing in field on the normal pvp flag, on
-// its own queue; a player then standing in a combat zone is not flagged.
-func (n hallSiegeNotices) FlagPvP(field *zone.Siege) {
+// SetSiegeState gives each member in the world of clans the siege state
+// s, then shows it its UserInfo and everyone who knows it its CharInfo and
+// relations, on its own queue.
+func (n hallSiegeNotices) SetSiegeState(clans []*clan.Clan, s siege.State) {
 	l := n.l
+	for _, cl := range clans {
+		for _, member := range l.onlineClanMembers(cl, 0) {
+			postLive(member, func() {
+				member.SetSiegeState(int32(s))
+				l.broadcastCharacterInfo(member)
+			})
+		}
+	}
+}
+
+// FlagPvP puts every player standing in field on the normal pvp flag, on
+// its own queue; a player then standing in a combat zone is not flagged,
+// nor is one standing in hall hallID's grounds of another clan than
+// ownerID, banished from them just before.
+func (n hallSiegeNotices) FlagPvP(field *zone.Siege, hallID, ownerID int32) {
+	l := n.l
+	banished := map[zone.Actor]bool{}
+	if l.zones != nil {
+		for _, z := range zone.OfKind[*zone.ClanHall](l.zones) {
+			if int32(z.ResidenceID) != hallID {
+				continue
+			}
+			for _, a := range z.Occupants() {
+				if p, ok := a.(zone.Player); ok && p.ClanID() != ownerID {
+					banished[a] = true
+				}
+			}
+			break
+		}
+	}
 	for _, a := range field.Occupants() {
 		za, ok := a.(*liveZoneActor)
-		if !ok {
+		if !ok || banished[a] {
 			continue
 		}
 		live := za.live

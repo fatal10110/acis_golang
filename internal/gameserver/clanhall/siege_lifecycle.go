@@ -233,7 +233,8 @@ func (hs *Halls) endLocked(h *hall, fx *siegeEffects, winnerID int32) {
 		})
 	}
 	if n != nil {
-		fx.add(func() { s.withBattlefield(n.FlagPvP) })
+		owner := h.ownerID
+		fx.add(func() { s.withBattlefield(func(f *zone.Siege) { n.FlagPvP(f, id, owner) }) })
 	}
 	hs.setSiege(func() {
 		st.attackers = nil
