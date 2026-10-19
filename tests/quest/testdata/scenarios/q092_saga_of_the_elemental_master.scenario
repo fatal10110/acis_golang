@@ -1,0 +1,109 @@
+# Saga of the Elemental Master (Q092) on the saga core, played by a level 76 Elemental Summoner from
+# the start: Arkenias offers it and gives the main item; Radyss sends the player to Cerenas,
+# who asks for what the player does not hold; Arkenias has nothing more to say until the
+# tablets are done, and a relog keeps the journal. Expectations are the reference trace's
+# (the relog's rows and state derived from ThirdClassQuest.java and Q092_SagaOfTheElementalMaster.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q092_saga_of_the_elemental_master.golden
+character ElementalSummone 76
+class 28
+script quest.Q092_SagaOfTheElementalMaster
+item 7111
+page villagemaster/30174.htm
+page default/31614.htm
+page trainer/31281.htm
+page script/quest/Q092_SagaOfTheElementalMaster/
+npc arkenias 30174 VillageMasterMystic 10 0 0
+npc radyss 31614 Folk -10 0 0
+npc cerenas 31281 Trainer 0 10 0
+
+action arkenias
+action arkenias
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenias item=0 page=villagemaster/30174.htm
+  S ActionFailed
+bypass npc_{arkenias}_Quest
+  S NpcHtmlMessage obj=arkenias item=0 page=script/quest/Q092_SagaOfTheElementalMaster/0-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q092_SagaOfTheElementalMaster 0-1
+  S NpcHtmlMessage obj=arkenias item=0 page=script/quest/Q092_SagaOfTheElementalMaster/0-05.htm
+  S ActionFailed
+bypass Quest Q092_SagaOfTheElementalMaster accept
+  S QuestList 92:0x80000001
+  S ExShowQuestMark quest=92
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7111
+  S NpcHtmlMessage obj=arkenias item=0 page=script/quest/Q092_SagaOfTheElementalMaster/0-03.htm
+  S ActionFailed
+  Q upsert Q092_SagaOfTheElementalMaster | <state> | STARTED
+  Q upsert Q092_SagaOfTheElementalMaster | <cond> | 1
+  items 7111=1
+  state Q092_SagaOfTheElementalMaster STARTED
+action arkenias
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenias item=0 page=villagemaster/30174.htm
+  S ActionFailed
+bypass npc_{arkenias}_Quest
+  S NpcHtmlMessage obj=arkenias item=0 page=script/quest/Q092_SagaOfTheElementalMaster/0-04.htm
+  S ActionFailed
+  S ActionFailed
+action radyss
+action radyss
+  S ActionFailed
+  S NpcHtmlMessage obj=radyss item=0 page=default/31614.htm
+  S ActionFailed
+bypass npc_{radyss}_Quest
+  S NpcHtmlMessage obj=radyss item=0 page=script/quest/Q092_SagaOfTheElementalMaster/2-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q092_SagaOfTheElementalMaster 2-1
+  S QuestList 92:0x80000003
+  S ExShowQuestMark quest=92
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=radyss item=0 page=script/quest/Q092_SagaOfTheElementalMaster/2-05.htm
+  S ActionFailed
+  Q upsert Q092_SagaOfTheElementalMaster | <cond> | 2
+action radyss
+  S ActionFailed
+  S NpcHtmlMessage obj=radyss item=0 page=default/31614.htm
+  S ActionFailed
+bypass npc_{radyss}_Quest
+  S NpcHtmlMessage obj=radyss item=0 page=script/quest/Q092_SagaOfTheElementalMaster/2-02.htm
+  S ActionFailed
+  S ActionFailed
+action cerenas
+action cerenas
+  S ActionFailed
+  S NpcHtmlMessage obj=cerenas item=0 page=trainer/31281.htm
+  S ActionFailed
+bypass npc_{cerenas}_Quest
+  S NpcHtmlMessage obj=cerenas item=0 page=script/quest/Q092_SagaOfTheElementalMaster/1-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q092_SagaOfTheElementalMaster 1-3
+  S QuestList 92:0x80000007
+  S ExShowQuestMark quest=92
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=cerenas item=0 page=script/quest/Q092_SagaOfTheElementalMaster/1-05.htm
+  S ActionFailed
+  Q upsert Q092_SagaOfTheElementalMaster | <cond> | 3
+action cerenas
+  S ActionFailed
+  S NpcHtmlMessage obj=cerenas item=0 page=trainer/31281.htm
+  S ActionFailed
+bypass npc_{cerenas}_Quest
+  S NpcHtmlMessage obj=cerenas item=0 page=script/quest/Q092_SagaOfTheElementalMaster/1-02.htm
+  S ActionFailed
+  S ActionFailed
+action arkenias
+action arkenias
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenias item=0 page=villagemaster/30174.htm
+  S ActionFailed
+bypass npc_{arkenias}_Quest
+  S NpcHtmlMessage obj=arkenias item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
+  state Q092_SagaOfTheElementalMaster STARTED
+  rows Q092_SagaOfTheElementalMaster <cond>=3 <state>=STARTED

@@ -1,0 +1,109 @@
+# Saga of the Spectral Master (Q093) on the saga core, played by a level 76 Phantom Summoner from
+# the start: Fairen offers it and gives the main item; Noctisse sends the player to Kamilen,
+# who asks for what the player does not hold; Fairen has nothing more to say until the
+# tablets are done, and a relog keeps the journal. Expectations are the reference trace's
+# (the relog's rows and state derived from ThirdClassQuest.java and Q093_SagaOfTheSpectralMaster.java).
+trace internal/gameserver/script/testdata/oracle/scenarios/q093_saga_of_the_spectral_master.golden
+character PhantomSummoner 76
+class 41
+script quest.Q093_SagaOfTheSpectralMaster
+item 7112
+page villagemaster/30175.htm
+page default/31613.htm
+page trainer/31287.htm
+page script/quest/Q093_SagaOfTheSpectralMaster/
+npc fairen 30175 VillageMasterMystic 10 0 0
+npc noctisse 31613 Folk -10 0 0
+npc kamilen 31287 Trainer 0 10 0
+
+action fairen
+action fairen
+  S ActionFailed
+  S NpcHtmlMessage obj=fairen item=0 page=villagemaster/30175.htm
+  S ActionFailed
+bypass npc_{fairen}_Quest
+  S NpcHtmlMessage obj=fairen item=0 page=script/quest/Q093_SagaOfTheSpectralMaster/0-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q093_SagaOfTheSpectralMaster 0-1
+  S NpcHtmlMessage obj=fairen item=0 page=script/quest/Q093_SagaOfTheSpectralMaster/0-05.htm
+  S ActionFailed
+bypass Quest Q093_SagaOfTheSpectralMaster accept
+  S QuestList 93:0x80000001
+  S ExShowQuestMark quest=93
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:7112
+  S NpcHtmlMessage obj=fairen item=0 page=script/quest/Q093_SagaOfTheSpectralMaster/0-03.htm
+  S ActionFailed
+  Q upsert Q093_SagaOfTheSpectralMaster | <state> | STARTED
+  Q upsert Q093_SagaOfTheSpectralMaster | <cond> | 1
+  items 7112=1
+  state Q093_SagaOfTheSpectralMaster STARTED
+action fairen
+  S ActionFailed
+  S NpcHtmlMessage obj=fairen item=0 page=villagemaster/30175.htm
+  S ActionFailed
+bypass npc_{fairen}_Quest
+  S NpcHtmlMessage obj=fairen item=0 page=script/quest/Q093_SagaOfTheSpectralMaster/0-04.htm
+  S ActionFailed
+  S ActionFailed
+action noctisse
+action noctisse
+  S ActionFailed
+  S NpcHtmlMessage obj=noctisse item=0 page=default/31613.htm
+  S ActionFailed
+bypass npc_{noctisse}_Quest
+  S NpcHtmlMessage obj=noctisse item=0 page=script/quest/Q093_SagaOfTheSpectralMaster/2-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q093_SagaOfTheSpectralMaster 2-1
+  S QuestList 93:0x80000003
+  S ExShowQuestMark quest=93
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=noctisse item=0 page=script/quest/Q093_SagaOfTheSpectralMaster/2-05.htm
+  S ActionFailed
+  Q upsert Q093_SagaOfTheSpectralMaster | <cond> | 2
+action noctisse
+  S ActionFailed
+  S NpcHtmlMessage obj=noctisse item=0 page=default/31613.htm
+  S ActionFailed
+bypass npc_{noctisse}_Quest
+  S NpcHtmlMessage obj=noctisse item=0 page=script/quest/Q093_SagaOfTheSpectralMaster/2-02.htm
+  S ActionFailed
+  S ActionFailed
+action kamilen
+action kamilen
+  S ActionFailed
+  S NpcHtmlMessage obj=kamilen item=0 page=trainer/31287.htm
+  S ActionFailed
+bypass npc_{kamilen}_Quest
+  S NpcHtmlMessage obj=kamilen item=0 page=script/quest/Q093_SagaOfTheSpectralMaster/1-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q093_SagaOfTheSpectralMaster 1-3
+  S QuestList 93:0x80000007
+  S ExShowQuestMark quest=93
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=kamilen item=0 page=script/quest/Q093_SagaOfTheSpectralMaster/1-05.htm
+  S ActionFailed
+  Q upsert Q093_SagaOfTheSpectralMaster | <cond> | 3
+action kamilen
+  S ActionFailed
+  S NpcHtmlMessage obj=kamilen item=0 page=trainer/31287.htm
+  S ActionFailed
+bypass npc_{kamilen}_Quest
+  S NpcHtmlMessage obj=kamilen item=0 page=script/quest/Q093_SagaOfTheSpectralMaster/1-02.htm
+  S ActionFailed
+  S ActionFailed
+action fairen
+action fairen
+  S ActionFailed
+  S NpcHtmlMessage obj=fairen item=0 page=villagemaster/30175.htm
+  S ActionFailed
+bypass npc_{fairen}_Quest
+  S NpcHtmlMessage obj=fairen item=0 html="<html><body>You are either not on a quest that involves this NPC, or you don't meet this NPC's minimum quest requirements.</body></html>"
+  S ActionFailed
+  S ActionFailed
+relog
+  state Q093_SagaOfTheSpectralMaster STARTED
+  rows Q093_SagaOfTheSpectralMaster <cond>=3 <state>=STARTED
