@@ -394,7 +394,8 @@ func TestPartyLeaderWizardTimers(t *testing.T) {
 // TestPartyLeaderWizardSeesBuffs runs PartyLeaderWizard's see-spell hook: a
 // self buff of the character with 100 aggro points enters it in the hate
 // list of a level 1 leader at 100 / 8 * 75 = 937.5; a buff with none adds
-// nothing.
+// nothing. Once the leader attacks the character, the creature its attacks
+// hate most, the same buff adds 100 / 8 * 150 = 1875.
 func TestPartyLeaderWizardSeesBuffs(t *testing.T) {
 	t.Parallel()
 	db := sqltest.SharedDB(t)
@@ -430,6 +431,17 @@ func TestPartyLeaderWizardSeesBuffs(t *testing.T) {
 	w.srv.AdvanceUntil(t, "the buff's hate", func() bool { return w.hateListOf(h) != 0 })
 	if got := w.hateListOf(h); got != 937.5 {
 		t.Fatalf("hate list entry after a buff with 100 aggro points = %v, want 937.5", got)
+	}
+
+	w.onQueue(t, h, func() { script.NPCOf(h).AddAttackDesire(script.PlayerOf(w.player), 1000) })
+	w.ticks(t, 2)
+	if got := h.AI().CurrentIntention(); got != actorai.IntentionAttack {
+		t.Fatalf("leader intention = %v, want attack", got)
+	}
+	castOwnSkill(w.warriorWorld, plwAggroBuff)
+	w.srv.AdvanceUntil(t, "the attacked leader's buff hate", func() bool { return w.hateListOf(h) != 937.5 })
+	if got := w.hateListOf(h); got != 937.5+1875 {
+		t.Fatalf("hate list entry after the buff of the character it attacks = %v, want 937.5 + 100 / 8 * 150", got)
 	}
 }
 
@@ -513,12 +525,12 @@ func TestElcrokiCallsSilhouettesOnSightAndAsTheyDie(t *testing.T) {
 	if got := [2]int32{h.Scratch().Int(npc.IntAI3), h.Scratch().Int(npc.IntAI4)}; got != [2]int32{3, 4} {
 		t.Fatalf("int slots 3 and 4 after a silhouette death = %v, want 3 4", got)
 	}
+	if top != w.player.ObjectID() {
+		t.Fatalf("Elcroki top desire target = %d, want the character %d", top, w.player.ObjectID())
+	}
 	live := livePrivates(t, h, 3)
 	for _, s := range live[1:] {
-		want := [2]int32{0, 0}
-		if top != 0 {
-			want = [2]int32{1000, top}
-		}
+		want := [2]int32{1000, top}
 		if got := [2]int32{s.Scratch().Int(npc.IntParam1), s.Scratch().Int(npc.IntParam2)}; got != want {
 			t.Errorf("new silhouette spawn parameters = %v, want %v", got, want)
 		}
@@ -590,6 +602,34 @@ func TestElcrokiAttackedBuffsCursesAndStrikes(t *testing.T) {
 	w.hit(t, h, 1)
 	if _, ok := castDesireOf(h, elBuffID); ok {
 		t.Fatal("Elcroki wants its buff again after it landed")
+	}
+}
+
+// TestElcrokiAttacksWhenItCannotPay runs Elcroki's attacked hook with a
+// long range DD magic it cannot pay for, every draw 0: the first hit from
+// 150 away sets int slot 0 and wants to attack the character with weight
+// 1000 instead; with the slot set, the next hit of 10 adds the attack
+// formula, 10 / 8 * 100 = 125.
+func TestElcrokiAttacksWhenItCannotPay(t *testing.T) {
+	t.Parallel()
+	w := bootIndividual6(t, raidBoot{}, elcrokiTemplate(nil))
+	h := w.spawn(t, elcrokiID, 150, 0)
+	long := harmlessSkill(elLongDDID)
+	long.MPConsume = 100000
+	w.srv.InstallNPCCastSeam(t, h, modelskill.NewTable([]modelskill.Definition{
+		long, harmlessSkill(elShortDDID), npcSkill(elBuffID, 1, false), npcSkill(elDebuffID, 1, false),
+	}))
+
+	w.hit(t, h, 10)
+	if d, ok := desire(h, actorai.IntentionAttack); h.Scratch().Int(npc.IntAI0) != 1 || !ok || d.Weight != 1000 {
+		t.Fatalf("Elcroki short of MP: int slot 0 %d, attack desire %+v (%v); want 1 and weight 1000", h.Scratch().Int(npc.IntAI0), d, ok)
+	}
+	if _, ok := castDesireOf(h, elLongDDID); ok {
+		t.Fatal("Elcroki short of MP wants its long range DD magic")
+	}
+	w.hit(t, h, 10)
+	if d, _ := desire(h, actorai.IntentionAttack); d.Weight != 1125 {
+		t.Fatalf("Elcroki attack desire after its next hit = %v, want 1000 + 125", d.Weight)
 	}
 }
 
