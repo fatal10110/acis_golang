@@ -1,0 +1,166 @@
+# Elrokian Hunter's Proof (Q111), first part: a level 75 character accepts at Marquez, meets
+# Mushika and Asamah, hears Marquez's story to the journal hunt and kills three velociraptors for
+# journal fragments (every roll pinned to succeed); then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q111_elrokian_hunters_proof.golden
+character Hunter 75
+random always 0
+script quest.Q111_ElrokianHuntersProof
+item 8768 8769 8770 8771 8772 8773 8763 8764 57
+page default/32113.htm
+page default/32114.htm
+page default/32115.htm
+page default/32116.htm
+page script/quest/Q111_ElrokianHuntersProof/
+npc marquez 32113 Folk 10 0 0
+npc mushika 32114 Folk 20 0 0
+npc asamah 32115 Folk 30 0 0
+npc raptor 22196 Monster 40 0 0
+
+# Marquez: three pages, then accept.
+action marquez
+action marquez
+  S ActionFailed
+  S NpcHtmlMessage obj=marquez item=0 page=default/32113.htm
+  S ActionFailed
+bypass npc_{marquez}_Quest
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-001.htm
+  S ActionFailed
+  S ActionFailed
+  state Q111_ElrokianHuntersProof CREATED
+bypass Quest Q111_ElrokianHuntersProof 32113-001a.htm
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-001a.htm
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32113-001b.htm
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-001b.htm
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32113-002.htm
+  S QuestList 111:0x80000001
+  S ExShowQuestMark quest=111
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-002.htm
+  S ActionFailed
+  Q upsert Q111_ElrokianHuntersProof | <state> | STARTED
+  Q upsert Q111_ElrokianHuntersProof | <cond> | 1
+  state Q111_ElrokianHuntersProof STARTED
+  rows Q111_ElrokianHuntersProof <cond>=1 <state>=STARTED
+action marquez
+  S ActionFailed
+  S NpcHtmlMessage obj=marquez item=0 page=default/32113.htm
+  S ActionFailed
+bypass npc_{marquez}_Quest
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-002.htm
+  S ActionFailed
+  S ActionFailed
+
+# Mushika.
+action mushika
+action mushika
+  S ActionFailed
+  S NpcHtmlMessage obj=mushika item=0 page=default/32114.htm
+  S ActionFailed
+bypass npc_{mushika}_Quest
+  S QuestList 111:0x80000003
+  S ExShowQuestMark quest=111
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=mushika item=0 page=script/quest/Q111_ElrokianHuntersProof/32114-001.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q111_ElrokianHuntersProof | <cond> | 2
+  rows Q111_ElrokianHuntersProof <cond>=2 <state>=STARTED
+action mushika
+  S ActionFailed
+  S NpcHtmlMessage obj=mushika item=0 page=default/32114.htm
+  S ActionFailed
+bypass npc_{mushika}_Quest
+  S NpcHtmlMessage obj=mushika item=0 page=script/quest/Q111_ElrokianHuntersProof/32114-001.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q111_ElrokianHuntersProof <cond>=2 <state>=STARTED
+
+# Asamah.
+action asamah
+action asamah
+  S ActionFailed
+  S NpcHtmlMessage obj=asamah item=0 page=default/32115.htm
+  S ActionFailed
+bypass npc_{asamah}_Quest
+  S NpcHtmlMessage obj=asamah item=0 page=script/quest/Q111_ElrokianHuntersProof/32115-001.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32115-002.htm
+  S QuestList 111:0x80000007
+  S ExShowQuestMark quest=111
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=asamah item=0 page=script/quest/Q111_ElrokianHuntersProof/32115-002.htm
+  S ActionFailed
+  Q upsert Q111_ElrokianHuntersProof | <cond> | 3
+  rows Q111_ElrokianHuntersProof <cond>=3 <state>=STARTED
+action asamah
+  S ActionFailed
+  S NpcHtmlMessage obj=asamah item=0 page=default/32115.htm
+  S ActionFailed
+bypass npc_{asamah}_Quest
+  S NpcHtmlMessage obj=asamah item=0 page=script/quest/Q111_ElrokianHuntersProof/32115-002.htm
+  S ActionFailed
+  S ActionFailed
+
+# Marquez's story.
+action marquez
+action marquez
+  S ActionFailed
+  S NpcHtmlMessage obj=marquez item=0 page=default/32113.htm
+  S ActionFailed
+bypass npc_{marquez}_Quest
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-003.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32113-004.htm
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-004.htm
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32113-005.htm
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-005.htm
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32113-006.htm
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-006.htm
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32113-007.htm
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-007.htm
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32113-008.htm
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-008.htm
+  S ActionFailed
+bypass Quest Q111_ElrokianHuntersProof 32113-009.htm
+  S QuestList 111:0x8000000f
+  S ExShowQuestMark quest=111
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-009.htm
+  S ActionFailed
+  Q upsert Q111_ElrokianHuntersProof | <cond> | 4
+  rows Q111_ElrokianHuntersProof <cond>=4 <state>=STARTED
+action marquez
+  S ActionFailed
+  S NpcHtmlMessage obj=marquez item=0 page=default/32113.htm
+  S ActionFailed
+bypass npc_{marquez}_Quest
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q111_ElrokianHuntersProof/32113-009.htm
+  S ActionFailed
+  S ActionFailed
+
+# Three velociraptors: three fragments.
+kill raptor x3
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8768
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8768
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8768
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 8768=3
+  rows Q111_ElrokianHuntersProof <cond>=4 <state>=STARTED
+
+relog
+  items 8768=3
+  state Q111_ElrokianHuntersProof STARTED
+  rows Q111_ElrokianHuntersProof <cond>=4 <state>=STARTED

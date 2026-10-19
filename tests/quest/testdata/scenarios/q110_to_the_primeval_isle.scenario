@@ -1,0 +1,91 @@
+# To the Primeval Isle (Q110): a level 75 character accepts at Anton, who gives the ancient book,
+# and brings it to Marquez, who pays adena; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q110_to_the_primeval_isle.golden
+character Courier 75
+script quest.Q110_ToThePrimevalIsle
+item 8777 57
+page merchant/31338.htm
+page default/32113.htm
+page script/quest/Q110_ToThePrimevalIsle/
+npc anton 31338 Merchant 10 0 0
+npc marquez 32113 Folk 20 0 0
+
+# Anton: three pages, then accept.
+action anton
+action anton
+  S ActionFailed
+  S NpcHtmlMessage obj=anton item=0 page=merchant/31338.htm
+  S ActionFailed
+bypass npc_{anton}_Quest
+  S NpcHtmlMessage obj=anton item=0 page=script/quest/Q110_ToThePrimevalIsle/31338-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q110_ToThePrimevalIsle CREATED
+bypass Quest Q110_ToThePrimevalIsle 31338-01a.htm
+  S NpcHtmlMessage obj=anton item=0 page=script/quest/Q110_ToThePrimevalIsle/31338-01a.htm
+  S ActionFailed
+bypass Quest Q110_ToThePrimevalIsle 31338-01b.htm
+  S NpcHtmlMessage obj=anton item=0 page=script/quest/Q110_ToThePrimevalIsle/31338-01b.htm
+  S ActionFailed
+bypass Quest Q110_ToThePrimevalIsle 31338-02.htm
+  S QuestList 110:0x80000001
+  S ExShowQuestMark quest=110
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:8777
+  S NpcHtmlMessage obj=anton item=0 page=script/quest/Q110_ToThePrimevalIsle/31338-02.htm
+  S ActionFailed
+  Q upsert Q110_ToThePrimevalIsle | <state> | STARTED
+  Q upsert Q110_ToThePrimevalIsle | <cond> | 1
+  state Q110_ToThePrimevalIsle STARTED
+  rows Q110_ToThePrimevalIsle <cond>=1 <state>=STARTED
+  items 8777=1
+action anton
+  S ActionFailed
+  S NpcHtmlMessage obj=anton item=0 page=merchant/31338.htm
+  S ActionFailed
+bypass npc_{anton}_Quest
+  S NpcHtmlMessage obj=anton item=0 page=script/quest/Q110_ToThePrimevalIsle/31338-01c.htm
+  S ActionFailed
+  S ActionFailed
+
+# Marquez takes the book.
+action marquez
+action marquez
+  S ActionFailed
+  S NpcHtmlMessage obj=marquez item=0 page=default/32113.htm
+  S ActionFailed
+bypass npc_{marquez}_Quest
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q110_ToThePrimevalIsle/32113-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q110_ToThePrimevalIsle 32113-02.htm
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q110_ToThePrimevalIsle/32113-02.htm
+  S ActionFailed
+bypass Quest Q110_ToThePrimevalIsle 32113-02a.htm
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q110_ToThePrimevalIsle/32113-02a.htm
+  S ActionFailed
+bypass Quest Q110_ToThePrimevalIsle 32113-03.htm
+  S SystemMessage id=302 3:8777
+  S SystemMessage id=52 6:169380
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 110:0x00000000
+  S NpcHtmlMessage obj=marquez item=0 page=script/quest/Q110_ToThePrimevalIsle/32113-03.htm
+  S ActionFailed
+  Q upsert Q110_ToThePrimevalIsle | <state> | COMPLETED
+  Q delete-except-state Q110_ToThePrimevalIsle
+  state Q110_ToThePrimevalIsle COMPLETED
+  rows Q110_ToThePrimevalIsle <state>=COMPLETED
+  items 8777=0 57=169380
+action marquez
+  S ActionFailed
+  S NpcHtmlMessage obj=marquez item=0 page=default/32113.htm
+  S ActionFailed
+bypass npc_{marquez}_Quest
+  S NpcHtmlMessage obj=marquez item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+relog
+  items 57=169380
+  state Q110_ToThePrimevalIsle COMPLETED
+  rows Q110_ToThePrimevalIsle <state>=COMPLETED
