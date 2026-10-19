@@ -435,13 +435,16 @@ func TestLV3KnightDefenceAndCrazyModes(t *testing.T) {
 // 4 to 5). Its 1 s timer, once the stun is gone, acts on 1, 3 and 5: it
 // drops its desires, wants the step's debuff on itself (with its normal
 // body at 3), moves the slot on and attacks the creature its first spawn
-// parameter named (200).
+// parameter named (200). Its combat draws are pinned so that no hit
+// breaks a stun.
 func TestLV3OrcWeakensUnderStuns(t *testing.T) {
 	t.Parallel()
 	w := bootIndividual7(t, raidBoot{}, ind7Template(ind7OrcID), warriorTemplate(ind7MasterID, nil))
 	me := w.player.ObjectID()
 	master := w.spawn(t, ind7MasterID, 600, 0)
 	orc := w.raise(t, master, ind7OrcID, 300, 0, script.Params{P1: me, P2: me, P3: master.ObjectID()})
+	// Every combat draw n-1: a hit never breaks the stun (a draw of 0 of 10).
+	w.onQueue(t, orc, func() { orc.SetRollSource(func(n int) int { return n - 1 }) })
 	self := orc.ObjectID()
 	step := func() int32 { return ind1Slot(orc, script.SlotIntAI0) }
 	if got := orc.NPCInfoSnapshot().EnchantEffect; got != 10 {
