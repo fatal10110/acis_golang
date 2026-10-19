@@ -23,7 +23,8 @@ const engineOwner = "engine"
 // TestScriptCatalogOwners: every script of the reference manifest (the
 // scripts.xml listing) has exactly one owner, the catalogs of scripts.go or
 // one content catalog file, and no catalog holds a script the manifest does
-// not list. It logs the scripts not ported yet, by catalog file.
+// not list, but for the tasks scripts.xml lists only in a comment
+// (commentedTasks). It logs the scripts not ported yet, by catalog file.
 func TestScriptCatalogOwners(t *testing.T) {
 	sagas := thirdclass.NewFamily()
 	owned := map[string]script.Catalog{engineOwner: {}}
@@ -31,7 +32,8 @@ func TestScriptCatalogOwners(t *testing.T) {
 		maps.Copy(owned[engineOwner], c)
 	}
 	maps.Copy(owned, catalog.Scripts(sagas))
-	checkOwners(t, "script", slices.Collect(maps.Keys(readScriptManifest(t))), owned)
+	want := append(slices.Collect(maps.Keys(readScriptManifest(t))), commentedTasks...)
+	checkOwners(t, "script", want, owned)
 }
 
 // TestMakerCatalogOwners: every npcmaker type the reference gives a maker of

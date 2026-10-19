@@ -164,7 +164,12 @@ type Spelled struct {
 }
 
 // Start: a scheduled task's start time came. Ctx ends when the schedule
-// runner stops; Server is what the task acts on.
+// runner stops; Server is what the task acts on, and the only way it acts.
+//
+// A start is handed no world: under it WorldPlayer, Object, WorldNPC and
+// TeleportPlayersInTerritory find nothing, so a start never reaches a
+// player. A timer a start hook starts fires its timer hook on that same
+// world-less script.
 type Start struct {
 	Ctx    context.Context
 	Server Server

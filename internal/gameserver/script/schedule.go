@@ -84,7 +84,8 @@ type scheduledTask struct {
 // first start is set from now; then, now and every rescanPeriod, each task
 // whose next start falls within the coming period is armed for it. A
 // firing moves the task's next start on by one period, runs its start hook
-// and arms the task again when that next start is also that close.
+// and arms the task again when that next start is also that close. The
+// start hooks are handed a copy of the task's script that finds no world.
 func StartSchedule(r *Registry, queue *sim.Queue, srv Server) *Schedule {
 	ctx, cancel := context.WithCancel(context.Background())
 	sch := &Schedule{r: r, queue: queue, srv: srv, ctx: ctx, cancel: cancel}
@@ -92,13 +93,28 @@ func StartSchedule(r *Registry, queue *sim.Queue, srv Server) *Schedule {
 		now := queue.Now()
 		for _, e := range r.entries {
 			if e.sched != nil {
-				sch.tasks = append(sch.tasks, &scheduledTask{s: e.script, sc: *e.sched, next: e.sched.first(now, usWeek)})
+				sch.tasks = append(sch.tasks, &scheduledTask{s: startScript(e.script), sc: *e.sched, next: e.sched.first(now, usWeek)})
 			}
 		}
 		sch.rescan()
 		queue.Every(rescanPeriod, sch.rescan)
 	})
 	return sch
+}
+
+// startScript returns the script a task's start hooks are handed: a copy
+// of s whose helpers act through a copy of its env without the world. A
+// departure does not wait for a running start hook, so a start must never
+// reach a player: two writes to one could fall on both sides of its final
+// saves.
+func startScript(s *Script) *Script {
+	c := *s
+	if s.env != nil {
+		env := *s.env
+		env.World = nil
+		c.env = &env
+	}
+	return &c
 }
 
 // Stop stops every timer and cancels the context of a start hook still
