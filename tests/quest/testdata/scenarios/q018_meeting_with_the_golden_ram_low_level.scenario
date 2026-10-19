@@ -1,0 +1,22 @@
+# Meeting with the Golden Ram (Q018), refused: a level 65 character, one short of the quest's
+# level, is turned away by Donal and the quest is not started. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q018_meeting_with_the_golden_ram_low_level.golden
+character Rammer 65
+script quest.Q018_MeetingWithTheGoldenRam
+item 7245 57
+page villagemaster/31314.htm
+page script/quest/Q018_MeetingWithTheGoldenRam/
+npc donal 31314 VillageMasterDwarf 10 0 0
+
+action donal
+action donal
+  S ActionFailed
+  S NpcHtmlMessage obj=donal item=0 page=villagemaster/31314.htm
+  S ActionFailed
+bypass npc_{donal}_Quest
+  S NpcHtmlMessage obj=donal item=0 page=script/quest/Q018_MeetingWithTheGoldenRam/31314-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q018_MeetingWithTheGoldenRam CREATED
+  rows Q018_MeetingWithTheGoldenRam -

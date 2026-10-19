@@ -1,0 +1,76 @@
+# Bring Up With Love (Q020): a level 65 character reads Tunatun's whole explanation (both answers
+# of the question page) and accepts; until the jewel of innocence is found Tunatun only reminds
+# the player. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q020_bring_up_with_love.golden
+character Tamer 65
+script quest.Q020_BringUpWithLove
+item 7185 57
+page default/31537.htm
+page script/quest/Q020_BringUpWithLove/
+npc tunatun 31537 Folk 10 0 0
+
+# Tunatun explains, then the player accepts.
+action tunatun
+action tunatun
+  S ActionFailed
+  S NpcHtmlMessage obj=tunatun item=0 page=default/31537.htm
+  S ActionFailed
+bypass npc_{tunatun}_Quest
+  S NpcHtmlMessage obj=tunatun item=0 page=script/quest/Q020_BringUpWithLove/31537-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q020_BringUpWithLove CREATED
+bypass Quest Q020_BringUpWithLove 31537-03.htm
+  S NpcHtmlMessage obj=tunatun item=0 page=script/quest/Q020_BringUpWithLove/31537-03.htm
+  S ActionFailed
+  state Q020_BringUpWithLove CREATED
+bypass Quest Q020_BringUpWithLove 31537-04.htm
+  S NpcHtmlMessage obj=tunatun item=0 page=script/quest/Q020_BringUpWithLove/31537-04.htm
+  S ActionFailed
+  state Q020_BringUpWithLove CREATED
+bypass Quest Q020_BringUpWithLove 31537-05.htm
+  S NpcHtmlMessage obj=tunatun item=0 page=script/quest/Q020_BringUpWithLove/31537-05.htm
+  S ActionFailed
+  state Q020_BringUpWithLove CREATED
+bypass Quest Q020_BringUpWithLove 31537-07.htm
+  S NpcHtmlMessage obj=tunatun item=0 page=script/quest/Q020_BringUpWithLove/31537-07.htm
+  S ActionFailed
+  state Q020_BringUpWithLove CREATED
+bypass Quest Q020_BringUpWithLove 31537-08.htm
+  S NpcHtmlMessage obj=tunatun item=0 page=script/quest/Q020_BringUpWithLove/31537-08.htm
+  S ActionFailed
+  state Q020_BringUpWithLove CREATED
+bypass Quest Q020_BringUpWithLove 31537-09.htm
+  S QuestList 20:0x80000001
+  S ExShowQuestMark quest=20
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tunatun item=0 page=script/quest/Q020_BringUpWithLove/31537-09.htm
+  S ActionFailed
+  Q upsert Q020_BringUpWithLove | <state> | STARTED
+  Q upsert Q020_BringUpWithLove | <cond> | 1
+  state Q020_BringUpWithLove STARTED
+  rows Q020_BringUpWithLove <cond>=1 <state>=STARTED
+
+# No jewel yet: the reminder.
+action tunatun
+  S ActionFailed
+  S NpcHtmlMessage obj=tunatun item=0 page=default/31537.htm
+  S ActionFailed
+bypass npc_{tunatun}_Quest
+  S NpcHtmlMessage obj=tunatun item=0 page=script/quest/Q020_BringUpWithLove/31537-10.htm
+  S ActionFailed
+  S ActionFailed
+
+# Relog: the started quest loads from its rows.
+relog
+  state Q020_BringUpWithLove STARTED
+  rows Q020_BringUpWithLove <cond>=1 <state>=STARTED
+action tunatun
+action tunatun
+  S ActionFailed
+  S NpcHtmlMessage obj=tunatun item=0 page=default/31537.htm
+  S ActionFailed
+bypass npc_{tunatun}_Quest
+  S NpcHtmlMessage obj=tunatun item=0 page=script/quest/Q020_BringUpWithLove/31537-10.htm
+  S ActionFailed
+  S ActionFailed

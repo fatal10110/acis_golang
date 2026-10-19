@@ -1,0 +1,28 @@
+# Chest caught with a bait of wind (Q027), refused: a level 26 character, one short of the quest's
+# level, is turned away by Lanosco even with the special bait quest done. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q027_chest_caught_with_a_bait_of_wind_low_level.golden
+character Angler 26
+quest Q050_LanoscosSpecialBait <state>=COMPLETED
+script quest.Q027_ChestCaughtWithABaitOfWind
+stub quest.Q050_LanoscosSpecialBait
+item 6500 7625 880
+page fisherman/31570.htm
+page script/quest/Q027_ChestCaughtWithABaitOfWind/
+npc lanosco 31570 Fisherman 10 0 0
+
+action lanosco
+action lanosco
+  S ActionFailed
+  S NpcHtmlMessage obj=lanosco item=0 page=fisherman/31570.htm
+  S ActionFailed
+bypass npc_{lanosco}_Quest
+  S NpcHtmlMessage obj=lanosco item=0 html="<html><body><a action=\"bypass -h npc_{lanosco}_Quest Q050_LanoscosSpecialBait\">[Lanosco's Special Bait (Done)]</a><br><a action=\"bypass -h npc_{lanosco}_Quest Q027_ChestCaughtWithABaitOfWind\">[Chest caught with a bait of wind]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{lanosco}_Quest Q027_ChestCaughtWithABaitOfWind
+  S NpcHtmlMessage obj=lanosco item=0 page=script/quest/Q027_ChestCaughtWithABaitOfWind/31570-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q027_ChestCaughtWithABaitOfWind CREATED
+  rows Q027_ChestCaughtWithABaitOfWind -

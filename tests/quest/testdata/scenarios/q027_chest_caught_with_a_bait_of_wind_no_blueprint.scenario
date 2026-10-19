@@ -1,0 +1,44 @@
+# Chest caught with a bait of wind (Q027), without the strange blueprint: a character on cond 2
+# that no longer holds it asks Shaling for the trade; Shaling refuses and nothing changes.
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q027_chest_caught_with_a_bait_of_wind_no_blueprint.golden
+character Angler 27
+quest Q050_LanoscosSpecialBait <state>=COMPLETED
+quest Q027_ChestCaughtWithABaitOfWind <cond>=2 <state>=STARTED
+script quest.Q027_ChestCaughtWithABaitOfWind
+stub quest.Q050_LanoscosSpecialBait
+item 6500 7625 880
+page fisherman/31570.htm
+page merchant/31434.htm
+page script/quest/Q027_ChestCaughtWithABaitOfWind/
+npc lanosco 31570 Fisherman 10 0 0
+npc shaling 31434 Merchant 20 0 0
+
+action lanosco
+action lanosco
+  S ActionFailed
+  S NpcHtmlMessage obj=lanosco item=0 page=fisherman/31570.htm
+  S ActionFailed
+bypass npc_{lanosco}_Quest
+  S NpcHtmlMessage obj=lanosco item=0 html="<html><body><a action=\"bypass -h npc_{lanosco}_Quest Q027_ChestCaughtWithABaitOfWind\">[Chest caught with a bait of wind (In Progress)]</a><br><a action=\"bypass -h npc_{lanosco}_Quest Q050_LanoscosSpecialBait\">[Lanosco's Special Bait (Done)]</a><br></body></html>"
+  S ActionFailed
+  S ActionFailed
+bypass npc_{lanosco}_Quest Q027_ChestCaughtWithABaitOfWind
+  S NpcHtmlMessage obj=lanosco item=0 page=script/quest/Q027_ChestCaughtWithABaitOfWind/31570-09.htm
+  S ActionFailed
+  S ActionFailed
+action shaling
+action shaling
+  S ActionFailed
+  S NpcHtmlMessage obj=shaling item=0 page=merchant/31434.htm
+  S ActionFailed
+bypass npc_{shaling}_Quest
+  S NpcHtmlMessage obj=shaling item=0 page=script/quest/Q027_ChestCaughtWithABaitOfWind/31434-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q027_ChestCaughtWithABaitOfWind 31434-02.htm
+  S NpcHtmlMessage obj=shaling item=0 page=script/quest/Q027_ChestCaughtWithABaitOfWind/31434-03.htm
+  S ActionFailed
+  state Q027_ChestCaughtWithABaitOfWind STARTED
+  rows Q027_ChestCaughtWithABaitOfWind <cond>=2 <state>=STARTED
+  items 7625=0 880=0
