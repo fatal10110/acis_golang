@@ -7,5 +7,73 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // aiIndividual5HandleOps holds, per script of ai_individual_5.go, the kind-specific NPC
 // handle operations each of its hooks reaches.
 func aiIndividual5HandleOps() map[string]script.HandleOps {
-	return map[string]script.HandleOps{}
+	return map[string]script.HandleOps{
+		"script.ai.individual.Monster.WarriorBase.Chests.TreasureChest": {
+			"OnAttacked":         {"NPC.DoDie", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned"},
+			"OnClanAttacked":     {"NPC.RemoveAllAttackDesire"},
+			"OnScriptEvent":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Chests.TreasureChestMimic": {
+			"OnAttacked":         {"NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned"},
+			"OnClanAttacked":     {"NPC.RemoveAllAttackDesire"},
+			"OnScriptEvent":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderSplit": {
+			"OnAttacked":         {"NPC.AbortAll", "NPC.CanAttack", "NPC.GeoPathFailCount", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned"},
+			"OnClanAttacked":     {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnScriptEvent":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.PartyLeaderSplitAggressive": {
+			"OnAttacked":         {"NPC.AbortAll", "NPC.CanAttack", "NPC.GeoPathFailCount", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned"},
+			"OnClanAttacked":     {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnScriptEvent":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserker": {
+			"OnAttacked":         {"NPC.AbortAll", "NPC.CanAttack", "NPC.GeoPathFailCount", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned"},
+			"OnClanAttacked":     {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnScriptEvent":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecial": {
+			"OnAttacked":         {"NPC.AbortAll", "NPC.CanAttack", "NPC.GeoPathFailCount", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned", "NPC.TopDesireTarget"},
+			"OnClanAttacked":     {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnClanDied":         {"NPC.TopDesireTarget"},
+			"OnScriptEvent":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecialAggressive": {
+			"OnAttacked":         {"NPC.AbortAll", "NPC.CanAttack", "NPC.GeoPathFailCount", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned", "NPC.TopDesireTarget"},
+			"OnClanAttacked":     {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnClanDied":         {"NPC.TopDesireTarget"},
+			"OnScriptEvent":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecialStoneAggressive": {
+			"OnAttacked":         {"NPC.AbortAll", "NPC.CanAttack", "NPC.GeoPathFailCount", "NPC.Paralyzed", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.Stunned", "NPC.TopDesireTarget"},
+			"OnClanAttacked":     {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnClanDied":         {"NPC.TopDesireTarget"},
+			"OnScriptEvent":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeCreature":      {"NPC.RemoveAllAttackDesire"},
+			"OnSeeSpell":         {"NPC.AbortAll", "NPC.GeoPathFailCount", "NPC.RemoveAllAttackDesire"},
+			"OnUseSkillFinished": {"NPC.DoDie"},
+		},
+	}
 }
