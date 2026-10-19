@@ -1,0 +1,62 @@
+# Possessor of a Precious Soul - 4 (Q247), first part, played by a level 76 human Gladiator on
+# its level 75 Sorcerer subclass holding Caradine's second letter: Caradine starts it, takes the
+# letter and sends the player to the Lady of the Lake; then relog. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q247_possessor_of_a_precious_soul.golden
+character Fighter 76
+class 2
+subclass 12 75
+hold 7679 1
+script quest.Q247_PossessorOfAPreciousSoul
+item 7679 7694
+page default/31740.htm
+page script/quest/Q247_PossessorOfAPreciousSoul/
+npc caradine 31740 Folk 10 0 0
+
+# Caradine: a level 75 subclass holding her second letter may start; she takes the letter.
+action caradine
+action caradine
+  S ActionFailed
+  S NpcHtmlMessage obj=caradine item=0 page=default/31740.htm
+  S ActionFailed
+bypass npc_{caradine}_Quest
+  S NpcHtmlMessage obj=caradine item=0 page=script/quest/Q247_PossessorOfAPreciousSoul/31740-01.htm
+  S ActionFailed
+  S ActionFailed
+  state Q247_PossessorOfAPreciousSoul CREATED
+bypass Quest Q247_PossessorOfAPreciousSoul 31740-03.htm
+  S QuestList 247:0x80000001
+  S ExShowQuestMark quest=247
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7679
+  S NpcHtmlMessage obj=caradine item=0 page=script/quest/Q247_PossessorOfAPreciousSoul/31740-03.htm
+  S ActionFailed
+  Q upsert Q247_PossessorOfAPreciousSoul | <state> | STARTED
+  Q upsert Q247_PossessorOfAPreciousSoul | <cond> | 1
+  items 7679=0
+  rows Q247_PossessorOfAPreciousSoul <state>=STARTED <cond>=1
+action caradine
+  S ActionFailed
+  S NpcHtmlMessage obj=caradine item=0 page=default/31740.htm
+  S ActionFailed
+bypass npc_{caradine}_Quest
+  S NpcHtmlMessage obj=caradine item=0 page=script/quest/Q247_PossessorOfAPreciousSoul/31740-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Caradine sends the player to the Lady of the Lake.
+bypass Quest Q247_PossessorOfAPreciousSoul 31740-05.htm
+  S QuestList 247:0x80000003
+  S ExShowQuestMark quest=247
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S ActionFailed
+  S NpcHtmlMessage obj=caradine item=0 page=script/quest/Q247_PossessorOfAPreciousSoul/31740-05.htm
+  S ActionFailed
+  Q upsert Q247_PossessorOfAPreciousSoul | <cond> | 2
+  rows Q247_PossessorOfAPreciousSoul <state>=STARTED <cond>=2
+relog
+  state Q247_PossessorOfAPreciousSoul STARTED
+  rows Q247_PossessorOfAPreciousSoul <state>=STARTED <cond>=2

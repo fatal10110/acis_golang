@@ -7,6 +7,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q241"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q242"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q246"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q247"
 )
 
 // quests201To250 is the catalog of quests 201 to 250 (#182), except the four the engine slices ported.
@@ -36,6 +37,6 @@ func quests201To250() script.Catalog {
 		"quest.Q241_PossessorOfAPreciousSoul": q241.New,
 		"quest.Q242_PossessorOfAPreciousSoul": q242.New,
 		"quest.Q246_PossessorOfAPreciousSoul": q246.New,
-		"quest.Q247_PossessorOfAPreciousSoul": nil,
+		"quest.Q247_PossessorOfAPreciousSoul": q247.New,
 	}
 }
