@@ -1,0 +1,175 @@
+# Help the Son! (Q044): a level 24 character holding the work hammer and 29 gemstone fragments accepts at Lundy, who takes the
+# work hammer. One Maille lizardman brings the thirtieth piece (the cond moves); Lundy trades the pieces for the whole one,
+# which Drikus takes; Lundy pays with a pet ticket and the quest completes; then relog. Every script
+# roll is pinned to 0.
+# Not traced (#4105): the starter's page lists multisell 101, the Go run's player object id, which
+# the Go render names {player}. Played with its trace line, the reference trace matched every step;
+# the starter's page lines below are that page with 101 written as {player}.
+character Helper 24
+hold 168 1
+hold 7552 29
+random always 0
+script quest.Q044_HelpTheSon
+item 168 7552 7553 7585
+page merchant/30827.htm
+page villagemaster/30505.htm
+page script/quest/Q044_HelpTheSon/
+npc lundy 30827 Merchant 10 0 0
+npc drikus 30505 VillageMasterOrc -10 0 0
+npc mob 20919 Monster 0 40 0
+
+# Lundy: accept.
+action lundy
+action lundy
+  S ActionFailed
+  S NpcHtmlMessage obj=lundy item=0 html="<html><body>Pet Manager Lundy:<br>\nPets are indispensable companions of adventurers. Anyone who has spent the night in the wilderness with their pet will know what I mean.<br>\n<a action=\"bypass -h npc_{lundy}_Buy 90\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{lundy}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{lundy}_multisell 999\">Exchange the hatchling equipment with the strider equipment.</a><br>\n<a action=\"bypass -h npc_{lundy}_multisell {player}\">Exchange the pet trade ticket with a pet.</a><br>\n<a action=\"bypass -h npc_{lundy}_Sell\">Sell your item.</a><br>\n<a action=\"bypass -h npc_{lundy}_TerritoryStatus\">See the lord and get the tax rate information.</a><br>\n<a action=\"bypass -h npc_{lundy}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{lundy}_Quest
+  S NpcHtmlMessage obj=lundy item=0 page=script/quest/Q044_HelpTheSon/30827-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q044_HelpTheSon CREATED
+bypass Quest Q044_HelpTheSon 30827-01.htm
+  S QuestList 44:0x80000001
+  S ExShowQuestMark quest=44
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=lundy item=0 page=script/quest/Q044_HelpTheSon/30827-01.htm
+  S ActionFailed
+  Q upsert Q044_HelpTheSon | <state> | STARTED
+  Q upsert Q044_HelpTheSon | <cond> | 1
+  state Q044_HelpTheSon STARTED
+  rows Q044_HelpTheSon <cond>=1 <state>=STARTED
+
+# Lundy takes the work hammer.
+action lundy
+  S ActionFailed
+  S NpcHtmlMessage obj=lundy item=0 html="<html><body>Pet Manager Lundy:<br>\nPets are indispensable companions of adventurers. Anyone who has spent the night in the wilderness with their pet will know what I mean.<br>\n<a action=\"bypass -h npc_{lundy}_Buy 90\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{lundy}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{lundy}_multisell 999\">Exchange the hatchling equipment with the strider equipment.</a><br>\n<a action=\"bypass -h npc_{lundy}_multisell {player}\">Exchange the pet trade ticket with a pet.</a><br>\n<a action=\"bypass -h npc_{lundy}_Sell\">Sell your item.</a><br>\n<a action=\"bypass -h npc_{lundy}_TerritoryStatus\">See the lord and get the tax rate information.</a><br>\n<a action=\"bypass -h npc_{lundy}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{lundy}_Quest
+  S NpcHtmlMessage obj=lundy item=0 page=script/quest/Q044_HelpTheSon/30827-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q044_HelpTheSon 30827-03.htm
+  S QuestList 44:0x80000003
+  S ExShowQuestMark quest=44
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:168
+  S NpcHtmlMessage obj=lundy item=0 page=script/quest/Q044_HelpTheSon/30827-03.htm
+  S ActionFailed
+  Q upsert Q044_HelpTheSon | <cond> | 2
+  items 168=0
+  rows Q044_HelpTheSon <cond>=2 <state>=STARTED
+action lundy
+  S ActionFailed
+  S NpcHtmlMessage obj=lundy item=0 html="<html><body>Pet Manager Lundy:<br>\nPets are indispensable companions of adventurers. Anyone who has spent the night in the wilderness with their pet will know what I mean.<br>\n<a action=\"bypass -h npc_{lundy}_Buy 90\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{lundy}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{lundy}_multisell 999\">Exchange the hatchling equipment with the strider equipment.</a><br>\n<a action=\"bypass -h npc_{lundy}_multisell {player}\">Exchange the pet trade ticket with a pet.</a><br>\n<a action=\"bypass -h npc_{lundy}_Sell\">Sell your item.</a><br>\n<a action=\"bypass -h npc_{lundy}_TerritoryStatus\">See the lord and get the tax rate information.</a><br>\n<a action=\"bypass -h npc_{lundy}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{lundy}_Quest
+  S NpcHtmlMessage obj=lundy item=0 page=script/quest/Q044_HelpTheSon/30827-03a.htm
+  S ActionFailed
+  S ActionFailed
+
+# The thirtieth piece.
+kill mob
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7552
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 44:0x80000007
+  S ExShowQuestMark quest=44
+  Q upsert Q044_HelpTheSon | <cond> | 3
+  items 7552=30
+  rows Q044_HelpTheSon <cond>=3 <state>=STARTED
+
+# Lundy trades the pieces.
+action lundy
+  S ActionFailed
+  S NpcHtmlMessage obj=lundy item=0 html="<html><body>Pet Manager Lundy:<br>\nPets are indispensable companions of adventurers. Anyone who has spent the night in the wilderness with their pet will know what I mean.<br>\n<a action=\"bypass -h npc_{lundy}_Buy 90\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{lundy}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{lundy}_multisell 999\">Exchange the hatchling equipment with the strider equipment.</a><br>\n<a action=\"bypass -h npc_{lundy}_multisell {player}\">Exchange the pet trade ticket with a pet.</a><br>\n<a action=\"bypass -h npc_{lundy}_Sell\">Sell your item.</a><br>\n<a action=\"bypass -h npc_{lundy}_TerritoryStatus\">See the lord and get the tax rate information.</a><br>\n<a action=\"bypass -h npc_{lundy}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{lundy}_Quest
+  S NpcHtmlMessage obj=lundy item=0 page=script/quest/Q044_HelpTheSon/30827-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q044_HelpTheSon 30827-05.htm
+  S QuestList 44:0x8000000f
+  S ExShowQuestMark quest=44
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7552 6:30
+  S SystemMessage id=54 3:7553
+  S NpcHtmlMessage obj=lundy item=0 page=script/quest/Q044_HelpTheSon/30827-05.htm
+  S ActionFailed
+  Q upsert Q044_HelpTheSon | <cond> | 4
+  items 7552=0 7553=1
+  rows Q044_HelpTheSon <cond>=4 <state>=STARTED
+action lundy
+  S ActionFailed
+  S NpcHtmlMessage obj=lundy item=0 html="<html><body>Pet Manager Lundy:<br>\nPets are indispensable companions of adventurers. Anyone who has spent the night in the wilderness with their pet will know what I mean.<br>\n<a action=\"bypass -h npc_{lundy}_Buy 90\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{lundy}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{lundy}_multisell 999\">Exchange the hatchling equipment with the strider equipment.</a><br>\n<a action=\"bypass -h npc_{lundy}_multisell {player}\">Exchange the pet trade ticket with a pet.</a><br>\n<a action=\"bypass -h npc_{lundy}_Sell\">Sell your item.</a><br>\n<a action=\"bypass -h npc_{lundy}_TerritoryStatus\">See the lord and get the tax rate information.</a><br>\n<a action=\"bypass -h npc_{lundy}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{lundy}_Quest
+  S NpcHtmlMessage obj=lundy item=0 page=script/quest/Q044_HelpTheSon/30827-05a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Drikus takes it.
+action drikus
+action drikus
+  S ActionFailed
+  S NpcHtmlMessage obj=drikus item=0 page=villagemaster/30505.htm
+  S ActionFailed
+bypass npc_{drikus}_Quest
+  S NpcHtmlMessage obj=drikus item=0 page=script/quest/Q044_HelpTheSon/30505-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q044_HelpTheSon 30505-06.htm
+  S QuestList 44:0x8000001f
+  S ExShowQuestMark quest=44
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7553
+  S NpcHtmlMessage obj=drikus item=0 page=script/quest/Q044_HelpTheSon/30505-06.htm
+  S ActionFailed
+  Q upsert Q044_HelpTheSon | <cond> | 5
+  items 7553=0
+  rows Q044_HelpTheSon <cond>=5 <state>=STARTED
+action drikus
+  S ActionFailed
+  S NpcHtmlMessage obj=drikus item=0 page=villagemaster/30505.htm
+  S ActionFailed
+bypass npc_{drikus}_Quest
+  S NpcHtmlMessage obj=drikus item=0 page=script/quest/Q044_HelpTheSon/30505-06a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Lundy pays with the pet ticket; the quest completes.
+action lundy
+action lundy
+  S ActionFailed
+  S NpcHtmlMessage obj=lundy item=0 html="<html><body>Pet Manager Lundy:<br>\nPets are indispensable companions of adventurers. Anyone who has spent the night in the wilderness with their pet will know what I mean.<br>\n<a action=\"bypass -h npc_{lundy}_Buy 90\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{lundy}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{lundy}_multisell 999\">Exchange the hatchling equipment with the strider equipment.</a><br>\n<a action=\"bypass -h npc_{lundy}_multisell {player}\">Exchange the pet trade ticket with a pet.</a><br>\n<a action=\"bypass -h npc_{lundy}_Sell\">Sell your item.</a><br>\n<a action=\"bypass -h npc_{lundy}_TerritoryStatus\">See the lord and get the tax rate information.</a><br>\n<a action=\"bypass -h npc_{lundy}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{lundy}_Quest
+  S NpcHtmlMessage obj=lundy item=0 page=script/quest/Q044_HelpTheSon/30827-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q044_HelpTheSon 30827-07.htm
+  S SystemMessage id=54 3:7585
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 44:0x00000000
+  S NpcHtmlMessage obj=lundy item=0 page=script/quest/Q044_HelpTheSon/30827-07.htm
+  S ActionFailed
+  Q upsert Q044_HelpTheSon | <state> | COMPLETED
+  Q delete-except-state Q044_HelpTheSon
+  state Q044_HelpTheSon COMPLETED
+  rows Q044_HelpTheSon <state>=COMPLETED
+  items 7585=1
+
+# Relog: the completed quest loads from its one row.
+relog
+  state Q044_HelpTheSon COMPLETED
+  rows Q044_HelpTheSon <state>=COMPLETED
+  items 7585=1
+action lundy
+action lundy
+  S ActionFailed
+  S NpcHtmlMessage obj=lundy item=0 html="<html><body>Pet Manager Lundy:<br>\nPets are indispensable companions of adventurers. Anyone who has spent the night in the wilderness with their pet will know what I mean.<br>\n<a action=\"bypass -h npc_{lundy}_Buy 90\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{lundy}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{lundy}_multisell 999\">Exchange the hatchling equipment with the strider equipment.</a><br>\n<a action=\"bypass -h npc_{lundy}_multisell {player}\">Exchange the pet trade ticket with a pet.</a><br>\n<a action=\"bypass -h npc_{lundy}_Sell\">Sell your item.</a><br>\n<a action=\"bypass -h npc_{lundy}_TerritoryStatus\">See the lord and get the tax rate information.</a><br>\n<a action=\"bypass -h npc_{lundy}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{lundy}_Quest
+  S NpcHtmlMessage obj=lundy item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

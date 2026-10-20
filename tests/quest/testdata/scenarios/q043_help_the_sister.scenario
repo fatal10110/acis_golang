@@ -1,0 +1,175 @@
+# Help the Sister! (Q043): a level 26 character holding the crafted dagger and 29 map pieces accepts at Cooper, who takes the
+# crafted dagger. One specter brings the thirtieth piece (the cond moves); Cooper trades the pieces for the whole one,
+# which Galladucci takes; Cooper pays with a pet ticket and the quest completes; then relog. Every script
+# roll is pinned to 0.
+# Not traced (#4105): the starter's page lists multisell 101, the Go run's player object id, which
+# the Go render names {player}. Played with its trace line, the reference trace matched every step;
+# the starter's page lines below are that page with 101 written as {player}.
+character Helper 26
+hold 220 1
+hold 7550 29
+random always 0
+script quest.Q043_HelpTheSister
+item 220 7550 7551 7584
+page merchant/30829.htm
+page merchant/30097.htm
+page script/quest/Q043_HelpTheSister/
+npc cooper 30829 Merchant 10 0 0
+npc galladucci 30097 Merchant -10 0 0
+npc mob 20171 Monster 0 40 0
+
+# Cooper: accept.
+action cooper
+action cooper
+  S ActionFailed
+  S NpcHtmlMessage obj=cooper item=0 html="<html><body>Pet Manager Cooper:<br>\nWelcome to the Pet Kennel of Giran Castle Town. This location is good for business but bad for the pets. I hope to move the shop to a quieter location in the country sometime in the future.<br>\n<a action=\"bypass -h npc_{cooper}_Buy 92\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{cooper}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{cooper}_multisell 999\">Exchange the hatchling equipment with the strider equipment</a><br>\n<a action=\"bypass -h npc_{cooper}_multisell {player}\">Exchange the pet trade ticket with a pet</a><br>\n<a action=\"bypass -h npc_{cooper}_Sell\">Sell your item</a><br>\n<a action=\"bypass -h npc_{cooper}_TerritoryStatus\">See the lord and get the tax rate information</a><br>\n<a action=\"bypass -h npc_{cooper}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{cooper}_Quest
+  S NpcHtmlMessage obj=cooper item=0 page=script/quest/Q043_HelpTheSister/30829-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q043_HelpTheSister CREATED
+bypass Quest Q043_HelpTheSister 30829-01.htm
+  S QuestList 43:0x80000001
+  S ExShowQuestMark quest=43
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=cooper item=0 page=script/quest/Q043_HelpTheSister/30829-01.htm
+  S ActionFailed
+  Q upsert Q043_HelpTheSister | <state> | STARTED
+  Q upsert Q043_HelpTheSister | <cond> | 1
+  state Q043_HelpTheSister STARTED
+  rows Q043_HelpTheSister <cond>=1 <state>=STARTED
+
+# Cooper takes the crafted dagger.
+action cooper
+  S ActionFailed
+  S NpcHtmlMessage obj=cooper item=0 html="<html><body>Pet Manager Cooper:<br>\nWelcome to the Pet Kennel of Giran Castle Town. This location is good for business but bad for the pets. I hope to move the shop to a quieter location in the country sometime in the future.<br>\n<a action=\"bypass -h npc_{cooper}_Buy 92\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{cooper}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{cooper}_multisell 999\">Exchange the hatchling equipment with the strider equipment</a><br>\n<a action=\"bypass -h npc_{cooper}_multisell {player}\">Exchange the pet trade ticket with a pet</a><br>\n<a action=\"bypass -h npc_{cooper}_Sell\">Sell your item</a><br>\n<a action=\"bypass -h npc_{cooper}_TerritoryStatus\">See the lord and get the tax rate information</a><br>\n<a action=\"bypass -h npc_{cooper}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{cooper}_Quest
+  S NpcHtmlMessage obj=cooper item=0 page=script/quest/Q043_HelpTheSister/30829-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q043_HelpTheSister 30829-03.htm
+  S QuestList 43:0x80000003
+  S ExShowQuestMark quest=43
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:220
+  S NpcHtmlMessage obj=cooper item=0 page=script/quest/Q043_HelpTheSister/30829-03.htm
+  S ActionFailed
+  Q upsert Q043_HelpTheSister | <cond> | 2
+  items 220=0
+  rows Q043_HelpTheSister <cond>=2 <state>=STARTED
+action cooper
+  S ActionFailed
+  S NpcHtmlMessage obj=cooper item=0 html="<html><body>Pet Manager Cooper:<br>\nWelcome to the Pet Kennel of Giran Castle Town. This location is good for business but bad for the pets. I hope to move the shop to a quieter location in the country sometime in the future.<br>\n<a action=\"bypass -h npc_{cooper}_Buy 92\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{cooper}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{cooper}_multisell 999\">Exchange the hatchling equipment with the strider equipment</a><br>\n<a action=\"bypass -h npc_{cooper}_multisell {player}\">Exchange the pet trade ticket with a pet</a><br>\n<a action=\"bypass -h npc_{cooper}_Sell\">Sell your item</a><br>\n<a action=\"bypass -h npc_{cooper}_TerritoryStatus\">See the lord and get the tax rate information</a><br>\n<a action=\"bypass -h npc_{cooper}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{cooper}_Quest
+  S NpcHtmlMessage obj=cooper item=0 page=script/quest/Q043_HelpTheSister/30829-03a.htm
+  S ActionFailed
+  S ActionFailed
+
+# The thirtieth piece.
+kill mob
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7550
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 43:0x80000007
+  S ExShowQuestMark quest=43
+  Q upsert Q043_HelpTheSister | <cond> | 3
+  items 7550=30
+  rows Q043_HelpTheSister <cond>=3 <state>=STARTED
+
+# Cooper trades the pieces.
+action cooper
+  S ActionFailed
+  S NpcHtmlMessage obj=cooper item=0 html="<html><body>Pet Manager Cooper:<br>\nWelcome to the Pet Kennel of Giran Castle Town. This location is good for business but bad for the pets. I hope to move the shop to a quieter location in the country sometime in the future.<br>\n<a action=\"bypass -h npc_{cooper}_Buy 92\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{cooper}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{cooper}_multisell 999\">Exchange the hatchling equipment with the strider equipment</a><br>\n<a action=\"bypass -h npc_{cooper}_multisell {player}\">Exchange the pet trade ticket with a pet</a><br>\n<a action=\"bypass -h npc_{cooper}_Sell\">Sell your item</a><br>\n<a action=\"bypass -h npc_{cooper}_TerritoryStatus\">See the lord and get the tax rate information</a><br>\n<a action=\"bypass -h npc_{cooper}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{cooper}_Quest
+  S NpcHtmlMessage obj=cooper item=0 page=script/quest/Q043_HelpTheSister/30829-04.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q043_HelpTheSister 30829-05.htm
+  S QuestList 43:0x8000000f
+  S ExShowQuestMark quest=43
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:7550 6:30
+  S SystemMessage id=54 3:7551
+  S NpcHtmlMessage obj=cooper item=0 page=script/quest/Q043_HelpTheSister/30829-05.htm
+  S ActionFailed
+  Q upsert Q043_HelpTheSister | <cond> | 4
+  items 7550=0 7551=1
+  rows Q043_HelpTheSister <cond>=4 <state>=STARTED
+action cooper
+  S ActionFailed
+  S NpcHtmlMessage obj=cooper item=0 html="<html><body>Pet Manager Cooper:<br>\nWelcome to the Pet Kennel of Giran Castle Town. This location is good for business but bad for the pets. I hope to move the shop to a quieter location in the country sometime in the future.<br>\n<a action=\"bypass -h npc_{cooper}_Buy 92\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{cooper}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{cooper}_multisell 999\">Exchange the hatchling equipment with the strider equipment</a><br>\n<a action=\"bypass -h npc_{cooper}_multisell {player}\">Exchange the pet trade ticket with a pet</a><br>\n<a action=\"bypass -h npc_{cooper}_Sell\">Sell your item</a><br>\n<a action=\"bypass -h npc_{cooper}_TerritoryStatus\">See the lord and get the tax rate information</a><br>\n<a action=\"bypass -h npc_{cooper}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{cooper}_Quest
+  S NpcHtmlMessage obj=cooper item=0 page=script/quest/Q043_HelpTheSister/30829-05a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Galladucci takes it.
+action galladucci
+action galladucci
+  S ActionFailed
+  S NpcHtmlMessage obj=galladucci item=0 page=merchant/30097.htm
+  S ActionFailed
+bypass npc_{galladucci}_Quest
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q043_HelpTheSister/30097-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q043_HelpTheSister 30097-06.htm
+  S QuestList 43:0x8000001f
+  S ExShowQuestMark quest=43
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:7551
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q043_HelpTheSister/30097-06.htm
+  S ActionFailed
+  Q upsert Q043_HelpTheSister | <cond> | 5
+  items 7551=0
+  rows Q043_HelpTheSister <cond>=5 <state>=STARTED
+action galladucci
+  S ActionFailed
+  S NpcHtmlMessage obj=galladucci item=0 page=merchant/30097.htm
+  S ActionFailed
+bypass npc_{galladucci}_Quest
+  S NpcHtmlMessage obj=galladucci item=0 page=script/quest/Q043_HelpTheSister/30097-06a.htm
+  S ActionFailed
+  S ActionFailed
+
+# Cooper pays with the pet ticket; the quest completes.
+action cooper
+action cooper
+  S ActionFailed
+  S NpcHtmlMessage obj=cooper item=0 html="<html><body>Pet Manager Cooper:<br>\nWelcome to the Pet Kennel of Giran Castle Town. This location is good for business but bad for the pets. I hope to move the shop to a quieter location in the country sometime in the future.<br>\n<a action=\"bypass -h npc_{cooper}_Buy 92\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{cooper}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{cooper}_multisell 999\">Exchange the hatchling equipment with the strider equipment</a><br>\n<a action=\"bypass -h npc_{cooper}_multisell {player}\">Exchange the pet trade ticket with a pet</a><br>\n<a action=\"bypass -h npc_{cooper}_Sell\">Sell your item</a><br>\n<a action=\"bypass -h npc_{cooper}_TerritoryStatus\">See the lord and get the tax rate information</a><br>\n<a action=\"bypass -h npc_{cooper}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{cooper}_Quest
+  S NpcHtmlMessage obj=cooper item=0 page=script/quest/Q043_HelpTheSister/30829-06.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q043_HelpTheSister 30829-07.htm
+  S SystemMessage id=54 3:7584
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 43:0x00000000
+  S NpcHtmlMessage obj=cooper item=0 page=script/quest/Q043_HelpTheSister/30829-07.htm
+  S ActionFailed
+  Q upsert Q043_HelpTheSister | <state> | COMPLETED
+  Q delete-except-state Q043_HelpTheSister
+  state Q043_HelpTheSister COMPLETED
+  rows Q043_HelpTheSister <state>=COMPLETED
+  items 7584=1
+
+# Relog: the completed quest loads from its one row.
+relog
+  state Q043_HelpTheSister COMPLETED
+  rows Q043_HelpTheSister <state>=COMPLETED
+  items 7584=1
+action cooper
+action cooper
+  S ActionFailed
+  S NpcHtmlMessage obj=cooper item=0 html="<html><body>Pet Manager Cooper:<br>\nWelcome to the Pet Kennel of Giran Castle Town. This location is good for business but bad for the pets. I hope to move the shop to a quieter location in the country sometime in the future.<br>\n<a action=\"bypass -h npc_{cooper}_Buy 92\">Buy a pet product</a><br>\n<a action=\"bypass -h npc_{cooper}_exc_multisell 1000\">Upgrade Pet Equipment</a><br>\n<a action=\"bypass -h npc_{cooper}_multisell 999\">Exchange the hatchling equipment with the strider equipment</a><br>\n<a action=\"bypass -h npc_{cooper}_multisell {player}\">Exchange the pet trade ticket with a pet</a><br>\n<a action=\"bypass -h npc_{cooper}_Sell\">Sell your item</a><br>\n<a action=\"bypass -h npc_{cooper}_TerritoryStatus\">See the lord and get the tax rate information</a><br>\n<a action=\"bypass -h npc_{cooper}_Quest\">Quest</a>\n</body></html>\n"
+  S ActionFailed
+bypass npc_{cooper}_Quest
+  S NpcHtmlMessage obj=cooper item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

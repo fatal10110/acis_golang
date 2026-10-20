@@ -1,0 +1,170 @@
+# Red-Eyed Invaders (Q039): a level 20 character holding 99 black and 100 red bone necklaces, 30
+# incense pouches and 29 gems of Maille accepts at Babenco, and Bathis sends it hunting. One Maille
+# lizardman brings the hundredth black necklace (the cond moves); Bathis takes the necklaces. One giant
+# araneid brings the thirtieth gem (the cond moves); Bathis takes the pouches and gems and pays in
+# fishing gear; the quest completes; then relog. Every script roll is pinned to 0 (the drops land).
+# Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q039_red_eyed_invaders.golden
+character Invader 20
+hold 7178 99
+hold 7179 100
+hold 7180 30
+hold 7181 29
+random always 0
+script quest.Q039_RedEyedInvaders
+item 7178 7179 7180 7181 6521 6529 6535
+page guard/30334.htm
+page guard/30332.htm
+page script/quest/Q039_RedEyedInvaders/
+npc babenco 30334 Guard 10 0 0
+npc bathis 30332 Guard -10 0 0
+npc lizardman 20919 Monster 0 40 0
+npc araneid 20925 Monster 0 -40 0
+
+# Babenco: accept.
+action babenco
+action babenco
+  S ActionFailed
+  S NpcHtmlMessage obj=babenco item=0 page=guard/30334.htm
+  S ActionFailed
+bypass npc_{babenco}_Quest
+  S NpcHtmlMessage obj=babenco item=0 page=script/quest/Q039_RedEyedInvaders/30334-0.htm
+  S ActionFailed
+  S ActionFailed
+  state Q039_RedEyedInvaders CREATED
+bypass Quest Q039_RedEyedInvaders 30334-1.htm
+  S QuestList 39:0x80000001
+  S ExShowQuestMark quest=39
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=babenco item=0 page=script/quest/Q039_RedEyedInvaders/30334-1.htm
+  S ActionFailed
+  Q upsert Q039_RedEyedInvaders | <state> | STARTED
+  Q upsert Q039_RedEyedInvaders | <cond> | 1
+  state Q039_RedEyedInvaders STARTED
+  rows Q039_RedEyedInvaders <cond>=1 <state>=STARTED
+action babenco
+  S ActionFailed
+  S NpcHtmlMessage obj=babenco item=0 page=guard/30334.htm
+  S ActionFailed
+bypass npc_{babenco}_Quest
+  S NpcHtmlMessage obj=babenco item=0 page=script/quest/Q039_RedEyedInvaders/30334-3.htm
+  S ActionFailed
+  S ActionFailed
+
+# Bathis sends the player after the lizardmen.
+action bathis
+action bathis
+  S ActionFailed
+  S NpcHtmlMessage obj=bathis item=0 page=guard/30332.htm
+  S ActionFailed
+bypass npc_{bathis}_Quest
+  S NpcHtmlMessage obj=bathis item=0 page=script/quest/Q039_RedEyedInvaders/30332-0.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q039_RedEyedInvaders 30332-1.htm
+  S QuestList 39:0x80000003
+  S ExShowQuestMark quest=39
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=bathis item=0 page=script/quest/Q039_RedEyedInvaders/30332-1.htm
+  S ActionFailed
+  Q upsert Q039_RedEyedInvaders | <cond> | 2
+  rows Q039_RedEyedInvaders <cond>=2 <state>=STARTED
+action bathis
+  S ActionFailed
+  S NpcHtmlMessage obj=bathis item=0 page=guard/30332.htm
+  S ActionFailed
+bypass npc_{bathis}_Quest
+  S NpcHtmlMessage obj=bathis item=0 page=script/quest/Q039_RedEyedInvaders/30332-2a.htm
+  S ActionFailed
+  S ActionFailed
+
+# A lizardman brings the hundredth black necklace.
+kill lizardman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7178
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 39:0x80000007
+  S ExShowQuestMark quest=39
+  Q upsert Q039_RedEyedInvaders | <cond> | 3
+  items 7178=100 7179=100
+  rows Q039_RedEyedInvaders <cond>=3 <state>=STARTED
+
+# Bathis takes the necklaces.
+action bathis
+  S ActionFailed
+  S NpcHtmlMessage obj=bathis item=0 page=guard/30332.htm
+  S ActionFailed
+bypass npc_{bathis}_Quest
+  S NpcHtmlMessage obj=bathis item=0 page=script/quest/Q039_RedEyedInvaders/30332-2.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q039_RedEyedInvaders 30332-3.htm
+  S QuestList 39:0x8000000f
+  S ExShowQuestMark quest=39
+  S SystemMessage id=301 3:7178 6:100
+  S SystemMessage id=301 3:7179 6:100
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=bathis item=0 page=script/quest/Q039_RedEyedInvaders/30332-3.htm
+  S ActionFailed
+  Q upsert Q039_RedEyedInvaders | <cond> | 4
+  items 7178=0 7179=0
+  rows Q039_RedEyedInvaders <cond>=4 <state>=STARTED
+action bathis
+  S ActionFailed
+  S NpcHtmlMessage obj=bathis item=0 page=guard/30332.htm
+  S ActionFailed
+bypass npc_{bathis}_Quest
+  S NpcHtmlMessage obj=bathis item=0 page=script/quest/Q039_RedEyedInvaders/30332-3a.htm
+  S ActionFailed
+  S ActionFailed
+
+# An araneid brings the thirtieth gem.
+kill araneid
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:7181
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 39:0x8000001f
+  S ExShowQuestMark quest=39
+  Q upsert Q039_RedEyedInvaders | <cond> | 5
+  items 7180=30 7181=30
+  rows Q039_RedEyedInvaders <cond>=5 <state>=STARTED
+
+# Bathis takes the pouches and gems and pays; the quest completes.
+action bathis
+  S ActionFailed
+  S NpcHtmlMessage obj=bathis item=0 page=guard/30332.htm
+  S ActionFailed
+bypass npc_{bathis}_Quest
+  S NpcHtmlMessage obj=bathis item=0 page=script/quest/Q039_RedEyedInvaders/30332-4.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q039_RedEyedInvaders 30332-5.htm
+  S SystemMessage id=301 3:7180 6:30
+  S SystemMessage id=301 3:7181 6:30
+  S SystemMessage id=53 3:6521 6:60
+  S SystemMessage id=54 3:6529
+  S SystemMessage id=53 3:6535 6:500
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 39:0x00000000
+  S NpcHtmlMessage obj=bathis item=0 page=script/quest/Q039_RedEyedInvaders/30332-5.htm
+  S ActionFailed
+  Q upsert Q039_RedEyedInvaders | <state> | COMPLETED
+  Q delete-except-state Q039_RedEyedInvaders
+  state Q039_RedEyedInvaders COMPLETED
+  rows Q039_RedEyedInvaders <state>=COMPLETED
+  items 7180=0 7181=0 6521=60 6529=1 6535=500
+
+# Relog: the completed quest loads from its one row.
+relog
+  state Q039_RedEyedInvaders COMPLETED
+  rows Q039_RedEyedInvaders <state>=COMPLETED
+  items 6521=60 6529=1 6535=500
+action babenco
+action babenco
+  S ActionFailed
+  S NpcHtmlMessage obj=babenco item=0 page=guard/30334.htm
+  S ActionFailed
+bypass npc_{babenco}_Quest
+  S NpcHtmlMessage obj=babenco item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
