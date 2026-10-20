@@ -1,0 +1,161 @@
+# Dreaming of the Skies (Q295): a level 11 character accepts at Arin. Twenty-four magical weavers give
+# two floating stones each (roll pinned to 0, not over 25), one gives one (roll 99), and the last one
+# rolls two but gives the one stone left to fifty, which moves the quest on. Arin takes them for a
+# ring of firefly and 500 SP, and the repeatable quest ends; then relog. Expectations replay the
+# reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q295_dreaming_of_the_skies.golden
+character Dreamer 11
+random 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 99 0 0 0
+script quest.Q295_DreamingOfTheSkies
+item 1492 1509
+page default/30536.htm
+page script/quest/Q295_DreamingOfTheSkies/
+npc arin 30536 Folk 10 0 0
+npc weaver 20153 Monster 40 0 0
+
+# Arin: accept.
+action arin
+action arin
+  S ActionFailed
+  S NpcHtmlMessage obj=arin item=0 page=default/30536.htm
+  S ActionFailed
+bypass npc_{arin}_Quest
+  S NpcHtmlMessage obj=arin item=0 page=script/quest/Q295_DreamingOfTheSkies/30536-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q295_DreamingOfTheSkies CREATED
+bypass Quest Q295_DreamingOfTheSkies 30536-03.htm
+  S QuestList 295:0x80000001
+  S ExShowQuestMark quest=295
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=arin item=0 page=script/quest/Q295_DreamingOfTheSkies/30536-03.htm
+  S ActionFailed
+  Q upsert Q295_DreamingOfTheSkies | <state> | STARTED
+  Q upsert Q295_DreamingOfTheSkies | <cond> | 1
+  state Q295_DreamingOfTheSkies STARTED
+  rows Q295_DreamingOfTheSkies <cond>=1 <state>=STARTED
+
+# Arin: not enough stones.
+action arin
+  S ActionFailed
+  S NpcHtmlMessage obj=arin item=0 page=default/30536.htm
+  S ActionFailed
+bypass npc_{arin}_Quest
+  S NpcHtmlMessage obj=arin item=0 page=script/quest/Q295_DreamingOfTheSkies/30536-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Fifty stones.
+kill weaver x24
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:1492 6:2
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1492=48
+kill weaver
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1492
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1492=49
+kill weaver
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1492
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 295:0x80000003
+  S ExShowQuestMark quest=295
+  Q upsert Q295_DreamingOfTheSkies | <cond> | 2
+  items 1492=50
+  rows Q295_DreamingOfTheSkies <cond>=2 <state>=STARTED
+
+# Arin: the stones for a ring of firefly; the quest ends.
+action arin
+  S ActionFailed
+  S NpcHtmlMessage obj=arin item=0 page=default/30536.htm
+  S ActionFailed
+bypass npc_{arin}_Quest
+  S SystemMessage id=301 3:1492 6:50
+  S SystemMessage id=54 3:1509
+  S SystemMessage id=331 1:500
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=arin item=0 page=script/quest/Q295_DreamingOfTheSkies/30536-05.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-quest Q295_DreamingOfTheSkies
+  items 1492=0 1509=1
+  state Q295_DreamingOfTheSkies -
+  rows Q295_DreamingOfTheSkies -
+
+# Relog: the quest is gone, and the ring stays.
+relog
+  state Q295_DreamingOfTheSkies -
+  rows Q295_DreamingOfTheSkies -
+  items 1509=1

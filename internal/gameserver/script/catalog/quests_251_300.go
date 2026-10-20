@@ -18,6 +18,14 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q274"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q277"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q291"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q292"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q293"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q294"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q295"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q296"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q297"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q298"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/q299"
 )
 
 // quests251To300 is the catalog of quests 251 to 300 (#183), except the one the engine slices ported.
@@ -41,14 +49,14 @@ func quests251To300() script.Catalog {
 		"quest.Q276_TotemOfTheHestui":          nil,
 		"quest.Q277_GatekeepersOffering":       q277.New,
 		"quest.Q291_RevengeOfTheRedbonnet":     q291.New,
-		"quest.Q292_BrigandsSweep":             nil,
-		"quest.Q293_TheHiddenVeins":            nil,
-		"quest.Q294_CovertBusiness":            nil,
-		"quest.Q295_DreamingOfTheSkies":        nil,
-		"quest.Q296_TarantulasSpiderSilk":      nil,
-		"quest.Q297_GatekeepersFavor":          nil,
-		"quest.Q298_LizardmensConspiracy":      nil,
-		"quest.Q299_GatherIngredientsForPie":   nil,
+		"quest.Q292_BrigandsSweep":             q292.New,
+		"quest.Q293_TheHiddenVeins":            q293.New,
+		"quest.Q294_CovertBusiness":            q294.New,
+		"quest.Q295_DreamingOfTheSkies":        q295.New,
+		"quest.Q296_TarantulasSpiderSilk":      q296.New,
+		"quest.Q297_GatekeepersFavor":          q297.New,
+		"quest.Q298_LizardmensConspiracy":      q298.New,
+		"quest.Q299_GatherIngredientsForPie":   q299.New,
 		"quest.Q300_HuntingLetoLizardman":      nil,
 	}
 }

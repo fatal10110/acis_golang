@@ -1,0 +1,228 @@
+# The Hidden Veins (Q293): a dwarven fighter of level 6 accepts at Filaur. Chinchirin cannot make a
+# map from no fragment. Ten Utuku orcs give ten chrysolite ores (roll pinned to 51, over 50), four more
+# four torn map fragments (roll 0, under 5) and one nothing (roll 20); Chinchirin makes a hidden vein
+# map from the four fragments. Filaur pays 5 per ore, 500 per map and 2000 more for ten ores, and, the
+# first time only, 6000 beginner soulshots with the tutorial voice. One more ore is paid alone, without
+# shots; four more fragments give a second map, paid alone; then the player quits the repeatable
+# quest; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q293_the_hidden_veins.golden
+character Veins 6
+class 53
+random 51 0 51 0 51 0 51 0 51 0 51 0 51 0 51 0 51 0 51 0 0 0 0 0 0 0 0 0 20 51 0 0 0 0 0 0 0 0 0
+script quest.Q293_TheHiddenVeins
+item 1488 1489 1490 5789
+page default/30535.htm
+page default/30539.htm
+page script/quest/Q293_TheHiddenVeins/
+npc filaur 30535 Folk 10 0 0
+npc chinchirin 30539 Folk -10 0 0
+npc orc 20446 Monster 40 0 0
+
+# Filaur: accept.
+action filaur
+action filaur
+  S ActionFailed
+  S NpcHtmlMessage obj=filaur item=0 page=default/30535.htm
+  S ActionFailed
+bypass npc_{filaur}_Quest
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q293_TheHiddenVeins/30535-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q293_TheHiddenVeins CREATED
+bypass Quest Q293_TheHiddenVeins 30535-03.htm
+  S QuestList 293:0x80000001
+  S ExShowQuestMark quest=293
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q293_TheHiddenVeins/30535-03.htm
+  S ActionFailed
+  Q upsert Q293_TheHiddenVeins | <state> | STARTED
+  Q upsert Q293_TheHiddenVeins | <cond> | 1
+  state Q293_TheHiddenVeins STARTED
+  rows Q293_TheHiddenVeins <cond>=1 <state>=STARTED
+
+# Filaur: nothing to pay yet.
+action filaur
+  S ActionFailed
+  S NpcHtmlMessage obj=filaur item=0 page=default/30535.htm
+  S ActionFailed
+bypass npc_{filaur}_Quest
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q293_TheHiddenVeins/30535-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Chinchirin: no fragment, no map.
+action chinchirin
+action chinchirin
+  S ActionFailed
+  S NpcHtmlMessage obj=chinchirin item=0 page=default/30539.htm
+  S ActionFailed
+bypass npc_{chinchirin}_Quest
+  S NpcHtmlMessage obj=chinchirin item=0 page=script/quest/Q293_TheHiddenVeins/30539-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q293_TheHiddenVeins 30539-02.htm
+  S NpcHtmlMessage obj=chinchirin item=0 page=script/quest/Q293_TheHiddenVeins/30539-02.htm
+  S ActionFailed
+
+# Ten ores, four fragments, and one orc that gives nothing.
+kill orc x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1488
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1488
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1488
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1488
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1488
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1488
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1488
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1488
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1488
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1488
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1488=10
+kill orc x4
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1489
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1489
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1489
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1489
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1489=4
+kill orc
+  S SystemMessage id=95 1:0 1:0
+  items 1488=10 1489=4
+
+# Chinchirin: the four fragments make a map.
+action chinchirin
+  S ActionFailed
+  S NpcHtmlMessage obj=chinchirin item=0 page=default/30539.htm
+  S ActionFailed
+bypass npc_{chinchirin}_Quest
+  S NpcHtmlMessage obj=chinchirin item=0 page=script/quest/Q293_TheHiddenVeins/30539-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q293_TheHiddenVeins 30539-02.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:1489 6:4
+  S SystemMessage id=54 3:1490
+  S NpcHtmlMessage obj=chinchirin item=0 page=script/quest/Q293_TheHiddenVeins/30539-03.htm
+  S ActionFailed
+  items 1489=0 1490=1
+
+# Filaur: 10 x 5 + 500 + 2000, and the beginner soulshots.
+action filaur
+action filaur
+  S ActionFailed
+  S NpcHtmlMessage obj=filaur item=0 page=default/30535.htm
+  S ActionFailed
+bypass npc_{filaur}_Quest
+  S SystemMessage id=301 3:1488 6:10
+  S SystemMessage id=302 3:1490
+  S SystemMessage id=52 6:2550
+  S TutorialShowQuestionMark id=26
+  S SystemMessage id=53 3:5789 6:6000
+  S PlaySound type=2 file=tutorial_voice_026 bind=1 obj=player loc=10,20,30 delay=0
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q293_TheHiddenVeins/30535-09.htm
+  S ActionFailed
+  S ActionFailed
+  M set Q293_TheHiddenVeins_OneTimeQuestFlag | true
+  items 1488=0 1490=0 57=2550 5789=6000
+
+# One ore alone: no shots this time.
+kill orc
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1488
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1488=1
+action filaur
+  S ActionFailed
+  S NpcHtmlMessage obj=filaur item=0 page=default/30535.htm
+  S ActionFailed
+bypass npc_{filaur}_Quest
+  S SystemMessage id=302 3:1488
+  S SystemMessage id=52 6:5
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q293_TheHiddenVeins/30535-05.htm
+  S ActionFailed
+  S ActionFailed
+  items 1488=0 57=2555 5789=6000
+
+# A second map alone; then quit.
+kill orc x4
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1489
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1489
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1489
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:1489
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 1489=4
+action chinchirin
+action chinchirin
+  S ActionFailed
+  S NpcHtmlMessage obj=chinchirin item=0 page=default/30539.htm
+  S ActionFailed
+bypass npc_{chinchirin}_Quest
+  S NpcHtmlMessage obj=chinchirin item=0 page=script/quest/Q293_TheHiddenVeins/30539-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q293_TheHiddenVeins 30539-02.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:1489 6:4
+  S SystemMessage id=54 3:1490
+  S NpcHtmlMessage obj=chinchirin item=0 page=script/quest/Q293_TheHiddenVeins/30539-03.htm
+  S ActionFailed
+  items 1489=0 1490=1
+action filaur
+action filaur
+  S ActionFailed
+  S NpcHtmlMessage obj=filaur item=0 page=default/30535.htm
+  S ActionFailed
+bypass npc_{filaur}_Quest
+  S SystemMessage id=302 3:1490
+  S SystemMessage id=52 6:500
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q293_TheHiddenVeins/30535-08.htm
+  S ActionFailed
+  S ActionFailed
+  items 1490=0 57=3055
+bypass Quest Q293_TheHiddenVeins 30535-06.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q293_TheHiddenVeins/30535-06.htm
+  S ActionFailed
+  Q delete-quest Q293_TheHiddenVeins
+  state Q293_TheHiddenVeins -
+  rows Q293_TheHiddenVeins -
+
+# Relog: the quest is gone, and what it paid stays.
+relog
+  state Q293_TheHiddenVeins -
+  rows Q293_TheHiddenVeins -
+  items 57=3055 5789=6000
