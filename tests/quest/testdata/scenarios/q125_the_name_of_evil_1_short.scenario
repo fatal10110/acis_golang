@@ -1,0 +1,52 @@
+# The Name of Evil - 1 (Q125), short: at cond 4 with one claw and two bones Karakawei sends the
+# character back to the hunt (cond 3); the next claw (the drop roll pinned to succeed) brings it
+# to two of each and cond 4, and Karakawei takes them. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q125_the_name_of_evil_1_short.golden
+character Seeker 76
+random always 0
+quest Q125_TheNameOfEvil_1 <cond>=4 <state>=STARTED
+hold 8779 1
+hold 8780 2
+script quest.Q125_TheNameOfEvil_1
+item 8779 8780 8781 8782
+page default/32117.htm
+page script/quest/Q125_TheNameOfEvil_1/
+npc karakawei 32117 Folk 20 0 0
+npc ornithomimus 22200 Monster 0 30 0
+
+action karakawei
+action karakawei
+  S ActionFailed
+  S NpcHtmlMessage obj=karakawei item=0 page=default/32117.htm
+  S ActionFailed
+bypass npc_{karakawei}_Quest
+  S QuestList 125:0x80000007
+  S ExShowQuestMark quest=125
+  S NpcHtmlMessage obj=karakawei item=0 page=script/quest/Q125_TheNameOfEvil_1/32117-09.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q125_TheNameOfEvil_1 | <cond> | 3
+  rows Q125_TheNameOfEvil_1 <cond>=3 <state>=STARTED
+  items 8779=1 8780=2
+kill ornithomimus
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:8779
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 125:0x8000000f
+  S ExShowQuestMark quest=125
+  Q upsert Q125_TheNameOfEvil_1 | <cond> | 4
+  rows Q125_TheNameOfEvil_1 <cond>=4 <state>=STARTED
+  items 8779=2 8780=2
+action karakawei
+  S ActionFailed
+  S NpcHtmlMessage obj=karakawei item=0 page=default/32117.htm
+  S ActionFailed
+bypass npc_{karakawei}_Quest
+  S SystemMessage id=301 3:8779 6:2
+  S SystemMessage id=301 3:8780 6:2
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=karakawei item=0 page=script/quest/Q125_TheNameOfEvil_1/32117-10.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q125_TheNameOfEvil_1 <cond>=4 <state>=STARTED
+  items 8779=0 8780=0
