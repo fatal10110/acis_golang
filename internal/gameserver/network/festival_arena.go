@@ -170,11 +170,19 @@ func (l *GameClientLink) festivalDeparture(live *livePlayer) (location.Location,
 }
 
 // postOnline runs fn on the queue of the player objectID while it is in the
-// world.
+// world: inside the call when the caller runs on that queue (see
+// RunOnOwnQueue), so that a party leave the player asked for takes it out
+// of its arena before the party's notices that follow; posted otherwise.
 func (w festivalWorld) postOnline(objectID int32, fn func(*livePlayer)) {
-	if live, ok := w.l.onlineLive(objectID); ok {
-		postLive(live, func() { fn(live) })
+	live, ok := w.l.onlineLive(objectID)
+	if !ok {
+		return
 	}
+	if live.OnOwnQueue() {
+		fn(live)
+		return
+	}
+	postLive(live, func() { fn(live) })
 }
 
 // SpawnWitch places the witch, then shows her two arrival casts on
