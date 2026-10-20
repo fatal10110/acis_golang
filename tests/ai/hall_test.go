@@ -62,6 +62,15 @@ func hallScripts() ([]script.Listing, script.Catalog) {
 		"script.ai.siegablehall.Agit03Alfred":            hall.Alfred,
 		"script.ai.siegablehall.Agit03Giselle":           hall.Giselle,
 		"script.ai.siegablehall.Agit03Lidia":             hall.Lidia,
+
+		"script.ai.siegablehall.AzitWateringGroud":                           hall.Gourd,
+		"script.ai.siegablehall.AzitWateringMimic":                           hall.Mimic,
+		"script.ai.siegablehall.AzitWateringMimicMagical":                    hall.MimicMagical,
+		"script.ai.siegablehall.AzitWateringRecycleCan":                      hall.RecycleCan,
+		"script.ai.siegablehall.AzitWateringTreasureBox":                     hall.TreasureBox,
+		"script.ai.siegablehall.Agit01Move1.Agit01Move1":                     hall.Move1,
+		"script.ai.siegablehall.Agit01Move1.Agit01PartisanSorcerer2":         hall.PartisanSorcerer2,
+		"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer1": hall.PartisanHealer1,
 	}
 	var list []script.Listing
 	for _, path := range []string{
@@ -73,6 +82,14 @@ func hallScripts() ([]script.Listing, script.Catalog) {
 		"script.ai.siegablehall.Agit03Alfred",
 		"script.ai.siegablehall.Agit03Giselle",
 		"script.ai.siegablehall.Agit03Lidia",
+		"script.ai.siegablehall.AzitWateringGroud",
+		"script.ai.siegablehall.AzitWateringMimic",
+		"script.ai.siegablehall.AzitWateringMimicMagical",
+		"script.ai.siegablehall.AzitWateringRecycleCan",
+		"script.ai.siegablehall.AzitWateringTreasureBox",
+		"script.ai.siegablehall.Agit01Move1.Agit01Move1",
+		"script.ai.siegablehall.Agit01Move1.Agit01PartisanSorcerer2",
+		"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer1",
 	} {
 		list = append(list, script.Listing{Path: path})
 	}
@@ -131,6 +148,9 @@ func bootHalls(t *testing.T, class, draw int, at location.Location, extra raidBo
 	kinds := map[int32]script.NPCKind{}
 	for _, tmpl := range templates {
 		kinds[int32(tmpl.ID)] = script.KindHostile
+		if tmpl.Type == "Folk" {
+			kinds[int32(tmpl.ID)] = script.KindFolk
+		}
 	}
 	classTemplate := func(id int) *player.Template {
 		tmpl := gameservertest.ClassTemplate()

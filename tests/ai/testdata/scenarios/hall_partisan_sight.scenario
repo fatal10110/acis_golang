@@ -1,0 +1,15 @@
+# The see-creature hooks of Agit01Move1 (a soldier, 35379) and Agit01PartisanSorcerer2 (35380, an
+# Agit01Move1), standing 2000 away until the character steps up to them. Seeing the character, the
+# soldier wants to attack it by 200; the sorcerer, whose own hook replaces its parent's, wants to
+# cast skill 4043 at it from where it stands, weight 1000000, and no attack. The sorcerer's
+# template lists 4043 so the fixture server knows the skill.
+character Hunter 20
+script script.ai.individual.DefaultNpc
+script script.ai.siegablehall.Agit01Move1.Agit01Move1
+script script.ai.siegablehall.Agit01Move1.Agit01PartisanSorcerer2
+npc soldier 35379 Monster 2000 0 0
+npc sorcerer 35380 Monster 2000 200 0 skill DD_MAGIC 4043 1
+
+approach soldier
+  desires soldier attack(player)=200
+  desires sorcerer cast(player,4043)=1000000

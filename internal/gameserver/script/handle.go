@@ -45,6 +45,9 @@ type Creature interface {
 	Playable() bool
 	Summon() bool
 	SiegeSummon() bool
+	// HoldsWeapon reports whether the creature holds an item in its right
+	// hand: a player or a pet can; a servitor or an NPC never does.
+	HoldsWeapon() bool
 	// combatant is the creature as the world tracks it, nil for a handle on
 	// nothing.
 	combatant() attackable.Combatant

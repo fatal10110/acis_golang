@@ -1,0 +1,19 @@
+# The Rainbow Springs treasure chests. AzitWateringMimic (35593) fights back at the character
+# hitting it, by the damage over its level plus 7: a hit of 22 on a level 1 chest wants an attack
+# of 22 / 8 * 100 = 275. AzitWateringMimicMagical (35594), at each hit, wants to cast its DD magic
+# at the attacker on a draw under 1 of 9, walking to it: not on a draw of 1, on one of 0. Its
+# vanishing once the cast lands is in tests/ai/hall_watering_test.go.
+character Hunter 20
+random 1 0
+script script.ai.individual.DefaultNpc
+script script.ai.siegablehall.AzitWateringMimic
+script script.ai.siegablehall.AzitWateringMimicMagical
+npc mimic 35593 Monster 40 0 0
+npc magic 35594 Monster -40 0 0 skill DD_MAGIC 4992 1
+
+hit mimic 22
+  desires mimic attack(player)=275
+hit magic 22
+  desires magic -
+hit magic 22
+  desires magic cast(player,4992,move)=1000000
