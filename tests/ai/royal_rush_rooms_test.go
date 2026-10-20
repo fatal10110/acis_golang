@@ -313,7 +313,8 @@ func TestRoyalRushAreaControllerRecastsAndShoutsAsItDies(t *testing.T) {
 }
 
 // TestRoyalRushKeyBoxGivesItsKeyOnce ports RoyalRushKeyBox: talked to, the
-// box gives the talker one Sepulcher Key and leaves the world. Like the
+// box gives the talker one Sepulcher Key and leaves the world; a box whose
+// first int slot says it gave its key gives none and leaves. Like the
 // other Royal Rush NPCs, a key box left standing leaves at minute 54.
 func TestRoyalRushKeyBoxGivesItsKeyOnce(t *testing.T) {
 	t.Parallel()
@@ -331,6 +332,27 @@ func TestRoyalRushKeyBoxGivesItsKeyOnce(t *testing.T) {
 	}
 	if got := framesOf(frames, serverpackets.OpcodeNpcHtmlMessage, box.ObjectID()); len(got) != 0 {
 		t.Fatalf("the box showed %d pages, want none", len(got))
+	}
+	w.talk(t, box)
+	if got := w.srv.PlayerItemCount(t, w.player.ObjectID(), rrSepulcherKey); got != 1 {
+		t.Fatalf("keys after a second talk = %d, want 1", got)
+	}
+
+	// A box that has given its key (first int slot 1) gives none, and
+	// still leaves.
+	obj, _ = w.place(t, rrKeyBoxID, 50, 0)
+	given := obj.(*npc.Folk)
+	w.onFolkQueue(t, given, func() { script.NPCOf(given).SetInt(script.SlotIntAI0, 1) })
+	w.selectNPC(t, given)
+	frames = w.talk(t, given)
+	if got := w.srv.PlayerItemCount(t, w.player.ObjectID(), rrSepulcherKey); got != 1 {
+		t.Fatalf("keys after a talk to a box that gave its key = %d, want 1", got)
+	}
+	if got := framesOf(frames, serverpackets.OpcodeDeleteObject, given.ObjectID()); len(got) != 1 {
+		t.Fatalf("DeleteObject frames of the box that gave its key = %d, want 1", len(got))
+	}
+	if got := framesOf(frames, serverpackets.OpcodeNpcHtmlMessage, given.ObjectID()); len(got) != 0 {
+		t.Fatalf("the box that gave its key showed %d pages, want none", len(got))
 	}
 
 	obj, _ = w.place(t, rrKeyBoxID, 100, 100)
@@ -457,7 +479,7 @@ func TestRoyalRushTriggerBoxWaitsOutTheClosingMinutes(t *testing.T) {
 	}
 
 	w.toMinute(t, 0, 0)
-	script.NPCOf(box).SetInt(script.SlotIntAI0, 1)
+	w.onFolkQueue(t, box, func() { script.NPCOf(box).SetInt(script.SlotIntAI0, 1) })
 	frames = w.talk(t, box)
 	if got := rrSays(frames, box.ObjectID()); len(got) != 0 {
 		t.Fatalf("a started box says %q, want nothing", got)
