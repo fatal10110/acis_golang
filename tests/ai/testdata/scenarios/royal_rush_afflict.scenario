@@ -1,0 +1,22 @@
+# RoyalRushAfflict (18244), a watchman of the graves, and RoyalRushTrasureBox (18256),
+# Halisha's treasure box. Created on a draw of 0, each looks around and wants to follow the
+# character it sees (a draw under 50). A hit makes the watchman want to flee the character
+# by its drift range (200), with no hate; the box, which cannot move, hates no one and adds
+# no flee. Their timed paths read the local clock, which deletes them at minute 54, so they
+# are covered by tests/ai/royal_rush_afflict_test.go, which sets the clock.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.RoyalRushDefaultNpc.RoyalRushAfflict
+script script.ai.individual.RoyalRushDefaultNpc.RoyalRushDefaultNpc
+script script.ai.individual.RoyalRushDefaultNpc.RoyalRushTrasureBox
+npc bomb 18244 Monster 100 0 0 walks skill AFFLICT_SKILL1 4614 9
+npc box 18256 HalishaChest -100 0 0
+
+hit bomb 10
+  hate bomb 0
+  desires bomb follow(player)=100 flee(player,200)=100
+
+hit box 10
+  hate box 0
+  desires box follow(player)=100

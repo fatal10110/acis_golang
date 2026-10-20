@@ -1,8 +1,8 @@
 // Package guard holds the town guard behaviors: Guard, which attacks
 // whoever hits it and the karma players it sees, plays its social
 // animations and goes back to its spawn point when it strays out of its
-// territory, and the GuardStand and GuardMoveAround behaviors derived from
-// it.
+// territory, the GuardStand and GuardMoveAround behaviors derived from it,
+// and their GuardFixed and GuardMoveAroundFixed children.
 package guard
 
 import (

@@ -11,10 +11,12 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/follower"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/group/randomteleport"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/guard"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/hall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/individual"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monster"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/monsterbehavior"
+	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/royalrush"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/siegeguard"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/warrior"
 	"github.com/fatal10110/acis_golang/internal/testsupport/scenario"
@@ -86,6 +88,14 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.Medusa":             warrior.Medusa,
 	"script.ai.individual.Monster.WarriorBase.WarriorBase":                                  warrior.Base,
 	"script.ai.individual.Monster.WarriorHero":                                              monster.WarriorHero,
+	"script.ai.individual.Guard.Guard":                                                      guard.Guard,
+	"script.ai.individual.Guard.GuardFixed":                                                 guard.Fixed,
+	"script.ai.individual.Guard.GuardMoveAround":                                            guard.MoveAround,
+	"script.ai.individual.Guard.GuardMoveAroundFixed":                                       guard.MoveAroundFixed,
+	"script.ai.individual.Guard.GuardStand":                                                 guard.Stand,
+	"script.ai.individual.RoyalRushDefaultNpc.RoyalRushAfflict":                             royalrush.Afflict,
+	"script.ai.individual.RoyalRushDefaultNpc.RoyalRushDefaultNpc":                          royalrush.DefaultNpc,
+	"script.ai.individual.RoyalRushDefaultNpc.RoyalRushTrasureBox":                          royalrush.TreasureBox,
 	"script.ai.individual.RoyalRushMissionNpc":                                              individual.RoyalRushMissionNpc,
 	"script.ai.individual.WarriorPetForPC":                                                  individual.WarriorPetForPC,
 	"script.ai.siegablehall.Agit02Dietrich":                                                 hall.Dietrich,
