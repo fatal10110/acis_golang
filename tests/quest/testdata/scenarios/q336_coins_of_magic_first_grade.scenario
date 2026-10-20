@@ -1,0 +1,199 @@
+# Coins of Magic (Q336), a first grade member: a level 40 character with the first grade
+# membership, twenty silver dryads and twenty silver undines. Pano trades ten of each for a Beleth
+# silver dragon at the fixed rate, then takes nine of each for the four-try game (coins rolled
+# 2 2 2): two coins right on the first guess, all three on the second; a second game finds too few
+# coins for the stake. Collob clears the trade, Ralford answers a first grade member and Bernard
+# hears of the guild. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q336_coins_of_magic_first_grade.golden
+character Collector 40
+quest Q336_CoinsOfMagic <cond>=11 <state>=STARTED state=3
+hold 3813 1
+hold 3492 20
+hold 3495 20
+random 2 2 2
+script quest.Q336_CoinsOfMagic
+item 132 206 233 303 472 852 855 886 916 2414 2435 2459 3472 3473 3474 3475 3476 3477 3478 3479 3480 3481 3482 3483 3484 3485 3486 3487 3488 3489 3490 3491 3492 3493 3494 3495 3496 3497 3498 3811 3812 3813 3814 3815
+page merchant/30078.htm
+page warehouse/30092.htm
+page merchant/30165.htm
+page default/30702.htm
+page script/quest/Q336_CoinsOfMagic/
+npc pano 30078 Merchant 10 0 0
+npc collob 30092 WarehouseKeeper 20 0 0
+npc ralford 30165 Merchant 30 0 0
+npc bernard 30702 Folk -10 0 0
+
+# Pano: the fixed rate.
+action pano
+action pano
+  S ActionFailed
+  S NpcHtmlMessage obj=pano item=0 page=merchant/30078.htm
+  S ActionFailed
+bypass npc_{pano}_Quest
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q336_CoinsOfMagic/30078-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-var Q336_CoinsOfMagic | flag
+  Q delete-var Q336_CoinsOfMagic | level
+  Q delete-var Q336_CoinsOfMagic | point
+  Q delete-var Q336_CoinsOfMagic | param1
+  Q delete-var Q336_CoinsOfMagic | param2
+bypass Quest Q336_CoinsOfMagic reply_4
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q336_CoinsOfMagic/30078-05.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | param2 | 42
+  Q upsert Q336_CoinsOfMagic | level | 1
+bypass Quest Q336_CoinsOfMagic 30078-06.htm
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q336_CoinsOfMagic/30078-06.htm
+  S ActionFailed
+bypass Quest Q336_CoinsOfMagic reply_10
+  S SystemMessage id=301 3:3492 6:10
+  S SystemMessage id=301 3:3495 6:10
+  S SystemMessage id=54 3:3496
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q336_CoinsOfMagic/30078-07.htm
+  S ActionFailed
+  items 3492=10 3495=10 3496=1
+
+# Pano: the four-try game, won at the second guess.
+action pano
+  S ActionFailed
+  S NpcHtmlMessage obj=pano item=0 page=merchant/30078.htm
+  S ActionFailed
+action pano
+  S ActionFailed
+  S NpcHtmlMessage obj=pano item=0 page=merchant/30078.htm
+  S ActionFailed
+bypass npc_{pano}_Quest
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q336_CoinsOfMagic/30078-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-var Q336_CoinsOfMagic | flag
+  Q delete-var Q336_CoinsOfMagic | level
+  Q delete-var Q336_CoinsOfMagic | point
+  Q delete-var Q336_CoinsOfMagic | param1
+  Q delete-var Q336_CoinsOfMagic | param2
+bypass Quest Q336_CoinsOfMagic reply_4
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q336_CoinsOfMagic/30078-05.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | param2 | 42
+  Q upsert Q336_CoinsOfMagic | level | 1
+bypass Quest Q336_CoinsOfMagic reply_8
+  S SystemMessage id=301 3:3492 6:9
+  S SystemMessage id=301 3:3495 6:9
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q336_CoinsOfMagic/30078-11.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | param1 | 63
+  Q upsert Q336_CoinsOfMagic | flag | 1
+  Q upsert Q336_CoinsOfMagic | point | 3
+  items 3492=1 3495=1
+  rows Q336_CoinsOfMagic <cond>=11 <state>=STARTED flag=1 level=1 param1=63 param2=42 point=3 state=3
+bypass Quest Q336_CoinsOfMagic reply_15
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q336_CoinsOfMagic/30078-16.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 48
+bypass Quest Q336_CoinsOfMagic reply_18
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q336_CoinsOfMagic/30078-19.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 60
+bypass Quest Q336_CoinsOfMagic reply_19
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q336_CoinsOfMagic/30078-51.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 1
+  Q upsert Q336_CoinsOfMagic | point | 2
+  Q upsert Q336_CoinsOfMagic | param1 | 63
+  Q upsert Q336_CoinsOfMagic | param2 | 42
+bypass Quest Q336_CoinsOfMagic reply_15
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q336_CoinsOfMagic/30078-16.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 48
+bypass Quest Q336_CoinsOfMagic reply_18
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q336_CoinsOfMagic/30078-19.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 60
+bypass Quest Q336_CoinsOfMagic reply_21
+  S SystemMessage id=54 3:3496
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q336_CoinsOfMagic/30078-20.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 63
+  Q upsert Q336_CoinsOfMagic | point | 0
+  Q upsert Q336_CoinsOfMagic | param1 | 0
+  Q upsert Q336_CoinsOfMagic | param2 | 42
+  items 3496=2
+  rows Q336_CoinsOfMagic <cond>=11 <state>=STARTED flag=63 level=1 param1=0 param2=42 point=0 state=3
+
+# Pano: too few coins for another game.
+action pano
+  S ActionFailed
+  S NpcHtmlMessage obj=pano item=0 page=merchant/30078.htm
+  S ActionFailed
+action pano
+  S ActionFailed
+  S NpcHtmlMessage obj=pano item=0 page=merchant/30078.htm
+  S ActionFailed
+bypass npc_{pano}_Quest
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q336_CoinsOfMagic/30078-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-var Q336_CoinsOfMagic | flag
+  Q delete-var Q336_CoinsOfMagic | level
+  Q delete-var Q336_CoinsOfMagic | point
+  Q delete-var Q336_CoinsOfMagic | param1
+  Q delete-var Q336_CoinsOfMagic | param2
+bypass Quest Q336_CoinsOfMagic reply_4
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q336_CoinsOfMagic/30078-05.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | param2 | 42
+  Q upsert Q336_CoinsOfMagic | level | 1
+bypass Quest Q336_CoinsOfMagic reply_8
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q336_CoinsOfMagic/30078-10.htm
+  S ActionFailed
+  items 3492=1 3495=1 3496=2
+
+# Collob clears the trade; Ralford and Bernard.
+action collob
+action collob
+  S ActionFailed
+  S NpcHtmlMessage obj=collob item=0 page=warehouse/30092.htm
+  S ActionFailed
+bypass npc_{collob}_Quest
+  S NpcHtmlMessage obj=collob item=0 page=script/quest/Q336_CoinsOfMagic/30092-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-var Q336_CoinsOfMagic | flag
+  Q delete-var Q336_CoinsOfMagic | level
+  Q delete-var Q336_CoinsOfMagic | point
+  Q delete-var Q336_CoinsOfMagic | param1
+  Q delete-var Q336_CoinsOfMagic | param2
+  rows Q336_CoinsOfMagic <cond>=11 <state>=STARTED state=3
+action ralford
+action ralford
+  S ActionFailed
+  S NpcHtmlMessage obj=ralford item=0 page=merchant/30165.htm
+  S ActionFailed
+bypass npc_{ralford}_Quest
+  S NpcHtmlMessage obj=ralford item=0 page=script/quest/Q336_CoinsOfMagic/30165-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-var Q336_CoinsOfMagic | flag
+  Q delete-var Q336_CoinsOfMagic | level
+  Q delete-var Q336_CoinsOfMagic | point
+  Q delete-var Q336_CoinsOfMagic | param1
+  Q delete-var Q336_CoinsOfMagic | param2
+action bernard
+action bernard
+  S ActionFailed
+  S NpcHtmlMessage obj=bernard item=0 page=default/30702.htm
+  S ActionFailed
+bypass npc_{bernard}_Quest
+  S NpcHtmlMessage obj=bernard item=0 page=script/quest/Q336_CoinsOfMagic/30702-05.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q336_CoinsOfMagic 30702-06.htm
+  S QuestList 336:0x8000007f
+  S ExShowQuestMark quest=336
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=bernard item=0 page=script/quest/Q336_CoinsOfMagic/30702-06.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | <cond> | 7
+  rows Q336_CoinsOfMagic <cond>=7 <state>=STARTED state=3

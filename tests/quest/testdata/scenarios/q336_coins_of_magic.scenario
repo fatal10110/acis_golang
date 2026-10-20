@@ -1,0 +1,379 @@
+# Coins of Magic (Q336), the membership run: a level 40 character holding twenty-one gold wyverns
+# and one of each coin but the gold knight of the third grade's upgrade set accepts at Sorint and
+# takes the diagram, and Bernard sends it hunting. An antelope drops no coin before the
+# membership; a Harit lizardman shaman drops the Kaldis gold dragon (rolls 0 0), which Sorint
+# takes for the third grade membership. An antelope then drops a gold wyvern (rolls 0 0). Lorain
+# trades ten wyverns for a gold knight at the fixed rate, then plays two games: four wyverns on two
+# tries, won at the first guess (coins rolled 0 0 0), and eight wyverns on three tries, one then
+# two coins right, then the hidden coins shown (rolled 1 2 0). Sorint raises the membership to the
+# second grade and asks for the first grade's set, whose page does not load (it is not valid
+# UTF-8); Pano, a first grade collector, has nothing for a second grade member. Sorint ends the
+# repeatable quest; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q336_coins_of_magic.golden
+character Collector 40
+hold 3482 21
+hold 3473 1
+hold 3475 1
+hold 3485 1
+hold 3491 1
+hold 3494 1
+random 0 0 0 0 0 0 0 1 2 0
+script quest.Q336_CoinsOfMagic
+item 132 206 233 303 472 852 855 886 916 2414 2435 2459 3472 3473 3474 3475 3476 3477 3478 3479 3480 3481 3482 3483 3484 3485 3486 3487 3488 3489 3490 3491 3492 3493 3494 3495 3496 3497 3498 3811 3812 3813 3814 3815
+page warehouse/30232.htm
+page default/30702.htm
+page default/30673.htm
+page merchant/30078.htm
+page script/quest/Q336_CoinsOfMagic/
+npc sorint 30232 WarehouseKeeper 10 0 0
+npc bernard 30702 Folk 20 0 0
+npc lorain 30673 Folk 30 0 0
+npc pano 30078 Merchant -10 0 0
+npc shaman 20644 Monster 0 -40 0
+npc antelope 21278 Monster 40 40 0
+
+# Sorint: accept, and the diagram.
+action sorint
+action sorint
+  S ActionFailed
+  S NpcHtmlMessage obj=sorint item=0 page=warehouse/30232.htm
+  S ActionFailed
+bypass npc_{sorint}_Quest
+  S NpcHtmlMessage obj=sorint item=0 page=script/quest/Q336_CoinsOfMagic/30232-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q336_CoinsOfMagic CREATED
+bypass Quest Q336_CoinsOfMagic 30232-03.htm
+  S NpcHtmlMessage obj=sorint item=0 page=script/quest/Q336_CoinsOfMagic/30232-03.htm
+  S ActionFailed
+bypass Quest Q336_CoinsOfMagic 30232-05.htm
+  S SystemMessage id=54 3:3811
+  S QuestList 336:0x80000001
+  S ExShowQuestMark quest=336
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=sorint item=0 page=script/quest/Q336_CoinsOfMagic/30232-05.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | <state> | STARTED
+  Q upsert Q336_CoinsOfMagic | <cond> | 1
+  Q upsert Q336_CoinsOfMagic | state | 1
+  state Q336_CoinsOfMagic STARTED
+  rows Q336_CoinsOfMagic <cond>=1 <state>=STARTED state=1
+  items 3811=1
+
+# Bernard sends the hunter to the Harit lizardmen.
+action bernard
+action bernard
+  S ActionFailed
+  S NpcHtmlMessage obj=bernard item=0 page=default/30702.htm
+  S ActionFailed
+bypass npc_{bernard}_Quest
+  S NpcHtmlMessage obj=bernard item=0 page=script/quest/Q336_CoinsOfMagic/30702-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q336_CoinsOfMagic 30702-02.htm
+  S NpcHtmlMessage obj=bernard item=0 page=script/quest/Q336_CoinsOfMagic/30702-02.htm
+  S ActionFailed
+bypass Quest Q336_CoinsOfMagic 30702-03.htm
+  S QuestList 336:0x80000003
+  S ExShowQuestMark quest=336
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=bernard item=0 page=script/quest/Q336_CoinsOfMagic/30702-03.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | <cond> | 2
+  Q upsert Q336_CoinsOfMagic | state | 2
+  rows Q336_CoinsOfMagic <cond>=2 <state>=STARTED state=2
+
+# The hunt: no coin before the membership; the Kaldis gold dragon.
+kill antelope
+  S SystemMessage id=95 1:0 1:0
+  items 3482=21 3812=0
+kill shaman
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3812
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 336:0x80000007
+  S ExShowQuestMark quest=336
+  Q upsert Q336_CoinsOfMagic | <cond> | 3
+  items 3812=1
+  rows Q336_CoinsOfMagic <cond>=3 <state>=STARTED state=2
+
+# Sorint: the third grade membership; then the first coin.
+action sorint
+action sorint
+  S ActionFailed
+  S NpcHtmlMessage obj=sorint item=0 page=warehouse/30232.htm
+  S ActionFailed
+bypass npc_{sorint}_Quest
+  S QuestList 336:0x8000000f
+  S ExShowQuestMark quest=336
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3811
+  S SystemMessage id=302 3:3812
+  S SystemMessage id=54 3:3815
+  S NpcHtmlMessage obj=sorint item=0 page=script/quest/Q336_CoinsOfMagic/30232-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | <cond> | 4
+  Q upsert Q336_CoinsOfMagic | state | 3
+  items 3811=0 3812=0 3815=1
+  rows Q336_CoinsOfMagic <cond>=4 <state>=STARTED state=3
+kill antelope
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3482
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  items 3482=22
+
+# Lorain: the fixed rate.
+action lorain
+action lorain
+  S ActionFailed
+  S NpcHtmlMessage obj=lorain item=0 page=default/30673.htm
+  S ActionFailed
+bypass npc_{lorain}_Quest
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-var Q336_CoinsOfMagic | flag
+  Q delete-var Q336_CoinsOfMagic | level
+  Q delete-var Q336_CoinsOfMagic | point
+  Q delete-var Q336_CoinsOfMagic | param1
+  Q delete-var Q336_CoinsOfMagic | param2
+bypass Quest Q336_CoinsOfMagic reply_1
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-02.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | param2 | 11
+  Q upsert Q336_CoinsOfMagic | level | 3
+  rows Q336_CoinsOfMagic <cond>=4 <state>=STARTED level=3 param2=11 state=3
+bypass Quest Q336_CoinsOfMagic 30673-06.htm
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-06.htm
+  S ActionFailed
+bypass Quest Q336_CoinsOfMagic reply_10
+  S SystemMessage id=301 3:3482 6:10
+  S SystemMessage id=54 3:3483
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-07.htm
+  S ActionFailed
+  items 3482=12 3483=1
+
+# Lorain: the two-try game, won at the first guess.
+action lorain
+  S ActionFailed
+  S NpcHtmlMessage obj=lorain item=0 page=default/30673.htm
+  S ActionFailed
+action lorain
+  S ActionFailed
+  S NpcHtmlMessage obj=lorain item=0 page=default/30673.htm
+  S ActionFailed
+bypass npc_{lorain}_Quest
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-var Q336_CoinsOfMagic | flag
+  Q delete-var Q336_CoinsOfMagic | level
+  Q delete-var Q336_CoinsOfMagic | point
+  Q delete-var Q336_CoinsOfMagic | param1
+  Q delete-var Q336_CoinsOfMagic | param2
+bypass Quest Q336_CoinsOfMagic reply_1
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-02.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | param2 | 11
+  Q upsert Q336_CoinsOfMagic | level | 3
+bypass Quest Q336_CoinsOfMagic reply_6
+  S SystemMessage id=301 3:3482 6:4
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-11.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | param1 | 21
+  Q upsert Q336_CoinsOfMagic | flag | 1
+  Q upsert Q336_CoinsOfMagic | point | 1
+  items 3482=8
+bypass Quest Q336_CoinsOfMagic reply_13
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-14.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 16
+bypass Quest Q336_CoinsOfMagic reply_16
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-17.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 20
+bypass Quest Q336_CoinsOfMagic reply_19
+  S SystemMessage id=54 3:3483
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-20.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 21
+  Q upsert Q336_CoinsOfMagic | point | 0
+  Q upsert Q336_CoinsOfMagic | param1 | 0
+  Q upsert Q336_CoinsOfMagic | param2 | 11
+  items 3483=2
+  rows Q336_CoinsOfMagic <cond>=4 <state>=STARTED flag=21 level=3 param1=0 param2=11 point=0 state=3
+
+# Lorain: the three-try game, lost.
+action lorain
+  S ActionFailed
+  S NpcHtmlMessage obj=lorain item=0 page=default/30673.htm
+  S ActionFailed
+action lorain
+  S ActionFailed
+  S NpcHtmlMessage obj=lorain item=0 page=default/30673.htm
+  S ActionFailed
+bypass npc_{lorain}_Quest
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q delete-var Q336_CoinsOfMagic | flag
+  Q delete-var Q336_CoinsOfMagic | level
+  Q delete-var Q336_CoinsOfMagic | point
+  Q delete-var Q336_CoinsOfMagic | param1
+  Q delete-var Q336_CoinsOfMagic | param2
+bypass Quest Q336_CoinsOfMagic reply_1
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-02.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | param2 | 11
+  Q upsert Q336_CoinsOfMagic | level | 3
+bypass Quest Q336_CoinsOfMagic reply_7
+  S SystemMessage id=301 3:3482 6:8
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-11.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | param1 | 30
+  Q upsert Q336_CoinsOfMagic | flag | 1
+  Q upsert Q336_CoinsOfMagic | point | 2
+  items 3482=0
+bypass Quest Q336_CoinsOfMagic reply_13
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-14.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 16
+bypass Quest Q336_CoinsOfMagic reply_16
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-17.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 20
+bypass Quest Q336_CoinsOfMagic reply_19
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-50.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 1
+  Q upsert Q336_CoinsOfMagic | point | 1
+  Q upsert Q336_CoinsOfMagic | param1 | 30
+  Q upsert Q336_CoinsOfMagic | param2 | 11
+  rows Q336_CoinsOfMagic <cond>=4 <state>=STARTED flag=1 level=3 param1=30 param2=11 point=1 state=3
+bypass Quest Q336_CoinsOfMagic reply_13
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-14.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 16
+bypass Quest Q336_CoinsOfMagic reply_17
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-18.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 24
+bypass Quest Q336_CoinsOfMagic reply_20
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-51.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 1
+  Q upsert Q336_CoinsOfMagic | point | 0
+  Q upsert Q336_CoinsOfMagic | param1 | 30
+  Q upsert Q336_CoinsOfMagic | param2 | 11
+bypass Quest Q336_CoinsOfMagic reply_14
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-15.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 32
+bypass Quest Q336_CoinsOfMagic reply_18
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-19.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 44
+bypass Quest Q336_CoinsOfMagic reply_21
+  S NpcHtmlMessage obj=lorain item=0 page=script/quest/Q336_CoinsOfMagic/30673-37.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | flag | 47
+  Q upsert Q336_CoinsOfMagic | point | 0
+  Q upsert Q336_CoinsOfMagic | param1 | 0
+  Q upsert Q336_CoinsOfMagic | param2 | 11
+  items 3483=2
+  rows Q336_CoinsOfMagic <cond>=4 <state>=STARTED flag=47 level=3 param1=0 param2=11 point=0 state=3
+
+# Sorint: the second grade, then no set for the first.
+action sorint
+action sorint
+  S ActionFailed
+  S NpcHtmlMessage obj=sorint item=0 page=warehouse/30232.htm
+  S ActionFailed
+bypass npc_{sorint}_Quest
+  S NpcHtmlMessage obj=sorint item=0 page=script/quest/Q336_CoinsOfMagic/30232-10.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q336_CoinsOfMagic upgrade
+  S QuestList 336:0x8000010f
+  S ExShowQuestMark quest=336
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3815
+  S SystemMessage id=302 3:3473
+  S SystemMessage id=302 3:3475
+  S SystemMessage id=302 3:3483
+  S SystemMessage id=302 3:3485
+  S SystemMessage id=302 3:3491
+  S SystemMessage id=302 3:3494
+  S SystemMessage id=54 3:3814
+  S NpcHtmlMessage obj=sorint item=0 page=script/quest/Q336_CoinsOfMagic/30232-16.htm
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | <flags> | -2147483377
+  Q upsert Q336_CoinsOfMagic | <cond> | 9
+  items 3815=0 3473=0 3475=0 3483=1 3485=0 3491=0 3494=0 3814=1
+  rows Q336_CoinsOfMagic <cond>=9 <flags>=-2147483377 <state>=STARTED flag=47 level=3 param1=0 param2=11 point=0 state=3
+action sorint
+  S ActionFailed
+  S NpcHtmlMessage obj=sorint item=0 page=warehouse/30232.htm
+  S ActionFailed
+action sorint
+  S ActionFailed
+  S NpcHtmlMessage obj=sorint item=0 page=warehouse/30232.htm
+  S ActionFailed
+bypass npc_{sorint}_Quest
+  S NpcHtmlMessage obj=sorint item=0 page=script/quest/Q336_CoinsOfMagic/30232-11.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q336_CoinsOfMagic upgrade
+  S QuestList 336:0x8000030f
+  S ExShowQuestMark quest=336
+  S NpcHtmlMessage obj=sorint item=0 html="<html><body>My html is missing:<br>./data/html/script/quest/Q336_CoinsOfMagic/30232-14.htm</body></html>"
+  S ActionFailed
+  Q upsert Q336_CoinsOfMagic | <flags> | -2147482865
+  Q upsert Q336_CoinsOfMagic | <cond> | 10
+  items 3814=1 3813=0
+  rows Q336_CoinsOfMagic <cond>=10 <flags>=-2147482865 <state>=STARTED flag=47 level=3 param1=0 param2=11 point=0 state=3
+
+# Pano trades with first grade members only.
+action pano
+action pano
+  S ActionFailed
+  S NpcHtmlMessage obj=pano item=0 page=merchant/30078.htm
+  S ActionFailed
+bypass npc_{pano}_Quest
+  S NpcHtmlMessage obj=pano item=0 page=script/quest/Q336_CoinsOfMagic/30078-54.htm
+  S ActionFailed
+  S ActionFailed
+
+# Sorint: leave the guild.
+action sorint
+action sorint
+  S ActionFailed
+  S NpcHtmlMessage obj=sorint item=0 page=warehouse/30232.htm
+  S ActionFailed
+bypass npc_{sorint}_Quest
+  S NpcHtmlMessage obj=sorint item=0 page=script/quest/Q336_CoinsOfMagic/30232-11.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q336_CoinsOfMagic 30232-18.htm
+  S NpcHtmlMessage obj=sorint item=0 page=script/quest/Q336_CoinsOfMagic/30232-18.htm
+  S ActionFailed
+bypass Quest Q336_CoinsOfMagic 30232-18a.htm
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList
+  S SystemMessage id=302 3:3814
+  S NpcHtmlMessage obj=sorint item=0 page=script/quest/Q336_CoinsOfMagic/30232-18a.htm
+  S ActionFailed
+  Q delete-quest Q336_CoinsOfMagic
+  state Q336_CoinsOfMagic -
+  rows Q336_CoinsOfMagic -
+  items 3814=0 3483=1
+relog
+  S SystemMessage id=34
+  S SystemMessage id=1261
+  S QuestList
+  S ActionFailed
+  state Q336_CoinsOfMagic -
+  rows Q336_CoinsOfMagic -
+  items 3483=1 3814=0
