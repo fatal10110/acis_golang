@@ -1,0 +1,44 @@
+# Testimony of Life (Q218) at cond 12, played by a level 37 Elven Knight holding Arkenia's
+# stardust: Thalia takes it, and below level 38 gives her instructions instead of her second
+# letter (cond 13); asked again below level 38, she waits. Expectations replay the reference
+# trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q218_testimony_of_life_thalia_low_level.golden
+character Dryling 37
+class 19
+quest Q218_TestimonyOfLife <state>=STARTED <cond>=12
+hold 3155 1
+script quest.Q218_TestimonyOfLife
+item 3026 3140 3141 3142 3143 3144 3145 3146 3147 3148 3149 3150 3151 3152 3153 3154 3155 3156 3157 3158 3159 3160 3161 3162 3163 3164 3165 3166 3167 3168 3169 3170 3171 7562
+page default/30371.htm
+page script/quest/Q218_TestimonyOfLife/
+npc thalia 30371 Folk 10 0 0
+
+action thalia
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+bypass npc_{thalia}_Quest
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q218_TestimonyOfLife/30371-09.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30371-11.htm
+  S SystemMessage id=302 3:3155
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 218:0x80001fff
+  S ExShowQuestMark quest=218
+  S SystemMessage id=54 3:3148
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q218_TestimonyOfLife/30371-10.htm
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <cond> | 13
+  items 3148=1 3155=0
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+bypass npc_{thalia}_Quest
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q218_TestimonyOfLife/30371-12.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q218_TestimonyOfLife <state>=STARTED <cond>=13
+  items 3147=0 3148=1 3155=0

@@ -1,0 +1,904 @@
+# Testimony of Life (Q218), a second class-change testimony for elves, played by a level 38
+# Elven Knight wearing a Talin's Spear of its own (only a spear in hand slays the Unicorn of
+# Eva for its tears), every script roll pinned to 0: Cardien starts it and pays the level 37
+# set's Dimensional Diamonds (102 for an elf, once per character); Hierarch Asterios gives
+# his letter and the Moonflower Charm; Thalia sends the traveller to Pushkin, who wants ten
+# pure mithril ores, twenty wyrm talons and twenty ant soldier acids for the Pure Mithril Cup;
+# Arkenia's contract asks Adonius for twenty spider ichors and harpy downs; Arkenia's
+# stardust and Thalia's second letter send the traveller to Isael, who wants the six pieces
+# of Talin's spear of the Leto Lizardman Shamans; Thalia's Grail of Purity brings the tears of
+# the unicorn, Thalia the Water of Life, Asterios the Camomile Charm, and Cardien the Mark of
+# Life; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q218_testimony_of_life.golden
+character Lively 38
+class 19
+equip 3026
+random always 0
+script quest.Q218_TestimonyOfLife
+item 3026 3140 3141 3142 3143 3144 3145 3146 3147 3148 3149 3150 3151 3152 3153 3154 3155 3156 3157 3158 3159 3160 3161 3162 3163 3164 3165 3166 3167 3168 3169 3170 3171 7562
+page villagemaster/30154.htm
+page trainer/30300.htm
+page default/30371.htm
+page trainer/30375.htm
+page default/30419.htm
+page trainer/30460.htm
+page default/30655.htm
+page script/quest/Q218_TestimonyOfLife/
+npc cardien 30460 Trainer 10 0 0
+npc asterios 30154 VillageMasterPriest -10 0 0
+npc thalia 30371 Folk 0 10 0
+npc pushkin 30300 Trainer 0 -10 0
+npc arkenia 30419 Folk 20 20 0
+npc adonius 30375 Trainer -20 20 0
+npc isael 30655 Folk 20 -20 0
+npc basilisk 20550 Monster 40 0 0
+npc wyrm 20176 Monster -40 0 0
+npc ant 20082 Monster 0 40 0
+npc spider 20233 Monster 0 -40 0
+npc harpy 20145 Monster 40 40 0
+npc shaman 20581 Monster -40 40 0
+npc unicorn 27077 Monster 40 -40 0
+
+
+# Cardien: an elf of the first occupation at level 37 or more may start; the first testimony
+# of the set pays the diamonds, which turns the accept page into 30460-04a.htm.
+action cardien
+action cardien
+  S ActionFailed
+  S NpcHtmlMessage obj=cardien item=0 page=trainer/30460.htm
+  S ActionFailed
+bypass npc_{cardien}_Quest
+  S NpcHtmlMessage obj=cardien item=0 page=script/quest/Q218_TestimonyOfLife/30460-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30460-04.htm
+  S QuestList 218:0x80000001
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3141
+  S SystemMessage id=53 3:7562 6:102
+  S NpcHtmlMessage obj=cardien item=0 page=script/quest/Q218_TestimonyOfLife/30460-04a.htm
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <state> | STARTED
+  Q upsert Q218_TestimonyOfLife | <cond> | 1
+  M set secondClassChange37 | true
+  items 3141=1 7562=102
+  state Q218_TestimonyOfLife STARTED
+  rows Q218_TestimonyOfLife <state>=STARTED <cond>=1
+action cardien
+  S ActionFailed
+  S NpcHtmlMessage obj=cardien item=0 page=trainer/30460.htm
+  S ActionFailed
+bypass npc_{cardien}_Quest
+  S NpcHtmlMessage obj=cardien item=0 page=script/quest/Q218_TestimonyOfLife/30460-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Asterios walks the traveller through his pages and gives his letter and the charm.
+action asterios
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+bypass npc_{asterios}_Quest
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q218_TestimonyOfLife/30154-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30154-02.htm
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q218_TestimonyOfLife/30154-02.htm
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30154-04.htm
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q218_TestimonyOfLife/30154-04.htm
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30154-05.htm
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q218_TestimonyOfLife/30154-05.htm
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30154-06.htm
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q218_TestimonyOfLife/30154-06.htm
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30154-07.htm
+  S QuestList 218:0x80000003
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3141
+  S SystemMessage id=54 3:3143
+  S SystemMessage id=54 3:3144
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q218_TestimonyOfLife/30154-07.htm
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <cond> | 2
+  items 3141=0 3143=1 3144=1
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+bypass npc_{asterios}_Quest
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q218_TestimonyOfLife/30154-08.htm
+  S ActionFailed
+  S ActionFailed
+
+# Thalia takes the letter and gives the grail diagram; Pushkin gives his list.
+action thalia
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+bypass npc_{thalia}_Quest
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q218_TestimonyOfLife/30371-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30371-02.htm
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q218_TestimonyOfLife/30371-02.htm
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30371-03.htm
+  S QuestList 218:0x80000007
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3143
+  S SystemMessage id=54 3:3145
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q218_TestimonyOfLife/30371-03.htm
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <cond> | 3
+  items 3143=0 3145=1
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+bypass npc_{thalia}_Quest
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q218_TestimonyOfLife/30371-04.htm
+  S ActionFailed
+  S ActionFailed
+action pushkin
+action pushkin
+  S ActionFailed
+  S NpcHtmlMessage obj=pushkin item=0 page=trainer/30300.htm
+  S ActionFailed
+bypass npc_{pushkin}_Quest
+  S NpcHtmlMessage obj=pushkin item=0 page=script/quest/Q218_TestimonyOfLife/30300-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30300-02.htm
+  S NpcHtmlMessage obj=pushkin item=0 page=script/quest/Q218_TestimonyOfLife/30300-02.htm
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30300-03.htm
+  S NpcHtmlMessage obj=pushkin item=0 page=script/quest/Q218_TestimonyOfLife/30300-03.htm
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30300-04.htm
+  S NpcHtmlMessage obj=pushkin item=0 page=script/quest/Q218_TestimonyOfLife/30300-04.htm
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30300-05.htm
+  S NpcHtmlMessage obj=pushkin item=0 page=script/quest/Q218_TestimonyOfLife/30300-05.htm
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30300-06.htm
+  S QuestList 218:0x8000000f
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3145
+  S SystemMessage id=54 3:3149
+  S NpcHtmlMessage obj=pushkin item=0 page=script/quest/Q218_TestimonyOfLife/30300-06.htm
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <cond> | 4
+  items 3145=0 3149=1
+action pushkin
+  S ActionFailed
+  S NpcHtmlMessage obj=pushkin item=0 page=trainer/30300.htm
+  S ActionFailed
+bypass npc_{pushkin}_Quest
+  S NpcHtmlMessage obj=pushkin item=0 page=script/quest/Q218_TestimonyOfLife/30300-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ten ores, twenty talons, twenty acids; the last acid completes the list.
+kill basilisk x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3161
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3161
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3161
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3161
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3161
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3161
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3161
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3161
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3161
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3161
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3161=10
+kill wyrm x20
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3163
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3163=20
+kill ant x20
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3162
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 218:0x8000001f
+  S ExShowQuestMark quest=218
+  Q upsert Q218_TestimonyOfLife | <cond> | 5
+  items 3162=20
+action pushkin
+  S ActionFailed
+  S NpcHtmlMessage obj=pushkin item=0 page=trainer/30300.htm
+  S ActionFailed
+action pushkin
+  S ActionFailed
+  S NpcHtmlMessage obj=pushkin item=0 page=trainer/30300.htm
+  S ActionFailed
+bypass npc_{pushkin}_Quest
+  S NpcHtmlMessage obj=pushkin item=0 page=script/quest/Q218_TestimonyOfLife/30300-08.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30300-09.htm
+  S NpcHtmlMessage obj=pushkin item=0 page=script/quest/Q218_TestimonyOfLife/30300-09.htm
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30300-10.htm
+  S QuestList 218:0x8000003f
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3149
+  S SystemMessage id=301 3:3162 6:20
+  S SystemMessage id=301 3:3161 6:10
+  S SystemMessage id=301 3:3163 6:20
+  S SystemMessage id=54 3:3150
+  S NpcHtmlMessage obj=pushkin item=0 page=script/quest/Q218_TestimonyOfLife/30300-10.htm
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <cond> | 6
+  items 3149=0 3150=1 3161=0 3162=0 3163=0
+action pushkin
+  S ActionFailed
+  S NpcHtmlMessage obj=pushkin item=0 page=trainer/30300.htm
+  S ActionFailed
+bypass npc_{pushkin}_Quest
+  S NpcHtmlMessage obj=pushkin item=0 page=script/quest/Q218_TestimonyOfLife/30300-11.htm
+  S ActionFailed
+  S ActionFailed
+
+# Thalia takes the cup and writes to Arkenia, who writes a contract and sends the traveller to Adonius.
+action thalia
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+bypass npc_{thalia}_Quest
+  S QuestList 218:0x8000007f
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3150
+  S SystemMessage id=54 3:3146
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q218_TestimonyOfLife/30371-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <cond> | 7
+  items 3146=1 3150=0
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+bypass npc_{thalia}_Quest
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q218_TestimonyOfLife/30371-07.htm
+  S ActionFailed
+  S ActionFailed
+action arkenia
+action arkenia
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenia item=0 page=default/30419.htm
+  S ActionFailed
+bypass npc_{arkenia}_Quest
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q218_TestimonyOfLife/30419-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30419-02.htm
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q218_TestimonyOfLife/30419-02.htm
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30419-03.htm
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q218_TestimonyOfLife/30419-03.htm
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30419-04.htm
+  S QuestList 218:0x800000ff
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3146
+  S SystemMessage id=54 3:3151
+  S SystemMessage id=54 3:3152
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q218_TestimonyOfLife/30419-04.htm
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <cond> | 8
+  items 3146=0 3151=1 3152=1
+action arkenia
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenia item=0 page=default/30419.htm
+  S ActionFailed
+bypass npc_{arkenia}_Quest
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q218_TestimonyOfLife/30419-05.htm
+  S ActionFailed
+  S ActionFailed
+action adonius
+action adonius
+  S ActionFailed
+  S NpcHtmlMessage obj=adonius item=0 page=trainer/30375.htm
+  S ActionFailed
+bypass npc_{adonius}_Quest
+  S NpcHtmlMessage obj=adonius item=0 page=script/quest/Q218_TestimonyOfLife/30375-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30375-02.htm
+  S QuestList 218:0x800001ff
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3152
+  S SystemMessage id=54 3:3153
+  S NpcHtmlMessage obj=adonius item=0 page=script/quest/Q218_TestimonyOfLife/30375-02.htm
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <cond> | 9
+  items 3152=0 3153=1
+action adonius
+  S ActionFailed
+  S NpcHtmlMessage obj=adonius item=0 page=trainer/30375.htm
+  S ActionFailed
+bypass npc_{adonius}_Quest
+  S NpcHtmlMessage obj=adonius item=0 page=script/quest/Q218_TestimonyOfLife/30375-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Twenty spider ichors and twenty harpy downs.
+kill spider x20
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3164
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3164=20
+kill harpy x20
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3165
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 218:0x800003ff
+  S ExShowQuestMark quest=218
+  Q upsert Q218_TestimonyOfLife | <cond> | 10
+  items 3165=20
+action adonius
+  S ActionFailed
+  S NpcHtmlMessage obj=adonius item=0 page=trainer/30375.htm
+  S ActionFailed
+action adonius
+  S ActionFailed
+  S NpcHtmlMessage obj=adonius item=0 page=trainer/30375.htm
+  S ActionFailed
+bypass npc_{adonius}_Quest
+  S QuestList 218:0x800007ff
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3153
+  S SystemMessage id=301 3:3165 6:20
+  S SystemMessage id=301 3:3164 6:20
+  S SystemMessage id=54 3:3154
+  S NpcHtmlMessage obj=adonius item=0 page=script/quest/Q218_TestimonyOfLife/30375-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <cond> | 11
+  items 3153=0 3154=1 3164=0 3165=0
+action adonius
+  S ActionFailed
+  S NpcHtmlMessage obj=adonius item=0 page=trainer/30375.htm
+  S ActionFailed
+bypass npc_{adonius}_Quest
+  S NpcHtmlMessage obj=adonius item=0 page=script/quest/Q218_TestimonyOfLife/30375-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Arkenia takes the scripture copy and the contract for the stardust; Thalia, at level 38,
+# takes the stardust and writes to Isael.
+action arkenia
+action arkenia
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenia item=0 page=default/30419.htm
+  S ActionFailed
+bypass npc_{arkenia}_Quest
+  S QuestList 218:0x80000fff
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3154
+  S SystemMessage id=302 3:3151
+  S SystemMessage id=54 3:3155
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q218_TestimonyOfLife/30419-06.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <cond> | 12
+  items 3151=0 3154=0 3155=1
+action arkenia
+  S ActionFailed
+  S NpcHtmlMessage obj=arkenia item=0 page=default/30419.htm
+  S ActionFailed
+bypass npc_{arkenia}_Quest
+  S NpcHtmlMessage obj=arkenia item=0 page=script/quest/Q218_TestimonyOfLife/30419-07.htm
+  S ActionFailed
+  S ActionFailed
+action thalia
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+bypass npc_{thalia}_Quest
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q218_TestimonyOfLife/30371-09.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30371-11.htm
+  S SystemMessage id=302 3:3155
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 218:0x80002fff
+  S ExShowQuestMark quest=218
+  S SystemMessage id=54 3:3147
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q218_TestimonyOfLife/30371-11.htm
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <flags> | -2147471361
+  Q upsert Q218_TestimonyOfLife | <cond> | 14
+  items 3147=1 3155=0
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+bypass npc_{thalia}_Quest
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q218_TestimonyOfLife/30371-14.htm
+  S ActionFailed
+  S ActionFailed
+action isael
+action isael
+  S ActionFailed
+  S NpcHtmlMessage obj=isael item=0 page=default/30655.htm
+  S ActionFailed
+bypass npc_{isael}_Quest
+  S NpcHtmlMessage obj=isael item=0 page=script/quest/Q218_TestimonyOfLife/30655-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q218_TestimonyOfLife 30655-02.htm
+  S QuestList 218:0x80006fff
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3147
+  S SystemMessage id=54 3:3156
+  S NpcHtmlMessage obj=isael item=0 page=script/quest/Q218_TestimonyOfLife/30655-02.htm
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <flags> | -2147454977
+  Q upsert Q218_TestimonyOfLife | <cond> | 15
+  items 3147=0 3156=1
+action isael
+  S ActionFailed
+  S NpcHtmlMessage obj=isael item=0 page=default/30655.htm
+  S ActionFailed
+bypass npc_{isael}_Quest
+  S NpcHtmlMessage obj=isael item=0 page=script/quest/Q218_TestimonyOfLife/30655-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Six shamans, each giving the next piece of the spear.
+kill shaman x6
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3166
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3167
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3168
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3169
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3170
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3171
+  S QuestList 218:0x8000efff
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  Q upsert Q218_TestimonyOfLife | <flags> | -2147422209
+  Q upsert Q218_TestimonyOfLife | <cond> | 16
+  items 3166=1 3167=1 3168=1 3169=1 3170=1 3171=1
+
+# Isael takes the six pieces and gives his letter and a Talin's Spear.
+action isael
+  S ActionFailed
+  S NpcHtmlMessage obj=isael item=0 page=default/30655.htm
+  S ActionFailed
+action isael
+  S ActionFailed
+  S NpcHtmlMessage obj=isael item=0 page=default/30655.htm
+  S ActionFailed
+bypass npc_{isael}_Quest
+  S QuestList 218:0x8001efff
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3166
+  S SystemMessage id=302 3:3167
+  S SystemMessage id=302 3:3168
+  S SystemMessage id=302 3:3169
+  S SystemMessage id=302 3:3170
+  S SystemMessage id=302 3:3171
+  S SystemMessage id=302 3:3156
+  S SystemMessage id=54 3:3157
+  S SystemMessage id=54 3:3026
+  S NpcHtmlMessage obj=isael item=0 page=script/quest/Q218_TestimonyOfLife/30655-04.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <flags> | -2147356673
+  Q upsert Q218_TestimonyOfLife | <cond> | 17
+  items 3026=2 3156=0 3157=1 3166=0 3167=0 3168=0 3169=0 3170=0 3171=0
+action isael
+  S ActionFailed
+  S NpcHtmlMessage obj=isael item=0 page=default/30655.htm
+  S ActionFailed
+bypass npc_{isael}_Quest
+  S NpcHtmlMessage obj=isael item=0 page=script/quest/Q218_TestimonyOfLife/30655-05.htm
+  S ActionFailed
+  S ActionFailed
+action thalia
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+bypass npc_{thalia}_Quest
+  S QuestList 218:0x8003efff
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3157
+  S SystemMessage id=54 3:3158
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q218_TestimonyOfLife/30371-16.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <flags> | -2147225601
+  Q upsert Q218_TestimonyOfLife | <cond> | 18
+  items 3157=0 3158=1
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+bypass npc_{thalia}_Quest
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q218_TestimonyOfLife/30371-17.htm
+  S ActionFailed
+  S ActionFailed
+
+# The unicorn, slain spear in hand: its tears.
+kill unicorn
+  S SystemMessage id=95 1:0 1:0
+  S QuestList 218:0x8007efff
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3158
+  S SystemMessage id=302 3:3026
+  S SystemMessage id=54 3:3159
+  Q upsert Q218_TestimonyOfLife | <flags> | -2146963457
+  Q upsert Q218_TestimonyOfLife | <cond> | 19
+  items 3026=1 3158=0 3159=1
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+bypass npc_{thalia}_Quest
+  S QuestList 218:0x800fefff
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3159
+  S SystemMessage id=54 3:3160
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q218_TestimonyOfLife/30371-18.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <flags> | -2146439169
+  Q upsert Q218_TestimonyOfLife | <cond> | 20
+  items 3159=0 3160=1
+action thalia
+  S ActionFailed
+  S NpcHtmlMessage obj=thalia item=0 page=default/30371.htm
+  S ActionFailed
+bypass npc_{thalia}_Quest
+  S NpcHtmlMessage obj=thalia item=0 page=script/quest/Q218_TestimonyOfLife/30371-19.htm
+  S ActionFailed
+  S ActionFailed
+action asterios
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+bypass npc_{asterios}_Quest
+  S QuestList 218:0x801fefff
+  S ExShowQuestMark quest=218
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3144
+  S SystemMessage id=302 3:3160
+  S SystemMessage id=54 3:3142
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q218_TestimonyOfLife/30154-09.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <flags> | -2145390593
+  Q upsert Q218_TestimonyOfLife | <cond> | 21
+  items 3142=1 3144=0 3160=0
+action asterios
+  S ActionFailed
+  S NpcHtmlMessage obj=asterios item=0 page=villagemaster/30154.htm
+  S ActionFailed
+bypass npc_{asterios}_Quest
+  S NpcHtmlMessage obj=asterios item=0 page=script/quest/Q218_TestimonyOfLife/30154-10.htm
+  S ActionFailed
+  S ActionFailed
+
+# Cardien takes the Camomile Charm, gives the Mark of Life and completes the quest.
+action cardien
+action cardien
+  S ActionFailed
+  S NpcHtmlMessage obj=cardien item=0 page=trainer/30460.htm
+  S ActionFailed
+bypass npc_{cardien}_Quest
+  S SystemMessage id=302 3:3142
+  S SystemMessage id=54 3:3140
+  S SystemMessage id=95 1:104591 1:11250
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 218:0x00000000
+  S SystemMessage id=302 3:3026
+  S NpcHtmlMessage obj=cardien item=0 page=script/quest/Q218_TestimonyOfLife/30460-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q218_TestimonyOfLife | <state> | COMPLETED
+  Q delete-except-state Q218_TestimonyOfLife
+  items 3026=0 3140=1 3142=0
+  state Q218_TestimonyOfLife COMPLETED
+  rows Q218_TestimonyOfLife <state>=COMPLETED
+relog
+  state Q218_TestimonyOfLife COMPLETED
+  rows Q218_TestimonyOfLife <state>=COMPLETED
+  items 3140=1 3142=0 7562=102
+action cardien
+action cardien
+  S ActionFailed
+  S NpcHtmlMessage obj=cardien item=0 page=trainer/30460.htm
+  S ActionFailed
+bypass npc_{cardien}_Quest
+  S NpcHtmlMessage obj=cardien item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
