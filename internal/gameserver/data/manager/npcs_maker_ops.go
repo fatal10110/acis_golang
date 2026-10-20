@@ -15,8 +15,13 @@ import (
 
 // FindSpawn returns the first spawn, in list order across every npcmaker,
 // whose NPC template has alias, ignoring case; nil when none has.
-func (g *makerGroup) FindSpawn(alias string) spawn.GroupSpawn {
+func (g *makerGroup) FindSpawn(alias string) spawn.GroupSpawn { return g.findSpawn(alias, nil) }
+
+// findSpawn is FindSpawn for a hook running in scope; a nil scope for
+// none.
+func (g *makerGroup) findSpawn(alias string, scope *hookScope) spawn.GroupSpawn {
 	if s, ok := g.n.findGroupSpawn(func(t *npc.Template) bool { return strings.EqualFold(t.Alias, alias) }); ok {
+		s.scope = scope
 		return s
 	}
 	return nil
@@ -100,7 +105,7 @@ func (s groupSpawn) SendScriptEvent(eventID, arg1, arg2 int32) {
 	}
 }
 
-func (s groupSpawn) DeleteNPCs() { s.g.deleteEntry(s.i) }
+func (s groupSpawn) DeleteNPCs() { s.g.deleteEntry(s.i, s.scope) }
 
 func (s groupSpawn) CheckDead() bool {
 	name := s.rowName()
@@ -141,7 +146,8 @@ func (c groupNPC) SendScriptEvent(eventID, arg1, arg2 int32) {
 		return
 	}
 	c.n.mu.Lock()
-	slot, ok := c.n.slot[c.key]
+	key, ok := c.keyLocked()
+	slot := c.n.slot[key]
 	c.n.mu.Unlock()
 	if !ok || slot.memory == nil {
 		return

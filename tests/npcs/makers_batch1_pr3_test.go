@@ -578,8 +578,8 @@ const (
 // UniqueNpcKillEventMaker: an NPC other than the unique one (alias
 // Chapel_Boss, matched ignoring case) leaving respawns as the default
 // maker's does. With event 0 the unique NPC leaving runs the maker's own
-// 1000, deleting the rest of its group and cancelling their respawns.
-// With event 1 it runs 1001 on the npcmaker
+// 1000, deleting the rest of its group and cancelling their respawns, and
+// arms its own respawn, which brings it back. With event 1 it runs 1001 on the npcmaker
 // maker_name names, which brings that maker's NPC in, and arms its own
 // respawn; the rest of its group stays.
 func TestUniqueNpcKillEventMakerActsOnItsUniqueNPC(t *testing.T) {
@@ -630,9 +630,9 @@ func TestUniqueNpcKillEventMakerActsOnItsUniqueNPC(t *testing.T) {
 	if got := armed(); len(got) != 0 {
 		t.Fatalf("event 0: mob respawns still armed = %v", got)
 	}
-	// The unique NPC's own respawn, armed after the 1000 dropped its
-	// group's slots, is not asserted: the reference brings it back, and
-	// the population drops it (#4038).
+	if !w.srv.NpcRespawns.Tracked("uk_delete#0#0") {
+		t.Fatal("event 0: the unique NPC armed no respawn after the 1000")
+	}
 
 	wakeBoss := mw.inWorld(ukWakeBossID)[0]
 	wakeBoss.DeleteMe()
@@ -647,6 +647,19 @@ func TestUniqueNpcKillEventMakerActsOnItsUniqueNPC(t *testing.T) {
 	}
 	if !w.srv.NpcRespawns.Tracked("uk_wake#0#0") {
 		t.Fatal("event 1: the unique NPC armed no respawn")
+	}
+
+	// Both unique NPCs come back when their respawns come due: the event
+	// 0 one too, though the 1000 had deleted its group; the mobs it
+	// deleted stay gone. The harness never fires a respawn timer.
+	for _, slot := range []string{"uk_delete#0#0", "uk_wake#0#0"} {
+		w.srv.NpcRespawns.Cancel(slot)
+		w.srv.NpcSpawns.Respawn(slot)
+	}
+	w.srv.Settle(t)
+	count("the unique NPCs respawned", 1, 0, 1, 1, 1)
+	if got := shown(drainFrames(t, w.c)); !slices.Equal(got, []int{ukBossID, ukWakeBossID}) {
+		t.Fatalf("respawn: NPCs shown = %v, want [%d %d]", got, ukBossID, ukWakeBossID)
 	}
 }
 
