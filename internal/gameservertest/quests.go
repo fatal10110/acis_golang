@@ -6,12 +6,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
-
-	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
-
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
