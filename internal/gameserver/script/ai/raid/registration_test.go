@@ -15,14 +15,16 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// chain is the behavior chain down to RaidPrivateStandard, in scripts.xml
-// order, with the Go constructor of each.
+// chain is the behavior chain down to the raid behaviors this package
+// ports, in scripts.xml order, with the Go constructor of each.
 var chain = []struct {
 	path string
 	ctor func() script.Script
 }{
 	{"script.ai.individual.DefaultNpc", defaultnpc.New},
 	{"script.ai.individual.Monster.MonsterAI", monster.New},
+	{"script.ai.individual.Monster.RaidBoss.RaidBossStandard", BossStandard},
+	{"script.ai.individual.Monster.RaidBoss.RaidBossAlone.RaidBossType1.RaidBossType1", BossType1},
 	{"script.ai.individual.Monster.RaidPrivate.RaidPrivateStandard", PrivateStandard},
 }
 
@@ -107,11 +109,16 @@ func readView(t *testing.T, path string, text *bufio.Scanner) manifestView {
 
 // TestRegistrationMatchesReferenceManifest registers the chain's Go
 // scripts through the engine registry, with the engine's own seam gate and
-// every id a hostile NPC, as all 95 ids RaidPrivateStandard binds are in
-// the datapack. None is refused, and the registry dump equals the reference
-// manifest for the chain: each script's kind and bind lines, and every
-// folded per-(npc, event) list restricted to the chain's scripts, the 95
-// ids on 6 events each.
+// every id a hostile NPC, as all ids the chain binds are in the datapack.
+// None is refused, and the registry dump equals the reference manifest for
+// the chain: each script's kind and bind lines, none for RaidBossStandard,
+// which binds no NPC of its own, and every folded per-(npc, event) list
+// restricted to the chain's scripts: RaidPrivateStandard's 95 ids on 6
+// events each and RaidBossType1's 4 events on each of its 39 ids but
+// 25512. In the reference, DrChaosGiganticGolem,
+// listed later and not ported yet, takes every event of 25512 from
+// RaidBossType1, so the dump's 25512 lists, RaidBossType1's own until that
+// child is ported, are left out of the comparison.
 func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, len(chain))
 	catalog := script.Catalog{}
@@ -126,6 +133,7 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := readView(t, "dump", bufio.NewScanner(strings.NewReader(dump.String())))
+	got.folds = slices.DeleteFunc(got.folds, func(f string) bool { return strings.Fields(f)[1] == "25512" })
 
 	path := filepath.Join("..", "..", "testdata", "oracle", "manifest.golden")
 	f, err := os.Open(path)
@@ -148,13 +156,13 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 			t.Errorf("%s binds:\n got %q\nwant %q", c.path, got.binds[c.path], want.binds[c.path])
 		}
 	}
-	if wantFolds, got := 95*6, len(want.folds); got != wantFolds {
-		t.Fatalf("reference folds = %d entries, want %d: the 95 ids on 6 events each", got, wantFolds)
+	if wantFolds, got := 95*6+38*4, len(want.folds); got != wantFolds {
+		t.Fatalf("reference folds = %d entries, want %d", got, wantFolds)
 	}
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ: %d entries, reference %d", len(got.folds), len(want.folds))
 	}
-	for _, id := range []int32{25006, 25526, 29097} {
+	for _, id := range []int32{25006, 25526, 29097, 25019, 25163, 29036} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want a behavior bound", id)
 		}

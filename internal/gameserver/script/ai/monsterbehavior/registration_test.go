@@ -26,6 +26,7 @@ var chain = []struct {
 	{"script.ai.individual.Monster.MonsterAI", monster.New},
 	{"script.ai.individual.Monster.MonsterBehavior.MonsterBehavior", MonsterBehavior},
 	{"script.ai.individual.Monster.MonsterBehavior.WarriorBehavior.WarriorBehavior", WarriorBehavior},
+	{"script.ai.individual.Monster.MonsterBehavior.WarriorBehavior.WarriorUseSkill.WarriorUseSkill", WarriorUseSkill},
 	{"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardBehavior", WizardBehavior},
 	{"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardUseSkill.WizardUseSkill", WizardUseSkill},
 }
@@ -115,8 +116,9 @@ func readView(t *testing.T, path string, text *bufio.Scanner) manifestView {
 // reference manifest for the chain: each script's kind and its bind lines,
 // none for MonsterBehavior, WarriorBehavior and WizardBehavior, which bind
 // no NPC of their own, and the folded per-(npc, event) lists restricted to
-// the chain: WizardUseSkill's ten events on each of its eight ids, every
-// one of them then bound to a behavior.
+// the chain: WarriorUseSkill's ten events on each of its 13 ids and
+// WizardUseSkill's ten on each of its eight, every one of them then bound
+// to a behavior.
 func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 	list := make([]script.Listing, len(chain))
 	catalog := script.Catalog{}
@@ -153,15 +155,15 @@ func TestRegistrationMatchesReferenceManifest(t *testing.T) {
 			t.Errorf("%s binds:\n got %q\nwant %q", c.path, got.binds[c.path], want.binds[c.path])
 		}
 	}
-	if got := len(want.folds); got != 80 {
-		t.Fatalf("reference folds = %d entries, want 80", got)
+	if got := len(want.folds); got != 13*10+8*10 {
+		t.Fatalf("reference folds = %d entries, want %d", got, 13*10+8*10)
 	}
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ:\n got %q\nwant %q", got.folds, want.folds)
 	}
-	for _, id := range []int32{20216, 20220, 21036, 21038, 21039, 21040, 21394, 21395} {
+	for _, id := range []int32{20136, 20214, 20215, 20217, 20218, 20219, 20222, 20751, 20752, 20753, 20754, 21035, 21037, 20216, 20220, 21036, 21038, 21039, 21040, 21394, 21395} {
 		if !r.Behaves(id) {
-			t.Errorf("Behaves(%d) = false, want WizardUseSkill bound", id)
+			t.Errorf("Behaves(%d) = false, want a use-skill behavior bound", id)
 		}
 	}
 }

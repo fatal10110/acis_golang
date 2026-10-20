@@ -1,0 +1,22 @@
+# WarriorUseSkill (20136) is hit twice by the character standing 100 away. WarriorBehavior
+# wants to attack the character at 10 per point of damage. Its first skill (SKILL01_ID) aims
+# by default at its top desire target as the hit begins, at any distance, on a draw under
+# 3333: the first hit finds none, the second the character, wanted at 1000000000, which its
+# AI's next ticks cast. Its other targets, its clan, party, sight and spell hooks need what
+# the format still lacks, AI parameters and privates (#4052): tests/ai/warrior_use_skill_test.go
+# covers them.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.MonsterBehavior.MonsterBehavior
+script script.ai.individual.Monster.MonsterBehavior.WarriorBehavior.WarriorBehavior
+script script.ai.individual.Monster.MonsterBehavior.WarriorBehavior.WarriorUseSkill.WarriorUseSkill
+npc warrior 20136 Monster 100 0 0 walks skill SKILL01_ID 4157 4
+
+hit warrior 22
+  desires warrior attack(player)=220
+hit warrior 22
+  desires warrior attack(player)=440 cast(player,4157,move)=1000000000
+tick x2
+  S MagicSkillUse caster=warrior target=player skill=4157-4 hit=10571 reuse=0 success=0
