@@ -255,12 +255,21 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 	}
 	for _, r := range raw {
 		step := traceStep{client: r.client}
-		// task holds the rendered packets of the task running now.
+		// task holds the rendered packets of the task running now; own
+		// reports that it is a client packet's own run, which runs on the
+		// player's own queue.
 		var task []string
+		own := strings.HasPrefix(r.client, "C ")
+		endTask := func() {
+			if !own {
+				task = deferTeleports(task)
+			}
+			step.sent = append(step.sent, task...)
+			task, own = nil, false
+		}
 		for _, line := range r.lines {
 			if strings.HasPrefix(line, "T ") {
-				step.sent = append(step.sent, deferTeleports(task)...)
-				task = nil
+				endTask()
 				continue
 			}
 			if m := traceDraw.FindStringSubmatch(line); m != nil {
@@ -292,7 +301,7 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 				task = append(task, rendered)
 			}
 		}
-		step.sent = append(step.sent, deferTeleports(task)...)
+		endTask()
 		steps = append(steps, step)
 	}
 	return steps, npcObjs, nil
@@ -301,9 +310,11 @@ func readTrace(sc *Scenario, data []byte) (steps []traceStep, npcObjs map[string
 // deferTeleports moves each teleport of the player among task, the
 // rendered packets one task of the trace sent, to the end of task, with the
 // ActionFailed lines right before it (its aborts'): a script's teleport of
-// a player runs on the player's queue once the hook's task is done, so the
-// packets the rest of the hook sends go out before the teleport's (script
-// engine plan, section 9, item 4).
+// a player from a hook on another queue runs on the player's queue once the
+// hook's task is done, so the packets the rest of the hook sends go out
+// before the teleport's (script engine plan, section 9, item 4). A client
+// packet's own run is on the player's queue, where the teleport runs inside
+// the call, so its task is not deferred.
 func deferTeleports(task []string) []string {
 	var rest, teleports []string
 	for _, line := range task {

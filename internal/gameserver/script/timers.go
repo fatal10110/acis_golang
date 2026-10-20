@@ -46,6 +46,9 @@ type scriptTimer struct {
 	due time.Time
 	// queue is the timer's home queue, where its hook runs.
 	queue *sim.Queue
+	// owner is the bound player when queue is that player's own queue, nil
+	// otherwise. Set before the timer registers, it never changes.
+	owner *player.Character
 	armed *sim.Timer
 	// decays reports that the timer stops when its NPC decays: its script
 	// is a behavior bound to the NPC's template.
@@ -215,6 +218,9 @@ func (ts *timers) start(s *Script, name string, n *NPC, p *Player, d, period tim
 		t.queue, onNPCQueue = live.Queue(), true
 	case pl != nil && !pl.Detaching():
 		t.queue = pl.Queue()
+		if h, ok := pl.(player.CharacterHolder); ok {
+			t.owner = h.PlayerCharacter()
+		}
 	}
 	if t.queue == nil {
 		t.queue = ts.engine
@@ -300,7 +306,8 @@ func (ts *timers) remove(t *scriptTimer) {
 // registry before its hook runs, so the hook may start the same timer
 // again; a fixed-rate timer is armed for its next deadline after the hook,
 // unless the hook cancelled it. Neither the NPC nor the player is checked
-// for being alive.
+// for being alive. On the bound player's own queue the hook runs as a hook
+// on that queue (TeleportTo).
 func (ts *timers) fire(t *scriptTimer) {
 	ts.mu.Lock()
 	if ts.byScript[t.s][t.key] != t {
@@ -313,8 +320,15 @@ func (ts *timers) fire(t *scriptTimer) {
 	ts.mu.Unlock()
 
 	s := t.s
-	res := ts.r.answer(s, hookTimer, func() string { return s.Hooks.Timer(s, Timer{Name: t.key.name, NPC: t.npc, Player: t.pl}) })
-	ts.show(t, res)
+	hook := func() {
+		res := ts.r.answer(s, hookTimer, func() string { return s.Hooks.Timer(s, Timer{Name: t.key.name, NPC: t.npc, Player: t.pl}) })
+		ts.show(t, res)
+	}
+	if t.owner != nil {
+		t.owner.RunOnOwnQueue(hook)
+	} else {
+		hook()
+	}
 
 	if t.period == 0 {
 		return

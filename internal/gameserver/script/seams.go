@@ -14,8 +14,8 @@ import (
 
 // ItemUsed runs the item-use hook of every script bound to itemID, in list
 // order, for which p's quest state is started: p used the item objectID,
-// of template itemID, with target selected. It runs on p's queue, after
-// the item's own use.
+// of template itemID, with target selected. It runs on p's own queue, after
+// the item's own use, and so do the hooks (TeleportTo).
 func (r *Registry) ItemUsed(p *Player, itemID, objectID int32, target attackable.Combatant) {
 	if r == nil {
 		return
@@ -24,14 +24,17 @@ func (r *Registry) ItemUsed(p *Player, itemID, objectID int32, target attackable
 	if len(list) == 0 {
 		return
 	}
-	journal := p.character().Quests()
+	c := p.character()
+	journal := c.Quests()
 	e := ItemUse{Player: p, ItemID: itemID, ObjectID: objectID, Target: creatureOf(target)}
-	for _, s := range list {
-		if st := journal.State(s.Name); st == nil || st.Status() != questlog.StatusStarted {
-			continue
+	c.RunOnOwnQueue(func() {
+		for _, s := range list {
+			if st := journal.State(s.Name); st == nil || st.Status() != questlog.StatusStarted {
+				continue
+			}
+			r.run(s, hookItemUse, func() { s.Hooks.ItemUse(s, e) })
 		}
-		r.run(s, hookItemUse, func() { s.Hooks.ItemUse(s, e) })
-	}
+	})
 }
 
 // PlayableDied runs the death hook of each quest of c's journal that has
