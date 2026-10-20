@@ -99,7 +99,7 @@ func ParseSubclassCommand(command string) SubclassCommand {
 
 // parseTrimmedInt parses the characters in units, trimmed of every
 // character up to the space, as a 32-bit decimal. A surrogate left alone by
-// the range is no digit, so no number reads.
+// the range reads as U+FFFD, no digit, so no number reads.
 func parseTrimmedInt(units []uint16) (int, bool) {
 	n, err := commons.ParseInt(strings.TrimFunc(commons.UTF16String(units), isCtrlOrSpace), 32)
 	return int(n), err == nil
