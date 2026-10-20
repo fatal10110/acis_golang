@@ -564,6 +564,8 @@ func TestPartyLeaderWizardSaintSeesAndStrikes(t *testing.T) {
 // range debuff on the attacker (a draw over 33). A saint that cannot pay
 // for the debuff sets int slot 0 and wants to attack the character with
 // weight 1000; then its next hit adds the attack formula, 10 / 8 * 100.
+// Once the character leads a party, it is answered with the range debuff
+// even as the top desire target.
 func TestPartyLeaderWizardSaintAnswersHits(t *testing.T) {
 	t.Parallel()
 	w := bootIndividual6c(t, raidBoot{}, i6cSaintTemplate(0), warriorTemplate(i6cFoeID, nil))
@@ -602,25 +604,38 @@ func TestPartyLeaderWizardSaintAnswersHits(t *testing.T) {
 	w.srv.InstallNPCCastSeam(t, broke, i6cSaintSkills(100000))
 	w.onQueue(t, broke, func() { script.NPCOf(broke).SetTopDesireTarget(script.NPCOf(foe)) })
 	w.hit(t, broke, 10)
-	if d, ok := desire(broke, actorai.IntentionAttack); broke.Scratch().Int(npc.IntAI0) != 1 || !ok {
-		t.Fatalf("saint short of MP: int slot 0 %d, attack desire %+v (%v); want 1", broke.Scratch().Int(npc.IntAI0), d, ok)
+	if got := broke.Scratch().Int(npc.IntAI0); got != 1 {
+		t.Fatalf("saint short of MP int slot 0 = %d, want 1", got)
 	}
-	before := broke.AI().Desires().Snapshot()
-	var weight float64
-	for _, d := range before {
-		if d.Kind == actorai.IntentionAttack && d.FinalTarget != nil && d.FinalTarget.ObjectID() == me {
-			weight = d.Weight
-		}
-	}
-	if weight != 1000 {
-		t.Fatalf("saint short of MP attack desire on the character = %v, want 1000", weight)
+	if got := i6cAttackWeight(broke, me); got != 1000 {
+		t.Fatalf("saint short of MP attack desire on the character = %v, want 1000", got)
 	}
 	w.hit(t, broke, 10)
-	for _, d := range broke.AI().Desires().Snapshot() {
-		if d.Kind == actorai.IntentionAttack && d.FinalTarget != nil && d.FinalTarget.ObjectID() == me && d.Weight != 1125 {
-			t.Fatalf("saint short of MP attack desire after its next hit = %v, want 1125", d.Weight)
+	if got := i6cAttackWeight(broke, me); got != 1125 {
+		t.Fatalf("saint short of MP attack desire after its next hit = %v, want 1125", got)
+	}
+
+	// In a party, the character is answered even as the top desire target.
+	w.joinMate(t)
+	w.onQueue(t, h, func() {
+		h.AI().Desires().Clear()
+		script.NPCOf(h).SetTopDesireTarget(script.PlayerOf(w.player))
+	})
+	w.hit(t, h, 10)
+	if !i6cWants(h, i6cRangeDebuffID, me) {
+		t.Fatal("saint wants no range debuff on its attacker in a party, its top desire target")
+	}
+}
+
+// i6cAttackWeight returns the weight of h's attack desire on target, 0 for
+// none.
+func i6cAttackWeight(h *npc.Hostile, target int32) float64 {
+	for _, d := range h.AI().Desires().Snapshot() {
+		if d.Kind == actorai.IntentionAttack && d.FinalTarget != nil && d.FinalTarget.ObjectID() == target {
+			return d.Weight
 		}
 	}
+	return 0
 }
 
 // TestPartyLeaderWizardSaintAnswersItsPartyAndClan runs the saint's
