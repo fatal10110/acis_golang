@@ -1,6 +1,9 @@
 package hall
 
 import (
+	"strings"
+	"time"
+
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script/ai/defaultnpc"
 )
@@ -89,4 +92,57 @@ func partisanHealer1Hooks() script.Hooks {
 // that heals Bloody Lord Nurka when he is hit low.
 func PartisanHealer1() script.Script {
 	return script.Script{Dir: healerDir, Behavior: true, NPCs: []int32{35369}, Hooks: partisanHealer1Hooks()}
+}
+
+// PartisanHealer2 is Agit01PartisanHealer2: an Agit01PartisanHealer1
+// healer of Bloody Lord Nurka's escort. Every 10 seconds, while it has a
+// master, it walks once to each of three places by the master's flag:
+// beside the master while the flag is 0, to a first fixed place when it is
+// 1, and to a second for any other value. The first healer to appear,
+// until it dies, takes the place of each pair 40 further along x.
+func PartisanHealer2() script.Script {
+	base := partisanHealer1Hooks()
+	first := &script.NPCCell{}
+	return script.Script{Dir: healerDir, Behavior: true, NPCs: []int32{35376}, Hooks: base.With(script.Hooks{
+		OnCreated: func(s *script.Script, e script.Created) {
+			n := e.NPC
+			first.SetIfEmpty(n)
+			n.SetInt(script.SlotIntAI0, 0)
+			s.StartTimerAtFixedRate("2001", n, nil, 10000*time.Millisecond, 10000*time.Millisecond)
+		},
+		OnMyDying: func(_ *script.Script, e script.MyDying) {
+			first.ClearIf(e.NPC)
+		},
+		OnTimer: func(s *script.Script, e script.Timer) string {
+			if strings.EqualFold(e.Name, "2001") {
+				n := e.NPC
+				if n.HasMaster() {
+					right := func(r, l int) int {
+						if held := first.Get(); held != nil && script.Same(held, n) {
+							return r
+						}
+						return l
+					}
+					master := n.Master()
+					switch flag := master.Int(script.SlotFlag); {
+					case flag == 0:
+						if n.Int(script.SlotIntAI0) < 1 {
+							at := script.LocOf(master)
+							n.AddMoveToDesire(script.Loc{X: at.X + right(20, -20), Y: at.Y, Z: at.Z}, 100000000)
+							n.SetInt(script.SlotIntAI0, 1)
+						}
+					case flag == 1:
+						if n.Int(script.SlotIntAI0) < 2 {
+							n.AddMoveToDesire(script.Loc{X: right(45822, 45782), Y: 109981, Z: -1970}, 100000000)
+							n.SetInt(script.SlotIntAI0, 2)
+						}
+					case n.Int(script.SlotIntAI0) < 3:
+						n.AddMoveToDesire(script.Loc{X: right(44545, 44505), Y: 108867, Z: -2020}, 100000000)
+						n.SetInt(script.SlotIntAI0, 3)
+					}
+				}
+			}
+			return base.Timer(s, e)
+		},
+	})}
 }

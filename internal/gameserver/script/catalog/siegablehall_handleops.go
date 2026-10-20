@@ -18,6 +18,16 @@ func siegableHallHandleOps() map[string]script.HandleOps {
 			"OnClanAttacked": {"NPC.MaxHP"},
 			"OnSeeSpell":     {"NPC.MaxHP"},
 		},
+		"script.ai.siegablehall.Agit01Stand1.Agit01Stand1": {
+			"OnAttacked":     {"NPC.MaxHP"},
+			"OnClanAttacked": {"NPC.MaxHP"},
+			"OnSeeSpell":     {"NPC.MaxHP"},
+		},
+		"script.ai.siegablehall.Agit01Stand1.Agit01Stand2": {
+			"OnAttacked":     {"NPC.MaxHP"},
+			"OnClanAttacked": {"NPC.MaxHP"},
+			"OnSeeSpell":     {"NPC.MaxHP"},
+		},
 		"script.ai.siegablehall.Agit02Dietrich": {
 			"OnPartyAttacked": {"NPC.CanAttemptCast", "NPC.MaxHP"},
 			"OnSeeSpell":      {"NPC.MaxHP", "NPC.TopDesireTarget"},
@@ -52,6 +62,10 @@ func siegableHallHandleOps() map[string]script.HandleOps {
 		"script.ai.siegablehall.AzitWateringTreasureBox": {
 			"OnAttacked": {"NPC.HP"},
 			"OnMyDying":  {"NPC.DropItem"},
+		},
+		"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka1": {
+			"OnAttacked":     {"NPC.MaxHP"},
+			"OnClanAttacked": {"NPC.MaxHP"},
 		},
 	}
 }

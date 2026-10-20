@@ -116,6 +116,8 @@ var scenarioScripts = script.Catalog{
 	"script.ai.siegablehall.Agit01Move1.Agit01Move1":                                                         hall.Move1,
 	"script.ai.siegablehall.Agit01Move1.Agit01PartisanSorcerer2":                                             hall.PartisanSorcerer2,
 	"script.ai.siegablehall.Agit01PartisanHealer1.Agit01PartisanHealer1":                                     hall.PartisanHealer1,
+	"script.ai.siegablehall.Agit01Stand1.Agit01Stand1":                                                       hall.Stand1,
+	"script.ai.siegablehall.BloodyLordNurka1.BloodyLordNurka1":                                               hall.Nurka1,
 	"script.ai.siegeguards.GludioCleric":                                                                     siegeguard.Cleric,
 	"script.ai.siegeguards.GludioClericStand":                                                                siegeguard.ClericStand,
 	"script.ai.siegeguards.GludioHold.GludioBowGuard":                                                        siegeguard.BowGuard,
