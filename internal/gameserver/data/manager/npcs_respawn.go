@@ -87,7 +87,7 @@ func (n *Npcs) groupNPCDeleted(g *makerGroup, slot slotInfo) {
 		return
 	}
 	if !slot.first {
-		g.behavior.NPCDeleted(g, groupSpawn{g: g, i: slot.spawnIdx}, groupNPC{n: n, key: slot.key, slot: slot})
+		g.behavior.NPCDeleted(g, groupSpawn{g: g, i: slot.spawnIdx}, groupNPC{n: n, slot: slot})
 	}
 
 	now := n.now()
@@ -129,18 +129,19 @@ func (n *Npcs) orphanNPCDeleted(g *makerGroup, slot slotInfo) {
 }
 
 // unlistGroupSlotLocked takes the slot of g off its spawn's list: dropped,
-// or kept as an orphan when a respawn is armed for it. The caller holds
-// n.mu.
+// or kept as an orphan, its armed respawn moved along, when a respawn is
+// armed for it. The caller holds n.mu.
 func (n *Npcs) unlistGroupSlotLocked(g *makerGroup, slot slotInfo) {
 	current, ok := n.slot[slot.key]
-	if !ok {
+	if !ok || current.serial != slot.serial {
 		return
 	}
-	if n.respawn.Tracked(slot.key) {
-		current.orphan = true
-		n.slot[slot.key] = current
-	} else {
-		n.dropSlotLocked(slot.key)
+	n.dropSlotLocked(slot.key)
+	if deadline, armed := n.respawn.Deadline(slot.key); armed {
+		n.respawn.Cancel(slot.key)
+		if key, ok := n.adoptOrphanLocked(current); ok {
+			n.respawn.Add(key, deadline)
+		}
 	}
 	keys := g.keys[slot.spawnIdx]
 	if i := slices.Index(keys, slot.key); i >= 0 {

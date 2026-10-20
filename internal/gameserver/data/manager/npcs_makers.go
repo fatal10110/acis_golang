@@ -3,6 +3,7 @@ package manager
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -241,7 +242,7 @@ func (s groupSpawn) NPCs() []spawn.GroupNPC {
 	out := make([]spawn.GroupNPC, 0, len(s.g.keys[s.i]))
 	for _, key := range s.g.keys[s.i] {
 		if !n.slot[key].spawning {
-			out = append(out, groupNPC{n: n, key: key, slot: n.slot[key]})
+			out = append(out, groupNPC{n: n, slot: n.slot[key]})
 		}
 	}
 	return out
@@ -276,24 +277,37 @@ func (s groupSpawn) ClearDBLoaded() {
 
 // groupNPC is the NPC one spawn slot keeps (spawn.GroupNPC): the slot
 // lives on across the NPC's respawns. slot is the slot as the NPC was
-// handed out, which a respawn armed after its spawn dropped the slot
-// brings back.
+// handed out: a respawn armed after its spawn dropped it brings it back as
+// an orphan slot.
 type groupNPC struct {
 	n    *Npcs
-	key  string
 	slot slotInfo
+}
+
+// keyLocked returns the key c's slot lives under now, listed or orphan,
+// and whether it lives at all: a slot declared anew under the same key is
+// another NPC's. The caller holds n.mu.
+func (c groupNPC) keyLocked() (string, bool) {
+	for _, key := range [2]string{c.slot.key, orphanKey(c.slot)} {
+		if slot, ok := c.n.slot[key]; ok && slot.serial == c.slot.serial {
+			return key, true
+		}
+	}
+	return "", false
 }
 
 func (c groupNPC) Decayed() bool {
 	c.n.mu.Lock()
 	defer c.n.mu.Unlock()
-	return !c.n.liveLocked(c.key)
+	key, ok := c.keyLocked()
+	return !ok || !c.n.liveLocked(key)
 }
 
 func (c groupNPC) Delete() {
 	c.n.mu.Lock()
-	slot := c.n.slot[c.key]
-	live := c.n.liveLocked(c.key)
+	key, ok := c.keyLocked()
+	slot := c.n.slot[key]
+	live := ok && c.n.liveLocked(key)
 	c.n.mu.Unlock()
 	if live {
 		c.n.deleteLive(slot.liveID)
@@ -311,23 +325,37 @@ func (c groupNPC) ScheduleRespawn(d time.Duration) {
 	now := c.n.now()
 	c.n.mu.Lock()
 	defer c.n.mu.Unlock()
-	if _, ok := c.n.slot[c.key]; !ok && !c.n.adoptOrphanLocked(c.slot) {
-		return
+	key, ok := c.keyLocked()
+	if !ok {
+		if key, ok = c.n.adoptOrphanLocked(c.slot); !ok {
+			return
+		}
 	}
-	c.n.respawn.AddEarliest(c.key, now.Add(d))
+	c.n.respawn.AddEarliest(key, now.Add(d))
+}
+
+// orphanKey is the key slot lives under once its spawn lets it go. Only
+// a database-tracked slot needs a new one: its spawn declares every slot
+// under its one key, where any other slot key is declared once.
+func orphanKey(slot slotInfo) string {
+	if slot.orphan || slot.dbName == "" {
+		return slot.key
+	}
+	return slot.key + "~" + strconv.Itoa(slot.serial)
 }
 
 // adoptOrphanLocked declares slot again as an orphan slot of its group,
-// its NPC out of the world, and reports whether it did: not for a slot of
-// no npcmaker, nor one DespawnAll or RespawnAll dropped. The caller holds
+// its NPC out of the world, and returns its key: none for a slot of no
+// npcmaker, nor one DespawnAll or RespawnAll dropped. The caller holds
 // n.mu.
-func (n *Npcs) adoptOrphanLocked(slot slotInfo) bool {
+func (n *Npcs) adoptOrphanLocked(slot slotInfo) (string, bool) {
 	if slot.group == nil || slot.key == "" || slot.epoch != n.despawns || !slices.Contains(n.groups, slot.group) {
-		return false
+		return "", false
 	}
+	slot.key = orphanKey(slot)
 	slot.orphan, slot.liveID, slot.spawning, slot.first = true, 0, false, false
 	n.slot[slot.key] = slot
-	return true
+	return slot.key, true
 }
 
 // liveLocked reports whether the slot key has its NPC in the world. The
@@ -380,7 +408,7 @@ func (n *Npcs) spawnGroupEntry(g *makerGroup, i int) {
 // decayed.
 func (n *Npcs) created(slot slotInfo) {
 	g := slot.group
-	g.behavior.NPCCreated(g, groupSpawn{g: g, i: slot.spawnIdx}, groupNPC{n: n, key: slot.key, slot: slot})
+	g.behavior.NPCCreated(g, groupSpawn{g: g, i: slot.spawnIdx}, groupNPC{n: n, slot: slot})
 }
 
 // held reports whether the spawn condition of m holds, keeping its NPCs out

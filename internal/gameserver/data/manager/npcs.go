@@ -46,10 +46,15 @@ type slotInfo struct {
 	// came back through a respawn armed after the spawn let it go (a
 	// DeleteAll, or a spawn that does not respawn). Its group counts it
 	// alive, but no spawn count, list or delete reaches it, and its
-	// leaving runs no maker hook.
+	// leaving runs no maker hook. It lives under a key of its own (see
+	// orphanKey), so the spawn can place an NPC of its own meanwhile.
 	orphan bool
 	// epoch is the DespawnAll run the slot was declared in.
-	epoch  int
+	epoch int
+	// serial tells an npcmaker's slot apart from any other declared under
+	// the same key: a database-tracked entry declares each of its slots
+	// under its one key.
+	serial int
 	entry  spawn.Entry
 	dbName string
 	// master is the master a private's slot spawns its NPC for, as the
@@ -269,6 +274,8 @@ type Npcs struct {
 	// despawns counts the DespawnAll runs: a slot declared before the
 	// last one is gone for good.
 	despawns int
+	// serials counts the npcmaker slots declared, numbering each.
+	serials int
 	// groups are the run-time npcmakers of the spawn list in use, in list
 	// order.
 	groups []*makerGroup

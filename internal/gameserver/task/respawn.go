@@ -69,6 +69,11 @@ func (r *Respawn) Tracked(key string) bool {
 	return r.tracked(key)
 }
 
+// Deadline returns the respawn deadline tracked for key, if any.
+func (r *Respawn) Deadline(key string) (time.Time, bool) {
+	return r.deadlineOf(key)
+}
+
 // Tick respawns every slot whose deadline has passed.
 func (r *Respawn) Tick() {
 	r.tickDueConcurrent(r.now(), r.effects.Respawn)

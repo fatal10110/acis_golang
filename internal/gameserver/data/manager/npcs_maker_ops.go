@@ -136,7 +136,8 @@ func (c groupNPC) SendScriptEvent(eventID, arg1, arg2 int32) {
 		return
 	}
 	c.n.mu.Lock()
-	slot, ok := c.n.slot[c.key]
+	key, ok := c.keyLocked()
+	slot := c.n.slot[key]
 	c.n.mu.Unlock()
 	if !ok || slot.memory == nil {
 		return
