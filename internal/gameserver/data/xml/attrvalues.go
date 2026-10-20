@@ -83,7 +83,7 @@ func (a *attrValues) int(key string) int {
 		a.fail(fmt.Errorf("attribute %q is required", key))
 		return 0
 	}
-	n, err := commons.Atoi(raw)
+	n, err := strconv.Atoi(raw)
 	if err != nil {
 		a.fail(fmt.Errorf("attribute %q: %w", key, err))
 		return 0
@@ -140,7 +140,7 @@ func (a *attrValues) intDefault(key string, def int) int {
 	if !ok {
 		return def
 	}
-	n, err := commons.Atoi(raw)
+	n, err := strconv.Atoi(raw)
 	if err != nil {
 		a.fail(fmt.Errorf("attribute %q: %w", key, err))
 		return def
@@ -169,7 +169,7 @@ func (a *attrValues) int64Default(key string, def int64) int64 {
 	if !ok {
 		return def
 	}
-	n, err := commons.ParseInt(raw, 64)
+	n, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil {
 		a.fail(fmt.Errorf("attribute %q: %w", key, err))
 		return def
@@ -205,7 +205,7 @@ func (a *attrValues) intArray(key string) []int {
 	parts := strings.Split(raw, ";")
 	out := make([]int, len(parts))
 	for i, p := range parts {
-		n, err := commons.Atoi(p)
+		n, err := strconv.Atoi(p)
 		if err != nil {
 			a.fail(fmt.Errorf("attribute %q: %w", key, err))
 			return nil

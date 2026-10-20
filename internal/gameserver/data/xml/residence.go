@@ -3,9 +3,9 @@ package xml
 import (
 	"encoding/xml"
 	"fmt"
+	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/residence/castle"
@@ -104,13 +104,13 @@ func foldResidenceAttrs(own []xml.Attr, groups ...[]attrsElement) residenceAttrs
 	return out
 }
 
-// requiredInt reads a required int with the coord grammar (commons.Atoi).
+// requiredInt reads a required int with the coord grammar (strconv.Atoi).
 func (r residenceAttrs) requiredInt(key string) (int, error) {
 	raw, ok := r[key]
 	if !ok {
 		return 0, fmt.Errorf("%s is required", key)
 	}
-	n, err := commons.Atoi(raw)
+	n, err := strconv.Atoi(raw)
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", key, err)
 	}
@@ -123,7 +123,7 @@ func (r residenceAttrs) optionalInt64(key string) (int64, bool, error) {
 	if !ok {
 		return 0, false, nil
 	}
-	n, err := commons.ParseInt(raw, 64)
+	n, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil {
 		return 0, true, fmt.Errorf("%s: %w", key, err)
 	}
@@ -544,7 +544,7 @@ func splitInts(raw string) ([]int, error) {
 	parts := strings.Split(raw, ";")
 	out := make([]int, len(parts))
 	for i, p := range parts {
-		n, err := commons.Atoi(p)
+		n, err := strconv.Atoi(p)
 		if err != nil {
 			return nil, err
 		}

@@ -3,8 +3,6 @@ package bbs
 import (
 	"strconv"
 	"strings"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // The mail board's pages, under the board's page folder.
@@ -34,17 +32,17 @@ type MailQuery struct {
 func (q MailQuery) searching() bool { return q.SearchType != "" && q.Search != "" }
 
 // matcher returns a test of whether a mail answers q's search, matched in
-// any case unit by unit, or passes every mail without a search; writer
-// names a sender. The search key is built once for every mail it tests.
+// any case, or passes every mail without a search; writer names a sender.
+// The lower-cased search is built once for every mail it tests.
 func (q MailQuery) matcher(writer func(int32) string) func(Mail) bool {
 	if !q.searching() {
 		return func(Mail) bool { return true }
 	}
-	search := commons.UTF16LowerKey(q.Search)
+	search := strings.ToLower(q.Search)
 	if strings.EqualFold(q.SearchType, "title") {
-		return func(mail Mail) bool { return strings.Contains(commons.UTF16LowerKey(mail.Subject), search) }
+		return func(mail Mail) bool { return strings.Contains(strings.ToLower(mail.Subject), search) }
 	}
-	return func(mail Mail) bool { return strings.Contains(commons.UTF16LowerKey(writer(mail.SenderID)), search) }
+	return func(mail Mail) bool { return strings.Contains(strings.ToLower(writer(mail.SenderID)), search) }
 }
 
 // count is how many of box's mails in folder answer matches.

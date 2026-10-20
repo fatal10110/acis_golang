@@ -2,10 +2,10 @@ package network
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/wire"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
@@ -24,7 +24,7 @@ const adminRespawnDelay = 4 * time.Second
 // outside the classes answers nothing; a reserved id or target's own class
 // is refused; any other class is taken through adminRespawn.
 func (l *GameClientLink) adminSetClass(gm, target *livePlayer, value string, hasValue bool) {
-	id, err := commons.ParseInt(value, 32)
+	id, err := strconv.ParseInt(value, 10, 32)
 	if !hasValue || err != nil || id == player.MaxClassID+1 {
 		l.sendAdminFile(gm, "charclasses.htm")
 		return

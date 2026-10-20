@@ -2,9 +2,9 @@ package festival
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 )
 
@@ -66,7 +66,7 @@ func (m *Manager) signUp(g Guide, t GuideTalker, command string) GuideReply {
 	if !ok {
 		return GuideReply{Aborted: true}
 	}
-	stone, err := commons.Atoi(arg)
+	stone, err := strconv.Atoi(arg)
 	if err != nil {
 		return GuideReply{Aborted: true}
 	}

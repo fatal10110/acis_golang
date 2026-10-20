@@ -96,7 +96,7 @@ func (l *GameClientLink) adminSet(gm *livePlayer, line string) {
 		})
 	case "exp":
 		edit(func() {
-			exp, err := commons.ParseInt(value, 64)
+			exp, err := strconv.ParseInt(value, 10, 64)
 			if !hasValue || err != nil {
 				sendText(gm, "Usage: //set exp <number>")
 				return

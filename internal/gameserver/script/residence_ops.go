@@ -26,6 +26,19 @@ func (s *Script) Door(name string) *Door {
 	return &Door{obj: obj, doors: s.env.Doors}
 }
 
+// DoorByID returns the door whose id is id, nil when there is none
+// (#4026).
+func (s *Script) DoorByID(id int32) *Door {
+	if s.env == nil || s.env.Doors == nil {
+		return nil
+	}
+	obj, ok := s.env.Doors.Door(int(id))
+	if !ok {
+		return nil
+	}
+	return &Door{obj: obj, doors: s.env.Doors}
+}
+
 // Open opens the door as every opening does: its geodata is
 // lifted, the players around it see it open, and its next automatic close
 // or open is scheduled anew. A broken or open door is left as is.

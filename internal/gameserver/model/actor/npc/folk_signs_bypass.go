@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 )
 
@@ -54,7 +53,7 @@ func (f *Folk) signsPriestBypass(pages Pages, kind InstanceKind, talker Talker, 
 			reply.Outcome = BypassAborted
 			return reply, true
 		}
-		n, err := commons.ParseInt(arg, 32)
+		n, err := strconv.ParseInt(arg, 10, 32)
 		if err != nil {
 			reply.Outcome = BypassAborted
 			return reply, true
@@ -68,7 +67,7 @@ func (f *Folk) signsPriestBypass(pages Pages, kind InstanceKind, talker Talker, 
 	case kind == "SignsPriest" && strings.HasPrefix(command, "Chat"):
 		val := 0
 		if arg, ok := commandChars(command, 5, -1); ok {
-			if n, err := commons.ParseInt(arg, 32); err == nil {
+			if n, err := strconv.ParseInt(arg, 10, 32); err == nil {
 				val = int(n)
 			}
 		}
