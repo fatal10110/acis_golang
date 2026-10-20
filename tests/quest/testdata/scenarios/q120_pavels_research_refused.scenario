@@ -1,0 +1,22 @@
+# Pavel's Research (Q120), refused: without Resurrection of an Old Manager (Q114) done, the pile of
+# stones turns a level 50 character away; a character that finished it declines at the stones and
+# the quest is dropped. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q120_pavels_research_refused.golden
+character Researcher 50
+script quest.Q120_PavelsResearch
+item 8058 8059 8060 8290 8291 8292 854
+page default/32046.htm
+page script/quest/Q120_PavelsResearch/
+npc stones 32046 Folk 10 0 0
+
+action stones
+action stones
+  S ActionFailed
+  S NpcHtmlMessage obj=stones item=0 page=default/32046.htm
+  S ActionFailed
+bypass npc_{stones}_Quest
+  S NpcHtmlMessage obj=stones item=0 page=script/quest/Q120_PavelsResearch/32046-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q120_PavelsResearch CREATED
+  rows Q120_PavelsResearch -

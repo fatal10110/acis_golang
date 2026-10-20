@@ -1,0 +1,37 @@
+# Beyond the Hills of Winter (Q116), for adena: a dwarf on cond 1 short of thief keys is sent away
+# by Filaur; a dwarf on cond 2 with the goods chooses Obi's adena. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q116_beyond_the_hills_of_winter_adena.golden
+character Hauler 30
+class 53
+quest Q116_BeyondTheHillsOfWinter <cond>=2 <state>=STARTED
+hold 8098 1
+script quest.Q116_BeyondTheHillsOfWinter
+item 8098 57
+page default/32052.htm
+page script/quest/Q116_BeyondTheHillsOfWinter/
+npc obi 32052 Folk 20 0 0
+
+action obi
+action obi
+  S ActionFailed
+  S NpcHtmlMessage obj=obi item=0 page=default/32052.htm
+  S ActionFailed
+bypass npc_{obi}_Quest
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q116_BeyondTheHillsOfWinter/32052-00.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q116_BeyondTheHillsOfWinter 32052-01.htm
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q116_BeyondTheHillsOfWinter/32052-01.htm
+  S ActionFailed
+bypass Quest Q116_BeyondTheHillsOfWinter adena
+  S SystemMessage id=302 3:8098
+  S SystemMessage id=52 6:16500
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 116:0x00000000
+  S NpcHtmlMessage obj=obi item=0 page=script/quest/Q116_BeyondTheHillsOfWinter/32052-02.htm
+  S ActionFailed
+  Q upsert Q116_BeyondTheHillsOfWinter | <state> | COMPLETED
+  Q delete-except-state Q116_BeyondTheHillsOfWinter
+  state Q116_BeyondTheHillsOfWinter COMPLETED
+  rows Q116_BeyondTheHillsOfWinter <state>=COMPLETED
+  items 8098=0 57=16500

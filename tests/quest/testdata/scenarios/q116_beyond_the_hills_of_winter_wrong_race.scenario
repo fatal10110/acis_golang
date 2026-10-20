@@ -1,0 +1,21 @@
+# Beyond the Hills of Winter (Q116), refused: a level 30 human fighter is turned away by Filaur,
+# who takes dwarves only, and the quest is not started. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q116_beyond_the_hills_of_winter_wrong_race.golden
+character Stranger 30
+script quest.Q116_BeyondTheHillsOfWinter
+item 8098
+page default/30535.htm
+page script/quest/Q116_BeyondTheHillsOfWinter/
+npc filaur 30535 Folk 10 0 0
+
+action filaur
+action filaur
+  S ActionFailed
+  S NpcHtmlMessage obj=filaur item=0 page=default/30535.htm
+  S ActionFailed
+bypass npc_{filaur}_Quest
+  S NpcHtmlMessage obj=filaur item=0 page=script/quest/Q116_BeyondTheHillsOfWinter/30535-00.htm
+  S ActionFailed
+  S ActionFailed
+  state Q116_BeyondTheHillsOfWinter CREATED
+  rows Q116_BeyondTheHillsOfWinter -
