@@ -45,5 +45,15 @@ func aiIndividual7HandleOps() map[string]script.HandleOps {
 			"OnTimer":            {"NPC.InCombat", "NPC.RemoveAllAttackDesire"},
 			"OnUseSkillFinished": {"NPC.DoDie", "NPC.RemoveAllAttackDesire"},
 		},
+		"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardUseSkill.WizardUseSkill": {
+			"OnAttacked":         {"NPC.CanAutoAttack", "NPC.GeoPathFailCount", "NPC.HateList", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.Paralyzed", "NPC.PhysicalMuted", "NPC.RechargeShots", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.Stunned", "NPC.TopDesireTarget"},
+			"OnClanAttacked":     {"NPC.CanAutoAttack", "NPC.GeoPathFailCount", "NPC.HateList", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.PhysicalMuted", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.TopDesireTarget"},
+			"OnPartyAttacked":    {"NPC.CanAutoAttack", "NPC.GeoPathFailCount", "NPC.HateList", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.PhysicalMuted", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.TopDesireTarget"},
+			"OnPartyDied":        {"Spawner.RespawnDelay", "Spawner.ScheduleRespawn"},
+			"OnSeeCreature":      {"NPC.HateList", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.PhysicalMuted"},
+			"OnSeeSpell":         {"NPC.HateList", "NPC.TopDesireTarget"},
+			"OnTimer":            {"NPC.CanAutoAttack", "NPC.CastingNow", "NPC.GeoPathFailCount", "NPC.HateList", "NPC.InCombat", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.Paralyzed", "NPC.PhysicalMuted", "NPC.RechargeShots", "NPC.RemoveAllAttackDesire", "NPC.RemoveAttackDesire", "NPC.Rooted", "NPC.Stunned", "NPC.TopDesireTarget"},
+			"OnUseSkillFinished": {"NPC.HateList", "NPC.MeetsHPMPConditions", "NPC.Muted", "NPC.PhysicalMuted"},
+		},
 	}
 }
