@@ -2,6 +2,7 @@ package ai
 
 import (
 	"cmp"
+	"encoding/binary"
 	"fmt"
 	"slices"
 	"testing"
@@ -442,7 +443,8 @@ func TestPartyPrivateSplitTakesUpItsTarget(t *testing.T) {
 // TestPartyPrivateSplitLeavesWithoutItsMaster ports PartyPrivateSplit's
 // party-died and timer hooks. Another private's death starts nothing; its
 // master's death starts its 180 s timer "1004". Its master dead and it at
-// peace, the 20 s check takes it out of the world (DeleteObject).
+// peace, the 20 s check takes it out of the world (DeleteObject): its own
+// check runs before its parent's and returns, so the parent's never runs.
 func TestPartyPrivateSplitLeavesWithoutItsMaster(t *testing.T) {
 	t.Parallel()
 	w := bootIndividual4(t, raidBoot{}, ind4Leader(ind4cSplitID, 0), ind4cTemplate(ind4cSplitID, false))
@@ -689,4 +691,137 @@ func TestPartyPrivateCoupleFollowerCallsItsSilhouettes(t *testing.T) {
 	if got := len(w.liveNPCs(ind4cSilhouetteID)); got != 3 {
 		t.Fatalf("silhouettes after another death = %d, want still 3", got)
 	}
+}
+
+// The NpcString lines the fixture splits' AI parameters name.
+const (
+	ind4cShoutMsg2 = 1000290
+	ind4cShoutMsg3 = 1000291
+)
+
+// ind4cLine is an NpcSay line: its say type and text.
+type ind4cLine struct {
+	sayType int32
+	text    string
+}
+
+// ind4cLines returns the lines NpcSay frames show from objectID, each
+// with its say type.
+func ind4cLines(frames [][]byte, objectID int32) []ind4cLine {
+	var out []ind4cLine
+	sayFrames := framesOf(frames, serverpackets.OpcodeNpcSay, objectID)
+	for i, text := range says(frames, objectID) {
+		// opcode, object id, then the say type.
+		out = append(out, ind4cLine{int32(binary.LittleEndian.Uint32(sayFrames[i][5:9])), text})
+	}
+	return out
+}
+
+// ind4cSocialSplit boots a split private beside its master, its AI
+// parameters naming social 3 for 3 s, ShoutMsg2, ShoutMsg3 and isSay as
+// IsSay, so its chain starts the 10 s timer "1001" as it spawns.
+func ind4cSocialSplit(t *testing.T, isSay int) (*ind1World, *npc.Hostile) {
+	t.Helper()
+	tmpl := ind4cTemplate(ind4cSplitID, false)
+	tmpl.AIParams = npc.AIParams{
+		"MoveAroundSocial2": "3", "ShoutMsg2": fmt.Sprint(ind4cShoutMsg2), "ShoutMsg3": fmt.Sprint(ind4cShoutMsg3),
+		"IsSay": fmt.Sprint(isSay),
+	}
+	w := bootIndividual4(t, raidBoot{}, ind4Leader(ind4cSplitID, 0), tmpl)
+	leader := w.spawn(t, leaderID, 300, 0)
+	split := w.ind4cCallPrivate(t, leader, ind4cSplitID, 300, 50, script.Params{})
+	w.clearDesires(t, split)
+	return w, split
+}
+
+// wantSocial fails unless h's queued social desire is social 3 for 100
+// (3 * 1000 / 30) with weight, or h has none for a weight of 0.
+func wantSocial(t *testing.T, when string, h *npc.Hostile, weight float64) {
+	t.Helper()
+	d, ok := desire(h, actorai.IntentionSocial)
+	if weight == 0 {
+		if ok {
+			t.Fatalf("%s: social desire = %+v, want none", when, d)
+		}
+		return
+	}
+	if !ok || d.ItemObjectID != 3 || d.Timer != 100 || d.Weight != weight {
+		t.Fatalf("%s: social desire = %+v (%v), want social 3 for 100 with weight %v", when, d, ok, weight)
+	}
+}
+
+// TestPartyPrivateSplitActsOutAtPeace ports PartyPrivateSplit's timer
+// "1001" at peace, each firing drawing for the split's own social and
+// ShoutMsg2 line before its parent draws for the same in the same firing.
+// Both social draws under 20 want social 3 for 100, weight 50 each, so 100.
+// The split's own ShoutMsg2 draw under 17 of 1000 says the line (say type
+// 0, IsSay set); the parent's shouts it (type 1). Moving to a point, a
+// split acts out nothing of its own: only the parent's draws, which do
+// count that intention, want the social (50) and shout the line.
+func TestPartyPrivateSplitActsOutAtPeace(t *testing.T) {
+	t.Parallel()
+	w, split := ind4cSocialSplit(t, 1)
+	say := ind4cLine{serverpackets.SayTypeAll, script.NpcString(ind4cShoutMsg2)}
+	shout := ind4cLine{serverpackets.SayTypeShout, script.NpcString(ind4cShoutMsg2)}
+	firing := func(when string, social float64, lines []ind4cLine, draws ...int) {
+		t.Helper()
+		w.clearDesires(t, split)
+		w.draws.set(999, draws...)
+		w.srv.ReadQueued(t, w.srv.Client)
+		w.srv.Advance(t, 10*time.Second)
+		wantSocial(t, when, split, social)
+		if got := ind4cLines(w.srv.ReadQueued(t, w.srv.Client), split.ObjectID()); !slices.Equal(got, lines) {
+			t.Fatalf("%s: lines = %+v, want %+v", when, got, lines)
+		}
+	}
+
+	firing("both social draws pass", 100, nil, 0, 999, 0, 999)
+	firing("its own line draw passes", 0, []ind4cLine{say}, 99, 0, 99, 999)
+	firing("its parent's draws pass", 50, []ind4cLine{shout}, 99, 999, 0, 0)
+
+	w.clearDesires(t, split)
+	x, y, z := split.Position()
+	w.onQueue(t, split, func() { script.NPCOf(split).AddMoveToDesire(script.Loc{X: x + 3000, Y: y, Z: z}, 1000) })
+	w.ticks(t, 2)
+	if got := split.AI().CurrentIntention(); got != actorai.IntentionMoveTo {
+		t.Fatalf("setup: intention before the firing = %v, want move to", got)
+	}
+	firing("moving, every draw 0", 50, []ind4cLine{shout}, 0, 0)
+}
+
+// TestPartyPrivateSplitShoutsWithoutIsSay ports the IsSay switch of
+// PartyPrivateSplit's timer "1001": with IsSay 0 its own ShoutMsg2 line is
+// shouted (say type 1).
+func TestPartyPrivateSplitShoutsWithoutIsSay(t *testing.T) {
+	t.Parallel()
+	w, split := ind4cSocialSplit(t, 0)
+	w.draws.set(999, 99, 0, 99, 999)
+	w.srv.ReadQueued(t, w.srv.Client)
+	w.srv.Advance(t, 10*time.Second)
+	want := []ind4cLine{{serverpackets.SayTypeShout, script.NpcString(ind4cShoutMsg2)}}
+	if got := ind4cLines(w.srv.ReadQueued(t, w.srv.Client), split.ObjectID()); !slices.Equal(got, want) {
+		t.Fatalf("lines = %+v, want %+v", got, want)
+	}
+}
+
+// TestPartyPrivateSplitCallsOutInAFight ports the attack branch of
+// PartyPrivateSplit's timer "1001": fired while it attacks, its own draw
+// under 10 says its ShoutMsg3 line (IsSay set), its parent's failing draw
+// shouts nothing, and no social is wanted.
+func TestPartyPrivateSplitCallsOutInAFight(t *testing.T) {
+	t.Parallel()
+	w, split := ind4cSocialSplit(t, 1)
+	ind4bTakeUpAttack(t, w, split)
+	w.clearDesires(t, split)
+	w.draws.set(99, 0, 99)
+	w.srv.ReadQueued(t, w.srv.Client)
+	w.srv.Advance(t, 10*time.Second)
+	if got := split.AI().CurrentIntention(); got != actorai.IntentionAttack {
+		t.Fatalf("setup: intention at the firing = %v, want attack", got)
+	}
+	want := []ind4cLine{{serverpackets.SayTypeAll, script.NpcString(ind4cShoutMsg3)}}
+	if got := ind4cLines(w.srv.ReadQueued(t, w.srv.Client), split.ObjectID()); !slices.Equal(got, want) {
+		t.Fatalf("lines = %+v, want %+v", got, want)
+	}
+	wantSocial(t, "in the fight", split, 0)
 }
