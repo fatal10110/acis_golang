@@ -32,6 +32,12 @@ var individual6 = []struct {
 	{"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizard", PartyPrivate},
 	{"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2", PartyPrivateDD2},
 	{"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2Curse", PartyPrivateDD2Curse},
+	{"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardDD2Heal", PartyPrivateDD2Heal},
+	{"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardHereticCoward", PartyPrivateHereticCoward},
+	{"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardHereticDD2", PartyPrivateHereticDD2},
+	{"script.ai.individual.Monster.WizardBase.PartyPrivateWizard.PartyPrivateWizardHereticDD2Curse", PartyPrivateHereticDD2Curse},
+	{"script.ai.individual.Monster.WizardBase.Wizard.Agit02VampireArcherAgit", Agit02VampireArcherAgit},
+	{"script.ai.individual.Monster.WizardBase.Wizard.DoormanOfDrain", DoormanOfDrain},
 }
 
 // readIndividual6View reads a manifest-layout text as the batch sees it:
@@ -118,8 +124,8 @@ func TestIndividual6RegistrationMatchesReferenceManifest(t *testing.T) {
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
 	want := readIndividual6View(t, path, ours, sc)
-	if got := len(want.folds); got != 12+10*11+2*13+2*12+3*11 {
-		t.Fatalf("reference folds = %d entries, want 205", got)
+	if got := len(want.folds); got != 12+10*11+2*13+2*12+6*11+3*13+4*12+11+2*11 {
+		t.Fatalf("reference folds = %d entries, want 358", got)
 	}
 
 	for _, c := range individual6 {
@@ -136,7 +142,7 @@ func TestIndividual6RegistrationMatchesReferenceManifest(t *testing.T) {
 	if !slices.Equal(got.folds, want.folds) {
 		t.Errorf("folded lists differ:\n got %q\nwant %q", got.folds, want.folds)
 	}
-	for _, id := range []int32{22214, 21347, 21373, 21596, 21599, 21090, 22163, 22171, 22033, 22035, 22041, 22043, 21312, 21544, 21541, 21542, 21545, 20972} {
+	for _, id := range []int32{22214, 21347, 21373, 21596, 21599, 21090, 22163, 22171, 22033, 22035, 22041, 22043, 21312, 21544, 21541, 21542, 21545, 20972, 21543, 21546, 21823, 22158, 22162, 22174, 22166, 22165, 22168, 22173, 35634, 18343, 22136} {
 		if !r.Behaves(id) {
 			t.Errorf("Behaves(%d) = false, want its behavior bound", id)
 		}
