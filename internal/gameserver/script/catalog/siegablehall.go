@@ -22,7 +22,7 @@ func siegableHall() script.Catalog {
 		"script.ai.siegablehall.Agit03Alfred":                                           hall.Alfred,
 		"script.ai.siegablehall.Agit03Giselle":                                          hall.Giselle,
 		"script.ai.siegablehall.Agit03Lidia":                                            hall.Lidia,
-		"script.ai.siegablehall.AzitWateringCrazyYeti":                                  nil,
+		"script.ai.siegablehall.AzitWateringCrazyYeti":                                  hall.CrazyYeti,
 		"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManager":        func() script.Script { return hall.GameManager(watering) },
 		"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManagerCircle1": nil,
 		"script.ai.siegablehall.AzitWateringGameManager.AzitWateringGameManagerCircle2": nil,

@@ -107,6 +107,7 @@ var scenarioScripts = script.Catalog{
 	"script.ai.siegablehall.Agit03Alfred":                                                                    hall.Alfred,
 	"script.ai.siegablehall.Agit03Giselle":                                                                   hall.Giselle,
 	"script.ai.siegablehall.Agit03Lidia":                                                                     hall.Lidia,
+	"script.ai.siegablehall.AzitWateringCrazyYeti":                                                           hall.CrazyYeti,
 	"script.ai.siegablehall.AzitWateringGroud":                                                               hall.Gourd,
 	"script.ai.siegablehall.AzitWateringMimic":                                                               hall.Mimic,
 	"script.ai.siegablehall.AzitWateringMimicMagical":                                                        hall.MimicMagical,
