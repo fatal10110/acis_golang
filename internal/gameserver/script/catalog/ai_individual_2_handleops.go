@@ -67,5 +67,14 @@ func aiIndividual2HandleOps() map[string]script.HandleOps {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastingEnchant.OrfenPrivateRaikel": {
 			"OnTimer": {"NPC.RandomizeAttack"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.RoyalRushWarriorPhysicalSpecial": {
+			"OnAttacked": {"NPC.EquipItem", "NPC.SetEnchantEffect", "NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.RoyalRushWarriorStone": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorPhysicalSpecial.SaintNinja": {
+			"OnTimer": {"Spawner.DecayMe"},
+		},
 	}
 }
