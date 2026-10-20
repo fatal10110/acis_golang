@@ -17,7 +17,8 @@ import (
 
 // The skills the WizardUseSkill fixture NPCs list by type: two magic
 // attacks reaching 2000, one costing 50 MP (a fixture NPC has none), a buff
-// on one target, a self buff and a magic attack reaching only 100.
+// on one target, a self buff, magic attacks reaching only 100 and 50, and a
+// debuff reaching 2000 whose effect lasts 60 s.
 const (
 	wusMagic1 = modelskill.ID(9931)
 	wusMagic2 = modelskill.ID(9932)
@@ -25,6 +26,8 @@ const (
 	wusBuff   = modelskill.ID(9934)
 	wusSelf   = modelskill.ID(9935)
 	wusShort  = modelskill.ID(9936)
+	wusDebuff = modelskill.ID(9937)
+	wusTiny   = modelskill.ID(9938)
 )
 
 // wusSkills are the fixture skills of the WizardUseSkill scenarios.
@@ -35,7 +38,7 @@ func wusSkills() []modelskill.Definition {
 	buff.Offensive, buff.SkillType, buff.Power = false, "BUFF", 0
 	return []modelskill.Definition{
 		ind1Skill(wusMagic1, 2000, false), ind1Skill(wusMagic2, 2000, false), costly, buff, ind1Skill(wusSelf, 0, true),
-		ind1Skill(wusShort, 100, false),
+		ind1Skill(wusShort, 100, false), ind1Skill(wusTiny, 50, false), ind3bHeld(wusDebuff),
 	}
 }
 
@@ -50,8 +53,9 @@ func wusTemplate(id int32, ai npc.AIParams, skills map[npc.SkillType]modelskill.
 	return tmpl
 }
 
-// bootWizardUseSkill boots the WizardUseSkill chain beside templates, every
-// NPC casting the fixture skills, every draw 0 until a test queues others.
+// bootWizardUseSkill boots the WizardUseSkill chain beside templates, with
+// the director script landOnCharacter runs through, every NPC casting the
+// fixture skills, every draw 0 until a test queues others.
 func bootWizardUseSkill(t *testing.T, templates ...*npc.Template) *ind7World {
 	t.Helper()
 	paths := []string{
@@ -65,8 +69,10 @@ func bootWizardUseSkill(t *testing.T, templates ...*npc.Template) *ind7World {
 		paths[0]: defaultnpc.New, paths[1]: monster.New, paths[2]: monsterbehavior.MonsterBehavior,
 		paths[3]: monsterbehavior.WizardBehavior, paths[4]: monsterbehavior.WizardUseSkill,
 	}
+	const director = "test.Ind1Director"
+	catalog[director] = func() script.Script { return script.Script{} }
 	var list []script.Listing
-	for _, p := range paths {
+	for _, p := range append(paths, director) {
 		list = append(list, script.Listing{Path: p})
 	}
 	kinds := map[int32]script.NPCKind{}
@@ -286,4 +292,94 @@ func TestWizardUseSkillRecastsAfterEachCast(t *testing.T) {
 	if d, ok := desire(lonely, actorai.IntentionCast); ok {
 		t.Fatalf("a wizard hating no one wants %+v after its cast", d)
 	}
+}
+
+// TestWizardUseSkillDebuffsOnlyWhatLacksTheEffect ports the type 1 and 2
+// rule of the cast helper: a debuff (Skill03_Type 1) or a buff (2) is
+// wanted only on a target that holds no effect of its kind. Hit by the
+// character, both wizards want their third skill on it (Skill03_Target 1)
+// at 1000000000; once its effect holds on the character, the next hit
+// wants it on neither.
+func TestWizardUseSkillDebuffsOnlyWhatLacksTheEffect(t *testing.T) {
+	t.Parallel()
+	debuff := map[npc.SkillType]modelskill.ID{npc.SkillTypeSkill03ID: wusDebuff}
+	w := bootWizardUseSkill(t,
+		wusTemplate(21036, npc.AIParams{"Skill03_Target": "1", "Skill03_Type": "1"}, debuff),
+		wusTemplate(20216, npc.AIParams{"Skill03_Target": "1", "Skill03_Type": "2"}, debuff))
+	me := w.player.ObjectID()
+	type1 := w.spawn(t, 21036, 400, 0)
+	type2 := w.spawn(t, 20216, -400, 0)
+
+	for _, h := range []*npc.Hostile{type1, type2} {
+		w.hit(t, h, 10)
+		w.wantCasts(t, "first hit", h, map[modelskill.ID]ind1Cast{wusDebuff: {me, 1000000000}})
+		w.clearDesires(t, h)
+	}
+	w.landOnCharacter(t, wusDebuff, type1)
+	for _, h := range []*npc.Hostile{type1, type2} {
+		w.hit(t, h, 10)
+		w.wantCasts(t, "hit on the affected character", h, nil)
+	}
+}
+
+// TestWizardUseSkillHoldsItsGround ports the MovingAttack 0 branches. A hit
+// makes a wizard that holds its ground want its first skill on the
+// character from where it stands (a cast desire that does not move). One
+// that cannot pay for that skill wants to attack the character from where
+// it stands at 1000 and leaves its skills. Once its AI takes that attack
+// up, the character is its top desire target; the next hit, off its skills,
+// drops that attack, which it cannot land from 400 away, and wants a held
+// attack on the attacker at 10.
+func TestWizardUseSkillHoldsItsGround(t *testing.T) {
+	t.Parallel()
+	hold := npc.AIParams{"MovingAttack": "0"}
+	caster := wusTemplate(21394, hold, map[npc.SkillType]modelskill.ID{npc.SkillTypeSkill01ID: wusMagic1})
+	poor := wusTemplate(21395, hold, map[npc.SkillType]modelskill.ID{npc.SkillTypeSkill01ID: wusCostly})
+	caster.CanMove, poor.CanMove = false, false
+	w := bootWizardUseSkill(t, caster, poor)
+	c := w.spawn(t, 21394, 400, 0)
+	p := w.spawn(t, 21395, -400, 0)
+
+	w.hit(t, c, 10)
+	d, ok := desire(c, actorai.IntentionCast)
+	if !ok || d.Skill.ID != wusMagic1 || d.Weight != 1000000000 || d.MoveToTarget || d.FinalTarget == nil || d.FinalTarget.ObjectID() != w.player.ObjectID() {
+		t.Fatalf("holding caster's cast desire = %+v (%v), want skill %d on the character at 1e9, not moving", d, ok, wusMagic1)
+	}
+
+	w.hit(t, p, 10)
+	a, ok := attackOn(p, w.player)
+	if !ok || a.Weight != 1000 || a.MoveToTarget {
+		t.Fatalf("attack desire of the wizard that cannot pay = %+v (%v), want 1000, not moving", a, ok)
+	}
+	if got := ind1Slot(p, script.SlotIntAI4); got != 1 {
+		t.Fatalf("int slot 4 = %d, want 1", got)
+	}
+	w.ticks(t, 1)
+	if top := script.NPCOf(p).TopDesireTarget(); !script.Same(top, script.PlayerOf(w.player)) {
+		t.Fatalf("top desire target = %v, want the character", top)
+	}
+	w.hit(t, p, 10)
+	a, ok = attackOn(p, w.player)
+	if !ok || a.Weight != 10 || a.MoveToTarget {
+		t.Fatalf("attack desire after the hit off its skills = %+v (%v), want 10, not moving", a, ok)
+	}
+}
+
+// TestWizardUseSkillRecastsItsSecondSkillInItsBand ports the use-skill
+// finished hook's first arm: with its most hated 150 away, inside its
+// second skill's band (Skill02_Dist_Max 200, strictly between 0 and 200),
+// a finished cast of its self buff makes the wizard want its second skill
+// on the character, not its first. It cannot move, and the second skill
+// reaches only 50, so the wish stays queued.
+func TestWizardUseSkillRecastsItsSecondSkillInItsBand(t *testing.T) {
+	t.Parallel()
+	tmpl := wusTemplate(21036, npc.AIParams{"Skill02_Dist_Max": "200"},
+		map[npc.SkillType]modelskill.ID{npc.SkillTypeSkill01ID: wusShort, npc.SkillTypeSkill02ID: wusTiny})
+	tmpl.CanMove = false
+	w := bootWizardUseSkill(t, tmpl)
+	h := w.spawn(t, 21036, 150, 0)
+
+	w.hit(t, h, 10)
+	w.castOnce(t, h, wusSelf)
+	w.wantCasts(t, "after the cast", h, map[modelskill.ID]ind1Cast{wusTiny: {w.player.ObjectID(), 1000000000}})
 }
