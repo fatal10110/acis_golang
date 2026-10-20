@@ -1,0 +1,17 @@
+# WarriorCastDDMagicPhysicalSpecialBuffAggressive (21384, its shipped skills), every draw 0. It
+# appears wanting its buff (4031-3) on itself, weight 1000000. Seeing the character, which holds no
+# effect of the buff's stack, while it neither attacks nor casts, it wants the buff on itself again
+# (2000000 in all), which the tick's desire selection casts, and attacks the character (200).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagicPhysicalSpecial.WarriorCastDDMagicPhysicalSpecial
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagicPhysicalSpecial.WarriorCastDDMagicPhysicalSpecialBuffAggressive
+npc fire 21384 Monster 1500 0 0 skill BUFF 4031 3 skill PHYSICAL_SPECIAL_RANGE 4072 9 skill W_LONG_RANGE_DD_MAGIC 4153 9
+
+approach fire
+  S MagicSkillUse caster=fire target=fire skill=4031-3 hit=6607 reuse=21142 success=0
+  desires fire attack(player)=200 cast(fire,4031,move)=2000000
