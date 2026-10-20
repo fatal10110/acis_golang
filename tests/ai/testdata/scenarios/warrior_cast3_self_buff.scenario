@@ -1,0 +1,15 @@
+# WarriorCast3SkillsApproach (21177, Lilim Knight Errant), every draw 0: its created hook wants
+# its self buff (the shipped 4092-1) on itself, weight 1000000, and the next AI cycles cast it.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast3SkillsApproach.WarriorCast3SkillsApproach
+npc knight 21177 Monster 600 0 0 skill SELF_BUFF 4092 1
+
+advance 1s
+  desires knight cast(knight,4092,move)=1000000
+tick x2
+  S MagicSkillUse caster=knight target=knight skill=4092-1 hit=1982 reuse=10571 success=0

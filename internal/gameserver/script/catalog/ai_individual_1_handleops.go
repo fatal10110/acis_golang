@@ -28,6 +28,12 @@ func aiIndividual1HandleOps() map[string]script.HandleOps {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.CorePrivateWarriorAggressive": {
 			"OnTimer": {"NPC.RandomizeAttack"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.QueenAntPrivateGuardAnt": {
+			"OnTimer": {"NPC.RandomizeAttack"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorAggressive.WarriorSummonPrivateAtDyingAggressive": {
+			"OnAttacked": {"NPC.TopDesireTarget"},
+		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCast2SkillsApproachAggressive": {
 			"OnAttacked": {"NPC.TopDesireTarget"},
 			"OnMyDying":  {"NPC.DropItem"},
