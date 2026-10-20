@@ -17,11 +17,15 @@ const (
 	teleportQuest = "Q952_TeleportOrder"
 	// teleporterID is a civilian NPC the quest talks through.
 	teleporterID = 30986
+	// teleportItemID is the harness potion, which nothing else uses: its use
+	// runs only the quest's item-use hook.
+	teleportItemID = 20
 )
 
 // teleportOrderWorld is a player beside an NPC whose quest teleports it
-// from a quest event, from a timer bound to the player alone, and from an
-// engine timer reading the player out of a cell.
+// from a quest event, from a timer whose home queue is the player's, from a
+// closure the event hook runs later on the player's queue (After), from the
+// use of an item, and from an engine timer reading the player out of a cell.
 type teleportOrderWorld struct {
 	*dialogWorld
 	char *player.Character
@@ -35,18 +39,25 @@ type teleportOrderWorld struct {
 
 func bootTeleportOrder(t *testing.T) *teleportOrderWorld {
 	t.Helper()
-	w := &teleportOrderWorld{moved: map[string]*atomic.Bool{"event": {}, "own": {}, "stored": {}}, fired: &atomic.Int32{}}
+	w := &teleportOrderWorld{moved: map[string]*atomic.Bool{"event": {}, "own": {}, "after": {}, "item": {}, "stored": {}}, fired: &atomic.Int32{}}
 	held := &script.PlayerCell{}
 	teleport := func(hook string, p *script.Player) {
 		p.TeleportTo(script.Loc{X: w.dest.X, Y: w.dest.Y, Z: w.dest.Z}, 0)
 		x, y, z := w.char.Position()
 		w.moved[hook].Store(location.Location{X: x, Y: y, Z: z} == w.dest)
 	}
+	// teleportAndShow teleports from hook, then shows a page.
+	teleportAndShow := func(hook string, p *script.Player) {
+		defer w.fired.Add(1)
+		teleport(hook, p)
+		p.ShowHTML(0, "<html><body>"+hook+"</body></html>")
+	}
 	catalog := script.Catalog{
 		"quest." + teleportQuest: func() script.Script {
 			return script.Script{
 				Title: "Teleport Order", QuestID: 952,
-				Bind: script.Bindings{script.EventQuestStart: {teleporterID}, script.EventTalked: {teleporterID}},
+				Bind:      script.Bindings{script.EventQuestStart: {teleporterID}, script.EventTalked: {teleporterID}},
+				UsedItems: []int32{teleportItemID},
 				Hooks: script.Hooks{
 					OnEvent: func(s *script.Script, e script.Event) string {
 						switch e.Name {
@@ -55,12 +66,16 @@ func bootTeleportOrder(t *testing.T) *teleportOrderWorld {
 							return "after.htm"
 						case "own":
 							s.StartTimer("own", nil, e.Player, 100*time.Millisecond)
+						case "after":
+							p := e.Player
+							p.After(100*time.Millisecond, func() { teleportAndShow("after", p) })
 						case "stored":
 							held.Set(e.Player)
 							s.StartTimer("stored", nil, nil, 100*time.Millisecond)
 						}
 						return ""
 					},
+					OnItemUse: func(_ *script.Script, e script.ItemUse) { teleportAndShow("item", e.Player) },
 					OnTimer: func(_ *script.Script, e script.Timer) string {
 						defer w.fired.Add(1)
 						switch e.Name {
@@ -149,8 +164,8 @@ func TestQuestEventTeleportLandsBeforeThePage(t *testing.T) {
 	}
 }
 
-// TestOwnTimerTeleportLandsBeforeThePage: a timer bound to the player
-// alone runs on the player's own queue, so its teleport also runs inside
+// TestOwnTimerTeleportLandsBeforeThePage: a timer whose home queue is the
+// player's runs on that queue, so its teleport also runs inside
 // the call and lands before the page the timer answers.
 func TestOwnTimerTeleportLandsBeforeThePage(t *testing.T) {
 	t.Parallel()
@@ -165,6 +180,53 @@ func TestOwnTimerTeleportLandsBeforeThePage(t *testing.T) {
 	}
 	if !w.moved["own"].Load() {
 		t.Fatal("the timer hook read the old position after TeleportTo")
+	}
+}
+
+// TestAfterTeleportLandsBeforeThePage: a closure the event hook hands to
+// Player.After runs later as a hook on the player's own queue, so its
+// teleport runs inside the call and lands before the page it then shows.
+func TestAfterTeleportLandsBeforeThePage(t *testing.T) {
+	t.Parallel()
+	w := bootTeleportOrder(t)
+	w.srv.Client.Send(encodeBypass("Quest " + teleportQuest + " after"))
+	w.srv.ReadQueued(t, w.srv.Client)
+	w.srv.AdvanceUntil(t, "the After closure runs", func() bool { return w.fired.Load() > 0 })
+	got := teleportFrames(w.srv.ReadQueued(t, w.srv.Client))
+	want := append(slices.Clone(abortAndTeleport), "NpcHtmlMessage", "ActionFailed")
+	if !slices.Equal(got, want) {
+		t.Fatalf("After teleport frames:\n got %q\nwant %q", got, want)
+	}
+	if !w.moved["after"].Load() {
+		t.Fatal("the After closure read the old position after TeleportTo")
+	}
+}
+
+// TestItemUseTeleportLandsBeforeThePage: the item-use hook of a started
+// quest runs on the player's own queue, after the item's own use, so its teleport runs inside
+// the call and lands before the page it then shows.
+func TestItemUseTeleportLandsBeforeThePage(t *testing.T) {
+	t.Parallel()
+	w := bootTeleportOrder(t)
+	seedStarted(t, w.dialogWorld, teleportQuest)
+	w.srv.RunScript(t, w.player, teleportQuest, func(s *script.Script, p *script.Player) { s.GiveItems(p, teleportItemID, 1) })
+	w.srv.ReadQueued(t, w.srv.Client)
+	potion := w.srv.PlayerInventory(t, w.player).ItemByTemplateID(teleportItemID)
+	if potion == nil {
+		t.Fatal("the potion was not given")
+	}
+	w.srv.Client.Send(encodeUseItem(potion.ObjectID))
+	got := teleportFrames(w.srv.ReadQueued(t, w.srv.Client))
+	// The use's own answer, as for any item nothing else uses, goes first.
+	want := append(append([]string{"ActionFailed"}, abortAndTeleport...), "NpcHtmlMessage", "ActionFailed")
+	if !slices.Equal(got, want) {
+		t.Fatalf("item-use teleport frames:\n got %q\nwant %q", got, want)
+	}
+	if w.fired.Load() == 0 {
+		t.Fatal("the item-use hook did not run")
+	}
+	if !w.moved["item"].Load() {
+		t.Fatal("the item-use hook read the old position after TeleportTo")
 	}
 }
 

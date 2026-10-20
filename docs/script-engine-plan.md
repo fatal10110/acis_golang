@@ -353,10 +353,11 @@ where the reference asks an NPC to walk a route (A13).
    queue runs on the player's queue the same way, for the same reason: a teleport touches
    state only that queue owns (#3710), and packets the rest of the hook sends go out before
    the teleport's. From a hook the engine runs on that player's own queue (its talk, quest
-   window or quest event, its item use, a timer bound to it alone, `Player.After`) it runs
-   inside the call, as in the reference (#4046): the engine marks those hooks on the
-   character with a `sim.Turn`, which only the goroutine running the hook sees held, so a
-   handle stored in a cell or captured by a closure and used from another queue still posts.
+   window or quest event, its item use, a timer whose home queue is the player's,
+   `Player.After`) it runs inside the call, as in the reference (#4046): the engine marks
+   those hooks on the character with a `sim.Turn`, which only the goroutine running the hook
+   sees held, so a handle stored in a cell or captured by a closure and used from another
+   queue still posts.
    A script's skill call with a player caster
    (`Script.CallSkill`) runs on the caster's queue the same way: the skill's handlers own the
    caster's state, and a self-target recall or teleport moves the caster inside the cast

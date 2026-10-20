@@ -43,9 +43,10 @@ func (p *Player) HasAtLeastOneItem(itemIDs ...int32) bool {
 
 // TeleportTo moves the player to at, up to offset away on each axis. From
 // a hook running on the player's own queue (its talk, quest window or
-// quest event, its item use, a timer bound to it alone, After) the
-// teleport runs inside the call: its packets go out before what the rest of
-// the hook sends, and the rest of the hook reads the new position. From any
+// quest event, its item use, a timer whose home queue is the player's,
+// After) the teleport runs inside the call: its packets go out before what
+// the rest of the hook sends, and the rest of the hook reads the new
+// position. From any
 // other queue (an NPC's hook, another player's) it runs on the player's own
 // queue once the calling task is done, and the rest of the hook still reads
 // the old position.
