@@ -1,0 +1,17 @@
+# RoyalRushRoomBoss4 (18141) beside a Warrior of its clan, every draw 0. It appears wanting its
+# clan buff (4576-3, a self buff) on itself, weight 1000000. Told of the character's hit on the
+# Warrior, the character not its top desire target, it wants its first range magic (4568) on the
+# character and its clan buff on the Warrior, which lands on itself and so adds to the first.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBossBasic
+script script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss4
+npc boss 18141 Monster 40 0 0 clan royal_rush_room 600 skill RANGE_DD_MAGIC1 4568 9 skill CLAN_BUFF1 4576 3
+npc guard 20001 Monster 80 0 0 clan royal_rush_room 600
+
+hit guard 22
+  desires boss cast(boss,4576,move)=2000000 cast(player,4568,move)=1000000

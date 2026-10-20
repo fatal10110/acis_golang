@@ -11,7 +11,7 @@ import (
 // blow up around itself with its self range magic, and leaves the world
 // when any of its casts ends.
 func RoyalRushBomb() script.Script {
-	return script.Script{Dir: "ai/individual/Monster/WarriorBase/Warrior/RoyalRushBomb", Behavior: true, NPCs: []int32{18149, 18195, 18230}, Hooks: royalRushBombHooks()}
+	return script.Script{Dir: royalRushBombDir, Behavior: true, NPCs: []int32{18149, 18195, 18230}, Hooks: royalRushBombHooks()}
 }
 
 // royalRushBombHooks are RoyalRushBomb's hooks, which its children derive

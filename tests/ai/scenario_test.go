@@ -117,6 +117,15 @@ var scenarioScripts = script.Catalog{
 	"script.ai.siegeguards.GludioWizard.GludioWizard":                                       siegeguard.Wizard,
 	"script.ai.siegeguards.GludioWizard.GludioWizardUseSkill":                               siegeguard.WizardUseSkill,
 
+	// The Four Sepulchers bombs and room bosses, and the tyrannosaurus.
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushBomb":                   warrior.RoyalRushBomb,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb":            warrior.RoyalRushHereticBomb,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushBomb.RoyalRushHereticBomb2":           warrior.RoyalRushHereticBomb2,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBossBasic": warrior.RoyalRushRoomBossBasic,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss1":     warrior.RoyalRushRoomBoss1,
+	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss4":     warrior.RoyalRushRoomBoss4,
+	"script.ai.individual.Monster.WarriorBase.Warrior.TyrannoPrimeval.TyrannoPrimeval":               warrior.TyrannoPrimeval,
+
 	// The MonsterBehavior chain.
 	"script.ai.individual.Monster.MonsterBehavior.MonsterBehavior":                              monsterbehavior.MonsterBehavior,
 	"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardBehavior":                monsterbehavior.WizardBehavior,
