@@ -35,7 +35,7 @@ func Command(command string) int {
 	if len(command) <= len("Loto ") {
 		return 0
 	}
-	n, err := commons.ParseInt(command[len("Loto "):], 32)
+	n, err := strconv.ParseInt(command[len("Loto "):], 10, 32)
 	if err != nil {
 		return 0
 	}

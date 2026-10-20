@@ -262,7 +262,7 @@ func DecodeCommands(s string) ([]Command, error) {
 		}
 		var nums [3]int32
 		for i := range nums {
-			n, err := commons.ParseInt(fields[i], 32)
+			n, err := strconv.ParseInt(fields[i], 10, 32)
 			if err != nil {
 				return nil, errBadCommand(line, err)
 			}

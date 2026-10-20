@@ -380,7 +380,7 @@ func commandInt(command string, begin int) (int, bool) {
 	if begin > len(units) {
 		return 0, false
 	}
-	n, err := commons.ParseInt(commons.UTF16String(units[begin:]), 32)
+	n, err := strconv.ParseInt(commons.UTF16String(units[begin:]), 10, 32)
 	if err != nil {
 		return 0, false
 	}

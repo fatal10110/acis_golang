@@ -3,9 +3,8 @@ package recipe
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // Ingredient is an item id and quantity pair used by a recipe.
@@ -47,11 +46,11 @@ func ParseIngredient(raw string) (Ingredient, error) {
 	if len(parts) != 2 {
 		return Ingredient{}, fmt.Errorf("want item-count")
 	}
-	itemID, err := commons.ParseInt(parts[0], 32)
+	itemID, err := strconv.ParseInt(parts[0], 10, 32)
 	if err != nil {
 		return Ingredient{}, err
 	}
-	count, err := commons.Atoi(parts[1])
+	count, err := strconv.Atoi(parts[1])
 	if err != nil {
 		return Ingredient{}, err
 	}

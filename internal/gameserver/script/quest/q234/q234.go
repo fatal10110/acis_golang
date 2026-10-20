@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/questlog"
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
 )
@@ -173,7 +172,7 @@ func onAdvEvent(s *script.Script, e script.Event) string {
 			htmltext = weaponPage(s, "31002-15.htm", itemID)
 			break
 		}
-		aGrade, err := commons.ParseInt(strings.ReplaceAll(e.Name, "selectAGrade_", ""), 32)
+		aGrade, err := strconv.ParseInt(strings.ReplaceAll(e.Name, "selectAGrade_", ""), 10, 32)
 		if err != nil {
 			panic(err)
 		}

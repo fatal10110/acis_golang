@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/commons/db"
 	"github.com/fatal10110/acis_golang/internal/config"
 	"github.com/fatal10110/acis_golang/internal/gameserver/classmaster"
@@ -1063,7 +1062,7 @@ func gameServerConfigFromProperties(paths gameServerPaths, serverProps, hexProps
 	if !ok {
 		return gameServerConfig{}, fmt.Errorf("missing ServerID in hexid file")
 	}
-	serverID, err := commons.Atoi(serverIDText)
+	serverID, err := strconv.Atoi(serverIDText)
 	if err != nil {
 		return gameServerConfig{}, err
 	}

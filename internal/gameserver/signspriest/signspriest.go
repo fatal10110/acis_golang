@@ -229,7 +229,7 @@ func (h *handler) int() (int, bool) {
 	if h.next >= len(h.tokens) {
 		return 0, false
 	}
-	n, err := commons.ParseInt(h.tokens[h.next], 32)
+	n, err := strconv.ParseInt(h.tokens[h.next], 10, 32)
 	h.next++
 	return int(n), err == nil
 }
@@ -539,7 +539,7 @@ func (h *handler) exchangeStonesPage(command string) Reply {
 	if !ok {
 		return Reply{Aborted: true}
 	}
-	stoneType, err := commons.Atoi(arg)
+	stoneType, err := strconv.Atoi(arg)
 	if err != nil {
 		return Reply{Aborted: true}
 	}
@@ -771,7 +771,7 @@ func commandNumber(command string, begin int) (int, bool) {
 	if !ok {
 		return 0, false
 	}
-	n, err := commons.ParseInt(strings.TrimFunc(arg, isCtrlOrSpace), 32)
+	n, err := strconv.ParseInt(strings.TrimFunc(arg, isCtrlOrSpace), 10, 32)
 	return int(n), err == nil
 }
 
