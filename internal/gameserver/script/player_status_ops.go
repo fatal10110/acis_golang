@@ -25,6 +25,10 @@ func (p *Player) Flying() bool { return p.character().MountType() == player.Moun
 // third weight band or above, or an inventory at least 80% full.
 func (p *Player) Overweight() bool { return p.character().Overweight() }
 
+// InCombat reports whether the player holds an attack stance: from its
+// own attack or a hit it took, until the stance runs out (#4025).
+func (p *Player) InCombat() bool { return p.character().InCombat() }
+
 // RightHandItemID returns the item id of what the player holds in its right
 // hand, 0 when the hand is empty.
 func (p *Player) RightHandItemID() int32 { return p.character().RightHandItemID() }

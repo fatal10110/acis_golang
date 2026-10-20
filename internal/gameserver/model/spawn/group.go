@@ -97,6 +97,11 @@ type GroupSpawn interface {
 	// max HP and MP, and CheckAlive reports false. Any other spawn keeps
 	// no row: asking panics.
 	CheckAlive(at Position) bool
+	// SavedX returns the X a database-tracked spawn's row holds, leaving
+	// the row as it is: where the row last placed or saved its NPC alive,
+	// 0 for a row never initialized or one saved dead. Any other spawn
+	// keeps no row: asking panics.
+	SavedX() int
 	// Spawn places one more NPC of the spawn; a database-tracked spawn
 	// comes back as its saved row says.
 	Spawn()
