@@ -60,8 +60,8 @@ func CorePrivatePerum() script.Script {
 	})}
 }
 
-// coreShuffleDelay draws the time to a Core private's next hate shuffle:
-// 90 s and up to 240 s more.
+// coreShuffleDelay draws the time to a Core private's, or a Queen Ant
+// guard's, next hate shuffle: 90 s and up to 240 s more.
 func coreShuffleDelay(s *script.Script) time.Duration {
 	return time.Duration(90000+s.Rnd(240000)) * time.Millisecond
 }
