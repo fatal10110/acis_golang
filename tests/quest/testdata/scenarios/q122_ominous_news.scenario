@@ -1,0 +1,85 @@
+# Ominous News (Q122): a level 20 character accepts at Moira and reports to Karuda, who pays adena;
+# then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q122_ominous_news.golden
+character Courier 20
+script quest.Q122_OminousNews
+item 57
+page trainer/31979.htm
+page default/32017.htm
+page script/quest/Q122_OminousNews/
+npc moira 31979 Trainer 10 0 0
+npc karuda 32017 Folk 20 0 0
+
+# Moira: accept.
+action moira
+action moira
+  S ActionFailed
+  S NpcHtmlMessage obj=moira item=0 page=trainer/31979.htm
+  S ActionFailed
+bypass npc_{moira}_Quest
+  S NpcHtmlMessage obj=moira item=0 page=script/quest/Q122_OminousNews/31979-02.htm
+  S ActionFailed
+  S ActionFailed
+  state Q122_OminousNews CREATED
+bypass Quest Q122_OminousNews 31979-03.htm
+  S QuestList 122:0x80000001
+  S ExShowQuestMark quest=122
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=moira item=0 page=script/quest/Q122_OminousNews/31979-03.htm
+  S ActionFailed
+  Q upsert Q122_OminousNews | <state> | STARTED
+  Q upsert Q122_OminousNews | <cond> | 1
+  state Q122_OminousNews STARTED
+  rows Q122_OminousNews <cond>=1 <state>=STARTED
+action moira
+  S ActionFailed
+  S NpcHtmlMessage obj=moira item=0 page=trainer/31979.htm
+  S ActionFailed
+bypass npc_{moira}_Quest
+  S NpcHtmlMessage obj=moira item=0 page=script/quest/Q122_OminousNews/31979-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Karuda pays.
+action karuda
+action karuda
+  S ActionFailed
+  S NpcHtmlMessage obj=karuda item=0 page=default/32017.htm
+  S ActionFailed
+bypass npc_{karuda}_Quest
+  S NpcHtmlMessage obj=karuda item=0 page=script/quest/Q122_OminousNews/32017-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q122_OminousNews 32017-02.htm
+  S SystemMessage id=52 6:1695
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 122:0x00000000
+  S NpcHtmlMessage obj=karuda item=0 page=script/quest/Q122_OminousNews/32017-02.htm
+  S ActionFailed
+  Q upsert Q122_OminousNews | <state> | COMPLETED
+  Q delete-except-state Q122_OminousNews
+  state Q122_OminousNews COMPLETED
+  rows Q122_OminousNews <state>=COMPLETED
+  items 57=1695
+action karuda
+  S ActionFailed
+  S NpcHtmlMessage obj=karuda item=0 page=default/32017.htm
+  S ActionFailed
+bypass npc_{karuda}_Quest
+  S NpcHtmlMessage obj=karuda item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed
+
+relog
+  items 57=1695
+  state Q122_OminousNews COMPLETED
+  rows Q122_OminousNews <state>=COMPLETED
+action moira
+action moira
+  S ActionFailed
+  S NpcHtmlMessage obj=moira item=0 page=trainer/31979.htm
+  S ActionFailed
+bypass npc_{moira}_Quest
+  S NpcHtmlMessage obj=moira item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

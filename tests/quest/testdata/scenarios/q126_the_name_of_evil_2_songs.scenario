@@ -1,0 +1,299 @@
+# The Name of Evil - 2 (Q126), cond 11 to 18: the warrior's grave tells its story and the character
+# plays its three songs, a wrong last note of the first song once (the notes played so far kept),
+# then gets the bone powder; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q126_the_name_of_evil_2_songs.golden
+character Seeker 77
+quest Q126_TheNameOfEvil_2 <cond>=11 <state>=STARTED
+script quest.Q126_TheNameOfEvil_2
+item 8783 729
+page default/32122.htm
+page script/quest/Q126_TheNameOfEvil_2/
+npc grave 32122 Folk 0 30 0
+
+# The grave's story.
+action grave
+action grave
+  S ActionFailed
+  S NpcHtmlMessage obj=grave item=0 page=default/32122.htm
+  S ActionFailed
+bypass npc_{grave}_Quest
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-03.htm
+  S QuestList 126:0x80000fff
+  S ExShowQuestMark quest=126
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-03.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | <cond> | 12
+  rows Q126_TheNameOfEvil_2 <cond>=12 <state>=STARTED
+bypass Quest Q126_TheNameOfEvil_2 32122-04.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-04.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-05.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-05.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-06.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-06.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-07.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-07.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-08.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-08.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-09.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-09.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-10.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-10.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-11.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-11.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-12.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-12.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-13.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-13.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-14.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-14.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-15.htm
+  S QuestList 126:0x80001fff
+  S ExShowQuestMark quest=126
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-15.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | <cond> | 13
+  rows Q126_TheNameOfEvil_2 <cond>=13 <state>=STARTED
+bypass Quest Q126_TheNameOfEvil_2 32122-16.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-16.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-17.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-17.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-18.htm
+  S QuestList 126:0x80003fff
+  S ExShowQuestMark quest=126
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-18.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | <cond> | 14
+  rows Q126_TheNameOfEvil_2 <cond>=14 <state>=STARTED
+action grave
+  S ActionFailed
+  S NpcHtmlMessage obj=grave item=0 page=default/32122.htm
+  S ActionFailed
+bypass npc_{grave}_Quest
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-24.htm
+  S ActionFailed
+  S ActionFailed
+
+# The first song, a wrong last note, then again.
+bypass Quest Q126_TheNameOfEvil_2 32122-21.htm
+bypass Quest Q126_TheNameOfEvil_2 32122-24.htm
+bypass Quest Q126_TheNameOfEvil_2 DOOne
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-26.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | DO | 1
+bypass Quest Q126_TheNameOfEvil_2 32122-28.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-28.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 MIOne
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-30.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | MI | 1
+bypass Quest Q126_TheNameOfEvil_2 32122-32.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-32.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 FAOne
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-34.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | FA | 1
+bypass Quest Q126_TheNameOfEvil_2 32122-36.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-36.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 SOLOne
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-38.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | SOL | 1
+bypass Quest Q126_TheNameOfEvil_2 32122-40.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-40.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-43.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-43.htm
+  S ActionFailed
+  rows Q126_TheNameOfEvil_2 <cond>=14 <state>=STARTED DO=1 FA=1 MI=1 SOL=1
+bypass Quest Q126_TheNameOfEvil_2 32122-24.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-24.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 DOOne
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-26.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-28.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-28.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 MIOne
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-30.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-32.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-32.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 FAOne
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-34.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-36.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-36.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 SOLOne
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-38.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-40.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-40.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 FA_2One
+  S QuestList 126:0x80007fff
+  S ExShowQuestMark quest=126
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-42.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | FA_2 | 1
+  Q upsert Q126_TheNameOfEvil_2 | <cond> | 15
+  Q delete-var Q126_TheNameOfEvil_2 | DO
+  Q delete-var Q126_TheNameOfEvil_2 | MI
+  Q delete-var Q126_TheNameOfEvil_2 | FA
+  Q delete-var Q126_TheNameOfEvil_2 | SOL
+  Q delete-var Q126_TheNameOfEvil_2 | FA_2
+  rows Q126_TheNameOfEvil_2 <cond>=15 <state>=STARTED
+
+# The second song.
+bypass Quest Q126_TheNameOfEvil_2 32122-45.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-45.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 FATwo
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-47.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | FA | 1
+bypass Quest Q126_TheNameOfEvil_2 32122-49.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-49.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 SOLTwo
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-51.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | SOL | 1
+bypass Quest Q126_TheNameOfEvil_2 32122-53.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-53.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 TITwo
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-55.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | TI | 1
+bypass Quest Q126_TheNameOfEvil_2 32122-57.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-57.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 SOL_2Two
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-59.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | SOL_2 | 1
+bypass Quest Q126_TheNameOfEvil_2 32122-61.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-61.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 FA_2Two
+  S QuestList 126:0x8000ffff
+  S ExShowQuestMark quest=126
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-63.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | FA_2 | 1
+  Q upsert Q126_TheNameOfEvil_2 | <cond> | 16
+  Q delete-var Q126_TheNameOfEvil_2 | FA
+  Q delete-var Q126_TheNameOfEvil_2 | SOL
+  Q delete-var Q126_TheNameOfEvil_2 | TI
+  Q delete-var Q126_TheNameOfEvil_2 | SOL_2
+  Q delete-var Q126_TheNameOfEvil_2 | FA3_2
+  rows Q126_TheNameOfEvil_2 <cond>=16 <state>=STARTED FA_2=1
+action grave
+  S ActionFailed
+  S NpcHtmlMessage obj=grave item=0 page=default/32122.htm
+  S ActionFailed
+bypass npc_{grave}_Quest
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-66.htm
+  S ActionFailed
+  S ActionFailed
+
+# The third song.
+bypass Quest Q126_TheNameOfEvil_2 SOLTri
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-68.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | SOL | 1
+bypass Quest Q126_TheNameOfEvil_2 32122-70.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-70.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 FATri
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-72.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | FA | 1
+bypass Quest Q126_TheNameOfEvil_2 32122-74.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-74.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 MITri
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-76.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | MI | 1
+bypass Quest Q126_TheNameOfEvil_2 32122-78.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-78.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 FA_2Tri
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-80.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-82.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-82.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 MI_2Tri
+  S QuestList 126:0x8001ffff
+  S ExShowQuestMark quest=126
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-84.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | MI_2 | 1
+  Q upsert Q126_TheNameOfEvil_2 | <cond> | 17
+  Q delete-var Q126_TheNameOfEvil_2 | SOL
+  Q delete-var Q126_TheNameOfEvil_2 | FA
+  Q delete-var Q126_TheNameOfEvil_2 | MI
+  Q delete-var Q126_TheNameOfEvil_2 | FA_2
+  Q delete-var Q126_TheNameOfEvil_2 | MI_2
+  rows Q126_TheNameOfEvil_2 <cond>=17 <state>=STARTED
+
+# The bone powder.
+bypass Quest Q126_TheNameOfEvil_2 32122-87.htm
+  S SystemMessage id=54 3:8783
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-87.htm
+  S ActionFailed
+  rows Q126_TheNameOfEvil_2 <cond>=17 <state>=STARTED
+  items 8783=1
+bypass Quest Q126_TheNameOfEvil_2 32122-88.htm
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-88.htm
+  S ActionFailed
+bypass Quest Q126_TheNameOfEvil_2 32122-90.htm
+  S QuestList 126:0x8003ffff
+  S ExShowQuestMark quest=126
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-90.htm
+  S ActionFailed
+  Q upsert Q126_TheNameOfEvil_2 | <cond> | 18
+  rows Q126_TheNameOfEvil_2 <cond>=18 <state>=STARTED
+action grave
+  S ActionFailed
+  S NpcHtmlMessage obj=grave item=0 page=default/32122.htm
+  S ActionFailed
+bypass npc_{grave}_Quest
+  S NpcHtmlMessage obj=grave item=0 page=script/quest/Q126_TheNameOfEvil_2/32122-91.htm
+  S ActionFailed
+  S ActionFailed
+
+relog
+  rows Q126_TheNameOfEvil_2 <cond>=18 <state>=STARTED
+  items 8783=1

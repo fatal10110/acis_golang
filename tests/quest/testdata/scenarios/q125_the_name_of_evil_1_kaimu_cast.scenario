@@ -1,0 +1,30 @@
+# The Name of Evil - 1 (Q125), Ulu Kaimu's cast: at cond 5 the character talks to Ulu Kaimu, which
+# asks itself to cast Representation - Enter the Sailren Nest Quest (5089, level 1) at itself
+# (onTalk); it casts within the next three AI ticks. Expectations before the ticks replay the
+# reference trace of this scenario from a probe run with the ticks, where the reference casts at
+# itself on the second tick. This scenario has no trace: as q120_pavels_research_shelf_cast, the
+# probe cannot play the ticks without changing the traces of later scenarios, and its NPC casts
+# with the shipped template's casting stats (hit 1197 ms) where the Go runner's fixture NPC gives
+# hit 1570 (#4074).
+character Seeker 76
+quest Q125_TheNameOfEvil_1 <cond>=5 <state>=STARTED
+script quest.Q125_TheNameOfEvil_1
+item 8779 8780 8781 8782
+page default/32119.htm
+page script/quest/Q125_TheNameOfEvil_1/
+npc ulu 32119 Folk 30 0 0
+
+action ulu
+action ulu
+  S ActionFailed
+  S NpcHtmlMessage obj=ulu item=0 page=default/32119.htm
+  S ActionFailed
+bypass npc_{ulu}_Quest
+  S NpcHtmlMessage obj=ulu item=0 page=script/quest/Q125_TheNameOfEvil_1/32119-01.htm
+  S ActionFailed
+  S ActionFailed
+  rows Q125_TheNameOfEvil_1 <cond>=5 <state>=STARTED
+
+# Three AI ticks: Ulu Kaimu casts at itself.
+tick x3
+  S MagicSkillUse caster=ulu target=ulu skill=5089-1 hit=1570 reuse=0 success=0
