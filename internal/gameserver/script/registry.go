@@ -113,6 +113,17 @@ var raisedHooks = map[hook]kindSet{
 	hookPickedItem: kinds(KindFolk, KindHostile),
 }
 
+// silentHooks lists, per hook, the NPC kinds no game event ever raises it
+// on: a civilian NPC's attack reports no end. A binding to one of those
+// NPCs still registers, as it does on the NPCs the hook is raised on, and
+// the hook never runs for them.
+var silentHooks = map[hook]kindSet{
+	hookAttackFinished: kinds(KindFolk),
+}
+
+// silent reports whether no game event ever raises h on an NPC of kind k.
+func silent(h hook, k NPCKind) bool { return silentHooks[h]&kinds(k) != 0 }
+
 // Config is what Build needs besides the list and the catalog.
 type Config struct {
 	// KindOf returns the kind of the NPC template with id npcID, false when
@@ -332,7 +343,8 @@ func boundOf(s *Script, kindOf func(int32) (NPCKind, bool)) Bindings {
 }
 
 // gate checks that the engine raises every hook s subscribes to: for each
-// binding, the event's hook on that NPC's kind, and the event and timer
+// binding, the event's hook on that NPC's kind unless no game event raises
+// it there, and the event and timer
 // hooks when s sets them. A behavior's timers stop when its NPC decays, so
 // a behavior that sets the timer hook needs it raised on the kind of every
 // NPC it is bound to.
@@ -341,7 +353,7 @@ func gate(s *Script, bound Bindings, cfg *Config) error {
 		h := npcEvents[ev].hook
 		for _, id := range bound[ev] {
 			k, _ := cfg.KindOf(id)
-			if !cfg.raised(h, k) {
+			if !cfg.raised(h, k) && !silent(h, k) {
 				return fmt.Errorf("%s on npc %d: hook %s is not raised for %s npcs", ev, id, h, k)
 			}
 		}

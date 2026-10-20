@@ -17,7 +17,6 @@ import (
 	"testing"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/script"
-	"github.com/fatal10110/acis_golang/internal/gameserver/script/quest/thirdclass"
 	"github.com/fatal10110/acis_golang/internal/testsupport/handleops"
 	"github.com/rs/zerolog"
 )
@@ -163,9 +162,9 @@ func generateHandleOps(t *testing.T, prog *handleops.Program, catalog map[string
 // reaches a hostile-only handle operation is refused, and reported, when
 // the NPCs it is bound to are civilian ones.
 func TestManifestComparisonReportsHandleRefusal(t *testing.T) {
-	const path = "quest.Q230_TestOfTheSummoner"
+	const path = "script.feature.NewbieHelper"
 	list := []script.Listing{{Path: path}}
-	catalog := script.Catalog{path: questCatalog(nil, thirdclass.NewFamily())[path]}
+	catalog := script.Catalog{path: featureCatalog(nil)[path]}
 	folk := func(int32) (script.NPCKind, bool) { return script.KindFolk, true }
 	got := manifestMismatches(t, list, catalog, script.Config{KindOf: folk, Log: zerolog.Nop(), HandleOps: scriptHandleOps})
 	if !slices.Equal(got, []string{"script " + path + " refused"}) {

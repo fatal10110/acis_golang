@@ -40,6 +40,34 @@ func (n *NPC) params() aiParams {
 	panic("script: the AI parameters of a handle on nothing")
 }
 
+// fighter is what a hostile and a civilian NPC both fight with.
+type fighter interface {
+	AbortAll(clearTarget bool)
+	Stunned() bool
+	Paralyzed() bool
+	RechargeShots(physical, magic bool)
+	GeoPathFailCount() int
+	RemoveAllAttackDesire()
+	Kill(killer attackable.Combatant) bool
+}
+
+var (
+	_ fighter = (*npc.Hostile)(nil)
+	_ fighter = (*npc.Folk)(nil)
+)
+
+// fighter returns the hostile or civilian NPC n handles; a handle on
+// nothing panics: what names the operation.
+func (n *NPC) fighter(what string) fighter {
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		return o
+	case *npc.Folk:
+		return o
+	}
+	panic(fmt.Sprintf("script: %s for a handle on nothing", what))
+}
+
 // hostile returns the hostile NPC n handles. Any other NPC panics: what
 // names the operation.
 func (n *NPC) hostile(what string) *npc.Hostile {
@@ -173,7 +201,7 @@ func (n *NPC) ClearDesires() {
 // RemoveAllAttackDesire zeroes the NPC's hate of every attacker, drops its
 // attack desires and stops its movement. It does not send the NPC back to
 // peace.
-func (n *NPC) RemoveAllAttackDesire() { n.hostile("remove the attack desires").RemoveAllAttackDesire() }
+func (n *NPC) RemoveAllAttackDesire() { n.fighter("remove the attack desires").RemoveAllAttackDesire() }
 
 // Intention is the kind of intention an NPC's AI acts on.
 type Intention = ai.Intention
@@ -203,16 +231,16 @@ func (n *NPC) Intention() Intention {
 }
 
 // Stunned reports whether the NPC is stunned.
-func (n *NPC) Stunned() bool { return n.hostile("check a stun").Stunned() }
+func (n *NPC) Stunned() bool { return n.fighter("check a stun").Stunned() }
 
 // Paralyzed reports whether the NPC is paralyzed.
-func (n *NPC) Paralyzed() bool { return n.hostile("check a paralysis").Paralyzed() }
+func (n *NPC) Paralyzed() bool { return n.fighter("check a paralysis").Paralyzed() }
 
 // RechargeShots charges the NPC's soulshot when physical is set and its
 // spiritshot when magic is set, as its shots allow, showing the players
 // around it.
 func (n *NPC) RechargeShots(physical, magic bool) {
-	n.hostile("recharge shots").RechargeShots(physical, magic)
+	n.fighter("recharge shots").RechargeShots(physical, magic)
 }
 
 // Shout shouts text as the NPC's chat line to the players around it. A
@@ -228,18 +256,27 @@ func (n *NPC) Shout(text string) {
 
 // GeoPathFailCount returns how many times in a row the NPC's path finding
 // has failed.
-func (n *NPC) GeoPathFailCount() int { return n.hostile("read the path failures").GeoPathFailCount() }
+func (n *NPC) GeoPathFailCount() int { return n.fighter("read the path failures").GeoPathFailCount() }
 
 // CanAttack reports whether the NPC may attack c now: it can attack, c is
-// within reach when it cannot move, it knows c, c may be attacked by it, it
-// sees c and c does not fake death.
+// within reach when it cannot move, it knows c, c may be attacked by it and
+// it sees c; for a hostile NPC, c also does not fake death.
 func (n *NPC) CanAttack(c Creature) bool {
 	t := combatantOf(c)
-	return t != nil && n.hostile("check an attack").AI().CanAttack(t)
+	if t == nil {
+		return false
+	}
+	switch o := n.combatant().(type) {
+	case *npc.Hostile:
+		return o.AI().CanAttack(t)
+	case *npc.Folk:
+		return o.CanAttack(t)
+	}
+	panic("script: an attack check for a handle on nothing")
 }
 
 // DoDie kills the NPC, killer taking the kill. A dead NPC is left as it is.
-func (n *NPC) DoDie(killer Creature) { n.hostile("die").Kill(combatantOf(killer)) }
+func (n *NPC) DoDie(killer Creature) { n.fighter("die").Kill(combatantOf(killer)) }
 
 // IntSlot names one integer of an NPC's script memory.
 type IntSlot = npc.IntSlot

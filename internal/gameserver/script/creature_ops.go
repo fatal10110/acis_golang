@@ -131,7 +131,7 @@ func (n *NPC) Behind(c Creature) bool {
 }
 
 // AbortAll stops the NPC's movement, attack and cast.
-func (n *NPC) AbortAll() { n.hostile("abort its actions").AbortAll(false) }
+func (n *NPC) AbortAll() { n.fighter("abort its actions").AbortAll(false) }
 
 // AbortAll stops the player's movement, attack and cast, keeping its
 // target.

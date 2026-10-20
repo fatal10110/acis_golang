@@ -19,23 +19,20 @@ func siegableHallHandleOps() map[string]script.HandleOps {
 			"OnSeeSpell":     {"NPC.MaxHP"},
 		},
 		"script.ai.siegablehall.Agit02Dietrich": {
-			"OnPartyAttacked":    {"NPC.CanAttemptCast", "NPC.MaxHP"},
-			"OnSeeSpell":         {"NPC.MaxHP", "NPC.TopDesireTarget"},
-			"OnTimer":            {"NPC.RandomizeAttack", "NPC.RemoveAllAttackDesire"},
-			"OnUseSkillFinished": {"NPC.RemoveAllAttackDesire"},
+			"OnPartyAttacked": {"NPC.CanAttemptCast", "NPC.MaxHP"},
+			"OnSeeSpell":      {"NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnTimer":         {"NPC.RandomizeAttack"},
 		},
 		"script.ai.siegablehall.Agit02Gustav": {
-			"OnPartyAttacked":    {"NPC.MaxHP"},
-			"OnPartyDied":        {"Spawner.ScheduleRespawn"},
-			"OnSeeSpell":         {"NPC.MaxHP", "NPC.TopDesireTarget"},
-			"OnTimer":            {"NPC.DoDie", "NPC.RandomizeAttack", "NPC.RemoveAllAttackDesire"},
-			"OnUseSkillFinished": {"NPC.RemoveAllAttackDesire"},
+			"OnPartyAttacked": {"NPC.MaxHP"},
+			"OnPartyDied":     {"Spawner.ScheduleRespawn"},
+			"OnSeeSpell":      {"NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnTimer":         {"NPC.RandomizeAttack"},
 		},
 		"script.ai.siegablehall.Agit02Mikhail": {
-			"OnPartyAttacked":    {"NPC.MaxHP"},
-			"OnSeeSpell":         {"NPC.MaxHP", "NPC.TopDesireTarget"},
-			"OnTimer":            {"NPC.RandomizeAttack", "NPC.RemoveAllAttackDesire"},
-			"OnUseSkillFinished": {"NPC.RemoveAllAttackDesire"},
+			"OnPartyAttacked": {"NPC.MaxHP"},
+			"OnSeeSpell":      {"NPC.MaxHP", "NPC.TopDesireTarget"},
+			"OnTimer":         {"NPC.RandomizeAttack"},
 		},
 		"script.ai.siegablehall.Agit03Alfred": {
 			"OnAttacked": {"NPC.MaxHP"},
@@ -44,11 +41,11 @@ func siegableHallHandleOps() map[string]script.HandleOps {
 			"OnAttacked": {"NPC.MaxHP"},
 		},
 		"script.ai.siegablehall.Agit03Lidia": {
-			"OnAttacked":     {"NPC.MaxHP", "NPC.RemoveAllAttackDesire"},
+			"OnAttacked":     {"NPC.MaxHP"},
 			"OnClanAttacked": {"NPC.MaxHP"},
 		},
 		"script.ai.siegablehall.AzitWateringTreasureBox": {
-			"OnAttacked": {"NPC.DoDie", "NPC.HP"},
+			"OnAttacked": {"NPC.HP"},
 			"OnMyDying":  {"NPC.DropItem"},
 		},
 	}
