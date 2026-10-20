@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/door"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/spawn"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -92,6 +94,11 @@ type Env struct {
 	SiegableHall func(id int) bool
 	// Sieges are the castles' sieges; nil finds none.
 	Sieges Sieges
+	// Halls are the clan halls, with the siegable halls' sieges; nil finds
+	// none.
+	Halls *clanhall.Halls
+	// Clans are the clans a script looks up by id; nil finds none.
+	Clans Clans
 	// Zones are the zones of the world a script looks up; nil finds none.
 	Zones *zone.Index
 }
@@ -114,6 +121,11 @@ type Doors interface {
 	// SetClanCall installs c as the call a hit on any door, standing now
 	// or built by a later reload, makes to the NPCs around it.
 	SetClanCall(c door.ClanCall)
+}
+
+// Clans finds a clan by id.
+type Clans interface {
+	Get(id int32) (*clan.Clan, bool)
 }
 
 // Castles finds the castle an NPC belongs to.

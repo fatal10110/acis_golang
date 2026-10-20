@@ -117,6 +117,7 @@ func provideNpcs(spawns *manager.Spawns, data *gameData, state *world.State, ids
 	}
 	npcs.SetGroundTaker(link)
 	npcs.SetGuardedSieges(link.GuardedSiege)
+	npcs.SetResidenceOwners(link.NPCResidenceOwner)
 	npcs.SetSpawnTimes(network.SpawnTimes(link))
 	npcs.SetRegenSettings(link.PlayerRules())
 	decayHooks.SetRespawnHook(npcs.RespawnHook)

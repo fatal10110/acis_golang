@@ -38,17 +38,29 @@ func (l *GameClientLink) npcResidenceOwner(inst *npc.Instance) int32 {
 	return 0
 }
 
-// addNPCCrest puts into s, v's NpcInfo, the clan and alliance of the clan
-// owning the residence v serves, when npcs.properties ShowNpcCrest is set.
-// The alliance crest is the clan's as stored, whether or not it is still in
-// an alliance. Without the switch, or for an NPC whose residence has no
-// owner, s keeps no clan.
+// NPCResidenceOwner is the clan owning the residence inst serves, 0 for
+// none: the spawned hostile NPCs read it as the clan they stand for, unless
+// their spawn gave them one.
+func (l *GameClientLink) NPCResidenceOwner(inst *npc.Instance) int32 {
+	return l.npcResidenceOwner(inst)
+}
+
+// addNPCCrest puts into s, v's NpcInfo, the clan and alliance v stands for,
+// when npcs.properties ShowNpcCrest is set: the owner of the castle v
+// serves, else the clan v's spawn gave it, else the owner of the clan hall
+// v serves. The alliance crest is the clan's as stored, whether or not it
+// is still in an alliance. Without the switch, or for an NPC standing for
+// no clan, s keeps no clan.
 func (l *GameClientLink) addNPCCrest(v world.Tracked, s *npcinfo.Snapshot) {
 	if l == nil || !l.showNPCCrest {
 		return
 	}
 	inst := npcInstance(v)
 	if inst == nil {
+		return
+	}
+	if c, _ := l.npcResidence(inst); (c == nil || c.OwnerID() == 0) && inst.ClanID != 0 {
+		l.putClanCrest(s, inst.ClanID)
 		return
 	}
 	l.putClanCrest(s, l.npcResidenceOwner(inst))

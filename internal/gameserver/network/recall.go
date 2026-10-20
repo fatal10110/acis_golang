@@ -11,9 +11,6 @@ import (
 // hall recall at one of the hall live's clan owns; any other recall, or one
 // finding no such residence, goes to town (restartDestination). A residence
 // with no OWNER spawn moves no one. It runs on live's queue.
-//
-// ponytail: the FlagWar clan restart point of the town branch waits for the
-// FlagWar hall sieges (#3502).
 func (l *GameClientLink) recallLivePlayer(live *livePlayer, dest modelskill.RecallType) {
 	var (
 		at location.Location

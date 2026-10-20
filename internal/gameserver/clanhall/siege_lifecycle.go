@@ -56,16 +56,49 @@ func (fx siegeEffects) run() {
 	}
 }
 
-// siegeStep runs step: serialized with every other step, deciding under the
-// halls' mu, then running the world effects it decided with no lock held.
-func (hs *Halls) siegeStep(step func(fx *siegeEffects)) {
-	hs.stepMu.Lock()
-	defer hs.stepMu.Unlock()
+// decide runs step deciding under the halls' mu, then runs the world
+// effects it decided with no lock held.
+func (hs *Halls) decide(step func(fx *siegeEffects)) {
 	var fx siegeEffects
 	hs.mu.Lock()
 	step(&fx)
 	hs.mu.Unlock()
 	fx.run()
+}
+
+// runStep runs a step of s, serialized with every other step: the
+// script's override when it has one, else the base step.
+func (s *HallSiege) runStep(override func(SiegeScript) func(SiegeBase), base func(SiegeBase)) {
+	s.hs.stepMu.Lock()
+	defer s.hs.stepMu.Unlock()
+	b := SiegeBase{s: s}
+	if sc := s.script(); sc != nil {
+		if o := override(*sc); o != nil {
+			o(b)
+			return
+		}
+	}
+	base(b)
+}
+
+// prepareStep closes the registrations, the siege starting after delay.
+func (s *HallSiege) prepareStep(delay time.Duration) {
+	s.runStep(func(sc SiegeScript) func(SiegeBase) {
+		if sc.Prepare == nil {
+			return nil
+		}
+		return func(b SiegeBase) { sc.Prepare(b, delay) }
+	}, func(b SiegeBase) { b.Prepare(delay) })
+}
+
+// startStep starts the siege.
+func (s *HallSiege) startStep() {
+	s.runStep(func(sc SiegeScript) func(SiegeBase) { return sc.Start }, SiegeBase.Start)
+}
+
+// endStep ends the siege.
+func (s *HallSiege) endStep() {
+	s.runStep(func(sc SiegeScript) func(SiegeBase) { return sc.End }, SiegeBase.End)
 }
 
 // setSiege runs f, a change of the sieges' state, under siegeMu. The halls'
@@ -91,15 +124,21 @@ func (hs *Halls) armLocked(h *hall, d time.Duration, fire func()) {
 // date, the siege then starting at that date.
 func (hs *Halls) armPrepareLocked(h *hall) {
 	next := h.siege.next
+	s := &HallSiege{hs: hs, h: h}
 	hs.armLocked(h, hs.siegeDelay(next-registrationCloseMs), func() {
-		hs.siegeStep(func(fx *siegeEffects) { hs.prepareLocked(h, fx, hs.siegeDelay(h.siege.next)) })
+		s.prepareStep(time.Duration(s.Date()-hs.Now()) * time.Millisecond)
 	})
 	hs.log.Info().Int32("hall_id", h.id()).Time("date", time.UnixMilli(next)).Msg("clanhall: siege scheduled")
 }
 
 // armEndLocked arms the end of h's siege after d.
 func (hs *Halls) armEndLocked(h *hall, d time.Duration) {
-	hs.armLocked(h, d, func() { (&HallSiege{hs: hs, h: h}).End() })
+	hs.armLocked(h, d, (&HallSiege{hs: hs, h: h}).endStep)
+}
+
+// armStartLocked arms the start of h's siege after d.
+func (hs *Halls) armStartLocked(h *hall, d time.Duration) {
+	hs.armLocked(h, d, (&HallSiege{hs: hs, h: h}).startStep)
 }
 
 // Instant closes the registrations now and starts the siege at once,
@@ -108,22 +147,17 @@ func (s *HallSiege) Instant() bool {
 	if s.script() == nil {
 		return false
 	}
-	s.hs.siegeStep(func(fx *siegeEffects) { s.hs.prepareLocked(s.h, fx, 0) })
+	s.prepareStep(0)
 	return true
 }
 
 // End ends the siege now, as its time running out does, reporting false
-// when no script runs it. The script names the winner first.
+// when no script runs it.
 func (s *HallSiege) End() bool {
-	sc := s.script()
-	if sc == nil {
+	if s.script() == nil {
 		return false
 	}
-	var winner int32
-	if sc.Winner != nil {
-		winner = sc.Winner()
-	}
-	s.hs.siegeStep(func(fx *siegeEffects) { s.hs.endLocked(s.h, fx, winner) })
+	s.endStep()
 	return true
 }
 
@@ -161,7 +195,7 @@ func (hs *Halls) prepareLocked(h *hall, fx *siegeEffects, delay time.Duration) {
 	hs.freeLocked(h)
 	hs.banishLocked(h, fx, 0)
 	hs.setSiege(func() { st.status = siege.StatusRegistrationOver })
-	hs.armLocked(h, delay, func() { hs.siegeStep(func(fx *siegeEffects) { hs.startLocked(h, fx) }) })
+	hs.armStartLocked(h, delay)
 	hs.announceLocked(fx, siege.Message{ID: siege.MsgRegistrationTermEnded, CastleID: int(h.id())})
 }
 
@@ -223,6 +257,20 @@ func (hs *Halls) endLocked(h *hall, fx *siegeEffects, winnerID int32) {
 	hs.updateNextSiegeLocked(h)
 	hs.respawnDoorsLocked(h, fx)
 	hs.banishLocked(h, fx, h.ownerID)
+	hs.releaseAttackersLocked(h, fx)
+	hs.armPrepareLocked(h)
+	hs.setSiege(func() { st.status = siege.StatusRegistrationOpened })
+	if sc := st.script; sc.UnspawnNPCs != nil {
+		fx.add(sc.UnspawnNPCs)
+	}
+}
+
+// releaseAttackersLocked lets h's attackers go: each loses its
+// headquarters and its members in the world their siege state, the players
+// still on the battlefield are flagged and the attackers are dropped.
+func (hs *Halls) releaseAttackersLocked(h *hall, fx *siegeEffects) {
+	st := h.siege
+	s := &HallSiege{hs: hs, h: h}
 	n := hs.siegeNotify
 	for _, cl := range hs.resolveClans(st.attackers) {
 		fx.add(func() {
@@ -233,18 +281,13 @@ func (hs *Halls) endLocked(h *hall, fx *siegeEffects, winnerID int32) {
 		})
 	}
 	if n != nil {
-		owner := h.ownerID
+		id, owner := h.id(), h.ownerID
 		fx.add(func() { s.withBattlefield(func(f *zone.Siege) { n.FlagPvP(f, id, owner) }) })
 	}
 	hs.setSiege(func() {
 		st.attackers = nil
 		hs.saveAttackersLocked(h)
 	})
-	hs.armPrepareLocked(h)
-	hs.setSiege(func() { st.status = siege.StatusRegistrationOpened })
-	if sc := st.script; sc.UnspawnNPCs != nil {
-		fx.add(sc.UnspawnNPCs)
-	}
 }
 
 // updateNextSiegeLocked sets h's next siege date from now and stores the

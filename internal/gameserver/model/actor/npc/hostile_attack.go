@@ -398,12 +398,18 @@ func (h *Hostile) BroadcastStatus() {
 }
 
 // AttackableBy reports whether attacker may physically attack this NPC. A
-// siege guard may be attacked only by a player, or a player's summon, whose
+// Monster-family NPC refuses a player, or a player's summon, of the clan it
+// stands for (Instance.NPCClanID). A siege guard may be attacked only by a player, or a player's summon, whose
 // clan attacks the siege in progress of the castle, or the siegable hall,
 // the guard belongs to.
 func (h *Hostile) AttackableBy(attacker skilltarget.Actor) bool {
 	if attacker == nil || attacker.ObjectID() == h.ObjectID() || h.AlikeDead() {
 		return false
+	}
+	if h.MonsterKind() {
+		if clanID, ok := actingClanID(attacker); ok && clanID > 0 && clanID == h.Instance.NPCClanID() {
+			return false
+		}
 	}
 	if !h.SiegeGuard() {
 		return true

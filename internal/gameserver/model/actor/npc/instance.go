@@ -46,6 +46,14 @@ type Instance struct {
 	// its maker and template. Set before the NPC is placed, read-only
 	// after.
 	CastleID int
+	// ClanID is the clan the NPC was given as it spawned, a flag war's
+	// warrior; 0 for none, leaving it to the owner of the residence it
+	// serves. Set before the NPC is placed, read-only after.
+	ClanID int32
+	// ResidenceOwner returns the clan owning the residence the NPC serves,
+	// read at each use, 0 for none; nil serves none. Set before the NPC is
+	// placed, read-only after.
+	ResidenceOwner func(*Instance) int32
 
 	// name and title, once set, replace the template's; see Name and Title.
 	name, title atomic.Pointer[string]
@@ -140,4 +148,16 @@ func (inst *Instance) MaxDriftRange() int {
 		return inst.DriftRange
 	}
 	return defaultDriftRange
+}
+
+// NPCClanID is the clan the NPC stands for: the one its spawn gave it,
+// else the owner of the residence it serves; 0 for none.
+func (i *Instance) NPCClanID() int32 {
+	if i.ClanID != 0 {
+		return i.ClanID
+	}
+	if i.ResidenceOwner != nil {
+		return i.ResidenceOwner(i)
+	}
+	return 0
 }

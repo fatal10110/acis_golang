@@ -8,6 +8,8 @@ import (
 
 	"github.com/fatal10110/acis_golang/internal/commons/rnd"
 	"github.com/fatal10110/acis_golang/internal/gameserver/castle"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
+	"github.com/fatal10110/acis_golang/internal/gameserver/clanhall"
 	"github.com/fatal10110/acis_golang/internal/gameserver/data/cache"
 	gamemanager "github.com/fatal10110/acis_golang/internal/gameserver/data/manager"
 	gamesql "github.com/fatal10110/acis_golang/internal/gameserver/data/sql"
@@ -233,9 +235,10 @@ func bootQuests(db *sql.DB, worker *persist.Worker, ids *sequentialIDs, engine *
 }
 
 // bindResidences gives the scripts the doors they open and close, the
-// castles NPCs belong to with their sieges, and the clan halls telling
-// which residence ids name siegable halls; a nil one stays unset.
-func (q *questBoot) bindResidences(doors *gamemanager.WorldObjects, castles *castle.Manager, halls *hallmodel.Table, sieges *siege.Engine) {
+// castles NPCs belong to with their sieges, the clan halls telling which
+// residence ids name siegable halls, the halls with their sieges, and the
+// clans; a nil one stays unset.
+func (q *questBoot) bindResidences(doors *gamemanager.WorldObjects, castles *castle.Manager, halls *hallmodel.Table, sieges *siege.Engine, live *clanhall.Halls, clans *clan.Table) {
 	if doors != nil {
 		q.env.Doors = doors
 		q.registry.WatchDoors(doors)
@@ -248,6 +251,12 @@ func (q *questBoot) bindResidences(doors *gamemanager.WorldObjects, castles *cas
 	}
 	if sieges != nil {
 		q.env.Sieges = sieges
+	}
+	if live != nil {
+		q.env.Halls = live
+	}
+	if clans != nil {
+		q.env.Clans = clans
 	}
 }
 

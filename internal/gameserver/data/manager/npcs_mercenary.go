@@ -16,7 +16,7 @@ func (n *Npcs) SpawnMercenary(npcID int, at location.Location, castleID int) (in
 	if !ok {
 		return 0, fmt.Errorf("%w: %d", npc.ErrNoTemplate, npcID)
 	}
-	live, err := n.spawnStandalone(tmpl, at.X, at.Y, at.Z, 0, 0, nil, castleID)
+	live, err := n.spawnStandalone(tmpl, at.X, at.Y, at.Z, 0, 0, nil, castleID, 0)
 	if err != nil {
 		return 0, err
 	}

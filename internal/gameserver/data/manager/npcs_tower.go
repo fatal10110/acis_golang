@@ -13,7 +13,7 @@ import (
 // false.
 func (n *Npcs) SpawnTower(castleID int, t castledata.ControlTower) (*npc.Folk, bool) {
 	tmpl := npc.TowerTemplate(t.Type == castledata.TowerLifeControl, t.HP, t.PDef, t.MDef)
-	live, err := n.spawnStandalone(tmpl, t.Position.X, t.Position.Y, t.Position.Z, 0, 0, nil, castleID)
+	live, err := n.spawnStandalone(tmpl, t.Position.X, t.Position.Y, t.Position.Z, 0, 0, nil, castleID, 0)
 	if err != nil {
 		n.log.Warn().Err(err).Str("tower", t.Alias).Int("castle", castleID).Msg("castle control tower: cannot place npc")
 		return nil, false

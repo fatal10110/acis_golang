@@ -61,7 +61,22 @@ func (n *Npcs) placeStandalone(tmpl *npc.Template, x, y, z, heading int, summone
 	if heading < 0 {
 		heading = rnd.Get(65536)
 	}
-	return n.spawnStandalone(tmpl, x, y, z, heading, 0, summoner, 0)
+	return n.spawnStandalone(tmpl, x, y, z, heading, 0, summoner, 0, 0)
+}
+
+// SpawnForClan places one NPC of template npcID at (x, y, z) facing
+// heading, on the ground below it, as a standalone spawn that never
+// respawns, belonging to the clan clanID: it stands for that clan before
+// any residence it serves. A negative heading faces a random way.
+func (n *Npcs) SpawnForClan(npcID int32, x, y, z, heading int, clanID int32) (attackable.Combatant, error) {
+	tmpl, ok := n.templates.Get(int(npcID))
+	if !ok {
+		return nil, fmt.Errorf("%w: %d", npc.ErrNoTemplate, npcID)
+	}
+	if heading < 0 {
+		heading = rnd.Get(65536)
+	}
+	return n.spawnStandalone(tmpl, x, y, z, heading, 0, nil, 0, clanID)
 }
 
 // CreatePrivate places one NPC of template npcID as a private of master

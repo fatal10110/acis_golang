@@ -130,11 +130,10 @@ func (l *GameClientLink) restartRestoreExp(live *livePlayer, requestType int32) 
 // live, jailed or not, past the residence branches: during a siege in progress
 // at live's position, while Dawn holds the Seal of Strife in seal validation, a
 // random spawn of the besieged castle, a CHAOTIC one for a player with karma
-// and an OTHER one otherwise; else live's nearest town restart point. A castle
-// listing no such spawn falls back to the nearest town.
-//
-// ponytail: the FlagWar clan restart point of a clan hall siege waits for
-// the FlagWar hall sieges to store each clan's choice (#3502).
+// and an OTHER one otherwise; else the restart point the hall siege whose
+// battlefield is on at live's position keeps for live's clan; else live's
+// nearest town restart point. A castle listing no such spawn falls through
+// to the hall siege's point.
 func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location, bool) {
 	if s, ok := l.siegeAt(live); ok && l.dawnHoldsStrife() {
 		kind := residence.SpawnOther
@@ -146,6 +145,10 @@ func (l *GameClientLink) restartDestination(live *livePlayer) (location.Location
 				return at, true
 			}
 		}
+	}
+	pos := live.CurrentLocation()
+	if at, ok := l.halls.ClanRestartPointAt(pos.X, pos.Y, pos.Z, live.ClanID()); ok {
+		return at, true
 	}
 	if l.restarts == nil {
 		return location.Location{}, false
