@@ -23,6 +23,28 @@ func dd2Spell(n *script.NPC, c script.Creature) {
 	}
 }
 
+// dd2Attacked is the DD2 wizards' answer to a playable's hit, after their
+// parent's. Once it gave up its spells, n hates the attacker by the damage;
+// otherwise, when its hate list holds a creature or on a draw under 2, it
+// strikes the attacker with its long range DD magic from farther than 100
+// on a draw under 80, else with its short range one.
+func dd2Attacked(s *script.Script, e script.Attacked) {
+	n, attacker := e.NPC, e.Attacker
+	if n.Int(script.SlotIntAI0) != 0 {
+		f0 := damageHate(n, float64(e.Damage), defaultnpc.HateRatio(n, attacker))
+		n.AddAttackDesire(attacker, f0*100)
+		return
+	}
+	hated := n.HateList().MostHated() != nil
+	if n.Distance2D(attacker) > 100 && s.Rnd(100) < 80 {
+		if hated || s.Rnd(100) < 2 {
+			castOrAttack(n, attacker, npc.SkillTypeWLongRangeDDMagic, true)
+		}
+	} else if hated || s.Rnd(100) < 2 {
+		castOrAttack(n, attacker, npc.SkillTypeWShortRangeDDMagic, true)
+	}
+}
+
 // partyLeaderDD2Hooks are PartyLeaderWizardDD2's hooks, which its children
 // derive theirs from.
 func partyLeaderDD2Hooks() script.Hooks {
@@ -30,22 +52,8 @@ func partyLeaderDD2Hooks() script.Hooks {
 	return base.With(script.Hooks{
 		OnAttacked: func(s *script.Script, e script.Attacked) {
 			base.Attacked(s, e)
-			n, attacker := e.NPC, e.Attacker
-			if !attacker.Playable() {
-				return
-			}
-			if n.Int(script.SlotIntAI0) != 0 {
-				f0 := damageHate(n, float64(e.Damage), defaultnpc.HateRatio(n, attacker))
-				n.AddAttackDesire(attacker, f0*100)
-				return
-			}
-			hated := n.HateList().MostHated() != nil
-			if n.Distance2D(attacker) > 100 && s.Rnd(100) < 80 {
-				if hated || s.Rnd(100) < 2 {
-					castOrAttack(n, attacker, npc.SkillTypeWLongRangeDDMagic, true)
-				}
-			} else if hated || s.Rnd(100) < 2 {
-				castOrAttack(n, attacker, npc.SkillTypeWShortRangeDDMagic, true)
+			if e.Attacker.Playable() {
+				dd2Attacked(s, e)
 			}
 		},
 		OnClanAttacked: func(s *script.Script, e script.ClanAttacked) {
