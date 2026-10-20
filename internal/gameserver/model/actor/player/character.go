@@ -270,6 +270,9 @@ type Character struct {
 	// intention reads the creature c's current intention acts on; see
 	// SetIntentionSource.
 	intention atomic.Pointer[IntentionSource]
+	// festival tells whether the character is signed up for a festival;
+	// nil until the network layer attaches it.
+	festival atomic.Pointer[FestivalRoster]
 
 	// sink receives this character's events. Attach sets it once, before
 	// the character is published into the world, and it never changes

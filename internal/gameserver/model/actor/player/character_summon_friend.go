@@ -27,10 +27,6 @@ type SummonFriendRequester interface {
 	NoSummonFriendZone() bool
 }
 
-// FestivalParticipant always reports false: the Festival of Darkness (#223)
-// isn't ported yet.
-func (c *Character) FestivalParticipant() bool { return false }
-
 // TeleportTo moves the character to (x, y, z), scattered within radius. It
 // may be called from any queue: the teleport runs on the character's own
 // queue once the calling task is done.

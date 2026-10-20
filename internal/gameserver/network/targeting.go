@@ -810,8 +810,15 @@ type positionedTarget interface {
 	Heading() int
 }
 
+// selectLiveTarget makes target live's selection, showing it to live and
+// its observers. A festival monster stays out of reach of a player who is
+// no festival participant: the selection is cleared instead.
 func (l *GameClientLink) selectLiveTarget(live *livePlayer, target world.Tracked) bool {
 	if live == nil || target == nil {
+		return false
+	}
+	if h, ok := target.(*npc.Hostile); ok && h.FestivalMonster() && !live.FestivalParticipant() {
+		l.announceTargetCleared(live, live.TakeTarget())
 		return false
 	}
 	if cur := live.Target(); cur != nil && cur.ObjectID() == target.ObjectID() {
