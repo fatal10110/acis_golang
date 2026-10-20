@@ -1,0 +1,20 @@
+# GludioCleric's and GludioClericStand's clan-attacked hooks on a draw of 20 or more: both
+# Aden clerics (35237, 35250) stay idle, however hurt their clan mate, the knight (35235):
+# the second hit's calls read 40 of its 440 hit points.
+character Hunter 20
+random always 20
+script script.ai.individual.DefaultNpc
+script script.ai.siegeguards.GludioCleric
+script script.ai.siegeguards.GludioClericStand
+script script.ai.siegeguards.GludioHold.GludioHold
+script script.ai.siegeguards.GludioHold.GludioKnight
+npc knight 35235 SiegeGuard 100 0 0 walks clan aden_siege_clan 300
+npc cleric 35237 SiegeGuard 100 150 0 walks clan aden_siege_clan 300 skill MAGIC_HEAL 4115 1
+npc stand 35250 SiegeGuard 100 -150 0 walks clan aden_siege_clan 300 skill MAGIC_HEAL 4115 1
+
+hit knight 400
+hit knight 10
+  desires cleric -
+  desires stand -
+
+tick x2

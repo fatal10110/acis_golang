@@ -53,9 +53,13 @@
 //	page <path below data/html>               a shipped page the server serves; a path ending in / serves its directory
 //	npc <role> <npc id> <type> <dx> <dy> <dz> a fixture NPC template of that instance type, spawned at that offset from the character;
 //	    [walks] [maker <territory>]           the templates a script may spawn more NPCs of; walks, the template can move: a
-//	                                          civilian walks, a monster spawns moving and attacking (its spawn point its
-//	                                          home); with maker, the NPC is an npcmaker's whose territory is that territory
-//	                                          line's (see below)
+//	    [clan <name>[,<name>...] <range>]     civilian walks, a monster spawns moving and attacking (its spawn point its
+//	    [skill <type> <skill id> <level>]...  home); with maker, the NPC is an npcmaker's whose territory is that territory
+//	                                          line's (see below); clan, the template belongs to those clans, its clan
+//	                                          calls reaching that far (door_clan: a hit door's call reaches it); skill, the
+//	                                          template lists that shipped skill under that type (data/xml/npcs's
+//	                                          <skills> type, PASSIVE excepted), which its behaviors cast
+//	skill <skill id> <level>                  optional: the character knows that shipped skill, which a cast step casts
 //	roll <role> <draw>                        optional: every combat draw of the NPC is that draw (n-1 for a draw of
 //	                                          [0, n) it is not inside): its skill landing rolls, as its hit and
 //	                                          critical rolls; with 0 every skill it casts lands (a landing rate is at
@@ -75,6 +79,13 @@
 //	                                          weapon of the shipped data (data/xml/cursedWeapons.xml), count 1, whose life
 //	                                          starts as a monster kill's drop starts it, then it is laid; the server runs
 //	                                          the shipped cursed weapons when a ground line says cursed
+//	door <role> <door id> <dx> <dy> <dz>      optional: a fixture door of that id (a 16 by 16 gate of 600 HP, under no
+//	                                          siege: a hit takes none of its HP, but calls its door clan) standing at
+//	                                          that offset from where the character first enters the world
+//	summon <role> <npc id>                    optional: as it first enters the world, the character calls a siege summon
+//	                                          of a fixture template of that id, which stays on the active siege
+//	                                          battlefield the server then runs around where it enters the world; a
+//	                                          scenario with a summon line takes no relog or restart
 //
 // Each NPC line's NPC runs the created hooks of the scripts bound to it as
 // it appears, as the spawn pass runs them, and a civilian casts the shipped
@@ -93,11 +104,23 @@
 //	action <role>          an Action packet on the NPC: the first selects it, the next talks
 //	bypass <command>       a RequestBypassToServer; {role} stands for the NPC's object id
 //	link <file>            a RequestLinkHtml
-//	hit <role> <damage>    the character lands a hit of that damage on the NPC
+//	hit <role> <damage> [by <role>]
+//	                       the character, or the creature by names (an npc line's NPC or the summon), lands a
+//	                       hit of that damage on the NPC or the door, on the attacker's queue
 //	kill <role> [xN]       the character lands a lethal hit on the NPC, N times; a dead NPC is replaced by a fresh one first
 //	advance <duration>     time passes, as time.ParseDuration reads it
-//	approach <role>        the character steps to 100 in front of the NPC, inside its see range, and one
-//	                       AI tick runs, whose see-creature scan notices it
+//	approach <role> [<distance>]
+//	                       the character steps to that distance (default 100, inside its see range) in front
+//	                       of the NPC, and one AI tick runs, whose see-creature scan notices it
+//	away                   the character steps 1500 behind where it first entered the world, out of the sight
+//	                       of every NPC standing at an x offset of -1000 or more, and one AI tick runs, whose
+//	                       see-creature scans forget it: its next approach is seen again
+//	cast <role> <skill id> the character selects the NPC (unless it has it selected; the selection's packets
+//	                       are not compared) and casts that skill of a skill line on it, forced; time passes
+//	                       until it neither walks into cast range nor casts
+//	jump <role> <dx> <dy> <dz>
+//	                       the NPC jumps to that offset from where the character first entered the world,
+//	                       its spawn point kept
 //	tick [xN]              one AI tick runs (N ticks with xN), each let settle: what the NPCs' AI does
 //	                       on its own, as casting what a script asked of them
 //	pickup <item id>       an Action packet on the one ground item of that template, then time passes
@@ -125,12 +148,22 @@
 //	  items <id>=<n> ...   the character's count of each item after the step
 //	  rows <quest> <var>=<value> ... | -    the quest's character_quests rows after the step, all of them
 //	  state <quest> <status> | -            the quest's state in memory after the step
+//	  hate <role> <weight> [<creature>]     the NPC's hate of the character, or of that creature (an npc line's
+//	                                        NPC or the summon), after the step
+//	  desires <role> <desire> ... | -       the NPC's queued desires after the step, all of them, in any order,
+//	                                        each <kind>(<args>)=<weight>: attack(<creature>), follow(<creature>),
+//	                                        flee(<creature>,<distance>), cast(<creature>,<skill id>[,move]) (move: it
+//	                                        walks to its target), move_to(<dx>,<dy>,<dz>) (an offset from where the
+//	                                        character first entered the world), nothing(<timer>), any other kind ()
+//	  at <role> <dx> <dy> <dz>              where the NPC, or the character (player), stands after the step, as an
+//	                                        offset from where the character first entered the world
 //
 // A step other than create and enter acts in the world: a scenario starting
 // with create, or a restart, is followed by an enter before any of them. The
 // NPC lines' NPCs are spawned when the character first enters the world.
-// The items and state checks read the character in the world, so a create
-// or restart step takes rows checks only.
+// The items, state, hate, desires and at checks read the world, so a create
+// or restart step takes rows checks only. A weight renders in the fewest
+// digits that read back as it.
 //
 // The S, Q and M lists are exact: a step without S lines must send none of
 // the rendered packets (relog excepted: its enter burst is not compared),
@@ -167,7 +200,14 @@
 // run's same steps draw: the same bounds, in order. A trace under the
 // oracle's scenarios directory is the reference probe's play of this
 // scenario itself (the oracle README). The trace format has no member,
-// ground or look, so a traced scenario takes no member or ground line.
+// ground or look, so a traced scenario takes no member or ground line; nor
+// does the reference probe play a skill, door or summon line, an npc
+// line's clan or skill, a hit by another creature, an approach to a
+// distance, a cast, a jump or an away, so a traced scenario takes none.
+//
+// Every NPC and the character hold an attack stance while they fight (the
+// behaviors read it), which nothing ends during a run. A fixture monster
+// has 440 HP once its stats apply: a hit of 22 is a twentieth of them.
 package scenario
 
 import (
@@ -179,7 +219,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	modelskill "github.com/fatal10110/acis_golang/internal/gameserver/model/skill"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
 )
 
@@ -235,7 +277,12 @@ type Scenario struct {
 	Territories []Territory
 	Members     []Member
 	Grounds     []Ground
-	Steps       []Step
+	// Skills are the skill lines: the shipped skills the character knows.
+	// Doors are the door lines, Summon the summon line (nil for none).
+	Skills []modelskill.Ref
+	Doors  []Door
+	Summon *Summon
+	Steps  []Step
 }
 
 // Siege is the siege line: the clan's side of a castle's siege.
@@ -283,6 +330,13 @@ type NPC struct {
 	Walks bool
 	// Maker is the territory line of the NPC's npcmaker, empty for none.
 	Maker string
+	// Clans are the template's clans, nil for none, and ClanRange how far
+	// its clan calls reach.
+	Clans     []string
+	ClanRange int
+	// Skills are the template's skills by type, shipped skills it casts;
+	// nil for none.
+	Skills map[npc.SkillType]modelskill.Ref
 }
 
 // Step is one client action and what it must leave.
@@ -323,10 +377,13 @@ var argCount = map[string][2]int{
 	"action":   {1, 1},
 	"bypass":   {1, -1},
 	"link":     {1, 1},
-	"hit":      {2, 2},
+	"hit":      {2, 4},
 	"kill":     {1, 2},
 	"advance":  {1, 1},
-	"approach": {1, 1},
+	"approach": {1, 2},
+	"cast":     {2, 2},
+	"jump":     {4, 4},
+	"away":     {0, 0},
 	"pickup":   {1, 1},
 	"look":     {3, -1},
 	"walk":     {1, 1},
@@ -372,7 +429,7 @@ func Parse(name string, data []byte) (*Scenario, error) {
 			if len(args) < c[0] || (c[1] >= 0 && len(args) > c[1]) {
 				return nil, fail("%s takes %d to %d arguments, got %d", verb, c[0], c[1], len(args))
 			}
-			if err := checkStep(verb, args, roles); err != nil {
+			if err := sc.checkStep(verb, args, roles); err != nil {
 				return nil, fail("%v", err)
 			}
 			if verb == "bypass" {
@@ -403,6 +460,12 @@ func Parse(name string, data []byte) (*Scenario, error) {
 	}
 	if sc.Trace != "" && (len(sc.Members) > 0 || len(sc.Grounds) > 0) {
 		return nil, fmt.Errorf("%s: a traced scenario takes no member or ground line", name)
+	}
+	if what := sc.tracedFight(); sc.Trace != "" && what != "" {
+		return nil, fmt.Errorf("%s: a traced scenario takes no %s", name, what)
+	}
+	if err := sc.checkFightChecks(roles); err != nil {
+		return nil, fmt.Errorf("%s:%w", name, err)
 	}
 	if err := sc.checkFlow(); err != nil {
 		return nil, fmt.Errorf("%s:%w", name, err)
@@ -442,6 +505,8 @@ func (sc *Scenario) checkFlow() error {
 				return fail("a created character takes no hold, equip, standing, pk or cabal line")
 			case len(sc.Members) > 0:
 				return fail("a created character takes no member line")
+			case len(sc.Skills) > 0 || len(sc.Doors) > 0 || sc.Summon != nil:
+				return fail("a created character takes no skill, door or summon line")
 			}
 			inWorld = false
 		case "enter":
@@ -456,6 +521,10 @@ func (sc *Scenario) checkFlow() error {
 			if (st.Verb == "restart" || st.Verb == "relog") && len(sc.Members) > 0 {
 				// The character leaving the world breaks its party up.
 				return fail("a scenario with member lines takes no %s", st.Verb)
+			}
+			if (st.Verb == "restart" || st.Verb == "relog") && sc.Summon != nil {
+				// The character leaving the world takes its summon with it.
+				return fail("a scenario with a summon line takes no %s", st.Verb)
 			}
 			if st.Verb == "restart" {
 				inWorld = false
@@ -638,6 +707,8 @@ func (sc *Scenario) header(key string, args []string, roles map[string]bool) err
 		sc.NPCs = append(sc.NPCs, opts)
 	case "territory", "member", "ground", "roll":
 		return sc.world(key, args, roles)
+	case "skill", "door", "summon":
+		return sc.fight(key, args, roles)
 	default:
 		return fmt.Errorf("unknown header line %q", key)
 	}
@@ -727,9 +798,12 @@ func (sc *Scenario) holdings(key string, args []string) error {
 }
 
 // checkStep validates a step's arguments against the declared roles.
-func checkStep(verb string, args []string, roles map[string]bool) error {
+func (sc *Scenario) checkStep(verb string, args []string, roles map[string]bool) error {
+	if err := sc.checkFightStep(verb, args, roles); err != nil {
+		return err
+	}
 	switch verb {
-	case "action", "hit", "kill", "approach", "look", "walk":
+	case "action", "kill", "approach", "look", "walk":
 		if !roles[args[0]] {
 			return fmt.Errorf("unknown role %q", args[0])
 		}
@@ -789,7 +863,7 @@ func (s *Step) expect(n int, line string) error {
 			return err
 		}
 		s.Memos = append(s.Memos, rest)
-	case "items", "rows", "state":
+	case "items", "rows", "state", "hate", "desires", "at":
 		args := strings.Fields(rest)
 		if err := checkCheck(kind, args); err != nil {
 			return err
@@ -819,6 +893,8 @@ func checkMemo(line string) error {
 
 func checkCheck(kind string, args []string) error {
 	switch kind {
+	case "hate", "desires", "at":
+		return checkFightCheck(kind, args)
 	case "items":
 		if len(args) == 0 {
 			return fmt.Errorf("items takes one or more <id>=<count>")

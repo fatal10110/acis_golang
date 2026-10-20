@@ -21,6 +21,7 @@ import (
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/attackable"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/npc"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
+	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/summon"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/entity"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
@@ -102,6 +103,8 @@ type run struct {
 	grounds map[int32]bool
 	// members are the member lines' characters and their clients.
 	members []member
+	// summon is the summon line's summon once called.
+	summon *summon.Actor
 	// items is the item catalog the server runs with.
 	items *item.Table
 	// draws is the random line's source; traceDraws the draws the
@@ -244,6 +247,9 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		}
 		r.npcs[n.Role] = n
 	}
+	if s := r.sc.Summon; s != nil {
+		templates = append(templates, summonTemplate(s))
+	}
 	opts := []gameservertest.Option{
 		gameservertest.WithWantChars(1),
 		gameservertest.WithReuseDelays(0, 0),
@@ -252,12 +258,16 @@ func (r *run) boot(t *testing.T, cfg Config) {
 		gameservertest.WithItemTemplates(r.items),
 		// The AI task ticks only on an approach or a tick step.
 		gameservertest.WithAITask(),
+		// A creature that attacks or is attacked holds an attack stance, which
+		// the behaviors read (in combat); nothing ends it during a run.
+		gameservertest.WithAttackStanceClock(time.Now),
 		gameservertest.WithLevels(scenarioLevels(t)),
 		// The NPC population, with no maker, over the scenario's templates:
 		// the scripts' spawner places NPCs through it.
 		gameservertest.WithNPCs(npc.NewTable(templates)),
 		gameservertest.WithNpcSpawns(nil),
 	}
+	opts = append(opts, r.fightOptions(t)...)
 	switch {
 	case r.sc.Creates():
 		// The create step makes the character at the character select, with
@@ -307,6 +317,7 @@ func (r *run) boot(t *testing.T, cfg Config) {
 	seedExp(t, r.srv.DB, r.player, r.sc.Level)
 	r.seedSubclass(t)
 	r.seedHoldings(t)
+	r.seedSkills(t)
 	for _, m := range r.sc.Members {
 		c := r.srv.SeedCharacterFor(t, memberAccount(m), m.Name, m.Level, 0)
 		seedExp(t, r.srv.DB, c.ID, m.Level)
@@ -346,6 +357,7 @@ func (r *run) spawnNPCs(t *testing.T) {
 	for _, g := range r.sc.Grounds {
 		r.lay(t, g)
 	}
+	r.placeFight(t)
 	r.srv.ReadQueued(t, r.srv.Client)
 	r.drainMembers(t)
 }
@@ -513,6 +525,9 @@ func (r *run) spawn(t *testing.T, n NPC) {
 		} else {
 			h = r.srv.SpawnHostileNPCOfMakerAt(t, tmpl, at, maker)
 		}
+		if n.Skills != nil {
+			r.srv.InstallNPCCastSeam(t, h, shippedSkills(t))
+		}
 		r.srv.AI.Add(h)
 		r.live[n.Role], live = h, h
 	}
@@ -524,19 +539,25 @@ func (r *run) spawn(t *testing.T, n NPC) {
 }
 
 // template is the fixture template of n: a civilian one, undying like the
-// shipped service NPCs, or a level 1 monster of 1000 HP; it can move when
-// n walks.
+// shipped service NPCs, or a level 1 monster of 1000 HP and 1000 MP (what
+// its typed skills cost); it can move when n walks, and has n's clans and
+// typed skills.
 func template(n NPC) *npc.Template {
 	tmpl := gameservertest.FolkTemplate(n.Type, int(n.ID))
 	if npc.FolkKind(&npc.Instance{Template: tmpl}) {
 		tmpl.CanMove = n.Walks
-		return tmpl
+	} else {
+		tmpl = &npc.Template{
+			ID: int(n.ID), TemplateID: int(n.ID), Type: n.Type, Level: 1, HPMax: 1000, MPMax: 1000,
+			AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 8, CollisionHeight: 20,
+			CanMove: n.Walks,
+		}
 	}
-	return &npc.Template{
-		ID: int(n.ID), TemplateID: int(n.ID), Type: n.Type, Level: 1, HPMax: 1000,
-		AtkSpd: 300, RunSpeed: 120, WalkSpeed: 60, CollisionRadius: 8, CollisionHeight: 20,
-		CanMove: n.Walks,
+	tmpl.Clans, tmpl.ClanRange = n.Clans, n.ClanRange
+	if n.Skills != nil {
+		tmpl = npc.NewTemplate(*tmpl, npc.TemplateSkills{ByType: n.Skills})
 	}
+	return tmpl
 }
 
 func (r *run) step(t *testing.T, i int, st Step) {
@@ -567,12 +588,13 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		w.WriteString(st.Args[0])
 		c.Send(w.Bytes())
 	case "hit":
-		h := r.live[st.Args[0]]
-		if h == nil || h.AlikeDead() {
-			fail("NPC %s is not a live attackable", st.Args[0])
-		}
-		damage, _ := strconv.ParseInt(st.Args[1], 10, 32)
-		r.onPlayer(t, func(p attackable.Combatant) { h.TakeDamage(int(damage), p) })
+		r.hit(t, st.Args)
+	case "cast":
+		frames = r.cast(t, st.Args[0], st.Args[1])
+	case "jump":
+		r.jump(t, st.Args)
+	case "away":
+		r.away(t)
 	case "kill":
 		n := 1
 		if len(st.Args) == 2 {
@@ -594,7 +616,11 @@ func (r *run) step(t *testing.T, i int, st Step) {
 		d, _ := time.ParseDuration(st.Args[0])
 		r.srv.Advance(t, d)
 	case "approach":
-		r.approach(t, st.Args[0])
+		distance := 100
+		if len(st.Args) == 2 {
+			distance, _ = strconv.Atoi(st.Args[1])
+		}
+		r.approach(t, st.Args[0], distance)
 	case "tick":
 		n := 1
 		if len(st.Args) == 1 {
@@ -706,9 +732,9 @@ func (r *run) pickup(t *testing.T, id string) {
 	r.srv.AdvanceUntil(t, "item "+id+" picked up", func() bool { return len(onGround(items[0])) == 0 })
 }
 
-// approach puts the character 100 in front of role's NPC, on the -x side,
-// within every NPC's see range, then runs one AI tick and lets it settle.
-func (r *run) approach(t *testing.T, role string) {
+// approach puts the character distance in front of role's NPC, on the -x
+// side, then runs one AI tick and lets it settle.
+func (r *run) approach(t *testing.T, role string, distance int) {
 	t.Helper()
 	obj, ok := r.srv.State.Player(r.player)
 	if !ok {
@@ -723,7 +749,7 @@ func (r *run) approach(t *testing.T, role string) {
 		t.Fatalf("NPC %s (%T) is not a combatant", role, target)
 	}
 	x, y, z := n.Position()
-	if err := r.srv.State.Move(obj, x-100, y, z); err != nil {
+	if err := r.srv.State.Move(obj, x-distance, y, z); err != nil {
 		t.Fatalf("approach %s: %v", role, err)
 	}
 	if err := r.srv.AI.Tick(); err != nil {
@@ -784,6 +810,8 @@ func (r *run) check(t *testing.T, ck Check) string {
 			}
 		})
 		return FirstDiff(quest+" state", []string{got}, []string{want})
+	case "hate", "desires", "at":
+		return r.fightCheck(t, ck)
 	}
 	return ""
 }
