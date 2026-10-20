@@ -1,0 +1,25 @@
+# RoyalRushRoomBoss1 (18121) beside a Warrior of its clan, every draw 0. It appears wanting its
+# first self debuff (4694) on itself, weight 1000000, and counts the deaths in its clan: the third
+# (met with a count of 2) wants that debuff again, the fifth (a count of 4) its second (4695).
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBossBasic
+script script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss1
+npc boss 18121 Monster 40 0 0 clan royal_rush_room 600 skill SELF_DEBUFF1 4694 1 skill SELF_DEBUFF2 4695 1
+npc guard 20001 Monster 80 0 0 clan royal_rush_room 600
+
+kill guard x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  desires boss cast(boss,4694,move)=1000000
+kill guard
+  S SystemMessage id=95 1:0 1:0
+  desires boss cast(boss,4694,move)=2000000
+kill guard x2
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=95 1:0 1:0
+  desires boss cast(boss,4694,move)=2000000 cast(boss,4695,move)=1000000
