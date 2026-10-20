@@ -134,7 +134,7 @@ func (l *GameClientLink) requestAnswerJoinParty(live *livePlayer, req clientpack
 // leads. Anyone else, or a name no member has, expels nobody and hears
 // nothing.
 func (l *GameClientLink) requestOustPartyMember(live *livePlayer, req clientpackets.TargetName) {
-	l.applyPartyNotices(l.parties.Expel(live.ObjectID(), req.Name))
+	l.applyOwnPartyNotices(live, l.parties.Expel(live.ObjectID(), req.Name))
 }
 
 // requestChangePartyLeader hands the party live leads to the named member.
@@ -171,6 +171,14 @@ func (l *GameClientLink) sendPartyVitals(live *livePlayer) {
 	l.broadcastToMembers(without(view.Members, live), func() wire.Frame {
 		return serverpackets.FramePartySmallWindowUpdate(row)
 	})
+}
+
+// applyOwnPartyNotices is applyPartyNotices for a party change made by a
+// task of live's own queue: a festival that takes live out of its arena
+// then does it inside the call, before the notices that follow, while every
+// other member's removal is still posted to its own queue.
+func (l *GameClientLink) applyOwnPartyNotices(live *livePlayer, notices []party.Notice) {
+	live.RunOnOwnQueue(func() { l.applyPartyNotices(notices) })
 }
 
 // applyPartyNotices sends the packets of a party change, in order.

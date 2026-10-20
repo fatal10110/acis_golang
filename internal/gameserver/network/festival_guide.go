@@ -24,7 +24,10 @@ func (l *GameClientLink) festivalGuideBypass(live *livePlayer, f *npc.Folk, comm
 	if desc {
 		reply = l.festival.Description(guide, val)
 	} else {
-		reply = l.festival.Command(guide, l.festivalTalker(live), f.ObjectID(), val, command)
+		// "Festival 9" takes live out of its arena inside the call.
+		live.RunOnOwnQueue(func() {
+			reply = l.festival.Command(guide, l.festivalTalker(live), f.ObjectID(), val, command)
+		})
 	}
 	if reply.Aborted {
 		return false
@@ -52,7 +55,7 @@ func (l *GameClientLink) festivalGuideBypass(live *livePlayer, f *npc.Folk, comm
 		live.SendFrame(serverpackets.FrameActionFailed())
 	}
 	if reply.Expel && l.parties != nil {
-		l.applyPartyNotices(l.parties.Leave(live, party.Expelled))
+		l.applyOwnPartyNotices(live, l.parties.Leave(live, party.Expelled))
 	}
 	return true
 }
