@@ -1,0 +1,708 @@
+# Trial of the Guildsman (Q216), a second class-change trial, played by a level 36 Artisan
+# with the 2000 adena fee and the seven Journeyman Rings it crafts already in its pack (the
+# scenario format has no craft step), every script roll pinned to 0: Valkon takes the fee,
+# gives his recommendation and pays the level 35 set's Dimensional Diamonds; Altran, then
+# Valkon's Mandragora Berry errand; Altran's instructions, recommendations and ring recipe;
+# Norman's receipt, Duning's thirty keys of the Breka Orcs, then Norman's list of the seventy
+# bone powders, whetstones, pigments and yarns for the Journeyman Gems; Pinter gives the Artisan
+# the Amber Bead recipe, and the seventy Amber Beads of the ants (an Amber Lump with the last
+# drop) make the Journeyman Deco Beads; Valkon sees the seven rings, hands over the Mark of
+# Guildsman and completes the quest; then relog. Expectations replay the reference trace of
+# this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q216_trial_of_the_guildsman.golden
+character Artisan 36
+class 56
+hold 57 2000
+hold 3139 7
+random always 0
+script quest.Q216_TrialOfTheGuildsman
+item 3119 3024 3025 3120 3121 3122 3123 3124 3125 3126 3127 3128 3129 3130 3131 3132 3133 3134 3135 3136 3137 3138 3139 57 7562
+page warehouse/30103.htm
+page warehouse/30210.htm
+page default/30283.htm
+page trainer/30298.htm
+page trainer/30688.htm
+page script/quest/Q216_TrialOfTheGuildsman/
+npc valkon 30103 WarehouseKeeper 10 0 0
+npc norman 30210 WarehouseKeeper -10 0 0
+npc altran 30283 Folk 0 10 0
+npc pinter 30298 Trainer 0 -10 0
+npc duning 30688 Trainer 20 20 0
+npc mandragora 20154 Monster 40 0 0
+npc breka 20271 Monster -40 0 0
+npc strain 20200 Monster 0 40 0
+npc golem 20083 Monster 0 -40 0
+npc seeker 20202 Monster 40 40 0
+npc silenos 20168 Monster -40 -40 0
+npc ant 20079 Monster 40 -40 0
+
+# Valkon: an Artisan of level 35 or more may start for 2000 adena; the first trial of the set
+# pays the diamonds, which turns the accept page into 30103-06d.htm.
+action valkon
+action valkon
+  S ActionFailed
+  S NpcHtmlMessage obj=valkon item=0 page=warehouse/30103.htm
+  S ActionFailed
+bypass npc_{valkon}_Quest
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q216_TrialOfTheGuildsman CREATED
+bypass Quest Q216_TrialOfTheGuildsman 30103-04.htm
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-04.htm
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30103-05.htm
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-05.htm
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30103-06.htm
+  S QuestList 216:0x80000001
+  S ExShowQuestMark quest=216
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=672 1:2000
+  S SystemMessage id=54 3:3120
+  S SystemMessage id=53 3:7562 6:85
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-06d.htm
+  S ActionFailed
+  Q upsert Q216_TrialOfTheGuildsman | <state> | STARTED
+  Q upsert Q216_TrialOfTheGuildsman | <cond> | 1
+  M set secondClassChange35 | true
+  items 57=0 3120=1 7562=85
+
+# Valkon sends the Artisan to Altran.
+action valkon
+  S ActionFailed
+  S NpcHtmlMessage obj=valkon item=0 page=warehouse/30103.htm
+  S ActionFailed
+bypass npc_{valkon}_Quest
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-06c.htm
+  S ActionFailed
+  S ActionFailed
+
+# Altran hears of the trial.
+action altran
+action altran
+  S ActionFailed
+  S NpcHtmlMessage obj=altran item=0 page=default/30283.htm
+  S ActionFailed
+bypass npc_{altran}_Quest
+  S QuestList 216:0x80000003
+  S ExShowQuestMark quest=216
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=altran item=0 page=script/quest/Q216_TrialOfTheGuildsman/30283-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q216_TrialOfTheGuildsman | <cond> | 2
+
+# Valkon asks for a Mandragora Berry.
+action valkon
+action valkon
+  S ActionFailed
+  S NpcHtmlMessage obj=valkon item=0 page=warehouse/30103.htm
+  S ActionFailed
+bypass npc_{valkon}_Quest
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30103-07a.htm
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-07a.htm
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30103-07b.htm
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-07b.htm
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30103-07c.htm
+  S QuestList 216:0x80000007
+  S ExShowQuestMark quest=216
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-07c.htm
+  S ActionFailed
+  Q upsert Q216_TrialOfTheGuildsman | <cond> | 3
+
+# A Mandragora Sprout drops the berry.
+kill mandragora
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3121
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 216:0x8000000f
+  S ExShowQuestMark quest=216
+  Q upsert Q216_TrialOfTheGuildsman | <cond> | 4
+  items 3121=1
+
+# Altran takes the berry and the recommendation for his instructions, recommendations and
+# the ring recipe.
+action altran
+action altran
+  S ActionFailed
+  S NpcHtmlMessage obj=altran item=0 page=default/30283.htm
+  S ActionFailed
+bypass npc_{altran}_Quest
+  S NpcHtmlMessage obj=altran item=0 page=script/quest/Q216_TrialOfTheGuildsman/30283-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30283-03.htm
+  S QuestList 216:0x8000001f
+  S ExShowQuestMark quest=216
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3121
+  S SystemMessage id=302 3:3120
+  S SystemMessage id=54 3:3122
+  S SystemMessage id=54 3:3123
+  S SystemMessage id=54 3:3124
+  S SystemMessage id=54 3:3024
+  S NpcHtmlMessage obj=altran item=0 page=script/quest/Q216_TrialOfTheGuildsman/30283-03.htm
+  S ActionFailed
+  Q upsert Q216_TrialOfTheGuildsman | <cond> | 5
+  items 3121=0 3120=0 3122=1 3123=1 3124=1 3024=1
+
+# Altran has nothing more.
+action altran
+  S ActionFailed
+  S NpcHtmlMessage obj=altran item=0 page=default/30283.htm
+  S ActionFailed
+bypass npc_{altran}_Quest
+  S NpcHtmlMessage obj=altran item=0 page=script/quest/Q216_TrialOfTheGuildsman/30283-04.htm
+  S ActionFailed
+  S ActionFailed
+
+# Valkon waits for the rings.
+action valkon
+action valkon
+  S ActionFailed
+  S NpcHtmlMessage obj=valkon item=0 page=warehouse/30103.htm
+  S ActionFailed
+bypass npc_{valkon}_Quest
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-08.htm
+  S ActionFailed
+  S ActionFailed
+
+# Norman takes Altran's recommendation for his instructions and receipt.
+action norman
+action norman
+  S ActionFailed
+  S NpcHtmlMessage obj=norman item=0 page=warehouse/30210.htm
+  S ActionFailed
+bypass npc_{norman}_Quest
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q216_TrialOfTheGuildsman/30210-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30210-02.htm
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q216_TrialOfTheGuildsman/30210-02.htm
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30210-03.htm
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q216_TrialOfTheGuildsman/30210-03.htm
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30210-04.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3123
+  S SystemMessage id=54 3:3125
+  S SystemMessage id=54 3:3126
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q216_TrialOfTheGuildsman/30210-04.htm
+  S ActionFailed
+  items 3123=0 3125=1 3126=1
+
+# Norman sends the Artisan to Duning with the receipt.
+action norman
+  S ActionFailed
+  S NpcHtmlMessage obj=norman item=0 page=warehouse/30210.htm
+  S ActionFailed
+bypass npc_{norman}_Quest
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q216_TrialOfTheGuildsman/30210-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Duning takes the receipt for his instructions.
+action duning
+action duning
+  S ActionFailed
+  S NpcHtmlMessage obj=duning item=0 page=trainer/30688.htm
+  S ActionFailed
+bypass npc_{duning}_Quest
+  S NpcHtmlMessage obj=duning item=0 page=script/quest/Q216_TrialOfTheGuildsman/30688-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30688-02.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3126
+  S SystemMessage id=54 3:3127
+  S NpcHtmlMessage obj=duning item=0 page=script/quest/Q216_TrialOfTheGuildsman/30688-02.htm
+  S ActionFailed
+  items 3126=0 3127=1
+
+# Duning waits for his keys.
+action duning
+  S ActionFailed
+  S NpcHtmlMessage obj=duning item=0 page=trainer/30688.htm
+  S ActionFailed
+bypass npc_{duning}_Quest
+  S NpcHtmlMessage obj=duning item=0 page=script/quest/Q216_TrialOfTheGuildsman/30688-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Norman waits for Duning.
+action norman
+action norman
+  S ActionFailed
+  S NpcHtmlMessage obj=norman item=0 page=warehouse/30210.htm
+  S ActionFailed
+bypass npc_{norman}_Quest
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q216_TrialOfTheGuildsman/30210-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Thirty Breka Orc Warriors drop Duning's keys.
+kill breka x30
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:3128
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3128=30
+
+# Duning takes his instructions back.
+action duning
+action duning
+  S ActionFailed
+  S NpcHtmlMessage obj=duning item=0 page=trainer/30688.htm
+  S ActionFailed
+bypass npc_{duning}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3127
+  S NpcHtmlMessage obj=duning item=0 page=script/quest/Q216_TrialOfTheGuildsman/30688-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 3127=0 3128=30
+
+# Duning has nothing more.
+action duning
+  S ActionFailed
+  S NpcHtmlMessage obj=duning item=0 page=trainer/30688.htm
+  S ActionFailed
+bypass npc_{duning}_Quest
+  S NpcHtmlMessage obj=duning item=0 page=script/quest/Q216_TrialOfTheGuildsman/30688-05.htm
+  S ActionFailed
+  S ActionFailed
+
+# Norman takes the keys and hands over his list.
+action norman
+action norman
+  S ActionFailed
+  S NpcHtmlMessage obj=norman item=0 page=warehouse/30210.htm
+  S ActionFailed
+bypass npc_{norman}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=301 3:3128 6:30
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q216_TrialOfTheGuildsman/30210-07.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30210-08.htm
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q216_TrialOfTheGuildsman/30210-08.htm
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30210-09.htm
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q216_TrialOfTheGuildsman/30210-09.htm
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30210-10.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3129
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q216_TrialOfTheGuildsman/30210-10.htm
+  S ActionFailed
+  items 3128=0 3129=1
+
+# Norman waits for the materials.
+action norman
+  S ActionFailed
+  S NpcHtmlMessage obj=norman item=0 page=warehouse/30210.htm
+  S ActionFailed
+bypass npc_{norman}_Quest
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q216_TrialOfTheGuildsman/30210-11.htm
+  S ActionFailed
+  S ActionFailed
+
+# The materials of the list: five bone powders a strain, seven whetstones a golem, seven
+# pigments a dead seeker, ten yarns a silenos, seventy of each.
+kill strain x14
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3130 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3130 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3130 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3130 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3130 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3130 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3130 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3130 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3130 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3130 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3130 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3130 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3130 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3130 6:5
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3130=70
+kill golem x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3131 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3131 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3131 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3131 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3131 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3131 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3131 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3131 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3131 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3131 6:7
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3131=70
+kill seeker x10
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3132 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3132 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3132 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3132 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3132 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3132 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3132 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3132 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3132 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3132 6:7
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3132=70
+kill silenos x7
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3133 6:10
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3133 6:10
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3133 6:10
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3133 6:10
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3133 6:10
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3133 6:10
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3133 6:10
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  items 3133=70
+
+# Pinter, the Artisan being of level 36, gives his instructions and the Amber Bead recipe.
+action pinter
+action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+bypass npc_{pinter}_Quest
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q216_TrialOfTheGuildsman/30298-02.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30298-03.htm
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q216_TrialOfTheGuildsman/30298-03.htm
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30298-04.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:3124
+  S SystemMessage id=54 3:3135
+  S SystemMessage id=54 3:3025
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q216_TrialOfTheGuildsman/30298-05.htm
+  S ActionFailed
+  items 3124=0 3135=1 3025=1
+
+# Pinter waits for the beads.
+action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+bypass npc_{pinter}_Quest
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q216_TrialOfTheGuildsman/30298-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Fourteen ants drop five Amber Beads each; the seventieth brings an Amber Lump (draw 0).
+kill ant x14
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3136 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3136 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3136 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3136 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3136 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3136 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3136 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3136 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3136 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3136 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3136 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3136 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3136 6:5
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=53 3:3136 6:5
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:3137
+  items 3136=70 3137=1
+
+# Norman takes the materials for the seven Journeyman Gems.
+action norman
+action norman
+  S ActionFailed
+  S NpcHtmlMessage obj=norman item=0 page=warehouse/30210.htm
+  S ActionFailed
+bypass npc_{norman}_Quest
+  S SystemMessage id=302 3:3125
+  S SystemMessage id=302 3:3129
+  S SystemMessage id=301 3:3133 6:70
+  S SystemMessage id=301 3:3131 6:70
+  S SystemMessage id=301 3:3130 6:70
+  S SystemMessage id=301 3:3132 6:70
+  S SystemMessage id=53 3:3134 6:7
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=norman item=0 page=script/quest/Q216_TrialOfTheGuildsman/30210-12.htm
+  S ActionFailed
+  S ActionFailed
+  items 3125=0 3129=0 3130=0 3131=0 3132=0 3133=0 3134=7
+
+# Pinter takes the beads for the seven Journeyman Deco Beads, and the rings can be made.
+action pinter
+action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+bypass npc_{pinter}_Quest
+  S SystemMessage id=301 3:3136 6:70
+  S SystemMessage id=302 3:3135
+  S SystemMessage id=53 3:3138 6:7
+  S QuestList 216:0x8000003f
+  S ExShowQuestMark quest=216
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q216_TrialOfTheGuildsman/30298-07.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q216_TrialOfTheGuildsman | <cond> | 6
+  items 3136=0 3135=0 3138=7
+
+# Pinter has nothing more.
+action pinter
+  S ActionFailed
+  S NpcHtmlMessage obj=pinter item=0 page=trainer/30298.htm
+  S ActionFailed
+bypass npc_{pinter}_Quest
+  S NpcHtmlMessage obj=pinter item=0 page=script/quest/Q216_TrialOfTheGuildsman/30298-08.htm
+  S ActionFailed
+  S ActionFailed
+
+# Valkon sees the seven rings and hands over the Mark of Guildsman.
+action valkon
+action valkon
+  S ActionFailed
+  S NpcHtmlMessage obj=valkon item=0 page=warehouse/30103.htm
+  S ActionFailed
+bypass npc_{valkon}_Quest
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-09.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q216_TrialOfTheGuildsman 30103-09a.htm
+  S SystemMessage id=302 3:3122
+  S SystemMessage id=301 3:3139 6:7
+  S SystemMessage id=54 3:3119
+  S SystemMessage id=95 1:80993 1:12250
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 216:0x00000000
+  S SystemMessage id=302 3:3024
+  S SystemMessage id=302 3:3025
+  S SystemMessage id=301 3:3134 6:7
+  S SystemMessage id=302 3:3137
+  S SystemMessage id=301 3:3138 6:7
+  S NpcHtmlMessage obj=valkon item=0 page=script/quest/Q216_TrialOfTheGuildsman/30103-09a.htm
+  S ActionFailed
+  Q upsert Q216_TrialOfTheGuildsman | <state> | COMPLETED
+  Q delete-except-state Q216_TrialOfTheGuildsman
+  state Q216_TrialOfTheGuildsman COMPLETED
+  rows Q216_TrialOfTheGuildsman <state>=COMPLETED
+  items 3119=1 3139=0 3122=0
+
+relog
+  state Q216_TrialOfTheGuildsman COMPLETED
+  rows Q216_TrialOfTheGuildsman <state>=COMPLETED
+  items 3119=1 3139=0 7562=85
+action valkon
+action valkon
+  S ActionFailed
+  S NpcHtmlMessage obj=valkon item=0 page=warehouse/30103.htm
+  S ActionFailed
+bypass npc_{valkon}_Quest
+  S NpcHtmlMessage obj=valkon item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

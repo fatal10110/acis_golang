@@ -1,0 +1,506 @@
+# Trial of the Pilgrim (Q215), a second class-change trial, played by a level 36 Cleric
+# carrying the 100000 adena Gerald asks for his book, every script roll pinned to 0:
+# Santiago starts it, hands over the Voucher of Trial and pays the level 35 set's Dimensional
+# Diamonds; Tanapi takes the voucher; Ancestor Martankus sends the cleric after a Lava
+# Salamander's Essence of Flame and turns it into the Spirit of Flame; Tanapi, then Gauri
+# Twinklerock's Tag of Rumor; Gerald sells his book, Dorf takes the tag for the Gray Badge,
+# Gerald buys the book back; Primos, then Petron's Picture of Nahir for Nahir's hair and the
+# Statue of Einhasad; Andellia (level 36) sends the cleric after a Black Willow, Uruha trades
+# the willow's debris for the Book of Darkness, which Andellia lets the cleric keep; Casian
+# takes the four tokens for the Book of Sage; Santiago hands over the Mark of Pilgrim and
+# completes the quest; then relog. Expectations replay the reference trace of this scenario.
+trace internal/gameserver/script/testdata/oracle/scenarios/q215_trial_of_the_pilgrim.golden
+character Pilgrim 36
+class 15
+hold 57 100000
+random always 0
+script quest.Q215_TrialOfThePilgrim
+item 2721 2722 2723 2724 2725 2726 2727 2728 2729 2730 2731 2732 2733 57 7562
+page default/30648.htm
+page trainer/30571.htm
+page default/30649.htm
+page default/30550.htm
+page default/30651.htm
+page default/30650.htm
+page trainer/30117.htm
+page trainer/30036.htm
+page default/30362.htm
+page default/30652.htm
+page default/30612.htm
+page script/quest/Q215_TrialOfThePilgrim/
+npc santiago 30648 Folk 10 0 0
+npc tanapi 30571 Trainer -10 0 0
+npc martankus 30649 Folk 0 10 0
+npc gauri 30550 Folk 0 -10 0
+npc dorf 30651 Folk 20 20 0
+npc gerald 30650 Folk -20 20 0
+npc primos 30117 Trainer 20 -20 0
+npc petron 30036 Trainer -20 -20 0
+npc andellia 30362 Folk 30 0 0
+npc uruha 30652 Folk -30 0 0
+npc casian 30612 Folk 0 30 0
+npc salamander 27116 Monster 40 0 0
+npc nahir 27117 Monster -40 0 0
+npc willow 27118 Monster 0 -40 0
+
+# Santiago: a Cleric of level 35 or more may start; the first trial of the set pays the
+# diamonds, which turns the accept page into 30648-04a.htm.
+action santiago
+action santiago
+  S ActionFailed
+  S NpcHtmlMessage obj=santiago item=0 page=default/30648.htm
+  S ActionFailed
+bypass npc_{santiago}_Quest
+  S NpcHtmlMessage obj=santiago item=0 page=script/quest/Q215_TrialOfThePilgrim/30648-03.htm
+  S ActionFailed
+  S ActionFailed
+  state Q215_TrialOfThePilgrim CREATED
+bypass Quest Q215_TrialOfThePilgrim 30648-04.htm
+  S QuestList 215:0x80000001
+  S ExShowQuestMark quest=215
+  S PlaySound type=0 file=ItemSound.quest_accept bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2723
+  S SystemMessage id=53 3:7562 6:49
+  S NpcHtmlMessage obj=santiago item=0 page=script/quest/Q215_TrialOfThePilgrim/30648-04a.htm
+  S ActionFailed
+  Q upsert Q215_TrialOfThePilgrim | <state> | STARTED
+  Q upsert Q215_TrialOfThePilgrim | <cond> | 1
+  M set secondClassChange35 | true
+  items 2723=1 7562=49 57=100000
+
+# Santiago has nothing more until the trial is over.
+action santiago
+  S ActionFailed
+  S NpcHtmlMessage obj=santiago item=0 page=default/30648.htm
+  S ActionFailed
+bypass npc_{santiago}_Quest
+  S NpcHtmlMessage obj=santiago item=0 page=script/quest/Q215_TrialOfThePilgrim/30648-09.htm
+  S ActionFailed
+  S ActionFailed
+
+# Tanapi takes the voucher.
+action tanapi
+action tanapi
+  S ActionFailed
+  S NpcHtmlMessage obj=tanapi item=0 page=trainer/30571.htm
+  S ActionFailed
+bypass npc_{tanapi}_Quest
+  S QuestList 215:0x80000003
+  S ExShowQuestMark quest=215
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2723
+  S NpcHtmlMessage obj=tanapi item=0 page=script/quest/Q215_TrialOfThePilgrim/30571-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q215_TrialOfThePilgrim | <cond> | 2
+  items 2723=0
+
+# Tanapi waits for the ancestor's word.
+action tanapi
+  S ActionFailed
+  S NpcHtmlMessage obj=tanapi item=0 page=trainer/30571.htm
+  S ActionFailed
+bypass npc_{tanapi}_Quest
+  S NpcHtmlMessage obj=tanapi item=0 page=script/quest/Q215_TrialOfThePilgrim/30571-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Ancestor Martankus sends the cleric after the Essence of Flame.
+action martankus
+action martankus
+  S ActionFailed
+  S NpcHtmlMessage obj=martankus item=0 page=default/30649.htm
+  S ActionFailed
+bypass npc_{martankus}_Quest
+  S QuestList 215:0x80000007
+  S ExShowQuestMark quest=215
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=martankus item=0 page=script/quest/Q215_TrialOfThePilgrim/30649-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q215_TrialOfThePilgrim | <cond> | 3
+
+# Martankus waits for the essence.
+action martankus
+  S ActionFailed
+  S NpcHtmlMessage obj=martankus item=0 page=default/30649.htm
+  S ActionFailed
+bypass npc_{martankus}_Quest
+  S NpcHtmlMessage obj=martankus item=0 page=script/quest/Q215_TrialOfThePilgrim/30649-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# A Lava Salamander drops the essence (draw 0, under 200000 of 1000000).
+kill salamander
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2725
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 215:0x8000000f
+  S ExShowQuestMark quest=215
+  Q upsert Q215_TrialOfThePilgrim | <cond> | 4
+  items 2725=1
+
+# Martankus turns the essence into the Spirit of Flame.
+action martankus
+  S ActionFailed
+  S NpcHtmlMessage obj=martankus item=0 page=default/30649.htm
+  S ActionFailed
+bypass npc_{martankus}_Quest
+  S NpcHtmlMessage obj=martankus item=0 page=script/quest/Q215_TrialOfThePilgrim/30649-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q215_TrialOfThePilgrim 30649-04.htm
+  S QuestList 215:0x8000001f
+  S ExShowQuestMark quest=215
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2725
+  S SystemMessage id=54 3:2724
+  S NpcHtmlMessage obj=martankus item=0 html="<html><body>My html is missing:<br>./data/html/script/quest/Q215_TrialOfThePilgrim/30649-04.htm</body></html>"
+  S ActionFailed
+  Q upsert Q215_TrialOfThePilgrim | <cond> | 5
+  items 2725=0 2724=1
+
+# Tanapi hears of the spirit.
+action tanapi
+action tanapi
+  S ActionFailed
+  S NpcHtmlMessage obj=tanapi item=0 page=trainer/30571.htm
+  S ActionFailed
+bypass npc_{tanapi}_Quest
+  S QuestList 215:0x8000003f
+  S ExShowQuestMark quest=215
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=tanapi item=0 page=script/quest/Q215_TrialOfThePilgrim/30571-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q215_TrialOfThePilgrim | <cond> | 6
+
+# Tanapi has nothing more.
+action tanapi
+  S ActionFailed
+  S NpcHtmlMessage obj=tanapi item=0 page=trainer/30571.htm
+  S ActionFailed
+bypass npc_{tanapi}_Quest
+  S NpcHtmlMessage obj=tanapi item=0 page=script/quest/Q215_TrialOfThePilgrim/30571-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Gauri Twinklerock hands over the Tag of Rumor.
+action gauri
+action gauri
+  S ActionFailed
+  S NpcHtmlMessage obj=gauri item=0 page=default/30550.htm
+  S ActionFailed
+bypass npc_{gauri}_Quest
+  S QuestList 215:0x8000007f
+  S ExShowQuestMark quest=215
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2733
+  S NpcHtmlMessage obj=gauri item=0 page=script/quest/Q215_TrialOfThePilgrim/30550-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q215_TrialOfThePilgrim | <cond> | 7
+  items 2733=1
+
+# Gerald sells his book for 100000 adena.
+action gerald
+action gerald
+  S ActionFailed
+  S NpcHtmlMessage obj=gerald item=0 page=default/30650.htm
+  S ActionFailed
+bypass npc_{gerald}_Quest
+  S NpcHtmlMessage obj=gerald item=0 page=script/quest/Q215_TrialOfThePilgrim/30650-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q215_TrialOfThePilgrim 30650-02.htm
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=672 1:100000
+  S SystemMessage id=54 3:2726
+  S NpcHtmlMessage obj=gerald item=0 page=script/quest/Q215_TrialOfThePilgrim/30650-02.htm
+  S ActionFailed
+  items 57=0 2726=1
+
+# Dorf sees the book, takes the tag and gives the Gray Badge.
+action dorf
+action dorf
+  S ActionFailed
+  S NpcHtmlMessage obj=dorf item=0 page=default/30651.htm
+  S ActionFailed
+bypass npc_{dorf}_Quest
+  S QuestList 215:0x800000ff
+  S ExShowQuestMark quest=215
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2733
+  S SystemMessage id=54 3:2727
+  S NpcHtmlMessage obj=dorf item=0 page=script/quest/Q215_TrialOfThePilgrim/30651-02.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q215_TrialOfThePilgrim | <cond> | 8
+  items 2733=0 2727=1 2726=1
+
+# Gerald buys his book back.
+action gerald
+action gerald
+  S ActionFailed
+  S NpcHtmlMessage obj=gerald item=0 page=default/30650.htm
+  S ActionFailed
+bypass npc_{gerald}_Quest
+  S PlaySound type=0 file=ItemSound.quest_itemget bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2726
+  S SystemMessage id=52 6:100000
+  S NpcHtmlMessage obj=gerald item=0 page=script/quest/Q215_TrialOfThePilgrim/30650-04.htm
+  S ActionFailed
+  S ActionFailed
+  items 57=100000 2726=0
+
+# Dorf has nothing more.
+action dorf
+action dorf
+  S ActionFailed
+  S NpcHtmlMessage obj=dorf item=0 page=default/30651.htm
+  S ActionFailed
+bypass npc_{dorf}_Quest
+  S NpcHtmlMessage obj=dorf item=0 page=script/quest/Q215_TrialOfThePilgrim/30651-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Primos sends the cleric to Petron.
+action primos
+action primos
+  S ActionFailed
+  S NpcHtmlMessage obj=primos item=0 page=trainer/30117.htm
+  S ActionFailed
+bypass npc_{primos}_Quest
+  S QuestList 215:0x800001ff
+  S ExShowQuestMark quest=215
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=primos item=0 page=script/quest/Q215_TrialOfThePilgrim/30117-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q215_TrialOfThePilgrim | <cond> | 9
+
+# Petron hands over the Picture of Nahir.
+action petron
+action petron
+  S ActionFailed
+  S NpcHtmlMessage obj=petron item=0 page=trainer/30036.htm
+  S ActionFailed
+bypass npc_{petron}_Quest
+  S QuestList 215:0x800003ff
+  S ExShowQuestMark quest=215
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=54 3:2728
+  S NpcHtmlMessage obj=petron item=0 page=script/quest/Q215_TrialOfThePilgrim/30036-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q215_TrialOfThePilgrim | <cond> | 10
+  items 2728=1
+
+# Petron waits for the hair.
+action petron
+  S ActionFailed
+  S NpcHtmlMessage obj=petron item=0 page=trainer/30036.htm
+  S ActionFailed
+bypass npc_{petron}_Quest
+  S NpcHtmlMessage obj=petron item=0 page=script/quest/Q215_TrialOfThePilgrim/30036-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Nahir drops its hair (draw 0, under 200000 of 1000000).
+kill nahir
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2729
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 215:0x800007ff
+  S ExShowQuestMark quest=215
+  Q upsert Q215_TrialOfThePilgrim | <cond> | 11
+  items 2729=1
+
+# Petron takes the hair and the picture for the Statue of Einhasad.
+action petron
+  S ActionFailed
+  S NpcHtmlMessage obj=petron item=0 page=trainer/30036.htm
+  S ActionFailed
+bypass npc_{petron}_Quest
+  S QuestList 215:0x80000fff
+  S ExShowQuestMark quest=215
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2729
+  S SystemMessage id=302 3:2728
+  S SystemMessage id=54 3:2730
+  S NpcHtmlMessage obj=petron item=0 page=script/quest/Q215_TrialOfThePilgrim/30036-03.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q215_TrialOfThePilgrim | <cond> | 12
+  items 2728=0 2729=0 2730=1
+
+# Andellia, the cleric being of level 36, sends it after the Black Willow.
+action andellia
+action andellia
+  S ActionFailed
+  S NpcHtmlMessage obj=andellia item=0 page=default/30362.htm
+  S ActionFailed
+bypass npc_{andellia}_Quest
+  S QuestList 215:0x80001fff
+  S ExShowQuestMark quest=215
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=andellia item=0 page=script/quest/Q215_TrialOfThePilgrim/30362-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q215_TrialOfThePilgrim | <cond> | 13
+
+# Andellia repeats herself (draw 0: the first of her two pages).
+action andellia
+  S ActionFailed
+  S NpcHtmlMessage obj=andellia item=0 page=default/30362.htm
+  S ActionFailed
+bypass npc_{andellia}_Quest
+  S NpcHtmlMessage obj=andellia item=0 page=script/quest/Q215_TrialOfThePilgrim/30362-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# A Black Willow drops its debris (draw 0, under 200000 of 1000000).
+kill willow
+  S SystemMessage id=95 1:0 1:0
+  S SystemMessage id=54 3:2732
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 215:0x80003fff
+  S ExShowQuestMark quest=215
+  Q upsert Q215_TrialOfThePilgrim | <cond> | 14
+  items 2732=1
+
+# Andellia waits for Uruha.
+action andellia
+  S ActionFailed
+  S NpcHtmlMessage obj=andellia item=0 page=default/30362.htm
+  S ActionFailed
+bypass npc_{andellia}_Quest
+  S NpcHtmlMessage obj=andellia item=0 page=script/quest/Q215_TrialOfThePilgrim/30362-07.htm
+  S ActionFailed
+  S ActionFailed
+
+# Uruha trades the debris for the Book of Darkness.
+action uruha
+action uruha
+  S ActionFailed
+  S NpcHtmlMessage obj=uruha item=0 page=default/30652.htm
+  S ActionFailed
+bypass npc_{uruha}_Quest
+  S NpcHtmlMessage obj=uruha item=0 page=script/quest/Q215_TrialOfThePilgrim/30652-01.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q215_TrialOfThePilgrim 30652-02.htm
+  S QuestList 215:0x80007fff
+  S ExShowQuestMark quest=215
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2732
+  S SystemMessage id=54 3:2731
+  S NpcHtmlMessage obj=uruha item=0 page=script/quest/Q215_TrialOfThePilgrim/30652-02.htm
+  S ActionFailed
+  Q upsert Q215_TrialOfThePilgrim | <cond> | 15
+  items 2732=0 2731=1
+
+# Uruha has nothing more.
+action uruha
+  S ActionFailed
+  S NpcHtmlMessage obj=uruha item=0 page=default/30652.htm
+  S ActionFailed
+bypass npc_{uruha}_Quest
+  S NpcHtmlMessage obj=uruha item=0 page=script/quest/Q215_TrialOfThePilgrim/30652-03.htm
+  S ActionFailed
+  S ActionFailed
+
+# Andellia lets the cleric keep the book.
+action andellia
+action andellia
+  S ActionFailed
+  S NpcHtmlMessage obj=andellia item=0 page=default/30362.htm
+  S ActionFailed
+bypass npc_{andellia}_Quest
+  S NpcHtmlMessage obj=andellia item=0 page=script/quest/Q215_TrialOfThePilgrim/30362-03.htm
+  S ActionFailed
+  S ActionFailed
+bypass Quest Q215_TrialOfThePilgrim 30362-04.htm
+  S QuestList 215:0x8000ffff
+  S ExShowQuestMark quest=215
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S NpcHtmlMessage obj=andellia item=0 page=script/quest/Q215_TrialOfThePilgrim/30362-04.htm
+  S ActionFailed
+  Q upsert Q215_TrialOfThePilgrim | <cond> | 16
+  items 2731=1
+
+# Andellia has nothing more.
+action andellia
+  S ActionFailed
+  S NpcHtmlMessage obj=andellia item=0 page=default/30362.htm
+  S ActionFailed
+bypass npc_{andellia}_Quest
+  S NpcHtmlMessage obj=andellia item=0 page=script/quest/Q215_TrialOfThePilgrim/30362-06.htm
+  S ActionFailed
+  S ActionFailed
+
+# Casian takes the book, the badge, the spirit and the statue for the Book of Sage.
+action casian
+action casian
+  S ActionFailed
+  S NpcHtmlMessage obj=casian item=0 page=default/30612.htm
+  S ActionFailed
+bypass npc_{casian}_Quest
+  S QuestList 215:0x8001ffff
+  S ExShowQuestMark quest=215
+  S PlaySound type=0 file=ItemSound.quest_middle bind=0 obj=0 loc=0,0,0 delay=0
+  S SystemMessage id=302 3:2731
+  S SystemMessage id=302 3:2727
+  S SystemMessage id=302 3:2724
+  S SystemMessage id=302 3:2730
+  S SystemMessage id=54 3:2722
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q215_TrialOfThePilgrim/30612-01.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q215_TrialOfThePilgrim | <cond> | 17
+  items 2731=0 2727=0 2724=0 2730=0 2722=1
+
+# Casian has nothing more.
+action casian
+  S ActionFailed
+  S NpcHtmlMessage obj=casian item=0 page=default/30612.htm
+  S ActionFailed
+bypass npc_{casian}_Quest
+  S NpcHtmlMessage obj=casian item=0 page=script/quest/Q215_TrialOfThePilgrim/30612-02.htm
+  S ActionFailed
+  S ActionFailed
+
+# Santiago hands over the Mark of Pilgrim.
+action santiago
+action santiago
+  S ActionFailed
+  S NpcHtmlMessage obj=santiago item=0 page=default/30648.htm
+  S ActionFailed
+bypass npc_{santiago}_Quest
+  S SystemMessage id=302 3:2722
+  S SystemMessage id=54 3:2721
+  S SystemMessage id=95 1:77382 1:16000
+  S PlaySound type=0 file=ItemSound.quest_finish bind=0 obj=0 loc=0,0,0 delay=0
+  S QuestList 215:0x00000000
+  S NpcHtmlMessage obj=santiago item=0 page=script/quest/Q215_TrialOfThePilgrim/30648-10.htm
+  S ActionFailed
+  S ActionFailed
+  Q upsert Q215_TrialOfThePilgrim | <state> | COMPLETED
+  Q delete-except-state Q215_TrialOfThePilgrim
+  state Q215_TrialOfThePilgrim COMPLETED
+  rows Q215_TrialOfThePilgrim <state>=COMPLETED
+  items 2721=1 2722=0
+
+relog
+  state Q215_TrialOfThePilgrim COMPLETED
+  rows Q215_TrialOfThePilgrim <state>=COMPLETED
+  items 2721=1 57=100000 7562=49
+action santiago
+action santiago
+  S ActionFailed
+  S NpcHtmlMessage obj=santiago item=0 page=default/30648.htm
+  S ActionFailed
+bypass npc_{santiago}_Quest
+  S NpcHtmlMessage obj=santiago item=0 html="<html><body>This quest has already been completed.</body></html>"
+  S ActionFailed
+  S ActionFailed

@@ -7,5 +7,9 @@ import "github.com/fatal10110/acis_golang/internal/gameserver/script"
 // quests201To250HandleOps holds, per script of quests_201_250.go, the kind-specific NPC
 // handle operations each of its hooks reaches.
 func quests201To250HandleOps() map[string]script.HandleOps {
-	return map[string]script.HandleOps{}
+	return map[string]script.HandleOps{
+		"quest.Q216_TrialOfTheGuildsman": {
+			"OnMyDying": {"NPC.ActualSpoiler"},
+		},
+	}
 }
