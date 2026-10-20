@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
 	"github.com/fatal10110/acis_golang/internal/gameserver/skill/conditions"
 	"github.com/rs/zerolog"
@@ -340,12 +339,12 @@ func parseIntPairAttr(a *attrValues, key string) (int32, int32) {
 		a.fail(fmt.Errorf("attribute %q: want \"a,b\", got %q", key, raw))
 		return 0, 0
 	}
-	rate, err := commons.ParseInt(strings.TrimSpace(parts[0]), 32)
+	rate, err := strconv.ParseInt(strings.TrimSpace(parts[0]), 10, 32)
 	if err != nil {
 		a.fail(fmt.Errorf("attribute %q: %w", key, err))
 		return 0, 0
 	}
-	value, err := commons.ParseInt(strings.TrimSpace(parts[1]), 32)
+	value, err := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 32)
 	if err != nil {
 		a.fail(fmt.Errorf("attribute %q: %w", key, err))
 		return 0, 0

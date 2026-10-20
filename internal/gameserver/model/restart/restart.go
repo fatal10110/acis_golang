@@ -3,9 +3,9 @@ package restart
 import (
 	"fmt"
 	"math/rand/v2"
+	"strconv"
 	"strings"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/location"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/zone"
@@ -182,7 +182,7 @@ func ParseLocationValue(raw string) (location.Location, error) {
 	}
 	vals := make([]int, 3)
 	for i, p := range parts {
-		n, err := commons.Atoi(p)
+		n, err := strconv.Atoi(p)
 		if err != nil {
 			return location.Location{}, err
 		}
@@ -197,11 +197,11 @@ func ParsePointValue(raw string) (location.Point, error) {
 	if !ok {
 		return location.Point{}, fmt.Errorf("%q must be formatted x;y", raw)
 	}
-	xn, err := commons.Atoi(x)
+	xn, err := strconv.Atoi(x)
 	if err != nil {
 		return location.Point{}, err
 	}
-	yn, err := commons.Atoi(y)
+	yn, err := strconv.Atoi(y)
 	if err != nil {
 		return location.Point{}, err
 	}

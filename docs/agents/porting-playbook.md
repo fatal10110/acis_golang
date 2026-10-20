@@ -60,6 +60,14 @@ packet-impact and silent-rejection contract.
 If required behavior depends on a later system, document the exact dependency and integration point.
 Do not leave an accepted opcode as a quiet no-op.
 
+**Parity exception: JDK Unicode quirks are not ported.** Client and data text follows the Go standard
+library (`unicode`, `strings`, `strconv`, `unicode/utf8`, `unicode/utf16`): an unpaired UTF-16
+surrogate decodes to U+FFFD at the wire, case mapping uses the toolchain's Unicode tables (no
+Unicode-version case tables, no final-sigma or U+0130 special cases), and integers parse ASCII digits
+only. Do not open issues to emulate these. UTF-16 length counting (`commons.UTF16Len`/`UTF16Cut`)
+stays a core rule, and stdlib behavior must never accept input the server would otherwise reject for
+abuse (length, name validity, duplicate names).
+
 ## 4. Design the native Go shape
 
 Search the Go repository for existing domain types, helpers, constructors, fixtures, and package

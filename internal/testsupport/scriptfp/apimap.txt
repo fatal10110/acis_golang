@@ -2,6 +2,8 @@
 #
 #   <row> <Go name>    the Go call a port makes for that row; Check matches the
 #                      name after its last '.' against the package's calls
+#   <row> <a>,<b>      the row stands for overloads the port calls under
+#                      separate Go names; Check accepts a call of any
 #   <row> inline       the row has no Go call of its own (a getter the Go
 #                      handle folds into the next call)
 #   <row> exempt       the API freeze leaves the row out: only siegable-hall
@@ -504,7 +506,7 @@ Castle.getSiege inline
 Clan.getCastleId script.Player.ClanCastleID
 Door.closeMe script.Door.Close
 Door.openMe script.Door.Open
-DoorData.getDoor script.Script.Door
+DoorData.getDoor script.Script.Door,script.Script.DoorByID
 DoorData.getInstance inline
 Npc.getCastle script.Script.Castle
 Npc.getMinions script.NPC.Minions

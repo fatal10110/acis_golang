@@ -139,7 +139,7 @@ call Door.addMakerEvent classes 2 sites 2 go script.Door.AddMakerEvent
 call Door.closeMe classes 4 sites 10 go script.Door.Close
 call Door.isOpened classes 5 sites 5 go script.Door.Opened
 call Door.openMe classes 7 sites 29 go script.Door.Open
-call DoorData.getDoor classes 9 sites 40 go script.Script.Door
+call DoorData.getDoor classes 9 sites 40 go script.Script.Door,script.Script.DoorByID
 call DoorData.getInstance classes 9 sites 40 go inline
 call Earthquake.new classes 3 sites 4 go Earthquake
 call EffectTemplate.getStackOrder classes 1 sites 1 go inline

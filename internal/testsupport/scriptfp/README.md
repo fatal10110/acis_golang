@@ -79,7 +79,7 @@ shapes.
 
 ```
 classes <n> sites <n> rows <n> mapped <n> inline <n> exempt <n> unmapped <n> unresolved <n>
-call <row> classes <n> sites <n> go <Go name>|inline|exempt|-
+call <row> classes <n> sites <n> go <Go name>[,<Go name>...]|inline|exempt|-
 ```
 
 `-` marks an unmapped row; `exempt` a row the freeze leaves out (`Check` reports it as a
@@ -97,7 +97,9 @@ A family package names every class it ports; their fingerprints are compared as 
 
 - a number, string or char literal on one side only;
 - a call of the classes with no `apimap.txt` row, or whose Go name the package never
-  calls (matched on the name after its last `.`); a call mapped from a `Quest` helper row
+  calls (matched on the name after its last `.`). A row whose overloads are separate Go
+  calls lists them comma-separated (`DoorData.getDoor script.Script.Door,script.Script.DoorByID`),
+  and a call of any of them matches; a call mapped from a `Quest` helper row
   that none of the classes makes;
 - an `on*` hook whose name or shape differs. The Go hook is the `OnX` field of a `Hooks`
   composite literal (a function literal or a package function), named `onX` except

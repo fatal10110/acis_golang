@@ -33,7 +33,7 @@ func (l *GameClientLink) adminNpcInfo(gm *livePlayer, obj world.Tracked, inst *n
 	case "ai":
 		page := 0
 		if len(args) > 1 {
-			if n, err := commons.ParseInt(args[1], 32); err == nil {
+			if n, err := strconv.ParseInt(args[1], 10, 32); err == nil {
 				page = int(n)
 			}
 		}
