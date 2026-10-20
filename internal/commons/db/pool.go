@@ -65,8 +65,7 @@ func Open(cfg Config) (*sql.DB, error) {
 	return pool, nil
 }
 
-// OpenDSN builds a connection pool on a go-sql-driver/mysql DSN. Every
-// string query argument is written as StoredText gives it.
+// OpenDSN builds a connection pool on a go-sql-driver/mysql DSN.
 func OpenDSN(dsn string) (*sql.DB, error) {
 	driverCfg, err := mysql.ParseDSN(dsn)
 	if err != nil {
@@ -76,7 +75,7 @@ func OpenDSN(dsn string) (*sql.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open database pool: %w", err)
 	}
-	return sql.OpenDB(textConnector{connector}), nil
+	return sql.OpenDB(connector), nil
 }
 
 // dataSourceName converts a MariaDB or MySQL JDBC URL, as shipped in

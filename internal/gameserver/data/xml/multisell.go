@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"strconv"
 
 	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/item"
@@ -33,7 +34,7 @@ func (n *npcIDText) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
 	if err := d.DecodeElement(&text, &start); err != nil {
 		return err
 	}
-	v, err := commons.ParseInt(text, 32)
+	v, err := strconv.ParseInt(text, 10, 32)
 	if err != nil {
 		return fmt.Errorf("npc: %w", err)
 	}

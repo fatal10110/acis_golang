@@ -3,6 +3,7 @@ package xml
 import (
 	"encoding/xml"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -103,7 +104,7 @@ func buildNPCTemplate(el npcElement, items *item.Table, skillsTable *skill.Table
 		vals[s.Name] = s.Val
 	}
 	var npcID int
-	if n, err := commons.Atoi(vals["id"]); err == nil {
+	if n, err := strconv.Atoi(vals["id"]); err == nil {
 		npcID = n
 	}
 

@@ -116,7 +116,7 @@ func (m *Manager) Bypass(page func(path string) string, npcID int, objectID int3
 		if len(args) < 3 {
 			return Reply{Aborted: true}
 		}
-		pageNo, err := commons.ParseInt(args[2], 32)
+		pageNo, err := strconv.ParseInt(args[2], 10, 32)
 		if err != nil {
 			return Reply{Aborted: true}
 		}
@@ -166,7 +166,7 @@ func (d dialog) give(args []string) Reply {
 	if len(args) < 2 {
 		return Reply{Aborted: true}
 	}
-	cost, err := commons.ParseInt(args[1], 32)
+	cost, err := strconv.ParseInt(args[1], 10, 32)
 	if err != nil {
 		return Reply{Aborted: true}
 	}
@@ -201,11 +201,11 @@ func (d dialog) selectSkill(command string, args []string) Reply {
 		return Reply{Aborted: true}
 	}
 	group, name := args[0], args[1]
-	id, err := commons.ParseInt(args[2], 32)
+	id, err := strconv.ParseInt(args[2], 10, 32)
 	if err != nil {
 		return Reply{Aborted: true}
 	}
-	pageNo, err := commons.ParseInt(args[3], 32)
+	pageNo, err := strconv.ParseInt(args[3], 10, 32)
 	if err != nil {
 		return Reply{Aborted: true}
 	}

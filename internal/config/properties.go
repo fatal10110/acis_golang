@@ -14,8 +14,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/rs/zerolog"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // warnLog receives the missing-key and malformed-value warnings raised while
@@ -244,7 +242,7 @@ func (p *Properties) Bool(key string, def bool) bool {
 // Int returns an int property or def when key is missing.
 func (p *Properties) Int(key string, def int) (int, error) {
 	if value, ok := p.Lookup(key); ok {
-		n, err := commons.Atoi(value)
+		n, err := strconv.Atoi(value)
 		if err != nil {
 			return 0, fmt.Errorf("parse %s as int: %w", key, err)
 		}
@@ -263,7 +261,7 @@ func (p *Properties) OptionalInt(key string) (int, bool, error) {
 	if !ok {
 		return 0, false, nil
 	}
-	n, err := commons.Atoi(value)
+	n, err := strconv.Atoi(value)
 	if err != nil {
 		return 0, false, fmt.Errorf("parse %s as int: %w", key, err)
 	}
@@ -273,7 +271,7 @@ func (p *Properties) OptionalInt(key string) (int, bool, error) {
 // Int64 returns an int64 property or def when key is missing.
 func (p *Properties) Int64(key string, def int64) (int64, error) {
 	if value, ok := p.Lookup(key); ok {
-		n, err := commons.ParseInt(value, 64)
+		n, err := strconv.ParseInt(value, 10, 64)
 		if err != nil {
 			return 0, fmt.Errorf("parse %s as int64: %w", key, err)
 		}
@@ -325,7 +323,7 @@ func (p *Properties) Ints(key string, def []int) ([]int, error) {
 		parts := splitTrimTrailingEmpty(defaultDelimitersRE, value)
 		out := make([]int, len(parts))
 		for i, part := range parts {
-			n, err := commons.Atoi(part)
+			n, err := strconv.Atoi(part)
 			if err != nil {
 				return nil, fmt.Errorf("parse %s[%d] as int: %w", key, i, err)
 			}
@@ -343,7 +341,7 @@ func (p *Properties) Int64s(key string, def []int64) ([]int64, error) {
 		parts := splitTrimTrailingEmpty(defaultDelimitersRE, value)
 		out := make([]int64, len(parts))
 		for i, part := range parts {
-			n, err := commons.ParseInt(part, 64)
+			n, err := strconv.ParseInt(part, 10, 64)
 			if err != nil {
 				return nil, fmt.Errorf("parse %s[%d] as int64: %w", key, i, err)
 			}
@@ -413,7 +411,7 @@ func (p *Properties) intPairsSep(sep, key, def string, tolerant bool) ([]IntPair
 			}
 			return nil, err
 		}
-		first, err := commons.ParseInt(strings.TrimSpace(bounds[0]), 32)
+		first, err := strconv.ParseInt(strings.TrimSpace(bounds[0]), 10, 32)
 		if err != nil {
 			err = fmt.Errorf("parse %s[%d] first: %w", key, i, err)
 			if tolerant {
@@ -422,7 +420,7 @@ func (p *Properties) intPairsSep(sep, key, def string, tolerant bool) ([]IntPair
 			}
 			return nil, err
 		}
-		second, err := commons.ParseInt(strings.TrimSpace(bounds[1]), 32)
+		second, err := strconv.ParseInt(strings.TrimSpace(bounds[1]), 10, 32)
 		if err != nil {
 			err = fmt.Errorf("parse %s[%d] second: %w", key, i, err)
 			if tolerant {

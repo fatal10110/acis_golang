@@ -2,11 +2,10 @@ package zone
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
-
-	"github.com/fatal10110/acis_golang/internal/commons"
 )
 
 // TargetScope narrows which occupant families an effect zone works on.
@@ -121,11 +120,11 @@ func ParseSkillRefs(raw string) ([]SkillRef, error) {
 		if len(idLevel) != 2 {
 			return nil, fmt.Errorf("zone: malformed skill reference %q", part)
 		}
-		id, err := commons.Atoi(idLevel[0])
+		id, err := strconv.Atoi(idLevel[0])
 		if err != nil {
 			return nil, fmt.Errorf("zone: malformed skill reference %q: %w", part, err)
 		}
-		level, err := commons.Atoi(idLevel[1])
+		level, err := strconv.Atoi(idLevel[1])
 		if err != nil {
 			return nil, fmt.Errorf("zone: malformed skill reference %q: %w", part, err)
 		}

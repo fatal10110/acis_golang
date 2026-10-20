@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fatal10110/acis_golang/internal/commons"
 	"github.com/fatal10110/acis_golang/internal/gameserver/clan"
 	"github.com/fatal10110/acis_golang/internal/gameserver/model/actor/player"
 	"github.com/fatal10110/acis_golang/internal/gameserver/sevensigns"
@@ -118,7 +117,7 @@ func (f *Folk) residenceCommand(pages Pages, kind InstanceKind, rules ChatRules,
 // not parse.
 func chatVal(command string) int {
 	if arg, ok := commandChars(command, 5, -1); ok {
-		if n, err := commons.ParseInt(arg, 32); err == nil {
+		if n, err := strconv.ParseInt(arg, 10, 32); err == nil {
 			return int(n)
 		}
 	}
@@ -348,7 +347,7 @@ func splitTrailing(s, sep string) []string {
 // parse, reporting it malformed.
 func parseDoorIDs(tokens []string) (ids []int, malformed bool) {
 	for _, token := range tokens {
-		id, err := commons.ParseInt(token, 32)
+		id, err := strconv.ParseInt(token, 10, 32)
 		if err != nil {
 			return ids, true
 		}
@@ -476,7 +475,7 @@ func (f *Folk) mercenaryHire(pages Pages, r ResidenceTalk, command string, reply
 		reply.Outcome = BypassAborted
 		return reply
 	}
-	id, err := commons.ParseInt(strconv.Itoa(f.NpcID())+tokens[1], 32)
+	id, err := strconv.ParseInt(strconv.Itoa(f.NpcID())+tokens[1], 10, 32)
 	if err != nil {
 		reply.Outcome = BypassAborted
 		return reply
