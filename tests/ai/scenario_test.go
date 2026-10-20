@@ -134,6 +134,13 @@ var scenarioScripts = script.Catalog{
 	"script.ai.individual.Monster.WarriorBase.Warrior.RoyalRushRoomBossBasic.RoyalRushRoomBoss4":     warrior.RoyalRushRoomBoss4,
 	"script.ai.individual.Monster.WarriorBase.Warrior.TyrannoPrimeval.TyrannoPrimeval":               warrior.TyrannoPrimeval,
 
+	// The DD magic physical specials and the physical poisons.
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagicPhysicalSpecial.WarriorCastDDMagicPhysicalSpecial":                warrior.CastDDMagicPhysicalSpecial,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagicPhysicalSpecial.WarriorCastDDMagicPhysicalSpecialBuffAggressive":  warrior.CastDDMagicPhysicalSpecialBuffAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastEnchantPhysicalPoison":                  warrior.CastEnchantPhysicalPoison,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastEnchantPhysicalPoisonAggressive":        warrior.CastEnchantPhysicalPoisonAggressive,
+	"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastDDMagicEnchantPhysicalPoisonAggressive": warrior.CastDDMagicEnchantPhysicalPoisonAggressive,
+
 	// The MonsterBehavior chain.
 	"script.ai.individual.Monster.MonsterBehavior.MonsterBehavior":                              monsterbehavior.MonsterBehavior,
 	"script.ai.individual.Monster.MonsterBehavior.WizardBehavior.WizardBehavior":                monsterbehavior.WizardBehavior,

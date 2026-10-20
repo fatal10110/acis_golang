@@ -1,0 +1,21 @@
+# WarriorCastDDMagicEnchantPhysicalPoisonAggressive (21321) beside a Warrior of its clan, both far
+# from the character, every draw 0. Settled past 7 AI cycles and not attacking, told of the
+# character's hit on the Warrior from farther than 100, it wants its DD magic (4002) on the
+# character, which the hit's desire selection casts, and, through its parent's clan-attacked hook,
+# its first debuff (4554) on the character, each weight 1000000.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastEnchantPhysicalPoison
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastEnchantPhysicalPoisonAggressive
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastDDMagicEnchantPhysicalPoisonAggressive
+npc mage 21321 Monster 1500 100 0 clan poison_clan 600 skill DD_MAGIC 4002 8 skill DEBUFF1 4554 1
+npc guard 20001 Monster 1500 0 0 clan poison_clan 600
+
+tick x8
+hit guard 22
+  S MagicSkillUse caster=mage target=player skill=4002-8 hit=10571 reuse=21142 success=0
+  desires mage cast(player,4002,move)=1000000 cast(player,4554,move)=1000000 wander()=5

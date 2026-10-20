@@ -31,6 +31,13 @@ func aiIndividual5HandleOps() map[string]script.HandleOps {
 			"OnTimer":            {"NPC.HateList", "NPC.InCombat"},
 			"OnUseSkillFinished": {"NPC.InCombat"},
 		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.TyrannoPrimeval.TyrannoPrimevalWalker": {
+			"OnAttacked":         {"NPC.TopDesireTarget"},
+			"OnNoDesire":         {"NPC.InCombat"},
+			"OnSeeCreature":      {"NPC.InCombat"},
+			"OnTimer":            {"NPC.HateList", "NPC.InCombat"},
+			"OnUseSkillFinished": {"NPC.InCombat"},
+		},
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecial": {
 			"OnAttacked": {"NPC.TopDesireTarget"},
 			"OnClanDied": {"NPC.TopDesireTarget"},
@@ -42,6 +49,12 @@ func aiIndividual5HandleOps() map[string]script.HandleOps {
 		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorBerserkerPhysicalSpecialStoneAggressive": {
 			"OnAttacked": {"NPC.TopDesireTarget"},
 			"OnClanDied": {"NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastDDMagicPhysicalSpecial.WarriorCastDDMagicPhysicalSpecialAggressive": {
+			"OnSeeCreature": {"NPC.TopDesireTarget"},
+		},
+		"script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastEnchantRangePhysicalPoisonAggressive": {
+			"OnAttacked": {"NPC.MeetsHPMPDisabledConditions"},
 		},
 	}
 }

@@ -1,0 +1,17 @@
+# WarriorCastEnchantPhysicalPoisonAggressive (21316, its shipped skills, no debuffs), every draw 0.
+# It appears wanting both its buffs (4099, 4074) on itself, weight 1000000. A hit wants both again,
+# neither yet held, so each weighs 2000000, and on a draw under 33 its physical special (4073) on
+# the character; the hit's desire selection casts its first buff.
+character Hunter 20
+random always 0
+script script.ai.individual.DefaultNpc
+script script.ai.individual.Monster.MonsterAI
+script script.ai.individual.Monster.WarriorBase.WarriorBase
+script script.ai.individual.Monster.WarriorBase.Warrior.Warrior
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastEnchantPhysicalPoison
+script script.ai.individual.Monster.WarriorBase.Warrior.WarriorCastEnchantPhysicalPoison.WarriorCastEnchantPhysicalPoisonAggressive
+npc poison 21316 Monster 300 0 0 skill PHYSICAL_SPECIAL 4073 7 skill BUFF2 4074 2 skill BUFF1 4099 2
+
+hit poison 22
+  S MagicSkillUse caster=poison target=poison skill=4099-2 hit=10571 reuse=21142 success=0
+  desires poison attack(player)=275 cast(player,4073,move)=1000000 cast(poison,4074,move)=2000000 cast(poison,4099,move)=2000000
